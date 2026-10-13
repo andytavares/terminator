@@ -13,7 +13,7 @@ export interface MovedMark {
   expanded: boolean
 }
 
-interface GapView {
+export interface GapView {
   above: DiffLine[]
   hidden: number | null
   below: DiffLine[]
@@ -82,13 +82,24 @@ function unifiedItems(source: DiffItemSource, hunk: DiffHunk, hunkIndex: number)
   return items
 }
 
+function splitRowSides(row: SplitRow): { left: DiffLine | null; right: DiffLine | null } {
+  if (row.kind === 'context') return { left: row.line, right: row.line }
+  return { left: row.oldLine, right: row.newLine }
+}
+
+/** The moved block a split row's side shows, read by that side's line number. */
+function sideMark(source: DiffItemSource, line: DiffLine | null, side: Side): MovedMark | null {
+  if (!line) return null
+  const lineNum = side === 'LEFT' ? line.oldLineNumber : line.newLineNumber
+  return source.movedMark(lineNum ?? 0, side)
+}
+
 function splitItems(source: DiffItemSource, hunkIndex: number): DiffItem[] {
   const items: DiffItem[] = []
   source.splitRows[hunkIndex].forEach((row, rowIndex) => {
-    const left = (row.kind === 'context' ? row.line : row.oldLine) ?? null
-    const right = (row.kind === 'context' ? row.line : row.newLine) ?? null
-    const movedLeft = left ? source.movedMark(left.oldLineNumber ?? 0, 'LEFT') : null
-    const movedRight = right ? source.movedMark(right.newLineNumber ?? 0, 'RIGHT') : null
+    const { left, right } = splitRowSides(row)
+    const movedLeft = sideMark(source, left, 'LEFT')
+    const movedRight = sideMark(source, right, 'RIGHT')
     if (hiddenByMove(movedLeft) || hiddenByMove(movedRight)) return
     items.push({
       kind: 'split-row',

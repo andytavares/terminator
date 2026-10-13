@@ -21,6 +21,19 @@ import { channelRegistry } from './support/channels'
 
 const CONFLICT = '<<<<<<< HEAD\nours\n=======\ntheirs\n>>>>>>> feature'
 
+/** Invokes a merge-flow channel on run.sh's first block in `repo`. */
+async function invokeOnBlock(repo: string, channel: string, payload: Record<string, unknown>) {
+  const registry = channelRegistry()
+  registerMergeFlowHandlers(registry.register)
+  return registry.invoke(channel, { repoRoot: repo, blockId: 'run.sh#0', ...payload })
+}
+
+/** run.sh in `repo` is a new file, not inode `before`, and nothing else was left behind. */
+function expectReplacedWhole(repo: string, before: number) {
+  expect(statSync(join(repo, 'run.sh')).ino).not.toBe(before)
+  expect(readdirSync(repo)).toEqual(['run.sh'])
+}
+
 describe('merge flow writes resolved files whole', () => {
   let repo: string
   const file = () => join(repo, 'run.sh')
@@ -34,11 +47,8 @@ describe('merge flow writes resolved files whole', () => {
 
   afterEach(() => rmSync(repo, { recursive: true, force: true }))
 
-  async function invoke(channel: string, payload: Record<string, unknown>) {
-    const registry = channelRegistry()
-    registerMergeFlowHandlers(registry.register)
-    return registry.invoke(channel, { repoRoot: repo, blockId: 'run.sh#0', ...payload })
-  }
+  const invoke = (channel: string, payload: Record<string, unknown>) =>
+    invokeOnBlock(repo, channel, payload)
 
   it('replaces the file instead of truncating it, keeping its mode and leaving nothing behind', async () => {
     const before = statSync(file()).ino
@@ -51,10 +61,26 @@ describe('merge flow writes resolved files whole', () => {
 
     expect(result).toEqual({ success: true })
     expect(readFileSync(file(), 'utf8')).toBe('#!/bin/sh\nours\n')
-    expect(statSync(file()).ino).not.toBe(before)
     expect(statSync(file()).mode & 0o777).toBe(0o755)
-    expect(readdirSync(repo)).toEqual(['run.sh'])
+    expectReplacedWhole(repo, before)
   })
+})
+
+describe('merge flow writes resolved files whole — on undo', () => {
+  let repo: string
+  const file = () => join(repo, 'run.sh')
+
+  beforeEach(() => {
+    repo = mkdtempSync(join(tmpdir(), 'merge-atomic-'))
+    bindWorkspaceRoots(() => [repo])
+    writeFileSync(file(), `#!/bin/sh\n${CONFLICT}\n`)
+    chmodSync(file(), 0o755)
+  })
+
+  afterEach(() => rmSync(repo, { recursive: true, force: true }))
+
+  const invoke = (channel: string, payload: Record<string, unknown>) =>
+    invokeOnBlock(repo, channel, payload)
 
   it('undoing a decision replaces the file the same way', async () => {
     writeFileSync(file(), '#!/bin/sh\nours\n')
@@ -63,7 +89,6 @@ describe('merge flow writes resolved files whole', () => {
     await invoke('git:undo-resolve', { resolvedText: 'ours', originalConflictText: CONFLICT })
 
     expect(readFileSync(file(), 'utf8')).toBe(`#!/bin/sh\n${CONFLICT}\n`)
-    expect(statSync(file()).ino).not.toBe(before)
-    expect(readdirSync(repo)).toEqual(['run.sh'])
+    expectReplacedWhole(repo, before)
   })
 })

@@ -19,14 +19,58 @@ function renderTable(source: string, from = 0, view = makeView().view): HTMLElem
   return new TableWidget(source, parsed, from).toDOM(view)
 }
 
-describe('TableWidget', () => {
-  const SOURCE = [
-    '| Name | Notes | Count |',
-    '| :--- | :---: | ---: |',
-    '| apples | **fresh** | 3 |',
-    '| pears | `ripe` | 12 |',
-  ].join('\n')
+const SOURCE = [
+  '| Name | Notes | Count |',
+  '| :--- | :---: | ---: |',
+  '| apples | **fresh** | 3 |',
+  '| pears | `ripe` | 12 |',
+].join('\n')
 
+describe('TableWidget', tableWidgetTests)
+
+const EDIT_SOURCE = ['| Name | Count |', '| --- | --- |', '| apples | 3 |'].join('\n')
+
+function clickCell(selector: string, index: number, from = 0) {
+  const { view, dispatch, focus } = makeView()
+  const dom = renderTable(EDIT_SOURCE, from, view)
+  const cells = dom.querySelectorAll<HTMLElement>(selector)
+  cells[index].dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))
+  return { dispatch, focus }
+}
+
+// A replaced range cannot be clicked into, so without this the rendered table
+// would be uneditable — the caret could never get inside it.
+describe('TableWidget editing', tableWidgetEditingTests)
+
+describe('AlertHeaderWidget', () => {
+  it.each(ALERT_KINDS)('renders the %s label', (kind) => {
+    const dom = new AlertHeaderWidget(kind).toDOM()
+    expect(dom.querySelector('.notepad-alert__label')?.textContent?.toLowerCase()).toBe(kind)
+  })
+
+  it('carries the kind in its class so CSS can colour it', () => {
+    const dom = new AlertHeaderWidget('caution').toDOM()
+    expect(dom.className).toContain('notepad-alert__header--caution')
+  })
+
+  it('hides the decorative icon from assistive tech', () => {
+    const dom = new AlertHeaderWidget('note').toDOM()
+    expect(dom.querySelector('.notepad-alert__icon')?.getAttribute('aria-hidden')).toBe('true')
+  })
+
+  it('treats widgets of the same kind as equal', () => {
+    expect(new AlertHeaderWidget('tip').eq(new AlertHeaderWidget('tip'))).toBe(true)
+    expect(new AlertHeaderWidget('tip').eq(new AlertHeaderWidget('note'))).toBe(false)
+  })
+})
+
+function tableWidgetTests() {
+  describe('rendering', tableWidgetRenderingTests)
+  describe('cell content', tableWidgetCellContentTests)
+  describe('equality', tableWidgetEqualityTests)
+}
+
+function tableWidgetRenderingTests() {
   it('renders a real table element', () => {
     expect(renderTable(SOURCE).querySelector('table')).not.toBeNull()
   })
@@ -55,7 +99,9 @@ describe('TableWidget', () => {
     expect(ths[1].style.textAlign).toBe('center')
     expect(ths[2].style.textAlign).toBe('right')
   })
+}
 
+function tableWidgetCellContentTests() {
   it('renders inline markup inside cells rather than showing the markers', () => {
     const dom = renderTable(SOURCE)
     expect(dom.querySelector('tbody strong')?.textContent).toBe('fresh')
@@ -73,7 +119,9 @@ describe('TableWidget', () => {
     expect(dom.querySelector('img')).toBeNull()
     expect(dom.querySelector('tbody td')?.textContent).toBe('<img src=x>')
   })
+}
 
+function tableWidgetEqualityTests() {
   it('treats widgets with identical source and position as equal, so redraws are skipped', () => {
     const a = new TableWidget(SOURCE, parseTable(SOURCE)!, 0)
     const b = new TableWidget(SOURCE, parseTable(SOURCE)!, 0)
@@ -92,49 +140,45 @@ describe('TableWidget', () => {
     const b = new TableWidget(SOURCE, parseTable(SOURCE)!, 40)
     expect(a.eq(b)).toBe(false)
   })
-})
+}
 
-// A replaced range cannot be clicked into, so without this the rendered table
-// would be uneditable — the caret could never get inside it.
-describe('TableWidget editing', () => {
-  const SOURCE = ['| Name | Count |', '| --- | --- |', '| apples | 3 |'].join('\n')
+function tableWidgetEditingTests() {
+  describe('placing the caret', tableWidgetEditingPlacingCaretTests)
+  describe('focus and scrolling', tableWidgetEditingFocusScrollingTests)
+  describe('events', tableWidgetEditingEventsTests)
+}
 
-  function clickCell(selector: string, index: number, from = 0) {
-    const { view, dispatch, focus } = makeView()
-    const dom = renderTable(SOURCE, from, view)
-    const cells = dom.querySelectorAll<HTMLElement>(selector)
-    cells[index].dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))
-    return { dispatch, focus }
-  }
-
+function tableWidgetEditingPlacingCaretTests() {
   it('puts the caret in the clicked header cell', () => {
     const { dispatch } = clickCell('thead th', 0)
     expect(dispatch).toHaveBeenCalledWith(
-      expect.objectContaining({ selection: { anchor: SOURCE.indexOf('Name') } })
+      expect.objectContaining({ selection: { anchor: EDIT_SOURCE.indexOf('Name') } })
     )
   })
 
   it('puts the caret in the clicked body cell', () => {
     const { dispatch } = clickCell('tbody td', 0)
     expect(dispatch).toHaveBeenCalledWith(
-      expect.objectContaining({ selection: { anchor: SOURCE.indexOf('apples') } })
+      expect.objectContaining({ selection: { anchor: EDIT_SOURCE.indexOf('apples') } })
     )
   })
 
   it('distinguishes columns within a row', () => {
     const { dispatch } = clickCell('tbody td', 1)
     expect(dispatch).toHaveBeenCalledWith(
-      expect.objectContaining({ selection: { anchor: SOURCE.indexOf('3') } })
+      expect.objectContaining({ selection: { anchor: EDIT_SOURCE.indexOf('3') } })
     )
   })
 
   it('offsets the caret by the table position in the document', () => {
     const { dispatch } = clickCell('thead th', 1, 500)
     expect(dispatch).toHaveBeenCalledWith(
-      expect.objectContaining({ selection: { anchor: 500 + SOURCE.indexOf('Count') } })
+      expect.objectContaining({ selection: { anchor: 500 + EDIT_SOURCE.indexOf('Count') } })
     )
   })
+}
 
+function tableWidgetEditingFocusScrollingTests() {
   it('focuses the editor so the user can type straight away', () => {
     const { focus } = clickCell('tbody td', 0)
     expect(focus).toHaveBeenCalled()
@@ -147,44 +191,24 @@ describe('TableWidget editing', () => {
 
   it('clamps the caret to the document length', () => {
     const { view, dispatch } = makeView(5)
-    const dom = renderTable(SOURCE, 0, view)
+    const dom = renderTable(EDIT_SOURCE, 0, view)
     dom
       .querySelectorAll<HTMLElement>('tbody td')[1]
       .dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))
     expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ selection: { anchor: 5 } }))
   })
+}
 
+function tableWidgetEditingEventsTests() {
   it('prevents the default so the browser does not fight the caret placement', () => {
     const { view } = makeView()
-    const dom = renderTable(SOURCE, 0, view)
+    const dom = renderTable(EDIT_SOURCE, 0, view)
     const event = new MouseEvent('mousedown', { bubbles: true, cancelable: true })
     dom.querySelector('tbody td')!.dispatchEvent(event)
     expect(event.defaultPrevented).toBe(true)
   })
 
   it('advertises that cells are clickable', () => {
-    expect(renderTable(SOURCE).querySelector('table')?.getAttribute('title')).toMatch(/edit/i)
+    expect(renderTable(EDIT_SOURCE).querySelector('table')?.getAttribute('title')).toMatch(/edit/i)
   })
-})
-
-describe('AlertHeaderWidget', () => {
-  it.each(ALERT_KINDS)('renders the %s label', (kind) => {
-    const dom = new AlertHeaderWidget(kind).toDOM()
-    expect(dom.querySelector('.notepad-alert__label')?.textContent?.toLowerCase()).toBe(kind)
-  })
-
-  it('carries the kind in its class so CSS can colour it', () => {
-    const dom = new AlertHeaderWidget('caution').toDOM()
-    expect(dom.className).toContain('notepad-alert__header--caution')
-  })
-
-  it('hides the decorative icon from assistive tech', () => {
-    const dom = new AlertHeaderWidget('note').toDOM()
-    expect(dom.querySelector('.notepad-alert__icon')?.getAttribute('aria-hidden')).toBe('true')
-  })
-
-  it('treats widgets of the same kind as equal', () => {
-    expect(new AlertHeaderWidget('tip').eq(new AlertHeaderWidget('tip'))).toBe(true)
-    expect(new AlertHeaderWidget('tip').eq(new AlertHeaderWidget('note'))).toBe(false)
-  })
-})
+}

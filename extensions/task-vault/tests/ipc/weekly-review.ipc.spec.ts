@@ -161,7 +161,14 @@ describe('task-vault:review:get', () => {
   })
 })
 
-describe('task-vault:review:export', () => {
+describe('task-vault:review:export', taskVaultReviewExportTests)
+
+function taskVaultReviewExportTests() {
+  describe('writing', taskVaultReviewExportWritingTests)
+  describe('cancelling', taskVaultReviewExportCancellingTests)
+}
+
+function taskVaultReviewExportWritingTests() {
   it('writes markdown to the chosen path', async () => {
     const reviewId = await startReview()
     await invoke('task-vault:review:log', {
@@ -190,7 +197,9 @@ describe('task-vault:review:export', () => {
     const options = mockShowSaveDialog.mock.calls[0][0] as { defaultPath: string }
     expect(options.defaultPath).toMatch(/^weekly-review-\d{4}-\d{2}-\d{2}\.md$/)
   })
+}
 
+function taskVaultReviewExportCancellingTests() {
   it('writes nothing when the user cancels', async () => {
     const reviewId = await startReview()
     mockShowSaveDialog.mockResolvedValue({ canceled: true, filePath: undefined })
@@ -215,4 +224,4 @@ describe('task-vault:review:export', () => {
 
     expect(await invoke('task-vault:review:export', { reviewId })).toEqual({ error: 'EACCES' })
   })
-})
+}

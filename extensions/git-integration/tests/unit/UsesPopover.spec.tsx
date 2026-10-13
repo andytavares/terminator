@@ -49,7 +49,9 @@ describe('UsesPopover', () => {
     render(<UsesPopover uses={allRead} onPeekDefinition={vi.fn()} />)
     expect(screen.getByRole('button', { name: 'Uses 2' })).toBeTruthy()
   })
+})
 
+describe('UsesPopover — lists each symbol with its step and read state', () => {
   it('lists each symbol with its step and read state', async () => {
     render(<UsesPopover uses={USES} onPeekDefinition={vi.fn()} />)
     await userEvent.click(screen.getByRole('button', { name: 'Uses 2 · 1 unread' }))

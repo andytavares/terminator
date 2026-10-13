@@ -45,6 +45,14 @@ beforeEach(async () => {
   await applyNotepadSchema(db)
 })
 
+/** Invokes the handler registered for a folders channel, as the renderer would. */
+function invokeFolders(action: string, payload?: unknown): Promise<unknown> {
+  const handler = (ipcMain.handle as unknown as ReturnType<typeof vi.fn>).mock.calls.find(
+    ([c]) => c === `terminator.notepad:folders.${action}`
+  )![1] as (e: unknown, payload?: unknown) => Promise<unknown>
+  return handler({}, payload)
+}
+
 describe('createFolder', () => {
   it('creates a folder with the given name', async () => {
     const result = await createFolder(db, { name: 'Work' })
@@ -112,11 +120,19 @@ describe('renameFolder', () => {
   })
 })
 
-describe('deleteFolder', () => {
+describe('deleteFolder', deleteFolderTests)
+describe('moveItemsToFolder', moveItemsToFolderTests)
+describe('registerFoldersIpcHandlers', registerFoldersIpcHandlersTests)
+
+function deleteFolderTests() {
+  describe('notes', deleteFolderNotesTests)
+  describe('diagrams and unknown folders', deleteFolderDiagramsUnknownFoldersTests)
+}
+
+function deleteFolderNotesTests() {
   it('deletes a folder and nullifies folder_id on notes', async () => {
     const folderResult = await createFolder(db, { name: 'To Delete' })
     const { id: folderId } = (folderResult as { data: { id: string } }).data
-
     const noteResult = await createNote(db, { title: 'Note in folder' })
     const { id: noteId } = (noteResult as { data: { id: string } }).data
     await db.run('UPDATE notes SET folder_id=? WHERE id=?', [folderId, noteId])
@@ -132,11 +148,12 @@ describe('deleteFolder', () => {
     )
     expect(noteRow?.folder_id).toBeNull()
   })
+}
 
+function deleteFolderDiagramsUnknownFoldersTests() {
   it('deletes a folder and nullifies folder_id on diagrams', async () => {
     const folderResult = await createFolder(db, { name: 'Diagram folder' })
     const { id: folderId } = (folderResult as { data: { id: string } }).data
-
     const diagramResult = await createDiagram(db, { title: 'Diagram in folder' })
     const { id: diagramId } = (diagramResult as { data: { id: string } }).data
     await db.run('UPDATE diagrams SET folder_id=? WHERE id=?', [folderId, diagramId])
@@ -154,13 +171,18 @@ describe('deleteFolder', () => {
     const result = await deleteFolder(db, { id: 'nonexistent' })
     expect(result).toEqual({ error: 'FOLDER_NOT_FOUND' })
   })
-})
+}
 
-describe('moveItemsToFolder', () => {
+function moveItemsToFolderTests() {
+  describe('notes', moveItemsToFolderNotesTests)
+  describe('diagrams', moveItemsToFolderDiagramsTests)
+  describe('moving out', moveItemsToFolderMovingOutTests)
+}
+
+function moveItemsToFolderNotesTests() {
   it('moves a note into a folder', async () => {
     const folderResult = await createFolder(db, { name: 'Target' })
     const { id: folderId } = (folderResult as { data: { id: string } }).data
-
     const noteResult = await createNote(db, { title: 'My note' })
     const { id: noteId } = (noteResult as { data: { id: string } }).data
 
@@ -171,11 +193,12 @@ describe('moveItemsToFolder', () => {
     ])
     expect(row?.folder_id).toBe(folderId)
   })
+}
 
+function moveItemsToFolderDiagramsTests() {
   it('moves a diagram into a folder', async () => {
     const folderResult = await createFolder(db, { name: 'Diagrams folder' })
     const { id: folderId } = (folderResult as { data: { id: string } }).data
-
     const diagramResult = await createDiagram(db, { title: 'Flow' })
     const { id: diagramId } = (diagramResult as { data: { id: string } }).data
 
@@ -186,11 +209,12 @@ describe('moveItemsToFolder', () => {
     ])
     expect(row?.folder_id).toBe(folderId)
   })
+}
 
+function moveItemsToFolderMovingOutTests() {
   it('removes an item from a folder by passing folderId: null', async () => {
     const folderResult = await createFolder(db, { name: 'Temp' })
     const { id: folderId } = (folderResult as { data: { id: string } }).data
-
     const noteResult = await createNote(db, { title: 'Note' })
     const { id: noteId } = (noteResult as { data: { id: string } }).data
     await db.run('UPDATE notes SET folder_id=? WHERE id=?', [folderId, noteId])
@@ -213,69 +237,35 @@ describe('moveItemsToFolder', () => {
     })
     expect(result).toEqual({ error: 'FOLDER_NOT_FOUND' })
   })
-})
+}
 
-describe('registerFoldersIpcHandlers', () => {
+function registerFoldersIpcHandlersTests() {
   it('dispatches registered handlers to the folder functions', async () => {
     ;(ipcMain.handle as unknown as ReturnType<typeof vi.fn>).mockClear()
     const cleanup = registerFoldersIpcHandlers(mockApi, db)
-    const get = (ch: string) =>
-      (ipcMain.handle as unknown as ReturnType<typeof vi.fn>).mock.calls.find(
-        ([c]) => c === ch
-      )![1] as (e: unknown, payload?: unknown) => Promise<unknown>
-
-    const created = (await get('terminator.notepad:folders.create')({}, { name: 'Inbox' })) as {
-      data: { id: string }
-    }
+    const created = (await invokeFolders('create', { name: 'Inbox' })) as { data: { id: string } }
     expect(created.data.id).toBeTruthy()
-
-    const listed = (await get('terminator.notepad:folders.list')({})) as { data: unknown[] }
+    const id = created.data.id
+    const listed = (await invokeFolders('list')) as { data: unknown[] }
     expect(listed.data).toHaveLength(1)
-
-    const renamed = (await get('terminator.notepad:folders.rename')(
-      {},
-      { id: created.data.id, name: 'Later' }
-    )) as { data: unknown }
-    expect(renamed).toHaveProperty('data')
-
-    const moved = await get('terminator.notepad:folders.move')(
-      {},
-      { items: 'not-an-array', folderId: created.data.id }
-    )
-    expect(moved).toEqual({ error: 'VALIDATION_ERROR' })
-
-    const deleted = (await get('terminator.notepad:folders.delete')(
-      {},
-      { id: created.data.id }
-    )) as { data: unknown }
-    expect(deleted).toHaveProperty('data')
+    expect(await invokeFolders('rename', { id, name: 'Later' })).toHaveProperty('data')
+    expect(await invokeFolders('move', { items: 'not-an-array', folderId: id })).toEqual({
+      error: 'VALIDATION_ERROR',
+    })
+    expect(await invokeFolders('delete', { id })).toHaveProperty('data')
     cleanup()
   })
 
   it('registers and returns a cleanup function', () => {
     const cleanup = registerFoldersIpcHandlers(mockApi, db)
     expect(typeof cleanup).toBe('function')
-    expect(ipcMain.handle).toHaveBeenCalledWith(
-      'terminator.notepad:folders.create',
-      expect.any(Function)
-    )
-    expect(ipcMain.handle).toHaveBeenCalledWith(
-      'terminator.notepad:folders.list',
-      expect.any(Function)
-    )
-    expect(ipcMain.handle).toHaveBeenCalledWith(
-      'terminator.notepad:folders.rename',
-      expect.any(Function)
-    )
-    expect(ipcMain.handle).toHaveBeenCalledWith(
-      'terminator.notepad:folders.delete',
-      expect.any(Function)
-    )
-    expect(ipcMain.handle).toHaveBeenCalledWith(
-      'terminator.notepad:folders.move',
-      expect.any(Function)
-    )
+    for (const action of ['create', 'list', 'rename', 'delete', 'move']) {
+      expect(ipcMain.handle).toHaveBeenCalledWith(
+        `terminator.notepad:folders.${action}`,
+        expect.any(Function)
+      )
+    }
     cleanup()
     expect(ipcMain.removeHandler).toHaveBeenCalledWith('terminator.notepad:folders.create')
   })
-})
+}

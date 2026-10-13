@@ -129,7 +129,9 @@ describe('StagingArea — states', () => {
     expect(screen.getAllByText('No staged changes').length).toBeGreaterThan(0)
     expect(screen.getAllByText('No unstaged changes').length).toBeGreaterThan(0)
   })
+})
 
+describe('StagingArea — states — shows truncation banner when truncated is true', () => {
   it('shows truncation banner when truncated is true', () => {
     mockStore({
       status: { branch: 'main', files: [], truncated: true, hasConflicts: false },
@@ -151,7 +153,9 @@ describe('StagingArea — states', () => {
     expect(screen.getByText('staged.ts')).toBeTruthy()
     expect(screen.getByText('unstaged.ts')).toBeTruthy()
   })
+})
 
+describe('StagingArea — states — shows Unstage All button when files are staged', () => {
   it('shows Unstage All button when files are staged', () => {
     const files = [makeFile('modified', true, 'staged.ts')]
     mockStore({
@@ -188,7 +192,9 @@ describe('StagingArea — interactions', () => {
     fireEvent.click(screen.getByText('src/a.ts'))
     expect(onFileSelect).toHaveBeenCalledWith('src/a.ts', false)
   })
+})
 
+describe('StagingArea — interactions — calls git.stage and refreshes when unstaged checkbox is checked', () => {
   it('calls git.stage and refreshes when unstaged checkbox is checked', async () => {
     const files = [makeFile('modified', false, 'src/a.ts')]
     mockStore({
@@ -204,7 +210,9 @@ describe('StagingArea — interactions', () => {
     )
     expect(mockStatus).toHaveBeenCalled()
   })
+})
 
+describe('StagingArea — interactions — calls git.unstage when staged checkbox is unchecked', () => {
   it('calls git.unstage when staged checkbox is unchecked', async () => {
     const files = [makeFile('modified', true, 'src/b.ts')]
     mockStore({
@@ -219,7 +227,9 @@ describe('StagingArea — interactions', () => {
       expect(mockUnstage).toHaveBeenCalledWith({ repoRoot: '/repo', paths: ['src/b.ts'] })
     )
   })
+})
 
+describe('StagingArea — interactions — calls git.stage for all unstaged files when Stage All is clicked', () => {
   it('calls git.stage for all unstaged files when Stage All is clicked', async () => {
     const files = [makeFile('modified', false, 'a.ts'), makeFile('added', false, 'b.ts')]
     mockStore({
@@ -233,7 +243,9 @@ describe('StagingArea — interactions', () => {
       expect(mockStage).toHaveBeenCalledWith({ repoRoot: '/repo', paths: ['a.ts', 'b.ts'] })
     )
   })
+})
 
+describe('StagingArea — interactions — calls git.unstage for all staged files when Unstage All is clicked', () => {
   it('calls git.unstage for all staged files when Unstage All is clicked', async () => {
     const files = [makeFile('modified', true, 'a.ts'), makeFile('added', true, 'b.ts')]
     mockStore({
@@ -259,7 +271,9 @@ describe('StagingArea — interactions', () => {
     const checkbox = screen.getByRole('checkbox')
     expect(checkbox).toHaveProperty('disabled', true)
   })
+})
 
+describe('StagingArea — interactions — highlights selected file row', () => {
   it('highlights selected file row', () => {
     const files = [makeFile('modified', false, 'selected.ts')]
     mockStore({

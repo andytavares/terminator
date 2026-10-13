@@ -97,52 +97,7 @@ import {
 } from '../../src/editor/NoteEditor'
 import type { EditorView } from '@codemirror/view'
 
-describe('NoteEditor', () => {
-  it('renders the editor container div', () => {
-    const { container } = render(<NoteEditor initialDoc="# Test" onChange={vi.fn()} />)
-    expect(container.querySelector('.notepad-editor-cm')).toBeTruthy()
-  })
-
-  it('does not call onChange on initial mount', () => {
-    const onChange = vi.fn()
-    render(<NoteEditor initialDoc="hello" onChange={onChange} />)
-    expect(onChange).not.toHaveBeenCalled()
-  })
-
-  it('calls onAnchorsReady with a getter function', () => {
-    const onAnchorsReady = vi.fn()
-    render(<NoteEditor initialDoc="hello" onChange={vi.fn()} onAnchorsReady={onAnchorsReady} />)
-    expect(onAnchorsReady).toHaveBeenCalledWith(expect.any(Function))
-  })
-
-  // Source mode is expressed by configuring the live-preview compartment with
-  // nothing in it, so the raw markdown shows through.
-  it('configures the preview compartment with the plugin by default', () => {
-    compartmentOf.mockClear()
-    render(<NoteEditor initialDoc="# Test" onChange={vi.fn()} />)
-    expect(compartmentOf).toHaveBeenCalledWith({})
-  })
-
-  it('configures the preview compartment empty in source mode', () => {
-    compartmentOf.mockClear()
-    render(<NoteEditor initialDoc="# Test" onChange={vi.fn()} sourceMode />)
-    expect(compartmentOf).toHaveBeenCalledWith([])
-  })
-
-  it('reconfigures the compartment when the mode is switched on', () => {
-    const { rerender } = render(<NoteEditor initialDoc="# Test" onChange={vi.fn()} />)
-    compartmentReconfigure.mockClear()
-    rerender(<NoteEditor initialDoc="# Test" onChange={vi.fn()} sourceMode />)
-    expect(compartmentReconfigure).toHaveBeenCalledWith([])
-  })
-
-  it('reconfigures the compartment when the mode is switched back off', () => {
-    const { rerender } = render(<NoteEditor initialDoc="# Test" onChange={vi.fn()} sourceMode />)
-    compartmentReconfigure.mockClear()
-    rerender(<NoteEditor initialDoc="# Test" onChange={vi.fn()} />)
-    expect(compartmentReconfigure).toHaveBeenCalledWith({})
-  })
-})
+describe('NoteEditor', noteEditorTests)
 
 describe('applyAnchors', () => {
   it('calls view.dispatch with setAnchors effect', () => {
@@ -184,15 +139,74 @@ describe('scrollToAnchor', () => {
   })
 })
 
-describe('scrollToPosition', () => {
-  function viewWithDoc(length: number) {
-    return {
-      state: { doc: { length } },
-      dispatch: vi.fn(),
-      focus: vi.fn(),
-    } as unknown as EditorView
-  }
+function viewWithDoc(length: number) {
+  return {
+    state: { doc: { length } },
+    dispatch: vi.fn(),
+    focus: vi.fn(),
+  } as unknown as EditorView
+}
 
+describe('scrollToPosition', scrollToPositionTests)
+
+function noteEditorTests() {
+  describe('mounting', noteEditorMountingTests)
+  describe('default mode', noteEditorDefaultModeTests)
+  describe('switching mode', noteEditorSwitchingModeTests)
+}
+
+function noteEditorMountingTests() {
+  it('renders the editor container div', () => {
+    const { container } = render(<NoteEditor initialDoc="# Test" onChange={vi.fn()} />)
+    expect(container.querySelector('.notepad-editor-cm')).toBeTruthy()
+  })
+
+  it('does not call onChange on initial mount', () => {
+    const onChange = vi.fn()
+    render(<NoteEditor initialDoc="hello" onChange={onChange} />)
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('calls onAnchorsReady with a getter function', () => {
+    const onAnchorsReady = vi.fn()
+    render(<NoteEditor initialDoc="hello" onChange={vi.fn()} onAnchorsReady={onAnchorsReady} />)
+    expect(onAnchorsReady).toHaveBeenCalledWith(expect.any(Function))
+  })
+}
+
+function noteEditorDefaultModeTests() {
+  // Source mode is expressed by configuring the live-preview compartment with
+  // nothing in it, so the raw markdown shows through.
+  it('configures the preview compartment with the plugin by default', () => {
+    compartmentOf.mockClear()
+    render(<NoteEditor initialDoc="# Test" onChange={vi.fn()} />)
+    expect(compartmentOf).toHaveBeenCalledWith({})
+  })
+
+  it('configures the preview compartment empty in source mode', () => {
+    compartmentOf.mockClear()
+    render(<NoteEditor initialDoc="# Test" onChange={vi.fn()} sourceMode />)
+    expect(compartmentOf).toHaveBeenCalledWith([])
+  })
+}
+
+function noteEditorSwitchingModeTests() {
+  it('reconfigures the compartment when the mode is switched on', () => {
+    const { rerender } = render(<NoteEditor initialDoc="# Test" onChange={vi.fn()} />)
+    compartmentReconfigure.mockClear()
+    rerender(<NoteEditor initialDoc="# Test" onChange={vi.fn()} sourceMode />)
+    expect(compartmentReconfigure).toHaveBeenCalledWith([])
+  })
+
+  it('reconfigures the compartment when the mode is switched back off', () => {
+    const { rerender } = render(<NoteEditor initialDoc="# Test" onChange={vi.fn()} sourceMode />)
+    compartmentReconfigure.mockClear()
+    rerender(<NoteEditor initialDoc="# Test" onChange={vi.fn()} />)
+    expect(compartmentReconfigure).toHaveBeenCalledWith({})
+  })
+}
+
+function scrollToPositionTests() {
   it('puts the caret at the position and scrolls it to the top of the viewport', () => {
     const mockView = viewWithDoc(100)
     scrollToPosition(mockView, 42)
@@ -215,4 +229,4 @@ describe('scrollToPosition', () => {
   it('does nothing when view is null', () => {
     expect(() => scrollToPosition(null, 0)).not.toThrow()
   })
-})
+}

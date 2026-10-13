@@ -7,6 +7,7 @@ import { KanbanLaneEditor } from './KanbanLaneEditor'
 import { TaskDetailPanel } from './TaskDetailPanel'
 import { Button, Markdown } from '@terminator/extension-ui'
 import { openInBrowser } from '../utils/open-in-browser'
+import { useIndexReload } from './vault-hooks'
 
 interface KanbanTask {
   id: string
@@ -23,17 +24,61 @@ interface KanbanBoardProps {
   onConfigChange?: (config: KanbanConfig) => void
 }
 
+interface SwimlaneGroup {
+  key: string
+  label: string
+  tasks: KanbanTask[]
+}
+
+/** What every lane and card on the board shares: drag state, handlers and the selection. */
+interface Board {
+  dragOverLane: string | null
+  selectedTaskId: string | null
+  onDragOver: (e: React.DragEvent, laneId: string) => void
+  onDragLeave: () => void
+  onDrop: (e: React.DragEvent, laneId: string) => void
+  onDragStart: (e: React.DragEvent, taskId: string) => void
+  onDragEnd: () => void
+  onSelect: (task: KanbanTask) => void
+}
+
+interface LaneColumnProps {
+  lane: KanbanLane
+  tasks: KanbanTask[]
+  board: Board
+}
+
+interface SwimlaneProps {
+  group: SwimlaneGroup
+  lanes: KanbanLane[]
+  grouping: SwimlaneGrouping
+  board: Board
+}
+
+type KanbanTasksOutcome = { tasks: KanbanTask[] } | { error: string } | Record<string, never>
+
+interface ToolbarProps {
+  grouping: SwimlaneGrouping
+  onGrouping: (grouping: SwimlaneGrouping) => void
+  onEditLanes: () => void
+}
+
+interface BoardBodyProps {
+  data: ReturnType<typeof useKanbanData>
+  board: Board
+  selection: ReturnType<typeof useSelectedCard>
+}
+
+interface SelectedCard {
+  id: string
+  text: string
+}
+
 function laneForTask(task: KanbanTask, lanes: KanbanLane[]): string | null {
   for (const lane of lanes) {
     if (lane.taskStatuses.includes(task.status)) return lane.id
   }
   return null
-}
-
-interface SwimlaneGroup {
-  key: string
-  label: string
-  tasks: KanbanTask[]
 }
 
 function groupBySwimlane(tasks: KanbanTask[], grouping: SwimlaneGrouping): SwimlaneGroup[] {
@@ -58,39 +103,74 @@ function groupBySwimlane(tasks: KanbanTask[], grouping: SwimlaneGrouping): Swiml
   return groups
 }
 
-interface LaneColumnProps {
-  lane: KanbanLane
-  tasks: KanbanTask[]
-  isDragOver: boolean
-  selectedTaskId: string | null
-  onDragOver: (e: React.DragEvent) => void
-  onDragLeave: () => void
-  onDrop: (e: React.DragEvent, laneId: string) => void
-  onDragStart: (e: React.DragEvent, taskId: string) => void
-  onDragEnd: () => void
-  onSelect: (task: KanbanTask) => void
+function CardTags({ task }: { task: KanbanTask }): React.JSX.Element {
+  return (
+    <div className="tv-kanban__card-meta">
+      {task.project && (
+        <span className="tv-kanban__tag tv-kanban__tag--project">{`@${task.project}`}</span>
+      )}
+      {task.area && <span className="tv-kanban__tag tv-kanban__tag--area">{`#${task.area}`}</span>}
+      {task.dueDate && (
+        <span className="tv-kanban__tag tv-kanban__tag--due">{`due:${task.dueDate}`}</span>
+      )}
+    </div>
+  )
 }
 
-function LaneColumn({
-  lane,
-  tasks,
-  isDragOver,
-  selectedTaskId,
-  onDragOver,
-  onDragLeave,
-  onDrop,
-  onDragStart,
-  onDragEnd,
-  onSelect,
-}: LaneColumnProps) {
-  const didDragRef = useRef(false)
+/**
+ * A card. A click right after a drag does not select it (the flag resets a tick
+ * after the drag ends), and a link in the description opens itself instead.
+ */
+function KanbanCard({ task, board }: { task: KanbanTask; board: Board }): React.JSX.Element {
+  const selected = board.selectedTaskId === task.id
+  const gestures = useCardGestures(task, board)
+  return (
+    <div
+      draggable
+      className={`tv-kanban__card${selected ? ' tv-kanban__card--selected' : ''}`}
+      onDragStart={gestures.onDragStart}
+      onDragEnd={gestures.onDragEnd}
+      onClick={gestures.onClick}
+    >
+      <div className="tv-kanban__card-text">{task.text}</div>
+      {task.description && (
+        <Markdown fetchesNothing className="tv-kanban__card-desc" onOpenLink={openInBrowser}>
+          {task.description}
+        </Markdown>
+      )}
+      <CardTags task={task} />
+    </div>
+  )
+}
 
+function useCardGestures(task: KanbanTask, board: Board) {
+  const didDragRef = useRef(false)
+  return {
+    onDragStart: (e: React.DragEvent) => {
+      didDragRef.current = true
+      board.onDragStart(e, task.id)
+    },
+    onDragEnd: () => {
+      board.onDragEnd()
+      setTimeout(() => {
+        didDragRef.current = false
+      }, 0)
+    },
+    onClick: (e: React.MouseEvent) => {
+      if ((e.target as HTMLElement).closest('a')) return
+      if (!didDragRef.current) board.onSelect(task)
+    },
+  }
+}
+
+function LaneColumn({ lane, tasks, board }: LaneColumnProps) {
+  const isDragOver = board.dragOverLane === lane.id
   return (
     <div
       className={`tv-kanban__lane${isDragOver ? ' tv-kanban__lane--dragover' : ''}`}
-      onDragOver={onDragOver}
-      onDragLeave={onDragLeave}
-      onDrop={(e) => onDrop(e, lane.id)}
+      onDragOver={(e) => board.onDragOver(e, lane.id)}
+      onDragLeave={board.onDragLeave}
+      onDrop={(e) => board.onDrop(e, lane.id)}
     >
       <div className="tv-kanban__lane-header">
         <span className="tv-kanban__lane-title">{lane.label}</span>
@@ -98,45 +178,7 @@ function LaneColumn({
       </div>
       <div className="tv-kanban__lane-body">
         {tasks.map((task) => (
-          <div
-            key={task.id}
-            className={`tv-kanban__card${selectedTaskId === task.id ? ' tv-kanban__card--selected' : ''}`}
-            draggable
-            onDragStart={(e) => {
-              didDragRef.current = true
-              onDragStart(e, task.id)
-            }}
-            onDragEnd={() => {
-              onDragEnd()
-              // Reset flag after a tick so onClick doesn't fire
-              setTimeout(() => {
-                didDragRef.current = false
-              }, 0)
-            }}
-            onClick={(e) => {
-              // A link in the description opens itself; it does not select the card.
-              if ((e.target as HTMLElement).closest('a')) return
-              if (!didDragRef.current) onSelect(task)
-            }}
-          >
-            <div className="tv-kanban__card-text">{task.text}</div>
-            {task.description && (
-              <Markdown fetchesNothing className="tv-kanban__card-desc" onOpenLink={openInBrowser}>
-                {task.description}
-              </Markdown>
-            )}
-            <div className="tv-kanban__card-meta">
-              {task.project && (
-                <span className="tv-kanban__tag tv-kanban__tag--project">@{task.project}</span>
-              )}
-              {task.area && (
-                <span className="tv-kanban__tag tv-kanban__tag--area">#{task.area}</span>
-              )}
-              {task.dueDate && (
-                <span className="tv-kanban__tag tv-kanban__tag--due">due:{task.dueDate}</span>
-              )}
-            </div>
-          </div>
+          <KanbanCard key={task.id} task={task} board={board} />
         ))}
         {tasks.length === 0 && <div className="tv-kanban__lane-empty">—</div>}
       </div>
@@ -144,61 +186,24 @@ function LaneColumn({
   )
 }
 
-interface SwimlaneProps {
-  group: SwimlaneGroup
-  lanes: KanbanLane[]
-  grouping: SwimlaneGrouping
-  dragOverLane: string | null
-  selectedTaskId: string | null
-  onDragOver: (e: React.DragEvent, laneId: string) => void
-  onDragLeave: () => void
-  onDrop: (e: React.DragEvent, laneId: string) => void
-  onDragStart: (e: React.DragEvent, taskId: string) => void
-  onDragEnd: () => void
-  onSelect: (task: KanbanTask) => void
-}
-
-function Swimlane({
-  group,
-  lanes,
-  grouping,
-  dragOverLane,
-  selectedTaskId,
-  onDragOver,
-  onDragLeave,
-  onDrop,
-  onDragStart,
-  onDragEnd,
-  onSelect,
-}: SwimlaneProps) {
+function Swimlane(props: SwimlaneProps) {
+  const { group, lanes, grouping, board } = props
   return (
     <div className="tv-kanban__swimlane">
       {grouping !== 'none' && <div className="tv-kanban__swimlane-header">{group.label}</div>}
       <div className="tv-kanban__lanes">
-        {lanes.map((lane) => {
-          const laneTasks = group.tasks.filter((t) => laneForTask(t, lanes) === lane.id)
-          return (
-            <LaneColumn
-              key={lane.id}
-              lane={lane}
-              tasks={laneTasks}
-              isDragOver={dragOverLane === lane.id}
-              selectedTaskId={selectedTaskId}
-              onDragOver={(e) => onDragOver(e, lane.id)}
-              onDragLeave={onDragLeave}
-              onDrop={onDrop}
-              onDragStart={onDragStart}
-              onDragEnd={onDragEnd}
-              onSelect={onSelect}
-            />
-          )
-        })}
+        {lanes.map((lane) => (
+          <LaneColumn
+            key={lane.id}
+            lane={lane}
+            tasks={group.tasks.filter((t) => laneForTask(t, lanes) === lane.id)}
+            board={board}
+          />
+        ))}
       </div>
     </div>
   )
 }
-
-type KanbanTasksOutcome = { tasks: KanbanTask[] } | { error: string } | Record<string, never>
 
 async function fetchKanbanConfig(): Promise<KanbanConfig | null> {
   try {
@@ -213,202 +218,221 @@ async function fetchKanbanConfig(): Promise<KanbanConfig | null> {
 async function fetchKanbanTasks(): Promise<KanbanTasksOutcome> {
   try {
     const result = await window.electronAPI.extensionBridge.invoke('task-vault:kanban:list-tasks')
-    if (result && typeof result === 'object' && 'tasks' in result) {
-      return { tasks: (result as { tasks: KanbanTask[] }).tasks }
-    }
-    if (result && typeof result === 'object' && 'error' in result) {
-      return { error: (result as { error: string }).error }
-    }
+    if (!result || typeof result !== 'object') return {}
+    if ('tasks' in result) return { tasks: (result as { tasks: KanbanTask[] }).tasks }
+    if ('error' in result) return { error: (result as { error: string }).error }
     return {}
   } catch (err) {
     return { error: String(err) }
   }
 }
 
-export function KanbanBoard({ onConfigChange }: KanbanBoardProps) {
-  const [config, setConfig] = useState<KanbanConfig>(DEFAULT_KANBAN_CONFIG)
+/** The board's cards, reloaded when the index changes. */
+function useKanbanTasks() {
   const [tasks, setTasks] = useState<KanbanTask[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [showLaneEditor, setShowLaneEditor] = useState(false)
-  const [dragOverLane, setDragOverLane] = useState<string | null>(null)
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
-  const [selectedTaskText, setSelectedTaskText] = useState('')
-  const draggingTaskId = useRef<string | null>(null)
-
-  const { selectedContexts, setKanbanLanes, loadToday, tickCalendar } = useVaultStore()
-
-  const visibleTasks = useMemo(() => {
-    if (selectedContexts.length === 0) return tasks
-    return tasks.filter((t) => selectedContexts.includes(t.context ?? ''))
-  }, [tasks, selectedContexts])
-
-  function applyConfig(loaded: KanbanConfig | null) {
-    if (!loaded) return
-    setConfig(loaded)
-    setKanbanLanes(loaded.lanes)
-  }
-
   const applyTasks = useCallback((outcome: KanbanTasksOutcome) => {
     if ('tasks' in outcome) setTasks(outcome.tasks)
     else if ('error' in outcome) setError(outcome.error)
     setLoading(false)
   }, [])
-
   const loadTasks = useCallback(async () => {
     setLoading(true)
     setError(null)
     applyTasks(await fetchKanbanTasks())
   }, [applyTasks])
-
   useEffect(() => {
-    void fetchKanbanConfig().then(applyConfig)
     void fetchKanbanTasks().then(applyTasks)
   }, [applyTasks])
+  useIndexReload(() => void loadTasks(), [loadTasks])
+  return { tasks, loading, error, loadTasks }
+}
 
+/** The board's lanes and grouping, loaded once and saved on every change. */
+function useKanbanConfig(onConfigChange?: (config: KanbanConfig) => void) {
+  const [config, setConfig] = useState<KanbanConfig>(DEFAULT_KANBAN_CONFIG)
+  const { setKanbanLanes } = useVaultStore()
   useEffect(() => {
-    const unsub = window.electronAPI.extensionBridge.on('task-vault:push:index-updated', () => {
-      void loadTasks()
+    void fetchKanbanConfig().then((loaded) => {
+      if (!loaded) return
+      setConfig(loaded)
+      setKanbanLanes(loaded.lanes)
     })
-    return unsub
-  }, [loadTasks])
-
-  const saveConfig = useCallback(
-    async (newConfig: KanbanConfig) => {
-      setConfig(newConfig)
-      setKanbanLanes(newConfig.lanes)
-      onConfigChange?.(newConfig)
-      await window.electronAPI.extensionBridge.invoke('task-vault:kanban:save-config', newConfig)
-    },
-    [onConfigChange, setKanbanLanes]
-  )
-
-  const handleDragStart = (e: React.DragEvent, taskId: string) => {
-    draggingTaskId.current = taskId
-    e.dataTransfer.effectAllowed = 'move'
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  async function saveConfig(newConfig: KanbanConfig) {
+    setConfig(newConfig)
+    setKanbanLanes(newConfig.lanes)
+    onConfigChange?.(newConfig)
+    await window.electronAPI.extensionBridge.invoke('task-vault:kanban:save-config', newConfig)
   }
+  return { config, saveConfig }
+}
 
-  const handleDragOver = (e: React.DragEvent, laneId: string) => {
-    e.preventDefault()
-    e.dataTransfer.dropEffect = 'move'
-    setDragOverLane(laneId)
-  }
+/** The board's config and cards. */
+function useKanbanData(onConfigChange?: (config: KanbanConfig) => void) {
+  return { ...useKanbanConfig(onConfigChange), ...useKanbanTasks() }
+}
 
-  const handleDragLeave = () => {
-    setDragOverLane(null)
-  }
+/** Moves a card to the lane's first status; false when the lane maps no status. */
+async function moveToLane(lanes: KanbanLane[], laneId: string, taskId: string): Promise<boolean> {
+  const lane = lanes.find((l) => l.id === laneId)
+  if (!lane || lane.taskStatuses.length === 0) return false
+  await window.electronAPI.extensionBridge.invoke('task-vault:kanban:move-task', {
+    taskId,
+    toStatus: lane.taskStatuses[0],
+  })
+  return true
+}
 
-  const handleDragEnd = () => {
-    draggingTaskId.current = null
-    setDragOverLane(null)
-  }
-
-  const handleSelect = (task: KanbanTask) => {
-    if (task.id === selectedTaskId) {
-      setSelectedTaskId(null)
-      setSelectedTaskText('')
-    } else {
-      setSelectedTaskId(task.id)
-      setSelectedTaskText(task.text)
-    }
-  }
-
-  const handleDrop = async (e: React.DragEvent, laneId: string) => {
+/** Drag-and-drop between lanes: a drop moves the card to the lane's first status. */
+function useDragAndDrop(lanes: KanbanLane[], afterMove: () => Promise<void>) {
+  const [dragOverLane, setDragOverLane] = useState<string | null>(null)
+  const draggingTaskId = useRef<string | null>(null)
+  async function onDrop(e: React.DragEvent, laneId: string) {
     e.preventDefault()
     setDragOverLane(null)
     const taskId = draggingTaskId.current
     if (!taskId) return
     draggingTaskId.current = null
+    if (await moveToLane(lanes, laneId, taskId)) await afterMove()
+  }
+  return {
+    dragOverLane,
+    onDrop: (e: React.DragEvent, laneId: string) => void onDrop(e, laneId),
+    onDragStart: (e: React.DragEvent, taskId: string) => {
+      draggingTaskId.current = taskId
+      e.dataTransfer.effectAllowed = 'move'
+    },
+    onDragOver: (e: React.DragEvent, laneId: string) => {
+      e.preventDefault()
+      e.dataTransfer.dropEffect = 'move'
+      setDragOverLane(laneId)
+    },
+    onDragLeave: () => setDragOverLane(null),
+    onDragEnd: () => {
+      draggingTaskId.current = null
+      setDragOverLane(null)
+    },
+  }
+}
 
-    const lane = config.lanes.find((l) => l.id === laneId)
-    if (!lane || lane.taskStatuses.length === 0) return
-
-    const toStatus = lane.taskStatuses[0]
-    await window.electronAPI.extensionBridge.invoke('task-vault:kanban:move-task', {
-      taskId,
-      toStatus,
+/** The card shown in the detail panel; selecting it again closes the panel. */
+function useSelectedCard() {
+  const [selected, setSelected] = useState<SelectedCard | null>(null)
+  const onSelect = (task: KanbanTask) =>
+    setSelected((prev) => {
+      if (prev?.id === task.id) return null
+      return { id: task.id, text: task.text }
     })
-    await Promise.all([loadTasks(), loadToday()])
+  return { selected, onSelect, close: () => setSelected(null) }
+}
+
+const GROUPINGS: { value: SwimlaneGrouping; label: string }[] = [
+  { value: 'none', label: 'Off' },
+  { value: 'project', label: 'Project' },
+  { value: 'area', label: 'Area' },
+]
+
+function KanbanToolbar({ grouping, onGrouping, onEditLanes }: ToolbarProps): React.JSX.Element {
+  return (
+    <div className="tv-kanban__toolbar">
+      <div className="tv-kanban__swimlane-toggle">
+        <span className="tv-kanban__toolbar-label">Swimlanes:</span>
+        {GROUPINGS.map((g) => (
+          <Button
+            aria-pressed={grouping === g.value}
+            key={g.value}
+            variant={grouping === g.value ? 'primary' : 'ghost'}
+            size="sm"
+            onClick={() => onGrouping(g.value)}
+          >
+            {g.label}
+          </Button>
+        ))}
+      </div>
+      <Button variant="ghost" size="sm" icon={Settings} onClick={onEditLanes} title="Edit lanes">
+        Lanes
+      </Button>
+    </div>
+  )
+}
+
+/** The cards in the selected contexts, or all of them when none is selected. */
+function useVisibleTasks(tasks: KanbanTask[]): KanbanTask[] {
+  const { selectedContexts } = useVaultStore()
+  return useMemo(() => {
+    if (selectedContexts.length === 0) return tasks
+    return tasks.filter((t) => selectedContexts.includes(t.context ?? ''))
+  }, [tasks, selectedContexts])
+}
+
+function BoardBody({ data, board, selection }: BoardBodyProps): React.JSX.Element {
+  const { config } = data
+  const swimlanes = groupBySwimlane(useVisibleTasks(data.tasks), config.swimlaneGrouping)
+  return (
+    <div className="tv-kanban__body">
+      <div className="tv-kanban__board">
+        {swimlanes.map((group) => (
+          <Swimlane
+            key={group.key}
+            group={group}
+            lanes={config.lanes}
+            grouping={config.swimlaneGrouping}
+            board={board}
+          />
+        ))}
+      </div>
+      {selection.selected && (
+        <TaskDetailPanel
+          taskId={selection.selected.id}
+          taskText={selection.selected.text}
+          onClose={selection.close}
+        />
+      )}
+    </div>
+  )
+}
+
+/** Moving a card refreshes the board, today's log and the calendar. */
+function useBoard(data: ReturnType<typeof useKanbanData>) {
+  const { loadToday, tickCalendar } = useVaultStore()
+  const drag = useDragAndDrop(data.config.lanes, async () => {
+    await Promise.all([data.loadTasks(), loadToday()])
     tickCalendar()
+  })
+  const selection = useSelectedCard()
+  const board: Board = {
+    ...drag,
+    selectedTaskId: selection.selected?.id ?? null,
+    onSelect: selection.onSelect,
   }
+  return { board, selection }
+}
 
-  const swimlanes = groupBySwimlane(visibleTasks, config.swimlaneGrouping)
-
-  if (loading) {
-    return <div className="tv-kanban__loading">Loading…</div>
+export function KanbanBoard({ onConfigChange }: KanbanBoardProps) {
+  const data = useKanbanData(onConfigChange)
+  const { config, saveConfig } = data
+  const [showLaneEditor, setShowLaneEditor] = useState(false)
+  const { board, selection } = useBoard(data)
+  if (data.loading) return <div className="tv-kanban__loading">Loading…</div>
+  if (data.error) return <div className="tv-kanban__error">{data.error}</div>
+  const saveLanes = (lanes: KanbanLane[]) => {
+    void saveConfig({ ...config, lanes })
+    setShowLaneEditor(false)
   }
-
-  if (error) {
-    return <div className="tv-kanban__error">{error}</div>
-  }
-
   return (
     <div className="tv-kanban">
-      <div className="tv-kanban__toolbar">
-        <div className="tv-kanban__swimlane-toggle">
-          <span className="tv-kanban__toolbar-label">Swimlanes:</span>
-          {(['none', 'project', 'area'] as SwimlaneGrouping[]).map((g) => (
-            <Button
-              key={g}
-              variant={config.swimlaneGrouping === g ? 'primary' : 'ghost'}
-              size="sm"
-              aria-pressed={config.swimlaneGrouping === g}
-              onClick={() => void saveConfig({ ...config, swimlaneGrouping: g })}
-            >
-              {g === 'none' ? 'Off' : g === 'project' ? 'Project' : 'Area'}
-            </Button>
-          ))}
-        </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          icon={Settings}
-          onClick={() => setShowLaneEditor(true)}
-          title="Edit lanes"
-        >
-          Lanes
-        </Button>
-      </div>
-
-      <div className="tv-kanban__body">
-        <div className="tv-kanban__board">
-          {swimlanes.map((group) => (
-            <Swimlane
-              key={group.key}
-              group={group}
-              lanes={config.lanes}
-              grouping={config.swimlaneGrouping}
-              dragOverLane={dragOverLane}
-              selectedTaskId={selectedTaskId}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-              onDragStart={handleDragStart}
-              onDragEnd={handleDragEnd}
-              onSelect={handleSelect}
-            />
-          ))}
-        </div>
-
-        {selectedTaskId && (
-          <TaskDetailPanel
-            taskId={selectedTaskId}
-            taskText={selectedTaskText}
-            onClose={() => {
-              setSelectedTaskId(null)
-              setSelectedTaskText('')
-            }}
-          />
-        )}
-      </div>
-
+      <KanbanToolbar
+        grouping={config.swimlaneGrouping}
+        onGrouping={(g) => void saveConfig({ ...config, swimlaneGrouping: g })}
+        onEditLanes={() => setShowLaneEditor(true)}
+      />
+      <BoardBody data={data} board={board} selection={selection} />
       {showLaneEditor && (
         <KanbanLaneEditor
           lanes={config.lanes}
-          onSave={(lanes) => {
-            void saveConfig({ ...config, lanes })
-            setShowLaneEditor(false)
-          }}
+          onSave={saveLanes}
           onClose={() => setShowLaneEditor(false)}
         />
       )}

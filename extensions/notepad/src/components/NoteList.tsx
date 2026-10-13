@@ -4,29 +4,40 @@ import {
   ChevronDown,
   ChevronRight,
   Download,
-  Folder,
-  LayoutTemplate,
+  Folder as FolderIcon,
   Plus,
   Tag as TagIcon,
   X,
 } from 'lucide-react'
-import {
-  Button,
-  ConfirmDialog,
-  Dialog,
-  RelativeTime,
-  useDismissible,
-} from '@terminator/extension-ui'
+import { Button, ConfirmDialog, useDismissible } from '@terminator/extension-ui'
 import { loadLibrary, useNotesStore } from '../stores/notes.store'
 import { useFilterStore } from '../stores/filter.store'
 import { EmptyState } from './EmptyState'
-import type { NoteListItem, DiagramListItem, SearchResult, Tag } from '../db/types'
+import { ItemEditModal, ItemRow, type DragProps, type EditModalState } from './NoteListItems'
+import {
+  activeTagNamesOf,
+  applyDrop,
+  buildListModel,
+  deleteFolder,
+  deleteForGood,
+  folderIdOf,
+  itemsInFolder,
+  moveToFolder,
+  noResultsText,
+  planDrop,
+  renameFolder,
+  tagsInUse,
+  toggleArchived,
+  type DropTarget,
+  type ItemRef,
+  type ListModel,
+  type MixedItem,
+} from './noteListModel'
+import type { Folder, SearchResult, Tag } from '../db/types'
 
-// ── Context menu ──────────────────────────────────────────────────
-
+/** The item a context menu was opened on, and where. */
 interface ContextMenuState {
-  itemId: string
-  itemType: 'note' | 'diagram'
+  item: ItemRef
   title: string
   tags: string[]
   isArchived: boolean
@@ -42,343 +53,74 @@ interface FolderContextMenuState {
   y: number
 }
 
-interface EditModalState {
-  itemId: string
-  itemType: 'note' | 'diagram'
-  title: string
-  tags: string[]
+/** The list's menus, dialogs and folder state. */
+type ListUi = ReturnType<typeof useListUi>
+
+type ListDrag = ReturnType<typeof useListDrag>
+
+/** What the list body needs to render its items. */
+interface ListView {
+  model: ListModel
+  ui: ListUi
+  drag: ListDrag
+  /** Rows can be dragged only while the list is not a text-search result. */
+  canDrag: boolean
 }
 
-function TagChipInput({
-  tags,
-  onChange,
-}: {
-  tags: string[]
-  onChange: (tags: string[]) => void
-}): React.JSX.Element {
-  const [inputVal, setInputVal] = useState('')
-  const inputRef = useRef<HTMLInputElement>(null)
+interface FolderSectionProps {
+  folder: Folder
+  view: ListView
+}
 
-  function addTag(raw: string) {
-    const trimmed = raw.trim().toLowerCase().replace(/\s+/g, '-')
-    if (trimmed && !tags.includes(trimmed)) {
-      onChange([...tags, trimmed])
-    }
-    setInputVal('')
-  }
+interface TagFilterProps {
+  tags: Tag[]
+}
 
-  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === 'Enter' || e.key === ',') {
-      e.preventDefault()
-      addTag(inputVal)
-    } else if (e.key === 'Backspace' && inputVal === '' && tags.length > 0) {
-      onChange(tags.slice(0, -1))
-    }
-  }
+interface MenuProps {
+  ui: ListUi
+  menuRef: React.RefObject<HTMLDivElement>
+}
+
+type DragState = ReturnType<typeof useDragState>
+
+interface RowDragContext {
+  model: ListModel
+  state: DragState
+}
+
+interface MenuItemProps {
+  onClick: () => void
+  danger?: boolean
+  children: React.ReactNode
+}
+
+export function NoteList(): React.JSX.Element {
+  const { notes, diagrams } = useNotesStore()
+  const { searchQuery, activeTagIds } = useFilterStore()
+  const searchResults = useSearchResults(searchQuery)
+  const tags = useMemo(() => tagsInUse(notes, diagrams), [notes, diagrams])
+  const activeTagNames = activeTagNamesOf(activeTagIds, tags)
+  const model = buildListModel(notes, diagrams, { searchResults, activeTagNames, searchQuery })
+  const ui = useListUi()
+  const drag = useListDrag(model)
+  const view = { model, ui, drag, canDrag: searchResults === null }
 
   return (
-    <div className="notepad-tag-chip-input" onClick={() => inputRef.current?.focus()}>
-      {tags.map((tag) => (
-        <span key={tag} className="notepad-tag-chip-input__chip">
-          {tag}
-          <button
-            type="button"
-            className="notepad-tag-chip-input__remove"
-            onClick={(e) => {
-              e.stopPropagation()
-              onChange(tags.filter((t) => t !== tag))
-            }}
-            aria-label={`Remove tag ${tag}`}
-          >
-            <X className="tm-icon-sm" />
-          </button>
-        </span>
-      ))}
-      <input
-        ref={inputRef}
-        className="notepad-tag-chip-input__field"
-        placeholder={tags.length === 0 ? 'Add tags…' : ''}
-        value={inputVal}
-        onChange={(e) => setInputVal(e.target.value)}
-        onKeyDown={handleKeyDown}
-        onBlur={() => {
-          if (inputVal.trim()) addTag(inputVal)
-        }}
-      />
+    <div className="notepad-note-list">
+      <SearchBox />
+      {tags.length !== 0 && <TagFilter tags={tags} />}
+      <ListBody view={view} activeTagNames={activeTagNames} />
+      <ListFooter />
+      <ListOverlays ui={ui} />
     </div>
   )
 }
 
-function ItemEditModal({
-  state,
-  onClose,
-  onSaved,
-}: {
-  state: EditModalState
-  onClose: () => void
-  onSaved: () => void
-}): React.JSX.Element {
-  const [title, setTitle] = useState(state.title)
-  const [tags, setTags] = useState(state.tags)
-  const [saving, setSaving] = useState(false)
-
-  async function handleSave() {
-    if (saving) return
-    setSaving(true)
-    try {
-      if (state.itemType === 'diagram') {
-        await window.electronAPI.extensionBridge.invoke('terminator.notepad:diagrams.autosave', {
-          id: state.itemId,
-          title: title.trim() || 'Untitled diagram',
-          tags,
-        })
-      } else {
-        const noteResult = await window.electronAPI.extensionBridge.invoke(
-          'terminator.notepad:notes.get',
-          { id: state.itemId }
-        )
-        const body = (noteResult as { data?: { body: string } }).data?.body ?? ''
-        await window.electronAPI.extensionBridge.invoke('terminator.notepad:notes.autosave', {
-          id: state.itemId,
-          title: title.trim() || 'Untitled note',
-          body,
-          tags,
-          // Editing only the tags leaves a derived title deriving.
-          titleSetByHand: title.trim() !== state.title,
-        })
-      }
-      onSaved()
-      onClose()
-    } catch (err) {
-      console.error('[notepad] edit item failed', err)
-      setSaving(false)
-    }
-  }
-
-  return (
-    <Dialog
-      title={state.itemType === 'diagram' ? 'Edit diagram' : 'Edit note'}
-      onDismiss={onClose}
-      actions={[
-        { label: 'Cancel', onSelect: onClose, disabled: saving },
-        {
-          label: saving ? 'Saving…' : 'Save',
-          tone: 'primary',
-          submit: true,
-          shortcut: '↵',
-          disabled: saving,
-          onSelect: handleSave,
-        },
-      ]}
-    >
-      <div className="notepad-edit-fields">
-        <input
-          autoFocus
-          className="notepad-input"
-          placeholder="Title"
-          aria-label="Title"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-        />
-        <TagChipInput tags={tags} onChange={setTags} />
-      </div>
-    </Dialog>
-  )
-}
-
-// ── Drag helpers ─────────────────────────────────────────────────
-
-interface DragProps {
-  draggable: boolean
-  dragOverPosition: 'before' | 'after' | null
-  onDragStart: (e: React.DragEvent) => void
-  onDragOver: (e: React.DragEvent) => void
-  onDragLeave: () => void
-  onDrop: (e: React.DragEvent) => void
-  onDragEnd: () => void
-}
-
-// ── Note row ──────────────────────────────────────────────────────
-
-function NoteRow({
-  note,
-  onContextMenu,
-  dimmed,
-  dragProps,
-}: {
-  note: NoteListItem | SearchResult
-  onContextMenu: (e: React.MouseEvent, note: NoteListItem | SearchResult) => void
-  dimmed?: boolean
-  dragProps?: DragProps
-}): React.JSX.Element {
-  const { selectedNoteId, setSelected } = useNotesStore()
-  const id = note.id
-  const isSelected = selectedNoteId === id
-  const title = note.title
-
-  const tagList = note.tags ?? []
-  const dragOverClass =
-    dragProps?.dragOverPosition === 'before'
-      ? ' notepad-note-row--drag-over-before'
-      : dragProps?.dragOverPosition === 'after'
-        ? ' notepad-note-row--drag-over-after'
-        : ''
-
-  return (
-    <button
-      className={`notepad-note-row${isSelected ? ' notepad-note-row--selected' : ''}${dimmed ? ' notepad-note-row--dimmed' : ''}${dragOverClass}`}
-      draggable={dragProps?.draggable}
-      onClick={() => setSelected(id)}
-      onDoubleClick={() => {
-        window.electronAPI.extensionBridge
-          .invoke('terminator.notepad:notes.openWindow', { id })
-          .catch(console.error)
-      }}
-      onContextMenu={(e) => {
-        e.preventDefault()
-        onContextMenu(e, note)
-      }}
-      onDragStart={dragProps?.onDragStart}
-      onDragOver={dragProps?.onDragOver}
-      onDragLeave={dragProps?.onDragLeave}
-      onDrop={dragProps?.onDrop}
-      onDragEnd={dragProps?.onDragEnd}
-      aria-selected={isSelected}
-    >
-      <div className="notepad-note-row__title">{title}</div>
-      <div className="notepad-note-row__meta-line">
-        <span className="notepad-note-row__time">
-          <RelativeTime value={note.updatedAt} />
-        </span>
-        {tagList.length > 0 && (
-          <>
-            <span className="notepad-note-row__dot">·</span>
-            <span className="notepad-note-row__tags-inline">
-              {tagList
-                .slice(0, 3)
-                .map((t) => `#${t}`)
-                .join(' ')}
-            </span>
-          </>
-        )}
-      </div>
-    </button>
-  )
-}
-
-// ── DiagramRow ───────────────────────────────────────────────────
-
-function DiagramRow({
-  diagram,
-  onContextMenu,
-  dimmed,
-  dragProps,
-}: {
-  diagram: DiagramListItem
-  onContextMenu: (e: React.MouseEvent, diagram: DiagramListItem) => void
-  dimmed?: boolean
-  dragProps?: DragProps
-}): React.JSX.Element {
-  const { selectedDiagramId, setSelectedDiagram } = useNotesStore()
-  const isSelected = selectedDiagramId === diagram.id
-  const dragOverClass =
-    dragProps?.dragOverPosition === 'before'
-      ? ' notepad-note-row--drag-over-before'
-      : dragProps?.dragOverPosition === 'after'
-        ? ' notepad-note-row--drag-over-after'
-        : ''
-
-  return (
-    <button
-      className={`notepad-note-row notepad-note-row--diagram${isSelected ? ' notepad-note-row--selected' : ''}${dimmed ? ' notepad-note-row--dimmed' : ''}${dragOverClass}`}
-      draggable={dragProps?.draggable}
-      onClick={() => setSelectedDiagram(diagram.id)}
-      onDoubleClick={() => {
-        window.electronAPI.extensionBridge
-          .invoke('terminator.notepad:diagrams.openWindow', { id: diagram.id })
-          .catch(console.error)
-      }}
-      onContextMenu={(e) => {
-        e.preventDefault()
-        onContextMenu(e, diagram)
-      }}
-      onDragStart={dragProps?.onDragStart}
-      onDragOver={dragProps?.onDragOver}
-      onDragLeave={dragProps?.onDragLeave}
-      onDrop={dragProps?.onDrop}
-      onDragEnd={dragProps?.onDragEnd}
-      aria-selected={isSelected}
-    >
-      <div className="notepad-note-row__title">
-        <LayoutTemplate className="notepad-note-row__diagram-icon tm-icon-sm" />
-        {diagram.title}
-      </div>
-      <div className="notepad-note-row__meta-line">
-        <span className="notepad-note-row__time">
-          <RelativeTime value={diagram.updatedAt} />
-        </span>
-        {diagram.tags && diagram.tags.length > 0 && (
-          <>
-            <span className="notepad-note-row__dot">·</span>
-            <span className="notepad-note-row__tags-inline">
-              {diagram.tags
-                .slice(0, 3)
-                .map((t) => `#${t}`)
-                .join(' ')}
-            </span>
-          </>
-        )}
-      </div>
-    </button>
-  )
-}
-
-// ── NoteList ──────────────────────────────────────────────────────
-
-type ItemRef = { id: string; type: 'note' | 'diagram' }
-
-/** Whether the pointer is over the top half of the row, which drops above it. */
-function inTopHalf(e: React.DragEvent): boolean {
-  const rect = e.currentTarget.getBoundingClientRect()
-  return e.clientY < rect.top + rect.height / 2
-}
-
 /**
- * The group's order with the dragged item put before or after the target,
- * or null when the target is not in the group.
+ * Text search runs over IPC (tags are filtered client-side). A newer query
+ * supersedes a pending one; clearing the query drops the results at once.
  */
-function orderAfterDrop(
-  group: ItemRef[],
-  dragged: ItemRef,
-  target: { id: string; before: boolean }
-): ItemRef[] | null {
-  if (!group.some((item) => item.id === target.id)) return null
-  const order = group.filter((item) => item.id !== dragged.id)
-  const at = order.findIndex((item) => item.id === target.id)
-  order.splice(target.before ? at : at + 1, 0, dragged)
-  return order
-}
-
-/** Saves a dropped order and, when the item changed folder, its new folder. */
-function saveDrop(
-  order: ItemRef[],
-  moved: ItemRef,
-  toFolder: string | null | undefined
-): Promise<unknown> {
-  const invoke = (channel: string, payload: unknown) =>
-    window.electronAPI.extensionBridge.invoke(channel, payload)
-  const saves = [invoke('terminator.notepad:notes.reorder', { items: order })]
-  if (toFolder !== undefined) {
-    saves.push(invoke('terminator.notepad:folders.move', { items: [moved], folderId: toFolder }))
-  }
-  return Promise.all(saves)
-}
-
-export function NoteList(): React.JSX.Element {
-  const { notes, diagrams, folders, selectedNoteId, setSelected, setShowQuickCreate } =
-    useNotesStore()
-  const { searchQuery, activeTagIds, setQuery, toggleTag, clearTags } = useFilterStore()
-
+function useSearchResults(searchQuery: string): SearchResult[] | null {
   const [searchResults, setSearchResults] = useState<SearchResult[] | null>(null)
   const [resultsQuery, setResultsQuery] = useState(searchQuery)
   if (resultsQuery !== searchQuery) {
@@ -386,742 +128,595 @@ export function NoteList(): React.JSX.Element {
     if (!searchQuery) setSearchResults(null)
   }
   const searchGenRef = useRef(0)
-  const [tagDropdownOpen, setTagDropdownOpen] = useState(false)
-  const tagDropdownRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const gen = ++searchGenRef.current
+    /* v8 ignore next */
+    if (!searchQuery) return
+    void window.electronAPI.extensionBridge
+      .invoke('terminator.notepad:search.query', { query: searchQuery, includeArchived: true })
+      .then((result) => {
+        if (gen !== searchGenRef.current) return
+        const data = (result as { data?: SearchResult[] }).data
+        if (data) setSearchResults(data)
+      })
+  }, [searchQuery])
+
+  return searchResults
+}
+
+function useListUi() {
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
   const [folderContextMenu, setFolderContextMenu] = useState<FolderContextMenuState | null>(null)
-  const contextMenuRef = useRef<HTMLDivElement>(null)
   const [editModal, setEditModal] = useState<EditModalState | null>(null)
   const [archivedExpanded, setArchivedExpanded] = useState(false)
   const [collapsedFolderIds, setCollapsedFolderIds] = useState<Set<string>>(new Set())
-  const [folderRenameState, setFolderRenameState] = useState<{ id: string; name: string } | null>(
-    null
-  )
+  const [renamingFolderId, setRenamingFolderId] = useState<string | null>(null)
   const [folderDeletePending, setFolderDeletePending] = useState<string | null>(null)
 
-  // Drag-and-drop state
-  const [dragId, setDragId] = useState<string | null>(null)
-  const [dragType, setDragType] = useState<'note' | 'diagram' | null>(null)
-  const [dropTarget, setDropTarget] = useState<{ id: string; before: boolean } | null>(null)
+  const toggleFolder = (id: string, collapsed?: boolean) =>
+    setCollapsedFolderIds((prev) => {
+      const next = new Set(prev)
+      if (collapsed ?? !next.has(id)) next.add(id)
+      else next.delete(id)
+      return next
+    })
+  return {
+    ...{ contextMenu, setContextMenu, folderContextMenu, setFolderContextMenu },
+    ...{ editModal, setEditModal, archivedExpanded, setArchivedExpanded },
+    ...{ collapsedFolderIds, toggleFolder, renamingFolderId, setRenamingFolderId },
+    ...{ folderDeletePending, setFolderDeletePending },
+  }
+}
+
+function contextMenuFor(e: React.MouseEvent, entry: MixedItem): ContextMenuState {
+  const { item } = entry
+  return {
+    item: { id: item.id, type: entry.kind },
+    title: item.title,
+    tags: item.tags ?? [],
+    isArchived: !!item.archivedAt,
+    folderId: folderIdOf(entry),
+    x: e.clientX,
+    y: e.clientY,
+  }
+}
+
+// ── Drag and drop ─────────────────────────────────────────────────
+
+/** The dragged item and the two kinds of drop target. */
+function useDragState() {
+  const [dragged, setDragged] = useState<ItemRef | null>(null)
+  const [dropTarget, setDropTarget] = useState<DropTarget | null>(null)
   const [folderDropTarget, setFolderDropTarget] = useState<string | null>(null)
+  const endDrag = () => {
+    setDragged(null)
+    setDropTarget(null)
+    setFolderDropTarget(null)
+  }
+  return {
+    ...{ dragged, setDragged, dropTarget, setDropTarget },
+    ...{ folderDropTarget, setFolderDropTarget, endDrag },
+  }
+}
 
-  const tags = useMemo<Tag[]>(() => {
-    const noteCounts = new Map<string, number>()
-    const allTagSources = [...notes.flatMap((n) => n.tags), ...diagrams.flatMap((d) => d.tags)]
-    for (const name of allTagSources) noteCounts.set(name, (noteCounts.get(name) ?? 0) + 1)
-    return Array.from(noteCounts, ([name, noteCount]) => ({ id: `local:${name}`, name, noteCount }))
-  }, [notes, diagrams])
+/**
+ * Reordering by dropping beside an item, moving into a folder by dropping on
+ * its header, and out of one by dropping on the list. Rows and headers stop a
+ * dragover once handled: the list behind clears every drop target on dragover.
+ */
+function useListDrag(model: ListModel) {
+  const state = useDragState()
+  return {
+    state,
+    rowDragProps: (item: ItemRef, canDrag: boolean) =>
+      rowDragProps(item, canDrag, { model, state }),
+    folderDropProps: (folderId: string) => folderDropProps(folderId, state),
+    listDropHandlers: listDropHandlers(model, state),
+  }
+}
 
-  // The ref wraps the trigger too, so clicking it to close does not reopen.
+/** Moves the dragged item into a folder (or the root, with null), then ends the drag. */
+function dropInto(state: DragState, folderId: string | null): void {
+  const item = state.dragged
+  state.endDrag()
+  if (item) moveToFolder(item, folderId).catch(console.error)
+}
+
+function dragOverPosition(target: DropTarget | null, id: string): DragProps['dragOverPosition'] {
+  if (!target || target.id !== id) return null
+  if (target.before) return 'before'
+  return 'after'
+}
+
+function rowDragProps(item: ItemRef, canDrag: boolean, ctx: RowDragContext) {
+  const { state } = ctx
+  if (!canDrag) return undefined
+  const props: DragProps = {
+    draggable: canDrag,
+    dragOverPosition: dragOverPosition(state.dropTarget, item.id),
+    onDragStart(e) {
+      state.setDragged(item)
+      e.dataTransfer.effectAllowed = 'move'
+    },
+    onDragOver: (e) => markDropBeside(e, item, state),
+    onDragLeave: () => state.setDropTarget((prev) => (prev?.id === item.id ? null : prev)),
+    onDrop: (e) => dropBeside(e, ctx),
+    onDragEnd: state.endDrag,
+  }
+  return props
+}
+
+/** Marks the drop as before or after the row, by which half the pointer is over. */
+function markDropBeside(e: React.DragEvent, item: ItemRef, state: DragState): void {
+  e.preventDefault()
+  e.stopPropagation()
+  e.dataTransfer.dropEffect = 'move'
+  const rect = e.currentTarget.getBoundingClientRect()
+  const before = e.clientY < rect.top + rect.height / 2
+  state.setDropTarget((prev) =>
+    prev?.id === item.id && prev.before === before ? prev : { id: item.id, before }
+  )
+}
+
+function dropBeside(e: React.DragEvent, ctx: RowDragContext): void {
+  const { model, state } = ctx
+  e.preventDefault()
+  e.stopPropagation()
+  const { dragged, dropTarget } = state
+  const plan = dragged && dropTarget ? planDrop(model, dragged, dropTarget) : null
+  state.endDrag()
+  if (dragged && plan) applyDrop(dragged, plan).catch(console.error)
+}
+
+function folderDropProps(folderId: string, state: DragState) {
+  return {
+    isOver: state.folderDropTarget === folderId,
+    onDragOver(e: React.DragEvent) {
+      if (!state.dragged) return
+      e.preventDefault()
+      e.stopPropagation()
+      e.dataTransfer.dropEffect = 'move'
+      state.setFolderDropTarget(folderId)
+      state.setDropTarget(null)
+    },
+    onDragLeave: () => state.setFolderDropTarget((prev) => (prev === folderId ? null : prev)),
+    onDrop(e: React.DragEvent) {
+      e.preventDefault()
+      e.stopPropagation()
+      dropInto(state, folderId)
+    },
+  }
+}
+
+/** Dropping on the list itself takes an item out of its folder. */
+function listDropHandlers(model: ListModel, state: DragState) {
+  return {
+    onDragOver(e: React.DragEvent) {
+      if (!state.dragged) return
+      e.preventDefault()
+      e.dataTransfer.dropEffect = 'move'
+      state.setDropTarget(null)
+      state.setFolderDropTarget(null)
+    },
+    onDrop(e: React.DragEvent) {
+      const { dragged } = state
+      if (!dragged) return
+      e.preventDefault()
+      const entry = model.activeItems.find((en) => en.item.id === dragged.id)
+      if (folderIdOf(entry) === null) state.endDrag()
+      else dropInto(state, null)
+    },
+  }
+}
+
+// ── Search and tag filter ─────────────────────────────────────────
+
+function SearchBox(): React.JSX.Element {
+  const { searchQuery, setQuery } = useFilterStore()
+  return (
+    <div className="notepad-note-list__search">
+      <input
+        type="text"
+        className="notepad-search-input"
+        placeholder="Search notes…"
+        value={searchQuery}
+        onChange={(e) => setQuery(e.target.value)}
+      />
+      <kbd className="notepad-search-kbd">⌘⇧F</kbd>
+    </div>
+  )
+}
+
+function tagButtonLabel(count: number): string {
+  if (count === 0) return 'Tags'
+  if (count === 1) return '1 tag'
+  return String(count) + ' tags'
+}
+
+/** The ref wraps the trigger too, so clicking it to close does not reopen. */
+function TagFilter({ tags }: TagFilterProps): React.JSX.Element {
+  const { activeTagIds, clearTags } = useFilterStore()
+  const [open, setOpen] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
   useDismissible({
-    ref: tagDropdownRef,
-    onDismiss: () => setTagDropdownOpen(false),
+    ref: dropdownRef,
+    onDismiss: () => setOpen(false),
     manageFocus: false,
-    enabled: tagDropdownOpen,
+    enabled: open,
   })
+  return (
+    <div className="notepad-tag-filter" ref={dropdownRef}>
+      <Button size="sm" icon={TagIcon} onClick={() => setOpen((v) => !v)}>
+        {tagButtonLabel(activeTagIds.length)}
+        {activeTagIds.length !== 0 && <ClearTagsButton onClear={clearTags} />}
+      </Button>
+      {open && <TagOptions tags={tags} />}
+    </div>
+  )
+}
 
-  // Text search via IPC (tags are filtered client-side)
-  useEffect(() => {
-    /* v8 ignore next */
-    if (!searchQuery) {
-      ++searchGenRef.current
-      return
-    }
-    /* v8 ignore next */
-    const gen = ++searchGenRef.current
-    const run = async () => {
-      const result = await window.electronAPI.extensionBridge.invoke(
-        'terminator.notepad:search.query',
-        { query: searchQuery, includeArchived: true }
-      )
-      if (gen !== searchGenRef.current) return
-      const data = (result as { data?: SearchResult[] }).data
-      if (data) setSearchResults(data)
-    }
-    void run()
-  }, [searchQuery])
+function ClearTagsButton({ onClear }: { onClear: () => void }): React.JSX.Element {
+  return (
+    <span
+      className="notepad-tag-filter__clear-x"
+      role="button"
+      onMouseDown={(e) => {
+        e.stopPropagation()
+        onClear()
+      }}
+    >
+      <X className="tm-icon-sm" />
+    </span>
+  )
+}
 
+/** Active tags first. */
+function TagOptions({ tags }: TagFilterProps): React.JSX.Element {
+  const { activeTagIds, toggleTag } = useFilterStore()
+  const rank = (tag: Tag) => (activeTagIds.includes(tag.id) ? 0 : 1)
+  return (
+    <div className="notepad-tag-filter__dropdown">
+      {[...tags]
+        .sort((a, b) => rank(a) - rank(b))
+        .map((tag) => (
+          <TagOption
+            key={tag.id}
+            tag={tag}
+            isActive={activeTagIds.includes(tag.id)}
+            onToggle={() => toggleTag(tag.id)}
+          />
+        ))}
+    </div>
+  )
+}
+
+function TagOption(props: { tag: Tag; isActive: boolean; onToggle: () => void }) {
+  const { tag, isActive, onToggle } = props
+  const modifier = isActive ? ' notepad-tag-filter__option--active' : ''
+  return (
+    <button className={'notepad-tag-filter__option' + modifier} onClick={onToggle}>
+      <span className="notepad-tag-filter__check">
+        {isActive && <Check className="tm-icon-sm" />}
+      </span>
+      <span className="notepad-tag-filter__hash">#</span>
+      {tag.name}
+      <span className="notepad-tag-filter__count">{tag.noteCount}</span>
+    </button>
+  )
+}
+
+// ── List body ─────────────────────────────────────────────────────
+
+function ListBody(props: { view: ListView; activeTagNames: string[] }): React.JSX.Element {
+  const { view, activeTagNames } = props
+  const { model } = view
+  const folders = useNotesStore((s) => s.folders)
+  const searchQuery = useFilterStore((s) => s.searchQuery)
+  const isEmpty = model.activeItems.length === 0 && model.archivedItems.length === 0
+  const showsNothing = isEmpty && (folders.length === 0 || model.isFiltering)
+
+  return (
+    <div className="notepad-note-list__notes" {...view.drag.listDropHandlers}>
+      {showsNothing && model.isFiltering && (
+        <div className="notepad-note-list__no-results">
+          {noResultsText(activeTagNames, searchQuery)}
+        </div>
+      )}
+      {showsNothing && !model.isFiltering && <EmptyState />}
+      {!showsNothing && <ActiveItems view={view} folders={folders} />}
+      <ArchivedSection view={view} />
+    </div>
+  )
+}
+
+function ActiveItems(props: { view: ListView; folders: Folder[] }): React.JSX.Element {
+  const { view, folders } = props
+  return (
+    <>
+      {view.model.rootActiveItems.map((entry) => (
+        <ListRow key={entry.item.id} entry={entry} view={view} />
+      ))}
+      {!view.model.isFiltering &&
+        folders.map((folder) => <FolderSection key={folder.id} folder={folder} view={view} />)}
+    </>
+  )
+}
+
+function ListRow(props: { entry: MixedItem; view: ListView; dimmed?: boolean }) {
+  const { entry, view, dimmed } = props
+  const item = { id: entry.item.id, type: entry.kind }
+  return (
+    <ItemRow
+      entry={entry}
+      onContextMenu={(e, en) => view.ui.setContextMenu(contextMenuFor(e, en))}
+      dimmed={dimmed}
+      dragProps={dimmed ? undefined : view.drag.rowDragProps(item, view.canDrag)}
+    />
+  )
+}
+
+function FolderSection({ folder, view }: FolderSectionProps): React.JSX.Element {
+  const { ui, drag } = view
+  const folderItems = itemsInFolder(view.model, folder.id)
+  const isCollapsed = ui.collapsedFolderIds.has(folder.id)
+  const folderDrop = drag.folderDropProps(folder.id)
+  const dropModifier = folderDrop.isOver ? ' notepad-folder-header--drop-target' : ''
+
+  return (
+    <div className="notepad-folder-section">
+      <div
+        className={'notepad-folder-header' + dropModifier}
+        onContextMenu={(e) => {
+          e.preventDefault()
+          const { clientX: x, clientY: y } = e
+          ui.setFolderContextMenu({ folderId: folder.id, folderName: folder.name, x, y })
+        }}
+        onDragOver={folderDrop.onDragOver}
+        onDragLeave={folderDrop.onDragLeave}
+        onDrop={folderDrop.onDrop}
+      >
+        <FolderToggle folder={folder} view={view} count={folderItems.length} />
+      </div>
+      {!isCollapsed && <FolderItems items={folderItems} view={view} />}
+    </div>
+  )
+}
+
+function FolderItems(props: { items: MixedItem[]; view: ListView }): React.JSX.Element {
+  const { items, view } = props
+  return (
+    <div className="notepad-folder-items">
+      {items.length === 0 && <div className="notepad-folder-empty">Empty</div>}
+      {items.map((entry) => (
+        <ListRow key={entry.item.id} entry={entry} view={view} />
+      ))}
+    </div>
+  )
+}
+
+function FolderToggle(props: FolderSectionProps & { count: number }): React.JSX.Element {
+  const { folder, view, count } = props
+  const { ui } = view
+  const isCollapsed = ui.collapsedFolderIds.has(folder.id)
+  const Chevron = isCollapsed ? ChevronRight : ChevronDown
+  const label = (isCollapsed ? 'Expand ' : 'Collapse ') + folder.name
+  return (
+    <button
+      aria-label={label}
+      className="notepad-folder-header__toggle"
+      onClick={() => ui.toggleFolder(folder.id)}
+    >
+      <Chevron className="tm-icon-sm" />
+      <FolderIcon className="notepad-folder-header__icon tm-icon-sm" />
+      {ui.renamingFolderId === folder.id ? (
+        <FolderRenameInput folder={folder} ui={ui} />
+      ) : (
+        <span className="notepad-folder-header__name">{folder.name}</span>
+      )}
+      <span className="notepad-folder-header__count">{count}</span>
+    </button>
+  )
+}
+
+function FolderRenameInput({ folder, ui }: { folder: Folder; ui: ListUi }): React.JSX.Element {
+  const commit = async (value: string) => {
+    await renameFolder(folder.id, value || folder.name)
+    ui.setRenamingFolderId(null)
+    await loadLibrary()
+  }
+  return (
+    <input
+      className="notepad-folder-header__rename-input"
+      autoFocus={true}
+      defaultValue={folder.name}
+      onBlur={(e) => void commit(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') void commit(e.currentTarget.value)
+        if (e.key === 'Escape') ui.setRenamingFolderId(null)
+      }}
+      onClick={(e) => e.stopPropagation()}
+    />
+  )
+}
+
+function ArchivedSection({ view }: { view: ListView }): React.JSX.Element | null {
+  const { archivedItems } = view.model
+  const { archivedExpanded, setArchivedExpanded } = view.ui
+  if (archivedItems.length === 0) return null
+  const Chevron = archivedExpanded ? ChevronDown : ChevronRight
+  return (
+    <>
+      <button
+        aria-expanded={archivedExpanded}
+        type="button"
+        className="notepad-archived-toggle"
+        onClick={() => setArchivedExpanded((v) => !v)}
+      >
+        <Chevron aria-hidden="true" className="tm-icon-sm" />
+        Archived ({archivedItems.length})
+      </button>
+      {archivedExpanded &&
+        archivedItems.map((entry) => (
+          <ListRow key={entry.item.id} entry={entry} view={view} dimmed={true} />
+        ))}
+    </>
+  )
+}
+
+function ListFooter(): React.JSX.Element {
+  const setShowQuickCreate = useNotesStore((s) => s.setShowQuickCreate)
+  return (
+    <div className="notepad-note-list__footer">
+      <Button
+        variant="ghost"
+        size="sm"
+        icon={Download}
+        onClick={() => window.dispatchEvent(new CustomEvent('notepad:openExport'))}
+      >
+        Export
+      </Button>
+      <Button variant="primary" size="sm" icon={Plus} onClick={() => setShowQuickCreate(true)}>
+        New <kbd className="tmui-kbd">⌘⇧N</kbd>
+      </Button>
+    </div>
+  )
+}
+
+// ── Menus and dialogs ─────────────────────────────────────────────
+
+function ListOverlays({ ui }: { ui: ListUi }): React.JSX.Element {
+  const menuRef = useRef<HTMLDivElement>(null)
+  const { setContextMenu, setFolderContextMenu, folderDeletePending } = ui
   useDismissible({
-    ref: contextMenuRef,
+    ref: menuRef,
     onDismiss: () => {
       setContextMenu(null)
       setFolderContextMenu(null)
     },
     manageFocus: false,
-    enabled: contextMenu !== null || folderContextMenu !== null,
+    enabled: ui.contextMenu !== null || ui.folderContextMenu !== null,
   })
 
-  function handleContextMenu(e: React.MouseEvent, note: NoteListItem | SearchResult) {
-    setContextMenu({
-      itemId: note.id,
-      itemType: 'note',
-      title: note.title,
-      tags: note.tags ?? [],
-      isArchived: !!note.archivedAt,
-      folderId: ('folderId' in note ? note.folderId : null) ?? null,
-      x: e.clientX,
-      y: e.clientY,
-    })
-  }
-
-  function handleDiagramContextMenu(e: React.MouseEvent, diagram: DiagramListItem) {
-    setContextMenu({
-      itemId: diagram.id,
-      itemType: 'diagram',
-      title: diagram.title,
-      tags: diagram.tags,
-      isArchived: !!diagram.archivedAt,
-      folderId: diagram.folderId ?? null,
-      x: e.clientX,
-      y: e.clientY,
-    })
-  }
-
-  async function handleArchiveToggle(
-    itemId: string,
-    itemType: 'note' | 'diagram',
-    isArchived: boolean
-  ) {
-    const baseChannel =
-      itemType === 'diagram' ? 'terminator.notepad:diagrams' : 'terminator.notepad:notes'
-    const action = isArchived ? 'restore' : 'archive'
-    await window.electronAPI.extensionBridge
-      .invoke(`${baseChannel}.${action}`, { id: itemId })
-      .catch(console.error)
-    await loadLibrary()
-  }
-
-  async function handleDelete(itemId: string, itemType: 'note' | 'diagram', isArchived: boolean) {
-    if (!isArchived) {
-      window.alert(`Archive this ${itemType} before deleting it.`)
-      return
-    }
-    const ok = window.confirm(`Permanently delete this ${itemType}? This cannot be undone.`)
-    if (!ok) return
-    const channel =
-      itemType === 'diagram'
-        ? 'terminator.notepad:diagrams.hardDelete'
-        : 'terminator.notepad:notes.hardDelete'
-    await window.electronAPI.extensionBridge.invoke(channel, { id: itemId }).catch(console.error)
-    if (itemType === 'note' && selectedNoteId === itemId) setSelected(null)
-    if (itemType === 'diagram' && useNotesStore.getState().selectedDiagramId === itemId)
-      useNotesStore.getState().setSelectedDiagram(null)
-    await loadLibrary()
-  }
-
-  // Resolve active tag names for client-side filtering
-  const activeTagNames = activeTagIds
-    .map((id) => {
-      const t = tags.find((tg) => tg.id === id)
-      return t?.name ?? (id.startsWith('local:') ? id.slice(6) : null)
-    })
-    .filter((n): n is string => n !== null)
-
-  // Notes: text search via IPC; tag filter client-side
-  const filteredNoteItems: (NoteListItem | SearchResult)[] = (() => {
-    const base = searchResults !== null ? (searchResults as SearchResult[]) : notes
-    if (activeTagNames.length === 0) return base
-    return base.filter((n) => activeTagNames.some((name) => n.tags.includes(name)))
-  })()
-
-  const activeNotes = filteredNoteItems.filter((n) => !n.archivedAt)
-  const archivedNotes = filteredNoteItems.filter((n) => n.archivedAt)
-
-  // Diagrams: always filtered client-side
-  const filteredDiagrams = (() => {
-    let result = diagrams
-    if (activeTagNames.length > 0) {
-      result = result.filter((d) => activeTagNames.some((name) => d.tags.includes(name)))
-    }
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase()
-      result = result.filter(
-        (d) => d.title.toLowerCase().includes(q) || d.tags.some((t) => t.toLowerCase().includes(q))
-      )
-    }
-    return result
-  })()
-
-  const activeDiagrams = filteredDiagrams.filter((d) => !d.archivedAt)
-  const archivedDiagrams = filteredDiagrams.filter((d) => d.archivedAt)
-
-  type MixedItem =
-    | { kind: 'note'; item: NoteListItem | SearchResult }
-    | { kind: 'diagram'; item: DiagramListItem }
-
-  function mergeSorted(
-    noteItems: (NoteListItem | SearchResult)[],
-    diagramItems: DiagramListItem[]
-  ): MixedItem[] {
-    const mixed: MixedItem[] = [
-      ...noteItems.map((n) => ({ kind: 'note' as const, item: n })),
-      ...diagramItems.map((d) => ({ kind: 'diagram' as const, item: d })),
-    ]
-    return mixed.sort((a, b) => {
-      const aOrder = ('sortOrder' in a.item ? a.item.sortOrder : undefined) ?? 0
-      const bOrder = ('sortOrder' in b.item ? b.item.sortOrder : undefined) ?? 0
-      if (aOrder !== bOrder) return aOrder - bOrder
-      return b.item.updatedAt.localeCompare(a.item.updatedAt)
-    })
-  }
-
-  const activeItems = mergeSorted(activeNotes, activeDiagrams)
-  const archivedItems = mergeSorted(archivedNotes, archivedDiagrams)
-
-  const isFiltering = searchResults !== null || activeTagNames.length > 0
-
-  // When filtering, show everything flat. When not filtering, split by folder.
-  const rootActiveItems = isFiltering
-    ? activeItems
-    : activeItems.filter((e) => {
-        const folderId = 'folderId' in e.item ? e.item.folderId : null
-        return folderId === null
-      })
-
-  function getItemsInFolder(folderId: string): MixedItem[] {
-    return activeItems.filter((e) => {
-      const itemFolderId = 'folderId' in e.item ? e.item.folderId : null
-      return itemFolderId === folderId
-    })
-  }
-
-  function toggleFolder(id: string) {
-    setCollapsedFolderIds((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-  }
-
-  async function handleMoveToFolder(
-    itemId: string,
-    itemType: 'note' | 'diagram',
-    folderId: string | null
-  ) {
-    await window.electronAPI.extensionBridge
-      .invoke('terminator.notepad:folders.move', {
-        items: [{ id: itemId, type: itemType }],
-        folderId,
-      })
-      .catch(console.error)
-    await loadLibrary()
-  }
-
-  async function handleFolderRename(folderId: string, name: string) {
-    await window.electronAPI.extensionBridge
-      .invoke('terminator.notepad:folders.rename', { id: folderId, name })
-      .catch(console.error)
-    setFolderRenameState(null)
-    await loadLibrary()
-  }
-
-  async function handleFolderDelete(folderId: string) {
-    await window.electronAPI.extensionBridge
-      .invoke('terminator.notepad:folders.delete', { id: folderId })
-      .catch(console.error)
-    setCollapsedFolderIds((prev) => {
-      const next = new Set(prev)
-      next.delete(folderId)
-      return next
-    })
-    await loadLibrary()
-  }
-
-  function renderMixedItem(entry: MixedItem) {
-    if (entry.kind === 'diagram') {
-      return (
-        <DiagramRow
-          key={entry.item.id}
-          diagram={entry.item as DiagramListItem}
-          onContextMenu={handleDiagramContextMenu}
-          dragProps={searchResults === null ? makeDragProps(entry.item.id, 'diagram') : undefined}
-        />
-      )
-    }
-    return (
-      <NoteRow
-        key={entry.item.id}
-        note={entry.item as NoteListItem | SearchResult}
-        onContextMenu={handleContextMenu}
-        dragProps={searchResults === null ? makeDragProps(entry.item.id, 'note') : undefined}
-      />
-    )
-  }
-
-  function clearDrag() {
-    setDragId(null)
-    setDragType(null)
-    setDropTarget(null)
-  }
-
-  function folderOf(itemId: string): string | null {
-    const entry = activeItems.find((en) => en.item.id === itemId)
-    return entry && 'folderId' in entry.item ? (entry.item.folderId ?? null) : null
-  }
-
-  /** Puts the dragged item where the drop target says, in the target's folder. */
-  function dropOnItem(e: React.DragEvent) {
-    e.preventDefault()
-    e.stopPropagation()
-    const target = dropTarget
-    if (!dragId || !dragType || !target) return clearDrag()
-    const dragged: ItemRef = { id: dragId, type: dragType }
-    const dropFolderId = folderOf(target.id)
-    const group = dropFolderId === null ? rootActiveItems : getItemsInFolder(dropFolderId)
-    const refs = group.map((en) => ({ id: en.item.id, type: en.kind }))
-    const order = orderAfterDrop(refs, dragged, target)
-    clearDrag()
-    if (!order) return
-    const movedFolder = folderOf(dragged.id) === dropFolderId ? undefined : dropFolderId
-    saveDrop(order, dragged, movedFolder)
-      .then(() => loadLibrary())
-      .catch(console.error)
-  }
-
-  function makeDragProps(id: string, type: 'note' | 'diagram'): DragProps {
-    return {
-      draggable: searchResults === null,
-      dragOverPosition: dropTarget?.id === id ? (dropTarget.before ? 'before' : 'after') : null,
-      onDragStart(e) {
-        setDragId(id)
-        setDragType(type)
-        e.dataTransfer.effectAllowed = 'move'
-      },
-      onDragOver(e) {
-        e.preventDefault()
-        // The list under the row clears the drop target on its own dragover.
-        e.stopPropagation()
-        e.dataTransfer.dropEffect = 'move'
-        const before = inTopHalf(e)
-        setDropTarget((prev) => (prev?.id === id && prev.before === before ? prev : { id, before }))
-      },
-      onDragLeave() {
-        setDropTarget((prev) => (prev?.id === id ? null : prev))
-      },
-      onDrop: dropOnItem,
-      onDragEnd() {
-        clearDrag()
-        setFolderDropTarget(null)
-      },
-    }
-  }
-
-  function makeFolderDropProps(folderId: string) {
-    return {
-      isOver: folderDropTarget === folderId,
-      onDragOver(e: React.DragEvent) {
-        if (!dragId) return
-        e.preventDefault()
-        e.stopPropagation()
-        e.dataTransfer.dropEffect = 'move'
-        setFolderDropTarget(folderId)
-        setDropTarget(null)
-      },
-      onDragLeave() {
-        setFolderDropTarget((prev) => (prev === folderId ? null : prev))
-      },
-      onDrop(e: React.DragEvent) {
-        e.preventDefault()
-        if (!dragId || !dragType) {
-          setDragId(null)
-          setDragType(null)
-          setFolderDropTarget(null)
-          return
-        }
-        const id = dragId
-        const type = dragType
-        setDragId(null)
-        setDragType(null)
-        setFolderDropTarget(null)
-        setDropTarget(null)
-        e.stopPropagation()
-        window.electronAPI.extensionBridge
-          .invoke('terminator.notepad:folders.move', {
-            items: [{ id, type }],
-            folderId,
-          })
-          .then(() => loadLibrary())
-          .catch(console.error)
-      },
-    }
-  }
-
   return (
-    <div className="notepad-note-list">
-      <div className="notepad-note-list__search">
-        <input
-          type="text"
-          className="notepad-search-input"
-          placeholder="Search notes…"
-          value={searchQuery}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-        <kbd className="notepad-search-kbd">⌘⇧F</kbd>
-      </div>
-
-      {tags.length > 0 && (
-        <div className="notepad-tag-filter" ref={tagDropdownRef}>
-          <Button size="sm" icon={TagIcon} onClick={() => setTagDropdownOpen((v) => !v)}>
-            {activeTagIds.length > 0
-              ? `${activeTagIds.length} tag${activeTagIds.length > 1 ? 's' : ''}`
-              : 'Tags'}
-            {activeTagIds.length > 0 && (
-              <span
-                className="notepad-tag-filter__clear-x"
-                role="button"
-                onMouseDown={(e) => {
-                  e.stopPropagation()
-                  clearTags()
-                }}
-              >
-                <X className="tm-icon-sm" />
-              </span>
-            )}
-          </Button>
-          {tagDropdownOpen && (
-            <div className="notepad-tag-filter__dropdown">
-              {[...tags]
-                .sort((a, b) => {
-                  const aActive = activeTagIds.includes(a.id) ? 0 : 1
-                  const bActive = activeTagIds.includes(b.id) ? 0 : 1
-                  return aActive - bActive
-                })
-                .map((tag) => {
-                  const isActive = activeTagIds.includes(tag.id)
-                  return (
-                    <button
-                      key={tag.id}
-                      className={`notepad-tag-filter__option${isActive ? ' notepad-tag-filter__option--active' : ''}`}
-                      onClick={() => toggleTag(tag.id)}
-                    >
-                      <span className="notepad-tag-filter__check">
-                        {isActive && <Check className="tm-icon-sm" />}
-                      </span>
-                      <span className="notepad-tag-filter__hash">#</span>
-                      {tag.name}
-                      <span className="notepad-tag-filter__count">{tag.noteCount}</span>
-                    </button>
-                  )
-                })}
-            </div>
-          )}
-        </div>
-      )}
-
-      <div
-        className="notepad-note-list__notes"
-        onDragOver={(e) => {
-          if (!dragId) return
-          e.preventDefault()
-          e.dataTransfer.dropEffect = 'move'
-          setDropTarget(null)
-          setFolderDropTarget(null)
-        }}
-        onDrop={(e) => {
-          if (!dragId || !dragType) return
-          e.preventDefault()
-          // Check if the item was in a folder
-          const draggedEntry = activeItems.find((entry) => entry.item.id === dragId)
-          const draggedFolderId =
-            draggedEntry && 'folderId' in draggedEntry.item ? draggedEntry.item.folderId : null
-          if (draggedFolderId === null) {
-            setDragId(null)
-            setDragType(null)
-            return
-          }
-          const id = dragId
-          const type = dragType
-          setDragId(null)
-          setDragType(null)
-          window.electronAPI.extensionBridge
-            .invoke('terminator.notepad:folders.move', {
-              items: [{ id, type }],
-              folderId: null,
-            })
-            .then(() => loadLibrary())
-            .catch(console.error)
-        }}
-      >
-        {activeItems.length === 0 &&
-        archivedItems.length === 0 &&
-        (folders.length === 0 || isFiltering) ? (
-          isFiltering ? (
-            <div className="notepad-note-list__no-results">
-              No results
-              {activeTagNames.length > 0 && ` for ${activeTagNames.map((n) => `#${n}`).join(', ')}`}
-              {searchQuery && activeTagNames.length > 0
-                ? ` matching "${searchQuery}"`
-                : searchQuery
-                  ? ` for "${searchQuery}"`
-                  : ''}
-            </div>
-          ) : (
-            <EmptyState />
-          )
-        ) : (
-          <>
-            {rootActiveItems.map((entry) => renderMixedItem(entry))}
-
-            {!isFiltering &&
-              folders.map((folder) => {
-                const folderItems = getItemsInFolder(folder.id)
-                const isCollapsed = collapsedFolderIds.has(folder.id)
-                const isRenaming = folderRenameState?.id === folder.id
-                const folderDrop = makeFolderDropProps(folder.id)
-                return (
-                  <div key={folder.id} className="notepad-folder-section">
-                    <div
-                      className={`notepad-folder-header${folderDrop.isOver ? ' notepad-folder-header--drop-target' : ''}`}
-                      onContextMenu={(e) => {
-                        e.preventDefault()
-                        setFolderContextMenu({
-                          folderId: folder.id,
-                          folderName: folder.name,
-                          x: e.clientX,
-                          y: e.clientY,
-                        })
-                      }}
-                      onDragOver={folderDrop.onDragOver}
-                      onDragLeave={folderDrop.onDragLeave}
-                      onDrop={folderDrop.onDrop}
-                    >
-                      <button
-                        className="notepad-folder-header__toggle"
-                        onClick={() => toggleFolder(folder.id)}
-                        aria-label={
-                          isCollapsed ? `Expand ${folder.name}` : `Collapse ${folder.name}`
-                        }
-                      >
-                        {isCollapsed ? (
-                          <ChevronRight className="tm-icon-sm" />
-                        ) : (
-                          <ChevronDown className="tm-icon-sm" />
-                        )}
-                        <Folder className="notepad-folder-header__icon tm-icon-sm" />
-                        {isRenaming ? (
-                          <input
-                            className="notepad-folder-header__rename-input"
-                            autoFocus
-                            defaultValue={folder.name}
-                            onBlur={(e) =>
-                              void handleFolderRename(folder.id, e.target.value || folder.name)
-                            }
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter')
-                                void handleFolderRename(
-                                  folder.id,
-                                  e.currentTarget.value || folder.name
-                                )
-                              if (e.key === 'Escape') setFolderRenameState(null)
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                          />
-                        ) : (
-                          <span className="notepad-folder-header__name">{folder.name}</span>
-                        )}
-                        <span className="notepad-folder-header__count">{folderItems.length}</span>
-                      </button>
-                    </div>
-                    {!isCollapsed && (
-                      <div className="notepad-folder-items">
-                        {folderItems.length === 0 ? (
-                          <div className="notepad-folder-empty">Empty</div>
-                        ) : (
-                          folderItems.map((entry) => renderMixedItem(entry))
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-          </>
-        )}
-
-        {archivedItems.length > 0 && (
-          <>
-            <button
-              type="button"
-              className="notepad-archived-toggle"
-              aria-expanded={archivedExpanded}
-              onClick={() => setArchivedExpanded((v) => !v)}
-            >
-              {archivedExpanded ? (
-                <ChevronDown aria-hidden="true" className="tm-icon-sm" />
-              ) : (
-                <ChevronRight aria-hidden="true" className="tm-icon-sm" />
-              )}
-              Archived ({archivedItems.length})
-            </button>
-            {archivedExpanded &&
-              archivedItems.map((entry) =>
-                entry.kind === 'diagram' ? (
-                  <DiagramRow
-                    key={entry.item.id}
-                    diagram={entry.item as DiagramListItem}
-                    onContextMenu={handleDiagramContextMenu}
-                    dimmed
-                  />
-                ) : (
-                  <NoteRow
-                    key={entry.item.id}
-                    note={entry.item as NoteListItem | SearchResult}
-                    onContextMenu={handleContextMenu}
-                    dimmed
-                  />
-                )
-              )}
-          </>
-        )}
-      </div>
-
-      <div className="notepad-note-list__footer">
-        <Button
-          variant="ghost"
-          size="sm"
-          icon={Download}
-          onClick={() => window.dispatchEvent(new CustomEvent('notepad:openExport'))}
-        >
-          Export
-        </Button>
-        <Button variant="primary" size="sm" icon={Plus} onClick={() => setShowQuickCreate(true)}>
-          New <kbd className="tmui-kbd">⌘⇧N</kbd>
-        </Button>
-      </div>
-
-      {/* Context menu */}
-      {contextMenu && (
-        <div
-          className="notepad-context-menu"
-          style={{ position: 'fixed', top: contextMenu.y, left: contextMenu.x }}
-          ref={contextMenuRef}
-        >
-          <button
-            className="notepad-context-menu__item"
-            onClick={() => {
-              setEditModal({
-                itemId: contextMenu.itemId,
-                itemType: contextMenu.itemType,
-                title: contextMenu.title,
-                tags: contextMenu.tags,
-              })
-              setContextMenu(null)
-            }}
-          >
-            Edit title &amp; tags
-          </button>
-          <button
-            className="notepad-context-menu__item"
-            onClick={() => {
-              const { itemId, itemType, isArchived } = contextMenu
-              setContextMenu(null)
-              void handleArchiveToggle(itemId, itemType, isArchived)
-            }}
-          >
-            {contextMenu.isArchived ? 'Unarchive' : 'Archive'}
-          </button>
-          {contextMenu.isArchived && (
-            <button
-              className="notepad-context-menu__item notepad-context-menu__item--danger"
-              onClick={() => {
-                const { itemId, itemType, isArchived } = contextMenu
-                setContextMenu(null)
-                void handleDelete(itemId, itemType, isArchived)
-              }}
-            >
-              Delete
-            </button>
-          )}
-          {folders.length > 0 && !contextMenu.isArchived && (
-            <>
-              <div className="notepad-context-menu__separator" />
-              {contextMenu.folderId !== null && (
-                <button
-                  className="notepad-context-menu__item"
-                  onClick={() => {
-                    const { itemId, itemType } = contextMenu
-                    setContextMenu(null)
-                    void handleMoveToFolder(itemId, itemType, null)
-                  }}
-                >
-                  Remove from folder
-                </button>
-              )}
-              {folders
-                .filter((f) => f.id !== contextMenu.folderId)
-                .map((f) => (
-                  <button
-                    key={f.id}
-                    className="notepad-context-menu__item"
-                    onClick={() => {
-                      const { itemId, itemType } = contextMenu
-                      setContextMenu(null)
-                      void handleMoveToFolder(itemId, itemType, f.id)
-                    }}
-                  >
-                    Move to {f.name}
-                  </button>
-                ))}
-            </>
-          )}
-        </div>
-      )}
-
-      {/* Folder context menu */}
-      {folderContextMenu && (
-        <div
-          className="notepad-context-menu"
-          style={{ position: 'fixed', top: folderContextMenu.y, left: folderContextMenu.x }}
-          ref={contextMenuRef}
-        >
-          <button
-            className="notepad-context-menu__item"
-            onClick={() => {
-              setFolderRenameState({
-                id: folderContextMenu.folderId,
-                name: folderContextMenu.folderName,
-              })
-              setFolderContextMenu(null)
-            }}
-          >
-            Rename
-          </button>
-          <button
-            className="notepad-context-menu__item notepad-context-menu__item--danger"
-            onClick={() => {
-              const { folderId } = folderContextMenu
-              setFolderContextMenu(null)
-              setFolderDeletePending(folderId)
-            }}
-          >
-            Delete folder
-          </button>
-        </div>
-      )}
-
-      {/* Edit modal */}
-      {editModal && (
+    <>
+      {ui.contextMenu && <ItemContextMenu ui={ui} menuRef={menuRef} />}
+      {ui.folderContextMenu && <FolderContextMenu ui={ui} menuRef={menuRef} />}
+      {ui.editModal && (
         <ItemEditModal
-          state={editModal}
-          onClose={() => setEditModal(null)}
+          state={ui.editModal}
+          onClose={() => ui.setEditModal(null)}
           onSaved={() => void loadLibrary()}
         />
       )}
+      {folderDeletePending && <FolderDeleteConfirm ui={ui} folderId={folderDeletePending} />}
+    </>
+  )
+}
 
-      {folderDeletePending && (
-        <ConfirmDialog
-          title="Delete folder?"
-          description="Notes and diagrams inside will be moved to the root."
-          confirmLabel="Delete"
-          danger
-          onConfirm={() => {
-            const id = folderDeletePending
-            setFolderDeletePending(null)
-            void handleFolderDelete(id)
-          }}
-          onClose={() => setFolderDeletePending(null)}
-        />
+function FolderDeleteConfirm(props: { ui: ListUi; folderId: string }): React.JSX.Element {
+  const { ui, folderId } = props
+  return (
+    <ConfirmDialog
+      title="Delete folder?"
+      description="Notes and diagrams inside will be moved to the root."
+      confirmLabel="Delete"
+      danger={true}
+      onConfirm={() => {
+        ui.setFolderDeletePending(null)
+        ui.toggleFolder(folderId, false)
+        void deleteFolder(folderId)
+      }}
+      onClose={() => ui.setFolderDeletePending(null)}
+    />
+  )
+}
+
+function MenuItem({ onClick, danger, children }: MenuItemProps): React.JSX.Element {
+  const modifier = danger ? ' notepad-context-menu__item--danger' : ''
+  return (
+    <button className={'notepad-context-menu__item' + modifier} onClick={onClick}>
+      {children}
+    </button>
+  )
+}
+
+/** Closes the item menu, then acts on the item it was opened on. */
+function itemMenuAction(ui: ListUi, action: (menu: ContextMenuState) => void) {
+  return () => {
+    const menu = ui.contextMenu
+    ui.setContextMenu(null)
+    if (menu) action(menu)
+  }
+}
+
+function ItemContextMenu({ ui, menuRef }: MenuProps): React.JSX.Element | null {
+  const menu = ui.contextMenu
+  if (!menu) return null
+  const editItem = ({ item, title, tags }: ContextMenuState) =>
+    ui.setEditModal({ itemId: item.id, itemType: item.type, title, tags })
+  return (
+    <div
+      ref={menuRef}
+      className="notepad-context-menu"
+      style={{ position: 'fixed', top: menu.y, left: menu.x }}
+    >
+      <MenuItem onClick={itemMenuAction(ui, editItem)}>Edit title &amp; tags</MenuItem>
+      <MenuItem onClick={itemMenuAction(ui, (m) => void toggleArchived(m.item, m.isArchived))}>
+        {menu.isArchived ? 'Unarchive' : 'Archive'}
+      </MenuItem>
+      {menu.isArchived && (
+        <MenuItem
+          danger={true}
+          onClick={itemMenuAction(ui, (m) => void deleteForGood(m.item, true))}
+        >
+          Delete
+        </MenuItem>
       )}
+      {!menu.isArchived && <FolderMoves ui={ui} menu={menu} />}
     </div>
+  )
+}
+
+function FolderContextMenu({ ui, menuRef }: MenuProps): React.JSX.Element | null {
+  const menu = ui.folderContextMenu
+  if (!menu) return null
+  const close = (then: () => void) => () => {
+    ui.setFolderContextMenu(null)
+    then()
+  }
+  return (
+    <div
+      ref={menuRef}
+      className="notepad-context-menu"
+      style={{ position: 'fixed', top: menu.y, left: menu.x }}
+    >
+      <MenuItem onClick={close(() => ui.setRenamingFolderId(menu.folderId))}>Rename</MenuItem>
+      <MenuItem danger={true} onClick={close(() => ui.setFolderDeletePending(menu.folderId))}>
+        Delete folder
+      </MenuItem>
+    </div>
+  )
+}
+
+function FolderMoves(props: { ui: ListUi; menu: ContextMenuState }): React.JSX.Element | null {
+  const { ui, menu } = props
+  const folders = useNotesStore((s) => s.folders)
+  if (folders.length === 0) return null
+  const moveTo = (folderId: string | null) =>
+    itemMenuAction(ui, (m) => void moveToFolder(m.item, folderId))
+  const inFolder = menu.folderId !== null
+  return (
+    <>
+      <div className="notepad-context-menu__separator" />
+      {inFolder && <MenuItem onClick={moveTo(null)}>Remove from folder</MenuItem>}
+      {folders
+        .filter((f) => f.id !== menu.folderId)
+        .map((f) => (
+          <MenuItem key={f.id} onClick={moveTo(f.id)}>
+            Move to {f.name}
+          </MenuItem>
+        ))}
+    </>
   )
 }

@@ -1,7 +1,14 @@
 import { describe, it, expect } from 'vitest'
 import { AuthRateLimiter } from '../../src/server/auth-rate-limiter'
 
-describe('AuthRateLimiter', () => {
+describe('AuthRateLimiter', authRateLimiterTests)
+
+function authRateLimiterTests() {
+  describe('locking out', rateLimiterLockoutTests)
+  describe('unlocking', rateLimiterUnlockTests)
+}
+
+function rateLimiterLockoutTests() {
   it('does not lock out before maxAttempts failures', () => {
     const now = 0
     const limiter = new AuthRateLimiter({ maxAttempts: 3, windowMs: 1000, now: () => now })
@@ -27,7 +34,9 @@ describe('AuthRateLimiter', () => {
     expect(limiter.isLockedOut('a')).toBe(true)
     expect(limiter.isLockedOut('b')).toBe(false)
   })
+}
 
+function rateLimiterUnlockTests() {
   it('unlocks after the window elapses with no new failures', () => {
     let now = 0
     const limiter = new AuthRateLimiter({ maxAttempts: 2, windowMs: 1000, now: () => now })
@@ -46,4 +55,4 @@ describe('AuthRateLimiter', () => {
     limiter.recordFailure('x')
     expect(limiter.isLockedOut('x')).toBe(false)
   })
-})
+}

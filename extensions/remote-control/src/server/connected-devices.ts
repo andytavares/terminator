@@ -49,6 +49,14 @@ function browserOn(ua: string, platform: string): string {
 
 type Listener = (devices: ConnectedDevice[]) => void
 
+/** A socket that has just connected, as `add` records it. */
+export interface DeviceConnection {
+  id: string
+  userAgent: string | undefined
+  viewing: string
+  close?: () => void
+}
+
 /**
  * The live set, with a change signal.
  *
@@ -70,12 +78,7 @@ export class ConnectedDeviceRegistry {
    * beside the device rather than in the published shape, so the list crossing
    * the bridge stays plain data.
    */
-  add(
-    id: string,
-    userAgent: string | undefined,
-    viewing: string,
-    close?: () => void
-  ): ConnectedDevice {
+  add({ id, userAgent, viewing, close }: DeviceConnection): ConnectedDevice {
     const device: ConnectedDevice = {
       id,
       label: deviceLabel(userAgent),

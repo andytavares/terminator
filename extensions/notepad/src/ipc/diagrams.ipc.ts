@@ -32,6 +32,25 @@ export async function createDiagram(
 
 const ListDiagramsPayload = z.object({ includeArchived: z.boolean().optional() }).default({})
 
+type DiagramListRow = {
+  id: string
+  title: string
+  created_at: string
+  updated_at: string
+  archived_at: string | null
+  sort_order: number
+  folder_id: string | null
+}
+
+type DiagramRow = {
+  id: string
+  title: string
+  scene_json: string
+  created_at: string
+  updated_at: string
+  archived_at: string | null
+}
+
 export async function listDiagrams(
   db: ExtensionDB,
   args: z.infer<typeof ListDiagramsPayload>
@@ -39,21 +58,17 @@ export async function listDiagrams(
   const { includeArchived = false } = args
 
   const archivedFilter = includeArchived ? '' : 'AND archived_at IS NULL'
-  const rows = await db.query<{
-    id: string
-    title: string
-    created_at: string
-    updated_at: string
-    archived_at: string | null
-    sort_order: number
-    folder_id: string | null
-  }>(
+  const rows = await db.query<DiagramListRow>(
     `SELECT id, title, created_at, updated_at, archived_at, COALESCE(sort_order, 0) AS sort_order, folder_id
      FROM diagrams
      WHERE 1=1 ${archivedFilter}
      ORDER BY COALESCE(sort_order, 0) ASC, updated_at DESC`
   )
+  const tagsByDiagramId = await diagramTagsById(db)
+  return { data: rows.map((r) => toDiagramListItem(r, tagsByDiagramId.get(r.id) ?? [])) }
+}
 
+async function diagramTagsById(db: ExtensionDB): Promise<Map<string, string[]>> {
   const allTagRows = await db.query<{ diagram_id: string; tag: string }>(
     `SELECT diagram_id, tag FROM diagram_tags ORDER BY tag`
   )
@@ -63,19 +78,20 @@ export async function listDiagrams(
     arr.push(t.tag)
     tagsByDiagramId.set(t.diagram_id, arr)
   }
+  return tagsByDiagramId
+}
 
+function toDiagramListItem(r: DiagramListRow, tags: string[]) {
   return {
-    data: rows.map((r) => ({
-      id: r.id,
-      title: r.title,
-      tags: tagsByDiagramId.get(r.id) ?? [],
-      createdAt: r.created_at,
-      updatedAt: r.updated_at,
-      archivedAt: r.archived_at,
-      type: 'diagram' as const,
-      sortOrder: r.sort_order ?? 0,
-      folderId: r.folder_id ?? null,
-    })),
+    id: r.id,
+    title: r.title,
+    tags,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+    archivedAt: r.archived_at,
+    type: 'diagram' as const,
+    sortOrder: r.sort_order ?? 0,
+    folderId: r.folder_id ?? null,
   }
 }
 
@@ -83,17 +99,10 @@ export async function getDiagram(
   db: ExtensionDB,
   args: z.infer<typeof IdPayload>
 ): Promise<Record<string, unknown>> {
-  const row = await db.get<{
-    id: string
-    title: string
-    scene_json: string
-    created_at: string
-    updated_at: string
-    archived_at: string | null
-  }>(`SELECT id, title, scene_json, created_at, updated_at, archived_at FROM diagrams WHERE id=?`, [
-    args.id,
-  ])
-
+  const row = await db.get<DiagramRow>(
+    `SELECT id, title, scene_json, created_at, updated_at, archived_at FROM diagrams WHERE id=?`,
+    [args.id]
+  )
   if (!row) return { error: 'DIAGRAM_NOT_FOUND' }
 
   const tagRows = await db.query<{ tag: string }>(
@@ -125,35 +134,43 @@ export async function autosaveDiagram(
   db: ExtensionDB,
   args: z.infer<typeof AutosaveDiagramPayload>
 ): Promise<Record<string, unknown>> {
-  const { id, title, sceneJson } = args
+  const { id } = args
   const now = new Date().toISOString()
 
   const existing = await db.get<{ id: string }>('SELECT id FROM diagrams WHERE id=?', [id])
   if (!existing) return { error: 'DIAGRAM_NOT_FOUND' }
 
+  await saveDiagramContent(db, args, now)
+  if (args.tags !== undefined) await replaceDiagramTags(db, id, args.tags)
+
+  return { data: { updatedAt: now } }
+}
+
+/** The title, and the scene when one was sent; a title-only save keeps the scene. */
+async function saveDiagramContent(
+  db: ExtensionDB,
+  args: z.infer<typeof AutosaveDiagramPayload>,
+  now: string
+): Promise<void> {
+  const { id, sceneJson } = args
+  const title = args.title.trim() || 'Untitled diagram'
   if (sceneJson !== undefined) {
     await db.run('UPDATE diagrams SET title=?, scene_json=?, updated_at=? WHERE id=?', [
-      title.trim() || 'Untitled diagram',
+      title,
       sceneJson,
       now,
       id,
     ])
   } else {
-    await db.run('UPDATE diagrams SET title=?, updated_at=? WHERE id=?', [
-      title.trim() || 'Untitled diagram',
-      now,
-      id,
-    ])
+    await db.run('UPDATE diagrams SET title=?, updated_at=? WHERE id=?', [title, now, id])
   }
+}
 
-  if (args.tags !== undefined) {
-    await db.run(`DELETE FROM diagram_tags WHERE diagram_id=?`, [id])
-    for (const tag of args.tags) {
-      await db.run(`INSERT INTO diagram_tags (diagram_id, tag) VALUES (?, ?)`, [id, tag])
-    }
+async function replaceDiagramTags(db: ExtensionDB, id: string, tags: string[]): Promise<void> {
+  await db.run(`DELETE FROM diagram_tags WHERE diagram_id=?`, [id])
+  for (const tag of tags) {
+    await db.run(`INSERT INTO diagram_tags (diagram_id, tag) VALUES (?, ?)`, [id, tag])
   }
-
-  return { data: { updatedAt: now } }
 }
 
 export async function archiveDiagram(

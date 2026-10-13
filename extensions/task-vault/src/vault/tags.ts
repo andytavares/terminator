@@ -19,57 +19,52 @@ export interface ExtractedTags {
   terminatorLinks: string[]
 }
 
-export function extractTags(raw: string): ExtractedTags {
-  const metadata: Record<string, string> = {}
-  let project: string | undefined
-  let context: string | undefined
-  let area: string | undefined
-  let dueDate: string | undefined
-  const terminatorLinks: string[] = []
+/** The display name of a tag pattern's first match in `raw`, if any. */
+function firstTag(pattern: RegExp, raw: string): string | undefined {
+  pattern.lastIndex = 0
+  const match = pattern.exec(raw)
+  return match ? toDisplayName(match[1]) : undefined
+}
 
-  // Extract terminator:<uuid> links
+/** Every terminator:<uuid> link in `raw`, lower-cased. */
+function terminatorLinksIn(raw: string): string[] {
+  const links: string[] = []
   TERMINATOR_LINK_RE.lastIndex = 0
-  let tlMatch: RegExpExecArray | null
-  while ((tlMatch = TERMINATOR_LINK_RE.exec(raw)) !== null) {
-    terminatorLinks.push(tlMatch[1].toLowerCase())
-  }
+  let match: RegExpExecArray | null
+  while ((match = TERMINATOR_LINK_RE.exec(raw)) !== null) links.push(match[1].toLowerCase())
+  return links
+}
 
-  // Extract @project (first occurrence)
-  TAG_PROJECT.lastIndex = 0
-  const projMatch = TAG_PROJECT.exec(raw)
-  if (projMatch) project = toDisplayName(projMatch[1])
-
-  // Extract +context (first occurrence)
-  TAG_CONTEXT.lastIndex = 0
-  const ctxMatch = TAG_CONTEXT.exec(raw)
-  if (ctxMatch) context = toDisplayName(ctxMatch[1])
-
-  // Extract #area (first occurrence)
-  TAG_AREA.lastIndex = 0
-  const areaMatch = TAG_AREA.exec(raw)
-  if (areaMatch) area = toDisplayName(areaMatch[1])
-
-  // Extract key:value metadata (including due:)
+/** key:value pairs in `raw`: `due:` becomes the due date, `terminator:` is skipped. */
+function metaTagsIn(raw: string): { dueDate?: string; metadata: Record<string, string> } {
+  const metadata: Record<string, string> = {}
+  let dueDate: string | undefined
   TAG_META.lastIndex = 0
-  let metaMatch: RegExpExecArray | null
-  while ((metaMatch = TAG_META.exec(raw)) !== null) {
-    const key = metaMatch[1]
-    const value = metaMatch[2]
-    if (key === 'due') {
-      dueDate = value
-    } else if (key !== 'terminator') {
-      metadata[key] = value
-    }
+  let match: RegExpExecArray | null
+  while ((match = TAG_META.exec(raw)) !== null) {
+    const [, key, value] = match
+    if (key === 'due') dueDate = value
+    else if (key !== 'terminator') metadata[key] = value
   }
+  return { dueDate, metadata }
+}
 
-  // Strip tags from text
-  const text = raw
+/** The text with every tag removed and whitespace collapsed. */
+function stripTags(raw: string): string {
+  return raw
     .replace(/@\S+/g, '')
     .replace(/\+\S+/g, '')
     .replace(/#\S+/g, '')
     .replace(/\b[a-z][a-z0-9_-]*:[\S]+/g, '')
     .replace(/\s+/g, ' ')
     .trim()
+}
 
-  return { text, project, context, area, dueDate, metadata, terminatorLinks }
+export function extractTags(raw: string): ExtractedTags {
+  const terminatorLinks = terminatorLinksIn(raw)
+  const project = firstTag(TAG_PROJECT, raw)
+  const context = firstTag(TAG_CONTEXT, raw)
+  const area = firstTag(TAG_AREA, raw)
+  const { dueDate, metadata } = metaTagsIn(raw)
+  return { text: stripTags(raw), project, context, area, dueDate, metadata, terminatorLinks }
 }

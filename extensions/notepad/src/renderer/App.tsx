@@ -7,6 +7,17 @@ import { useNotesStore } from '../stores/notes.store'
 
 export function App(): JSX.Element {
   const view = new URLSearchParams(window.location.search).get('view')
+  useQuickCreateRequests()
+  return (
+    <>
+      <WindowContent view={view} />
+      <QuickCreateOverlay />
+    </>
+  )
+}
+
+/** Opens the quick-create overlay when the shortcut fires, including before this view existed. */
+function useQuickCreateRequests(): void {
   const { setShowQuickCreate } = useNotesStore()
 
   useEffect(() => {
@@ -25,20 +36,11 @@ export function App(): JSX.Element {
       })
       .catch(() => {})
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+}
 
-  let content: React.ReactElement
-  if (view === 'note') {
-    content = <NoteWindowView />
-  } else if (view === 'diagram') {
-    content = <DiagramWindowView />
-  } else {
-    content = <NotepadView />
-  }
-
-  return (
-    <>
-      {content}
-      <QuickCreateOverlay />
-    </>
-  )
+/** The window's own view: a note, a diagram, or the notepad panel. */
+function WindowContent({ view }: { view: string | null }): JSX.Element {
+  if (view === 'note') return <NoteWindowView />
+  if (view === 'diagram') return <DiagramWindowView />
+  return <NotepadView />
 }

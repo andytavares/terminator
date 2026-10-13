@@ -20,8 +20,15 @@ export function useTerminalSessions(enabled: boolean): {
 
   useEffect(() => {
     if (!enabled) return
-    void window.electronAPI.terminal.listSessions().then(setSessions)
-    void projectPlaces().then(setPlaces)
+    // A list the app cannot read shows as no sessions; unreadable workspaces leave
+    // each session labelled by its tab or id.
+    window.electronAPI.terminal
+      .listSessions()
+      .then(setSessions)
+      .catch((err) => console.error('[task-vault] listing terminal sessions failed', err))
+    projectPlaces()
+      .then(setPlaces)
+      .catch((err) => console.error('[task-vault] reading workspaces failed', err))
   }, [enabled])
 
   const labelOf = (s: TerminalSession): string => {

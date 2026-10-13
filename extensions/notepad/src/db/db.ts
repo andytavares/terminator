@@ -3,7 +3,8 @@ import type { ExtensionDB } from '@terminator/extension-sdk'
 
 export { randomUUID }
 
-const NOTEPAD_SCHEMA = `
+// Folders, notes and their tags.
+const NOTE_SCHEMA = `
     CREATE TABLE IF NOT EXISTS folders (
       id         TEXT PRIMARY KEY,
       name       TEXT NOT NULL,
@@ -31,9 +32,10 @@ const NOTEPAD_SCHEMA = `
       note_id TEXT NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
       tag_id  TEXT NOT NULL REFERENCES tags(id)  ON DELETE CASCADE,
       PRIMARY KEY (note_id, tag_id)
-    );
+    );`
 
-    CREATE TABLE IF NOT EXISTS comments (
+// Note comments, and the extension's settings.
+const COMMENT_SCHEMA = `    CREATE TABLE IF NOT EXISTS comments (
       id           TEXT PRIMARY KEY,
       note_id      TEXT NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
       parent_id    TEXT REFERENCES comments(id) ON DELETE CASCADE,
@@ -55,9 +57,10 @@ const NOTEPAD_SCHEMA = `
       key          TEXT NOT NULL,
       value        TEXT NOT NULL,
       PRIMARY KEY (extension_id, key)
-    );
+    );`
 
-    CREATE TABLE IF NOT EXISTS diagrams (
+// Diagrams, their tags and their comments.
+const DIAGRAM_SCHEMA = `    CREATE TABLE IF NOT EXISTS diagrams (
       id          TEXT PRIMARY KEY,
       title       TEXT NOT NULL DEFAULT 'Untitled diagram',
       scene_json  TEXT NOT NULL DEFAULT '{}',
@@ -87,20 +90,27 @@ const NOTEPAD_SCHEMA = `
       updated_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_diagram_comments_diagram ON diagram_comments(diagram_id, status);
-  `
+`
 
 export async function applyNotepadSchema(db: ExtensionDB): Promise<void> {
-  await db.exec(NOTEPAD_SCHEMA)
-  await addColumnIfMissing(db, 'notes', 'title_set_by_hand', 'INTEGER NOT NULL DEFAULT 0')
+  await db.exec(NOTE_SCHEMA + '\n\n' + COMMENT_SCHEMA + '\n\n' + DIAGRAM_SCHEMA)
+  await addColumnIfMissing(db, {
+    table: 'notes',
+    column: 'title_set_by_hand',
+    definition: 'INTEGER NOT NULL DEFAULT 0',
+  })
+}
+
+/** A column a table created by an earlier version of this schema may lack. */
+interface ColumnSpec {
+  table: string
+  column: string
+  definition: string
 }
 
 /** Adds a column to a table created by an earlier version of this schema. */
-async function addColumnIfMissing(
-  db: ExtensionDB,
-  table: string,
-  column: string,
-  definition: string
-): Promise<void> {
+async function addColumnIfMissing(db: ExtensionDB, spec: ColumnSpec): Promise<void> {
+  const { table, column, definition } = spec
   const present = await db.get('SELECT 1 FROM pragma_table_info(?) WHERE name = ?', [table, column])
   if (!present) await db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`)
 }

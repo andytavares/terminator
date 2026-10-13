@@ -5,7 +5,25 @@ import { ConnectedDeviceRegistry, deviceLabel } from '../../src/server/connected
 // is worse than none here — this is the surface that says who currently has
 // shell access.
 
-describe('deviceLabel', () => {
+describe('deviceLabel', deviceLabelTests)
+
+const clock = () => {
+  let t = 1000
+  return () => (t += 10)
+}
+
+describe('ConnectedDeviceRegistry', deviceRegistryTests)
+
+// "Disconnect" in the view has to reach the socket, or the button is decoration.
+describe('disconnecting', deviceDisconnectTests)
+
+function deviceLabelTests() {
+  describe('phones, tablets and desktops', deviceLabelPlatformTests)
+  describe('telling browsers apart', deviceLabelBrowserTests)
+  describe('an unrecognisable agent', deviceLabelUnknownTests)
+}
+
+function deviceLabelPlatformTests() {
   it.each([
     ['Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1', 'iPhone'],
     ['Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X) AppleWebKit/605.1', 'iPad'],
@@ -24,7 +42,9 @@ describe('deviceLabel', () => {
   ])('names the browser and platform for %s', (ua, expected) => {
     expect(deviceLabel(ua)).toBe(expected)
   })
+}
 
+function deviceLabelBrowserTests() {
   // Chrome and Edge both claim Safari in their user agent, so order matters.
   it('does not mistake Chrome for Safari', () => {
     expect(deviceLabel('Macintosh Chrome/120 Safari/537.36')).toBe('Chrome on Mac')
@@ -33,7 +53,9 @@ describe('deviceLabel', () => {
   it('does not mistake Edge for Chrome', () => {
     expect(deviceLabel('Windows Chrome/120 Safari/537.36 Edg/120')).toBe('Edge on Windows')
   })
+}
 
+function deviceLabelUnknownTests() {
   it('says so rather than guessing when it cannot tell', () => {
     expect(deviceLabel(undefined)).toBe('Unknown device')
     expect(deviceLabel('curl/8.1.2')).toBe('Unknown device')
@@ -45,14 +67,15 @@ describe('deviceLabel', () => {
     const ua = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0) AppleWebKit/605.1'
     expect(deviceLabel(ua)).not.toContain('Mozilla')
   })
-})
+}
 
-describe('ConnectedDeviceRegistry', () => {
-  const clock = () => {
-    let t = 1000
-    return () => (t += 10)
-  }
+function deviceRegistryTests() {
+  describe('recording devices', deviceRegistryRecordTests)
+  describe('removing and ordering', deviceRegistryRemoveTests)
+  deviceRegistryChangeTests()
+}
 
+function deviceRegistryRecordTests() {
   it('starts empty', () => {
     const registry = new ConnectedDeviceRegistry(clock())
     expect(registry.list()).toEqual([])
@@ -61,15 +84,21 @@ describe('ConnectedDeviceRegistry', () => {
 
   it('records a device with a recognisable label', () => {
     const registry = new ConnectedDeviceRegistry(clock())
-    const device = registry.add('a', 'iPhone; CPU iPhone OS 17_0', 'ses-1')
+    const device = registry.add({
+      id: 'a',
+      userAgent: 'iPhone; CPU iPhone OS 17_0',
+      viewing: 'ses-1',
+    })
     expect(device.label).toBe('iPhone')
     expect(device.viewing).toBe('ses-1')
     expect(registry.count()).toBe(1)
   })
+}
 
+function deviceRegistryRemoveTests() {
   it('drops a device when it disconnects', () => {
     const registry = new ConnectedDeviceRegistry(clock())
-    registry.add('a', 'iPhone', 'ses-1')
+    registry.add({ id: 'a', userAgent: 'iPhone', viewing: 'ses-1' })
     registry.remove('a')
     expect(registry.count()).toBe(0)
   })
@@ -83,68 +112,86 @@ describe('ConnectedDeviceRegistry', () => {
   // disconnect move under the pointer.
   it('keeps the oldest connection first', () => {
     const registry = new ConnectedDeviceRegistry(clock())
-    registry.add('a', 'iPhone', 'ses-1')
-    registry.add('b', 'iPad', 'ses-2')
-    registry.add('c', 'Windows Firefox', 'ses-3')
+    registry.add({ id: 'a', userAgent: 'iPhone', viewing: 'ses-1' })
+    registry.add({ id: 'b', userAgent: 'iPad', viewing: 'ses-2' })
+    registry.add({ id: 'c', userAgent: 'Windows Firefox', viewing: 'ses-3' })
     expect(registry.list().map((d) => d.id)).toEqual(['a', 'b', 'c'])
   })
+}
 
-  describe('change signal', () => {
-    it('fires when a device joins', () => {
-      const registry = new ConnectedDeviceRegistry(clock())
-      const seen = vi.fn()
-      registry.onChange(seen)
-      registry.add('a', 'iPhone', 'ses-1')
-      expect(seen).toHaveBeenCalledTimes(1)
-      expect(seen.mock.calls[0][0]).toHaveLength(1)
-    })
+function deviceRegistryChangeTests() {
+  describe('change signal', deviceChangeSignalTests)
+}
 
-    it('fires when a device leaves', () => {
-      const registry = new ConnectedDeviceRegistry(clock())
-      registry.add('a', 'iPhone', 'ses-1')
-      const seen = vi.fn()
-      registry.onChange(seen)
-      registry.remove('a')
-      expect(seen).toHaveBeenCalledTimes(1)
-      expect(seen.mock.calls[0][0]).toEqual([])
-    })
+function deviceChangeSignalTests() {
+  describe('joining and leaving', deviceChangeJoinLeaveTests)
+  describe('quiet changes and unsubscribing', deviceChangeQuietTests)
+  describe('several listeners', deviceChangeListenersTests)
+}
 
-    it('does not fire for a disconnect that changed nothing', () => {
-      const registry = new ConnectedDeviceRegistry(clock())
-      const seen = vi.fn()
-      registry.onChange(seen)
-      registry.remove('ghost')
-      expect(seen).not.toHaveBeenCalled()
-    })
-
-    it('stops after unsubscribing, so a closed view leaks nothing', () => {
-      const registry = new ConnectedDeviceRegistry(clock())
-      const seen = vi.fn()
-      const off = registry.onChange(seen)
-      off()
-      registry.add('a', 'iPhone', 'ses-1')
-      expect(seen).not.toHaveBeenCalled()
-    })
-
-    it('notifies every listener', () => {
-      const registry = new ConnectedDeviceRegistry(clock())
-      const a = vi.fn()
-      const b = vi.fn()
-      registry.onChange(a)
-      registry.onChange(b)
-      registry.add('x', 'iPad', 'ses-1')
-      expect(a).toHaveBeenCalledTimes(1)
-      expect(b).toHaveBeenCalledTimes(1)
-    })
+function deviceChangeJoinLeaveTests() {
+  it('fires when a device joins', () => {
+    const registry = new ConnectedDeviceRegistry(clock())
+    const seen = vi.fn()
+    registry.onChange(seen)
+    registry.add({ id: 'a', userAgent: 'iPhone', viewing: 'ses-1' })
+    expect(seen).toHaveBeenCalledTimes(1)
+    expect(seen.mock.calls[0][0]).toHaveLength(1)
   })
-})
 
-// "Disconnect" in the view has to reach the socket, or the button is decoration.
-describe('disconnecting', () => {
+  it('fires when a device leaves', () => {
+    const registry = new ConnectedDeviceRegistry(clock())
+    registry.add({ id: 'a', userAgent: 'iPhone', viewing: 'ses-1' })
+    const seen = vi.fn()
+    registry.onChange(seen)
+    registry.remove('a')
+    expect(seen).toHaveBeenCalledTimes(1)
+    expect(seen.mock.calls[0][0]).toEqual([])
+  })
+}
+
+function deviceChangeQuietTests() {
+  it('does not fire for a disconnect that changed nothing', () => {
+    const registry = new ConnectedDeviceRegistry(clock())
+    const seen = vi.fn()
+    registry.onChange(seen)
+    registry.remove('ghost')
+    expect(seen).not.toHaveBeenCalled()
+  })
+
+  it('stops after unsubscribing, so a closed view leaks nothing', () => {
+    const registry = new ConnectedDeviceRegistry(clock())
+    const seen = vi.fn()
+    const off = registry.onChange(seen)
+    off()
+    registry.add({ id: 'a', userAgent: 'iPhone', viewing: 'ses-1' })
+    expect(seen).not.toHaveBeenCalled()
+  })
+}
+
+function deviceChangeListenersTests() {
+  it('notifies every listener', () => {
+    const registry = new ConnectedDeviceRegistry(clock())
+    const a = vi.fn()
+    const b = vi.fn()
+    registry.onChange(a)
+    registry.onChange(b)
+    registry.add({ id: 'x', userAgent: 'iPad', viewing: 'ses-1' })
+    expect(a).toHaveBeenCalledTimes(1)
+    expect(b).toHaveBeenCalledTimes(1)
+  })
+}
+
+function deviceDisconnectTests() {
+  describe('closing', deviceDisconnectCloseTests)
+  describe('what it cannot close', deviceDisconnectFailureTests)
+}
+
+function deviceDisconnectCloseTests() {
   it('closes the connection it was given', () => {
     const registry = new ConnectedDeviceRegistry(() => 1000)
     const close = vi.fn()
-    registry.add('a', 'iPhone', 'ses-1', close)
+    registry.add({ id: 'a', userAgent: 'iPhone', viewing: 'ses-1', close })
     expect(registry.disconnect('a')).toBe(true)
     expect(close).toHaveBeenCalledTimes(1)
   })
@@ -153,14 +200,16 @@ describe('disconnecting', () => {
   // failed disconnect leaves it visible rather than lying about it.
   it('does not remove the row itself', () => {
     const registry = new ConnectedDeviceRegistry(() => 1000)
-    registry.add('a', 'iPhone', 'ses-1', () => {})
+    registry.add({ id: 'a', userAgent: 'iPhone', viewing: 'ses-1', close: () => {} })
     registry.disconnect('a')
     expect(registry.count()).toBe(1)
   })
+}
 
+function deviceDisconnectFailureTests() {
   it('reports failure for something it cannot close', () => {
     const registry = new ConnectedDeviceRegistry(() => 1000)
-    registry.add('a', 'iPhone', 'ses-1')
+    registry.add({ id: 'a', userAgent: 'iPhone', viewing: 'ses-1' })
     expect(registry.disconnect('a')).toBe(false)
     expect(registry.disconnect('ghost')).toBe(false)
   })
@@ -168,9 +217,9 @@ describe('disconnecting', () => {
   it('forgets the closer once the socket is gone', () => {
     const registry = new ConnectedDeviceRegistry(() => 1000)
     const close = vi.fn()
-    registry.add('a', 'iPhone', 'ses-1', close)
+    registry.add({ id: 'a', userAgent: 'iPhone', viewing: 'ses-1', close })
     registry.remove('a')
     expect(registry.disconnect('a')).toBe(false)
     expect(close).not.toHaveBeenCalled()
   })
-})
+}

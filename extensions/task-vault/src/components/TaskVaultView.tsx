@@ -14,6 +14,9 @@ import {
 import './task-vault.css'
 import { notify } from '../utils/notify'
 import { useVaultStore } from '../stores/vault.store'
+import type { VaultView } from '../stores/vault.store'
+import { useVaultDataStore } from '../stores/vault-data.store'
+import type { KanbanLane } from '../vault/types'
 import { useVaultNavStore } from '../stores/vault-nav.store'
 import { VaultSidebar } from './VaultSidebar'
 import { DailyLog } from './DailyLog'
@@ -28,29 +31,68 @@ import { KanbanBoard } from './KanbanBoard'
 import { TaskDetailPanel } from './TaskDetailPanel'
 import { DatabaseAdmin } from './DatabaseAdmin'
 
-export function CaptureModal(): React.JSX.Element | null {
+interface NavigationTarget {
+  date?: string
+  taskId?: string
+  view?: 'daily' | 'review'
+}
+
+interface Selected {
+  id: string | null
+  text: string
+}
+
+interface ToolbarProps {
+  availableContexts: string[]
+  showCalendar: boolean
+  onToggleCalendar: () => void
+  onDataTools: () => void
+}
+
+interface DailyProps {
+  selection: ReturnType<typeof useTaskSelection>
+}
+
+type Transfer = ReturnType<typeof useDataTransfer>
+
+type DataTab = 'data' | 'admin'
+
+interface DataToolsTabsProps {
+  tab: DataTab
+  onSelect: (tab: DataTab) => void
+  onWrite: () => void
+}
+
+/** The task text lookup and reload a daily action needs. */
+interface DayContext {
+  textOf: (taskId: string) => string
+  reloadDay: () => Promise<void>
+}
+
+type DailyActions = ReturnType<typeof useDailyActions>
+
+/** Closes the modal on Escape, in the capture phase so no child can stop it first. */
+function useEscapeToClose(open: boolean, close: () => void): void {
+  useEffect(() => {
+    if (!open) return
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') close()
+    }
+    document.addEventListener('keydown', onKey, true)
+    return () => document.removeEventListener('keydown', onKey, true)
+  }, [open, close])
+}
+
+function useCaptureModal() {
   const { showCaptureModal, setShowCaptureModal, refreshInboxCount } = useVaultStore()
   const [text, setText] = useState('')
   const [capturing, setCapturing] = useState(false)
-
   const close = useCallback(() => {
     setText('')
     setShowCaptureModal(false)
   }, [setShowCaptureModal])
-
-  useEffect(() => {
-    if (!showCaptureModal) return
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') close()
-    }
-    // Capture phase: fires before any child (SmartTaskInput, date picker) can stopPropagation.
-    document.addEventListener('keydown', onKey, true)
-    return () => document.removeEventListener('keydown', onKey, true)
-  }, [showCaptureModal, close])
-
-  if (!showCaptureModal) return null
-
-  async function handleCapture() {
+  useEscapeToClose(showCaptureModal, close)
+  async function capture() {
     if (!text.trim()) return
     setCapturing(true)
     try {
@@ -63,28 +105,28 @@ export function CaptureModal(): React.JSX.Element | null {
       setCapturing(false)
     }
   }
+  return { show: showCaptureModal, text, setText, capturing, close, capture }
+}
 
+export function CaptureModal(): React.JSX.Element | null {
+  const modal = useCaptureModal()
+  if (!modal.show) return null
+  const action = {
+    label: modal.capturing ? '…' : 'Capture',
+    tone: 'primary' as const,
+    disabled: modal.capturing || !modal.text.trim(),
+    shortcut: '↵',
+    onSelect: () => void modal.capture(),
+  }
   return createPortal(
-    <Dialog
-      title="Capture to Inbox"
-      onDismiss={close}
-      actions={[
-        {
-          label: capturing ? '…' : 'Capture',
-          tone: 'primary',
-          disabled: capturing || !text.trim(),
-          shortcut: '↵',
-          onSelect: () => void handleCapture(),
-        },
-      ]}
-    >
+    <Dialog title="Capture to Inbox" onDismiss={modal.close} actions={[action]}>
       <SmartTaskInput
-        value={text}
-        onChange={setText}
-        onSubmit={handleCapture}
-        onCancel={close}
-        disabled={capturing}
         autoFocus
+        value={modal.text}
+        onChange={modal.setText}
+        onSubmit={modal.capture}
+        onCancel={modal.close}
+        disabled={modal.capturing}
         placeholder="Task text… @project #area +context due:YYYY-MM-DD"
       />
     </Dialog>,
@@ -92,70 +134,166 @@ export function CaptureModal(): React.JSX.Element | null {
   )
 }
 
-function DataToolsModal({ onClose }: { onClose: () => void }): React.JSX.Element {
-  const { loadToday, refreshInboxCount } = useVaultStore()
-  const [tab, setTab] = useState<'data' | 'admin'>('data')
+function localDateString(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
+/** Saves `data` as a JSON download. */
+function downloadJson(data: unknown, fileName: string): void {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = fileName
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+/** The import's outcome, as the status line reports it. */
+async function importFile(file: File): Promise<string> {
+  try {
+    const data = JSON.parse(await file.text())
+    const result = await window.electronAPI.extensionBridge.invoke(
+      'task-vault:vault:import-json',
+      data
+    )
+    if (result && typeof result === 'object' && 'error' in result) {
+      return `Import failed: ${(result as { error: string }).error}`
+    }
+    return `Imported ${(result as { imported: number }).imported} records successfully.`
+  } catch (err) {
+    return `Import failed: ${String(err)}`
+  }
+}
+
+/** Exports the vault to a downloaded JSON file; returns the status line to show. */
+async function exportVault(): Promise<string> {
+  const result = await window.electronAPI.extensionBridge.invoke('task-vault:vault:export-json')
+  if (result && typeof result === 'object' && 'error' in result) {
+    return `Export failed: ${(result as { error: string }).error}`
+  }
+  downloadJson(result, `task-vault-export-${localDateString(new Date())}.json`)
+  return 'Exported successfully.'
+}
+
+/** Export and import, with a status line for what happened last. */
+function useDataTransfer() {
   const [importing, setImporting] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
 
-  async function handleExport() {
+  async function exportJson() {
     setExporting(true)
     setStatus(null)
     try {
-      const result = await window.electronAPI.extensionBridge.invoke('task-vault:vault:export-json')
-      if (result && typeof result === 'object' && 'error' in result) {
-        setStatus(`Export failed: ${(result as { error: string }).error}`)
-        return
-      }
-      const json = JSON.stringify(result, null, 2)
-      const blob = new Blob([json], { type: 'application/json' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `task-vault-export-${(() => {
-        const d = new Date()
-        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-      })()}.json`
-      a.click()
-      URL.revokeObjectURL(url)
-      setStatus('Exported successfully.')
+      setStatus(await exportVault())
     } finally {
       setExporting(false)
     }
   }
 
-  function handleImportClick() {
-    fileInputRef.current?.click()
-  }
-
-  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
+  async function importChosen(input: HTMLInputElement) {
+    const file = input.files?.[0]
     if (!file) return
     setImporting(true)
     setStatus(null)
-    try {
-      const text = await file.text()
-      const data = JSON.parse(text)
-      const result = await window.electronAPI.extensionBridge.invoke(
-        'task-vault:vault:import-json',
-        data
-      )
-      if (result && typeof result === 'object' && 'error' in result) {
-        setStatus(`Import failed: ${(result as { error: string }).error}`)
-      } else {
-        const count = (result as { imported: number }).imported
-        setStatus(`Imported ${count} records successfully.`)
-      }
-    } catch (err) {
-      setStatus(`Import failed: ${String(err)}`)
-    } finally {
-      setImporting(false)
-      if (fileInputRef.current) fileInputRef.current.value = ''
-    }
+    setStatus(await importFile(file))
+    setImporting(false)
+    input.value = ''
   }
+  return { importing, exporting, status, exportJson, importChosen }
+}
 
+function StatusLine({ status }: { status: string | null }): React.JSX.Element | null {
+  if (!status) return null
+  const color = status.includes('failed') ? 'var(--tm-danger)' : 'var(--tm-success)'
+  return <p style={{ fontSize: 12, color, margin: 0 }}>{status}</p>
+}
+
+const ROW_BUTTON = { display: 'flex', alignItems: 'center', gap: 6 }
+
+function ExportButton({ transfer }: { transfer: Transfer }): React.JSX.Element {
+  return (
+    <Button
+      variant="primary"
+      icon={Download}
+      onClick={transfer.exportJson}
+      disabled={transfer.exporting}
+      style={ROW_BUTTON}
+    >
+      {transfer.exporting ? 'Exporting…' : 'Export JSON'}
+    </Button>
+  )
+}
+
+function TransferButtons({ transfer }: { transfer: Transfer }): React.JSX.Element {
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  return (
+    <div style={{ display: 'flex', gap: 8 }}>
+      <ExportButton transfer={transfer} />
+      <Button
+        icon={Upload}
+        onClick={() => fileInputRef.current?.click()}
+        disabled={transfer.importing}
+        style={ROW_BUTTON}
+      >
+        {transfer.importing ? 'Importing…' : 'Import JSON'}
+      </Button>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".json"
+        style={{ display: 'none' }}
+        onChange={(e) => void transfer.importChosen(e.target)}
+      />
+    </div>
+  )
+}
+
+function ExportImportPanel(): React.JSX.Element {
+  const transfer = useDataTransfer()
+  return (
+    <div
+      className="capture-modal__body"
+      style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
+    >
+      <p style={{ fontSize: 12, color: 'var(--tm-text-muted)', margin: 0 }}>
+        Export everything to JSON for backup or migration. Import merges records by ID — existing
+        data is not overwritten.
+      </p>
+      <TransferButtons transfer={transfer} />
+      <StatusLine status={transfer.status} />
+    </div>
+  )
+}
+
+function DataToolsTabs(props: DataToolsTabsProps): React.JSX.Element {
+  return (
+    <TabsRoot selectedId={props.tab} onSelect={props.onSelect}>
+      <TabList label="Data tools">
+        <Tab id="data">Export &amp; import</Tab>
+        <Tab id="admin">Database</Tab>
+      </TabList>
+      <TabPanel id="data">
+        <ExportImportPanel />
+      </TabPanel>
+      <TabPanel id="admin">
+        <div className="capture-modal__body" style={{ padding: 0 }}>
+          <DatabaseAdmin onWrite={props.onWrite} />
+        </div>
+      </TabPanel>
+    </TabsRoot>
+  )
+}
+
+function DataToolsModal({ onClose }: { onClose: () => void }): React.JSX.Element {
+  const { loadToday, refreshInboxCount } = useVaultStore()
+  const [tab, setTab] = useState<DataTab>('data')
+  const onWrite = () => {
+    void loadToday()
+    void refreshInboxCount()
+  }
   return createPortal(
     <Dialog
       title="Data tools"
@@ -164,72 +302,7 @@ function DataToolsModal({ onClose }: { onClose: () => void }): React.JSX.Element
       size={tab === 'admin' ? 'wide' : 'default'}
     >
       <div className="tv-data-tools" data-wide={tab === 'admin' ? '' : undefined}>
-        <TabsRoot selectedId={tab} onSelect={setTab}>
-          <TabList label="Data tools">
-            <Tab id="data">Export &amp; import</Tab>
-            <Tab id="admin">Database</Tab>
-          </TabList>
-
-          <TabPanel id="data">
-            <div
-              className="capture-modal__body"
-              style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
-            >
-              <p style={{ fontSize: 12, color: 'var(--tm-text-muted)', margin: 0 }}>
-                Export everything to JSON for backup or migration. Import merges records by ID —
-                existing data is not overwritten.
-              </p>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <Button
-                  variant="primary"
-                  icon={Download}
-                  onClick={handleExport}
-                  disabled={exporting}
-                  style={{ display: 'flex', alignItems: 'center', gap: 6 }}
-                >
-                  {exporting ? 'Exporting…' : 'Export JSON'}
-                </Button>
-                <Button
-                  icon={Upload}
-                  onClick={handleImportClick}
-                  disabled={importing}
-                  style={{ display: 'flex', alignItems: 'center', gap: 6 }}
-                >
-                  {importing ? 'Importing…' : 'Import JSON'}
-                </Button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".json"
-                  style={{ display: 'none' }}
-                  onChange={handleFileChange}
-                />
-              </div>
-              {status && (
-                <p
-                  style={{
-                    fontSize: 12,
-                    color: status.includes('failed') ? 'var(--tm-danger)' : 'var(--tm-success)',
-                    margin: 0,
-                  }}
-                >
-                  {status}
-                </p>
-              )}
-            </div>
-          </TabPanel>
-
-          <TabPanel id="admin">
-            <div className="capture-modal__body" style={{ padding: 0 }}>
-              <DatabaseAdmin
-                onWrite={() => {
-                  void loadToday()
-                  void refreshInboxCount()
-                }}
-              />
-            </div>
-          </TabPanel>
-        </TabsRoot>
+        <DataToolsTabs tab={tab} onSelect={setTab} onWrite={onWrite} />
       </div>
     </Dialog>,
     document.body
@@ -250,443 +323,450 @@ async function fetchContexts(): Promise<string[] | null> {
   return null
 }
 
-/** Where the calendar sends the vault: a date's log, a task in it, a view. */
-interface VaultNavigation {
-  date?: string
-  taskId?: string
-  view?: 'daily' | 'review'
+/** Reloads the day being viewed: the viewed date, or today. */
+function reloadViewedDay(): void {
+  const vd = useVaultNavStore.getState().viewingDate
+  if (vd) void useVaultDataStore.getState().loadDate(vd)
+  else void useVaultDataStore.getState().loadToday()
 }
 
-export function TaskVaultView(): React.JSX.Element {
-  const {
-    todayLog,
-    activeView,
-    viewMode,
-    setViewMode,
-    selectedContexts,
-    setSelectedContexts,
-    toggleContext,
-    isLoading,
-    error,
-    loadToday,
-    loadDate,
-    refreshInboxCount,
-    rolledOverTaskIds,
-    pendingTaskId,
-    clearPendingTask,
-    viewingDate,
-    somedayTasks,
-    loadSomeday,
-    setKanbanLanes,
-    tickCalendar,
-    staleDaysThreshold,
-  } = useVaultStore()
-  const [showDataTools, setShowDataTools] = useState(false)
-  const [showCalendar, setShowCalendar] = useState(true)
-  const [availableContexts, setAvailableContexts] = useState<string[]>([])
-  const [contextMenuOpen, setContextMenuOpen] = useState(false)
-  const contextMenuRef = useRef<HTMLDivElement>(null)
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
-  const [selectedTaskText, setSelectedTaskText] = useState<string>('')
+/**
+ * Opens a navigation target: the day (or today), then the task, then an explicit
+ * view — after the task, because navigating to a task puts you on the daily log.
+ */
+function followNavigation(target: NavigationTarget): void {
+  const nav = useVaultNavStore.getState()
+  const data = useVaultDataStore.getState()
+  nav.setSkipNextVisibilityReset(true)
+  if (target.date) void data.loadDate(target.date)
+  else void data.loadToday()
+  if (target.taskId) nav.navigateToTask(target.taskId, target.date)
+  if (target.view) nav.setView(target.view)
+}
 
-  const loadSomedayTasks = loadSomeday
-
-  function applyContexts(contexts: string[] | null) {
-    if (contexts) setAvailableContexts(contexts)
-  }
-
-  const loadKanbanConfig = useCallback(async () => {
-    try {
-      const result = await window.electronAPI.extensionBridge.invoke('task-vault:kanban:get-config')
-      if (result && typeof result === 'object' && !('error' in result)) {
-        const cfg = result as { lanes: import('../vault/types').KanbanLane[] }
-        setKanbanLanes(cfg.lanes)
-      }
-    } catch {
-      // non-critical
-    }
-  }, [setKanbanLanes])
-
-  // The ref wraps the trigger too, so clicking it to close does not reopen.
-  useDismissible({
-    ref: contextMenuRef,
-    onDismiss: () => setContextMenuOpen(false),
-    manageFocus: false,
-    enabled: contextMenuOpen,
-  })
-
-  // Navigation intent arrives on the `task-vault:navigate` bridge channel, which
-  // the effect further down listens to. A second path used to read the core
-  // registry's pendingNavigations map — but this view bundles its own copy of
-  // that store, so nothing was ever put in the map it was reading.
-
-  const pendingTask =
-    pendingTaskId && todayLog ? todayLog.tasks.find((t) => t.id === pendingTaskId) : undefined
-  if (pendingTask && (selectedTaskId !== pendingTask.id || selectedTaskText !== pendingTask.text)) {
-    setSelectedTaskId(pendingTask.id)
-    setSelectedTaskText(pendingTask.text)
-  }
-
+/**
+ * Navigation from the calendar arrives on `task-vault:navigate`; one sent before this
+ * view existed is popped from main on mount. A second path used to read the core
+ * registry's pendingNavigations map — but this view bundles its own copy of that
+ * store, so nothing was ever put in the map it was reading.
+ */
+function useNavigationRequests(): void {
   useEffect(() => {
-    if (!pendingTaskId || !todayLog) return
-    const found = todayLog.tasks.some((t) => t.id === pendingTaskId)
-    // If still loading: wait for todayLog to update with the correct date's data.
-    // Loaded but not found: stale/deleted task, clear to avoid looping.
-    if (found || !isLoading) clearPendingTask()
-  }, [pendingTaskId, todayLog, isLoading, clearPendingTask])
+    return window.electronAPI.extensionBridge.on('task-vault:navigate', (data) => {
+      followNavigation((data ?? {}) as NavigationTarget)
+    })
+  }, [])
+  useEffect(() => {
+    window.electronAPI.extensionBridge
+      .invoke('task-vault:pop-pending-navigation', null)
+      .then((nav) => {
+        if (nav && typeof nav === 'object') followNavigation(nav as NavigationTarget)
+      })
+      .catch(() => {})
+  }, [])
+}
 
-  // Reset to today whenever the vault panel becomes visible from hidden.
-  // This ensures "open vault" always lands on today, while in-session navigation is preserved.
-  // skipNextVisibilityReset suppresses this reset when navigation from the calendar panel
-  // has already set the target date before the panel becomes visible.
+/**
+ * Resets to today whenever the vault panel becomes visible from hidden, so "open vault"
+ * lands on today while in-session navigation is kept. skipNextVisibilityReset suppresses
+ * it when a calendar navigation already set the target before the panel showed.
+ */
+function useVisibilityReset(): void {
   useEffect(() => {
     function onVisibilityChange() {
       if (document.visibilityState !== 'visible') return
       const store = useVaultNavStore.getState()
-      if (store.skipNextVisibilityReset) {
-        store.setSkipNextVisibilityReset(false)
-        return
-      }
-      useVaultNavStore.getState().setView('daily')
-      useVaultNavStore.getState().setViewingDate(null)
-      void loadToday()
+      if (store.skipNextVisibilityReset) return store.setSkipNextVisibilityReset(false)
+      store.setView('daily')
+      store.setViewingDate(null)
+      void useVaultDataStore.getState().loadToday()
     }
     document.addEventListener('visibilitychange', onVisibilityChange)
     return () => document.removeEventListener('visibilitychange', onVisibilityChange)
-  }, [loadToday])
-
-  // Go where a calendar navigation points: a date (else today), a task, a view.
-  const goTo = useCallback(
-    ({ date, taskId, view }: VaultNavigation) => {
-      useVaultNavStore.getState().setSkipNextVisibilityReset(true)
-      if (date) void loadDate(date)
-      else void loadToday()
-      if (taskId) useVaultNavStore.getState().navigateToTask(taskId, date)
-      // After the task, because `navigateToTask` puts you on the daily log —
-      // an explicit view is the caller overriding that, not competing with it.
-      if (view) useVaultNavStore.getState().setView(view)
-    },
-    [loadDate, loadToday]
-  )
-
-  // Handle navigation from the in-app calendar sidebar / standalone calendar panel.
-  useEffect(() => {
-    return window.electronAPI.extensionBridge.on('task-vault:navigate', (data) =>
-      goTo((data ?? {}) as VaultNavigation)
-    )
-  }, [goTo])
-
-  // Cold-start: if this view mounted because of a calendar navigation (before the
-  // WebContentsView existed), the broadcast was lost — pop the pending nav from main.
-  useEffect(() => {
-    void (async () => {
-      try {
-        const nav = await window.electronAPI.extensionBridge.invoke(
-          'task-vault:pop-pending-navigation',
-          null
-        )
-        if (!nav || typeof nav !== 'object') return
-        goTo(nav as VaultNavigation)
-      } catch {
-        // non-critical
-      }
-    })()
-  }, [goTo])
-
-  useEffect(() => {
-    const vd = useVaultNavStore.getState().viewingDate
-    if (vd) void loadDate(vd)
-    else loadToday()
-    refreshInboxCount()
-    void fetchContexts().then(applyContexts)
-    void loadSomedayTasks()
-    void loadKanbanConfig()
-
-    const unsubIndexUpdated = window.electronAPI.extensionBridge.on(
-      'task-vault:push:index-updated',
-      () => {
-        const vd = useVaultNavStore.getState().viewingDate
-        if (vd) void loadDate(vd)
-        else loadToday()
-        refreshInboxCount()
-        void fetchContexts().then(applyContexts)
-        void loadSomedayTasks()
-        tickCalendar()
-      }
-    )
-
-    const unsubExternal = window.electronAPI.extensionBridge.on(
-      'task-vault:push:file-changed-externally',
-      () => {
-        const vd = useVaultNavStore.getState().viewingDate
-        if (vd) void loadDate(vd)
-        else loadToday()
-      }
-    )
-
-    const unsubRecurrenceSpawned = window.electronAPI.extensionBridge.on(
-      'task-vault:recurrence-spawned',
-      () => {
-        tickCalendar()
-        const vd = useVaultNavStore.getState().viewingDate
-        if (vd) void loadDate(vd)
-        else loadToday()
-      }
-    )
-
-    return () => {
-      unsubIndexUpdated()
-      unsubExternal()
-      unsubRecurrenceSpawned()
-    }
   }, [])
+}
 
-  function makeTaskNavHandler(taskId: string): () => void {
-    // Already inside the vault view; the tab activation this used to do reached
-    // a copy of the core registry bundled into this view and moved nothing.
-    return () => useVaultNavStore.getState().navigateToTask(taskId)
-  }
-
-  async function handleComplete(taskId: string) {
-    const taskText = (todayLog?.tasks ?? []).find((t) => t.id === taskId)?.text ?? ''
-    await window.electronAPI.extensionBridge.invoke('task-vault:vault:complete-task', { taskId })
-    notify('success', taskText ? `Completed: ${taskText}` : 'Task completed', 'taskCompleted', {
-      onClick: makeTaskNavHandler(taskId),
-    })
-    if (viewingDate) await loadDate(viewingDate)
-    else await loadToday()
-  }
-
-  async function handlePickUpToday(taskId: string) {
-    await window.electronAPI.extensionBridge.invoke('task-vault:vault:someday-to-today', { taskId })
-    await loadToday()
-    await loadSomedayTasks()
-  }
-
-  async function handleDeleteBacklogTask(taskId: string) {
-    await window.electronAPI.extensionBridge.invoke('task-vault:vault:delete-task', { taskId })
-    await loadSomedayTasks()
-  }
-
-  async function handleMigrate(taskId: string, targetDate: string) {
-    const taskText = (todayLog?.tasks ?? []).find((t) => t.id === taskId)?.text ?? ''
-    const result = (await window.electronAPI.extensionBridge.invoke(
-      'task-vault:vault:migrate-task',
-      {
-        taskId,
-        targetDate,
-      }
-    )) as { noop?: boolean } | undefined
-    if (result?.noop) return
-    notify('info', taskText ? `Migrated: ${taskText}` : 'Task migrated', 'taskMigrated', {
-      onClick: makeTaskNavHandler(taskId),
-    })
-    if (viewingDate) await loadDate(viewingDate)
-    else await loadToday()
-  }
-
-  // Day navigation helpers
-  const todayStr = (() => {
-    const d = new Date()
-    const pad = (n: number) => String(n).padStart(2, '0')
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-  })()
-  const currentDate = viewingDate ?? todayStr
-  const isToday = viewingDate === null || viewingDate === todayStr
-
-  function goToPrevDay() {
-    const d = new Date(currentDate + 'T12:00:00')
-    d.setDate(d.getDate() - 1)
-    const pad = (n: number) => String(n).padStart(2, '0')
-    const prev = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-    void loadDate(prev)
-  }
-
-  function goToNextDay() {
-    const d = new Date(currentDate + 'T12:00:00')
-    d.setDate(d.getDate() + 1)
-    const pad = (n: number) => String(n).padStart(2, '0')
-    const next = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-    void loadDate(next)
-  }
-
-  function handleSelectTask(taskId: string | null) {
-    if (taskId === null) {
-      setSelectedTaskId(null)
-      setSelectedTaskText('')
-      return
+async function loadKanbanLanes(): Promise<void> {
+  try {
+    const result = await window.electronAPI.extensionBridge.invoke('task-vault:kanban:get-config')
+    if (result && typeof result === 'object' && !('error' in result)) {
+      useVaultDataStore.getState().setKanbanLanes((result as { lanes: KanbanLane[] }).lanes)
     }
-    // Toggle off if same task clicked again
-    if (taskId === selectedTaskId) {
-      setSelectedTaskId(null)
-      setSelectedTaskText('')
-      return
-    }
-    const allTasks = [...(todayLog?.tasks ?? []), ...somedayTasks]
-    const task = allTasks.find((t) => t.id === taskId)
-    setSelectedTaskId(taskId)
-    setSelectedTaskText(task?.text ?? '')
+  } catch {
+    // non-critical
   }
+}
 
+/** Loads the day, inbox count, contexts, backlog and lanes, and reloads on vault pushes. */
+function useVaultData(setContexts: (contexts: string[]) => void): void {
   useEffect(() => {
-    if (!selectedTaskId) return
+    const data = useVaultDataStore.getState()
+    const loadContexts = () => void fetchContexts().then((c) => c && setContexts(c))
+    reloadViewedDay()
+    void data.refreshInboxCount()
+    loadContexts()
+    void data.loadSomeday()
+    void loadKanbanLanes()
+    const on = window.electronAPI.extensionBridge.on
+    const unsubs = [
+      on('task-vault:push:index-updated', () => {
+        reloadViewedDay()
+        void data.refreshInboxCount()
+        loadContexts()
+        void data.loadSomeday()
+        data.tickCalendar()
+      }),
+      on('task-vault:push:file-changed-externally', reloadViewedDay),
+      on('task-vault:recurrence-spawned', () => {
+        data.tickCalendar()
+        reloadViewedDay()
+      }),
+    ]
+    return () => unsubs.forEach((unsub) => unsub())
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+}
+
+/** The task in the detail panel: picked by click (again to close) or by a pending navigation. */
+function useTaskSelection() {
+  const { todayLog, somedayTasks, pendingTaskId, isLoading, clearPendingTask } = useVaultStore()
+  const [selected, setSelected] = useState<Selected>({ id: null, text: '' })
+  const pendingTask =
+    pendingTaskId && todayLog ? todayLog.tasks.find((t) => t.id === pendingTaskId) : undefined
+  if (pendingTask && (selected.id !== pendingTask.id || selected.text !== pendingTask.text)) {
+    setSelected({ id: pendingTask.id, text: pendingTask.text })
+  }
+  useEffect(() => {
+    if (!pendingTaskId || !todayLog) return
+    // Still loading: wait for the right day. Loaded but missing: stale, so clear it.
+    if (todayLog.tasks.some((t) => t.id === pendingTaskId) || !isLoading) clearPendingTask()
+  }, [pendingTaskId, todayLog, isLoading, clearPendingTask])
+
+  function select(taskId: string | null) {
+    if (taskId === null || taskId === selected.id) return setSelected({ id: null, text: '' })
+    const task = [...(todayLog?.tasks ?? []), ...somedayTasks].find((t) => t.id === taskId)
+    setSelected({ id: taskId, text: task?.text ?? '' })
+  }
+  useEscapeDeselect(selected.id, () => select(null))
+  return { selected, select }
+}
+
+/** Escape closes the detail panel, unless a suggestion list is open. */
+function useEscapeDeselect(selectedId: string | null, deselect: () => void): void {
+  useEffect(() => {
+    if (!selectedId) return
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape' && !document.querySelector('.smart-input__dropdown')) {
-        handleSelectTask(null)
-      }
+      if (e.key === 'Escape' && !document.querySelector('.smart-input__dropdown')) deselect()
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [selectedTaskId])
+  }, [selectedId]) // eslint-disable-line react-hooks/exhaustive-deps
+}
 
+function shiftDay(date: string, days: number): string {
+  const d = new Date(date + 'T12:00:00')
+  d.setDate(d.getDate() + days)
+  return localDateString(d)
+}
+
+/**
+ * Leads back to the task. Already inside the vault view; the tab activation this
+ * used to do reached a copy of the core registry bundled into this view and moved nothing.
+ */
+function makeTaskNavHandler(taskId: string): () => void {
+  return () => useVaultNavStore.getState().navigateToTask(taskId)
+}
+
+function invoke(channel: string, payload: unknown): Promise<unknown> {
+  return window.electronAPI.extensionBridge.invoke(channel, payload)
+}
+
+/** Completes the task, says so with a link back to it, and reloads the day. */
+async function completeTask(day: DayContext, taskId: string): Promise<void> {
+  const text = day.textOf(taskId)
+  await invoke('task-vault:vault:complete-task', { taskId })
+  notify('success', text ? `Completed: ${text}` : 'Task completed', {
+    key: 'taskCompleted',
+    onClick: makeTaskNavHandler(taskId),
+  })
+  await day.reloadDay()
+}
+
+/** Migrates the task; a no-op migration says nothing and reloads nothing. */
+async function migrateTask(day: DayContext, taskId: string, targetDate: string): Promise<void> {
+  const text = day.textOf(taskId)
+  const result = (await invoke('task-vault:vault:migrate-task', { taskId, targetDate })) as
+    | { noop?: boolean }
+    | undefined
+  if (result?.noop) return
+  notify('info', text ? `Migrated: ${text}` : 'Task migrated', {
+    key: 'taskMigrated',
+    onClick: makeTaskNavHandler(taskId),
+  })
+  await day.reloadDay()
+}
+
+/** The daily log's actions: complete, migrate, the backlog, and moving between days. */
+function useDailyActions() {
+  const { todayLog, viewingDate, loadDate, loadToday, loadSomeday } = useVaultStore()
+  const textOf = (taskId: string) =>
+    (todayLog?.tasks ?? []).find((t) => t.id === taskId)?.text ?? ''
+  const day: DayContext = {
+    textOf,
+    reloadDay: () => (viewingDate ? loadDate(viewingDate) : loadToday()),
+  }
+  const currentDate = viewingDate ?? localDateString(new Date())
+  return {
+    currentDate,
+    isToday: viewingDate === null || viewingDate === localDateString(new Date()),
+    complete: (taskId: string) => completeTask(day, taskId),
+    migrate: (taskId: string, targetDate: string) => migrateTask(day, taskId, targetDate),
+    pickUpToday: async (taskId: string) => {
+      await invoke('task-vault:vault:someday-to-today', { taskId })
+      await loadToday()
+      await loadSomeday()
+    },
+    deleteBacklogTask: async (taskId: string) => {
+      await invoke('task-vault:vault:delete-task', { taskId })
+      await loadSomeday()
+    },
+    prevDay: () => void loadDate(shiftDay(currentDate, -1)),
+    nextDay: () => void loadDate(shiftDay(currentDate, 1)),
+  }
+}
+
+/** Filter label: "Filter", the one context, or how many are chosen. */
+function filterLabel(selected: string[]): string {
+  if (selected.length === 0) return 'Filter'
+  if (selected.length === 1) return `+${selected[0]}`
+  return `${selected.length} contexts`
+}
+
+function ContextFilterHeader(): React.JSX.Element {
+  const { selectedContexts, setSelectedContexts } = useVaultStore()
+  return (
+    <div className="tv-context-filter__header">
+      <span className="tv-context-filter__heading">Filter by context</span>
+      {selectedContexts.length > 0 && (
+        <Button variant="ghost" size="sm" onClick={() => setSelectedContexts([])}>
+          Clear
+        </Button>
+      )}
+    </div>
+  )
+}
+
+function ContextOptions({ availableContexts }: { availableContexts: string[] }): React.JSX.Element {
+  const { selectedContexts, toggleContext } = useVaultStore()
+  return (
+    <div className="tv-context-filter__dropdown">
+      <ContextFilterHeader />
+      {availableContexts.length === 0 && (
+        <span className="tv-context-filter__empty">No contexts found</span>
+      )}
+      {availableContexts.map((ctx) => (
+        <label key={ctx} className="tv-context-filter__option">
+          <input
+            type="checkbox"
+            checked={selectedContexts.includes(ctx)}
+            onChange={() => toggleContext(ctx)}
+            className="tv-context-filter__checkbox"
+          />
+          <span>{`+${ctx}`}</span>
+        </label>
+      ))}
+    </div>
+  )
+}
+
+/** The context filter; its ref wraps the trigger too, so clicking it to close does not reopen. */
+function ContextFilter({ availableContexts }: { availableContexts: string[] }): React.JSX.Element {
+  const { selectedContexts } = useVaultStore()
+  const [open, setOpen] = useState(false)
+  const contextMenuRef = useRef<HTMLDivElement>(null)
+  useDismissible({
+    ref: contextMenuRef,
+    onDismiss: () => setOpen(false),
+    manageFocus: false,
+    enabled: open,
+  })
+  return (
+    <div className="tv-context-filter" ref={contextMenuRef}>
+      <Button
+        aria-label="Filter by context"
+        variant={selectedContexts.length > 0 ? 'secondary' : 'ghost'}
+        size="sm"
+        onClick={() => setOpen((v) => !v)}
+        title="Filter"
+      >
+        {filterLabel(selectedContexts)}
+        <ChevronDown className="tm-icon-sm" />
+      </Button>
+      {open && <ContextOptions availableContexts={availableContexts} />}
+    </div>
+  )
+}
+
+function ViewModeToggles(): React.JSX.Element {
+  const { viewMode, setViewMode } = useVaultStore()
+  return (
+    <>
+      <IconButton
+        icon={List}
+        label="List view"
+        pressed={viewMode === 'list'}
+        onClick={() => setViewMode('list')}
+      />
+      <IconButton
+        icon={Kanban}
+        label="Board view"
+        pressed={viewMode === 'kanban'}
+        onClick={() => setViewMode('kanban')}
+      />
+    </>
+  )
+}
+
+/**
+ * The view toggles carried `title` alone, so enumerating every button in the running
+ * view returned neither: a tooltip is not a label, and never appears for keyboard or
+ * touch. IconButton takes the label as a required prop.
+ */
+function VaultToolbar(props: ToolbarProps): React.JSX.Element {
+  const { activeView } = useVaultStore()
+  return (
+    <div className="task-vault-view__toolbar-row">
+      <div className="task-vault-view__toolbar">
+        <div className="task-vault-view__toolbar-right">
+          <ViewModeToggles />
+          <ContextFilter availableContexts={props.availableContexts} />
+          {activeView === 'daily' && (
+            <IconButton
+              icon={CalendarDays}
+              label="Calendar"
+              pressed={props.showCalendar}
+              className="task-vault-view__tools-btn"
+              onClick={props.onToggleCalendar}
+            />
+          )}
+          <IconButton
+            icon={Settings}
+            label="Data tools (export / import)"
+            size="sm"
+            className="task-vault-view__tools-btn"
+            onClick={props.onDataTools}
+          />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** No log yet: the loading line, and any load error under it. */
+function LoadingDay(props: { error: string | null }): React.JSX.Element {
+  return (
+    <>
+      <div className="task-vault-view__loading">Loading…</div>
+      {props.error && <div className="task-vault-view__error">{props.error}</div>}
+    </>
+  )
+}
+
+/** Today reloads the log and the backlog; another day reloads just that day. */
+function dayRefresh(store: ReturnType<typeof useVaultStore>, actions: DailyActions) {
+  if (!actions.isToday) return () => store.loadDate(actions.currentDate)
+  return async () => {
+    await store.loadToday()
+    await store.loadSomeday()
+  }
+}
+
+function DailyArea({ selection }: DailyProps): React.JSX.Element {
+  const store = useVaultStore()
+  const { todayLog, error } = store
+  const actions = useDailyActions()
+  if (!todayLog) return <LoadingDay error={error} />
+  if (error) return <div className="task-vault-view__error">{error}</div>
+  return (
+    <DailyLog
+      log={todayLog}
+      rolledOverTaskIds={store.rolledOverTaskIds}
+      selectedContexts={store.selectedContexts}
+      selectedTaskId={selection.selected.id}
+      onSelectTask={selection.select}
+      onTaskComplete={actions.complete}
+      onTaskMigrate={actions.migrate}
+      onRefresh={dayRefresh(store, actions)}
+      onPrevDay={actions.prevDay}
+      onNextDay={actions.nextDay}
+      onGoToToday={store.loadToday}
+      isToday={actions.isToday}
+      somedayTasks={store.somedayTasks}
+      onPickUpToday={actions.pickUpToday}
+      onDeleteBacklogTask={actions.deleteBacklogTask}
+      onRefreshBacklog={store.loadSomeday}
+      staleDaysThreshold={store.staleDaysThreshold}
+    />
+  )
+}
+
+const OTHER_VIEWS: Partial<Record<VaultView, () => React.JSX.Element>> = {
+  inbox: InboxView,
+  projects: ProjectsBrowser,
+  areas: AreasView,
+  archive: ArchiveView,
+  review: WeeklyReview,
+}
+
+function DetailPane({ selection }: DailyProps): React.JSX.Element | null {
+  const { id, text } = selection.selected
+  if (!id) return null
+  return (
+    <>
+      <div className="tv-detail-panel__backdrop" onClick={() => selection.select(null)} />
+      <TaskDetailPanel taskId={id} taskText={text} onClose={() => selection.select(null)} />
+    </>
+  )
+}
+
+function MainPanel({ selection, showCalendar }: DailyProps & { showCalendar: boolean }) {
+  const { activeView } = useVaultStore()
+  const Other = OTHER_VIEWS[activeView]
+  return (
+    <div className="task-vault-view__main">
+      <div className="task-vault-view__list">
+        {activeView === 'daily' && <DailyArea selection={selection} />}
+        {Other && <Other />}
+      </div>
+      {activeView === 'daily' && <DetailPane selection={selection} />}
+      {activeView === 'daily' && showCalendar && <CalendarDrawer />}
+    </div>
+  )
+}
+
+export function TaskVaultView(): React.JSX.Element {
+  const { viewMode, activeView } = useVaultStore()
+  const [showDataTools, setShowDataTools] = useState(false)
+  const [showCalendar, setShowCalendar] = useState(true)
+  const [availableContexts, setAvailableContexts] = useState<string[]>([])
+  const selection = useTaskSelection()
+  useVisibilityReset()
+  useNavigationRequests()
+  useVaultData(setAvailableContexts)
   return (
     <div className="task-vault-view">
       {showDataTools && <DataToolsModal onClose={() => setShowDataTools(false)} />}
       <VaultSidebar />
       <div className="task-vault-view__content">
-        <div className="task-vault-view__toolbar-row">
-          <div className="task-vault-view__toolbar">
-            <div className="task-vault-view__toolbar-right">
-              {/* These carried `title` alone, so enumerating every button in the
-                  running view returned neither of them: a tooltip is not a
-                  label, and never appears for keyboard or touch. IconButton
-                  takes the label as a required prop. */}
-              <IconButton
-                icon={List}
-                label="List view"
-                pressed={viewMode === 'list'}
-                onClick={() => setViewMode('list')}
-              />
-              <IconButton
-                icon={Kanban}
-                label="Board view"
-                pressed={viewMode === 'kanban'}
-                onClick={() => setViewMode('kanban')}
-              />
-              <div className="tv-context-filter" ref={contextMenuRef}>
-                <Button
-                  variant={selectedContexts.length > 0 ? 'secondary' : 'ghost'}
-                  size="sm"
-                  onClick={() => setContextMenuOpen((v) => !v)}
-                  title="Filter"
-                  aria-label="Filter by context"
-                >
-                  {selectedContexts.length === 0
-                    ? 'Filter'
-                    : selectedContexts.length === 1
-                      ? `+${selectedContexts[0]}`
-                      : `${selectedContexts.length} contexts`}
-                  <ChevronDown className="tm-icon-sm" />
-                </Button>
-                {contextMenuOpen && (
-                  <div className="tv-context-filter__dropdown">
-                    <div className="tv-context-filter__header">
-                      <span className="tv-context-filter__heading">Filter by context</span>
-                      {selectedContexts.length > 0 && (
-                        <Button variant="ghost" size="sm" onClick={() => setSelectedContexts([])}>
-                          Clear
-                        </Button>
-                      )}
-                    </div>
-                    {availableContexts.length === 0 && (
-                      <span className="tv-context-filter__empty">No contexts found</span>
-                    )}
-                    {availableContexts.map((ctx) => {
-                      const checked = selectedContexts.includes(ctx)
-                      return (
-                        <label key={ctx} className="tv-context-filter__option">
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={() => toggleContext(ctx)}
-                            className="tv-context-filter__checkbox"
-                          />
-                          <span>+{ctx}</span>
-                        </label>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
-              {activeView === 'daily' && (
-                <IconButton
-                  icon={CalendarDays}
-                  label="Calendar"
-                  pressed={showCalendar}
-                  className="task-vault-view__tools-btn"
-                  onClick={() => setShowCalendar((v) => !v)}
-                />
-              )}
-              <IconButton
-                icon={Settings}
-                label="Data tools (export / import)"
-                size="sm"
-                className="task-vault-view__tools-btn"
-                onClick={() => setShowDataTools(true)}
-              />
-            </div>
-          </div>
-        </div>
+        <VaultToolbar
+          availableContexts={availableContexts}
+          showCalendar={showCalendar}
+          onToggleCalendar={() => setShowCalendar((v) => !v)}
+          onDataTools={() => setShowDataTools(true)}
+        />
         {viewMode === 'kanban' && activeView !== 'review' ? (
           <KanbanBoard />
         ) : (
-          <div className="task-vault-view__main">
-            <div className="task-vault-view__list">
-              {activeView === 'daily' && isLoading && !todayLog && (
-                <div className="task-vault-view__loading">Loading…</div>
-              )}
-              {activeView === 'daily' && error && (
-                <div className="task-vault-view__error">{error}</div>
-              )}
-              {activeView === 'daily' && !error && todayLog && (
-                <DailyLog
-                  log={todayLog}
-                  rolledOverTaskIds={rolledOverTaskIds}
-                  selectedContexts={selectedContexts}
-                  selectedTaskId={selectedTaskId}
-                  onSelectTask={handleSelectTask}
-                  onTaskComplete={handleComplete}
-                  onTaskMigrate={handleMigrate}
-                  onRefresh={
-                    isToday
-                      ? async () => {
-                          await loadToday()
-                          await loadSomedayTasks()
-                        }
-                      : () => loadDate(currentDate)
-                  }
-                  onPrevDay={goToPrevDay}
-                  onNextDay={goToNextDay}
-                  onGoToToday={loadToday}
-                  isToday={isToday}
-                  somedayTasks={somedayTasks}
-                  onPickUpToday={handlePickUpToday}
-                  onDeleteBacklogTask={handleDeleteBacklogTask}
-                  onRefreshBacklog={loadSomedayTasks}
-                  staleDaysThreshold={staleDaysThreshold}
-                />
-              )}
-              {activeView === 'daily' && !isLoading && !error && !todayLog && (
-                <div className="task-vault-view__loading">Loading…</div>
-              )}
-              {activeView === 'inbox' && <InboxView />}
-              {activeView === 'projects' && <ProjectsBrowser />}
-              {activeView === 'areas' && <AreasView />}
-              {activeView === 'archive' && <ArchiveView />}
-              {activeView === 'review' && <WeeklyReview />}
-            </div>
-            {selectedTaskId && activeView === 'daily' && (
-              <>
-                <div className="tv-detail-panel__backdrop" onClick={() => handleSelectTask(null)} />
-                <TaskDetailPanel
-                  taskId={selectedTaskId}
-                  taskText={selectedTaskText}
-                  onClose={() => handleSelectTask(null)}
-                />
-              </>
-            )}
-            {activeView === 'daily' && showCalendar && <CalendarDrawer />}
-          </div>
+          <MainPanel selection={selection} showCalendar={showCalendar} />
         )}
       </div>
     </div>

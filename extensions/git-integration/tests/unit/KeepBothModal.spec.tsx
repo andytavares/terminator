@@ -59,7 +59,9 @@ describe('KeepBothModal', () => {
     const text = previewEl?.textContent ?? ''
     expect(text.indexOf('const y = 2')).toBeLessThan(text.indexOf('const x = 1'))
   })
+})
 
+describe('KeepBothModal — Mine first toggle restores original order', () => {
   it('"Mine first" toggle restores original order', () => {
     render(<KeepBothModal block={uniqueBlock} onConfirm={vi.fn()} onCancel={vi.fn()} />)
     fireEvent.click(screen.getByRole('radio', { name: /Theirs first/i }))
@@ -78,7 +80,9 @@ describe('KeepBothModal', () => {
       'both-ours-first'
     )
   })
+})
 
+describe('KeepBothModal — calls onConfirm with both-theirs-first strategy when confirming theirs-first', () => {
   it('calls onConfirm with both-theirs-first strategy when confirming theirs-first', () => {
     const onConfirm = vi.fn()
     render(<KeepBothModal block={uniqueBlock} onConfirm={onConfirm} onCancel={vi.fn()} />)
@@ -103,7 +107,9 @@ describe('KeepBothModal', () => {
     fireEvent.click(screen.getByText(/Cancel/i))
     expect(onConfirm).not.toHaveBeenCalled()
   })
+})
 
+describe('KeepBothModal — shows duplicate identifier warning when ours and theirs contain same function name', () => {
   it('shows duplicate identifier warning when ours and theirs contain same function name', () => {
     render(<KeepBothModal block={baseBlock} onConfirm={vi.fn()} onCancel={vi.fn()} />)
     expect(screen.getByText(/duplicate|same name|conflict/i)).toBeTruthy()

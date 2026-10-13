@@ -38,18 +38,18 @@ function buildRegistry() {
   }
 }
 
+let getHandler: (channel: string) => Handler
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  const registry = buildRegistry()
+  registerGitExtensionHandlers(registry.register)
+  getHandler = registry.getHandler
+})
+
 // ── tests ─────────────────────────────────────────────────────────────────────
 
 describe('git:status', () => {
-  let getHandler: (channel: string) => Handler
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    const registry = buildRegistry()
-    registerGitExtensionHandlers(registry.register)
-    getHandler = registry.getHandler
-  })
-
   it('returns the status from getStatus, defaulting maxFiles to 500', async () => {
     vi.mocked(gitService.getStatus).mockResolvedValue({
       branch: 'main',
@@ -81,15 +81,6 @@ describe('git:status', () => {
 })
 
 describe('git:diff-file', () => {
-  let getHandler: (channel: string) => Handler
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    const registry = buildRegistry()
-    registerGitExtensionHandlers(registry.register)
-    getHandler = registry.getHandler
-  })
-
   it('wraps the diff from getDiff, passing staged and isUntracked through', async () => {
     vi.mocked(gitService.getDiff).mockResolvedValue({
       path: 'a.ts',
@@ -103,10 +94,15 @@ describe('git:diff-file', () => {
       staged: true,
       isUntracked: false,
     })
-    expect(gitService.getDiff).toHaveBeenCalledWith('/repo', 'a.ts', true, false)
+    expect(gitService.getDiff).toHaveBeenCalledWith('/repo', 'a.ts', {
+      staged: true,
+      isUntracked: false,
+    })
     expect(result).toEqual({ diff: { path: 'a.ts', hunks: [], isBinary: false, truncated: false } })
   })
+})
 
+describe('git:diff-file — returns an error when getDiff throws', () => {
   it('returns an error when getDiff throws', async () => {
     vi.mocked(gitService.getDiff).mockRejectedValue(new Error('no such path'))
     const result = (await getHandler('git:diff-file')({
@@ -119,15 +115,6 @@ describe('git:diff-file', () => {
 })
 
 describe('git:stage', () => {
-  let getHandler: (channel: string) => Handler
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    const registry = buildRegistry()
-    registerGitExtensionHandlers(registry.register)
-    getHandler = registry.getHandler
-  })
-
   it('returns success when stageFiles succeeds', async () => {
     vi.mocked(gitService.stageFiles).mockResolvedValue(undefined)
     const result = await getHandler('git:stage')({ repoRoot: '/repo', paths: ['src/main.ts'] })
@@ -146,15 +133,6 @@ describe('git:stage', () => {
 })
 
 describe('git:unstage', () => {
-  let getHandler: (channel: string) => Handler
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    const registry = buildRegistry()
-    registerGitExtensionHandlers(registry.register)
-    getHandler = registry.getHandler
-  })
-
   it('returns error when unstageFiles throws', async () => {
     vi.mocked(gitService.unstageFiles).mockRejectedValue(new Error('index locked'))
     const result = (await getHandler('git:unstage')({
@@ -172,15 +150,6 @@ describe('git:unstage', () => {
 })
 
 describe('git:commit', () => {
-  let getHandler: (channel: string) => Handler
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    const registry = buildRegistry()
-    registerGitExtensionHandlers(registry.register)
-    getHandler = registry.getHandler
-  })
-
   it('returns EMPTY_MESSAGE for a blank message and never calls commitChanges', async () => {
     const result = (await getHandler('git:commit')({
       repoRoot: '/repo',
@@ -198,40 +167,36 @@ describe('git:commit', () => {
       signOff: true,
       noVerify: true,
     })
-    expect(gitService.commitChanges).toHaveBeenCalledWith(
-      '/repo',
-      'feat: add x',
-      true,
-      true,
-      expect.any(Function)
-    )
+    expect(gitService.commitChanges).toHaveBeenCalledWith('/repo', 'feat: add x', {
+      signOff: true,
+      noVerify: true,
+      onOutput: expect.any(Function),
+    })
     expect(result).toEqual({ commitHash: 'abc123' })
   })
+})
 
+describe('git:commit — defaults and streamed output', () => {
   it('defaults signOff and noVerify to false when omitted', async () => {
     vi.mocked(gitService.commitChanges).mockResolvedValue({ commitHash: 'abc123' })
     await getHandler('git:commit')({ repoRoot: '/repo', message: 'msg' })
-    expect(gitService.commitChanges).toHaveBeenCalledWith(
-      '/repo',
-      'msg',
-      false,
-      false,
-      expect.any(Function)
-    )
+    expect(gitService.commitChanges).toHaveBeenCalledWith('/repo', 'msg', {
+      signOff: false,
+      noVerify: false,
+      onOutput: expect.any(Function),
+    })
   })
 
   it('buffers onOutput lines so a poll during the commit can read them, then clears the buffer once the commit resolves', async () => {
     let captured: ((line: string) => void) | undefined
-    vi.mocked(gitService.commitChanges).mockImplementation(
-      async (_root, _msg, _s, _n, onOutput) => {
-        captured = onOutput
-        captured?.('running pre-commit hook')
-        const poll = getHandler('git:commit-output-poll')
-        const midCommit = (await poll({ repoRoot: '/repo' })) as { lines: string[] }
-        expect(midCommit.lines).toEqual(['running pre-commit hook'])
-        return { commitHash: 'abc123' }
-      }
-    )
+    vi.mocked(gitService.commitChanges).mockImplementation(async (_root, _msg, options) => {
+      captured = options?.onOutput
+      captured?.('running pre-commit hook')
+      const poll = getHandler('git:commit-output-poll')
+      const midCommit = (await poll({ repoRoot: '/repo' })) as { lines: string[] }
+      expect(midCommit.lines).toEqual(['running pre-commit hook'])
+      return { commitHash: 'abc123' }
+    })
 
     await getHandler('git:commit')({ repoRoot: '/repo', message: 'msg' })
 
@@ -243,15 +208,6 @@ describe('git:commit', () => {
 })
 
 describe('git:commit-output-poll', () => {
-  let getHandler: (channel: string) => Handler
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    const registry = buildRegistry()
-    registerGitExtensionHandlers(registry.register)
-    getHandler = registry.getHandler
-  })
-
   it('returns an empty lines array when no commit is in progress for that repo', async () => {
     const result = await getHandler('git:commit-output-poll')({ repoRoot: '/never-committed' })
     expect(result).toEqual({ lines: [] })
@@ -259,15 +215,6 @@ describe('git:commit-output-poll', () => {
 })
 
 describe('git:push handler (lines 96-110)', () => {
-  let getHandler: (channel: string) => Handler
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    const registry = buildRegistry()
-    registerGitExtensionHandlers(registry.register)
-    getHandler = registry.getHandler
-  })
-
   it('delegates to pushBranch with the repo root', async () => {
     vi.mocked(gitService.pushBranch).mockResolvedValue({
       success: true,

@@ -1,6 +1,7 @@
 import { classifyTier } from '../github/pr-review-service'
-import { analyseSnippet, symbolFromHunkHeader } from './symbols'
+import { analyseLines, symbolFromHunkHeader } from './symbols'
 import type { ReadingStep, SymbolUse } from '../schemas/pr-review.schema'
+import type { FileDiff } from '../schemas/git.schema'
 import type { ParsedPrFile } from './parsed-file'
 
 type ReferenceKind = 'call' | 'render' | 'use'
@@ -16,6 +17,24 @@ interface FileNode {
   references: Map<string, ReferenceKind>
 }
 
+interface StepContext {
+  byPath: Map<string, FileNode>
+  definerOf: Map<string, string>
+  stepOf: Map<string, number>
+  /** How many files reference each symbol. */
+  usageCount: Map<string, number>
+}
+
+/** A reference to a symbol another file defines, at that file's step. */
+interface Candidate {
+  symbol: string
+  kind: ReferenceKind
+  step: number
+}
+
+const KIND_PRIORITY: Record<ReferenceKind, number> = { call: 0, render: 1, use: 2 }
+const KIND_VERB: Record<ReferenceKind, string> = { call: 'Calls', render: 'Renders', use: 'Uses' }
+
 function referenceKind(addedText: string, symbol: string): ReferenceKind {
   const escaped = symbol.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   // A JSX element opens after whitespace, `(`, `{`, `=`, `>` or `?`/`:`; a type
@@ -25,256 +44,287 @@ function referenceKind(addedText: string, symbol: string): ReferenceKind {
   return 'use'
 }
 
+function hunkHeaderSymbols(diff: FileDiff): string[] {
+  return diff.hunks.flatMap((hunk) => symbolFromHunkHeader(hunk.header) ?? [])
+}
+
+function referencesOutside(
+  symbols: string[],
+  definitions: Set<string>,
+  addedText: string
+): Map<string, ReferenceKind> {
+  const references = new Map<string, ReferenceKind>()
+  for (const ref of symbols) {
+    if (!definitions.has(ref)) references.set(ref, referenceKind(addedText, ref))
+  }
+  return references
+}
+
 async function buildFileNode(file: ParsedPrFile): Promise<FileNode> {
   const { path, additions, deletions, diff } = file
   const tier = classifyTier(path)
-
-  const definitions = new Set<string>()
-  for (const hunk of diff.hunks) {
-    const headerSymbol = symbolFromHunkHeader(hunk.header)
-    if (headerSymbol) definitions.add(headerSymbol)
-  }
-
-  const definitionLines = diff.hunks
-    .flatMap((h) => h.lines.filter((l) => l.type === 'add' || l.type === 'context'))
-    .map((l) => l.content)
-    .join('\n')
-  const addedLines = diff.hunks
-    .flatMap((h) => h.lines.filter((l) => l.type === 'add'))
-    .map((l) => l.content)
-  const addedText = addedLines.join('\n')
-
-  const defAnalysis = definitionLines ? await analyseSnippet(path, definitionLines) : null
-  const refAnalysis = addedText ? await analyseSnippet(path, addedText) : null
-  const hasGrammar = defAnalysis !== null || refAnalysis !== null
-
-  if (defAnalysis) for (const d of defAnalysis.definitions) definitions.add(d)
-
-  const references = new Map<string, ReferenceKind>()
-  if (refAnalysis) {
-    for (const ref of refAnalysis.references) {
-      if (definitions.has(ref)) continue
-      references.set(ref, referenceKind(addedText, ref))
-    }
-  }
-
+  const headLines = diff.hunks.flatMap((h) => h.lines.filter((l) => l.type !== 'remove'))
+  const addedLines = diff.hunks.flatMap((h) => h.lines.filter((l) => l.type === 'add'))
+  const defAnalysis = await analyseLines(path, headLines)
+  const refAnalysis = await analyseLines(path, addedLines)
+  const definitions = new Set([...hunkHeaderSymbols(diff), ...(defAnalysis?.definitions ?? [])])
+  const addedText = addedLines.map((l) => l.content).join('\n')
   return {
     path,
     size: additions + deletions,
     tier,
     isTest: tier === 2,
-    hasGrammar,
+    hasGrammar: defAnalysis !== null || refAnalysis !== null,
     definitions,
-    references,
+    references: referencesOutside(refAnalysis?.references ?? [], definitions, addedText),
   }
 }
 
 // ─── Tarjan SCC ─────────────────────────────────────────────────────────────────
 
-function stronglyConnectedComponents(nodes: string[], edges: Map<string, Set<string>>): string[][] {
-  let index = 0
-  const indices = new Map<string, number>()
-  const lowlink = new Map<string, number>()
-  const onStack = new Set<string>()
-  const stack: string[] = []
-  const result: string[][] = []
+interface TarjanState {
+  edges: Map<string, Set<string>>
+  index: number
+  indices: Map<string, number>
+  lowlink: Map<string, number>
+  onStack: Set<string>
+  stack: string[]
+  components: string[][]
+}
 
-  function strongConnect(v: string): void {
-    indices.set(v, index)
-    lowlink.set(v, index)
-    index++
-    stack.push(v)
-    onStack.add(v)
+function popComponent(state: TarjanState, root: string): string[] {
+  const component: string[] = []
+  let w: string
+  do {
+    w = state.stack.pop()!
+    state.onStack.delete(w)
+    component.push(w)
+  } while (w !== root)
+  return component
+}
 
-    for (const w of edges.get(v) ?? []) {
-      if (!indices.has(w)) {
-        strongConnect(w)
-        lowlink.set(v, Math.min(lowlink.get(v)!, lowlink.get(w)!))
-      } else if (onStack.has(w)) {
-        lowlink.set(v, Math.min(lowlink.get(v)!, indices.get(w)!))
-      }
-    }
-
-    if (lowlink.get(v) === indices.get(v)) {
-      const component: string[] = []
-      let w: string
-      do {
-        w = stack.pop()!
-        onStack.delete(w)
-        component.push(w)
-      } while (w !== v)
-      result.push(component)
+function strongConnect(state: TarjanState, v: string): void {
+  state.indices.set(v, state.index)
+  state.lowlink.set(v, state.index)
+  state.index++
+  state.stack.push(v)
+  state.onStack.add(v)
+  for (const w of state.edges.get(v) ?? []) {
+    if (!state.indices.has(w)) {
+      strongConnect(state, w)
+      state.lowlink.set(v, Math.min(state.lowlink.get(v)!, state.lowlink.get(w)!))
+    } else if (state.onStack.has(w)) {
+      state.lowlink.set(v, Math.min(state.lowlink.get(v)!, state.indices.get(w)!))
     }
   }
+  if (state.lowlink.get(v) === state.indices.get(v)) state.components.push(popComponent(state, v))
+}
 
-  for (const v of nodes) if (!indices.has(v)) strongConnect(v)
+function stronglyConnectedComponents(nodes: string[], edges: Map<string, Set<string>>): string[][] {
+  const state: TarjanState = {
+    edges,
+    index: 0,
+    indices: new Map(),
+    lowlink: new Map(),
+    onStack: new Set(),
+    stack: [],
+    components: [],
+  }
+  for (const v of nodes) if (!state.indices.has(v)) strongConnect(state, v)
+  return state.components
+}
+
+// ─── Ordering ───────────────────────────────────────────────────────────────────
+
+/** Symbol -> path of the first file that defines it. */
+function firstDefiners(nodes: FileNode[]): Map<string, string> {
+  const definerOf = new Map<string, string>()
+  for (const node of nodes) {
+    for (const def of node.definitions) {
+      if (!definerOf.has(def)) definerOf.set(def, node.path)
+    }
+  }
+  return definerOf
+}
+
+/** Edges definer -> dependent: "read the definer before this file". */
+function dependencyEdges(
+  graphNodes: FileNode[],
+  definerOf: Map<string, string>
+): Map<string, Set<string>> {
+  const edges = new Map(graphNodes.map((n) => [n.path, new Set<string>()]))
+  for (const node of graphNodes) {
+    for (const symbol of node.references.keys()) {
+      const definer = definerOf.get(symbol)
+      if (!definer || definer === node.path) continue
+      // A definer outside the graph (a test or tier-3 file) adds no ordering edge.
+      edges.get(definer)?.add(node.path)
+    }
+  }
+  return edges
+}
+
+/** The DAG of components: which components each one must precede, and how many precede it. */
+function condensedDag(components: string[][], edges: Map<string, Set<string>>) {
+  const componentOf = new Map<string, number>()
+  components.forEach((members, i) => members.forEach((path) => componentOf.set(path, i)))
+  const successors = new Map(components.map((_, i) => [i, new Set<number>()]))
+  const indegree = new Map(components.map((_, i) => [i, 0]))
+  for (const [from, tos] of edges) {
+    const fromComponent = componentOf.get(from)!
+    for (const to of tos) {
+      const toComponent = componentOf.get(to)!
+      if (fromComponent === toComponent || successors.get(fromComponent)!.has(toComponent)) continue
+      successors.get(fromComponent)!.add(toComponent)
+      indegree.set(toComponent, indegree.get(toComponent)! + 1)
+    }
+  }
+  return { successors, indegree }
+}
+
+/** Topological order of the components, the largest free component first, its biggest file first. */
+function orderByDependency(
+  components: string[][],
+  edges: Map<string, Set<string>>,
+  byPath: Map<string, FileNode>
+): string[] {
+  const { successors, indegree } = condensedDag(components, edges)
+  const sizeOf = (path: string) => byPath.get(path)!.size
+  const componentSize = (i: number) => components[i].reduce((s, p) => s + sizeOf(p), 0)
+  const remaining = new Set(components.map((_, i) => i))
+  const ordered: string[] = []
+  while (remaining.size > 0) {
+    const available = [...remaining].filter((i) => indegree.get(i) === 0)
+    available.sort((a, b) => componentSize(b) - componentSize(a))
+    const next = available[0]
+    remaining.delete(next)
+    ordered.push(...[...components[next]].sort((a, b) => sizeOf(b) - sizeOf(a)))
+    for (const to of successors.get(next) ?? []) indegree.set(to, indegree.get(to)! - 1)
+  }
+  return ordered
+}
+
+function lastReferencedPosition(
+  test: FileNode,
+  definerOf: Map<string, string>,
+  ordered: string[]
+): number {
+  let last = -1
+  for (const symbol of test.references.keys()) {
+    const definer = definerOf.get(symbol)
+    if (definer) last = Math.max(last, ordered.indexOf(definer))
+  }
+  return last
+}
+
+/** Places each test file right after the last file (by final position) it references. */
+function withTestsAttached(
+  ordered: string[],
+  testNodes: FileNode[],
+  definerOf: Map<string, string>
+): string[] {
+  const result = [...ordered]
+  for (const test of testNodes) {
+    const insertAfter = lastReferencedPosition(test, definerOf, result)
+    if (insertAfter === -1) {
+      result.push(test.path) // fallback: no in-PR reference found
+    } else {
+      result.splice(insertAfter + 1, 0, test.path)
+    }
+  }
   return result
 }
 
-/**
- * Orders `files` for reading: symbols defined before they're used, test files
- * right after the last file they exercise, cycles kept adjacent, tier-3 last.
- */
-export async function buildReadingOrder(files: ParsedPrFile[]): Promise<ReadingStep[]> {
-  const nodes = await Promise.all(files.map(buildFileNode))
-  if (nodes.length === 0) return []
+// ─── Steps ──────────────────────────────────────────────────────────────────────
 
-  // First definer wins.
-  const symbolMap = new Map<string, string>()
-  for (const node of nodes) {
-    for (const def of node.definitions) {
-      if (!symbolMap.has(def)) symbolMap.set(def, node.path)
-    }
-  }
-
-  const byPath = new Map(nodes.map((n) => [n.path, n]))
-
-  const tier3 = nodes.filter((n) => n.tier === 3)
-  const testNodes = nodes.filter((n) => n.tier !== 3 && n.isTest)
-  const graphNodes = nodes.filter((n) => n.tier !== 3 && !n.isTest)
-  const graphPaths = graphNodes.map((n) => n.path)
-
-  // Edges: definer -> dependent ("read the definer before this file").
-  const edges = new Map<string, Set<string>>()
-  for (const path of graphPaths) edges.set(path, new Set())
-  for (const node of graphNodes) {
-    for (const symbol of node.references.keys()) {
-      const definer = symbolMap.get(symbol)
-      if (!definer || definer === node.path) continue
-      if (!edges.has(definer)) continue // definer outside the graph (test/tier3) — no ordering edge
-      edges.get(definer)!.add(node.path)
-    }
-  }
-
-  const sccs = stronglyConnectedComponents(graphPaths, edges)
-  const sccOf = new Map<string, number>()
-  sccs.forEach((component, i) => component.forEach((path) => sccOf.set(path, i)))
-
-  // Condensed DAG over SCCs.
-  const condensedEdges = new Map<number, Set<number>>()
-  const condensedIndegree = new Map<number, number>()
-  sccs.forEach((_, i) => {
-    condensedEdges.set(i, new Set())
-    condensedIndegree.set(i, 0)
-  })
-  for (const [from, tos] of edges) {
-    const fromScc = sccOf.get(from)!
-    for (const to of tos) {
-      const toScc = sccOf.get(to)!
-      if (fromScc === toScc) continue
-      if (!condensedEdges.get(fromScc)!.has(toScc)) {
-        condensedEdges.get(fromScc)!.add(toScc)
-        condensedIndegree.set(toScc, condensedIndegree.get(toScc)! + 1)
-      }
-    }
-  }
-
-  const sccSize = (i: number): number => sccs[i].reduce((s, p) => s + byPath.get(p)!.size, 0)
-
-  const placedSccs = new Set<number>()
-  const orderedPaths: string[] = []
-  const remaining = new Set(sccs.map((_, i) => i))
-
-  while (remaining.size > 0) {
-    const available = [...remaining].filter((i) => condensedIndegree.get(i) === 0)
-    available.sort((a, b) => sccSize(b) - sccSize(a))
-    const next = available[0]
-    remaining.delete(next)
-    placedSccs.add(next)
-    const members = [...sccs[next]].sort((a, b) => byPath.get(b)!.size - byPath.get(a)!.size)
-    orderedPaths.push(...members)
-    for (const to of condensedEdges.get(next) ?? []) {
-      condensedIndegree.set(to, condensedIndegree.get(to)! - 1)
-    }
-  }
-
-  // Attach test files right after the last file (by final position) they reference.
-  const positionOf = new Map(orderedPaths.map((p, i) => [p, i]))
-  for (const test of testNodes) {
-    let insertAfter = -1
-    for (const symbol of test.references.keys()) {
-      const definer = symbolMap.get(symbol)
-      if (!definer) continue
-      const pos = positionOf.get(definer)
-      if (pos !== undefined && pos > insertAfter) insertAfter = pos
-    }
-    if (insertAfter === -1) {
-      orderedPaths.push(test.path) // fallback: no in-PR reference found
-    } else {
-      orderedPaths.splice(insertAfter + 1, 0, test.path)
-    }
-    // Recompute positions after each insertion.
-    orderedPaths.forEach((p, i) => positionOf.set(p, i))
-  }
-
-  for (const node of tier3) orderedPaths.push(node.path)
-
-  const finalOrder = orderedPaths
-  const stepOf = new Map(finalOrder.map((p, i) => [p, i + 1]))
-
-  // How many *other* files reference each symbol — used to pick each file's
-  // headline symbol and whether anything in this PR depends on it.
+function referenceCounts(nodes: FileNode[]): Map<string, number> {
   const usageCount = new Map<string, number>()
   for (const node of nodes) {
     for (const symbol of node.references.keys()) {
       usageCount.set(symbol, (usageCount.get(symbol) ?? 0) + 1)
     }
   }
+  return usageCount
+}
 
-  const steps: ReadingStep[] = finalOrder.map((path) => {
-    const node = byPath.get(path)!
-    const step = stepOf.get(path)!
-
-    let mainSymbol: string | null = null
-    let mainSymbolCount = -1
-    for (const def of node.definitions) {
-      const count = usageCount.get(def) ?? 0
-      if (count > mainSymbolCount) {
-        mainSymbol = def
-        mainSymbolCount = count
-      }
+/** The file's definition the most other files use; the first one on a tie. */
+function headlineSymbol(node: FileNode, usageCount: Map<string, number>): string | null {
+  let mainSymbol: string | null = null
+  let mainSymbolCount = -1
+  for (const def of node.definitions) {
+    const count = usageCount.get(def) ?? 0
+    if (count > mainSymbolCount) {
+      mainSymbol = def
+      mainSymbolCount = count
     }
-    const uses: SymbolUse[] = [...node.references.keys()].map((symbol) => {
-      const definer = symbolMap.get(symbol)
-      const definedInStep = definer ? (stepOf.get(definer) ?? null) : null
-      return { symbol, definedInStep: definedInStep ?? null, definedInPath: definer ?? null }
-    })
+  }
+  return mainSymbol
+}
 
-    interface Candidate {
-      symbol: string
-      kind: ReferenceKind
-      step: number
-    }
-    const kindPriority: Record<ReferenceKind, number> = { call: 0, render: 1, use: 2 }
-    const candidates: Candidate[] = []
-    for (const [symbol, kind] of node.references) {
-      const definer = symbolMap.get(symbol)
-      if (!definer || definer === path) continue
-      const definerStep = stepOf.get(definer)
-      if (definerStep === undefined) continue
-      candidates.push({ symbol, kind, step: definerStep })
-    }
-    candidates.sort((a, b) => kindPriority[a.kind] - kindPriority[b.kind] || a.step - b.step)
-    const primary = candidates[0]
-
-    let reason: string
-    if (node.isTest) {
-      reason =
-        primary !== undefined
-          ? `Tests step ${primary.step}, read right after it`
-          : 'Tests nothing in this PR, read wherever'
-    } else if (primary !== undefined) {
-      const word =
-        primary.kind === 'call' ? 'Calls' : primary.kind === 'render' ? 'Renders' : 'Uses'
-      reason = `${word} ${primary.symbol} (step ${primary.step})`
-    } else if (mainSymbol !== null) {
-      reason = `Defines ${mainSymbol} · depends on nothing in this PR`
-    } else {
-      reason = 'No dependencies detected in this PR'
-    }
-
-    return { step, path, symbol: mainSymbol, reason, uses }
+function symbolUses(node: FileNode, ctx: StepContext): SymbolUse[] {
+  return [...node.references.keys()].map((symbol) => {
+    const definer = ctx.definerOf.get(symbol)
+    const definedInStep = definer ? (ctx.stepOf.get(definer) ?? null) : null
+    return { symbol, definedInStep: definedInStep ?? null, definedInPath: definer ?? null }
   })
+}
 
-  return steps
+/** The reference that best explains the file's place: calls before renders before uses, then earliest step. */
+function primaryReference(node: FileNode, ctx: StepContext): Candidate | undefined {
+  const candidates: Candidate[] = []
+  for (const [symbol, kind] of node.references) {
+    const definer = ctx.definerOf.get(symbol)
+    if (!definer || definer === node.path) continue
+    const definerStep = ctx.stepOf.get(definer)
+    if (definerStep !== undefined) candidates.push({ symbol, kind, step: definerStep })
+  }
+  candidates.sort((a, b) => KIND_PRIORITY[a.kind] - KIND_PRIORITY[b.kind] || a.step - b.step)
+  return candidates[0]
+}
+
+function stepReason(node: FileNode, primary: Candidate | undefined, mainSymbol: string | null) {
+  if (node.isTest && primary !== undefined) {
+    return `Tests step ${primary.step}, read right after it`
+  }
+  if (node.isTest) return 'Tests nothing in this PR, read wherever'
+  if (primary !== undefined)
+    return `${KIND_VERB[primary.kind]} ${primary.symbol} (step ${primary.step})`
+  if (mainSymbol !== null) return `Defines ${mainSymbol} · depends on nothing in this PR`
+  return 'No dependencies detected in this PR'
+}
+
+function readingStepFor(path: string, ctx: StepContext): ReadingStep {
+  const node = ctx.byPath.get(path)!
+  const mainSymbol = headlineSymbol(node, ctx.usageCount)
+  const reason = stepReason(node, primaryReference(node, ctx), mainSymbol)
+  return {
+    step: ctx.stepOf.get(path)!,
+    path,
+    symbol: mainSymbol,
+    reason,
+    uses: symbolUses(node, ctx),
+  }
+}
+
+/** Orders `files` for reading: symbols defined before they're used, test files right after
+ * the last file they exercise, cycles kept adjacent, tier-3 last. */
+export async function buildReadingOrder(files: ParsedPrFile[]): Promise<ReadingStep[]> {
+  const nodes = await Promise.all(files.map(buildFileNode))
+  if (nodes.length === 0) return []
+  const definerOf = firstDefiners(nodes)
+  const byPath = new Map(nodes.map((n) => [n.path, n]))
+  const graphNodes = nodes.filter((n) => n.tier !== 3 && !n.isTest)
+  const edges = dependencyEdges(graphNodes, definerOf)
+  const components = stronglyConnectedComponents(
+    graphNodes.map((n) => n.path),
+    edges
+  )
+  const testNodes = nodes.filter((n) => n.tier !== 3 && n.isTest)
+  const finalOrder = [
+    ...withTestsAttached(orderByDependency(components, edges, byPath), testNodes, definerOf),
+    ...nodes.filter((n) => n.tier === 3).map((n) => n.path),
+  ]
+  const stepOf = new Map(finalOrder.map((p, i) => [p, i + 1]))
+  const ctx: StepContext = { byPath, definerOf, stepOf, usageCount: referenceCounts(nodes) }
+  return finalOrder.map((path) => readingStepFor(path, ctx))
 }

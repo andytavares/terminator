@@ -57,7 +57,9 @@ describe('ReviewFooter', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Finish chapter ↵' }))
     expect(handlers.onFinishChapter).toHaveBeenCalledTimes(1)
   })
+})
 
+describe('ReviewFooter — labels the primary action Submit review… on the last file of the last chapter and finishes', () => {
   it('labels the primary action "Submit review…" on the last file of the last chapter and finishes', async () => {
     const handlers = renderFooter({ isLastFile: true, isLastChapter: true })
     await userEvent.click(screen.getByRole('button', { name: 'Submit review…' }))
@@ -84,7 +86,9 @@ describe('ReviewFooter', () => {
     renderFooter({ isLastFile: false })
     expect(screen.queryByRole('button', { name: /^Submit review/ })).toBeNull()
   })
+})
 
+describe('ReviewFooter — opens the keyboard help from the ? Shortcuts hint', () => {
   it('opens the keyboard help from the "? Shortcuts" hint', async () => {
     const handlers = renderFooter()
     await userEvent.click(screen.getByRole('button', { name: /Shortcuts/ }))
@@ -101,7 +105,9 @@ describe('ReviewFooter', () => {
     renderFooter({ drafts: [makeDraft({ path: 'src/foo.ts' })] })
     expect(screen.getByRole('button', { name: '1 draft on 1 file' })).toBeTruthy()
   })
+})
 
+describe('ReviewFooter — shows plural draft/file label and counts distinct files with duplicates', () => {
   it('shows plural draft/file label and counts distinct files with duplicates', () => {
     renderFooter({
       drafts: [
@@ -124,7 +130,9 @@ describe('ReviewFooter', () => {
       screen.getByRole('button', { name: '2 drafts on 2 files · 1 from an agent finding' })
     ).toBeTruthy()
   })
+})
 
+describe('ReviewFooter — omits the agent-finding suffix when no drafts came from a finding', () => {
   it('omits the agent-finding suffix when no drafts came from a finding', () => {
     renderFooter({
       drafts: [makeDraft({ id: 'd1', path: 'src/foo.ts', fromFindingId: null })],

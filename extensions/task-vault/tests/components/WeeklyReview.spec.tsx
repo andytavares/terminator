@@ -105,7 +105,17 @@ beforeEach(() => {
   })
 })
 
-describe('WeeklyReview', () => {
+describe('WeeklyReview', weeklyReviewTests)
+
+function weeklyReviewTests() {
+  describe('step trail', weeklyReviewStepTrailTests)
+  describe('projects', weeklyReviewProjectsTests)
+  describe('inbox refresh', weeklyReviewInboxRefreshTests)
+  describe('review record', weeklyReviewReviewRecordTests)
+  describe('completing', weeklyReviewCompletingTests)
+}
+
+function weeklyReviewStepTrailTests() {
   // Position used to be stated four times over — a large numeral, "step 1 of 6",
   // six unlabelled dots, and the step's own heading — while what the six steps
   // are was never shown. Now the steps are named and position is stated once.
@@ -122,7 +132,14 @@ describe('WeeklyReview', () => {
     await waitFor(() => expect(screen.getByText('1 of 6')).toBeTruthy())
     expect(screen.getByText('Get clear').getAttribute('aria-current')).toBe('step')
   })
+}
 
+function weeklyReviewProjectsTests() {
+  describe('listing', weeklyReviewProjectsListingTests)
+  describe('archiving', weeklyReviewProjectsArchivingTests)
+}
+
+function weeklyReviewProjectsListingTests() {
   it('step 3 shows all active projects', async () => {
     render(<WeeklyReview />)
     await waitFor(() => screen.getByText('1 of 6'))
@@ -137,7 +154,9 @@ describe('WeeklyReview', () => {
     expect(screen.getByText('Alpha Project')).toBeTruthy()
     expect(screen.getByText('Stale Project')).toBeTruthy()
   })
+}
 
+function weeklyReviewProjectsArchivingTests() {
   it('archiving stale project removes it from step 3 list', async () => {
     render(<WeeklyReview />)
     await waitFor(() => screen.getByText('1 of 6'))
@@ -157,41 +176,47 @@ describe('WeeklyReview', () => {
       )
     })
   })
+}
 
+const capturedTask = {
+  id: 'new-1',
+  text: 'Mind sweep item',
+  status: 'open',
+  terminatorLinks: [],
+  filePath: '/vault/inbox.md',
+  line: 2,
+  metadata: {},
+}
+
+/** After the first answer, weekly-review answers with the inbox plus one captured item. */
+function answerWithCapturedItem(): void {
+  const freshPayload = {
+    ...weeklyReviewPayload,
+    inboxItems: [...weeklyReviewPayload.inboxItems, capturedTask],
+  }
+  mockInvoke
+    .mockResolvedValueOnce(weeklyReviewPayload) // initial load
+    .mockImplementation((channel: string) => {
+      if (channel === 'task-vault:projects:weekly-review') return Promise.resolve(freshPayload)
+      if (channel === 'task-vault:vault:update-project-status')
+        return Promise.resolve({ success: true })
+      if (channel === 'task-vault:vault:add-task') return Promise.resolve({ success: true })
+      return Promise.resolve({})
+    })
+}
+
+/**
+ * The step 1 advance button sits inside the step content, not the header nav.
+ * It used to read "Nothing to add — Next", which made the loudest control on
+ * the screen the one that skips the step; it now says where it goes, and
+ * skipping is a link beside it.
+ */
+function weeklyReviewInboxRefreshTests() {
   it('re-fetches inbox items when advancing from Step 1 so captures appear in Step 2', async () => {
-    const capturedTask = {
-      id: 'new-1',
-      text: 'Mind sweep item',
-      status: 'open',
-      terminatorLinks: [],
-      filePath: '/vault/inbox.md',
-      line: 2,
-      metadata: {},
-    }
-    const freshPayload = {
-      ...weeklyReviewPayload,
-      inboxItems: [...weeklyReviewPayload.inboxItems, capturedTask],
-    }
-    // Second call to weekly-review returns the fresh payload with the new item
-    mockInvoke
-      .mockResolvedValueOnce(weeklyReviewPayload) // initial load
-      .mockImplementation((channel: string) => {
-        if (channel === 'task-vault:projects:weekly-review') return Promise.resolve(freshPayload)
-        if (channel === 'task-vault:vault:update-project-status')
-          return Promise.resolve({ success: true })
-        if (channel === 'task-vault:vault:add-task') return Promise.resolve({ success: true })
-        return Promise.resolve({})
-      })
-
+    answerWithCapturedItem()
     render(<WeeklyReview />)
     await waitFor(() => screen.getByText('1 of 6'))
-
-    // Click the step 1 advance button inside the step content, not the header
-    // nav. It used to read "Nothing to add — Next", which made the loudest
-    // control on the screen the one that skips the step; it now says where it
-    // goes, and skipping is a link beside it.
-    const step1Next = screen.getByRole('button', { name: /next: inbox/i })
-    fireEvent.click(step1Next)
+    fireEvent.click(screen.getByRole('button', { name: /next: inbox/i }))
 
     await waitFor(() => screen.getByText('2 of 6'))
 
@@ -206,7 +231,9 @@ describe('WeeklyReview', () => {
       expect(screen.getByText('1 of 2')).toBeTruthy()
     })
   })
+}
 
+function weeklyReviewReviewRecordTests() {
   it('starts (or resumes) a persisted review on mount', async () => {
     render(<WeeklyReview />)
     await waitFor(() => {
@@ -224,7 +251,9 @@ describe('WeeklyReview', () => {
     })
     expect(mockInvoke).toHaveBeenCalledWith('task-vault:review:list', {})
   })
+}
 
+function weeklyReviewCompletingTests() {
   it('completing all steps records the reflection against the review', async () => {
     render(<WeeklyReview />)
     await waitFor(() => screen.getByText('1 of 6'))
@@ -247,4 +276,4 @@ describe('WeeklyReview', () => {
       })
     }
   })
-})
+}

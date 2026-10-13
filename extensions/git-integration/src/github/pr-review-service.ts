@@ -12,6 +12,75 @@ import type { StatusCheck, IssueComment, InlineComment } from '../schemas/pr-rev
 import type { FileDiff } from '../schemas/git.schema.js'
 import { FileDiffSchema } from '../schemas/git.schema.js'
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+export interface ComplexityHotspot {
+  hunkIndex: number
+  complexityDelta: number
+  message: string
+}
+
+type Tier = 0 | 1 | 2 | 3
+type SignalValue = 'pass' | 'warn' | 'fail' | 'unknown'
+type RawRecord = Record<string, unknown>
+
+interface RawFile {
+  path: string
+  additions: number
+  deletions: number
+  changeType?: string
+  patch?: string
+}
+
+/** A file's risk inputs, each scaled to 0..1 across the PR; null when unknown. */
+interface NormalisedMetrics {
+  churn: number | null
+  blast: number | null
+  size: number | null
+  complexity: number | null
+  coverageGap: number | null
+}
+
+interface RiskContribution {
+  label: string
+  value: number
+}
+
+/** Totals for a queue row, from its file list when GitHub sent one, else from its counters. */
+interface QueueTotals {
+  fileCount: number
+  additions: number
+  deletions: number
+  filePaths: string[]
+}
+
+/** The tracker connection that fills in an issue's title and state. */
+export interface IssueLookup {
+  get(
+    tracker: 'linear' | 'jira',
+    key: string,
+    opts?: { refresh?: boolean }
+  ): Promise<{ title: string; state: { name: string } } | null>
+}
+
+interface HunkLines {
+  lines: Array<{ type: string; content: string }>
+}
+
+type CommitContext = { name?: string; context?: string; conclusion?: string; state?: string }
+type CommitNode = { commit?: { statusCheckRollup?: { contexts?: { nodes?: CommitContext[] } } } }
+type ReviewNode = {
+  author?: { login?: string; avatarUrl?: string }
+  state?: string
+  submittedAt?: string
+}
+type ReviewRequestNode = {
+  requestedReviewer?: { login?: string; avatarUrl?: string; name?: string }
+}
+type Nodes<T> = { nodes?: T[] } | undefined
+
+type DiffLineDraft = FileDiff['hunks'][0]['lines'][0]
+
 // ─── Decision-point keywords for cyclomatic complexity ───────────────────────
 
 const DECISION_KEYWORDS = [
@@ -32,144 +101,157 @@ const DECISION_KEYWORDS = [
 function countDecisionPoints(line: string): number {
   return DECISION_KEYWORDS.reduce((acc, re) => {
     re.lastIndex = 0
-    const matches = line.match(re)
-    return acc + (matches ? matches.length : 0)
+    return acc + (line.match(re)?.length ?? 0)
   }, 0)
+}
+
+/** Decision points the hunk adds minus those it removes. */
+function hunkDecisionDelta(hunk: FileDiff['hunks'][0]): number {
+  let delta = 0
+  for (const line of hunk.lines) {
+    if (line.type === 'add') delta += countDecisionPoints(line.content)
+    else if (line.type === 'remove') delta -= countDecisionPoints(line.content)
+  }
+  return delta
 }
 
 // ─── Complexity hotspot detection ─────────────────────────────────────────────
 
-export interface ComplexityHotspot {
-  hunkIndex: number
-  complexityDelta: number
-  message: string
-}
-
 export function detectComplexityHotspots(diff: FileDiff): ComplexityHotspot[] {
   const hotspots: ComplexityHotspot[] = []
-
   diff.hunks.forEach((hunk, hunkIndex) => {
-    let added = 0
-    let removed = 0
-
-    for (const line of hunk.lines) {
-      if (line.type === 'add') added += countDecisionPoints(line.content)
-      else if (line.type === 'remove') removed += countDecisionPoints(line.content)
-    }
-
-    const delta = added - removed
-    if (delta >= 5) {
-      hotspots.push({
-        hunkIndex,
-        complexityDelta: delta,
-        message: `Complexity hotspot — this block adds ${delta} decision point${delta !== 1 ? 's' : ''} (cyclomatic delta +${delta}).`,
-      })
-    }
+    const delta = hunkDecisionDelta(hunk)
+    if (delta < 5) return
+    const message = `Complexity hotspot — this block adds ${delta} decision points (cyclomatic delta +${delta}).`
+    hotspots.push({ hunkIndex, complexityDelta: delta, message })
   })
-
   return hotspots
 }
 
 export function computeFileCyclomaticDelta(diff: FileDiff): number {
-  return diff.hunks.reduce((total, hunk) => {
-    let added = 0
-    let removed = 0
-    for (const line of hunk.lines) {
-      if (line.type === 'add') added += countDecisionPoints(line.content)
-      else if (line.type === 'remove') removed += countDecisionPoints(line.content)
-    }
-    return total + (added - removed)
-  }, 0)
+  return diff.hunks.reduce((total, hunk) => total + hunkDecisionDelta(hunk), 0)
 }
 
 // ─── Risk score computation ────────────────────────────────────────────────────
 
 const MISSING_TEST_PENALTY = 20
 
-export function computeRiskScore(metrics: FileMetrics, allFilesMetrics: FileMetrics[]): RiskScore {
-  function normalise(value: number | null, allValues: (number | null)[]): number | null {
-    if (value == null) return null
-    const nums = allValues.filter((v): v is number => v != null)
-    if (nums.length === 0) return null
-    const min = Math.min(...nums)
-    const max = Math.max(...nums)
-    if (max === min) return 0
-    return (value - min) / (max - min)
-  }
+const RISK_WEIGHTS: Record<keyof NormalisedMetrics, number> = {
+  churn: 0.25,
+  blast: 0.25,
+  size: 0.2,
+  complexity: 0.1,
+  coverageGap: 0.05,
+}
 
-  const allChurn = allFilesMetrics.map((m) => m.churn90d)
-  const allBlast = allFilesMetrics.map((m) => m.blastRadius)
-  const allSize = allFilesMetrics.map((m) => m.additions + m.deletions)
-  const allComp = allFilesMetrics.map((m) => m.complexityDelta)
+/** `value` scaled to 0..1 between the smallest and largest of `allValues`. */
+function normalise(value: number | null, allValues: (number | null)[]): number | null {
+  if (value == null) return null
+  const nums = allValues.filter((v): v is number => v != null)
+  if (nums.length === 0) return null
+  const min = Math.min(...nums)
+  const max = Math.max(...nums)
+  if (max === min) return 0
+  return (value - min) / (max - min)
+}
 
-  const churn_n = normalise(metrics.churn90d, allChurn)
-  const blast_n = normalise(metrics.blastRadius, allBlast)
-  const size_n = normalise(metrics.additions + metrics.deletions, allSize)
-  const comp_n = normalise(metrics.complexityDelta, allComp)
-  const coverage_n = metrics.patchCoverage != null ? 1 - metrics.patchCoverage / 100 : null
+function changeSizeOf(m: FileMetrics): number {
+  return m.additions + m.deletions
+}
 
-  type MetricEntry = { value: number | null; weight: number }
-  const entries: MetricEntry[] = [
-    { value: churn_n, weight: 0.25 },
-    { value: blast_n, weight: 0.25 },
-    { value: size_n, weight: 0.2 },
-    { value: comp_n, weight: 0.1 },
-    { value: coverage_n, weight: 0.05 },
-  ]
-
-  const available = entries.filter((e) => e.value != null)
-  let composite: number | null = null
-
-  if (available.length >= 2) {
-    const totalWeight = available.reduce((s, e) => s + e.weight, 0)
-    const weighted = available.reduce((s, e) => s + e.value! * e.weight, 0)
-    composite = (weighted / totalWeight) * 80
-
-    if (!metrics.testFilePresent) composite += MISSING_TEST_PENALTY
-    composite = Math.min(100, Math.round(composite))
-  }
-
-  const contributions: Array<{ label: string; value: number }> = []
-  if (churn_n != null && metrics.churn90d != null)
-    contributions.push({
-      label: `High churn — ${metrics.churn90d} commits/90d`,
-      value: churn_n * 0.25,
-    })
-  if (blast_n != null && metrics.blastRadius != null)
-    contributions.push({
-      label: `Wide blast radius — ${metrics.blastRadius} importers`,
-      value: blast_n * 0.25,
-    })
-  if (size_n != null)
-    contributions.push({
-      label: `Large change — ${metrics.additions + metrics.deletions} lines`,
-      value: size_n * 0.2,
-    })
-  if (comp_n != null && metrics.complexityDelta != null && metrics.complexityDelta > 0)
-    contributions.push({
-      label: `Complexity increase — +${metrics.complexityDelta} decision points`,
-      value: comp_n * 0.1,
-    })
-  if (!metrics.testFilePresent)
-    contributions.push({ label: 'Missing test file', value: MISSING_TEST_PENALTY / 100 })
-
-  contributions.sort((a, b) => b.value - a.value)
-  const dominantDriver = contributions[0]?.label ?? 'No dominant risk signal'
-
-  const level: 'low' | 'medium' | 'high' =
-    composite == null ? 'low' : composite >= 67 ? 'high' : composite >= 34 ? 'medium' : 'low'
-
+function normalisedMetrics(metrics: FileMetrics, all: FileMetrics[]): NormalisedMetrics {
+  const coverageGap = metrics.patchCoverage == null ? null : 1 - metrics.patchCoverage / 100
   return {
-    level,
+    churn: normalise(
+      metrics.churn90d,
+      all.map((m) => m.churn90d)
+    ),
+    blast: normalise(
+      metrics.blastRadius,
+      all.map((m) => m.blastRadius)
+    ),
+    size: normalise(changeSizeOf(metrics), all.map(changeSizeOf)),
+    complexity: normalise(
+      metrics.complexityDelta,
+      all.map((m) => m.complexityDelta)
+    ),
+    coverageGap,
+  }
+}
+
+/** The weighted score out of 100, or null when fewer than two inputs are known. */
+function compositeScore(norm: NormalisedMetrics, testFilePresent: boolean | null): number | null {
+  const known = (Object.keys(RISK_WEIGHTS) as (keyof NormalisedMetrics)[]).filter(
+    (k) => norm[k] != null
+  )
+  if (known.length < 2) return null
+  const totalWeight = known.reduce((s, k) => s + RISK_WEIGHTS[k], 0)
+  const weighted = known.reduce((s, k) => s + norm[k]! * RISK_WEIGHTS[k], 0)
+  const penalty = testFilePresent ? 0 : MISSING_TEST_PENALTY
+  return Math.min(100, Math.round((weighted / totalWeight) * 80 + penalty))
+}
+
+/** Churn and blast radius: how often the file changes and how many files import it. */
+function historyContributions(norm: NormalisedMetrics, metrics: FileMetrics): RiskContribution[] {
+  const out: RiskContribution[] = []
+  if (norm.churn != null && metrics.churn90d != null) {
+    const label = `High churn — ${metrics.churn90d} commits/90d`
+    out.push({ label, value: norm.churn * RISK_WEIGHTS.churn })
+  }
+  if (norm.blast != null && metrics.blastRadius != null) {
+    const label = `Wide blast radius — ${metrics.blastRadius} importers`
+    out.push({ label, value: norm.blast * RISK_WEIGHTS.blast })
+  }
+  return out
+}
+
+/** Size, added complexity and a missing test: what this change itself does. */
+function changeContributions(norm: NormalisedMetrics, metrics: FileMetrics): RiskContribution[] {
+  const out: RiskContribution[] = []
+  if (norm.size != null) {
+    const label = `Large change — ${changeSizeOf(metrics)} lines`
+    out.push({ label, value: norm.size * RISK_WEIGHTS.size })
+  }
+  if (norm.complexity != null && (metrics.complexityDelta ?? 0) > 0) {
+    const label = `Complexity increase — +${metrics.complexityDelta} decision points`
+    out.push({ label, value: norm.complexity * RISK_WEIGHTS.complexity })
+  }
+  if (!metrics.testFilePresent) {
+    out.push({ label: 'Missing test file', value: MISSING_TEST_PENALTY / 100 })
+  }
+  return out
+}
+
+function riskContributions(norm: NormalisedMetrics, metrics: FileMetrics): RiskContribution[] {
+  const all = [...historyContributions(norm, metrics), ...changeContributions(norm, metrics)]
+  return all.sort((a, b) => b.value - a.value)
+}
+
+function riskLevelOf(composite: number | null): RiskScore['level'] {
+  if (composite == null || composite < 34) return 'low'
+  if (composite >= 67) return 'high'
+  return 'medium'
+}
+
+function riskMetricsOf(metrics: FileMetrics): RiskScore['metrics'] {
+  const { churn90d, blastRadius, testFilePresent, complexityDelta, patchCoverage } = metrics
+  const changeSize = changeSizeOf(metrics)
+  return { changeSize, churn90d, blastRadius, testFilePresent, complexityDelta, patchCoverage }
+}
+
+function dominantDriverOf(contributions: RiskContribution[]): string {
+  if (contributions.length === 0) return 'No dominant risk signal'
+  return contributions[0].label
+}
+
+export function computeRiskScore(metrics: FileMetrics, allFilesMetrics: FileMetrics[]): RiskScore {
+  const norm = normalisedMetrics(metrics, allFilesMetrics)
+  const composite = compositeScore(norm, metrics.testFilePresent)
+  const dominantDriver = dominantDriverOf(riskContributions(norm, metrics))
+  return {
+    level: riskLevelOf(composite),
     composite,
-    metrics: {
-      changeSize: metrics.additions + metrics.deletions,
-      churn90d: metrics.churn90d,
-      blastRadius: metrics.blastRadius,
-      testFilePresent: metrics.testFilePresent,
-      complexityDelta: metrics.complexityDelta,
-      patchCoverage: metrics.patchCoverage,
-    },
+    metrics: riskMetricsOf(metrics),
     dominantDriver,
     topImporters: metrics.topImporters.slice(0, 5),
     importerCount: metrics.importerCount,
@@ -196,87 +278,89 @@ export function queueRiskLevel(changeSize: number): 'low' | 'medium' | 'high' {
 
 // ─── Chapter building ─────────────────────────────────────────────────────────
 
+const LOCK_OR_GENERATED_PATTERNS = [
+  /\.lock$/, // *.lock (yarn, Cargo, Gemfile, poetry, etc.)
+  /package-lock\.json$/, // npm
+  /pnpm-lock\.yaml$/, // pnpm
+  /packages\.lock\.json$/, // .NET
+  /gradle\.lockfile$/, // Gradle
+  /Package\.resolved$/, // Swift
+  /go\.sum$/, // Go
+  /go\.work\.sum$/, // Go workspaces
+  /requirements\.txt$/, // Python (pinned deps)
+  /constraints\.txt$/, // Python pip constraints
+  /shrinkwrap\.json$/, // npm shrinkwrap
+  /\.generated\.[^.]+$/, // generated / mechanical files
+  /\.snap$/, // test snapshots
+  /\.pb\.go$/, // protobuf Go
+  /\.pb\.swift$/, // protobuf Swift
+  /_pb2\.py$/, // protobuf Python
+  /\.pb\.cc$|\.pb\.h$/, // protobuf C++
+  /GraphQL\.swift$/, // Apollo GraphQL generated
+  /API\.graphql\.swift$/,
+]
+
 function isLockOrGeneratedFile(name: string): boolean {
-  // Lock files (all languages)
-  if (/\.lock$/.test(name)) return true // *.lock (yarn, Cargo, Gemfile, poetry, etc.)
-  if (/package-lock\.json$/.test(name)) return true // npm
-  if (/pnpm-lock\.yaml$/.test(name)) return true // pnpm
-  if (/packages\.lock\.json$/.test(name)) return true // .NET
-  if (/gradle\.lockfile$/.test(name)) return true // Gradle
-  if (/Package\.resolved$/.test(name)) return true // Swift
-  if (/go\.sum$/.test(name)) return true // Go
-  if (/go\.work\.sum$/.test(name)) return true // Go workspaces
-  if (/requirements\.txt$/.test(name)) return true // Python (pinned deps)
-  if (/constraints\.txt$/.test(name)) return true // Python pip constraints
-  if (/shrinkwrap\.json$/.test(name)) return true // npm shrinkwrap
-  // Generated / mechanical files
-  if (/\.generated\.[^.]+$/.test(name)) return true
-  if (/\.snap$/.test(name)) return true // test snapshots
-  if (/\.pb\.go$/.test(name)) return true // protobuf Go
-  if (/\.pb\.swift$/.test(name)) return true // protobuf Swift
-  if (/_pb2\.py$/.test(name)) return true // protobuf Python
-  if (/\.pb\.cc$|\.pb\.h$/.test(name)) return true // protobuf C++
-  if (/GraphQL\.swift$/.test(name)) return true // Apollo GraphQL generated
-  if (/API\.graphql\.swift$/.test(name)) return true
-  return false
+  return LOCK_OR_GENERATED_PATTERNS.some((re) => re.test(name))
 }
 
-export function classifyTier(path: string): 0 | 1 | 2 | 3 {
+const TYPE_FILE_NAMES = new Set(['types.ts', 'interfaces.ts', 'index.ts'])
+const TYPE_FILE_RE = new RegExp('\\.(d\\.ts|types?\\.ts|interface\\.ts)$')
+
+/** Test files by name, per language: JS/TS, Go, Python, Ruby, Java, Swift. */
+const TEST_NAME_PATTERNS = [
+  /\.(spec|test)\.[^.]+$/,
+  /_test\.go$/,
+  /^test_.*\.py$/,
+  /^conftest\.py$/,
+  /_(spec|test)\.rb$/,
+  /Tests?\.java$|Spec\.java$/,
+  /Tests?\.swift$|Spec\.swift$/,
+]
+
+function isTypeFile(name: string): boolean {
+  return TYPE_FILE_RE.test(name) || TYPE_FILE_NAMES.has(name)
+}
+
+function isTestFile(path: string, name: string): boolean {
+  if (path.includes('__tests__/') || /^tests\/.*\.rs$/.test(path)) return true
+  return TEST_NAME_PATTERNS.some((re) => re.test(name))
+}
+
+export function classifyTier(path: string): Tier {
   const name = path.split('/').pop() ?? path
-  if (
-    /\.(d\.ts|types?\.ts|interface\.ts)$/.test(name) ||
-    name === 'types.ts' ||
-    name === 'interfaces.ts' ||
-    name === 'index.ts'
-  )
-    return 0
-  // JS/TS test files
-  if (/\.(spec|test)\.[^.]+$/.test(name) || path.includes('__tests__/')) return 2
-  // Go test files (*_test.go)
-  if (/_test\.go$/.test(name)) return 2
-  // Python test files (test_*.py, conftest.py)
-  if (/^test_.*\.py$/.test(name) || name === 'conftest.py') return 2
-  // Ruby test/spec files (*_spec.rb, *_test.rb)
-  if (/_(spec|test)\.rb$/.test(name)) return 2
-  // Java test files (*Test.java, *Tests.java, *Spec.java)
-  if (/Tests?\.java$|Spec\.java$/.test(name)) return 2
-  // Swift test files (*Tests.swift, *Spec.swift)
-  if (/Tests?\.swift$|Spec\.swift$/.test(name)) return 2
-  // Rust tests directory
-  if (/^tests\/.*\.rs$/.test(path)) return 2
+  if (isTypeFile(name)) return 0
+  if (isTestFile(path, name)) return 2
   if (isLockOrGeneratedFile(name)) return 3
   return 1
 }
 
 // Layer score for tier-1 files: higher = more likely a consumer/dependent → shown first.
 // Lower = more likely a provider/dependee → shown after its consumers.
+const LAYER_PATTERNS: [RegExp, number][] = [
+  [/\b(route|router|routing)\b/, 9],
+  [/\b(page|screen|app|main)\b/, 8],
+  [/\b(component|widget|panel|dialog|modal)\b/, 7],
+  [/^use[a-z]/, 6],
+  [/\bhook\b/, 6],
+  [/\b(store|slice|context|state)\b/, 5],
+  [/\b(service|handler|controller|api|manager|middleware)\b/, 4],
+  [/\b(repository|gateway|client|adapter)\b/, 3],
+  [/\b(model|entity|domain|schema|validator|dto)\b/, 2],
+  [/\b(util|utils|helper|helpers|lib|common|shared|format|parse|transform)\b/, 1],
+  [/\b(config|constant|constants|env|settings)\b/, 1],
+]
+
 function layerScore(path: string): number {
   const stem = (path.split('/').pop() ?? path).toLowerCase().replace(/\.[^.]+$/, '')
-  if (/\b(route|router|routing)\b/.test(stem)) return 9
-  if (/\b(page|screen|app|main)\b/.test(stem)) return 8
-  if (/\b(component|widget|panel|dialog|modal)\b/.test(stem)) return 7
-  if (/^use[a-z]/.test(stem) || /\bhook\b/.test(stem)) return 6
-  if (/\b(store|slice|context|state)\b/.test(stem)) return 5
-  if (/\b(service|handler|controller|api|manager|middleware)\b/.test(stem)) return 4
-  if (/\b(repository|gateway|client|adapter)\b/.test(stem)) return 3
-  if (/\b(model|entity|domain|schema|validator|dto)\b/.test(stem)) return 2
-  if (/\b(util|utils|helper|helpers|lib|common|shared|format|parse|transform)\b/.test(stem))
-    return 1
-  if (/\b(config|constant|constants|env|settings)\b/.test(stem)) return 1
-  return 4
+  return LAYER_PATTERNS.find(([re]) => re.test(stem))?.[1] ?? 4
 }
 
-function whyHere(tier: 0 | 1 | 2 | 3): string {
-  switch (tier) {
-    case 0:
-      return 'Interface/type file — contract foundation for the source files above'
-    case 1:
-      return 'Source file — implementation'
-    case 2:
-      return 'Test file — validates the implementation above'
-    case 3:
-      return 'Mechanical change — lock file, generated output, or formatting only'
-  }
+const WHY_HERE: Record<Tier, string> = {
+  0: 'Interface/type file — contract foundation for the source files above',
+  1: 'Source file — implementation',
+  2: 'Test file — validates the implementation above',
+  3: 'Mechanical change — lock file, generated output, or formatting only',
 }
 
 // ─── Semantic grouping (Signal 1) ─────────────────────────────────────────────
@@ -295,22 +379,25 @@ const CANONICAL_GROUPS: [RegExp, string][] = [
   [/^(tests?|__tests__|specs?|e2e)$/, 'Tests'],
 ]
 
-// Matches against individual directory segments (not the joined path) to avoid false
-// positives like 'test-batch' matching 'tests'. Iterates deepest segment first so
-// that e.g. '__tests__' inside 'components/' correctly classifies as Tests, not UI.
+function parentDirName(path: string): string {
+  const parts = path.split('/')
+  if (parts.length > 1) return parts[parts.length - 2]
+  return 'root'
+}
+
+// Matches whole directory segments, deepest first, so '__tests__' inside 'components/'
+// is Tests, not UI, and 'test-batch' never matches 'tests'.
 function semanticGroupName(filePath: string): string {
-  const parts = filePath.split('/')
-  // Iterate from deepest to shallowest directory segment (excluding the filename)
-  const dirSegments = parts
+  const dirSegments = filePath
+    .split('/')
     .slice(0, -1)
     .map((s) => s.toLowerCase())
     .reverse()
   for (const segment of dirSegments) {
-    for (const [pattern, name] of CANONICAL_GROUPS) {
-      if (pattern.test(segment)) return name
-    }
+    const hit = CANONICAL_GROUPS.find(([pattern]) => pattern.test(segment))
+    if (hit) return hit[1]
   }
-  return parts.length > 1 ? parts[parts.length - 2] : 'root'
+  return parentDirName(filePath)
 }
 
 // ─── Feature-stem merge (Signal 2) ────────────────────────────────────────────
@@ -338,24 +425,32 @@ function resolvePath(fromDir: string, spec: string): string {
   return result.join('/')
 }
 
+/** The known path a relative import resolves to: the file itself, with an extension, or its index. */
+function knownPathFor(resolved: string, knownPaths: Set<string>): string | undefined {
+  return [...knownPaths].find(
+    (p) => p === resolved || p.startsWith(resolved + '.') || p.startsWith(resolved + '/index.')
+  )
+}
+
 function extractImports(patch: string, fromPath: string, knownPaths: Set<string>): string[] {
   const fromDir = fromPath.split('/').slice(0, -1).join('/')
   const found: string[] = []
-  IMPORT_RE.lastIndex = 0
-  let match: RegExpExecArray | null
-  while ((match = IMPORT_RE.exec(patch)) !== null) {
-    const spec = match[1]
-    if (!spec.startsWith('.')) continue
-    const resolved = resolvePath(fromDir, spec)
-    const hit = [...knownPaths].find(
-      (p) => p === resolved || p.startsWith(resolved + '.') || p.startsWith(resolved + '/index.')
-    )
+  for (const match of patch.matchAll(IMPORT_RE)) {
+    if (!match[1].startsWith('.')) continue
+    const hit = knownPathFor(resolvePath(fromDir, match[1]), knownPaths)
     if (hit) found.push(hit)
   }
   return found
 }
 
 // ─── Union-find for group merging ──────────────────────────────────────────────
+
+/** Lower CANONICAL_GROUPS index = more foundational; fallback groups rank after all of them. */
+function groupPriority(group: string): number {
+  const index = CANONICAL_GROUPS.findIndex(([, n]) => n === group)
+  if (index === -1) return 999
+  return index
+}
 
 class UnionFind {
   private parent = new Map<string, string>()
@@ -377,12 +472,7 @@ class UnionFind {
     const ra = this.find(a)
     const rb = this.find(b)
     if (ra === rb) return
-    // Lower CANONICAL_GROUPS index = more foundational = wins. Fallback groups lose to canonical ones.
-    const ia = CANONICAL_GROUPS.findIndex(([, n]) => n === ra)
-    const ib = CANONICAL_GROUPS.findIndex(([, n]) => n === rb)
-    const prioA = ia === -1 ? 999 : ia
-    const prioB = ib === -1 ? 999 : ib
-    if (prioA <= prioB) this.parent.set(rb, ra)
+    if (groupPriority(ra) <= groupPriority(rb)) this.parent.set(rb, ra)
     else this.parent.set(ra, rb)
   }
 }
@@ -391,93 +481,84 @@ class UnionFind {
 
 const MAX_GROUP_SIZE = 15
 
-function groupFilesIntoChapters(
-  files: RawFile[],
-  coChangeAffinity?: Map<string, string[]>
-): Map<string, RawFile[]> {
-  const uf = new UnionFind()
-  const fileGroup = new Map<string, string>()
+/** Each file's starting group, merged as the signals connect them. */
+class FileGrouping {
+  readonly uf = new UnionFind()
+  readonly fileGroup: Map<string, string>
 
-  // Signal 1: assign each file to a semantic group
-  for (const f of files) {
-    fileGroup.set(f.path, semanticGroupName(f.path))
+  constructor(files: RawFile[]) {
+    this.fileGroup = new Map(files.map((f) => [f.path, semanticGroupName(f.path)]))
   }
 
-  // Signal 2: merge groups whose files share a feature stem (≥ 3 chars to skip noise)
+  /** Merges the groups of two files, when both files are in the PR. */
+  unionFiles(a: string, b: string): void {
+    const ga = this.fileGroup.get(a)
+    const gb = this.fileGroup.get(b)
+    if (ga && gb) this.uf.union(ga, gb)
+  }
+
+  groupOf(path: string): string {
+    return this.uf.find(this.fileGroup.get(path)!)
+  }
+}
+
+/** Signal 2: groups whose files share a feature stem (3+ chars, to skip noise) merge. */
+function mergeByFeatureStem(grouping: FileGrouping): void {
   const stemToGroups = new Map<string, string[]>()
-  for (const [path, group] of fileGroup) {
+  for (const [path, group] of grouping.fileGroup) {
     const stem = featureStem(path)
-    if (stem.length >= 3) {
-      const list = stemToGroups.get(stem) ?? []
-      list.push(group)
-      stemToGroups.set(stem, list)
-    }
+    if (stem.length >= 3) stemToGroups.set(stem, [...(stemToGroups.get(stem) ?? []), group])
   }
   for (const groups of stemToGroups.values()) {
-    for (let i = 1; i < groups.length; i++) uf.union(groups[0], groups[i])
+    for (const group of groups.slice(1)) grouping.uf.union(groups[0], group)
   }
+}
 
-  // Signal 3: language-agnostic co-change affinity from git history
-  if (coChangeAffinity) {
-    for (const f of files) {
-      const cochanged = coChangeAffinity.get(f.path) ?? []
-      for (const other of cochanged) {
-        const ga = fileGroup.get(f.path)
-        const gb = fileGroup.get(other)
-        if (ga && gb) uf.union(ga, gb)
-      }
-    }
-  }
-
-  // Signal 3b: JS/TS import graph — merge groups connected by direct imports in patch text
+/** Signal 3: files git history shows changing together, and files one imports. */
+function mergeByCoupling(
+  grouping: FileGrouping,
+  files: RawFile[],
+  coChangeAffinity?: Map<string, string[]>
+): void {
   const knownPaths = new Set(files.map((f) => f.path))
+  for (const f of files) {
+    for (const other of coChangeAffinity?.get(f.path) ?? []) grouping.unionFiles(f.path, other)
+  }
   for (const f of files) {
     if (!f.patch) continue
     for (const imported of extractImports(f.patch, f.path, knownPaths)) {
-      const ga = fileGroup.get(f.path)
-      const gb = fileGroup.get(imported)
-      if (ga && gb) uf.union(ga, gb)
+      grouping.unionFiles(f.path, imported)
     }
   }
+}
 
-  // Collect files by canonical group
-  const groups = new Map<string, RawFile[]>()
-  for (const f of files) {
-    const canonical = uf.find(fileGroup.get(f.path)!)
-    const list = groups.get(canonical) ?? []
-    list.push(f)
-    groups.set(canonical, list)
-  }
+function pushTo<K, V>(map: Map<K, V[]>, key: K, value: V): void {
+  map.set(key, [...(map.get(key) ?? []), value])
+}
 
-  // Sub-split any group that still exceeds MAX_GROUP_SIZE (by directory depth)
+/** A group over MAX_GROUP_SIZE splits by immediate parent directory. */
+function withOversizedSplit(groups: Map<string, RawFile[]>): Map<string, RawFile[]> {
   const result = new Map<string, RawFile[]>()
   for (const [key, groupFiles] of groups) {
     if (groupFiles.length <= MAX_GROUP_SIZE) {
       result.set(key, groupFiles)
-    } else {
-      // Split by immediate parent directory, prefixed with the semantic group key
-      const byDir = new Map<string, RawFile[]>()
-      for (const f of groupFiles) {
-        const parts = f.path.split('/')
-        const dir = parts.length > 1 ? parts[parts.length - 2] : 'root'
-        const subKey = `${key} / ${dir}`
-        const list = byDir.get(subKey) ?? []
-        list.push(f)
-        byDir.set(subKey, list)
-      }
-      for (const [subKey, subFiles] of byDir) result.set(subKey, subFiles)
+      continue
     }
+    for (const f of groupFiles) pushTo(result, `${key} / ${parentDirName(f.path)}`, f)
   }
-
   return result
 }
 
-interface RawFile {
-  path: string
-  additions: number
-  deletions: number
-  changeType?: string
-  patch?: string
+function groupFilesIntoChapters(
+  files: RawFile[],
+  coChangeAffinity?: Map<string, string[]>
+): Map<string, RawFile[]> {
+  const grouping = new FileGrouping(files)
+  mergeByFeatureStem(grouping)
+  mergeByCoupling(grouping, files, coChangeAffinity)
+  const groups = new Map<string, RawFile[]>()
+  for (const f of files) pushTo(groups, grouping.groupOf(f.path), f)
+  return withOversizedSplit(groups)
 }
 
 function defaultRiskScore(): RiskScore {
@@ -498,98 +579,85 @@ function defaultRiskScore(): RiskScore {
   }
 }
 
+/** The first of `keys` set on `obj`. */
+function firstOf(obj: object, keys: string[]): unknown {
+  return keys.map((k) => (obj as RawRecord)[k]).find((v) => v != null)
+}
+
+function rawFileFrom(raw: unknown): RawFile {
+  const obj = raw as RawRecord
+  return {
+    path: String(firstOf(obj, ['path', 'filename']) ?? ''),
+    additions: Number(obj.additions ?? 0),
+    deletions: Number(obj.deletions ?? 0),
+    changeType: String(firstOf(obj, ['changeType', 'status']) ?? 'modified'),
+    patch: obj.patch ? String(obj.patch) : undefined,
+  }
+}
+
+function estimatedMinutesFor(lines: number): number {
+  return Math.max(1, Math.ceil(lines / 60))
+}
+
+function changedFileFrom(f: RawFile, tier: Tier): PrChangedFile {
+  return {
+    path: f.path,
+    changeType: mapChangeType(f.changeType ?? 'modified'),
+    additions: f.additions,
+    deletions: f.deletions,
+    isBinary: false,
+    tier,
+    whyHere: WHY_HERE[tier],
+    riskScore: defaultRiskScore(),
+    estimatedMinutes: estimatedMinutesFor(f.additions + f.deletions),
+  }
+}
+
+/** Implementation first (by layer, then size), then types, tests and mechanical changes. */
+const TIER_READING_ORDER: Tier[] = [1, 0, 2, 3]
+
+function byLayerThenSize(a: RawFile, b: RawFile): number {
+  const ld = layerScore(b.path) - layerScore(a.path)
+  if (ld !== 0) return ld
+  return b.additions + b.deletions - (a.additions + a.deletions)
+}
+
+function tierOrderedFiles(groupFiles: RawFile[]): PrChangedFile[] {
+  return TIER_READING_ORDER.flatMap((tier) => {
+    const inTier = groupFiles.filter((f) => classifyTier(f.path) === tier)
+    if (tier === 1) inTier.sort(byLayerThenSize)
+    return inTier.map((f) => changedFileFrom(f, tier))
+  })
+}
+
+function chapterFor(
+  groupKey: string,
+  groupFiles: RawFile[],
+  overrides?: Record<string, string[]>
+): Chapter {
+  const id = groupKey.replace(/[^a-z0-9]/gi, '-').toLowerCase()
+  const files = applyOverrides(tierOrderedFiles(groupFiles), overrides?.[id])
+  const estimatedMinutes = files.reduce((s, f) => s + f.estimatedMinutes, 0)
+  return { id, name: groupKey, files, estimatedMinutes, status: 'not-started' }
+}
+
+function isMechanicalGroup([, groupFiles]: [string, RawFile[]]): boolean {
+  return groupFiles.every((f) => classifyTier(f.path) === 3)
+}
+
 export function buildChapters(
   rawFiles: unknown[],
   overrides?: Record<string, string[]>,
   coChangeAffinity?: Map<string, string[]>
 ): Chapter[] {
-  const files: RawFile[] = rawFiles
-    .map((f) => {
-      const obj = f as Record<string, unknown>
-      return {
-        path: String(obj.path ?? obj.filename ?? ''),
-        additions: Number(obj.additions ?? 0),
-        deletions: Number(obj.deletions ?? 0),
-        changeType: String(obj.changeType ?? obj.status ?? 'modified'),
-        patch: obj.patch ? String(obj.patch) : undefined,
-      }
-    })
-    .filter((f) => f.path.length > 0)
-
+  const files = rawFiles.map(rawFileFrom).filter((f) => f.path.length > 0)
   if (files.length === 0) return []
-
-  const groups = groupFilesIntoChapters(files, coChangeAffinity)
-
-  const chapters: Chapter[] = []
-
-  const buildGroupChapter = (groupKey: string, groupFiles: RawFile[]) => {
-    const byTier = new Map<0 | 1 | 2 | 3, RawFile[]>()
-    for (const f of groupFiles) {
-      const tier = classifyTier(f.path)
-      const existing = byTier.get(tier) ?? []
-      existing.push(f)
-      byTier.set(tier, existing)
-    }
-
-    // Order: tier 1 (consumers/implementation) first sorted by layer desc then size desc,
-    // then tier 0 (types/interfaces — what implementation depends on),
-    // then tier 2 (tests), then tier 3 (mechanical).
-    const tier1 = [...(byTier.get(1) ?? [])].sort((a, b) => {
-      const ld = layerScore(b.path) - layerScore(a.path)
-      if (ld !== 0) return ld
-      return b.additions + b.deletions - (a.additions + a.deletions)
-    })
-    const tier0 = byTier.get(0) ?? []
-    const tier2 = byTier.get(2) ?? []
-    const tier3 = byTier.get(3) ?? []
-
-    const tieredFiles: PrChangedFile[] = []
-    for (const [tFiles, tier] of [
-      [tier1, 1],
-      [tier0, 0],
-      [tier2, 2],
-      [tier3, 3],
-    ] as [RawFile[], 0 | 1 | 2 | 3][]) {
-      for (const f of tFiles) {
-        tieredFiles.push({
-          path: f.path,
-          changeType: mapChangeType(f.changeType ?? 'modified'),
-          additions: f.additions,
-          deletions: f.deletions,
-          isBinary: false,
-          tier,
-          whyHere: whyHere(tier),
-          riskScore: defaultRiskScore(),
-          estimatedMinutes: Math.max(1, Math.ceil((f.additions + f.deletions) / 60)),
-        })
-      }
-    }
-
-    const chapterId = groupKey.replace(/[^a-z0-9]/gi, '-').toLowerCase()
-    const ordered = applyOverrides(tieredFiles, overrides?.[chapterId])
-
-    chapters.push({
-      id: chapterId,
-      name: groupKey,
-      files: ordered,
-      estimatedMinutes: ordered.reduce((s, f) => s + f.estimatedMinutes, 0),
-      status: 'not-started',
-    })
-  }
-
-  const regularGroups: [string, RawFile[]][] = []
-  const mechanicalGroups: [string, RawFile[]][] = []
-
-  for (const [key, groupFiles] of groups) {
-    const allMech = groupFiles.every((f) => classifyTier(f.path) === 3)
-    if (allMech) mechanicalGroups.push([key, groupFiles])
-    else regularGroups.push([key, groupFiles])
-  }
-
-  for (const [key, groupFiles] of regularGroups) buildGroupChapter(key, groupFiles)
-  for (const [key, groupFiles] of mechanicalGroups) buildGroupChapter(key, groupFiles)
-
-  return chapters
+  const groups = [...groupFilesIntoChapters(files, coChangeAffinity)]
+  const regular = groups.filter((g) => !isMechanicalGroup(g))
+  const mechanical = groups.filter(isMechanicalGroup)
+  return [...regular, ...mechanical].map(([key, groupFiles]) =>
+    chapterFor(key, groupFiles, overrides)
+  )
 }
 
 function applyOverrides(files: PrChangedFile[], order?: string[]): PrChangedFile[] {
@@ -598,27 +666,67 @@ function applyOverrides(files: PrChangedFile[], order?: string[]): PrChangedFile
   const ordered: PrChangedFile[] = []
   for (const path of order) {
     const f = fileMap.get(path)
-    if (f) {
-      ordered.push(f)
-      fileMap.delete(path)
-    }
+    if (!f) continue
+    ordered.push(f)
+    fileMap.delete(path)
   }
-  for (const f of fileMap.values()) ordered.push(f)
-  return ordered
+  return [...ordered, ...fileMap.values()]
 }
 
+const CHANGE_TYPES = new Map<string, PrChangedFile['changeType']>([
+  ['added', 'added'],
+  ['removed', 'deleted'],
+  ['deleted', 'deleted'],
+  ['renamed', 'renamed'],
+])
+
 function mapChangeType(raw: string): PrChangedFile['changeType'] {
-  switch (raw.toLowerCase()) {
-    case 'added':
-      return 'added'
-    case 'removed':
-    case 'deleted':
-      return 'deleted'
-    case 'renamed':
-      return 'renamed'
-    default:
-      return 'modified'
-  }
+  return CHANGE_TYPES.get(raw.toLowerCase()) ?? 'modified'
+}
+
+// ─── Check states ─────────────────────────────────────────────────────────────
+
+const FAILED_STATES = new Set(['FAILURE', 'ERROR', 'TIMED_OUT', 'ACTION_REQUIRED'])
+const RUNNING_STATES = new Set(['PENDING', 'IN_PROGRESS', 'QUEUED'])
+const RUNNING_OR_WAITING_STATES = new Set([...RUNNING_STATES, 'WAITING'])
+const SKIPPED_STATES = new Set(['SKIPPED', 'NEUTRAL', 'CANCELLED'])
+/** mapCheckStatus does not count ACTION_REQUIRED as failed. */
+const CHECK_FAILED_STATES = new Set(['FAILURE', 'ERROR', 'TIMED_OUT'])
+
+const CI_STATUS_BY_SIGNAL: Record<SignalValue, ReviewQueuePR['ciStatus']> = {
+  fail: 'failing',
+  warn: 'pending',
+  pass: 'passing',
+  unknown: 'none',
+}
+
+/**
+ * Failed beats running beats succeeded; skipped, neutral or cancelled checks never
+ * decide it, so a rollup of only those is unknown.
+ */
+function rollupVerdict(states: string[], failed: Set<string>, running: Set<string>): SignalValue {
+  if (states.some((s) => failed.has(s))) return 'fail'
+  if (states.some((s) => running.has(s))) return 'warn'
+  if (states.some((s) => s === 'SUCCESS')) return 'pass'
+  return 'unknown'
+}
+
+/** The upper-cased state of each check; gh puts it in `state` or `conclusion`. */
+function checkStates(checks: RawRecord[], first: 'state' | 'conclusion'): string[] {
+  const second = first === 'state' ? 'conclusion' : 'state'
+  return checks.map((s) => String(s[first] ?? s[second] ?? '').toUpperCase())
+}
+
+function checksNamed(rollup: RawRecord[], keywords: string[]): RawRecord[] {
+  return rollup.filter((s) => {
+    const name = String(s.name ?? s.context ?? '').toLowerCase()
+    return keywords.some((k) => name.includes(k))
+  })
+}
+
+function asRollup(rollup: unknown): RawRecord[] | null {
+  if (!rollup || !Array.isArray(rollup)) return null
+  return rollup as RawRecord[]
 }
 
 // ─── Queue PR parsing ─────────────────────────────────────────────────────────
@@ -626,170 +734,155 @@ function mapChangeType(raw: string): PrChangedFile['changeType'] {
 const LINT_NAMES = ['lint', 'eslint', 'rubocop', 'flake8', 'pylint', 'stylelint', 'tslint']
 const COVERAGE_NAMES = ['coverage', 'codecov', 'coveralls', 'sonar', 'codeclimate', 'lcov']
 
-type SignalValue = 'pass' | 'warn' | 'fail' | 'unknown'
-
-const FAILED = new Set(['FAILURE', 'ERROR', 'TIMED_OUT', 'ACTION_REQUIRED'])
-const RUNNING = new Set(['PENDING', 'IN_PROGRESS', 'QUEUED'])
-
-/** One signal for a set of status checks: any failed fails, any running warns, else any success passes. */
-function rollupSignal(checks: Array<Record<string, unknown>>): SignalValue {
-  const states = checks.map((s) => String(s.state ?? s.conclusion ?? '').toUpperCase())
-  if (states.some((s) => FAILED.has(s))) return 'fail'
-  if (states.some((s) => RUNNING.has(s))) return 'warn'
-  // SKIPPED/NEUTRAL/CANCELLED are non-blocking: pass if at least one check succeeded
-  if (states.some((s) => s === 'SUCCESS')) return 'pass'
-  return 'unknown'
-}
-
 function checkSignal(rollup: unknown, keywords: string[]): SignalValue {
-  if (!rollup || !Array.isArray(rollup)) return 'unknown'
-  const checks = (rollup as Array<Record<string, unknown>>).filter((s) => {
-    const name = String(s.name ?? s.context ?? '').toLowerCase()
-    return keywords.some((k) => name.includes(k))
-  })
-  if (checks.length === 0) return 'unknown'
-  return rollupSignal(checks)
+  const checks = checksNamed(asRollup(rollup) ?? [], keywords)
+  return rollupVerdict(checkStates(checks, 'state'), FAILED_STATES, RUNNING_STATES)
 }
 
 function ciSignal(rollup: unknown): SignalValue {
-  if (!rollup || !Array.isArray(rollup) || rollup.length === 0) return 'unknown'
-  return rollupSignal(rollup as Array<Record<string, unknown>>)
+  return rollupVerdict(checkStates(asRollup(rollup) ?? [], 'state'), FAILED_STATES, RUNNING_STATES)
+}
+
+const SOURCE_FILE_RE = /\.(ts|tsx|js|jsx|py|rb|go|java|cs)$/
+
+function isJsTestPath(p: string): boolean {
+  return /\.(spec|test)\.[^.]+$/.test(p) || p.includes('__tests__')
 }
 
 function testsSignal(filePaths: string[]): SignalValue {
-  if (filePaths.length === 0) return 'unknown'
-  const sourceFiles = filePaths.filter(
-    (p) =>
-      /\.(ts|tsx|js|jsx|py|rb|go|java|cs)$/.test(p) &&
-      !/\.(spec|test)\.[^.]+$/.test(p) &&
-      !p.includes('__tests__')
-  )
+  const sourceFiles = filePaths.filter((p) => SOURCE_FILE_RE.test(p) && !isJsTestPath(p))
   if (sourceFiles.length === 0) return 'unknown'
-  const testFiles = new Set(
-    filePaths.filter((p) => /\.(spec|test)\.[^.]+$/.test(p) || p.includes('__tests__'))
-  )
-  if (testFiles.size === 0) return 'fail'
-  // Check if source files have corresponding test files in the PR
+  const testFiles = filePaths.filter(isJsTestPath)
+  if (testFiles.length === 0) return 'fail'
+  // A source file is covered when a test file in the PR names its stem.
   const covered = sourceFiles.filter((src) => {
     const stem = src.replace(/\.[^.]+$/, '').replace(/\/index$/, '')
-    return [...testFiles].some((t) => t.includes(stem.split('/').pop()!))
+    return testFiles.some((t) => t.includes(stem.split('/').pop()!))
   })
-  if (covered.length === 0) return 'warn'
-  return covered.length >= sourceFiles.length / 2 ? 'pass' : 'warn'
+  if (covered.length === 0 || covered.length < sourceFiles.length / 2) return 'warn'
+  return 'pass'
 }
 
 function churnSignal(totalLines: number, fileCount: number): SignalValue {
   if (fileCount === 0) return 'unknown'
   const perFile = totalLines / fileCount
-  return perFile > 200 ? 'fail' : perFile > 80 ? 'warn' : 'pass'
+  if (perFile > 200) return 'fail'
+  if (perFile > 80) return 'warn'
+  return 'pass'
 }
 
 function blastSignal(fileCount: number): SignalValue {
-  return fileCount > 15 ? 'fail' : fileCount > 6 ? 'warn' : 'pass'
+  if (fileCount > 15) return 'fail'
+  if (fileCount > 6) return 'warn'
+  return 'pass'
 }
 
-export function parseReviewQueuePR(raw: unknown): ReviewQueuePR {
-  const obj = raw as Record<string, unknown>
-  const rawFiles = (obj.files as unknown[] | undefined) ?? []
-  const fileCount = rawFiles.length > 0 ? rawFiles.length : Number(obj.changedFiles ?? 0)
-  const additions =
-    rawFiles.length > 0
-      ? rawFiles.reduce<number>(
-          (s, f) => s + Number((f as Record<string, unknown>).additions ?? 0),
-          0
-        )
-      : Number(obj.additions ?? 0)
-  const deletions =
-    rawFiles.length > 0
-      ? rawFiles.reduce<number>(
-          (s, f) => s + Number((f as Record<string, unknown>).deletions ?? 0),
-          0
-        )
-      : Number(obj.deletions ?? 0)
-  const filePaths = rawFiles.map((f) =>
-    String((f as Record<string, unknown>).path ?? (f as Record<string, unknown>).filename ?? '')
-  )
-  const rollup = obj.statusCheckRollup
+function sumOf(files: RawRecord[], key: 'additions' | 'deletions'): number {
+  return files.reduce((s, f) => s + Number(f[key] ?? 0), 0)
+}
 
-  const signalDots: SignalDots = {
-    tests: testsSignal(filePaths),
+function queueTotals(obj: RawRecord): QueueTotals {
+  const files = (obj.files as RawRecord[] | undefined) ?? []
+  const filePaths = files.map((f) => String(firstOf(f, ['path', 'filename']) ?? ''))
+  if (files.length === 0) {
+    const [additions, deletions] = [Number(obj.additions ?? 0), Number(obj.deletions ?? 0)]
+    return { fileCount: Number(obj.changedFiles ?? 0), additions, deletions, filePaths }
+  }
+  const [additions, deletions] = [sumOf(files, 'additions'), sumOf(files, 'deletions')]
+  return { fileCount: files.length, additions, deletions, filePaths }
+}
+
+function signalDotsFor(totals: QueueTotals, rollup: unknown): SignalDots {
+  return {
+    tests: testsSignal(totals.filePaths),
     coverage: checkSignal(rollup, COVERAGE_NAMES),
     ci: ciSignal(rollup),
     lint: checkSignal(rollup, LINT_NAMES),
-    churn: churnSignal(additions + deletions, fileCount),
-    blast: blastSignal(fileCount),
+    churn: churnSignal(totals.additions + totals.deletions, totals.fileCount),
+    blast: blastSignal(totals.fileCount),
   }
+}
 
-  const ciSt = ciSignal(rollup)
-  const ciStatus: ReviewQueuePR['ciStatus'] =
-    ciSt === 'pass' ? 'passing' : ciSt === 'fail' ? 'failing' : ciSt === 'warn' ? 'pending' : 'none'
+/** Approvers from the REST `reviews` field or GraphQL `latestReviews.nodes`, once each. */
+function approversOf(obj: RawRecord): string[] {
+  const reviews =
+    (obj.reviews as RawRecord[] | undefined) ?? (obj.latestReviews as Nodes<RawRecord>)?.nodes ?? []
+  const approvers = reviews
+    .filter((r) => String(r.state ?? '').toUpperCase() === 'APPROVED')
+    .map((r) => String(((r.author as RawRecord) ?? {}).login ?? ''))
+    .filter(Boolean)
+  return [...new Set(approvers)]
+}
 
-  // Extract approvals from REST `reviews` field or GraphQL `latestReviews.nodes`
-  const rawReviews =
-    (obj.reviews as unknown[] | undefined) ??
-    (obj.latestReviews as { nodes?: unknown[] } | undefined)?.nodes ??
-    []
-  const approvedBy = [
-    ...new Set(
-      (rawReviews as Array<Record<string, unknown>>)
-        .filter((r) => String(r.state ?? '').toUpperCase() === 'APPROVED')
-        .map((r) => {
-          const author = (r.author as Record<string, unknown>) ?? {}
-          return String(author.login ?? '')
-        })
-        .filter(Boolean)
-    ),
-  ]
+/** Assignees as normalizeGraphQLNode flattens them, or from the REST `assignees` field. */
+function assigneeLoginsOf(obj: RawRecord): string[] {
+  if (Array.isArray(obj.assigneeLogins)) return obj.assigneeLogins as string[]
+  if (!Array.isArray(obj.assignees)) return []
+  return (obj.assignees as RawRecord[]).map((a) => String(a.login ?? '')).filter(Boolean)
+}
 
-  // Extract requested reviewers (already flattened by normalizeGraphQLNode or raw REST field)
-  const requestedReviewers: string[] = Array.isArray(obj.requestedReviewers)
-    ? (obj.requestedReviewers as string[])
-    : []
+const PR_STATES: Record<string, 'merged' | 'closed'> = { MERGED: 'merged', CLOSED: 'closed' }
 
-  // Extract assignees (flattened by normalizeGraphQLNode or REST assignees field)
-  const assigneeLogins: string[] = Array.isArray(obj.assigneeLogins)
-    ? (obj.assigneeLogins as string[])
-    : Array.isArray(obj.assignees)
-      ? (obj.assignees as Array<Record<string, unknown>>)
-          .map((a) => String(a.login ?? ''))
-          .filter(Boolean)
-      : []
+const QUEUE_MERGE_STATES: Record<string, ReviewQueuePR['mergeStateStatus']> = {
+  BEHIND: 'behind',
+  DIRTY: 'dirty',
+  CLEAN: 'clean',
+  HAS_HOOKS: 'clean',
+}
 
+function upper(value: unknown): string {
+  return String(value ?? '').toUpperCase()
+}
+
+function textOf(value: unknown): string {
+  return String(value ?? '')
+}
+
+/** Who and what the PR is: number, title, author, branches, state. */
+function queueIdentity(obj: RawRecord) {
+  const author = (obj.author ?? {}) as RawRecord
   return {
     number: Number(obj.number),
-    title: String(obj.title ?? ''),
-    author: String((obj.author as Record<string, unknown>)?.login ?? ''),
-    authorAvatarUrl: String((obj.author as Record<string, unknown>)?.avatarUrl ?? ''),
-    openedAt: String(obj.createdAt ?? ''),
-    headRefName: String(obj.headRefName ?? ''),
-    baseRefName: String(obj.baseRefName ?? ''),
-    state: (() => {
-      const s = String(obj.state ?? '').toUpperCase()
-      if (s === 'MERGED') return 'merged' as const
-      if (s === 'CLOSED') return 'closed' as const
-      return 'open' as const
-    })(),
+    title: textOf(obj.title),
+    author: textOf(author.login),
+    authorAvatarUrl: textOf(author.avatarUrl),
+    openedAt: textOf(obj.createdAt),
+    headRefName: textOf(obj.headRefName),
+    baseRefName: textOf(obj.baseRefName),
+    state: PR_STATES[upper(obj.state)] ?? 'open',
     isDraft: Boolean(obj.isDraft),
-    ciStatus,
-    fileCount,
-    additions,
-    deletions,
-    estimatedMinutes: Math.max(1, Math.ceil((additions + deletions) / 60)),
-    riskLevel: queueRiskLevel(additions + deletions),
-    signalDots,
-    sessionStatus: 'not-started',
-    viewedFileCount: 0,
+  }
+}
+
+/** Where review stands: approvals, requested reviewers, assignees and mergeability. */
+function queueReviewState(obj: RawRecord) {
+  const approvedBy = approversOf(obj)
+  const requested = obj.requestedReviewers
+  return {
     approvalCount: approvedBy.length,
     approvedBy,
-    requestedReviewers,
-    assigneeLogins,
-    mergeStateStatus: (() => {
-      const s = String(obj.mergeStateStatus ?? '').toUpperCase()
-      if (s === 'BEHIND') return 'behind' as const
-      if (s === 'DIRTY') return 'dirty' as const
-      if (s === 'CLEAN' || s === 'HAS_HOOKS') return 'clean' as const
-      return 'unknown' as const
-    })(),
+    requestedReviewers: Array.isArray(requested) ? (requested as string[]) : [],
+    assigneeLogins: assigneeLoginsOf(obj),
+    mergeStateStatus: QUEUE_MERGE_STATES[upper(obj.mergeStateStatus)] ?? 'unknown',
+  }
+}
+
+export function parseReviewQueuePR(raw: unknown): ReviewQueuePR {
+  const obj = raw as RawRecord
+  const totals = queueTotals(obj)
+  const changeSize = totals.additions + totals.deletions
+  return {
+    ...queueIdentity(obj),
+    ciStatus: CI_STATUS_BY_SIGNAL[ciSignal(obj.statusCheckRollup)],
+    fileCount: totals.fileCount,
+    additions: totals.additions,
+    deletions: totals.deletions,
+    estimatedMinutes: estimatedMinutesFor(changeSize),
+    riskLevel: queueRiskLevel(changeSize),
+    signalDots: signalDotsFor(totals, obj.statusCheckRollup),
+    sessionStatus: 'not-started',
+    viewedFileCount: 0,
+    ...queueReviewState(obj),
   }
 }
 
@@ -804,87 +897,72 @@ export function chapterRiskLevel(chapter: Chapter): 'low' | 'medium' | 'high' {
 
 // ─── Hunk classification (formatting vs semantic) ─────────────────────────────
 
-export function classifyHunk(hunk: {
-  lines: Array<{ type: string; content: string }>
-}): 'semantic' | 'formatting' {
-  const added = hunk.lines.filter((l) => l.type === 'add').map((l) => l.content.trim())
-  const removed = hunk.lines.filter((l) => l.type === 'remove').map((l) => l.content.trim())
+function trimmedLinesOf(hunk: HunkLines, type: 'add' | 'remove'): string[] {
+  return hunk.lines.filter((l) => l.type === type).map((l) => l.content.trim())
+}
 
-  // No actual changes in this hunk — just context lines; treat as semantic (don't filter)
+function sameMultiset(a: string[], b: string[]): boolean {
+  const counts = new Map<string, number>()
+  for (const line of a) counts.set(line, (counts.get(line) ?? 0) + 1)
+  for (const line of b) counts.set(line, (counts.get(line) ?? 0) - 1)
+  return [...counts.values()].every((v) => v === 0)
+}
+
+/** Formatting when the added and removed lines are the same multiset once trimmed. */
+export function classifyHunk(hunk: HunkLines): 'semantic' | 'formatting' {
+  const added = trimmedLinesOf(hunk, 'add')
+  const removed = trimmedLinesOf(hunk, 'remove')
+  // A hunk of only context lines changes nothing to filter out.
   if (added.length === 0 && removed.length === 0) return 'semantic'
   if (added.length !== removed.length) return 'semantic'
-
-  // Check multiset equality: if stripped add lines == stripped remove lines, it's formatting
-  const counts = new Map<string, number>()
-  for (const line of added) counts.set(line, (counts.get(line) ?? 0) + 1)
-  for (const line of removed) counts.set(line, (counts.get(line) ?? 0) - 1)
-  return [...counts.values()].every((v) => v === 0) ? 'formatting' : 'semantic'
+  if (sameMultiset(added, removed)) return 'formatting'
+  return 'semantic'
 }
 
 // ─── Issue reference extraction ───────────────────────────────────────────────
 
 export function extractIssueRefs(body: string): IssueRef[] {
-  const refs: IssueRef[] = []
   // GitHub: Fixes #123, Closes #456, Resolves #789, Related #012
-  const ghRe = /(?:fixes|closes|resolves|related)\s+#(\d+)/gi
-  let m: RegExpExecArray | null
-  while ((m = ghRe.exec(body)) !== null) {
-    refs.push({ type: 'github', ref: `#${m[1]}` })
-  }
+  const github = [...body.matchAll(/(?:fixes|closes|resolves|related)\s+#(\d+)/gi)].map(
+    (m): IssueRef => ({ type: 'github', ref: `#${m[1]}` })
+  )
   // Linear: https://linear.app/team/issue/TEAM-123
-  const linearRe = /https?:\/\/linear\.app\/[^\s/]+\/issue\/([A-Z]+-\d+)/g
-  while ((m = linearRe.exec(body)) !== null) {
-    refs.push({ type: 'linear', ref: m[1], url: m[0] })
-  }
+  const linear = [...body.matchAll(/https?:\/\/linear\.app\/[^\s/]+\/issue\/([A-Z]+-\d+)/g)].map(
+    (m): IssueRef => ({ type: 'linear', ref: m[1], url: m[0] })
+  )
   // Jira: https://your-team.atlassian.net/browse/TEAM-123
-  const jiraRe = /https?:\/\/[^\s/]+\.atlassian\.net\/browse\/([A-Z][A-Z0-9]*-\d+)/g
-  while ((m = jiraRe.exec(body)) !== null) {
-    refs.push({ type: 'jira', ref: m[1], url: m[0] })
+  const jira = [
+    ...body.matchAll(/https?:\/\/[^\s/]+\.atlassian\.net\/browse\/([A-Z][A-Z0-9]*-\d+)/g),
+  ].map((m): IssueRef => ({ type: 'jira', ref: m[1], url: m[0] }))
+  return [...github, ...linear, ...jira]
+}
+
+async function enrichIssueRef(ref: IssueRef, issues: IssueLookup): Promise<IssueRef> {
+  if (ref.type === 'github') return ref
+  try {
+    const issue = await issues.get(ref.type, ref.ref)
+    if (issue === null) return ref
+    return { ...ref, title: issue.title, state: issue.state.name }
+  } catch {
+    return ref
   }
-  return refs
 }
 
 /**
- * Fill in what a bare key does not say.
- *
- * The scraper can only ever produce a key and a URL — it is a regex over a
- * pull-request description. The application's tracker connection knows the
- * title and the state, which is the part a reviewer actually wants.
- *
- * Best-effort by design: an unconnected or unreachable tracker leaves the
- * references exactly as they render today, rather than failing a review.
+ * Adds each tracker issue's title and state, which a key scraped from the PR body
+ * cannot carry. Best-effort: an unconnected or unreachable tracker leaves refs as they are.
  */
 export async function enrichIssueRefs(
   refs: IssueRef[],
-  issues:
-    | {
-        get(
-          tracker: 'linear' | 'jira',
-          key: string,
-          opts?: { refresh?: boolean }
-        ): Promise<{
-          title: string
-          state: { name: string }
-        } | null>
-      }
-    | undefined
+  issues: IssueLookup | undefined
 ): Promise<IssueRef[]> {
   if (!issues) return refs
-  return Promise.all(
-    refs.map(async (ref) => {
-      if (ref.type === 'github') return ref
-      try {
-        const issue = await issues.get(ref.type, ref.ref)
-        if (issue === null) return ref
-        return { ...ref, title: issue.title, state: issue.state.name }
-      } catch {
-        return ref
-      }
-    })
-  )
+  return Promise.all(refs.map((ref) => enrichIssueRef(ref, issues)))
 }
 
 // ─── DRY violation detection ──────────────────────────────────────────────────
+
+const DRY_WINDOW = 5
 
 function normalizeForDry(line: string): string {
   return line
@@ -895,76 +973,65 @@ function normalizeForDry(line: string): string {
     .trim()
 }
 
+/** Each run of DRY_WINDOW normalized added lines in `patch`. */
+function addedLineWindows(patch: string): string[] {
+  const added = patch
+    .split('\n')
+    .filter((l) => l.startsWith('+') && !l.startsWith('+++'))
+    .map((l) => normalizeForDry(l.slice(1)))
+    .filter((l) => l.length > 10)
+  const windows: string[] = []
+  for (let i = 0; i + DRY_WINDOW <= added.length; i++) {
+    windows.push(added.slice(i, i + DRY_WINDOW).join('\n'))
+  }
+  return windows
+}
+
 export function detectDryViolations(
   files: Array<{ path: string; patch?: string }>
 ): DryViolation[] {
-  const WINDOW = 5
   const fingerprints = new Map<string, Set<string>>()
-
   for (const file of files) {
-    if (!file.patch) continue
-    const addedLines = file.patch
-      .split('\n')
-      .filter((l) => l.startsWith('+') && !l.startsWith('+++'))
-      .map((l) => normalizeForDry(l.slice(1)))
-      .filter((l) => l.length > 10)
-
-    for (let i = 0; i <= addedLines.length - WINDOW; i++) {
-      const block = addedLines.slice(i, i + WINDOW).join('\n')
-      const existing = fingerprints.get(block) ?? new Set<string>()
-      existing.add(file.path)
-      fingerprints.set(block, existing)
+    for (const block of addedLineWindows(file.patch ?? '')) {
+      fingerprints.set(block, (fingerprints.get(block) ?? new Set()).add(file.path))
     }
   }
-
-  const violations: DryViolation[] = []
-  for (const [fingerprint, fileSet] of fingerprints) {
-    if (fileSet.size >= 2) {
-      violations.push({ files: [...fileSet], fingerprint, lineCount: WINDOW })
-    }
-  }
-  return violations
+  return [...fingerprints]
+    .filter(([, fileSet]) => fileSet.size >= 2)
+    .map(([fingerprint, fileSet]) => ({
+      files: [...fileSet],
+      fingerprint,
+      lineCount: DRY_WINDOW,
+    }))
 }
 
 // ─── gh response mappers (pure; moved from github.ipc.ts) ────────────────────
 
-export function normalizeGraphQLNode(node: unknown): Record<string, unknown> {
-  const obj = node as Record<string, unknown>
-  type CommitContext = { name?: string; context?: string; conclusion?: string; state?: string }
-  type CommitNode = { commit?: { statusCheckRollup?: { contexts?: { nodes?: CommitContext[] } } } }
-  type CommitsField = { nodes?: CommitNode[] }
-  type ReviewNode = {
-    author?: { login?: string; avatarUrl?: string }
-    state?: string
-    submittedAt?: string
-  }
-  type LatestReviews = { nodes?: ReviewNode[] }
-  type ReviewRequestNode = {
-    requestedReviewer?: { login?: string; avatarUrl?: string; name?: string }
-  }
-  type ReviewRequests = { nodes?: ReviewRequestNode[] }
-  type AssigneeNode = { login?: string }
-  type Assignees = { nodes?: AssigneeNode[] }
-  const commits = obj.commits as CommitsField | undefined
-  const contextNodes = commits?.nodes?.[0]?.commit?.statusCheckRollup?.contexts?.nodes ?? []
-  const statusCheckRollup = contextNodes.map((ctx) => ({
-    name: ctx.name ?? ctx.context ?? '',
-    state: ctx.conclusion ?? ctx.state ?? '',
-    conclusion: ctx.conclusion ?? ctx.state ?? '',
-  }))
-  const latestReviewNodes = (obj.latestReviews as LatestReviews | undefined)?.nodes ?? []
-  const reviewRequestNodes = (obj.reviewRequests as ReviewRequests | undefined)?.nodes ?? []
-  const requestedReviewers = reviewRequestNodes
+function rollupFromCommits(obj: RawRecord): RawRecord[] {
+  const commits = obj.commits as Nodes<CommitNode>
+  const contexts = commits?.nodes?.[0]?.commit?.statusCheckRollup?.contexts?.nodes ?? []
+  return contexts.map((ctx) => {
+    const state = textOf(firstOf(ctx, ['conclusion', 'state']))
+    return { name: textOf(firstOf(ctx, ['name', 'context'])), state, conclusion: state }
+  })
+}
+
+function requestedReviewerLogins(obj: RawRecord): string[] {
+  const nodes = (obj.reviewRequests as Nodes<ReviewRequestNode>)?.nodes ?? []
+  return nodes
     .map((n) => n.requestedReviewer?.login ?? n.requestedReviewer?.name ?? '')
     .filter(Boolean)
-  const assigneeNodes = (obj.assignees as Assignees | undefined)?.nodes ?? []
-  const assigneeLogins = assigneeNodes.map((n) => n.login ?? '').filter(Boolean)
+}
+
+export function normalizeGraphQLNode(node: unknown): Record<string, unknown> {
+  const obj = node as RawRecord
+  const assigneeNodes = (obj.assignees as Nodes<{ login?: string }>)?.nodes ?? []
   return {
     ...obj,
-    statusCheckRollup,
-    latestReviews: { nodes: latestReviewNodes },
-    requestedReviewers,
-    assigneeLogins,
+    statusCheckRollup: rollupFromCommits(obj),
+    latestReviews: { nodes: (obj.latestReviews as Nodes<ReviewNode>)?.nodes ?? [] },
+    requestedReviewers: requestedReviewerLogins(obj),
+    assigneeLogins: assigneeNodes.map((n) => n.login ?? '').filter(Boolean),
   }
 }
 
@@ -987,207 +1054,160 @@ export const COVERAGE_CHECK_NAMES = [
   'lcov',
 ]
 
-const NON_BLOCKING = new Set(['SKIPPED', 'NEUTRAL', 'CANCELLED', 'STALE'])
+const MERGE_STATES: Record<string, 'behind' | 'dirty' | 'clean'> = {
+  BEHIND: 'behind',
+  DIRTY: 'dirty',
+  CONFLICTING: 'dirty',
+  CLEAN: 'clean',
+  HAS_HOOKS: 'clean',
+  UNSTABLE: 'clean',
+  BLOCKED: 'clean',
+}
 
 export function mapMergeStateStatus(raw: string): 'behind' | 'dirty' | 'clean' | 'unknown' {
-  const s = raw.toUpperCase()
-  if (s === 'BEHIND') return 'behind'
-  if (s === 'DIRTY' || s === 'CONFLICTING') return 'dirty'
-  if (s === 'CLEAN' || s === 'HAS_HOOKS' || s === 'UNSTABLE' || s === 'BLOCKED') return 'clean'
-  return 'unknown'
+  return MERGE_STATES[raw.toUpperCase()] ?? 'unknown'
 }
 
 export function mapCiStatus(rollup: unknown): 'passing' | 'failing' | 'pending' | 'none' {
-  if (!rollup || !Array.isArray(rollup) || rollup.length === 0) return 'none'
-  // Normalise: gh returns `conclusion` on CheckRuns; StatusContext uses `state`
-  const statuses = (rollup as Array<Record<string, unknown>>).map((s) =>
-    String(s.conclusion ?? s.state ?? '').toUpperCase()
-  )
-  if (
-    statuses.some(
-      (s) => s === 'FAILURE' || s === 'ERROR' || s === 'TIMED_OUT' || s === 'ACTION_REQUIRED'
-    )
-  )
-    return 'failing'
-  if (
-    statuses.some(
-      (s) => s === 'PENDING' || s === 'IN_PROGRESS' || s === 'QUEUED' || s === 'WAITING'
-    )
-  )
-    return 'pending'
-  // SKIPPED / NEUTRAL / CANCELLED are non-blocking; pass if at least one check succeeded
-  if (statuses.some((s) => s === 'SUCCESS')) return 'passing'
-  return 'none'
+  const states = checkStates(asRollup(rollup) ?? [], 'conclusion')
+  return CI_STATUS_BY_SIGNAL[rollupVerdict(states, FAILED_STATES, RUNNING_OR_WAITING_STATES)]
 }
 
 export function mapCheckStatus(
   rollup: unknown,
   names: string[]
 ): 'pass' | 'fail' | 'warn' | 'unknown' {
-  if (!rollup || !Array.isArray(rollup) || rollup.length === 0) return 'unknown'
-  const checks = (rollup as Array<Record<string, unknown>>).filter((s) => {
-    const name = String(s.name ?? s.context ?? '').toLowerCase()
-    return names.some((n) => name.includes(n))
-  })
-  if (checks.length === 0) return 'unknown'
-  const statuses = checks.map((s) => String(s.conclusion ?? s.state ?? '').toUpperCase())
-  if (statuses.some((s) => s === 'FAILURE' || s === 'ERROR' || s === 'TIMED_OUT')) return 'fail'
-  if (statuses.some((s) => s === 'PENDING' || s === 'IN_PROGRESS' || s === 'QUEUED')) return 'warn'
-  if (statuses.some((s) => s === 'SUCCESS')) return 'pass'
-  if (statuses.every((s) => NON_BLOCKING.has(s))) return 'unknown'
+  const states = checkStates(checksNamed(asRollup(rollup) ?? [], names), 'conclusion')
+  return rollupVerdict(states, CHECK_FAILED_STATES, RUNNING_STATES)
+}
+
+function statusCheckState(raw: string): StatusCheck['state'] {
+  if (raw === 'SUCCESS') return 'pass'
+  if (FAILED_STATES.has(raw)) return 'fail'
+  if (RUNNING_OR_WAITING_STATES.has(raw)) return 'pending'
+  if (SKIPPED_STATES.has(raw)) return 'skipped'
   return 'unknown'
 }
 
 export function mapStatusChecks(rollup: unknown): StatusCheck[] {
-  if (!rollup || !Array.isArray(rollup)) return []
-  return (rollup as Array<Record<string, unknown>>).map((s) => {
-    const raw = String(s.conclusion ?? s.state ?? '').toUpperCase()
-    const state: StatusCheck['state'] =
-      raw === 'SUCCESS'
-        ? 'pass'
-        : raw === 'FAILURE' || raw === 'ERROR' || raw === 'TIMED_OUT' || raw === 'ACTION_REQUIRED'
-          ? 'fail'
-          : raw === 'PENDING' || raw === 'IN_PROGRESS' || raw === 'QUEUED' || raw === 'WAITING'
-            ? 'pending'
-            : raw === 'SKIPPED' || raw === 'NEUTRAL' || raw === 'CANCELLED'
-              ? 'skipped'
-              : 'unknown'
-    return {
-      name: String(s.name ?? s.context ?? 'Unknown check'),
-      state,
-      url: s.url ? String(s.url) : undefined,
-    }
-  })
+  return (asRollup(rollup) ?? []).map((s) => ({
+    name: String(s.name ?? s.context ?? 'Unknown check'),
+    state: statusCheckState(upper(s.conclusion ?? s.state)),
+    url: s.url ? String(s.url) : undefined,
+  }))
+}
+
+function reviewLogin(r: RawRecord): string {
+  return String(((r.user as RawRecord) ?? {}).login ?? '')
 }
 
 export function mapApprovals(
   reviews: Array<Record<string, unknown>>
 ): Array<{ author: string; authorAvatarUrl: string; submittedAt: string }> {
-  // Only keep the latest APPROVED review per author (later CHANGES_REQUESTED dismiss earlier approvals)
-  const byAuthor = new Map<string, Record<string, unknown>>()
+  // Each author's latest decisive review counts: a later CHANGES_REQUESTED dismisses an
+  // earlier approval, while a later COMMENTED review does not.
+  const byAuthor = new Map<string, RawRecord>()
   for (const r of reviews) {
-    const login = String((r.user as Record<string, unknown>)?.login ?? '')
-    if (!login) continue
-    const state = String(r.state ?? '').toUpperCase()
-    // Track any review per author; we'll filter for APPROVED at the end
-    if (!byAuthor.has(login) || state !== 'COMMENTED') {
-      byAuthor.set(login, r)
-    }
+    const login = reviewLogin(r)
+    if (login && (!byAuthor.has(login) || upper(r.state) !== 'COMMENTED')) byAuthor.set(login, r)
   }
   return [...byAuthor.values()]
-    .filter((r) => String(r.state ?? '').toUpperCase() === 'APPROVED')
-    .map((r) => {
-      const user = (r.user as Record<string, unknown>) ?? {}
-      return {
-        author: String(user.login ?? ''),
-        authorAvatarUrl: String(user.avatar_url ?? ''),
-        submittedAt: String(r.submitted_at ?? ''),
-      }
-    })
+    .filter((r) => upper(r.state) === 'APPROVED')
+    .map((r) => ({
+      author: reviewLogin(r),
+      authorAvatarUrl: String(((r.user as RawRecord) ?? {}).avatar_url ?? ''),
+      submittedAt: String(r.submitted_at ?? ''),
+    }))
+}
+
+/** The fields an issue comment and an inline comment share. */
+function commentBase(obj: RawRecord) {
+  const user = (firstOf(obj, ['user', 'author']) ?? {}) as RawRecord
+  return {
+    id: Number(obj.id),
+    author: textOf(user.login),
+    authorAvatarUrl: textOf(user.avatar_url),
+    body: textOf(obj.body),
+    createdAt: textOf(obj.created_at),
+    updatedAt: textOf(obj.updated_at),
+  }
 }
 
 export function mapIssueComment(raw: unknown): IssueComment {
-  const obj = raw as Record<string, unknown>
-  const user = (obj.user ?? obj.author ?? {}) as Record<string, unknown>
-  return {
-    id: Number(obj.id),
-    author: String(user.login ?? ''),
-    authorAvatarUrl: String(user.avatar_url ?? ''),
-    body: String(obj.body ?? ''),
-    createdAt: String(obj.created_at ?? ''),
-    updatedAt: String(obj.updated_at ?? ''),
-  }
+  return commentBase(raw as RawRecord)
+}
+
+function optionalNumber(value: unknown): number | null {
+  if (value == null) return null
+  return Number(value)
+}
+
+/** A reply joins its parent's thread; a top-level comment starts its own. */
+function threadFields(id: number, inReplyTo: number | null) {
+  const threadId = String(inReplyTo ?? id)
+  return { threadId, isReply: inReplyTo != null, parentId: inReplyTo }
 }
 
 export function mapComment(raw: unknown): InlineComment {
-  const obj = raw as Record<string, unknown>
-  const user = (obj.user ?? obj.author ?? {}) as Record<string, unknown>
-  const id = Number(obj.id)
-  const inReplyTo = obj.in_reply_to_id != null ? Number(obj.in_reply_to_id) : null
+  const obj = raw as RawRecord
+  const base = commentBase(obj)
+  const side: 'LEFT' | 'RIGHT' = upper(obj.side ?? 'RIGHT') === 'LEFT' ? 'LEFT' : 'RIGHT'
   return {
-    id,
-    author: String(user.login ?? ''),
-    authorAvatarUrl: String(user.avatar_url ?? ''),
-    body: String(obj.body ?? ''),
-    createdAt: String(obj.created_at ?? ''),
-    updatedAt: String(obj.updated_at ?? ''),
+    ...base,
     path: String(obj.path ?? ''),
     line: Number(obj.line ?? 0),
-    startLine: obj.start_line != null ? Number(obj.start_line) : null,
-    side: (String(obj.side ?? 'RIGHT').toUpperCase() === 'LEFT' ? 'LEFT' : 'RIGHT') as
-      | 'LEFT'
-      | 'RIGHT',
+    startLine: optionalNumber(obj.start_line),
+    side,
     diffHunk: String(obj.diff_hunk ?? ''),
     outdated: Boolean(obj.outdated),
-    threadId: inReplyTo != null ? String(inReplyTo) : String(id),
-    isReply: inReplyTo != null,
-    parentId: inReplyTo,
+    ...threadFields(base.id, optionalNumber(obj.in_reply_to_id)),
   }
 }
 
-export function parseDiff(raw: string, filePath: string): FileDiff {
-  if (!raw.trim()) {
-    return { path: filePath, hunks: [], isBinary: false, truncated: false }
-  }
-  if (raw.includes('Binary files')) {
-    return { path: filePath, hunks: [], isBinary: true, truncated: false }
-  }
+/** The diff line a patch line is, numbered later; null for a file header line. */
+function draftLine(line: string): DiffLineDraft | null {
+  const content = line.slice(1)
+  if (line.startsWith('+++') || line.startsWith('---')) return null
+  const blank = { content, oldLineNumber: null, newLineNumber: null }
+  if (line.startsWith('+')) return { type: 'add', ...blank }
+  if (line.startsWith('-')) return { type: 'remove', ...blank }
+  return { type: 'context', ...blank }
+}
 
+function hunksFromPatch(raw: string): FileDiff['hunks'] {
   const hunks: FileDiff['hunks'] = []
-  let currentHunk: FileDiff['hunks'][0] | null = null
-
   const rawLines = raw.split('\n')
   for (const [i, line] of rawLines.entries()) {
     if (line.startsWith('\\')) continue
     if (line === '' && i === rawLines.length - 1) continue
     if (line.startsWith('@@ ')) {
-      if (currentHunk) hunks.push(currentHunk)
-      currentHunk = { header: line, lines: [] }
+      hunks.push({ header: line, lines: [] })
       continue
     }
-    if (!currentHunk) continue
-
-    if (line.startsWith('+') && !line.startsWith('+++')) {
-      currentHunk.lines.push({
-        type: 'add',
-        content: line.slice(1),
-        oldLineNumber: null,
-        newLineNumber: null,
-      })
-    } else if (line.startsWith('-') && !line.startsWith('---')) {
-      currentHunk.lines.push({
-        type: 'remove',
-        content: line.slice(1),
-        oldLineNumber: null,
-        newLineNumber: null,
-      })
-    } else if (!line.startsWith('---') && !line.startsWith('+++')) {
-      currentHunk.lines.push({
-        type: 'context',
-        content: line.slice(1),
-        oldLineNumber: null,
-        newLineNumber: null,
-      })
-    }
+    const drafted = hunks.length > 0 ? draftLine(line) : null
+    if (drafted) hunks[hunks.length - 1].lines.push(drafted)
   }
-  if (currentHunk) hunks.push(currentHunk)
+  return hunks
+}
 
-  for (const hunk of hunks) {
-    const match = hunk.header.match(/@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/)
-    let oldN = match ? parseInt(match[1], 10) : 1
-    let newN = match ? parseInt(match[2], 10) : 1
-    for (const dl of hunk.lines) {
-      if (dl.type === 'add') {
-        dl.newLineNumber = newN++
-      } else if (dl.type === 'remove') {
-        dl.oldLineNumber = oldN++
-      } else {
-        dl.oldLineNumber = oldN++
-        dl.newLineNumber = newN++
-      }
-    }
+function numberHunkLines(hunk: FileDiff['hunks'][0]): void {
+  const match = hunk.header.match(/@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/)
+  let oldN = match ? parseInt(match[1], 10) : 1
+  let newN = match ? parseInt(match[2], 10) : 1
+  for (const dl of hunk.lines) {
+    if (dl.type !== 'add') dl.oldLineNumber = oldN++
+    if (dl.type !== 'remove') dl.newLineNumber = newN++
   }
+}
 
+export function parseDiff(raw: string, filePath: string): FileDiff {
+  if (!raw.trim()) return { path: filePath, hunks: [], isBinary: false, truncated: false }
+  if (raw.includes('Binary files')) {
+    return { path: filePath, hunks: [], isBinary: true, truncated: false }
+  }
+  const hunks = hunksFromPatch(raw)
+  hunks.forEach(numberHunkLines)
   const result = FileDiffSchema.safeParse({ path: filePath, hunks, isBinary: false })
-  return result.success ? result.data : { path: filePath, hunks, isBinary: false, truncated: false }
+  if (result.success) return result.data
+  return { path: filePath, hunks, isBinary: false, truncated: false }
 }
