@@ -80,7 +80,7 @@ E2E runs with no retries, so a test that fails once fails the build ([ADR 070](a
 - Every test passes alone (`npx playwright test tests/e2e/<file>:<line>`), unless it is part of a `test.describe.serial` story, which runs as a whole. Use serial only for a sequence that cannot be split.
 - Before sending keys to a surface you just opened, assert that it has focus.
 - Launch the app through `launchApp()`. It isolates the profile, runs the terminals on a fixture zsh config (`tests/e2e/fixtures/zdotdir`) whose `claude` is a stub, so no real agent runs, and turns off macOS window restore, whose crash prompt blocks startup.
-- Read what a terminal shows with `terminalRows(page)` from `tests/e2e/helpers.ts`, never from `.xterm-rows`. A visible terminal draws with WebGL into a canvas and the DOM holds none of its text; `terminalRows` reads xterm's buffer through `window.terminatorE2E`, which the app sets up in `src/renderer/terminal/terminal-rows.ts`.
+- Read what a terminal shows with `terminalRows(page)` from `tests/e2e/helpers.ts`, never from `.xterm-rows`. A visible terminal draws with WebGL into a canvas and the DOM holds none of its text; `terminalRows` reads xterm's buffer through `window.terminatorE2E`, which the app sets up in `src/renderer/terminal/terminal-rows.ts`. It reads every open terminal, hidden ones too, one after another; when the row's terminal or its place on screen matters, read one pane with `terminalRowsIn(screen)`, where `screen` is that pane's `.xterm-screen` (`visibleTerminalScreen(page)` for the first one on screen). To run the specs on the WebGL renderer, as macOS does, on Linux: `E2E_ELECTRON_ARGS="--no-sandbox --use-gl=angle --use-angle=swiftshader --enable-unsafe-swiftshader --ignore-gpu-blocklist"`.
 - A new spec goes in `scripts/e2e-select.mjs`: under the extension it covers, or in `CORE_SPECS`. The selector's unit test fails for a spec that is in neither.
 - CI runs only the specs your diff selects, plus the smoke set. Changed specs run three times. To see what your branch selects: `node scripts/e2e-select.mjs origin/main`.
 
@@ -105,7 +105,7 @@ npm run typecheck  # TypeScript type check (no emit — zero errors required)
 npm run format     # Prettier (auto-fixes)
 ```
 
-The root `npx tsc --noEmit` checks nothing; use `npm run typecheck`, which checks main, renderer, shared, the core's specs (`tsconfig.test.json`: `tests/unit` and `tests/integration` outside the extension and package directories), both packages and every extension. Both `lint` and `typecheck` must pass with **0 errors** before opening a PR. Warnings are acceptable but should not accumulate.
+The root `npx tsc --noEmit` checks nothing; use `npm run typecheck`, which checks main, renderer, shared, the core's specs (`tsconfig.test.json`: everything under `tests/unit`, `tests/integration` and `tests/e2e`; Playwright runs the e2e specs without checking their types, so this is the only check they get), both packages and every extension. Both `lint` and `typecheck` must pass with **0 errors** before opening a PR. Warnings are acceptable but should not accumulate.
 
 `npm run lint:unused` runs [knip](https://knip.dev) with `knip.jsonc` and must report nothing ([ADR 104](adr/104-unused-code-is-a-ci-gate.md)). Its plugins find the entry points: electron-vite's main, preload and renderer inputs, each extension's `src/index.ts` and view, Vite, Vitest, Playwright and Storybook configs, and the `exports` of the SDK and the design system, which are their public API. When it reports something:
 

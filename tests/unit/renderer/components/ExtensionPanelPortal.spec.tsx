@@ -32,7 +32,7 @@ vi.mock('../../../../src/renderer/lib/focus-terminal', () => ({
 
 describe('ExtensionPanelPortal', () => {
   let panelLoadedHandler: ((id: string) => void) | null = null
-  const originalElectronAPI = (window as unknown as Record<string, unknown>).electronAPI
+  const originalElectronAPI = window.electronAPI
 
   beforeEach(() => {
     vi.clearAllMocks()

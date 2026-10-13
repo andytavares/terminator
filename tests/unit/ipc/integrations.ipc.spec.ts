@@ -88,6 +88,7 @@ async function addProject(): Promise<string> {
     workspaceId: created.workspace.id,
     name: 'main',
     worktreePath: projectDir,
+    isWorktree: false,
   })
   if (!('project' in added)) throw new Error(added.error)
   return added.project.id
@@ -156,9 +157,9 @@ describe('integrations:connect', () => {
   })
 
   it('stores nothing when the credential is rejected', async () => {
-    verify.jira.mockRejectedValue(
-      Object.assign(new Error('Authentication required'), { kind: 'auth-failed' })
-    )
+    // The module the handlers were registered with, after this test's resetModules.
+    const { TrackerError } = await import('../../../src/main/integrations/tracker-error')
+    verify.jira.mockRejectedValue(new TrackerError('auth-failed', 'Authentication required'))
     const result = await invoke('integrations:connect', {
       tracker: 'jira',
       site: 's.atlassian.net',
@@ -167,7 +168,7 @@ describe('integrations:connect', () => {
       jql: 'x',
     })
 
-    expect(result).toMatchObject({ error: expect.any(String) })
+    expect(result).toEqual({ error: 'auth-failed', message: 'Authentication required' })
     expect(await connection('jira')).toMatchObject({ connected: false, account: null })
   })
 

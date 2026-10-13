@@ -88,6 +88,7 @@ export function captureFocus(
   return () => {
     if (restored) return
     restored = true
-    if (opener && opener.isConnected && typeof opener.focus === 'function') opener.focus()
+    // An opener that has left the document (a row the dialog deleted) ignores focus().
+    if (opener && typeof opener.focus === 'function') opener.focus()
   }
 }

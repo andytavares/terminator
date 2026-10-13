@@ -63,13 +63,15 @@ export function TerminalPane({ projectId }: Props): JSX.Element {
 
   // Single-pane mode: mount/unmount the active terminal when it changes.
   useEffect(() => {
+    const prevId = prevSessionIdRef.current
     if (layout) {
       // LeafPane handles mounting in split mode. Reset ref so when the split
-      // collapses, the surviving terminal gets remounted correctly.
+      // collapses, the surviving terminal gets remounted correctly. A tab that
+      // showed alone and is no pane of this split goes off screen.
+      if (prevId && !leafIds(layout).includes(prevId)) getTerminalInstance(prevId)?.unmount()
       prevSessionIdRef.current = null
       return
     }
-    const prevId = prevSessionIdRef.current
     const nextId = activeSessionId
     if (prevId === nextId) return
 

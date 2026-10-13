@@ -7,7 +7,7 @@ export const CORE_GROUPS: QuickActionGroup[] = [
   { id: 'custom', mnemonic: 'x', label: 'Custom' },
 ]
 
-export const CORE_TOP_MNEMONICS = new Set(['h', 'o', 'a', 'b', ',', '/'])
+const CORE_TOP_MNEMONICS = new Set(['h', 'o', 'a', 'b', ',', '/'])
 
 const RESERVED_LETTERS = new Set([
   ...CORE_GROUPS.map((g) => g.mnemonic),

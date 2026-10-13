@@ -14,77 +14,64 @@ function git(args: string[], cwd: string): Promise<string> {
   return runGit(cwd, args, { timeoutMs: GIT_TIMEOUT })
 }
 
-/**
- * Parse conflict blocks from raw working-tree file content.
- * Returns a ConflictBlock[] ordered by appearance.
- */
-export function readConflictBlocks(
-  filePath: string,
-  workingTreeContent: string,
-  _baseContent: string,
-  oursContent: string,
-  theirsContent: string
-): ConflictBlock[] {
+/** A conflict's lines: ours, theirs, the whole marked region, and the lines around it. */
+interface ConflictRegion {
+  end: number
+  ours: string[]
+  theirs: string[]
+  marked: string[]
+  contextBefore: string[]
+  contextAfter: string[]
+}
+
+/** The conflict opening at `start`, through its `>>>>>>>` line or the end of the file. */
+function conflictRegionAt(lines: string[], start: number): ConflictRegion {
+  const ours: string[] = []
+  const theirs: string[] = []
+  const marked = [lines[start]]
+  let inOurs = true
+  let end = start + 1
+  for (; end < lines.length && !lines[end].startsWith('>>>>>>>'); end++) {
+    if (lines[end].startsWith('=======')) inOurs = false
+    else if (inOurs) ours.push(lines[end])
+    else theirs.push(lines[end])
+    marked.push(lines[end])
+  }
+  // include >>>>>>> line
+  if (end < lines.length) marked.push(lines[end++])
+  const contextBefore = lines.slice(Math.max(0, start - CONTEXT_LINES), start)
+  const contextAfter = lines.slice(end, Math.min(lines.length, end + CONTEXT_LINES))
+  return { end, ours, theirs, marked, contextBefore, contextAfter }
+}
+
+function conflictBlockFrom(filePath: string, index: number, region: ConflictRegion): ConflictBlock {
+  return {
+    blockId: `${filePath}#${index}`,
+    index,
+    oursText: region.ours.join('\n'),
+    theirsText: region.theirs.join('\n'),
+    baseText: '',
+    contextBefore: region.contextBefore,
+    contextAfter: region.contextAfter,
+    originalConflictText: region.marked.join('\n'),
+    isResolved: false,
+  }
+}
+
+/** Parses the conflict blocks of a working-tree file, in the order they appear. */
+export function readConflictBlocks(filePath: string, workingTreeContent: string): ConflictBlock[] {
   const lines = workingTreeContent.split('\n')
   const blocks: ConflictBlock[] = []
   let i = 0
-  let blockIndex = 0
-
   while (i < lines.length) {
     if (!lines[i].startsWith('<<<<<<<')) {
       i++
       continue
     }
-
-    const startLine = i
-    const oursLines: string[] = []
-    const theirsLines: string[] = []
-    let inOurs = true
-    const conflictLines: string[] = [lines[i]]
-
-    i++
-    while (i < lines.length && !lines[i].startsWith('>>>>>>>')) {
-      if (lines[i].startsWith('=======')) {
-        inOurs = false
-        conflictLines.push(lines[i])
-      } else if (inOurs) {
-        oursLines.push(lines[i])
-        conflictLines.push(lines[i])
-      } else {
-        theirsLines.push(lines[i])
-        conflictLines.push(lines[i])
-      }
-      i++
-    }
-    // include >>>>>>> line
-    if (i < lines.length) {
-      conflictLines.push(lines[i])
-      i++
-    }
-
-    const contextBefore = lines.slice(Math.max(0, startLine - CONTEXT_LINES), startLine)
-    const contextAfter = lines.slice(i, Math.min(lines.length, i + CONTEXT_LINES))
-
-    blocks.push({
-      blockId: `${filePath}#${blockIndex}`,
-      index: blockIndex,
-      oursText: oursLines.join('\n'),
-      theirsText: theirsLines.join('\n'),
-      baseText: '',
-      contextBefore,
-      contextAfter,
-      originalConflictText: conflictLines.join('\n'),
-      isResolved: false,
-    })
-
-    blockIndex++
+    const region = conflictRegionAt(lines, i)
+    blocks.push(conflictBlockFrom(filePath, blocks.length, region))
+    i = region.end
   }
-
-  // If caller provided staged index content, use it to populate baseText on each block
-  // (best-effort; empty string is valid)
-  void oursContent
-  void theirsContent
-
   return blocks
 }
 
@@ -128,28 +115,15 @@ async function buildConflictFile(
   filePath: string,
   isRebase: boolean
 ): Promise<ConflictFile> {
-  const [baseContent, oursContent, theirsContent] = await Promise.all([
-    git(['show', `:1:${filePath}`], repoRoot).catch(() => ''),
-    git(['show', `:2:${filePath}`], repoRoot).catch(() => ''),
-    git(['show', `:3:${filePath}`], repoRoot).catch(() => ''),
-  ])
-
-  const workingTreePath = `${repoRoot}/${filePath}`
-  const workingTree = await readFile(workingTreePath, 'utf-8').catch(() => '')
-
-  const blocks = readConflictBlocks(filePath, workingTree, baseContent, oursContent, theirsContent)
-
+  const workingTree = await readFile(`${repoRoot}/${filePath}`, 'utf-8').catch(() => '')
+  const blocks = readConflictBlocks(filePath, workingTree)
   const mergeRef = isRebase ? 'REBASE_HEAD' : 'MERGE_HEAD'
-
   const [oursAuthor, theirsAuthor, oursSubject, theirsSubject] = await Promise.all([
     getAuthor(repoRoot, 'HEAD', filePath),
     getAuthor(repoRoot, mergeRef, filePath),
     getCommitSubject(repoRoot, 'HEAD', filePath),
     getCommitSubject(repoRoot, mergeRef, filePath),
   ])
-
-  const conflictDescription = [oursSubject, theirsSubject].filter(Boolean).join('; ')
-
   return {
     filePath,
     conflictCount: blocks.length,
@@ -157,7 +131,7 @@ async function buildConflictFile(
     blocks,
     oursAuthor,
     theirsAuthor,
-    conflictDescription,
+    conflictDescription: [oursSubject, theirsSubject].filter(Boolean).join('; '),
   }
 }
 

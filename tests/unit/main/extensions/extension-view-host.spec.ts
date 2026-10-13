@@ -42,29 +42,26 @@ vi.mock('electron', () => ({
   session: { defaultSession: mockDefaultSession, fromPartition: () => mockDefaultSession },
 }))
 
-vi.mock('../../src/main/logger.js', () => ({
-  makeLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn() }),
-}))
-
-vi.mock('../../../src/main/logger.js', () => ({
-  makeLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn() }),
-}))
-
 import {
   ExtensionViewHost,
   EXTENSION_BASE_CSS,
   isQuickActionsOpenShortcut,
 } from '../../../../src/main/extensions/extension-view-host.js'
 import type { Extension } from '../../../../src/shared/types/index.js'
+import type { BrowserWindow, View, WebContents } from 'electron'
+import { partialFake } from '../../../support/fakes'
 
 const mockMainWebContentsFocus = vi.fn()
 
-function makeMainWindow() {
-  return {
-    webContents: { send: mockSend, focus: mockMainWebContentsFocus },
-    contentView: { addChildView: mockAddChildView, removeChildView: mockRemoveChildView },
-    getContentBounds: vi.fn().mockReturnValue({ x: 0, y: 0, width: 1280, height: 800 }),
-  } as unknown as Parameters<typeof ExtensionViewHost>[0]
+function makeMainWindow(): BrowserWindow {
+  return partialFake<BrowserWindow>({
+    webContents: partialFake<WebContents>({ send: mockSend, focus: mockMainWebContentsFocus }),
+    contentView: partialFake<View>({
+      addChildView: mockAddChildView,
+      removeChildView: mockRemoveChildView,
+    }),
+    getContentBounds: () => ({ x: 0, y: 0, width: 1280, height: 800 }),
+  })
 }
 
 function makeExt(overrides: Partial<Extension> = {}): Extension {
@@ -82,12 +79,12 @@ function makeExt(overrides: Partial<Extension> = {}): Extension {
 
 describe('ExtensionViewHost', () => {
   let host: ExtensionViewHost
-  let mainWindow: ReturnType<typeof makeMainWindow>
+  let mainWindow: BrowserWindow
 
   beforeEach(() => {
     vi.clearAllMocks()
     mainWindow = makeMainWindow()
-    host = new ExtensionViewHost(mainWindow as never, '/fake/preload/webview.js')
+    host = new ExtensionViewHost(mainWindow, '/fake/preload/webview.js')
   })
 
   it('hasView returns false before any view is created', () => {
@@ -117,7 +114,7 @@ describe('ExtensionViewHost', () => {
 
   it('createView passes viewParam as ?view= query param', async () => {
     await host.createView(makeExt(), 'sidebar')
-    expect(mockLoadURL).toHaveBeenCalledWith(expect.stringContaining('view=sidebar'))
+    expect(new URL(mockLoadURL.mock.calls[0][0]).searchParams.get('view')).toBe('sidebar')
   })
 
   it('createView does nothing when ext has no rendererUrl', async () => {
@@ -238,7 +235,11 @@ describe('ExtensionViewHost', () => {
       if (event === 'did-finish-load') finishLoadCb = cb
     })
     await host.createView(makeExt(), 'main', null)
-    finishLoadCb?.()
+    finishLoadCb!()
+    expect(mockSend).toHaveBeenCalledWith('extension:panel-loaded', {
+      id: 'com.test.ext',
+      viewParam: 'main',
+    })
     const workspaceCalls = mockSend.mock.calls.filter(([ch]) => ch === 'workspace:changed')
     expect(workspaceCalls).toHaveLength(0)
   })
@@ -258,7 +259,7 @@ describe('ExtensionViewHost', () => {
 
   it('createView includes repoRoot in URL when provided', async () => {
     await host.createView(makeExt(), 'main', '/my/repo')
-    expect(mockLoadURL).toHaveBeenCalledWith(expect.stringContaining('repoRoot='))
+    expect(new URL(mockLoadURL.mock.calls[0][0]).searchParams.get('repoRoot')).toBe('/my/repo')
   })
 
   it('createView URL omits repoRoot when not provided', async () => {
@@ -305,7 +306,7 @@ describe('ExtensionViewHost', () => {
 
 describe('ExtensionViewHost focus restoration', () => {
   let host: ExtensionViewHost
-  let mainWindow: ReturnType<typeof makeMainWindow>
+  let mainWindow: BrowserWindow
 
   // The electron mock shares one `on` spy across every WebContentsView, so the
   // handlers are recovered positionally: one 'focus' registration per created view.
@@ -318,7 +319,7 @@ describe('ExtensionViewHost focus restoration', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mainWindow = makeMainWindow()
-    host = new ExtensionViewHost(mainWindow as never, '/fake/preload/webview.js')
+    host = new ExtensionViewHost(mainWindow, '/fake/preload/webview.js')
   })
 
   async function makeVisibleView(viewParam: string) {
@@ -505,7 +506,7 @@ describe('isQuickActionsOpenShortcut', () => {
 
 describe('ExtensionViewHost quick-actions leader', () => {
   let host: ExtensionViewHost
-  let mainWindow: ReturnType<typeof makeMainWindow>
+  let mainWindow: BrowserWindow
 
   function inputHandlers(): Array<(event: { preventDefault: () => void }, input: unknown) => void> {
     return mockOn.mock.calls
@@ -518,7 +519,7 @@ describe('ExtensionViewHost quick-actions leader', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mainWindow = makeMainWindow()
-    host = new ExtensionViewHost(mainWindow as never, '/fake/preload/webview.js')
+    host = new ExtensionViewHost(mainWindow, '/fake/preload/webview.js')
   })
 
   it('registers a before-input-event handler on the extension view', async () => {

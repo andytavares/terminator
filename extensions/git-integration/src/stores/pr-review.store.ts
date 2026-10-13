@@ -1,4 +1,4 @@
-import { create } from 'zustand'
+import { create, type StoreApi } from 'zustand'
 import { githubAPI } from '../api/github'
 import type {
   ReviewSession,
@@ -10,13 +10,15 @@ import type {
   SignalDots,
   ReviewNote,
   DraftComment,
+  PrHead,
+  PrChangedFile,
 } from '../schemas/pr-review.schema'
 
 interface RateLimitState {
   resetAt: number
 }
 
-interface PrReviewStore {
+export interface PrReviewStore {
   // Queue state
   prQueue: ReviewQueuePR[]
   queueLoading: boolean
@@ -77,18 +79,12 @@ interface PrReviewStore {
   setCurrentChapter(chapterId: string | null): void
   setCurrentFile(filePath: string | null): void
 
-  markFileViewed(repoRoot: string, prNumber: number, headSHA: string, filePath: string): void
-  markFilesViewed(repoRoot: string, prNumber: number, headSHA: string, filePaths: string[]): void
-  unmarkFileViewed(repoRoot: string, prNumber: number, headSHA: string, filePath: string): void
-  reorderFiles(
-    chapterId: string,
-    orderedPaths: string[],
-    repoRoot: string,
-    prNumber: number,
-    headSHA: string
-  ): void
+  markFileViewed(head: PrHead, filePath: string): void
+  markFilesViewed(head: PrHead, filePaths: string[]): void
+  unmarkFileViewed(head: PrHead, filePath: string): void
+  reorderFiles(head: PrHead, chapterId: string, orderedPaths: string[]): void
   setScrollPosition(pos: number | null): void
-  setPaused(repoRoot: string, prNumber: number, headSHA: string, isoTimestamp: string | null): void
+  setPaused(head: PrHead, isoTimestamp: string | null): void
 
   setThreads(path: string, threads: Thread[]): void
   setIssueComments(comments: IssueComment[]): void
@@ -115,20 +111,14 @@ interface PrReviewStore {
    * `changedSince`. 'all' means the old head is gone (force-push), so every
    * viewed file must be looked at again.
    */
-  reconcileHead(
-    repoRoot: string,
-    prNumber: number,
-    headSHA: string,
-    changedPaths: string[] | 'all',
-    addedPaths?: string[]
-  ): void
+  reconcileHead(head: PrHead, changedPaths: string[] | 'all', addedPaths?: string[]): void
 
-  addNote(repoRoot: string, prNumber: number, headSHA: string, note: ReviewNote): void
-  removeNote(repoRoot: string, prNumber: number, headSHA: string, id: string): void
-  addDraft(repoRoot: string, prNumber: number, headSHA: string, draft: DraftComment): void
-  updateDraft(repoRoot: string, prNumber: number, headSHA: string, id: string, body: string): void
-  removeDraft(repoRoot: string, prNumber: number, headSHA: string, id: string): void
-  clearDrafts(repoRoot: string, prNumber: number, headSHA: string): void
+  addNote(head: PrHead, note: ReviewNote): void
+  removeNote(head: PrHead, id: string): void
+  addDraft(head: PrHead, draft: DraftComment): void
+  updateDraft(head: PrHead, id: string, body: string): void
+  removeDraft(head: PrHead, id: string): void
+  clearDrafts(head: PrHead): void
   reset(): void
 }
 
@@ -144,116 +134,43 @@ export function legacySessionKey(repoRoot: string, prNumber: number, headSHA: st
   return `${repoRoot}:::${prNumber}:::${headSHA}`
 }
 
-async function persistSession(
-  store: Pick<
-    PrReviewStore,
-    | 'viewedFiles'
-    | 'fileOrderOverrides'
-    | 'scrollPosition'
-    | 'pausedAt'
-    | 'currentChapterId'
-    | 'currentFilePath'
-    | 'viewedAt'
-    | 'notes'
-    | 'drafts'
-  >,
-  repoRoot: string,
-  prNumber: number,
-  headSHA: string
-): Promise<void> {
-  if (typeof window === 'undefined') return
-  const session: ReviewSession = {
-    repoRoot,
-    prNumber,
-    headSHA,
-    currentChapterId: store.currentChapterId,
-    currentFilePath: store.currentFilePath,
-    viewedFiles: [...store.viewedFiles],
-    fileOrderOverrides: store.fileOrderOverrides,
-    scrollPosition: store.scrollPosition,
-    pausedAt: store.pausedAt,
-    lastAccessedAt: new Date().toISOString(),
-    viewedAt: store.viewedAt,
-    notes: store.notes,
-    drafts: store.drafts,
-  }
-  const key = sessionKey(repoRoot, prNumber)
-  await githubAPI.sessionSet(key, session)
-}
+type SetState = StoreApi<PrReviewStore>['setState']
+type GetState = StoreApi<PrReviewStore>['getState']
 
-function nodeIdFor(state: Pick<PrReviewStore, 'activePr'>, prNumber: number): string | undefined {
-  return state.activePr?.number === prNumber ? state.activePr.nodeId : undefined
-}
-
-function syncViewedMany(
-  repoRoot: string,
-  prNumber: number,
-  paths: string[],
-  nodeId?: string
-): void {
-  if (typeof window === 'undefined') return
-  try {
-    void Promise.resolve(githubAPI.filesViewedSet(repoRoot, prNumber, nodeId, paths, true)).catch(
-      () => undefined
-    )
-  } catch {
-    // No bridge: nothing to mirror to.
-  }
-}
-
-/** Mirrors a viewed mark onto GitHub (S1). Best-effort: local state is the source of truth. */
-function syncViewed(
-  repoRoot: string,
-  prNumber: number,
-  path: string,
-  viewed: boolean,
-  nodeId?: string
-): void {
-  if (typeof window === 'undefined') return
-  try {
-    void Promise.resolve(githubAPI.fileViewedSet(repoRoot, prNumber, path, viewed, nodeId)).catch(
-      () => undefined
-    )
-  } catch {
-    // No bridge (a test or a detached view): nothing to mirror to.
-  }
-}
-
-type ReviewFields = Pick<
+/** The parts of the store a saved session keeps. */
+type SessionFields = Pick<
   PrReviewStore,
-  | 'activePr'
-  | 'currentChapterId'
-  | 'currentFilePath'
   | 'viewedFiles'
   | 'fileOrderOverrides'
   | 'scrollPosition'
   | 'pausedAt'
+  | 'currentChapterId'
+  | 'currentFilePath'
   | 'viewedAt'
-  | 'changedSince'
-  | 'newSinceLook'
-  | 'lastSeenHeadSHA'
-  | 'historyRewritten'
-  | 'lastAccessedAt'
   | 'notes'
   | 'drafts'
-  | 'threads'
-  | 'issueComments'
-  | 'rateLimitState'
 >
 
-/** The review fields a fresh pull request starts from, and `reset` returns to. */
-function freshReview(): ReviewFields {
+/** Where a viewed mark is mirrored on GitHub: the PR, and its node id when it is the open one. */
+interface ViewedTarget {
+  repoRoot: string
+  prNumber: number
+  nodeId?: string
+}
+
+/** The fields reset() clears: everything tied to one open pull request. */
+function emptyReviewState() {
   return {
     activePr: null,
     currentChapterId: null,
     currentFilePath: null,
-    viewedFiles: new Set(),
+    viewedFiles: new Set<string>(),
     fileOrderOverrides: {},
     scrollPosition: null,
     pausedAt: null,
     viewedAt: {},
-    changedSince: new Set(),
-    newSinceLook: new Set(),
+    changedSince: new Set<string>(),
+    newSinceLook: new Set<string>(),
     lastSeenHeadSHA: null,
     historyRewritten: false,
     lastAccessedAt: null,
@@ -265,43 +182,282 @@ function freshReview(): ReviewFields {
   }
 }
 
-type ChangedFile = PrReviewDetail['chapters'][number]['files'][number]
-
-/** The pull request with one file of one chapter replaced by `change(file)`. */
-function patchChapterFile(
-  pr: PrReviewDetail,
-  at: { chapterId: string; filePath: string },
-  change: (file: ChangedFile) => ChangedFile
-): PrReviewDetail {
-  const chapters = pr.chapters.map((chapter) => {
-    if (chapter.id !== at.chapterId) return chapter
-    return {
-      ...chapter,
-      files: chapter.files.map((f) => (f.path === at.filePath ? change(f) : f)),
-    }
-  })
-  return { ...pr, chapters }
+async function persistSession(store: SessionFields, head: PrHead): Promise<void> {
+  if (typeof window === 'undefined') return
+  const session: ReviewSession = {
+    repoRoot: head.repoRoot,
+    prNumber: head.prNumber,
+    headSHA: head.headSHA,
+    currentChapterId: store.currentChapterId,
+    currentFilePath: store.currentFilePath,
+    viewedFiles: [...store.viewedFiles],
+    fileOrderOverrides: store.fileOrderOverrides,
+    scrollPosition: store.scrollPosition,
+    pausedAt: store.pausedAt,
+    lastAccessedAt: new Date().toISOString(),
+    viewedAt: store.viewedAt,
+    notes: store.notes,
+    drafts: store.drafts,
+  }
+  await githubAPI.sessionSet(sessionKey(head.repoRoot, head.prNumber), session)
 }
 
-/** The file with its complexity delta recorded and its composite risk adjusted for it. */
-function withComplexity(f: ChangedFile, complexityDelta: number): ChangedFile {
-  const prevComposite = f.riskScore.composite ?? 0
-  // Simple adjustment: apply complexity weight (0.10 * 80) relative to thresholds
+function viewedTarget(state: Pick<PrReviewStore, 'activePr'>, head: PrHead): ViewedTarget {
+  const nodeId = state.activePr?.number === head.prNumber ? state.activePr.nodeId : undefined
+  return { repoRoot: head.repoRoot, prNumber: head.prNumber, nodeId }
+}
+
+/** Runs a GitHub mirror call, ignoring failure: local state is the source of truth (S1). */
+function bestEffort(call: () => unknown): void {
+  if (typeof window === 'undefined') return
+  try {
+    void Promise.resolve(call()).catch(() => undefined)
+  } catch {
+    // No bridge (a test or a detached view): nothing to mirror to.
+  }
+}
+
+function syncViewedMany(target: ViewedTarget, paths: string[]): void {
+  const { repoRoot, prNumber, nodeId } = target
+  bestEffort(() => githubAPI.filesViewedSet({ repoRoot, prNumber, nodeId, paths, viewed: true }))
+}
+
+/** Mirrors a viewed mark onto GitHub (S1). */
+function syncViewed(target: ViewedTarget, path: string, viewed: boolean): void {
+  const { repoRoot, prNumber, nodeId } = target
+  bestEffort(() => githubAPI.fileViewedSet({ repoRoot, prNumber, path, viewed, nodeId }))
+}
+
+function withViewedCount(
+  queue: ReviewQueuePR[],
+  prNumber: number,
+  patch: Partial<ReviewQueuePR>
+): ReviewQueuePR[] {
+  return queue.map((pr) => (pr.number === prNumber ? { ...pr, ...patch } : pr))
+}
+
+/** `paths` marked viewed at `headSHA`, and no longer counted as changed since. */
+function viewedAdded(state: PrReviewStore, paths: string[], head: PrHead) {
+  const viewedFiles = new Set([...state.viewedFiles, ...paths])
+  const changedSince = new Set([...state.changedSince].filter((p) => !paths.includes(p)))
+  const viewedAt = { ...state.viewedAt }
+  for (const path of paths) viewedAt[path] = head.headSHA
+  const patch = { sessionStatus: 'in-progress' as const, viewedFileCount: viewedFiles.size }
+  return {
+    viewedFiles,
+    changedSince,
+    viewedAt,
+    prQueue: withViewedCount(state.prQueue, head.prNumber, patch),
+  }
+}
+
+function viewedRemoved(state: PrReviewStore, path: string, prNumber: number) {
+  const viewedFiles = new Set([...state.viewedFiles].filter((p) => p !== path))
+  const changedSince = new Set([...state.changedSince].filter((p) => p !== path))
+  const viewedAt = { ...state.viewedAt }
+  delete viewedAt[path]
+  const prQueue = withViewedCount(state.prQueue, prNumber, { viewedFileCount: viewedFiles.size })
+  return { viewedFiles, changedSince, viewedAt, prQueue }
+}
+
+/** Viewed files a push touched move to `changedSince`; 'all' (a force-push) moves every one. */
+function reconciled(state: PrReviewStore, changedPaths: string[] | 'all', addedPaths: string[]) {
+  const touched = changedPaths === 'all' ? null : new Set(changedPaths)
+  const viewedFiles = new Set<string>()
+  const changedSince = new Set(state.changedSince)
+  for (const path of state.viewedFiles) {
+    if (touched === null || touched.has(path)) changedSince.add(path)
+    else viewedFiles.add(path)
+  }
+  const historyRewritten = changedPaths === 'all' && changedSince.size > 0
+  return { viewedFiles, changedSince, historyRewritten, newSinceLook: new Set(addedPaths) }
+}
+
+/** The active PR with `update` applied to each file `matches` picks. */
+function withFiles(
+  activePr: PrReviewDetail,
+  matches: (chapterId: string, path: string) => boolean,
+  update: (file: PrChangedFile) => PrChangedFile
+): PrReviewDetail {
+  const chapters = activePr.chapters.map((chapter) => ({
+    ...chapter,
+    files: chapter.files.map((f) => (matches(chapter.id, f.path) ? update(f) : f)),
+  }))
+  return { ...activePr, chapters }
+}
+
+function riskLevelFor(composite: number): RiskScore['level'] {
+  if (composite >= 67) return 'high'
+  if (composite >= 34) return 'medium'
+  return 'low'
+}
+
+/** Adds the complexity weight (0.10 of the 80-point scale) to a scored file's composite. */
+function withComplexity(file: PrChangedFile, complexityDelta: number): PrChangedFile {
+  const prevComposite = file.riskScore.composite ?? 0
   const compContrib = complexityDelta <= 0 ? 0 : Math.min(1, complexityDelta / 15) * 0.1 * 80
+  const scored = file.riskScore.metrics.changeSize != null
   const newComposite = Math.min(
     100,
-    Math.round(f.riskScore.metrics.changeSize != null ? prevComposite + compContrib : prevComposite)
+    Math.round(scored ? prevComposite + compContrib : prevComposite)
   )
-  const level: 'low' | 'medium' | 'high' =
-    newComposite >= 67 ? 'high' : newComposite >= 34 ? 'medium' : 'low'
+  const riskScore: RiskScore = {
+    ...file.riskScore,
+    composite: newComposite || null,
+    level: riskLevelFor(newComposite),
+    metrics: { ...file.riskScore.metrics, complexityDelta },
+  }
+  return { ...file, riskScore }
+}
+
+function queueActions(set: SetState) {
   return {
-    ...f,
-    riskScore: {
-      ...f.riskScore,
-      composite: newComposite || null,
-      level,
-      metrics: { ...f.riskScore.metrics, complexityDelta },
+    setQueue: (prs: ReviewQueuePR[]) => set({ prQueue: prs }),
+    appendQueue: (prs: ReviewQueuePR[]) => set((s) => ({ prQueue: [...s.prQueue, ...prs] })),
+    setQueueLoading: (loading: boolean) => set({ queueLoading: loading }),
+    setLoadingMorePrs: (loading: boolean) => set({ loadingMorePrs: loading }),
+    setQueueError: (error: string | null) => set({ queueError: error }),
+    setHasMorePrs: (hasMore: boolean) => set({ hasMorePrs: hasMore }),
+    setTotalPrCount: (total: number | null) => set({ totalPrCount: total }),
+    setNextPrCursor: (cursor: string | undefined) => set({ nextPrCursor: cursor }),
+    updateQueuePrRisk: (prNumber: number, riskLevel: RiskScore['level'], signalDots: SignalDots) =>
+      set((s) => ({ prQueue: withViewedCount(s.prQueue, prNumber, { riskLevel, signalDots }) })),
+    markPrInProgress: (prNumber: number) =>
+      set((s) => ({
+        prQueue: s.prQueue.map((pr) =>
+          pr.number === prNumber && pr.sessionStatus === 'not-started'
+            ? { ...pr, sessionStatus: 'in-progress' }
+            : pr
+        ),
+      })),
+    dismissPr: (prNumber: number) =>
+      set((s) => ({ prQueue: s.prQueue.filter((pr) => pr.number !== prNumber) })),
+  }
+}
+
+function viewedActions(set: SetState, get: GetState) {
+  return {
+    markFileViewed: (head: PrHead, filePath: string) => {
+      set((state) => viewedAdded(state, [filePath], head))
+      persistSession(get(), head)
+      syncViewed(viewedTarget(get(), head), filePath, true)
     },
+    markFilesViewed: (head: PrHead, filePaths: string[]) => {
+      if (filePaths.length === 0) return
+      set((state) => viewedAdded(state, filePaths, head))
+      persistSession(get(), head)
+      syncViewedMany(viewedTarget(get(), head), filePaths)
+    },
+    unmarkFileViewed: (head: PrHead, filePath: string) => {
+      set((state) => viewedRemoved(state, filePath, head.prNumber))
+      persistSession(get(), head)
+      syncViewed(viewedTarget(get(), head), filePath, false)
+    },
+    reconcileHead: (head: PrHead, changedPaths: string[] | 'all', addedPaths: string[] = []) => {
+      set((state) => reconciled(state, changedPaths, addedPaths))
+      persistSession(get(), head)
+    },
+  }
+}
+
+function riskActions(set: SetState) {
+  const updateFiles = (
+    matches: (chapterId: string, path: string) => boolean,
+    update: (file: PrChangedFile) => PrChangedFile
+  ) =>
+    set((state) => (state.activePr ? { activePr: withFiles(state.activePr, matches, update) } : {}))
+  return {
+    updateFileRiskScore: (chapterId: string, filePath: string, riskScore: RiskScore) =>
+      updateFiles(
+        (c, p) => c === chapterId && p === filePath,
+        (f) => ({ ...f, riskScore })
+      ),
+    updateFileRiskScores: (scores: Record<string, RiskScore>) =>
+      updateFiles(
+        (_c, p) => !!scores[p],
+        (f) => ({ ...f, riskScore: scores[f.path] })
+      ),
+    patchFileComplexity: (chapterId: string, filePath: string, complexityDelta: number) =>
+      updateFiles(
+        (c, p) => c === chapterId && p === filePath,
+        (f) => withComplexity(f, complexityDelta)
+      ),
+  }
+}
+
+/** Notes and drafts, each change saved with the session. */
+function noteActions(set: SetState, get: GetState) {
+  const thenPersist = (head: PrHead) => persistSession(get(), head)
+  return {
+    addNote: (head: PrHead, note: ReviewNote) => {
+      set((s) => ({ notes: [...s.notes, note] }))
+      thenPersist(head)
+    },
+    removeNote: (head: PrHead, id: string) => {
+      set((s) => ({ notes: s.notes.filter((n) => n.id !== id) }))
+      thenPersist(head)
+    },
+    addDraft: (head: PrHead, draft: DraftComment) => {
+      set((s) => ({ drafts: [...s.drafts, draft] }))
+      thenPersist(head)
+    },
+    updateDraft: (head: PrHead, id: string, body: string) => {
+      set((s) => ({ drafts: s.drafts.map((d) => (d.id === id ? { ...d, body } : d)) }))
+      thenPersist(head)
+    },
+    removeDraft: (head: PrHead, id: string) => {
+      set((s) => ({ drafts: s.drafts.filter((d) => d.id !== id) }))
+      thenPersist(head)
+    },
+    clearDrafts: (head: PrHead) => {
+      set({ drafts: [] })
+      thenPersist(head)
+    },
+  }
+}
+
+function sessionActions(set: SetState, get: GetState) {
+  return {
+    reorderFiles: (head: PrHead, chapterId: string, orderedPaths: string[]) => {
+      set((s) => ({ fileOrderOverrides: { ...s.fileOrderOverrides, [chapterId]: orderedPaths } }))
+      persistSession(get(), head)
+    },
+    setPaused: (head: PrHead, isoTimestamp: string | null) => {
+      set({ pausedAt: isoTimestamp })
+      persistSession(get(), head)
+    },
+    initSession: (session: ReviewSession) =>
+      set({
+        currentChapterId: session.currentChapterId,
+        currentFilePath: session.currentFilePath,
+        viewedFiles: new Set(session.viewedFiles),
+        fileOrderOverrides: session.fileOrderOverrides,
+        scrollPosition: session.scrollPosition,
+        pausedAt: session.pausedAt,
+        viewedAt: session.viewedAt ?? {},
+        changedSince: new Set(),
+        newSinceLook: new Set(),
+        lastSeenHeadSHA: session.headSHA,
+        historyRewritten: false,
+        lastAccessedAt: session.lastAccessedAt,
+        notes: session.notes ?? [],
+        drafts: session.drafts ?? [],
+      }),
+  }
+}
+
+function viewActions(set: SetState) {
+  return {
+    setActivePr: (pr: PrReviewDetail | null) => set({ activePr: pr }),
+    setCurrentChapter: (chapterId: string | null) => set({ currentChapterId: chapterId }),
+    setCurrentFile: (filePath: string | null) => set({ currentFilePath: filePath }),
+    setScrollPosition: (pos: number | null) => set({ scrollPosition: pos }),
+    setThreads: (path: string, threads: Thread[]) =>
+      set((s) => ({ threads: { ...s.threads, [path]: threads } })),
+    setIssueComments: (comments: IssueComment[]) => set({ issueComments: comments }),
+    setRateLimitState: (s: RateLimitState | null) => set({ rateLimitState: s }),
+    setCurrentUserLogin: (login: string | null) => set({ currentUserLogin: login }),
+    reset: () => set(emptyReviewState()),
   }
 }
 
@@ -313,236 +469,12 @@ export const usePrReviewStore = create<PrReviewStore>((set, get) => ({
   hasMorePrs: false,
   totalPrCount: null,
   nextPrCursor: undefined,
-  ...freshReview(),
+  ...emptyReviewState(),
   currentUserLogin: null,
-
-  setQueue: (prs) => set({ prQueue: prs }),
-  appendQueue: (prs) => set((state) => ({ prQueue: [...state.prQueue, ...prs] })),
-  setQueueLoading: (loading) => set({ queueLoading: loading }),
-  setLoadingMorePrs: (loading) => set({ loadingMorePrs: loading }),
-  setQueueError: (error) => set({ queueError: error }),
-  setHasMorePrs: (hasMore) => set({ hasMorePrs: hasMore }),
-  setTotalPrCount: (total) => set({ totalPrCount: total }),
-  setNextPrCursor: (cursor) => set({ nextPrCursor: cursor }),
-
-  setActivePr: (pr) => set({ activePr: pr }),
-  setCurrentChapter: (chapterId) => set({ currentChapterId: chapterId }),
-  setCurrentFile: (filePath) => set({ currentFilePath: filePath }),
-
-  markFileViewed: (repoRoot, prNumber, headSHA, filePath) => {
-    set((state) => {
-      const next = new Set(state.viewedFiles)
-      next.add(filePath)
-      const changed = new Set(state.changedSince)
-      changed.delete(filePath)
-      return {
-        viewedFiles: next,
-        changedSince: changed,
-        viewedAt: { ...state.viewedAt, [filePath]: headSHA },
-        prQueue: state.prQueue.map((pr) =>
-          pr.number === prNumber
-            ? { ...pr, sessionStatus: 'in-progress' as const, viewedFileCount: next.size }
-            : pr
-        ),
-      }
-    })
-    const state = get()
-    persistSession(state, repoRoot, prNumber, headSHA)
-    syncViewed(repoRoot, prNumber, filePath, true, nodeIdFor(state, prNumber))
-  },
-
-  markFilesViewed: (repoRoot, prNumber, headSHA, filePaths) => {
-    if (filePaths.length === 0) return
-    set((state) => {
-      const next = new Set(state.viewedFiles)
-      const changed = new Set(state.changedSince)
-      const viewedAt = { ...state.viewedAt }
-      for (const path of filePaths) {
-        next.add(path)
-        changed.delete(path)
-        viewedAt[path] = headSHA
-      }
-      return {
-        viewedFiles: next,
-        changedSince: changed,
-        viewedAt,
-        prQueue: state.prQueue.map((pr) =>
-          pr.number === prNumber
-            ? { ...pr, sessionStatus: 'in-progress' as const, viewedFileCount: next.size }
-            : pr
-        ),
-      }
-    })
-    const state = get()
-    persistSession(state, repoRoot, prNumber, headSHA)
-    syncViewedMany(repoRoot, prNumber, filePaths, nodeIdFor(state, prNumber))
-  },
-
-  unmarkFileViewed: (repoRoot, prNumber, headSHA, filePath) => {
-    set((state) => {
-      const next = new Set(state.viewedFiles)
-      next.delete(filePath)
-      const changed = new Set(state.changedSince)
-      changed.delete(filePath)
-      const viewedAt = { ...state.viewedAt }
-      delete viewedAt[filePath]
-      return {
-        viewedFiles: next,
-        changedSince: changed,
-        viewedAt,
-        prQueue: state.prQueue.map((pr) =>
-          pr.number === prNumber ? { ...pr, viewedFileCount: next.size } : pr
-        ),
-      }
-    })
-    const state = get()
-    persistSession(state, repoRoot, prNumber, headSHA)
-    syncViewed(repoRoot, prNumber, filePath, false, nodeIdFor(state, prNumber))
-  },
-
-  reorderFiles: (chapterId, orderedPaths, repoRoot, prNumber, headSHA) => {
-    set((state) => ({
-      fileOrderOverrides: { ...state.fileOrderOverrides, [chapterId]: orderedPaths },
-    }))
-    const state = get()
-    persistSession(state, repoRoot, prNumber, headSHA)
-  },
-
-  setScrollPosition: (pos) => set({ scrollPosition: pos }),
-
-  setPaused: (repoRoot, prNumber, headSHA, isoTimestamp) => {
-    set({ pausedAt: isoTimestamp })
-    const state = get()
-    persistSession(state, repoRoot, prNumber, headSHA)
-  },
-
-  setThreads: (path, threads) =>
-    set((state) => ({ threads: { ...state.threads, [path]: threads } })),
-
-  setIssueComments: (comments) => set({ issueComments: comments }),
-
-  updateFileRiskScore: (chapterId, filePath, riskScore) =>
-    set((state) => {
-      if (!state.activePr) return {}
-      return {
-        activePr: patchChapterFile(state.activePr, { chapterId, filePath }, (f) => ({
-          ...f,
-          riskScore,
-        })),
-      }
-    }),
-
-  updateFileRiskScores: (scores) =>
-    set((state) => {
-      if (!state.activePr) return {}
-      const chapters = state.activePr.chapters.map((chapter) => ({
-        ...chapter,
-        files: chapter.files.map((f) => (scores[f.path] ? { ...f, riskScore: scores[f.path] } : f)),
-      }))
-      return { activePr: { ...state.activePr, chapters } }
-    }),
-
-  patchFileComplexity: (chapterId, filePath, complexityDelta) =>
-    set((state) => {
-      if (!state.activePr) return {}
-      return {
-        activePr: patchChapterFile(state.activePr, { chapterId, filePath }, (f) =>
-          withComplexity(f, complexityDelta)
-        ),
-      }
-    }),
-
-  updateQueuePrRisk: (prNumber, riskLevel, signalDots) =>
-    set((state) => ({
-      prQueue: state.prQueue.map((pr) =>
-        pr.number === prNumber ? { ...pr, riskLevel, signalDots } : pr
-      ),
-    })),
-
-  setRateLimitState: (s) => set({ rateLimitState: s }),
-  setCurrentUserLogin: (login) => set({ currentUserLogin: login }),
-
-  markPrInProgress: (prNumber) =>
-    set((state) => ({
-      prQueue: state.prQueue.map((pr) =>
-        pr.number === prNumber && pr.sessionStatus === 'not-started'
-          ? { ...pr, sessionStatus: 'in-progress' }
-          : pr
-      ),
-    })),
-
-  dismissPr: (prNumber) =>
-    set((state) => ({
-      prQueue: state.prQueue.filter((pr) => pr.number !== prNumber),
-    })),
-
-  initSession: (session) => {
-    set({
-      currentChapterId: session.currentChapterId,
-      currentFilePath: session.currentFilePath,
-      viewedFiles: new Set(session.viewedFiles),
-      fileOrderOverrides: session.fileOrderOverrides,
-      scrollPosition: session.scrollPosition,
-      pausedAt: session.pausedAt,
-      viewedAt: session.viewedAt ?? {},
-      changedSince: new Set(),
-      newSinceLook: new Set(),
-      lastSeenHeadSHA: session.headSHA,
-      historyRewritten: false,
-      lastAccessedAt: session.lastAccessedAt,
-      notes: session.notes ?? [],
-      drafts: session.drafts ?? [],
-    })
-  },
-
-  reconcileHead: (repoRoot, prNumber, headSHA, changedPaths, addedPaths = []) => {
-    set((state) => {
-      const touched = changedPaths === 'all' ? null : new Set(changedPaths)
-      const viewed = new Set<string>()
-      const changed = new Set(state.changedSince)
-      for (const path of state.viewedFiles) {
-        if (touched === null || touched.has(path)) changed.add(path)
-        else viewed.add(path)
-      }
-      return {
-        viewedFiles: viewed,
-        changedSince: changed,
-        historyRewritten: changedPaths === 'all' && changed.size > 0,
-        newSinceLook: new Set(addedPaths),
-      }
-    })
-    persistSession(get(), repoRoot, prNumber, headSHA)
-  },
-
-  addNote: (repoRoot, prNumber, headSHA, note) => {
-    set((state) => ({ notes: [...state.notes, note] }))
-    persistSession(get(), repoRoot, prNumber, headSHA)
-  },
-
-  removeNote: (repoRoot, prNumber, headSHA, id) => {
-    set((state) => ({ notes: state.notes.filter((n) => n.id !== id) }))
-    persistSession(get(), repoRoot, prNumber, headSHA)
-  },
-
-  addDraft: (repoRoot, prNumber, headSHA, draft) => {
-    set((state) => ({ drafts: [...state.drafts, draft] }))
-    persistSession(get(), repoRoot, prNumber, headSHA)
-  },
-
-  updateDraft: (repoRoot, prNumber, headSHA, id, body) => {
-    set((state) => ({ drafts: state.drafts.map((d) => (d.id === id ? { ...d, body } : d)) }))
-    persistSession(get(), repoRoot, prNumber, headSHA)
-  },
-
-  removeDraft: (repoRoot, prNumber, headSHA, id) => {
-    set((state) => ({ drafts: state.drafts.filter((d) => d.id !== id) }))
-    persistSession(get(), repoRoot, prNumber, headSHA)
-  },
-
-  clearDrafts: (repoRoot, prNumber, headSHA) => {
-    set({ drafts: [] })
-    persistSession(get(), repoRoot, prNumber, headSHA)
-  },
-
-  reset: () => set(freshReview()),
+  ...queueActions(set),
+  ...viewActions(set),
+  ...viewedActions(set, get),
+  ...riskActions(set),
+  ...noteActions(set, get),
+  ...sessionActions(set, get),
 }))

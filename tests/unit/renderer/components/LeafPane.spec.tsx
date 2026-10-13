@@ -6,20 +6,20 @@ import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { LeafPane } from '../../../../src/renderer/components/terminal/LeafPane'
 import type { TerminalInstance } from '../../../../src/renderer/components/terminal/TerminalSession'
 import { terminalSessionOf } from '../../../support/renderer-stores'
+import { installElectronApi } from '../../../support/electron-api'
+import { partialFake } from '../../../support/fakes'
+import type { Terminal } from '@xterm/xterm'
 
 const mockTerminalInput = vi.fn()
 
 // xterm does not run in jsdom: the instance is faked down to what LeafPane calls.
-function makeInstance(overrides: Record<string, unknown> = {}) {
-  return {
+function makeInstance(overrides: Partial<TerminalInstance> = {}): TerminalInstance {
+  return partialFake<TerminalInstance>({
     mount: vi.fn(),
     unmount: vi.fn(),
-    terminal: {
-      focus: vi.fn(),
-      paste: vi.fn(),
-    },
+    terminal: partialFake<Terminal>({ focus: vi.fn(), paste: vi.fn() }),
     ...overrides,
-  } as unknown as TerminalInstance
+  })
 }
 
 /** The live terminal the session store holds for sess-1. */
@@ -32,8 +32,11 @@ const focusedIn = (projectId: string): string | null =>
 
 beforeEach(() => {
   vi.clearAllMocks()
+  useSessionStore.setState(useSessionStore.getInitialState())
+  // A pane is drawn only for the split on screen: sess-1 and its pane sess-2.
+  useSessionStore.getState().setActiveSessionForProject('proj-1', 'sess-1')
+  useSessionStore.getState().activateSplit('proj-1', 'sess-1', 'sess-2', 'vertical')
   useSessionStore.setState({
-    ...useSessionStore.getInitialState(),
     sessions: new Map([
       [
         'sess-1',
@@ -46,11 +49,11 @@ beforeEach(() => {
       ],
     ]),
   })
-  ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
+  installElectronApi({
     terminal: { input: mockTerminalInput },
     // Electron 32+ removed File.path; the path is only available through the preload.
     getFilePath: (file: File) => pathsByFileName[file.name] ?? '',
-  }
+  })
 })
 
 const pathsByFileName: Record<string, string> = {
@@ -77,7 +80,7 @@ describe('LeafPane', () => {
   })
 
   it('does not add focused class when session is not focused', () => {
-    useSessionStore.getState().setFocusedSession('proj-1', 'other-sess')
+    useSessionStore.getState().setFocusedSession('proj-1', 'sess-2')
     const { container } = render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
     expect(container.querySelector('.leaf-pane--focused')).toBeNull()
   })
@@ -155,7 +158,7 @@ describe('LeafPane', () => {
   it('ignores non-left-button mousedown (button !== 0)', () => {
     const { container } = render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
     fireEvent.mouseDown(container.querySelector('.leaf-pane')!, { button: 2 })
-    expect(focusedIn('proj-1')).toBeNull()
+    expect(focusedIn('proj-1')).toBe('sess-2')
     expect(useSessionStore.getState().getBellCountForSession('sess-1')).toBe(2)
   })
 

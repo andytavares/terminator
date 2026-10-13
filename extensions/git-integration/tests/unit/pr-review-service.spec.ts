@@ -17,20 +17,20 @@ import type { PrChangedFile, ReviewSession, FileMetrics } from '../../src/schema
 
 // ─── Session persistence schema (T037) ───────────────────────────────────────
 
-describe('ReviewSessionSchema', () => {
-  const validSession: ReviewSession = {
-    repoRoot: '/home/user/repo',
-    prNumber: 42,
-    headSHA: 'abc123',
-    currentChapterId: 'src',
-    currentFilePath: 'src/auth.ts',
-    viewedFiles: ['src/auth.ts', 'src/types.ts'],
-    fileOrderOverrides: { src: ['src/types.ts', 'src/auth.ts'] },
-    scrollPosition: 250,
-    pausedAt: '2026-05-07T12:00:00Z',
-    lastAccessedAt: '2026-05-07T12:05:00Z',
-  }
+const validSession: ReviewSession = {
+  repoRoot: '/home/user/repo',
+  prNumber: 42,
+  headSHA: 'abc123',
+  currentChapterId: 'src',
+  currentFilePath: 'src/auth.ts',
+  viewedFiles: ['src/auth.ts', 'src/types.ts'],
+  fileOrderOverrides: { src: ['src/types.ts', 'src/auth.ts'] },
+  scrollPosition: 250,
+  pausedAt: '2026-05-07T12:00:00Z',
+  lastAccessedAt: '2026-05-07T12:05:00Z',
+}
 
+describe('ReviewSessionSchema', () => {
   it('parses a valid session', () => {
     const result = ReviewSessionSchema.safeParse(validSession)
     expect(result.success).toBe(true)
@@ -54,7 +54,9 @@ describe('ReviewSessionSchema', () => {
     const result = ReviewSessionSchema.safeParse({ ...validSession, pausedAt: null })
     expect(result.success).toBe(true)
   })
+})
 
+describe('ReviewSessionSchema — rejects missing repoRoot', () => {
   it('rejects missing repoRoot', () => {
     const { repoRoot: _, ...rest } = validSession
     expect(ReviewSessionSchema.safeParse(rest).success).toBe(false)
@@ -126,7 +128,9 @@ describe('computeRiskScore()', () => {
     expect(score.level).toBe('high')
     expect(score.composite).toBeGreaterThanOrEqual(67)
   })
+})
 
+describe('computeRiskScore() — computes level=medium when composite is 34-66', () => {
   it('computes level=medium when composite is 34-66', () => {
     // Create a scenario where score lands in medium range
     const metrics = makeFileMetrics({
@@ -145,7 +149,9 @@ describe('computeRiskScore()', () => {
     // We only care this path is exercised — level must be one of the valid values
     expect(['low', 'medium', 'high']).toContain(score.level)
   })
+})
 
+describe('computeRiskScore() — returns level=low when composite < 34', () => {
   it('returns level=low when composite < 34', () => {
     const metrics = makeFileMetrics({
       churn90d: 1,
@@ -172,7 +178,9 @@ describe('computeRiskScore()', () => {
     const score = computeRiskScore(metrics, allMetrics)
     expect(score.metrics.patchCoverage).toBe(30)
   })
+})
 
+describe('computeRiskScore() — includes complexity delta in contributions when > 0', () => {
   it('includes complexity delta in contributions when > 0', () => {
     const metrics = makeFileMetrics({
       churn90d: 10,
@@ -197,7 +205,9 @@ describe('computeRiskScore()', () => {
     // normalise returns 0 when all values equal — churn_n and blast_n are 0
     expect(score.composite).not.toBeNull()
   })
+})
 
+describe('computeRiskScore() — contributions', () => {
   it('includes "Missing test file" contribution when testFilePresent is false', () => {
     // Use a case where only 1 other real metric is available — churn
     // churn_n = 0, since both have churn90d = 1 (max === min → 0)
@@ -227,7 +237,9 @@ describe('computeRiskScore()', () => {
     // dominantDriver could be size or missing-test; just verify it's not the default "No dominant risk signal"
     expect(score.dominantDriver).not.toBe('No dominant risk signal')
   })
+})
 
+describe('computeRiskScore() — caps composite at 100', () => {
   it('caps composite at 100', () => {
     const metrics = makeFileMetrics({
       churn90d: 1000,
@@ -304,7 +316,9 @@ describe('parseReviewQueuePR()', () => {
     }
     expect(parseReviewQueuePR(raw).riskLevel).toBe('high')
   })
+})
 
+describe('parseReviewQueuePR() — classifies a mid-size PR (150-399 lines) as medium risk', () => {
   it('classifies a mid-size PR (150-399 lines) as medium risk', () => {
     const raw = {
       number: 102,
@@ -321,7 +335,9 @@ describe('parseReviewQueuePR()', () => {
     }
     expect(parseReviewQueuePR(raw).riskLevel).toBe('medium')
   })
+})
 
+describe('parseReviewQueuePR() — leaves a small PR at low risk (so it can still be a quick win)', () => {
   it('leaves a small PR at low risk (so it can still be a quick win)', () => {
     const raw = {
       number: 101,
@@ -338,7 +354,9 @@ describe('parseReviewQueuePR()', () => {
     }
     expect(parseReviewQueuePR(raw).riskLevel).toBe('low')
   })
+})
 
+describe('parseReviewQueuePR() — parses a PR with no files (uses changedFiles, additions, deletions from root)', () => {
   it('parses a PR with no files (uses changedFiles, additions, deletions from root)', () => {
     const raw = {
       number: 1,
@@ -359,7 +377,9 @@ describe('parseReviewQueuePR()', () => {
     expect(pr.deletions).toBe(10)
     expect(pr.ciStatus).toBe('none')
   })
+})
 
+describe('parseReviewQueuePR() — parses a PR with files array (sums additions/deletions from files)', () => {
   it('parses a PR with files array (sums additions/deletions from files)', () => {
     const raw = {
       number: 2,
@@ -381,7 +401,9 @@ describe('parseReviewQueuePR()', () => {
     expect(pr.deletions).toBe(8)
     expect(pr.isDraft).toBe(true)
   })
+})
 
+describe('parseReviewQueuePR() — maps ciSignal=fail to ciStatus=failing', () => {
   it('maps ciSignal=fail to ciStatus=failing', () => {
     const raw = {
       number: 3,
@@ -396,7 +418,9 @@ describe('parseReviewQueuePR()', () => {
     const pr = parseReviewQueuePR(raw)
     expect(pr.ciStatus).toBe('failing')
   })
+})
 
+describe('parseReviewQueuePR() — maps ciSignal=warn to ciStatus=pending', () => {
   it('maps ciSignal=warn to ciStatus=pending', () => {
     const raw = {
       number: 4,
@@ -411,7 +435,9 @@ describe('parseReviewQueuePR()', () => {
     const pr = parseReviewQueuePR(raw)
     expect(pr.ciStatus).toBe('pending')
   })
+})
 
+describe('parseReviewQueuePR() — testsSignal returns fail when source files but no test files', () => {
   it('testsSignal returns fail when source files but no test files', () => {
     const raw = {
       number: 5,
@@ -427,7 +453,9 @@ describe('parseReviewQueuePR()', () => {
     const pr = parseReviewQueuePR(raw)
     expect(pr.signalDots.tests).toBe('fail')
   })
+})
 
+describe('parseReviewQueuePR() — testsSignal returns pass when covered source files have test files', () => {
   it('testsSignal returns pass when covered source files have test files', () => {
     const raw = {
       number: 6,
@@ -446,7 +474,9 @@ describe('parseReviewQueuePR()', () => {
     const pr = parseReviewQueuePR(raw)
     expect(pr.signalDots.tests).toBe('pass')
   })
+})
 
+describe('parseReviewQueuePR() — churnSignal returns warn for perFile > 80', () => {
   it('churnSignal returns warn for perFile > 80', () => {
     // 1 file, 100 lines total → perFile = 100 > 80 → warn
     const raw = {
@@ -465,7 +495,9 @@ describe('parseReviewQueuePR()', () => {
     const pr = parseReviewQueuePR(raw)
     expect(pr.signalDots.churn).toBe('warn')
   })
+})
 
+describe('parseReviewQueuePR() — churnSignal returns fail for perFile > 200', () => {
   it('churnSignal returns fail for perFile > 200', () => {
     const raw = {
       number: 8,
@@ -483,7 +515,9 @@ describe('parseReviewQueuePR()', () => {
     const pr = parseReviewQueuePR(raw)
     expect(pr.signalDots.churn).toBe('fail')
   })
+})
 
+describe('parseReviewQueuePR() — blastSignal returns warn for fileCount 7-15', () => {
   it('blastSignal returns warn for fileCount 7-15', () => {
     const files = Array.from({ length: 10 }, (_, i) => ({
       path: `src/file${i}.ts`,
@@ -504,7 +538,9 @@ describe('parseReviewQueuePR()', () => {
     const pr = parseReviewQueuePR(raw)
     expect(pr.signalDots.blast).toBe('warn')
   })
+})
 
+describe('parseReviewQueuePR() — blastSignal returns fail for fileCount > 15', () => {
   it('blastSignal returns fail for fileCount > 15', () => {
     const files = Array.from({ length: 20 }, (_, i) => ({
       path: `src/file${i}.ts`,
@@ -525,7 +561,9 @@ describe('parseReviewQueuePR()', () => {
     const pr = parseReviewQueuePR(raw)
     expect(pr.signalDots.blast).toBe('fail')
   })
+})
 
+describe('parseReviewQueuePR() — checkSignal returns warn for PENDING lint check', () => {
   it('checkSignal returns warn for PENDING lint check', () => {
     const raw = {
       number: 11,
@@ -540,7 +578,9 @@ describe('parseReviewQueuePR()', () => {
     const pr = parseReviewQueuePR(raw)
     expect(pr.signalDots.lint).toBe('warn')
   })
+})
 
+describe('parseReviewQueuePR() — checkSignal returns fail for FAILURE lint check', () => {
   it('checkSignal returns fail for FAILURE lint check', () => {
     const raw = {
       number: 12,
@@ -559,36 +599,36 @@ describe('parseReviewQueuePR()', () => {
 
 // ─── chapterRiskLevel ─────────────────────────────────────────────────────────
 
-describe('chapterRiskLevel()', () => {
-  const makeChapterFile = (
-    level: 'low' | 'medium' | 'high',
-    tier: 0 | 1 | 2 | 3 = 1
-  ): PrChangedFile => ({
-    path: `src/file-${level}.ts`,
-    changeType: 'modified',
-    additions: 10,
-    deletions: 2,
-    isBinary: false,
-    tier,
-    whyHere: 'Source file',
-    riskScore: {
-      level,
-      composite: level === 'high' ? 80 : level === 'medium' ? 50 : 10,
-      metrics: {
-        changeSize: null,
-        churn90d: null,
-        blastRadius: null,
-        testFilePresent: null,
-        complexityDelta: null,
-        patchCoverage: null,
-      },
-      dominantDriver: '',
-      topImporters: [],
-      importerCount: 0,
+const makeChapterFile = (
+  level: 'low' | 'medium' | 'high',
+  tier: 0 | 1 | 2 | 3 = 1
+): PrChangedFile => ({
+  path: `src/file-${level}.ts`,
+  changeType: 'modified',
+  additions: 10,
+  deletions: 2,
+  isBinary: false,
+  tier,
+  whyHere: 'Source file',
+  riskScore: {
+    level,
+    composite: level === 'high' ? 80 : level === 'medium' ? 50 : 10,
+    metrics: {
+      changeSize: null,
+      churn90d: null,
+      blastRadius: null,
+      testFilePresent: null,
+      complexityDelta: null,
+      patchCoverage: null,
     },
-    estimatedMinutes: 1,
-  })
+    dominantDriver: '',
+    topImporters: [],
+    importerCount: 0,
+  },
+  estimatedMinutes: 1,
+})
 
+describe('chapterRiskLevel()', () => {
   it('returns high when any scoreable file is high', () => {
     const chapter = {
       id: 'ch-1',
@@ -610,7 +650,9 @@ describe('chapterRiskLevel()', () => {
     }
     expect(chapterRiskLevel(chapter)).toBe('medium')
   })
+})
 
+describe('chapterRiskLevel() — returns low when all scoreable files are low', () => {
   it('returns low when all scoreable files are low', () => {
     const chapter = {
       id: 'ch-1',
@@ -659,7 +701,9 @@ describe('buildChapters() — additional branches', () => {
     // Lock file should end up in its own chapter or merged — just verify it doesn't crash
     expect(chapters.length).toBeGreaterThanOrEqual(1)
   })
+})
 
+describe('buildChapters() — additional branches — applies overrides to reorder files in a chapter', () => {
   it('applies overrides to reorder files in a chapter', () => {
     const rawFiles = [
       { path: 'src/service.ts', additions: 10, deletions: 0 },
@@ -676,7 +720,9 @@ describe('buildChapters() — additional branches', () => {
     const chapters = buildChapters(rawFiles, overrides)
     expect(chapters[0].files[0].path).toBe('src/types.ts')
   })
+})
 
+describe('buildChapters() — additional branches — handles file with explicit added/removed changeType', () => {
   it('handles file with explicit added/removed changeType', () => {
     const rawFiles = [
       { path: 'src/new-file.ts', additions: 50, deletions: 0, changeType: 'added' },
@@ -695,7 +741,9 @@ describe('buildChapters() — additional branches', () => {
     const chapters = buildChapters(rawFiles)
     expect(chapters[0].files[0].path).toBe('src/component.ts')
   })
+})
 
+describe('buildChapters() — additional branches — splits large groups (>15 files) across multiple directories', () => {
   it('splits large groups (>15 files) across multiple directories', () => {
     // Put files in different parent directories so sub-splitting creates multiple chapters
     const rawFiles = [
@@ -717,7 +765,9 @@ describe('buildChapters() — additional branches', () => {
     const totalFiles = chapters.reduce((sum, c) => sum + c.files.length, 0)
     expect(totalFiles).toBe(20)
   })
+})
 
+describe('buildChapters() — additional branches — groups files by import connections (signal 3)', () => {
   it('groups files by import connections (signal 3)', () => {
     const patch = `import { foo } from './utils/helper'\n`
     const rawFiles = [
@@ -728,7 +778,9 @@ describe('buildChapters() — additional branches', () => {
     // Both files should be in the same chapter (connected by import)
     expect(chapters.some((c) => c.files.some((f) => f.path === 'src/api/service.ts'))).toBe(true)
   })
+})
 
+describe('buildChapters() — additional branches — uses co-change affinity to group files across directories', () => {
   it('uses co-change affinity to group files across directories', () => {
     const coChangeAffinity = new Map([
       ['cmd/server/main.go', ['internal/handler/user.go']],
@@ -770,7 +822,9 @@ describe('classifyHunk', () => {
     }
     expect(classifyHunk(hunk)).toBe('semantic')
   })
+})
 
+describe('classifyHunk — returns formatting when add and remove are whitespace variants of each other', () => {
   it('returns formatting when add and remove are whitespace variants of each other', () => {
     const hunk = {
       lines: [
@@ -790,7 +844,9 @@ describe('classifyHunk', () => {
     }
     expect(classifyHunk(hunk)).toBe('semantic')
   })
+})
 
+describe('classifyHunk — returns formatting for reordered import lines', () => {
   it('returns formatting for reordered import lines', () => {
     const hunk = {
       lines: [
@@ -903,13 +959,13 @@ describe('extractIssueRefs — Jira', () => {
   })
 })
 
-describe('enrichIssueRefs (FR-030)', () => {
-  const LINEAR_REF = {
-    type: 'linear' as const,
-    ref: 'TAV-42',
-    url: 'https://linear.app/tav/issue/TAV-42',
-  }
+const LINEAR_REF = {
+  type: 'linear' as const,
+  ref: 'TAV-42',
+  url: 'https://linear.app/tav/issue/TAV-42',
+}
 
+describe('enrichIssueRefs (FR-030)', () => {
   it('fills in the title and state a bare key does not carry', async () => {
     const { enrichIssueRefs } = await import('../../src/github/pr-review-service')
     const issues = {
@@ -933,7 +989,9 @@ describe('enrichIssueRefs (FR-030)', () => {
     expect(issues.get).not.toHaveBeenCalled()
     expect(enriched).toEqual({ type: 'github', ref: '#12' })
   })
+})
 
+describe('enrichIssueRefs (FR-030) — renders exactly as today when the tracker cannot be reached', () => {
   it('renders exactly as today when the tracker cannot be reached', async () => {
     const { enrichIssueRefs } = await import('../../src/github/pr-review-service')
     const issues = { get: vi.fn().mockRejectedValue(new Error('not connected')) }
@@ -951,7 +1009,9 @@ describe('enrichIssueRefs (FR-030)', () => {
     const [enriched] = await enrichIssueRefs([LINEAR_REF], issues)
     expect(enriched).toEqual(LINEAR_REF)
   })
+})
 
+describe('enrichIssueRefs (FR-030) — enriches Jira references through the same path', () => {
   it('enriches Jira references through the same path', async () => {
     const { enrichIssueRefs } = await import('../../src/github/pr-review-service')
     const issues = {
@@ -976,14 +1036,14 @@ describe('enrichIssueRefs — no tracker available', () => {
   })
 })
 
+const head = 'diff --git a/x b/x\n--- a/x\n+++ b/x\n'
+
+const flat = (raw: string) =>
+  parseDiff(raw, 'x').hunks.flatMap((h) =>
+    h.lines.map((l) => [l.type, l.content, l.oldLineNumber, l.newLineNumber])
+  )
+
 describe('parseDiff', () => {
-  const head = 'diff --git a/x b/x\n--- a/x\n+++ b/x\n'
-
-  const flat = (raw: string) =>
-    parseDiff(raw, 'x').hunks.flatMap((h) =>
-      h.lines.map((l) => [l.type, l.content, l.oldLineNumber, l.newLineNumber])
-    )
-
   it('drops the "No newline at end of file" marker and the trailing empty element', () => {
     const raw = `${head}@@ -1,2 +1,2 @@\n a\n-b\n+c\n\\ No newline at end of file\n`
     expect(flat(raw)).toEqual([
@@ -1007,7 +1067,9 @@ describe('parseDiff', () => {
       ['add', 'c', null, 3],
     ])
   })
+})
 
+describe('parseDiff — numbers a second hunk from its own header', () => {
   it('numbers a second hunk from its own header', () => {
     const raw = `${head}@@ -1,1 +1,1 @@\n a\n@@ -10,2 +20,2 @@\n-x\n+y\n z\n`
     const hunks = parseDiff(raw, 'x').hunks

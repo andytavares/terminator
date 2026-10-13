@@ -18,10 +18,14 @@ export interface ParsedPrFile {
   diff: FileDiff
 }
 
+function prFilePath(file: RawPrFile): string {
+  return file.path ?? file.filename ?? ''
+}
+
 /** Parses each file's patch exactly once; GitHub sends `filename`, local callers `path`. */
 export function parsePrFiles(files: unknown[]): ParsedPrFile[] {
   return (files as RawPrFile[]).map((file) => {
-    const path = file.path ?? file.filename ?? ''
+    const path = prFilePath(file)
     return {
       path,
       additions: file.additions ?? 0,

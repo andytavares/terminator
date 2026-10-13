@@ -184,7 +184,6 @@ describe('adfToMarkdown — degradation', () => {
   })
 
   it('renders an unmapped leaf node with no text as nothing, without throwing', () => {
-    expect(() => adfToMarkdown(doc({ type: 'mediaSingle', attrs: { width: 100 } }))).not.toThrow()
     expect(adfToMarkdown(doc({ type: 'mediaSingle', attrs: { width: 100 } }))).toBe('')
   })
 
@@ -195,8 +194,7 @@ describe('adfToMarkdown — degradation', () => {
 
   it('does not throw on a malformed document', () => {
     for (const bad of [null, undefined, {}, { type: 'doc' }, { type: 'doc', content: null }, 42]) {
-      expect(() => adfToMarkdown(bad)).not.toThrow()
-      expect(typeof adfToMarkdown(bad)).toBe('string')
+      expect(adfToMarkdown(bad)).toBe('')
     }
   })
 

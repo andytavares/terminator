@@ -66,9 +66,11 @@ describe('registerInvokeTable', () => {
         run: () => ({ ok: true }),
       }),
     ])
-    const result = (await capturedHandler('a:detail')({}, {})) as { error: string; message: string }
-    expect(result.error).toBe('VALIDATION_ERROR')
-    expect(result.message).toBeTruthy()
+    const { error } = z.object({ id: z.string() }).safeParse({})
+    expect(await capturedHandler('a:detail')({}, {})).toEqual({
+      error: 'VALIDATION_ERROR',
+      message: error!.message,
+    })
   })
 
   it('maps thrown errors through onError', async () => {

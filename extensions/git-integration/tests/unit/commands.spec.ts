@@ -55,32 +55,19 @@ describe('registerQuickActionCommands', () => {
     expect(registrations).toHaveLength(4)
     const byId = Object.fromEntries(registrations.map((r) => [r.command.id, r.command]))
 
-    expect(byId.commit).toMatchObject({
-      label: 'Commit…',
-      mnemonic: 'c',
-      requires: 'repo',
-      category: 'Git',
-    })
-    expect(byId.push).toMatchObject({
-      label: 'Push',
-      mnemonic: 'p',
-      requires: 'repo',
-      category: 'Git',
-    })
-    expect(byId.pull).toMatchObject({
-      label: 'Pull',
-      mnemonic: 'l',
-      requires: 'repo',
-      category: 'Git',
-    })
-    expect(byId['create-pr']).toMatchObject({
-      label: 'Create PR…',
-      mnemonic: 'r',
-      requires: 'repo',
-      category: 'Git',
-    })
+    const expected = [
+      ['commit', 'Commit…', 'c'],
+      ['push', 'Push', 'p'],
+      ['pull', 'Pull', 'l'],
+      ['create-pr', 'Create PR…', 'r'],
+    ]
+    for (const [id, label, mnemonic] of expected) {
+      expect(byId[id]).toMatchObject({ label, mnemonic, requires: 'repo', category: 'Git' })
+    }
   })
+})
 
+describe('registerQuickActionCommands — disposing the returned disposables removes every command', () => {
   it('disposing the returned disposables removes every command', () => {
     const { api, registrations } = buildMockApi()
     const disposables = registerQuickActionCommands(api as never)
@@ -89,92 +76,98 @@ describe('registerQuickActionCommands', () => {
     disposables.forEach((d) => d.dispose())
     expect(registrations.every((r) => r.disposed)).toBe(true)
   })
+})
 
-  describe('push', () => {
-    it('calls pushBranch with ctx.repoRoot and toasts success', async () => {
-      const { api, registrations, showToast } = buildMockApi()
-      registerQuickActionCommands(api as never)
-      vi.mocked(gitService.pushBranch).mockResolvedValue({
-        success: true,
-        branch: 'main',
-        remote: 'origin',
-      })
-
-      const push = registrations.find((r) => r.command.id === 'push')!
-      await push.handler(ctx('/repo'))
-
-      expect(gitService.pushBranch).toHaveBeenCalledWith('/repo')
-      expect(showToast).toHaveBeenCalledWith('success', 'Pushed main to origin', 'pushSucceeded')
+describe('registerQuickActionCommands (continued) — push', () => {
+  it('calls pushBranch with ctx.repoRoot and toasts success', async () => {
+    const { api, registrations, showToast } = buildMockApi()
+    registerQuickActionCommands(api as never)
+    vi.mocked(gitService.pushBranch).mockResolvedValue({
+      success: true,
+      branch: 'main',
+      remote: 'origin',
     })
 
-    it('toasts an error when the push is rejected', async () => {
-      const { api, registrations, showToast } = buildMockApi()
-      registerQuickActionCommands(api as never)
-      vi.mocked(gitService.pushBranch).mockResolvedValue({ error: 'REJECTED' })
+    const push = registrations.find((r) => r.command.id === 'push')!
+    await push.handler(ctx('/repo'))
 
-      const push = registrations.find((r) => r.command.id === 'push')!
-      await push.handler(ctx('/repo'))
-
-      expect(showToast).toHaveBeenCalledWith('error', expect.any(String), 'pushFailed')
-    })
-
-    it('does nothing when ctx.repoRoot is null', async () => {
-      const { api, registrations, showToast } = buildMockApi()
-      registerQuickActionCommands(api as never)
-
-      const push = registrations.find((r) => r.command.id === 'push')!
-      await push.handler(ctx(null))
-
-      expect(gitService.pushBranch).not.toHaveBeenCalled()
-      expect(showToast).not.toHaveBeenCalled()
-    })
+    expect(gitService.pushBranch).toHaveBeenCalledWith('/repo')
+    expect(showToast).toHaveBeenCalledWith('success', 'Pushed main to origin', 'pushSucceeded')
   })
 
-  describe('pull', () => {
-    it('runs pull --ff-only in ctx.repoRoot and toasts success', async () => {
-      const { api, registrations, showToast } = buildMockApi()
-      registerQuickActionCommands(api as never)
-      vi.mocked(gitService.pullFastForward).mockResolvedValue({ success: true, branch: 'main' })
+  it('toasts an error when the push is rejected', async () => {
+    const { api, registrations, showToast } = buildMockApi()
+    registerQuickActionCommands(api as never)
+    vi.mocked(gitService.pushBranch).mockResolvedValue({ error: 'REJECTED' })
 
-      const pull = registrations.find((r) => r.command.id === 'pull')!
-      await pull.handler(ctx('/repo'))
+    const push = registrations.find((r) => r.command.id === 'push')!
+    await push.handler(ctx('/repo'))
 
-      expect(gitService.pullFastForward).toHaveBeenCalledWith('/repo')
-      expect(showToast).toHaveBeenCalledWith(
-        'success',
-        expect.stringContaining('main'),
-        'pullSucceeded'
-      )
+    expect(showToast).toHaveBeenCalledWith('error', expect.any(String), 'pushFailed')
+  })
+})
+
+describe('registerQuickActionCommands (continued) — push — does nothing when ctx.repoRoot is null', () => {
+  it('does nothing when ctx.repoRoot is null', async () => {
+    const { api, registrations, showToast } = buildMockApi()
+    registerQuickActionCommands(api as never)
+
+    const push = registrations.find((r) => r.command.id === 'push')!
+    await push.handler(ctx(null))
+
+    expect(gitService.pushBranch).not.toHaveBeenCalled()
+    expect(showToast).not.toHaveBeenCalled()
+  })
+})
+
+describe('registerQuickActionCommands (continued) — pull', () => {
+  it('runs pull --ff-only in ctx.repoRoot and toasts success', async () => {
+    const { api, registrations, showToast } = buildMockApi()
+    registerQuickActionCommands(api as never)
+    vi.mocked(gitService.pullFastForward).mockResolvedValue({ success: true, branch: 'main' })
+
+    const pull = registrations.find((r) => r.command.id === 'pull')!
+    await pull.handler(ctx('/repo'))
+
+    expect(gitService.pullFastForward).toHaveBeenCalledWith('/repo')
+    expect(showToast).toHaveBeenCalledWith(
+      'success',
+      expect.stringContaining('main'),
+      'pullSucceeded'
+    )
+  })
+})
+
+describe('registerQuickActionCommands (continued) — pull — toasts an error when the pull fails', () => {
+  it('toasts an error when the pull fails', async () => {
+    const { api, registrations, showToast } = buildMockApi()
+    registerQuickActionCommands(api as never)
+    vi.mocked(gitService.pullFastForward).mockResolvedValue({
+      error: 'Not possible to fast-forward',
     })
 
-    it('toasts an error when the pull fails', async () => {
-      const { api, registrations, showToast } = buildMockApi()
-      registerQuickActionCommands(api as never)
-      vi.mocked(gitService.pullFastForward).mockResolvedValue({
-        error: 'Not possible to fast-forward',
-      })
+    const pull = registrations.find((r) => r.command.id === 'pull')!
+    await pull.handler(ctx('/repo'))
 
-      const pull = registrations.find((r) => r.command.id === 'pull')!
-      await pull.handler(ctx('/repo'))
-
-      expect(showToast).toHaveBeenCalledWith(
-        'error',
-        expect.stringContaining('Not possible to fast-forward'),
-        'pullFailed'
-      )
-    })
-
-    it('does nothing when ctx.repoRoot is null', async () => {
-      const { api, registrations } = buildMockApi()
-      registerQuickActionCommands(api as never)
-
-      const pull = registrations.find((r) => r.command.id === 'pull')!
-      await pull.handler(ctx(null))
-
-      expect(gitService.pullFastForward).not.toHaveBeenCalled()
-    })
+    expect(showToast).toHaveBeenCalledWith(
+      'error',
+      expect.stringContaining('Not possible to fast-forward'),
+      'pullFailed'
+    )
   })
 
+  it('does nothing when ctx.repoRoot is null', async () => {
+    const { api, registrations } = buildMockApi()
+    registerQuickActionCommands(api as never)
+
+    const pull = registrations.find((r) => r.command.id === 'pull')!
+    await pull.handler(ctx(null))
+
+    expect(gitService.pullFastForward).not.toHaveBeenCalled()
+  })
+})
+
+describe('registerQuickActionCommands (continued)', () => {
   describe('commit', () => {
     it('brings the project tab forward and asks the view to focus the commit message', () => {
       const { api, registrations, showSelf, broadcast } = buildMockApi()
@@ -198,7 +191,9 @@ describe('registerQuickActionCommands', () => {
       expect(broadcast).not.toHaveBeenCalled()
     })
   })
+})
 
+describe('registerQuickActionCommands (continued)', () => {
   describe('create-pr', () => {
     it('brings the project tab forward and asks the view to open the PR dialog', () => {
       const { api, registrations, showSelf, broadcast } = buildMockApi()
@@ -222,9 +217,11 @@ describe('registerQuickActionCommands', () => {
       expect(broadcast).not.toHaveBeenCalled()
     })
   })
+})
 
-  // The Git view may not exist yet when the command runs: the broadcast then
-  // reaches nobody, so the request waits for the view to ask for it.
+// The Git view may not exist yet when the command runs: the broadcast then
+// reaches nobody, so the request waits for the view to ask for it.
+describe('registerQuickActionCommands (continued)', () => {
   describe('a request made before the Git view exists', () => {
     it.each([
       ['commit', 'commit'],

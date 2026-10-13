@@ -44,46 +44,40 @@ function parse(hunk: DiffHunk): Span | null {
   }
 }
 
-export function gapsFor(hunks: readonly DiffHunk[]): Gap[] {
+/** Each hunk's span, or null when one is unparseable or covers a whole added or deleted file. */
+function spansOf(hunks: readonly DiffHunk[]): Span[] | null {
   const spans: Span[] = []
   for (const hunk of hunks) {
     const span = parse(hunk)
-    if (!span || span.wholeFile) return []
+    if (!span || span.wholeFile) return null
     spans.push(span)
   }
-  if (spans.length === 0) return []
+  return spans
+}
 
-  const gaps: Gap[] = []
-  const first = spans[0]
-  if (first.newFirst > 1) {
-    gaps.push({
-      key: 'top',
-      newStart: 1,
-      newEnd: first.newFirst - 1,
-      oldOffset: first.newFirst - first.oldFirst,
-    })
-  }
-  for (let i = 0; i < spans.length - 1; i++) {
-    const prev = spans[i]
-    const next = spans[i + 1]
-    const newStart = prev.newFirst + prev.newCount
-    if (newStart < next.newFirst) {
-      gaps.push({
-        key: `after-${i}`,
-        newStart,
-        newEnd: next.newFirst - 1,
-        oldOffset: next.newFirst - next.oldFirst,
-      })
-    }
-  }
-  const last = spans[spans.length - 1]
-  gaps.push({
+/** The unchanged lines above `next`, up to the line before it; none when `newStart` reaches it. */
+function gapBefore(key: string, newStart: number, next: Span): Gap[] {
+  if (newStart >= next.newFirst) return []
+  return [{ key, newStart, newEnd: next.newFirst - 1, oldOffset: next.newFirst - next.oldFirst }]
+}
+
+function bottomGap(last: Span): Gap {
+  const newStart = last.newFirst + last.newCount
+  return {
     key: 'bottom',
-    newStart: last.newFirst + last.newCount,
+    newStart,
     newEnd: null,
-    oldOffset: last.newFirst + last.newCount - (last.oldFirst + last.oldCount),
-  })
-  return gaps
+    oldOffset: newStart - (last.oldFirst + last.oldCount),
+  }
+}
+
+export function gapsFor(hunks: readonly DiffHunk[]): Gap[] {
+  const spans = spansOf(hunks)
+  if (!spans || spans.length === 0) return []
+  const between = spans
+    .slice(1)
+    .flatMap((next, i) => gapBefore(`after-${i}`, spans[i].newFirst + spans[i].newCount, next))
+  return [...gapBefore('top', 1, spans[0]), ...between, bottomGap(spans[spans.length - 1])]
 }
 
 export function splitLines(text: string): string[] {

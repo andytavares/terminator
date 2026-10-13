@@ -67,7 +67,7 @@ export function useDismissible({
 
   useEffect(() => {
     if (!enabled) return
-    const registry = createModalDepthRegistry(window as unknown as Record<string, unknown>)
+    const registry = createModalDepthRegistry(window)
     const release = registry.release()
     const restoreFocus = manageFocus && ref.current ? captureFocus(ref.current) : () => {}
 

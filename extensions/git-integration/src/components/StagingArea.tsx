@@ -36,31 +36,32 @@ interface StagingAreaProps {
   onStagingChange?: () => void
 }
 
-function FileItem({
-  file,
-  isSelected,
-  onToggle,
-  onSelect,
-}: {
+interface FileItemProps {
   file: GitFileStatus
   isSelected: boolean
   onToggle: (path: string, currentlyStaged: boolean) => Promise<void>
   onSelect: (path: string, staged: boolean) => void
-}): JSX.Element {
-  const isConflicted = file.status === 'conflicted'
-  const badge = STATUS_BADGE[file.status] ?? 'Changed'
+}
 
+type StatusAnswer = GitStatus | { error: string }
+
+const CONFLICT_HINT = 'Resolve conflicts before staging'
+
+function FileItem(props: FileItemProps): JSX.Element {
+  const { file, onToggle } = props
+  const isConflicted = file.status === 'conflicted'
+  const selected = (props.isSelected && ' staging-area__file-row--selected') || ''
   return (
     <div
-      className={`staging-area__file-row${isSelected ? ' staging-area__file-row--selected' : ''}`}
-      onClick={() => onSelect(file.path, file.staged)}
+      className={`staging-area__file-row${selected}`}
+      onClick={() => props.onSelect(file.path, file.staged)}
     >
       <input
         type="checkbox"
         className="staging-area__checkbox"
         checked={file.staged}
         disabled={isConflicted}
-        title={isConflicted ? 'Resolve conflicts before staging' : undefined}
+        title={(isConflicted && CONFLICT_HINT) || undefined}
         onChange={() => void onToggle(file.path, file.staged)}
         onClick={(e) => e.stopPropagation()}
       />
@@ -68,7 +69,7 @@ function FileItem({
         className={`staging-area__badge staging-area__badge--${file.status}`}
         title={STATUS_LABEL[file.status] ?? file.status}
       >
-        {badge}
+        {STATUS_BADGE[file.status] ?? 'Changed'}
       </span>
       <span className="staging-area__file-path">{file.path}</span>
       {isConflicted && <span className="staging-area__conflict-badge">!</span>}
@@ -81,7 +82,7 @@ async function refreshStatus(
   setStatus: (s: GitStatus | null) => void
 ): Promise<void> {
   try {
-    const result = (await gitAPI.status(repoRoot)) as GitStatus | { error: string }
+    const result = (await gitAPI.status(repoRoot)) as StatusAnswer
     if ('error' in result) setStatus(null)
     else setStatus(result as unknown as GitStatus)
   } catch {
@@ -89,115 +90,142 @@ async function refreshStatus(
   }
 }
 
-export function StagingArea({
-  repoRoot,
-  onFileSelect,
-  onStagingChange,
-}: StagingAreaProps): JSX.Element {
-  const status = useGitStore((s) => s.status)
-  const setStatus = useGitStore((s) => s.setStatus)
-  const selectedFile = useGitStore((s) => s.selectedFile)
+interface StagingTarget {
+  repoRoot: string
+  setStatus: (s: GitStatus | null) => void
+  onStagingChange: (() => void) | undefined
+}
 
-  const toggleFile = useCallback(
-    async (filePath: string, currentlyStaged: boolean) => {
-      try {
-        if (currentlyStaged) {
-          await gitAPI.unstage(repoRoot, [filePath])
-        } else {
-          await gitAPI.stage(repoRoot, [filePath])
-        }
-        // Bust the diff cache so the next click on this file fetches a fresh diff.
-        onStagingChange?.()
-        await refreshStatus(repoRoot, setStatus)
-      } catch {
-        // errors surface via next status poll
-      }
-    },
+/** Stage or unstage paths, then let the view drop its cached diffs and refresh the status. */
+async function applyStaging(target: StagingTarget, paths: string[], stage: boolean): Promise<void> {
+  if (paths.length === 0) return
+  if (stage) await gitAPI.stage(target.repoRoot, paths)
+  else await gitAPI.unstage(target.repoRoot, paths)
+  // Bust the diff cache so the next click on a file fetches a fresh diff.
+  target.onStagingChange?.()
+  await refreshStatus(target.repoRoot, target.setStatus)
+}
+
+function useStaging(repoRoot: string, onStagingChange: StagingTarget['onStagingChange']) {
+  const setStatus = useGitStore((s) => s.setStatus)
+  return useCallback(
+    (paths: string[], stage: boolean) =>
+      applyStaging({ repoRoot, setStatus, onStagingChange }, paths, stage),
     [repoRoot, setStatus, onStagingChange]
   )
+}
 
-  const stageAll = useCallback(async () => {
-    const unstaged = status?.files.filter((f) => !f.staged && f.status !== 'conflicted') ?? []
-    if (unstaged.length === 0) return
-    await gitAPI.stage(
-      repoRoot,
-      unstaged.map((f) => f.path)
-    )
-    onStagingChange?.()
-    await refreshStatus(repoRoot, setStatus)
-  }, [repoRoot, status, setStatus, onStagingChange])
+/** What every row in a section shares: the selected file and the row handlers. */
+interface SectionItem extends Omit<FileItemProps, 'file' | 'isSelected'> {
+  selectedFile: string | null
+}
 
-  const unstageAll = useCallback(async () => {
-    const staged = status?.files.filter((f) => f.staged) ?? []
-    if (staged.length === 0) return
-    await gitAPI.unstage(
-      repoRoot,
-      staged.map((f) => f.path)
-    )
-    onStagingChange?.()
-    await refreshStatus(repoRoot, setStatus)
-  }, [repoRoot, status, setStatus, onStagingChange])
+interface SectionText {
+  title: string
+  emptyText: string
+  bulkLabel: string
+}
 
-  if (!status) {
-    return (
-      <div className="staging-area">
-        <div className="staging-area__empty">Loading…</div>
+const STAGED_TEXT: SectionText = {
+  title: 'Staged',
+  emptyText: 'No staged changes',
+  bulkLabel: 'Unstage All',
+}
+
+const CHANGES_TEXT: SectionText = {
+  title: 'Changes',
+  emptyText: 'No unstaged changes',
+  bulkLabel: 'Stage All',
+}
+
+interface FileSectionProps {
+  text: SectionText
+  files: GitFileStatus[]
+  onBulk: () => void
+  item: SectionItem
+}
+
+function FileSection(props: FileSectionProps) {
+  const { files, item, text } = props
+  return (
+    <div className="staging-area__section">
+      <div className="staging-area__section-header">
+        <span>
+          {text.title} ({files.length})
+        </span>
+        {files.length > 0 && (
+          <Button variant="ghost" size="sm" onClick={props.onBulk}>
+            {text.bulkLabel}
+          </Button>
+        )}
       </div>
+      {files.map((f) => (
+        <FileItem
+          key={f.path}
+          file={f}
+          isSelected={f.path === item.selectedFile}
+          onToggle={item.onToggle}
+          onSelect={item.onSelect}
+        />
+      ))}
+      {files.length === 0 && <div className="staging-area__empty">{text.emptyText}</div>}
+    </div>
+  )
+}
+
+function StagingLoading() {
+  return (
+    <div className="staging-area">
+      <div className="staging-area__empty">Loading…</div>
+    </div>
+  )
+}
+
+interface StagingSectionsProps {
+  files: GitFileStatus[]
+  setStaged: (paths: string[], stage: boolean) => Promise<void>
+  item: SectionItem
+}
+
+function StagingSections({ files, setStaged, item }: StagingSectionsProps): JSX.Element {
+  const staged = files.filter((f) => f.staged)
+  const unstaged = files.filter((f) => !f.staged)
+  const stageable = unstaged.filter((f) => f.status !== 'conflicted').map((f) => f.path)
+  const unstageAll = () =>
+    void setStaged(
+      staged.map((f) => f.path),
+      false
     )
-  }
+  return (
+    <>
+      <FileSection text={STAGED_TEXT} files={staged} onBulk={unstageAll} item={item} />
+      <FileSection
+        text={CHANGES_TEXT}
+        files={unstaged}
+        onBulk={() => void setStaged(stageable, true)}
+        item={item}
+      />
+    </>
+  )
+}
 
-  const stagedFiles = status.files.filter((f) => f.staged)
-  const unstagedFiles = status.files.filter((f) => !f.staged)
-
+export function StagingArea(props: StagingAreaProps): JSX.Element {
+  const status = useGitStore((s) => s.status)
+  const selectedFile = useGitStore((s) => s.selectedFile)
+  const setStaged = useStaging(props.repoRoot, props.onStagingChange)
+  // A failed toggle surfaces through the next status poll.
+  const toggleFile = useCallback(
+    (path: string, staged: boolean) => setStaged([path], !staged).catch(() => {}),
+    [setStaged]
+  )
+  if (!status) return <StagingLoading />
+  const item = { selectedFile, onToggle: toggleFile, onSelect: props.onFileSelect }
   return (
     <div className="staging-area">
       {status.truncated && (
         <div className="staging-area__truncation-banner">Showing first 500 files.</div>
       )}
-
-      <div className="staging-area__section">
-        <div className="staging-area__section-header">
-          <span>Staged ({stagedFiles.length})</span>
-          {stagedFiles.length > 0 && (
-            <Button variant="ghost" size="sm" onClick={() => void unstageAll()}>
-              Unstage All
-            </Button>
-          )}
-        </div>
-        {stagedFiles.map((f) => (
-          <FileItem
-            key={f.path}
-            file={f}
-            isSelected={f.path === selectedFile}
-            onToggle={toggleFile}
-            onSelect={onFileSelect}
-          />
-        ))}
-        {stagedFiles.length === 0 && <div className="staging-area__empty">No staged changes</div>}
-      </div>
-
-      <div className="staging-area__section">
-        <div className="staging-area__section-header">
-          <span>Changes ({unstagedFiles.length})</span>
-          {unstagedFiles.length > 0 && (
-            <Button variant="ghost" size="sm" onClick={() => void stageAll()}>
-              Stage All
-            </Button>
-          )}
-        </div>
-        {unstagedFiles.map((f) => (
-          <FileItem
-            key={f.path}
-            file={f}
-            isSelected={f.path === selectedFile}
-            onToggle={toggleFile}
-            onSelect={onFileSelect}
-          />
-        ))}
-        {unstagedFiles.length === 0 && (
-          <div className="staging-area__empty">No unstaged changes</div>
-        )}
-      </div>
+      <StagingSections files={status.files} setStaged={setStaged} item={item} />
     </div>
   )
 }

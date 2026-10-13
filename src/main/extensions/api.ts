@@ -189,14 +189,13 @@ function rebuildViewMenu(): void {
 // the registration code above; these functions keep their decoding here too,
 // so no other module re-derives key formats.
 
-export function listExtensionSettingsSections(): Array<{
-  extensionId: string
-  label: string
-  properties: ExtensionSettingsSchema['properties']
-}> {
+export function listExtensionSettingsSections(): Array<
+  ExtensionSettingsSchema & { extensionId: string }
+> {
   return [...globalRegistry.settingsSections.entries()].map(([key, schema]) => ({
     extensionId: key.replace(/\.settings$/, ''),
     label: schema.label,
+    description: schema.description,
     properties: schema.properties,
   }))
 }

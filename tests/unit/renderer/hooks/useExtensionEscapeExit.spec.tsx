@@ -4,6 +4,7 @@ import { useExtensionEscapeExit } from '../../../../src/renderer/hooks/useExtens
 import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
 import { useModalStore } from '../../../../src/renderer/stores/modal.store'
 import { DOUBLE_ESCAPE_WINDOW_MS } from '../../../../src/shared/double-escape'
+import { installElectronApi } from '../../../support/electron-api'
 
 const mockExit = vi.fn()
 const mockFocusTerminal = vi.fn()
@@ -31,14 +32,14 @@ describe('useExtensionEscapeExit', () => {
 
     useExtensionRegistry.setState({ exitExtensionToTerminal: mockExit })
     useModalStore.setState({ depth: 0 })
-    ;(window as unknown as { electronAPI: unknown }).electronAPI = {
+    installElectronApi({
       extensionEvents: {
-        onExtensionExitToTerminal: (handler: (payload: unknown) => void) => {
-          exitEventHandler = handler
+        onExtensionExitToTerminal: (handler) => {
+          exitEventHandler = handler as (payload: unknown) => void
           return mockUnsubscribe
         },
       },
-    }
+    })
   })
 
   afterEach(() => {
@@ -171,7 +172,7 @@ describe('useExtensionEscapeExit', () => {
     })
 
     it('survives a transport without the exit event (remote shim)', () => {
-      ;(window as unknown as { electronAPI: unknown }).electronAPI = { extensionEvents: {} }
+      installElectronApi({ extensionEvents: {} })
       expect(() => renderHook(() => useExtensionEscapeExit())).not.toThrow()
     })
   })

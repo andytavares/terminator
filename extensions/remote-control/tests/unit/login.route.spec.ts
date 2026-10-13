@@ -121,19 +121,17 @@ function loginRejectTests() {
 }
 
 function loginLockoutTests() {
-  // Ten bcrypt comparisons, each deliberately slow; on a loaded machine they pass 5 s.
-  it(
-    'locks a client out after repeated wrong passwords, even for the right one',
-    {
-      timeout: 30_000,
-    },
-    async () => {
-      for (let attempt = 0; attempt < 10; attempt++) {
-        expect((await login('wrong-password')).statusCode).toBe(401)
-      }
-      expect((await login(PASSWORD)).statusCode).toBe(429)
+  it('locks a client out after repeated wrong passwords, even for the right one', async () => {
+    // Every password is wrong while none is set, without a scrypt derivation
+    // for each of the ten (16 MiB each, seconds in all on a busy machine).
+    const realHash = storedHash
+    storedHash = ''
+    for (let attempt = 0; attempt < 10; attempt++) {
+      expect((await login('wrong-password')).statusCode).toBe(401)
     }
-  )
+    storedHash = realHash
+    expect((await login(PASSWORD)).statusCode).toBe(429)
+  })
 
   it('refuses a request whose Host is not local, LAN or tunnel', async () => {
     const res = await app.inject({

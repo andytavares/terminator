@@ -1,4 +1,4 @@
-import { _electron as electron, ElectronApplication, Page, expect } from '@playwright/test'
+import { _electron as electron, ElectronApplication, Locator, Page, expect } from '@playwright/test'
 import { mkdtempSync } from 'node:fs'
 import { dirname, delimiter, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -66,9 +66,13 @@ const CLAUDE_STUB_DIR = join(dirname(fileURLToPath(import.meta.url)), 'fixtures'
 const CLAUDE_STUB_ZDOTDIR = join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'zdotdir')
 
 /** The environment every e2e-launched Electron process gets. */
-function e2eEnv(): NodeJS.ProcessEnv {
+function e2eEnv(): Record<string, string> {
+  // Electron's launch takes defined strings only; an unset variable is left out.
+  const inherited = Object.entries(process.env).filter(
+    (entry): entry is [string, string] => entry[1] !== undefined
+  )
   return {
-    ...process.env,
+    ...Object.fromEntries(inherited),
     NODE_ENV: 'test',
     PATH: `${CLAUDE_STUB_DIR}${delimiter}${process.env.PATH ?? ''}`,
     // Pins terminal.defaultShell's process.env.SHELL fallback to zsh
@@ -134,7 +138,7 @@ export async function launchApp(
     await moveWindowOffPointer(app)
     return { app, page, userDataDir }
   } catch (error) {
-    await closeApp({ app, page: undefined as unknown as Page, userDataDir })
+    await closeApp({ app, userDataDir })
     throw new Error(
       `The app did not finish starting within ${LAUNCH_DEADLINE_MS / 1000}s: ${String(error)}\n` +
         `--- the app's own output ---\n${output.join('').slice(-6000) || '(nothing)'}`,
@@ -170,7 +174,9 @@ async function moveWindowOffPointer(app: ElectronApplication): Promise<void> {
 // and fails the whole job as a non-test error).
 const GRACEFUL_CLOSE_MS = 5000
 
-export async function closeApp(handle: AppHandle | undefined): Promise<void> {
+export async function closeApp(
+  handle: Pick<AppHandle, 'app' | 'userDataDir'> | undefined
+): Promise<void> {
   if (!handle) return
   // Capture the OS process up front: once app.close() resolves, Playwright
   // tears down its internal handle and app.process() would throw.
@@ -334,13 +340,21 @@ export function inExtensionView<T>(handle: AppHandle, urlPart: string, script: s
   ) as Promise<T>
 }
 
-/** The window as the app sets it up, with `src/renderer/terminal/terminal-rows.ts`. */
-export type TerminalRowsWindow = Window & { terminatorE2E: { terminalRows(): string[] } }
-
 /**
- * The rows every open terminal shows, read from xterm's buffer. Under the
- * WebGL renderer the terminal is a canvas and the DOM holds none of its text.
+ * The rows every open terminal shows, one terminal after another, read from
+ * xterm's buffer. Under the WebGL renderer the terminal is a canvas and the
+ * DOM holds none of its text. For a row's place on screen, use `terminalRowsIn`.
  */
 export function terminalRows(page: Page): Promise<string[]> {
-  return page.evaluate(() => (window as unknown as TerminalRowsWindow).terminatorE2E.terminalRows())
+  return page.evaluate(() => window.terminatorE2E!.terminalRows())
+}
+
+/** The screen (`.xterm-screen`) of the first terminal that is on screen. */
+export function visibleTerminalScreen(page: Page): Locator {
+  return page.locator('.xterm-screen').filter({ visible: true }).first()
+}
+
+/** The rows of the one terminal drawn in `screen`, a pane's `.xterm-screen`, top to bottom. */
+export function terminalRowsIn(screen: Locator): Promise<string[]> {
+  return screen.evaluate((element) => window.terminatorE2E!.terminalRowsIn(element))
 }

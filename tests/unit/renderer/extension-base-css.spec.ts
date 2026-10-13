@@ -1,6 +1,8 @@
+import { resolve } from 'node:path'
 import { describe, it, expect } from 'vitest'
 import { EXTENSION_BASE_CSS } from '../../../src/main/extensions/extension-view-host'
 import { LAYERS, LAYER_NAMES } from '../../../packages/extension-ui/src/layers'
+import { extensionBaseCss } from '../../e2e/extension-base-css'
 
 // An extension view is a separate document and does not load the core
 // stylesheet. Anything an extension's CSS references has to be injected here or
@@ -8,6 +10,12 @@ import { LAYERS, LAYER_NAMES } from '../../../packages/extension-ui/src/layers'
 // would have silently stopped stacking.
 
 describe('EXTENSION_BASE_CSS', () => {
+  // The Chromium-rendered e2e specs rebuild it from files; a sheet missing
+  // there (controls.css once was) makes them measure what no user sees.
+  it('is what the e2e specs rebuild from the stylesheet files', () => {
+    expect(extensionBaseCss(resolve(__dirname, '../../..'))).toBe(EXTENSION_BASE_CSS)
+  })
+
   it('defines every layer the scale publishes', () => {
     for (const name of LAYER_NAMES) {
       expect(EXTENSION_BASE_CSS).toContain(`--tm-layer-${name}:`)

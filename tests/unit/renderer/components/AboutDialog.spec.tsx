@@ -2,16 +2,15 @@ import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { AboutDialog } from '../../../../src/renderer/components/AboutDialog'
+import type { ElectronAPI } from '../../../../src/shared/electron-api/api-type'
+import { installElectronApi } from '../../../support/electron-api'
 
-const mockGetInfo = vi.fn()
-const mockDbHealth = vi.fn()
+const mockGetInfo = vi.fn<ElectronAPI['app']['getInfo']>()
+const mockDbHealth = vi.fn<ElectronAPI['db']['health']>()
 
 beforeEach(() => {
   vi.clearAllMocks()
-  window.electronAPI = {
-    app: { getInfo: mockGetInfo },
-    db: { health: mockDbHealth },
-  } as unknown as typeof window.electronAPI
+  installElectronApi({ app: { getInfo: mockGetInfo }, db: { health: mockDbHealth } })
 
   mockDbHealth.mockResolvedValue({ ok: true })
   mockGetInfo.mockResolvedValue({
@@ -21,6 +20,7 @@ beforeEach(() => {
     nodeVersion: '20.0.0',
     chromeVersion: '124.0.0',
     platform: 'darwin',
+    homeDir: '/Users/me',
   })
 })
 

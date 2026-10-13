@@ -1,56 +1,27 @@
+// @vitest-environment jsdom
 import React from 'react'
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import type { ComponentType } from 'react'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { render, screen } from '@testing-library/react'
 import type { Extension } from '../../../../src/shared/types/index.js'
+import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
+import {
+  initExtensions,
+  registerWebviewExtension,
+} from '../../../../src/renderer/extensions/loader'
+import { resetStore } from '../../../support/renderer-stores'
+import { installElectronApi } from '../../../support/electron-api'
 
-const mockList = vi.fn()
-const mockRegisterGlobalTab = vi.fn()
-const mockRegisterWorkspaceTab = vi.fn()
-const mockRegisterProjectTab = vi.fn()
-const mockRegisterSidebarPanel = vi.fn()
-const mockRegisterWindowView = vi.fn()
-const mockRegisterKeyboardShortcut = vi.fn()
-const mockTogglePanel = vi.fn()
-const mockSetQuickActionGroups = vi.fn()
-
-const mockRegistry = {
-  registerGlobalTab: mockRegisterGlobalTab,
-  registerWorkspaceTab: mockRegisterWorkspaceTab,
-  registerProjectTab: mockRegisterProjectTab,
-  registerSidebarPanel: mockRegisterSidebarPanel,
-  registerWindowView: mockRegisterWindowView,
-  registerKeyboardShortcut: mockRegisterKeyboardShortcut,
-  togglePanel: mockTogglePanel,
-  setQuickActionGroups: mockSetQuickActionGroups,
-}
-
-vi.mock('../../../../src/renderer/extensions/registry', () => ({
-  useExtensionRegistry: {
-    getState: () => mockRegistry,
-  },
-}))
-
+// The real portal mounts a WebContentsView through IPC. This one shows what it
+// was asked to host.
 vi.mock('../../../../src/renderer/components/ExtensionPanelPortal', () => ({
-  ExtensionPanelPortal: () => null,
+  ExtensionPanelPortal: ({ extensionId, viewParam }: { extensionId: string; viewParam: string }) =>
+    React.createElement('div', { 'data-testid': 'portal' }, `${extensionId}:${viewParam}`),
 }))
 
-vi.mock('../../../../src/renderer/extensions/icon-from-name', () => ({
-  iconFromName: (name: string) => name,
-}))
+const registry = () => useExtensionRegistry.getState()
 
 beforeEach(() => {
-  vi.clearAllMocks()
-  ;(globalThis as unknown as Record<string, unknown>).window = {
-    electronAPI: {
-      extension: {
-        list: mockList,
-      },
-    },
-  }
-})
-
-afterEach(() => {
-  delete (globalThis as unknown as Record<string, unknown>).window
+  resetStore(useExtensionRegistry)
 })
 
 function makeExt(overrides: Partial<Extension> = {}): Extension {
@@ -66,18 +37,24 @@ function makeExt(overrides: Partial<Extension> = {}): Extension {
   }
 }
 
+/** Starts the loader with `extensions` as the main process lists them. */
 async function callInit(extensions: Partial<Extension>[]): Promise<void> {
-  mockList.mockResolvedValue({ extensions: extensions.map((e) => makeExt(e)) })
-  const { initExtensions } = await import('../../../../src/renderer/extensions/loader.js')
+  installElectronApi({
+    extension: { list: async () => ({ extensions: extensions.map((e) => makeExt(e)) }) },
+  })
   return initExtensions()
 }
 
-describe('initExtensions — manifest-driven (contributes) registration', () => {
-  it('calls list to get active extensions', async () => {
-    await callInit([])
-    expect(mockList).toHaveBeenCalledTimes(1)
-  })
+/** What the surface's component puts on screen: the portal for its extension and view. */
+function portalOf<Props extends object>(
+  component: React.ComponentType<Props>,
+  props: Props
+): string | null {
+  render(React.createElement(component, props))
+  return screen.getByTestId('portal').textContent
+}
 
+describe('initExtensions — manifest-driven (contributes) registration', () => {
   it('registers globalTab via registerGlobalTab when contributes.globalTab is set', async () => {
     await callInit([
       {
@@ -85,45 +62,34 @@ describe('initExtensions — manifest-driven (contributes) registration', () => 
         contributes: { globalTab: { label: 'My Tool', icon: 'wrench', view: 'main' } },
       },
     ])
-    expect(mockRegisterGlobalTab).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'com.test.ext', label: 'My Tool' })
-    )
+    const tab = registry().globalTabs.get('com.test.ext')
+    expect(tab).toMatchObject({ label: 'My Tool', view: 'main', sortOrder: 1 })
+    expect(React.isValidElement(tab?.icon)).toBe(true)
   })
 
   it('registers workspaceTab via registerWorkspaceTab when contributes.workspaceTab is set', async () => {
     await callInit([
-      {
-        id: 'com.test.ext',
-        contributes: { workspaceTab: { label: 'WS Tab', view: 'workspace' } },
-      },
+      { id: 'com.test.ext', contributes: { workspaceTab: { label: 'WS Tab', view: 'workspace' } } },
     ])
-    expect(mockRegisterWorkspaceTab).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'com.test.ext', label: 'WS Tab' })
-    )
+    expect(registry().workspaceTabs.get('com.test.ext')).toMatchObject({ label: 'WS Tab' })
   })
 
   it('registers projectTab via registerProjectTab when contributes.projectTab is set', async () => {
     await callInit([
-      {
-        id: 'com.test.ext',
-        contributes: { projectTab: { label: 'Proj Tab', view: 'project' } },
-      },
+      { id: 'com.test.ext', contributes: { projectTab: { label: 'Proj Tab', view: 'project' } } },
     ])
-    expect(mockRegisterProjectTab).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'com.test.ext', label: 'Proj Tab' })
-    )
+    expect(registry().projectTabs.get('com.test.ext')).toMatchObject({ label: 'Proj Tab' })
   })
 
   it('registers sidebarPanel via registerSidebarPanel when contributes.sidebarPanel is set', async () => {
     await callInit([
       {
         id: 'com.test.ext',
-        contributes: { sidebarPanel: { label: 'Sidebar', defaultOpen: false, view: 'sidebar' } },
+        contributes: { sidebarPanel: { label: 'Sidebar', defaultOpen: true, view: 'sidebar' } },
       },
     ])
-    expect(mockRegisterSidebarPanel).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'com.test.ext', label: 'Sidebar', defaultOpen: false })
-    )
+    expect(registry().sidebarPanels.get('com.test.ext')).toMatchObject({ label: 'Sidebar' })
+    expect(registry().openPanels.has('com.test.ext')).toBe(true)
   })
 
   it('registers each windowView via registerWindowView', async () => {
@@ -138,130 +104,81 @@ describe('initExtensions — manifest-driven (contributes) registration', () => 
         },
       },
     ])
-    expect(mockRegisterWindowView).toHaveBeenCalledTimes(2)
-    expect(mockRegisterWindowView).toHaveBeenCalledWith('view-a', expect.any(Function))
-    expect(mockRegisterWindowView).toHaveBeenCalledWith('view-b', expect.any(Function))
+    expect([...registry().windowViews.keys()]).toEqual(['view-a', 'view-b'])
+    expect(portalOf(registry().windowViews.get('view-b')!, { repoRoot: null })).toBe(
+      'com.test.ext:preview'
+    )
   })
 
   it('does not call any registry method when extension has no contributes', async () => {
     await callInit([{ id: 'com.test.ext' }])
-    expect(mockRegisterGlobalTab).not.toHaveBeenCalled()
-    expect(mockRegisterWorkspaceTab).not.toHaveBeenCalled()
-    expect(mockRegisterProjectTab).not.toHaveBeenCalled()
-    expect(mockRegisterSidebarPanel).not.toHaveBeenCalled()
-    expect(mockRegisterWindowView).not.toHaveBeenCalled()
+    const { globalTabs, workspaceTabs, projectTabs, sidebarPanels, windowViews } = registry()
+    for (const surfaces of [globalTabs, workspaceTabs, projectTabs, sidebarPanels, windowViews]) {
+      expect(surfaces.size).toBe(0)
+    }
   })
 
   it('skips disabled extensions', async () => {
     await callInit([
       { id: 'com.test.ext', status: 'disabled', contributes: { globalTab: { label: 'X' } } },
     ])
-    expect(mockRegisterGlobalTab).not.toHaveBeenCalled()
+    expect(registry().globalTabs.size).toBe(0)
   })
 })
 
 describe('registerWebviewExtension — default view params', () => {
-  it('uses "main" as default view for globalTab when view is not set', async () => {
-    const { registerWebviewExtension } = await import(
-      '../../../../src/renderer/extensions/loader.js'
-    )
-    registerWebviewExtension(
-      makeExt({ contributes: { globalTab: { label: 'X' } } }),
-      mockRegistry as never
-    )
-    expect(mockRegisterGlobalTab).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'com.test.ext' })
-    )
+  const register = (contributes: Extension['contributes']) =>
+    registerWebviewExtension(makeExt({ contributes }), registry())
+
+  it('hosts the "main" view in a global tab that names none, with no icon', () => {
+    register({ globalTab: { label: 'X' } })
+    const tab = registry().globalTabs.get('com.test.ext')!
+    expect(tab).toMatchObject({ view: 'main', icon: undefined })
+    expect(portalOf(tab.component, {})).toBe('com.test.ext:main')
   })
 
-  it('passes undefined icon when globalTab.icon is not set', async () => {
-    const { registerWebviewExtension } = await import(
-      '../../../../src/renderer/extensions/loader.js'
-    )
-    registerWebviewExtension(
-      makeExt({ contributes: { globalTab: { label: 'X' } } }),
-      mockRegistry as never
-    )
-    expect(mockRegisterGlobalTab).toHaveBeenCalledWith(expect.objectContaining({ icon: undefined }))
+  it('hosts the "workspace" view in a workspace tab that names none, with no icon', () => {
+    register({ workspaceTab: { label: 'WS' } })
+    const tab = registry().workspaceTabs.get('com.test.ext')!
+    expect(tab).toMatchObject({ view: 'workspace', icon: undefined })
+    expect(portalOf(tab.component, {})).toBe('com.test.ext:workspace')
   })
 
-  it('uses "workspace" as default view for workspaceTab when view is not set', async () => {
-    const { registerWebviewExtension } = await import(
-      '../../../../src/renderer/extensions/loader.js'
-    )
-    registerWebviewExtension(
-      makeExt({ contributes: { workspaceTab: { label: 'WS' } } }),
-      mockRegistry as never
-    )
-    expect(mockRegisterWorkspaceTab).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'com.test.ext' })
-    )
+  it('hosts the "project" view in a project tab that names none', () => {
+    register({ projectTab: { label: 'Proj' } })
+    const tab = registry().projectTabs.get('com.test.ext')!
+    expect(tab.view).toBe('project')
+    expect(portalOf(tab.component, { repoRoot: null })).toBe('com.test.ext:project')
   })
 
-  it('passes undefined icon when workspaceTab.icon is not set', async () => {
-    const { registerWebviewExtension } = await import(
-      '../../../../src/renderer/extensions/loader.js'
-    )
-    registerWebviewExtension(
-      makeExt({ contributes: { workspaceTab: { label: 'WS' } } }),
-      mockRegistry as never
-    )
-    expect(mockRegisterWorkspaceTab).toHaveBeenCalledWith(
-      expect.objectContaining({ icon: undefined })
-    )
-  })
-
-  it('uses "project" as default view for projectTab when view is not set', async () => {
-    const { registerWebviewExtension } = await import(
-      '../../../../src/renderer/extensions/loader.js'
-    )
-    registerWebviewExtension(
-      makeExt({ contributes: { projectTab: { label: 'Proj' } } }),
-      mockRegistry as never
-    )
-    expect(mockRegisterProjectTab).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'com.test.ext' })
-    )
-  })
-
-  it('uses "sidebar" as default view for sidebarPanel when view is not set', async () => {
-    const { registerWebviewExtension } = await import(
-      '../../../../src/renderer/extensions/loader.js'
-    )
-    registerWebviewExtension(
-      makeExt({ contributes: { sidebarPanel: { label: 'Panel' } } }),
-      mockRegistry as never
-    )
-    expect(mockRegisterSidebarPanel).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'com.test.ext' })
+  it('hosts the "sidebar" view in a sidebar panel that names none', () => {
+    register({ sidebarPanel: { label: 'Panel' } })
+    const panel = registry().sidebarPanels.get('com.test.ext')!
+    expect(panel.view).toBe('sidebar')
+    expect(portalOf(panel.component, { repoRoot: null, onClose: () => {} })).toBe(
+      'com.test.ext:sidebar'
     )
   })
 })
 
 describe('registerWebviewExtension — commands / keyboard shortcuts', () => {
-  it('registers a keyboard shortcut when contributes.commands has a shortcut and a sidebarPanel', async () => {
-    const { registerWebviewExtension } = await import(
-      '../../../../src/renderer/extensions/loader.js'
-    )
+  it("binds a command's shortcut to toggling the extension's sidebar panel", () => {
     registerWebviewExtension(
       makeExt({
-        id: 'com.test.ext',
         contributes: {
           sidebarPanel: { label: 'Panel', view: 'sidebar' },
           commands: [{ id: 'ext:toggle', label: 'Toggle', shortcut: 'CmdOrCtrl+Shift+G' }],
         },
       }),
-      mockRegistry as never
+      registry()
     )
-    expect(mockRegisterKeyboardShortcut).toHaveBeenCalledWith(
-      expect.objectContaining({ accelerator: 'CmdOrCtrl+Shift+G' })
-    )
+    const [shortcut] = registry().keyboardShortcuts
+    expect(shortcut.accelerator).toBe('CmdOrCtrl+Shift+G')
+    shortcut.action()
+    expect(registry().openPanels.has('com.test.ext')).toBe(true)
   })
 
-  it('does not register a keyboard shortcut when the command has no shortcut', async () => {
-    const { registerWebviewExtension } = await import(
-      '../../../../src/renderer/extensions/loader.js'
-    )
+  it('does not register a keyboard shortcut when the command has no shortcut', () => {
     registerWebviewExtension(
       makeExt({
         contributes: {
@@ -269,15 +186,12 @@ describe('registerWebviewExtension — commands / keyboard shortcuts', () => {
           commands: [{ id: 'ext:action', label: 'Action' }],
         },
       }),
-      mockRegistry as never
+      registry()
     )
-    expect(mockRegisterKeyboardShortcut).not.toHaveBeenCalled()
+    expect(registry().keyboardShortcuts).toEqual([])
   })
 
-  it('does not register a keyboard shortcut when there is no sidebarPanel', async () => {
-    const { registerWebviewExtension } = await import(
-      '../../../../src/renderer/extensions/loader.js'
-    )
+  it('does not register a keyboard shortcut when there is no sidebarPanel', () => {
     registerWebviewExtension(
       makeExt({
         contributes: {
@@ -285,45 +199,16 @@ describe('registerWebviewExtension — commands / keyboard shortcuts', () => {
           commands: [{ id: 'ext:action', label: 'Action', shortcut: 'CmdOrCtrl+X' }],
         },
       }),
-      mockRegistry as never
+      registry()
     )
-    expect(mockRegisterKeyboardShortcut).not.toHaveBeenCalled()
-  })
-})
-
-describe('registerWebviewExtension — exported function', () => {
-  it('is exported and callable', async () => {
-    const { registerWebviewExtension } = await import(
-      '../../../../src/renderer/extensions/loader.js'
-    )
-    expect(typeof registerWebviewExtension).toBe('function')
-  })
-
-  it('component factory produces a renderable React component', async () => {
-    const { registerWebviewExtension } = await import(
-      '../../../../src/renderer/extensions/loader.js'
-    )
-    registerWebviewExtension(
-      makeExt({ id: 'com.test.ext', contributes: { globalTab: { label: 'X', view: 'main' } } }),
-      mockRegistry as never
-    )
-    const { component } = mockRegisterGlobalTab.mock.calls[0][0] as { component: ComponentType }
-    const element = (component as () => React.ReactElement)()
-    expect(React.isValidElement(element)).toBe(true)
+    expect(registry().keyboardShortcuts).toEqual([])
   })
 })
 
 describe('initExtensions — no __terminatorRegistry global', () => {
   it('does not set __terminatorRegistry on window', async () => {
-    const fakeWindow: Record<string, unknown> = {
-      electronAPI: { extension: { list: vi.fn().mockResolvedValue({ extensions: [] }) } },
-    }
-    ;(globalThis as unknown as { window: unknown }).window = fakeWindow
-    vi.resetModules()
-    await import('../../../../src/renderer/extensions/loader.js')
-    expect(fakeWindow.__terminatorRegistry).toBeUndefined()
-    delete (globalThis as unknown as { window?: unknown }).window
-    vi.resetModules()
+    await callInit([{ id: 'com.test.ext', contributes: { globalTab: { label: 'X' } } }])
+    expect('__terminatorRegistry' in window).toBe(false)
   })
 })
 
@@ -339,15 +224,18 @@ describe('Quick Actions group allocation at init', () => {
         contributes: { quickActions: { group: { mnemonic: 'n', label: 'Notes' } } },
       },
     ])
-    expect(mockSetQuickActionGroups).toHaveBeenCalledWith([
+    expect(registry().quickActionGroups).toEqual([
       { id: 'ext:git-integration', mnemonic: 'g', label: 'Git', owner: 'git-integration' },
       { id: 'ext:notepad', mnemonic: 'n', label: 'Notes', owner: 'notepad' },
     ])
   })
 
   it('sets an empty list when no extension declares a quickActions group', async () => {
+    resetStore(useExtensionRegistry, {
+      quickActionGroups: [{ id: 'ext:gone', mnemonic: 'x', label: 'Gone', owner: 'gone' }],
+    })
     await callInit([{ id: 'com.test.ext' }])
-    expect(mockSetQuickActionGroups).toHaveBeenCalledWith([])
+    expect(registry().quickActionGroups).toEqual([])
   })
 
   it('reassigns a colliding mnemonic rather than dropping the group', async () => {
@@ -355,7 +243,7 @@ describe('Quick Actions group allocation at init', () => {
       { id: 'one', contributes: { quickActions: { group: { mnemonic: 'g', label: 'One' } } } },
       { id: 'two', contributes: { quickActions: { group: { mnemonic: 'g', label: 'Two' } } } },
     ])
-    const groups = mockSetQuickActionGroups.mock.calls[0][0]
+    const groups = registry().quickActionGroups
     expect(groups).toHaveLength(2)
     expect(groups[1].mnemonic).not.toBe('g')
   })

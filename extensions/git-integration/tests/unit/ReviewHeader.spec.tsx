@@ -58,41 +58,45 @@ describe('ReviewHeader', () => {
     render(<ReviewHeader {...baseProps({ isDraft: false })} />)
     expect(screen.queryByText(/draft/i)).toBeNull()
   })
+})
 
-  describe('checks pill', () => {
-    it('is absent when there are no checks', () => {
-      render(<ReviewHeader {...baseProps({ checks: [] })} />)
-      expect(screen.queryByText(/checks/i)).toBeNull()
-    })
-
-    it('shows failing count when any check fails', () => {
-      render(<ReviewHeader {...baseProps({ checks: failing })} />)
-      expect(screen.getByRole('button', { name: /1 of 2 checks failing/i })).toBeTruthy()
-    })
-
-    it('shows pending count when none fail but some pend', () => {
-      render(<ReviewHeader {...baseProps({ checks: pending })} />)
-      expect(screen.getByRole('button', { name: /1 of 2 checks pending/i })).toBeTruthy()
-    })
-
-    it('shows passing count when all pass', () => {
-      render(<ReviewHeader {...baseProps({ checks: passing })} />)
-      expect(screen.getByRole('button', { name: /2 checks passing/i })).toBeTruthy()
-    })
-
-    it('uses the singular "check" for a single passing check', () => {
-      render(<ReviewHeader {...baseProps({ checks: [{ name: 'only', state: 'pass' }] })} />)
-      expect(screen.getByRole('button', { name: /1 check passing/i })).toBeTruthy()
-    })
-
-    it('opens a popover with the check list on click', () => {
-      render(<ReviewHeader {...baseProps({ checks: failing })} />)
-      fireEvent.click(screen.getByRole('button', { name: /checks failing/i }))
-      expect(screen.getByText('build / test')).toBeTruthy()
-      expect(screen.getByText('lint')).toBeTruthy()
-    })
+describe('ReviewHeader (continued) — checks pill', () => {
+  it('is absent when there are no checks', () => {
+    render(<ReviewHeader {...baseProps({ checks: [] })} />)
+    expect(screen.queryByText(/checks/i)).toBeNull()
   })
 
+  it('shows failing count when any check fails', () => {
+    render(<ReviewHeader {...baseProps({ checks: failing })} />)
+    expect(screen.getByRole('button', { name: /1 of 2 checks failing/i })).toBeTruthy()
+  })
+
+  it('shows pending count when none fail but some pend', () => {
+    render(<ReviewHeader {...baseProps({ checks: pending })} />)
+    expect(screen.getByRole('button', { name: /1 of 2 checks pending/i })).toBeTruthy()
+  })
+
+  it('shows passing count when all pass', () => {
+    render(<ReviewHeader {...baseProps({ checks: passing })} />)
+    expect(screen.getByRole('button', { name: /2 checks passing/i })).toBeTruthy()
+  })
+
+  it('uses the singular "check" for a single passing check', () => {
+    render(<ReviewHeader {...baseProps({ checks: [{ name: 'only', state: 'pass' }] })} />)
+    expect(screen.getByRole('button', { name: /1 check passing/i })).toBeTruthy()
+  })
+})
+
+describe('ReviewHeader (continued) — checks pill — opens a popover with the check list on click', () => {
+  it('opens a popover with the check list on click', () => {
+    render(<ReviewHeader {...baseProps({ checks: failing })} />)
+    fireEvent.click(screen.getByRole('button', { name: /checks failing/i }))
+    expect(screen.getByText('build / test')).toBeTruthy()
+    expect(screen.getByText('lint')).toBeTruthy()
+  })
+})
+
+describe('ReviewHeader (continued)', () => {
   describe('large-PR pill', () => {
     it('is absent when largePr is null', () => {
       render(<ReviewHeader {...baseProps({ largePr: null })} />)
@@ -119,7 +123,9 @@ describe('ReviewHeader', () => {
       expect(onDismissLargePr).toHaveBeenCalledTimes(1)
     })
   })
+})
 
+describe('ReviewHeader (continued)', () => {
   describe('focus pill', () => {
     it('is absent when focusMode is false', () => {
       render(<ReviewHeader {...baseProps({ focusMode: false })} />)
@@ -135,7 +141,9 @@ describe('ReviewHeader', () => {
       expect(onToggleFocusMode).toHaveBeenCalledTimes(1)
     })
   })
+})
 
+describe('ReviewHeader (continued)', () => {
   describe('progress', () => {
     it('exposes aria progressbar values and visible text', () => {
       render(
@@ -157,105 +165,113 @@ describe('ReviewHeader', () => {
     fireEvent.click(btn)
     expect(onAskAgent).toHaveBeenCalledTimes(1)
   })
+})
 
+describe('ReviewHeader — calls onClose from the close button', () => {
   it('calls onClose from the close button', () => {
     const onClose = vi.fn()
     render(<ReviewHeader {...baseProps({ onClose })} />)
     fireEvent.click(screen.getByRole('button', { name: 'Close review' }))
     expect(onClose).toHaveBeenCalledTimes(1)
   })
+})
 
-  describe('More menu', () => {
-    function openMenu() {
-      fireEvent.click(screen.getByRole('button', { name: 'More review actions' }))
-    }
+function openMenu() {
+  fireEvent.click(screen.getByRole('button', { name: 'More review actions' }))
+}
 
-    it('has aria-haspopup and toggles aria-expanded', () => {
-      render(<ReviewHeader {...baseProps()} />)
-      const trigger = screen.getByRole('button', { name: 'More review actions' })
-      expect(trigger.getAttribute('aria-haspopup')).toBe('menu')
-      expect(trigger.getAttribute('aria-expanded')).toBe('false')
-      fireEvent.click(trigger)
-      expect(trigger.getAttribute('aria-expanded')).toBe('true')
-    })
+describe('ReviewHeader (continued) — More menu', () => {
+  it('has aria-haspopup and toggles aria-expanded', () => {
+    render(<ReviewHeader {...baseProps()} />)
+    const trigger = screen.getByRole('button', { name: 'More review actions' })
+    expect(trigger.getAttribute('aria-haspopup')).toBe('menu')
+    expect(trigger.getAttribute('aria-expanded')).toBe('false')
+    fireEvent.click(trigger)
+    expect(trigger.getAttribute('aria-expanded')).toBe('true')
+  })
 
-    it('opens a menu with role=menu and calls onToggleFocusMode, closing after', () => {
-      const onToggleFocusMode = vi.fn()
-      render(<ReviewHeader {...baseProps({ onToggleFocusMode })} />)
-      openMenu()
-      expect(screen.getByRole('menu')).toBeTruthy()
-      fireEvent.click(screen.getByRole('menuitem', { name: /focus mode/i }))
-      expect(onToggleFocusMode).toHaveBeenCalledTimes(1)
-      expect(screen.queryByRole('menu')).toBeNull()
-    })
+  it('opens a menu with role=menu and calls onToggleFocusMode, closing after', () => {
+    const onToggleFocusMode = vi.fn()
+    render(<ReviewHeader {...baseProps({ onToggleFocusMode })} />)
+    openMenu()
+    expect(screen.getByRole('menu')).toBeTruthy()
+    fireEvent.click(screen.getByRole('menuitem', { name: /focus mode/i }))
+    expect(onToggleFocusMode).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('menu')).toBeNull()
+  })
 
-    it('shows "On" next to Focus mode item when focusMode is true', () => {
-      render(<ReviewHeader {...baseProps({ focusMode: true })} />)
-      openMenu()
-      expect(screen.getByRole('menuitem', { name: /focus mode.*on/i })).toBeTruthy()
-    })
+  it('shows "On" next to Focus mode item when focusMode is true', () => {
+    render(<ReviewHeader {...baseProps({ focusMode: true })} />)
+    openMenu()
+    expect(screen.getByRole('menuitem', { name: /focus mode.*on/i })).toBeTruthy()
+  })
+})
 
-    it('calls onShowOverview and closes when Overview is present', () => {
-      const onShowOverview = vi.fn()
-      render(<ReviewHeader {...baseProps({ onShowOverview })} />)
-      openMenu()
-      fireEvent.click(screen.getByRole('menuitem', { name: /overview/i }))
-      expect(onShowOverview).toHaveBeenCalledTimes(1)
-      expect(screen.queryByRole('menu')).toBeNull()
-    })
+describe('ReviewHeader (continued) — More menu — calls onShowOverview and closes when Overview is present', () => {
+  it('calls onShowOverview and closes when Overview is present', () => {
+    const onShowOverview = vi.fn()
+    render(<ReviewHeader {...baseProps({ onShowOverview })} />)
+    openMenu()
+    fireEvent.click(screen.getByRole('menuitem', { name: /overview/i }))
+    expect(onShowOverview).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('menu')).toBeNull()
+  })
 
-    it('omits Overview when onShowOverview is not provided', () => {
-      render(<ReviewHeader {...baseProps({ onShowOverview: undefined })} />)
-      openMenu()
-      expect(screen.queryByRole('menuitem', { name: /overview/i })).toBeNull()
-    })
+  it('omits Overview when onShowOverview is not provided', () => {
+    render(<ReviewHeader {...baseProps({ onShowOverview: undefined })} />)
+    openMenu()
+    expect(screen.queryByRole('menuitem', { name: /overview/i })).toBeNull()
+  })
 
-    it('calls onToggleFileList for Hide file list and closes', () => {
-      const onToggleFileList = vi.fn()
-      render(<ReviewHeader {...baseProps({ onToggleFileList })} />)
-      openMenu()
-      fireEvent.click(screen.getByRole('menuitem', { name: /hide file list/i }))
-      expect(onToggleFileList).toHaveBeenCalledTimes(1)
-      expect(screen.queryByRole('menu')).toBeNull()
-    })
+  it('calls onToggleFileList for Hide file list and closes', () => {
+    const onToggleFileList = vi.fn()
+    render(<ReviewHeader {...baseProps({ onToggleFileList })} />)
+    openMenu()
+    fireEvent.click(screen.getByRole('menuitem', { name: /hide file list/i }))
+    expect(onToggleFileList).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('menu')).toBeNull()
+  })
+})
 
-    it('calls onRefresh for Refresh PR and closes', () => {
-      const onRefresh = vi.fn()
-      render(<ReviewHeader {...baseProps({ onRefresh })} />)
-      openMenu()
-      fireEvent.click(screen.getByRole('menuitem', { name: /refresh pr/i }))
-      expect(onRefresh).toHaveBeenCalledTimes(1)
-      expect(screen.queryByRole('menu')).toBeNull()
-    })
+describe('ReviewHeader (continued) — More menu — calls onRefresh for Refresh PR and closes', () => {
+  it('calls onRefresh for Refresh PR and closes', () => {
+    const onRefresh = vi.fn()
+    render(<ReviewHeader {...baseProps({ onRefresh })} />)
+    openMenu()
+    fireEvent.click(screen.getByRole('menuitem', { name: /refresh pr/i }))
+    expect(onRefresh).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('menu')).toBeNull()
+  })
 
-    it('disables Refresh PR while refreshing', () => {
-      render(<ReviewHeader {...baseProps({ refreshing: true })} />)
-      openMenu()
-      const item = screen.getByRole('menuitem', { name: /refresh pr/i })
-      expect(item.hasAttribute('disabled')).toBe(true)
-    })
+  it('disables Refresh PR while refreshing', () => {
+    render(<ReviewHeader {...baseProps({ refreshing: true })} />)
+    openMenu()
+    const item = screen.getByRole('menuitem', { name: /refresh pr/i })
+    expect(item.hasAttribute('disabled')).toBe(true)
+  })
+})
 
-    it('calls onPopOut for Pop out and closes, and omits it when absent', () => {
-      const onPopOut = vi.fn()
-      const { unmount } = render(<ReviewHeader {...baseProps({ onPopOut })} />)
-      openMenu()
-      fireEvent.click(screen.getByRole('menuitem', { name: /pop out/i }))
-      expect(onPopOut).toHaveBeenCalledTimes(1)
-      expect(screen.queryByRole('menu')).toBeNull()
-      unmount()
+describe('ReviewHeader (continued) — More menu — calls onPopOut for Pop out and closes, and omits it when absent', () => {
+  it('calls onPopOut for Pop out and closes, and omits it when absent', () => {
+    const onPopOut = vi.fn()
+    const { unmount } = render(<ReviewHeader {...baseProps({ onPopOut })} />)
+    openMenu()
+    fireEvent.click(screen.getByRole('menuitem', { name: /pop out/i }))
+    expect(onPopOut).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('menu')).toBeNull()
+    unmount()
 
-      render(<ReviewHeader {...baseProps({ onPopOut: undefined })} />)
-      openMenu()
-      expect(screen.queryByRole('menuitem', { name: /pop out/i })).toBeNull()
-    })
+    render(<ReviewHeader {...baseProps({ onPopOut: undefined })} />)
+    openMenu()
+    expect(screen.queryByRole('menuitem', { name: /pop out/i })).toBeNull()
+  })
 
-    it('calls onOpenKeyboardHelp for Keyboard shortcuts and closes', () => {
-      const onOpenKeyboardHelp = vi.fn()
-      render(<ReviewHeader {...baseProps({ onOpenKeyboardHelp })} />)
-      openMenu()
-      fireEvent.click(screen.getByRole('menuitem', { name: /keyboard shortcuts/i }))
-      expect(onOpenKeyboardHelp).toHaveBeenCalledTimes(1)
-      expect(screen.queryByRole('menu')).toBeNull()
-    })
+  it('calls onOpenKeyboardHelp for Keyboard shortcuts and closes', () => {
+    const onOpenKeyboardHelp = vi.fn()
+    render(<ReviewHeader {...baseProps({ onOpenKeyboardHelp })} />)
+    openMenu()
+    fireEvent.click(screen.getByRole('menuitem', { name: /keyboard shortcuts/i }))
+    expect(onOpenKeyboardHelp).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('menu')).toBeNull()
   })
 })

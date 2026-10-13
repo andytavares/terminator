@@ -11,20 +11,55 @@ type ExecFileStub = (...args: unknown[]) => unknown
 type Exec = ExtensionAPI['shell']['exec']
 
 interface StubError extends Error {
-  code?: string | number
+  code?: string | number | null
   stdout?: string
   stderr?: string
 }
 
 function toResult(error: StubError | null, out?: { stdout?: string; stderr?: string }) {
+  if (!error) {
+    const stdout = out?.stdout ?? ''
+    const stderr = out?.stderr ?? ''
+    return { exitCode: 0, stdout, stderr, timedOut: false, exceededMaxBuffer: false }
+  }
   const result: ShellExecResult = {
-    exitCode: error ? (typeof error.code === 'number' ? error.code : 1) : 0,
-    stdout: error ? (error.stdout ?? '') : (out?.stdout ?? ''),
-    stderr: error ? error.stderr || error.message : (out?.stderr ?? ''),
+    exitCode: typeof error.code === 'number' ? error.code : 1,
+    stdout: error.stdout ?? '',
+    stderr: error.stderr || error.message,
     timedOut: false,
-    exceededMaxBuffer: error?.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER',
+    exceededMaxBuffer: error.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER',
   }
   return result
+}
+
+type ExecFileCallback = (error: StubError | null, out?: { stdout: string; stderr: string }) => void
+
+/** An execFile stub answer that prints `stdout`; execFile's callback is always its last argument. */
+export function stubPrints(stdout: string): ExecFileStub {
+  return (...args) => (args.at(-1) as ExecFileCallback)(null, { stdout, stderr: '' })
+}
+
+/** One call an execFile stub received. */
+export interface StubCall {
+  command: string
+  args: string[]
+  cwd?: string
+}
+
+/** An execFile stub that answers each call with what `answer` returns: stdout text, or an Error to fail. */
+export function stubAnswering(answer: (call: StubCall) => string | StubError): ExecFileStub {
+  return (...callArgs) => {
+    const [command, args, opts] = callArgs as [string, string[], { cwd?: string } | undefined]
+    const out = answer({ command, args, cwd: opts?.cwd })
+    const cb = callArgs.at(-1) as ExecFileCallback
+    if (out instanceof Error) return cb(out)
+    return cb(null, { stdout: out, stderr: '' })
+  }
+}
+
+/** An execFile stub answer that fails with `error`. */
+export function stubFails(error: StubError): ExecFileStub {
+  return (...args) => (args.at(-1) as ExecFileCallback)(error)
 }
 
 /** shell.exec answered by an execFile stub, which sees the cwd, env and limits it was given. */

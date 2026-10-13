@@ -1,105 +1,79 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { renderHook } from '@testing-library/react'
+import { renderHook, waitFor } from '@testing-library/react'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { useSettingsStore } from '../../../../src/renderer/stores/settings.store'
 import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
-import { useTerminalSession } from '../../../../src/renderer/hooks/useTerminalSession'
-import { seedStore, terminalSessionOf, workspaceOf } from '../../../support/renderer-stores'
+import { useKeyboardShortcuts } from '../../../../src/renderer/hooks/useKeyboardShortcuts'
+import type { useTerminalSession } from '../../../../src/renderer/hooks/useTerminalSession'
+import { resetStore, terminalSessionOf, workspaceOf } from '../../../support/renderer-stores'
+import { installElectronApi } from '../../../support/electron-api'
 import { DEFAULT_GLOBAL_SETTINGS } from '../../../../src/shared/schemas/settings.schema'
-import type { TerminalSession, Workspace } from '../../../../src/shared/types/index'
+import { SCRATCH_PROJECT_ID, type TerminalSession } from '../../../../src/shared/types/index'
+import type { ElectronAPI } from '../../../../src/shared/electron-api/api-type'
 
-vi.mock('../../../../src/renderer/extensions/registry', () => ({
-  useExtensionRegistry: Object.assign(vi.fn(), { getState: vi.fn() }),
-  matchesAccelerator: vi.fn(),
+type TerminalSessionApi = ReturnType<typeof useTerminalSession>
+
+// The hook builds an xterm for each terminal it opens, which jsdom cannot run;
+// what is asserted is the terminal it asks for.
+const terminals = vi.hoisted(() => ({
+  createSession: vi.fn(),
+  splitSession: vi.fn(),
 }))
 vi.mock('../../../../src/renderer/hooks/useTerminalSession', () => ({
-  useTerminalSession: vi.fn(),
-}))
-vi.mock('../../../../src/renderer/lib/notifications', () => ({
-  dispatchNotification: vi.fn(),
+  useTerminalSession: (): TerminalSessionApi => terminals,
 }))
 
-const mockSetActiveWorkspace = vi.fn()
-const mockGetActiveSessionForProject = vi.fn().mockReturnValue(null)
-const mockSetActiveSessionForProject = vi.fn()
-const mockGetSessionsForProject = vi.fn().mockReturnValue([])
-const mockCreateSession = vi.fn().mockResolvedValue('session-id')
-const mockSplitSession = vi.fn().mockResolvedValue(undefined)
-const mockGetPaneLayout = vi.fn().mockReturnValue(null)
-const mockGetFocusedSession = vi.fn().mockReturnValue(null)
-const mockCloseSplitLeaf = vi.fn()
-const mockCloseSession = vi.fn().mockResolvedValue(undefined)
-const mockResolveSettings = vi.fn().mockReturnValue({
-  ...DEFAULT_GLOBAL_SETTINGS,
-  terminal: { ...DEFAULT_GLOBAL_SETTINGS.terminal, scrollbackLimit: 5000 },
-})
-const mockSetActiveProject = vi.fn()
-const mockRequestFocus = vi.fn()
-const mockSetActiveGlobalTab = vi.fn()
-const mockSetActiveWorkspaceTab = vi.fn()
-const mockSetActiveProjectTab = vi.fn()
-let storeSessions = new Map<string, TerminalSession>()
-const { matchesAccelerator } = await import('../../../../src/renderer/extensions/registry')
+const createSession = vi.mocked<TerminalSessionApi['createSession']>(terminals.createSession)
+const splitSession = vi.mocked<TerminalSessionApi['splitSession']>(terminals.splitSession)
+const input = vi.fn<ElectronAPI['terminal']['input']>()
+const createNotification = vi.fn<ElectronAPI['notifications']['create']>(async () => ({
+  id: 'n1',
+}))
 
-const workspace1 = workspaceOf({ id: 'ws-1', name: 'WS 1', folderPath: '/ws1', color: '#fff' })
-const workspace2 = workspaceOf({ id: 'ws-2', name: 'WS 2', folderPath: '/ws2', color: '#f00' })
+const workspace1 = workspaceOf({ id: 'ws-1', name: 'WS 1', folderPath: '/ws1' })
+const workspace2 = workspaceOf({ id: 'ws-2', name: 'WS 2', folderPath: '/ws2' })
 
-function setupMocks(
-  overrides: {
-    activeWorkspaceId?: string | null
-    activeProjectId?: string | null
-    workspaces?: Workspace[]
-  } = {}
+const workspaces = () => useWorkspaceStore.getState()
+const sessions = () => useSessionStore.getState()
+
+function setup(
+  overrides: { activeProjectId?: string | null; workspaces?: (typeof workspace1)[] } = {}
 ) {
-  seedStore(useWorkspaceStore, {
+  resetStore(useWorkspaceStore, {
     workspaces: overrides.workspaces ?? [workspace1, workspace2],
-    activeWorkspaceId: overrides.activeWorkspaceId ?? 'ws-1',
-    setActiveWorkspace: mockSetActiveWorkspace,
+    activeWorkspaceId: 'ws-1',
     activeProjectId: overrides.activeProjectId ?? null,
-    resolveActiveCwd: vi.fn().mockReturnValue('/workspace/path'),
-    setExpandedWorkspaceIds: vi.fn(),
-    setActiveProject: mockSetActiveProject,
   })
-  seedStore(useSessionStore, {
-    getActiveSessionForProject: mockGetActiveSessionForProject,
-    setActiveSessionForProject: mockSetActiveSessionForProject,
-    getSessionsForProject: mockGetSessionsForProject,
-    getPaneLayout: mockGetPaneLayout,
-    getFocusedSession: mockGetFocusedSession,
-    closeSplitLeaf: mockCloseSplitLeaf,
-    closeSession: mockCloseSession,
-    sessions: storeSessions,
-    requestFocus: mockRequestFocus,
-  })
-  seedStore(useSettingsStore, {
-    resolveSettings: mockResolveSettings,
-  })
-  vi.mocked(useExtensionRegistry).mockReturnValue({
-    keyboardShortcuts: [],
-  } as unknown as ReturnType<typeof useWorkspaceStore>)
-  vi.mocked(useExtensionRegistry.getState).mockReturnValue({
-    setActiveGlobalTab: mockSetActiveGlobalTab,
-    setActiveWorkspaceTab: mockSetActiveWorkspaceTab,
-    setActiveProjectTab: mockSetActiveProjectTab,
-  } as unknown as ReturnType<typeof useExtensionRegistry.getState>)
-  vi.mocked(useTerminalSession).mockReturnValue({
-    createSession: mockCreateSession,
-    splitSession: mockSplitSession,
-  })
+}
+
+/** Sessions of one project, as tabs in that order, with `active` shown. */
+function withTabs(projectId: string, ids: string[], active: string): void {
+  const all = new Map(sessions().sessions)
+  for (const id of ids) all.set(id, terminalSessionOf({ id, projectId }))
+  useSessionStore.setState({ sessions: all })
+  sessions().setActiveSessionForProject(projectId, active)
 }
 
 beforeEach(() => {
   vi.clearAllMocks()
-  setupMocks()
+  createSession.mockResolvedValue('session-id')
+  splitSession.mockResolvedValue(undefined)
+  resetStore(useSessionStore)
+  resetStore(useExtensionRegistry)
+  resetStore(useSettingsStore, {
+    globalSettings: {
+      ...DEFAULT_GLOBAL_SETTINGS,
+      terminal: { ...DEFAULT_GLOBAL_SETTINGS.terminal, scrollbackLimit: 5000 },
+    },
+  })
+  setup()
+  installElectronApi({
+    project: { list: async () => ({ projects: [] }) },
+    terminal: { input, close: async () => ({ success: true }) },
+    notifications: { create: createNotification },
+  })
 })
-
-async function importHook() {
-  const { useKeyboardShortcuts } = await import(
-    '../../../../src/renderer/hooks/useKeyboardShortcuts'
-  )
-  return useKeyboardShortcuts
-}
 
 function pressKey(
   key: string,
@@ -111,138 +85,105 @@ function pressKey(
 }
 
 describe('useKeyboardShortcuts', () => {
-  it('calls onOpenSettings when Cmd+, is pressed', async () => {
-    const useKeyboardShortcuts = await importHook()
+  it('calls onOpenSettings when Cmd+, is pressed', () => {
     const onOpenSettings = vi.fn()
     renderHook(() => useKeyboardShortcuts({ onOpenSettings }))
     pressKey(',', { metaKey: true })
     expect(onOpenSettings).toHaveBeenCalled()
   })
 
-  it('calls onToggleLog when Cmd+Shift+L is pressed', async () => {
-    const useKeyboardShortcuts = await importHook()
+  it('calls onToggleLog when Cmd+Shift+L is pressed', () => {
     const onToggleLog = vi.fn()
     renderHook(() => useKeyboardShortcuts({ onToggleLog }))
     pressKey('l', { metaKey: true, shiftKey: true })
     expect(onToggleLog).toHaveBeenCalled()
   })
 
-  it('switches to workspace by number when Cmd+1 is pressed', async () => {
-    const useKeyboardShortcuts = await importHook()
-    renderHook(() => useKeyboardShortcuts())
-    pressKey('1', { metaKey: true })
-    expect(mockSetActiveWorkspace).toHaveBeenCalledWith('ws-1')
-  })
-
-  it('switches to second workspace when Cmd+2 is pressed', async () => {
-    const useKeyboardShortcuts = await importHook()
+  it('switches to workspace by number when Cmd+2 is pressed, expanding only it', () => {
     renderHook(() => useKeyboardShortcuts())
     pressKey('2', { metaKey: true })
-    expect(mockSetActiveWorkspace).toHaveBeenCalledWith('ws-2')
+    expect(workspaces().activeWorkspaceId).toBe('ws-2')
+    expect(workspaces().expandedWorkspaceIds).toEqual(new Set(['ws-2']))
   })
 
-  it('does nothing for out-of-range workspace index', async () => {
-    const useKeyboardShortcuts = await importHook()
+  it('does nothing for out-of-range workspace index', () => {
     renderHook(() => useKeyboardShortcuts())
     pressKey('9', { metaKey: true })
-    expect(mockSetActiveWorkspace).not.toHaveBeenCalled()
+    expect(workspaces().activeWorkspaceId).toBe('ws-1')
   })
 
-  it('cycles to next workspace on Cmd+=', async () => {
-    const useKeyboardShortcuts = await importHook()
+  it('cycles to next workspace on Cmd+=, expanding only it', () => {
     renderHook(() => useKeyboardShortcuts())
     pressKey('=', { metaKey: true })
-    expect(mockSetActiveWorkspace).toHaveBeenCalledWith('ws-2')
+    expect(workspaces().activeWorkspaceId).toBe('ws-2')
+    expect(workspaces().expandedWorkspaceIds).toEqual(new Set(['ws-2']))
   })
 
-  it('cycles to previous workspace on Cmd+-', async () => {
-    const useKeyboardShortcuts = await importHook()
+  it('cycles to previous workspace on Cmd+-', () => {
     renderHook(() => useKeyboardShortcuts())
     pressKey('-', { metaKey: true })
-    expect(mockSetActiveWorkspace).toHaveBeenCalledWith('ws-2') // wraps around
+    expect(workspaces().activeWorkspaceId).toBe('ws-2') // wraps around
   })
 
-  it('creates new session on Cmd+T when project is active', async () => {
-    setupMocks({ activeProjectId: 'proj-1', activeWorkspaceId: 'ws-1' })
-    const useKeyboardShortcuts = await importHook()
+  it('cycleWorkspace does nothing when workspaces list is empty', () => {
+    resetStore(useWorkspaceStore)
+    renderHook(() => useKeyboardShortcuts())
+    pressKey('=', { metaKey: true })
+    expect(workspaces().activeWorkspaceId).toBeNull()
+  })
+
+  it('creates new session on Cmd+T when project is active', () => {
+    setup({ activeProjectId: 'proj-1' })
     renderHook(() => useKeyboardShortcuts())
     pressKey('t', { metaKey: true })
-    expect(mockCreateSession).toHaveBeenCalledWith(
-      'proj-1',
-      'human',
-      'Terminal',
-      expect.any(String),
-      5000
-    )
+    expect(createSession).toHaveBeenCalledWith('proj-1', 'human', 'Terminal', '/ws1', 5000)
   })
 
-  it('calls onOpenCommandPalette when Cmd+P is pressed', async () => {
-    const useKeyboardShortcuts = await importHook()
+  it('does not create session on Cmd+T when no active project', () => {
+    renderHook(() => useKeyboardShortcuts())
+    pressKey('t', { metaKey: true })
+    expect(createSession).not.toHaveBeenCalled()
+  })
+
+  it('calls onOpenCommandPalette when Cmd+P is pressed', () => {
     const onOpenCommandPalette = vi.fn()
     renderHook(() => useKeyboardShortcuts({ onOpenCommandPalette }))
     pressKey('p', { metaKey: true })
     expect(onOpenCommandPalette).toHaveBeenCalled()
   })
 
-  it('sends clear escape to active terminal on Cmd+K when project and session active', async () => {
-    const mockTerminalInput = vi.fn()
-    ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
-      terminal: { input: mockTerminalInput },
-    }
-    mockGetActiveSessionForProject.mockReturnValue('session-1')
-    setupMocks({ activeProjectId: 'proj-1', activeWorkspaceId: 'ws-1' })
-    const useKeyboardShortcuts = await importHook()
+  it('sends clear escape to active terminal on Cmd+K when project and session active', () => {
+    setup({ activeProjectId: 'proj-1' })
+    withTabs('proj-1', ['session-1'], 'session-1')
     renderHook(() => useKeyboardShortcuts())
     pressKey('k', { metaKey: true })
-    expect(mockTerminalInput).toHaveBeenCalledWith('session-1', '\x0c')
-    delete (globalThis as unknown as Record<string, unknown>).electronAPI
+    expect(input).toHaveBeenCalledWith('session-1', '\x0c')
   })
 
-  it('does nothing on Cmd+K when no active project', async () => {
-    const mockTerminalInput = vi.fn()
-    ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
-      terminal: { input: mockTerminalInput },
-    }
-    setupMocks({ activeProjectId: null })
-    const useKeyboardShortcuts = await importHook()
+  it('does nothing on Cmd+K when no active project', () => {
+    withTabs('proj-1', ['session-1'], 'session-1')
     renderHook(() => useKeyboardShortcuts())
     pressKey('k', { metaKey: true })
-    expect(mockTerminalInput).not.toHaveBeenCalled()
-    delete (globalThis as unknown as Record<string, unknown>).electronAPI
+    expect(input).not.toHaveBeenCalled()
   })
 
-  it('does not create session on Cmd+T when no active project', async () => {
-    setupMocks({ activeProjectId: null })
-    const useKeyboardShortcuts = await importHook()
-    renderHook(() => useKeyboardShortcuts())
-    pressKey('t', { metaKey: true })
-    expect(mockCreateSession).not.toHaveBeenCalled()
-  })
-
-  it('cycles tabs on Cmd+ArrowRight when sessions exist', async () => {
-    const sessions = [{ id: 's1' }, { id: 's2' }]
-    mockGetSessionsForProject.mockReturnValue(sessions)
-    mockGetActiveSessionForProject.mockReturnValue('s1')
-    setupMocks({ activeProjectId: 'proj-1' })
-    const useKeyboardShortcuts = await importHook()
+  it('cycles tabs on Cmd+ArrowRight when sessions exist', () => {
+    setup({ activeProjectId: 'proj-1' })
+    withTabs('proj-1', ['s1', 's2'], 's1')
     renderHook(() => useKeyboardShortcuts())
     pressKey('ArrowRight', { metaKey: true })
-    expect(mockSetActiveSessionForProject).toHaveBeenCalledWith('proj-1', 's2')
+    expect(sessions().getActiveSessionForProject('proj-1')).toBe('s2')
   })
 
-  it('cycles tabs on Cmd+ArrowLeft when sessions exist', async () => {
-    const sessions = [{ id: 's1' }, { id: 's2' }]
-    mockGetSessionsForProject.mockReturnValue(sessions)
-    mockGetActiveSessionForProject.mockReturnValue('s2')
-    setupMocks({ activeProjectId: 'proj-1' })
-    const useKeyboardShortcuts = await importHook()
+  it('cycles tabs on Cmd+ArrowLeft when sessions exist', () => {
+    setup({ activeProjectId: 'proj-1' })
+    withTabs('proj-1', ['s1', 's2'], 's2')
     renderHook(() => useKeyboardShortcuts())
     pressKey('ArrowLeft', { metaKey: true })
-    expect(mockSetActiveSessionForProject).toHaveBeenCalledWith('proj-1', 's1')
+    expect(sessions().getActiveSessionForProject('proj-1')).toBe('s1')
   })
 
-  it('calls onToggleOverview when Cmd+Shift+E is pressed', async () => {
-    const useKeyboardShortcuts = await importHook()
+  it('calls onToggleOverview when Cmd+Shift+E is pressed', () => {
     const onToggleOverview = vi.fn()
     renderHook(() => useKeyboardShortcuts({ onToggleOverview }))
     pressKey('e', { metaKey: true, shiftKey: true })
@@ -251,66 +192,33 @@ describe('useKeyboardShortcuts', () => {
 
   // Cmd+Shift+I belongs to the "Open Extension DevTools" menu accelerator, which Electron
   // consumes before the renderer sees it — the hook must not also claim it.
-  it('does not call onToggleOverview when Cmd+Shift+I is pressed', async () => {
-    const useKeyboardShortcuts = await importHook()
+  it('does not call onToggleOverview when Cmd+Shift+I is pressed', () => {
     const onToggleOverview = vi.fn()
     renderHook(() => useKeyboardShortcuts({ onToggleOverview }))
     pressKey('i', { metaKey: true, shiftKey: true })
     expect(onToggleOverview).not.toHaveBeenCalled()
   })
 
-  it('calls onNewScratch when Cmd+Shift+T is pressed', async () => {
-    const useKeyboardShortcuts = await importHook()
+  it('calls onNewScratch when Cmd+Shift+T is pressed', () => {
     const onNewScratch = vi.fn()
     renderHook(() => useKeyboardShortcuts({ onNewScratch }))
     pressKey('t', { metaKey: true, shiftKey: true })
     expect(onNewScratch).toHaveBeenCalled()
   })
 
-  it('Cmd+= also calls setExpandedWorkspaceIds on the cycled workspace', async () => {
-    const mockSetExpanded = vi.fn()
-    seedStore(useWorkspaceStore, {
-      workspaces: [workspace1, workspace2],
-      activeWorkspaceId: 'ws-1',
-      setActiveWorkspace: mockSetActiveWorkspace,
-      activeProjectId: null,
-      resolveActiveCwd: vi.fn().mockReturnValue('/workspace/path'),
-      setExpandedWorkspaceIds: mockSetExpanded,
-    })
-    const useKeyboardShortcuts = await importHook()
+  it('reports a split that fails on Cmd+D', async () => {
+    splitSession.mockRejectedValueOnce(new Error('split failed'))
+    setup({ activeProjectId: 'proj-1' })
     renderHook(() => useKeyboardShortcuts())
-    pressKey('=', { metaKey: true })
-    expect(mockSetExpanded).toHaveBeenCalledWith(new Set(['ws-2']))
-  })
-
-  it('cycleWorkspace does nothing when workspaces list is empty', async () => {
-    seedStore(useWorkspaceStore, {
-      workspaces: [],
-      activeWorkspaceId: null,
-      setActiveWorkspace: mockSetActiveWorkspace,
-      activeProjectId: null,
-      resolveActiveCwd: vi.fn().mockReturnValue('/'),
-      setExpandedWorkspaceIds: vi.fn(),
-    })
-    const useKeyboardShortcuts = await importHook()
-    renderHook(() => useKeyboardShortcuts())
-    pressKey('=', { metaKey: true })
-    expect(mockSetActiveWorkspace).not.toHaveBeenCalled()
-  })
-
-  it('Cmd+D does not crash when splitSession rejects', async () => {
-    mockSplitSession.mockRejectedValueOnce(new Error('split failed'))
-    setupMocks({ activeProjectId: 'proj-1' })
-    const useKeyboardShortcuts = await importHook()
-    renderHook(() => useKeyboardShortcuts())
-    // Should not throw — the .catch handler swallows and dispatches a notification
     pressKey('d', { metaKey: true })
-    await new Promise((r) => setTimeout(r, 10))
-    expect(mockSplitSession).toHaveBeenCalled()
+    await waitFor(() =>
+      expect(createNotification).toHaveBeenCalledWith(
+        expect.objectContaining({ key: 'splitPaneFailed', message: 'split failed' })
+      )
+    )
   })
 
-  it('removes keydown listener on unmount', async () => {
-    const useKeyboardShortcuts = await importHook()
+  it('removes keydown listener on unmount', () => {
     const onOpenSettings = vi.fn()
     const { unmount } = renderHook(() => useKeyboardShortcuts({ onOpenSettings }))
     unmount()
@@ -318,220 +226,163 @@ describe('useKeyboardShortcuts', () => {
     expect(onOpenSettings).not.toHaveBeenCalled()
   })
 
-  it('calls extension shortcut action when accelerator matches', async () => {
-    const shortcutAction = vi.fn()
-    vi.mocked(useExtensionRegistry).mockReturnValue({
-      keyboardShortcuts: [{ accelerator: 'CmdOrCtrl+Shift+K', action: shortcutAction }],
-    } as unknown as ReturnType<typeof useWorkspaceStore>)
-    vi.mocked(matchesAccelerator).mockReturnValue(true)
-    const useKeyboardShortcuts = await importHook()
-    renderHook(() => useKeyboardShortcuts())
-    pressKey('k', { metaKey: true, shiftKey: true })
-    expect(shortcutAction).toHaveBeenCalled()
+  describe('extension shortcuts', () => {
+    function registered(accelerator: string) {
+      const action = vi.fn()
+      useExtensionRegistry.getState().registerKeyboardShortcut({ accelerator, action })
+      return action
+    }
+
+    function pressIn(field: HTMLElement, key: string, metaKey = false): void {
+      document.body.appendChild(field)
+      field.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, metaKey }))
+      field.remove()
+    }
+
+    it('calls extension shortcut action when accelerator matches', () => {
+      const action = registered('CmdOrCtrl+Shift+K')
+      renderHook(() => useKeyboardShortcuts())
+      pressKey('k', { metaKey: true, shiftKey: true })
+      expect(action).toHaveBeenCalled()
+    })
+
+    it('suppresses bare-key extension shortcut when pressed inside an input', () => {
+      const action = registered('1')
+      renderHook(() => useKeyboardShortcuts())
+      pressIn(document.createElement('input'), '1')
+      expect(action).not.toHaveBeenCalled()
+    })
+
+    it('fires bare-key extension shortcut when pressed outside an input', () => {
+      const action = registered('1')
+      renderHook(() => useKeyboardShortcuts())
+      pressKey('1')
+      expect(action).toHaveBeenCalled()
+    })
+
+    it('fires modifier+key extension shortcut even when pressed inside an input', () => {
+      const action = registered('CmdOrCtrl+1')
+      renderHook(() => useKeyboardShortcuts())
+      pressIn(document.createElement('input'), '1', true)
+      expect(action).toHaveBeenCalled()
+    })
   })
 
-  it('suppresses bare-key extension shortcut when pressed inside an input', async () => {
-    const shortcutAction = vi.fn()
-    vi.mocked(useExtensionRegistry).mockReturnValue({
-      keyboardShortcuts: [{ accelerator: '1', action: shortcutAction }],
-    } as unknown as ReturnType<typeof useWorkspaceStore>)
-    vi.mocked(matchesAccelerator).mockReturnValue(true)
-    const useKeyboardShortcuts = await importHook()
-    renderHook(() => useKeyboardShortcuts())
-
-    const input = document.createElement('input')
-    document.body.appendChild(input)
-    const event = new KeyboardEvent('keydown', { key: '1', bubbles: true })
-    input.dispatchEvent(event)
-    document.body.removeChild(input)
-
-    expect(shortcutAction).not.toHaveBeenCalled()
-  })
-
-  it('fires bare-key extension shortcut when pressed outside an input', async () => {
-    const shortcutAction = vi.fn()
-    vi.mocked(useExtensionRegistry).mockReturnValue({
-      keyboardShortcuts: [{ accelerator: '1', action: shortcutAction }],
-    } as unknown as ReturnType<typeof useWorkspaceStore>)
-    vi.mocked(matchesAccelerator).mockReturnValue(true)
-    const useKeyboardShortcuts = await importHook()
-    renderHook(() => useKeyboardShortcuts())
-    pressKey('1')
-    expect(shortcutAction).toHaveBeenCalled()
-  })
-
-  it('fires modifier+key extension shortcut even when pressed inside an input', async () => {
-    const shortcutAction = vi.fn()
-    vi.mocked(useExtensionRegistry).mockReturnValue({
-      keyboardShortcuts: [{ accelerator: 'CmdOrCtrl+1', action: shortcutAction }],
-    } as unknown as ReturnType<typeof useWorkspaceStore>)
-    vi.mocked(matchesAccelerator).mockReturnValue(true)
-    const useKeyboardShortcuts = await importHook()
-    renderHook(() => useKeyboardShortcuts())
-
-    const input = document.createElement('input')
-    document.body.appendChild(input)
-    const event = new KeyboardEvent('keydown', { key: '1', bubbles: true, metaKey: true })
-    input.dispatchEvent(event)
-    document.body.removeChild(input)
-
-    expect(shortcutAction).toHaveBeenCalled()
-  })
-
-  it('Cmd+D splits vertically when activeProjectId is set', async () => {
-    setupMocks({ activeProjectId: 'proj-1' })
-    const useKeyboardShortcuts = await importHook()
+  it('Cmd+D splits vertically when activeProjectId is set', () => {
+    setup({ activeProjectId: 'proj-1' })
     renderHook(() => useKeyboardShortcuts())
     pressKey('d', { metaKey: true })
-    expect(mockSplitSession).toHaveBeenCalledWith('proj-1', 'vertical', expect.any(String), 5000)
+    expect(splitSession).toHaveBeenCalledWith('proj-1', 'vertical', '/ws1', 5000)
   })
 
-  it('Cmd+D does nothing when no activeProjectId', async () => {
-    setupMocks({ activeProjectId: null })
-    const useKeyboardShortcuts = await importHook()
+  it('Cmd+D does nothing when no activeProjectId', () => {
     renderHook(() => useKeyboardShortcuts())
     pressKey('d', { metaKey: true })
-    expect(mockSplitSession).not.toHaveBeenCalled()
+    expect(splitSession).not.toHaveBeenCalled()
   })
 
-  it('Cmd+Shift+D splits horizontally when activeProjectId is set', async () => {
-    setupMocks({ activeProjectId: 'proj-1' })
-    const useKeyboardShortcuts = await importHook()
+  it('Cmd+Shift+D splits horizontally when activeProjectId is set', () => {
+    setup({ activeProjectId: 'proj-1' })
     renderHook(() => useKeyboardShortcuts())
     pressKey('d', { metaKey: true, shiftKey: true })
-    expect(mockSplitSession).toHaveBeenCalledWith('proj-1', 'horizontal', expect.any(String), 5000)
+    expect(splitSession).toHaveBeenCalledWith('proj-1', 'horizontal', '/ws1', 5000)
   })
 
   it('Cmd+W closes focused split pane when in split mode', async () => {
-    mockGetPaneLayout.mockReturnValue({ type: 'split' })
-    mockGetFocusedSession.mockReturnValue('ses-focused')
-    mockGetActiveSessionForProject.mockReturnValue('ses-focused')
-    setupMocks({ activeProjectId: 'proj-1' })
-    const useKeyboardShortcuts = await importHook()
+    setup({ activeProjectId: 'proj-1' })
+    withTabs('proj-1', ['ses-root', 'ses-focused'], 'ses-root')
+    sessions().activateSplit('proj-1', 'ses-root', 'ses-focused', 'vertical')
+    sessions().setFocusedSession('proj-1', 'ses-focused')
     renderHook(() => useKeyboardShortcuts())
     pressKey('w', { metaKey: true })
-    expect(mockCloseSplitLeaf).toHaveBeenCalledWith('proj-1', 'ses-focused')
-    expect(mockCloseSession).toHaveBeenCalledWith('ses-focused')
+    expect(JSON.stringify(sessions().getPaneLayout('proj-1'))).not.toContain('ses-focused')
+    await waitFor(() => expect(sessions().sessions.has('ses-focused')).toBe(false))
+    expect(sessions().sessions.has('ses-root')).toBe(true)
   })
 
   it('Cmd+W closes active tab when not in split mode', async () => {
-    mockGetPaneLayout.mockReturnValue(null)
-    mockGetActiveSessionForProject.mockReturnValue('ses-active')
-    setupMocks({ activeProjectId: 'proj-1' })
-    const useKeyboardShortcuts = await importHook()
+    setup({ activeProjectId: 'proj-1' })
+    withTabs('proj-1', ['ses-other', 'ses-active'], 'ses-active')
     renderHook(() => useKeyboardShortcuts())
     pressKey('w', { metaKey: true })
-    expect(mockCloseSession).toHaveBeenCalledWith('ses-active')
+    await waitFor(() => expect(sessions().sessions.has('ses-active')).toBe(false))
+    expect(sessions().sessions.has('ses-other')).toBe(true)
   })
 
   it('Cmd+W does nothing when no activeProjectId', async () => {
-    setupMocks({ activeProjectId: null })
-    const useKeyboardShortcuts = await importHook()
+    withTabs('proj-1', ['ses-active'], 'ses-active')
     renderHook(() => useKeyboardShortcuts())
     pressKey('w', { metaKey: true })
-    expect(mockCloseSession).not.toHaveBeenCalled()
+    await Promise.resolve()
+    expect(sessions().sessions.has('ses-active')).toBe(true)
   })
 
   describe('scratch mode — scratchProjectId overrides activeProjectId', () => {
-    const SCRATCH_ID = '00000000-0000-0000-0000-000000000000'
+    const scratch = { scratchProjectId: SCRATCH_PROJECT_ID }
 
-    it('Cmd+K clears scratch session when scratchProjectId is set and activeProjectId is null', async () => {
-      const mockTerminalInput = vi.fn()
-      ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
-        terminal: { input: mockTerminalInput },
-      }
-      mockGetActiveSessionForProject.mockReturnValue('scratch-ses-1')
-      setupMocks({ activeProjectId: null })
-      const useKeyboardShortcuts = await importHook()
-      renderHook(() => useKeyboardShortcuts({ scratchProjectId: SCRATCH_ID }))
+    it('Cmd+K clears scratch session when scratchProjectId is set and activeProjectId is null', () => {
+      withTabs(SCRATCH_PROJECT_ID, ['scratch-ses-1'], 'scratch-ses-1')
+      renderHook(() => useKeyboardShortcuts(scratch))
       pressKey('k', { metaKey: true })
-      expect(mockGetActiveSessionForProject).toHaveBeenCalledWith(SCRATCH_ID)
-      expect(mockTerminalInput).toHaveBeenCalledWith('scratch-ses-1', '\x0c')
-      delete (globalThis as unknown as Record<string, unknown>).electronAPI
+      expect(input).toHaveBeenCalledWith('scratch-ses-1', '\x0c')
     })
 
-    it('Cmd+T creates scratch session when scratchProjectId is set and activeProjectId is null', async () => {
-      setupMocks({ activeProjectId: null })
-      const useKeyboardShortcuts = await importHook()
-      renderHook(() => useKeyboardShortcuts({ scratchProjectId: SCRATCH_ID }))
+    it('Cmd+T creates scratch session when scratchProjectId is set and activeProjectId is null', () => {
+      renderHook(() => useKeyboardShortcuts(scratch))
       pressKey('t', { metaKey: true })
-      expect(mockCreateSession).toHaveBeenCalledWith(
-        SCRATCH_ID,
+      expect(createSession).toHaveBeenCalledWith(
+        SCRATCH_PROJECT_ID,
         'human',
         'Terminal',
-        expect.any(String),
+        '/ws1',
         5000
       )
     })
 
-    it('Cmd+D splits the scratch terminal when that is what is on screen', async () => {
+    it('Cmd+D splits the scratch terminal when that is what is on screen', () => {
       // This used to be gated on `activeProjectId` alone and do nothing at
       // all here — silently, with the palette entries absent too, which reads
       // as the feature having been removed rather than as not applying. Cmd+T
       // and Cmd+W already treat scratch as an ordinary project; this now does
       // the same.
-      setupMocks({ activeProjectId: null })
-      const useKeyboardShortcuts = await importHook()
-      renderHook(() => useKeyboardShortcuts({ scratchProjectId: SCRATCH_ID }))
+      renderHook(() => useKeyboardShortcuts(scratch))
       pressKey('d', { metaKey: true })
-      expect(mockSplitSession).toHaveBeenCalledWith(
-        SCRATCH_ID,
-        'vertical',
-        expect.any(String),
-        5000
-      )
+      expect(splitSession).toHaveBeenCalledWith(SCRATCH_PROJECT_ID, 'vertical', '/ws1', 5000)
     })
 
-    it('Cmd+Shift+D splits the scratch terminal horizontally', async () => {
-      setupMocks({ activeProjectId: null })
-      const useKeyboardShortcuts = await importHook()
-      renderHook(() => useKeyboardShortcuts({ scratchProjectId: SCRATCH_ID }))
+    it('Cmd+Shift+D splits the scratch terminal horizontally', () => {
+      renderHook(() => useKeyboardShortcuts(scratch))
       pressKey('d', { metaKey: true, shiftKey: true })
-      expect(mockSplitSession).toHaveBeenCalledWith(
-        SCRATCH_ID,
-        'horizontal',
-        expect.any(String),
-        5000
-      )
+      expect(splitSession).toHaveBeenCalledWith(SCRATCH_PROJECT_ID, 'horizontal', '/ws1', 5000)
     })
 
     it('Cmd+W closes scratch tab when scratchProjectId is set', async () => {
-      mockGetPaneLayout.mockReturnValue(null)
-      mockGetActiveSessionForProject.mockReturnValue('scratch-ses-1')
-      setupMocks({ activeProjectId: null })
-      const useKeyboardShortcuts = await importHook()
-      renderHook(() => useKeyboardShortcuts({ scratchProjectId: SCRATCH_ID }))
+      withTabs(SCRATCH_PROJECT_ID, ['scratch-ses-1'], 'scratch-ses-1')
+      renderHook(() => useKeyboardShortcuts(scratch))
       pressKey('w', { metaKey: true })
-      expect(mockCloseSession).toHaveBeenCalledWith('scratch-ses-1')
+      await waitFor(() => expect(sessions().sessions.has('scratch-ses-1')).toBe(false))
     })
 
-    it('Cmd+ArrowRight cycles scratch tabs when scratchProjectId is set', async () => {
-      const sessions = [{ id: 'ss1' }, { id: 'ss2' }]
-      mockGetSessionsForProject.mockReturnValue(sessions)
-      mockGetActiveSessionForProject.mockReturnValue('ss1')
-      setupMocks({ activeProjectId: null })
-      const useKeyboardShortcuts = await importHook()
-      renderHook(() => useKeyboardShortcuts({ scratchProjectId: SCRATCH_ID }))
+    it('Cmd+ArrowRight cycles scratch tabs when scratchProjectId is set', () => {
+      withTabs(SCRATCH_PROJECT_ID, ['ss1', 'ss2'], 'ss1')
+      renderHook(() => useKeyboardShortcuts(scratch))
       pressKey('ArrowRight', { metaKey: true })
-      expect(mockSetActiveSessionForProject).toHaveBeenCalledWith(SCRATCH_ID, 'ss2')
+      expect(sessions().getActiveSessionForProject(SCRATCH_PROJECT_ID)).toBe('ss2')
     })
 
-    it('regular project shortcuts still work when both activeProjectId and scratchProjectId are null', async () => {
-      setupMocks({ activeProjectId: null })
-      const useKeyboardShortcuts = await importHook()
+    it('regular project shortcuts still work when both activeProjectId and scratchProjectId are null', () => {
       renderHook(() => useKeyboardShortcuts({ scratchProjectId: null }))
       pressKey('t', { metaKey: true })
-      expect(mockCreateSession).not.toHaveBeenCalled()
+      expect(createSession).not.toHaveBeenCalled()
     })
 
-    it('Cmd+T calls onNewTab when provided instead of creating a session directly', async () => {
-      const mockOnNewTab = vi.fn()
-      setupMocks({ activeProjectId: 'proj-1' })
-      const useKeyboardShortcuts = await importHook()
-      renderHook(() => useKeyboardShortcuts({ scratchProjectId: null, onNewTab: mockOnNewTab }))
+    it('Cmd+T calls onNewTab when provided instead of creating a session directly', () => {
+      const onNewTab = vi.fn()
+      setup({ activeProjectId: 'proj-1' })
+      renderHook(() => useKeyboardShortcuts({ scratchProjectId: null, onNewTab }))
       pressKey('t', { metaKey: true })
-      expect(mockOnNewTab).toHaveBeenCalled()
-      expect(mockCreateSession).not.toHaveBeenCalled()
+      expect(onNewTab).toHaveBeenCalled()
+      expect(createSession).not.toHaveBeenCalled()
     })
   })
 })
@@ -540,85 +391,83 @@ describe('session navigation shortcuts (FR-032)', () => {
   const mkSession = (id: string, projectId: string, patch: Partial<TerminalSession> = {}) =>
     terminalSessionOf({ id, projectId, type: 'agent', ...patch })
 
+  function withSessions(...list: TerminalSession[]): void {
+    useSessionStore.setState({ sessions: new Map(list.map((s) => [s.id, s])) })
+    useSessionStore.setState({
+      projectViews: new Map([['p1', { terminalCounter: 0, activeSessionId: 'a' }]]),
+    })
+  }
+
   beforeEach(() => {
-    storeSessions = new Map([
-      ['a', mkSession('a', 'p1', { lastAttendedAt: 300 })],
-      ['b', mkSession('b', 'p2', { lastAttendedAt: 200 })],
-      ['c', mkSession('c', 'p3', { lastAttendedAt: 100, bellCount: 1 })],
-    ])
-    setupMocks({ activeProjectId: 'p1' })
-    mockGetActiveSessionForProject.mockReturnValue('a')
+    setup({ activeProjectId: 'p1' })
+    withSessions(
+      mkSession('a', 'p1', { lastAttendedAt: 300 }),
+      mkSession('b', 'p2', { lastAttendedAt: 200 }),
+      mkSession('c', 'p3', { lastAttendedAt: 100, bellCount: 1 })
+    )
   })
 
-  it('Cmd+] moves to the next most-recently-attended session, across projects', async () => {
-    const useKeyboardShortcuts = await importHook()
+  it('Cmd+] moves to the next most-recently-attended session, across projects', () => {
     renderHook(() => useKeyboardShortcuts({}))
     pressKey(']', { metaKey: true })
-    expect(mockSetActiveSessionForProject).toHaveBeenCalledWith('p2', 'b')
+    expect(sessions().getActiveSessionForProject('p2')).toBe('b')
   })
 
-  it('Cmd+[ moves the other way and wraps around', async () => {
-    const useKeyboardShortcuts = await importHook()
+  it('Cmd+[ moves the other way and wraps around', () => {
     renderHook(() => useKeyboardShortcuts({}))
     pressKey('[', { metaKey: true })
-    expect(mockSetActiveSessionForProject).toHaveBeenCalledWith('p3', 'c')
+    expect(sessions().getActiveSessionForProject('p3')).toBe('c')
   })
 
-  it('keeps activeProjectId in step so the project tab bar does not lose its footing', async () => {
-    const useKeyboardShortcuts = await importHook()
+  it('keeps activeProjectId in step so the project tab bar does not lose its footing', () => {
     renderHook(() => useKeyboardShortcuts({}))
     pressKey(']', { metaKey: true })
-    expect(mockSetActiveProject).toHaveBeenCalledWith('p2')
+    expect(workspaces().activeProjectId).toBe('p2')
   })
 
-  it('does nothing when there is only one session to cycle', async () => {
-    storeSessions = new Map([['a', mkSession('a', 'p1', { lastAttendedAt: 1 })]])
-    setupMocks({ activeProjectId: 'p1' })
-    const useKeyboardShortcuts = await importHook()
+  it('does nothing when there is only one session to cycle', () => {
+    withSessions(mkSession('a', 'p1', { lastAttendedAt: 1 }))
     renderHook(() => useKeyboardShortcuts({}))
     pressKey(']', { metaKey: true })
-    expect(mockSetActiveSessionForProject).not.toHaveBeenCalled()
+    expect(workspaces().activeProjectId).toBe('p1')
+    expect(sessions().focusRequest).toBeNull()
   })
 
-  it('Cmd+Shift+A jumps to a session waiting on you', async () => {
-    const useKeyboardShortcuts = await importHook()
+  it('Cmd+Shift+A jumps to a session waiting on you', () => {
     renderHook(() => useKeyboardShortcuts({}))
     pressKey('a', { metaKey: true, shiftKey: true })
-    expect(mockSetActiveSessionForProject).toHaveBeenCalledWith('p3', 'c')
+    expect(sessions().getActiveSessionForProject('p3')).toBe('c')
+    expect(workspaces().activeProjectId).toBe('p3')
   })
 
-  it('Cmd+Shift+A does nothing when no session is waiting', async () => {
-    storeSessions = new Map([['a', mkSession('a', 'p1')]])
-    setupMocks({ activeProjectId: 'p1' })
-    const useKeyboardShortcuts = await importHook()
+  it('Cmd+Shift+A does nothing when no session is waiting', () => {
+    withSessions(mkSession('a', 'p1'))
     renderHook(() => useKeyboardShortcuts({}))
     pressKey('a', { metaKey: true, shiftKey: true })
-    expect(mockSetActiveSessionForProject).not.toHaveBeenCalled()
+    expect(workspaces().activeProjectId).toBe('p1')
+    expect(sessions().focusRequest).toBeNull()
   })
 
-  it('Cmd+I opens the note editor', async () => {
-    const useKeyboardShortcuts = await importHook()
+  it('Cmd+I opens the note editor', () => {
     const onEditSessionNote = vi.fn()
     renderHook(() => useKeyboardShortcuts({ onEditSessionNote }))
     pressKey('i', { metaKey: true })
     expect(onEditSessionNote).toHaveBeenCalledOnce()
   })
 
-  it('never binds Escape — it belongs to the terminal (FR-033)', async () => {
-    const useKeyboardShortcuts = await importHook()
+  it('never binds Escape — it belongs to the terminal (FR-033)', () => {
     renderHook(() => useKeyboardShortcuts({ onEditSessionNote: vi.fn() }))
     const event = pressKey('Escape', { metaKey: true })
     expect(event.defaultPrevented).toBe(false)
   })
 
-  it('leaves the new bindings alone while typing in a text field', async () => {
-    const useKeyboardShortcuts = await importHook()
+  it('leaves the new bindings alone while typing in a text field', () => {
     renderHook(() => useKeyboardShortcuts({}))
-    const input = document.createElement('input')
-    document.body.appendChild(input)
-    input.focus()
-    input.dispatchEvent(new KeyboardEvent('keydown', { key: ']', metaKey: true, bubbles: true }))
-    expect(mockSetActiveSessionForProject).not.toHaveBeenCalled()
-    input.remove()
+    const field = document.createElement('input')
+    document.body.appendChild(field)
+    field.focus()
+    field.dispatchEvent(new KeyboardEvent('keydown', { key: ']', metaKey: true, bubbles: true }))
+    expect(workspaces().activeProjectId).toBe('p1')
+    field.remove()
   })
 })

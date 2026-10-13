@@ -212,7 +212,7 @@ export default defineConfig([
     // lines (blank lines and comments aside), complexity 10 and three
     // parameters. Pass more than three values as one named object. Add an
     // extension here once all of its functions, tests included, meet them.
-    files: ['extensions/{task-vault,notepad,remote-control}/**/*.{ts,tsx}'],
+    files: ['extensions/{task-vault,notepad,remote-control,git-integration}/**/*.{ts,tsx}'],
     rules: {
       'max-lines-per-function': ['error', { max: 30, skipBlankLines: true, skipComments: true }],
       complexity: ['error', 10],

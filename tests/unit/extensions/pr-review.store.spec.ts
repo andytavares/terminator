@@ -1,87 +1,67 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { usePrReviewStore } from '../../../extensions/git-integration/src/stores/pr-review.store'
-import type {
-  ReviewQueuePR,
-  PrReviewDetail,
-  ReviewSession,
+import {
+  PrReviewDetailSchema,
+  ReviewSessionSchema,
+  ThreadSchema,
+  type PrReviewDetail,
+  type RiskScore,
 } from '../../../extensions/git-integration/src/schemas/pr-review.schema'
+import { reviewQueuePr } from '../../../extensions/git-integration/tests/unit/support/review-queue-pr'
 
 // persistSession checks `typeof window === 'undefined'` and returns early in Node
 // so all state-mutation tests work cleanly without a DOM mock.
 
-const makePR = (number: number): ReviewQueuePR => ({
-  number,
-  title: `PR ${number}`,
-  author: 'alice',
-  authorAvatarUrl: '',
-  openedAt: '2024-01-01T00:00:00Z',
-  headRefName: `feature/${number}`,
-  baseRefName: 'main',
-  isDraft: false,
-  ciStatus: 'passing',
-  fileCount: 2,
-  additions: 10,
-  deletions: 5,
-  estimatedMinutes: 5,
-  riskLevel: 'low',
-  signalDots: {
-    tests: 'pass',
-    coverage: 'pass',
-    ci: 'pass',
-    lint: 'pass',
-    churn: 'pass',
-    blast: 'pass',
-  },
-  sessionStatus: 'not-started',
-})
+const makePR = reviewQueuePr
 
-const makeDetail = (): PrReviewDetail => ({
-  number: 42,
-  title: 'Fix: memory leak',
-  body: 'Description here',
-  author: 'alice',
-  authorAvatarUrl: '',
-  openedAt: '2024-01-01T00:00:00Z',
-  headRefName: 'fix/memory-leak',
-  baseRefName: 'main',
-  headSHA: 'abc1234',
-  ciStatus: 'passing',
-  chapters: [
-    {
-      id: 'ch-1',
-      name: 'Core Changes',
-      files: [
-        {
-          path: 'src/app.ts',
-          changeType: 'modified',
-          additions: 10,
-          deletions: 5,
-          isBinary: false,
-          tier: 1,
-          whyHere: 'core logic',
-          riskScore: {
-            level: 'medium',
-            composite: 50,
-            metrics: {
-              changeSize: 100,
-              churn90d: null,
-              blastRadius: null,
-              testFilePresent: true,
-              complexityDelta: null,
-              patchCoverage: null,
+const makeDetail = (): PrReviewDetail =>
+  PrReviewDetailSchema.parse({
+    number: 42,
+    title: 'Fix: memory leak',
+    body: 'Description here',
+    author: 'alice',
+    authorAvatarUrl: '',
+    openedAt: '2024-01-01T00:00:00Z',
+    headRefName: 'fix/memory-leak',
+    baseRefName: 'main',
+    headSHA: 'abc1234',
+    ciStatus: 'passing',
+    chapters: [
+      {
+        id: 'ch-1',
+        name: 'Core Changes',
+        files: [
+          {
+            path: 'src/app.ts',
+            changeType: 'modified',
+            additions: 10,
+            deletions: 5,
+            isBinary: false,
+            tier: 1,
+            whyHere: 'core logic',
+            riskScore: {
+              level: 'medium',
+              composite: 50,
+              metrics: {
+                changeSize: 100,
+                churn90d: null,
+                blastRadius: null,
+                testFilePresent: true,
+                complexityDelta: null,
+                patchCoverage: null,
+              },
+              dominantDriver: 'changeSize',
+              topImporters: [],
+              importerCount: 0,
             },
-            dominantDriver: 'changeSize',
-            topImporters: [],
-            importerCount: 0,
+            estimatedMinutes: 5,
           },
-          estimatedMinutes: 5,
-        },
-      ],
-      estimatedMinutes: 5,
-      status: 'not-started',
-    },
-  ],
-})
+        ],
+        estimatedMinutes: 5,
+        status: 'not-started',
+      },
+    ],
+  })
 
 function resetStore() {
   usePrReviewStore.setState({
@@ -178,26 +158,39 @@ describe('usePrReviewStore', () => {
 
   describe('viewed files tracking', () => {
     it('markFileViewed adds file to viewedFiles set', () => {
-      usePrReviewStore.getState().markFileViewed('/repo', 42, 'abc1234', 'src/app.ts')
+      usePrReviewStore
+        .getState()
+        .markFileViewed({ repoRoot: '/repo', prNumber: 42, headSHA: 'abc1234' }, 'src/app.ts')
       expect(usePrReviewStore.getState().viewedFiles.has('src/app.ts')).toBe(true)
     })
 
     it('markFileViewed is idempotent', () => {
-      usePrReviewStore.getState().markFileViewed('/repo', 42, 'abc1234', 'src/app.ts')
-      usePrReviewStore.getState().markFileViewed('/repo', 42, 'abc1234', 'src/app.ts')
+      usePrReviewStore
+        .getState()
+        .markFileViewed({ repoRoot: '/repo', prNumber: 42, headSHA: 'abc1234' }, 'src/app.ts')
+      usePrReviewStore
+        .getState()
+        .markFileViewed({ repoRoot: '/repo', prNumber: 42, headSHA: 'abc1234' }, 'src/app.ts')
       expect(usePrReviewStore.getState().viewedFiles.size).toBe(1)
     })
 
     it('unmarkFileViewed removes file from viewedFiles', () => {
       usePrReviewStore.setState({ viewedFiles: new Set(['src/app.ts']) })
-      usePrReviewStore.getState().unmarkFileViewed('/repo', 42, 'abc1234', 'src/app.ts')
+      usePrReviewStore
+        .getState()
+        .unmarkFileViewed({ repoRoot: '/repo', prNumber: 42, headSHA: 'abc1234' }, 'src/app.ts')
       expect(usePrReviewStore.getState().viewedFiles.has('src/app.ts')).toBe(false)
     })
   })
 
   describe('file reordering', () => {
     it('reorderFiles updates fileOrderOverrides', () => {
-      usePrReviewStore.getState().reorderFiles('ch-1', ['src/b.ts', 'src/a.ts'], '/repo', 42, 'abc')
+      usePrReviewStore
+        .getState()
+        .reorderFiles({ repoRoot: '/repo', prNumber: 42, headSHA: 'abc' }, 'ch-1', [
+          'src/b.ts',
+          'src/a.ts',
+        ])
       expect(usePrReviewStore.getState().fileOrderOverrides['ch-1']).toEqual([
         'src/b.ts',
         'src/a.ts',
@@ -206,7 +199,9 @@ describe('usePrReviewStore', () => {
 
     it('reorderFiles preserves overrides for other chapters', () => {
       usePrReviewStore.setState({ fileOrderOverrides: { 'ch-2': ['x.ts'] } })
-      usePrReviewStore.getState().reorderFiles('ch-1', ['src/b.ts'], '/repo', 42, 'abc')
+      usePrReviewStore
+        .getState()
+        .reorderFiles({ repoRoot: '/repo', prNumber: 42, headSHA: 'abc' }, 'ch-1', ['src/b.ts'])
       expect(usePrReviewStore.getState().fileOrderOverrides['ch-2']).toEqual(['x.ts'])
     })
   })
@@ -224,13 +219,17 @@ describe('usePrReviewStore', () => {
     })
 
     it('setPaused stores timestamp', () => {
-      usePrReviewStore.getState().setPaused('/repo', 42, 'abc', '2024-01-01T12:00:00Z')
+      usePrReviewStore
+        .getState()
+        .setPaused({ repoRoot: '/repo', prNumber: 42, headSHA: 'abc' }, '2024-01-01T12:00:00Z')
       expect(usePrReviewStore.getState().pausedAt).toBe('2024-01-01T12:00:00Z')
     })
 
     it('setPaused clears with null', () => {
       usePrReviewStore.setState({ pausedAt: '2024-01-01T12:00:00Z' })
-      usePrReviewStore.getState().setPaused('/repo', 42, 'abc', null)
+      usePrReviewStore
+        .getState()
+        .setPaused({ repoRoot: '/repo', prNumber: 42, headSHA: 'abc' }, null)
       expect(usePrReviewStore.getState().pausedAt).toBeNull()
     })
   })
@@ -238,16 +237,16 @@ describe('usePrReviewStore', () => {
   describe('threads', () => {
     it('setThreads stores thread list by path', () => {
       const threads = [
-        {
+        ThreadSchema.parse({
           id: 't-1',
           path: 'src/app.ts',
           line: 42,
           startLine: null,
-          side: 'RIGHT' as const,
+          side: 'RIGHT',
           outdated: false,
           comments: [],
           collapsed: false,
-        },
+        }),
       ]
       usePrReviewStore.getState().setThreads('src/app.ts', threads)
       expect(usePrReviewStore.getState().threads['src/app.ts']).toEqual(threads)
@@ -256,16 +255,16 @@ describe('usePrReviewStore', () => {
     it('setThreads overwrites existing threads for the same path', () => {
       usePrReviewStore.setState({ threads: { 'src/app.ts': [] } })
       const threads = [
-        {
+        ThreadSchema.parse({
           id: 't-1',
           path: 'src/app.ts',
           line: 10,
           startLine: null,
-          side: 'RIGHT' as const,
+          side: 'RIGHT',
           outdated: false,
           comments: [],
           collapsed: false,
-        },
+        }),
       ]
       usePrReviewStore.getState().setThreads('src/app.ts', threads)
       expect(usePrReviewStore.getState().threads['src/app.ts']).toHaveLength(1)
@@ -275,8 +274,8 @@ describe('usePrReviewStore', () => {
   describe('updateFileRiskScore', () => {
     it('updates risk score for file in specified chapter', () => {
       usePrReviewStore.setState({ activePr: makeDetail() })
-      const newRisk = {
-        level: 'high' as const,
+      const newRisk: RiskScore = {
+        level: 'high',
         composite: 90,
         metrics: {
           changeSize: 200,
@@ -297,15 +296,9 @@ describe('usePrReviewStore', () => {
     })
 
     it('is a no-op when activePr is null', () => {
-      expect(() =>
-        usePrReviewStore
-          .getState()
-          .updateFileRiskScore(
-            'ch-1',
-            'src/app.ts',
-            {} as unknown as ReturnType<typeof usePrReviewStore>
-          )
-      ).not.toThrow()
+      const risk = makeDetail().chapters[0].files[0].riskScore
+      usePrReviewStore.getState().updateFileRiskScore('ch-1', 'src/app.ts', risk)
+      expect(usePrReviewStore.getState().activePr).toBeNull()
     })
   })
 
@@ -356,7 +349,7 @@ describe('usePrReviewStore', () => {
 
   describe('initSession', () => {
     it('restores session state from ReviewSession object', () => {
-      const session: ReviewSession = {
+      const session = ReviewSessionSchema.parse({
         repoRoot: '/repo',
         prNumber: 42,
         headSHA: 'abc',
@@ -367,7 +360,7 @@ describe('usePrReviewStore', () => {
         scrollPosition: 500,
         pausedAt: null,
         lastAccessedAt: '2024-01-01T00:00:00Z',
-      }
+      })
       usePrReviewStore.getState().initSession(session)
       const state = usePrReviewStore.getState()
       expect(state.currentChapterId).toBe('ch-2')
@@ -376,23 +369,6 @@ describe('usePrReviewStore', () => {
       expect(state.viewedFiles.has('src/util.ts')).toBe(true)
       expect(state.fileOrderOverrides['ch-1']).toEqual(['src/b.ts', 'src/a.ts'])
       expect(state.scrollPosition).toBe(500)
-    })
-
-    it('converts viewedFiles array to Set', () => {
-      const session: ReviewSession = {
-        repoRoot: '/repo',
-        prNumber: 1,
-        headSHA: 'abc',
-        currentChapterId: null,
-        currentFilePath: null,
-        viewedFiles: ['a.ts', 'b.ts'],
-        fileOrderOverrides: {},
-        scrollPosition: null,
-        pausedAt: null,
-        lastAccessedAt: '2024-01-01T00:00:00Z',
-      }
-      usePrReviewStore.getState().initSession(session)
-      expect(usePrReviewStore.getState().viewedFiles).toBeInstanceOf(Set)
     })
   })
 
@@ -431,12 +407,13 @@ describe('usePrReviewStore', () => {
       usePrReviewStore.getState().patchFileComplexity('ch-1', 'src/app.ts', 10)
       const file = usePrReviewStore.getState().activePr?.chapters[0].files[0]
       expect(file?.riskScore.metrics.complexityDelta).toBe(10)
+      // 50, plus 10/15 of complexity's 8 points, rounded.
+      expect(file?.riskScore).toMatchObject({ composite: 55, level: 'medium' })
     })
 
     it('is a no-op when activePr is null', () => {
-      expect(() =>
-        usePrReviewStore.getState().patchFileComplexity('ch-1', 'src/app.ts', 5)
-      ).not.toThrow()
+      usePrReviewStore.getState().patchFileComplexity('ch-1', 'src/app.ts', 5)
+      expect(usePrReviewStore.getState().activePr).toBeNull()
     })
 
     it('does not modify files in other chapters', () => {

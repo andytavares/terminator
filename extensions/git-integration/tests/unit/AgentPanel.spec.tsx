@@ -164,7 +164,9 @@ describe('AgentPanel', () => {
       expect(mockStart).toHaveBeenCalledWith(expect.objectContaining({ request: 'explain' }))
     })
   })
+})
 
+describe('AgentPanel — shows the running state and cancels the run', () => {
   it('shows the running state and cancels the run', () => {
     const run = makeRun({ status: 'running', activity: [] })
     setStoreState({ agentPanelScope: linesScope, agentRuns: [run] })
@@ -185,7 +187,9 @@ describe('AgentPanel', () => {
     expect(screen.getByText('Risk scored twice per file')).toBeTruthy()
     expect(screen.getByText('usePrReview.ts:317')).toBeTruthy()
   })
+})
 
+describe('AgentPanel — renders a finding body as markdown, so code reads as code', () => {
   it('renders a finding body as markdown, so code reads as code', () => {
     const run = makeRun({
       status: 'done',
@@ -197,7 +201,9 @@ describe('AgentPanel', () => {
     expect(code?.textContent).toBe('computeRiskScore')
     expect(container.querySelector('.ap-fnd-body')?.textContent).not.toContain('`')
   })
+})
 
+describe('AgentPanel — posts a finding as a comment with fromFindingId and the finding line', () => {
   it('posts a finding as a comment with fromFindingId and the finding line', () => {
     const run = makeRun({ status: 'done', findings: [finding1, finding2] })
     setStoreState({ agentPanelScope: linesScope, agentRuns: [run] })
@@ -214,7 +220,9 @@ describe('AgentPanel', () => {
       })
     )
   })
+})
 
+describe('AgentPanel — dismisses a finding and hides its card', () => {
   it('dismisses a finding and hides its card', () => {
     const run = makeRun({ status: 'done', findings: [finding1, finding2] })
     setStoreState({ agentPanelScope: linesScope, agentRuns: [run] })

@@ -49,10 +49,9 @@ import { MergeFlowView } from '../../src/components/merge-flow/MergeFlowView'
 const mockStartSession = vi.fn()
 const mockStoreClearSession = vi.fn()
 
-beforeEach(() => {
-  vi.clearAllMocks()
-  mockRestoreSession.mockResolvedValue({ session: null })
-  mockListConflicts.mockResolvedValue({
+/** A fresh session with one unresolved conflict in src/foo.ts. */
+function oneConflictSession() {
+  return {
     repoRoot: '/repo',
     files: [
       {
@@ -69,7 +68,13 @@ beforeEach(() => {
     totalResolved: 0,
     isRebase: false,
     startedAt: '',
-  })
+  }
+}
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  mockRestoreSession.mockResolvedValue({ session: null })
+  mockListConflicts.mockResolvedValue(oneConflictSession())
   mockPersistSession.mockResolvedValue({ success: true })
   mockStoreState = {
     session: null,
@@ -91,7 +96,9 @@ describe('MergeFlowView', () => {
     render(<MergeFlowView repoRoot="/repo" onExit={vi.fn()} />)
     expect(screen.getByText(/loading/i)).toBeTruthy()
   })
+})
 
+describe('MergeFlowView — renders ConflictHub when session has files and no file selected', () => {
   it('renders ConflictHub when session has files and no file selected', async () => {
     const session = {
       repoRoot: '/repo',
@@ -115,7 +122,9 @@ describe('MergeFlowView', () => {
     render(<MergeFlowView repoRoot="/repo" onExit={vi.fn()} />)
     expect(screen.getByTestId('conflict-hub')).toBeTruthy()
   })
+})
 
+describe('MergeFlowView — renders CompletionScreen when restored session has all conflicts resolved', () => {
   it('renders CompletionScreen when restored session has all conflicts resolved', async () => {
     const session = {
       repoRoot: '/repo',
@@ -130,7 +139,9 @@ describe('MergeFlowView', () => {
     render(<MergeFlowView repoRoot="/repo" onExit={vi.fn()} />)
     await waitFor(() => expect(screen.getByTestId('completion-screen')).toBeTruthy())
   })
+})
 
+describe('MergeFlowView — calls onExit when listConflicts returns no files', () => {
   it('calls onExit when listConflicts returns no files', async () => {
     mockListConflicts.mockResolvedValueOnce({
       repoRoot: '/repo',

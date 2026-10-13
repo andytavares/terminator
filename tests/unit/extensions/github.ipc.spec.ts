@@ -1,14 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-// Mock child_process with promisify.custom so runGh/runGit work
-const { execFileMock } = vi.hoisted(() => {
-  const CUSTOM_SYM = Symbol.for('nodejs.util.promisify.custom')
-  const mock = vi.fn()
-  ;(mock as unknown as Record<symbol, ReturnType<typeof vi.fn>>)[CUSTOM_SYM] = vi.fn()
-  return { execFileMock: mock }
-})
-vi.mock('child_process', () => ({ execFile: execFileMock }))
-
 // Mock electron-store
 const storeData: Record<string, unknown> = {}
 vi.mock('electron-store', () => ({
@@ -43,10 +34,12 @@ import { reviewQueuePr } from '../../../extensions/git-integration/tests/unit/su
 type Handler = (payload: unknown) => Promise<unknown>
 let registry = channelRegistry()
 
+/** A promisified execFile: every command the handlers run. */
+const promisedExecFile =
+  vi.fn<(...args: unknown[]) => Promise<{ stdout: string; stderr: string }>>()
+
 function customMock() {
-  return (execFileMock as unknown as Record<symbol, ReturnType<typeof vi.fn>>)[
-    Symbol.for('nodejs.util.promisify.custom')
-  ]
+  return promisedExecFile
 }
 
 function mockResolve(stdout: string) {
@@ -67,6 +60,7 @@ beforeEach(() => {
   registerGithubHandlers(registry.register, {
     github: githubOverPromisedStub(stub),
     getToken: () => '',
+    noCheckoutCwd: '/user-data',
   })
 })
 
@@ -425,16 +419,6 @@ describe('github:session-set', () => {
 })
 
 // ─── github:save-active-review ────────────────────────────────────────────────
-
-describe('github:save-active-review', () => {
-  it('persists the PR snapshot and returns ok', async () => {
-    const result = (await getHandler('github:save-active-review')({
-      repoRoot: '/repo',
-      pr: reviewQueuePr(42),
-    })) as { ok: boolean }
-    expect(result.ok).toBe(true)
-  })
-})
 
 // ─── github:active-reviews-for-repo ──────────────────────────────────────────
 

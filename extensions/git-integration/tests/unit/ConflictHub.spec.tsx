@@ -75,7 +75,9 @@ describe('ConflictHub', () => {
     render(<ConflictHub onSelectFile={vi.fn()} />)
     expect(screen.getByText(/Alice added logging/i)).toBeTruthy()
   })
+})
 
+describe('ConflictHub — shows author names', () => {
   it('shows author names', () => {
     render(<ConflictHub onSelectFile={vi.fn()} />)
     expect(screen.getAllByText(/Alice/).length).toBeGreaterThan(0)
@@ -100,7 +102,9 @@ describe('ConflictHub', () => {
     render(<ConflictHub onSelectFile={vi.fn()} />)
     expect(screen.getByText(/rebase/i)).toBeTruthy()
   })
+})
 
+describe('ConflictHub — renders null when session is null', () => {
   it('renders null when session is null', () => {
     mockStoreState = { session: null, setActiveFile: mockSetActiveFile }
     const { container } = render(<ConflictHub onSelectFile={vi.fn()} />)

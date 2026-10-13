@@ -21,51 +21,79 @@ export function freshGlobalStorage(): string {
   return join(userData, 'extensions', 'terminator.git-integration')
 }
 
-/**
- * Activates git-integration against a stand-in API and returns every channel
- * it registered, with the shell, gh and the log's warn as spies.
- */
-export function activateCapturingChannels(
-  workspace?: FakeWorkspace,
-  globalStorage = freshGlobalStorage()
-) {
-  const channels: RegisteredChannel[] = []
-  const disposable = { dispose: () => {} }
-  const exec = vi.fn()
-  const githubApi = vi.fn()
-  const warn = vi.fn()
-  const api = {
-    ipc: {
-      registerHandler: (spec: ChannelSpec, opts?: { remoteAccessible?: boolean }) => {
-        channels.push({ spec, remoteAccessible: opts?.remoteAccessible === true })
-        return disposable
-      },
+const disposable = { dispose: () => {} }
+
+interface ApiSpies {
+  exec: ReturnType<typeof vi.fn>
+  githubApi: ReturnType<typeof vi.fn>
+  warn: ReturnType<typeof vi.fn>
+}
+
+/** Where the stand-in API says the workspace and this extension's own folder are. */
+interface ApiPlaces {
+  workspace?: FakeWorkspace
+  globalStorage: string
+}
+
+/** An ipc whose registerHandler collects into `channels`. */
+function capturingIpc(channels: RegisteredChannel[]) {
+  return {
+    registerHandler: (spec: ChannelSpec, opts?: { remoteAccessible?: boolean }) => {
+      channels.push({ spec, remoteAccessible: opts?.remoteAccessible === true })
+      return disposable
     },
+  }
+}
+
+/** A stand-in ExtensionAPI whose registerHandler collects into `channels`. */
+function capturingApi(
+  channels: RegisteredChannel[],
+  spies: ApiSpies,
+  places: ApiPlaces
+): ExtensionAPI {
+  return {
+    ipc: capturingIpc(channels),
     settings: {
       get: () => undefined,
       register: () => disposable,
       isBranchExcluded: async () => false,
     },
-    paths: { app: '/app', globalStorage },
-    log: { debug: () => {}, info: () => {}, warn, error: () => {} },
+    paths: { app: '/app', globalStorage: places.globalStorage },
+    log: { debug: () => {}, info: () => {}, warn: spies.warn, error: () => {} },
     commands: { register: () => disposable },
     window: { broadcast: () => {}, openAuxiliary: () => {} },
     nativeMenu: { addViewMenuItem: () => disposable },
     notifications: { showToast: () => {}, createNotification: () => disposable },
-    workspace: {
-      list: () => (workspace ? [{ id: 'w1', name: 'w', folderPath: workspace.folderPath }] : []),
-      listProjects: () =>
-        (workspace?.worktreePaths ?? []).map((worktreePath, i) => ({
-          id: `p${i}`,
-          workspaceId: 'w1',
-          name: `p${i}`,
-          worktreePath,
-        })),
+    workspace: fakeWorkspaceApi(places.workspace),
+    shell: { exec: spies.exec },
+    github: {
+      api: spies.githubApi,
+      pullRequests: { view: spies.githubApi, list: spies.githubApi },
     },
-    shell: { exec },
-    github: { api: githubApi, pullRequests: { view: githubApi, list: githubApi } },
   } as unknown as ExtensionAPI
-  activate(api)
+}
+
+function fakeWorkspaceApi(workspace?: FakeWorkspace) {
+  return {
+    list: () => (workspace ? [{ id: 'w1', name: 'w', folderPath: workspace.folderPath }] : []),
+    listProjects: () =>
+      (workspace?.worktreePaths ?? []).map((worktreePath, i) => ({
+        id: `p${i}`,
+        workspaceId: 'w1',
+        name: `p${i}`,
+        worktreePath,
+      })),
+  }
+}
+
+/** Activates git-integration on a stand-in API; returns its channels and the shell, gh and log warn spies. */
+export function activateCapturingChannels(
+  workspace?: FakeWorkspace,
+  globalStorage = freshGlobalStorage()
+) {
+  const channels: RegisteredChannel[] = []
+  const spies = { exec: vi.fn(), githubApi: vi.fn(), warn: vi.fn() }
+  activate(capturingApi(channels, spies, { workspace, globalStorage }))
   deactivate()
-  return { channels, exec, githubApi, warn }
+  return { channels, ...spies }
 }

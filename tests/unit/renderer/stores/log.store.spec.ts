@@ -30,8 +30,8 @@ describe('useLogStore', () => {
     it('includes a timestamp string', () => {
       useLogStore.getState().addEntry('error', 'oops')
       const { entries } = useLogStore.getState()
-      expect(typeof entries[0].timestamp).toBe('string')
-      expect(entries[0].timestamp.length).toBeGreaterThan(0)
+      // A 24-hour wall-clock time, as the log window prints it.
+      expect(entries[0].timestamp).toMatch(/^\d{2}:\d{2}:\d{2}$/)
     })
 
     it('caps log at 1000 entries, dropping oldest', () => {

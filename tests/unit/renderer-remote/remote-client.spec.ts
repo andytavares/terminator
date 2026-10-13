@@ -35,6 +35,12 @@ describe('createTerminal', () => {
       '/api/terminals',
       expect.objectContaining({ method: 'POST' })
     )
+    const [, init] = mockFetch.mock.calls[0] as [string, RequestInit]
+    expect(JSON.parse(init.body as string)).toEqual({
+      cwd: '/tmp',
+      type: 'human',
+      tabTitle: 'Test',
+    })
   })
 
   it('throws when response is not ok', async () => {
@@ -65,6 +71,8 @@ describe('resizeTerminal', () => {
       '/api/terminals/s1/resize',
       expect.objectContaining({ method: 'POST' })
     )
+    const [, init] = mockFetch.mock.calls[0] as [string, RequestInit]
+    expect(JSON.parse(init.body as string)).toEqual({ cols: 120, rows: 40 })
   })
 })
 

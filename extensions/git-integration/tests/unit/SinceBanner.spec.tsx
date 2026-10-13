@@ -23,7 +23,9 @@ describe('SinceBanner', () => {
     expect(screen.getByText(/51 still viewed/)).toBeTruthy()
     expect(screen.getByText(/4 files changed/)).toBeTruthy()
   })
+})
 
+describe('SinceBanner — shows history-rewritten text instead of the commit count when rewritten', () => {
   it('shows history-rewritten text instead of the commit count when rewritten', () => {
     render(
       <SinceBanner
@@ -37,7 +39,9 @@ describe('SinceBanner', () => {
     expect(screen.getByText('History rewritten since you last looked')).toBeTruthy()
     expect(screen.queryByText('3 commits since you last looked')).toBeNull()
   })
+})
 
+describe('SinceBanner — calls setDiffRange when the seg buttons are clicked', () => {
   it('calls setDiffRange when the seg buttons are clicked', () => {
     render(
       <SinceBanner
@@ -53,7 +57,9 @@ describe('SinceBanner', () => {
     fireEvent.click(screen.getByText(/Since my review/))
     expect(useReviewUiStore.getState().diffRange).toBe('since')
   })
+})
 
+describe('SinceBanner — checks the chosen diff range', () => {
   it('checks the chosen diff range', () => {
     render(
       <SinceBanner
@@ -69,7 +75,9 @@ describe('SinceBanner', () => {
     expect(since.getAttribute('aria-checked')).toBe('true')
     expect(whole.getAttribute('aria-checked')).toBe('false')
   })
+})
 
+describe('SinceBanner — uses singular commit for a single commit', () => {
   it('uses singular "commit" for a single commit', () => {
     render(
       <SinceBanner

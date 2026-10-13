@@ -32,6 +32,11 @@ export function CreateWorkspaceDialog({ onClose }: Props): JSX.Element {
   async function handleSubmit(): Promise<void> {
     if (!form.nameIsValid()) return
     const { name, folderPath, color } = form.draft
+    // Main refuses a workspace without a folder; say so before sending anything.
+    if (!folderPath.trim()) {
+      form.setError('Choose a folder for the workspace')
+      return
+    }
     const result = await createWorkspace({
       name: name.trim(),
       folderPath,
@@ -43,7 +48,7 @@ export function CreateWorkspaceDialog({ onClose }: Props): JSX.Element {
       else form.setError('Failed to create workspace')
       return
     }
-    if (folderPath && 'workspace' in result) await addCheckout(result.workspace.id, folderPath)
+    await addCheckout(result.workspace.id, folderPath)
     onClose()
   }
 

@@ -62,14 +62,13 @@ describe('branchFromIssue — deriving one when the tracker offers none', () => 
     const branch = branchFromIssue(
       summary({ branchName: null, key: 'ENG-4', title: '...leading and trailing...' })
     )
-    expect(branch).not.toMatch(/^[-.]/)
-    expect(branch).not.toMatch(/[-.]$/)
+    expect(branch).toBe('eng-4-leading-and-trailing')
   })
 
   it('never produces a name git rejects for ending in .lock', () => {
-    expect(
-      branchFromIssue(summary({ branchName: null, key: 'ENG-5', title: 'file.lock' }))
-    ).not.toMatch(/\.lock$/)
+    expect(branchFromIssue(summary({ branchName: null, key: 'ENG-5', title: 'file.lock' }))).toBe(
+      'eng-5-file-lock'
+    )
   })
 
   it('bounds the length so a rambling title does not become a 300-character branch', () => {

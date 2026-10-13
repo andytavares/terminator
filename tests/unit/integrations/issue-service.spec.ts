@@ -267,7 +267,9 @@ describe('issue-service — rate limits (FR-031)', () => {
     const { service, sleep } = build({ linear })
 
     await expect(service.get('linear', 'TAV-42')).rejects.toMatchObject({ kind: 'rate-limited' })
-    expect(sleep.mock.calls.length).toBeLessThanOrEqual(2)
+    // One wait and one retry, then the limit is reported.
+    expect(sleep).toHaveBeenCalledTimes(1)
+    expect(linear.get).toHaveBeenCalledTimes(2)
   })
 
   it('does not retry an auth failure — a bad credential will not fix itself', async () => {
@@ -366,6 +368,6 @@ describe('issue-service — error reporting to settings', () => {
     })
     const { service, sleep } = build({ linear })
     await service.get('linear', 'TAV-42')
-    expect(sleep).toHaveBeenCalledWith(expect.any(Number))
+    expect(sleep).toHaveBeenCalledWith(5000)
   })
 })

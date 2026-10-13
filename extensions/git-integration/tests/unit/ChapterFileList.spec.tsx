@@ -64,16 +64,16 @@ beforeEach(() => {
   } as unknown as ReturnType<typeof usePrReviewStore>)
 })
 
-describe('ChapterFileList', () => {
-  const defaultProps = {
-    repoRoot: '/repo',
-    prNumber: 42,
-    headSHA: 'abc',
-    chapter: makeChapter(),
-    currentFilePath: null,
-    onSelectFile: vi.fn(),
-  }
+const defaultProps = {
+  repoRoot: '/repo',
+  prNumber: 42,
+  headSHA: 'abc',
+  chapter: makeChapter(),
+  currentFilePath: null,
+  onSelectFile: vi.fn(),
+}
 
+describe('ChapterFileList', () => {
   it('renders file names', () => {
     render(<ChapterFileList {...defaultProps} />)
     expect(screen.getByText('foo.ts')).toBeTruthy()
@@ -94,7 +94,9 @@ describe('ChapterFileList', () => {
     fireEvent.keyDown(rows[0], { key: 'Enter' })
     expect(onSelectFile).toHaveBeenCalled()
   })
+})
 
+describe('ChapterFileList — marks active file with active class', () => {
   it('marks active file with active class', () => {
     const { container } = render(<ChapterFileList {...defaultProps} currentFilePath="src/foo.ts" />)
     const active = container.querySelector('.chapter-file-row--active')
@@ -121,7 +123,9 @@ describe('ChapterFileList', () => {
     render(<ChapterFileList {...defaultProps} />)
     expect(screen.getByTitle('Core logic')).toBeTruthy()
   })
+})
 
+describe('ChapterFileList — respects fileOrderOverrides for file order', () => {
   it('respects fileOrderOverrides for file order', () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
       viewedFiles: new Set<string>(),
@@ -139,7 +143,9 @@ describe('ChapterFileList', () => {
     expect(screen.getByText('1')).toBeTruthy()
     expect(screen.getByText('2')).toBeTruthy()
   })
+})
 
+describe('ChapterFileList — calls reorderFiles on drag and drop between rows', () => {
   it('calls reorderFiles on drag and drop between rows', () => {
     render(<ChapterFileList {...defaultProps} />)
     const rows = screen.getAllByRole('button')
@@ -147,11 +153,9 @@ describe('ChapterFileList', () => {
     fireEvent.dragOver(rows[1])
     fireEvent.drop(rows[1])
     expect(mockReorderFiles).toHaveBeenCalledWith(
+      { repoRoot: '/repo', prNumber: 42, headSHA: 'abc' },
       'ch-1',
-      ['src/bar.ts', 'src/foo.ts'],
-      '/repo',
-      42,
-      'abc'
+      ['src/bar.ts', 'src/foo.ts']
     )
   })
 
@@ -162,7 +166,9 @@ describe('ChapterFileList', () => {
     fireEvent.drop(rows[0])
     expect(mockReorderFiles).not.toHaveBeenCalled()
   })
+})
 
+describe('ChapterFileList — sets drag-over class when dragging over a row', () => {
   it('sets drag-over class when dragging over a row', () => {
     const { container } = render(<ChapterFileList {...defaultProps} />)
     const rows = screen.getAllByRole('button')
@@ -179,7 +185,9 @@ describe('ChapterFileList', () => {
     fireEvent.dragEnd(rows[0])
     expect(container.querySelector('.chapter-file-row--drag-over')).toBeNull()
   })
+})
 
+describe('ChapterFileList — shows changed for a file changed since it was viewed', () => {
   it('shows "changed" for a file changed since it was viewed', () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
       viewedFiles: new Set<string>(),
@@ -205,7 +213,9 @@ describe('ChapterFileList', () => {
     render(<ChapterFileList {...defaultProps} chapter={chapter} />)
     expect(screen.getByText('new file')).toBeTruthy()
   })
+})
 
+describe('ChapterFileList — does not call an added file new on a first review', () => {
   it('does not call an added file new on a first review', () => {
     const chapter = makeChapter()
     chapter.files[1] = { ...chapter.files[1], changeType: 'added' } as Chapter['files'][number]

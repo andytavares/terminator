@@ -30,11 +30,7 @@ test.beforeAll(async () => {
   // Settings → Git Integration → "Clone folder for reviews", through the channel the field writes.
   await handle.page.evaluate(
     (folder) =>
-      (
-        window as unknown as {
-          electronAPI: { extension: { updateSetting(k: string, v: unknown): Promise<unknown> } }
-        }
-      ).electronAPI.extension.updateSetting(
+      window.electronAPI.extension.updateSetting(
         'terminator.git-integration.review.cloneFolder',
         folder
       ),

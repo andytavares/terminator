@@ -57,7 +57,9 @@ describe('git-integration renderer App', () => {
     render(<App />)
     expect(screen.getByTestId('pr-review-tab')).toBeDefined()
   })
+})
 
+describe('git-integration renderer App — renders PrReviewTab for ?view=pr-review', () => {
   it('renders PrReviewTab for ?view=pr-review', () => {
     setSearch({ view: 'pr-review', repoRoot: '/my/repo' })
     render(<App />)

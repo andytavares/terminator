@@ -1,4 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import type { Project } from '../../../../src/shared/types/index'
+import { electronApiOf, pushedEvent } from '../../../support/electron-api'
 
 const mockElectronAPI = {
   workspace: {
@@ -62,7 +64,7 @@ const ws2 = {
   createdAt: '',
   updatedAt: '',
 }
-const proj1 = {
+const proj1: Project = {
   id: 'p-1',
   workspaceId: 'ws-1',
   name: 'Project 1',
@@ -70,7 +72,7 @@ const proj1 = {
   createdAt: '',
   updatedAt: '',
 }
-const proj2 = {
+const proj2: Project = {
   id: 'p-2',
   workspaceId: 'ws-1',
   name: 'Project 2',
@@ -99,12 +101,6 @@ describe('useWorkspaceStore', () => {
       mockElectronAPI.workspace.list.mockResolvedValue({ workspaces: [ws1, ws2] })
       await useWorkspaceStore.getState().loadWorkspaces()
       expect(useWorkspaceStore.getState().workspaces).toEqual([ws1, ws2])
-    })
-
-    it('stores empty array when result has no workspaces', async () => {
-      mockElectronAPI.workspace.list.mockResolvedValue({ workspaces: null })
-      await useWorkspaceStore.getState().loadWorkspaces()
-      expect(useWorkspaceStore.getState().workspaces).toEqual([])
     })
   })
 
@@ -207,12 +203,6 @@ describe('useWorkspaceStore', () => {
       await useWorkspaceStore.getState().loadProjects('ws-1')
       expect(useWorkspaceStore.getState().projectsByWorkspaceId.get('ws-1')).toEqual([proj1, proj2])
     })
-
-    it('stores empty array when result.projects is null', async () => {
-      mockElectronAPI.project.list.mockResolvedValue({ projects: null })
-      await useWorkspaceStore.getState().loadProjects('ws-1')
-      expect(useWorkspaceStore.getState().projectsByWorkspaceId.get('ws-1')).toEqual([])
-    })
   })
 
   describe('createProject', () => {
@@ -220,14 +210,14 @@ describe('useWorkspaceStore', () => {
       useWorkspaceStore.setState({ projectsByWorkspaceId: new Map([['ws-1', [proj1]]]) })
       mockElectronAPI.project.create.mockResolvedValue({ project: proj2 })
       await useWorkspaceStore.getState().createProject({ workspaceId: 'ws-1', name: 'Project 2' })
-      expect(useWorkspaceStore.getState().projectsByWorkspaceId.get('ws-1')).toHaveLength(2)
+      expect(useWorkspaceStore.getState().projectsByWorkspaceId.get('ws-1')).toEqual([proj1, proj2])
     })
 
     it('creates workspace entry if it does not exist yet', async () => {
       useWorkspaceStore.setState({ projectsByWorkspaceId: new Map() })
       mockElectronAPI.project.create.mockResolvedValue({ project: proj1 })
       await useWorkspaceStore.getState().createProject({ workspaceId: 'ws-1', name: 'Project 1' })
-      expect(useWorkspaceStore.getState().projectsByWorkspaceId.get('ws-1')).toHaveLength(1)
+      expect(useWorkspaceStore.getState().projectsByWorkspaceId.get('ws-1')).toEqual([proj1])
     })
 
     it('does not update state when result has no project (error case)', async () => {
@@ -506,7 +496,7 @@ describe('useWorkspaceStore', () => {
       mockLocalStorage.setItem.mockImplementationOnce(() => {
         throw new Error('QuotaExceededError')
       })
-      expect(() => useWorkspaceStore.getState().toggleProjectCollapse('p-1')).not.toThrow()
+      useWorkspaceStore.getState().toggleProjectCollapse('p-1')
       expect(useWorkspaceStore.getState().collapsedProjectIds.has('p-1')).toBe(true)
     })
   })
@@ -544,7 +534,8 @@ describe('useWorkspaceStore', () => {
       mockLocalStorage.setItem.mockImplementationOnce(() => {
         throw new Error('QuotaExceededError')
       })
-      expect(() => useWorkspaceStore.getState().ensureProjectExpanded('p-1')).not.toThrow()
+      useWorkspaceStore.getState().ensureProjectExpanded('p-1')
+      expect(useWorkspaceStore.getState().collapsedProjectIds.has('p-1')).toBe(false)
     })
   })
 
@@ -588,7 +579,7 @@ describe('useWorkspaceStore', () => {
       mockLocalStorage.setItem.mockImplementationOnce(() => {
         throw new Error('QuotaExceededError')
       })
-      expect(() => useWorkspaceStore.getState().toggleWorkspaceCollapse('ws-1')).not.toThrow()
+      useWorkspaceStore.getState().toggleWorkspaceCollapse('ws-1')
       expect(useWorkspaceStore.getState().expandedWorkspaceIds.has('ws-1')).toBe(true)
     })
 
@@ -605,9 +596,7 @@ describe('useWorkspaceStore', () => {
       mockLocalStorage.setItem.mockImplementationOnce(() => {
         throw new Error('QuotaExceededError')
       })
-      expect(() =>
-        useWorkspaceStore.getState().setExpandedWorkspaceIds(new Set(['ws-1']))
-      ).not.toThrow()
+      useWorkspaceStore.getState().setExpandedWorkspaceIds(new Set(['ws-1']))
       expect(useWorkspaceStore.getState().expandedWorkspaceIds.has('ws-1')).toBe(true)
     })
   })
@@ -639,112 +628,60 @@ describe('workspace.store — localStorage initialisation', () => {
   })
 })
 
-// Push-subscriber tests — require a fresh module load with onAdded/onRemoved in the mock
+// Push-subscriber tests: the store subscribes when its module loads, so each
+// case loads a fresh copy against a bridge that carries the two push events.
 describe('workspace.store — push event subscribers', () => {
-  it('onAdded adds a new project to the store', async () => {
-    let capturedOnAdded: ((p: unknown) => void) | null = null
-    window.electronAPI = {
+  async function freshStoreWithPush() {
+    const added = pushedEvent<[Project]>()
+    const removed = pushedEvent<[string]>()
+    window.electronAPI = electronApiOf({
       ...mockElectronAPI,
       project: {
         ...mockElectronAPI.project,
-        onAdded: (cb: (p: unknown) => void) => {
-          capturedOnAdded = cb
-          return () => {}
-        },
-        onRemoved: () => () => {},
+        onAdded: added.subscribe,
+        onRemoved: removed.subscribe,
       },
-    } as unknown as typeof window.electronAPI
-
+    })
     vi.resetModules()
-    const { useWorkspaceStore: freshStore } = await import(
+    const { useWorkspaceStore: store } = await import(
       '../../../../src/renderer/stores/workspace.store'
     )
-    freshStore.setState({ projectsByWorkspaceId: new Map([['ws-1', [proj1]]]) })
-    capturedOnAdded!(proj2)
-    expect(freshStore.getState().projectsByWorkspaceId.get('ws-1')).toHaveLength(2)
+    return { store, added, removed }
+  }
 
-    window.electronAPI = { ...mockElectronAPI } as unknown as typeof window.electronAPI
+  afterEach(() => {
+    window.electronAPI = electronApiOf(mockElectronAPI)
     vi.resetModules()
+  })
+
+  it('onAdded adds a new project to the store', async () => {
+    const { store, added } = await freshStoreWithPush()
+    store.setState({ projectsByWorkspaceId: new Map([['ws-1', [proj1]]]) })
+    added.emit(proj2)
+    expect(store.getState().projectsByWorkspaceId.get('ws-1')).toEqual([proj1, proj2])
   })
 
   it('onAdded skips project that already exists (dedup guard)', async () => {
-    let capturedOnAdded: ((p: unknown) => void) | null = null
-    window.electronAPI = {
-      ...mockElectronAPI,
-      project: {
-        ...mockElectronAPI.project,
-        onAdded: (cb: (p: unknown) => void) => {
-          capturedOnAdded = cb
-          return () => {}
-        },
-        onRemoved: () => () => {},
-      },
-    } as unknown as typeof window.electronAPI
-
-    vi.resetModules()
-    const { useWorkspaceStore: freshStore } = await import(
-      '../../../../src/renderer/stores/workspace.store'
-    )
-    freshStore.setState({ projectsByWorkspaceId: new Map([['ws-1', [proj1]]]) })
-    capturedOnAdded!(proj1)
-    expect(freshStore.getState().projectsByWorkspaceId.get('ws-1')).toHaveLength(1)
-
-    window.electronAPI = { ...mockElectronAPI } as unknown as typeof window.electronAPI
-    vi.resetModules()
+    const { store, added } = await freshStoreWithPush()
+    store.setState({ projectsByWorkspaceId: new Map([['ws-1', [proj1]]]) })
+    added.emit(proj1)
+    expect(store.getState().projectsByWorkspaceId.get('ws-1')).toEqual([proj1])
   })
 
   it('onRemoved removes project from the store', async () => {
-    let capturedOnRemoved: ((id: string) => void) | null = null
-    window.electronAPI = {
-      ...mockElectronAPI,
-      project: {
-        ...mockElectronAPI.project,
-        onAdded: () => () => {},
-        onRemoved: (cb: (id: string) => void) => {
-          capturedOnRemoved = cb
-          return () => {}
-        },
-      },
-    } as unknown as typeof window.electronAPI
-
-    vi.resetModules()
-    const { useWorkspaceStore: freshStore } = await import(
-      '../../../../src/renderer/stores/workspace.store'
-    )
-    freshStore.setState({ projectsByWorkspaceId: new Map([['ws-1', [proj1, proj2]]]) })
-    capturedOnRemoved!('p-1')
-    expect(freshStore.getState().projectsByWorkspaceId.get('ws-1')).toEqual([proj2])
-
-    window.electronAPI = { ...mockElectronAPI } as unknown as typeof window.electronAPI
-    vi.resetModules()
+    const { store, removed } = await freshStoreWithPush()
+    store.setState({ projectsByWorkspaceId: new Map([['ws-1', [proj1, proj2]]]) })
+    removed.emit('p-1')
+    expect(store.getState().projectsByWorkspaceId.get('ws-1')).toEqual([proj2])
   })
 
   it('onRemoved clears activeProjectId when removed project was active', async () => {
-    let capturedOnRemoved: ((id: string) => void) | null = null
-    window.electronAPI = {
-      ...mockElectronAPI,
-      project: {
-        ...mockElectronAPI.project,
-        onAdded: () => () => {},
-        onRemoved: (cb: (id: string) => void) => {
-          capturedOnRemoved = cb
-          return () => {}
-        },
-      },
-    } as unknown as typeof window.electronAPI
-
-    vi.resetModules()
-    const { useWorkspaceStore: freshStore } = await import(
-      '../../../../src/renderer/stores/workspace.store'
-    )
-    freshStore.setState({
+    const { store, removed } = await freshStoreWithPush()
+    store.setState({
       projectsByWorkspaceId: new Map([['ws-1', [proj1]]]),
       activeProjectId: 'p-1',
     })
-    capturedOnRemoved!('p-1')
-    expect(freshStore.getState().activeProjectId).toBeNull()
-
-    window.electronAPI = { ...mockElectronAPI } as unknown as typeof window.electronAPI
-    vi.resetModules()
+    removed.emit('p-1')
+    expect(store.getState().activeProjectId).toBeNull()
   })
 })

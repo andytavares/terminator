@@ -241,8 +241,16 @@ and a terminal past that stays on the DOM renderer. A lost context (`onContextLo
 WebGL2 also falls back to the DOM renderer. The DOM renderer clips the last column's glyph on macOS (about
 2px), which WebGL does not do because it has no row boxes to clip. The phone client keeps the DOM renderer.
 Because WebGL leaves no terminal text in the DOM, the renderer sets `window.terminatorE2E.terminalRows()`
-(`src/renderer/terminal/terminal-rows.ts`), which reads every terminal's visible rows from its xterm buffer;
-the end-to-end specs read terminals through it.
+(`src/renderer/terminal/terminal-rows.ts`), which reads every terminal's visible rows from its xterm buffer,
+one terminal after another, and `terminalRowsIn(element)`, which reads only the terminal drawn in that
+element; the end-to-end specs read terminals through them.
+
+**Links.** `src/renderer/terminal/terminal-links.ts` finds the URLs and paths on a row and declares them to
+xterm. `LinkPointer` (`src/renderer/terminal/link-pointer.ts`) underlines the link under the pointer while
+⌘ (Ctrl off macOS) is held and opens it on ⌘-click. It maps the pointer to a cell from the box of
+`.xterm-screen`, which both renderers size to exactly `cols × rows` cells inside the pane's padding
+(`WebglRenderer.ts` and `DomRenderer.ts` in xterm.js). It never measures `.xterm-rows`, which the WebGL
+renderer does not create.
 
 **Batching and flow control.** A PTY produces thousands of small chunks a second. `OutputRelay`
 (`src/main/terminal/output-relay.ts`) joins them in an `OutputBatcher` and sends one `terminal:output`
@@ -415,7 +423,7 @@ The core and every extension are built from one design system, `packages/extensi
 **Tokens.** `packages/extension-ui/src/tokens.css` is the one definition of every token: colour, spacing, radius, fonts and the `--tm-layer-*` scale, under the `--tm-*` names, for both themes (a dark `:root` and a light `[data-theme='light']`). Tokens reach each document differently:
 
 - The core renderer imports the file in `src/renderer/index.tsx`. `src/renderer/styles.css` defines the core's older names (`--bg-*`, `--text-*`, `--border-*`, `--accent`, `--font-*`) as aliases of `--tm-*`; they hold no value of their own.
-- An extension view is a separate document, so CSS has to be injected into it. `EXTENSION_BASE_CSS` (`src/extension-base-css.ts`: `tokens.css` plus `extension-base.css`, the icon scale and control resets) is read at build time with Vite's `?raw` import, so nothing is looked up on disk at run time. `ExtensionViewHost` inserts it into every view on load, and `extensions/remote-control/src/server/remote-server.ts` serves the same constant to the remote client.
+- An extension view is a separate document, so CSS has to be injected into it. `EXTENSION_BASE_CSS` (`src/extension-base-css.ts`: `tokens.css`, `extension-base.css` with the icon scale and element resets, and `controls.css` with the one field height and the themed checkboxes and radios) is read at build time with Vite's `?raw` import, so nothing is looked up on disk at run time. `ExtensionViewHost` inserts it into every view on load, and `extensions/remote-control/src/server/remote-server.ts` serves the same constant to the remote client. The e2e specs that render extension stylesheets in plain Chromium rebuild it with `tests/e2e/extension-base-css.ts`, which reads the builder's own `?raw` imports, and `tests/unit/renderer/extension-base-css.spec.ts` checks the two are identical.
 - An extension document never sees the main renderer's `data-theme`, so `ExtensionViewHost.setTheme` stamps it on every open view and remembers it for views created later, driven by the renderer over `extension:set-theme`.
 
 A `--tm-*` name referenced but not defined makes its declaration invalid, and the browser drops it.
@@ -445,21 +453,21 @@ The written rules for extension UI are [EXTENSION-STYLE.md](EXTENSION-STYLE.md);
 
 The main window keeps its state in [Zustand](https://github.com/pmndrs/zustand) stores, one per domain, in `src/renderer/stores/`:
 
-| Store                          | Holds                                                                                                               | Main actions                                                                                                    |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `workspace.store.ts`           | workspaces, projects by workspace, the active workspace and project, collapse state, scratch                        | `loadWorkspaces`, `createWorkspace`, `setActiveWorkspace`, `createProject`, `reorderProjects`, `deleteProject`  |
-| `session.store.ts`             | terminal sessions, their xterm instances, each project's view (active session, split layout, order), focus requests | `createSession`, `adoptSession`, `closeSession`, `setActiveSessionForProject`, `setSplitLayout`, `requestFocus` |
-| `settings.store.ts`            | global settings, workspace settings, the resolved theme                                                             | `loadSettings`, `resolveSettings`, `updateGlobalTheme`, `updateQuickActions`                                    |
-| `session-records.store.ts`     | session descriptions, links and agent conversations                                                                 | `load`, `setDescription`, `setLink`, `transfer`, `forget`                                                       |
-| `integrations.store.ts`        | tracker connections, project issue links, fetched issues, the link dialog and issue drawer                          | `loadConnections`, `linkIssue`, `listMine`, `searchIssues`, `connect`, `openDrawer`                             |
-| `change-stats.store.ts`        | each branch's `+n/−n` change counts, fetched out of band ([ADR-031](adr/031-change-stats-out-of-band.md))           | `ensure`, `invalidate`, `invalidateAll`                                                                         |
-| `extension-commands.store.ts`  | the commands extensions declared and registered, for Quick Actions                                                  | `refresh`                                                                                                       |
-| `notification.store.ts`        | the notification centre's entries, unread count, panel open                                                         | `markRead`, `markAllRead`, `dismiss`, `togglePanel`                                                             |
-| `toast.store.ts`               | the transient toast queue                                                                                           | `addToast`, `removeToast`                                                                                       |
-| `log.store.ts`                 | the log window's entries                                                                                            | `addEntry`, `clear`                                                                                             |
-| `metrics.store.ts`             | system CPU, memory and network; per-session process metrics                                                         | `enableGlobalMetrics`, `disableGlobalMetrics`, `startPolling`, `stopPolling`                                    |
-| `modal.store.ts`               | how many core modals are open (`useModalEffect`), which hides extension views                                       | `push`, `pop`                                                                                                   |
-| `terminal-open-error.store.ts` | the error and retry count when a project's terminal fails to open                                                   | `setError`, `clearError`, `retry`                                                                               |
+| Store                          | Holds                                                                                                                                 | Main actions                                                                                                   |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `workspace.store.ts`           | workspaces, projects by workspace, the active workspace and project, collapse state, scratch                                          | `loadWorkspaces`, `createWorkspace`, `setActiveWorkspace`, `createProject`, `reorderProjects`, `deleteProject` |
+| `session.store.ts`             | terminal sessions, their xterm instances, each project's view (active session, one split layout per split tab, order), focus requests | `createSession`, `adoptSession`, `closeSession`, `setActiveSessionForProject`, `activateSplit`, `requestFocus` |
+| `settings.store.ts`            | global settings, workspace settings, the resolved theme                                                                               | `loadSettings`, `resolveSettings`, `updateGlobalTheme`, `updateQuickActions`                                   |
+| `session-records.store.ts`     | session descriptions, links and agent conversations                                                                                   | `load`, `setDescription`, `setLink`, `transfer`, `forget`                                                      |
+| `integrations.store.ts`        | tracker connections, project issue links, fetched issues, the link dialog and issue drawer                                            | `loadConnections`, `linkIssue`, `listMine`, `searchIssues`, `connect`, `openDrawer`                            |
+| `change-stats.store.ts`        | each branch's `+n/−n` change counts, fetched out of band ([ADR-031](adr/031-change-stats-out-of-band.md))                             | `ensure`, `invalidate`, `invalidateAll`                                                                        |
+| `extension-commands.store.ts`  | the commands extensions declared and registered, for Quick Actions                                                                    | `refresh`                                                                                                      |
+| `notification.store.ts`        | the notification centre's entries, unread count, panel open                                                                           | `markRead`, `markAllRead`, `dismiss`, `togglePanel`                                                            |
+| `toast.store.ts`               | the transient toast queue                                                                                                             | `addToast`, `removeToast`                                                                                      |
+| `log.store.ts`                 | the log window's entries                                                                                                              | `addEntry`, `clear`                                                                                            |
+| `metrics.store.ts`             | system CPU, memory and network; per-session process metrics                                                                           | `enableGlobalMetrics`, `disableGlobalMetrics`, `startPolling`, `stopPolling`                                   |
+| `modal.store.ts`               | how many core modals are open (`useModalEffect`), which hides extension views                                                         | `push`, `pop`                                                                                                  |
+| `terminal-open-error.store.ts` | the error and retry count when a project's terminal fails to open                                                                     | `setError`, `clearError`, `retry`                                                                              |
 
 Beside them, `src/renderer/extensions/registry.ts` (`useExtensionRegistry`) holds what the extensions contributed: sidebar panels, global, workspace and project tabs, window views, commands, keyboard shortcuts, the active tab of each kind, and the Quick Actions groups.
 

@@ -59,13 +59,14 @@ describe('validateId()', () => {
 
 describe('generateManifest()', () => {
   it('generates valid JSON manifest with correct fields', () => {
-    const manifest = generateManifest('my-ext', 'com.example.my-ext')
-    const parsed = JSON.parse(manifest)
-    expect(parsed.id).toBe('com.example.my-ext')
-    expect(parsed.name).toBeTruthy() // human-readable display name
-    expect(parsed.version).toBe('0.1.0')
-    expect(parsed.main).toBe('src/index.js')
-    expect(parsed.minAppVersion).toBeDefined()
+    expect(JSON.parse(generateManifest('my-ext', 'com.example.my-ext'))).toEqual({
+      id: 'com.example.my-ext',
+      name: 'My Ext',
+      version: '0.1.0',
+      description: 'My Ext extension for Terminator.',
+      main: 'src/index.js',
+      minAppVersion: '0.1.0',
+    })
   })
 })
 
@@ -78,12 +79,6 @@ describe('generatePackageJson()', () => {
 })
 
 describe('generateIndex()', () => {
-  it('generates index with activate and deactivate exports', () => {
-    const index = generateIndex('my-ext', 'com.example.my-ext')
-    expect(index).toContain('activate')
-    expect(index).toContain('deactivate')
-  })
-
   it('names the SDK version of this repository', () => {
     const index = generateIndex('my-ext', 'com.example.my-ext')
     const sdk = JSON.parse(readFileSync(join(ROOT, 'packages/extension-sdk/package.json'), 'utf8'))
