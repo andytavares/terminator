@@ -20,10 +20,8 @@ export interface SerializedNotification {
 
 export interface ElectronAPI {
   ui: {
-    /**
-     * How many dialogs the view has open, so the host's double-Escape exit
-     * stands down while one is. @terminator/extension-ui's Dialog reports it.
-     */
+    /** How many dialogs the view has open, so the host's double-Escape exit stands down while
+     * one is. @terminator/extension-ui's Dialog reports it. */
     setModalDepth(depth: number): void
   }
   terminal: {
@@ -118,11 +116,9 @@ export interface ElectronAPI {
     getSettingsSchemas(): Promise<{ schemas: unknown[] }>
     getSettingsValues(): Promise<{ values: Record<string, unknown> }>
     updateSetting(key: string, value: unknown): Promise<{ ok: true }>
-    /**
-     * Called after any extension setting changes; re-read with `getSettingsValues`.
-     * `change.workspaceId` names the workspace whose own value changed, null for a
-     * global value (since 4.1.0).
-     */
+    /** Called after any extension setting changes; re-read with `getSettingsValues`.
+     * `change.workspaceId` names the workspace whose own value changed, null for a global value
+     * (since 4.1.0). */
     onSettingsChanged(handler: (change: SettingsChange) => void): () => void
     getCommands(): Promise<{
       commands: Array<{

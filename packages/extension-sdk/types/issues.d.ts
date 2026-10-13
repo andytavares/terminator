@@ -5,10 +5,8 @@
 
 export type TrackerId = 'linear' | 'jira'
 
-/**
- * Two trackers can issue the same key (`TAV-42` in both), so nothing is
- * identified by key alone. This pair is the identity.
- */
+/** Two trackers can issue the same key (`TAV-42` in both), so nothing is identified by key
+ * alone. This pair is the identity. */
 export interface IssueRef {
   tracker: TrackerId
   key: string
@@ -21,18 +19,14 @@ export type TrackerErrorKind =
   | 'unavailable'
   | 'not-found'
   | 'failed'
-  /**
-   * The tracker cannot be asked to do this at all — not today, not on retry.
-   * Distinct from 'failed' because a caller retries a failure and records an
-   * unsupported capability once (037 FR-063).
-   */
+  /** The tracker cannot be asked to do this at all — not today, not on retry. Distinct from
+   * 'failed' because a caller retries a failure and records an unsupported capability once (037
+   * FR-063). */
   | 'unsupported'
 
-/**
- * How "my issues" is defined, per tracker. Tracker-shaped rather than
- * flattened: Linear identifies an assignee directly, Jira expresses it as a
- * saved query, and pretending those are the same loses information.
- */
+/** How "my issues" is defined, per tracker. Tracker-shaped rather than flattened: Linear
+ * identifies an assignee directly, Jira expresses it as a saved query, and pretending those are
+ * the same loses information. */
 export type MineSelector =
   | { kind: 'assignee'; email: string | null }
   | { kind: 'query'; jql: string }
@@ -81,14 +75,9 @@ export interface IssueSummary {
   url: string
   state: IssueState
   assignee: TrackerAccount | null
-  /**
-   * The tracker's suggested VCS branch. Always null for Jira.
-   *
-   * On the summary rather than only the full issue because the new-project
-   * dialog prefills a branch straight from a picked row, and Linear returns
-   * this on the same query the list already makes — fetching the whole issue
-   * again just to read one string would be a request for nothing.
-   */
+  /** The tracker's suggested VCS branch; always null for Jira. On the summary because the
+   * new-project dialog prefills a branch from a picked row, and Linear returns it on the list's own
+   * query: fetching the whole issue for one string would be a request for nothing. */
   branchName: string | null
 }
 
@@ -116,20 +105,15 @@ export interface TrackerFailure {
   error: TrackerErrorKind
 }
 
-/**
- * A tracker that fails does not fail the call. Callers show what arrived and
- * say what is missing, rather than presenting a partial list as complete.
- */
+/** A tracker that fails does not fail the call. Callers show what arrived and say what is
+ * missing, rather than presenting a partial list as complete. */
 export interface IssueListResult {
   issues: IssueSummary[]
   failures: TrackerFailure[]
 }
 
-/**
- * Where to move an issue, as an intent rather than a state identifier: "in
- * review" is not a fact about a tracker but a decision about which of its
- * states means that.
- */
+/** Where to move an issue, as an intent rather than a state identifier: "in review" is not a
+ * fact about a tracker but a decision about which of its states means that. */
 export type TransitionIntent = 'started' | 'in_review' | 'done'
 
 /** One position an issue could be moved to, as this tracker describes it. */

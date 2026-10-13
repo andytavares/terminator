@@ -31,11 +31,9 @@ export interface RegisterHandlerOptions {
   remoteAccessible?: boolean
 }
 
-/**
- * Registers `spec.channel`. The payload is parsed with `spec.schema` before
- * `spec.run` sees it; a payload the schema rejects is answered with
- * `spec.invalid` and `run` is not called (ADR 096).
- */
+/** Registers `spec.channel`. The payload is parsed with `spec.schema` before `spec.run` sees it;
+ * a payload the schema rejects is answered with `spec.invalid` and `run` is not called
+ * (ADR 096). */
 export type RegisterChannel = (spec: ChannelSpec, opts?: RegisterHandlerOptions) => Disposable
 
 /** The extension's own SQLite tables. Every call is async and runs in call order. */
@@ -70,10 +68,8 @@ export interface SettingDefinition {
   options?: string[]
   min?: number
   max?: number
-  /**
-   * Workspace Settings can set a value for one workspace, with "Use global
-   * default" to hand it back. Read it with `settings.get(key, { repoPath })`.
-   */
+  /** Workspace Settings can set a value for one workspace, with "Use global default" to hand it
+   * back. Read it with `settings.get(key, { repoPath })`. */
   workspaceScoped?: boolean
   secret?: boolean
   channel?: string
@@ -83,10 +79,8 @@ export interface SettingDefinition {
 
 /** Where `settings.get` reads a `workspaceScoped` setting. Since 4.1.0. */
 export interface SettingScope {
-  /**
-   * A path in a workspace: its folder, a project's worktree, or anything below
-   * one. The setting resolves to that workspace's own value, else the global one.
-   */
+  /** A path in a workspace: its folder, a project's worktree, or anything below one. The setting
+   * resolves to that workspace's own value, else the global one. */
   repoPath?: string
 }
 
@@ -125,10 +119,8 @@ export interface CommandContribution {
   mnemonic?: string
   /** Dims the action, with a stock reason, when the focused context lacks this. */
   requires?: 'repo' | 'session'
-  /**
-   * Shape of the `args` another surface may pass when it runs this command
-   * (v2.7.0, ADR-083). A command without one never receives args.
-   */
+  /** Shape of the `args` another surface may pass when it runs this command (v2.7.0, ADR-083). A
+   * command without one never receives args. */
   args?: ZodTypeAny
 }
 
@@ -161,11 +153,8 @@ export interface CreateProjectInput {
   gitBranch?: string
   /** True when the directory is a git worktree rather than a plain folder. */
   isWorktree?: boolean
-  /**
-   * Attach this issue to the project as it is created (v2.2.0). When an
-   * existing project is returned for the same path, the issue is attached to
-   * that project.
-   */
+  /** Attach this issue to the project as it is created (v2.2.0). When an existing project is
+   * returned for the same path, the issue is attached to that project. */
   issue?: { tracker: TrackerId; key: string }
 }
 
@@ -220,48 +209,32 @@ export interface RunInTerminalInput extends Omit<OpenTerminalTabInput, 'shell'> 
 /** How a `runInTerminal` process ended. */
 export interface TerminalExit {
   sessionId: string
-  /**
-   * The process's exit code. Null when it has none: a signal ended it, which
-   * is also what closing its tab before it finished does. Null is never a
-   * success.
-   */
+  /** The process's exit code. Null when it has none: a signal ended it, which is also what
+   * closing its tab before it finished does. Null is never a success. */
   exitCode: number | null
 }
 
 export interface PtyManagerAPI {
-  /**
-   * Spawns a process and a data stream. Throws an error whose `name` is
-   * 'MissingCwdError' when `cwd` is not an existing directory.
-   */
+  /** Spawns a process and a data stream. Throws an error whose `name` is 'MissingCwdError' when
+   * `cwd` is not an existing directory. */
   spawnSession(opts: SpawnSessionOptions): Promise<SessionInfo>
-  /**
-   * Spawns a terminal and puts it on screen as an ordinary tab, holding the
-   * process's output until the tab is mounted. Resolves to the session id, or
-   * null when there is no window to show it in. Since 4.0.0.
-   */
+  /** Spawns a terminal and puts it on screen as an ordinary tab, holding the process's output
+   * until the tab is mounted. Resolves to the session id, or null when there is no window to
+   * show it in. Since 4.0.0. */
   openTerminal(input: OpenTerminalTabInput): Promise<string | null>
-  /**
-   * Runs a program as the process of a new terminal tab, nothing typed into a
-   * shell, and resolves once it ends, with how it ended. The tab stays open,
-   * showing "[exited]", until `closeTerminalTab`. Null when there is no window
-   * to show it in; nothing is run then. Since 4.0.0.
-   */
+  /** Runs a program as a new terminal tab's process (nothing typed into a shell) and resolves with
+   * how it ended. The tab shows "[exited]" until `closeTerminalTab`. Null, running nothing, when
+   * there is no window to show it in. Since 4.0.0. */
   runInTerminal(input: RunInTerminalInput): Promise<TerminalExit | null>
-  /**
-   * Closes a tab `openTerminal` opened, ending its process if it still runs
-   * (v2.6.0). `kill` alone leaves the tab on screen marked "[exited]".
-   */
+  /** Closes a tab `openTerminal` opened, ending its process if it still runs (v2.6.0). `kill`
+   * alone leaves the tab on screen marked "[exited]". */
   closeTerminalTab(sessionId: string): void
-  /**
-   * The session's output, in batches of at most one per frame (4.0.0). Returns a disposer; a
-   * session that does not exist never calls the listener.
-   */
+  /** The session's output, in batches of at most one per frame (4.0.0). Returns a disposer; a
+   * session that does not exist never calls the listener. */
   onData(sessionId: string, listener: (data: string) => void): () => void
-  /**
-   * Multi-subscriber exit fan-out. Listeners fire after the session is removed, and after the
+  /** Multi-subscriber exit fan-out. Listeners fire after the session is removed, and after the
    * last batch of its output, with the exit code, or null when a signal ended the process
-   * (4.0.0). Returns a disposer.
-   */
+   * (4.0.0). Returns a disposer. */
   onExit(sessionId: string, listener: (exitCode: number | null) => void): () => void
   getSession(sessionId: string): Promise<SessionInfo | undefined>
   /** Stamps workspace metadata on the session (null clears it). False for an unknown session. */
@@ -275,27 +248,18 @@ export interface PtyManagerAPI {
 export interface ShellExecOptions {
   command: 'git' | 'gh'
   args: string[]
-  /**
-   * Must be, after resolving symlinks, one of the extension's shell roots or
-   * below one: a workspace folder, a project worktree, `api.paths.globalStorage`, or
-   * the directory a folder setting the manifest declares in
-   * `contributes.shellRoots` holds. Since 4.0.0.
-   */
+  /** Must be, after resolving symlinks, one of the extension's shell roots or below one: a
+   * workspace folder, a project worktree, `api.paths.globalStorage`, or the directory a folder
+   * setting the manifest declares in `contributes.shellRoots` holds. Since 4.0.0. */
   cwd: string
-  /**
-   * Default 10 000. When it expires the command is killed and the result is a
-   * failure: `timedOut: true` and `exitCode` 124, timeout(1)'s status.
-   */
+  /** Default 10 000. When it expires the command is killed and the result is a failure:
+   * `timedOut: true` and `exitCode` 124, timeout(1)'s status. */
   timeoutMs?: number
-  /**
-   * Most bytes of output kept per stream (default 1 MiB). Past it the command
-   * is stopped: `exceededMaxBuffer: true` and a non-zero `exitCode`. Since 2.1.0.
-   */
+  /** Most bytes of output kept per stream (default 1 MiB). Past it the command is stopped:
+   * `exceededMaxBuffer: true` and a non-zero `exitCode`. Since 2.1.0. */
   maxBuffer?: number
-  /**
-   * Added to the command's environment, over the minimal one every command
-   * gets (PATH, HOME, git and gh credentials, `GIT_TERMINAL_PROMPT=0`). Since 2.1.0.
-   */
+  /** Added to the command's environment, over the minimal one every command gets (PATH, HOME,
+   * git and gh credentials, `GIT_TERMINAL_PROMPT=0`). Since 2.1.0. */
   env?: Record<string, string>
   /** `'buffer'` returns stdout and stderr as bytes. Since 2.1.0. */
   encoding?: 'utf8' | 'buffer'
@@ -331,20 +295,16 @@ export interface SaveDialogOptions {
 }
 
 export interface ExtensionAPI {
-  /**
-   * The extension's database. Throws until the app database is initialised. The extension host
-   * holds its own connection, so `transaction(fn)` runs `fn` in the extension's own process.
-   */
+  /** The extension's database. Throws until the app database is initialised. The extension host
+   * holds its own connection, so `transaction(fn)` runs `fn` in the extension's own process. */
   db: ExtensionDB
   /** Where the application and this extension's data live on disk. Since 4.0.0. */
   paths: {
     /** The application's own directory (Electron's `app.getAppPath()`). */
     readonly app: string
-    /**
-     * This extension's own data folder, `<userData>/extensions/<id>`: VS Code's
-     * `ExtensionContext.globalStorageUri`, shared by no other extension. It may
-     * not exist yet; create it (recursively) before writing into it.
-     */
+    /** This extension's own data folder, `<userData>/extensions/<id>`: VS Code's
+     * `ExtensionContext.globalStorageUri`, shared by no other extension. It may not exist yet;
+     * create it (recursively) before writing into it. */
     readonly globalStorage: string
   }
   /** The operating system's file dialogs, over the focused window. Since 4.0.0. */
@@ -360,21 +320,14 @@ export interface ExtensionAPI {
   }
   settings: {
     register(schema: ExtensionSettingsSchema): Disposable
-    /**
-     * Read from a snapshot of the settings the core pushes on every change, so it stays
-     * synchronous; `set` updates the snapshot at once.
-     *
-     * With `scope.repoPath`, a `workspaceScoped` setting resolves to the value
-     * the workspace owning that path sets for itself, else the global value,
-     * else the schema's default. Without a scope, the global value (scope since 4.1.0).
-     */
+    /** Synchronous: a snapshot the core pushes on every change, which `set` updates at once. With
+     * `scope.repoPath` (4.1.0) a `workspaceScoped` setting is that workspace's own value, else the
+     * global value, else the schema's default; without a scope, the global value. */
     get<T>(key: string, scope?: SettingScope): T | undefined
     set(key: string, value: unknown): void
-    /**
-     * Whether a branch matches Settings → Git → Branch Exclude Patterns: the
-     * override of the workspace that owns `repoPath`, else the global list.
-     * `*` matches anything, slashes included. Since 2.8.0; a promise since 4.0.0.
-     */
+    /** Whether a branch matches Settings → Git → Branch Exclude Patterns: the override of the
+     * workspace that owns `repoPath`, else the global list. `*` matches anything, slashes
+     * included. Since 2.8.0; a promise since 4.0.0. */
     isBranchExcluded(branch: string, repoPath?: string): Promise<boolean>
   }
   globalShortcut: {
@@ -385,42 +338,32 @@ export interface ExtensionAPI {
   workspace: {
     list(): WorkspaceSnapshot[]
     listProjects(workspaceId: string): ProjectSnapshot[]
-    /**
-     * Registers a directory as a project in a workspace, so it appears in the
-     * sidebar and can hold terminals. Resolves to the existing project when the
-     * workspace already has one for that path; null when it cannot be created. Since 4.0.0.
-     */
+    /** Registers a directory as a project in a workspace, so it appears in the sidebar and can
+     * hold terminals. Resolves to the existing project when the workspace already has one for
+     * that path; null when it cannot be created. Since 4.0.0. */
     addProject(input: CreateProjectInput): Promise<ProjectSnapshot | null>
     deleteProject(projectId: string): void
   }
-  /**
-   * Other extensions' APIs (since 2.1.0). An extension's API is the value its
-   * `activate` returns. List the provider's id in your manifest's
-   * `extensionDependencies`: the host then activates the provider first, and
-   * fails your activation when it is missing, failed, or in a dependency cycle.
-   */
+  /** Other extensions' APIs, each the value its `activate` returns (since 2.1.0). List the
+   * provider in your manifest's `extensionDependencies`: the host activates it first, and fails
+   * yours when it is missing, failed, or in a dependency cycle. */
   extensions: {
     /** The provider's `activate` return value. Throws for an id the manifest does not declare. */
     get<K extends keyof BuiltInExtensionExports>(extensionId: K): BuiltInExtensionExports[K]
     get<T = unknown>(extensionId: string): T
   }
   shell: {
-    /**
-     * Runs git or gh without a shell. Resolves for every outcome of the command;
-     * read `exitCode`. Rejects, running nothing, with an error named
-     * 'CwdOutOfScopeError' when `cwd` is outside every shell root (since 4.0.0).
-     */
+    /** Runs git or gh without a shell. Resolves for every outcome of the command; read
+     * `exitCode`. Rejects, running nothing, with an error named 'CwdOutOfScopeError' when `cwd`
+     * is outside every shell root (since 4.0.0). */
     exec(options: ShellExecOptions & { encoding: 'buffer' }): Promise<ShellExecResult<Uint8Array>>
     exec(options: ShellExecOptions): Promise<ShellExecResult<string>>
   }
   /** GitHub pull requests and API through the gh CLI the core runs. Since 2.1.0. */
   github: GithubAPI
-  /**
-   * Issue trackers, through the application's single connection (v2.2.0). An
-   * extension never holds a tracker credential. Three writes, and only three:
-   * a comment, a move in the issue's own workflow, and a new issue the
-   * operator asked for.
-   */
+  /** Issue trackers, through the application's single connection (v2.2.0). An extension never
+   * holds a tracker credential. Three writes, and only three: a comment, a move in the issue's
+   * own workflow, and a new issue the operator asked for. */
   issues: {
     /** Connected trackers and whose account each credential proved to be. Never a secret. */
     connections(): Promise<TrackerConnection[]>
@@ -434,11 +377,9 @@ export interface ExtensionAPI {
     comment(tracker: TrackerId, key: string, body: string): Promise<void>
     /** What this issue can be moved to. Per-issue: the answer may depend on its current status. */
     states(tracker: TrackerId, key: string): Promise<TrackerStateOption[]>
-    /**
-     * Move it. `optionId` is the operator's own mapping for this intent, taken
-     * from `states()`; without one the tracker resolves the intent itself.
-     * Rejects when nothing available satisfies it.
-     */
+    /** Move it. `optionId` is the operator's own mapping for this intent, taken from `states()`;
+     * without one the tracker resolves the intent itself. Rejects when nothing available
+     * satisfies it. */
     transition(
       tracker: TrackerId,
       key: string,
@@ -501,11 +442,9 @@ export interface ExtensionAPI {
     broadcast(channel: string, data: unknown): void
     /** Focuses this extension's view `viewParam` (default 'main') where it is already open. */
     focusSelf(viewParam?: string): void
-    /**
-     * Asks core to bring forward whichever surface this extension registered
-     * for `view` (global, workspace, project tab or sidebar panel) and focus
-     * it. Core's own "Open <surface>" quick actions use this same path.
-     */
+    /** Asks core to bring forward whichever surface this extension registered for `view`
+     * (global, workspace, project tab or sidebar panel) and focus it. Core's own "Open
+     * <surface>" quick actions use this same path. */
     showSelf(view?: string): void
     /** Restores and focuses every application window. Since 4.0.0. */
     raise(): void
