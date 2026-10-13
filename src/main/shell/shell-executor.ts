@@ -1,4 +1,5 @@
-import { execFile as execFileCb, type ChildProcess, type ExecFileException } from 'child_process'
+import { spawn, type ChildProcess } from 'child_process'
+import { StringDecoder } from 'string_decoder'
 import { loginShellPathReady } from './login-shell-path.js'
 import { realpath } from 'fs/promises'
 import { basename, dirname, isAbsolute, join, relative, sep } from 'path'
@@ -85,10 +86,22 @@ function isWithin(path: string, root: string): boolean {
 
 // Matches the exit status of timeout(1).
 const TIMEOUT_EXIT_CODE = 124
+const DEFAULT_TIMEOUT_MS = 10_000
+// execFile's default, which this runner replaced:
+// https://nodejs.org/api/child_process.html#child_processexecfilefile-args-options-callback
+const DEFAULT_MAX_BUFFER = 1024 * 1024
 
-function numericExitCode(code: string | number | undefined | null): number {
-  return typeof code === 'number' && code !== 0 ? code : 1
-}
+/**
+ * Each command leads a process group of its own, so stopping it stops what it
+ * started too: kill() with a negative pid signals the whole group
+ * (https://nodejs.org/api/child_process.html#optionsdetached,
+ * https://man7.org/linux/man-pages/man2/kill.2.html). Not on Windows, where
+ * `detached` gives the command a console of its own instead.
+ */
+const OWN_PROCESS_GROUP = process.platform !== 'win32'
+
+/** Commands started and not yet ended, for stopRunningCommands. */
+const running = new Set<ChildProcess>()
 
 function baseEnvironment(): NodeJS.ProcessEnv {
   return {
@@ -112,24 +125,128 @@ function baseEnvironment(): NodeJS.ProcessEnv {
   }
 }
 
-/** stderr, or why the command did not run to completion when it said nothing itself. */
-function stderrOf(error: ExecFileException | null, stderr: string | Buffer): string | Buffer {
-  // A string code means the command did not run to completion (e.g. ENOENT); say why.
-  const reason = typeof error?.code === 'string' && stderr.length === 0 ? error.message : ''
-  if (!reason) return stderr
-  return typeof stderr === 'string' ? reason : Buffer.from(reason)
+function stopGroup(child: ChildProcess): void {
+  if (child.pid === undefined) return
+  try {
+    process.kill(OWN_PROCESS_GROUP ? -child.pid : child.pid, 'SIGTERM')
+  } catch {
+    // Already gone.
+  }
+}
+
+/**
+ * Stops every git and gh command still running, with everything each one
+ * started. The app calls it as it quits: on macOS /usr/bin/git is an xcrun shim
+ * that can start xcodebuild, which outlived the app (run 38382115775).
+ */
+export function stopRunningCommands(): void {
+  for (const child of running) stopGroup(child)
+}
+
+interface CommandRun {
+  child: ChildProcess
+  stdout: Buffer[]
+  stderr: Buffer[]
+  timedOut: boolean
+  exceededMaxBuffer: boolean
+  /** Why the command could not start, when it could not. */
+  failure?: string
+}
+
+/** Keeps each stream's output up to `maxBuffer` bytes; past it the command is stopped. */
+function collectOutput(run: CommandRun, input: ShellExecInput): void {
+  const limit = input.maxBuffer ?? DEFAULT_MAX_BUFFER
+  const keep = (stream: 'stdout' | 'stderr') => {
+    const decoder = new StringDecoder('utf8')
+    let bytes = 0
+    return (chunk: Buffer): void => {
+      if (input.onOutput) input.onOutput(decoder.write(chunk))
+      bytes += chunk.length
+      if (bytes <= limit) return void run[stream].push(chunk)
+      run.exceededMaxBuffer = true
+      stopGroup(run.child)
+    }
+  }
+  run.child.stdout?.on('data', keep('stdout'))
+  run.child.stderr?.on('data', keep('stderr'))
+}
+
+function startCommand(input: ShellExecInput, environment: NodeJS.ProcessEnv): CommandRun {
+  const child = spawn(input.command, input.args, {
+    cwd: input.cwd,
+    shell: false,
+    detached: OWN_PROCESS_GROUP,
+    windowsHide: true,
+    env: { ...environment, ...input.env },
+  })
+  const run: CommandRun = {
+    child,
+    stdout: [],
+    stderr: [],
+    timedOut: false,
+    exceededMaxBuffer: false,
+  }
+  running.add(child)
+  collectOutput(run, input)
+  // A command that has exited, or never started, cannot take its input.
+  child.stdin?.on('error', () => {})
+  if (input.input !== undefined) child.stdin?.end(input.input)
+  return run
+}
+
+function exitCodeOf(run: CommandRun, code: number | null): number {
+  if (run.timedOut) return TIMEOUT_EXIT_CODE
+  if (run.exceededMaxBuffer || run.failure !== undefined) return 1
+  // No code means a signal ended the command.
+  return code ?? 1
 }
 
 function toOutput(
-  error: ExecFileException | null,
-  stdout: string | Buffer,
-  stderr: string | Buffer
+  run: CommandRun,
+  code: number | null,
+  encoding: ShellExecInput['encoding']
 ): ShellExecOutput<string | Buffer> {
-  // The timeout kills the child with a signal, so node reports code null and killed true.
-  const timedOut = error?.killed === true && error.code == null
-  const exceededMaxBuffer = error?.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER'
-  const exitCode = !error ? 0 : timedOut ? TIMEOUT_EXIT_CODE : numericExitCode(error.code)
-  return { exitCode, stdout, stderr: stderrOf(error, stderr), timedOut, exceededMaxBuffer }
+  const stdout = Buffer.concat(run.stdout)
+  const said = Buffer.concat(run.stderr)
+  // A command that never started has no stderr of its own; say why.
+  const stderr = said.length === 0 && run.failure ? Buffer.from(run.failure) : said
+  const text = encoding !== 'buffer'
+  return {
+    exitCode: exitCodeOf(run, code),
+    stdout: text ? stdout.toString('utf8') : stdout,
+    stderr: text ? stderr.toString('utf8') : stderr,
+    timedOut: run.timedOut,
+    exceededMaxBuffer: run.exceededMaxBuffer,
+  }
+}
+
+function timeOut(run: CommandRun): void {
+  run.timedOut = true
+  stopGroup(run.child)
+}
+
+/** Resolves once the command has ended and its output has closed, or it could not start. */
+function finished(
+  run: CommandRun,
+  input: ShellExecInput
+): Promise<ShellExecOutput<string | Buffer>> {
+  const timeoutMs = input.timeoutMs ?? DEFAULT_TIMEOUT_MS
+  const timer = timeoutMs > 0 ? setTimeout(() => timeOut(run), timeoutMs) : undefined
+  return new Promise((resolve) => {
+    let settled = false
+    const settle = (code: number | null): void => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      running.delete(run.child)
+      resolve(toOutput(run, code, input.encoding))
+    }
+    run.child.once('error', (error) => {
+      run.failure = error.message
+      settle(null)
+    })
+    run.child.once('close', settle)
+  })
 }
 
 export function execShell(
@@ -137,33 +254,20 @@ export function execShell(
 ): Promise<ShellExecOutput<Buffer>>
 export function execShell(input: ShellExecInput): Promise<ShellExecOutput>
 export async function execShell(input: ShellExecInput): Promise<ShellExecOutput<string | Buffer>> {
-  const { command, args, cwd, timeoutMs = 10000, maxBuffer, env, encoding = 'utf8' } = input
   // The PATH is read at spawn time, after the login shell's has been adopted.
   await loginShellPathReady()
-  return new Promise((resolve) => {
-    const child = execFileCb(
-      command,
-      args,
-      {
-        cwd,
-        shell: false,
-        timeout: timeoutMs,
-        encoding,
-        ...(maxBuffer === undefined ? {} : { maxBuffer }),
-        env: { ...baseEnvironment(), ...env },
-      },
-      (error, stdout, stderr) => resolve(toOutput(error, stdout, stderr))
-    )
-    child.on('error', () => {
-      // handled in callback
-    })
-    if (input.onOutput) streamOutput(child, input.onOutput)
-    if (input.input !== undefined) child.stdin?.end(input.input)
-  })
+  return finished(startCommand(input, baseEnvironment()), input)
 }
 
-function streamOutput(child: ChildProcess, onOutput: (chunk: string) => void): void {
-  const forward = (chunk: Buffer | string) => onOutput(chunk.toString())
-  child.stdout?.on('data', forward)
-  child.stderr?.on('data', forward)
+/**
+ * Runs a command the way execShell does, stopped by stopRunningCommands too,
+ * but in `environment` as given and without waiting for the login-shell PATH:
+ * the core's own git (src/main/git/git-service.ts). Output is text.
+ */
+export async function runCommand(
+  input: Omit<ShellExecInput, 'encoding'>,
+  environment: NodeJS.ProcessEnv
+): Promise<ShellExecOutput> {
+  const result = await finished(startCommand(input, environment), input)
+  return { ...result, stdout: result.stdout.toString(), stderr: result.stderr.toString() }
 }

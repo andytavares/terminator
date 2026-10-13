@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { writeFileSync, chmodSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { execShell } from '../../../src/main/shell/shell-executor'
@@ -115,5 +115,58 @@ describe('execShell per-call options — limits and timeouts', () => {
     const result = await execShell({ command: 'gh', args: [], cwd: scratch, timeoutMs: 100 })
 
     expect(result).toMatchObject({ timedOut: true, exitCode: 124 })
+  })
+})
+
+describe('execShell results', () => {
+  it('resolves with exit code 0 and the output of a command that succeeds', async () => {
+    fakeGh('echo hello')
+
+    const result = await execShell({ command: 'gh', args: [], cwd: scratch })
+
+    expect(result).toEqual({
+      exitCode: 0,
+      stdout: 'hello\n',
+      stderr: '',
+      timedOut: false,
+      exceededMaxBuffer: false,
+    })
+  })
+
+  it("resolves with the command's own exit code and stderr when it fails", async () => {
+    fakeGh(`printf 'error output' >&2; exit 3`)
+
+    const result = await execShell({ command: 'gh', args: [], cwd: scratch })
+
+    expect(result).toMatchObject({ exitCode: 3, stderr: 'error output', timedOut: false })
+  })
+})
+
+describe('execShell results — commands that could not start or were ended', () => {
+  // A command that never started has no stderr of its own; without the spawn
+  // error a caller could only report "exit code 1".
+  it('reports why a command could not start as stderr, with exit code 1', async () => {
+    const command = 'terminator-no-such-command'
+    const result = await execShell({ command, args: [], cwd: scratch })
+
+    expect(result).toMatchObject({ exitCode: 1, stderr: `spawn ${command} ENOENT` })
+  })
+
+  it('reports a command ended by a signal as failed, not timed out', async () => {
+    fakeGh('kill -SEGV $$')
+
+    const result = await execShell({ command: 'gh', args: [], cwd: scratch })
+
+    expect(result).toMatchObject({ exitCode: 1, timedOut: false })
+  })
+
+  it('passes only the allowed environment, not everything the app has', async () => {
+    vi.stubEnv('AWS_SECRET_ACCESS_KEY', 'in-the-app-environment')
+    fakeGh('printf "%s|%s" "$GIT_TERMINAL_PROMPT" "${AWS_SECRET_ACCESS_KEY:-unset}"')
+
+    const result = await execShell({ command: 'gh', args: [], cwd: scratch })
+
+    vi.unstubAllEnvs()
+    expect(result.stdout).toBe('0|unset')
   })
 })
