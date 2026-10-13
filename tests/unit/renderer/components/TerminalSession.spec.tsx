@@ -17,7 +17,10 @@ const mockResizeObserver = vi.fn().mockImplementation(function () {
 vi.stubGlobal('ResizeObserver', mockResizeObserver)
 
 // Mock xterm and its addons
-function makeMockBuffer(rows: number, cols: number, lineText = '', viewportY = 0) {
+/** An 80 by 24 buffer whose every line reads `lineText`. */
+function makeMockBuffer(lineText = '', viewportY = 0) {
+  const rows = 24
+  const cols = 80
   return {
     active: {
       getLine: (_row: number) => ({
@@ -50,7 +53,7 @@ vi.mock('@xterm/xterm', () => {
       getSelection: vi.fn().mockReturnValue(''),
       registerLinkProvider: vi.fn().mockReturnValue({ dispose: vi.fn() }),
       onRender: vi.fn().mockReturnValue({ dispose: mockRenderDispose }),
-      buffer: makeMockBuffer(24, 80),
+      buffer: makeMockBuffer(),
       options: { theme: null as unknown },
     }
   })
@@ -675,7 +678,7 @@ function getProvider(lineText: string, providerIndex: number) {
   new TerminalInstance('ses-links', 1000)
   const instance = vi.mocked(Terminal).mock.results[0].value
   Object.defineProperty(instance, 'buffer', {
-    value: makeMockBuffer(24, 80, lineText),
+    value: makeMockBuffer(lineText),
     configurable: true,
   })
   return instance.registerLinkProvider.mock.calls[providerIndex][0]
@@ -838,7 +841,7 @@ function makeInstanceWithLine(lineText: string) {
   const termMock = vi.mocked(Terminal).mock.results.at(-1)!.value
   drawScreen(termMock, { width: 8, height: 16 })
   Object.defineProperty(termMock, 'buffer', {
-    value: makeMockBuffer(24, 80, lineText, 0),
+    value: makeMockBuffer(lineText, 0),
     configurable: true,
   })
   return instance
@@ -1130,7 +1133,7 @@ describe('TerminalInstance — link interaction (hover overlay + cmd+click) — 
     const instance = new TerminalInstance('ses-unopened', 1000)
     const termMock = vi.mocked(Terminal).mock.results.at(-1)!.value
     Object.defineProperty(termMock, 'buffer', {
-      value: makeMockBuffer(24, 80, 'https://example.com', 0),
+      value: makeMockBuffer('https://example.com', 0),
       configurable: true,
     })
     fire(instance.element, 'mousemove', { metaKey: true, clientX: 8, clientY: 0 })

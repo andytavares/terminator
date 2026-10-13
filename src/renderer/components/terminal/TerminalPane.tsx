@@ -15,153 +15,150 @@ interface Props {
   projectId: string
 }
 
-export function TerminalPane({ projectId }: Props): JSX.Element {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const prevSessionIdRef = useRef<string | null>(null)
-  const {
-    getSessionsForProject,
-    getActiveSessionForProject,
-    getTerminalInstance,
-    clearBellCount,
-    getPaneLayout,
-    setSplitRatio,
-    setFocusedSession,
-    focusRequest,
-  } = useSessionStore(
+const instanceOf = (sessionId: string) => useSessionStore.getState().getTerminalInstance(sessionId)
+
+/** What the pane draws: its project's tabs, the one showing, and that tab's split. */
+function usePaneState(projectId: string) {
+  const store = useSessionStore(
     useShallow((s) => ({
       getSessionsForProject: s.getSessionsForProject,
       getActiveSessionForProject: s.getActiveSessionForProject,
-      getTerminalInstance: s.getTerminalInstance,
-      clearBellCount: s.clearBellCount,
       getPaneLayout: s.getPaneLayout,
-      setSplitRatio: s.setSplitRatio,
-      setFocusedSession: s.setFocusedSession,
       focusRequest: s.focusRequest,
       sessions: s.sessions,
       projectViews: s.projectViews,
       terminalInstances: s.terminalInstances,
     }))
   )
-  const modalOpen = useModalStore((s) => s.depth > 0)
+  return {
+    activeSessionId: store.getActiveSessionForProject(projectId),
+    hasSessions: store.getSessionsForProject(projectId).length > 0,
+    layout: store.getPaneLayout(projectId),
+    focusRequest: store.focusRequest,
+  }
+}
 
-  const openError = useTerminalOpenErrorStore((s) => s.errors[projectId])
-  const retryOpen = useTerminalOpenErrorStore((s) => s.retry)
+/** A tab that opened clears the open error; the tab on screen has its bells seen. */
+function useShownTabSeen(
+  projectId: string,
+  { hasSessions, activeSessionId }: { hasSessions: boolean; activeSessionId: string | null }
+): void {
   const clearOpenError = useTerminalOpenErrorStore((s) => s.clearError)
-
-  const activeSessionId = getActiveSessionForProject(projectId)
-  const sessions = getSessionsForProject(projectId)
-  const hasSessions = sessions.length > 0
-  const layout = getPaneLayout(projectId)
-  // All hooks must run unconditionally before any early return.
   useEffect(() => {
     if (hasSessions) clearOpenError(projectId)
   }, [hasSessions, projectId, clearOpenError])
 
   useEffect(() => {
-    if (activeSessionId) clearBellCount(activeSessionId)
-  }, [activeSessionId, clearBellCount])
+    if (activeSessionId) useSessionStore.getState().clearBellCount(activeSessionId)
+  }, [activeSessionId])
+}
 
-  // Single-pane mode: mount/unmount the active terminal when it changes.
+/** Takes the previous terminal off screen and puts the next one in the container. */
+function swapTerminal(
+  prevId: string | null,
+  nextId: string | null,
+  container: HTMLDivElement | null
+): void {
+  if (prevId) instanceOf(prevId)?.unmount()
+  if (nextId && container) instanceOf(nextId)?.mount(container)
+}
+
+/** Single-pane mode: mounts the active terminal in the container, unmounting the one before. */
+function useSinglePaneMount(
+  containerRef: React.RefObject<HTMLDivElement>,
+  activeSessionId: string | null,
+  layout: PaneNode | null
+): void {
+  const prevSessionIdRef = useRef<string | null>(null)
   useEffect(() => {
     const prevId = prevSessionIdRef.current
     if (layout) {
       // LeafPane handles mounting in split mode. Reset ref so when the split
       // collapses, the surviving terminal gets remounted correctly. A tab that
       // showed alone and is no pane of this split goes off screen.
-      if (prevId && !leafIds(layout).includes(prevId)) getTerminalInstance(prevId)?.unmount()
+      if (prevId && !leafIds(layout).includes(prevId)) instanceOf(prevId)?.unmount()
       prevSessionIdRef.current = null
       return
     }
-    const nextId = activeSessionId
-    if (prevId === nextId) return
-
-    if (prevId) {
-      const prev = getTerminalInstance(prevId)
-      prev?.unmount()
-    }
-
-    if (nextId && containerRef.current) {
-      const next = getTerminalInstance(nextId)
-      next?.mount(containerRef.current)
-    }
-
-    prevSessionIdRef.current = nextId
-  }, [activeSessionId, layout, getTerminalInstance])
+    if (prevId === activeSessionId) return
+    swapTerminal(prevId, activeSessionId, containerRef.current)
+    prevSessionIdRef.current = activeSessionId
+  }, [containerRef, activeSessionId, layout])
 
   // Cleanup on unmount — useLayoutEffect so snapshot capture precedes browser layout.
   useLayoutEffect(() => {
     return () => {
       const currentId = prevSessionIdRef.current
       prevSessionIdRef.current = null
-      if (currentId) {
-        const instance = getTerminalInstance(currentId)
-        instance?.unmount()
-      }
+      if (currentId) instanceOf(currentId)?.unmount()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+}
 
-  // Any "go to session" path (sidebar click, Quick Actions, a notification)
-  // bumps focusRequest.nonce, even when the requested session was already
-  // active — which is exactly the case a change to activeSessionId alone
-  // cannot see, so this cannot be keyed off activeSessionId. Only reacts when
-  // the requested session belongs to this pane's project: single mode, it is
-  // the active session; split mode, it is one of the leaves.
-  // The request this pane last met. A modal closing re-runs the effect so a
-  // request made while it was open is met then; one already met is not met
-  // again, or closing Quick Actions would take focus from what the action
-  // just focused (the note editor of Edit session note).
+type PaneState = ReturnType<typeof usePaneState>
+
+// Any "go to session" path (sidebar click, Quick Actions, a notification)
+// bumps focusRequest.nonce, even when the requested session was already
+// active — which is exactly the case a change to activeSessionId alone
+// cannot see, so this cannot be keyed off activeSessionId. Only reacts when
+// the requested session belongs to this pane's project: single mode, it is
+// the active session; split mode, it is one of the leaves.
+// The request this pane last met. A modal closing re-runs the effect so a
+// request made while it was open is met then; one already met is not met
+// again, or closing Quick Actions would take focus from what the action
+// just focused (the note editor of Edit session note).
+function useFocusRequests(
+  projectId: string,
+  { focusRequest, layout, activeSessionId }: PaneState
+): void {
+  const modalOpen = useModalStore((s) => s.depth > 0)
   const metNonce = useRef<number | null>(null)
   useEffect(() => {
     if (!focusRequest || modalOpen || metNonce.current === focusRequest.nonce) return
     const { sessionId, nonce } = focusRequest
     const belongsHere = layout ? leafIds(layout).includes(sessionId) : activeSessionId === sessionId
     if (!belongsHere) return
-    if (layout) setFocusedSession(projectId, sessionId)
+    if (layout) useSessionStore.getState().setFocusedSession(projectId, sessionId)
     // A modal can open between this effect and the frame (⌘P right after
     // Settings closes); focusing the terminal then would steal its keys.
     requestAnimationFrame(() => {
       if (useModalStore.getState().depth > 0) return
       metNonce.current = nonce
-      getTerminalInstance(sessionId)?.terminal.focus()
+      instanceOf(sessionId)?.terminal.focus()
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusRequest?.nonce, modalOpen])
+}
 
+/** Focuses the active terminal now and whenever the window regains focus. */
+function useRefocusActive(activeSessionId: string | null): () => void {
   const refocusActive = useCallback(() => {
     if (!activeSessionId) return
-    const instance = getTerminalInstance(activeSessionId)
-    if (!instance) return
-    instance.terminal.focus()
-  }, [activeSessionId, getTerminalInstance])
+    instanceOf(activeSessionId)?.terminal.focus()
+  }, [activeSessionId])
 
   useEffect(() => {
     window.addEventListener('focus', refocusActive)
     return () => window.removeEventListener('focus', refocusActive)
   }, [refocusActive])
+  return refocusActive
+}
 
+export function TerminalPane({ projectId }: Props): JSX.Element {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const pane = usePaneState(projectId)
+  const { activeSessionId, layout } = pane
+  useShownTabSeen(projectId, pane)
+  useSinglePaneMount(containerRef, activeSessionId, layout)
+  useFocusRequests(projectId, pane)
+  const refocusActive = useRefocusActive(activeSessionId)
   const handleRatioChange = useCallback(
-    (splitId: string, ratio: number) => {
-      setSplitRatio(projectId, splitId, ratio)
-    },
-    [projectId, setSplitRatio]
+    (splitId: string, ratio: number) =>
+      useSessionStore.getState().setSplitRatio(projectId, splitId, ratio),
+    [projectId]
   )
 
-  if (sessions.length === 0) {
-    return (
-      <div className="terminal-pane terminal-pane--empty">
-        {openError ? (
-          <div className="terminal-pane__open-error" role="alert">
-            <span>Couldn&apos;t open a terminal: {openError}</span>
-            <Button onClick={() => retryOpen(projectId)}>Try again</Button>
-          </div>
-        ) : (
-          <span>Open a terminal tab to get started</span>
-        )}
-      </div>
-    )
-  }
-
+  if (!pane.hasSessions) return <EmptyTerminalPane projectId={projectId} />
   if (layout) {
     return (
       <div className="terminal-pane terminal-pane--split">
@@ -169,20 +166,53 @@ export function TerminalPane({ projectId }: Props): JSX.Element {
       </div>
     )
   }
+  return (
+    <SingleTerminal
+      containerRef={containerRef}
+      activeSessionId={activeSessionId}
+      refocusActive={refocusActive}
+    />
+  )
+}
 
+/** No tab yet: a prompt to open one, or why the last one would not open. */
+function EmptyTerminalPane({ projectId }: Props): JSX.Element {
+  const openError = useTerminalOpenErrorStore((s) => s.errors[projectId])
+  const retryOpen = useTerminalOpenErrorStore((s) => s.retry)
+  return (
+    <div className="terminal-pane terminal-pane--empty">
+      {openError ? (
+        <div className="terminal-pane__open-error" role="alert">
+          <span>Couldn&apos;t open a terminal: {openError}</span>
+          <Button onClick={() => retryOpen(projectId)}>Try again</Button>
+        </div>
+      ) : (
+        <span>Open a terminal tab to get started</span>
+      )}
+    </div>
+  )
+}
+
+function handleDragOver(e: React.DragEvent<HTMLDivElement>): void {
+  if (e.dataTransfer.types.includes('Files')) e.preventDefault()
+}
+
+interface SingleTerminalProps {
+  containerRef: React.RefObject<HTMLDivElement>
+  activeSessionId: string | null
+  refocusActive: () => void
+}
+
+/** One tab alone: a click focuses it, and files dropped on it paste their paths. */
+function SingleTerminal({ containerRef, activeSessionId, refocusActive }: SingleTerminalProps) {
   function handleMouseDown(e: React.MouseEvent): void {
     if (e.button !== 0) return
     refocusActive()
   }
 
-  function handleDragOver(e: React.DragEvent<HTMLDivElement>): void {
-    if (e.dataTransfer.types.includes('Files')) e.preventDefault()
-  }
-
   function handleDrop(e: React.DragEvent<HTMLDivElement>): void {
     e.preventDefault()
-    if (!activeSessionId) return
-    const instance = getTerminalInstance(activeSessionId)
+    const instance = activeSessionId ? instanceOf(activeSessionId) : undefined
     if (!instance) return
     const paths = droppedPaths(e.dataTransfer.files)
     if (paths) instance.terminal.paste(paths)

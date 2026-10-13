@@ -180,3 +180,38 @@ describe('LeafPane — calls mount with just the container element', () => {
     ).not.toThrow()
   })
 })
+
+describe('LeafPane — closing one pane', () => {
+  it('closes this pane alone: it leaves the split and its terminal ends', async () => {
+    installElectronApi({
+      terminal: { input: mockTerminalInput, close: vi.fn(async () => ({ success: true })) },
+    })
+    useSessionStore.setState({
+      sessions: new Map([
+        [
+          'sess-1',
+          terminalSessionOf({ id: 'sess-1', projectId: 'proj-1', tabTitle: 'Terminal 1' }),
+        ],
+        [
+          'sess-2',
+          terminalSessionOf({ id: 'sess-2', projectId: 'proj-1', tabTitle: 'Terminal 2' }),
+        ],
+      ]),
+    })
+    const { getByRole } = render(<LeafPane sessionId="sess-2" projectId="proj-1" />)
+    fireEvent.click(getByRole('button', { name: 'Close Terminal 2' }))
+    expect(useSessionStore.getState().getPaneLayout('proj-1')).toBeNull()
+    await vi.waitFor(() => expect(useSessionStore.getState().sessions.has('sess-2')).toBe(false))
+    expect(useSessionStore.getState().sessions.has('sess-1')).toBe(true)
+  })
+})
+
+describe('LeafPane — closing one pane — leaves a drag of something other than files to the browser', () => {
+  it('leaves a drag of something other than files to the browser', () => {
+    const { container } = render(<LeafPane sessionId="sess-1" projectId="proj-1" />)
+    const event = new Event('dragover', { bubbles: true, cancelable: true })
+    Object.assign(event, { dataTransfer: { types: ['text/plain'] } })
+    container.querySelector('.leaf-pane')!.dispatchEvent(event)
+    expect(event.defaultPrevented).toBe(false)
+  })
+})

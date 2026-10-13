@@ -783,3 +783,33 @@ describe('TabBar — the description, edited from the tab (054 FR-006) — offer
     expect(screen.getByText('Edit description…')).toBeTruthy()
   })
 })
+
+describe('TabBar — the drop target', () => {
+  const twoTabs = () => {
+    mockGetSessions.mockReturnValue([
+      { id: 'ses-1', tabTitle: 'Tab 1', type: 'human', agentState: 'idle' },
+      { id: 'ses-2', tabTitle: 'Tab 2', type: 'human', agentState: 'idle' },
+    ])
+    renderTabBar()
+    return document.querySelectorAll('.tab-bar__tab--session')
+  }
+
+  it('marks the tab a drag is over, and unmarks it when the drag leaves', () => {
+    const tabs = twoTabs()
+    fireEvent.dragStart(tabs[0])
+    fireEvent.dragOver(tabs[1])
+    expect(tabs[1].classList.contains('tab-bar__tab--dnd-over')).toBe(true)
+    fireEvent.dragLeave(tabs[1])
+    expect(tabs[1].classList.contains('tab-bar__tab--dnd-over')).toBe(false)
+  })
+
+  it('unmarks it, and moves nothing, when the drag is abandoned', () => {
+    const tabs = twoTabs()
+    fireEvent.dragStart(tabs[0])
+    fireEvent.dragOver(tabs[1])
+    fireEvent.dragEnd(tabs[0])
+    expect(tabs[1].classList.contains('tab-bar__tab--dnd-over')).toBe(false)
+    fireEvent.drop(tabs[1])
+    expect(mockReorderSessions).not.toHaveBeenCalled()
+  })
+})
