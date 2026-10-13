@@ -16,7 +16,8 @@ The phases in `docs/research/perf/` and the ADRs 093–105 record each decision.
 - node:sqlite replaces PGlite (ADR 099); Remote Control credentials (ADR 100).
 - Shell exec limited to declared roots (ADR 102); per-extension data folders (ADR 103).
 - CI gates: typecheck of every project, coverage on the patch (ADR 095), one version per dependency
-  (syncpack), unused code (knip, ADR 104), duplicate code (jscpd, ADR 105), temp-dir leak check,
+  (syncpack), unused code (knip, ADR 104), code only tests reach (knip --production, ADR 107),
+  duplicate code (jscpd, ADR 105), temp-dir leak check,
   selective e2e (`scripts/e2e-select.mjs`), perf budgets (`npm run test:perf`), Storybook stories.
 - Design system in Storybook (ADR 098); Linux baselines come from the `update-story-baselines`
   label workflow (`.github/workflows/story-baselines.yml`).
@@ -39,7 +40,7 @@ The phases in `docs/research/perf/` and the ADRs 093–105 record each decision.
 4. Foundry `readOnlyTools` and `criticalPaths` settings need multi-line input.
 5. Tests for the effect of each remaining setting.
 6. Remote Control: 4 of 9 channels are driven end to end; the other 5 need e2e.
-7. `knip --production` as a second gate.
+7. Done: `knip --production` is a second gate (ADR 107).
 8. Final review, the PR description with a "How to read this change" section, CI green on the head.
 
 ## Decisions made without the user
