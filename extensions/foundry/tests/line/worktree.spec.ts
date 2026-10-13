@@ -67,6 +67,11 @@ describe('where a checkout goes', () => {
 })
 
 describe('which branch a lane works on', () => {
+  describe('tracker names', trackerNamesTests)
+  describe('fallbacks', fallbacksTests)
+})
+
+function trackerNamesTests() {
   it("takes the tracker's own suggested name when the order carries one", () => {
     const seeded = order()
     const withBranch: WorkOrder = {
@@ -88,7 +93,9 @@ describe('which branch a lane works on', () => {
     }
     expect(branchFor(withSource, 1)).toBe('andrew/tav-15-ticket')
   })
+}
 
+function fallbacksTests() {
   it('falls back to the repository own head branch', () => {
     const seeded = order()
     const withHead: WorkOrder = {
@@ -104,9 +111,38 @@ describe('which branch a lane works on', () => {
   it('derives one from the order id when nothing named it', () => {
     expect(branchFor(order(), 1)).toBe('foundry/wo-1')
   })
-})
+}
 
 describe('preparing a checkout', () => {
+  describe('adding', addingTests)
+  describe('reusing', reusingTests)
+  describe('failures', failuresTests)
+  describe('concurrent callers', concurrentCallersTests)
+  describe('retrying', retryingTests)
+})
+
+function twoLanes(): WorkOrder {
+  const base = order()
+  return {
+    ...base,
+    context: {
+      ...base.context,
+      repos: [
+        { name: 'proto', path: '/repos/proto', lane: 1, baseBranch: 'main', headBranch: '' },
+        { name: 'cli', path: '/repos/cli', lane: 2, baseBranch: 'main', headBranch: '' },
+      ],
+    },
+    plan: {
+      ...base.plan,
+      lanes: [
+        { ord: 1, repo: 'proto', branch: '', role: null, blocks: [], blockedBy: [] },
+        { ord: 2, repo: 'cli', branch: '', role: null, blocks: [], blockedBy: [] },
+      ],
+    },
+  }
+}
+
+function addingTests() {
   it('adds a worktree on a branch cut from the base', async () => {
     const d = deps()
     const checkout = await ensureCheckout(order(), 1, d)
@@ -130,7 +166,9 @@ describe('preparing a checkout', () => {
     await ensureCheckout(order(), 1, d)
     expect(calls(d.exec).find((c) => c.args[1] === 'add')?.args).toContain('-B')
   })
+}
 
+function reusingTests() {
   it('reuses the worktree git already has, rather than adding a second', async () => {
     const target = path.join(ROOT, 'orders', 'WO-1', 'worktrees', 'app')
     const exec = vi.fn(async (options: { args: string[] }) =>
@@ -150,7 +188,9 @@ describe('preparing a checkout', () => {
     await ensureCheckout(order(), 1, d)
     expect(calls(d.exec)[0].args).toEqual(['worktree', 'list', '--porcelain'])
   })
+}
 
+function failuresTests() {
   it('says which repository failed, and why', async () => {
     const exec = vi.fn(async (options: { args: string[] }) =>
       options.args[1] === 'add'
@@ -168,7 +208,17 @@ describe('preparing a checkout', () => {
   it('refuses a lane the order does not have', async () => {
     await expect(ensureCheckout(order(), 9, deps())).rejects.toThrow(/no such lane/)
   })
+}
 
+/** What git prints when a second `worktree add` races the first for the same branch. */
+const CANNOT_LOCK = {
+  exitCode: 128,
+  stdout: '',
+  stderr: 'fatal: cannot lock ref: reference already exists',
+  timedOut: false,
+}
+
+function concurrentCallersTests() {
   it('gives two callers asking at once the same checkout, not a second add', async () => {
     // The scout and the architect's first turn both prepare lane 1 as an order
     // starts. Real git lists no worktree to either, then fails the second add
@@ -182,13 +232,7 @@ describe('preparing a checkout', () => {
         return { exitCode: 0, stdout, stderr: '', timedOut: false }
       }
       if (options.args[1] === 'add') {
-        if (adding || added)
-          return {
-            exitCode: 128,
-            stdout: '',
-            stderr: 'fatal: cannot lock ref: reference already exists',
-            timedOut: false,
-          }
+        if (adding || added) return CANNOT_LOCK
         adding = true
         await new Promise((r) => setTimeout(r, 5))
         added = true
@@ -203,7 +247,9 @@ describe('preparing a checkout', () => {
     expect(b.path).toBe(target)
     expect(calls(exec).filter((c) => c.args[1] === 'add')).toHaveLength(1)
   })
+}
 
+function retryingTests() {
   it('tries again after a failed attempt rather than repeating its error', async () => {
     let failNext = true
     const exec = vi.fn(async (options: { args: string[] }) => {
@@ -218,30 +264,13 @@ describe('preparing a checkout', () => {
     await expect(ensureCheckout(order(), 1, d)).rejects.toThrow(/transient/)
     await expect(ensureCheckout(order(), 1, d)).resolves.toMatchObject({ created: true })
   })
-})
+}
 
 describe('preparing every lane', () => {
-  function twoLanes(): WorkOrder {
-    const base = order()
-    return {
-      ...base,
-      context: {
-        ...base.context,
-        repos: [
-          { name: 'proto', path: '/repos/proto', lane: 1, baseBranch: 'main', headBranch: '' },
-          { name: 'cli', path: '/repos/cli', lane: 2, baseBranch: 'main', headBranch: '' },
-        ],
-      },
-      plan: {
-        ...base.plan,
-        lanes: [
-          { ord: 1, repo: 'proto', branch: '', role: null, blocks: [], blockedBy: [] },
-          { ord: 2, repo: 'cli', branch: '', role: null, blocks: [], blockedBy: [] },
-        ],
-      },
-    }
-  }
+  describe('every lane', everyLaneTests)
+})
 
+function everyLaneTests() {
   it('prepares all of them, in lane order', async () => {
     const d = deps()
     const checkouts = await ensureCheckouts(twoLanes(), d)
@@ -266,7 +295,7 @@ describe('preparing every lane', () => {
     const d = deps()
     expect((await ensureCheckouts(order(), d)).size).toBe(1)
   })
-})
+}
 
 describe('taking one away', () => {
   it('removes the worktree from the repository it was cut from', async () => {
@@ -293,15 +322,28 @@ describe('taking one away', () => {
   })
 })
 
+const scratch: string[] = []
+function tmpDir(prefix: string): string {
+  const dir = makeTempDir(prefix)
+  scratch.push(dir)
+  return dir
+}
+function lsFilesAnd(...manifests: string[]) {
+  return vi.fn(async (options: { args: string[] }) => {
+    if (options.args[0] === 'ls-files')
+      return {
+        exitCode: 0,
+        stdout: manifests.length === 0 ? '' : manifests.join('\0') + '\0',
+        stderr: '',
+        timedOut: false,
+      }
+    if (options.args[0] === 'check-ignore')
+      return { exitCode: 0, stdout: '', stderr: '', timedOut: false }
+    return { exitCode: 0, stdout: '', stderr: '', timedOut: false }
+  })
+}
+
 describe('provisioning dependencies', () => {
-  const scratch: string[] = []
-
-  function tmpDir(prefix: string): string {
-    const dir = makeTempDir(prefix)
-    scratch.push(dir)
-    return dir
-  }
-
   afterEach(() => {
     while (scratch.length > 0) {
       const dir = scratch.pop()
@@ -309,21 +351,84 @@ describe('provisioning dependencies', () => {
     }
   })
 
-  function lsFilesAnd(...manifests: string[]) {
-    return vi.fn(async (options: { args: string[] }) => {
-      if (options.args[0] === 'ls-files')
-        return {
-          exitCode: 0,
-          stdout: manifests.length === 0 ? '' : manifests.join('\0') + '\0',
-          stderr: '',
-          timedOut: false,
-        }
-      if (options.args[0] === 'check-ignore')
-        return { exitCode: 0, stdout: '', stderr: '', timedOut: false }
-      return { exitCode: 0, stdout: '', stderr: '', timedOut: false }
-    })
-  }
+  describe('linking', linkingTests)
+  describe('unlinking', unlinkingTests)
+  describe('nothing to link', nothingToLinkTests)
+  describe('check-ignore', checkIgnoreTests)
+  describe('reused checkouts', reusedCheckoutsTests)
+  describe('git unable to list', gitUnableToListTests)
+  describe('odd checkouts', oddCheckoutsTests)
+})
 
+/** git refusing every command, as in a directory that is no longer a repository. */
+const refusingGit = vi.fn(async () => ({
+  exitCode: 128,
+  stdout: '',
+  stderr: 'fatal: not a git repository',
+  timedOut: false,
+}))
+
+function gitUnableToListTests() {
+  it('lends nothing when git cannot list the manifests', async () => {
+    const origin = tmpDir('foundry-origin-')
+    const wt = tmpDir('foundry-wt-')
+    fs.mkdirSync(path.join(origin, 'node_modules'))
+    const checkout: Checkout = { repo: 'app', origin, path: wt, branch: 'b', created: true }
+
+    const linked = await provisionDependencies(checkout, deps({ exec: refusingGit as never }))
+
+    expect(linked).toEqual([])
+    expect(fs.existsSync(path.join(wt, 'node_modules'))).toBe(false)
+  })
+
+  it('takes nothing back when git cannot list the manifests', async () => {
+    const origin = tmpDir('foundry-origin-')
+    const wt = tmpDir('foundry-wt-')
+    fs.mkdirSync(path.join(origin, 'node_modules'))
+    fs.symlinkSync(path.join(origin, 'node_modules'), path.join(wt, 'node_modules'), 'dir')
+    const checkout: Checkout = { repo: 'app', origin, path: wt, branch: 'b', created: true }
+
+    const unlinked = await unlinkBorrowedDependencies(
+      checkout,
+      deps({ exec: refusingGit as never })
+    )
+
+    expect(unlinked).toEqual([])
+    expect(fs.lstatSync(path.join(wt, 'node_modules')).isSymbolicLink()).toBe(true)
+  })
+}
+
+function oddCheckoutsTests() {
+  it('lends nothing into a package directory the checkout does not have', async () => {
+    const origin = tmpDir('foundry-origin-')
+    const wt = tmpDir('foundry-wt-')
+    fs.mkdirSync(path.join(origin, 'packages', 'gone', 'node_modules'), { recursive: true })
+    const exec = lsFilesAnd('packages/gone/package.json')
+    const checkout: Checkout = { repo: 'app', origin, path: wt, branch: 'b', created: true }
+
+    const linked = await provisionDependencies(checkout, deps({ exec: exec as never }))
+
+    expect(linked).toEqual([])
+  })
+
+  it('never throws at a caller when git itself throws', async () => {
+    const exec = vi.fn(async () => {
+      throw new Error('spawn git ENOENT')
+    })
+    const checkout: Checkout = { repo: 'app', origin: '/o', path: '/w', branch: 'b', created: true }
+
+    await expect(provisionDependencies(checkout, deps({ exec: exec as never }))).resolves.toEqual(
+      []
+    )
+    await expect(
+      unlinkBorrowedDependencies(checkout, deps({ exec: exec as never }))
+    ).resolves.toEqual([])
+  })
+}
+
+const baseTarget = path.join(ROOT, 'orders', 'WO-1', 'worktrees', 'app@base')
+
+function linkingTests() {
   it('links the origin root node_modules into the worktree', async () => {
     const origin = tmpDir('foundry-origin-')
     const wt = tmpDir('foundry-wt-')
@@ -352,7 +457,9 @@ describe('provisioning dependencies', () => {
       true
     )
   })
+}
 
+function unlinkingTests() {
   // A reinstall into a borrowed node_modules would write through the link
   // into the origin's install, so the link goes first and only the link.
   it('unlinks borrowed node_modules and leaves the origin and real installs alone', async () => {
@@ -371,7 +478,9 @@ describe('provisioning dependencies', () => {
     expect(fs.existsSync(path.join(origin, 'node_modules', 'left-pad'))).toBe(true)
     expect(fs.existsSync(path.join(wt, 'packages', 'foo', 'node_modules'))).toBe(true)
   })
+}
 
+function nothingToLinkTests() {
   it('does not link when the origin has no node_modules', async () => {
     const origin = tmpDir('foundry-origin-')
     const wt = tmpDir('foundry-wt-')
@@ -397,7 +506,9 @@ describe('provisioning dependencies', () => {
     expect(linked).toEqual([])
     expect(fs.lstatSync(path.join(wt, 'node_modules')).isSymbolicLink()).toBe(false)
   })
+}
 
+function checkIgnoreTests() {
   it('removes the link when git check-ignore says the path is not ignored', async () => {
     const origin = tmpDir('foundry-origin-')
     const wt = tmpDir('foundry-wt-')
@@ -416,7 +527,9 @@ describe('provisioning dependencies', () => {
     expect(linked).toEqual([])
     expect(fs.existsSync(path.join(wt, 'node_modules'))).toBe(false)
   })
+}
 
+function reusedCheckoutsTests() {
   it('provisions a reused checkout as well as a freshly created one', async () => {
     const origin = tmpDir('foundry-origin-')
     const root = tmpDir('foundry-root-')
@@ -445,11 +558,15 @@ describe('provisioning dependencies', () => {
     expect(checkout.created).toBe(false)
     expect(fs.lstatSync(path.join(target, 'node_modules')).isSymbolicLink()).toBe(true)
   })
-})
+}
 
 describe('a checkout of the base branch', () => {
-  const baseTarget = path.join(ROOT, 'orders', 'WO-1', 'worktrees', 'app@base')
+  describe('adding and reusing', addingAndReusingTests)
+  describe('base failures', baseFailuresTests)
+  describe('removing it', removingItTests)
+})
 
+function addingAndReusingTests() {
   it('adds a detached worktree of the base beside the lane checkout', async () => {
     const d = deps()
     const checkout = await ensureBaseCheckout(order(), 1, d)
@@ -474,7 +591,9 @@ describe('a checkout of the base branch', () => {
     expect(checkout.created).toBe(false)
     expect(calls(exec).some((c) => c.args[1] === 'add')).toBe(false)
   })
+}
 
+function baseFailuresTests() {
   it('says which repository failed, and why', async () => {
     const exec = vi.fn(async (options: { args: string[] }) => ({
       exitCode: options.args[1] === 'add' ? 128 : 0,
@@ -490,7 +609,9 @@ describe('a checkout of the base branch', () => {
   it('refuses a lane the order does not have', async () => {
     await expect(ensureBaseCheckout(order(), 9, deps())).rejects.toBeInstanceOf(CheckoutFailedError)
   })
+}
 
+function removingItTests() {
   it('removes it and prunes, and never throws at a caller that is cleaning up', async () => {
     const d = deps()
     const checkout = await ensureBaseCheckout(order(), 1, d)
@@ -509,4 +630,4 @@ describe('a checkout of the base branch', () => {
     })
     await expect(removeBaseCheckout(checkout, failing)).resolves.toBeUndefined()
   })
-})
+}

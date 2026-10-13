@@ -36,6 +36,11 @@ afterEach(() => {
 })
 
 describe('appendEntry', () => {
+  describe('writing lines', writingLinesTests)
+  describe('concurrent and invalid entries', concurrentAndInvalidEntriesTests)
+})
+
+function writingLinesTests() {
   it('creates the file and its parent directory on first write', async () => {
     const nested = path.join(dir, 'orders', 'WO-1', 'ledger.jsonl')
     await appendEntry(nested, entry())
@@ -63,7 +68,9 @@ describe('appendEntry', () => {
     const entries = await readEntries(file)
     expect(entries.map((e) => e.action)).toEqual(['gate.decided', 'gate.reversed'])
   })
+}
 
+function concurrentAndInvalidEntriesTests() {
   it('lands every entry when many writers append at once', async () => {
     await Promise.all(
       Array.from({ length: 40 }, (_, i) => appendEntry(file, entry({ subject: `S-${i}` })))
@@ -80,7 +87,7 @@ describe('appendEntry', () => {
   it('rejects an entry with no action', async () => {
     await expect(appendEntry(file, entry({ action: '' }))).rejects.toThrow()
   })
-})
+}
 
 describe('readEntries', () => {
   it('returns nothing for a ledger that does not exist yet', async () => {
@@ -97,6 +104,11 @@ describe('readEntries', () => {
 })
 
 describe('every decision is attributable (FR-078)', () => {
+  describe('who, what and why', whoWhatAndWhyTests)
+  describe('evidence, gaps and order', evidenceGapsAndOrderTests)
+})
+
+function whoWhatAndWhyTests() {
   it('keeps all four of who, what, about what and why', async () => {
     await appendEntry(
       file,
@@ -124,7 +136,9 @@ describe('every decision is attributable (FR-078)', () => {
     const actors = (await readEntries(file)).map((e) => e.actor)
     expect(actors).toEqual(['operator', 'rule:budget.exceeded', 'role:verifier'])
   })
+}
 
+function evidenceGapsAndOrderTests() {
   it('carries the evidence a decision was taken on', async () => {
     await appendEntry(
       file,
@@ -153,4 +167,4 @@ describe('every decision is attributable (FR-078)', () => {
     const own = (await readEntries(file)).filter((e) => e.orderId === 'WO-2')
     expect(own.map((e) => e.subject)).toEqual(['b'])
   })
-})
+}

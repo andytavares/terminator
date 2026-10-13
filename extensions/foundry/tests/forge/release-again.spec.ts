@@ -38,6 +38,11 @@ function deps(entries: LedgerEntry[], over: Partial<ReleaseDeps> = {}): ReleaseD
 }
 
 describe('readyToHandOff', () => {
+  describe('agreeing again', agreeingAgainTests)
+  describe('why it did not start', whyItDidNotStartTests)
+})
+
+function agreeingAgainTests() {
   // Hand-off is the operator's (tests/hand-off.spec.ts): a draft nobody has
   // released waits for the button.
   it('waits for the operator when the order was never released', async () => {
@@ -56,7 +61,9 @@ describe('readyToHandOff', () => {
     expect(d.sayRestarted).toHaveBeenCalledWith(ORDER)
     expect(d.refuse).not.toHaveBeenCalled()
   })
+}
 
+function whyItDidNotStartTests() {
   it('records exactly why when it could not be agreed, and does not start', async () => {
     const d = deps([entry('order.agreed')], {
       agree: vi.fn(async () => ({ ok: false as const, reason: 'AC-5 has no way to verify it.' })),
@@ -74,4 +81,4 @@ describe('readyToHandOff', () => {
     expect(d.refuse).toHaveBeenCalledWith(ORDER, 'Unknown skill "ci-fix".')
     expect(d.sayRestarted).not.toHaveBeenCalled()
   })
-})
+}

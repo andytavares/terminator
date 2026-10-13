@@ -49,6 +49,11 @@ describe('createRoleRegistry', () => {
 })
 
 describe('assertResumable', () => {
+  describe('who may resume', whoMayResumeTests)
+  describe('the reason and the exceptions', theReasonAndTheExceptionsTests)
+})
+
+function whoMayResumeTests() {
   it('permits a role that may resume', () => {
     expect(() => createRoleRegistry(sources()).assertResumable('builder', 'sess-1')).not.toThrow()
   })
@@ -65,7 +70,9 @@ describe('assertResumable', () => {
       expect(() => registry.assertResumable(role, 'sess-1')).toThrow(ResumeForbiddenError)
     }
   })
+}
 
+function theReasonAndTheExceptionsTests() {
   it('says why, so the refusal is not a mystery in a log', () => {
     expect(() => createRoleRegistry(sources()).assertResumable('verifier', 's')).toThrow(
       /already been persuaded/
@@ -84,7 +91,7 @@ describe('assertResumable', () => {
       ResumeForbiddenError
     )
   })
-})
+}
 
 // `mayUseTool` takes the tool's own name, because that is what a hook is
 // handed. The role file's vocabulary is on the other side of the mapping.
@@ -128,6 +135,11 @@ describe('tool and write permissions', () => {
 // came back as "may write" because the check was `writes.length > 0`. The executor installs its read-only policy on
 // that answer, so the adversarial pass could edit the code it was reviewing.
 describe('who may write to the checkout', () => {
+  describe('which roles', whichRolesTests)
+  describe('the built-in role files', theBuiltInRoleFilesTests)
+})
+
+function whichRolesTests() {
   it('is the roles whose writes land in a working copy', () => {
     const registry = createRoleRegistry(sources())
     expect(registry.mayWrite('builder')).toBe(true)
@@ -146,7 +158,9 @@ describe('who may write to the checkout', () => {
     expect(registry.mayWrite('verifier')).toBe(false)
     expect(registry.mayWrite('inspector')).toBe(false)
   })
+}
 
+function theBuiltInRoleFilesTests() {
   it('agrees with what the built-in role files declare', () => {
     // The same set the built-ins spec asserts, checked through the registry
     // the executor actually asks.
@@ -162,7 +176,7 @@ describe('who may write to the checkout', () => {
     ].filter((role) => registry.mayWrite(role))
     expect(writers.sort()).toEqual(['builder', 'scribe'])
   })
-})
+}
 
 describe('writesOnlyDocs', () => {
   it('is true for the scribe, whose whole product is documentation', () => {

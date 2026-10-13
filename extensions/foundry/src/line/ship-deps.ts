@@ -168,10 +168,10 @@ export function ciSendBackFor(
     const shipId = shipNodeId(recipe)
     if (target === null || shipId === null) return false
 
-    graphRef.current = rework(graphRef.current, shipId, target, feedback)
+    graphRef.current = rework(graphRef.current, shipId, { to: target, feedback })
     await writeGraph(root, graphRef.current)
 
-    const outcome = await execute(order, recipe, graphRef.current, deps.executorDeps)
+    const outcome = await execute({ order, recipe, graph: graphRef.current }, deps.executorDeps)
     graphRef.current = outcome.graph
     await writeGraph(root, graphRef.current)
 
@@ -193,7 +193,7 @@ export async function settleShipNode(
   const { root, recipe, graphRef } = run
   const shipId = shipNodeId(recipe)
   if (shipId === null) return
-  const settled = settleShip(graphRef.current, shipId, asked, new Date().toISOString())
+  const settled = settleShip(graphRef.current, shipId, { asked, at: new Date().toISOString() })
   if (settled === graphRef.current) return
   graphRef.current = settled
   await writeGraph(root, graphRef.current)

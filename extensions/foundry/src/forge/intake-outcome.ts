@@ -72,6 +72,97 @@ export type IntakeOutcome =
   /** It finished and nothing moved, because the proposal was not accepted. */
   | { readonly kind: 'refused'; readonly at: string; readonly reason: string }
 
+type Running = Extract<IntakeOutcome, { kind: 'running' }>
+
+/** A turn that started with `entry` and has not ended, as `over` describes it. */
+function runningFrom(
+  entry: LedgerEntry,
+  over: Pick<Running, 'asked' | 'actor' | 'trigger' | 'round' | 'autoTurn'>
+): Running {
+  return { kind: 'running', at: entry.at, sessionId: entry.subject, ...over }
+}
+
+/** The number a `round N…` reason names, or null when it names none. */
+function roundIn(reason: string, pattern: RegExp): number | null {
+  const match = pattern.exec(reason)
+  return match === null ? null : Number(match[1])
+}
+
+/**
+ * Which automatic follow-up this is: every `converge.followed_up` since the
+ * most recent `converge.started`, this one included.
+ */
+function autoTurnAt(entries: readonly LedgerEntry[], i: number): number {
+  let autoTurn = 0
+  for (let j = i; j >= 0; j -= 1) {
+    if (entries[j].action === FOLLOWED_UP) autoTurn += 1
+    else if (entries[j].action === STARTED) break
+  }
+  return autoTurn
+}
+
+type IntakeReader = (
+  entry: LedgerEntry,
+  entries: readonly LedgerEntry[],
+  i: number
+) => IntakeOutcome
+
+const refused: IntakeReader = (entry) => ({ kind: 'refused', at: entry.at, reason: entry.reason })
+const redrafted: IntakeReader = (entry) => ({ kind: 'redrafted', at: entry.at, note: entry.reason })
+
+/** What each ledger action says about the last intake turn. */
+const INTAKE_READERS: Record<string, IntakeReader> = {
+  [REFUSED]: refused,
+  [REDRAFTED]: redrafted,
+  // A fix turn the review loop started names its own round in the reason it
+  // records: `red team round 2 fix`. Every other start is the operator's,
+  // whether typed just now or the very first draft.
+  [STARTED]: (entry) => {
+    const round = roundIn(entry.reason, /^red team round (\d+)/)
+    const trigger = round === null ? 'you' : 'automatic'
+    return runningFrom(entry, {
+      asked: entry.reason,
+      actor: 'architect',
+      trigger,
+      round,
+      autoTurn: null,
+    })
+  },
+  [FOLLOWED_UP]: (entry, entries, i) =>
+    runningFrom(entry, {
+      asked: entry.reason,
+      actor: 'architect',
+      trigger: 'automatic',
+      round: null,
+      autoTurn: autoTurnAt(entries, i),
+    }),
+  [REVIEW_REFUSED]: refused,
+  // The loop giving up is "needs you", not a refusal — nothing about the
+  // proposal was rejected, and the findings it stopped on are surfaced
+  // through `loopFacts(entries).exhausted` instead.
+  [REVIEW_EXHAUSTED]: redrafted,
+  [REVIEW_STARTED]: (entry) =>
+    runningFrom(entry, {
+      asked: `red team, ${entry.reason}`,
+      actor: 'red team',
+      trigger: 'automatic',
+      round: roundIn(entry.reason, /^round (\d+)/),
+      autoTurn: null,
+    }),
+  [SCOUT_STARTED]: (entry) =>
+    runningFrom(entry, {
+      asked: 'scout',
+      actor: 'scout',
+      trigger: 'automatic',
+      round: null,
+      autoTurn: null,
+    }),
+  // A round that finished is not a turn running — either a fix turn or the
+  // next round follows it, or nothing does because the order was handed off.
+  // Either way there is no session waiting on an answer right now.
+  [REVIEW_ROUND]: redrafted,
+}
+
 /**
  * Read the last intake turn out of an order's ledger.
  *
@@ -82,82 +173,9 @@ export type IntakeOutcome =
 export function lastIntake(entries: readonly LedgerEntry[]): IntakeOutcome {
   for (let i = entries.length - 1; i >= 0; i -= 1) {
     const entry = entries[i]
-    if (entry.action === REFUSED) return { kind: 'refused', at: entry.at, reason: entry.reason }
-    if (entry.action === REDRAFTED) return { kind: 'redrafted', at: entry.at, note: entry.reason }
-    if (entry.action === STARTED) {
-      // A fix turn the review loop started names its own round in the
-      // reason it records: `red team round 2 fix`. Every other start is the
-      // operator's, whether typed just now or the very first draft.
-      const match = /^red team round (\d+)/.exec(entry.reason)
-      return {
-        kind: 'running',
-        at: entry.at,
-        sessionId: entry.subject,
-        asked: entry.reason,
-        actor: 'architect',
-        trigger: match === null ? 'you' : 'automatic',
-        round: match === null ? null : Number(match[1]),
-        autoTurn: null,
-      }
+    if (Object.hasOwn(INTAKE_READERS, entry.action)) {
+      return INTAKE_READERS[entry.action](entry, entries, i)
     }
-    if (entry.action === FOLLOWED_UP) {
-      // Which automatic follow-up this is: every `converge.followed_up`
-      // since the most recent `converge.started`, this one included.
-      let autoTurn = 0
-      for (let j = i; j >= 0; j -= 1) {
-        if (entries[j].action === FOLLOWED_UP) autoTurn += 1
-        else if (entries[j].action === STARTED) break
-      }
-      return {
-        kind: 'running',
-        at: entry.at,
-        sessionId: entry.subject,
-        asked: entry.reason,
-        actor: 'architect',
-        trigger: 'automatic',
-        round: null,
-        autoTurn,
-      }
-    }
-    if (entry.action === REVIEW_REFUSED) {
-      return { kind: 'refused', at: entry.at, reason: entry.reason }
-    }
-    // The loop giving up is "needs you", not a refusal — nothing about the
-    // proposal was rejected, and the findings it stopped on are surfaced
-    // through `loopFacts(entries).exhausted` instead.
-    if (entry.action === REVIEW_EXHAUSTED) {
-      return { kind: 'redrafted', at: entry.at, note: entry.reason }
-    }
-    if (entry.action === REVIEW_STARTED) {
-      const match = /^round (\d+)/.exec(entry.reason)
-      return {
-        kind: 'running',
-        at: entry.at,
-        sessionId: entry.subject,
-        asked: `red team, ${entry.reason}`,
-        actor: 'red team',
-        trigger: 'automatic',
-        round: match === null ? null : Number(match[1]),
-        autoTurn: null,
-      }
-    }
-    if (entry.action === SCOUT_STARTED) {
-      return {
-        kind: 'running',
-        at: entry.at,
-        sessionId: entry.subject,
-        asked: 'scout',
-        actor: 'scout',
-        trigger: 'automatic',
-        round: null,
-        autoTurn: null,
-      }
-    }
-    // A round that finished is not a turn running — either a fix turn or the
-    // next round follows it, or nothing does because the order was handed
-    // off. Either way there is no session waiting on an answer right now.
-    if (entry.action === REVIEW_ROUND)
-      return { kind: 'redrafted', at: entry.at, note: entry.reason }
   }
   return { kind: 'none' }
 }
@@ -177,6 +195,52 @@ const REVIEW_HELD = 'review.held'
 const REVIEW_RELEASED = 'review.released'
 const ORDER_AGREED = 'order.agreed'
 
+/** What the ledger has said about the review loop so far, read in order. */
+interface LoopTally {
+  readonly rounds: { round: number; startedAt: string; finishedAt: string | null }[]
+  heldAt: string | null
+  releasedAt: string | null
+  lastOfStartedOrExhausted: 'started' | 'exhausted' | null
+  skipped: string | undefined
+}
+
+/** The round still open, finished at `at`. */
+function finishOpenRound(tally: LoopTally, at: string): void {
+  const open = [...tally.rounds].reverse().find((round) => round.finishedAt === null)
+  if (open !== undefined) open.finishedAt = at
+}
+
+/** What each ledger action does to the tally. */
+const LOOP_STEPS: Record<string, (tally: LoopTally, entry: LedgerEntry) => void> = {
+  [REVIEW_STARTED]: (tally, entry) => {
+    const match = /^round (\d+)/.exec(entry.reason)
+    tally.rounds.push({
+      round: match === null ? 0 : Number(match[1]),
+      startedAt: entry.at,
+      finishedAt: null,
+    })
+    tally.lastOfStartedOrExhausted = 'started'
+  },
+  [REVIEW_ROUND]: (tally, entry) => finishOpenRound(tally, entry.at),
+  [REVIEW_REFUSED]: (tally, entry) => finishOpenRound(tally, entry.at),
+  [REVIEW_EXHAUSTED]: (tally, entry) => {
+    finishOpenRound(tally, entry.at)
+    tally.lastOfStartedOrExhausted = 'exhausted'
+  },
+  [REVIEW_SKIPPED]: (tally, entry) => {
+    tally.skipped = entry.reason
+  },
+  [REDRAFTED]: (tally) => {
+    tally.skipped = undefined
+  },
+  [REVIEW_HELD]: (tally, entry) => {
+    tally.heldAt = entry.at
+  },
+  [REVIEW_RELEASED]: (tally, entry) => {
+    tally.releasedAt = entry.at
+  },
+}
+
 /**
  * Every red-team round on this order, and whether the operator has it held.
  *
@@ -185,44 +249,21 @@ const ORDER_AGREED = 'order.agreed'
  * history to draw "round 2 of 3" while round 3 is still running.
  */
 export function loopFacts(entries: readonly LedgerEntry[]): LoopFacts {
-  const rounds: { round: number; startedAt: string; finishedAt: string | null }[] = []
-  let heldAt: string | null = null
-  let releasedAt: string | null = null
-  let lastOfStartedOrExhausted: 'started' | 'exhausted' | null = null
-  let skipped: string | undefined
-
-  for (const entry of entries) {
-    if (entry.action === REVIEW_STARTED) {
-      const match = /^round (\d+)/.exec(entry.reason)
-      rounds.push({
-        round: match === null ? 0 : Number(match[1]),
-        startedAt: entry.at,
-        finishedAt: null,
-      })
-      lastOfStartedOrExhausted = 'started'
-    } else if (
-      entry.action === REVIEW_ROUND ||
-      entry.action === REVIEW_REFUSED ||
-      entry.action === REVIEW_EXHAUSTED
-    ) {
-      const open = [...rounds].reverse().find((round) => round.finishedAt === null)
-      if (open !== undefined) open.finishedAt = entry.at
-      if (entry.action === REVIEW_EXHAUSTED) lastOfStartedOrExhausted = 'exhausted'
-    } else if (entry.action === REVIEW_SKIPPED) {
-      skipped = entry.reason
-    } else if (entry.action === REDRAFTED) {
-      skipped = undefined
-    } else if (entry.action === REVIEW_HELD) {
-      heldAt = entry.at
-    } else if (entry.action === REVIEW_RELEASED) {
-      releasedAt = entry.at
-    }
+  const tally: LoopTally = {
+    rounds: [],
+    heldAt: null,
+    releasedAt: null,
+    lastOfStartedOrExhausted: null,
+    skipped: undefined,
   }
-
+  for (const entry of entries) {
+    if (Object.hasOwn(LOOP_STEPS, entry.action)) LOOP_STEPS[entry.action](tally, entry)
+  }
+  const { heldAt, releasedAt, skipped } = tally
   return {
-    rounds,
+    rounds: tally.rounds,
     heldAt: heldAt !== null && (releasedAt === null || heldAt > releasedAt) ? heldAt : null,
-    exhausted: lastOfStartedOrExhausted === 'exhausted',
+    exhausted: tally.lastOfStartedOrExhausted === 'exhausted',
     ...(skipped === undefined ? {} : { skipped }),
   }
 }

@@ -37,6 +37,26 @@ function refused(command: string, result: ExecResult, timeoutMs: number): Commit
   }
 }
 
+/** One git command a commit runs, by the name a refusal reports it under. */
+interface GitStep {
+  readonly name: string
+  readonly args: string[]
+  readonly timeoutMs: number
+}
+
+/** Runs one step; its result, or the refusal when it failed or ran out of time. */
+async function gitStep(
+  exec: ShellExec,
+  cwd: string,
+  step: GitStep
+): Promise<{ ok: true; result: ExecResult } | { ok: false; outcome: CommitOutcome }> {
+  const result = await exec({ command: 'git', args: step.args, cwd, timeoutMs: step.timeoutMs })
+  if (result.exitCode !== 0 || result.timedOut) {
+    return { ok: false, outcome: refused(step.name, result, step.timeoutMs) }
+  }
+  return { ok: true, result }
+}
+
 /**
  * Commit whatever is uncommitted in a checkout.
  *
@@ -48,35 +68,21 @@ export async function commitWorktree(
   message: string,
   exec: ShellExec
 ): Promise<CommitOutcome> {
-  const status = await exec({
-    command: 'git',
+  const status = await gitStep(exec, cwd, {
+    name: 'git status',
     args: ['status', '--porcelain'],
-    cwd,
     timeoutMs: LOCAL_STEP_TIMEOUT_MS,
   })
-  if (status.exitCode !== 0 || status.timedOut) {
-    return refused('git status', status, LOCAL_STEP_TIMEOUT_MS)
-  }
-  if (status.stdout.trim() === '') return { kind: 'clean' }
+  if (!status.ok) return status.outcome
+  if (status.result.stdout.trim() === '') return { kind: 'clean' }
 
-  const added = await exec({
-    command: 'git',
-    args: ['add', '-A'],
-    cwd,
-    timeoutMs: LOCAL_STEP_TIMEOUT_MS,
-  })
-  if (added.exitCode !== 0 || added.timedOut) {
-    return refused('git add', added, LOCAL_STEP_TIMEOUT_MS)
-  }
-
-  const committed = await exec({
-    command: 'git',
-    args: ['commit', '-m', message],
-    cwd,
-    timeoutMs: COMMIT_TIMEOUT_MS,
-  })
-  if (committed.exitCode !== 0 || committed.timedOut) {
-    return refused('git commit', committed, COMMIT_TIMEOUT_MS)
+  const steps: GitStep[] = [
+    { name: 'git add', args: ['add', '-A'], timeoutMs: LOCAL_STEP_TIMEOUT_MS },
+    { name: 'git commit', args: ['commit', '-m', message], timeoutMs: COMMIT_TIMEOUT_MS },
+  ]
+  for (const step of steps) {
+    const done = await gitStep(exec, cwd, step)
+    if (!done.ok) return done.outcome
   }
   return { kind: 'committed' }
 }

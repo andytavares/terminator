@@ -21,6 +21,12 @@ const TICKET = [
 ].join('\n')
 
 describe('acceptanceFromTicket', () => {
+  describe('taking the criteria', takingTheCriteriaTests)
+  describe('other headings and lists', otherHeadingsAndListsTests)
+  describe('nothing stated', nothingStatedTests)
+})
+
+function takingTheCriteriaTests() {
   it('takes the criteria a ticket states', () => {
     const found = acceptanceFromTicket(TICKET)
     expect(found.map((c) => c.statement)).toEqual([
@@ -50,7 +56,9 @@ describe('acceptanceFromTicket', () => {
     expect(first.verify).toMatchObject({ rubric: 'All text in the application is red' })
     expect(first.unverifiable).toBeNull()
   })
+}
 
+function otherHeadingsAndListsTests() {
   it('reads the other things people call that heading', () => {
     for (const heading of [
       '## Acceptance',
@@ -75,7 +83,9 @@ describe('acceptanceFromTicket', () => {
     const found = acceptanceFromTicket('# Acceptance Criteria\nAll of these:\n- one\n- two\n')
     expect(found.map((c) => c.statement)).toEqual(['one', 'two'])
   })
+}
 
+function nothingStatedTests() {
   it('finds nothing in a ticket that states nothing', () => {
     expect(acceptanceFromTicket('# Summary\nJust do the thing.\n')).toEqual([])
     expect(acceptanceFromTicket('')).toEqual([])
@@ -87,4 +97,4 @@ describe('acceptanceFromTicket', () => {
     // finding none.
     expect(acceptanceFromTicket('- open the app\n- click the thing\n')).toEqual([])
   })
-})
+}

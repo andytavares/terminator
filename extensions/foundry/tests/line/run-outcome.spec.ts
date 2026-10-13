@@ -23,6 +23,12 @@ function entry(over: Partial<LedgerEntry> & Pick<LedgerEntry, 'action'>): Ledger
 }
 
 describe('runFailure', () => {
+  describe('refusals', refusalsTests)
+  describe('shipping failures', shippingFailuresTests)
+  describe('resumed and clean runs', resumedAndCleanRunsTests)
+})
+
+function refusalsTests() {
   // An agreed order whose run refused to start never reached `running`, so
   // the refusal is the only record of why nothing is building.
   it('is the reason when the run refused to start', () => {
@@ -41,7 +47,9 @@ describe('runFailure', () => {
       ])
     ).toBeNull()
   })
+}
 
+function shippingFailuresTests() {
   // The exact WO-0913-0bd tail: a run that finished its graph and then failed
   // trying to ship it.
   it('is the reason when the run finished and then failed to ship', () => {
@@ -69,7 +77,9 @@ describe('runFailure', () => {
     ])
     expect(reason).toBe('no acceptance criteria were verified')
   })
+}
 
+function resumedAndCleanRunsTests() {
   // A retry clears the old failure: `run.resumed` is recorded before the retry
   // starts, so a scan hitting it first reads null rather than the stale
   // reason from the attempt before.
@@ -88,9 +98,14 @@ describe('runFailure', () => {
     expect(runFailure([entry({ action: 'run.complete' })])).toBeNull()
     expect(runFailure([entry({ action: 'run.halted', reason: 'waiting on a gate' })])).toBeNull()
   })
-})
+}
 
 describe('runDocumentReady', () => {
+  describe('the latest attempt', theLatestAttemptTests)
+  describe('failures', failuresTests)
+})
+
+function theLatestAttemptTests() {
   it('is the reason when the latest attempt ended on a document', () => {
     expect(
       runDocumentReady([
@@ -116,7 +131,9 @@ describe('runDocumentReady', () => {
       ])
     ).toBeNull()
   })
+}
 
+function failuresTests() {
   it('is not a failure, and a failure after it is', () => {
     const ready = [
       entry({ action: 'run.started' }),
@@ -134,4 +151,4 @@ describe('runDocumentReady', () => {
       ])
     ).toBeNull()
   })
-})
+}

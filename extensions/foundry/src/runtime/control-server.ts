@@ -155,80 +155,23 @@ function parseEvent(body: string): { sessionId: string; kind: AgentEventKind } |
   return { sessionId, kind }
 }
 
+/** What every request is checked against and routed to: the run's token and each session's handlers. */
+interface ControlState {
+  readonly token: string
+  readonly handlers: Map<string, SessionHandlers>
+}
+
 export async function createControlServer(): Promise<ControlServer> {
-  const token = randomBytes(32).toString('hex')
-  const handlers = new Map<string, SessionHandlers>()
+  const state: ControlState = {
+    token: randomBytes(32).toString('hex'),
+    handlers: new Map<string, SessionHandlers>(),
+  }
+  const { token, handlers } = state
 
   const server: Server = createServer((request, response) => {
-    void (async () => {
-      const path = request.url
-      if (request.method !== 'POST' || (path !== '/pretooluse' && path !== '/event')) {
-        send(response, 404, FALL_BACK_TO_THE_TERMINAL)
-        return
-      }
-      if (request.headers.authorization !== `Bearer ${token}`) {
-        send(response, 401, FALL_BACK_TO_THE_TERMINAL)
-        return
-      }
-
-      let body: string
-      try {
-        body = await readBody(request)
-      } catch {
-        send(response, 400, FALL_BACK_TO_THE_TERMINAL)
-        return
-      }
-
-      if (path === '/event') {
-        const event = parseEvent(body)
-        if (event === null) {
-          send(response, 400, FALL_BACK_TO_THE_TERMINAL)
-          return
-        }
-        // Answered first, acted on second: a lifecycle hook must never hold
-        // the agent up, and it has nothing to wait for.
-        send(response, 200, { permissionDecision: 'allow' })
-        try {
-          handlers.get(event.sessionId)?.onEvent?.(event.kind)
-        } catch {
-          // A listener that throws is a bug in a surface, not a reason to take
-          // the server down with an unhandled rejection.
-        }
-        return
-      }
-
-      const asked = parseRequest(body)
-      if (asked === null) {
-        send(response, 400, FALL_BACK_TO_THE_TERMINAL)
-        return
-      }
-
-      const handler = handlers.get(asked.sessionId)?.decide
-      if (handler === undefined) {
-        // A session the console does not know about — it restarted, or the
-        // terminal outlived the run. The operator can still answer in the
-        // terminal, so the agent is not stuck.
-        send(response, 200, FALL_BACK_TO_THE_TERMINAL)
-        return
-      }
-
-      // The connection stays open here, for as long as it takes.
-      let decided: HookDecision
-      try {
-        decided = await handler(asked)
-      } catch {
-        decided = FALL_BACK_TO_THE_TERMINAL
-      }
-      if (!response.writableEnded) send(response, 200, decided)
-    })()
+    void handleRequest(state, request, response)
   })
-
-  await new Promise<void>((resolve, reject) => {
-    server.once('error', reject)
-    // Loopback only. A hook running on this machine is the only caller there
-    // should ever be.
-    server.listen(0, '127.0.0.1', resolve)
-  })
+  await listenOnLoopback(server)
 
   const address = server.address()
   const port = typeof address === 'object' && address !== null ? address.port : 0
@@ -243,14 +186,100 @@ export async function createControlServer(): Promise<ControlServer> {
       return () => handlers.delete(sessionId)
     },
 
-    async close(): Promise<void> {
-      handlers.clear()
-      await new Promise<void>((resolve) => {
-        // Closes the listener; a hook still waiting on a decision is severed,
-        // and its script falls back to the terminal prompt.
-        server.closeAllConnections?.()
-        server.close(() => resolve())
-      })
-    },
+    close: () => closeServer(server, handlers),
   }
+}
+
+function listenOnLoopback(server: Server): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    server.once('error', reject)
+    // Loopback only. A hook running on this machine is the only caller there
+    // should ever be.
+    server.listen(0, '127.0.0.1', resolve)
+  })
+}
+
+async function closeServer(server: Server, handlers: Map<string, SessionHandlers>): Promise<void> {
+  handlers.clear()
+  await new Promise<void>((resolve) => {
+    // Closes the listener; a hook still waiting on a decision is severed,
+    // and its script falls back to the terminal prompt.
+    server.closeAllConnections?.()
+    server.close(() => resolve())
+  })
+}
+
+/** One hook's request: refused, an event, or a tool call held until it is decided. */
+async function handleRequest(
+  state: ControlState,
+  request: IncomingMessage,
+  response: ServerResponse
+): Promise<void> {
+  const path = request.url
+  if (request.method !== 'POST' || (path !== '/pretooluse' && path !== '/event')) {
+    send(response, 404, FALL_BACK_TO_THE_TERMINAL)
+    return
+  }
+  if (request.headers.authorization !== `Bearer ${state.token}`) {
+    send(response, 401, FALL_BACK_TO_THE_TERMINAL)
+    return
+  }
+
+  let body: string
+  try {
+    body = await readBody(request)
+  } catch {
+    send(response, 400, FALL_BACK_TO_THE_TERMINAL)
+    return
+  }
+
+  if (path === '/event') handleEvent(state, body, response)
+  else await handleToolCall(state, body, response)
+}
+
+function handleEvent(state: ControlState, body: string, response: ServerResponse): void {
+  const event = parseEvent(body)
+  if (event === null) {
+    send(response, 400, FALL_BACK_TO_THE_TERMINAL)
+    return
+  }
+  // Answered first, acted on second: a lifecycle hook must never hold
+  // the agent up, and it has nothing to wait for.
+  send(response, 200, { permissionDecision: 'allow' })
+  try {
+    state.handlers.get(event.sessionId)?.onEvent?.(event.kind)
+  } catch {
+    // A listener that throws is a bug in a surface, not a reason to take
+    // the server down with an unhandled rejection.
+  }
+}
+
+async function handleToolCall(
+  state: ControlState,
+  body: string,
+  response: ServerResponse
+): Promise<void> {
+  const asked = parseRequest(body)
+  if (asked === null) {
+    send(response, 400, FALL_BACK_TO_THE_TERMINAL)
+    return
+  }
+
+  const handler = state.handlers.get(asked.sessionId)?.decide
+  if (handler === undefined) {
+    // A session the console does not know about — it restarted, or the
+    // terminal outlived the run. The operator can still answer in the
+    // terminal, so the agent is not stuck.
+    send(response, 200, FALL_BACK_TO_THE_TERMINAL)
+    return
+  }
+
+  // The connection stays open here, for as long as it takes.
+  let decided: HookDecision
+  try {
+    decided = await handler(asked)
+  } catch {
+    decided = FALL_BACK_TO_THE_TERMINAL
+  }
+  if (!response.writableEnded) send(response, 200, decided)
 }

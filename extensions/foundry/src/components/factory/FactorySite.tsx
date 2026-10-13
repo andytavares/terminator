@@ -6,10 +6,10 @@ import type { Signal } from '../../sensors/types.js'
 import type { CiState } from '../../line/ci-state.js'
 import { HallThumbnail } from './HallThumbnail.js'
 import { ciLabel } from '../../line/ci-label.js'
-import { Button, usePolling } from '@terminator/extension-ui'
+import { Button } from '@terminator/extension-ui'
 import { usePushed, ANY_RECORD } from '../../renderer/use-pushed.js'
 import { invoke } from '@terminator/extension-sdk/renderer'
-import { readSignals, type SensorRow, type SignalsRead } from '../signals-read.js'
+import { usePromotion, useSignalFeed } from '../../renderer/use-signals.js'
 
 // The Factory's front door: every order in the workspace, as a hall card, in
 // place of the list rows `Orders.tsx` draws in List mode.
@@ -68,6 +68,78 @@ interface QueueChain {
   readonly joins: readonly number[]
 }
 
+/** Which orders are joined, through any number of others: a union-find over their ids. */
+class Joins {
+  private readonly parent = new Map<string, string>()
+
+  find(id: string): string {
+    let root = id
+    while (this.parent.has(root)) root = this.parent.get(root) as string
+    return root
+  }
+
+  union(a: string, b: string): void {
+    const ra = this.find(a)
+    const rb = this.find(b)
+    if (ra !== rb) this.parent.set(ra, rb)
+  }
+}
+
+/** What the list says of the queues: each order's title and place, who sits behind whom, and over how many files. */
+interface QueueFacts {
+  readonly title: Map<string, string>
+  readonly position: Map<string, number>
+  readonly shared: Map<string, number>
+  readonly joins: Joins
+}
+
+const pairKey = (a: string, b: string): string => [a, b].sort().join('|')
+
+function queueFacts(rows: readonly FactoryOrderRow[]): QueueFacts {
+  const facts: QueueFacts = {
+    title: new Map(),
+    position: new Map(),
+    shared: new Map(),
+    joins: new Joins(),
+  }
+  for (const row of rows) {
+    facts.title.set(row.id, row.title)
+    if (row.queue != null) facts.position.set(row.id, row.queue.position)
+  }
+  for (const row of rows) {
+    if (row.queue == null) continue
+    for (const entry of row.queue.behind) {
+      facts.title.set(entry.orderId, entry.title)
+      facts.joins.union(row.id, entry.orderId)
+      facts.shared.set(pairKey(row.id, entry.orderId), entry.files.length)
+    }
+  }
+  return facts
+}
+
+/** Every order named, grouped with the ones it is joined to. */
+function groupsOf({ title, joins }: QueueFacts): Set<string>[] {
+  const groups = new Map<string, Set<string>>()
+  for (const id of title.keys()) {
+    const root = joins.find(id)
+    const group = groups.get(root) ?? new Set<string>()
+    group.add(id)
+    groups.set(root, group)
+  }
+  return [...groups.values()]
+}
+
+/** One group as a chain, in queue order, with the files shared at each join. */
+function chainOf(group: ReadonlySet<string>, { title, position, shared }: QueueFacts): QueueChain {
+  const tokens = [...group]
+    .map((id) => ({ id, title: title.get(id) ?? id, position: position.get(id) ?? 0 }))
+    .sort((a, b) => a.position - b.position)
+  const joins = tokens
+    .slice(1)
+    .map((token, index) => shared.get(pairKey(tokens[index].id, token.id)) ?? 0)
+  return { tokens, joins }
+}
+
 /**
  * The refinery's queues, as chains of orders that overlap on disk.
  *
@@ -77,55 +149,10 @@ interface QueueChain {
  * whichever repository it is.
  */
 function refineryChains(rows: readonly FactoryOrderRow[]): QueueChain[] {
-  const title = new Map<string, string>()
-  const position = new Map<string, number>()
-  for (const row of rows) {
-    title.set(row.id, row.title)
-    if (row.queue != null) position.set(row.id, row.queue.position)
-  }
-
-  const parent = new Map<string, string>()
-  const find = (id: string): string => {
-    let root = id
-    while (parent.has(root)) root = parent.get(root) as string
-    return root
-  }
-  const union = (a: string, b: string): void => {
-    const ra = find(a)
-    const rb = find(b)
-    if (ra !== rb) parent.set(ra, rb)
-  }
-
-  const shared = new Map<string, number>()
-  for (const row of rows) {
-    if (row.queue == null) continue
-    for (const entry of row.queue.behind) {
-      title.set(entry.orderId, entry.title)
-      union(row.id, entry.orderId)
-      shared.set([row.id, entry.orderId].sort().join('|'), entry.files.length)
-    }
-  }
-
-  const groups = new Map<string, Set<string>>()
-  for (const id of title.keys()) {
-    const root = find(id)
-    const group = groups.get(root) ?? new Set<string>()
-    group.add(id)
-    groups.set(root, group)
-  }
-
-  const chains: QueueChain[] = []
-  for (const group of groups.values()) {
-    if (group.size < 2) continue
-    const tokens = [...group]
-      .map((id) => ({ id, title: title.get(id) ?? id, position: position.get(id) ?? 0 }))
-      .sort((a, b) => a.position - b.position)
-    const joins = tokens
-      .slice(1)
-      .map((token, index) => shared.get([tokens[index].id, token.id].sort().join('|')) ?? 0)
-    chains.push({ tokens, joins })
-  }
-  return chains
+  const facts = queueFacts(rows)
+  return groupsOf(facts)
+    .filter((group) => group.size >= 2)
+    .map((group) => chainOf(group, facts))
 }
 
 /** Finished, with nothing left for anyone to do. A shipped order still
@@ -134,38 +161,43 @@ function isCompleted(row: FactoryOrderRow): boolean {
   return row.standing === undefined ? row.status === 'shipped' : row.standing.kind === 'done'
 }
 
-function HallGrid({
-  rows,
-  onOpen,
-}: {
+interface GridProps {
   readonly rows: readonly FactoryOrderRow[]
   readonly onOpen: (order: FactoryOrderRow) => void
-}): JSX.Element {
+}
+
+function HallGrid({ rows, onOpen }: GridProps): JSX.Element {
   return (
     <div className="fdry-hall-grid">
       {rows.map((row) => (
-        <button
-          key={row.id}
-          type="button"
-          className={isCompleted(row) ? 'fdry-hall-card is-done' : 'fdry-hall-card'}
-          onClick={() => onOpen(row)}
-        >
-          {row.standing?.turn === 'you' ? (
-            <span className="fdry-hall-card-beacon" aria-hidden="true" />
-          ) : null}
-          <HallThumbnail
-            orderId={row.id}
-            title={row.title}
-            refreshKey={`${row.status}:${row.standing?.kind ?? ''}:${row.ci?.status ?? ''}:${row.ci?.round ?? ''}`}
-          />
-          <b>{row.title}</b>
-          {row.standing === undefined ? null : (
-            <span className="fdry-hall-card-state">{row.standing.label}</span>
-          )}
-          {row.ci ? <span className="fdry-hall-card-ci">{ciLine(row.ci)}</span> : null}
-        </button>
+        <HallCard key={row.id} row={row} onOpen={onOpen} />
       ))}
     </div>
+  )
+}
+
+/** What a card's thumbnail is drawn again for: a change in status, standing or CI round. */
+function refreshKeyOf(row: FactoryOrderRow): string {
+  return `${row.status}:${row.standing?.kind ?? ''}:${row.ci?.status ?? ''}:${row.ci?.round ?? ''}`
+}
+
+function HallCard({ row, onOpen }: { readonly row: FactoryOrderRow } & Pick<GridProps, 'onOpen'>) {
+  return (
+    <button
+      type="button"
+      className={isCompleted(row) ? 'fdry-hall-card is-done' : 'fdry-hall-card'}
+      onClick={() => onOpen(row)}
+    >
+      {row.standing?.turn === 'you' ? (
+        <span className="fdry-hall-card-beacon" aria-hidden="true" />
+      ) : null}
+      <HallThumbnail orderId={row.id} title={row.title} refreshKey={refreshKeyOf(row)} />
+      <b>{row.title}</b>
+      {row.standing === undefined ? null : (
+        <span className="fdry-hall-card-state">{row.standing.label}</span>
+      )}
+      {row.ci ? <span className="fdry-hall-card-ci">{ciLine(row.ci)}</span> : null}
+    </button>
   )
 }
 
@@ -203,65 +235,31 @@ async function readMetrics(window: '30d' | 'all'): Promise<FactoryMetrics | null
   return 'error' in r ? null : r
 }
 
-export function FactorySite({ onOpen }: FactorySiteProps): JSX.Element {
+/** Every order, and the factory's numbers over the window chosen; both pushed. */
+function useSiteRecords() {
   const [rows, setRows] = useState<FactoryOrderRow[]>([])
   const [window_, setWindow] = useState<'30d' | 'all'>('30d')
   const [metrics, setMetrics] = useState<FactoryMetrics | null>(null)
-  const [signals, setSignals] = useState<Signal[]>([])
-  const [sensors, setSensors] = useState<SensorRow[]>([])
-  const [promoting, setPromoting] = useState<string | null>(null)
-  const [repoDraft, setRepoDraft] = useState('')
-  const [dockProblem, setDockProblem] = useState<string | null>(null)
-  const [promoted, setPromoted] = useState<string | null>(null)
-
   const readMetricsFor = useCallback(() => readMetrics(window_), [window_])
   const showMetrics = useCallback((read: FactoryMetrics | null): void => {
     if (read !== null) setMetrics(read)
   }, [])
-  const showSignals = useCallback((read: SignalsRead): void => {
-    setSignals(read.signals)
-    setSensors(read.sensors)
-  }, [])
-
-  const refreshSignals = useCallback(() => readSignals().then(showSignals), [showSignals])
-
   usePushed(readOrders, setRows, { kinds: ANY_RECORD })
   usePushed(readMetricsFor, showMetrics, { kinds: ANY_RECORD })
-  usePolling(readSignals, showSignals, SIGNALS_POLL_MS)
+  return { rows, window_, setWindow, metrics }
+}
 
-  const startPromote = useCallback(
-    (signal: Signal) => {
-      const sensor = sensors.find((s) => s.def.id === signal.sensorId)
-      setDockProblem(null)
-      setPromoted(null)
-      setRepoDraft(sensor?.state.repoPath ?? '')
-      setPromoting(signal.id)
-    },
-    [sensors]
-  )
+/** The sensors' signals on the dock, and promoting one into a draft. */
+function useDock() {
+  const { signals, sensors, refreshSignals } = useSignalFeed(SIGNALS_POLL_MS)
+  return { signals, ...usePromotion(sensors, refreshSignals) }
+}
 
-  const confirmPromote = useCallback(
-    async (id: string) => {
-      setDockProblem(null)
-      const result = (await invoke('foundry:signals.promote', {
-        id,
-        repoPaths: [repoDraft],
-      })) as { order?: { id: string }; error?: string }
-      if (result.error !== undefined) {
-        setDockProblem(result.error)
-        return
-      }
-      setPromoting(null)
-      setPromoted(`Draft ${result.order?.id ?? ''} created — open it in the Forge`)
-      await refreshSignals()
-    },
-    [repoDraft, refreshSignals]
-  )
+type Dock = ReturnType<typeof useDock>
 
-  const chains = refineryChains(rows)
-  const completed = rows.filter(isCompleted)
-  const active = rows.filter((row) => !isCompleted(row))
-
+export function FactorySite({ onOpen }: FactorySiteProps): JSX.Element {
+  const { rows, window_, setWindow, metrics } = useSiteRecords()
+  const dock = useDock()
   return (
     <div className="fdry-site">
       <aside className="fdry-status-wall" aria-label="Status wall">
@@ -274,99 +272,132 @@ export function FactorySite({ onOpen }: FactorySiteProps): JSX.Element {
         )}
       </aside>
       <div className="fdry-site-main">
-        {signals.length > 0 ? (
-          <div className="fdry-dock" aria-label="Dock">
-            <h3 className="fdry-panel-h">Dock</h3>
-            {dockProblem !== null ? <p className="fdry-problem">{dockProblem}</p> : null}
-            {promoted !== null ? <p className="fdry-note">{promoted}</p> : null}
-            <div className="fdry-dock-crates">
-              {signals.map((signal) => (
-                <div key={signal.id} className="fdry-crate">
-                  <b>{signal.title}</b>
-                  <span className="fdry-crate-meta">
-                    ×{signal.occurrences} · {signal.severity}
-                  </span>
-                  {promoting === signal.id ? (
-                    <div className="fdry-crate-promote">
-                      <label>
-                        Repository
-                        <input
-                          type="text"
-                          value={repoDraft}
-                          placeholder="/path/to/repo"
-                          onChange={(event) => setRepoDraft(event.target.value)}
-                        />
-                      </label>
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        disabled={repoDraft.trim() === ''}
-                        onClick={() => void confirmPromote(signal.id)}
-                      >
-                        Confirm promote
-                      </Button>
-                      <Button size="sm" onClick={() => setPromoting(null)}>
-                        Cancel
-                      </Button>
-                    </div>
-                  ) : (
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      className="fdry-crate-action"
-                      onClick={() => startPromote(signal)}
-                    >
-                      Promote
-                    </Button>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : null}
-        {rows.length === 0 ? (
-          <p className="fdry-note">No orders yet. Start one from the List view.</p>
-        ) : (
-          <>
-            <section className="fdry-hall-section" aria-label="Active">
-              <h3 className="fdry-panel-h">Active</h3>
-              {active.length === 0 ? (
-                <p className="fdry-note">Nothing running.</p>
-              ) : (
-                <HallGrid rows={active} onOpen={onOpen} />
-              )}
-            </section>
-            {completed.length > 0 ? (
-              <section className="fdry-hall-section" aria-label="Completed">
-                <h3 className="fdry-panel-h fdry-group-h--done">Completed</h3>
-                <HallGrid rows={completed} onOpen={onOpen} />
-              </section>
-            ) : null}
-          </>
-        )}
-        {/* The refinery: which orders sit behind which on disk. Nothing here
-          when no order is queued behind another (R5). */}
-        {chains.length > 0 ? (
-          <section className="fdry-refinery" aria-label="Refinery">
-            <h3 className="fdry-panel-h">Refinery</h3>
-            {chains.map((chain) => (
-              <div key={chain.tokens[0].id} className="fdry-refinery-track">
-                {chain.tokens.map((token, index) => (
-                  <React.Fragment key={token.id}>
-                    {index > 0 ? (
-                      <span className="fdry-refinery-join">
-                        {chain.joins[index - 1]}{' '}
-                        {chain.joins[index - 1] === 1 ? 'shared file' : 'shared files'}
-                      </span>
-                    ) : null}
-                    <span className="fdry-refinery-token">{token.title}</span>
-                  </React.Fragment>
-                ))}
-              </div>
-            ))}
-          </section>
-        ) : null}
+        {dock.signals.length > 0 ? <SignalDock dock={dock} /> : null}
+        <OrderHalls rows={rows} onOpen={onOpen} />
+        <Refinery chains={refineryChains(rows)} />
       </div>
     </div>
+  )
+}
+
+function SignalDock({ dock }: { readonly dock: Dock }) {
+  return (
+    <div className="fdry-dock" aria-label="Dock">
+      <h3 className="fdry-panel-h">Dock</h3>
+      {dock.signalProblem !== null ? <p className="fdry-problem">{dock.signalProblem}</p> : null}
+      {dock.promoted !== null ? <p className="fdry-note">{dock.promoted}</p> : null}
+      <div className="fdry-dock-crates">
+        {dock.signals.map((signal) => (
+          <Crate key={signal.id} signal={signal} dock={dock} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function Crate({ signal, dock }: { readonly signal: Signal; readonly dock: Dock }) {
+  return (
+    <div className="fdry-crate">
+      <b>{signal.title}</b>
+      <span className="fdry-crate-meta">
+        ×{signal.occurrences} · {signal.severity}
+      </span>
+      {dock.promoting === signal.id ? (
+        <PromoteForm signal={signal} dock={dock} />
+      ) : (
+        <Button
+          variant="primary"
+          size="sm"
+          className="fdry-crate-action"
+          onClick={() => dock.startPromote(signal)}
+        >
+          Promote
+        </Button>
+      )}
+    </div>
+  )
+}
+
+function PromoteForm({ signal, dock }: { readonly signal: Signal; readonly dock: Dock }) {
+  return (
+    <div className="fdry-crate-promote">
+      <label>
+        Repository
+        <input
+          type="text"
+          value={dock.repoDraft}
+          placeholder="/path/to/repo"
+          onChange={(event) => dock.setRepoDraft(event.target.value)}
+        />
+      </label>
+      <Button
+        variant="primary"
+        size="sm"
+        disabled={dock.repoDraft.trim() === ''}
+        onClick={() => void dock.confirmPromote(signal.id)}
+      >
+        Confirm promote
+      </Button>
+      <Button size="sm" onClick={() => dock.setPromoting(null)}>
+        Cancel
+      </Button>
+    </div>
+  )
+}
+
+function OrderHalls({ rows, onOpen }: GridProps) {
+  if (rows.length === 0) {
+    return <p className="fdry-note">No orders yet. Start one from the List view.</p>
+  }
+  const completed = rows.filter(isCompleted)
+  const active = rows.filter((row) => !isCompleted(row))
+  return (
+    <>
+      <section className="fdry-hall-section" aria-label="Active">
+        <h3 className="fdry-panel-h">Active</h3>
+        {active.length === 0 ? (
+          <p className="fdry-note">Nothing running.</p>
+        ) : (
+          <HallGrid rows={active} onOpen={onOpen} />
+        )}
+      </section>
+      {completed.length > 0 ? (
+        <section className="fdry-hall-section" aria-label="Completed">
+          <h3 className="fdry-panel-h fdry-group-h--done">Completed</h3>
+          <HallGrid rows={completed} onOpen={onOpen} />
+        </section>
+      ) : null}
+    </>
+  )
+}
+
+/**
+ * The refinery: which orders sit behind which on disk. Nothing here when no
+ * order is queued behind another (R5).
+ */
+function Refinery({ chains }: { readonly chains: readonly QueueChain[] }) {
+  if (chains.length === 0) return null
+  return (
+    <section className="fdry-refinery" aria-label="Refinery">
+      <h3 className="fdry-panel-h">Refinery</h3>
+      {chains.map((chain) => (
+        <div key={chain.tokens[0].id} className="fdry-refinery-track">
+          {chain.tokens.map((token, index) => (
+            <React.Fragment key={token.id}>
+              {index > 0 ? <ChainJoin files={chain.joins[index - 1]} /> : null}
+              <span className="fdry-refinery-token">{token.title}</span>
+            </React.Fragment>
+          ))}
+        </div>
+      ))}
+    </section>
+  )
+}
+
+function ChainJoin({ files }: { readonly files: number }) {
+  return (
+    <span className="fdry-refinery-join">
+      {files} {files === 1 ? 'shared file' : 'shared files'}
+    </span>
   )
 }

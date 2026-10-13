@@ -78,20 +78,20 @@ function outcome(over: Partial<RunOutcome> = {}): RunOutcome {
   } as RunOutcome
 }
 
+/** What git and gh print: the new pull request's address, and a dirty checkout when it is one. */
+function printed(options: { command: string; args: string[] }, dirty: boolean): string {
+  if (options.command === 'gh' && options.args[1] === 'create') {
+    return 'https://github.com/tav/app/pull/7\n'
+  }
+  const status = options.command === 'git' && options.args[0] === 'status'
+  return status && dirty ? ' M a.ts\n' : ''
+}
+
 function setup(over: Partial<IntegrateDeps> = {}, dirty = false) {
   const calls: string[] = []
   const exec = vi.fn(async (options: { command: string; args: string[] }) => {
     calls.push(`${options.command} ${options.args.slice(0, 2).join(' ')}`)
-    if (options.command === 'gh' && options.args[1] === 'create') {
-      return {
-        exitCode: 0,
-        stdout: 'https://github.com/tav/app/pull/7\n',
-        stderr: '',
-        timedOut: false,
-      }
-    }
-    const status = options.command === 'git' && options.args[0] === 'status'
-    return { exitCode: 0, stdout: status && dirty ? ' M a.ts\n' : '', stderr: '', timedOut: false }
+    return { exitCode: 0, stdout: printed(options, dirty), stderr: '', timedOut: false }
   })
   const raised: string[] = []
   const deps = {
@@ -112,6 +112,16 @@ function setup(over: Partial<IntegrateDeps> = {}, dirty = false) {
 
 beforeEach(() => {
   root = makeTempDir('fdry-early-')
+})
+
+describe('without a CI watch', () => {
+  it('opens the draft with nothing to watch when CI is not watched, and asks once it ends', async () => {
+    const { early, raised } = setup({ watchCi: undefined })
+    expect(await early.beforeFinalCheck({ risk: risk('P3'), verdicts: [] })).toBe(true)
+    const shipped = await early.finish(outcome())
+    expect(shipped?.held).toBe(false)
+    expect(raised).toEqual(['ready-for-review'])
+  })
 })
 
 describe('opening before the final check', () => {
@@ -144,6 +154,13 @@ describe('opening before the final check', () => {
 })
 
 describe('after the final check', () => {
+  describe('the ready question', theReadyQuestionTests)
+  describe('CI', ciTests)
+  describe('after the check wrote', afterTheCheckWroteTests)
+  describe('failures and re-entry', failuresAndReEntryTests)
+})
+
+function theReadyQuestionTests() {
   it('raises the ready question when the check passed and CI is green', async () => {
     const green: CiOutcome = { kind: 'green', checks: [] }
     const { early, raised } = setup({ watchCi: vi.fn(async () => green) })
@@ -161,7 +178,9 @@ describe('after the final check', () => {
     expect(raised).toEqual([])
     expect(calls.filter((c) => c === 'gh pr create')).toHaveLength(1)
   })
+}
 
+function ciTests() {
   it('waits for CI before asking, even when the check finished first', async () => {
     let release: (value: CiOutcome) => void = () => undefined
     const slow = new Promise<CiOutcome>((resolve) => (release = resolve))
@@ -183,7 +202,9 @@ describe('after the final check', () => {
     expect(done?.gate?.rule).toBe('ci.red')
     expect(raised).toEqual(['ci.red'])
   })
+}
 
+function afterTheCheckWroteTests() {
   it('commits what the check wrote, pushes it, and watches CI again on that commit', async () => {
     const watchCi = vi.fn(async () => ({ kind: 'green', checks: [] }) as CiOutcome)
     const { early, calls } = setup({ watchCi }, true)
@@ -198,7 +219,9 @@ describe('after the final check', () => {
     const { early } = setup()
     expect(await early.finish(outcome())).toBeNull()
   })
+}
 
+function failuresAndReEntryTests() {
   it('surfaces a CI watch that threw rather than swallowing it', async () => {
     const { early } = setup({ watchCi: vi.fn(async () => Promise.reject(new Error('gh down'))) })
     await early.beforeFinalCheck({ risk: risk('P3'), verdicts: [] })
@@ -213,4 +236,4 @@ describe('after the final check', () => {
     expect(second.calls.filter((c) => c === 'gh pr create')).toHaveLength(0)
     expect(second.calls.some((c) => c.startsWith('git push'))).toBe(true)
   })
-})
+}

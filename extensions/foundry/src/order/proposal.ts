@@ -134,6 +134,70 @@ export function parseProposal(value: unknown): Proposal {
 }
 
 /**
+ * Findings only. `repos`, `toolchain` and `houseDocs` are what Foundry
+ * measured, and an agent that could rewrite them could tell the ladder a
+ * command exists that does not.
+ */
+function withFindings(
+  context: WorkOrder['context'],
+  findings: Proposal['findings']
+): WorkOrder['context'] {
+  return {
+    ...context,
+    entryPoints: findings?.entryPoints ?? context.entryPoints,
+    conventions: findings?.conventions ?? context.conventions,
+    priorArt: findings?.priorArt ?? context.priorArt,
+  }
+}
+
+/**
+ * The proposal's plan over the order's. A lane's branch can be fixed by the
+ * ticket; a proposal that leaves it blank must not erase it.
+ */
+function mergedPlan(plan: WorkOrder['plan'], proposed: Proposal['plan']): WorkOrder['plan'] {
+  const merged = { ...plan, ...proposed }
+  if (proposed?.lanes === undefined) return merged
+  const lanes = proposed.lanes.map((lane) => {
+    const kept = plan.lanes.find((l) => l.ord === lane.ord)?.branch ?? ''
+    return lane.branch.trim() === '' && kept !== '' ? { ...lane, branch: kept } : lane
+  })
+  return { ...merged, lanes }
+}
+
+/**
+ * An operator's struck assumption stays struck: the proposal's version of one
+ * already on the order does not resurrect it.
+ */
+function keptStruck(
+  current: WorkOrder['assumptions'],
+  proposed: WorkOrder['assumptions']
+): WorkOrder['assumptions'] {
+  return proposed.map((assumption) => {
+    const existing = current.find((a) => a.id === assumption.id)
+    return existing?.struck === true ? { ...assumption, struck: true } : assumption
+  })
+}
+
+/** Likewise an answered question stays answered. */
+function keptAnswered(
+  current: WorkOrder['openQuestions'],
+  proposed: WorkOrder['openQuestions']
+): WorkOrder['openQuestions'] {
+  return proposed.map((question) => {
+    const existing = current.find((q) => q.id === question.id)
+    return existing?.answer !== null && existing?.answer !== undefined
+      ? { ...question, answer: existing.answer }
+      : question
+  })
+}
+
+/** What the architect said it did, or that it redrafted the plan when it said nothing. */
+function noteOf(proposal: Proposal): string {
+  const note = proposal.note.trim()
+  return note === '' ? 'redrafted the plan' : note
+}
+
+/**
  * Merge a proposal into an order.
  *
  * Field by field, and only the fields the schema names. Everything the agent
@@ -151,50 +215,15 @@ export function applyProposal(order: WorkOrder, proposal: Proposal, at: string):
   const next: WorkOrder = {
     ...order,
     intent: { ...order.intent, ...proposal.intent },
-    // Findings only. `repos`, `toolchain` and `houseDocs` are what Foundry
-    // measured, and an agent that could rewrite them could tell the ladder a
-    // command exists that does not.
-    context: {
-      ...order.context,
-      entryPoints: proposal.findings?.entryPoints ?? order.context.entryPoints,
-      conventions: proposal.findings?.conventions ?? order.context.conventions,
-      priorArt: proposal.findings?.priorArt ?? order.context.priorArt,
-    },
+    context: withFindings(order.context, proposal.findings),
     acceptance: proposal.acceptance ?? order.acceptance,
     risk: { ...order.risk, ...proposal.risk },
-    plan: {
-      ...order.plan,
-      ...proposal.plan,
-      // A lane's branch can be fixed by the ticket; a proposal that leaves it
-      // blank must not erase it.
-      ...(proposal.plan?.lanes === undefined
-        ? {}
-        : {
-            lanes: proposal.plan.lanes.map((lane) => {
-              const kept = order.plan.lanes.find((l) => l.ord === lane.ord)?.branch ?? ''
-              return lane.branch.trim() === '' && kept !== '' ? { ...lane, branch: kept } : lane
-            }),
-          }),
-    },
-    // An operator's struck assumption stays struck: the proposal's version of
-    // one already on the order does not resurrect it.
-    assumptions: (proposal.assumptions ?? order.assumptions).map((assumption) => {
-      const existing = order.assumptions.find((a) => a.id === assumption.id)
-      return existing?.struck === true ? { ...assumption, struck: true } : assumption
-    }),
-    // Likewise an answered question stays answered.
-    openQuestions: (proposal.openQuestions ?? order.openQuestions).map((question) => {
-      const existing = order.openQuestions.find((q) => q.id === question.id)
-      return existing?.answer !== null && existing?.answer !== undefined
-        ? { ...question, answer: existing.answer }
-        : question
-    }),
+    plan: mergedPlan(order.plan, proposal.plan),
+    assumptions: keptStruck(order.assumptions, proposal.assumptions ?? order.assumptions),
+    openQuestions: keptAnswered(order.openQuestions, proposal.openQuestions ?? order.openQuestions),
     provenance: {
       ...order.provenance,
-      decisions: [
-        ...order.provenance.decisions,
-        `${at} architect: ${proposal.note.trim() === '' ? 'redrafted the plan' : proposal.note.trim()}`,
-      ],
+      decisions: [...order.provenance.decisions, `${at} architect: ${noteOf(proposal)}`],
     },
   }
 

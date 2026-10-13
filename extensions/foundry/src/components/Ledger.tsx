@@ -105,19 +105,71 @@ type LedgerTab = 'record' | 'factory'
 
 export function Ledger(): JSX.Element {
   const [tab, setTab] = useState<LedgerTab>('record')
+  const entries = useLedgerEntries()
+  const { rules, refreshRules } = useRules()
+  const factory = useFactoryMetrics(tab)
+  const proposals = useProposals(refreshRules)
+
+  if (entries.view === null) return <div className="fdry-empty">Loading the record…</div>
+
+  return (
+    <div className="fdry-shell">
+      <TabsRoot selectedId={tab} onSelect={setTab}>
+        <TabList label="Record or Factory" className="fdry-ledger-tabs">
+          <Tab id="record">Record</Tab>
+          <Tab id="factory">Factory</Tab>
+        </TabList>
+
+        <TabPanel id="factory" className="fdry-ledger-panel">
+          <FactoryView {...factory} />
+        </TabPanel>
+        <TabPanel id="record" className="fdry-ledger-panel">
+          <RecordTab
+            entries={entries}
+            view={entries.view}
+            rules={rules ?? NO_RULES}
+            proposals={proposals}
+          />
+        </TabPanel>
+      </TabsRoot>
+    </div>
+  )
+}
+
+const NO_RULES: RulesView = { rules: [], declined: [], skills: [] }
+
+interface RecordTabProps {
+  readonly entries: ReturnType<typeof useLedgerEntries>
+  readonly view: LedgerView
+  readonly rules: RulesView
+  readonly proposals: ReturnType<typeof useProposals>
+}
+
+/** The Record tab: the filters, the rules asked about and in force, and the entries. */
+function RecordTab({ entries, view, rules, proposals }: RecordTabProps) {
+  return (
+    <>
+      <LedgerFilters entries={entries} view={view} onAsk={() => void proposals.ask()} />
+      {proposals.note !== null ? <p className="fdry-note">{proposals.note}</p> : null}
+      <ProposalsPanel proposals={proposals.proposals} onDecide={proposals.decide} />
+      <AcceptedPanel rules={rules} onRemove={proposals.remove} />
+      <SkillsPanel rules={rules} />
+      <EntriesTable entries={view.entries} />
+      <footer className="fdry-queue-foot">
+        <span>
+          showing <b>{view.entries.length}</b> of <b>{view.total}</b>
+        </span>
+      </footer>
+    </>
+  )
+}
+
+/** The record as filtered, kept current: Foundry says when it grows, and for which order. */
+function useLedgerEntries() {
   const [view, setView] = useState<LedgerView | null>(null)
   const [orderId, setOrderId] = useState('')
   const [actor, setActor] = useState('')
   const [action, setAction] = useState('')
-  const [proposals, setProposals] = useState<Proposal[] | null>(null)
-  const [rules, setRules] = useState<RulesView | null>(null)
-  const [note, setNote] = useState<string | null>(null)
-  const [metricsWindow, setMetricsWindow] = useState<'30d' | 'all'>('30d')
-  const [metrics, setMetrics] = useState<FactoryMetrics | null>(null)
-
-  const refreshRules = useCallback(() => readRules().then(whenRead(setRules)), [])
-
-  // The record grows while it is open; Foundry says when, and for which order.
   const readEntries = useCallback(
     () => readLedger(orderId, actor, action),
     [orderId, actor, action]
@@ -126,14 +178,26 @@ export function Ledger(): JSX.Element {
     if (next !== null) setView(next)
   }, [])
   usePushed(readEntries, showEntries, { kinds: ['ledger'] })
+  return { view, orderId, setOrderId, actor, setActor, action, setAction }
+}
 
+function useRules() {
+  const [rules, setRules] = useState<RulesView | null>(null)
+  const refreshRules = useCallback(() => readRules().then(whenRead(setRules)), [])
   useEffect(() => {
     void readRules().then(whenRead(setRules))
   }, [])
+  return { rules, refreshRules }
+}
 
-  // Fetched only once the operator asks for the Factory view — the same
-  // discipline as the proposals panel: a surface that fetches before it is
-  // looked at is a surface whose numbers go stale unnoticed.
+/**
+ * The factory's numbers, fetched only once the operator asks for the Factory
+ * view — the same discipline as the proposals panel: a surface that fetches
+ * before it is looked at is a surface whose numbers go stale unnoticed.
+ */
+function useFactoryMetrics(tab: LedgerTab): FactoryViewProps {
+  const [metricsWindow, setMetricsWindow] = useState<'30d' | 'all'>('30d')
+  const [metrics, setMetrics] = useState<FactoryMetrics | null>(null)
   const readShownMetrics = useCallback(
     () => (tab === 'factory' ? readMetrics(metricsWindow) : Promise.resolve(null)),
     [tab, metricsWindow]
@@ -142,21 +206,23 @@ export function Ledger(): JSX.Element {
     if (next !== null) setMetrics(next)
   }, [])
   usePushed(readShownMetrics, showMetrics, { kinds: tab === 'factory' ? ANY_RECORD : [] })
+  return { metrics, metricsWindow, onWindow: setMetricsWindow }
+}
 
+/** Proposed rules, asked for by the operator, and what accepting, declining or removing one said. */
+function useProposals(refreshRules: () => Promise<void>) {
+  const [proposals, setProposals] = useState<Proposal[] | null>(null)
+  const [note, setNote] = useState<string | null>(null)
   const ask = useCallback(async () => {
     const next = (await invoke('foundry:rules.propose', {})) as { proposals?: Proposal[] }
     setProposals(next.proposals ?? [])
     setNote(null)
   }, [])
-
   const decide = useCallback(
     async (proposal: Proposal, accept: boolean) => {
-      const result = (await invoke('foundry:rules.decide', {
-        proposalId: proposal.id,
-        accept,
-      })) as { error?: string; rule?: string }
-      if (result.error !== undefined) {
-        setNote(result.error)
+      const error = await decideProposal(proposal, accept)
+      if (error !== null) {
+        setNote(error)
         return
       }
       setNote(
@@ -169,15 +235,28 @@ export function Ledger(): JSX.Element {
     },
     [refreshRules]
   )
+  const remove = useRemoveRule(setNote, refreshRules)
+  return { proposals, note, ask, decide, remove }
+}
 
-  /**
-   * Take an accepted check back out.
-   *
-   * The counterpart to accepting one. A rule the operator can add but never
-   * remove is one they stop accepting at all, and the removal is recorded so
-   * the same proposal is not offered back next week.
-   */
-  const remove = useCallback(
+/** Accepts or declines a proposal; the refusal, or null when it took. */
+async function decideProposal(proposal: Proposal, accept: boolean): Promise<string | null> {
+  const result = (await invoke('foundry:rules.decide', {
+    proposalId: proposal.id,
+    accept,
+  })) as { error?: string; rule?: string }
+  return result.error ?? null
+}
+
+/**
+ * Take an accepted check back out.
+ *
+ * The counterpart to accepting one. A rule the operator can add but never
+ * remove is one they stop accepting at all, and the removal is recorded so
+ * the same proposal is not offered back next week.
+ */
+function useRemoveRule(setNote: (note: string | null) => void, refreshRules: () => Promise<void>) {
+  return useCallback(
     async (rule: AcceptedRule) => {
       const result = (await invoke('foundry:rules.remove', { ruleId: rule.id })) as {
         error?: string
@@ -189,240 +268,272 @@ export function Ledger(): JSX.Element {
       setNote(`"${rule.asserts}" is no longer in force, and will not be proposed again.`)
       await refreshRules()
     },
-    [refreshRules]
+    [setNote, refreshRules]
   )
+}
 
-  if (view === null) return <div className="fdry-empty">Loading the record…</div>
+interface LedgerFiltersProps {
+  readonly entries: ReturnType<typeof useLedgerEntries>
+  readonly view: LedgerView
+  readonly onAsk: () => void
+}
 
+function LedgerFilters({ entries, view, onAsk }: LedgerFiltersProps) {
   return (
-    <div className="fdry-shell">
-      <TabsRoot selectedId={tab} onSelect={setTab}>
-        <TabList label="Record or Factory" className="fdry-ledger-tabs">
-          <Tab id="record">Record</Tab>
-          <Tab id="factory">Factory</Tab>
-        </TabList>
-
-        <TabPanel id="factory" className="fdry-ledger-panel">
-          <FactoryView
-            metrics={metrics}
-            metricsWindow={metricsWindow}
-            onWindow={setMetricsWindow}
-          />
-        </TabPanel>
-        <TabPanel id="record" className="fdry-ledger-panel">
-          <div className="fdry-ledger-bar">
-            <label>
-              Order
-              <select value={orderId} onChange={(event) => setOrderId(event.target.value)}>
-                <option value="">every order</option>
-                {view.orders.map((id) => (
-                  <option key={id} value={id}>
-                    {id}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Decided by
-              <select value={actor} onChange={(event) => setActor(event.target.value)}>
-                <option value="">anyone</option>
-                {view.actors.map((who) => (
-                  <option key={who} value={who}>
-                    {who}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Action
-              <select value={action} onChange={(event) => setAction(event.target.value)}>
-                <option value="">anything</option>
-                {view.actions.map((what) => (
-                  <option key={what} value={what}>
-                    {what}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <Button
-              variant="ghost"
-              size="sm"
-              icon={Sparkles}
-              className="fdry-propose"
-              onClick={() => void ask()}
-            >
-              What do I keep rejecting?
-            </Button>
-          </div>
-
-          {note !== null ? <p className="fdry-note">{note}</p> : null}
-
-          {proposals !== null ? (
-            <section className="fdry-panel">
-              <h3 className="fdry-panel-h">Proposed rules</h3>
-              {proposals.length === 0 ? (
-                <p className="fdry-note">
-                  Nothing yet. A rule is proposed once the same reason has turned work away three
-                  times — twice is a coincidence.
-                </p>
-              ) : (
-                proposals.map((proposal) => (
-                  <article key={proposal.id} className="fdry-proposal">
-                    <b>{proposal.asserts}</b>
-                    <p className="fdry-note">
-                      {proposal.occurrences} rejections · checked at{' '}
-                      {rungLevelInWords(proposal.rung as Rung)}
-                    </p>
-                    <ul className="fdry-citations">
-                      {proposal.citations.map((citation) => (
-                        <li key={citation.ref}>
-                          <code>{citation.subject}</code> {citation.at.slice(0, 10)} —{' '}
-                          <Markdown
-                            inline
-                            fetchesNothing
-                            className="fdry-md-inline"
-                            onOpenLink={openInBrowser}
-                          >
-                            {citation.reason}
-                          </Markdown>
-                        </li>
-                      ))}
-                    </ul>
-                    <div className="fdry-proposal-actions">
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        icon={Check}
-                        onClick={() => void decide(proposal, true)}
-                      >
-                        Accept
-                      </Button>
-                      <Button size="sm" icon={X} onClick={() => void decide(proposal, false)}>
-                        Never propose this
-                      </Button>
-                    </div>
-                  </article>
-                ))
-              )}
-            </section>
-          ) : null}
-
-          {(rules?.rules?.length ?? 0) > 0 || (rules?.declined?.length ?? 0) > 0 ? (
-            <section className="fdry-panel">
-              <h3 className="fdry-panel-h">Checks you accepted</h3>
-              {rules?.rules?.length === 0 ? (
-                <p className="fdry-note">None in force.</p>
-              ) : (
-                rules?.rules?.map((rule) => (
-                  <article key={rule.id} className="fdry-proposal">
-                    <b>{rule.asserts}</b>
-                    <p className="fdry-note">
-                      from {rungInWords(rule.rung as ResolveRung)} · origin {rule.origin}
-                    </p>
-                    <div className="fdry-proposal-actions">
-                      <Button size="sm" icon={Trash2} onClick={() => void remove(rule)}>
-                        Remove this check
-                      </Button>
-                    </div>
-                  </article>
-                ))
-              )}
-              {(rules?.declined?.length ?? 0) > 0 ? (
-                <ul className="fdry-citations">
-                  {rules?.declined?.map((entry) => (
-                    <li key={entry.id}>
-                      <Markdown
-                        inline
-                        fetchesNothing
-                        className="fdry-md-inline"
-                        onOpenLink={openInBrowser}
-                      >
-                        {declinedInWords(entry)}
-                      </Markdown>{' '}
-                      — turned down:{' '}
-                      <Markdown
-                        inline
-                        fetchesNothing
-                        className="fdry-md-inline"
-                        onOpenLink={openInBrowser}
-                      >
-                        {entry.reason}
-                      </Markdown>
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-            </section>
-          ) : null}
-
-          {(rules?.skills?.length ?? 0) > 0 ? (
-            <section className="fdry-panel">
-              <h3 className="fdry-panel-h">Skills in force</h3>
-              <ul className="fdry-citations">
-                {rules?.skills?.map((skill) => (
-                  <li key={skill.id}>
-                    <code>{skill.id}</code> ({rungInWords(skill.rung as ResolveRung)})
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ) : null}
-
-          {view.entries.length === 0 ? (
-            <div className="fdry-nothing">
-              <ScrollText aria-hidden="true" />
-              <p>Nothing recorded yet.</p>
-            </div>
-          ) : (
-            <div className="fdry-scroll">
-              <table className="fdry-ledger">
-                <thead>
-                  <tr>
-                    <th>When</th>
-                    <th>Decided by</th>
-                    <th>Action</th>
-                    <th>About</th>
-                    <th>Why</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {view.entries.map((entry) => (
-                    <tr key={`${entry.at}-${entry.subject}-${entry.action}`}>
-                      <td>{entry.at.replace('T', ' ').slice(0, 19)}</td>
-                      <td>
-                        <span className={`fdry-actor is-${actorKind(entry.actor)}`}>
-                          {entry.actor}
-                        </span>
-                      </td>
-                      <td>
-                        <code>{entry.action}</code>
-                      </td>
-                      <td>{entry.subject}</td>
-                      <td>
-                        <Markdown
-                          inline
-                          fetchesNothing
-                          className="fdry-md-inline"
-                          onOpenLink={openInBrowser}
-                        >
-                          {entry.reason}
-                        </Markdown>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          <footer className="fdry-queue-foot">
-            <span>
-              showing <b>{view.entries.length}</b> of <b>{view.total}</b>
-            </span>
-          </footer>
-        </TabPanel>
-      </TabsRoot>
+    <div className="fdry-ledger-bar">
+      <FilterSelect
+        label="Order"
+        value={entries.orderId}
+        onChange={entries.setOrderId}
+        any="every order"
+        options={view.orders}
+      />
+      <FilterSelect
+        label="Decided by"
+        value={entries.actor}
+        onChange={entries.setActor}
+        any="anyone"
+        options={view.actors}
+      />
+      <FilterSelect
+        label="Action"
+        value={entries.action}
+        onChange={entries.setAction}
+        any="anything"
+        options={view.actions}
+      />
+      <Button variant="ghost" size="sm" icon={Sparkles} className="fdry-propose" onClick={onAsk}>
+        What do I keep rejecting?
+      </Button>
     </div>
+  )
+}
+
+interface FilterSelectProps {
+  readonly label: string
+  readonly value: string
+  readonly onChange: (value: string) => void
+  /** What the empty choice, which filters nothing out, is called. */
+  readonly any: string
+  readonly options: readonly string[]
+}
+
+function FilterSelect({ label, value, onChange, any, options }: FilterSelectProps) {
+  return (
+    <label>
+      {label}
+      <select value={value} onChange={(event) => onChange(event.target.value)}>
+        <option value="">{any}</option>
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </select>
+    </label>
+  )
+}
+
+/** Markdown inline, opening any link in the browser and fetching nothing. */
+function InlineMarkdown({ children }: { readonly children: string }) {
+  return (
+    <Markdown inline fetchesNothing className="fdry-md-inline" onOpenLink={openInBrowser}>
+      {children}
+    </Markdown>
+  )
+}
+
+function ProposalsPanel({
+  proposals,
+  onDecide,
+}: {
+  readonly proposals: Proposal[] | null
+  readonly onDecide: (proposal: Proposal, accept: boolean) => Promise<void>
+}) {
+  if (proposals === null) return null
+  return (
+    <section className="fdry-panel">
+      <h3 className="fdry-panel-h">Proposed rules</h3>
+      {proposals.length === 0 ? (
+        <p className="fdry-note">
+          Nothing yet. A rule is proposed once the same reason has turned work away three times —
+          twice is a coincidence.
+        </p>
+      ) : (
+        proposals.map((proposal) => (
+          <ProposalCard key={proposal.id} proposal={proposal} onDecide={onDecide} />
+        ))
+      )}
+    </section>
+  )
+}
+
+function ProposalCard({
+  proposal,
+  onDecide,
+}: {
+  readonly proposal: Proposal
+  readonly onDecide: (proposal: Proposal, accept: boolean) => Promise<void>
+}) {
+  return (
+    <article className="fdry-proposal">
+      <b>{proposal.asserts}</b>
+      <p className="fdry-note">
+        {proposal.occurrences} rejections · checked at {rungLevelInWords(proposal.rung as Rung)}
+      </p>
+      <Citations citations={proposal.citations} />
+      <div className="fdry-proposal-actions">
+        <Button
+          variant="primary"
+          size="sm"
+          icon={Check}
+          onClick={() => void onDecide(proposal, true)}
+        >
+          Accept
+        </Button>
+        <Button size="sm" icon={X} onClick={() => void onDecide(proposal, false)}>
+          Never propose this
+        </Button>
+      </div>
+    </article>
+  )
+}
+
+/** Each rejection a proposal stands on: what it was about, when, and why. */
+function Citations({ citations }: { readonly citations: Proposal['citations'] }) {
+  return (
+    <ul className="fdry-citations">
+      {citations.map((citation) => (
+        <li key={citation.ref}>
+          <code>{citation.subject}</code> {citation.at.slice(0, 10)} —{' '}
+          <InlineMarkdown>{citation.reason}</InlineMarkdown>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+function AcceptedPanel({
+  rules,
+  onRemove,
+}: {
+  readonly rules: RulesView
+  readonly onRemove: (rule: AcceptedRule) => Promise<void>
+}) {
+  if (rules.rules.length === 0 && rules.declined.length === 0) return null
+  return (
+    <section className="fdry-panel">
+      <h3 className="fdry-panel-h">Checks you accepted</h3>
+      {rules.rules.length === 0 ? (
+        <p className="fdry-note">None in force.</p>
+      ) : (
+        rules.rules.map((rule) => (
+          <AcceptedRuleCard key={rule.id} rule={rule} onRemove={onRemove} />
+        ))
+      )}
+      <DeclinedList declined={rules.declined} />
+    </section>
+  )
+}
+
+function AcceptedRuleCard({
+  rule,
+  onRemove,
+}: {
+  readonly rule: AcceptedRule
+  readonly onRemove: (rule: AcceptedRule) => Promise<void>
+}) {
+  return (
+    <article className="fdry-proposal">
+      <b>{rule.asserts}</b>
+      <p className="fdry-note">
+        from {rungInWords(rule.rung as ResolveRung)} · origin {rule.origin}
+      </p>
+      <div className="fdry-proposal-actions">
+        <Button size="sm" icon={Trash2} onClick={() => void onRemove(rule)}>
+          Remove this check
+        </Button>
+      </div>
+    </article>
+  )
+}
+
+function DeclinedList({ declined }: { readonly declined: RulesView['declined'] }) {
+  if (declined.length === 0) return null
+  return (
+    <ul className="fdry-citations">
+      {declined.map((entry) => (
+        <li key={entry.id}>
+          <InlineMarkdown>{declinedInWords(entry)}</InlineMarkdown> — turned down:{' '}
+          <InlineMarkdown>{entry.reason}</InlineMarkdown>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+function SkillsPanel({ rules }: { readonly rules: RulesView }) {
+  if (rules.skills.length === 0) return null
+  return (
+    <section className="fdry-panel">
+      <h3 className="fdry-panel-h">Skills in force</h3>
+      <ul className="fdry-citations">
+        {rules.skills.map((skill) => (
+          <li key={skill.id}>
+            <code>{skill.id}</code> ({rungInWords(skill.rung as ResolveRung)})
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+function EntriesTable({ entries }: { readonly entries: readonly LedgerEntry[] }) {
+  if (entries.length === 0) {
+    return (
+      <div className="fdry-nothing">
+        <ScrollText aria-hidden="true" />
+        <p>Nothing recorded yet.</p>
+      </div>
+    )
+  }
+  return (
+    <div className="fdry-scroll">
+      <table className="fdry-ledger">
+        <thead>
+          <tr>
+            <th>When</th>
+            <th>Decided by</th>
+            <th>Action</th>
+            <th>About</th>
+            <th>Why</th>
+          </tr>
+        </thead>
+        <tbody>
+          {entries.map((entry) => (
+            <EntryRow key={`${entry.at}-${entry.subject}-${entry.action}`} entry={entry} />
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function EntryRow({ entry }: { readonly entry: LedgerEntry }) {
+  return (
+    <tr>
+      <td>{entry.at.replace('T', ' ').slice(0, 19)}</td>
+      <td>
+        <span className={`fdry-actor is-${actorKind(entry.actor)}`}>{entry.actor}</span>
+      </td>
+      <td>
+        <code>{entry.action}</code>
+      </td>
+      <td>{entry.subject}</td>
+      <td>
+        <InlineMarkdown>{entry.reason}</InlineMarkdown>
+      </td>
+    </tr>
   )
 }
 
@@ -440,41 +551,52 @@ function FactoryView({ metrics, metricsWindow, onWindow }: FactoryViewProps): JS
     <div>
       <WindowToggle value={metricsWindow} onChange={onWindow} />
       <MetricsTiles metrics={metrics} />
-
       {metrics.orders.length === 0 ? (
         <p className="fdry-note">No orders in this window.</p>
       ) : (
-        <div className="fdry-scroll">
-          <table className="fdry-ledger">
-            <thead>
-              <tr>
-                <th>Order</th>
-                <th>Shipped</th>
-                <th>Lead time</th>
-                <th>Your time</th>
-                <th>Reworks</th>
-                <th>CI rounds</th>
-                <th>Sessions</th>
-                <th>First pass</th>
-              </tr>
-            </thead>
-            <tbody>
-              {metrics.orders.map((order) => (
-                <tr key={order.orderId}>
-                  <td>{order.title}</td>
-                  <td>{order.shipped ? '✓' : '—'}</td>
-                  <td>{order.leadTimeMs === null ? '—' : formatDuration(order.leadTimeMs)}</td>
-                  <td>{formatDuration(order.yourTimeMs)}</td>
-                  <td>{order.reworks}</td>
-                  <td>{order.ciRounds}</td>
-                  <td>{order.sessions}</td>
-                  <td>{order.firstPass ? '✓' : '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <OrderMetricsTable orders={metrics.orders} />
       )}
     </div>
+  )
+}
+
+function OrderMetricsTable({ orders }: { readonly orders: FactoryMetrics['orders'] }) {
+  return (
+    <div className="fdry-scroll">
+      <table className="fdry-ledger">
+        <thead>
+          <tr>
+            <th>Order</th>
+            <th>Shipped</th>
+            <th>Lead time</th>
+            <th>Your time</th>
+            <th>Reworks</th>
+            <th>CI rounds</th>
+            <th>Sessions</th>
+            <th>First pass</th>
+          </tr>
+        </thead>
+        <tbody>
+          {orders.map((order) => (
+            <OrderMetricsRow key={order.orderId} order={order} />
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function OrderMetricsRow({ order }: { readonly order: FactoryMetrics['orders'][number] }) {
+  return (
+    <tr>
+      <td>{order.title}</td>
+      <td>{order.shipped ? '✓' : '—'}</td>
+      <td>{order.leadTimeMs === null ? '—' : formatDuration(order.leadTimeMs)}</td>
+      <td>{formatDuration(order.yourTimeMs)}</td>
+      <td>{order.reworks}</td>
+      <td>{order.ciRounds}</td>
+      <td>{order.sessions}</td>
+      <td>{order.firstPass ? '✓' : '—'}</td>
+    </tr>
   )
 }

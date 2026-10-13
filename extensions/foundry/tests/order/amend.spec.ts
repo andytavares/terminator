@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { builderUnit, testCriterion } from '../helpers/order-parts.js'
 import { amendOrder } from '../../src/order/amend.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
@@ -24,34 +25,22 @@ function agreed(): WorkOrder {
     ...base,
     status: 'agreed',
     agreedAt: '2026-09-06T11:00:00.000Z',
-    acceptance: [
-      {
-        id: 'AC-1',
-        statement: 'a',
-        priority: 'P1',
-        verify: { kind: 'test', command: 'npm test', assert: 'exit_code == 0' },
-        unverifiable: null,
-      },
-    ],
+    acceptance: [testCriterion('AC-1', { statement: 'a' })],
     plan: {
       ...base.plan,
-      units: [
-        {
-          id: 'U-1',
-          title: 'one',
-          role: 'builder',
-          lane: 1,
-          dependsOn: [],
-          satisfies: ['AC-1'],
-          touches: [],
-          verify: [],
-        },
-      ],
+      units: [builderUnit('U-1', { title: 'one', satisfies: ['AC-1'] })],
     },
   }
 }
 
 describe('amendOrder', () => {
+  describe('draft and record', draftAndRecordTests)
+  describe('changes', changesTests)
+  describe('accumulating', accumulatingTests)
+  describe('drafts and mutation', draftsAndMutationTests)
+})
+
+function draftAndRecordTests() {
   it('returns an agreed order to draft', () => {
     const after = amendOrder(agreed(), { reason: 'scope changed', at: '2026-09-06T12:00:00.000Z' })
     expect(after.status).toBe('draft')
@@ -72,7 +61,9 @@ describe('amendOrder', () => {
     expect(after.plan.units.map((u) => u.id)).toEqual(before.plan.units.map((u) => u.id))
     expect(after.id).toBe(before.id)
   })
+}
 
+function changesTests() {
   it('applies a change alongside the amendment', () => {
     const after = amendOrder(agreed(), {
       reason: 'added a criterion',
@@ -94,13 +85,17 @@ describe('amendOrder', () => {
     expect(after.acceptance.map((a) => a.id)).toEqual(['AC-1', 'AC-2'])
     expect(after.status).toBe('draft')
   })
+}
 
+function accumulatingTests() {
   it('accumulates amendments rather than replacing the last one', () => {
     const once = amendOrder(agreed(), { reason: 'first', at: '2026-09-06T12:00:00.000Z' })
     const twice = amendOrder(once, { reason: 'second', at: '2026-09-06T13:00:00.000Z' })
     expect(twice.provenance.amendments).toHaveLength(2)
   })
+}
 
+function draftsAndMutationTests() {
   it('amends a draft too — a draft that changes is still a change worth recording', () => {
     const after = amendOrder(
       draftOrder({
@@ -121,4 +116,4 @@ describe('amendOrder', () => {
     expect(before.status).toBe('agreed')
     expect(before.provenance.amendments).toEqual([])
   })
-})
+}

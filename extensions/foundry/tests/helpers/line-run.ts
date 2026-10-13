@@ -8,6 +8,7 @@ import * as path from 'node:path'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import { realGit, seededRepository, type fakeRunner } from './foundry-host.js'
+import { builderUnit, testCriterion } from './order-parts.js'
 
 /** A seeded repository whose `origin` is a bare repository beside it, so pushes land. */
 export async function repositoryWithRemote(parent: string): Promise<string> {
@@ -28,41 +29,17 @@ export function agreedOrder(repo: string, over: Partial<WorkOrder> = {}): WorkOr
     repoPaths: [repo],
     now: '2026-10-12T10:00:00.000Z',
   })
+  const test = { command: 'npm test', source: 'package.json' }
   return {
     ...base,
     status: 'agreed',
     agreedAt: '2026-10-12T10:01:00.000Z',
     intent: { problem: 'text is blue', outcome: 'text is red', nonGoals: [] },
-    context: {
-      ...base.context,
-      toolchain: {
-        ...base.context.toolchain,
-        test: { command: 'npm test', source: 'package.json' },
-      },
-    },
-    acceptance: [
-      {
-        id: 'AC-1',
-        statement: 'text is red',
-        priority: 'P1',
-        verify: { kind: 'test', command: 'npm test', assert: 'exit_code == 0' },
-        unverifiable: null,
-      },
-    ],
+    context: { ...base.context, toolchain: { ...base.context.toolchain, test } },
+    acceptance: [testCriterion('AC-1', { statement: 'text is red' })],
     plan: {
       ...base.plan,
-      units: [
-        {
-          id: 'U-1',
-          title: 'red text',
-          role: 'builder',
-          lane: 1,
-          dependsOn: [],
-          satisfies: ['AC-1'],
-          touches: ['red.css'],
-          verify: [],
-        },
-      ],
+      units: [builderUnit('U-1', { title: 'red text', satisfies: ['AC-1'], touches: ['red.css'] })],
     },
     ...over,
   } as WorkOrder

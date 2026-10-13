@@ -7,7 +7,8 @@ import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from 'vites
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 
-import { activateFoundry, fakeHost, temporaryDirectory } from '../helpers/foundry-host.js'
+import { fakeHost, temporaryDirectory } from '../helpers/foundry-host.js'
+import { activateFoundry, deactivate } from '../helpers/foundry-activation.js'
 import type { FoundryHost } from '../helpers/foundry-host.js'
 import { agentsAnswer, agreedOrder, checks, repositoryWithRemote } from '../helpers/line-run.js'
 import { createOrderStore } from '../../src/order/store.js'
@@ -49,7 +50,6 @@ beforeAll(async () => {
 })
 
 afterAll(async () => {
-  const { deactivate } = await import('../../src/index.ts')
   deactivate()
   vi.unstubAllEnvs()
 })
@@ -181,6 +181,11 @@ function buildAndShip(): string {
 }
 
 describe('answering the inbox after a run shipped', () => {
+  describe('marking ready', markingReadyTests)
+  describe('red CI sent back', redCiSentBackTests)
+})
+
+function markingReadyTests() {
   it('marks the drafts ready for review when the operator says so', async () => {
     githubAnswers(() => checks('pass'))
     await started(order())
@@ -192,7 +197,9 @@ describe('answering the inbox after a run shipped', () => {
     expect(decided).toMatchObject({ ok: true })
     expect(host.gh).toHaveBeenCalledWith(expect.objectContaining({ args: ['pr', 'ready', PULL] }))
   })
+}
 
+function redCiSentBackTests() {
   it('runs one more CI round on the open drafts when red CI is sent back, and asks again once it is green', async () => {
     // Every step and every automatic round before the question is a whole
     // round of agents over real git, and none of them is what this asks about.
@@ -218,7 +225,7 @@ describe('answering the inbox after a run shipped', () => {
       interval: 100,
     })
   })
-})
+}
 
 describe('an order whose check keeps failing', () => {
   it('does not ship, and says on the ledger why not', async () => {
@@ -234,17 +241,22 @@ describe('an order whose check keeps failing', () => {
   })
 })
 
-describe('the run’s own channels', () => {
-  async function halted(): Promise<void> {
-    githubAnswers(() => '[]')
-    theRunner.runCommand.mockResolvedValue(1)
-    await started(order())
-    await vi.waitFor(
-      async () => expect(await ledger()).toEqual(expect.arrayContaining(['run.halted'])),
-      { timeout: 20_000, interval: 100 }
-    )
-  }
+async function halted(): Promise<void> {
+  githubAnswers(() => '[]')
+  theRunner.runCommand.mockResolvedValue(1)
+  await started(order())
+  await vi.waitFor(
+    async () => expect(await ledger()).toEqual(expect.arrayContaining(['run.halted'])),
+    { timeout: 20_000, interval: 100 }
+  )
+}
 
+describe('the run’s own channels', () => {
+  describe('agent transcripts', agentTranscriptsTests)
+  describe('starting over and stopping', startingOverAndStoppingTests)
+})
+
+function agentTranscriptsTests() {
   it('show what each agent has been doing, from its transcript', async () => {
     await halted()
     const graph = await readGraph(dataDir, 'WO-1')
@@ -266,7 +278,9 @@ describe('the run’s own channels', () => {
       expect.objectContaining({ toolName: 'Read', path: 'red.css' }),
     ])
   })
+}
 
+function startingOverAndStoppingTests() {
   it('start an order over: its checkout is gone and it can be run again from the start', async () => {
     await halted()
     const reset = (await host.call('foundry:run.reset', { id: 'WO-1' })) as {
@@ -292,4 +306,4 @@ describe('the run’s own channels', () => {
       error: 'No order WO-9.',
     })
   })
-})
+}

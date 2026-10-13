@@ -119,6 +119,12 @@ describe('forgetting', () => {
 })
 
 describe('the record of what is over', () => {
+  describe('what is over', whatIsOverTests)
+  describe('reading', readingTests)
+  describe('copies and unknown sessions', copiesAndUnknownSessionsTests)
+})
+
+function whatIsOverTests() {
   it('starts empty, and says so rather than inventing a row', () => {
     expect(createRunRegistry().history()).toEqual([])
   })
@@ -142,7 +148,9 @@ describe('the record of what is over', () => {
     registry.noteDiff('session-1', { files: 99, added: 99, removed: 99 })
     expect(registry.history()[0].diff).toEqual({ files: 1, added: 1, removed: 0 })
   })
+}
 
+function readingTests() {
   it('reads newest first, because the last thing that happened is what you want', () => {
     const registry = createRunRegistry()
     add(registry)
@@ -162,7 +170,9 @@ describe('the record of what is over', () => {
     }
     expect(registry.history()).toHaveLength(200)
   })
+}
 
+function copiesAndUnknownSessionsTests() {
   it('hands back a copy, so a surface cannot mutate the record it is showing', () => {
     const registry = createRunRegistry()
     add(registry)
@@ -174,4 +184,4 @@ describe('the record of what is over', () => {
   it('reports nothing for a session it does not have', () => {
     expect(createRunRegistry().archive('nobody', 'approved', 1)).toBeNull()
   })
-})
+}

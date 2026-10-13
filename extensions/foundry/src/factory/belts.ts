@@ -90,6 +90,26 @@ export interface RouteBeltsResult {
   readonly beltTiles: readonly BeltTile[]
 }
 
+/** The floor belts are routed over, and the rows between which they may run. */
+export interface BeltFloor {
+  readonly solid: readonly (readonly boolean[])[]
+  /** Each row's role: a belt runs across only a station row or a belt row. */
+  readonly role: readonly string[]
+  readonly blockedForBelt: ReadonlySet<string>
+  readonly width: number
+  readonly height: number
+  readonly topWallRow: number
+  readonly roomRow: number
+}
+
+/** One `dependsOn` edge to route: whose belt it is, and from where to where. */
+interface Leg {
+  readonly fromId: string
+  readonly toId: string
+  readonly start: Tile
+  readonly goal: Tile
+}
+
 /**
  * Routes one belt per `dependsOn` edge from the tile east of its source to
  * the tile west of its target, over the tiles where `passBelt` allows a
@@ -101,160 +121,236 @@ export interface RouteBeltsResult {
 export function routeBelts(
   nodes: readonly RunNode[],
   byNode: ReadonlyMap<string, HallProp>,
-  solid: readonly (readonly boolean[])[],
-  role: readonly string[],
-  blockedForBelt: ReadonlySet<string>,
-  width: number,
-  height: number,
-  topWallRow: number,
-  roomRow: number
+  floor: BeltFloor
 ): RouteBeltsResult {
-  const cells = new Map<string, Cell>()
-  const belts: HallBelt[] = []
-
-  const passBelt = (t: Tile): boolean =>
-    t.x >= 1 &&
-    t.x < width - 1 &&
-    t.y > topWallRow &&
-    t.y < roomRow &&
-    !solid[t.y][t.x] &&
-    !blockedForBelt.has(key(t))
-
+  const router = new BeltRouter(floor)
   for (const node of nodes) {
     for (const fromId of node.dependsOn) {
       const a = byNode.get(fromId)
       const b = byNode.get(node.id)
       if (!a || !b) continue
-      const start: Tile = { x: a.x + a.w, y: a.y }
-      const goal: Tile = { x: b.x - 1, y: b.y }
-
-      const S = width * height * 4
-      const dist = new Float64Array(S).fill(Infinity)
-      const prev = new Int32Array(S).fill(-1)
-      const sid = (t: Tile, d: number): number => ((t.y * width + t.x) << 2) | d
-      const heap = new Heap()
-      const s0 = sid(start, 0)
-      dist[s0] = 0
-      heap.push(0, s0)
-      let end = -1
-
-      const compatible = (c: Cell): boolean =>
-        [...c.from].every((f) => f === fromId) || [...c.to].every((toId) => toId === node.id)
-
-      while (heap.a.length) {
-        const [dcur, s] = heap.pop()
-        if (dcur > dist[s]) continue
-        const d = s & 3
-        const t: Tile = { x: (s >> 2) % width, y: Math.floor((s >> 2) / width) }
-        if (t.x === goal.x && t.y === goal.y) {
-          end = s
-          break
-        }
-        const here = cells.get(key(t))
-        const onCross = here !== undefined && !compatible(here)
-        for (let nd2 = 0; nd2 < 4; nd2++) {
-          const dir = SIDES[nd2]
-          if (onCross && nd2 !== d) continue
-          const n: Tile = { x: t.x + STEP[dir].x, y: t.y + STEP[dir].y }
-          const isGoal = n.x === goal.x && n.y === goal.y
-          if (!isGoal && !passBelt(n)) continue
-          if (isGoal && !passBelt(n) && solid[n.y][n.x]) continue
-          const horizontal = dir === 'E' || dir === 'W'
-          if (horizontal && role[n.y] !== 'station' && role[n.y] !== 'belt') continue
-          if (horizontal && role[t.y] !== 'station' && role[t.y] !== 'belt') continue
-          let cost = 1 + (nd2 !== d && !(t.x === start.x && t.y === start.y && nd2 === 0) ? 2 : 0)
-          if (role[n.y] === 'seat' || role[n.y] === 'aisle') cost += 1
-          const c = cells.get(key(n))
-          if (c) {
-            if (compatible(c)) cost = c.outs.has(dir) ? 0.2 : cost + 1
-            else {
-              const cHorizontal = c.outs.has('E') || c.outs.has('W')
-              if (cHorizontal === horizontal || c.kind !== 'straight' || isGoal) continue
-              cost += 10
-            }
-          }
-          const ns = sid(n, nd2)
-          if (dcur + cost < dist[ns]) {
-            dist[ns] = dcur + cost
-            prev[ns] = s
-            heap.push(dist[ns], ns)
-          }
-        }
-      }
-
-      let path: Tile[]
-      if (end < 0) {
-        path = [start, ...findPath(solid, start, goal)]
-      } else {
-        path = []
-        for (let s = end; s >= 0; s = prev[s]) {
-          path.unshift({ x: (s >> 2) % width, y: Math.floor((s >> 2) / width) })
-        }
-      }
-
-      const id = `${fromId}->${node.id}`
-      belts.push({ id, fromNodeId: fromId, toNodeId: node.id, path })
-
-      path.forEach((t, i) => {
-        const k = key(t)
-        let c = cells.get(k)
-        if (!c) {
-          c = {
-            ins: new Set(),
-            outs: new Set(),
-            kind: 'straight',
-            over: null,
-            from: new Set(),
-            to: new Set(),
-          }
-          cells.set(k, c)
-        }
-        const prevT = path[i - 1]
-        const nextT = path[i + 1]
-        const inD: Side = prevT
-          ? (SIDES.find((s) => prevT.x + STEP[s].x === t.x && prevT.y + STEP[s].y === t.y) as Side)
-          : 'E'
-        const outD: Side = nextT
-          ? (SIDES.find((s) => t.x + STEP[s].x === nextT.x && t.y + STEP[s].y === nextT.y) as Side)
-          : 'E'
-        if (c.from.size && !compatible(c)) {
-          c.over = [OPP[inD], outD]
-          return
-        }
-        c.ins.add(OPP[inD])
-        c.outs.add(outD)
-        c.from.add(fromId)
-        c.to.add(node.id)
+      router.route({
+        fromId,
+        toId: node.id,
+        start: { x: a.x + a.w, y: a.y },
+        goal: { x: b.x - 1, y: b.y },
       })
     }
   }
+  return router.result()
+}
 
-  for (const c of cells.values()) {
-    const sides = [...c.ins, ...c.outs]
-    c.kind = c.over
-      ? 'cross'
-      : c.outs.size > 1
-        ? 'split'
-        : c.ins.size > 1
-          ? 'merge'
-          : sides.length === 2 &&
-              STEP[sides[0]].x + STEP[sides[1]].x === 0 &&
-              STEP[sides[0]].y + STEP[sides[1]].y === 0
-            ? 'straight'
-            : 'corner'
+/** The belts laid so far, and the tiles they share. */
+class BeltRouter {
+  readonly floor: BeltFloor
+  readonly cells = new Map<string, Cell>()
+  private readonly belts: HallBelt[] = []
+
+  constructor(floor: BeltFloor) {
+    this.floor = floor
   }
 
-  const beltTiles: BeltTile[] = [...cells.entries()].map(([k, c]) => {
-    const [x, y] = k.split(',').map(Number)
-    return {
-      x,
-      y,
-      ins: [...c.ins],
-      outs: [...c.outs],
-      kind: c.kind,
-      over: c.over ? { from: c.over[0], to: c.over[1] } : null,
-    }
-  })
+  /** Whether a belt may run over this tile at all. */
+  passBelt(t: Tile): boolean {
+    const { width, topWallRow, roomRow, solid, blockedForBelt } = this.floor
+    return (
+      t.x >= 1 &&
+      t.x < width - 1 &&
+      t.y > topWallRow &&
+      t.y < roomRow &&
+      !solid[t.y][t.x] &&
+      !blockedForBelt.has(key(t))
+    )
+  }
 
-  return { belts, beltTiles }
+  /** Whether a tile's belts can share it with this leg: the same source (a split) or target (a merge). */
+  compatible(c: Cell, leg: Leg): boolean {
+    return (
+      [...c.from].every((f) => f === leg.fromId) || [...c.to].every((toId) => toId === leg.toId)
+    )
+  }
+
+  route(leg: Leg): void {
+    const path = new BeltSearch(this, leg).run() ?? [
+      leg.start,
+      ...findPath(this.floor.solid, { from: leg.start, to: leg.goal }),
+    ]
+    const id = `${leg.fromId}->${leg.toId}`
+    this.belts.push({ id, fromNodeId: leg.fromId, toNodeId: leg.toId, path })
+    path.forEach((t, i) => this.lay(leg, { t, prevT: path[i - 1], nextT: path[i + 1] }))
+  }
+
+  /** One tile of a routed path, into the cell it shares with any belt already there. */
+  private lay(leg: Leg, { t, prevT, nextT }: { t: Tile; prevT?: Tile; nextT?: Tile }): void {
+    const c = this.cellAt(key(t))
+    const inD: Side = prevT ? sideBetween(prevT, t) : 'E'
+    const outD: Side = nextT ? sideBetween(t, nextT) : 'E'
+    if (c.from.size && !this.compatible(c, leg)) {
+      c.over = [OPP[inD], outD]
+      return
+    }
+    c.ins.add(OPP[inD])
+    c.outs.add(outD)
+    c.from.add(leg.fromId)
+    c.to.add(leg.toId)
+  }
+
+  private cellAt(k: string): Cell {
+    const existing = this.cells.get(k)
+    if (existing) return existing
+    const c: Cell = {
+      ins: new Set(),
+      outs: new Set(),
+      kind: 'straight',
+      over: null,
+      from: new Set(),
+      to: new Set(),
+    }
+    this.cells.set(k, c)
+    return c
+  }
+
+  result(): RouteBeltsResult {
+    for (const c of this.cells.values()) c.kind = kindOf(c)
+    const beltTiles: BeltTile[] = [...this.cells.entries()].map(([k, c]) => {
+      const [x, y] = k.split(',').map(Number)
+      return {
+        x,
+        y,
+        ins: [...c.ins],
+        outs: [...c.outs],
+        kind: c.kind,
+        over: c.over ? { from: c.over[0], to: c.over[1] } : null,
+      }
+    })
+    return { belts: this.belts, beltTiles }
+  }
+}
+
+/** The side of `from` that `to` lies on — they are neighbours. */
+function sideBetween(from: Tile, to: Tile): Side {
+  return SIDES.find((s) => from.x + STEP[s].x === to.x && from.y + STEP[s].y === to.y) as Side
+}
+
+/** What a shared tile is drawn as, from the belts that run through it. */
+function kindOf(c: Cell): BeltTileKind {
+  if (c.over) return 'cross'
+  if (c.outs.size > 1) return 'split'
+  if (c.ins.size > 1) return 'merge'
+  const sides = [...c.ins, ...c.outs]
+  return sides.length === 2 &&
+    STEP[sides[0]].x + STEP[sides[1]].x === 0 &&
+    STEP[sides[0]].y + STEP[sides[1]].y === 0
+    ? 'straight'
+    : 'corner'
+}
+
+/** Dijkstra over (tile, heading) for one leg, against the belts already laid. */
+class BeltSearch {
+  private readonly router: BeltRouter
+  private readonly leg: Leg
+  private readonly dist: Float64Array
+  private readonly prev: Int32Array
+  private readonly heap = new Heap()
+
+  constructor(router: BeltRouter, leg: Leg) {
+    this.router = router
+    this.leg = leg
+    const { width, height } = router.floor
+    this.dist = new Float64Array(width * height * 4).fill(Infinity)
+    this.prev = new Int32Array(width * height * 4).fill(-1)
+  }
+
+  private sid(t: Tile, d: number): number {
+    return ((t.y * this.router.floor.width + t.x) << 2) | d
+  }
+
+  private tileOf(s: number): Tile {
+    const { width } = this.router.floor
+    return { x: (s >> 2) % width, y: Math.floor((s >> 2) / width) }
+  }
+
+  /** The path from the leg's start to its goal, or null when the floor has none. */
+  run(): Tile[] | null {
+    const { goal } = this.leg
+    const s0 = this.sid(this.leg.start, 0)
+    this.dist[s0] = 0
+    this.heap.push(0, s0)
+    while (this.heap.a.length) {
+      const [dcur, s] = this.heap.pop()
+      if (dcur > this.dist[s]) continue
+      const t = this.tileOf(s)
+      if (t.x === goal.x && t.y === goal.y) return this.pathTo(s)
+      this.expand(s, { dcur, t })
+    }
+    return null
+  }
+
+  private pathTo(end: number): Tile[] {
+    const path: Tile[] = []
+    for (let s = end; s >= 0; s = this.prev[s]) path.unshift(this.tileOf(s))
+    return path
+  }
+
+  private expand(s: number, { dcur, t }: { dcur: number; t: Tile }): void {
+    const d = s & 3
+    const here = this.router.cells.get(key(t))
+    const onCross = here !== undefined && !this.router.compatible(here, this.leg)
+    for (let nd2 = 0; nd2 < 4; nd2++) {
+      if (onCross && nd2 !== d) continue
+      const step = this.step(t, { d, nd2 })
+      if (step === null) continue
+      const ns = this.sid(step.n, nd2)
+      if (dcur + step.cost < this.dist[ns]) {
+        this.dist[ns] = dcur + step.cost
+        this.prev[ns] = s
+        this.heap.push(this.dist[ns], ns)
+      }
+    }
+  }
+
+  /** The tile one step from `t` heading `SIDES[nd2]`, and what the step costs; null when it is no way. */
+  private step(t: Tile, { d, nd2 }: { d: number; nd2: number }): { n: Tile; cost: number } | null {
+    const { start, goal } = this.leg
+    const { role } = this.router.floor
+    const dir = SIDES[nd2]
+    const n: Tile = { x: t.x + STEP[dir].x, y: t.y + STEP[dir].y }
+    const isGoal = n.x === goal.x && n.y === goal.y
+    if (!this.mayEnter(t, { n, dir, isGoal })) return null
+    let cost = 1 + (nd2 !== d && !(t.x === start.x && t.y === start.y && nd2 === 0) ? 2 : 0)
+    if (role[n.y] === 'seat' || role[n.y] === 'aisle') cost += 1
+    const shared = this.sharedCost(n, { dir, cost, isGoal })
+    return shared === null ? null : { n, cost: shared }
+  }
+
+  /** Whether a belt may step from `t` onto `n`: free floor, or the goal, and across only on a belt row. */
+  private mayEnter(t: Tile, { n, dir, isGoal }: { n: Tile; dir: Side; isGoal: boolean }): boolean {
+    const floorAllows = this.router.passBelt(n) || (isGoal && !this.router.floor.solid[n.y][n.x])
+    if (!floorAllows) return false
+    const horizontal = dir === 'E' || dir === 'W'
+    return !horizontal || (this.beltRow(n.y) && this.beltRow(t.y))
+  }
+
+  private beltRow(y: number): boolean {
+    const role = this.router.floor.role[y]
+    return role === 'station' || role === 'belt'
+  }
+
+  /**
+   * What stepping onto a tile another belt uses costs: almost nothing along a
+   * compatible belt's own way, a little more against it, and a lot to cross an
+   * unrelated straight at a right angle — null for any other crossing.
+   */
+  private sharedCost(
+    n: Tile,
+    { dir, cost, isGoal }: { dir: Side; cost: number; isGoal: boolean }
+  ): number | null {
+    const c = this.router.cells.get(key(n))
+    if (!c) return cost
+    if (this.router.compatible(c, this.leg)) return c.outs.has(dir) ? 0.2 : cost + 1
+    const horizontal = dir === 'E' || dir === 'W'
+    const cHorizontal = c.outs.has('E') || c.outs.has('W')
+    if (cHorizontal === horizontal || c.kind !== 'straight' || isGoal) return null
+    return cost + 10
+  }
 }

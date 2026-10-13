@@ -106,25 +106,35 @@ function nodeOfSession(graph: RunGraph, sessionId: string): string | null {
   return graph.nodes.find((n) => n.sessionId === sessionId)?.id ?? null
 }
 
+/** What changed between two observations of one kind; each reads the pair for itself. */
+type ChangeReader = (prev: Observation, next: Observation) => FactoryEvent[]
+
 export function diffObservation(prev: Observation | null, next: Observation): FactoryEvent[] {
   if (prev === null) return []
+  return CHANGE_READERS.flatMap((read) => read(prev, next))
+}
 
-  const events: FactoryEvent[] = []
+function stateChanges(prev: Observation, next: Observation): FactoryEvent[] {
   const prevNodes = new Map(prev.graph.nodes.map((n) => [n.id, n]))
-
+  const events: FactoryEvent[] = []
   for (const node of next.graph.nodes) {
-    const before = prevNodes.get(node.id)
-    const from = before?.state ?? null
+    const from = prevNodes.get(node.id)?.state ?? null
     if (from !== node.state) {
       events.push({ kind: 'node-state', nodeId: node.id, from, to: node.state })
     }
   }
+  return events
+}
 
+function orphanChanges(prev: Observation, next: Observation): FactoryEvent[] {
   const prevOrphaned = new Set(prev.orphaned)
-  for (const nodeId of next.orphaned) {
-    if (!prevOrphaned.has(nodeId)) events.push({ kind: 'orphaned', nodeId })
-  }
+  return next.orphaned
+    .filter((nodeId) => !prevOrphaned.has(nodeId))
+    .map((nodeId): FactoryEvent => ({ kind: 'orphaned', nodeId }))
+}
 
+function strandedChanges(prev: Observation, next: Observation): FactoryEvent[] {
+  const events: FactoryEvent[] = []
   const prevStranded = new Set(prev.stranded)
   const nextStranded = new Set(next.stranded)
   for (const sessionId of next.stranded) {
@@ -137,7 +147,11 @@ export function diffObservation(prev: Observation | null, next: Observation): Fa
     const nodeId = nodeOfSession(next.graph, sessionId)
     if (nodeId !== null) events.push({ kind: 'stranded', nodeId, on: false })
   }
+  return events
+}
 
+function toolChanges(prev: Observation, next: Observation): FactoryEvent[] {
+  const events: FactoryEvent[] = []
   for (const [nodeId, activities] of Object.entries(next.activity)) {
     const before = new Set((prev.activity[nodeId] ?? []).map(activityKey))
     for (const activity of activities) {
@@ -152,14 +166,18 @@ export function diffObservation(prev: Observation | null, next: Observation): Fa
       })
     }
   }
+  return events
+}
 
+function handoffChanges(prev: Observation, next: Observation): FactoryEvent[] {
+  const prevNodes = new Map(prev.graph.nodes.map((n) => [n.id, n]))
   const nextNodes = new Map(next.graph.nodes.map((n) => [n.id, n]))
+  const events: FactoryEvent[] = []
   for (const node of next.graph.nodes) {
     for (const fromNodeId of node.dependsOn) {
       const sourceNow = nextNodes.get(fromNodeId)
       if (sourceNow === undefined || sourceNow.state !== 'passed') continue
-      const sourceBefore = prevNodes.get(fromNodeId)
-      if (sourceBefore?.state === 'passed') continue
+      if (prevNodes.get(fromNodeId)?.state === 'passed') continue
       events.push({
         kind: 'handoff',
         fromNodeId,
@@ -168,11 +186,15 @@ export function diffObservation(prev: Observation | null, next: Observation): Fa
       })
     }
   }
+  return events
+}
 
+function reworkChanges(prev: Observation, next: Observation): FactoryEvent[] {
+  const prevNodes = new Map(prev.graph.nodes.map((n) => [n.id, n]))
+  const events: FactoryEvent[] = []
   for (const node of next.graph.nodes) {
-    const before = prevNodes.get(node.id)
     const { feedback } = node
-    const prevLength = before?.feedback.length ?? 0
+    const prevLength = prevNodes.get(node.id)?.feedback.length ?? 0
     if (feedback.length > prevLength) {
       const newest = feedback[feedback.length - 1]
       events.push({
@@ -183,7 +205,11 @@ export function diffObservation(prev: Observation | null, next: Observation): Fa
       })
     }
   }
+  return events
+}
 
+function gateChanges(prev: Observation, next: Observation): FactoryEvent[] {
+  const events: FactoryEvent[] = []
   const prevGateNodes = gateNodeIds(prev.waiting, prev.graph)
   const nextGateNodes = gateNodeIds(next.waiting, next.graph)
   for (const nodeId of nextGateNodes) {
@@ -192,84 +218,100 @@ export function diffObservation(prev: Observation | null, next: Observation): Fa
   for (const nodeId of prevGateNodes) {
     if (!nextGateNodes.has(nodeId)) events.push({ kind: 'gate', nodeId, waiting: false })
   }
-
-  if (next.ci !== null && (prev.ci === null || next.ci.round > prev.ci.round)) {
-    events.push({ kind: 'ci-round', round: next.ci.round, max: next.ci.max })
-  }
-
-  if (next.ci !== null) {
-    const prevBuckets = new Map<string, Check['bucket']>()
-    for (const pull of prev.ci?.pulls ?? []) {
-      for (const check of pull.checks) prevBuckets.set(check.name, check.bucket)
-    }
-    for (const pull of next.ci.pulls) {
-      for (const check of pull.checks) {
-        if (prevBuckets.get(check.name) !== check.bucket) {
-          events.push({ kind: 'ci-check', name: check.name, bucket: check.bucket })
-        }
-      }
-    }
-  }
-
-  if (next.queue !== null) {
-    const changed =
-      prev.queue === null ||
-      prev.queue.position !== next.queue.position ||
-      prev.queue.behind.length !== next.queue.behind.length ||
-      prev.queue.behind.some((entry, index) => entry.orderId !== next.queue?.behind[index]?.orderId)
-    if (changed) {
-      events.push({
-        kind: 'queued',
-        position: next.queue.position,
-        behind: next.queue.behind.map((entry) => entry.title),
-      })
-    }
-  }
-
   return events
 }
 
+function ciRoundChanges(prev: Observation, next: Observation): FactoryEvent[] {
+  if (next.ci === null || (prev.ci !== null && next.ci.round <= prev.ci.round)) return []
+  return [{ kind: 'ci-round', round: next.ci.round, max: next.ci.max }]
+}
+
+function ciCheckChanges(prev: Observation, next: Observation): FactoryEvent[] {
+  if (next.ci === null) return []
+  const events: FactoryEvent[] = []
+  const prevBuckets = new Map<string, Check['bucket']>()
+  for (const pull of prev.ci?.pulls ?? []) {
+    for (const check of pull.checks) prevBuckets.set(check.name, check.bucket)
+  }
+  for (const pull of next.ci.pulls) {
+    for (const check of pull.checks) {
+      if (prevBuckets.get(check.name) !== check.bucket) {
+        events.push({ kind: 'ci-check', name: check.name, bucket: check.bucket })
+      }
+    }
+  }
+  return events
+}
+
+function queueChanges(prev: Observation, next: Observation): FactoryEvent[] {
+  const queue = next.queue
+  if (queue === null) return []
+  const changed =
+    prev.queue === null ||
+    prev.queue.position !== queue.position ||
+    prev.queue.behind.length !== queue.behind.length ||
+    prev.queue.behind.some((entry, index) => entry.orderId !== queue.behind[index]?.orderId)
+  if (!changed) return []
+  return [
+    { kind: 'queued', position: queue.position, behind: queue.behind.map((entry) => entry.title) },
+  ]
+}
+
+/** In the order a diff reports them. */
+const CHANGE_READERS: readonly ChangeReader[] = [
+  stateChanges,
+  orphanChanges,
+  strandedChanges,
+  toolChanges,
+  handoffChanges,
+  reworkChanges,
+  gateChanges,
+  ciRoundChanges,
+  ciCheckChanges,
+  queueChanges,
+]
+
 function name(labels: Readonly<Record<string, string>>, nodeId: string): string {
   return labels[nodeId] ?? nodeId
+}
+
+/** One kind of event in words, given how to name a node. */
+type Describer<K extends FactoryEvent['kind']> = (
+  event: Extract<FactoryEvent, { kind: K }>,
+  named: (nodeId: string) => string
+) => string
+
+/** Each kind of event in words — a kind this lacks is a compile error. */
+const DESCRIBE: { readonly [K in FactoryEvent['kind']]: Describer<K> } = {
+  'node-state': (event, named) => `${named(event.nodeId)} is now ${event.to}.`,
+  orphaned: (event, named) => `${named(event.nodeId)}'s agent is gone.`,
+  stranded: (event, named) =>
+    event.on
+      ? `${named(event.nodeId)} is waiting on you.`
+      : `${named(event.nodeId)} is back to work.`,
+  tool: (event, named) =>
+    event.open
+      ? `${named(event.nodeId)} is using the ${event.prop}.`
+      : `${named(event.nodeId)} is done with the ${event.prop}.`,
+  handoff: (event, named) => `${named(event.fromNodeId)} handed off to ${named(event.toNodeId)}.`,
+  gate: (event, named) =>
+    event.waiting
+      ? `${named(event.nodeId)} is waiting at the gate.`
+      : `${named(event.nodeId)}'s gate cleared.`,
+  rework: (event, named) =>
+    `${named(event.fromNodeId)} sent ${named(event.toNodeId)} back (round ${event.round}).`,
+  'ci-round': (event) => `CI round ${event.round} of ${event.max}.`,
+  'ci-check': (event) => `${event.name} is now ${event.bucket}.`,
+  queued: (event) =>
+    event.behind.length === 0
+      ? `Queued ${ordinal(event.position)}.`
+      : `Queued ${ordinal(event.position)}, behind ${event.behind.join(', ')}.`,
 }
 
 export function describeEvent(
   event: FactoryEvent,
   labels: Readonly<Record<string, string>>
 ): string {
-  switch (event.kind) {
-    case 'node-state':
-      return `${name(labels, event.nodeId)} is now ${event.to}.`
-    case 'orphaned':
-      return `${name(labels, event.nodeId)}'s agent is gone.`
-    case 'stranded':
-      return event.on
-        ? `${name(labels, event.nodeId)} is waiting on you.`
-        : `${name(labels, event.nodeId)} is back to work.`
-    case 'tool':
-      return event.open
-        ? `${name(labels, event.nodeId)} is using the ${event.prop}.`
-        : `${name(labels, event.nodeId)} is done with the ${event.prop}.`
-    case 'handoff':
-      return `${name(labels, event.fromNodeId)} handed off to ${name(labels, event.toNodeId)}.`
-    case 'gate':
-      return event.waiting
-        ? `${name(labels, event.nodeId)} is waiting at the gate.`
-        : `${name(labels, event.nodeId)}'s gate cleared.`
-    case 'rework':
-      return `${name(labels, event.fromNodeId)} sent ${name(labels, event.toNodeId)} back (round ${event.round}).`
-    case 'ci-round':
-      return `CI round ${event.round} of ${event.max}.`
-    case 'ci-check':
-      return `${event.name} is now ${event.bucket}.`
-    case 'queued':
-      return event.behind.length === 0
-        ? `Queued ${ordinal(event.position)}.`
-        : `Queued ${ordinal(event.position)}, behind ${event.behind.join(', ')}.`
-    /* v8 ignore next 3 -- exhaustive union, unreachable */
-    default: {
-      const never: never = event
-      throw new Error(`unhandled factory event: ${String(never)}`)
-    }
-  }
+  const describe = DESCRIBE[event.kind] as Describer<FactoryEvent['kind']>
+  return describe(event, (nodeId) => name(labels, nodeId))
 }

@@ -12,8 +12,6 @@ import {
   AlertCircle,
   Loader,
   CheckCircle2,
-  GitPullRequest,
-  Ticket,
   Eye,
   ExternalLink as OpenOutside,
 } from 'lucide-react'
@@ -26,6 +24,8 @@ import { ordinal } from '../factory/format.js'
 import { Button, IconButton, Markdown, RelativeTime, usePolling } from '@terminator/extension-ui'
 import { usePushed } from '../renderer/use-pushed.js'
 import { ExternalLink, openInBrowser } from './ExternalLink.js'
+import { OrderLinks } from './OrderLinks.js'
+import { attachTo } from '../renderer/attach-to-step.js'
 import {
   useRunObservation,
   type FloorView,
@@ -195,90 +195,131 @@ export interface FloorProps {
 }
 
 export function Floor({ orderId }: FloorProps): JSX.Element {
+  const floor = useFloor(orderId)
+  const { view, problem } = floor
+  if (problem !== null && view === null) return <p className="fdry-note">{problem}</p>
+  if (view === null) return <div className="fdry-empty">Loading the run…</div>
+  return <FloorPage floor={floor} view={view} />
+}
+
+/** Everything the Floor keeps: the run observed, what the agents say, and the moves on it. */
+function useFloor(orderId: string) {
   const { view, problem: observeProblem, pending, refresh } = useRunObservation(orderId)
   // Errors an action raises here — a click that failed, a decision the run
   // refused — live alongside whatever the observation poll last said, so one
   // does not silently overwrite the other.
   const [actionProblem, setProblem] = useState<string | null>(null)
+  const watch = useWatch()
+  const activity = useActivity(watch)
+  const asks = useAskAnswers(setProblem, activity.pollLive)
+  const sessions = useSessionControl(setProblem, activity.pollLive)
+  const review = useReview(view, setProblem)
+  const attach = useAttach(orderId)
+  const decisions = useDecisions(orderId, setProblem, refresh)
+  const words = useAgentWords(view, watch)
   const problem = actionProblem ?? observeProblem
+  return {
+    view,
+    pending,
+    problem,
+    watch,
+    ...activity,
+    ...asks,
+    ...sessions,
+    ...review,
+    ...attach,
+    ...decisions,
+    ...words,
+  }
+}
+
+type FloorModel = ReturnType<typeof useFloor>
+
+/** The agent being read, what it last said, and what you are typing to send it instead. */
+function useWatch() {
   const [transcript, setTranscript] = useState<TranscriptLine[]>([])
-  /** The last few things each running agent said, by session. */
-  const [live, setLive] = useState<Record<string, TranscriptLine[]>>({})
-  /** When the tails were last read: the "now" their ages are counted against. */
-  const [tailsReadAt, setTailsReadAt] = useState(0)
   const [watching, setWatching] = useState<string | null>(null)
   const [redirect, setRedirect] = useState('')
-  /** What a step's attach was refused with, beside the step that asked. */
-  const [attachProblems, setAttachProblems] = useState<Record<string, string>>({})
-  /** Whether the git extension's review can be reached; null until asked. */
-  const [reviewable, setReviewable] = useState<boolean | null>(null)
-  const [feed, setFeed] = useState<FeedEntry[]>([])
-  const [mutes, setMutes] = useState<MuteRule[]>([])
-  const [stalls, setStalls] = useState<StallFiring[]>([])
-  const [shadowMode, setShadowMode] = useState(true)
+  return { transcript, setTranscript, watching, setWatching, redirect, setRedirect }
+}
 
-  // The feed and the stall firings are Foundry's own and are pushed. What the
-  // agents say is read by the one fallback poll below, and by `pollLive` after
-  // an action.
-  const showLive = useCallback((read: LiveRead): void => {
-    setStalls(read.stalls)
-    setShadowMode(read.shadowMode)
-    setFeed(read.feed)
-    setMutes(read.mutes)
-  }, [])
+type Watch = ReturnType<typeof useWatch>
+
+const NO_LIVE: LiveRead = { stalls: [], shadowMode: true, feed: [], mutes: [] }
+
+/**
+ * The feed and the stall firings, which are Foundry's own and are pushed. What
+ * the agents say is read by the one fallback poll (`useAgentWords`), and by
+ * `pollLive` after an action.
+ */
+function useActivity({ watching, setTranscript }: Watch) {
+  const [activity, showLive] = useState<LiveRead>(NO_LIVE)
   usePushed(readLiveState, showLive, { kinds: ['live'] })
   const pollLive = useCallback(async () => {
     showLive(await readLiveState())
     const lines = await readWatched(watching)
     if (lines !== null) setTranscript(lines)
-  }, [watching, showLive])
+  }, [watching, setTranscript])
+  return { ...activity, pollLive }
+}
 
+type SetProblem = (problem: string | null) => void
+
+/** Allows or denies a held call; why not, when it is no longer waiting. */
+async function resolveAsk(ask: PendingAsk, decision: 'allow' | 'deny'): Promise<string | null> {
+  const result = (await invoke('foundry:permission-resolve', {
+    requestId: ask.requestId,
+    decision,
+  })) as { ok: boolean; reason?: string }
+  // A click that did nothing is worse than a refusal that says why.
+  return result.ok ? null : (result.reason ?? 'that request is no longer waiting')
+}
+
+/** Hands a held call back to its terminal and goes there; what went wrong, if anything. */
+async function handAskBack(ask: PendingAsk): Promise<string | null> {
+  const given = (await invoke('foundry:permission-hand-back', {
+    requestId: ask.requestId,
+  })) as { ok?: boolean }
+  if (given.ok !== true) return 'that request is no longer waiting'
+  // Handing back and going there are two things, and the second can fail on
+  // its own: a run whose terminal has been closed accepts the hand-back and
+  // has nowhere to send you. Silently, until this said so.
+  const gone = (await invoke('foundry:run-terminal', { sessionId: ask.sessionId })) as {
+    ok?: boolean
+  }
+  return gone.ok === true ? null : 'handed back, but that run no longer has a terminal to open'
+}
+
+function useAskAnswers(setProblem: SetProblem, pollLive: () => Promise<void>) {
   const answer = useCallback(
     async (ask: PendingAsk, decision: 'allow' | 'deny') => {
-      const result = (await invoke('foundry:permission-resolve', {
-        requestId: ask.requestId,
-        decision,
-      })) as { ok: boolean; reason?: string }
-      // A click that did nothing is worse than a refusal that says why.
-      if (!result.ok) setProblem(result.reason ?? 'that request is no longer waiting')
+      const trouble = await resolveAsk(ask, decision)
+      if (trouble !== null) setProblem(trouble)
       await pollLive()
     },
-    [pollLive]
+    [pollLive, setProblem]
   )
-
   const handBack = useCallback(
     async (ask: PendingAsk) => {
-      const given = (await invoke('foundry:permission-hand-back', {
-        requestId: ask.requestId,
-      })) as { ok?: boolean }
-      if (given.ok !== true) {
-        setProblem('that request is no longer waiting')
-        await pollLive()
-        return
-      }
-      // Handing back and going there are two things, and the second can fail on
-      // its own: a run whose terminal has been closed accepts the hand-back and
-      // has nowhere to send you. Silently, until this said so.
-      const gone = (await invoke('foundry:run-terminal', { sessionId: ask.sessionId })) as {
-        ok?: boolean
-      }
-      if (gone.ok !== true) {
-        setProblem('handed back, but that run no longer has a terminal to open')
-      }
+      const trouble = await handAskBack(ask)
+      if (trouble !== null) setProblem(trouble)
       await pollLive()
     },
-    [pollLive]
+    [pollLive, setProblem]
   )
+  return { answer, handBack }
+}
 
+/** Steering a live agent, and clearing or silencing what the feed says. */
+function useSessionControl(setProblem: SetProblem, pollLive: () => Promise<void>) {
   const control = useCallback(
     async (channel: string, payload: Record<string, unknown>) => {
       const result = (await invoke(channel, payload)) as { ok?: boolean }
       if (result.ok !== true) setProblem('that run is no longer live')
       await pollLive()
     },
-    [pollLive]
+    [pollLive, setProblem]
   )
-
   const dismiss = useCallback(
     async (entry: FeedEntry, mute: boolean) => {
       await invoke(mute ? 'foundry:feed-mute' : 'foundry:feed-dismiss', {
@@ -289,8 +330,19 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
     },
     [pollLive]
   )
+  const unmute = useCallback(
+    async (rule: MuteRule) => {
+      await invoke('foundry:feed-unmute', rule)
+      await pollLive()
+    },
+    [pollLive]
+  )
+  return { control, dismiss, unmute }
+}
 
-  const hasPulls = (view?.pulls ?? []).length > 0
+/** Whether the git extension's review can be reached; null until asked, asked once there are pulls. */
+function useReviewable(hasPulls: boolean) {
+  const [reviewable, setReviewable] = useState<boolean | null>(null)
   useEffect(() => {
     if (!hasPulls) return
     let cancelled = false
@@ -301,20 +353,28 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
       cancelled = true
     }
   }, [hasPulls])
+  return [reviewable, setReviewable] as const
+}
 
-  /**
-   * Review a pull request in the git extension, or open it where it lives.
-   *
-   * Foundry used to draw its own hunk-by-hunk review of the working copy, a
-   * second and worse review beside the one the git extension already has for
-   * the pull request. Asking that one is the whole of it; when it is not
-   * there, the pull request on GitHub is the next best thing.
-   */
+function openOutside(url: string): void {
+  void window.electronAPI.shell?.openExternal(url)
+}
+
+/**
+ * Review a pull request in the git extension, or open it where it lives.
+ *
+ * Foundry used to draw its own hunk-by-hunk review of the working copy, a
+ * second and worse review beside the one the git extension already has for
+ * the pull request. Asking that one is the whole of it; when it is not
+ * there, the pull request on GitHub is the next best thing.
+ */
+function useReview(view: FloorView | null, setProblem: SetProblem) {
+  const [reviewable, setReviewable] = useReviewable((view?.pulls ?? []).length > 0)
   const review = useCallback(
     async (pull: { url: string; number: number; cwd: string }) => {
       setProblem(null)
       if (reviewable === false) {
-        void window.electronAPI.shell?.openExternal(pull.url)
+        openOutside(pull.url)
         return
       }
       const opened = await window.electronAPI.extension?.runCommand(REVIEW_COMMAND, {
@@ -324,223 +384,189 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
       if (opened === undefined || opened.ok) return
       if (opened.reason === 'not-registered') {
         setReviewable(false)
-        void window.electronAPI.shell?.openExternal(pull.url)
+        openOutside(pull.url)
         return
       }
       setProblem(`The review could not open: ${opened.reason}`)
     },
-    [reviewable]
+    [reviewable, setProblem, setReviewable]
   )
+  return { reviewable, review }
+}
 
-  const unmute = useCallback(
-    async (rule: MuteRule) => {
-      await invoke('foundry:feed-unmute', rule)
-      await pollLive()
-    },
-    [pollLive]
-  )
+/** The refusals by step, with this one's said or cleared. */
+function withRefusal(
+  was: Record<string, string>,
+  [nodeId, message]: [string, string | null]
+): Record<string, string> {
+  const next = { ...was }
+  if (message === null) delete next[nodeId]
+  else next[nodeId] = message
+  return next
+}
 
+/** What a step's attach was refused with, beside the step that asked. */
+function useAttach(orderId: string) {
+  const [attachProblems, setAttachProblems] = useState<Record<string, string>>({})
   const attach = useCallback(
     async (nodeId: string) => {
       // Said beside the step that was clicked: a refusal at the foot of a page
       // this long was a refusal nobody could connect to what they had pressed.
       const refuse = (message: string | null): void =>
-        setAttachProblems((was) => {
-          const next = { ...was }
-          if (message === null) delete next[nodeId]
-          else next[nodeId] = message
-          return next
-        })
+        setAttachProblems((was) => withRefusal(was, [nodeId, message]))
       refuse(null)
-      const r = (await invoke('foundry:session.attach', { orderId, nodeId })) as
-        | { terminalSessionId: string }
-        | { error: string }
-      if ('error' in r) {
-        refuse(r.error)
-        return
-      }
-      // And then actually go there. This resolved the session and dropped it,
-      // so the button labelled "Attach" navigated nowhere at all — the one
-      // control on a read-only surface, and it did nothing.
-      const gone = (await invoke('foundry:run-terminal', {
-        sessionId: r.terminalSessionId,
-      })) as { ok?: boolean }
-      if (gone.ok !== true) refuse('That agent is no longer in a terminal.')
+      const trouble = await attachTo(orderId, nodeId)
+      if (trouble !== null) refuse(trouble)
     },
     [orderId]
   )
+  return { attachProblems, attach }
+}
 
-  /**
-   * Pick the run back up, or stop it.
-   *
-   * The two answers to a run nothing is running. `run.resume` has existed and
-   * been registered the whole time with no surface calling it: the only way to
-   * restart a run was to happen to have a gate open in the inbox.
-   */
+type RunChannel = 'foundry:run.resume' | 'foundry:run.stop' | 'foundry:run.reset'
+
+/**
+ * Pick the run back up, or stop it; and answer the gate holding this order.
+ *
+ * The two answers to a run nothing is running. `run.resume` has existed and
+ * been registered the whole time with no surface calling it: the only way to
+ * restart a run was to happen to have a gate open in the inbox.
+ *
+ * The gate is answered on the same channel the inbox answers it with — this is
+ * not a second queue, it is the one blocking thing on this order put where the
+ * person looking at the order will see it. The inbox stays the cross-order queue.
+ */
+function useDecisions(orderId: string, setProblem: SetProblem, refresh: () => Promise<void>) {
   const [busy, setBusy] = useState(false)
-  const decideRun = useCallback(
-    async (channel: 'foundry:run.resume' | 'foundry:run.stop' | 'foundry:run.reset') => {
+  const decide = useCallback(
+    async (channel: string, payload: Record<string, unknown>) => {
       setBusy(true)
       try {
-        const r = (await invoke(channel, { id: orderId })) as { error?: string }
+        const r = (await invoke(channel, payload)) as { error?: string; actionError?: string }
         // Said out loud. A refusal that leaves the band exactly as it was reads
         // as a button that does nothing, which is what sent people to the
         // terminal to find out.
-        setProblem(r.error ?? null)
-        await refresh()
-      } finally {
-        setBusy(false)
-      }
-    },
-    [orderId, refresh]
-  )
-
-  /**
-   * Answer the gate holding this order, from the screen that shows the order.
-   *
-   * The same channel the inbox answers it with — this is not a second queue,
-   * it is the one blocking thing on this order put where the person looking at
-   * the order will see it. The inbox stays the cross-order queue.
-   */
-  const decideGate = useCallback(
-    async (gateId: string, option: string, limit?: number | null) => {
-      setBusy(true)
-      try {
-        const payload = limit === undefined ? { gateId, option } : { gateId, option, limit }
-        const r = (await invoke('foundry:inbox.decide', payload)) as {
-          error?: string
-          actionError?: string
-        }
         setProblem(r.error ?? r.actionError ?? null)
         await refresh()
       } finally {
         setBusy(false)
       }
     },
-    [refresh]
+    [refresh, setProblem]
   )
+  const decideRun = useCallback(
+    (channel: RunChannel) => decide(channel, { id: orderId }),
+    [orderId, decide]
+  )
+  const decideGate = useCallback(
+    (gateId: string, option: string, limit?: number | null) =>
+      decide(
+        'foundry:inbox.decide',
+        limit === undefined ? { gateId, option } : { gateId, option, limit }
+      ),
+    [decide]
+  )
+  return { busy, decideRun, decideGate }
+}
 
-  // Every running agent's tail, without choosing one to watch. The band read
-  // "0 of 3 steps done" for the whole of a build step, which is most of a run,
-  // and said nothing else: reported as "basically always blank".
-  const runningSessions = (view?.graph.nodes ?? [])
+/**
+ * Every running agent's session, without choosing one to watch. The band read
+ * "0 of 3 steps done" for the whole of a build step, which is most of a run,
+ * and said nothing else: reported as "basically always blank".
+ */
+function runningSessionsOf(view: FloorView | null): string {
+  return (view?.graph.nodes ?? [])
     .filter((n) => isLive(n, view?.orphaned ?? []))
     .map((n) => n.sessionId)
     .join(' ')
-  const showTails = useCallback((tails: Record<string, TranscriptLine[]>): void => {
-    setLive(tails)
-    setTailsReadAt(Date.now())
-  }, [])
-  // The one poll left on this view: what the agents have been saying changes
-  // in their own processes, with nothing Foundry writes to announce it.
+}
+
+interface AgentWords {
+  readonly watched: TranscriptLine[] | null
+  readonly tails: Record<string, TranscriptLine[]>
+}
+
+/**
+ * The one poll left on this view: what the agents have been saying changes in
+ * their own processes, with nothing Foundry writes to announce it.
+ */
+function useAgentWords(view: FloorView | null, { watching, setTranscript }: Watch) {
+  /** The last few things each running agent said, by session. */
+  const [live, setLive] = useState<Record<string, TranscriptLine[]>>({})
+  /** When the tails were last read: the "now" their ages are counted against. */
+  const [tailsReadAt, setTailsReadAt] = useState(0)
+  const runningSessions = runningSessionsOf(view)
   const readAgentWords = useCallback(
-    async () => ({
+    async (): Promise<AgentWords> => ({
       watched: await readWatched(watching),
       tails: await readRunningTails(runningSessions),
     }),
     [watching, runningSessions]
   )
   const showAgentWords = useCallback(
-    (read: { watched: TranscriptLine[] | null; tails: Record<string, TranscriptLine[]> }): void => {
+    (read: AgentWords): void => {
       if (read.watched !== null) setTranscript(read.watched)
-      showTails(read.tails)
+      setLive(read.tails)
+      setTailsReadAt(Date.now())
     },
-    [showTails]
+    [setTranscript]
   )
   usePolling(readAgentWords, showAgentWords, LIVE_POLL_MS)
+  useForgetTails(runningSessions, setLive)
+  return { live, tailsReadAt }
+}
 
+/** Nothing running, nothing said: the tails go when the last running agent does. */
+function useForgetTails(
+  runningSessions: string,
+  setLive: (live: Record<string, TranscriptLine[]>) => void
+): void {
   const [polledSessions, setPolledSessions] = useState(runningSessions)
   if (polledSessions !== runningSessions) {
     setPolledSessions(runningSessions)
     if (runningSessions === '') setLive({})
   }
+}
 
-  if (problem !== null && view === null) return <p className="fdry-note">{problem}</p>
-  if (view === null) return <div className="fdry-empty">Loading the run…</div>
+/** What a step is called: its label, its role, or "this step". */
+function stepName(view: FloorView, node: RunNode): string {
+  return view.labels?.[node.id] ?? node.role ?? 'this step'
+}
 
-  const lanes = [...new Set(view.graph.nodes.map((n) => n.lane ?? 0))].sort((a, b) => a - b)
-  const orphaned = view.orphaned ?? []
+/** What a session is called: the step running it, or the session itself when no step does. */
+function sessionName(view: FloorView, session: string): string {
+  const node = view.graph.nodes.find((n) => n.sessionId === session)
+  return node === undefined ? session : stepName(view, node)
+}
 
-  const standing = view.standing
-  const pulls = view.pulls ?? []
-  const source = view.source ?? null
-  const waiting = view.waiting ?? []
-  const allChecks = view.ci?.pulls.flatMap((pull) => pull.checks) ?? []
-  const stranded = view.stranded ?? []
+interface PageProps {
+  readonly floor: FloorModel
+  readonly view: FloorView
+}
 
-  // The step being read, so its transcript opens under that step's own row.
-  // A session no step owns — a stall names one by session — has no row to sit
-  // under, and goes at the foot.
-  const watchedNode =
-    watching === null ? undefined : view.graph.nodes.find((n) => n.sessionId === watching)
-  const watchedLane = watchedNode === undefined ? null : (watchedNode.lane ?? 0)
-  const watchPanel =
-    watching === null ? null : (
-      <section
-        className="fdry-panel fdry-watch"
-        style={{ marginTop: 12 }}
-        aria-labelledby="fdry-watching-h"
-      >
-        <h3 className="fdry-panel-h" id="fdry-watching-h">
-          {watchedNode === undefined
-            ? watching
-            : (view.labels?.[watchedNode.id] ?? watchedNode.role ?? 'this step')}
-        </h3>
-        <pre className="fdry-transcript">
-          {transcript.length === 0 ? 'Nothing yet.' : transcript.map((l) => l.text).join('\n')}
-        </pre>
-        <form
-          className="fdry-redirect"
-          onSubmit={(event) => {
-            event.preventDefault()
-            if (redirect.trim() === '') return
-            void control('foundry:run-redirect', {
-              sessionId: watching,
-              message: redirect.trim(),
-            })
-            setRedirect('')
-          }}
-        >
-          <input
-            aria-label="Tell it what to do instead"
-            placeholder="Tell it what to do instead…"
-            value={redirect}
-            onChange={(event) => setRedirect(event.target.value)}
-          />
-          <Button
-            type="submit"
-            size="sm"
-            variant="primary"
-            icon={CornerDownLeft}
-            disabled={redirect.trim() === ''}
-          >
-            Redirect
-          </Button>
-          <Button
-            size="sm"
-            onClick={() => void control('foundry:run-interrupt', { sessionId: watching })}
-          >
-            Interrupt
-          </Button>
-          <Button
-            size="sm"
-            variant="danger"
-            icon={Square}
-            onClick={() =>
-              void control('foundry:run-stop', {
-                sessionId: watching,
-                reason: 'stopped from the floor',
-              })
-            }
-          >
-            Stop
-          </Button>
-        </form>
-      </section>
-    )
-
+function FloorPage({ floor, view }: PageProps) {
   return (
     <div className="fdry-shell">
+      <OrderHeading view={view} />
+      <FloorLinks view={view} reviewable={floor.reviewable} review={floor.review} />
+      <RefineryQueue view={view} />
+      <StandingBand floor={floor} view={view} />
+      <RunControls view={view} busy={floor.busy} decideRun={floor.decideRun} />
+      <HeldCalls pending={floor.pending} answer={floor.answer} handBack={floor.handBack} />
+      <MergeOrder view={view} />
+      <CiPanel view={view} />
+      <Lanes floor={floor} view={view} />
+      <ActivityPanel floor={floor} />
+      <StallsPanel floor={floor} view={view} />
+      <BlockedPanel view={view} />
+      {floor.problem !== null ? <p className="fdry-problem">{floor.problem}</p> : null}
+    </div>
+  )
+}
+
+function OrderHeading({ view }: { readonly view: FloorView }) {
+  return (
+    <>
       {/* What the order is, then what it is called by the records. The heading
           used to be the id and the recipe name — two identifiers nobody chose
           — on a screen whose whole job is to say which piece of work this is. */}
@@ -552,382 +578,534 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
           ? view.graph.recipe
           : `${view.graph.orderId} · ${view.graph.recipe}`}
       </p>
+    </>
+  )
+}
 
-      {/* Where the work is, one click away: the pull requests it opened and
-          the ticket it came from, and the review of each. */}
-      {pulls.length > 0 || source !== null ? (
-        <p className="fdry-order-links">
-          {pulls.map((pull) => (
-            <ExternalLink key={pull.url} href={pull.url}>
-              <GitPullRequest aria-hidden="true" />#{pull.number}
-            </ExternalLink>
-          ))}
-          {source === null ? null : (
-            <ExternalLink href={source.url}>
-              <Ticket aria-hidden="true" />
-              {source.key}
-            </ExternalLink>
-          )}
-          {pulls.map((pull) => (
-            <Button
-              key={pull.url}
-              size="sm"
-              icon={reviewable === false ? OpenOutside : Eye}
-              onClick={() => void review(pull)}
-            >
-              {reviewable === false
-                ? 'Open on GitHub'
-                : pulls.length > 1
-                  ? `Review #${pull.number}`
-                  : 'Review'}
-            </Button>
-          ))}
-        </p>
-      ) : null}
+type Pull = NonNullable<FloorView['pulls']>[number]
 
-      {/* The refinery's file-overlap queue: what this order sits behind, and
-          why — the collision the merge-order section cannot see, because it
-          is between orders, not between lanes of the same one. Nothing here
-          when it is not queued behind anything (R5). */}
-      {view.queue !== null && view.queue !== undefined && view.queue.behind.length > 0 ? (
-        <section className="fdry-queue" aria-label="Refinery queue">
-          {view.queue.behind.map((entry) => (
-            <p key={entry.orderId} className="fdry-note">
-              {`Queued ${ordinal(view.queue?.position ?? 0)}, behind ${entry.title} (${entry.files.length} shared ${entry.files.length === 1 ? 'file' : 'files'})`}
-            </p>
-          ))}
-        </section>
-      ) : null}
+interface FloorLinksProps {
+  readonly view: FloorView
+  readonly reviewable: boolean | null
+  readonly review: (pull: Pull) => Promise<void>
+}
 
-      {/* Where the run stands, and the move that takes it forward.
-
-          First on the screen and across its width, because everything below is
-          detail about a run whose state this is the only statement of. Without
-          it the panel opened on a wall of grey chips: a run halted two hours
-          earlier at an undecided gate drew the same chips as one mid-build,
-          the gate holding it was named nowhere, and the list that sent you
-          here called the same order "ready to hand off". */}
-      {standing === undefined ? null : (
-        <section
-          className={`fdry-standing is-${standing.kind}${standing.turn === 'you' ? ' is-yours' : ''}`}
-          aria-labelledby="fdry-standing-h"
+/**
+ * Where the work is, one click away: the pull requests it opened and the
+ * ticket it came from, and the review of each.
+ */
+function FloorLinks({ view, reviewable, review }: FloorLinksProps) {
+  const pulls = view.pulls ?? []
+  const source = view.source ?? null
+  if (pulls.length === 0 && source === null) return null
+  return (
+    <p className="fdry-order-links">
+      <OrderLinks pulls={pulls} source={source} />
+      {pulls.map((pull) => (
+        <Button
+          key={pull.url}
+          size="sm"
+          icon={reviewable === false ? OpenOutside : Eye}
+          onClick={() => void review(pull)}
         >
-          <div className="fdry-standing-head">
-            <span className="fdry-standing-mark" aria-hidden="true">
-              {standing.turn === 'you' ? (
-                <AlertCircle />
-              ) : standing.kind === 'done' ? (
-                <CheckCircle2 />
-              ) : (
-                <Loader />
-              )}
-            </span>
-            <div className="fdry-standing-main">
-              <h3 className="fdry-standing-h" id="fdry-standing-h">
-                {standing.headline}
-              </h3>
-              <p className="fdry-standing-detail">{standing.detail}</p>
-            </div>
-            {standing.total === 0 ? null : (
-              <span className="fdry-standing-count">
-                {standing.done} of {standing.total}
-              </span>
-            )}
-          </div>
+          {reviewLabel(reviewable, pull, pulls.length)}
+        </Button>
+      ))}
+    </p>
+  )
+}
 
-          {standing.total === 0 ? null : (
-            <div
-              className="fdry-standing-bar"
-              role="progressbar"
-              aria-valuenow={standing.done}
-              aria-valuemin={0}
-              aria-valuemax={standing.total}
-              aria-label="steps done"
-            >
-              <span style={{ width: `${(standing.done / standing.total) * 100}%` }} />
-            </div>
-          )}
+function reviewLabel(reviewable: boolean | null, pull: Pull, pullCount: number): string {
+  if (reviewable === false) return 'Open on GitHub'
+  return pullCount > 1 ? `Review #${pull.number}` : 'Review'
+}
 
-          {view.graph.nodes.some((n) => isLive(n, orphaned)) ? (
-            <ul className="fdry-live" aria-label="What the agents are doing">
-              {view.graph.nodes
-                .filter((n) => isLive(n, orphaned))
-                .map((node) => {
-                  const lines = (live[node.sessionId ?? ''] ?? []).slice(-LIVE_LINES)
-                  const last = lines.at(-1)
-                  return (
-                    <li key={node.id} className="fdry-live-agent">
-                      <div className="fdry-live-head">
-                        <b>{view.labels?.[node.id] ?? node.role ?? 'this step'}</b>
-                        {last === undefined ? null : (
-                          <RelativeTime value={last.at} now={tailsReadAt} />
-                        )}
-                      </div>
-                      {lines.length === 0 ? (
-                        <p className="fdry-live-empty">Starting — nothing yet.</p>
-                      ) : (
-                        <ol className="fdry-live-lines">
-                          {lines.map((line, index) => (
-                            <li
-                              key={`${line.at}-${index}`}
-                              className={index === lines.length - 1 ? 'is-latest' : undefined}
-                            >
-                              {line.text.split('\n')[0]}
-                            </li>
-                          ))}
-                        </ol>
-                      )}
-                    </li>
-                  )
-                })}
-            </ul>
-          ) : null}
+/**
+ * The refinery's file-overlap queue: what this order sits behind, and why —
+ * the collision the merge-order section cannot see, because it is between
+ * orders, not between lanes of the same one. Nothing here when it is not
+ * queued behind anything (R5).
+ */
+function RefineryQueue({ view }: { readonly view: FloorView }) {
+  const queue = view.queue
+  if (queue === null || queue === undefined || queue.behind.length === 0) return null
+  return (
+    <section className="fdry-queue" aria-label="Refinery queue">
+      {queue.behind.map((entry) => (
+        <p key={entry.orderId} className="fdry-note">
+          {`Queued ${ordinal(view.queue?.position ?? 0)}, behind ${entry.title} (${entry.files.length} shared ${entry.files.length === 1 ? 'file' : 'files'})`}
+        </p>
+      ))}
+    </section>
+  )
+}
 
-          {/* An agent stopped at a prompt only a person can clear.
+type StandingOf = NonNullable<FloorView['standing']>
 
-              Nothing on this screen could answer it: the bridge had already
-              taken the question out of the UI and put it in the terminal, so
-              the one move is to go there. */}
-          {standing.kind === 'stranded' && stranded.length > 0 ? (
-            <div className="fdry-standing-gate">
-              <div className="fdry-standing-options">
-                {stranded.map((session) => (
-                  <div key={session} className="fdry-standing-option">
-                    <Button
-                      variant="primary"
-                      icon={Terminal}
-                      disabled={busy}
-                      onClick={() => void control('foundry:run-terminal', { sessionId: session })}
-                    >
-                      Go to its terminal
-                    </Button>
-                    <small>
-                      {view.graph.nodes.find((n) => n.sessionId === session) === undefined
-                        ? session
-                        : (view.labels?.[
-                            view.graph.nodes.find((n) => n.sessionId === session)?.id ?? ''
-                          ] ?? session)}
-                    </small>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : null}
-
-          {/* A run nothing is running, and the one thing to do about it.
-
-              This was its own panel below the band, which meant the screen
-              said "nothing is running this" twice in two different voices.
-              The band states it; this is the move. */}
-          {standing.kind === 'adrift' ? (
-            <div className="fdry-standing-gate">
-              <p className="fdry-note">
-                {orphaned.map((id) => view.labels?.[id] ?? id).join(', ')}
-              </p>
-              <div className="fdry-standing-options">
-                <div className="fdry-standing-option">
-                  <Button
-                    variant="primary"
-                    disabled={busy}
-                    onClick={() => void decideRun('foundry:run.resume')}
-                  >
-                    Pick it back up
-                  </Button>
-                  <small>Every step that stopped is started again where it left off.</small>
-                </div>
-              </div>
-            </div>
-          ) : null}
-
-          {/* Every step passed and the run still never opened its pull
-              request — or it failed outright — and neither is answerable by
-              starting a fresh run: the finished steps are still finished.
-              The one move is to have Foundry check the work again. */}
-          {standing.kind === 'stopped' ? (
-            <div className="fdry-standing-gate">
-              <div className="fdry-standing-options">
-                <div className="fdry-standing-option">
-                  <Button
-                    variant="primary"
-                    disabled={busy}
-                    onClick={() => void decideRun('foundry:run.resume')}
-                  >
-                    Try again
-                  </Button>
-                  <small>
-                    Finished steps stay finished. Once every step has passed, Foundry checks the
-                    work again and tries to open the pull request.
-                  </small>
-                </div>
-              </div>
-            </div>
-          ) : null}
-
-          {/* The gate's own options, on the screen showing the order it holds.
-              A check that names a problem and offers no reachable control is a
-              wall: this one was answerable only from a tab the operator had no
-              reason to connect to the run they were looking at. */}
-          {waiting.map((gate) => (
-            <GateCard
-              key={gate.id}
-              gate={gate}
-              busy={busy}
-              pulls={pulls}
-              source={source}
-              onDecide={(option, limit) => void decideGate(gate.id, option, limit)}
-            />
-          ))}
-        </section>
-      )}
-
-      {/* Always here, not only when the run is orphaned.
-
-          Both of these lived inside the "nothing is running this" band, so a
-          run that was live — or halted at a gate — had no way out on this
-          screen at all, and `order.cancel` refuses a running order and points
-          back at the gate. Three orders for one ask, all `cancelled`, and four
-          branches cut by hand, is what that cost. */}
-      <div className="fdry-run-controls">
-        <ConfirmButton
-          label="Stop the run"
-          confirmLabel="Stop it"
-          warning={`This ends every agent still working on ${view.graph.orderId}. What is in the worktree stays there.`}
-          disabled={busy}
-          onConfirm={() => void decideRun('foundry:run.stop')}
+/**
+ * Where the run stands, and the move that takes it forward.
+ *
+ * First on the screen and across its width, because everything below is
+ * detail about a run whose state this is the only statement of. Without it
+ * the panel opened on a wall of grey chips: a run halted two hours earlier at
+ * an undecided gate drew the same chips as one mid-build, the gate holding it
+ * was named nowhere, and the list that sent you here called the same order
+ * "ready to hand off".
+ */
+function StandingBand({ floor, view }: PageProps) {
+  const standing = view.standing
+  if (standing === undefined) return null
+  return (
+    <section
+      className={`fdry-standing is-${standing.kind}${standing.turn === 'you' ? ' is-yours' : ''}`}
+      aria-labelledby="fdry-standing-h"
+    >
+      <StandingHead standing={standing} />
+      <StandingBar standing={standing} />
+      <LiveAgents floor={floor} view={view} />
+      <StrandedGate floor={floor} view={view} />
+      <AdriftGate floor={floor} view={view} />
+      <StoppedGate floor={floor} view={view} />
+      {/* The gate's own options, on the screen showing the order it holds.
+          A check that names a problem and offers no reachable control is a
+          wall: this one was answerable only from a tab the operator had no
+          reason to connect to the run they were looking at. */}
+      {(view.waiting ?? []).map((gate) => (
+        <GateCard
+          key={gate.id}
+          gate={gate}
+          busy={floor.busy}
+          pulls={view.pulls ?? []}
+          source={view.source ?? null}
+          onDecide={(option, limit) => void floor.decideGate(gate.id, option, limit)}
         />
-        <ConfirmButton
-          label="Start over"
-          confirmLabel="Destroy it and start over"
-          warning={`This destroys the checkout, the branch, the run graph and every gate ${view.graph.orderId} raised. The order, its criteria and its plan stay, and it can be run again from the beginning.`}
-          disabled={busy}
-          onConfirm={() => void decideRun('foundry:run.reset')}
-        />
+      ))}
+    </section>
+  )
+}
+
+function StandingHead({ standing }: { readonly standing: StandingOf }) {
+  return (
+    <div className="fdry-standing-head">
+      <span className="fdry-standing-mark" aria-hidden="true">
+        <StandingMark standing={standing} />
+      </span>
+      <div className="fdry-standing-main">
+        <h3 className="fdry-standing-h" id="fdry-standing-h">
+          {standing.headline}
+        </h3>
+        <p className="fdry-standing-detail">{standing.detail}</p>
       </div>
+      {standing.total === 0 ? null : (
+        <span className="fdry-standing-count">
+          {standing.done} of {standing.total}
+        </span>
+      )}
+    </div>
+  )
+}
 
-      {/* Held tool calls, oldest first — the order they must be answered in.
-          This is the UI-first half of the promise: the terminal is the
-          backstop, not the only way to answer.
+function StandingMark({ standing }: { readonly standing: StandingOf }) {
+  if (standing.turn === 'you') return <AlertCircle />
+  return standing.kind === 'done' ? <CheckCircle2 /> : <Loader />
+}
 
-          Above the run graph rather than under it. A held call is the only
-          thing on this screen that is waiting on a person; it used to sit
-          below every lane and every unit, which on a real run is a scroll —
-          and an agent blocked at a PreToolUse hook looks exactly like an agent
-          that has gone quiet. */}
-      {pending.length > 0 ? (
-        <section className="fdry-needs-you" aria-labelledby="fdry-waiting-h">
-          <h3 className="fdry-needs-you-h" id="fdry-waiting-h">
-            <ShieldQuestion aria-hidden="true" />
-            Waiting on you — {pending.length}
-          </h3>
-          <div className="fdry-needs-you-list">
-            {pending.map((ask) => (
-              <div key={ask.requestId} className="fdry-ask">
-                <span className="fdry-ask-icon" aria-hidden="true">
-                  <ShieldQuestion />
-                </span>
-                <div className="fdry-ask-main">
-                  <b>{ask.summary}</b>
-                  <small>
-                    <code>{ask.toolName}</code>
-                  </small>
-                  {/* An agent's question is prose; any other tool's input is
-                      literal, and rendering it would eat a command's `*`s. */}
-                  {ask.detail === null ? null : ask.toolName === 'AskUserQuestion' ? (
-                    <Markdown fetchesNothing className="fdry-md" onOpenLink={openInBrowser}>
-                      {ask.detail}
-                    </Markdown>
-                  ) : (
-                    <pre className="fdry-ask-detail">{ask.detail}</pre>
-                  )}
-                </div>
-                <div className="fdry-ask-actions">
-                  <Button variant="primary" size="sm" onClick={() => void answer(ask, 'allow')}>
-                    Allow
-                  </Button>
-                  <Button size="sm" onClick={() => void answer(ask, 'deny')}>
-                    Deny
-                  </Button>
-                  <Button
-                    size="sm"
-                    icon={Terminal}
-                    title="Answer it in the terminal instead"
-                    onClick={() => void handBack(ask)}
-                  >
-                    In the terminal
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      ) : null}
+function StandingBar({ standing }: { readonly standing: StandingOf }) {
+  if (standing.total === 0) return null
+  return (
+    <div
+      className="fdry-standing-bar"
+      role="progressbar"
+      aria-valuenow={standing.done}
+      aria-valuemin={0}
+      aria-valuemax={standing.total}
+      aria-label="steps done"
+    >
+      <span style={{ width: `${(standing.done / standing.total) * 100}%` }} />
+    </div>
+  )
+}
 
-      {/* Only where there is more than one repository. A single-lane order
-          gets no merge-order section at all, because "1 of 1, merges first"
-          is ceremony over nothing (FR-068). */}
-      {(view.lanes?.length ?? 0) > 1 ? (
-        <section className="fdry-panel" style={{ marginBottom: 12 }}>
-          <h3 className="fdry-panel-h">Merge order</h3>
-          <ol className="fdry-merge">
-            {view.lanes?.map((row) => (
-              <li key={row.ord} className={row.hold === null ? '' : 'is-held'}>
-                <b>{row.repo}</b>
-                {row.role === null ? null : <span className="fdry-role">{row.role}</span>}
-                {row.collisions.length > 0 ? (
-                  <small>shares {row.collisions.join(', ')}</small>
-                ) : null}
-                {row.hold === null ? (
-                  <small>free to merge</small>
-                ) : (
-                  <small className="fdry-hold">{row.hold}</small>
-                )}
-              </li>
-            ))}
-          </ol>
-        </section>
-      ) : null}
+function LiveAgents({ floor, view }: PageProps) {
+  const running = view.graph.nodes.filter((n) => isLive(n, view.orphaned ?? []))
+  if (running.length === 0) return null
+  return (
+    <ul className="fdry-live" aria-label="What the agents are doing">
+      {running.map((node) => (
+        <LiveAgent
+          key={node.id}
+          name={stepName(view, node)}
+          lines={(floor.live[node.sessionId ?? ''] ?? []).slice(-LIVE_LINES)}
+          now={floor.tailsReadAt}
+        />
+      ))}
+    </ul>
+  )
+}
 
-      {/* Present only when the ship tail has actually written a CI state — a
-          draft that has never shipped a pull says nothing here (ADR-060). */}
-      {view.ci ? (
-        <section className="fdry-panel" style={{ marginBottom: 12 }} aria-labelledby="fdry-ci-h">
-          <h3 className="fdry-panel-h" id="fdry-ci-h">
-            CI
-          </h3>
-          <p className="fdry-ci-status">
-            {view.ci.status === 'watching' || view.ci.status === 'reworking' ? (
-              <span className="fdry-ci-spin" role="status" aria-label="Checks are running">
-                <Loader className="fdry-spin" aria-hidden="true" />
-              </span>
-            ) : null}
-            {ciLabel(view.ci)}
-          </p>
-          {allChecks.length === 0 ? null : (
-            <p className="fdry-note">
-              {allChecks.filter((check) => check.bucket !== 'pending').length} of {allChecks.length}{' '}
-              checks done
-            </p>
-          )}
-          {view.ci.pulls.map((pull) => (
-            <ExternalLink key={pull.url} href={pull.url} className="fdry-ci-pull">
-              Pull request #{pullNumber(pull.url)}
-            </ExternalLink>
+interface LiveAgentProps {
+  readonly name: string
+  readonly lines: TranscriptLine[]
+  readonly now: number
+}
+
+function LiveAgent({ name, lines, now }: LiveAgentProps) {
+  const last = lines.at(-1)
+  return (
+    <li className="fdry-live-agent">
+      <div className="fdry-live-head">
+        <b>{name}</b>
+        {last === undefined ? null : <RelativeTime value={last.at} now={now} />}
+      </div>
+      {lines.length === 0 ? (
+        <p className="fdry-live-empty">Starting — nothing yet.</p>
+      ) : (
+        <ol className="fdry-live-lines">
+          {lines.map((line, index) => (
+            <li
+              key={`${line.at}-${index}`}
+              className={index === lines.length - 1 ? 'is-latest' : undefined}
+            >
+              {line.text.split('\n')[0]}
+            </li>
           ))}
-          <ul className="fdry-ci-checks">
-            {view.ci.pulls.flatMap((pull, pullIndex) =>
-              pull.checks.map((check, checkIndex) => (
-                <li key={`${pullIndex}-${checkIndex}`}>
-                  <ExternalLink href={check.link}>{check.name}</ExternalLink>
-                  <span className="fdry-ci-bucket" data-bucket={check.bucket}>
-                    {check.bucket}
-                  </span>
-                </li>
-              ))
-            )}
-          </ul>
-        </section>
-      ) : null}
+        </ol>
+      )}
+    </li>
+  )
+}
 
+/**
+ * An agent stopped at a prompt only a person can clear.
+ *
+ * Nothing on this screen could answer it: the bridge had already taken the
+ * question out of the UI and put it in the terminal, so the one move is to go
+ * there.
+ */
+function StrandedGate({ floor, view }: PageProps) {
+  const stranded = view.stranded ?? []
+  if (view.standing?.kind !== 'stranded' || stranded.length === 0) return null
+  return (
+    <div className="fdry-standing-gate">
+      <div className="fdry-standing-options">
+        {stranded.map((session) => (
+          <div key={session} className="fdry-standing-option">
+            <Button
+              variant="primary"
+              icon={Terminal}
+              disabled={floor.busy}
+              onClick={() => void floor.control('foundry:run-terminal', { sessionId: session })}
+            >
+              Go to its terminal
+            </Button>
+            <small>{strandedLabel(view, session)}</small>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/** The label of the step a stranded session belongs to; the session when it has none. */
+function strandedLabel(view: FloorView, session: string): string {
+  const node = view.graph.nodes.find((n) => n.sessionId === session)
+  return node === undefined ? session : (view.labels?.[node.id] ?? session)
+}
+
+interface ResumeOptionProps {
+  readonly floor: FloorModel
+  readonly label: string
+  readonly children: React.ReactNode
+}
+
+/** Starting the run again: one primary button, and what it will do. */
+function ResumeOption({ floor, label, children }: ResumeOptionProps) {
+  return (
+    <div className="fdry-standing-options">
+      <div className="fdry-standing-option">
+        <Button
+          variant="primary"
+          disabled={floor.busy}
+          onClick={() => void floor.decideRun('foundry:run.resume')}
+        >
+          {label}
+        </Button>
+        <small>{children}</small>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * A run nothing is running, and the one thing to do about it.
+ *
+ * This was its own panel below the band, which meant the screen said "nothing
+ * is running this" twice in two different voices. The band states it; this is
+ * the move.
+ */
+function AdriftGate({ floor, view }: PageProps) {
+  if (view.standing?.kind !== 'adrift') return null
+  return (
+    <div className="fdry-standing-gate">
+      <p className="fdry-note">
+        {(view.orphaned ?? []).map((id) => view.labels?.[id] ?? id).join(', ')}
+      </p>
+      <ResumeOption floor={floor} label="Pick it back up">
+        Every step that stopped is started again where it left off.
+      </ResumeOption>
+    </div>
+  )
+}
+
+/**
+ * Every step passed and the run still never opened its pull request — or it
+ * failed outright — and neither is answerable by starting a fresh run: the
+ * finished steps are still finished. The one move is to have Foundry check the
+ * work again.
+ */
+function StoppedGate({ floor, view }: PageProps) {
+  if (view.standing?.kind !== 'stopped') return null
+  return (
+    <div className="fdry-standing-gate">
+      <ResumeOption floor={floor} label="Try again">
+        Finished steps stay finished. Once every step has passed, Foundry checks the work again and
+        tries to open the pull request.
+      </ResumeOption>
+    </div>
+  )
+}
+
+interface RunControlsProps {
+  readonly view: FloorView
+  readonly busy: boolean
+  readonly decideRun: (channel: RunChannel) => Promise<void>
+}
+
+/**
+ * Always here, not only when the run is orphaned.
+ *
+ * Both of these lived inside the "nothing is running this" band, so a run that
+ * was live — or halted at a gate — had no way out on this screen at all, and
+ * `order.cancel` refuses a running order and points back at the gate. Three
+ * orders for one ask, all `cancelled`, and four branches cut by hand, is what
+ * that cost.
+ */
+function RunControls({ view, busy, decideRun }: RunControlsProps) {
+  return (
+    <div className="fdry-run-controls">
+      <ConfirmButton
+        label="Stop the run"
+        confirmLabel="Stop it"
+        warning={`This ends every agent still working on ${view.graph.orderId}. What is in the worktree stays there.`}
+        disabled={busy}
+        onConfirm={() => void decideRun('foundry:run.stop')}
+      />
+      <ConfirmButton
+        label="Start over"
+        confirmLabel="Destroy it and start over"
+        warning={`This destroys the checkout, the branch, the run graph and every gate ${view.graph.orderId} raised. The order, its criteria and its plan stay, and it can be run again from the beginning.`}
+        disabled={busy}
+        onConfirm={() => void decideRun('foundry:run.reset')}
+      />
+    </div>
+  )
+}
+
+interface HeldCallsProps {
+  readonly pending: PendingAsk[]
+  readonly answer: (ask: PendingAsk, decision: 'allow' | 'deny') => Promise<void>
+  readonly handBack: (ask: PendingAsk) => Promise<void>
+}
+
+/**
+ * Held tool calls, oldest first — the order they must be answered in. This is
+ * the UI-first half of the promise: the terminal is the backstop, not the only
+ * way to answer.
+ *
+ * Above the run graph rather than under it. A held call is the only thing on
+ * this screen that is waiting on a person; it used to sit below every lane and
+ * every unit, which on a real run is a scroll — and an agent blocked at a
+ * PreToolUse hook looks exactly like an agent that has gone quiet.
+ */
+function HeldCalls({ pending, answer, handBack }: HeldCallsProps) {
+  if (pending.length === 0) return null
+  return (
+    <section className="fdry-needs-you" aria-labelledby="fdry-waiting-h">
+      <h3 className="fdry-needs-you-h" id="fdry-waiting-h">
+        <ShieldQuestion aria-hidden="true" />
+        Waiting on you — {pending.length}
+      </h3>
+      <div className="fdry-needs-you-list">
+        {pending.map((ask) => (
+          <HeldCall key={ask.requestId} ask={ask} answer={answer} handBack={handBack} />
+        ))}
+      </div>
+    </section>
+  )
+}
+
+type HeldCallProps = Omit<HeldCallsProps, 'pending'> & { readonly ask: PendingAsk }
+
+function HeldCall({ ask, answer, handBack }: HeldCallProps) {
+  return (
+    <div className="fdry-ask">
+      <span className="fdry-ask-icon" aria-hidden="true">
+        <ShieldQuestion />
+      </span>
+      <div className="fdry-ask-main">
+        <b>{ask.summary}</b>
+        <small>
+          <code>{ask.toolName}</code>
+        </small>
+        <AskDetail ask={ask} />
+      </div>
+      <AskActions ask={ask} answer={answer} handBack={handBack} />
+    </div>
+  )
+}
+
+function AskActions({ ask, answer, handBack }: HeldCallProps) {
+  return (
+    <div className="fdry-ask-actions">
+      <Button variant="primary" size="sm" onClick={() => void answer(ask, 'allow')}>
+        Allow
+      </Button>
+      <Button size="sm" onClick={() => void answer(ask, 'deny')}>
+        Deny
+      </Button>
+      <Button
+        size="sm"
+        icon={Terminal}
+        title="Answer it in the terminal instead"
+        onClick={() => void handBack(ask)}
+      >
+        In the terminal
+      </Button>
+    </div>
+  )
+}
+
+/** An agent's question is prose; any other tool's input is literal, and rendering it would eat a command's `*`s. */
+function AskDetail({ ask }: { readonly ask: PendingAsk }) {
+  if (ask.detail === null) return null
+  if (ask.toolName !== 'AskUserQuestion') return <pre className="fdry-ask-detail">{ask.detail}</pre>
+  return (
+    <Markdown fetchesNothing className="fdry-md" onOpenLink={openInBrowser}>
+      {ask.detail}
+    </Markdown>
+  )
+}
+
+/**
+ * Only where there is more than one repository. A single-lane order gets no
+ * merge-order section at all, because "1 of 1, merges first" is ceremony over
+ * nothing (FR-068).
+ */
+function MergeOrder({ view }: { readonly view: FloorView }) {
+  if ((view.lanes?.length ?? 0) <= 1) return null
+  return (
+    <section className="fdry-panel" style={{ marginBottom: 12 }}>
+      <h3 className="fdry-panel-h">Merge order</h3>
+      <ol className="fdry-merge">
+        {view.lanes?.map((row) => <MergeRow key={row.ord} row={row} />)}
+      </ol>
+    </section>
+  )
+}
+
+function MergeRow({ row }: { readonly row: NonNullable<FloorView['lanes']>[number] }) {
+  return (
+    <li className={row.hold === null ? '' : 'is-held'}>
+      <b>{row.repo}</b>
+      {row.role === null ? null : <span className="fdry-role">{row.role}</span>}
+      {row.collisions.length > 0 ? <small>shares {row.collisions.join(', ')}</small> : null}
+      {row.hold === null ? (
+        <small>free to merge</small>
+      ) : (
+        <small className="fdry-hold">{row.hold}</small>
+      )}
+    </li>
+  )
+}
+
+type CiOf = NonNullable<FloorView['ci']>
+
+/**
+ * Present only when the ship tail has actually written a CI state — a draft
+ * that has never shipped a pull says nothing here (ADR-060).
+ */
+function CiPanel({ view }: { readonly view: FloorView }) {
+  const ci = view.ci
+  if (!ci) return null
+  const allChecks = ci.pulls.flatMap((pull) => pull.checks)
+  return (
+    <section className="fdry-panel" style={{ marginBottom: 12 }} aria-labelledby="fdry-ci-h">
+      <h3 className="fdry-panel-h" id="fdry-ci-h">
+        CI
+      </h3>
+      <CiStatus ci={ci} />
+      {allChecks.length === 0 ? null : (
+        <p className="fdry-note">
+          {allChecks.filter((check) => check.bucket !== 'pending').length} of {allChecks.length}{' '}
+          checks done
+        </p>
+      )}
+      {ci.pulls.map((pull) => (
+        <ExternalLink key={pull.url} href={pull.url} className="fdry-ci-pull">
+          Pull request #{pullNumber(pull.url)}
+        </ExternalLink>
+      ))}
+      <CiChecks ci={ci} />
+    </section>
+  )
+}
+
+function CiStatus({ ci }: { readonly ci: CiOf }) {
+  return (
+    <p className="fdry-ci-status">
+      {ci.status === 'watching' || ci.status === 'reworking' ? (
+        <span className="fdry-ci-spin" role="status" aria-label="Checks are running">
+          <Loader className="fdry-spin" aria-hidden="true" />
+        </span>
+      ) : null}
+      {ciLabel(ci)}
+    </p>
+  )
+}
+
+function CiChecks({ ci }: { readonly ci: CiOf }) {
+  return (
+    <ul className="fdry-ci-checks">
+      {ci.pulls.flatMap((pull, pullIndex) =>
+        pull.checks.map((check, checkIndex) => (
+          <li key={`${pullIndex}-${checkIndex}`}>
+            <ExternalLink href={check.link}>{check.name}</ExternalLink>
+            <span className="fdry-ci-bucket" data-bucket={check.bucket}>
+              {check.bucket}
+            </span>
+          </li>
+        ))
+      )}
+    </ul>
+  )
+}
+
+/**
+ * The step being read, so its transcript opens under that step's own row. A
+ * session no step owns — a stall names one by session — has no row to sit
+ * under, and goes at the foot.
+ */
+function watchedNodeOf(view: FloorView, watching: string | null): RunNode | undefined {
+  return watching === null ? undefined : view.graph.nodes.find((n) => n.sessionId === watching)
+}
+
+function Lanes({ floor, view }: PageProps) {
+  const lanes = [...new Set(view.graph.nodes.map((n) => n.lane ?? 0))].sort((a, b) => a - b)
+  const watchedNode = watchedNodeOf(view, floor.watch.watching)
+  const watchedLane = watchedNode === undefined ? null : (watchedNode.lane ?? 0)
+  const watchPanel = <WatchPanel floor={floor} view={view} node={watchedNode} />
+  return (
+    <>
       {lanes.map((lane) => (
         <div key={lane} className="fdry-lane">
           <div className="fdry-lane-name">
@@ -936,87 +1114,9 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
           <div className="fdry-units">
             {view.graph.nodes
               .filter((n) => (n.lane ?? 0) === lane)
-              .map((node) => {
-                // A node the graph calls running that nothing is running.
-                // Drawn as what it is: left alone the chip read "building"
-                // under a band saying nothing was running it, and a surface
-                // that contradicts itself is worse than one that says less.
-                const gone = orphaned.includes(node.id)
-                const { feedback, reworks } = node
-                const name = view.labels?.[node.id] ?? node.role ?? 'this step'
-                const skipped =
-                  node.state === 'skipped' && node.skipReason != null && node.skipReason !== ''
-                    ? `Skipped: ${node.skipReason}`
-                    : null
-                const attachProblem = attachProblems[node.id]
-                return (
-                  <React.Fragment key={node.id}>
-                    <span
-                      className={`fdry-unit is-${node.state}${gone ? ' is-orphaned' : ''}`}
-                      // The id stays reachable because it is what the ledger and
-                      // the graph call this node, but it is not what a person
-                      // watching the run needs to read. A skipped step is
-                      // better explained by why it did not run.
-                      title={skipped ?? node.id}
-                      aria-describedby={skipped === null ? undefined : `fdry-skip-${node.id}`}
-                    >
-                      <span className="fdry-unit-label">{name}</span>
-                      <u>{gone ? 'stopped' : STATE_LABEL[node.state]}</u>
-                      {skipped === null ? null : (
-                        <span id={`fdry-skip-${node.id}`} className="fdry-sr-only">
-                          {skipped}
-                        </span>
-                      )}
-                      {reworks > 0 ? (
-                        <span className="fdry-unit-rework">{`Sent back ${reworks}×`}</span>
-                      ) : null}
-                      {node.sessionId !== null && !gone ? (
-                        <>
-                          <IconButton
-                            icon={ScrollText}
-                            size="sm"
-                            label="Transcript"
-                            onClick={() => setWatching(node.sessionId)}
-                          />
-                          {/* A finished step's session is closed (ADR 076), so
-                              there is nothing to go to. */}
-                          {node.state === 'running' ? (
-                            <IconButton
-                              icon={Terminal}
-                              size="sm"
-                              label={`Attach to ${name}`}
-                              onClick={() => void attach(node.id)}
-                            />
-                          ) : null}
-                        </>
-                      ) : null}
-                    </span>
-                    {attachProblem === undefined ? null : (
-                      <p className="fdry-unit-problem" role="alert">
-                        {attachProblem}
-                      </p>
-                    )}
-                    {(view.skills?.[node.id]?.length ?? 0) > 0 ? (
-                      <p className="fdry-unit-skills">{`Skills: ${view.skills?.[node.id]?.join(', ')}`}</p>
-                    ) : null}
-                    {feedback.length > 0 ? (
-                      <details className="fdry-unit-feedback">
-                        <summary>Why it was sent back</summary>
-                        <ul>
-                          {feedback.map((entry, index) => (
-                            <li key={index}>
-                              <code>{entry.command ?? 'a check'}</code>
-                              {' — exit '}
-                              {entry.exitCode ?? 'unknown'}
-                              <pre className="fdry-ask-detail">{entry.excerpt}</pre>
-                            </li>
-                          ))}
-                        </ul>
-                      </details>
-                    ) : null}
-                  </React.Fragment>
-                )
-              })}
+              .map((node) => (
+                <Unit key={node.id} node={node} floor={floor} view={view} />
+              ))}
           </div>
           {/* Under the row of the step it belongs to, not at the foot of the
               page — which on a long run is a scroll away from the chip that
@@ -1024,143 +1124,381 @@ export function Floor({ orderId }: FloorProps): JSX.Element {
           {watchedLane === lane ? watchPanel : null}
         </div>
       ))}
-
       {watchedLane === null ? watchPanel : null}
+    </>
+  )
+}
 
-      {/* What happened while you were away. Every row can be cleared, and a
-          run that keeps interrupting can be muted without hiding what it
-          does — a feed you cannot clear a line from is one you stop reading. */}
-      {feed.length > 0 || mutes.length > 0 ? (
-        <section className="fdry-panel" style={{ marginTop: 12 }}>
-          <h3 className="fdry-panel-h">Activity</h3>
-          {mutes.length > 0 ? (
-            <p className="fdry-note">
-              Silenced:{' '}
-              {mutes.map((rule) => (
-                <Button
-                  key={`${rule.sessionId ?? ''}-${rule.author ?? ''}`}
-                  variant="ghost"
-                  size="sm"
-                  className="fdry-unmute"
-                  aria-label={`Unmute ${rule.sessionId ?? rule.author ?? 'everything'}`}
-                  onClick={() => void unmute(rule)}
-                >
-                  {rule.sessionId ?? rule.author ?? 'everything'}
-                  <X aria-hidden="true" className="tm-icon-sm" />
-                </Button>
-              ))}
-            </p>
-          ) : null}
-          {feed.map((entry) => (
-            <div key={entry.id} className="fdry-feed-row">
-              <span className="fdry-feed-author">{entry.author}</span>
-              <span className="fdry-feed-summary">
-                <Markdown
-                  inline
-                  fetchesNothing
-                  className="fdry-md-inline"
-                  onOpenLink={openInBrowser}
-                >
-                  {entry.summary}
-                </Markdown>
-              </span>
-              <IconButton
-                icon={X}
-                size="sm"
-                label={`Dismiss: ${entry.summary}`}
-                onClick={() => void dismiss(entry, false)}
-              />
-              <IconButton
-                icon={BellOff}
-                size="sm"
-                label={`Mute ${entry.sessionId}`}
-                description="Stop this run interrupting, without hiding what it does"
-                onClick={() => void dismiss(entry, true)}
-              />
-            </div>
-          ))}
-        </section>
+/** Why a skipped step did not run, when it says; null for every other step. */
+function skipNote(node: RunNode): string | null {
+  if (node.state !== 'skipped' || node.skipReason == null || node.skipReason === '') return null
+  return `Skipped: ${node.skipReason}`
+}
+
+interface UnitProps extends PageProps {
+  readonly node: RunNode
+}
+
+function Unit({ node, floor, view }: UnitProps) {
+  const attachProblem = floor.attachProblems[node.id]
+  const skills = view.skills?.[node.id] ?? []
+  return (
+    <>
+      <UnitChip node={node} floor={floor} view={view} />
+      {attachProblem === undefined ? null : (
+        <p className="fdry-unit-problem" role="alert">
+          {attachProblem}
+        </p>
+      )}
+      {skills.length > 0 ? (
+        <p className="fdry-unit-skills">{`Skills: ${skills.join(', ')}`}</p>
       ) : null}
+      {node.feedback.length > 0 ? <UnitFeedback feedback={node.feedback} /> : null}
+    </>
+  )
+}
 
-      {/* Work that stopped making progress without asking for anything — the
-          failure nobody instruments, because it looks exactly like work. */}
-      {stalls.length > 0 ? (
-        <section className="fdry-panel" style={{ marginTop: 12 }}>
-          <h3 className="fdry-panel-h">
-            Stopped making progress — {stalls.length}
-            {shadowMode ? ' (recorded, not acted on)' : ''}
-          </h3>
-          {stalls.slice(-5).map((entry) => {
-            const session = entry.firing.sessionId
-            // What the operator calls it. The panel printed the session id,
-            // which is a uuid nobody chose, beside this extension's own word
-            // for the signal.
-            const node = view.graph.nodes.find((n) => n.sessionId === session)
-            return (
-              <div key={`${session}-${entry.firing.firedAt}`} className="fdry-ask">
-                <div className="fdry-ask-main">
-                  <b>
-                    {node === undefined
-                      ? session
-                      : (view.labels?.[node.id] ?? node.role ?? 'this step')}
-                  </b>
-                  <small>
-                    {stallInWords(entry.firing)}
-                    {entry.shadow ? ' · shadow' : ''}
-                  </small>
-                </div>
-                {/* A panel that names a stall and offers nothing is a wall.
-                    These are the three things you do about one, and every
-                    channel behind them already existed. */}
-                <div className="fdry-ask-actions">
-                  <Button size="sm" icon={ScanEye} onClick={() => setWatching(session)}>
-                    Read what it was saying
-                  </Button>
-                  <Button
-                    size="sm"
-                    icon={Terminal}
-                    onClick={() => void control('foundry:run-terminal', { sessionId: session })}
-                  >
-                    Take it over
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="danger"
-                    icon={Square}
-                    onClick={() =>
-                      void control('foundry:run-stop', {
-                        sessionId: session,
-                        reason: 'stopped from the Floor: it had stopped making progress',
-                      })
-                    }
-                  >
-                    End this agent
-                  </Button>
-                </div>
-              </div>
-            )
-          })}
-          {shadowMode ? (
-            <p className="fdry-note">
-              Shadow mode: these are recorded and never notified, until the thresholds have earned
-              it. Turn it off in settings once they have.
-            </p>
-          ) : null}
-        </section>
+function UnitChip({ node, floor, view }: UnitProps) {
+  // A node the graph calls running that nothing is running. Drawn as what it
+  // is: left alone the chip read "building" under a band saying nothing was
+  // running it, and a surface that contradicts itself is worse than one that
+  // says less.
+  const gone = (view.orphaned ?? []).includes(node.id)
+  const skipped = skipNote(node)
+  return (
+    <span
+      className={`fdry-unit is-${node.state}${gone ? ' is-orphaned' : ''}`}
+      // The id stays reachable because it is what the ledger and the graph call
+      // this node, but it is not what a person watching the run needs to read.
+      // A skipped step is better explained by why it did not run.
+      title={skipped ?? node.id}
+      aria-describedby={skipped === null ? undefined : `fdry-skip-${node.id}`}
+    >
+      <span className="fdry-unit-label">{stepName(view, node)}</span>
+      <u>{gone ? 'stopped' : STATE_LABEL[node.state]}</u>
+      {skipped === null ? null : (
+        <span id={`fdry-skip-${node.id}`} className="fdry-sr-only">
+          {skipped}
+        </span>
+      )}
+      {node.reworks > 0 ? (
+        <span className="fdry-unit-rework">{`Sent back ${node.reworks}×`}</span>
       ) : null}
-
-      {view.blocked.length > 0 ? (
-        <section className="fdry-panel" style={{ marginTop: 12 }}>
-          <h3 className="fdry-panel-h">Blocked</h3>
-          {view.blocked.map((entry) => (
-            <p key={entry.id} className="fdry-note" title={entry.id}>
-              <b>{view.labels?.[entry.id] ?? entry.id}</b> — {entry.reason}
-            </p>
-          ))}
-        </section>
+      {node.sessionId !== null && !gone ? (
+        <UnitButtons node={node} floor={floor} view={view} />
       ) : null}
+    </span>
+  )
+}
 
-      {problem !== null ? <p className="fdry-problem">{problem}</p> : null}
+function UnitButtons({ node, floor, view }: UnitProps) {
+  return (
+    <>
+      <IconButton
+        icon={ScrollText}
+        size="sm"
+        label="Transcript"
+        onClick={() => floor.watch.setWatching(node.sessionId)}
+      />
+      {/* A finished step's session is closed (ADR 076), so there is nothing
+          to go to. */}
+      {node.state === 'running' ? (
+        <IconButton
+          icon={Terminal}
+          size="sm"
+          label={`Attach to ${stepName(view, node)}`}
+          onClick={() => void floor.attach(node.id)}
+        />
+      ) : null}
+    </>
+  )
+}
+
+function UnitFeedback({ feedback }: { readonly feedback: RunNode['feedback'] }) {
+  return (
+    <details className="fdry-unit-feedback">
+      <summary>Why it was sent back</summary>
+      <ul>
+        {feedback.map((entry, index) => (
+          <li key={index}>
+            <code>{entry.command ?? 'a check'}</code>
+            {' — exit '}
+            {entry.exitCode ?? 'unknown'}
+            <pre className="fdry-ask-detail">{entry.excerpt}</pre>
+          </li>
+        ))}
+      </ul>
+    </details>
+  )
+}
+
+interface WatchPanelProps extends PageProps {
+  readonly node: RunNode | undefined
+}
+
+function WatchPanel({ floor, view, node }: WatchPanelProps) {
+  const { watching, transcript } = floor.watch
+  if (watching === null) return null
+  return (
+    <section
+      className="fdry-panel fdry-watch"
+      style={{ marginTop: 12 }}
+      aria-labelledby="fdry-watching-h"
+    >
+      <h3 className="fdry-panel-h" id="fdry-watching-h">
+        {node === undefined ? watching : stepName(view, node)}
+      </h3>
+      <pre className="fdry-transcript">
+        {transcript.length === 0 ? 'Nothing yet.' : transcript.map((l) => l.text).join('\n')}
+      </pre>
+      <RedirectForm watch={floor.watch} watching={watching} control={floor.control} />
+    </section>
+  )
+}
+
+interface RedirectFormProps {
+  readonly watch: Watch
+  readonly watching: string
+  readonly control: FloorModel['control']
+}
+
+function RedirectForm({ watch, watching, control }: RedirectFormProps) {
+  const { redirect, setRedirect } = watch
+  return (
+    <form
+      className="fdry-redirect"
+      onSubmit={(event) => {
+        event.preventDefault()
+        if (redirect.trim() === '') return
+        void control('foundry:run-redirect', { sessionId: watching, message: redirect.trim() })
+        setRedirect('')
+      }}
+    >
+      <RedirectInput redirect={redirect} setRedirect={setRedirect} />
+      <WatchedButtons watching={watching} control={control} />
+    </form>
+  )
+}
+
+function RedirectInput({ redirect, setRedirect }: Pick<Watch, 'redirect' | 'setRedirect'>) {
+  return (
+    <>
+      <input
+        aria-label="Tell it what to do instead"
+        placeholder="Tell it what to do instead…"
+        value={redirect}
+        onChange={(event) => setRedirect(event.target.value)}
+      />
+      <Button
+        type="submit"
+        size="sm"
+        variant="primary"
+        icon={CornerDownLeft}
+        disabled={redirect.trim() === ''}
+      >
+        Redirect
+      </Button>
+    </>
+  )
+}
+
+function WatchedButtons({ watching, control }: Omit<RedirectFormProps, 'watch'>) {
+  return (
+    <>
+      <Button
+        size="sm"
+        onClick={() => void control('foundry:run-interrupt', { sessionId: watching })}
+      >
+        Interrupt
+      </Button>
+      <Button
+        size="sm"
+        variant="danger"
+        icon={Square}
+        onClick={() =>
+          void control('foundry:run-stop', {
+            sessionId: watching,
+            reason: 'stopped from the floor',
+          })
+        }
+      >
+        Stop
+      </Button>
+    </>
+  )
+}
+
+/**
+ * What happened while you were away. Every row can be cleared, and a run that
+ * keeps interrupting can be muted without hiding what it does — a feed you
+ * cannot clear a line from is one you stop reading.
+ */
+function ActivityPanel({ floor }: { readonly floor: FloorModel }) {
+  const { feed, mutes } = floor
+  if (feed.length === 0 && mutes.length === 0) return null
+  return (
+    <section className="fdry-panel" style={{ marginTop: 12 }}>
+      <h3 className="fdry-panel-h">Activity</h3>
+      {mutes.length > 0 ? <MuteList mutes={mutes} unmute={floor.unmute} /> : null}
+      {feed.map((entry) => (
+        <FeedRow key={entry.id} entry={entry} dismiss={floor.dismiss} />
+      ))}
+    </section>
+  )
+}
+
+function MuteList({ mutes, unmute }: Pick<FloorModel, 'mutes' | 'unmute'>) {
+  return (
+    <p className="fdry-note">
+      Silenced:{' '}
+      {mutes.map((rule) => (
+        <Button
+          key={`${rule.sessionId ?? ''}-${rule.author ?? ''}`}
+          variant="ghost"
+          size="sm"
+          className="fdry-unmute"
+          aria-label={`Unmute ${rule.sessionId ?? rule.author ?? 'everything'}`}
+          onClick={() => void unmute(rule)}
+        >
+          {rule.sessionId ?? rule.author ?? 'everything'}
+          <X aria-hidden="true" className="tm-icon-sm" />
+        </Button>
+      ))}
+    </p>
+  )
+}
+
+function FeedRow({ entry, dismiss }: { readonly entry: FeedEntry } & Pick<FloorModel, 'dismiss'>) {
+  return (
+    <div className="fdry-feed-row">
+      <span className="fdry-feed-author">{entry.author}</span>
+      <span className="fdry-feed-summary">
+        <Markdown inline fetchesNothing className="fdry-md-inline" onOpenLink={openInBrowser}>
+          {entry.summary}
+        </Markdown>
+      </span>
+      <IconButton
+        icon={X}
+        size="sm"
+        label={`Dismiss: ${entry.summary}`}
+        onClick={() => void dismiss(entry, false)}
+      />
+      <IconButton
+        icon={BellOff}
+        size="sm"
+        label={`Mute ${entry.sessionId}`}
+        description="Stop this run interrupting, without hiding what it does"
+        onClick={() => void dismiss(entry, true)}
+      />
     </div>
+  )
+}
+
+/**
+ * Work that stopped making progress without asking for anything — the failure
+ * nobody instruments, because it looks exactly like work.
+ */
+function StallsPanel({ floor, view }: PageProps) {
+  const { stalls, shadowMode } = floor
+  if (stalls.length === 0) return null
+  return (
+    <section className="fdry-panel" style={{ marginTop: 12 }}>
+      <h3 className="fdry-panel-h">
+        Stopped making progress — {stalls.length}
+        {shadowMode ? ' (recorded, not acted on)' : ''}
+      </h3>
+      {stalls.slice(-5).map((entry) => (
+        <StallRow
+          key={`${entry.firing.sessionId}-${entry.firing.firedAt}`}
+          entry={entry}
+          floor={floor}
+          view={view}
+        />
+      ))}
+      {shadowMode ? (
+        <p className="fdry-note">
+          Shadow mode: these are recorded and never notified, until the thresholds have earned it.
+          Turn it off in settings once they have.
+        </p>
+      ) : null}
+    </section>
+  )
+}
+
+function StallRow({ entry, floor, view }: PageProps & { readonly entry: StallFiring }) {
+  const session = entry.firing.sessionId
+  return (
+    <div className="fdry-ask">
+      <div className="fdry-ask-main">
+        {/* What the operator calls it. The panel printed the session id, which
+            is a uuid nobody chose, beside this extension's own word for the
+            signal. */}
+        <b>{sessionName(view, session)}</b>
+        <small>
+          {stallInWords(entry.firing)}
+          {entry.shadow ? ' · shadow' : ''}
+        </small>
+      </div>
+      <StallActions session={session} floor={floor} />
+    </div>
+  )
+}
+
+/**
+ * A panel that names a stall and offers nothing is a wall. These are the three
+ * things you do about one, and every channel behind them already existed.
+ */
+interface StallActionsProps {
+  readonly session: string
+  readonly floor: FloorModel
+}
+
+function StallActions({ session, floor }: StallActionsProps) {
+  return (
+    <div className="fdry-ask-actions">
+      <Button size="sm" icon={ScanEye} onClick={() => floor.watch.setWatching(session)}>
+        Read what it was saying
+      </Button>
+      <Button
+        size="sm"
+        icon={Terminal}
+        onClick={() => void floor.control('foundry:run-terminal', { sessionId: session })}
+      >
+        Take it over
+      </Button>
+      <EndAgent session={session} floor={floor} />
+    </div>
+  )
+}
+
+function EndAgent({ session, floor }: StallActionsProps) {
+  return (
+    <Button
+      size="sm"
+      variant="danger"
+      icon={Square}
+      onClick={() =>
+        void floor.control('foundry:run-stop', {
+          sessionId: session,
+          reason: 'stopped from the Floor: it had stopped making progress',
+        })
+      }
+    >
+      End this agent
+    </Button>
+  )
+}
+
+function BlockedPanel({ view }: { readonly view: FloorView }) {
+  if (view.blocked.length === 0) return null
+  return (
+    <section className="fdry-panel" style={{ marginTop: 12 }}>
+      <h3 className="fdry-panel-h">Blocked</h3>
+      {view.blocked.map((entry) => (
+        <p key={entry.id} className="fdry-note" title={entry.id}>
+          <b>{view.labels?.[entry.id] ?? entry.id}</b> — {entry.reason}
+        </p>
+      ))}
+    </section>
   )
 }

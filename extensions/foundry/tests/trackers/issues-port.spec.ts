@@ -40,9 +40,18 @@ async function ledger(): Promise<Array<{ action: string; actor: string }>> {
 }
 
 describe('an agreed order from a tracker issue', () => {
+  describe('the agreed order comment', theAgreedOrderCommentTests)
+  describe('the state move', theStateMoveTests)
+})
+
+function theAgreedOrderCommentTests() {
   it('comments the agreed order on the issue and records it as the write-back rule', async () => {
     const order = trackedOrder()
-    await writeBack(order, 'agreed', writeBackDepsFor(root, order, issuesPortFor(host.api)))
+    await writeBack(
+      order,
+      { event: 'agreed' },
+      writeBackDepsFor(root, order, issuesPortFor(host.api))
+    )
     expect(host.issues.comment).toHaveBeenCalledWith(
       'linear',
       'ENG-1',
@@ -50,14 +59,16 @@ describe('an agreed order from a tracker issue', () => {
     )
     expect((await ledger()).map((entry) => entry.actor)).toEqual(['rule:writeback'])
   })
+}
 
+function theStateMoveTests() {
   it('moves the issue to the state the operator mapped, and lets the tracker choose where none is', async () => {
     const mapped = trackedOrder({
       stateMapping: { started: 'state-42', in_review: null, done: null },
     })
     const deps = writeBackDepsFor(root, mapped, issuesPortFor(host.api))
-    await writeBack(mapped, 'started', deps)
-    await writeBack(mapped, 'draft_opened', deps)
+    await writeBack(mapped, { event: 'started' }, deps)
+    await writeBack(mapped, { event: 'draft_opened' }, deps)
     expect(vi.mocked(host.issues.transition).mock.calls).toEqual([
       ['linear', 'ENG-1', 'started', 'state-42'],
       ['linear', 'ENG-1', 'in_review', undefined],
@@ -76,4 +87,4 @@ describe('an agreed order from a tracker issue', () => {
     expect(host.issues.states).toHaveBeenCalledWith('linear', 'ENG-1')
     expect(report).toMatchObject({ transitions: 'supported', unreachable: ['in_review', 'done'] })
   })
-})
+}

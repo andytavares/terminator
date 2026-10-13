@@ -38,6 +38,17 @@ const risky: RiskAssessment = {
 }
 
 describe('ladderFor', () => {
+  describe('rungs and commands', rungsAndCommandsTests)
+  describe('builds', buildsTests)
+  describe('inspection', inspectionTests)
+  describe('decided elsewhere', decidedElsewhereTests)
+  describe('an empty repository', anEmptyRepositoryTests)
+})
+
+const stepsFor = (changedFiles: readonly string[]) =>
+  ladderFor({ toolchain: full, risk: noRisk, touchesUi: false, changedFiles })
+
+function rungsAndCommandsTests() {
   it('places every rung from L0 to L6', () => {
     const rungs = new Set(
       ladderFor({ toolchain: full, risk: noRisk, touchesUi: false }).map((s) => s.rung)
@@ -60,7 +71,9 @@ describe('ladderFor', () => {
     expect(coverage?.status).toBe('unavailable')
     expect(coverage?.reason).toContain('no coverage command')
   })
+}
 
+function buildsTests() {
   it('builds the application right before the end-to-end tests when it can', () => {
     const steps = ladderFor({
       toolchain: toolchain({
@@ -88,7 +101,9 @@ describe('ladderFor', () => {
     })
     expect(steps.some((s) => s.name === 'Build the application')).toBe(false)
   })
+}
 
+function inspectionTests() {
   it('does not trigger the inspection when nothing warrants one, and says so', () => {
     const inspection = ladderFor({ toolchain: full, risk: noRisk, touchesUi: false }).find(
       (s) => s.rung === 'L4'
@@ -111,7 +126,9 @@ describe('ladderFor', () => {
     )
     expect(integration?.name).toMatch(/picture of the running application/)
   })
+}
 
+function decidedElsewhereTests() {
   // Three rungs are not commands and never were: independent verification is
   // the verifier's own node, the inspection is the inspector's, and the human
   // decision is a gate. They used to be `runnable` with nothing to run, so
@@ -133,18 +150,35 @@ describe('ladderFor', () => {
     expect(steps.find((s) => s.rung === 'L4')?.reason).toMatch(/findings/)
     expect(steps.find((s) => s.rung === 'L6')?.reason).toMatch(/decision/)
   })
+}
 
+function anEmptyRepositoryTests() {
   it('reports every rung unavailable in a repository with nothing in it, and none as passing', () => {
     const steps = ladderFor({ toolchain: toolchain(), risk: noRisk, touchesUi: false })
     const commandRungs = steps.filter((s) => s.check !== null)
     expect(commandRungs.every((s) => s.status === 'unavailable')).toBe(true)
   })
-})
+}
 
 describe('a change that is documentation only', () => {
-  const steps = (changedFiles: readonly string[]) =>
-    ladderFor({ toolchain: full, risk: noRisk, touchesUi: false, changedFiles })
+  describe('format and lint', formatAndLintTests)
+  describe('gaps', gapsTests)
+  describe('code changes', codeChangesTests)
+  describe('unknown changes and inspection', unknownChangesAndInspectionTests)
+})
 
+const steps = (over: Partial<LadderStep>[] = []): LadderStep[] =>
+  over.map((o, i) => ({
+    rung: 'L0',
+    name: `step-${i}`,
+    command: `run-${i}`,
+    status: 'runnable',
+    reason: '',
+    check: null,
+    ...o,
+  })) as LadderStep[]
+
+function formatAndLintTests() {
   it.each([
     ['a markdown file', ['notes/answer.md']],
     ['a docs file that is not markdown', ['docs/diagram.svg']],
@@ -153,13 +187,13 @@ describe('a change that is documentation only', () => {
     ['a changelog', ['CHANGELOG.txt']],
     ['several of them', ['docs/a.md', 'README.md', 'specs/x/y.json']],
   ])('runs only format and lint for %s', (_name, files) => {
-    const commandSteps = steps(files).filter((s) => s.check !== null)
+    const commandSteps = stepsFor(files).filter((s) => s.check !== null)
     const runnable = commandSteps.filter((s) => s.status === 'runnable').map((s) => s.name)
     expect(runnable).toEqual(['Format', 'Lint'])
   })
 
   it('marks every other command step not run, with the reason', () => {
-    const others = steps(['docs/a.md']).filter(
+    const others = stepsFor(['docs/a.md']).filter(
       (s) => s.check !== null && s.check !== 'format' && s.check !== 'lint'
     )
     expect(others.map((s) => s.check)).toEqual(['test', 'coverage', 'e2e'])
@@ -169,9 +203,11 @@ describe('a change that is documentation only', () => {
       expect(other.command).toBeNull()
     }
   })
+}
 
+function gapsTests() {
   it('does not count those steps as unmeasured gaps when it climbs', async () => {
-    const outcome = await climb(steps(['docs/a.md']), async () => 0)
+    const outcome = await climb(stepsFor(['docs/a.md']), async () => 0)
     expect(outcome.ok).toBe(true)
     expect(outcome.unmeasured).toEqual([])
     expect(outcome.steps.filter((s) => s.result === 'pass').map((s) => s.name)).toEqual([
@@ -183,19 +219,23 @@ describe('a change that is documentation only', () => {
       reason: 'documentation only',
     })
   })
+}
 
+function codeChangesTests() {
   it('runs the whole ladder as soon as one changed file is code', () => {
-    const runnable = steps(['docs/a.md', 'src/a.ts'])
+    const runnable = stepsFor(['docs/a.md', 'src/a.ts'])
       .filter((s) => s.status === 'runnable')
       .map((s) => s.name)
     expect(runnable).toEqual(expect.arrayContaining(['Format', 'Lint', "The unit's own tests"]))
   })
 
   it('treats a markdown-looking name outside the checkout as code', () => {
-    const runnable = steps(['../outside/a.md']).filter((s) => s.status === 'runnable')
+    const runnable = stepsFor(['../outside/a.md']).filter((s) => s.status === 'runnable')
     expect(runnable.length).toBeGreaterThan(2)
   })
+}
 
+function unknownChangesAndInspectionTests() {
   it('runs the whole ladder when nothing is known about what changed', () => {
     for (const files of [undefined, []] as const) {
       const runnable = ladderFor({
@@ -219,20 +259,21 @@ describe('a change that is documentation only', () => {
     }).find((s) => s.rung === 'L4')
     expect(inspection?.status).toBe('elsewhere')
   })
-})
+}
 
 describe('climb', () => {
-  const steps = (over: Partial<LadderStep>[] = []): LadderStep[] =>
-    over.map((o, i) => ({
-      rung: 'L0',
-      name: `step-${i}`,
-      command: `run-${i}`,
-      status: 'runnable',
-      reason: '',
-      check: null,
-      ...o,
-    })) as LadderStep[]
+  describe('stopping', stoppingTests)
+  describe('unmeasured rungs', unmeasuredRungsTests)
+  describe('untriggered and empty results', untriggeredAndEmptyResultsTests)
+})
 
+let dataRoot: string
+let repo: string
+function sources() {
+  return { dataRoot, repoPaths: [repo], builtInDir }
+}
+
+function stoppingTests() {
   it('climbs everything when nothing fails', async () => {
     const outcome = await climb(steps([{}, {}, {}]), async () => 0)
     expect(outcome.ok).toBe(true)
@@ -258,7 +299,9 @@ describe('climb', () => {
     expect(outcome.steps[1].result).toBe('pass')
     expect(outcome.stoppedAt).toBeNull()
   })
+}
 
+function unmeasuredRungsTests() {
   it('carries every unmeasured rung out, so nothing downstream can read absence as green', async () => {
     const outcome = await climb(
       steps([{ status: 'unavailable', name: 'Coverage', reason: 'none' }, {}]),
@@ -271,7 +314,9 @@ describe('climb', () => {
     const outcome = await climb(steps([{ status: 'unavailable', reason: 'none' }]), async () => 0)
     expect(outcome.ok).toBe(true)
   })
+}
 
+function untriggeredAndEmptyResultsTests() {
   it('records a step that was not triggered without running it', async () => {
     const run = vi.fn(async () => 0)
     const outcome = await climb(steps([{ status: 'not_triggered', reason: 'no trigger' }]), run)
@@ -290,12 +335,9 @@ describe('climb', () => {
     expect(outcome.steps[0].result).toBe('fail')
     expect(outcome.steps[0].exitCode).toBe(2)
   })
-})
+}
 
 describe('rulesFor', () => {
-  let dataRoot: string
-  let repo: string
-
   beforeEach(() => {
     dataRoot = makeTempDir('fdry-rules-')
     repo = makeTempDir('fdry-rules-repo-')
@@ -305,10 +347,12 @@ describe('rulesFor', () => {
     for (const d of [dataRoot, repo]) fs.rmSync(d, { recursive: true, force: true })
   })
 
-  function sources() {
-    return { dataRoot, repoPaths: [repo], builtInDir }
-  }
+  describe('universal and project rules', universalAndProjectRulesTests)
+  describe('conditions', conditionsTests)
+  describe('malformed rules', malformedRulesTests)
+})
 
+function universalAndProjectRulesTests() {
   it('loads every universal rule in any repository', () => {
     const loaded = rulesFor(sources(), { repoPaths: [repo], houseDocs: [] })
     const universal = loaded.rules.filter((r) => r.scope === 'universal').map((r) => r.id)
@@ -331,7 +375,9 @@ describe('rulesFor', () => {
     expect(loaded.rules.map((r) => r.id)).not.toContain('docs-in-pr')
     expect(loaded.notApplicable.map((r) => r.id)).toContain('docs-in-pr')
   })
+}
 
+function conditionsTests() {
   it('applies a project rule once the repository carries what it rests on', () => {
     const loaded = rulesFor(sources(), {
       repoPaths: [repo],
@@ -360,7 +406,9 @@ describe('rulesFor', () => {
     const loaded = rulesFor(sources(), { repoPaths: [repo], houseDocs: [] })
     expect(loaded.rules.map((r) => r.id)).not.toContain('odd')
   })
+}
 
+function malformedRulesTests() {
   it('reports a malformed rule without losing the rest', () => {
     fs.mkdirSync(path.join(dataRoot, 'rules'), { recursive: true })
     fs.writeFileSync(path.join(dataRoot, 'rules', 'broken.yaml'), 'scope: [unclosed\n')
@@ -368,7 +416,7 @@ describe('rulesFor', () => {
     expect(loaded.problems).toHaveLength(1)
     expect(loaded.rules.length).toBeGreaterThan(0)
   })
-})
+}
 
 describe('rulesAtRung', () => {
   it('picks the rules that belong at one rung', () => {
@@ -381,16 +429,21 @@ describe('rulesAtRung', () => {
   })
 })
 
-describe('climb with two steps that resolve to the same command', () => {
-  const step = (name: string, command: string): LadderStep => ({
-    rung: 'L1',
-    name,
-    command,
-    status: 'runnable',
-    reason: '',
-    check: null,
-  })
+const step = (name: string, command: string): LadderStep => ({
+  rung: 'L1',
+  name,
+  command,
+  status: 'runnable',
+  reason: '',
+  check: null,
+})
 
+describe('climb with two steps that resolve to the same command', () => {
+  describe('reusing', reusingTests)
+  describe('distinct commands and failures', distinctCommandsAndFailuresTests)
+})
+
+function reusingTests() {
   it('runs the command once and says the later step reused it', async () => {
     const run = vi.fn(async () => 0)
     const outcome = await climb(
@@ -409,7 +462,9 @@ describe('climb with two steps that resolve to the same command', () => {
     })
     expect(outcome.steps[1].reason).toContain('same command as The unit’s own tests')
   })
+}
 
+function distinctCommandsAndFailuresTests() {
   it('runs distinct commands each', async () => {
     const run = vi.fn(async () => 0)
     await climb([step('a', 'one'), step('b', 'two')], run)
@@ -423,4 +478,4 @@ describe('climb with two steps that resolve to the same command', () => {
     expect(outcome.steps).toHaveLength(1)
     expect(outcome.ok).toBe(false)
   })
-})
+}

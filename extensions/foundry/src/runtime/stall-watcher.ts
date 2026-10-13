@@ -62,38 +62,23 @@ export interface StallWatcher {
   tick(): void
 }
 
+/** How many tool calls count as "recent" for the loop signal. */
+const RECENT_WINDOW = 8
+
 /**
  * What the transcript says about a run, as the detector needs it.
  *
  * A shell call still in flight is the load-bearing fact here: without it every
  * test suite longer than the threshold reads as a stall, which the spec calls
  * the obvious first bug and makes the gate on shipping this at all.
+ * @internal
  */
-/** How many tool calls count as "recent" for the loop signal. */
-const RECENT_WINDOW = 8
-
-/** @internal */
 export function factsFrom(
   run: WatchedRun,
   activity: readonly ToolActivity[],
   netChange = 1
 ): SessionFacts {
-  const open = new Set<string>()
-  let lastToolActivityAt: number | null = null
-  let openShellStartedAt: number | null = null
-
-  for (const event of activity) {
-    lastToolActivityAt = event.at
-    if (event.kind === 'tool_started') {
-      if (event.isShell) {
-        open.add(event.callId)
-        openShellStartedAt = event.at
-      }
-    } else if (open.delete(event.callId) && open.size === 0) {
-      openShellStartedAt = null
-    }
-  }
-
+  const { lastToolActivityAt, openShellStartedAt } = shellActivity(activity)
   return {
     sessionId: run.sessionId,
     // Waiting on a person is blocked, not stuck.
@@ -115,9 +100,30 @@ export function factsFrom(
   }
 }
 
+/** When a tool was last used, and since when a shell call has been open, if one is. */
+function shellActivity(activity: readonly ToolActivity[]): {
+  lastToolActivityAt: number | null
+  openShellStartedAt: number | null
+} {
+  const open = new Set<string>()
+  let lastToolActivityAt: number | null = null
+  let openShellStartedAt: number | null = null
+
+  for (const event of activity) {
+    lastToolActivityAt = event.at
+    if (event.kind === 'tool_started') {
+      if (event.isShell) {
+        open.add(event.callId)
+        openShellStartedAt = event.at
+      }
+    } else if (open.delete(event.callId) && open.size === 0) {
+      openShellStartedAt = null
+    }
+  }
+  return { lastToolActivityAt, openShellStartedAt }
+}
+
 export function createStallWatcher(options: StallWatcherOptions): StallWatcher {
-  const now = options.now ?? Date.now
-  const thresholds = options.thresholds ?? DEFAULT_THRESHOLDS
   const intervalMs = options.intervalMs ?? 30_000
   let timer: ReturnType<typeof setInterval> | null = null
 
@@ -138,25 +144,34 @@ export function createStallWatcher(options: StallWatcherOptions): StallWatcher {
       timer = null
     },
 
-    tick(): void {
-      const live = options.runs()
-      // A run that has ended can stall again if it is started again.
-      for (const sessionId of [...fired]) {
-        if (!live.some((run) => run.sessionId === sessionId)) fired.delete(sessionId)
-      }
+    tick: () => tick(options, fired),
+  }
+}
 
-      for (const run of live) {
-        const activity = readTranscript(run.transcriptPath)
-        options.onActivity?.(run, activity)
-        if (fired.has(run.sessionId)) continue
-        // Growth since the last look. Without it the loop signal cannot tell
-        // "going round in circles" from "working steadily on one file".
-        const facts = factsFrom(run, activity, options.netChangeSince?.(run.sessionId) ?? 1)
-        const firing = evaluateStall(facts, thresholds, now())
-        if (firing === null) continue
-        fired.add(run.sessionId)
-        options.onFiring(firing, run.featureDir)
-      }
-    },
+/** A run that has ended can stall again if it is started again. */
+function forgetEnded(fired: Set<string>, live: readonly WatchedRun[]): void {
+  for (const sessionId of [...fired]) {
+    if (!live.some((run) => run.sessionId === sessionId)) fired.delete(sessionId)
+  }
+}
+
+/** One pass over the live runs, firing once for each that has newly stalled. */
+function tick(options: StallWatcherOptions, fired: Set<string>): void {
+  const live = options.runs()
+  forgetEnded(fired, live)
+
+  const now = options.now ?? Date.now
+  const thresholds = options.thresholds ?? DEFAULT_THRESHOLDS
+  for (const run of live) {
+    const activity = readTranscript(run.transcriptPath)
+    options.onActivity?.(run, activity)
+    if (fired.has(run.sessionId)) continue
+    // Growth since the last look. Without it the loop signal cannot tell
+    // "going round in circles" from "working steadily on one file".
+    const facts = factsFrom(run, activity, options.netChangeSince?.(run.sessionId) ?? 1)
+    const firing = evaluateStall(facts, thresholds, now())
+    if (firing === null) continue
+    fired.add(run.sessionId)
+    options.onFiring(firing, run.featureDir)
   }
 }

@@ -89,17 +89,23 @@ export async function startSupervisionRuntime(api: ExtensionAPI): Promise<Superv
     startPaletteRefresh(api)
     return runtime.supervision
   } catch (error) {
-    // Without it, phases fall back to the headless spawn. Said out loud: the
-    // difference is whether tool calls are asked about or approved silently.
-    api.log.error('supervised runtime unavailable — phases will run unsupervised', error)
-    closeHalfStartedRuntime()
-    api.notifications.showToast(
-      'error',
-      'Supervision could not start — phases will run unsupervised, approving their own tool calls',
-      'foundry.runtime.unavailable'
-    )
+    runtimeUnavailable(api, error)
     return null
   }
+}
+
+/**
+ * Without it, phases fall back to the headless spawn. Said out loud: the
+ * difference is whether tool calls are asked about or approved silently.
+ */
+function runtimeUnavailable(api: ExtensionAPI, error: unknown): void {
+  api.log.error('supervised runtime unavailable — phases will run unsupervised', error)
+  closeHalfStartedRuntime()
+  api.notifications.showToast(
+    'error',
+    'Supervision could not start — phases will run unsupervised, approving their own tool calls',
+    'foundry.runtime.unavailable'
+  )
 }
 
 // Close what was opened. A failure after the control server bound left it

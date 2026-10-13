@@ -1,87 +1,108 @@
 import { describe, it, expect } from 'vitest'
 import { decideReadOnly } from '../../src/runtime/read-only-policy.js'
 
+const allowed = (command: string) => decideReadOnly('Bash', { command })
+
+const allowedTool = (tool: string, input?: unknown) => decideReadOnly(tool, input).allow
+
 // A read-only role used to be a request in a prompt, so a reviewer could
 // rewrite the worktree it was reviewing. It now decides from this policy, with
 // no person asked — an automated gate that waits on a human is a flaky one.
 
 describe('what a review may do', () => {
-  const allowed = (tool: string, input?: unknown) => decideReadOnly(tool, input).allow
+  describe('reading and writing', readingAndWritingTests)
+  describe('git commands', gitCommandsTests)
+  describe('inspection', inspectionTests)
+  describe('chains and redirection', chainsAndRedirectionTests)
+  describe('substitution and empty calls', substitutionAndEmptyCallsTests)
+  describe('the reason', theReasonTests)
+})
 
+function readingAndWritingTests() {
   it('allows reading', () => {
-    expect(allowed('Read', { file_path: '/a.ts' })).toBe(true)
-    expect(allowed('Grep', { pattern: 'x' })).toBe(true)
-    expect(allowed('Glob', { pattern: '*.ts' })).toBe(true)
+    expect(allowedTool('Read', { file_path: '/a.ts' })).toBe(true)
+    expect(allowedTool('Grep', { pattern: 'x' })).toBe(true)
+    expect(allowedTool('Glob', { pattern: '*.ts' })).toBe(true)
   })
 
   it('refuses writing', () => {
-    expect(allowed('Write', { file_path: '/a.ts', content: 'x' })).toBe(false)
-    expect(allowed('Edit', { file_path: '/a.ts' })).toBe(false)
-    expect(allowed('NotebookEdit', {})).toBe(false)
+    expect(allowedTool('Write', { file_path: '/a.ts', content: 'x' })).toBe(false)
+    expect(allowedTool('Edit', { file_path: '/a.ts' })).toBe(false)
+    expect(allowedTool('NotebookEdit', {})).toBe(false)
   })
 
   it('refuses a tool it has never been taught about', () => {
     // A tool the policy cannot vouch for is one a review has no business using.
-    expect(allowed('SomeNewTool', {})).toBe(false)
+    expect(allowedTool('SomeNewTool', {})).toBe(false)
   })
+}
 
+function gitCommandsTests() {
   it('allows the git commands a review is actually made of', () => {
-    expect(allowed('Bash', { command: 'git diff main...HEAD' })).toBe(true)
-    expect(allowed('Bash', { command: 'git log --oneline -5' })).toBe(true)
-    expect(allowed('Bash', { command: 'git status' })).toBe(true)
+    expect(allowedTool('Bash', { command: 'git diff main...HEAD' })).toBe(true)
+    expect(allowedTool('Bash', { command: 'git log --oneline -5' })).toBe(true)
+    expect(allowedTool('Bash', { command: 'git status' })).toBe(true)
   })
 
   it('refuses git commands that change the repository', () => {
-    expect(allowed('Bash', { command: 'git checkout main' })).toBe(false)
-    expect(allowed('Bash', { command: 'git commit -m x' })).toBe(false)
-    expect(allowed('Bash', { command: 'git push' })).toBe(false)
-    expect(allowed('Bash', { command: 'git reset --hard' })).toBe(false)
+    expect(allowedTool('Bash', { command: 'git checkout main' })).toBe(false)
+    expect(allowedTool('Bash', { command: 'git commit -m x' })).toBe(false)
+    expect(allowedTool('Bash', { command: 'git push' })).toBe(false)
+    expect(allowedTool('Bash', { command: 'git reset --hard' })).toBe(false)
   })
+}
 
+function inspectionTests() {
   it('allows plain inspection commands', () => {
-    expect(allowed('Bash', { command: 'cat package.json' })).toBe(true)
-    expect(allowed('Bash', { command: 'rg TODO src' })).toBe(true)
+    expect(allowedTool('Bash', { command: 'cat package.json' })).toBe(true)
+    expect(allowedTool('Bash', { command: 'rg TODO src' })).toBe(true)
   })
 
   it('refuses anything not on the list', () => {
-    expect(allowed('Bash', { command: 'rm -rf .' })).toBe(false)
-    expect(allowed('Bash', { command: 'npm install left-pad' })).toBe(false)
-    expect(allowed('Bash', { command: 'curl https://example.com' })).toBe(false)
+    expect(allowedTool('Bash', { command: 'rm -rf .' })).toBe(false)
+    expect(allowedTool('Bash', { command: 'npm install left-pad' })).toBe(false)
+    expect(allowedTool('Bash', { command: 'curl https://example.com' })).toBe(false)
   })
+}
 
+function chainsAndRedirectionTests() {
   it('refuses a chained command, however innocent it starts', () => {
     // This is the load-bearing check. `git diff` on its own passes, so without
     // it the allowlist is theatre.
-    expect(allowed('Bash', { command: 'git diff; rm -rf .' })).toBe(false)
-    expect(allowed('Bash', { command: 'git diff && rm -rf .' })).toBe(false)
-    expect(allowed('Bash', { command: 'git diff || rm -rf .' })).toBe(false)
+    expect(allowedTool('Bash', { command: 'git diff; rm -rf .' })).toBe(false)
+    expect(allowedTool('Bash', { command: 'git diff && rm -rf .' })).toBe(false)
+    expect(allowedTool('Bash', { command: 'git diff || rm -rf .' })).toBe(false)
   })
 
   it('refuses redirection, which is how a read becomes a write', () => {
     // The exact hole that made --allowedTools useless: an agent told it could
     // only read still created a file, because Bash can redirect.
-    expect(allowed('Bash', { command: 'echo banana > probe.txt' })).toBe(false)
-    expect(allowed('Bash', { command: 'git diff > /tmp/out' })).toBe(false)
-    expect(allowed('Bash', { command: 'cat a.ts >> b.ts' })).toBe(false)
+    expect(allowedTool('Bash', { command: 'echo banana > probe.txt' })).toBe(false)
+    expect(allowedTool('Bash', { command: 'git diff > /tmp/out' })).toBe(false)
+    expect(allowedTool('Bash', { command: 'cat a.ts >> b.ts' })).toBe(false)
   })
+}
 
+function substitutionAndEmptyCallsTests() {
   it('refuses command substitution and pipes', () => {
-    expect(allowed('Bash', { command: 'git diff $(rm -rf .)' })).toBe(false)
-    expect(allowed('Bash', { command: 'git diff `rm -rf .`' })).toBe(false)
-    expect(allowed('Bash', { command: 'cat a | tee b' })).toBe(false)
+    expect(allowedTool('Bash', { command: 'git diff $(rm -rf .)' })).toBe(false)
+    expect(allowedTool('Bash', { command: 'git diff `rm -rf .`' })).toBe(false)
+    expect(allowedTool('Bash', { command: 'cat a | tee b' })).toBe(false)
   })
 
   it('refuses a Bash call with nothing to check', () => {
-    expect(allowed('Bash', {})).toBe(false)
-    expect(allowed('Bash', { command: '   ' })).toBe(false)
-    expect(allowed('Bash', undefined)).toBe(false)
+    expect(allowedTool('Bash', {})).toBe(false)
+    expect(allowedTool('Bash', { command: '   ' })).toBe(false)
+    expect(allowedTool('Bash', undefined)).toBe(false)
   })
+}
 
+function theReasonTests() {
   it('says why, in words the agent reads and a person can act on', () => {
     expect(decideReadOnly('Write', {}).reason).toMatch(/may only read/)
     expect(decideReadOnly('Bash', { command: 'git diff > x' }).reason).toMatch(/redirect/)
   })
-})
+}
 
 // The hook runs in a process Claude Code owns, with no bundler and nothing to
 // import, so it carries its own copy of the rules. These run the real script the
@@ -96,6 +117,11 @@ describe('what a review may do', () => {
 // with.
 
 describe('the ways this was bypassable', () => {
+  describe('newlines and flags', newlinesAndFlagsTests)
+  describe('what still works', whatStillWorksTests)
+})
+
+function newlinesAndFlagsTests() {
   // Every one of these was allowed, verified by running the policy directly.
   // A review that can run them is not a review — it is an agent with write
   // access and a reassuring name.
@@ -126,7 +152,9 @@ describe('the ways this was bypassable', () => {
   ])('refuses: %s', (_why, command) => {
     expect(decideReadOnly('Bash', { command }).allow).toBe(false)
   })
+}
 
+function whatStillWorksTests() {
   it.each([
     ['reading a file', 'cat README.md'],
     ['searching', 'grep -rn thing src'],
@@ -135,7 +163,7 @@ describe('the ways this was bypassable', () => {
   ])('still allows: %s', (_why, command) => {
     expect(decideReadOnly('Bash', { command }).allow).toBe(true)
   })
-})
+}
 
 // A reading agent has to be able to read. This path *denies*; it never asks —
 // so a binary left off the allowlist is not "the agent can ask for it", it is
@@ -143,6 +171,12 @@ describe('the ways this was bypassable', () => {
 // reading a repository, try three times and give up with nothing left it was
 // allowed to run.
 describe('exploring a repository', () => {
+  describe('listing and finding', listingAndFindingTests)
+  describe('find writes', findWritesTests)
+  describe('grep', grepTests)
+})
+
+function listingAndFindingTests() {
   it('lets a reader list the files', () => {
     const d = decideReadOnly('Bash', { command: "find . -type f -not -path './.git/*'" })
     expect(d.allow, d.reason).toBe(true)
@@ -151,7 +185,9 @@ describe('exploring a repository', () => {
   it('lets it look for things by name', () => {
     expect(decideReadOnly('Bash', { command: "find src -name '*.ts'" }).allow).toBe(true)
   })
+}
 
+function findWritesTests() {
   it.each([
     'find . -delete',
     'find . -name x -exec rm {} ;',
@@ -178,7 +214,9 @@ describe('exploring a repository', () => {
     expect(decideReadOnly('Bash', { command: "sed -n '1,20p' file" }).allow).toBe(false)
     expect(decideReadOnly('Bash', { command: "awk '{print}' file" }).allow).toBe(false)
   })
+}
 
+function grepTests() {
   it('lets grep be case-insensitive, which is what -i means on everything here', () => {
     // `-i` was refused globally, for in-place editing. It is also how `grep`,
     // `rg` and `diff` spell "ignore case", and nothing on the allowlist writes
@@ -191,7 +229,7 @@ describe('exploring a repository', () => {
   it('still refuses the spelt-out form, whatever is running it', () => {
     expect(decideReadOnly('Bash', { command: 'grep --in-place x' }).allow).toBe(false)
   })
-})
+}
 
 // Refusing every compound was the original answer to `git diff\nrm -rf .` — a
 // check that reads the first word reads the wrong command. But it also refused
@@ -199,8 +237,11 @@ describe('exploring a repository', () => {
 // a live architect with nothing at all it was allowed to run. Every segment is
 // checked now, so the safety property is the same and composing reads works.
 describe('a command joined to another', () => {
-  const allowed = (command: string) => decideReadOnly('Bash', { command })
+  describe('allowing and refusing chains', allowingAndRefusingChainsTests)
+  describe('naming and nesting', namingAndNestingTests)
+})
 
+function allowingAndRefusingChainsTests() {
   it.each([
     'find . -type f | head -50',
     'git log --oneline -5 | head -3',
@@ -223,7 +264,9 @@ describe('a command joined to another', () => {
     const d = allowed(command)
     expect(d.allow, `${command} was allowed: ${d.reason}`).toBe(false)
   })
+}
 
+function namingAndNestingTests() {
   it('names the offending part, not the whole line', () => {
     expect(allowed('ls && rm file').reason).toMatch(/rm/)
   })
@@ -242,15 +285,13 @@ describe('a command joined to another', () => {
   it('says how many commands it checked, so the reason is not a guess', () => {
     expect(allowed('find . | head -5').reason).toMatch(/2 commands/)
   })
-})
+}
 
 // `-o` was refused for every binary, for `--output`. It is also how `find`
 // spells "or", so `find . -path ./node_modules -prune -o -type f -print` — the
 // exact command the live architect reached for — was refused. And `pwd` and
 // `echo`, which cannot change anything at all, were not on the list.
 describe('the flags and binaries a reader actually reaches for', () => {
-  const allowed = (command: string) => decideReadOnly('Bash', { command })
-
   it("lets find use -o, which is how find spells 'or'", () => {
     const d = allowed('find . -path ./node_modules -prune -o -type f -print')
     expect(d.allow, d.reason).toBe(true)
@@ -287,8 +328,6 @@ describe('the flags and binaries a reader actually reaches for', () => {
 // reader reaches for, and it was refused with every other redirection — the
 // live architect's opening command was `… 2>/dev/null` four runs running.
 describe('throwing output away', () => {
-  const allowed = (command: string) => decideReadOnly('Bash', { command })
-
   it.each([
     'cat package.json 2>/dev/null',
     'cat package.json 2> /dev/null',
@@ -319,8 +358,6 @@ describe('throwing output away', () => {
 
 // Two more the live architect walked into, both ordinary reader shapes.
 describe('moving around and setting a variable', () => {
-  const allowed = (command: string) => decideReadOnly('Bash', { command })
-
   it('lets a reader change directory, which changes nothing in the repository', () => {
     expect(allowed('cd /repo && git log --oneline -5').allow).toBe(true)
   })
@@ -349,8 +386,11 @@ describe('moving around and setting a variable', () => {
 // was refused because `git branch -D` deletes. Every writing form of `branch`
 // is visible — a flag, or a bare name — so it can be told apart.
 describe('git branch, listing and writing', () => {
-  const allowed = (command: string) => decideReadOnly('Bash', { command })
+  describe('listing and writing', listingAndWritingTests)
+  describe('bare names and other subcommands', bareNamesAndOtherSubcommandsTests)
+})
 
+function listingAndWritingTests() {
   it.each([
     'git branch',
     'git branch -a',
@@ -375,7 +415,9 @@ describe('git branch, listing and writing', () => {
   ])('refuses `%s`, which writes a ref', (command) => {
     expect(allowed(command).allow, `${command} was allowed`).toBe(false)
   })
+}
 
+function bareNamesAndOtherSubcommandsTests() {
   it('refuses a bare name, which creates a branch and looks like nothing', () => {
     expect(allowed('git branch newthing').allow).toBe(false)
     expect(allowed('git branch -a newthing').allow).toBe(false)
@@ -391,7 +433,7 @@ describe('git branch, listing and writing', () => {
     expect(allowed('git config user.name x').allow).toBe(false)
     expect(allowed('git remote add origin x').allow).toBe(false)
   })
-})
+}
 
 // Deny-by-default for an unknown tool is the right posture and stays. But
 // loading a tool's schema is not using it: refusing this took a reviewer's

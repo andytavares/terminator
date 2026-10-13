@@ -130,15 +130,21 @@ afterEach(() => {
   for (const d of [root, repo]) fs.rmSync(d, { recursive: true, force: true, maxRetries: 5 })
 })
 
-describe('a proposal refused after the turn ended', () => {
-  function writeProposal(body: unknown): string {
-    const dir = orderDir(root, 'WO-0909-6db')
-    fs.mkdirSync(dir, { recursive: true })
-    const file = path.join(dir, 'proposal.json')
-    fs.writeFileSync(file, JSON.stringify(body))
-    return file
-  }
+function writeProposal(body: unknown): string {
+  const dir = orderDir(root, 'WO-0909-6db')
+  fs.mkdirSync(dir, { recursive: true })
+  const file = path.join(dir, 'proposal.json')
+  fs.writeFileSync(file, JSON.stringify(body))
+  return file
+}
 
+describe('a proposal refused after the turn ended', () => {
+  describe('refusing', refusingTests)
+  describe('the surface', theSurfaceTests)
+  describe('the corrected proposal', theCorrectedProposalTests)
+})
+
+function refusingTests() {
   it('refuses a file path where an evidence kind belongs, and names the field', async () => {
     await finish(seeded(), writeProposal(BAD_PROPOSAL))
 
@@ -157,7 +163,9 @@ describe('a proposal refused after the turn ended', () => {
     expect(after).toBe(before)
     expect((await store.load('WO-0909-6db'))?.provenance.decisions).toEqual([])
   })
+}
 
+function theSurfaceTests() {
   it('reaches the surface that has to say so', async () => {
     await finish(seeded(), writeProposal(BAD_PROPOSAL))
     const c = createForgeChannels({
@@ -182,7 +190,9 @@ describe('a proposal refused after the turn ended', () => {
     expect(listed.orders[0].standing.turn).toBe('you')
     expect(listed.orders[0].standing.headline).toMatch(/refused/i)
   })
+}
 
+function theCorrectedProposalTests() {
   // The correction the operator's next turn asks for, all the way through.
   it('accepts the corrected proposal and clears the refusal', async () => {
     await finish(seeded(), writeProposal(BAD_PROPOSAL))
@@ -218,4 +228,4 @@ describe('a proposal refused after the turn ended', () => {
     await finish(seeded(), file)
     expect(fs.existsSync(file)).toBe(false)
   })
-})
+}

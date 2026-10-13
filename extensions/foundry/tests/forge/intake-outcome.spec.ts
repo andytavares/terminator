@@ -29,6 +29,16 @@ function entry(over: Partial<LedgerEntry> & Pick<LedgerEntry, 'action'>): Ledger
 }
 
 describe('lastIntake', () => {
+  describe('not started and running', notStartedAndRunningTests)
+  describe('the fix turn', theFixTurnTests)
+  describe('a follow-up', aFollowUpTests)
+  describe('counting follow-ups', countingFollowUpsTests)
+  describe('redrafted', redraftedTests)
+  describe('refused', refusedTests)
+  describe('other lines and the last turn', otherLinesAndTheLastTurnTests)
+})
+
+function notStartedAndRunningTests() {
   it('is none when intake has never run', () => {
     expect(lastIntake([]).kind).toBe('none')
     expect(lastIntake([entry({ action: 'order.agreed' })]).kind).toBe('none')
@@ -49,7 +59,9 @@ describe('lastIntake', () => {
       autoTurn: null,
     })
   })
+}
 
+function theFixTurnTests() {
   it('is running, as the loop’s own fix turn, when the operator did not start it', () => {
     const out = lastIntake([
       entry({
@@ -69,7 +81,9 @@ describe('lastIntake', () => {
       autoTurn: null,
     })
   })
+}
 
+function aFollowUpTests() {
   // A turn the Forge started on its own, closing a gap the architect left
   // behind, still counts as an operator-started turn to every reader here.
   it('is running while a follow-up the Forge started itself is the last thing that happened', () => {
@@ -91,7 +105,9 @@ describe('lastIntake', () => {
       autoTurn: 1,
     })
   })
+}
 
+function countingFollowUpsTests() {
   it('counts which automatic follow-up this is, since the most recent start', () => {
     const out = lastIntake([
       entry({ action: 'converge.started', at: '2026-09-09T19:30:00Z', subject: 'sess-2' }),
@@ -108,7 +124,9 @@ describe('lastIntake', () => {
     ])
     expect(out).toMatchObject({ kind: 'running', autoTurn: 2 })
   })
+}
 
+function redraftedTests() {
   it('is redrafted once the architect has saved one', () => {
     const out = lastIntake([
       entry({ action: 'converge.started', subject: 'sess-1' }),
@@ -124,7 +142,9 @@ describe('lastIntake', () => {
       note: 'added six criteria',
     })
   })
+}
 
+function refusedTests() {
   // The case the whole module exists for.
   it('is refused, carrying the validator’s reason', () => {
     const out = lastIntake([
@@ -141,7 +161,9 @@ describe('lastIntake', () => {
       reason: 'acceptance.5.verify.evidence.1: Invalid enum value.',
     })
   })
+}
 
+function otherLinesAndTheLastTurnTests() {
   // Entries the order accumulates between turns must not hide the turn.
   it('reads past everything that is not an intake line', () => {
     const out = lastIntake([
@@ -171,11 +193,18 @@ describe('lastIntake', () => {
       autoTurn: null,
     })
   })
-})
+}
 
 // The review loop's lines — see src/forge/review-loop.ts and
 // docs/research/foundry-red-team-loop.md.
 describe('lastIntake, for the review loop', () => {
+  describe('running rounds', runningRoundsTests)
+  describe('finished rounds', finishedRoundsTests)
+  describe('a loop that could not converge', aLoopThatCouldNotConvergeTests)
+  describe('a refused round', aRefusedRoundTests)
+})
+
+function runningRoundsTests() {
   it('is running while a red-team round is the last thing that happened', () => {
     const out = lastIntake([
       entry({ action: 'review.started', subject: 'sess-3', reason: 'round 2' }),
@@ -205,7 +234,9 @@ describe('lastIntake, for the review loop', () => {
       autoTurn: null,
     })
   })
+}
 
+function finishedRoundsTests() {
   it('is not running once a round finished with nothing after it', () => {
     const out = lastIntake([
       entry({ action: 'review.started', subject: 'sess-3' }),
@@ -221,7 +252,9 @@ describe('lastIntake, for the review loop', () => {
       note: 'round 2: 0 blocking, 1 note',
     })
   })
+}
 
+function aLoopThatCouldNotConvergeTests() {
   // The loop giving up is "needs you", not a refusal: nothing about the
   // proposal was rejected. `loopFacts(entries).exhausted` is what surfaces it.
   it('is redrafted, not refused, when the loop could not converge', () => {
@@ -238,7 +271,9 @@ describe('lastIntake, for the review loop', () => {
       note: 'still has 1 blocking finding after 3 rounds',
     })
   })
+}
 
+function aRefusedRoundTests() {
   // `readOnlyRound` writes `${roleId}.refused`, so a red-team round that
   // could not run leaves `red-team.refused`. Read as anything else, the round
   // it closes stays `running` and the Forge says the red team is working for
@@ -259,7 +294,7 @@ describe('lastIntake, for the review loop', () => {
       reason: 'no output written',
     })
   })
-})
+}
 
 describe('intakeRefusal', () => {
   it('is the reason when the last turn was refused', () => {
@@ -276,6 +311,12 @@ describe('intakeRefusal', () => {
 })
 
 describe('loopFacts', () => {
+  describe('rounds', roundsTests)
+  describe('holds', holdsTests)
+  describe('exhaustion', exhaustionTests)
+})
+
+function roundsTests() {
   it('is empty, unheld, not exhausted with no review lines', () => {
     expect(loopFacts([])).toEqual({ rounds: [], heldAt: null, exhausted: false })
   })
@@ -305,7 +346,9 @@ describe('loopFacts', () => {
       { round: 2, startedAt: '2026-09-09T19:40:00Z', finishedAt: null },
     ])
   })
+}
 
+function holdsTests() {
   it('is held when the last hold is after the last release', () => {
     const out = loopFacts([
       entry({ action: 'review.held', at: '2026-09-09T19:30:00Z' }),
@@ -322,7 +365,9 @@ describe('loopFacts', () => {
     ])
     expect(out.heldAt).toBeNull()
   })
+}
 
+function exhaustionTests() {
   it('is exhausted when the loop gave up last', () => {
     const out = loopFacts([
       entry({ action: 'review.started', reason: 'round 1' }),
@@ -338,7 +383,7 @@ describe('loopFacts', () => {
     ])
     expect(out.exhausted).toBe(false)
   })
-})
+}
 
 describe('agreedFacts', () => {
   it('is null before the order is agreed', () => {
@@ -396,6 +441,11 @@ describe('reviewedCurrentPlan', () => {
 })
 
 describe('anotherPassWanted', () => {
+  describe('the last round', theLastRoundTests)
+  describe('the round that asked', theRoundThatAskedTests)
+})
+
+function theLastRoundTests() {
   it('is false when the last round asked for nothing more', () => {
     expect(
       anotherPassWanted([
@@ -416,7 +466,9 @@ describe('anotherPassWanted', () => {
       ])
     ).toBe(true)
   })
+}
 
+function theRoundThatAskedTests() {
   it('belongs to the round that asked, not the one after it', () => {
     expect(
       anotherPassWanted([
@@ -427,7 +479,7 @@ describe('anotherPassWanted', () => {
       ])
     ).toBe(false)
   })
-})
+}
 
 describe('a skipped red team', () => {
   it('is read off the ledger by loopFacts', () => {

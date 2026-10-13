@@ -46,17 +46,208 @@ async function readSensors(): Promise<SensorRow[]> {
 }
 
 export function SettingsView(): JSX.Element {
-  const [models, setModels] = useState<ModelChoiceView[]>([])
-  const [selected, setSelected] = useState<string>('')
+  const saver = useSaver()
+  const models = useModels(saver)
+  const ask = useAskModel(saver)
+  return (
+    <div className="fdry-settings">
+      <ModelSection models={models} saving={saver.saving} />
+      <AskModelSection ask={ask} saving={saver.saving} />
+      {saver.problem !== null ? <p className="fdry-problem">{saver.problem}</p> : null}
+      <SensorsSection />
+      <h2 className="fdry-panel-h" style={{ marginTop: 20 }}>
+        Everything else
+      </h2>
+      <p className="fdry-note">
+        The records location, the autonomy dial, the budgets, tracker write-backs and your critical
+        paths are in the application&rsquo;s own settings, under Foundry.
+      </p>
+    </div>
+  )
+}
+
+/** One save at a time for the model pickers, and what the last one refused. */
+interface Saver {
+  readonly saving: boolean
+  readonly problem: string | null
+  readonly setProblem: (problem: string | null) => void
+  /** Writes a choice; `write` answers with a refusal, or null when it took. */
+  readonly save: (write: () => Promise<string | null>, onSaved: () => void) => Promise<void>
+}
+
+function useSaver(): Saver {
   const [saving, setSaving] = useState(false)
   const [problem, setProblem] = useState<string | null>(null)
-  const [askModel, setAskModel] = useState<string>('sonnet')
+  const save = useCallback(async (write: () => Promise<string | null>, onSaved: () => void) => {
+    setSaving(true)
+    setProblem(null)
+    try {
+      const error = await write()
+      if (error !== null) {
+        setProblem(error)
+        return
+      }
+      onSaved()
+    } finally {
+      setSaving(false)
+    }
+  }, [])
+  return { saving, problem, setProblem, save }
+}
 
+/** The models on offer, the one chosen, and a way to choose another. */
+function useModels({ save, setProblem }: Saver) {
+  const [models, setModels] = useState<ModelChoiceView[]>([])
+  const [selected, setSelected] = useState<string>('')
+  useEffect(() => {
+    void (async () => {
+      try {
+        const answer = await getFoundryAPI().modelsList()
+        // Defensive on purpose: a channel that answers oddly should cost the
+        // operator a message, not a blank settings page.
+        setModels(Array.isArray(answer?.models) ? answer.models : [])
+        setSelected(typeof answer?.selected === 'string' ? answer.selected : '')
+      } catch {
+        setProblem('Could not read the model list.')
+      }
+    })()
+  }, [setProblem])
+  const choose = useCallback(
+    (id: string) =>
+      save(
+        async () => {
+          const result = await getFoundryAPI().modelSet({ model: id })
+          return 'error' in result ? result.error : null
+        },
+        () => setSelected(id)
+      ),
+    [save]
+  )
+  return { models, selected, choose }
+}
+
+/** The model the architect amends a plan on, and a way to choose another. */
+function useAskModel({ save }: Saver) {
+  const [askModel, setAskModel] = useState<string>('sonnet')
+  useEffect(() => {
+    void (async () => {
+      const answer = (await invoke('foundry:ask-model')) as { selected?: unknown }
+      if (typeof answer?.selected === 'string') setAskModel(answer.selected)
+    })()
+  }, [])
+  const chooseAskModel = useCallback(
+    (id: string) =>
+      save(
+        async () => {
+          const result = (await invoke('foundry:ask-model-set', { model: id })) as {
+            error?: string
+          }
+          return result.error !== undefined ? result.error : null
+        },
+        () => setAskModel(id)
+      ),
+    [save]
+  )
+  return { askModel, chooseAskModel }
+}
+
+interface ModelSectionProps {
+  readonly models: ReturnType<typeof useModels>
+  readonly saving: boolean
+}
+
+function ModelSection({ models: { models, selected, choose }, saving }: ModelSectionProps) {
+  return (
+    <>
+      <h2 className="fdry-panel-h">Model</h2>
+      <p className="fdry-note">
+        What every agent runs on, unless its role asks for the fast tier — the scribe and the scout
+        do. An alias never goes stale the way a pinned identifier does.
+      </p>
+
+      <ul className="fdry-models">
+        {models.map((model) => (
+          <li key={model.id || 'inherit'}>
+            <ChoiceButton
+              on={model.id === selected}
+              saving={saving}
+              onChoose={() => void choose(model.id)}
+            >
+              <b>{model.label}</b>
+              <small>
+                {model.floating ? 'alias — follows the latest of its family' : model.id}
+              </small>
+            </ChoiceButton>
+          </li>
+        ))}
+      </ul>
+    </>
+  )
+}
+
+/** One choice of a picker: pressed when it is the one chosen. */
+function ChoiceButton({
+  on,
+  saving,
+  onChoose,
+  children,
+}: {
+  readonly on: boolean
+  readonly saving: boolean
+  readonly onChoose: () => void
+  readonly children: React.ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={on}
+      className={on ? 'is-on' : ''}
+      disabled={saving}
+      onClick={onChoose}
+    >
+      {children}
+    </button>
+  )
+}
+
+interface AskModelSectionProps {
+  readonly ask: ReturnType<typeof useAskModel>
+  readonly saving: boolean
+}
+
+function AskModelSection({ ask: { askModel, chooseAskModel }, saving }: AskModelSectionProps) {
+  return (
+    <>
+      <h2 className="fdry-panel-h" style={{ marginTop: 20 }}>
+        Answering asks
+      </h2>
+      <p className="fdry-note">
+        What the architect runs on when it amends a drafted plan: an ask, an answer, or a failing
+        check it closes on its own. The first draft stays on the model above.
+      </p>
+
+      <ul className="fdry-models">
+        {ASK_MODEL_CHOICES.map((choice) => (
+          <li key={choice.id}>
+            <ChoiceButton
+              on={choice.id === askModel}
+              saving={saving}
+              onChoose={() => void chooseAskModel(choice.id)}
+            >
+              <b>{choice.label}</b>
+              <small>{choice.note}</small>
+            </ChoiceButton>
+          </li>
+        ))}
+      </ul>
+    </>
+  )
+}
+
+/** The sensors, each with the repository typed for it and what its last run said. */
+function useSensorRows() {
   const [sensors, setSensors] = useState<SensorRow[]>([])
   const [repoDrafts, setRepoDrafts] = useState<Record<string, string>>({})
-  const [sensorProblems, setSensorProblems] = useState<Record<string, string>>({})
-  const [runNotes, setRunNotes] = useState<Record<string, string>>({})
-
   const showSensors = useCallback((rows: SensorRow[]): void => {
     setSensors(rows)
     setRepoDrafts((current) => {
@@ -67,13 +258,20 @@ export function SettingsView(): JSX.Element {
       return next
     })
   }, [])
-
   const refreshSensors = useCallback(() => readSensors().then(showSensors), [showSensors])
-
   useEffect(() => {
     void readSensors().then(showSensors)
   }, [showSensors])
+  return { sensors, repoDrafts, setRepoDrafts, refreshSensors }
+}
 
+/** What a sensor's controls do: enable it, save its repository, run it now. */
+function useSensorActions({
+  repoDrafts,
+  refreshSensors,
+}: Pick<ReturnType<typeof useSensorRows>, 'repoDrafts' | 'refreshSensors'>) {
+  const [sensorProblems, setSensorProblems] = useState<Record<string, string>>({})
+  const [runNotes, setRunNotes] = useState<Record<string, string>>({})
   const setSensor = useCallback(
     async (id: string, patch: { enabled?: boolean; repoPath?: string | null }) => {
       setSensorProblems((current) => ({ ...current, [id]: '' }))
@@ -87,24 +285,20 @@ export function SettingsView(): JSX.Element {
     },
     [refreshSensors]
   )
+  const repoOf = (id: string): string | null => (repoDrafts[id] ?? '').trim() || null
+  const toggleSensor = (id: string, enabled: boolean) =>
+    void setSensor(id, { enabled, repoPath: repoOf(id) })
+  const saveRepo = (id: string) => void setSensor(id, { repoPath: repoOf(id) })
+  const runNow = useRunNow(setRunNotes, refreshSensors)
+  return { sensorProblems, runNotes, toggleSensor, saveRepo, runNow }
+}
 
-  const toggleSensor = useCallback(
-    (id: string, enabled: boolean) => {
-      const repoPath = (repoDrafts[id] ?? '').trim() || null
-      void setSensor(id, { enabled, repoPath })
-    },
-    [repoDrafts, setSensor]
-  )
-
-  const saveRepo = useCallback(
-    (id: string) => {
-      const repoPath = (repoDrafts[id] ?? '').trim() || null
-      void setSensor(id, { repoPath })
-    },
-    [repoDrafts, setSensor]
-  )
-
-  const runNow = useCallback(
+/** Runs a sensor at once, noting what it recorded or why it could not. */
+function useRunNow(
+  setRunNotes: React.Dispatch<React.SetStateAction<Record<string, string>>>,
+  refreshSensors: () => Promise<void>
+) {
+  return useCallback(
     async (id: string) => {
       const result = (await invoke('foundry:sensors.run-now', { id })) as {
         recorded?: number
@@ -119,114 +313,15 @@ export function SettingsView(): JSX.Element {
       }))
       await refreshSensors()
     },
-    [refreshSensors]
+    [setRunNotes, refreshSensors]
   )
+}
 
-  useEffect(() => {
-    void (async () => {
-      try {
-        const answer = await getFoundryAPI().modelsList()
-        // Defensive on purpose: a channel that answers oddly should cost the
-        // operator a message, not a blank settings page.
-        setModels(Array.isArray(answer?.models) ? answer.models : [])
-        setSelected(typeof answer?.selected === 'string' ? answer.selected : '')
-      } catch {
-        setProblem('Could not read the model list.')
-      }
-    })()
-  }, [])
-
-  useEffect(() => {
-    void (async () => {
-      const answer = (await invoke('foundry:ask-model')) as { selected?: unknown }
-      if (typeof answer?.selected === 'string') setAskModel(answer.selected)
-    })()
-  }, [])
-
-  const chooseAskModel = useCallback(async (id: string) => {
-    setSaving(true)
-    setProblem(null)
-    try {
-      const result = (await invoke('foundry:ask-model-set', { model: id })) as { error?: string }
-      if (result.error !== undefined) {
-        setProblem(result.error)
-        return
-      }
-      setAskModel(id)
-    } finally {
-      setSaving(false)
-    }
-  }, [])
-
-  const choose = useCallback(async (id: string) => {
-    setSaving(true)
-    setProblem(null)
-    try {
-      const result = await getFoundryAPI().modelSet({ model: id })
-      if ('error' in result) {
-        setProblem(result.error)
-        return
-      }
-      setSelected(id)
-    } finally {
-      setSaving(false)
-    }
-  }, [])
-
+function SensorsSection() {
+  const rows = useSensorRows()
+  const actions = useSensorActions(rows)
   return (
-    <div className="fdry-settings">
-      <h2 className="fdry-panel-h">Model</h2>
-      <p className="fdry-note">
-        What every agent runs on, unless its role asks for the fast tier — the scribe and the scout
-        do. An alias never goes stale the way a pinned identifier does.
-      </p>
-
-      <ul className="fdry-models">
-        {models.map((model) => (
-          <li key={model.id || 'inherit'}>
-            <button
-              type="button"
-              aria-pressed={model.id === selected}
-              className={model.id === selected ? 'is-on' : ''}
-              disabled={saving}
-              onClick={() => void choose(model.id)}
-            >
-              <b>{model.label}</b>
-              <small>
-                {model.floating ? 'alias — follows the latest of its family' : model.id}
-              </small>
-            </button>
-          </li>
-        ))}
-      </ul>
-
-      <h2 className="fdry-panel-h" style={{ marginTop: 20 }}>
-        Answering asks
-      </h2>
-      <p className="fdry-note">
-        What the architect runs on when it amends a drafted plan: an ask, an answer, or a failing
-        check it closes on its own. The first draft stays on the model above.
-      </p>
-
-      <ul className="fdry-models">
-        {ASK_MODEL_CHOICES.map((choice) => (
-          <li key={choice.id}>
-            <button
-              type="button"
-              aria-pressed={choice.id === askModel}
-              className={choice.id === askModel ? 'is-on' : ''}
-              disabled={saving}
-              onClick={() => void chooseAskModel(choice.id)}
-            >
-              <b>{choice.label}</b>
-              <small>{choice.note}</small>
-            </button>
-          </li>
-        ))}
-      </ul>
-
-      {problem !== null ? <p className="fdry-problem">{problem}</p> : null}
-
+    <>
       <h2 className="fdry-panel-h" style={{ marginTop: 20 }}>
         Sensors
       </h2>
@@ -236,65 +331,93 @@ export function SettingsView(): JSX.Element {
       </p>
 
       <ul className="fdry-sensors">
-        {sensors.map((row) => (
-          <li key={row.def.id} className="fdry-sensor">
-            <div className="fdry-sensor-head">
-              <b>{row.def.description}</b>
-              <span className="fdry-sensor-rung">{rungInWords(row.rung as Rung)}</span>
-              <label className="fdry-sensor-toggle">
-                <input
-                  type="checkbox"
-                  aria-label={`Enable ${row.def.description}`}
-                  checked={row.state.enabled}
-                  onChange={(event) => toggleSensor(row.def.id, event.target.checked)}
-                />
-                Enabled
-              </label>
-            </div>
-
-            <label className="fdry-sensor-repo">
-              Repository
-              <input
-                type="text"
-                aria-label={`Repository for ${row.def.description}`}
-                value={repoDrafts[row.def.id] ?? ''}
-                placeholder="/path/to/repo"
-                onChange={(event) =>
-                  setRepoDrafts((current) => ({ ...current, [row.def.id]: event.target.value }))
-                }
-                onBlur={() => saveRepo(row.def.id)}
-              />
-            </label>
-
-            {sensorProblems[row.def.id] ? (
-              <p className="fdry-problem">{sensorProblems[row.def.id]}</p>
-            ) : null}
-
-            <div className="fdry-sensor-meta">
-              <span>Last run: {row.state.lastRunAt ?? 'never'}</span>
-              <span>Next due: {row.nextDueAt ?? '—'}</span>
-              {row.state.lastProblem !== null ? (
-                <span>Last problem: {row.state.lastProblem}</span>
-              ) : null}
-            </div>
-
-            <div className="fdry-sensor-actions">
-              <Button size="sm" onClick={() => void runNow(row.def.id)}>
-                Run now
-              </Button>
-              {runNotes[row.def.id] !== undefined ? <span>{runNotes[row.def.id]}</span> : null}
-            </div>
-          </li>
+        {rows.sensors.map((row) => (
+          <SensorItem
+            key={row.def.id}
+            row={row}
+            repoDraft={rows.repoDrafts[row.def.id] ?? ''}
+            onRepoDraft={(text) =>
+              rows.setRepoDrafts((current) => ({ ...current, [row.def.id]: text }))
+            }
+            actions={actions}
+          />
         ))}
       </ul>
+    </>
+  )
+}
 
-      <h2 className="fdry-panel-h" style={{ marginTop: 20 }}>
-        Everything else
-      </h2>
-      <p className="fdry-note">
-        The records location, the autonomy dial, the budgets, tracker write-backs and your critical
-        paths are in the application&rsquo;s own settings, under Foundry.
-      </p>
+interface SensorItemProps {
+  readonly row: SensorRow
+  readonly repoDraft: string
+  readonly onRepoDraft: (text: string) => void
+  readonly actions: ReturnType<typeof useSensorActions>
+}
+
+function SensorItem({ row, repoDraft, onRepoDraft, actions }: SensorItemProps) {
+  const id = row.def.id
+  return (
+    <li className="fdry-sensor">
+      <SensorHead row={row} onToggle={(enabled) => actions.toggleSensor(id, enabled)} />
+
+      <label className="fdry-sensor-repo">
+        Repository
+        <input
+          type="text"
+          aria-label={`Repository for ${row.def.description}`}
+          value={repoDraft}
+          placeholder="/path/to/repo"
+          onChange={(event) => onRepoDraft(event.target.value)}
+          onBlur={() => actions.saveRepo(id)}
+        />
+      </label>
+
+      {actions.sensorProblems[id] ? (
+        <p className="fdry-problem">{actions.sensorProblems[id]}</p>
+      ) : null}
+
+      <SensorMeta row={row} />
+
+      <div className="fdry-sensor-actions">
+        <Button size="sm" onClick={() => void actions.runNow(id)}>
+          Run now
+        </Button>
+        {actions.runNotes[id] !== undefined ? <span>{actions.runNotes[id]}</span> : null}
+      </div>
+    </li>
+  )
+}
+
+function SensorHead({
+  row,
+  onToggle,
+}: {
+  readonly row: SensorRow
+  readonly onToggle: (enabled: boolean) => void
+}) {
+  return (
+    <div className="fdry-sensor-head">
+      <b>{row.def.description}</b>
+      <span className="fdry-sensor-rung">{rungInWords(row.rung as Rung)}</span>
+      <label className="fdry-sensor-toggle">
+        <input
+          type="checkbox"
+          aria-label={`Enable ${row.def.description}`}
+          checked={row.state.enabled}
+          onChange={(event) => onToggle(event.target.checked)}
+        />
+        Enabled
+      </label>
+    </div>
+  )
+}
+
+function SensorMeta({ row }: { readonly row: SensorRow }) {
+  return (
+    <div className="fdry-sensor-meta">
+      <span>Last run: {row.state.lastRunAt ?? 'never'}</span>
+      <span>Next due: {row.nextDueAt ?? '—'}</span>
+      {row.state.lastProblem !== null ? <span>Last problem: {row.state.lastProblem}</span> : null}
     </div>
   )
 }

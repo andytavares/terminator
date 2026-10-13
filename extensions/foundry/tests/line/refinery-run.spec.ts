@@ -7,7 +7,8 @@ import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from 'vites
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 
-import { activateFoundry, fakeHost, realGit, temporaryDirectory } from '../helpers/foundry-host.js'
+import { fakeHost, realGit, temporaryDirectory } from '../helpers/foundry-host.js'
+import { activateFoundry, deactivate } from '../helpers/foundry-activation.js'
 import type { FoundryHost } from '../helpers/foundry-host.js'
 import { agentsAnswer, agreedOrder, checks, repositoryWithRemote } from '../helpers/line-run.js'
 import { createOrderStore } from '../../src/order/store.js'
@@ -51,7 +52,6 @@ beforeAll(async () => {
 })
 
 afterAll(async () => {
-  const { deactivate } = await import('../../src/index.ts')
   deactivate()
   vi.useRealTimers()
   vi.unstubAllEnvs()
@@ -113,6 +113,12 @@ beforeEach(async () => {
 })
 
 describe('a minute after an order merged', () => {
+  describe('rebasing', rebasingTests)
+  describe('a failed rebase', aFailedRebaseTests)
+  describe('the merged issue', theMergedIssueTests)
+})
+
+function rebasingTests() {
   it('rebases the order queued behind it on the same files and checks it again', async () => {
     await shipBoth()
     await mergeFirst()
@@ -138,7 +144,9 @@ describe('a minute after an order merged', () => {
     })
     expect(carriesTheMerge.exitCode).toBe(0)
   })
+}
 
+function aFailedRebaseTests() {
   it('puts an order that no longer rebases in front of the operator', async () => {
     await shipBoth()
     // main moves under WO-2's own file with different contents.
@@ -159,7 +167,9 @@ describe('a minute after an order merged', () => {
       evidence: [{ kind: 'diff', path: 'wo-2.css' }],
     })
   })
+}
 
+function theMergedIssueTests() {
   it('moves the merged order’s issue to done', async () => {
     vi.mocked(host.issues.supportsTransitions).mockReturnValue(true)
     try {
@@ -187,4 +197,4 @@ describe('a minute after an order merged', () => {
       vi.mocked(host.issues.supportsTransitions).mockReturnValue(false)
     }
   })
-})
+}

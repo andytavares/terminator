@@ -35,6 +35,50 @@ function order(over: Partial<WorkOrder> = {}): WorkOrder {
   }
 }
 
+/** The one criterion most fixtures carry, proved by the test command. */
+function criterion(
+  over: Partial<WorkOrder['acceptance'][number]> = {}
+): WorkOrder['acceptance'][number] {
+  return {
+    id: 'AC-1',
+    statement: 'a',
+    priority: 'P1',
+    verify: { kind: 'test', command: 'npm test', assert: 'exit_code == 0' },
+    unverifiable: null,
+    ...over,
+  }
+}
+
+/** One builder unit in lane 1 that satisfies AC-1. */
+function unit(
+  over: Partial<WorkOrder['plan']['units'][number]> = {}
+): WorkOrder['plan']['units'][number] {
+  return {
+    id: 'U-1',
+    title: 'a',
+    role: 'builder',
+    lane: 1,
+    dependsOn: [],
+    satisfies: ['AC-1'],
+    touches: ['src/a.ts'],
+    verify: [],
+    ...over,
+  }
+}
+
+/** An order every compile check passes. */
+function compilable(over: Partial<WorkOrder> = {}): WorkOrder {
+  const base = order()
+  return {
+    ...base,
+    acceptance: [criterion()],
+    intent: { problem: 'p', outcome: 'o', nonGoals: [] },
+    risk: { grade: 'P2', triggers: [], blastRadius: ['src/'], criticalPaths: [] },
+    plan: { ...base.plan, units: [unit()] },
+    ...over,
+  }
+}
+
 let invoke: ReturnType<typeof vi.fn>
 /** What `foundry:run-terminal` answers. Reset before every test. */
 let terminalReply: unknown = { ok: true }
@@ -43,6 +87,31 @@ let bus = createChangeBus()
 beforeEach(() => {
   bus = createChangeBus()
 })
+
+/** Puts `invoke` and the change bus behind the bridge the Forge reads. */
+function installBridge(): void {
+  Object.defineProperty(window, 'electronAPI', {
+    value: { extensionBridge: { invoke, on: bus.on } },
+    configurable: true,
+    writable: true,
+  })
+}
+
+/** Renders the Forge over `current`; compile and converge both answer with it. */
+function mountShowing(current: WorkOrder): void {
+  invoke = vi.fn(async (channel: string) =>
+    channel === 'foundry:order.compile' || channel === 'foundry:order.converge'
+      ? { order: current, compile: compileOrder(current) }
+      : {}
+  )
+  installBridge()
+  render(<Forge orderId="WO-1" />)
+}
+
+/** The converge call one Send makes, with the decisions it carries. */
+function converged(settle: Record<string, unknown>) {
+  return { id: 'WO-1', settle: { answers: [], accepts: [], fixes: [], asks: [], ...settle } }
+}
 
 /** Foundry says this order's records changed, and the view reads once the burst is over. */
 async function orderChanged(): Promise<void> {
@@ -69,9 +138,7 @@ function mount(statesReply: unknown, over: Partial<WorkOrder> = {}) {
     if (channel === 'foundry:run-terminal') return terminalReply
     return {}
   })
-  ;(window as unknown as Record<string, unknown>).electronAPI = {
-    extensionBridge: { invoke, on: bus.on },
-  }
+  installBridge()
   render(<Forge orderId="WO-1" />)
 }
 
@@ -124,6 +191,14 @@ function queryHandOffButton(): HTMLElement | null {
 beforeEach(() => vi.clearAllMocks())
 
 describe('the tracker write-back panel', () => {
+  describe('the rows and choices', theRowsAndChoicesTests)
+  describe('overriding', overridingTests)
+  describe('resetting', resettingTests)
+  describe('nowhere to go', nowhereToGoTests)
+  describe('nothing to offer', nothingToOfferTests)
+})
+
+function theRowsAndChoicesTests() {
   it('offers one row per moment in the order life', async () => {
     mount({ capability: { transitions: 'supported', states: STATES, unreachable: [] } })
     await openStep('Tracker')
@@ -144,7 +219,9 @@ describe('the tracker write-back panel', () => {
     await openStep('Tracker')
     expect(screen.getAllByRole('option', { name: 'let the tracker decide' })).toHaveLength(3)
   })
+}
 
+function overridingTests() {
   it('stores the override when the operator picks one', async () => {
     mount({ capability: { transitions: 'supported', states: STATES, unreachable: [] } })
     await openStep('Tracker')
@@ -160,7 +237,9 @@ describe('the tracker write-back panel', () => {
       })
     )
   })
+}
 
+function resettingTests() {
   it('puts an intent back to the tracker own resolution', async () => {
     mount({
       capability: { transitions: 'supported', states: STATES, unreachable: [] },
@@ -177,7 +256,9 @@ describe('the tracker write-back panel', () => {
       })
     )
   })
+}
 
+function nowhereToGoTests() {
   it('says the workflow has nowhere to go rather than offering a wrong state', async () => {
     mount({
       capability: {
@@ -196,7 +277,9 @@ describe('the tracker write-back panel', () => {
     expect(screen.getByText(/cannot be asked to move an issue/)).toBeTruthy()
     expect(screen.queryByRole('combobox')).toBeNull()
   })
+}
 
+function nothingToOfferTests() {
   it('offers no step at all for an order nobody seeded from a tracker', async () => {
     mount({ capability: { transitions: 'no_issue', states: [], unreachable: [] } })
     await waitFor(() => screen.getByText('Refuse an expired refresh token'))
@@ -214,7 +297,7 @@ describe('the tracker write-back panel', () => {
     await openStep('Tracker')
     expect(invoke.mock.calls.filter((c) => c[0] === 'foundry:order.states')).toHaveLength(1)
   })
-})
+}
 
 // The header chip no longer links to the signal's evidence url — the
 // redesign dropped it, leaving only the plain "From a sensor signal" chip.
@@ -243,93 +326,78 @@ describe('an order seeded from a sensor signal', () => {
   })
 })
 
-/** A Forge over an order that will compile, so hand-off actually runs. */
-function mountForStart(over: Record<string, unknown> = {}) {
-  let chosen: string | null = null
-  const current = {
-    ...order(),
-    acceptance: [
-      {
-        id: 'AC-1',
-        statement: 'a',
-        priority: 'P1' as const,
-        verify: { kind: 'test' as const, command: 'npm test', assert: 'exit_code == 0' },
-        unverifiable: null,
-      },
-    ],
-    intent: { problem: 'p', outcome: 'o', nonGoals: [] },
-    risk: { grade: 'P2' as const, triggers: [], blastRadius: ['src/'], criticalPaths: [] },
-    plan: {
-      ...order().plan,
-      units: [
-        {
-          id: 'U-1',
-          title: 'a',
-          role: 'builder',
-          lane: 1,
-          dependsOn: [],
-          satisfies: ['AC-1'],
-          touches: ['src/a.ts'],
-          verify: [],
-        },
-      ],
-    },
+/** The shapes the Shape step offers, with one this repository cannot run. */
+const SHAPES = [
+  { name: 'direct', available: true, unmet: [], rung: 'built-in' },
+  { name: 'standard', available: true, unmet: [], rung: 'built-in' },
+  {
+    name: 'speckit',
+    available: false,
+    unmet: ['this repository has no SpecKit skills'],
+    rung: 'built-in',
+  },
+]
+
+/** Answers a spec overrides; a function answers from what it was asked. */
+interface StartReplies {
+  intake?: unknown
+  advisory?: string | null
+  recipes?: unknown
+  start?: unknown
+}
+
+const answer = (reply: unknown, payload?: unknown) =>
+  typeof reply === 'function' ? (reply as (p: unknown) => unknown)(payload) : reply
+
+/** What `foundry:order.compile` answers for `current`: agreed once the operator commits. */
+function compiledFor(current: WorkOrder, over: StartReplies, payload: unknown) {
+  const commit = (payload as { commit?: boolean }).commit === true
+  const shown = commit ? { ...current, status: 'agreed' as const } : current
+  return {
+    order: shown,
+    compile: compileOrder(shown),
+    ...(over.intake === undefined ? {} : { intake: answer(over.intake) }),
+    ...(commit ? { advisory: over.advisory ?? null } : {}),
   }
-  const onStarted = vi.fn()
-  invoke = vi.fn(async (channel: string, payload: unknown) => {
-    if (channel === 'foundry:order.compile') {
-      const commit = (payload as { commit?: boolean }).commit === true
-      const shown = commit ? { ...current, status: 'agreed' as const } : current
-      return {
-        order: shown,
-        compile: compileOrder(shown),
-        ...(over.intake === undefined
-          ? {}
-          : { intake: typeof over.intake === 'function' ? over.intake() : over.intake }),
-        ...(commit ? { advisory: (over.advisory as string | null | undefined) ?? null } : {}),
-      }
-    }
-    if (channel === 'foundry:order.states') return {}
+}
+
+/** The channels hand-off reaches, answering as the backend does. */
+function startReplies(over: StartReplies): Record<string, (payload: unknown) => unknown> {
+  const current = compilable()
+  let chosen: string | null = null
+  const proposal = { proposed: 'standard', proposedWhy: '2 units of work' }
+  return {
+    'foundry:order.compile': (payload) => compiledFor(current, over, payload),
+    'foundry:order.states': () => ({}),
     // As the backend does: the pick is saved to the order and read back.
-    if (channel === 'foundry:order.recipe') {
+    'foundry:order.recipe': (payload) => {
       chosen = (payload as { recipe: string | null }).recipe
       return {}
-    }
-    if (channel === 'foundry:run.recipes') {
-      return (
-        over.recipes ?? {
-          chosen,
-          recipes: [
-            { name: 'direct', available: true, unmet: [], rung: 'built-in' },
-            { name: 'standard', available: true, unmet: [], rung: 'built-in' },
-            {
-              name: 'speckit',
-              available: false,
-              unmet: ['this repository has no SpecKit skills'],
-              rung: 'built-in',
-            },
-          ],
-          proposed: 'standard',
-          proposedWhy: '2 units of work',
-        }
-      )
-    }
-    if (channel === 'foundry:run.start') {
-      // A function when the answer depends on the payload.
-      return typeof over.start === 'function'
-        ? (over.start as (p: unknown) => unknown)(payload)
-        : (over.start ?? { ok: true })
-    }
-    return {}
-  })
-  ;(window as unknown as Record<string, unknown>).electronAPI = {
-    extensionBridge: { invoke, on: bus.on },
+    },
+    'foundry:run.recipes': () => over.recipes ?? { chosen, recipes: SHAPES, ...proposal },
+    'foundry:run.start': (payload) => answer(over.start ?? { ok: true }, payload),
   }
+}
+
+/** A Forge over an order that will compile, so hand-off actually runs. */
+function mountForStart(over: StartReplies = {}) {
+  const onStarted = vi.fn()
+  const replies = startReplies(over)
+  invoke = vi.fn(async (channel: string, payload: unknown) =>
+    channel in replies ? replies[channel](payload) : {}
+  )
+  installBridge()
   render(<Forge orderId="WO-1" onStarted={onStarted} />)
   return onStarted
 }
 
 describe('handing off', () => {
+  describe('starting the Line', startingTheLineTests)
+  describe('no start', noStartTests)
+  describe('the refinery advisory', theRefineryAdvisoryTests)
+})
+
+function startingTheLineTests() {
   it('starts the Line, rather than leaving the order agreed and idle', async () => {
     mountForStart()
     await waitFor(() => handOffButton())
@@ -352,7 +420,9 @@ describe('handing off', () => {
     expect(screen.getByText(/no test command/)).toBeTruthy()
     expect(onStarted).not.toHaveBeenCalled()
   })
+}
 
+function noStartTests() {
   it('starts nothing for an order that did not compile', async () => {
     mount({ capability: { transitions: 'no_issue', states: [], unreachable: [] } })
     await openStep('Hand off')
@@ -362,7 +432,9 @@ describe('handing off', () => {
     fireEvent.click(button)
     expect(invoke).not.toHaveBeenCalledWith('foundry:run.start', expect.anything())
   })
+}
 
+function theRefineryAdvisoryTests() {
   it('shows the refinery advisory as a note, once agreeing returns one (R4/R5)', async () => {
     mountForStart({ advisory: 'This queues behind WO-2 on src/a.ts.' })
     await waitFor(() => handOffButton())
@@ -379,9 +451,17 @@ describe('handing off', () => {
     await waitFor(() => expect(screen.getAllByText(/Handed off/).length).toBeGreaterThan(0))
     expect(screen.queryByText(/queues behind/)).toBeNull()
   })
-})
+}
 
 describe('choosing the shape of work', () => {
+  describe('the proposal', theProposalTests)
+  describe('shapes it cannot run', shapesItCannotRunTests)
+  describe('choosing', choosingTests)
+  describe('nothing supported', nothingSupportedTests)
+  describe('choosing mid-turn', choosingMidTurnTests)
+})
+
+function theProposalTests() {
   it('offers the shapes this repository can support, marking the proposal', async () => {
     mountForStart()
     await openStep('Shape')
@@ -406,7 +486,9 @@ describe('choosing the shape of work', () => {
     await openStep('Shape')
     expect(screen.queryByText(/units of work/)).toBeNull()
   })
+}
 
+function shapesItCannotRunTests() {
   it('shows one it cannot run, with the requirement it does not meet', async () => {
     mountForStart()
     await openStep('Shape')
@@ -420,7 +502,9 @@ describe('choosing the shape of work', () => {
     expect(isUnavailable(speckit)).toBe(true)
     expect(reasonFor(speckit)).toContain('no SpecKit skills')
   })
+}
 
+function choosingTests() {
   it('starts with the proposal when the operator says nothing', async () => {
     mountForStart()
     await waitFor(() => handOffButton())
@@ -438,29 +522,43 @@ describe('choosing the shape of work', () => {
       expect(invoke).toHaveBeenCalledWith('foundry:run.start', { id: 'WO-1', recipe: 'direct' })
     )
   })
+}
 
+function nothingSupportedTests() {
   it('offers nothing when the repository supports no shape at all', async () => {
     mountForStart({ recipes: { recipes: [], proposed: '' } })
     await waitFor(() => handOffButton())
     expect(within(stepList()).queryByRole('button', { name: /^Shape/ })).toBeNull()
   })
+}
 
+/** An intake turn the architect is part way through, at the operator's asking. */
+function runningIntake(at: string, sessionId: string) {
+  return {
+    kind: 'running' as const,
+    at,
+    sessionId,
+    asked: '',
+    actor: 'architect' as const,
+    trigger: 'you' as const,
+    round: null,
+    autoTurn: null,
+  }
+}
+
+/** A shape on the Shape step, found by the name it shows. */
+function shapeButton(name: string): HTMLElement {
+  return screen.getByText(name).closest('button') as HTMLElement
+}
+
+function choosingMidTurnTests() {
   // A turn that never finishes must not lock every shape but the proposal:
   // the operator can always override it, whether or not the architect is
   // still working. The pick is saved to the order as it is made, so hand-off
   // — the operator's or the automatic one — runs it.
   it('lets an available shape be chosen while an intake turn is running, and hand-off carries it', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
-    const running = {
-      kind: 'running' as const,
-      at: '2026-09-06T10:00:00.000Z',
-      sessionId: 'S-1',
-      asked: '',
-      actor: 'architect' as const,
-      trigger: 'you' as const,
-      round: null,
-      autoTurn: null,
-    }
+    const running = runningIntake('2026-09-06T10:00:00.000Z', 'S-1')
     const ended = { kind: 'redrafted' as const, at: '2026-09-06T10:01:00.000Z', note: 'redrafted' }
     let polls = 0
     mountForStart({
@@ -470,16 +568,10 @@ describe('choosing the shape of work', () => {
       },
     })
     await openStep('Shape')
-    const direct = screen.getByText('Direct').closest('button') as HTMLElement
-    expect(isUnavailable(direct)).toBe(false)
-    expect(direct.getAttribute('aria-pressed')).toBe('false')
-
-    fireEvent.click(direct)
-    await vi.waitFor(() =>
-      expect(
-        (screen.getByText('Direct').closest('button') as HTMLElement).getAttribute('aria-pressed')
-      ).toBe('true')
-    )
+    expect(isUnavailable(shapeButton('Direct'))).toBe(false)
+    expect(shapeButton('Direct').getAttribute('aria-pressed')).toBe('false')
+    fireEvent.click(shapeButton('Direct'))
+    await vi.waitFor(() => expect(shapeButton('Direct').getAttribute('aria-pressed')).toBe('true'))
 
     await orderChanged()
     await openStep('Hand off')
@@ -490,9 +582,17 @@ describe('choosing the shape of work', () => {
     )
     vi.useRealTimers()
   })
-})
+}
 
 describe('drafting the plan', () => {
+  describe('asking the architect', askingTheArchitectTests)
+  describe('refusals', refusalsTests)
+  describe('drafts', draftsTests)
+  describe('redrafts', redraftsTests)
+  describe('after hand-off', afterHandOffTests)
+})
+
+function askingTheArchitectTests() {
   it('offers the action, because nothing else writes the criteria', async () => {
     mount({ capability: { transitions: 'no_issue', states: [], unreachable: [] } })
     await waitFor(() => expect(screen.getByRole('button', { name: /Draft the plan/ })).toBeTruthy())
@@ -527,7 +627,9 @@ describe('drafting the plan', () => {
       })
     )
   })
+}
 
+function refusalsTests() {
   it('says why intake refused, rather than looking as though nothing happened', async () => {
     invoke = vi.fn(async (channel: string) => {
       if (channel === 'foundry:order.compile') {
@@ -542,16 +644,16 @@ describe('drafting the plan', () => {
       }
       return {}
     })
-    ;(window as unknown as Record<string, unknown>).electronAPI = {
-      extensionBridge: { invoke, on: bus.on },
-    }
+    installBridge()
     render(<Forge orderId="WO-1" />)
 
     await waitFor(() => screen.getByRole('button', { name: /Draft the plan/ }))
     fireEvent.click(screen.getByRole('button', { name: /Draft the plan/ }))
     await waitFor(() => expect(screen.getByText('the proposal reached for a status')).toBeTruthy())
   })
+}
 
+function draftsTests() {
   it('offers a draft, not a redraft, when a ticket brought criteria and no units', async () => {
     const seeded = {
       ...order(),
@@ -571,55 +673,23 @@ describe('drafting the plan', () => {
       }
       return {}
     })
-    ;(window as unknown as Record<string, unknown>).electronAPI = {
-      extensionBridge: { invoke, on: bus.on },
-    }
+    installBridge()
     render(<Forge orderId="WO-1" />)
     await waitFor(() => expect(screen.getByRole('button', { name: /Draft the plan/ })).toBeTruthy())
     expect(screen.queryByRole('button', { name: /Redraft/ })).toBeNull()
   })
+}
 
+function redraftsTests() {
   it('offers a redraft once there is a plan', async () => {
-    const withCriteria = {
-      ...order(),
-      plan: {
-        ...order().plan,
-        units: [
-          {
-            id: 'U-1',
-            title: 'u',
-            role: 'builder' as const,
-            lane: 1,
-            dependsOn: [],
-            satisfies: ['AC-1'],
-            touches: [],
-            verify: [],
-          },
-        ],
-      },
-      acceptance: [
-        {
-          id: 'AC-1',
-          statement: 'a',
-          priority: 'P1' as const,
-          verify: { kind: 'test' as const, command: 'npm test', assert: 'exit_code == 0' },
-          unverifiable: null,
-        },
-      ],
-    }
-    invoke = vi.fn(async (channel: string) => {
-      if (channel === 'foundry:order.compile') {
-        return { order: withCriteria, compile: compileOrder(withCriteria) }
-      }
-      return {}
-    })
-    ;(window as unknown as Record<string, unknown>).electronAPI = {
-      extensionBridge: { invoke, on: bus.on },
-    }
-    render(<Forge orderId="WO-1" />)
+    const base = order()
+    const units = [unit({ title: 'u', touches: [] })]
+    mountShowing({ ...base, plan: { ...base.plan, units }, acceptance: [criterion()] })
     await waitFor(() => expect(screen.getByRole('button', { name: /Redraft/ })).toBeTruthy())
   })
+}
 
+function afterHandOffTests() {
   it('offers neither once the order has been handed off', async () => {
     const running = { ...order(), status: 'running' as const }
     invoke = vi.fn(async (channel: string) => {
@@ -628,14 +698,12 @@ describe('drafting the plan', () => {
       }
       return {}
     })
-    ;(window as unknown as Record<string, unknown>).electronAPI = {
-      extensionBridge: { invoke, on: bus.on },
-    }
+    installBridge()
     render(<Forge orderId="WO-1" />)
     await waitFor(() => expect(screen.getAllByText(/Handed off/).length).toBeGreaterThan(0))
     expect(screen.queryByRole('button', { name: /Draft the plan|Redraft/ })).toBeNull()
   })
-})
+}
 
 describe('the hand-off pill on an order that has shipped', () => {
   function mountShipped(standing: { turn: 'you' | 'foundry' } | undefined) {
@@ -646,9 +714,7 @@ describe('the hand-off pill on an order that has shipped', () => {
       }
       return {}
     })
-    ;(window as unknown as Record<string, unknown>).electronAPI = {
-      extensionBridge: { invoke, on: bus.on },
-    }
+    installBridge()
     render(<Forge orderId="WO-1" standing={standing as never} />)
   }
 
@@ -666,29 +732,59 @@ describe('the hand-off pill on an order that has shipped', () => {
   })
 })
 
-describe('only the parts affected are redrawn (FR-007)', () => {
-  function withChanged(changed: string[]) {
-    const current = {
-      ...order(),
-      assumptions: [
-        { id: 'A-1', text: 'sessions are stored in Redis', struck: false, affects: ['AC-1'] },
-      ],
-    }
-    invoke = vi.fn(async (channel: string) => {
-      if (channel === 'foundry:order.compile') {
-        return { order: current, compile: compileOrder(current) }
-      }
-      if (channel === 'foundry:order.turn') {
-        return { order: current, compile: compileOrder(current), changed }
-      }
-      return {}
-    })
-    ;(window as unknown as Record<string, unknown>).electronAPI = {
-      extensionBridge: { invoke, on: bus.on },
-    }
-    render(<Forge orderId="WO-1" />)
+function withChanged(changed: string[]) {
+  const current = {
+    ...order(),
+    assumptions: [
+      { id: 'A-1', text: 'sessions are stored in Redis', struck: false, affects: ['AC-1'] },
+    ],
   }
+  invoke = vi.fn(async (channel: string) => {
+    if (channel === 'foundry:order.compile') {
+      return { order: current, compile: compileOrder(current) }
+    }
+    if (channel === 'foundry:order.turn') {
+      return { order: current, compile: compileOrder(current), changed }
+    }
+    return {}
+  })
+  installBridge()
+  render(<Forge orderId="WO-1" />)
+}
 
+describe('only the parts affected are redrawn (FR-007)', () => {
+  describe('a struck assumption', aStruckAssumptionTests)
+  describe('nothing moved', nothingMovedTests)
+})
+
+function withFinding() {
+  const current = {
+    ...order(),
+    redTeam: [
+      {
+        id: 'RT-1',
+        severity: 'high' as const,
+        category: 'wrong-outcome' as const,
+        text: 'the outcome restates the problem',
+        status: 'open' as const,
+        reason: '',
+      },
+    ],
+  }
+  invoke = vi.fn(async (channel: string) => {
+    if (channel === 'foundry:order.compile') {
+      return { order: current, compile: compileOrder(current) }
+    }
+    if (channel === 'foundry:order.converge') {
+      return { order: current, compile: compileOrder(current) }
+    }
+    return {}
+  })
+  installBridge()
+  render(<Forge orderId="WO-1" />)
+}
+
+function aStruckAssumptionTests() {
   it('marks what a struck assumption moved, and nothing else', async () => {
     withChanged(['acceptance'])
     await openStep('Plan')
@@ -711,7 +807,9 @@ describe('only the parts affected are redrawn (FR-007)', () => {
       screen.getByRole('heading', { name: 'Assumptions' }).closest('section')?.className
     ).not.toContain('is-redrawn')
   })
+}
 
+function nothingMovedTests() {
   it('marks nothing when nothing moved', async () => {
     withChanged([])
     await openStep('Plan')
@@ -728,41 +826,45 @@ describe('only the parts affected are redrawn (FR-007)', () => {
         .some((step) => step.className.includes('is-redrawn'))
     ).toBe(false)
   })
-})
+}
 
 // A blocking finding is decided in the "Needs you" band, alongside the open
 // questions — not one at a time on the Red team step, and not sent until the
 // band's own Send button collects every decision into one turn.
 describe('deciding a blocking finding, in the band', () => {
-  function withFinding() {
-    const current = {
-      ...order(),
-      redTeam: [
-        {
-          id: 'RT-1',
-          severity: 'high' as const,
-          category: 'wrong-outcome' as const,
-          text: 'the outcome restates the problem',
-          status: 'open' as const,
-          reason: '',
-        },
-      ],
-    }
-    invoke = vi.fn(async (channel: string) => {
-      if (channel === 'foundry:order.compile') {
-        return { order: current, compile: compileOrder(current) }
-      }
-      if (channel === 'foundry:order.converge') {
-        return { order: current, compile: compileOrder(current) }
-      }
-      return {}
-    })
-    ;(window as unknown as Record<string, unknown>).electronAPI = {
-      extensionBridge: { invoke, on: bus.on },
-    }
-    render(<Forge orderId="WO-1" />)
-  }
+  describe('the decide button', theDecideButtonTests)
+  describe('sending a fix', sendingAFixTests)
+  describe('the fix box and clearing', theFixBoxAndClearingTests)
+  describe('while the architect works', whileTheArchitectWorksTests)
+  describe('accepting', acceptingTests)
+})
 
+const TWO_QUESTIONS = [
+  {
+    id: 'Q-1',
+    text: 'which token?',
+    why: '',
+    options: ['a', 'b'],
+    recommended: 0,
+    answer: null,
+    rank: 2,
+  },
+  {
+    id: 'Q-2',
+    text: 'which clock?',
+    why: '',
+    options: ['server', 'client'],
+    recommended: 0,
+    answer: null,
+    rank: 1,
+  },
+]
+
+function withQuestions() {
+  mountShowing({ ...order(), acceptance: [criterion()], openQuestions: TWO_QUESTIONS })
+}
+
+function theDecideButtonTests() {
   it('offers a way to decide it, on the Red team step', async () => {
     withFinding()
     await openStep('Red team')
@@ -771,7 +873,9 @@ describe('deciding a blocking finding, in the band', () => {
     expect(screen.getByRole('button', { name: 'Fix it…' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Accept it' })).toBeTruthy()
   })
+}
 
+function sendingAFixTests() {
   // Reported: "fixed provides no way to fix anything." It marked the finding
   // resolved with nothing changed. Fixing is now saying how, to the architect,
   // and only once Send is pressed — not on typing it.
@@ -786,19 +890,18 @@ describe('deciding a blocking finding, in the band', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Send \d decision/ }))
     await waitFor(() =>
-      expect(invoke).toHaveBeenCalledWith('foundry:order.converge', {
-        id: 'WO-1',
-        settle: {
-          answers: [],
-          accepts: [],
+      expect(invoke).toHaveBeenCalledWith(
+        'foundry:order.converge',
+        converged({
           fixes: [{ findingId: 'RT-1', how: 'state what will be observably different' }],
-          asks: [],
-        },
-      })
+        })
+      )
     )
     expect(invoke.mock.calls.filter((c) => c[0] === 'foundry:order.converge')).toHaveLength(1)
   })
+}
 
+function theFixBoxAndClearingTests() {
   it('opens the fix box under the finding it is for', async () => {
     withFinding()
     await openStep('Red team')
@@ -820,18 +923,12 @@ describe('deciding a blocking finding, in the band', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Send \d decision/ }))
     await waitFor(() =>
-      expect(invoke).toHaveBeenCalledWith('foundry:order.converge', {
-        id: 'WO-1',
-        settle: {
-          answers: [],
-          accepts: [],
-          fixes: [],
-          asks: ['RT-1'],
-        },
-      })
+      expect(invoke).toHaveBeenCalledWith('foundry:order.converge', converged({ asks: ['RT-1'] }))
     )
   })
+}
 
+function whileTheArchitectWorksTests() {
   // Nothing here is hidden while a turn runs, and the settle just sent
   // cleared its own selection, so there is nothing left to send again.
   it('keeps the step open while the architect works, with nothing left queued to send', async () => {
@@ -862,7 +959,9 @@ describe('deciding a blocking finding, in the band', () => {
     expect(isUnavailable(send)).toBe(true)
     expect(reasonFor(send)).toBe('Choose an answer or a decision above first.')
   })
+}
 
+function acceptingTests() {
   it('asks for the reason before accepting one', async () => {
     withFinding()
     await openStep('Red team')
@@ -878,18 +977,13 @@ describe('deciding a blocking finding, in the band', () => {
     expect(isUnavailable(send())).toBe(false)
     fireEvent.click(send())
     await waitFor(() =>
-      expect(invoke).toHaveBeenCalledWith('foundry:order.converge', {
-        id: 'WO-1',
-        settle: {
-          answers: [],
-          accepts: [{ findingId: 'RT-1', reason: 'the risk is priced in' }],
-          fixes: [],
-          asks: [],
-        },
-      })
+      expect(invoke).toHaveBeenCalledWith(
+        'foundry:order.converge',
+        converged({ accepts: [{ findingId: 'RT-1', reason: 'the risk is priced in' }] })
+      )
     )
   })
-})
+}
 
 // The band collects every open question and every blocking finding, and one
 // Send turns everything decided into a single call — the fix for the run that
@@ -902,54 +996,34 @@ describe('deciding a blocking finding, in the band', () => {
 // and leaves the other empty, so the two can no longer be sent together.
 // Replaced below with one "collects everything on this step" test per step.
 describe('answering the open questions on the Plan step, one submit', () => {
-  function withQuestions() {
-    const current = {
-      ...order(),
-      acceptance: [
-        {
-          id: 'AC-1',
-          statement: 'a',
-          priority: 'P1' as const,
-          verify: { kind: 'test' as const, command: 'npm test', assert: 'exit_code == 0' },
-          unverifiable: null,
-        },
-      ],
-      openQuestions: [
-        {
-          id: 'Q-1',
-          text: 'which token?',
-          why: '',
-          options: ['a', 'b'],
-          recommended: 0,
-          answer: null,
-          rank: 2,
-        },
-        {
-          id: 'Q-2',
-          text: 'which clock?',
-          why: '',
-          options: ['server', 'client'],
-          recommended: 0,
-          answer: null,
-          rank: 1,
-        },
-      ],
-    }
-    invoke = vi.fn(async (channel: string) => {
-      if (channel === 'foundry:order.compile') {
-        return { order: current, compile: compileOrder(current) }
-      }
-      if (channel === 'foundry:order.converge') {
-        return { order: current, compile: compileOrder(current) }
-      }
-      return {}
-    })
-    ;(window as unknown as Record<string, unknown>).electronAPI = {
-      extensionBridge: { invoke, on: bus.on },
-    }
-    render(<Forge orderId="WO-1" />)
-  }
+  describe('one converge call', oneConvergeCallTests)
+  describe('send unavailable until answered', sendUnavailableUntilAnsweredTests)
+})
 
+const TWO_FINDINGS = [
+  {
+    id: 'RT-1',
+    severity: 'high' as const,
+    category: 'wrong-outcome' as const,
+    text: 'finding one',
+    status: 'open' as const,
+    reason: '',
+  },
+  {
+    id: 'RT-2',
+    severity: 'high' as const,
+    category: 'regression' as const,
+    text: 'finding two',
+    status: 'open' as const,
+    reason: '',
+  },
+]
+
+function withFindings() {
+  mountShowing({ ...order(), redTeam: TWO_FINDINGS })
+}
+
+function oneConvergeCallTests() {
   it('issues one converge call carrying every answer', async () => {
     withQuestions()
     await waitFor(() => screen.getByText('which token?'))
@@ -960,22 +1034,21 @@ describe('answering the open questions on the Plan step, one submit', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /^Send( \d)? decisions?$/ }))
     await waitFor(() =>
-      expect(invoke).toHaveBeenCalledWith('foundry:order.converge', {
-        id: 'WO-1',
-        settle: {
+      expect(invoke).toHaveBeenCalledWith(
+        'foundry:order.converge',
+        converged({
           answers: [
             { questionId: 'Q-1', option: 1 },
             { questionId: 'Q-2', option: 1 },
           ],
-          accepts: [],
-          fixes: [],
-          asks: [],
-        },
-      })
+        })
+      )
     )
     expect(invoke.mock.calls.filter((c) => c[0] === 'foundry:order.converge')).toHaveLength(1)
   })
+}
 
+function sendUnavailableUntilAnsweredTests() {
   it('leaves Send unavailable until at least one question is answered', async () => {
     withQuestions()
     await waitFor(() => screen.getByText('which token?'))
@@ -985,61 +1058,37 @@ describe('answering the open questions on the Plan step, one submit', () => {
     fireEvent.click(screen.getByRole('button', { name: 'b' }))
     expect(isUnavailable(send())).toBe(false)
   })
-})
+}
 
 describe('deciding two red-team findings on the Red team step, one submit', () => {
-  function withFindings() {
-    const current = {
-      ...order(),
-      redTeam: [
-        {
-          id: 'RT-1',
-          severity: 'high' as const,
-          category: 'wrong-outcome' as const,
-          text: 'finding one',
-          status: 'open' as const,
-          reason: '',
-        },
-        {
-          id: 'RT-2',
-          severity: 'high' as const,
-          category: 'regression' as const,
-          text: 'finding two',
-          status: 'open' as const,
-          reason: '',
-        },
-      ],
-    }
-    invoke = vi.fn(async (channel: string) => {
-      if (channel === 'foundry:order.compile') {
-        return { order: current, compile: compileOrder(current) }
-      }
-      if (channel === 'foundry:order.converge') {
-        return { order: current, compile: compileOrder(current) }
-      }
-      return {}
-    })
-    ;(window as unknown as Record<string, unknown>).electronAPI = {
-      extensionBridge: { invoke, on: bus.on },
-    }
-    render(<Forge orderId="WO-1" />)
-  }
+  describe('one converge call for every decision', oneConvergeCallForEveryDecisionTests)
+  describe('send unavailable until decided', sendUnavailableUntilDecidedTests)
+})
 
+/** Opens a decision on the finding that says `text`, and types what it is. */
+function decideFinding(text: string, decision: { button: string; field: RegExp; value: string }) {
+  const card = screen.getByText(text).closest('.fdry-fnd') as HTMLElement
+  fireEvent.click(within(card).getByRole('button', { name: decision.button }))
+  fireEvent.change(within(card).getByLabelText(decision.field), {
+    target: { value: decision.value },
+  })
+}
+
+function oneConvergeCallForEveryDecisionTests() {
   it('issues exactly one converge call carrying every decision', async () => {
     withFindings()
     await openStep('Red team')
     await waitFor(() => screen.getByText('finding one'))
 
-    const findingOne = screen.getByText('finding one').closest('.fdry-fnd') as HTMLElement
-    fireEvent.click(within(findingOne).getByRole('button', { name: 'Fix it…' }))
-    fireEvent.change(within(findingOne).getByLabelText(/How should "finding one" be fixed/), {
-      target: { value: 'do it this way' },
+    decideFinding('finding one', {
+      button: 'Fix it…',
+      field: /How should "finding one" be fixed/,
+      value: 'do it this way',
     })
-
-    const findingTwo = screen.getByText('finding two').closest('.fdry-fnd') as HTMLElement
-    fireEvent.click(within(findingTwo).getByRole('button', { name: 'Accept it' }))
-    fireEvent.change(within(findingTwo).getByLabelText(/Why "finding two" is accepted/), {
-      target: { value: 'priced in' },
+    decideFinding('finding two', {
+      button: 'Accept it',
+      field: /Why "finding two" is accepted/,
+      value: 'priced in',
     })
 
     expect(screen.getByText(/2 of 2 decided/)).toBeTruthy()
@@ -1047,19 +1096,19 @@ describe('deciding two red-team findings on the Red team step, one submit', () =
     fireEvent.click(screen.getByRole('button', { name: /^Send( \d)? decisions?$/ }))
 
     await waitFor(() =>
-      expect(invoke).toHaveBeenCalledWith('foundry:order.converge', {
-        id: 'WO-1',
-        settle: {
-          answers: [],
+      expect(invoke).toHaveBeenCalledWith(
+        'foundry:order.converge',
+        converged({
           accepts: [{ findingId: 'RT-2', reason: 'priced in' }],
           fixes: [{ findingId: 'RT-1', how: 'do it this way' }],
-          asks: [],
-        },
-      })
+        })
+      )
     )
     expect(invoke.mock.calls.filter((c) => c[0] === 'foundry:order.converge')).toHaveLength(1)
   })
+}
 
+function sendUnavailableUntilDecidedTests() {
   it('leaves Send unavailable until at least one finding is decided', async () => {
     withFindings()
     await openStep('Red team')
@@ -1071,7 +1120,29 @@ describe('deciding two red-team findings on the Red team step, one submit', () =
     fireEvent.click(within(findingOne).getByRole('button', { name: 'Ask the architect' }))
     expect(isUnavailable(send())).toBe(false)
   })
-})
+}
+
+/** A Forge whose architect is mid-turn at the first read and has redrafted by the next. */
+function mountWhileDrafting() {
+  const initial = { ...order(), redTeam: [TWO_FINDINGS[0]] }
+  const running = runningIntake('2026-09-17T23:05:42Z', 'sess-1')
+  const ended = { kind: 'redrafted', at: '2026-09-17T23:06:00Z', note: 'redrafted the plan' }
+  let polls = 0
+  invoke = vi.fn(async (channel: string) => {
+    if (channel === 'foundry:order.compile') {
+      polls += 1
+      // The turn the operator asked about ends after the first poll — this
+      // test is about the settle sent afterwards, not about how many polls
+      // a turn takes.
+      const intake = polls > 1 ? ended : running
+      return { order: initial, compile: compileOrder(initial), intake }
+    }
+    if (channel !== 'foundry:order.converge') return {}
+    return { order: initial, compile: compileOrder(initial) }
+  })
+  installBridge()
+  render(<Forge orderId="WO-1" />)
+}
 
 // A settle made while the architect is already working on a different turn
 // cannot race it: the proposal is merged over the order as it stood when that
@@ -1080,52 +1151,7 @@ describe('deciding two red-team findings on the Red team step, one submit', () =
 describe('a settle made while the architect is drafting', () => {
   it('is queued, shown as queued, and sent once the turn ends', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
-    const initial = {
-      ...order(),
-      redTeam: [
-        {
-          id: 'RT-1',
-          severity: 'high' as const,
-          category: 'wrong-outcome' as const,
-          text: 'finding one',
-          status: 'open' as const,
-          reason: '',
-        },
-      ],
-    }
-    const running = {
-      kind: 'running',
-      at: '2026-09-17T23:05:42Z',
-      sessionId: 'sess-1',
-      asked: '',
-      actor: 'architect',
-      trigger: 'you',
-      round: null,
-      autoTurn: null,
-    }
-    const ended = { kind: 'redrafted', at: '2026-09-17T23:06:00Z', note: 'redrafted the plan' }
-    let polls = 0
-    invoke = vi.fn(async (channel: string) => {
-      if (channel === 'foundry:order.compile') {
-        polls += 1
-        // The turn the operator asked about ends after the first poll — this
-        // test is about the settle sent afterwards, not about how many polls
-        // a turn takes.
-        return {
-          order: initial,
-          compile: compileOrder(initial),
-          intake: polls > 1 ? ended : running,
-        }
-      }
-      if (channel === 'foundry:order.converge') {
-        return { order: initial, compile: compileOrder(initial) }
-      }
-      return {}
-    })
-    ;(window as unknown as Record<string, unknown>).electronAPI = {
-      extensionBridge: { invoke, on: bus.on },
-    }
-    render(<Forge orderId="WO-1" />)
+    mountWhileDrafting()
 
     await openStep('Red team')
     await vi.waitFor(() => screen.getByText('finding one'))
@@ -1142,35 +1168,34 @@ describe('a settle made while the architect is drafting', () => {
 
     await orderChanged()
     await vi.waitFor(() =>
-      expect(invoke).toHaveBeenCalledWith('foundry:order.converge', {
-        id: 'WO-1',
-        settle: { answers: [], accepts: [], fixes: [], asks: ['RT-1'] },
-      })
+      expect(invoke).toHaveBeenCalledWith('foundry:order.converge', converged({ asks: ['RT-1'] }))
     )
     vi.useRealTimers()
   })
 })
 
+function withText(redTeam: WorkOrder['redTeam']) {
+  const current = { ...order(), redTeam }
+  invoke = vi.fn(async (channel: string) =>
+    channel === 'foundry:order.compile' ? { order: current, compile: compileOrder(current) } : {}
+  )
+  installBridge()
+  render(<Forge orderId="WO-1" />)
+}
+const open = (text: string) => ({
+  id: 'RT-red-team-1',
+  severity: 'high' as const,
+  text,
+  status: 'open' as const,
+  reason: '',
+})
+
 describe('reading a finding', () => {
-  function withText(redTeam: WorkOrder['redTeam']) {
-    const current = { ...order(), redTeam }
-    invoke = vi.fn(async (channel: string) =>
-      channel === 'foundry:order.compile' ? { order: current, compile: compileOrder(current) } : {}
-    )
-    ;(window as unknown as Record<string, unknown>).electronAPI = {
-      extensionBridge: { invoke, on: bus.on },
-    }
-    render(<Forge orderId="WO-1" />)
-  }
+  describe('one-sentence findings', oneSentenceFindingsTests)
+  describe('what cleared it', whatClearedItTests)
+})
 
-  const open = (text: string) => ({
-    id: 'RT-red-team-1',
-    severity: 'high' as const,
-    text,
-    status: 'open' as const,
-    reason: '',
-  })
-
+function oneSentenceFindingsTests() {
   // Deleted: "leads with its first sentence and folds the rest under it" and
   // "renders the detail as markdown, so a list is a list". Both covered a
   // per-finding <details> fold that no longer exists — readiness.ts's
@@ -1195,7 +1220,9 @@ describe('reading a finding', () => {
     expect(screen.getByText(/The handler filters after a fixed/)).toBeTruthy()
     expect(screen.queryByText(/Linear has no state filter/)).toBeNull()
   })
+}
 
+function whatClearedItTests() {
   // "Ask the architect seems to not do anything": the redraft landed, and
   // nothing on screen said what it had done about the finding.
   it('lists what cleared a finding, and how', async () => {
@@ -1212,67 +1239,79 @@ describe('reading a finding', () => {
     expect(within(resolved).getByText(/The handler filters after a fixed/)).toBeTruthy()
     expect(within(resolved).getByText('architect: AC-1 now pages past 50 tickets')).toBeTruthy()
   })
-})
+}
+
+const REFUSED = {
+  kind: 'refused',
+  at: '2026-09-09T19:33:21Z',
+  reason: "acceptance.5.verify.evidence.1: Invalid enum value. Expected 'exit_code' | 'stdout'",
+}
+
+/**
+ * A ledger that turns over after `polls` reads.
+ *
+ * The channel's `intake` field, not `provenance.decisions`, because a turn
+ * can end without the document moving at all — which is what a refusal is,
+ * and what the old fixture could not express.
+ */
+function landsAfter(polls: number, ending: Record<string, unknown>) {
+  const before = order()
+  const shown = (intake: unknown) => ({ order: before, compile: compileOrder(before), intake })
+  const running = runningIntake('2026-09-09T19:30:00Z', 'sess-arch')
+  let reads = 0
+  let started = false
+  invoke = vi.fn(async (channel: string) => {
+    if (channel === 'foundry:order.compile') {
+      // Before the click there is no turn, which is what the mount read
+      // sees; after it, `polls` reads of a turn in flight and then its end.
+      if (!started) return shown({ kind: 'none' })
+      reads += 1
+      return shown(reads > polls ? ending : running)
+    }
+    if (channel !== 'foundry:order.converge') return {}
+    started = true
+    return { ...shown(running), converging: 'sess-arch' }
+  })
+  installBridge()
+  render(<Forge orderId="WO-1" />)
+}
+const REDRAFTED = { kind: 'redrafted', at: '2026-09-09T19:33:00Z', note: 'redrafted the plan' }
 
 describe('while the architect is working', () => {
-  /**
-   * A ledger that turns over after `polls` reads.
-   *
-   * The channel's `intake` field, not `provenance.decisions`, because a turn
-   * can end without the document moving at all — which is what a refusal is,
-   * and what the old fixture could not express.
-   */
-  function landsAfter(polls: number, ending: Record<string, unknown>) {
-    let reads = 0
-    let started = false
-    const before = order()
-    const running = {
-      kind: 'running',
-      at: '2026-09-09T19:30:00Z',
-      sessionId: 'sess-arch',
-      asked: '',
-      actor: 'architect',
-      trigger: 'you',
-      round: null,
-      autoTurn: null,
-    }
-    invoke = vi.fn(async (channel: string) => {
-      if (channel === 'foundry:order.compile') {
-        // Before the click there is no turn, which is what the mount read
-        // sees; after it, `polls` reads of a turn in flight and then its end.
-        if (!started)
-          return { order: before, compile: compileOrder(before), intake: { kind: 'none' } }
-        reads += 1
-        return {
-          order: before,
-          compile: compileOrder(before),
-          intake: reads > polls ? ending : running,
-        }
-      }
-      if (channel === 'foundry:order.converge') {
-        started = true
-        return {
-          order: before,
-          compile: compileOrder(before),
-          converging: 'sess-arch',
-          intake: running,
-        }
-      }
-      return {}
-    })
-    ;(window as unknown as Record<string, unknown>).electronAPI = {
-      extensionBridge: { invoke, on: bus.on },
-    }
-    render(<Forge orderId="WO-1" />)
-  }
+  describe('reading again', readingAgainTests)
+  describe('clearing', clearingTests)
+})
 
-  const REDRAFTED = { kind: 'redrafted', at: '2026-09-09T19:33:00Z', note: 'redrafted the plan' }
-  const REFUSED = {
-    kind: 'refused',
-    at: '2026-09-09T19:33:21Z',
-    reason: "acceptance.5.verify.evidence.1: Invalid enum value. Expected 'exit_code' | 'stdout'",
-  }
+function refused() {
+  const shown = order()
+  invoke = vi.fn(async (channel: string) => {
+    if (channel === 'foundry:order.compile') {
+      return { order: shown, compile: compileOrder(shown), intake: REFUSED }
+    }
+    if (channel === 'foundry:order.converge') {
+      return {
+        order: shown,
+        compile: compileOrder(shown),
+        converging: 'sess-arch',
+        intake: {
+          kind: 'running',
+          at: '2026-09-09T19:40:00Z',
+          sessionId: 'sess-arch',
+          asked: '',
+          actor: 'architect',
+          trigger: 'you',
+          round: null,
+          autoTurn: null,
+        },
+      }
+    }
+    return {}
+  })
+  installBridge()
+  render(<Forge orderId="WO-1" />)
+}
 
+function readingAgainTests() {
   it('reads again each time the order changes until the redraft lands, rather than giving up after one', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     landsAfter(3, REDRAFTED)
@@ -1291,7 +1330,9 @@ describe('while the architect is working', () => {
     expect(compiled()).toBe(before + 3)
     vi.useRealTimers()
   })
+}
 
+function clearingTests() {
   // Deleted: "stops once the architect has written its line" and "stops
   // when the turn was refused, though nothing was saved" asserted that the
   // 3s poll itself stopped once a turn ended. The view now listens to its
@@ -1326,46 +1367,14 @@ describe('while the architect is working', () => {
     await vi.waitFor(() => expect(screen.queryByText(/The architect is working/)).toBeNull())
     vi.useRealTimers()
   })
-})
+}
 
 describe('a turn that was refused', () => {
-  const REFUSED = {
-    kind: 'refused',
-    at: '2026-09-09T19:33:21Z',
-    reason: "acceptance.5.verify.evidence.1: Invalid enum value. Expected 'exit_code' | 'stdout'",
-  }
+  describe('the reason', theReasonTests)
+  describe('starting over', startingOverTests)
+})
 
-  function refused() {
-    const shown = order()
-    invoke = vi.fn(async (channel: string) => {
-      if (channel === 'foundry:order.compile') {
-        return { order: shown, compile: compileOrder(shown), intake: REFUSED }
-      }
-      if (channel === 'foundry:order.converge') {
-        return {
-          order: shown,
-          compile: compileOrder(shown),
-          converging: 'sess-arch',
-          intake: {
-            kind: 'running',
-            at: '2026-09-09T19:40:00Z',
-            sessionId: 'sess-arch',
-            asked: '',
-            actor: 'architect',
-            trigger: 'you',
-            round: null,
-            autoTurn: null,
-          },
-        }
-      }
-      return {}
-    })
-    ;(window as unknown as Record<string, unknown>).electronAPI = {
-      extensionBridge: { invoke, on: bus.on },
-    }
-    render(<Forge orderId="WO-1" />)
-  }
-
+function theReasonTests() {
   it('says so, and says why, in the validator\u2019s own words', async () => {
     refused()
     await waitFor(() => expect(screen.getByText(/plan was refused/i)).toBeTruthy())
@@ -1389,7 +1398,9 @@ describe('a turn that was refused', () => {
       expect(message).toContain('proposal.json')
     })
   })
+}
 
+function startingOverTests() {
   it('can also start the turn over, carrying nothing', async () => {
     refused()
     await waitFor(() => screen.getByText(/plan was refused/i))
@@ -1399,7 +1410,7 @@ describe('a turn that was refused', () => {
       expect(invoke).toHaveBeenCalledWith('foundry:order.converge', { id: 'WO-1' })
     )
   })
-})
+}
 
 describe('what this order writes back (FR-062)', () => {
   it('offers each write-back, checked from the order', async () => {
@@ -1488,33 +1499,13 @@ describe('a start is never held back by finished turns', () => {
 
 /** A draft whose only failing check is the one the operator reported. */
 function orderBlockedOnPictures() {
+  const base = compilable()
   return {
-    ...order(),
-    acceptance: [
-      {
-        id: 'AC-1',
-        statement: 'the row does not clip its last glyph',
-        priority: 'P1' as const,
-        verify: { kind: 'test' as const, command: 'npm test', assert: 'exit_code == 0' },
-        unverifiable: null,
-      },
-    ],
-    intent: { problem: 'p', outcome: 'o', nonGoals: [] },
-    risk: { grade: 'P2' as const, triggers: [], blastRadius: ['src/'], criticalPaths: [] },
+    ...base,
+    acceptance: [criterion({ statement: 'the row does not clip its last glyph' })],
     plan: {
-      ...order().plan,
-      units: [
-        {
-          id: 'U-1',
-          title: 'redraw the row',
-          role: 'builder',
-          lane: 1,
-          dependsOn: [],
-          satisfies: ['AC-1'],
-          touches: ['src/components/Row.tsx'],
-          verify: [],
-        },
-      ],
+      ...base.plan,
+      units: [unit({ title: 'redraw the row', touches: ['src/components/Row.tsx'] })],
     },
   }
 }
@@ -1533,9 +1524,7 @@ function mountBlocked(over: Record<string, unknown> = {}) {
     }
     return {}
   })
-  ;(window as unknown as Record<string, unknown>).electronAPI = {
-    extensionBridge: { invoke, on: bus.on },
-  }
+  installBridge()
   render(<Forge orderId="WO-1" />)
   return current
 }
@@ -1572,9 +1561,7 @@ function mountAsking(current: WorkOrder) {
     }
     return {}
   })
-  ;(window as unknown as Record<string, unknown>).electronAPI = {
-    extensionBridge: { invoke, on: bus.on },
-  }
+  installBridge()
   render(<Forge orderId="WO-1" />)
 }
 
@@ -1586,6 +1573,12 @@ function converges(): number {
 // it's working." The button went faintly disabled and kept its label; the only
 // word that anything had started was in the header, out of view.
 describe('an ask the architect is working on', () => {
+  describe('the running ask', theRunningAskTests)
+  describe('after leaving the step', afterLeavingTheStepTests)
+  describe('other moves held', otherMovesHeldTests)
+})
+
+function theRunningAskTests() {
   it('says so on the check it was asked about, in place of the button', async () => {
     mountAsking(orderBlockedOnPictures() as WorkOrder)
     fireEvent.click(await screen.findByRole('button', { name: 'Ask for proof' }))
@@ -1611,7 +1604,9 @@ describe('an ask the architect is working on', () => {
     await screen.findByRole('status', { name: /Asked/ })
     expect(screen.queryByRole('button', { name: 'Ask for the gap to be closed' })).toBeNull()
   })
+}
 
+function afterLeavingTheStepTests() {
   it('says so again after leaving the step and coming back, from the record', async () => {
     mountAsking(orderBlockedOnPictures() as WorkOrder)
     fireEvent.click(await screen.findByRole('button', { name: 'Ask for proof' }))
@@ -1620,7 +1615,9 @@ describe('an ask the architect is working on', () => {
     await openStep('Plan')
     expect(await screen.findByRole('status', { name: /Asked/ })).toBeTruthy()
   })
+}
 
+function otherMovesHeldTests() {
   // Reported: accepting items while the architect worked ended in refusals.
   // Its proposal is merged over the order as it stood when the turn started,
   // so an edit made meanwhile is one the architect never saw — everything
@@ -1655,9 +1652,17 @@ describe('an ask the architect is working on', () => {
     await openStep('Plan')
     expect(isUnavailable(screen.getByRole('button', { name: /tokens are JWTs/ }))).toBe(true)
   })
-})
+}
 
 describe('a failing check says how to clear it', () => {
+  describe('proof and the escape', proofAndTheEscapeTests)
+  describe('accepting as unverifiable', acceptingAsUnverifiableTests)
+  describe('the accepted reason', theAcceptedReasonTests)
+  describe('open questions', openQuestionsTests)
+  describe('no remedy', noRemedyTests)
+})
+
+function proofAndTheEscapeTests() {
   it('shows the falsifiable check failing, on the case an operator actually meets', async () => {
     mountBlocked()
     await waitFor(() => expect(screen.getByText(/no criterion asks for a picture/)).toBeTruthy())
@@ -1684,7 +1689,9 @@ describe('a failing check says how to clear it', () => {
     await waitFor(() => expect(document.getElementById('fdry-acceptance')).not.toBeNull())
     expect(document.activeElement?.id).toBe('fdry-acceptance')
   })
+}
 
+function acceptingAsUnverifiableTests() {
   it('accepts a criterion as unverifiable, with a reason', async () => {
     mountBlocked()
     await waitFor(() => screen.getByRole('button', { name: 'Nothing here can prove this' }))
@@ -1713,7 +1720,9 @@ describe('a failing check says how to clear it', () => {
     expect(isUnavailable(accept)).toBe(true)
     expect(reasonFor(accept)).toBe('Say why it stands. The reason travels with the order.')
   })
+}
 
+function theAcceptedReasonTests() {
   it('renders the reason once it is accepted, instead of offering it again', async () => {
     const accepted = orderBlockedOnPictures()
     mountBlocked({
@@ -1733,7 +1742,9 @@ describe('a failing check says how to clear it', () => {
     )
     expect(screen.queryByRole('button', { name: 'Nothing here can prove this' })).toBeNull()
   })
+}
 
+function openQuestionsTests() {
   it('sends the open questions to the band rather than to the architect', async () => {
     mountBlocked({
       openQuestions: [
@@ -1752,7 +1763,9 @@ describe('a failing check says how to clear it', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Answer them' }))
     expect(invoke).not.toHaveBeenCalledWith('foundry:order.converge', expect.anything())
   })
+}
 
+function noRemedyTests() {
   it('offers no remedy on a check that passes', async () => {
     mountBlocked()
     await waitFor(() => screen.getByRole('heading', { name: 'The plan and how it is proven' }))
@@ -1767,13 +1780,16 @@ describe('a failing check says how to clear it', () => {
     await openStep('Plan')
     expect(screen.queryByRole('button', { name: 'Nothing here can prove this' })).toBeNull()
   })
-})
+}
 
 // Budgets came from settings and could be changed nowhere on an order, and
 // the architect could replace them. They are the operator's, on the Plan step.
 describe('an order’s budgets', () => {
-  const SET = { agents: 3, wallClockMinutes: 45, tokens: null }
+  describe('the Plan step', thePlanStepTests)
+  describe('no files budget and no controls', noFilesBudgetAndNoControlsTests)
+})
 
+function thePlanStepTests() {
   it('shows them on the Plan step and saves what the operator sets', async () => {
     mountBlocked({ budgets: { agents: 2, wallClockMinutes: null, tokens: null } })
     await openStep('Plan')
@@ -1794,6 +1810,10 @@ describe('an order’s budgets', () => {
       })
     )
   })
+}
+
+function noFilesBudgetAndNoControlsTests() {
+  const SET = { agents: 3, wallClockMinutes: 45, tokens: null }
 
   // ADR 056: agents and minutes are budgets; a count of files is not.
   it('offers no files budget, and no check that a plan fits one', async () => {
@@ -1811,11 +1831,52 @@ describe('an order’s budgets', () => {
     expect(within(section).getByText('3 agents · 45 minutes')).toBeTruthy()
     expect(within(section).queryByRole('button', { name: 'Save budgets' })).toBeNull()
   })
-})
+}
 
 // Walked, one step at a time, rather than read off a rail of tiles beside the
 // document: an operator reported the rail's cards as too condensed to read.
 describe('walking the Forge', () => {
+  describe('the blocking step', theBlockingStepTests)
+  describe('moving between steps', movingBetweenStepsTests)
+})
+
+const md = {
+  openQuestions: [
+    {
+      id: 'Q-1',
+      text: 'Hide **done** tickets?',
+      why: 'The picker lists `completed` ones.\n\n- one\n- two',
+      options: ['Hide *them*', 'Grey them'],
+      recommended: 0,
+      answer: null,
+      rank: 1,
+      confidence: 0.5,
+    },
+  ],
+  acceptance: [
+    {
+      id: 'AC-1',
+      statement: 'Only **open** tickets are listed',
+      priority: 'P1' as const,
+      verify: { kind: 'test' as const, command: 'npm test', assert: 'exit_code == 0' },
+      unverifiable: null,
+    },
+  ],
+  assumptions: [
+    { id: 'A-1', text: 'The filter lives in `Orders.tsx`', struck: false, affects: [] },
+  ],
+  redTeam: [
+    {
+      id: 'RT-x',
+      severity: 'medium' as const,
+      text: 'The plan never touches **the picker**',
+      status: 'open' as const,
+      reason: '',
+    },
+  ],
+}
+
+function theBlockingStepTests() {
   it('opens on the step that is blocking, not on the first one', async () => {
     mountBlocked()
     await waitFor(() =>
@@ -1834,7 +1895,9 @@ describe('walking the Forge', () => {
     const intentStep = within(stepList()).getByRole('button', { name: /^Intent/ })
     expect(intentStep.className).toContain('fdry-rail-step--done')
   })
+}
 
+function movingBetweenStepsTests() {
   it('goes forward to the next step and back again', async () => {
     mount({})
     await waitFor(() => screen.getByRole('heading', { name: 'What is being asked' }))
@@ -1859,47 +1922,15 @@ describe('walking the Forge', () => {
     await openStep('Red team')
     expect(document.activeElement?.textContent).toBe('Red team findings')
   })
-})
+}
 
 // What the architect and the red team write is markdown, and is shown as
 // markdown — not as asterisks and backticks.
 describe('agent text is rendered as markdown', () => {
-  const md = {
-    openQuestions: [
-      {
-        id: 'Q-1',
-        text: 'Hide **done** tickets?',
-        why: 'The picker lists `completed` ones.\n\n- one\n- two',
-        options: ['Hide *them*', 'Grey them'],
-        recommended: 0,
-        answer: null,
-        rank: 1,
-        confidence: 0.5,
-      },
-    ],
-    acceptance: [
-      {
-        id: 'AC-1',
-        statement: 'Only **open** tickets are listed',
-        priority: 'P1' as const,
-        verify: { kind: 'test' as const, command: 'npm test', assert: 'exit_code == 0' },
-        unverifiable: null,
-      },
-    ],
-    assumptions: [
-      { id: 'A-1', text: 'The filter lives in `Orders.tsx`', struck: false, affects: [] },
-    ],
-    redTeam: [
-      {
-        id: 'RT-x',
-        severity: 'medium' as const,
-        text: 'The plan never touches **the picker**',
-        status: 'open' as const,
-        reason: '',
-      },
-    ],
-  }
+  describe('each step', eachStepTests)
+})
 
+function eachStepTests() {
   it('renders a question, its reason and its options', async () => {
     mount({}, md)
     await waitFor(() => screen.getByText('done'))
@@ -1923,7 +1954,7 @@ describe('agent text is rendered as markdown', () => {
     await waitFor(() => screen.getByText('the picker'))
     expect(screen.getByText('the picker').tagName).toBe('STRONG')
   })
-})
+}
 
 // New coverage for the ADR 074 redesign: readiness() driving the strip, the
 // Hand off row, shape choice mid-turn, automatic hand-off, the finding
@@ -1964,45 +1995,36 @@ describe('the Hand off step', () => {
   })
 })
 
-describe('choosing a shape while a turn is running', () => {
-  function mountShapeDuringTurn() {
-    const running = {
-      kind: 'running',
-      at: '2026-09-06T10:00:00.000Z',
-      sessionId: 'S-1',
-      asked: '',
-      actor: 'architect',
-      trigger: 'you',
-      round: null,
-      autoTurn: null,
-    }
-    const current = order()
-    invoke = vi.fn(async (channel: string) => {
-      if (channel === 'foundry:order.compile') {
-        return { order: current, compile: compileOrder(current), intake: running }
-      }
-      if (channel === 'foundry:order.states') return {}
-      if (channel === 'foundry:run.recipes') {
-        return {
-          recipes: [
-            { name: 'direct', available: true, unmet: [], rung: 'built-in' },
-            { name: 'standard', available: true, unmet: [], rung: 'built-in' },
-          ],
-          proposed: 'standard',
-          proposedWhy: '2 units of work',
-          chosen: 'direct',
-          chosenAt: '2026-09-06T10:05:00.000Z',
-        }
-      }
-      if (channel === 'foundry:order.recipe') return { ok: true }
-      return {}
-    })
-    ;(window as unknown as Record<string, unknown>).electronAPI = {
-      extensionBridge: { invoke, on: bus.on },
-    }
-    render(<Forge orderId="WO-1" />)
+function mountShapeDuringTurn() {
+  const current = order()
+  const running = runningIntake('2026-09-06T10:00:00.000Z', 'S-1')
+  const recipes = {
+    recipes: SHAPES.slice(0, 2),
+    proposed: 'standard',
+    proposedWhy: '2 units of work',
+    chosen: 'direct',
+    chosenAt: '2026-09-06T10:05:00.000Z',
   }
+  const replies: Record<string, () => unknown> = {
+    'foundry:order.compile': () => ({
+      order: current,
+      compile: compileOrder(current),
+      intake: running,
+    }),
+    'foundry:order.states': () => ({}),
+    'foundry:run.recipes': () => recipes,
+    'foundry:order.recipe': () => ({ ok: true }),
+  }
+  invoke = vi.fn(async (channel: string) => (channel in replies ? replies[channel]() : {}))
+  installBridge()
+  render(<Forge orderId="WO-1" />)
+}
 
+describe('choosing a shape while a turn is running', () => {
+  describe('order.recipe', orderRecipeTests)
+})
+
+function orderRecipeTests() {
   it('invokes order.recipe with the shape clicked, even mid-turn', async () => {
     mountShapeDuringTurn()
     await openStep('Shape')
@@ -2023,7 +2045,7 @@ describe('choosing a shape while a turn is running', () => {
       expect(invoke).toHaveBeenCalledWith('foundry:order.recipe', { id: 'WO-1', recipe: null })
     )
   })
-})
+}
 
 describe('an order agreed and handed off automatically', () => {
   it('says so, with the time it happened', async () => {
@@ -2037,67 +2059,57 @@ describe('an order agreed and handed off automatically', () => {
           }
         : {}
     )
-    ;(window as unknown as Record<string, unknown>).electronAPI = {
-      extensionBridge: { invoke, on: bus.on },
-    }
+    installBridge()
     render(<Forge orderId="WO-1" />)
     await waitFor(() => expect(screen.getByText(/Handed off automatically at/)).toBeTruthy())
   })
 })
 
+const BLOCKING_AND_NOTE = [
+  {
+    id: 'RT-1',
+    severity: 'high' as const,
+    category: 'wrong-outcome' as const,
+    text: 'blocking one',
+    status: 'open' as const,
+    reason: '',
+    round: 2,
+  },
+  {
+    id: 'RT-2',
+    severity: 'low' as const,
+    category: 'pre-existing' as const,
+    text: 'note one',
+    status: 'open' as const,
+    reason: '',
+  },
+]
+
+/** Two finished red-team rounds, after which the loop gave up. */
+const EXHAUSTED_LOOP = {
+  rounds: [
+    { round: 1, startedAt: '2026-09-06T09:50:00.000Z', finishedAt: '2026-09-06T09:55:00.000Z' },
+    { round: 2, startedAt: '2026-09-06T09:56:00.000Z', finishedAt: '2026-09-06T10:00:00.000Z' },
+  ],
+  heldAt: null,
+  exhausted: true,
+}
+
+/** Renders the Forge over `current`, whose compile read also carries `facts`. */
+function mountCompiled(current: WorkOrder, facts: Record<string, unknown>): void {
+  invoke = vi.fn(async (channel: string) =>
+    channel === 'foundry:order.compile'
+      ? { order: current, compile: compileOrder(current), ...facts }
+      : {}
+  )
+  installBridge()
+  render(<Forge orderId="WO-1" />)
+}
+
 describe('findings grouped by who acts on them', () => {
   it('shows a note under "Notes, nothing to do" and a blocking finding under "Needs your decision"', async () => {
-    const current = {
-      ...order(),
-      redTeam: [
-        {
-          id: 'RT-1',
-          severity: 'high' as const,
-          category: 'wrong-outcome' as const,
-          text: 'blocking one',
-          status: 'open' as const,
-          reason: '',
-          round: 2,
-        },
-        {
-          id: 'RT-2',
-          severity: 'low' as const,
-          category: 'pre-existing' as const,
-          text: 'note one',
-          status: 'open' as const,
-          reason: '',
-        },
-      ],
-    }
-    invoke = vi.fn(async (channel: string) =>
-      channel === 'foundry:order.compile'
-        ? {
-            order: current,
-            compile: compileOrder(current),
-            intake: { kind: 'redrafted', at: '2026-09-06T10:10:00.000Z', note: 'redrafted' },
-            loop: {
-              rounds: [
-                {
-                  round: 1,
-                  startedAt: '2026-09-06T09:50:00.000Z',
-                  finishedAt: '2026-09-06T09:55:00.000Z',
-                },
-                {
-                  round: 2,
-                  startedAt: '2026-09-06T09:56:00.000Z',
-                  finishedAt: '2026-09-06T10:00:00.000Z',
-                },
-              ],
-              heldAt: null,
-              exhausted: true,
-            },
-          }
-        : {}
-    )
-    ;(window as unknown as Record<string, unknown>).electronAPI = {
-      extensionBridge: { invoke, on: bus.on },
-    }
-    render(<Forge orderId="WO-1" />)
+    const intake = { kind: 'redrafted', at: '2026-09-06T10:10:00.000Z', note: 'redrafted' }
+    mountCompiled({ ...order(), redTeam: BLOCKING_AND_NOTE }, { intake, loop: EXHAUSTED_LOOP })
     await openStep('Red team')
     await waitFor(() => screen.getByText('blocking one'))
     expect(screen.getByText('Notes, nothing to do')).toBeTruthy()
@@ -2110,40 +2122,53 @@ describe('findings grouped by who acts on them', () => {
   })
 })
 
-describe('holding and releasing the red-team loop from the strip', () => {
-  function mountRedTeamRunning(heldAt: string | null) {
-    const current = order()
-    invoke = vi.fn(async (channel: string) => {
-      if (channel === 'foundry:order.compile') {
-        return {
-          order: current,
-          compile: compileOrder(current),
-          intake: {
-            kind: 'running',
-            at: '2026-09-06T10:00:00.000Z',
-            sessionId: 'S-1',
-            asked: '',
-            actor: 'red team',
-            trigger: 'automatic',
-            round: 2,
-            autoTurn: null,
-          },
-          loop: {
-            rounds: [{ round: 2, startedAt: '2026-09-06T09:56:00.000Z', finishedAt: null }],
-            heldAt,
-            exhausted: false,
-          },
-        }
+function mountRedTeamRunning(heldAt: string | null) {
+  const current = order()
+  invoke = vi.fn(async (channel: string) => {
+    if (channel === 'foundry:order.compile') {
+      return {
+        order: current,
+        compile: compileOrder(current),
+        intake: {
+          kind: 'running',
+          at: '2026-09-06T10:00:00.000Z',
+          sessionId: 'S-1',
+          asked: '',
+          actor: 'red team',
+          trigger: 'automatic',
+          round: 2,
+          autoTurn: null,
+        },
+        loop: {
+          rounds: [{ round: 2, startedAt: '2026-09-06T09:56:00.000Z', finishedAt: null }],
+          heldAt,
+          exhausted: false,
+        },
       }
-      if (channel === 'foundry:order.hold') return { ok: true }
-      return {}
-    })
-    ;(window as unknown as Record<string, unknown>).electronAPI = {
-      extensionBridge: { invoke, on: bus.on },
     }
-    render(<Forge orderId="WO-1" />)
-  }
+    if (channel === 'foundry:order.hold') return { ok: true }
+    return {}
+  })
+  installBridge()
+  render(<Forge orderId="WO-1" />)
+}
 
+describe('holding and releasing the red-team loop from the strip', () => {
+  describe('order.hold', orderHoldTests)
+})
+
+function auditUnavailableControls(): void {
+  const nodes = Array.from(document.querySelectorAll('[aria-disabled="true"]'))
+  expect(nodes.length).toBeGreaterThan(0)
+  for (const node of nodes) {
+    const id = node.getAttribute('aria-describedby')
+    expect(id).not.toBeNull()
+    const tip = document.getElementById(id as string)
+    expect(tip?.textContent?.trim()).not.toBe('')
+  }
+}
+
+function orderHoldTests() {
   it('"Hold for me" invokes order.hold with held: true', async () => {
     mountRedTeamRunning(null)
     fireEvent.click(await screen.findByRole('button', { name: 'Hold for me' }))
@@ -2159,7 +2184,7 @@ describe('holding and releasing the red-team loop from the strip', () => {
       expect(invoke).toHaveBeenCalledWith('foundry:order.hold', { id: 'WO-1', held: false })
     )
   })
-})
+}
 
 // Every ReasonButton that renders aria-disabled must resolve its
 // aria-describedby to non-empty text (ReasonButton.tsx) — swept across the
@@ -2167,17 +2192,13 @@ describe('holding and releasing the red-team loop from the strip', () => {
 // needing a decision, a step whose shape has an unmet requirement, and a
 // handed-off order.
 describe('every unavailable control names why, everywhere (ADR 074)', () => {
-  function auditUnavailableControls(): void {
-    const nodes = Array.from(document.querySelectorAll('[aria-disabled="true"]'))
-    expect(nodes.length).toBeGreaterThan(0)
-    for (const node of nodes) {
-      const id = node.getAttribute('aria-describedby')
-      expect(id).not.toBeNull()
-      const tip = document.getElementById(id as string)
-      expect(tip?.textContent?.trim()).not.toBe('')
-    }
-  }
+  describe('a running turn', aRunningTurnTests)
+  describe('a refused turn', aRefusedTurnTests)
+  describe('a finding needing a decision', aFindingNeedingADecisionTests)
+  describe('the shape step', theShapeStepTests)
+})
 
+function aRunningTurnTests() {
   it('holds on a running turn', async () => {
     mountForStart({
       intake: {
@@ -2197,7 +2218,9 @@ describe('every unavailable control names why, everywhere (ADR 074)', () => {
     await openStep('Hand off')
     auditUnavailableControls()
   })
+}
 
+function aRefusedTurnTests() {
   it('holds on a refused turn', async () => {
     const shown = order()
     invoke = vi.fn(async (channel: string) =>
@@ -2209,59 +2232,32 @@ describe('every unavailable control names why, everywhere (ADR 074)', () => {
           }
         : {}
     )
-    ;(window as unknown as Record<string, unknown>).electronAPI = {
-      extensionBridge: { invoke, on: bus.on },
-    }
+    installBridge()
     render(<Forge orderId="WO-1" />)
     await waitFor(() => screen.getByText(/plan was refused/i))
     auditUnavailableControls()
   })
+}
 
+function aFindingNeedingADecisionTests() {
   it('holds when a finding needs a decision', async () => {
-    const current = {
-      ...order(),
-      redTeam: [
-        {
-          id: 'RT-1',
-          severity: 'high' as const,
-          category: 'wrong-outcome' as const,
-          text: 'blocking one',
-          status: 'open' as const,
-          reason: '',
-          round: 1,
-        },
-      ],
+    const redTeam = [{ ...BLOCKING_AND_NOTE[0], round: 1 }]
+    const intake = { kind: 'redrafted', at: '2026-09-06T10:00:00.000Z', note: 'redrafted' }
+    const round = {
+      round: 1,
+      startedAt: '2026-09-06T09:00:00.000Z',
+      finishedAt: '2026-09-06T09:05:00.000Z',
     }
-    invoke = vi.fn(async (channel: string) =>
-      channel === 'foundry:order.compile'
-        ? {
-            order: current,
-            compile: compileOrder(current),
-            intake: { kind: 'redrafted', at: '2026-09-06T10:00:00.000Z', note: 'redrafted' },
-            loop: {
-              rounds: [
-                {
-                  round: 1,
-                  startedAt: '2026-09-06T09:00:00.000Z',
-                  finishedAt: '2026-09-06T09:05:00.000Z',
-                },
-              ],
-              heldAt: null,
-              exhausted: true,
-            },
-          }
-        : {}
-    )
-    ;(window as unknown as Record<string, unknown>).electronAPI = {
-      extensionBridge: { invoke, on: bus.on },
-    }
-    render(<Forge orderId="WO-1" />)
+    const loop = { rounds: [round], heldAt: null, exhausted: true }
+    mountCompiled({ ...order(), redTeam }, { intake, loop })
     await openStep('Red team')
     await waitFor(() => screen.getByText('blocking one'))
     // Nothing is decided yet, so Send is unavailable — the case under audit.
     auditUnavailableControls()
   })
+}
 
+function theShapeStepTests() {
   it('holds on the shape step even when the order is otherwise ready', async () => {
     mountForStart()
     await openStep('Shape')
@@ -2277,4 +2273,4 @@ describe('every unavailable control names why, everywhere (ADR 074)', () => {
     await openStep('Shape')
     auditUnavailableControls()
   })
-})
+}

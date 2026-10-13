@@ -49,6 +49,15 @@ function setup() {
 }
 
 describe('the Foundry index', () => {
+  describe('reading from disk', readingFromDiskTests)
+  describe('orders', ordersTests)
+  describe('gates', gatesTests)
+  describe('ledgers', ledgersTests)
+  describe('graphs and resets', graphsAndResetsTests)
+  describe('deletion, roots and live changes', deletionRootsAndLiveChangesTests)
+})
+
+function readingFromDiskTests() {
   it('reads from disk again after a failed read instead of keeping the failure', async () => {
     const source = disk()
     let fail = true
@@ -77,7 +86,9 @@ describe('the Foundry index', () => {
     }
     expect(source.reads).toEqual({ orders: 1, gates: 1, graph: 1, ledger: 1 })
   })
+}
 
+function ordersTests() {
   it('shares one load between concurrent first readers', async () => {
     const { source, index } = setup()
     await Promise.all([index.orders(), index.orders(), index.order('WO-1')])
@@ -104,7 +115,9 @@ describe('the Foundry index', () => {
     ;(first as { title: string }).title = 'changed'
     expect((await index.order('WO-1'))?.title).toBe('WO-1')
   })
+}
 
+function gatesTests() {
   it('replaces the gates of one order and announces the order they belong to', async () => {
     const { index, changes } = setup()
     await index.gates()
@@ -117,7 +130,9 @@ describe('the Foundry index', () => {
       { kind: 'gates', orderId: 'WO-2' },
     ])
   })
+}
 
+function ledgersTests() {
   it('appends a ledger entry to a loaded ledger and announces it', async () => {
     const { index, changes } = setup()
     await index.ledger('WO-1')
@@ -142,7 +157,9 @@ describe('the Foundry index', () => {
     await loading
     expect((await index.ledger('WO-1')).map((e) => e.action)).toEqual(['first', 'second'])
   })
+}
 
+function graphsAndResetsTests() {
   it('keeps a written graph and announces it', async () => {
     const { index, changes } = setup()
     expect(await index.graph('WO-1')).toBeNull()
@@ -166,7 +183,9 @@ describe('the Foundry index', () => {
       { kind: 'gates', orderId: 'WO-1' },
     ])
   })
+}
 
+function deletionRootsAndLiveChangesTests() {
   it('forgets a deleted order everywhere', async () => {
     const { index } = setup()
     await index.orders()
@@ -193,4 +212,4 @@ describe('the Foundry index', () => {
     indexes.announce({ kind: 'live', orderId: '' })
     expect(changes).toEqual([{ kind: 'live', orderId: '' }])
   })
-})
+}

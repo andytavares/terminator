@@ -11,8 +11,7 @@ export async function endAndWait(
     isLive(sessionId: string): boolean
     sleep?: (ms: number) => Promise<void>
   },
-  sessionId: string,
-  reason: string,
+  { sessionId, reason }: { sessionId: string; reason: string },
   opts: { timeoutMs?: number; intervalMs?: number } = {}
 ): Promise<boolean> {
   if (!deps.isLive(sessionId)) return true

@@ -31,6 +31,12 @@ function writeSkillFiles(dir: string, body = 'name: ci-fix\n---\nFix it.\n'): vo
 }
 
 describe('mountSkills', () => {
+  describe('copying', copyingTests)
+  describe('overwriting', overwritingTests)
+  describe('the repository and no skills', theRepositoryAndNoSkillsTests)
+})
+
+function copyingTests() {
   it('copies SKILL.md and sibling files into <mountDir>/.claude/skills/<id>/', () => {
     const source = path.join(root, 'source', 'ci-fix')
     writeSkillFiles(source)
@@ -56,7 +62,9 @@ describe('mountSkills', () => {
     expect(fs.existsSync(path.join(mounted, 'old-skill'))).toBe(false)
     expect(fs.existsSync(path.join(mounted, 'ci-fix', 'SKILL.md'))).toBe(true)
   })
+}
 
+function overwritingTests() {
   it('overwrites an existing copy of the same skill with the current contents', () => {
     const source = path.join(root, 'source', 'ci-fix')
     writeSkillFiles(source, 'name: ci-fix\n---\nfirst version\n')
@@ -71,7 +79,9 @@ describe('mountSkills', () => {
     )
     expect(text).toContain('second version')
   })
+}
 
+function theRepositoryAndNoSkillsTests() {
   it('writes nothing into the repository', () => {
     const source = path.join(root, 'source', 'ci-fix')
     writeSkillFiles(source)
@@ -86,4 +96,4 @@ describe('mountSkills', () => {
     expect(fs.existsSync(path.join(mountDir, '.claude', 'skills'))).toBe(true)
     expect(fs.readdirSync(path.join(mountDir, '.claude', 'skills'))).toEqual([])
   })
-})
+}

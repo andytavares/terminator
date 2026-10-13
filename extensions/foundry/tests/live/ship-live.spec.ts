@@ -1,11 +1,12 @@
 import { describe, it, expect, afterAll, beforeAll } from 'vitest'
+import { builderUnit, testCriterion } from '../helpers/order-parts.js'
 import { execFile, execFileSync } from 'node:child_process'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import { shipOrder, markReady } from '../../src/line/integrate.js'
 import { checkoutPath } from '../../src/line/worktree.js'
-import type { ExecResult, ShellExec } from '../../src/line/integrate.js'
+import type { ExecResult, IntegrateDeps, Shipment, ShellExec } from '../../src/line/integrate.js'
 import { createOrderStore } from '../../src/order/store.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
@@ -50,6 +51,18 @@ function gitIn(cwd: string, ...args: string[]): void {
 let dataRoot: string
 let branch: string
 
+const TTL_INTENT: WorkOrder['intent'] = {
+  problem: 'The session TTL is hardcoded, so it cannot differ per environment.',
+  outcome: 'The TTL is read from an environment variable, with the current value as default.',
+  nonGoals: ['Changing how expiry is computed'],
+}
+
+const READ_TTL = builderUnit('U-1', {
+  title: 'read TTL_MS from the environment',
+  satisfies: ['AC-1'],
+  touches: ['src/session.js'],
+})
+
 function order(): WorkOrder {
   const base = draftOrder({
     id: 'WO-LIVE-1',
@@ -62,249 +75,258 @@ function order(): WorkOrder {
     ...base,
     status: 'running',
     recipe: 'direct',
-    intent: {
-      problem: 'The session TTL is hardcoded, so it cannot differ per environment.',
-      outcome: 'The TTL is read from an environment variable, with the current value as default.',
-      nonGoals: ['Changing how expiry is computed'],
-    },
-    acceptance: [
-      {
-        id: 'AC-1',
-        statement: 'A token past its TTL is reported expired.',
-        priority: 'P1',
-        verify: { kind: 'test', command: 'npm test', assert: 'exit_code == 0' },
-        unverifiable: null,
-      },
-    ],
+    intent: TTL_INTENT,
+    acceptance: [testCriterion('AC-1', { statement: 'A token past its TTL is reported expired.' })],
     // P2: below the gated grades, so the draft opens before the decision — the
     // path that actually reaches GitHub.
     risk: { grade: 'P2', triggers: [], blastRadius: ['src/session.js'], criticalPaths: [] },
     plan: {
       ...base.plan,
-      units: [
-        {
-          id: 'U-1',
-          title: 'read TTL_MS from the environment',
-          role: 'builder',
-          lane: 1,
-          dependsOn: [],
-          satisfies: ['AC-1'],
-          touches: ['src/session.js'],
-          verify: [],
-        },
-      ],
+      units: [READ_TTL],
       lanes: base.plan.lanes.map((lane) => ({ ...lane, branch })),
     },
   }
 }
 
-describe.skipIf(LIVE === '')('shipping, for real', () => {
-  // vitest.live.config.ts has no tests/setup.ts, so this spec removes its own
-  // directory. The worktree inside it is registered in the live checkout;
-  // `git worktree prune` drops that record once the directory is gone.
-  afterAll(() => {
-    fs.rmSync(dataRoot, { recursive: true, force: true })
-    git('worktree', 'prune')
-  })
+/** The change itself: the TTL read from the environment, tagged with the branch it is on. */
+function sessionSource(): string {
+  return [
+    '/** Milliseconds a session token is good for. */',
+    `export const TTL_MS = Number(process.env.SESSION_TTL_MS ?? 15 * 60 * 1000) // ${branch}`,
+    '',
+    'export function isExpired(issuedAt, now) {',
+    '  return now - issuedAt >= TTL_MS',
+    '}',
+    '',
+  ].join('\n')
+}
 
-  beforeAll(() => {
-    dataRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-live-'))
-    branch = `foundry/live-${Date.now().toString(36)}`
+/**
+ * A real change on a real branch **in a real worktree**, because that is
+ * where a builder leaves it — and where shipping has to look for it. This
+ * used to commit in the repository itself, which is the shape the bug had:
+ * `shipOrder` pushed `HEAD:<branch>` from `context.repos[].path`, where
+ * `main` is checked out, so the branch reached the remote at the commit it
+ * was cut from and GitHub said "No commits between main and <branch>". The
+ * test passed throughout, because it had put the work where the bug looked.
+ */
+function commitTheChangeInAWorktree(): void {
+  dataRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-live-'))
+  branch = `foundry/live-${Date.now().toString(36)}`
+  git('fetch', 'origin')
+  const worktree = checkoutPath(dataRoot, order(), order().context.repos[0].name)
+  fs.mkdirSync(path.dirname(worktree), { recursive: true })
+  git('worktree', 'add', '-b', branch, worktree, 'origin/main')
+  fs.writeFileSync(path.join(worktree, 'src', 'session.js'), sessionSource())
+  gitIn(worktree, 'add', '-A')
+  gitIn(worktree, 'commit', '-m', 'read the session TTL from the environment')
+}
 
-    // A real change on a real branch **in a real worktree**, because that is
-    // where a builder leaves it — and where shipping has to look for it. This
-    // used to commit in the repository itself, which is the shape the bug had:
-    // `shipOrder` pushed `HEAD:<branch>` from `context.repos[].path`, where
-    // `main` is checked out, so the branch reached the remote at the commit it
-    // was cut from and GitHub said "No commits between main and <branch>". The
-    // test passed throughout, because it had put the work where the bug looked.
-    git('fetch', 'origin')
-    const worktree = checkoutPath(dataRoot, order(), order().context.repos[0].name)
-    fs.mkdirSync(path.dirname(worktree), { recursive: true })
-    git('worktree', 'add', '-b', branch, worktree, 'origin/main')
-    const file = path.join(worktree, 'src', 'session.js')
-    fs.writeFileSync(
-      file,
-      [
-        '/** Milliseconds a session token is good for. */',
-        `export const TTL_MS = Number(process.env.SESSION_TTL_MS ?? 15 * 60 * 1000) // ${branch}`,
-        '',
-        'export function isExpired(issuedAt, now) {',
-        '  return now - issuedAt >= TTL_MS',
-        '}',
-        '',
-      ].join('\n')
-    )
-    gitIn(worktree, 'add', '-A')
-    gitIn(worktree, 'commit', '-m', 'read the session TTL from the environment')
-  })
+/**
+ * vitest.live.config.ts has no tests/setup.ts, so this spec removes its own
+ * directory. The worktree inside it is registered in the live checkout;
+ * `git worktree prune` drops that record once the directory is gone.
+ */
+function removeTheLiveRecords(): void {
+  fs.rmSync(dataRoot, { recursive: true, force: true })
+  git('worktree', 'prune')
+}
 
-  it('pushes the branch and opens a draft pull request GitHub can show back', async () => {
-    const raised: Gate[] = []
-    const recorded: string[] = []
-
-    const result = await shipOrder(
-      order(),
+/** A verified change: the one criterion passed, lint and the unit's tests passed. */
+function verifiedShipment(): Shipment {
+  return {
+    verdicts: [
       {
-        verdicts: [
-          {
-            criterionId: 'AC-1',
-            nodeId: 'n-verify',
-            result: 'pass',
-            reason: '',
-            command: 'npm test',
-            exitCode: 0,
-            producedBy: { role: 'verifier', sessionId: 'sess-verifier' },
-            at: new Date().toISOString(),
-          },
-        ],
-        findings: [],
-        ladder: {
-          steps: [
-            { rung: 'L0', name: 'Lint', result: 'pass', reason: '', exitCode: 0 },
-            { rung: 'L1', name: "The unit's own tests", result: 'pass', reason: '', exitCode: 0 },
-            {
-              rung: 'L3',
-              name: 'Independent verification',
-              result: 'elsewhere',
-              reason: 'by the verifier on each unit — see the criteria table',
-              exitCode: null,
-            },
-          ],
-          stoppedAt: null,
-          unmeasured: [],
-          ok: true,
-        },
-        rulesInForce: ['exit-code-not-count (L2)'],
+        criterionId: 'AC-1',
+        nodeId: 'n-verify',
+        result: 'pass',
+        reason: '',
+        command: 'npm test',
+        exitCode: 0,
+        producedBy: { role: 'verifier', sessionId: 'sess-verifier' },
+        at: new Date().toISOString(),
       },
-      {
-        exec,
-        root: dataRoot,
-        now: () => new Date().toISOString(),
-        autoOpen: true,
-        decide: async (gate) => {
-          raised.push(gate)
-          return 'hold'
-        },
-        // The real writer, not a spy. `integrateDepsFor` filed every shipping
-        // entry under `orderId: subject`, and `ship.draft_opened`'s subject is
-        // the pull request URL — so the entry that says the Line did its job
-        // went to `orders/https:/github.com/owner/repo/pull/8/ledger.jsonl`
-        // and the order's own ledger never mentioned the draft. A spy for
-        // `record` cannot see that: it is handed the arguments, not the file.
-        record: async (action, subject, reason) => {
-          recorded.push(`${action} ${subject} ${reason}`)
-          await createOrderStore(dataRoot).record({
-            at: new Date().toISOString(),
-            orderId: order().id,
-            actor: 'rule:ship',
-            action,
-            subject,
-            reason,
-            evidence: [],
-          })
-        },
-        raiseGate: async (gate) => {
-          raised.push(gate)
-        },
-      }
-    )
+    ],
+    findings: [],
+    ladder: PASSED_LADDER,
+    rulesInForce: ['exit-code-not-count (L2)'],
+  }
+}
 
-    expect(result.pulls, `shipOrder reported: ${JSON.stringify(result)}`).toHaveLength(1)
-    const pull = result.pulls[0]
-    expect(pull.url).toMatch(/^https:\/\/github\.com\/andytavares\/foundry-live-check\/pull\/\d+$/)
+const PASSED_LADDER: Shipment['ladder'] = {
+  steps: [
+    { rung: 'L0', name: 'Lint', result: 'pass', reason: '', exitCode: 0 },
+    { rung: 'L1', name: "The unit's own tests", result: 'pass', reason: '', exitCode: 0 },
+    {
+      rung: 'L3',
+      name: 'Independent verification',
+      result: 'elsewhere',
+      reason: 'by the verifier on each unit — see the criteria table',
+      exitCode: null,
+    },
+  ],
+  stoppedAt: null,
+  unmeasured: [],
+  ok: true,
+}
 
-    // Read it back from GitHub rather than trusting what the command printed.
-    const view = await exec({
-      command: 'gh',
-      args: ['pr', 'view', pull.url, '--json', 'isDraft,title,body,headRefName,state'],
-      cwd: LIVE,
-    })
-    expect(view.exitCode, view.stderr).toBe(0)
-    const pr = JSON.parse(view.stdout) as {
-      isDraft: boolean
-      title: string
-      body: string
-      headRefName: string
-      state: string
-    }
-
-    // A draft, never a review request (FR-053).
-    expect(pr.isDraft).toBe(true)
-    expect(pr.state).toBe('OPEN')
-    expect(pr.headRefName).toBe(branch)
-    // The body GitHub stored is the one written to the order directory.
-    expect(pr.body).toContain('AC-1')
-    expect(pr.body).toContain('Read the session TTL from configuration')
-    expect(fs.readFileSync(pull.bodyPath, 'utf8')).toBe(pr.body)
-
-    // And the decision the operator is finally offered is "mark it ready?",
-    // raised only once the draft exists.
-    expect(raised.map((g) => g.rule)).toContain('ready-for-review')
-
-    // Left for the reader of the test output.
-
-    console.log(`live pull request: ${pull.url}`)
-  }, 180_000)
-
-  it('turns the draft into a review request when the operator says so', async () => {
-    // The last `gh` path with no live cover. `markReady` is what the
-    // "mark it ready?" decision runs, and it is the only thing in the whole
-    // feature that stops being a draft.
-    const opened = await exec({
-      command: 'gh',
-      args: ['pr', 'list', '--head', branch, '--json', 'url,number', '--limit', '1'],
-      cwd: LIVE,
-    })
-    const [pull] = JSON.parse(opened.stdout) as { url: string; number: number }[]
-    expect(pull, 'the previous case did not leave a pull request to mark').toBeDefined()
-
-    await markReady(
-      { url: pull.url, cwd: LIVE },
-      {
-        exec,
-        root: dataRoot,
-        now: () => new Date().toISOString(),
-        autoOpen: true,
-        decide: async () => 'approve',
-        record: async () => undefined,
-      }
-    )
-
-    const after = await exec({
-      command: 'gh',
-      args: ['pr', 'view', pull.url, '--json', 'isDraft,state'],
-      cwd: LIVE,
-    })
-    expect(after.exitCode, after.stderr).toBe(0)
-    const state = JSON.parse(after.stdout) as { isDraft: boolean; state: string }
-    expect(state.isDraft, 'gh pr ready did not take it out of draft').toBe(false)
-    expect(state.state).toBe('OPEN')
-
-    // Put it back, so the repository does not accumulate review requests.
-    await exec({ command: 'gh', args: ['pr', 'ready', pull.url, '--undo'], cwd: LIVE })
-  }, 120_000)
-
-  it("records the draft in the order's own ledger, and nowhere else", async () => {
-    // The entry that says the Line did the thing it exists to do. Its subject
-    // is the pull request URL, and filing by subject built a directory tree
-    // out of one:
-    //
-    //   orders/https:/github.com/owner/repo/pull/8/ledger.jsonl
-    //
-    // while the order's ledger said nothing about the draft it had opened.
-    const ledger = path.join(dataRoot, 'orders', order().id, 'ledger.jsonl')
-    expect(fs.existsSync(ledger), 'the order has no ledger').toBe(true)
-    const actions = fs
-      .readFileSync(ledger, 'utf8')
-      .split('\n')
-      .filter((line) => line.trim() !== '')
-      .map((line) => JSON.parse(line) as { action: string })
-      .map((entry) => entry.action)
-    expect(actions).toContain('ship.draft_opened')
-
-    // And no order directory named after anything but an order.
-    const orders = fs.readdirSync(path.join(dataRoot, 'orders'))
-    expect(orders, 'a ledger was filed somewhere that is not an order').toEqual([order().id])
+/**
+ * The real writer, not a spy. `integrateDepsFor` filed every shipping entry
+ * under `orderId: subject`, and `ship.draft_opened`'s subject is the pull
+ * request URL — so the entry that says the Line did its job went to
+ * `orders/https:/github.com/owner/repo/pull/8/ledger.jsonl` and the order's
+ * own ledger never mentioned the draft. A spy for `record` cannot see that:
+ * it is handed the arguments, not the file.
+ */
+async function recordInTheLedger(action: string, subject: string, reason: string) {
+  await createOrderStore(dataRoot).record({
+    at: new Date().toISOString(),
+    orderId: order().id,
+    actor: 'rule:ship',
+    action,
+    subject,
+    reason,
+    evidence: [],
   })
+}
+
+/** Ships for real, holding every decision and keeping each gate raised in `raised`. */
+function liveShipDeps(raised: Gate[]): IntegrateDeps {
+  return {
+    exec,
+    root: dataRoot,
+    now: () => new Date().toISOString(),
+    autoOpen: true,
+    decide: async (gate) => {
+      raised.push(gate)
+      return 'hold'
+    },
+    record: recordInTheLedger,
+    raiseGate: async (gate) => {
+      raised.push(gate)
+    },
+  }
+}
+
+interface PullView {
+  isDraft: boolean
+  title: string
+  body: string
+  headRefName: string
+  state: string
+}
+
+/** The pull request as GitHub has it, rather than what the command printed. */
+async function viewOnGitHub(url: string): Promise<PullView> {
+  const view = await exec({
+    command: 'gh',
+    args: ['pr', 'view', url, '--json', 'isDraft,title,body,headRefName,state'],
+    cwd: LIVE,
+  })
+  expect(view.exitCode, view.stderr).toBe(0)
+  return JSON.parse(view.stdout) as PullView
+}
+
+async function opensADraftGitHubCanShowBack(): Promise<void> {
+  const raised: Gate[] = []
+  const result = await shipOrder(order(), verifiedShipment(), liveShipDeps(raised))
+
+  expect(result.pulls, `shipOrder reported: ${JSON.stringify(result)}`).toHaveLength(1)
+  const pull = result.pulls[0]
+  expect(pull.url).toMatch(/^https:\/\/github\.com\/andytavares\/foundry-live-check\/pull\/\d+$/)
+  const pr = await viewOnGitHub(pull.url)
+
+  // A draft, never a review request (FR-053).
+  expect(pr.isDraft).toBe(true)
+  expect(pr.state).toBe('OPEN')
+  expect(pr.headRefName).toBe(branch)
+  // The body GitHub stored is the one written to the order directory.
+  expect(pr.body).toContain('AC-1')
+  expect(pr.body).toContain('Read the session TTL from configuration')
+  expect(fs.readFileSync(pull.bodyPath, 'utf8')).toBe(pr.body)
+
+  // And the decision the operator is finally offered is "mark it ready?",
+  // raised only once the draft exists.
+  expect(raised.map((g) => g.rule)).toContain('ready-for-review')
+
+  // Left for the reader of the test output.
+
+  console.log(`live pull request: ${pull.url}`)
+}
+
+async function marksTheDraftReady(): Promise<void> {
+  // The last `gh` path with no live cover. `markReady` is what the
+  // "mark it ready?" decision runs, and it is the only thing in the whole
+  // feature that stops being a draft.
+  const opened = await exec({
+    command: 'gh',
+    args: ['pr', 'list', '--head', branch, '--json', 'url,number', '--limit', '1'],
+    cwd: LIVE,
+  })
+  const [pull] = JSON.parse(opened.stdout) as { url: string; number: number }[]
+  expect(pull, 'the previous case did not leave a pull request to mark').toBeDefined()
+
+  await markReady(
+    { url: pull.url, cwd: LIVE },
+    {
+      exec,
+      root: dataRoot,
+      now: () => new Date().toISOString(),
+      autoOpen: true,
+      decide: async () => 'approve',
+      record: async () => undefined,
+    }
+  )
+
+  const after = await exec({
+    command: 'gh',
+    args: ['pr', 'view', pull.url, '--json', 'isDraft,state'],
+    cwd: LIVE,
+  })
+  expect(after.exitCode, after.stderr).toBe(0)
+  const state = JSON.parse(after.stdout) as { isDraft: boolean; state: string }
+  expect(state.isDraft, 'gh pr ready did not take it out of draft').toBe(false)
+  expect(state.state).toBe('OPEN')
+
+  // Put it back, so the repository does not accumulate review requests.
+  await exec({ command: 'gh', args: ['pr', 'ready', pull.url, '--undo'], cwd: LIVE })
+}
+
+async function recordsTheDraftInTheOrdersLedger(): Promise<void> {
+  // The entry that says the Line did the thing it exists to do. Its subject
+  // is the pull request URL, and filing by subject built a directory tree
+  // out of one:
+  //
+  //   orders/https:/github.com/owner/repo/pull/8/ledger.jsonl
+  //
+  // while the order's ledger said nothing about the draft it had opened.
+  const ledger = path.join(dataRoot, 'orders', order().id, 'ledger.jsonl')
+  expect(fs.existsSync(ledger), 'the order has no ledger').toBe(true)
+  const actions = fs
+    .readFileSync(ledger, 'utf8')
+    .split('\n')
+    .filter((line) => line.trim() !== '')
+    .map((line) => JSON.parse(line) as { action: string })
+    .map((entry) => entry.action)
+  expect(actions).toContain('ship.draft_opened')
+
+  // And no order directory named after anything but an order.
+  const orders = fs.readdirSync(path.join(dataRoot, 'orders'))
+  expect(orders, 'a ledger was filed somewhere that is not an order').toEqual([order().id])
+}
+
+describe.skipIf(LIVE === '')('shipping, for real', () => {
+  afterAll(removeTheLiveRecords)
+  beforeAll(commitTheChangeInAWorktree)
+
+  it(
+    'pushes the branch and opens a draft pull request GitHub can show back',
+    opensADraftGitHubCanShowBack,
+    180_000
+  )
+  it('turns the draft into a review request when the operator says so', marksTheDraftReady, 120_000)
+  it(
+    "records the draft in the order's own ledger, and nowhere else",
+    recordsTheDraftInTheOrdersLedger
+  )
 })

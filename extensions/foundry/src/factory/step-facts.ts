@@ -22,7 +22,7 @@ export interface StepFactsInput {
 
 /** Lines for a gate or a join; null for a step an agent works, which has a transcript. */
 export function stepFacts(input: StepFactsInput): string[] | null {
-  const { node, graph, labels } = input
+  const { node, labels } = input
   if (node.kind === 'join') {
     const names = joinedWords(node.dependsOn.map((id) => labels[id] ?? id))
     const done = node.state === 'passed' || node.state === 'skipped'
@@ -30,6 +30,12 @@ export function stepFacts(input: StepFactsInput): string[] | null {
   }
   if (node.kind !== 'gate') return null
 
+  return gateFacts(input)
+}
+
+/** A gate's drafts, its checks, and what it is waiting on the operator for. */
+function gateFacts(input: StepFactsInput): string[] {
+  const { node, graph } = input
   const facts: string[] = []
   for (const pull of input.pulls ?? []) facts.push(`Draft opened · #${pull.number}`)
   const checks = (input.ci?.pulls ?? []).flatMap((pull) => pull.checks.map((c) => c.bucket))

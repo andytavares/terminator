@@ -174,6 +174,13 @@ describe('the snapshot a surface reads', () => {
 })
 
 describe('how it reaches git', () => {
+  describe('the extension shell', theExtensionShellTests)
+  describe('the branch', theBranchTests)
+  describe('no working copy', noWorkingCopyTests)
+  describe('runs it does not have', runsItDoesNotHaveTests)
+})
+
+function theExtensionShellTests() {
   it('goes through the extension shell when nothing else is injected', async () => {
     // `api.shell.exec` is restricted to git and gh, which is exactly the reach
     // this needs and no more.
@@ -193,7 +200,9 @@ describe('how it reaches git', () => {
     await s.measure('session-1')
     expect(calls[0]).toMatchObject({ command: 'git' })
   })
+}
 
+function theBranchTests() {
   it('measures against the branch it was told to', async () => {
     const calls: string[][] = []
     const s = build({
@@ -207,7 +216,9 @@ describe('how it reaches git', () => {
     await s.measure('session-1')
     expect(calls[0]).toContain('develop')
   })
+}
 
+function noWorkingCopyTests() {
   it('measures nothing for a run with no working copy', async () => {
     const calls: string[][] = []
     const s = build({
@@ -229,7 +240,9 @@ describe('how it reaches git', () => {
     await s.measure('no-copy')
     expect(calls).toEqual([])
   })
+}
 
+function runsItDoesNotHaveTests() {
   it('ignores a measurement for a run it does not have', async () => {
     await expect(build().measure('nobody')).resolves.toBeUndefined()
   })
@@ -241,4 +254,4 @@ describe('how it reaches git', () => {
   it('does nothing for a run ending that it does not have', () => {
     expect(() => build().finish('nobody', 2_000)).not.toThrow()
   })
-})
+}

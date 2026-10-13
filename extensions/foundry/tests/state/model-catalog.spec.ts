@@ -1,6 +1,10 @@
 import { describe, it, expect, vi } from 'vitest'
 import { MODEL_ALIASES, fetchLiveModels, modelCatalog } from '../../src/state/model-catalog.js'
 
+const withKey: NodeJS.ProcessEnv = { ANTHROPIC_API_KEY: 'sk-test' }
+const respond = (body: unknown, ok = true): typeof fetch =>
+  vi.fn().mockResolvedValue({ ok, json: async () => body }) as unknown as typeof fetch
+
 /**
  * The picker used to be three `<option>` tags typed into the settings view,
  * naming a generation that had already shipped its successor — and nothing
@@ -9,11 +13,14 @@ import { MODEL_ALIASES, fetchLiveModels, modelCatalog } from '../../src/state/mo
  * rather than a broken settings page.
  */
 describe('the model catalog', () => {
-  const noCredentials: NodeJS.ProcessEnv = {}
-  const withKey: NodeJS.ProcessEnv = { ANTHROPIC_API_KEY: 'sk-test' }
+  describe('without a credential', withoutACredentialTests)
+  describe('with a credential', withACredentialTests)
+  describe('ordering and degrading', orderingAndDegradingTests)
+  describe('entries and overrides', entriesAndOverridesTests)
+})
 
-  const respond = (body: unknown, ok = true): typeof fetch =>
-    vi.fn().mockResolvedValue({ ok, json: async () => body }) as unknown as typeof fetch
+function withoutACredentialTests() {
+  const noCredentials: NodeJS.ProcessEnv = {}
 
   it('offers the aliases with no credential, because they need none', async () => {
     const models = await modelCatalog(noCredentials, respond({}))
@@ -31,7 +38,9 @@ describe('the model catalog', () => {
     await modelCatalog(noCredentials, fetchImpl)
     expect(fetchImpl).not.toHaveBeenCalled()
   })
+}
 
+function withACredentialTests() {
   it('sends an API key as x-api-key and a token as a bearer', async () => {
     const keyed = respond({ data: [] })
     await fetchLiveModels({ ANTHROPIC_API_KEY: 'sk-test' }, keyed)
@@ -59,7 +68,9 @@ describe('the model catalog', () => {
       floating: false,
     })
   })
+}
 
+function orderingAndDegradingTests() {
   it('keeps the aliases first, so the list does not depend on an env var', async () => {
     const models = await modelCatalog(withKey, respond({ data: [{ id: 'claude-opus-5' }] }))
     expect(models.slice(0, MODEL_ALIASES.length)).toEqual([...MODEL_ALIASES])
@@ -84,7 +95,9 @@ describe('the model catalog', () => {
   it('degrades to the aliases when the response is not the shape it claims', async () => {
     expect(await modelCatalog(withKey, respond({ data: 'nope' }))).toEqual([...MODEL_ALIASES])
   })
+}
 
+function entriesAndOverridesTests() {
   it('drops entries with no usable id rather than offering a blank row', async () => {
     const models = await fetchLiveModels(withKey, respond({ data: [{ id: '' }, { id: 42 }] }))
     expect(models).toEqual([])
@@ -103,4 +116,4 @@ describe('the model catalog', () => {
     await fetchLiveModels({ ANTHROPIC_API_KEY: '   ' }, fetchImpl)
     expect(fetchImpl).not.toHaveBeenCalled()
   })
-})
+}

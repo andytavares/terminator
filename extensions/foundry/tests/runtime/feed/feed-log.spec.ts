@@ -104,6 +104,11 @@ describe('mute rules (FR-029)', () => {
 // longer exists.
 
 describe('forgetting a session', () => {
+  describe('forgetting', forgettingTests)
+  describe('later and unknown sessions', laterAndUnknownSessionsTests)
+})
+
+function forgettingTests() {
   it('drops everything said about it', () => {
     const log = newLog()
     log.post({ at: 1_000, sessionId: 's1', author: 'agent', summary: 'did a thing' })
@@ -126,7 +131,9 @@ describe('forgetting a session', () => {
     log.forget('s1')
     expect(newLog().list()).toEqual([])
   })
+}
 
+function laterAndUnknownSessionsTests() {
   it('keeps anything said after it was forgotten', () => {
     const log = newLog()
     log.post({ at: 1_000, sessionId: 's1', author: 'agent', summary: 'before' })
@@ -141,7 +148,7 @@ describe('forgetting a session', () => {
     log.forget('ghost')
     expect(log.list()).toHaveLength(1)
   })
-})
+}
 
 describe('removing one entry', () => {
   it('takes it off the feed', () => {

@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { testCriterion } from '../helpers/order-parts.js'
 import {
   sharedFilesFor,
   collidingLanes,
@@ -43,15 +44,7 @@ function order(over: Partial<WorkOrder> = {}): WorkOrder {
     ...base,
     intent: { problem: 'p', outcome: 'o', nonGoals: [] },
     risk: { grade: 'P2', triggers: [], blastRadius: ['proto/', 'src/'], criticalPaths: [] },
-    acceptance: [
-      {
-        id: 'AC-1',
-        statement: 'a session id is a ULID',
-        priority: 'P1',
-        verify: { kind: 'test', command: 'npm test', assert: 'exit_code == 0' },
-        unverifiable: null,
-      },
-    ],
+    acceptance: [testCriterion('AC-1', { statement: 'a session id is a ULID' })],
     plan: {
       ...base.plan,
       lanes: [
@@ -93,6 +86,12 @@ function single(): WorkOrder {
 }
 
 describe('detecting a collision', () => {
+  describe('shared files', sharedFilesTests)
+  describe('single lanes and no overlap', singleLanesAndNoOverlapTests)
+  describe('parties and derivation', partiesAndDerivationTests)
+})
+
+function sharedFilesTests() {
   it('finds the file two lanes both change', () => {
     expect(sharedFilesFor(order())).toEqual(['proto/session.proto'])
   })
@@ -109,7 +108,9 @@ describe('detecting a collision', () => {
     })
     expect(sharedFilesFor(oneLane)).toEqual([])
   })
+}
 
+function singleLanesAndNoOverlapTests() {
   it('finds nothing for a single-lane order, however many files it touches', () => {
     expect(sharedFilesFor(single())).toEqual([])
   })
@@ -126,7 +127,9 @@ describe('detecting a collision', () => {
     })
     expect(sharedFilesFor(apart)).toEqual([])
   })
+}
 
+function partiesAndDerivationTests() {
   it('names every lane party to a collision', () => {
     expect(collidingLanes(order(), ['proto/session.proto'])).toEqual([1, 2])
   })
@@ -136,9 +139,15 @@ describe('detecting a collision', () => {
     const lying = order({ plan: { ...order().plan, sharedFiles: ['nothing/real.ts'] } })
     expect(sharedFilesFor(lying)).toEqual(['proto/session.proto'])
   })
-})
+}
 
 describe('compiling an order with a collision', () => {
+  describe('refusing', refusingTests)
+  describe('producers', producersTests)
+  describe('single lanes and coverage', singleLanesAndCoverageTests)
+})
+
+function refusingTests() {
   it('refuses one where nobody owns the shared change', () => {
     const result = compileOrder(order())
     expect(result.ok).toBe(false)
@@ -156,7 +165,9 @@ describe('compiling an order with a collision', () => {
     const failure = compileOrder(order()).failures.find((f) => f.check === 'coverage')
     expect(failure?.subjectIds).toEqual(['U-1', 'U-2'])
   })
+}
 
+function producersTests() {
   it('passes once one lane is declared the producer', () => {
     expect(compileOrder(withProducer()).ok).toBe(true)
   })
@@ -172,7 +183,9 @@ describe('compiling an order with a collision', () => {
     }
     expect(compileOrder(both).failures.some((f) => f.detail.includes('2 lanes'))).toBe(true)
   })
+}
 
+function singleLanesAndCoverageTests() {
   it('never asks a single-lane order about producers (FR-068)', () => {
     expect(compileOrder(single()).ok).toBe(true)
   })
@@ -182,9 +195,14 @@ describe('compiling an order with a collision', () => {
     const detail = compileOrder(gap).failures.find((f) => f.check === 'coverage')?.detail ?? ''
     expect(detail).toContain('“a session id is a ULID”')
   })
-})
+}
 
 describe('writing the merge order down at agreement', () => {
+  describe('holds', holdsTests)
+  describe('stale and unowned holds', staleAndUnownedHoldsTests)
+})
+
+function holdsTests() {
   it('records the derived collisions on the agreed order', () => {
     const agreed = agreeOrder(withProducer(), '2026-09-06T12:00:00.000Z')
     expect(agreed.ok && agreed.order.plan.sharedFiles).toEqual(['proto/session.proto'])
@@ -203,7 +221,9 @@ describe('writing the merge order down at agreement', () => {
     expect(agreed.order.plan.lanes[0]).toMatchObject({ blocks: [], blockedBy: [] })
     expect(agreed.order.plan.sharedFiles).toEqual([])
   })
+}
 
+function staleAndUnownedHoldsTests() {
   it('clears a stale hold left over from an earlier plan', () => {
     const stale = single()
     const withStale: WorkOrder = {
@@ -220,7 +240,7 @@ describe('writing the merge order down at agreement', () => {
     // Compile refuses this anyway; planLanes must not invent an ordering.
     expect(planLanes(order()).plan.lanes.every((lane) => lane.blockedBy.length === 0)).toBe(true)
   })
-})
+}
 
 describe('what a surface shows', () => {
   const planned = planLanes(withProducer())
@@ -284,22 +304,29 @@ describe('holding a merge (FR-067)', () => {
   })
 })
 
-describe('a change somebody can see needs a picture of it (FR-040)', () => {
-  function uiOrder(over: Partial<WorkOrder> = {}): WorkOrder {
-    const base = order()
-    return {
-      ...base,
-      plan: {
-        ...base.plan,
-        lanes: [{ ord: 1, repo: 'proto', branch: '', role: null, blocks: [], blockedBy: [] }],
-        units: [unit({ id: 'U-1', lane: 1, touches: ['src/components/Inbox.tsx'] })],
-        sharedFiles: [],
-      },
-      risk: { grade: 'P2', triggers: [], blastRadius: ['src/'], criticalPaths: [] },
-      ...over,
-    }
+function uiOrder(over: Partial<WorkOrder> = {}): WorkOrder {
+  const base = order()
+  return {
+    ...base,
+    plan: {
+      ...base.plan,
+      lanes: [{ ord: 1, repo: 'proto', branch: '', role: null, blocks: [], blockedBy: [] }],
+      units: [unit({ id: 'U-1', lane: 1, touches: ['src/components/Inbox.tsx'] })],
+      sharedFiles: [],
+    },
+    risk: { grade: 'P2', triggers: [], blastRadius: ['src/'], criticalPaths: [] },
+    ...over,
   }
+}
 
+describe('a change somebody can see needs a picture of it (FR-040)', () => {
+  describe('commands and screenshots', commandsAndScreenshotsTests)
+  describe('judges', judgesTests)
+  describe('the escape', theEscapeTests)
+  describe('invisible changes and units', invisibleChangesAndUnitsTests)
+})
+
+function commandsAndScreenshotsTests() {
   it('refuses one whose criteria are all commands', () => {
     const result = compileOrder(uiOrder())
     expect(result.ok).toBe(false)
@@ -322,7 +349,9 @@ describe('a change somebody can see needs a picture of it (FR-040)', () => {
     })
     expect(compileOrder(withPicture).ok).toBe(true)
   })
+}
 
+function judgesTests() {
   it('accepts a judge that names a screenshot as its evidence', () => {
     const judged = uiOrder({
       acceptance: [
@@ -337,22 +366,23 @@ describe('a change somebody can see needs a picture of it (FR-040)', () => {
     })
     expect(compileOrder(judged).ok).toBe(true)
   })
+}
 
+function theEscapeTests() {
   it('takes the same escape every criterion has, in writing', () => {
     const accepted = uiOrder({
       acceptance: [
-        {
-          id: 'AC-1',
+        testCriterion('AC-1', {
           statement: 'it looks right',
-          priority: 'P1',
-          verify: { kind: 'test', command: 'npm test', assert: 'exit_code == 0' },
           unverifiable: { accepted: true, reason: 'no display in this environment' },
-        },
+        }),
       ],
     })
     expect(compileOrder(accepted).ok).toBe(true)
   })
+}
 
+function invisibleChangesAndUnitsTests() {
   it('asks nothing of a change nobody looks at', () => {
     const backend = uiOrder({
       plan: {
@@ -367,4 +397,4 @@ describe('a change somebody can see needs a picture of it (FR-040)', () => {
     const failure = compileOrder(uiOrder()).failures.find((f) => f.check === 'verifiable')
     expect(failure?.subjectIds).toEqual(['U-1'])
   })
-})
+}

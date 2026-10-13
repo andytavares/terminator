@@ -46,7 +46,15 @@ function matchesAnyGlob(file: string, globs: readonly string[]): boolean {
 }
 
 export function gradeRisk(change: ChangeSummary): GradedChange {
-  // ── P0 ────────────────────────────────────────────────────────────────────
+  return (
+    p0Of(change) ??
+    p1Of(change) ??
+    p3Of(change) ?? { grade: 'P2', trigger: 'ordinary feature work' }
+  )
+}
+
+// ── P0 ────────────────────────────────────────────────────────────────────
+function p0Of(change: ChangeSummary): GradedChange | null {
   for (const file of change.files) {
     for (const { label, pattern } of P0_PATTERNS) {
       if (pattern.test(file)) return { grade: 'P0', trigger: `touches ${label}: ${file}` }
@@ -55,8 +63,11 @@ export function gradeRisk(change: ChangeSummary): GradedChange {
       return { grade: 'P0', trigger: `on this repository's critical-path list: ${file}` }
     }
   }
+  return null
+}
 
-  // ── P1 ────────────────────────────────────────────────────────────────────
+// ── P1 ────────────────────────────────────────────────────────────────────
+function p1Of(change: ChangeSummary): GradedChange | null {
   for (const file of change.files) {
     if (SCHEMA_PATTERN.test(file)) return { grade: 'P1', trigger: `alters a schema: ${file}` }
     if (change.sharedContractFiles.includes(file)) {
@@ -66,12 +77,15 @@ export function gradeRisk(change: ChangeSummary): GradedChange {
   if (change.linesChanged > LARGE_CHANGE_LINES) {
     return { grade: 'P1', trigger: `${change.linesChanged} changed lines` }
   }
+  return null
+}
 
-  // ── P3 ────────────────────────────────────────────────────────────────────
-  // Last, and only when every file is trivial AND the checks actually passed.
-  // Anything other than `passing` — including an unreachable code host — must
-  // not produce a P3, because P3 is the only grade eligible for unattended
-  // merge (FR-057, FR-062).
+// ── P3 ────────────────────────────────────────────────────────────────────
+// Last, and only when every file is trivial AND the checks actually passed.
+// Anything other than `passing` — including an unreachable code host — must
+// not produce a P3, because P3 is the only grade eligible for unattended
+// merge (FR-057, FR-062).
+function p3Of(change: ChangeSummary): GradedChange | null {
   if (
     change.files.length > 0 &&
     change.checkState === 'passing' &&
@@ -79,6 +93,5 @@ export function gradeRisk(change: ChangeSummary): GradedChange {
   ) {
     return { grade: 'P3', trigger: 'lockfile, formatting or dependency bump with green checks' }
   }
-
-  return { grade: 'P2', trigger: 'ordinary feature work' }
+  return null
 }

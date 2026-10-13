@@ -64,6 +64,12 @@ beforeEach(() => {
 })
 
 describe('restack', () => {
+  describe('rebasing', rebasingTests)
+  describe('conflicts', conflictsTests)
+  describe('push failures', pushFailuresTests)
+})
+
+function rebasingTests() {
   it('rebases and pushes when the base moved without overlap', async () => {
     // A commit on the lane branch that does not touch main's change.
     fs.appendFileSync(path.join(lane, 'lane-only.txt'), 'lane work\n')
@@ -85,7 +91,9 @@ describe('restack', () => {
     expect(remoteLog).toContain('predecessor merged')
     expect(remoteLog).toContain('lane work')
   })
+}
 
+function conflictsTests() {
   it('aborts and reports the conflicting file when the same line changed on both sides', async () => {
     // The lane edits line one.
     fs.writeFileSync(path.join(lane, 'file.txt'), 'lane change\nline two\nline three\n')
@@ -109,7 +117,9 @@ describe('restack', () => {
     expect(status).not.toContain('rebase in progress')
     expect(gitRevParse(lane, 'HEAD')).toBe(headBefore)
   })
+}
 
+function pushFailuresTests() {
   it('fails when the force-with-lease is refused because origin moved underneath it', async () => {
     // Someone else pushes a new commit to the lane branch on origin, out from
     // under the local clone's tracking ref.
@@ -137,7 +147,7 @@ describe('restack', () => {
 
     expect(result.kind).toBe('failed')
   })
-})
+}
 
 describe('restack when a step does not finish', () => {
   const timingOut =

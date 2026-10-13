@@ -3,6 +3,8 @@
  * told, and nothing that needs an agent pretends to have started one.
  */
 import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest'
+import { builderUnit } from '../helpers/order-parts.js'
+import { activate, deactivate } from '../../src/index.ts'
 import * as path from 'node:path'
 
 import { fakeHost, seededRepository, temporaryDirectory } from '../helpers/foundry-host.js'
@@ -30,13 +32,11 @@ beforeAll(async () => {
   dataDir = path.join(parent, 'records')
   repo = await seededRepository(parent)
   host = fakeHost(() => dataDir)
-  const { activate } = await import('../../src/index.ts')
   activate(host.api)
   await vi.waitFor(() => expect(host.showToast).toHaveBeenCalled())
 })
 
 afterAll(async () => {
-  const { deactivate } = await import('../../src/index.ts')
   deactivate()
   vi.unstubAllEnvs()
 })
@@ -66,22 +66,18 @@ function readyDraft() {
     plan: {
       ...base.plan,
       units: [
-        {
-          id: 'U-1',
-          title: 'red text',
-          role: 'builder',
-          lane: 1,
-          dependsOn: [],
-          satisfies: ['AC-1'],
-          touches: ['src/theme.ts'],
-          verify: [],
-        },
+        builderUnit('U-1', { title: 'red text', satisfies: ['AC-1'], touches: ['src/theme.ts'] }),
       ],
     },
   }
 }
 
 describe('a supervision runtime that could not start', () => {
+  describe('saying so', sayingSoTests)
+  describe('refusals', refusalsTests)
+})
+
+function sayingSoTests() {
   it('is said out loud: phases would approve their own tool calls', () => {
     expect(host.showToast).toHaveBeenCalledWith(
       'error',
@@ -98,7 +94,9 @@ describe('a supervision runtime that could not start', () => {
       ok: false,
     })
   })
+}
 
+function refusalsTests() {
   it('refuses an architect turn and says why', async () => {
     await createOrderStore(dataDir).save(readyDraft())
     const started = (await host.call('foundry:order.converge', { id: 'WO-1', message: 'go' })) as {
@@ -118,4 +116,4 @@ describe('a supervision runtime that could not start', () => {
       )
     })
   })
-})
+}

@@ -244,23 +244,8 @@ function documentGuide(outputsDir: string | undefined): string[] {
   ]
 }
 
-/**
- * What to write, and where.
- *
- * Empty for a role with nothing to hand back — a contract offering no keys is
- * an instruction to write `{}`, which is a turn spent producing nothing.
- */
-export function rungOutputContract(
-  file: string,
-  writes: readonly Collectable[],
-  options: { readonly outputsDir?: string } = {}
-): string {
-  if (writes.length === 0) return ''
-
-  const body = writes.flatMap((artefact) => EXAMPLE[artefact])
-  const reported = writes.some((w) => w === 'plan' || w === 'acceptance')
-  const findsThings = writes.includes('findings')
-
+/** The one file a rung writes, and why it is the only one. */
+function whereToWrite(file: string): string[] {
   return [
     '',
     '---',
@@ -279,6 +264,28 @@ export function rungOutputContract(
     'Every key is optional. Omit what you have nothing to say about rather than',
     'restating it. Anything not listed here is refused outright.',
     '',
+  ]
+}
+
+/**
+ * What to write, and where.
+ *
+ * Empty for a role with nothing to hand back — a contract offering no keys is
+ * an instruction to write `{}`, which is a turn spent producing nothing.
+ */
+export function rungOutputContract(
+  file: string,
+  writes: readonly Collectable[],
+  options: { readonly outputsDir?: string } = {}
+): string {
+  if (writes.length === 0) return ''
+
+  const body = writes.flatMap((artefact) => EXAMPLE[artefact])
+  const reported = writes.some((w) => w === 'plan' || w === 'acceptance')
+  const findsThings = writes.includes('findings')
+
+  return [
+    ...whereToWrite(file),
     '```json',
     '{',
     ...body,
@@ -393,10 +400,35 @@ const DUPLICATE_BAR = 0.6
  */
 export function applyRungOutput(order: WorkOrder, input: ApplyRungInput): AppliedRungOutput {
   const { output, role, at, round = 0 } = input
-  const note = output.note.trim()
-  const anotherPass = output.anotherPass === true
-  let next = order
+  let next = withHandBack(order, output)
+  const merge = mergeRedTeam(next.redTeam, output.redTeam ?? [], { role, round })
+  if (merge.fresh.length > 0 || merge.redTeam !== next.redTeam) {
+    next = { ...next, redTeam: [...merge.redTeam, ...merge.fresh] }
+  }
+  const blockingReasons = [...merge.blockingReasons, ...contestedReasons(output)]
+  const told = {
+    note: output.note.trim(),
+    document: output.document ?? null,
+    anotherPass: output.anotherPass === true,
+  }
+  if (blockingReasons.length === 0) {
+    return {
+      ...told,
+      order: next === order ? order : WorkOrderSchema.parse(next),
+      note: told.note === '' && merge.notesAdded > 0 ? notesWord(merge.notesAdded) : told.note,
+      defect: null,
+    }
+  }
+  return disputed(next, { told, blockingReasons, redTeamBlocked: merge.redTeamBlocked, role, at })
+}
 
+function notesWord(count: number): string {
+  return `${count} non-blocking note${count === 1 ? '' : 's'}`
+}
+
+/** What a rung found about the repository, and the document it handed back, on the order. */
+function withHandBack(order: WorkOrder, output: RungOutput): WorkOrder {
+  let next = order
   if (output.findings !== undefined) {
     next = {
       ...next,
@@ -408,118 +440,161 @@ export function applyRungOutput(order: WorkOrder, input: ApplyRungInput): Applie
       },
     }
   }
-
   if (output.document !== undefined) next = { ...next, document: output.document }
+  return next
+}
 
-  // What forces the order back to draft, named for the defect message.
-  const blockingReasons: string[] = []
-  // True only when a red-team finding is the reason — a disputed plan or
-  // acceptance list is reported as a question and never amends the order.
-  let redTeamBlocked = false
-  // Findings that landed but changed nothing an operator has to act on.
-  let notesAdded = 0
-
-  if (output.redTeam !== undefined && output.redTeam.length > 0) {
-    let redTeam = next.redTeam
-    const seenText = new Set(redTeam.map((f) => normalise(f.text)))
-    const seenHeadlines = redTeam.map((f) => headlineTokens(f.text))
-    const fresh: WorkOrder['redTeam'] = []
-
-    for (const finding of output.redTeam) {
-      if (finding.reopens !== undefined) {
-        const target = redTeam.find((f) => f.id === finding.reopens && f.status !== 'open')
-        const evidence = (finding.newEvidence ?? '').trim()
-        // Dropped, not raised: a reopen with nothing the earlier reason did
-        // not already answer is the same finding a second time.
-        if (target === undefined || evidence === '') continue
-
-        redTeam = redTeam.map((f) =>
-          f.id === target.id
-            ? { ...f, status: 'open' as const, text: `${f.text}\n\n${evidence}` }
-            : f
-        )
-        if (isBlocking(target)) {
-          blockingReasons.push(`${target.id} reopened — ${evidence}`)
-          redTeamBlocked = true
-        } else {
-          notesAdded += 1
-        }
-        continue
-      }
-
-      if (seenText.has(normalise(finding.text))) continue
-
-      const headline = headlineTokens(finding.text)
-      const isDuplicate =
-        seenHeadlines.some((h) => jaccard(h, headline) >= DUPLICATE_BAR) ||
-        fresh.some((f) => jaccard(headlineTokens(f.text), headline) >= DUPLICATE_BAR)
-      if (isDuplicate) continue
-
-      seenText.add(normalise(finding.text))
-      fresh.push({
-        // Numbered from what is already there rather than from this batch, so
-        // a second turn's first finding is not the first turn's first finding
-        // under a new name.
-        id: `RT-${role}-${redTeam.length + fresh.length + 1}`,
-        severity: finding.severity,
-        category: finding.category,
-        text: finding.text,
-        status: 'open',
-        reason: '',
-        round,
-      })
-    }
-
-    if (fresh.length > 0 || redTeam !== next.redTeam) {
-      next = { ...next, redTeam: [...redTeam, ...fresh] }
-    }
-
-    const blockingFresh = fresh.filter(isBlocking)
-    notesAdded += fresh.length - blockingFresh.length
-    if (blockingFresh.length > 0) {
-      redTeamBlocked = true
-      blockingReasons.push(
-        `${blockingFresh.map((f) => f.id).join(', ')} — ${blockingFresh.map((f) => f.text.trim()).join(' ')}`
-      )
-    }
-  }
-
+/** The plan or acceptance list a rung tried to rewrite, which is reported and never applied. */
+function contestedReasons(output: RungOutput): string[] {
   const contested = (['plan', 'acceptance'] as const).filter(
     (artefact) => output[artefact] !== undefined
   )
-  if (contested.length > 0) {
-    blockingReasons.push(
-      `it would rewrite the ${contested.join(' and ')} of an order this run is already building from`
-    )
-  }
+  if (contested.length === 0) return []
+  return [
+    `it would rewrite the ${contested.join(' and ')} of an order this run is already building from`,
+  ]
+}
 
-  if (blockingReasons.length === 0) {
-    const finalNote =
-      note === '' && notesAdded > 0
-        ? `${notesAdded} non-blocking note${notesAdded === 1 ? '' : 's'}`
-        : note
-    return {
-      order: next === order ? order : WorkOrderSchema.parse(next),
-      note: finalNote,
-      defect: null,
-      document: output.document ?? null,
-      anotherPass,
+type RedTeam = WorkOrder['redTeam']
+type IncomingFinding = NonNullable<RungOutput['redTeam']>[number]
+
+/** The red team's findings merged into the order's, and what that merge says. */
+interface RedTeamMerge {
+  /** The order's findings, with any the rung reopened. */
+  redTeam: RedTeam
+  /** Findings new to the order, numbered after the ones it has. */
+  readonly fresh: RedTeam[number][]
+  /** What forces the order back to draft, named for the defect message. */
+  readonly blockingReasons: string[]
+  /**
+   * True only when a red-team finding is the reason — a disputed plan or
+   * acceptance list is reported as a question and never amends the order.
+   */
+  redTeamBlocked: boolean
+  /** Findings that landed but changed nothing an operator has to act on. */
+  notesAdded: number
+}
+
+function mergeRedTeam(
+  existing: RedTeam,
+  incoming: readonly IncomingFinding[],
+  by: { role: string; round: number }
+): RedTeamMerge {
+  const merge: RedTeamMerge = {
+    redTeam: existing,
+    fresh: [],
+    blockingReasons: [],
+    redTeamBlocked: false,
+    notesAdded: 0,
+  }
+  const seenText = new Set(existing.map((f) => normalise(f.text)))
+  const seenHeadlines = existing.map((f) => headlineTokens(f.text))
+  for (const finding of incoming) {
+    if (finding.reopens !== undefined) reopen(merge, finding)
+    else if (!isRepeat(finding.text, { seenText, seenHeadlines, fresh: merge.fresh })) {
+      seenText.add(normalise(finding.text))
+      merge.fresh.push(freshFinding(finding, { ...by, number: nextNumber(merge) }))
     }
   }
+  countFresh(merge)
+  return merge
+}
 
-  // Both kinds are the same thing to an operator: a reader with no stake in
-  // the draft has said the order is wrong, while the work is being done from
-  // it. At intake a finding is refused by the compile gate; on the Line there
-  // is no compile gate, so a finding that raised nothing would revert the
-  // order to draft under a run that carried on regardless.
-  const defect = `The ${role} says this order is wrong: ${blockingReasons.join('; ')}${
-    note === '' ? '.' : `. ${note}`
-  }`
+/** The fresh findings that block go into the defect; the rest are notes. */
+function countFresh(merge: RedTeamMerge): void {
+  const blockingFresh = merge.fresh.filter(isBlocking)
+  merge.notesAdded += merge.fresh.length - blockingFresh.length
+  if (blockingFresh.length === 0) return
+  merge.redTeamBlocked = true
+  merge.blockingReasons.push(
+    `${blockingFresh.map((f) => f.id).join(', ')} — ${blockingFresh.map((f) => f.text.trim()).join(' ')}`
+  )
+}
 
-  if (redTeamBlocked) {
-    next = amendOrder(next, { at, reason: `${role}: ${defect}` })
+/**
+ * Numbered from what is already there rather than from this batch, so a second
+ * turn's first finding is not the first turn's first finding under a new name.
+ */
+function nextNumber(merge: RedTeamMerge): number {
+  return merge.redTeam.length + merge.fresh.length + 1
+}
+
+function freshFinding(
+  finding: IncomingFinding,
+  { role, round, number }: { role: string; round: number; number: number }
+): RedTeam[number] {
+  return {
+    id: `RT-${role}-${number}`,
+    severity: finding.severity,
+    category: finding.category,
+    text: finding.text,
+    status: 'open',
+    reason: '',
+    round,
   }
+}
 
+/** Already on the order word for word, or the same claim in other words. */
+function isRepeat(
+  text: string,
+  seen: {
+    seenText: ReadonlySet<string>
+    seenHeadlines: readonly ReadonlySet<string>[]
+    fresh: readonly RedTeam[number][]
+  }
+): boolean {
+  if (seen.seenText.has(normalise(text))) return true
+  const headline = headlineTokens(text)
+  return (
+    seen.seenHeadlines.some((h) => jaccard(h, headline) >= DUPLICATE_BAR) ||
+    seen.fresh.some((f) => jaccard(headlineTokens(f.text), headline) >= DUPLICATE_BAR)
+  )
+}
+
+/**
+ * Reopen a settled finding with the new evidence that answers what settled it.
+ * Dropped, not raised: a reopen with nothing the earlier reason did not
+ * already answer is the same finding a second time.
+ */
+function reopen(merge: RedTeamMerge, finding: IncomingFinding): void {
+  const target = merge.redTeam.find((f) => f.id === finding.reopens && f.status !== 'open')
+  const evidence = (finding.newEvidence ?? '').trim()
+  if (target === undefined || evidence === '') return
+  merge.redTeam = merge.redTeam.map((f) =>
+    f.id === target.id ? { ...f, status: 'open' as const, text: `${f.text}\n\n${evidence}` } : f
+  )
+  if (isBlocking(target)) {
+    merge.blockingReasons.push(`${target.id} reopened — ${evidence}`)
+    merge.redTeamBlocked = true
+  } else {
+    merge.notesAdded += 1
+  }
+}
+
+/**
+ * Both kinds are the same thing to an operator: a reader with no stake in the
+ * draft has said the order is wrong, while the work is being done from it. At
+ * intake a finding is refused by the compile gate; on the Line there is no
+ * compile gate, so a finding that raised nothing would revert the order to
+ * draft under a run that carried on regardless.
+ */
+function disputed(
+  order: WorkOrder,
+  dispute: {
+    told: Pick<AppliedRungOutput, 'note' | 'document' | 'anotherPass'>
+    blockingReasons: readonly string[]
+    redTeamBlocked: boolean
+    role: string
+    at: string
+  }
+): AppliedRungOutput {
+  const { told, role, at } = dispute
+  const defect = `The ${role} says this order is wrong: ${dispute.blockingReasons.join('; ')}${
+    told.note === '' ? '.' : `. ${told.note}`
+  }`
+  const next = dispute.redTeamBlocked
+    ? amendOrder(order, { at, reason: `${role}: ${defect}` })
+    : order
   return {
     order: WorkOrderSchema.parse({
       ...next,
@@ -530,10 +605,8 @@ export function applyRungOutput(order: WorkOrder, input: ApplyRungInput): Applie
         decisions: [...next.provenance.decisions, `${at} ${role}: ${defect}`],
       },
     }),
-    note,
+    ...told,
     defect,
-    document: output.document ?? null,
-    anotherPass,
   }
 }
 
@@ -559,7 +632,25 @@ export type CollectResult =
  * and whatever it worked out is only in its terminal. The caller says so in
  * the record rather than letting it pass as an ordinary turn.
  */
-export function readRungOutput(input: {
+export function readRungOutput(input: ReadRungInput): CollectResult | null {
+  let raw: string
+  try {
+    raw = fs.readFileSync(input.outputPath, 'utf8')
+  } catch {
+    return null
+  }
+  try {
+    return applyWritten(raw, input)
+  } finally {
+    try {
+      fs.unlinkSync(input.outputPath)
+    } catch {
+      // Already gone, or never there. Either way there is nothing to clear.
+    }
+  }
+}
+
+interface ReadRungInput {
   readonly order: WorkOrder
   readonly role: string
   readonly writes: readonly Collectable[]
@@ -567,24 +658,14 @@ export function readRungOutput(input: {
   readonly at: string
   /** Which review round this is. Stamped onto every fresh finding. Defaults to 0. */
   readonly round?: number
-}): CollectResult | null {
-  let raw: string
-  try {
-    raw = fs.readFileSync(input.outputPath, 'utf8')
-  } catch {
-    return null
-  }
+}
 
+/** What the rung wrote, applied to the order, or why it could not be. */
+function applyWritten(raw: string, input: ReadRungInput): CollectResult {
   try {
     const output = parseRungOutput(JSON.parse(raw), input.writes)
-    const applied = applyRungOutput(input.order, {
-      role: input.role,
-      output,
-      writes: input.writes,
-      at: input.at,
-      round: input.round,
-    })
-    return { ok: true, ...applied }
+    const { role, writes, at, round } = input
+    return { ok: true, ...applyRungOutput(input.order, { role, output, writes, at, round }) }
   } catch (error) {
     return {
       ok: false,
@@ -592,12 +673,6 @@ export function readRungOutput(input: {
         error instanceof RungOutputRejected
           ? error.message
           : `what the rung wrote was not readable: ${error instanceof Error ? error.message : String(error)}`,
-    }
-  } finally {
-    try {
-      fs.unlinkSync(input.outputPath)
-    } catch {
-      // Already gone, or never there. Either way there is nothing to clear.
     }
   }
 }

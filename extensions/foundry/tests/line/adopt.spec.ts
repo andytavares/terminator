@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { builderUnit } from '../helpers/order-parts.js'
 import { interruptedRuns, interruptedGate } from '../../src/line/adopt.js'
 import { buildRunGraph, withNode } from '../../src/line/run-graph.js'
 import { parseRecipe } from '../../src/recipe/parse.js'
@@ -39,18 +40,7 @@ function order(over: Partial<WorkOrder> = {}): WorkOrder {
     status: 'running',
     plan: {
       ...base.plan,
-      units: [
-        {
-          id: 'U-1',
-          title: 'the first bit',
-          role: 'builder',
-          lane: 1,
-          dependsOn: [],
-          satisfies: ['AC-1'],
-          touches: [],
-          verify: [],
-        },
-      ],
+      units: [builderUnit('U-1', { title: 'the first bit', satisfies: ['AC-1'] })],
     },
     ...over,
   }

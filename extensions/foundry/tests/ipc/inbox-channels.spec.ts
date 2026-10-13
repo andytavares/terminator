@@ -74,6 +74,18 @@ afterEach(() => {
 })
 
 describe('foundry:inbox.list', () => {
+  describe('empty and orders waiting', emptyAndOrdersWaitingTests)
+  describe('raised gates', raisedGatesTests)
+  describe('links', linksTests)
+  describe('typed orders and ranking', typedOrdersAndRankingTests)
+  describe('silenced and unconditional rules', silencedAndUnconditionalRulesTests)
+  describe('deadlines', deadlinesTests)
+  describe('undefaulted gates and failures', undefaultedGatesAndFailuresTests)
+  describe('acting once and no deadline', actingOnceAndNoDeadlineTests)
+  describe('counts', countsTests)
+})
+
+function emptyAndOrdersWaitingTests() {
   it('is empty before anything has been raised', async () => {
     const r = (await channels().list()) as { gates: Gate[] }
     expect(r.gates).toEqual([])
@@ -95,7 +107,9 @@ describe('foundry:inbox.list', () => {
     }
     expect(r.waiting).toEqual(waiting)
   })
+}
 
+function raisedGatesTests() {
   it('lists a raised gate with the rule that produced it', async () => {
     await createGateStore(root).save(gate())
     const r = (await channels().list()) as { gates: Gate[] }
@@ -103,19 +117,19 @@ describe('foundry:inbox.list', () => {
     expect(r.gates[0].rule).toBe('risk.p0')
     expect(r.gates[0].why).toContain('session.ts')
   })
+}
 
+const TAV_15 = {
+  kind: 'tracker' as const,
+  tracker: 'linear',
+  key: 'TAV-15',
+  url: 'https://linear.app/team/issue/TAV-15',
+}
+
+function linksTests() {
   it('carries the order\u2019s pull requests and ticket on each gate, so the row can link them', async () => {
     const orders = createOrderStore(root)
-    await orders.save(
-      order({
-        source: {
-          kind: 'tracker',
-          tracker: 'linear',
-          key: 'TAV-15',
-          url: 'https://linear.app/team/issue/TAV-15',
-        },
-      })
-    )
+    await orders.save(order({ source: TAV_15 }))
     await createGateStore(root).save(gate())
     const url = 'https://github.com/andytavares/terminator/pull/233'
     const c = createInboxChannels(
@@ -131,12 +145,11 @@ describe('foundry:inbox.list', () => {
       }[]
     }
     expect(r.gates[0].pulls).toEqual([{ number: 233, url }])
-    expect(r.gates[0].source).toEqual({
-      key: 'TAV-15',
-      url: 'https://linear.app/team/issue/TAV-15',
-    })
+    expect(r.gates[0].source).toEqual({ key: TAV_15.key, url: TAV_15.url })
   })
+}
 
+function typedOrdersAndRankingTests() {
   it('says there is no ticket when the order came from typing', async () => {
     await createOrderStore(root).save(order())
     await createGateStore(root).save(gate())
@@ -152,7 +165,9 @@ describe('foundry:inbox.list', () => {
     const r = (await channels().list()) as { gates: Gate[] }
     expect(r.gates.map((g) => g.id)).toEqual(['G-busy', 'G-idle'])
   })
+}
 
+function silencedAndUnconditionalRulesTests() {
   it('hides a gate whose rule this autonomy setting silences', async () => {
     await createGateStore(root).save(gate({ id: 'G-unit', rule: 'unit.boundary' }))
     expect(((await channels('standard').list()) as { gates: Gate[] }).gates).toHaveLength(0)
@@ -172,18 +187,19 @@ describe('foundry:inbox.list', () => {
     const r = (await channels('lights-out').list()) as { gates: Gate[] }
     expect(r.gates).toHaveLength(4)
   })
+}
 
+function deadlinesTests() {
   it('takes the stated default once a deadline has passed, and records it as automatic', async () => {
     await createGateStore(root).save(gate({ id: 'G-late', deadline: '2026-09-06T11:00:00.000Z' }))
     const c = channels()
     const r = (await c.list()) as { gates: Gate[] }
     expect(r.gates).toHaveLength(0)
-    expect(record).toHaveBeenCalledWith(
-      'WO-1',
-      'gate.default',
-      'G-late',
-      expect.stringContaining('no answer')
-    )
+    expect(record).toHaveBeenCalledWith('WO-1', {
+      action: 'gate.default',
+      subject: 'G-late',
+      reason: expect.stringContaining('no answer'),
+    })
     expect((await createGateStore(root).get('G-late'))?.decision?.by).toBe('default')
   })
 
@@ -198,7 +214,9 @@ describe('foundry:inbox.list', () => {
     await c.list()
     expect(acted).toEqual([{ id: 'G-late', option: 'hold' }])
   })
+}
 
+function undefaultedGatesAndFailuresTests() {
   it('does not act on a gate nobody has defaulted', async () => {
     await createGateStore(root).save(gate({ id: 'G-patient', deadline: null }))
     const acted: string[] = []
@@ -216,14 +234,15 @@ describe('foundry:inbox.list', () => {
     })
     const r = (await c.list()) as { gates: Gate[] }
     expect(r.gates).toHaveLength(0)
-    expect(record).toHaveBeenCalledWith(
-      'WO-1',
-      'gate.action_failed',
-      'G-late',
-      'gh: not authenticated'
-    )
+    expect(record).toHaveBeenCalledWith('WO-1', {
+      action: 'gate.action_failed',
+      subject: 'G-late',
+      reason: 'gh: not authenticated',
+    })
   })
+}
 
+function actingOnceAndNoDeadlineTests() {
   it('acts once, not on every read of the inbox', async () => {
     await createGateStore(root).save(gate({ id: 'G-late', deadline: '2026-09-06T11:00:00.000Z' }))
     const acted: string[] = []
@@ -239,7 +258,9 @@ describe('foundry:inbox.list', () => {
     await createGateStore(root).save(gate({ id: 'G-patient', deadline: null }))
     expect(((await channels().list()) as { gates: Gate[] }).gates).toHaveLength(1)
   })
+}
 
+function countsTests() {
   it('counts what is building and what is converging, for the empty state', async () => {
     const orders = createOrderStore(root)
     await orders.save(order({ id: 'WO-run', status: 'running' }))
@@ -254,9 +275,15 @@ describe('foundry:inbox.list', () => {
     const r = (await channels().list()) as { summary: { automatic: number } }
     expect(r.summary.automatic).toBe(1)
   })
-})
+}
 
 describe('foundry:inbox.decide', () => {
+  describe('recording', recordingTests)
+  describe('refusals', refusalsTests)
+  describe('no note', noNoteTests)
+})
+
+function recordingTests() {
   it('records the decision and keeps it', async () => {
     await createGateStore(root).save(gate())
     const c = channels()
@@ -273,14 +300,17 @@ describe('foundry:inbox.decide', () => {
     await createGateStore(root).save(gate())
     const c = channels()
     await c.decide({ gateId: 'G-1', option: 'approve' })
-    expect(record).toHaveBeenCalledWith(
-      'WO-1',
-      'gate.decided',
-      'G-1',
-      expect.stringContaining('changes that turn out to be riskier than planned -> approve')
-    )
+    expect(record).toHaveBeenCalledWith('WO-1', {
+      action: 'gate.decided',
+      subject: 'G-1',
+      reason: expect.stringContaining(
+        'changes that turn out to be riskier than planned -> approve'
+      ),
+    })
   })
+}
 
+function refusalsTests() {
   it('refuses an option the gate never offered', async () => {
     await createGateStore(root).save(gate())
     const r = (await channels().decide({ gateId: 'G-1', option: 'ship_it' })) as { error: string }
@@ -300,13 +330,15 @@ describe('foundry:inbox.decide', () => {
       error: 'No gate G-nope.',
     })
   })
+}
 
+function noNoteTests() {
   it('takes a decision with no note', async () => {
     await createGateStore(root).save(gate())
     const r = (await channels().decide({ gateId: 'G-1', option: 'hold' })) as { ok: true }
     expect(r.ok).toBe(true)
   })
-})
+}
 
 describe('createGateStore', () => {
   it('replaces a gate rather than duplicating it', async () => {
@@ -388,18 +420,23 @@ describe('acting on the decision', () => {
   })
 })
 
+const breach = { kind: 'wall_clock' as const, limit: 10, actual: 47 }
+async function halted() {
+  await createOrderStore(root).save(
+    order({ budgets: { agents: 3, wallClockMinutes: 10, tokens: null } })
+  )
+  await createGateStore(root).save(gate({ rule: 'budget.exceeded', breach }))
+}
+
 // "Raise the budget" resumed the run with the budget it had, so the run went
 // straight back past it and stopped again. Raising now takes the new limit.
 describe('raising a budget', () => {
-  const breach = { kind: 'wall_clock' as const, limit: 10, actual: 47 }
+  describe('setting the limit', settingTheLimitTests)
+  describe('refusing', refusingTests)
+  describe('resuming', resumingTests)
+})
 
-  async function halted() {
-    await createOrderStore(root).save(
-      order({ budgets: { agents: 3, wallClockMinutes: 10, tokens: null } })
-    )
-    await createGateStore(root).save(gate({ rule: 'budget.exceeded', breach }))
-  }
-
+function settingTheLimitTests() {
   it('sets the new limit on the order before the run is resumed', async () => {
     await halted()
     let budgetsWhenActed: unknown = null
@@ -410,16 +447,26 @@ describe('raising a budget', () => {
     expect(r).toMatchObject({ ok: true })
     expect(act).toHaveBeenCalledWith(expect.objectContaining({ id: 'G-1' }), 'raise')
     expect(budgetsWhenActed).toMatchObject({ wallClockMinutes: 60, agents: 3 })
-    expect(record).toHaveBeenCalledWith('WO-1', 'budget.raised', 'wall_clock', '10 -> 60')
+    expect(record).toHaveBeenCalledWith('WO-1', {
+      action: 'budget.raised',
+      subject: 'wall_clock',
+      reason: '10 -> 60',
+    })
   })
 
   it('takes no limit', async () => {
     await halted()
     await channels().decide({ gateId: 'G-1', option: 'raise', limit: null })
     expect((await createOrderStore(root).load('WO-1'))?.budgets.wallClockMinutes).toBeNull()
-    expect(record).toHaveBeenCalledWith('WO-1', 'budget.raised', 'wall_clock', '10 -> no limit')
+    expect(record).toHaveBeenCalledWith('WO-1', {
+      action: 'budget.raised',
+      subject: 'wall_clock',
+      reason: '10 -> no limit',
+    })
   })
+}
 
+function refusingTests() {
   it('refuses a limit the run is already past, and decides nothing', async () => {
     await halted()
     const act = vi.fn(async () => undefined)
@@ -440,7 +487,9 @@ describe('raising a budget', () => {
     expect(r.error).toContain('limit')
     expect((await createGateStore(root).get('G-1'))?.decision).toBeNull()
   })
+}
 
+function resumingTests() {
   // ADR 056 retired the files budget. A run halted on it before then has a
   // gate naming a budget that no longer exists, so there is nothing to raise.
   it('resumes a gate stopped at the retired files budget, and changes no budget', async () => {
@@ -468,7 +517,7 @@ describe('raising a budget', () => {
     ).toMatchObject({ ok: true })
     expect(act).toHaveBeenCalled()
   })
-})
+}
 
 describe('a gate store whose root follows the workspace', () => {
   it('reads and writes wherever the resolver points, on each call', async () => {
@@ -493,19 +542,23 @@ describe('a gate store whose root follows the workspace', () => {
   })
 })
 
-describe('a decision that leaves the run stopped is a decision that did nothing', () => {
-  function decided(rule: Parameters<typeof gate>[0]['rule'], option: string) {
-    const act = vi.fn(async () => undefined)
-    return {
-      act,
-      run: async () => {
-        await createGateStore(root).save(gate({ rule }))
-        const c = createInboxChannels(inboxDeps({ autonomy: () => 'escorted', act }))
-        await c.decide({ gateId: 'G-1', option })
-      },
-    }
+function decided(rule: Parameters<typeof gate>[0]['rule'], option: string) {
+  const act = vi.fn(async () => undefined)
+  return {
+    act,
+    run: async () => {
+      await createGateStore(root).save(gate({ rule }))
+      const c = createInboxChannels(inboxDeps({ autonomy: () => 'escorted', act }))
+      await c.decide({ gateId: 'G-1', option })
+    },
   }
+}
 
+describe('a decision that leaves the run stopped is a decision that did nothing', () => {
+  describe('carrying the choice', carryingTheChoiceTests)
+})
+
+function carryingTheChoiceTests() {
   it('carries the chosen option through, so the caller can act on which one it was', async () => {
     const { act, run } = decided('verify.repeat-fail', 'send_back')
     await run()
@@ -528,7 +581,7 @@ describe('a decision that leaves the run stopped is a decision that did nothing'
     await c.decide({ gateId: 'G-1', option: 'send_back' })
     expect((act.mock.calls[0][0] as { nodeId: string | null }).nodeId).toBe('build:U-1')
   })
-})
+}
 
 describe('what this setting is not asking about', () => {
   it('names the silenced rules alongside the queue', async () => {

@@ -99,14 +99,6 @@ function isDocumentationPath(target: string, worktreePath: string): boolean {
   return isDocumentationRelative(path.normalize(relative).split(path.sep).join('/'))
 }
 
-/**
- * Decide, or hand it to the operator.
- *
- * `null` means "ask": the hook holds the call and it reaches the inbox. A
- * decision either way is recorded on the run like any other, and is never a
- * bypass — the read-only path in particular answers **both** ways rather than
- * abstaining, because a read-only role exists to decide without a person.
- */
 /** The file a tool call names, when it names one at all. */
 function targetOf(input: unknown): string | null {
   const target = (input as { file_path?: unknown } | null)?.file_path
@@ -159,124 +151,179 @@ function shipsTheBranch(command: string): boolean {
   })
 }
 
-export function decideTool(request: ToolRequest): PolicyDecision | 'mode' | null {
-  // A node's skills, mounted read-only outside the repository and handed to
-  // the agent with `--add-dir`. Anything `decideTool` does not decide is held
-  // for five minutes, so a read of the mount that fell through to "ask" would
-  // cost the run five minutes for looking at its own skill — this runs before
-  // every other branch, for a role that may write and one that may not alike.
-  if (READ_TOOLS.has(request.tool) && isInsideMount(pathOf(request.input), request.skillsMount)) {
-    return { allow: true, reason: 'a skill mounted for this node' }
-  }
-  if (WRITE_TOOLS.has(request.tool) && isInsideMount(pathOf(request.input), request.skillsMount)) {
+/** What `decideTool` answers: a decision, auto mode's to take, or `null` to ask. */
+type ToolAnswer = PolicyDecision | 'mode' | null
+
+/** One of `decideTool`'s rules: its answer, or `undefined` to leave it to the next. */
+type ToolRule = (request: ToolRequest) => ToolAnswer | undefined
+
+/**
+ * A node's skills, mounted read-only outside the repository and handed to
+ * the agent with `--add-dir`. Anything `decideTool` does not decide is held
+ * for five minutes, so a read of the mount that fell through to "ask" would
+ * cost the run five minutes for looking at its own skill — this runs before
+ * every other rule, for a role that may write and one that may not alike.
+ */
+function skillsMountRule(request: ToolRequest): PolicyDecision | undefined {
+  if (!isInsideMount(pathOf(request.input), request.skillsMount)) return undefined
+  if (READ_TOOLS.has(request.tool)) return { allow: true, reason: 'a skill mounted for this node' }
+  if (WRITE_TOOLS.has(request.tool)) {
     return {
       allow: false,
       reason: 'skills are mounted read-only; they are the factory’s, not the run’s',
     }
   }
+  return undefined
+}
 
-  if (request.tool === 'Bash' && shipsTheBranch(commandOf(request.input))) {
-    return {
-      allow: false,
-      reason:
-        'Foundry pushes the branch and opens the pull request itself; leave both to the line.',
-    }
+function shipsTheBranchRule(request: ToolRequest): PolicyDecision | undefined {
+  if (request.tool !== 'Bash' || !shipsTheBranch(commandOf(request.input))) return undefined
+  return {
+    allow: false,
+    reason: 'Foundry pushes the branch and opens the pull request itself; leave both to the line.',
+  }
+}
+
+function readOnlyRule(request: ToolRequest): PolicyDecision | undefined {
+  return request.readOnly ? readOnlyDecision(request) : undefined
+}
+
+/** A read-only role's call, decided both ways and never left to a person. */
+function readOnlyDecision(request: ToolRequest): PolicyDecision {
+  // A role that declared `run_tests` may run the project's own commands, and
+  // only those. The verifier's whole job is a verdict from an exit status,
+  // and the read-only policy refuses `npm test` like any other unknown
+  // binary — so the role vocabulary said one thing and the gate did another.
+  if (request.mayUseTool('run_tests') && request.isProbed(request.tool, request.input)) {
+    return { allow: true, reason: "the project's own command, which this role may run" }
   }
 
-  if (request.readOnly) {
-    // A role that declared `run_tests` may run the project's own commands, and
-    // only those. The verifier's whole job is a verdict from an exit status,
-    // and the read-only policy refuses `npm test` like any other unknown
-    // binary — so the role vocabulary said one thing and the gate did another.
-    if (request.mayUseTool('run_tests') && request.isProbed(request.tool, request.input)) {
-      return { allow: true, reason: "the project's own command, which this role may run" }
-    }
-
-    // Tools the operator has said only read. The policy refuses any tool it has
-    // not been taught about, which is right — an MCP server's tools are named
-    // by somebody else, and `mcp__…__save_issue` and `mcp__…__query_docs` are
-    // the same shape to anything reading names. Foundry does not guess which of
-    // them read; the operator says.
-    if (request.readOnlyTools.includes(request.tool)) {
-      return { allow: true, reason: 'the operator listed this as a tool that only reads' }
-    }
-
-    // The one thing a read-only rung is allowed to change. Without it the
-    // policy refused every channel a rung invented for itself — `cat >`,
-    // `sed`, `awk`, then `Write` — so four of the standard shape's nine steps
-    // could not hand back a word of what they had worked out. Watched live: an
-    // architect lost a complete corrected order to "a review may not redirect
-    // output" while the builders it had just contradicted were starting.
-    if (request.outputPath !== null && targetOf(request.input) === request.outputPath) {
-      return { allow: true, reason: 'this is where this rung hands back what it found' }
-    }
-
-    const decision = decideReadOnly(request.tool, request.input)
-    // Both ways, never abstaining. Returning `null` on an *allowed* command
-    // sent it to the operator anyway, where it sat for the five-minute hold
-    // before falling back to the terminal. Six tool calls was half an hour of
-    // waiting, and the console showed an agent thinking.
-    return { allow: decision.allow, reason: decision.reason }
+  // Tools the operator has said only read. The policy refuses any tool it has
+  // not been taught about, which is right — an MCP server's tools are named
+  // by somebody else, and `mcp__…__save_issue` and `mcp__…__query_docs` are
+  // the same shape to anything reading names. Foundry does not guess which of
+  // them read; the operator says.
+  if (request.readOnlyTools.includes(request.tool)) {
+    return { allow: true, reason: 'the operator listed this as a tool that only reads' }
   }
 
-  // Two gates, not one. Read-only is the whole-role decision; this holds a role
-  // that may write to what it said it writes with — a scribe that decided to
-  // edit source rather than documentation is refused here, and by neither if
-  // the only check were "may this role write at all".
-  if (request.role !== null && !request.mayUseTool(request.tool)) {
-    return {
-      allow: false,
-      reason: `the ${request.role} role does not use ${request.tool}; its role file lists what it does`,
-    }
+  // The one thing a read-only rung is allowed to change. Without it the
+  // policy refused every channel a rung invented for itself — `cat >`,
+  // `sed`, `awk`, then `Write` — so four of the standard shape's nine steps
+  // could not hand back a word of what they had worked out. Watched live: an
+  // architect lost a complete corrected order to "a review may not redirect
+  // output" while the builders it had just contradicted were starting.
+  if (request.outputPath !== null && targetOf(request.input) === request.outputPath) {
+    return { allow: true, reason: 'this is where this rung hands back what it found' }
   }
 
-  if (request.docsOnly === true && WRITE_TOOLS.has(request.tool)) {
-    const target = pathOf(request.input)
-    if (target !== null && target === request.outputPath) {
-      return { allow: true, reason: 'this is where this node hands back what it produced' }
-    }
-    if (isInsideMount(target, request.outputsDir ?? null)) {
-      return { allow: true, reason: 'the order’s outputs directory, where a document may go' }
-    }
-    if (target === null || !isDocumentationPath(target, request.worktreePath)) {
-      return {
-        allow: false,
-        reason: `the ${request.role ?? 'documentation'} role writes documentation only: markdown files, README, CHANGELOG, docs/ and specs/. ${target ?? 'This edit'} is code or configuration, and changing it is the builder's job, not yours.`,
-      }
-    }
-  }
+  const decision = decideReadOnly(request.tool, request.input)
+  // Both ways, never abstaining. Returning `null` on an *allowed* command
+  // sent it to the operator anyway, where it sat for the five-minute hold
+  // before falling back to the terminal. Six tool calls was half an hour of
+  // waiting, and the console showed an agent thinking.
+  return { allow: decision.allow, reason: decision.reason }
+}
 
-  // FR-029's automatic half. Without it every ordinary edit went to the
-  // operator at every setting, so no run finished unattended and "lights-out"
-  // named something the factory could not do.
+/**
+ * Two gates, not one. Read-only is the whole-role decision; this holds a role
+ * that may write to what it said it writes with — a scribe that decided to
+ * edit source rather than documentation is refused here, and by neither if
+ * the only check were "may this role write at all".
+ */
+function roleToolRule(request: ToolRequest): PolicyDecision | undefined {
+  if (request.role === null || request.mayUseTool(request.tool)) return undefined
+  return {
+    allow: false,
+    reason: `the ${request.role} role does not use ${request.tool}; its role file lists what it does`,
+  }
+}
+
+function docsOnlyRule(request: ToolRequest): PolicyDecision | undefined {
+  if (request.docsOnly !== true || !WRITE_TOOLS.has(request.tool)) return undefined
+  return docsOnlyWrite(request, pathOf(request.input))
+}
+
+/** A documentation-only role's edit: where it hands back, its outputs, documentation, or refused. */
+function docsOnlyWrite(request: ToolRequest, target: string | null): PolicyDecision | undefined {
+  if (target !== null && target === request.outputPath) {
+    return { allow: true, reason: 'this is where this node hands back what it produced' }
+  }
+  if (isInsideMount(target, request.outputsDir ?? null)) {
+    return { allow: true, reason: 'the order’s outputs directory, where a document may go' }
+  }
+  if (target !== null && isDocumentationPath(target, request.worktreePath)) return undefined
+  return {
+    allow: false,
+    reason: `the ${request.role ?? 'documentation'} role writes documentation only: markdown files, README, CHANGELOG, docs/ and specs/. ${target ?? 'This edit'} is code or configuration, and changing it is the builder's job, not yours.`,
+  }
+}
+
+/**
+ * FR-029's automatic half. Without it every ordinary edit went to the
+ * operator at every setting, so no run finished unattended and "lights-out"
+ * named something the factory could not do.
+ */
+function autonomyRule(request: ToolRequest): PolicyDecision | undefined {
   const taken = decideByAutonomy({
     toolName: request.tool,
     input: request.input,
     autonomy: request.autonomy,
     worktreePath: request.worktreePath,
   })
-  if (taken !== null) return { allow: taken.allow, reason: taken.reason }
+  return taken === null ? undefined : { allow: taken.allow, reason: taken.reason }
+}
 
-  if (request.letModeDecide && request.autonomy !== 'escorted') return 'mode'
+function modeRule(request: ToolRequest): 'mode' | undefined {
+  return request.letModeDecide && request.autonomy !== 'escorted' ? 'mode' : undefined
+}
 
-  // At `lights-out` a question has nobody to answer it, so it is a refusal
-  // rather than a wait.
-  //
-  // Asking is right whenever somebody is there. When nobody is, the held call
-  // goes to the operator, then five minutes later to the runtime's own prompt
-  // in the terminal, and the agent stands at that prompt until the wall-clock
-  // budget ends the run. Measured on a live run: the builder redirected its
-  // test output to a scratch file, which is outside the checkout and so worth
-  // a question, and thirty minutes later the order had shipped nothing.
-  //
-  // **Nothing becomes more permissive.** The action is refused, exactly as an
-  // unanswered question refused it — the difference is that the agent is told,
-  // and told why, so it can do the same work another way. They do: the
-  // read-only roles work around this policy's refusals all day.
-  if (request.autonomy === 'lights-out') {
-    return { allow: false, reason: whyRefusedUnattended(request) }
+/**
+ * At `lights-out` a question has nobody to answer it, so it is a refusal
+ * rather than a wait; anywhere else it is asked.
+ *
+ * Asking is right whenever somebody is there. When nobody is, the held call
+ * goes to the operator, then five minutes later to the runtime's own prompt
+ * in the terminal, and the agent stands at that prompt until the wall-clock
+ * budget ends the run. Measured on a live run: the builder redirected its
+ * test output to a scratch file, which is outside the checkout and so worth
+ * a question, and thirty minutes later the order had shipped nothing.
+ *
+ * **Nothing becomes more permissive.** The action is refused, exactly as an
+ * unanswered question refused it — the difference is that the agent is told,
+ * and told why, so it can do the same work another way. They do: the
+ * read-only roles work around this policy's refusals all day.
+ */
+function unattendedRule(request: ToolRequest): PolicyDecision | null {
+  if (request.autonomy !== 'lights-out') return null
+  return { allow: false, reason: whyRefusedUnattended(request) }
+}
+
+/** In order: the order is the whole design. What none of them answers, `unattendedRule` does. */
+const TOOL_RULES: readonly ToolRule[] = [
+  skillsMountRule,
+  shipsTheBranchRule,
+  readOnlyRule,
+  roleToolRule,
+  docsOnlyRule,
+  autonomyRule,
+  modeRule,
+]
+
+/**
+ * Decide, or hand it to the operator.
+ *
+ * `null` means "ask": the hook holds the call and it reaches the inbox. A
+ * decision either way is recorded on the run like any other, and is never a
+ * bypass — the read-only path in particular answers **both** ways rather than
+ * abstaining, because a read-only role exists to decide without a person.
+ */
+export function decideTool(request: ToolRequest): ToolAnswer {
+  for (const rule of TOOL_RULES) {
+    const answer = rule(request)
+    if (answer !== undefined) return answer
   }
-  return null
+  return unattendedRule(request)
 }
 
 /**

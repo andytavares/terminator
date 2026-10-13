@@ -46,6 +46,35 @@ function question(over: Record<string, unknown> = {}) {
 }
 
 describe('decideConfidentQuestions', () => {
+  describe('deciding', decidingTests)
+  describe('leaving it to the operator', leavingItToTheOperatorTests)
+})
+
+const findings = [
+  {
+    id: 'RT-no-non-goals',
+    severity: 'low' as const,
+    text: 't',
+    status: 'open' as const,
+    reason: '',
+  },
+  {
+    id: 'RT-fully-serial-plan',
+    severity: 'medium' as const,
+    text: 't',
+    status: 'open' as const,
+    reason: '',
+  },
+  {
+    id: 'RT-no-runnable-check',
+    severity: 'high' as const,
+    text: 't',
+    status: 'open' as const,
+    reason: '',
+  },
+]
+
+function decidingTests() {
   it('takes the recommended option when the architect is at least 90% sure', () => {
     const next = decideConfidentQuestions(
       order({ openQuestions: [question({ confidence: 0.92 })] })
@@ -72,7 +101,9 @@ describe('decideConfidentQuestions', () => {
     )
     expect(next.openQuestions[0].answer).toBe('Hide them')
   })
+}
 
+function leavingItToTheOperatorTests() {
   it('leaves a question below the bar for the operator', () => {
     const next = decideConfidentQuestions(
       order({ openQuestions: [question({ confidence: 0.89 })] })
@@ -101,33 +132,14 @@ describe('decideConfidentQuestions', () => {
     expect(next.openQuestions[0].answer).toBe('Grey them out')
     expect(next.assumptions).toHaveLength(0)
   })
-})
+}
 
 describe('dismissConfidentFindings', () => {
-  const findings = [
-    {
-      id: 'RT-no-non-goals',
-      severity: 'low' as const,
-      text: 't',
-      status: 'open' as const,
-      reason: '',
-    },
-    {
-      id: 'RT-fully-serial-plan',
-      severity: 'medium' as const,
-      text: 't',
-      status: 'open' as const,
-      reason: '',
-    },
-    {
-      id: 'RT-no-runnable-check',
-      severity: 'high' as const,
-      text: 't',
-      status: 'open' as const,
-      reason: '',
-    },
-  ]
+  describe('dismissing', dismissingTests)
+  describe('leaving open', leavingOpenTests)
+})
 
+function dismissingTests() {
   it('accepts a low or medium finding the architect is at least 90% sure does not apply', () => {
     const next = dismissConfidentFindings(order({ redTeam: findings }), [
       { id: 'RT-no-non-goals', reason: 'a one-line fix has no scope to exclude', confidence: 0.93 },
@@ -151,7 +163,9 @@ describe('dismissConfidentFindings', () => {
       reason: 'architect, 99% confident: this repo has no toolchain by design',
     })
   })
+}
 
+function leavingOpenTests() {
   it('leaves one dismissed below the bar, or with no reason, open', () => {
     const next = dismissConfidentFindings(order({ redTeam: findings }), [
       { id: 'RT-no-non-goals', reason: 'r', confidence: 0.5 },
@@ -159,7 +173,7 @@ describe('dismissConfidentFindings', () => {
     ])
     expect(next.redTeam.slice(0, 2).every((f) => f.status === 'open')).toBe(true)
   })
-})
+}
 
 describe('followUpFor', () => {
   const failure = (check: CompileFailure['check'], detail = 'd'): CompileFailure => ({

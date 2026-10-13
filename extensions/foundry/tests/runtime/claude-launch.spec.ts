@@ -79,6 +79,26 @@ describe('resumableIn', () => {
 })
 
 describe('transcriptPathFor', () => {
+  describe('encoding', encodingTests)
+  describe('resolving the directory', resolvingTheDirectoryTests)
+})
+
+const settings = () =>
+  buildSettings({
+    hookScriptPath: '/opt/hook.mjs',
+    controlUrl: 'http://127.0.0.1:1/pretooluse',
+    controlEventUrl: 'http://127.0.0.1:1/event',
+    controlToken: 'tok',
+    sessionId: 's1',
+    nodePath: '/opt/node',
+  }) as {
+    hooks: Record<
+      'PreToolUse' | 'Stop' | 'SessionEnd',
+      Array<{ matcher: string; hooks: Array<{ command: string; timeout: number }> }>
+    >
+  }
+
+function encodingTests() {
   it('encodes the working copy the way the runtime does', () => {
     // Reproduced from a real run: separators and dots both become dashes.
     expect(transcriptPathFor('/private/tmp/scratchpad/hooktest', 'sid', '/home/me')).toBe(
@@ -95,7 +115,9 @@ describe('transcriptPathFor', () => {
   it('names the file after the session, so it is known before the run exists', () => {
     expect(transcriptPathFor('/a', 'the-session', '/home/me')).toMatch(/the-session\.jsonl$/)
   })
+}
 
+function resolvingTheDirectoryTests() {
   // The runtime encodes the directory the *process* is in, and macOS hands out
   // two names for the same one. A worktree under `/var/folders/…` is
   // `/private/var/folders/…` to the process that chdir'd into it, so this
@@ -124,24 +146,14 @@ describe('transcriptPathFor', () => {
       '/home/me/.claude/projects/-a-not-here-yet/sid.jsonl'
     )
   })
-})
+}
 
 describe('buildSettings', () => {
-  const settings = () =>
-    buildSettings({
-      hookScriptPath: '/opt/hook.mjs',
-      controlUrl: 'http://127.0.0.1:1/pretooluse',
-      controlEventUrl: 'http://127.0.0.1:1/event',
-      controlToken: 'tok',
-      sessionId: 's1',
-      nodePath: '/opt/node',
-    }) as {
-      hooks: Record<
-        'PreToolUse' | 'Stop' | 'SessionEnd',
-        Array<{ matcher: string; hooks: Array<{ command: string; timeout: number }> }>
-      >
-    }
+  describe('the PreToolUse hook', thePretooluseHookTests)
+  describe('lifecycle hooks', lifecycleHooksTests)
+})
 
+function thePretooluseHookTests() {
   it('registers a PreToolUse hook, which is the only event that can hold a tool call still', () => {
     expect(settings().hooks.PreToolUse).toHaveLength(1)
   })
@@ -164,7 +176,9 @@ describe('buildSettings', () => {
   it('waits hours rather than the default minute, because it is waiting for a person', () => {
     expect(settings().hooks.PreToolUse[0].hooks[0].timeout).toBe(43_200)
   })
+}
 
+function lifecycleHooksTests() {
   it('asks to be told when a turn ends, which is what tells finished from stuck', () => {
     expect(settings().hooks.Stop[0].hooks[0].command).toContain(`'stop'`)
   })
@@ -181,9 +195,15 @@ describe('buildSettings', () => {
     expect(settings().hooks.Stop[0].hooks[0].timeout).toBe(10)
     expect(settings().hooks.SessionEnd[0].hooks[0].timeout).toBe(10)
   })
-})
+}
 
 describe('buildLaunchSpec', () => {
+  describe('the session and its files', theSessionAndItsFilesTests)
+  describe('permissions and the model', permissionsAndTheModelTests)
+  describe('the prompt and the working copy', thePromptAndTheWorkingCopyTests)
+})
+
+function theSessionAndItsFilesTests() {
   it('runs the session under the id the console chose', () => {
     const spec = buildLaunchSpec(options())
     expect(spec.command).toContain('--session-id 11111111-2222-3333-4444-555555555555')
@@ -211,7 +231,9 @@ describe('buildLaunchSpec', () => {
   it('creates the settings directory rather than requiring one', () => {
     expect(() => buildLaunchSpec(options())).not.toThrow()
   })
+}
 
+function permissionsAndTheModelTests() {
   it('lets the runtime decide what the ladder abstains on, rather than prompting', () => {
     // The PreToolUse hook runs under every permission mode and its allow/deny
     // is honoured first, so the ladder's judgement is unchanged; what the mode
@@ -233,7 +255,9 @@ describe('buildLaunchSpec', () => {
     const spec = buildLaunchSpec({ ...options(), model: "o'; rm -rf /" })
     expect(spec.command).toContain(`--model 'o'\\''; rm -rf /'`)
   })
+}
 
+function thePromptAndTheWorkingCopyTests() {
   it('passes the composed prompt as one argument however it is punctuated', () => {
     const spec = buildLaunchSpec({ ...options(), prompt: `don't break it` })
     expect(spec.command).toContain(`'don'\\''t break it'`)
@@ -246,7 +270,7 @@ describe('buildLaunchSpec', () => {
   it('marks the session as Foundry’s, then starts the claude binary the terminal runs', () => {
     expect(buildLaunchSpec(options()).command.startsWith('FOUNDRY_RUN=1 claude ')).toBe(true)
   })
-})
+}
 
 describe('mounted skills on the command line', () => {
   it('adds no --add-dir when there is nothing to mount', () => {

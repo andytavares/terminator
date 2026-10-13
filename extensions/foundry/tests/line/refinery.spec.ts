@@ -21,6 +21,12 @@ function entry(
 }
 
 describe('queue', () => {
+  describe('ordering', orderingTests)
+  describe('base branches', baseBranchesTests)
+  describe('merged entries', mergedEntriesTests)
+})
+
+function orderingTests() {
   it('orders unmerged entries by agreedAt within a repo+base group, noting only overlaps behind', () => {
     const entries = [
       entry({ orderId: 'WO-1', agreedAt: '2026-09-01T00:00:00.000Z', files: ['a.ts'] }),
@@ -39,7 +45,9 @@ describe('queue', () => {
     ])
     expect(positions.find((p) => p.orderId === 'WO-3')?.behind).toEqual([])
   })
+}
 
+function baseBranchesTests() {
   it('keeps different base branches in separate queues', () => {
     const entries = [
       entry({ orderId: 'WO-1', agreedAt: '2026-09-01T00:00:00.000Z', files: ['a.ts'] }),
@@ -57,7 +65,9 @@ describe('queue', () => {
     ])
     expect(positions.find((p) => p.orderId === 'WO-2')?.behind).toEqual([])
   })
+}
 
+function mergedEntriesTests() {
   it('excludes merged entries from positions and from behind lists', () => {
     const entries = [
       entry({
@@ -77,7 +87,7 @@ describe('queue', () => {
       { orderId: 'WO-2', title: 'WO-2', files: ['a.ts'] },
     ])
   })
-})
+}
 
 describe('laterOverlapping', () => {
   it('names only later unmerged orders that share a file with the merged one', () => {
@@ -97,6 +107,12 @@ describe('laterOverlapping', () => {
 })
 
 describe('advisory', () => {
+  describe('no overlap and one', noOverlapAndOneTests)
+  describe('several overlaps', severalOverlapsTests)
+  describe('what it ignores', whatItIgnoresTests)
+})
+
+function noOverlapAndOneTests() {
   it('is null when the draft overlaps nothing', () => {
     const entries = [
       entry({ orderId: 'WO-1', agreedAt: '2026-09-01T00:00:00.000Z', files: ['a.ts'] }),
@@ -117,7 +133,9 @@ describe('advisory', () => {
       'Overlaps WO-1 on 2 files; it will queue behind it.'
     )
   })
+}
 
+function severalOverlapsTests() {
   it('names multiple overlapping orders in the plural, counting distinct shared files', () => {
     const entries = [
       entry({ orderId: 'WO-1', agreedAt: '2026-09-01T00:00:00.000Z', files: ['a.ts'] }),
@@ -131,7 +149,9 @@ describe('advisory', () => {
       advisory({ repo: '/repos/a', base: 'main', files: ['a.ts', 'b.ts', 'c.ts'] }, entries)
     ).toBe('Overlaps WO-1 and WO-2 on 3 files; it will queue behind them.')
   })
+}
 
+function whatItIgnoresTests() {
   it('ignores merged entries and entries in a different repo or base', () => {
     const entries = [
       entry({
@@ -155,4 +175,4 @@ describe('advisory', () => {
     ]
     expect(advisory({ repo: '/repos/a', base: 'main', files: ['a.ts'] }, entries)).toBeNull()
   })
-})
+}

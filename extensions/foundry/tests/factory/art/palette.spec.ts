@@ -2,6 +2,11 @@ import { describe, it, expect } from 'vitest'
 import { roleStyle } from '../../../src/factory/art/palette.js'
 
 describe('factory/art/palette roleStyle', () => {
+  describe('hats, visors and hair', hatsVisorsAndHairTests)
+  describe('fallbacks', fallbacksTests)
+})
+
+function hatsVisorsAndHairTests() {
   it('gives the builder a hard hat and no visor', () => {
     const s = roleStyle('builder')
     expect(s.hat).not.toBeNull()
@@ -24,7 +29,9 @@ describe('factory/art/palette roleStyle', () => {
     expect(shirts.size).toBe(roles.length)
     expect(hairs.size).toBe(roles.length)
   })
+}
 
+function fallbacksTests() {
   it('falls back to a neutral silhouette for an unknown role', () => {
     const known = ['builder', 'verifier', 'inspector', 'architect', 'author', 'scribe', 'scout']
     const unknown = roleStyle('unlisted')
@@ -36,4 +43,4 @@ describe('factory/art/palette roleStyle', () => {
   it('is deterministic for the same role', () => {
     expect(roleStyle('builder')).toEqual(roleStyle('builder'))
   })
-})
+}

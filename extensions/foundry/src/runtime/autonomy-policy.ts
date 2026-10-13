@@ -133,20 +133,20 @@ function destructiveSegment(segment: string): boolean {
   if (words.length === 0) return false
   const binary = path.basename(words[0] ?? '')
   if (DESTRUCTIVE_BINARIES.has(binary)) return true
+  if (binary === 'git') return destructiveGit(words[1] ?? '', words.slice(1))
+  return words.slice(1).some(isDestructiveFlag)
+}
 
-  const flags = words.slice(1)
-  if (binary === 'git') {
-    const subcommand = words[1] ?? ''
-    if (DESTRUCTIVE_GIT.has(subcommand)) return true
-    // A force push rewrites what other people have.
-    if (subcommand === 'push' && flags.some((f) => DESTRUCTIVE_FLAGS.some((r) => r.test(f)))) {
-      return true
-    }
-    if (subcommand === 'branch' && flags.some((f) => /^-D$|^--delete$/.test(f))) return true
-    return false
-  }
+function isDestructiveFlag(flag: string): boolean {
+  return DESTRUCTIVE_FLAGS.some((rule) => rule.test(flag))
+}
 
-  return flags.some((flag) => DESTRUCTIVE_FLAGS.some((rule) => rule.test(flag)))
+/** A `git` command, by its subcommand and the words after `git`. */
+function destructiveGit(subcommand: string, flags: readonly string[]): boolean {
+  if (DESTRUCTIVE_GIT.has(subcommand)) return true
+  // A force push rewrites what other people have.
+  if (subcommand === 'push') return flags.some(isDestructiveFlag)
+  return subcommand === 'branch' && flags.some((f) => /^-D$|^--delete$/.test(f))
 }
 
 /**

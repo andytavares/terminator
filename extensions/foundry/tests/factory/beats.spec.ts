@@ -41,12 +41,21 @@ const settled = (): ReturnType<typeof createBeats> =>
   createBeats({ doc: 'running', integrate: 'waiting', ship: 'waiting' })
 
 describe('beat scheduler', () => {
+  describe('dwell and order', dwellAndOrderTests)
+  describe('dropping and lag', droppingAndLagTests)
+  describe('determinism and free events', determinismAndFreeEventsTests)
+  describe('held tool calls', heldToolCallsTests)
+  describe('parked handoffs', parkedHandoffsTests)
+  describe('join strokes', joinStrokesTests)
+})
+
+function dwellAndOrderTests() {
   it('releases a first event at once and holds a step behind its feeder for the minimum dwell', () => {
     const events: FactoryEvent[] = [
       passed('doc'),
       { kind: 'node-state', nodeId: 'integrate', from: 'waiting', to: 'running' },
     ]
-    const beats = schedule(settled(), events, nodes, 1000)
+    const beats = schedule(settled(), { events, nodes }, 1000)
     const now = release(beats, 1000)
     expect(now.events.map((e) => e.kind === 'node-state' && e.nodeId)).toEqual(['doc'])
     expect(release(now.beats, 1000 + MIN_DWELL_MS - 1).events).toEqual([])
@@ -57,7 +66,7 @@ describe('beat scheduler', () => {
 
   it('spaces a chain that passed within 2ms, in order, one dwell apart', () => {
     const events = [passed('doc'), passed('integrate', 'waiting'), passed('ship', 'waiting')]
-    const beats = schedule(settled(), events, nodes, 5000)
+    const beats = schedule(settled(), { events, nodes }, 5000)
     const seen = drain(beats, 5000, 5000 + 4 * MIN_DWELL_MS)
       .filter((s) => s.event.kind === 'node-state' && s.event.to === 'passed')
       .map((s) => [(s.event as { nodeId: string }).nodeId, s.at])
@@ -66,10 +75,12 @@ describe('beat scheduler', () => {
     expect(times[1] - times[0]).toBeGreaterThanOrEqual(MIN_DWELL_MS)
     expect(times[2] - times[1]).toBeGreaterThanOrEqual(MIN_DWELL_MS)
   })
+}
 
+function droppingAndLagTests() {
   it('never drops an event: everything scheduled is released eventually', () => {
     const events = [passed('doc'), passed('integrate', 'waiting'), passed('ship', 'waiting')]
-    const beats = schedule(settled(), events, nodes, 0)
+    const beats = schedule(settled(), { events, nodes }, 0)
     const out = drain(beats, 0, 60_000)
     expect(out.map((o) => o.event.kind === 'node-state' && o.event.nodeId)).toContain('ship')
     const end = release(beats, 60_000)
@@ -83,26 +94,34 @@ describe('beat scheduler', () => {
       dependsOn: i === 0 ? [] : [`n${i - 1}`],
     }))
     const events = chain.map((n) => passed(n.id, 'waiting'))
-    const beats = schedule(createBeats({}), events, chain, 1000)
+    const beats = schedule(createBeats({}), { events, nodes: chain }, 1000)
     expect(Math.max(...beats.held.map((h) => h.due)) - 1000).toBeLessThanOrEqual(MAX_LAG_MS)
     const out = drain(beats, 1000, 1000 + MAX_LAG_MS)
     expect(out).toHaveLength(8)
     expect(out.map((o) => (o.event as { nodeId: string }).nodeId)).toEqual(chain.map((n) => n.id))
   })
+}
 
+function determinismAndFreeEventsTests() {
   it('is deterministic: the same events at the same times release the same beats', () => {
     const events = [passed('doc'), passed('integrate', 'waiting'), passed('ship', 'waiting')]
     const run = (): unknown =>
-      drain(schedule(settled(), events, nodes, 777), 777, 20_000).map((o) => [o.at, o.event])
+      drain(schedule(settled(), { events, nodes }, 777), 777, 20_000).map((o) => [o.at, o.event])
     expect(run()).toEqual(run())
   })
 
   it('lets events with no step to wait on straight through', () => {
     const ci: FactoryEvent = { kind: 'ci-round', round: 1, max: 3 }
-    const beats = schedule(settled(), [passed('doc'), passed('integrate', 'waiting'), ci], nodes, 0)
+    const beats = schedule(
+      settled(),
+      { events: [passed('doc'), passed('integrate', 'waiting'), ci], nodes },
+      0
+    )
     expect(release(beats, 0).events).toContainEqual(ci)
   })
+}
 
+function heldToolCallsTests() {
   it("holds a step's tool calls and handoff behind its own held events", () => {
     const tool: FactoryEvent = {
       kind: 'tool',
@@ -114,19 +133,23 @@ describe('beat scheduler', () => {
     }
     const beats = schedule(
       settled(),
-      [
-        passed('doc'),
-        { kind: 'node-state', nodeId: 'integrate', from: 'waiting', to: 'running' },
-        tool,
-      ],
-      nodes,
+      {
+        events: [
+          passed('doc'),
+          { kind: 'node-state', nodeId: 'integrate', from: 'waiting', to: 'running' },
+          tool,
+        ],
+        nodes,
+      },
       0
     )
     const first = release(beats, 0)
     expect(first.events).toHaveLength(1)
     expect(release(first.beats, MIN_DWELL_MS).events).toHaveLength(2)
   })
+}
 
+function parkedHandoffsTests() {
   it('reports a handoff as parked until the step it feeds is shown started', () => {
     const handoff: FactoryEvent = {
       kind: 'handoff',
@@ -136,20 +159,24 @@ describe('beat scheduler', () => {
     }
     const beats = schedule(
       settled(),
-      [
-        passed('doc'),
-        { kind: 'node-state', nodeId: 'integrate', from: 'waiting', to: 'running' },
-        handoff,
-      ],
-      nodes,
+      {
+        events: [
+          passed('doc'),
+          { kind: 'node-state', nodeId: 'integrate', from: 'waiting', to: 'running' },
+          handoff,
+        ],
+        nodes,
+      },
       0
     )
     const out = release(beats, 0).events.find((e) => e.kind === 'handoff')
     expect(out).toMatchObject({ targetStarted: false })
   })
+}
 
+function joinStrokesTests() {
   it('shows a join that passes unseen running for one stroke first', () => {
-    const beats = schedule(settled(), [passed('integrate', 'waiting')], nodes, 0)
+    const beats = schedule(settled(), { events: [passed('integrate', 'waiting')], nodes }, 0)
     const out = drain(beats, 0, 3000)
     expect(out.map((o) => (o.event as { to: NodeState }).to)).toEqual(['running', 'passed'])
     expect(out[1].at - out[0].at).toBeGreaterThanOrEqual(STROKE_MS)
@@ -157,12 +184,12 @@ describe('beat scheduler', () => {
 
   it('does not stroke a join that was already seen running, nor a non-join', () => {
     const seen = createBeats({ integrate: 'running' })
-    const a = schedule(seen, [passed('integrate')], nodes, 0)
+    const a = schedule(seen, { events: [passed('integrate')], nodes }, 0)
     expect(a.held).toHaveLength(1)
-    const b = schedule(settled(), [passed('doc', 'waiting')], nodes, 0)
+    const b = schedule(settled(), { events: [passed('doc', 'waiting')], nodes }, 0)
     expect(b.held).toHaveLength(1)
   })
-})
+}
 
 describe('beat scheduler: rework', () => {
   it('holds the next event for the sent-back node until the box could have been carried', () => {
@@ -175,8 +202,7 @@ describe('beat scheduler: rework', () => {
     const back: FactoryEvent = { kind: 'node-state', nodeId: 'doc', from: 'passed', to: 'waiting' }
     const beats = schedule(
       createBeats({ doc: 'passed', integrate: 'failed', ship: 'waiting' }),
-      [rework, back],
-      nodes,
+      { events: [rework, back], nodes },
       1000
     )
     const first = release(beats, 1000)

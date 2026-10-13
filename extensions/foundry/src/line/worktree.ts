@@ -84,51 +84,83 @@ export async function ensureCheckout(
   const target = checkoutPath(deps.root, order, repo.name)
   const pending = inFlight.get(target)
   if (pending !== undefined) return pending
-  const preparing = prepareCheckout(order, lane, repo, target, deps).finally(() =>
-    inFlight.delete(target)
+  const preparing = prepareCheckout({ repo, target, branch: branchFor(order, lane) }, deps).finally(
+    () => inFlight.delete(target)
   )
   inFlight.set(target, preparing)
   return preparing
 }
 
-async function prepareCheckout(
-  order: WorkOrder,
-  lane: number,
-  repo: WorkOrder['context']['repos'][number],
-  target: string,
-  deps: CheckoutDeps
-): Promise<Checkout> {
-  const branch = branchFor(order, lane)
+/** Where a lane's checkout goes, from which repository, on which branch. */
+interface CheckoutPlan {
+  readonly repo: WorkOrder['context']['repos'][number]
+  readonly target: string
+  readonly branch: string
+}
 
-  // Ask git, rather than the filesystem: a directory that exists but is not a
-  // registered worktree is not a checkout, and reusing it would put the agent
-  // somewhere git does not know about.
+/**
+ * Whether git has a worktree registered at `target`. Asked of git rather than
+ * the filesystem: a directory that exists but is not a registered worktree is
+ * not a checkout, and reusing it would put the agent somewhere git does not
+ * know about.
+ */
+async function isRegistered(origin: string, target: string, deps: CheckoutDeps): Promise<boolean> {
   const listed = await deps.exec({
     command: 'git',
     args: ['worktree', 'list', '--porcelain'],
-    cwd: repo.path,
+    cwd: origin,
     timeoutMs: 30_000,
   })
-  if (listed.exitCode === 0 && listed.stdout.includes(`worktree ${target}`)) {
-    const checkout = { repo: repo.name, origin: repo.path, path: target, branch, created: false }
-    await provisionDependencies(checkout, deps)
-    return checkout
-  }
+  return listed.exitCode === 0 && listed.stdout.includes(`worktree ${target}`)
+}
 
-  // `-B` rather than `-b`: a branch left over from a previous attempt is reset
-  // onto the base rather than failing the run with "already exists". The base
-  // is named explicitly so this does not depend on what is checked out.
+/**
+ * Adds `target` as a worktree of `repo` at its base branch, the way `how`
+ * says, unless it already is one; whether it already was.
+ */
+async function addWorktree(
+  repo: CheckoutPlan['repo'],
+  { target, how }: { target: string; how: readonly string[] },
+  deps: CheckoutDeps
+): Promise<boolean> {
+  const existing = await isRegistered(repo.path, target, deps)
+  if (existing) return true
   const added = await deps.exec({
     command: 'git',
-    args: ['worktree', 'add', '-B', branch, target, repo.baseBranch],
+    args: ['worktree', 'add', ...how, target, repo.baseBranch],
     cwd: repo.path,
     timeoutMs: 120_000,
   })
   if (added.exitCode !== 0) throw new CheckoutFailedError(repo.name, added.stderr)
+  return false
+}
 
-  const checkout = { repo: repo.name, origin: repo.path, path: target, branch, created: true }
+async function prepareCheckout(
+  { repo, target, branch }: CheckoutPlan,
+  deps: CheckoutDeps
+): Promise<Checkout> {
+  // `-B` rather than `-b`: a branch left over from a previous attempt is reset
+  // onto the base rather than failing the run with "already exists". The base
+  // is named explicitly so this does not depend on what is checked out.
+  const existing = await addWorktree(repo, { target, how: ['-B', branch] }, deps)
+  const checkout = { repo: repo.name, origin: repo.path, path: target, branch, created: !existing }
   await provisionDependencies(checkout, deps)
   return checkout
+}
+
+/** The directories holding a tracked package.json, or null when git cannot say. */
+async function manifestDirs(checkout: Checkout, deps: CheckoutDeps): Promise<string[] | null> {
+  const listed = await deps.exec({
+    command: 'git',
+    args: ['ls-files', '-z', '--', 'package.json', '*/package.json'],
+    cwd: checkout.path,
+    timeoutMs: 30_000,
+  })
+  if (listed.exitCode !== 0) return null
+  return listed.stdout
+    .split('\0')
+    .filter((p) => p !== '' && !p.includes('node_modules'))
+    .map((manifest) => path.dirname(manifest))
 }
 
 /**
@@ -150,64 +182,56 @@ export async function provisionDependencies(
 ): Promise<string[]> {
   const linked: string[] = []
   try {
-    const listed = await deps.exec({
-      command: 'git',
-      args: ['ls-files', '-z', '--', 'package.json', '*/package.json'],
-      cwd: checkout.path,
-      timeoutMs: 30_000,
-    })
-    if (listed.exitCode !== 0) return linked
-
-    const manifests = listed.stdout
-      .split('\0')
-      .filter((p) => p !== '' && !p.includes('node_modules'))
-
-    for (const manifest of manifests) {
-      const dir = path.dirname(manifest)
-      const originModules = path.join(checkout.origin, dir, 'node_modules')
-      const worktreeModules = path.join(checkout.path, dir, 'node_modules')
-      const rel = path.join(dir, 'node_modules')
-
-      try {
-        if (!fs.statSync(originModules).isDirectory()) continue
-      } catch {
-        continue
-      }
-
-      try {
-        fs.lstatSync(worktreeModules)
-        continue // already there — never overwrite what the worktree has
-      } catch {
-        // does not exist yet, proceed to link it
-      }
-
-      try {
-        fs.symlinkSync(originModules, worktreeModules, 'dir')
-      } catch {
-        continue
-      }
-
-      const ignored = await deps.exec({
-        command: 'git',
-        args: ['check-ignore', '-q', rel],
-        cwd: checkout.path,
-        timeoutMs: 30_000,
-      })
-      if (ignored.exitCode !== 0) {
-        try {
-          fs.unlinkSync(worktreeModules)
-        } catch {
-          // best effort — nothing else to do if this fails too
-        }
-        continue
-      }
-
-      linked.push(rel)
+    for (const dir of (await manifestDirs(checkout, deps)) ?? []) {
+      if (await lendModules(checkout, dir, deps)) linked.push(path.join(dir, 'node_modules'))
     }
   } catch {
     return linked
   }
   return linked
+}
+
+/** Links the origin's `node_modules` for `dir` into the checkout, where git ignores it. */
+async function lendModules(checkout: Checkout, dir: string, deps: CheckoutDeps): Promise<boolean> {
+  const originModules = path.join(checkout.origin, dir, 'node_modules')
+  const worktreeModules = path.join(checkout.path, dir, 'node_modules')
+  if (!isDirectory(originModules) || exists(worktreeModules)) return false
+  try {
+    fs.symlinkSync(originModules, worktreeModules, 'dir')
+  } catch {
+    return false
+  }
+  const ignored = await deps.exec({
+    command: 'git',
+    args: ['check-ignore', '-q', path.join(dir, 'node_modules')],
+    cwd: checkout.path,
+    timeoutMs: 30_000,
+  })
+  if (ignored.exitCode === 0) return true
+  try {
+    fs.unlinkSync(worktreeModules)
+  } catch {
+    // best effort — nothing else to do if this fails too
+  }
+  return false
+}
+
+function isDirectory(target: string): boolean {
+  try {
+    return fs.statSync(target).isDirectory()
+  } catch {
+    return false
+  }
+}
+
+/** Whether anything is at `target`, a dangling link included — never overwrite what is there. */
+function exists(target: string): boolean {
+  try {
+    fs.lstatSync(target)
+    return true
+  } catch {
+    return false
+  }
 }
 
 /**
@@ -223,29 +247,25 @@ export async function unlinkBorrowedDependencies(
 ): Promise<string[]> {
   const unlinked: string[] = []
   try {
-    const listed = await deps.exec({
-      command: 'git',
-      args: ['ls-files', '-z', '--', 'package.json', '*/package.json'],
-      cwd: checkout.path,
-      timeoutMs: 30_000,
-    })
-    if (listed.exitCode !== 0) return unlinked
-    for (const manifest of listed.stdout.split('\0')) {
-      if (manifest === '' || manifest.includes('node_modules')) continue
-      const rel = path.join(path.dirname(manifest), 'node_modules')
-      const target = path.join(checkout.path, rel)
-      try {
-        if (!fs.lstatSync(target).isSymbolicLink()) continue
-        fs.unlinkSync(target)
-        unlinked.push(rel)
-      } catch {
-        // absent, or not ours to remove
-      }
+    for (const dir of (await manifestDirs(checkout, deps)) ?? []) {
+      const rel = path.join(dir, 'node_modules')
+      if (unlinkIfLink(path.join(checkout.path, rel))) unlinked.push(rel)
     }
   } catch {
     return unlinked
   }
   return unlinked
+}
+
+function unlinkIfLink(target: string): boolean {
+  try {
+    if (!fs.lstatSync(target).isSymbolicLink()) return false
+    fs.unlinkSync(target)
+    return true
+  } catch {
+    // absent, or not ours to remove
+    return false
+  }
 }
 
 /**
@@ -297,23 +317,7 @@ export async function ensureBaseCheckout(
     throw new CheckoutFailedError(`lane ${lane}`, 'the order has no such lane')
 
   const target = `${checkoutPath(deps.root, order, repo.name)}@base`
-  const listed = await deps.exec({
-    command: 'git',
-    args: ['worktree', 'list', '--porcelain'],
-    cwd: repo.path,
-    timeoutMs: 30_000,
-  })
-  const existing = listed.exitCode === 0 && listed.stdout.includes(`worktree ${target}`)
-
-  if (!existing) {
-    const added = await deps.exec({
-      command: 'git',
-      args: ['worktree', 'add', '--detach', target, repo.baseBranch],
-      cwd: repo.path,
-      timeoutMs: 120_000,
-    })
-    if (added.exitCode !== 0) throw new CheckoutFailedError(repo.name, added.stderr)
-  }
+  const existing = await addWorktree(repo, { target, how: ['--detach'] }, deps)
 
   const checkout = {
     repo: repo.name,
