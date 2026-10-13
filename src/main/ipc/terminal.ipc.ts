@@ -12,7 +12,7 @@ import { MissingCwdError } from '../terminal/pty-manager.js'
 import type { OutputRelay, RendererSend } from '../terminal/output-relay.js'
 import type { PtyManager } from '../terminal/pty-manager.js'
 import type { BrowserWindow } from 'electron'
-import { getGlobalSettings } from '../storage/settings-store.js'
+import { defaultShellFor } from '../terminal/default-shell.js'
 import { markClosed } from '../sessions/session-record-store.js'
 
 const CreateTerminalSchema = z.object({
@@ -237,7 +237,7 @@ function createTerminal(
   input: z.infer<typeof CreateTerminalSchema>
 ): { sessionId: string; shell: string } {
   const { projectId, tabTitle, type, cwd, shell, initialCommand } = input
-  const defaultShell = shell ?? getGlobalSettings().terminal.defaultShell
+  const defaultShell = shell ?? defaultShellFor(projectId)
   const sessionId = randomUUID()
 
   ptyManager.spawnSession({

@@ -21,7 +21,11 @@ import { MissingCwdError } from '../../../src/main/terminal/pty-manager.js'
 import type { SessionInfo, SpawnSessionOptions } from '@terminator/extension-sdk'
 import { OUTPUT_FLUSH_INTERVAL_MS } from '../../../src/main/terminal/output-batcher.js'
 import { HIGH_WATERMARK_CHARS } from '../../../src/main/terminal/flow-control.js'
-import { updateGlobalSettings } from '../../../src/main/storage/settings-store.js'
+import {
+  updateGlobalSettings,
+  updateWorkspaceSettings,
+} from '../../../src/main/storage/settings-store.js'
+import { createProject, createWorkspace } from '../../../src/main/storage/workspace-store.js'
 import * as records from '../../../src/main/sessions/session-record-store.js'
 import * as links from '../../../src/main/integrations/issue-link-store.js'
 import { writeContextFile } from '../../../src/main/integrations/agent-context.js'
@@ -252,6 +256,43 @@ describe('registerTerminalHandlers — terminal:create explicit shell', () => {
     expect(ptyManager.spawnSession).toHaveBeenCalledWith(
       expect.objectContaining({ shell: '/bin/fish' })
     )
+  })
+})
+
+/** A project in a new workspace whose own default shell is `shell`. */
+function projectInWorkspaceUsing(shell: string): string {
+  const created = createWorkspace({ name: `ws ${shell}`, folderPath: '/repo' })
+  if (!('workspace' in created)) throw new Error('workspace not created')
+  updateWorkspaceSettings(created.workspace.id, { terminal: { defaultShell: shell } })
+  const made = createProject({
+    workspaceId: created.workspace.id,
+    name: 'main',
+    worktreePath: '/repo',
+  })
+  if (!('project' in made)) throw new Error('project not created')
+  return made.project.id
+}
+
+describe('registerTerminalHandlers — a workspace default shell', () => {
+  useTerminalHandlers()
+
+  it("opens a project's terminal in its workspace's own default shell", async () => {
+    const projectId = projectInWorkspaceUsing('/bin/fish')
+    const created = (await invokeHandler('terminal:create')(
+      {},
+      { ...VALID_CREATE, projectId }
+    )) as {
+      shell: string
+    }
+    expect(created.shell).toBe('/bin/fish')
+    expect(ptyManager.spawnSession).toHaveBeenCalledWith(
+      expect.objectContaining({ shell: '/bin/fish' })
+    )
+  })
+
+  it('uses the global default shell for a project whose workspace sets none', async () => {
+    const created = (await invokeHandler('terminal:create')({}, VALID_CREATE)) as { shell: string }
+    expect(created.shell).toBe('/bin/zsh')
   })
 })
 

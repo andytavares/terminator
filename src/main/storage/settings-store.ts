@@ -43,7 +43,7 @@ export function updateWorkspaceSettings(workspaceId: string, patch: unknown): Wo
   const workspaces = store.get('workspaces')
   const current = workspaces[workspaceId] ?? { workspaceId, overrides: {}, extensions: {} }
   const overrides = WorkspaceSettingsSchema.shape.overrides.parse(
-    deepMerge(current.overrides ?? {}, (patch as WorkspaceSettings['overrides']) ?? {})
+    mergeOverrides(current.overrides ?? {}, (patch as Record<string, unknown>) ?? {})
   )
   const updated: WorkspaceSettings = { ...current, overrides }
   store.set('workspaces', { ...workspaces, [workspaceId]: updated })
@@ -59,6 +59,21 @@ function deepMerge<T>(target: T, source: Partial<T>): T {
     } else if (val !== undefined) {
       result[key] = val as T[typeof key]
     }
+  }
+  return result
+}
+
+/**
+ * Like deepMerge, except that a key the patch sets to undefined is removed:
+ * that is how "Use global default" hands a setting back to the global value.
+ */
+function mergeOverrides(target: object, patch: Record<string, unknown>): object {
+  const result: Record<string, unknown> = { ...target }
+  for (const [key, val] of Object.entries(patch)) {
+    if (val === undefined) delete result[key]
+    else if (val !== null && typeof val === 'object' && !Array.isArray(val)) {
+      result[key] = mergeOverrides((result[key] as object) ?? {}, val as Record<string, unknown>)
+    } else result[key] = val
   }
   return result
 }

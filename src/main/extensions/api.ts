@@ -60,6 +60,7 @@ import {
 import type { NotificationTarget } from '../notifications/notification-manager.js'
 import { getExtensionSetting, setExtensionSetting } from '../storage/extension-settings-store.js'
 import { getGlobalSettings } from '../storage/settings-store.js'
+import { defaultShellFor } from '../terminal/default-shell.js'
 import { basename } from 'path'
 import { randomUUID } from 'crypto'
 import { makeLogger } from '../logger.js'
@@ -778,7 +779,7 @@ function ptyTabsApi({
       return requirePty().spawnSession(opts)
     },
     async openTerminal(input): Promise<string | null> {
-      const shell = input.shell ?? getGlobalSettings().terminal.defaultShell
+      const shell = input.shell ?? defaultShellFor(input.projectId)
       return openTab(requirePty(), deps, { ...input, shell })
     },
     async runInTerminal(input): Promise<TerminalExit | null> {

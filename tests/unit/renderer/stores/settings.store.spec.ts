@@ -157,14 +157,30 @@ describe('useSettingsStore — updateWorkspaceWorktreeBaseDir', () => {
     expect(useSettingsStore.getState().workspaceSettings.get('ws-1')).toEqual(wsSettings)
   })
 
-  it('calls updateWorkspace with undefined git override when dir is undefined', async () => {
+  it('hands back only the worktree directory when dir is undefined', async () => {
     const wsSettings = { overrides: undefined }
     mockElectronAPI.settings.updateWorkspace.mockResolvedValue({ settings: wsSettings })
 
     await useSettingsStore.getState().updateWorkspaceWorktreeBaseDir('ws-1', undefined)
     expect(mockElectronAPI.settings.updateWorkspace).toHaveBeenCalledWith('ws-1', {
-      git: undefined,
+      git: { worktreeBaseDir: undefined },
     })
+  })
+})
+
+describe('useSettingsStore — updateWorkspaceDefaultShell', () => {
+  it("saves the workspace's own shell, and undefined hands it back", async () => {
+    const wsSettings = { overrides: { terminal: { defaultShell: '/bin/fish' } } }
+    mockElectronAPI.settings.updateWorkspace.mockResolvedValue({ settings: wsSettings })
+
+    await useSettingsStore.getState().updateWorkspaceDefaultShell('ws-1', '/bin/fish')
+    await useSettingsStore.getState().updateWorkspaceDefaultShell('ws-1', undefined)
+
+    expect(mockElectronAPI.settings.updateWorkspace.mock.calls).toEqual([
+      ['ws-1', { terminal: { defaultShell: '/bin/fish' } }],
+      ['ws-1', { terminal: { defaultShell: undefined } }],
+    ])
+    expect(useSettingsStore.getState().workspaceSettings.get('ws-1')).toEqual(wsSettings)
   })
 })
 
@@ -415,7 +431,7 @@ describe("useSettingsStore — branch exclude patterns — clears a repo's own p
     mockElectronAPI.settings.updateWorkspace.mockResolvedValue({ settings: wsSettings })
     await useSettingsStore.getState().updateWorkspaceBranchExcludePatterns('ws-1', undefined)
     expect(mockElectronAPI.settings.updateWorkspace).toHaveBeenCalledWith('ws-1', {
-      git: undefined,
+      git: { branchExcludePatterns: undefined },
     })
     expect(useSettingsStore.getState().workspaceSettings.get('ws-1')).toEqual(wsSettings)
   })

@@ -1,5 +1,12 @@
 import { test, expect, Page } from '@playwright/test'
-import { AppHandle, launchApp, closeApp, createWorkspace, addAndSelectProject } from './helpers'
+import {
+  AppHandle,
+  launchApp,
+  closeApp,
+  createWorkspace,
+  addAndSelectProject,
+  terminalRows,
+} from './helpers'
 import { openExtensionSettings } from './extension-settings-page'
 
 let handle: AppHandle
@@ -143,4 +150,20 @@ test("a list setting is edited one item per line and stored as a list (Foundry's
     'src/auth/**\nmigrations/**'
   )
   await closeSettings(page)
+})
+
+test("a workspace's own Default Shell is the shell its new terminals open in", async () => {
+  const { page } = handle
+  await openSettings(page)
+  await page.locator('.settings-panel__nav-item').filter({ hasText: 'Workspace Settings' }).click()
+  const shell = page.getByRole('textbox', { name: 'Default Shell' })
+  await shell.fill('/bin/bash')
+  await shell.blur()
+  await closeSettings(page)
+
+  await page.keyboard.press('Meta+t')
+  await page.keyboard.type('echo "shell:$0"\n')
+  await expect
+    .poll(async () => (await terminalRows(page)).join('\n'), { timeout: 15_000 })
+    .toContain('shell:/bin/bash')
 })

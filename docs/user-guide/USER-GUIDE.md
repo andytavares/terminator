@@ -274,7 +274,7 @@ working again as soon as you reconnect.
 
 ### Per-workspace overrides
 
-Expand any workspace in Settings to override the global theme, scrollback limit, and default shell for sessions in that workspace.
+Expand any workspace in Settings to override the global theme, scrollback limit, and default shell for sessions in that workspace. A new terminal in one of its projects opens in the workspace's own shell. **Use global default** beside a setting hands that one setting back to the global value and leaves the workspace's other overrides alone.
 
 Themes switch immediately across the entire app — no restart required. Terminal colours re-apply live via a `MutationObserver`.
 

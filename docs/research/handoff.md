@@ -109,6 +109,14 @@ Each entry: what was decided, why, and how to undo it.
     baseline from the `update-story-baselines` label (decision 1). Undo: revert both commits;
     a migrated value is then a `string[]` the old readers do not split, so set the two lists
     again.
+20. Workspace settings: a workspace's own **Default Shell** is applied, and **Use global
+    default** works. The schema and the user guide offered a per-workspace shell, but Settings had
+    no field for it and terminals always opened the global shell; main now resolves a project's
+    shell through its workspace (`src/main/terminal/default-shell.ts`), for the app's terminals and
+    for `api.pty.openTerminal`. "Use global default" sent `{ key: undefined }`, which the store's
+    merge skipped, so no override could be handed back; a workspace patch now removes a key it sets
+    to undefined (`mergeOverrides`), and each reset names only its own setting. Undo: revert the
+    commit; the field goes and overrides become sticky again.
 
 ## Known advisories
 
