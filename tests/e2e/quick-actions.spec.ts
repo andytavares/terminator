@@ -234,6 +234,9 @@ async function leaderInsideNotesOpensPanel(handle: AppHandle): Promise<void> {
 
   await keyInView(handle, 'notepad', { keyCode: 'P', modifiers: [LEADER_MODIFIER] })
   await expect(dialog(page)).toBeVisible({ timeout: 10000 })
+  // Escape closes the panel from inside it; pressed before focus has moved
+  // there from the extension's view, it closes nothing (as core-ipc found).
+  await expect(dialog(page)).toBeFocused()
 
   // A single Escape closes only the panel — Notes stays the active surface.
   await page.keyboard.press('Escape')
