@@ -11,7 +11,7 @@
   system's `ListInput`). Give it a `default` of `[]`.
 - A view's `extension.onSettingsChanged(handler)`: called after any extension setting changes,
   whoever changed it, so a view re-reads `getSettingsValues()` and applies the change at once.
-  Returns the unsubscribe.
+  Returns the unsubscribe. A pop-out window (`api.window.openAuxiliary`) has it too.
 
 ### Fixed
 

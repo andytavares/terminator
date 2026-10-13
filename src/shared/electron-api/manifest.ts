@@ -651,8 +651,9 @@ export const ELECTRON_API_MANIFEST = [
     signature: signature<(handler: () => void) => Unsubscribe>(),
     toHandlerArgs: () => [],
     // A view re-reads the settings it applies; Settings itself writes them.
+    // Shared: a pop-out window runs an extension view on the app preload.
     remote: 'omit',
-    extensionView: 'only',
+    extensionView: 'shared',
   }),
   method({
     path: 'extension.getCommands',
