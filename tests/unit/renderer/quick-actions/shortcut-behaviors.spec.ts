@@ -87,7 +87,9 @@ describe('cycleMostRecentlyAttended', () => {
     cycleMostRecentlyAttended('p1', -1, sessions())
     expect(shownIn('p1')).toBe('b')
   })
+})
 
+describe('cycleMostRecentlyAttended — ignores closed sessions and does nothing with fewer than two', () => {
   it('ignores closed sessions and does nothing with fewer than two', () => {
     addSession('a', 'p1', { lastAttendedAt: 300 })
     addSession('b', 'p1', { lastAttendedAt: 200, status: 'closed' })
@@ -207,18 +209,18 @@ describe('splitPane', () => {
   })
 })
 
-describe('closeFocusedPane', () => {
-  function deps(overrides: Partial<ClosePaneDeps> = {}): ClosePaneDeps {
-    return {
-      getPaneLayout: () => null,
-      getFocusedSession: () => null,
-      closeSplitLeaf: vi.fn(),
-      closeSession: vi.fn(() => Promise.resolve()),
-      getActiveSessionForProject: () => null,
-      ...overrides,
-    }
+function deps(overrides: Partial<ClosePaneDeps> = {}): ClosePaneDeps {
+  return {
+    getPaneLayout: () => null,
+    getFocusedSession: () => null,
+    closeSplitLeaf: vi.fn(),
+    closeSession: vi.fn(() => Promise.resolve()),
+    getActiveSessionForProject: () => null,
+    ...overrides,
   }
+}
 
+describe('closeFocusedPane', () => {
   it('closes the focused leaf of a split and reports a failed close', async () => {
     const d = deps({
       getPaneLayout: () => ({}),

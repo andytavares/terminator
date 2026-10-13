@@ -18,7 +18,8 @@ function setupWindow() {
   vi.stubGlobal('window', { electronAPI: electronApiOf({ logger: { write: mockLoggerWrite } }) })
 }
 
-describe('makeRendererLogger()', () => {
+/** The hooks every "makeRendererLogger()" describe registers. */
+function setUpMakeRendererLogger(): void {
   beforeEach(() => {
     vi.clearAllMocks()
     setupWindow()
@@ -27,6 +28,10 @@ describe('makeRendererLogger()', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
   })
+}
+
+describe('makeRendererLogger()', () => {
+  setUpMakeRendererLogger()
 
   it('ships debug messages to the log store', () => {
     const log = makeRendererLogger('test')
@@ -57,6 +62,10 @@ describe('makeRendererLogger()', () => {
     log.info('status', 200, { detail: 'ok' })
     expect(logged()).toContainEqual(['info', '[ns] status 200 {"detail":"ok"}'])
   })
+})
+
+describe('makeRendererLogger() — calls window.electronAPI.logger.write', () => {
+  setUpMakeRendererLogger()
 
   it('calls window.electronAPI.logger.write', () => {
     const log = makeRendererLogger('ns')
@@ -72,12 +81,16 @@ describe('makeRendererLogger()', () => {
   })
 })
 
-describe('installLogInterceptor()', () => {
-  let originalLog: typeof console.log
-  let originalInfo: typeof console.info
-  let originalWarn: typeof console.warn
-  let originalError: typeof console.error
+let originalLog: typeof console.log
 
+let originalInfo: typeof console.info
+
+let originalWarn: typeof console.warn
+
+let originalError: typeof console.error
+
+/** The hooks every "installLogInterceptor()" describe registers. */
+function setUpInstallLogInterceptor(): void {
   beforeEach(() => {
     vi.clearAllMocks()
     setupWindow()
@@ -94,6 +107,10 @@ describe('installLogInterceptor()', () => {
     console.error = originalError
     vi.unstubAllGlobals()
   })
+}
+
+describe('installLogInterceptor()', () => {
+  setUpInstallLogInterceptor()
 
   it('wraps console.log to ship to the log store', () => {
     installLogInterceptor()
@@ -124,6 +141,10 @@ describe('installLogInterceptor()', () => {
     console.log('hello', 'world')
     expect(logged()).toContainEqual(['log', '[renderer] hello world'])
   })
+})
+
+describe('installLogInterceptor() — serialises object arguments', () => {
+  setUpInstallLogInterceptor()
 
   it('serialises object arguments', () => {
     installLogInterceptor()

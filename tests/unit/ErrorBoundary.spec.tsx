@@ -29,7 +29,9 @@ describe('ErrorBoundary', () => {
     console.error = originalError
     expect(screen.getByText('Something went wrong')).toBeTruthy()
   })
+})
 
+describe('ErrorBoundary — fallback container uses CSS variable for background, not hardcoded hex', () => {
   it('fallback container uses CSS variable for background, not hardcoded hex', () => {
     const originalError = console.error
     console.error = () => {}

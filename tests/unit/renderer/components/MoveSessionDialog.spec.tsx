@@ -79,12 +79,12 @@ function setupMocks(sessionProjectId = SCRATCH) {
   })
 }
 
-describe('MoveSessionDialog', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-    setupMocks()
-  })
+beforeEach(() => {
+  vi.clearAllMocks()
+  setupMocks()
+})
 
+describe('MoveSessionDialog', () => {
   it('renders workspace and project options', () => {
     render(<MoveSessionDialog sessionId="sess-1" onClose={mockOnClose} />)
     expect(screen.getByText('Alpha')).toBeTruthy()
@@ -109,7 +109,9 @@ describe('MoveSessionDialog', () => {
     fireEvent.click(screen.getByText('+ New branch in Alpha'))
     expect(screen.getByPlaceholderText('My branch')).toBeTruthy()
   })
+})
 
+describe('MoveSessionDialog — moves the session to the chosen branch and shows it there', () => {
   it('moves the session to the chosen branch and shows it there', async () => {
     render(<MoveSessionDialog sessionId="sess-1" onClose={mockOnClose} onMoved={mockOnMoved} />)
     fireEvent.click(screen.getByText('Proj One'))
@@ -137,7 +139,9 @@ describe('MoveSessionDialog', () => {
       expect(screen.getByText('Name is required')).toBeTruthy()
     })
   })
+})
 
+describe('MoveSessionDialog — creates the branch and moves the session into it', () => {
   it('creates the branch and moves the session into it', async () => {
     render(<MoveSessionDialog sessionId="sess-1" onClose={mockOnClose} />)
     fireEvent.click(screen.getByText('+ New branch in Alpha'))
@@ -160,7 +164,9 @@ describe('MoveSessionDialog', () => {
       expect(screen.getByText('Name already in use')).toBeTruthy()
     })
   })
+})
 
+describe('MoveSessionDialog — shows generic error when createProject returns a non-duplicate error', () => {
   it('shows generic error when createProject returns a non-duplicate error', async () => {
     mockCreateProject.mockResolvedValueOnce({ error: 'UNKNOWN' })
     render(<MoveSessionDialog sessionId="sess-1" onClose={mockOnClose} />)
@@ -188,7 +194,9 @@ describe('MoveSessionDialog', () => {
     await waitFor(() => expect(projectIds()).toEqual(['proj-2']))
     expect(projectOfSession()).toBe('proj-2')
   })
+})
 
+describe('MoveSessionDialog — submits new project form on Enter key', () => {
   it('submits new project form on Enter key', async () => {
     render(<MoveSessionDialog sessionId="sess-1" onClose={mockOnClose} />)
     fireEvent.click(screen.getByText('+ New branch in Alpha'))
@@ -215,5 +223,31 @@ describe('MoveSessionDialog', () => {
     await waitFor(() => expect(screen.getByText('Name is required')).toBeTruthy())
     fireEvent.change(screen.getByPlaceholderText('My branch'), { target: { value: 'x' } })
     expect(screen.queryByText('Name is required')).toBeNull()
+  })
+})
+
+describe('MoveSessionDialog — branches it has to load or keep', () => {
+  it('loads the branches of a workspace not loaded yet', async () => {
+    const workspace2 = workspaceOf({ id: 'ws-2', name: 'Beta', folderPath: '/b' })
+    stored = [...stored, projectOf({ id: 'proj-b', workspaceId: 'ws-2', name: 'Beta One' })]
+    useWorkspaceStore.setState({ workspaces: [workspace1, workspace2] })
+    render(<MoveSessionDialog sessionId="sess-1" onClose={mockOnClose} />)
+    expect(screen.getByText('+ New branch in Beta')).toBeTruthy()
+    expect(await screen.findByText('Beta One')).toBeTruthy()
+    expect(projectApi.list).toHaveBeenCalledWith('ws-2')
+    expect(projectApi.list).not.toHaveBeenCalledWith('ws-1')
+  })
+
+  it('keeps the branch it left while another terminal is open there', async () => {
+    setupMocks('proj-1')
+    const other = terminalSessionOf({ id: 'sess-2', projectId: 'proj-1', tabTitle: 'Other' })
+    const sessions = new Map(useSessionStore.getState().sessions).set('sess-2', other)
+    useSessionStore.setState({ sessions })
+    render(<MoveSessionDialog sessionId="sess-1" onClose={mockOnClose} />)
+    fireEvent.click(screen.getByText('Proj Two'))
+    await waitFor(() => expect(mockOnClose).toHaveBeenCalled())
+    expect(projectOfSession()).toBe('proj-2')
+    expect(projectIds()).toEqual(['proj-1', 'proj-2'])
+    expect(projectApi.delete).not.toHaveBeenCalled()
   })
 })

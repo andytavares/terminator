@@ -63,7 +63,9 @@ describe('planResume', () => {
   it('has no plan when the conversation can no longer be resumed', () => {
     expect(planResume(exited({ resumable: false }))).toBeNull()
   })
+})
 
+describe('planResume — takes the branch from the snapshot, which a closed session still has', () => {
   it('takes the branch from the snapshot, which a closed session still has', () => {
     const closed = exited({
       isClosed: true,

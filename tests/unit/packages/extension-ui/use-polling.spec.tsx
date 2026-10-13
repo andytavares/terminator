@@ -40,7 +40,9 @@ describe('usePolling', () => {
     await vi.advanceTimersByTimeAsync(5000)
     expect(read).toHaveBeenCalledTimes(1)
   })
+})
 
+describe('usePolling — does not show an answer that arrives after unmount', () => {
   it('does not show an answer that arrives after unmount', async () => {
     let arrive: (value: number) => void = () => {}
     const read = vi.fn(() => new Promise<number>((resolve) => (arrive = resolve)))
@@ -51,7 +53,9 @@ describe('usePolling', () => {
     await act(async () => {})
     expect(show).not.toHaveBeenCalled()
   })
+})
 
+describe('usePolling — stops while the view is hidden and reads at once when it is shown again', () => {
   it('stops while the view is hidden and reads at once when it is shown again', async () => {
     const read = vi.fn(async () => 1)
     renderHook(() => usePolling(read, vi.fn(), 1000))

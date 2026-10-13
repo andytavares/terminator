@@ -42,18 +42,7 @@ export function Toast({
   action,
   onDismiss,
 }: ToastProps): JSX.Element {
-  const dismissRef = useRef(onDismiss)
-  useEffect(() => {
-    dismissRef.current = onDismiss
-  })
-
-  useEffect(() => {
-    const ms = duration ?? (tone === 'error' ? 0 : DEFAULT_DURATION_MS)
-    if (ms <= 0) return
-    const timer = setTimeout(() => dismissRef.current(), ms)
-    return () => clearTimeout(timer)
-  }, [duration, tone])
-
+  useAutoDismiss(onDismiss, duration, tone)
   return (
     <div className="tmui-toast" data-tone={tone} role="status">
       <span className="tmui-toast__message">{message}</span>
@@ -73,6 +62,25 @@ export function Toast({
       </button>
     </div>
   )
+}
+
+/** Dismisses after the toast's duration; zero leaves it to the reader. */
+function useAutoDismiss(
+  onDismiss: () => void,
+  duration: number | undefined,
+  tone: ToastTone
+): void {
+  const dismissRef = useRef(onDismiss)
+  useEffect(() => {
+    dismissRef.current = onDismiss
+  })
+
+  useEffect(() => {
+    const ms = duration ?? (tone === 'error' ? 0 : DEFAULT_DURATION_MS)
+    if (ms <= 0) return
+    const timer = setTimeout(() => dismissRef.current(), ms)
+    return () => clearTimeout(timer)
+  }, [duration, tone])
 }
 
 export interface ToastRegionProps {

@@ -35,7 +35,9 @@ describe('ChoiceButtons', () => {
     expect(onAnswer).toHaveBeenCalledWith(3)
     expect(tile).not.toHaveBeenCalled()
   })
+})
 
+describe('ChoiceButtons — does not bubble Enter to a tile that would open on it', () => {
   it('does not bubble Enter to a tile that would open on it', () => {
     const tileKey = vi.fn()
     render(

@@ -117,7 +117,9 @@ describe('LinkIssueDialog — searching', () => {
     })
     expect(screen.getByText('Results')).toBeTruthy()
   })
+})
 
+describe('LinkIssueDialog — searching — goes back to assigned issues when the search is cleared', () => {
   it('goes back to assigned issues when the search is cleared', async () => {
     vi.useFakeTimers()
     open()
@@ -154,10 +156,14 @@ describe('LinkIssueDialog — linking', () => {
     fireEvent.click(await screen.findByText('TAV-42'))
     fireEvent.click(screen.getByText('Link TAV-42'))
 
-    await waitFor(() => expect(linkIssue).toHaveBeenCalledWith(P, 'linear', 'TAV-42'))
+    await waitFor(() =>
+      expect(linkIssue).toHaveBeenCalledWith(P, { tracker: 'linear', key: 'TAV-42' })
+    )
     await waitFor(() => expect(onClose).toHaveBeenCalled())
   })
+})
 
+describe('LinkIssueDialog — linking — reports a failure and stays open rather than pretending', () => {
   it('reports a failure and stays open rather than pretending', async () => {
     const onClose = vi.fn()
     linkIssue.mockResolvedValue(false)
@@ -185,7 +191,9 @@ describe('LinkIssueDialog — linking', () => {
     fireEvent.click(await screen.findByText('TAV-42'))
     expect(screen.queryByRole('alert')).toBeNull()
   })
+})
 
+describe('LinkIssueDialog — linking — does not warn for a project that has no issue yet', () => {
   it('does not warn for a project that has no issue yet', async () => {
     open()
     fireEvent.click(await screen.findByText('TAV-42'))
@@ -234,5 +242,28 @@ describe('LinkIssueDialog — dismissal', () => {
 
     fireEvent.click(container.querySelector('.tmui-dialog__scrim') as Element)
     expect(onClose).toHaveBeenCalled()
+  })
+})
+
+describe('LinkIssueDialog — shortcuts and odd failures', () => {
+  it('links a row on double click, and tells the caller', async () => {
+    const onClose = vi.fn()
+    const onLinked = vi.fn()
+    open({ onClose, onLinked })
+    const row = await screen.findByText('TAV-42')
+    fireEvent.click(row)
+    fireEvent.doubleClick(row)
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+    expect(linkIssue).toHaveBeenCalledWith(P, { tracker: 'linear', key: 'TAV-42' })
+    expect(onLinked).toHaveBeenCalledWith(expect.objectContaining({ key: 'TAV-42' }))
+  })
+
+  it('names a failure it has no words for by its code', async () => {
+    listMine.mockResolvedValue({
+      issues: [issueSummaryOf()],
+      failures: [{ tracker: 'jira', error: 'brand-new-error' }],
+    })
+    open()
+    expect((await screen.findByRole('status')).textContent).toBe('Jira brand-new-error')
   })
 })

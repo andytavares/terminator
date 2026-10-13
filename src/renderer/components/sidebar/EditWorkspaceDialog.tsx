@@ -1,9 +1,7 @@
 import { useShallow } from 'zustand/react/shallow'
-import { Dialog } from '@terminator/extension-ui'
 import type { Workspace } from '../../../shared/types/index'
 import { useWorkspaceStore } from '../../stores/workspace.store'
-import { useModalEffect } from '../../stores/modal.store'
-import { DUPLICATE_NAME, WorkspaceFields, useWorkspaceForm } from './workspace-form'
+import { WorkspaceDialog, showSaveError, useWorkspaceForm } from './workspace-form'
 
 interface Props {
   workspace: Workspace
@@ -11,7 +9,20 @@ interface Props {
 }
 
 export function EditWorkspaceDialog({ workspace, onClose }: Props): JSX.Element {
-  useModalEffect()
+  const { form, save } = useEditWorkspace(workspace, onClose)
+  return (
+    <WorkspaceDialog
+      title="Edit Workspace"
+      submitLabel="Save"
+      form={form}
+      onSubmit={save}
+      onClose={onClose}
+    />
+  )
+}
+
+/** The workspace's draft, and saving it unless its new name is another's. */
+function useEditWorkspace(workspace: Workspace, onClose: () => void) {
   const { updateWorkspace, workspaces } = useWorkspaceStore(
     useShallow((s) => ({ updateWorkspace: s.updateWorkspace, workspaces: s.workspaces }))
   )
@@ -27,7 +38,7 @@ export function EditWorkspaceDialog({ workspace, onClose }: Props): JSX.Element 
       workspaces.some((w) => w.name.toLowerCase() === value.toLowerCase() && w.id !== workspace.id)
   )
 
-  async function handleSubmit(): Promise<void> {
+  async function save(): Promise<void> {
     if (!form.nameIsValid()) return
     const { name, folderPath, color } = form.draft
     const result = await updateWorkspace({
@@ -37,30 +48,8 @@ export function EditWorkspaceDialog({ workspace, onClose }: Props): JSX.Element 
       color,
       tags: form.tagList(),
     })
-    if ('error' in result) {
-      if (result.error === 'DUPLICATE_NAME') form.setNameError(DUPLICATE_NAME)
-      else form.setError('Failed to update workspace')
-      return
-    }
-    onClose()
+    if (!showSaveError(form, result, 'Failed to update workspace')) onClose()
   }
 
-  return (
-    <Dialog
-      title="Edit Workspace"
-      onDismiss={onClose}
-      actions={[
-        { label: 'Cancel', onSelect: onClose },
-        {
-          label: 'Save',
-          tone: 'primary',
-          submit: true,
-          disabled: !!form.nameError,
-          onSelect: handleSubmit,
-        },
-      ]}
-    >
-      <WorkspaceFields form={form} />
-    </Dialog>
-  )
+  return { form, save }
 }

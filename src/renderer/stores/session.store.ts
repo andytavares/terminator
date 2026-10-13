@@ -1,12 +1,13 @@
-import { create } from 'zustand'
-import type {
-  ChoicePrompt,
-  TerminalSession,
-  PaneNode,
-  PaneSplitDirection,
-} from '../../shared/types/index'
+import { create, type StoreApi } from 'zustand'
+import type { ChoicePrompt, TerminalSession, PaneNode } from '../../shared/types/index'
 import { SCRATCH_PROJECT_ID } from '../../shared/types/index'
-import { splitLeaf, removeLeaf, leafIds, updateSplitRatio } from '../utils/pane-tree'
+import {
+  splitLeaf,
+  removeLeaf,
+  leafIds,
+  updateSplitRatio,
+  type PaneSplit,
+} from '../utils/pane-tree'
 import type { TerminalInstance } from '../components/terminal/TerminalSession'
 
 /**
@@ -16,7 +17,7 @@ import type { TerminalInstance } from '../components/terminal/TerminalSession'
  * five parallel maps — removing or moving a session reconciles it in exactly
  * one place (detachSessionFromView).
  */
-export interface ProjectView {
+interface ProjectView {
   activeSessionId?: string
   focusedSessionId?: string
   /**
@@ -85,32 +86,35 @@ function detachSessionFromView(
   // Layout: drop the leaf; a layout with ≤1 leaf collapses to single-pane mode.
   const held = layoutHolding(next, sessionId)
   const pruned = held ? removeLeaf(held, sessionId) : null
-  if (held) {
-    next.paneLayouts = replaceLayout(
-      next,
-      held,
-      pruned && leafIds(pruned).length > 1 ? pruned : undefined
-    )
-  }
+  if (held) next.paneLayouts = replaceLayout(next, held, stillSplit(pruned))
 
   // Order: filter the departing session out.
-  if (next.order) {
-    const filtered = next.order.filter((id) => id !== sessionId)
-    next.order = filtered.length > 0 ? filtered : undefined
-  }
+  if (next.order) next.order = orderWithout(next.order, sessionId)
 
   // Active: what is left of its split, else the first remaining tab in display order.
   if (next.activeSessionId === sessionId) {
     next.activeSessionId = pruned ? leafIds(pruned)[0] : remainingOrderedIds[0]
   }
+  return withFocusOnScreen(next, sessionId)
+}
 
-  // Focused: only meaningful while a split is on screen.
-  const onScreen = layoutHolding(next, next.activeSessionId)
-  if (next.focusedSessionId === sessionId || !onScreen) {
-    next.focusedSessionId = onScreen ? leafIds(onScreen)[0] : undefined
+/** A pruned layout that still splits the tab, or undefined once one pane is left. */
+function stillSplit(pruned: PaneNode | null): PaneNode | undefined {
+  return pruned && leafIds(pruned).length > 1 ? pruned : undefined
+}
+
+function orderWithout(order: string[], sessionId: string): string[] | undefined {
+  const filtered = order.filter((id) => id !== sessionId)
+  return filtered.length > 0 ? filtered : undefined
+}
+
+/** Focused: only meaningful while a split is on screen. */
+function withFocusOnScreen(view: ProjectView, departedId: string): ProjectView {
+  const onScreen = layoutHolding(view, view.activeSessionId)
+  if (view.focusedSessionId === departedId || !onScreen) {
+    view.focusedSessionId = onScreen ? leafIds(onScreen)[0] : undefined
   }
-
-  return next
+  return view
 }
 
 /**
@@ -151,21 +155,26 @@ function orderedSessionsForProject(
   return [...ordered, ...untracked]
 }
 
+/** A terminal to open: where, of what kind, and under what title. */
+export interface NewSessionRequest {
+  projectId: string
+  type: 'human' | 'agent'
+  /** Empty for the next "Terminal N". */
+  title: string
+  cwd: string
+  scrollbackLimit: number
+  /** The session this one is a split pane of. */
+  parentSessionId?: string
+  /** One line run in the terminal once it opens, for a terminal that resumes a conversation. */
+  initialCommand?: string
+}
+
 interface SessionState {
   sessions: Map<string, TerminalSession>
   terminalInstances: Map<string, TerminalInstance>
   projectViews: Map<string, ProjectView>
 
-  createSession: (
-    projectId: string,
-    type: 'human' | 'agent',
-    title: string,
-    cwd: string,
-    scrollbackLimit: number,
-    parentSessionId?: string,
-    /** One line run in the terminal once it opens, for a terminal that resumes a conversation. */
-    initialCommand?: string
-  ) => Promise<string>
+  createSession: (request: NewSessionRequest) => Promise<string>
   /**
    * Takes ownership of a terminal the main process already spawned.
    *
@@ -210,12 +219,8 @@ interface SessionState {
 
   /** The split of the tab on screen; null when that tab shows alone. */
   getPaneLayout: (projectId: string) => PaneNode | null
-  activateSplit: (
-    projectId: string,
-    focusedId: string,
-    newId: string,
-    direction: PaneSplitDirection
-  ) => void
+  /** Splits `split.targetId` in the project's tab, focusing the new pane. */
+  activateSplit: (projectId: string, split: PaneSplit) => void
   closeSplitLeaf: (projectId: string, sessionId: string) => void
   setSplitRatio: (projectId: string, splitId: string, ratio: number) => void
   /** The focused pane of the split on screen; null when that tab shows alone. */
@@ -254,349 +259,399 @@ function patchView(
   return { projectViews }
 }
 
+type SetSessions = StoreApi<SessionState>['setState']
+type GetSessions = StoreApi<SessionState>['getState']
+type SessionData = Pick<SessionState, 'sessions' | 'terminalInstances' | 'projectViews'>
+
+/** The request's title, or the project's next "Terminal N", counting it. */
+function resolveTitle(set: SetSessions, get: GetSessions, request: NewSessionRequest): string {
+  if (request.title) return request.title
+  const next = viewOf(get().projectViews, request.projectId).terminalCounter + 1
+  set((s) => patchView(s, request.projectId, { terminalCounter: next }))
+  return `Terminal ${next}`
+}
+
+function newSessionRecord(
+  request: NewSessionRequest,
+  tabTitle: string,
+  { sessionId, shell }: { sessionId: string; shell?: string }
+): TerminalSession {
+  const createdAt = new Date().toISOString()
+  return {
+    id: sessionId,
+    projectId: request.projectId,
+    tabTitle,
+    status: 'active',
+    type: request.type,
+    scrollbackLimit: request.scrollbackLimit,
+    createdAt,
+    parentSessionId: request.parentSessionId,
+    // A session with no recorded activity is treated as last active when it
+    // was created, so recency is representable from the first render (FR-007).
+    lastActivityAt: Date.parse(createdAt),
+    agentState: 'idle',
+    ...(shell === undefined ? {} : { shell }),
+  }
+}
+
+/** Adds the session, appending it to its project's order when one is kept. */
+function withSession(s: SessionData, session: TerminalSession): Partial<SessionData> {
+  const sessions = new Map(s.sessions)
+  sessions.set(session.id, session)
+  const view = viewOf(s.projectViews, session.projectId)
+  const projectViews = new Map(s.projectViews)
+  if (view.order) {
+    projectViews.set(session.projectId, { ...view, order: [...view.order, session.id] })
+  }
+  return { sessions, projectViews }
+}
+
+async function createSession(
+  set: SetSessions,
+  get: GetSessions,
+  request: NewSessionRequest
+): Promise<string> {
+  const tabTitle = resolveTitle(set, get, request)
+  const { projectId, type, scrollbackLimit, cwd, initialCommand } = request
+  const result = await window.electronAPI.terminal.create({
+    ...{ projectId, type, tabTitle, scrollbackLimit, cwd },
+    ...(initialCommand === undefined ? {} : { initialCommand }),
+  })
+  // The message when there is one: 'CWD_MISSING' names the failure, but only
+  // the message names the folder, and the folder is the whole answer.
+  if ('error' in result) throw new Error(result.message ?? result.error)
+  const session = newSessionRecord(request, tabTitle, result)
+  set((s) => withSession(s, session))
+  return result.sessionId
+}
+
+type Adopted = Parameters<SessionState['adoptSession']>[0]
+
+function adoptedSession(s: SessionData, adopted: Adopted): Partial<SessionData> {
+  const createdAt = new Date().toISOString()
+  const session: TerminalSession = {
+    id: adopted.sessionId,
+    projectId: adopted.projectId,
+    tabTitle: adopted.tabTitle,
+    status: 'active',
+    type: 'agent',
+    scrollbackLimit: adopted.scrollbackLimit,
+    createdAt,
+    lastActivityAt: Date.parse(createdAt),
+    agentState: 'idle',
+  }
+  const added = withSession(s, session)
+  const projectViews = new Map(added.projectViews)
+  const view = viewOf(projectViews, adopted.projectId)
+  // Made active when the project has nothing showing. Without this the
+  // tab exists and no pane is ever mounted, so opening the project shows
+  // an empty project rather than the agent that is running in it.
+  projectViews.set(adopted.projectId, {
+    ...view,
+    activeSessionId: view.activeSessionId ?? adopted.sessionId,
+  })
+  return { ...added, projectViews }
+}
+
+function withoutProject(s: SessionData, projectId: string): Partial<SessionData> {
+  const sessions = new Map(s.sessions)
+  const terminalInstances = new Map(s.terminalInstances)
+  for (const session of s.sessions.values()) {
+    if (session.projectId !== projectId) continue
+    terminalInstances.get(session.id)?.dispose?.()
+    terminalInstances.delete(session.id)
+    sessions.delete(session.id)
+  }
+  const projectViews = new Map(s.projectViews)
+  projectViews.delete(projectId)
+  return { sessions, terminalInstances, projectViews }
+}
+
+/** Reconciles the project's view for a session that has left it. */
+function detachFrom(
+  projectViews: Map<string, ProjectView>,
+  sessions: Map<string, TerminalSession>,
+  departed: { sessionId: string; projectId: string }
+): void {
+  const remaining = orderedSessionsForProject(sessions, projectViews, departed.projectId)
+  const view = detachSessionFromView(
+    viewOf(projectViews, departed.projectId),
+    departed.sessionId,
+    remaining.map((r) => r.id)
+  )
+  normalizeView(projectViews, departed.projectId, view)
+}
+
+function withoutSession(s: SessionData, sessionId: string): Partial<SessionData> {
+  const session = s.sessions.get(sessionId)
+  const sessions = new Map(s.sessions)
+  sessions.delete(sessionId)
+  const terminalInstances = new Map(s.terminalInstances)
+  terminalInstances.delete(sessionId)
+  const projectViews = new Map(s.projectViews)
+  if (session) detachFrom(projectViews, sessions, { sessionId, projectId: session.projectId })
+  return { sessions, terminalInstances, projectViews }
+}
+
+async function closeSession(set: SetSessions, get: GetSessions, sessionId: string): Promise<void> {
+  // Close any split children that belong to this session before closing the parent
+  const children = [...get().sessions.values()].filter((s) => s.parentSessionId === sessionId)
+  for (const child of children) {
+    await get().closeSession(child.id)
+  }
+  // Dispose xterm instance before removing from store
+  const instance = get().terminalInstances.get(sessionId)
+  instance?.dispose?.()
+  await window.electronAPI.terminal.close(sessionId)
+  set((s) => withoutSession(s, sessionId))
+}
+
+function movedSession(
+  s: SessionData,
+  sessionId: string,
+  targetProjectId: string
+): Partial<SessionData> {
+  const session = s.sessions.get(sessionId)
+  if (!session) return s
+  const sessions = new Map(s.sessions)
+  sessions.set(sessionId, { ...session, projectId: targetProjectId })
+
+  const projectViews = new Map(s.projectViews)
+  // Leaving the old project: same reconciliation as closing there.
+  detachFrom(projectViews, sessions, { sessionId, projectId: session.projectId })
+
+  // Arriving at the target: becomes active, appends to any explicit order.
+  const targetView = { ...viewOf(projectViews, targetProjectId) }
+  targetView.activeSessionId = sessionId
+  if (targetView.order) targetView.order = [...targetView.order, sessionId]
+  projectViews.set(targetProjectId, targetView)
+
+  return { sessions, projectViews }
+}
+
+/** The shown tab becomes active and attended; the project's others go to the background. */
+function activatedSession(
+  s: SessionData,
+  shown: { projectId: string; sessionId: string },
+  now: number
+): Partial<SessionData> {
+  const sessions = new Map(s.sessions)
+  for (const [id, session] of sessions) {
+    if (session.projectId !== shown.projectId) continue
+    const isActive = id === shown.sessionId
+    // An exited terminal stays closed whichever tab is shown.
+    const status =
+      session.status === 'closed' ? session.status : isActive ? 'active' : 'backgrounded'
+    sessions.set(id, {
+      ...session,
+      status,
+      bellCount: isActive ? undefined : session.bellCount,
+      ...(isActive ? { lastAttendedAt: now } : {}),
+    })
+  }
+  return { sessions, ...patchView(s, shown.projectId, { activeSessionId: shown.sessionId }) }
+}
+
+function exitedSession(s: SessionData, sessionId: string): Partial<SessionData> {
+  const session = s.sessions.get(sessionId)
+  if (!session) return s
+  return (
+    patchSession(s, sessionId, {
+      status: 'closed',
+      closedAt: new Date().toISOString(),
+      tabTitle: `${session.tabTitle} [exited]`,
+    }) ?? s
+  )
+}
+
+function splitIn(s: SessionData, projectId: string, split: PaneSplit): Partial<SessionData> {
+  const view = viewOf(s.projectViews, projectId)
+  const existing = layoutHolding(view, split.targetId)
+  const root: PaneNode = existing ?? { type: 'leaf', sessionId: split.targetId }
+  return patchView(s, projectId, {
+    paneLayouts: replaceLayout(view, existing, splitLeaf(root, split)),
+    focusedSessionId: split.newId,
+  })
+}
+
+function unsplitIn(s: SessionData, projectId: string, sessionId: string): Partial<SessionData> {
+  const view = s.projectViews.get(projectId)
+  const held = view && layoutHolding(view, sessionId)
+  if (!view || !held) return s
+  const projectViews = new Map(s.projectViews)
+  normalizeView(projectViews, projectId, withoutLeaf(view, held, sessionId))
+  return { projectViews }
+}
+
+function focusedOnScreen(view: ProjectView): string | null {
+  const focused = view.focusedSessionId
+  const onScreen = layoutHolding(view, view.activeSessionId)
+  return focused && onScreen && leafIds(onScreen).includes(focused) ? focused : null
+}
+
+type Slice<Keys extends keyof SessionState> = Pick<SessionState, Keys>
+
+/** Opening, adopting, moving, ordering and closing tabs. */
+function lifecycleSlice(
+  set: SetSessions,
+  get: GetSessions
+): Slice<
+  | 'createSession'
+  | 'adoptSession'
+  | 'dropProjectSessions'
+  | 'closeSession'
+  | 'moveSession'
+  | 'reorderSessions'
+  | 'handleProcessExit'
+  | 'renameSession'
+> {
+  return {
+    createSession: (request) => createSession(set, get, request),
+    adoptSession: (adopted) => {
+      // Idempotent: a re-sent notification must not produce a second tab for one
+      // terminal.
+      if (get().sessions.has(adopted.sessionId)) return
+      set((s) => adoptedSession(s, adopted))
+    },
+    dropProjectSessions: (projectId) => set((s) => withoutProject(s, projectId)),
+    closeSession: (sessionId) => closeSession(set, get, sessionId),
+    moveSession: (sessionId, target) => set((s) => movedSession(s, sessionId, target)),
+    reorderSessions: (projectId, orderedIds) =>
+      set((s) => patchView(s, projectId, { order: orderedIds })),
+    handleProcessExit: (sessionId) => set((s) => exitedSession(s, sessionId)),
+    renameSession: (sessionId, title) =>
+      set((s) => patchSession(s, sessionId, { tabTitle: title }) ?? s),
+  }
+}
+
+/** What the tabs show and what they ask for: the active tab, bells, busy and the screen. */
+function activitySlice(
+  set: SetSessions
+): Slice<'stampActivity' | 'setActiveSessionForProject' | 'setSessionScreen'> {
+  return {
+    stampActivity: (sessionId, now) =>
+      set((s) => patchSession(s, sessionId, { lastActivityAt: now }) ?? s),
+    setActiveSessionForProject: (projectId, sessionId, now = Date.now()) =>
+      set((s) => activatedSession(s, { projectId, sessionId }, now)),
+    setSessionScreen: (sessionId, { latestLine, choicePrompt }) =>
+      set(
+        (s) =>
+          patchSession(s, sessionId, { latestLine, choicePrompt: choicePrompt ?? undefined }) ?? s
+      ),
+  }
+}
+
+/** The xterm behind each tab, and the tab that wants the keyboard. */
+function terminalSlice(set: SetSessions): Slice<'setTerminalInstance' | 'requestFocus'> {
+  return {
+    setTerminalInstance: (sessionId, terminal) =>
+      set((s) => ({ terminalInstances: new Map(s.terminalInstances).set(sessionId, terminal) })),
+    requestFocus: (sessionId) =>
+      set((s) => ({ focusRequest: { sessionId, nonce: (s.focusRequest?.nonce ?? 0) + 1 } })),
+  }
+}
+
+/** The bell, and busy and idle, which flip on every burst of output and so write only on a change. */
+function signalSlice(
+  set: SetSessions
+): Slice<'incrementBellCount' | 'clearBellCount' | 'setSessionBusy' | 'setSessionIdle'> {
+  return {
+    incrementBellCount: (sessionId) =>
+      set((s) => {
+        const bellCount = (s.sessions.get(sessionId)?.bellCount ?? 0) + 1
+        return patchSession(s, sessionId, { bellCount }) ?? s
+      }),
+    clearBellCount: (sessionId) =>
+      set((s) => {
+        if (!s.sessions.get(sessionId)?.bellCount) return s
+        return patchSession(s, sessionId, { bellCount: undefined }) ?? s
+      }),
+    setSessionBusy: (sessionId) =>
+      set((s) => {
+        if (s.sessions.get(sessionId)?.busy) return s
+        return patchSession(s, sessionId, { busy: true }) ?? s
+      }),
+    setSessionIdle: (sessionId) =>
+      set((s) => {
+        if (!s.sessions.get(sessionId)?.busy) return s
+        return patchSession(s, sessionId, { busy: false }) ?? s
+      }),
+  }
+}
+
+/** Reads over the sessions and their views. */
+function querySlice(
+  get: GetSessions
+): Slice<
+  | 'getSessionsForProject'
+  | 'getScratchSessions'
+  | 'getTerminalInstance'
+  | 'getActiveSessionForProject'
+  | 'getBellCountForSession'
+  | 'getBellCountForProject'
+  | 'isSessionBusy'
+  | 'isProjectBusy'
+> {
+  const inProject = (projectId: string) =>
+    [...get().sessions.values()].filter((session) => session.projectId === projectId)
+  return {
+    getSessionsForProject: (projectId) =>
+      orderedSessionsForProject(get().sessions, get().projectViews, projectId),
+    getScratchSessions: () => get().getSessionsForProject(SCRATCH_PROJECT_ID),
+    getTerminalInstance: (sessionId) => get().terminalInstances.get(sessionId),
+    getActiveSessionForProject: (projectId) =>
+      get().projectViews.get(projectId)?.activeSessionId ?? null,
+    getBellCountForSession: (sessionId) => get().sessions.get(sessionId)?.bellCount ?? 0,
+    getBellCountForProject: (projectId) =>
+      inProject(projectId).reduce((total, session) => total + (session.bellCount ?? 0), 0),
+    isSessionBusy: (sessionId) => get().sessions.get(sessionId)?.busy ?? false,
+    isProjectBusy: (projectId) => inProject(projectId).some((session) => session.busy),
+  }
+}
+
+/** The split panes of each tab, and which one is focused. */
+function splitSlice(
+  set: SetSessions,
+  get: GetSessions
+): Slice<
+  | 'getPaneLayout'
+  | 'activateSplit'
+  | 'closeSplitLeaf'
+  | 'setSplitRatio'
+  | 'getFocusedSession'
+  | 'setFocusedSession'
+> {
+  return {
+    getPaneLayout: (projectId) => {
+      const view = viewOf(get().projectViews, projectId)
+      return layoutHolding(view, view.activeSessionId) ?? null
+    },
+    activateSplit: (projectId, split) => set((s) => splitIn(s, projectId, split)),
+    closeSplitLeaf: (projectId, sessionId) => set((s) => unsplitIn(s, projectId, sessionId)),
+    setSplitRatio: (projectId, splitId, ratio) =>
+      set((s) => {
+        const layouts = s.projectViews.get(projectId)?.paneLayouts
+        if (!layouts) return s
+        const paneLayouts = layouts.map((layout) => updateSplitRatio(layout, splitId, ratio))
+        return patchView(s, projectId, { paneLayouts })
+      }),
+    getFocusedSession: (projectId) => focusedOnScreen(viewOf(get().projectViews, projectId)),
+    setFocusedSession: (projectId, sessionId) =>
+      set((s) => patchView(s, projectId, { focusedSessionId: sessionId })),
+  }
+}
+
+// One store built from slices, each a group of actions over the same state:
+// https://zustand.docs.pmnd.rs/guides/slices-pattern
 export const useSessionStore = create<SessionState>((set, get) => ({
   sessions: new Map(),
   terminalInstances: new Map(),
   projectViews: new Map(),
   focusRequest: null,
-
-  createSession: async (
-    projectId,
-    type,
-    title,
-    cwd,
-    scrollbackLimit,
-    parentSessionId,
-    initialCommand
-  ) => {
-    let resolvedTitle = title
-    if (!resolvedTitle) {
-      const next = viewOf(get().projectViews, projectId).terminalCounter + 1
-      set((s) => patchView(s, projectId, { terminalCounter: next }))
-      resolvedTitle = `Terminal ${next}`
-    }
-
-    const result = await window.electronAPI.terminal.create({
-      projectId,
-      type,
-      tabTitle: resolvedTitle,
-      scrollbackLimit,
-      cwd,
-      ...(initialCommand === undefined ? {} : { initialCommand }),
-    })
-    // The message when there is one: 'CWD_MISSING' names the failure, but only
-    // the message names the folder, and the folder is the whole answer.
-    if ('error' in result) throw new Error(result.message ?? result.error)
-
-    const { sessionId, shell } = result
-    const createdAt = new Date().toISOString()
-    const session: TerminalSession = {
-      id: sessionId,
-      projectId,
-      tabTitle: resolvedTitle,
-      status: 'active',
-      type,
-      scrollbackLimit,
-      createdAt,
-      parentSessionId,
-      // A session with no recorded activity is treated as last active when it
-      // was created, so recency is representable from the first render (FR-007).
-      lastActivityAt: Date.parse(createdAt),
-      agentState: 'idle',
-      ...(shell === undefined ? {} : { shell }),
-    }
-
-    set((s) => {
-      const sessions = new Map(s.sessions)
-      sessions.set(sessionId, session)
-      // Append to ordering if an explicit order exists for this project
-      const view = viewOf(s.projectViews, projectId)
-      const projectViews = new Map(s.projectViews)
-      if (view.order) {
-        projectViews.set(projectId, { ...view, order: [...view.order, sessionId] })
-      }
-      return { sessions, projectViews }
-    })
-
-    return sessionId
-  },
-
-  adoptSession: ({ sessionId, projectId, tabTitle, scrollbackLimit }) => {
-    // Idempotent: a re-sent notification must not produce a second tab for one
-    // terminal.
-    if (get().sessions.has(sessionId)) return
-    const createdAt = new Date().toISOString()
-    const session: TerminalSession = {
-      id: sessionId,
-      projectId,
-      tabTitle,
-      status: 'active',
-      type: 'agent',
-      scrollbackLimit,
-      createdAt,
-      lastActivityAt: Date.parse(createdAt),
-      agentState: 'idle',
-    }
-    set((s) => {
-      const sessions = new Map(s.sessions)
-      sessions.set(sessionId, session)
-      const view = viewOf(s.projectViews, projectId)
-      const projectViews = new Map(s.projectViews)
-      projectViews.set(projectId, {
-        ...view,
-        ...(view.order ? { order: [...view.order, sessionId] } : {}),
-        // Made active when the project has nothing showing. Without this the
-        // tab exists and no pane is ever mounted, so opening the project shows
-        // an empty project rather than the agent that is running in it.
-        activeSessionId: view.activeSessionId ?? sessionId,
-      })
-      return { sessions, projectViews }
-    })
-  },
-
-  dropProjectSessions: (projectId) => {
-    set((s) => {
-      const sessions = new Map(s.sessions)
-      const terminalInstances = new Map(s.terminalInstances)
-      for (const session of s.sessions.values()) {
-        if (session.projectId !== projectId) continue
-        terminalInstances.get(session.id)?.dispose?.()
-        terminalInstances.delete(session.id)
-        sessions.delete(session.id)
-      }
-      const projectViews = new Map(s.projectViews)
-      projectViews.delete(projectId)
-      return { sessions, terminalInstances, projectViews }
-    })
-  },
-
-  closeSession: async (sessionId) => {
-    // Close any split children that belong to this session before closing the parent
-    const children = [...get().sessions.values()].filter((s) => s.parentSessionId === sessionId)
-    for (const child of children) {
-      await get().closeSession(child.id)
-    }
-    // Dispose xterm instance before removing from store
-    const instance = get().terminalInstances.get(sessionId)
-    instance?.dispose?.()
-    await window.electronAPI.terminal.close(sessionId)
-    set((s) => {
-      const session = s.sessions.get(sessionId)
-      const sessions = new Map(s.sessions)
-      sessions.delete(sessionId)
-      const terminalInstances = new Map(s.terminalInstances)
-      terminalInstances.delete(sessionId)
-
-      const projectViews = new Map(s.projectViews)
-      if (session) {
-        const remaining = orderedSessionsForProject(sessions, projectViews, session.projectId)
-        const view = detachSessionFromView(
-          viewOf(projectViews, session.projectId),
-          sessionId,
-          remaining.map((r) => r.id)
-        )
-        normalizeView(projectViews, session.projectId, view)
-      }
-
-      return { sessions, terminalInstances, projectViews }
-    })
-  },
-
-  getSessionsForProject: (projectId) =>
-    orderedSessionsForProject(get().sessions, get().projectViews, projectId),
-
-  getScratchSessions: () => {
-    return get().getSessionsForProject(SCRATCH_PROJECT_ID)
-  },
-
-  moveSession: (sessionId, targetProjectId) => {
-    set((s) => {
-      const session = s.sessions.get(sessionId)
-      if (!session) return s
-      const oldProjectId = session.projectId
-
-      const sessions = new Map(s.sessions)
-      sessions.set(sessionId, { ...session, projectId: targetProjectId })
-
-      const projectViews = new Map(s.projectViews)
-      // Leaving the old project: same reconciliation as closing there.
-      const remaining = orderedSessionsForProject(sessions, projectViews, oldProjectId)
-      const oldView = detachSessionFromView(
-        viewOf(projectViews, oldProjectId),
-        sessionId,
-        remaining.map((r) => r.id)
-      )
-      normalizeView(projectViews, oldProjectId, oldView)
-
-      // Arriving at the target: becomes active, appends to any explicit order.
-      const targetView = { ...viewOf(projectViews, targetProjectId) }
-      targetView.activeSessionId = sessionId
-      if (targetView.order) targetView.order = [...targetView.order, sessionId]
-      projectViews.set(targetProjectId, targetView)
-
-      return { sessions, projectViews }
-    })
-  },
-
-  reorderSessions: (projectId, orderedIds) => {
-    set((s) => patchView(s, projectId, { order: orderedIds }))
-  },
-
-  setTerminalInstance: (sessionId, terminal) => {
-    set((s) => {
-      const map = new Map(s.terminalInstances)
-      map.set(sessionId, terminal)
-      return { terminalInstances: map }
-    })
-  },
-
-  getTerminalInstance: (sessionId) => get().terminalInstances.get(sessionId),
-
-  setActiveSessionForProject: (projectId, sessionId, now = Date.now()) => {
-    set((s) => {
-      const sessions = new Map(s.sessions)
-      for (const [id, session] of sessions) {
-        if (session.projectId !== projectId) continue
-        const isActive = id === sessionId
-        // An exited terminal stays closed whichever tab is shown.
-        const shown = isActive ? 'active' : 'backgrounded'
-        const status = session.status === 'closed' ? session.status : shown
-        const bellCount = isActive ? undefined : session.bellCount
-        sessions.set(id, {
-          ...session,
-          status,
-          bellCount,
-          ...(isActive ? { lastAttendedAt: now } : {}),
-        })
-      }
-      return { sessions, ...patchView(s, projectId, { activeSessionId: sessionId }) }
-    })
-  },
-
-  stampActivity: (sessionId, now) => {
-    set((s) => patchSession(s, sessionId, { lastActivityAt: now }) ?? s)
-  },
-
-  getActiveSessionForProject: (projectId) =>
-    get().projectViews.get(projectId)?.activeSessionId ?? null,
-
-  incrementBellCount: (sessionId) => {
-    set((s) => {
-      const session = s.sessions.get(sessionId)
-      return patchSession(s, sessionId, { bellCount: (session?.bellCount ?? 0) + 1 }) ?? s
-    })
-  },
-
-  clearBellCount: (sessionId) => {
-    set((s) => {
-      if (!s.sessions.get(sessionId)?.bellCount) return s
-      return patchSession(s, sessionId, { bellCount: undefined }) ?? s
-    })
-  },
-
-  getBellCountForSession: (sessionId) => get().sessions.get(sessionId)?.bellCount ?? 0,
-
-  getBellCountForProject: (projectId) => {
-    let total = 0
-    for (const session of get().sessions.values())
-      if (session.projectId === projectId) total += session.bellCount ?? 0
-    return total
-  },
-
-  setSessionBusy: (sessionId) =>
-    set((s) => {
-      if (s.sessions.get(sessionId)?.busy) return s
-      return patchSession(s, sessionId, { busy: true }) ?? s
-    }),
-
-  setSessionIdle: (sessionId) =>
-    set((s) => {
-      if (!s.sessions.get(sessionId)?.busy) return s
-      return patchSession(s, sessionId, { busy: false }) ?? s
-    }),
-
-  setSessionScreen: (sessionId, { latestLine, choicePrompt }) =>
-    set(
-      (s) =>
-        patchSession(s, sessionId, { latestLine, choicePrompt: choicePrompt ?? undefined }) ?? s
-    ),
-
-  isSessionBusy: (sessionId) => get().sessions.get(sessionId)?.busy ?? false,
-
-  isProjectBusy: (projectId) => {
-    for (const session of get().sessions.values())
-      if (session.projectId === projectId && session.busy) return true
-    return false
-  },
-
-  handleProcessExit: (sessionId, _exitCode) => {
-    set((s) => {
-      const session = s.sessions.get(sessionId)
-      if (!session) return s
-      return (
-        patchSession(s, sessionId, {
-          status: 'closed',
-          closedAt: new Date().toISOString(),
-          tabTitle: `${session.tabTitle} [exited]`,
-        }) ?? s
-      )
-    })
-  },
-
-  renameSession: (sessionId, title) => {
-    set((s) => patchSession(s, sessionId, { tabTitle: title }) ?? s)
-  },
-
-  getPaneLayout: (projectId) => {
-    const view = viewOf(get().projectViews, projectId)
-    return layoutHolding(view, view.activeSessionId) ?? null
-  },
-
-  activateSplit: (projectId, focusedId, newId, direction) => {
-    set((s) => {
-      const view = viewOf(s.projectViews, projectId)
-      const existing = layoutHolding(view, focusedId)
-      const root: PaneNode = existing ?? { type: 'leaf', sessionId: focusedId }
-      const newLayout = splitLeaf(root, focusedId, newId, direction)
-      return patchView(s, projectId, {
-        paneLayouts: replaceLayout(view, existing, newLayout),
-        focusedSessionId: newId,
-      })
-    })
-  },
-
-  closeSplitLeaf: (projectId, sessionId) => {
-    set((s) => {
-      const view = s.projectViews.get(projectId)
-      const held = view && layoutHolding(view, sessionId)
-      if (!view || !held) return s
-      const projectViews = new Map(s.projectViews)
-      normalizeView(projectViews, projectId, withoutLeaf(view, held, sessionId))
-      return { projectViews }
-    })
-  },
-
-  setSplitRatio: (projectId, splitId, ratio) => {
-    set((s) => {
-      const layouts = s.projectViews.get(projectId)?.paneLayouts
-      if (!layouts) return s
-      const paneLayouts = layouts.map((layout) => updateSplitRatio(layout, splitId, ratio))
-      return patchView(s, projectId, { paneLayouts })
-    })
-  },
-
-  getFocusedSession: (projectId) => {
-    const view = viewOf(get().projectViews, projectId)
-    const focused = view.focusedSessionId
-    const onScreen = layoutHolding(view, view.activeSessionId)
-    return focused && onScreen && leafIds(onScreen).includes(focused) ? focused : null
-  },
-
-  setFocusedSession: (projectId, sessionId) => {
-    set((s) => patchView(s, projectId, { focusedSessionId: sessionId }))
-  },
-
-  requestFocus: (sessionId) => {
-    set((s) => ({ focusRequest: { sessionId, nonce: (s.focusRequest?.nonce ?? 0) + 1 } }))
-  },
+  ...lifecycleSlice(set, get),
+  ...activitySlice(set),
+  ...terminalSlice(set),
+  ...signalSlice(set),
+  ...querySlice(get),
+  ...splitSlice(set, get),
 }))

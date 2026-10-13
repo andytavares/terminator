@@ -66,7 +66,9 @@ describe('ExtensionWindowView', () => {
     const { container } = render(<ExtensionWindowView view="pr-review" />)
     expect(container.querySelector('div[style*="height: 3px"]')).toBeFalsy()
   })
+})
 
+describe('ExtensionWindowView — takes the theme from the saved settings it loads on mount', () => {
   it('takes the theme from the saved settings it loads on mount', async () => {
     savedSettings('light')
     render(<ExtensionWindowView view="pr-review" />)

@@ -17,10 +17,6 @@ export function SidebarSearch({
   const internalRef = useRef<HTMLInputElement>(null)
   const ref = inputRef ?? internalRef
 
-  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>): void {
-    if (e.key === 'Escape') onClear()
-  }
-
   return (
     <div className={`sidebar-search${query ? ' sidebar-search--active' : ''}`}>
       <span className="sidebar-search__icon">⌕</span>
@@ -31,7 +27,9 @@ export function SidebarSearch({
         value={query}
         placeholder="Search…"
         onChange={(e) => onChange(e.target.value)}
-        onKeyDown={handleKeyDown}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') onClear()
+        }}
       />
       {query && (
         <button className="sidebar-search__clear" aria-label="Clear search" onClick={onClear}>

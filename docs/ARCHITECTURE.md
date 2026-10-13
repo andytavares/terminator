@@ -476,7 +476,9 @@ Actions that change stored state call IPC first and update the store only when m
 
 Components read a store through a selector — `useStore(useShallow((s) => ({ a: s.a, b: s.b })))` — never the whole store, so a component re-renders only when a field it picked changes. A getter such as `statsFor`, `linkFor` or `resolveSettings` reads state through `get()`, so a selector that picks a getter called during render also picks the state behind it (`entries`, `links`, `globalSettings`); one called only from a handler or effect does not need to.
 
-`session.store` changes about once a second per printing terminal (the activity stamp and latest line), and `metrics.store` on every sample. `App.tsx` therefore subscribes to neither: the parts that draw them — Home's badge and the metrics bar (`components/AppShellParts.tsx`), and Quick Actions (`components/QuickActionsHost.tsx`, mounted only while the panel is open) — subscribe on their own. The sidebar hands its branch rows a clock that moves only when the set of stale sessions changes (`useStalenessClock`), and drops a branch's change statistics when its terminals stop printing, once per burst rather than once per activity stamp.
+`session.store` changes about once a second per printing terminal (the activity stamp and latest line), and `metrics.store` on every sample. `App.tsx` and the shell modules under `src/renderer/shell/` therefore subscribe to neither: the parts that draw them — Home's badge and the metrics bar (`components/AppShellParts.tsx`), and Quick Actions (`components/QuickActionsHost.tsx`, mounted only while the panel is open) — subscribe on their own. The sidebar hands its branch rows a clock that moves only when the set of stale sessions changes (`useStalenessClock`), and drops a branch's change statistics when its terminals stop printing, once per burst rather than once per activity stamp.
+
+`App.tsx` only wires the window together; each concern lives in `src/renderer/shell/`: `bootstrap.ts` (what loads when the window opens, and what follows the selection), `terminal-launch.ts` (new tab, scratch terminal, the name prompt and a branch's first terminal), `main-events.ts` (menu accelerators, notifications and what extensions ask over the bridge), `panels.ts` (sidebar panels and surfaces), `core-tabs.tsx` (Home and Overview), `MainArea.tsx` (what sits beside the sidebar) and `ShellOverlays.tsx` (dialogs, windows, the palette and toasts).
 
 Surfaces opened on demand — Settings, the Overview wall and the issue drawer — load with `React.lazy` behind a `Suspense` boundary, each as its own chunk, and the renderer build is minified (`electron.vite.config.ts`; electron-vite leaves renderers unminified by default). Quick Actions is not lazy: it is driven by keys typed straight after ⌘P, which would reach the app before a lazily loaded panel mounted. For the same reason the extension commands it offers live in `stores/extension-commands.store.ts`, read once at startup and again on each open, rather than in the panel, which would start from an empty list every time it mounts. The build warns on any chunk over `chunkSizeWarningLimit` (900 kB, `electron.vite.config.ts`), and CI fails the build on any warning.
 
@@ -504,7 +506,7 @@ Delivery targets, any combination of:
 The renderer never decides this either: core-renderer code calls
 `dispatchNotification()` (`src/renderer/lib/notifications.ts`), which just
 forwards to `notifications:create` over IPC; the existing
-`notifications:push` listener in `App.tsx` renders whatever the resolved
+`notifications:push` listener (`useNotificationFeed`, `src/renderer/shell/main-events.ts`) renders whatever the resolved
 notification's `targets` say (adding to the center store and/or firing a
 toast). Extensions call `api.notifications.showToast()` /
 `createNotification()`, both of which resolve identically through the same
@@ -593,22 +595,38 @@ UnifiedSidebar (src/renderer/components/sidebar/UnifiedSidebar.tsx)
 │   │     only the render target and density moved (ADR 033, then FR-036).
 │   └── search row — search, FilterMenu, DisplayMenu, "+ repo". These act on
 │         the list below, which is why they sit here and not in the band.
-├── [list]
-│   ├── RepoHeader — three things at rest: name, branch count, and (only while
-│   │     collapsed) a marker that a branch inside is waiting on you. The
-│   │     colour swatch is not counted; it is identity, not a fact. Hover
-│   │     reveals the chevron, "+ new branch" and the registered repo actions,
-│   │     in reserved space so nothing already drawn moves. Carries the
-│   │     drag handle for reordering repos.
-│   ├── BranchRow[] — at most six things at rest: the state glyph in a fixed
-│   │     16px gutter, the branch-kind glyph, the branch name in mono, the
-│   │     issue key as plain text, the +n/−n change counts, and either a
-│   │     state count or an age. The repo's 2px rail is excluded from the six.
-│   └── scratch section — scratch terminals, drawn with BranchRow because in
+├── [list] RepoList (SidebarList.tsx) — the repos in drawn order, repo drag
+│   ├── RepoSection
+│   │   ├── RepoHeader — three things at rest: name, branch count, and (only
+│   │   │     while collapsed) a marker that a branch inside is waiting on you.
+│   │   │     The colour swatch is not counted; it is identity, not a fact.
+│   │   │     Hover reveals the chevron, "+ new branch" and the registered repo
+│   │   │     actions, in reserved space so nothing already drawn moves. Carries
+│   │   │     the drag handle for reordering repos.
+│   │   └── BranchList → BranchEntry[]
+│   │       ├── BranchRow — at most six things at rest: the state glyph in a
+│   │       │     fixed 16px gutter, the branch-kind glyph, the branch name in
+│   │       │     mono, the issue key as plain text, the +n/−n change counts,
+│   │       │     and either a state count or an age. The repo's 2px rail is
+│   │       │     excluded from the six.
+│   │       └── TerminalEntries → TerminalRow[] — once the branch is expanded
+│   └── ScratchSection — scratch terminals, drawn with BranchRow because in
 │         that section a scratch terminal IS the unit of work. The one place
 │         a terminal is still a row: nothing else can represent it.
-└── resize handle
+├── resize handle
+├── IssueDialogs — the issue link dialog and the issue drawer
+└── SidebarDialogs — the one sidebar dialog open: session link, create, edit
+      or remove a workspace, create or remove a branch
 ```
+
+The component keeps no state of its own. `useSidebarWidth` holds the width
+and the resize drag, `useSidebarViews` the saved views, the active one and the
+search, `useSidebarRows` the session list and `buildBranchRows`' result for the
+active view and for every view's count, and `branch-actions.ts` what a row
+does (select a branch or terminal, start or close one, open a folder in the
+editor). Each row is handed one `RowContext` with those actions, the collapse
+state and the dialog opener; a branch row subscribes to its own issue key,
+change counts and selection.
 
 `FilterMenu` and `DisplayMenu` replaced four bands with two controls. Filter holds the saved views, the stale toggle, and a count of what is hidden — that badge is what deleted the standalone filter-notice strip, and it puts the way out of a filter in the same control as the way in. Display holds grouping and sort. Measured against the running app, chrome above the first row of work fell from **165px to 98px**.
 
@@ -636,7 +654,7 @@ UnifiedSidebar (src/renderer/components/sidebar/UnifiedSidebar.tsx)
 
 **Ordering is `buildBranchRows`' job at both levels.** The sort key orders the repo groups as well as the branches inside each one — a sort that only reached inside a repo read as a sort that did nothing, because the group order was hard-coded alphabetical. `manual` is the order the stores hand the lists over in, read through an index map (`workspaces` for repos, `projects` within a repo) rather than left to a stable sort. Every computed key falls back to the repo name so equally quiet repos hold a fixed order; `manual` takes no such tie-break, because an alphabetical fallback is exactly what would swallow a drag. A repo with no branches is seeded as an empty group here rather than appended by the component, so it sorts and reorders with the rest instead of being pinned below them.
 
-`UnifiedSidebar` writes that order back. `useDragReorder` is given the list **as drawn**, which is not the list as stored once a computed sort or a filter is on; `mergeReorder` rewrites only the slots the visible rows occupy, so a filtered-out repo keeps its place instead of being swept to the end by an order that never mentioned it. Committing a drop also sets the view's sort to `manual` — under any other key the next render would recompute the order and the drag would vanish. Repos reorder through `workspace:reorder`, branches through `project:reorder`; branch rows are not draggable under `groupBy: 'none'`, where one list spans every repo and the stores keep no order that crosses them.
+`UnifiedSidebar` (`manualReorder`) writes that order back. `useDragReorder` is given the list **as drawn**, which is not the list as stored once a computed sort or a filter is on; `mergeReorder` rewrites only the slots the visible rows occupy, so a filtered-out repo keeps its place instead of being swept to the end by an order that never mentioned it. Committing a drop also sets the view's sort to `manual` — under any other key the next render would recompute the order and the drag would vanish. Repos reorder through `workspace:reorder`, branches through `project:reorder`; branch rows are not draggable under `groupBy: 'none'`, where one list spans every repo and the stores keep no order that crosses them.
 
 Deliberately absent from a `BranchRow`: change statistics and the linked issue key. Both arrive from stores on their own schedule, and folding them in would make the result a function of when git or the tracker last answered (ADR 031).
 
@@ -655,7 +673,7 @@ Clicking a branch resolves to exactly one terminal: one that is waiting on you, 
 Two core global tabs draw every session from one view model. `useSessionFacts` builds `SessionFacts` from the session, workspace, session-records and integrations stores through `buildSessionFacts`, which is pure.
 
 - **Ending and starting** are on the surfaces themselves: `CloseSessionButton` ends a live session through `closeSessionFromFacts` (leave the split, then close, as Cmd+W does) and removes a closed one through `session-records:forget`; `NewSessionMenu` starts one on Home and on the wall. Both live in `components/session/`, since Home and Overview share them.
-- **Home** (`core.home`, `components/home/`) is the launch view: `App.tsx` activates it on mount, and `HomeBadge` (`components/AppShellParts.tsx`) keeps its app-band badge at the count of sessions waiting on you. `HomeScreen` switches between `LedgerView` (rows from `buildLedger`, arranged by `LedgerDisplayMenu`) and `LogbookView` (a list from `buildLogbook` and one session's detail). The layout and the Ledger's arrangement persist; the text and Needs you filters do not.
+- **Home** (`core.home`, `components/home/`) is the launch view: `useCoreTabs` (`src/renderer/shell/core-tabs.tsx`) registers it and activates it on mount, and `HomeBadge` (`components/AppShellParts.tsx`) keeps its app-band badge at the count of sessions waiting on you. `HomeScreen` switches between `LedgerView` (rows from `buildLedger`, arranged by `LedgerDisplayMenu`) and `LogbookView` (a list from `buildLogbook` and one session's detail). The layout and the Ledger's arrangement persist; the text and Needs you filters do not.
 - **The Monitor wall** (`core.overview`, `OverviewScreen`) draws a `WallTile` per open session. **Every tile and both band headings are direct children of one grid**, and `placeWall` emits placements in session id order with position carried by CSS `order` and `grid-column: span`. That is load-bearing: `LivePreview` calls `mountPreview`, which moves the session's single xterm element into the tile, and a re-parented or reordered tile would tear the live terminal out. ADR 036's invariant, kept by ADR 054.
 - **Live previews** fill their box's width and follow the cursor (`terminal/preview-window.ts`), re-placed on every xterm render.
 - **Descriptions and session links** live in `src/main/sessions/session-record-store.ts`, beside `issue-link-store` and in its shape: in memory, mirrored to `userData/session-records.json` with a tmp-then-rename write, exposed as `session-records:*` on `window.electronAPI.sessionRecords`. A record exists only while a session has a description or its own link. `terminal:close` closes it, a startup sweep closes anything the last run left open (a quit closes no terminals one by one), and `pruneRecords` drops records 30 days after close. A session's work item is its own link, else its branch's. The branch link, and the agent context injected from it, are untouched. `forget` deletes a **closed** record outright, which is how the operator clears one from Home before retention does; it refuses an open one, whose record is what Home draws the session from.

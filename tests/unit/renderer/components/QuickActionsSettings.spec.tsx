@@ -59,7 +59,9 @@ describe('QuickActionsSettings — global scope', () => {
     expect(screen.getByText('shell')).toBeTruthy()
     expect(screen.getByText('New tab on branch')).toBeTruthy()
   })
+})
 
+describe('QuickActionsSettings — global scope — adds a new action and saves it via updateQuickActions', () => {
   it('adds a new action and saves it via updateQuickActions', () => {
     mockStore([])
     render(<QuickActionsSettings scope="global" />)
@@ -83,7 +85,9 @@ describe('QuickActionsSettings — global scope', () => {
       ],
     })
   })
+})
 
+describe('QuickActionsSettings — global scope — edits an existing action in place', () => {
   it('edits an existing action in place', () => {
     mockStore([
       {
@@ -113,7 +117,9 @@ describe('QuickActionsSettings — global scope', () => {
       ],
     })
   })
+})
 
+describe('QuickActionsSettings — global scope — deletes an action', () => {
   it('deletes an action', () => {
     mockStore([
       {
@@ -139,7 +145,9 @@ describe('QuickActionsSettings — global scope', () => {
     expect(screen.getByText('Label is required')).toBeTruthy()
     expect(settings.updateQuickActions).not.toHaveBeenCalled()
   })
+})
 
+describe('QuickActionsSettings — global scope — requires a body', () => {
   it('requires a body', () => {
     mockStore([])
     render(<QuickActionsSettings scope="global" />)
@@ -158,7 +166,9 @@ describe('QuickActionsSettings — global scope', () => {
     fireEvent.change(keyInput, { target: { value: 'ab' } })
     expect(keyInput.value).toBe('a')
   })
+})
 
+describe('QuickActionsSettings — global scope — rejects a key already used by another action', () => {
   it('rejects a key already used by another action', () => {
     mockStore([
       {
@@ -179,7 +189,9 @@ describe('QuickActionsSettings — global scope', () => {
     expect(screen.getByText('Key already used by Existing')).toBeTruthy()
     expect(settings.updateQuickActions).not.toHaveBeenCalled()
   })
+})
 
+describe('QuickActionsSettings — global scope — resets target to the first valid option when kind changes', () => {
   it('resets target to the first valid option when kind changes', () => {
     mockStore([])
     render(<QuickActionsSettings scope="global" />)
@@ -212,5 +224,45 @@ describe('QuickActionsSettings — workspace scope', () => {
     fireEvent.click(screen.getByText('Delete'))
     expect(settings.updateWorkspaceQuickActions).toHaveBeenCalledWith('ws-1', [])
     expect(settings.updateQuickActions).not.toHaveBeenCalled()
+  })
+})
+
+const askClaude: CustomAction = {
+  id: 'a2',
+  label: 'Ask Claude',
+  kind: 'prompt',
+  target: 'agent',
+  body: 'review this',
+}
+
+describe('QuickActionsSettings — actions without a key, and scopes with nothing yet', () => {
+  it('lists a prompt action against the focused Claude session, with no key', () => {
+    mockStore([askClaude])
+    render(<QuickActionsSettings scope="global" />)
+    expect(screen.getByText('Focused Claude session')).toBeTruthy()
+    expect(document.querySelector('.qa-settings-list__key')!.textContent).toBe('')
+  })
+
+  it('edits a keyless action with an empty Key field, and keeps it keyless', () => {
+    mockStore([askClaude])
+    render(<QuickActionsSettings scope="global" />)
+    fireEvent.click(screen.getByText('Edit'))
+    expect((screen.getByLabelText('Key') as HTMLInputElement).value).toBe('')
+    fireEvent.click(screen.getByText('Save'))
+    expect(settings.updateQuickActions).toHaveBeenCalledWith({
+      custom: [{ ...askClaude, mnemonic: undefined }],
+    })
+  })
+
+  it('shows no actions while global settings have not loaded', () => {
+    seedStore(useSettingsStore, { globalSettings: null, workspaceSettings: new Map() })
+    render(<QuickActionsSettings scope="global" />)
+    expect(screen.getByText('No custom actions yet.')).toBeTruthy()
+  })
+
+  it('shows no actions for a workspace with no settings of its own', () => {
+    mockStore([])
+    render(<QuickActionsSettings scope="workspace" workspaceId="ws-unknown" />)
+    expect(screen.getByText('No custom actions yet.')).toBeTruthy()
   })
 })

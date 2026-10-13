@@ -60,7 +60,9 @@ describe('NewSessionMenu', () => {
     expect(onBranch).toHaveBeenCalledWith('p2')
     expect(screen.queryByRole('menu')).toBeNull()
   })
+})
 
+describe('NewSessionMenu — starts a scratch terminal', () => {
   it('starts a scratch terminal', () => {
     open()
     fireEvent.click(screen.getByRole('menuitem', { name: 'New scratch terminal' }))

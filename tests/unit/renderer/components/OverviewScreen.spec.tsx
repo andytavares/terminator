@@ -88,6 +88,8 @@ beforeEach(() => {
 
 const tiles = () => screen.getAllByRole('article')
 
+const tileOf = (name: string) => tiles().find((t) => t.getAttribute('aria-label')?.endsWith(name))!
+
 describe('OverviewScreen — the Monitor wall', () => {
   it('draws every open session as a tile, and no closed history', () => {
     render(<OverviewScreen />)
@@ -113,7 +115,9 @@ describe('OverviewScreen — the Monitor wall', () => {
     expect(screen.queryByRole('heading', { name: 'Needs you' })).toBeNull()
     expect(screen.queryByRole('heading', { name: 'Everything else' })).toBeNull()
   })
+})
 
+describe('OverviewScreen — the Monitor wall — keeps every tile in one grid, so a state change moves a tile without remounting it', () => {
   it('keeps every tile in one grid, so a state change moves a tile without remounting it', () => {
     const { rerender, container } = render(<OverviewScreen />)
     const grid = container.querySelector('.wall__grid')!
@@ -136,7 +140,9 @@ describe('OverviewScreen — the Monitor wall', () => {
     expect(screen.queryByRole('heading', { name: 'Needs you' })).toBeNull()
     expect(JSON.parse(localStorage.getItem('terminator.wall.prefs')!).pinNeeds).toBe(false)
   })
+})
 
+describe('OverviewScreen — the Monitor wall — changes tile size and remembers it', () => {
   it('changes tile size and remembers it', () => {
     const { container } = render(<OverviewScreen />)
     const sizes = screen.getByRole('radiogroup', { name: 'Tile size' })
@@ -165,7 +171,9 @@ describe('OverviewScreen — the Monitor wall', () => {
     expect(container.querySelector('.wall__grid')!.getAttribute('data-size')).toBe('s')
     expect(screen.queryByRole('heading', { name: 'Needs you' })).toBeNull()
   })
+})
 
+describe('OverviewScreen — the Monitor wall — filters tiles by what is typed', () => {
   it('filters tiles by what is typed', () => {
     render(<OverviewScreen />)
     fireEvent.change(screen.getByRole('searchbox', { name: 'Filter sessions' }), {
@@ -189,7 +197,9 @@ describe('OverviewScreen — the Monitor wall', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Open zsh' }))
     expect(navigate).toHaveBeenCalledWith('c')
   })
+})
 
+describe('OverviewScreen — the Monitor wall — saves a description typed on a tile', () => {
   it('saves a description typed on a tile', () => {
     render(<OverviewScreen />)
     const tile = tiles().find((t) => t.getAttribute('aria-label')?.endsWith('claude'))!
@@ -201,9 +211,6 @@ describe('OverviewScreen — the Monitor wall', () => {
       'Session home view'
     )
   })
-
-  const tileOf = (name: string) =>
-    tiles().find((t) => t.getAttribute('aria-label')?.endsWith(name))!
 
   it('shows the process load of each session on the wall', async () => {
     render(<OverviewScreen />)
@@ -221,7 +228,9 @@ describe('OverviewScreen — the Monitor wall', () => {
     expect(metricsApi.getProcesses).not.toHaveBeenCalled()
     expect(tileOf('vitest').textContent).not.toContain('%')
   })
+})
 
+describe('OverviewScreen — the Monitor wall — shows no load when the pid lookup reports an error', () => {
   it('shows no load when the pid lookup reports an error', async () => {
     metricsApi.getPids.mockResolvedValue({ error: 'nope' })
     render(<OverviewScreen />)
@@ -249,7 +258,9 @@ describe('OverviewScreen — the Monitor wall', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Go to terminals' }))
     expect(useExtensionRegistry.getState().activeGlobalTabId).toBeNull()
   })
+})
 
+describe('OverviewScreen — the Monitor wall — opens the link dialog for a session, and closes it', () => {
   it('opens the link dialog for a session, and closes it', () => {
     render(<OverviewScreen />)
     const host = tiles().find((t) => t.getAttribute('aria-label')?.endsWith('claude'))!
@@ -272,5 +283,46 @@ describe('OverviewScreen — the Monitor wall', () => {
     render(<OverviewScreen />)
     fireEvent.click(screen.getAllByRole('button', { name: /^Close / })[0])
     expect(closeFromFacts).toHaveBeenCalled()
+  })
+})
+
+describe('OverviewScreen — starting and resuming from the wall', () => {
+  it('starts a terminal in a branch from its bar', async () => {
+    const { useWorkspaceStore } = await import('../../../../src/renderer/stores/workspace.store')
+    const { startSessionInBranch } = await import('../../../../src/renderer/terminal/start-session')
+    const { workspaceOf, projectOf } = await import('../../../support/renderer-stores')
+    useWorkspaceStore.setState({
+      workspaces: [workspaceOf({ id: 'w1', name: 'repo' })],
+      projectsByWorkspaceId: new Map([
+        ['w1', [projectOf({ id: 'p1', workspaceId: 'w1', name: 'main' })]],
+      ]),
+    })
+    render(<OverviewScreen />)
+    fireEvent.click(screen.getByRole('button', { name: 'New terminal' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'New terminal in repo / main' }))
+    expect(startSessionInBranch).toHaveBeenCalledWith('p1')
+  })
+})
+
+describe('OverviewScreen — starting and resuming from the wall — resumes a stopped session whose conversation is still there', () => {
+  it('resumes a stopped session whose conversation is still there', async () => {
+    const { resumeSession } = await import('../../../../src/renderer/terminal/start-session')
+    const stopped = fact({
+      sessionId: 'r',
+      name: 'claude',
+      state: 'exited',
+      agent: {
+        provider: 'claude',
+        sessionId: 'conv-1',
+        transcriptPath: '/t/c.jsonl',
+        cwd: '/code/repo',
+        capturedAt: '2026-09-15T18:00:00.000Z',
+      },
+      resumable: true,
+    })
+    state.facts = [stopped]
+    render(<OverviewScreen />)
+    fireEvent.click(screen.getByRole('button', { name: 'Resume claude' }))
+    expect(resumeSession).toHaveBeenCalledWith(stopped)
   })
 })

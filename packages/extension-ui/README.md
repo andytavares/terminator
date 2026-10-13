@@ -151,3 +151,7 @@ export default meta
 export const Primary: StoryObj<typeof meta> = { args: { children: 'Save', variant: 'primary' } }
 export const PrimaryLight = inLight(Primary)
 ```
+
+The package, its stories and its tests are held to the core's function size limits (at most 30
+lines, complexity 10, three parameters; see `docs/CONTRIBUTING.md`). A component or story that
+outgrows them is split into named subcomponents and hooks.

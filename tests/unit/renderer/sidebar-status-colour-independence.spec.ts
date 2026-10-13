@@ -45,7 +45,9 @@ describe('sidebar status vocabulary survives greyscale (SC-011)', () => {
     // Idle and exited must be told apart, not merely both dim.
     expect(Math.abs(scale[2] - scale[3])).toBeGreaterThanOrEqual(0.05)
   })
+})
 
+describe('sidebar status vocabulary survives greyscale (SC-011) — puts no colour on the status glyph itself — shape and opacity are the only channels', () => {
   it('puts no colour on the status glyph itself — shape and opacity are the only channels', () => {
     // The glyph's own rules live in StateChip.css now (BranchRow just sizes
     // the compact chip to its gutter). The chip's fill/edge colour the row
@@ -82,7 +84,9 @@ describe('sidebar status vocabulary survives greyscale (SC-011)', () => {
       expect(ROW_TSX).not.toContain(glyph)
     }
   })
+})
 
+describe('sidebar status vocabulary survives greyscale (SC-011) — uses no emoji anywhere in the row (Principle XII)', () => {
   it('uses no emoji anywhere in the row (Principle XII)', () => {
     expect(ROW_TSX).not.toMatch(/[\u{1F300}-\u{1FAFF}]/u)
   })

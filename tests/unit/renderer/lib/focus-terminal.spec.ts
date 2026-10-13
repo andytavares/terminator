@@ -15,13 +15,13 @@ function stubSession(overrides: Record<string, unknown> = {}): void {
   } as never)
 }
 
-describe('focusActiveTerminal', () => {
-  beforeEach(() => {
-    focus.mockReset()
-    useWorkspaceStore.setState({ activeProjectId: 'proj-1', scratchActive: false } as never)
-    stubSession()
-  })
+beforeEach(() => {
+  focus.mockReset()
+  useWorkspaceStore.setState({ activeProjectId: 'proj-1', scratchActive: false } as never)
+  stubSession()
+})
 
+describe('focusActiveTerminal', () => {
   it('focuses the project’s active session', () => {
     stubSession({
       getActiveSessionForProject: (id: string) => (id === 'proj-1' ? 'sess-1' : null),
@@ -57,7 +57,9 @@ describe('focusActiveTerminal', () => {
 
     expect(focus).toHaveBeenCalled()
   })
+})
 
+describe('focusActiveTerminal — does nothing when no project is active', () => {
   it('does nothing when no project is active', () => {
     useWorkspaceStore.setState({ activeProjectId: null, scratchActive: false } as never)
 

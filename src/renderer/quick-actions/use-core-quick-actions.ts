@@ -12,6 +12,8 @@ import { qualifiedBranchLabel } from '../sidebar/branch-display'
 import { agentStateOf } from '../sidebar/agent-state'
 import { buildCoreActions, type CoreSessionSummary } from './core-actions'
 import type { QuickActionTarget } from './use-active-scope'
+import type { CoreActionDeps } from './core-actions'
+import type { PaneSplitDirection, TerminalSession, Workspace } from '../../shared/types/index'
 import type { QuickAction } from './types'
 
 /** What the app shell does on behalf of an action: its own dialogs, panes and toggles. */
@@ -64,171 +66,218 @@ function useFocusedIssue(focusedSessionId: string | null) {
     : undefined
   const focusedWorkItem = focusedFacts?.workItem ?? null
   const issue = useIssue(focusedWorkItem?.ref ?? null)
-  const link = useMemo(
-    () =>
-      focusedWorkItem
+  return useMemo(
+    () => ({
+      issue: issue ?? null,
+      issueLink: focusedWorkItem
         ? { key: focusedWorkItem.ref.key, tracker: focusedWorkItem.ref.tracker }
         : null,
-    [focusedWorkItem]
+    }),
+    [focusedWorkItem, issue]
   )
-  return { issue: issue ?? null, link }
+}
+
+/** What the core actions act on: the focus, the stores' current state and the shell. */
+interface CoreContext {
+  /** The project Quick Actions acts in; null when none is focused. */
+  projectId: string | null
+  focusedSessionId: string | null
+  activeWorkspaceId: string | null
+  activeProjectId: string | null
+  workspaces: Workspace[]
+  sessions: Map<string, TerminalSession>
+  issueLink: CoreActionDeps['issueLink']
+  issue: { url: string } | null
+  shell: ShellCommands
+  splitSession: ReturnType<typeof useTerminalSession>['splitSession']
+}
+
+type Handlers<Keys extends keyof CoreActionDeps> = Pick<CoreActionDeps, Keys>
+
+function splitFocused(c: CoreContext, direction: PaneSplitDirection): void {
+  if (!c.projectId) return
+  const settings = useSettingsStore.getState().resolveSettings(c.activeWorkspaceId)
+  const cwd = useWorkspaceStore.getState().resolveActiveCwd()
+  void c.splitSession(c.projectId, direction, {
+    cwd,
+    scrollbackLimit: settings.terminal.scrollbackLimit,
+  })
+}
+
+/** Closes the focused pane of a split, or else the tab on screen. */
+function closePane(projectId: string | null): void {
+  if (!projectId) return
+  const store = useSessionStore.getState()
+  const layout = store.getPaneLayout?.(projectId)
+  const focusedId = store.getFocusedSession?.(projectId)
+  if (layout && focusedId) {
+    store.closeSplitLeaf(projectId, focusedId)
+    void store.closeSession(focusedId)
+  } else {
+    const activeId = store.getActiveSessionForProject?.(projectId)
+    if (activeId) void store.closeSession(activeId)
+  }
+}
+
+function cycleTab(projectId: string | null, delta: number): void {
+  if (!projectId) return
+  const store = useSessionStore.getState()
+  const list = store.getSessionsForProject(projectId)
+  if (list.length === 0) return
+  const idx = list.findIndex((s) => s.id === store.getActiveSessionForProject?.(projectId))
+  const next = list[(((idx + delta) % list.length) + list.length) % list.length]
+  // Cycling stays within the project already on screen — unlike the other
+  // "go to session" paths it must not switch to the session's own
+  // projectId — but still has to leave whatever tab is showing and ask
+  // for focus, the way every other path does.
+  useExtensionRegistry.getState().setActiveGlobalTab(null)
+  useExtensionRegistry.getState().setActiveWorkspaceTab(null)
+  useExtensionRegistry.getState().setActiveProjectTab(null)
+  store.setActiveSessionForProject(projectId, next.id)
+  useSessionStore.getState().requestFocus(next.id)
+}
+
+function terminalHandlers(
+  c: CoreContext
+): Handlers<
+  'onNewTab' | 'onSplit' | 'onClosePane' | 'onClear' | 'onNewScratch' | 'onEditNote' | 'onCycleTab'
+> {
+  return {
+    onNewTab: c.shell.onNewTab,
+    onSplit: (direction) => splitFocused(c, direction),
+    onClosePane: () => closePane(c.projectId),
+    onClear: () => {
+      if (c.focusedSessionId) window.electronAPI.terminal.input(c.focusedSessionId, '\x0c')
+    },
+    onNewScratch: c.shell.onNewScratch,
+    onEditNote: () => c.shell.onEditNote(c.focusedSessionId),
+    onCycleTab: (delta) => cycleTab(c.projectId, delta),
+  }
+}
+
+/** Steps through the open sessions, most recently attended first. */
+function cycleRecent(c: CoreContext, delta: number): void {
+  const all = [...c.sessions.values()]
+    .filter((s) => s.status !== 'closed')
+    .sort((a, b) => (b.lastAttendedAt ?? 0) - (a.lastAttendedAt ?? 0))
+  if (all.length < 2) return
+  const idx = all.findIndex((s) => s.id === c.focusedSessionId)
+  const next = all[((idx === -1 ? 0 : idx) + delta + all.length) % all.length]
+  revealSession(next.id)
+}
+
+/** The waiting session after the focused one. */
+function nextWaiting(c: CoreContext): void {
+  const waiting = [...c.sessions.values()].filter((s) => agentStateOf(s) === 'awaiting-input')
+  if (waiting.length === 0) return
+  const idx = waiting.findIndex((s) => s.id === c.focusedSessionId)
+  revealSession(waiting[(idx + 1) % waiting.length].id)
+}
+
+const openHome = (): void => useExtensionRegistry.getState().setActiveGlobalTab('core.home')
+
+function sessionHandlers(
+  c: CoreContext
+): Handlers<'onCycleRecentSession' | 'onSelectSession' | 'onNextWaiting' | 'onResume' | 'onHome'> {
+  return {
+    onCycleRecentSession: (delta) => cycleRecent(c, delta),
+    onSelectSession: (session) => revealSession(session.id),
+    onNextWaiting: () => nextWaiting(c),
+    onResume: openHome,
+    onHome: openHome,
+  }
+}
+
+function cycleWorkspace(c: CoreContext, delta: number): void {
+  if (c.workspaces.length === 0) return
+  const idx = c.workspaces.findIndex((w) => w.id === c.activeWorkspaceId)
+  const next = c.workspaces[(idx + delta + c.workspaces.length) % c.workspaces.length]
+  useWorkspaceStore.getState().setActiveWorkspace(next.id)
+}
+
+function workspaceHandlers(
+  c: CoreContext
+): Handlers<'onSwitchWorkspace' | 'onCycleWorkspace' | 'onLinkIssueBranch' | 'onViewIssue'> {
+  const integrations = useIntegrationsStore.getState()
+  return {
+    onSwitchWorkspace: (id) => useWorkspaceStore.getState().setActiveWorkspace(id),
+    onCycleWorkspace: (delta) => cycleWorkspace(c, delta),
+    onLinkIssueBranch: () => c.activeProjectId && integrations.openLinkDialog(c.activeProjectId),
+    onViewIssue: () => c.activeProjectId && integrations.openDrawer(c.activeProjectId),
+  }
+}
+
+function issueHandlers(c: CoreContext): Handlers<'onLinkIssue' | 'onCopyIssueKey' | 'onOpenIssue'> {
+  return {
+    onLinkIssue: () => c.focusedSessionId && c.shell.onLinkSession(c.focusedSessionId),
+    onCopyIssueKey: () => c.issueLink && void navigator.clipboard?.writeText(c.issueLink.key),
+    onOpenIssue: () => c.issue && void window.electronAPI.shell.openExternal(c.issue.url),
+  }
+}
+
+function shellHandlers(
+  shell: ShellCommands
+): Handlers<'onOverview' | 'onToggleSidebar' | 'onOpenSettings' | 'onToggleLog'> {
+  return {
+    onOverview: shell.onToggleOverview,
+    onToggleSidebar: shell.onToggleSidebar,
+    onOpenSettings: shell.onOpenSettings,
+    onToggleLog: shell.onToggleLog,
+  }
+}
+
+function coreActionDeps(c: CoreContext, paletteSessions: CoreSessionSummary[]): CoreActionDeps {
+  return {
+    hasProjectFocused: !!c.projectId,
+    hasTerminalFocused: !!c.focusedSessionId,
+    activeWorkspaceId: c.activeWorkspaceId,
+    workspaces: c.workspaces.map((w) => ({ id: w.id, name: w.name })),
+    sessions: paletteSessions,
+    issueLink: c.issueLink,
+    issue: c.issue,
+    ...terminalHandlers(c),
+    ...sessionHandlers(c),
+    ...workspaceHandlers(c),
+    ...issueHandlers(c),
+    ...shellHandlers(c.shell),
+  }
+}
+
+/** The focus, the stores' state and the shell the core actions read, as one value. */
+function useCoreContext(target: QuickActionTarget, shell: ShellCommands): CoreContext {
+  const { projectId, focusedSessionId } = target
+  const workspaceFocus = useWorkspaceStore(
+    useShallow((s) => ({
+      activeWorkspaceId: s.activeWorkspaceId,
+      activeProjectId: s.activeProjectId,
+      workspaces: s.workspaces,
+    }))
+  )
+  const sessions = useSessionStore((s) => s.sessions)
+  const { splitSession } = useTerminalSession()
+  const focusedIssue = useFocusedIssue(focusedSessionId)
+  return useMemo(
+    () => ({
+      projectId,
+      focusedSessionId,
+      ...workspaceFocus,
+      sessions,
+      ...focusedIssue,
+      shell,
+      splitSession,
+    }),
+    [projectId, focusedSessionId, workspaceFocus, sessions, focusedIssue, shell, splitSession]
+  )
 }
 
 export function useCoreQuickActions(
   target: QuickActionTarget,
   shell: ShellCommands
 ): QuickAction[] {
-  const { projectId: qaProjectId, focusedSessionId } = target
-  const { activeWorkspaceId, activeProjectId, workspaces, setActiveWorkspace, resolveActiveCwd } =
-    useWorkspaceStore(
-      useShallow((s) => ({
-        activeWorkspaceId: s.activeWorkspaceId,
-        activeProjectId: s.activeProjectId,
-        workspaces: s.workspaces,
-        setActiveWorkspace: s.setActiveWorkspace,
-        resolveActiveCwd: s.resolveActiveCwd,
-      }))
-    )
-  const { resolveSettings } = useSettingsStore(
-    useShallow((s) => ({ resolveSettings: s.resolveSettings }))
-  )
-  const { openLinkDialog, openDrawer } = useIntegrationsStore(
-    useShallow((s) => ({ openLinkDialog: s.openLinkDialog, openDrawer: s.openDrawer }))
-  )
-  const {
-    sessions,
-    getSessionsForProject,
-    getActiveSessionForProject,
-    getFocusedSession,
-    getPaneLayout,
-    closeSplitLeaf,
-    closeSession,
-    setActiveSessionForProject,
-  } = useSessionStore(
-    useShallow((s) => ({
-      sessions: s.sessions,
-      getSessionsForProject: s.getSessionsForProject,
-      getActiveSessionForProject: s.getActiveSessionForProject,
-      getFocusedSession: s.getFocusedSession,
-      getPaneLayout: s.getPaneLayout,
-      closeSplitLeaf: s.closeSplitLeaf,
-      closeSession: s.closeSession,
-      setActiveSessionForProject: s.setActiveSessionForProject,
-    }))
-  )
-  const { setActiveGlobalTab } = useExtensionRegistry(
-    useShallow((s) => ({ setActiveGlobalTab: s.setActiveGlobalTab }))
-  )
-  const { splitSession } = useTerminalSession()
+  const context = useCoreContext(target, shell)
   const paletteSessions = usePaletteSessions()
-  const { issue: focusedIssue, link: focusedIssueLink } = useFocusedIssue(focusedSessionId)
-
   return useMemo(
-    () =>
-      buildCoreActions({
-        hasProjectFocused: !!qaProjectId,
-        hasTerminalFocused: !!focusedSessionId,
-        activeWorkspaceId,
-        workspaces: workspaces.map((w) => ({ id: w.id, name: w.name })),
-        sessions: paletteSessions,
-        issueLink: focusedIssueLink,
-        issue: focusedIssue,
-        onNewTab: shell.onNewTab,
-        onSplit: (direction) => {
-          if (!qaProjectId) return
-          const settings = resolveSettings(activeWorkspaceId)
-          void splitSession(
-            qaProjectId,
-            direction,
-            resolveActiveCwd(),
-            settings.terminal.scrollbackLimit
-          )
-        },
-        onClosePane: () => {
-          if (!qaProjectId) return
-          const layout = getPaneLayout?.(qaProjectId)
-          const focusedId = getFocusedSession?.(qaProjectId)
-          if (layout && focusedId) {
-            closeSplitLeaf(qaProjectId, focusedId)
-            void closeSession(focusedId)
-          } else {
-            const activeId = getActiveSessionForProject?.(qaProjectId)
-            if (activeId) void closeSession(activeId)
-          }
-        },
-        onClear: () => {
-          if (focusedSessionId) window.electronAPI.terminal.input(focusedSessionId, '\x0c')
-        },
-        onNewScratch: shell.onNewScratch,
-        onEditNote: () => shell.onEditNote(focusedSessionId),
-        onCycleTab: (delta) => {
-          if (!qaProjectId) return
-          const list = getSessionsForProject(qaProjectId)
-          if (list.length === 0) return
-          const idx = list.findIndex((s) => s.id === getActiveSessionForProject?.(qaProjectId))
-          const next = list[(((idx + delta) % list.length) + list.length) % list.length]
-          // Cycling stays within the project already on screen — unlike the other
-          // "go to session" paths it must not switch to the session's own
-          // projectId — but still has to leave whatever tab is showing and ask
-          // for focus, the way every other path does.
-          useExtensionRegistry.getState().setActiveGlobalTab(null)
-          useExtensionRegistry.getState().setActiveWorkspaceTab(null)
-          useExtensionRegistry.getState().setActiveProjectTab(null)
-          setActiveSessionForProject(qaProjectId, next.id)
-          useSessionStore.getState().requestFocus(next.id)
-        },
-        onCycleRecentSession: (delta) => {
-          const all = [...sessions.values()]
-            .filter((s) => s.status !== 'closed')
-            .sort((a, b) => (b.lastAttendedAt ?? 0) - (a.lastAttendedAt ?? 0))
-          if (all.length < 2) return
-          const idx = all.findIndex((s) => s.id === focusedSessionId)
-          const next = all[((idx === -1 ? 0 : idx) + delta + all.length) % all.length]
-          revealSession(next.id)
-        },
-        onSelectSession: (session) => {
-          revealSession(session.id)
-        },
-        onNextWaiting: () => {
-          const waiting = [...sessions.values()].filter((s) => agentStateOf(s) === 'awaiting-input')
-          if (waiting.length === 0) return
-          const idx = waiting.findIndex((s) => s.id === focusedSessionId)
-          const next = waiting[(idx + 1) % waiting.length]
-          revealSession(next.id)
-        },
-        onResume: () => setActiveGlobalTab('core.home'),
-        onSwitchWorkspace: (id) => setActiveWorkspace(id),
-        onCycleWorkspace: (delta) => {
-          if (workspaces.length === 0) return
-          const idx = workspaces.findIndex((w) => w.id === activeWorkspaceId)
-          const next = workspaces[(idx + delta + workspaces.length) % workspaces.length]
-          setActiveWorkspace(next.id)
-        },
-        onLinkIssue: () => focusedSessionId && shell.onLinkSession(focusedSessionId),
-        onLinkIssueBranch: () => activeProjectId && openLinkDialog(activeProjectId),
-        onViewIssue: () => activeProjectId && openDrawer(activeProjectId),
-        onCopyIssueKey: () =>
-          focusedIssueLink && void navigator.clipboard?.writeText(focusedIssueLink.key),
-        onOpenIssue: () =>
-          focusedIssue && void window.electronAPI.shell.openExternal(focusedIssue.url),
-        onHome: () => setActiveGlobalTab('core.home'),
-        onOverview: shell.onToggleOverview,
-        onToggleSidebar: shell.onToggleSidebar,
-        onOpenSettings: shell.onOpenSettings,
-        onToggleLog: shell.onToggleLog,
-      }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [
-      qaProjectId,
-      focusedSessionId,
-      activeWorkspaceId,
-      workspaces,
-      paletteSessions,
-      focusedIssueLink,
-      focusedIssue,
-      sessions,
-      activeProjectId,
-      shell,
-    ]
+    () => buildCoreActions(coreActionDeps(context, paletteSessions)),
+    [context, paletteSessions]
   )
 }

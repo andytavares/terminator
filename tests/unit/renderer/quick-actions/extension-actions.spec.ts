@@ -26,7 +26,11 @@ function registered(overrides: Partial<RegisteredCommand> = {}): RegisteredComma
 
 describe('buildExtensionActions', () => {
   it('groups a registered command under its extension group', () => {
-    const actions = buildExtensionActions([registered()], [], [gitGroup], ctx(), vi.fn())
+    const actions = buildExtensionActions(
+      { registered: [registered()], declared: [] },
+      [gitGroup],
+      { ctx: ctx(), execute: vi.fn() }
+    )
     expect(actions[0]).toMatchObject({
       id: 'ext:git.command.push',
       group: 'ext:git',
@@ -36,33 +40,29 @@ describe('buildExtensionActions', () => {
 
   it('falls back to "top" when the extension has no allocated group', () => {
     const actions = buildExtensionActions(
-      [registered({ extensionId: 'other' })],
-      [],
+      { registered: [registered({ extensionId: 'other' })], declared: [] },
       [gitGroup],
-      ctx(),
-      vi.fn()
+      { ctx: ctx(), execute: vi.fn() }
     )
     expect(actions[0].group).toBe('top')
   })
+})
 
+describe('buildExtensionActions — disables a repo-required command with "No repository focused" when repoRoot is null', () => {
   it('disables a repo-required command with "No repository focused" when repoRoot is null', () => {
     const actions = buildExtensionActions(
-      [registered({ requires: 'repo' })],
-      [],
+      { registered: [registered({ requires: 'repo' })], declared: [] },
       [gitGroup],
-      ctx({ repoRoot: null }),
-      vi.fn()
+      { ctx: ctx({ repoRoot: null }), execute: vi.fn() }
     )
     expect(actions[0].disabledReason).toBe('No repository focused')
   })
 
   it('disables a session-required command with "No terminal focused" when sessionId is null', () => {
     const actions = buildExtensionActions(
-      [registered({ requires: 'session' })],
-      [],
+      { registered: [registered({ requires: 'session' })], declared: [] },
       [gitGroup],
-      ctx({ sessionId: null }),
-      vi.fn()
+      { ctx: ctx({ sessionId: null }), execute: vi.fn() }
     )
     expect(actions[0].disabledReason).toBe('No terminal focused')
   })
@@ -70,14 +70,23 @@ describe('buildExtensionActions', () => {
   it('calls execute with the command key and the given context', () => {
     const execute = vi.fn()
     const c = ctx()
-    const actions = buildExtensionActions([registered()], [], [gitGroup], c, execute)
+    const actions = buildExtensionActions(
+      { registered: [registered()], declared: [] },
+      [gitGroup],
+      { ctx: c, execute }
+    )
     actions[0].run()
     expect(execute).toHaveBeenCalledWith('git.push', c)
   })
+})
 
+describe('buildExtensionActions — shows a dimmed action for a declared command the extension never registered', () => {
   it('shows a dimmed action for a declared command the extension never registered', () => {
     const declared: DeclaredCommand[] = [{ extensionId: 'git', id: 'pull', label: 'Pull' }]
-    const actions = buildExtensionActions([], declared, [gitGroup], ctx(), vi.fn())
+    const actions = buildExtensionActions({ registered: [], declared }, [gitGroup], {
+      ctx: ctx(),
+      execute: vi.fn(),
+    })
     expect(actions[0]).toMatchObject({
       label: 'Pull',
       disabledReason: 'Extension did not register this command',
@@ -86,16 +95,23 @@ describe('buildExtensionActions', () => {
 
   it('does not duplicate a declared command that is also registered', () => {
     const declared: DeclaredCommand[] = [{ extensionId: 'git', id: 'push', label: 'Push' }]
-    const actions = buildExtensionActions([registered()], declared, [gitGroup], ctx(), vi.fn())
+    const actions = buildExtensionActions({ registered: [registered()], declared }, [gitGroup], {
+      ctx: ctx(),
+      execute: vi.fn(),
+    })
     expect(actions).toHaveLength(1)
     expect(actions[0].disabledReason).toBeUndefined()
   })
+})
 
+describe('buildExtensionActions — shows a dimmed action for a declared command the extension never registered — converts renderer-registered commands into top-level actions without mnemonics', () => {
   it('converts renderer-registered commands into top-level actions without mnemonics', () => {
     const action = vi.fn()
-    const actions = buildExtensionActions([], [], [gitGroup], ctx(), vi.fn(), [
-      { id: 'core.foo', label: 'Foo', action },
-    ])
+    const actions = buildExtensionActions(
+      { registered: [], declared: [], renderer: [{ id: 'core.foo', label: 'Foo', action }] },
+      [gitGroup],
+      { ctx: ctx(), execute: vi.fn() }
+    )
     expect(actions[0]).toMatchObject({ id: 'renderer:core.foo', group: 'top', label: 'Foo' })
     expect(actions[0].mnemonic).toBeUndefined()
     actions[0].run()

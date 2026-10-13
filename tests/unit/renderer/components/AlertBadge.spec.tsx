@@ -34,7 +34,9 @@ describe('AlertBadge', () => {
     const badge = screen.getByLabelText('1 alert')
     expect(badge).toBeTruthy()
   })
+})
 
+describe('AlertBadge — has correct aria-label for multiple alerts', () => {
   it('has correct aria-label for multiple alerts', () => {
     render(<AlertBadge count={5} />)
     const badge = screen.getByLabelText('5 alerts')

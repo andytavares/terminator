@@ -33,7 +33,9 @@ describe('latestLineOf', () => {
     const rows = ['⏺ Done.', '╭' + '─'.repeat(40) + '╮', '│ > │', '╰' + '─'.repeat(40) + '╯']
     expect(latestLineOf(rows, 2)).toBe('⏺ Done.')
   })
+})
 
+describe('latestLineOf — is empty for a blank screen', () => {
   it('is empty for a blank screen', () => {
     expect(latestLineOf(['', '  '])).toBe('')
     expect(latestLineOf([])).toBe('')

@@ -59,7 +59,9 @@ describe('IssuePicker — choosing', () => {
     await waitFor(() => expect(screen.getByText('Jira')).toBeTruthy())
     expect(screen.getByText('Linear')).toBeTruthy()
   })
+})
 
+describe('IssuePicker — choosing — reports the picked issue and closes the list', () => {
   it('reports the picked issue and closes the list', async () => {
     const onSelect = vi.fn()
     open({ onSelect })
@@ -88,7 +90,9 @@ describe('IssuePicker — choosing', () => {
     fireEvent.focus(screen.getByPlaceholderText(/Search/))
     expect(await screen.findByText('No issues found.')).toBeTruthy()
   })
+})
 
+describe('IssuePicker — choosing — says nothing about a tracker that was simply never connected', () => {
   it('says nothing about a tracker that was simply never connected', async () => {
     listMine.mockResolvedValue({
       issues: [summary()],
@@ -116,16 +120,16 @@ describe('IssuePicker — choosing', () => {
   })
 })
 
-describe('IssuePicker — dismissing the list', () => {
-  async function openList() {
-    const view = open()
-    await act(async () => {
-      fireEvent.focus(screen.getByPlaceholderText('Search, or type an issue key'))
-    })
-    await waitFor(() => expect(screen.getByText('TAV-42')).toBeTruthy())
-    return view
-  }
+async function openList() {
+  const view = open()
+  await act(async () => {
+    fireEvent.focus(screen.getByPlaceholderText('Search, or type an issue key'))
+  })
+  await waitFor(() => expect(screen.getByText('TAV-42')).toBeTruthy())
+  return view
+}
 
+describe('IssuePicker — dismissing the list', () => {
   it('closes on Escape, and keeps the key from reaching the dialog behind it', async () => {
     const behind = vi.fn()
     render(<div onKeyDown={behind} />)
@@ -153,7 +157,9 @@ describe('IssuePicker — dismissing the list', () => {
     fireEvent.pointerDown(document.body)
     await waitFor(() => expect(screen.queryByText('TAV-42')).toBeNull())
   })
+})
 
+describe('IssuePicker — dismissing the list — stays open when the pointer goes down inside it', () => {
   it('stays open when the pointer goes down inside it', async () => {
     await openList()
     fireEvent.pointerDown(screen.getByText('TAV-42'))

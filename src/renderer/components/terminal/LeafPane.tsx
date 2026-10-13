@@ -1,4 +1,3 @@
-import { useShallow } from 'zustand/react/shallow'
 import React, { useRef, useLayoutEffect, useCallback } from 'react'
 import { X } from 'lucide-react'
 import { useSessionStore } from '../../stores/session.store'
@@ -10,52 +9,36 @@ interface Props {
   projectId: string
 }
 
-export function LeafPane({ sessionId, projectId }: Props): JSX.Element {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const {
-    getTerminalInstance,
-    getFocusedSession,
-    setFocusedSession,
-    clearBellCount,
-    sessions,
-    closeSplitLeaf,
-    closeSession,
-  } = useSessionStore(
-    useShallow((s) => ({
-      getTerminalInstance: s.getTerminalInstance,
-      getFocusedSession: s.getFocusedSession,
-      setFocusedSession: s.setFocusedSession,
-      clearBellCount: s.clearBellCount,
-      sessions: s.sessions,
-      closeSplitLeaf: s.closeSplitLeaf,
-      closeSession: s.closeSession,
-      terminalInstances: s.terminalInstances,
-      projectViews: s.projectViews,
-    }))
-  )
-  const isFocused = getFocusedSession(projectId) === sessionId
-  const session = sessions.get(sessionId)
-  const tabTitle = session?.tabTitle ?? sessionId
-
+/** Puts the session's xterm in the container while the pane is mounted. */
+function useMountedTerminal(
+  containerRef: React.RefObject<HTMLDivElement>,
+  sessionId: string
+): void {
   useLayoutEffect(() => {
-    const instance = getTerminalInstance(sessionId)
+    const instance = useSessionStore.getState().getTerminalInstance(sessionId)
     if (!instance || !containerRef.current) return
     instance.mount(containerRef.current)
     return () => {
       instance.unmount()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionId])
+  }, [containerRef, sessionId])
+}
 
+function handleDragOver(e: React.DragEvent<HTMLDivElement>): void {
+  if (e.dataTransfer.types.includes('Files')) e.preventDefault()
+}
+
+/** Focusing the pane, closing it, and pasting the paths of files dropped on it. */
+function usePaneHandlers({ sessionId, projectId }: Props) {
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
       if (e.button !== 0) return
-      setFocusedSession(projectId, sessionId)
-      clearBellCount(sessionId)
-      const instance = getTerminalInstance(sessionId)
-      instance?.terminal.focus()
+      const store = useSessionStore.getState()
+      store.setFocusedSession(projectId, sessionId)
+      store.clearBellCount(sessionId)
+      store.getTerminalInstance(sessionId)?.terminal.focus()
     },
-    [projectId, sessionId, setFocusedSession, clearBellCount, getTerminalInstance]
+    [projectId, sessionId]
   )
 
   /**
@@ -70,23 +53,28 @@ export function LeafPane({ sessionId, projectId }: Props): JSX.Element {
   const handleClose = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation()
-      closeSplitLeaf(projectId, sessionId)
-      void closeSession(sessionId)
+      useSessionStore.getState().closeSplitLeaf(projectId, sessionId)
+      void useSessionStore.getState().closeSession(sessionId)
     },
-    [projectId, sessionId, closeSplitLeaf, closeSession]
+    [projectId, sessionId]
   )
-
-  function handleDragOver(e: React.DragEvent<HTMLDivElement>): void {
-    if (e.dataTransfer.types.includes('Files')) e.preventDefault()
-  }
 
   function handleDrop(e: React.DragEvent<HTMLDivElement>): void {
     e.preventDefault()
-    const instance = getTerminalInstance(sessionId)
+    const instance = useSessionStore.getState().getTerminalInstance(sessionId)
     if (!instance) return
     const paths = droppedPaths(e.dataTransfer.files)
     if (paths) instance.terminal.paste(paths)
   }
+  return { handleMouseDown, handleClose, handleDrop }
+}
+
+export function LeafPane({ sessionId, projectId }: Props): JSX.Element {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const isFocused = useSessionStore((s) => s.getFocusedSession(projectId) === sessionId)
+  const tabTitle = useSessionStore((s) => s.sessions.get(sessionId)?.tabTitle ?? sessionId)
+  useMountedTerminal(containerRef, sessionId)
+  const { handleMouseDown, handleClose, handleDrop } = usePaneHandlers({ sessionId, projectId })
 
   return (
     <div

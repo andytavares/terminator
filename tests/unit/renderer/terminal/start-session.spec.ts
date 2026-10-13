@@ -39,8 +39,8 @@ const repo = workspaceOf({ id: 'w1', name: 'Repo', folderPath: '/code/repo' })
 let records: SeededStore<typeof useSessionRecordsStore>
 const closeSession = vi.fn()
 
-beforeEach(() => {
-  vi.clearAllMocks()
+/** Repo w1 with its main checkout p1 and its worktree p2. */
+function seedWorkspaces(): void {
   useWorkspaceStore.setState({
     ...useWorkspaceStore.getInitialState(),
     workspaces: [repo],
@@ -60,6 +60,10 @@ beforeEach(() => {
       ],
     ]),
   })
+}
+
+/** The global scrollback, overridden by w1. */
+function seedSettings(): void {
   useSettingsStore.setState({
     ...useSettingsStore.getInitialState(),
     globalSettings: {
@@ -77,6 +81,12 @@ beforeEach(() => {
       ],
     ]),
   })
+}
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  seedWorkspaces()
+  seedSettings()
   useExtensionRegistry.setState(useExtensionRegistry.getInitialState(), true)
   useExtensionRegistry.getState().setActiveGlobalTab('core.home')
   // Closing a terminal and moving a record both reach the main process.
@@ -89,19 +99,39 @@ beforeEach(() => {
 describe('startSessionInBranch', () => {
   it("starts a terminal in the branch's own checkout and shows it", async () => {
     await startSessionInBranch('p2')
-    expect(create).toHaveBeenCalledWith('p2', 'human', '', '/code/repo-wt', REPO_SCROLLBACK)
+    expect(create).toHaveBeenCalledWith({
+      projectId: 'p2',
+      type: 'human',
+      title: '',
+      cwd: '/code/repo-wt',
+      scrollbackLimit: REPO_SCROLLBACK,
+    })
     expect(navigate).toHaveBeenCalledWith('new-session')
   })
 
   it("falls back to the repo's folder for a branch with no checkout of its own", async () => {
     await startSessionInBranch('p1')
-    expect(create).toHaveBeenCalledWith('p1', 'human', '', '/code/repo', REPO_SCROLLBACK)
+    expect(create).toHaveBeenCalledWith({
+      projectId: 'p1',
+      type: 'human',
+      title: '',
+      cwd: '/code/repo',
+      scrollbackLimit: REPO_SCROLLBACK,
+    })
   })
+})
 
+describe("startSessionInBranch — falls back to the home directory when the branch's repo has gone", () => {
   it("falls back to the home directory when the branch's repo has gone", async () => {
     useWorkspaceStore.setState({ workspaces: [] })
     await startSessionInBranch('p1')
-    expect(create).toHaveBeenCalledWith('p1', 'human', '', '~', REPO_SCROLLBACK)
+    expect(create).toHaveBeenCalledWith({
+      projectId: 'p1',
+      type: 'human',
+      title: '',
+      cwd: '~',
+      scrollbackLimit: REPO_SCROLLBACK,
+    })
   })
 
   it('does nothing for a branch that has gone', async () => {
@@ -120,13 +150,13 @@ describe('startSessionInBranch', () => {
 describe('startScratchSession', () => {
   it('starts a scratch terminal and leaves Home for it', async () => {
     await startScratchSession()
-    expect(create).toHaveBeenCalledWith(
-      SCRATCH_PROJECT_ID,
-      'human',
-      'Scratch',
-      '/code/repo',
-      REPO_SCROLLBACK
-    )
+    expect(create).toHaveBeenCalledWith({
+      projectId: SCRATCH_PROJECT_ID,
+      type: 'human',
+      title: 'Scratch',
+      cwd: '/code/repo',
+      scrollbackLimit: REPO_SCROLLBACK,
+    })
     expect(useWorkspaceStore.getState().scratchActive).toBe(true)
     expect(useExtensionRegistry.getState().activeGlobalTabId).toBeNull()
   })
@@ -134,15 +164,17 @@ describe('startScratchSession', () => {
   it('resolves settings globally when no repo is active', async () => {
     useWorkspaceStore.setState({ activeWorkspaceId: null })
     await startScratchSession()
-    expect(create).toHaveBeenCalledWith(
-      SCRATCH_PROJECT_ID,
-      'human',
-      'Scratch',
-      '~',
-      GLOBAL_SCROLLBACK
-    )
+    expect(create).toHaveBeenCalledWith({
+      projectId: SCRATCH_PROJECT_ID,
+      type: 'human',
+      title: 'Scratch',
+      cwd: '~',
+      scrollbackLimit: GLOBAL_SCROLLBACK,
+    })
   })
+})
 
+describe('startScratchSession — stays on Home when the scratch terminal cannot start', () => {
   it('stays on Home when the scratch terminal cannot start', async () => {
     create.mockRejectedValueOnce(new Error('nope'))
     await startScratchSession()
@@ -151,42 +183,47 @@ describe('startScratchSession', () => {
   })
 })
 
-describe('resumeSession', () => {
-  const conversation = {
-    provider: 'claude' as const,
-    sessionId: 'conv-1',
-    transcriptPath: '/t/conv-1.jsonl',
-    cwd: '/code/repo-wt',
-    capturedAt: '2026-09-15T18:00:00.000Z',
-  }
-  const stopped = (patch = {}) =>
-    fact({
-      sessionId: 'old',
-      name: 'claude',
-      state: 'exited',
-      agent: conversation,
-      resumable: true,
-      snapshot: { ...fact().snapshot, sessionId: 'old', projectId: 'p1' },
-      ...patch,
-    })
+const conversation = {
+  provider: 'claude' as const,
+  sessionId: 'conv-1',
+  transcriptPath: '/t/conv-1.jsonl',
+  cwd: '/code/repo-wt',
+  capturedAt: '2026-09-15T18:00:00.000Z',
+}
 
+const stopped = (patch = {}) =>
+  fact({
+    sessionId: 'old',
+    name: 'claude',
+    state: 'exited',
+    agent: conversation,
+    resumable: true,
+    snapshot: { ...fact().snapshot, sessionId: 'old', projectId: 'p1' },
+    ...patch,
+  })
+
+/** The hooks every "resumeSession" describe registers. */
+function setUpResumeSession(): void {
   beforeEach(() => {
     useSessionStore.setState({
       sessions: new Map([['old', terminalSessionOf({ id: 'old', projectId: 'p1' })]]),
     })
   })
+}
+
+describe('resumeSession', () => {
+  setUpResumeSession()
 
   it('opens a terminal that carries the conversation on, where it ran', async () => {
     await resumeSession(stopped())
-    expect(create).toHaveBeenCalledWith(
-      'p1',
-      'human',
-      '',
-      '/code/repo-wt',
-      REPO_SCROLLBACK,
-      undefined,
-      'claude --resume conv-1'
-    )
+    expect(create).toHaveBeenCalledWith({
+      projectId: 'p1',
+      type: 'human',
+      title: '',
+      cwd: '/code/repo-wt',
+      scrollbackLimit: REPO_SCROLLBACK,
+      initialCommand: 'claude --resume conv-1',
+    })
     expect(navigate).toHaveBeenCalledWith('new-session')
   })
 
@@ -201,6 +238,10 @@ describe('resumeSession', () => {
       closeSession.mock.invocationCallOrder[0]
     )
   })
+})
+
+describe('resumeSession — closes nothing for a session whose terminal has already gone', () => {
+  setUpResumeSession()
 
   it('closes nothing for a session whose terminal has already gone', async () => {
     useSessionStore.setState({ sessions: new Map() })

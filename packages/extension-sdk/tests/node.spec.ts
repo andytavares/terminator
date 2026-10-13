@@ -35,12 +35,16 @@ describe('writeJsonAtomic', () => {
   })
 })
 
-describe('moveFromUserData', () => {
-  let userData: string
-  let globalStorage: string
-  const warn = vi.fn()
-  const api = () => ({ paths: { app: '/app', globalStorage }, log: { warn } })
+let userData: string
 
+let globalStorage: string
+
+const warn = vi.fn()
+
+const api = () => ({ paths: { app: '/app', globalStorage }, log: { warn } })
+
+/** The hooks every "moveFromUserData" describe registers. */
+function setUpMoveFromUserData(): void {
   beforeEach(() => {
     warn.mockClear()
     userData = makeTempDir('sdk-move-legacy-')
@@ -50,6 +54,10 @@ describe('moveFromUserData', () => {
   afterEach(() => {
     rmSync(userData, { recursive: true, force: true })
   })
+}
+
+describe('moveFromUserData', () => {
+  setUpMoveFromUserData()
 
   it('moves a folder and a file from userData into globalStorage, creating it', () => {
     mkdirSync(join(userData, 'tool', 'orders'), { recursive: true })
@@ -78,6 +86,10 @@ describe('moveFromUserData', () => {
     expect(moveFromUserData(api(), [{ from: 'tool', to: 'records' }])).toEqual(['nothing-to-move'])
     expect(existsSync(join(globalStorage, 'records'))).toBe(true)
   })
+})
+
+describe('moveFromUserData — leaves both copies untouched when the new location already exists', () => {
+  setUpMoveFromUserData()
 
   it('leaves both copies untouched when the new location already exists', () => {
     mkdirSync(join(userData, 'tool'))

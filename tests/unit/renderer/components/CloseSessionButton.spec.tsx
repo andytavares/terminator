@@ -30,7 +30,9 @@ describe('CloseSessionButton', () => {
     expect(onForget).toHaveBeenCalledWith(facts)
     expect(onClose).not.toHaveBeenCalled()
   })
+})
 
+describe('CloseSessionButton — still ends a live session when removing is also possible', () => {
   it('still ends a live session when removing is also possible', () => {
     const onForget = vi.fn()
     const onClose = vi.fn()
