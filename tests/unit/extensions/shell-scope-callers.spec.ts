@@ -73,7 +73,7 @@ async function builtIn(name: string, id: string): Promise<ExtensionAPI> {
   const host = new ExtensionHost(new FakeBackendHost())
   host.setDeps({ paths: { app: directory('app'), userData } })
   await host.load(join(BUILT_IN, name))
-  return host.hostedApi(id)!
+  return host.apiOf(id)!
 }
 
 beforeEach(() => {

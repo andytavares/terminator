@@ -93,7 +93,7 @@ async function readStoredEntries(): Promise<unknown[]> {
 }
 
 /** One stored entry as a record, or null when it lacks what identifies one. */
-function storedRecord(entry: unknown): SessionRecord | null {
+function parseStoredRecord(entry: unknown): SessionRecord | null {
   if (typeof entry !== 'object' || entry === null) return null
   const r = entry as Partial<SessionRecord>
   if (typeof r.sessionId !== 'string' || typeof r.projectId !== 'string') return null
@@ -119,7 +119,7 @@ function storedRecord(entry: unknown): SessionRecord | null {
 export async function loadRecords(): Promise<void> {
   records.clear()
   const loaded = (await readStoredEntries())
-    .map(storedRecord)
+    .map(parseStoredRecord)
     .filter((record): record is SessionRecord => record !== null)
   const kept = pruneRecords(loaded, Date.now())
   for (const record of kept) records.set(record.sessionId, record)

@@ -52,7 +52,7 @@ function renderer(channel: string, data: unknown): void {
 function terminalHostApi(): ExtensionAPI {
   const coreApi = createExtensionAPI('test.runner', {
     ptyManager,
-    terminalRelay: { start: () => {} } as never,
+    terminalRelay: { startRelaying: () => {} } as never,
     broadcastToWindows: renderer,
   })
   const { port1, port2 } = new MessageChannel()

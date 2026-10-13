@@ -28,14 +28,14 @@ export function useInitialLoad(): void {
   // Read before the first ⌘P, so the keys typed straight after it find them,
   // and again whenever a backend registers or drops a command.
   useEffect(() => {
-    const refresh = (): void => {
+    const refreshCommands = (): void => {
       useExtensionCommandsStore
         .getState()
         .refresh()
         .catch((error: unknown) => console.warn('Could not read extension commands', error))
     }
-    refresh()
-    return window.electronAPI.extension?.onCommandsChanged?.(refresh)
+    refreshCommands()
+    return window.electronAPI.extension?.onCommandsChanged?.(refreshCommands)
   }, [])
 
   useEffect(() => {
@@ -45,11 +45,9 @@ export function useInitialLoad(): void {
   }, [])
 }
 
-/**
- * Keeps the window in step with what is selected: main told what is on screen,
- * the workspace's own settings loaded, scratch left once a branch is chosen,
- * and the welcome marked seen once one is.
- */
+/** Keeps the window in step with what is selected: main told what is on screen, the workspace's
+ * own settings loaded, scratch left once a branch is chosen, and the welcome marked seen once
+ * one is. */
 export function useSelectionEffects(): void {
   const { activeWorkspaceId, activeProjectId } = useWorkspaceStore(
     useShallow((s) => ({
@@ -98,11 +96,9 @@ export function useGlobalMetrics(showMetricsBar: boolean): void {
   }, [showMetricsBar])
 }
 
-/**
- * A card is named by its branch, so the branch it names has to be the one its
- * tree is on. Worktree cards are fixed at creation and are left out; the rest
- * follow whatever the operator checks out in their own terminal.
- */
+/** A card is named by its branch, so the branch it names has to be the one its tree is on.
+ * Worktree cards are fixed at creation and are left out; the rest follow whatever the operator
+ * checks out in their own terminal. */
 export function useBranchSyncTargets(): void {
   const { workspaces, projectsByWorkspaceId } = useWorkspaceStore(
     useShallow((s) => ({

@@ -160,16 +160,9 @@ function useHighlightReset(
   }
 }
 
-/**
- * Focus follows the mode: the search box while searching, else the panel.
- *
- * Moving DOM focus into the panel as soon as it mounts matters. Without it,
- * focus stays on whatever was focused before ⌘P (most often the terminal), and
- * xterm attaches its own Escape handling directly to its textarea in the
- * capture phase — which stops propagation before this component's window-level
- * keydown listener ever sees the event. The panel would then never close on
- * Escape while a terminal had focus.
- */
+/** Focus follows the mode: the search box while searching, else the panel, from mount. Left on the
+ * terminal, xterm's capture-phase Escape handler stops the event before this window-level listener,
+ * and the panel would never close on Escape. */
 function usePanelFocus(mode: Mode) {
   const inputRef = useRef<HTMLInputElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
@@ -187,20 +180,20 @@ function usePanelRows(props: QuickActionsProps, panel: PanelState) {
   const { groups, actions } = props
   const groupById = useMemo(() => new Map(groups.map((g) => [g.id, g])), [groups])
   const top = useTopRows(props, groupById)
-  const groupActions = useMemo<Row[]>(() => {
+  const openGroupRows = useMemo<Row[]>(() => {
     if (!panel.groupId) return []
     return actions
       .filter((a) => a.group === panel.groupId)
       .map((a) => actionRow(a, a.mnemonic ?? ''))
   }, [panel.groupId, actions])
-  const search = useMemo<Row[]>(() => {
+  const searchRows = useMemo<Row[]>(() => {
     if (panel.mode !== 'search') return []
     return searchActions(actions, groups, panel.query).map((a) =>
       actionRow(a, '', groupById.get(a.group)?.label)
     )
   }, [panel.mode, panel.query, actions, groups, groupById])
-  const visible = { top: top.all, group: groupActions, search }[panel.mode]
-  return { groupById, ...top, groupActions, search, visible }
+  const visible = { top: top.all, group: openGroupRows, search: searchRows }[panel.mode]
+  return { groupById, ...top, openGroupRows, searchRows, visible }
 }
 
 type PanelRows = ReturnType<typeof usePanelRows>
@@ -269,9 +262,9 @@ function useQuickActionKeys(props: QuickActionsProps, panel: PanelState, rows: P
     contextRef.current = context
   })
   useEffect(() => {
-    const onKey = (e: KeyboardEvent): void => handleQuickActionKey(e, contextRef.current)
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    const dispatchKey = (e: KeyboardEvent): void => handleQuickActionKey(e, contextRef.current)
+    window.addEventListener('keydown', dispatchKey)
+    return () => window.removeEventListener('keydown', dispatchKey)
   }, [])
 }
 
@@ -285,7 +278,7 @@ type HeaderProps = PanelPartProps & { inputRef: React.RefObject<HTMLInputElement
 /** The search box while searching; else where you are, and the context chip at the top. */
 function PanelHeader({ panel, rows, contextLabel, inputRef }: HeaderProps): JSX.Element {
   if (panel.mode === 'search') {
-    return <SearchBox panel={panel} results={rows.search} inputRef={inputRef} />
+    return <SearchBox panel={panel} results={rows.searchRows} inputRef={inputRef} />
   }
   const group = panel.groupId ? rows.groupById.get(panel.groupId) : undefined
   return (
@@ -348,12 +341,12 @@ function PanelBody(props: PanelPartProps): JSX.Element {
           role="listbox"
           aria-label={rows.groupById.get(panel.groupId ?? '')?.label ?? 'Group'}
         >
-          <RowList rows={rows.groupActions} offset={0} {...rowProps} />
+          <RowList rows={rows.openGroupRows} offset={0} {...rowProps} />
         </ul>
       )}
       {panel.mode === 'search' && (
         <ul className="qa-list" id="qa-search-list" role="listbox" aria-label="Search results">
-          <RowList rows={rows.search} offset={0} {...rowProps} />
+          <RowList rows={rows.searchRows} offset={0} {...rowProps} />
         </ul>
       )}
     </div>
@@ -435,13 +428,8 @@ function RowList({ rows, offset, panel, pins, onTogglePin }: RowListProps): JSX.
   )
 }
 
-/**
- * `.qa-row` is a 3-column grid (`24px 1fr auto`). Omitting this element
- * entirely for a mnemonic-less action (a direct-shortcut-only action, or one
- * surfaced dynamically) left only 2 grid children, so the label landed in the
- * 24px key column and clipped to a single letter. An empty, invisible
- * placeholder keeps every row's children aligned to the same three columns.
- */
+/** Always rendered, empty for an action with no mnemonic: `.qa-row` is a 3-column grid (`24px
+ * 1fr auto`), and without it the label landed in the 24px key column, clipped to a letter. */
 function KeyLabel({ keyLabel }: { keyLabel: string }): JSX.Element {
   if (!keyLabel) return <span className="qa-key qa-key--empty" aria-hidden="true" />
   return <span className={`qa-key${keyLabel.length > 1 ? ' qa-key--wide' : ''}`}>{keyLabel}</span>

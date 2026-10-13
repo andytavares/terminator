@@ -76,8 +76,8 @@ function writeBundle(dependenciesById: Record<string, string[] | undefined>): st
   return bundle
 }
 
-function extensionsById(host: { listExtensions(): Array<{ id: string }> }) {
-  return Object.fromEntries(host.listExtensions().map((e) => [e.id, e]))
+function extensionsById(host: { listAll(): Array<{ id: string }> }) {
+  return Object.fromEntries(host.listAll().map((e) => [e.id, e]))
 }
 
 const ready = Promise.resolve()
@@ -100,13 +100,13 @@ describe('ExtensionHost.start', () => {
       'com.peer': () => markPeerStarted(),
     })
 
-    await host.start({
+    await host.startAll({
       bundledDirectory: writeBundle({ 'com.waiter': [], 'com.peer': [] }),
       beforeActivation: ready,
     })
 
     expect(backendHost.activated.map((record) => record.id)).toEqual(['com.peer', 'com.waiter'])
-    expect(host.listExtensions().map((e) => e.status)).toEqual(['enabled', 'enabled'])
+    expect(host.listAll().map((e) => e.status)).toEqual(['enabled', 'enabled'])
   })
 })
 
@@ -118,7 +118,7 @@ describe('ExtensionHost.start — failures and logging', () => {
       },
     })
 
-    await host.start({
+    await host.startAll({
       bundledDirectory: writeBundle({ 'com.broken': [], 'com.healthy': [] }),
       beforeActivation: ready,
     })
@@ -140,7 +140,7 @@ describe('ExtensionHost.start — logging', () => {
       },
     })
 
-    await host.start({
+    await host.startAll({
       bundledDirectory: writeBundle({ 'com.new': [], 'com.broken': [] }),
       beforeActivation: ready,
     })
@@ -158,12 +158,12 @@ describe('ExtensionHost.start — listing and stored extensions', () => {
     let releaseActivation = () => {}
     const gate = new Promise<void>((resolve) => (releaseActivation = resolve))
 
-    const started = host.start({
+    const started = host.startAll({
       bundledDirectory: writeBundle({ 'com.late': [] }),
       beforeActivation: gate,
     })
 
-    expect(host.listExtensions().map((e) => e.id)).toEqual(['com.late'])
+    expect(host.listAll().map((e) => e.id)).toEqual(['com.late'])
     expect(backendHost.activated).toEqual([])
 
     releaseActivation()
@@ -176,10 +176,10 @@ describe('ExtensionHost.start — listing and stored extensions', () => {
     storeData.extensions = [storedExtensionRecord(bundle, 'com.stored', 'enabled')]
     const { host, backendHost } = await newExtensionHost()
 
-    await host.start({ bundledDirectory: bundle, beforeActivation: ready })
+    await host.startAll({ bundledDirectory: bundle, beforeActivation: ready })
 
     expect(backendHost.activated.map((record) => record.id)).toEqual(['com.stored'])
-    expect(host.listExtensions()).toHaveLength(1)
+    expect(host.listAll()).toHaveLength(1)
   })
 })
 
@@ -189,7 +189,7 @@ describe('ExtensionHost.start — disabled extensions and whenActivated', () => 
     storeData.extensions = [storedExtensionRecord(bundle, 'com.off', 'disabled')]
     const { host, backendHost } = await newExtensionHost()
 
-    await host.start({ bundledDirectory: bundle, beforeActivation: ready })
+    await host.startAll({ bundledDirectory: bundle, beforeActivation: ready })
 
     expect(backendHost.activated).toEqual([])
   })
@@ -199,7 +199,7 @@ describe('ExtensionHost.start — disabled extensions and whenActivated', () => 
       'com.slow': () => new Promise(() => {}),
     })
 
-    void host.start({
+    void host.startAll({
       bundledDirectory: writeBundle({ 'com.quick': [], 'com.slow': [] }),
       beforeActivation: ready,
     })
@@ -225,7 +225,7 @@ describe('ExtensionHost.start — afterActivation', () => {
       events.push('after')
     }
 
-    void host.start({
+    void host.startAll({
       bundledDirectory: writeBundle({ 'com.first': [], 'com.second': [] }),
       beforeActivation: ready,
       afterActivation: recordAfterActivation,
@@ -237,7 +237,7 @@ describe('ExtensionHost.start — afterActivation', () => {
 
   it('whenActivated resolves at once for an unknown extension', async () => {
     const { host } = await newExtensionHost()
-    await host.start({ bundledDirectory: '/nonexistent/bundle', beforeActivation: ready })
+    await host.startAll({ bundledDirectory: '/nonexistent/bundle', beforeActivation: ready })
     await expect(host.whenActivated('com.unknown')).resolves.toBeUndefined()
   })
 })
@@ -256,7 +256,7 @@ describe('ExtensionHost.start with extensionDependencies (ADR 094)', () => {
     })
 
     // Directory order would activate the consumer first.
-    await host.start({
+    await host.startAll({
       bundledDirectory: writeBundle({ 'com.a-consumer': ['com.z-provider'], 'com.z-provider': [] }),
       beforeActivation: ready,
     })
@@ -273,7 +273,7 @@ describe('ExtensionHost.start with extensionDependencies — missing dependencie
   it('fails activation with a clear message when a dependency is not installed', async () => {
     const { host, backendHost } = await newExtensionHost()
 
-    await host.start({
+    await host.startAll({
       bundledDirectory: writeBundle({ 'com.orphan': ['com.missing'] }),
       beforeActivation: ready,
     })
@@ -292,7 +292,7 @@ describe('ExtensionHost.start with extensionDependencies — missing dependencie
       },
     })
 
-    await host.start({
+    await host.startAll({
       bundledDirectory: writeBundle({ 'com.broken': [], 'com.dependant': ['com.broken'] }),
       beforeActivation: ready,
     })
@@ -309,7 +309,7 @@ describe('ExtensionHost.start with extensionDependencies — cycles', () => {
   it('fails every extension in a dependency cycle, naming the cycle, and activates the rest', async () => {
     const { host, backendHost } = await newExtensionHost()
 
-    await host.start({
+    await host.startAll({
       bundledDirectory: writeBundle({
         'com.one': ['com.two'],
         'com.two': ['com.one'],

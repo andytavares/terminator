@@ -37,20 +37,14 @@ export interface MarkdownProps {
   className?: string
   /** Called with the absolute http(s) or mailto address the reader clicked. */
   onOpenLink: (url: string) => void
-  /**
-   * Draws a fenced block that names a language, e.g. with a syntax highlighter.
-   * Without it the block renders as plain `pre` and `code`.
-   */
+  /** Draws a fenced block that names a language, e.g. with a syntax highlighter. Without it the
+   * block renders as plain `pre` and `code`. */
   renderCode?: (code: string, language: string) => React.ReactNode
-  /**
-   * One line, in a `span`: code, bold, italic, strikethrough and links, so it
-   * can sit inside a button or a label. Any other block keeps only its words.
-   */
+  /** One line, in a `span`: code, bold, italic, strikethrough and links, so it can sit inside a
+   * button or a label. Any other block keeps only its words. */
   inline?: boolean
-  /**
-   * For text anyone can write, such as a tracker's issue: raw HTML is dropped,
-   * not parsed, and no image or other `src` survives, so nothing is fetched.
-   */
+  /** For text anyone can write, such as a tracker's issue: raw HTML is dropped, not parsed, and
+   * no image or other `src` survives, so nothing is fetched. */
   fetchesNothing?: boolean
 }
 
@@ -95,11 +89,9 @@ function markdownComponents({ onOpenLink, renderCode, fetchesNothing }: Markdown
   }
 }
 
-/**
- * The one Markdown renderer: react-markdown with GitHub-flavoured Markdown, and
- * raw HTML parsed then sanitised. A body can come from a pull request or an
- * agent, and this view can run shell commands, so nothing here sets inner HTML.
- */
+/** The one Markdown renderer: react-markdown with GitHub-flavoured Markdown, and raw HTML parsed
+ * then sanitised. A body can come from a pull request or an agent, and this view can run shell
+ * commands, so nothing here sets inner HTML. */
 export function Markdown(props: MarkdownProps): JSX.Element {
   const { children, className, inline, fetchesNothing } = props
   const [rehypePlugins, setRehypePlugins] = useState(htmlPlugins)

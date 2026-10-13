@@ -323,11 +323,9 @@ function ptyStreamOf(ptyManager: PtyManager): BatchedPtyStream {
 /** A tab's terminal: the program it runs, and that program's arguments if it is not a shell. */
 type TabInput = Omit<OpenTerminalTabInput, 'shell'> & { shell: string; args?: string[] }
 
-/**
- * Spawns a terminal and puts it on screen as an ordinary tab. Null, spawning
- * nothing, when there is no window to show it in.
- */
-function openTab(
+/** Spawns a terminal and puts it on screen as an ordinary tab. Null, spawning nothing, when
+ * there is no window to show it in. */
+function openTerminalTab(
   ptyManager: PtyManager,
   deps: ExtensionAPIDeps | undefined,
   input: TabInput
@@ -347,7 +345,7 @@ function openTab(
     // render, and mount an xterm before anything is listening.
     holdOutput: true,
   })
-  deps.terminalRelay.start(sessionId)
+  deps.terminalRelay.startRelaying(sessionId)
   deps.broadcastToWindows('terminal:adopt', {
     sessionId,
     projectId: input.projectId,
@@ -357,12 +355,9 @@ function openTab(
   return sessionId
 }
 
-/**
- * How the session's process ends. Subscribed in the tick that spawned it, so a
- * process that exits at once is not missed, as one subscribed across the
- * extension host's port could be.
- */
-function exitOf(ptyManager: PtyManager, sessionId: string): Promise<TerminalExit> {
+/** How the session's process ends. Subscribed in the tick that spawned it, so a process that
+ * exits at once is not missed, as one subscribed across the extension host's port could be. */
+function exitOfSession(ptyManager: PtyManager, sessionId: string): Promise<TerminalExit> {
   return new Promise((resolve) => {
     ptyManager.onExit(sessionId, (exitCode) => resolve({ sessionId, exitCode }))
   })
@@ -402,10 +397,8 @@ function closedDb(extensionId: string): ExtensionDB {
   return { exec: notReady, query: notReady, get: notReady, run: notReady, transaction: notReady }
 }
 
-/**
- * A setting's stored value, the own value of the workspace owning `repoPath`
- * first, or the default this extension's schema gives it.
- */
+/** A setting's stored value, the own value of the workspace owning `repoPath` first, or the
+ * default this extension's schema gives it. */
 function extensionSettingValue<T>(
   extensionId: string,
   key: string,
@@ -524,14 +517,9 @@ function globalShortcutApi({ disposable }: ApiContext): ExtensionAPI['globalShor
 
 type AddProjectInput = Parameters<ExtensionAPI['workspace']['addProject']>[0]
 
-/**
- * Registers a worktree as a project, or reuses the one already pointing at it.
- *
- * Reused by path only. Matching on the name as well meant two cards whose
- * branches happened to share a name got one project — pointing at whichever
- * worktree was registered first — and the snapshot returned described a
- * different directory than the caller had asked for.
- */
+/** Registers a worktree as a project, or reuses the one at that path. By path only: matching names
+ * too gave two cards whose branches shared a name one project, and a snapshot of a directory the
+ * caller had not asked for. */
 function addProject(context: ApiContext, input: AddProjectInput): ProjectSnapshot | null {
   const existing = listProjectsFromStore(input.workspaceId).find(
     (project) => project.worktreePath === input.worktreePath
@@ -549,7 +537,7 @@ function addProject(context: ApiContext, input: AddProjectInput): ProjectSnapsho
 }
 
 function createProjectWithUniqueName(input: AddProjectInput) {
-  const create = (name: string) =>
+  const addProjectNamed = (name: string) =>
     createProjectInStore({
       workspaceId: input.workspaceId,
       name,
@@ -557,12 +545,12 @@ function createProjectWithUniqueName(input: AddProjectInput) {
       gitBranch: input.gitBranch,
       isWorktree: input.isWorktree ?? true,
     })
-  const created = create(input.name)
+  const created = addProjectNamed(input.name)
   if (!('error' in created && created.error === 'DUPLICATE_NAME')) return created
   // A different worktree that happens to share a branch name. The store keeps
   // names unique per workspace, so disambiguate rather than return null — the
   // caller's alternative is running the agent with nowhere to show it.
-  return create(`${input.name} (${basename(input.worktreePath)})`)
+  return addProjectNamed(`${input.name} (${basename(input.worktreePath)})`)
 }
 
 function workspaceApi(context: ApiContext): ExtensionAPI['workspace'] {
@@ -683,7 +671,7 @@ function notificationsApi({ extensionId, disposable }: ApiContext): ExtensionAPI
         actions: opts.actions,
         onClick: opts.onClick,
       })
-      return disposable(() => notificationManager.dismiss(id))
+      return disposable(() => notificationManager.dismissNotification(id))
     },
   }
 }
@@ -756,10 +744,9 @@ function ipcBridgeApi({
       // Core channels (invoke, send, and push/subscribe) are declared in the
       // channel manifest, which REMOTE_ACCESSIBLE_CHANNELS is derived from.
       if (REMOTE_ACCESSIBLE_CHANNELS.has(channel)) return true
-      // Everything else is decided by what was declared at registration.
-      // Registered-but-undeclared channels are NOT reachable: the old rule
-      // ("any registered channel is extension-owned and safe") also exposed
-      // every internal core invoke channel to authenticated remote clients.
+      // Everything else is decided by what was declared at registration. Registered-but-undeclared
+      // channels are NOT reachable: the old rule ("any registered channel is extension-owned and
+      // safe") also exposed every internal core invoke channel to authenticated remote clients.
       return deps?.bridge?.invokeRegistry.get(channel)?.remoteAccessible ?? false
     },
     sendChannel(channel: string, payload: unknown): void {
@@ -797,12 +784,12 @@ function ptyTabsApi({
     },
     async openTerminal(input): Promise<string | null> {
       const shell = input.shell ?? defaultShellFor(input.projectId)
-      return openTab(requirePty(), deps, { ...input, shell })
+      return openTerminalTab(requirePty(), deps, { ...input, shell })
     },
     async runInTerminal(input): Promise<TerminalExit | null> {
       const ptyManager = requirePty()
-      const sessionId = openTab(ptyManager, deps, { ...input, shell: input.file })
-      return sessionId === null ? null : exitOf(ptyManager, sessionId)
+      const sessionId = openTerminalTab(ptyManager, deps, { ...input, shell: input.file })
+      return sessionId === null ? null : exitOfSession(ptyManager, sessionId)
     },
     closeTerminalTab(sessionId): void {
       // The renderer owns the tab list; its close also ends the process
@@ -898,7 +885,7 @@ function newAuxiliaryWindow(view: string, rendererUrl: string | undefined): Brow
   return win
 }
 
-function openAuxiliary(
+function openAuxiliaryWindow(
   view: string,
   params: Record<string, string> | undefined,
   rendererUrl: string | undefined
@@ -930,7 +917,7 @@ function windowApi(context: ApiContext): ExtensionAPI['window'] {
   const { extensionId, deps } = context
   return {
     openAuxiliary(view: string, params?: Record<string, string>): void {
-      openAuxiliary(view, params, context.rendererUrl)
+      openAuxiliaryWindow(view, params, context.rendererUrl)
     },
     broadcast(channel: string, data: unknown): void {
       broadcastToAllWindows(context, channel, data)

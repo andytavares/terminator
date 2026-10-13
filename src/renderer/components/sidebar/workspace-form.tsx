@@ -17,41 +17,49 @@ export interface WorkspaceDraft {
 
 const DUPLICATE_NAME = 'A workspace with this name already exists'
 
+/** Why `name` cannot be a workspace's name, or '' when it can. */
+function workspaceNameError(name: string, nameTaken: (name: string) => boolean): string {
+  if (!name.trim()) return 'Name is required'
+  if (name.length > 100) return 'Name must be 100 characters or less'
+  return nameTaken(name) ? DUPLICATE_NAME : ''
+}
+
 /** The draft, its errors, and the checks a submit runs first. */
 export function useWorkspaceForm(initial: WorkspaceDraft, nameTaken: (name: string) => boolean) {
   const [draft, setDraft] = useState(initial)
   const [nameError, setNameError] = useState('')
   const [error, setError] = useState('')
 
-  const validateName = (value: string): string => {
-    if (!value.trim()) return 'Name is required'
-    if (value.length > 100) return 'Name must be 100 characters or less'
-    return nameTaken(value) ? DUPLICATE_NAME : ''
-  }
-
   /** False, with the reason shown, when the name cannot be submitted. */
   const nameIsValid = (): boolean => {
-    const reason = validateName(draft.name)
+    const reason = workspaceNameError(draft.name, nameTaken)
     setNameError(reason)
     return reason === ''
   }
 
-  const update = (patch: Partial<WorkspaceDraft>): void => setDraft((d) => ({ ...d, ...patch }))
+  const updateForm = (patch: Partial<WorkspaceDraft>): void => setDraft((d) => ({ ...d, ...patch }))
   const tagList = (): string[] =>
     draft.tags
       .split(',')
       .map((t) => t.trim())
       .filter(Boolean)
 
-  return { draft, update, nameError, setNameError, error, setError, nameIsValid, tagList }
+  return {
+    draft,
+    update: updateForm,
+    nameError,
+    setNameError,
+    error,
+    setError,
+    nameIsValid,
+    tagList,
+  }
 }
 
 type WorkspaceForm = ReturnType<typeof useWorkspaceForm>
 
-/**
- * Shows a refused save on the form: a taken name beside the name, anything
- * else as `failure`. False, narrowing to the saved workspace, when it went through.
- */
+/** Shows a refused save on the form: a taken name beside the name, anything else as `failure`.
+ * False, narrowing to the saved workspace, when it went through. */
 export function showSaveError(
   form: WorkspaceForm,
   result: { workspace: Workspace } | { error: string },

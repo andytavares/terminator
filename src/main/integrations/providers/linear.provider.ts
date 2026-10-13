@@ -1,4 +1,4 @@
-import { LinearClient } from '@linear/sdk'
+import { LinearClient, PaginationOrderBy, type LinearDocument } from '@linear/sdk'
 import type {
   Issue,
   IssueComment,
@@ -31,29 +31,19 @@ import type {
 const MAX_COMMENTS = 5
 
 /** Filter to exclude completed and canceled issues from listMine results. */
-const OPEN_STATES_FILTER = {
+const OPEN_STATES_FILTER: LinearDocument.IssueFilter = {
   state: { type: { nin: ['completed', 'canceled'] } },
-} as const
-
-interface LinearLike {
-  viewer: Promise<{
-    name: string
-    email: string
-    assignedIssues?: (vars?: unknown) => unknown
-    teams?: (vars?: unknown) => unknown
-  }>
-  issues(vars?: unknown): unknown
-  searchIssues(term: string, vars?: unknown): unknown
-  issue(id: string): unknown
-  createComment(input: { issueId: string; body: string }): unknown
-  updateIssue(id: string, input: { stateId: string }): unknown
-  createIssue(input: NewIssueInput): unknown
 }
+
+/** The part of the SDK client the provider calls; specs pass a fake of it. */
+type LinearLike = Pick<
+  LinearClient,
+  'viewer' | 'issues' | 'searchIssues' | 'issue' | 'createComment' | 'updateIssue' | 'createIssue'
+>
 
 export type LinearClientFactory = (apiKey: string) => LinearLike
 
-const defaultFactory: LinearClientFactory = (apiKey) =>
-  new LinearClient({ apiKey }) as unknown as LinearLike
+const defaultFactory: LinearClientFactory = (apiKey) => new LinearClient({ apiKey })
 
 function assertLinear(
   cred: StoredCredential
@@ -307,7 +297,7 @@ async function assignedIssues(client: LinearLike, email: string | null, limit: n
   return client.issues({
     filter: { ...OPEN_STATES_FILTER, assignee: { email: { eq: email } } },
     first: limit,
-    orderBy: 'updatedAt',
+    orderBy: PaginationOrderBy.UpdatedAt,
   })
 }
 
@@ -346,10 +336,9 @@ async function get(client: LinearLike, key: string): Promise<Issue | null> {
 
 function comment(client: LinearLike, key: string, body: string): Promise<void> {
   return run(async () => {
-    // Linear issues are addressed by UUID, always — not by the human key,
-    // even where Linear would accept one. One addressing mechanism means
-    // one thing to be right about, and the UUID is the one Linear
-    // documents as working for every operation including this one.
+    // Linear issues are addressed by UUID, always — not by the human key, even where Linear would
+    // accept one. One addressing mechanism means one thing to be right about, and the UUID is the
+    // one Linear documents as working for every operation including this one.
     const raw = await issueOrThrow(client, key)
     const result = (await client.createComment({ issueId: raw.id, body })) as {
       success?: boolean
@@ -369,14 +358,9 @@ interface MoveTarget {
   optionId?: string
 }
 
-/**
- * The state a move goes to.
- *
- * The operator's own mapping wins over the type rule, which is the whole
- * point of presenting it to them. An override naming a state this workflow
- * does not have is refused rather than fallen back on: moving somewhere they
- * did not choose is worse than not moving.
- */
+/** The state a move goes to: the operator's own mapping wins over the type rule. An override
+ * naming a state this workflow lacks is refused, not fallen back on: moving somewhere they did
+ * not choose is worse than not moving. */
 function chosenState(
   options: TrackerStateOption[],
   key: string,

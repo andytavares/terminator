@@ -45,7 +45,7 @@ export function GlobalSettings(): JSX.Element {
     <>
       <div className="settings-section">
         <h3 className="settings-section__title">Appearance</h3>
-        <ThemeField theme={settings.appearance.theme} />
+        <GlobalThemeField theme={settings.appearance.theme} />
         <SectionTitle>Terminal</SectionTitle>
         <TerminalFields settings={settings} />
         <SectionTitle>Interface</SectionTitle>
@@ -71,7 +71,7 @@ function SectionTitle({ children }: { children: React.ReactNode }): JSX.Element 
   )
 }
 
-function ThemeField({ theme }: { theme: Settings['appearance']['theme'] }): JSX.Element {
+function GlobalThemeField({ theme }: { theme: Settings['appearance']['theme'] }): JSX.Element {
   const updateGlobalTheme = useSettingsStore((s) => s.updateGlobalTheme)
   return (
     <div className="settings-section__field">
@@ -102,13 +102,13 @@ function TerminalFields({ settings }: { settings: Settings }): JSX.Element {
           }}
         />
       </div>
-      <DefaultShellField shell={settings.terminal.defaultShell} />
+      <GlobalDefaultShellField shell={settings.terminal.defaultShell} />
       <PromptForNameField checked={settings.terminal.promptForName ?? false} />
     </>
   )
 }
 
-function DefaultShellField({ shell }: { shell: string }): JSX.Element {
+function GlobalDefaultShellField({ shell }: { shell: string }): JSX.Element {
   return (
     <div className="settings-section__field">
       <label className="settings-section__label">Default Shell</label>

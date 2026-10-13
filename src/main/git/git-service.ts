@@ -1,19 +1,17 @@
 import { join } from 'path'
 import type { Branch, WorktreeInfo } from '../../shared/types/index.js'
 import type { ChangeStats } from '../../shared/schemas/git.schema.js'
-import { runCommand } from '../shell/command-runner.js'
+import { runTextCommand } from '../shell/command-runner.js'
 import { GIT_ENV } from './git-env.js'
 
 const GIT_TIMEOUT = 10_000
 const FETCH_TIMEOUT = 60_000
 
-/**
- * Runs git and resolves with its trimmed stdout, or rejects with its stderr.
- * Through runCommand, so a git still running when the app quits is stopped
- * with whatever it started (stopRunningCommands).
- */
+/** Runs git and resolves with its trimmed stdout, or rejects with its stderr. Through
+ * runTextCommand, so a git still running when the app quits is stopped with whatever it started
+ * (stopRunningCommands). */
 async function git(args: string[], cwd: string, timeoutMs = GIT_TIMEOUT): Promise<string> {
-  const result = await runCommand({ command: 'git', args, cwd, timeoutMs }, GIT_ENV)
+  const result = await runTextCommand({ command: 'git', args, cwd, timeoutMs }, GIT_ENV)
   if (result.exitCode !== 0) {
     throw new Error(`Command failed: git ${args.join(' ')}\n${result.stderr}`)
   }
@@ -77,10 +75,8 @@ export async function getCurrentBranch(dirPath: string): Promise<string> {
   return branch || 'HEAD'
 }
 
-/**
- * One line of `git branch --format=%(HEAD)|%(refname)` as a branch, or null for
- * a ref no configured remote owns, a remote's HEAD, or a pull ref.
- */
+/** One line of `git branch --format=%(HEAD)|%(refname)` as a branch, or null for a ref no
+ * configured remote owns, a remote's HEAD, or a pull ref. */
 function branchFromRef(line: string, remotePrefixes: string[]): Branch | null {
   const [head, ref] = line.split('|')
   if (ref.startsWith('refs/heads/')) {
@@ -93,10 +89,8 @@ function branchFromRef(line: string, remotePrefixes: string[]): Branch | null {
   return { name, isCurrent: false, isRemote: true }
 }
 
-/**
- * Local branches, then each remote branch whose name nothing local or on another
- * remote already carries; git's checkout and worktree add resolve the bare name to it.
- */
+/** Local branches, then each remote branch whose name nothing local or on another remote already
+ * carries; git's checkout and worktree add resolve the bare name to it. */
 function withoutShadowedRemotes(branches: Branch[]): Branch[] {
   const local = branches.filter((b) => !b.isRemote)
   const seen = new Set(local.map((b) => b.name))

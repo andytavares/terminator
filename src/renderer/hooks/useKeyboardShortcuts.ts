@@ -47,18 +47,16 @@ interface KeyTarget {
   inTextField: boolean
 }
 
-/**
- * One core shortcut: when it applies, the CORE_SHORTCUTS action id it reports
- * (none for Cmd+P, which is no action, and for Cmd+1–9, which reports only when
- * there is a workspace to switch to), and what it does.
- */
+/** One core shortcut: when it applies, the CORE_SHORTCUTS action id it reports (none for Cmd+P,
+ * which is no action, and for Cmd+1–9, which reports only when there is a workspace to switch
+ * to), and what it does. */
 interface CoreKey {
   test(e: KeyboardEvent, at: KeyTarget): boolean
   actionId?: string | ((e: KeyboardEvent) => string)
   run(c: ShortcutContext, e: KeyboardEvent): void
 }
 
-const projectOf = (c: ShortcutContext): string | null =>
+const effectiveProjectOf = (c: ShortcutContext): string | null =>
   c.options.scratchProjectId ?? useWorkspaceStore.getState().activeProjectId
 
 /** What newTerminalTab and splitPane read: the settings, the cwd and the terminal factory. */
@@ -129,33 +127,34 @@ const TERMINAL_KEYS: CoreKey[] = [
   {
     test: (e, at) => at.isMeta && e.key === 'k' && !at.inTextField,
     actionId: 'core.clear',
-    run: (c) => clearTerminal(projectOf(c), useSessionStore.getState()),
+    run: (c) => clearTerminal(effectiveProjectOf(c), useSessionStore.getState()),
   },
   {
     test: (e, at) => at.isMeta && e.key === 't',
     actionId: 'core.new-tab',
     run: (c) =>
-      c.options.onNewTab ? c.options.onNewTab() : newTerminalTab(projectOf(c), terminalDeps(c)),
+      c.options.onNewTab
+        ? c.options.onNewTab()
+        : newTerminalTab(effectiveProjectOf(c), terminalDeps(c)),
   },
-  // Cmd+D splits side by side, Cmd+Shift+D top and bottom. The effective
-  // project rather than the active one, so a scratch terminal splits too — it
-  // used to do nothing at all there, and say nothing, which reads as the
-  // feature having been removed rather than as not applying.
+  // Cmd+D splits side by side, Cmd+Shift+D top and bottom. The effective project rather than the
+  // active one, so a scratch terminal splits too — it used to do nothing at all there, and say
+  // nothing, which reads as the feature having been removed rather than as not applying.
   {
     test: (e, at) => at.isMeta && !e.shiftKey && e.key === 'd',
     actionId: 'core.split-vertical',
-    run: (c) => splitPane(projectOf(c), 'vertical', terminalDeps(c)),
+    run: (c) => splitPane(effectiveProjectOf(c), 'vertical', terminalDeps(c)),
   },
   {
     test: (e, at) => at.isMeta && e.shiftKey && e.key === 'd',
     actionId: 'core.split-horizontal',
-    run: (c) => splitPane(projectOf(c), 'horizontal', terminalDeps(c)),
+    run: (c) => splitPane(effectiveProjectOf(c), 'horizontal', terminalDeps(c)),
   },
   // Cmd+W: close focused split pane (or active tab if not in split mode)
   {
     test: (e, at) => at.isMeta && e.key === 'w',
     actionId: 'core.close-tab',
-    run: (c) => closeFocusedPane(projectOf(c), useSessionStore.getState()),
+    run: (c) => closeFocusedPane(effectiveProjectOf(c), useSessionStore.getState()),
   },
 ]
 
@@ -167,12 +166,16 @@ const SESSION_KEYS: CoreKey[] = [
     test: (e, at) => at.isMeta && (e.key === ']' || e.key === '[') && !at.inTextField,
     actionId: (e) => (e.key === ']' ? 'core.cycle-recent-next' : 'core.cycle-recent-prev'),
     run: (c, e) =>
-      cycleMostRecentlyAttended(projectOf(c), e.key === ']' ? 1 : -1, useSessionStore.getState()),
+      cycleMostRecentlyAttended(
+        effectiveProjectOf(c),
+        e.key === ']' ? 1 : -1,
+        useSessionStore.getState()
+      ),
   },
   {
     test: (e, at) => at.isMeta && e.shiftKey && (e.key === 'a' || e.key === 'A') && !at.inTextField,
     actionId: 'core.next-waiting',
-    run: (c) => jumpToNextAwaitingInput(projectOf(c), useSessionStore.getState()),
+    run: (c) => jumpToNextAwaitingInput(effectiveProjectOf(c), useSessionStore.getState()),
   },
   {
     test: (e, at) =>
@@ -184,12 +187,12 @@ const SESSION_KEYS: CoreKey[] = [
   {
     test: (e, at) => at.isMeta && e.key === 'ArrowLeft' && !at.inTextField,
     actionId: 'core.prev-tab',
-    run: (c) => cycleTabIn(projectOf(c), -1),
+    run: (c) => cycleTabIn(effectiveProjectOf(c), -1),
   },
   {
     test: (e, at) => at.isMeta && e.key === 'ArrowRight' && !at.inTextField,
     actionId: 'core.next-tab',
-    run: (c) => cycleTabIn(projectOf(c), 1),
+    run: (c) => cycleTabIn(effectiveProjectOf(c), 1),
   },
 ]
 
@@ -247,10 +250,8 @@ function handleKeyDown(e: KeyboardEvent, c: ShortcutContext): void {
   }
 }
 
-/**
- * The app's keyboard shortcuts, on the window. The store state they act on is
- * read when the key is pressed; the caller's callbacks are always its latest.
- */
+/** The app's keyboard shortcuts, on the window. The store state they act on is read when the key
+ * is pressed; the caller's callbacks are always its latest. */
 export function useKeyboardShortcuts(options: Options = {}): void {
   const { keyboardShortcuts } = useExtensionRegistry()
   const terminals = useTerminalSession()
@@ -260,8 +261,8 @@ export function useKeyboardShortcuts(options: Options = {}): void {
   })
 
   useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent): void => handleKeyDown(e, latest.current)
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
+    const handleWindowKey = (e: KeyboardEvent): void => handleKeyDown(e, latest.current)
+    window.addEventListener('keydown', handleWindowKey)
+    return () => window.removeEventListener('keydown', handleWindowKey)
   }, [])
 }

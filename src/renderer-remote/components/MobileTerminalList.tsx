@@ -72,14 +72,14 @@ function useLongPress(openMenu: OpenMenu) {
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const longPressFired = useRef(false)
 
-  const cancel = () => {
+  const cancelLongPress = () => {
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current)
       longPressTimer.current = null
     }
   }
-  const start = (e: React.TouchEvent, sessionId: string) => {
-    cancel()
+  const startLongPress = (e: React.TouchEvent, sessionId: string) => {
+    cancelLongPress()
     longPressFired.current = false
     const touch = e.touches[0]
     longPressTimer.current = setTimeout(() => {
@@ -92,7 +92,7 @@ function useLongPress(openMenu: OpenMenu) {
     longPressFired.current = false
     return fired
   }
-  return { start, cancel, consumeLongPress }
+  return { start: startLongPress, cancel: cancelLongPress, consumeLongPress }
 }
 
 /** A terminal belongs to the workspace it was assigned to, or else to the folder it runs in. */
@@ -113,8 +113,8 @@ function groupTerminals(workspaces: Workspace[], terminals: TerminalSession[]) {
 
 export function MobileTerminalList({ workspaces, terminals, ...handlers }: Props) {
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
-  const openMenu: OpenMenu = (sessionId, x, y) => setContextMenu({ sessionId, x, y })
-  const longPress = useLongPress(openMenu)
+  const openTerminalMenu: OpenMenu = (sessionId, x, y) => setContextMenu({ sessionId, x, y })
+  const longPress = useLongPress(openTerminalMenu)
   const { groups, scratch } = groupTerminals(workspaces, terminals)
 
   return (
@@ -131,7 +131,7 @@ export function MobileTerminalList({ workspaces, terminals, ...handlers }: Props
         terminals={scratch}
         longPress={longPress}
         onSelectTerminal={handlers.onSelectTerminal}
-        openMenu={openMenu}
+        openMenu={openTerminalMenu}
       />
       <MoveToWorkspaceMenu
         menu={contextMenu}

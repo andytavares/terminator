@@ -1,12 +1,12 @@
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 import { contextFilePath } from './agent-context.js'
+import { shellQuote } from '@terminator/extension-sdk/node'
 import { sessionContextDirectory } from './session-context.js'
 import {
   putSessionStartHook,
   readClaudeSettings,
   runsCommandContaining,
-  shellQuote,
   writeClaudeSettings,
   type ClaudeSettingsFile,
 } from './claude-settings.js'
@@ -113,7 +113,7 @@ export function hookCommand(options: HookCommandOptions): string {
   ].join(' ')
 }
 
-function settingsPath(projectDir: string): string {
+function localSettingsPath(projectDir: string): string {
   return path.join(projectDir, '.claude', 'settings.local.json')
 }
 
@@ -128,7 +128,11 @@ export async function installProjectHook(
   projectDir: string,
   options: HookCommandOptions
 ): Promise<void> {
-  await putSessionStartHook(settingsPath(projectDir), options.hookScriptPath, hookCommand(options))
+  await putSessionStartHook(
+    localSettingsPath(projectDir),
+    options.hookScriptPath,
+    hookCommand(options)
+  )
 }
 
 /**
@@ -139,7 +143,7 @@ export async function installProjectHook(
  * unchanged after detachment", and a leftover empty file fails that.
  */
 export async function removeProjectHook(projectDir: string, hookScriptPath: string): Promise<void> {
-  const settings = await readClaudeSettings(settingsPath(projectDir)).catch(() => null)
+  const settings = await readClaudeSettings(localSettingsPath(projectDir)).catch(() => null)
   if (settings === null) return
 
   const hooks = settings.hooks
@@ -156,10 +160,10 @@ export async function removeProjectHook(projectDir: string, hookScriptPath: stri
   else delete next.hooks
 
   if (Object.keys(next).length === 0) {
-    await fs.rm(settingsPath(projectDir), { force: true })
+    await fs.rm(localSettingsPath(projectDir), { force: true })
     // Only if it is now empty — an operator's own .claude contents stay.
     await fs.rmdir(path.join(projectDir, '.claude')).catch(() => {})
     return
   }
-  await writeClaudeSettings(settingsPath(projectDir), next)
+  await writeClaudeSettings(localSettingsPath(projectDir), next)
 }

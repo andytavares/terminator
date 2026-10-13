@@ -75,11 +75,9 @@ function sequential(): <T>(task: () => Promise<T>) => Promise<T> {
 
 const TOP_LEVEL: TransactionSql = { begin: 'BEGIN', commit: 'COMMIT', rollback: 'ROLLBACK' }
 
-/**
- * Wraps one synchronous connection in the async ExtensionDB interface. Statements
- * and transactions run one at a time, in call order: a statement issued while a
- * transaction is open waits for it, so it is never committed or rolled back with it.
- */
+/** Wraps one synchronous connection in the async ExtensionDB interface. Statements and
+ * transactions run one at a time, in call order: a statement issued while a transaction is open
+ * waits for it, so it is never committed or rolled back with it. */
 export function wrapDb(database: DatabaseSync): ExtensionDB {
   const direct = statements(database)
   const inOrder = sequential()

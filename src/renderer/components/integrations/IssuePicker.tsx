@@ -18,7 +18,7 @@ export interface IssuePickerProps {
 }
 
 export function IssuePicker({ selected, onSelect, onClear }: IssuePickerProps): JSX.Element {
-  const { term, open, setOpen, rootRef, clear, search, pick } = usePicker(onSelect, onClear)
+  const { term, open, setOpen, rootRef, clear, search, pick } = useIssuePicker(onSelect, onClear)
   const { result, loading } = useIssueSearch(term, open, { limit: 25 })
 
   if (selected !== null) return <ChosenIssue issue={selected} onClear={clear} />
@@ -35,14 +35,14 @@ export function IssuePicker({ selected, onSelect, onClear }: IssuePickerProps): 
         setOpen(false)
       }}
     >
-      <SearchBox term={term} onFocus={() => setOpen(true)} onChange={search} />
+      <IssueSearchBox term={term} onFocus={() => setOpen(true)} onChange={search} />
       {open && <PickerList result={result} loading={loading} onPick={pick} />}
     </div>
   )
 }
 
 /** The search text and the list, and what clearing, typing and picking do to them. */
-function usePicker(onSelect: (issue: IssueSummary) => void, onClear: () => void) {
+function useIssuePicker(onSelect: (issue: IssueSummary) => void, onClear: () => void) {
   const [term, setTerm] = useState('')
   const { open, setOpen, rootRef } = useDropdown()
   return {
@@ -66,11 +66,9 @@ function usePicker(onSelect: (issue: IssueSummary) => void, onClear: () => void)
   }
 }
 
-/**
- * Whether the list is open. The list is a dropdown, so it goes away the way one
- * does: Escape, or a pointer anywhere else. Without this it stayed open over
- * whatever it was opened from, and only picking an issue closed it.
- */
+/** Whether the list is open. The list is a dropdown, so it goes away the way one does: Escape,
+ * or a pointer anywhere else. Without this it stayed open over whatever it was opened from, and
+ * only picking an issue closed it. */
 function useDropdown() {
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
@@ -118,7 +116,7 @@ interface SearchBoxProps {
   onChange: (term: string) => void
 }
 
-function SearchBox({ term, onFocus, onChange }: SearchBoxProps): JSX.Element {
+function IssueSearchBox({ term, onFocus, onChange }: SearchBoxProps): JSX.Element {
   return (
     <div className="issue-picker__search">
       <Search />

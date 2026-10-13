@@ -3,11 +3,9 @@ import type { PtyManager } from '../terminal/pty-manager.js'
 
 type PtySource = Pick<PtyManager, 'onData' | 'onExit'>
 
-/**
- * A session's output as an extension receives it (SDK 4.0.0): at most one batch
- * per frame, so a busy process costs one message per frame across the extension
- * host's port, and every batch delivered before the session's exit.
- */
+/** A session's output as an extension receives it (SDK 4.0.0): at most one batch per frame, so a
+ * busy process costs one message per frame across the extension host's port, and every batch
+ * delivered before the session's exit. */
 export class BatchedPtyStream {
   private readonly pending = new Map<string, Set<OutputBatcher>>()
 
@@ -18,13 +16,13 @@ export class BatchedPtyStream {
     const batcher = new OutputBatcher((data) => {
       if (active) listener(data)
     })
-    const dispose = this.source.onData(sessionId, (data) => batcher.push(data))
-    if (!dispose) return () => {}
+    const unsubscribe = this.source.onData(sessionId, (data) => batcher.push(data))
+    if (!unsubscribe) return () => {}
     const batchers = this.batchersOf(sessionId)
     batchers.add(batcher)
     return () => {
       active = false
-      dispose()
+      unsubscribe()
       batchers.delete(batcher)
     }
   }

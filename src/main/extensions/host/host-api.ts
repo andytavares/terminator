@@ -45,7 +45,7 @@ class MainCalls {
 
   constructor(private readonly context: HostContext) {}
 
-  async call(path: string, ...params: unknown[]): Promise<never> {
+  async ask(path: string, ...params: unknown[]): Promise<never> {
     const { endpoint, callbacks, extensionId } = this.context
     const marshalled = callbacks.marshal(params)
     try {
@@ -56,12 +56,12 @@ class MainCalls {
     }
   }
 
-  fire(path: string, ...params: unknown[]): void {
+  tell(path: string, ...params: unknown[]): void {
     const call: ApiCall = { extensionId: this.context.extensionId, path, params }
     this.context.endpoint.notify('api', call)
   }
 
-  register(method: string, ...params: unknown[]): Registration {
+  registerAcross(method: string, ...params: unknown[]): Registration {
     const { endpoint, callbacks, extensionId, report } = this.context
     const handleId = this.nextHandle++
     const marshalled = callbacks.marshal(params)
@@ -80,18 +80,18 @@ class MainCalls {
           } satisfies HeldRegistration<unknown[]>)
     ready.catch(() => callbacks.release(marshalled.ids))
     let disposed = false
-    const dispose = () => {
+    const release = () => {
       if (disposed) return
       disposed = true
       callbacks.release(marshalled.ids)
       ready.then(() => endpoint.request('release', extensionId, handleId)).catch(report)
     }
-    return { disposable: { dispose }, ready }
+    return { disposable: { dispose: release }, ready }
   }
 
   /** A registration whose failure only the log hears of, as an in-process one would throw. */
-  held(path: string, ...params: unknown[]): Disposable {
-    const { disposable, ready } = this.register('api', path, ...params)
+  hold(path: string, ...params: unknown[]): Disposable {
+    const { disposable, ready } = this.registerAcross('api', path, ...params)
     ready.catch(this.context.report)
     return disposable
   }
@@ -102,7 +102,7 @@ function settingsFor(context: HostContext, main: MainCalls): ExtensionAPI['setti
   return {
     register(registered) {
       schema = registered
-      return main.held('settings.register', registered)
+      return main.hold('settings.register', registered)
     },
     get<T>(key: string, scope?: SettingScope): T | undefined {
       const { settings, workspaces } = context.snapshot
@@ -114,40 +114,39 @@ function settingsFor(context: HostContext, main: MainCalls): ExtensionAPI['setti
     set(key, value) {
       const { settings } = context.snapshot
       context.snapshot.settings = { ...settings, global: { ...settings.global, [key]: value } }
-      main.fire('settings.set', key, value)
+      main.tell('settings.set', key, value)
     },
-    isBranchExcluded: (branch, repoPath) =>
-      main.call('settings.isBranchExcluded', branch, repoPath),
+    isBranchExcluded: (branch, repoPath) => main.ask('settings.isBranchExcluded', branch, repoPath),
   }
 }
 
-function workspaceFor(context: HostContext, main: MainCalls): ExtensionAPI['workspace'] {
+function hostWorkspaceApi(context: HostContext, main: MainCalls): ExtensionAPI['workspace'] {
   return {
     list: () => context.snapshot.workspaces.workspaces,
     listProjects: (workspaceId) => context.snapshot.workspaces.projects[workspaceId] ?? [],
-    addProject: (input) => main.call('workspace.addProject', input),
-    deleteProject: (projectId) => main.fire('workspace.deleteProject', projectId),
+    addProject: (input) => main.ask('workspace.addProject', input),
+    deleteProject: (projectId) => main.tell('workspace.deleteProject', projectId),
   }
 }
 
 function ptyFor(main: MainCalls): ExtensionAPI['pty'] {
-  const listener = (path: string, sessionId: string, callback: unknown) => {
-    const { disposable } = main.register('api', path, sessionId, callback)
+  const listenAcross = (path: string, sessionId: string, callback: unknown) => {
+    const { disposable } = main.registerAcross('api', path, sessionId, callback)
     return () => disposable.dispose()
   }
   return {
-    spawnSession: (options) => main.call('pty.spawnSession', options),
-    openTerminal: (input) => main.call('pty.openTerminal', input),
-    runInTerminal: (input) => main.call('pty.runInTerminal', input),
-    closeTerminalTab: (sessionId) => main.fire('pty.closeTerminalTab', sessionId),
-    onData: (sessionId, callback) => listener('pty.onData', sessionId, callback),
-    onExit: (sessionId, callback) => listener('pty.onExit', sessionId, callback),
-    getSession: (sessionId) => main.call('pty.getSession', sessionId),
-    setWorkspace: (sessionId, workspaceId) => main.call('pty.setWorkspace', sessionId, workspaceId),
-    write: (sessionId, data) => main.fire('pty.write', sessionId, data),
-    resize: (sessionId, cols, rows) => main.fire('pty.resize', sessionId, cols, rows),
-    kill: (sessionId) => main.fire('pty.kill', sessionId),
-    listSessions: () => main.call('pty.listSessions'),
+    spawnSession: (options) => main.ask('pty.spawnSession', options),
+    openTerminal: (input) => main.ask('pty.openTerminal', input),
+    runInTerminal: (input) => main.ask('pty.runInTerminal', input),
+    closeTerminalTab: (sessionId) => main.tell('pty.closeTerminalTab', sessionId),
+    onData: (sessionId, callback) => listenAcross('pty.onData', sessionId, callback),
+    onExit: (sessionId, callback) => listenAcross('pty.onExit', sessionId, callback),
+    getSession: (sessionId) => main.ask('pty.getSession', sessionId),
+    setWorkspace: (sessionId, workspaceId) => main.ask('pty.setWorkspace', sessionId, workspaceId),
+    write: (sessionId, data) => main.tell('pty.write', sessionId, data),
+    resize: (sessionId, cols, rows) => main.tell('pty.resize', sessionId, cols, rows),
+    kill: (sessionId) => main.tell('pty.kill', sessionId),
+    listSessions: () => main.ask('pty.listSessions'),
   }
 }
 
@@ -159,7 +158,7 @@ function ipcFor(context: HostContext, main: MainCalls): ExtensionAPI['ipc'] {
       }
       context.channels.set(spec.channel, spec)
       const remote = options?.remoteAccessible ?? false
-      const { disposable } = main.register('channel.register', spec.channel, remote)
+      const { disposable } = main.registerAcross('channel.register', spec.channel, remote)
       return {
         dispose() {
           context.channels.delete(spec.channel)
@@ -167,13 +166,13 @@ function ipcFor(context: HostContext, main: MainCalls): ExtensionAPI['ipc'] {
         },
       }
     },
-    invokeChannel: (channel, payload) => main.call('ipc.invokeChannel', channel, payload),
-    sendChannel: (channel, payload) => main.fire('ipc.sendChannel', channel, payload),
+    invokeChannel: (channel, payload) => main.ask('ipc.invokeChannel', channel, payload),
+    sendChannel: (channel, payload) => main.tell('ipc.sendChannel', channel, payload),
     onWindowEvent(channel, handler) {
-      const { disposable } = main.register('api', 'ipc.onWindowEvent', channel, handler)
+      const { disposable } = main.registerAcross('api', 'ipc.onWindowEvent', channel, handler)
       return () => disposable.dispose()
     },
-    isRemoteAccessible: (channel) => main.call('ipc.isRemoteAccessible', channel),
+    isRemoteAccessible: (channel) => main.ask('ipc.isRemoteAccessible', channel),
   }
 }
 
@@ -183,7 +182,7 @@ function commandsFor(context: HostContext, main: MainCalls): ExtensionAPI['comma
       const key = `${context.extensionId}.command.${command.id}`
       context.commands.set(key, { contribution: command, handler })
       const { args, ...crossing } = command
-      const { disposable } = main.register('command.register', crossing, args !== undefined)
+      const { disposable } = main.registerAcross('command.register', crossing, args !== undefined)
       return {
         dispose() {
           context.commands.delete(key)
@@ -196,49 +195,49 @@ function commandsFor(context: HostContext, main: MainCalls): ExtensionAPI['comma
 
 function issuesFor(context: HostContext, main: MainCalls): ExtensionAPI['issues'] {
   return {
-    connections: () => main.call('issues.connections'),
-    listMine: (options) => main.call('issues.listMine', options),
-    search: (term, options) => main.call('issues.search', term, options),
-    get: (tracker, key, options) => main.call('issues.get', tracker, key, options),
-    comment: (tracker, key, body) => main.call('issues.comment', tracker, key, body),
-    states: (tracker, key) => main.call('issues.states', tracker, key),
+    connections: () => main.ask('issues.connections'),
+    listMine: (options) => main.ask('issues.listMine', options),
+    search: (term, options) => main.ask('issues.search', term, options),
+    get: (tracker, key, options) => main.ask('issues.get', tracker, key, options),
+    comment: (tracker, key, body) => main.ask('issues.comment', tracker, key, body),
+    states: (tracker, key) => main.ask('issues.states', tracker, key),
     // Forwarded as the SDK declares it: tracker, key, intent and the operator's option.
-    transition: (...move) => main.call('issues.transition', ...move),
+    transition: (...move) => main.ask('issues.transition', ...move),
     supportsTransitions: (tracker) => context.snapshot.trackers[tracker]?.transitions ?? false,
-    teams: (tracker) => main.call('issues.teams', tracker),
-    create: (tracker, input) => main.call('issues.create', tracker, input),
+    teams: (tracker) => main.ask('issues.teams', tracker),
+    create: (tracker, input) => main.ask('issues.create', tracker, input),
     supportsCreate: (tracker) => context.snapshot.trackers[tracker]?.create ?? false,
   }
 }
 
 function githubFor(main: MainCalls): ExtensionAPI['github'] {
   return {
-    api: (target, request) => main.call('github.api', target, request),
+    api: (target, request) => main.ask('github.api', target, request),
     pullRequests: {
       view: (target, pullRequest, fields) =>
-        main.call('github.pullRequests.view', target, pullRequest, fields),
-      list: (target, query) => main.call('github.pullRequests.list', target, query),
-      create: (target, input) => main.call('github.pullRequests.create', target, input),
+        main.ask('github.pullRequests.view', target, pullRequest, fields),
+      list: (target, query) => main.ask('github.pullRequests.list', target, query),
+      create: (target, input) => main.ask('github.pullRequests.create', target, input),
       markReady: (target, pullRequest) =>
-        main.call('github.pullRequests.markReady', target, pullRequest),
+        main.ask('github.pullRequests.markReady', target, pullRequest),
       updateBranch: (target, pullRequest) =>
-        main.call('github.pullRequests.updateBranch', target, pullRequest),
+        main.ask('github.pullRequests.updateBranch', target, pullRequest),
     },
     repositories: {
-      view: (target, fields) => main.call('github.repositories.view', target, fields),
+      view: (target, fields) => main.ask('github.repositories.view', target, fields),
       clone: (target, repository, directory) =>
-        main.call('github.repositories.clone', target, repository, directory),
+        main.ask('github.repositories.clone', target, repository, directory),
     },
   }
 }
 
 function windowFor(main: MainCalls): ExtensionAPI['window'] {
   return {
-    openAuxiliary: (view, params) => main.fire('window.openAuxiliary', view, params),
-    broadcast: (channel, data) => main.fire('window.broadcast', channel, data),
-    focusSelf: (viewParam) => main.fire('window.focusSelf', viewParam),
-    showSelf: (view) => main.fire('window.showSelf', view),
-    raise: () => main.fire('window.raise'),
+    openAuxiliary: (view, params) => main.tell('window.openAuxiliary', view, params),
+    broadcast: (channel, data) => main.tell('window.broadcast', channel, data),
+    focusSelf: (viewParam) => main.tell('window.focusSelf', viewParam),
+    showSelf: (view) => main.tell('window.showSelf', view),
+    raise: () => main.tell('window.raise'),
   }
 }
 
@@ -254,14 +253,14 @@ function logFor(main: MainCalls): ExtensionAPI['log'] {
   const level =
     (name: string) =>
     (message: string, ...meta: unknown[]) =>
-      main.fire(`log.${name}`, message, ...loggable(meta))
+      main.tell(`log.${name}`, message, ...loggable(meta))
   return { debug: level('debug'), info: level('info'), warn: level('warn'), error: level('error') }
 }
 
 function globalShortcutFor(main: MainCalls): ExtensionAPI['globalShortcut'] {
   return {
     async register(accelerator, handler) {
-      const { disposable, ready } = main.register(
+      const { disposable, ready } = main.registerAcross(
         'api',
         'globalShortcut.register',
         accelerator,
@@ -279,29 +278,27 @@ type ForwardedMember = 'dialog' | 'shell' | 'notifications' | 'nativeMenu' | 'te
 function forwardedMembersFor(main: MainCalls): Pick<ExtensionAPI, ForwardedMember> {
   return {
     dialog: {
-      showOpenDialog: (options) => main.call('dialog.showOpenDialog', options),
-      showSaveDialog: (options) => main.call('dialog.showSaveDialog', options),
+      showOpenDialog: (options) => main.ask('dialog.showOpenDialog', options),
+      showSaveDialog: (options) => main.ask('dialog.showSaveDialog', options),
     },
     shell: {
-      exec: ((options) => main.call('shell.exec', options)) as ExtensionAPI['shell']['exec'],
+      exec: ((options) => main.ask('shell.exec', options)) as ExtensionAPI['shell']['exec'],
     },
     notifications: {
-      showToast: (type, message, key) => main.fire('notifications.showToast', type, message, key),
-      createNotification: (options) => main.held('notifications.createNotification', options),
+      showToast: (type, message, key) => main.tell('notifications.showToast', type, message, key),
+      createNotification: (options) => main.hold('notifications.createNotification', options),
     },
-    nativeMenu: { addViewMenuItem: (item) => main.held('nativeMenu.addViewMenuItem', item) },
+    nativeMenu: { addViewMenuItem: (item) => main.hold('nativeMenu.addViewMenuItem', item) },
     terminal: {
-      onSessionCreate: (handler) => main.held('terminal.onSessionCreate', handler),
-      onSessionClose: (handler) => main.held('terminal.onSessionClose', handler),
+      onSessionCreate: (handler) => main.hold('terminal.onSessionCreate', handler),
+      onSessionClose: (handler) => main.hold('terminal.onSessionClose', handler),
     },
   }
 }
 
-/**
- * The ExtensionAPI an extension receives in the extension host (ADR 094): the
- * same declaration as main's `api.ts`, each member a call across the port, a
- * read of the snapshot main pushes, or (`db`, `extensions`) answered here.
- */
+/** The ExtensionAPI an extension receives in the extension host (ADR 094): the same declaration
+ * as main's `api.ts`, each member a call across the port, a read of the snapshot main pushes,
+ * or (`db`, `extensions`) answered here. */
 export function createHostExtensionAPI(context: HostContext): ExtensionAPI {
   const main = new MainCalls(context)
   return {
@@ -312,7 +309,7 @@ export function createHostExtensionAPI(context: HostContext): ExtensionAPI {
     log: logFor(main),
     settings: settingsFor(context, main),
     globalShortcut: globalShortcutFor(main),
-    workspace: workspaceFor(context, main),
+    workspace: hostWorkspaceApi(context, main),
     github: githubFor(main),
     issues: issuesFor(context, main),
     commands: commandsFor(context, main),

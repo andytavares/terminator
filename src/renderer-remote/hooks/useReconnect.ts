@@ -104,8 +104,8 @@ function useTurnedAwayOnClose(ws: WebSocket | null, { turnedAwayRef, setStatus }
 
 /** Up to three attempts, two seconds apart, then disconnected until a retry. */
 function useAttempt({ wsRef, openWsRef, attemptsRef, turnedAwayRef, setStatus }: Loop): () => void {
-  const attempt = useCallback(
-    function attempt() {
+  const tryReconnect = useCallback(
+    function tryReconnect() {
       const state = wsRef.current?.readyState
       if (turnedAwayRef.current) return
       if (state === WebSocket.OPEN) {
@@ -118,13 +118,13 @@ function useAttempt({ wsRef, openWsRef, attemptsRef, turnedAwayRef, setStatus }:
         // If already CONNECTING, don't open another socket — just wait and count the attempt
         if (state !== WebSocket.CONNECTING) openWsRef.current()
         setStatus('reconnecting')
-        setTimeout(attempt, RETRY_DELAY_MS)
+        setTimeout(tryReconnect, RETRY_DELAY_MS)
       }
     },
     [wsRef, openWsRef, attemptsRef, turnedAwayRef, setStatus]
   )
 
-  return attempt
+  return tryReconnect
 }
 
 // Called by openWs when a connection attempt fails (ticket fetch error, socket error, etc.)

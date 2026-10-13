@@ -7,10 +7,8 @@ export interface RelativeTimeProps {
   now?: TimeInput
 }
 
-/**
- * The time as a sentence, with the exact moment in the tooltip and in the
- * `datetime` attribute for assistive technology and copy.
- */
+/** The time as a sentence, with the exact moment in the tooltip and in the `datetime` attribute
+ * for assistive technology and copy. */
 export function RelativeTime({ value, now }: RelativeTimeProps): JSX.Element | null {
   const moment = new Date(toMilliseconds(value))
   if (Number.isNaN(moment.getTime())) return null

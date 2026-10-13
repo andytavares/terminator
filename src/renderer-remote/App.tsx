@@ -25,7 +25,7 @@ export function App(): JSX.Element {
         <h1 className="login__title">Terminator Remote</h1>
         <PasswordInput value={password} onChange={setPassword} />
         <div className="login__error">{error}</div>
-        <ConnectButton loading={loading} />
+        <LoginButton loading={loading} />
       </form>
     </div>
   )
@@ -50,7 +50,7 @@ function PasswordInput({
   )
 }
 
-function ConnectButton({ loading }: { loading: boolean }): JSX.Element {
+function LoginButton({ loading }: { loading: boolean }): JSX.Element {
   return (
     <button className="login__btn" type="submit" disabled={loading}>
       {loading ? 'Connecting…' : 'Connect'}
@@ -66,11 +66,8 @@ const REFUSALS: Record<number, string> = {
   429: 'Too many attempts. Try again later',
 }
 
-/**
- * Logs in, then swaps the session for a one-time ticket to the mobile or the
- * desktop app and goes there. Resolves to why it could not, or null once it
- * has left the page.
- */
+/** Logs in, then swaps the session for a one-time ticket to the mobile or the desktop app and
+ * goes there. Resolves to why it could not, or null once it has left the page. */
 async function logIn(password: string): Promise<string | null> {
   const res = await fetch('/api/login', {
     method: 'POST',

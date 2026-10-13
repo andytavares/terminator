@@ -144,10 +144,8 @@ function BranchRowContent(props: BranchRowProps & { rename: Rename }): JSX.Eleme
   )
 }
 
-/**
- * Rename, Open in the editor, the issue actions, the repo's actions, then
- * Remove. Each that does not end the menu itself closes it first.
- */
+/** Rename, Open in the editor, the issue actions, the repo's actions, then Remove. Each that
+ * does not end the menu itself closes it first. */
 function branchMenuItems(
   props: BranchRowProps,
   closeMenu: () => void,
@@ -218,11 +216,9 @@ function RenameInput({ rename }: { rename: Rename }): JSX.Element {
   )
 }
 
-/**
- * The disclosure for this branch's terminals. Drawn only when there is
- * something under it, and it takes the click without selecting the branch —
- * expanding to see what is there is not the same act as switching to it.
- */
+/** The disclosure for this branch's terminals. Drawn only when there is something under it, and
+ * it takes the click without selecting the branch — expanding to see what is there is not the
+ * same act as switching to it. */
 function Disclosure({ row, expanded, onToggleExpanded }: BranchRowProps): JSX.Element {
   if (!onToggleExpanded || row.terminals.length === 0) {
     return (
@@ -242,10 +238,8 @@ function Disclosure({ row, expanded, onToggleExpanded }: BranchRowProps): JSX.El
   )
 }
 
-/**
- * One key element whatever the count: the branch's own key first, then the
- * count of other keys its terminals carry, all of them in the tooltip.
- */
+/** One key element whatever the count: the branch's own key first, then the count of other keys
+ * its terminals carry, all of them in the tooltip. */
 function issueKeys(issueKey: string | null | undefined, sessionIssueKeys: string[]) {
   const branchKey = issueKey != null && issueKey !== '' ? issueKey : null
   const keys = [...new Set([...(branchKey !== null ? [branchKey] : []), ...sessionIssueKeys])]
@@ -309,11 +303,8 @@ function AddTerminal({ label, onAdd }: { label: string; onAdd: () => void }): JS
   )
 }
 
-/**
- * Last on the row, so it sits flush against the right edge and lands in the
- * same column as every other count in the sidebar. Anything that can appear or
- * disappear goes to its left.
- */
+/** Last on the row, so it sits flush against the right edge and lands in the same column as
+ * every other count in the sidebar. Anything that can appear or disappear goes to its left. */
 function CountOrAge({ row, now }: Pick<BranchRowProps, 'row' | 'now'>): JSX.Element {
   if (row.stateCount > 1) return <span className="branch-row__count">{row.stateCount}</span>
   return (

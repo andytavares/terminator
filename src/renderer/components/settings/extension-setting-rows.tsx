@@ -43,12 +43,9 @@ export function readExtensionSettings(sink: {
     .catch(() => {})
 }
 
-// Any extension may declare per-notification-kind delivery settings using the
-// convention `<extensionId>.notify.<notificationKey>.(system|center|toast)`
-// (3 booleans per notification kind). This is a naming convention only — core
-// never knows which specific notification keys an extension defines — but it
-// lets the generic settings UI group them into a compact table instead of a
-// long list of individual switches.
+// A naming convention, `<extensionId>.notify.<notificationKey>.(system|center|toast)`, three
+// booleans per notification kind, which the settings UI groups into one table. Core never knows an
+// extension's notification keys.
 const NOTIFICATION_SETTING_KEY_RE = /^(.+)\.notify\.([^.]+)\.(system|center|toast)$/
 
 type DeliveryTarget = 'system' | 'center' | 'toast'
@@ -102,12 +99,12 @@ function actionOutcome(result: unknown): ActionOutcome {
 
 /** Runs the action on its channel and says how it went. */
 async function runSettingAction(def: SettingPropDef): Promise<void> {
-  const notify = ({ type, message }: ActionOutcome): void =>
+  const notifyOutcome = ({ type, message }: ActionOutcome): void =>
     dispatchNotification({ type, title: def.label, message, key: 'extensionSettingAction' })
   try {
-    notify(actionOutcome(await window.electronAPI.extensionBridge.invoke(def.channel!, {})))
+    notifyOutcome(actionOutcome(await window.electronAPI.extensionBridge.invoke(def.channel!, {})))
   } catch (err) {
-    notify({ type: 'error', message: err instanceof Error ? err.message : String(err) })
+    notifyOutcome({ type: 'error', message: err instanceof Error ? err.message : String(err) })
   }
 }
 
@@ -115,7 +112,7 @@ async function runSettingAction(def: SettingPropDef): Promise<void> {
 export function ActionSettingRow({ def }: { def: SettingPropDef }): JSX.Element {
   const [busy, setBusy] = useState(false)
 
-  async function run(): Promise<void> {
+  async function runAction(): Promise<void> {
     if (def.confirmMessage && !window.confirm(def.confirmMessage)) return
     setBusy(true)
     await runSettingAction(def)
@@ -131,7 +128,7 @@ export function ActionSettingRow({ def }: { def: SettingPropDef }): JSX.Element 
       )}
       <button
         className={`ext-btn${def.danger ? ' ext-btn--danger' : ''}`}
-        onClick={() => void run()}
+        onClick={() => void runAction()}
         disabled={busy}
       >
         {busy ? '…' : def.label}
@@ -154,34 +151,32 @@ function settingText(value: unknown): string {
 
 type Save = (key: string, value: unknown) => Promise<void>
 
-/**
- * The setting's text as edited, saved 400ms after the last edit, and saved at
- * once if the panel closes first so closing does not lose it.
- */
+/** The setting's text as edited, saved 400ms after the last edit, and saved at once if the panel
+ * closes first so closing does not lose it. */
 function useDebouncedSetting(propKey: string, def: SettingPropDef, save: Save) {
   const [text, setText] = useState(settingText(def.default))
   const pending = useRef<{ timer: ReturnType<typeof setTimeout>; text: string } | null>(null)
-  const flush = (): void => {
+  const flushPending = (): void => {
     if (!pending.current) return
     clearTimeout(pending.current.timer)
     const value = pending.current.text
     pending.current = null
     void save(propKey, coerce(def.type, value))
   }
-  const flushRef = useRef(flush)
+  const flushRef = useRef(flushPending)
   useEffect(() => {
-    flushRef.current = flush
+    flushRef.current = flushPending
   })
   useEffect(() => {
     const latest = flushRef
     return () => latest.current()
   }, [])
-  function edit(next: string): void {
+  function editText(next: string): void {
     setText(next)
     if (pending.current) clearTimeout(pending.current.timer)
     pending.current = { timer: setTimeout(() => flushRef.current(), 400), text: next }
   }
-  return { text, edit }
+  return { text, edit: editText }
 }
 
 interface ExtensionSettingRowProps {

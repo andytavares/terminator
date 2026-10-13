@@ -134,10 +134,8 @@ function useTabEditing(factsById: FactsById) {
 
 type TabEditing = ReturnType<typeof useTabEditing>
 
-/**
- * The ⌘I shortcut opens the description editor on the tab it names, once per
- * request, and only for a tab this branch has.
- */
+/** The ⌘I shortcut opens the description editor on the tab it names, once per request, and only
+ * for a tab this branch has. */
 function useEditNoteRequest(
   editNoteSessionId: string | null | undefined,
   {
@@ -249,10 +247,8 @@ function SessionTabs(props: SessionTabsProps): JSX.Element {
   )
 }
 
-/**
- * Tabs are scoped to one branch, and switching branches silently swapped the
- * whole row. Say whose terminals these are.
- */
+/** Tabs are scoped to one branch, and switching branches silently swapped the whole row. Say
+ * whose terminals these are. */
 function ScopeLabel({ projectId }: { projectId: string }): JSX.Element | null {
   const scopeLabel = useScopeLabel(projectId)
   if (!scopeLabel) return null
@@ -273,7 +269,7 @@ function SessionTab(props: SessionTabProps): JSX.Element {
   const { projectId, session, editing, dragProps, isDragOver } = props
   const isActive = session.id === props.tabs.activeId
   const isRenaming = editing.rename.id === session.id
-  const show = (): void => {
+  const showSession = (): void => {
     useSessionStore.getState().setActiveSessionForProject(projectId, session.id)
     useSessionStore.getState().requestFocus(session.id)
   }
@@ -281,7 +277,7 @@ function SessionTab(props: SessionTabProps): JSX.Element {
     <div
       {...dragProps}
       className={`tab-bar__tab tab-bar__tab--session${isActive ? ' tab-bar__tab--active' : ''}${isDragOver ? ' tab-bar__tab--dnd-over' : ''}`}
-      onClick={show}
+      onClick={showSession}
       onContextMenu={(e) => props.onContextMenu(e, session.id)}
       onDoubleClick={(e) => {
         e.stopPropagation()
@@ -366,11 +362,9 @@ function RenameInput({ sessionId, rename }: { sessionId: string; rename: TabEdit
   )
 }
 
-/**
- * The bell count on a tab you are not on; the close button on the one you are.
- * A close button on every tab was the fourth element on a 100px box, and
- * closing a terminal you are not looking at is not a thing worth one-clicking.
- */
+/** The bell count on a tab you are not on; the close button on the one you are. A close button
+ * on every tab was the fourth element on a 100px box, and closing a terminal you are not
+ * looking at is not a thing worth one-clicking. */
 function TabEnd({ sessionId, isActive }: { sessionId: string; isActive: boolean }) {
   const bells = useSessionStore((s) => s.getBellCountForSession(sessionId))
   if (!isActive) return <AlertBadge count={bells} className="alert-badge--tab" />

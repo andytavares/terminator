@@ -116,10 +116,7 @@ function rendererCommand(c: CommandRegistration): RendererCommand {
   }
 }
 
-/**
- * What a custom action runs against: the focused terminal, and the variables
- * its body can use.
- */
+/** What a custom action runs against: the focused terminal, and the variables its body can use. */
 function useCustomEnv(target: QuickActionTarget): CustomRunEnv {
   const { activeWorkspace, activeProject } = useActiveScope()
   const activeProjectId = useWorkspaceStore((s) => s.activeProjectId)
@@ -169,7 +166,7 @@ function useCustomQuickActions(target: QuickActionTarget): QuickAction[] {
     () =>
       buildCustomQuickActions([...(globalCustom ?? []), ...(workspaceCustom ?? [])], env, {
         input: (sessionId, data) => window.electronAPI.terminal.input(sessionId, data),
-        openTab: (tabProjectId) => openTab(tabProjectId, activeWorkspaceId, createSession),
+        openTab: (tabProjectId) => openProjectTab(tabProjectId, activeWorkspaceId, createSession),
         notify: (message) => useToastStore.getState().addToast({ type: 'error', message }),
       }),
     [globalCustom, workspaceCustom, env, activeWorkspaceId, createSession]
@@ -179,7 +176,7 @@ function useCustomQuickActions(target: QuickActionTarget): QuickAction[] {
 type CreateSession = ReturnType<typeof useTerminalSession>['createSession']
 
 /** A new terminal on the branch, for a custom action that types into one. */
-async function openTab(
+async function openProjectTab(
   projectId: string,
   workspaceId: string | null,
   createSession: CreateSession
@@ -196,7 +193,7 @@ async function openTab(
 }
 
 /** Records the run, offers the shortcut hint, then runs the action and reports a failure. */
-function runQuickAction(
+function dispatchQuickAction(
   action: QuickAction,
   liveIds: Set<string>,
   addToast: (toast: { type: 'info' | 'error'; message: string }) => void
@@ -243,11 +240,8 @@ function contextLabelFor(
   return target.focusedSession ? `in terminal · ${target.focusedSession.tabTitle}` : undefined
 }
 
-/**
- * The palette and everything it offers, mounted only while it is open: the
- * actions read every session, so building them is work the closed palette
- * should not cost the rest of the app.
- */
+/** The palette and everything it offers, mounted only while it is open: the actions read every
+ * session, so building them is work the closed palette should not cost the rest of the app. */
 export function QuickActionsHost(props: QuickActionsHostProps): JSX.Element {
   const target = useQuickActionTarget()
   const quickActionGroups = useExtensionRegistry((s) => s.quickActionGroups)
@@ -259,7 +253,8 @@ export function QuickActionsHost(props: QuickActionsHostProps): JSX.Element {
   const handleRun = useCallback(
     (action: QuickAction) => {
       onClose()
-      runQuickAction(action, new Set(actions.map((a) => a.id)), useToastStore.getState().addToast)
+      const liveIds = new Set(actions.map((a) => a.id))
+      dispatchQuickAction(action, liveIds, useToastStore.getState().addToast)
     },
     [actions, onClose]
   )

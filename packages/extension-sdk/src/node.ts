@@ -4,11 +4,9 @@ import { rename, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import type { ExtensionAPI } from '../types/api'
 
-/**
- * Writes `value` as indented JSON so that a reader sees the old file or the
- * new one, never half of it: a temporary file beside the target, then a
- * rename. The temporary name is unique, so concurrent writers do not share it.
- */
+/** Writes `value` as indented JSON so that a reader sees the old file or the new one, never half
+ * of it: a temporary file beside the target, then a rename. The temporary name is unique, so
+ * concurrent writers do not share it. */
 export async function writeJsonAtomic(target: string, value: unknown): Promise<void> {
   const temporary = `${target}.${randomUUID()}.tmp`
   await writeFile(temporary, JSON.stringify(value, null, 2), 'utf8')
@@ -25,13 +23,9 @@ export interface UserDataMove {
 
 export type UserDataMoveOutcome = 'moved' | 'nothing-to-move' | 'kept-both'
 
-/**
- * Moves what an extension wrote to the shared userData folder into its own
- * `paths.globalStorage`, each path only while its new location does not exist.
- * When both exist neither is touched, and the log says where the old copy is.
- * Synchronous, for the top of `activate`, before anything opens either path.
- * A rename: both are inside userData.
- */
+/** Moves what an extension wrote to the shared userData folder into its own `paths.globalStorage`,
+ * a path only while its new location does not exist (both exist: neither moves, the log names the
+ * old copy). A synchronous rename, for the top of `activate` before anything opens either path. */
 export function moveFromUserData(
   api: Pick<ExtensionAPI, 'paths'> & { log: Pick<ExtensionAPI['log'], 'warn'> },
   moves: readonly UserDataMove[]
@@ -54,4 +48,9 @@ function movePath(legacy: string, target: string): UserDataMoveOutcome {
   mkdirSync(dirname(target), { recursive: true })
   renameSync(legacy, target)
   return 'moved'
+}
+
+/** `value` single-quoted for a POSIX shell, so it reads as one word whatever it holds. */
+export function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`
 }

@@ -189,7 +189,7 @@ const RESUME: CoreActionSpec = {
   run: (d) => d.onResume(),
 }
 
-const issueKey = (d: CoreActionDeps): string | undefined => d.issueLink?.key
+const linkedIssueKey = (d: CoreActionDeps): string | undefined => d.issueLink?.key
 const trackerName = (d: CoreActionDeps): string =>
   d.issueLink?.tracker === 'linear' ? 'Linear' : 'Jira'
 
@@ -230,7 +230,7 @@ const WORKSPACE_ACTIONS: CoreActionSpec[] = [
   },
   {
     id: 'core.view-issue',
-    label: (d) => (d.issueLink ? `View ${issueKey(d)}` : 'View linked issue'),
+    label: (d) => (d.issueLink ? `View ${linkedIssueKey(d)}` : 'View linked issue'),
     group: 'workspace',
     mnemonic: 'v',
     requires: 'issue',
@@ -238,7 +238,7 @@ const WORKSPACE_ACTIONS: CoreActionSpec[] = [
   },
   {
     id: 'core.copy-issue-key',
-    label: (d) => (d.issueLink ? `Copy issue key (${issueKey(d)})` : 'Copy issue key'),
+    label: (d) => (d.issueLink ? `Copy issue key (${linkedIssueKey(d)})` : 'Copy issue key'),
     group: 'workspace',
     mnemonic: 'c',
     requires: 'issue',
@@ -247,7 +247,7 @@ const WORKSPACE_ACTIONS: CoreActionSpec[] = [
   {
     id: 'core.open-issue',
     label: (d) =>
-      d.issueLink ? `Open ${issueKey(d)} in ${trackerName(d)}` : 'Open issue in tracker',
+      d.issueLink ? `Open ${linkedIssueKey(d)} in ${trackerName(d)}` : 'Open issue in tracker',
     group: 'workspace',
     mnemonic: 'o',
     requires: 'issue',
@@ -325,7 +325,7 @@ function actionOf(spec: CoreActionSpec, deps: CoreActionDeps): QuickAction {
 }
 
 /** The first nine open sessions, numbered 1–9. */
-function sessionActions(deps: CoreActionDeps): QuickAction[] {
+function coreSessionActions(deps: CoreActionDeps): QuickAction[] {
   return deps.sessions.slice(0, 9).map((session, i) => ({
     id: `session:${session.id}`,
     label: session.tabTitle,
@@ -352,7 +352,7 @@ export function buildCoreActions(deps: CoreActionDeps): QuickAction[] {
   const fromSpecs = (specs: CoreActionSpec[]) => specs.map((spec) => actionOf(spec, deps))
   return [
     ...fromSpecs(TERMINAL_ACTIONS),
-    ...sessionActions(deps),
+    ...coreSessionActions(deps),
     actionOf(RESUME, deps),
     ...switchWorkspaceActions(deps),
     ...fromSpecs(WORKSPACE_ACTIONS),

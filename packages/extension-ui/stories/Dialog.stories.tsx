@@ -4,7 +4,7 @@ import { expect, fn, userEvent, within } from 'storybook/test'
 import { Dialog } from '../src/Dialog'
 import { inLight } from './in-light'
 
-const noop = (): void => {}
+const selectNothing = (): void => {}
 
 const meta = {
   title: 'Components/Dialog',
@@ -13,8 +13,8 @@ const meta = {
     title: 'Rename note',
     onDismiss: fn(),
     actions: [
-      { label: 'Cancel', onSelect: noop },
-      { label: 'Rename', tone: 'primary', onSelect: noop },
+      { label: 'Cancel', onSelect: selectNothing },
+      { label: 'Rename', tone: 'primary', onSelect: selectNothing },
     ],
     children: <p style={{ margin: 0 }}>The note keeps its history under the new name.</p>,
   },
@@ -39,8 +39,8 @@ export const DangerAction: Story = {
   args: {
     title: 'Delete note',
     actions: [
-      { label: 'Cancel', onSelect: noop },
-      { label: 'Delete', tone: 'danger', onSelect: noop },
+      { label: 'Cancel', onSelect: selectNothing },
+      { label: 'Delete', tone: 'danger', onSelect: selectNothing },
     ],
   },
 }
@@ -48,8 +48,8 @@ export const DangerAction: Story = {
 export const DisabledAction: Story = {
   args: {
     actions: [
-      { label: 'Cancel', onSelect: noop },
-      { label: 'Rename', tone: 'primary', disabled: true, onSelect: noop },
+      { label: 'Cancel', onSelect: selectNothing },
+      { label: 'Rename', tone: 'primary', disabled: true, onSelect: selectNothing },
     ],
   },
 }
@@ -57,8 +57,8 @@ export const DisabledAction: Story = {
 export const WithShortcutHint: Story = {
   args: {
     actions: [
-      { label: 'Cancel', onSelect: noop },
-      { label: 'Rename', tone: 'primary', shortcut: '⌘↵', onSelect: noop },
+      { label: 'Cancel', onSelect: selectNothing },
+      { label: 'Rename', tone: 'primary', shortcut: '⌘↵', onSelect: selectNothing },
     ],
   },
 }
@@ -88,7 +88,7 @@ export const CloseControlDismisses: Story = {
 export const FormSubmitsOnEnter: Story = {
   args: {
     actions: [
-      { label: 'Cancel', onSelect: noop },
+      { label: 'Cancel', onSelect: selectNothing },
       { label: 'Rename', tone: 'primary', submit: true, onSelect: fn() },
     ],
     children: <input aria-label="Name" defaultValue="Standup notes" />,

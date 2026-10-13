@@ -27,17 +27,15 @@ function useExtensionSettings() {
   const [schemas, setSchemas] = useState<ExtensionSchema[]>([])
   const [values, setValues] = useState<Record<string, unknown>>({})
   useEffect(() => {
-    const read = (): void => readExtensionSettings({ setSchemas, setValues })
-    read()
-    return window.electronAPI.extension.onListChanged(read)
+    const readSettings = (): void => readExtensionSettings({ setSchemas, setValues })
+    readSettings()
+    return window.electronAPI.extension.onListChanged(readSettings)
   }, [])
   return { groups: workspaceScopedSettings(schemas), values }
 }
 
-/**
- * The extension settings a workspace may set for itself: each shows the value
- * that applies here, and "Use global default" once the workspace sets its own.
- */
+/** The extension settings a workspace may set for itself: each shows the value that applies
+ * here, and "Use global default" once the workspace sets its own. */
 export function WorkspaceExtensionSettings({ workspaceId }: { workspaceId: string }) {
   const { groups, values } = useExtensionSettings()
   const own = useSettingsStore((s) => s.workspaceSettings.get(workspaceId)?.extensions)
@@ -73,7 +71,7 @@ function WorkspaceSettingRow({ workspaceId, setting, values }: RowProps): JSX.El
   const update = useSettingsStore((s) => s.updateWorkspaceExtensionSetting)
   // The row keeps what was typed; a new generation redraws it with the global value.
   const [generation, setGeneration] = useState(0)
-  const handBack = async (): Promise<void> => {
+  const handBackToGlobal = async (): Promise<void> => {
     await update(workspaceId, setting.key, undefined)
     setGeneration((g) => g + 1)
   }
@@ -86,7 +84,7 @@ function WorkspaceSettingRow({ workspaceId, setting, values }: RowProps): JSX.El
         value={values.own ?? values.global ?? setting.def.default}
         onChange={(key, value) => update(workspaceId, key, value)}
       />
-      {values.own !== undefined && <UseGlobalButton onClick={() => void handBack()} />}
+      {values.own !== undefined && <UseGlobalButton onClick={() => void handBackToGlobal()} />}
     </>
   )
 }

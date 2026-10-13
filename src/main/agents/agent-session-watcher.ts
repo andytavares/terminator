@@ -32,15 +32,9 @@ function conversationOf(
   }
 }
 
-/**
- * Folds one report in and deletes it, so each is handled once however many
- * events announce it. A report for a terminal this process cannot place is an
- * old one, or one from a session that has already gone: there is nothing to
- * attach it to, and it is deleted too.
- *
- * The file is renamed before it is read, so a report the hook writes while this
- * one is being handled lands as a new file instead of being deleted unread.
- */
+/** Folds one report in and deletes it, so each is handled once however many events announce it;
+ * one for a terminal this process cannot place is stale and deleted too. Renamed before it is read,
+ * so a report the hook writes meanwhile lands as a new file instead of being deleted unread. */
 function consume(file: string, options: WatcherOptions): void {
   const claimed = `${file}.claimed`
   try {
@@ -71,14 +65,9 @@ function consumeDirectory(directory: string, options: WatcherOptions): void {
   }
 }
 
-/**
- * Watch for reported conversations. Returns the way to stop.
- *
- * The directory is watched (`fs.watch`, as ADR-005 chose for file changes) and
- * each report is consumed when it appears. Reports written while the
- * application was closed have no event to deliver, so the directory is read
- * once at startup, after the watch is armed so that nothing falls between.
- */
+/** Watches for reported conversations (`fs.watch`, ADR-005) and returns the way to stop. Reports
+ * written while the app was closed have no event, so the directory is also read once at startup,
+ * after the watch is armed so that nothing falls between. */
 export function startAgentSessionWatcher(options: WatcherOptions): () => void {
   const directory = reportDirectory()
   fs.mkdirSync(directory, { recursive: true })

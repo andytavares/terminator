@@ -225,17 +225,9 @@ function updateSlice(
 const isExitable = (id: string | null): boolean =>
   id !== null && !id.startsWith(CORE_SURFACE_PREFIX)
 
-/**
- * Dismisses the extension surface the user is in so the terminal shows again.
- * `sidebarPanelId` is passed only when the exit came from a sidebar panel —
- * those sit beside the terminal rather than replacing it, so closing the panel
- * is the whole exit. Everything else is a full-screen surface: clearing all
- * three tab slots at once lands on TerminalPane, which still holds the
- * project's activeSessionId, i.e. the session the user left.
- *
- * Returns false when there was nothing to exit, so the caller can skip
- * re-focusing the terminal.
- */
+/** Leaves the extension surface for the terminal: closes the sidebar panel the exit came from, else
+ * clears all three tab slots, landing on TerminalPane and the session the user left. False when
+ * there was nothing to exit, so the caller skips re-focusing the terminal. */
 function exitExtensionToTerminal(
   set: SetRegistry,
   get: GetRegistry,
@@ -249,20 +241,18 @@ function exitExtensionToTerminal(
   }
   const tabs = [s.activeGlobalTabId, s.activeWorkspaceTabId, s.activeProjectTabId]
   if (!tabs.some(isExitable)) return false
-  const keep = (id: string | null): string | null => (isExitable(id) ? null : id)
+  const keepUnlessExitable = (id: string | null): string | null => (isExitable(id) ? null : id)
   set((prev) => ({
-    activeGlobalTabId: keep(prev.activeGlobalTabId),
-    activeWorkspaceTabId: keep(prev.activeWorkspaceTabId),
-    activeProjectTabId: keep(prev.activeProjectTabId),
+    activeGlobalTabId: keepUnlessExitable(prev.activeGlobalTabId),
+    activeWorkspaceTabId: keepUnlessExitable(prev.activeWorkspaceTabId),
+    activeProjectTabId: keepUnlessExitable(prev.activeProjectTabId),
   }))
   return true
 }
 
-/**
- * Dismisses whatever is showing in place of the terminal, core screens such
- * as Home and Overview included — the user has moved on to something else.
- * Sidebar panels sit beside the terminal rather than over it, so they stay.
- */
+/** Dismisses whatever is showing in place of the terminal, core screens such as Home and
+ * Overview included — the user has moved on to something else. Sidebar panels sit beside the
+ * terminal rather than over it, so they stay. */
 function dismissSurfaces(set: SetRegistry, get: GetRegistry): boolean {
   const s = get()
   if (!s.activeGlobalTabId && !s.activeWorkspaceTabId && !s.activeProjectTabId) return false

@@ -122,9 +122,9 @@ forgetLegacyToken()
 
   function onBridgeMessage(msg: BridgeMessage) {
     if (msg.type === 'result' && msg.id) {
-      settle(msg.id, (p) => p.resolve(msg.result))
+      settlePending(msg.id, (p) => p.resolve(msg.result))
     } else if (msg.type === 'error' && msg.id) {
-      settle(msg.id, (p) => p.reject(new Error(msg.error ?? 'bridge error')))
+      settlePending(msg.id, (p) => p.reject(new Error(msg.error ?? 'bridge error')))
     } else if (msg.type === 'event' && msg.channel) {
       const args = msg.args ?? []
       listeners.get(msg.channel)?.forEach((cb) => cb(...args))
@@ -132,7 +132,7 @@ forgetLegacyToken()
   }
 
   /** Answers the invoke waiting on `id`, if one still is. */
-  function settle(id: string, answer: (p: Pending) => void) {
+  function settlePending(id: string, answer: (p: Pending) => void) {
     const p = pending.get(id)
     if (!p) return
     pending.delete(id)

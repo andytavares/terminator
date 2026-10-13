@@ -20,10 +20,8 @@ import type { TerminalInstance } from '../components/terminal/TerminalSession'
 interface ProjectView {
   activeSessionId?: string
   focusedSessionId?: string
-  /**
-   * One per split tab: its root session and the panes split off it. The one on
-   * screen is the one holding the active session; a tab with none shows alone.
-   */
+  /** One per split tab: its root session and the panes split off it. The one on screen is the
+   * one holding the active session; a tab with none shows alone. */
   paneLayouts?: PaneNode[]
   order?: string[]
   terminalCounter: number
@@ -117,12 +115,9 @@ function withFocusOnScreen(view: ProjectView, departedId: string): ProjectView {
   return view
 }
 
-/**
- * Unsplitting: `sessionId` leaves the split `held`, and the session stays in
- * the project. A split left with one pane collapses and, when it was on
- * screen, its remaining pane activates. A split off screen changes nothing
- * on screen.
- */
+/** Unsplitting: `sessionId` leaves the split `held`, and the session stays in the project. A
+ * split left with one pane collapses and, when it was on screen, its remaining pane activates.
+ * A split off screen changes nothing on screen. */
 function withoutLeaf(view: ProjectView, held: PaneNode, sessionId: string): ProjectView {
   const onScreen = layoutHolding(view, view.activeSessionId) === held
   const pruned = removeLeaf(held, sessionId)
@@ -295,7 +290,7 @@ function newSessionRecord(
 }
 
 /** Adds the session, appending it to its project's order when one is kept. */
-function withSession(s: SessionData, session: TerminalSession): Partial<SessionData> {
+function withSessionAdded(s: SessionData, session: TerminalSession): Partial<SessionData> {
   const sessions = new Map(s.sessions)
   sessions.set(session.id, session)
   const view = viewOf(s.projectViews, session.projectId)
@@ -321,7 +316,7 @@ async function createSession(
   // the message names the folder, and the folder is the whole answer.
   if ('error' in result) throw new Error(result.message ?? result.error)
   const session = newSessionRecord(request, tabTitle, result)
-  set((s) => withSession(s, session))
+  set((s) => withSessionAdded(s, session))
   return result.sessionId
 }
 
@@ -340,7 +335,7 @@ function adoptedSession(s: SessionData, adopted: Adopted): Partial<SessionData> 
     lastActivityAt: Date.parse(createdAt),
     agentState: 'idle',
   }
-  const added = withSession(s, session)
+  const added = withSessionAdded(s, session)
   const projectViews = new Map(added.projectViews)
   const view = viewOf(projectViews, adopted.projectId)
   // Made active when the project has nothing showing. Without this the

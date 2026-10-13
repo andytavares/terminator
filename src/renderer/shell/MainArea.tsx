@@ -19,10 +19,8 @@ export interface MainAreaActions {
   editNoteSessionId: string | null
 }
 
-/**
- * The area beside the sidebar: an app-level tab, a repo's tab, or the
- * terminal (with any extension panels open beside it).
- */
+/** The area beside the sidebar: an app-level tab, a repo's tab, or the terminal (with any
+ * extension panels open beside it). */
 export function MainArea(actions: MainAreaActions): JSX.Element {
   const { GlobalTab, WorkspaceTab, anySurfaceTab } = useActiveSurfaceTabs()
   const { repoRoot } = useActiveScope()

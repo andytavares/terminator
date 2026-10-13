@@ -14,11 +14,6 @@ interface HookEntry {
   hooks?: Array<{ command?: string }>
 }
 
-/** Single-quoted for a POSIX shell, which is what runs a hook command. */
-export function shellQuote(value: string): string {
-  return `'${value.replace(/'/g, `'\\''`)}'`
-}
-
 /** True when the entry runs a command containing `marker`. */
 export function runsCommandContaining(entry: unknown, marker: string): boolean {
   const hooks = (entry as HookEntry | null)?.hooks
@@ -47,11 +42,8 @@ export async function writeClaudeSettings(
   await fs.writeFile(file, `${JSON.stringify(settings, null, 2)}\n`, 'utf8')
 }
 
-/**
- * Every SessionStart entry `marker` identifies goes, then one comes back with
- * `command`. The timeout is in seconds; a hook that hung would hold up every
- * session start it covers.
- */
+/** Every SessionStart entry `marker` identifies goes, then one comes back with `command`. The
+ * timeout is in seconds; a hook that hung would hold up every session start it covers. */
 export async function putSessionStartHook(
   file: string,
   marker: string,

@@ -63,7 +63,7 @@ function applyMarks(value: string, marks: AdfMark[] | undefined): string {
 }
 
 /** Everything that can appear inside a paragraph, cell, heading or task item. */
-function renderInline(nodes: AdfNode[]): string {
+function renderAdfInline(nodes: AdfNode[]): string {
   return nodes
     .map((node) => {
       switch (node.type) {
@@ -83,7 +83,7 @@ function renderInline(nodes: AdfNode[]): string {
           return typeof url === 'string' ? url : ''
         }
         default:
-          return renderInline(childrenOf(node))
+          return renderAdfInline(childrenOf(node))
       }
     })
     .join('')
@@ -132,7 +132,7 @@ function renderTaskItems(node: AdfNode, depth: number): string {
   return childrenOf(node)
     .map((item) => {
       const done = attr(item, 'state') === 'DONE'
-      return `${indent}- [${done ? 'x' : ' '}] ${renderInline(childrenOf(item))}`
+      return `${indent}- [${done ? 'x' : ' '}] ${renderAdfInline(childrenOf(item))}`
     })
     .join('\n')
 }
@@ -155,7 +155,7 @@ function renderTable(node: AdfNode): string {
 function renderHeading(node: AdfNode): string {
   const rawLevel = attr(node, 'level')
   const level = typeof rawLevel === 'number' ? Math.min(Math.max(rawLevel, 1), 6) : 1
-  return `${'#'.repeat(level)} ${renderInline(childrenOf(node))}`
+  return `${'#'.repeat(level)} ${renderAdfInline(childrenOf(node))}`
 }
 
 function renderBlockquote(node: AdfNode, depth: number): string {
@@ -168,13 +168,13 @@ function renderBlockquote(node: AdfNode, depth: number): string {
 function renderCodeBlock(node: AdfNode): string {
   const language = attr(node, 'language')
   const fence = typeof language === 'string' && language.length > 0 ? `\`\`\`${language}` : '```'
-  return `${fence}\n${renderInline(childrenOf(node))}\n\`\`\``
+  return `${fence}\n${renderAdfInline(childrenOf(node))}\n\`\`\``
 }
 
-const renderAsInline = (node: AdfNode): string => renderInline([node])
+const renderAsInline = (node: AdfNode): string => renderAdfInline([node])
 
 const BLOCK_RENDERERS = new Map<string, (node: AdfNode, depth: number) => string>([
-  ['paragraph', (node) => renderInline(childrenOf(node))],
+  ['paragraph', (node) => renderAdfInline(childrenOf(node))],
   ['heading', renderHeading],
   ['bulletList', (node, depth) => renderListItems(node, depth, false)],
   ['orderedList', (node, depth) => renderListItems(node, depth, true)],

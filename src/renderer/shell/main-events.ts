@@ -16,10 +16,8 @@ import { revealSession } from '../terminal/navigate-to-session'
 // What the main process tells the window: menu accelerators, notifications,
 // and what extensions ask the shell to do.
 
-/**
- * Counts a use of a core shortcut, so the palette stops hinting at it once the
- * operator knows it. Writes only when the count changed.
- */
+/** Counts a use of a core shortcut, so the palette stops hinting at it once the operator knows
+ * it. Writes only when the count changed. */
 export function recordDirectShortcut(actionId: string): void {
   const current = useSettingsStore.getState().globalSettings?.quickActions?.directUse ?? []
   const directUse = recordDirectUse(current, actionId)
@@ -46,7 +44,7 @@ type MenuEvents = typeof window.electronAPI.extensionEvents
 type Unsubscribe = (() => void) | undefined
 
 /** Wraps a menu action so it also counts as a direct use of that shortcut. */
-function counted(actionId: string, run: () => void): () => void {
+function countedShortcut(actionId: string, run: () => void): () => void {
   return () => {
     recordDirectShortcut(actionId)
     run()
@@ -56,9 +54,9 @@ function counted(actionId: string, run: () => void): () => void {
 /** The accelerators for the shell's own windows and tabs. */
 function subscribeShellMenu(events: MenuEvents | undefined, handlers: MenuHandlers): Unsubscribe[] {
   return [
-    events?.onMenuOpenSettings?.(counted('core.open-settings', handlers.openSettings)),
+    events?.onMenuOpenSettings?.(countedShortcut('core.open-settings', handlers.openSettings)),
     events?.onMenuOpenAbout?.(handlers.openAbout),
-    events?.onMenuToggleSidebar?.(counted('core.toggle-sidebar', handlers.toggleSidebar)),
+    events?.onMenuToggleSidebar?.(countedShortcut('core.toggle-sidebar', handlers.toggleSidebar)),
     events?.onMenuCloseTab?.(closeActiveTab),
   ]
 }
@@ -71,7 +69,7 @@ function subscribeSurfaceMenu(events: MenuEvents | undefined): Unsubscribe[] {
     events?.onSelectProjectTab?.((tabId) => registry().setActiveProjectTab(tabId)),
     // Home is a Window-menu accelerator (Cmd+Shift+H), not a renderer keydown.
     events?.onMenuOpenHome?.(
-      counted('core.open-home', () => registry().setActiveGlobalTab('core.home'))
+      countedShortcut('core.open-home', () => registry().setActiveGlobalTab('core.home'))
     ),
   ]
 }
@@ -113,7 +111,11 @@ function bridgeHandlers(
   showSurface: (surface: SurfaceRegistration) => void,
   surfaces: SurfaceRegistration[]
 ): BridgeHandlers {
-  return { ...surfaceHandlers(showSurface, surfaces), ...terminalHandlers(), ...logHandlers() }
+  return {
+    ...surfaceHandlers(showSurface, surfaces),
+    ...terminalBridgeHandlers(),
+    ...logHandlers(),
+  }
 }
 
 /** Showing an extension's app-level tab or one of its surfaces. */
@@ -134,12 +136,11 @@ function surfaceHandlers(
 }
 
 /** Terminals an extension opens, closes or brings into view. */
-function terminalHandlers(): BridgeHandlers {
+function terminalBridgeHandlers(): BridgeHandlers {
   return {
-    // A terminal an extension opened. The renderer owns the tab list, so
-    // without adopting it the process runs and nothing on screen ever shows
-    // it, and its output is held until the tab is mounted rather than
-    // delivered to nobody.
+    // A terminal an extension opened. The renderer owns the tab list, so without adopting it the
+    // process runs and nothing on screen ever shows it, and its output is held until the tab is
+    // mounted rather than delivered to nobody.
     'terminal:adopt': (data) => {
       const { sessionId, projectId, tabTitle, scrollbackLimit } = data as {
         sessionId: string

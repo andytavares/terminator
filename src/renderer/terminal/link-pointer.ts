@@ -20,10 +20,8 @@ function openTarget(target: LinkTarget): void {
   else window.electronAPI.shell.openPath(target.path).catch(() => {})
 }
 
-/**
- * Underlines the link under the pointer while ⌘ (Ctrl off macOS) is held, and
- * opens it on ⌘-click. On macOS Ctrl-click is a secondary click, left alone.
- */
+/** Underlines the link under the pointer while ⌘ (Ctrl off macOS) is held, and opens it on
+ * ⌘-click. On macOS Ctrl-click is a secondary click, left alone. */
 export class LinkPointer {
   /** A 1px line under the hovered link, inside the terminal's element. */
   readonly overlay: HTMLDivElement
@@ -39,22 +37,22 @@ export class LinkPointer {
     this.overlay.style.cssText =
       'position:absolute;pointer-events:none;height:1px;background:#4a9eff;display:none;z-index:10;'
     element.appendChild(this.overlay)
-    element.addEventListener('mousemove', this.onMouseMove)
+    element.addEventListener('mousemove', this.trackPointer)
     element.addEventListener('mouseleave', this.onMouseLeave)
     element.addEventListener('mousedown', this.onMouseDown)
-    document.addEventListener('keydown', this.onKeyDown)
+    document.addEventListener('keydown', this.trackModifier)
     document.addEventListener('keyup', this.onKeyUp)
   }
 
   dispose(): void {
-    this.element.removeEventListener('mousemove', this.onMouseMove)
+    this.element.removeEventListener('mousemove', this.trackPointer)
     this.element.removeEventListener('mouseleave', this.onMouseLeave)
     this.element.removeEventListener('mousedown', this.onMouseDown)
-    document.removeEventListener('keydown', this.onKeyDown)
+    document.removeEventListener('keydown', this.trackModifier)
     document.removeEventListener('keyup', this.onKeyUp)
   }
 
-  private clear(): void {
+  private clearHover(): void {
     this.overlay.style.display = 'none'
     this.terminal.element?.classList.remove('xterm-cursor-pointer')
   }
@@ -97,7 +95,7 @@ export class LinkPointer {
 
   private underline(cell: ScreenCell, grid: CellGrid): void {
     const link = this.linkIn(cell)
-    if (!link) return this.clear()
+    if (!link) return this.clearHover()
     const origin = this.element.getBoundingClientRect()
     this.overlay.style.left = `${grid.left - origin.left + link.index * grid.cellWidth}px`
     this.overlay.style.top = `${grid.top - origin.top + (cell.row + 1) * grid.cellHeight - 1}px`
@@ -106,25 +104,25 @@ export class LinkPointer {
     this.terminal.element?.classList.add('xterm-cursor-pointer')
   }
 
-  private readonly onMouseMove = (e: MouseEvent): void => {
+  private readonly trackPointer = (e: MouseEvent): void => {
     const grid = this.grid()
     this.lastCell = grid && this.cellAt(e, grid)
     if (grid && this.lastCell && this.isModifierHeld(e)) this.underline(this.lastCell, grid)
-    else this.clear()
+    else this.clearHover()
   }
 
   private readonly onMouseLeave = (): void => {
     this.lastCell = null
-    this.clear()
+    this.clearHover()
   }
 
-  private readonly onKeyDown = (e: KeyboardEvent): void => {
+  private readonly trackModifier = (e: KeyboardEvent): void => {
     const grid = this.grid()
     if (grid && this.lastCell && this.isModifierKey(e)) this.underline(this.lastCell, grid)
   }
 
   private readonly onKeyUp = (e: KeyboardEvent): void => {
-    if (this.isModifierKey(e)) this.clear()
+    if (this.isModifierKey(e)) this.clearHover()
   }
 
   private readonly onMouseDown = (e: MouseEvent): void => {

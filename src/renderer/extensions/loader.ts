@@ -53,7 +53,11 @@ function registerFullTabs(ext: Extension, contributes: Contributes, registry: Re
 }
 
 /** The project tab, which shows the extension in place of a branch's terminal. */
-function registerProjectTab(ext: Extension, contributes: Contributes, registry: Registry): void {
+function registerContributedProjectTab(
+  ext: Extension,
+  contributes: Contributes,
+  registry: Registry
+): void {
   const { projectTab } = contributes
   if (!projectTab) return
   const viewParam = projectTab.view ?? 'project'
@@ -68,7 +72,11 @@ function registerProjectTab(ext: Extension, contributes: Contributes, registry: 
 }
 
 /** The sidebar panel, which shows beside the terminal. */
-function registerSidebarPanel(ext: Extension, contributes: Contributes, registry: Registry): void {
+function registerContributedSidebarPanel(
+  ext: Extension,
+  contributes: Contributes,
+  registry: Registry
+): void {
   const { sidebarPanel } = contributes
   if (!sidebarPanel) return
   const viewParam = sidebarPanel.view ?? 'sidebar'
@@ -111,8 +119,8 @@ function registerWindowsAndShortcuts(
 export function registerWebviewExtension(ext: Extension, registry: Registry): void {
   if (!ext.contributes) return
   registerFullTabs(ext, ext.contributes, registry)
-  registerProjectTab(ext, ext.contributes, registry)
-  registerSidebarPanel(ext, ext.contributes, registry)
+  registerContributedProjectTab(ext, ext.contributes, registry)
+  registerContributedSidebarPanel(ext, ext.contributes, registry)
   registerWindowsAndShortcuts(ext, ext.contributes, registry)
 }
 

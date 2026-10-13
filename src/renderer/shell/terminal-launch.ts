@@ -43,7 +43,7 @@ function pendingTabFor(projectId: string, cwd: string, scrollbackLimit: number):
 }
 
 /** Opens a human terminal; a failure is left to the session store to report. */
-function openTerminal(createSession: CreateSession, tab: PendingTab, title: string): void {
+function openPendingTab(createSession: CreateSession, tab: PendingTab, title: string): void {
   const { projectId, cwd, scrollbackLimit } = tab
   void createSession({ projectId, type: 'human', title, cwd, scrollbackLimit }).catch(() => {})
 }
@@ -74,14 +74,14 @@ export function useTerminalLaunch() {
     const { cwd, scrollbackLimit, promptForName } = terminalPlace()
     const tab = pendingTabFor(projectId, cwd, scrollbackLimit)
     if (promptForName) setPendingTab(tab)
-    else openTerminal(createSession, tab, '')
+    else openPendingTab(createSession, tab, '')
   }
 
   /** Opens the tab the name prompt was for, under the name given. */
   function confirmPendingTab(title: string): void {
     if (!pendingTab) return
     setPendingTab(null)
-    openTerminal(createSession, pendingTab, title)
+    openPendingTab(createSession, pendingTab, title)
   }
 
   return {
@@ -93,12 +93,9 @@ export function useTerminalLaunch() {
   }
 }
 
-/**
- * Opens a terminal whenever the Terminal tab is active and has none. Covers
- * the first selection of a branch, coming back from an extension tab, and the
- * last terminal closing. A failure is kept for the branch to show, and a
- * retry from there runs this again.
- */
+/** Opens a terminal whenever the Terminal tab is active and has none. Covers the first selection
+ * of a branch, coming back from an extension tab, and the last terminal closing. A failure is
+ * kept for the branch to show, and a retry from there runs this again. */
 export function useAutoOpenTerminal(activeProjectTabId: string | null): void {
   const { createSession } = useTerminalSession()
   const activeProjectId = useWorkspaceStore((s) => s.activeProjectId)

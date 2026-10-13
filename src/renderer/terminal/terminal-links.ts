@@ -61,10 +61,8 @@ export function linkAt(text: string, col: number): TerminalLink | null {
   return null
 }
 
-/**
- * Declares one kind of link to xterm, for accessibility tooling only. The
- * underline and the click are the terminal's own, gated on ⌘ (Ctrl off macOS).
- */
+/** Declares one kind of link to xterm, for accessibility tooling only. The underline and the
+ * click are the terminal's own, gated on ⌘ (Ctrl off macOS). */
 function linkProvider(terminal: Terminal, kind: LinkKind): ILinkProvider {
   return {
     provideLinks: (bufferLineIndex, callback) => {

@@ -1,5 +1,5 @@
 import { delimiter } from 'path'
-import { runCommand } from './command-runner.js'
+import { runTextCommand } from './command-runner.js'
 
 const MARK = '__TERMINATOR_PATH__'
 
@@ -11,13 +11,13 @@ const MARK = '__TERMINATOR_PATH__'
  * spawns fail with ENOENT. `-i` as well as `-l` because PATH is commonly set in
  * an interactive rc file (.zshrc), which a login-only shell does not read. The
  * rc file may print, so only the value between the markers is taken. Any
- * failure keeps the PATH the app already has. Run through runCommand, so the
+ * failure keeps the PATH the app already has. Run through runTextCommand, so the
  * timeout, or the app quitting, also stops what the rc files started.
  * @internal
  */
 export async function adoptLoginShellPath(env: NodeJS.ProcessEnv = process.env): Promise<void> {
   if (!env.SHELL) return
-  const probe = await runCommand(
+  const probe = await runTextCommand(
     {
       command: env.SHELL,
       args: ['-ilc', `printf '${MARK}%s${MARK}' "$PATH"`],
@@ -35,10 +35,8 @@ export async function adoptLoginShellPath(env: NodeJS.ProcessEnv = process.env):
 
 let loginShellPath: Promise<void> = Promise.resolve()
 
-/**
- * Starts reading the login-shell PATH and remembers the read, so a spawn made
- * while the window is already open can wait for it (`loginShellPathReady`).
- */
+/** Starts reading the login-shell PATH and remembers the read, so a spawn made while the window
+ * is already open can wait for it (`loginShellPathReady`). */
 export function startAdoptingLoginShellPath(env: NodeJS.ProcessEnv = process.env): Promise<void> {
   loginShellPath = adoptLoginShellPath(env)
   return loginShellPath

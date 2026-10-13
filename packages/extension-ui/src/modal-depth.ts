@@ -34,10 +34,8 @@ export interface ModalDepthRegistry {
   release(): () => void
 }
 
-/**
- * What the count is kept on: the page's `window`, or in a test any object of
- * the same shape. A window qualifies as it is, through the declaration below.
- */
+/** What the count is kept on: the page's `window`, or in a test any object of the same shape. A
+ * window qualifies as it is, through the declaration below. */
 export interface ModalDepthHost {
   [MODAL_DEPTH_KEY]?: unknown
   /** The context bridge an extension view's preload exposes, when there is one. */

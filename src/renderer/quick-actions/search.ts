@@ -8,17 +8,12 @@ function isSubsequence(query: string, text: string): boolean {
   return qi === query.length
 }
 
-/**
- * The most results a search shows.
- * @internal
- */
+/** The most results a search shows. @internal */
 export const MAX_RESULTS = 50
 
-/**
- * How well `action` matches: 0 for its label containing the query, 1 for the
- * query's letters in order in its label, 2 for either in its label, group and
- * description together; null for no match.
- */
+/** How well `action` matches: 0 for its label containing the query, 1 for the query's letters in
+ * order in its label, 2 for either in its label, group and description together; null for no
+ * match. */
 function tierOf(action: QuickAction, q: string, groupLabel: string): number | null {
   const label = action.label.toLowerCase()
   const text = `${action.label} ${groupLabel} ${action.description ?? ''}`.toLowerCase()

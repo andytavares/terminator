@@ -82,7 +82,7 @@ function DescriptionView({ description, onEdit }: { description: string; onEdit?
 function useDescriptionDraft(description: string | null, save: Props['onSaveDescription']) {
   const [editing, setEditing] = useState(false)
   const [text, setText] = useState('')
-  const finish = (): void => {
+  const stopEditing = (): void => {
     setText('')
     setEditing(false)
   }
@@ -98,9 +98,9 @@ function useDescriptionDraft(description: string | null, save: Props['onSaveDesc
       const trimmed = text.trim()
       if (trimmed === '' && description === null) return
       save(trimmed === '' ? null : trimmed)
-      finish()
+      stopEditing()
     },
-    cancel: finish,
+    cancel: stopEditing,
   }
 }
 
@@ -127,12 +127,12 @@ function DescriptionEditor({ draft, onLink }: EditorProps): JSX.Element {
           if (e.key === 'Escape') draft.cancel()
         }}
       />
-      {onLink !== undefined && <LinkButton onLink={onLink} />}
+      {onLink !== undefined && <LinkIssueButton onLink={onLink} />}
     </span>
   )
 }
 
-function LinkButton({ onLink }: { onLink: () => void }): JSX.Element {
+function LinkIssueButton({ onLink }: { onLink: () => void }): JSX.Element {
   return (
     <button
       type="button"

@@ -71,10 +71,8 @@ function RefreshButton({
 
 type DropdownProps = Props & { close: () => void }
 
-/**
- * The search box and the list it narrows. Mounted only while open, so the
- * search starts empty every time.
- */
+/** The search box and the list it narrows. Mounted only while open, so the search starts empty
+ * every time. */
 function BranchDropdown(props: DropdownProps): JSX.Element {
   const [filter, setFilter] = useState('')
   const filterRef = useRef<HTMLInputElement>(null)

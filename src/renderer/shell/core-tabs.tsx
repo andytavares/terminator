@@ -9,10 +9,8 @@ const OverviewScreen = lazy(() =>
   import('../components/overview/OverviewScreen').then((m) => ({ default: m.OverviewScreen }))
 )
 
-/**
- * Registers core's two app-level destinations, Home and Overview, and opens
- * on Home. Home is registered first so it sits first in the band.
- */
+/** Registers core's two app-level destinations, Home and Overview, and opens on Home. Home is
+ * registered first so it sits first in the band. */
 export function useCoreTabs(openQuickActions: () => void): void {
   useEffect(() => {
     return useExtensionRegistry.getState().registerGlobalTab({

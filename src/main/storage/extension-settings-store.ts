@@ -2,7 +2,7 @@ import type { SettingsChange } from '@terminator/extension-sdk'
 import { CachedStore } from './cached-store.js'
 import {
   listWorkspaceExtensionSettings,
-  updateWorkspaceExtensionSetting,
+  writeWorkspaceExtensionSetting,
   type WorkspaceExtensionSettingChange,
 } from './settings-store.js'
 import type { ExtensionSettingsSnapshot } from '../extensions/setting-scope.js'
@@ -28,15 +28,13 @@ export function setExtensionSetting(key: string, value: unknown): void {
   store.set('values', { ...values, [key]: value })
 }
 
-/**
- * Sets a `workspaceScoped` setting for one workspace, in that workspace's
- * settings; no value hands it back to the global one ("Use global default").
- */
+/** Sets a `workspaceScoped` setting for one workspace, in that workspace's settings; no value
+ * hands it back to the global one ("Use global default"). */
 export function setWorkspaceExtensionSetting(
   workspaceId: string,
   change: WorkspaceExtensionSettingChange
 ): WorkspaceSettings {
-  const updated = updateWorkspaceExtensionSetting(workspaceId, change)
+  const updated = writeWorkspaceExtensionSetting(workspaceId, change)
   for (const listener of workspaceListeners) listener({ workspaceId })
   return updated
 }
@@ -44,7 +42,7 @@ export function setWorkspaceExtensionSetting(
 /** Calls `listener` after any change, with the workspace it was made in, or null for a global one. */
 export function onExtensionSettingsChanged(listener: (change: SettingsChange) => void): () => void {
   workspaceListeners.add(listener)
-  const stopGlobal = store.onChange(() => listener({ workspaceId: null }))
+  const stopGlobal = store.onAnyChange(() => listener({ workspaceId: null }))
   return () => {
     workspaceListeners.delete(listener)
     stopGlobal()

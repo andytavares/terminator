@@ -30,10 +30,8 @@ function useIssueQuery(mineLimit: number | undefined) {
   )
 }
 
-/**
- * The issues a picker lists, the search debounced and only the latest
- * answer kept. Nothing is fetched while `enabled` is false.
- */
+/** The issues a picker lists, the search debounced and only the latest answer kept. Nothing is
+ * fetched while `enabled` is false. */
 export function useIssueSearch(
   term: string,
   enabled: boolean,
@@ -51,14 +49,14 @@ export function useIssueSearch(
     if (!enabled) return
     const id = ++requestId.current
     const trimmed = term.trim()
-    const run = async (): Promise<void> => {
+    const runSearch = async (): Promise<void> => {
       const next = await query(trimmed)
       if (id !== requestId.current) return
       setResult(next)
       setAnsweredTerm(trimmed)
     }
-    if (trimmed.length === 0) return void run()
-    const timer = setTimeout(() => void run(), SEARCH_DEBOUNCE_MS)
+    if (trimmed.length === 0) return void runSearch()
+    const timer = setTimeout(() => void runSearch(), SEARCH_DEBOUNCE_MS)
     return () => clearTimeout(timer)
   }, [term, enabled, query])
 

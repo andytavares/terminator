@@ -33,21 +33,19 @@ function StatusDot({ connection }: { connection: TrackerConnection | undefined }
 
 type ConnectInput = Parameters<ReturnType<typeof useIntegrationsStore.getState>['connect']>[0]
 
-/**
- * Sending a credential for `tracker`: busy while main verifies it, and the
- * error it gave back, cleared as soon as the operator types again.
- */
+/** Sending a credential for `tracker`: busy while main verifies it, and the error it gave back,
+ * cleared as soon as the operator types again. */
 function useConnect(tracker: TrackerId) {
   const error = useIntegrationsStore((s) => s.connectError[tracker])
   const [busy, setBusy] = useState(false)
-  async function connect(input: ConnectInput): Promise<boolean> {
+  async function connectTracker(input: ConnectInput): Promise<boolean> {
     setBusy(true)
     const ok = await useIntegrationsStore.getState().connect(input)
     setBusy(false)
     return ok
   }
   const clearError = (): void => useIntegrationsStore.getState().clearConnectError(tracker)
-  return { busy, error, connect, clearError }
+  return { busy, error, connect: connectTracker, clearError }
 }
 
 interface FieldProps {
@@ -60,7 +58,7 @@ interface FieldProps {
   secret?: boolean
 }
 
-function Field({ id, label, value, onChange, placeholder, secret = false }: FieldProps) {
+function CredentialField({ id, label, value, onChange, placeholder, secret = false }: FieldProps) {
   return (
     <>
       <label className="settings-section__label" htmlFor={id}>
@@ -126,7 +124,7 @@ function LinearForm(): JSX.Element {
   const form = useLinearForm()
   return (
     <div className="integrations__form">
-      <Field
+      <CredentialField
         id="linear-api-key"
         label="API key"
         secret
@@ -134,7 +132,7 @@ function LinearForm(): JSX.Element {
         placeholder="lin_api_…"
         onChange={form.typeKey}
       />
-      <Field
+      <CredentialField
         id="linear-email"
         label="Assigned-issue lookup (optional)"
         value={form.email}
@@ -156,10 +154,8 @@ const DEFAULT_JQL = 'assignee = currentUser() AND resolution = Unresolved'
 
 type JiraDraft = { site: string; email: string; apiToken: string; jql: string }
 
-/**
- * The Jira form's fields and sending them. The token is cleared after every
- * attempt, the site and email only once connected.
- */
+/** The Jira form's fields and sending them. The token is cleared after every attempt, the site
+ * and email only once connected. */
 function useJiraForm() {
   const { connect, clearError, ...state } = useConnect('jira')
   const [draft, setDraft] = useState<JiraDraft>({
@@ -168,7 +164,7 @@ function useJiraForm() {
     apiToken: '',
     jql: DEFAULT_JQL,
   })
-  const update = (patch: Partial<JiraDraft>): void => setDraft((d) => ({ ...d, ...patch }))
+  const updateDraft = (patch: Partial<JiraDraft>): void => setDraft((d) => ({ ...d, ...patch }))
   async function submit(): Promise<void> {
     const { site, email, apiToken, jql } = draft
     const ok = await connect({
@@ -178,15 +174,15 @@ function useJiraForm() {
       apiToken,
       jql,
     })
-    update(ok ? { apiToken: '', site: '', email: '' } : { apiToken: '' })
+    updateDraft(ok ? { apiToken: '', site: '', email: '' } : { apiToken: '' })
   }
-  const edit = (patch: Partial<JiraDraft>): void => {
-    update(patch)
+  const editDraft = (patch: Partial<JiraDraft>): void => {
+    updateDraft(patch)
     clearError()
   }
   const ready =
     draft.site.trim().length > 0 && draft.email.trim().length > 0 && draft.apiToken.length > 0
-  return { ...state, draft, update, edit, ready, submit }
+  return { ...state, draft, update: updateDraft, edit: editDraft, ready, submit }
 }
 
 function JiraForm(): JSX.Element {
@@ -195,7 +191,7 @@ function JiraForm(): JSX.Element {
   return (
     <div className="integrations__form">
       <JiraCredentialFields form={form} />
-      <Field
+      <CredentialField
         id="jira-jql"
         label="My issues (JQL)"
         value={draft.jql}
@@ -217,20 +213,20 @@ function JiraCredentialFields({ form }: { form: ReturnType<typeof useJiraForm> }
   const { draft, update, edit } = form
   return (
     <>
-      <Field
+      <CredentialField
         id="jira-site"
         label="Site"
         value={draft.site}
         placeholder="your-team.atlassian.net"
         onChange={(site) => edit({ site })}
       />
-      <Field
+      <CredentialField
         id="jira-email"
         label="Account email"
         value={draft.email}
         onChange={(email) => update({ email })}
       />
-      <Field
+      <CredentialField
         id="jira-token"
         label="API token"
         secret

@@ -26,7 +26,7 @@ function useRelay(): void {
     ptyManager = relayPtyManager()
     send = vi.fn(() => true)
     relay = new OutputRelay(ptyManager as never, send)
-    relay.start('s1')
+    relay.startRelaying('s1')
   })
 
   afterEach(() => {
@@ -70,13 +70,13 @@ describe('OutputRelay — flow control', () => {
 
   it('resumes it when the renderer has caught up', () => {
     flood(HIGH_WATERMARK_CHARS + 1)
-    relay.acknowledge('s1', HIGH_WATERMARK_CHARS + 1 - LOW_WATERMARK_CHARS + 1)
+    relay.acknowledgeOutput('s1', HIGH_WATERMARK_CHARS + 1 - LOW_WATERMARK_CHARS + 1)
     expect(ptyManager.resume).toHaveBeenCalledWith('s1')
   })
 
   it('keeps it paused while the renderer is still behind', () => {
     flood(HIGH_WATERMARK_CHARS + 1)
-    relay.acknowledge('s1', 10)
+    relay.acknowledgeOutput('s1', 10)
     expect(ptyManager.resume).not.toHaveBeenCalled()
   })
 })
@@ -92,21 +92,21 @@ describe('OutputRelay — flow control without a window or a session', () => {
 
   it('resumes a paused process when the renderer starts over', () => {
     flood(HIGH_WATERMARK_CHARS + 1)
-    relay.reset('s1')
+    relay.rendererAttached('s1')
     expect(ptyManager.resume).toHaveBeenCalledWith('s1')
   })
 
   it('ignores acknowledgements and resets for sessions it does not relay', () => {
     flood(HIGH_WATERMARK_CHARS + 1)
-    relay.acknowledge('other', HIGH_WATERMARK_CHARS + 1)
-    relay.reset('other')
+    relay.acknowledgeOutput('other', HIGH_WATERMARK_CHARS + 1)
+    relay.rendererAttached('other')
     expect(ptyManager.resume).not.toHaveBeenCalled()
   })
 
   it('ignores acknowledgements after the session has exited', () => {
     flood(HIGH_WATERMARK_CHARS + 1)
     ptyManager.pushExit(0)
-    relay.acknowledge('s1', HIGH_WATERMARK_CHARS)
+    relay.acknowledgeOutput('s1', HIGH_WATERMARK_CHARS)
     expect(ptyManager.resume).not.toHaveBeenCalled()
   })
 })

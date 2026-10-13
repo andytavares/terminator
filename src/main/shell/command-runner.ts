@@ -36,13 +36,9 @@ const DEFAULT_TIMEOUT_MS = 10_000
 // https://nodejs.org/api/child_process.html#child_processexecfilefile-args-options-callback
 const DEFAULT_MAX_BUFFER = 1024 * 1024
 
-/**
- * Each command leads a process group of its own, so stopping it stops what it
- * started too: kill() with a negative pid signals the whole group
- * (https://nodejs.org/api/child_process.html#optionsdetached,
- * https://man7.org/linux/man-pages/man2/kill.2.html). Not on Windows, where
- * `detached` gives the command a console of its own instead.
- */
+/** Each command leads its own process group, so kill() with a negative pid stops what it started
+ * too (https://nodejs.org/api/child_process.html#optionsdetached, kill(2)). Not on Windows, where
+ * `detached` gives the command a console of its own instead. */
 const OWN_PROCESS_GROUP = process.platform !== 'win32'
 
 /** Commands started and not yet ended, for stopRunningCommands. */
@@ -57,11 +53,9 @@ function stopGroup(child: ChildProcess): void {
   }
 }
 
-/**
- * Stops every command still running (git, gh, the login-shell probe, the
- * metrics' ps), with everything each one started. The app calls it as it quits: on macOS /usr/bin/git is an xcrun shim
- * that can start xcodebuild, which outlived the app (run 38382115775).
- */
+/** Stops every command still running (git, gh, the login-shell probe, the metrics' ps), with
+ * everything each one started. The app calls it as it quits: on macOS /usr/bin/git is an xcrun
+ * shim that can start xcodebuild, which outlived the app (run 38382115775). */
 export function stopRunningCommands(): void {
   for (const child of running) stopGroup(child)
 }
@@ -77,9 +71,9 @@ interface CommandRun {
 }
 
 /** Keeps each stream's output up to `maxBuffer` bytes; past it the command is stopped. */
-function collectOutput(run: CommandRun, input: ShellExecInput): void {
+function collectCommandOutput(run: CommandRun, input: ShellExecInput): void {
   const limit = input.maxBuffer ?? DEFAULT_MAX_BUFFER
-  const keep = (stream: 'stdout' | 'stderr') => {
+  const collectStream = (stream: 'stdout' | 'stderr') => {
     const decoder = new StringDecoder('utf8')
     let bytes = 0
     return (chunk: Buffer): void => {
@@ -90,8 +84,8 @@ function collectOutput(run: CommandRun, input: ShellExecInput): void {
       stopGroup(run.child)
     }
   }
-  run.child.stdout?.on('data', keep('stdout'))
-  run.child.stderr?.on('data', keep('stderr'))
+  run.child.stdout?.on('data', collectStream('stdout'))
+  run.child.stderr?.on('data', collectStream('stderr'))
 }
 
 function startCommand(input: ShellExecInput, environment: NodeJS.ProcessEnv): CommandRun {
@@ -110,7 +104,7 @@ function startCommand(input: ShellExecInput, environment: NodeJS.ProcessEnv): Co
     exceededMaxBuffer: false,
   }
   running.add(child)
-  collectOutput(run, input)
+  collectCommandOutput(run, input)
   // A command that has exited, or never started, cannot take its input.
   child.stdin?.on('error', () => {})
   if (input.input !== undefined) child.stdin?.end(input.input)
@@ -183,7 +177,7 @@ export function runProcess(
 /**
  * Runs a command in `environment` as given, and resolves with its output as text.
  */
-export async function runCommand(
+export async function runTextCommand(
   input: Omit<ShellExecInput, 'encoding'>,
   environment: NodeJS.ProcessEnv
 ): Promise<ShellExecOutput> {

@@ -62,17 +62,13 @@ function openGroups(open: SessionFacts[], prefs: HomePrefs): LedgerGroup[] {
 }
 
 /** A group of its own, or none when it would be empty. */
-function groupOf(key: string, label: string, facts: SessionFacts[]): LedgerGroup[] {
+function ledgerGroupOf(key: string, label: string, facts: SessionFacts[]): LedgerGroup[] {
   return facts.length === 0 ? [] : [{ key, label, facts }]
 }
 
-/**
- * The Ledger's rows, grouped and ordered.
- *
- * Filters apply first, so a group that loses every row to them is not drawn.
- * Closed sessions are always their own last group, newest first: they are
- * history, and ordering them by state would put every one of them last anyway.
- */
+/** The Ledger's rows, grouped and ordered. Filters apply first, so a group that loses every row
+ * to them is not drawn. Closed sessions are always their own last group, newest first: they are
+ * history, and ordering them by state would put every one of them last anyway. */
 export function buildLedger(
   facts: readonly SessionFacts[],
   prefs: HomePrefs,
@@ -88,8 +84,8 @@ export function buildLedger(
     .sort((a, b) => Date.parse(b.closedAt ?? '') - Date.parse(a.closedAt ?? ''))
 
   return [
-    ...groupOf(NEEDS_YOU, 'Needs you', needsYou.sort(compare(prefs.sort))),
+    ...ledgerGroupOf(NEEDS_YOU, 'Needs you', needsYou.sort(compare(prefs.sort))),
     ...openGroups(rest, prefs),
-    ...groupOf(CLOSED, CLOSED, closed),
+    ...ledgerGroupOf(CLOSED, CLOSED, closed),
   ]
 }

@@ -1,11 +1,9 @@
 import type { ReactElement } from 'react'
 import { createRoot } from 'react-dom/client'
 
-/**
- * Calls one of this extension's own channels. The handler owns the result
- * shape, so the caller states it. A call without a payload sends `{}`, which
- * is also what the remote bridge sends in its place.
- */
+/** Calls one of this extension's own channels. The handler owns the result shape, so the caller
+ * states it. A call without a payload sends `{}`, which is also what the remote bridge sends in
+ * its place. */
 export function invoke<T = unknown>(channel: string, payload: unknown = {}): Promise<T> {
   return window.electronAPI.extensionBridge.invoke(channel, payload) as Promise<T>
 }

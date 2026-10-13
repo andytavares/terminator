@@ -215,10 +215,9 @@ const linkChannels: ChannelSpec[] = [
       try {
         return { link, issue: await getIssueService().get(link.tracker, link.key) }
       } catch (error) {
-        // The association exists and the issue could not be read. Both facts
-        // matter: the badge renders unavailable rather than vanishing.
-        // Named issueError, not error: the call succeeded, and a caller
-        // narrowing on `error` must not mistake this for a failed channel.
+        // The association exists and the issue could not be read. Both facts matter: the badge
+        // renders unavailable rather than vanishing. Named issueError, not error: the call
+        // succeeded, and a caller narrowing on `error` must not mistake this for a failed channel.
         return { link, issue: null, issueError: toErrorKind(error) }
       }
     },

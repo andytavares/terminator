@@ -42,7 +42,7 @@ describe('callbacks across the port — reviving', () => {
       params,
       (id) =>
         (...args) =>
-          registry.invoke(id, args)
+          registry.invokeById(id, args)
     )
     const [, call] = revived as [string, (data: string) => void]
 
@@ -55,7 +55,7 @@ describe('callbacks across the port — reviving', () => {
     const listener = vi.fn()
     const { ids } = registry.marshal([listener])
     registry.release(ids)
-    registry.invoke(ids[0], [])
+    registry.invokeById(ids[0], [])
     expect(listener).not.toHaveBeenCalled()
   })
 })

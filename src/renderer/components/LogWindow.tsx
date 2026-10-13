@@ -1,5 +1,6 @@
 import { useShallow } from 'zustand/react/shallow'
 import React, { useEffect, useRef } from 'react'
+import { useCloseOnEscape } from '../hooks/useCloseOnEscape'
 import { useLogStore } from '../stores/log.store'
 import type { LogLevel } from '../stores/log.store'
 import './LogWindow.css'
@@ -16,16 +17,6 @@ const LEVEL_LABEL: Record<LogLevel, string> = {
 }
 
 /** Escape anywhere in the window closes the log. */
-function useCloseOnEscape(onClose: () => void): void {
-  useEffect(() => {
-    function handleKey(e: KeyboardEvent): void {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', handleKey)
-    return () => window.removeEventListener('keydown', handleKey)
-  }, [onClose])
-}
-
 export function LogWindow({ onClose }: Props): JSX.Element {
   const { entries, clear } = useLogStore(
     useShallow((s) => ({ entries: s.entries, clear: s.clear }))

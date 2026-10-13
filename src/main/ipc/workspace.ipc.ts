@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { BrowserWindow } from 'electron'
 import { defineChannel, type ChannelSpec } from '@terminator/extension-sdk'
+import { validationError } from './validation-error.js'
 import { registerInvokeTable, noPayload } from './invoke-table.js'
 import {
   CreateProjectInputSchema,
@@ -46,10 +47,6 @@ export function setActiveWorkspaceContext(ctx: ActiveWorkspaceContext): void {
 
 const IdSchema = z.object({ id: z.string().min(1) })
 const failed = { success: false }
-const validationError = (error: z.ZodError) => ({
-  error: 'VALIDATION_ERROR',
-  message: error.message,
-})
 
 const workspaceChannels: ChannelSpec[] = [
   defineChannel({

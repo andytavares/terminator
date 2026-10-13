@@ -27,11 +27,11 @@ import { partialFake } from '../../../support/fakes'
 
 function makeExtensionHost(overrides: Partial<ExtensionHost> = {}): ExtensionHost {
   return partialFake<ExtensionHost>({
-    listExtensions: vi.fn(() => []),
+    listAll: vi.fn(() => []),
     load: vi.fn(),
-    toggle: vi.fn(),
-    uninstall: vi.fn(),
-    reload: vi.fn(),
+    setEnabled: vi.fn(),
+    uninstallExtension: vi.fn(),
+    reloadExtension: vi.fn(),
     ...overrides,
   })
 }

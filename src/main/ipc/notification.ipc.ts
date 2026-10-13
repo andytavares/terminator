@@ -1,11 +1,10 @@
 import { BrowserWindow } from 'electron'
 import { z } from 'zod'
 import { defineChannel, type ChannelSpec } from '@terminator/extension-sdk'
+import { validationError } from './validation-error.js'
 import { registerInvokeTable, noPayload } from './invoke-table.js'
 import { notificationManager } from '../notifications/notification-manager'
 import { sendToWindow } from '../safe-send'
-
-const validationError = (err: z.ZodError) => ({ error: 'VALIDATION_ERROR', message: err.message })
 
 /**
  * Clicking a notification about a session shows/focuses every window and
@@ -51,7 +50,7 @@ const notificationChannels: ChannelSpec[] = [
     schema: z.object({ id: z.string().min(1) }),
     invalid: validationError,
     run: ({ id }) => {
-      notificationManager.dismiss(id)
+      notificationManager.dismissNotification(id)
       return { ok: true }
     },
   }),

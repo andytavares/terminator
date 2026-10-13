@@ -83,10 +83,8 @@ async function write(file: string, data: StoreFile): Promise<void> {
   await writeJsonAtomic(file, data)
 }
 
-// Each change reads, edits and writes the whole file. Two at once (two
-// trackers answering one listMine, or blurring one tracker's field by clicking
-// the other's Disconnect) would each write over the other's, and a read could
-// miss a change under way. So every access waits for the ones asked for
+// Each change rewrites the whole file, so two at once (two trackers answering one listMine) would
+// overwrite each other, and a read could miss one under way. Every access waits for those asked for
 // before it, and takes the file's path when it is asked for.
 let queue: Promise<unknown> = Promise.resolve()
 
@@ -97,7 +95,7 @@ function serialized<T>(op: (file: string) => Promise<T>): Promise<T> {
   return run
 }
 
-function change(edit: (data: StoreFile) => void): Promise<void> {
+function editStoreFile(edit: (data: StoreFile) => void): Promise<void> {
   return serialized(async (file) => {
     const data = await read(file)
     edit(data)
@@ -106,7 +104,7 @@ function change(edit: (data: StoreFile) => void): Promise<void> {
 }
 
 function update(tracker: TrackerId, patch: Partial<StoredTracker>): Promise<void> {
-  return change((data) => {
+  return editStoreFile((data) => {
     data[tracker] = { ...data[tracker], ...patch }
   })
 }
@@ -139,7 +137,7 @@ export async function getCredential(tracker: TrackerId): Promise<StoredCredentia
 }
 
 export function clearCredential(tracker: TrackerId): Promise<void> {
-  return change((data) => {
+  return editStoreFile((data) => {
     // The mine selector survives a disconnect: it is the operator's
     // configuration, not the credential's, and retyping a JQL query because a
     // token expired is a small insult that adds up.
@@ -211,7 +209,7 @@ export async function migrateLegacyCredentials(): Promise<void> {
   }
 
   try {
-    await change((data) => adoptLegacy(data, legacy))
+    await editStoreFile((data) => adoptLegacy(data, legacy))
     await fs.rename(legacyPath(), `${legacyPath()}.bak`)
   } catch {
     // A migration that cannot finish leaves the legacy file in place so it can

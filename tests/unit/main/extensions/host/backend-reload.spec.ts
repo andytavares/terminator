@@ -101,7 +101,7 @@ async function extensionHost(): Promise<ExtensionHost> {
       return { link: workerPortLink(port1, ports), onExit: () => {}, kill: () => {} }
     },
     snapshot: () => hostSnapshot(),
-    apiFor: (id) => host?.hostedApi(id),
+    apiFor: (id) => host?.apiOf(id),
     onBackendsFailed: () => {},
     log: () => {},
   })
@@ -117,7 +117,7 @@ describe('reloading a backend in the extension host', () => {
     expect(ran.backendVersion).toBe('main:v1')
 
     writeBackend(directory, 'edited')
-    await expect(host.reload('com.reload')).resolves.toMatchObject({ extension: {} })
+    await expect(host.reloadExtension('com.reload')).resolves.toMatchObject({ extension: {} })
 
     expect(ran.backendVersion).toBe('edited:v1')
   })
@@ -128,7 +128,7 @@ describe('reloading a backend in the extension host', () => {
     await host.load(directory)
 
     writeVersion(directory, 'v2')
-    await host.reload('com.reload')
+    await host.reloadExtension('com.reload')
 
     expect(ran.backendVersion).toBe('main:v2')
   })
@@ -141,7 +141,7 @@ describe('reloading a backend in the extension host', () => {
     expect(ran.backendVersion).toBeUndefined()
 
     writeBackend(directory, 'fixed')
-    await expect(host.reload('com.reload')).resolves.toMatchObject({ extension: {} })
+    await expect(host.reloadExtension('com.reload')).resolves.toMatchObject({ extension: {} })
 
     expect(ran.backendVersion).toBe('fixed:v1')
   })

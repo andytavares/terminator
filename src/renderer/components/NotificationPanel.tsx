@@ -1,7 +1,8 @@
 import { useShallow } from 'zustand/react/shallow'
-import React, { useEffect, useCallback, useRef } from 'react'
+import React, { useEffect, useRef } from 'react'
 import { Bell, Info, CheckCircle, AlertTriangle, XCircle } from 'lucide-react'
 import { RelativeTime } from '@terminator/extension-ui'
+import { useCloseOnEscape } from '../hooks/useCloseOnEscape'
 import { useNotificationStore, type Notification } from '../stores/notification.store'
 import './NotificationPanel.css'
 
@@ -136,19 +137,9 @@ function NotificationActions({
   )
 }
 
-/**
- * Reserve the strip this drawer sits in, rather than hiding what is under it.
- *
- * An extension's UI is a native `WebContentsView` that paints above the
- * renderer's DOM, so a panel drawn over it would be invisible. This used to
- * call `useModalEffect`, which is the blunt answer: it hides every extension
- * view while a modal is open. That is right for a centred dialog and wrong
- * here — opening the drawer blanked the whole application to show a 340px
- * panel down the left edge.
- *
- * Measured from the rendered element rather than assumed, so the reservation
- * cannot drift from the CSS the way a duplicated width would.
- */
+/** Reserves the drawer's strip, as an extension's WebContentsView paints over the DOM; hiding
+ * every view (`useModalEffect`) blanked the app to show a 340px drawer. Measured from the
+ * rendered element, so the reservation cannot drift from the CSS. */
 function useLeftInset(panelRef: React.RefObject<HTMLDivElement>): void {
   useEffect(() => {
     const setInset = (px: number): void => window.electronAPI?.extension?.setLeftInset?.(px)
@@ -163,20 +154,6 @@ function useLeftInset(panelRef: React.RefObject<HTMLDivElement>): void {
       setInset(0)
     }
   }, [panelRef])
-}
-
-function useCloseOnEscape(closePanel: () => void): void {
-  const handleKeyDown = useCallback(
-    (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') closePanel()
-    },
-    [closePanel]
-  )
-
-  useEffect(() => {
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [handleKeyDown])
 }
 
 function NotificationPanelInner(): JSX.Element {

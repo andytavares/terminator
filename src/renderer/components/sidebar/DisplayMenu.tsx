@@ -32,7 +32,7 @@ export function DisplayMenu({ view, onChangeView }: DisplayMenuProps): JSX.Eleme
   return (
     <DropdownMenu label="Display" icon={<SlidersHorizontal aria-hidden="true" />}>
       {(close) => {
-        const pick = (patch: Partial<SessionView>): void => {
+        const pickView = (patch: Partial<SessionView>): void => {
           onChangeView(patch)
           close()
         }
@@ -42,14 +42,14 @@ export function DisplayMenu({ view, onChangeView }: DisplayMenuProps): JSX.Eleme
             <RadioChoices
               choices={GROUPS}
               current={view.groupBy}
-              onPick={(groupBy) => pick({ groupBy })}
+              onPick={(groupBy) => pickView({ groupBy })}
             />
             <div className="sidebar-menu__separator" />
             <div className="sidebar-menu__heading">Sort</div>
             <RadioChoices
               choices={SORTS}
               current={view.sortBy}
-              onPick={(sortBy) => pick({ sortBy })}
+              onPick={(sortBy) => pickView({ sortBy })}
             />
           </>
         )

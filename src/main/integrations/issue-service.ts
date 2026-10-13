@@ -48,10 +48,8 @@ export interface IssueServiceDeps {
   ) => Promise<void> | void
 }
 
-/**
- * The SDK's `api.issues` (its declaration is the documentation), less
- * `connections`, which the integrations store answers.
- */
+/** The SDK's `api.issues` (its declaration is the documentation), less `connections`, which the
+ * integrations store answers. */
 export interface IssueService extends Omit<ExtensionAPI['issues'], 'connections'> {
   /** Drops every cached copy. Used when a credential changes underneath us. */
   invalidate(tracker?: TrackerId): void
@@ -105,13 +103,9 @@ function retryWaitMs(error: unknown): number {
     : DEFAULT_RATE_LIMIT_WAIT_MS
 }
 
-/**
- * Run a provider call, honouring a rate-limit refusal by waiting exactly as
- * long as the tracker asked and trying once more.
- *
- * Only rate limits are retried: an auth failure will not fix itself, and
- * retrying it just spends the operator's remaining budget.
- */
+/** Run a provider call, honouring a rate-limit refusal by waiting exactly as long as the tracker
+ * asked and trying once more. Only rate limits are retried: an auth failure will not fix
+ * itself, and retrying it just spends the operator's remaining budget. */
 async function withRetry<T>(
   policy: RetryPolicy,
   tracker: TrackerId,
@@ -136,12 +130,9 @@ async function withRetry<T>(
   }
 }
 
-/**
- * A capability this tracker does not have, said in a way a caller can act
- * on. Its own kind rather than 'failed', because the two are handled
- * differently: a failure is retried, an unsupported capability is recorded
- * once and never asked about again.
- */
+/** A capability this tracker does not have, said in a way a caller can act on. Its own kind
+ * rather than 'failed', because the two are handled differently: a failure is retried, an
+ * unsupported capability is recorded once and never asked about again. */
 function unsupported(tracker: TrackerId, what = 'move an issue'): TrackerError {
   return new TrackerError('unsupported', `${tracker} cannot be asked to ${what}`)
 }
@@ -174,13 +165,9 @@ function cachedGet(context: Omit<ServiceContext, 'get'>): IssueService['get'] {
   }
 }
 
-/**
- * Ask every connected tracker and keep what comes back.
- *
- * A tracker that fails does not fail the call — the operator sees the issues
- * that arrived and is told which tracker is missing and why. A partial list
- * presented as complete is the failure this shape exists to prevent.
- */
+/** Ask every connected tracker and keep what comes back. A tracker that fails does not fail the
+ * call — the operator sees the issues that arrived and is told which tracker is missing and
+ * why. A partial list presented as complete is the failure this shape exists to prevent. */
 async function gather(
   context: ServiceContext,
   trackers: readonly TrackerId[],

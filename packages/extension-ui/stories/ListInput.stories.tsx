@@ -4,7 +4,13 @@ import { expect, userEvent, within } from 'storybook/test'
 import { ListInput } from '../src/ListInput'
 import { inLight } from './in-light'
 
-function Controlled({ initial, placeholder }: { initial: string[]; placeholder?: string }) {
+function ControlledListInput({
+  initial,
+  placeholder,
+}: {
+  initial: string[]
+  placeholder?: string
+}) {
   const [items, setItems] = useState(initial)
   return (
     <div style={{ width: 320 }}>
@@ -23,7 +29,7 @@ const meta = {
   title: 'Components/ListInput',
   component: ListInput,
   args: { label: 'Critical paths', value: [], onChange: () => {} },
-  render: () => <Controlled initial={['src/auth/**', 'migrations/**']} />,
+  render: () => <ControlledListInput initial={['src/auth/**', 'migrations/**']} />,
 } satisfies Meta<typeof ListInput>
 
 export default meta
@@ -33,12 +39,12 @@ export const WithItems: Story = {}
 export const WithItemsLight = inLight(WithItems)
 
 export const Empty: Story = {
-  render: () => <Controlled initial={[]} placeholder="One glob per line" />,
+  render: () => <ControlledListInput initial={[]} placeholder="One glob per line" />,
 }
 export const EmptyLight = inLight(Empty)
 
 export const TypingOneItemPerLine: Story = {
-  render: () => <Controlled initial={[]} />,
+  render: () => <ControlledListInput initial={[]} />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
     await userEvent.type(

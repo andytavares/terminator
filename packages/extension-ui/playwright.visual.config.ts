@@ -5,11 +5,9 @@ import { defineConfig } from '@playwright/test'
 const dirname = path.dirname(fileURLToPath(import.meta.url))
 const PORT = 6007
 
-// Screenshot tests over the built Storybook (ADR 098): every story, dark and
-// light, at the app's default window size. Fonts are bundled, so the pictures
-// do not depend on what the machine has installed; the browser build and the
-// operating system still do, so each platform keeps its own baselines
-// (https://playwright.dev/docs/test-snapshots). CI compares on Linux only.
+// Screenshots of every built story, dark and light, at the app's default window size (ADR 098).
+// Fonts are bundled, but the browser build and OS still change pixels, so each platform keeps its
+// own baselines (https://playwright.dev/docs/test-snapshots); CI compares on Linux only.
 export default defineConfig({
   testDir: 'visual',
   testMatch: '**/*.visual.ts',

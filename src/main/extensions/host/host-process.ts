@@ -1,6 +1,6 @@
 import { MessageChannelMain, utilityProcess } from 'electron'
 import type { ExtensionAPI } from '@terminator/extension-sdk'
-import { RpcEndpoint, type MessageLink, type RpcMessage } from './rpc-endpoint.js'
+import { RpcEndpoint, messagePortLink, type MessageLink } from './rpc-endpoint.js'
 import { ExtensionApiServer } from './api-server.js'
 import type { BackendRecord } from './host-runtime.js'
 import type { HostSnapshot, WorkspacesSnapshot } from './snapshot.js'
@@ -31,12 +31,9 @@ interface Running {
   server: ExtensionApiServer
 }
 
-/**
- * Main's handle on the one extension host process (ADR 094). Started on the
- * first backend it is given. When it exits unasked, the app stays up: it is
- * started again once and its backends activated again; a second exit fails
- * them, which the extensions list shows.
- */
+/** Main's handle on the one extension host process (ADR 094). Started on the first backend it is
+ * given. When it exits unasked, the app stays up: it is started again once and its backends
+ * activated again; a second exit fails them, which the extensions list shows. */
 export class ExtensionHostProcess {
   private running: Running | null = null
   private readonly records = new Map<string, BackendRecord>()
@@ -51,7 +48,7 @@ export class ExtensionHostProcess {
     try {
       await endpoint.request('activate', record)
     } catch (error) {
-      this.forget(record.id)
+      this.forgetBackend(record.id)
       throw error
     }
   }
@@ -59,7 +56,7 @@ export class ExtensionHostProcess {
   async deactivate(extensionId: string): Promise<void> {
     if (!this.records.has(extensionId)) return
     const endpoint = this.running?.endpoint
-    this.forget(extensionId)
+    this.forgetBackend(extensionId)
     await endpoint?.request('deactivate', extensionId)
   }
 
@@ -71,12 +68,12 @@ export class ExtensionHostProcess {
     this.running?.endpoint.notify('workspaces.changed', workspaces)
   }
 
-  stop(): void {
+  stopHost(): void {
     this.stopping = true
     this.running?.host.kill()
   }
 
-  private forget(extensionId: string): void {
+  private forgetBackend(extensionId: string): void {
     this.records.delete(extensionId)
     this.running?.server.releaseAll(extensionId)
   }
@@ -89,12 +86,12 @@ export class ExtensionHostProcess {
     )
     const server = new ExtensionApiServer(endpoint, this.options.apiFor)
     const running = { host, endpoint, server }
-    host.onExit((code) => this.exited(running, code))
+    host.onExit((code) => this.onHostExit(running, code))
     this.running = running
     return running
   }
 
-  private exited(running: Running, code: number): void {
+  private onHostExit(running: Running, code: number): void {
     if (this.running !== running) return
     this.running = null
     running.endpoint.failPending(`extension host exited with code ${code}`)
@@ -133,7 +130,7 @@ export class ExtensionHostProcess {
     }
     for (const { id } of records) {
       reactivation(id).catch((error) =>
-        this.options.onBackendsFailed([id], `${message}; restart failed: ${errorText(error)}`)
+        this.options.onBackendsFailed([id], `${message}; restart failed: ${describeError(error)}`)
       )
     }
   }
@@ -147,15 +144,8 @@ function dependencyReady(reactivation: (id: string) => Promise<void>) {
     })
 }
 
-function errorText(error: unknown): string {
+function describeError(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
-}
-
-function portLink(port: Electron.MessagePortMain): MessageLink {
-  return {
-    post: (message) => port.postMessage(message),
-    listen: (receive) => port.on('message', (event) => receive(event.data as RpcMessage)),
-  }
 }
 
 /** Starts `entryPath` as a utilityProcess and hands it one end of a MessageChannelMain. */
@@ -166,7 +156,7 @@ export function spawnUtilityHost(entryPath: string): (snapshot: HostSnapshot) =>
     child.postMessage(snapshot, [port2])
     port1.start()
     return {
-      link: portLink(port1),
+      link: messagePortLink(port1),
       onExit: (listener) => child.on('exit', listener),
       kill: () => child.kill(),
     }

@@ -27,26 +27,26 @@ function useExtensionListing() {
   // Read when the panel opens, and again whenever main says the list changed:
   // a backend can fail, or come back with its settings, while the panel is open.
   useEffect(() => {
-    const read = (): void => {
+    const readExtensions = (): void => {
       void window.electronAPI.extension.list().then((r) => setExtensions(r.extensions ?? []))
       readExtensionSettings({ setSchemas, setValues })
     }
-    read()
-    return window.electronAPI.extension.onListChanged(read)
+    readExtensions()
+    return window.electronAPI.extension.onListChanged(readExtensions)
   }, [])
-  async function changeSetting(key: string, value: unknown): Promise<void> {
+  async function saveSetting(key: string, value: unknown): Promise<void> {
     await window.electronAPI.extension.updateSetting(key, value)
     setValues((prev) => ({ ...prev, [key]: value }))
   }
-  return { extensions, setExtensions, schemas, values, changeSetting }
+  return { extensions, setExtensions, schemas, values, saveSetting }
 }
 
 type Listing = ReturnType<typeof useExtensionListing>
 
 type Notice = { title: string; message: string; key: string }
 
-const info = (n: Notice): void => dispatchNotification({ type: 'info', ...n })
-const failure = (n: Notice): void => dispatchNotification({ type: 'error', ...n })
+const notifyInfo = (n: Notice): void => dispatchNotification({ type: 'info', ...n })
+const notifyFailure = (n: Notice): void => dispatchNotification({ type: 'error', ...n })
 
 /** Installs from a folder the operator picks, and lists it once, however the list was re-read. */
 async function installExtension(setExtensions: SetExtensions): Promise<void> {
@@ -54,7 +54,7 @@ async function installExtension(setExtensions: SetExtensions): Promise<void> {
   if ('cancelled' in picked) return
   const result = await window.electronAPI.extension.install(picked.filePath)
   if (!('extension' in result)) {
-    return failure({
+    return notifyFailure({
       title: 'Extension install failed',
       message: result.error,
       key: 'extensionInstallFailed',
@@ -63,7 +63,7 @@ async function installExtension(setExtensions: SetExtensions): Promise<void> {
   // The list main announced may already hold it.
   const installed = result.extension
   setExtensions((prev) => [...prev.filter((e) => e.id !== installed.id), installed])
-  info({
+  notifyInfo({
     title: 'Extension installed',
     message: 'Reload the window to activate it.',
     key: 'extensionInstalled',
@@ -82,14 +82,14 @@ const replacing = (updated: Extension) => (prev: Extension[]) =>
 async function reloadExtension(id: string, setExtensions: SetExtensions): Promise<void> {
   const result = await window.electronAPI.extension.reload(id)
   if (!('extension' in result)) {
-    return failure({
+    return notifyFailure({
       title: 'Extension reload failed',
       message: result.error,
       key: 'extensionReloadFailed',
     })
   }
   setExtensions(replacing(result.extension))
-  info({
+  notifyInfo({
     title: 'Extension reloaded',
     message: 'Reload the window to see UI changes.',
     key: 'extensionReloaded',
@@ -101,14 +101,14 @@ async function uninstallExtension(ext: Extension, setExtensions: SetExtensions):
   if (!window.confirm(`Uninstall "${ext.name}"? This cannot be undone.`)) return
   const result = await window.electronAPI.extension.uninstall(ext.id)
   if (!('ok' in result)) {
-    return failure({
+    return notifyFailure({
       title: 'Extension uninstall failed',
       message: result.error,
       key: 'extensionUninstallFailed',
     })
   }
   setExtensions((prev) => prev.filter((e) => e.id !== ext.id))
-  info({
+  notifyInfo({
     title: 'Extension uninstalled',
     message: `"${ext.name}" uninstalled. Reload the window to remove its UI.`,
     key: 'extensionUninstalled',
@@ -122,13 +122,13 @@ async function upgradeExtension(id: string, setExtensions: SetExtensions): Promi
   const picked = await window.electronAPI.dialog.openDirectory()
   if ('cancelled' in picked) return
   const removed = await window.electronAPI.extension.uninstall(id)
-  if ('error' in removed) return failure({ ...UPGRADE_FAILED, message: removed.error })
+  if ('error' in removed) return notifyFailure({ ...UPGRADE_FAILED, message: removed.error })
   const result = await window.electronAPI.extension.install(picked.filePath)
   if (!('extension' in result)) {
-    return failure({ ...UPGRADE_FAILED, message: `Failed during install: ${result.error}` })
+    return notifyFailure({ ...UPGRADE_FAILED, message: `Failed during install: ${result.error}` })
   }
   setExtensions(replacing(result.extension))
-  info({
+  notifyInfo({
     title: 'Extension upgraded',
     message: 'Reload the window to activate.',
     key: 'extensionUpgraded',
@@ -207,7 +207,7 @@ function ExtensionEntry({ ext, listing, expanded, onToggleSettings }: EntryProps
         </div>
       </div>
       {schema && expanded && (
-        <SettingsList schema={schema} values={listing.values} onChange={listing.changeSetting} />
+        <SettingsList schema={schema} values={listing.values} onChange={listing.saveSetting} />
       )}
     </div>
   )

@@ -5,10 +5,7 @@ import tokens from './tokens.css?raw'
 import base from './extension-base.css?raw'
 import controls from './controls.css?raw'
 
-/**
- * The stylesheet injected into every extension document: the tokens, the icon
- * scale, the element resets and the form controls. Read at build time with `?raw`, so the text is
- * part of the bundle in dev, in the packaged app and in the remote-control
- * server alike, with no file to find on disk at run time.
- */
+/** The stylesheet injected into every extension document: tokens, icon scale, resets and form
+ * controls. Read at build time with `?raw`, so it is in the bundle in dev, the packaged app and the
+ * remote-control server alike, with no file to find on disk at run time. */
 export const EXTENSION_BASE_CSS = `${tokens}\n${base}\n${controls}`

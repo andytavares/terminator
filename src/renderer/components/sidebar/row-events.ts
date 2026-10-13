@@ -25,13 +25,13 @@ export function clickOnly(run: () => void) {
 /** A row's context menu: where it is open, if it is. Opening it closes any other menu first. */
 export function useRowMenu() {
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
-  const openMenu = (e: React.MouseEvent): void => {
+  const openRowMenu = (e: React.MouseEvent): void => {
     e.preventDefault()
     e.stopPropagation()
     closeAllContextMenus()
     setMenu({ x: e.clientX, y: e.clientY })
   }
-  return { menu, openMenu, closeMenu: () => setMenu(null) }
+  return { menu, openMenu: openRowMenu, closeMenu: () => setMenu(null) }
 }
 
 /** A menu item's action that closes the menu before it runs `run`. */

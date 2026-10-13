@@ -29,10 +29,8 @@ function lastOptionRow(rows: readonly string[], last: number): number {
   return -1
 }
 
-/**
- * The option rows and their wrapped continuations, read upwards from `end`, and
- * the row of the first option.
- */
+/** The option rows and their wrapped continuations, read upwards from `end`, and the row of the
+ * first option. */
 function optionLines(rows: readonly string[], end: number): { lines: PromptLine[]; start: number } {
   const lines: PromptLine[] = []
   let start = end
@@ -67,14 +65,9 @@ function promptOptions(lines: PromptLine[]): ChoiceOption[] | null {
   return options.some((o, i) => o.number !== i + 1) ? null : options
 }
 
-/**
- * The numbered choice an agent is waiting on, read off its screen.
- *
- * Only a prompt that is the last thing on screen counts — a question that has
- * scrolled up under newer output has been answered. It must show exactly one
- * ❯ cursor, which is what separates a select prompt from a numbered list in
- * ordinary output, and number its options 1 to n.
- */
+/** The numbered choice an agent waits on: the last thing on screen (one scrolled up is answered),
+ * with exactly one ❯ cursor, which tells a select prompt from a numbered list in ordinary output,
+ * and options numbered 1 to n. */
 export function parseChoicePrompt(rows: readonly string[]): ChoicePrompt | null {
   const last = lastFilledRow(rows, rows.length - 1)
   if (last < 0) return null

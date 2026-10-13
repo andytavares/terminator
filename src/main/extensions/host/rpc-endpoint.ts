@@ -3,15 +3,15 @@
  * that are not, over one MessagePort. Main and the extension host each hold one
  * endpoint; either side can call the other.
  */
+import type { MessagePortMain } from 'electron'
+
 export type RpcMessage =
   | { kind: 'request'; id: number; method: string; params: unknown[] }
   | { kind: 'response'; id: number; result?: unknown; error?: RpcErrorShape }
   | { kind: 'event'; method: string; params: unknown[] }
 
-/**
- * An error as it crosses: only `name` and `message`, so a caller can still tell a
- * MissingCwdError or a CwdOutOfScopeError, and nothing else of it leaks.
- */
+/** An error as it crosses: only `name` and `message`, so a caller can still tell a
+ * MissingCwdError or a CwdOutOfScopeError, and nothing else of it leaks. */
 interface RpcErrorShape {
   name: string
   message: string
@@ -21,6 +21,14 @@ interface RpcErrorShape {
 export interface MessageLink {
   post(message: RpcMessage): void
   listen(receive: (message: RpcMessage) => void): void
+}
+
+/** Electron's MessagePortMain as a link. */
+export function messagePortLink(port: MessagePortMain): MessageLink {
+  return {
+    post: (message) => port.postMessage(message),
+    listen: (receive) => port.on('message', (event) => receive(event.data as RpcMessage)),
+  }
 }
 
 type Handler = (...params: never[]) => unknown
@@ -83,11 +91,11 @@ export class RpcEndpoint {
   private receive(message: RpcMessage): void {
     if (message.kind === 'response') return this.settle(message)
     if (message.kind === 'request') return void this.answer(message)
-    const report = (error: unknown) => this.onEventError(message.method, error)
+    const reportEventError = (error: unknown) => this.onEventError(message.method, error)
     try {
-      Promise.resolve(this.invoke(message.method, message.params)).catch(report)
+      Promise.resolve(this.invoke(message.method, message.params)).catch(reportEventError)
     } catch (error) {
-      report(error)
+      reportEventError(error)
     }
   }
 

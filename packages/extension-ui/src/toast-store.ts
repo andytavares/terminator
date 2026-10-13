@@ -20,10 +20,8 @@ export interface ToastQueue {
   removeToast: (id: string) => void
 }
 
-/**
- * A view's queue of toasts, as a store any of its modules can add to. Each
- * toast leaves on its own: an error after 6 s, anything else after 3.5 s.
- */
+/** A view's queue of toasts, as a store any of its modules can add to. Each toast leaves on its
+ * own: an error after 6 s, anything else after 3.5 s. */
 export function createToastStore() {
   return create<ToastQueue>((set) => ({
     toasts: [],

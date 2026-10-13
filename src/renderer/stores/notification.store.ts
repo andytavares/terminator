@@ -29,7 +29,7 @@ interface NotificationState {
 }
 
 /** The notifications with the unread count that agrees with them. */
-const counted = (notifications: Notification[]) => ({
+const withUnreadCount = (notifications: Notification[]) => ({
   notifications,
   unreadCount: notifications.filter((n) => !n.read).length,
 })
@@ -56,7 +56,9 @@ function readSlice(
   return {
     addNotification: (n) => set((s) => withNotification(s, n)),
     markRead: (id) =>
-      set((s) => counted(s.notifications.map((n) => (n.id === id ? { ...n, read: true } : n)))),
+      set((s) =>
+        withUnreadCount(s.notifications.map((n) => (n.id === id ? { ...n, read: true } : n)))
+      ),
     markAllRead: () =>
       set((s) => ({
         notifications: s.notifications.map((n) => ({ ...n, read: true })),
@@ -77,7 +79,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   },
 
   remove(id) {
-    set((s) => counted(s.notifications.filter((n) => n.id !== id)))
+    set((s) => withUnreadCount(s.notifications.filter((n) => n.id !== id)))
   },
 
   clearAll() {

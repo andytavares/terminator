@@ -30,7 +30,7 @@ export function handleQuickActionKey(e: KeyboardEvent, ctx: KeyContext): void {
   if (e.key === 'Escape') return void press(e, ctx.onClose)
   if (ctx.mode === 'search') return void press(e, keyIn(searchKeys(ctx), e.key))
   if (e.metaKey || e.ctrlKey || e.altKey) return
-  if (ctx.mode === 'group') return groupKey(e, ctx)
+  if (ctx.mode === 'group') return handleGroupKey(e, ctx)
   topKey(e, ctx)
 }
 
@@ -70,7 +70,7 @@ function searchKeys(ctx: KeyContext): Keys {
 }
 
 /** In a group: the list keys, Backspace to go back, "/" to search, or an action's letter. */
-function groupKey(e: KeyboardEvent, ctx: KeyContext): void {
+function handleGroupKey(e: KeyboardEvent, ctx: KeyContext): void {
   const keys: Keys = { ...listKeys(ctx), Backspace: ctx.backToTop, '/': ctx.enterSearch }
   if (press(e, keyIn(keys, e.key)) || e.key.length !== 1) return
   press(e, byMnemonic(ctx.rows, e.key, ctx))

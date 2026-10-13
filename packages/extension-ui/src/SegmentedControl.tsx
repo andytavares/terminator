@@ -1,16 +1,9 @@
 import React from 'react'
 import './extension-ui.css'
 
-/*
- * One choice out of a few, drawn as joined buttons: the WAI-ARIA radio group
- * pattern. The arrow keys move focus and the choice together, Home and End jump
- * to the ends, disabled options are skipped, and only the chosen option is in
- * the Tab order.
- * https://www.w3.org/WAI/ARIA/apg/patterns/radio/
- *
- * For a value a form or a view reads ("30 days", "Diagram"). Switching between
- * whole views with their own panels is `Tabs`.
- */
+/* One choice of a few ("30 days", "Diagram"), as joined buttons; switching whole views is `Tabs`.
+ * The WAI-ARIA radio group pattern (https://www.w3.org/WAI/ARIA/apg/patterns/radio/): arrows move
+ * focus and choice together, Home/End jump, disabled options are skipped, one Tab stop. */
 
 export interface SegmentedOption<Value extends string> {
   value: Value

@@ -33,7 +33,7 @@ function now(): string {
 }
 
 export function onWorkspacesChanged(listener: () => void): () => void {
-  return store.onChange(listener)
+  return store.onAnyChange(listener)
 }
 
 export function listWorkspaces(): Workspace[] {

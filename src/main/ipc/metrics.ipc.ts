@@ -3,7 +3,7 @@ import { defineChannel, type ChannelSpec } from '@terminator/extension-sdk'
 import { registerInvokeTable, noPayload } from './invoke-table.js'
 import * as os from 'os'
 import { readFile } from 'fs/promises'
-import { runCommand } from '../shell/command-runner.js'
+import { runTextCommand } from '../shell/command-runner.js'
 import type { PtyManager } from '../terminal/pty-manager.js'
 import type { SystemMetrics, ProcessMetrics } from '../../shared/types/index.js'
 
@@ -29,17 +29,15 @@ function takeCpuSnapshot(): CpuSnapshot {
 
 // ─── Network sampler ─────────────────────────────────────────────────────────
 
-/**
- * Runs a sampler (netstat, ps) and resolves with its stdout, or rejects when it
- * fails. Through runCommand, so one still running as the app quits is stopped.
- */
+/** Runs a sampler (netstat, ps) and resolves with its stdout, or rejects when it fails. Through
+ * runTextCommand, so one still running as the app quits is stopped. */
 async function runSampler(
   command: string,
   args: string[],
   options: { timeout: number }
 ): Promise<{ stdout: string }> {
   const input = { command, args, cwd: process.cwd(), timeoutMs: options.timeout }
-  const result = await runCommand(input, process.env)
+  const result = await runTextCommand(input, process.env)
   if (result.exitCode !== 0) throw new Error(`${command} failed: ${result.stderr}`)
   return { stdout: result.stdout }
 }

@@ -109,10 +109,8 @@ function sendPanelBounds(el: HTMLElement, placement: PanelPlacement): void {
   })
 }
 
-/**
- * Keeps the extension's WebContentsView over the container: its bounds follow
- * every resize, and it hides while a modal is open or the panel is not active.
- */
+/** Keeps the extension's WebContentsView over the container: its bounds follow every resize, and
+ * it hides while a modal is open or the panel is not active. */
 function usePanelBounds(
   containerRef: React.RefObject<HTMLDivElement>,
   { extensionId, viewParam, isActive, repoRoot = null }: Props

@@ -43,11 +43,11 @@ import type { ExtensionViewHost } from '../../../src/main/extensions/extension-v
 import { partialFake } from '../../support/fakes'
 
 const mockExtensionHost = {
-  listExtensions: vi.fn(),
+  listAll: vi.fn(),
   load: vi.fn(),
-  toggle: vi.fn(),
-  uninstall: vi.fn(),
-  reload: vi.fn(),
+  setEnabled: vi.fn(),
+  uninstallExtension: vi.fn(),
+  reloadExtension: vi.fn(),
   whenActivated: vi.fn().mockResolvedValue(undefined),
 }
 const extensionHost = partialFake<ExtensionHost>(mockExtensionHost)
@@ -72,7 +72,7 @@ describe('extension IPC handlers — extension:list', () => {
 
   it('returns extensions from host', async () => {
     const extensions = [{ id: 'com.test', name: 'Test' }]
-    mockExtensionHost.listExtensions.mockReturnValue(extensions)
+    mockExtensionHost.listAll.mockReturnValue(extensions)
     const handler = captureHandle('extension:list')
     const result = (await handler({})) as { extensions: unknown[] }
     expect(result.extensions).toEqual(extensions)
@@ -97,17 +97,17 @@ describe('extension IPC handlers — extension:toggle', () => {
 
   it('returns extension on successful toggle', async () => {
     const ext = { id: 'com.test', status: 'disabled' }
-    mockExtensionHost.toggle.mockResolvedValue(ext)
+    mockExtensionHost.setEnabled.mockResolvedValue(ext)
     const handler = captureHandle('extension:toggle')
     const result = (await handler({}, { id: 'com.test', enabled: false })) as {
       extension: unknown
     }
-    expect(mockExtensionHost.toggle).toHaveBeenCalledWith('com.test', false)
+    expect(mockExtensionHost.setEnabled).toHaveBeenCalledWith('com.test', false)
     expect(result.extension).toEqual(ext)
   })
 
   it('returns NOT_FOUND error when toggle returns null', async () => {
-    mockExtensionHost.toggle.mockResolvedValue(null)
+    mockExtensionHost.setEnabled.mockResolvedValue(null)
     const handler = captureHandle('extension:toggle')
     const result = (await handler({}, { id: 'missing', enabled: true })) as { error: string }
     expect(result.error).toBe('NOT_FOUND')
@@ -118,15 +118,15 @@ describe('extension IPC handlers — extension:uninstall', () => {
   useExtensionHandlers()
 
   it('returns ok when extension is removed', async () => {
-    mockExtensionHost.uninstall.mockResolvedValue(true)
+    mockExtensionHost.uninstallExtension.mockResolvedValue(true)
     const handler = captureHandle('extension:uninstall')
     const result = (await handler({}, { id: 'com.test' })) as { ok: boolean }
-    expect(mockExtensionHost.uninstall).toHaveBeenCalledWith('com.test')
+    expect(mockExtensionHost.uninstallExtension).toHaveBeenCalledWith('com.test')
     expect(result.ok).toBe(true)
   })
 
   it('returns NOT_FOUND when extension does not exist', async () => {
-    mockExtensionHost.uninstall.mockResolvedValue(false)
+    mockExtensionHost.uninstallExtension.mockResolvedValue(false)
     const handler = captureHandle('extension:uninstall')
     const result = (await handler({}, { id: 'missing' })) as { error: string }
     expect(result.error).toBe('NOT_FOUND')
@@ -138,15 +138,15 @@ describe('extension IPC handlers — extension:reload', () => {
 
   it('returns extension on successful reload', async () => {
     const ext = { id: 'com.test', status: 'enabled' }
-    mockExtensionHost.reload.mockResolvedValue({ extension: ext })
+    mockExtensionHost.reloadExtension.mockResolvedValue({ extension: ext })
     const handler = captureHandle('extension:reload')
     const result = (await handler({}, { id: 'com.test' })) as { extension: unknown }
-    expect(mockExtensionHost.reload).toHaveBeenCalledWith('com.test')
+    expect(mockExtensionHost.reloadExtension).toHaveBeenCalledWith('com.test')
     expect(result.extension).toEqual(ext)
   })
 
   it('returns error when extension not found', async () => {
-    mockExtensionHost.reload.mockResolvedValue({ error: 'NOT_FOUND' })
+    mockExtensionHost.reloadExtension.mockResolvedValue({ error: 'NOT_FOUND' })
     const handler = captureHandle('extension:reload')
     const result = (await handler({}, { id: 'missing' })) as { error: string }
     expect(result.error).toBe('NOT_FOUND')
@@ -161,7 +161,7 @@ describe('extension IPC handlers — extension:reload broadcasts', () => {
     vi.clearAllMocks()
     registerExtensionHandlers(extensionHost, broadcast, () => null)
     const ext = { id: 'com.test', status: 'enabled' }
-    mockExtensionHost.reload.mockResolvedValue({ extension: ext })
+    mockExtensionHost.reloadExtension.mockResolvedValue({ extension: ext })
     const handler = captureHandle('extension:reload')
     await handler({}, { id: 'com.test' })
     expect(broadcast).toHaveBeenCalledWith('extension:renderer-reload', { id: 'com.test' })
@@ -171,7 +171,7 @@ describe('extension IPC handlers — extension:reload broadcasts', () => {
     const broadcast = vi.fn()
     vi.clearAllMocks()
     registerExtensionHandlers(extensionHost, broadcast, () => null)
-    mockExtensionHost.reload.mockResolvedValue({ error: 'NOT_FOUND' })
+    mockExtensionHost.reloadExtension.mockResolvedValue({ error: 'NOT_FOUND' })
     const handler = captureHandle('extension:reload')
     await handler({}, { id: 'missing' })
     expect(broadcast).not.toHaveBeenCalled()
@@ -188,7 +188,7 @@ describe('extension IPC handlers — extension:update-panel-bounds', () => {
       partialFake<ExtensionViewHost>({ updatePanelBounds })
     )
     const ext = { id: 'com.test', name: 'Test' }
-    mockExtensionHost.listExtensions.mockReturnValue([ext])
+    mockExtensionHost.listAll.mockReturnValue([ext])
     const bounds = { x: 10, y: 20, width: 300, height: 400 }
     await captureHandle('extension:update-panel-bounds')(
       {},

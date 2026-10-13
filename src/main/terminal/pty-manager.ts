@@ -69,11 +69,9 @@ export class MissingCwdError extends Error {
   }
 }
 
-/**
- * The process's exit code, or null when a signal ended it. node-pty reports a
- * signalled process as `exitCode` 0 with the signal beside it (WIFSIGNALED in
- * its src/unix/pty.cc), and 0 alone reads as success.
- */
+/** The process's exit code, or null when a signal ended it. node-pty reports a signalled process
+ * as `exitCode` 0 with the signal beside it (WIFSIGNALED in its src/unix/pty.cc), and 0 alone
+ * reads as success. */
 function exitStatusOf(exit: { exitCode: number; signal?: number }): number | null {
   return exit.signal ? null : exit.exitCode
 }
@@ -88,7 +86,7 @@ function assertUsableCwd(cwd: string): void {
   if (!isDirectory) throw new MissingCwdError(cwd)
 }
 
-function startSession(opts: SpawnSessionOptions): ActiveSession {
+function spawnPtySession(opts: SpawnSessionOptions): ActiveSession {
   const ptyProcess = pty.spawn(opts.shell, opts.args ?? ['-l'], {
     name: 'xterm-256color',
     cols: 80,
@@ -160,7 +158,7 @@ export class PtyManager {
     // the operator exited.
     assertUsableCwd(opts.cwd)
 
-    const session = startSession(opts)
+    const session = spawnPtySession(opts)
     session.pty.onData((data) => deliverOrHold(session, data))
     session.pty.onExit((exit) => this.endSession(session, exit))
 
@@ -171,20 +169,17 @@ export class PtyManager {
 
   private endSession(session: ActiveSession, exit: { exitCode: number; signal?: number }): void {
     const { sessionId } = session.info
-    // Everything held goes out first. A process that dies before any tab
-    // mounted — a bad flag, a missing binary, the wrong cwd — otherwise took
-    // its output to the grave and left exactly the blank terminal this hold
-    // exists to prevent. Delivered to whoever is listening; kept on the
-    // session for whoever attaches next.
+    // Held output goes out first: a process that dies before any tab mounted (a bad flag, the wrong
+    // cwd) would otherwise leave the blank terminal the hold prevents. Delivered to whoever
+    // listens, and kept on the session for whoever attaches next.
     const buffered = takeHeld(session)
     if (buffered !== null) {
       if (session.dataListeners.size > 0) {
         for (const listener of session.dataListeners) listener(buffered)
       } else {
-        // Nothing has mounted yet. Kept for a tab that is still on its way,
-        // because the alternative is the blank terminal this hold exists to
-        // prevent — and a run that dies at launch is exactly when its output
-        // matters most.
+        // Nothing has mounted yet. Kept for a tab that is still on its way, because the alternative
+        // is the blank terminal this hold exists to prevent — and a run that dies at launch is
+        // exactly when its output matters most.
         this.rememberForLateAttach(sessionId, buffered)
       }
     }
@@ -238,10 +233,8 @@ export class PtyManager {
     return () => session.dataListeners.delete(listener)
   }
 
-  /**
-   * Subscribes to a session's exit: its exit code, or null when a signal ended
-   * it. Listeners fire after the session is removed.
-   */
+  /** Subscribes to a session's exit: its exit code, or null when a signal ended it. Listeners
+   * fire after the session is removed. */
   onExit(sessionId: string, listener: (exitCode: number | null) => void): (() => void) | null {
     const session = this.sessions.get(sessionId)
     if (!session) return null

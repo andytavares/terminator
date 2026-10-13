@@ -54,16 +54,9 @@ interface CreateNotificationOptions {
   source?: string
   key: string
   actions?: Array<{ id: string; label: string; handler: () => void }>
-  /**
-   * Take me to the thing this is about.
-   *
-   * A handler rather than a route, because only the notification's author
-   * knows what "the thing" is — a card, a task, a review — and a route
-   * shape general enough to name all of them would be a second navigation
-   * system. It is stored as a reserved action so the existing trigger path
-   * carries it: a function cannot cross IPC, and inventing a channel for
-   * one that could would be the same mechanism twice.
-   */
+  /** Takes the operator to what this is about. A handler, not a route: only the author knows what
+   * that is, and a route for all of them would be a second navigation system. Stored as a reserved
+   * action, so the existing trigger path carries it across IPC, where a function cannot go. */
   onClick?: () => void
 }
 
@@ -153,7 +146,7 @@ class NotificationManager {
     return id
   }
 
-  dismiss(id: string): void {
+  dismissNotification(id: string): void {
     this.records.delete(id)
   }
 
@@ -167,7 +160,7 @@ class NotificationManager {
     // asked for teaches you to dismiss without reading — approve a phase and
     // the request to approve that phase is still sitting there. Opening the
     // thing is not a decision, though, so it leaves the row alone.
-    if (actionId !== OPEN_ACTION_ID) this.dismiss(notifId)
+    if (actionId !== OPEN_ACTION_ID) this.dismissNotification(notifId)
     return { ok: true }
   }
 

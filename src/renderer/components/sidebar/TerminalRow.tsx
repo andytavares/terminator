@@ -75,18 +75,16 @@ export function TerminalRow(props: TerminalRowProps): JSX.Element {
 /** Where the link menu is open, if it is; no menu at all when nothing can link. */
 function useLinkMenu(canLink: boolean) {
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
-  const openMenu = (e: React.MouseEvent): void => {
+  const openLinkMenu = (e: React.MouseEvent): void => {
     e.preventDefault()
     e.stopPropagation()
     setMenu({ x: e.clientX, y: e.clientY })
   }
-  return { menu, closeMenu: () => setMenu(null), openMenu: canLink ? openMenu : undefined }
+  return { menu, closeMenu: () => setMenu(null), openMenu: canLink ? openLinkMenu : undefined }
 }
 
-/**
- * Link issue… for a session with no link of its own, else change or remove
- * that link. Each closes the menu first.
- */
+/** Link issue… for a session with no link of its own, else change or remove that link. Each
+ * closes the menu first. */
 function linkItems(
   { onLinkIssue, onRemoveLink }: TerminalRowProps,
   key: string | null,

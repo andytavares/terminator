@@ -20,12 +20,9 @@ export function toMilliseconds(value: TimeInput): number {
   return value instanceof Date ? value.getTime() : new Date(value).getTime()
 }
 
-/**
- * "5 minutes ago", "in 2 hours", "yesterday", in the reader's language.
- *
- * Fourteen hand-written variants of this sentence had drifted apart: five
- * minutes was six different strings. One unit picker and `Intl` replace them.
- */
+/** "5 minutes ago", "in 2 hours", "yesterday", in the reader's language. Fourteen hand-written
+ * variants of this sentence had drifted apart: five minutes was six different strings. One unit
+ * picker and `Intl` replace them. */
 export function formatRelativeTime(
   from: TimeInput,
   now: TimeInput = Date.now(),

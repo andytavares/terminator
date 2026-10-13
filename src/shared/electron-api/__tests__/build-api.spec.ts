@@ -327,11 +327,11 @@ describe('buildElectronApi — remote mode transport', () => {
 })
 
 // Every method on a built bridge, as a dot path ('terminal.create', 'getFilePath').
-function methodPaths(api: Record<string, unknown>, prefix = ''): string[] {
+function collectMethodPaths(api: Record<string, unknown>, prefix = ''): string[] {
   return Object.entries(api).flatMap(([name, value]) =>
     typeof value === 'function'
       ? [prefix + name]
-      : methodPaths(value as Record<string, unknown>, `${prefix}${name}.`)
+      : collectMethodPaths(value as Record<string, unknown>, `${prefix}${name}.`)
   )
 }
 
@@ -344,14 +344,14 @@ function manifestPathsWhere(keep: (spec: (typeof ELECTRON_API_MANIFEST)[number])
 describe('buildElectronApi — the manifest is the whole surface', () => {
   it('gives the app renderer every manifest method not reserved for extension views', () => {
     const api = buildElectronApi(makeTransport(), { mode: 'native', locals: NATIVE_LOCALS })
-    expect(methodPaths(api).sort()).toEqual(
+    expect(collectMethodPaths(api).sort()).toEqual(
       manifestPathsWhere((spec) => spec.extensionView !== 'only')
     )
   })
 
   it('gives the remote client every renderer method except the omitted ones', () => {
     const api = buildElectronApi(makeTransport(), { mode: 'remote', locals: REMOTE_LOCALS })
-    expect(methodPaths(api).sort()).toEqual(
+    expect(collectMethodPaths(api).sort()).toEqual(
       manifestPathsWhere((spec) => spec.extensionView !== 'only' && spec.remote !== 'omit')
     )
   })
