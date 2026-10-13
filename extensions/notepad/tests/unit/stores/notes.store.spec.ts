@@ -10,6 +10,8 @@ const mockNote: NoteListItem = {
   archivedAt: null,
   tags: [],
   bodyPreview: '',
+  sortOrder: 0,
+  folderId: null,
 }
 
 const mockDiagram: DiagramListItem = {
@@ -19,6 +21,9 @@ const mockDiagram: DiagramListItem = {
   createdAt: '2026-01-02T00:00:00Z',
   archivedAt: null,
   type: 'diagram',
+  tags: [],
+  sortOrder: 0,
+  folderId: null,
 }
 
 describe('notes.store', notesStoreTests)
