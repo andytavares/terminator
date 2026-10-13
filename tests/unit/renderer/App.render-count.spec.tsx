@@ -71,13 +71,12 @@ const system: SystemMetrics = {
 }
 
 function stubElectronApi(): void {
-  const unsubscribe = () => {}
   installElectronApi({
-    terminal: { onProcessExit: () => unsubscribe, input: () => {} },
-    notifications: { list: async () => [], onPush: () => unsubscribe },
-    extensionBridge: { on: () => unsubscribe },
+    terminal: { onProcessExit: () => () => {}, input: () => {} },
+    notifications: { list: async () => [], onPush: () => () => {} },
+    extensionBridge: { on: () => () => {} },
     extension: { setBottomInset: () => {} },
-    quickActions: { onOpen: () => unsubscribe },
+    quickActions: { onOpen: () => () => {} },
   })
 }
 

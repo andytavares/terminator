@@ -17,6 +17,7 @@ import {
   openFoundry,
   openListedOrder,
   restartFoundry,
+  createTypedOrder,
 } from './foundry-harness'
 
 // The Forge: opening an order, running it, and the controls that manage its
@@ -47,17 +48,6 @@ test.afterAll(async () => {
 async function openOrderRow(id: string): Promise<void> {
   await listOrdersInForge(handle, id)
   await openListedOrder(handle, id)
-}
-
-/** Creates a typed order on the fixture repo, and returns its id. */
-async function createOrder(text: string, missing: string): Promise<string> {
-  const created = (await foundryChannel(handle, 'foundry:order.create', {
-    source: { kind: 'typed', text },
-    repoPaths: [repo],
-  })) as { order?: { id: string } }
-  const id = created.order?.id as string
-  expect(id, missing).toBeTruthy()
-  return id
 }
 
 /** The fixture repository, its toolchain and nothing else known about it. */
@@ -109,7 +99,7 @@ const GREET_TAKES_A_NAME = {
 }
 
 /** A complete, agreed order: what the Forge would have filled in. */
-function agreedOrder(id: string): unknown {
+function agreedForgeOrder(id: string): unknown {
   return {
     schemaVersion: 1,
     id,
@@ -136,7 +126,7 @@ function agreedOrder(id: string): unknown {
 }
 
 /** Starts the run, and checks it was accepted with something to run. */
-async function startRun(id: string): Promise<void> {
+async function startForgeRun(id: string): Promise<void> {
   const started = (await foundryChannel(handle, 'foundry:run.start', { id })) as {
     error?: string
     started?: boolean
@@ -181,10 +171,10 @@ test('a run cuts a worktree and launches a supervised agent in a visible termina
   const id = 'WO-E2E-1'
   const dir = join(repo, '.foundry', 'orders', id)
   mkdirSync(dir, { recursive: true })
-  writeFileSync(join(dir, 'order.json'), JSON.stringify(agreedOrder(id)))
+  writeFileSync(join(dir, 'order.json'), JSON.stringify(agreedForgeOrder(id)))
 
   handle = await restartFoundry(handle, 'Foundry Forge')
-  await startRun(id)
+  await startForgeRun(id)
 
   // The worktree became a project in the sidebar, named for the branch the
   // run cut — which is what makes it findable at all.
@@ -287,10 +277,11 @@ test('an open order is a frame, and the controls that end it never scroll away',
   // Asserted as behaviour, not as a stylesheet: the controls are on screen before and after
   // everything that can scroll has scrolled to its end. The fault it guards against is in
   // docs/research/forge-shaping-redesign.md, "Layout".
-  const id = await createOrder(
-    'the frame keeps its controls at the foot',
-    'no order was created to open'
-  )
+  const id = await createTypedOrder(handle, {
+    repo,
+    text: 'the frame keeps its controls at the foot',
+    missing: 'no order was created to open',
+  })
 
   // A window small enough that the rail cannot fit in it, which is the whole
   // point — and the size the report came from. Restored afterwards, because
@@ -357,7 +348,11 @@ const RENDERED_MARKDOWN = `(function () {
 // budget" resumed the run against the budget it had just gone past. Both are
 // read back from the order the running application saved, not from the call.
 test('what the architect writes is shown as markdown in the Forge', async () => {
-  const id = await createOrder('markdown in the forge', 'no order was created to open')
+  const id = await createTypedOrder(handle, {
+    repo,
+    text: 'markdown in the forge',
+    missing: 'no order was created to open',
+  })
   writeMarkdownQuestion(id)
   handle = await restartFoundry(handle, 'Foundry Forge')
 
@@ -478,7 +473,11 @@ async function raiseAtGate(id: string, summary: string): Promise<void> {
 }
 
 test('an order’s budgets are set on the Plan step, and raised at the gate that stopped it', async () => {
-  const id = await createOrder('budgets are the operator’s to set', 'no order was created')
+  const id = await createTypedOrder(handle, {
+    repo,
+    text: 'budgets are the operator’s to set',
+    missing: 'no order was created',
+  })
 
   await openOrderRow(id)
   await openPlanStep()

@@ -6,12 +6,12 @@ import {
   AppHandle,
   addAndSelectProject,
   closeApp,
-  closeSettings,
+  closeSettingsPanel,
   createWorkspace,
   launchApp,
-  openSettings,
+  openSettingsSection,
   projectGroup,
-  runQuickAction,
+  runQuickActionFromPanel,
 } from './helpers'
 import { connectJira, startJiraStub, type JiraStub } from './jira-stub'
 import { allowCredentialsWithoutKeychain } from './main-stubs'
@@ -54,12 +54,12 @@ async function connectingProvesCredential(): Promise<void> {
 
 async function myIssuesQueryReachesTracker(): Promise<void> {
   const { page } = handle
-  await openSettings(page, 'Integrations')
+  await openSettingsSection(page, 'Integrations')
   const mine = page.locator('#jira-mine')
   await mine.fill('project = OPS ORDER BY updated DESC')
   await mine.blur()
-  await closeSettings(page)
-  await runQuickAction(page, 'Link issue to branch')
+  await closeSettingsPanel(page)
+  await runQuickActionFromPanel(page, 'Link issue to branch')
   const dialog = page.getByRole('dialog', { name: 'Link an issue' })
   await expect(dialog.locator('.link-issue__group')).toHaveText('Assigned to you')
   await expect(dialog.locator('.link-issue__row', { hasText: 'OPS-8' })).toBeVisible()
@@ -70,7 +70,7 @@ async function myIssuesQueryReachesTracker(): Promise<void> {
 
 async function searchAndLinkAttachIssue(): Promise<void> {
   const { page } = handle
-  await runQuickAction(page, 'Link issue to branch')
+  await runQuickActionFromPanel(page, 'Link issue to branch')
   const dialog = page.getByRole('dialog', { name: 'Link an issue' })
   await dialog.getByPlaceholder('Search, or type an issue key').fill('signing')
   await expect(dialog.locator('.link-issue__group')).toHaveText('Results')
@@ -83,7 +83,7 @@ async function searchAndLinkAttachIssue(): Promise<void> {
 
 async function drawerShowsIssueAndContext(): Promise<void> {
   const { page } = handle
-  await runQuickAction(page, 'View OPS-7')
+  await runQuickActionFromPanel(page, 'View OPS-7')
   await expect(drawer().getByRole('heading', { name: 'Rotate the signing keys' })).toBeVisible()
   await expect(drawer().locator('.issue-drawer__context')).toContainText('OPS-7')
   await expect(drawer().locator('.issue-drawer__context')).toContainText('Keys expire.')
@@ -103,7 +103,7 @@ async function newTerminalGetsIssueContext(): Promise<void> {
   if (!(await feed.isChecked())) await feed.click()
   await expect(feed).toBeChecked()
   await drawer().getByTitle('Close').click()
-  await runQuickAction(page, 'New tab')
+  await runQuickActionFromPanel(page, 'New tab')
   await expect(
     page.locator('.tmui-toast__message', { hasText: 'Session started with OPS-7' })
   ).toBeVisible({ timeout: 15000 })
@@ -111,12 +111,12 @@ async function newTerminalGetsIssueContext(): Promise<void> {
 
 async function feedOffStopsContext(): Promise<void> {
   const { page } = handle
-  await runQuickAction(page, 'View OPS-7')
+  await runQuickActionFromPanel(page, 'View OPS-7')
   const feed = drawer().getByRole('checkbox', { name: /Feed this issue to agent sessions/ })
   await feed.click()
   await expect(feed).not.toBeChecked()
   await drawer().getByTitle('Close').click()
-  await runQuickAction(page, 'View OPS-7')
+  await runQuickActionFromPanel(page, 'View OPS-7')
   await expect(
     drawer().getByRole('checkbox', { name: /Feed this issue to agent sessions/ })
   ).not.toBeChecked()
@@ -131,11 +131,11 @@ async function unlinkTakesIssueOff(): Promise<void> {
 
 async function disconnectShowsConnectForm(): Promise<void> {
   const { page } = handle
-  await openSettings(page, 'Integrations')
+  await openSettingsSection(page, 'Integrations')
   await jiraRow().getByRole('button', { name: 'Disconnect' }).click()
   await expect(jiraRow().locator('.integrations__status')).toHaveText('Not connected')
   await expect(page.locator('#jira-site')).toBeVisible()
-  await closeSettings(page)
+  await closeSettingsPanel(page)
 }
 
 test.describe.serial('a Jira connection, from connect to disconnect', () => {

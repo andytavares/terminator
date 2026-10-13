@@ -134,7 +134,7 @@ export function settingSpecs(setting, driven) {
 
 const specList = (specs) => (specs ? [...specs].sort().join(', ') : '')
 
-function table(rows, columns) {
+function markdownTable(rows, columns) {
   const header = `| ${columns.map((c) => c.title).join(' | ')} |`
   const rule = `| ${columns.map(() => '---').join(' | ')} |`
   const body = rows.map((row) => `| ${columns.map((c) => c.value(row)).join(' | ')} |`)
@@ -142,18 +142,23 @@ function table(rows, columns) {
 }
 
 /** One section of the report: what was not driven, then what was and by which specs. */
-function section({ title, items, specsOf, describe }) {
+function coverageSection({ title, items, specsOf, formatItem }) {
   const driven = items.filter((item) => specsOf(item))
   const lines = [`### ${title}: ${driven.length} of ${items.length} driven`, '']
   const undriven = items.filter((item) => !specsOf(item))
   if (undriven.length > 0) {
-    lines.push('Not driven by any spec:', '', ...undriven.map((item) => `- ${describe(item)}`), '')
+    lines.push(
+      'Not driven by any spec:',
+      '',
+      ...undriven.map((item) => `- ${formatItem(item)}`),
+      ''
+    )
   }
   if (driven.length > 0) {
     lines.push(
       '<details><summary>Driven, and by which specs</summary>',
       '',
-      ...driven.map((item) => `- ${describe(item)}: ${specList(specsOf(item))}`),
+      ...driven.map((item) => `- ${formatItem(item)}: ${specList(specsOf(item))}`),
       '',
       '</details>',
       ''
@@ -188,17 +193,22 @@ function channelItems(inventory) {
 
 function ipcSections({ coreItems, byExtension }, driven) {
   const specsOf = (item) => (item.events ? driven.events : driven.channels).get(item.name)
-  const core = section({
+  const core = coverageSection({
     title: 'Core IPC',
     items: coreItems,
     specsOf,
-    describe: (i) => `\`${i.name}\` — ${i.detail}`,
+    formatItem: (i) => `\`${i.name}\` — ${i.detail}`,
   })
   return [
     { area: 'Core IPC (window.electronAPI)', ...core },
     ...[...byExtension].map(([id, items]) => ({
       area: `${id} IPC`,
-      ...section({ title: `${id} IPC`, items, specsOf, describe: (i) => `\`${i.name}\`` }),
+      ...coverageSection({
+        title: `${id} IPC`,
+        items,
+        specsOf,
+        formatItem: (i) => `\`${i.name}\``,
+      }),
     })),
   ]
 }
@@ -206,11 +216,11 @@ function ipcSections({ coreItems, byExtension }, driven) {
 function commandSection(commands, driven) {
   return {
     area: 'Commands (Quick Actions, menus)',
-    ...section({
+    ...coverageSection({
       title: 'Extension commands',
       items: commands,
       specsOf: (c) => driven.commands.get(c.key),
-      describe: (c) => `\`${c.key}\` — ${c.label}`,
+      formatItem: (c) => `\`${c.key}\` — ${c.label}`,
     }),
   }
 }
@@ -228,11 +238,11 @@ function quickActionSpecs(action, driven) {
 function quickActionSection(driven) {
   return {
     area: 'Core Quick Actions',
-    ...section({
+    ...coverageSection({
       title: 'Core Quick Actions',
       items: [...coreQuickActions(), ...CORE_QUICK_ACTION_TEMPLATES],
       specsOf: (a) => quickActionSpecs(a, driven),
-      describe: (a) => `\`${a.id}\`${a.note ? ` (${a.note})` : ''}`,
+      formatItem: (a) => `\`${a.id}\`${a.note ? ` (${a.note})` : ''}`,
     }),
   }
 }
@@ -240,17 +250,17 @@ function quickActionSection(driven) {
 function settingSection(settings, driven) {
   return {
     area: 'Extension settings',
-    ...section({
+    ...coverageSection({
       title: 'Extension settings',
       items: settings,
       specsOf: (s) => settingSpecs(s, driven),
-      describe: (s) => `\`${s.key}\` — ${s.label}`,
+      formatItem: (s) => `\`${s.key}\` — ${s.label}`,
     }),
   }
 }
 
 function summaryTable(sections) {
-  return table(sections, [
+  return markdownTable(sections, [
     { title: 'Area', value: (s) => s.area },
     { title: 'Driven', value: (s) => String(s.driven) },
     { title: 'Total', value: (s) => String(s.total) },

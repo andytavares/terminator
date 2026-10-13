@@ -6,11 +6,12 @@ import { useSettingsStore } from '../../../../src/renderer/stores/settings.store
 import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
 import { useKeyboardShortcuts } from '../../../../src/renderer/hooks/useKeyboardShortcuts'
 import type { useTerminalSession } from '../../../../src/renderer/hooks/useTerminalSession'
-import { resetStore, terminalSessionOf, workspaceOf } from '../../../support/renderer-stores'
+import { resetStore, terminalSessionOf, workspaceFixture } from '../../../support/renderer-stores'
 import { installElectronApi } from '../../../support/electron-api'
 import { DEFAULT_GLOBAL_SETTINGS } from '../../../../src/shared/schemas/settings.schema'
 import { SCRATCH_PROJECT_ID, type TerminalSession } from '../../../../src/shared/types/index'
 import type { ElectronAPI } from '../../../../src/shared/electron-api/api-type'
+import { sessionState, workspaceState } from '../../../support/store-state'
 
 type TerminalSessionApi = ReturnType<typeof useTerminalSession>
 
@@ -31,11 +32,8 @@ const createNotification = vi.fn<ElectronAPI['notifications']['create']>(async (
   id: 'n1',
 }))
 
-const workspace1 = workspaceOf({ id: 'ws-1', name: 'WS 1', folderPath: '/ws1' })
-const workspace2 = workspaceOf({ id: 'ws-2', name: 'WS 2', folderPath: '/ws2' })
-
-const workspaces = () => useWorkspaceStore.getState()
-const sessions = () => useSessionStore.getState()
+const workspace1 = workspaceFixture({ id: 'ws-1', name: 'WS 1', folderPath: '/ws1' })
+const workspace2 = workspaceFixture({ id: 'ws-2', name: 'WS 2', folderPath: '/ws2' })
 
 function setup(
   overrides: { activeProjectId?: string | null; workspaces?: (typeof workspace1)[] } = {}
@@ -49,10 +47,10 @@ function setup(
 
 /** Sessions of one project, as tabs in that order, with `active` shown. */
 function withTabs(projectId: string, ids: string[], active: string): void {
-  const all = new Map(sessions().sessions)
+  const all = new Map(sessionState().sessions)
   for (const id of ids) all.set(id, terminalSessionOf({ id, projectId }))
   useSessionStore.setState({ sessions: all })
-  sessions().setActiveSessionForProject(projectId, active)
+  sessionState().setActiveSessionForProject(projectId, active)
 }
 
 beforeEach(() => {
@@ -102,14 +100,14 @@ describe('useKeyboardShortcuts', () => {
   it('switches to workspace by number when Cmd+2 is pressed, expanding only it', () => {
     renderHook(() => useKeyboardShortcuts())
     pressKey('2', { metaKey: true })
-    expect(workspaces().activeWorkspaceId).toBe('ws-2')
-    expect(workspaces().expandedWorkspaceIds).toEqual(new Set(['ws-2']))
+    expect(workspaceState().activeWorkspaceId).toBe('ws-2')
+    expect(workspaceState().expandedWorkspaceIds).toEqual(new Set(['ws-2']))
   })
 
   it('does nothing for out-of-range workspace index', () => {
     renderHook(() => useKeyboardShortcuts())
     pressKey('9', { metaKey: true })
-    expect(workspaces().activeWorkspaceId).toBe('ws-1')
+    expect(workspaceState().activeWorkspaceId).toBe('ws-1')
   })
 })
 
@@ -117,21 +115,21 @@ describe('useKeyboardShortcuts — cycles to next workspace on Cmd+=, expanding 
   it('cycles to next workspace on Cmd+=, expanding only it', () => {
     renderHook(() => useKeyboardShortcuts())
     pressKey('=', { metaKey: true })
-    expect(workspaces().activeWorkspaceId).toBe('ws-2')
-    expect(workspaces().expandedWorkspaceIds).toEqual(new Set(['ws-2']))
+    expect(workspaceState().activeWorkspaceId).toBe('ws-2')
+    expect(workspaceState().expandedWorkspaceIds).toEqual(new Set(['ws-2']))
   })
 
   it('cycles to previous workspace on Cmd+-', () => {
     renderHook(() => useKeyboardShortcuts())
     pressKey('-', { metaKey: true })
-    expect(workspaces().activeWorkspaceId).toBe('ws-2') // wraps around
+    expect(workspaceState().activeWorkspaceId).toBe('ws-2') // wraps around
   })
 
   it('cycleWorkspace does nothing when workspaces list is empty', () => {
     resetStore(useWorkspaceStore)
     renderHook(() => useKeyboardShortcuts())
     pressKey('=', { metaKey: true })
-    expect(workspaces().activeWorkspaceId).toBeNull()
+    expect(workspaceState().activeWorkspaceId).toBeNull()
   })
 })
 
@@ -186,7 +184,7 @@ describe('useKeyboardShortcuts — cycles tabs on Cmd+ArrowRight when sessions e
     withTabs('proj-1', ['s1', 's2'], 's1')
     renderHook(() => useKeyboardShortcuts())
     pressKey('ArrowRight', { metaKey: true })
-    expect(sessions().getActiveSessionForProject('proj-1')).toBe('s2')
+    expect(sessionState().getActiveSessionForProject('proj-1')).toBe('s2')
   })
 
   it('cycles tabs on Cmd+ArrowLeft when sessions exist', () => {
@@ -194,7 +192,7 @@ describe('useKeyboardShortcuts — cycles tabs on Cmd+ArrowRight when sessions e
     withTabs('proj-1', ['s1', 's2'], 's2')
     renderHook(() => useKeyboardShortcuts())
     pressKey('ArrowLeft', { metaKey: true })
-    expect(sessions().getActiveSessionForProject('proj-1')).toBe('s1')
+    expect(sessionState().getActiveSessionForProject('proj-1')).toBe('s1')
   })
 
   it('calls onToggleOverview when Cmd+Shift+E is pressed', () => {
@@ -243,7 +241,7 @@ describe('useKeyboardShortcuts — calls onNewScratch when Cmd+Shift+T is presse
   })
 })
 
-function registered(accelerator: string) {
+function registeredAccelerator(accelerator: string) {
   const action = vi.fn()
   useExtensionRegistry.getState().registerKeyboardShortcut({ accelerator, action })
   return action
@@ -257,28 +255,28 @@ function pressIn(field: HTMLElement, key: string, metaKey = false): void {
 
 describe('useKeyboardShortcuts — extension shortcuts', () => {
   it('calls extension shortcut action when accelerator matches', () => {
-    const action = registered('CmdOrCtrl+Shift+K')
+    const action = registeredAccelerator('CmdOrCtrl+Shift+K')
     renderHook(() => useKeyboardShortcuts())
     pressKey('k', { metaKey: true, shiftKey: true })
     expect(action).toHaveBeenCalled()
   })
 
   it('suppresses bare-key extension shortcut when pressed inside an input', () => {
-    const action = registered('1')
+    const action = registeredAccelerator('1')
     renderHook(() => useKeyboardShortcuts())
     pressIn(document.createElement('input'), '1')
     expect(action).not.toHaveBeenCalled()
   })
 
   it('fires bare-key extension shortcut when pressed outside an input', () => {
-    const action = registered('1')
+    const action = registeredAccelerator('1')
     renderHook(() => useKeyboardShortcuts())
     pressKey('1')
     expect(action).toHaveBeenCalled()
   })
 
   it('fires modifier+key extension shortcut even when pressed inside an input', () => {
-    const action = registered('CmdOrCtrl+1')
+    const action = registeredAccelerator('CmdOrCtrl+1')
     renderHook(() => useKeyboardShortcuts())
     pressIn(document.createElement('input'), '1', true)
     expect(action).toHaveBeenCalled()
@@ -317,17 +315,17 @@ describe('useKeyboardShortcuts — Cmd+W closes focused split pane when in split
   it('Cmd+W closes focused split pane when in split mode', async () => {
     setup({ activeProjectId: 'proj-1' })
     withTabs('proj-1', ['ses-root', 'ses-focused'], 'ses-root')
-    sessions().activateSplit('proj-1', {
+    sessionState().activateSplit('proj-1', {
       targetId: 'ses-root',
       newId: 'ses-focused',
       direction: 'vertical',
     })
-    sessions().setFocusedSession('proj-1', 'ses-focused')
+    sessionState().setFocusedSession('proj-1', 'ses-focused')
     renderHook(() => useKeyboardShortcuts())
     pressKey('w', { metaKey: true })
-    expect(JSON.stringify(sessions().getPaneLayout('proj-1'))).not.toContain('ses-focused')
-    await waitFor(() => expect(sessions().sessions.has('ses-focused')).toBe(false))
-    expect(sessions().sessions.has('ses-root')).toBe(true)
+    expect(JSON.stringify(sessionState().getPaneLayout('proj-1'))).not.toContain('ses-focused')
+    await waitFor(() => expect(sessionState().sessions.has('ses-focused')).toBe(false))
+    expect(sessionState().sessions.has('ses-root')).toBe(true)
   })
 
   it('Cmd+W closes active tab when not in split mode', async () => {
@@ -335,8 +333,8 @@ describe('useKeyboardShortcuts — Cmd+W closes focused split pane when in split
     withTabs('proj-1', ['ses-other', 'ses-active'], 'ses-active')
     renderHook(() => useKeyboardShortcuts())
     pressKey('w', { metaKey: true })
-    await waitFor(() => expect(sessions().sessions.has('ses-active')).toBe(false))
-    expect(sessions().sessions.has('ses-other')).toBe(true)
+    await waitFor(() => expect(sessionState().sessions.has('ses-active')).toBe(false))
+    expect(sessionState().sessions.has('ses-other')).toBe(true)
   })
 })
 
@@ -346,7 +344,7 @@ describe('useKeyboardShortcuts — Cmd+W closes focused split pane when in split
     renderHook(() => useKeyboardShortcuts())
     pressKey('w', { metaKey: true })
     await Promise.resolve()
-    expect(sessions().sessions.has('ses-active')).toBe(true)
+    expect(sessionState().sessions.has('ses-active')).toBe(true)
   })
 })
 
@@ -400,14 +398,14 @@ describe('useKeyboardShortcuts — scratch mode — scratchProjectId overrides a
     withTabs(SCRATCH_PROJECT_ID, ['scratch-ses-1'], 'scratch-ses-1')
     renderHook(() => useKeyboardShortcuts(scratch))
     pressKey('w', { metaKey: true })
-    await waitFor(() => expect(sessions().sessions.has('scratch-ses-1')).toBe(false))
+    await waitFor(() => expect(sessionState().sessions.has('scratch-ses-1')).toBe(false))
   })
 
   it('Cmd+ArrowRight cycles scratch tabs when scratchProjectId is set', () => {
     withTabs(SCRATCH_PROJECT_ID, ['ss1', 'ss2'], 'ss1')
     renderHook(() => useKeyboardShortcuts(scratch))
     pressKey('ArrowRight', { metaKey: true })
-    expect(sessions().getActiveSessionForProject(SCRATCH_PROJECT_ID)).toBe('ss2')
+    expect(sessionState().getActiveSessionForProject(SCRATCH_PROJECT_ID)).toBe('ss2')
   })
 
   it('regular project shortcuts still work when both activeProjectId and scratchProjectId are null', () => {
@@ -429,7 +427,7 @@ describe('useKeyboardShortcuts — scratch mode — scratchProjectId overrides a
 const mkSession = (id: string, projectId: string, patch: Partial<TerminalSession> = {}) =>
   terminalSessionOf({ id, projectId, type: 'agent', ...patch })
 
-function withSessions(...list: TerminalSession[]): void {
+function seedSessionsWithActive(...list: TerminalSession[]): void {
   useSessionStore.setState({ sessions: new Map(list.map((s) => [s.id, s])) })
   useSessionStore.setState({
     projectViews: new Map([['p1', { terminalCounter: 0, activeSessionId: 'a' }]]),
@@ -440,7 +438,7 @@ function withSessions(...list: TerminalSession[]): void {
 function setUpSessionNavigationShortcutsFR(): void {
   beforeEach(() => {
     setup({ activeProjectId: 'p1' })
-    withSessions(
+    seedSessionsWithActive(
       mkSession('a', 'p1', { lastAttendedAt: 300 }),
       mkSession('b', 'p2', { lastAttendedAt: 200 }),
       mkSession('c', 'p3', { lastAttendedAt: 100, bellCount: 1 })
@@ -454,27 +452,27 @@ describe('session navigation shortcuts (FR-032)', () => {
   it('Cmd+] moves to the next most-recently-attended session, across projects', () => {
     renderHook(() => useKeyboardShortcuts({}))
     pressKey(']', { metaKey: true })
-    expect(sessions().getActiveSessionForProject('p2')).toBe('b')
+    expect(sessionState().getActiveSessionForProject('p2')).toBe('b')
   })
 
   it('Cmd+[ moves the other way and wraps around', () => {
     renderHook(() => useKeyboardShortcuts({}))
     pressKey('[', { metaKey: true })
-    expect(sessions().getActiveSessionForProject('p3')).toBe('c')
+    expect(sessionState().getActiveSessionForProject('p3')).toBe('c')
   })
 
   it('keeps activeProjectId in step so the project tab bar does not lose its footing', () => {
     renderHook(() => useKeyboardShortcuts({}))
     pressKey(']', { metaKey: true })
-    expect(workspaces().activeProjectId).toBe('p2')
+    expect(workspaceState().activeProjectId).toBe('p2')
   })
 
   it('does nothing when there is only one session to cycle', () => {
-    withSessions(mkSession('a', 'p1', { lastAttendedAt: 1 }))
+    seedSessionsWithActive(mkSession('a', 'p1', { lastAttendedAt: 1 }))
     renderHook(() => useKeyboardShortcuts({}))
     pressKey(']', { metaKey: true })
-    expect(workspaces().activeProjectId).toBe('p1')
-    expect(sessions().focusRequest).toBeNull()
+    expect(workspaceState().activeProjectId).toBe('p1')
+    expect(sessionState().focusRequest).toBeNull()
   })
 })
 
@@ -484,16 +482,16 @@ describe('session navigation shortcuts (FR-032) — Cmd+Shift+A jumps to a sessi
   it('Cmd+Shift+A jumps to a session waiting on you', () => {
     renderHook(() => useKeyboardShortcuts({}))
     pressKey('a', { metaKey: true, shiftKey: true })
-    expect(sessions().getActiveSessionForProject('p3')).toBe('c')
-    expect(workspaces().activeProjectId).toBe('p3')
+    expect(sessionState().getActiveSessionForProject('p3')).toBe('c')
+    expect(workspaceState().activeProjectId).toBe('p3')
   })
 
   it('Cmd+Shift+A does nothing when no session is waiting', () => {
-    withSessions(mkSession('a', 'p1'))
+    seedSessionsWithActive(mkSession('a', 'p1'))
     renderHook(() => useKeyboardShortcuts({}))
     pressKey('a', { metaKey: true, shiftKey: true })
-    expect(workspaces().activeProjectId).toBe('p1')
-    expect(sessions().focusRequest).toBeNull()
+    expect(workspaceState().activeProjectId).toBe('p1')
+    expect(sessionState().focusRequest).toBeNull()
   })
 
   it('Cmd+I opens the note editor', () => {
@@ -519,7 +517,7 @@ describe('session navigation shortcuts (FR-032) — leaves the new bindings alon
     document.body.appendChild(field)
     field.focus()
     field.dispatchEvent(new KeyboardEvent('keydown', { key: ']', metaKey: true, bubbles: true }))
-    expect(workspaces().activeProjectId).toBe('p1')
+    expect(workspaceState().activeProjectId).toBe('p1')
     field.remove()
   })
 })

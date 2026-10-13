@@ -2,9 +2,9 @@ import { test, expect, type Locator } from '@playwright/test'
 import { rmSync } from 'node:fs'
 import {
   closeApp,
-  closeSettings,
+  closeSettingsPanel,
   launchApp,
-  openSettings,
+  openSettingsSection,
   projectGroup,
   type AppHandle,
 } from './helpers'
@@ -46,11 +46,11 @@ test.afterAll(async () => {
 /** Workspace Settings of the workspace whose branch row `branch` is, opened. */
 async function openWorkspaceSettings(branch: string): Promise<Locator> {
   await projectGroup(handle.page, branch).click()
-  await openSettings(handle.page, 'Workspace Settings')
+  await openSettingsSection(handle.page, 'Workspace Settings')
   return handle.page.locator('.settings-panel__content')
 }
 
-const signOffSwitch = (settings: Locator) =>
+const signOffSwitchIn = (settings: Locator) =>
   settingRow(settings, 'Add sign-off to commits').getByRole('switch')
 
 /** Git Integration's "Use global default", not a core setting's. */
@@ -76,10 +76,10 @@ async function commitFrom(branch: string, repo: string, file: string): Promise<s
 
 test("sign-off switched on in one workspace's settings signs its commits, not the other's", async () => {
   const settings = await openWorkspaceSettings('signed-work')
-  await expect(signOffSwitch(settings)).toHaveAttribute('aria-checked', 'false')
-  await signOffSwitch(settings).click()
+  await expect(signOffSwitchIn(settings)).toHaveAttribute('aria-checked', 'false')
+  await signOffSwitchIn(settings).click()
   await expect(useGlobalDefault(settings)).toBeVisible()
-  await closeSettings(handle.page)
+  await closeSettingsPanel(handle.page)
 
   expect(await commitFrom('signed-work', signed, 'one.md')).toBe(
     'Add one.md\n\nSigned-off-by: E2E <e2e@example.com>'
@@ -87,18 +87,18 @@ test("sign-off switched on in one workspace's settings signs its commits, not th
   expect(await commitFrom('plain-work', plain, 'one.md')).toBe('Add one.md')
 
   const plainSettings = await openWorkspaceSettings('plain-work')
-  await expect(signOffSwitch(plainSettings)).toHaveAttribute('aria-checked', 'false')
+  await expect(signOffSwitchIn(plainSettings)).toHaveAttribute('aria-checked', 'false')
   await expect(useGlobalDefault(plainSettings)).toBeHidden()
-  await closeSettings(handle.page)
+  await closeSettingsPanel(handle.page)
 })
 
 test('"Use global default" hands sign-off back to the global value', async () => {
   const settings = await openWorkspaceSettings('signed-work')
-  await expect(signOffSwitch(settings)).toHaveAttribute('aria-checked', 'true')
+  await expect(signOffSwitchIn(settings)).toHaveAttribute('aria-checked', 'true')
   await useGlobalDefault(settings).click()
-  await expect(signOffSwitch(settings)).toHaveAttribute('aria-checked', 'false')
+  await expect(signOffSwitchIn(settings)).toHaveAttribute('aria-checked', 'false')
   await expect(useGlobalDefault(settings)).toBeHidden()
-  await closeSettings(handle.page)
+  await closeSettingsPanel(handle.page)
 
   expect(await commitFrom('signed-work', signed, 'two.md')).toBe('Add two.md')
 })

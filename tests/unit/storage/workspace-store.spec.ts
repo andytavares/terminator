@@ -15,7 +15,7 @@ function workspace(name: string) {
   return result.workspace
 }
 
-function project(workspaceId: string, name: string) {
+function projectIn(workspaceId: string, name: string) {
   const result = store.createProject({ workspaceId, name, isWorktree: false })
   if ('error' in result) throw new Error(result.error)
   return result.project
@@ -58,8 +58,8 @@ describe('workspace-store — listing and deleting workspaces', () => {
   it('deletes workspace and its projects', () => {
     const doomed = workspace('ToDelete')
     const kept = workspace('Kept')
-    project(doomed.id, 'P1')
-    project(kept.id, 'P2')
+    projectIn(doomed.id, 'P1')
+    projectIn(kept.id, 'P2')
     store.deleteWorkspace(doomed.id)
     expect(store.listWorkspaces()).toEqual([kept])
     expect(store.listProjects(doomed.id)).toEqual([])
@@ -70,14 +70,14 @@ describe('workspace-store — listing and deleting workspaces', () => {
 describe('workspace-store — creating projects', () => {
   it('creates a project within a workspace', () => {
     const ws = workspace('ForProject')
-    const created = project(ws.id, 'MyProject')
+    const created = projectIn(ws.id, 'MyProject')
     expect(created).toMatchObject({ workspaceId: ws.id, name: 'MyProject', isWorktree: false })
     expect(store.listProjects(ws.id)).toEqual([created])
   })
 
   it('rejects duplicate project name within same workspace', () => {
     const ws = workspace('DupWS')
-    project(ws.id, 'P')
+    projectIn(ws.id, 'P')
     expect(store.createProject({ workspaceId: ws.id, name: 'p', isWorktree: false })).toEqual({
       error: 'DUPLICATE_NAME',
     })
@@ -86,8 +86,8 @@ describe('workspace-store — creating projects', () => {
   it('allows same project name in different workspaces', () => {
     const w1 = workspace('WSA')
     const w2 = workspace('WSB')
-    project(w1.id, 'SharedName')
-    expect(project(w2.id, 'SharedName').workspaceId).toBe(w2.id)
+    projectIn(w1.id, 'SharedName')
+    expect(projectIn(w2.id, 'SharedName').workspaceId).toBe(w2.id)
   })
 
   it('createProject returns WORKSPACE_NOT_FOUND for unknown workspace', () => {
@@ -102,7 +102,7 @@ describe('workspace-store — creating projects', () => {
 
 describe('workspace-store — branches and deleting projects', () => {
   it('updateProjectBranch updates the branch on a project', () => {
-    const p = project(workspace('BranchWS').id, 'BranchProj')
+    const p = projectIn(workspace('BranchWS').id, 'BranchProj')
     expect(store.updateProjectBranch({ id: p.id, gitBranch: 'feature/test' })).toMatchObject({
       project: { id: p.id, gitBranch: 'feature/test' },
     })
@@ -116,7 +116,7 @@ describe('workspace-store — branches and deleting projects', () => {
 
   it('deleteProject removes the project', () => {
     const ws = workspace('DelProjWS')
-    const p = project(ws.id, 'ToDelete')
+    const p = projectIn(ws.id, 'ToDelete')
     store.deleteProject(p.id)
     expect(store.listProjects(ws.id)).toEqual([])
   })
@@ -124,7 +124,7 @@ describe('workspace-store — branches and deleting projects', () => {
 
 describe('workspace-store — renaming projects', () => {
   it('renameProject renames an existing project', () => {
-    const p = project(workspace('RenameWS').id, 'OldName')
+    const p = projectIn(workspace('RenameWS').id, 'OldName')
     expect(store.renameProject({ id: p.id, name: 'NewName' })).toMatchObject({
       project: { name: 'NewName' },
     })
@@ -138,8 +138,8 @@ describe('workspace-store — renaming projects', () => {
 
   it('renameProject returns DUPLICATE_NAME when name conflicts', () => {
     const ws = workspace('DupRenameWS')
-    project(ws.id, 'ExistingName')
-    const other = project(ws.id, 'OtherName')
+    projectIn(ws.id, 'ExistingName')
+    const other = projectIn(ws.id, 'OtherName')
     expect(store.renameProject({ id: other.id, name: 'ExistingName' })).toEqual({
       error: 'DUPLICATE_NAME',
     })
@@ -156,8 +156,8 @@ describe('workspace-store — ordering and updating', () => {
 
   it('reorderProjects reorders projects within a workspace', () => {
     const ws = workspace('OrderWS')
-    const p1 = project(ws.id, 'First')
-    const p2 = project(ws.id, 'Second')
+    const p1 = projectIn(ws.id, 'First')
+    const p2 = projectIn(ws.id, 'Second')
     store.reorderProjects({ workspaceId: ws.id, ids: [p2.id, p1.id] })
     expect(store.listProjects(ws.id).map((p) => p.id)).toEqual([p2.id, p1.id])
   })

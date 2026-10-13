@@ -5,10 +5,10 @@ import { usePolling } from '../../../../packages/extension-ui/src/usePolling'
 beforeEach(() => vi.useFakeTimers())
 afterEach(() => {
   vi.useRealTimers()
-  setHidden(false)
+  setDocumentHidden(false)
 })
 
-function setHidden(hidden: boolean): void {
+function setDocumentHidden(hidden: boolean): void {
   Object.defineProperty(document, 'hidden', { configurable: true, get: () => hidden })
   document.dispatchEvent(new Event('visibilitychange'))
 }
@@ -62,13 +62,13 @@ describe('usePolling — stops while the view is hidden and reads at once when i
     await act(async () => {})
     expect(read).toHaveBeenCalledTimes(1)
 
-    act(() => setHidden(true))
+    act(() => setDocumentHidden(true))
     await act(async () => {
       await vi.advanceTimersByTimeAsync(10_000)
     })
     expect(read).toHaveBeenCalledTimes(1)
 
-    act(() => setHidden(false))
+    act(() => setDocumentHidden(false))
     await act(async () => {})
     expect(read).toHaveBeenCalledTimes(2)
     await act(async () => {
@@ -78,7 +78,7 @@ describe('usePolling — stops while the view is hidden and reads at once when i
   })
 
   it('does not start polling when mounted while hidden', async () => {
-    setHidden(true)
+    setDocumentHidden(true)
     const read = vi.fn(async () => 1)
     renderHook(() => usePolling(read, vi.fn(), 1000))
     await act(async () => {

@@ -4,6 +4,7 @@ import { join, resolve } from 'node:path'
 import { dispatchChannel, type ChannelSpec, type ExtensionAPI } from '@terminator/extension-sdk'
 import { FakeBackendHost } from './fake-backend-host'
 import { makeTempDir } from '../../support/temp-dir'
+import { gitStatusIn } from './status-command'
 
 // Every legitimate caller ADR-006's workspace-only rule would have refused, with its real cwd,
 // through the real check (ADR 102); git and gh are stand-ins on PATH that record where they ran.
@@ -59,7 +60,7 @@ function directory(...parts: string[]): string {
 }
 
 /** A stand-in that records the directory it ran in and prints `out` (empty when absent). */
-function standIn(bin: string, name: string): void {
+function printingStandIn(bin: string, name: string): void {
   const script = join(bin, name)
   writeFileSync(script, `#!/bin/sh\npwd >> "${ran}"\ncat "${scratch}/out" 2>/dev/null\nexit 0\n`)
   chmodSync(script, 0o755)
@@ -75,9 +76,6 @@ async function builtIn(name: string, id: string): Promise<ExtensionAPI> {
   return host.hostedApi(id)!
 }
 
-const gitIn = (api: ExtensionAPI, cwd: string) =>
-  api.shell.exec({ command: 'git', args: ['status'], cwd })
-
 beforeEach(() => {
   vi.resetModules()
   storeData.extensions = []
@@ -88,8 +86,8 @@ beforeEach(() => {
   userData = directory('user-data')
   ran = join(scratch, 'ran.log')
   const bin = directory('bin')
-  standIn(bin, 'git')
-  standIn(bin, 'gh')
+  printingStandIn(bin, 'git')
+  printingStandIn(bin, 'gh')
   process.env.PATH = `${bin}:${originalPath}`
 })
 
@@ -108,12 +106,12 @@ describe('a project worktree under git.worktreeBaseDir, outside the workspace fo
     projects.push({ id: 'p1', workspaceId: 'w1', name: 'login', worktreePath: worktree })
     const api = await builtIn('foundry', 'terminator.foundry')
 
-    expect((await gitIn(api, worktree)).exitCode).toBe(0)
+    expect((await gitStatusIn(api, worktree)).exitCode).toBe(0)
     expect(ranIn()).toEqual([worktree])
   })
 })
 
-async function foundry(): Promise<ExtensionAPI> {
+async function foundryApi(): Promise<ExtensionAPI> {
   const api = await builtIn('foundry', 'terminator.foundry')
   const { registerSettings } = await import('../../../extensions/foundry/src/state/settings-schema')
   registerSettings(api)
@@ -131,24 +129,24 @@ async function lanePath(api: ExtensionAPI): Promise<{ root: string; lane: string
 
 describe('Foundry', () => {
   it('runs git in its records root in api.paths.globalStorage, and in a lane there, with no workspace open', async () => {
-    const api = await foundry()
+    const api = await foundryApi()
     const { root, lane } = await lanePath(api)
 
     expect(root.startsWith(join(userData, 'extensions', 'terminator.foundry'))).toBe(true)
-    expect((await gitIn(api, root)).exitCode).toBe(0)
-    expect((await gitIn(api, lane)).exitCode).toBe(0)
+    expect((await gitStatusIn(api, root)).exitCode).toBe(0)
+    expect((await gitStatusIn(api, lane)).exitCode).toBe(0)
     expect(ranIn()).toEqual([root, lane])
   })
 
   it('runs git in terminator.foundry.dataDir set to an absolute path, and in a lane there', async () => {
     workspaces.push({ id: 'w1', name: 'Widgets', folderPath: directory('code', 'widgets') })
     settings['terminator.foundry.dataDir'] = directory('foundry-records')
-    const api = await foundry()
+    const api = await foundryApi()
     const { root, lane } = await lanePath(api)
 
     expect(root).toBe(join(scratch, 'foundry-records'))
-    expect((await gitIn(api, root)).exitCode).toBe(0)
-    expect((await gitIn(api, lane)).exitCode).toBe(0)
+    expect((await gitStatusIn(api, root)).exitCode).toBe(0)
+    expect((await gitStatusIn(api, lane)).exitCode).toBe(0)
     expect(ranIn()).toEqual([root, lane])
   })
 })

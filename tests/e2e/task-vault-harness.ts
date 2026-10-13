@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test'
 import type { AppHandle } from './helpers'
-import { invokeChannel, openExtension } from './extension-page'
+import { invokeChannel, openFromAppBand } from './extension-page'
 
 // Shared by the tests/e2e/task-vault-*.spec.ts files: opening the vault, moving
 // between its sections, and reading back what an action stored.
@@ -25,19 +25,19 @@ const VAULT_URL = 'terminator.task-vault/dist/index.html?view=main'
 export function localDate(offsetDays = 0): string {
   const date = new Date()
   date.setDate(date.getDate() + offsetDays)
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+  const twoDigits = (n: number) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${twoDigits(date.getMonth() + 1)}-${twoDigits(date.getDate())}`
 }
 
 /** Opens Task Vault from the app band and waits for its navigation. */
 export async function openVault(handle: AppHandle): Promise<Page> {
-  const vault = await openExtension(handle, 'Task Vault', VAULT_URL)
+  const vault = await openFromAppBand(handle, 'Task Vault', VAULT_URL)
   await expect(vault.locator('.vault-sidebar')).toBeVisible({ timeout: 20_000 })
   return vault
 }
 
 /** Clicks a section in the vault's own sidebar: Today, Inbox, Projects, Areas, History or Weekly review. */
-export async function goTo(vault: Page, section: string): Promise<void> {
+export async function goToSection(vault: Page, section: string): Promise<void> {
   await vault.locator('.vault-sidebar').getByRole('button', { name: section, exact: true }).click()
 }
 
@@ -56,4 +56,9 @@ export async function storedTask(vault: Page, text: string): Promise<StoredTask 
 export async function todayTasks(vault: Page): Promise<StoredTask[]> {
   const result = await invokeChannel<{ tasks: StoredTask[] }>(vault, 'task-vault:vault:get-today')
   return result.tasks
+}
+
+/** A task row of the open daily log, found by its exact text. */
+export function dailyLogTaskRow(vault: Page, text: string) {
+  return vault.locator('.daily-log__task').filter({ has: vault.getByText(text, { exact: true }) })
 }

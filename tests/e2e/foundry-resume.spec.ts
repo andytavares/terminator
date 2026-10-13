@@ -118,7 +118,7 @@ function order(): unknown {
 }
 
 /** The graph, frozen mid-run: one step `running`, with a session that is gone. */
-function graph(): unknown {
+function resumeGraph(): unknown {
   return {
     orderId: ORDER_ID,
     recipe: 'direct',
@@ -310,7 +310,10 @@ const pretty = (value: unknown): string => `${JSON.stringify(value, null, 2)}\n`
  * every node passed, status still `running`, and the ledger's last word is a
  * failure to ship. */
 function writeLeftOrders(): void {
-  writeOrderFiles(ORDER_ID, { 'order.json': pretty(order()), 'run-graph.json': pretty(graph()) })
+  writeOrderFiles(ORDER_ID, {
+    'order.json': pretty(order()),
+    'run-graph.json': pretty(resumeGraph()),
+  })
   writeOrderFiles(UNSHIPPED_ID, {
     'order.json': pretty(unshippedOrder()),
     'run-graph.json': pretty(unshippedGraph()),
@@ -418,7 +421,7 @@ test('the inbox renders the row with its move on it', async () => {
 })
 
 /** Waits for the order's row in the Forge list, then opens it. */
-async function openOrderRow(id: string, missing: string): Promise<void> {
+async function openOrderRowInView(id: string, missing: string): Promise<void> {
   await expect
     .poll(
       () =>
@@ -476,7 +479,7 @@ test('the Floor carries the same move, above the graph', async () => {
 
   // The Forge tab, then the running order — which opens on the Floor.
   expect(await clickByName('Forge')).toBe(true)
-  await openOrderRow(ORDER_ID, 'no row for the running order')
+  await openOrderRowInView(ORDER_ID, 'no row for the running order')
 
   await expect.poll(() => bodyText(), { timeout: 15_000 }).toContain('Halted — your move')
   const text = await bodyText()
@@ -515,7 +518,7 @@ test('a run that finished every step and still failed to ship says so, with a mo
   await clickByName('All orders')
   // The list refetches on its own 4s timer, and the previous test left the
   // view mid-navigation — a fixed pause here was a flake waiting to happen.
-  await openOrderRow(UNSHIPPED_ID, 'no row for the unshipped order')
+  await openOrderRowInView(UNSHIPPED_ID, 'no row for the unshipped order')
 
   await expect.poll(() => bodyText(), { timeout: 15_000 }).toContain('Finished, but not shipped')
   const text = await bodyText()

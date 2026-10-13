@@ -124,8 +124,8 @@ test('a note is archived, restored, archived again and deleted for good', async 
 
 test('dragging a note above another reorders the list', async () => {
   await createItem(notepad, 'Note', 'Reading list')
-  const titles = () => notepad.locator('.notepad-note-row__title').allTextContents()
-  const before = await titles()
+  const noteTitles = () => notepad.locator('.notepad-note-row__title').allTextContents()
+  const before = await noteTitles()
   const [first, second] = [before[0], before[1]]
 
   // A hand drags in steps, so the row under the pointer sees several dragovers.
@@ -134,7 +134,7 @@ test('dragging a note above another reorders the list', async () => {
     steps: 20,
   })
 
-  await expect.poll(titles).toEqual([second, first, ...before.slice(2)])
+  await expect.poll(noteTitles).toEqual([second, first, ...before.slice(2)])
   const stored = (await storedNotes(notepad)).filter((note) => !note.archivedAt)
   expect(stored.map((note) => note.title).slice(0, 2)).toEqual([second, first])
 })

@@ -89,11 +89,11 @@ async function registerWithWindow(win: { isDestroyed(): boolean; webContents: un
     '../../../src/main/ipc/terminal.ipc'
   )
   const { OutputRelay } = await import('../../../src/main/terminal/output-relay')
-  const getWindow = () => win as never
+  const registeredWindow = () => win as never
   registerTerminalHandlers(
     ptyManager,
-    getWindow,
-    new OutputRelay(ptyManager, sendToRenderer(getWindow))
+    registeredWindow,
+    new OutputRelay(ptyManager, sendToRenderer(registeredWindow))
   )
 }
 

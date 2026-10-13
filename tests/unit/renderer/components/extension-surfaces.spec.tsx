@@ -9,7 +9,11 @@ import { AppBand } from '../../../../src/renderer/components/sidebar/AppBand'
 import type { GroupKey } from '../../../../src/renderer/sidebar/view-model'
 import { useSettingsStore } from '../../../../src/renderer/stores/settings.store'
 import { DEFAULT_GLOBAL_SETTINGS } from '../../../../src/shared/schemas/settings.schema'
-import { projectOf, terminalSessionOf, workspaceOf } from '../../../support/renderer-stores'
+import {
+  projectFixture,
+  terminalSessionOf,
+  workspaceFixture,
+} from '../../../support/renderer-stores'
 
 // THE MERGE GATE for feature 030.
 //
@@ -36,8 +40,8 @@ vi.mock('../../../../src/renderer/components/session/useSessionFacts', () => ({
 const NOW = 1_000_000_000
 const GROUPINGS: GroupKey[] = ['workspace', 'none']
 
-const ws1 = workspaceOf({ id: 'ws-1', name: 'Backend', folderPath: '/b', color: '#111' })
-const api = projectOf({ id: 'p1', workspaceId: 'ws-1', name: 'API', gitBranch: 'main' })
+const ws1 = workspaceFixture({ id: 'ws-1', name: 'Backend', folderPath: '/b', color: '#111' })
+const api = projectFixture({ id: 'p1', workspaceId: 'ws-1', name: 'API', gitBranch: 'main' })
 const s1 = terminalSessionOf({
   id: 's1',
   projectId: 'p1',

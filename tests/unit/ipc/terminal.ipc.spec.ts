@@ -127,11 +127,11 @@ function useTerminalHandlers(): void {
     ptyManager = makeFakePtyManager()
     win = openWindow()
     webContentsSend = win.webContents.send
-    const getWindow = () => win as never
+    const currentWindow = () => win as never
     registerTerminalHandlers(
       ptyManager as never,
-      getWindow,
-      new OutputRelay(ptyManager as never, sendToRenderer(getWindow))
+      currentWindow,
+      new OutputRelay(ptyManager as never, sendToRenderer(currentWindow))
     )
   })
 }
@@ -504,11 +504,11 @@ let linkedWin: ReturnType<typeof openWindow>
 
 async function createTerminal(ptyManager: ReturnType<typeof makeFakePtyManager>) {
   linkedWin = openWindow()
-  const getWindow = () => linkedWin as never
+  const linkedWindow = () => linkedWin as never
   registerTerminalHandlers(
     ptyManager as never,
-    getWindow,
-    new OutputRelay(ptyManager as never, sendToRenderer(getWindow))
+    linkedWindow,
+    new OutputRelay(ptyManager as never, sendToRenderer(linkedWindow))
   )
   // The outer suite has already registered handlers against a different fake;
   // mockHandle accumulates, so take the most recent registration, not the
@@ -518,7 +518,7 @@ async function createTerminal(ptyManager: ReturnType<typeof makeFakePtyManager>)
   return handler({}, { projectId: P, tabTitle: 'shell', type: 'human', cwd: '/tmp' })
 }
 
-const contextOf = (chars: number, truncated: boolean) => ({
+const injectedContext = (chars: number, truncated: boolean) => ({
   projectId: P,
   tracker: 'linear' as const,
   key: 'TAV-42',
@@ -561,7 +561,7 @@ describe('terminal:create — linked issue', () => {
 describe('terminal:create — linked issue notices', () => {
   it('tells the operator the session started with issue context (FR-024)', async () => {
     await links.setLink({ projectId: P, tracker: 'linear', key: 'TAV-42' })
-    await writeContextFile(contextOf(2143, false))
+    await writeContextFile(injectedContext(2143, false))
     await createTerminal(makeFakePtyManager())
 
     await vi.waitFor(() =>
@@ -574,7 +574,7 @@ describe('terminal:create — linked issue notices', () => {
 
   it('says how much context, and whether it was shortened', async () => {
     await links.setLink({ projectId: P, tracker: 'linear', key: 'TAV-42' })
-    await writeContextFile(contextOf(9900, true))
+    await writeContextFile(injectedContext(9900, true))
     await createTerminal(makeFakePtyManager())
 
     await vi.waitFor(() => expect(notificationManager.list()).toHaveLength(1))
@@ -587,7 +587,7 @@ describe('terminal:create — linked issue notices', () => {
 describe('terminal:create — linked issue, nothing to say', () => {
   it('says nothing when injection is turned off for the project', async () => {
     await links.setLink({ projectId: P, tracker: 'linear', key: 'TAV-42', injectContext: false })
-    await writeContextFile(contextOf(10, false))
+    await writeContextFile(injectedContext(10, false))
     await createTerminal(makeFakePtyManager())
     await new Promise((r) => setImmediate(r))
 

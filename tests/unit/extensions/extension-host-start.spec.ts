@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mkdirSync, writeFileSync, rmSync } from 'fs'
 import { join } from 'path'
 import os from 'os'
-import { FakeBackendHost, type FakeBackend } from './fake-backend-host'
+import { newExtensionHost, storedExtensionRecord } from './fake-backend-host'
 
 vi.mock('electron', () => ({
   app: {
@@ -36,8 +36,13 @@ vi.mock('../../../src/main/storage/extension-settings-store', () => ({
 // to tell that every bundled extension came up.
 const logged: string[] = []
 vi.mock('../../../src/main/logger', () => {
-  const write = (message: string) => logged.push(message)
-  const log = { debug: write, info: write, warn: write, error: write }
+  const recordLogLine = (message: string) => logged.push(message)
+  const log = {
+    debug: recordLogLine,
+    info: recordLogLine,
+    warn: recordLogLine,
+    error: recordLogLine,
+  }
   return { makeLogger: () => log, logger: log }
 })
 
@@ -71,27 +76,7 @@ function writeBundle(dependenciesById: Record<string, string[] | undefined>): st
   return bundle
 }
 
-function storedRecord(id: string, status: 'enabled' | 'disabled') {
-  const directoryPath = join(bundle, id)
-  return {
-    id,
-    name: id,
-    version: '1.0.0',
-    description: '',
-    entryPoint: join(directoryPath, 'main.js'),
-    status,
-    installedAt: new Date().toISOString(),
-    directoryPath,
-  }
-}
-
-async function newHost(backends: Record<string, FakeBackend> = {}) {
-  const { ExtensionHost } = await import('../../../src/main/extensions/extension-host')
-  const backendHost = new FakeBackendHost(backends)
-  return { host: new ExtensionHost(backendHost), backendHost }
-}
-
-function byId(host: { listExtensions(): Array<{ id: string }> }) {
+function extensionsById(host: { listExtensions(): Array<{ id: string }> }) {
   return Object.fromEntries(host.listExtensions().map((e) => [e.id, e]))
 }
 
@@ -101,7 +86,7 @@ describe('ExtensionHost.start', () => {
   it('activates extensions concurrently: one waits for another to have started', async () => {
     let markPeerStarted = () => {}
     const peerStarted = new Promise<void>((resolve) => (markPeerStarted = resolve))
-    const { host, backendHost } = await newHost({
+    const { host, backendHost } = await newExtensionHost({
       'com.waiter': async () => {
         // Started here, not before newHost: importing the host can take longer
         // than the timeout, and a rejection nothing awaits yet fails the run.
@@ -127,7 +112,7 @@ describe('ExtensionHost.start', () => {
 
 describe('ExtensionHost.start — failures and logging', () => {
   it('marks a failing extension as errored and still activates the others', async () => {
-    const { host, backendHost } = await newHost({
+    const { host, backendHost } = await newExtensionHost({
       'com.broken': () => {
         throw new Error('boom')
       },
@@ -138,7 +123,7 @@ describe('ExtensionHost.start — failures and logging', () => {
       beforeActivation: ready,
     })
 
-    const extensions = byId(host)
+    const extensions = extensionsById(host)
     expect(extensions['com.broken']).toMatchObject({ status: 'error', errorMessage: 'boom' })
     expect(extensions['com.healthy']).toMatchObject({ status: 'enabled' })
     expect(backendHost.activated.map((record) => record.id)).toEqual(['com.healthy'])
@@ -148,8 +133,8 @@ describe('ExtensionHost.start — failures and logging', () => {
 describe('ExtensionHost.start — logging', () => {
   it('logs every extension it activates, new or stored, and never one that failed', async () => {
     writeBundle({ 'com.stored': [] })
-    storeData.extensions = [storedRecord('com.stored', 'enabled')]
-    const { host } = await newHost({
+    storeData.extensions = [storedExtensionRecord(bundle, 'com.stored', 'enabled')]
+    const { host } = await newExtensionHost({
       'com.broken': () => {
         throw new Error('boom')
       },
@@ -169,9 +154,9 @@ describe('ExtensionHost.start — logging', () => {
 
 describe('ExtensionHost.start — listing and stored extensions', () => {
   it('lists extensions as soon as start is called, before any is activated, and activates only after beforeActivation', async () => {
-    const { host, backendHost } = await newHost()
-    let release = () => {}
-    const gate = new Promise<void>((resolve) => (release = resolve))
+    const { host, backendHost } = await newExtensionHost()
+    let releaseActivation = () => {}
+    const gate = new Promise<void>((resolve) => (releaseActivation = resolve))
 
     const started = host.start({
       bundledDirectory: writeBundle({ 'com.late': [] }),
@@ -181,15 +166,15 @@ describe('ExtensionHost.start — listing and stored extensions', () => {
     expect(host.listExtensions().map((e) => e.id)).toEqual(['com.late'])
     expect(backendHost.activated).toEqual([])
 
-    release()
+    releaseActivation()
     await started
     expect(backendHost.activated.map((record) => record.id)).toEqual(['com.late'])
   })
 
   it('activates an extension already stored as enabled, without registering it twice', async () => {
     writeBundle({ 'com.stored': [] })
-    storeData.extensions = [storedRecord('com.stored', 'enabled')]
-    const { host, backendHost } = await newHost()
+    storeData.extensions = [storedExtensionRecord(bundle, 'com.stored', 'enabled')]
+    const { host, backendHost } = await newExtensionHost()
 
     await host.start({ bundledDirectory: bundle, beforeActivation: ready })
 
@@ -201,8 +186,8 @@ describe('ExtensionHost.start — listing and stored extensions', () => {
 describe('ExtensionHost.start — disabled extensions and whenActivated', () => {
   it('does not activate an extension stored as disabled', async () => {
     writeBundle({ 'com.off': [] })
-    storeData.extensions = [storedRecord('com.off', 'disabled')]
-    const { host, backendHost } = await newHost()
+    storeData.extensions = [storedExtensionRecord(bundle, 'com.off', 'disabled')]
+    const { host, backendHost } = await newExtensionHost()
 
     await host.start({ bundledDirectory: bundle, beforeActivation: ready })
 
@@ -210,7 +195,9 @@ describe('ExtensionHost.start — disabled extensions and whenActivated', () => 
   })
 
   it('whenActivated waits for that extension only, not for a slower one', async () => {
-    const { host, backendHost } = await newHost({ 'com.slow': () => new Promise(() => {}) })
+    const { host, backendHost } = await newExtensionHost({
+      'com.slow': () => new Promise(() => {}),
+    })
 
     void host.start({
       bundledDirectory: writeBundle({ 'com.quick': [], 'com.slow': [] }),
@@ -225,7 +212,7 @@ describe('ExtensionHost.start — disabled extensions and whenActivated', () => 
 describe('ExtensionHost.start — afterActivation', () => {
   it('whenActivated also waits for afterActivation, which runs once every extension is done', async () => {
     const events: string[] = []
-    const { host } = await newHost({
+    const { host } = await newExtensionHost({
       'com.first': () => {
         events.push('first')
       },
@@ -234,14 +221,14 @@ describe('ExtensionHost.start — afterActivation', () => {
         events.push('second')
       },
     })
-    const afterActivation = async () => {
+    const recordAfterActivation = async () => {
       events.push('after')
     }
 
     void host.start({
       bundledDirectory: writeBundle({ 'com.first': [], 'com.second': [] }),
       beforeActivation: ready,
-      afterActivation,
+      afterActivation: recordAfterActivation,
     })
     await host.whenActivated('com.first')
 
@@ -249,7 +236,7 @@ describe('ExtensionHost.start — afterActivation', () => {
   })
 
   it('whenActivated resolves at once for an unknown extension', async () => {
-    const { host } = await newHost()
+    const { host } = await newExtensionHost()
     await host.start({ bundledDirectory: '/nonexistent/bundle', beforeActivation: ready })
     await expect(host.whenActivated('com.unknown')).resolves.toBeUndefined()
   })
@@ -258,7 +245,7 @@ describe('ExtensionHost.start — afterActivation', () => {
 describe('ExtensionHost.start with extensionDependencies (ADR 094)', () => {
   it('activates a dependency first and tells the extension host what the dependant declared', async () => {
     const events: string[] = []
-    const { host, backendHost } = await newHost({
+    const { host, backendHost } = await newExtensionHost({
       'com.a-consumer': () => {
         events.push('consumer')
       },
@@ -278,20 +265,20 @@ describe('ExtensionHost.start with extensionDependencies (ADR 094)', () => {
     expect(backendHost.activated.find((record) => record.id === 'com.a-consumer')).toMatchObject({
       dependencies: ['com.z-provider'],
     })
-    expect(byId(host)['com.a-consumer']).toMatchObject({ status: 'enabled' })
+    expect(extensionsById(host)['com.a-consumer']).toMatchObject({ status: 'enabled' })
   })
 })
 
 describe('ExtensionHost.start with extensionDependencies — missing dependencies', () => {
   it('fails activation with a clear message when a dependency is not installed', async () => {
-    const { host, backendHost } = await newHost()
+    const { host, backendHost } = await newExtensionHost()
 
     await host.start({
       bundledDirectory: writeBundle({ 'com.orphan': ['com.missing'] }),
       beforeActivation: ready,
     })
 
-    expect(byId(host)['com.orphan']).toMatchObject({
+    expect(extensionsById(host)['com.orphan']).toMatchObject({
       status: 'error',
       errorMessage: 'Missing extension dependency "com.missing"',
     })
@@ -299,7 +286,7 @@ describe('ExtensionHost.start with extensionDependencies — missing dependencie
   })
 
   it('fails activation when a dependency itself failed to activate', async () => {
-    const { host, backendHost } = await newHost({
+    const { host, backendHost } = await newExtensionHost({
       'com.broken': () => {
         throw new Error('boom')
       },
@@ -310,7 +297,7 @@ describe('ExtensionHost.start with extensionDependencies — missing dependencie
       beforeActivation: ready,
     })
 
-    expect(byId(host)['com.dependant']).toMatchObject({
+    expect(extensionsById(host)['com.dependant']).toMatchObject({
       status: 'error',
       errorMessage: 'Extension dependency "com.broken" failed to activate',
     })
@@ -320,7 +307,7 @@ describe('ExtensionHost.start with extensionDependencies — missing dependencie
 
 describe('ExtensionHost.start with extensionDependencies — cycles', () => {
   it('fails every extension in a dependency cycle, naming the cycle, and activates the rest', async () => {
-    const { host, backendHost } = await newHost()
+    const { host, backendHost } = await newExtensionHost()
 
     await host.start({
       bundledDirectory: writeBundle({
@@ -331,7 +318,7 @@ describe('ExtensionHost.start with extensionDependencies — cycles', () => {
       beforeActivation: ready,
     })
 
-    const extensions = byId(host)
+    const extensions = extensionsById(host)
     expect(extensions['com.one']).toMatchObject({
       errorMessage: 'Extension dependency cycle: com.one -> com.two -> com.one',
     })

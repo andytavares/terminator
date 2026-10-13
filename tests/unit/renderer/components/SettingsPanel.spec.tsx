@@ -612,11 +612,15 @@ describe('ExtensionsSection — groups per-notification-kind boolean settings in
   setUpExtensionsSection()
 
   it('groups per-notification-kind boolean settings into a 4-column table instead of individual switches', async () => {
-    const toggle = (label: string) => ({ type: 'boolean', label, default: true })
+    const booleanSetting = (label: string) => ({ type: 'boolean', label, default: true })
     await openSettingsOf({
-      'com.test.notify.taskCompleted.system': toggle('Task completed → System notification'),
-      'com.test.notify.taskCompleted.center': toggle('Task completed → In-app notification center'),
-      'com.test.notify.taskCompleted.toast': toggle('Task completed → Toast'),
+      'com.test.notify.taskCompleted.system': booleanSetting(
+        'Task completed → System notification'
+      ),
+      'com.test.notify.taskCompleted.center': booleanSetting(
+        'Task completed → In-app notification center'
+      ),
+      'com.test.notify.taskCompleted.toast': booleanSetting('Task completed → Toast'),
     })
 
     // One row for the notification kind, not three separate switch rows
@@ -940,7 +944,7 @@ async function openSettingsOf(
   return view
 }
 
-const saved = (key: string, value: unknown) =>
+const savedSetting = (key: string, value: unknown) =>
   waitFor(() => expect(api.extension.updateSetting).toHaveBeenCalledWith(key, value), {
     timeout: 2000,
   })
@@ -951,7 +955,7 @@ describe('ExtensionsSection — editing each kind of setting', () => {
   it('saves a switched boolean as a boolean', async () => {
     await openSettingsOf({ 'com.test.on': { type: 'boolean', label: 'On', default: true } })
     fireEvent.click(screen.getByRole('switch', { name: 'On' }))
-    await saved('com.test.on', false)
+    await savedSetting('com.test.on', false)
   })
 
   it('saves the option picked from an enum', async () => {
@@ -959,7 +963,7 @@ describe('ExtensionsSection — editing each kind of setting', () => {
       'com.test.mode': { type: 'enum', label: 'Mode', default: 'fast', options: ['fast', 'safe'] },
     })
     fireEvent.click(screen.getByText('Safe'))
-    await saved('com.test.mode', 'safe')
+    await savedSetting('com.test.mode', 'safe')
   })
 
   it('masks a secret setting', async () => {
@@ -973,7 +977,7 @@ describe('ExtensionsSection — editing each kind of setting', () => {
     await openSettingsOf({ 'com.test.n': { type: 'number', label: 'N', default: 1 } })
     fireEvent.change(screen.getByDisplayValue('1'), { target: { value: '2' } })
     fireEvent.change(screen.getByDisplayValue('2'), { target: { value: '3' } })
-    await saved('com.test.n', 3)
+    await savedSetting('com.test.n', 3)
     expect(api.extension.updateSetting).toHaveBeenCalledTimes(1)
   })
 })
@@ -995,7 +999,7 @@ describe('ExtensionsSection — a list setting', () => {
     fireEvent.change(screen.getByRole('textbox', { name: 'Paths' }), {
       target: { value: 'src/auth/**\n\n  docs/** ' },
     })
-    await saved('com.test.paths', ['src/auth/**', 'docs/**'])
+    await savedSetting('com.test.paths', ['src/auth/**', 'docs/**'])
   })
 })
 

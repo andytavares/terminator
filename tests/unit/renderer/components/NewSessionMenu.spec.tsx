@@ -4,11 +4,11 @@ import { render, screen, fireEvent, within } from '@testing-library/react'
 import type { Project, Workspace } from '../../../../src/shared/types/index'
 import { NewSessionMenu } from '../../../../src/renderer/components/session/NewSessionMenu'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
-import { projectOf, seedStore, workspaceOf } from '../../../support/renderer-stores'
+import { projectFixture, seedStore, workspaceFixture } from '../../../support/renderer-stores'
 
-const repo = (id: string, name: string): Workspace => workspaceOf({ id, name })
+const repo = (id: string, name: string): Workspace => workspaceFixture({ id, name })
 const branch = (id: string, workspaceId: string, name: string): Project =>
-  projectOf({ id, workspaceId, name })
+  projectFixture({ id, workspaceId, name })
 
 let onBranch: Mock<(projectId: string) => void>
 let onScratch: Mock<() => void>

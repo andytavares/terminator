@@ -4,7 +4,7 @@ import { DEFAULT_GLOBAL_SETTINGS } from '../../../src/shared/schemas/settings.sc
 type Handler = (event: unknown, payload?: unknown) => unknown
 const handlers = vi.hoisted(() => new Map<string, Handler>())
 
-function fakeWindow({ minimized = false, destroyed = false } = {}) {
+function fakeFocusableWindow({ minimized = false, destroyed = false } = {}) {
   return {
     isDestroyed: () => destroyed,
     isMinimized: () => minimized,
@@ -14,7 +14,7 @@ function fakeWindow({ minimized = false, destroyed = false } = {}) {
     webContents: { isDestroyed: () => destroyed, send: vi.fn() },
   }
 }
-const windows = vi.hoisted(() => [] as Array<ReturnType<typeof fakeWindow>>)
+const windows = vi.hoisted(() => [] as Array<ReturnType<typeof fakeFocusableWindow>>)
 
 vi.mock('electron', () => ({
   ipcMain: { handle: (channel: string, handler: Handler) => handlers.set(channel, handler) },
@@ -30,7 +30,7 @@ function invoke<T = unknown>(channel: string, payload?: unknown): Promise<T> {
   return Promise.resolve(handlers.get(channel)!({}, payload)) as Promise<T>
 }
 
-async function create(payload: Record<string, unknown>): Promise<string> {
+async function invokeCreate(payload: Record<string, unknown>): Promise<string> {
   const { id } = await invoke<{ id: string }>('notifications:create', {
     type: 'info',
     title: 'Build finished',
@@ -51,7 +51,7 @@ beforeEach(async () => {
 
 describe('notifications:create', () => {
   it('lists the notification, delivered where the settings say rather than where the caller asks', async () => {
-    const id = await create({ source: 'terminator.task-vault', targets: ['system'] })
+    const id = await invokeCreate({ source: 'terminator.task-vault', targets: ['system'] })
 
     expect(await invoke('notifications:list')).toEqual([
       expect.objectContaining({
@@ -68,7 +68,7 @@ describe('notifications:create', () => {
 
 describe('notifications:dismiss', () => {
   it('takes the notification off the list', async () => {
-    const id = await create({})
+    const id = await invokeCreate({})
 
     expect(await invoke('notifications:dismiss', { id })).toEqual({ ok: true })
 
@@ -78,10 +78,10 @@ describe('notifications:dismiss', () => {
 
 describe('notifications:trigger-action', () => {
   it('opening a notification about a session reveals it in every live window and keeps the row', async () => {
-    const minimized = fakeWindow({ minimized: true })
-    const destroyed = fakeWindow({ destroyed: true })
+    const minimized = fakeFocusableWindow({ minimized: true })
+    const destroyed = fakeFocusableWindow({ destroyed: true })
     windows.push(minimized, destroyed)
-    const id = await create({ sessionId: 'ses-1' })
+    const id = await invokeCreate({ sessionId: 'ses-1' })
 
     expect(
       await invoke('notifications:trigger-action', { notifId: id, actionId: '__open__' })
@@ -100,7 +100,7 @@ describe('notifications:trigger-action', () => {
 
 describe('notifications:trigger-action — refusals', () => {
   it('cannot open a notification that is not about a session', async () => {
-    const id = await create({})
+    const id = await invokeCreate({})
 
     expect(
       await invoke('notifications:trigger-action', { notifId: id, actionId: '__open__' })
@@ -108,7 +108,7 @@ describe('notifications:trigger-action — refusals', () => {
   })
 
   it('answers UNKNOWN_NOTIFICATION once the notification is gone', async () => {
-    const id = await create({})
+    const id = await invokeCreate({})
     await invoke('notifications:dismiss', { id })
 
     expect(await invoke('notifications:trigger-action', { notifId: id, actionId: 'go' })).toEqual({

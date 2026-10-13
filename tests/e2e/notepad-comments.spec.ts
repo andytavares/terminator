@@ -39,7 +39,7 @@ test.afterAll(async () => {
   await closeApp(handle)
 })
 
-async function comments(): Promise<StoredComment[]> {
+async function storedComments(): Promise<StoredComment[]> {
   const result = await invokeChannel<{ data: StoredComment[] }>(
     notepad,
     'terminator.notepad:comments.list',
@@ -58,7 +58,7 @@ async function selectInEditor(text: string): Promise<void> {
   for (let i = 0; i < text.length; i++) await notepad.keyboard.press('Shift+ArrowRight')
 }
 
-function card(body: string) {
+function commentCard(body: string) {
   return notepad.locator('.notepad-comment').filter({ hasText: body })
 }
 
@@ -68,8 +68,8 @@ test('a comment is anchored to the text selected', async () => {
   await notepad.getByPlaceholder('Add a comment…').fill('Which fox?')
   await notepad.getByRole('button', { name: 'Add comment' }).click()
 
-  await expect(card('Which fox?')).toContainText('“brown fox”')
-  expect(await comments()).toMatchObject([
+  await expect(commentCard('Which fox?')).toContainText('“brown fox”')
+  expect(await storedComments()).toMatchObject([
     {
       body: 'Which fox?',
       quote: 'brown fox',
@@ -80,19 +80,23 @@ test('a comment is anchored to the text selected', async () => {
 })
 
 test('a comment is edited, replied to and resolved', async () => {
-  await card('Which fox?').getByRole('button', { name: 'Edit comment (click to edit)' }).click()
-  await card('Which fox?').getByLabel('Edit comment', { exact: true }).fill('Which fox, exactly?')
-  await card('Which fox').getByRole('button', { name: 'Save' }).click()
-  await expect(card('Which fox, exactly?')).toBeVisible()
+  await commentCard('Which fox?')
+    .getByRole('button', { name: 'Edit comment (click to edit)' })
+    .click()
+  await commentCard('Which fox?')
+    .getByLabel('Edit comment', { exact: true })
+    .fill('Which fox, exactly?')
+  await commentCard('Which fox').getByRole('button', { name: 'Save' }).click()
+  await expect(commentCard('Which fox, exactly?')).toBeVisible()
 
-  await card('Which fox, exactly?').getByRole('button', { name: 'Reply' }).click()
-  await card('Which fox, exactly?').getByPlaceholder('Write a reply…').fill('The red one')
-  await card('Which fox, exactly?').getByRole('button', { name: 'Send' }).click()
-  await expect(card('Which fox, exactly?')).toContainText('The red one')
+  await commentCard('Which fox, exactly?').getByRole('button', { name: 'Reply' }).click()
+  await commentCard('Which fox, exactly?').getByPlaceholder('Write a reply…').fill('The red one')
+  await commentCard('Which fox, exactly?').getByRole('button', { name: 'Send' }).click()
+  await expect(commentCard('Which fox, exactly?')).toContainText('The red one')
 
-  await card('Which fox, exactly?').getByRole('button', { name: 'Resolve' }).click()
+  await commentCard('Which fox, exactly?').getByRole('button', { name: 'Resolve' }).click()
   await expect
-    .poll(async () => (await comments())[0])
+    .poll(async () => (await storedComments())[0])
     .toMatchObject({
       body: 'Which fox, exactly?',
       status: 'resolved',
@@ -105,7 +109,7 @@ test('an anchor follows its text when the note is edited above it', async () => 
   await notepad.getByTitle('Add comment').dispatchEvent('mousedown')
   await notepad.getByPlaceholder('Add a comment…').fill('Over what?')
   await notepad.getByRole('button', { name: 'Add comment' }).click()
-  await expect(card('Over what?')).toBeVisible()
+  await expect(commentCard('Over what?')).toBeVisible()
 
   await notepad.locator('.notepad-view__editor .cm-content').click()
   await notepad.keyboard.press('ControlOrMeta+Home')
@@ -114,7 +118,7 @@ test('an anchor follows its text when the note is edited above it', async () => 
   await notepad.keyboard.type('Note: ')
 
   await expect
-    .poll(async () => (await comments()).find((c) => c.body === 'Over what?')?.startOffset, {
+    .poll(async () => (await storedComments()).find((c) => c.body === 'Over what?')?.startOffset, {
       timeout: 10_000,
     })
     .toBe(BODY.indexOf('jumps over') + 'Note: '.length)
@@ -125,7 +129,7 @@ test('deleting the anchored text orphans the comment, which can then be deleted'
   await notepad.getByTitle('Add comment').dispatchEvent('mousedown')
   await notepad.getByPlaceholder('Add a comment…').fill('Too lazy?')
   await notepad.getByRole('button', { name: 'Add comment' }).click()
-  await expect(card('Too lazy?')).toBeVisible()
+  await expect(commentCard('Too lazy?')).toBeVisible()
 
   // Select the anchored words again, now six characters further on, and delete them.
   const start = BODY.indexOf('lazy dog') + 'Note: '.length
@@ -136,13 +140,13 @@ test('deleting the anchored text orphans the comment, which can then be deleted'
   await notepad.keyboard.press('Backspace')
 
   await expect
-    .poll(async () => (await comments()).find((c) => c.body === 'Too lazy?')?.status, {
+    .poll(async () => (await storedComments()).find((c) => c.body === 'Too lazy?')?.status, {
       timeout: 10_000,
     })
     .toBe('orphaned')
-  await expect(card('Too lazy?')).toHaveClass(/notepad-comment--orphaned/)
+  await expect(commentCard('Too lazy?')).toHaveClass(/notepad-comment--orphaned/)
 
-  await card('Too lazy?').getByRole('button', { name: 'Delete comment' }).click()
-  await expect(card('Too lazy?')).toHaveCount(0)
-  expect((await comments()).map((c) => c.body)).toEqual(['Which fox, exactly?', 'Over what?'])
+  await commentCard('Too lazy?').getByRole('button', { name: 'Delete comment' }).click()
+  await expect(commentCard('Too lazy?')).toHaveCount(0)
+  expect((await storedComments()).map((c) => c.body)).toEqual(['Which fox, exactly?', 'Over what?'])
 })

@@ -354,7 +354,7 @@ await window.electronAPI.extension.hasCommand(key) // boolean
 A view is its own `WebContentsView` on an `ext://` origin, and Playwright attaches to it like any other page in the app's browser context. `tests/e2e/extension-page.ts` finds it, so a spec clicks, types and drags in your view with ordinary locators:
 
 ```ts
-const vault = await openExtension(
+const vault = await openFromAppBand(
   handle,
   'Task Vault',
   'terminator.task-vault/dist/index.html?view=main'

@@ -1,3 +1,4 @@
+import { join } from 'path'
 import type { BackendHost } from '../../../src/main/extensions/extension-host'
 import type { BackendRecord } from '../../../src/main/extensions/host/host-runtime'
 
@@ -21,4 +22,26 @@ export class FakeBackendHost implements BackendHost {
   async deactivate(extensionId: string): Promise<void> {
     this.deactivated.push(extensionId)
   }
+}
+
+/** An extension record as an earlier run stored it, for an extension directory under `root`. */
+export function storedExtensionRecord(root: string, id: string, status: 'enabled' | 'disabled') {
+  const directoryPath = join(root, id)
+  return {
+    id,
+    name: id,
+    version: '1.0.0',
+    description: '',
+    entryPoint: join(directoryPath, 'main.js'),
+    status,
+    installedAt: new Date().toISOString(),
+    directoryPath,
+  }
+}
+
+/** A real ExtensionHost over a FakeBackendHost, imported after the spec's `vi.resetModules()`. */
+export async function newExtensionHost(backends: Record<string, FakeBackend> = {}) {
+  const { ExtensionHost } = await import('../../../src/main/extensions/extension-host')
+  const backendHost = new FakeBackendHost(backends)
+  return { host: new ExtensionHost(backendHost), backendHost }
 }

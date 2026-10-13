@@ -8,7 +8,7 @@ import {
   projectGroup,
 } from './helpers'
 import { invokeChannel } from './extension-page'
-import { openVault, storedTask, type StoredTask } from './task-vault-harness'
+import { dailyLogTaskRow, openVault, storedTask, type StoredTask } from './task-vault-harness'
 
 // Linking tasks and projects to terminal sessions, and jumping from a task to
 // the terminal it is linked to. The remote API's two link channels, which no
@@ -42,18 +42,18 @@ test.afterAll(async () => {
   await closeApp(handle)
 })
 
-function taskRow(text: string) {
-  return vault.locator('.daily-log__task').filter({ has: vault.getByText(text, { exact: true }) })
-}
-
 test('a task is linked to the terminal picked for it', async () => {
-  await taskRow('Deploy the fix').hover()
-  await taskRow('Deploy the fix').getByRole('button', { name: 'Link to terminal session' }).click()
+  await dailyLogTaskRow(vault, 'Deploy the fix').hover()
+  await dailyLogTaskRow(vault, 'Deploy the fix')
+    .getByRole('button', { name: 'Link to terminal session' })
+    .click()
   await pickAlpha(vault.locator('.daily-log__link-picker select'))
 
-  await taskRow('Deploy the fix').hover()
+  await dailyLogTaskRow(vault, 'Deploy the fix').hover()
   await expect(
-    taskRow('Deploy the fix').getByRole('button', { name: 'Jump to linked terminal' })
+    dailyLogTaskRow(vault, 'Deploy the fix').getByRole('button', {
+      name: 'Jump to linked terminal',
+    })
   ).toBeVisible()
   const stored = (await storedTask(vault, 'Deploy the fix')) as StoredTask & {
     terminatorLinks: string[]
@@ -64,8 +64,10 @@ test('a task is linked to the terminal picked for it', async () => {
 
 test('jumping from the task brings its terminal forward', async () => {
   await expect(projectGroup(handle.page, 'beta')).toHaveClass(/branch-row--selected/)
-  await taskRow('Deploy the fix').hover()
-  await taskRow('Deploy the fix').getByRole('button', { name: 'Jump to linked terminal' }).click()
+  await dailyLogTaskRow(vault, 'Deploy the fix').hover()
+  await dailyLogTaskRow(vault, 'Deploy the fix')
+    .getByRole('button', { name: 'Jump to linked terminal' })
+    .click()
 
   await expect(projectGroup(handle.page, 'alpha')).toHaveClass(/branch-row--selected/)
 })
@@ -108,8 +110,7 @@ test('the remote API lists what a terminal is linked to, and unlinks a task', as
   )
   expect(after).toEqual({ tasks: [], projects: [] })
   await vault.locator('.vault-sidebar').getByRole('button', { name: 'Today', exact: true }).click()
-  await taskRow('Deploy the fix').hover()
-  await expect(
-    taskRow('Deploy the fix').getByRole('button', { name: 'Link to terminal session' })
-  ).toBeVisible()
+  const row = dailyLogTaskRow(vault, 'Deploy the fix')
+  await row.hover()
+  await expect(row.getByRole('button', { name: 'Link to terminal session' })).toBeVisible()
 })

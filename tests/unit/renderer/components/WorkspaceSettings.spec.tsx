@@ -4,7 +4,7 @@ import { render, screen, fireEvent, within } from '@testing-library/react'
 import { useSettingsStore } from '../../../../src/renderer/stores/settings.store'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { WorkspaceSettings } from '../../../../src/renderer/components/settings/WorkspaceSettings'
-import { seedStore, workspaceOf } from '../../../support/renderer-stores'
+import { seedStore, workspaceFixture } from '../../../support/renderer-stores'
 import { DEFAULT_GLOBAL_SETTINGS } from '../../../../src/shared/schemas/settings.schema'
 import type { GlobalSettings as GlobalSettingsValue } from '../../../../src/shared/types'
 import { installElectronApi } from '../../../support/electron-api'
@@ -51,7 +51,7 @@ beforeEach(() => {
     loadSettings: mockLoadSettings,
   })
   seedStore(useWorkspaceStore, {
-    workspaces: [workspaceOf({ id: 'ws-1', name: 'My Workspace' })],
+    workspaces: [workspaceFixture({ id: 'ws-1', name: 'My Workspace' })],
   })
 })
 

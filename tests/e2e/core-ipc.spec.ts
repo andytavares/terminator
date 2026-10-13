@@ -12,8 +12,8 @@ import {
   launchApp,
   projectGroup,
   quickActionsPanel,
-  runQuickAction,
-  terminalRowsIn,
+  runQuickActionFromPanel,
+  readTerminalRowsIn,
   visibleTerminalScreen,
   workspaceRow,
 } from './helpers'
@@ -40,7 +40,7 @@ function fromView<T>(handle: AppHandle, call: string): Promise<T> {
   return inExtensionView<T>(handle, NOTES, `(async (api) => ${call})(window.electronAPI)`)
 }
 
-function currentBranch(repo: string): string {
+function branchCheckedOutIn(repo: string): string {
   return execFileSync('git', ['branch', '--show-current'], { cwd: repo }).toString().trim()
 }
 
@@ -53,9 +53,9 @@ async function printAndModClick(screen: Locator, line: string): Promise<void> {
   await page.keyboard.type(`printf '%s\\n' '${line}'`)
   await page.keyboard.press('Enter')
   const rowsOfLine = async () =>
-    (await terminalRowsIn(screen)).filter((row) => row.startsWith(line)).length
+    (await readTerminalRowsIn(screen)).filter((row) => row.startsWith(line)).length
   await expect.poll(rowsOfLine).toBe(1)
-  const rows = await terminalRowsIn(screen)
+  const rows = await readTerminalRowsIn(screen)
   const index = rows.findIndex((row) => row.startsWith(line))
   const box = (await screen.boundingBox())!
   const modifier = process.platform === 'darwin' ? 'Meta' : 'Control'
@@ -110,7 +110,7 @@ async function viewCheckoutMovesCard(handle: AppHandle, repo: string): Promise<v
   await openNotesView(handle)
   const result = await fromView(handle, `api.git.checkout(${JSON.stringify(repo)}, 'made-in-app')`)
   expect(result).toEqual({ success: true })
-  expect(currentBranch(repo)).toBe('made-in-app')
+  expect(branchCheckedOutIn(repo)).toBe('made-in-app')
 }
 
 async function viewWorktreeRemovalDeletesIt(handle: AppHandle, repo: string): Promise<void> {
@@ -208,7 +208,7 @@ async function urlOpensOnModClick(handle: AppHandle): Promise<void> {
   await projectGroup(page, 'notebook').click()
   // Two terminals on screen, so the click has to find the row in the right one.
   // The split stays for the bell test, whose new tab must show alone and take the keys.
-  await runQuickAction(page, 'Split down')
+  await runQuickActionFromPanel(page, 'Split down')
   const screens = page.locator('.terminal-pane .xterm-screen').filter({ visible: true })
   await expect(screens).toHaveCount(2, { timeout: 15000 })
   await printAndModClick(screens.last(), 'https://example.com/e2e-link')
@@ -225,7 +225,7 @@ async function filePathOpensOnModClick(handle: AppHandle, folder: string): Promi
 
 async function bellNotifiesAndReveals(handle: AppHandle): Promise<void> {
   const { page } = handle
-  await runQuickAction(page, 'New tab')
+  await runQuickActionFromPanel(page, 'New tab')
   const tabs = page.locator('.tab-bar__tab--session')
   await page.keyboard.type("sleep 2; printf '\\a'")
   await page.keyboard.press('Enter')

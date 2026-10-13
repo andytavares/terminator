@@ -25,7 +25,7 @@ beforeEach(async () => {
   ;({ makeSnapshotFor } = await import('../../../src/main/sessions/session-snapshot'))
 })
 
-function addProject(gitBranch?: string): Project {
+function addSnapshotProject(gitBranch?: string): Project {
   const created = workspaces.createWorkspace({
     name: 'terminator',
     folderPath: '/code/terminator',
@@ -59,7 +59,7 @@ const snapshotFor = (info: SessionInfo | undefined) =>
 
 describe('makeSnapshotFor', () => {
   it('describes a terminal by where it lives', () => {
-    const project = addProject('054-session-home-wall')
+    const project = addSnapshotProject('054-session-home-wall')
     expect(snapshotFor(session({ projectId: project.id }))).toEqual({
       sessionId: 's1',
       projectId: project.id,
@@ -73,14 +73,14 @@ describe('makeSnapshotFor', () => {
   })
 
   it('leaves out a branch a project does not have', () => {
-    const project = addProject()
+    const project = addSnapshotProject()
     expect(snapshotFor(session({ projectId: project.id }))?.branch).toBeNull()
   })
 })
 
 describe('makeSnapshotFor — missing projects', () => {
   it('describes a terminal whose project has gone, without inventing one', () => {
-    const project = addProject()
+    const project = addSnapshotProject()
     workspaces.deleteProject(project.id)
     expect(snapshotFor(session({ projectId: project.id }))).toMatchObject({
       projectId: project.id,

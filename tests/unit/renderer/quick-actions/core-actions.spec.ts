@@ -5,6 +5,7 @@ import {
 } from '../../../../src/renderer/quick-actions/core-actions'
 import { CORE_GROUPS } from '../../../../src/renderer/quick-actions/groups'
 import { CORE_SHORTCUTS, findMnemonicConflicts } from '../../../support/quick-actions'
+import type { QuickAction } from '../../../../src/renderer/quick-actions/types'
 
 function makeDeps(overrides: Partial<CoreActionDeps> = {}): CoreActionDeps {
   return {
@@ -15,13 +16,13 @@ function makeDeps(overrides: Partial<CoreActionDeps> = {}): CoreActionDeps {
     sessions: [{ id: 's1', projectId: 'p1', tabTitle: 'Terminal 1', projectName: 'main' }],
     issueLink: { key: 'ABC-1', tracker: 'linear' },
     issue: { url: 'https://example.com' },
-    ...handlers(),
+    ...coreActionHandlers(),
     ...overrides,
   }
 }
 
 /** A fake for every handler an action can run. */
-function handlers() {
+function coreActionHandlers() {
   return {
     onNewTab: vi.fn(),
     onSplit: vi.fn(),
@@ -47,6 +48,11 @@ function handlers() {
     onOpenSettings: vi.fn(),
     onToggleLog: vi.fn(),
   }
+}
+
+/** The label of the action with `id`. */
+function actionLabelOf(actions: QuickAction[], id: string): string {
+  return actions.find((action) => action.id === id)!.label
 }
 
 describe('buildCoreActions', () => {
@@ -188,10 +194,10 @@ describe('CORE_SHORTCUTS', () => {
   it('matches the KeyboardEvent shape it documents', () => {
     const entry = CORE_SHORTCUTS.find((s) => s.actionId === 'core.clear')!
     expect(
-      entry.match({ key: 'k', metaKey: true, ctrlKey: false, shiftKey: false, altKey: false })
+      entry.firedBy({ key: 'k', metaKey: true, ctrlKey: false, shiftKey: false, altKey: false })
     ).toBe(true)
     expect(
-      entry.match({ key: 'k', metaKey: false, ctrlKey: false, shiftKey: false, altKey: false })
+      entry.firedBy({ key: 'k', metaKey: false, ctrlKey: false, shiftKey: false, altKey: false })
     ).toBe(false)
   })
 })
@@ -236,19 +242,17 @@ describe('buildCoreActions — every action runs its own handler', () => {
 describe('buildCoreActions — issue labels name the linked issue', () => {
   it('names a Jira issue and its tracker', () => {
     const actions = buildCoreActions(makeDeps({ issueLink: { key: 'J-7', tracker: 'jira' } }))
-    const label = (id: string) => actions.find((a) => a.id === id)!.label
-    expect(label('core.link-issue')).toBe('Change linked issue')
-    expect(label('core.view-issue')).toBe('View J-7')
-    expect(label('core.copy-issue-key')).toBe('Copy issue key (J-7)')
-    expect(label('core.open-issue')).toBe('Open J-7 in Jira')
+    expect(actionLabelOf(actions, 'core.link-issue')).toBe('Change linked issue')
+    expect(actionLabelOf(actions, 'core.view-issue')).toBe('View J-7')
+    expect(actionLabelOf(actions, 'core.copy-issue-key')).toBe('Copy issue key (J-7)')
+    expect(actionLabelOf(actions, 'core.open-issue')).toBe('Open J-7 in Jira')
   })
 
   it('says what it would do when nothing is linked', () => {
     const actions = buildCoreActions(makeDeps({ issueLink: null }))
-    const label = (id: string) => actions.find((a) => a.id === id)!.label
-    expect(label('core.link-issue')).toBe('Link issue')
-    expect(label('core.view-issue')).toBe('View linked issue')
-    expect(label('core.copy-issue-key')).toBe('Copy issue key')
-    expect(label('core.open-issue')).toBe('Open issue in tracker')
+    expect(actionLabelOf(actions, 'core.link-issue')).toBe('Link issue')
+    expect(actionLabelOf(actions, 'core.view-issue')).toBe('View linked issue')
+    expect(actionLabelOf(actions, 'core.copy-issue-key')).toBe('Copy issue key')
+    expect(actionLabelOf(actions, 'core.open-issue')).toBe('Open issue in tracker')
   })
 })

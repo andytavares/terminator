@@ -30,25 +30,25 @@ function installIpcTrace(
 ): void {
   const seen = new Set<string>()
   Object.assign(globalThis, { __ipcTrace: seen })
-  const note = (kind: string, channel: string, payload?: unknown) =>
+  const recordTrace = (kind: string, channel: string, payload?: unknown) =>
     seen.add(JSON.stringify([kind, channel, naming.includes(channel) ? payload : null]))
   // Electron keeps ipcMain.handle's handlers in this map and reads it on every invoke.
   const handlers: Map<string, IpcHandler> = Reflect.get(ipcMain, '_invokeHandlers')
   const traced = (channel: string, handler: IpcHandler): IpcHandler => {
-    return (event, ...args) => (note('invoke', channel, args[0]), handler(event, ...args))
+    return (event, ...args) => (recordTrace('invoke', channel, args[0]), handler(event, ...args))
   }
   for (const [channel, handler] of handlers) handlers.set(channel, traced(channel, handler))
   const handle = ipcMain.handle.bind(ipcMain)
   ipcMain.handle = (channel, handler) => handle(channel, traced(channel, handler as IpcHandler))
   const emit = ipcMain.emit.bind(ipcMain)
   ipcMain.emit = (channel: string | symbol, ...args: unknown[]) => {
-    if (typeof channel === 'string') note('send', channel, args[1])
+    if (typeof channel === 'string') recordTrace('send', channel, args[1])
     return emit(channel, ...args)
   }
   const tracePushes = (contents: Electron.WebContents) => {
     const send = contents.send
     contents.send = function (channel: string, ...args: unknown[]) {
-      note('event', channel)
+      recordTrace('event', channel)
       return send.call(this, channel, ...args)
     }
   }

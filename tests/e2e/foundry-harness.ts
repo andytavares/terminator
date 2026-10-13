@@ -312,3 +312,17 @@ export async function captureFoundry(handle: AppHandle, name: string): Promise<v
   })
   writeFileSync(join(outDir, name), Buffer.from(pngBase64, 'base64'))
 }
+
+/** Creates a typed order on `repo` and returns its id; `missing` is the failure's message. */
+export async function createTypedOrder(
+  handle: AppHandle,
+  order: { repo: string; text: string; missing: string }
+): Promise<string> {
+  const created = (await foundryChannel(handle, 'foundry:order.create', {
+    source: { kind: 'typed', text: order.text },
+    repoPaths: [order.repo],
+  })) as { order?: { id: string } }
+  const id = created.order?.id as string
+  expect(id, order.missing).toBeTruthy()
+  return id
+}

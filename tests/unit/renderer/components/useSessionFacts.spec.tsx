@@ -10,15 +10,20 @@ import {
   useIssueTitles,
 } from '../../../../src/renderer/components/session/useSessionFacts'
 import {
-  issueOf,
-  projectOf,
+  issueFixture,
+  projectFixture,
   sessionRecordOf,
   terminalSessionOf,
-  workspaceOf,
+  workspaceFixture,
 } from '../../../support/renderer-stores'
 
-const workspace = workspaceOf({ id: 'w1', name: 'Personal', color: '#5c6bc0' })
-const project = projectOf({ id: 'p1', workspaceId: 'w1', name: 'terminator', gitBranch: 'main' })
+const workspace = workspaceFixture({ id: 'w1', name: 'Personal', color: '#5c6bc0' })
+const project = projectFixture({
+  id: 'p1',
+  workspaceId: 'w1',
+  name: 'terminator',
+  gitBranch: 'main',
+})
 const session = terminalSessionOf({
   id: 's1',
   projectId: 'p1',
@@ -100,7 +105,7 @@ describe('useSessionFacts', () => {
 
 describe('useIssue', () => {
   it('loads the issue for a work item and returns it once read', async () => {
-    const home = issueOf({ key: 'TAV-1', title: 'Home' })
+    const home = issueFixture({ key: 'TAV-1', title: 'Home' })
     getIssue.mockResolvedValue({ issue: home })
     const { result } = renderHook(() => useIssue({ tracker: 'linear', key: 'TAV-1' }))
     expect(result.current).toBeUndefined()
@@ -119,7 +124,7 @@ describe('useIssueTitles', () => {
   it('maps every issue read so far to its title, leaving out unreadable ones', () => {
     useIntegrationsStore.setState({
       issuesByKey: new Map([
-        ['linear:TAV-1', issueOf({ key: 'TAV-1', title: 'Home' })],
+        ['linear:TAV-1', issueFixture({ key: 'TAV-1', title: 'Home' })],
         ['linear:TAV-2', null],
       ]),
     })

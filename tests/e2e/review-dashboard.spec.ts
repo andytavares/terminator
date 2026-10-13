@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { closeApp, launchApp, type AppHandle } from './helpers'
-import { git, gitView, makeRepoWithRemote, pushBranch } from './git-harness'
+import { git, gitView, makeRepoWithRemote, pushBranchToOrigin } from './git-harness'
 import { startGithubStub, type GithubStub } from './github-stub'
 
 /** The Reviews dashboard, against the stub GitHub: narrowing it to chosen
@@ -20,7 +20,7 @@ test.describe.configure({ mode: 'serial' })
 
 test.beforeAll(async () => {
   ;({ repo, bare } = makeRepoWithRemote('terminator-e2e-dashboard'))
-  pushBranch(repo, 'feat/subtract', { 'src/subtract.ts': 'export const subtract = 1\n' })
+  pushBranchToOrigin(repo, 'feat/subtract', { 'src/subtract.ts': 'export const subtract = 1\n' })
   stub = await startGithubStub({ bareRepo: bare })
   stub.openPullRequest({ title: 'Add subtract', headRefName: 'feat/subtract' })
   cloneFolder = mkdtempSync(join(tmpdir(), 'terminator-e2e-clones-'))

@@ -64,7 +64,7 @@ function markersAfterCheckout(file: string): number {
 
 /** Reads `file` every few milliseconds, as an editor or git might while the app
  * writes it, and keeps every read that found it empty or missing. */
-function watchReads(file: string): { stop(): string[] } {
+function watchReads(file: string): { stopWatching(): string[] } {
   const torn: string[] = []
   const timer = setInterval(() => {
     try {
@@ -73,7 +73,7 @@ function watchReads(file: string): { stop(): string[] } {
       torn.push(String(error))
     }
   }, 2)
-  return { stop: () => (clearInterval(timer), torn) }
+  return { stopWatching: () => (clearInterval(timer), torn) }
 }
 
 async function openSolver(): Promise<Page> {
@@ -83,7 +83,7 @@ async function openSolver(): Promise<Page> {
   return view
 }
 
-async function decide(view: Page, choice: 'Keep mine' | 'Keep theirs'): Promise<void> {
+async function decideConflict(view: Page, choice: 'Keep mine' | 'Keep theirs'): Promise<void> {
   await view.getByRole('button', { name: new RegExp(`^${choice}`) }).click()
   await view.getByRole('button', { name: /^Confirm/ }).click()
 }
@@ -108,7 +108,7 @@ test('a decision is written to the file, and undo puts the conflict back', async
 
   const inode = statSync(join(repo, 'app.ts')).ino
   const reads = watchReads('app.ts')
-  await decide(view, 'Keep mine')
+  await decideConflict(view, 'Keep mine')
   await expect.poll(() => markerCount('app.ts')).toBe(1)
   expect(fileText('app.ts')).toContain('export const greeting = "good day"')
   // A new file renamed over the old one. Checked after this one write: the
@@ -119,14 +119,14 @@ test('a decision is written to the file, and undo puts the conflict back', async
   await view.getByRole('button', { name: 'Undo last decision' }).click()
   await expect.poll(() => markerCount('app.ts')).toBe(2)
   // Replaced by rename each time, so no reader ever caught it half written.
-  expect(reads.stop()).toEqual([])
+  expect(reads.stopWatching()).toEqual([])
 })
 
 test('Start over restores every conflict marker once a file is fully decided', async () => {
   const view = await gitViewWithResolver()
-  await decide(view, 'Keep mine')
+  await decideConflict(view, 'Keep mine')
   await expect.poll(() => markerCount('app.ts')).toBe(1)
-  await decide(view, 'Keep theirs')
+  await decideConflict(view, 'Keep theirs')
   await expect.poll(() => markerCount('app.ts')).toBe(0)
   expect(fileText('app.ts')).toContain('export const count = 2')
 
@@ -147,9 +147,9 @@ async function gitViewWithResolver(): Promise<Page> {
 test('resolving every conflict commits the merge, and the failed push is reported', async () => {
   const view = await openGitTab(handle)
   await view.getByTestId('conflict-file-row').filter({ hasText: 'app.ts' }).click()
-  await decide(view, 'Keep mine')
-  await decide(view, 'Keep theirs')
-  await decide(view, 'Keep theirs')
+  await decideConflict(view, 'Keep mine')
+  await decideConflict(view, 'Keep theirs')
+  await decideConflict(view, 'Keep theirs')
 
   await expect(view.getByText('All conflicts resolved')).toBeVisible()
   await view.getByRole('button', { name: 'Commit merge' }).click()

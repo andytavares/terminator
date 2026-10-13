@@ -54,11 +54,11 @@ beforeEach(() => {
   vi.clearAllMocks()
   registry = channelRegistry()
   Object.keys(storeData).forEach((k) => delete storeData[k])
-  const stub = (...args: unknown[]) => customMock()(...args)
-  bindShell({ exec: execOverPromisedStub(stub) })
+  const customStub = (...args: unknown[]) => customMock()(...args)
+  bindShell({ exec: execOverPromisedStub(customStub) })
   bindWorkspaceRoots(() => ['/repo', '/other'])
   registerGithubHandlers(registry.register, {
-    github: githubOverPromisedStub(stub),
+    github: githubOverPromisedStub(customStub),
     getToken: () => '',
     noCheckoutCwd: '/user-data',
   })

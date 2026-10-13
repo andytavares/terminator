@@ -118,7 +118,7 @@ function recordTimings(reportFiles) {
 }
 
 /** Every test Playwright would run for these spec arguments. */
-function listTests(specArgs) {
+function listPlaywrightTests(specArgs) {
   const listed = JSON.parse(
     execFileSync('npx', ['playwright', 'test', '--list', '--reporter=json', ...specArgs], {
       cwd: REPO_ROOT,
@@ -131,7 +131,7 @@ function listTests(specArgs) {
 
 /** The arguments for one shard of `total`. */
 function shardArgs(shard, total, specArgs) {
-  const tests = listTests(specArgs)
+  const tests = listPlaywrightTests(specArgs)
   const parallelFiles = new Set(
     [...new Set(tests.map((t) => t.file))].filter((file) =>
       isParallelFile(readFileSync(join(REPO_ROOT, E2E_DIR, file), 'utf8'))

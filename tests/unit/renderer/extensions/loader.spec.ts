@@ -10,6 +10,7 @@ import {
 } from '../../../../src/renderer/extensions/loader'
 import { resetStore } from '../../../support/renderer-stores'
 import { installElectronApi } from '../../../support/electron-api'
+import { registryState } from '../../../support/store-state'
 
 // The real portal mounts a WebContentsView through IPC. This one shows what it
 // was asked to host.
@@ -17,8 +18,6 @@ vi.mock('../../../../src/renderer/components/ExtensionPanelPortal', () => ({
   ExtensionPanelPortal: ({ extensionId, viewParam }: { extensionId: string; viewParam: string }) =>
     React.createElement('div', { 'data-testid': 'portal' }, `${extensionId}:${viewParam}`),
 }))
-
-const registry = () => useExtensionRegistry.getState()
 
 beforeEach(() => {
   resetStore(useExtensionRegistry)
@@ -62,7 +61,7 @@ describe('initExtensions — manifest-driven (contributes) registration', () => 
         contributes: { globalTab: { label: 'My Tool', icon: 'wrench', view: 'main' } },
       },
     ])
-    const tab = registry().globalTabs.get('com.test.ext')
+    const tab = registryState().globalTabs.get('com.test.ext')
     expect(tab).toMatchObject({ label: 'My Tool', view: 'main', sortOrder: 1 })
     expect(React.isValidElement(tab?.icon)).toBe(true)
   })
@@ -71,14 +70,14 @@ describe('initExtensions — manifest-driven (contributes) registration', () => 
     await callInit([
       { id: 'com.test.ext', contributes: { workspaceTab: { label: 'WS Tab', view: 'workspace' } } },
     ])
-    expect(registry().workspaceTabs.get('com.test.ext')).toMatchObject({ label: 'WS Tab' })
+    expect(registryState().workspaceTabs.get('com.test.ext')).toMatchObject({ label: 'WS Tab' })
   })
 
   it('registers projectTab via registerProjectTab when contributes.projectTab is set', async () => {
     await callInit([
       { id: 'com.test.ext', contributes: { projectTab: { label: 'Proj Tab', view: 'project' } } },
     ])
-    expect(registry().projectTabs.get('com.test.ext')).toMatchObject({ label: 'Proj Tab' })
+    expect(registryState().projectTabs.get('com.test.ext')).toMatchObject({ label: 'Proj Tab' })
   })
 })
 
@@ -90,8 +89,8 @@ describe('initExtensions — manifest-driven (contributes) registration — regi
         contributes: { sidebarPanel: { label: 'Sidebar', defaultOpen: true, view: 'sidebar' } },
       },
     ])
-    expect(registry().sidebarPanels.get('com.test.ext')).toMatchObject({ label: 'Sidebar' })
-    expect(registry().openPanels.has('com.test.ext')).toBe(true)
+    expect(registryState().sidebarPanels.get('com.test.ext')).toMatchObject({ label: 'Sidebar' })
+    expect(registryState().openPanels.has('com.test.ext')).toBe(true)
   })
 
   it('registers each windowView via registerWindowView', async () => {
@@ -106,8 +105,8 @@ describe('initExtensions — manifest-driven (contributes) registration — regi
         },
       },
     ])
-    expect([...registry().windowViews.keys()]).toEqual(['view-a', 'view-b'])
-    expect(portalOf(registry().windowViews.get('view-b')!, { repoRoot: null })).toBe(
+    expect([...registryState().windowViews.keys()]).toEqual(['view-a', 'view-b'])
+    expect(portalOf(registryState().windowViews.get('view-b')!, { repoRoot: null })).toBe(
       'com.test.ext:preview'
     )
   })
@@ -116,7 +115,7 @@ describe('initExtensions — manifest-driven (contributes) registration — regi
 describe('initExtensions — manifest-driven (contributes) registration — does not call any registry method when extension has no contributes', () => {
   it('does not call any registry method when extension has no contributes', async () => {
     await callInit([{ id: 'com.test.ext' }])
-    const { globalTabs, workspaceTabs, projectTabs, sidebarPanels, windowViews } = registry()
+    const { globalTabs, workspaceTabs, projectTabs, sidebarPanels, windowViews } = registryState()
     for (const surfaces of [globalTabs, workspaceTabs, projectTabs, sidebarPanels, windowViews]) {
       expect(surfaces.size).toBe(0)
     }
@@ -126,38 +125,38 @@ describe('initExtensions — manifest-driven (contributes) registration — does
     await callInit([
       { id: 'com.test.ext', status: 'disabled', contributes: { globalTab: { label: 'X' } } },
     ])
-    expect(registry().globalTabs.size).toBe(0)
+    expect(registryState().globalTabs.size).toBe(0)
   })
 })
 
 describe('registerWebviewExtension — default view params', () => {
   const register = (contributes: Extension['contributes']) =>
-    registerWebviewExtension(makeExt({ contributes }), registry())
+    registerWebviewExtension(makeExt({ contributes }), registryState())
 
   it('hosts the "main" view in a global tab that names none, with no icon', () => {
     register({ globalTab: { label: 'X' } })
-    const tab = registry().globalTabs.get('com.test.ext')!
+    const tab = registryState().globalTabs.get('com.test.ext')!
     expect(tab).toMatchObject({ view: 'main', icon: undefined })
     expect(portalOf(tab.component, {})).toBe('com.test.ext:main')
   })
 
   it('hosts the "workspace" view in a workspace tab that names none, with no icon', () => {
     register({ workspaceTab: { label: 'WS' } })
-    const tab = registry().workspaceTabs.get('com.test.ext')!
+    const tab = registryState().workspaceTabs.get('com.test.ext')!
     expect(tab).toMatchObject({ view: 'workspace', icon: undefined })
     expect(portalOf(tab.component, {})).toBe('com.test.ext:workspace')
   })
 
   it('hosts the "project" view in a project tab that names none', () => {
     register({ projectTab: { label: 'Proj' } })
-    const tab = registry().projectTabs.get('com.test.ext')!
+    const tab = registryState().projectTabs.get('com.test.ext')!
     expect(tab.view).toBe('project')
     expect(portalOf(tab.component, { repoRoot: null })).toBe('com.test.ext:project')
   })
 
   it('hosts the "sidebar" view in a sidebar panel that names none', () => {
     register({ sidebarPanel: { label: 'Panel' } })
-    const panel = registry().sidebarPanels.get('com.test.ext')!
+    const panel = registryState().sidebarPanels.get('com.test.ext')!
     expect(panel.view).toBe('sidebar')
     expect(portalOf(panel.component, { repoRoot: null, onClose: () => {} })).toBe(
       'com.test.ext:sidebar'
@@ -174,12 +173,12 @@ describe('registerWebviewExtension — commands / keyboard shortcuts', () => {
           commands: [{ id: 'ext:toggle', label: 'Toggle', shortcut: 'CmdOrCtrl+Shift+G' }],
         },
       }),
-      registry()
+      registryState()
     )
-    const [shortcut] = registry().keyboardShortcuts
+    const [shortcut] = registryState().keyboardShortcuts
     expect(shortcut.accelerator).toBe('CmdOrCtrl+Shift+G')
     shortcut.action()
-    expect(registry().openPanels.has('com.test.ext')).toBe(true)
+    expect(registryState().openPanels.has('com.test.ext')).toBe(true)
   })
 
   it('does not register a keyboard shortcut when the command has no shortcut', () => {
@@ -190,9 +189,9 @@ describe('registerWebviewExtension — commands / keyboard shortcuts', () => {
           commands: [{ id: 'ext:action', label: 'Action' }],
         },
       }),
-      registry()
+      registryState()
     )
-    expect(registry().keyboardShortcuts).toEqual([])
+    expect(registryState().keyboardShortcuts).toEqual([])
   })
 })
 
@@ -205,9 +204,9 @@ describe('registerWebviewExtension — commands / keyboard shortcuts — does no
           commands: [{ id: 'ext:action', label: 'Action', shortcut: 'CmdOrCtrl+X' }],
         },
       }),
-      registry()
+      registryState()
     )
-    expect(registry().keyboardShortcuts).toEqual([])
+    expect(registryState().keyboardShortcuts).toEqual([])
   })
 })
 
@@ -230,7 +229,7 @@ describe('Quick Actions group allocation at init', () => {
         contributes: { quickActions: { group: { mnemonic: 'n', label: 'Notes' } } },
       },
     ])
-    expect(registry().quickActionGroups).toEqual([
+    expect(registryState().quickActionGroups).toEqual([
       { id: 'ext:git-integration', mnemonic: 'g', label: 'Git', owner: 'git-integration' },
       { id: 'ext:notepad', mnemonic: 'n', label: 'Notes', owner: 'notepad' },
     ])
@@ -241,7 +240,7 @@ describe('Quick Actions group allocation at init', () => {
       quickActionGroups: [{ id: 'ext:gone', mnemonic: 'x', label: 'Gone', owner: 'gone' }],
     })
     await callInit([{ id: 'com.test.ext' }])
-    expect(registry().quickActionGroups).toEqual([])
+    expect(registryState().quickActionGroups).toEqual([])
   })
 })
 
@@ -251,7 +250,7 @@ describe('Quick Actions group allocation at init — reassigns a colliding mnemo
       { id: 'one', contributes: { quickActions: { group: { mnemonic: 'g', label: 'One' } } } },
       { id: 'two', contributes: { quickActions: { group: { mnemonic: 'g', label: 'Two' } } } },
     ])
-    const groups = registry().quickActionGroups
+    const groups = registryState().quickActionGroups
     expect(groups).toHaveLength(2)
     expect(groups[1].mnemonic).not.toBe('g')
   })

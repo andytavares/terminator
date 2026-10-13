@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { execFileSync } from 'child_process'
 import { existsSync, readFileSync, writeFileSync, rmSync } from 'fs'
 import { join } from 'path'
 import { adoptLoginShellPath } from '../../../src/main/shell/login-shell-path'
 import { stopRunningCommands } from '../../../src/main/shell/command-runner'
 import { makeTempDir } from '../../support/temp-dir'
+import { isProcessAlive } from '../../support/processes'
 
 let dir: string
 
@@ -63,16 +63,6 @@ describe('adoptLoginShellPath', () => {
   })
 })
 
-/** Running, and not a zombie waiting for its new parent to reap it. */
-function isAlive(pid: number): boolean {
-  try {
-    const state = execFileSync('ps', ['-o', 'stat=', '-p', String(pid)], { encoding: 'utf8' })
-    return !state.startsWith('Z')
-  } catch {
-    return false
-  }
-}
-
 describe('adoptLoginShellPath while the app quits', () => {
   // An interactive login shell runs the person's rc files, which can start
   // processes of their own; quitting during the probe must end them too.
@@ -88,6 +78,6 @@ describe('adoptLoginShellPath while the app quits', () => {
     await adopting
 
     expect(env.PATH).toBe('/usr/bin:/bin')
-    await expect.poll(() => isAlive(grandchild)).toBe(false)
+    await expect.poll(() => isProcessAlive(grandchild)).toBe(false)
   })
 })

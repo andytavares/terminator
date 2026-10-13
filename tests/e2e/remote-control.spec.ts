@@ -9,7 +9,7 @@ import {
   e2ePath,
   launchApp,
 } from './helpers'
-import { openExtension } from './extension-page'
+import { openFromAppBand } from './extension-page'
 
 // Remote Control's channels, driven from its view, with each effect read where it lands: a
 // browser running the real remote renderer, the server, or the clipboard. The public address
@@ -48,7 +48,7 @@ test.beforeAll(async ({ playwright }) => {
   handle = await launchApp(undefined, { PATH: e2ePath(NGROK_STUB_DIR) })
   await createWorkspace(handle.page, 'Remote-WS', handle.userDataDir)
   await addAndSelectProject(handle.page, 'Remote-WS', 'phone-branch')
-  view = await openExtension(handle, 'Remote Control', 'remote-control')
+  view = await openFromAppBand(handle, 'Remote Control', 'remote-control')
   browser = await playwright.chromium.launch()
 })
 
@@ -58,13 +58,13 @@ test.afterAll(async () => {
 })
 
 /** The view's Settings section, opened. */
-async function openSettings(): Promise<void> {
+async function openRemoteSettings(): Promise<void> {
   const toggle = view.getByRole('button', { name: /^Settings/ })
   if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click()
 }
 
 /** Types `value` into the settings field labelled `label` and leaves it, which saves it. */
-async function saveField(label: string, value: string): Promise<void> {
+async function saveRemoteField(label: string, value: string): Promise<void> {
   const field = view.getByLabel(label, { exact: true })
   await field.fill(value)
   await field.blur()
@@ -88,12 +88,12 @@ function heading(name: string) {
 }
 
 async function tokenOpensThePublicAddress(): Promise<void> {
-  await openSettings()
-  await saveField('Account token', NGROK_TOKEN)
+  await openRemoteSettings()
+  await saveRemoteField('Account token', NGROK_TOKEN)
   await view.getByPlaceholder('New password').fill(PASSWORD)
   await view.getByRole('button', { name: 'Set password' }).click()
   await expect(view.getByText('A password is set.')).toBeVisible()
-  await saveField('Port', String(PORT))
+  await saveRemoteField('Port', String(PORT))
   await view.getByRole('button', { name: 'Turn on' }).click()
   // The stand-in opens a tunnel only when ngrok is started with the saved token.
   await expect(heading(PUBLIC_HEADING)).toBeVisible({ timeout: 20_000 })
@@ -114,8 +114,8 @@ async function reconnectKeepsThePhone(): Promise<void> {
 }
 
 async function viewerLimitTurnsTheNextAway(): Promise<void> {
-  await openSettings()
-  await saveField('Viewers per terminal', '1')
+  await openRemoteSettings()
+  await saveRemoteField('Viewers per terminal', '1')
   await expect(view.getByText('up to 1 viewers')).toBeVisible()
   await expect(view.locator('.rc-count')).toHaveText('1 of 1')
   const second = await openPhone()
@@ -139,7 +139,7 @@ function clipboardText(): Promise<string> {
 
 async function caddyfileProxiesTheRemoteRenderer(): Promise<void> {
   await handle.app.evaluate(({ clipboard }) => clipboard.writeText('nothing yet'))
-  await openSettings()
+  await openRemoteSettings()
   await view.getByRole('button', { name: 'Copy Caddyfile' }).click()
   await expect.poll(clipboardText).toContain(`reverse_proxy localhost:${PORT}`)
   expect(await clipboardText()).toContain('tls internal')

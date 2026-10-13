@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { CreateWorkspaceDialog } from '../../../../src/renderer/components/sidebar/CreateWorkspaceDialog'
-import { projectOf, workspaceOf } from '../../../support/renderer-stores'
+import { projectFixture, workspaceFixture } from '../../../support/renderer-stores'
 import type { ElectronAPI } from '../../../../src/shared/electron-api/api-type'
 import {
   CreateProjectInputSchema,
@@ -19,14 +19,15 @@ let nextWorkspaceId = NEW_WORKSPACE
 const mockCreateWorkspace = vi.fn<ElectronAPI['workspace']['create']>(async (payload) => {
   const input = CreateWorkspaceInputSchema.safeParse(payload)
   if (!input.success) return { error: 'VALIDATION_ERROR', message: input.error.message }
-  return { workspace: workspaceOf({ id: nextWorkspaceId, ...input.data }) }
+  return { workspace: workspaceFixture({ id: nextWorkspaceId, ...input.data }) }
 })
 const mockCreateProject = vi.fn<ElectronAPI['project']['create']>(async (payload) => ({
-  project: projectOf({ id: 'proj-new', ...CreateProjectInputSchema.parse(payload) }),
+  project: projectFixture({ id: 'proj-new', ...CreateProjectInputSchema.parse(payload) }),
 }))
 const mockOpenDirectory = vi.fn<ElectronAPI['dialog']['openDirectory']>()
 
-const workspaceNames = (): string[] => useWorkspaceStore.getState().workspaces.map((w) => w.name)
+const storedWorkspaceNames = (): string[] =>
+  useWorkspaceStore.getState().workspaces.map((w) => w.name)
 
 function withApi(
   repo: Partial<ElectronAPI['git']> = { isRepo: async () => ({ isRepo: false }) }
@@ -71,7 +72,7 @@ describe('CreateWorkspaceDialog', () => {
   })
 
   it('shows duplicate name error', () => {
-    useWorkspaceStore.setState({ workspaces: [workspaceOf({ id: 'ws-1', name: 'Existing' })] })
+    useWorkspaceStore.setState({ workspaces: [workspaceFixture({ id: 'ws-1', name: 'Existing' })] })
     render(<CreateWorkspaceDialog onClose={vi.fn()} />)
     const nameInput = screen.getByPlaceholderText('My Workspace')
     fireEvent.change(nameInput, { target: { value: 'existing' } })
@@ -88,7 +89,7 @@ describe('CreateWorkspaceDialog — adds the workspace it creates to the list', 
       target: { value: '/repos/my-ws' },
     })
     fireEvent.click(screen.getByText('Create'))
-    await vi.waitFor(() => expect(workspaceNames()).toEqual(['My WS']))
+    await vi.waitFor(() => expect(storedWorkspaceNames()).toEqual(['My WS']))
   })
 
   it('renders folder path input', () => {

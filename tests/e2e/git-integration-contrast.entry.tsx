@@ -50,7 +50,7 @@ interface FileChange {
   deletions: number
 }
 
-function file(path: string, { level, tier, additions, deletions }: FileChange) {
+function contrastFile(path: string, { level, tier, additions, deletions }: FileChange) {
   return {
     path,
     changeType: 'modified' as const,
@@ -71,19 +71,19 @@ const chapters = [
     estimatedMinutes: 12,
     status: 'in-progress' as const,
     files: [
-      file('src/main/session/session-store.ts', {
+      contrastFile('src/main/session/session-store.ts', {
         level: 'high',
         tier: 0,
         additions: 120,
         deletions: 14,
       }),
-      file('src/main/session/session-records.ts', {
+      contrastFile('src/main/session/session-records.ts', {
         level: 'medium',
         tier: 1,
         additions: 44,
         deletions: 6,
       }),
-      file('src/main/session/session-types.ts', {
+      contrastFile('src/main/session/session-types.ts', {
         level: 'low',
         tier: 2,
         additions: 12,
@@ -97,13 +97,18 @@ const chapters = [
     estimatedMinutes: 9,
     status: 'not-started' as const,
     files: [
-      file('src/renderer/home/Ledger.tsx', {
+      contrastFile('src/renderer/home/Ledger.tsx', {
         level: 'medium',
         tier: 1,
         additions: 80,
         deletions: 22,
       }),
-      file('src/renderer/home/Logbook.tsx', { level: 'low', tier: 2, additions: 31, deletions: 3 }),
+      contrastFile('src/renderer/home/Logbook.tsx', {
+        level: 'low',
+        tier: 2,
+        additions: 31,
+        deletions: 3,
+      }),
     ],
   },
   {
@@ -111,7 +116,9 @@ const chapters = [
     name: 'Generated and lockfiles',
     estimatedMinutes: 1,
     status: 'complete' as const,
-    files: [file('package-lock.json', { level: 'low', tier: 3, additions: 400, deletions: 380 })],
+    files: [
+      contrastFile('package-lock.json', { level: 'low', tier: 3, additions: 400, deletions: 380 }),
+    ],
   },
 ]
 

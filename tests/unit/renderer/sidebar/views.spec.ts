@@ -62,7 +62,7 @@ const repo: Workspace = {
   updatedAt: '',
 }
 
-const branch = (id: string): Project => ({
+const branchProject = (id: string): Project => ({
   id,
   workspaceId: 'w1',
   name: id,
@@ -72,17 +72,17 @@ const branch = (id: string): Project => ({
   updatedAt: '',
 })
 
-const terminal = (projectId: string, agentState: AgentState, lastActivityAt = NOW) =>
+const terminalOn = (projectId: string, agentState: AgentState, lastActivityAt = NOW) =>
   terminalSessionOf({ id: `s-${projectId}`, projectId, agentState, lastActivityAt })
 
 const sessions: TerminalSession[] = [
-  terminal('working', 'working'),
-  terminal('waiting', 'awaiting-input'),
-  terminal('idle', 'idle'),
-  terminal('quiet', 'idle', NOW - STALE_AFTER - 1),
+  terminalOn('working', 'working'),
+  terminalOn('waiting', 'awaiting-input'),
+  terminalOn('idle', 'idle'),
+  terminalOn('quiet', 'idle', NOW - STALE_AFTER - 1),
 ]
 
-const projects = ['working', 'waiting', 'idle', 'quiet'].map(branch)
+const projects = ['working', 'waiting', 'idle', 'quiet'].map(branchProject)
 
 const shownBy = (id: string): string[] => {
   const view = BUILT_IN_VIEWS.find((v) => v.id === id)!

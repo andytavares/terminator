@@ -4,6 +4,7 @@ import { readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { launchApp, closeApp, createWorkspace, type AppHandle, e2eTempDir } from '../helpers'
 import { writeLiveOrder } from './live-order'
+import { expectOneDraftPullRequest, liveOrderDir, liveRunOver, startLiveRun } from './live-run'
 
 // A whole run, for real: a real agent, in a real worktree, editing real code,
 // running the project's real tests, and ending in a real draft pull request.
@@ -119,34 +120,12 @@ interface Observed {
   blocked?: { id: string; reason: string }[]
 }
 
-/** Starts the run, and checks it was accepted with something to run. */
-async function startRun(): Promise<void> {
-  const started = (await foundry('foundry:run.start', { id: ORDER })) as {
-    error?: string
-    started?: boolean
-  }
-  expect(started.error, 'the run was refused').toBeUndefined()
-  expect(started.started, 'nothing was there to run it').toBe(true)
-}
-
-const orderFile = (name: string): string => join(repo, '.foundry', 'orders', ORDER, name)
-
-/** The run is over when it has said so: a draft on the ledger, or a gate
- * holding it. Null while it has said neither. */
-function runOver(): string | null {
-  const ledger = existsSync(orderFile('ledger.jsonl'))
-    ? readFileSync(orderFile('ledger.jsonl'), 'utf8')
-    : ''
-  if (ledger.includes('ship.draft_opened')) return 'a draft is on the ledger'
-  if (ledger.includes('ship.refused')) return 'shipping was refused, and said so'
-  if (existsSync(orderFile('gates.json'))) return 'a gate is holding it'
-  return null
-}
+const orderFile = (name: string): string => join(liveOrderDir(repo, ORDER), name)
 
 const SETTLED = new Set(['passed', 'failed', 'skipped', 'blocked'])
 
 /** Logs the graph's line when it differs from the last one logged, and returns it. */
-function logGraph(observed: Observed, previous: string): string {
+function logGraphStates(observed: Observed, previous: string): string {
   const nodes = observed.graph?.nodes ?? []
   const line = nodes.map((n) => `${observed.labels?.[n.id] ?? n.id}=${n.state}`).join(' ')
   if (line !== previous) console.log(`[${new Date().toISOString().slice(11, 19)}] ${line}`)
@@ -167,15 +146,15 @@ function settledAt(observed: Observed, since: number | null): number | null {
 /** Polls until the run says it is over, the tail hangs, or the deadline (longer than the
  * order's budget) passes; never until the graph settles, since the climb and the shipping
  * come after. Why: docs/CONTRIBUTING.md, "Live specs". */
-async function observeUntilOver(): Promise<Observed> {
+async function observeUntilShippedOrStalled(): Promise<Observed> {
   const deadline = Date.now() + 45 * 60_000
   let last: Observed = {}
   let previous = ''
   let settledSince: number | null = null
   while (Date.now() < deadline) {
     last = (await foundry('foundry:run.observe', { id: ORDER })) as Observed
-    previous = logGraph(last, previous)
-    const over = runOver()
+    previous = logGraphStates(last, previous)
+    const over = liveRunOver(liveOrderDir(repo, ORDER))
     if (over !== null) {
       console.log(`[run over] ${over}`)
       break
@@ -234,24 +213,6 @@ function expectTheChangeMade(): string {
   return worktree
 }
 
-/** The thing this test is named after. Read back from GitHub rather than from
- * the ledger, because the ledger records what the code believed. */
-function expectOneDraftOnGitHub(worktree: string): void {
-  const branch = execFileSync('git', ['branch', '--show-current'], { cwd: worktree })
-    .toString()
-    .trim()
-  const listed = execFileSync(
-    'gh',
-    ['pr', 'list', '--head', branch, '--json', 'url,isDraft,headRefName'],
-    { cwd: repo }
-  ).toString()
-
-  console.log(`pull requests on ${branch}: ${listed}`)
-  const pulls = JSON.parse(listed) as { url: string; isDraft: boolean }[]
-  expect(pulls, `nothing was opened on ${branch}`).toHaveLength(1)
-  expect(pulls[0].isDraft, 'it was opened, but not as a draft (FR-053)').toBe(true)
-}
-
 /** The climb measured what this repository has: a test that lets the ladder report a check
  * it ran as unmeasured would let it report one it never ran as passed (it once missed a
  * transcript at `-private-var-folders-…`). */
@@ -279,9 +240,9 @@ test('an agent takes an order to a draft pull request', async () => {
   // killing it with "timed out".
   test.setTimeout(3_000_000)
   writeOrder()
-  await startRun()
+  await startLiveRun(foundry, ORDER)
 
-  const last = await observeUntilOver()
+  const last = await observeUntilShippedOrStalled()
   expectNothingRunningUnexplained(last)
   const worktree = expectTheChangeMade()
 
@@ -290,7 +251,7 @@ test('an agent takes an order to a draft pull request', async () => {
   console.log(`ledger:\n${ledger}`)
   expect(ledger).toContain('run.started')
 
-  expectOneDraftOnGitHub(worktree)
+  expectOneDraftPullRequest(repo, worktree)
   // And the order says so too, which is what the operator reads.
   expect(ledger).toContain('ship.draft_opened')
   expectTheClimbMeasured(ledger)

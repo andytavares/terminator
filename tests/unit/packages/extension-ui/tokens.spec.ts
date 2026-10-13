@@ -1,11 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
 import { EXTENSION_BASE_CSS } from '../../../../packages/extension-ui/src/extension-base-css'
+import { readBeside } from '../../../support/files'
 
-const read = (path: string) => readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8')
-const TOKENS = read('../../../../packages/extension-ui/src/tokens.css')
-const CORE_STYLES = read('../../../../src/renderer/styles.css')
+const TOKENS = readBeside(import.meta.url, '../../../../packages/extension-ui/src/tokens.css')
+const CORE_STYLES = readBeside(import.meta.url, '../../../../src/renderer/styles.css')
 
 function definedTokens(css: string): Set<string> {
   return new Set([...css.matchAll(/^\s*(--tm-[a-z0-9-]+):/gm)].map((match) => match[1]))

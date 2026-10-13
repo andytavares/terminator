@@ -1,8 +1,8 @@
 import { describe, it, expect, afterAll } from 'vitest'
-import { execFileSync } from 'node:child_process'
 import { chmodSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { makeTempDir } from '../../support/temp-dir'
+import { isProcessAlive } from '../../support/processes'
 
 // The core's own git commands end with the app: one in flight at quit, with the xcodebuild
 // its xcrun shim started, outlived it (macOS run 38382115775). The stand-in git records a sleep's pid.
@@ -16,16 +16,6 @@ const originalPath = process.env.PATH
 afterAll(() => {
   process.env.PATH = originalPath
 })
-
-/** Running, and not a zombie waiting for its new parent to reap it. */
-function isAlive(pid: number): boolean {
-  try {
-    const state = execFileSync('ps', ['-o', 'stat=', '-p', String(pid)], { encoding: 'utf8' })
-    return !state.startsWith('Z')
-  } catch {
-    return false
-  }
-}
 
 describe('git-service on quit', () => {
   it('has its running git commands, and what they started, stopped with the rest', async () => {
@@ -43,6 +33,6 @@ describe('git-service on quit', () => {
     stopRunningCommands()
 
     expect(await fetch).toBe('rejected')
-    await expect.poll(() => isAlive(grandchild)).toBe(false)
+    await expect.poll(() => isProcessAlive(grandchild)).toBe(false)
   })
 })

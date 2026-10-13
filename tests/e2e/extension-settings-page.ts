@@ -1,5 +1,5 @@
 import { expect, type Locator, type Page } from '@playwright/test'
-import { openSettings } from './helpers'
+import { openSettingsSection } from './helpers'
 
 // An extension's own page in Settings → Extensions, opened with its ⚙ button,
 // and one setting's row on it, found by the label the extension declared.
@@ -24,7 +24,7 @@ export function settingRow(panel: Locator, label: string): Locator {
 
 /** Opens Settings on the extension's own settings page and returns its entry. */
 export async function openExtensionSettings(page: Page, name: string): Promise<Locator> {
-  await openSettings(page, 'Extensions')
+  await openSettingsSection(page, 'Extensions')
   const entry = extensionEntry(page, name)
   if ((await entry.locator('.extension-settings-panel').count()) === 0) {
     await entry.getByTitle('Configure').click()

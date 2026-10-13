@@ -1,9 +1,9 @@
 import { test } from '@playwright/test'
-import { execFileSync } from 'node:child_process'
 import { writeFileSync, mkdirSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { writeFileSync as write } from 'node:fs'
 import { launchApp, closeApp, createWorkspace, type AppHandle, e2eTempDir } from '../helpers'
+import { git } from '../foundry-harness'
 
 // Retakes the user-guide screenshots of the Foundry surfaces.
 //
@@ -23,19 +23,11 @@ let repo: string
 
 const SHOTS = join(process.cwd(), 'docs', 'user-guide', 'screenshots')
 
-function git(...args: string[]): void {
-  const env = { ...process.env }
-  delete env.GIT_DIR
-  delete env.GIT_INDEX_FILE
-  delete env.GIT_WORK_TREE
-  execFileSync('git', args, { cwd: repo, env })
-}
-
 /** A repository with a README and a package whose scripts the Forge can read. */
 function commitRepo(): void {
-  git('init', '-b', 'main')
-  git('config', 'user.email', 'shot@example.com')
-  git('config', 'user.name', 'Shot')
+  git(repo, 'init', '-b', 'main')
+  git(repo, 'config', 'user.email', 'shot@example.com')
+  git(repo, 'config', 'user.name', 'Shot')
   writeFileSync(join(repo, 'README.md'), '# terminator\n')
   writeFileSync(
     join(repo, 'package.json'),
@@ -45,8 +37,8 @@ function commitRepo(): void {
       2
     )
   )
-  git('add', '.')
-  git('commit', '-m', 'initial')
+  git(repo, 'add', '.')
+  git(repo, 'commit', '-m', 'initial')
 }
 
 /** The Ledger's accepted-checks panel only appears when there is something in
@@ -84,7 +76,7 @@ async function runInFoundry(script: string): Promise<void> {
 /** The Foundry view as a PNG. The image comes back as base64 rather than being
  * written inside the main process: `evaluate` runs there, but only
  * serialisable values cross back. */
-async function capture(): Promise<Buffer> {
+async function captureWindow(): Promise<Buffer> {
   const png = await handle.app.evaluate(async ({ webContents }) => {
     const view = webContents
       .getAllWebContents()
@@ -144,7 +136,7 @@ interface RunNodeSpec {
 }
 
 /** A node of the run graph, with no session or worktree of its own. */
-function runNode(spec: RunNodeSpec): unknown {
+function runningNode(spec: RunNodeSpec): unknown {
   return {
     id: spec.id,
     stepId: spec.stepId,
@@ -228,7 +220,7 @@ function markOrderRunning(): void {
   writeFileSync(orderFile, JSON.stringify({ ...order, status: 'running' }, null, 2))
   writeFileSync(
     join(ordersDir, orderId, 'run-graph.json'),
-    JSON.stringify({ orderId, recipe: 'direct', nodes: RUN_NODES.map(runNode) }, null, 2)
+    JSON.stringify({ orderId, recipe: 'direct', nodes: RUN_NODES.map(runningNode) }, null, 2)
   )
 }
 
@@ -250,7 +242,7 @@ async function captureForgeWithAnIdea(): Promise<void> {
   await openSurface('Forge')
   await runInFoundry(NEW_ORDER_FROM_IDEA)
   await handle.page.waitForTimeout(4000)
-  write(join(SHOTS, '08b-foundry-forge.png'), await capture())
+  write(join(SHOTS, '08b-foundry-forge.png'), await captureWindow())
 }
 
 /** Back out to the list and in again, so the surface re-reads the order, on its Floor. */
@@ -259,7 +251,7 @@ async function captureFloor(): Promise<void> {
   await openSurface('Forge')
   await runInFoundry(`document.querySelector('.fdry-orders button')?.click()`)
   await handle.page.waitForTimeout(2500)
-  write(join(SHOTS, '08e-foundry-floor.png'), await capture())
+  write(join(SHOTS, '08e-foundry-floor.png'), await captureWindow())
 }
 
 /** Settings is behind the gear rather than a named tab, so it is reached by its
@@ -268,7 +260,7 @@ async function captureFloor(): Promise<void> {
 async function captureSettings(): Promise<void> {
   await runInFoundry(`document.querySelector('button[aria-label="Settings"]')?.click()`)
   await handle.page.waitForTimeout(1500)
-  write(join(SHOTS, '08d-foundry-settings.png'), await capture())
+  write(join(SHOTS, '08d-foundry-settings.png'), await captureWindow())
 }
 
 test('capture the Foundry surfaces', async () => {
@@ -278,13 +270,13 @@ test('capture the Foundry surfaces', async () => {
   seedAcceptedCheck()
   await openFoundryOnRepo()
 
-  write(join(SHOTS, '08-foundry-tab.png'), await capture())
+  write(join(SHOTS, '08-foundry-tab.png'), await captureWindow())
   await captureForgeWithAnIdea()
   markOrderRunning()
   await captureFloor()
 
   await openSurface('Ledger')
-  write(join(SHOTS, '08c-foundry-ledger.png'), await capture())
+  write(join(SHOTS, '08c-foundry-ledger.png'), await captureWindow())
   await captureSettings()
 
   await closeApp(handle)

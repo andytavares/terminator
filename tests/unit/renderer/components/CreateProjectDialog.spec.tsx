@@ -4,7 +4,12 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { useSettingsStore } from '../../../../src/renderer/stores/settings.store'
 import { CreateProjectDialog } from '../../../../src/renderer/components/sidebar/CreateProjectDialog'
-import { issueSummaryOf, projectOf, seedStore, workspaceOf } from '../../../support/renderer-stores'
+import {
+  issueSummaryOf,
+  projectFixture,
+  seedStore,
+  workspaceFixture,
+} from '../../../support/renderer-stores'
 import type { IssueSummary } from '../../../../src/shared/types/index'
 import { DEFAULT_GLOBAL_SETTINGS } from '../../../../src/shared/schemas/settings.schema'
 import type { ElectronAPI } from '../../../../src/shared/electron-api/api-type'
@@ -43,7 +48,7 @@ beforeEach(() => {
   seedStore(useWorkspaceStore, {
     createProject: mockCreateProject,
     projectsByWorkspaceId: new Map([['ws-1', []]]),
-    workspaces: [workspaceOf({ id: 'ws-1', name: 'My WS', folderPath: '' })],
+    workspaces: [workspaceFixture({ id: 'ws-1', name: 'My WS', folderPath: '' })],
   })
   seedStore(useSettingsStore, {
     resolveSettings: vi.fn().mockReturnValue(DEFAULT_GLOBAL_SETTINGS),
@@ -58,7 +63,7 @@ function setupGitWorkspace(): void {
   seedStore(useWorkspaceStore, {
     createProject: mockCreateProject,
     projectsByWorkspaceId: new Map([['ws-1', []]]),
-    workspaces: [workspaceOf({ id: 'ws-1', name: 'My WS', folderPath: '/repo' })],
+    workspaces: [workspaceFixture({ id: 'ws-1', name: 'My WS', folderPath: '/repo' })],
   })
 }
 
@@ -119,9 +124,9 @@ describe('CreateProjectDialog — shows duplicate project name error on blur', (
     seedStore(useWorkspaceStore, {
       createProject: mockCreateProject,
       projectsByWorkspaceId: new Map([
-        ['ws-1', [projectOf({ workspaceId: 'ws-1', id: 'p1', name: 'My App' })]],
+        ['ws-1', [projectFixture({ workspaceId: 'ws-1', id: 'p1', name: 'My App' })]],
       ]),
-      workspaces: [workspaceOf({ id: 'ws-1', name: 'My WS', folderPath: '' })],
+      workspaces: [workspaceFixture({ id: 'ws-1', name: 'My WS', folderPath: '' })],
     })
     render(<CreateProjectDialog workspaceId="ws-1" onClose={vi.fn()} />)
     const nameInput = screen.getAllByRole('textbox')[0]
@@ -248,12 +253,11 @@ describe('CreateProjectDialog — new branch mode shows error when branch name i
 
   it('disables Branch tab and defaults to worktree when non-worktree project exists', async () => {
     setupGitWorkspace()
+    const main = projectFixture({ workspaceId: 'ws-1', id: 'p1', name: 'Main', isWorktree: false })
     seedStore(useWorkspaceStore, {
       createProject: mockCreateProject,
-      projectsByWorkspaceId: new Map([
-        ['ws-1', [projectOf({ workspaceId: 'ws-1', id: 'p1', name: 'Main', isWorktree: false })]],
-      ]),
-      workspaces: [workspaceOf({ id: 'ws-1', name: 'My WS', folderPath: '/repo' })],
+      projectsByWorkspaceId: new Map([['ws-1', [main]]]),
+      workspaces: [workspaceFixture({ id: 'ws-1', name: 'My WS', folderPath: '/repo' })],
     })
     render(<CreateProjectDialog workspaceId="ws-1" onClose={vi.fn()} />)
     await vi.waitFor(() => screen.getByRole('button', { name: 'Branch' }))
@@ -276,10 +280,10 @@ describe('CreateProjectDialog — submit guard shows error when branchMode is ex
       projectsByWorkspaceId: new Map([
         [
           'ws-1',
-          [projectOf({ workspaceId: 'ws-1', id: 'p1', name: 'Existing', isWorktree: false })],
+          [projectFixture({ workspaceId: 'ws-1', id: 'p1', name: 'Existing', isWorktree: false })],
         ],
       ]),
-      workspaces: [workspaceOf({ id: 'ws-1', name: 'My WS', folderPath: '' })],
+      workspaces: [workspaceFixture({ id: 'ws-1', name: 'My WS', folderPath: '' })],
     })
     rerender(<CreateProjectDialog workspaceId="ws-1" onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Create'))
@@ -373,7 +377,7 @@ describe('CreateProjectDialog — branch mode selecting a branch via dropdown fi
     seedStore(useWorkspaceStore, {
       createProject: mockCreateProject,
       projectsByWorkspaceId: new Map([['ws-1', []]]),
-      workspaces: [workspaceOf({ id: 'ws-1', name: 'My WS', folderPath: '/repo' })],
+      workspaces: [workspaceFixture({ id: 'ws-1', name: 'My WS', folderPath: '/repo' })],
     })
     render(<CreateProjectDialog workspaceId="ws-1" onClose={vi.fn()} />)
     await vi.waitFor(() => screen.getByText('main'))
@@ -400,7 +404,7 @@ describe('CreateProjectDialog — worktree mode selecting existing branch then n
     seedStore(useWorkspaceStore, {
       createProject: mockCreateProject,
       projectsByWorkspaceId: new Map([['ws-1', []]]),
-      workspaces: [workspaceOf({ id: 'ws-1', name: 'My WS', folderPath: '/repo' })],
+      workspaces: [workspaceFixture({ id: 'ws-1', name: 'My WS', folderPath: '/repo' })],
     })
     render(<CreateProjectDialog workspaceId="ws-1" onClose={vi.fn()} />)
     await vi.waitFor(() => screen.getByText('Worktree'))
@@ -552,7 +556,7 @@ async function openWithIssues(connected = true, issues: IssueSummary[] = [ISSUE]
   seedStore(useWorkspaceStore, {
     createProject: mockCreateProject,
     projectsByWorkspaceId: new Map(),
-    workspaces: [workspaceOf({ id: 'w1', name: 'ws', folderPath: '/repo' })],
+    workspaces: [workspaceFixture({ id: 'w1', name: 'ws', folderPath: '/repo' })],
   })
   seedStore(useSettingsStore, { resolveSettings: () => DEFAULT_GLOBAL_SETTINGS })
 
@@ -828,7 +832,7 @@ describe('CreateProjectDialog — names outside a repo', () => {
     seedStore(useWorkspaceStore, {
       createProject: mockCreateProject,
       projectsByWorkspaceId: new Map(),
-      workspaces: [workspaceOf({ id: 'ws-1', name: 'My WS', folderPath: '' })],
+      workspaces: [workspaceFixture({ id: 'ws-1', name: 'My WS', folderPath: '' })],
     })
     render(<CreateProjectDialog workspaceId="ws-1" onClose={vi.fn()} />)
     fireEvent.change(screen.getByPlaceholderText('My branch'), { target: { value: 'My App' } })
@@ -841,7 +845,7 @@ describe('CreateProjectDialog — names outside a repo — treats a repo with no
   it('treats a repo with no reported root as a plain folder', async () => {
     gitApi.isRepo.mockResolvedValue({ isRepo: true })
     seedStore(useWorkspaceStore, {
-      workspaces: [workspaceOf({ id: 'ws-1', name: 'My WS', folderPath: '/somewhere' })],
+      workspaces: [workspaceFixture({ id: 'ws-1', name: 'My WS', folderPath: '/somewhere' })],
     })
     render(<CreateProjectDialog workspaceId="ws-1" onClose={vi.fn()} />)
     await vi.waitFor(() => expect(gitApi.isRepo).toHaveBeenCalledWith('/somewhere'))

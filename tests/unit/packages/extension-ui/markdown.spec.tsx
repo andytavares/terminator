@@ -184,12 +184,12 @@ describe('Markdown raw HTML — sanitising — points an in-page HTML anchor at 
   })
 })
 
-const link = (body: string) => {
+const renderedLink = (body: string) => {
   const { container } = render(<Markdown onOpenLink={onOpenLink}>{body}</Markdown>)
   return container.querySelector('a')!
 }
 
-const click = (anchor: HTMLElement) => {
+const clickAnchor = (anchor: Element) => {
   const event = new MouseEvent('click', { bubbles: true, cancelable: true })
   anchor.dispatchEvent(event)
   return event
@@ -204,32 +204,34 @@ describe('Markdown links', () => {
   setUpMarkdownLinks()
 
   it('opens an https address through onOpenLink and keeps the view where it is', () => {
-    const event = click(link('[PR](https://example.com/pr)'))
+    const event = clickAnchor(renderedLink('[PR](https://example.com/pr)'))
     expect(onOpenLink).toHaveBeenCalledWith('https://example.com/pr')
     expect(event.defaultPrevented).toBe(true)
   })
 
   it('opens an http address through onOpenLink', () => {
-    click(link('[PR](http://example.com/pr)'))
+    clickAnchor(renderedLink('[PR](http://example.com/pr)'))
     expect(onOpenLink).toHaveBeenCalledWith('http://example.com/pr')
   })
 
   it('lets an in-page link scroll the view', () => {
-    const anchor = link('[jump](#section)')
-    expect(click(anchor).defaultPrevented).toBe(false)
+    const anchor = renderedLink('[jump](#section)')
+    expect(clickAnchor(anchor).defaultPrevented).toBe(false)
     expect(onOpenLink).not.toHaveBeenCalled()
   })
 
   it('points an in-page link at the prefixed id the sanitiser gives the target', () => {
-    expect(link('[jump](#section)').getAttribute('href')).toBe('#user-content-section')
+    expect(renderedLink('[jump](#section)').getAttribute('href')).toBe('#user-content-section')
   })
 
   it('leaves an already-prefixed in-page link alone', () => {
-    expect(link('[jump](#user-content-section)').getAttribute('href')).toBe('#user-content-section')
+    expect(renderedLink('[jump](#user-content-section)').getAttribute('href')).toBe(
+      '#user-content-section'
+    )
   })
 
   it('keeps a relative href from navigating the view', () => {
-    const event = click(link('[x](./relative/path)'))
+    const event = clickAnchor(renderedLink('[x](./relative/path)'))
     expect(event.defaultPrevented).toBe(true)
     expect(onOpenLink).not.toHaveBeenCalled()
   })
@@ -239,7 +241,7 @@ describe('Markdown links — keeps a protocol-relative href from navigating the 
   setUpMarkdownLinks()
 
   it('keeps a protocol-relative href from navigating the view', () => {
-    const event = click(link('[x](//evil.example/x)'))
+    const event = clickAnchor(renderedLink('[x](//evil.example/x)'))
     expect(event.defaultPrevented).toBe(true)
     expect(onOpenLink).not.toHaveBeenCalled()
   })
@@ -255,29 +257,23 @@ describe('Markdown links — keeps a protocol-relative href from navigating the 
 })
 
 describe('Markdown links to other schemes', () => {
-  const click = (anchor: Element) => {
-    const event = new MouseEvent('click', { bubbles: true, cancelable: true })
-    anchor.dispatchEvent(event)
-    return event
-  }
-
   beforeEach(() => onOpenLink.mockClear())
 
   it('opens a mailto address through onOpenLink', () => {
-    const event = click(renderBody('[mail](mailto:team@example.com)').querySelector('a')!)
+    const event = clickAnchor(renderBody('[mail](mailto:team@example.com)').querySelector('a')!)
     expect(onOpenLink).toHaveBeenCalledWith('mailto:team@example.com')
     expect(event.defaultPrevented).toBe(true)
   })
 
   it('keeps a link with no destination from reloading the view', () => {
-    const event = click(renderBody('[empty]()').querySelector('a')!)
+    const event = clickAnchor(renderBody('[empty]()').querySelector('a')!)
     expect(event.defaultPrevented).toBe(true)
     expect(onOpenLink).not.toHaveBeenCalled()
   })
 
   it('leaves a javascript: link inert', () => {
     const anchor = renderBody('[click me](javascript:window.__pwned=3)').querySelector('a')!
-    expect(click(anchor).defaultPrevented).toBe(true)
+    expect(clickAnchor(anchor).defaultPrevented).toBe(true)
     expect(anchor.getAttribute('href') ?? '').not.toContain('javascript:')
     expect(onOpenLink).not.toHaveBeenCalled()
   })
@@ -359,21 +355,23 @@ describe('Markdown that fetches nothing — still opens a link through onOpenLin
   })
 })
 
+function renderInlineMarkdown(body: string) {
+  return render(
+    <button type="button">
+      <Markdown onOpenLink={onOpenLink} inline>
+        {body}
+      </Markdown>
+    </button>
+  ).container
+}
+
 // One line of text — a question, an option, a reason — that sits inside a button
 // or a label, where a block element is invalid markup.
 describe('inline Markdown', () => {
-  function renderInline(body: string) {
-    return render(
-      <button type="button">
-        <Markdown onOpenLink={onOpenLink} inline>
-          {body}
-        </Markdown>
-      </button>
-    ).container
-  }
-
   it('renders code, bold, italic and links inside a span, with no block element', () => {
-    const el = renderInline('Hide **done** in `Orders.tsx`, *not* [grey](https://e.example)')
+    const el = renderInlineMarkdown(
+      'Hide **done** in `Orders.tsx`, *not* [grey](https://e.example)'
+    )
     expect(el.querySelector('strong')?.textContent).toBe('done')
     expect(el.querySelector('code')?.textContent).toBe('Orders.tsx')
     expect(el.querySelector('em')?.textContent).toBe('not')
@@ -383,12 +381,14 @@ describe('inline Markdown', () => {
   })
 
   it('keeps the words of a block it does not draw', () => {
-    const el = renderInline('# Heading\n\n- an item')
+    const el = renderInlineMarkdown('# Heading\n\n- an item')
     expect(el.textContent).toContain('Heading')
     expect(el.textContent).toContain('an item')
   })
 
   it('shows no image', () => {
-    expect(renderInline('see ![pixel](https://evil.example/p.png)').querySelector('img')).toBeNull()
+    expect(
+      renderInlineMarkdown('see ![pixel](https://evil.example/p.png)').querySelector('img')
+    ).toBeNull()
   })
 })

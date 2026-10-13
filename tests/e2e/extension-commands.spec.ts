@@ -10,7 +10,7 @@ import {
   inExtensionView,
   launchApp,
   projectGroup,
-  runQuickAction,
+  runQuickActionFromPanel,
 } from './helpers'
 import { git, makeFixtureRepo } from './foundry-harness'
 
@@ -46,7 +46,7 @@ test.beforeAll(async () => {
 test.afterAll(async () => closeApp(handle))
 
 test('Git → Commit… opens the Git tab with the cursor in the commit message', async () => {
-  await runQuickAction(handle.page, 'Commit…')
+  await runQuickActionFromPanel(handle.page, 'Commit…')
   await expect(gitTab()).toHaveClass(/tab-bar__tab--active/, { timeout: 15000 })
   await expect.poll(() => activeElementIn('terminator.git-integration')).toBe('Commit message…')
 })
@@ -57,7 +57,7 @@ test('Git → Create PR… opens the pull request dialog', async () => {
   await closeApp(handle)
   handle = await launchApp(userDataDir)
   await projectGroup(handle.page, 'main').click()
-  await runQuickAction(handle.page, 'Create PR…')
+  await runQuickActionFromPanel(handle.page, 'Create PR…')
   await expect(gitTab()).toHaveClass(/tab-bar__tab--active/)
   await expect
     .poll(() =>
@@ -79,7 +79,7 @@ test('Git → Pull fast-forwards to a commit pushed elsewhere', async () => {
   git(other, 'add', '.')
   git(other, 'commit', '-m', 'pushed elsewhere')
   git(other, 'push', 'origin', 'main')
-  await runQuickAction(handle.page, 'Pull')
+  await runQuickActionFromPanel(handle.page, 'Pull')
   await expect(handle.page.locator('.tmui-toast__message', { hasText: 'Pulled main' })).toBeVisible(
     {
       timeout: 15000,
@@ -90,7 +90,7 @@ test('Git → Pull fast-forwards to a commit pushed elsewhere', async () => {
 })
 
 test('Foundry → New work order… opens the Forge with the cursor in the idea box', async () => {
-  await runQuickAction(handle.page, 'New work order…')
+  await runQuickActionFromPanel(handle.page, 'New work order…')
   await expect(handle.page.locator('[data-extension-panel="terminator.foundry"]')).toHaveCount(1, {
     timeout: 30000,
   })
@@ -100,13 +100,13 @@ test('Foundry → New work order… opens the Forge with the cursor in the idea 
 })
 
 test('Foundry → Toggle factory view switches the stored view and back', async () => {
-  const view = async () =>
+  const commandsView = async () =>
     (await handle.page.evaluate(() => window.electronAPI.extension.getSettingsValues())).values[
       'terminator.foundry.view'
     ] ?? 'list'
-  expect(await view()).toBe('list')
-  await runQuickAction(handle.page, 'Toggle factory view')
-  await expect.poll(view).toBe('factory')
+  expect(await commandsView()).toBe('list')
+  await runQuickActionFromPanel(handle.page, 'Toggle factory view')
+  await expect.poll(commandsView).toBe('factory')
   await expect
     .poll(() =>
       inExtensionView<string>(
@@ -116,6 +116,6 @@ test('Foundry → Toggle factory view switches the stored view and back', async 
       ).catch(() => '')
     )
     .toBe('true')
-  await runQuickAction(handle.page, 'Toggle factory view')
-  await expect.poll(view).toBe('list')
+  await runQuickActionFromPanel(handle.page, 'Toggle factory view')
+  await expect.poll(commandsView).toBe('list')
 })

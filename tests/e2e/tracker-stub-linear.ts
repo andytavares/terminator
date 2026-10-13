@@ -49,13 +49,13 @@ function issueNode(issue: LinearStubIssue) {
   }
 }
 
-const connection = (issues: LinearStubIssue[]) => ({ nodes: issues.map(issueNode), ...PAGE })
+const issueConnection = (issues: LinearStubIssue[]) => ({ nodes: issues.map(issueNode), ...PAGE })
 
 function findIssue(state: LinearState, id: unknown): LinearStubIssue | undefined {
   return state.issues.find((i) => i.identifier === id)
 }
 
-function issueComments(state: LinearState, id: unknown) {
+function commentConnectionOf(state: LinearState, id: unknown) {
   const nodes = (findIssue(state, id)?.comments ?? []).map((c, index) => ({
     ...MODEL_DEFAULTS,
     id: `${String(id)}-comment-${index}`,
@@ -67,7 +67,7 @@ function issueComments(state: LinearState, id: unknown) {
   return { issue: { comments: { nodes, ...PAGE } } }
 }
 
-function createComment(state: LinearState, input: { issueId: string; body: string }) {
+function appendLinearComment(state: LinearState, input: { issueId: string; body: string }) {
   findIssue(state, input.issueId)?.comments.push({
     author: state.viewer.email,
     body: input.body,
@@ -81,16 +81,18 @@ type Operation = (state: LinearState, variables: Record<string, unknown>) => unk
 const OPERATIONS: Record<string, Operation> = {
   viewer: (state) => ({ viewer: { id: state.viewer.email, ...state.viewer } }),
   user_assignedIssues: (state, v) => ({
-    user: { assignedIssues: connection(state.issues.filter((i) => i.assigneeEmail === v.id)) },
+    user: { assignedIssues: issueConnection(state.issues.filter((i) => i.assigneeEmail === v.id)) },
   }),
   issues: (state, v) => {
     const email = (v.filter as { assignee?: { email?: { eq?: string } } })?.assignee?.email?.eq
-    return { issues: connection(state.issues.filter((i) => i.assigneeEmail === email)) }
+    return { issues: issueConnection(state.issues.filter((i) => i.assigneeEmail === email)) }
   },
   searchIssues: (state, v) => {
     const term = String(v.term).toLowerCase()
     const found = state.issues.filter((i) => i.title.toLowerCase().includes(term))
-    return { searchIssues: { ...connection(found), totalCount: found.length, archivePayload: {} } }
+    return {
+      searchIssues: { ...issueConnection(found), totalCount: found.length, archivePayload: {} },
+    }
   },
   issue: (state, v) => ({
     issue: findIssue(state, v.id) ? issueNode(findIssue(state, v.id)!) : null,
@@ -107,8 +109,9 @@ const OPERATIONS: Record<string, Operation> = {
     },
   }),
   issue_labels: () => ({ issue: { labels: { nodes: [], ...PAGE } } }),
-  issue_comments: (state, v) => issueComments(state, v.id),
-  createComment: (state, v) => createComment(state, v.input as { issueId: string; body: string }),
+  issue_comments: (state, v) => commentConnectionOf(state, v.id),
+  createComment: (state, v) =>
+    appendLinearComment(state, v.input as { issueId: string; body: string }),
 }
 
 /** A `$name: String!` variable given something other than a string, as GraphQL refuses it. */

@@ -40,7 +40,11 @@ export function writeFile(repo: string, path: string, content: string): void {
 }
 
 /** Commits `files` on a new branch off main and pushes it; the checkout goes back to main. */
-export function pushBranch(repo: string, branch: string, files: Record<string, string>): void {
+export function pushBranchToOrigin(
+  repo: string,
+  branch: string,
+  files: Record<string, string>
+): void {
   git(repo, 'checkout', '--quiet', '-b', branch, 'main')
   for (const [path, content] of Object.entries(files)) writeFile(repo, path, content)
   git(repo, 'add', '-A')
@@ -62,7 +66,7 @@ export function projectTab(page: Page, label: string) {
 
 /** The Git Integration view showing `view`, once loaded, as a page to drive. */
 export async function gitView(handle: AppHandle, view: string): Promise<Page> {
-  const find = () =>
+  const findGitView = () =>
     handle.app
       .windows()
       .find(
@@ -71,9 +75,9 @@ export async function gitView(handle: AppHandle, view: string): Promise<Page> {
           new URL(page.url()).searchParams.get('view') === view
       )
   await expect
-    .poll(() => Boolean(find()), { message: `no ${view} view`, timeout: 20000 })
+    .poll(() => Boolean(findGitView()), { message: `no ${view} view`, timeout: 20000 })
     .toBe(true)
-  const page = find() as Page
+  const page = findGitView() as Page
   await page.waitForLoadState('domcontentloaded')
   return page
 }

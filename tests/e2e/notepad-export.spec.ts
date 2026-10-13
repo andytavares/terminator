@@ -120,12 +120,12 @@ test('the dialog starts on the folder and comment format chosen in Settings', as
     has: page.locator('.extension-item__name', { hasText: 'Notepad' }),
   })
   await notepadSettings.getByTitle('Configure').click()
-  const row = (label: string) =>
+  const exportRow = (label: string) =>
     notepadSettings.locator('.extension-setting-row').filter({ hasText: label })
-  await row('Export comments as').getByRole('button', { name: 'Inline' }).click()
+  await exportRow('Export comments as').getByRole('button', { name: 'Inline' }).click()
   await answerNextOpenDialog(handle, folder)
-  await row('Export folder').getByRole('button', { name: 'Choose…' }).click()
-  await expect(row('Export folder')).toContainText(folder)
+  await exportRow('Export folder').getByRole('button', { name: 'Choose…' }).click()
+  await expect(exportRow('Export folder')).toContainText(folder)
   await page.keyboard.press('Escape')
 
   await notepad.bringToFront()

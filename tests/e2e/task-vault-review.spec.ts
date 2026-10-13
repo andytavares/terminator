@@ -4,13 +4,16 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { AppHandle, launchApp, closeApp } from './helpers'
 import { answerNextSaveDialog, invokeChannel } from './extension-page'
-import { goTo, openVault, storedTask, localDate } from './task-vault-harness'
+import { goToSection, openVault, storedTask, localDate } from './task-vault-harness'
 
 // The six-step weekly review, walked end to end: every decision a step offers
 // is made once, then the review is read back from History and exported.
 
 let handle: AppHandle
 let vault: Page
+
+/** A row of the weekly review's current step. */
+const reviewItem = (text: string) => vault.locator('.wr-step__item', { hasText: text })
 
 async function projectStatus(name: string): Promise<string | undefined> {
   const result = await invokeChannel<{ projects: { name: string; status: string }[] }>(
@@ -23,26 +26,32 @@ async function projectStatus(name: string): Promise<string | undefined> {
 
 /** What the review finds waiting: projects in each state, a stale task and a backlog item. */
 async function seedTheWeek(): Promise<void> {
-  const call = (channel: string, payload: unknown) =>
+  const invokeVaultChannel = (channel: string, payload: unknown) =>
     invokeChannel(vault, `task-vault:${channel}`, payload)
-  await call('projects:create', { name: 'Garden Shed' })
-  await call('projects:create', { name: 'Kitchen Remodel' })
-  await call('vault:add-task', {
+  await invokeVaultChannel('projects:create', { name: 'Garden Shed' })
+  await invokeVaultChannel('projects:create', { name: 'Kitchen Remodel' })
+  await invokeVaultChannel('vault:add-task', {
     filePath: 'projects/Kitchen Remodel.md',
     text: 'Pick the tiles @Kitchen-Remodel',
   })
-  await call('projects:create', { name: 'Learn Piano' })
-  await call('vault:update-project-status', { projectFilePath: 'Learn Piano', status: 'someday' })
+  await invokeVaultChannel('projects:create', { name: 'Learn Piano' })
+  await invokeVaultChannel('vault:update-project-status', {
+    projectFilePath: 'Learn Piano',
+    status: 'someday',
+  })
   for (const [text, daysAgo] of [
     ['Sort the receipts', 10],
     ['Fix the bike', 10],
     ['Call the bank', 10],
   ] as const) {
-    await call('vault:add-task', { filePath: `daily/${localDate(-daysAgo)}.md`, text })
+    await invokeVaultChannel('vault:add-task', {
+      filePath: `daily/${localDate(-daysAgo)}.md`,
+      text,
+    })
   }
   for (const text of ['Read the backlog novel', 'Retire the old laptop']) {
-    const { taskId } = (await call('vault:capture', { text })) as { taskId: string }
-    await call('vault:process-inbox-item', { taskId, action: 'someday' })
+    const { taskId } = (await invokeVaultChannel('vault:capture', { text })) as { taskId: string }
+    await invokeVaultChannel('vault:process-inbox-item', { taskId, action: 'someday' })
   }
 }
 
@@ -52,7 +61,7 @@ test.beforeAll(async () => {
   await seedTheWeek()
   // Opening today rolls last week's open tasks over, which is what makes them stale.
   await invokeChannel(vault, 'task-vault:vault:get-today')
-  await goTo(vault, 'Weekly review')
+  await goToSection(vault, 'Weekly review')
   await expect(vault.locator('.weekly-review__steps')).toBeVisible()
 })
 
@@ -77,9 +86,8 @@ test('step 2 clarifies what was captured', async () => {
 })
 
 test('step 3 keeps a live project and shelves a stale one', async () => {
-  const item = (name: string) => vault.locator('.wr-step__item', { hasText: name })
-  await item('Kitchen Remodel').getByRole('button', { name: 'Keep' }).click()
-  await item('Garden Shed').getByRole('button', { name: 'Someday' }).click()
+  await reviewItem('Kitchen Remodel').getByRole('button', { name: 'Keep' }).click()
+  await reviewItem('Garden Shed').getByRole('button', { name: 'Someday' }).click()
   await expect(vault.getByText('All projects reviewed!')).toBeVisible()
   expect(await projectStatus('Kitchen Remodel')).toBe('active')
   expect(await projectStatus('Garden Shed')).toBe('someday')
@@ -87,10 +95,9 @@ test('step 3 keeps a live project and shelves a stale one', async () => {
 })
 
 test('step 4 backlogs, deletes and keeps the tasks that went stale', async () => {
-  const item = (text: string) => vault.locator('.wr-step__item', { hasText: text })
-  await item('Sort the receipts').getByRole('button', { name: 'Backlog' }).click()
-  await item('Fix the bike').getByRole('button', { name: 'Delete' }).click()
-  await item('Call the bank').getByRole('button', { name: 'Keep' }).click()
+  await reviewItem('Sort the receipts').getByRole('button', { name: 'Backlog' }).click()
+  await reviewItem('Fix the bike').getByRole('button', { name: 'Delete' }).click()
+  await reviewItem('Call the bank').getByRole('button', { name: 'Keep' }).click()
   await expect(
     vault.getByText('No stale tasks — nice work staying on top of things.')
   ).toBeVisible()
@@ -117,11 +124,10 @@ test('step 4 backlogs, deletes and keeps the tasks that went stale', async () =>
 })
 
 test('step 5 picks up and archives backlog items and promotes a someday project', async () => {
-  const item = (text: string) => vault.locator('.wr-step__item', { hasText: text })
-  await item('Read the backlog novel').getByRole('button', { name: 'Pick up today' }).click()
-  await item('Retire the old laptop').getByRole('button', { name: 'Archive' }).click()
-  await item('Learn Piano').getByRole('button', { name: 'Promote to active' }).click()
-  await expect(item('Learn Piano')).toHaveCount(0)
+  await reviewItem('Read the backlog novel').getByRole('button', { name: 'Pick up today' }).click()
+  await reviewItem('Retire the old laptop').getByRole('button', { name: 'Archive' }).click()
+  await reviewItem('Learn Piano').getByRole('button', { name: 'Promote to active' }).click()
+  await expect(reviewItem('Learn Piano')).toHaveCount(0)
 
   const today = await invokeChannel<{ tasks: { text: string }[] }>(
     vault,

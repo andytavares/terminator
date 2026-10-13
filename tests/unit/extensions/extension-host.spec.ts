@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mkdirSync, writeFileSync, rmSync } from 'fs'
 import { join } from 'path'
 import os from 'os'
-import { FakeBackendHost, type FakeBackend } from './fake-backend-host'
+import { newExtensionHost, storedExtensionRecord, type FakeBackend } from './fake-backend-host'
 
 vi.mock('electron', () => ({
   app: {
@@ -44,7 +44,7 @@ beforeEach(() => {
 afterEach(() => rmSync(root, { recursive: true, force: true }))
 
 /** An extension directory: only its manifest, since the backend is the fake host's. */
-function writeExtension(id: string, manifest: Record<string, unknown> = {}): string {
+function writeManifestOnly(id: string, manifest: Record<string, unknown> = {}): string {
   const directory = join(root, id)
   mkdirSync(directory, { recursive: true })
   const fields = { id, name: id, version: '1.0.0', description: 'Test extension', main: 'main.js' }
@@ -55,28 +55,7 @@ function writeExtension(id: string, manifest: Record<string, unknown> = {}): str
   return directory
 }
 
-/** A record as an earlier run stored it. */
-function storedRecord(id: string, status: 'enabled' | 'disabled') {
-  const directoryPath = join(root, id)
-  return {
-    id,
-    name: id,
-    version: '1.0.0',
-    description: '',
-    entryPoint: join(directoryPath, 'main.js'),
-    status,
-    installedAt: new Date().toISOString(),
-    directoryPath,
-  }
-}
-
-async function newHost(backends: Record<string, FakeBackend> = {}) {
-  const { ExtensionHost } = await import('../../../src/main/extensions/extension-host')
-  const backendHost = new FakeBackendHost(backends)
-  return { host: new ExtensionHost(backendHost), backendHost }
-}
-
-const failing =
+const failingBackend =
   (message: string): FakeBackend =>
   () => {
     throw new Error(message)
@@ -84,8 +63,8 @@ const failing =
 
 describe('ExtensionHost.load', () => {
   it('activates the backend in the extension host, with the API it calls kept in main', async () => {
-    const { host, backendHost } = await newHost()
-    const directory = writeExtension('com.hosted')
+    const { host, backendHost } = await newExtensionHost()
+    const directory = writeManifestOnly('com.hosted')
 
     const result = await host.load(directory)
 
@@ -98,9 +77,9 @@ describe('ExtensionHost.load', () => {
   })
 
   it('stores the extension as failed, with why, when its backend fails to activate', async () => {
-    const { host } = await newHost({ 'com.crash': failing('activation boom') })
+    const { host } = await newExtensionHost({ 'com.crash': failingBackend('activation boom') })
 
-    const result = await host.load(writeExtension('com.crash'))
+    const result = await host.load(writeManifestOnly('com.crash'))
 
     expect(result).toMatchObject({
       extension: { status: 'error', errorMessage: 'activation boom' },
@@ -112,7 +91,7 @@ describe('ExtensionHost.load', () => {
 
 describe('ExtensionHost.load — invalid manifests', () => {
   it('returns INVALID_MANIFEST for a directory without a manifest', async () => {
-    const { host, backendHost } = await newHost()
+    const { host, backendHost } = await newExtensionHost()
 
     const result = await host.load(join(root, 'nothing-here'))
 
@@ -122,18 +101,18 @@ describe('ExtensionHost.load — invalid manifests', () => {
   })
 
   it('returns INVALID_MANIFEST when the manifest fails the schema', async () => {
-    const { host } = await newHost()
+    const { host } = await newExtensionHost()
 
-    const result = await host.load(writeExtension('bad', { id: 'INVALID ID!' }))
+    const result = await host.load(writeManifestOnly('bad', { id: 'INVALID ID!' }))
 
     expect(result).toMatchObject({ error: 'INVALID_MANIFEST', message: expect.any(String) })
   })
 
   it('refuses a manifest that declares a shell root setting outside its own settings', async () => {
-    const { host, backendHost } = await newHost()
+    const { host, backendHost } = await newExtensionHost()
     const manifest = { contributes: { shellRoots: ['com.other.cloneFolder'] } }
 
-    const result = await host.load(writeExtension('com.greedy', manifest))
+    const result = await host.load(writeManifestOnly('com.greedy', manifest))
 
     expect(result).toMatchObject({
       error: 'INVALID_MANIFEST',
@@ -146,19 +125,19 @@ describe('ExtensionHost.load — invalid manifests', () => {
 
 describe('ExtensionHost.load — shell roots and duplicates', () => {
   it('loads a manifest that declares a shell root setting of its own', async () => {
-    const { host } = await newHost()
+    const { host } = await newExtensionHost()
     const manifest = { contributes: { shellRoots: ['com.owner.cloneFolder'] } }
 
-    const result = await host.load(writeExtension('com.owner', manifest))
+    const result = await host.load(writeManifestOnly('com.owner', manifest))
 
     expect(result).toMatchObject({ extension: { id: 'com.owner', status: 'enabled' } })
   })
 
   it('returns DUPLICATE_ID for an extension already stored', async () => {
-    storeData.extensions = [storedRecord('com.dup', 'enabled')]
-    const { host, backendHost } = await newHost()
+    storeData.extensions = [storedExtensionRecord(root, 'com.dup', 'enabled')]
+    const { host, backendHost } = await newExtensionHost()
 
-    const result = await host.load(writeExtension('com.dup'))
+    const result = await host.load(writeManifestOnly('com.dup'))
 
     expect(result).toEqual({ error: 'DUPLICATE_ID' })
     expect(backendHost.activated).toHaveLength(0)
@@ -167,9 +146,9 @@ describe('ExtensionHost.load — shell roots and duplicates', () => {
   it.each(['99.0.0', '0.2.0'])(
     'returns VERSION_INCOMPATIBLE when the manifest needs app %s',
     async (minAppVersion) => {
-      const { host } = await newHost()
+      const { host } = await newExtensionHost()
 
-      const result = await host.load(writeExtension('com.future', { minAppVersion }))
+      const result = await host.load(writeManifestOnly('com.future', { minAppVersion }))
 
       expect(result).toEqual({
         error: 'VERSION_INCOMPATIBLE',
@@ -182,8 +161,8 @@ describe('ExtensionHost.load — shell roots and duplicates', () => {
 describe('ExtensionHost.unload', () => {
   it('deactivates the backend and disposes what it registered in main', async () => {
     const { globalRegistry } = await import('../../../src/main/extensions/api')
-    const { host, backendHost } = await newHost()
-    await host.load(writeExtension('com.dispose'))
+    const { host, backendHost } = await newExtensionHost()
+    await host.load(writeManifestOnly('com.dispose'))
     // The api server runs a backend's registrations on its API in main.
     const api = host.hostedApi('com.dispose')!
     api.commands.register({ id: 'disp-cmd', label: 'Disp' }, () => {})
@@ -197,8 +176,8 @@ describe('ExtensionHost.unload', () => {
 
   it('still disposes the registrations when deactivating the backend fails', async () => {
     const { globalRegistry } = await import('../../../src/main/extensions/api')
-    const { host, backendHost } = await newHost()
-    await host.load(writeExtension('com.stubborn'))
+    const { host, backendHost } = await newExtensionHost()
+    await host.load(writeManifestOnly('com.stubborn'))
     host.hostedApi('com.stubborn')!.commands.register({ id: 'cmd', label: 'Cmd' }, () => {})
     vi.spyOn(backendHost, 'deactivate').mockRejectedValue(new Error('deactivate failed'))
 
@@ -208,7 +187,7 @@ describe('ExtensionHost.unload', () => {
   })
 
   it('does nothing for an extension that is not active', async () => {
-    const { host, backendHost } = await newHost()
+    const { host, backendHost } = await newExtensionHost()
 
     await host.unload('com.unknown')
 
@@ -218,8 +197,8 @@ describe('ExtensionHost.unload', () => {
 
 describe('ExtensionHost lifecycle', () => {
   it('uninstall deactivates the backend and removes the extension', async () => {
-    const { host, backendHost } = await newHost()
-    await host.load(writeExtension('com.removable'))
+    const { host, backendHost } = await newExtensionHost()
+    await host.load(writeManifestOnly('com.removable'))
 
     await expect(host.uninstall('com.removable')).resolves.toBe(true)
 
@@ -228,15 +207,15 @@ describe('ExtensionHost lifecycle', () => {
   })
 
   it('uninstall returns false for an unknown extension', async () => {
-    const { host } = await newHost()
+    const { host } = await newExtensionHost()
     await expect(host.uninstall('com.unknown')).resolves.toBe(false)
   })
 })
 
 describe('ExtensionHost lifecycle — reload', () => {
   it('reload deactivates the backend and activates it again', async () => {
-    const { host, backendHost } = await newHost()
-    await host.load(writeExtension('com.reload'))
+    const { host, backendHost } = await newExtensionHost()
+    await host.load(writeManifestOnly('com.reload'))
 
     const result = await host.reload('com.reload')
 
@@ -247,26 +226,26 @@ describe('ExtensionHost lifecycle — reload', () => {
 
   it('reload returns why when the backend fails to activate again', async () => {
     let starts = 0
-    const { host } = await newHost({
+    const { host } = await newExtensionHost({
       'com.reload': () => {
         if (++starts > 1) throw new Error('second start failed')
       },
     })
-    await host.load(writeExtension('com.reload'))
+    await host.load(writeManifestOnly('com.reload'))
 
     await expect(host.reload('com.reload')).resolves.toEqual({ error: 'second start failed' })
   })
 
   it('reload returns NOT_FOUND for an unknown extension', async () => {
-    const { host } = await newHost()
+    const { host } = await newExtensionHost()
     await expect(host.reload('com.unknown')).resolves.toEqual({ error: 'NOT_FOUND' })
   })
 })
 
 describe('ExtensionHost lifecycle — toggle', () => {
   it('toggle off deactivates the backend; toggle on activates it again', async () => {
-    const { host, backendHost } = await newHost()
-    await host.load(writeExtension('com.toggle'))
+    const { host, backendHost } = await newExtensionHost()
+    await host.load(writeManifestOnly('com.toggle'))
 
     await expect(host.toggle('com.toggle', false)).resolves.toMatchObject({ status: 'disabled' })
     expect(backendHost.deactivated).toEqual(['com.toggle'])
@@ -277,15 +256,15 @@ describe('ExtensionHost lifecycle — toggle', () => {
   })
 
   it('toggle returns null for an unknown extension', async () => {
-    const { host } = await newHost()
+    const { host } = await newExtensionHost()
     await expect(host.toggle('com.unknown', true)).resolves.toBeNull()
   })
 })
 
 describe('ExtensionHost when the extension host loses its backends', () => {
   it('shows them as failed, with why, until they activate again', async () => {
-    const { host } = await newHost()
-    await host.load(writeExtension('com.lost'))
+    const { host } = await newExtensionHost()
+    await host.load(writeManifestOnly('com.lost'))
 
     host.failHostedBackends(['com.lost'], 'Extension host exited with code 134')
 
@@ -304,7 +283,7 @@ describe('ExtensionHost when the extension host loses its backends', () => {
 // Settings -> Extensions stays open while a backend fails or comes back, so it
 // re-reads the list on this event rather than only when it opens.
 async function watchedHost(backends: Record<string, FakeBackend> = {}) {
-  const created = await newHost(backends)
+  const created = await newExtensionHost(backends)
   const broadcastToWindows = vi.fn()
   created.host.setDeps({ broadcastToWindows })
   const listChanges = () =>
@@ -315,7 +294,7 @@ async function watchedHost(backends: Record<string, FakeBackend> = {}) {
 describe('ExtensionHost tells the windows when the extension list changes', () => {
   it('when the extension host loses its backends for good', async () => {
     const { host, listChanges } = await watchedHost()
-    await host.load(writeExtension('com.lost'))
+    await host.load(writeManifestOnly('com.lost'))
     const before = listChanges().length
 
     host.failHostedBackends(['com.lost'], 'Extension host exited with code 134')
@@ -326,7 +305,7 @@ describe('ExtensionHost tells the windows when the extension list changes', () =
 
   it('when a failed backend activates again', async () => {
     const { host, listChanges } = await watchedHost()
-    await host.load(writeExtension('com.lost'))
+    await host.load(writeManifestOnly('com.lost'))
     host.failHostedBackends(['com.lost'], 'Extension host exited with code 134')
     const before = listChanges().length
 
@@ -339,7 +318,7 @@ describe('ExtensionHost tells the windows when the extension list changes', () =
 describe('ExtensionHost tells the windows — not for unchanged statuses', () => {
   it('not when a running backend is reloaded and its status stays the same', async () => {
     const { host, listChanges } = await watchedHost()
-    await host.load(writeExtension('com.steady'))
+    await host.load(writeManifestOnly('com.steady'))
     const before = listChanges().length
 
     await host.reload('com.steady')
@@ -358,18 +337,18 @@ describe('ExtensionHost tells the windows — not for unchanged statuses', () =>
 
 describe('ExtensionHost tells the windows — install, failure, toggle and uninstall', () => {
   it('when an extension is installed, fails to activate, is toggled or uninstalled', async () => {
-    const { host, listChanges } = await watchedHost({ 'com.crash': failing('boom') })
+    const { host, listChanges } = await watchedHost({ 'com.crash': failingBackend('boom') })
     const counts: number[] = []
-    const step = async (action: () => Promise<unknown>) => {
+    const countListChanges = async (action: () => Promise<unknown>) => {
       const before = listChanges().length
       await action()
       counts.push(listChanges().length - before)
     }
 
-    await step(() => host.load(writeExtension('com.crash')))
-    await step(() => host.load(writeExtension('com.toggle')))
-    await step(() => host.toggle('com.toggle', false))
-    await step(() => host.uninstall('com.toggle'))
+    await countListChanges(() => host.load(writeManifestOnly('com.crash')))
+    await countListChanges(() => host.load(writeManifestOnly('com.toggle')))
+    await countListChanges(() => host.toggle('com.toggle', false))
+    await countListChanges(() => host.uninstall('com.toggle'))
 
     expect(counts.every((count) => count > 0)).toBe(true)
   })
@@ -377,8 +356,8 @@ describe('ExtensionHost tells the windows — install, failure, toggle and unins
 
 describe('ExtensionHost records', () => {
   it('getExtensionDirectory returns the stored directory, or null for an unknown extension', async () => {
-    storeData.extensions = [storedRecord('com.dir', 'enabled')]
-    const { host } = await newHost()
+    storeData.extensions = [storedExtensionRecord(root, 'com.dir', 'enabled')]
+    const { host } = await newExtensionHost()
 
     expect(host.getExtensionDirectory('com.dir')).toBe(join(root, 'com.dir'))
     expect(host.getExtensionDirectory('com.unknown')).toBeNull()
@@ -387,12 +366,12 @@ describe('ExtensionHost records', () => {
   it('listExtensions leaves out directoryPath and rendererRelPath', async () => {
     storeData.extensions = [
       {
-        ...storedRecord('com.strip', 'enabled'),
+        ...storedExtensionRecord(root, 'com.strip', 'enabled'),
         rendererRelPath: 'dist/renderer.js',
         rendererUrl: 'ext://com.strip/dist/renderer.js',
       },
     ]
-    const { host } = await newHost()
+    const { host } = await newExtensionHost()
 
     const [listed] = host.listExtensions()
 
@@ -405,7 +384,7 @@ describe('ExtensionHost records', () => {
 describe('ExtensionHost.start with an unusual bundled directory', () => {
   it('skips subdirectories without a manifest', async () => {
     mkdirSync(join(root, 'not-an-extension'))
-    const { host, backendHost } = await newHost()
+    const { host, backendHost } = await newExtensionHost()
 
     await host.start({ bundledDirectory: root, beforeActivation: Promise.resolve() })
 
@@ -416,7 +395,7 @@ describe('ExtensionHost.start with an unusual bundled directory', () => {
   it('copes with a bundled path that is a file', async () => {
     const file = join(root, 'not-a-directory.txt')
     writeFileSync(file, 'I am a file')
-    const { host } = await newHost()
+    const { host } = await newExtensionHost()
 
     await expect(
       host.start({ bundledDirectory: file, beforeActivation: Promise.resolve() })

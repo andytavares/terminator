@@ -28,10 +28,10 @@ import {
 } from '../../../src/shared/types/index'
 import type { ElectronAPI } from '../../../src/shared/electron-api/api-type'
 import {
-  projectOf,
+  projectFixture,
   resetStore,
   terminalSessionOf,
-  workspaceOf,
+  workspaceFixture,
 } from '../../support/renderer-stores'
 import { bridgeEvents, installElectronApi, pushedEvent } from '../../support/electron-api'
 import { partialFake } from '../../support/fakes'
@@ -232,7 +232,7 @@ type MainData = { workspaces: Workspace[]; projects: Map<string, Project[]> }
 function coreParts(data: MainData, events: MainEvents, sent: MainSent) {
   return {
     terminal: {
-      onProcessExit: events.processExit.subscribe,
+      onProcessExit: events.processExit.addListener,
       input: sent.input,
       close: async () => ({ success: true }),
     },
@@ -250,30 +250,29 @@ function coreParts(data: MainData, events: MainEvents, sent: MainSent) {
 function extensionParts(events: MainEvents, sent: MainSent) {
   return {
     extensionEvents: {
-      onMenuOpenSettings: events.openSettings.subscribe,
-      onMenuOpenAbout: events.openAbout.subscribe,
-      onMenuOpenHome: events.openHome.subscribe,
-      onMenuToggleSidebar: events.toggleSidebar.subscribe,
-      onMenuCloseTab: events.closeTab.subscribe,
-      onTogglePanel: events.togglePanel.subscribe,
-      onSelectProjectTab: events.selectProjectTab.subscribe,
+      onMenuOpenSettings: events.openSettings.addListener,
+      onMenuOpenAbout: events.openAbout.addListener,
+      onMenuOpenHome: events.openHome.addListener,
+      onMenuToggleSidebar: events.toggleSidebar.addListener,
+      onMenuCloseTab: events.closeTab.addListener,
+      onTogglePanel: events.togglePanel.addListener,
+      onSelectProjectTab: events.selectProjectTab.addListener,
       notifyPanelState: sent.notifyPanelState,
     },
     extensionBridge: { on: events.bridge.on, invoke: async () => ({}) },
     extension: {
       setBottomInset: () => {},
       getCommands: sent.getCommands,
-      onCommandsChanged: events.commandsChanged.subscribe,
+      onCommandsChanged: events.commandsChanged.addListener,
       list: async () => ({ extensions: [] }),
       executeCommand: () => {},
     },
-    quickActions: { onOpen: events.quickActionsOpen.subscribe },
+    quickActions: { onOpen: events.quickActionsOpen.addListener },
   }
 }
 
 /** What the window only reads: notifications, session records, metrics and the branch. */
 function quietParts() {
-  const unsubscribe = () => {}
   const system = {
     cpuPercent: 0,
     memUsedBytes: 0,
@@ -284,10 +283,10 @@ function quietParts() {
   return {
     notifications: {
       list: async () => [],
-      onPush: () => unsubscribe,
+      onPush: () => () => {},
       create: async () => ({ id: 'n1' }),
     },
-    sessionRecords: { list: async () => ({ data: [] }), onChanged: () => unsubscribe },
+    sessionRecords: { list: async () => ({ data: [] }), onChanged: () => () => {} },
     metrics: {
       getSystem: async () => ({ data: system }),
       getProcesses: async () => ({ data: [] }),
@@ -310,9 +309,9 @@ function mainProcess(data: MainData) {
 
 let main: ReturnType<typeof mainProcess>
 
-const WS1 = workspaceOf({ id: 'ws-1', name: 'One', folderPath: '/a' })
-const WS2 = workspaceOf({ id: 'ws-2', name: 'Two', folderPath: '/b' })
-const PROJ1 = projectOf({ id: 'proj-1', workspaceId: 'ws-1', name: 'API' })
+const WS1 = workspaceFixture({ id: 'ws-1', name: 'One', folderPath: '/a' })
+const WS2 = workspaceFixture({ id: 'ws-2', name: 'Two', folderPath: '/b' })
+const PROJ1 = projectFixture({ id: 'proj-1', workspaceId: 'ws-1', name: 'API' })
 
 interface AppState {
   activeWorkspaceId?: string | null
@@ -412,7 +411,7 @@ describe('App', () => {
     await waitFor(() => expect(main.sent.getCommands).toHaveBeenCalled())
     const command = { key: 'k1', extensionId: 'ext', id: 'go', label: 'Go' }
     main.sent.getCommands.mockResolvedValue({ commands: [command] })
-    act(() => main.events.commandsChanged.emit())
+    act(() => main.events.commandsChanged.deliver())
     await waitFor(() => expect(useExtensionCommandsStore.getState().registered).toEqual([command]))
   })
 
@@ -482,7 +481,7 @@ describe('App — shows Welcome to Terminator EmptyState when no welcome seen', 
   it('opens SettingsPanel via menu:open-settings IPC event', async () => {
     render(<App />)
     expect(screen.queryByTestId('settings-panel')).toBeNull()
-    act(() => main.events.openSettings.emit())
+    act(() => main.events.openSettings.deliver())
     await waitFor(() => expect(screen.getByTestId('settings-panel')).toBeTruthy())
   })
 })
@@ -490,7 +489,7 @@ describe('App — shows Welcome to Terminator EmptyState when no welcome seen', 
 describe('App — closes SettingsPanel when onClose is called', () => {
   it('closes SettingsPanel when onClose is called', async () => {
     render(<App />)
-    act(() => main.events.openSettings.emit())
+    act(() => main.events.openSettings.deliver())
     await waitFor(() => screen.getByText('Close Settings'))
     fireEvent.click(screen.getByText('Close Settings'))
     await waitFor(() => expect(screen.queryByTestId('settings-panel')).toBeNull())
@@ -499,7 +498,7 @@ describe('App — closes SettingsPanel when onClose is called', () => {
   it("marks the session exited when main reports its process's exit", () => {
     setupApp({ sessions: [terminalSessionOf({ id: 'sess-1', projectId: 'p1', tabTitle: 'zsh' })] })
     render(<App />)
-    act(() => main.events.processExit.emit('sess-1', 0))
+    act(() => main.events.processExit.deliver('sess-1', 0))
     expect(useSessionStore.getState().sessions.get('sess-1')).toMatchObject({
       status: 'closed',
       tabTitle: 'zsh [exited]',
@@ -580,7 +579,7 @@ describe('App — activates core.home when the menu:open-home event fires', () =
   it('activates core.home when the menu:open-home event fires', () => {
     render(<App />)
     leaveHome()
-    act(() => main.events.openHome.emit())
+    act(() => main.events.openHome.deliver())
     expect(registry().activeGlobalTabId).toBe('core.home')
   })
 
@@ -612,7 +611,7 @@ describe('App — renders an open extension sidebar panel, and closes it from th
 
   it('opens a panel when main asks to toggle it', () => {
     render(<App />)
-    act(() => main.events.togglePanel.emit('git-changes'))
+    act(() => main.events.togglePanel.deliver('git-changes'))
     expect(registry().openPanels.has('git-changes')).toBe(true)
   })
 })
@@ -629,7 +628,7 @@ describe("App — shows an extension's project tab in place of the terminal once
     })
     render(<App />)
     leaveHome()
-    act(() => main.events.selectProjectTab.emit('git'))
+    act(() => main.events.selectProjectTab.deliver('git'))
     expect(screen.getByTestId('project-tab-content')).toBeTruthy()
     expect(screen.queryByTestId('terminal-pane')).toBeNull()
   })
@@ -657,7 +656,7 @@ describe('App — does not close open panels when workspace changes', () => {
 
   it('selects the project tab main asks for', () => {
     render(<App />)
-    act(() => main.events.selectProjectTab.emit('git'))
+    act(() => main.events.selectProjectTab.deliver('git'))
     expect(registry().activeProjectTabId).toBe('git')
   })
 
@@ -752,7 +751,7 @@ describe('App — menu:close-tab (onMenuCloseTab)', () => {
     })
     showTab('proj-1', 'ses-active')
     render(<App />)
-    act(() => main.events.closeTab.emit())
+    act(() => main.events.closeTab.deliver())
     await waitFor(() => expect(has('ses-active')).toBe(false))
     expect(has('ses-other')).toBe(true)
   })
@@ -761,7 +760,7 @@ describe('App — menu:close-tab (onMenuCloseTab)', () => {
     setupApp({ sessions: [tab('ses-active', 'proj-1')] })
     showTab('proj-1', 'ses-active')
     render(<App />)
-    act(() => main.events.closeTab.emit())
+    act(() => main.events.closeTab.deliver())
     await act(async () => {})
     expect(has('ses-active')).toBe(true)
   })
@@ -774,7 +773,7 @@ describe('App — menu:close-tab (onMenuCloseTab) — closes the scratch session
     render(<App />)
     act(() => shortcuts.callbacks.onNewScratch?.())
     await waitFor(() => expect(useWorkspaceStore.getState().scratchActive).toBe(true))
-    act(() => main.events.closeTab.emit())
+    act(() => main.events.closeTab.deliver())
     await waitFor(() => expect(has('ses-scratch')).toBe(false))
   })
 
@@ -785,7 +784,7 @@ describe('App — menu:close-tab (onMenuCloseTab) — closes the scratch session
       sessions: [tab('ses-1', 'proj-1')],
     })
     render(<App />)
-    act(() => main.events.closeTab.emit())
+    act(() => main.events.closeTab.deliver())
     await act(async () => {})
     expect(has('ses-1')).toBe(true)
   })
@@ -802,7 +801,7 @@ describe('App — command core.toggle-overview action opens Overview', () => {
   it('opens AboutDialog when main asks, and closes it', async () => {
     render(<App />)
     expect(screen.queryByTestId('about-dialog')).toBeNull()
-    act(() => main.events.openAbout.emit())
+    act(() => main.events.openAbout.deliver())
     await waitFor(() => screen.getByTestId('about-dialog'))
     fireEvent.click(screen.getByText('Close About'))
     await waitFor(() => expect(screen.queryByTestId('about-dialog')).toBeNull())
@@ -852,7 +851,7 @@ describe('App — toggles sidebar when onMenuToggleSidebar event fires', () => {
     setupApp({ activeWorkspaceId: 'ws-1' })
     render(<App />)
     expect(screen.getByTestId('unified-sidebar').className).toBe('')
-    act(() => main.events.toggleSidebar.emit())
+    act(() => main.events.toggleSidebar.deliver())
     await waitFor(() =>
       expect(screen.getByTestId('unified-sidebar').className).toContain('unified-sidebar--hidden')
     )
@@ -1158,7 +1157,7 @@ describe('App — Quick Actions integration (feature 057)', () => {
   it('opens the panel via the quickActions.onOpen bridge event', async () => {
     render(<App />)
     expect(screen.queryByTestId('quick-actions')).toBeNull()
-    act(() => main.events.quickActionsOpen.emit())
+    act(() => main.events.quickActionsOpen.deliver())
     await waitFor(() => expect(screen.getByTestId('quick-actions')).toBeTruthy())
   })
 
@@ -1216,7 +1215,7 @@ function setupTwoWorkspaces(): void {
     workspaces: [WS1, WS2],
     projectsByWorkspaceId: new Map([
       ['ws-1', [PROJ1]],
-      ['ws-2', [projectOf({ id: 'proj-2', workspaceId: 'ws-2' })]],
+      ['ws-2', [projectFixture({ id: 'proj-2', workspaceId: 'ws-2' })]],
     ]),
     sessions: [s1, s2, s3],
   })
@@ -1509,16 +1508,16 @@ describe('App — Quick Actions branch coverage (context, surfaces, custom vars,
     render(<App />)
     const directUse = () => settings()?.quickActions.directUse.map((d) => d.id) ?? []
 
-    act(() => main.events.openHome.emit())
+    act(() => main.events.openHome.deliver())
     await waitFor(() => expect(directUse()).toContain('core.open-home'))
 
-    act(() => main.events.toggleSidebar.emit())
+    act(() => main.events.toggleSidebar.deliver())
     await waitFor(() => expect(directUse()).toContain('core.toggle-sidebar'))
 
-    act(() => main.events.openSettings.emit())
+    act(() => main.events.openSettings.deliver())
     await waitFor(() => expect(directUse()).toContain('core.open-settings'))
 
-    act(() => main.events.closeTab.emit())
+    act(() => main.events.closeTab.deliver())
     await waitFor(() => expect(directUse()).toContain('core.close-tab'))
   })
 })
@@ -1695,11 +1694,11 @@ describe('App — notifications and log lines from main', () => {
     const push = pushedEvent<[Pushed]>()
     installElectronApi({
       ...main.parts,
-      notifications: { ...main.parts.notifications, onPush: push.subscribe },
+      notifications: { ...main.parts.notifications, onPush: push.addListener },
     })
     render(<App />)
-    act(() => push.emit(notice({ title: 'Saved', message: 'all of it', targets: ['toast'] })))
-    act(() => push.emit(notice({ title: 'Done', targets: ['center', 'toast'] })))
+    act(() => push.deliver(notice({ title: 'Saved', message: 'all of it', targets: ['toast'] })))
+    act(() => push.deliver(notice({ title: 'Done', targets: ['center', 'toast'] })))
     expect(toasts().map((t) => t.message)).toEqual(['Saved: all of it', 'Done'])
     expect(useNotificationStore.getState().notifications.map((n) => n.title)).toEqual(['Done'])
   })

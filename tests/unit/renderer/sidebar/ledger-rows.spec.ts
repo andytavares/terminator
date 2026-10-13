@@ -7,7 +7,7 @@ const NO_FILTERS: LedgerFilters = { needsYou: false, text: '' }
 const titles = new Map<string, string>()
 
 /** The ledger with the default preferences and no filter. */
-const ledger = (facts: Parameters<typeof buildLedger>[0]) =>
+const sidebarLedgerOf = (facts: Parameters<typeof buildLedger>[0]) =>
   buildLedger(facts, DEFAULT_HOME_PREFS, { ...NO_FILTERS, titles })
 const shape = (groups: ReturnType<typeof buildLedger>) =>
   groups.map((g) => [g.label, g.facts.map((f) => f.sessionId)])
@@ -69,7 +69,7 @@ describe('buildLedger — default grouping and order (US1) — lifts awaiting-in
   })
 
   it('draws no group at all when there are no sessions', () => {
-    expect(ledger([])).toEqual([])
+    expect(sidebarLedgerOf([])).toEqual([])
   })
 })
 
@@ -81,9 +81,9 @@ describe('buildLedger — default grouping and order (US1) — does not move a r
       personal('r1', { state: 'working', startedAt: T1, lastActivityAt: 100 }),
       personal('r2', { state: 'idle', startedAt: T2, lastActivityAt: 200 }),
     ]
-    const beforeOrder = shape(ledger(before))[0][1]
+    const beforeOrder = shape(sidebarLedgerOf(before))[0][1]
     const swapped = before.map((f) => ({ ...f, lastActivityAt: f.sessionId === 'r1' ? 999 : 1 }))
-    const afterOrder = shape(ledger(swapped))[0][1]
+    const afterOrder = shape(sidebarLedgerOf(swapped))[0][1]
     expect(afterOrder).toEqual(beforeOrder)
   })
 
@@ -94,9 +94,9 @@ describe('buildLedger — default grouping and order (US1) — does not move a r
       personal('r1', { state: 'working', startedAt: T1 }),
       personal('r2', { state: 'idle', startedAt: T2 }),
     ]
-    const beforeOrder = shape(ledger(before))[0][1]
+    const beforeOrder = shape(sidebarLedgerOf(before))[0][1]
     const flipped = before.map((f) => (f.sessionId === 'r1' ? { ...f, state: 'idle' as const } : f))
-    const afterOrder = shape(ledger(flipped))[0][1]
+    const afterOrder = shape(sidebarLedgerOf(flipped))[0][1]
     expect(afterOrder).toEqual(beforeOrder)
   })
 })
@@ -112,7 +112,7 @@ describe('buildLedger — default grouping and order (US1) — moves a session i
     const flipped = before.map((f) =>
       f.sessionId === 'r1' ? { ...f, state: 'awaiting-input' as const } : f
     )
-    const groups = shape(ledger(flipped))
+    const groups = shape(sidebarLedgerOf(flipped))
     expect(groups).toEqual([
       ['Needs you', ['r1']],
       ['Personal / terminator', ['r2']],

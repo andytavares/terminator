@@ -150,7 +150,7 @@ function filePatch(context: StubContext, range: string, path: string): string {
 }
 
 /** GitHub's REST file list for a `base...head` range. */
-function changedFiles(context: StubContext, range: string) {
+function filesChangedIn(context: StubContext, range: string) {
   const statuses = bareGit(context, 'diff', '--name-status', range).split('\n')
   const statusOf = new Map(statuses.map((line) => [line.split('\t').at(-1), line[0]] as const))
   return bareGit(context, 'diff', '--numstat', range)
@@ -170,7 +170,7 @@ function changedFiles(context: StubContext, range: string) {
 }
 
 function pullRequestFiles(context: StubContext, pr: StubPullRequest) {
-  return changedFiles(context, `refs/heads/${pr.baseRefName}...${headSha(context, pr)}`)
+  return filesChangedIn(context, `refs/heads/${pr.baseRefName}...${headSha(context, pr)}`)
 }
 
 // ─── Pull requests ───────────────────────────────────────────────────────────
@@ -236,7 +236,7 @@ function pullRequestJson(context: StubContext, pr: StubPullRequest): Record<stri
   }
 }
 
-function pick(json: Record<string, unknown>, fields: string): Record<string, unknown> {
+function pickFields(json: Record<string, unknown>, fields: string): Record<string, unknown> {
   return Object.fromEntries(fields.split(',').map((field) => [field, json[field]]))
 }
 
@@ -260,7 +260,7 @@ function listPullRequests(context: StubContext, args: string[]): unknown[] {
   return context.pullRequests
     .filter((pr) => state === 'ALL' || pr.state === state)
     .filter((pr) => pr.title.toLowerCase().includes(text))
-    .map((pr) => pick(pullRequestJson(context, pr), flagValue(args, '--json') ?? 'number'))
+    .map((pr) => pickFields(pullRequestJson(context, pr), flagValue(args, '--json') ?? 'number'))
 }
 
 /** `gh pr create`: the head branch must already be pushed, as on GitHub. */
@@ -287,7 +287,7 @@ function prCommand(context: StubContext, args: string[]): string {
   const [verb, selector] = args
   if (verb === 'view') {
     const json = pullRequestJson(context, viewedPullRequest(context, selector))
-    return JSON.stringify(pick(json, flagValue(args, '--json') ?? 'number'))
+    return JSON.stringify(pickFields(json, flagValue(args, '--json') ?? 'number'))
   }
   if (verb === 'list') return JSON.stringify(listPullRequests(context, args))
   if (verb === 'create') return createPullRequest(context, args)
@@ -304,7 +304,7 @@ function repoCommand(context: StubContext, args: string[], cwd: string): string 
   const [verb] = args
   if (verb === 'view') {
     const json = { owner: { login: context.owner }, name: context.name }
-    return JSON.stringify(pick(json, flagValue(args, '--json') ?? 'name'))
+    return JSON.stringify(pickFields(json, flagValue(args, '--json') ?? 'name'))
   }
   if (verb === 'clone') {
     execFileSync('git', ['clone', '--quiet', context.bareRepo, args[2]], { cwd })
@@ -377,7 +377,7 @@ const REST_ROUTES: Array<[string, RegExp, RestHandler]> = [
   ['GET', /^user\/repos$/, (context) => accessibleRepositories(context)],
   ['GET', new RegExp(`^${REPO}/pulls/(\\d+)/files$`), (c, _r, m) => prFiles(c, m)],
   ['GET', new RegExp(`^${REPO}/pulls/(\\d+)/reviews$`), (c, _r, m) => pr(c, m).reviews],
-  ['POST', new RegExp(`^${REPO}/pulls/(\\d+)/reviews$`), (c, r, m) => submitReview(c, r, m)],
+  ['POST', new RegExp(`^${REPO}/pulls/(\\d+)/reviews$`), (c, r, m) => submitPrReview(c, r, m)],
   ['GET', new RegExp(`^${REPO}/pulls/(\\d+)/requested_reviewers$`), () => noReviewers()],
   ['GET', new RegExp(`^${REPO}/pulls/(\\d+)/comments$`), (c, _r, m) => pr(c, m).reviewComments],
   [
@@ -390,7 +390,7 @@ const REST_ROUTES: Array<[string, RegExp, RestHandler]> = [
   [
     'GET',
     new RegExp(`^${REPO}/compare/([0-9a-f]+)\\.\\.\\.([0-9a-f]+)$`),
-    (c, _r, m) => compare(c, m),
+    (c, _r, m) => compareRefs(c, m),
   ],
   ['GET', new RegExp(`^${REPO}/commits/[0-9a-f]+/check-suites$`), () => ({ check_suites: [] })],
   ['GET', new RegExp(`^${REPO}/contents/(.+)$`), (c, r, m) => fileContent(c, r, m)],
@@ -460,7 +460,7 @@ const REVIEW_STATES = {
 } as const
 
 /** POST .../reviews, with its draft comments in the same request, as GitHub takes them. */
-function submitReview(context: StubContext, request: ApiRequest, match: RegExpMatchArray) {
+function submitPrReview(context: StubContext, request: ApiRequest, match: RegExpMatchArray) {
   const pullRequest = pr(context, match)
   const input = { ...request.body, ...request.fields } as {
     event: keyof typeof REVIEW_STATES
@@ -511,10 +511,10 @@ function addReviewComment(
   })
 }
 
-function compare(context: StubContext, match: RegExpMatchArray) {
+function compareRefs(context: StubContext, match: RegExpMatchArray) {
   const [, from, to] = match
   if (!resolves(context, from) || !resolves(context, to)) throw new GhFailure(404, 'Not Found')
-  const files = changedFiles(context, `${from}...${to}`)
+  const files = filesChangedIn(context, `${from}...${to}`)
   const aheadBy = Number(bareGit(context, 'rev-list', '--count', `${from}..${to}`))
   return { ahead_by: aheadBy, files }
 }
@@ -531,9 +531,9 @@ function graphql(context: StubContext, request: ApiRequest): unknown {
   const { query } = request.fields
   if (query.includes('pullRequests(first:')) return openPullRequestPage(context)
   if (query.includes('reviewThreads(first:100)')) return reviewThreads(context, request)
-  if (query.includes('pullRequest(number:$n){id}')) return pullRequestNodeId(request)
-  if (query.includes('markFileAsViewed')) return markViewed(context, request)
-  if (query.includes('search(query:')) return dashboardSearch(context, query)
+  if (query.includes('pullRequest(number:$n){id}')) return nodeIdOfPullRequest(request)
+  if (query.includes('markFileAsViewed')) return markPathViewed(context, request)
+  if (query.includes('search(query:')) return searchDashboard(context, query)
   throw new GhFailure(1, `stub GitHub cannot answer this query: ${query.slice(0, 80)}`)
 }
 
@@ -569,12 +569,12 @@ function reviewThreads(context: StubContext, request: ApiRequest) {
   return { data: { repository: { pullRequest: { reviewThreads: { nodes } } } } }
 }
 
-function pullRequestNodeId(request: ApiRequest) {
+function nodeIdOfPullRequest(request: ApiRequest) {
   return { data: { repository: { pullRequest: { id: `PR_node_${request.fields.n}` } } } }
 }
 
 /** markFileAsViewed / unmarkFileAsViewed, one alias per path or a single `$p`. */
-function markViewed(context: StubContext, request: ApiRequest) {
+function markPathViewed(context: StubContext, request: ApiRequest) {
   const number = Number(request.fields.id.replace('PR_node_', ''))
   const pullRequest = findPullRequest(context, number)
   const paths = Object.entries(request.fields)
@@ -587,7 +587,7 @@ function markViewed(context: StubContext, request: ApiRequest) {
 }
 
 /** The Reviews dashboard: what asks for the viewer's review, and what the viewer opened. */
-function dashboardSearch(context: StubContext, query: string) {
+function searchDashboard(context: StubContext, query: string) {
   const alias = query.match(/(\w+): search\(/)?.[1] ?? ''
   const open = context.pullRequests.filter((pr) => pr.state === 'OPEN')
   const matches =
@@ -596,11 +596,11 @@ function dashboardSearch(context: StubContext, query: string) {
       : alias === 'mine'
         ? open.filter((pr) => pr.author === context.viewer)
         : []
-  const nodes = matches.map((pr) => dashboardNode(context, pr))
+  const nodes = matches.map((pr) => prDashboardNode(context, pr))
   return { data: { [alias]: { issueCount: nodes.length, nodes } } }
 }
 
-function dashboardNode(context: StubContext, pr: StubPullRequest) {
+function prDashboardNode(context: StubContext, pr: StubPullRequest) {
   const json = pullRequestJson(context, pr)
   const head = { oid: json.headRefOid, committedDate: pr.createdAt, statusCheckRollup: null }
   return {

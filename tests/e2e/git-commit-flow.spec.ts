@@ -20,7 +20,7 @@ const PASSING_HOOK =
   '#!/bin/sh\necho "lint: checking staged files"\nsleep 1\necho "lint: clean"\nsleep 1\n'
 const FAILING_HOOK = '#!/bin/sh\necho "lint: src/greeting.ts has a problem"\nexit 1\n'
 
-function installHook(script: string): void {
+function installPreCommitHook(script: string): void {
   writeFile(repo, '.git/hooks/pre-commit', script)
   chmodSync(join(repo, '.git/hooks/pre-commit'), 0o755)
 }
@@ -29,7 +29,7 @@ function fileRow(view: Page, path: string) {
   return view.locator('.staging-area__file-row').filter({ hasText: path })
 }
 
-function section(view: Page, title: RegExp) {
+function gitViewSection(view: Page, title: RegExp) {
   return view.locator('.staging-area__section').filter({ hasText: title })
 }
 
@@ -66,25 +66,25 @@ test('selecting a changed file shows its diff', async () => {
 test('checking a file stages it, unchecking unstages it, and the index agrees', async () => {
   const view = await openGitTab(handle)
   await fileRow(view, 'src/greeting.ts').locator('input[type=checkbox]').click()
-  await expect(section(view, /^Staged \(1\)/)).toContainText('src/greeting.ts')
+  await expect(gitViewSection(view, /^Staged \(1\)/)).toContainText('src/greeting.ts')
   expect(git(repo, 'diff', '--cached', '--name-only')).toBe('src/greeting.ts')
 
   await fileRow(view, 'src/greeting.ts').locator('input[type=checkbox]').click()
-  await expect(section(view, /^Changes \(2\)/)).toContainText('src/greeting.ts')
+  await expect(gitViewSection(view, /^Changes \(2\)/)).toContainText('src/greeting.ts')
   expect(git(repo, 'diff', '--cached', '--name-only')).toBe('')
 
   await view.getByRole('button', { name: 'Stage All' }).click()
-  await expect(section(view, /^Staged \(2\)/)).toBeVisible()
+  await expect(gitViewSection(view, /^Staged \(2\)/)).toBeVisible()
   await view.getByRole('button', { name: 'Unstage All' }).click()
-  await expect(section(view, /^Staged \(0\)/)).toBeVisible()
+  await expect(gitViewSection(view, /^Staged \(0\)/)).toBeVisible()
   expect(git(repo, 'diff', '--cached', '--name-only')).toBe('')
 })
 
 test('a failing pre-commit hook is reported with its output, and can be bypassed', async () => {
-  installHook(FAILING_HOOK)
+  installPreCommitHook(FAILING_HOOK)
   const view = await openGitTab(handle)
   await fileRow(view, 'src/greeting.ts').locator('input[type=checkbox]').click()
-  await expect(section(view, /^Staged \(1\)/)).toContainText('src/greeting.ts')
+  await expect(gitViewSection(view, /^Staged \(1\)/)).toContainText('src/greeting.ts')
   await view.getByPlaceholder('Commit message…').fill('Add a greeting')
   await view.getByRole('button', { name: 'Commit', exact: true }).click()
 
@@ -99,10 +99,10 @@ test('a failing pre-commit hook is reported with its output, and can be bypassed
 })
 
 test('a slow hook streams its output while the commit runs, then Commit & Push reaches the remote', async () => {
-  installHook(PASSING_HOOK)
+  installPreCommitHook(PASSING_HOOK)
   const view = await openGitTab(handle)
   await fileRow(view, 'src/math.ts').locator('input[type=checkbox]').click()
-  await expect(section(view, /^Staged \(1\)/)).toContainText('src/math.ts')
+  await expect(gitViewSection(view, /^Staged \(1\)/)).toContainText('src/math.ts')
   await view.getByPlaceholder('Commit message…').fill('Add in either order')
   await view.getByRole('button', { name: 'Commit & Push' }).click()
 
@@ -110,7 +110,7 @@ test('a slow hook streams its output while the commit runs, then Commit & Push r
   await expect(view.getByPlaceholder('Commit message…')).toHaveValue('', { timeout: 15000 })
   await expect(view.locator('.git-view__commit-error')).toBeHidden()
   await expect.poll(() => git(bare, 'log', '-1', '--format=%s', BRANCH)).toBe('Add in either order')
-  await expect(section(view, /^Changes \(0\)/)).toBeVisible()
+  await expect(gitViewSection(view, /^Changes \(0\)/)).toBeVisible()
 })
 
 test('Open PR pushes the branch and opens a pull request on GitHub', async () => {

@@ -452,7 +452,7 @@ describe('api.settings workspace precedence — schema defaults', () => {
 })
 
 describe('api.notifications.createNotification', () => {
-  const titles = () => notificationManager.list().map((n) => n.title)
+  const notificationTitles = () => notificationManager.list().map((n) => n.title)
 
   it('lists the notification until its disposable dismisses it', () => {
     const api = createExtensionAPI('test.ext')
@@ -461,9 +461,9 @@ describe('api.notifications.createNotification', () => {
       title: 'Test notif',
       key: 'testNotif',
     })
-    expect(titles()).toContain('Test notif')
+    expect(notificationTitles()).toContain('Test notif')
     disposable.dispose()
-    expect(titles()).not.toContain('Test notif')
+    expect(notificationTitles()).not.toContain('Test notif')
   })
 
   it('sends its actions to the windows, without their handlers', () => {
@@ -487,10 +487,10 @@ describe('api.commands.register', () => {
   it('lists the command until its disposable removes it', () => {
     const api = createExtensionAPI('test.ext')
     const disposable = api.commands.register({ id: 'my-command', label: 'My Command' }, vi.fn())
-    const listed = () => listExtensionCommands().some((c) => c.id === 'my-command')
-    expect(listed()).toBe(true)
+    const commandListed = () => listExtensionCommands().some((c) => c.id === 'my-command')
+    expect(commandListed()).toBe(true)
     disposable.dispose()
-    expect(listed()).toBe(false)
+    expect(commandListed()).toBe(false)
   })
 
   // Quick Actions lists the registered commands; an extension that activates

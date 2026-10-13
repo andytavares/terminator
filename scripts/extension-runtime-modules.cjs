@@ -7,7 +7,7 @@
 const { existsSync, readFileSync, readdirSync } = require('fs')
 const { join } = require('path')
 
-function readJson(path) {
+function readJsonFile(path) {
   return JSON.parse(readFileSync(path, 'utf8'))
 }
 
@@ -64,7 +64,7 @@ function topLevelDirectory(location) {
 /** Every extension's dependencies that its backend requires, those in `externals`
  * except Electron itself, as a lockfile entry to walk from. */
 function runtimeEntry(root, location, externals) {
-  const declared = readJson(join(root, location, 'package.json')).dependencies ?? {}
+  const declared = readJsonFile(join(root, location, 'package.json')).dependencies ?? {}
   const required = Object.entries(declared).filter(
     ([name]) => externals.includes(name) && name !== 'electron'
   )
@@ -72,7 +72,7 @@ function runtimeEntry(root, location, externals) {
 }
 
 function extensionRuntimeModules(root, externals) {
-  const { packages } = readJson(join(root, 'package-lock.json'))
+  const { packages } = readJsonFile(join(root, 'package-lock.json'))
   const found = new Set()
   for (const location of extensionLocations(root)) {
     const entry = runtimeEntry(root, location, externals)

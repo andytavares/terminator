@@ -33,7 +33,7 @@ const adf = (text: string) => ({
 })
 
 /** The text of a one-paragraph ADF document, which is all the core posts. */
-function adfText(doc: unknown): string {
+function paragraphText(doc: unknown): string {
   const paragraph = (doc as { content?: Array<{ content?: Array<{ text?: string }> }> })
     ?.content?.[0]
   return (paragraph?.content ?? []).map((node) => node.text ?? '').join('')
@@ -55,7 +55,7 @@ function issueJson(issue: JiraStubIssue) {
   }
 }
 
-function search(state: JiraState, url: URL): StubAnswer {
+function searchJiraIssues(state: JiraState, url: URL): StubAnswer {
   const jql = url.searchParams.get('jql') ?? ''
   state.searches.push(jql)
   const text = jql.match(/text ~ "([^"]*)"/)?.[1]?.toLowerCase()
@@ -80,7 +80,7 @@ function issueRoute(state: JiraState, { method, url, body }: StubRequest): StubA
   if (method === 'POST') {
     const comment = {
       author: state.account.displayName,
-      body: adfText((body as { body: unknown }).body),
+      body: paragraphText((body as { body: unknown }).body),
       created: new Date().toISOString(),
     }
     issue.comments.push(comment)
@@ -101,7 +101,7 @@ export function answerJira(state: JiraState, request: IncomingMessage, body: unk
   }
   const url = new URL(request.url ?? '/', 'https://stub')
   if (url.pathname === '/rest/api/3/myself') return { status: 200, body: state.account }
-  if (url.pathname === '/rest/api/3/search/jql') return search(state, url)
+  if (url.pathname === '/rest/api/3/search/jql') return searchJiraIssues(state, url)
   if (url.pathname.startsWith('/rest/api/3/issue/'))
     return issueRoute(state, { method: request.method, url, body })
   return { status: 404, body: { errorMessages: [`stub Jira has no ${url.pathname}`] } }

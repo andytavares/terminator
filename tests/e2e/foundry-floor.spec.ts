@@ -6,13 +6,13 @@ import {
   bodyText,
   captureFoundry,
   clickByName,
-  foundryChannel,
   inFoundry,
   listOrdersInForge,
   makeFixtureRepo,
   openFoundry,
   openListedOrder,
   restartFoundry,
+  createTypedOrder,
 } from './foundry-harness'
 
 // The Floor's live CI band and the Ledger's Factory metrics: numbers read
@@ -45,17 +45,6 @@ async function openOrderRow(id: string, listShot?: string): Promise<string> {
   const list = await bodyText(handle)
   await openListedOrder(handle, id)
   return list
-}
-
-/** Creates a typed order on the fixture repo, and returns its id. */
-async function createOrder(text: string, missing: string): Promise<string> {
-  const created = (await foundryChannel(handle, 'foundry:order.create', {
-    source: { kind: 'typed', text },
-    repoPaths: [repo],
-  })) as { order?: { id: string } }
-  const id = created.order?.id as string
-  expect(id, missing).toBeTruthy()
-  return id
 }
 
 /** One node of a run graph that has passed. */
@@ -157,7 +146,11 @@ function ciBand(): Promise<string> {
 }
 
 test('a draft’s CI is on the Floor while it is watched', async () => {
-  const id = await createOrder('a draft whose CI is being watched', 'no order was created')
+  const id = await createTypedOrder(handle, {
+    repo,
+    text: 'a draft whose CI is being watched',
+    missing: 'no order was created',
+  })
   const dir = join(repo, '.foundry', 'orders', id)
   writeRunningOrder(dir, id)
   writeDraftPull(dir)
@@ -229,7 +222,11 @@ async function expectStatusWall(): Promise<void> {
 }
 
 test('the Ledger’s Factory tab reads the numbers off what was recorded', async () => {
-  const id = await createOrder('a shipped order to measure', 'no order was created to measure')
+  const id = await createTypedOrder(handle, {
+    repo,
+    text: 'a shipped order to measure',
+    missing: 'no order was created to measure',
+  })
   writeShippedFirstTime(id)
   // Foundry keeps each ledger in memory from its first read and never sees a
   // hand edit; an open panel may already have read this order's after create.

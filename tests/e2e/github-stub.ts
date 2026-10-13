@@ -1,8 +1,9 @@
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
-import { createServer, type IncomingMessage, type Server } from 'node:http'
+import { createServer, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { readRequestBody } from './stub-http'
 import {
   addPullRequest,
   findPullRequest,
@@ -44,7 +45,7 @@ export async function startGithubStub(options: GithubStubOptions): Promise<Githu
   const context = stubContext(options)
   const calls: GhCall[] = []
   const server = ghServer(context, calls)
-  const configHome = await listen(server)
+  const configHome = await listenAndWriteConfig(server)
   return {
     owner: context.owner,
     name: context.name,
@@ -78,7 +79,7 @@ function stubContext(options: GithubStubOptions): StubContext {
 /** Answers each forwarded gh call, and records it in `calls`. */
 function ghServer(context: StubContext, calls: GhCall[]): Server {
   return createServer((request, response) => {
-    void readBody(request).then((raw) => {
+    void readRequestBody(request).then((raw) => {
       const call = JSON.parse(raw) as GhCall
       calls.push(call)
       response.setHeader('content-type', 'application/json')
@@ -87,16 +88,8 @@ function ghServer(context: StubContext, calls: GhCall[]): Server {
   })
 }
 
-function readBody(request: IncomingMessage): Promise<string> {
-  return new Promise((resolve) => {
-    let body = ''
-    request.on('data', (chunk) => (body += chunk))
-    request.on('end', () => resolve(body))
-  })
-}
-
 /** Listens on a free port and writes gh/e2e-stub-url, where the gh stand-in looks. */
-async function listen(server: Server): Promise<string> {
+async function listenAndWriteConfig(server: Server): Promise<string> {
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
   const { port } = server.address() as AddressInfo
   const configHome = mkdtempSync(join(tmpdir(), 'terminator-e2e-gh-'))

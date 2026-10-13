@@ -10,7 +10,7 @@ import {
   createWorkspace,
   addAndSelectProject,
   e2eTempDir,
-  terminalRows,
+  readTerminalRows,
 } from '../helpers'
 
 // The run that proves the feature: a real Claude Code conversation, ended, then
@@ -44,7 +44,7 @@ test.afterAll(async () => {
 })
 
 async function rows(page: Page): Promise<string> {
-  return (await terminalRows(page)).join('\n')
+  return (await readTerminalRows(page)).join('\n')
 }
 
 async function type(page: Page, text: string): Promise<void> {

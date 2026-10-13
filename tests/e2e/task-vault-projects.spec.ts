@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test'
 import { AppHandle, launchApp, closeApp } from './helpers'
 import { invokeChannel } from './extension-page'
-import { goTo, openVault, storedTask } from './task-vault-harness'
+import { goToSection, openVault, storedTask } from './task-vault-harness'
 
 // Projects, areas and the history of what was archived: creating, renaming,
 // filing tasks under them, archiving, restoring and deleting, each through the
@@ -41,7 +41,7 @@ async function projects(): Promise<StoredProject[]> {
   return result.projects
 }
 
-async function project(name: string): Promise<StoredProject | undefined> {
+async function storedProject(name: string): Promise<StoredProject | undefined> {
   return (await projects()).find((candidate) => candidate.name === name)
 }
 
@@ -69,7 +69,7 @@ function areaCard(name: string) {
 }
 
 test('a project created with an outcome, a new area and a deadline is listed', async () => {
-  await goTo(vault, 'Projects')
+  await goToSection(vault, 'Projects')
   await vault.getByRole('button', { name: '+ New project' }).click()
   const form = vault.locator('.create-project-form')
   await form.getByPlaceholder('Project name').fill('Launch the website')
@@ -81,7 +81,10 @@ test('a project created with an outcome, a new area and a deadline is listed', a
 
   await expect(projectCard('Launch The Website')).toContainText('#Marketing')
   await expect(projectCard('Launch The Website')).toContainText('due:')
-  expect(await project('Launch The Website')).toMatchObject({ status: 'active', area: 'Marketing' })
+  expect(await storedProject('Launch The Website')).toMatchObject({
+    status: 'active',
+    area: 'Marketing',
+  })
   expect((await areas()).map((area) => area.name)).toContain('Marketing')
 })
 
@@ -124,26 +127,26 @@ test('a project is renamed, moved to another area and its deadline cleared', asy
   await renameRow.locator('input').fill('Launch the new website')
   await renameRow.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(projectCard('Launch the new website')).toBeVisible()
-  expect(await project('Launch The Website')).toBeUndefined()
+  expect(await storedProject('Launch The Website')).toBeUndefined()
 
   const renamed = projectCard('Launch the new website')
   await renamed.getByRole('button', { name: 'Change area' }).click()
   await renamed.getByPlaceholder('e.g. work').fill('Engineering')
   await renamed.getByRole('button', { name: 'Save area' }).click()
   await expect(renamed).toContainText('#Engineering')
-  expect(await project('Launch the new website')).toMatchObject({ area: 'Engineering' })
+  expect(await storedProject('Launch the new website')).toMatchObject({ area: 'Engineering' })
 
   await renamed.getByTitle('Edit deadline').click()
   await renamed.getByRole('button', { name: 'Clear', exact: true }).click()
   await expect(renamed.getByTitle('Set deadline')).toBeVisible()
-  expect(await project('Launch the new website')).toHaveProperty('deadline', undefined)
+  expect(await storedProject('Launch the new website')).toHaveProperty('deadline', undefined)
 
   await renamed.getByTitle('Set deadline').click()
   await renamed.locator('.dtp__trigger').click()
   await vault.locator('.dtp__popover').getByRole('button', { name: '1 week' }).click()
   await renamed.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(renamed.getByTitle('Edit deadline')).toBeVisible()
-  expect((await project('Launch the new website'))?.deadline).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+  expect((await storedProject('Launch the new website'))?.deadline).toMatch(/^\d{4}-\d{2}-\d{2}$/)
 })
 
 test('an archived project is restored from History, archived again and deleted', async () => {
@@ -151,18 +154,18 @@ test('an archived project is restored from History, archived again and deleted',
     .getByRole('button', { name: 'Archive project' })
     .click()
   await expect(projectCard('Launch the new website')).toHaveCount(0)
-  expect(await project('Launch the new website')).toMatchObject({ status: 'archived' })
+  expect(await storedProject('Launch the new website')).toMatchObject({ status: 'archived' })
 
-  await goTo(vault, 'History')
+  await goToSection(vault, 'History')
   await vault.getByRole('tab', { name: /Archived projects/ }).click()
   const archived = vault.locator('.archive-view__project-card', {
     hasText: 'Launch the new website',
   })
   await archived.getByRole('button', { name: 'Restore to active' }).click()
   await expect(archived).toHaveCount(0)
-  expect(await project('Launch the new website')).toMatchObject({ status: 'active' })
+  expect(await storedProject('Launch the new website')).toMatchObject({ status: 'active' })
 
-  await goTo(vault, 'Projects')
+  await goToSection(vault, 'Projects')
   await projectCard('Launch the new website')
     .getByRole('button', { name: 'Archive project' })
     .click()
@@ -172,13 +175,13 @@ test('an archived project is restored from History, archived again and deleted',
     .getByRole('button', { name: 'Delete project' })
     .click()
   await expect(projectCard('Launch the new website')).toHaveCount(0)
-  expect(await project('Launch the new website')).toBeUndefined()
+  expect(await storedProject('Launch the new website')).toBeUndefined()
   expect(await storedTask(vault, 'Write the hero copy')).toBeUndefined()
 })
 
 /** Creates the Health area and gives it a task. */
 async function createHealthAreaWithTask(): Promise<void> {
-  await goTo(vault, 'Areas')
+  await goToSection(vault, 'Areas')
   await vault.getByRole('button', { name: '+ New area' }).click()
   await vault.getByPlaceholder('Area name (e.g. health, finances, work)').fill('Health')
   await vault.getByRole('button', { name: 'Create', exact: true }).click()
@@ -227,7 +230,7 @@ async function renameAndArchiveArea(): Promise<void> {
 
 /** Restores Wellbeing from History. */
 async function restoreArchivedArea(): Promise<void> {
-  await goTo(vault, 'History')
+  await goToSection(vault, 'History')
   await vault.getByRole('tab', { name: /Archived areas/ }).click()
   const archived = vault.locator('.archive-view__project-card', { hasText: 'Wellbeing' })
   await archived.getByRole('button', { name: 'Restore to active' }).click()
@@ -240,7 +243,7 @@ async function restoreArchivedArea(): Promise<void> {
 
 /** Archives Wellbeing again, and deletes it for good. */
 async function deleteArchivedArea(): Promise<void> {
-  await goTo(vault, 'Areas')
+  await goToSection(vault, 'Areas')
   vault.once('dialog', (dialog) => void dialog.accept())
   await areaCard('Wellbeing').getByRole('button', { name: 'Archive area' }).click()
   await vault.locator('.projects-browser__filter-btn', { hasText: 'Archived' }).click()
@@ -260,7 +263,7 @@ test('an area is created, given a task, renamed, archived, restored and deleted'
 
 test('History restores a finished task and deletes another for good', async () => {
   // Deleting the project took its tasks with it, so the day starts empty.
-  await goTo(vault, 'Today')
+  await goToSection(vault, 'Today')
   await vault.getByRole('button', { name: 'Add task', exact: true }).click()
   for (const text of ['Return the library books', 'Fix the gate']) {
     if (text === 'Fix the gate') await vault.locator('.daily-log__add-btn').click()
@@ -273,15 +276,17 @@ test('History restores a finished task and deletes another for good', async () =
       .click()
   }
 
-  await goTo(vault, 'History')
+  await goToSection(vault, 'History')
   await vault.getByRole('tab', { name: /Completed tasks/ }).click()
-  const row = (text: string) => vault.locator('.archive-task', { hasText: text })
-  await row('Return the library books').getByRole('button', { name: 'Restore to open' }).click()
-  await expect(row('Return the library books')).toHaveCount(0)
+  const archiveRow = (text: string) => vault.locator('.archive-task', { hasText: text })
+  await archiveRow('Return the library books')
+    .getByRole('button', { name: 'Restore to open' })
+    .click()
+  await expect(archiveRow('Return the library books')).toHaveCount(0)
   expect(await storedTask(vault, 'Return the library books')).toMatchObject({ status: 'open' })
 
   vault.once('dialog', (dialog) => void dialog.accept())
-  await row('Fix the gate').getByRole('button', { name: 'Delete permanently' }).click()
-  await expect(row('Fix the gate')).toHaveCount(0)
+  await archiveRow('Fix the gate').getByRole('button', { name: 'Delete permanently' }).click()
+  await expect(archiveRow('Fix the gate')).toHaveCount(0)
   expect(await storedTask(vault, 'Fix the gate')).toBeUndefined()
 })

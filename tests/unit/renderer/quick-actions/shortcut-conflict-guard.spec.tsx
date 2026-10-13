@@ -6,14 +6,18 @@ import { useSettingsStore } from '../../../../src/renderer/stores/settings.store
 import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
 import { useTerminalSession } from '../../../../src/renderer/hooks/useTerminalSession'
 import { CORE_SHORTCUTS } from '../../../support/quick-actions'
-import { projectOf, terminalSessionOf, workspaceOf } from '../../../support/renderer-stores'
+import {
+  projectFixture,
+  terminalSessionOf,
+  workspaceFixture,
+} from '../../../support/renderer-stores'
 import { installElectronApi } from '../../../support/electron-api'
 
 vi.mock('../../../../src/renderer/hooks/useTerminalSession', () => ({
   useTerminalSession: vi.fn(),
 }))
 
-const workspace1 = workspaceOf({ id: 'ws-1', name: 'WS 1', folderPath: '/ws1', color: '#fff' })
+const workspace1 = workspaceFixture({ id: 'ws-1', name: 'WS 1', folderPath: '/ws1', color: '#fff' })
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -23,7 +27,9 @@ beforeEach(() => {
     workspaces: [workspace1],
     activeWorkspaceId: 'ws-1',
     activeProjectId: 'proj-1',
-    projectsByWorkspaceId: new Map([['ws-1', [projectOf({ id: 'proj-1', workspaceId: 'ws-1' })]]]),
+    projectsByWorkspaceId: new Map([
+      ['ws-1', [projectFixture({ id: 'proj-1', workspaceId: 'ws-1' })]],
+    ]),
     loadProjects: vi.fn().mockResolvedValue(undefined),
   })
   useSessionStore.setState({
@@ -89,7 +95,7 @@ function candidatesFor() {
 function keyEventFor(entry: ShortcutEntry) {
   const sample = { key: 'k', metaKey: true, ctrlKey: false, shiftKey: false, altKey: false }
   const withKey = entry.actionId === 'core.switch-workspace' ? { ...sample, key: '1' } : sample
-  return candidatesFor().find((candidate) => entry.match(candidate)) ?? withKey
+  return candidatesFor().find((candidate) => entry.firedBy(candidate)) ?? withKey
 }
 
 async function renderShortcuts(onDirectShortcut: (actionId: string) => void) {

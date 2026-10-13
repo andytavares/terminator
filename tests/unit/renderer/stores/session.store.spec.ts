@@ -20,6 +20,7 @@ import type { TerminalSession } from '../../../../src/shared/types/index'
 import type { TerminalInstance } from '../../../../src/renderer/components/terminal/TerminalSession'
 import { partialFake } from '../../../support/fakes'
 import { leafIds } from '../../../../src/renderer/utils/pane-tree'
+import { sessionState } from '../../../support/store-state'
 
 function makeSession(overrides: Partial<TerminalSession> = {}): TerminalSession {
   return {
@@ -37,7 +38,7 @@ function makeSession(overrides: Partial<TerminalSession> = {}): TerminalSession 
 }
 
 /** A shell in proj-1, with whatever a spec changes. */
-function request(overrides: Partial<NewSessionRequest> = {}): NewSessionRequest {
+function shellRequest(overrides: Partial<NewSessionRequest> = {}): NewSessionRequest {
   return {
     projectId: 'proj-1',
     type: 'human',
@@ -92,13 +93,13 @@ describe('useSessionStore — createSession', () => {
       sessionId: 'sess-sh',
       shell: '/bin/fish',
     })
-    await useSessionStore.getState().createSession(request())
+    await useSessionStore.getState().createSession(shellRequest())
     expect(useSessionStore.getState().sessions.get('sess-sh')?.shell).toBe('/bin/fish')
   })
 
   it('creates a session and stores it', async () => {
     mockElectronAPI.terminal.create.mockResolvedValue({ sessionId: 'sess-1' })
-    const id = await useSessionStore.getState().createSession(request())
+    const id = await useSessionStore.getState().createSession(shellRequest())
     expect(id).toBe('sess-1')
     const session = useSessionStore.getState().sessions.get('sess-1')
     expect(session).toMatchObject({
@@ -117,7 +118,7 @@ describe('useSessionStore — createSession — throws when terminal.create retu
 
   it('throws when terminal.create returns an error', async () => {
     mockElectronAPI.terminal.create.mockResolvedValue({ error: 'FAILED' })
-    await expect(useSessionStore.getState().createSession(request())).rejects.toThrow('FAILED')
+    await expect(useSessionStore.getState().createSession(shellRequest())).rejects.toThrow('FAILED')
   })
 
   // The code names the failure; only the message names the folder, and the
@@ -128,13 +129,13 @@ describe('useSessionStore — createSession — throws when terminal.create retu
       message: 'That folder no longer exists: /repo/.worktrees/removed',
     })
     await expect(
-      useSessionStore.getState().createSession(request({ cwd: '/gone' }))
+      useSessionStore.getState().createSession(shellRequest({ cwd: '/gone' }))
     ).rejects.toThrow('That folder no longer exists: /repo/.worktrees/removed')
   })
 
   it('auto-numbers title as "Terminal 1" when empty title given', async () => {
     mockElectronAPI.terminal.create.mockResolvedValue({ sessionId: 'sess-1' })
-    await useSessionStore.getState().createSession(request({ title: '' }))
+    await useSessionStore.getState().createSession(shellRequest({ title: '' }))
     const session = useSessionStore.getState().sessions.get('sess-1')
     expect(session?.tabTitle).toBe('Terminal 1')
   })
@@ -147,15 +148,15 @@ describe('useSessionStore — createSession — increments counter per project f
     mockElectronAPI.terminal.create
       .mockResolvedValueOnce({ sessionId: 'sess-1' })
       .mockResolvedValueOnce({ sessionId: 'sess-2' })
-    await useSessionStore.getState().createSession(request({ title: '' }))
-    await useSessionStore.getState().createSession(request({ title: '' }))
+    await useSessionStore.getState().createSession(shellRequest({ title: '' }))
+    await useSessionStore.getState().createSession(shellRequest({ title: '' }))
     expect(useSessionStore.getState().sessions.get('sess-1')?.tabTitle).toBe('Terminal 1')
     expect(useSessionStore.getState().sessions.get('sess-2')?.tabTitle).toBe('Terminal 2')
   })
 
   it('uses explicit title when provided (no auto-numbering)', async () => {
     mockElectronAPI.terminal.create.mockResolvedValue({ sessionId: 'sess-1' })
-    await useSessionStore.getState().createSession(request({ title: 'My Tab' }))
+    await useSessionStore.getState().createSession(shellRequest({ title: 'My Tab' }))
     expect(useSessionStore.getState().sessions.get('sess-1')?.tabTitle).toBe('My Tab')
   })
 })
@@ -750,10 +751,8 @@ describe('useSessionStore — split pane actions — closing the active pane kee
   })
 })
 
-const store = () => useSessionStore.getState()
-
 const leavesOnScreen = () => {
-  const layout = store().getPaneLayout('proj-1')
+  const layout = sessionState().getPaneLayout('proj-1')
   return layout ? leafIds(layout) : null
 }
 
@@ -763,8 +762,8 @@ function setUpUseSessionStoreASplitBelongs(): void {
 
   beforeEach(() => {
     vi.stubGlobal('crypto', { randomUUID: vi.fn(() => 'split-uuid') })
-    store().setActiveSessionForProject('proj-1', 'sess-a')
-    store().activateSplit('proj-1', {
+    sessionState().setActiveSessionForProject('proj-1', 'sess-a')
+    sessionState().activateSplit('proj-1', {
       targetId: 'sess-a',
       newId: 'sess-b',
       direction: 'horizontal',
@@ -776,29 +775,29 @@ describe('useSessionStore — a split belongs to the tab it was made in', () => 
   setUpUseSessionStoreASplitBelongs()
 
   it('a new tab shows alone, and the split comes back with its own tab', () => {
-    store().setActiveSessionForProject('proj-1', 'sess-c')
+    sessionState().setActiveSessionForProject('proj-1', 'sess-c')
     expect(leavesOnScreen()).toBeNull()
-    store().setActiveSessionForProject('proj-1', 'sess-a')
+    sessionState().setActiveSessionForProject('proj-1', 'sess-a')
     expect(leavesOnScreen()).toEqual(['sess-a', 'sess-b'])
-    store().setActiveSessionForProject('proj-1', 'sess-b')
+    sessionState().setActiveSessionForProject('proj-1', 'sess-b')
     expect(leavesOnScreen()).toEqual(['sess-a', 'sess-b'])
   })
 
   it('names no focused pane while the split is off screen', () => {
-    expect(store().getFocusedSession('proj-1')).toBe('sess-b')
-    store().setActiveSessionForProject('proj-1', 'sess-c')
-    expect(store().getFocusedSession('proj-1')).toBeNull()
+    expect(sessionState().getFocusedSession('proj-1')).toBe('sess-b')
+    sessionState().setActiveSessionForProject('proj-1', 'sess-c')
+    expect(sessionState().getFocusedSession('proj-1')).toBeNull()
   })
 
   it('each tab keeps its own split', () => {
-    store().setActiveSessionForProject('proj-1', 'sess-c')
-    store().activateSplit('proj-1', {
+    sessionState().setActiveSessionForProject('proj-1', 'sess-c')
+    sessionState().activateSplit('proj-1', {
       targetId: 'sess-c',
       newId: 'sess-d',
       direction: 'vertical',
     })
     expect(leavesOnScreen()).toEqual(['sess-c', 'sess-d'])
-    store().setActiveSessionForProject('proj-1', 'sess-a')
+    sessionState().setActiveSessionForProject('proj-1', 'sess-a')
     expect(leavesOnScreen()).toEqual(['sess-a', 'sess-b'])
   })
 })
@@ -807,30 +806,30 @@ describe("useSessionStore — a split belongs to the tab it was made in — clos
   setUpUseSessionStoreASplitBelongs()
 
   it("closing a pane of one tab's split leaves the other tab's split alone", () => {
-    store().setActiveSessionForProject('proj-1', 'sess-c')
-    store().activateSplit('proj-1', {
+    sessionState().setActiveSessionForProject('proj-1', 'sess-c')
+    sessionState().activateSplit('proj-1', {
       targetId: 'sess-c',
       newId: 'sess-d',
       direction: 'vertical',
     })
-    store().closeSplitLeaf('proj-1', 'sess-d')
+    sessionState().closeSplitLeaf('proj-1', 'sess-d')
     expect(leavesOnScreen()).toBeNull()
-    store().setActiveSessionForProject('proj-1', 'sess-a')
+    sessionState().setActiveSessionForProject('proj-1', 'sess-a')
     expect(leavesOnScreen()).toEqual(['sess-a', 'sess-b'])
   })
 
   it('unsplitting a tab that is off screen leaves the tab on screen as it was', () => {
-    store().setActiveSessionForProject('proj-1', 'sess-c')
-    store().closeSplitLeaf('proj-1', 'sess-b')
-    expect(store().getActiveSessionForProject('proj-1')).toBe('sess-c')
-    store().setActiveSessionForProject('proj-1', 'sess-a')
+    sessionState().setActiveSessionForProject('proj-1', 'sess-c')
+    sessionState().closeSplitLeaf('proj-1', 'sess-b')
+    expect(sessionState().getActiveSessionForProject('proj-1')).toBe('sess-c')
+    sessionState().setActiveSessionForProject('proj-1', 'sess-a')
     expect(leavesOnScreen()).toBeNull()
   })
 
   it('unsplitting a pane that is in no split changes nothing', () => {
-    const before = store().projectViews
-    store().closeSplitLeaf('proj-1', 'sess-c')
-    expect(store().projectViews).toBe(before)
+    const before = sessionState().projectViews
+    sessionState().closeSplitLeaf('proj-1', 'sess-c')
+    expect(sessionState().projectViews).toBe(before)
   })
 })
 
@@ -1088,7 +1087,7 @@ describe('activity, attention and notes (feature 030) — lastActivityAt backfil
 
   it('createSession stamps lastActivityAt from createdAt', async () => {
     mockElectronAPI.terminal.create.mockResolvedValue({ sessionId: 'new-1' })
-    await useSessionStore.getState().createSession(request({ title: 'T', cwd: '/tmp' }))
+    await useSessionStore.getState().createSession(shellRequest({ title: 'T', cwd: '/tmp' }))
     const created = useSessionStore.getState().sessions.get('new-1')!
     expect(created.lastActivityAt).toBe(Date.parse(created.createdAt))
   })
@@ -1106,7 +1105,7 @@ describe('activity, attention and notes (feature 030) — lastActivityAt backfil
 
   it('a newly created session starts idle', async () => {
     mockElectronAPI.terminal.create.mockResolvedValue({ sessionId: 'new-2' })
-    await useSessionStore.getState().createSession(request({ title: 'T', cwd: '/tmp' }))
+    await useSessionStore.getState().createSession(shellRequest({ title: 'T', cwd: '/tmp' }))
     expect(useSessionStore.getState().sessions.get('new-2')!.agentState).toBe('idle')
   })
 })
@@ -1137,7 +1136,7 @@ describe('activity, attention and notes (feature 030) — lastAttendedAt', () =>
 describe('setSessionScreen', () => {
   it("records a session's last visible line", async () => {
     mockElectronAPI.terminal.create.mockResolvedValue({ sessionId: 'scr-1' })
-    await useSessionStore.getState().createSession(request())
+    await useSessionStore.getState().createSession(shellRequest())
     useSessionStore.getState().setSessionScreen('scr-1', { latestLine: 'done', choicePrompt: null })
     const session = useSessionStore.getState().sessions.get('scr-1')
     expect(session?.latestLine).toBe('done')
@@ -1156,7 +1155,9 @@ describe('createSession — resuming', () => {
     mockElectronAPI.terminal.create.mockResolvedValue({ sessionId: 'res-1' })
     await useSessionStore
       .getState()
-      .createSession(request({ title: '', cwd: '/repo', initialCommand: 'claude --resume abc' }))
+      .createSession(
+        shellRequest({ title: '', cwd: '/repo', initialCommand: 'claude --resume abc' })
+      )
     expect(mockElectronAPI.terminal.create).toHaveBeenCalledWith(
       expect.objectContaining({ initialCommand: 'claude --resume abc' })
     )
@@ -1164,7 +1165,7 @@ describe('createSession — resuming', () => {
 
   it('asks for no command when there is none', async () => {
     mockElectronAPI.terminal.create.mockResolvedValue({ sessionId: 'res-2' })
-    await useSessionStore.getState().createSession(request({ title: '', cwd: '/repo' }))
+    await useSessionStore.getState().createSession(shellRequest({ title: '', cwd: '/repo' }))
     expect(mockElectronAPI.terminal.create.mock.calls.at(-1)?.[0]).not.toHaveProperty(
       'initialCommand'
     )

@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test'
 import { AppHandle, launchApp, closeApp } from './helpers'
 import { invokeChannel } from './extension-page'
-import { goTo, openVault, localDate } from './task-vault-harness'
+import { goToSection, openVault, localDate } from './task-vault-harness'
 
 // Remote-accessible channels that no view calls: a remote client is their only
 // caller, so they are driven the way it calls them, and their effect is read
@@ -32,7 +32,7 @@ test('projects:update-status shelves a project and its open tasks', async () => 
     })
   ).toEqual({ success: true })
 
-  await goTo(vault, 'Projects')
+  await goToSection(vault, 'Projects')
   await vault.locator('.projects-browser__filter-btn', { hasText: 'All' }).click()
   const card = vault.locator('.projects-browser__card', { hasText: 'Podcast' })
   await expect(card.locator('.projects-browser__someday-badge')).toBeVisible()
@@ -59,16 +59,16 @@ test('vault:query filters by status, context, project, area and due date', async
   ]) {
     await invokeChannel(vault, 'task-vault:vault:capture', { text })
   }
-  const query = async (filter: Record<string, unknown>) =>
+  const queryVault = async (filter: Record<string, unknown>) =>
     (
       await invokeChannel<{ tasks: { text: string }[] }>(vault, 'task-vault:vault:query', filter)
     ).tasks.map((task) => task.text)
 
   // Tags are stored under their display name.
-  expect(await query({ context: 'Errands' })).toEqual(['Buy paint'])
-  expect(await query({ area: 'Home' })).toEqual(['Buy paint', 'Call the council'])
-  expect(await query({ area: 'Home', dueBefore: '2031-02-01' })).toEqual(['Buy paint'])
-  expect(await query({ status: ['open'], context: 'Computer' })).toEqual(['Email the editor'])
+  expect(await queryVault({ context: 'Errands' })).toEqual(['Buy paint'])
+  expect(await queryVault({ area: 'Home' })).toEqual(['Buy paint', 'Call the council'])
+  expect(await queryVault({ area: 'Home', dueBefore: '2031-02-01' })).toEqual(['Buy paint'])
+  expect(await queryVault({ status: ['open'], context: 'Computer' })).toEqual(['Email the editor'])
 })
 
 test('settings:set-stale-threshold decides when a rolled-over task reads as stale', async () => {
@@ -78,7 +78,7 @@ test('settings:set-stale-threshold decides when a rolled-over task reads as stal
   })
   // Opening the vault afresh rolls last week's open task over to today.
   await vault.reload()
-  await goTo(vault, 'Today')
+  await goToSection(vault, 'Today')
   const row = vault.locator('.daily-log__task', { hasText: 'Renew the insurance' })
   // Eight days over the default threshold of seven.
   await expect(row.locator('.daily-log__stale-badge')).toBeVisible()

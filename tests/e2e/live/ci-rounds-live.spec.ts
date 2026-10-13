@@ -4,6 +4,7 @@ import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { launchApp, closeApp, createWorkspace, type AppHandle, e2eTempDir } from '../helpers'
 import { writeLiveOrder } from './live-order'
+import { liveOrderDir, startLiveRun } from './live-run'
 
 // A red CI goes back to the builder, for real (ADR-064).
 //
@@ -136,22 +137,11 @@ function writeOrder(): void {
   })
 }
 
-/** Starts the run, and checks it was accepted with something to run. */
-async function startRun(): Promise<void> {
-  const started = (await foundry('foundry:run.start', { id: ORDER })) as {
-    error?: string
-    started?: boolean
-  }
-  expect(started.error, 'the run was refused').toBeUndefined()
-  expect(started.started, 'nothing was there to run it').toBe(true)
-}
-
-const orderDir = (): string => join(repo, '.foundry', 'orders', ORDER)
 const readIfThere = (file: string): string => (existsSync(file) ? readFileSync(file, 'utf8') : '')
 
 /** The run is over when the ledger says how shipping ended. Null until then. */
 function shippingOver(): string | null {
-  const ledger = readIfThere(join(orderDir(), 'ledger.jsonl'))
+  const ledger = readIfThere(join(liveOrderDir(repo, ORDER), 'ledger.jsonl'))
   if (ledger.includes('ship.ready_asked')) return 'the ready gate was raised'
   if (ledger.includes('ship.ci_red')) return 'CI stayed red'
   if (ledger.includes('ship.refused')) return 'shipping was refused'
@@ -161,7 +151,7 @@ function shippingOver(): string | null {
 
 /** Logs what ci.json says when it changes, and returns it. */
 function logCi(previous: string): string {
-  const ci = readIfThere(join(orderDir(), 'ci.json'))
+  const ci = readIfThere(join(liveOrderDir(repo, ORDER), 'ci.json'))
   const state = ci === '' ? 'no ci yet' : ci.replace(/\s+/g, ' ').slice(0, 300)
   if (state !== previous) console.log(`[${new Date().toISOString().slice(11, 19)}] ${state}`)
   return state
@@ -184,7 +174,7 @@ async function waitForShipping(): Promise<void> {
 
 /** One fix round, CI green, and the ready gate raised with the checks that passed. */
 function expectOneRoundToGreen(ledger: string): void {
-  const gatesFile = join(orderDir(), 'gates.json')
+  const gatesFile = join(liveOrderDir(repo, ORDER), 'gates.json')
   const gates = existsSync(gatesFile)
     ? (JSON.parse(readFileSync(gatesFile, 'utf8')) as { rule: string; why: string }[])
     : []
@@ -204,7 +194,7 @@ function expectOneRoundToGreen(ledger: string): void {
 
 /** GitHub agrees: every check on the lane's branch passed or was skipped. */
 function expectChecksGreenOnGitHub(): void {
-  const worktree = join(orderDir(), 'worktrees', 'live')
+  const worktree = join(liveOrderDir(repo, ORDER), 'worktrees', 'live')
   const branch = execFileSync('git', ['branch', '--show-current'], { cwd: worktree })
     .toString()
     .trim()
@@ -219,10 +209,10 @@ function expectChecksGreenOnGitHub(): void {
 test('a red CI goes back to the builder and the draft reaches the ready gate green', async () => {
   test.setTimeout(3_600_000)
   writeOrder()
-  await startRun()
+  await startLiveRun(foundry, ORDER)
   await waitForShipping()
 
-  const ledger = readIfThere(join(orderDir(), 'ledger.jsonl'))
+  const ledger = readIfThere(join(liveOrderDir(repo, ORDER), 'ledger.jsonl'))
 
   console.log(`ledger:\n${ledger}`)
   expectOneRoundToGreen(ledger)

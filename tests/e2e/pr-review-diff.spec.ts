@@ -6,7 +6,7 @@ import {
   makeRepoWithRemote,
   openCodeReviews,
   openRepo,
-  pushBranch,
+  pushBranchToOrigin,
   writeFile,
 } from './git-harness'
 import { startGithubStub, type GithubStub } from './github-stub'
@@ -43,7 +43,7 @@ test.beforeAll(async () => {
   git(repo, 'add', '-A')
   git(repo, 'commit', '--quiet', '-m', 'math with a tail')
   git(repo, 'push', '--quiet')
-  pushBranch(repo, 'feat/subtract', {
+  pushBranchToOrigin(repo, 'feat/subtract', {
     'src/math.ts': [...MATH_HEAD, ...MATH_TAIL, ''].join('\n'),
     'tests/math.spec.ts': MATH_SPEC,
   })
@@ -73,7 +73,7 @@ test.afterAll(async () => {
   for (const dir of [repo, bare]) if (dir) rmSync(dir, { recursive: true, force: true })
 })
 
-async function startReview(): Promise<Page> {
+async function startPrReview(): Promise<Page> {
   const view = await openCodeReviews(handle, 'Review Diff')
   await view.locator('.rd-row').filter({ hasText: 'Add subtract' }).click()
   await view.getByRole('button', { name: /^(Start|Continue|Resume) Review/ }).click()
@@ -85,7 +85,7 @@ function fileInList(view: Page, path: string) {
 }
 
 test('the diff shows the change, and the context below it on request', async () => {
-  const view = await startReview()
+  const view = await startPrReview()
   await fileInList(view, 'src/math.ts').click()
   await expect(view.getByRole('main')).toContainText('return a - b')
   await expect(view.getByRole('main')).not.toContainText('export const step20 = 20')
@@ -176,6 +176,6 @@ test('after the author pushes again, the review says what changed since the last
   git(repo, 'push', '--quiet', 'origin', 'feat/subtract')
   git(repo, 'checkout', '--quiet', 'main')
 
-  await startReview()
+  await startPrReview()
   await expect(view.getByText('1 commit since you last looked')).toBeVisible()
 })

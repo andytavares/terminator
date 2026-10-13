@@ -12,6 +12,7 @@ import { join } from 'node:path'
 import type { ExtensionAPI } from '@terminator/extension-sdk'
 import { FakeBackendHost } from './fake-backend-host'
 import { makeTempDir } from '../../support/temp-dir'
+import { gitStatusIn } from './status-command'
 
 // api.shell.exec and api.github as an extension's calls reach them: through the
 // extension host, with the manifest the extension shipped, the real cwd check and
@@ -68,13 +69,13 @@ function directory(...parts: string[]): string {
 }
 
 /** A stand-in for `name` that records the directory it ran in, then prints it. */
-function standIn(bin: string, name: string): void {
+function recordingStandIn(bin: string, name: string): void {
   const script = join(bin, name)
   writeFileSync(script, `#!/bin/sh\npwd >> "${ran}"\npwd\n`)
   chmodSync(script, 0o755)
 }
 
-async function hostedApi(contributes: Record<string, unknown> = {}): Promise<ExtensionAPI> {
+async function toolExtensionApi(contributes: Record<string, unknown> = {}): Promise<ExtensionAPI> {
   const { ExtensionHost } = await import('../../../src/main/extensions/extension-host')
   const host = new ExtensionHost(new FakeBackendHost())
   host.setDeps({ paths: { app: directory('app'), userData: directory('user-data') } })
@@ -95,9 +96,6 @@ function registerFolderSetting(api: ExtensionAPI, type: 'folder' | 'string' = 'f
   })
 }
 
-const gitIn = (api: ExtensionAPI, cwd: string) =>
-  api.shell.exec({ command: 'git', args: ['status'], cwd })
-
 beforeEach(() => {
   vi.resetModules()
   storeData.extensions = []
@@ -107,8 +105,8 @@ beforeEach(() => {
   scratch = realpathSync(makeTempDir('shell-scope-'))
   ran = join(scratch, 'ran.log')
   const bin = directory('bin')
-  standIn(bin, 'git')
-  standIn(bin, 'gh')
+  recordingStandIn(bin, 'git')
+  recordingStandIn(bin, 'gh')
   process.env.PATH = `${bin}:${originalPath}`
 })
 
@@ -123,50 +121,50 @@ describe('api.shell.exec runs only inside a root', () => {
     const worktree = directory('worktrees', 'repo-feature')
     workspaces.push({ id: 'w1', name: 'Repo', folderPath: folder })
     projects.push({ id: 'p1', workspaceId: 'w1', name: 'feature', worktreePath: worktree })
-    const api = await hostedApi()
+    const api = await toolExtensionApi()
 
-    expect((await gitIn(api, join(folder))).stdout).toBe(`${folder}\n`)
-    expect((await gitIn(api, worktree)).stdout).toBe(`${worktree}\n`)
+    expect((await gitStatusIn(api, join(folder))).stdout).toBe(`${folder}\n`)
+    expect((await gitStatusIn(api, worktree)).stdout).toBe(`${worktree}\n`)
   })
 
   it('runs in its own api.paths.globalStorage, <userData>/extensions/<id>', async () => {
-    const api = await hostedApi()
+    const api = await toolExtensionApi()
 
     expect(api.paths.globalStorage).toBe(join(scratch, 'user-data', 'extensions', ID))
     const records = directory('user-data', 'extensions', ID, 'records')
-    expect((await gitIn(api, records)).stdout).toBe(`${records}\n`)
+    expect((await gitStatusIn(api, records)).stdout).toBe(`${records}\n`)
   })
 })
 
 describe('api.shell.exec runs only inside a root — other folders and settings', () => {
   it("refuses another extension's folder, and userData outside its own folder", async () => {
-    const api = await hostedApi()
+    const api = await toolExtensionApi()
     const other = directory('user-data', 'extensions', 'com.example.other', 'records')
 
     for (const cwd of [other, join(scratch, 'user-data'), directory('user-data', 'foundry')]) {
-      await expect(gitIn(api, cwd)).rejects.toMatchObject({ name: 'CwdOutOfScopeError' })
+      await expect(gitStatusIn(api, cwd)).rejects.toMatchObject({ name: 'CwdOutOfScopeError' })
     }
     expect(existsSync(ran)).toBe(false)
   })
 
   it('runs in a declared folder setting, read when the call is made', async () => {
-    const api = await hostedApi({ shellRoots: [FOLDER_KEY] })
+    const api = await toolExtensionApi({ shellRoots: [FOLDER_KEY] })
     registerFolderSetting(api)
     const clones = directory('clones')
     settings[FOLDER_KEY] = clones
 
-    expect((await gitIn(api, clones)).stdout).toBe(`${clones}\n`)
+    expect((await gitStatusIn(api, clones)).stdout).toBe(`${clones}\n`)
     settings[FOLDER_KEY] = directory('elsewhere')
-    await expect(gitIn(api, clones)).rejects.toMatchObject({ name: 'CwdOutOfScopeError' })
+    await expect(gitStatusIn(api, clones)).rejects.toMatchObject({ name: 'CwdOutOfScopeError' })
   })
 })
 
 describe('api.shell.exec runs only inside a root — escapes', () => {
   it('refuses a directory outside every root, and runs nothing', async () => {
     workspaces.push({ id: 'w1', name: 'Repo', folderPath: directory('repo') })
-    const api = await hostedApi()
+    const api = await toolExtensionApi()
 
-    await expect(gitIn(api, directory('outside'))).rejects.toMatchObject({
+    await expect(gitStatusIn(api, directory('outside'))).rejects.toMatchObject({
       name: 'CwdOutOfScopeError',
       message: expect.stringContaining(join(scratch, 'outside')),
     })
@@ -178,10 +176,10 @@ describe('api.shell.exec runs only inside a root — escapes', () => {
     const outside = directory('outside')
     symlinkSync(outside, join(folder, 'escape'))
     workspaces.push({ id: 'w1', name: 'Repo', folderPath: folder })
-    const api = await hostedApi()
+    const api = await toolExtensionApi()
 
     for (const cwd of [`${folder}/../outside`, join(folder, 'escape'), directory('repo-sibling')]) {
-      await expect(gitIn(api, cwd)).rejects.toMatchObject({ name: 'CwdOutOfScopeError' })
+      await expect(gitStatusIn(api, cwd)).rejects.toMatchObject({ name: 'CwdOutOfScopeError' })
     }
     expect(existsSync(ran)).toBe(false)
   })
@@ -189,21 +187,21 @@ describe('api.shell.exec runs only inside a root — escapes', () => {
 
 describe('api.shell.exec runs only inside a root — undeclared folders', () => {
   it('ignores a declared key the extension never registered as a folder', async () => {
-    const api = await hostedApi({ shellRoots: [FOLDER_KEY] })
+    const api = await toolExtensionApi({ shellRoots: [FOLDER_KEY] })
     const clones = directory('clones')
     settings[FOLDER_KEY] = clones
 
-    await expect(gitIn(api, clones)).rejects.toMatchObject({ name: 'CwdOutOfScopeError' })
+    await expect(gitStatusIn(api, clones)).rejects.toMatchObject({ name: 'CwdOutOfScopeError' })
     registerFolderSetting(api, 'string')
-    await expect(gitIn(api, clones)).rejects.toMatchObject({ name: 'CwdOutOfScopeError' })
+    await expect(gitStatusIn(api, clones)).rejects.toMatchObject({ name: 'CwdOutOfScopeError' })
   })
 
   it('ignores a folder setting the manifest does not declare', async () => {
-    const api = await hostedApi()
+    const api = await toolExtensionApi()
     registerFolderSetting(api)
     settings[FOLDER_KEY] = directory('clones')
 
-    await expect(gitIn(api, join(scratch, 'clones'))).rejects.toMatchObject({
+    await expect(gitStatusIn(api, join(scratch, 'clones'))).rejects.toMatchObject({
       name: 'CwdOutOfScopeError',
     })
   })
@@ -211,14 +209,14 @@ describe('api.shell.exec runs only inside a root — undeclared folders', () => 
 
 describe('api.github runs gh only inside a root', () => {
   it('runs gh in api.paths.globalStorage', async () => {
-    const api = await hostedApi()
+    const api = await toolExtensionApi()
     const own = directory('user-data', 'extensions', ID)
 
     expect(await api.github.api({ cwd: own }, { path: 'user' })).toBe(`${own}\n`)
   })
 
   it('refuses gh in a directory outside every root, such as the home directory', async () => {
-    const api = await hostedApi()
+    const api = await toolExtensionApi()
 
     await expect(
       api.github.api({ cwd: directory('home') }, { path: 'user' })

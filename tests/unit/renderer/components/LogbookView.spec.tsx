@@ -10,7 +10,7 @@ import { LogbookView } from '../../../../src/renderer/components/home/LogbookVie
 import { buildLogbook } from '../../../../src/renderer/sidebar/logbook-groups'
 import { fact } from '../sidebar/fixtures/facts'
 import { useIntegrationsStore } from '../../../../src/renderer/stores/integrations.store'
-import { issueOf, issueSummaryOf, trackerConnectionOf } from '../../../support/renderer-stores'
+import { issueFixture, issueSummaryOf, trackerConnectionOf } from '../../../support/renderer-stores'
 
 const NOW = Date.parse('2026-09-15T12:00:00.000Z')
 const titles = new Map([['linear:NW-88', 'Rate limit per API key']])
@@ -170,7 +170,7 @@ describe('LogbookView — the detail of an open session — suggests tickets and
 
   it("offers the branch's own ticket first when the session is linked elsewhere", async () => {
     useIntegrationsStore.setState({
-      issues: new Map([['p1', issueOf({ key: 'P-1', title: 'Project ticket' })]]),
+      issues: new Map([['p1', issueFixture({ key: 'P-1', title: 'Project ticket' })]]),
     })
     const own = {
       ...undescribed,

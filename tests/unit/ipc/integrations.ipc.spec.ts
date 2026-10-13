@@ -75,7 +75,7 @@ const window = {
   },
 }
 
-async function addProject(): Promise<string> {
+async function addLinkedProject(): Promise<string> {
   const workspaces = await import('../../../src/main/storage/workspace-store')
   const created = workspaces.createWorkspace({
     name: 'repo',
@@ -106,10 +106,10 @@ async function invoke<T = unknown>(channel: string, payload: unknown): Promise<T
   return (await handler({}, payload)) as T
 }
 
-const connection = async (tracker: string) =>
+const connectionOf = async (tracker: string) =>
   (await trackers.listConnections()).find((c) => c.tracker === tracker)
 
-const contextFile = () => path.join(userData, 'integrations', 'context', `${P}.json`)
+const sessionContextFile = () => path.join(userData, 'integrations', 'context', `${P}.json`)
 const projectSettings = () => path.join(projectDir, '.claude', 'settings.local.json')
 
 beforeEach(async () => {
@@ -123,7 +123,7 @@ beforeEach(async () => {
   service.get.mockResolvedValue(TAV_42)
   trackers = await import('../../../src/main/integrations/tracker-store')
   links = await import('../../../src/main/integrations/issue-link-store')
-  P = await addProject()
+  P = await addLinkedProject()
   await trackers.setCredential({ tracker: 'linear', apiKey: 'stored-key' })
   await register()
 })
@@ -169,14 +169,14 @@ describe('integrations:connect', () => {
     })
 
     expect(result).toEqual({ error: 'auth-failed', message: 'Authentication required' })
-    expect(await connection('jira')).toMatchObject({ connected: false, account: null })
+    expect(await connectionOf('jira')).toMatchObject({ connected: false, account: null })
   })
 })
 
 describe('integrations:connect — what it stores', () => {
   it('records the account the credential proved to belong to', async () => {
     await invoke('integrations:connect', { tracker: 'linear', apiKey: 'k' })
-    expect((await connection('linear'))?.account).toEqual({ name: 'Andrew', email: 'a@b.c' })
+    expect((await connectionOf('linear'))?.account).toEqual({ name: 'Andrew', email: 'a@b.c' })
   })
 
   it('stores the Jira query as its mine selector', async () => {
@@ -212,7 +212,7 @@ describe('integrations:disconnect', () => {
     })
     await invoke('integrations:disconnect', { tracker: 'linear' })
     expect(await trackers.getCredential('linear')).toBeNull()
-    expect(await connection('jira')).toMatchObject({ connected: true })
+    expect(await connectionOf('jira')).toMatchObject({ connected: true })
   })
 })
 
@@ -411,7 +411,7 @@ describe('integrations:link-clear', () => {
 describe('integrations — agent context', () => {
   it('writes the context and the project hook when a link is made', async () => {
     await invoke('integrations:link-set', { projectId: P, tracker: 'linear', key: 'TAV-42' })
-    expect(JSON.parse(fs.readFileSync(contextFile(), 'utf8')).markdown).toContain('TAV-42')
+    expect(JSON.parse(fs.readFileSync(sessionContextFile(), 'utf8')).markdown).toContain('TAV-42')
     expect(fs.existsSync(projectSettings())).toBe(true)
   })
 
@@ -435,7 +435,7 @@ describe('integrations — agent context when unlinking and previewing', () => {
     const before = fs.readdirSync(projectDir)
     await invoke('integrations:link-set', { projectId: P, tracker: 'linear', key: 'TAV-42' })
     await invoke('integrations:link-clear', { projectId: P })
-    expect(fs.existsSync(contextFile())).toBe(false)
+    expect(fs.existsSync(sessionContextFile())).toBe(false)
     expect(fs.readdirSync(projectDir)).toEqual(before)
   })
 
@@ -445,7 +445,7 @@ describe('integrations — agent context when unlinking and previewing', () => {
       projectId: P,
     })
     expect(result.context.markdown).toContain('TAV-42')
-    expect(fs.existsSync(contextFile())).toBe(false)
+    expect(fs.existsSync(sessionContextFile())).toBe(false)
   })
 
   it('removes the context when injection is turned off, and announces it', async () => {
@@ -454,7 +454,7 @@ describe('integrations — agent context when unlinking and previewing', () => {
     await invoke('integrations:set-inject-context', { projectId: P, injectContext: false })
 
     expect(links.getLink(P)?.injectContext).toBe(false)
-    expect(fs.existsSync(contextFile())).toBe(false)
+    expect(fs.existsSync(sessionContextFile())).toBe(false)
     expect(fs.existsSync(projectSettings())).toBe(false)
     expect(sent.find((s) => s.channel === 'integrations:link-changed')?.data).toMatchObject({
       link: { injectContext: false },

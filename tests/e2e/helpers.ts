@@ -254,7 +254,7 @@ function hasExited(proc: ChildProcess): boolean {
 }
 
 /** Settles on the process's 'exit' event (https://nodejs.org/api/child_process.html#event-exit). */
-function exited(proc: ChildProcess): Promise<void> {
+function processExited(proc: ChildProcess): Promise<void> {
   return new Promise((resolve) => {
     if (hasExited(proc)) resolve()
     else proc.once('exit', () => resolve())
@@ -270,7 +270,7 @@ async function stopApp(app: ElectronApplication, graceMs: number): Promise<void>
   await Promise.race([app.close().catch(() => {}), deadline(graceMs)])
   if (hasExited(proc)) return
   proc.kill('SIGKILL')
-  await Promise.race([exited(proc), deadline(KILLED_EXIT_MS)])
+  await Promise.race([processExited(proc), deadline(KILLED_EXIT_MS)])
   if (!hasExited(proc)) {
     throw new Error(
       `The app (pid ${proc.pid}) was still running ${KILLED_EXIT_MS} ms after SIGKILL`
@@ -378,7 +378,7 @@ const exactly = (text: string): RegExp =>
 /** Runs a Quick Action the way an operator finds one they have no key for: the
  * band's Quick actions button, `/`, its name, then its row. The panel records
  * the run in `quickActions.usage`, which is how the coverage map counts it. */
-export async function runQuickAction(page: Page, label: string): Promise<void> {
+export async function runQuickActionFromPanel(page: Page, label: string): Promise<void> {
   await page.locator('.app-band__entry[aria-label="Quick actions (⌘P)"]').click()
   const panel = quickActionsPanel(page)
   await expect(panel).toBeFocused({ timeout: 10000 })
@@ -393,7 +393,7 @@ export async function runQuickAction(page: Page, label: string): Promise<void> {
 }
 
 /** Opens Settings with ⌘, (Ctrl+, off macOS) on the named section. */
-export async function openSettings(page: Page, section: string): Promise<void> {
+export async function openSettingsSection(page: Page, section: string): Promise<void> {
   if (!(await page.locator('.settings-panel').isVisible())) {
     await page.keyboard.press('ControlOrMeta+,')
   }
@@ -402,7 +402,7 @@ export async function openSettings(page: Page, section: string): Promise<void> {
 }
 
 /** Closes Settings with its close button. */
-export async function closeSettings(page: Page): Promise<void> {
+export async function closeSettingsPanel(page: Page): Promise<void> {
   await page.locator('.settings-panel__close').click()
   await expect(page.locator('.settings-panel')).toBeHidden()
 }
@@ -425,7 +425,7 @@ export function inExtensionView<T>(handle: AppHandle, urlPart: string, script: s
 /** The rows every open terminal shows, one terminal after another, read from
  * xterm's buffer. Under the WebGL renderer the terminal is a canvas and the
  * DOM holds none of its text. For a row's place on screen, use `terminalRowsIn`. */
-export function terminalRows(page: Page): Promise<string[]> {
+export function readTerminalRows(page: Page): Promise<string[]> {
   return page.evaluate(() => window.terminatorE2E!.terminalRows())
 }
 
@@ -435,6 +435,6 @@ export function visibleTerminalScreen(page: Page): Locator {
 }
 
 /** The rows of the one terminal drawn in `screen`, a pane's `.xterm-screen`, top to bottom. */
-export function terminalRowsIn(screen: Locator): Promise<string[]> {
+export function readTerminalRowsIn(screen: Locator): Promise<string[]> {
   return screen.evaluate((element) => window.terminatorE2E!.terminalRowsIn(element))
 }

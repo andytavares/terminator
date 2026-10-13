@@ -105,15 +105,15 @@ function launch([command, args]) {
   return run
 }
 
-const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+const waitMs = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
 /** Waits until every extension is active, the app exits, or the deadline passes. */
 async function awaitStartup(run, observed, extensionIds) {
   const deadline = Date.now() + STARTUP_DEADLINE_MS
   while (Date.now() < deadline && run.exitCode === undefined) {
     const { ready, inactive } = startupProgress(observed(), extensionIds)
-    if (ready && inactive.length === 0) return pause(SETTLE_MS)
-    await pause(500)
+    if (ready && inactive.length === 0) return waitMs(SETTLE_MS)
+    await waitMs(500)
   }
 }
 
@@ -151,7 +151,7 @@ async function quit(run, executable) {
   const pid = electronMainPid(table, run.child.pid, electronBinary(executable))
   if (pid) process.kill(pid, 'SIGTERM')
   const deadline = Date.now() + EXIT_DEADLINE_MS
-  while (run.exitCode === undefined && Date.now() < deadline) await pause(200)
+  while (run.exitCode === undefined && Date.now() < deadline) await waitMs(200)
   if (run.exitCode !== undefined) return run.exitCode
   process.kill(-run.child.pid, 'SIGKILL')
   return pid ? `still running 15s after SIGTERM to ${pid}` : 'no Electron main process found'
@@ -173,15 +173,15 @@ async function main([mode, executable]) {
   const run = launch(
     startCommand({ mode, platform: process.platform, userDataDirectory, executable })
   )
-  const observed = () => `${readFrom(logPath, logOffset)}\n${run.output}`
+  const outputSoFar = () => `${readFrom(logPath, logOffset)}\n${run.output}`
 
-  await awaitStartup(run, observed, extensionIds)
+  await awaitStartup(run, outputSoFar, extensionIds)
   const exitedEarly = run.exitCode !== undefined
   const exitOnQuit = exitedEarly ? run.exitCode : await quit(run, executable)
   const problems = [
     ...(exitedEarly ? [`the app exited by itself (${run.exitCode}) before startup finished`] : []),
     ...(exitedEarly || exitOnQuit === 0 ? [] : [`the app did not quit cleanly: ${exitOnQuit}`]),
-    ...startupProblems(observed(), extensionIds),
+    ...startupProblems(outputSoFar(), extensionIds),
   ]
   return { problems, extensionIds, mainLog: readFrom(logPath, logOffset) }
 }

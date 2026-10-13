@@ -7,14 +7,14 @@ import {
   AppHandle,
   addAndSelectProject,
   closeApp,
-  closeSettings,
+  closeSettingsPanel,
   createWorkspace,
   inExtensionView,
   launchApp,
-  openSettings,
+  openSettingsSection,
   projectGroup,
   quickActionsPanel,
-  runQuickAction,
+  runQuickActionFromPanel,
 } from './helpers'
 import { answerFolderPicker } from './main-stubs'
 
@@ -49,13 +49,13 @@ test.afterAll(async () => closeApp(handle))
 
 async function installListsItAcrossRestart(): Promise<void> {
   await answerFolderPicker(handle.app, PROBE)
-  await openSettings(handle.page, 'Extensions')
+  await openSettingsSection(handle.page, 'Extensions')
   await handle.page.getByRole('button', { name: 'Install from Directory' }).click()
   await expect(probeRow().locator('.extension-item__status')).toHaveText('enabled')
   await relaunch()
-  await openSettings(handle.page, 'Extensions')
+  await openSettingsSection(handle.page, 'Extensions')
   await expect(probeRow().locator('.extension-item__status')).toHaveText('enabled')
-  await closeSettings(handle.page)
+  await closeSettingsPanel(handle.page)
 }
 
 async function tabAndQuickActionsGroupShow(): Promise<void> {
@@ -68,7 +68,7 @@ async function tabAndQuickActionsGroupShow(): Promise<void> {
     .filter({ has: page.locator('.qa-row__label', { hasText: /^Probe$/ }) })
   await expect(group.locator('.qa-key').first()).toHaveText('p')
   await page.keyboard.press('Escape')
-  await runQuickAction(page, 'Toggle log window')
+  await runQuickActionFromPanel(page, 'Toggle log window')
   await expect(page.getByRole('dialog', { name: 'Application Logs' })).toContainText(CLASH)
   await page.locator('.log-window__btn--close').click()
   const logFile = join(await app.evaluate(({ app: a }) => a.getPath('logs')), 'terminator.log')
@@ -78,7 +78,7 @@ async function tabAndQuickActionsGroupShow(): Promise<void> {
 async function commandBringsTabForward(): Promise<void> {
   const { page } = handle
   await expect(probeTab()).not.toHaveClass(/tab-bar__tab--active/)
-  await runQuickAction(page, 'Show the probe tab')
+  await runQuickActionFromPanel(page, 'Show the probe tab')
   await expect(probeTab()).toHaveClass(/tab-bar__tab--active/)
 }
 
@@ -101,7 +101,7 @@ async function viewRunsCommandById(): Promise<void> {
 
 async function reloadReactivatesAndTellsViews(): Promise<void> {
   const { page } = handle
-  await openSettings(page, 'Extensions')
+  await openSettingsSection(page, 'Extensions')
   await probeRow().getByRole('button', { name: 'Reload' }).click()
   await expect(
     page.locator('.tmui-toast__message', { hasText: 'Extension reloaded' })
@@ -109,22 +109,22 @@ async function reloadReactivatesAndTellsViews(): Promise<void> {
   await expect
     .poll(() => inExtensionView<string>(handle, 'e2e.probe', `document.body.innerText`))
     .toContain('reloads: 1')
-  await closeSettings(page)
-  await runQuickAction(page, 'Show the probe tab')
+  await closeSettingsPanel(page)
+  await runQuickActionFromPanel(page, 'Show the probe tab')
   await expect(probeTab()).toHaveClass(/tab-bar__tab--active/)
 }
 
 async function uninstallRemovesItAcrossRestart(): Promise<void> {
   const { page } = handle
   page.once('dialog', (dialog) => void dialog.accept())
-  await openSettings(page, 'Extensions')
+  await openSettingsSection(page, 'Extensions')
   await probeRow().getByRole('button', { name: 'Uninstall' }).click()
   await expect(probeRow()).toHaveCount(0)
   await relaunch()
-  await openSettings(handle.page, 'Extensions')
+  await openSettingsSection(handle.page, 'Extensions')
   await expect(handle.page.locator('.extension-item').first()).toBeVisible()
   await expect(probeRow()).toHaveCount(0)
-  await closeSettings(handle.page)
+  await closeSettingsPanel(handle.page)
   await projectGroup(handle.page, 'probe-branch').click()
   await expect(probeTab()).toHaveCount(0)
 }

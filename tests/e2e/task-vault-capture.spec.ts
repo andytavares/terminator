@@ -1,7 +1,7 @@
 import { test, expect, type Locator, type Page } from '@playwright/test'
 import { AppHandle, launchApp, closeApp } from './helpers'
 import { invokeChannel } from './extension-page'
-import { goTo, openVault, storedTask, type StoredTask } from './task-vault-harness'
+import { goToSection, openVault, storedTask, type StoredTask } from './task-vault-harness'
 import { canPressGlobalKeys, pressGlobalChord } from './x11-keys'
 
 // Capturing into the Task Vault inbox and clarifying what was captured, the
@@ -37,7 +37,7 @@ function inboxRow(text: string) {
 }
 
 test('an item captured in the inbox is listed, counted and stored', async () => {
-  await goTo(vault, 'Inbox')
+  await goToSection(vault, 'Inbox')
   await captureFromInbox('Call the plumber')
 
   await expect(vault.locator('.inbox-view__count')).toHaveText('1 item')

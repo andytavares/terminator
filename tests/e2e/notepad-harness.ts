@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test'
 import type { AppHandle } from './helpers'
-import { invokeChannel, openExtension } from './extension-page'
+import { invokeChannel, openFromAppBand } from './extension-page'
 
 // Shared by the tests/e2e/notepad-*.spec.ts files: opening Notepad, creating
 // items through its New dialog, and reading back what it stored.
@@ -18,7 +18,7 @@ const NOTEPAD_URL = 'terminator.notepad/dist/index.html?view=main'
 
 /** Opens Notepad from the app band and waits for it to render. */
 export async function openNotepad(handle: AppHandle): Promise<Page> {
-  const notepad = await openExtension(handle, 'Notes', NOTEPAD_URL)
+  const notepad = await openFromAppBand(handle, 'Notes', NOTEPAD_URL)
   await expect(notepad.locator('.notepad-view')).toBeVisible({ timeout: 20_000 })
   return notepad
 }

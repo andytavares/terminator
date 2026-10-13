@@ -41,7 +41,8 @@ const onClose = vi.fn()
 const setLink = vi.fn<Window['electronAPI']['sessionRecords']['setLink']>(
   async ({ session, link }) => ({ data: sessionRecordOf(session, { link }) })
 )
-const linkOf = (sessionId: string) => useSessionRecordsStore.getState().records.get(sessionId)?.link
+const storedLinkOf = (sessionId: string) =>
+  useSessionRecordsStore.getState().records.get(sessionId)?.link
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -69,7 +70,7 @@ describe('SessionLinkDialog', () => {
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Link NW-88' }))
     })
-    expect(linkOf(facts.sessionId)).toEqual({ tracker: 'linear', key: 'NW-88' })
+    expect(storedLinkOf(facts.sessionId)).toEqual({ tracker: 'linear', key: 'NW-88' })
     expect(onClose).toHaveBeenCalled()
   })
 
@@ -102,7 +103,7 @@ describe("SessionLinkDialog — removes the session's own link, which falls back
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Remove session link' }))
     })
-    expect(linkOf(own.sessionId)).toBeNull()
+    expect(storedLinkOf(own.sessionId)).toBeNull()
     expect(onClose).toHaveBeenCalled()
   })
 

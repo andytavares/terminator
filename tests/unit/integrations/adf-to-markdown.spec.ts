@@ -11,10 +11,10 @@ function text(value: string, marks?: unknown[]): unknown {
 function para(...content: unknown[]): unknown {
   return { type: 'paragraph', content }
 }
-function list(type: 'bulletList' | 'orderedList', ...items: unknown[]): unknown {
+function adfList(type: 'bulletList' | 'orderedList', ...items: unknown[]): unknown {
   return { type, content: items }
 }
-function item(...content: unknown[]): unknown {
+function adfListItem(...content: unknown[]): unknown {
   return { type: 'listItem', content }
 }
 
@@ -38,21 +38,21 @@ describe('adfToMarkdown — block nodes', () => {
 describe('adfToMarkdown — lists', () => {
   it('renders a bullet list', () => {
     const out = adfToMarkdown(
-      doc(list('bulletList', item(para(text('alpha'))), item(para(text('beta')))))
+      doc(adfList('bulletList', adfListItem(para(text('alpha'))), adfListItem(para(text('beta')))))
     )
     expect(out).toBe('- alpha\n- beta')
   })
 
   it('renders an ordered list with ascending numbers', () => {
     const out = adfToMarkdown(
-      doc(list('orderedList', item(para(text('one'))), item(para(text('two')))))
+      doc(adfList('orderedList', adfListItem(para(text('one'))), adfListItem(para(text('two')))))
     )
     expect(out).toBe('1. one\n2. two')
   })
 
   it('nests a list inside a list item', () => {
-    const inner = list('bulletList', item(para(text('inner'))))
-    const out = adfToMarkdown(doc(list('bulletList', item(para(text('outer')), inner))))
+    const inner = adfList('bulletList', adfListItem(para(text('inner'))))
+    const out = adfToMarkdown(doc(adfList('bulletList', adfListItem(para(text('outer')), inner))))
     expect(out).toBe('- outer\n  - inner')
   })
 })

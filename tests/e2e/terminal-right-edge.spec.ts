@@ -5,7 +5,7 @@ import {
   closeApp,
   createWorkspace,
   addAndSelectProject,
-  terminalRowsIn,
+  readTerminalRowsIn,
 } from './helpers'
 
 // Regression guard for right-edge text clipping, per renderer, and for geometry that ignores
@@ -152,7 +152,7 @@ async function measureRulerRow(
   // Found by content, not at row 0: on CI the shell may print a notice first.
   const screen = page.locator(PANE_SCREEN)
   const rulerRow = async () =>
-    (await terminalRowsIn(screen)).findIndex((row) => /^#+$/.test(row) && row.length >= 40)
+    (await readTerminalRowsIn(screen)).findIndex((row) => /^#+$/.test(row) && row.length >= 40)
   await expect.poll(rulerRow, { timeout: 30000 }).toBeGreaterThanOrEqual(0)
   // The DOM renderer draws the screen's rows in order, one div each; its clip box is the
   // thing under test, so this measures the DOM on purpose.

@@ -1,12 +1,12 @@
 import { execFileSync } from 'node:child_process'
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
-import type { IncomingMessage, ServerResponse } from 'node:http'
 import { createServer } from 'node:https'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, type Page } from '@playwright/test'
-import { closeSettings, openSettings } from './helpers'
+import { closeSettingsPanel, openSettingsSection } from './helpers'
+import { readJsonBody, sendJson } from './stub-http'
 
 // A local Jira Cloud REST v3. The app's Jira client speaks only https, so the stub serves TLS
 // from a throwaway CA the app trusts through NODE_EXTRA_CA_CERTS
@@ -57,24 +57,29 @@ keyUsage = critical, keyCertSign, cRLSign
 /** A CA and a certificate for 127.0.0.1 it signed, written to a fresh directory. */
 function issueCertificate(): { caPath: string; keyPath: string; certPath: string } {
   const dir = mkdtempSync(join(tmpdir(), 'terminator-e2e-tls-'))
-  const file = (name: string) => join(dir, name)
-  writeFileSync(file('openssl.cnf'), OPENSSL_CONFIG)
-  const openssl = (...args: string[]) => execFileSync('openssl', args, { stdio: 'pipe' })
-  openssl(
+  const inCertDir = (name: string) => join(dir, name)
+  writeFileSync(inCertDir('openssl.cnf'), OPENSSL_CONFIG)
+  const runOpenssl = (...args: string[]) => execFileSync('openssl', args, { stdio: 'pipe' })
+  runOpenssl(
     ...['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '2', '-subj', '/CN=e2e CA'],
-    ...['-keyout', file('ca.key'), '-out', file('ca.pem')],
-    ...['-config', file('openssl.cnf'), '-extensions', 'ca']
+    ...['-keyout', inCertDir('ca.key'), '-out', inCertDir('ca.pem')],
+    ...['-config', inCertDir('openssl.cnf'), '-extensions', 'ca']
   )
-  openssl(
-    ...['req', '-newkey', 'rsa:2048', '-nodes', '-keyout', file('server.key')],
-    ...['-out', file('server.csr'), '-config', file('openssl.cnf')]
+  runOpenssl(
+    ...['req', '-newkey', 'rsa:2048', '-nodes', '-keyout', inCertDir('server.key')],
+    ...['-out', inCertDir('server.csr'), '-config', inCertDir('openssl.cnf')]
   )
-  openssl(
-    ...['x509', '-req', '-in', file('server.csr'), '-CA', file('ca.pem')],
-    ...['-CAkey', file('ca.key'), '-CAcreateserial', '-days', '2', '-out', file('server.pem')],
-    ...['-extfile', file('openssl.cnf'), '-extensions', 'leaf']
+  runOpenssl(
+    ...['x509', '-req', '-in', inCertDir('server.csr'), '-CA', inCertDir('ca.pem')],
+    ...['-CAkey', inCertDir('ca.key'), '-CAcreateserial', '-days', '2'],
+    ...['-out', inCertDir('server.pem')],
+    ...['-extfile', inCertDir('openssl.cnf'), '-extensions', 'leaf']
   )
-  return { caPath: file('ca.pem'), keyPath: file('server.key'), certPath: file('server.pem') }
+  return {
+    caPath: inCertDir('ca.pem'),
+    keyPath: inCertDir('server.key'),
+    certPath: inCertDir('server.pem'),
+  }
 }
 
 function toJira(issue: StubIssue, site: string) {
@@ -103,18 +108,7 @@ function searchTerm(jql: string): string | null {
   return /text ~ "((?:[^"\\]|\\.)*)"/.exec(jql)?.[1] ?? null
 }
 
-function send(response: ServerResponse, status: number, body: unknown): void {
-  response.writeHead(status, { 'Content-Type': 'application/json' })
-  response.end(JSON.stringify(body))
-}
-
-async function readBody(request: IncomingMessage): Promise<unknown> {
-  const chunks: Buffer[] = []
-  for await (const chunk of request) chunks.push(chunk as Buffer)
-  return chunks.length === 0 ? null : JSON.parse(Buffer.concat(chunks).toString('utf8'))
-}
-
-function adfText(body: unknown): string {
+function commentBodyText(body: unknown): string {
   const content = (body as { body?: { content?: Array<{ content?: Array<{ text?: string }> }> } })
     ?.body?.content
   return (content ?? []).flatMap((block) => (block.content ?? []).map((n) => n.text ?? '')).join('')
@@ -144,11 +138,11 @@ function searchAnswer(state: StubState, url: URL): Answer {
 
 function commentAnswer(state: StubState, key: string, request: StubRequest): Answer {
   if (request.method !== 'POST') return { status: 200, body: { comments: [] } }
-  state.comments.set(key, [...(state.comments.get(key) ?? []), adfText(request.body)])
+  state.comments.set(key, [...(state.comments.get(key) ?? []), commentBodyText(request.body)])
   return { status: 201, body: {} }
 }
 
-function route(state: StubState, request: StubRequest): Answer {
+function routeJira(state: StubState, request: StubRequest): Answer {
   const path = request.url.pathname.replace(/^\/rest\/api\/3/, '')
   if (path === '/myself') {
     return { status: 200, body: { displayName: 'E2E Operator', emailAddress: OPERATOR } }
@@ -164,7 +158,7 @@ function route(state: StubState, request: StubRequest): Answer {
 
 /** Connects Jira through Settings → Integrations, against the stub. */
 export async function connectJira(page: Page, stub: JiraStub): Promise<void> {
-  await openSettings(page, 'Integrations')
+  await openSettingsSection(page, 'Integrations')
   await page.locator('#jira-site').fill(stub.site)
   await page.locator('#jira-email').fill('operator@example.com')
   await page.locator('#jira-token').fill('e2e-token')
@@ -172,7 +166,7 @@ export async function connectJira(page: Page, stub: JiraStub): Promise<void> {
   await expect(page.locator('.integrations__tracker', { hasText: 'Jira' })).toContainText(
     `Connected as operator@example.com · ${stub.site}`
   )
-  await closeSettings(page)
+  await closeSettingsPanel(page)
 }
 
 /** Starts the stub on a free port, answering for `issues`. */
@@ -189,8 +183,8 @@ export async function startJiraStub(issues: StubIssue[]): Promise<JiraStub> {
         const url = new URL(request.url ?? '/', `https://${site}`)
         const method = request.method ?? 'GET'
         requests.push(`${method} ${url.pathname}${url.search}`)
-        const answer = route(state, { method, url, body: await readBody(request) })
-        send(response, answer.status, answer.body)
+        const answer = routeJira(state, { method, url, body: await readJsonBody(request) })
+        sendJson(response, answer.status, answer.body)
       })()
     }
   )

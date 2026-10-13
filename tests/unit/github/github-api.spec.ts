@@ -3,7 +3,7 @@ import type { GithubCommandError } from '@terminator/extension-sdk'
 import { createGithubApi } from '../../../src/main/github/github-api'
 import type { ShellExecInput, ShellExecOutput } from '../../../src/main/shell/shell-executor'
 
-function result(overrides: Partial<ShellExecOutput> = {}): ShellExecOutput {
+function execOutput(overrides: Partial<ShellExecOutput> = {}): ShellExecOutput {
   return {
     exitCode: 0,
     stdout: '',
@@ -15,13 +15,13 @@ function result(overrides: Partial<ShellExecOutput> = {}): ShellExecOutput {
 }
 
 function fakeGh(...outputs: ShellExecOutput[]) {
-  const run = vi.fn(async (_input: ShellExecInput) => outputs.shift() ?? result())
+  const run = vi.fn(async (_input: ShellExecInput) => outputs.shift() ?? execOutput())
   return { run, github: createGithubApi(run) }
 }
 
 describe('api.github', () => {
   it('runs gh for a repository without a checkout through GH_REPO', async () => {
-    const { run, github } = fakeGh(result({ stdout: '{"number":7,"state":"OPEN"}\n' }))
+    const { run, github } = fakeGh(execOutput({ stdout: '{"number":7,"state":"OPEN"}\n' }))
 
     const pullRequest = await github.pullRequests.view(
       { cwd: '/home/me', repository: 'octo/repo' },
@@ -40,8 +40,8 @@ describe('api.github', () => {
 
   it('retries without the configured token when gh rejects it, so gh login still works', async () => {
     const { run, github } = fakeGh(
-      result({ exitCode: 1, stderr: 'HTTP 401: Bad credentials' }),
-      result({ stdout: 'alice\n' })
+      execOutput({ exitCode: 1, stderr: 'HTTP 401: Bad credentials' }),
+      execOutput({ stdout: 'alice\n' })
     )
 
     const login = await github.api(
@@ -58,7 +58,7 @@ describe('api.github — request bodies', () => {
   it('sends a JSON body on stdin and rejects with what gh printed when GitHub refuses it', async () => {
     const refusal = '{"message":"Validation Failed"}'
     const { run, github } = fakeGh(
-      result({ exitCode: 1, stdout: refusal, stderr: 'gh: Unprocessable Entity (HTTP 422)\n' })
+      execOutput({ exitCode: 1, stdout: refusal, stderr: 'gh: Unprocessable Entity (HTTP 422)\n' })
     )
 
     const request = github.api(
@@ -81,7 +81,7 @@ describe('api.github — request bodies', () => {
 
 describe('api.github — gh api command lines', () => {
   it('puts string and typed parameters, paging and a jq filter on the gh api command line', async () => {
-    const { run, github } = fakeGh(result({ stdout: '[]' }))
+    const { run, github } = fakeGh(execOutput({ stdout: '[]' }))
 
     await github.api(
       { cwd: '/repo' },
@@ -110,7 +110,7 @@ describe('api.github — gh api command lines', () => {
 
 describe('api.github — pull requests, repositories and timeouts', () => {
   it('opens a pull request and reads its number from the URL gh prints', async () => {
-    const { run, github } = fakeGh(result({ stdout: 'https://github.com/o/r/pull/42\n' }))
+    const { run, github } = fakeGh(execOutput({ stdout: 'https://github.com/o/r/pull/42\n' }))
 
     const created = await github.pullRequests.create(
       { cwd: '/repo' },
@@ -136,7 +136,9 @@ describe('api.github — pull requests, repositories and timeouts', () => {
 
 describe('api.github — repositories and timeouts', () => {
   it('reads the repository a checkout belongs to', async () => {
-    const { run, github } = fakeGh(result({ stdout: '{"name":"repo","owner":{"login":"octo"}}' }))
+    const { run, github } = fakeGh(
+      execOutput({ stdout: '{"name":"repo","owner":{"login":"octo"}}' })
+    )
 
     const repository = await github.repositories.view({ cwd: '/repo' }, ['owner', 'name'])
 
@@ -145,7 +147,7 @@ describe('api.github — repositories and timeouts', () => {
   })
 
   it('marks a timeout as a failure', async () => {
-    const { github } = fakeGh(result({ exitCode: 124, timedOut: true }))
+    const { github } = fakeGh(execOutput({ exitCode: 124, timedOut: true }))
 
     await expect(github.pullRequests.markReady({ cwd: '/repo' }, 3)).rejects.toMatchObject({
       timedOut: true,

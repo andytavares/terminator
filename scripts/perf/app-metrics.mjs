@@ -17,7 +17,7 @@ import { join } from 'node:path'
 
 const THROUGHPUT_BYTES = 50 * 1024 * 1024
 
-function option(name, fallback) {
+function cliOption(name, fallback) {
   const hit = process.argv.find((arg) => arg.startsWith(`--${name}=`))
   return hit ? hit.slice(name.length + 3) : fallback
 }
@@ -28,7 +28,7 @@ function electronArgs() {
     .map((arg) => arg.slice('--electron-arg='.length))
 }
 
-function median(values) {
+function middleValue(values) {
   const sorted = [...values].sort((a, b) => a - b)
   return sorted[Math.floor(sorted.length / 2)]
 }
@@ -47,7 +47,7 @@ async function hostMemory(app) {
   }
 }
 
-async function launch(profile) {
+async function launchTimed(profile) {
   const launchedAt = performance.now()
   const app = await electron.launch({
     args: ['.', `--user-data-dir=${profile}`, ...electronArgs()],
@@ -89,7 +89,7 @@ async function cpuSecondsByProcessType(app) {
 const SUBMIT = '.tmui-dialog__actions .tmui-button--primary, .dialog__btn-primary'
 
 // A fresh profile has no terminal: add a workspace and a branch, which opens one.
-async function openTerminal(page, folder) {
+async function openTerminalIn(page, folder) {
   await page.click('.sidebar-header__add')
   await page.getByPlaceholder('My Workspace').fill('Perf')
   await page.getByPlaceholder('/path/to/folder').fill(folder)
@@ -123,7 +123,7 @@ async function waitUntilIdle(app) {
 // does not depend on how the terminal draws (DOM rows or WebGL). producedMs is
 // when the shell finished; renderedMs is when the app went idle after it.
 async function terminalThroughput(page, app, profile) {
-  await openTerminal(page, profile)
+  await openTerminalIn(page, profile)
   await page.getByRole('textbox', { name: 'Terminal input' }).first().focus()
   const marker = join(profile, 'perf-done')
   const command = `head -c ${THROUGHPUT_BYTES} /dev/zero | tr '\\0' x; echo; touch ${marker}\r`
@@ -140,7 +140,7 @@ async function terminalThroughput(page, app, profile) {
 
 async function measureOnce(settleMs, withThroughput) {
   const profile = mkdtempSync(join(tmpdir(), 'terminator-perf-'))
-  const { app, page, startup } = await launch(profile)
+  const { app, page, startup } = await launchTimed(profile)
   try {
     await page.waitForTimeout(settleMs)
     const memory = await memoryByProcessType(app)
@@ -167,34 +167,53 @@ async function measureOnce(settleMs, withThroughput) {
   }
 }
 
-function summarise(results) {
-  const pick = (read) => Math.round(median(results.map(read)))
+/** The median of `read` over every run, rounded. */
+function roundedMedian(results, read) {
+  return Math.round(middleValue(results.map(read)))
+}
+
+/** The rounded median of `read(run, key)` for each of `keys`. */
+function mediansByKey(results, keys, read) {
+  return Object.fromEntries(keys.map((key) => [key, roundedMedian(results, (r) => read(r, key))]))
+}
+
+/** The throughput figures, or nulls when the runs did not measure throughput. */
+function summariseThroughput(results, types) {
+  if (results[0].throughputMs === null) {
+    return { throughputRunsMs: null, memoryAfterThroughputMB: null, throughputCpuSeconds: null }
+  }
+  return {
+    throughputRunsMs: results.map((r) => Math.round(r.throughputMs)),
+    memoryAfterThroughputMB: mediansByKey(
+      results,
+      types,
+      (r, type) => r.memoryAfterThroughput[type] ?? 0
+    ),
+    throughputCpuSeconds: Object.fromEntries(
+      Object.keys(results[0].throughputCpuSeconds).map((type) => [
+        type,
+        Number(middleValue(results.map((r) => r.throughputCpuSeconds[type] ?? 0)).toFixed(2)),
+      ])
+    ),
+  }
+}
+
+function summariseRuns(results) {
   const types = Object.keys(results[0].memory)
+  const { throughputRunsMs, memoryAfterThroughputMB, throughputCpuSeconds } = summariseThroughput(
+    results,
+    types
+  )
   return {
     runs: results.length,
-    startupMs: Object.fromEntries(
-      Object.keys(results[0].startup).map((key) => [key, pick((r) => r.startup[key])])
-    ),
-    memoryMB: Object.fromEntries(types.map((type) => [type, pick((r) => r.memory[type] ?? 0)])),
-    throughputMs: results[0].throughputMs === null ? null : pick((r) => r.throughputMs),
-    renderedMs: results[0].renderedMs === null ? null : pick((r) => r.renderedMs),
-    throughputRunsMs:
-      results[0].throughputMs === null ? null : results.map((r) => Math.round(r.throughputMs)),
-    memoryAfterThroughputMB:
-      results[0].throughputMs === null
-        ? null
-        : Object.fromEntries(
-            types.map((type) => [type, pick((r) => r.memoryAfterThroughput[type] ?? 0)])
-          ),
-    throughputCpuSeconds:
-      results[0].throughputMs === null
-        ? null
-        : Object.fromEntries(
-            Object.keys(results[0].throughputCpuSeconds).map((type) => [
-              type,
-              Number(median(results.map((r) => r.throughputCpuSeconds[type] ?? 0)).toFixed(2)),
-            ])
-          ),
+    startupMs: mediansByKey(results, Object.keys(results[0].startup), (r, key) => r.startup[key]),
+    memoryMB: mediansByKey(results, types, (r, type) => r.memory[type] ?? 0),
+    throughputMs:
+      results[0].throughputMs === null ? null : roundedMedian(results, (r) => r.throughputMs),
+    renderedMs: results[0].renderedMs === null ? null : roundedMedian(results, (r) => r.renderedMs),
+    throughputRunsMs,
+    memoryAfterThroughputMB,
+    throughputCpuSeconds,
   }
 }
 
@@ -202,7 +221,7 @@ function summarise(results) {
 async function bundledRecords() {
   const profile = mkdtempSync(join(tmpdir(), 'terminator-perf-seed-'))
   try {
-    const { app } = await launch(profile)
+    const { app } = await launchTimed(profile)
     await app.close()
     return JSON.parse(readFileSync(join(profile, 'extensions.json'), 'utf8')).extensions
   } finally {
@@ -264,7 +283,7 @@ function insideHost(probeDirectory) {
 async function measureHostOnce(records, settleMs) {
   const profile = mkdtempSync(join(tmpdir(), 'terminator-perf-'))
   writeFileSync(join(profile, 'extensions.json'), JSON.stringify({ extensions: records }))
-  const { app, page } = await launch(profile)
+  const { app, page } = await launchTimed(profile)
   try {
     await page.waitForTimeout(settleMs)
     return { host: await hostMemory(app), memory: await memoryByProcessType(app) }
@@ -281,21 +300,22 @@ async function measureHostRun(records, settleMs, probeDirectory) {
 }
 
 function summariseHost(results) {
-  const pick = (read) => Math.round(median(results.map(read)))
   const probed = results.filter((r) => r.inside !== null)
-  const pickProbed = (key) => Number(median(probed.map((r) => r.inside[key])).toFixed(1))
+  const pickProbed = (key) => Number(middleValue(probed.map((r) => r.inside[key])).toFixed(1))
   return {
     runs: results.length,
     hostMB: results[0].host && {
-      workingSet: pick((r) => r.host.workingSetMB),
-      peakWorkingSet: pick((r) => r.host.peakWorkingSetMB),
+      workingSet: roundedMedian(results, (r) => r.host.workingSetMB),
+      peakWorkingSet: roundedMedian(results, (r) => r.host.peakWorkingSetMB),
     },
     probedRuns: probed.length,
     insideHostMB:
       probed.length === 0
         ? null
         : Object.fromEntries(Object.keys(probed[0].inside).map((key) => [key, pickProbed(key)])),
-    totalMB: pick((r) => Object.values(r.memory).reduce((sum, mb) => sum + mb, 0)),
+    totalMB: roundedMedian(results, (r) =>
+      Object.values(r.memory).reduce((sum, mb) => sum + mb, 0)
+    ),
   }
 }
 
@@ -332,13 +352,13 @@ async function measureApp(runs, settleMs) {
   const withThroughput = process.argv.includes('--throughput')
   const results = []
   for (let run = 0; run < runs; run++) results.push(await measureOnce(settleMs, withThroughput))
-  return summarise(results)
+  return summariseRuns(results)
 }
 
-const runs = Number(option('runs', '5'))
-const settleMs = Number(option('settle-ms', '9000'))
+const runs = Number(cliOption('runs', '5'))
+const settleMs = Number(cliOption('settle-ms', '9000'))
 const summary =
-  option('extensions', '') === 'each'
+  cliOption('extensions', '') === 'each'
     ? await measureEachExtension(runs, settleMs)
     : await measureApp(runs, settleMs)
 console.log(JSON.stringify(summary, null, 2))

@@ -34,7 +34,7 @@ function runIn(sandbox, command) {
 
 const LISTED_FILES = 40
 
-function report(sandbox, entries) {
+function reportLeftovers(sandbox, entries) {
   if (entries.length === 0) {
     console.log('check-temp-leaks: 0 entries left in the temporary directory')
     return
@@ -51,7 +51,7 @@ function main(command) {
   try {
     const run = runIn(sandbox, command)
     const entries = readdirSync(sandbox)
-    report(sandbox, entries)
+    reportLeftovers(sandbox, entries)
     if (run.status !== 0) return run.status ?? 1
     return entries.length === 0 ? 0 : 1
   } finally {

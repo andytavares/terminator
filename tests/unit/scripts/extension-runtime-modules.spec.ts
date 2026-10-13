@@ -10,7 +10,10 @@ const { extensionRuntimeModules } = require('../../../scripts/extension-runtime-
 const REPO_ROOT = resolve(__dirname, '../../..')
 
 /** A repository with one extension and the lockfile npm would write for it. */
-function fixture(dependencies: Record<string, string>, packages: Record<string, object>): string {
+function lockfileFixture(
+  dependencies: Record<string, string>,
+  packages: Record<string, object>
+): string {
   const root = makeTempDir('runtime-modules-')
   mkdirSync(join(root, 'extensions', 'server'), { recursive: true })
   writeFileSync(join(root, 'extensions', 'server', 'manifest.json'), '{"id":"com.server"}')
@@ -25,7 +28,7 @@ function fixture(dependencies: Record<string, string>, packages: Record<string, 
 
 describe('extensionRuntimeModules', () => {
   it('is what the backend leaves external and everything that needs, not what its view bundles', () => {
-    const root = fixture(
+    const root = lockfileFixture(
       { fastify: '5.0.0', react: '18.3.1' },
       {
         'node_modules/fastify': { dependencies: { avvio: '9.0.0', 'fast-json': '6.0.0' } },
@@ -40,7 +43,7 @@ describe('extensionRuntimeModules', () => {
   })
 
   it('fails loudly when a dependency is missing from the lockfile', () => {
-    const root = fixture({ fastify: '5.0.0' }, {})
+    const root = lockfileFixture({ fastify: '5.0.0' }, {})
     expect(() => extensionRuntimeModules(root, ['fastify'])).toThrow(
       'fastify, needed by extensions/server, is not in package-lock.json'
     )

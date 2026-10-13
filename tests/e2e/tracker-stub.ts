@@ -1,14 +1,11 @@
 import { execFileSync } from 'node:child_process'
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
-import {
-  createServer as createHttpServer,
-  type IncomingMessage,
-  type ServerResponse,
-} from 'node:http'
+import { createServer as createHttpServer, type IncomingMessage } from 'node:http'
 import { createServer as createHttpsServer } from 'node:https'
 import type { AddressInfo, Socket } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { readJsonBody, sendJson } from './stub-http'
 import { answerJira, type JiraState } from './tracker-stub-jira'
 import { answerLinear, type LinearState } from './tracker-stub-linear'
 
@@ -48,17 +45,21 @@ const LEAF_EXTENSIONS = [
 
 /** A CA and a server certificate for both hosts, with openssl(1) commands LibreSSL also takes. */
 function makeCertificates(dir: string): { ca: string; key: Buffer; cert: Buffer } {
-  const openssl = (args: string) =>
+  const opensslInDir = (args: string) =>
     execFileSync('openssl', args.split(' '), { cwd: dir, stdio: 'pipe' })
   writeFileSync(join(dir, 'ca.ext'), CA_EXTENSIONS.join('\n'))
   writeFileSync(join(dir, 'leaf.ext'), LEAF_EXTENSIONS.join('\n'))
   const sign = '-req -sha256 -days 2 -set_serial'
   for (const name of ['ca', 'leaf']) {
-    openssl(`genrsa -out ${name}.key 2048`)
-    openssl(`req -new -sha256 -key ${name}.key -subj /CN=terminator-e2e-${name} -out ${name}.csr`)
+    opensslInDir(`genrsa -out ${name}.key 2048`)
+    opensslInDir(
+      `req -new -sha256 -key ${name}.key -subj /CN=terminator-e2e-${name} -out ${name}.csr`
+    )
   }
-  openssl(`x509 ${sign} 1 -in ca.csr -signkey ca.key -extfile ca.ext -out ca.pem`)
-  openssl(`x509 ${sign} 2 -in leaf.csr -CA ca.pem -CAkey ca.key -extfile leaf.ext -out leaf.pem`)
+  opensslInDir(`x509 ${sign} 1 -in ca.csr -signkey ca.key -extfile ca.ext -out ca.pem`)
+  opensslInDir(
+    `x509 ${sign} 2 -in leaf.csr -CA ca.pem -CAkey ca.key -extfile leaf.ext -out leaf.pem`
+  )
   return {
     ca: join(dir, 'ca.pem'),
     key: readFileSync(join(dir, 'leaf.key')),
@@ -66,27 +67,14 @@ function makeCertificates(dir: string): { ca: string; key: Buffer; cert: Buffer 
   }
 }
 
-function readJson(request: IncomingMessage): Promise<unknown> {
-  return new Promise((resolve) => {
-    let body = ''
-    request.on('data', (chunk) => (body += chunk))
-    request.on('end', () => resolve(body ? JSON.parse(body) : null))
-  })
-}
-
-function reply(response: ServerResponse, status: number, body: unknown): void {
-  response.writeHead(status, { 'content-type': 'application/json' })
-  response.end(JSON.stringify(body))
-}
-
 /** Answers TLS for both hosts itself, each request by the host it names. */
 function trackerServer(linear: LinearState, jira: JiraState, tls: { key: Buffer; cert: Buffer }) {
   return createHttpsServer(tls, (request, response) => {
-    void readJson(request).then((body) => {
+    void readJsonBody(request).then((body) => {
       const host = request.headers.host ?? ''
       const answer =
         host === LINEAR_HOST ? answerLinear(linear, request, body) : answerJira(jira, request, body)
-      reply(response, answer.status, answer.body)
+      sendJson(response, answer.status, answer.body)
     })
   })
 }
@@ -94,7 +82,7 @@ function trackerServer(linear: LinearState, jira: JiraState, tls: { key: Buffer;
 /** A CONNECT proxy that tunnels the two tracker hosts to `tls` and refuses every other. */
 function trackerProxy(tls: ReturnType<typeof trackerServer>, diagnostics: string[]) {
   tls.on('tlsClientError', (error) => diagnostics.push(`TLS: ${error.message}`))
-  const proxy = createHttpServer((_request, response) => reply(response, 403, {}))
+  const proxy = createHttpServer((_request, response) => sendJson(response, 403, {}))
   const tunnels = new Set<Socket>()
   proxy.on('connect', (request: IncomingMessage, socket: Socket) => {
     tunnels.add(socket)

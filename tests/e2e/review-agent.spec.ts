@@ -5,11 +5,11 @@ import { join } from 'node:path'
 import {
   closeApp,
   launchApp,
-  terminalRowsIn,
+  readTerminalRowsIn,
   visibleTerminalScreen,
   type AppHandle,
 } from './helpers'
-import { makeRepoWithRemote, openCodeReviews, openRepo, pushBranch } from './git-harness'
+import { makeRepoWithRemote, openCodeReviews, openRepo, pushBranchToOrigin } from './git-harness'
 import { startGithubStub, type GithubStub } from './github-stub'
 
 /** The review agent: a run cancelled, continued in a terminal, and one whose finding stays
@@ -46,7 +46,7 @@ test.describe.configure({ mode: 'serial' })
 
 test.beforeAll(async () => {
   ;({ repo, bare } = makeRepoWithRemote('terminator-e2e-agent'))
-  pushBranch(repo, 'feat/subtract', {
+  pushBranchToOrigin(repo, 'feat/subtract', {
     'src/math.ts':
       'export function add(a: number, b: number) {\n  return a + b\n}\n\nexport function subtract(a: number, b: number) {\n  return b - a\n}\n',
   })
@@ -71,7 +71,7 @@ test.afterAll(async () => {
   }
 })
 
-async function askAgent(): Promise<Page> {
+async function askReviewAgent(): Promise<Page> {
   const view = await openCodeReviews(handle, 'Agent Review')
   const queueOrReview = view.locator('.rd-row, [aria-label="Close review"]').first()
   await expect(queueOrReview).toBeVisible({ timeout: 15000 })
@@ -86,7 +86,7 @@ async function askAgent(): Promise<Page> {
 const panel = (view: Page) => view.getByRole('complementary', { name: 'Agent panel' })
 
 test('a running review can be continued in a terminal, then cancelled', async () => {
-  const view = await askAgent()
+  const view = await askReviewAgent()
   await panel(view).getByRole('button', { name: 'Run' }).click()
   await expect(panel(view)).toContainText('Reviewing', { timeout: 15000 })
 
@@ -98,7 +98,7 @@ test('a running review can be continued in a terminal, then cancelled', async ()
   const screen = visibleTerminalScreen(handle.page)
   await expect(screen).toBeVisible({ timeout: 15000 })
   await expect
-    .poll(async () => (await terminalRowsIn(screen)).join('\n'), { timeout: 15000 })
+    .poll(async () => (await readTerminalRowsIn(screen)).join('\n'), { timeout: 15000 })
     .toContain('claude-stub --resume')
 
   await openCodeReviews(handle, 'Agent Review')
@@ -108,7 +108,7 @@ test('a running review can be continued in a terminal, then cancelled', async ()
 
 test('a finished review lists its finding, and a dismissed finding stays dismissed', async () => {
   writeFileSync(join(replyDir, 'reply.json'), JSON.stringify(REPLY))
-  const view = await askAgent()
+  const view = await askReviewAgent()
   await panel(view)
     .getByRole('button', { name: /^(Run|Try again|Ask again)$/ })
     .click()
@@ -122,7 +122,7 @@ test('a finished review lists its finding, and a dismissed finding stays dismiss
   await expect(panel(view)).toContainText('0 findings')
 
   await view.getByRole('button', { name: 'Close review' }).click()
-  await askAgent()
+  await askReviewAgent()
   await expect(panel(view)).toContainText('0 findings')
   await expect(panel(view)).not.toContainText('subtract swaps its operands')
 })

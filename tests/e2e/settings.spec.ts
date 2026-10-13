@@ -5,7 +5,7 @@ import {
   closeApp,
   createWorkspace,
   addAndSelectProject,
-  terminalRows,
+  readTerminalRows,
 } from './helpers'
 import { openExtensionSettings } from './extension-settings-page'
 
@@ -138,12 +138,12 @@ test("a list setting is edited one item per line and stored as a list (Foundry's
   await box.fill('src/auth/**\n\n  migrations/** ')
   await closeSettings(page)
 
-  const stored = () =>
+  const storedGlobalSettings = () =>
     page.evaluate(async (key) => {
       const { values } = await window.electronAPI.extension.getSettingsValues()
       return values[key]
     }, 'terminator.foundry.criticalPaths')
-  await expect.poll(stored).toEqual(['src/auth/**', 'migrations/**'])
+  await expect.poll(storedGlobalSettings).toEqual(['src/auth/**', 'migrations/**'])
 
   const reopened = await openExtensionSettings(page, 'Foundry')
   await expect(reopened.getByRole('textbox', { name: label })).toHaveValue(
@@ -164,6 +164,6 @@ test("a workspace's own Default Shell is the shell its new terminals open in", a
   await page.keyboard.press('Meta+t')
   await page.keyboard.type('echo "shell:$0"\n')
   await expect
-    .poll(async () => (await terminalRows(page)).join('\n'), { timeout: 15_000 })
+    .poll(async () => (await readTerminalRows(page)).join('\n'), { timeout: 15_000 })
     .toContain('shell:/bin/bash')
 })

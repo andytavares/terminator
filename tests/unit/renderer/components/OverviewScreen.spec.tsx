@@ -88,7 +88,8 @@ beforeEach(() => {
 
 const tiles = () => screen.getAllByRole('article')
 
-const tileOf = (name: string) => tiles().find((t) => t.getAttribute('aria-label')?.endsWith(name))!
+const overviewTileOf = (name: string) =>
+  tiles().find((t) => t.getAttribute('aria-label')?.endsWith(name))!
 
 describe('OverviewScreen — the Monitor wall', () => {
   it('draws every open session as a tile, and no closed history', () => {
@@ -216,7 +217,7 @@ describe('OverviewScreen — the Monitor wall — saves a description typed on a
     render(<OverviewScreen />)
     await act(async () => {})
     expect(metricsApi.getPids).toHaveBeenCalledWith(['a', 'b', 'c'])
-    expect(tileOf('vitest').textContent).toContain('12.5%')
+    expect(overviewTileOf('vitest').textContent).toContain('12.5%')
     expect(useMetricsStore.getState().processesBySessionId.has('a')).toBe(false)
   })
 
@@ -226,7 +227,7 @@ describe('OverviewScreen — the Monitor wall — saves a description typed on a
     await act(async () => {})
     expect(useMetricsStore.getState().pollingActive).toBe(true)
     expect(metricsApi.getProcesses).not.toHaveBeenCalled()
-    expect(tileOf('vitest').textContent).not.toContain('%')
+    expect(overviewTileOf('vitest').textContent).not.toContain('%')
   })
 })
 
@@ -237,7 +238,7 @@ describe('OverviewScreen — the Monitor wall — shows no load when the pid loo
     await act(async () => {})
     expect(useMetricsStore.getState().pollingActive).toBe(true)
     expect(metricsApi.getProcesses).not.toHaveBeenCalled()
-    expect(tileOf('vitest').textContent).not.toContain('%')
+    expect(overviewTileOf('vitest').textContent).not.toContain('%')
   })
 
   it('stops polling when the wall closes', async () => {
@@ -290,7 +291,9 @@ describe('OverviewScreen — starting and resuming from the wall', () => {
   it('starts a terminal in a branch from its bar', async () => {
     const { useWorkspaceStore } = await import('../../../../src/renderer/stores/workspace.store')
     const { startSessionInBranch } = await import('../../../../src/renderer/terminal/start-session')
-    const { workspaceOf, projectOf } = await import('../../../support/renderer-stores')
+    const { workspaceFixture: workspaceOf, projectFixture: projectOf } = await import(
+      '../../../support/renderer-stores'
+    )
     useWorkspaceStore.setState({
       workspaces: [workspaceOf({ id: 'w1', name: 'repo' })],
       projectsByWorkspaceId: new Map([

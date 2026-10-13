@@ -26,7 +26,7 @@ function calendarDay(date: string) {
   })
 }
 
-function lane(label: string) {
+function boardLane(label: string) {
   return vault
     .locator('.tv-kanban__lane')
     .filter({ has: vault.locator('.tv-kanban__lane-title', { hasText: label }) })
@@ -51,7 +51,7 @@ test.beforeAll(async () => {
   })
   await vault.getByRole('button', { name: 'Board view' }).click()
   // The board holds every open task, whatever day it is logged on.
-  await expect(lane('Todo').locator('.tv-kanban__card')).toHaveCount(3)
+  await expect(boardLane('Todo').locator('.tv-kanban__card')).toHaveCount(3)
 })
 
 test.afterAll(async () => {
@@ -59,10 +59,10 @@ test.afterAll(async () => {
 })
 
 test('dragging a card to another lane gives the task that lane’s status', async () => {
-  const card = lane('Todo').locator('.tv-kanban__card', { hasText: 'Design the logo' })
-  await card.dragTo(lane('In Progress'))
+  const card = boardLane('Todo').locator('.tv-kanban__card', { hasText: 'Design the logo' })
+  await card.dragTo(boardLane('In Progress'))
 
-  await expect(lane('In Progress').locator('.tv-kanban__card')).toHaveText([/Design the logo/])
+  await expect(boardLane('In Progress').locator('.tv-kanban__card')).toHaveText([/Design the logo/])
   expect(await storedTask(vault, 'Design the logo')).toMatchObject({ status: 'in-progress' })
 })
 
@@ -86,7 +86,7 @@ test('a lane renamed and given a dot colour keeps both after saving', async () =
   await todoRow.locator('input[type="color"]').fill('#ff8800')
   await editor.getByRole('button', { name: 'Save lanes' }).click()
 
-  await expect(lane('Up next')).toBeVisible()
+  await expect(boardLane('Up next')).toBeVisible()
   const saved = (await kanbanConfig()).lanes[0]
   expect(saved).toMatchObject({ label: 'Up next', taskStatuses: ['open'], dotColor: '#ff8800' })
 })

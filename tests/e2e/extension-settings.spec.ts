@@ -5,12 +5,12 @@ import { join } from 'node:path'
 import {
   AppHandle,
   closeApp,
-  closeSettings,
+  closeSettingsPanel,
   createWorkspace,
   inExtensionView,
   launchApp,
   projectGroup,
-  runQuickAction,
+  runQuickActionFromPanel,
 } from './helpers'
 import { foundryChannel, makeFixtureRepo } from './foundry-harness'
 import { answerFolderPicker } from './main-stubs'
@@ -186,7 +186,7 @@ async function writesEverySetting(extension: string): Promise<void> {
     await writeControl(handle, panel, { key, def, value })
     expected.set(key, value)
   }
-  await closeSettings(handle.page)
+  await closeSettingsPanel(handle.page)
   const keys = Object.keys(schema.properties).filter((key) => expected.has(key))
   await expect
     .poll(async () => {
@@ -208,7 +208,7 @@ async function valuesSurviveRestart(): Promise<void> {
     for (const [key, def] of Object.entries(schema.properties)) {
       if (expected.has(key)) await expectControl(panel, { key, def, value: expected.get(key) })
     }
-    await closeSettings(handle.page)
+    await closeSettingsPanel(handle.page)
   }
 }
 
@@ -239,7 +239,7 @@ async function gitIntegrationOffRegistersNoCommands(): Promise<void> {
     'aria-checked',
     'false'
   )
-  await closeSettings(page)
+  await closeSettingsPanel(page)
   const { commands } = await page.evaluate(() => window.electronAPI.extension.getCommands())
   expect(commands.filter((c) => c.extensionId === 'terminator.git-integration')).toEqual([])
 }
@@ -256,7 +256,7 @@ async function foundryOrderStartsWithSettings(): Promise<void> {
 
 async function notepadNoteStartsWithDefaultTags(): Promise<void> {
   await projectGroup(handle.page, 'main').click()
-  await runQuickAction(handle.page, 'New note')
+  await runQuickActionFromPanel(handle.page, 'New note')
   await expect
     .poll(() =>
       inExtensionView<string>(handle, 'terminator.notepad', 'document.body.innerText').catch(
@@ -271,7 +271,7 @@ async function notepadNoteStartsWithDefaultTags(): Promise<void> {
 // target back on is what brings it back.
 async function notificationSwitchRoutesIt(): Promise<void> {
   const { page } = handle
-  const raise = (title: string) =>
+  const raiseNotification = (title: string) =>
     page.evaluate(async (t) => {
       await window.electronAPI.notifications.create({
         type: 'success',
@@ -282,12 +282,12 @@ async function notificationSwitchRoutesIt(): Promise<void> {
       return (await window.electronAPI.notifications.list()).find((n) => n.title === t)?.targets
     }, title)
   // With every target off it is not recorded at all.
-  expect(await raise('Completed: muted')).toBeUndefined()
+  expect(await raiseNotification('Completed: muted')).toBeUndefined()
   const schema = schemas.find((s) => s.extensionId === 'terminator.task-vault')!
   const panel = await openPage(page, schema)
   await panel.getByRole('checkbox', { name: 'Task completed → center', exact: true }).click()
-  await closeSettings(page)
-  await expect.poll(() => raise('Completed: heard')).toEqual(['center'])
+  await closeSettingsPanel(page)
+  await expect.poll(() => raiseNotification('Completed: heard')).toEqual(['center'])
   await page.locator('.app-band__entry[aria-label^="Notifications"]').click()
   await expect(page.locator('.notif-item', { hasText: 'Completed: heard' })).toBeVisible()
   await expect(page.locator('.notif-item', { hasText: 'Completed: muted' })).toHaveCount(0)

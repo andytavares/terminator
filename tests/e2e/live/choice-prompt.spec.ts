@@ -10,7 +10,7 @@ import {
   createWorkspace,
   addAndSelectProject,
   e2eTempDir,
-  terminalRows,
+  readTerminalRows,
 } from '../helpers'
 
 // Runs a real `claude` in the app's terminal to answer the one question no
@@ -41,7 +41,7 @@ async function waitForChoice(page: Page): Promise<string[]> {
   let rows: string[] = []
   try {
     await expect
-      .poll(async () => hasNumberedChoice((rows = await terminalRows(page))), {
+      .poll(async () => hasNumberedChoice((rows = await readTerminalRows(page))), {
         timeout: 90_000,
         intervals: [500],
       })

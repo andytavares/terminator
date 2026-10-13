@@ -172,7 +172,7 @@ export function select({ changed, specs, isMainPush }) {
   if (isMainPush) return everySpec(specs)
   if (changed.length === 0) return { mode: 'none', specs: [] }
 
-  const impact = impactOf(changed)
+  const impact = specImpactOf(changed)
   if (impact.forceAll) return everySpec(specs)
   if (!impact.sawNonNonePath) return { mode: 'none', specs: [] }
   return { mode: 'some', specs: selectedSpecs(impact, specs) }
@@ -183,7 +183,7 @@ function everySpec(specs) {
 }
 
 /** What the changed paths ask for: the whole suite, spec globs, or the spec files themselves. */
-function impactOf(changed) {
+function specImpactOf(changed) {
   const impact = {
     forceAll: false,
     sawNonNonePath: false,

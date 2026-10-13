@@ -68,7 +68,7 @@ const sessionOf = (id: string): TerminalSession | undefined =>
 const activeIn = (projectId: string): string | null =>
   useSessionStore.getState().getActiveSessionForProject(projectId)
 /** Puts a session in the store as if it had been open a while. */
-const addSession = (id: string, patch: Partial<TerminalSession> = {}): void =>
+const storeSession = (id: string, patch: Partial<TerminalSession> = {}): void =>
   useSessionStore.setState((s) => ({
     sessions: new Map(s.sessions).set(id, terminalSessionOf({ id, projectId: 'proj-1', ...patch })),
   }))
@@ -94,7 +94,7 @@ afterEach(() => {
 })
 
 /** A terminal in proj-1, with whatever a spec changes. */
-function request(overrides: Partial<NewSessionRequest> = {}): NewSessionRequest {
+function terminalRequest(overrides: Partial<NewSessionRequest> = {}): NewSessionRequest {
   return {
     projectId: 'proj-1',
     type: 'human',
@@ -108,7 +108,7 @@ function request(overrides: Partial<NewSessionRequest> = {}): NewSessionRequest 
 describe('createTerminalSession', () => {
   it('records the session with the given args and returns the id', async () => {
     const id = await createTerminalSession(
-      request({ title: 'My Tab', parentSessionId: 'parent-1' })
+      terminalRequest({ title: 'My Tab', parentSessionId: 'parent-1' })
     )
     expect(id).toBe('session-123')
     expect(sessionOf('session-123')).toMatchObject({
@@ -122,7 +122,9 @@ describe('createTerminalSession', () => {
   })
 
   it('carries the line a resuming terminal opens with', async () => {
-    await createTerminalSession(request({ title: 'My Tab', initialCommand: 'claude --resume abc' }))
+    await createTerminalSession(
+      terminalRequest({ title: 'My Tab', initialCommand: 'claude --resume abc' })
+    )
     expect(terminalApi.create).toHaveBeenCalledWith(
       expect.objectContaining({ initialCommand: 'claude --resume abc' })
     )
@@ -139,7 +141,7 @@ describe('createTerminalSession — reports a terminal that could not start, and
       message: 'That folder no longer exists: /repo/.worktrees/removed',
     })
 
-    await expect(createTerminalSession(request({ cwd: '/gone' }))).rejects.toThrow(
+    await expect(createTerminalSession(terminalRequest({ cwd: '/gone' }))).rejects.toThrow(
       '/repo/.worktrees/removed'
     )
 
@@ -167,13 +169,13 @@ describe('createTerminalSession — stores the instance before activating the se
       )
         seen.push('activate')
     })
-    await createTerminalSession(request())
+    await createTerminalSession(terminalRequest())
     stop()
     expect(seen).toEqual(['instance', 'activate'])
   })
 
   it('constructs the instance with the session id, scrollback, and activity hooks', async () => {
-    await createTerminalSession(request({ scrollbackLimit: 7777 }))
+    await createTerminalSession(terminalRequest({ scrollbackLimit: 7777 }))
     expect(capturedCtorArgs).toHaveLength(1)
     const { sessionId, scrollbackLimit, hooks } = capturedCtorArgs[0]
     expect(sessionId).toBe('session-123')
@@ -186,7 +188,7 @@ describe('createTerminalSession — marks the session busy on output, and idle a
   it('marks the session busy on output, and idle after the working hold', async () => {
     vi.useFakeTimers()
     try {
-      await createTerminalSession(request())
+      await createTerminalSession(terminalRequest())
       const { hooks } = capturedCtorArgs[0]
       hooks!.onBusy!()
       expect(sessionOf('session-123')!.busy).toBe(true)
@@ -200,20 +202,20 @@ describe('createTerminalSession — marks the session busy on output, and idle a
   })
 
   it('reads the screen when output settles, and records its last line', async () => {
-    await createTerminalSession(request())
+    await createTerminalSession(terminalRequest())
     screenRows = ['$ pnpm test', '  14 passed, 2 failed', '', '']
     capturedCtorArgs[0].hooks!.onIdle!()
     expect(sessionOf('session-123')!.latestLine).toBe('14 passed, 2 failed')
   })
 
   it('requests focus for the new session, so its pane grabs the keyboard', async () => {
-    await createTerminalSession(request())
+    await createTerminalSession(terminalRequest())
     expect(useSessionStore.getState().focusRequest?.sessionId).toBe('session-123')
   })
 })
 
 async function createAndGetBell(): Promise<() => void> {
-  await createTerminalSession(request({ title: 'My Tab' }))
+  await createTerminalSession(terminalRequest({ title: 'My Tab' }))
   return capturedCtorArgs[0].hooks!.onBell!
 }
 
@@ -269,7 +271,7 @@ describe('splitTerminalSession', () => {
   })
 
   it('creates a session pinned to the focused session and splits the pane', async () => {
-    addSession('focused-1')
+    storeSession('focused-1')
     useSessionStore.getState().setActiveSessionForProject('proj-1', 'focused-1')
     await splitTerminalSession('proj-1', 'vertical', { cwd: '/repo', scrollbackLimit: 5000 })
     expect(sessionOf('session-123')).toMatchObject({
@@ -285,8 +287,8 @@ describe('splitTerminalSession', () => {
 
 describe('splitTerminalSession — splits the focused pane of the split on screen, not the active tab', () => {
   it('splits the focused pane of the split on screen, not the active tab', async () => {
-    addSession('root-1')
-    addSession('pane-1', { parentSessionId: 'root-1' })
+    storeSession('root-1')
+    storeSession('pane-1', { parentSessionId: 'root-1' })
     useSessionStore.getState().setActiveSessionForProject('proj-1', 'root-1')
     useSessionStore
       .getState()
@@ -299,14 +301,14 @@ describe('splitTerminalSession — splits the focused pane of the split on scree
 
 describe('splitTerminalSession — pins to the focused session root when the focused session is itself a split child', () => {
   it('pins to the focused session root when the focused session is itself a split child', async () => {
-    addSession('child-1', { parentSessionId: 'root-1' })
+    storeSession('child-1', { parentSessionId: 'root-1' })
     useSessionStore.getState().setActiveSessionForProject('proj-1', 'child-1')
     await splitTerminalSession('proj-1', 'horizontal', { cwd: '/repo', scrollbackLimit: 5000 })
     expect(sessionOf('session-123')!.parentSessionId).toBe('root-1')
   })
 
   it('falls back to the active session when nothing is focused', async () => {
-    addSession('active-9')
+    storeSession('active-9')
     useSessionStore.getState().setActiveSessionForProject('proj-1', 'active-9')
     await splitTerminalSession('proj-1', 'horizontal', { cwd: '/repo', scrollbackLimit: 5000 })
     expect(layoutOf('proj-1')).toMatchObject({ type: 'split', direction: 'horizontal' })
@@ -314,7 +316,7 @@ describe('splitTerminalSession — pins to the focused session root when the foc
   })
 
   it('wires the same bell handling into split instances', async () => {
-    addSession('focused-1')
+    storeSession('focused-1')
     useSessionStore.getState().setActiveSessionForProject('proj-1', 'focused-1')
     await splitTerminalSession('proj-1', 'horizontal', { cwd: '/repo', scrollbackLimit: 5000 })
     useSessionStore.getState().renameSession('session-123', 'Split Tab')
@@ -363,7 +365,7 @@ describe('adoptTerminalSession', () => {
   it('does not steal focus from the terminal being read', () => {
     // A supervised run starting in the background used to yank the operator
     // away from whatever they had open in that project.
-    addSession('the-one-being-read')
+    storeSession('the-one-being-read')
     useSessionStore.getState().setActiveSessionForProject('proj-1', 'the-one-being-read')
     adoptTerminalSession(adopted)
     expect(activeIn('proj-1')).toBe('the-one-being-read')
@@ -372,7 +374,7 @@ describe('adoptTerminalSession', () => {
 
 describe('adoptTerminalSession — does nothing for a session it already has, so a repeat is not a second tab', () => {
   it('does nothing for a session it already has, so a repeat is not a second tab', () => {
-    addSession('terminal-1', { tabTitle: 'feat/x', type: 'human' })
+    storeSession('terminal-1', { tabTitle: 'feat/x', type: 'human' })
     adoptTerminalSession(adopted)
     expect(sessionOf('terminal-1')!.type).toBe('human')
     expect(capturedCtorArgs).toEqual([])
@@ -397,7 +399,7 @@ describe('adoptTerminalSession — does nothing for a session it already has, so
 // would write to the store — and re-render the sidebar — per chunk.
 async function busyHookFor(sessionId: string) {
   terminalApi.create.mockResolvedValue({ sessionId })
-  await createTerminalSession(request({ type: 'agent', title: 'A' }))
+  await createTerminalSession(terminalRequest({ type: 'agent', title: 'A' }))
   const hooks = capturedCtorArgs.at(-1)!.hooks!
   return hooks.onBusy!
 }
@@ -495,7 +497,7 @@ describe('activity stamping throttle (FR-002) — still marks the session busy o
   it('stamps activity when the session goes idle so the last byte counts', async () => {
     vi.setSystemTime(9_000)
     terminalApi.create.mockResolvedValue({ sessionId: 's1' })
-    await createTerminalSession(request({ type: 'agent', title: 'A' }))
+    await createTerminalSession(terminalRequest({ type: 'agent', title: 'A' }))
     const hooks = capturedCtorArgs.at(-1)!.hooks!
     hooks.onIdle!()
     expect(sessionOf('s1')!.lastActivityAt).toBe(9_000)
@@ -520,7 +522,7 @@ const PROMPT = {
 
 describe('reading a choice prompt off the screen (054)', () => {
   it('records the prompt a settled screen shows', async () => {
-    await createTerminalSession(request())
+    await createTerminalSession(terminalRequest())
     screenRows = PROMPT_ROWS
     capturedCtorArgs[0].hooks!.onIdle!()
     expect(sessionOf('session-123')).toMatchObject({
@@ -530,7 +532,7 @@ describe('reading a choice prompt off the screen (054)', () => {
   })
 
   it('forgets the prompt as soon as output moves again', async () => {
-    await createTerminalSession(request())
+    await createTerminalSession(terminalRequest())
     screenRows = PROMPT_ROWS
     capturedCtorArgs[0].hooks!.onIdle!()
     screenRows = ['⏺ Wrote 1 line to a.txt', '']
@@ -542,7 +544,7 @@ describe('reading a choice prompt off the screen (054)', () => {
 
 describe('reading a choice prompt off the screen (054) — refreshes the latest line of a session that never settles, once a second', () => {
   it('refreshes the latest line of a session that never settles, once a second', async () => {
-    await createTerminalSession(request())
+    await createTerminalSession(terminalRequest())
     screenRows = ['17:02:21 14 passed', '']
     capturedCtorArgs[0].hooks!.onBusy!()
     expect(sessionOf('session-123')!.latestLine).toBe('17:02:21 14 passed')
@@ -555,7 +557,7 @@ describe('reading a choice prompt off the screen (054) — refreshes the latest 
   })
 
   it('reads the latest line from above the cursor', async () => {
-    await createTerminalSession(request())
+    await createTerminalSession(terminalRequest())
     screenRows = ['$ pnpm test', '14 passed, 2 failed', 'me@host $ ', '']
     screenCursor = 2
     capturedCtorArgs[0].hooks!.onIdle!()
@@ -564,7 +566,7 @@ describe('reading a choice prompt off the screen (054) — refreshes the latest 
 })
 
 async function busySession(): Promise<NonNullable<(typeof capturedCtorArgs)[0]['hooks']>> {
-  await createTerminalSession(request())
+  await createTerminalSession(terminalRequest())
   const hooks = capturedCtorArgs[0].hooks!
   hooks.onBusy!()
   return hooks
@@ -633,7 +635,7 @@ describe('working hold before idle (058) — a busy event inside the hold cancel
 function setUpAnswerChoice054(): void {
   beforeEach(async () => {
     terminalApi.create.mockResolvedValue({ sessionId: 's1' })
-    await createTerminalSession(request({ projectId: 'p', title: 'claude' }))
+    await createTerminalSession(terminalRequest({ projectId: 'p', title: 'claude' }))
     screenRows = PROMPT_ROWS
     capturedCtorArgs[0].hooks!.onIdle!()
   })

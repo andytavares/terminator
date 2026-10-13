@@ -5,6 +5,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { IpcRendererEvent } from 'electron'
 import { ELECTRON_API_MANIFEST } from '../../../src/shared/electron-api/manifest.js'
 import { partialFake } from '../../support/fakes'
+import { methodPathsOf } from '../../support/electron-api'
 
 const exposed: Record<string, unknown> = {}
 const mockSend = vi.fn()
@@ -69,16 +70,10 @@ describe('preload-webview — the declared surface', () => {
   usePreloadWebview()
 
   it('exposes exactly the methods the manifest declares for extension views', () => {
-    const methodPaths = (api: Record<string, unknown>, prefix = ''): string[] =>
-      Object.entries(api).flatMap(([name, value]) =>
-        typeof value === 'function'
-          ? [prefix + name]
-          : methodPaths(value as Record<string, unknown>, `${prefix}${name}.`)
-      )
     const declared = ELECTRON_API_MANIFEST.filter((spec) => spec.extensionView !== undefined).map(
       (spec) => spec.path
     )
-    const exposedPaths = methodPaths(exposed['electronAPI'] as Record<string, unknown>)
+    const exposedPaths = methodPathsOf(exposed['electronAPI'] as Record<string, unknown>)
     expect(exposedPaths.sort()).toEqual(declared.sort())
   })
 })

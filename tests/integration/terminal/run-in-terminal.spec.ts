@@ -29,24 +29,17 @@ vi.mock('../../../src/main/storage/settings-store', () => ({
 
 import { PtyManager } from '../../../src/main/terminal/pty-manager'
 import { createExtensionAPI } from '../../../src/main/extensions/api'
-import { RpcEndpoint, type MessageLink } from '../../../src/main/extensions/host/rpc-endpoint'
+import { RpcEndpoint } from '../../../src/main/extensions/host/rpc-endpoint'
 import { ExtensionApiServer } from '../../../src/main/extensions/host/api-server'
 import { createHostExtensionAPI } from '../../../src/main/extensions/host/host-api'
 import { CallbackRegistry } from '../../../src/main/extensions/host/callbacks'
 import type { ExtensionAPI } from '@terminator/extension-sdk'
+import { workerPortLink } from '../../support/message-ports'
 
 const ports: MessagePort[] = []
 let ptyManager: PtyManager
 /** What the renderer is told to do once a tab is adopted, standing in for a person. */
 let onAdopt: (sessionId: string) => void
-
-function link(port: MessagePort): MessageLink {
-  ports.push(port)
-  return {
-    post: (message) => port.postMessage(message),
-    listen: (receive) => port.on('message', receive),
-  }
-}
 
 /** The renderer's part: adopt a tab, and close it (ending its process) when asked. */
 function renderer(channel: string, data: unknown): void {
@@ -56,18 +49,18 @@ function renderer(channel: string, data: unknown): void {
 }
 
 /** The API as an extension backend in the extension host holds it. */
-function hostApi(): ExtensionAPI {
+function terminalHostApi(): ExtensionAPI {
   const coreApi = createExtensionAPI('test.runner', {
     ptyManager,
     terminalRelay: { start: () => {} } as never,
     broadcastToWindows: renderer,
   })
   const { port1, port2 } = new MessageChannel()
-  const main = new RpcEndpoint(link(port1))
+  const main = new RpcEndpoint(workerPortLink(port1, ports))
   new ExtensionApiServer(main, () => coreApi)
   return createHostExtensionAPI({
     extensionId: 'test.runner',
-    endpoint: new RpcEndpoint(link(port2)),
+    endpoint: new RpcEndpoint(workerPortLink(port2, ports)),
     snapshot: hostSnapshot(),
     db: {} as never,
     callbacks: new CallbackRegistry(),
@@ -78,7 +71,7 @@ function hostApi(): ExtensionAPI {
   })
 }
 
-function run(api: ExtensionAPI, script: string) {
+function runScriptInTerminal(api: ExtensionAPI, script: string) {
   return api.pty.runInTerminal({
     projectId: 'proj-1',
     cwd: userData,
@@ -100,36 +93,42 @@ afterEach(async () => {
 
 describe('pty.runInTerminal, over a real PTY and the extension host port', () => {
   it('resolves 0 for a command that exits 0', async () => {
-    await expect(run(hostApi(), 'exit 0')).resolves.toEqual({
+    await expect(runScriptInTerminal(terminalHostApi(), 'exit 0')).resolves.toEqual({
       sessionId: expect.any(String),
       exitCode: 0,
     })
   })
 
   it("resolves a non-zero exit with the process's own status", async () => {
-    await expect(run(hostApi(), 'echo failing; exit 3')).resolves.toMatchObject({ exitCode: 3 })
+    await expect(
+      runScriptInTerminal(terminalHostApi(), 'echo failing; exit 3')
+    ).resolves.toMatchObject({ exitCode: 3 })
   })
 
   // node-pty reports a signalled process as exitCode 0 with the signal beside
   // it (WIFSIGNALED in src/unix/pty.cc); read on its own, that is a pass.
   it('resolves null, never 0, for a process killed by a signal', async () => {
-    await expect(run(hostApi(), 'kill -9 $$')).resolves.toMatchObject({ exitCode: null })
+    await expect(runScriptInTerminal(terminalHostApi(), 'kill -9 $$')).resolves.toMatchObject({
+      exitCode: null,
+    })
   })
 
   it('resolves null when the tab is closed before the process exits', async () => {
-    const api = hostApi()
+    const api = terminalHostApi()
     onAdopt = (sessionId) => setTimeout(() => api.pty.closeTerminalTab(sessionId), 200)
-    await expect(run(api, 'sleep 30; exit 0')).resolves.toMatchObject({ exitCode: null })
+    await expect(runScriptInTerminal(api, 'sleep 30; exit 0')).resolves.toMatchObject({
+      exitCode: null,
+    })
   })
 
   it('resolves null, opening nothing, when there is no window to show the tab in', async () => {
     const api = createExtensionAPI('test.runner', { ptyManager })
-    await expect(run(api, 'exit 0')).resolves.toBeNull()
+    await expect(runScriptInTerminal(api, 'exit 0')).resolves.toBeNull()
     expect(ptyManager.listSessions()).toEqual([])
   })
 })
 
-function exitOf(script: string): Promise<number | null> {
+function terminalExitCodeOf(script: string): Promise<number | null> {
   ptyManager.spawnSession({
     sessionId: 'exit-probe',
     cwd: userData,
@@ -143,7 +142,7 @@ function exitOf(script: string): Promise<number | null> {
 
 describe('PtyManager exit status, over a real PTY', () => {
   it('reports the exit code of a process that exited', async () => {
-    await expect(exitOf('exit 7')).resolves.toBe(7)
+    await expect(terminalExitCodeOf('exit 7')).resolves.toBe(7)
   })
 
   it('reports null, not 0, for a shell killed while it was still running', async () => {
@@ -160,7 +159,7 @@ describe('PtyManager exit status, over a real PTY', () => {
   })
 
   it('reports null for a process ended by a signal', async () => {
-    await expect(exitOf('kill -TERM $$')).resolves.toBeNull()
+    await expect(terminalExitCodeOf('kill -TERM $$')).resolves.toBeNull()
   })
 })
 

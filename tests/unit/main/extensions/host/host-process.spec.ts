@@ -17,21 +17,17 @@ import {
   type SpawnedHost,
 } from '../../../../../src/main/extensions/host/host-process'
 import { HostRuntime } from '../../../../../src/main/extensions/host/host-runtime'
-import { RpcEndpoint, type MessageLink } from '../../../../../src/main/extensions/host/rpc-endpoint'
+import { RpcEndpoint } from '../../../../../src/main/extensions/host/rpc-endpoint'
 import { hostSnapshot } from '../../../../support/host-snapshot'
 import type { HostSnapshot } from '../../../../../src/main/extensions/host/snapshot'
 import type { BackendModule } from '../../../../../src/main/extensions/host/backend-loader'
 import { partialFake } from '../../../../support/fakes'
+import { workerPortLink } from '../../../../support/message-ports'
 
 const ports: MessagePort[] = []
 afterEach(() => {
   for (const port of ports.splice(0)) port.close()
 })
-
-function link(port: MessagePort): MessageLink {
-  ports.push(port)
-  return { post: (m) => port.postMessage(m), listen: (receive) => port.on('message', receive) }
-}
 
 /** Main's command registry, as far as these backends reach it. */
 function commandsInMain() {
@@ -128,15 +124,19 @@ const signOffReader: BackendModule = {
 }
 
 /** A host process whose "process" is a HostRuntime on the other end of a MessageChannel. */
-function harness(modules: Record<string, BackendModule> = {}) {
+function hostHarness(modules: Record<string, BackendModule> = {}) {
   const main = mainApi()
   const exits: Array<(code: number) => void> = []
   const spawned = vi.fn((initial: HostSnapshot): SpawnedHost => {
     const { port1, port2 } = new MessageChannel()
-    const endpoint = new RpcEndpoint(link(port2))
+    const endpoint = new RpcEndpoint(workerPortLink(port2, ports))
     const loader = { load: (entry: string) => modules[entry] ?? backend, forget: () => {} }
     new HostRuntime(endpoint, { snapshot: initial, db: {} as ExtensionDB, loader })
-    return { link: link(port1), onExit: (listener) => exits.push(listener), kill: vi.fn() }
+    return {
+      link: workerPortLink(port1, ports),
+      onExit: (listener) => exits.push(listener),
+      kill: vi.fn(),
+    }
   })
   const onBackendsFailed = vi.fn()
   const process = new ExtensionHostProcess({
@@ -154,7 +154,7 @@ function harness(modules: Record<string, BackendModule> = {}) {
 
 describe('extension backends in the extension host', () => {
   it('answers a channel with the backend, its schema checked in the host', async () => {
-    const { main, process, record } = harness()
+    const { main, process, record } = hostHarness()
     await process.activate(record)
     const spec = main.channels.get('demo:greet')!
 
@@ -175,7 +175,7 @@ describe('extension backends in the extension host', () => {
         )
       },
     }
-    const { main, process, record } = harness({ '/demo/main.cjs': paths })
+    const { main, process, record } = hostHarness({ '/demo/main.cjs': paths })
     await process.activate(record)
 
     await expect(dispatchChannel(main.channels.get('demo:paths')!, {})).resolves.toEqual({
@@ -187,7 +187,7 @@ describe('extension backends in the extension host', () => {
 
 describe('extension backends — settings and listeners', () => {
   it('reads settings from the snapshot main pushes', async () => {
-    const { main, process, record } = harness()
+    const { main, process, record } = hostHarness()
     await process.activate(record)
     process.pushSettings({ global: { 'demo.greeting': 'hi' }, workspaces: {} })
     const spec = main.channels.get('demo:greet')!
@@ -198,7 +198,7 @@ describe('extension backends — settings and listeners', () => {
   })
 
   it("calls the backend's listener when main's fires", async () => {
-    const { main, process, record } = harness()
+    const { main, process, record } = hostHarness()
     await process.activate(record)
     await vi.waitFor(() => expect(main.dataListeners).toHaveLength(1))
 
@@ -207,7 +207,7 @@ describe('extension backends — settings and listeners', () => {
   })
 
   it('ends what a backend registered in main when it is deactivated', async () => {
-    const { main, process, record } = harness()
+    const { main, process, record } = hostHarness()
     await process.activate(record)
     await vi.waitFor(() => expect(main.dataListeners).toHaveLength(1))
 
@@ -219,7 +219,7 @@ describe('extension backends — settings and listeners', () => {
 
 describe('extension backends — workspace-scoped settings', () => {
   it("reads a workspace's own value for a path in it, else the global value, else the default", async () => {
-    const { main, process, record } = harness({ '/demo/main.cjs': signOffReader })
+    const { main, process, record } = hostHarness({ '/demo/main.cjs': signOffReader })
     await process.activate(record)
     process.pushWorkspaces({
       workspaces: [
@@ -245,7 +245,7 @@ describe('extension backends — workspace-scoped settings', () => {
 
 describe('extension backends — restarts', () => {
   it('starts the host again once after it exits, and activates its backends again', async () => {
-    const { main, process, record, spawned, crash, onBackendsFailed } = harness()
+    const { main, process, record, spawned, crash, onBackendsFailed } = hostHarness()
     await process.activate(record)
     crash(1)
 
@@ -256,7 +256,7 @@ describe('extension backends — restarts', () => {
   })
 
   it('fails the backends when the restarted host exits too', async () => {
-    const { process, record, spawned, crash, onBackendsFailed } = harness()
+    const { process, record, spawned, crash, onBackendsFailed } = hostHarness()
     await process.activate(record)
     crash(1)
     await vi.waitFor(() => expect(spawned).toHaveBeenCalledTimes(2))
@@ -272,7 +272,7 @@ describe('extension backends — dependencies', () => {
     const seen: unknown[] = []
     const provider: BackendModule = { activate: () => ({ secret: 1 }) }
     const reader: BackendModule = { activate: (api) => seen.push(api.extensions.get('provider')) }
-    const { process } = harness({ '/p.cjs': provider, '/r.cjs': reader })
+    const { process } = hostHarness({ '/p.cjs': provider, '/r.cjs': reader })
     await process.activate({
       id: 'provider',
       entryPoint: '/p.cjs',
@@ -316,7 +316,10 @@ describe('extension backends — dependencies across a restart', () => {
     const consumer: BackendModule = {
       activate: (api) => seen.push(api.extensions.get<{ greet(): string }>('provider')?.greet()),
     }
-    const { process, crash, onBackendsFailed } = harness({ '/p.cjs': provider, '/c.cjs': consumer })
+    const { process, crash, onBackendsFailed } = hostHarness({
+      '/p.cjs': provider,
+      '/c.cjs': consumer,
+    })
     await activateProviderThenConsumer(process)
 
     crash(1)
@@ -337,7 +340,10 @@ describe('extension backends — a provider that does not come back', () => {
       },
     }
     const consumer: BackendModule = { activate: vi.fn() }
-    const { process, crash, onBackendsFailed } = harness({ '/p.cjs': provider, '/c.cjs': consumer })
+    const { process, crash, onBackendsFailed } = hostHarness({
+      '/p.cjs': provider,
+      '/c.cjs': consumer,
+    })
     await activateProviderThenConsumer(process)
 
     crash(1)
@@ -358,14 +364,14 @@ describe('calls a backend makes to main', () => {
     const mover: BackendModule = {
       activate: (api) => api.issues.transition('linear', 'TAV-1', 'started', 'opt-1'),
     }
-    const { main, process, record } = harness({ '/demo/main.cjs': mover })
+    const { main, process, record } = hostHarness({ '/demo/main.cjs': mover })
     await process.activate(record)
     expect(main.transition).toHaveBeenCalledWith('linear', 'TAV-1', 'started', 'opt-1')
   })
 
   it('delivers a call that does not wait for an answer', async () => {
     const setter: BackendModule = { activate: (api) => api.settings.set('demo.size', 3) }
-    const { main, process, record } = harness({ '/demo/main.cjs': setter })
+    const { main, process, record } = hostHarness({ '/demo/main.cjs': setter })
     await process.activate(record)
     await vi.waitFor(() => expect(main.setSetting).toHaveBeenCalledWith('demo.size', 3))
   })
@@ -381,7 +387,7 @@ describe('commands a backend registers', () => {
           (_context, args) => void ran.push(args)
         ),
     }
-    const { main, process, record } = harness({ '/demo/main.cjs': greeter })
+    const { main, process, record } = hostHarness({ '/demo/main.cjs': greeter })
     await process.activate(record)
     await vi.waitFor(() => expect(main.commands.has('hello')).toBe(true))
     await main.commands.get('hello')!(NO_CONTEXT, { name: 'Ada' })
@@ -392,7 +398,7 @@ describe('commands a backend registers', () => {
     const once: BackendModule = {
       activate: (api) => api.commands.register({ id: 'once', label: 'Once' }, () => {}).dispose(),
     }
-    const { main, process, record } = harness({ '/demo/main.cjs': once })
+    const { main, process, record } = hostHarness({ '/demo/main.cjs': once })
     await process.activate(record)
     await vi.waitFor(() => expect(main.commands.has('once')).toBe(false))
   })

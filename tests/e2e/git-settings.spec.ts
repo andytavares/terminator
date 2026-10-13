@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { rmSync } from 'node:fs'
-import { closeApp, closeSettings, launchApp, type AppHandle } from './helpers'
+import { closeApp, closeSettingsPanel, launchApp, type AppHandle } from './helpers'
 import { git, makeRepoWithRemote, openGitTab, openRepo, writeFile } from './git-harness'
 import { openExtensionSettings, settingRow } from './extension-settings-page'
 
@@ -33,7 +33,7 @@ test('the changed-files list stops at "Max displayed changed files" and says so'
 
   const page = await openExtensionSettings(handle.page, 'Git Integration')
   await settingRow(page, 'Max displayed changed files').locator('input').fill('10')
-  await closeSettings(handle.page)
+  await closeSettingsPanel(handle.page)
 
   await expect(view.locator('.staging-area__file-row')).toHaveCount(10, { timeout: 15000 })
   await expect(view.locator('.staging-area__truncation-banner')).toHaveText(
@@ -44,7 +44,7 @@ test('the changed-files list stops at "Max displayed changed files" and says so'
 test('a commit made with "Add sign-off to commits" on ends with Signed-off-by', async () => {
   const page = await openExtensionSettings(handle.page, 'Git Integration')
   await settingRow(page, 'Add sign-off to commits').getByRole('switch').click()
-  await closeSettings(handle.page)
+  await closeSettingsPanel(handle.page)
 
   const view = await openGitTab(handle)
   await view.getByRole('button', { name: 'Stage All' }).click()

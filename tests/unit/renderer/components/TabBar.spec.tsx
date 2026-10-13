@@ -5,7 +5,7 @@ import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { useSessionRecordsStore } from '../../../../src/renderer/stores/session-records.store'
 import { TabBar } from '../../../../src/renderer/components/terminal/TabBar'
-import { projectOf, seedStore, workspaceOf } from '../../../support/renderer-stores'
+import { projectFixture, seedStore, workspaceFixture } from '../../../support/renderer-stores'
 
 const records = {
   setDescription: vi.fn().mockResolvedValue(true),
@@ -172,7 +172,7 @@ describe('TabBar — calls closeSession when close button is clicked', () => {
   it('applies workspace color css variable when workspace matches', () => {
     seedStore(useWorkspaceStore, {
       workspaces: [
-        workspaceOf({ id: 'ws-1', color: '#ff0000', name: 'Test', folderPath: '/', tags: [] }),
+        workspaceFixture({ id: 'ws-1', color: '#ff0000', name: 'Test', folderPath: '/', tags: [] }),
       ],
       activeWorkspaceId: 'ws-1',
       projectsByWorkspaceId: new Map(),
@@ -482,12 +482,12 @@ describe('TabBar — MoveSessionDialog onMoved callback', () => {
 function setUpTabBarTheSessionBar(): void {
   beforeEach(() => {
     seedStore(useWorkspaceStore, {
-      workspaces: [workspaceOf({ id: 'ws-1', name: 'Terminator' })],
+      workspaces: [workspaceFixture({ id: 'ws-1', name: 'Terminator' })],
       activeWorkspaceId: 'ws-1',
       projectsByWorkspaceId: new Map([
         [
           'ws-1',
-          [projectOf({ id: 'proj-1', workspaceId: 'ws-1', name: 'main', gitBranch: 'main' })],
+          [projectFixture({ id: 'proj-1', workspaceId: 'ws-1', name: 'main', gitBranch: 'main' })],
         ],
       ]),
     })

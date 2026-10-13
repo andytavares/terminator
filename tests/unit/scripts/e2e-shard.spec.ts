@@ -155,7 +155,7 @@ function scriptCopy(): { root: string; script: string } {
   return { root, script }
 }
 
-function runScript(script: string, args: string[]): { status: number | null; stderr: string } {
+function runNodeScript(script: string, args: string[]): { status: number | null; stderr: string } {
   const run = spawnSync(process.execPath, [script, ...args], { encoding: 'utf8' })
   return { status: run.status, stderr: run.stderr }
 }
@@ -179,7 +179,7 @@ describe('the command line — recording', () => {
     const second = join(root, 'second.json')
     writeFileSync(first, JSON.stringify(REPORT))
     writeFileSync(second, JSON.stringify(SECOND_REPORT))
-    expect(runScript(script, ['--record', first, second]).status).toBe(0)
+    expect(runNodeScript(script, ['--record', first, second]).status).toBe(0)
     const written = readFileSync(join(root, 'tests', 'e2e', 'timings.json'), 'utf8')
     expect(written).toBe(
       `${JSON.stringify(
@@ -200,7 +200,7 @@ describe('the command line — usage', () => {
     'refuses shard arguments %j with its usage',
     (args) => {
       const { script } = scriptCopy()
-      const run = runScript(script, args)
+      const run = runNodeScript(script, args)
       expect(run.status).not.toBe(0)
       expect(run.stderr).toContain('usage: e2e-shard.mjs <shard> <total> [spec ...]')
     }

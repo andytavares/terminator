@@ -8,8 +8,8 @@ import {
   closeApp,
   createWorkspace,
   launchApp,
-  runQuickAction,
-  terminalRowsIn,
+  runQuickActionFromPanel,
+  readTerminalRowsIn,
 } from './helpers'
 
 /**
@@ -134,23 +134,23 @@ test.describe.serial('a new tab beside a split', () => {
 
   test('New tab after Split down shows the new terminal, and typing reaches it', async () => {
     const { page } = app
-    await runQuickAction(page, 'Split down')
+    await runQuickActionFromPanel(page, 'Split down')
     await expect(visibleScreens()).toHaveCount(2, { timeout: 15000 })
-    await runQuickAction(page, 'New tab')
+    await runQuickActionFromPanel(page, 'New tab')
     await expect(sessionTabs()).toHaveCount(2)
     await expect(sessionTabs().last()).toHaveClass(/tab-bar__tab--active/)
     await expect(visibleScreens()).toHaveCount(1, { timeout: 15000 })
     await page.keyboard.type('echo typed-into-new-tab')
     await page.keyboard.press('Enter')
-    const rows = async () => (await terminalRowsIn(visibleScreens().first())).join('\n')
-    await expect.poll(rows).toContain('typed-into-new-tab')
+    const visibleRows = async () => (await readTerminalRowsIn(visibleScreens().first())).join('\n')
+    await expect.poll(visibleRows).toContain('typed-into-new-tab')
   })
 
   test('going back to the first tab shows its split again', async () => {
     await sessionTabs().first().click()
     await expect(visibleScreens()).toHaveCount(2, { timeout: 15000 })
     for (const screen of await visibleScreens().all()) {
-      expect((await terminalRowsIn(screen)).join('\n')).not.toContain('typed-into-new-tab')
+      expect((await readTerminalRowsIn(screen)).join('\n')).not.toContain('typed-into-new-tab')
     }
   })
 })

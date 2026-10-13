@@ -86,7 +86,7 @@ async function invoke<T = unknown>(channel: string, payload?: unknown): Promise<
 
 const list = async () => (await invoke<{ data: Listing[] }>('session-records:list')).data
 
-function contextFile(sessionId: string): string {
+function recordContextFile(sessionId: string): string {
   return path.join(userData, 'integrations', 'session-context', `${sessionId}.json`)
 }
 
@@ -208,7 +208,7 @@ describe('session-records:set-link — agent context', () => {
       link: { tracker: 'linear', key: 'NW-88' },
     })
     expect(tracker.get).toHaveBeenCalledWith('linear', 'NW-88')
-    expect(JSON.parse(fs.readFileSync(contextFile('s1'), 'utf8')).markdown).toContain('NW-88')
+    expect(JSON.parse(fs.readFileSync(recordContextFile('s1'), 'utf8')).markdown).toContain('NW-88')
   })
 
   it('deletes the session’s agent context when the link is cleared', async () => {
@@ -217,7 +217,7 @@ describe('session-records:set-link — agent context', () => {
       link: { tracker: 'linear', key: 'NW-88' },
     })
     await invoke('session-records:set-link', { session: SNAP, link: null })
-    expect(fs.existsSync(contextFile('s1'))).toBe(false)
+    expect(fs.existsSync(recordContextFile('s1'))).toBe(false)
   })
 
   it('reports a write to a closed record', async () => {

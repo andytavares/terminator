@@ -31,7 +31,7 @@ function writeXdgGitConfig(): string {
   return xdgHome
 }
 
-export default function setup(project: TestProject): () => void {
+export default function setupSpecGitConfig(project: TestProject): () => void {
   const xdgHome = writeXdgGitConfig()
   project.provide('xdgConfigHome', xdgHome)
   return () => rmSync(xdgHome, { recursive: true, force: true })

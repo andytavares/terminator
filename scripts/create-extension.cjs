@@ -263,7 +263,7 @@ Exit codes:
 }
 
 /** Prints `message` and exits with `code`. */
-function fail(message, code) {
+function exitWithError(message, code) {
   console.error(message)
   process.exit(code)
 }
@@ -279,12 +279,12 @@ function parseArgs(args) {
     process.exit(1)
   }
   const nameError = validateName(name)
-  if (nameError) fail(`Error: ${nameError}`, 1)
+  if (nameError) exitWithError(`Error: ${nameError}`, 1)
 
   const idIdx = args.indexOf('--id')
   const id = idIdx !== -1 ? args[idIdx + 1] : `com.example.${name}`
   const idError = validateId(id)
-  if (idError) fail(`Error: ${idError}`, 1)
+  if (idError) exitWithError(`Error: ${idError}`, 1)
 
   const dirIdx = args.indexOf('--dir')
   const outDir =
@@ -314,7 +314,7 @@ function main(argv) {
     process.exit(0)
   }
   const { name, id, outDir } = parseArgs(args)
-  if (fs.existsSync(outDir)) fail(`Error: Directory already exists: ${outDir}`, 2)
+  if (fs.existsSync(outDir)) exitWithError(`Error: Directory already exists: ${outDir}`, 2)
 
   const files = {
     pkg: generatePackageJson(name),
@@ -324,7 +324,7 @@ function main(argv) {
   try {
     writeExtension(outDir, files)
   } catch (err) {
-    fail(`Error writing extension files: ${err.message}`, 3)
+    exitWithError(`Error writing extension files: ${err.message}`, 3)
   }
   printCreated(name, id, outDir)
 }

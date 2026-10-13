@@ -12,11 +12,11 @@ vi.mock('electron', () => ({
 
 import { registerFsHandlers } from '../../../src/main/ipc/fs.ipc'
 
-function fakeWindow(destroyed = false) {
+function fakeWatcherWindow(destroyed = false) {
   return { isDestroyed: () => destroyed, webContents: { send: vi.fn() } }
 }
 
-let window: ReturnType<typeof fakeWindow> | null
+let window: ReturnType<typeof fakeWatcherWindow> | null
 // The watcher service is a singleton that keeps every handler added to it, so register once.
 registerFsHandlers(() => window as never)
 
@@ -25,12 +25,12 @@ function invoke<T>(channel: string, payload?: unknown): Promise<T> {
 }
 
 /** Long enough for a watch event to have arrived, for asserting one did not. */
-const quiet = () => new Promise((r) => setTimeout(r, 300))
+const waitOutWatcher = () => new Promise((r) => setTimeout(r, 300))
 
 let projectRoot: string
 
 beforeEach(() => {
-  window = fakeWindow()
+  window = fakeWatcherWindow()
   projectRoot = makeTempDir('fs-ipc-')
 })
 
@@ -54,15 +54,15 @@ describe('fs:watch-start / fs:watch-stop', () => {
     await invoke('fs:watch-start', { projectRoot })
     expect(await invoke('fs:watch-stop')).toEqual({ ok: true })
     fs.writeFileSync(path.join(projectRoot, 'a.ts'), 'x')
-    await quiet()
+    await waitOutWatcher()
     expect(window!.webContents.send).not.toHaveBeenCalled()
   })
 
   it('sends nothing to a window that has closed', async () => {
-    window = fakeWindow(true)
+    window = fakeWatcherWindow(true)
     await invoke('fs:watch-start', { projectRoot })
     fs.writeFileSync(path.join(projectRoot, 'a.ts'), 'x')
-    await quiet()
+    await waitOutWatcher()
     expect(window.webContents.send).not.toHaveBeenCalled()
   })
 })

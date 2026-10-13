@@ -7,21 +7,24 @@ import type { AppHandle } from './helpers'
 
 /** The loaded page whose URL contains `urlPart`, once it exists. */
 export async function extensionPage(handle: AppHandle, urlPart: string): Promise<Page> {
-  const find = () =>
+  const findExtensionPage = () =>
     handle.app
       .context()
       .pages()
       .find((page) => page.url().startsWith('ext://') && page.url().includes(urlPart))
   await expect
-    .poll(() => Boolean(find()), { timeout: 20_000, message: `no ext:// page for ${urlPart}` })
+    .poll(() => Boolean(findExtensionPage()), {
+      timeout: 20_000,
+      message: `no ext:// page for ${urlPart}`,
+    })
     .toBe(true)
-  const page = find() as Page
+  const page = findExtensionPage() as Page
   await page.waitForLoadState('domcontentloaded')
   return page
 }
 
 /** Opens an extension from the app band and returns its view. */
-export async function openExtension(
+export async function openFromAppBand(
   handle: AppHandle,
   bandLabel: string,
   urlPart: string

@@ -34,7 +34,7 @@ function clonedRepository(): string {
 }
 
 /** This process's environment without GIT_* variables, the trace2 one aside. */
-function scrubbedEnv(): NodeJS.ProcessEnv {
+function scrubbedGitEnv(): NodeJS.ProcessEnv {
   return Object.fromEntries(
     Object.entries(process.env).filter(([k]) => !k.startsWith('GIT_') || k === 'GIT_TRACE2_EVENT')
   ) as NodeJS.ProcessEnv
@@ -54,7 +54,7 @@ describe('git run by the test suite', () => {
     const commit = execFileSync(
       'sh',
       ['-c', 'GIT_TRACE=1 git -c user.name=t -c user.email=t@t commit -q --allow-empty -m c 2>&1'],
-      { cwd: clone, env: scrubbedEnv(), encoding: 'utf-8' }
+      { cwd: clone, env: scrubbedGitEnv(), encoding: 'utf-8' }
     )
     expect(commit).not.toMatch(/maintenance run --auto/)
     const trace = execFileSync('sh', ['-c', 'GIT_TRACE=1 git fetch -q origin 2>&1'], {

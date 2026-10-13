@@ -37,8 +37,9 @@ import type { ExtensionHost } from '../../../../../src/main/extensions/extension
 import { ExtensionHostProcess } from '../../../../../src/main/extensions/host/host-process'
 import { HostRuntime } from '../../../../../src/main/extensions/host/host-runtime'
 import { requireLoader } from '../../../../../src/main/extensions/host/backend-loader'
-import { RpcEndpoint, type MessageLink } from '../../../../../src/main/extensions/host/rpc-endpoint'
+import { RpcEndpoint } from '../../../../../src/main/extensions/host/rpc-endpoint'
 import { hostSnapshot } from '../../../../support/host-snapshot'
+import { workerPortLink } from '../../../../support/message-ports'
 
 /** What the backends below write when they activate: the code that ran. */
 const ran = globalThis as { backendVersion?: string }
@@ -59,13 +60,8 @@ afterEach(() => {
   rmSync(root, { recursive: true, force: true })
 })
 
-function link(port: MessagePort): MessageLink {
-  ports.push(port)
-  return { post: (m) => port.postMessage(m), listen: (receive) => port.on('message', receive) }
-}
-
 /** The extension directory: a manifest, a backend, and a module the backend requires. */
-function writeExtension(): string {
+function writeReloadExtension(): string {
   const directory = join(root, 'com.reload')
   const manifest = { id: 'com.reload', name: 'Reload', version: '1.0.0', main: 'main.cjs' }
   writeFileSync(
@@ -97,12 +93,12 @@ async function extensionHost(): Promise<ExtensionHost> {
   const backends = new ExtensionHostProcess({
     spawn: (initial) => {
       const { port1, port2 } = new MessageChannel()
-      new HostRuntime(new RpcEndpoint(link(port2)), {
+      new HostRuntime(new RpcEndpoint(workerPortLink(port2, ports)), {
         snapshot: initial,
         db: {} as ExtensionDB,
         loader,
       })
-      return { link: link(port1), onExit: () => {}, kill: () => {} }
+      return { link: workerPortLink(port1, ports), onExit: () => {}, kill: () => {} }
     },
     snapshot: () => hostSnapshot(),
     apiFor: (id) => host?.hostedApi(id),
@@ -116,7 +112,7 @@ async function extensionHost(): Promise<ExtensionHost> {
 describe('reloading a backend in the extension host', () => {
   it('runs the backend file as it is on disk now', async () => {
     const host = await extensionHost()
-    const directory = writeExtension()
+    const directory = writeReloadExtension()
     await host.load(directory)
     expect(ran.backendVersion).toBe('main:v1')
 
@@ -128,7 +124,7 @@ describe('reloading a backend in the extension host', () => {
 
   it('runs the modules under its directory as they are on disk now', async () => {
     const host = await extensionHost()
-    const directory = writeExtension()
+    const directory = writeReloadExtension()
     await host.load(directory)
 
     writeVersion(directory, 'v2')
@@ -139,7 +135,7 @@ describe('reloading a backend in the extension host', () => {
 
   it('runs the fixed file after a version whose activate threw', async () => {
     const host = await extensionHost()
-    const directory = writeExtension()
+    const directory = writeReloadExtension()
     writeBackend(directory, 'main', true)
     await host.load(directory)
     expect(ran.backendVersion).toBeUndefined()

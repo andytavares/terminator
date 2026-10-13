@@ -16,11 +16,11 @@ import type { SessionFacts } from '../../../../src/renderer/sidebar/session-fact
 import type { Project, TerminalSession, Workspace } from '../../../../src/shared/types/index'
 import { fact } from '../sidebar/fixtures/facts'
 import {
-  issueOf,
-  projectOf,
+  issueFixture,
+  projectFixture,
   sessionRecordOf,
   terminalSessionOf,
-  workspaceOf,
+  workspaceFixture,
 } from '../../../support/renderer-stores'
 
 vi.mock('../../../../src/renderer/hooks/useBranchSync', () => ({ useBranchSync: vi.fn() }))
@@ -89,20 +89,20 @@ const staleAfterMs = DEFAULT_GLOBAL_SETTINGS.sidebar.staleAfterMs
 
 const NOW = 1_000_000_000
 
-const ws1 = workspaceOf({ id: 'ws-1', name: 'Backend', folderPath: '/b', color: '#5c6bc0' })
-const ws2 = workspaceOf({ id: 'ws-2', name: 'Frontend', folderPath: '/f', color: '#26a69a' })
+const ws1 = workspaceFixture({ id: 'ws-1', name: 'Backend', folderPath: '/b', color: '#5c6bc0' })
+const ws2 = workspaceFixture({ id: 'ws-2', name: 'Frontend', folderPath: '/f', color: '#26a69a' })
 
-const api = projectOf({ id: 'p1', workspaceId: 'ws-1', name: 'API', gitBranch: 'main' })
+const api = projectFixture({ id: 'p1', workspaceId: 'ws-1', name: 'API', gitBranch: 'main' })
 // A worktree has a directory of its own; the fixture claimed to be one
 // without saying where, which nothing read until now.
-const jobs = projectOf({
+const jobs = projectFixture({
   id: 'p2',
   workspaceId: 'ws-1',
   name: 'Jobs',
   isWorktree: true,
   worktreePath: '/wt/jobs',
 })
-const web = projectOf({ id: 'p3', workspaceId: 'ws-2', name: 'Web' })
+const web = projectFixture({ id: 'p3', workspaceId: 'ws-2', name: 'Web' })
 
 const projectsOf = (): Map<string, Project[]> =>
   new Map([
@@ -110,7 +110,7 @@ const projectsOf = (): Map<string, Project[]> =>
     ['ws-2', [web]],
   ])
 
-function session(
+function sidebarSession(
   id: string,
   projectId: string,
   patch: Partial<TerminalSession> = {}
@@ -181,10 +181,10 @@ beforeEach(() => {
     value: { project: projectApi, workspace: workspaceApi, sessionRecords: sessionRecordsApi },
   })
   sessions = new Map([
-    ['s1', session('s1', 'p1', { tabTitle: 'api-shell' })],
-    ['s2', session('s2', 'p1', { tabTitle: 'api-agent', lastActivityAt: NOW - 300_000 })],
-    ['s3', session('s3', 'p2', { tabTitle: 'jobs-run' })],
-    ['s4', session('s4', 'p3', { tabTitle: 'web-dev' })],
+    ['s1', sidebarSession('s1', 'p1', { tabTitle: 'api-shell' })],
+    ['s2', sidebarSession('s2', 'p1', { tabTitle: 'api-agent', lastActivityAt: NOW - 300_000 })],
+    ['s3', sidebarSession('s3', 'p2', { tabTitle: 'jobs-run' })],
+    ['s4', sidebarSession('s4', 'p3', { tabTitle: 'web-dev' })],
   ])
   useWorkspaceStore.setState({
     ...useWorkspaceStore.getInitialState(),
@@ -241,7 +241,7 @@ describe('UnifiedSidebar — the list is branches, not terminals (US1)', () => {
 
 describe('UnifiedSidebar — the list is branches, not terminals (US1) — shows a branch state folded from its terminals', () => {
   it('shows a branch state folded from its terminals', () => {
-    setSessions(new Map([['s1', session('s1', 'p1', { bellCount: 1 })]]))
+    setSessions(new Map([['s1', sidebarSession('s1', 'p1', { bellCount: 1 })]]))
     const { container } = renderSidebar()
     const main = branchRows(container)[0]
     expect(main.querySelector('.branch-row__gutter svg')!.getAttribute('data-state')).toBe(
@@ -284,8 +284,8 @@ describe('UnifiedSidebar — selecting a branch (FR-047)', () => {
 
   it('focuses the terminal that is waiting on you', () => {
     sessions = new Map([
-      ['s1', session('s1', 'p1', { lastActivityAt: NOW })],
-      ['s2', session('s2', 'p1', { bellCount: 1, lastActivityAt: NOW - 900_000 })],
+      ['s1', sidebarSession('s1', 'p1', { lastActivityAt: NOW })],
+      ['s2', sidebarSession('s2', 'p1', { bellCount: 1, lastActivityAt: NOW - 900_000 })],
     ])
     setSessions(sessions)
     const { container } = renderSidebar()
@@ -297,8 +297,8 @@ describe('UnifiedSidebar — selecting a branch (FR-047)', () => {
 describe('UnifiedSidebar — selecting a branch (FR-047) — falls back to the one you last had open on that branch', () => {
   it('falls back to the one you last had open on that branch', () => {
     sessions = new Map([
-      ['s1', session('s1', 'p1', { lastActivityAt: NOW - 900_000 })],
-      ['s2', session('s2', 'p1', { lastActivityAt: NOW })],
+      ['s1', sidebarSession('s1', 'p1', { lastActivityAt: NOW - 900_000 })],
+      ['s2', sidebarSession('s2', 'p1', { lastActivityAt: NOW })],
     ])
     useSessionStore.setState({
       sessions,
@@ -311,8 +311,8 @@ describe('UnifiedSidebar — selecting a branch (FR-047) — falls back to the o
 
   it('falls back to the most recently active when there is no memory of one', () => {
     sessions = new Map([
-      ['s1', session('s1', 'p1', { lastActivityAt: NOW - 900_000 })],
-      ['s2', session('s2', 'p1', { lastActivityAt: NOW })],
+      ['s1', sidebarSession('s1', 'p1', { lastActivityAt: NOW - 900_000 })],
+      ['s2', sidebarSession('s2', 'p1', { lastActivityAt: NOW })],
     ])
     setSessions(sessions)
     const { container } = renderSidebar()
@@ -357,7 +357,7 @@ describe('UnifiedSidebar — collapse', () => {
   })
 
   it('still signals a waiting branch under a collapsed repo', () => {
-    setSessions(new Map([['s1', session('s1', 'p1', { bellCount: 1 })]]))
+    setSessions(new Map([['s1', sidebarSession('s1', 'p1', { bellCount: 1 })]]))
     const { container } = renderSidebar()
     fireEvent.click(container.querySelector('.repo-header')!)
     expect(container.querySelector('.repo-header__needs-you')).toBeTruthy()
@@ -493,7 +493,7 @@ describe('UnifiedSidebar — search', () => {
 function setUpUnifiedSidebarScratchIsThe(): void {
   beforeEach(() => {
     sessions = new Map([
-      ['sc1', session('sc1', '00000000-0000-0000-0000-000000000000', { tabTitle: 'notes' })],
+      ['sc1', sidebarSession('sc1', '00000000-0000-0000-0000-000000000000', { tabTitle: 'notes' })],
     ])
     setSessions(sessions)
   })
@@ -528,7 +528,7 @@ describe("UnifiedSidebar — scratch is the one place a terminal is still a row 
   it("shows a scratch terminal's own ticket, and one its split pane carries, on its row", () => {
     sessions.set(
       'sc1-pane',
-      session('sc1-pane', '00000000-0000-0000-0000-000000000000', {
+      sidebarSession('sc1-pane', '00000000-0000-0000-0000-000000000000', {
         tabTitle: 'pane',
         parentSessionId: 'sc1',
       })
@@ -843,7 +843,7 @@ describe('UnifiedSidebar — two menus replace four bands of chrome (US5) — di
 
 describe('UnifiedSidebar — agent state is derived, not read from a field nobody writes', () => {
   it('treats a session with an unread bell as awaiting input', () => {
-    setSessions(new Map([['s6', session('s6', 'p1', { tabTitle: 'claude', bellCount: 2 })]]))
+    setSessions(new Map([['s6', sidebarSession('s6', 'p1', { tabTitle: 'claude', bellCount: 2 })]]))
     const { container } = renderSidebar({ initialViewId: 'needs-me' })
     const names = Array.from(container.querySelectorAll('.branch-row__name')).map(
       (n) => n.textContent
@@ -852,7 +852,7 @@ describe('UnifiedSidebar — agent state is derived, not read from a field nobod
   })
 
   it('treats a session producing output as working', () => {
-    setSessions(new Map([['s7', session('s7', 'p1', { tabTitle: 'build', busy: true })]]))
+    setSessions(new Map([['s7', sidebarSession('s7', 'p1', { tabTitle: 'build', busy: true })]]))
     const { container } = renderSidebar({ initialViewId: 'active' })
     const names = Array.from(container.querySelectorAll('.branch-row__name')).map(
       (n) => n.textContent
@@ -862,7 +862,7 @@ describe('UnifiedSidebar — agent state is derived, not read from a field nobod
 
   it('leaves a quiet session idle, so it appears in neither', () => {
     sessions.clear()
-    sessions.set('s8', session('s8', 'p1', { tabTitle: 'quiet' }))
+    sessions.set('s8', sidebarSession('s8', 'p1', { tabTitle: 'quiet' }))
     const needs = renderSidebar({ initialViewId: 'needs-me' })
     expect(needs.container.textContent).not.toContain('quiet')
     needs.unmount()
@@ -874,7 +874,7 @@ describe('UnifiedSidebar — agent state is derived, not read from a field nobod
 describe('UnifiedSidebar — agent state is derived, not read from a field nobody writes — treats a closed session as exited', () => {
   it('treats a closed session as exited', () => {
     sessions.clear()
-    sessions.set('s9', session('s9', 'p1', { tabTitle: 'gone', status: 'closed' }))
+    sessions.set('s9', sidebarSession('s9', 'p1', { tabTitle: 'gone', status: 'closed' }))
     const { container } = renderSidebar()
     expect(container.querySelector('.branch-row__gutter svg')!.getAttribute('data-state')).toBe(
       'exited'
@@ -940,7 +940,9 @@ describe('UnifiedSidebar — issue actions on a branch header', () => {
 
   it('opens the linked issue in the tracker', () => {
     useIntegrationsStore.setState({
-      issues: new Map([['p1', issueOf({ key: 'TAV-14', url: 'https://linear.app/x/TAV-14' })]]),
+      issues: new Map([
+        ['p1', issueFixture({ key: 'TAV-14', url: 'https://linear.app/x/TAV-14' })],
+      ]),
     })
     openBranchMenu()
     fireEvent.click(screen.getByText('Open TAV-14 in tracker'))
@@ -1294,7 +1296,7 @@ describe('UnifiedSidebar — a drag is the manual order (Display → Manual) —
   })
 
   it('sorts a repo with no branches among the rest', () => {
-    const ws3 = workspaceOf({ id: 'ws-3', name: 'Aardvark' })
+    const ws3 = workspaceFixture({ id: 'ws-3', name: 'Aardvark' })
     setWorkspaces([ws1, ws2, ws3], new Map([...projectsOf(), ['ws-3', []]]))
     const { container } = renderSidebar()
     pickSort('Name')
@@ -1407,14 +1409,14 @@ describe('a busy terminal and the sidebar — still lists a branch as stale once
     const { container, rerender } = renderSidebar()
     fireEvent.click(screen.getByRole('button', { name: /^Filter/ }))
     fireEvent.click(screen.getByRole('menuitemradio', { name: /Stale/ }))
-    const names = () =>
+    const rowNames = () =>
       Array.from(container.querySelectorAll('.branch-row__name')).map((n) => n.textContent)
-    expect(names()).not.toContain('Web')
+    expect(rowNames()).not.toContain('Web')
 
     await act(async () =>
       rerender(<UnifiedSidebar {...defaultProps} now={NOW + staleAfterMs + 1000} />)
     )
-    expect(names()).toContain('Web')
+    expect(rowNames()).toContain('Web')
   })
 })
 
@@ -1489,7 +1491,10 @@ describe('UnifiedSidebar — the terminals under a branch — linking one', () =
 
 /** s1 on main with one pane split off it. */
 function withPane(): void {
-  sessions.set('s1-pane', session('s1-pane', 'p1', { tabTitle: 'pane', parentSessionId: 's1' }))
+  sessions.set(
+    's1-pane',
+    sidebarSession('s1-pane', 'p1', { tabTitle: 'pane', parentSessionId: 's1' })
+  )
   setSessions(new Map(sessions))
 }
 
@@ -1586,7 +1591,10 @@ describe('UnifiedSidebar — odds and ends', () => {
   it('renames a scratch terminal from its row', () => {
     setSessions(
       new Map([
-        ['sc1', session('sc1', '00000000-0000-0000-0000-000000000000', { tabTitle: 'notes' })],
+        [
+          'sc1',
+          sidebarSession('sc1', '00000000-0000-0000-0000-000000000000', { tabTitle: 'notes' }),
+        ],
       ])
     )
     const renameSession = vi.fn()

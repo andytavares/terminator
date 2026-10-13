@@ -12,6 +12,7 @@ import {
   e2eTempDir,
 } from '../helpers'
 import { writeLiveOrder } from './live-order'
+import { expectOneDraftPullRequest, liveOrderDir, liveRunOver, startLiveRun } from './live-run'
 
 // A failed check sends the work back, for real (ADR-063).
 //
@@ -138,31 +139,11 @@ interface Observed {
   }
 }
 
-/** Starts the run, and checks it was accepted with something to run. */
-async function startRun(): Promise<void> {
-  const started = (await foundry('foundry:run.start', { id: ORDER })) as {
-    error?: string
-    started?: boolean
-  }
-  expect(started.error, 'the run was refused').toBeUndefined()
-  expect(started.started, 'nothing was there to run it').toBe(true)
-}
-
-const orderDir = (): string => join(repo, '.foundry', 'orders', ORDER)
-const ledgerFile = (): string => join(orderDir(), 'ledger.jsonl')
-const gatesFile = (): string => join(orderDir(), 'gates.json')
-
-/** The run is over when it has said so: a draft, a refusal, or a gate. Null until then. */
-function runOver(): string | null {
-  const ledger = existsSync(ledgerFile()) ? readFileSync(ledgerFile(), 'utf8') : ''
-  if (ledger.includes('ship.draft_opened')) return 'a draft is on the ledger'
-  if (ledger.includes('ship.refused')) return 'shipping was refused'
-  if (existsSync(gatesFile())) return 'a gate is holding it'
-  return null
-}
+const ledgerFile = (): string => join(liveOrderDir(repo, ORDER), 'ledger.jsonl')
+const gatesFile = (): string => join(liveOrderDir(repo, ORDER), 'gates.json')
 
 /** Logs the graph's line when it differs from the last one logged, and returns it. */
-function logGraph(observed: Observed, previous: string): string {
+function logGraphReworks(observed: Observed, previous: string): string {
   const line = (observed.graph?.nodes ?? [])
     .map((n) => `${n.id}=${n.state}/a${n.attempts}/r${n.reworks}/f${n.feedback.length}`)
     .join(' ')
@@ -171,14 +152,14 @@ function logGraph(observed: Observed, previous: string): string {
 }
 
 /** Polls the graph until the run says it is over, or the deadline passes. */
-async function observeUntilOver(): Promise<Observed> {
+async function observeUntilOverOrDeadline(): Promise<Observed> {
   const deadline = Date.now() + 55 * 60_000
   let last: Observed = {}
   let previous = ''
   while (Date.now() < deadline) {
     last = (await foundry('foundry:run.observe', { id: ORDER })) as Observed
-    previous = logGraph(last, previous)
-    const over = runOver()
+    previous = logGraphReworks(last, previous)
+    const over = liveRunOver(liveOrderDir(repo, ORDER))
     if (over !== null) {
       console.log(`[run over] ${over}`)
       break
@@ -230,28 +211,11 @@ function expectNobodyAsked(): void {
   ).toEqual([])
 }
 
-/** One draft pull request on GitHub, for the branch the lane worked on. */
-function expectOneDraftOnGitHub(): void {
-  const worktree = join(orderDir(), 'worktrees', 'live')
-  const branch = execFileSync('git', ['branch', '--show-current'], { cwd: worktree })
-    .toString()
-    .trim()
-  const pulls = JSON.parse(
-    execFileSync('gh', ['pr', 'list', '--head', branch, '--json', 'url,isDraft'], {
-      cwd: repo,
-    }).toString()
-  ) as { url: string; isDraft: boolean }[]
-
-  console.log(`pull requests on ${branch}: ${JSON.stringify(pulls)}`)
-  expect(pulls).toHaveLength(1)
-  expect(pulls[0].isDraft).toBe(true)
-}
-
 test('a lint failure goes back to the builder and the run still ships', async () => {
   test.setTimeout(3_600_000)
   writeOrder()
-  await startRun()
-  const last = await observeUntilOver()
+  await startLiveRun(foundry, ORDER)
+  const last = await observeUntilOverOrDeadline()
 
   const ledger = existsSync(ledgerFile()) ? readFileSync(ledgerFile(), 'utf8') : ''
 
@@ -264,5 +228,5 @@ test('a lint failure goes back to the builder and the run still ships', async ()
   expectSkillsMounted(last, ledger)
   expectNobodyAsked()
   expect(ledger).toContain('ship.draft_opened')
-  expectOneDraftOnGitHub()
+  expectOneDraftPullRequest(repo, join(liveOrderDir(repo, ORDER), 'worktrees', 'live'))
 })

@@ -13,7 +13,7 @@ vi.mock('electron', () => ({
   dialog: { showOpenDialog: (...a: unknown[]) => showOpenDialog(...a) },
 }))
 
-function handlerFor(channel: string): (event: unknown, payload?: unknown) => unknown {
+function appHandlerFor(channel: string): (event: unknown, payload?: unknown) => unknown {
   const match = mockHandle.mock.calls.find(([ch]) => ch === channel)
   if (!match) throw new Error(`No handler registered for: ${channel}`)
   return match[1] as (event: unknown, payload?: unknown) => unknown
@@ -35,7 +35,7 @@ beforeEach(async () => {
 
 describe('app:get-info', () => {
   it('reports the app name, version, runtime versions and home directory', async () => {
-    const info = (await handlerFor('app:get-info')(null, undefined)) as Record<string, string>
+    const info = (await appHandlerFor('app:get-info')(null, undefined)) as Record<string, string>
     expect(info).toMatchObject({
       appName: 'Terminator',
       version: '9.9.9',
@@ -49,7 +49,7 @@ describe('app:get-info', () => {
 describe('dialog:open-directory', () => {
   it('returns the folder the user picked', async () => {
     showOpenDialog.mockResolvedValue({ canceled: false, filePaths: ['/repos/app'] })
-    expect(await handlerFor('dialog:open-directory')(null, undefined)).toEqual({
+    expect(await appHandlerFor('dialog:open-directory')(null, undefined)).toEqual({
       filePath: '/repos/app',
     })
     expect(showOpenDialog).toHaveBeenCalledWith(window, { properties: ['openDirectory'] })
@@ -57,14 +57,14 @@ describe('dialog:open-directory', () => {
 
   it('reports a cancelled dialog as cancelled', async () => {
     showOpenDialog.mockResolvedValue({ canceled: true, filePaths: [] })
-    expect(await handlerFor('dialog:open-directory')(null, undefined)).toEqual({
+    expect(await appHandlerFor('dialog:open-directory')(null, undefined)).toEqual({
       cancelled: true,
     })
   })
 
   it('does not open a dialog when there is no window to own it', async () => {
     mainWindow = null
-    expect(await handlerFor('dialog:open-directory')(null, undefined)).toEqual({
+    expect(await appHandlerFor('dialog:open-directory')(null, undefined)).toEqual({
       cancelled: true,
     })
     expect(showOpenDialog).not.toHaveBeenCalled()

@@ -17,7 +17,7 @@ const TABS: TabItem[] = [
   { id: 'history', label: 'History', panel: <p>Commit history</p> },
 ]
 
-function Harness({ initial = 'files' }: { initial?: string }): JSX.Element {
+function TabsHarness({ initial = 'files' }: { initial?: string }): JSX.Element {
   const [selectedId, setSelectedId] = useState(initial)
   return (
     <Tabs
@@ -29,89 +29,89 @@ function Harness({ initial = 'files' }: { initial?: string }): JSX.Element {
   )
 }
 
-const tab = (name: string) => screen.getByRole('tab', { name })
+const tabNamed = (name: string) => screen.getByRole('tab', { name })
 
 describe('Tabs', () => {
   it('names the tab list', () => {
-    render(<Harness />)
+    render(<TabsHarness />)
     expect(screen.getByRole('tablist', { name: 'Pull request sections' })).toBeTruthy()
   })
 
   it('selects one tab and shows only its panel', () => {
-    render(<Harness />)
-    expect(tab('Files').getAttribute('aria-selected')).toBe('true')
-    expect(tab('Checks').getAttribute('aria-selected')).toBe('false')
+    render(<TabsHarness />)
+    expect(tabNamed('Files').getAttribute('aria-selected')).toBe('true')
+    expect(tabNamed('Checks').getAttribute('aria-selected')).toBe('false')
     expect(screen.getByRole('tabpanel').textContent).toBe('File list')
   })
 
   it('ties the panel to its tab both ways', () => {
-    render(<Harness />)
+    render(<TabsHarness />)
     const panel = screen.getByRole('tabpanel')
-    expect(panel.getAttribute('aria-labelledby')).toBe(tab('Files').id)
-    expect(tab('Files').getAttribute('aria-controls')).toBe(panel.id)
+    expect(panel.getAttribute('aria-labelledby')).toBe(tabNamed('Files').id)
+    expect(tabNamed('Files').getAttribute('aria-controls')).toBe(panel.id)
   })
 
   it('puts only the selected tab in the Tab order', () => {
-    render(<Harness />)
-    expect(tab('Files').tabIndex).toBe(0)
-    expect(tab('Checks').tabIndex).toBe(-1)
+    render(<TabsHarness />)
+    expect(tabNamed('Files').tabIndex).toBe(0)
+    expect(tabNamed('Checks').tabIndex).toBe(-1)
   })
 
   it('selects a tab when it is clicked', () => {
-    render(<Harness />)
-    fireEvent.click(tab('Checks'))
-    expect(tab('Checks').getAttribute('aria-selected')).toBe('true')
+    render(<TabsHarness />)
+    fireEvent.click(tabNamed('Checks'))
+    expect(tabNamed('Checks').getAttribute('aria-selected')).toBe('true')
     expect(screen.getByRole('tabpanel').textContent).toBe('Check list')
   })
 })
 
 describe('Tabs — moves focus and selection with the arrow keys', () => {
   it('moves focus and selection with the arrow keys', () => {
-    render(<Harness />)
-    tab('Files').focus()
-    fireEvent.keyDown(tab('Files'), { key: 'ArrowRight' })
-    expect(document.activeElement).toBe(tab('Checks'))
-    expect(tab('Checks').getAttribute('aria-selected')).toBe('true')
-    fireEvent.keyDown(tab('Checks'), { key: 'ArrowLeft' })
-    expect(document.activeElement).toBe(tab('Files'))
+    render(<TabsHarness />)
+    tabNamed('Files').focus()
+    fireEvent.keyDown(tabNamed('Files'), { key: 'ArrowRight' })
+    expect(document.activeElement).toBe(tabNamed('Checks'))
+    expect(tabNamed('Checks').getAttribute('aria-selected')).toBe('true')
+    fireEvent.keyDown(tabNamed('Checks'), { key: 'ArrowLeft' })
+    expect(document.activeElement).toBe(tabNamed('Files'))
   })
 
   it('skips a disabled tab', () => {
-    render(<Harness initial="checks" />)
-    fireEvent.keyDown(tab('Checks'), { key: 'ArrowRight' })
-    expect(tab('History').getAttribute('aria-selected')).toBe('true')
+    render(<TabsHarness initial="checks" />)
+    fireEvent.keyDown(tabNamed('Checks'), { key: 'ArrowRight' })
+    expect(tabNamed('History').getAttribute('aria-selected')).toBe('true')
   })
 
   it('wraps from the last tab to the first and back', () => {
-    render(<Harness initial="history" />)
-    fireEvent.keyDown(tab('History'), { key: 'ArrowRight' })
-    expect(tab('Files').getAttribute('aria-selected')).toBe('true')
-    fireEvent.keyDown(tab('Files'), { key: 'ArrowLeft' })
-    expect(tab('History').getAttribute('aria-selected')).toBe('true')
+    render(<TabsHarness initial="history" />)
+    fireEvent.keyDown(tabNamed('History'), { key: 'ArrowRight' })
+    expect(tabNamed('Files').getAttribute('aria-selected')).toBe('true')
+    fireEvent.keyDown(tabNamed('Files'), { key: 'ArrowLeft' })
+    expect(tabNamed('History').getAttribute('aria-selected')).toBe('true')
   })
 })
 
 describe('Tabs — jumps to the ends with Home and End', () => {
   it('jumps to the ends with Home and End', () => {
-    render(<Harness initial="checks" />)
-    fireEvent.keyDown(tab('Checks'), { key: 'End' })
-    expect(tab('History').getAttribute('aria-selected')).toBe('true')
-    fireEvent.keyDown(tab('History'), { key: 'Home' })
-    expect(tab('Files').getAttribute('aria-selected')).toBe('true')
+    render(<TabsHarness initial="checks" />)
+    fireEvent.keyDown(tabNamed('Checks'), { key: 'End' })
+    expect(tabNamed('History').getAttribute('aria-selected')).toBe('true')
+    fireEvent.keyDown(tabNamed('History'), { key: 'Home' })
+    expect(tabNamed('Files').getAttribute('aria-selected')).toBe('true')
   })
 
   it('leaves other keys to the browser', () => {
-    render(<Harness />)
+    render(<TabsHarness />)
     const event = new KeyboardEvent('keydown', { key: 'a', bubbles: true, cancelable: true })
-    tab('Files').dispatchEvent(event)
+    tabNamed('Files').dispatchEvent(event)
     expect(event.defaultPrevented).toBe(false)
-    expect(tab('Files').getAttribute('aria-selected')).toBe('true')
+    expect(tabNamed('Files').getAttribute('aria-selected')).toBe('true')
   })
 
   it('does not select a disabled tab by click', () => {
-    render(<Harness />)
-    fireEvent.click(tab('Notes'))
-    expect(tab('Files').getAttribute('aria-selected')).toBe('true')
+    render(<TabsHarness />)
+    fireEvent.click(tabNamed('Notes'))
+    expect(tabNamed('Files').getAttribute('aria-selected')).toBe('true')
   })
 })
 
@@ -136,7 +136,7 @@ describe('Tabs with a rich label', () => {
         onSelect={() => {}}
       />
     )
-    expect(tab('Needs you, 3').textContent).toBe('Needs you3')
+    expect(tabNamed('Needs you, 3').textContent).toBe('Needs you3')
   })
 })
 
@@ -194,14 +194,14 @@ describe('Tabs parts: TabsRoot, TabList, Tab, TabPanel', () => {
 
   it('names a tab with markup inside by its accessibleName', () => {
     render(<PartsHarness />)
-    expect(tab('Needs you, 3').getAttribute('aria-selected')).toBe('true')
+    expect(tabNamed('Needs you, 3').getAttribute('aria-selected')).toBe('true')
   })
 
   it('ties the selected tab and its panel both ways', () => {
     render(<PartsHarness />)
     const panel = screen.getByRole('tabpanel')
-    expect(tab('Needs you, 3').getAttribute('aria-controls')).toBe(panel.id)
-    expect(panel.getAttribute('aria-labelledby')).toBe(tab('Needs you, 3').id)
+    expect(tabNamed('Needs you, 3').getAttribute('aria-controls')).toBe(panel.id)
+    expect(panel.getAttribute('aria-labelledby')).toBe(tabNamed('Needs you, 3').id)
   })
 
   it('points aria-controls only at a panel that is in the document', () => {
@@ -210,21 +210,21 @@ describe('Tabs parts: TabsRoot, TabList, Tab, TabPanel', () => {
       const controls = element.getAttribute('aria-controls')
       if (controls) expect(document.getElementById(controls)).not.toBeNull()
     }
-    expect(tab('My PRs').hasAttribute('aria-controls')).toBe(false)
+    expect(tabNamed('My PRs').hasAttribute('aria-controls')).toBe(false)
   })
 })
 
 describe('Tabs parts: TabsRoot, TabList, Tab, TabPanel — leaves aria-controls off when the caller renders no panel', () => {
   it('leaves aria-controls off when the caller renders no panel', () => {
     render(<PartsHarness withPanels={false} />)
-    expect(tab('Needs you, 3').hasAttribute('aria-controls')).toBe(false)
+    expect(tabNamed('Needs you, 3').hasAttribute('aria-controls')).toBe(false)
   })
 
   it('moves the panel with the selection on click', () => {
     render(<PartsHarness />)
-    fireEvent.click(tab('My PRs'))
+    fireEvent.click(tabNamed('My PRs'))
     expect(screen.getByRole('tabpanel').textContent).toBe('Mine rows')
-    expect(tab('My PRs').getAttribute('aria-controls')).toBe(screen.getByRole('tabpanel').id)
+    expect(tabNamed('My PRs').getAttribute('aria-controls')).toBe(screen.getByRole('tabpanel').id)
   })
 
   it('keeps one roving tab stop on the selected tab', () => {
@@ -234,34 +234,34 @@ describe('Tabs parts: TabsRoot, TabList, Tab, TabPanel — leaves aria-controls 
 
   it('moves focus and selection with Left and Right, skipping disabled tabs and wrapping', () => {
     render(<PartsHarness initial="mine" />)
-    fireEvent.keyDown(tab('My PRs'), { key: 'ArrowRight' })
-    expect(document.activeElement).toBe(tab('Involved'))
-    expect(tab('Involved').getAttribute('aria-selected')).toBe('true')
-    fireEvent.keyDown(tab('Involved'), { key: 'ArrowRight' })
-    expect(document.activeElement).toBe(tab('Needs you, 3'))
-    fireEvent.keyDown(tab('Needs you, 3'), { key: 'ArrowLeft' })
-    expect(tab('Involved').getAttribute('aria-selected')).toBe('true')
+    fireEvent.keyDown(tabNamed('My PRs'), { key: 'ArrowRight' })
+    expect(document.activeElement).toBe(tabNamed('Involved'))
+    expect(tabNamed('Involved').getAttribute('aria-selected')).toBe('true')
+    fireEvent.keyDown(tabNamed('Involved'), { key: 'ArrowRight' })
+    expect(document.activeElement).toBe(tabNamed('Needs you, 3'))
+    fireEvent.keyDown(tabNamed('Needs you, 3'), { key: 'ArrowLeft' })
+    expect(tabNamed('Involved').getAttribute('aria-selected')).toBe('true')
   })
 })
 
 describe('Tabs parts: TabsRoot, TabList, Tab, TabPanel — jumps to the ends with Home and End', () => {
   it('jumps to the ends with Home and End', () => {
     render(<PartsHarness initial="mine" />)
-    fireEvent.keyDown(tab('My PRs'), { key: 'End' })
-    expect(document.activeElement).toBe(tab('Involved'))
-    fireEvent.keyDown(tab('Involved'), { key: 'Home' })
-    expect(document.activeElement).toBe(tab('Needs you, 3'))
+    fireEvent.keyDown(tabNamed('My PRs'), { key: 'End' })
+    expect(document.activeElement).toBe(tabNamed('Involved'))
+    fireEvent.keyDown(tabNamed('Involved'), { key: 'Home' })
+    expect(document.activeElement).toBe(tabNamed('Needs you, 3'))
   })
 
   it('uses Up and Down, not Left and Right, in a vertical list', () => {
     render(<PartsHarness orientation="vertical" />)
     expect(screen.getByRole('tablist').getAttribute('aria-orientation')).toBe('vertical')
-    fireEvent.keyDown(tab('Needs you, 3'), { key: 'ArrowRight' })
-    expect(tab('Needs you, 3').getAttribute('aria-selected')).toBe('true')
-    fireEvent.keyDown(tab('Needs you, 3'), { key: 'ArrowDown' })
-    expect(document.activeElement).toBe(tab('My PRs'))
-    fireEvent.keyDown(tab('My PRs'), { key: 'ArrowUp' })
-    expect(tab('Needs you, 3').getAttribute('aria-selected')).toBe('true')
+    fireEvent.keyDown(tabNamed('Needs you, 3'), { key: 'ArrowRight' })
+    expect(tabNamed('Needs you, 3').getAttribute('aria-selected')).toBe('true')
+    fireEvent.keyDown(tabNamed('Needs you, 3'), { key: 'ArrowDown' })
+    expect(document.activeElement).toBe(tabNamed('My PRs'))
+    fireEvent.keyDown(tabNamed('My PRs'), { key: 'ArrowUp' })
+    expect(tabNamed('Needs you, 3').getAttribute('aria-selected')).toBe('true')
   })
 
   it('refuses a Tab outside a TabsRoot, which would have nothing to select', () => {

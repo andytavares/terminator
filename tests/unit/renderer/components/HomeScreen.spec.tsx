@@ -46,10 +46,10 @@ import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.sto
 import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
 import {
   issueSummaryOf,
-  projectOf,
+  projectFixture,
   seedStore,
   trackerConnectionOf,
-  workspaceOf,
+  workspaceFixture,
   type SeededStore,
 } from '../../../support/renderer-stores'
 
@@ -75,9 +75,9 @@ beforeEach(() => {
     }),
   })
   seedStore(useWorkspaceStore, {
-    workspaces: [workspaceOf({ id: 'w1', name: 'terminator' })],
+    workspaces: [workspaceFixture({ id: 'w1', name: 'terminator' })],
     projectsByWorkspaceId: new Map([
-      ['w1', [projectOf({ id: 'p1', workspaceId: 'w1', name: 'main' })]],
+      ['w1', [projectFixture({ id: 'p1', workspaceId: 'w1', name: 'main' })]],
     ]),
   })
   useExtensionRegistry.setState(useExtensionRegistry.getInitialState(), true)

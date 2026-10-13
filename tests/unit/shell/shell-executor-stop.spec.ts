@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { execFileSync } from 'node:child_process'
 import { chmodSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { execShell } from '../../../src/main/shell/shell-executor'
 import { stopRunningCommands } from '../../../src/main/shell/command-runner'
 import { makeTempDir } from '../../support/temp-dir'
+import { isProcessAlive } from '../../support/processes'
 
 // A git or gh command running at quit ends with the app, with what it started (macOS's git
 // shim started an xcodebuild that outlived it, run 38382115775). The stand-in gh records a sleep's pid.
@@ -25,17 +25,6 @@ afterEach(() => {
   process.env.PATH = originalPath
 })
 
-/** Running, and not a zombie waiting for its new parent to reap it. */
-function isAlive(pid: number): boolean {
-  try {
-    return !execFileSync('ps', ['-o', 'stat=', '-p', String(pid)], { encoding: 'utf8' }).startsWith(
-      'Z'
-    )
-  } catch {
-    return false
-  }
-}
-
 async function grandchildPid(): Promise<number> {
   await expect
     .poll(() => existsSync(pidFile) && readFileSync(pidFile, 'utf8').trim() !== '')
@@ -51,7 +40,7 @@ describe('stopRunningCommands', () => {
     stopRunningCommands()
 
     expect((await run).exitCode).not.toBe(0)
-    await expect.poll(() => isAlive(grandchild)).toBe(false)
+    await expect.poll(() => isProcessAlive(grandchild)).toBe(false)
   })
 
   it('leaves nothing to stop once a command has finished', async () => {
@@ -67,6 +56,6 @@ describe('execShell timeout', () => {
     const grandchild = await grandchildPid()
 
     expect(await run).toMatchObject({ timedOut: true, exitCode: 124 })
-    await expect.poll(() => isAlive(grandchild)).toBe(false)
+    await expect.poll(() => isProcessAlive(grandchild)).toBe(false)
   })
 })

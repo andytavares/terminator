@@ -314,36 +314,36 @@ describe('QuickActions — arrow navigation', () => {
   })
 })
 
-const key = (k: string, mods: Partial<KeyboardEventInit> = {}): void => {
+const pressInPanel = (k: string, mods: Partial<KeyboardEventInit> = {}): void => {
   fireEvent.keyDown(window, { key: k, ...mods })
 }
-const ran = (): string[] => onRun.mock.calls.map(([action]) => action.id)
+const ranActionIds = (): string[] => onRun.mock.calls.map(([action]) => action.id)
 
 describe('QuickActions — group mode keys', () => {
   it('moves through the group with the arrows and runs the highlighted action on Enter', () => {
     renderPanel()
-    key('t')
-    key('ArrowDown')
-    key('ArrowDown')
-    key('Enter')
-    key('ArrowUp')
-    key('Enter')
+    pressInPanel('t')
+    pressInPanel('ArrowDown')
+    pressInPanel('ArrowDown')
+    pressInPanel('Enter')
+    pressInPanel('ArrowUp')
+    pressInPanel('Enter')
     // The second ArrowDown stops at the last of the two.
-    expect(ran()).toEqual(['terminal.split-down', 'terminal.split'])
+    expect(ranActionIds()).toEqual(['terminal.split-down', 'terminal.split'])
   })
 
   it('goes to search on "/"', () => {
     renderPanel()
-    key('t')
-    key('/')
+    pressInPanel('t')
+    pressInPanel('/')
     expect(screen.getByRole('combobox')).toBeTruthy()
   })
 
   it('ignores a letter no action has, and keys with a modifier', () => {
     renderPanel()
-    key('t')
-    key('z')
-    key('d', { altKey: true })
+    pressInPanel('t')
+    pressInPanel('z')
+    pressInPanel('d', { altKey: true })
     expect(onRun).not.toHaveBeenCalled()
     expect(screen.getByText('Split right')).toBeTruthy()
   })
@@ -352,18 +352,18 @@ describe('QuickActions — group mode keys', () => {
 describe('QuickActions — top level keys and pointer', () => {
   it('runs a Go action by its letter, and ignores a letter nothing has', () => {
     renderPanel()
-    key('z')
+    pressInPanel('z')
     expect(onRun).not.toHaveBeenCalled()
-    key('h')
-    expect(ran()).toEqual(['top.home'])
+    pressInPanel('h')
+    expect(ranActionIds()).toEqual(['top.home'])
   })
 
   it('opens a group from its row with Enter', () => {
     renderPanel()
     // Push and Split right (pinned and recent), then the Terminal group.
-    key('ArrowDown')
-    key('ArrowDown')
-    key('Enter')
+    pressInPanel('ArrowDown')
+    pressInPanel('ArrowDown')
+    pressInPanel('Enter')
     expect(screen.getByRole('listbox', { name: 'Terminal' })).toBeTruthy()
   })
 
@@ -372,7 +372,7 @@ describe('QuickActions — top level keys and pointer', () => {
     fireEvent.mouseDown(screen.getByText('Git').closest('.qa-row')!)
     fireEvent.mouseEnter(screen.getByText('Push').closest('.qa-row')!)
     fireEvent.mouseDown(screen.getByText('Push').closest('.qa-row')!)
-    expect(ran()).toEqual(['git.push'])
+    expect(ranActionIds()).toEqual(['git.push'])
   })
 
   it('does not run a row when its pin button is pressed', () => {
@@ -385,7 +385,7 @@ describe('QuickActions — top level keys and pointer', () => {
 describe('QuickActions — top level keys and pointer — pins nothing when cmd+. lands on a group row', () => {
   it('pins nothing when cmd+. lands on a group row', () => {
     renderPanel({ pinned: [], recent: [] })
-    key('.', { metaKey: true })
+    pressInPanel('.', { metaKey: true })
     expect(onTogglePin).not.toHaveBeenCalled()
   })
 })
@@ -393,19 +393,19 @@ describe('QuickActions — top level keys and pointer — pins nothing when cmd+
 describe('QuickActions — search keys', () => {
   it('moves back up the results with ArrowUp', () => {
     renderPanel()
-    key('/')
+    pressInPanel('/')
     fireEvent.change(screen.getByRole('combobox'), { target: { value: 'split' } })
-    key('ArrowDown')
-    key('ArrowUp')
-    key('Enter')
-    expect(ran()).toEqual(['terminal.split'])
+    pressInPanel('ArrowDown')
+    pressInPanel('ArrowUp')
+    pressInPanel('Enter')
+    expect(ranActionIds()).toEqual(['terminal.split'])
   })
 
   it('keeps searching on Backspace while there is a query', () => {
     renderPanel()
-    key('/')
+    pressInPanel('/')
     fireEvent.change(screen.getByRole('combobox'), { target: { value: 'p' } })
-    key('Backspace')
+    pressInPanel('Backspace')
     expect(screen.getByRole('combobox')).toBeTruthy()
   })
 })

@@ -24,10 +24,10 @@ import { useSessionRecordsStore } from '../../../../src/renderer/stores/session-
 import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
 import { DEFAULT_GLOBAL_SETTINGS } from '../../../../src/shared/schemas/settings.schema'
 import {
-  projectOf,
+  projectFixture,
   seedStore,
   terminalSessionOf,
-  workspaceOf,
+  workspaceFixture,
   type SeededStore,
 } from '../../../support/renderer-stores'
 
@@ -35,7 +35,7 @@ import {
 const GLOBAL_SCROLLBACK = 4242
 const REPO_SCROLLBACK = 5151
 
-const repo = workspaceOf({ id: 'w1', name: 'Repo', folderPath: '/code/repo' })
+const repo = workspaceFixture({ id: 'w1', name: 'Repo', folderPath: '/code/repo' })
 let records: SeededStore<typeof useSessionRecordsStore>
 const closeSession = vi.fn()
 
@@ -49,8 +49,8 @@ function seedWorkspaces(): void {
       [
         'w1',
         [
-          projectOf({ id: 'p1', workspaceId: 'w1', name: 'main' }),
-          projectOf({
+          projectFixture({ id: 'p1', workspaceId: 'w1', name: 'main' }),
+          projectFixture({
             id: 'p2',
             workspaceId: 'w1',
             name: 'worktree',

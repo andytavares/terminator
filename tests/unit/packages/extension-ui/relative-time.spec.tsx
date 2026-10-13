@@ -10,7 +10,7 @@ const MINUTE = 60 * SECOND
 const HOUR = 60 * MINUTE
 const DAY = 24 * HOUR
 
-const ago = (milliseconds: number) => formatRelativeTime(NOW - milliseconds, NOW, 'en')
+const relativeAgo = (milliseconds: number) => formatRelativeTime(NOW - milliseconds, NOW, 'en')
 const ahead = (milliseconds: number) => formatRelativeTime(NOW + milliseconds, NOW, 'en')
 
 describe('formatRelativeTime', () => {
@@ -33,12 +33,12 @@ describe('formatRelativeTime', () => {
     [365 * DAY, 'last year'],
     [800 * DAY, '2 years ago'],
   ])('says %i milliseconds in the past as "%s"', (milliseconds, sentence) => {
-    expect(ago(milliseconds)).toBe(sentence)
+    expect(relativeAgo(milliseconds)).toBe(sentence)
   })
 
   it('counts whole units, never rounding up to one that has not passed', () => {
-    expect(ago(119 * SECOND)).toBe('1 minute ago')
-    expect(ago(2 * HOUR - SECOND)).toBe('1 hour ago')
+    expect(relativeAgo(119 * SECOND)).toBe('1 minute ago')
+    expect(relativeAgo(2 * HOUR - SECOND)).toBe('1 hour ago')
   })
 })
 

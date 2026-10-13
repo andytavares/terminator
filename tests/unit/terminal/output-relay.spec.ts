@@ -3,12 +3,12 @@ import { OutputRelay, type RendererSend } from '../../../src/main/terminal/outpu
 import { OUTPUT_FLUSH_INTERVAL_MS } from '../../../src/main/terminal/output-batcher'
 import { HIGH_WATERMARK_CHARS, LOW_WATERMARK_CHARS } from '../../../src/main/terminal/flow-control'
 
-function makeFakePtyManager() {
+function relayPtyManager() {
   const dataListeners: Array<(data: string) => void> = []
   const exitListeners: Array<(code: number) => void> = []
   return {
-    emitData: (data: string) => dataListeners.forEach((l) => l(data)),
-    emitExit: (code: number) => exitListeners.forEach((l) => l(code)),
+    pushData: (data: string) => dataListeners.forEach((l) => l(data)),
+    pushExit: (code: number) => exitListeners.forEach((l) => l(code)),
     onData: vi.fn((_id: string, l: (data: string) => void) => dataListeners.push(l)),
     onExit: vi.fn((_id: string, l: (code: number) => void) => exitListeners.push(l)),
     pause: vi.fn(),
@@ -16,14 +16,14 @@ function makeFakePtyManager() {
   }
 }
 
-let ptyManager: ReturnType<typeof makeFakePtyManager>
+let ptyManager: ReturnType<typeof relayPtyManager>
 let send: Mock<RendererSend>
 let relay: OutputRelay
 
 function useRelay(): void {
   beforeEach(() => {
     vi.useFakeTimers()
-    ptyManager = makeFakePtyManager()
+    ptyManager = relayPtyManager()
     send = vi.fn(() => true)
     relay = new OutputRelay(ptyManager as never, send)
     relay.start('s1')
@@ -38,15 +38,15 @@ describe('OutputRelay', () => {
   useRelay()
 
   it('sends the chunks of one frame as one message', () => {
-    ptyManager.emitData('a')
-    ptyManager.emitData('b')
+    ptyManager.pushData('a')
+    ptyManager.pushData('b')
     vi.advanceTimersByTime(OUTPUT_FLUSH_INTERVAL_MS)
     expect(send.mock.calls).toEqual([['terminal:output', { sessionId: 's1', data: 'ab' }]])
   })
 
   it('sends pending output before the exit, without waiting for the frame', () => {
-    ptyManager.emitData('last words')
-    ptyManager.emitExit(3)
+    ptyManager.pushData('last words')
+    ptyManager.pushExit(3)
     expect(send.mock.calls).toEqual([
       ['terminal:output', { sessionId: 's1', data: 'last words' }],
       ['terminal:process-exit', { sessionId: 's1', exitCode: 3 }],
@@ -56,7 +56,7 @@ describe('OutputRelay', () => {
 
 /** Sends `chars` characters of output and lets the frame go out. */
 function flood(chars: number): void {
-  ptyManager.emitData('x'.repeat(chars))
+  ptyManager.pushData('x'.repeat(chars))
   vi.advanceTimersByTime(OUTPUT_FLUSH_INTERVAL_MS)
 }
 
@@ -105,7 +105,7 @@ describe('OutputRelay — flow control without a window or a session', () => {
 
   it('ignores acknowledgements after the session has exited', () => {
     flood(HIGH_WATERMARK_CHARS + 1)
-    ptyManager.emitExit(0)
+    ptyManager.pushExit(0)
     relay.acknowledge('s1', HIGH_WATERMARK_CHARS)
     expect(ptyManager.resume).not.toHaveBeenCalled()
   })

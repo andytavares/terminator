@@ -11,7 +11,7 @@ import { useExtensionRegistry } from '../../../../src/renderer/extensions/regist
 import { useExtensionCommandsStore } from '../../../../src/renderer/stores/extension-commands.store'
 import { DEFAULT_GLOBAL_SETTINGS } from '../../../../src/shared/schemas/settings.schema'
 import type { CustomAction } from '../../../../src/shared/types'
-import { projectOf, resetStore, workspaceOf } from '../../../support/renderer-stores'
+import { projectFixture, resetStore, workspaceFixture } from '../../../support/renderer-stores'
 import { installElectronApi } from '../../../support/electron-api'
 
 vi.mock('../../../../src/renderer/components/QuickActions.css', () => ({}))
@@ -73,8 +73,8 @@ beforeEach(() => {
   resetStore(useSettingsStore)
   withCustom([])
   resetStore(useWorkspaceStore, {
-    workspaces: [workspaceOf({ id: 'ws-1', folderPath: '/repo' })],
-    projectsByWorkspaceId: new Map([['ws-1', [projectOf({ id: 'p1', workspaceId: 'ws-1' })]]]),
+    workspaces: [workspaceFixture({ id: 'ws-1', folderPath: '/repo' })],
+    projectsByWorkspaceId: new Map([['ws-1', [projectFixture({ id: 'p1', workspaceId: 'ws-1' })]]]),
     activeWorkspaceId: 'ws-1',
     activeProjectId: 'p1',
   })

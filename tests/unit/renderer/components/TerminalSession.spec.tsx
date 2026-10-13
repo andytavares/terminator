@@ -822,7 +822,7 @@ describe('TerminalInstance — link providers (visual decoration) — quoted-pat
 // jsdom puts at 0,0 along with the terminal's element; viewportY=0.
 
 /** Gives the mocked terminal the `.xterm-screen` xterm sizes to its cells. */
-function drawScreen(
+function drawTerminalScreen(
   termMock: Record<string, unknown>,
   cell: { width: number; height: number },
   screen = { left: 0, top: 0 }
@@ -839,7 +839,7 @@ function drawScreen(
 function makeInstanceWithLine(lineText: string) {
   const instance = new TerminalInstance('ses-link', 1000)
   const termMock = vi.mocked(Terminal).mock.results.at(-1)!.value
-  drawScreen(termMock, { width: 8, height: 16 })
+  drawTerminalScreen(termMock, { width: 8, height: 16 })
   Object.defineProperty(termMock, 'buffer', {
     value: makeMockBuffer(lineText, 0),
     configurable: true,
@@ -1158,7 +1158,7 @@ const CELL = { width: 7, height: 18 }
 function makeDrawnTerminal(lines: Record<number, string>, screen = { left: 0, top: 0 }) {
   const instance = new TerminalInstance('ses-drawn', 1000)
   const termMock = vi.mocked(Terminal).mock.results.at(-1)!.value
-  drawScreen(termMock, CELL, screen)
+  drawTerminalScreen(termMock, CELL, screen)
   Object.defineProperty(termMock, 'buffer', {
     value: {
       active: {

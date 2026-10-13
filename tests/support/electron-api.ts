@@ -28,13 +28,13 @@ export function installElectronApi(parts: ElectronApiParts): ElectronAPI {
 export function pushedEvent<Args extends unknown[]>() {
   const listeners = new Set<(...args: Args) => void>()
   return {
-    subscribe: (listener: (...args: Args) => void): (() => void) => {
+    addListener: (listener: (...args: Args) => void): (() => void) => {
       listeners.add(listener)
       return () => {
         listeners.delete(listener)
       }
     },
-    emit: (...args: Args): void => listeners.forEach((listener) => listener(...args)),
+    deliver: (...args: Args): void => listeners.forEach((listener) => listener(...args)),
     get listening(): boolean {
       return listeners.size > 0
     },
@@ -56,4 +56,13 @@ export function bridgeEvents() {
     emit: (channel: string, data?: unknown): void =>
       listeners.get(channel)?.forEach((listener) => listener(data)),
   }
+}
+
+/** The dotted path of every function in `api`, e.g. `terminal.create`. */
+export function methodPathsOf(api: Record<string, unknown>, prefix = ''): string[] {
+  return Object.entries(api).flatMap(([name, value]) =>
+    typeof value === 'function'
+      ? [prefix + name]
+      : methodPathsOf(value as Record<string, unknown>, `${prefix}${name}.`)
+  )
 }

@@ -1,22 +1,18 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { MessageChannel, type MessagePort } from 'node:worker_threads'
-import { RpcEndpoint, type MessageLink } from '../../../../../src/main/extensions/host/rpc-endpoint'
+import { RpcEndpoint } from '../../../../../src/main/extensions/host/rpc-endpoint'
 import { CwdOutOfScopeError } from '../../../../../src/main/shell/shell-executor'
+import { workerPortLink } from '../../../../support/message-ports'
 
 const ports: MessagePort[] = []
-
-function link(port: MessagePort): MessageLink {
-  ports.push(port)
-  return {
-    post: (message) => port.postMessage(message),
-    listen: (receive) => port.on('message', receive),
-  }
-}
 
 /** Two endpoints joined by a real MessageChannel, so every value is structured-cloned. */
 function pair() {
   const { port1, port2 } = new MessageChannel()
-  return { main: new RpcEndpoint(link(port1)), host: new RpcEndpoint(link(port2)) }
+  return {
+    main: new RpcEndpoint(workerPortLink(port1, ports)),
+    host: new RpcEndpoint(workerPortLink(port2, ports)),
+  }
 }
 
 afterEach(() => {
@@ -83,8 +79,8 @@ describe('RpcEndpoint — failures', () => {
   it('reports an event handler that throws instead of losing it', async () => {
     const { port1, port2 } = new MessageChannel()
     const onEventError = vi.fn()
-    const main = new RpcEndpoint(link(port1), onEventError)
-    const host = new RpcEndpoint(link(port2))
+    const main = new RpcEndpoint(workerPortLink(port1, ports), onEventError)
+    const host = new RpcEndpoint(workerPortLink(port2, ports))
     main.handle('callback', () => {
       throw new Error('listener broke')
     })
@@ -101,7 +97,7 @@ describe('RpcEndpoint — failures', () => {
   it('fails every waiting request when the other side is gone', async () => {
     const { port1, port2 } = new MessageChannel()
     ports.push(port2)
-    const silent = new RpcEndpoint(link(port1))
+    const silent = new RpcEndpoint(workerPortLink(port1, ports))
     const waiting = silent.request('never.answered')
     silent.failPending('extension host exited')
     await expect(waiting).rejects.toThrow('extension host exited')

@@ -25,12 +25,12 @@ export function fact(patch: Partial<SessionFacts> = {}): SessionFacts {
     choicePrompt: null,
     agent: null,
     resumable: false,
-    snapshot: snapshot(sessionId),
+    snapshot: snapshotOf(sessionId),
     ...patch,
   }
 }
 
-function snapshot(sessionId: string): SessionFacts['snapshot'] {
+function snapshotOf(sessionId: string): SessionFacts['snapshot'] {
   return {
     sessionId,
     projectId: 'p1',

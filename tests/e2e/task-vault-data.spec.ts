@@ -34,7 +34,7 @@ function dataTools() {
   return vault.getByRole('dialog', { name: 'Data tools' })
 }
 
-async function openDataTools(tab: 'Export & import' | 'Database'): Promise<void> {
+async function openVaultDataTools(tab: 'Export & import' | 'Database'): Promise<void> {
   if ((await dataTools().count()) === 0) {
     await vault.getByRole('button', { name: 'Data tools (export / import)' }).click()
   }
@@ -67,7 +67,7 @@ async function runSql(sql: string): Promise<void> {
 }
 
 test('the Database tab counts each table and answers a query', async () => {
-  await openDataTools('Database')
+  await openVaultDataTools('Database')
   const tasksChip = dataTools().locator('.db-admin__stat-chip', { hasText: /^tasks/ })
   await expect(tasksChip.locator('.db-admin__stat-count')).toHaveText('2')
 
@@ -85,7 +85,7 @@ test('a write in the SQL console shows on the log at once', async () => {
 })
 
 test('the SQL console refuses to change the schema', async () => {
-  await openDataTools('Database')
+  await openVaultDataTools('Database')
   await runSql('DROP TABLE tasks')
   await expect(dataTools().locator('.db-admin__error')).toHaveText(
     'DDL statements (DROP, CREATE, ALTER) are not permitted'
@@ -94,7 +94,7 @@ test('the SQL console refuses to change the schema', async () => {
 })
 
 test('Export JSON downloads every task, project and area', async () => {
-  await openDataTools('Export & import')
+  await openVaultDataTools('Export & import')
   exportFile = join(mkdtempSync(join(tmpdir(), 'vault-export-')), 'vault.json')
   const saved = saveNextDownload(exportFile)
   await dataTools().getByRole('button', { name: 'Export JSON' }).click()
@@ -148,7 +148,7 @@ test('Re-initialize in Settings reapplies the schema and reports success', async
 
 test('Import JSON brings back what was exported', async () => {
   await vault.bringToFront()
-  await openDataTools('Export & import')
+  await openVaultDataTools('Export & import')
   await dataTools().locator('input[type="file"]').setInputFiles(exportFile)
 
   await expect(dataTools()).toContainText(/Imported \d+ records successfully\./)

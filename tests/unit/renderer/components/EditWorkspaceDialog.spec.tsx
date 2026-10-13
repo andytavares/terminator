@@ -5,7 +5,7 @@ import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.sto
 import { EditWorkspaceDialog } from '../../../../src/renderer/components/sidebar/EditWorkspaceDialog'
 import type { ElectronAPI } from '../../../../src/shared/electron-api/api-type'
 import { UpdateWorkspaceInputSchema } from '../../../../src/shared/schemas/workspace.schema'
-import { workspaceOf } from '../../../support/renderer-stores'
+import { workspaceFixture } from '../../../support/renderer-stores'
 import { installElectronApi } from '../../../support/electron-api'
 
 const mockOpenDirectory = vi.fn<ElectronAPI['dialog']['openDirectory']>()
@@ -15,7 +15,7 @@ const mockUpdateWorkspace = vi.fn<ElectronAPI['workspace']['update']>(async (pay
 }))
 
 const WS_ID = '00000000-0000-4000-8000-000000000001'
-const ws = workspaceOf({
+const ws = workspaceFixture({
   id: WS_ID,
   name: 'My Work',
   folderPath: '/home/work',
@@ -123,7 +123,9 @@ describe('EditWorkspaceDialog — clears nameError when name input changes', () 
   })
 
   it('shows error when duplicate name on blur', () => {
-    useWorkspaceStore.setState({ workspaces: [ws, workspaceOf({ id: 'ws-2', name: 'Other' })] })
+    useWorkspaceStore.setState({
+      workspaces: [ws, workspaceFixture({ id: 'ws-2', name: 'Other' })],
+    })
     render(<EditWorkspaceDialog workspace={ws} onClose={vi.fn()} />)
     const nameInput = screen.getByDisplayValue('My Work')
     fireEvent.change(nameInput, { target: { value: 'Other' } })

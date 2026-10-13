@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { ELECTRON_API_MANIFEST, type ChannelSpec } from '../../../src/shared/electron-api/manifest'
 import { methodAt } from '../../../src/shared/electron-api/__tests__/method-at'
+import { methodPathsOf } from '../../support/electron-api'
 
 class MockWebSocket {
   static instances: MockWebSocket[] = []
@@ -235,14 +236,6 @@ const onRemote = (spec: ChannelSpec) =>
 const overBridge = (spec: ChannelSpec) =>
   onRemote(spec) && spec.kind !== 'local' && spec.remote !== 'stub'
 
-function methodPaths(api: Record<string, unknown>, prefix = ''): string[] {
-  return Object.entries(api).flatMap(([name, value]) =>
-    typeof value === 'function'
-      ? [prefix + name]
-      : methodPaths(value as Record<string, unknown>, `${prefix}${name}.`)
-  )
-}
-
 /** What a value looks like after a trip through the bridge's JSON. */
 const overTheWire = (value: unknown) => JSON.parse(JSON.stringify(value))
 
@@ -250,7 +243,7 @@ describe('electron-api-shim surface, as the manifest declares it', () => {
   it('exposes exactly the methods the manifest gives a remote client', async () => {
     const { api } = await loadShim()
     const declared = ELECTRON_API_MANIFEST.filter(onRemote).map((spec) => spec.path)
-    expect(methodPaths(api).sort()).toEqual(declared.sort())
+    expect(methodPathsOf(api).sort()).toEqual(declared.sort())
   })
 
   it.each(

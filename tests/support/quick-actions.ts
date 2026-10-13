@@ -14,7 +14,7 @@ interface ShortcutEvent {
 interface ShortcutSpec {
   actionId: string
   display: string
-  match(e: ShortcutEvent): boolean
+  firedBy(e: ShortcutEvent): boolean
 }
 
 function meta(e: ShortcutEvent): boolean {
@@ -28,98 +28,98 @@ export const CORE_SHORTCUTS: ShortcutSpec[] = [
   {
     actionId: 'core.open-home',
     display: '⌘⇧H',
-    match: (e) => meta(e) && e.shiftKey && e.key.toLowerCase() === 'h',
+    firedBy: (e) => meta(e) && e.shiftKey && e.key.toLowerCase() === 'h',
   },
   {
     actionId: 'core.open-settings',
     display: '⌘,',
-    match: (e) => meta(e) && !e.shiftKey && e.key === ',',
+    firedBy: (e) => meta(e) && !e.shiftKey && e.key === ',',
   },
   {
     actionId: 'core.toggle-log',
     display: '⌘⇧L',
-    match: (e) => meta(e) && e.shiftKey && e.key.toLowerCase() === 'l',
+    firedBy: (e) => meta(e) && e.shiftKey && e.key.toLowerCase() === 'l',
   },
   {
     actionId: 'core.toggle-overview',
     display: '⌘⇧E',
-    match: (e) => meta(e) && e.shiftKey && e.key.toLowerCase() === 'e',
+    firedBy: (e) => meta(e) && e.shiftKey && e.key.toLowerCase() === 'e',
   },
   {
     actionId: 'core.new-scratch',
     display: '⌘⇧T',
-    match: (e) => meta(e) && e.shiftKey && e.key.toLowerCase() === 't',
+    firedBy: (e) => meta(e) && e.shiftKey && e.key.toLowerCase() === 't',
   },
   {
     actionId: 'core.switch-workspace',
     display: '⌘1–9',
-    match: (e) => meta(e) && e.key >= '1' && e.key <= '9',
+    firedBy: (e) => meta(e) && e.key >= '1' && e.key <= '9',
   },
   {
     actionId: 'core.cycle-workspace-next',
     display: '⌘=',
-    match: (e) => meta(e) && (e.key === '=' || e.key === '+'),
+    firedBy: (e) => meta(e) && (e.key === '=' || e.key === '+'),
   },
   {
     actionId: 'core.cycle-workspace-prev',
     display: '⌘-',
-    match: (e) => meta(e) && e.key === '-',
+    firedBy: (e) => meta(e) && e.key === '-',
   },
-  { actionId: 'core.clear', display: '⌘K', match: (e) => meta(e) && e.key.toLowerCase() === 'k' },
+  { actionId: 'core.clear', display: '⌘K', firedBy: (e) => meta(e) && e.key.toLowerCase() === 'k' },
   {
     actionId: 'core.new-tab',
     display: '⌘T',
-    match: (e) => meta(e) && !e.shiftKey && e.key.toLowerCase() === 't',
+    firedBy: (e) => meta(e) && !e.shiftKey && e.key.toLowerCase() === 't',
   },
   {
     actionId: 'core.split-vertical',
     display: '⌘D',
-    match: (e) => meta(e) && !e.shiftKey && e.key.toLowerCase() === 'd',
+    firedBy: (e) => meta(e) && !e.shiftKey && e.key.toLowerCase() === 'd',
   },
   {
     actionId: 'core.split-horizontal',
     display: '⌘⇧D',
-    match: (e) => meta(e) && e.shiftKey && e.key.toLowerCase() === 'd',
+    firedBy: (e) => meta(e) && e.shiftKey && e.key.toLowerCase() === 'd',
   },
   {
     actionId: 'core.close-tab',
     display: '⌘W',
-    match: (e) => meta(e) && e.key.toLowerCase() === 'w',
+    firedBy: (e) => meta(e) && e.key.toLowerCase() === 'w',
   },
   {
     actionId: 'core.cycle-recent-next',
     display: '⌘]',
-    match: (e) => meta(e) && e.key === ']',
+    firedBy: (e) => meta(e) && e.key === ']',
   },
   {
     actionId: 'core.cycle-recent-prev',
     display: '⌘[',
-    match: (e) => meta(e) && e.key === '[',
+    firedBy: (e) => meta(e) && e.key === '[',
   },
   {
     actionId: 'core.next-waiting',
     display: '⌘⇧A',
-    match: (e) => meta(e) && e.shiftKey && e.key.toLowerCase() === 'a',
+    firedBy: (e) => meta(e) && e.shiftKey && e.key.toLowerCase() === 'a',
   },
   {
     actionId: 'core.edit-note',
     display: '⌘I',
-    match: (e) => meta(e) && !e.shiftKey && e.key.toLowerCase() === 'i',
+    firedBy: (e) => meta(e) && !e.shiftKey && e.key.toLowerCase() === 'i',
   },
   {
     actionId: 'core.prev-tab',
     display: '⌘←',
-    match: (e) => meta(e) && e.key === 'ArrowLeft',
+    firedBy: (e) => meta(e) && e.key === 'ArrowLeft',
   },
   {
     actionId: 'core.next-tab',
     display: '⌘→',
-    match: (e) => meta(e) && e.key === 'ArrowRight',
+    firedBy: (e) => meta(e) && e.key === 'ArrowRight',
   },
   {
     actionId: 'core.toggle-sidebar',
     display: '⌘B',
-    match: (e) => meta(e) && e.key.toLowerCase() === 'b',
+    firedBy: (e) => meta(e) && e.key.toLowerCase() === 'b',
   },
 ]
 

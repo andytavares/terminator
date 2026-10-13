@@ -106,18 +106,18 @@ async function openIntegrations(): Promise<Page> {
   return page
 }
 
-async function closeSettings(): Promise<void> {
+async function escapeSettings(): Promise<void> {
   await handle.page.keyboard.press('Escape')
   await expect(handle.page.locator('.settings-panel')).toBeHidden()
 }
 
-const tracker = (page: Page, name: string) =>
+const trackerRow = (page: Page, name: string) =>
   page.locator('.integrations__tracker').filter({ hasText: name })
 
 /** The tracker reads as connected; if not, the failure says what reached the stub. */
 async function connected(page: Page, name: string): Promise<void> {
   try {
-    await expect(tracker(page, name)).toContainText('Connected as ada@acme.dev')
+    await expect(trackerRow(page, name)).toContainText('Connected as ada@acme.dev')
   } catch (error) {
     const seen = stub.diagnostics.join('\n  ') || 'nothing reached the proxy'
     throw new Error(`${(error as Error).message}\nstub saw:\n  ${seen}`, { cause: error })
@@ -135,10 +135,10 @@ test('Linear and Jira connect with credentials their servers accept', async () =
   await page.locator('#jira-token').fill('jira-token')
   await page.getByRole('button', { name: 'Connect Jira' }).click()
   await connected(page, 'Jira')
-  await closeSettings()
+  await escapeSettings()
 })
 
-async function openLinkDialog(): Promise<Page> {
+async function openIssueLinkDialog(): Promise<Page> {
   const { page } = handle
   await projectGroup(page, BRANCH).click({ button: 'right' })
   await page.getByRole('button', { name: 'Link issue…' }).click()
@@ -149,7 +149,7 @@ async function openLinkDialog(): Promise<Page> {
 const issueRows = (page: Page) => page.locator('.link-issue__row .link-issue__key')
 
 test('linking lists my issues from both trackers, and search finds by title', async () => {
-  const page = await openLinkDialog()
+  const page = await openIssueLinkDialog()
   await expect(issueRows(page)).toHaveText(['ENG-12', 'OPS-7'], { useInnerText: true })
 
   await page.getByPlaceholder('Search, or type an issue key').fill('crash')
@@ -208,14 +208,14 @@ test('unlinking from the drawer takes the issue off the branch', async () => {
 
 test("changing whose issues are mine changes what Link lists, and a disconnected tracker's go", async () => {
   let page = await openIntegrations()
-  const mine = tracker(page, 'Linear').getByLabel('Assigned-issue lookup')
+  const mine = trackerRow(page, 'Linear').getByLabel('Assigned-issue lookup')
   await mine.fill('grace@acme.dev')
   await mine.blur()
-  await tracker(page, 'Jira').getByRole('button', { name: 'Disconnect' }).click()
+  await trackerRow(page, 'Jira').getByRole('button', { name: 'Disconnect' }).click()
   await expect(page.getByRole('button', { name: 'Connect Jira' })).toBeVisible()
-  await closeSettings()
+  await escapeSettings()
 
-  page = await openLinkDialog()
+  page = await openIssueLinkDialog()
   await expect(issueRows(page)).toHaveText(['ENG-40'])
   await page.getByRole('button', { name: 'Cancel' }).click()
 })

@@ -24,7 +24,7 @@ const settings = {
   workspaces: { 'ws-api': { 'terminator.git-integration': { [KEY]: true } } },
 }
 
-const read = (repoPath?: string) =>
+const readScopedSetting = (repoPath?: string) =>
   storedSettingValue(settings, workspaces, {
     extensionId: 'terminator.git-integration',
     key: KEY,
@@ -46,14 +46,14 @@ describe('workspaceOwning', () => {
 
 describe('storedSettingValue', () => {
   it("reads the workspace's own value for a path in that workspace", () => {
-    expect(read('/code/api')).toBe(true)
-    expect(read('/wt/api-fix')).toBe(true)
+    expect(readScopedSetting('/code/api')).toBe(true)
+    expect(readScopedSetting('/wt/api-fix')).toBe(true)
   })
 
   it('reads the global value for a workspace that sets none, and with no path', () => {
-    expect(read('/code/web')).toBe(false)
-    expect(read()).toBe(false)
-    expect(read('/elsewhere')).toBe(false)
+    expect(readScopedSetting('/code/web')).toBe(false)
+    expect(readScopedSetting()).toBe(false)
+    expect(readScopedSetting('/elsewhere')).toBe(false)
   })
 
   it("never reads another extension's value under the same key", () => {

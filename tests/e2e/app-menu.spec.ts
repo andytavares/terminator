@@ -9,7 +9,7 @@ import {
   createWorkspace,
   launchApp,
   projectGroup,
-  runQuickAction,
+  runQuickActionFromPanel,
 } from './helpers'
 import { recordShellOpens, shellOpens } from './main-stubs'
 
@@ -83,7 +83,7 @@ test('Window → Home opens Home', async () => {
 test('Window → Close Tab closes the active terminal tab', async () => {
   const { app, page } = handle
   await projectGroup(page, 'menu-branch').click()
-  await runQuickAction(page, 'New tab')
+  await runQuickActionFromPanel(page, 'New tab')
   const tabs = page.locator('.tab-bar__tab--session')
   await expect(tabs).toHaveCount(2)
   await clickMenuItem(app, ['Window', 'Close Tab'])

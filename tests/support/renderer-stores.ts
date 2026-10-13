@@ -15,7 +15,7 @@ import type {
 const CREATED = '2026-01-01T00:00:00.000Z'
 
 /** A complete workspace for store state; `overrides` names what the spec cares about. */
-export function workspaceOf(overrides: Partial<Workspace> & Pick<Workspace, 'id'>): Workspace {
+export function workspaceFixture(overrides: Partial<Workspace> & Pick<Workspace, 'id'>): Workspace {
   return {
     name: overrides.id,
     folderPath: `/repos/${overrides.id}`,
@@ -28,7 +28,7 @@ export function workspaceOf(overrides: Partial<Workspace> & Pick<Workspace, 'id'
 }
 
 /** A complete project for store state. */
-export function projectOf(
+export function projectFixture(
   overrides: Partial<Project> & Pick<Project, 'id' | 'workspaceId'>
 ): Project {
   return {
@@ -99,7 +99,7 @@ export function issueSummaryOf(overrides: Partial<IssueSummary> = {}): IssueSumm
 }
 
 /** A complete issue, as the integrations store holds a project's linked one. */
-export function issueOf(overrides: Partial<Issue> = {}): Issue {
+export function issueFixture(overrides: Partial<Issue> = {}): Issue {
   return {
     ...issueSummaryOf(overrides),
     description: '',

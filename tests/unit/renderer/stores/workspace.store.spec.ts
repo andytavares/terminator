@@ -701,8 +701,8 @@ async function freshStoreWithPush() {
     ...mockElectronAPI,
     project: {
       ...mockElectronAPI.project,
-      onAdded: added.subscribe,
-      onRemoved: removed.subscribe,
+      onAdded: added.addListener,
+      onRemoved: removed.addListener,
     },
   })
   vi.resetModules()
@@ -726,21 +726,21 @@ describe('workspace.store — push event subscribers', () => {
   it('onAdded adds a new project to the store', async () => {
     const { store, added } = await freshStoreWithPush()
     store.setState({ projectsByWorkspaceId: new Map([['ws-1', [proj1]]]) })
-    added.emit(proj2)
+    added.deliver(proj2)
     expect(store.getState().projectsByWorkspaceId.get('ws-1')).toEqual([proj1, proj2])
   })
 
   it('onAdded skips project that already exists (dedup guard)', async () => {
     const { store, added } = await freshStoreWithPush()
     store.setState({ projectsByWorkspaceId: new Map([['ws-1', [proj1]]]) })
-    added.emit(proj1)
+    added.deliver(proj1)
     expect(store.getState().projectsByWorkspaceId.get('ws-1')).toEqual([proj1])
   })
 
   it('onRemoved removes project from the store', async () => {
     const { store, removed } = await freshStoreWithPush()
     store.setState({ projectsByWorkspaceId: new Map([['ws-1', [proj1, proj2]]]) })
-    removed.emit('p-1')
+    removed.deliver('p-1')
     expect(store.getState().projectsByWorkspaceId.get('ws-1')).toEqual([proj2])
   })
 })
@@ -754,7 +754,7 @@ describe('workspace.store — push event subscribers — onRemoved clears active
       projectsByWorkspaceId: new Map([['ws-1', [proj1]]]),
       activeProjectId: 'p-1',
     })
-    removed.emit('p-1')
+    removed.deliver('p-1')
     expect(store.getState().activeProjectId).toBeNull()
   })
 })

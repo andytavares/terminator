@@ -5,7 +5,11 @@ import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.sto
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { MoveSessionDialog } from '../../../../src/renderer/components/sidebar/MoveSessionDialog'
 import type { Project } from '../../../../src/shared/types/index'
-import { projectOf, terminalSessionOf, workspaceOf } from '../../../support/renderer-stores'
+import {
+  projectFixture,
+  terminalSessionOf,
+  workspaceFixture,
+} from '../../../support/renderer-stores'
 
 vi.mock('../../../../src/renderer/components/sidebar/CreateWorkspaceDialog', () => ({
   CreateWorkspaceDialog: ({ onClose }: { onClose: () => void }) => (
@@ -17,9 +21,9 @@ vi.mock('../../../../src/renderer/components/sidebar/CreateWorkspaceDialog', () 
 
 const SCRATCH = '00000000-0000-0000-0000-000000000000'
 
-const workspace1 = workspaceOf({ id: 'ws-1', name: 'Alpha', folderPath: '/a' })
-const project1 = projectOf({ id: 'proj-1', workspaceId: 'ws-1', name: 'Proj One' })
-const project2 = projectOf({ id: 'proj-2', workspaceId: 'ws-1', name: 'Proj Two' })
+const workspace1 = workspaceFixture({ id: 'ws-1', name: 'Alpha', folderPath: '/a' })
+const project1 = projectFixture({ id: 'proj-1', workspaceId: 'ws-1', name: 'Proj One' })
+const project2 = projectFixture({ id: 'proj-2', workspaceId: 'ws-1', name: 'Proj Two' })
 
 type ProjectInput = Pick<Project, 'workspaceId' | 'name'>
 
@@ -28,7 +32,7 @@ type ProjectInput = Pick<Project, 'workspaceId' | 'name'>
 let stored: Project[] = []
 const mockCreateProject = vi.fn(
   async (input: ProjectInput): Promise<{ project: Project } | { error: string }> => {
-    const project = projectOf({ id: 'proj-new', ...input })
+    const project = projectFixture({ id: 'proj-new', ...input })
     stored = [...stored, project]
     return { project }
   }
@@ -228,8 +232,8 @@ describe('MoveSessionDialog — submits new project form on Enter key', () => {
 
 describe('MoveSessionDialog — branches it has to load or keep', () => {
   it('loads the branches of a workspace not loaded yet', async () => {
-    const workspace2 = workspaceOf({ id: 'ws-2', name: 'Beta', folderPath: '/b' })
-    stored = [...stored, projectOf({ id: 'proj-b', workspaceId: 'ws-2', name: 'Beta One' })]
+    const workspace2 = workspaceFixture({ id: 'ws-2', name: 'Beta', folderPath: '/b' })
+    stored = [...stored, projectFixture({ id: 'proj-b', workspaceId: 'ws-2', name: 'Beta One' })]
     useWorkspaceStore.setState({ workspaces: [workspace1, workspace2] })
     render(<MoveSessionDialog sessionId="sess-1" onClose={mockOnClose} />)
     expect(screen.getByText('+ New branch in Beta')).toBeTruthy()

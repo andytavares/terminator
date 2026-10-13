@@ -30,7 +30,7 @@ const CHECKS = [
   'dismissible from outside',
 ]
 
-const open = (onDismiss = vi.fn()) => {
+const openRenameDialog = (onDismiss = vi.fn()) => {
   render(
     <Dialog title="Rename" onDismiss={onDismiss} actions={[{ label: 'Go', onSelect: vi.fn() }]}>
       <input aria-label="name" />
@@ -41,29 +41,29 @@ const open = (onDismiss = vi.fn()) => {
 
 describe('behaviour matrix: Dialog', () => {
   it(CHECKS[0], () => {
-    const onDismiss = open()
+    const onDismiss = openRenameDialog()
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(onDismiss).toHaveBeenCalled()
   })
 
   it(CHECKS[1], () => {
-    open()
+    openRenameDialog()
     expect(screen.getByRole('dialog')).toBeTruthy()
   })
 
   it(CHECKS[2], () => {
-    open()
+    openRenameDialog()
     expect(screen.getByRole('dialog').getAttribute('aria-modal')).toBe('true')
   })
 
   it(CHECKS[3], () => {
-    open()
+    openRenameDialog()
     // Focus moved into the surface rather than being left behind it.
     expect(screen.getByRole('dialog').contains(document.activeElement)).toBe(true)
   })
 
   it(CHECKS[4], () => {
-    const onDismiss = open()
+    const onDismiss = openRenameDialog()
     fireEvent.mouseDown(document.querySelector('.tmui-dialog__scrim') as Element)
     fireEvent.click(document.querySelector('.tmui-dialog__scrim') as Element)
     expect(onDismiss).toHaveBeenCalled()
@@ -84,52 +84,41 @@ describe('behaviour matrix: Dialog — counts toward the modal depth the exit ge
   })
 })
 
-describe('behaviour matrix: ConfirmDialog', () => {
-  const open = (onDismiss = vi.fn()) => {
-    render(
-      <ConfirmDialog
-        title="Delete this note?"
-        description="It cannot be recovered."
-        onConfirm={vi.fn()}
-        onClose={onDismiss}
-      />
-    )
-    return onDismiss
-  }
+const openConfirmDialog = (onDismiss = vi.fn()) => {
+  render(
+    <ConfirmDialog
+      title="Delete this note?"
+      description="It cannot be recovered."
+      onConfirm={vi.fn()}
+      onClose={onDismiss}
+    />
+  )
+  return onDismiss
+}
 
+describe('behaviour matrix: ConfirmDialog', () => {
   it(CHECKS[0], () => {
-    const onDismiss = open()
+    const onDismiss = openConfirmDialog()
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(onDismiss).toHaveBeenCalled()
   })
   it(CHECKS[1], () => {
-    open()
+    openConfirmDialog()
     expect(screen.getByRole('dialog')).toBeTruthy()
   })
   it(CHECKS[2], () => {
-    open()
+    openConfirmDialog()
     expect(screen.getByRole('dialog').getAttribute('aria-modal')).toBe('true')
   })
 })
 
 describe('behaviour matrix: ConfirmDialog — continued', () => {
-  const open = (onDismiss = vi.fn()) => {
-    render(
-      <ConfirmDialog
-        title="Delete this note?"
-        description="It cannot be recovered."
-        onConfirm={vi.fn()}
-        onClose={onDismiss}
-      />
-    )
-    return onDismiss
-  }
   it(CHECKS[3], () => {
-    open()
+    openConfirmDialog()
     expect(screen.getByRole('dialog').contains(document.activeElement)).toBe(true)
   })
   it(CHECKS[4], () => {
-    const onDismiss = open()
+    const onDismiss = openConfirmDialog()
     const scrim = document.querySelector('.tmui-dialog__scrim') as Element
     fireEvent.mouseDown(scrim)
     fireEvent.click(scrim)

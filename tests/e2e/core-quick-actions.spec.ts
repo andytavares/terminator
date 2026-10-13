@@ -6,13 +6,13 @@ import {
   AppHandle,
   addAndSelectProject,
   closeApp,
-  closeSettings,
+  closeSettingsPanel,
   createWorkspace,
   launchApp,
-  openSettings,
+  openSettingsSection,
   projectGroup,
-  runQuickAction,
-  terminalRows,
+  runQuickActionFromPanel,
+  readTerminalRows,
 } from './helpers'
 import { connectJira, startJiraStub, type JiraStub } from './jira-stub'
 import { allowCredentialsWithoutKeychain, recordShellOpens, shellOpens } from './main-stubs'
@@ -33,13 +33,13 @@ async function typeInTerminal(page: Page, command: string): Promise<void> {
 
 /** The text on the open terminals' screens. */
 async function screenText(page: Page): Promise<string> {
-  return (await terminalRows(page)).join('\n')
+  return (await readTerminalRows(page)).join('\n')
 }
 
 async function activeWorkspaceName(page: Page): Promise<string> {
-  await openSettings(page, 'Workspace Settings')
+  await openSettingsSection(page, 'Workspace Settings')
   const title = (await page.locator('.settings-section__title').first().textContent()) ?? ''
-  await closeSettings(page)
+  await closeSettingsPanel(page)
   return title.replace('Settings for: ', '')
 }
 
@@ -48,7 +48,7 @@ let handle: AppHandle
 async function splitDownStacksPane(): Promise<void> {
   const { page } = handle
   await expect(page.locator('.terminal-pane .xterm')).toHaveCount(1)
-  await runQuickAction(page, 'Split down')
+  await runQuickActionFromPanel(page, 'Split down')
   const panes = page.locator('.terminal-pane .xterm')
   await expect(panes).toHaveCount(2, { timeout: 15000 })
   const [top, bottom] = [await panes.nth(0).boundingBox(), await panes.nth(1).boundingBox()]
@@ -58,7 +58,7 @@ async function splitDownStacksPane(): Promise<void> {
 
 async function closePaneKeepsOther(): Promise<void> {
   const { page } = handle
-  await runQuickAction(page, 'Close pane')
+  await runQuickActionFromPanel(page, 'Close pane')
   await expect(page.locator('.terminal-pane .xterm')).toHaveCount(1, { timeout: 15000 })
 }
 
@@ -66,24 +66,24 @@ async function clearWipesTerminal(): Promise<void> {
   const { page } = handle
   await typeInTerminal(page, 'echo qa-clear-marker')
   await expect.poll(() => screenText(page)).toContain('qa-clear-marker')
-  await runQuickAction(page, 'Clear')
+  await runQuickActionFromPanel(page, 'Clear')
   await expect.poll(() => screenText(page), { timeout: 10000 }).not.toContain('qa-clear-marker')
 }
 
 async function previousTabMovesLeft(): Promise<void> {
   const { page } = handle
-  await runQuickAction(page, 'New tab')
+  await runQuickActionFromPanel(page, 'New tab')
   await expect(sessionTabs(page)).toHaveCount(2)
   await expect(sessionTabs(page).last()).toHaveClass(/tab-bar__tab--active/)
-  await runQuickAction(page, 'Previous tab')
+  await runQuickActionFromPanel(page, 'Previous tab')
   await expect(sessionTabs(page).first()).toHaveClass(/tab-bar__tab--active/)
 }
 
 async function recentSessionSwitches(): Promise<void> {
   const { page } = handle
-  await runQuickAction(page, 'Next recent session')
+  await runQuickActionFromPanel(page, 'Next recent session')
   await expect(sessionTabs(page).last()).toHaveClass(/tab-bar__tab--active/)
-  await runQuickAction(page, 'Previous recent session')
+  await runQuickActionFromPanel(page, 'Previous recent session')
   await expect(sessionTabs(page).first()).toHaveClass(/tab-bar__tab--active/)
 }
 
@@ -100,14 +100,14 @@ async function nextWaitingRevealsRungSession(): Promise<void> {
     await expect(to.locator('.tab-bar__state[aria-label="Waiting on you"]')).toBeVisible({
       timeout: 15000,
     })
-    await runQuickAction(page, label)
+    await runQuickActionFromPanel(page, label)
     await expect(to).toHaveClass(/tab-bar__tab--active/)
   }
 }
 
 async function editSessionNoteShowsOnTab(): Promise<void> {
   const { page } = handle
-  await runQuickAction(page, 'Edit session note')
+  await runQuickActionFromPanel(page, 'Edit session note')
   const note = page.locator('.tab-bar__note-input')
   await expect(note).toBeFocused()
   await note.fill('reviewing the qa run')
@@ -117,7 +117,7 @@ async function editSessionNoteShowsOnTab(): Promise<void> {
 
 async function newScratchTerminalOpens(): Promise<void> {
   const { page } = handle
-  await runQuickAction(page, 'New scratch terminal')
+  await runQuickActionFromPanel(page, 'New scratch terminal')
   await expect(activeTab(page)).toContainText('Scratch', { timeout: 15000 })
   await projectGroup(page, 'alpha').click()
   await expect(activeTab(page)).toContainText('Terminal')
@@ -129,7 +129,7 @@ async function homeAndResumeOpenHome(): Promise<void> {
   for (const label of ['Home', 'Resume a conversation…']) {
     await projectGroup(page, 'alpha').click()
     await expect(home).toBeHidden()
-    await runQuickAction(page, label)
+    await runQuickActionFromPanel(page, label)
     await expect(home).toBeVisible()
   }
 }
@@ -137,16 +137,16 @@ async function homeAndResumeOpenHome(): Promise<void> {
 async function overviewTogglesWall(): Promise<void> {
   const { page } = handle
   const wall = page.getByRole('heading', { name: 'Overview', exact: true })
-  await runQuickAction(page, 'Overview')
+  await runQuickActionFromPanel(page, 'Overview')
   await expect(wall).toBeVisible()
-  await runQuickAction(page, 'Overview')
+  await runQuickActionFromPanel(page, 'Overview')
   await expect(wall).toBeHidden()
 }
 
 async function toggleLogWindowOpensLog(): Promise<void> {
   const { page } = handle
   const log = page.getByRole('dialog', { name: 'Application Logs' })
-  await runQuickAction(page, 'Toggle log window')
+  await runQuickActionFromPanel(page, 'Toggle log window')
   await expect(log).toBeVisible()
   // The log covers the bottom of the band, Quick actions button included.
   await log.locator('.log-window__btn--close').click()
@@ -157,9 +157,9 @@ async function workspaceActionsMoveActive(): Promise<void> {
   const { page } = handle
   await projectGroup(page, 'alpha').click()
   expect(await activeWorkspaceName(page)).toBe('QA One')
-  await runQuickAction(page, 'Next workspace')
+  await runQuickActionFromPanel(page, 'Next workspace')
   expect(await activeWorkspaceName(page)).toBe('QA Two')
-  await runQuickAction(page, 'Previous workspace')
+  await runQuickActionFromPanel(page, 'Previous workspace')
   expect(await activeWorkspaceName(page)).toBe('QA One')
 }
 
@@ -219,7 +219,7 @@ async function appConnectedToJira(stub: JiraStub): Promise<AppHandle> {
 
 async function linkIssueAttachesToBranch(tracked: AppHandle): Promise<void> {
   const { page } = tracked
-  await runQuickAction(page, 'Link issue to branch')
+  await runQuickActionFromPanel(page, 'Link issue to branch')
   const dialog = page.getByRole('dialog', { name: 'Link an issue' })
   await dialog.getByPlaceholder('Search, or type an issue key').fill('login')
   await dialog.locator('.link-issue__row', { hasText: 'OPS-1' }).click()
@@ -230,7 +230,7 @@ async function linkIssueAttachesToBranch(tracked: AppHandle): Promise<void> {
 
 async function viewOpensIssueDrawer(tracked: AppHandle): Promise<void> {
   const { page } = tracked
-  await runQuickAction(page, 'View OPS-1')
+  await runQuickActionFromPanel(page, 'View OPS-1')
   const drawer = page.getByRole('complementary', { name: 'Issue OPS-1' })
   await expect(drawer.getByRole('heading', { name: 'Fix the login page' })).toBeVisible()
   await drawer.getByTitle('Close').click()
@@ -240,20 +240,20 @@ async function viewOpensIssueDrawer(tracked: AppHandle): Promise<void> {
 async function copyIssueKeyFillsClipboard(tracked: AppHandle): Promise<void> {
   const { page, app } = tracked
   await app.evaluate(({ clipboard }) => clipboard.writeText('nothing yet'))
-  await runQuickAction(page, 'Copy issue key (OPS-1)')
+  await runQuickActionFromPanel(page, 'Copy issue key (OPS-1)')
   await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText())).toBe('OPS-1')
 }
 
 async function openInJiraOpensBrowser(tracked: AppHandle, stub: JiraStub): Promise<void> {
   const { page, app } = tracked
-  await runQuickAction(page, 'Open OPS-1 in Jira')
+  await runQuickActionFromPanel(page, 'Open OPS-1 in Jira')
   await expect.poll(() => shellOpens(app)).toContain(`https://${stub.site}/browse/OPS-1`)
 }
 
 async function changeLinkedIssuePinsSession(tracked: AppHandle): Promise<void> {
   const { page } = tracked
   // The session already resolves to its branch's issue, so the action offers a change.
-  await runQuickAction(page, 'Change linked issue')
+  await runQuickActionFromPanel(page, 'Change linked issue')
   const dialog = page.getByRole('dialog', { name: 'Link a work item' })
   await dialog.getByPlaceholder('Search, or type an issue key').fill('audit')
   await dialog.locator('.issue-picker__row', { hasText: 'OPS-2' }).click()
