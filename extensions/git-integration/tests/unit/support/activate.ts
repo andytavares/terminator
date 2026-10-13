@@ -35,6 +35,16 @@ interface ApiPlaces {
   globalStorage: string
 }
 
+/** An ipc whose registerHandler collects into `channels`. */
+function capturingIpc(channels: RegisteredChannel[]) {
+  return {
+    registerHandler: (spec: ChannelSpec, opts?: { remoteAccessible?: boolean }) => {
+      channels.push({ spec, remoteAccessible: opts?.remoteAccessible === true })
+      return disposable
+    },
+  }
+}
+
 /** A stand-in ExtensionAPI whose registerHandler collects into `channels`. */
 function capturingApi(
   channels: RegisteredChannel[],
@@ -42,12 +52,7 @@ function capturingApi(
   places: ApiPlaces
 ): ExtensionAPI {
   return {
-    ipc: {
-      registerHandler: (spec: ChannelSpec, opts?: { remoteAccessible?: boolean }) => {
-        channels.push({ spec, remoteAccessible: opts?.remoteAccessible === true })
-        return disposable
-      },
-    },
+    ipc: capturingIpc(channels),
     settings: {
       get: () => undefined,
       register: () => disposable,

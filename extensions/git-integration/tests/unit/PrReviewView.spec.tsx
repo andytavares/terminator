@@ -489,29 +489,11 @@ describe('PrReviewView (continued) — large-PR warning — drops all-low-risk c
       ...makeLargeFile('src/high.ts', 300),
       riskScore: { ...mockFile.riskScore, level: 'high' as const },
     }
-    const lowChapter = {
-      id: 'ch-low',
-      name: 'Low only',
-      estimatedMinutes: 5,
-      status: 'not-started' as const,
-      files: [lowFile],
-    }
-    const highChapter = {
-      id: 'ch-high',
-      name: 'High risk',
-      estimatedMinutes: 5,
-      status: 'not-started' as const,
-      files: [highFile],
-    }
-    const { PrReviewView } = await import('../../src/components/pr-review/PrReviewView')
-    setupStore({ currentFilePath: 'src/high.ts', currentChapterId: 'ch-high' })
-    const { unmount } = render(
-      <PrReviewView
-        repoRoot="/repo"
-        pr={{ ...mockPr, chapters: [lowChapter, highChapter] }}
-        onClose={mockClose}
-        onRefresh={mockRefresh}
-      />
+    const lowChapter = { ...mockChapter, id: 'ch-low', name: 'Low only', files: [lowFile] }
+    const highChapter = { ...mockChapter, id: 'ch-high', name: 'High risk', files: [highFile] }
+    const { unmount } = await renderView(
+      { chapters: [lowChapter, highChapter] },
+      { currentFilePath: 'src/high.ts', currentChapterId: 'ch-high' }
     )
     fireEvent.click(screen.getByRole('button', { name: 'More review actions' }))
     fireEvent.click(screen.getByRole('menuitem', { name: /^Focus mode/ }))

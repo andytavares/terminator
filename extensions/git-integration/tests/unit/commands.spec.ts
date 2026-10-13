@@ -217,9 +217,11 @@ describe('registerQuickActionCommands (continued)', () => {
       expect(broadcast).not.toHaveBeenCalled()
     })
   })
+})
 
-  // The Git view may not exist yet when the command runs: the broadcast then
-  // reaches nobody, so the request waits for the view to ask for it.
+// The Git view may not exist yet when the command runs: the broadcast then
+// reaches nobody, so the request waits for the view to ask for it.
+describe('registerQuickActionCommands (continued)', () => {
   describe('a request made before the Git view exists', () => {
     it.each([
       ['commit', 'commit'],

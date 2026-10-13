@@ -157,6 +157,35 @@ async function openPr() {
   })
 }
 
+/** PR 1's stored v2 session, viewed a.ts at oldSha. */
+function storeSessionAtOldSha() {
+  const session = {
+    repoRoot: '/repo',
+    prNumber: 1,
+    headSHA: 'oldSha',
+    currentChapterId: null,
+    currentFilePath: null,
+    viewedFiles: ['a.ts'],
+    fileOrderOverrides: {},
+    scrollPosition: null,
+    pausedAt: null,
+    lastAccessedAt: '2025-01-01T00:00:00Z',
+  }
+  vi.mocked(githubModule.githubAPI.sessionGet).mockImplementation(async (key: string) =>
+    key === '/repo:::1' ? { session } : { session: null }
+  )
+}
+
+/** Renders the tab and opens PR 1, whose detail loads at `headSHA`. */
+async function openPrAtHead(headSHA: string) {
+  const { useLoadPrDetail } = await import('../../src/hooks/usePrReview')
+  vi.mocked(useLoadPrDetail).mockReturnValue(async (_n: number, cb: (d: unknown) => unknown) =>
+    cb({ number: 1, headSHA })
+  )
+  render(<PrReviewTab repoRoot="/repo" />)
+  await openPr()
+}
+
 describe('PrReviewTab', () => {
   it('shows empty message when repoRoot is null', () => {
     render(<PrReviewTab repoRoot={null} />)
@@ -317,12 +346,7 @@ describe('PrReviewTab — reads the v2 session key before falling back to the le
     ;(githubModule.githubAPI.sessionGet as ReturnType<typeof vi.fn>).mockImplementation(
       async (key: string) => (key === '/repo:::1' ? { session: null } : { session: null })
     )
-    const { useLoadPrDetail } = await import('../../src/hooks/usePrReview')
-    vi.mocked(useLoadPrDetail).mockReturnValue(async (_n: number, cb: (d: unknown) => unknown) =>
-      cb({ number: 1, headSHA: 'headA' })
-    )
-    render(<PrReviewTab repoRoot="/repo" />)
-    await openPr()
+    await openPrAtHead('headA')
     expect(githubModule.githubAPI.sessionGet).toHaveBeenCalledWith('/repo:::1')
     expect(githubModule.githubAPI.sessionGet).toHaveBeenCalledWith('/repo:::1:::headA')
   })
@@ -330,25 +354,7 @@ describe('PrReviewTab — reads the v2 session key before falling back to the le
 
 describe('PrReviewTab — reconciles the stored session against the new head via prCompare', () => {
   it('reconciles the stored session against the new head via prCompare', async () => {
-    ;(githubModule.githubAPI.sessionGet as ReturnType<typeof vi.fn>).mockImplementation(
-      async (key: string) =>
-        key === '/repo:::1'
-          ? {
-              session: {
-                repoRoot: '/repo',
-                prNumber: 1,
-                headSHA: 'oldSha',
-                currentChapterId: null,
-                currentFilePath: null,
-                viewedFiles: ['a.ts'],
-                fileOrderOverrides: {},
-                scrollPosition: null,
-                pausedAt: null,
-                lastAccessedAt: '2025-01-01T00:00:00Z',
-              },
-            }
-          : { session: null }
-    )
+    storeSessionAtOldSha()
     ;(githubModule.githubAPI.prCompare as ReturnType<typeof vi.fn>).mockResolvedValue({
       rewritten: false,
       commits: 3,
@@ -357,12 +363,7 @@ describe('PrReviewTab — reconciles the stored session against the new head via
         { path: 'scripts/e2e-burn-in.ts', status: 'added' },
       ],
     })
-    const { useLoadPrDetail } = await import('../../src/hooks/usePrReview')
-    vi.mocked(useLoadPrDetail).mockReturnValue(async (_n: number, cb: (d: unknown) => unknown) =>
-      cb({ number: 1, headSHA: 'newSha' })
-    )
-    render(<PrReviewTab repoRoot="/repo" />)
-    await openPr()
+    await openPrAtHead('newSha')
     expect(githubModule.githubAPI.prCompare).toHaveBeenCalledWith('/repo', 'oldSha', 'newSha')
     expect(mockReconcileHead).toHaveBeenCalledWith(
       { repoRoot: '/repo', prNumber: 1, headSHA: 'newSha' },
@@ -374,36 +375,13 @@ describe('PrReviewTab — reconciles the stored session against the new head via
 
 describe('PrReviewTab — reconciles with all when the compare says history was rewritten', () => {
   it('reconciles with "all" when the compare says history was rewritten', async () => {
-    ;(githubModule.githubAPI.sessionGet as ReturnType<typeof vi.fn>).mockImplementation(
-      async (key: string) =>
-        key === '/repo:::1'
-          ? {
-              session: {
-                repoRoot: '/repo',
-                prNumber: 1,
-                headSHA: 'oldSha',
-                currentChapterId: null,
-                currentFilePath: null,
-                viewedFiles: ['a.ts'],
-                fileOrderOverrides: {},
-                scrollPosition: null,
-                pausedAt: null,
-                lastAccessedAt: '2025-01-01T00:00:00Z',
-              },
-            }
-          : { session: null }
-    )
+    storeSessionAtOldSha()
     ;(githubModule.githubAPI.prCompare as ReturnType<typeof vi.fn>).mockResolvedValue({
       rewritten: true,
       commits: 5,
       files: [],
     })
-    const { useLoadPrDetail } = await import('../../src/hooks/usePrReview')
-    vi.mocked(useLoadPrDetail).mockReturnValue(async (_n: number, cb: (d: unknown) => unknown) =>
-      cb({ number: 1, headSHA: 'newSha' })
-    )
-    render(<PrReviewTab repoRoot="/repo" />)
-    await openPr()
+    await openPrAtHead('newSha')
     expect(mockReconcileHead).toHaveBeenCalledWith(
       { repoRoot: '/repo', prNumber: 1, headSHA: 'newSha' },
       'all',

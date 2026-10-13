@@ -106,6 +106,13 @@ async function renderView(
   return render(<GitFullView repoRoot={repoRoot} />)
 }
 
+/** Renders the view for /repo and opens the PR dialog. */
+async function renderWithPrDialogOpen() {
+  await renderView()
+  fireEvent.click(screen.getByText('Open PR'))
+  await waitFor(() => screen.getByTestId('pr-dialog'))
+}
+
 // The first import compiles the component tree, which on a loaded machine takes longer
 // than one test's 5 s; load it once here so every test times only its own work.
 beforeAll(async () => {
@@ -212,32 +219,35 @@ describe('GitFullView — calls commit and push when Commit & Push is clicked', 
 
 describe('GitFullView — closes PR dialog when ClosePrDialog is clicked', () => {
   it('closes PR dialog when ClosePrDialog is clicked', async () => {
-    await renderView()
-    fireEvent.click(screen.getByText('Open PR'))
-    await waitFor(() => screen.getByTestId('pr-dialog'))
+    await renderWithPrDialogOpen()
     fireEvent.click(screen.getByText('ClosePrDialog'))
     expect(screen.queryByTestId('pr-dialog')).toBeNull()
   })
 
   it('closes PR dialog and dispatches event when PR is created', async () => {
     const dispatchSpy = vi.spyOn(window, 'dispatchEvent')
-    await renderView()
-    fireEvent.click(screen.getByText('Open PR'))
-    await waitFor(() => screen.getByTestId('pr-dialog'))
+    await renderWithPrDialogOpen()
     fireEvent.click(screen.getByText('CreatePr'))
     expect(screen.queryByTestId('pr-dialog')).toBeNull()
     expect(dispatchSpy).toHaveBeenCalled()
     dispatchSpy.mockRestore()
   })
 
+  it('shows char count when commit message exceeds 50 chars', async () => {
+    await renderView()
+    const msg = 'a'.repeat(51)
+    fireEvent.change(screen.getByPlaceholderText('Commit message…'), { target: { value: msg } })
+    expect(screen.getByText('51 chars')).toBeTruthy()
+  })
+})
+
+describe('GitFullView — the pull request Open PR created', () => {
   it('shows the created pull request with a link that opens it, and announces it', async () => {
     const openExternal = vi.fn().mockResolvedValue(undefined)
     Object.assign((globalThis as unknown as { electronAPI: object }).electronAPI, {
       shell: { openExternal },
     })
-    await renderView()
-    fireEvent.click(screen.getByText('Open PR'))
-    await waitFor(() => screen.getByTestId('pr-dialog'))
+    await renderWithPrDialogOpen()
     fireEvent.click(screen.getByText('CreatePr'))
 
     fireEvent.click(await screen.findByRole('link', { name: '#42 PR' }))
@@ -246,13 +256,6 @@ describe('GitFullView — closes PR dialog when ClosePrDialog is clicked', () =>
       'git:notify',
       expect.objectContaining({ type: 'success', key: 'prCreated', title: 'Opened #42 PR' })
     )
-  })
-
-  it('shows char count when commit message exceeds 50 chars', async () => {
-    await renderView()
-    const msg = 'a'.repeat(51)
-    fireEvent.change(screen.getByPlaceholderText('Commit message…'), { target: { value: msg } })
-    expect(screen.getByText('51 chars')).toBeTruthy()
   })
 })
 
