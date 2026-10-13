@@ -12,8 +12,10 @@ import {
   defaultWriteBack,
   defaultBudgets,
   declaredCriticalPaths,
+  migrateLineListSettings,
 } from '../../src/state/settings.js'
 import { DEFAULT_ASK_MODEL } from '../../src/forge/converge.js'
+import { partialFake } from '../../../../tests/support/fakes'
 
 // What the operator wrote in the settings page, as each reader hands it on.
 
@@ -62,14 +64,37 @@ describe('the model a run launches with', () => {
   })
 })
 
-describe('lists written one per line', () => {
-  it('ignore blank lines and surrounding space, and name a critical path once', () => {
+describe('lists the operator wrote, one item per line', () => {
+  it('are read as written, and name a critical path once', () => {
     const written = host({
-      'terminator.foundry.readOnlyTools': '  mcp__docs__get \n\n mcp__docs__search',
-      'terminator.foundry.criticalPaths': 'src/auth/**\n\nsrc/auth/**\n  migrations/** ',
+      'terminator.foundry.readOnlyTools': ['mcp__docs__get', 'mcp__docs__search'],
+      'terminator.foundry.criticalPaths': ['src/auth/**', 'src/auth/**', 'migrations/**'],
     })
     expect(readOnlyTools(written)).toEqual(['mcp__docs__get', 'mcp__docs__search'])
     expect(declaredCriticalPaths(written)).toEqual(['src/auth/**', 'migrations/**'])
+  })
+})
+
+describe('a list an earlier version stored as text', () => {
+  /** Settings the migration reads and writes, held in `values`. */
+  function storedIn(values: Record<string, unknown>): ExtensionAPI {
+    const settings = partialFake<ExtensionAPI['settings']>({
+      get: <T>(key: string) => values[key] as T,
+      set: (key: string, value: unknown) => void (values[key] = value),
+    })
+    return partialFake<ExtensionAPI>({ settings })
+  }
+
+  it('becomes one item per line, without blank lines or surrounding space', () => {
+    const values: Record<string, unknown> = {
+      'terminator.foundry.readOnlyTools': '  mcp__docs__get \n\n mcp__docs__search',
+      'terminator.foundry.criticalPaths': ['src/auth/**'],
+    }
+    migrateLineListSettings(storedIn(values))
+    expect(values).toEqual({
+      'terminator.foundry.readOnlyTools': ['mcp__docs__get', 'mcp__docs__search'],
+      'terminator.foundry.criticalPaths': ['src/auth/**'],
+    })
   })
 })
 

@@ -100,6 +100,15 @@ Each entry: what was decided, why, and how to undo it.
     Activation moves an existing row into the setting and deletes it; `set-stale-threshold` writes
     the setting. Undo: revert the commit; a moved value then lives only in the setting, so put it
     back with `task-vault:settings:set-stale-threshold` from the previous build.
+19. Settings has a `list` setting type, stored as a `string[]` and edited one item per line in
+    the design system's new `ListInput` (trimmed, blank lines dropped). Foundry's
+    `readOnlyTools` and `criticalPaths` use it. They were text settings read one item per line,
+    so Foundry's activation turns a stored text value into its list once
+    (`migrateLineListSettings`, `src/state/settings.ts`). A list type, rather than a multi-line
+    flag on `string`, because the value is a list everywhere it is read. Its story needs a Linux
+    baseline from the `update-story-baselines` label (decision 1). Undo: revert both commits;
+    a migrated value is then a `string[]` the old readers do not split, so set the two lists
+    again.
 
 ## Known advisories
 

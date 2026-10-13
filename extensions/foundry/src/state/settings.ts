@@ -17,11 +17,25 @@ export const ASK_MODEL_SETTING_KEY = 'terminator.foundry.askModel'
  * a review cannot change what it is reviewing.
  */
 export function readOnlyTools(api: ExtensionAPI): string[] {
-  const raw = api.settings?.get<string>('terminator.foundry.readOnlyTools') ?? ''
-  return raw
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line !== '')
+  return api.settings?.get<string[]>('terminator.foundry.readOnlyTools') ?? []
+}
+
+const LINE_LIST_SETTINGS = ['terminator.foundry.readOnlyTools', 'terminator.foundry.criticalPaths']
+
+/**
+ * Both lists were text settings, one item per line, before the settings page
+ * had a list type. A value stored that way becomes the list it spelled.
+ */
+export function migrateLineListSettings(api: ExtensionAPI): void {
+  for (const key of LINE_LIST_SETTINGS) {
+    const stored = api.settings.get<unknown>(key)
+    if (typeof stored !== 'string') continue
+    const items = stored.split('\n').map((line) => line.trim())
+    api.settings.set(
+      key,
+      items.filter((line) => line !== '')
+    )
+  }
 }
 
 /** The autonomy dial, read wherever it is needed rather than copied. */
@@ -117,13 +131,5 @@ export function defaultBudgets(api: ExtensionAPI): Omit<Budgets, 'tokens'> {
 
 /** The operator's critical paths, one glob per line (FR-043). Never inferred. */
 export function declaredCriticalPaths(api: ExtensionAPI): string[] {
-  const raw = api.settings?.get<string>('terminator.foundry.criticalPaths') ?? ''
-  return [
-    ...new Set(
-      raw
-        .split('\n')
-        .map((line) => line.trim())
-        .filter((line) => line !== '')
-    ),
-  ]
+  return [...new Set(api.settings?.get<string[]>('terminator.foundry.criticalPaths') ?? [])]
 }

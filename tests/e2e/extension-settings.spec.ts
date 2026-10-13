@@ -48,7 +48,7 @@ const CHOSEN: Record<string, unknown> = {
   'terminator.foundry.untrackedNoticeSeen': false,
   'terminator.foundry.budgets.agents': 7,
   'terminator.foundry.budgets.wallClockMinutes': 50,
-  'terminator.foundry.criticalPaths': 'src/auth/**',
+  'terminator.foundry.criticalPaths': ['src/auth/**'],
   'terminator.notepad.defaultTags': 'e2e-tag',
   'terminator.remote-control.maxSubscribers': 13,
   'terminator.task-vault.weeklyReviewDay': '3',
@@ -61,6 +61,7 @@ function chosenValue(key: string, def: SettingDef, folder: string): unknown {
   if (def.type === 'boolean') return !def.default
   if (def.type === 'enum') return def.options!.find((option) => option !== def.default)
   if (def.type === 'folder') return folder
+  if (def.type === 'list') return [`e2e ${key.split('.').pop()}`]
   if (def.type === 'number') {
     const low = def.min ?? 0
     return [low + 1, low + 2].find((n) => n !== def.default && (def.max ?? n) >= n)
@@ -106,7 +107,17 @@ async function writeControl(handle: AppHandle, panel: Locator, setting: Setting)
     await answerFolderPicker(handle.app, String(value))
     return row.getByRole('button', { name: 'Choose…' }).click()
   }
-  await row.locator('input').fill(String(value))
+  await row.locator('input, textarea').fill(controlText(value))
+}
+
+/** What a text control shows for a value: a list one item per line. */
+function controlText(value: unknown): string {
+  return Array.isArray(value) ? value.join('\n') : String(value)
+}
+
+/** Whether a stored value differs from the one written; a list is compared item by item. */
+function differs(stored: unknown, written: unknown): boolean {
+  return JSON.stringify(stored) !== JSON.stringify(written)
 }
 
 /** Runs an action setting's button, confirming when it asks. */
@@ -135,7 +146,7 @@ async function expectControl(panel: Locator, setting: Setting) {
     )
   if (def.type === 'folder')
     return expect(row.locator('.ext-folder-row__path')).toHaveText(String(value))
-  await expect(row.locator('input')).toHaveValue(String(value))
+  await expect(row.locator('input, textarea')).toHaveValue(controlText(value))
 }
 
 function storedValues(page: Page): Promise<Record<string, unknown>> {
@@ -183,7 +194,7 @@ async function writesEverySetting(extension: string): Promise<void> {
   await expect
     .poll(async () => {
       const values = await storedValues(handle.page)
-      return keys.filter((key) => values[key] !== expected.get(key))
+      return keys.filter((key) => differs(values[key], expected.get(key)))
     })
     .toEqual([])
 }
@@ -194,7 +205,7 @@ async function valuesSurviveRestart(): Promise<void> {
   await closeApp(handle)
   handle = await launchApp(userDataDir)
   const values = await storedValues(handle.page)
-  expect([...expected].filter(([key, value]) => values[key] !== value)).toEqual([])
+  expect([...expected].filter(([key, value]) => differs(values[key], value))).toEqual([])
   for (const schema of schemas) {
     const panel = await openPage(handle.page, schema)
     for (const [key, def] of Object.entries(schema.properties)) {
