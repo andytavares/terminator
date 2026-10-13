@@ -234,3 +234,95 @@ function spellingsTests() {
     expect(readShell("cat > a <<'EOF'\nunterminated body").unreadable).toBe(true)
   })
 }
+
+// The spellings an agent writes less often, each read the way bash reads it.
+describe('the rarer spellings', () => {
+  describe('heredoc delimiters', heredocDelimiterTests)
+  describe('heredoc lines', heredocLineTests)
+  describe('inside a substitution', insideASubstitutionTests)
+  describe('redirect targets', rarerRedirectTargetTests)
+})
+
+function heredocDelimiterTests() {
+  it('reads a delimiter after a space, and one whose space is escaped', () => {
+    expect(readShell("cat > a << 'EOF'\nx `y\nEOF\necho done").segments).toEqual([
+      "cat > a << 'EOF'",
+      'echo done',
+    ])
+    expect(readShell('cat > a <<E\\ OF\nx `y\nE OF\necho done').segments).toEqual([
+      'cat > a <<E\\ OF',
+      'echo done',
+    ])
+  })
+
+  it('takes no delimiter whose quote never closes, and reads the rest as shell', () => {
+    const reading = readShell("cat > a <<'EOF\nx\nEOF")
+    expect(reading.segments).toEqual(["cat > a <<'EOF\nx\nEOF"])
+    expect(reading.redirects).toBe(true)
+  })
+
+  it('takes no empty delimiter', () => {
+    expect(readShell('cat <<\necho done').segments).toEqual(['cat <<', 'echo done'])
+  })
+}
+
+function heredocLineTests() {
+  it('skips every body on a line, in the order the operators came', () => {
+    expect(readShell('cat <<A <<B\na `x\nA\nb `y\nB\necho done').segments).toEqual([
+      'cat <<A <<B',
+      'echo done',
+    ])
+  })
+
+  it('reads CRLF line endings, and blanks after the terminator', () => {
+    expect(readShell('cat <<EOF\r\nx `y\r\nEOF\r\necho done').segments).toEqual([
+      'cat <<EOF',
+      'echo done',
+    ])
+    expect(readShell('cat <<EOF\nx `y\nEOF  \necho done').segments).toEqual([
+      'cat <<EOF',
+      'echo done',
+    ])
+  })
+}
+
+function insideASubstitutionTests() {
+  it('reports a redirection made inside a substitution', () => {
+    expect(readShell('echo $(cat x > y)')).toEqual({
+      segments: ['echo $(cat x > y)', 'cat x > y'],
+      redirects: true,
+      unreadable: false,
+    })
+  })
+
+  it('reports one it cannot read inside one it can', () => {
+    expect(readShell('echo $(echo `x)').unreadable).toBe(true)
+  })
+
+  it('reads an escaped backtick inside backticks as part of the command', () => {
+    expect(readShell('echo `a \\` b`').segments).toEqual(['echo `a \\` b`', 'a \\` b'])
+  })
+
+  it('reads `&>` as a redirection rather than a joiner', () => {
+    expect(readShell('npm test &> log')).toEqual({
+      segments: ['npm test &> log'],
+      redirects: true,
+      unreadable: false,
+    })
+  })
+}
+
+function rarerRedirectTargetTests() {
+  it('names every file a command writes', () => {
+    expect(redirectTargets('a > x 2> y')).toEqual(['x', 'y'])
+  })
+
+  it('says nothing about an escaped angle bracket, or an operator with no target', () => {
+    expect(redirectTargets('echo a\\>b')).toEqual([])
+    expect(redirectTargets('echo >')).toEqual([])
+  })
+
+  it('names a quoted target whose quote never closes, up to the end', () => {
+    expect(redirectTargets('a >"unclosed')).toEqual(['unclosed'])
+  })
+}
