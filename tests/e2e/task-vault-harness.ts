@@ -21,6 +21,14 @@ export interface StoredTask {
 
 const VAULT_URL = 'terminator.task-vault/dist/index.html?view=main'
 
+/** The local date `offsetDays` from today, as the vault names a daily log: YYYY-MM-DD. */
+export function localDate(offsetDays = 0): string {
+  const date = new Date()
+  date.setDate(date.getDate() + offsetDays)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+}
+
 /** Opens Task Vault from the app band and waits for its navigation. */
 export async function openVault(handle: AppHandle): Promise<Page> {
   const vault = await openExtension(handle, 'Task Vault', VAULT_URL)

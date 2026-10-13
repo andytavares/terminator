@@ -498,7 +498,7 @@ A spec that hands `activate` a `globalStorage` makes it with `makeTempDir(prefix
 
 ### `api.settings`
 
-`register(schema)` adds a section to Settings. A property with `workspaceScoped: true` can be overridden per workspace. Property types are `string`, `number`, `boolean`, `enum` (with `options`), `folder` and `action` (a button that invokes `channel`, optionally after `confirmMessage`); `secret` masks the value.
+`register(schema)` adds a section to Settings. A property with `workspaceScoped: true` can be overridden per workspace. Property types are `string`, `number`, `boolean`, `enum` (with `options`), `folder`, `list` (a `string[]`, edited one item per line) and `action` (a button that invokes `channel`, optionally after `confirmMessage`); `secret` masks the value.
 
 ```typescript
 api.settings.register({
@@ -524,6 +524,8 @@ api.settings.set('com.example.my-extension.mode', 'safe')
 ```
 
 Prefix every key with your extension id; nothing else keeps two extensions' keys apart.
+
+A view reads the stored values with `window.electronAPI.extension.getSettingsValues()`, which holds only what has been set, so apply your own defaults. `extension.onSettingsChanged(handler)` is called after any setting changes; re-read there and a change made in Settings applies without reopening the view (Notepad's `src/stores/settings.store.ts`).
 
 `isBranchExcluded(branch, repoPath?)` resolves whether a branch matches Settings → Git → Branch Exclude Patterns: the override of the workspace that owns `repoPath`, else the global list. `*` matches anything, slashes included. The core owns the patterns, so your lists hide the same branches the core's pickers do:
 

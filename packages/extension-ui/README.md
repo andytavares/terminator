@@ -28,6 +28,7 @@ should define a colour.
 | `IconButton`                                     | an icon-only control with a required accessible name; optional longer `description` tooltip; sm (20px), md (26px); disabled |
 | `Tabs`; `TabsRoot`, `TabList`, `Tab`, `TabPanel` | WAI-ARIA tabs: arrow keys, Home, End, roving `tabindex`; assembled or in parts                                              |
 | `SegmentedControl`                               | one choice out of a few, as joined buttons: WAI-ARIA radio group; sm, md                                                    |
+| `ListInput`, `listItems`                         | a list of short strings edited one item per line (globs, tool names); trimmed, blank lines dropped                          |
 | `Dialog`, `ConfirmDialog`                        | a modal question or form; yes or no                                                                                         |
 | `Popover`                                        | a dismissible, non-modal surface anchored to a control                                                                      |
 | `ToastRegion`, `Toast`                           | transient messages                                                                                                          |

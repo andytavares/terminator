@@ -16,6 +16,11 @@ import { createIpcRegistrar, errorResult } from './ipc/register.js'
 import { registerAdminIpcHandlers } from './ipc/admin.ipc.js'
 import { registerWeeklyReviewIpcHandlers } from './ipc/weekly-review.ipc.js'
 import { applyTaskVaultSchema } from './vault/db.js'
+import {
+  migrateStoredStaleThreshold,
+  STALE_THRESHOLD,
+  STALE_THRESHOLD_KEY,
+} from './stale-threshold.js'
 import { backfillRecurringTasks } from './vault/ensure-next-occurrence.js'
 import {
   bindBroadcast,
@@ -74,13 +79,14 @@ function buildNotificationSettingProperties(): Record<string, SettingDefinition>
 
 /** The extension's own settings, before the per-notification delivery toggles. */
 const BASE_SETTINGS: Record<string, SettingDefinition> = {
-  'terminator.task-vault.staleThresholdDays': {
+  [STALE_THRESHOLD_KEY]: {
     type: 'number',
-    label: 'Stale Project Threshold (days)',
-    description: 'Days without modification before a project is considered stale',
-    default: 14,
-    min: 1,
-    max: 365,
+    label: 'Stale Task Threshold (days)',
+    description:
+      'Days a task can roll over on Today before it is marked stale and listed in the weekly review',
+    default: STALE_THRESHOLD.default,
+    min: STALE_THRESHOLD.min,
+    max: STALE_THRESHOLD.max,
   },
   'terminator.task-vault.weeklyReviewDay': {
     type: 'string',
@@ -188,6 +194,7 @@ function registerFeatureIpc(api: ExtensionAPI, db: ExtensionDB): void {
 async function initializeSchema(api: ExtensionAPI, db: ExtensionDB): Promise<void> {
   try {
     await applyTaskVaultSchema(db)
+    await migrateStoredStaleThreshold(api, db)
     await backfillRecurringTasks(db)
     maybeStartScheduler(db)
   } catch (err) {
@@ -304,7 +311,7 @@ export async function activate(api: ExtensionAPI): Promise<TaskVaultAPI> {
   await initializeSchema(api, db)
   registerNavigation(ownIpc, api)
   addCalendarMenuItem(api)
-  scheduleWeeklyReviewNudge(api, weeklyReviewDay(api))
+  scheduleWeeklyReviewNudge(api)
   registerPendingCapture(ownIpc)
   await registerCaptureShortcut(api)
   registerCaptureCommand(api)
@@ -316,14 +323,15 @@ export async function activate(api: ExtensionAPI): Promise<TaskVaultAPI> {
 
 let reviewNudgeInterval: ReturnType<typeof setInterval> | null = null
 
-function scheduleWeeklyReviewNudge(api: ExtensionAPI, reviewDay: number): void {
+/** Checks daily whether today is the review day; the setting is read at each check, so a change applies. */
+function scheduleWeeklyReviewNudge(api: ExtensionAPI): void {
   if (reviewNudgeInterval !== null) {
     clearInterval(reviewNudgeInterval)
     reviewNudgeInterval = null
   }
   function checkAndNudge() {
     const now = new Date()
-    if (now.getDay() !== reviewDay) return
+    if (now.getDay() !== weeklyReviewDay(api)) return
     // A notification rather than a toast: a toast is transient and has nothing
     // to click, so "open Task Vault to start" was an instruction to go and do
     // the navigation yourself. This one is the link.

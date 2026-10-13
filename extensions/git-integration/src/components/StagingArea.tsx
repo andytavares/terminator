@@ -223,7 +223,9 @@ export function StagingArea(props: StagingAreaProps): JSX.Element {
   return (
     <div className="staging-area">
       {status.truncated && (
-        <div className="staging-area__truncation-banner">Showing first 500 files.</div>
+        <div className="staging-area__truncation-banner">
+          Showing first {status.files.length} files.
+        </div>
       )}
       <StagingSections files={status.files} setStaged={setStaged} item={item} />
     </div>

@@ -645,6 +645,16 @@ export const ELECTRON_API_MANIFEST = [
     // Extensions, which re-reads the list on this while it is open.
   }),
   method({
+    path: 'extension.onSettingsChanged',
+    kind: 'event',
+    channel: 'extension:settings-changed',
+    signature: signature<(handler: () => void) => Unsubscribe>(),
+    toHandlerArgs: () => [],
+    // A view re-reads the settings it applies; Settings itself writes them.
+    remote: 'omit',
+    extensionView: 'only',
+  }),
+  method({
     path: 'extension.getCommands',
     kind: 'invoke',
     channel: 'extension:get-commands',

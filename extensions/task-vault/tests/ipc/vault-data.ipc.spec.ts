@@ -44,14 +44,12 @@ const now = '2026-02-01T10:00:00.000Z'
 describe('task-vault:vault:export-json and import-json', taskVaultVaultExportJsonTests)
 
 describe('task-vault settings and today_since', () => {
-  it('set-stale-threshold stores the days and overwrites a previous value', async () => {
+  it('set-stale-threshold writes the "Stale task threshold" setting', async () => {
     await invoke('task-vault:settings:set-stale-threshold', { days: 5 })
     await invoke('task-vault:settings:set-stale-threshold', { days: 9 })
 
-    const rows = await db.query<{ value: string }>(
-      `SELECT value FROM settings WHERE extension_id = 'task-vault' AND key = 'stale_days_threshold'`
-    )
-    expect(rows.map((row) => row.value)).toEqual(['9'])
+    expect(harness.settings.get('terminator.task-vault.staleThresholdDays')).toBe(9)
+    expect(await invoke('task-vault:vault:get-today')).toMatchObject({ staleDaysThreshold: 9 })
   })
 
   it('reset-today-since sets today_since to today', async () => {

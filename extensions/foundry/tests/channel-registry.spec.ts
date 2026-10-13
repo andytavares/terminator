@@ -204,7 +204,7 @@ describe('tools the operator says only read', () => {
   it('reads the list rather than guessing from a name', () => {
     const fn = src.slice(src.indexOf('function readOnlyTools'))
     const body = fn.slice(0, fn.indexOf('\n}'))
-    expect(body).toContain("get<string>('terminator.foundry.readOnlyTools')")
+    expect(body).toContain("get<string[]>('terminator.foundry.readOnlyTools')")
     expect(body).not.toMatch(/startsWith\('mcp__'\)|includes\('get_'\)|\/read|search\//)
   })
 })

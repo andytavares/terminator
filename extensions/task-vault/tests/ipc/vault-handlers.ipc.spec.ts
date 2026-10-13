@@ -464,10 +464,8 @@ function taskVaultVaultGetTodayEmptyListingTests() {
 }
 
 function taskVaultVaultGetTodayThresholdTests() {
-  it('reads the stale threshold from settings', async () => {
-    await db.run(
-      `INSERT INTO settings (extension_id, key, value) VALUES ('task-vault', 'stale_days_threshold', '12')`
-    )
+  it('reads the stale threshold from the "Stale task threshold" setting', async () => {
+    harness.settings.set('terminator.task-vault.staleThresholdDays', 12)
     expect((await getToday()).staleDaysThreshold).toBe(12)
   })
 }

@@ -34,7 +34,10 @@ function useGitHandlers(): void {
   beforeEach(() => {
     vi.clearAllMocks()
     const registry = buildRegistry()
-    registerGitExtensionHandlers(registry.register)
+    registerGitExtensionHandlers(registry.register, {
+      signOff: () => false,
+      maxDisplayedFiles: () => 500,
+    })
     getHandler = registry.getHandler
   })
 }
@@ -50,14 +53,14 @@ describe('git-integration extension: git:status IPC handler', () => {
       truncated: false,
     })
 
-    const result = await getHandler('git:status')({ path: '/tmp/repo', maxFiles: 500 })
+    const result = await getHandler('git:status')({ path: '/tmp/repo' })
     expect(gitService.getStatus).toHaveBeenCalledWith('/tmp/repo', 500)
     expect(result).toMatchObject({ branch: 'main', files: expect.any(Array) })
   })
 
   it('returns error for non-repo path', async () => {
     vi.mocked(gitService.getStatus).mockRejectedValue(new Error('not a git repository'))
-    const result = await getHandler('git:status')({ path: '/tmp/not-a-repo', maxFiles: 500 })
+    const result = await getHandler('git:status')({ path: '/tmp/not-a-repo' })
     expect(result).toEqual({ error: 'Error: not a git repository' })
   })
 })

@@ -16,6 +16,21 @@ Markdown notepad with live preview, margin comments, tags, and full-text search.
 - **Diagrams** — diagram notes with their own comments and tags
 - **Export / Import** — export notes to a folder (`.md`), with comments as sidecar/inline/both; import `.md` files, matching existing notes by frontmatter `id`
 
+## Settings
+
+Under **Settings → Extensions → Notepad**:
+
+| Key                                      | Type   | Default                        | What it does                                                         |
+| ---------------------------------------- | ------ | ------------------------------ | -------------------------------------------------------------------- |
+| `terminator.notepad.exportPath`          | folder | `~/Documents/Terminator Notes` | The folder Export starts on                                          |
+| `terminator.notepad.commentExportFormat` | enum   | `sidecar`                      | How Export writes comments: `sidecar`, `inline` or `both`            |
+| `terminator.notepad.autosaveMs`          | number | `800`                          | How long typing must pause before a note is saved, in ms (100–10000) |
+| `terminator.notepad.defaultTags`         | string | `''`                           | Comma-separated tags a quick-created note starts with                |
+| `terminator.notepad.editorFontSize`      | number | `14`                           | The editor's text size in px (8–32)                                  |
+| `terminator.notepad.db.reinit`           | action |                                | Re-applies the schema without deleting data                          |
+
+A view reads the values with `extension.getSettingsValues()` and again on `extension.onSettingsChanged`, so a change applies at once (`src/stores/settings.store.ts`). Bounds and defaults live in `src/notepad-settings.ts`. Diagrams keep their own 1.2 s save delay: a scene is written whole.
+
 ## Storage
 
 Notes, tags, comments, diagrams, and settings are stored in the shared SQLite database (`app.sqlite`) via the injected `ExtensionDB`. Note, tag, and comment IDs are UUIDs assigned at creation and stable across restarts. The schema is created with `CREATE TABLE IF NOT EXISTS` on every launch, so a launch never alters data that is already there. Search matches with `LIKE`, which ignores case for ASCII letters only. Notes from the previous PGlite database are imported once on the first start after the upgrade.

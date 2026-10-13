@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test'
 import { AppHandle, launchApp, closeApp } from './helpers'
 import { invokeChannel } from './extension-page'
-import { goTo, openVault } from './task-vault-harness'
+import { goTo, openVault, localDate } from './task-vault-harness'
 
 // Remote-accessible channels that no view calls: a remote client is their only
 // caller, so they are driven the way it calls them, and their effect is read
@@ -9,13 +9,6 @@ import { goTo, openVault } from './task-vault-harness'
 
 let handle: AppHandle
 let vault: Page
-
-function localDate(offsetDays: number): string {
-  const date = new Date()
-  date.setDate(date.getDate() + offsetDays)
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
-}
 
 test.beforeAll(async () => {
   handle = await launchApp()

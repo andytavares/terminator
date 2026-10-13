@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { ListInput, listItems } from '@terminator/extension-ui'
 import { dispatchNotification } from '../../lib/notifications'
 
 // One extension's settings, drawn from the schema it registered: a row per
@@ -115,10 +116,16 @@ export function ActionSettingRow({ def }: { def: SettingPropDef }): JSX.Element 
   )
 }
 
-/** A typed value as the setting stores it: a number, a boolean, or the text. */
+/** A typed value as the setting stores it: a number, a boolean, a list of lines, or the text. */
 function coerce(type: string, text: string): unknown {
   if (type === 'number') return Number(text)
+  if (type === 'list') return listItems(text)
   return type === 'boolean' ? text === 'true' : text
+}
+
+/** A stored value as the row edits it: a list one item per line, anything else as text. */
+function settingText(value: unknown): string {
+  return Array.isArray(value) ? value.join('\n') : String(value ?? '')
 }
 
 type Save = (key: string, value: unknown) => Promise<void>
@@ -128,7 +135,7 @@ type Save = (key: string, value: unknown) => Promise<void>
  * once if the panel closes first so closing does not lose it.
  */
 function useDebouncedSetting(propKey: string, def: SettingPropDef, save: Save) {
-  const [text, setText] = useState(String(def.default ?? ''))
+  const [text, setText] = useState(settingText(def.default))
   const pending = useRef<{ timer: ReturnType<typeof setTimeout>; text: string } | null>(null)
   const flush = (): void => {
     if (!pending.current) return
@@ -163,8 +170,9 @@ interface ExtensionSettingRowProps {
 /** One value setting: its label, description, and the control its type calls for. */
 export function ExtensionSettingRow({ propKey, def, value, onChange }: ExtensionSettingRowProps) {
   const setting = useDebouncedSetting(propKey, { ...def, default: value ?? def.default }, onChange)
+  const stacked = def.type === 'list' ? ' extension-setting-row--stacked' : ''
   return (
-    <div className="extension-setting-row">
+    <div className={`extension-setting-row${stacked}`}>
       <label className="extension-setting-row__label">
         {def.label}
         {def.description && <span className="extension-setting-row__desc">{def.description}</span>}
@@ -185,7 +193,7 @@ interface ControlProps {
   edit: (text: string) => void
 }
 
-/** A switch, a segmented choice, a folder picker, or a text or number box. */
+/** A switch, a segmented choice, a folder picker, a list box, or a text or number box. */
 function SettingControl({ def, text, edit }: ControlProps): JSX.Element {
   if (def.type === 'boolean') {
     return (
@@ -202,6 +210,18 @@ function SettingControl({ def, text, edit }: ControlProps): JSX.Element {
     return <EnumChoice options={def.options} text={text} edit={edit} />
   }
   if (def.type === 'folder') return <FolderButton edit={edit} />
+  if (def.type === 'list') return <ListControl def={def} text={text} edit={edit} />
+  return <TextControl def={def} text={text} edit={edit} />
+}
+
+/** A list, one item per line; the row keeps it as those lines. */
+function ListControl({ def, text, edit }: ControlProps): JSX.Element {
+  const save = (items: string[]) => edit(items.join('\n'))
+  return <ListInput label={def.label} value={listItems(text)} onChange={save} />
+}
+
+/** A text box, masked for a secret, or a number box within the setting's bounds. */
+function TextControl({ def, text, edit }: ControlProps): JSX.Element {
   return (
     <input
       className="extension-setting-row__input"

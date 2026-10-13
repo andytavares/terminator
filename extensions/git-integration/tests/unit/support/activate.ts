@@ -29,10 +29,11 @@ interface ApiSpies {
   warn: ReturnType<typeof vi.fn>
 }
 
-/** Where the stand-in API says the workspace and this extension's own folder are. */
+/** Where the stand-in API says the workspace and this extension's own folder are, and its settings. */
 interface ApiPlaces {
   workspace?: FakeWorkspace
   globalStorage: string
+  settings?: Record<string, unknown>
 }
 
 /** An ipc whose registerHandler collects into `channels`. */
@@ -54,7 +55,7 @@ function capturingApi(
   return {
     ipc: capturingIpc(channels),
     settings: {
-      get: () => undefined,
+      get: (key: string) => places.settings?.[key],
       register: () => disposable,
       isBranchExcluded: async () => false,
     },
@@ -89,11 +90,12 @@ function fakeWorkspaceApi(workspace?: FakeWorkspace) {
 /** Activates git-integration on a stand-in API; returns its channels and the shell, gh and log warn spies. */
 export function activateCapturingChannels(
   workspace?: FakeWorkspace,
-  globalStorage = freshGlobalStorage()
+  globalStorage = freshGlobalStorage(),
+  settings?: Record<string, unknown>
 ) {
   const channels: RegisteredChannel[] = []
   const spies = { exec: vi.fn(), githubApi: vi.fn(), warn: vi.fn() }
-  activate(capturingApi(channels, spies, { workspace, globalStorage }))
+  activate(capturingApi(channels, spies, { workspace, globalStorage, settings }))
   deactivate()
   return { channels, ...spies }
 }

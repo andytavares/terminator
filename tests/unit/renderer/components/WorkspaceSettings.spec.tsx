@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, within } from '@testing-library/react'
 import { useSettingsStore } from '../../../../src/renderer/stores/settings.store'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { WorkspaceSettings } from '../../../../src/renderer/components/settings/WorkspaceSettings'
@@ -146,7 +146,10 @@ describe('WorkspaceSettings — calls updateWorkspace to clear scrollback overri
     const scrollbackBtn = buttons.find((b) => b.textContent === 'Use global default')
     expect(scrollbackBtn).toBeTruthy()
     fireEvent.click(scrollbackBtn!)
-    expect(mockUpdateWorkspace).toHaveBeenCalledWith('ws-1', { terminal: undefined })
+    // Only the scrollback: the workspace's own shell, if it sets one, stays.
+    expect(mockUpdateWorkspace).toHaveBeenCalledWith('ws-1', {
+      terminal: { scrollbackLimit: undefined },
+    })
   })
 
   it('calls updateWorkspaceWorktreeBaseDir on blur of worktree dir input', () => {
@@ -261,5 +264,43 @@ describe('WorkspaceSettings — mounts the Quick actions section scoped to the w
       'ws-1',
       expect.arrayContaining([expect.objectContaining({ label: 'Deploy' })])
     )
+  })
+})
+
+describe("WorkspaceSettings — the workspace's own default shell", () => {
+  const mockUpdateShell = vi.fn()
+  const shellBox = () => screen.getByRole('textbox', { name: 'Default Shell' }) as HTMLInputElement
+
+  /** The store as the page reads it, with this workspace's own shell when given. */
+  function seedShell(own?: string) {
+    const overrides = own ? { terminal: { defaultShell: own } } : {}
+    seedStore(useSettingsStore, {
+      globalSettings,
+      workspaceSettings: new Map([['ws-1', { workspaceId: 'ws-1', overrides, extensions: {} }]]),
+      updateWorkspaceDefaultShell: mockUpdateShell,
+      loadSettings: mockLoadSettings,
+    })
+  }
+
+  it('shows the global shell until the workspace sets its own, then saves that one', () => {
+    seedShell()
+    render(<WorkspaceSettings workspaceId="ws-1" />)
+    expect(shellBox().value).toBe('/bin/zsh')
+
+    fireEvent.change(shellBox(), { target: { value: '  /bin/fish ' } })
+    fireEvent.blur(shellBox())
+
+    expect(mockUpdateShell).toHaveBeenCalledWith('ws-1', '/bin/fish')
+  })
+
+  it('hands the shell back to the global one with "Use global default"', () => {
+    seedShell('/bin/fish')
+    render(<WorkspaceSettings workspaceId="ws-1" />)
+    expect(shellBox().value).toBe('/bin/fish')
+
+    const field = shellBox().closest('div')!
+    fireEvent.click(within(field).getByRole('button', { name: 'Use global default' }))
+
+    expect(mockUpdateShell).toHaveBeenCalledWith('ws-1', undefined)
   })
 })

@@ -20,6 +20,7 @@ import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirro
 import { searchKeymap } from '@codemirror/search'
 import { livePreviewPlugin } from './livePreview'
 import { insertNewlineKeepingHeadingMarker } from './headingEnter'
+import { useNotepadSettingsStore } from '../stores/settings.store'
 import {
   commentAnchorField,
   commentAnchorDecorations,
@@ -214,7 +215,13 @@ export function NoteEditor(props: NoteEditorProps): React.JSX.Element {
   useCompartmentSync(viewRef, compartments.readOnly, readOnlyExtension(readOnly))
   useCompartmentSync(viewRef, compartments.preview, previewExtension(sourceMode))
 
-  return <div ref={containerRef} className="notepad-editor-cm" style={{ height: '100%' }} />
+  return <div ref={containerRef} className="notepad-editor-cm" style={useFontSizeStyle()} />
+}
+
+/** The editor's height, and the text size from Notepad's settings, read by notepad.css. */
+function useFontSizeStyle(): React.CSSProperties {
+  const fontSize = useNotepadSettingsStore((settings) => settings.editorFontSize)
+  return { height: '100%', ['--notepad-editor-font-size' as string]: `${fontSize}px` }
 }
 
 /** The compartments a mounted editor reconfigures, and the latest selection callback. */
