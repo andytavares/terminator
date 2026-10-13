@@ -38,7 +38,7 @@ const disposable = () => ({ dispose: vi.fn() })
 
 /** The API Task Vault activates with; settings not in `settings` read as '0'. */
 function makeApi(settings: Record<string, unknown> = {}) {
-  const commandsRegister = vi.fn(disposable)
+  const commandsRegister = vi.fn<ExtensionAPI['commands']['register']>(disposable)
   const globalShortcutRegister = vi.fn(async () => disposable())
   const api = partialFake<ExtensionAPI>({
     db: partialFake<ExtensionAPI['db']>({ get: vi.fn(async () => undefined) }),
@@ -242,9 +242,9 @@ function taskVaultActivateQuickActionsWithoutShortcutTests() {
       expect.objectContaining({ id: 'task-vault:capture-to-inbox' }),
       expect.any(Function)
     )
-    const handler = commandsRegister.mock.calls.find(
-      (c) => (c[0] as { id: string }).id === 'task-vault:capture-to-inbox'
-    )?.[1] as (ctx: unknown) => void
+    const [, handler] = commandsRegister.mock.calls.find(
+      ([command]) => command.id === 'task-vault:capture-to-inbox'
+    )!
     handler({ projectId: null, sessionId: null, repoRoot: null })
 
     const channels = (api.window.broadcast as unknown as ReturnType<typeof vi.fn>).mock.calls.map(
