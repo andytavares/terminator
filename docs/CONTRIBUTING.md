@@ -59,6 +59,8 @@ npm run test:visual     # The design system's screenshot tests
 
 A spec that asserts a wall-clock budget is named `*.perf.spec.ts`. `npm test` leaves it out, because beside every other spec in parallel it measures the load; `npm run test:perf` (`vitest.perf.config.ts`) runs it alone, and CI's `Perf budgets` job runs that.
 
+Every other spec has to pass on a loaded machine too, where a test can run ten times slower than on an idle one. It waits for the event it needs, never for a fixed time that hopes the event came first. A clock the code reads (a replay, a poll) is a fake one, `vi.useFakeTimers({ toFake: [...] })` with only the timers that code uses. A canvas whose pixels the spec does not check gets no 2D context (`getContext` returns `null`), because a `vi.fn()` fake records every call of every frame. `tests/setup.ts` makes jsdom parse its built-in stylesheet before the first test, so that test is not charged 300 ms for it. To find a flake, run 4–6 copies of the spec at once: `for i in 1 2 3 4 5 6; do npx vitest run <spec> & done; wait`.
+
 Coverage is gated by Codecov on the pull request, not locally ([ADR 095](adr/095-coverage-is-gated-by-codecov.md)). `codecov/patch` needs 80% of the lines your change adds or modifies, and `codecov/project` must not drop. A test covers a scenario the running app can produce; a branch no real caller can reach is deleted, not tested.
 
 ### Measure performance

@@ -60,3 +60,9 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
     disconnect() {}
   }
 }
+
+// jsdom parses its built-in user-agent stylesheet on the first getComputedStyle
+// in a file, and every ByRole query calls getComputedStyle. Paid here, at
+// setup, the 300+ ms parse is not charged to the five-second budget of
+// whichever test happens to query first.
+if (typeof window !== 'undefined') window.getComputedStyle(document.documentElement)
