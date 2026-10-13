@@ -16,6 +16,7 @@ import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import type { TerminalSession } from '../../../../src/shared/types/index'
 import type { TerminalInstance } from '../../../../src/renderer/components/terminal/TerminalSession'
 import { partialFake } from '../../../support/fakes'
+import { leafIds } from '../../../../src/renderer/utils/pane-tree'
 
 function makeSession(overrides: Partial<TerminalSession> = {}): TerminalSession {
   return {
@@ -450,24 +451,13 @@ describe('useSessionStore', () => {
   })
 
   describe('split pane actions', () => {
+    // Every split is made from the tab on screen.
     beforeEach(() => {
       vi.stubGlobal('crypto', { randomUUID: vi.fn(() => 'split-uuid') })
+      useSessionStore.getState().setActiveSessionForProject('proj-1', 'sess-a')
     })
 
     it('getPaneLayout returns null when no layout set', () => {
-      expect(useSessionStore.getState().getPaneLayout('proj-1')).toBeNull()
-    })
-
-    it('setSplitLayout stores and retrieves a layout', () => {
-      const layout = { type: 'leaf' as const, sessionId: 'sess-1' }
-      useSessionStore.getState().setSplitLayout('proj-1', layout)
-      expect(useSessionStore.getState().getPaneLayout('proj-1')).toEqual(layout)
-    })
-
-    it('setSplitLayout with null removes the layout', () => {
-      const layout = { type: 'leaf' as const, sessionId: 'sess-1' }
-      useSessionStore.getState().setSplitLayout('proj-1', layout)
-      useSessionStore.getState().setSplitLayout('proj-1', null)
       expect(useSessionStore.getState().getPaneLayout('proj-1')).toBeNull()
     })
 
@@ -475,9 +465,15 @@ describe('useSessionStore', () => {
       expect(useSessionStore.getState().getFocusedSession('proj-1')).toBeNull()
     })
 
-    it('setFocusedSession stores the focused session', () => {
-      useSessionStore.getState().setFocusedSession('proj-1', 'sess-1')
-      expect(useSessionStore.getState().getFocusedSession('proj-1')).toBe('sess-1')
+    it('setFocusedSession stores the focused pane of the split on screen', () => {
+      useSessionStore.getState().activateSplit('proj-1', 'sess-a', 'sess-b', 'vertical')
+      useSessionStore.getState().setFocusedSession('proj-1', 'sess-a')
+      expect(useSessionStore.getState().getFocusedSession('proj-1')).toBe('sess-a')
+    })
+
+    it('getFocusedSession names no pane while no split is on screen', () => {
+      useSessionStore.getState().setFocusedSession('proj-1', 'sess-a')
+      expect(useSessionStore.getState().getFocusedSession('proj-1')).toBeNull()
     })
 
     it('activateSplit creates a split layout from a single session', () => {
@@ -562,6 +558,74 @@ describe('useSessionStore', () => {
       await useSessionStore.getState().closeSession('sess-a')
       await useSessionStore.getState().closeSession('sess-b')
       expect(useSessionStore.getState().getPaneLayout('proj-1')).toBeNull()
+    })
+
+    it('closing the active pane keeps the rest of its split on screen', async () => {
+      mockElectronAPI.terminal.close.mockResolvedValue({})
+      useSessionStore.getState().activateSplit('proj-1', 'sess-a', 'sess-b', 'vertical')
+      useSessionStore.getState().activateSplit('proj-1', 'sess-b', 'sess-c', 'horizontal')
+      useSessionStore.setState((s) => {
+        const sessions = new Map(s.sessions)
+        for (const id of ['sess-a', 'sess-b', 'sess-c', 'sess-z'])
+          sessions.set(id, makeSession({ id, projectId: 'proj-1' }))
+        return { sessions }
+      })
+      useSessionStore.getState().reorderSessions('proj-1', ['sess-z', 'sess-a', 'sess-b', 'sess-c'])
+      useSessionStore.getState().setActiveSessionForProject('proj-1', 'sess-c')
+      useSessionStore.getState().closeSplitLeaf('proj-1', 'sess-c')
+      expect(leafIds(useSessionStore.getState().getPaneLayout('proj-1')!)).toEqual([
+        'sess-a',
+        'sess-b',
+      ])
+      useSessionStore.getState().setActiveSessionForProject('proj-1', 'sess-b')
+      await useSessionStore.getState().closeSession('sess-b')
+      expect(useSessionStore.getState().getActiveSessionForProject('proj-1')).toBe('sess-a')
+    })
+  })
+
+  describe('a split belongs to the tab it was made in', () => {
+    const store = () => useSessionStore.getState()
+    const leavesOnScreen = () => {
+      const layout = store().getPaneLayout('proj-1')
+      return layout ? leafIds(layout) : null
+    }
+
+    beforeEach(() => {
+      vi.stubGlobal('crypto', { randomUUID: vi.fn(() => 'split-uuid') })
+      store().setActiveSessionForProject('proj-1', 'sess-a')
+      store().activateSplit('proj-1', 'sess-a', 'sess-b', 'horizontal')
+    })
+
+    it('a new tab shows alone, and the split comes back with its own tab', () => {
+      store().setActiveSessionForProject('proj-1', 'sess-c')
+      expect(leavesOnScreen()).toBeNull()
+      store().setActiveSessionForProject('proj-1', 'sess-a')
+      expect(leavesOnScreen()).toEqual(['sess-a', 'sess-b'])
+      store().setActiveSessionForProject('proj-1', 'sess-b')
+      expect(leavesOnScreen()).toEqual(['sess-a', 'sess-b'])
+    })
+
+    it('names no focused pane while the split is off screen', () => {
+      expect(store().getFocusedSession('proj-1')).toBe('sess-b')
+      store().setActiveSessionForProject('proj-1', 'sess-c')
+      expect(store().getFocusedSession('proj-1')).toBeNull()
+    })
+
+    it('each tab keeps its own split', () => {
+      store().setActiveSessionForProject('proj-1', 'sess-c')
+      store().activateSplit('proj-1', 'sess-c', 'sess-d', 'vertical')
+      expect(leavesOnScreen()).toEqual(['sess-c', 'sess-d'])
+      store().setActiveSessionForProject('proj-1', 'sess-a')
+      expect(leavesOnScreen()).toEqual(['sess-a', 'sess-b'])
+    })
+
+    it("closing a pane of one tab's split leaves the other tab's split alone", () => {
+      store().setActiveSessionForProject('proj-1', 'sess-c')
+      store().activateSplit('proj-1', 'sess-c', 'sess-d', 'vertical')
+      store().closeSplitLeaf('proj-1', 'sess-d')
+      expect(leavesOnScreen()).toBeNull()
+      store().setActiveSessionForProject('proj-1', 'sess-a')
+      expect(leavesOnScreen()).toEqual(['sess-a', 'sess-b'])
     })
   })
 
