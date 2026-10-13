@@ -185,6 +185,97 @@ beforeEach(() => {
 })
 
 describe('answering a forge-defect gate', () => {
+  describe('starting the architect', startingTheArchitectTests)
+  describe('resume failures', resumeFailuresTests)
+})
+
+function cleanOrder(): WorkOrder {
+  const base = order()
+  return {
+    ...base,
+    recipe: null,
+    intent: { problem: 'p', outcome: 'rows render fully', nonGoals: ['scrollbars'] },
+    risk: { grade: 'P2', triggers: [], blastRadius: ['src/'], criticalPaths: [] },
+    acceptance: [
+      {
+        id: 'AC-1',
+        statement: 'a full-width row renders its final glyph',
+        priority: 'P1',
+        verify: { kind: 'test', command: 'npm test', assert: 'exit_code == 0' },
+        unverifiable: null,
+      },
+    ],
+    plan: {
+      ...base.plan,
+      units: [
+        {
+          id: 'U-1',
+          title: 'widen',
+          role: 'builder',
+          lane: 1,
+          dependsOn: [],
+          satisfies: ['AC-1'],
+          touches: ['src/a.ts'],
+          verify: [],
+        },
+      ],
+    },
+    redTeam: [
+      {
+        id: 'RT-inspector-6',
+        severity: 'high',
+        text: 'footnote links stop working',
+        status: 'open',
+        reason: '',
+        category: 'regression',
+        round: 1,
+      },
+    ],
+  }
+}
+function architectAmends(): void {
+  runner.start.mockImplementation(
+    async (input: {
+      phase: string
+      onRegistered?: (run: { sessionId: string }) => void
+      onTurnEnd?: () => void
+    }) => {
+      const sessionId = `${input.phase}-session`
+      input.onRegistered?.({ sessionId })
+      if (input.phase === 'architect') {
+        fs.writeFileSync(
+          path.join(dataDir, 'orders', 'WO-1', 'proposal.json'),
+          JSON.stringify({
+            note: 'Added AC-5 so footnote links survive the sanitizer',
+            resolveFindings: [{ id: 'RT-inspector-6', how: 'prefix #… hrefs in the a override' }],
+          })
+        )
+        setTimeout(() => input.onTurnEnd?.(), 0)
+      }
+      return { sessionId }
+    }
+  )
+}
+async function seed(released: boolean): Promise<void> {
+  dataDir = makeTempDir('fdry-amended-')
+  const store = createOrderStore(dataDir)
+  await store.save(cleanOrder())
+  if (released) {
+    await store.record({
+      at: '2026-10-08T01:55:24.000Z',
+      orderId: 'WO-1',
+      actor: 'operator',
+      action: 'order.agreed',
+      subject: 'WO-1',
+      reason: 'all checks pass',
+      evidence: [],
+    })
+  }
+  saveGate(forgeDefectGate())
+  architectAmends()
+}
+
+function startingTheArchitectTests() {
   it('starts the architect on every open blocking finding, rather than resuming, when the order is not running', async () => {
     dataDir = makeTempDir('fdry-forge-defect-')
     const store = createOrderStore(dataDir)
@@ -216,7 +307,9 @@ describe('answering a forge-defect gate', () => {
     expect(started.phase).toBe('architect')
     expect(started.prompt).toContain('RT-2')
   })
+}
 
+function resumeFailuresTests() {
   it('records a resume failure as gate.action_failed, rather than a silent no-op', async () => {
     dataDir = makeTempDir('fdry-forge-defect-resume-')
     const store = createOrderStore(dataDir)
@@ -243,7 +336,7 @@ describe('answering a forge-defect gate', () => {
     expect(ledger()).toContain('gate.action_failed')
     expect(runner.start).not.toHaveBeenCalled()
   })
-})
+}
 
 /**
  * WO-1008-287, end to end: the operator handed the order off, the inspector
@@ -252,94 +345,12 @@ describe('answering a forge-defect gate', () => {
  * must say so on the Inbox rather than sit there.
  */
 describe('after the architect amends an answered defect', () => {
-  function cleanOrder(): WorkOrder {
-    const base = order()
-    return {
-      ...base,
-      recipe: null,
-      intent: { problem: 'p', outcome: 'rows render fully', nonGoals: ['scrollbars'] },
-      risk: { grade: 'P2', triggers: [], blastRadius: ['src/'], criticalPaths: [] },
-      acceptance: [
-        {
-          id: 'AC-1',
-          statement: 'a full-width row renders its final glyph',
-          priority: 'P1',
-          verify: { kind: 'test', command: 'npm test', assert: 'exit_code == 0' },
-          unverifiable: null,
-        },
-      ],
-      plan: {
-        ...base.plan,
-        units: [
-          {
-            id: 'U-1',
-            title: 'widen',
-            role: 'builder',
-            lane: 1,
-            dependsOn: [],
-            satisfies: ['AC-1'],
-            touches: ['src/a.ts'],
-            verify: [],
-          },
-        ],
-      },
-      redTeam: [
-        {
-          id: 'RT-inspector-6',
-          severity: 'high',
-          text: 'footnote links stop working',
-          status: 'open',
-          reason: '',
-          category: 'regression',
-          round: 1,
-        },
-      ],
-    }
-  }
+  describe('agreeing again', agreeingAgainTests)
+  describe('the inbox', theInboxTests)
+  describe('the order before', theOrderBeforeTests)
+})
 
-  function architectAmends(): void {
-    runner.start.mockImplementation(
-      async (input: {
-        phase: string
-        onRegistered?: (run: { sessionId: string }) => void
-        onTurnEnd?: () => void
-      }) => {
-        const sessionId = `${input.phase}-session`
-        input.onRegistered?.({ sessionId })
-        if (input.phase === 'architect') {
-          fs.writeFileSync(
-            path.join(dataDir, 'orders', 'WO-1', 'proposal.json'),
-            JSON.stringify({
-              note: 'Added AC-5 so footnote links survive the sanitizer',
-              resolveFindings: [{ id: 'RT-inspector-6', how: 'prefix #… hrefs in the a override' }],
-            })
-          )
-          setTimeout(() => input.onTurnEnd?.(), 0)
-        }
-        return { sessionId }
-      }
-    )
-  }
-
-  async function seed(released: boolean): Promise<void> {
-    dataDir = makeTempDir('fdry-amended-')
-    const store = createOrderStore(dataDir)
-    await store.save(cleanOrder())
-    if (released) {
-      await store.record({
-        at: '2026-10-08T01:55:24.000Z',
-        orderId: 'WO-1',
-        actor: 'operator',
-        action: 'order.agreed',
-        subject: 'WO-1',
-        reason: 'all checks pass',
-        evidence: [],
-      })
-    }
-    saveGate(forgeDefectGate())
-    architectAmends()
-  }
-
+function agreeingAgainTests() {
   it('agrees the released order again and starts its run', async () => {
     await seed(true)
     await call('foundry:inbox.decide', { gateId: 'WO-1-forge-defect', option: 'answer' })
@@ -355,7 +366,9 @@ describe('after the architect amends an answered defect', () => {
     expect(lines.some((l) => l.action === 'converge.started')).toBe(true)
     expect((await createOrderStore(dataDir).load('WO-1'))?.status).toBe('running')
   })
+}
 
+function theInboxTests() {
   it('lists an order nobody released on the Inbox, and counts it on the badge', async () => {
     await seed(false)
     await call('foundry:inbox.decide', { gateId: 'WO-1-forge-defect', option: 'answer' })
@@ -376,7 +389,9 @@ describe('after the architect amends an answered defect', () => {
     expect((await createOrderStore(dataDir).load('WO-1'))?.status).toBe('draft')
     expect(ledger()).not.toContain('run.started')
   })
+}
 
+function theOrderBeforeTests() {
   // Recording which conversation wrote the plan loads the whole order and
   // saves it back. Unordered, that save could land after the amendment's and
   // put the old plan back: the answered finding open again, and the restart
@@ -438,4 +453,4 @@ describe('after the architect amends an answered defect', () => {
     const saved = await createOrderStore(dataDir).load('WO-1')
     expect(saved?.redTeam.find((f) => f.id === 'RT-inspector-6')?.status).toBe('resolved')
   })
-})
+}

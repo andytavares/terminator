@@ -233,6 +233,12 @@ beforeEach(() => {
 })
 
 describe('a fresh application opening on a run the last one left in flight', () => {
+  describe('noticing', noticingTests)
+  describe('once only and live agents', onceOnlyAndLiveAgentsTests)
+  describe('the Floor and terminals', theFloorAndTerminalsTests)
+})
+
+function noticingTests() {
   it('notices without being asked, on the poll the chrome already makes', async () => {
     await seedInterruptedRun()
     await call('foundry:attention')
@@ -256,7 +262,9 @@ describe('a fresh application opening on a run the last one left in flight', () 
     await call('foundry:attention')
     expect(ledger()).toContain('run.interrupted')
   })
+}
 
+function onceOnlyAndLiveAgentsTests() {
   it('raises one row however many times the application is reopened', async () => {
     await seedInterruptedRun()
     await call('foundry:attention')
@@ -277,7 +285,9 @@ describe('a fresh application opening on a run the last one left in flight', () 
     await call('foundry:attention')
     expect(gatesOnDisk()).toEqual([])
   })
+}
 
+function theFloorAndTerminalsTests() {
   it('tells the Floor which steps nothing is running', async () => {
     await seedInterruptedRun()
     const view = (await call('foundry:run.observe', { id: 'WO-1' })) as { orphaned: string[] }
@@ -292,9 +302,14 @@ describe('a fresh application opening on a run the last one left in flight', () 
     })) as { error: string }
     expect(r.error).toMatch(/no live agent/)
   })
-})
+}
 
 describe('answering the gate', () => {
+  describe('picking up', pickingUpTests)
+  describe('stopping and holding', stoppingAndHoldingTests)
+})
+
+function pickingUpTests() {
   it('picks the run back up, putting the abandoned step back in the queue', async () => {
     await seedInterruptedRun()
     await call('foundry:attention')
@@ -320,7 +335,9 @@ describe('answering the gate', () => {
     await call('foundry:inbox.decide', { gateId: 'WO-1-run.interrupted', option: 'resume' })
     expect(graphOnDisk().nodes[0].sessionId).toBe('session-from-a-dead-process')
   })
+}
 
+function stoppingAndHoldingTests() {
   it('stopping actually stops: the order is cancelled rather than left running', async () => {
     await seedInterruptedRun()
     await call('foundry:attention')
@@ -335,7 +352,7 @@ describe('answering the gate', () => {
     expect(graphOnDisk().nodes[0].state).toBe('running')
     expect((await createOrderStore(dataDir).load('WO-1'))?.status).toBe('running')
   })
-})
+}
 
 describe('stopping a run whose agents are still alive', () => {
   it('ends each one, saying why, before the order is cancelled', async () => {

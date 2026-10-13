@@ -234,6 +234,11 @@ describe('reading what it was doing', () => {
 })
 
 describe('interrupting and redirecting', () => {
+  describe('interrupting', interruptingTests)
+  describe('refusing and recording', refusingAndRecordingTests)
+})
+
+function interruptingTests() {
   it('interrupts the session', async () => {
     expect(await call('foundry:run-interrupt', { sessionId: 'session-1' })).toEqual({ ok: true })
     expect(runner.interrupt).toHaveBeenCalledWith('session-1')
@@ -247,7 +252,9 @@ describe('interrupting and redirecting', () => {
     expect(runner.interrupt).toHaveBeenCalledWith('session-1')
     expect(runner.send).toHaveBeenCalledWith('session-1', 'try the other approach')
   })
+}
 
+function refusingAndRecordingTests() {
   it('refuses a payload with no message at all, rather than throwing', async () => {
     // A handler that throws on a missing field takes the channel down for
     // everyone rather than refusing one call. Found by driving the real app.
@@ -273,7 +280,7 @@ describe('interrupting and redirecting', () => {
       true
     )
   })
-})
+}
 
 describe('ending a run', () => {
   it('stops it with the reason, so the agent record carries it', async () => {
