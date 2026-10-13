@@ -40,9 +40,9 @@ function makeCpus(idle: number, total: number) {
   ]
 }
 
-describe('registerMetricsHandlers', () => {
-  let getPtyManager: () => { getPid: ReturnType<typeof vi.fn> }
+let getPtyManager: () => { getPid: ReturnType<typeof vi.fn> }
 
+function useMetricsMocks(): void {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.useFakeTimers()
@@ -57,6 +57,23 @@ describe('registerMetricsHandlers', () => {
   afterEach(() => {
     vi.useRealTimers()
   })
+}
+
+const netstat = (bytesIn: number, bytesOut: number) => ({
+  stdout: `Name Mtu Network Address Ipkts Ierrs Ibytes Opkts Oerrs Obytes Drop\nen0 1500 <Link> aa:bb 1 0 ${bytesIn} 1 0 ${bytesOut} 0\n`,
+})
+
+async function registerAndGetSystemHandler() {
+  vi.resetModules()
+  const { registerMetricsHandlers } = await import('../../../src/main/ipc/metrics.ipc.js')
+  registerMetricsHandlers(getPtyManager() as never)
+  return mockHandle.mock.calls.find(([ch]) => ch === 'metrics:system')![1] as () => Promise<{
+    data: { netInBytesPerSec: number; netOutBytesPerSec: number }
+  }>
+}
+
+describe('registerMetricsHandlers', () => {
+  useMetricsMocks()
 
   it('metrics:system returns cpu/mem/net data', async () => {
     vi.resetModules()
@@ -86,69 +103,67 @@ describe('registerMetricsHandlers', () => {
     await vi.advanceTimersByTimeAsync(1000)
     expect(await handler()).toMatchObject({ data: { cpuPercent: 50 } })
   })
+})
 
-  describe('sampler lifecycle', () => {
-    const netstat = (bytesIn: number, bytesOut: number) => ({
-      stdout: `Name Mtu Network Address Ipkts Ierrs Ibytes Opkts Oerrs Obytes Drop\nen0 1500 <Link> aa:bb 1 0 ${bytesIn} 1 0 ${bytesOut} 0\n`,
-    })
-    beforeEach(() => setPlatform('darwin'))
+describe('registerMetricsHandlers — sampler lifecycle', () => {
+  useMetricsMocks()
+  beforeEach(() => setPlatform('darwin'))
 
-    async function registerAndGetSystemHandler() {
-      vi.resetModules()
-      const { registerMetricsHandlers } = await import('../../../src/main/ipc/metrics.ipc.js')
-      registerMetricsHandlers(getPtyManager() as never)
-      return mockHandle.mock.calls.find(([ch]) => ch === 'metrics:system')![1] as () => Promise<{
-        data: { netInBytesPerSec: number; netOutBytesPerSec: number }
-      }>
-    }
+  it('does not run netstat while no metrics view has polled', async () => {
+    await registerAndGetSystemHandler()
 
-    it('does not run netstat while no metrics view has polled', async () => {
-      await registerAndGetSystemHandler()
+    await vi.advanceTimersByTimeAsync(30_000)
 
-      await vi.advanceTimersByTimeAsync(30_000)
-
-      expect(mockExecFile).not.toHaveBeenCalled()
-    })
-
-    it('measures network bytes per second between samples once polled, without execSync', async () => {
-      mockExecFile.mockResolvedValueOnce(netstat(1000, 500)).mockResolvedValue(netstat(3000, 1500))
-      const system = await registerAndGetSystemHandler()
-
-      await system()
-      await vi.advanceTimersByTimeAsync(1000)
-      const result = await system()
-
-      expect(mockExecFile).toHaveBeenCalledWith('netstat', ['-ib'], expect.anything())
-      expect(result.data.netInBytesPerSec).toBe(2000)
-      expect(result.data.netOutBytesPerSec).toBe(1000)
-    })
-
-    it('stops sampling when the polls stop and starts again on the next poll', async () => {
-      mockExecFile.mockResolvedValue(netstat(1000, 500))
-      const system = await registerAndGetSystemHandler()
-
-      await system()
-      await vi.advanceTimersByTimeAsync(6000)
-      const callsWhilePolled = mockExecFile.mock.calls.length
-      await vi.advanceTimersByTimeAsync(30_000)
-      expect(mockExecFile).toHaveBeenCalledTimes(callsWhilePolled)
-
-      await system()
-      expect(mockExecFile).toHaveBeenCalledTimes(callsWhilePolled + 1)
-    })
-
-    it('does not start a second netstat while the previous one is still running', async () => {
-      let finish: (value: ReturnType<typeof netstat>) => void = () => {}
-      mockExecFile.mockReturnValue(new Promise((resolve) => (finish = resolve)))
-      const system = await registerAndGetSystemHandler()
-
-      await system()
-      await vi.advanceTimersByTimeAsync(3000)
-
-      expect(mockExecFile).toHaveBeenCalledTimes(1)
-      finish(netstat(1, 1))
-    })
+    expect(mockExecFile).not.toHaveBeenCalled()
   })
+
+  it('measures network bytes per second between samples once polled, without execSync', async () => {
+    mockExecFile.mockResolvedValueOnce(netstat(1000, 500)).mockResolvedValue(netstat(3000, 1500))
+    const system = await registerAndGetSystemHandler()
+
+    await system()
+    await vi.advanceTimersByTimeAsync(1000)
+    const result = await system()
+
+    expect(mockExecFile).toHaveBeenCalledWith('netstat', ['-ib'], expect.anything())
+    expect(result.data.netInBytesPerSec).toBe(2000)
+    expect(result.data.netOutBytesPerSec).toBe(1000)
+  })
+})
+
+describe('registerMetricsHandlers — sampler stops and overlaps', () => {
+  useMetricsMocks()
+  beforeEach(() => setPlatform('darwin'))
+
+  it('stops sampling when the polls stop and starts again on the next poll', async () => {
+    mockExecFile.mockResolvedValue(netstat(1000, 500))
+    const system = await registerAndGetSystemHandler()
+
+    await system()
+    await vi.advanceTimersByTimeAsync(6000)
+    const callsWhilePolled = mockExecFile.mock.calls.length
+    await vi.advanceTimersByTimeAsync(30_000)
+    expect(mockExecFile).toHaveBeenCalledTimes(callsWhilePolled)
+
+    await system()
+    expect(mockExecFile).toHaveBeenCalledTimes(callsWhilePolled + 1)
+  })
+
+  it('does not start a second netstat while the previous one is still running', async () => {
+    let finish: (value: ReturnType<typeof netstat>) => void = () => {}
+    mockExecFile.mockReturnValue(new Promise((resolve) => (finish = resolve)))
+    const system = await registerAndGetSystemHandler()
+
+    await system()
+    await vi.advanceTimersByTimeAsync(3000)
+
+    expect(mockExecFile).toHaveBeenCalledTimes(1)
+    finish(netstat(1, 1))
+  })
+})
+
+describe('registerMetricsHandlers — processes and pids', () => {
+  useMetricsMocks()
 
   it('metrics:processes returns empty array when no pids given', async () => {
     vi.resetModules()
@@ -168,6 +183,10 @@ describe('registerMetricsHandlers', () => {
     const result = await queryProcessMetrics([1234])
     expect(result).toEqual([{ pid: 1234, cpuPercent: 5.0, rssBytes: 1024 * 1024 }])
   })
+})
+
+describe('registerMetricsHandlers — truncated network rows', () => {
+  useMetricsMocks()
 
   it('readNetBytes tolerates truncated netstat rows on macOS', async () => {
     // Header + a row with too few columns + a row with non-numeric byte counts
@@ -187,6 +206,10 @@ describe('registerMetricsHandlers', () => {
     const { readNetBytes } = await import('../../../src/main/ipc/metrics.ipc.js')
     expect(await readNetBytes()).toEqual({ bytesIn: 0, bytesOut: 0 })
   })
+})
+
+describe('registerMetricsHandlers — ps output', () => {
+  useMetricsMocks()
 
   it('metrics:processes parses ps output', async () => {
     mockExecFile.mockImplementation(async (cmd: string) => ({
@@ -204,6 +227,10 @@ describe('registerMetricsHandlers', () => {
     expect(result.data[0].cpuPercent).toBe(12.5)
     expect(result.data[0].rssBytes).toBe(204800 * 1024)
   })
+})
+
+describe('registerMetricsHandlers — ps failures', () => {
+  useMetricsMocks()
 
   it('metrics:processes returns empty array when ps fails', async () => {
     mockExecFile.mockImplementation(async (cmd: string) => {
@@ -217,6 +244,10 @@ describe('registerMetricsHandlers', () => {
     const result = (await handler(null, { pids: [9999] })) as { data: unknown[] }
     expect(result.data).toEqual([])
   })
+})
+
+describe('registerMetricsHandlers — pids', () => {
+  useMetricsMocks()
 
   it('metrics:pids maps sessionIds to pids', async () => {
     vi.resetModules()
@@ -241,6 +272,10 @@ describe('registerMetricsHandlers', () => {
     const result = (await handler(null, {})) as { data: unknown[] }
     expect(result.data).toEqual([])
   })
+})
+
+describe('registerMetricsHandlers — network on linux', () => {
+  useMetricsMocks()
 
   it('metrics:system measures network rates from /proc/net/dev on linux', async () => {
     setPlatform('linux')
@@ -298,6 +333,14 @@ describe('readNetBytes (exported)', () => {
     expect(result.bytesIn).toBe(3000)
     expect(result.bytesOut).toBe(1500)
   })
+})
+
+describe('readNetBytes (exported) — darwin', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockCpus.mockReturnValue(makeCpus(800, 1000))
+    mockExecFile.mockResolvedValue({ stdout: '' })
+  })
 
   it('parses netstat -ib on Darwin, reads correct columns, skips lo0', async () => {
     setPlatform('darwin')
@@ -317,6 +360,14 @@ describe('readNetBytes (exported)', () => {
     // en0: Ibytes=200000 (col 6), Obytes=100000 (col 9); en1: 120000/60000; lo0 skipped
     expect(result.bytesIn).toBe(320000)
     expect(result.bytesOut).toBe(160000)
+  })
+})
+
+describe('readNetBytes (exported) — failures', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockCpus.mockReturnValue(makeCpus(800, 1000))
+    mockExecFile.mockResolvedValue({ stdout: '' })
   })
 
   it('returns { bytesIn: 0, bytesOut: 0 } when read/exec throws', async () => {
@@ -364,6 +415,13 @@ describe('queryProcessMetrics (exported)', () => {
       expect.anything()
     )
   })
+})
+
+describe('queryProcessMetrics (exported) — darwin and malformed output', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockCpus.mockReturnValue(makeCpus(800, 1000))
+  })
 
   it('parses ps output on Darwin and returns the same shape', async () => {
     setPlatform('darwin')
@@ -382,6 +440,13 @@ describe('queryProcessMetrics (exported)', () => {
       ['-p', '9999', '-o', 'pid=,%cpu=,rss='],
       expect.anything()
     )
+  })
+})
+
+describe('queryProcessMetrics (exported) — malformed output and failures', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockCpus.mockReturnValue(makeCpus(800, 1000))
   })
 
   it('skips malformed lines that have fewer than 3 parts', async () => {

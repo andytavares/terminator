@@ -20,9 +20,9 @@ vi.mock('fs', () => {
 
 import * as fs from 'fs'
 
-describe('FsWatcherService', () => {
-  let service: FsWatcherService
+let service: FsWatcherService
 
+function useWatcherService(): void {
   beforeEach(() => {
     vi.useFakeTimers()
     service = new FsWatcherService(1000)
@@ -32,6 +32,10 @@ describe('FsWatcherService', () => {
   afterEach(() => {
     vi.useRealTimers()
   })
+}
+
+describe('FsWatcherService', () => {
+  useWatcherService()
 
   it('attaches fs.watch on watchStart', () => {
     service.watchStart('/tmp/repo')
@@ -43,6 +47,10 @@ describe('FsWatcherService', () => {
     service.watchStart('/tmp/repo')
     expect(fs.watch).toHaveBeenCalledTimes(1)
   })
+})
+
+describe('FsWatcherService — events and polling fallback', () => {
+  useWatcherService()
 
   it('delivers change events to registered handlers', () => {
     const handler = vi.fn()
@@ -78,6 +86,10 @@ describe('FsWatcherService', () => {
       filename: null,
     })
   })
+})
+
+describe('FsWatcherService — stopping and watcher errors', () => {
+  useWatcherService()
 
   it('stops watcher on watchStop', () => {
     service.watchStart('/tmp/repo')
@@ -103,6 +115,10 @@ describe('FsWatcherService', () => {
       expect.objectContaining({ eventType: 'change', filename: null })
     )
   })
+})
+
+describe('FsWatcherService — event types', () => {
+  useWatcherService()
 
   it('maps rename eventType correctly', () => {
     const handler = vi.fn()
@@ -133,6 +149,10 @@ describe('FsWatcherService', () => {
       filename: null,
     })
   })
+})
+
+describe('FsWatcherService — polling and handler failures', () => {
+  useWatcherService()
 
   it('watchStop clears pollInterval when running in polling mode', () => {
     vi.mocked(fs.watch).mockImplementationOnce(() => {
@@ -164,6 +184,10 @@ describe('FsWatcherService', () => {
 
     expect(goodHandler).toHaveBeenCalled()
   })
+})
+
+describe('FsWatcherService — switching roots', () => {
+  useWatcherService()
 
   it('switches root correctly when watchStart is called with a new path', () => {
     service.watchStart('/tmp/repo-a')
