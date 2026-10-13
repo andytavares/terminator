@@ -33,11 +33,17 @@ The phases in `docs/research/perf/` and the ADRs 093–105 record each decision.
    functions, including `ExtensionsSection` and `executor.execute`), then turn the ESLint rule on
    for them.
 2. Clean-gate final report items: 929 repeated names and 255 runs of comments.
-3. Settings that nothing reads: `autosaveMs`, `editorFontSize`, `mcpSidecar`, git
-   `commit.signOff`, `maxDisplayedFiles`, `staleThresholdDays`. Each is implemented with a test of
-   its effect, or removed with its migration.
-4. Foundry `readOnlyTools` and `criticalPaths` settings need multi-line input.
-5. Tests for the effect of each remaining setting.
+3. Done: the settings nothing read are implemented or removed (decisions 15–18).
+4. Done: list settings are edited one item per line (decision 19).
+5. Done, but for one decision the user must make: every declared setting now has a test of its
+   effect, except two things the core declares and never implements. `workspaceScoped` on an
+   extension setting (git `enabled` and `commit.signOff`, Foundry's two lists) is documented in
+   `docs/EXTENSION-DEVELOPMENT.md` and the git README as "can be overridden per workspace", but
+   the core stores one value per key and `api.settings.get(key)` has no workspace to resolve
+   against. The `extensions` records in the global and workspace settings schemas are defaulted
+   and never read or written; they look meant to hold those per-workspace values. Implementing it
+   changes the SDK (`get` would need a workspace); dropping it changes the docs, the README scope
+   column and both schemas.
 6. Remote Control: 4 of 9 channels are driven end to end; the other 5 need e2e.
 7. `knip --production` as a second gate.
 8. Final review, the PR description with a "How to read this change" section, CI green on the head.
