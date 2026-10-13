@@ -36,11 +36,10 @@ The phases in `docs/research/perf/` and the ADRs 093–105 record each decision.
 2. Clean-gate final report items: 929 repeated names and 255 runs of comments.
 3. Done: the settings nothing read are implemented or removed (decisions 15–18).
 4. Done: list settings are edited one item per line (decision 19).
-5. Every declared setting now has a test of its effect. In progress: `workspaceScoped` extension
-   settings (git `enabled` and `commit.signOff`, Foundry's two lists) are documented in
-   `docs/EXTENSION-DEVELOPMENT.md` and the git README as "can be overridden per workspace", but
-   the core stores one value per key. Decision 21: build it, since the docs promise it and the
-   `extensions` records in both settings schemas already exist for it.
+5. Done: every declared setting has a test of its effect. `workspaceScoped` extension settings
+   (git `enabled` and `commit.signOff`, Foundry's two lists) are built (decision 21):
+   `api.settings.get(key, { repoPath })`, the workspace's `extensions` record, Workspace Settings
+   with "Use global default", and `tests/e2e/workspace-extension-settings.spec.ts`.
 6. Done: Remote Control's 9 channels are driven end to end (`remote-control.spec.ts`).
 7. Done: `knip --production` is a second gate (ADR 107).
 8. Final review, the PR description with a "How to read this change" section, CI green on the head.
