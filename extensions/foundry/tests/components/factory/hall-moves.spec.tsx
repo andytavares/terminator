@@ -86,18 +86,25 @@ afterEach(() => {
 describe('playing a replay', () => {
   it('pauses where it is, and plays again from the start once it has ended', async () => {
     mount(view())
-    fireEvent.click(await screen.findByRole('button', { name: 'Replay' }))
-    fireEvent.click(await screen.findByRole('button', { name: 'Pause' }))
-    await screen.findByRole('button', { name: 'Play' })
-    const position = (await screen.findByRole('slider', {
-      name: 'Replay position',
-    })) as HTMLInputElement
-    fireEvent.change(position, { target: { value: position.max } })
-    await waitFor(() => expect(position.value).toBe(position.max))
-    expect(screen.getByRole('button', { name: 'Play' })).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Play' }))
-    await screen.findByRole('button', { name: 'Pause' })
-    expect(Number(position.value)).toBeLessThan(Number(position.max))
+    // The replay's clock stands still: on a real one every step redraws the
+    // hall, and every query waiting for a button reads the whole hall again.
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+    try {
+      fireEvent.click(await screen.findByRole('button', { name: 'Replay' }))
+      fireEvent.click(await screen.findByRole('button', { name: 'Pause' }))
+      await screen.findByRole('button', { name: 'Play' })
+      const position = (await screen.findByRole('slider', {
+        name: 'Replay position',
+      })) as HTMLInputElement
+      fireEvent.change(position, { target: { value: position.max } })
+      await waitFor(() => expect(position.value).toBe(position.max))
+      expect(screen.getByRole('button', { name: 'Play' })).toBeTruthy()
+      fireEvent.click(screen.getByRole('button', { name: 'Play' }))
+      await screen.findByRole('button', { name: 'Pause' })
+      expect(Number(position.value)).toBeLessThan(Number(position.max))
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
 

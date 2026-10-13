@@ -1,7 +1,7 @@
 import { createChangeBus } from '../../helpers/change-bus.js'
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, waitFor, fireEvent, within } from '@testing-library/react'
+import { act, render, screen, waitFor, fireEvent, within } from '@testing-library/react'
 import { FactoryHall } from '../../../src/components/factory/FactoryHall.js'
 import { raiseGate } from '../../../src/gates/rules.js'
 
@@ -9,19 +9,11 @@ import { raiseGate } from '../../../src/gates/rules.js'
 // station per node, and the two moves this view keeps — attach, and opening
 // the inbox to decide a gate. Everything else stays in the List view.
 //
-// jsdom has no canvas, so `HallScene`'s 2D context is a fake this spec never
-// inspects: the point here is what the stations and the drawer say, not the
-// pixels `HallScene.spec.tsx` already covers.
-
-function fakeContext2D() {
-  return {
-    fillStyle: '#000',
-    globalCompositeOperation: 'source-over',
-    fillRect: vi.fn(),
-    drawImage: vi.fn(),
-    createRadialGradient: vi.fn(() => ({ addColorStop: vi.fn() })),
-  }
-}
+// The point here is what the stations and the drawer say, not the pixels
+// `HallScene.spec.tsx` already covers, so the canvas has no 2D context and the
+// hall draws nothing. A recording fake would take every pixel of the bake and
+// every frame: 220,000 fillRect calls in the transcript test alone, which ran
+// past five seconds on a loaded machine.
 
 function node(over: Record<string, unknown> = {}) {
   return {
@@ -169,9 +161,7 @@ function waitingAtTheGate() {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
-    fakeContext2D() as unknown as CanvasRenderingContext2D
-  )
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null)
 })
 
 afterEach(() => {
@@ -587,13 +577,22 @@ function playbackTests() {
       { at: 1000, nodes: [{ id: 'N-1', state: 'running', attempts: 1, sessionId: 's-1' }] },
       { at: 3000, nodes: [{ id: 'N-1', state: 'passed', attempts: 1, sessionId: 's-1' }] },
     ])
-    fireEvent.click(await screen.findByRole('button', { name: 'Replay' }))
-    await screen.findByRole('button', { name: 'Pause' })
-    fireEvent.click(screen.getByRole('button', { name: '4x' }))
-    expect(screen.getByRole('button', { name: '4x' }).getAttribute('aria-pressed')).toBe('true')
-    // 2 s of recording at 4x is half a second of replay
-    await waitFor(() => expect(plateText()).toContain('Done'), { timeout: 2500 })
-    await screen.findByRole('button', { name: 'Play' })
+    // The replay's own clock, so a loaded machine cannot stretch its 750 ms.
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+    try {
+      fireEvent.click(await screen.findByRole('button', { name: 'Replay' }))
+      await screen.findByRole('button', { name: 'Pause' })
+      fireEvent.click(screen.getByRole('button', { name: '4x' }))
+      expect(screen.getByRole('button', { name: '4x' }).getAttribute('aria-pressed')).toBe('true')
+      // 3 s of recording at 4x is 750 ms of replay, in steps of 100 ms
+      await act(() => vi.advanceTimersByTimeAsync(700))
+      expect(plateText()).not.toContain('Done')
+      await act(() => vi.advanceTimersByTimeAsync(100))
+      expect(plateText()).toContain('Done')
+      await screen.findByRole('button', { name: 'Play' })
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('says so when nothing was recorded for this run', async () => {
