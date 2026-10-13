@@ -71,6 +71,7 @@ describe('DailyLog adding subtasks', ghostTests)
 describe('DailyLog adding subtasks, continued', ghostTestsPart2)
 describe('DailyLog terminal links', linkTests)
 describe('DailyLog terminal links, continued', linkTestsPart2)
+describe('DailyLog terminal links the app cannot list', unlistableTests)
 describe('DailyLog jumping to a linked terminal', jumpTests)
 describe('DailyLog jumping to a linked terminal, continued', jumpTestsPart2)
 
@@ -245,5 +246,49 @@ function jumpTestsPart2() {
     )
     fireEvent.click(button('Jump to linked terminal'))
     await eventually(() => expect(bridge.calls('task-vault:navigate-to-terminal')).toHaveLength(1))
+  })
+}
+
+/** Collects the promise rejections nothing handled while `run` and a macrotask after it ran. */
+async function unhandledRejectionsDuring(run: () => Promise<void>): Promise<unknown[]> {
+  const reasons: unknown[] = []
+  const record = (reason: unknown) => void reasons.push(reason)
+  process.on('unhandledRejection', record)
+  try {
+    await run()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+  } finally {
+    process.off('unhandledRejection', record)
+  }
+  return reasons
+}
+
+function unlistableTests() {
+  it('says no session is open when the session list fails, leaving no rejection unhandled', async () => {
+    bridge = installBridge({
+      terminal: { listSessions: vi.fn(async () => Promise.reject(new Error('host gone'))) },
+      workspace: { list: vi.fn(async () => Promise.reject(new Error('host gone'))) },
+      project: { list: vi.fn(async () => ({ projects: [] })) },
+    })
+    const reasons = await unhandledRejectionsDuring(async () => {
+      renderTask(task('t1', 'Write'))
+      fireEvent.click(button('Link to terminal session'))
+    })
+    expect(reasons).toEqual([])
+    expect(screen.getByText('No active terminal sessions.')).toBeTruthy()
+  })
+
+  it('still lists the sessions, by tab, when the workspaces cannot be read', async () => {
+    bridge = installBridge({
+      terminal: { listSessions: vi.fn(async () => SESSIONS) },
+      workspace: { list: vi.fn(async () => Promise.reject(new Error('host gone'))) },
+      project: { list: vi.fn(async () => ({ projects: [] })) },
+    })
+    const reasons = await unhandledRejectionsDuring(async () => {
+      renderTask(task('t1', 'Write'))
+      fireEvent.click(button('Link to terminal session'))
+    })
+    expect(reasons).toEqual([])
+    expect(await screen.findByRole('option', { name: 'zsh' })).toBeTruthy()
   })
 }
