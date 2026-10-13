@@ -33,6 +33,7 @@ import type { Recipe } from '../../src/recipe/parse.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import type { LadderStep } from '../../src/verify/ladder.js'
 import type { ExecutorDeps } from '../../src/line/executor.js'
+import { ledgerActions } from '../helpers/order-ledger.js'
 
 let root: string
 let repo: string
@@ -135,10 +136,6 @@ function agentStarts(sessionId: string): { started: Promise<StartInput> } {
     }
   }) as never)
   return { started }
-}
-
-async function ledger(): Promise<string[]> {
-  return (await createOrderStore(root).entries('WO-1')).map((entry) => entry.action)
 }
 
 function git(cwd: string, ...args: string[]) {
@@ -425,7 +422,7 @@ function whatItWroteTests() {
     expect(
       await deps.collect({ nodeId: 'scout', role: 'scout', outputPath: outputPath() })
     ).toBeNull()
-    expect(await ledger()).toContain('rung.refused')
+    expect(await ledgerActions(root)).toContain('rung.refused')
   })
 }
 
@@ -451,7 +448,7 @@ function executorDepsGatesTests() {
       })
     )
     expect((await createGateStore(root).list()).map((gate) => gate.id)).toEqual(['WO-1-conflict'])
-    expect(await ledger()).toContain('gate.raised')
+    expect(await ledgerActions(root)).toContain('gate.raised')
   })
 }
 
@@ -471,7 +468,7 @@ function executorDepsVerdictsTests() {
     deps.onEvent({ type: 'wave', nodes: [] } as never)
     await deps.record('run.note', 'WO-1', 'a line')
     await vi.waitFor(async () =>
-      expect((await ledger()).sort()).toEqual(['run.note', 'verify.verdict'])
+      expect((await ledgerActions(root)).sort()).toEqual(['run.note', 'verify.verdict'])
     )
     const entries = await createOrderStore(root).entries('WO-1')
     expect(entries.find((entry) => entry.action === 'verify.verdict')?.reason).toBe(

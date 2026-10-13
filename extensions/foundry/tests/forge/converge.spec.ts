@@ -14,6 +14,7 @@ import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import { orderDir } from '../../src/data-root.js'
 import { makeTempDir } from '../../../../tests/support/temp-dir'
+import { writeFileWithDirs } from '../helpers/files.js'
 
 // Converging an order.
 //
@@ -68,10 +69,10 @@ describe('what the architect is told', () => {
   describe('where it runs', whereItRunsTests)
 })
 
-function write(value: unknown): string {
+/** Writes the architect's proposal for WO-1; where it went. */
+function writeProposal(value: unknown): string {
   const file = path.join(orderDir(root, 'WO-1'), 'proposal.json')
-  fs.mkdirSync(path.dirname(file), { recursive: true })
-  fs.writeFileSync(file, typeof value === 'string' ? value : JSON.stringify(value))
+  writeFileWithDirs(file, value)
   return file
 }
 type Finding = WorkOrder['redTeam'][number]
@@ -333,7 +334,7 @@ describe('reading back what it wrote', () => {
 
 function mergingAndDecidingTests() {
   it('merges a proposal into the order', () => {
-    const file = write({ acceptance: [CRITERION], note: 'first draft' })
+    const file = writeProposal({ acceptance: [CRITERION], note: 'first draft' })
     const result = readProposal(order(), file, '2026-09-06T12:00:00.000Z')
     expect(result.ok).toBe(true)
     expect(result.ok && result.order.acceptance).toHaveLength(1)
@@ -343,7 +344,7 @@ function mergingAndDecidingTests() {
   // Spec 062: the Forge stops the operator only for what the architect
   // cannot settle.
   it('decides a question the architect is at least 90% sure of, instead of asking', () => {
-    const file = write({
+    const file = writeProposal({
       openQuestions: [
         {
           id: 'Q-1',
@@ -362,7 +363,7 @@ function mergingAndDecidingTests() {
 
 function dismissedFindingsTests() {
   it('applies the findings the architect dismissed with confidence, whatever their severity', () => {
-    const file = write({
+    const file = writeProposal({
       dismissFindings: [
         { id: 'RT-no-non-goals', reason: 'nothing to exclude', confidence: 0.95 },
         {
@@ -390,25 +391,25 @@ function nothingBadOrStaleFilesTests() {
   })
 
   it('refuses one that is not readable JSON, rather than half-applying it', () => {
-    const file = write('{{{')
+    const file = writeProposal('{{{')
     const result = readProposal(order(), file, 'now')
     expect(result.ok).toBe(false)
     expect(!result.ok && result.reason).toMatch(/not readable/)
   })
 
   it('refuses one that reaches for a field it may not have', () => {
-    const file = write({ status: 'agreed' })
+    const file = writeProposal({ status: 'agreed' })
     const result = readProposal(order(), file, 'now')
     expect(result.ok).toBe(false)
     expect(!result.ok && result.reason).toMatch(/refused/)
   })
 
   it('clears the file whatever happened, so a stale one is never read as this turn', () => {
-    const file = write({ note: 'x' })
+    const file = writeProposal({ note: 'x' })
     readProposal(order(), file, 'now')
     expect(fs.existsSync(file)).toBe(false)
 
-    const bad = write('{{{')
+    const bad = writeProposal('{{{')
     readProposal(order(), bad, 'now')
     expect(fs.existsSync(bad)).toBe(false)
   })
@@ -416,7 +417,7 @@ function nothingBadOrStaleFilesTests() {
 
 function clearedFindingsTests() {
   it('closes a finding the redraft cleared, so asking for it is enough', () => {
-    const file = write({
+    const file = writeProposal({
       intent: { problem: 'p', outcome: 'o', nonGoals: ['the settings screen'] },
     })
     const before = order({
@@ -434,7 +435,7 @@ function reviewerFindingsTests() {
   // redrafted, but a reviewer's finding is not re-derivable, and it had no
   // field to say it was cleared — so the finding sat open and unchanged.
   it('closes a reviewer finding the architect says it cleared, with how', () => {
-    const file = write({
+    const file = writeProposal({
       resolveFindings: [{ id: 'RT-red-team-1', how: 'AC-1 now pages past 50 tickets' }],
     })
     const before = order({
@@ -456,7 +457,7 @@ function reviewerFindingsTests() {
 
 function convergeAcceptedFindingsTests() {
   it('does not reopen or rewrite a finding the operator already accepted', () => {
-    const file = write({ resolveFindings: [{ id: 'RT-red-team-1', how: 'changed it' }] })
+    const file = writeProposal({ resolveFindings: [{ id: 'RT-red-team-1', how: 'changed it' }] })
     const accepted = {
       id: 'RT-red-team-1',
       severity: 'low' as const,
@@ -473,26 +474,19 @@ function convergeAcceptedFindingsTests() {
 
 function refusalsAndDraftsTests() {
   it('refuses a resolution that does not say how', () => {
-    const file = write({ resolveFindings: [{ id: 'RT-red-team-1', how: '' }] })
+    const file = writeProposal({ resolveFindings: [{ id: 'RT-red-team-1', how: '' }] })
     const result = readProposal(order(), file, 'now')
     expect(result.ok).toBe(false)
   })
 
   it('leaves the order a draft — converging is not agreeing', () => {
-    const file = write({ acceptance: [CRITERION] })
+    const file = writeProposal({ acceptance: [CRITERION] })
     const result = readProposal(order(), file, 'now')
     expect(result.ok && result.order.status).toBe('draft')
   })
 }
 
 describe('when the proposal is read', () => {
-  function write(value: unknown): string {
-    const file = path.join(orderDir(root, 'WO-1'), 'proposal.json')
-    fs.mkdirSync(path.dirname(file), { recursive: true })
-    fs.writeFileSync(file, typeof value === 'string' ? value : JSON.stringify(value))
-    return file
-  }
-
   it('is not read while the file is not there — a turn ending is not the architect finishing', () => {
     // It thinks, replies, asks something, and may write on a later turn.
     // Reading at the first turn end reported "wrote no proposal" while it was
@@ -502,7 +496,7 @@ describe('when the proposal is read', () => {
   })
 
   it('is read once it is there, whatever turn wrote it', () => {
-    const file = write({ note: 'on the third turn' })
+    const file = writeProposal({ note: 'on the third turn' })
     const result = readProposal(order(), file, 'now')
     expect(result.ok && result.note).toBe('on the third turn')
   })

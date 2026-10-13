@@ -11,16 +11,12 @@ import { fakeHost, realGit, seededRepository, temporaryDirectory } from './helpe
 import { activateFoundry, deactivate } from './helpers/foundry-activation.js'
 import type { FoundryHost } from './helpers/foundry-host.js'
 import { resolveFoundryDataRoot } from '../src/workspace-root.js'
+import { writeFileWithDirs } from './helpers/files.js'
 
 vi.mock('../src/runtime/supervised-runner.js', () => import('./helpers/supervision-mocks.js'))
 vi.mock('../src/runtime/control-server.js', () => import('./helpers/supervision-mocks.js'))
 
 const userDataOf = (host: FoundryHost) => path.dirname(path.dirname(host.globalStorage))
-
-function write(file: string, content: string): void {
-  fs.mkdirSync(path.dirname(file), { recursive: true })
-  fs.writeFileSync(file, content)
-}
 
 afterEach(async () => {
   deactivate()
@@ -47,8 +43,11 @@ function movingTheRecordsTests() {
   it('moves the records and the runtime state out of userData', async () => {
     const host = fakeHost(() => '')
     const userData = userDataOf(host)
-    write(path.join(userData, 'foundry', '.foundry', 'orders', 'WO-1', 'ledger.jsonl'), '{"n":1}\n')
-    write(path.join(userData, 'foundry-runtime', 'mutes.json'), '[]')
+    writeFileWithDirs(
+      path.join(userData, 'foundry', '.foundry', 'orders', 'WO-1', 'ledger.jsonl'),
+      '{"n":1}\n'
+    )
+    writeFileWithDirs(path.join(userData, 'foundry-runtime', 'mutes.json'), '[]')
 
     await activateFoundry(host)
 
@@ -76,8 +75,8 @@ function recordsAlreadyMovedTests() {
       'WO-2',
       'ledger.jsonl'
     )
-    write(old, 'old')
-    write(kept, 'new')
+    writeFileWithDirs(old, 'old')
+    writeFileWithDirs(kept, 'new')
 
     await activateFoundry(host)
 

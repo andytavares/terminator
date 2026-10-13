@@ -22,6 +22,7 @@ import type { WorkOrder } from '../../src/order/schema.js'
 import type { RunGraph } from '../../src/line/run-graph.js'
 import type { Gate } from '../../src/gates/rules.js'
 import { theRunner } from '../helpers/supervision-mocks.js'
+import { ledgerFileText } from '../helpers/order-ledger.js'
 
 /**
  * Nothing is running. That is the state a fresh application is always in —
@@ -102,11 +103,6 @@ function graphOnDisk(): RunGraph {
   ) as RunGraph
 }
 
-function ledger(): string {
-  const file = path.join(dataDir, 'orders', 'WO-1', 'ledger.jsonl')
-  return fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : ''
-}
-
 beforeAll(async () => {
   host = fakeHost(() => dataDir)
   host.exec.mockResolvedValue({ exitCode: 0, stdout: '', stderr: '', timedOut: false })
@@ -160,7 +156,7 @@ function noticingTests() {
   it('writes it to the order’s own record, so it is answerable afterwards', async () => {
     await seedInterruptedRun()
     await call('foundry:attention')
-    expect(ledger()).toContain('run.interrupted')
+    expect(ledgerFileText(dataDir)).toContain('run.interrupted')
   })
 }
 
@@ -316,6 +312,6 @@ describe('stopping the whole order rather than one agent', () => {
     await seedInterruptedRun()
     expect(await call('foundry:run.stop', { id: 'WO-1' })).toEqual({ ok: true })
     expect((await createOrderStore(dataDir).load('WO-1'))?.status).toBe('cancelled')
-    expect(ledger()).toContain('run.stopped')
+    expect(ledgerFileText(dataDir)).toContain('run.stopped')
   })
 })

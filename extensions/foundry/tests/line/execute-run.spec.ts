@@ -17,6 +17,7 @@ import { checkoutPath } from '../../src/line/worktree.js'
 import { readGraph } from '../../src/state/live-index.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import { theRunner } from '../helpers/supervision-mocks.js'
+import { ledgerActions } from '../helpers/order-ledger.js'
 
 // These cases drive real git and give each step up to 20 s (the vi.waitFor
 // calls below); the 5 s default case timeout cut them off first on a busy machine.
@@ -60,10 +61,6 @@ function order(over: Partial<WorkOrder> = {}): WorkOrder {
   return agreedOrder(repo, over)
 }
 
-async function ledger(): Promise<string[]> {
-  return (await createOrderStore(dataDir).entries('WO-1')).map((entry) => entry.action)
-}
-
 async function started(saved: WorkOrder, recipe = 'direct'): Promise<void> {
   await createOrderStore(dataDir).save(saved)
   expect(await host.call('foundry:run.start', { id: saved.id, recipe })).toMatchObject({
@@ -101,7 +98,9 @@ describe('an agreed order whose checks pass', () => {
     githubAnswers(() => checks('pass'))
     await started(order())
     await shipped()
-    expect(await ledger()).toEqual(expect.arrayContaining(['run.complete', 'ship.draft_opened']))
+    expect(await ledgerActions(dataDir)).toEqual(
+      expect.arrayContaining(['run.complete', 'ship.draft_opened'])
+    )
     expect(await gateFor('ready-for-review')).toBeTruthy()
   })
 })
@@ -218,7 +217,8 @@ describe('an order whose check keeps failing', () => {
     theRunner.runCommand.mockResolvedValue(1)
     await started(order())
     await vi.waitFor(
-      async () => expect(await ledger()).toEqual(expect.arrayContaining(['run.halted'])),
+      async () =>
+        expect(await ledgerActions(dataDir)).toEqual(expect.arrayContaining(['run.halted'])),
       { timeout: 20_000, interval: 100 }
     )
     expect((await createOrderStore(dataDir).load('WO-1'))?.status).toBe('running')
@@ -231,7 +231,8 @@ async function halted(): Promise<void> {
   theRunner.runCommand.mockResolvedValue(1)
   await started(order())
   await vi.waitFor(
-    async () => expect(await ledger()).toEqual(expect.arrayContaining(['run.halted'])),
+    async () =>
+      expect(await ledgerActions(dataDir)).toEqual(expect.arrayContaining(['run.halted'])),
     { timeout: 20_000, interval: 100 }
   )
 }
@@ -276,14 +277,14 @@ function startingOverAndStoppingTests() {
     expect(reset.removed.length).toBeGreaterThan(0)
     expect(fs.existsSync(checkoutPath(dataDir, order(), 'app'))).toBe(false)
     expect((await createOrderStore(dataDir).load('WO-1'))?.status).toBe('agreed')
-    expect(await ledger()).toContain('run.reset')
+    expect(await ledgerActions(dataDir)).toContain('run.reset')
   })
 
   it('stop the whole order', async () => {
     await halted()
     expect(await host.call('foundry:run.stop', { id: 'WO-1' })).toEqual({ ok: true })
     expect((await createOrderStore(dataDir).load('WO-1'))?.status).toBe('cancelled')
-    expect(await ledger()).toContain('run.stopped')
+    expect(await ledgerActions(dataDir)).toContain('run.stopped')
   })
 
   it('refuse to start over an order that does not exist', async () => {

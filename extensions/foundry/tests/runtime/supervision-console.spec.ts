@@ -12,6 +12,7 @@ import { createOrderStore } from '../../src/order/store.js'
 import { draftOrder } from '../../src/order/draft.js'
 import { orderDir } from '../../src/data-root.js'
 import { theRunner } from '../helpers/supervision-mocks.js'
+import { ledgerActions } from '../helpers/order-ledger.js'
 
 vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
 vi.mock('../../src/runtime/control-server.js', () => import('../helpers/supervision-mocks.js'))
@@ -67,10 +68,6 @@ function heldCall(requestId: string, questions?: Array<{ question: string; optio
   }
 }
 
-async function ledger(): Promise<string[]> {
-  return (await createOrderStore(dataDir).entries('WO-1')).map((entry) => entry.action)
-}
-
 describe('a held tool call', () => {
   describe('listing and answering', listingAndAnsweringTests)
   describe('questions and words', questionsAndWordsTests)
@@ -121,7 +118,7 @@ function questionsAndWordsTests() {
       id: 'WO-1',
       root: dataDir,
     })
-    await vi.waitFor(async () => expect(await ledger()).toContain('intake.defect'))
+    await vi.waitFor(async () => expect(await ledgerActions(dataDir)).toContain('intake.defect'))
     noteResolved('req-2')
   })
 
@@ -301,7 +298,7 @@ describe('a run that stops making progress', () => {
 function shadowModeTests() {
   it('in shadow mode is recorded on the order and listed, and interrupts nobody', async () => {
     watchStalledRun('quiet-1')
-    await vi.waitFor(async () => expect(await ledger()).toContain('run.stalled'))
+    await vi.waitFor(async () => expect(await ledgerActions(dataDir)).toContain('run.stalled'))
     const listed = (await host.call('foundry:stalls-list')) as {
       firings: Array<{ firing: { sessionId: string; signal: string }; shadow: boolean }>
       shadowMode: boolean
@@ -361,7 +358,7 @@ function outsideAnOrderTests() {
     ] as never)
     runtime.stallWatcher?.tick()
     expect(stallFirings[0].firing.sessionId).toBe('loose-1')
-    expect(await ledger()).not.toContain('run.stalled')
+    expect(await ledgerActions(dataDir)).not.toContain('run.stalled')
   })
 }
 

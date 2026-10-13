@@ -9,7 +9,7 @@
 import { execFile } from 'node:child_process'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
-import { vi } from 'vitest'
+import { expect, vi } from 'vitest'
 import {
   dispatchChannel,
   type ChannelSpec,
@@ -234,6 +234,16 @@ export function fakeHost(dataDir: () => string): FoundryHost {
     ...parts,
     globalStorage,
   }
+}
+
+/** The message of every toast the host has shown, oldest first. */
+export function toastsShown(host: FoundryHost): string[] {
+  return host.showToast.mock.calls.map((call) => call[1] as string)
+}
+
+/** Until the host has shown a toast saying `message`. */
+export async function untilToastShown(host: FoundryHost, message: string): Promise<void> {
+  await vi.waitFor(() => expect(toastsShown(host)).toContain(message), { timeout: 10_000 })
 }
 
 /** A fresh temporary directory under the OS temp directory. */

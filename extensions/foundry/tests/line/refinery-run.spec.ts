@@ -16,6 +16,7 @@ import { createGateStore } from '../../src/gates/store.js'
 import { writeObservedFiles } from '../../src/line/observed-files.js'
 import { checkoutPath } from '../../src/line/worktree.js'
 import { theRunner } from '../helpers/supervision-mocks.js'
+import { ledgerActions } from '../helpers/order-ledger.js'
 
 // These cases drive real git and give each step up to 20 s (the vi.waitFor
 // calls below); the 5 s default case timeout cut them off first on a busy machine.
@@ -88,10 +89,6 @@ async function mergeFirst(): Promise<void> {
   merged.add(pullOf('WO-1'))
 }
 
-async function ledgerOf(id: string): Promise<string[]> {
-  return (await createOrderStore(dataDir).entries(id)).map((entry) => entry.action)
-}
-
 beforeEach(async () => {
   const parent = temporaryDirectory('fdry-refinery-order')
   dataDir = path.join(parent, 'records')
@@ -115,11 +112,14 @@ function rebasingTests() {
     host.gh.mockClear()
 
     await vi.advanceTimersByTimeAsync(60_000)
-    await vi.waitFor(async () => expect(await ledgerOf('WO-2')).toContain('refinery.rebased'), {
-      timeout: 20_000,
-      interval: 100,
-    })
-    expect(await ledgerOf('WO-1')).toContain('refinery.merged')
+    await vi.waitFor(
+      async () => expect(await ledgerActions(dataDir, 'WO-2')).toContain('refinery.rebased'),
+      {
+        timeout: 20_000,
+        interval: 100,
+      }
+    )
+    expect(await ledgerActions(dataDir, 'WO-1')).toContain('refinery.merged')
     // The rebased branch is the one on the remote, and CI was asked about it again.
     await vi.waitFor(() =>
       expect(host.gh).toHaveBeenCalledWith(
@@ -147,10 +147,13 @@ function aFailedRebaseTests() {
     await mergeFirst()
 
     await vi.advanceTimersByTimeAsync(60_000)
-    await vi.waitFor(async () => expect(await ledgerOf('WO-2')).toContain('refinery.conflict'), {
-      timeout: 20_000,
-      interval: 100,
-    })
+    await vi.waitFor(
+      async () => expect(await ledgerActions(dataDir, 'WO-2')).toContain('refinery.conflict'),
+      {
+        timeout: 20_000,
+        interval: 100,
+      }
+    )
     const gates = await createGateStore(dataDir).list()
     expect(gates.find((gate) => gate.rule === 'refinery.conflict')).toMatchObject({
       orderId: 'WO-2',

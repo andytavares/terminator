@@ -22,6 +22,7 @@ import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import type { Gate } from '../../src/gates/rules.js'
 import { theRunner } from '../helpers/supervision-mocks.js'
+import { ledgerFileText } from '../helpers/order-ledger.js'
 
 vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
 vi.mock('../../src/runtime/control-server.js', () => import('../helpers/supervision-mocks.js'))
@@ -39,11 +40,6 @@ function order(over: Partial<WorkOrder> = {}): WorkOrder {
     now: '2026-09-06T10:00:00.000Z',
   })
   return { ...base, status: 'draft', recipe: 'direct', ...over }
-}
-
-function ledger(): string {
-  const file = path.join(dataDir, 'orders', 'WO-1', 'ledger.jsonl')
-  return fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : ''
 }
 
 function saveGate(gate: Gate): void {
@@ -246,7 +242,7 @@ function resumeFailuresTests() {
     })) as { ok: boolean; actionError?: string }
 
     expect(r.actionError).toContain('draft')
-    expect(ledger()).toContain('gate.action_failed')
+    expect(ledgerFileText(dataDir)).toContain('gate.action_failed')
     expect(theRunner.start).not.toHaveBeenCalled()
   })
 }
@@ -268,10 +264,10 @@ function agreeingAgainTests() {
     await seed(true)
     await call('foundry:inbox.decide', { gateId: 'WO-1-forge-defect', option: 'answer' })
 
-    await vi.waitFor(() => expect(ledger()).toContain('"action":"run.started"'), {
+    await vi.waitFor(() => expect(ledgerFileText(dataDir)).toContain('"action":"run.started"'), {
       timeout: 5000,
     })
-    const lines = ledger()
+    const lines = ledgerFileText(dataDir)
       .trim()
       .split('\n')
       .map((l) => JSON.parse(l) as { action: string; actor: string })
@@ -286,7 +282,9 @@ function theInboxTests() {
     await seed(false)
     await call('foundry:inbox.decide', { gateId: 'WO-1-forge-defect', option: 'answer' })
 
-    await vi.waitFor(() => expect(ledger()).toContain('order.redrafted'), { timeout: 5000 })
+    await vi.waitFor(() => expect(ledgerFileText(dataDir)).toContain('order.redrafted'), {
+      timeout: 5000,
+    })
     await vi.waitFor(
       async () => {
         const inbox = (await call('foundry:inbox.list')) as {
@@ -300,7 +298,7 @@ function theInboxTests() {
     )
     expect(((await call('foundry:attention')) as { inbox: number }).inbox).toBe(1)
     expect((await createOrderStore(dataDir).load('WO-1'))?.status).toBe('draft')
-    expect(ledger()).not.toContain('run.started')
+    expect(ledgerFileText(dataDir)).not.toContain('run.started')
   })
 }
 
@@ -317,16 +315,19 @@ function theOrderBeforeTests() {
 
     try {
       await call('foundry:inbox.decide', { gateId: 'WO-1-forge-defect', option: 'answer' })
-      await vi.waitFor(() => expect(ledger()).toMatch(/"action":"run\.(started|refused)"/), {
-        timeout: 2000,
-      })
+      await vi.waitFor(
+        () => expect(ledgerFileText(dataDir)).toMatch(/"action":"run\.(started|refused)"/),
+        {
+          timeout: 2000,
+        }
+      )
       await new Promise((resolve) => setTimeout(resolve, 200))
     } finally {
       slow.restore()
     }
 
-    expect(ledger()).not.toContain('run.refused')
-    expect(ledger()).toContain('"action":"run.started"')
+    expect(ledgerFileText(dataDir)).not.toContain('run.refused')
+    expect(ledgerFileText(dataDir)).toContain('"action":"run.started"')
     const saved = await createOrderStore(dataDir).load('WO-1')
     expect(saved?.redTeam.find((f) => f.id === 'RT-inspector-6')?.status).toBe('resolved')
   })
