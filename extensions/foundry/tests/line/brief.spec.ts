@@ -107,6 +107,28 @@ describe('the instruction', () => {
   })
 })
 
+describe('a node with no role', () => {
+  it('gets the order and nothing it would have to be permitted to read', () => {
+    const text = brief({ order: order(), role: null, units: [unit()], rules: [] })
+    expect(text.startsWith('---')).toBe(true)
+    expect(text).toContain('# Refuse an expired refresh token')
+    expect(text).toContain('it is refused with a 401')
+    expect(text).not.toContain('## The unit:')
+    expect(text).not.toContain('## The repository')
+  })
+
+  it('has no output contract to end on', () => {
+    const text = brief({
+      order: order(),
+      role: null,
+      units: [],
+      rules: [],
+      outputPath: '/data/orders/WO-1/rungs/x.json',
+    })
+    expect(text).not.toContain('What to write, and where')
+  })
+})
+
 describe('what each role may read is declared, not assumed', () => {
   describe('the builder brief', theBuilderBriefTests)
   describe('open findings', openFindingsTests)
