@@ -1,22 +1,23 @@
-import { execFile as execFileCb } from 'child_process'
-import { promisify } from 'util'
 import { join } from 'path'
 import type { Branch, WorktreeInfo } from '../../shared/types/index.js'
 import type { ChangeStats } from '../../shared/schemas/git.schema.js'
+import { runCommand } from '../shell/shell-executor.js'
 import { GIT_ENV } from './git-env.js'
-
-const execFile = promisify(execFileCb)
 
 const GIT_TIMEOUT = 10_000
 const FETCH_TIMEOUT = 60_000
 
-async function git(args: string[], cwd: string): Promise<string> {
-  const { stdout } = await execFile('git', args, {
-    cwd,
-    timeout: GIT_TIMEOUT,
-    env: GIT_ENV,
-  })
-  return stdout.trim()
+/**
+ * Runs git and resolves with its trimmed stdout, or rejects with its stderr.
+ * Through runCommand, so a git still running when the app quits is stopped
+ * with whatever it started (stopRunningCommands).
+ */
+async function git(args: string[], cwd: string, timeoutMs = GIT_TIMEOUT): Promise<string> {
+  const result = await runCommand({ command: 'git', args, cwd, timeoutMs }, GIT_ENV)
+  if (result.exitCode !== 0) {
+    throw new Error(`Command failed: git ${args.join(' ')}\n${result.stderr}`)
+  }
+  return result.stdout.trim()
 }
 
 /**
@@ -129,11 +130,7 @@ export async function listBranches(dirPath: string): Promise<Branch[]> {
 }
 
 export async function fetchRemotes(dirPath: string): Promise<void> {
-  await execFile('git', ['fetch', '--all', '--prune'], {
-    cwd: dirPath,
-    timeout: FETCH_TIMEOUT,
-    env: GIT_ENV,
-  })
+  await git(['fetch', '--all', '--prune'], dirPath, FETCH_TIMEOUT)
 }
 
 export async function checkoutBranch(dirPath: string, branch: string): Promise<void> {
