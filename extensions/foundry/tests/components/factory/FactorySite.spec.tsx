@@ -120,35 +120,40 @@ function theCardsTests() {
   })
 }
 
+/** A standing that says the order is finished. */
+const doneStanding = (label: string) => ({
+  kind: 'done' as const,
+  turn: 'foundry' as const,
+  label,
+  headline: '',
+  detail: '',
+  done: 1,
+  total: 1,
+  gateId: null,
+})
+
+/** Two shipped orders either side of one still building. */
+const SHIPPED_AROUND_BUILDING = [
+  {
+    id: 'WO-1',
+    title: 'Shipped early',
+    status: 'shipped',
+    standing: doneStanding('shipped'),
+    createdAt: '2026-10-01T00:00:00.000Z',
+  },
+  { id: 'WO-2', title: 'Building', status: 'running', createdAt: '2026-10-02T00:00:00.000Z' },
+  {
+    id: 'WO-3',
+    title: 'Shipped late',
+    status: 'shipped',
+    standing: doneStanding('shipped'),
+    createdAt: '2026-10-05T00:00:00.000Z',
+  },
+] as FactoryOrderRow[]
+
 function completedOrdersTests() {
   it('puts finished orders in their own section, marked done, newest first', async () => {
-    const done = (label: string) => ({
-      kind: 'done' as const,
-      turn: 'foundry' as const,
-      label,
-      headline: '',
-      detail: '',
-      done: 1,
-      total: 1,
-      gateId: null,
-    })
-    mount([
-      {
-        id: 'WO-1',
-        title: 'Shipped early',
-        status: 'shipped',
-        standing: done('shipped'),
-        createdAt: '2026-10-01T00:00:00.000Z',
-      },
-      { id: 'WO-2', title: 'Building', status: 'running', createdAt: '2026-10-02T00:00:00.000Z' },
-      {
-        id: 'WO-3',
-        title: 'Shipped late',
-        status: 'shipped',
-        standing: done('shipped'),
-        createdAt: '2026-10-05T00:00:00.000Z',
-      },
-    ])
+    mount(SHIPPED_AROUND_BUILDING)
     await waitFor(() => screen.getByText('Building'))
 
     const active = screen.getByRole('region', { name: 'Active' })

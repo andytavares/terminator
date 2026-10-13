@@ -61,36 +61,43 @@ let openExternal: ReturnType<typeof vi.fn>
 let runCommand: ReturnType<typeof vi.fn>
 let hasCommand: ReturnType<typeof vi.fn>
 
+const ok = () => ({ ok: true })
+
+/** What each channel answers for a Floor showing `view`; `live` overrides the defaults. */
+function floorReplies(view: Record<string, unknown>, live: Record<string, unknown>) {
+  const control = () => live.control ?? ok()
+  const replies: Record<string, () => unknown> = {
+    'foundry:run.observe': () => view,
+    'foundry:permissions-list': () => ({ pending: live.pending ?? [] }),
+    'foundry:stalls-list': () => ({
+      firings: live.stalls ?? [],
+      shadowMode: live.shadowMode ?? true,
+    }),
+    'foundry:run.resume': () => live.resume ?? { started: true, reclaimed: [] },
+    'foundry:inbox.decide': () => live.decide ?? ok(),
+    'foundry:run.stop': () => live.stop ?? ok(),
+    'foundry:permission-hand-back': () => live.handBack ?? ok(),
+    'foundry:run-terminal': () => live.terminal ?? ok(),
+    'foundry:feed-list': () => ({ entries: live.feed ?? [], mutes: live.mutes ?? [] }),
+    'foundry:feed-unmute': () => ({ mutes: [] }),
+    'foundry:feed-dismiss': ok,
+    'foundry:feed-mute': ok,
+    'foundry:run-transcript': () => ({ lines: live.lines ?? [] }),
+    'foundry:permission-resolve': () => live.resolve ?? ok(),
+    'foundry:run-interrupt': control,
+    'foundry:run-stop': control,
+    'foundry:run-redirect': control,
+    'foundry:session.attach': () => live.attach ?? { terminalSessionId: 't-1' },
+  }
+  return replies
+}
+
 function mount(view: Record<string, unknown>, live: Record<string, unknown> = {}) {
   bus = createChangeBus()
-  invoke = vi.fn(async (channel: string) => {
-    if (channel === 'foundry:run.observe') return view
-    if (channel === 'foundry:permissions-list') return { pending: live.pending ?? [] }
-    if (channel === 'foundry:stalls-list') {
-      return { firings: live.stalls ?? [], shadowMode: live.shadowMode ?? true }
-    }
-    if (channel === 'foundry:run.resume') return live.resume ?? { started: true, reclaimed: [] }
-    if (channel === 'foundry:inbox.decide') return live.decide ?? { ok: true }
-    if (channel === 'foundry:run.stop') return live.stop ?? { ok: true }
-    if (channel === 'foundry:permission-hand-back') return live.handBack ?? { ok: true }
-    if (channel === 'foundry:run-terminal') return live.terminal ?? { ok: true }
-    if (channel === 'foundry:feed-list') {
-      return { entries: live.feed ?? [], mutes: live.mutes ?? [] }
-    }
-    if (channel === 'foundry:feed-unmute') return { mutes: [] }
-    if (channel === 'foundry:feed-dismiss' || channel === 'foundry:feed-mute') return { ok: true }
-    if (channel === 'foundry:run-transcript') return { lines: live.lines ?? [] }
-    if (channel === 'foundry:permission-resolve') return live.resolve ?? { ok: true }
-    if (
-      channel === 'foundry:run-interrupt' ||
-      channel === 'foundry:run-stop' ||
-      channel === 'foundry:run-redirect'
-    ) {
-      return live.control ?? { ok: true }
-    }
-    if (channel === 'foundry:session.attach') return live.attach ?? { terminalSessionId: 't-1' }
-    return { terminalSessionId: 't-1', ok: true }
-  })
+  const replies = floorReplies(view, live)
+  invoke = vi.fn(async (channel: string) =>
+    channel in replies ? replies[channel]() : { terminalSessionId: 't-1', ok: true }
+  )
   ;(window as unknown as Record<string, unknown>).electronAPI = {
     extensionBridge: { invoke, on: bus.on },
     shell: { openExternal },
@@ -257,7 +264,30 @@ function nothingToShowTests() {
   })
 }
 
+/** A run whose CI is in round 1 of 3 and has decided; `over` says how. */
+function withCi(over: Record<string, unknown>) {
+  return reply({
+    ci: { round: 1, max: 3, pulls: [], reason: '', at: '2026-09-06T10:00:00.000Z', ...over },
+  })
+}
+
+const FAILED_TEST = {
+  name: 'test',
+  bucket: 'fail',
+  link: 'https://github.com/x/y/actions/runs/1',
+  workflow: 'CI',
+}
+
 describe('the CI band', () => {
+  describe('a decided run', aDecidedRunTests)
+  describe('while it is still running', () => {
+    describe('the round and spinner', theRoundAndSpinnerTests)
+    describe('checks and links', checksAndLinksTests)
+  })
+  describe('the checks', theChecksTests)
+})
+
+function aDecidedRunTests() {
   it('shows nothing when the run has no CI state', async () => {
     mount(reply())
     await waitFor(() => screen.getByText(/WO-1/))
@@ -265,77 +295,31 @@ describe('the CI band', () => {
   })
 
   it('says a green run is green, and its round', async () => {
-    mount(
-      reply({
-        ci: {
-          round: 2,
-          max: 3,
-          status: 'green',
-          pulls: [{ url: 'https://github.com/x/y/pull/1', checks: [] }],
-          reason: '',
-          at: '2026-09-06T10:00:00.000Z',
-        },
-      })
-    )
+    const pulls = [{ url: 'https://github.com/x/y/pull/1', checks: [] }]
+    mount(withCi({ round: 2, status: 'green', pulls }))
     await waitFor(() => screen.getByText('CI'))
     expect(screen.getByText('Passed')).toBeTruthy()
     expect(document.body.textContent).not.toMatch(/Round \d of \d/)
   })
 
   it('says why CI is not measured', async () => {
-    mount(
-      reply({
-        ci: {
-          round: 1,
-          max: 3,
-          status: 'not_measured',
-          pulls: [],
-          reason: 'no checks were reported',
-          at: '2026-09-06T10:00:00.000Z',
-        },
-      })
-    )
+    mount(withCi({ status: 'not_measured', reason: 'no checks were reported' }))
     await waitFor(() => screen.getByText('CI'))
     expect(screen.getByText(/Not measured: no checks were reported/)).toBeTruthy()
   })
+}
 
-  describe('while it is still running', () => {
-    describe('the round and spinner', theRoundAndSpinnerTests)
-    describe('checks and links', checksAndLinksTests)
-  })
-
+function theChecksTests() {
   it('lists each check by name, bucket and a link to it', async () => {
-    mount(
-      reply({
-        ci: {
-          round: 1,
-          max: 3,
-          status: 'red',
-          pulls: [
-            {
-              url: 'https://github.com/x/y/pull/1',
-              checks: [
-                {
-                  name: 'test',
-                  bucket: 'fail',
-                  link: 'https://github.com/x/y/actions/runs/1',
-                  workflow: 'CI',
-                },
-              ],
-            },
-          ],
-          reason: '',
-          at: '2026-09-06T10:00:00.000Z',
-        },
-      })
-    )
+    const pulls = [{ url: 'https://github.com/x/y/pull/1', checks: [FAILED_TEST] }]
+    mount(withCi({ status: 'red', pulls }))
     await waitFor(() => screen.getByText('CI'))
     expect(screen.getByText('test')).toBeTruthy()
     expect(screen.getByText('fail')).toBeTruthy()
     const link = screen.getByRole('link', { name: /test/i })
     expect(link.getAttribute('href')).toBe('https://github.com/x/y/actions/runs/1')
   })
-})
+}
 
 function theRoundAndSpinnerTests() {
   it('says what round it is in words, and how many fixes are allowed', async () => {
@@ -972,35 +956,28 @@ function blockedNodesTests() {
   })
 }
 
+/** The ship gate of a direct run, which belongs to no lane. */
+const SHIP_GATE = {
+  id: 'N-9',
+  unitId: null,
+  lane: null,
+  role: null,
+  kind: 'gate',
+  state: 'waiting',
+  sessionId: null,
+  attempts: 0,
+  startedAt: null,
+  endedAt: null,
+  dependsOn: [],
+  stepId: 'ship',
+  reworks: 0,
+  feedback: [],
+}
+
 describe('the group that is not a lane', () => {
   it('says the nodes with no lane belong to the whole order', async () => {
-    mount(
-      reply({
-        graph: {
-          orderId: 'WO-1',
-          recipe: 'direct',
-          nodes: [
-            {
-              id: 'N-9',
-              unitId: null,
-              lane: null,
-              role: null,
-              kind: 'gate',
-              state: 'waiting',
-              sessionId: null,
-              attempts: 0,
-              startedAt: null,
-              endedAt: null,
-              dependsOn: [],
-              stepId: 'ship',
-              reworks: 0,
-              feedback: [],
-            },
-          ],
-        },
-        labels: { 'N-9': 'ship' },
-      })
-    )
+    const graph = { orderId: 'WO-1', recipe: 'direct', nodes: [SHIP_GATE] }
+    mount(reply({ graph, labels: { 'N-9': 'ship' } }))
     await waitFor(() => expect(screen.getByText('the whole order')).toBeTruthy())
   })
 })
@@ -1207,6 +1184,56 @@ describe('getting into a running agent’s terminal', () => {
   })
 })
 
+function standing(over: Record<string, unknown> = {}) {
+  return {
+    kind: 'working',
+    turn: 'foundry',
+    label: 'building 0/6',
+    headline: 'Building',
+    detail: '1 agent is working — 0 of 6 steps done.',
+    done: 0,
+    total: 6,
+    gateId: null,
+    ...over,
+  }
+}
+
+const GATE = {
+  id: 'WO-1-budget.exceeded-1',
+  rule: 'budget.exceeded',
+  orderId: 'WO-1',
+  nodeId: null,
+  summary: 'Make all text red has gone past its wall clock budget',
+  why: 'The order budgets 90 and this run is at 90.',
+  evidence: [],
+  options: [
+    { id: 'raise', label: 'Raise the budget', consequence: 'Work continues with more room.' },
+    { id: 'stop', label: 'Stop here', consequence: 'The order is cancelled and reconciled.' },
+    { id: 'hold', label: 'Hold', consequence: 'Nothing proceeds until you come back to it.' },
+  ],
+  defaultIfIgnored: 'hold',
+  deadline: null,
+  blockedUnits: 5,
+  riskGrade: 'P2',
+  raisedAt: '2026-09-09T18:12:21.514Z',
+  decision: null,
+}
+
+const RECORDED = {
+  ...GATE,
+  summary: 'Make all text red has gone past its wall clock budget',
+  why: 'The order budgets 10 minutes and this run is at 47.',
+  breach: { kind: 'wall_clock', limit: 10, actual: 47 },
+}
+function halted() {
+  mount(
+    reply({
+      standing: standing({ kind: 'halted', turn: 'you', headline: 'Halted — your move' }),
+      waiting: [RECORDED],
+    })
+  )
+}
+
 // What to do next.
 //
 // This screen used to open with an order id, a recipe name and a wall of grey
@@ -1214,41 +1241,21 @@ describe('getting into a running agent’s terminal', () => {
 // like a run mid-build, the gate holding it was named nowhere on the screen,
 // and the list that sent you here said the same order was "ready to hand off".
 describe('the standing band', () => {
-  function standing(over: Record<string, unknown> = {}) {
-    return {
-      kind: 'working',
-      turn: 'foundry',
-      label: 'building 0/6',
-      headline: 'Building',
-      detail: '1 agent is working — 0 of 6 steps done.',
-      done: 0,
-      total: 6,
-      gateId: null,
-      ...over,
-    }
-  }
+  describe('the headline', theHeadlineTests)
+  describe('the live band', theLiveBandTests)
+  describe('progress and the gate', progressAndTheGateTests)
+  describe('answering the gate', answeringTheGateTests)
+  describe('raising the budget it stopped at', raisingTheBudgetItStoppedAtTests)
+  describe('options and whose move', optionsAndWhoseMoveTests)
+  describe('refetching', refetchingTests)
+  describe('reading transcripts', readingTranscriptsTests)
+  describe('live state', liveStateTests)
+  describe('handed back terminals', handedBackTerminalsTests)
+  describe('no standing', noStandingTests)
+  describe('trying again', tryingAgainTests)
+})
 
-  const GATE = {
-    id: 'WO-1-budget.exceeded-1',
-    rule: 'budget.exceeded',
-    orderId: 'WO-1',
-    nodeId: null,
-    summary: 'Make all text red has gone past its wall clock budget',
-    why: 'The order budgets 90 and this run is at 90.',
-    evidence: [],
-    options: [
-      { id: 'raise', label: 'Raise the budget', consequence: 'Work continues with more room.' },
-      { id: 'stop', label: 'Stop here', consequence: 'The order is cancelled and reconciled.' },
-      { id: 'hold', label: 'Hold', consequence: 'Nothing proceeds until you come back to it.' },
-    ],
-    defaultIfIgnored: 'hold',
-    deadline: null,
-    blockedUnits: 5,
-    riskGrade: 'P2',
-    raisedAt: '2026-09-09T18:12:21.514Z',
-    decision: null,
-  }
-
+function theHeadlineTests() {
   it('opens with where the run stands and what the order is called', async () => {
     mount(reply({ standing: standing(), title: 'Make all text in the application red' }))
     await waitFor(() => expect(screen.getByText('Building')).toBeTruthy())
@@ -1272,7 +1279,9 @@ describe('the standing band', () => {
       expect.objectContaining({ sessionId: 's-1' })
     )
   })
+}
 
+function theLiveBandTests() {
   it('shows one row per message in the live band, the first line of it', async () => {
     const at = Date.now() - 3000
     mount(reply({ standing: standing() }), {
@@ -1303,7 +1312,9 @@ describe('the standing band', () => {
       .map((c) => (c[1] as { sessionId: string }).sessionId)
     expect(new Set(asked)).toEqual(new Set(['s-1']))
   })
+}
 
+function progressAndTheGateTests() {
   it('says how far along the run is', async () => {
     mount(reply({ standing: standing({ done: 2, total: 6 }) }))
     await waitFor(() => expect(screen.getByText('2 of 6')).toBeTruthy())
@@ -1328,7 +1339,9 @@ describe('the standing band', () => {
       expect(screen.getByRole('button', { name: new RegExp(option.label) })).toBeTruthy()
     }
   })
+}
 
+function answeringTheGateTests() {
   it('answers the gate through the same channel the inbox answers it with', async () => {
     mount(
       reply({
@@ -1345,78 +1358,15 @@ describe('the standing band', () => {
       })
     )
   })
+}
 
-  // "Raise the budget" resumed with the same budget and stopped again. A gate
-  // that knows which budget it stopped at asks for the new limit first.
-  describe('raising the budget it stopped at', () => {
-    const RECORDED = {
-      ...GATE,
-      summary: 'Make all text red has gone past its wall clock budget',
-      why: 'The order budgets 10 minutes and this run is at 47.',
-      breach: { kind: 'wall_clock', limit: 10, actual: 47 },
-    }
+function raisingTheBudgetItStoppedAtTests() {
+  describe('asking for a limit', askingForALimitTests)
 
-    function halted() {
-      mount(
-        reply({
-          standing: standing({ kind: 'halted', turn: 'you', headline: 'Halted — your move' }),
-          waiting: [RECORDED],
-        })
-      )
-    }
+  describe('no limit and cancel', noLimitAndCancelTests)
+}
 
-    it('asks for the new limit instead of deciding', async () => {
-      halted()
-      await waitFor(() => expect(screen.getByText(RECORDED.summary)).toBeTruthy())
-      fireEvent.click(screen.getByRole('button', { name: /Raise the budget/ }))
-      const field = screen.getByRole('spinbutton', { name: 'Minutes' }) as HTMLInputElement
-      expect(Number(field.value)).toBeGreaterThanOrEqual(47)
-      expect(screen.getByText('At least 47.')).toBeTruthy()
-      expect(invoke).not.toHaveBeenCalledWith('foundry:inbox.decide', expect.anything())
-    })
-
-    it('sends the limit the operator chose with the decision', async () => {
-      halted()
-      await waitFor(() => expect(screen.getByText(RECORDED.summary)).toBeTruthy())
-      fireEvent.click(screen.getByRole('button', { name: /Raise the budget/ }))
-      fireEvent.change(screen.getByRole('spinbutton', { name: 'Minutes' }), {
-        target: { value: '80' },
-      })
-      fireEvent.click(screen.getByRole('button', { name: 'Raise and resume' }))
-      await waitFor(() =>
-        expect(invoke).toHaveBeenCalledWith('foundry:inbox.decide', {
-          gateId: RECORDED.id,
-          option: 'raise',
-          limit: 80,
-        })
-      )
-    })
-
-    it('sends no limit', async () => {
-      halted()
-      await waitFor(() => expect(screen.getByText(RECORDED.summary)).toBeTruthy())
-      fireEvent.click(screen.getByRole('button', { name: /Raise the budget/ }))
-      fireEvent.click(screen.getByRole('checkbox', { name: 'No limit on minutes' }))
-      fireEvent.click(screen.getByRole('button', { name: 'Raise and resume' }))
-      await waitFor(() =>
-        expect(invoke).toHaveBeenCalledWith('foundry:inbox.decide', {
-          gateId: RECORDED.id,
-          option: 'raise',
-          limit: null,
-        })
-      )
-    })
-
-    it('goes back to the options on cancel', async () => {
-      halted()
-      await waitFor(() => expect(screen.getByText(RECORDED.summary)).toBeTruthy())
-      fireEvent.click(screen.getByRole('button', { name: /Raise the budget/ }))
-      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
-      expect(screen.queryByRole('spinbutton', { name: 'Minutes' })).toBeNull()
-      expect(screen.getByRole('button', { name: /Stop here/ })).toBeTruthy()
-    })
-  })
-
+function optionsAndWhoseMoveTests() {
   it('says what happens to each option, and what happens if you do nothing', async () => {
     mount(
       reply({
@@ -1440,7 +1390,9 @@ describe('the standing band', () => {
     await waitFor(() => expect(screen.getByText('Building')).toBeTruthy())
     expect(document.querySelector('.fdry-standing.is-yours')).toBeNull()
   })
+}
 
+function refetchingTests() {
   // The graph half of this screen was fetched once, on mount, and never again
   // — so a state chip was a snapshot of whenever the panel happened to open.
   it('refetches the graph when Foundry says this order changed, and not for another', async () => {
@@ -1459,7 +1411,9 @@ describe('the standing band', () => {
     expect(observed()).toBe(before + 1)
     vi.useRealTimers()
   })
+}
 
+function readingTranscriptsTests() {
   // What the agents are saying is written by their own processes, so it is the
   // one thing still asked for on a timer.
   it('keeps reading what the agents are saying, and stops while hidden', async () => {
@@ -1480,7 +1434,9 @@ describe('the standing band', () => {
     Object.defineProperty(document, 'hidden', { configurable: true, get: () => false })
     vi.useRealTimers()
   })
+}
 
+function liveStateTests() {
   it('reads the feed and the stalls when Foundry says live state changed, not on a timer', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     mount(reply({ standing: standing() }))
@@ -1495,7 +1451,9 @@ describe('the standing band', () => {
     expect(feedReads()).toBe(2)
     vi.useRealTimers()
   })
+}
 
+function handedBackTerminalsTests() {
   // The failure the whole band came out of: a tool call nobody answered was
   // handed back to the terminal's own prompt, the agent stopped there, and the
   // screen went on drawing a working build over it for two hours.
@@ -1520,7 +1478,9 @@ describe('the standing band', () => {
       expect(invoke).toHaveBeenCalledWith('foundry:run-terminal', { sessionId: 's-1' })
     )
   })
+}
 
+function noStandingTests() {
   // A host part way through an upgrade answers without one. The panel has to
   // render the run anyway rather than blank.
   it('renders the run when the host sends no standing', async () => {
@@ -1528,7 +1488,9 @@ describe('the standing band', () => {
     await waitFor(() => expect(screen.getByText('Stop the run')).toBeTruthy())
     expect(document.querySelector('.fdry-standing')).toBeNull()
   })
+}
 
+function tryingAgainTests() {
   // Every step passed and the run still never opened its pull request — the
   // one move left is to have Foundry check the work again and try.
   it('offers to try again when a finished run never shipped', async () => {
@@ -1558,7 +1520,62 @@ describe('the standing band', () => {
     await waitFor(() => expect(screen.getByText('Building')).toBeTruthy())
     expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull()
   })
-})
+}
+
+function askingForALimitTests() {
+  it('asks for the new limit instead of deciding', async () => {
+    halted()
+    await waitFor(() => expect(screen.getByText(RECORDED.summary)).toBeTruthy())
+    fireEvent.click(screen.getByRole('button', { name: /Raise the budget/ }))
+    const field = screen.getByRole('spinbutton', { name: 'Minutes' }) as HTMLInputElement
+    expect(Number(field.value)).toBeGreaterThanOrEqual(47)
+    expect(screen.getByText('At least 47.')).toBeTruthy()
+    expect(invoke).not.toHaveBeenCalledWith('foundry:inbox.decide', expect.anything())
+  })
+
+  it('sends the limit the operator chose with the decision', async () => {
+    halted()
+    await waitFor(() => expect(screen.getByText(RECORDED.summary)).toBeTruthy())
+    fireEvent.click(screen.getByRole('button', { name: /Raise the budget/ }))
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Minutes' }), {
+      target: { value: '80' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Raise and resume' }))
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith('foundry:inbox.decide', {
+        gateId: RECORDED.id,
+        option: 'raise',
+        limit: 80,
+      })
+    )
+  })
+}
+
+function noLimitAndCancelTests() {
+  it('sends no limit', async () => {
+    halted()
+    await waitFor(() => expect(screen.getByText(RECORDED.summary)).toBeTruthy())
+    fireEvent.click(screen.getByRole('button', { name: /Raise the budget/ }))
+    fireEvent.click(screen.getByRole('checkbox', { name: 'No limit on minutes' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Raise and resume' }))
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith('foundry:inbox.decide', {
+        gateId: RECORDED.id,
+        option: 'raise',
+        limit: null,
+      })
+    )
+  })
+
+  it('goes back to the options on cancel', async () => {
+    halted()
+    await waitFor(() => expect(screen.getByText(RECORDED.summary)).toBeTruthy())
+    fireEvent.click(screen.getByRole('button', { name: /Raise the budget/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByRole('spinbutton', { name: 'Minutes' })).toBeNull()
+    expect(screen.getByRole('button', { name: /Stop here/ })).toBeTruthy()
+  })
+}
 
 // An agent's own words are markdown and shown as markdown; a command it wants
 // to run is shown literally, because rendering it would eat its `*`s.
@@ -1697,41 +1714,37 @@ function severalPullsAndNoPerHunkReviewTests() {
   })
 }
 
+const READY_GATE = {
+  id: 'G-1',
+  rule: 'ready-for-review',
+  orderId: 'WO-1',
+  nodeId: null,
+  summary: 'Ready for you to look at',
+  why: 'Every step passed.',
+  evidence: [],
+  options: [{ id: 'approve', label: 'Approve', consequence: 'It ships.' }],
+  defaultIfIgnored: 'hold',
+  deadline: null,
+  blockedUnits: 0,
+  riskGrade: 'P2',
+  raisedAt: '2026-09-09T18:12:21.514Z',
+  decision: null,
+}
+
+const HALTED_AT_G1 = {
+  kind: 'halted',
+  turn: 'you',
+  label: 'x',
+  headline: 'Halted — your move',
+  detail: 'd',
+  done: 0,
+  total: 0,
+  gateId: 'G-1',
+}
+
 describe('a gate on the Floor', () => {
   it('links the pull request and the ticket on its line', async () => {
-    const gate = {
-      id: 'G-1',
-      rule: 'ready-for-review',
-      orderId: 'WO-1',
-      nodeId: null,
-      summary: 'Ready for you to look at',
-      why: 'Every step passed.',
-      evidence: [],
-      options: [{ id: 'approve', label: 'Approve', consequence: 'It ships.' }],
-      defaultIfIgnored: 'hold',
-      deadline: null,
-      blockedUnits: 0,
-      riskGrade: 'P2',
-      raisedAt: '2026-09-09T18:12:21.514Z',
-      decision: null,
-    }
-    mount(
-      reply({
-        pulls: [PULL],
-        source: TICKET,
-        waiting: [gate],
-        standing: {
-          kind: 'halted',
-          turn: 'you',
-          label: 'x',
-          headline: 'Halted — your move',
-          detail: 'd',
-          done: 0,
-          total: 0,
-          gateId: 'G-1',
-        },
-      })
-    )
+    mount(reply({ pulls: [PULL], source: TICKET, waiting: [READY_GATE], standing: HALTED_AT_G1 }))
     await screen.findByText('Ready for you to look at')
     const line = screen
       .getByText('Ready for you to look at')

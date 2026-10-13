@@ -69,10 +69,11 @@ const standAt = (tile: { x: number; y: number }, over: Partial<Crew> = {}): Crew
   ...over,
 })
 
+let fillRectSpy: ReturnType<typeof vi.fn>
+let rafSpy: ReturnType<typeof vi.fn>
+let cancelSpy: ReturnType<typeof vi.fn>
+
 describe('components/factory/HallScene', () => {
-  let fillRectSpy: ReturnType<typeof vi.fn>
-  let rafSpy: ReturnType<typeof vi.fn>
-  let cancelSpy: ReturnType<typeof vi.fn>
   let nextRafId: number
 
   beforeEach(() => {
@@ -93,6 +94,17 @@ describe('components/factory/HallScene', () => {
     vi.unstubAllGlobals()
   })
 
+  describe('the frame loop', theFrameLoopTests)
+  describe('drawing', drawingTests)
+  describe('drawOrderY', draworderyTests)
+
+  describe('sceneActivity', () => {
+    describe('tools', toolsTests)
+    describe('fixtures', fixturesTests)
+  })
+})
+
+function theFrameLoopTests() {
   it('starts one rAF loop on mount and cancels it on unmount', () => {
     const map = fakeMap()
     const worldRef = { current: fakeWorld(map) }
@@ -128,7 +140,9 @@ describe('components/factory/HallScene', () => {
 
     expect(cancelSpy).toHaveBeenCalledTimes(1)
   })
+}
 
+function drawingTests() {
   it('draws the bake and the frame at least once on mount', () => {
     const map = fakeMap()
     const worldRef = { current: fakeWorld(map) }
@@ -157,39 +171,36 @@ describe('components/factory/HallScene', () => {
     expect(canvas?.width).toBe(map.width * 16)
     expect(canvas?.height).toBe(map.height * 16)
   })
+}
 
-  describe('drawOrderY', () => {
-    const roomRow = 19
-    const room: HallProp = {
-      id: 'room-partition',
-      kind: 'partition',
-      x: 7,
-      y: roomRow,
-      w: 15,
-      h: 5,
-      solid: false,
-      nodeId: null,
-      seat: null,
-      sign: null,
-    }
-    const standingOn = (row: number): number => row * 16 + 12
+function draworderyTests() {
+  const roomRow = 19
 
-    it('sorts the breakroom partition by its wall row, so crew on the room first row draw over it', () => {
-      expect(drawOrderY(room)).toBeLessThan(standingOn(roomRow + 1))
-      expect(drawOrderY(room)).toBeGreaterThan(standingOn(roomRow - 1))
-    })
+  const room: HallProp = {
+    id: 'room-partition',
+    kind: 'partition',
+    x: 7,
+    y: roomRow,
+    w: 15,
+    h: 5,
+    solid: false,
+    nodeId: null,
+    seat: null,
+    sign: null,
+  }
 
-    it('sorts other props by their floor edge, and seating furniture by its top', () => {
-      expect(drawOrderY({ ...room, kind: 'desk', y: 5, h: 2 })).toBe(7 * 16)
-      expect(drawOrderY({ ...room, kind: 'sofa', y: 5, h: 2 })).toBe(5 * 16)
-    })
+  const standingOn = (row: number): number => row * 16 + 12
+
+  it('sorts the breakroom partition by its wall row, so crew on the room first row draw over it', () => {
+    expect(drawOrderY(room)).toBeLessThan(standingOn(roomRow + 1))
+    expect(drawOrderY(room)).toBeGreaterThan(standingOn(roomRow - 1))
   })
 
-  describe('sceneActivity', () => {
-    describe('tools', toolsTests)
-    describe('fixtures', fixturesTests)
+  it('sorts other props by their floor edge, and seating furniture by its top', () => {
+    expect(drawOrderY({ ...room, kind: 'desk', y: 5, h: 2 })).toBe(7 * 16)
+    expect(drawOrderY({ ...room, kind: 'sofa', y: 5, h: 2 })).toBe(5 * 16)
   })
-})
+}
 
 function toolsTests() {
   it('keeps the newest open tool per station and passes the verdicts through', () => {

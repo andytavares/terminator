@@ -75,28 +75,29 @@ const FACTORY_METRICS = {
 let invoke: ReturnType<typeof vi.fn>
 let bus = createChangeBus()
 
+/** What each channel answers; `over` replaces the record's query fields and any answer. */
+function ledgerReplies(over: Record<string, unknown>): Record<string, () => unknown> {
+  return {
+    'foundry:ledger.query': () => ({
+      entries: ENTRIES,
+      total: 2,
+      actors: ['operator', 'rule:budget.exceeded'],
+      actions: ['gate.decided', 'gate.default'],
+      orders: ['WO-1', 'WO-2'],
+      ...over,
+    }),
+    'foundry:rules.propose': () => ({ proposals: over.proposals ?? [] }),
+    'foundry:rules.decide': () => over.decide ?? { ok: true, accepted: true },
+    'foundry:rules.inForce': () => over.inForce ?? { rules: [], declined: [] },
+    'foundry:rules.remove': () => over.remove ?? { ok: true, removed: true },
+    'foundry:factory.metrics': () => over.factoryMetrics ?? FACTORY_METRICS,
+  }
+}
+
 function mount(over: Record<string, unknown> = {}) {
   bus = createChangeBus()
-  invoke = vi.fn(async (channel: string) => {
-    if (channel === 'foundry:ledger.query') {
-      return {
-        entries: ENTRIES,
-        total: 2,
-        actors: ['operator', 'rule:budget.exceeded'],
-        actions: ['gate.decided', 'gate.default'],
-        orders: ['WO-1', 'WO-2'],
-        ...over,
-      }
-    }
-    if (channel === 'foundry:rules.propose') return { proposals: over.proposals ?? [] }
-    if (channel === 'foundry:rules.decide') return over.decide ?? { ok: true, accepted: true }
-    if (channel === 'foundry:rules.inForce') {
-      return over.inForce ?? { rules: [], declined: [] }
-    }
-    if (channel === 'foundry:rules.remove') return over.remove ?? { ok: true, removed: true }
-    if (channel === 'foundry:factory.metrics') return over.factoryMetrics ?? FACTORY_METRICS
-    return {}
-  })
+  const replies = ledgerReplies(over)
+  invoke = vi.fn(async (channel: string) => (channel in replies ? replies[channel]() : {}))
   ;(window as unknown as Record<string, unknown>).electronAPI = {
     extensionBridge: { invoke, on: bus.on },
   }

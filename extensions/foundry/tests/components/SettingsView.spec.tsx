@@ -26,38 +26,49 @@ function sensorRow(over: Record<string, unknown> = {}) {
   }
 }
 
-function mount(over: Record<string, unknown> = {}) {
+type SensorRow = { def: { id: string }; state: { enabled: boolean; repoPath: string | null } }
+
+/** Sets a sensor the way the channel does: no enabling without a repository. */
+function setSensor(sensors: unknown[], payload: unknown) {
+  const { id, enabled, repoPath } = payload as {
+    id: string
+    enabled?: boolean
+    repoPath?: string | null
+  }
+  const row = (sensors as SensorRow[]).find((s) => s.def.id === id)
+  if (row === undefined) return { error: `No sensor ${id}.` }
+  const nextRepoPath = repoPath === undefined ? row.state.repoPath : repoPath
+  const nextEnabled = enabled ?? row.state.enabled
+  if (nextEnabled && nextRepoPath === null) {
+    return { error: 'A sensor needs a repository before it can be enabled.' }
+  }
+  row.state.enabled = nextEnabled
+  row.state.repoPath = nextRepoPath
+  return { state: row.state }
+}
+
+function settingsReplies(
+  over: Record<string, unknown>
+): Record<string, (payload: unknown) => unknown> {
   const sensors = [...(((over.sensors as unknown[] | undefined) ?? [sensorRow()]) as unknown[])]
-  invoke = vi.fn(async (channel: string, payload?: unknown) => {
-    if (channel === 'foundry:models-list') return { models: [], selected: '' }
-    if (channel === 'foundry:ask-model') return { selected: over.askModel ?? 'sonnet' }
-    if (channel === 'foundry:ask-model-set')
-      return { ok: true, selected: (payload as { model: string }).model }
-    if (channel === 'foundry:sensors.list') return { sensors }
-    if (channel === 'foundry:sensors.set') {
-      const { id, enabled, repoPath } = payload as {
-        id: string
-        enabled?: boolean
-        repoPath?: string | null
-      }
-      const row = sensors.find((s) => (s as { def: { id: string } }).def.id === id) as
-        | { state: { enabled: boolean; repoPath: string | null } }
-        | undefined
-      if (row === undefined) return { error: `No sensor ${id}.` }
-      const nextRepoPath = repoPath === undefined ? row.state.repoPath : repoPath
-      const nextEnabled = enabled ?? row.state.enabled
-      if (nextEnabled && nextRepoPath === null) {
-        return { error: 'A sensor needs a repository before it can be enabled.' }
-      }
-      row.state.enabled = nextEnabled
-      row.state.repoPath = nextRepoPath
-      return { state: row.state }
-    }
-    if (channel === 'foundry:sensors.run-now') {
-      return over.runNow ?? { recorded: 2, problem: null }
-    }
-    return { ok: true }
-  })
+  return {
+    'foundry:models-list': () => ({ models: [], selected: '' }),
+    'foundry:ask-model': () => ({ selected: over.askModel ?? 'sonnet' }),
+    'foundry:ask-model-set': (payload) => ({
+      ok: true,
+      selected: (payload as { model: string }).model,
+    }),
+    'foundry:sensors.list': () => ({ sensors }),
+    'foundry:sensors.set': (payload) => setSensor(sensors, payload),
+    'foundry:sensors.run-now': () => over.runNow ?? { recorded: 2, problem: null },
+  }
+}
+
+function mount(over: Record<string, unknown> = {}) {
+  const replies = settingsReplies(over)
+  invoke = vi.fn(async (channel: string, payload?: unknown) =>
+    channel in replies ? replies[channel](payload) : { ok: true }
+  )
   ;(window as unknown as Record<string, unknown>).electronAPI = {
     extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
   }

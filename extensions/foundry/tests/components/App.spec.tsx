@@ -18,79 +18,81 @@ let currentView: 'list' | 'factory' = 'list'
 let observeStanding: unknown
 let inboxWaiting: unknown[] = []
 
-const mockBridgeInvoke = vi.fn(async (channel: string, payload?: unknown) => {
-  if (channel === 'foundry:order.list') return { orders: orderRows }
-  if (channel === 'foundry:models-list') {
-    return { models: [{ id: '', label: 'Inherit', floating: true }], selected: '' }
+/** The one node a run of WO-1 shows, building. */
+const BUILDING_NODE = {
+  id: 'N-1',
+  stepId: 'build',
+  kind: 'agent',
+  state: 'running',
+  unitIds: [],
+  lane: null,
+  role: 'builder',
+  dependsOn: [],
+  attempts: 1,
+  reworks: 0,
+  feedback: [],
+  sessionId: null,
+  worktreePath: null,
+  startedAt: null,
+  endedAt: null,
+}
+
+function observedRun(payload: unknown) {
+  const { id } = (payload as { id?: string }) ?? {}
+  return {
+    graph: { orderId: id ?? 'WO-1', recipe: 'standard', nodes: [BUILDING_NODE] },
+    labels: { 'N-1': 'Builder' },
+    ready: [],
+    blocked: [],
+    standing: observeStanding,
   }
-  if (channel === 'foundry:ledger.query') {
-    return { entries: [], total: 0, actors: [], actions: [], orders: [] }
-  }
-  if (channel === 'foundry:inbox.list') {
-    return {
-      gates: [],
-      waiting: inboxWaiting,
-      summary: { waiting: 0, orders: 0, automatic: 0, building: 0, converging: 0 },
-    }
-  }
-  if (channel === 'foundry:ui.consume-pending-new-order') {
-    return { pending: pendingNewOrder }
-  }
-  if (channel === 'foundry:ui.view') return { view: currentView }
-  if (channel === 'foundry:ui.set-view') {
-    const view = (payload as { view?: string }).view
-    currentView = view === 'factory' ? 'factory' : 'list'
-    return { view: currentView }
-  }
-  if (channel === 'foundry:run.observe') {
-    const { id } = (payload as { id?: string }) ?? {}
-    return {
-      graph: {
-        orderId: id ?? 'WO-1',
-        recipe: 'standard',
-        nodes: [
-          {
-            id: 'N-1',
-            stepId: 'build',
-            kind: 'agent',
-            state: 'running',
-            unitIds: [],
-            lane: null,
-            role: 'builder',
-            dependsOn: [],
-            attempts: 1,
-            reworks: 0,
-            feedback: [],
-            sessionId: null,
-            worktreePath: null,
-            startedAt: null,
-            endedAt: null,
-          },
-        ],
-      },
-      labels: { 'N-1': 'Builder' },
-      ready: [],
-      blocked: [],
-      standing: observeStanding,
-    }
-  }
-  if (channel === 'foundry:run.activity') return { activity: {} }
-  if (channel === 'foundry:permissions-list') return { pending: [] }
-  if (channel === 'foundry:run-transcript') return { lines: [] }
-  if (channel === 'foundry:order.compile') {
-    const shapingOrder = draftOrder({
-      id: 'WO-2',
-      title: 'Still shaping',
-      source: { kind: 'typed', text: 'still shaping' },
-      repoPaths: ['/repo'],
-      now: '2026-09-06T10:00:00.000Z',
-    })
-    return { order: shapingOrder, compile: compileOrder(shapingOrder) }
-  }
-  if (channel === 'foundry:order.states') return { supported: false }
-  if (channel === 'foundry:run.recipes') return { recipes: [], proposed: 'standard' }
-  return {}
-})
+}
+
+function compiledShapingOrder() {
+  const shapingOrder = draftOrder({
+    id: 'WO-2',
+    title: 'Still shaping',
+    source: { kind: 'typed', text: 'still shaping' },
+    repoPaths: ['/repo'],
+    now: '2026-09-06T10:00:00.000Z',
+  })
+  return { order: shapingOrder, compile: compileOrder(shapingOrder) }
+}
+
+function setView(payload: unknown) {
+  const view = (payload as { view?: string }).view
+  currentView = view === 'factory' ? 'factory' : 'list'
+  return { view: currentView }
+}
+
+/** What each channel answers; a channel not listed answers `{}`. */
+const replies: Record<string, (payload: unknown) => unknown> = {
+  'foundry:order.list': () => ({ orders: orderRows }),
+  'foundry:models-list': () => ({
+    models: [{ id: '', label: 'Inherit', floating: true }],
+    selected: '',
+  }),
+  'foundry:ledger.query': () => ({ entries: [], total: 0, actors: [], actions: [], orders: [] }),
+  'foundry:inbox.list': () => ({
+    gates: [],
+    waiting: inboxWaiting,
+    summary: { waiting: 0, orders: 0, automatic: 0, building: 0, converging: 0 },
+  }),
+  'foundry:ui.consume-pending-new-order': () => ({ pending: pendingNewOrder }),
+  'foundry:ui.view': () => ({ view: currentView }),
+  'foundry:ui.set-view': setView,
+  'foundry:run.observe': observedRun,
+  'foundry:run.activity': () => ({ activity: {} }),
+  'foundry:permissions-list': () => ({ pending: [] }),
+  'foundry:run-transcript': () => ({ lines: [] }),
+  'foundry:order.compile': compiledShapingOrder,
+  'foundry:order.states': () => ({ supported: false }),
+  'foundry:run.recipes': () => ({ recipes: [], proposed: 'standard' }),
+}
+
+const mockBridgeInvoke = vi.fn(async (channel: string, payload?: unknown) =>
+  channel in replies ? replies[channel](payload) : {}
+)
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -128,6 +130,44 @@ const waitingRow = {
   title: 'render html in comments',
   headline: 'Ready to hand off',
   detail: 'Every check passes.',
+}
+
+/** A running order the Factory view draws as a hall. */
+const WORKING_ROW = {
+  id: 'WO-1',
+  title: 'Working order',
+  status: 'running',
+  risk: 'low',
+  failures: 0,
+  source: { kind: 'typed', tracker: null, key: null },
+  standing: standingOf({
+    kind: 'working',
+    turn: 'foundry',
+    label: 'building',
+    headline: 'Building',
+  }),
+}
+
+/** A standing for one step, with no gate unless one is named. */
+function standingOf(over: {
+  kind: string
+  turn: string
+  label: string
+  headline: string
+  gateId?: string
+}) {
+  return { detail: '', done: 0, total: 1, gateId: null, ...over }
+}
+
+/** Opens the Forge in the Factory view and steps into the working order's hall. */
+async function openWorkingHall() {
+  orderRows = [WORKING_ROW]
+  render(<App />)
+  fireEvent.click(screen.getByRole('button', { name: 'Forge' }))
+  await waitFor(() => screen.getByRole('button', { name: 'Factory view' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Factory view' }))
+  await waitFor(() => screen.getByText('Working order'))
+  fireEvent.click(screen.getByRole('button', { name: /Working order/ }))
 }
 
 describe('App', () => {
@@ -449,32 +489,7 @@ function switchingTests() {
 
 function openingOrdersTests() {
   it('opens a working order in the hall, and a shaping one back in the list', async () => {
-    orderRows = [
-      {
-        id: 'WO-1',
-        title: 'Working order',
-        status: 'running',
-        risk: 'low',
-        failures: 0,
-        source: { kind: 'typed', tracker: null, key: null },
-        standing: {
-          kind: 'working',
-          turn: 'foundry',
-          label: 'building',
-          headline: 'Building',
-          detail: '',
-          done: 0,
-          total: 1,
-          gateId: null,
-        },
-      },
-    ]
-    render(<App />)
-    fireEvent.click(screen.getByRole('button', { name: 'Forge' }))
-    await waitFor(() => screen.getByRole('button', { name: 'Factory view' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Factory view' }))
-    await waitFor(() => screen.getByText('Working order'))
-    fireEvent.click(screen.getByRole('button', { name: /Working order/ }))
+    await openWorkingHall()
     await waitFor(() => expect(screen.getByRole('button', { name: 'All halls' })).toBeTruthy())
   })
 }
@@ -528,42 +543,14 @@ function aGatedHallTests() {
   // sends you anywhere to find it.
   it('keeps a gated hall under the queue that answers it', async () => {
     inboxWaiting = [waitingRow]
-    orderRows = [
-      {
-        id: 'WO-1',
-        title: 'Working order',
-        status: 'running',
-        risk: 'low',
-        failures: 0,
-        source: { kind: 'typed', tracker: null, key: null },
-        standing: {
-          kind: 'working',
-          turn: 'foundry',
-          label: 'building',
-          headline: 'Building',
-          detail: '',
-          done: 0,
-          total: 1,
-          gateId: null,
-        },
-      },
-    ]
-    observeStanding = {
+    observeStanding = standingOf({
       kind: 'halted',
       turn: 'you',
       label: 'halted',
       headline: 'Halted — your move',
-      detail: '',
-      done: 0,
-      total: 1,
       gateId: 'g-1',
-    }
-    render(<App />)
-    fireEvent.click(screen.getByRole('button', { name: 'Forge' }))
-    await waitFor(() => screen.getByRole('button', { name: 'Factory view' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Factory view' }))
-    await waitFor(() => screen.getByText('Working order'))
-    fireEvent.click(screen.getByRole('button', { name: /Working order/ }))
+    })
+    await openWorkingHall()
     await waitFor(() => screen.getByText('Halted — your move'))
     expect(screen.getByRole('region', { name: 'Waiting on you' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Open Inbox' })).toBeNull()
@@ -572,42 +559,13 @@ function aGatedHallTests() {
 
 function aHallBandWithoutAGateTests() {
   it('opens a hall band with no gate behind it in the List view', async () => {
-    orderRows = [
-      {
-        id: 'WO-1',
-        title: 'Working order',
-        status: 'running',
-        risk: 'low',
-        failures: 0,
-        source: { kind: 'typed', tracker: null, key: null },
-        standing: {
-          kind: 'working',
-          turn: 'foundry',
-          label: 'building',
-          headline: 'Building',
-          detail: '',
-          done: 0,
-          total: 1,
-          gateId: null,
-        },
-      },
-    ]
-    observeStanding = {
+    observeStanding = standingOf({
       kind: 'adrift',
       turn: 'you',
       label: 'adrift',
       headline: 'Nothing is running this',
-      detail: '',
-      done: 0,
-      total: 1,
-      gateId: null,
-    }
-    render(<App />)
-    fireEvent.click(screen.getByRole('button', { name: 'Forge' }))
-    await waitFor(() => screen.getByRole('button', { name: 'Factory view' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Factory view' }))
-    await waitFor(() => screen.getByText('Working order'))
-    fireEvent.click(screen.getByRole('button', { name: /Working order/ }))
+    })
+    await openWorkingHall()
     await waitFor(() => screen.getByText('Nothing is running this'))
     fireEvent.click(screen.getByRole('button', { name: 'Open in List view' }))
     await waitFor(() =>

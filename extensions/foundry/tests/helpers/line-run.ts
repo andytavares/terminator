@@ -19,6 +19,31 @@ export async function repositoryWithRemote(parent: string): Promise<string> {
   return repo
 }
 
+/** The one criterion an agreed order is checked against. */
+const redTextAcceptance = (): WorkOrder['acceptance'] => [
+  {
+    id: 'AC-1',
+    statement: 'text is red',
+    priority: 'P1',
+    verify: { kind: 'test', command: 'npm test', assert: 'exit_code == 0' },
+    unverifiable: null,
+  },
+]
+
+/** The one unit that satisfies it, in lane 1. */
+const redTextUnits = (): WorkOrder['plan']['units'] => [
+  {
+    id: 'U-1',
+    title: 'red text',
+    role: 'builder',
+    lane: 1,
+    dependsOn: [],
+    satisfies: ['AC-1'],
+    touches: ['red.css'],
+    verify: [],
+  },
+]
+
 /** One unit in one lane, checked by the repository's own `npm test`. */
 export function agreedOrder(repo: string, over: Partial<WorkOrder> = {}): WorkOrder {
   const base = draftOrder({
@@ -28,42 +53,15 @@ export function agreedOrder(repo: string, over: Partial<WorkOrder> = {}): WorkOr
     repoPaths: [repo],
     now: '2026-10-12T10:00:00.000Z',
   })
+  const test = { command: 'npm test', source: 'package.json' }
   return {
     ...base,
     status: 'agreed',
     agreedAt: '2026-10-12T10:01:00.000Z',
     intent: { problem: 'text is blue', outcome: 'text is red', nonGoals: [] },
-    context: {
-      ...base.context,
-      toolchain: {
-        ...base.context.toolchain,
-        test: { command: 'npm test', source: 'package.json' },
-      },
-    },
-    acceptance: [
-      {
-        id: 'AC-1',
-        statement: 'text is red',
-        priority: 'P1',
-        verify: { kind: 'test', command: 'npm test', assert: 'exit_code == 0' },
-        unverifiable: null,
-      },
-    ],
-    plan: {
-      ...base.plan,
-      units: [
-        {
-          id: 'U-1',
-          title: 'red text',
-          role: 'builder',
-          lane: 1,
-          dependsOn: [],
-          satisfies: ['AC-1'],
-          touches: ['red.css'],
-          verify: [],
-        },
-      ],
-    },
+    context: { ...base.context, toolchain: { ...base.context.toolchain, test } },
+    acceptance: redTextAcceptance(),
+    plan: { ...base.plan, units: redTextUnits() },
     ...over,
   } as WorkOrder
 }

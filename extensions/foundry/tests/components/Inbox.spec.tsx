@@ -54,43 +54,53 @@ function signal(over: Partial<Signal> = {}): Signal {
   }
 }
 
-function mount(over: Record<string, unknown> = {}) {
-  // Mutable so a dismiss during the test is reflected the next time the
-  // component re-polls the list, the way the real channel would behave.
+/** What `foundry:inbox.list` answers: `over` names what is waiting. */
+function inboxList(over: Record<string, unknown>) {
+  return {
+    gates: over.gates ?? [],
+    waiting: over.waiting ?? [],
+    autonomy: over.autonomy ?? 'standard',
+    silenced: over.silenced ?? [],
+    summary: {
+      waiting: 0,
+      orders: 0,
+      automatic: 0,
+      building: 0,
+      converging: 0,
+      ...(over.summary as object satisfies object | undefined),
+    },
+  }
+}
+
+/**
+ * What each channel answers. The signals are a live list, so a dismiss during
+ * the test is reflected the next time the component re-polls it, the way the
+ * real channel behaves.
+ */
+function inboxReplies(
+  over: Record<string, unknown>
+): Record<string, (payload: unknown) => unknown> {
   let liveSignals = [...((over.signals as Signal[] | undefined) ?? [])]
-  bus = createChangeBus()
-  invoke = vi.fn(async (channel: string, payload?: unknown) => {
-    if (channel === 'foundry:inbox.list') {
-      return {
-        gates: over.gates ?? [],
-        waiting: over.waiting ?? [],
-        autonomy: over.autonomy ?? 'standard',
-        silenced: over.silenced ?? [],
-        summary: {
-          waiting: 0,
-          orders: 0,
-          automatic: 0,
-          building: 0,
-          converging: 0,
-          ...(over.summary as object satisfies object | undefined),
-        },
-      }
-    }
-    if (channel === 'foundry:inbox.decide') return over.decide ?? { ok: true }
-    if (channel === 'foundry:signals.list') {
-      return { signals: liveSignals, counts: { open: liveSignals.length } }
-    }
-    if (channel === 'foundry:sensors.list') {
-      return { sensors: over.sensors ?? [] }
-    }
-    if (channel === 'foundry:signals.dismiss') {
+  return {
+    'foundry:inbox.list': () => inboxList(over),
+    'foundry:inbox.decide': () => over.decide ?? { ok: true },
+    'foundry:signals.list': () => ({ signals: liveSignals, counts: { open: liveSignals.length } }),
+    'foundry:sensors.list': () => ({ sensors: over.sensors ?? [] }),
+    'foundry:signals.dismiss': (payload) => {
       const { id } = payload as { id: string }
       liveSignals = liveSignals.filter((s) => s.id !== id)
       return over.dismiss ?? { signal: null }
-    }
-    if (channel === 'foundry:signals.promote') return over.promote ?? { order: { id: 'WO-9' } }
-    return { ok: true }
-  })
+    },
+    'foundry:signals.promote': () => over.promote ?? { order: { id: 'WO-9' } },
+  }
+}
+
+function mount(over: Record<string, unknown> = {}) {
+  bus = createChangeBus()
+  const replies = inboxReplies(over)
+  invoke = vi.fn(async (channel: string, payload?: unknown) =>
+    channel in replies ? replies[channel](payload) : { ok: true }
+  )
   ;(window as unknown as Record<string, unknown>).electronAPI = {
     extensionBridge: { invoke, on: bus.on },
     shell: { openExternal },

@@ -60,35 +60,111 @@ function view(over: Record<string, unknown> = {}) {
 let invoke: ReturnType<typeof vi.fn>
 const openExternal = vi.fn()
 
-function mount(
-  props: {
-    view?: Record<string, unknown>
-    pending?: unknown[]
-    activity?: Record<string, unknown>
-    lines?: unknown[]
-    metrics?: Record<string, unknown>[]
-    onBack?: () => void
-    onOpenInList?: () => void
-  } = {}
-) {
+interface MountProps {
+  view?: Record<string, unknown>
+  pending?: unknown[]
+  activity?: Record<string, unknown>
+  lines?: unknown[]
+  metrics?: Record<string, unknown>[]
+  onBack?: () => void
+  onOpenInList?: () => void
+}
+
+/** What each channel answers for the hall `props` describe. */
+function hallReplies(props: MountProps): Record<string, () => unknown> {
+  return {
+    'foundry:run.observe': () => props.view ?? view(),
+    'foundry:permissions-list': () => ({ pending: props.pending ?? [] }),
+    'foundry:run.activity': () => ({ activity: props.activity ?? {} }),
+    'foundry:run-transcript': () => ({ lines: props.lines ?? [] }),
+    'foundry:session.attach': () => ({ terminalSessionId: 't-1' }),
+    'foundry:run-terminal': () => ({ ok: true }),
+    'foundry:factory.metrics': () => ({ orders: props.metrics ?? [] }),
+  }
+}
+
+function mount(props: MountProps = {}) {
   const onBack = props.onBack ?? vi.fn()
   const onOpenInList = props.onOpenInList ?? vi.fn()
-  invoke = vi.fn(async (channel: string) => {
-    if (channel === 'foundry:run.observe') return props.view ?? view()
-    if (channel === 'foundry:permissions-list') return { pending: props.pending ?? [] }
-    if (channel === 'foundry:run.activity') return { activity: props.activity ?? {} }
-    if (channel === 'foundry:run-transcript') return { lines: props.lines ?? [] }
-    if (channel === 'foundry:session.attach') return { terminalSessionId: 't-1' }
-    if (channel === 'foundry:run-terminal') return { ok: true }
-    if (channel === 'foundry:factory.metrics') return { orders: props.metrics ?? [] }
-    return {}
-  })
+  const replies = hallReplies(props)
+  invoke = vi.fn(async (channel: string) => (channel in replies ? replies[channel]() : {}))
   ;(window as unknown as Record<string, unknown>).electronAPI = {
     extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
     shell: { openExternal },
   }
   render(<FactoryHall orderId="WO-1" onOpenInList={onOpenInList} onBack={onBack} />)
   return { onOpenInList, onBack }
+}
+
+/** A hall whose observation is `read()` on every read, and the bus that says it changed. */
+function mountLive(read: () => unknown) {
+  const bus = createChangeBus()
+  const replies: Record<string, () => unknown> = {
+    'foundry:run.observe': read,
+    'foundry:permissions-list': () => ({ pending: [] }),
+    'foundry:run.activity': () => ({ activity: {} }),
+  }
+  invoke = vi.fn(async (channel: string) => (channel in replies ? replies[channel]() : {}))
+  Object.defineProperty(window, 'electronAPI', {
+    value: { extensionBridge: { invoke, on: bus.on } },
+    configurable: true,
+    writable: true,
+  })
+  render(<FactoryHall orderId="WO-1" onOpenInList={vi.fn()} onBack={vi.fn()} />)
+  return bus
+}
+
+/** jsdom lays nothing out: give every box a size, and the hall one too. */
+function sizeEveryBox(): void {
+  vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(400)
+  vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(20)
+  vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(1000)
+  vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(600)
+}
+
+/** Two stations in the same state. */
+function twoStations(state: string) {
+  return view({
+    graph: {
+      orderId: 'WO-1',
+      recipe: 'standard',
+      nodes: [node({ state }), node({ id: 'N-2', sessionId: 's-2', state })],
+    },
+    labels: { 'N-1': 'Build the thing', 'N-2': 'Build the other' },
+  })
+}
+
+/** A merge gate waiting on the gate station G, which follows a passed build. */
+const MERGE_GATE = {
+  id: 'g-1',
+  rule: 'merge',
+  orderId: 'WO-1',
+  nodeId: 'G',
+  summary: 'Merge the pull request?',
+  why: 'Every check passed.',
+  evidence: [],
+  options: [
+    { id: 'approve', label: 'Approve', consequence: 'Merges.' },
+    { id: 'hold', label: 'Hold', consequence: 'Waits.' },
+  ],
+  defaultIfIgnored: 'hold',
+  deadline: null,
+  blockedUnits: 1,
+  riskGrade: 'P2',
+}
+
+function waitingAtTheGate() {
+  const gate = node({
+    id: 'G',
+    kind: 'gate',
+    state: 'waiting',
+    sessionId: null,
+    dependsOn: ['N-1'],
+  })
+  return view({
+    graph: { orderId: 'WO-1', recipe: 'standard', nodes: [node({ state: 'passed' }), gate] },
+    waiting: [MERGE_GATE],
+  })
 }
 
 beforeEach(() => {
@@ -327,34 +403,11 @@ function theOrderBarTests() {
 
 function calloutsRaisedTogetherTests() {
   it('lifts callouts raised together clear of each other', async () => {
-    // jsdom lays nothing out: give every box a size, and the hall one too.
-    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(400)
-    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(20)
-    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(1000)
-    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(600)
-    const two = (state: string) =>
-      view({
-        graph: {
-          orderId: 'WO-1',
-          recipe: 'standard',
-          nodes: [node({ state }), node({ id: 'N-2', sessionId: 's-2', state })],
-        },
-        labels: { 'N-1': 'Build the thing', 'N-2': 'Build the other' },
-      })
-    let current = two('running')
-    const bus = createChangeBus()
-    invoke = vi.fn(async (channel: string) => {
-      if (channel === 'foundry:run.observe') return current
-      if (channel === 'foundry:permissions-list') return { pending: [] }
-      if (channel === 'foundry:run.activity') return { activity: {} }
-      return {}
-    })
-    ;(window as unknown as Record<string, unknown>).electronAPI = {
-      extensionBridge: { invoke, on: bus.on },
-    }
-    render(<FactoryHall orderId="WO-1" onOpenInList={vi.fn()} onBack={vi.fn()} />)
+    sizeEveryBox()
+    let current = twoStations('running')
+    const bus = mountLive(() => current)
     await screen.findByRole('button', { name: /Build the other/ })
-    current = two('passed')
+    current = twoStations('passed')
     bus.emit({ kind: 'graph', orderId: 'WO-1' })
     await waitFor(
       () => expect(document.querySelectorAll('.fdry-hall-overlay .fdry-callout')).toHaveLength(2),
@@ -370,17 +423,7 @@ function calloutsRaisedTogetherTests() {
 function calloutsOnStateChangeTests() {
   it('raises a callout at the station when its state changes, not a line under the picture', async () => {
     let current = view()
-    const bus = createChangeBus()
-    invoke = vi.fn(async (channel: string) => {
-      if (channel === 'foundry:run.observe') return current
-      if (channel === 'foundry:permissions-list') return { pending: [] }
-      if (channel === 'foundry:run.activity') return { activity: {} }
-      return {}
-    })
-    ;(window as unknown as Record<string, unknown>).electronAPI = {
-      extensionBridge: { invoke, on: bus.on },
-    }
-    render(<FactoryHall orderId="WO-1" onOpenInList={vi.fn()} onBack={vi.fn()} />)
+    const bus = mountLive(() => current)
     await waitFor(() => screen.getByRole('button', { name: /Build the thing/ }))
     current = view({
       graph: { orderId: 'WO-1', recipe: 'standard', nodes: [node({ state: 'passed' })] },
@@ -454,43 +497,7 @@ function markdownQuestionsTests() {
 
 function waitingGatesTests() {
   it('pins a waiting gate over the gate and decides it with the gate’s own options', async () => {
-    mount({
-      view: view({
-        graph: {
-          orderId: 'WO-1',
-          recipe: 'standard',
-          nodes: [
-            node({ state: 'passed' }),
-            node({
-              id: 'G',
-              kind: 'gate',
-              state: 'waiting',
-              sessionId: null,
-              dependsOn: ['N-1'],
-            }),
-          ],
-        },
-        waiting: [
-          {
-            id: 'g-1',
-            rule: 'merge',
-            orderId: 'WO-1',
-            nodeId: 'G',
-            summary: 'Merge the pull request?',
-            why: 'Every check passed.',
-            evidence: [],
-            options: [
-              { id: 'approve', label: 'Approve', consequence: 'Merges.' },
-              { id: 'hold', label: 'Hold', consequence: 'Waits.' },
-            ],
-            defaultIfIgnored: 'hold',
-            deadline: null,
-            blockedUnits: 1,
-            riskGrade: 'P2',
-          },
-        ],
-      }),
-    })
+    mount({ view: waitingAtTheGate() })
     const card = await screen.findByRole('group', { name: 'Merge the pull request?' })
     fireEvent.click(within(card).getByRole('button', { name: 'Approve' }))
     await waitFor(() =>
@@ -535,24 +542,29 @@ function replayingTests() {
   })
 }
 
+/** One pull request whose checks stand in the buckets given. */
+const pullWith = (buckets: ('pass' | 'pending')[]) => [
+  {
+    url: 'https://github.com/a/b/pull/1',
+    checks: buckets.map((bucket, i) => ({ name: `c${i}`, bucket, link: '', workflow: '' })),
+  },
+]
+
+/** A build that ran from 1 s and passed at 9 s. */
+const BUILD_FRAMES = [
+  { at: 1000, nodes: [{ id: 'N-1', state: 'running', attempts: 1, sessionId: 's-1' }] },
+  { at: 9000, nodes: [{ id: 'N-1', state: 'passed', attempts: 1, sessionId: 's-1' }] },
+]
+
+/** CI waiting on one of two checks from the start, green at 9 s. */
+const CI_STATES = [
+  { at: 0, round: 0, max: 2, status: 'watching', pulls: pullWith(['pass', 'pending']) },
+  { at: 9000, round: 0, max: 2, status: 'green', pulls: pullWith(['pass', 'pass']) },
+]
+
 function replayingCiTests() {
   it('replays the wait on CI, and the tower to wait at, from what was recorded', async () => {
-    const pulls = (buckets: ('pass' | 'pending')[]) => [
-      {
-        url: 'https://github.com/a/b/pull/1',
-        checks: buckets.map((bucket, i) => ({ name: `c${i}`, bucket, link: '', workflow: '' })),
-      },
-    ]
-    replayable(
-      [
-        { at: 1000, nodes: [{ id: 'N-1', state: 'running', attempts: 1, sessionId: 's-1' }] },
-        { at: 9000, nodes: [{ id: 'N-1', state: 'passed', attempts: 1, sessionId: 's-1' }] },
-      ],
-      [
-        { at: 0, round: 0, max: 2, status: 'watching', pulls: pulls(['pass', 'pending']) },
-        { at: 9000, round: 0, max: 2, status: 'green', pulls: pulls(['pass', 'pass']) },
-      ]
-    )
+    replayable(BUILD_FRAMES, CI_STATES)
     fireEvent.click(await screen.findByRole('button', { name: 'Replay' }))
     const position = (await screen.findByRole('slider', {
       name: 'Replay position',
@@ -654,18 +666,22 @@ const shipGraph = {
   ],
 }
 
+/** The bridge hands back a fresh array on every read; the fake would not. */
+function freshLinesOnEveryRead(): void {
+  const fake = invoke.getMockImplementation()!
+  invoke.mockImplementation(async (channel: string, payload?: unknown) => {
+    const r = (await fake(channel, payload)) as { lines?: unknown[] }
+    return channel === 'foundry:run-transcript' ? { lines: [...(r.lines ?? [])] } : r
+  })
+}
+
 function readingTheTranscriptTests() {
   const line = (text: string, at: number) => ({ role: 'assistant', kind: 'text', text, at })
 
   it('reads the transcript at once, then on the activity beat, and stops when closed', async () => {
     const lines = [line('first', 1)]
     mount({ lines })
-    // The bridge hands back a fresh array on every read; the fake would not.
-    const fake = invoke.getMockImplementation()!
-    invoke.mockImplementation(async (channel: string, payload?: unknown) => {
-      const r = (await fake(channel, payload)) as { lines?: unknown[] }
-      return channel === 'foundry:run-transcript' ? { lines: [...(r.lines ?? [])] } : r
-    })
+    freshLinesOnEveryRead()
     const station = await screen.findByRole('button', { name: /Build the thing/ })
     vi.useFakeTimers()
     try {
