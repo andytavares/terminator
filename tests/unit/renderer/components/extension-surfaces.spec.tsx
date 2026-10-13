@@ -73,8 +73,8 @@ const sidebarProps = {
   now: NOW,
 }
 
-beforeEach(() => {
-  vi.clearAllMocks()
+/** One saved sidebar view per grouping, so each test can open the sidebar under any of them. */
+function saveGroupingViews(): void {
   localStorage.clear()
   localStorage.setItem(
     'terminator.sidebar.views',
@@ -88,7 +88,11 @@ beforeEach(() => {
       }))
     )
   )
-  // The real stores. Only loading a repo's branches reaches the main process.
+}
+
+/** The real stores, holding one repo with one branch and its terminal. */
+function seedStores(): void {
+  // Only loading a repo's branches reaches the main process.
   useWorkspaceStore.setState({
     ...useWorkspaceStore.getInitialState(),
     workspaces: [ws1],
@@ -107,13 +111,23 @@ beforeEach(() => {
       terminal: { ...DEFAULT_GLOBAL_SETTINGS.terminal, scrollbackLimit: 5000 },
     },
   })
-  // What the fake extension contributed, in the real registry.
+}
+
+/** What the fake extension contributed, in the real registry. */
+function seedRegistry(): void {
   useExtensionRegistry.setState(useExtensionRegistry.getInitialState(), true)
   useExtensionRegistry.setState({
     globalTabs: new Map([[globalTab.id, globalTab]]),
     workspaceTabs: new Map([[workspaceTab.id, workspaceTab]]),
     projectTabs: new Map([[projectTab.id, projectTab]]),
   })
+}
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  saveGroupingViews()
+  seedStores()
+  seedRegistry()
 })
 
 const commandLabels = (): string[] =>
@@ -153,7 +167,9 @@ describe.each(GROUPINGS)('every extension surface survives %s grouping', (groupB
     }
     expect(onSelectWorkspaceTab).toHaveBeenCalledWith('ws-1', 'fake.wstab')
   })
+})
 
+describe.each(GROUPINGS)('the branch scope survives %s grouping', (groupBy) => {
   it('surface 4: selecting a branch leaves activeProjectId resolved for the project tab', () => {
     const { container } = renderSidebar(groupBy)
     fireEvent.click(container.querySelector('.branch-row')!)

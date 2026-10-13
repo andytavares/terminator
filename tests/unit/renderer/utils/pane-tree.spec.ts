@@ -66,7 +66,9 @@ describe('removeLeaf', () => {
     const tree = split('s1', [leaf('a'), leaf('b')], { direction: 'vertical' })
     expect(removeLeaf(tree, 'b')).toEqual(leaf('a'))
   })
+})
 
+describe('removeLeaf in nested trees', () => {
   it('removes a deeply nested leaf and collapses the parent', () => {
     const tree = split(
       's1',

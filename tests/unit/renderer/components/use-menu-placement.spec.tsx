@@ -16,41 +16,40 @@ function rect(box: { left: number; top: number; width: number; height: number })
   } as DOMRect
 }
 
+type Box = { left: number; top: number; width: number; height: number }
+
+/** Records the node in `ref` and gives it the box `box` reports, as the node attaches. */
+function boxed<T extends HTMLElement>(
+  ref: React.MutableRefObject<T | null>,
+  box: () => DOMRect
+): (node: T | null) => void {
+  // Callback refs patch the boxes as the nodes attach, before layout effects run.
+  return (node) => {
+    ref.current = node
+    if (node !== null) node.getBoundingClientRect = box
+  }
+}
+
 function Menu({
   button,
   panel,
   open = true,
 }: {
-  button: { left: number; top: number; width: number; height: number }
+  button: Box
   panel: { width: number; height: number }
   open?: boolean
 }): JSX.Element {
   const buttonRef = useRef<HTMLButtonElement | null>(null)
   const panelRef = useRef<HTMLDivElement | null>(null)
   const style = useMenuPlacement(open, buttonRef, panelRef)
-  // Callback refs patch the boxes as the nodes attach, before layout effects run.
-  const attach =
-    (box: () => DOMRect) =>
-    (node: HTMLElement | null): void => {
-      if (node !== null) node.getBoundingClientRect = box
-    }
   return (
     <>
-      <button
-        ref={(node) => {
-          buttonRef.current = node
-          attach(() => rect(button))(node)
-        }}
-        type="button"
-      >
+      <button ref={boxed(buttonRef, () => rect(button))} type="button">
         open
       </button>
       {open && (
         <div
-          ref={(node) => {
-            panelRef.current = node
-            attach(() => rect({ left: 0, top: 0, ...panel }))(node)
-          }}
+          ref={boxed(panelRef, () => rect({ left: 0, top: 0, ...panel }))}
           data-testid="panel"
           style={style}
         >
