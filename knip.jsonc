@@ -30,7 +30,8 @@
       // Tools the e2e stubs call on the runner's PATH: openssl makes the stub
       // servers' throwaway CA (tracker-stub.ts, jira-stub.ts) and jq shapes the
       // gh stub's --jq output (github-stub-gh.ts). Both ship on GitHub's runners.
-      "project": ["**/*.{js,mjs,cjs,jsx,ts,tsx,mts,cts}!", "!tests/**!"],
+      // src/**/__tests__/ holds specs and their helpers, as tests/ does.
+      "project": ["**/*.{js,mjs,cjs,jsx,ts,tsx,mts,cts}!", "!tests/**!", "!src/**/__tests__/**!"],
       "ignoreBinaries": ["openssl", "jq"],
       "vite": { "config": ["vite.config.remote.ts"] },
       "vitest": { "config": ["vitest.config.ts", "vitest.live.config.ts"] },
