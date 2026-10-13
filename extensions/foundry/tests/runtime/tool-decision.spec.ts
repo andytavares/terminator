@@ -417,7 +417,17 @@ describe('a skill mounted for this node', () => {
   describe('writing as a reader', writingAsAReaderTests)
   describe('paths that only look inside', pathsThatOnlyLookInsideTests)
   describe('no mount', noMountTests)
+  describe('other tools', otherToolsAtTheMountTests)
 })
+
+function otherToolsAtTheMountTests() {
+  it('changes nothing for a tool that neither reads nor writes files, pointed at the mount', () => {
+    const at = { tool: 'mcp__docs__open', input: { path: `${mount}/scout.md` } }
+    const withMount = reviewing({ ...at, skillsMount: mount })
+    expect(withMount).toEqual(reviewing({ ...at, skillsMount: null }))
+    expect(withMount?.allow).toBe(false)
+  })
+}
 
 const auto = (over: Partial<ToolRequest> = {}) =>
   decideTool(request({ letModeDecide: true, ...over }))
