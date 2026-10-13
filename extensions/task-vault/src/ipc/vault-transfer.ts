@@ -93,31 +93,32 @@ async function importProject(db: ExtensionDB, p: Row): Promise<void> {
   )
 }
 
-/** Columns an exported task row carries as-is: [insertTask field, export column, default]. */
-const IMPORTED_COLUMNS: [keyof NewTaskRow, keyof ImportedTask, unknown][] = [
-  ['status', 'status', 'open'],
-  ['context', 'context', null],
-  ['dueDate', 'due_date', null],
-  ['completedDate', 'completed_date', null],
-  ['migratedTo', 'migrated_to', null],
-  ['source', 'source', 'inbox'],
-  ['sourceRef', 'source_ref', null],
-  ['parentId', 'parent_id', null],
-  ['sortOrder', 'sort_order', 0],
-  ['metadata', 'metadata', '{}'],
-  ['terminatorLinks', 'terminator_links', '[]'],
-]
-
 /** The insertTask fields an exported row carries as-is, defaulting what older exports omit. */
 function importedTaskFields(t: ImportedTask): NewTaskRow {
-  const fields: Record<string, unknown> = {
+  return {
     id: t.id,
     text: t.text,
     createdAt: t.created_at,
     updatedAt: t.updated_at,
+    status: t.status ?? 'open',
+    source: t.source ?? 'inbox',
+    ...importedOptionalFields(t),
   }
-  for (const [field, column, fallback] of IMPORTED_COLUMNS) fields[field] = t[column] ?? fallback
-  return fields as unknown as NewTaskRow
+}
+
+/** The optional columns of an exported row; older exports omit some of them. */
+function importedOptionalFields(t: ImportedTask): Partial<NewTaskRow> {
+  return {
+    context: t.context ?? null,
+    dueDate: t.due_date ?? null,
+    completedDate: t.completed_date ?? null,
+    migratedTo: t.migrated_to ?? null,
+    sourceRef: t.source_ref ?? null,
+    parentId: t.parent_id ?? null,
+    sortOrder: t.sort_order ?? 0,
+    metadata: t.metadata ?? '{}',
+    terminatorLinks: t.terminator_links ?? '[]',
+  }
 }
 
 async function importTask(db: ExtensionDB, t: ImportedTask): Promise<void> {

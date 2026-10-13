@@ -58,9 +58,7 @@ const focusTrackPlugin = ViewPlugin.define((view) => {
 function openOnClick(link: HTMLAnchorElement, url: string): void {
   link.addEventListener('click', (e) => {
     e.preventDefault()
-    const api = (
-      window as unknown as { electronAPI?: { shell?: { openExternal?: (u: string) => void } } }
-    ).electronAPI
+    const api: { shell?: { openExternal?: (u: string) => void } } | undefined = window.electronAPI
     if (api?.shell?.openExternal) {
       api.shell.openExternal(url)
     } else {

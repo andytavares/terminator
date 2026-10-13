@@ -69,7 +69,7 @@ function defaultSpawn(
 ): SpawnedProcess {
   const child = spawnCb(cmd, args, { cwd: opts.cwd, env: opts.env, detached: OWN_PROCESS_GROUP })
   const kill = (signal?: NodeJS.Signals): void => killGroup(child, signal)
-  return Object.assign(child, { kill }) as unknown as SpawnedProcess
+  return Object.assign(child, { kill })
 }
 
 /**

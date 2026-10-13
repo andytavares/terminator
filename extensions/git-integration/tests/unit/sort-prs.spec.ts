@@ -48,7 +48,7 @@ describe('mergeReadiness', () => {
 
 describe('sortPrs', () => {
   it('newest puts the latest opened first', () => {
-    expect(ids(sortPrs([pr(1), pr(3), pr(2)], 'newest'))).toEqual([3, 2, 1])
+    expect(ids(sortPrs([pr(1), pr(3), pr(2)], 'newest', (row) => row))).toEqual([3, 2, 1])
   })
 
   it('closest orders by readiness, then newest', () => {
@@ -60,7 +60,7 @@ describe('sortPrs', () => {
       pr(5, { reviewDecision: 'approved' }),
       pr(6, { reviewDecision: 'approved' }),
     ]
-    expect(ids(sortPrs(list, 'closest'))).toEqual([6, 5, 4, 3, 2, 1])
+    expect(ids(sortPrs(list, 'closest', (row) => row))).toEqual([6, 5, 4, 3, 2, 1])
   })
 })
 
@@ -74,7 +74,7 @@ describe('sortPrs — started', () => {
       pr(5, { sessionStatus: 'paused', viewedFileCount: 1, fileCount: 2 }),
       pr(6, { sessionStatus: 'not-started' }),
     ]
-    expect(ids(sortPrs(list, 'started'))).toEqual([3, 5, 4, 2, 6, 1])
+    expect(ids(sortPrs(list, 'started', (row) => row))).toEqual([3, 5, 4, 2, 6, 1])
   })
 
   it('started does not divide by zero for an empty PR', () => {
@@ -82,7 +82,7 @@ describe('sortPrs — started', () => {
       pr(1, { sessionStatus: 'in-progress', viewedFileCount: 0, fileCount: 0 }),
       pr(2, { sessionStatus: 'in-progress', viewedFileCount: 0, fileCount: 0 }),
     ]
-    expect(ids(sortPrs(list, 'started'))).toEqual([2, 1])
+    expect(ids(sortPrs(list, 'started', (row) => row))).toEqual([2, 1])
   })
 })
 
@@ -90,7 +90,7 @@ describe('sortPrs — the input and dashboard rows', () => {
   it('never mutates the input', () => {
     const list = [pr(3), pr(1), pr(2)]
     const copy = [...list]
-    const sorted = sortPrs(list, 'newest')
+    const sorted = sortPrs(list, 'newest', (row) => row)
     expect(list).toEqual(copy)
     expect(sorted).not.toBe(list)
   })

@@ -159,7 +159,7 @@ function QueueRows(props: QueueRowsProps) {
         <span>Open pull requests</span>
         <span className="rd-ct">{store.totalPrCount ?? prQueue.length}</span>
       </h3>
-      {sortPrs(prQueue, queueSort).map((pr) => (
+      {sortPrs(prQueue, queueSort, (pr) => pr).map((pr) => (
         <QueueRow
           key={pr.number}
           pr={pr}

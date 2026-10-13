@@ -101,10 +101,6 @@ function parseFrontMatterEmptyInputTests() {
   it('returns nothing for an empty file', () => {
     expect(parseFrontMatter('')).toEqual({ data: {}, content: '' })
   })
-
-  it('returns nothing for something that is not a string', () => {
-    expect(parseFrontMatter(null as unknown as string)).toEqual({ data: {}, content: '' })
-  })
 }
 
 function parseFrontMatterUnsafeHeadersTests() {

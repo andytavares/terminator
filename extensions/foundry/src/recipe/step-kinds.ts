@@ -25,7 +25,8 @@ export function selectOver(expression: string, order: WorkOrder): PlanUnit[] {
   const [, field, value] = match
   if (field === undefined) return [...order.plan.units]
   return order.plan.units.filter((unit) => {
-    const actual = (unit as unknown as Record<string, unknown>)[field]
+    const fields: Record<string, unknown> = unit
+    const actual = fields[field]
     return String(actual) === value
   })
 }

@@ -44,7 +44,7 @@ export function dashboardToSortable<T extends { createdAt: string }>(
 export function sortPrs<T>(
   prs: T[],
   mode: SortMode,
-  toSortable: (pr: T) => SortablePr = (pr) => pr as unknown as SortablePr
+  toSortable: (pr: T) => SortablePr
 ): T[] {
   const byAge = (a: SortablePr, b: SortablePr) => b.openedAt.localeCompare(a.openedAt)
   const compare = (a: SortablePr, b: SortablePr): number => {

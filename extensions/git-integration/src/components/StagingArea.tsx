@@ -84,7 +84,7 @@ async function refreshStatus(
   try {
     const result = (await gitAPI.status(repoRoot)) as StatusAnswer
     if ('error' in result) setStatus(null)
-    else setStatus(result as unknown as GitStatus)
+    else setStatus(result)
   } catch {
     // silently ignore — next polling cycle will pick it up
   }

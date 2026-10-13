@@ -33,7 +33,7 @@ const EMPTY: FrontMatter = { data: {}, content: '' }
 const DELIMITED = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n([\s\S]*))?$/
 
 export function parseFrontMatter(input: string): FrontMatter {
-  if (typeof input !== 'string' || input === '') return EMPTY
+  if (input === '') return EMPTY
 
   const match = DELIMITED.exec(input)
   if (match === null) return { data: {}, content: input }

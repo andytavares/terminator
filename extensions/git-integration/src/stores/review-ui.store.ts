@@ -125,8 +125,16 @@ type GetState = StoreApi<ReviewUiStore>['getState']
 
 /** The preference fields of the store, as savePrefs keeps them. */
 function prefsOf(state: ReviewUiStore): Prefs {
-  const keys = Object.keys(DEFAULT_PREFS) as (keyof Prefs)[]
-  return Object.fromEntries(keys.map((k) => [k, state[k]])) as unknown as Prefs
+  return {
+    commentVisibility: state.commentVisibility,
+    agentNotesOn: state.agentNotesOn,
+    diffRange: state.diffRange,
+    fileListHidden: state.fileListHidden,
+    diffViewMode: state.diffViewMode,
+    hideFormattingHunks: state.hideFormattingHunks,
+    queueSort: state.queueSort,
+    dashboardSort: state.dashboardSort,
+  }
 }
 
 /** Setters for the preferences, each saved as it changes. */

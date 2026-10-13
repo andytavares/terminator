@@ -227,11 +227,12 @@ function withUnitIdsOnNodes(graph: RunGraph): RunGraph {
  * here then sees one shape.
  */
 function withUnitIds(node: RunNode): RunNode {
+  const legacyUnitId = 'unitId' in node ? node.unitId : null
   const unitIds = Array.isArray(node.unitIds)
     ? node.unitIds
-    : ((node as unknown as { unitId?: string | null }).unitId ?? null) === null
-      ? []
-      : [(node as unknown as { unitId: string }).unitId]
+    : typeof legacyUnitId === 'string'
+      ? [legacyUnitId]
+      : []
   // Graphs written before reworks and feedback existed have neither on disk;
   // every reader from here on sees the same shape.
   const reworks = node.reworks ?? 0
