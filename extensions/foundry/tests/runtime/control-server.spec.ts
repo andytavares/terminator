@@ -101,9 +101,12 @@ function deliveringTests() {
 function holdingTheConnectionTests() {
   it('holds the connection open until the operator answers', async () => {
     server = await createControlServer()
-    let answer: ((decision: HookDecision) => void) | null = null
+    // Resolves once the request has reached the operator, however long the
+    // loopback round trip takes on a loaded machine.
+    const { promise: asked, resolve: deliverAnswer } =
+      Promise.withResolvers<(decision: HookDecision) => void>()
     server.register('s1', {
-      decide: () => new Promise<HookDecision>((resolve) => (answer = resolve)),
+      decide: () => new Promise<HookDecision>((resolve) => deliverAnswer(resolve)),
     })
 
     let settled = false
@@ -115,9 +118,12 @@ function holdingTheConnectionTests() {
     // rejection there would be reported as a suite error.
     pending.catch(() => {})
 
+    const answer = await asked
+    // A window for a premature reply to arrive in; nothing can settle it but
+    // the answer below, so a slow machine only makes the check stricter.
     await new Promise((resolve) => setTimeout(resolve, 50))
     expect(settled).toBe(false)
-    ;(answer as unknown as (decision: HookDecision) => void)({ permissionDecision: 'allow' })
+    answer({ permissionDecision: 'allow' })
     expect((await pending).decision.permissionDecision).toBe('allow')
   })
 }
