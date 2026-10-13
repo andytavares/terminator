@@ -7,7 +7,8 @@ import type {
   SettingDefinition,
 } from '@terminator/extension-sdk'
 import { registerGitExtensionHandlers } from './ipc/git.ipc.js'
-import { gitSettings, MAX_DISPLAYED_FILES } from './git-settings.js'
+import { gitEnabled, gitEnabledAnywhere, gitSettings, MAX_DISPLAYED_FILES } from './git-settings.js'
+import { gatedByWorkspace } from './ipc/workspace-switch.js'
 import { bindWorkspaceRoots } from './ipc/repo-root.js'
 import { projectForCheckout } from './review/terminal-project.js'
 import { VALIDATION_ERROR, type RegisterFn } from './ipc/register.js'
@@ -198,8 +199,11 @@ function registerGithub(api: ExtensionAPI, registerFn: RegisterFn, roots: Channe
 
 /** Every channel this extension answers, each with its remote-access rule. */
 function registerChannels(api: ExtensionAPI, roots: ChannelRoots): void {
+  // A repository whose workspace switched the extension off is answered GIT_DISABLED.
+  const isEnabled = (repoPath?: string) => gitEnabled(api, repoPath)
   const registerFn = (spec: ChannelSpec) => {
-    disposables.push(api.ipc.registerHandler(spec, remoteAccessFor(spec.channel)))
+    const gated = gatedByWorkspace(spec, isEnabled)
+    disposables.push(api.ipc.registerHandler(gated, remoteAccessFor(spec.channel)))
   }
   registerGitExtensionHandlers(registerFn, gitSettings(api))
   registerFn(pendingRequestChannel())
@@ -269,11 +273,11 @@ function contributions(api: ExtensionAPI): Disposable[] {
 }
 
 export function activate(api: ExtensionAPI): void {
-  // Registered before the enabled check: switched off, the extension registers
-  // nothing else, and the settings page is the only way back on.
+  // Registered before the enabled check: switched off globally and in every
+  // workspace, the extension registers nothing else, and the settings page is
+  // the only way back on.
   disposables.push(api.settings.register({ label: 'Git Integration', properties: SETTINGS }))
-  const enabled = api.settings.get<boolean>(`${SETTING}.git.enabled`) ?? true
-  if (!enabled) return
+  if (!gitEnabledAnywhere(api)) return
   bindShell(api.shell)
   const storage = openStorageDirectory(api)
   const projectRoots = projectRootsOf(api)

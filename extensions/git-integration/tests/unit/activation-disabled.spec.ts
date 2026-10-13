@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import type { ExtensionAPI } from '@terminator/extension-sdk'
 import { activate, deactivate } from '../../src/index.ts'
+import { partialFake } from '../../../../tests/support/fakes'
 
 // "Enable Git Integration" lives on Git Integration's own settings page. Switched
 // off, the extension registers nothing else, so the page must still be there:
@@ -10,14 +11,15 @@ describe('activate with Git Integration switched off', () => {
     const disposable = { dispose: () => {} }
     const register = vi.fn(() => disposable)
     const registerHandler = vi.fn(() => disposable)
-    const api = {
-      settings: {
-        get: (key: string) =>
-          key === 'terminator.git-integration.git.enabled' ? false : undefined,
+    const api = partialFake<ExtensionAPI>({
+      settings: partialFake<ExtensionAPI['settings']>({
+        get: <T>(key: string) =>
+          (key === 'terminator.git-integration.git.enabled' ? false : undefined) as T,
         register,
-      },
-      ipc: { registerHandler },
-    } as unknown as ExtensionAPI
+      }),
+      ipc: partialFake<ExtensionAPI['ipc']>({ registerHandler }),
+      workspace: partialFake<ExtensionAPI['workspace']>({ list: () => [] }),
+    })
 
     activate(api)
     deactivate()

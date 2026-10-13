@@ -43,6 +43,8 @@ Configure under **Settings → Git Integration**. `activate` (`src/index.ts`) re
 
 `git:commit` and `git:status` read the two Git settings on every call (`src/git-settings.ts`), so a change applies to the next commit and the next status refresh. With more changed files than **Max displayed changed files**, the Git tab lists that many and says so.
 
+A **workspace** setting can also be set per workspace in Workspace Settings ("Use global default" hands it back), and is read for the repository a call is about (`api.settings.get(key, { repoPath })`). Sign-off is read for the repository being committed in. **Enable Git Integration** is read for the repository a channel names (`repoRoot`, or `git:status`'s `path`): where it is off, the channel answers `{ error: 'GIT_DISABLED' }` and runs nothing (`src/ipc/workspace-switch.ts`), and the Git tab says "Git Integration is off for this workspace." A channel that names no repository follows the global value. The extension activates when the setting is on globally or in any workspace; off everywhere, it registers only its settings page, and switching it back on takes a reload.
+
 ## Requirements
 
 - **git** — must be on `$PATH`.

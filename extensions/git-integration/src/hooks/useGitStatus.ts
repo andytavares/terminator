@@ -5,7 +5,16 @@ import { gitAPI } from '../api/git'
 
 interface StatusSink {
   setStatus: (status: GitStatus | null) => void
+  setDisabled: (disabled: boolean) => void
   setLoading: (loading: boolean) => void
+}
+
+type StatusAnswer = GitStatus | { error: string }
+
+/** Keeps the status, or none for an error, and whether the workspace switched the extension off. */
+function keep(sink: StatusSink, result: StatusAnswer): void {
+  sink.setDisabled('error' in result && result.error === 'GIT_DISABLED')
+  sink.setStatus('error' in result ? null : result)
 }
 
 /** A refresh that never overlaps itself and stops writing once `isCancelled` says so. */
@@ -15,8 +24,8 @@ function statusRefresher(repoRoot: string, sink: StatusSink, isCancelled: () => 
     if (isCancelled() || inFlight) return
     inFlight = true
     try {
-      const result = (await gitAPI.status(repoRoot)) as GitStatus | { error: string }
-      if (!isCancelled()) sink.setStatus('error' in result ? null : (result as GitStatus))
+      const result = (await gitAPI.status(repoRoot)) as StatusAnswer
+      if (!isCancelled()) keep(sink, result)
     } catch {
       if (!isCancelled()) sink.setStatus(null)
     } finally {
@@ -45,6 +54,7 @@ function pollStatus(refresh: () => Promise<void>, intervalMs: number): () => voi
 
 export function useGitStatus(repoRoot: string | null, refreshIntervalMs = 3000): void {
   const setStatus = useGitStore((s) => s.setStatus)
+  const setDisabled = useGitStore((s) => s.setDisabled)
   const setLoading = useGitStore((s) => s.setLoading)
   useEffect(() => {
     if (!repoRoot) {
@@ -52,7 +62,8 @@ export function useGitStatus(repoRoot: string | null, refreshIntervalMs = 3000):
       return
     }
     let cancelled = false
-    const refresh = statusRefresher(repoRoot, { setStatus, setLoading }, () => cancelled)
+    const sink = { setStatus, setDisabled, setLoading }
+    const refresh = statusRefresher(repoRoot, sink, () => cancelled)
     setLoading(true)
     void refresh()
     const stopPolling = pollStatus(refresh, refreshIntervalMs)
@@ -60,5 +71,5 @@ export function useGitStatus(repoRoot: string | null, refreshIntervalMs = 3000):
       cancelled = true
       stopPolling()
     }
-  }, [repoRoot, refreshIntervalMs, setStatus, setLoading])
+  }, [repoRoot, refreshIntervalMs, setStatus, setDisabled, setLoading])
 }

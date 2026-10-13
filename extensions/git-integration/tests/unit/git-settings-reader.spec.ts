@@ -1,12 +1,19 @@
 import { describe, it, expect } from 'vitest'
-import type { ExtensionAPI } from '@terminator/extension-sdk'
+import type { ExtensionAPI, SettingScope } from '@terminator/extension-sdk'
 import { gitSettings } from '../../src/git-settings'
 import { partialFake } from '../../../../tests/support/fakes'
 
-/** The settings reader over stored values, as the settings page writes them. */
-function readerOver(stored: Record<string, unknown>) {
+/**
+ * The settings reader over stored values, as the settings page writes them:
+ * `ownValues` by workspace folder, read for a repository there, else `stored`.
+ */
+function readerOver(
+  stored: Record<string, unknown>,
+  ownValues: Record<string, Record<string, unknown>> = {}
+) {
   const settings = partialFake<ExtensionAPI['settings']>({
-    get: <T>(key: string) => stored[key] as T | undefined,
+    get: <T>(key: string, scope?: SettingScope) =>
+      (ownValues[scope?.repoPath ?? '']?.[key] ?? stored[key]) as T | undefined,
   })
   return gitSettings(partialFake<ExtensionAPI>({ settings }))
 }
@@ -16,9 +23,16 @@ const SIGN_OFF = 'terminator.git-integration.git.commit.signOff'
 
 describe('gitSettings', () => {
   it('reads a sign-off switched on, and anything else as off', () => {
-    expect(readerOver({ [SIGN_OFF]: true }).signOff()).toBe(true)
-    expect(readerOver({ [SIGN_OFF]: false }).signOff()).toBe(false)
-    expect(readerOver({}).signOff()).toBe(false)
+    expect(readerOver({ [SIGN_OFF]: true }).signOff('/code/api')).toBe(true)
+    expect(readerOver({ [SIGN_OFF]: false }).signOff('/code/api')).toBe(false)
+    expect(readerOver({}).signOff('/code/api')).toBe(false)
+  })
+
+  it("reads sign-off for the repository's workspace: its own value, else the global one", () => {
+    const reader = readerOver({ [SIGN_OFF]: false }, { '/code/api': { [SIGN_OFF]: true } })
+
+    expect(reader.signOff('/code/api')).toBe(true)
+    expect(reader.signOff('/code/web')).toBe(false)
   })
 
   it('keeps the file limit within the 10 to 5000 the setting declares', () => {

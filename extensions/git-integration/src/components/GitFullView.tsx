@@ -514,21 +514,36 @@ function OpenPrDialog({ repoRoot, pr }: { repoRoot: string; pr: PrDialogState })
 function useGitFullView(repoRoot: string | null) {
   useGitStatus(repoRoot)
   const resize = useResizePanel(300, { min: 160, max: 600 }, -1)
-  const { status, view, setView } = useGitStore(
-    useShallow((s) => ({ status: s.status, view: s.view, setView: s.setView }))
+  const { status, disabled, view, setView } = useGitStore(
+    useShallow((s) => ({
+      status: s.status,
+      disabled: s.disabled,
+      view: s.view,
+      setView: s.setView,
+    }))
   )
   const { selectedDiff, handleFileSelect } = useFileDiff(repoRoot)
   const flow = useCommitFlow(repoRoot, status?.files.some((f) => f.staged) ?? false)
   const pr = usePrDialog(repoRoot)
   const commitMessageRef = useRef<HTMLTextAreaElement>(null)
   usePendingViewRequest(repoRoot, { commitMessageRef, openPrDialog: pr.openPrDialog })
-  return { resize, view, setView, selectedDiff, handleFileSelect, flow, pr, commitMessageRef }
+  return {
+    ...{ resize, disabled, view, setView, selectedDiff, handleFileSelect },
+    ...{ flow, pr, commitMessageRef },
+  }
+}
+
+/** What the view says instead of the changes: no project, or the workspace switched it off. */
+function emptyNotice(repoRoot: string | null, disabled: boolean): string | null {
+  if (!repoRoot) return 'No project selected.'
+  return disabled ? 'Git Integration is off for this workspace.' : null
 }
 
 export function GitFullView({ repoRoot }: Props): JSX.Element {
   const g = useGitFullView(repoRoot)
-  if (!repoRoot) {
-    return <div className="git-full-view git-full-view--empty">No project selected.</div>
+  const notice = emptyNotice(repoRoot, g.disabled)
+  if (notice !== null || !repoRoot) {
+    return <div className="git-full-view git-full-view--empty">{notice}</div>
   }
   if (g.view === 'merge-flow') {
     return <MergeFlowView repoRoot={repoRoot} onExit={() => g.setView('default')} />

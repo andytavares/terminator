@@ -26,7 +26,7 @@ beforeEach(() => {
     extensionBridge: { invoke: mockInvoke },
     fs: { onChanged: mockOnChanged },
   }
-  const state = { setStatus: mockSetStatus, setLoading: mockSetLoading }
+  const state = { setStatus: mockSetStatus, setDisabled: vi.fn(), setLoading: mockSetLoading }
   vi.mocked(useGitStore).mockImplementation(((sel?: (s: unknown) => unknown) =>
     sel ? sel(state) : state) as unknown as typeof useGitStore)
 })

@@ -27,7 +27,8 @@ const CommitPayload = z.object({
 
 /** The Git settings the channels read on every call, so a change applies to the next one. */
 export interface GitSettings {
-  signOff(): boolean
+  /** Whether a commit in `repoRoot` adds a Signed-off-by trailer (workspace-scoped). */
+  signOff(repoRoot: string): boolean
   maxDisplayedFiles(): number
 }
 
@@ -67,7 +68,7 @@ function settingChannels(settings: GitSettings): ChannelSpec[] {
       channel: 'git:commit',
       schema: CommitPayload,
       invalid: VALIDATION_ERROR,
-      run: (payload) => commitCollectingOutput(payload, settings.signOff()),
+      run: (payload) => commitCollectingOutput(payload, settings.signOff(payload.repoRoot)),
     }),
   ]
 }
