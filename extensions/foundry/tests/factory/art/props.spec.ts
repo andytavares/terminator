@@ -225,51 +225,21 @@ function everyKindAndDesksTests() {
   })
 
   it('lights a desk only when a present crew member of its own node is typing', () => {
-    const lit = createRecordingPaint()
-    drawProp(lit, prop('desk'), {
-      context: context({ crew: [crew({ nodeId: 'n1', anim: 'type' })] }),
-      tMs: 0,
-    })
-    expect(containsColor(lit.calls, HALL.screenOn)).toBe(true)
-
-    const idle = createRecordingPaint()
-    drawProp(idle, prop('desk'), {
-      context: context({ crew: [crew({ nodeId: 'n1', anim: 'idle' })] }),
-      tMs: 0,
-    })
-    expect(containsColor(idle.calls, HALL.screenOn)).toBe(false)
-
-    const orphaned = createRecordingPaint()
-    drawProp(orphaned, prop('desk'), {
-      context: context({ crew: [crew({ nodeId: 'n1', anim: 'type', present: false })] }),
-      tMs: 0,
-    })
-    expect(containsColor(orphaned.calls, HALL.screenOn)).toBe(false)
-
-    const otherNode = createRecordingPaint()
-    drawProp(otherNode, prop('desk'), {
-      context: context({ crew: [crew({ nodeId: 'n2', anim: 'type' })] }),
-      tMs: 0,
-    })
-    expect(containsColor(otherNode.calls, HALL.screenOn)).toBe(false)
+    const desk = lampOf('desk')
+    const lit = (one: Partial<Crew>) => containsColor(desk({ crew: [crew(one)] }), HALL.screenOn)
+    expect(lit({ nodeId: 'n1', anim: 'type' })).toBe(true)
+    expect(lit({ nodeId: 'n1', anim: 'idle' })).toBe(false)
+    expect(lit({ nodeId: 'n1', anim: 'type', present: false })).toBe(false)
+    expect(lit({ nodeId: 'n2', anim: 'type' })).toBe(false)
   })
 }
 
 function rigsBenchesAndGatesTests() {
   it('draws a rig waveform only while its crew scans', () => {
-    const scanning = createRecordingPaint()
-    drawProp(scanning, prop('rig'), {
-      context: context({ crew: [crew({ nodeId: 'n1', anim: 'scan' })] }),
-      tMs: 0,
-    })
-    expect(containsColor(scanning.calls, HALL.green)).toBe(true)
-
-    const idle = createRecordingPaint()
-    drawProp(idle, prop('rig'), {
-      context: context({ crew: [crew({ nodeId: 'n1', anim: 'idle' })] }),
-      tMs: 0,
-    })
-    expect(containsColor(idle.calls, HALL.green)).toBe(false)
+    const rig = lampOf('rig')
+    const waving = (one: Partial<Crew>) => containsColor(rig({ crew: [crew(one)] }), HALL.green)
+    expect(waving({ nodeId: 'n1', anim: 'scan' })).toBe(true)
+    expect(waving({ nodeId: 'n1', anim: 'idle' })).toBe(false)
   })
 
   it('draws a rest bench identically regardless of crew or clock — it is breakroom furniture, not a station', () => {
