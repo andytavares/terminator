@@ -205,3 +205,29 @@ function whatTheyAreToldTests() {
     })
   })
 }
+
+/** A step's own check failed twice: its gate names the node it holds. */
+function stepGate(id: string): Gate {
+  return raiseGate({
+    id,
+    rule: 'verify.repeat-fail',
+    orderId,
+    nodeId: 'docs',
+    summary: 'docs failed twice',
+    why: 'the docs check failed',
+    evidence: [],
+    at: AT,
+  })
+}
+
+describe('sending a step back', () => {
+  it('retries the step its gate names, and leaves the others as they were', async () => {
+    await seedFailedFinalCheck([stepGate('G-step')])
+    await call('foundry:inbox.decide', { gateId: 'G-step', option: 'send_back' })
+
+    const graph = await sentBack()
+    expect(node(graph, 'docs')?.state).not.toBe('passed')
+    expect(node(graph, 'docs')?.feedback).toEqual([])
+    expect(node(graph, 'build:U-1')?.state).toBe('passed')
+  })
+})
