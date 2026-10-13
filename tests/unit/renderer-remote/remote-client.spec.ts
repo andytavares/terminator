@@ -180,7 +180,9 @@ describe('assignTerminalWorkspace', () => {
     const [, opts] = mockFetch.mock.calls[0] as [string, RequestInit]
     expect(JSON.parse(opts.body as string)).toEqual({ workspaceId: null })
   })
+})
 
+describe('assignTerminalWorkspace — throws when PATCH response is not ok', () => {
   it('throws when PATCH response is not ok', async () => {
     mockFetch.mockResolvedValueOnce({ ok: false, status: 404 })
     const { assignTerminalWorkspace } = await import(
