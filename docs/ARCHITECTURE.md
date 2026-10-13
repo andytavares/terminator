@@ -593,22 +593,38 @@ UnifiedSidebar (src/renderer/components/sidebar/UnifiedSidebar.tsx)
 │   │     only the render target and density moved (ADR 033, then FR-036).
 │   └── search row — search, FilterMenu, DisplayMenu, "+ repo". These act on
 │         the list below, which is why they sit here and not in the band.
-├── [list]
-│   ├── RepoHeader — three things at rest: name, branch count, and (only while
-│   │     collapsed) a marker that a branch inside is waiting on you. The
-│   │     colour swatch is not counted; it is identity, not a fact. Hover
-│   │     reveals the chevron, "+ new branch" and the registered repo actions,
-│   │     in reserved space so nothing already drawn moves. Carries the
-│   │     drag handle for reordering repos.
-│   ├── BranchRow[] — at most six things at rest: the state glyph in a fixed
-│   │     16px gutter, the branch-kind glyph, the branch name in mono, the
-│   │     issue key as plain text, the +n/−n change counts, and either a
-│   │     state count or an age. The repo's 2px rail is excluded from the six.
-│   └── scratch section — scratch terminals, drawn with BranchRow because in
+├── [list] RepoList (SidebarList.tsx) — the repos in drawn order, repo drag
+│   ├── RepoSection
+│   │   ├── RepoHeader — three things at rest: name, branch count, and (only
+│   │   │     while collapsed) a marker that a branch inside is waiting on you.
+│   │   │     The colour swatch is not counted; it is identity, not a fact.
+│   │   │     Hover reveals the chevron, "+ new branch" and the registered repo
+│   │   │     actions, in reserved space so nothing already drawn moves. Carries
+│   │   │     the drag handle for reordering repos.
+│   │   └── BranchList → BranchEntry[]
+│   │       ├── BranchRow — at most six things at rest: the state glyph in a
+│   │       │     fixed 16px gutter, the branch-kind glyph, the branch name in
+│   │       │     mono, the issue key as plain text, the +n/−n change counts,
+│   │       │     and either a state count or an age. The repo's 2px rail is
+│   │       │     excluded from the six.
+│   │       └── TerminalEntries → TerminalRow[] — once the branch is expanded
+│   └── ScratchSection — scratch terminals, drawn with BranchRow because in
 │         that section a scratch terminal IS the unit of work. The one place
 │         a terminal is still a row: nothing else can represent it.
-└── resize handle
+├── resize handle
+├── IssueDialogs — the issue link dialog and the issue drawer
+└── SidebarDialogs — the one sidebar dialog open: session link, create, edit
+      or remove a workspace, create or remove a branch
 ```
+
+The component keeps no state of its own. `useSidebarWidth` holds the width
+and the resize drag, `useSidebarViews` the saved views, the active one and the
+search, `useSidebarRows` the session list and `buildBranchRows`' result for the
+active view and for every view's count, and `branch-actions.ts` what a row
+does (select a branch or terminal, start or close one, open a folder in the
+editor). Each row is handed one `RowContext` with those actions, the collapse
+state and the dialog opener; a branch row subscribes to its own issue key,
+change counts and selection.
 
 `FilterMenu` and `DisplayMenu` replaced four bands with two controls. Filter holds the saved views, the stale toggle, and a count of what is hidden — that badge is what deleted the standalone filter-notice strip, and it puts the way out of a filter in the same control as the way in. Display holds grouping and sort. Measured against the running app, chrome above the first row of work fell from **165px to 98px**.
 
@@ -636,7 +652,7 @@ UnifiedSidebar (src/renderer/components/sidebar/UnifiedSidebar.tsx)
 
 **Ordering is `buildBranchRows`' job at both levels.** The sort key orders the repo groups as well as the branches inside each one — a sort that only reached inside a repo read as a sort that did nothing, because the group order was hard-coded alphabetical. `manual` is the order the stores hand the lists over in, read through an index map (`workspaces` for repos, `projects` within a repo) rather than left to a stable sort. Every computed key falls back to the repo name so equally quiet repos hold a fixed order; `manual` takes no such tie-break, because an alphabetical fallback is exactly what would swallow a drag. A repo with no branches is seeded as an empty group here rather than appended by the component, so it sorts and reorders with the rest instead of being pinned below them.
 
-`UnifiedSidebar` writes that order back. `useDragReorder` is given the list **as drawn**, which is not the list as stored once a computed sort or a filter is on; `mergeReorder` rewrites only the slots the visible rows occupy, so a filtered-out repo keeps its place instead of being swept to the end by an order that never mentioned it. Committing a drop also sets the view's sort to `manual` — under any other key the next render would recompute the order and the drag would vanish. Repos reorder through `workspace:reorder`, branches through `project:reorder`; branch rows are not draggable under `groupBy: 'none'`, where one list spans every repo and the stores keep no order that crosses them.
+`UnifiedSidebar` (`manualReorder`) writes that order back. `useDragReorder` is given the list **as drawn**, which is not the list as stored once a computed sort or a filter is on; `mergeReorder` rewrites only the slots the visible rows occupy, so a filtered-out repo keeps its place instead of being swept to the end by an order that never mentioned it. Committing a drop also sets the view's sort to `manual` — under any other key the next render would recompute the order and the drag would vanish. Repos reorder through `workspace:reorder`, branches through `project:reorder`; branch rows are not draggable under `groupBy: 'none'`, where one list spans every repo and the stores keep no order that crosses them.
 
 Deliberately absent from a `BranchRow`: change statistics and the linked issue key. Both arrive from stores on their own schedule, and folding them in would make the result a function of when git or the tracker last answered (ADR 031).
 

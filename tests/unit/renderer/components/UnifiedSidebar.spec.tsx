@@ -54,6 +54,14 @@ vi.mock('../../../../src/renderer/components/sidebar/CreateWorkspaceDialog', () 
     </div>
   ),
 }))
+vi.mock('../../../../src/renderer/components/integrations/IssueDrawer', () => ({
+  IssueDrawer: ({ projectName, onClose }: { projectName: string; onClose: () => void }) => (
+    <div data-testid="issue-drawer">
+      {projectName}
+      <button onClick={onClose}>close-drawer</button>
+    </div>
+  ),
+}))
 const mockUseSessionFacts = vi.fn((): SessionFacts[] => [])
 vi.mock('../../../../src/renderer/components/session/useSessionFacts', () => ({
   useSessionFacts: () => mockUseSessionFacts(),
@@ -1407,5 +1415,230 @@ describe('a busy terminal and the sidebar — still lists a branch as stale once
       rerender(<UnifiedSidebar {...defaultProps} now={NOW + staleAfterMs + 1000} />)
     )
     expect(names()).toContain('Web')
+  })
+})
+
+/** Expands main's terminals and returns the terminal rows drawn under it. */
+function expandMain(container: HTMLElement): Element[] {
+  fireEvent.click(screen.getByRole('button', { name: 'Show terminals in main' }))
+  return Array.from(container.querySelectorAll('.terminal-row'))
+}
+
+const terminalRowNamed = (container: HTMLElement, title: string): Element =>
+  Array.from(container.querySelectorAll('.terminal-row')).find(
+    (r) => r.querySelector('.terminal-row__name')?.textContent === title
+  )!
+
+describe('UnifiedSidebar — the terminals under a branch', () => {
+  it('shows the terminal picked from them, and tells the host', () => {
+    const onSelectProject = vi.fn()
+    const { container } = renderSidebar({ onSelectProject })
+    expandMain(container)
+    fireEvent.click(terminalRowNamed(container, 'api-agent'))
+    expect(useSessionStore.getState().projectViews.get('p1')?.activeSessionId).toBe('s2')
+    expect(onSelectProject).toHaveBeenCalled()
+  })
+
+  it('marks the terminal the branch is showing', () => {
+    useSessionStore.getState().setActiveSessionForProject('p1', 's2')
+    const { container } = renderSidebar()
+    expandMain(container)
+    expect(terminalRowNamed(container, 'api-agent').classList).toContain('terminal-row--selected')
+    expect(terminalRowNamed(container, 'api-shell').classList).not.toContain(
+      'terminal-row--selected'
+    )
+  })
+})
+
+describe('UnifiedSidebar — the terminals under a branch — closes one by leaving its split first, then ending it', () => {
+  it('closes one by leaving its split first, then ending it', () => {
+    const closeSplitLeaf = vi.fn()
+    const closeSession = vi.fn(async () => {})
+    useSessionStore.setState({ closeSplitLeaf, closeSession })
+    const { container } = renderSidebar()
+    expandMain(container)
+    fireEvent.click(screen.getByRole('button', { name: 'Close api-shell' }))
+    expect(closeSplitLeaf).toHaveBeenCalledWith('p1', 's1')
+    expect(closeSession).toHaveBeenCalledWith('s1')
+    expect(closeSplitLeaf.mock.invocationCallOrder[0]).toBeLessThan(
+      closeSession.mock.invocationCallOrder[0]
+    )
+  })
+})
+
+describe('UnifiedSidebar — the terminals under a branch — linking one', () => {
+  it('opens the session link dialog for it, and closes it again', () => {
+    mockUseSessionFacts.mockReturnValue([fact({ sessionId: 's1', name: 'api-shell' })])
+    const { container } = renderSidebar()
+    expandMain(container)
+    fireEvent.contextMenu(terminalRowNamed(container, 'api-shell'))
+    fireEvent.click(screen.getByText('Link issue…'))
+    expect(screen.getByTestId('session-link-dialog').textContent).toContain('api-shell')
+    fireEvent.click(screen.getByText('close-session-link'))
+    expect(screen.queryByTestId('session-link-dialog')).toBeNull()
+  })
+
+  it('opens no dialog for a terminal it has no facts about', () => {
+    const { container } = renderSidebar()
+    expandMain(container)
+    fireEvent.contextMenu(terminalRowNamed(container, 'api-shell'))
+    fireEvent.click(screen.getByText('Link issue…'))
+    expect(screen.queryByTestId('session-link-dialog')).toBeNull()
+  })
+})
+
+/** s1 on main with one pane split off it. */
+function withPane(): void {
+  sessions.set('s1-pane', session('s1-pane', 'p1', { tabTitle: 'pane', parentSessionId: 's1' }))
+  setSessions(new Map(sessions))
+}
+
+describe('UnifiedSidebar — a pane under its terminal', () => {
+  it('is drawn nested under the terminal it was split off', () => {
+    withPane()
+    const { container } = renderSidebar()
+    expandMain(container)
+    expect(terminalRowNamed(container, 'pane').classList).toContain('terminal-row--nested')
+  })
+
+  it('is shown, closed and linked on its own', () => {
+    withPane()
+    mockUseSessionFacts.mockReturnValue([fact({ sessionId: 's1-pane', name: 'pane' })])
+    const closeSplitLeaf = vi.fn()
+    useSessionStore.setState({ closeSplitLeaf, closeSession: vi.fn(async () => {}) })
+    const { container } = renderSidebar()
+    expandMain(container)
+    fireEvent.click(terminalRowNamed(container, 'pane'))
+    expect(useSessionStore.getState().projectViews.get('p1')?.activeSessionId).toBe('s1-pane')
+    fireEvent.contextMenu(terminalRowNamed(container, 'pane'))
+    fireEvent.click(screen.getByText('Link issue…'))
+    expect(screen.getByTestId('session-link-dialog').textContent).toContain('pane')
+    fireEvent.click(screen.getByRole('button', { name: 'Close pane' }))
+    expect(closeSplitLeaf).toHaveBeenCalledWith('p1', 's1-pane')
+  })
+})
+
+describe('UnifiedSidebar — a pane under its terminal — removes its own link from its menu', () => {
+  it('removes its own link from its menu', async () => {
+    withPane()
+    const linked = fact({
+      sessionId: 's1-pane',
+      workItem: { source: 'session', ref: { tracker: 'linear', key: 'ENG-5' } },
+    })
+    mockUseSessionFacts.mockReturnValue([linked])
+    const setLink = vi.fn(async () => true)
+    useSessionRecordsStore.setState({ setLink })
+    const { container } = renderSidebar()
+    expandMain(container)
+    fireEvent.contextMenu(terminalRowNamed(container, 'pane'))
+    fireEvent.click(screen.getByText('Remove session link'))
+    expect(setLink).toHaveBeenCalledWith(linked.snapshot, null)
+  })
+})
+
+describe('UnifiedSidebar — the issue drawer', () => {
+  it('opens from the branch key and closes again', async () => {
+    useIntegrationsStore.setState({ links: new Map([['p1', link]]) })
+    renderSidebar()
+    fireEvent.click(screen.getByRole('button', { name: 'Open TAV-14' }))
+    expect((await screen.findByTestId('issue-drawer')).textContent).toBe('mainclose-drawer')
+    fireEvent.click(screen.getByText('close-drawer'))
+    expect(screen.queryByTestId('issue-drawer')).toBeNull()
+  })
+
+  it('draws neither drawer nor link dialog for a branch it does not know', () => {
+    useIntegrationsStore.setState({ drawerProjectId: 'gone', linkDialogProjectId: 'gone' })
+    const { container } = renderSidebar()
+    expect(container.parentElement!.querySelector('.issue-drawer-host')).toBeNull()
+    expect(screen.queryByTestId('link-issue-dialog')).toBeNull()
+  })
+})
+
+describe('UnifiedSidebar — backing out of a dialog', () => {
+  it('closes the workspace editor when it asks to', () => {
+    const { container } = renderSidebar()
+    fireEvent.contextMenu(container.querySelector('.repo-header')!)
+    fireEvent.click(screen.getByText('Edit workspace'))
+    fireEvent.click(screen.getByText('close-edit'))
+    expect(screen.queryByTestId('edit-workspace-dialog')).toBeNull()
+  })
+
+  it('keeps the workspace when its removal is cancelled', () => {
+    const { container } = renderSidebar()
+    fireEvent.contextMenu(container.querySelector('.repo-header')!)
+    fireEvent.click(screen.getByText('Remove workspace'))
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByText(/Remove workspace "/)).toBeNull()
+    expect(workspaceApi.delete).not.toHaveBeenCalled()
+  })
+
+  it('keeps the branch when its removal is cancelled', () => {
+    const { container } = renderSidebar()
+    openRowMenu(container, 'main')
+    fireEvent.click(screen.getByText('Remove branch'))
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByText(/Remove branch "/)).toBeNull()
+    expect(projectApi.delete).not.toHaveBeenCalled()
+  })
+})
+
+describe('UnifiedSidebar — odds and ends', () => {
+  it('renames a scratch terminal from its row', () => {
+    setSessions(
+      new Map([
+        ['sc1', session('sc1', '00000000-0000-0000-0000-000000000000', { tabTitle: 'notes' })],
+      ])
+    )
+    const renameSession = vi.fn()
+    useSessionStore.setState({ renameSession })
+    const { container } = renderSidebar()
+    const row = container.querySelector('.unified-sidebar__scratch .branch-row')!
+    fireEvent.contextMenu(row)
+    fireEvent.click(screen.getByText('Rename'))
+    const input = container.querySelector<HTMLInputElement>('.branch-row__rename')!
+    fireEvent.change(input, { target: { value: 'scratchpad' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(renameSession).toHaveBeenCalledWith('sc1', 'scratchpad')
+  })
+
+  it('falls back to Everything for a starting view it does not have', () => {
+    const { container } = renderSidebar({ initialViewId: 'gone' })
+    expect(branchNames(container)).toHaveLength(3)
+  })
+})
+
+describe('UnifiedSidebar — odds and ends — names no editor and abbreviates no path when main cannot say', () => {
+  it('names no editor and abbreviates no path when main cannot say', async () => {
+    Object.defineProperty(window, 'electronAPI', {
+      configurable: true,
+      value: {
+        app: { getInfo: vi.fn().mockRejectedValue(new Error('gone')) },
+        editor: { detect: vi.fn().mockRejectedValue(new Error('gone')), open: vi.fn() },
+      },
+    })
+    const { container } = renderSidebar()
+    await waitFor(() => expect(window.electronAPI.editor.detect).toHaveBeenCalled())
+    expect(container.querySelector('.repo-header__name')!.getAttribute('title')).toBe('/b')
+    openRowMenu(container, 'main')
+    expect(screen.getByText('Open in editor')).toBeTruthy()
+  })
+
+  it('swallows a terminal that fails to start from a branch row', async () => {
+    mockCreateSession.mockRejectedValueOnce(new Error('pty'))
+    renderSidebar()
+    fireEvent.click(screen.getByRole('button', { name: 'New terminal in main' }))
+    await waitFor(() => expect(mockCreateSession).toHaveBeenCalled())
+  })
+})
+
+describe('UnifiedSidebar — odds and ends — swallows a terminal that fails to start from the command palette', () => {
+  it('swallows a terminal that fails to start from the command palette', async () => {
+    mockCreateSession.mockRejectedValueOnce(new Error('pty'))
+    renderSidebar()
+    const command = useExtensionRegistry
+      .getState()
+      .commands.find((c) => c.id === 'core.scope.new-terminal.p1')!
+    command.action()
+    await waitFor(() => expect(mockCreateSession).toHaveBeenCalled())
   })
 })
