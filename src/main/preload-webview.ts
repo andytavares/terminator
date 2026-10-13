@@ -124,8 +124,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getSettingsValues: () => ipcRenderer.invoke('extension:get-settings-values'),
     updateSetting: (key: string, value: unknown) =>
       ipcRenderer.invoke('extension:update-setting', { key, value }),
-    onSettingsChanged: (handler: () => void) => {
-      const listener = () => handler()
+    onSettingsChanged: (handler: (change: unknown) => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, change: unknown) => handler(change)
       ipcRenderer.on('extension:settings-changed', listener)
       return () => ipcRenderer.removeListener('extension:settings-changed', listener)
     },

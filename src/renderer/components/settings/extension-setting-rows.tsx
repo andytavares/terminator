@@ -14,9 +14,33 @@ export type SettingPropDef = {
   options?: string[]
   min?: number
   max?: number
+  workspaceScoped?: boolean
   channel?: string
   confirmMessage?: string
   danger?: boolean
+}
+
+export type ExtensionSchema = {
+  extensionId: string
+  label: string
+  description?: string
+  properties: Record<string, SettingPropDef>
+}
+
+/** Reads every extension's settings schema, and the global values set for them. */
+export function readExtensionSettings(sink: {
+  setSchemas: (schemas: ExtensionSchema[]) => void
+  setValues: (values: Record<string, unknown>) => void
+}): void {
+  const extension = window.electronAPI.extension
+  extension
+    .getSettingsSchemas()
+    .then((r) => sink.setSchemas(r.schemas ?? []))
+    .catch(() => {})
+  extension
+    .getSettingsValues()
+    .then((r) => sink.setValues(r.values ?? {}))
+    .catch(() => {})
 }
 
 // Any extension may declare per-notification-kind delivery settings using the

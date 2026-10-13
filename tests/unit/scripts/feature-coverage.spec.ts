@@ -62,6 +62,24 @@ describe('drivenFeatures', () => {
   })
 })
 
+describe('drivenFeatures — a workspace value', () => {
+  it('credits an extension setting written for one workspace in Workspace Settings', () => {
+    const driven = drivenFeatures([
+      {
+        spec: 'a.spec.ts',
+        entries: [
+          [
+            'invoke',
+            'extension:update-workspace-setting',
+            { workspaceId: 'w1', key: 'x.signOff', value: true },
+          ],
+        ],
+      },
+    ])
+    expect([...driven.extensionSettings.keys()]).toEqual(['x.signOff'])
+  })
+})
+
 describe('drivenFeatures — payloads that name nothing', () => {
   it('credits only the channel when a command, setting or patch carries nothing to name', () => {
     const driven = drivenFeatures([

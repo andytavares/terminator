@@ -14,6 +14,7 @@ import type { CommandContext } from '@terminator/extension-sdk'
 import {
   getAllExtensionSettings,
   setExtensionSetting,
+  setWorkspaceExtensionSetting,
 } from '../storage/extension-settings-store.js'
 
 const invalid = { error: 'VALIDATION_ERROR' }
@@ -30,6 +31,13 @@ const PanelBoundsSchema = z.object({
   visible: z.boolean(),
   repoRoot: z.string().nullable().optional(),
 })
+
+/** The extension that registered `key` as `workspaceScoped`, if one did. */
+function workspaceScopedOwner(key: string): string | undefined {
+  return listExtensionSettingsSections().find(
+    (section) => section.properties[key]?.workspaceScoped === true
+  )?.extensionId
+}
 
 const settingsChannels: ChannelSpec[] = [
   defineChannel({
@@ -51,6 +59,21 @@ const settingsChannels: ChannelSpec[] = [
     run: ({ key, value }) => {
       setExtensionSetting(key, value)
       return { ok: true }
+    },
+  }),
+  // Workspace Settings: one workspace's own value; no value hands it back to the global one.
+  defineChannel({
+    channel: 'extension:update-workspace-setting',
+    schema: z.object({
+      workspaceId: z.string().min(1),
+      key: z.string().min(1),
+      value: z.unknown(),
+    }),
+    invalid,
+    run: ({ workspaceId, key, value }) => {
+      const extensionId = workspaceScopedOwner(key)
+      if (extensionId === undefined) return { error: 'NOT_WORKSPACE_SCOPED' }
+      return { settings: setWorkspaceExtensionSetting(workspaceId, { extensionId, key, value }) }
     },
   }),
 ]

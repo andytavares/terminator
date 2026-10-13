@@ -33,6 +33,12 @@ beforeEach(() => {
   mockUpdateWorkspace.mockResolvedValue(undefined)
   installElectronApi({
     settings: { updateWorkspace: mockUpdateWorkspace },
+    // No extension declares a workspace-scoped setting here; WorkspaceExtensionSettings.spec covers those.
+    extension: {
+      getSettingsSchemas: vi.fn(async () => ({ schemas: [] })),
+      getSettingsValues: vi.fn(async () => ({ values: {} })),
+      onListChanged: vi.fn(() => () => {}),
+    },
   })
   seedStore(useSettingsStore, {
     globalSettings,

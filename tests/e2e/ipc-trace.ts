@@ -17,6 +17,7 @@ const NAMING_CHANNELS = [
   'extension:execute-command',
   'extension:run-command',
   'extension:update-setting',
+  'extension:update-workspace-setting',
   'settings:update-global',
   'settings:update-workspace',
 ]

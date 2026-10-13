@@ -35,6 +35,12 @@ interface SettingsState {
   updateNotificationOverride: (key: string, targets: NotificationTarget[]) => Promise<void>
   updateQuickActions: (patch: Partial<QuickActionsSettings>) => Promise<void>
   updateWorkspaceQuickActions: (workspaceId: string, custom: CustomAction[]) => Promise<void>
+  /** A `workspaceScoped` extension setting's own value here; undefined hands it back to the global one. */
+  updateWorkspaceExtensionSetting: (
+    workspaceId: string,
+    key: string,
+    value: unknown
+  ) => Promise<void>
   resolveSettings: (workspaceId?: string | null) => GlobalSettings
 }
 
@@ -96,6 +102,16 @@ async function saveWorkspace(
 ): Promise<void> {
   const result = await window.electronAPI.settings.updateWorkspace(workspaceId, patch)
   set((s) => withWorkspace(s, workspaceId, result.settings))
+}
+
+/** Saves one extension setting's value in one workspace and keeps what main answers with. */
+async function saveWorkspaceExtensionSetting(
+  set: SetSettings,
+  workspaceId: string,
+  { key, value }: { key: string; value: unknown }
+): Promise<void> {
+  const result = await window.electronAPI.extension.updateWorkspaceSetting(workspaceId, key, value)
+  if ('settings' in result) set((s) => withWorkspace(s, workspaceId, result.settings))
 }
 
 async function loadSettings(
@@ -180,6 +196,7 @@ function workspaceSlice(
   | 'updateWorkspaceDefaultShell'
   | 'updateWorkspaceBranchExcludePatterns'
   | 'updateWorkspaceQuickActions'
+  | 'updateWorkspaceExtensionSetting'
 > {
   return {
     updateWorkspaceTheme: (workspaceId, theme) => updateWorkspaceTheme(set, workspaceId, theme),
@@ -194,6 +211,8 @@ function workspaceSlice(
       saveWorkspace(set, workspaceId, { git: { branchExcludePatterns: patterns } }),
     updateWorkspaceQuickActions: (workspaceId, custom) =>
       saveWorkspace(set, workspaceId, { quickActions: { custom } }),
+    updateWorkspaceExtensionSetting: (workspaceId, key, value) =>
+      saveWorkspaceExtensionSetting(set, workspaceId, { key, value }),
   }
 }
 

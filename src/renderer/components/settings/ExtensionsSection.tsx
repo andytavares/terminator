@@ -5,15 +5,9 @@ import {
   ExtensionSettingRow,
   NotificationSettingsTable,
   partitionNotificationSettings,
-  type SettingPropDef,
+  readExtensionSettings,
+  type ExtensionSchema,
 } from './extension-setting-rows'
-
-type ExtensionSchema = {
-  extensionId: string
-  label: string
-  description?: string
-  properties: Record<string, SettingPropDef>
-}
 
 type Extension = {
   id: string
@@ -34,16 +28,8 @@ function useExtensionListing() {
   // a backend can fail, or come back with its settings, while the panel is open.
   useEffect(() => {
     const read = (): void => {
-      const ext = window.electronAPI.extension
-      void ext.list().then((r) => setExtensions(r.extensions ?? []))
-      ext
-        .getSettingsSchemas()
-        .then((r) => setSchemas(r.schemas ?? []))
-        .catch(() => {})
-      ext
-        .getSettingsValues()
-        .then((r) => setValues(r.values ?? {}))
-        .catch(() => {})
+      void window.electronAPI.extension.list().then((r) => setExtensions(r.extensions ?? []))
+      readExtensionSettings({ setSchemas, setValues })
     }
     read()
     return window.electronAPI.extension.onListChanged(read)

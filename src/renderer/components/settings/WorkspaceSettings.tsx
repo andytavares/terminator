@@ -6,6 +6,8 @@ import '@terminator/extension-ui/settings-fields.css'
 import './SettingsPanel.css'
 import { ThemeChoices } from './ThemeChoices'
 import { parsePatterns, PATTERNS_PLACEHOLDER } from './patterns'
+import { UseGlobalButton } from './UseGlobalButton'
+import { WorkspaceExtensionSettings } from './WorkspaceExtensionSettings'
 import type {
   GlobalSettings,
   WorkspaceSettings as WorkspaceSettingsValue,
@@ -35,6 +37,7 @@ export function WorkspaceSettings({ workspaceId }: Props): JSX.Element {
         <p className="settings-section__desc">Override global defaults for this workspace.</p>
         <WorkspaceFields field={field} own={ownSettings(overrides)} />
       </div>
+      <WorkspaceExtensionSettings workspaceId={workspaceId} />
       <QuickActionsSettings scope="workspace" workspaceId={workspaceId} />
     </>
   )
@@ -179,14 +182,6 @@ function DefaultShellField({ workspaceId, effective, overridden }: FieldProps): 
       />
       {overridden && <UseGlobalButton onClick={() => void update(workspaceId, undefined)} />}
     </div>
-  )
-}
-
-function UseGlobalButton({ onClick }: { onClick: () => void }): JSX.Element {
-  return (
-    <button className="settings-section__btn-link" onClick={onClick}>
-      Use global default
-    </button>
   )
 }
 

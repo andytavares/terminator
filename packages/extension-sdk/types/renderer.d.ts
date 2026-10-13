@@ -3,6 +3,8 @@
  * This is the renderer-side (webview / browser context) API surface.
  */
 
+import type { SettingsChange } from './api'
+
 export type NotificationTarget = 'system' | 'center' | 'toast'
 
 export interface SerializedNotification {
@@ -116,8 +118,12 @@ export interface ElectronAPI {
     getSettingsSchemas(): Promise<{ schemas: unknown[] }>
     getSettingsValues(): Promise<{ values: Record<string, unknown> }>
     updateSetting(key: string, value: unknown): Promise<{ ok: true }>
-    /** Called after any extension setting changes; re-read with `getSettingsValues`. */
-    onSettingsChanged(handler: () => void): () => void
+    /**
+     * Called after any extension setting changes; re-read with `getSettingsValues`.
+     * `change.workspaceId` names the workspace whose own value changed, null for a
+     * global value (since 4.1.0).
+     */
+    onSettingsChanged(handler: (change: SettingsChange) => void): () => void
     getCommands(): Promise<{
       commands: Array<{
         key: string

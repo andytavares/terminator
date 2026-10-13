@@ -75,6 +75,7 @@ const EXPECTED_REMOTE_CHANNELS = [
   'extension:toggle',
   'extension:reload',
   'extension:update-setting',
+  'extension:update-workspace-setting',
   'extension:get-commands',
   'extension:get-settings-schemas',
   'extension:get-settings-values',

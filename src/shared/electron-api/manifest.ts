@@ -18,6 +18,7 @@
 // main process. Type-only imports are erased and therefore allowed.
 
 import type { z } from 'zod'
+import type { SettingsChange } from '@terminator/extension-sdk'
 import type {
   AgentContext,
   Branch,
@@ -154,6 +155,7 @@ interface ExtensionSettingsSchema {
       options?: string[]
       min?: number
       max?: number
+      workspaceScoped?: boolean
       channel?: string
       confirmMessage?: string
       danger?: boolean
@@ -626,6 +628,22 @@ export const ELECTRON_API_MANIFEST = [
     toPayload: (key, value) => ({ key, value }),
     extensionView: 'shared',
   }),
+  // Workspace Settings: a `workspaceScoped` setting's value for one workspace;
+  // no value hands it back to the global one ("Use global default").
+  method({
+    path: 'extension.updateWorkspaceSetting',
+    kind: 'invoke',
+    channel: 'extension:update-workspace-setting',
+    signature:
+      signature<
+        (
+          workspaceId: string,
+          key: string,
+          value?: unknown
+        ) => Promise<{ settings: WorkspaceSettings } | Failure>
+      >(),
+    toPayload: (workspaceId, key, value) => ({ workspaceId, key, value }),
+  }),
   method({
     path: 'extension.onCommandsChanged',
     kind: 'event',
@@ -648,8 +666,9 @@ export const ELECTRON_API_MANIFEST = [
     path: 'extension.onSettingsChanged',
     kind: 'event',
     channel: 'extension:settings-changed',
-    signature: signature<(handler: () => void) => Unsubscribe>(),
-    toHandlerArgs: () => [],
+    // The workspace whose own value changed, or null for a global value.
+    signature: signature<(handler: (change: SettingsChange) => void) => Unsubscribe>(),
+    toHandlerArgs: (args) => [args[0]],
     // A view re-reads the settings it applies; Settings itself writes them.
     remote: 'omit',
     extensionView: 'only',

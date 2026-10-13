@@ -9,9 +9,9 @@
 //
 // A feature is "driven" when some spec caused its IPC: a channel invoked or
 // sent, an event pushed, a command run through extension:execute-command or
-// extension:run-command, a setting written through settings:update-global or
-// extension:update-setting, a Quick Action recorded in quickActions.usage or
-// quickActions.directUse. Driven is not asserted: a spec that opens a view
+// extension:run-command, a setting written through settings:update-global,
+// extension:update-setting or extension:update-workspace-setting, a Quick
+// Action recorded in quickActions.usage or quickActions.directUse. Driven is not asserted: a spec that opens a view
 // drives every channel the view loads with, whether or not it checks them.
 
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
@@ -81,6 +81,7 @@ const KEYED_CHANNELS = new Map([
   ['extension:execute-command', 'commands'],
   ['extension:run-command', 'commands'],
   ['extension:update-setting', 'extensionSettings'],
+  ['extension:update-workspace-setting', 'extensionSettings'],
 ])
 
 /** Credits `spec` with what one trace entry drove. */

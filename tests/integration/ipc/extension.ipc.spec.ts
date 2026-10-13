@@ -289,3 +289,59 @@ describe('extension IPC handlers — extension settings values', () => {
     expect(await values({})).toEqual({ values: { 'com.test.token': 'abc123' } })
   })
 })
+
+// Workspace Settings sets a `workspaceScoped` setting for one workspace; the
+// value lives in that workspace's settings, under the extension that declared it.
+const WORKSPACE_ID = '7f1d2c3b-4a5e-4f60-8a7b-9c0d1e2f3a4b'
+
+function registerSignOff(): void {
+  ;(globalRegistry.settingsSections as Map<string, unknown>).set('com.test.settings', {
+    label: 'Test Extension',
+    properties: {
+      'com.test.signOff': {
+        type: 'boolean',
+        label: 'Sign off',
+        default: false,
+        workspaceScoped: true,
+      },
+      'com.test.token': { type: 'string', label: 'Token', default: '' },
+    },
+  })
+}
+
+describe('extension IPC handlers — a workspace value', () => {
+  useExtensionHandlers()
+
+  it('stores it under the extension that declared the key, and "Use global default" removes it', async () => {
+    registerSignOff()
+    const update = captureHandle('extension:update-workspace-setting')
+
+    const set = (await update(
+      {},
+      { workspaceId: WORKSPACE_ID, key: 'com.test.signOff', value: true }
+    )) as {
+      settings: { extensions: unknown }
+    }
+    expect(set.settings.extensions).toEqual({ 'com.test': { 'com.test.signOff': true } })
+
+    const cleared = (await update({}, { workspaceId: WORKSPACE_ID, key: 'com.test.signOff' })) as {
+      settings: { extensions: unknown }
+    }
+    expect(cleared.settings.extensions).toEqual({ 'com.test': {} })
+  })
+})
+
+describe('extension IPC handlers — a workspace value for another key', () => {
+  useExtensionHandlers()
+
+  it('refuses a key no extension declared workspaceScoped', async () => {
+    registerSignOff()
+    const update = captureHandle('extension:update-workspace-setting')
+
+    for (const key of ['com.test.token', 'com.other.unknown']) {
+      expect(await update({}, { workspaceId: WORKSPACE_ID, key, value: 'x' })).toEqual({
+        error: 'NOT_WORKSPACE_SCOPED',
+      })
+    }
+  })
+})
