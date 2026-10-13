@@ -16,6 +16,11 @@ import { createIpcRegistrar, errorResult } from './ipc/register.js'
 import { registerAdminIpcHandlers } from './ipc/admin.ipc.js'
 import { registerWeeklyReviewIpcHandlers } from './ipc/weekly-review.ipc.js'
 import { applyTaskVaultSchema } from './vault/db.js'
+import {
+  migrateStoredStaleThreshold,
+  STALE_THRESHOLD,
+  STALE_THRESHOLD_KEY,
+} from './stale-threshold.js'
 import { backfillRecurringTasks } from './vault/ensure-next-occurrence.js'
 import {
   bindBroadcast,
@@ -74,13 +79,14 @@ function buildNotificationSettingProperties(): Record<string, SettingDefinition>
 
 /** The extension's own settings, before the per-notification delivery toggles. */
 const BASE_SETTINGS: Record<string, SettingDefinition> = {
-  'terminator.task-vault.staleThresholdDays': {
+  [STALE_THRESHOLD_KEY]: {
     type: 'number',
-    label: 'Stale Project Threshold (days)',
-    description: 'Days without modification before a project is considered stale',
-    default: 14,
-    min: 1,
-    max: 365,
+    label: 'Stale Task Threshold (days)',
+    description:
+      'Days a task can roll over on Today before it is marked stale and listed in the weekly review',
+    default: STALE_THRESHOLD.default,
+    min: STALE_THRESHOLD.min,
+    max: STALE_THRESHOLD.max,
   },
   'terminator.task-vault.weeklyReviewDay': {
     type: 'string',
@@ -188,6 +194,7 @@ function registerFeatureIpc(api: ExtensionAPI, db: ExtensionDB): void {
 async function initializeSchema(api: ExtensionAPI, db: ExtensionDB): Promise<void> {
   try {
     await applyTaskVaultSchema(db)
+    await migrateStoredStaleThreshold(api, db)
     await backfillRecurringTasks(db)
     maybeStartScheduler(db)
   } catch (err) {

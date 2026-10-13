@@ -91,6 +91,15 @@ Each entry: what was decided, why, and how to undo it.
     the new `extension.onSettingsChanged` (the core broadcasts `extension:settings-changed`): an
     extension view gets no focus or visibility event when Settings closes, measured under xvfb.
     Undo: revert the notepad commit; the SDK event can stay, it has no other cost.
+18. Task Vault's `staleThresholdDays` now sets when a task is stale, and is labelled **Stale
+    Task Threshold (days)**. It was declared as "days without modification before a project is
+    considered stale", which the product does not do: a project is stale when it has no open next
+    action (GTD), and that stays. What did use a days threshold was task staleness on Today and the
+    review's Stale step, read from a `stale_days_threshold` row only the remote channel could set.
+    The setting is now that threshold, default 7 (what users had, not the declared 14), 1–365.
+    Activation moves an existing row into the setting and deletes it; `set-stale-threshold` writes
+    the setting. Undo: revert the commit; a moved value then lives only in the setting, so put it
+    back with `task-vault:settings:set-stale-threshold` from the previous build.
 
 ## Known advisories
 

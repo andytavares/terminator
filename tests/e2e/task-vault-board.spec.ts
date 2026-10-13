@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test'
 import { AppHandle, launchApp, closeApp } from './helpers'
 import { invokeChannel } from './extension-page'
-import { openVault, storedTask } from './task-vault-harness'
+import { openVault, storedTask, localDate } from './task-vault-harness'
 
 // The board view and the calendar beside the log: moving cards between lanes,
 // grouping and editing lanes, and jumping from a day in the calendar to a task.
@@ -13,13 +13,6 @@ interface KanbanConfig {
 
 let handle: AppHandle
 let vault: Page
-
-function localDate(offsetDays: number): string {
-  const date = new Date()
-  date.setDate(date.getDate() + offsetDays)
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
-}
 
 /** A day in this month's calendar grid other than today. */
 const OTHER_DAY =

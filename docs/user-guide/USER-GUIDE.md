@@ -1062,6 +1062,11 @@ The calendar on the right marks each day by what is on it, and hovering a day sa
 The six steps are named as you go — **Get clear**, **Inbox**, **Projects**, **Stale**, **Someday**,
 **Reflect** — instead of counting "Step 3 of 6" without saying what step 3 is.
 
+An open task left on Today rolls over to the next day. Once it has rolled over for **Stale Task
+Threshold (days)** (Settings → Extensions → Task Vault, 7 by default), Today marks it **stale** and
+the review's **Stale** step lists it. A project is stale for a different reason: it has no open
+next action.
+
 ### Quick capture
 
 Press **`Cmd+Shift+Space`** from anywhere to open the capture dialog. Type using the natural syntax:
