@@ -10,7 +10,7 @@ import { rungOutputPath } from '../../src/line/rung-output.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import { writeFileWithDirs } from './files.js'
 
-export type ForgePhase = 'architect' | 'red-team' | 'scout'
+type ForgePhase = 'architect' | 'red-team' | 'scout'
 
 export interface ForgeTurnInput {
   phase: ForgePhase
@@ -64,7 +64,7 @@ export function redTeamRegression(text: string) {
 }
 
 /** The one file a turn of `phase` may write: the architect's proposal, or a rung's output. */
-export function forgeAnswerPath(dataDir: string, phase: ForgePhase, turn: number): string {
+function forgeAnswerPath(dataDir: string, phase: ForgePhase, turn: number): string {
   const order = orderDir(dataDir, 'WO-1')
   if (phase === 'architect') return path.join(order, 'proposal.json')
   return rungOutputPath(order, phase === 'scout' ? 'forge-scout' : `review-${turn}`)
