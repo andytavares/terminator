@@ -45,12 +45,9 @@ export async function loadLinks(): Promise<void> {
   }
 }
 
-/**
- * One entry of the file as a link, or null when it is not one.
- *
- * The file is on disk and hand-editable. A null or a bare string in it used
- * to throw, which took out every *other* link the operator had.
- */
+/** One entry of the file as a link, or null when it is not one. The file is on disk and
+ * hand-editable. A null or a bare string in it used to throw, which took out every *other* link
+ * the operator had. */
 function storedLink(entry: unknown): IssueLink | null {
   if (typeof entry !== 'object' || entry === null) return null
   const link = entry as Partial<IssueLink>

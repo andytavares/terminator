@@ -83,10 +83,8 @@ async function write(file: string, data: StoreFile): Promise<void> {
   await writeJsonAtomic(file, data)
 }
 
-// Each change reads, edits and writes the whole file. Two at once (two
-// trackers answering one listMine, or blurring one tracker's field by clicking
-// the other's Disconnect) would each write over the other's, and a read could
-// miss a change under way. So every access waits for the ones asked for
+// Each change rewrites the whole file, so two at once (two trackers answering one listMine) would
+// overwrite each other, and a read could miss one under way. Every access waits for those asked for
 // before it, and takes the file's path when it is asked for.
 let queue: Promise<unknown> = Promise.resolve()
 

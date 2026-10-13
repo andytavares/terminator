@@ -336,10 +336,9 @@ async function get(client: LinearLike, key: string): Promise<Issue | null> {
 
 function comment(client: LinearLike, key: string, body: string): Promise<void> {
   return run(async () => {
-    // Linear issues are addressed by UUID, always — not by the human key,
-    // even where Linear would accept one. One addressing mechanism means
-    // one thing to be right about, and the UUID is the one Linear
-    // documents as working for every operation including this one.
+    // Linear issues are addressed by UUID, always — not by the human key, even where Linear would
+    // accept one. One addressing mechanism means one thing to be right about, and the UUID is the
+    // one Linear documents as working for every operation including this one.
     const raw = await issueOrThrow(client, key)
     const result = (await client.createComment({ issueId: raw.id, body })) as {
       success?: boolean
@@ -359,14 +358,9 @@ interface MoveTarget {
   optionId?: string
 }
 
-/**
- * The state a move goes to.
- *
- * The operator's own mapping wins over the type rule, which is the whole
- * point of presenting it to them. An override naming a state this workflow
- * does not have is refused rather than fallen back on: moving somewhere they
- * did not choose is worse than not moving.
- */
+/** The state a move goes to: the operator's own mapping wins over the type rule. An override
+ * naming a state this workflow lacks is refused, not fallen back on: moving somewhere they did
+ * not choose is worse than not moving. */
 function chosenState(
   options: TrackerStateOption[],
   key: string,

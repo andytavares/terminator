@@ -87,10 +87,9 @@ const recordWriteChannels: ChannelSpec[] = [
     invalid,
     run: async ({ session, link }) => {
       const record = await setLink(session, link)
-      // The session's own link feeds its agent's SessionStart context and
-      // wins over the project's. Best-effort: a tracker outage keeps
-      // whatever context was there rather than costing the operator the
-      // link (syncSessionContext handles that itself).
+      // The session's own link feeds its agent's SessionStart context and wins over the project's.
+      // Best-effort: a tracker outage keeps whatever context was there rather than costing the
+      // operator the link (syncSessionContext handles that itself).
       await syncSessionContext(session.sessionId, getIssueService())
       return { data: listing(record) }
     },

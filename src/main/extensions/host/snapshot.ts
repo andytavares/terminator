@@ -11,11 +11,8 @@ export interface WorkspacesSnapshot {
 /** What a tracker can do. Fixed per tracker, so it is sent once. */
 export type TrackerAbilities = Record<TrackerId, { transitions: boolean; create: boolean }>
 
-/**
- * What main sends the extension host when it starts, and keeps current with
- * `settings.changed` and `workspaces.changed` events: the values behind the
- * API's synchronous getters (SDK 4.0.0).
- */
+/** What main sends the extension host when it starts, and keeps current with `settings.changed`
+ * and `workspaces.changed` events: the values behind the API's synchronous getters (SDK 4.0.0). */
 export interface HostSnapshot {
   databasePath: string
   /** Each extension's `api.paths` is built from these (`extensionPaths`). */

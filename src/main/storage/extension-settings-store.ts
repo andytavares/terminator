@@ -28,10 +28,8 @@ export function setExtensionSetting(key: string, value: unknown): void {
   store.set('values', { ...values, [key]: value })
 }
 
-/**
- * Sets a `workspaceScoped` setting for one workspace, in that workspace's
- * settings; no value hands it back to the global one ("Use global default").
- */
+/** Sets a `workspaceScoped` setting for one workspace, in that workspace's settings; no value
+ * hands it back to the global one ("Use global default"). */
 export function setWorkspaceExtensionSetting(
   workspaceId: string,
   change: WorkspaceExtensionSettingChange

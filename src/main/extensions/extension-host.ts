@@ -77,10 +77,8 @@ function toRecord(manifest: ParsedManifest, directoryPath: string): ExtensionRec
   }
 }
 
-/**
- * Read from the manifest, not the stored record: a bundled extension stays
- * registered across updates, so its record can predate the field.
- */
+/** Read from the manifest, not the stored record: a bundled extension stays registered across
+ * updates, so its record can predate the field. */
 function declaredDependencies(record: ExtensionRecord): string[] {
   const manifest = readManifest(record.directoryPath)
   return 'data' in manifest ? (manifest.data.extensionDependencies ?? []) : []
@@ -139,10 +137,8 @@ export class ExtensionHost {
     return this.hostedApis.get(extensionId)
   }
 
-  /**
-   * The extension host lost these backends for good: they show as failed, with
-   * why, until they activate again. Not stored, so the next launch retries them.
-   */
+  /** The extension host lost these backends for good: they show as failed, with why, until they
+   * activate again. Not stored, so the next launch retries them. */
   failHostedBackends(extensionIds: string[], message: string): void {
     const lost = extensionIds.flatMap((id) => {
       const loaded = this.loaded.get(id)
@@ -158,10 +154,8 @@ export class ExtensionHost {
     if (lost.length > 0) this.announceListChanged()
   }
 
-  /**
-   * Tells the windows `listExtensions` changed: Settings -> Extensions re-reads
-   * it, since a backend can fail or come back while the panel is open.
-   */
+  /** Tells the windows `listExtensions` changed: Settings -> Extensions re-reads it, since a
+   * backend can fail or come back while the panel is open. */
   private announceListChanged(): void {
     this.deps.broadcastToWindows?.('extension:list-changed', null)
   }
@@ -314,12 +308,9 @@ export class ExtensionHost {
     return record?.directoryPath ?? null
   }
 
-  /**
-   * Registers every extension, so `listExtensions` is complete when this call
-   * returns its promise, then activates them all at once after
-   * `beforeActivation`. One extension failing never stops another: `activate`
-   * reports failure as a value. Views wait on `whenActivated`.
-   */
+  /** Registers every extension, so `listExtensions` is complete when this call returns its
+   * promise, then activates them all at once after `beforeActivation`. One extension failing
+   * never stops another: `activate` reports failure as a value. Views wait on `whenActivated`. */
   async start(options: StartOptions): Promise<void> {
     const registered = [
       ...store

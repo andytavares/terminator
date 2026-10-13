@@ -297,11 +297,9 @@ function forwardedMembersFor(main: MainCalls): Pick<ExtensionAPI, ForwardedMembe
   }
 }
 
-/**
- * The ExtensionAPI an extension receives in the extension host (ADR 094): the
- * same declaration as main's `api.ts`, each member a call across the port, a
- * read of the snapshot main pushes, or (`db`, `extensions`) answered here.
- */
+/** The ExtensionAPI an extension receives in the extension host (ADR 094): the same declaration
+ * as main's `api.ts`, each member a call across the port, a read of the snapshot main pushes,
+ * or (`db`, `extensions`) answered here. */
 export function createHostExtensionAPI(context: HostContext): ExtensionAPI {
   const main = new MainCalls(context)
   return {

@@ -21,12 +21,9 @@ export interface BackendLoader {
   forget(files: BackendFiles): void
 }
 
-/**
- * A loader over `load`, a CommonJS require. Its `require.cache` is keyed by
- * each module's resolved (real) path, and a module deleted from it is
- * evaluated again on its next require:
- * https://nodejs.org/api/modules.html#requirecache
- */
+/** A loader over `load`, a CommonJS require. Its `require.cache` is keyed by each module's
+ * resolved (real) path, and a module deleted from it is evaluated again on its next require:
+ * https://nodejs.org/api/modules.html#requirecache */
 export function requireLoader(load: NodeJS.Require): BackendLoader {
   return {
     load: (entryPoint) => load(entryPoint) as BackendModule,

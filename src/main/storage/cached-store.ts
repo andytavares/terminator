@@ -1,14 +1,8 @@
 import Store from 'electron-store'
 
-/**
- * An electron-store that reads its file once per key instead of on every get
- * (electron-store parses the whole file each time).
- *
- * The cache is dropped on this store's own writes and whenever electron-store
- * reports a change, which with `watch` on includes writes by anyone else.
- * Values are handed out as copies so a caller changing one cannot change the
- * cache.
- */
+/** An electron-store that parses its file once per key, not on every get. The cache drops on any
+ * change electron-store reports, which with `watch` on includes other processes' writes. Values are
+ * handed out as copies, so a caller changing one cannot change the cache. */
 export class CachedStore<Schema extends object> {
   private readonly store: Store<Schema>
   private readonly cache = new Map<keyof Schema, unknown>()

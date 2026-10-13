@@ -56,12 +56,9 @@ async function copyTable(legacy: PGlite, tx: ExtensionDB, table: string): Promis
   return copied
 }
 
-/**
- * Copies every row of each table that exists in both databases, so it must run
- * after the extensions have created their tables. All or nothing: a failure is
- * logged and leaves the new database empty. app.pglite is never deleted; removing
- * app.sqlite makes the next start import again.
- */
+/** Copies every row of each table in both databases, so it runs after extensions create theirs.
+ * All or nothing: a failure is logged and leaves the new database empty. app.pglite is never
+ * deleted; removing app.sqlite makes the next start import again. */
 export async function importLegacyDatabase(userData: string, db: ExtensionDB): Promise<void> {
   let legacy: PGlite | undefined
   try {

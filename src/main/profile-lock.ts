@@ -7,12 +7,9 @@ export type ProfileApp = Pick<
   commandLine: Pick<App['commandLine'], 'hasSwitch'>
 }
 
-// Only one process may own a profile. The workspace, settings and extension
-// settings live in electron-store JSON files that each process rewrites whole,
-// with no cross-process locking, so two instances overwrite each other's
-// changes (SQLite itself would tolerate it). A dev run must not share the
-// installed app's profile.
-// The single-instance lock lives in userData, so the dev path is set first.
+// One process per profile: the electron-store JSON files are rewritten whole with no cross-process
+// lock, so two instances overwrite each other. A dev run gets its own profile, set before the
+// single-instance lock, which lives in userData.
 export function claimProfile(app: ProfileApp): boolean {
   if (!app.isPackaged && !app.commandLine.hasSwitch('user-data-dir')) {
     app.setPath('userData', `${app.getPath('userData')}-dev`)

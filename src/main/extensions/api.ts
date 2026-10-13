@@ -323,10 +323,8 @@ function ptyStreamOf(ptyManager: PtyManager): BatchedPtyStream {
 /** A tab's terminal: the program it runs, and that program's arguments if it is not a shell. */
 type TabInput = Omit<OpenTerminalTabInput, 'shell'> & { shell: string; args?: string[] }
 
-/**
- * Spawns a terminal and puts it on screen as an ordinary tab. Null, spawning
- * nothing, when there is no window to show it in.
- */
+/** Spawns a terminal and puts it on screen as an ordinary tab. Null, spawning nothing, when
+ * there is no window to show it in. */
 function openTab(
   ptyManager: PtyManager,
   deps: ExtensionAPIDeps | undefined,
@@ -357,11 +355,8 @@ function openTab(
   return sessionId
 }
 
-/**
- * How the session's process ends. Subscribed in the tick that spawned it, so a
- * process that exits at once is not missed, as one subscribed across the
- * extension host's port could be.
- */
+/** How the session's process ends. Subscribed in the tick that spawned it, so a process that
+ * exits at once is not missed, as one subscribed across the extension host's port could be. */
 function exitOf(ptyManager: PtyManager, sessionId: string): Promise<TerminalExit> {
   return new Promise((resolve) => {
     ptyManager.onExit(sessionId, (exitCode) => resolve({ sessionId, exitCode }))
@@ -402,10 +397,8 @@ function closedDb(extensionId: string): ExtensionDB {
   return { exec: notReady, query: notReady, get: notReady, run: notReady, transaction: notReady }
 }
 
-/**
- * A setting's stored value, the own value of the workspace owning `repoPath`
- * first, or the default this extension's schema gives it.
- */
+/** A setting's stored value, the own value of the workspace owning `repoPath` first, or the
+ * default this extension's schema gives it. */
 function extensionSettingValue<T>(
   extensionId: string,
   key: string,
@@ -524,14 +517,9 @@ function globalShortcutApi({ disposable }: ApiContext): ExtensionAPI['globalShor
 
 type AddProjectInput = Parameters<ExtensionAPI['workspace']['addProject']>[0]
 
-/**
- * Registers a worktree as a project, or reuses the one already pointing at it.
- *
- * Reused by path only. Matching on the name as well meant two cards whose
- * branches happened to share a name got one project — pointing at whichever
- * worktree was registered first — and the snapshot returned described a
- * different directory than the caller had asked for.
- */
+/** Registers a worktree as a project, or reuses the one at that path. By path only: matching names
+ * too gave two cards whose branches shared a name one project, and a snapshot of a directory the
+ * caller had not asked for. */
 function addProject(context: ApiContext, input: AddProjectInput): ProjectSnapshot | null {
   const existing = listProjectsFromStore(input.workspaceId).find(
     (project) => project.worktreePath === input.worktreePath
@@ -756,10 +744,9 @@ function ipcBridgeApi({
       // Core channels (invoke, send, and push/subscribe) are declared in the
       // channel manifest, which REMOTE_ACCESSIBLE_CHANNELS is derived from.
       if (REMOTE_ACCESSIBLE_CHANNELS.has(channel)) return true
-      // Everything else is decided by what was declared at registration.
-      // Registered-but-undeclared channels are NOT reachable: the old rule
-      // ("any registered channel is extension-owned and safe") also exposed
-      // every internal core invoke channel to authenticated remote clients.
+      // Everything else is decided by what was declared at registration. Registered-but-undeclared
+      // channels are NOT reachable: the old rule ("any registered channel is extension-owned and
+      // safe") also exposed every internal core invoke channel to authenticated remote clients.
       return deps?.bridge?.invokeRegistry.get(channel)?.remoteAccessible ?? false
     },
     sendChannel(channel: string, payload: unknown): void {

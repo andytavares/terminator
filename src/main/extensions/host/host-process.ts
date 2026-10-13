@@ -31,12 +31,9 @@ interface Running {
   server: ExtensionApiServer
 }
 
-/**
- * Main's handle on the one extension host process (ADR 094). Started on the
- * first backend it is given. When it exits unasked, the app stays up: it is
- * started again once and its backends activated again; a second exit fails
- * them, which the extensions list shows.
- */
+/** Main's handle on the one extension host process (ADR 094). Started on the first backend it is
+ * given. When it exits unasked, the app stays up: it is started again once and its backends
+ * activated again; a second exit fails them, which the extensions list shows. */
 export class ExtensionHostProcess {
   private running: Running | null = null
   private readonly records = new Map<string, BackendRecord>()

@@ -12,11 +12,9 @@ export interface ShellRootSources {
   readSetting: (key: string) => unknown
 }
 
-/**
- * Every directory an extension's git and gh may run in: each workspace folder,
- * each project worktree, its own `api.paths.globalStorage`, and the current
- * value of each folder setting the extension declared and registered.
- */
+/** Every directory an extension's git and gh may run in: each workspace folder, each project
+ * worktree, its own `api.paths.globalStorage`, and the current value of each folder setting the
+ * extension declared and registered. */
 export function extensionShellRoots(sources: ShellRootSources): string[] {
   return [...workspaceRoots(), sources.globalStorage, ...declaredFolders(sources)]
 }

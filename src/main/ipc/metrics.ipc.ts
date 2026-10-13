@@ -29,10 +29,8 @@ function takeCpuSnapshot(): CpuSnapshot {
 
 // ─── Network sampler ─────────────────────────────────────────────────────────
 
-/**
- * Runs a sampler (netstat, ps) and resolves with its stdout, or rejects when it
- * fails. Through runCommand, so one still running as the app quits is stopped.
- */
+/** Runs a sampler (netstat, ps) and resolves with its stdout, or rejects when it fails. Through
+ * runCommand, so one still running as the app quits is stopped. */
 async function runSampler(
   command: string,
   args: string[],

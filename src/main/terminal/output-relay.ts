@@ -5,12 +5,9 @@ import { FlowControl } from './flow-control.js'
 /** Sends one message to the renderer; false when there was no window to receive it. */
 export type RendererSend = (channel: string, payload: object) => boolean
 
-/**
- * Carries a session's output and exit to the renderer: one message per frame,
- * paused at the source while the renderer has not yet written what it was sent.
- * Pending output leaves before the exit does, so the renderer never sees an
- * exit with output still to come.
- */
+/** Carries a session's output and exit to the renderer: one message per frame, paused at the
+ * source while the renderer has not yet written what it was sent. Pending output leaves before
+ * the exit does, so the renderer never sees an exit with output still to come. */
 export class OutputRelay {
   private readonly flows = new Map<string, FlowControl>()
 

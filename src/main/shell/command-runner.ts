@@ -36,13 +36,9 @@ const DEFAULT_TIMEOUT_MS = 10_000
 // https://nodejs.org/api/child_process.html#child_processexecfilefile-args-options-callback
 const DEFAULT_MAX_BUFFER = 1024 * 1024
 
-/**
- * Each command leads a process group of its own, so stopping it stops what it
- * started too: kill() with a negative pid signals the whole group
- * (https://nodejs.org/api/child_process.html#optionsdetached,
- * https://man7.org/linux/man-pages/man2/kill.2.html). Not on Windows, where
- * `detached` gives the command a console of its own instead.
- */
+/** Each command leads its own process group, so kill() with a negative pid stops what it started
+ * too (https://nodejs.org/api/child_process.html#optionsdetached, kill(2)). Not on Windows, where
+ * `detached` gives the command a console of its own instead. */
 const OWN_PROCESS_GROUP = process.platform !== 'win32'
 
 /** Commands started and not yet ended, for stopRunningCommands. */
@@ -57,11 +53,9 @@ function stopGroup(child: ChildProcess): void {
   }
 }
 
-/**
- * Stops every command still running (git, gh, the login-shell probe, the
- * metrics' ps), with everything each one started. The app calls it as it quits: on macOS /usr/bin/git is an xcrun shim
- * that can start xcodebuild, which outlived the app (run 38382115775).
- */
+/** Stops every command still running (git, gh, the login-shell probe, the metrics' ps), with
+ * everything each one started. The app calls it as it quits: on macOS /usr/bin/git is an xcrun
+ * shim that can start xcodebuild, which outlived the app (run 38382115775). */
 export function stopRunningCommands(): void {
   for (const child of running) stopGroup(child)
 }

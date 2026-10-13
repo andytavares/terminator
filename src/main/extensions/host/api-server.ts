@@ -5,12 +5,9 @@ import type { RpcEndpoint } from './rpc-endpoint.js'
 import type { ApiCall, ChannelRegistration, CommandRegistration, CommandRun } from './messages.js'
 import { reviveCallbacks } from './callbacks.js'
 
-/**
- * Every API member the extension host may call by path. The rest are answered
- * in the host itself (`db`, `extensions`, `paths`, the snapshots behind
- * `settings.get` and `workspace.list`) or registered through their own methods
- * below (`ipc.registerHandler`, `commands.register`, whose schemas cannot cross).
- */
+/** Every API member the extension host may call by path. The host answers the rest (`db`,
+ * `extensions`, `paths`, the `settings.get` and `workspace.list` snapshots); others register below,
+ * since a schema cannot cross (`ipc.registerHandler`, `commands.register`). */
 const CROSSING_MEMBERS: ReadonlySet<string> = new Set([
   'log.debug',
   'log.info',
@@ -86,12 +83,9 @@ function disposeHandle(handle: Handle | undefined): void {
   else handle?.dispose()
 }
 
-/**
- * Main's side of the extension host's port: each call names an extension and
- * runs on that extension's in-process API object, so `api.ts` stays the one
- * implementation. A registration's disposable is kept under the id the host
- * chose, so the host can return a Disposable without waiting for the answer.
- */
+/** Main's side of the extension host's port: a call runs on the named extension's API object, so
+ * `api.ts` stays the one implementation. A registration's disposable is kept under the id the host
+ * chose, so the host returns a Disposable without waiting for the answer. */
 export class ExtensionApiServer {
   private readonly handles = new Map<string, Map<number, Handle>>()
 

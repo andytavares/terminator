@@ -47,11 +47,8 @@ export async function writeClaudeSettings(
   await fs.writeFile(file, `${JSON.stringify(settings, null, 2)}\n`, 'utf8')
 }
 
-/**
- * Every SessionStart entry `marker` identifies goes, then one comes back with
- * `command`. The timeout is in seconds; a hook that hung would hold up every
- * session start it covers.
- */
+/** Every SessionStart entry `marker` identifies goes, then one comes back with `command`. The
+ * timeout is in seconds; a hook that hung would hold up every session start it covers. */
 export async function putSessionStartHook(
   file: string,
   marker: string,

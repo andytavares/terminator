@@ -4,17 +4,12 @@
  */
 export const OUTPUT_FLUSH_INTERVAL_MS = 16
 
-/**
- * A batch this large is sent at once instead of waiting for the frame.
- * @internal
- */
+/** A batch this large is sent at once instead of waiting for the frame. @internal */
 export const OUTPUT_FLUSH_MAX_CHARS = 128 * 1024
 
-/**
- * Joins the chunks a PTY produces into one message per frame. A busy process
- * writes thousands of small chunks a second, and each IPC message costs a
- * structured clone, a renderer task and an xterm write.
- */
+/** Joins the chunks a PTY produces into one message per frame. A busy process writes thousands
+ * of small chunks a second, and each IPC message costs a structured clone, a renderer task and
+ * an xterm write. */
 export class OutputBatcher {
   private chunks: string[] = []
   private size = 0

@@ -28,11 +28,9 @@ interface Active {
   callbacks: CallbackRegistry
 }
 
-/**
- * The extension host's side (ADR 094): loads each backend with an API whose
- * members cross to main, and answers main's calls into the backends: a
- * channel's payload, a command, a callback, a changed snapshot.
- */
+/** The extension host's side (ADR 094): loads each backend with an API whose members cross to
+ * main, and answers main's calls into the backends: a channel's payload, a command, a callback,
+ * a changed snapshot. */
 export class HostRuntime {
   private readonly active = new Map<string, Active>()
   private readonly channels = new Map<string, ChannelSpec>()
@@ -68,11 +66,8 @@ export class HostRuntime {
     })
   }
 
-  /**
-   * Requires the backend and runs its activate. A backend that fails, like one
-   * deactivated, leaves the require cache, so its next activation (a reload)
-   * runs the code on disk then.
-   */
+  /** Requires the backend and runs its activate. A backend that fails, like one deactivated,
+   * leaves the require cache, so its next activation (a reload) runs the code on disk then. */
   private async activate(record: BackendRecord): Promise<void> {
     try {
       const module = this.loader.load(record.entryPoint)

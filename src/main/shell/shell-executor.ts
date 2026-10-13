@@ -32,10 +32,8 @@ export function assertCommandAllowed(command: string): void {
   }
 }
 
-/**
- * Refuses a `cwd` that is not one of `roots` or below one (ADR 102). Both sides
- * are compared after realpath, so a symlink inside a root cannot lead out of it.
- */
+/** Refuses a `cwd` that is not one of `roots` or below one (ADR 102). Both sides are compared
+ * after realpath, so a symlink inside a root cannot lead out of it. */
 export async function assertCwdInScope(cwd: string, roots: readonly string[]): Promise<void> {
   if (!isAbsolute(cwd)) throw new CwdOutOfScopeError(cwd)
   const real = await realPathOf(cwd)
@@ -43,10 +41,8 @@ export async function assertCwdInScope(cwd: string, roots: readonly string[]): P
   if (!realRoots.some((root) => isWithin(real, root))) throw new CwdOutOfScopeError(cwd)
 }
 
-/**
- * The real path of `target`, or of its nearest existing ancestor with the rest
- * appended: a directory not created yet (a clone target) is still somewhere.
- */
+/** The real path of `target`, or of its nearest existing ancestor with the rest appended: a
+ * directory not created yet (a clone target) is still somewhere. */
 async function realPathOf(target: string): Promise<string> {
   try {
     return await realpath(target)

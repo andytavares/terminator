@@ -86,13 +86,9 @@ const extensionHostProcess: ExtensionHostProcess = new ExtensionHostProcess({
 })
 const extensionHost: ExtensionHost = new ExtensionHost(extensionHostProcess)
 
-/**
- * Returning to Terminator from another app must land the caret back where the
- * user left it — no second click. Electron restores focus to the window's own
- * webContents (and on macOS not even that), so the focused surface is
- * snapshotted on blur and re-focused explicitly on focus. The snapshot has to
- * happen on blur: by 'focus' time Electron has already overwritten the record.
- */
+/** Returning from another app lands the caret where the user left it. Electron restores focus to
+ * the window's own webContents at most, so the focused surface is recorded on blur (by 'focus'
+ * Electron has overwritten it) and focused again on focus. */
 function restoreFocusOnReturn(win: BrowserWindow): void {
   win.webContents.on('focus', () => viewHost?.noteFocused(null))
   win.on('blur', () => viewHost?.captureFocusTarget())
@@ -131,10 +127,8 @@ function openExternally(url: string): void {
   }
 }
 
-/**
- * Redirect external http(s) link clicks and window.open() calls to the system browser.
- * Non-http URLs (e.g. same-origin navigations) are denied without opening externally.
- */
+/** Redirect external http(s) link clicks and window.open() calls to the system browser. Non-http
+ * URLs (e.g. same-origin navigations) are denied without opening externally. */
 function openLinksInBrowser(win: BrowserWindow): void {
   win.webContents.setWindowOpenHandler(({ url }) => {
     openExternally(url)
@@ -148,10 +142,8 @@ function openLinksInBrowser(win: BrowserWindow): void {
   })
 }
 
-/**
- * On macOS, hide instead of destroy so PTY sessions and renderer state survive.
- * Full quit (Cmd+Q / right-click Quit) still goes through before-quit → killAll().
- */
+/** On macOS, hide instead of destroy so PTY sessions and renderer state survive. Full quit
+ * (Cmd+Q / right-click Quit) still goes through before-quit → killAll(). */
 function handleWindowClose(win: BrowserWindow): void {
   if (process.platform === 'darwin') {
     win.on('close', (event) => {
@@ -321,10 +313,8 @@ protocol.registerSchemesAsPrivileged([
   },
 ])
 
-/**
- * Serves extension renderer files via ext://<id>/<relPath>. Only files within
- * the extension's registered directory are accessible.
- */
+/** Serves extension renderer files via ext://<id>/<relPath>. Only files within the extension's
+ * registered directory are accessible. */
 async function serveExtensionFile(request: Request): Promise<Response> {
   const url = new URL(request.url)
   const extensionId = url.hostname
@@ -349,11 +339,8 @@ async function serveExtensionFile(request: Request): Promise<Response> {
   return new Response(res.body, { status: res.status, headers })
 }
 
-/**
- * Extension WebContentsViews use the 'ext-views' in-memory partition to avoid
- * service-worker storage conflicts with the main window session. Both sessions
- * need the handler registered.
- */
+/** Extension WebContentsViews use the 'ext-views' in-memory partition to avoid service-worker
+ * storage conflicts with the main window session. Both sessions need the handler registered. */
 function registerExtProtocol(): void {
   session.defaultSession.protocol.handle('ext', serveExtensionFile)
   session.fromPartition('ext-views').protocol.handle('ext', serveExtensionFile)
@@ -457,17 +444,15 @@ function registerToolHandlers(): void {
 }
 
 function broadcastToWindows(channel: string, data: unknown): void {
-  // Auxiliary windows (extension pop-outs) are real BrowserWindows and must
-  // receive pushes too, otherwise a pop-out and the docked panel drift apart.
-  // Guarded: a PTY opened through the extension API broadcasts on every
-  // chunk, and keeps running after the window that opened it has closed.
+  // Extension pop-outs are BrowserWindows too and get every push, or they drift from the docked
+  // panel. Guarded: an extension's PTY broadcasts every chunk, and outlives the window that opened
+  // it.
   for (const win of BrowserWindow.getAllWindows()) {
     sendToWindow(win, channel, data)
   }
-  // The main window's send is patched above to relay to extension
-  // WebContentsViews for every channel except the two it filters out — only
-  // relay explicitly when that patch did not already do it, or the views
-  // would receive the same push twice.
+  // The main window's send is patched above to relay to extension WebContentsViews for every
+  // channel except the two it filters out — only relay explicitly when that patch did not already
+  // do it, or the views would receive the same push twice.
   const relayedByMainWindow =
     !!mainWindow &&
     !mainWindow.isDestroyed() &&
@@ -493,11 +478,9 @@ function extensionDeps(terminalRelay: OutputRelay, userData: string): ExtensionA
   }
 }
 
-/**
- * The renderer lists the extensions (complete as soon as start is called) and
- * each extension view waits for its own backend, so none of this holds the
- * window back. The legacy import needs every extension's tables to exist.
- */
+/** The renderer lists the extensions (complete as soon as start is called) and each extension
+ * view waits for its own backend, so none of this holds the window back. The legacy import
+ * needs every extension's tables to exist. */
 function startExtensions(
   loginShellPath: Promise<void>,
   importLegacy: boolean,

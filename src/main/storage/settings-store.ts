@@ -93,10 +93,8 @@ function deepMerge<T>(target: T, source: Partial<T>): T {
   return result
 }
 
-/**
- * Like deepMerge, except that a key the patch sets to undefined is removed:
- * that is how "Use global default" hands a setting back to the global value.
- */
+/** Like deepMerge, except that a key the patch sets to undefined is removed: that is how "Use
+ * global default" hands a setting back to the global value. */
 function mergeOverrides(target: object, patch: Record<string, unknown>): object {
   const result: Record<string, unknown> = { ...target }
   for (const [key, val] of Object.entries(patch)) {

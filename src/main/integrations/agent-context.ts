@@ -97,10 +97,8 @@ function composeSections(issue: Issue): ComposedContext {
   }
 }
 
-/**
- * Whatever the per-section budgets allowed, the whole must still fit — and
- * the footer that admits the truncation has to fit inside it too.
- */
+/** Whatever the per-section budgets allowed, the whole must still fit — and the footer that
+ * admits the truncation has to fit inside it too. */
 function fitWithinBudget(composed: ComposedContext, url: string): ComposedContext {
   const footer = `\n\n_— truncated; full issue at ${url}_`
   const overBudget = composed.markdown.length > MAX_CONTEXT_CHARS
@@ -111,12 +109,9 @@ function fitWithinBudget(composed: ComposedContext, url: string): ComposedContex
   return { markdown: truncated ? markdown + footer : markdown, truncated }
 }
 
-/**
- * The text a session receives, and the numbers the operator is shown.
- *
- * Pure: the drawer previews exactly what the file will contain because both
- * come from this function, not from two renderings of the same idea.
- */
+/** The text a session receives, and the numbers the operator is shown. Pure: the drawer previews
+ * exactly what the file will contain because both come from this function, not from two
+ * renderings of the same idea. */
 export function buildAgentContext(projectId: string, issue: Issue | null): AgentContext | null {
   if (issue === null) return null
   const { markdown, truncated } = fitWithinBudget(composeSections(issue), issue.url)

@@ -35,10 +35,8 @@ export async function adoptLoginShellPath(env: NodeJS.ProcessEnv = process.env):
 
 let loginShellPath: Promise<void> = Promise.resolve()
 
-/**
- * Starts reading the login-shell PATH and remembers the read, so a spawn made
- * while the window is already open can wait for it (`loginShellPathReady`).
- */
+/** Starts reading the login-shell PATH and remembers the read, so a spawn made while the window
+ * is already open can wait for it (`loginShellPathReady`). */
 export function startAdoptingLoginShellPath(env: NodeJS.ProcessEnv = process.env): Promise<void> {
   loginShellPath = adoptLoginShellPath(env)
   return loginShellPath
