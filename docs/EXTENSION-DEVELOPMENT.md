@@ -498,7 +498,7 @@ A spec that hands `activate` a `globalStorage` makes it with `makeTempDir(prefix
 
 ### `api.settings`
 
-`register(schema)` adds a section to Settings. A property with `workspaceScoped: true` can be overridden per workspace. Property types are `string`, `number`, `boolean`, `enum` (with `options`), `folder` and `action` (a button that invokes `channel`, optionally after `confirmMessage`); `secret` masks the value.
+`register(schema)` adds a section to Settings. A property with `workspaceScoped: true` can be overridden per workspace. Property types are `string`, `number`, `boolean`, `enum` (with `options`), `folder`, `list` (a `string[]`, edited one item per line) and `action` (a button that invokes `channel`, optionally after `confirmMessage`); `secret` masks the value.
 
 ```typescript
 api.settings.register({

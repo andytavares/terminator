@@ -6,6 +6,9 @@
 
 - `@terminator/extension-sdk/vite`: `extensionViewConfig(directory, { plugins, chunkSizeWarningLimit? })`,
   the Vite config of an extension's view (`index.html` built to `dist/` with relative URLs).
+- A `list` setting type (`SettingDefinition.type`): the value is a `string[]`, which Settings
+  edits in a multi-line box, one item per line, trimmed, blank lines dropped (the design
+  system's `ListInput`). Give it a `default` of `[]`.
 - A view's `extension.onSettingsChanged(handler)`: called after any extension setting changes,
   whoever changed it, so a view re-reads `getSettingsValues()` and applies the change at once.
   Returns the unsubscribe.

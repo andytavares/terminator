@@ -62,7 +62,8 @@ export interface ExtensionSettingsSchema {
 }
 
 export interface SettingDefinition {
-  type: 'string' | 'number' | 'boolean' | 'enum' | 'folder' | 'action'
+  /** `list` holds a `string[]`, edited in Settings one item per line (since 4.1.0). */
+  type: 'string' | 'number' | 'boolean' | 'enum' | 'folder' | 'action' | 'list'
   label: string
   description?: string
   default: unknown

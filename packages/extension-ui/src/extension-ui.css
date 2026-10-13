@@ -234,6 +234,31 @@
   border-color: var(--tm-accent);
 }
 
+/* A list edited one item per line (ListInput): monospace, so globs line up. */
+.tmui-list-input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  background: var(--tm-bg-input);
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-sm, 6px);
+  color: var(--tm-text-primary);
+  font-family: var(--tm-font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  padding: 6px 9px;
+  resize: vertical;
+  outline: none;
+}
+
+.tmui-list-input:focus {
+  border-color: var(--tm-accent);
+}
+
+.tmui-list-input::placeholder {
+  color: var(--tm-text-muted);
+}
+
 .tmui-kbd {
   padding: 0 4px;
   border: 1px solid var(--tm-border-strong);
