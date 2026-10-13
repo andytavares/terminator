@@ -196,11 +196,8 @@ interface SurfaceExchange {
   reply: FastifyReply
 }
 
-/**
- * Admit a request to a surface's entry page: an existing valid session cookie is
- * accepted (allows page refresh without re-auth); otherwise a one-use ticket
- * issues one. False when the request has neither.
- */
+/** A valid session cookie is accepted, so a refresh needs no new login; otherwise a one-use
+ *  ticket issues one. False when the request has neither. */
 function admitToSurface(
   parts: RemoteServerParts,
   surface: 'app' | 'mobile',

@@ -79,11 +79,8 @@ export function reduceStatus(previous: RemoteStatus, message: StatusBroadcast): 
   return enabledStatus(previous, message, port)
 }
 
-/**
- * A dropped tunnel is followed at once by a broadcast of the local address
- * alone. That broadcast says nothing new about the tunnel, so the drop stands
- * until one brings a public address or a new tunnel error.
- */
+/** A dropped tunnel is followed at once by a broadcast of the local address alone, which says
+ *  nothing new, so the drop stands until a public address or a new tunnel error arrives. */
 function stillDropped(previous: RemoteStatus, message: StatusBroadcast): boolean {
   if (previous.kind !== 'failed' || previous.failure.reason !== 'tunnel-dropped') return false
   return !message.publicUrl && !message.ngrokError

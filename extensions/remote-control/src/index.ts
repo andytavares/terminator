@@ -195,10 +195,8 @@ async function openTunnel(api: ExtensionAPI, port: number): Promise<void> {
   await connectTunnel(api, port)
 }
 
-/**
- * Opens the ngrok tunnel to `port` and broadcasts the public address, or why
- * there is none. A tunnel that later drops broadcasts the local address alone.
- */
+/** Broadcasts the public address, or why there is none. A tunnel that later drops broadcasts
+ *  the local address alone. */
 async function connectTunnel(api: ExtensionAPI, port: number): Promise<void> {
   const authToken = getNgrokAuthToken(api)
   try {

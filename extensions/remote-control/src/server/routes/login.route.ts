@@ -9,11 +9,8 @@ interface LoginRouteOptions {
   rateLimiter: AuthRateLimiter
 }
 
-/**
- * The one place the password is checked. A correct password is exchanged for a
- * session cookie; every later request is authorised by that cookie, so the
- * password is neither stored by the browser nor sent again.
- */
+/** The one place the password is checked. It is exchanged for a session cookie that authorises
+ *  every later request, so the browser neither stores nor resends the password. */
 export async function registerLoginRoute(
   app: FastifyInstance,
   options: LoginRouteOptions

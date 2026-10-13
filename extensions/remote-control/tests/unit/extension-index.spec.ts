@@ -99,11 +99,8 @@ async function setupAndGetToggleHandler(
 
 let currentHash = ''
 
-/**
- * Waits for every server start or stop the extension has queued: deactivate awaits
- * that queue first. Toggling only queues the start, which imports the server module
- * and so takes as long as the machine needs; a fixed sleep raced it.
- */
+/** Deactivate awaits the queued server starts and stops. Toggling only queues the start, which
+ *  imports the server module and takes as long as the machine needs; a fixed sleep raced it. */
 async function queueDrained(): Promise<void> {
   const { deactivate } = await import('../../src/index.ts')
   await deactivate()

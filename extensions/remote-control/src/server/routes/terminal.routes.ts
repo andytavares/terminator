@@ -72,10 +72,7 @@ export async function registerTerminalRoutes(
   return { cleanup: () => streams.cleanup() }
 }
 
-/**
- * The broadcast listeners and pending teardowns of the sessions this surface
- * streams: how they start, stop and are cleaned up.
- */
+/** The broadcast listeners and pending teardowns of the sessions this surface streams. */
 class SessionStreams {
   // One output-broadcast listener per session this surface is streaming.
   private broadcastDisposers = new Map<string, () => void>()

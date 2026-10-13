@@ -34,11 +34,8 @@ interface AuthMiddlewareOptions {
   hasValidSession: (cookieHeader: string) => boolean
 }
 
-/**
- * Every /api and /ws request must come from an allowed Host. Beyond that,
- * /api requests need the session cookie that POST /api/login issues; the
- * password is checked there, once, and never on a later request.
- */
+/** Every /api and /ws request must come from an allowed Host, and /api requests need the session
+ *  cookie POST /api/login issues: the password is checked there, once, never again. */
 export async function registerAuthMiddleware(
   app: FastifyInstance,
   opts: AuthMiddlewareOptions

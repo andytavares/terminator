@@ -182,11 +182,8 @@ function FailedBand(props: BandProps & { status: FailedStatus }): React.JSX.Elem
   )
 }
 
-/**
- * Only the public address failed: the server is still listening, and anyone
- * on this network is still connected. Reconnecting the tunnel keeps them;
- * turning the server off and on would not.
- */
+/** Only the public address failed: the server still listens and devices on this network stay
+ *  connected. Reconnecting the tunnel keeps them; turning the server off and on would not. */
 function ReconnectButton(): React.JSX.Element {
   const [busy, setBusy] = useState(false)
   const reconnect = async () => {

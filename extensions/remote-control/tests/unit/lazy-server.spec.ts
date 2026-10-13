@@ -2,10 +2,9 @@ import { describe, it, expect, beforeAll, vi } from 'vitest'
 import { dispatchChannel, type ChannelSpec } from '@terminator/extension-sdk'
 import { hashPassword } from '../../src/server/password-hash'
 
-// The remote server and fastify cost the extension host 25 MB (docs/research/perf/
-// 2026-10-12-extension-host.md). They load when Remote Control is turned on, not
-// when the extension activates with it off, which is the default. Vitest runs a
-// vi.mock factory when the module is first imported, so `loaded` records it.
+// The server and fastify cost the host 25 MB (docs/research/perf/2026-10-12-extension-host.md),
+// so they load when Remote Control is turned on, not on activation. Vitest runs a vi.mock
+// factory when the module is first imported, so `loaded` records it.
 
 const loaded = vi.hoisted(() => ({ server: false }))
 const createRemoteServer = vi.hoisted(() => vi.fn())
