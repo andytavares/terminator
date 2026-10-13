@@ -41,11 +41,7 @@ export function dashboardToSortable<T extends { createdAt: string }>(
 }
 
 /** Returns a new array; ties always fall back to the newest first. */
-export function sortPrs<T>(
-  prs: T[],
-  mode: SortMode,
-  toSortable: (pr: T) => SortablePr
-): T[] {
+export function sortPrs<T>(prs: T[], mode: SortMode, toSortable: (pr: T) => SortablePr): T[] {
   const byAge = (a: SortablePr, b: SortablePr) => b.openedAt.localeCompare(a.openedAt)
   const compare = (a: SortablePr, b: SortablePr): number => {
     if (mode === 'closest') return mergeReadiness(a) - mergeReadiness(b) || byAge(a, b)
