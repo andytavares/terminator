@@ -1,9 +1,7 @@
 import { execFileSync, spawnSync } from 'node:child_process'
 
-// What the stub GitHub (`github-stub.ts`) answers to each gh command the app
-// runs: `gh api` for REST and GraphQL, `gh pr`, `gh repo`. Replies follow gh's
-// own output: the JSON GitHub returns, `--jq` applied with jq(1) (the filter
-// language gh embeds, https://cli.github.com/manual/gh_api), and on failure
+// The stub GitHub's answer to each gh command the app runs, shaped as gh prints it: GitHub's
+// JSON with `--jq` applied by jq(1) (https://cli.github.com/manual/gh_api), and on failure
 // GitHub's JSON error on stdout with gh's one-line summary on stderr.
 
 interface StubComment {

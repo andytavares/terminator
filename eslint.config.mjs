@@ -5,10 +5,9 @@ import reactHooks from 'eslint-plugin-react-hooks'
 import globals from 'globals'
 import tseslint from 'typescript-eslint'
 
-// Constitution II / ADR 094: an extension imports only the SDK, the design
-// system and its own npm packages. A relative path may not climb out of the
-// extension's directory; how many `../` that takes depends on how deep the
-// importing file sits, so there is one block per depth under src/.
+// Constitution II / ADR 094: a relative import may not climb out of the extension.
+// How many `../` that takes depends on the importing file's depth, so there is one
+// block per depth under src/.
 const EXTENSION_SRC_MAX_DEPTH = 6
 
 function extensionImportBoundary() {
@@ -208,11 +207,8 @@ export default defineConfig([
     },
   },
   {
-    // Function size limits for every file: at most 30 lines (blank lines and
-    // comments aside), complexity 10 and three parameters. Pass more than three
-    // values as one named object; split a component that outgrows them into
-    // named subcomponents and hooks (https://react.dev/learn/thinking-in-react),
-    // and a long spec `describe` into describes by topic.
+    // Function size limits for every file; how to split code that outgrows them:
+    // docs/CONTRIBUTING.md, "Lint and format".
     files: ['**/*.{js,mjs,cjs,ts,mts,tsx}'],
     rules: {
       'max-lines-per-function': ['error', { max: 30, skipBlankLines: true, skipComments: true }],

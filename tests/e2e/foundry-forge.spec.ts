@@ -284,22 +284,9 @@ async function withWindowSize(
 }
 
 test('an open order is a frame, and the controls that end it never scroll away', async () => {
-  // What this is about, in the operator's words: "use of space is terrible, I
-  // have to scroll so far to find the delete/discard button. Why the hell are
-  // there so many cards on the left side and we have nothing on the right for
-  // most of the screen."
-  //
-  // Both halves were one fault. The Forge's rail is controls and its document
-  // is the subject, and neither was bounded — measured on the reported order
-  // at the reported window (1005x768), the rail came out 1494px beside a
-  // 1906px document in a 729px viewport, so the page was 2383px long, two
-  // thirds of the width was empty for the stretch where only the rail was
-  // left, and the controls that end an order — which render after both
-  // columns — sat at 2367px. 1654px of scrolling to reach a button.
-  //
-  // Asserted as behaviour rather than as a stylesheet: the controls are on
-  // screen before anything is scrolled, and still on screen after everything
-  // that can scroll has been scrolled to its end.
+  // Asserted as behaviour, not as a stylesheet: the controls are on screen before and after
+  // everything that can scroll has scrolled to its end. The fault it guards against is in
+  // docs/research/forge-shaping-redesign.md, "Layout".
   const id = await createOrder(
     'the frame keeps its controls at the foot',
     'no order was created to open'

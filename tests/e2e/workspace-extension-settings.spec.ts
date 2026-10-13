@@ -11,13 +11,9 @@ import {
 import { git, makeRepoWithRemote, openGitTab, openRepo, writeFile } from './git-harness'
 import { settingRow } from './extension-settings-page'
 
-/**
- * A `workspaceScoped` extension setting set in one workspace's Workspace
- * Settings applies there and nowhere else, and "Use global default" hands it
- * back. Git Integration's "Add sign-off to commits" is read for the repository
- * being committed in: a commit made with sign-off on ends with a Signed-off-by
- * trailer (https://git-scm.com/docs/git-commit#Documentation/git-commit.txt---signoff).
- */
+/** A `workspaceScoped` setting applies only in its workspace until "Use global default": Git
+ * Integration's sign-off, read for the repository committed in, adds a Signed-off-by trailer
+ * (https://git-scm.com/docs/git-commit#Documentation/git-commit.txt---signoff). */
 
 let handle: AppHandle
 const repos: string[] = []

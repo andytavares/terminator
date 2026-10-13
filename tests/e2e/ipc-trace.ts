@@ -2,15 +2,9 @@ import { test, type ElectronApplication } from '@playwright/test'
 import { appendFileSync, mkdirSync } from 'node:fs'
 import { basename, join } from 'node:path'
 
-// Records which IPC channels a spec drives in the real app, the evidence behind
-// docs/research/feature-coverage.md. Off unless E2E_IPC_TRACE names a directory:
-//
-//   E2E_IPC_TRACE=/tmp/trace npx playwright test --workers=1
-//
-// writes one <spec>.jsonl per spec file there. Each line is
-// [kind, channel, payload]: an invoke or send from a renderer, or an event main
-// pushed to one. The payload is kept only for the channels that name what ran,
-// a command or a setting.
+// With E2E_IPC_TRACE=<dir>, writes <spec>.jsonl per spec file there: one [kind, channel, payload]
+// line per renderer invoke or send and per event main pushed, the evidence behind
+// docs/research/feature-coverage.md. Payloads are kept only where they name a command or setting.
 
 /** Channels whose payload says which command ran or which setting changed. */
 const NAMING_CHANNELS = [
@@ -28,10 +22,8 @@ function traceDirectory(): string | undefined {
 
 type IpcHandler = (event: unknown, ...args: unknown[]) => unknown
 
-/**
- * Runs in the main process, so it names nothing outside itself: Playwright sends
- * its source text, not the function.
- */
+/** Runs in the main process, so it names nothing outside itself: Playwright sends
+ * its source text, not the function. */
 function installIpcTrace(
   { app: electronApp, ipcMain, webContents }: typeof import('electron'),
   naming: string[]

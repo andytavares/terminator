@@ -327,10 +327,8 @@ describe('splitTerminalSession — pins to the focused session root when the foc
   })
 })
 
-// A supervised agent's terminal is spawned in the main process. The store
-// record alone is not a tab you can see: without an xterm instance nothing
-// ever mounts and the project opens empty, which is the invisible agent this
-// runtime exists to have got rid of.
+// A supervised agent's terminal is spawned in main; without an xterm instance its store
+// record never mounts, and the project opens empty.
 const adopted = {
   sessionId: 'terminal-1',
   projectId: 'proj-1',

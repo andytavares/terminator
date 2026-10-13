@@ -21,12 +21,9 @@ function meta(e: ShortcutEvent): boolean {
   return e.metaKey || e.ctrlKey
 }
 
-/**
- * Every direct shortcut in `useKeyboardShortcuts.ts`, plus the menu
- * accelerators handled in `App.tsx`'s `menu:*` subscriptions. The conflict-guard
- * spec presses each one and core-actions.spec checks `buildCoreActions` shows
- * it, so a new direct shortcut cannot exist without an action showing it (AC 4).
- */
+/** Every direct shortcut in `useKeyboardShortcuts.ts` and menu accelerator in `App.tsx`. Two
+ * specs press each one and check `buildCoreActions` shows it, so no shortcut exists without
+ * an action showing it (AC 4). */
 export const CORE_SHORTCUTS: ShortcutSpec[] = [
   {
     actionId: 'core.open-home',

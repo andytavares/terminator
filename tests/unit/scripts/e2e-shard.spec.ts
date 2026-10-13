@@ -144,10 +144,8 @@ describe('pack', () => {
   })
 })
 
-/**
- * The script run from a copy under a temp root, so `--record` writes that
- * root's tests/e2e/timings.json and never the repository's.
- */
+/** The script run from a copy under a temp root, so `--record` writes that
+ * root's tests/e2e/timings.json and never the repository's. */
 function scriptCopy(): { root: string; script: string } {
   const root = makeTempDir('e2e-shard-cli-')
   mkdirSync(join(root, 'scripts'))

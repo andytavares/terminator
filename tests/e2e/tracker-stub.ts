@@ -12,15 +12,9 @@ import { join } from 'node:path'
 import { answerJira, type JiraState } from './tracker-stub-jira'
 import { answerLinear, type LinearState } from './tracker-stub-linear'
 
-// Stub Linear and Jira for the e2e suite, reached at their real addresses.
-// The core calls https://api.linear.app/graphql (the Linear SDK) and
-// https://<site>/rest/api/3 (Jira) with Node's fetch. The app is started with
-// NODE_USE_ENV_PROXY=1 and HTTPS_PROXY naming this local proxy, which Node's
-// fetch then tunnels through (https://nodejs.org/api/cli.html#node_use_env_proxy1),
-// and NODE_EXTRA_CA_CERTS naming a certificate authority made for this run
-// (https://nodejs.org/api/cli.html#node_extra_ca_certsfile), so the proxy can
-// answer TLS for those hosts itself. Every other host is refused: nothing
-// leaves the machine.
+// Stub Linear and Jira at their real addresses: the app's fetch tunnels through this proxy
+// (NODE_USE_ENV_PROXY=1, HTTPS_PROXY), which answers TLS from a CA made for the run
+// (NODE_EXTRA_CA_CERTS) and refuses every other host. See https://nodejs.org/api/cli.html.
 
 const LINEAR_HOST = 'api.linear.app'
 export const JIRA_SITE = 'acme.atlassian.net'
@@ -117,11 +111,9 @@ function trackerProxy(tls: ReturnType<typeof trackerServer>, diagnostics: string
   return { proxy, tunnels }
 }
 
-/**
- * Closes the proxy without waiting on its clients. A tunnel the app left open
+/** Closes the proxy without waiting on its clients. A tunnel the app left open
  * (keep-alive, or a test that failed mid-request) would keep `server.close()`
- * pending forever, so every tunnel and idle connection is destroyed first.
- */
+ * pending forever, so every tunnel and idle connection is destroyed first. */
 function closeProxy(proxy: ReturnType<typeof createHttpServer>, tunnels: Set<Socket>) {
   for (const socket of tunnels) socket.destroy()
   proxy.closeAllConnections()

@@ -1,13 +1,7 @@
 #!/usr/bin/env node
-// Runs a command with TMPDIR pointed at a new, empty directory and fails if the
-// command leaves anything in it. Specs that never removed their mkdtemp
-// directories once left ~22,000 folders in /tmp in a day and filled the disk.
-// Node's os.tmpdir() reads TMPDIR (https://nodejs.org/api/os.html#ostmpdir), and
-// so do git, sh and mktemp, so the command's children are covered too.
-//
-//   node scripts/check-temp-leaks.mjs [command ...]   (default: npx vitest run)
-//
-// Exits with the command's own status when it fails, 1 when it left entries.
+// node scripts/check-temp-leaks.mjs [command ...]: runs it with TMPDIR at a new, empty directory
+// (Node, git, sh and mktemp all read it) and exits 1 if anything is left there, or with the
+// command's own status when it fails. Why: docs/CONTRIBUTING.md, "Run tests".
 
 import { spawnSync } from 'node:child_process'
 import { mkdtempSync, readdirSync, rmSync } from 'node:fs'
@@ -28,10 +22,9 @@ function summarize(entries) {
     .map(([name, n]) => `${String(n).padStart(6)}  ${name}`)
 }
 
-// npm and npx call module.enableCompileCache(), which keeps one shared
-// `node-compile-cache` in the temporary directory unless NODE_COMPILE_CACHE
-// names another (https://nodejs.org/api/module.html#module-compile-cache). It
-// stays where it always is: it is npm's cache, not something a spec made.
+// npm and npx keep their shared `node-compile-cache` in the temporary directory unless
+// NODE_COMPILE_CACHE names another; it stays out of the sandbox, being no spec's
+// (https://nodejs.org/api/module.html#module-compile-cache).
 function runIn(sandbox, command) {
   const [file, ...args] = command
   const NODE_COMPILE_CACHE = process.env.NODE_COMPILE_CACHE ?? join(tmpdir(), 'node-compile-cache')

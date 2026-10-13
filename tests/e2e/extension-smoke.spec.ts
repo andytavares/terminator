@@ -66,10 +66,8 @@ function inView<T>(part: string, script: string): Promise<T> {
   ) as Promise<T>
 }
 
-/**
- * True once the extension surface's own WebContentsView has finished loading
- * and drawn its view, which may be a lazy chunk that renders after the load.
- */
+/** True once the extension surface's own WebContentsView has finished loading
+ * and drawn its view, which may be a lazy chunk that renders after the load. */
 async function viewReady(part: string): Promise<boolean> {
   const loaded = await handle.app.evaluate(
     ({ webContents }, p) =>
@@ -143,10 +141,8 @@ interface StyleReport {
   sideScrollers: string[]
 }
 
-/**
- * Run in the view: what it threw, and every input, button, dialog and icon it
- * drew with nothing styling it.
- */
+/** Run in the view: what it threw, and every input, button, dialog and icon it
+ * drew with nothing styling it. */
 const STYLE_REPORT = `(() => {
         const unstyled = []
         for (const el of document.querySelectorAll('input:not([type=checkbox]):not([type=radio]):not([type=hidden]), textarea, select')) {

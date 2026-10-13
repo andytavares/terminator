@@ -8,11 +8,8 @@ import { join } from 'node:path'
 import { expect, type Page } from '@playwright/test'
 import { closeSettings, openSettings } from './helpers'
 
-// A local stand-in for Jira Cloud's REST v3, so a spec can connect a tracker,
-// search, link, read and comment without the network. The app's Jira client
-// only speaks https (src/main/integrations/providers/jira.provider.ts), so the
-// stub serves TLS with a certificate from a throwaway CA, and the app is told
-// to trust that CA through NODE_EXTRA_CA_CERTS
+// A local Jira Cloud REST v3. The app's Jira client speaks only https, so the stub serves TLS
+// from a throwaway CA the app trusts through NODE_EXTRA_CA_CERTS
 // (https://nodejs.org/api/cli.html#node_extra_ca_certsfile).
 
 export interface StubIssue {

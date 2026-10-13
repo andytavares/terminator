@@ -2,10 +2,8 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-// Directories made by makeTempDir in the running spec file. tests/setup.ts
-// removes them in an afterAll, which runs after the file's own hooks and
-// whether its tests passed or failed. Each spec file gets its own copy of this
-// module, so one file never removes another's directories.
+// This spec file's directories, which tests/setup.ts removes after the file's own hooks.
+// Each spec file has its own copy of this module, so it never removes another's.
 const made: string[] = []
 
 /** A new directory `<os temp dir>/<prefix>XXXXXX`, removed after the spec file ends. */
@@ -15,11 +13,9 @@ export function makeTempDir(prefix: string): string {
   return dir
 }
 
-/**
- * Removes every directory makeTempDir made. The retries cover a child process
+/** Removes every directory makeTempDir made. The retries cover a child process
  * (git maintenance, a supervised agent) still writing as the file ends:
- * rmSync retries on ENOTEMPTY and EBUSY (https://nodejs.org/api/fs.html#fsrmsyncpath-options).
- */
+ * rmSync retries on ENOTEMPTY and EBUSY (https://nodejs.org/api/fs.html#fsrmsyncpath-options). */
 export function removeTempDirs(): void {
   for (const dir of made.splice(0)) {
     rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })

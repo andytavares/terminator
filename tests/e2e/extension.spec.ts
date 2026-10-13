@@ -50,12 +50,8 @@ test('US6-3: each extension row shows a name and a toggle action', async () => {
   await closeSettings(page)
 })
 
-/**
- * Clicks a toggle and waits for the reload it causes. The toggle reloads only
- * once main has finished enabling or disabling the extension, which can take
- * seconds, so the old page is still loaded when the click returns; a spec that
- * waits for `domcontentloaded` there is answered by the page about to go away.
- */
+/** Clicks a toggle and waits for the reload it causes, which comes only once main has
+ * finished (seconds): `domcontentloaded` right after the click is answered by the old page. */
 async function toggleAndReload(pg: Page, extensionName: string): Promise<void> {
   const reloaded = pg.waitForEvent('load')
   await extensionRow(pg, extensionName)

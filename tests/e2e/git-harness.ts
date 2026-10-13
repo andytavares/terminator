@@ -5,11 +5,8 @@ import { dirname, join } from 'node:path'
 import { git } from './foundry-harness'
 import { createWorkspace, workspaceRow, type AppHandle } from './helpers'
 
-// Shared setup for the Git Integration specs: a repository with a real remote
-// (a local bare repository, which the stub GitHub also serves pull requests
-// from), and the extension's views as Playwright pages. Each view is its own
-// WebContentsView, which Playwright lists among the app's windows, so a spec
-// clicks and types in it as a user does.
+// Git Integration specs' setup: a repository whose remote is a local bare one (which the stub
+// GitHub serves pull requests from), and each view, its own WebContentsView, as a Playwright page.
 
 export { git }
 

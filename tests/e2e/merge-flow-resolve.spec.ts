@@ -5,12 +5,8 @@ import { join } from 'node:path'
 import { closeApp, launchApp, type AppHandle } from './helpers'
 import { git, openGitTab, openRepo, writeFile } from './git-harness'
 
-/**
- * Resolving a merge in the Conflict Solver, decision by decision, against a
- * real conflicted repository: each choice is written to the file on disk,
- * undo puts the markers back, Start over restores every conflict, and the
- * merge commit lands with a warning that it could not be pushed.
- */
+/** The Conflict Solver on a real conflicted repository: each choice written to disk, undo,
+ * Start over, and a merge commit that lands with a warning it could not be pushed. */
 
 let handle: AppHandle
 let repo: string
@@ -54,11 +50,9 @@ const markerCount = (file: string) =>
     .split('\n')
     .filter((l) => l.startsWith('<<<<<<<')).length
 
-/**
- * Conflicts left in `file`, or -1 while it is missing. Start over runs
+/** Conflicts left in `file`, or -1 while it is missing. Start over runs
  * `git checkout --conflict=merge`, and git's checkout removes a file before it
- * writes the new one, so a read in between finds nothing there.
- */
+ * writes the new one, so a read in between finds nothing there. */
 function markersAfterCheckout(file: string): number {
   try {
     return markerCount(file)
@@ -68,10 +62,8 @@ function markersAfterCheckout(file: string): number {
   }
 }
 
-/**
- * Reads `file` every few milliseconds, as an editor or git might while the app
- * writes it, and keeps every read that found it empty or missing.
- */
+/** Reads `file` every few milliseconds, as an editor or git might while the app
+ * writes it, and keeps every read that found it empty or missing. */
 function watchReads(file: string): { stop(): string[] } {
   const torn: string[] = []
   const timer = setInterval(() => {

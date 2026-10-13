@@ -127,12 +127,8 @@ export function sessionRecordOf(
   }
 }
 
-/**
- * Put a real renderer store back in its initial state, with `overrides` on
- * top. Its own actions and getters stay, so a spec sees what the store does;
- * `overrides` replaces only what it names (an action that reaches the main
- * process, say).
- */
+/** Puts a real renderer store back in its initial state with `overrides` on top; its own
+ * actions stay, so a spec sees what the store does. */
 export function resetStore<State extends object>(
   store: Pick<StoreApi<State>, 'getInitialState' | 'setState'>,
   overrides: Partial<State> = {}
@@ -152,18 +148,9 @@ export type SeededStore<Hook extends { getState: () => object }> = Seeded<
   ReturnType<Hook['getState']>
 >
 
-/**
- * Put a real renderer store (`useWorkspaceStore`, `useSessionStore`, ...) in a
- * known state for one spec, and return that state.
- *
- * The state starts from the store's own initial state, so every field is there
- * with its real type; every function in it becomes a `vi.fn()`, because the
- * real actions call `window.electronAPI`; `overrides` sets the rest. Components
- * read it through the real hook, selectors and `getState()` included.
- *
- *   const workspaces = seedStore(useWorkspaceStore, { workspaces: [ws] })
- *   expect(workspaces.createWorkspace).toHaveBeenCalledWith(...)
- */
+/** Seeds a real renderer store from its initial state, with every function a `vi.fn()` (the
+ * real actions call `window.electronAPI`) and `overrides` on top, and returns that state:
+ * `seedStore(useWorkspaceStore, { workspaces: [ws] }).createWorkspace`. */
 export function seedStore<State extends object>(
   store: Pick<StoreApi<State>, 'getInitialState' | 'setState'>,
   overrides: Partial<State> = {}

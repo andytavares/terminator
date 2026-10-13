@@ -41,10 +41,8 @@ async function createDesktopWorkspace(): Promise<void> {
   await expect(page.locator('.repo-header__name').filter({ hasText: WS_NAME })).toBeVisible()
 }
 
-/**
- * 2. Sets a password, then enables the remote-control server on an isolated
- * port. The password is stored only as a hash, so the test keeps the one it chose.
- */
+/** 2. Sets a password, then enables the remote-control server on an isolated
+ * port. The password is stored only as a hash, so the test keeps the one it chose. */
 async function startRemoteServer(): Promise<void> {
   await page.evaluate(
     async ({ port, password }) => {
@@ -83,13 +81,9 @@ async function appTicket(
   return { api, ticket }
 }
 
-/**
- * 4. Loads /app/ in a real browser that logged in the same way, so its IPC
- * shim can get a bridge ticket with the session cookie (no password is stored
- * in the page or sent in a header). 5. The remote renderer must boot, connect
- * the bridge, and render the desktop-created workspace — proving the bridge
- * invoke path works.
- */
+/** 4. /app/ in a browser logged in the same way gets a bridge ticket with the session cookie
+ * (no password in the page or a header). 5. The remote renderer boots, connects the bridge,
+ * and renders the desktop-created workspace. */
 async function expectRemoteWorkspace(
   playwright: Playwright,
   baseURL: string,

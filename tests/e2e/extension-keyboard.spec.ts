@@ -81,11 +81,9 @@ interface Surface {
   part: string
 }
 
-/**
- * Brings an extension's panel up and waits for its view to load. Idempotent:
+/** Brings an extension's panel up and waits for its view to load. Idempotent:
  * the sidebar button toggles, so clicking it when the panel is already up puts
- * the extension away instead of bringing it forward.
- */
+ * the extension away instead of bringing it forward. */
 async function showPanel({ id, label, part }: Surface): Promise<void> {
   const panel = handle.page.locator(`[data-extension-panel="${id}"]`)
   if ((await panel.count()) === 0) {

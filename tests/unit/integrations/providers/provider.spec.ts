@@ -27,11 +27,9 @@ const PROVIDER_OPERATIONS = [
   'create',
 ] as const
 
-/**
- * The operations permitted to write to a tracker. `transition` moves an issue
+/** The operations permitted to write to a tracker. `transition` moves an issue
  * along its own workflow and can do nothing else; `create` files a new issue the
- * operator asked for (ADR-061); neither can set a field of an existing one.
- */
+ * operator asked for (ADR-061); neither can set a field of an existing one. */
 const PROVIDER_WRITE_OPERATIONS = ['comment', 'transition', 'create'] as const
 
 /** What a provider may expose but need not: callers ask the issue service first. */

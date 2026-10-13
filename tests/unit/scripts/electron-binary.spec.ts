@@ -2,11 +2,9 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-// Electron 44 no longer downloads its binary in a postinstall script; it does so the
-// first time its own bin runs, or when `install-electron` is called
-// (https://github.com/electron/electron/blob/v44.7.0/docs/breaking-changes.md).
-// electron-vite reads node_modules/electron/path.txt itself and never runs that bin,
-// so every script that starts Electron through electron-vite must install it first.
+// Electron 44 downloads its binary on its bin's first run or `install-electron`, never at
+// install (https://github.com/electron/electron/blob/v44.7.0/docs/breaking-changes.md), and
+// electron-vite never runs that bin: every script that starts Electron through it installs first.
 const scripts: Record<string, string> = JSON.parse(
   readFileSync(join(__dirname, '../../../package.json'), 'utf8')
 ).scripts

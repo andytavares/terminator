@@ -20,11 +20,8 @@ import {
 import { git, makeFixtureRepo } from './foundry-harness'
 import { answerFolderPicker, recordShellOpens, shellOpens } from './main-stubs'
 
-// The core channels no other spec reaches: branches in a real repository,
-// renaming and removing cards, notifications, links opened from a terminal,
-// and the parts of window.electronAPI only an extension's view calls. Those
-// last run inside Notes' own view, through the same preload every extension
-// view gets.
+// The core channels no other spec reaches. The parts of window.electronAPI only an
+// extension's view calls run inside Notes' view, through the preload every view gets.
 
 const NOTES = 'terminator.notepad'
 
@@ -47,12 +44,9 @@ function currentBranch(repo: string): string {
   return execFileSync('git', ['branch', '--show-current'], { cwd: repo }).toString().trim()
 }
 
-/**
- * Prints `line` alone on a row of the terminal drawn in `screen`, a pane's
- * `.xterm-screen`, and ⌘-clicks it (Ctrl-click off macOS) at the row's first
- * characters. xterm sizes the screen to exactly its rows, so a row is the
- * screen's height over the number of rows that terminal shows.
- */
+/** Prints `line` alone on a row of the pane's `.xterm-screen` and ⌘-clicks (Ctrl off macOS)
+ * its first characters. xterm sizes the screen to exactly its rows, so a row is the
+ * screen's height over the number of rows. */
 async function printAndModClick(screen: Locator, line: string): Promise<void> {
   const page = screen.page()
   await screen.click()

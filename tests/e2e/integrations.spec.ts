@@ -16,11 +16,9 @@ import {
 import { connectJira, startJiraStub, type JiraStub } from './jira-stub'
 import { allowCredentialsWithoutKeychain } from './main-stubs'
 
-// The issue-tracker integration, end to end against a local Jira
-// (jira-stub.ts): connect, the "mine" query, search, link, read, comment,
-// feed the issue to sessions, unlink, disconnect. Each step is what an
-// operator does in Settings, the link dialog and the issue drawer, and each
-// assertion is what the app shows or what reached the tracker.
+// The issue-tracker integration against a local Jira (jira-stub.ts), from connect to
+// disconnect, each step done as an operator does it and each assertion on what the app shows
+// or what reached the tracker.
 
 let handle: AppHandle
 let stub: JiraStub

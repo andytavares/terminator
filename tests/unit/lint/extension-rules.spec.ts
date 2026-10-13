@@ -2,13 +2,8 @@ import { describe, it, expect } from 'vitest'
 import { ESLint } from 'eslint'
 import path from 'node:path'
 
-/**
- * The rules `eslint.config.mjs` applies to extension source, checked against
- * the real config. Loading the config imports typescript-eslint, and with it
- * the TypeScript compiler: about a second of CPU, against milliseconds for
- * each lint after it. So one instance serves every case, and the module loads
- * the config as it loads, before any case runs.
- */
+/** The rules `eslint.config.mjs` applies to extension source, against the real config, loaded
+ * once before any case: it imports the TypeScript compiler, about a second of CPU. */
 
 const repoRoot = path.resolve(__dirname, '../../..')
 const eslint = new ESLint({
@@ -32,10 +27,8 @@ async function messagesOf(code: string, file: string, ruleId: string) {
   return result.messages.filter((m) => m.ruleId === ruleId).map((m) => m.message)
 }
 
-/**
- * The import boundary (Constitution II, ADR 094): extension source imports
- * the SDK, the design system, npm packages and its own files, and nothing else.
- */
+/** The import boundary (Constitution II, ADR 094): extension source imports
+ * the SDK, the design system, npm packages and its own files, and nothing else. */
 async function rejected(specifier: string, file: string): Promise<boolean> {
   const code = `import { value } from '${specifier}'\nexport const used = value\n`
   return (await messagesOf(code, file, 'no-restricted-imports')).length > 0
@@ -86,15 +79,9 @@ describe('extension import boundary — allowed', () => {
   })
 })
 
-/**
- * The vocabulary rule. The "project"/"branch" rule has existed since ADR 032
- * but was scoped to `src/renderer/components/**`, which is exactly why the
- * extensions drifted: nothing was watching them. This asserts the widened
- * override fires on extension source, and — the half that matters more — that
- * it stays quiet on the identifiers, IPC channel names and imports that
- * legitimately carry the same words. A rule that cannot tell
- * `task-vault:vault:add-task` from "saved to vault" gets switched off within a week.
- */
+/** The vocabulary rule (ADR 032) fires on extension source and stays quiet on identifiers,
+ * channel names and imports carrying the same words: a rule that cannot tell
+ * `task-vault:vault:add-task` from "saved to vault" gets switched off. */
 function syntaxMessagesFor(code: string, file = 'extensions/notepad/src/components/X.tsx') {
   return messagesOf(code, file, 'no-restricted-syntax')
 }
@@ -162,10 +149,8 @@ describe('extension vocabulary rule', () => {
   })
 })
 
-/**
- * Constitution XII. Landed with the last conversion rather than before it: a
- * rule that fires 139 times on the day it ships gets switched off.
- */
+/** Constitution XII. Landed with the last conversion rather than before it: a
+ * rule that fires 139 times on the day it ships gets switched off. */
 describe('icon sizing rule', () => {
   it('rejects a size prop on a lucide icon', async () => {
     const msgs = await syntaxMessagesFor('const A = () => <Check size={14} />')

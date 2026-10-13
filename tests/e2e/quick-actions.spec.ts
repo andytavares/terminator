@@ -167,11 +167,8 @@ async function leaderNNOpensNotepadQuickCreate(handle: AppHandle): Promise<void>
   const { page } = handle
   await openPanel(page)
   await page.keyboard.press('n')
-  // The keydown listener that reads mnemonics is rebound on every mode
-  // change (QuickActions.tsx useEffect depends on `mode`), so a second key
-  // sent before that rebind lands can still be seen by the stale "top mode"
-  // closure and do nothing — the dialog then never closes. Wait for the
-  // group's own listbox to render before sending the row's mnemonic.
+  // The mnemonic listener is rebound on every mode change (QuickActions.tsx), so a key sent
+  // before the group's listbox renders reaches the stale closure and does nothing.
   await page.keyboard.press('n')
   // Generous: the first time an extension's view is created it can cold-load,
   // and closing the panel goes through the same main-process path.
@@ -526,10 +523,8 @@ test.describe('git push and a custom shell action', () => {
 async function capturesPanelInBothThemes(handle: AppHandle): Promise<void> {
   const { page } = handle
 
-  // The panel and its overlay fade and scale in over ~120ms
-  // (QuickActions.css), and `toBeVisible` is satisfied well before that
-  // finishes — capturing immediately would screenshot mid-transition, so
-  // wait for the animation itself to finish rather than guessing its length.
+  // The panel fades in over ~120ms (QuickActions.css), long after `toBeVisible` holds, so the
+  // capture waits for the animation itself to finish.
   await setTheme(page, 'dark')
   await openPanel(page)
   await waitForAnimationsToFinish(page, '.qa-panel')

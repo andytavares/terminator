@@ -13,14 +13,9 @@ declare module 'vitest' {
   }
 }
 
-// `git commit` and `git fetch` start `git maintenance run --auto --detach`,
-// which keeps writing into a spec's temporary repository after the command
-// returns; the spec's cleanup then fails with ENOTEMPTY whenever the machine is
-// busy. Turned off through git's XDG config file rather than a GIT_* variable:
-// the local GIT_* variables are forbidden in tests/setup.ts, and specs scrub the
-// rest before running git. The operator's own XDG config is included so nothing
-// else changes. Written once, before any worker starts, so no git reads it half
-// written.
+// Turns off `git maintenance run --auto --detach`, which writes into a spec's repository after
+// the command returns (cleanup then fails with ENOTEMPTY), through git's XDG config: specs scrub
+// GIT_* variables. Includes the operator's own, and is written before any worker starts.
 function writeXdgGitConfig(): string {
   const operatorConfig = join(
     process.env.XDG_CONFIG_HOME ?? join(homedir(), '.config'),

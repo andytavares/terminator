@@ -240,6 +240,13 @@ tile) disposes it, so a hidden terminal or a thumbnail never holds a GPU context
 and a terminal past that stays on the DOM renderer. A lost context (`onContextLoss`) or a machine without
 WebGL2 also falls back to the DOM renderer. The DOM renderer clips the last column's glyph on macOS (about
 2px), which WebGL does not do because it has no row boxes to clip. The phone client keeps the DOM renderer.
+The DOM renderer gives each row div `overflow: hidden` and a width of exactly cols × cellWidth but lays text
+out with the font's natural advance width, so the difference accumulates across the line (902px of content
+in a 900px row on macOS with xterm 6). A CSS rule that widens the rows cannot come back: xterm 6 draws its own
+fixed-width scrollbar beside the screen, which FitAddon reserves, so wider rows sit under it, and the terminal's
+geometry does not depend on the macOS overlay-scrollbar setting. `tests/e2e/terminal-right-edge.spec.ts`
+checks the live renderer: under WebGL the canvas ends at or before the scrollbar and the last column holds ink;
+under the DOM renderer a row's `scrollWidth` fits its `clientWidth`.
 Because WebGL leaves no terminal text in the DOM, the renderer sets `window.terminatorE2E.terminalRows()`
 (`src/renderer/terminal/terminal-rows.ts`), which reads every terminal's visible rows from its xterm buffer,
 one terminal after another, and `terminalRowsIn(element)`, which reads only the terminal drawn in that

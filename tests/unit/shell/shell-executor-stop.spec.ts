@@ -6,10 +6,8 @@ import { execShell } from '../../../src/main/shell/shell-executor'
 import { stopRunningCommands } from '../../../src/main/shell/command-runner'
 import { makeTempDir } from '../../support/temp-dir'
 
-// A git or gh command still running when the app quits, and whatever it started,
-// must end with the app. On macOS /usr/bin/git is an xcrun shim that can start
-// xcodebuild, which outlived the app in run 38382115775. The stand-in gh here
-// starts a `sleep` of its own and writes the sleep's pid down.
+// A git or gh command running at quit ends with the app, with what it started (macOS's git
+// shim started an xcodebuild that outlived it, run 38382115775). The stand-in gh records a sleep's pid.
 
 const originalPath = process.env.PATH
 let scratch: string

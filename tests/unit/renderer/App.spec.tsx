@@ -324,10 +324,8 @@ interface AppState {
   projectsByWorkspaceId?: Map<string, Project[]>
 }
 
-/**
- * The renderer's stores as the app would hold them, and a main process that
- * answers with the same workspaces, projects and settings.
- */
+/** The renderer's stores as the app would hold them, and a main process that
+ * answers with the same workspaces, projects and settings. */
 function setupApp(state: AppState = {}): void {
   const workspaces = state.workspaces ?? []
   const projects = state.projectsByWorkspaceId ?? new Map<string, Project[]>()
@@ -1201,10 +1199,8 @@ describe('App — Quick Actions integration (feature 057) — shows a "Next time
   })
 })
 
-/**
- * Two workspaces: s1 and s3 in the active branch with s1 showing, and s2,
- * waiting for input, in the other workspace's branch.
- */
+/** Two workspaces: s1 and s3 in the active branch with s1 showing, and s2,
+ * waiting for input, in the other workspace's branch. */
 function setupTwoWorkspaces(): void {
   const s1 = terminalSessionOf({ id: 's1', projectId: 'proj-1' })
   const s2 = terminalSessionOf({

@@ -47,10 +47,8 @@ async function startFourSessions(page: Page): Promise<void> {
   await addAndSelectProject(page, 'terminator', 'session-home')
   await run(
     page,
-    // The ❯ cursor is sent as its UTF-8 bytes in octal. Typed as itself it
-    // reaches a shell with no UTF-8 locale (an unset LANG, as on a CI runner)
-    // as three unknown characters, the prompt has no cursor, and nothing
-    // reads it as waiting on you.
+    // ❯ as its UTF-8 bytes in octal: typed as itself it reaches a shell with no UTF-8 locale
+    // (as on CI) as three unknown characters, and nothing reads the prompt as waiting on you.
     "clear; printf ' Do you want to create BoardScreen.tsx?\\n \\342\\235\\257 1. Yes\\n   2. Yes, and allow edits this session\\n   3. No\\n'"
   )
 

@@ -5,12 +5,9 @@ import { fileURLToPath } from 'node:url'
 import { bundledExtensionIds } from '../../../scripts/smoke-start.mjs'
 import { closeApp, launchApp, type AppHandle } from '../helpers'
 
-// What the running app offers, once every bundled extension is active: every
-// IPC channel main handles, every command, every extension setting. The other
-// half of docs/research/feature-coverage.md, joined with the e2e IPC trace by
-// scripts/feature-coverage.mjs. Run deliberately:
-//
-//   FEATURE_INVENTORY=/tmp/inventory.json E2E_TOOLS=1 npx playwright test tests/e2e/tools/feature-inventory.spec.ts
+// Every IPC channel, command and extension setting the running app offers: the other half of
+// docs/research/feature-coverage.md, which says how to run it. Run deliberately:
+// FEATURE_INVENTORY=/tmp/inventory.json E2E_TOOLS=1 npx playwright test tests/e2e/tools/feature-inventory.spec.ts
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../..')
 

@@ -4,10 +4,8 @@ import { chmodSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { makeTempDir } from '../../support/temp-dir'
 
-// The core's own git commands (the sidebar's branches, worktrees and fetches)
-// end with the app too: a `git worktree list --porcelain` in flight at quit,
-// with the xcodebuild an xcrun shim git had started, outlived the app (macOS
-// run 38382115775). The stand-in git starts a `sleep` and writes its pid down.
+// The core's own git commands end with the app: one in flight at quit, with the xcodebuild
+// its xcrun shim started, outlived it (macOS run 38382115775). The stand-in git records a sleep's pid.
 
 const scratch = makeTempDir('git-service-stop-')
 const pidFile = join(scratch, 'grandchild.pid')

@@ -12,18 +12,13 @@ module.exports = {
   appId: 'com.terminator.app',
   productName: 'Terminator',
   directories: { output: 'dist' },
-  // Nothing to rebuild: the one native module, node-pty, loads the N-API
-  // prebuild it ships for the platform (node_modules/node-pty/lib/utils.js),
-  // which does not depend on Electron's ABI. Rebuilding failed outright for
-  // Electron 44: "Could not detect abi for version 44.7.0" (@electron/rebuild's node-abi).
+  // node-pty loads the N-API prebuild it ships, which needs no rebuild for
+  // Electron's ABI. Why: docs/CONTRIBUTING.md, "Packaging".
   npmRebuild: false,
   files: [
     'out/**/*',
-    // The bundled extensions, where main looks for them: app.asar/extensions
-    // (join(__dirname, '../../extensions') from out/main). Everything an
-    // extension reads at run time ships, its built backend and view and its
-    // data (Foundry's roles, rules, recipes, skills, sensors, fonts); its
-    // sources and tests do not.
+    // The bundled extensions, at app.asar/extensions where main looks for them.
+    // What they read at run time ships (built code, data, fonts); sources and tests do not.
     {
       from: 'extensions',
       to: 'extensions',
@@ -37,26 +32,16 @@ module.exports = {
         '!*/index.html',
       ],
     },
-    // The packages the extension backends require at run time. electron-builder
-    // ships only the root package's dependencies, and these are the
-    // extensions' own (Constitution II), so they go beside the extensions,
-    // where Node finds them from extensions/<name>/src/index.js.
+    // The extensions' own run-time packages (Constitution II), which electron-builder
+    // does not ship by itself; Node finds them here from extensions/<name>/src/index.js.
     {
       from: 'node_modules',
       to: 'extensions/node_modules',
       filter: extensionRuntimeModules(__dirname, EXTENSION_EXTERNALS).map((name) => `${name}/**/*`),
     },
   ],
-  // Only the two binary assets need to be unpacked — they are read explicitly via
-  // readFileSync when the one-time import opens app.pglite (ADR 099,
-  // src/main/db/legacy-pglite-import.ts). Unpacking all of @electric-sql/pglite
-  // breaks Electron's ESM dynamic import handler: when pglite's JS modules are in
-  // app.asar.unpacked, `import("./fs/nodefs.js")` inside pglite fails to resolve
-  // through the asar virtual path, so the NodeFS adapter never loads, and
-  // pg_initdb aborts. Keeping JS inside the asar lets dynamic imports work
-  // normally while readFileSync for the two binary files is redirected to
-  // app.asar.unpacked by Electron's asar fs interception.
-  // These entries go when PGlite is removed, one release after the import ships.
+  // Only PGlite's two binaries, never its JS: unpacked JS breaks its dynamic
+  // imports (docs/CONTRIBUTING.md, "Packaging"). They go with PGlite (ADR 099).
   asarUnpack: [
     '**/node_modules/@electric-sql/pglite/dist/postgres.wasm',
     '**/node_modules/@electric-sql/pglite/dist/postgres.data',

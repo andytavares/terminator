@@ -201,10 +201,8 @@ function expectOneRework(last: Observed, ledger: string): void {
   expect(ledger).toContain('rework.started')
 }
 
-/**
- * The builder was given its skills (ADR-065): mounted, recorded, and seen by
- * the agent, with nothing written into the repository to do it.
- */
+/** The builder was given its skills (ADR-065): mounted, recorded, and seen by
+ * the agent, with nothing written into the repository to do it. */
 function expectSkillsMounted(last: Observed, ledger: string): void {
   expect(ledger).toMatch(/"skills.mounted"[^\n]*ci-fix \(built-in\)/)
   const buildSession = (last.graph?.nodes ?? []).find((n) => n.stepId === 'build')?.sessionId
@@ -220,10 +218,8 @@ function expectSkillsMounted(last: Observed, ledger: string): void {
   expect(existsSync(join(repo, '.claude')), 'a skill was written into the repository').toBe(false)
 }
 
-/**
- * The ready-for-review gate is raised once the draft exists; it is the one
- * decision that is always the operator's. Nothing else may have asked.
- */
+/** The ready-for-review gate is raised once the draft exists; it is the one
+ * decision that is always the operator's. Nothing else may have asked. */
 function expectNobodyAsked(): void {
   const asked = existsSync(gatesFile())
     ? (JSON.parse(readFileSync(gatesFile(), 'utf8')) as { rule: string }[]).map((g) => g.rule)

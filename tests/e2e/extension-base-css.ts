@@ -1,10 +1,9 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 
-// Specs that render extension stylesheets in plain Chromium rebuild the sheet
-// core injects into every extension view. Playwright's loader cannot import the
-// `?raw` modules EXTENSION_BASE_CSS is built from, so its imports are read
-// instead: a stylesheet added to it reaches these specs without a second list.
+// Rebuilds the sheet core injects into every extension view from the builder's imports:
+// Playwright's loader cannot import the `?raw` modules EXTENSION_BASE_CSS is built from,
+// and reading them means a stylesheet added there needs no second list here.
 const BUILDER = 'packages/extension-ui/src/extension-base-css.ts'
 
 /** EXTENSION_BASE_CSS: each `./x.css?raw` file the builder imports, in its order. */

@@ -11,14 +11,8 @@ const JSDOM_INCLUDE = [
   'extensions/*/tests/**/*.spec.tsx',
 ]
 
-// Notepad's and git-integration's DOM specs run in happy-dom, not jsdom. They
-// mount CodeMirror and the design system, which inject stylesheets, and jsdom
-// validates every declaration it parses (cssstyle, css-tree, css-color), with
-// no option to turn that off. CodeMirror's 5 KB of theme CSS took 150-250 ms
-// on the first view of each file, and the first test of a file 1-2 s,
-// which went past the five-second timeout on a busy machine. happy-dom parses
-// the same CSS in a few milliseconds, and every spec in both passes unchanged.
-// https://vitest.dev/guide/environment
+// happy-dom, not jsdom: jsdom validates every CSS declaration CodeMirror and the
+// design system inject, which timed specs out (docs/CONTRIBUTING.md, "Run tests").
 const HAPPY_DOM_INCLUDE = [
   'extensions/notepad/tests/**/*.spec.tsx',
   'extensions/git-integration/tests/**/*.spec.tsx',

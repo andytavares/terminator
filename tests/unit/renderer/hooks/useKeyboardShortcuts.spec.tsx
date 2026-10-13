@@ -373,11 +373,8 @@ describe('useKeyboardShortcuts — scratch mode — scratchProjectId overrides a
   })
 
   it('Cmd+D splits the scratch terminal when that is what is on screen', () => {
-    // This used to be gated on `activeProjectId` alone and do nothing at
-    // all here — silently, with the palette entries absent too, which reads
-    // as the feature having been removed rather than as not applying. Cmd+T
-    // and Cmd+W already treat scratch as an ordinary project; this now does
-    // the same.
+    // Scratch is an ordinary project here, as for Cmd+T and Cmd+W; doing nothing silently
+    // read as the feature having been removed.
     renderHook(() => useKeyboardShortcuts(scratch))
     pressKey('d', { metaKey: true })
     expect(splitSession).toHaveBeenCalledWith(SCRATCH_PROJECT_ID, 'vertical', {

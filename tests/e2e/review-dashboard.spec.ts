@@ -6,11 +6,9 @@ import { closeApp, launchApp, type AppHandle } from './helpers'
 import { git, gitView, makeRepoWithRemote, pushBranch } from './git-harness'
 import { startGithubStub, type GithubStub } from './github-stub'
 
-/**
- * The Reviews dashboard, against the stub GitHub: narrowing it to chosen
+/** The Reviews dashboard, against the stub GitHub: narrowing it to chosen
  * repositories, and cloning a repository no workspace has yet to review a
- * pull request in it.
- */
+ * pull request in it. */
 
 let handle: AppHandle
 let stub: GithubStub

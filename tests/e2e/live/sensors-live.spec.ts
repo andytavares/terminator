@@ -183,10 +183,8 @@ async function inboxTextAndShot(): Promise<{ text: string; png: string }> {
   })
 }
 
-/**
- * It shows in the Inbox, under the gates. The Inbox reads signals again on its
- * own poll, so one open since before the sensor ran still shows the signal.
- */
+/** It shows in the Inbox, under the gates. The Inbox reads signals again on its
+ * own poll, so one open since before the sensor ran still shows the signal. */
 async function expectSignalInInbox(red: SignalRow | undefined): Promise<void> {
   await handle.page.locator('button[aria-label="Foundry"]').click()
   await handle.page.waitForTimeout(6000)

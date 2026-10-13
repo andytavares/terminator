@@ -41,10 +41,8 @@ async function openDataTools(tab: 'Export & import' | 'Database'): Promise<void>
   await dataTools().getByRole('tab', { name: tab }).click()
 }
 
-/**
- * Saves the vault view's next download to `filePath`, where the save dialog
- * Electron shows by default would have let the user put it.
- */
+/** Saves the vault view's next download to `filePath`, where the save dialog
+ * Electron shows by default would have let the user put it. */
 function saveNextDownload(filePath: string): Promise<void> {
   return handle.app.evaluate(
     ({ webContents }, target) =>

@@ -49,11 +49,9 @@ function commitRepo(): void {
   git('commit', '-m', 'initial')
 }
 
-/**
- * The Ledger's accepted-checks panel only appears when there is something in
+/** The Ledger's accepted-checks panel only appears when there is something in
  * it, and the records location defaults to `<workdir>/.foundry/`. Seeded here
- * so the screenshot shows the panel rather than its absence.
- */
+ * so the screenshot shows the panel rather than its absence. */
 function seedAcceptedCheck(): void {
   mkdirSync(join(repo, '.foundry', 'rules'), { recursive: true })
   writeFileSync(
@@ -83,11 +81,9 @@ async function runInFoundry(script: string): Promise<void> {
   }, script)
 }
 
-/**
- * The Foundry view as a PNG. The image comes back as base64 rather than being
+/** The Foundry view as a PNG. The image comes back as base64 rather than being
  * written inside the main process: `evaluate` runs there, but only
- * serialisable values cross back.
- */
+ * serialisable values cross back. */
 async function capture(): Promise<Buffer> {
   const png = await handle.app.evaluate(async ({ webContents }) => {
     const view = webContents
@@ -100,11 +96,9 @@ async function capture(): Promise<Buffer> {
   return Buffer.from(png, 'base64')
 }
 
-/**
- * Clicks land inside the extension's own WebContentsView, which Playwright's
+/** Clicks land inside the extension's own WebContentsView, which Playwright's
  * `page` cannot see. Sent through the view's input queue instead, by the
- * accessible name the tab renders.
- */
+ * accessible name the tab renders. */
 async function openSurface(label: string): Promise<void> {
   await runInFoundry(
     `Array.from(document.querySelectorAll('button')).find((b) => b.textContent?.trim() === ${JSON.stringify(
@@ -224,12 +218,8 @@ const RUN_NODES: RunNodeSpec[] = [
   },
 ]
 
-/**
- * The Floor only renders for an order that is running, and starting one for
- * real launches an agent. The order the Forge just made is moved to running
- * with a graph beside it instead: the same files a real run writes, so the
- * surface reads them the same way, without an agent being launched.
- */
+/** The Floor renders only a running order, and starting one launches an agent, so this
+ * writes the files a real run writes: the order set running, with a graph beside it. */
 function markOrderRunning(): void {
   const ordersDir = join(repo, '.foundry', 'orders')
   const orderId = readdirSync(ordersDir)[0]
@@ -253,11 +243,9 @@ async function openFoundryOnRepo(): Promise<void> {
   mkdirSync(SHOTS, { recursive: true })
 }
 
-/**
- * An empty Forge shows a text box and nothing else. Seeded with a real idea so
+/** An empty Forge shows a text box and nothing else. Seeded with a real idea so
  * the picture shows what the surface is actually for: the criteria, the
- * assumptions and the shape of work with the reason it was proposed.
- */
+ * assumptions and the shape of work with the reason it was proposed. */
 async function captureForgeWithAnIdea(): Promise<void> {
   await openSurface('Forge')
   await runInFoundry(NEW_ORDER_FROM_IDEA)
@@ -274,11 +262,9 @@ async function captureFloor(): Promise<void> {
   write(join(SHOTS, '08e-foundry-floor.png'), await capture())
 }
 
-/**
- * Settings is behind the gear rather than a named tab, so it is reached by its
+/** Settings is behind the gear rather than a named tab, so it is reached by its
  * accessible name. Worth a picture of its own: every control here is one the
- * extension actually reads, and the panel is where that shows.
- */
+ * extension actually reads, and the panel is where that shows. */
 async function captureSettings(): Promise<void> {
   await runInFoundry(`document.querySelector('button[aria-label="Settings"]')?.click()`)
   await handle.page.waitForTimeout(1500)

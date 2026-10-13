@@ -1,12 +1,8 @@
 import { execFileSync } from 'node:child_process'
 
-// Presses a key chord at the X server, the way a physical keyboard does, so a
-// global shortcut fires whatever window has focus. Playwright's keyboard sends
-// key events to one page over the DevTools protocol and never reaches the X
-// server, where Electron's globalShortcut grabs its keys on Linux.
-//
-// It uses the XTEST extension (https://www.x.org/releases/X11R7.7/doc/libXtst/xtestlib.html)
-// through Python's ctypes, both present on any Linux desktop and under xvfb.
+// Presses a chord at the X server, where Electron's globalShortcut grabs keys on Linux and
+// Playwright's keyboard never reaches, through XTEST from Python's ctypes (both under xvfb):
+// https://www.x.org/releases/X11R7.7/doc/libXtst/xtestlib.html
 
 const PRESS_CHORD = `
 import ctypes, sys

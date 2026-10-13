@@ -29,10 +29,8 @@ for (const name of [
 // git maintenance is off under this XDG config; tests/global-setup.ts says why.
 process.env.XDG_CONFIG_HOME = inject('xdgConfigHome')
 
-// Directories the spec file made with makeTempDir. Registered here, before the
-// spec's own hooks, so it runs after them: afterAll hooks run in reverse order
-// (https://vitest.dev/config/sequence#sequence-hooks), so the spec's own
-// hooks close what is inside the directories first.
+// Registered before the spec's own hooks so it runs after them (afterAll runs in reverse,
+// https://vitest.dev/config/sequence#sequence-hooks): they close what is inside first.
 afterAll(removeTempDirs)
 
 // A trace2 event target in the operator's global git config (git-ai's daemon)
@@ -61,8 +59,6 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
   }
 }
 
-// jsdom parses its built-in user-agent stylesheet on the first getComputedStyle
-// in a file, and every ByRole query calls getComputedStyle. Paid here, at
-// setup, the 300+ ms parse is not charged to the five-second budget of
-// whichever test happens to query first.
+// jsdom parses its user-agent stylesheet (300+ ms) on a file's first getComputedStyle, which
+// every ByRole query calls; paid here, not by whichever test queries first.
 if (typeof window !== 'undefined') window.getComputedStyle(document.documentElement)

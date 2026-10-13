@@ -13,14 +13,9 @@ import {
   type StubPullRequest,
 } from './github-stub-gh'
 
-// A stub GitHub for the e2e suite, at the boundary the app really has: the gh
-// CLI. The core runs every gh command for the extensions (api.github, ADR 094);
-// `tests/e2e/fixtures/bin/gh` stands in for gh on the app's PATH and forwards
-// each call here when the app's XDG_CONFIG_HOME, where gh reads its own
-// config, holds gh/e2e-stub-url. Pull requests live in a local bare repository,
-// so their branches, diffs and `pull/N/head` refs are real git, fetched by the
-// app exactly as it fetches them from GitHub. What gh answers is in
-// `github-stub-gh.ts`.
+// A stub GitHub at the app's real boundary, the gh CLI: `fixtures/bin/gh` forwards each call
+// here when the app's XDG_CONFIG_HOME holds gh/e2e-stub-url. Pull requests live in a local
+// bare repository, so their refs are real git; the answers are in `github-stub-gh.ts`.
 
 export interface GithubStubOptions {
   /** The bare repository standing in for github.com/<owner>/<name>. */

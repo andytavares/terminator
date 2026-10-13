@@ -1,10 +1,8 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-// The agreed order the live specs hand to Foundry: one unit on one lane of the
-// scratch repository, changing src/session.js and its test. The Forge is what
-// writes one normally and has its own cover; what is under test in these specs
-// is an agent doing the work it describes.
+// The agreed order the live specs hand to Foundry: one unit on one lane changing
+// src/session.js and its test. Under test is the agent's work, not the Forge that writes orders.
 
 /** What one live spec's order says, beside what every one of them shares. */
 export interface LiveOrder {
@@ -72,13 +70,8 @@ function liveAcceptance({ statement }: LiveOrder): unknown[] {
   ]
 }
 
-/**
- * The test file as well as the source. The builder's role tells it to write
- * the failing test first, so a unit that changes code in a tested repository
- * touches two files — and one it writes that the order did not declare is a
- * risk trigger. A live run was held for an operator on `outside_blast_radius`
- * for exactly this, which was the order being wrong rather than the run.
- */
+/** The test file as well as the source: the builder writes the failing test first, and an
+ * undeclared file is a risk trigger (`outside_blast_radius` once held a live run for it). */
 const LIVE_RISK = {
   grade: 'P2',
   triggers: [],
@@ -105,12 +98,8 @@ function liveOrderJson(order: LiveOrder): unknown {
     context: liveContext(order),
     acceptance: liveAcceptance(order),
     risk: LIVE_RISK,
-    // Room for the whole pipeline plus the climb. At twenty minutes the budget
-    // was the thing under test: four agents and eight rungs is fifteen minutes
-    // on a good run, so a slow builder gated it rather than shipping. That the
-    // budget gate fires correctly is proven — a live run raised it, halted,
-    // left its agents in their terminals and wrote "not every node finished" —
-    // and it is not what these tests are named after.
+    // Room for the pipeline plus the climb: four agents and eight rungs take fifteen minutes
+    // on a good run, and a tighter budget tests the budget gate instead of the run.
     budgets: { agents: 1, wallClockMinutes: order.wallClockMinutes, tokens: null },
     plan: livePlan(order),
     assumptions: [],

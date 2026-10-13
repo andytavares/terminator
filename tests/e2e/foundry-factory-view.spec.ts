@@ -220,12 +220,8 @@ function graphNode(spec: HallNodeSpec): unknown {
   }
 }
 
-/**
- * The graph's nodes, frozen mid-run: an architect done, two build lanes (one
- * still `running`, with a session nothing in this process is running — the
- * Factory view must draw it orphaned, "no agent", not faked as live), a
- * verifier per lane, an inspector, a join and a gate.
- */
+/** The graph frozen mid-run. `build:lane1` is `running` with a session nothing in this
+ * process runs, which the Factory view must draw orphaned ("no agent"), not as live. */
 const HALL_NODES: HallNodeSpec[] = [
   {
     id: 'architect',
@@ -315,11 +311,9 @@ function hallGraph(): unknown {
   return { orderId: HALL_ORDER_ID, recipe: 'standard', nodes: HALL_NODES.map(graphNode) }
 }
 
-/**
- * The order and its graph, and what the recorder writes beside the graph as a
+/** The order and its graph, and what the recorder writes beside the graph as a
  * run goes: two frames, the architect working and then done, for the replay
- * to play back.
- */
+ * to play back. */
 function writeHallRecords(repo: string): void {
   const dir = join(repo, '.foundry', 'orders', HALL_ORDER_ID)
   mkdirSync(dir, { recursive: true })
@@ -345,14 +339,8 @@ function writeHallRecords(repo: string): void {
   )
 }
 
-/**
- * Every node, addressed exactly as `FactoryHall.tsx` labels a station: its
- * label, its role (or "unassigned"), the word `stateWord()` renders for its
- * `NodeState` (or "no agent" for an orphaned one), and its attempt count.
- * `build:lane1` is `running` with a session nothing in this process is
- * running: the orphaned treatment is the label itself — "no agent" — not a
- * crew member drawn on a canvas nothing is actually driving.
- */
+/** Every node as `FactoryHall.tsx` labels a station: label, role (or "unassigned"),
+ * `stateWord()` for its state (or "no agent" when orphaned) and attempt count. */
 const EXPECTED_STATIONS = [
   'architect, architect, Done, attempt 1',
   'builder, builder, no agent, attempt 1',
@@ -402,10 +390,8 @@ async function openHall(): Promise<void> {
     .toBe(true)
 }
 
-/**
- * One station button per run-graph node — the honesty rule: every node gets a
- * place in the hall whether or not anything is really running it.
- */
+/** One station button per run-graph node — the honesty rule: every node gets a
+ * place in the hall whether or not anything is really running it. */
 async function expectEveryStation(): Promise<void> {
   await expect.poll(() => stationCount(hall), { timeout: 15_000 }).toBe(8)
   for (const label of EXPECTED_STATIONS) {
@@ -414,10 +400,8 @@ async function expectEveryStation(): Promise<void> {
   await captureFoundry(hall, 'foundry-factory-hall.png')
 }
 
-/**
- * A station opens as a monitor: its heading and its transcript are there by
- * role. `build:lane1` is orphaned, so its tube says the line is dead.
- */
+/** A station opens as a monitor: its heading and its transcript are there by
+ * role. `build:lane1` is orphaned, so its tube says the line is dead. */
 async function expectOrphanMonitor(): Promise<void> {
   expect(await clickByName(hall, 'button', 'builder, builder, no agent')).toBe(true)
   await expect.poll(() => inFoundry<boolean>(hall, ORPHAN_MONITOR), { timeout: 15_000 }).toBe(true)

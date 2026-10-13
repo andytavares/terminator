@@ -217,11 +217,9 @@ test('a conversation that goes while the app is running stops being offered', as
   await expect(page.getByRole('button', { name: /^Resume/ })).toHaveCount(0)
 })
 
-/**
- * Resumes the closed conversation from the keyboard, with a focus ring to show
+/** Resumes the closed conversation from the keyboard, with a focus ring to show
  * where it is: this is the one control that brings work back, and it must not
- * need a mouse.
- */
+ * need a mouse. */
 async function resumeFromKeyboard(page: Page): Promise<void> {
   const resume = page
     .getByRole('rowgroup', { name: 'Closed' })

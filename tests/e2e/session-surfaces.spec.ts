@@ -145,10 +145,8 @@ async function openFromHomeAndWall(page: Page): Promise<void> {
   await expectTerminalFocused(page)
 }
 
-/**
- * 3. A sidebar terminal row, for a different session. 4. The sidebar row of
- * the already-active session, clicked again. 5. A session tab in the tab bar.
- */
+/** 3. A sidebar terminal row, for a different session. 4. The sidebar row of
+ * the already-active session, clicked again. 5. A session tab in the tab bar. */
 async function openFromSidebarAndTabs(page: Page): Promise<void> {
   await page.locator('.branch-row__disclosure[aria-label^="Show terminals in"]').click()
   await sidebarTerminalRow(page, 'Terminal 3').click()

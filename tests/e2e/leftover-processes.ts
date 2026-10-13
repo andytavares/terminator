@@ -2,15 +2,9 @@ import { expect } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 
-// Processes a closed app left behind, found two ways. launchApp puts a marker
-// unique to each launch in the app's environment, which every process the app
-// starts inherits unless it is started with an environment of its own; and
-// closeApp takes the app's process tree just before it closes it, which catches
-// those that do not: every git and gh command the core runs for an extension
-// gets a fresh environment (`baseEnvironment`, src/main/shell/shell-executor.ts).
-// On a CI runner leaked processes add up across specs until fork fails with
-// EAGAIN at the per-user process limit (macOS run 38344908607: `spawnSync git
-// EAGAIN`).
+// Processes a closed app left behind: those with the launch's marker in their environment, and
+// those in the tree taken before the close (git and gh get a fresh environment). Leaks add up
+// until fork fails with EAGAIN (macOS run 38344908607); docs/CONTRIBUTING.md, "E2E rules".
 
 const LAUNCH_MARKER = 'TERMINATOR_E2E_LAUNCH'
 
@@ -58,10 +52,8 @@ export function descendantsOf(rows: ProcessRow[], rootPid: number): ProcessRow[]
   return found
 }
 
-/**
- * Of `started`, those still running: the same pid with the same command, so a
- * pid the system has since handed to an unrelated process does not count.
- */
+/** Of `started`, those still running: the same pid with the same command, so a
+ * pid the system has since handed to an unrelated process does not count. */
 export function stillRunning(started: ProcessRow[], now: ProcessRow[]): ProcessRow[] {
   const running = new Map(now.map((row) => [row.pid, row.command]))
   return started.filter((row) => running.get(row.pid) === row.command)
@@ -76,13 +68,9 @@ export function appProcessTree(appPid: number): ProcessRow[] {
   return descendantsOf(processTable(), appPid)
 }
 
-/**
- * The pids of every live process with the launch's marker. `ps` prints a
- * process's environment after its command with `e` on Linux (procps) and with
- * `-E` on macOS: https://man7.org/linux/man-pages/man1/ps.1.html,
- * https://keith.github.io/xcode-man-pages/ps.1.html. The environment is only
- * matched, never shown: it holds the runner's tokens.
- */
+/** Pids with the launch's marker. `ps` prints the environment with `e` on Linux and `-E` on
+ * macOS (https://man7.org/linux/man-pages/man1/ps.1.html, https://keith.github.io/xcode-man-pages/ps.1.html);
+ * it is only matched, never shown: it holds the runner's tokens. */
 function markedPids(launchId: string): Set<number> {
   const env = process.platform === 'darwin' ? ['-E'] : ['e']
   const mark = `${LAUNCH_MARKER}=${launchId}`
@@ -106,11 +94,9 @@ function describeRow(row: ProcessRow): string {
   return `${row.pid} ${row.command}`.slice(0, 160)
 }
 
-/**
- * Fails when processes the app started outlive it, after killing them and
+/** Fails when processes the app started outlive it, after killing them and
  * everything they started, so one leak does not carry into the next spec.
- * `started` is the app's process tree taken before it was closed (`appProcessTree`).
- */
+ * `started` is the app's process tree taken before it was closed (`appProcessTree`). */
 export async function expectNoProcessesLeft(
   launchId: string,
   started: ProcessRow[]
@@ -127,13 +113,9 @@ export async function expectNoProcessesLeft(
   }
 }
 
-/**
- * Kills `roots` and every process under them, and returns how many. A leftover
- * can still be starting processes (the gh stub that ran itself, macOS run
- * 38380127678), and killing it first hands its children to init, out of reach.
- * So the whole tree is stopped first, until a listing finds nothing new in it,
- * and only then killed: https://man7.org/linux/man-pages/man7/signal.7.html
- */
+/** Kills `roots` and every process under them; returns how many. A leftover can still be
+ * forking (macOS run 38380127678), so the tree is stopped until a listing finds nothing new,
+ * then killed: killing first hands children to init (https://man7.org/linux/man-pages/man7/signal.7.html). */
 function killTrees(roots: number[]): number {
   const stopped = new Set<number>()
   for (let grew = true; grew; ) {

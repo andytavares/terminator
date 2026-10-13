@@ -5,10 +5,8 @@ import { dispatchChannel, type ChannelSpec, type ExtensionAPI } from '@terminato
 import { FakeBackendHost } from './fake-backend-host'
 import { makeTempDir } from '../../support/temp-dir'
 
-// Every legitimate caller ADR-006's workspace-only rule would have refused, run
-// with the cwd its real code computes, through the real check (ADR 102): the
-// built-in extensions are loaded from their own manifests, and git and gh are
-// stand-ins on PATH that record where they ran.
+// Every legitimate caller ADR-006's workspace-only rule would have refused, with its real cwd,
+// through the real check (ADR 102); git and gh are stand-ins on PATH that record where they ran.
 
 vi.mock('electron', () => ({
   // The logger writes terminator.log under logs; a spec scratch keeps it out of the temp root.

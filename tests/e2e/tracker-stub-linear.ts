@@ -1,11 +1,9 @@
 import type { IncomingMessage } from 'node:http'
 import type { StubAnswer } from './tracker-stub-jira'
 
-// The stub Linear API (tracker-stub.ts): the GraphQL operations the Linear SDK
-// sends for what the core reads and writes, answered by operation name. Each
-// connection carries the fields the SDK's models read when they are built.
-// Variables are checked against their declared GraphQL types, as Linear's
-// server does (https://spec.graphql.org/October2021/#sec-Coercing-Variable-Values).
+// The stub Linear API: the SDK's GraphQL operations answered by name, with the fields its
+// models read, and variables checked against their declared types as Linear's server does
+// (https://spec.graphql.org/October2021/#sec-Coercing-Variable-Values).
 
 interface LinearStubIssue {
   identifier: string

@@ -1,17 +1,7 @@
 #!/usr/bin/env node
-// Starts the app the way a developer or a user does and checks it came up
-// whole: the main process logged "App ready", every extension under
-// extensions/ logged that it activated, and nothing logged an error or an
-// uncaught exception, in main or a renderer. Then it quits the app and
-// checks the app exited.
-//
-//   node scripts/smoke-start.mjs dev        npm run dev
-//   node scripts/smoke-start.mjs preview    npm run preview (after npm run build)
-//   node scripts/smoke-start.mjs exec <app> a packaged app's executable
-//
-// Each run gets a fresh profile through --user-data-dir. Renderer errors reach
-// stderr through ELECTRON_ENABLE_LOGGING
-// (https://www.electronjs.org/docs/latest/api/environment-variables#electron_enable_logging).
+// node scripts/smoke-start.mjs dev | preview | exec <app>: starts the app on a fresh profile,
+// checks it came up whole (App ready, every extension activated, no error) and quits it.
+// What it checks and why: docs/CONTRIBUTING.md, "Check that the app starts".
 
 import { execFileSync, spawn } from 'node:child_process'
 import { existsSync, mkdtempSync, readFileSync, readdirSync } from 'node:fs'
@@ -67,11 +57,8 @@ export function startupProblems(output, extensionIds) {
   ]
 }
 
-/**
- * The main log file. Electron puts app.getPath('logs') inside userData except
- * on macOS, where it is ~/Library/Logs/<app name>
- * (https://www.electronjs.org/docs/latest/api/app#appsetapplogspathpath).
- */
+/** The main log file: app.getPath('logs') is inside userData except on macOS, where it is
+ * ~/Library/Logs/<app name> (https://www.electronjs.org/docs/latest/api/app#appsetapplogspathpath). */
 export function mainLogPath({ platform, userDataDirectory, appName }) {
   const directory =
     platform === 'darwin'
@@ -80,10 +67,8 @@ export function mainLogPath({ platform, userDataDirectory, appName }) {
   return join(directory, 'terminator.log')
 }
 
-/**
- * The command that starts the app for `mode`, sandbox off on Linux only.
- * @param {{ mode: string, platform: string, userDataDirectory: string, executable?: string }} options
- */
+/** The command that starts the app for `mode`, sandbox off on Linux only.
+ * @param {{ mode: string, platform: string, userDataDirectory: string, executable?: string }} options */
 export function startCommand({ mode, platform, userDataDirectory, executable }) {
   const linux = platform === 'linux'
   const appArguments = [`--user-data-dir=${userDataDirectory}`]
@@ -132,11 +117,8 @@ async function awaitStartup(run, observed, extensionIds) {
   }
 }
 
-/**
- * The Electron main process under `rootPid` in a `ps -o pid=,ppid=,args=`
- * table: the one running `binary` that is not one of Chromium's helpers,
- * which all carry --type=.
- */
+/** The Electron main process under `rootPid` in a `ps -o pid=,ppid=,args=` table: the one
+ * running `binary` that is not one of Chromium's helpers, which all carry --type=. */
 export function electronMainPid(processTable, rootPid, binary) {
   const rows = processTable
     .split('\n')
@@ -162,10 +144,8 @@ function electronBinary(executable) {
   return join(electron, 'dist', readFileSync(join(electron, 'path.txt'), 'utf8').trim())
 }
 
-/**
- * Asks Electron's main process to quit, as the OS does at logout, and waits for
- * the command to exit by itself: npm and electron-vite exit with Electron's code.
- */
+/** Asks Electron's main process to quit, as the OS does at logout, and waits for the
+ * command to exit by itself: npm and electron-vite exit with Electron's code. */
 async function quit(run, executable) {
   const table = execFileSync('ps', ['-A', '-o', 'pid=,ppid=,args='], { encoding: 'utf8' })
   const pid = electronMainPid(table, run.child.pid, electronBinary(executable))

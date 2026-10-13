@@ -156,10 +156,8 @@ describe('ExtensionViewHost — reserving a strip of the window', () => {
   useViewHost()
 
   it('moves the view aside rather than leaving it under a drawer', async () => {
-    // A WebContentsView paints above the renderer's DOM, so a panel drawn
-    // over it would be invisible. The old answer was to hide every extension
-    // view while a modal was open — right for a centred dialog, and wrong for
-    // a drawer down one edge: opening it blanked the whole application.
+    // A WebContentsView paints above the DOM; hiding it under a drawer down one edge, as for
+    // a centred dialog, blanked the whole application.
     const ext = makeExt()
     await placePanel(ext, 50)
     host.setLeftInset(340)

@@ -1,12 +1,8 @@
 'use strict'
 
-// The npm packages the bundled extensions need at run time in the packaged
-// app. electron-builder copies only the root package's production dependencies
-// (app-builder-lib's NpmNodeModulesCollector reads the root's
-// `_dependencies`), so it never ships an extension's own. An extension's
-// backend bundles everything but the packages in `externals`; this is the
-// closure of those an extension declares, resolved through package-lock.json
-// the way Node resolves them, as top-level directories of node_modules.
+// The npm packages the bundled extensions need at run time in the packaged app, which
+// electron-builder does not ship (docs/CONTRIBUTING.md, "Packaging"): the closure of their
+// `externals`, resolved through package-lock.json as Node would, as node_modules directories.
 
 const { existsSync, readFileSync, readdirSync } = require('fs')
 const { join } = require('path')
@@ -65,10 +61,8 @@ function topLevelDirectory(location) {
   return scopeOrName.startsWith('@') ? `${scopeOrName}/${name}` : scopeOrName
 }
 
-/**
- * Every extension's dependencies that its backend requires, those in `externals`
- * except Electron itself, as a lockfile entry to walk from.
- */
+/** Every extension's dependencies that its backend requires, those in `externals`
+ * except Electron itself, as a lockfile entry to walk from. */
 function runtimeEntry(root, location, externals) {
   const declared = readJson(join(root, location, 'package.json')).dependencies ?? {}
   const required = Object.entries(declared).filter(

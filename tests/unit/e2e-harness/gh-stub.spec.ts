@@ -4,11 +4,9 @@ import { delimiter, dirname, join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { makeTempDir } from '../../support/temp-dir'
 
-// tests/e2e/fixtures/bin/gh hands a call to the real gh, the next one on PATH,
-// when no stub GitHub is running. The app's PATH reaches the stub's folder as
-// `fixtures/zdotdir/../bin` (fixtures/zdotdir/.zprofile), and a stub that took
-// that entry for another gh ran itself until fork failed: macOS run
-// 38380127678 ended shard 4 with 594 `node` processes in one chain.
+// With no stub GitHub running, fixtures/bin/gh hands a call to the next gh on PATH, which
+// may reach its own folder as `fixtures/zdotdir/../bin`: taken for another gh, it ran itself
+// until fork failed (macOS run 38380127678, 594 `node` processes in one chain).
 
 const STUB_DIR = resolve(__dirname, '../../e2e/fixtures/bin')
 const STUB_TIMEOUT_MS = 3000
@@ -20,10 +18,8 @@ function fakeRealGh(): string {
   return dir
 }
 
-/**
- * Runs the stub with `path` as PATH, in a process group of its own so a stub
- * that keeps starting itself is killed whole when the deadline passes.
- */
+/** Runs the stub with `path` as PATH, in a process group of its own so a stub
+ * that keeps starting itself is killed whole when the deadline passes. */
 function runStub(path: string[]): Promise<string> {
   const env = {
     PATH: [...path, dirname(process.execPath)].join(delimiter),

@@ -11,13 +11,8 @@ import {
 } from './git-harness'
 import { startGithubStub, type GithubStub } from './github-stub'
 
-/**
- * Reviewing a pull request's diff in Code Reviews, against the stub GitHub:
- * the diff and the context around it, the risk behind a file, the tests that
- * cover a block, replying to a reviewer's thread, pending comments sent with
- * the review, files marked viewed on GitHub, and what changed since the last
- * look after the author pushes again.
- */
+/** A pull request's diff in Code Reviews against the stub GitHub: context, risk, covering
+ * tests, threads and pending comments, files marked viewed, and what changed since the last look. */
 
 let handle: AppHandle
 let stub: GithubStub

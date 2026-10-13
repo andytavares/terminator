@@ -55,11 +55,9 @@ async function foundry(channel: string, payload: unknown = {}): Promise<unknown>
 
 test.skip(REMOTE === '', 'set LIVE_REMOTE to run this')
 
-/**
- * A CI check the order does not mention: the house rule that a session TTL
+/** A CI check the order does not mention: the house rule that a session TTL
  * above 24 hours is clamped. Committed to the scratch repository, so the first
- * draft goes red on it.
- */
+ * draft goes red on it. */
 function commitMarkerWorkflow(): void {
   mkdirSync(join(repo, '.github', 'workflows'), { recursive: true })
   writeFileSync(

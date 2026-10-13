@@ -1,18 +1,7 @@
 #!/usr/bin/env node
-// Which of the app's features the e2e suite drives, from evidence rather than
-// from reading the specs: the IPC each spec caused in the real app
-// (tests/e2e/ipc-trace.ts) joined with what the running app offers
-// (tests/e2e/tools/feature-inventory.spec.ts). Writes the Markdown body of
-// docs/research/feature-coverage.md.
-//
-//   node scripts/feature-coverage.mjs <inventory.json> <trace directory>
-//
-// A feature is "driven" when some spec caused its IPC: a channel invoked or
-// sent, an event pushed, a command run through extension:execute-command or
-// extension:run-command, a setting written through settings:update-global,
-// extension:update-setting or extension:update-workspace-setting, a Quick
-// Action recorded in quickActions.usage or quickActions.directUse. Driven is not asserted: a spec that opens a view
-// drives every channel the view loads with, whether or not it checks them.
+// node scripts/feature-coverage.mjs <inventory.json> <trace directory>
+// Writes the Markdown body of docs/research/feature-coverage.md: the IPC each e2e spec caused,
+// joined with what the running app offers. That page defines "driven".
 
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
@@ -136,11 +125,8 @@ function coreQuickActions() {
   return [...new Set(fixed)].sort().map((id) => ({ id }))
 }
 
-/**
- * The specs that drove an extension setting: wrote it through
- * extension:update-setting, or, for an action setting (a button, which stores
- * nothing), invoked the channel the button runs.
- */
+/** The specs that wrote an extension setting through extension:update-setting, or, for an
+ * action setting (a button, which stores nothing), invoked the channel the button runs. */
 export function settingSpecs(setting, driven) {
   if (setting.type === 'action' && setting.channel) return driven.channels.get(setting.channel)
   return driven.extensionSettings.get(setting.key)
@@ -176,11 +162,8 @@ function section({ title, items, specsOf, describe }) {
   return { lines, driven: driven.length, total: items.length }
 }
 
-/**
- * Core: every manifest method, events included; extension: every channel the
- * running app handles that no manifest method declares and one extension names.
- * The rest are unowned.
- */
+/** Core: every manifest method, events included; extension: every channel the running app
+ * handles that no manifest method declares and one extension names. The rest are unowned. */
 function channelItems(inventory) {
   const manifest = coreChannels(
     readFileSync(join(REPO_ROOT, 'src/shared/electron-api/manifest.ts'), 'utf8')

@@ -12,13 +12,9 @@ import {
 import { makeRepoWithRemote, openCodeReviews, openRepo, pushBranch } from './git-harness'
 import { startGithubStub, type GithubStub } from './github-stub'
 
-/**
- * The review agent on a pull request: a run in the PR head's worktree that is
- * cancelled, continued in a terminal, and one that returns a finding, which is
- * dismissed and stays dismissed. `claude` is the e2e stub
- * (tests/e2e/fixtures/bin/claude), which idles until E2E_CLAUDE_REVIEW_REPLY
- * holds the JSON a headless `claude -p --output-format json` prints.
- */
+/** The review agent: a run cancelled, continued in a terminal, and one whose finding stays
+ * dismissed. The `claude` stub (fixtures/bin/claude) idles until E2E_CLAUDE_REVIEW_REPLY
+ * holds what `claude -p --output-format json` prints. */
 
 let handle: AppHandle
 let stub: GithubStub

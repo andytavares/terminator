@@ -8,11 +8,9 @@ import { AppHandle, launchApp, closeApp } from './helpers'
 
 let handle: AppHandle
 
-/**
- * Creates the fixture note and reloads the view. Seeded through the
+/** Creates the fixture note and reloads the view. Seeded through the
  * extension's own bridge: typing markdown through synthetic key events would
- * be exercising the input plumbing, not this.
- */
+ * be exercising the input plumbing, not this. */
 async function seedOutlineNote(): Promise<void> {
   await handle.app.evaluate(async ({ webContents }, body) => {
     const view = webContents

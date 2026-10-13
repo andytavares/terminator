@@ -9,13 +9,9 @@ import { JIRA_SITE, startTrackerStub, type TrackerStub } from './tracker-stub'
 import type { JiraState } from './tracker-stub-jira'
 import type { LinearState } from './tracker-stub-linear'
 
-/**
- * Linear and Jira, end to end, against stub servers at their real addresses
- * (tracker-stub.ts): connecting both, linking a branch to an issue found by
- * listing and by search, the issue drawer's context preview, injection toggle
- * and comment, the notice when a session starts with the issue, unlinking,
- * changing whose issues are "mine", and disconnecting.
- */
+/** Linear and Jira against stub servers at their real addresses (tracker-stub.ts): connect,
+ * link a branch to an issue, the issue drawer, a session started with the issue, unlink,
+ * whose issues are "mine", and disconnect. */
 
 let handle: AppHandle
 let stub: TrackerStub
@@ -84,13 +80,9 @@ test.beforeAll(async () => {
   await projectGroup(handle.page, BRANCH).click()
 })
 
-// The core refuses to store a tracker credential without OS encryption. On
-// macOS Playwright's --use-mock-keychain provides it, so the keychain path is
-// what runs there; on Linux Playwright's Electron loader appends
-// --password-store=basic (playwright-core/lib/server/electron/loader.js), under
-// which safeStorage reports no encryption, and allowCredentialsWithoutKeychain
-// switches it to Electron's plain-text backend, as integrations.spec.ts does.
-// The skip is for a platform that has neither.
+// The core stores a tracker credential only with OS encryption: macOS gets it from
+// --use-mock-keychain, Linux from allowCredentialsWithoutKeychain (Playwright's loader appends
+// --password-store=basic there). The skip is for a platform that has neither.
 test.beforeEach(() => {
   test.skip(!credentialStore, 'safeStorage has no OS encryption under Playwright here')
 })

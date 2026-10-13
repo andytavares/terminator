@@ -41,10 +41,8 @@ function makeConflictedRepo(): string {
   return dir
 }
 
-/**
- * True once the git-integration view for `viewParam` has finished loading and
- * drawn its view, a lazy chunk that renders after the load.
- */
+/** True once the git-integration view for `viewParam` has finished loading and
+ * drawn its view, a lazy chunk that renders after the load. */
 async function gitViewReady(viewParam: string): Promise<boolean> {
   const loaded = await handle.app.evaluate(
     ({ webContents }, param) =>

@@ -306,11 +306,9 @@ function writeOrderFiles(id: string, files: Record<string, string>): void {
 
 const pretty = (value: unknown): string => `${JSON.stringify(value, null, 2)}\n`
 
-/**
- * The run frozen mid-step; and a second order, left the way WO-0913-0bd was:
+/** The run frozen mid-step; and a second order, left the way WO-0913-0bd was:
  * every node passed, status still `running`, and the ledger's last word is a
- * failure to ship.
- */
+ * failure to ship. */
 function writeLeftOrders(): void {
   writeOrderFiles(ORDER_ID, { 'order.json': pretty(order()), 'run-graph.json': pretty(graph()) })
   writeOrderFiles(UNSHIPPED_ID, {

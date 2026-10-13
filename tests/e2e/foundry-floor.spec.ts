@@ -177,10 +177,8 @@ test('a draft’s CI is on the Floor while it is watched', async () => {
   await captureFoundry(handle, 'floor-ci.png')
 })
 
-/**
- * What a run that shipped first time leaves behind: started, then a draft
- * thirty minutes after the order was seeded, with nothing sent back.
- */
+/** What a run that shipped first time leaves behind: started, then a draft
+ * thirty minutes after the order was seeded, with nothing sent back. */
 function writeShippedFirstTime(id: string): void {
   const seededAt = Date.now()
   const entry = (minutes: number, action: string): string =>

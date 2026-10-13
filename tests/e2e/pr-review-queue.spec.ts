@@ -12,13 +12,8 @@ import {
 } from './git-harness'
 import { startGithubStub, type GithubStub } from './github-stub'
 
-/**
- * Code Reviews' queue and a pull request's overview, against the stub GitHub:
- * searching the queue, the discussion, a draft marked ready, a branch brought
- * up to date, in-progress reviews dismissed and merged ones dropped, a
- * conflicted pull request merged in a worktree and pushed, and an approval
- * from the pop-out review window.
- */
+/** Code Reviews' queue and a pull request's overview against the stub GitHub, from search
+ * to a conflicted pull request merged in a worktree and an approval from the pop-out window. */
 
 let handle: AppHandle
 let stub: GithubStub

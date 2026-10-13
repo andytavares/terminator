@@ -16,11 +16,8 @@ import { foundryChannel, makeFixtureRepo } from './foundry-harness'
 import { answerFolderPicker } from './main-stubs'
 import { openExtensionSettings, settingRow } from './extension-settings-page'
 
-// Every setting every bundled extension declares, written the way an operator
-// writes it: Settings → Extensions → the extension's ⚙ page, one control at a
-// time (extension:update-setting). Then the app restarts and every value is
-// read back, from the page and from main. Last, the settings whose effect can
-// be seen are checked for it.
+// Every bundled extension's settings, written one control at a time on its ⚙ page, read
+// back from the page and main after a restart, then checked for any effect that can be seen.
 
 interface SettingDef {
   type: string

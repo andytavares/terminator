@@ -53,10 +53,8 @@ function usePtyMocks(): void {
 describe('PtyManager — a cwd that is not there', () => {
   usePtyMocks()
 
-  // node-pty does not fail this spawn — the child forks, cannot chdir, and
-  // exits 1 with no output, which reaches the operator as a tab that opens
-  // and instantly dies showing nothing. Refusing up front is the only point
-  // at which the reason still exists.
+  // node-pty's child cannot chdir and exits 1 with no output, a tab that dies showing
+  // nothing; only up front does the reason still exist.
   it('refuses to spawn, and names the folder', async () => {
     const { PtyManager, MissingCwdError } = await import('../../../src/main/terminal/pty-manager')
     const pty = await import('node-pty')
@@ -533,10 +531,8 @@ describe('PtyManager session authority — listing', () => {
   })
 })
 
-/**
- * A manager whose PTY output and exit the test drives: `emit` writes output,
- * `exit` ends the process with `defaultExitCode` unless told otherwise.
- */
+/** A manager whose PTY output and exit the test drives: `emit` writes output,
+ * `exit` ends the process with `defaultExitCode` unless told otherwise. */
 async function controlledManager(defaultExitCode: number) {
   const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
   let emit: (data: string) => void = () => {}

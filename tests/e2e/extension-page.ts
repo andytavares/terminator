@@ -30,11 +30,9 @@ export async function openExtension(
   return extensionPage(handle, urlPart)
 }
 
-/**
- * Calls an extension channel from `page`, exactly as the extension's own UI
+/** Calls an extension channel from `page`, exactly as the extension's own UI
  * does. Specs use it to read back what an action stored, never to perform the
- * action a user would.
- */
+ * action a user would. */
 export function invokeChannel<T = unknown>(
   page: Page,
   channel: string,

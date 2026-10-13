@@ -4,10 +4,8 @@ import type { BackendRecord } from '../../../src/main/extensions/host/host-runti
 /** What a backend does when the extension host activates it; throwing fails the activation. */
 export type FakeBackend = (record: BackendRecord) => void | Promise<void>
 
-/**
- * The extension host process as ExtensionHost drives it (ADR 094), without a
- * process: each backend is a function given by extension id.
- */
+/** The extension host process as ExtensionHost drives it (ADR 094), without a
+ * process: each backend is a function given by extension id. */
 export class FakeBackendHost implements BackendHost {
   /** Every activation that succeeded, in the order each finished. */
   readonly activated: BackendRecord[] = []

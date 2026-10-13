@@ -2,13 +2,8 @@ import { describe, it, expect } from 'vitest'
 import { ESLint } from 'eslint'
 import path from 'node:path'
 
-/**
- * The function size limits `eslint.config.mjs` applies to every file,
- * checked against the real config: at most 30 lines (blank lines and comments
- * aside), complexity 10 and three parameters. As in extension-rules.spec.ts,
- * loading the config imports typescript-eslint and the TypeScript compiler,
- * so the module loads it once, before any case runs.
- */
+/** The function size limits `eslint.config.mjs` applies to every file, against the real
+ * config, loaded once as in extension-rules.spec.ts. */
 
 const repoRoot = path.resolve(__dirname, '../../..')
 const eslint = new ESLint({

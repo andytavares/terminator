@@ -131,10 +131,8 @@ async function startRun(): Promise<void> {
 
 const orderFile = (name: string): string => join(repo, '.foundry', 'orders', ORDER, name)
 
-/**
- * The run is over when it has said so: a draft on the ledger, or a gate
- * holding it. Null while it has said neither.
- */
+/** The run is over when it has said so: a draft on the ledger, or a gate
+ * holding it. Null while it has said neither. */
 function runOver(): string | null {
   const ledger = existsSync(orderFile('ledger.jsonl'))
     ? readFileSync(orderFile('ledger.jsonl'), 'utf8')
@@ -155,10 +153,8 @@ function logGraph(observed: Observed, previous: string): string {
   return line
 }
 
-/**
- * When the graph first settled. A settled graph with nothing on the ledger yet
- * means the tail is still working — the climb, then the push and the draft.
- */
+/** When the graph first settled. A settled graph with nothing on the ledger yet
+ * means the tail is still working — the climb, then the push and the draft. */
 function settledAt(observed: Observed, since: number | null): number | null {
   const nodes = observed.graph?.nodes ?? []
   if (since !== null || nodes.length === 0 || !nodes.every((n) => SETTLED.has(n.state))) {
@@ -168,24 +164,9 @@ function settledAt(observed: Observed, since: number | null): number | null {
   return Date.now()
 }
 
-/**
- * Polls the graph rather than the clock, until the run says it is over, the
- * tail hangs, or the deadline passes. Returns the last observation.
- *
- * A settled node is one nothing is waiting on any more — but a settled *graph*
- * is not a finished run, and reading it as one is what this test used to do.
- * The climb and the shipping both happen after the last node leaves the graph:
- * the ladder runs over the finished work, and only then does the run push its
- * branch and open the draft. Breaking on a settled graph declared the run over
- * at that moment, asserted against GitHub while the ladder was still climbing,
- * and then closed the application — killing the very step the test is named
- * after. It reported "nothing was opened", which was true and told nobody
- * anything.
- *
- * The deadline is longer than the order's own budget, deliberately. When the
- * two were the same the test gave up at the moment the budget would have
- * stopped the run, so the gate that exists for exactly this case was never seen.
- */
+/** Polls until the run says it is over, the tail hangs, or the deadline (longer than the
+ * order's budget) passes; never until the graph settles, since the climb and the shipping
+ * come after. Why: docs/CONTRIBUTING.md, "Live specs". */
 async function observeUntilOver(): Promise<Observed> {
   const deadline = Date.now() + 45 * 60_000
   let last: Observed = {}
@@ -211,12 +192,8 @@ async function observeUntilOver(): Promise<Observed> {
   return last
 }
 
-/**
- * A node may legitimately still be `running` — a budget breach halts the run
- * without killing its agents, which is what "preserving work in progress"
- * means. What may never happen is a run that stopped with nothing to say:
- * either every node settled, or something is on the inbox explaining it.
- */
+/** A budget breach halts the run without killing its agents, so a node may still be
+ * `running`; but then something on the inbox must explain it. */
 function expectNothingRunningUnexplained(last: Observed): void {
   const nodes = last.graph?.nodes ?? []
   console.log(`blocked: ${JSON.stringify(last.blocked ?? [])}`)
@@ -232,11 +209,9 @@ function expectNothingRunningUnexplained(last: Observed): void {
   }
 }
 
-/**
- * The agent's own work: the file the unit named actually changed, and the
+/** The agent's own work: the file the unit named actually changed, and the
  * project's own tests still pass against what it left behind. Returns the
- * worktree.
- */
+ * worktree. */
 function expectTheChangeMade(): string {
   const worktree = join(repo, '.foundry', 'orders', ORDER, 'worktrees', 'live')
   expect(existsSync(worktree), 'no worktree was cut').toBe(true)
@@ -259,10 +234,8 @@ function expectTheChangeMade(): string {
   return worktree
 }
 
-/**
- * The thing this test is named after. Read back from GitHub rather than from
- * the ledger, because the ledger records what the code believed.
- */
+/** The thing this test is named after. Read back from GitHub rather than from
+ * the ledger, because the ledger records what the code believed. */
 function expectOneDraftOnGitHub(worktree: string): void {
   const branch = execFileSync('git', ['branch', '--show-current'], { cwd: worktree })
     .toString()
@@ -279,17 +252,9 @@ function expectOneDraftOnGitHub(worktree: string): void {
   expect(pulls[0].isDraft, 'it was opened, but not as a draft (FR-053)').toBe(true)
 }
 
-/**
- * And the climb measured what this repository actually has.
- *
- * The test passed for a run whose ship message read "Not measured here:
- * Format, Lint, The unit's own tests, …" — while the ladder's own transcript
- * showed both rungs running and both exiting 0. `transcriptPathFor` was
- * predicting `-var-folders-…` for a file the runtime writes at
- * `-private-var-folders-…`, so every reader of it opened nothing. A green test
- * that lets the ladder report a check it did run as unmeasured is a test that
- * would let it report one it never ran as passed.
- */
+/** The climb measured what this repository has: a test that lets the ladder report a check
+ * it ran as unmeasured would let it report one it never ran as passed (it once missed a
+ * transcript at `-private-var-folders-…`). */
 function expectTheClimbMeasured(ledger: string): void {
   const shipped = ledger
     .split('\n')
@@ -310,10 +275,8 @@ function expectTheClimbMeasured(ledger: string): void {
 }
 
 test('an agent takes an order to a draft pull request', async () => {
-  // Longer than the polling deadline below, which is itself longer than the
-  // order's budget. At 25 minutes against a 30-minute deadline the loop could
-  // never reach its own end, so the run was killed by Playwright rather than
-  // reported by the test — and "timed out" says nothing about what happened.
+  // Longer than the polling deadline, so the test reports the run rather than Playwright
+  // killing it with "timed out".
   test.setTimeout(3_000_000)
   writeOrder()
   await startRun()

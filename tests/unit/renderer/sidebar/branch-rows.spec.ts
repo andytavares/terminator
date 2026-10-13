@@ -340,10 +340,8 @@ describe('buildBranchRows — order', () => {
 })
 
 describe('buildBranchRows — order — sorts repos by name when asked', () => {
-  // The repo headers are half the list. A sort that only reaches inside them
-  // reads as a sort that does nothing, which is what shipped: the group order
-  // was hard-coded alphabetical and neither the sort key nor a drag could
-  // move it.
+  // The repo headers are half the list: a sort that only reaches inside them reads as one
+  // that does nothing.
   it('sorts repos by name when asked', () => {
     expect(build([], view({ sortBy: 'name' })).groups.map((g) => g.label)).toEqual([
       'kalli',

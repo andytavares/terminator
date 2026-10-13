@@ -4,12 +4,9 @@ import { closeApp, closeSettings, launchApp, type AppHandle } from './helpers'
 import { git, makeRepoWithRemote, openGitTab, openRepo, writeFile } from './git-harness'
 import { openExtensionSettings, settingRow } from './extension-settings-page'
 
-/**
- * Git Integration's commit and changed-files settings, changed on its settings
- * page and seen in the Git tab: the file list stops at the configured limit
- * and says so, and a commit made with sign-off on ends with a Signed-off-by
- * trailer (https://git-scm.com/docs/git-commit#Documentation/git-commit.txt---signoff).
- */
+/** Git Integration's settings, seen in the Git tab: the file list stops at its limit and says
+ * so, and sign-off adds a Signed-off-by trailer
+ * (https://git-scm.com/docs/git-commit#Documentation/git-commit.txt---signoff). */
 
 let handle: AppHandle
 let repo: string

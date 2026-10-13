@@ -121,12 +121,8 @@ const sessionTabs = () => app.page.locator('.tab-bar__tab--session')
 const visibleScreens = () =>
   app.page.locator('.terminal-pane .xterm-screen').filter({ visible: true })
 
-/**
- * A new tab opened while the branch is split.
- *
- * The split belongs to the tab it was made in. The new tab shows its own
- * terminal, which takes the keyboard, and the split comes back with its tab.
- */
+/** A new tab opened while the branch is split shows its own terminal, which takes the
+ * keyboard; the split belongs to its tab and comes back with it. */
 test.describe.serial('a new tab beside a split', () => {
   test.beforeAll(async () => {
     app = await launchApp()

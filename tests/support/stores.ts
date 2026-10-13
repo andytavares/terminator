@@ -28,24 +28,16 @@ class InMemoryElectronStore {
   }
 }
 
-/**
- * The electron-store module for `vi.mock`, so a spec runs the real settings,
- * workspace and extension-settings stores instead of a partial mock of them.
- * Every store starts from its defaults; re-import the store module after
- * `vi.resetModules()` to start again.
- *
- *   vi.mock('electron-store', async () =>
- *     (await import('../../support/stores')).inMemoryElectronStore())
- */
+/** electron-store for `vi.mock`, so a spec runs the real stores from their defaults (re-import
+ * after `vi.resetModules()` to start again): `vi.mock('electron-store', async () =>
+ * (await import('../../support/stores')).inMemoryElectronStore())`. */
 export function inMemoryElectronStore(): { default: typeof InMemoryElectronStore } {
   return { default: InMemoryElectronStore }
 }
 
-/**
- * Make the named store's file corrupt, or every file readable again with null.
+/** Make the named store's file corrupt, or every file readable again with null.
  * Only for a spec that imports its store modules once, without
- * `vi.resetModules()`, so this module is the one the mock was built from.
- */
+ * `vi.resetModules()`, so this module is the one the mock was built from. */
 export function corruptStoreFile(name: string | null): void {
   if (name === null) unreadable.clear()
   else unreadable.add(name)

@@ -36,11 +36,9 @@ export function e2eRunRoot(): string {
   return root
 }
 
-/**
- * A new directory under this run's root, for a spec's repository or folder.
+/** A new directory under this run's root, for a spec's repository or folder.
  * `tests/e2e/global-teardown.ts` removes it with the root, whether the spec
- * passed or failed; one made in the OS temp directory stayed there.
- */
+ * passed or failed; one made in the OS temp directory stayed there. */
 export function e2eTempDir(prefix: string): string {
   return mkdtempSync(join(e2eRunRoot(), prefix))
 }
@@ -69,11 +67,9 @@ const CLAUDE_STUB_DIR = join(dirname(fileURLToPath(import.meta.url)), 'fixtures'
  */
 const CLAUDE_STUB_ZDOTDIR = join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'zdotdir')
 
-/**
- * The app's PATH: `firstDirs`, then the `claude` stub, then the runner's own.
+/** The app's PATH: `firstDirs`, then the `claude` stub, then the runner's own.
  * A spec that stands in for another program passes its folder as `env.PATH`
- * through this, so the `claude` stub stays ahead of any real one.
- */
+ * through this, so the `claude` stub stays ahead of any real one. */
 export function e2ePath(...firstDirs: string[]): string {
   return [...firstDirs, CLAUDE_STUB_DIR, process.env.PATH ?? ''].join(delimiter)
 }
@@ -110,19 +106,15 @@ const LAUNCH_DEADLINE_MS = 25_000
 const WINDOW_STATE_READ_MS = 1000
 const FAILED_LAUNCH_CLOSE_MS = 2500
 
-/**
- * Extra Electron switches for this machine, space-separated in
+/** Extra Electron switches for this machine, space-separated in
  * E2E_ELECTRON_ARGS. A Linux runner sets `--no-sandbox`: Chromium's sandbox
- * needs a setuid helper or user namespaces the runner does not grant.
- */
+ * needs a setuid helper or user namespaces the runner does not grant. */
 function machineArgs(): string[] {
   return (process.env.E2E_ELECTRON_ARGS ?? '').split(' ').filter(Boolean)
 }
 
-/**
- * Starts Electron on the profile, with this machine's switches and the e2e
- * environment beneath `env`.
- */
+/** Starts Electron on the profile, with this machine's switches and the e2e
+ * environment beneath `env`. */
 function startElectron(
   userDataDir: string,
   env: Record<string, string>,
@@ -209,12 +201,9 @@ function deadline(ms: number): Promise<void> {
   })
 }
 
-/**
- * What each window was doing when a launch gave up: the document it was on,
- * whether that was still loading, and whether its renderer had gone. A main
- * process that no longer answers says so instead, so a failed launch tells a
- * hung main, a dead renderer and a page that never loaded apart.
- */
+/** What each window was doing when a launch gave up (its document, still loading, renderer
+ * gone), or that main no longer answers: so a hung main, a dead renderer and a page that
+ * never loaded can be told apart. */
 async function windowStates(app: ElectronApplication): Promise<string> {
   const read = app
     .evaluate(({ BrowserWindow }) =>
@@ -234,16 +223,9 @@ async function windowStates(app: ElectronApplication): Promise<string> {
   return Promise.race([read, unanswered])
 }
 
-/**
- * Moves the app's window so the X server's own pointer is outside it, on Linux.
- *
- * Chromium on X11 synthesizes a mousemove at the real pointer whenever a view
- * under it is added, removed or resized, as an extension view is when its
- * extension activates. Xvfb parks the pointer at the centre of the screen,
- * inside the window, and that move carries no pressed button, so it lands
- * between Playwright's mouse down and mouse move and Chromium abandons the drag:
- * `dragTo` returned and nothing was dropped. macOS does not synthesize it.
- */
+/** Moves the window off the X server's pointer on Linux: Chromium synthesizes a button-less
+ * mousemove there whenever a view under it changes, which abandons a drag in progress
+ * (docs/CONTRIBUTING.md, "E2E rules"). */
 async function moveWindowOffPointer(app: ElectronApplication): Promise<void> {
   if (process.platform !== 'linux') return
   await app.evaluate(({ BrowserWindow, screen }) => {
@@ -264,11 +246,9 @@ const GRACEFUL_CLOSE_MS = 5000
 // only a guard against a kernel that never reaps it.
 const KILLED_EXIT_MS = 1000
 
-/**
- * Whether the process has ended. `killed` is not it: Node sets that when the
+/** Whether the process has ended. `killed` is not it: Node sets that when the
  * signal is sent, not when the process exits
- * (https://nodejs.org/api/child_process.html#subprocesskilled).
- */
+ * (https://nodejs.org/api/child_process.html#subprocesskilled). */
 function hasExited(proc: ChildProcess): boolean {
   return proc.exitCode !== null || proc.signalCode !== null
 }
@@ -281,13 +261,9 @@ function exited(proc: ChildProcess): Promise<void> {
   })
 }
 
-/**
- * Quits the app and returns once its process has exited, so it can never
- * overlap the next launch. A lingering PTY, git watcher or extension host can
- * keep app.close() from ever resolving, so the close gets `graceMs` before the
- * process is killed. The .catch keeps a close() that loses the race from
- * surfacing as an unhandled rejection after the SIGKILL.
- */
+/** Quits the app and returns once its process has exited. A lingering PTY, watcher or host
+ * can keep app.close() from resolving, so it gets `graceMs` before a kill; the .catch keeps
+ * a close() that loses that race from becoming an unhandled rejection. */
 async function stopApp(app: ElectronApplication, graceMs: number): Promise<void> {
   // Taken up front: once app.close() resolves, app.process() throws.
   const proc = app.process()
@@ -399,11 +375,9 @@ export function quickActionsPanel(page: Page) {
 const exactly = (text: string): RegExp =>
   new RegExp(`^${text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`)
 
-/**
- * Runs a Quick Action the way an operator finds one they have no key for: the
+/** Runs a Quick Action the way an operator finds one they have no key for: the
  * band's Quick actions button, `/`, its name, then its row. The panel records
- * the run in `quickActions.usage`, which is how the coverage map counts it.
- */
+ * the run in `quickActions.usage`, which is how the coverage map counts it. */
 export async function runQuickAction(page: Page, label: string): Promise<void> {
   await page.locator('.app-band__entry[aria-label="Quick actions (⌘P)"]').click()
   const panel = quickActionsPanel(page)
@@ -433,10 +407,8 @@ export async function closeSettings(page: Page): Promise<void> {
   await expect(page.locator('.settings-panel')).toBeHidden()
 }
 
-/**
- * Runs `script` inside the first extension view whose URL contains `urlPart`:
- * a WebContentsView of its own, which the page cannot reach.
- */
+/** Runs `script` inside the first extension view whose URL contains `urlPart`:
+ * a WebContentsView of its own, which the page cannot reach. */
 export function inExtensionView<T>(handle: AppHandle, urlPart: string, script: string): Promise<T> {
   return handle.app.evaluate(
     async ({ webContents }, { part, source }) => {
@@ -450,11 +422,9 @@ export function inExtensionView<T>(handle: AppHandle, urlPart: string, script: s
   ) as Promise<T>
 }
 
-/**
- * The rows every open terminal shows, one terminal after another, read from
+/** The rows every open terminal shows, one terminal after another, read from
  * xterm's buffer. Under the WebGL renderer the terminal is a canvas and the
- * DOM holds none of its text. For a row's place on screen, use `terminalRowsIn`.
- */
+ * DOM holds none of its text. For a row's place on screen, use `terminalRowsIn`. */
 export function terminalRows(page: Page): Promise<string[]> {
   return page.evaluate(() => window.terminatorE2E!.terminalRows())
 }

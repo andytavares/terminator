@@ -6,12 +6,8 @@ import { closeApp, launchApp, type AppHandle } from './helpers'
 import { git, makeRepoWithRemote, openGitTab, openRepo, projectTab, writeFile } from './git-harness'
 import { startGithubStub, type GithubStub } from './github-stub'
 
-/**
- * The Git tab, end to end, as a person uses it on a feature branch: read a
- * change's diff, stage and unstage it, commit through a pre-commit hook that
- * reports as it runs (and one that fails), commit and push to the remote, open
- * a pull request on the stub GitHub, and run the Git Quick Actions.
- */
+/** The Git tab on a feature branch: diff, stage, commit through a pre-commit hook (passing
+ * and failing), push, open a pull request on the stub GitHub, and the Git Quick Actions. */
 
 let handle: AppHandle
 let stub: GithubStub

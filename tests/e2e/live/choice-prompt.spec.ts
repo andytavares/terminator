@@ -63,10 +63,8 @@ async function askForAFile(page: Page): Promise<void> {
   await page.keyboard.press('Enter')
 }
 
-/**
- * Answers from the wall, the way an operator would: the session is pinned in
- * Needs you with the prompt's options as buttons. Records the buttons offered.
- */
+/** Answers from the wall, the way an operator would: the session is pinned in
+ * Needs you with the prompt's options as buttons. Records the buttons offered. */
 async function answerFromTheWall(page: Page, outcome: Record<string, unknown>): Promise<void> {
   await page.getByRole('button', { name: 'Overview' }).click()
   await expect(page.getByRole('heading', { name: 'Needs you' })).toBeVisible({ timeout: 15_000 })

@@ -8,29 +8,9 @@ import {
   terminalRowsIn,
 } from './helpers'
 
-// Regression guard for right-edge text clipping.
-//
-// THE BUG: xterm's DOM renderer gives each row div `overflow: hidden` and a width of
-// exactly cols x cellWidth, but lays text out with the font's natural advance width. The
-// difference accumulates across the line, so the final glyph overhangs the row box and is
-// sliced (on macOS with xterm 6: 902px of content in a 900px row). A CSS rule that widens
-// the rows cannot come back: xterm 6 draws its own scrollbar beside the screen, so wider
-// rows sit under it.
-//
-// THE FIX: a visible terminal renders with the WebGL add-on (TerminalInstance.mount), which
-// has no DOM rows to clip; glyphs are drawn into cells of a canvas that is cols x cellWidth
-// wide. The DOM renderer remains for terminals past the WebGL context limit, tiles, and
-// machines without WebGL2. These tests ask which renderer is live and guard each:
-//   - WebGL: the canvas ends at or before the scrollbar, and the last column holds ink.
-//   - DOM: a row's content (scrollWidth) fits its clip box (clientWidth).
-// Positions alone cannot see a clipped glyph, which is why the ink and overflow checks exist.
-//
-// The scrollbar-width tests guard a separate property: that terminal geometry does not
-// depend on the user's macOS overlay-scrollbar setting. xterm 6 draws its own scrollbar
-// (`.xterm-scrollable-element > .scrollbar.vertical`) with a fixed width, and FitAddon
-// reserves exactly that width.
-//
-// The suite runs against out/: rebuild before running it.
+// Regression guard for right-edge text clipping, per renderer, and for geometry that ignores
+// macOS overlay scrollbars: docs/ARCHITECTURE.md, "Renderer choice". Positions alone cannot
+// see a clipped glyph, hence the ink and overflow checks. Runs against out/: rebuild first.
 
 // xterm's default scrollbar width (ITerminalOptions.overviewRuler.width falls back to 14);
 // FitAddon subtracts the same value from the columns it proposes.
@@ -111,12 +91,9 @@ test('single-pane: rendered text never extends under the scrollbar', async () =>
   expect(g.renderedRight).toBeLessThanOrEqual(g.viewportContentRight)
 })
 
-// The WebGL canvas covers exactly cols x cellWidth, so the last column is drawn only if it
-// holds ink inside the canvas. This reads what is on screen: a screenshot of the canvas's
-// rightmost 4px (inside the last cell, whose '#' ink spans nearly its whole width). It must
-// be blank before the ruler line is printed and inked after, which cannot pass if the last
-// column is clipped or never drawn. The canvas keeps no readable buffer (WebGL clears it
-// after compositing), so a screenshot is the only faithful read-back.
+// The canvas's rightmost 4px, inside the last cell, must be blank before the ruler and inked
+// after, or the last column was clipped or never drawn. A screenshot is the only read-back:
+// WebGL clears its buffer after compositing.
 const STRIP_WIDTH_PX = 4
 
 async function lastColumnInk(): Promise<number> {
@@ -150,10 +127,8 @@ async function lastColumnInk(): Promise<number> {
   }, png.toString('base64'))
 }
 
-// A line of exactly `tput cols` identical characters, so the per-column advance drift
-// accumulates across the full width. awk rather than python3: it is guaranteed present
-// on both macOS and Linux runners. No trailing newline, so the prompt wraps to the next
-// row and this row stays nothing but the ruler.
+// Exactly `tput cols` '#'s, so the advance drift accumulates across the full width; awk is on
+// every runner. No trailing newline, so the row holds nothing but the ruler.
 const RULER_COMMAND =
   'clear; C=$(tput cols); awk -v c=$C \'BEGIN{s="";for(i=0;i<c;i++)s=s"#";printf "%s",s}\'\n'
 
@@ -174,10 +149,7 @@ async function expectRulerInkInLastColumn(page: Page): Promise<void> {
 async function measureRulerRow(
   page: Page
 ): Promise<{ cols: number; scrollW: number; clientW: number }> {
-  // Find the ruler row by content rather than assuming row 0 — on CI the shell prints a
-  // "default interactive shell is now zsh" notice first, so the ruler does not reliably
-  // land on any particular row. Strictly the ruler: nothing but '#', and long enough to
-  // be a real full-width line.
+  // Found by content, not at row 0: on CI the shell may print a notice first.
   const screen = page.locator(PANE_SCREEN)
   const rulerRow = async () =>
     (await terminalRowsIn(screen)).findIndex((row) => /^#+$/.test(row) && row.length >= 40)

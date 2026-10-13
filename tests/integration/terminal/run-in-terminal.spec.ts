@@ -4,10 +4,8 @@ import { MessageChannel, type MessagePort } from 'node:worker_threads'
 import { rmSync } from 'node:fs'
 import { makeTempDir } from '../../support/temp-dir'
 
-// A real PTY, end to end: node-pty runs the program, the core's terminal API
-// reports how it ended, and the answer crosses the extension host's port the
-// way Foundry's verification commands receive it. Nothing here is typed into
-// a shell, and no status is read back from output or a file.
+// A real PTY: node-pty runs the program and its exit crosses the extension host's port as
+// Foundry's verification commands receive it, never read back from output or a file.
 
 // Read when the registry is written, by which time this has run.
 const userData = makeTempDir('run-in-terminal-')

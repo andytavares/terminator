@@ -13,15 +13,11 @@ import {
 } from './helpers'
 import { recordShellOpens, shellOpens } from './main-stubs'
 
-// The application menu. Playwright cannot open a native menu, so each test
-// clicks the item itself, through the same MenuItem the menu bar would call
-// (https://www.electronjs.org/docs/latest/api/menu-item#menuitemclick), and
-// asserts what the window then shows.
+// Playwright cannot open a native menu, so each test clicks the MenuItem the menu bar
+// would call (https://www.electronjs.org/docs/latest/api/menu-item#menuitemclick).
 
-/**
- * Clicks the menu item at `path`, e.g. ['View', 'Open Settings'], each label
- * matched by its start: "About" is named after the app, which differs by build.
- */
+/** Clicks the menu item at `path`, e.g. ['View', 'Open Settings'], each label
+ * matched by its start: "About" is named after the app, which differs by build. */
 async function clickMenuItem(app: ElectronApplication, path: string[]): Promise<void> {
   await app.evaluate(({ Menu, BrowserWindow }, labels) => {
     let items = Menu.getApplicationMenu()?.items ?? []

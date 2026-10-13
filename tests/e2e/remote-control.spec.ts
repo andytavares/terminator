@@ -11,14 +11,9 @@ import {
 } from './helpers'
 import { openExtension } from './extension-page'
 
-// Remote Control's own channels, each driven from its view in the desktop app
-// the way a person does, with the effect read where it lands: in a phone's
-// browser running the real remote renderer (src/renderer-remote) in Chromium,
-// against the real server, or on the clipboard. remote-app.spec.ts covers
-// turning it on, the port, the password and the /app/ surface.
-//
-// The public address comes from a stand-in ngrok (fixtures/ngrok-bin/ngrok),
-// which opens a tunnel only for the account token this spec saves.
+// Remote Control's channels, driven from its view, with each effect read where it lands: a
+// browser running the real remote renderer, the server, or the clipboard. The public address
+// comes from a stand-in ngrok (fixtures/ngrok-bin/ngrok) that accepts only this spec's token.
 
 const NGROK_STUB_DIR = join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'ngrok-bin')
 const NGROK_TOKEN = 'e2e-ngrok-token'
@@ -75,10 +70,8 @@ async function saveField(label: string, value: string): Promise<void> {
   await field.blur()
 }
 
-/**
- * A phone's browser signing in on the remote renderer's own page and opening
- * the desktop app's terminal from its list, as a person does.
- */
+/** A phone's browser signing in on the remote renderer's own page and opening
+ * the desktop app's terminal from its list, as a person does. */
 async function openPhone(): Promise<Page> {
   const page = await browser.newPage({ baseURL: BASE_URL, viewport: { width: 390, height: 844 } })
   await page.goto('/')

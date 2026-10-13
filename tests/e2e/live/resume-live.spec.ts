@@ -59,10 +59,8 @@ async function openHome(page: Page): Promise<void> {
   await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible()
 }
 
-/**
- * 1. A conversation, started by hand, that remembers something. 2. Captured:
- * the hook reported it against this terminal. Returns what the hook reported.
- */
+/** 1. A conversation, started by hand, that remembers something. 2. Captured:
+ * the hook reported it against this terminal. Returns what the hook reported. */
 async function startAndCapture(handle: AppHandle): Promise<unknown> {
   const { page } = handle
   await type(page, 'claude "remember the number 4242. reply with ok"')

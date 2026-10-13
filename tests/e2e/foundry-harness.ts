@@ -162,14 +162,9 @@ export function hasStation(handle: AppHandle, prefix: string): Promise<boolean> 
   )
 }
 
-/**
- * Closes the app and opens it again on the same profile, with Foundry showing.
- *
- * Foundry reads its records from disk once and keeps them in memory, updated by
- * its own writes. A spec that writes records by hand while the app is running
- * is editing behind its back, which is not something the app notices — so it
- * writes first and restarts, the way an operator who edited them would.
- */
+/** Closes the app and opens it again on the same profile, with Foundry showing. Foundry
+ * reads its records from disk once, so a spec that writes them by hand restarts after,
+ * as an operator who edited them would. */
 export async function restartFoundry(handle: AppHandle, workspaceName: string): Promise<AppHandle> {
   const userDataDir = handle.userDataDir
   await closeApp(handle)

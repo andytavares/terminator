@@ -2,7 +2,7 @@
 
 What the Playwright suite (`tests/e2e/*.spec.ts`) drives in the real app, measured rather than read off the specs. Every spec ran with an IPC trace (`tests/e2e/ipc-trace.ts`) that records each channel a renderer invoked or sent and each event main pushed. That trace is joined with what the running app offers once every bundled extension is active (`tests/e2e/tools/feature-inventory.spec.ts`): every IPC channel main handles, every extension command, every extension setting.
 
-**Driven is not asserted.** A feature counts as driven when some spec caused its IPC. A spec that opens a view drives every channel the view loads with, whether or not it checks the result. The lists below say where a feature is never even reached. They do not say which reached features are tested well.
+**Driven is not asserted.** A feature counts as driven when some spec caused its IPC: a channel invoked or sent, an event pushed, a command run through `extension:execute-command` or `extension:run-command`, a setting written through `settings:update-global`, `extension:update-setting` or `extension:update-workspace-setting`, a Quick Action recorded in `quickActions.usage` or `quickActions.directUse`. A spec that opens a view drives every channel the view loads with, whether or not it checks the result. The lists below say where a feature is never even reached. They do not say which reached features are tested well.
 
 ## Run
 
