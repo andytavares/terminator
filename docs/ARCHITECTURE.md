@@ -244,6 +244,13 @@ Because WebGL leaves no terminal text in the DOM, the renderer sets `window.term
 (`src/renderer/terminal/terminal-rows.ts`), which reads every terminal's visible rows from its xterm buffer;
 the end-to-end specs read terminals through it.
 
+**Links.** `src/renderer/terminal/terminal-links.ts` finds the URLs and paths on a row and declares them to
+xterm. `LinkPointer` (`src/renderer/terminal/link-pointer.ts`) underlines the link under the pointer while
+⌘ (Ctrl off macOS) is held and opens it on ⌘-click. It maps the pointer to a cell from the box of
+`.xterm-screen`, which both renderers size to exactly `cols × rows` cells inside the pane's padding
+(`WebglRenderer.ts` and `DomRenderer.ts` in xterm.js). It never measures `.xterm-rows`, which the WebGL
+renderer does not create.
+
 **Batching and flow control.** A PTY produces thousands of small chunks a second. `OutputRelay`
 (`src/main/terminal/output-relay.ts`) joins them in an `OutputBatcher` and sends one `terminal:output`
 message per 16 ms frame, or at once when the batch reaches 128 KiB. Order is kept, and pending output is
