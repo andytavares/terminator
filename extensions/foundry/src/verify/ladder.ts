@@ -216,7 +216,7 @@ export async function climb(steps: readonly LadderStep[], run: RunStep): Promise
   const passed = new Map<string, string>()
 
   for (const step of steps) {
-    const outcome = await outcomeOf(step, run, passed)
+    const outcome = await rungOutcomeOf(step, run, passed)
     outcomes.push(outcome)
     if (outcome.result === 'fail') {
       stoppedAt = step.rung
@@ -232,7 +232,7 @@ export async function climb(steps: readonly LadderStep[], run: RunStep): Promise
   }
 }
 
-async function outcomeOf(
+async function rungOutcomeOf(
   step: LadderStep,
   run: RunStep,
   passed: Map<string, string>

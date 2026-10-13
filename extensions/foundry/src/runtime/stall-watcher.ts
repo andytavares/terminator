@@ -144,7 +144,7 @@ export function createStallWatcher(options: StallWatcherOptions): StallWatcher {
       timer = null
     },
 
-    tick: () => tick(options, fired),
+    tick: () => checkRunsOnce(options, fired),
   }
 }
 
@@ -156,7 +156,7 @@ function forgetEnded(fired: Set<string>, live: readonly WatchedRun[]): void {
 }
 
 /** One pass over the live runs, firing once for each that has newly stalled. */
-function tick(options: StallWatcherOptions, fired: Set<string>): void {
+function checkRunsOnce(options: StallWatcherOptions, fired: Set<string>): void {
   const live = options.runs()
   forgetEnded(fired, live)
 

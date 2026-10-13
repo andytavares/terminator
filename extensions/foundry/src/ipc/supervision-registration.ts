@@ -145,7 +145,7 @@ function registerRunActions(api: ExtensionAPI): void {
       return { ok: true }
     }),
     sessionChannel('foundry:run-redirect', RedirectPayload, redirectRun),
-    sessionChannel('foundry:run-stop', SessionStopPayload, stopRun)
+    sessionChannel('foundry:run-stop', SessionStopPayload, stopSessionOnRequest)
   )
 }
 
@@ -186,7 +186,9 @@ function redirectRun({ sessionId, message }: z.infer<typeof RedirectPayload>): {
 }
 
 // Ends the run, saying why first so the agent's own record carries it.
-function stopRun({ sessionId, reason }: z.infer<typeof SessionStopPayload>): { ok: boolean } {
+function stopSessionOnRequest({ sessionId, reason }: z.infer<typeof SessionStopPayload>): {
+  ok: boolean
+} {
   if (runtime.supervisedRunner === null) return { ok: false }
   const ok = runtime.supervisedRunner.stop(sessionId, reason)
   if (ok) {

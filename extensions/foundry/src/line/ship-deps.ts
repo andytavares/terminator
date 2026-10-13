@@ -9,7 +9,7 @@ import { ciReworkTarget, shipNodeId, settleShip } from './ship-tail.js'
 import { writeCiState } from './ci-state.js'
 import type { CiState } from './ci-state.js'
 import { rework } from './scheduler.js'
-import { execute, opensPullRequest } from './executor.js'
+import { executePlan, opensPullRequest } from './executor.js'
 import type { RunOutcome, ExecutorDeps } from './executor.js'
 import type { RunGraph, Feedback } from './run-graph.js'
 import type { Recipe } from '../recipe/parse.js'
@@ -172,7 +172,7 @@ export function ciSendBackFor(
     graphRef.current = rework(graphRef.current, shipId, { to: target, feedback })
     await writeGraph(root, graphRef.current)
 
-    const outcome = await execute({ order, recipe, graph: graphRef.current }, deps.executorDeps)
+    const outcome = await executePlan({ order, recipe, graph: graphRef.current }, deps.executorDeps)
     graphRef.current = outcome.graph
     await writeGraph(root, graphRef.current)
 

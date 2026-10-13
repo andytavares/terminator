@@ -127,7 +127,7 @@ export async function seedOrder(input: SeedInput, deps: SeedDeps): Promise<SeedR
   // Scout's pack, before any question could be asked.
   const toolchain = probeToolchain(input.repoPaths[0])
   const houseDocs = input.repoPaths.flatMap((repoPath) => houseDocsIn(repoPath))
-  const priorArt = await priorArtFor(origin.problem, deps)
+  const priorArt = await priorArtForProblem(origin.problem, deps)
   const seeded = seededFrom(order, { origin, context: { toolchain, houseDocs, priorArt } })
   return { order: seeded, unavailableChecks: unavailableChecks(toolchain) }
 }
@@ -192,7 +192,7 @@ async function signalOrigin(signalId: string, deps: SeedDeps): Promise<Read> {
  * the record is not a failure to seed an order: the draft is what the operator
  * asked for, and prior art is a courtesy on top of it.
  */
-async function priorArtFor(problem: string, deps: SeedDeps): Promise<string[]> {
+async function priorArtForProblem(problem: string, deps: SeedDeps): Promise<string[]> {
   const named = pathsNamedIn(problem)
   if (named.length === 0) return []
   try {

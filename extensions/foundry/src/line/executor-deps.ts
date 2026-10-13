@@ -21,13 +21,13 @@ import { autonomyFor } from '../state/settings.js'
 import { endLiveSession } from '../runtime/runtime-state.js'
 import { baseBranchOf, conversationKey, createRunContext } from './run-context.js'
 import type { OrderRun, RunContext } from './run-context.js'
-import { runNode } from './node-session.js'
+import { runNodeSession } from './node-session.js'
 import {
-  reinstall,
-  releaseBase,
+  reinstallDependencies,
+  releaseBaseCheckout,
   runRecipeCommand,
-  runStep,
-  runStepOnBase,
+  runLaneStep,
+  runStepOnBaseCheckout,
 } from './lane-commands.js'
 import { isoNow } from '../host-calls.js'
 
@@ -94,7 +94,7 @@ async function executorDepsFor(
   return {
     now: isoNow,
     sources: parts.sources,
-    run: (input) => runNode(context, input),
+    run: (input) => runNodeSession(context, input),
     sessionFor: (lane, role) => context.conversations.get(conversationKey(lane, role)),
     record: (action, subject, reason) => recordLineEntry(context, { action, subject, reason }),
     autonomy: autonomyFor(context.api),
@@ -105,12 +105,12 @@ async function executorDepsFor(
     commitNode: (input) => commitNode(context, input),
     priorGates: await parts.gates.list(),
     raise: (gate) => raiseGate(context, parts.gates, gate),
-    runStep: (step, logPath) => runStep(context, step, logPath),
-    runStepOnBase: (step, logPath) => runStepOnBase(context, step, logPath),
-    reinstall: (where, logPath) => reinstall(context, where, logPath),
-    releaseBase: () => releaseBase(context),
+    runStep: (step, logPath) => runLaneStep(context, step, logPath),
+    runStepOnBase: (step, logPath) => runStepOnBaseCheckout(context, step, logPath),
+    reinstall: (where, logPath) => reinstallDependencies(context, where, logPath),
+    releaseBase: () => releaseBaseCheckout(context),
     runCommand: (input) => runRecipeCommand(context, input),
-    endSession,
+    endSession: endPreviousProcess,
     observe: async () => ({ elapsedMinutes: minutesSince(parts.startedAt) }),
     onEvent: (event) => recordVerdict(context, event),
     persist: graphPersister(context, graph),
@@ -236,7 +236,7 @@ async function raiseGate(context: RunContext, gates: GateStore, gate: Gate): Pro
 // The previous process of this conversation may still be sitting at its
 // prompt when a node resumes it. Two processes must not share one
 // conversation — the same reason `endAndWait` exists for a follow-up turn.
-function endSession(sessionId: string): Promise<void> {
+function endPreviousProcess(sessionId: string): Promise<void> {
   return endLiveSession(sessionId, 'continuing the lane in its next step')
 }
 

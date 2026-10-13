@@ -63,7 +63,7 @@ function whenRead<T>(show: (value: T) => void): (value: T | null) => void {
   }
 }
 
-async function readRules(): Promise<RulesView | null> {
+async function readRulesView(): Promise<RulesView | null> {
   const next = (await invoke('foundry:rules.inForce', {})) as Partial<RulesView> & {
     error?: string
   }
@@ -183,9 +183,9 @@ function useLedgerEntries() {
 
 function useRules() {
   const [rules, setRules] = useState<RulesView | null>(null)
-  const refreshRules = useCallback(() => readRules().then(whenRead(setRules)), [])
+  const refreshRules = useCallback(() => readRulesView().then(whenRead(setRules)), [])
   useEffect(() => {
-    void readRules().then(whenRead(setRules))
+    void readRulesView().then(whenRead(setRules))
   }, [])
   return { rules, refreshRules }
 }
@@ -220,7 +220,7 @@ function useProposals(refreshRules: () => Promise<void>) {
   }, [])
   const decide = useCallback(
     async (proposal: Proposal, accept: boolean) => {
-      const error = await decideProposal(proposal, accept)
+      const error = await sendProposalDecision(proposal, accept)
       if (error !== null) {
         setNote(error)
         return
@@ -240,7 +240,7 @@ function useProposals(refreshRules: () => Promise<void>) {
 }
 
 /** Accepts or declines a proposal; the refusal, or null when it took. */
-async function decideProposal(proposal: Proposal, accept: boolean): Promise<string | null> {
+async function sendProposalDecision(proposal: Proposal, accept: boolean): Promise<string | null> {
   const result = (await invoke('foundry:rules.decide', {
     proposalId: proposal.id,
     accept,

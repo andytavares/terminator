@@ -335,7 +335,7 @@ interface Recording {
 }
 
 /** The run as recorded; null when nothing was. */
-async function readTimeline(orderId: string): Promise<Recording | null> {
+async function readRecording(orderId: string): Promise<Recording | null> {
   const r = (await invoke('foundry:run.timeline', { id: orderId })) as {
     graph?: RunGraph
     timeline?: Timeline
@@ -469,7 +469,7 @@ function useReplay(orderId: string, { labels, talk, refs }: ReplayDeps) {
   const { announce, setCallouts } = talk
   const startReplay = useCallback(async () => {
     refs.setReplayNote(null)
-    const recording = await readTimeline(orderId)
+    const recording = await readRecording(orderId)
     if (recording === null) {
       refs.setReplayNote('Nothing recorded for this run yet.')
       return

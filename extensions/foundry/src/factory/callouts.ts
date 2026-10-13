@@ -191,7 +191,7 @@ export interface InterruptionInput {
 
 /** Everything in this hall waiting on the operator, each pinned to a station where one owns it. */
 export function interruptionsFor(input: InterruptionInput): Interruption[] {
-  return [...asksOf(input), ...gatesOf(input), ...parkedOf(input)]
+  return [...asksOf(input), ...gateInterruptions(input), ...parkedOf(input)]
 }
 
 /** The held tool calls, each over its agent's station. */
@@ -207,7 +207,7 @@ function asksOf(input: InterruptionInput): Interruption[] {
 }
 
 /** The gates waiting on the operator, each over the station it holds. */
-function gatesOf(input: InterruptionInput): Interruption[] {
+function gateInterruptions(input: InterruptionInput): Interruption[] {
   return input.waiting.map((gate) => ({
     kind: 'gate',
     id: gate.id,

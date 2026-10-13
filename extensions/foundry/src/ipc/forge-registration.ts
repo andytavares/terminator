@@ -30,7 +30,7 @@ import { isoNow, shellExecOf } from '../host-calls.js'
  * the Architect "this was decided before", not to hand it the whole ledger.
  * @internal
  */
-export async function priorArtFor(root: string, paths: readonly string[]): Promise<string[]> {
+export async function priorArtInRecords(root: string, paths: readonly string[]): Promise<string[]> {
   const store = orderStoreAt(root)
   const orders = await store.list()
   const entries = (await Promise.all(orders.map((order) => store.entries(order.id)))).flat()
@@ -77,7 +77,7 @@ function createForge(
     writeBackDefault: () => defaultWriteBack(api),
     budgetDefaults: () => defaultBudgets(api),
     criticalPaths: (repoPaths) => declaredCriticalPaths(api, repoPaths),
-    priorArtFor: (paths) => priorArtFor(dataRoot(), paths),
+    priorArtFor: (paths) => priorArtInRecords(dataRoot(), paths),
     // The redraft lands here, when the architect's turn ends — minutes after
     // the channel that started it answered.
     converge: (order, message, recordStart) =>
@@ -88,13 +88,13 @@ function createForge(
     onAgreed: async (order) => {
       await writeBack(order, { event: 'agreed' }, writeBackDepsFor(dataRoot(), order, issuesPort))
     },
-    readIssue: (tracker, key) => readIssue(api, tracker, key),
+    readIssue: (tracker, key) => readTrackerIssue(api, tracker, key),
     queueEntries: queueEntriesOf(dataRoot),
     onReleased: loop.onReleased,
   })
 }
 
-async function readIssue(
+async function readTrackerIssue(
   api: ExtensionAPI,
   tracker: Parameters<ForgeDeps['readIssue']>[0],
   key: string

@@ -42,25 +42,25 @@ function createSettledReader(load: () => Promise<void>): SettledReader {
   let stale = false
   let cancelled = false
   let timer: ReturnType<typeof setTimeout> | null = null
-  const run = async (): Promise<void> => {
+  const readNow = async (): Promise<void> => {
     reading = true
     try {
       await load()
     } finally {
       reading = false
-      if (stale && !cancelled) settle()
+      if (stale && !cancelled) readOnceSettled()
     }
   }
-  const settle = (): void => {
+  const readOnceSettled = (): void => {
     stale = false
     timer ??= setTimeout(() => {
       timer = null
-      void run()
+      void readNow()
     }, SETTLE_MS)
   }
   return {
-    now: () => void run(),
-    notify: () => (reading ? (stale = true) : settle()),
+    now: () => void readNow(),
+    notify: () => (reading ? (stale = true) : readOnceSettled()),
     cancel() {
       cancelled = true
       if (timer !== null) clearTimeout(timer)
@@ -72,7 +72,7 @@ function createSettledReader(load: () => Promise<void>): SettledReader {
  * Switching workspace moves the records location under every view, and nothing
  * is written there to say so, so it counts as a change to all of them.
  */
-function onChanged(filter: ChangeFilter, relevant: () => void): () => void {
+function onFoundryChanged(filter: ChangeFilter, relevant: () => void): () => void {
   const bridge = window.electronAPI.extensionBridge
   const stopChanges = bridge.on('foundry:changed', (data: unknown) => {
     if (isRelevant(data as FoundryChange, filter)) relevant()
@@ -114,7 +114,7 @@ export function usePushed<T>(
   }, [read, show])
   useEffect(
     () =>
-      onChanged({ kinds: kinds.split(',') as ChangeKind[], orderId }, () =>
+      onFoundryChanged({ kinds: kinds.split(',') as ChangeKind[], orderId }, () =>
         reader.current?.notify()
       ),
     [kinds, orderId]

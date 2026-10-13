@@ -1160,23 +1160,23 @@ function drawBoardCell(
   [icon, value, color]: BoardCell,
   { cellLeft, top, cellW, index, measured }: CellPlace
 ): void {
-  const place = (width: number): number => placeInCell({ cellLeft, cellW, index }, width)
+  const placeInBoard = (width: number): number => placeInCell({ cellLeft, cellW, index }, width)
   if (index > 0) rect(paint, [cellLeft, top + 3, 1, BOARD_HEIGHT - 6], BOARD_DIVIDER)
-  drawIcon(paint, [place(ICON_SIZE), top + 3], {
+  drawIcon(paint, [placeInBoard(ICON_SIZE), top + 3], {
     icon,
     color: value === null ? BOARD_DIM : color,
   })
   const numberTop = top + 3 + ICON_SIZE + 3
   if (value === null) {
-    if (measured) rect(paint, [place(6), numberTop + 4, 6, 2], BOARD_DIM)
+    if (measured) rect(paint, [placeInBoard(6), numberTop + 4, 6, 2], BOARD_DIM)
     return
   }
   const digits = String(Math.min(Math.max(value, 0), BOARD_MAX))
   if (digits.length > 2) {
-    drawText(paint, [place(textWidth(digits)), numberTop + 3], { text: digits, color })
+    drawText(paint, [placeInBoard(textWidth(digits)), numberTop + 3], { text: digits, color })
     return
   }
-  let dx = place(digitsWidth(digits))
+  let dx = placeInBoard(digitsWidth(digits))
   for (const digit of digits) {
     drawDigit(paint, [dx, numberTop], { digit, color })
     dx += 7

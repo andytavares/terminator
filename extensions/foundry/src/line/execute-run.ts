@@ -7,7 +7,7 @@ import type { GateStore } from '../gates/store.js'
 import { shipOrder } from './integrate.js'
 import { afterFinalCheck, ciRounds, settledOnce } from './ship-tail.js'
 import { createEarlyShip } from './early-ship.js'
-import { execute } from './executor.js'
+import { executePlan } from './executor.js'
 import type { ExecutorDeps, RunOutcome } from './executor.js'
 import type { RunGraph } from './run-graph.js'
 import type { Recipe } from '../recipe/parse.js'
@@ -64,7 +64,7 @@ interface Found {
   reason: string
 }
 
-export async function executeRun(api: ExtensionAPI, run: OrderRun): Promise<void> {
+export async function executeOrderRun(api: ExtensionAPI, run: OrderRun): Promise<void> {
   const tail = await prepareRun(api, run)
   const { order } = tail
 
@@ -143,13 +143,13 @@ function shipDepsFor(tail: RunTail): IntegrateDeps {
         writeBackDepsFor(root, order, tail.issuesPort)
       )
     },
-    watchCi: (pulls) => watchCi(tail, pulls),
+    watchCi: (pulls) => watchShippedCi(tail, pulls),
   }
 }
 
 // A recipe with no `ci` never asks to watch anything (`rounds: null`
 // makes `ciRounds` return `{ kind: 'none' }` without a single poll).
-function watchCi(
+function watchShippedCi(
   tail: RunTail,
   pulls: Parameters<NonNullable<IntegrateDeps['watchCi']>>[0]
 ): ReturnType<typeof ciRounds> {
@@ -172,7 +172,7 @@ async function executeGraph(tail: RunTail, early: EarlyShip, graph: RunGraph): P
   const { order, recipe, store } = tail
   let outcome: RunOutcome
   try {
-    outcome = await execute(
+    outcome = await executePlan(
       { order, recipe, graph },
       {
         ...tail.executorDeps,

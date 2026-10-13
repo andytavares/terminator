@@ -88,13 +88,13 @@ export async function convergeOnce(
   const memory = rememberSessions(turn.root, order.id)
   return new Promise<ConvergeStarted>((resolve) => {
     let answered = false
-    const answer = (started: ConvergeStarted): void => {
+    const answerOnce = (started: ConvergeStarted): void => {
       if (answered) return
       answered = true
       resolve(started)
     }
     const progress: ArchitectLaunch['progress'] = { done: false, architectSession: null }
-    startArchitect({ api, turn, runner, ...place, memory, answer, progress })
+    launchArchitect({ api, turn, runner, ...place, memory, answer: answerOnce, progress })
   })
 }
 
@@ -166,7 +166,7 @@ function rememberSessions(root: string, orderId: string): SessionMemory {
   return { remember, remembered: () => remembering }
 }
 
-function startArchitect(launch: ArchitectLaunch): void {
+function launchArchitect(launch: ArchitectLaunch): void {
   const { api, turn, memory, answer, progress } = launch
   const { order } = turn
   trustRepository(api, launch.plan.cwd, { orderId: order.id, store: orderStoreAt(turn.root) })

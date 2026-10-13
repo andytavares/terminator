@@ -13,7 +13,7 @@ import { sourcesOf } from '../workspace-root.js'
 import { announceLive, indexFor, orderStoreAt, queueEntriesOf } from '../state/live-index.js'
 import { runtime, strandedAgents, isLiveSession } from '../runtime/runtime-state.js'
 import { executingOrders, stopOrder } from '../line/run-control.js'
-import { executeRun } from '../line/execute-run.js'
+import { executeOrderRun } from '../line/execute-run.js'
 import type { OrderRun } from '../line/run-context.js'
 import type { LiveStandingSources } from './standing.js'
 import { isoNow, shellExecOf } from '../host-calls.js'
@@ -70,7 +70,7 @@ async function executeMarked(
   executingOrders.add(order.id)
   announceLive(order.id)
   try {
-    await executeRun(api, { root: dataRoot(), ...run })
+    await executeOrderRun(api, { root: dataRoot(), ...run })
   } finally {
     executingOrders.delete(order.id)
     announceLive(order.id)

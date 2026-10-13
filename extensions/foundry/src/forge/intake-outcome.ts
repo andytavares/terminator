@@ -107,12 +107,16 @@ type IntakeReader = (
   i: number
 ) => IntakeOutcome
 
-const refused: IntakeReader = (entry) => ({ kind: 'refused', at: entry.at, reason: entry.reason })
+const readRefusal: IntakeReader = (entry) => ({
+  kind: 'refused',
+  at: entry.at,
+  reason: entry.reason,
+})
 const redrafted: IntakeReader = (entry) => ({ kind: 'redrafted', at: entry.at, note: entry.reason })
 
 /** What each ledger action says about the last intake turn. */
 const INTAKE_READERS: Record<string, IntakeReader> = {
-  [REFUSED]: refused,
+  [REFUSED]: readRefusal,
   [REDRAFTED]: redrafted,
   // A fix turn the review loop started names its own round in the reason it
   // records: `red team round 2 fix`. Every other start is the operator's,
@@ -136,7 +140,7 @@ const INTAKE_READERS: Record<string, IntakeReader> = {
       round: null,
       autoTurn: autoTurnAt(entries, i),
     }),
-  [REVIEW_REFUSED]: refused,
+  [REVIEW_REFUSED]: readRefusal,
   // The loop giving up is "needs you", not a refusal — nothing about the
   // proposal was rejected, and the findings it stopped on are surfaced
   // through `loopFacts(entries).exhausted` instead.

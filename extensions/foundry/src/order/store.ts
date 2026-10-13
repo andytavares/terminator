@@ -46,14 +46,14 @@ export function createLiveOrderStore(
   root: () => string,
   indexFor?: (root: string) => FoundryIndex
 ): OrderStore {
-  const store = (): OrderStore => createOrderStore(root(), indexFor?.(root()))
+  const orderStore = (): OrderStore => createOrderStore(root(), indexFor?.(root()))
   return {
-    save: (order) => store().save(order),
-    load: (id) => store().load(id),
-    list: () => store().list(),
-    findByIssue: (tracker, key) => store().findByIssue(tracker, key),
-    record: (entry) => store().record(entry),
-    entries: (orderId) => store().entries(orderId),
+    save: (order) => orderStore().save(order),
+    load: (id) => orderStore().load(id),
+    list: () => orderStore().list(),
+    findByIssue: (tracker, key) => orderStore().findByIssue(tracker, key),
+    record: (entry) => orderStore().record(entry),
+    entries: (orderId) => orderStore().entries(orderId),
   }
 }
 

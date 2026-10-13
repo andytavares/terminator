@@ -44,12 +44,12 @@ async function reconnectLaneWorktrees(api: ExtensionAPI, root: string): Promise<
 /** `<root>/orders/<id>/worktrees/<repo>`, the shape `checkoutPath` builds. */
 function laneWorktrees(root: string): string[] {
   const orders = path.join(root, 'orders')
-  return entries(orders).flatMap((order) => {
+  return directoryEntries(orders).flatMap((order) => {
     const worktrees = path.join(orders, order, 'worktrees')
-    return entries(worktrees).map((repo) => path.join(worktrees, repo))
+    return directoryEntries(worktrees).map((repo) => path.join(worktrees, repo))
   })
 }
 
-function entries(directory: string): string[] {
+function directoryEntries(directory: string): string[] {
   return fs.existsSync(directory) ? fs.readdirSync(directory) : []
 }

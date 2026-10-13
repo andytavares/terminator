@@ -531,10 +531,10 @@ async function runArchitectTurn(
   // Once, from inside the turn when the architect starts, or here when
   // `converge` answered without starting one.
   let recorded: Promise<void> | null = null
-  const recordStart = (s: ConvergeStarted): Promise<void> =>
+  const recordConvergeStart = (s: ConvergeStarted): Promise<void> =>
     (recorded ??= recordArchitectStart(deps, { order, message }, s))
-  const started = await deps.converge(order, message ?? '', recordStart)
-  await recordStart(started)
+  const started = await deps.converge(order, message ?? '', recordConvergeStart)
+  await recordConvergeStart(started)
   if (!started.ok) {
     return {
       ...view(order),

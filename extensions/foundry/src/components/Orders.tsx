@@ -75,7 +75,7 @@ interface TicketsRead {
   error?: string
 }
 
-async function readOrders(): Promise<OrderRow[]> {
+async function readOrderRows(): Promise<OrderRow[]> {
   const r = (await invoke('foundry:order.list')) as { orders?: OrderRow[] }
   return r.orders ?? []
 }
@@ -183,7 +183,7 @@ function useFrom(focusIdeaSignal: number | undefined) {
 /** The orders, kept current, and answering a row's gate from where it stands. */
 function useOrderRows(setProblem: (problem: string | null) => void) {
   const [rows, setRows] = useState<OrderRow[]>([])
-  const refresh = useCallback(() => readOrders().then(setRows), [])
+  const refresh = useCallback(() => readOrderRows().then(setRows), [])
   // The same channel the inbox answers with: the row is not a second queue, it
   // is the gate that holds this order put where you are already looking.
   const [answering, setAnswering] = useState<string | null>(null)
@@ -206,7 +206,7 @@ function useOrderRows(setProblem: (problem: string | null) => void) {
   // The counts on these rows go stale the moment a question is answered in
   // another window or a run raises one, and this list is where the tab's
   // badge sends you — so it is read again when Foundry says any of that changed.
-  usePushed(readOrders, setRows, { kinds: ANY_RECORD })
+  usePushed(readOrderRows, setRows, { kinds: ANY_RECORD })
   return { rows, refresh, answering, answer }
 }
 

@@ -48,11 +48,11 @@ export function createLiveGateStore(
   root: () => string,
   indexFor?: (root: string) => FoundryIndex
 ): GateStore {
-  const store = (): GateStore => createGateStore(root(), indexFor?.(root()))
+  const gateStore = (): GateStore => createGateStore(root(), indexFor?.(root()))
   return {
-    save: (gate) => store().save(gate),
-    list: () => store().list(),
-    get: (id) => store().get(id),
+    save: (gate) => gateStore().save(gate),
+    list: () => gateStore().list(),
+    get: (id) => gateStore().get(id),
   }
 }
 

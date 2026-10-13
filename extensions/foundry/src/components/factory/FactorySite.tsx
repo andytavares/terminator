@@ -303,7 +303,7 @@ function Crate({ signal, dock }: { readonly signal: Signal; readonly dock: Dock 
         ×{signal.occurrences} · {signal.severity}
       </span>
       {dock.promoting === signal.id ? (
-        <PromoteForm signal={signal} dock={dock} />
+        <DockPromoteForm signal={signal} dock={dock} />
       ) : (
         <Button
           variant="primary"
@@ -318,7 +318,7 @@ function Crate({ signal, dock }: { readonly signal: Signal; readonly dock: Dock 
   )
 }
 
-function PromoteForm({ signal, dock }: { readonly signal: Signal; readonly dock: Dock }) {
+function DockPromoteForm({ signal, dock }: { readonly signal: Signal; readonly dock: Dock }) {
   return (
     <div className="fdry-crate-promote">
       <label>

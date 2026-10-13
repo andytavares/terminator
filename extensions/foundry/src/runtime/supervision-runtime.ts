@@ -19,7 +19,7 @@ import {
   stallFirings,
   MAX_STALL_FIRINGS,
 } from './runtime-state.js'
-import { notify } from './held-calls.js'
+import { notifyPerson } from './held-calls.js'
 import { gotoRun, startPaletteRefresh, stopPaletteRefresh } from './palette-commands.js'
 
 /**
@@ -189,7 +189,7 @@ function onStallFiring(api: ExtensionAPI, firing: StallFiring, featureDir: strin
   }
   // An indication, not an interruption: a stall is not blocked on an
   // answer the way a held tool call is.
-  notify(api, {
+  notifyPerson(api, {
     event: { kind: 'stalled', sessionId: firing.sessionId },
     message: `A run stopped making progress (${firing.signal})`,
     // A stall is the notification you most want to act on, and acting on

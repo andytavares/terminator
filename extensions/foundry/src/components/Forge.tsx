@@ -579,7 +579,7 @@ async function commitOrder(orderId: string): Promise<OrderView | { error: string
 }
 
 /** Starts the agreed order's run in the shape chosen, if one was; why not, when it did not start. */
-async function startRun(
+async function startAgreedRun(
   orderId: string,
   chosen: string | null | undefined
 ): Promise<string | null> {
@@ -640,7 +640,7 @@ function useHandOff({ orderId, onStarted, shown, shapes }: HandOffDeps) {
         }
         setView(next)
         if (next.order.status !== 'agreed') return
-        const trouble = await startRun(orderId, chosen)
+        const trouble = await startAgreedRun(orderId, chosen)
         if (trouble !== null) {
           setProblem(`The order is agreed, but the run did not start: ${trouble}`)
           return

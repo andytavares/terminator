@@ -41,7 +41,7 @@ function commandIn(
 // of its own in the lane's checkout — visible, like everything else here —
 // with no agent in between to spend a turn on it or a transcript to read
 // the answer back out of.
-export async function runStep(
+export async function runLaneStep(
   context: RunContext,
   step: LadderStep,
   logPath: string
@@ -69,7 +69,7 @@ export async function runStep(
 // The same rung on the base branch, to tell a failure the change caused
 // from one that was already there. Never reads or writes the pass cache:
 // a pass on the base says nothing about the change, and the reverse.
-export async function runStepOnBase(
+export async function runStepOnBaseCheckout(
   context: RunContext,
   step: LadderStep,
   logPath: string
@@ -96,7 +96,7 @@ export async function runStepOnBase(
 
 // A broken install, mended in place. The borrowed links go first, so the
 // install lands in this checkout and never writes into the origin's.
-export async function reinstall(
+export async function reinstallDependencies(
   context: RunContext,
   where: 'change' | 'base',
   logPath: string
@@ -114,7 +114,7 @@ export async function reinstall(
   )
 }
 
-export async function releaseBase(context: RunContext): Promise<void> {
+export async function releaseBaseCheckout(context: RunContext): Promise<void> {
   const checkout = context.base.current
   if (checkout === null) return
   context.base.current = null

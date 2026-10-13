@@ -11,8 +11,8 @@ import type { RunNode } from './run-graph.js'
 import type { GateRuleId } from '../gates/rules.js'
 import { isGateRule } from './execution-parts.js'
 import type { Execution } from './execution.js'
-import { launch } from './execution-launch.js'
-import { settle } from './execution-settle.js'
+import { launchNode } from './execution-launch.js'
+import { settleNode } from './execution-settle.js'
 
 // Running everything that can run, one wave at a time, until nothing else can.
 //
@@ -139,7 +139,7 @@ async function runWave(run: Execution): Promise<boolean> {
     started.started
       .map((id) => run.current.nodes.find((n) => n.id === id))
       .filter((n): n is RunNode => n !== undefined && n.kind !== 'gate')
-      .map((node) => launch(run, node))
+      .map((node) => launchNode(run, node))
   )
   const waved = await run.waveOrBreach(wave)
   if ('breach' in waved) {
@@ -155,6 +155,6 @@ async function runWave(run: Execution): Promise<boolean> {
     // more. The budget is part of what was agreed, not a preference.
     return false
   }
-  for (const launched of waved.results) await settle(run, launched)
+  for (const launched of waved.results) await settleNode(run, launched)
   return true
 }

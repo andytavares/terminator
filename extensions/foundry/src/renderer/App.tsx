@@ -92,7 +92,7 @@ function useForgeView(): ForgeView {
     setView('list')
     setListOpenOrderId(orderId)
   }
-  const reset = (): void => {
+  const clearOpened = (): void => {
     setHall(null)
     setListOpenOrderId(null)
   }
@@ -101,14 +101,14 @@ function useForgeView(): ForgeView {
     hall,
     listOpenOrderId,
     choose: (next) => {
-      reset()
+      clearOpened()
       setView(next)
       void window.electronAPI.extensionBridge.invoke('foundry:ui.set-view', { view: next })
     },
     openFromSite: (order) => (isShaping(order) ? openInList(order.id) : setHall(order)),
     openInList,
     leaveHall: () => setHall(null),
-    reset,
+    reset: clearOpened,
   }
 }
 
@@ -275,7 +275,7 @@ export function App(): JSX.Element {
 }
 
 function ShownSurface({ chrome }: { chrome: Chrome }): JSX.Element {
-  if (chrome.showing === null) return <SettingsPanel onBack={chrome.closeSettings} />
+  if (chrome.showing === null) return <FoundrySettingsPanel onBack={chrome.closeSettings} />
   if (chrome.showing === 'ledger') return <Ledger />
   return (
     <ForgeSurface
@@ -371,7 +371,7 @@ function ForgeViewToggle({
   )
 }
 
-function SettingsPanel({ onBack }: { onBack: () => void }): JSX.Element {
+function FoundrySettingsPanel({ onBack }: { onBack: () => void }): JSX.Element {
   return (
     <div className="sk-settings-wrap">
       <Button variant="ghost" icon={ArrowLeft} onClick={onBack}>

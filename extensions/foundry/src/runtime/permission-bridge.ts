@@ -328,11 +328,15 @@ function canUseTool(state: BridgeState, toolName: string, input: unknown): Promi
     if (!auto.allow) options.onAutoDenied?.(toolName, auto.reason ?? 'no reason given')
     return Promise.resolve(toResult(auto, input))
   }
-  return hold(state, toolName, input)
+  return holdForAnswer(state, toolName, input)
 }
 
 /** Raises the call for a person and holds it until answered or handed back. */
-function hold(state: BridgeState, toolName: string, input: unknown): Promise<HookDecision> {
+function holdForAnswer(
+  state: BridgeState,
+  toolName: string,
+  input: unknown
+): Promise<HookDecision> {
   const { options } = state
   const { sessionId } = options
   const requestId = `${sessionId}-perm-${++state.held}`
@@ -367,12 +371,12 @@ function resolveRequest(
   // An answer is its own outcome. `toResult` encodes one as a deny
   // carrying the words, so reporting it as `allow` — or as `deny` — both
   // misread what the operator did.
-  state.options.onResolved(requestId, outcomeOf(decision))
+  state.options.onResolved(requestId, permissionOutcomeOf(decision))
   entry.settle(toResult(decision, entry.input))
   return true
 }
 
-function outcomeOf(decision: PermissionDecision): PermissionOutcome {
+function permissionOutcomeOf(decision: PermissionDecision): PermissionOutcome {
   if (answerOf(decision) !== '') return 'answered'
   return decision.allow ? 'allow' : 'deny'
 }

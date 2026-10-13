@@ -138,7 +138,7 @@ export function parseProposal(value: unknown): Proposal {
  * measured, and an agent that could rewrite them could tell the ladder a
  * command exists that does not.
  */
-function withFindings(
+function contextWithFindings(
   context: WorkOrder['context'],
   findings: Proposal['findings']
 ): WorkOrder['context'] {
@@ -215,7 +215,7 @@ export function applyProposal(order: WorkOrder, proposal: Proposal, at: string):
   const next: WorkOrder = {
     ...order,
     intent: { ...order.intent, ...proposal.intent },
-    context: withFindings(order.context, proposal.findings),
+    context: contextWithFindings(order.context, proposal.findings),
     acceptance: proposal.acceptance ?? order.acceptance,
     risk: { ...order.risk, ...proposal.risk },
     plan: mergedPlan(order.plan, proposal.plan),

@@ -315,16 +315,16 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
   const context = runnerContext(options)
   const { running } = context
   return {
-    start: (start) => startRun(context, start),
-    runCommand: (command) => runCommand(context, command),
+    start: (start) => startSupervisedRun(context, start),
+    runCommand: (command) => runCommandInTab(context, command),
     continueRun: (sessionId, next) => continueRun(context, sessionId, next),
     resolve: (sessionId, requestId, decision) =>
       running.get(sessionId)?.bridge.resolve(requestId, decision) ?? false,
     handBackToTerminal: (sessionId, requestId) =>
       running.get(sessionId)?.bridge.handBackToTerminal(requestId),
     interrupt: (sessionId) => interruptRun(context, sessionId),
-    stop: (sessionId, reason) => stopRun(context, sessionId, reason),
-    send: (sessionId, message) => sendTo(context, sessionId, message),
+    stop: (sessionId, reason) => stopSupervisedRun(context, sessionId, reason),
+    send: (sessionId, message) => sendToSession(context, sessionId, message),
     terminalFor: (sessionId) => terminalOf(running.get(sessionId)),
     watchable: () => watchableRuns(running),
     dispose: () => {
@@ -451,7 +451,7 @@ function end(context: RunnerContext, sessionId: string, clean: boolean): void {
   if (clean) context.api.pty.closeTerminalTab?.(run.terminalSessionId)
 }
 
-async function startRun(
+async function startSupervisedRun(
   context: RunnerContext,
   start: StartSupervisedRunOptions
 ): Promise<SupervisedRun | null> {
@@ -465,11 +465,11 @@ async function startRun(
   // are installed before the record exists.
   const phase: Running['phase'] = { current: { id: start.phase, ...start } }
 
-  const bridge = bridgeFor(context, sessionId, { phase, autoDecide: start.autoDecide })
+  const bridge = permissionBridgeFor(context, sessionId, { phase, autoDecide: start.autoDecide })
   const spec = launchSpecFor(context, sessionId, start)
   const release = registerControl(context, sessionId, { bridge, phase, spec })
 
-  const opened = await openAgentTerminal(context, start)
+  const opened = await openSupervisedTerminal(context, start)
   if (opened === null) {
     release()
     return null
@@ -501,7 +501,7 @@ interface BridgeSeams {
   readonly autoDecide: StartSupervisedRunOptions['autoDecide']
 }
 
-function bridgeFor(
+function permissionBridgeFor(
   context: RunnerContext,
   sessionId: string,
   { phase, autoDecide }: BridgeSeams
@@ -587,7 +587,7 @@ function registerControl(
 }
 
 /** Where a run lives: its worktree's project, and the terminal tab in it. */
-async function openAgentTerminal(
+async function openSupervisedTerminal(
   { api }: RunnerContext,
   start: StartSupervisedRunOptions
 ): Promise<{ projectId: string; terminalSessionId: string } | null> {
@@ -693,7 +693,7 @@ function typeLaunch(
   )
 }
 
-async function runCommand(
+async function runCommandInTab(
   { api, stateDir }: RunnerContext,
   options: RunCommandOptions
 ): Promise<number | null> {
@@ -772,7 +772,7 @@ function interruptRun(context: RunnerContext, sessionId: string): void {
   if (run !== undefined) context.api.pty.write(run.terminalSessionId, INTERRUPT)
 }
 
-function stopRun(context: RunnerContext, sessionId: string, reason?: string): boolean {
+function stopSupervisedRun(context: RunnerContext, sessionId: string, reason?: string): boolean {
   const run = context.running.get(sessionId)
   if (run === undefined) return false
   const { pty } = context.api
@@ -786,7 +786,7 @@ function stopRun(context: RunnerContext, sessionId: string, reason?: string): bo
   return true
 }
 
-function sendTo(context: RunnerContext, sessionId: string, message: string): boolean {
+function sendToSession(context: RunnerContext, sessionId: string, message: string): boolean {
   const run = context.running.get(sessionId)
   if (run === undefined) return false
   // It has been given something to do, so it is no longer waiting on us,

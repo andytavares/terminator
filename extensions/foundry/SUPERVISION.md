@@ -559,7 +559,7 @@ is empty in a fresh application by construction. `run.observe` carries
 to `waiting` before it re-enters the executor. The attempt is **given back** —
 the counter exists to catch an agent thrashing on the same check, and an
 application closing is not the agent's doing. The **session id stays on the
-node**, and `executeRun` seeds its lane/role conversation map from the graph, so
+node**, and `executeOrderRun` seeds its lane/role conversation map from the graph, so
 a resumed step continues its own conversation through `claude --resume` rather
 than putting a cold agent that has read nothing into a half-finished worktree.
 

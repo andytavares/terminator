@@ -229,7 +229,7 @@ function openBlockingFindings(order: WorkOrder): WorkOrder['redTeam'] {
  * questions, and whether the findings now wait on the operator (rule 5)
  * because the machine is not acting on them or has run out of rounds.
  */
-function openWork(input: Pick<ReadinessInput, 'order' | 'intake' | 'loop'>) {
+function openWorkOf(input: Pick<ReadinessInput, 'order' | 'intake' | 'loop'>) {
   const { order, intake, loop } = input
   const openBlocking = openBlockingFindings(order)
   const machineActing = intake.kind === 'running' && loop.heldAt === null
@@ -254,7 +254,7 @@ interface HolderStrip {
 }
 
 /** What the holder rules read: the input, what is open on the order, and the shape's name. */
-interface StripFacts extends ReturnType<typeof openWork> {
+interface StripFacts extends ReturnType<typeof openWorkOf> {
   readonly input: ReadinessInput
   readonly Shape: string
 }
@@ -264,7 +264,7 @@ type StripRule = (facts: StripFacts) => HolderStrip | null
 
 function deriveHolderAndStrip(input: ReadinessInput): HolderStrip {
   const facts: StripFacts = {
-    ...openWork(input),
+    ...openWorkOf(input),
     input,
     Shape: capitalise(input.shape.name ?? 'the proposed'),
   }
@@ -430,7 +430,7 @@ function architectRevising({ input }: StripFacts, intake: RunningIntake): Holder
 }
 
 /** 4. Held. */
-const held: StripRule = ({ input }) => {
+const heldForOperator: StripRule = ({ input }) => {
   const { loop, clock } = input
   if (loop.heldAt === null) return null
   return {
@@ -521,7 +521,7 @@ const STRIP_RULES: readonly StripRule[] = [
   handedOff,
   intakeRefused,
   intakeRunning,
-  held,
+  heldForOperator,
   findingsToDecide,
   questionsToAnswer,
   noPlan,
@@ -627,7 +627,7 @@ function checkRow(id: CheckId, input: ReadinessInput): Row {
   if (id === 'questions')
     return { id, label: ROW_LABELS[id], state: 'needs-you', detail: failure.detail }
   if (id === 'redTeam') {
-    if (openWork({ order, intake, loop }).rule5Applies)
+    if (openWorkOf({ order, intake, loop }).rule5Applies)
       return { id, label: ROW_LABELS[id], state: 'needs-you', detail: failure.detail }
   }
   return { id, label: ROW_LABELS[id], state: 'failing', detail: failure.detail }
@@ -734,7 +734,7 @@ function planStep(context: StepContext): BaseStep {
     intake.autoTurn !== null &&
     intake.round === null
   if (revising) return { state: 'work', mark: 'spin', word: `Revising ${intake.autoTurn} of 2` }
-  const { machineActing } = openWork(context.input)
+  const { machineActing } = openWorkOf(context.input)
   // An empty plan fails coverage by construction, so it is named before the
   // failing checks or it would read "Needs a fix" before anything was drafted.
   if (order.plan.units.length === 0) {
@@ -767,7 +767,7 @@ function planChecksStep({ order, compile }: ReadinessInput, machineActing: boole
 
 function redTeamStep({ input }: StepContext): BaseStep {
   const { intake, loop } = input
-  const { openBlocking, rule5Applies } = openWork(input)
+  const { openBlocking, rule5Applies } = openWorkOf(input)
   if (intake.kind === 'running' && intake.actor === 'red team') {
     return { state: 'work', mark: 'spin', word: `Reviewing, round ${intake.round} of 3` }
   }
@@ -950,7 +950,7 @@ type LockRule = (facts: StripFacts) => string | null | undefined
 
 function buildHandOffLock(input: ReadinessInput): string | null {
   const facts: StripFacts = {
-    ...openWork(input),
+    ...openWorkOf(input),
     input,
     Shape: capitalise(input.shape.name ?? 'the proposed'),
   }

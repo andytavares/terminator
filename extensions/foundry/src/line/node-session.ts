@@ -43,7 +43,7 @@ interface NodeLaunch {
  * session exists. Settled exactly once: an agent that both fails to start
  * and reports an end would otherwise resolve twice.
  */
-export function runNode(context: RunContext, input: NodeInput): Promise<StartedRun> {
+export function runNodeSession(context: RunContext, input: NodeInput): Promise<StartedRun> {
   const checkout = context.checkouts.get(input.node.lane ?? 1)
   // No checkout and no runner mean nothing ran. Reported with a null exit
   // status, which the verdict path reads as "not measured" — calling it a
@@ -116,14 +116,14 @@ function startOptions(launch: NodeLaunch, turn: NodeTurn): StartSupervisedRunOpt
     addDirs: input.skillsMount === null ? undefined : [input.skillsMount],
     autoDecide: toolDecisionFor(launch),
     onPending: (pending) => onPending(context, pending),
-    onResolved: (requestId, outcome) => onResolved(context, turn, { requestId, outcome }),
+    onResolved: (requestId, outcome) => recordResolution(context, turn, { requestId, outcome }),
     // Refusals reach the console. An agent being turned down looks
     // exactly like one that has gone quiet, and reading its transcript
     // was the only way to tell them apart.
     onAutoDenied: (tool, reason) => postToConsole(turn.sessionId, `refused ${tool}: ${reason}`),
-    onRegistered: (run) => onRegistered(input, turn, run),
-    onEnd: (exitCode) => onEnd(turn, exitCode),
-    onTurnEnd: (turns) => onTurnEnd(turn, turns),
+    onRegistered: (run) => adoptRegisteredRun(input, turn, run),
+    onEnd: (exitCode) => archiveEndedSession(turn, exitCode),
+    onTurnEnd: (turns) => finishNodeTurn(turn, turns),
   }
 }
 
@@ -192,7 +192,7 @@ function onPending(context: RunContext, pending: PendingCall): void {
   )
 }
 
-function onResolved(
+function recordResolution(
   context: RunContext,
   turn: NodeTurn,
   resolution: {
@@ -221,7 +221,7 @@ function onResolved(
 // Set here as well as after `start` resolves, so a turn that ends
 // before the promise settles still names the right session rather
 // than the placeholder.
-function onRegistered(input: NodeInput, turn: NodeTurn, run: SupervisedRun): void {
+function adoptRegisteredRun(input: NodeInput, turn: NodeTurn, run: SupervisedRun): void {
   turn.sessionId = run.sessionId
   turn.transcriptFrom = run.transcriptFrom
   // The graph learns the session while there is still an agent in
@@ -231,7 +231,7 @@ function onRegistered(input: NodeInput, turn: NodeTurn, run: SupervisedRun): voi
   input.onStarted?.(run.sessionId)
 }
 
-function onEnd(turn: NodeTurn, exitCode: number | null): void {
+function archiveEndedSession(turn: NodeTurn, exitCode: number | null): void {
   // Off the live list and into the record, so a finished unit stops
   // holding a review slot and the next wave can start.
   runtime.supervision?.finish(turn.sessionId, Date.now())
@@ -243,7 +243,7 @@ function onEnd(turn: NodeTurn, exitCode: number | null): void {
   turn.finish(exitCode)
 }
 
-function onTurnEnd(turn: NodeTurn, turns: number): void {
+function finishNodeTurn(turn: NodeTurn, turns: number): void {
   void runtime.supervision?.finishTurn(turn.sessionId, turns, Date.now())
   // The node is over when the *turn* is over, not when the process
   // is. A supervised session sits at its prompt after answering —

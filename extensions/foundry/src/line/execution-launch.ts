@@ -41,7 +41,7 @@ export type Launched = Ran | Skipped
  * never actually fail. A slash command such as `/speckit-plan` is an agent
  * instruction, not a shell command, and keeps going to `deps.run`.
  */
-export function launch(run: Execution, node: RunNode): Promise<Launched> {
+export function launchNode(run: Execution, node: RunNode): Promise<Launched> {
   const step = stepFor(run.recipe, node)
   if (
     step?.kind === 'run' &&

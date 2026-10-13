@@ -39,7 +39,7 @@ const NO_PROMOTION: Promotion = {
   promoted: null,
 }
 
-async function promoteSignal(
+async function requestPromotion(
   id: string,
   repoPath: string
 ): Promise<{ order?: { id: string }; error?: string }> {
@@ -55,10 +55,11 @@ async function promoteSignal(
  */
 export function usePromotion(sensors: readonly SensorRow[], refreshSignals: () => Promise<void>) {
   const [state, setState] = useState<Promotion>(NO_PROMOTION)
-  const patch = (next: Partial<Promotion>): void => setState((current) => ({ ...current, ...next }))
+  const patchPromotion = (next: Partial<Promotion>): void =>
+    setState((current) => ({ ...current, ...next }))
   const startPromote = (signal: Signal) => {
     const sensor = sensors.find((s) => s.def.id === signal.sensorId)
-    patch({
+    patchPromotion({
       signalProblem: null,
       promoted: null,
       repoDraft: sensor?.state.repoPath ?? '',
@@ -66,19 +67,19 @@ export function usePromotion(sensors: readonly SensorRow[], refreshSignals: () =
     })
   }
   const confirmPromote = async (id: string) => {
-    patch({ signalProblem: null })
-    const result = await promoteSignal(id, state.repoDraft)
+    patchPromotion({ signalProblem: null })
+    const result = await requestPromotion(id, state.repoDraft)
     if (result.error !== undefined) {
-      patch({ signalProblem: result.error })
+      patchPromotion({ signalProblem: result.error })
       return
     }
-    patch({
+    patchPromotion({
       promoting: null,
       promoted: `Draft ${result.order?.id ?? ''} created — open it in the Forge`,
     })
     await refreshSignals()
   }
-  const setPromoting = (promoting: string | null): void => patch({ promoting })
-  const setRepoDraft = (repoDraft: string): void => patch({ repoDraft })
+  const setPromoting = (promoting: string | null): void => patchPromotion({ promoting })
+  const setRepoDraft = (repoDraft: string): void => patchPromotion({ repoDraft })
   return { ...state, setPromoting, setRepoDraft, startPromote, confirmPromote }
 }

@@ -27,7 +27,7 @@ export interface Notice {
  * interrupt, everything else that needs a person is an indication, and routine
  * progress goes to the feed and nowhere else.
  */
-export function notify(api: ExtensionAPI, notice: Notice): Disposable | null {
+export function notifyPerson(api: ExtensionAPI, notice: Notice): Disposable | null {
   const { event, message, actions, onClick } = notice
   switch (channelFor(event)) {
     case 'modal':
@@ -75,7 +75,7 @@ export function notePending(api: ExtensionAPI, ask: PendingAsk, order?: OrderRef
       evidence: [{ kind: 'stdout', excerpt: ask.summary }],
     })
   }
-  const notification = notify(api, {
+  const notification = notifyPerson(api, {
     event: { kind: 'permission_requested', sessionId: ask.sessionId },
     message: `${path.basename(ask.featureDir)} is asking: ${ask.summary}`,
     actions: [answerAction(ask, true), answerAction(ask, false)],

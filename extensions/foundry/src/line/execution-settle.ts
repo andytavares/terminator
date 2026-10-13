@@ -26,7 +26,7 @@ interface Shortfall {
   readonly refusal: Refusal | null
 }
 
-export async function settle(run: Execution, launched: Launched): Promise<void> {
+export async function settleNode(run: Execution, launched: Launched): Promise<void> {
   // A command this repository's toolchain could not resolve. It never ran —
   // not a pass, and not a failure, which is why it does not go through the
   // pass/fail machinery below.
@@ -247,7 +247,7 @@ async function notPassed(run: Execution, ran: Ran, short: Shortfall): Promise<vo
   }
   const sendTo = reworkTarget(run, ran)
   if (sendTo === null) await failNode(run, ran, short)
-  else await sendBack(run, ran, sendTo)
+  else await sendBackForRework(run, ran, sendTo)
 }
 
 /**
@@ -266,7 +266,7 @@ function reworkTarget(run: Execution, { node }: Ran): { to: string; max: number 
   return { to: onFail.rework, max: onFail.max }
 }
 
-async function sendBack(run: Execution, ran: Ran, sendTo: { to: string; max: number }) {
+async function sendBackForRework(run: Execution, ran: Ran, sendTo: { to: string; max: number }) {
   const { node, result, command, logPath } = ran
   const excerpt =
     logPath !== null && fs.existsSync(logPath)

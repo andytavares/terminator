@@ -53,7 +53,7 @@ function useOnScreen(containerRef: React.MutableRefObject<HTMLDivElement | null>
 }
 
 /** The order's run graph; undefined for an order that has not started. */
-async function readGraph(orderId: string): Promise<RunGraph | undefined> {
+async function readThumbnailGraph(orderId: string): Promise<RunGraph | undefined> {
   const r = (await invoke('foundry:run.timeline', { id: orderId })) as {
     graph?: RunGraph
     error?: string
@@ -96,7 +96,7 @@ function useStillHall({ orderId, refreshKey, visible, worldRef }: StillDeps) {
     fetchedFor.current = key
     let cancelled = false
     void (async () => {
-      const graph = await readGraph(orderId)
+      const graph = await readThumbnailGraph(orderId)
       if (cancelled) return
       if (graph === undefined) {
         setDraft(true)

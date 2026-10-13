@@ -117,8 +117,8 @@ export function createForgeLoop(
   return {
     convergeWithFollowUps: (ask) => convergeWithFollowUps(forge, ask),
     convergeMaybeScouted: (order, message, recordStart) =>
-      convergeMaybeScouted(forge, { order, message, recordStart }),
-    onReleased: (order) => onReleased(forge, order),
+      convergeForForge(forge, { order, message, recordStart }),
+    onReleased: (order) => void resumeAfterRelease(forge, order),
   }
 }
 
@@ -310,7 +310,7 @@ async function reviewOrHandOff(
     return
   }
   const round = ask.loopRound ?? (await nextReviewRound(forge, ask.order.id))
-  await startReview(forge, { order: drafted, round, changed })
+  await startReviewRound(forge, { order: drafted, round, changed })
 }
 
 /**
@@ -321,7 +321,7 @@ async function reviewOrHandOff(
  * `MAX_REVIEW_ROUNDS` — the one point this whole feature still reaches the
  * operator. `clean` hands the order off, or says it is ready to.
  */
-async function startReview(forge: Forge, review: Review): Promise<void> {
+async function startReviewRound(forge: Forge, review: Review): Promise<void> {
   const { api } = forge
   const { order, round } = review
   const root = forge.dataRoot()
@@ -493,7 +493,7 @@ function releaseDepsFor(forge: Forge): ReleaseDeps {
   const store = orderStoreAt(root)
   return {
     entries: (orderId) => store.entries(orderId),
-    agree: (o) => agreeOrder(forge, o),
+    agree: (o) => agreeShapedOrder(forge, o),
     start: (o) => startOrder(forge, o),
     refuse: (o, reason) => refuseRestart({ api, root }, { order: o, reason }),
     sayReady: (o) =>
@@ -511,7 +511,7 @@ function releaseDepsFor(forge: Forge): ReleaseDeps {
   }
 }
 
-async function agreeOrder(forge: Forge, o: WorkOrder): Promise<Step> {
+async function agreeShapedOrder(forge: Forge, o: WorkOrder): Promise<Step> {
   const r = (await forge.channels().forge.compile({ id: o.id, commit: true, automatic: true })) as {
     error?: string
     order?: WorkOrder
@@ -562,10 +562,6 @@ async function refuseRestart(
  * a running turn is released the moment that turn's own `onFinished` reads
  * the ledger — starting a second thing here would race it.
  */
-function onReleased(forge: Forge, order: WorkOrder): void {
-  void resumeAfterRelease(forge, order)
-}
-
 async function resumeAfterRelease(forge: Forge, order: WorkOrder): Promise<void> {
   if (order.status !== 'draft') return
   const root = forge.dataRoot()
@@ -577,7 +573,7 @@ async function resumeAfterRelease(forge: Forge, order: WorkOrder): Promise<void>
     reviewedCurrentPlan: reviewedCurrentPlan(entries),
   })
   if (next.kind === 'review') {
-    await startReview(forge, { order, round: next.round, changed: '' })
+    await startReviewRound(forge, { order, round: next.round, changed: '' })
   } else if (next.kind === 'hand-off') {
     await handOffWhenReady(forge, order)
   } else if (next.kind === 'fix' || next.kind === 'follow-up') {
@@ -622,7 +618,7 @@ async function convergeAfterRelease(
  * injected collaborators, so it is testable without a runner. This is just
  * the wiring.
  */
-function convergeMaybeScouted(
+function convergeForForge(
   forge: Forge,
   { order, message, recordStart }: Pick<ArchitectAsk, 'order' | 'message' | 'recordStart'>
 ): Promise<ConvergeStarted> {

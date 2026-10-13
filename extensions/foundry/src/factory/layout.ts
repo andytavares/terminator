@@ -140,7 +140,7 @@ const CREWED_KINDS: readonly StepKind[] = ['agent', 'fanout', 'run']
 
 /** The nearest column in `row` that isn't solid, scanning outward from `preferred`. */
 /** The two tiles either side of a belt tile, across the way the belt runs. */
-function sidesOf(t: Tile, horizontal: boolean): readonly [Tile, Tile] {
+function flankingTiles(t: Tile, horizontal: boolean): readonly [Tile, Tile] {
   return horizontal
     ? [
         { x: t.x, y: t.y - 1 },
@@ -872,7 +872,7 @@ class Crossings {
   }
 
   private sidesOpen(t: Tile): readonly [Tile, Tile] | null {
-    const [p, q] = sidesOf(t, this.isHorizontal(t))
+    const [p, q] = flankingTiles(t, this.isHorizontal(t))
     return this.isOpen(p) && this.isOpen(q) ? [p, q] : null
   }
 
@@ -927,7 +927,7 @@ class Crossings {
         if (!this.isOpenableStraight(t)) return false
         const tile = this.beltTileAt.get(key(t)) as BeltTile
         const horizontal = tile.outs.includes('E') || tile.outs.includes('W')
-        const [p, q] = sidesOf(t, horizontal)
+        const [p, q] = flankingTiles(t, horizontal)
         return this.isOpen(p) && this.isOpen(q) && seen.has(key(p)) !== seen.has(key(q))
       })
       .sort((a, b) => a.y - b.y || a.x - b.x)

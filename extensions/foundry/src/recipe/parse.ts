@@ -1,5 +1,11 @@
 import { z } from 'zod'
-import { checkVersion, fail, idMatchesFile, loadYaml, type ParseResult } from './yaml-file.js'
+import {
+  checkVersion,
+  yamlFailure,
+  idMatchesFile,
+  loadYaml,
+  type ParseResult,
+} from './yaml-file.js'
 
 export type { ParseResult } from './yaml-file.js'
 
@@ -176,21 +182,22 @@ export function parseRecipe(text: string, file: string): ParseResult<Recipe> {
   if (versionProblem !== null) return versionProblem
 
   const parsed = RecipeSchema.safeParse(loaded.value)
-  if (!parsed.success) return fail(file, parsed.error.issues.map((i) => i.message).join('; '))
+  if (!parsed.success)
+    return yamlFailure(file, parsed.error.issues.map((i) => i.message).join('; '))
   const recipe = parsed.data
 
   // A name has to resolve to what it says it is, because resolution is by name
   // across three directories and a mismatch would silently shadow a built-in.
   if (!idMatchesFile(recipe.id, file)) {
-    return fail(file, `declares id "${recipe.id}", which does not match the filename`)
+    return yamlFailure(file, `declares id "${recipe.id}", which does not match the filename`)
   }
 
   const problem = stepGraphProblem(recipe.steps)
-  if (problem !== null) return fail(file, problem)
+  if (problem !== null) return yamlFailure(file, problem)
   const onFailProblem = checkOnFail(recipe.steps, file)
   if (onFailProblem !== null) return onFailProblem
   const ci = ciProblem(recipe)
-  return ci === null ? { ok: true, value: recipe } : fail(file, ci)
+  return ci === null ? { ok: true, value: recipe } : yamlFailure(file, ci)
 }
 
 /** The first thing wrong with how the steps name and wait on each other, in words. */
@@ -262,7 +269,7 @@ function checkOnFail(steps: readonly Step[], file: string): { ok: false; reason:
   for (const step of steps) {
     if (step.onFail === undefined) continue
     if (step.kind !== 'run') {
-      return fail(
+      return yamlFailure(
         file,
         `step "${step.id}" has onFail, but only a command step can fail on its own today`
       )
@@ -270,13 +277,13 @@ function checkOnFail(steps: readonly Step[], file: string): { ok: false; reason:
     const target = byId.get(step.onFail.rework)
     const upstream = upstreamOf(step.id, byId)
     if (target === undefined || !upstream.has(target.id)) {
-      return fail(
+      return yamlFailure(
         file,
         `step "${step.id}" has onFail.rework "${step.onFail.rework}", which is not upstream of it`
       )
     }
     if (target.kind !== 'agent' && target.kind !== 'fanout') {
-      return fail(
+      return yamlFailure(
         file,
         `step "${step.id}" has onFail.rework "${target.id}", but only an agent or fanout step can rework`
       )
@@ -313,13 +320,14 @@ export function parseRole(text: string, file: string): ParseResult<Role> {
   if (versionProblem !== null) return versionProblem
 
   const parsed = RoleSchema.safeParse(loaded.value)
-  if (!parsed.success) return fail(file, parsed.error.issues.map((i) => i.message).join('; '))
+  if (!parsed.success)
+    return yamlFailure(file, parsed.error.issues.map((i) => i.message).join('; '))
   if (!idMatchesFile(parsed.data.id, file)) {
-    return fail(file, `declares id "${parsed.data.id}", which does not match the filename`)
+    return yamlFailure(file, `declares id "${parsed.data.id}", which does not match the filename`)
   }
   const bad = badSkillIds(parsed.data.skills)
   if (bad.length > 0) {
-    return fail(
+    return yamlFailure(
       file,
       `role "${parsed.data.id}" names skill "${bad[0]}", which is not a valid skill id`
     )
@@ -354,9 +362,10 @@ export function parseRule(text: string, file: string): ParseResult<Rule> {
   if (versionProblem !== null) return versionProblem
 
   const parsed = RuleSchema.safeParse(loaded.value)
-  if (!parsed.success) return fail(file, parsed.error.issues.map((i) => i.message).join('; '))
+  if (!parsed.success)
+    return yamlFailure(file, parsed.error.issues.map((i) => i.message).join('; '))
   if (!idMatchesFile(parsed.data.id, file)) {
-    return fail(file, `declares id "${parsed.data.id}", which does not match the filename`)
+    return yamlFailure(file, `declares id "${parsed.data.id}", which does not match the filename`)
   }
   return { ok: true, value: parsed.data }
 }

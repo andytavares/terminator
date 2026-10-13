@@ -35,7 +35,7 @@ interface Change {
   readonly risk: RiskAssessment
 }
 
-export async function finishRun(run: Execution): Promise<RunOutcome> {
+export async function finishExecution(run: Execution): Promise<RunOutcome> {
   const change = await assessChange(run)
   const workDone = isWorkDone(run)
   const climber = new FinalClimb(run, change)
@@ -45,10 +45,10 @@ export async function finishRun(run: Execution): Promise<RunOutcome> {
   const owed = !run.halted && !run.stalled && workDone
   const draftsOpen = owed && (await openDraftsEarly(run, change))
   const climbed = owed ? await climber.climbAll() : null
-  if (climbed === null) return outcomeOf(run, { change, workDone, ladder: null })
+  if (climbed === null) return runOutcomeOf(run, { change, workDone, ladder: null })
   if (!run.halted) await raiseAfterWork(run, { change, climbed, climber })
   if (draftsOpen && !climbed.ladder.ok) await recordFinalCheckFailed(run, climbed.ladder)
-  return outcomeOf(run, { change, workDone, ladder: climbed.ladder })
+  return runOutcomeOf(run, { change, workDone, ladder: climbed.ladder })
 }
 
 /**
@@ -410,7 +410,7 @@ async function recordFinalCheckFailed(run: Execution, ladder: LadderOutcome): Pr
   )
 }
 
-function outcomeOf(
+function runOutcomeOf(
   run: Execution,
   { change, workDone, ladder }: { change: Change; workDone: boolean; ladder: LadderOutcome | null }
 ): RunOutcome {

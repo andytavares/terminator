@@ -195,7 +195,7 @@ export async function provisionDependencies(
 async function lendModules(checkout: Checkout, dir: string, deps: CheckoutDeps): Promise<boolean> {
   const originModules = path.join(checkout.origin, dir, 'node_modules')
   const worktreeModules = path.join(checkout.path, dir, 'node_modules')
-  if (!isDirectory(originModules) || exists(worktreeModules)) return false
+  if (!isDirectoryAt(originModules) || pathExists(worktreeModules)) return false
   try {
     fs.symlinkSync(originModules, worktreeModules, 'dir')
   } catch {
@@ -216,7 +216,7 @@ async function lendModules(checkout: Checkout, dir: string, deps: CheckoutDeps):
   return false
 }
 
-function isDirectory(target: string): boolean {
+function isDirectoryAt(target: string): boolean {
   try {
     return fs.statSync(target).isDirectory()
   } catch {
@@ -225,7 +225,7 @@ function isDirectory(target: string): boolean {
 }
 
 /** Whether anything is at `target`, a dangling link included — never overwrite what is there. */
-function exists(target: string): boolean {
+function pathExists(target: string): boolean {
   try {
     fs.lstatSync(target)
     return true
