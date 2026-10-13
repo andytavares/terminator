@@ -31,6 +31,13 @@ function node(over: Partial<RunNode> = {}): RunNode {
 }
 
 describe('factory/art/glyphs', () => {
+  describe('the table', theTableTests)
+  describe('measuring and drawing text', measuringAndDrawingTextTests)
+  describe('missing characters and digits', missingCharactersAndDigitsTests)
+  describe('shipped ids', shippedIdsTests)
+})
+
+function theTableTests() {
   it('has a 15-bit glyph for every letter, digit, hyphen, full stop and space', () => {
     const expected = [...'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-. ']
     expect(Object.keys(GLYPHS).sort()).toEqual([...expected].sort())
@@ -44,7 +51,9 @@ describe('factory/art/glyphs', () => {
       expect(bits.includes('1'), ch).toBe(ch !== ' ')
     }
   })
+}
 
+function measuringAndDrawingTextTests() {
   it('measures text as four pixels a character less the gap after the last', () => {
     expect(textWidth('A')).toBe(3)
     expect(textWidth('AB')).toBe(7)
@@ -66,7 +75,9 @@ describe('factory/art/glyphs', () => {
       { x: 16, y: 22 },
     ])
   })
+}
 
+function missingCharactersAndDigitsTests() {
   it('draws a character the font lacks as a space', () => {
     const paint = createRecordingPaint()
     drawText(paint, 0, 0, 'é', '#fff')
@@ -90,7 +101,9 @@ describe('factory/art/glyphs', () => {
       expect(paint.calls, bad).toHaveLength(0)
     }
   })
+}
 
+function shippedIdsTests() {
   it('has a glyph for every character a shipped recipe role or step id folds to', () => {
     const files = fs.readdirSync(RECIPES).filter((f) => f.endsWith('.yaml'))
     expect(files.length).toBeGreaterThan(0)
@@ -110,9 +123,15 @@ describe('factory/art/glyphs', () => {
     }
     expect(names).toBeGreaterThan(files.length)
   })
-})
+}
 
 describe('factory/layout signText', () => {
+  describe('picking a candidate', pickingACandidateTests)
+  describe('fallbacks and cuts', fallbacksAndCutsTests)
+  describe('ids and folding', idsAndFoldingTests)
+})
+
+function pickingACandidateTests() {
   it('shows the role and its one unit when they fit', () => {
     expect(signText(node({ role: 'builder', unitIds: ['U-1'] }), 12)).toBe('BUILDER U-1')
   })
@@ -134,7 +153,9 @@ describe('factory/layout signText', () => {
     expect(signText(n, 10)).toBe('U-1')
     expect(signText(node({ role: 'builder', unitIds: ['LONGUNIT-1'] }), 8)).toBe('BUILDER')
   })
+}
 
+function fallbacksAndCutsTests() {
   it('shows the role alone for a node with no unit or with several', () => {
     expect(signText(node({ role: 'builder' }), 12)).toBe('BUILDER')
     expect(signText(node({ role: 'builder', unitIds: ['U-1', 'U-2'] }), 12)).toBe('BUILDER')
@@ -145,7 +166,9 @@ describe('factory/layout signText', () => {
     expect(signText(node({ role: 'documentation' }), 4)).toBe('DOC.')
     expect(signText(node({ role: 'documentation', unitIds: ['U-1'] }), 8)).toBe('U-1')
   })
+}
 
+function idsAndFoldingTests() {
   it('names a step by its step id when it has no role', () => {
     expect(signText(node({ id: 'lint', stepId: 'lint' }), 8)).toBe('LINT')
   })
@@ -161,4 +184,4 @@ describe('factory/layout signText', () => {
     expect(signText(node({ role: 'é' }), 12)).toBe('-')
     expect(signText(node({ role: 'qa', unitIds: ['fix:auth/1'] }), 13)).toBe('QA FIX-AUTH-1')
   })
-})
+}

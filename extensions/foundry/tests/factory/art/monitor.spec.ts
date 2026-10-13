@@ -32,6 +32,13 @@ function raster(w: number, h: number): (string | null)[][] {
 }
 
 describe('factory/art/monitor drawMonitorCase', () => {
+  describe('the case', theCaseTests)
+  describe('highlights and corners', highlightsAndCornersTests)
+  describe('the tube', theTubeTests)
+  describe('determinism', determinismTests)
+})
+
+function theCaseTests() {
   it.each(SIZES)('paints outline, highlight, shadow and recess at %ix%i', (w, h) => {
     const styles = new Set(record(w, h).map((c) => c.style))
     for (const colour of [
@@ -48,7 +55,9 @@ describe('factory/art/monitor drawMonitorCase', () => {
       expect(styles.has(colour)).toBe(true)
     }
   })
+}
 
+function highlightsAndCornersTests() {
   it.each(SIZES)('highlights the top-left and shadows the bottom-right at %ix%i', (w, h) => {
     const g = raster(w, h)
     expect(g[1][w >> 1]).toBe(HALL.caseHi)
@@ -64,7 +73,9 @@ describe('factory/art/monitor drawMonitorCase', () => {
     expect(g[h - 1][w >> 1]).toBe(HALL.caseLine)
     expect(g[h - 3][w >> 1]).toBe(HALL.caseStand)
   })
+}
 
+function theTubeTests() {
   it.each(SIZES)('shows only the tube colour inside the tube at %ix%i', (w, h) => {
     const g = raster(w, h)
     const t = monitorTube(w, h)
@@ -85,7 +96,9 @@ describe('factory/art/monitor drawMonitorCase', () => {
       }
     }
   })
+}
 
+function determinismTests() {
   it.each(SIZES)('records the same calls for the same size at %ix%i', (w, h) => {
     expect(record(w, h)).toEqual(record(w, h))
   })
@@ -93,7 +106,7 @@ describe('factory/art/monitor drawMonitorCase', () => {
   it('draws differently for different sizes', () => {
     expect(record(72, 64)).not.toEqual(record(130, 110))
   })
-})
+}
 
 describe('factory/art/monitor monitorTube', () => {
   it('insets the tube from the case', () => {

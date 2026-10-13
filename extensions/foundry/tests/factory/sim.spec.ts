@@ -217,6 +217,15 @@ describe('createWorld: queue', () => {
 })
 
 describe('createWorld', () => {
+  describe('running and failed nodes', runningAndFailedNodesTests)
+  describe('resting nodes', restingNodesTests)
+  describe('absent crew', absentCrewTests)
+  describe('waiting gates', waitingGatesTests)
+  describe('stationless and determinism', stationlessAndDeterminismTests)
+  describe('distinct rest seats', distinctRestSeatsTests)
+})
+
+function runningAndFailedNodesTests() {
   it('settles a running node at its seat, doing its own kind of work', () => {
     const g = withNode(graph(), 'a', { state: 'running' })
     const map = layoutHall(g)
@@ -242,7 +251,9 @@ describe('createWorld', () => {
     const world = createWorld(map, obs(g))
     expect(world.crew.find((c) => c.nodeId === 'a')?.anim).toBe('slump')
   })
+}
 
+function restingNodesTests() {
   it('settles a passed node seated in the breakroom, on the nearest free rest seat', () => {
     const g = withNode(graph(), 'a', { state: 'passed' })
     const map = layoutHall(g)
@@ -264,7 +275,9 @@ describe('createWorld', () => {
     expect(crew.anim).toBe('couch')
     expect(crew.restSeat).not.toBe(null)
   })
+}
 
+function absentCrewTests() {
   it('an orphaned node is not present', () => {
     const g = withNode(graph(), 'a', { state: 'running' })
     const map = layoutHall(g)
@@ -279,7 +292,9 @@ describe('createWorld', () => {
     const world = createWorld(map, obs(g))
     expect(world.crew.some((c) => c.nodeId === 'g')).toBe(false)
   })
+}
 
+function waitingGatesTests() {
   it('gatesWaiting is empty unless a gate is waiting', () => {
     const g = graph()
     const map = layoutHall(g)
@@ -296,7 +311,9 @@ describe('createWorld', () => {
     })
     expect(createWorld(map, obs(g, { waiting: [raised] })).gatesWaiting).toEqual(['g'])
   })
+}
 
+function stationlessAndDeterminismTests() {
   it('a waiting node with no station in the map gets no crew of its own', () => {
     const g = withNode(graph(), 'b', { state: 'waiting' })
     const mapMissingB = layoutHall({ ...g, nodes: g.nodes.filter((n) => n.id !== 'b') })
@@ -309,7 +326,9 @@ describe('createWorld', () => {
     const map = layoutHall(g)
     expect(createWorld(map, obs(g))).toEqual(createWorld(map, obs(g)))
   })
+}
 
+function distinctRestSeatsTests() {
   it('all-passed gives every idle crew member a distinct rest seat', () => {
     const g0 = graphFor('standard.yaml', [1, 2, 3])
     let g = g0
@@ -321,9 +340,15 @@ describe('createWorld', () => {
     expect(seatIds.every((id) => id !== null)).toBe(true)
     expect(new Set(seatIds).size).toBe(seatIds.length)
   })
-})
+}
 
 describe('nearestRestSeat', () => {
+  describe('distance and ties', distanceAndTiesTests)
+  describe('full benches', fullBenchesTests)
+  describe('two crew', twoCrewTests)
+})
+
+function distanceAndTiesTests() {
   it('picks the free seat with the shortest walk, not the lower id, when the two disagree', () => {
     // A two-row strip: row 0 has two seats at x=2 and x=4 (both blocked in
     // `walk`, as a real seat is until it is taken); row 1 is a clear detour
@@ -359,7 +384,9 @@ describe('nearestRestSeat', () => {
     const seat = nearestRestSeat(map, { x: 3, y: 0 }, new Set())
     expect(seat?.id).toBe(3)
   })
+}
 
+function fullBenchesTests() {
   it('returns null when every seat is taken', () => {
     const row = [false, false, true]
     const map = {
@@ -368,7 +395,9 @@ describe('nearestRestSeat', () => {
     } as unknown as HallMap
     expect(nearestRestSeat(map, { x: 0, y: 0 }, new Set([0]))).toBe(null)
   })
+}
 
+function twoCrewTests() {
   it('two crew going idle one after another land on different seats', () => {
     const g = graphFor('standard.yaml', [1, 2, 3])
     const map = layoutHall(g)
@@ -390,7 +419,7 @@ describe('nearestRestSeat', () => {
     expect(verifySeat).not.toBe(null)
     expect(documentSeat).not.toBe(verifySeat)
   })
-})
+}
 
 describe('breakroom walk paths', () => {
   it('walks from each station seat to its rest seat without crossing an unopened belt tile', () => {
@@ -423,6 +452,17 @@ describe('breakroom walk paths', () => {
 })
 
 describe('tick', () => {
+  describe('walking', walkingTests)
+  describe('arriving', arrivingTests)
+  describe('rest seat facing', restSeatFacingTests)
+  describe('releasing seats', releasingSeatsTests)
+  describe('crates', cratesTests)
+  describe('queued work and unknown belts', queuedWorkAndUnknownBeltsTests)
+  describe('the clock and replays', theClockAndReplaysTests)
+  describe('empty paths', emptyPathsTests)
+})
+
+function walkingTests() {
   it('advances a walking crew member toward a goal and does not move one with none', () => {
     const g = graph()
     const map = layoutHall(g)
@@ -445,7 +485,9 @@ describe('tick', () => {
     expect(idleAfter.x).toBe(idle.x)
     expect(idleAfter.y).toBe(idle.y)
   })
+}
 
+function arrivingTests() {
   it('walks all the way to the seat and adopts the arrival animation, ticking in 16ms steps', () => {
     const g = graph()
     const map = layoutHall(g)
@@ -464,7 +506,9 @@ describe('tick', () => {
     expect(crew.goal).toBe(null)
     expect(crew.path).toEqual([])
   })
+}
 
+function restSeatFacingTests() {
   it('arrives at a rest seat facing the way the seat faces', () => {
     const g = graphFor('standard.yaml', [1, 2, 3])
     const map = layoutHall(g)
@@ -484,7 +528,9 @@ describe('tick', () => {
     const seat = map.restSeats.find((s) => s.id === crew.restSeat)!
     expect(crew.facing).toBe(seat.facing)
   })
+}
 
+function releasingSeatsTests() {
   it('releases its seat when sent back to work, and a later idle crew member can take it', () => {
     const g = graphFor('standard.yaml', [1, 2, 3])
     const map = layoutHall(g)
@@ -509,7 +555,9 @@ describe('tick', () => {
     const everyOther = new Set(map.restSeats.filter((s) => s.id !== seatId).map((s) => s.id))
     expect(nearestRestSeat(map, freed.tile, everyOther)?.id).toBe(seatId)
   })
+}
 
+function cratesTests() {
   it('a crate bound for a started step advances and is consumed on arrival', () => {
     const g = graph()
     const map = layoutHall(g)
@@ -540,7 +588,9 @@ describe('tick', () => {
     for (let i = 0; i < 50; i++) w = tick(w, 1000)
     expect(w.crates).toEqual([{ id: 'c1', beltId: belt.id, progress: 1, parks: true }])
   })
+}
 
+function queuedWorkAndUnknownBeltsTests() {
   it('shows work already queued on first load: a parked crate per finished-but-unstarted edge', () => {
     const g = graph()
     const belt = layoutHall(g).belts[0]
@@ -567,7 +617,9 @@ describe('tick', () => {
     w = tick(w, 100)
     expect(w.crates[0].progress).toBeGreaterThan(0)
   })
+}
 
+function theClockAndReplaysTests() {
   it('advances the clock deterministically', () => {
     const g = graph()
     const map = layoutHall(g)
@@ -591,7 +643,9 @@ describe('tick', () => {
     }
     expect(run()).toEqual(run())
   })
+}
 
+function emptyPathsTests() {
   it('a crew member with a goal but an already-empty path that resolves to no route arrives immediately', () => {
     // Build a world where the crew's own tile is already the goal.
     const g = graph()
@@ -607,7 +661,7 @@ describe('tick', () => {
     expect(after.goal).toBe(null)
     expect(after.anim).toBe('wave')
   })
-})
+}
 
 describe('cratePosition', () => {
   const belt = {
@@ -639,29 +693,96 @@ describe('cratePosition', () => {
   })
 })
 
+function restingWorld(): World {
+  let g = graphFor('standard.yaml', [1, 2])
+  for (const node of g.nodes) g = withNode(g, node.id, { state: 'passed' })
+  return createWorld(layoutHall(g), obs(g))
+}
+function runFor(world: World, ms: number, step = 100): World {
+  let w = world
+  for (let t = 0; t < ms; t += step) w = tick(w, step)
+  return w
+}
+function trail(world: World, ms: number): string[] {
+  const out: string[] = []
+  let w = world
+  for (let t = 0; t < ms; t += 100) {
+    w = tick(w, 100)
+    out.push(w.crew.map((c) => `${Math.round(c.x)},${Math.round(c.y)}`).join('|'))
+  }
+  return out
+}
+
 describe('idle crew wander', () => {
-  function restingWorld(): World {
-    let g = graphFor('standard.yaml', [1, 2])
-    for (const node of g.nodes) g = withNode(g, node.id, { state: 'passed' })
-    return createWorld(layoutHall(g), obs(g))
-  }
+  describe('loiter points', loiterPointsTests)
+  describe('strolling', strollingTests)
+  describe('determinism and overrides', determinismAndOverridesTests)
+})
 
-  function run(world: World, ms: number, step = 100): World {
-    let w = world
-    for (let t = 0; t < ms; t += step) w = tick(w, step)
-    return w
+// One-tile corridor along row 1 with a bay under x=3 and x=7 where someone
+// can stand aside. Only `walk` is read by the crew's movement.
+const ROWS = ['#########', '.........', '###.###.#', '#########']
+const walk = ROWS.map((row) => row.split('').map((ch) => ch === '#'))
+const corridor = { walk, solid: walk, restSeats: [], props: [] } as unknown as HallMap
+function member(
+  nodeId: string,
+  from: { x: number; y: number },
+  goal: { x: number; y: number },
+  then: Crew['then']
+): Crew {
+  const c = tileCenter(from)
+  return {
+    nodeId,
+    role: null,
+    x: c.x,
+    y: c.y,
+    facing: 'E',
+    anim: 'idle',
+    path: [],
+    goal,
+    then,
+    present: true,
+    restSeat: null,
+    settle: null,
   }
-
-  function trail(world: World, ms: number): string[] {
-    const out: string[] = []
-    let w = world
-    for (let t = 0; t < ms; t += 100) {
-      w = tick(w, 100)
-      out.push(w.crew.map((c) => `${Math.round(c.x)},${Math.round(c.y)}`).join('|'))
-    }
-    return out
+}
+function world(crew: Crew[]): World {
+  return {
+    map: corridor,
+    crew,
+    crates: [],
+    gatesWaiting: [],
+    openCalls: [],
+    verdicts: [],
+    clockMs: 0,
+    ci: null,
+    queue: null,
   }
+}
+function atGoal(c: Crew): boolean {
+  const t = tileOf(c.x, c.y)
+  return c.goal === null && c.path.length === 0 && t.x >= 0
+}
+function run(start: World, ticks: number, onTick?: (w: World) => void): World {
+  let w = start
+  for (let i = 0; i < ticks && !w.crew.every(atGoal); i++) {
+    w = tick(w, 16)
+    onTick?.(w)
+  }
+  return w
+}
+function sharedTile(w: World): string | null {
+  const seen = new Set<string>()
+  for (const c of w.crew.filter((m) => m.present)) {
+    const t = tileOf(c.x, c.y)
+    const k = `${t.x},${t.y}`
+    if (seen.has(k)) return k
+    seen.add(k)
+  }
+  return null
+}
 
+function loiterPointsTests() {
   it('picks loiter points from the map alone: free, reachable floor, in a fixed order', () => {
     const map = restingWorld().map
     const points = loiterPoints(map)
@@ -673,10 +794,12 @@ describe('idle crew wander', () => {
 
   it('leaves everyone seated before the first stroll is due', () => {
     const start = restingWorld()
-    const after = run(start, 19_000)
+    const after = runFor(start, 19_000)
     expect(after.crew.map((c) => [c.x, c.y])).toEqual(start.crew.map((c) => [c.x, c.y]))
   })
+}
 
+function strollingTests() {
   it('sends a resting crew member to a loiter point and back to their own seat', () => {
     const start = restingWorld()
     const seats = start.crew.map((c) => c.restSeat)
@@ -697,14 +820,16 @@ describe('idle crew wander', () => {
     expect(walked).toBe(true)
     expect(left).toBe(true)
     // after enough time everyone has either come home or is out strolling
-    const homeAgain = run(w, 120_000).crew.filter((c) => c.goal === null && c.wander == null)
+    const homeAgain = runFor(w, 120_000).crew.filter((c) => c.goal === null && c.wander == null)
     for (const c of homeAgain) {
       const seat = start.map.restSeats[c.restSeat as number]
       expect([c.x, c.y]).toEqual([tileCenter(seat.tile).x, tileCenter(seat.tile).y])
     }
     expect(w.crew.map((c) => c.restSeat)).toEqual(seats)
   })
+}
 
+function determinismAndOverridesTests() {
   it('is deterministic: the same world and tick sizes walk the same path', () => {
     expect(trail(restingWorld(), 90_000)).toEqual(trail(restingWorld(), 90_000))
   })
@@ -728,77 +853,35 @@ describe('idle crew wander', () => {
     expect(later.wander ?? null).toBeNull()
     expect(later.anim).not.toBe('couch')
   })
-})
+}
 
 describe('crew are solid', () => {
-  // One-tile corridor along row 1 with a bay under x=3 and x=7 where someone
-  // can stand aside. Only `walk` is read by the crew's movement.
-  const ROWS = ['#########', '.........', '###.###.#', '#########']
-  const walk = ROWS.map((row) => row.split('').map((ch) => ch === '#'))
-  const corridor = { walk, solid: walk, restSeats: [], props: [] } as unknown as HallMap
+  describe('head-on', headOnTests)
+  describe('a passing place', aPassingPlaceTests)
+  describe('absent crew and determinism', absentCrewAndDeterminismTests)
+})
 
-  function member(
-    nodeId: string,
-    from: { x: number; y: number },
-    goal: { x: number; y: number },
-    then: Crew['then']
-  ): Crew {
-    const c = tileCenter(from)
-    return {
-      nodeId,
-      role: null,
-      x: c.x,
-      y: c.y,
-      facing: 'E',
-      anim: 'idle',
-      path: [],
-      goal,
-      then,
-      present: true,
-      restSeat: null,
-      settle: null,
-    }
-  }
+const realGraph = (): RunGraph =>
+  JSON.parse(
+    fs.readFileSync(path.join(__dirname, 'fixtures', 'run-graph-real.json'), 'utf-8')
+  ) as RunGraph
+const crewOf = (world: World, id: string): Crew => world.crew.find((c) => c.nodeId === id)!
+const settled = (): World => {
+  const g = realGraph()
+  return createWorld(layoutHall(g), {
+    graph: g,
+    orphaned: [],
+    stranded: [],
+    waiting: [],
+    activity: {},
+    ci: null,
+    queue: null,
+  })
+}
+const sendBack = (toNodeId: string): World =>
+  direct(settled(), [{ kind: 'rework', fromNodeId: 'verify', toNodeId, round: 1 }], 0)
 
-  function world(crew: Crew[]): World {
-    return {
-      map: corridor,
-      crew,
-      crates: [],
-      gatesWaiting: [],
-      openCalls: [],
-      verdicts: [],
-      clockMs: 0,
-      ci: null,
-      queue: null,
-    }
-  }
-
-  function atGoal(c: Crew): boolean {
-    const t = tileOf(c.x, c.y)
-    return c.goal === null && c.path.length === 0 && t.x >= 0
-  }
-
-  function run(start: World, ticks: number, onTick?: (w: World) => void): World {
-    let w = start
-    for (let i = 0; i < ticks && !w.crew.every(atGoal); i++) {
-      w = tick(w, 16)
-      onTick?.(w)
-    }
-    return w
-  }
-
-  function sharedTile(w: World): string | null {
-    const seen = new Set<string>()
-    for (const c of w.crew.filter((m) => m.present)) {
-      const t = tileOf(c.x, c.y)
-      const k = `${t.x},${t.y}`
-      if (seen.has(k)) return k
-      seen.add(k)
-    }
-    return null
-  }
-
+function headOnTests() {
   it('two crew sent head-on never share a tile and both arrive', () => {
     const start = world([
       member('a', { x: 0, y: 1 }, { x: 8, y: 1 }, 'type'),
@@ -815,7 +898,9 @@ describe('crew are solid', () => {
       [null, { x: 0, y: 1 }],
     ])
   })
+}
 
+function aPassingPlaceTests() {
   it('four crew sent both ways through one passing place all arrive', () => {
     // A corridor with a 3x3 room in the middle to pass in. All four end in the
     // room, so nobody ends up parked in the corridor itself.
@@ -854,7 +939,9 @@ describe('crew are solid', () => {
       { x: 6, y: 1 },
     ])
   })
+}
 
+function absentCrewAndDeterminismTests() {
   it('a crew member who is not present does not block anyone', () => {
     const away = {
       ...member('away', { x: 4, y: 1 }, { x: 4, y: 1 }, 'idle'),
@@ -883,29 +970,14 @@ describe('crew are solid', () => {
     }
     expect(a).toEqual(b)
   })
-})
+}
 
 describe('tick: a box carried back to an earlier station', () => {
-  const realGraph = (): RunGraph =>
-    JSON.parse(
-      fs.readFileSync(path.join(__dirname, 'fixtures', 'run-graph-real.json'), 'utf-8')
-    ) as RunGraph
-  const crewOf = (world: World, id: string): Crew => world.crew.find((c) => c.nodeId === id)!
-  const settled = (): World => {
-    const g = realGraph()
-    return createWorld(layoutHall(g), {
-      graph: g,
-      orphaned: [],
-      stranded: [],
-      waiting: [],
-      activity: {},
-      ci: null,
-      queue: null,
-    })
-  }
-  const sendBack = (toNodeId: string): World =>
-    direct(settled(), [{ kind: 'rework', fromNodeId: 'verify', toNodeId, round: 1 }], 0)
+  describe('carrying the box', carryingTheBoxTests)
+  describe('cancelled errands', cancelledErrandsTests)
+})
 
+function carryingTheBoxTests() {
   it.each([
     ['build:lane-1', 0],
     ['lint', 1],
@@ -938,7 +1010,9 @@ describe('tick: a box carried back to an earlier station', () => {
       expect(crate).toMatchObject({ progress: 1, parks: true })
     }
   })
+}
 
+function cancelledErrandsTests() {
   it('cancels the errand when a real event sends the walker elsewhere', () => {
     let world = sendBack('build:lane-1')
     for (let i = 0; i < 5; i++) world = tick(world, 50)
@@ -952,4 +1026,4 @@ describe('tick: a box carried back to an earlier station', () => {
     expect(verifier.errand).toBeUndefined()
     expect(verifier.carrying).toBe(false)
   })
-})
+}

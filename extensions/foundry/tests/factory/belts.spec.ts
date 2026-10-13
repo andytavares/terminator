@@ -56,6 +56,13 @@ function roleRows(height: number, stationRow: number): string[] {
 }
 
 describe('routeBelts', () => {
+  describe('straight belts', straightBeltsTests)
+  describe('splits', splitsTests)
+  describe('BFS fallback', bfsFallbackTests)
+  describe('missing stations', missingStationsTests)
+})
+
+function straightBeltsTests() {
   it('routes a straight belt on the belt row when source and target share a row', () => {
     const a = station('a', 0, 2, 2)
     const b = station('b', 6, 2, 2)
@@ -74,7 +81,9 @@ describe('routeBelts', () => {
     expect(beltTiles.length).toBeGreaterThan(0)
     expect(beltTiles.every((t) => t.kind === 'straight' || t.kind === 'corner')).toBe(true)
   })
+}
 
+function splitsTests() {
   it('gives the shared tile of two belts from the same source a split, in graph order', () => {
     const a = station('a', 0, 2, 1)
     const b = station('b', 5, 2, 1)
@@ -101,7 +110,9 @@ describe('routeBelts', () => {
     const splitTile = beltTiles.find((t) => t.kind === 'split')!
     expect(splitTile.outs.length).toBeGreaterThan(1)
   })
+}
 
+function bfsFallbackTests() {
   it('falls back to a plain BFS path when the routed search can never turn', () => {
     // Every row is 'wall', so a horizontal step is never legal for the
     // routed search — it cannot reach a target one column removed no matter
@@ -126,7 +137,9 @@ describe('routeBelts', () => {
       prev = t
     }
   })
+}
 
+function missingStationsTests() {
   it('skips an edge whose source or target station is missing from the map', () => {
     const b = station('b', 4, 2, 1)
     const nodes = [node({ id: 'b', dependsOn: ['ghost'] })]
@@ -137,4 +150,4 @@ describe('routeBelts', () => {
     expect(belts).toEqual([])
     expect(beltTiles).toEqual([])
   })
-})
+}

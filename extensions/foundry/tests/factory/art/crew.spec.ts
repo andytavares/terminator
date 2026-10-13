@@ -33,6 +33,11 @@ function crew(overrides: Partial<Crew> = {}): Crew {
 }
 
 describe('factory/art/crew drawCrew', () => {
+  describe('poses', posesTests)
+  describe('roles and typing', rolesAndTypingTests)
+})
+
+function posesTests() {
   it('draws every anim in every facing without throwing', () => {
     for (const anim of ALL_ANIMS) {
       for (const facing of ALL_FACINGS) {
@@ -58,7 +63,9 @@ describe('factory/art/crew drawCrew', () => {
     const distinct = new Set(frames.map((f) => JSON.stringify(f)))
     expect(distinct.size).toBeGreaterThan(1)
   })
+}
 
+function rolesAndTypingTests() {
   it('does not throw for an unknown role (neutral silhouette)', () => {
     const paint = createRecordingPaint()
     expect(() => drawCrew(paint, crew({ role: 'unlisted' }), 0)).not.toThrow()
@@ -79,7 +86,7 @@ describe('factory/art/crew drawCrew', () => {
     drawCrew(b, crew({ anim: 'type' }), 100)
     expect(a.calls).not.toEqual(b.calls)
   })
-})
+}
 
 describe('factory/art/crew carrying', () => {
   const CRATE_BODY = '#b07a3c'

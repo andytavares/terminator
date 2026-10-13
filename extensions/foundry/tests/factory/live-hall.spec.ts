@@ -55,6 +55,15 @@ const handedOver = (): RunGraph =>
   withNode(withNode(graph(), 'a', { state: 'passed' }), 'b', { state: 'running' })
 
 describe('createLiveHall', () => {
+  describe('before and after the first observation', beforeAndAfterTheFirstObservationTests)
+  describe('dwell', dwellTests)
+  describe('subscribers', subscribersTests)
+  describe('unsubscribing', unsubscribingTests)
+  describe('played events', playedEventsTests)
+  describe('queue and relayout', queueAndRelayoutTests)
+})
+
+function beforeAndAfterTheFirstObservationTests() {
   it('is empty until it has been shown a run', () => {
     const hall = createLiveHall()
     expect(hall.snapshot().map).toBeNull()
@@ -69,7 +78,9 @@ describe('createLiveHall', () => {
     expect(hall.snapshot().shown.a).toBe('running')
     expect(hall.snapshot().shown.b).toBe('waiting')
   })
+}
 
+function dwellTests() {
   it('shows a step that passed at once, and holds the step behind it for the dwell', () => {
     const hall = createLiveHall()
     hall.observe(observation(running()), {}, 0)
@@ -82,7 +93,9 @@ describe('createLiveHall', () => {
     hall.releaseDue({}, 1000 + MIN_DWELL_MS)
     expect(hall.snapshot().shown.b).toBe('running')
   })
+}
 
+function subscribersTests() {
   it('tells subscribers when the scene changes, and not when nothing came due', () => {
     const hall = createLiveHall()
     const changed = vi.fn()
@@ -109,7 +122,9 @@ describe('createLiveHall', () => {
     hall.observe(observation(g), {}, 500)
     expect(changed).not.toHaveBeenCalled()
   })
+}
 
+function unsubscribingTests() {
   it('stops telling a subscriber that unsubscribed', () => {
     const hall = createLiveHall()
     const changed = vi.fn()
@@ -117,7 +132,9 @@ describe('createLiveHall', () => {
     hall.observe(observation(running()), {}, 0)
     expect(changed).not.toHaveBeenCalled()
   })
+}
 
+function playedEventsTests() {
   it('hands the events it played, with the labels, to the listeners', () => {
     const hall = createLiveHall()
     const heard = vi.fn()
@@ -134,7 +151,9 @@ describe('createLiveHall', () => {
     hall.releaseDue({}, 1000 + MIN_DWELL_MS)
     expect(heard).toHaveBeenCalledTimes(2)
   })
+}
 
+function queueAndRelayoutTests() {
   it('reflects the refinery queue it was told of', () => {
     const hall = createLiveHall()
     hall.observe(observation(running()), {}, 0)
@@ -153,4 +172,4 @@ describe('createLiveHall', () => {
     hall.observe(observation(fewer), {}, 100)
     expect(hall.snapshot().map).not.toBe(first)
   })
-})
+}

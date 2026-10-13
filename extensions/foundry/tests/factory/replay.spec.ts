@@ -89,6 +89,11 @@ function gate(raisedAt: number, decidedAt: number | null): Gate {
 }
 
 describe('observationAt', () => {
+  describe('frames', framesTests)
+  describe('tools, gates and liveness', toolsGatesAndLivenessTests)
+})
+
+function framesTests() {
   it('shows the states of the latest frame at or before the moment', () => {
     const at3 = observationAt(timeline, [], base, 3000)
     expect(at3.graph.nodes.map((n) => [n.id, n.state])).toEqual([
@@ -105,7 +110,9 @@ describe('observationAt', () => {
     const early = observationAt(timeline, [], base, 0)
     expect(early.graph.nodes.find((n) => n.id === 'a')?.state).toBe('running')
   })
+}
 
+function toolsGatesAndLivenessTests() {
   it('gives each node the tool calls its own session made up to that moment', () => {
     const at7 = observationAt(timeline, [], base, 7000)
     expect(at7.activity.a?.map((t) => t.callId)).toEqual(['c1'])
@@ -128,7 +135,7 @@ describe('observationAt', () => {
     expect(at.orphaned).toEqual([])
     expect(at.stranded).toEqual([])
   })
-})
+}
 
 describe('momentsOf', () => {
   it('collects every moment that shows something, gates included, from a second before the first movement', () => {
@@ -197,26 +204,30 @@ describe('replayClock', () => {
   })
 })
 
-describe('a replay of CI', () => {
-  const pull = (buckets: ('pass' | 'pending')[]) => [
-    {
-      url: 'https://github.com/a/b/pull/1',
-      checks: buckets.map((bucket, i) => ({
-        name: `check-${i}`,
-        bucket,
-        link: '',
-        workflow: 'CI',
-      })),
-    },
-  ]
-  const withCi: Timeline = {
-    ...timeline,
-    ci: [
-      { at: 5500, round: 0, max: 2, status: 'watching', pulls: pull(['pass', 'pending']) },
-      { at: 7500, round: 1, max: 2, status: 'green', pulls: pull(['pass', 'pass']) },
-    ],
-  }
+const pull = (buckets: ('pass' | 'pending')[]) => [
+  {
+    url: 'https://github.com/a/b/pull/1',
+    checks: buckets.map((bucket, i) => ({
+      name: `check-${i}`,
+      bucket,
+      link: '',
+      workflow: 'CI',
+    })),
+  },
+]
+const withCi: Timeline = {
+  ...timeline,
+  ci: [
+    { at: 5500, round: 0, max: 2, status: 'watching', pulls: pull(['pass', 'pending']) },
+    { at: 7500, round: 1, max: 2, status: 'green', pulls: pull(['pass', 'pass']) },
+  ],
+}
 
+describe('a replay of CI', () => {
+  describe('CI moments', ciMomentsTests)
+})
+
+function ciMomentsTests() {
   it('shows no CI before the first recorded state, and none for a recording without any', () => {
     expect(observationAt(withCi, [], base, 5000).ci).toBeNull()
     expect(observationAt(timeline, [], base, 9000).ci).toBeNull()
@@ -234,7 +245,7 @@ describe('a replay of CI', () => {
   it('counts each recorded CI change as a moment worth showing', () => {
     expect(momentsOf(withCi, [])).toEqual([0, 1000, 2000, 5000, 5500, 6000, 7500])
   })
-})
+}
 
 describe.skipIf(!existsSync(REAL_TIMELINE))('a recorded run', () => {
   it('has no CI line to replay yet, which is not an error', async () => {

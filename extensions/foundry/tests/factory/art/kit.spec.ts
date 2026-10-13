@@ -11,6 +11,13 @@ import {
 import { createRecordingPaint } from './paint-fake.js'
 
 describe('factory/art/kit', () => {
+  describe('mulberry32', mulberry32Tests)
+  describe('rect, bevel and rivets', rectBevelAndRivetsTests)
+  describe('wear', wearTests)
+  describe('scanlines and glow', scanlinesAndGlowTests)
+})
+
+function mulberry32Tests() {
   it('mulberry32 is deterministic for a seed', () => {
     const a = mulberry32(7)
     const b = mulberry32(7)
@@ -24,7 +31,9 @@ describe('factory/art/kit', () => {
     const b = mulberry32(2)()
     expect(a).not.toBe(b)
   })
+}
 
+function rectBevelAndRivetsTests() {
   it('rect fills one rounded rectangle in the given colour', () => {
     const paint = createRecordingPaint()
     rect(paint, 1.6, 2.2, 4, 5, '#abc')
@@ -49,7 +58,9 @@ describe('factory/art/kit', () => {
       { op: 'fillRect', x: 13, y: 13, w: 1, h: 1, style: '#555' },
     ])
   })
+}
 
+function wearTests() {
   it('wear draws the same smudges for the same seed', () => {
     const a = createRecordingPaint()
     const b = createRecordingPaint()
@@ -70,7 +81,9 @@ describe('factory/art/kit', () => {
     const paint = createRecordingPaint()
     expect(() => wear(paint, 0, 0, 0, 0, 1, '#111')).not.toThrow()
   })
+}
 
+function scanlinesAndGlowTests() {
   it('scanlines draws one faint row every two pixels down the whole frame', () => {
     const paint = createRecordingPaint()
     scanlines(paint, 32, 8)
@@ -86,4 +99,4 @@ describe('factory/art/kit', () => {
     const fill = paint.calls.find((c) => c.op === 'fillRect')
     expect(fill).toMatchObject({ x: 5, y: 5, w: 10, h: 10 })
   })
-})
+}

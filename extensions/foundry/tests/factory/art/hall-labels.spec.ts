@@ -60,9 +60,15 @@ function checks(pass: number, pending: number, fail: number): Record<string, Che
 const setBits = (digits: string): number =>
   [...digits].reduce((n, d) => n + [...GLYPHS[d]].filter((b) => b === '1').length, 0)
 
-describe('the scoreboard', () => {
-  const board = fixture('statuswall', { x: 20, y: 2, w: 3 })
+const board = fixture('statuswall', { x: 20, y: 2, w: 3 })
 
+describe('the scoreboard', () => {
+  describe('bounds', boundsTests)
+  describe('tiles and figures', tilesAndFiguresTests)
+  describe('no progress bar', noProgressBarTests)
+})
+
+function boundsTests() {
   it.each([
     ['a fresh order', { leadTimeMs: 25 * 60_000, reworks: 0, ciRounds: 0 }],
     ['the widest figures', { leadTimeMs: 99 * 60_000, reworks: 99, ciRounds: 99 }],
@@ -74,7 +80,9 @@ describe('the scoreboard', () => {
     expect(fills(paint.calls).length).toBeGreaterThan(0)
     expect(outside(paint.calls, boardRect(board))).toEqual([])
   })
+}
 
+function tilesAndFiguresTests() {
   it('is three tiles wide and one cell per figure, each under its own icon colour', () => {
     const paint = createRecordingPaint()
     drawProp(
@@ -95,7 +103,9 @@ describe('the scoreboard', () => {
       }
     }
   })
+}
 
+function noProgressBarTests() {
   it("draws no progress bar: that is the heads-up display's job", () => {
     const paint = createRecordingPaint()
     drawProp(
@@ -109,7 +119,7 @@ describe('the scoreboard', () => {
     )
     expect(fills(paint.calls).some((c) => c.style === HALL.green)).toBe(false)
   })
-})
+}
 
 describe('the queue plate', () => {
   const exit = { x: 30, y: 8 }
@@ -144,14 +154,19 @@ describe('the queue plate', () => {
   })
 })
 
-describe('the CI tower', () => {
-  const tower = fixture('dispatch', { x: 38, y: 8 })
-  const lamps = (calls: readonly PaintCall[]): Fill[] =>
-    fills(calls).filter(
-      (c) =>
-        c.w === 3 && c.h === 3 && [HALL.green, HALL.amber, HALL.red].includes(c.style as string)
-    )
+const tower = fixture('dispatch', { x: 38, y: 8 })
+const lamps = (calls: readonly PaintCall[]): Fill[] =>
+  fills(calls).filter(
+    (c) => c.w === 3 && c.h === 3 && [HALL.green, HALL.amber, HALL.red].includes(c.style as string)
+  )
 
+describe('the CI tower', () => {
+  describe('tower bounds', towerBoundsTests)
+  describe('lamps', lampsTests)
+  describe('the beacon', theBeaconTests)
+})
+
+function towerBoundsTests() {
   it.each([
     [0, 0, 0],
     [1, 0, 0],
@@ -179,7 +194,9 @@ describe('the CI tower', () => {
       expect(strays).toEqual([])
     }
   )
+}
 
+function lampsTests() {
   it('shows three lamps however many checks there are, each with its count in one-pixel digits', () => {
     const paint = createRecordingPaint()
     drawProp(paint, tower, context({ ci: { checks: checks(12, 5, 2) } }), 0)
@@ -197,7 +214,9 @@ describe('the CI tower', () => {
     drawProp(paint, tower, context({ ci: { checks: checks(3, 0, 0) } }), 0)
     expect(lamps(paint.calls).map((c) => c.style)).toEqual([HALL.green])
   })
+}
 
+function theBeaconTests() {
   it('blinks an amber beacon and parks a crate at the exit only while a check is pending', () => {
     const crate = '#b07a3c'
     const beacon = (calls: readonly PaintCall[], color: string): boolean =>
@@ -225,9 +244,14 @@ describe('the CI tower', () => {
     expect(beacon(quiet.calls, HALL.amberDim)).toBe(false)
     expect(fills(quiet.calls).some((c) => c.style === crate)).toBe(false)
   })
-})
+}
 
 describe('the vending decor', () => {
+  describe('wall fixtures', wallFixturesTests)
+  describe('baking', bakingTests)
+})
+
+function wallFixturesTests() {
   it('stands clear of every wall fixture', () => {
     const fixtures: HallProp[] = [
       fixture('shelves', { id: 'a', x: 8, y: 2 }),
@@ -242,7 +266,9 @@ describe('the vending decor', () => {
       expect(x + 14 <= left || x >= right).toBe(true)
     }
   })
+}
 
+function bakingTests() {
   it('bakes into a hall without throwing', () => {
     const width = 40
     const height = 30
@@ -270,7 +296,7 @@ describe('the vending decor', () => {
     } as unknown as HallMap
     expect(() => bakeHall(map, createRecordingPaint())).not.toThrow()
   })
-})
+}
 
 describe('the ship gate while its step runs through the final check and CI', () => {
   const gate = fixture('gate', { id: 'station-ship', nodeId: 'ship', x: 12, y: 6 })

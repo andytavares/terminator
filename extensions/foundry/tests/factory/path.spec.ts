@@ -10,6 +10,11 @@ function grid(rows: string[]): boolean[][] {
 }
 
 describe('findPath', () => {
+  describe('walking and detours', walkingAndDetoursTests)
+  describe('edge cases', edgeCasesTests)
+})
+
+function walkingAndDetoursTests() {
   it('walks a straight line when nothing is in the way', () => {
     const solid = grid(['.....', '.....', '.....'])
     const path = findPath(solid, { x: 0, y: 1 }, { x: 3, y: 1 })
@@ -36,7 +41,9 @@ describe('findPath', () => {
       prev = tile
     }
   })
+}
 
+function edgeCasesTests() {
   it('returns [] when the target is unreachable', () => {
     const solid = grid(['.....', '#####', '.....'])
     const path = findPath(solid, { x: 0, y: 0 }, { x: 0, y: 2 })
@@ -55,7 +62,7 @@ describe('findPath', () => {
     expect(path[path.length - 1]).toEqual({ x: 2, y: 1 })
     expect(path.length).toBeGreaterThan(0)
   })
-})
+}
 
 describe('distancesFrom', () => {
   it('gives the origin distance 0 and its neighbours increasing distances', () => {

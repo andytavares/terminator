@@ -48,6 +48,12 @@ const labels = { inspect: 'Inspector', scribe: 'Scribe', integrate: 'Integrate' 
 const none = { labels, metrics: null, queue: null, ci: null }
 
 describe('factory/signs', () => {
+  describe('junctions and names', junctionsAndNamesTests)
+  describe('the scoreboard', theScoreboardTests)
+  describe('queue and tower', queueAndTowerTests)
+})
+
+function junctionsAndNamesTests() {
   it('joins names in words', () => {
     expect(joinedWords(['A'])).toBe('A')
     expect(joinedWords(['A', 'B'])).toBe('A and B')
@@ -59,7 +65,9 @@ describe('factory/signs', () => {
     expect(signs.find((s) => s.id === 'split-5,5')?.text).toBe('Splits to Inspector and Scribe')
     expect(signs.find((s) => s.id === 'merge-9,5')?.text).toBe('Merges into Integrate')
   })
+}
 
+function theScoreboardTests() {
   it('labels the scoreboard with the real figures, in words', () => {
     const board = hallSigns(map, {
       ...none,
@@ -78,7 +86,9 @@ describe('factory/signs', () => {
       'Scoreboard · no figures yet'
     )
   })
+}
 
+function queueAndTowerTests() {
   it("says the order's place in the merge queue", () => {
     const plate = hallSigns(map, { ...none, queue: { position: 1 } }).find((s) => s.id === 'queue')
     expect(plate?.text).toBe('1st in the merge queue')
@@ -94,4 +104,4 @@ describe('factory/signs', () => {
     )
     expect(done?.text).toBe('Checks · 1 passed · 1 failed')
   })
-})
+}

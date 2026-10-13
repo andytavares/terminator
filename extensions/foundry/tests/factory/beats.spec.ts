@@ -41,6 +41,15 @@ const settled = (): ReturnType<typeof createBeats> =>
   createBeats({ doc: 'running', integrate: 'waiting', ship: 'waiting' })
 
 describe('beat scheduler', () => {
+  describe('dwell and order', dwellAndOrderTests)
+  describe('dropping and lag', droppingAndLagTests)
+  describe('determinism and free events', determinismAndFreeEventsTests)
+  describe('held tool calls', heldToolCallsTests)
+  describe('parked handoffs', parkedHandoffsTests)
+  describe('join strokes', joinStrokesTests)
+})
+
+function dwellAndOrderTests() {
   it('releases a first event at once and holds a step behind its feeder for the minimum dwell', () => {
     const events: FactoryEvent[] = [
       passed('doc'),
@@ -66,7 +75,9 @@ describe('beat scheduler', () => {
     expect(times[1] - times[0]).toBeGreaterThanOrEqual(MIN_DWELL_MS)
     expect(times[2] - times[1]).toBeGreaterThanOrEqual(MIN_DWELL_MS)
   })
+}
 
+function droppingAndLagTests() {
   it('never drops an event: everything scheduled is released eventually', () => {
     const events = [passed('doc'), passed('integrate', 'waiting'), passed('ship', 'waiting')]
     const beats = schedule(settled(), events, nodes, 0)
@@ -89,7 +100,9 @@ describe('beat scheduler', () => {
     expect(out).toHaveLength(8)
     expect(out.map((o) => (o.event as { nodeId: string }).nodeId)).toEqual(chain.map((n) => n.id))
   })
+}
 
+function determinismAndFreeEventsTests() {
   it('is deterministic: the same events at the same times release the same beats', () => {
     const events = [passed('doc'), passed('integrate', 'waiting'), passed('ship', 'waiting')]
     const run = (): unknown =>
@@ -102,7 +115,9 @@ describe('beat scheduler', () => {
     const beats = schedule(settled(), [passed('doc'), passed('integrate', 'waiting'), ci], nodes, 0)
     expect(release(beats, 0).events).toContainEqual(ci)
   })
+}
 
+function heldToolCallsTests() {
   it("holds a step's tool calls and handoff behind its own held events", () => {
     const tool: FactoryEvent = {
       kind: 'tool',
@@ -126,7 +141,9 @@ describe('beat scheduler', () => {
     expect(first.events).toHaveLength(1)
     expect(release(first.beats, MIN_DWELL_MS).events).toHaveLength(2)
   })
+}
 
+function parkedHandoffsTests() {
   it('reports a handoff as parked until the step it feeds is shown started', () => {
     const handoff: FactoryEvent = {
       kind: 'handoff',
@@ -147,7 +164,9 @@ describe('beat scheduler', () => {
     const out = release(beats, 0).events.find((e) => e.kind === 'handoff')
     expect(out).toMatchObject({ targetStarted: false })
   })
+}
 
+function joinStrokesTests() {
   it('shows a join that passes unseen running for one stroke first', () => {
     const beats = schedule(settled(), [passed('integrate', 'waiting')], nodes, 0)
     const out = drain(beats, 0, 3000)
@@ -162,7 +181,7 @@ describe('beat scheduler', () => {
     const b = schedule(settled(), [passed('doc', 'waiting')], nodes, 0)
     expect(b.held).toHaveLength(1)
   })
-})
+}
 
 describe('beat scheduler: rework', () => {
   it('holds the next event for the sent-back node until the box could have been carried', () => {

@@ -117,6 +117,17 @@ describe('toolProp', () => {
 })
 
 describe('diffObservation', () => {
+  describe('first loads and no change', firstLoadsAndNoChangeTests)
+  describe('node states', nodeStatesTests)
+  describe('orphans and strands', orphansAndStrandsTests)
+  describe('tools', toolsTests)
+  describe('handoffs', handoffsTests)
+  describe('passed sources', passedSourcesTests)
+  describe('gates', gatesTests)
+  describe('no open gate', noOpenGateTests)
+})
+
+function firstLoadsAndNoChangeTests() {
   it('returns no events on first load — settling is not a change', () => {
     expect(diffObservation(null, obs(graph()))).toEqual([])
   })
@@ -125,7 +136,9 @@ describe('diffObservation', () => {
     const g = graph()
     expect(diffObservation(obs(g), obs(g))).toEqual([])
   })
+}
 
+function nodeStatesTests() {
   it('emits a node-state event for a changed node, and only that node', () => {
     const g = graph()
     const g2 = withNode(g, 'a', { state: 'running' })
@@ -139,7 +152,9 @@ describe('diffObservation', () => {
     const events = diffObservation(obs(g), obs(g2))
     expect(events).toHaveLength(2)
   })
+}
 
+function orphansAndStrandsTests() {
   it('emits orphaned only for a node newly orphaned', () => {
     const g = graph()
     const first = diffObservation(obs(g, { orphaned: [] }), obs(g, { orphaned: ['a'] }))
@@ -163,7 +178,9 @@ describe('diffObservation', () => {
     const events = diffObservation(obs(g, { stranded: [] }), obs(g, { stranded: ['ghost'] }))
     expect(events).toEqual([])
   })
+}
 
+function toolsTests() {
   it('emits a tool event for a new activity, by callId+kind, and not for a repeat', () => {
     const g = graph()
     const started = activity({ kind: 'tool_started', callId: 'c1', toolName: 'Read', at: 100 })
@@ -188,7 +205,9 @@ describe('diffObservation', () => {
       { kind: 'tool', nodeId: 'a', prop: 'desk', callId: 'c1', open: false, at: 200 },
     ])
   })
+}
 
+function handoffsTests() {
   it('hands work off to a step that has not started, so it can queue there', () => {
     const g = graph()
     const after = withNode(g, 'a', { state: 'passed' })
@@ -213,7 +232,9 @@ describe('diffObservation', () => {
       targetStarted: true,
     })
   })
+}
 
+function passedSourcesTests() {
   it('does not re-emit a handoff for a source that was already passed', () => {
     const g = withNode(graph(), 'a', { state: 'passed' })
     const before = withNode(g, 'b', { state: 'waiting' })
@@ -221,7 +242,9 @@ describe('diffObservation', () => {
     const events = diffObservation(obs(before), obs(after))
     expect(events.some((e) => e.kind === 'handoff')).toBe(false)
   })
+}
 
+function gatesTests() {
   it('emits gate on/off, resolving a null nodeId to the first open gate node', () => {
     const g = graph()
     const raised = gate({ id: 'gate-1', nodeId: null })
@@ -238,7 +261,9 @@ describe('diffObservation', () => {
     const events = diffObservation(obs(g, { waiting: [] }), obs(g, { waiting: [raised] }))
     expect(events).toEqual([{ kind: 'gate', nodeId: 'b', waiting: true }])
   })
+}
 
+function noOpenGateTests() {
   it('gateNodeId falls back to null when there is no open gate node at all', () => {
     const parsed = parseRecipe(
       `
@@ -255,9 +280,15 @@ steps:
     const g = buildRunGraph(order(), parsed.value)
     expect(gateNodeId(gate({ id: 'gate-1', nodeId: null }), g)).toBe(null)
   })
-})
+}
 
 describe('diffObservation: rework', () => {
+  describe('growing feedback', growingFeedbackTests)
+  describe('unchanged feedback', unchangedFeedbackTests)
+  describe('no previous observation', noPreviousObservationTests)
+})
+
+function growingFeedbackTests() {
   it('emits a rework when a node’s feedback grows from 0 to 1', () => {
     const g = graph()
     const after = withNode(g, 'a', {
@@ -276,7 +307,9 @@ describe('diffObservation: rework', () => {
     const events = diffObservation(obs(g), obs(after))
     expect(events).toContainEqual({ kind: 'rework', fromNodeId: 'b', toNodeId: 'a', round: 1 })
   })
+}
 
+function unchangedFeedbackTests() {
   it('emits nothing when feedback is unchanged', () => {
     const feedback = [
       {
@@ -293,7 +326,9 @@ describe('diffObservation: rework', () => {
     const events = diffObservation(obs(g), obs(g))
     expect(events.some((e) => e.kind === 'rework')).toBe(false)
   })
+}
 
+function noPreviousObservationTests() {
   it('emits nothing when the previous observation is null, even with feedback present', () => {
     const g = withNode(graph(), 'a', {
       feedback: [
@@ -310,7 +345,7 @@ describe('diffObservation: rework', () => {
     })
     expect(diffObservation(null, obs(g))).toEqual([])
   })
-})
+}
 
 describe('describeEvent', () => {
   const labels = { a: 'Builder', b: 'Reviewer' }
@@ -360,6 +395,14 @@ describe('describeEvent', () => {
 })
 
 describe('CI events', () => {
+  describe('rounds', roundsTests)
+  describe('checks', checksTests)
+  describe('repeats', repeatsTests)
+})
+
+const queue1 = { position: 2, behind: [{ orderId: 'WO-2', title: 'Other order' }] }
+
+function roundsTests() {
   it('raises no event before there is CI to report', () => {
     const g = graph()
     expect(diffObservation(obs(g), obs(g))).toEqual([])
@@ -380,7 +423,9 @@ describe('CI events', () => {
     const grown = diffObservation(prev, obs(g, { ci: ci({ round: 2 }) }))
     expect(grown).toContainEqual({ kind: 'ci-round', round: 2, max: 3 })
   })
+}
 
+function checksTests() {
   it('raises a ci-check event for a new check, and for one whose bucket changed', () => {
     const g = graph()
     const prev = obs(g, {
@@ -407,7 +452,9 @@ describe('CI events', () => {
     expect(events).toContainEqual({ kind: 'ci-check', name: 'test', bucket: 'fail' })
     expect(events).toContainEqual({ kind: 'ci-check', name: 'lint', bucket: 'pass' })
   })
+}
 
+function repeatsTests() {
   it('raises nothing when a check reports the same bucket again', () => {
     const g = graph()
     const state = ci({
@@ -416,11 +463,15 @@ describe('CI events', () => {
     const events = diffObservation(obs(g, { ci: state }), obs(g, { ci: state }))
     expect(events.some((e) => e.kind === 'ci-check')).toBe(false)
   })
-})
+}
 
 describe('queue events', () => {
-  const queue1 = { position: 2, behind: [{ orderId: 'WO-2', title: 'Other order' }] }
+  describe('first positions', firstPositionsTests)
+  describe('moves', movesTests)
+  describe('clearing', clearingTests)
+})
 
+function firstPositionsTests() {
   it('raises no event while nothing is queued', () => {
     const g = graph()
     expect(diffObservation(obs(g), obs(g))).toEqual([])
@@ -438,7 +489,9 @@ describe('queue events', () => {
     const next = obs(g, { queue: { ...queue1 } })
     expect(diffObservation(prev, next).some((e) => e.kind === 'queued')).toBe(false)
   })
+}
 
+function movesTests() {
   it('raises a fresh queued event when the position moves', () => {
     const g = graph()
     const prev = obs(g, { queue: queue1 })
@@ -462,10 +515,12 @@ describe('queue events', () => {
       behind: ['A third order'],
     })
   })
+}
 
+function clearingTests() {
   it('raises nothing when the queue clears — nothing here can spell "unqueued"', () => {
     const g = graph()
     const events = diffObservation(obs(g, { queue: queue1 }), obs(g, { queue: null }))
     expect(events.some((e) => e.kind === 'queued')).toBe(false)
   })
-})
+}

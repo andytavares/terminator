@@ -62,9 +62,19 @@ function gate(over: Partial<Gate> = {}): Gate {
   } as Gate
 }
 
-describe('calloutFor', () => {
-  const at = (event: FactoryEvent) => calloutFor(event, labels, 1000)
+const at = (event: FactoryEvent) => calloutFor(event, labels, 1000)
 
+describe('calloutFor', () => {
+  describe('finishing and failing', finishingAndFailingTests)
+  describe('quiet moves and errands', quietMovesAndErrandsTests)
+  describe('handoffs and reworks', handoffsAndReworksTests)
+  describe('every other kind', everyOtherKindTests)
+  describe('CI rounds and checks', ciRoundsAndChecksTests)
+  describe('passing and pending checks', passingAndPendingChecksTests)
+  describe('the queue', theQueueTests)
+})
+
+function finishingAndFailingTests() {
   it('anchors a step that finishes to its own station, marked done', () => {
     expect(at({ kind: 'node-state', nodeId: 'build', from: 'running', to: 'passed' })).toEqual({
       id: 'build@1000',
@@ -83,7 +93,9 @@ describe('calloutFor', () => {
       text: 'Failed',
     })
   })
+}
 
+function quietMovesAndErrandsTests() {
   it('stays quiet for bookkeeping moves nobody needs to see', () => {
     expect(at({ kind: 'node-state', nodeId: 'build', from: 'running', to: 'waiting' })).toBeNull()
     expect(
@@ -104,7 +116,9 @@ describe('calloutFor', () => {
       at({ kind: 'tool', nodeId: 'build', prop: 'rack', callId: 'c', open: true, at: 0 })
     ).toMatchObject({ tone: 'tool', text: 'Running a command' })
   })
+}
 
+function handoffsAndReworksTests() {
   it('puts a handoff on the station receiving the work, naming where it came from', () => {
     expect(
       at({ kind: 'handoff', fromNodeId: 'build', toNodeId: 'ship', targetStarted: false })
@@ -124,7 +138,9 @@ describe('calloutFor', () => {
       text: 'Sent back: Ship it failed',
     })
   })
+}
 
+function everyOtherKindTests() {
   it('covers every other event kind', () => {
     expect(at({ kind: 'node-state', nodeId: 'build', from: 'waiting', to: 'running' })?.text).toBe(
       'Started'
@@ -149,7 +165,9 @@ describe('calloutFor', () => {
       tone: 'fail',
     })
   })
+}
 
+function ciRoundsAndChecksTests() {
   it('puts a CI round callout at the exit station', () => {
     expect(at({ kind: 'ci-round', round: 2, max: 3 })).toMatchObject({
       nodeId: 'ci',
@@ -168,7 +186,9 @@ describe('calloutFor', () => {
       tone: 'fail',
     })
   })
+}
 
+function passingAndPendingChecksTests() {
   it('says a passing check passed, at the exit station', () => {
     expect(at({ kind: 'ci-check', name: 'lint', bucket: 'pass' })).toMatchObject({
       nodeId: 'ci',
@@ -181,7 +201,9 @@ describe('calloutFor', () => {
     expect(at({ kind: 'ci-check', name: 'test', bucket: 'pending' })).toBeNull()
     expect(at({ kind: 'ci-check', name: 'test', bucket: 'skipping' })).toBeNull()
   })
+}
 
+function theQueueTests() {
   it('names the nearest predecessor, at the exit station, with the ordinal spelled out', () => {
     expect(
       at({ kind: 'queued', position: 2, behind: ['First order', 'Second order'] })
@@ -198,9 +220,16 @@ describe('calloutFor', () => {
       text: 'Queued 1st',
     })
   })
-})
+}
 
 describe('interruptionsFor', () => {
+  describe('held tool calls', heldToolCallsTests)
+  describe('questions and gates', questionsAndGatesTests)
+  describe('parked agents', parkedAgentsTests)
+  describe('unmatched sessions', unmatchedSessionsTests)
+})
+
+function heldToolCallsTests() {
   it('pins a held tool call to the station whose agent is holding it', () => {
     const [ask] = interruptionsFor({
       graph,
@@ -219,7 +248,9 @@ describe('interruptionsFor', () => {
       prose: false,
     })
   })
+}
 
+function questionsAndGatesTests() {
   it("marks an agent's question as prose, to be shown as markdown", () => {
     const [ask] = interruptionsFor({
       graph,
@@ -243,7 +274,9 @@ describe('interruptionsFor', () => {
     })
     expect(g.kind === 'gate' && g.gate.options.map((o) => o.id)).toEqual(['approve', 'hold'])
   })
+}
 
+function parkedAgentsTests() {
   it('pins an agent parked at its terminal, unless a held call already says so', () => {
     expect(interruptionsFor({ graph, waiting: [], stranded: ['s-build'], pending: [] })).toEqual([
       {
@@ -262,7 +295,9 @@ describe('interruptionsFor', () => {
     })
     expect(both.map((i) => i.kind)).toEqual(['ask'])
   })
+}
 
+function unmatchedSessionsTests() {
   it('keeps an interruption whose session matches no node, anchored nowhere', () => {
     const [ask] = interruptionsFor({
       graph,
@@ -272,7 +307,7 @@ describe('interruptionsFor', () => {
     })
     expect(ask.nodeId).toBeNull()
   })
-})
+}
 
 describe('stateWord', () => {
   it('has a word for every node state', () => {
@@ -284,10 +319,15 @@ describe('stateWord', () => {
   })
 })
 
-describe('calloutLevels', () => {
-  // A callout 100 wide and 20 tall, whose level-0 bottom edge sits at y.
-  const bubble = (id: string, x: number, y = 200) => ({ id, x, y, w: 100, h: 20 })
+// A callout 100 wide and 20 tall, whose level-0 bottom edge sits at y.
+const bubble = (id: string, x: number, y = 200) => ({ id, x, y, w: 100, h: 20 })
 
+describe('calloutLevels', () => {
+  describe('lifting', liftingTests)
+  describe('free levels and touching', freeLevelsAndTouchingTests)
+})
+
+function liftingTests() {
   it('leaves a callout nothing crowds on the ground level', () => {
     expect(calloutLevels([bubble('a', 100), bubble('b', 400)], [], {}, 26)).toEqual({
       a: 0,
@@ -305,7 +345,9 @@ describe('calloutLevels', () => {
   it('keeps the level a callout was given, so it never jumps when an older one leaves', () => {
     expect(calloutLevels([bubble('b', 160)], [], { b: 1 }, 26)).toEqual({ b: 1 })
   })
+}
 
+function freeLevelsAndTouchingTests() {
   it('takes the lowest free level, under a kept callout that sits higher', () => {
     const levels = calloutLevels(
       [bubble('a', 100), bubble('b', 160), bubble('c', 160)],
@@ -327,7 +369,7 @@ describe('calloutLevels', () => {
       b: 0,
     })
   })
-})
+}
 
 describe('calloutsFor', () => {
   it('raises one callout per station, however many things happened to it in one poll', () => {
