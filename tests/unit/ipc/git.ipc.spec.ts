@@ -134,7 +134,12 @@ describe('git:list-branches', () => {
   it("finds the workspace through a project's worktree outside its folder", async () => {
     gitService.listBranches.mockResolvedValue(all)
     const workspaceId = workspaceAt('/repos/app', ['trunk-merge/*'])
-    workspaceStore.createProject({ workspaceId, name: 'feat', worktreePath: '/wt/app-feat' })
+    workspaceStore.createProject({
+      workspaceId,
+      name: 'feat',
+      worktreePath: '/wt/app-feat',
+      isWorktree: true,
+    })
     const r = (await handler('git:list-branches')({}, { path: '/wt/app-feat' })) as {
       branches: { name: string }[]
     }

@@ -6,11 +6,12 @@ import { LivePreview } from '../../../../src/renderer/components/session/LivePre
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import type { TerminalInstance } from '../../../../src/renderer/components/terminal/TerminalSession'
 import { seedStore } from '../../../support/renderer-stores'
+import { partialFake } from '../../../support/fakes'
 
 const cleanup = vi.fn()
 const mountPreview = vi.fn(() => cleanup)
 // xterm does not run in jsdom: the instance is faked down to what LivePreview calls.
-const instance = { mountPreview } as unknown as TerminalInstance
+const instance = partialFake<TerminalInstance>({ mountPreview })
 
 beforeEach(() => {
   vi.clearAllMocks()

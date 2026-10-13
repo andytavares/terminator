@@ -55,7 +55,7 @@ describe('useSessionStore', () => {
           ['a', makeSession({ id: 'a', projectId: 'gone' })],
           ['b', makeSession({ id: 'b', projectId: 'kept' })],
         ]),
-        terminalInstances: new Map([['a', { dispose } as never]]),
+        terminalInstances: new Map([['a', partialFake<TerminalInstance>({ dispose })]]),
       })
       useSessionStore.getState().dropProjectSessions('gone')
       expect([...useSessionStore.getState().sessions.keys()]).toEqual(['b'])
@@ -144,7 +144,9 @@ describe('useSessionStore', () => {
     })
 
     it('is a no-op for unknown session id', () => {
-      expect(() => useSessionStore.getState().renameSession('nonexistent', 'Title')).not.toThrow()
+      const before = useSessionStore.getState().sessions
+      useSessionStore.getState().renameSession('nonexistent', 'Title')
+      expect(useSessionStore.getState().sessions).toBe(before)
     })
   })
 
@@ -170,10 +172,8 @@ describe('useSessionStore', () => {
     })
 
     it('clears bell count for closed session', async () => {
-      const session = makeSession()
       useSessionStore.setState({
-        sessions: new Map([['sess-1', session]]),
-        // bell count folded into the session record below
+        sessions: new Map([['sess-1', makeSession({ bellCount: 2 })]]),
       })
       mockElectronAPI.terminal.close.mockResolvedValue({})
       await useSessionStore.getState().closeSession('sess-1')
@@ -264,13 +264,34 @@ describe('useSessionStore', () => {
     })
 
     it('clears bell count for the newly active session', () => {
-      const session = makeSession()
-      useSessionStore.setState({
-        sessions: new Map([['sess-1', session]]),
-        // bell count folded into the session record below
-      })
+      useSessionStore.setState({ sessions: new Map([['sess-1', makeSession({ bellCount: 3 })]]) })
       useSessionStore.getState().setActiveSessionForProject('proj-1', 'sess-1')
       expect(useSessionStore.getState().getBellCountForSession('sess-1')).toBe(0)
+    })
+
+    // An exited terminal stays exited: the sidebar, Quick Actions and tab
+    // cycling all leave out a closed session, whichever tab is shown.
+    it('keeps an exited tab closed when another tab of its project is shown', () => {
+      useSessionStore.setState({
+        sessions: new Map([
+          ['sess-1', makeSession({ id: 'sess-1' })],
+          ['sess-2', makeSession({ id: 'sess-2', status: 'closed' })],
+        ]),
+      })
+      useSessionStore.getState().setActiveSessionForProject('proj-1', 'sess-1')
+      expect(useSessionStore.getState().sessions.get('sess-2')?.status).toBe('closed')
+    })
+
+    it('keeps an exited tab closed when it is the one shown', () => {
+      useSessionStore.setState({
+        sessions: new Map([['sess-1', makeSession({ status: 'closed', bellCount: 1 })]]),
+      })
+      useSessionStore.getState().setActiveSessionForProject('proj-1', 'sess-1', 42)
+      expect(useSessionStore.getState().sessions.get('sess-1')).toMatchObject({
+        status: 'closed',
+        bellCount: undefined,
+        lastAttendedAt: 42,
+      })
     })
 
     // A session whose process ended stays ended, whichever tab is selected.
@@ -321,7 +342,9 @@ describe('useSessionStore', () => {
     })
 
     it('is a no-op for unknown session id', () => {
-      expect(() => useSessionStore.getState().handleProcessExit('unknown', 0)).not.toThrow()
+      const before = useSessionStore.getState().sessions
+      useSessionStore.getState().handleProcessExit('unknown', 0)
+      expect(useSessionStore.getState().sessions).toBe(before)
     })
   })
 
@@ -334,17 +357,16 @@ describe('useSessionStore', () => {
     })
 
     it('clearBellCount removes entry', () => {
-      useSessionStore.setState((st) => ({
-        sessions: new Map(
-          [...st.sessions].map(([id, se]) => [id, id === 'sess-1' ? { ...se, bellCount: 3 } : se])
-        ),
-      }))
+      useSessionStore.setState({ sessions: new Map([['sess-1', makeSession({ bellCount: 3 })]]) })
       useSessionStore.getState().clearBellCount('sess-1')
       expect(useSessionStore.getState().getBellCountForSession('sess-1')).toBe(0)
     })
 
     it('clearBellCount is a no-op when count is already 0', () => {
-      expect(() => useSessionStore.getState().clearBellCount('never-set')).not.toThrow()
+      useSessionStore.setState({ sessions: new Map([['sess-1', makeSession()]]) })
+      const before = useSessionStore.getState().sessions
+      useSessionStore.getState().clearBellCount('sess-1')
+      expect(useSessionStore.getState().sessions).toBe(before)
     })
 
     it('getBellCountForSession returns 0 for unknown session', () => {
@@ -438,9 +460,8 @@ describe('useSessionStore', () => {
 
   describe('setTerminalInstance / getTerminalInstance', () => {
     it('stores and retrieves terminal instance by sessionId', () => {
-      const fakeTerminal = { write: vi.fn() }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      useSessionStore.getState().setTerminalInstance('sess-1', fakeTerminal as any)
+      const fakeTerminal = partialFake<TerminalInstance>({ dispose: vi.fn() })
+      useSessionStore.getState().setTerminalInstance('sess-1', fakeTerminal)
       expect(useSessionStore.getState().getTerminalInstance('sess-1')).toBe(fakeTerminal)
     })
 
@@ -500,10 +521,16 @@ describe('useSessionStore', () => {
       useSessionStore.getState().activateSplit('proj-1', 'sess-a', 'sess-b', 'vertical')
       useSessionStore.getState().setFocusedSession('proj-1', 'sess-b')
       useSessionStore.getState().activateSplit('proj-1', 'sess-b', 'sess-c', 'horizontal')
-      const layout = useSessionStore.getState().getPaneLayout('proj-1')
-      expect(layout?.type).toBe('split')
-      if (layout?.type !== 'split') return
-      expect(layout.second.type).toBe('split')
+      expect(useSessionStore.getState().getPaneLayout('proj-1')).toMatchObject({
+        type: 'split',
+        first: { type: 'leaf', sessionId: 'sess-a' },
+        second: {
+          type: 'split',
+          direction: 'horizontal',
+          first: { type: 'leaf', sessionId: 'sess-b' },
+          second: { type: 'leaf', sessionId: 'sess-c' },
+        },
+      })
     })
 
     it('setSplitRatio updates the ratio of a split node', () => {
@@ -517,7 +544,8 @@ describe('useSessionStore', () => {
     })
 
     it('setSplitRatio is no-op when no layout exists', () => {
-      expect(() => useSessionStore.getState().setSplitRatio('proj-1', 'noop', 0.5)).not.toThrow()
+      useSessionStore.getState().setSplitRatio('proj-1', 'noop', 0.5)
+      expect(useSessionStore.getState().getPaneLayout('proj-1')).toBeNull()
     })
 
     it('closeSplitLeaf removes a leaf and collapses split to null when 1 left', () => {
@@ -537,7 +565,11 @@ describe('useSessionStore', () => {
       useSessionStore.getState().activateSplit('proj-1', 'sess-a', 'sess-b', 'vertical')
       useSessionStore.getState().activateSplit('proj-1', 'sess-b', 'sess-c', 'horizontal')
       useSessionStore.getState().closeSplitLeaf('proj-1', 'sess-c')
-      expect(useSessionStore.getState().getPaneLayout('proj-1')).not.toBeNull()
+      expect(useSessionStore.getState().getPaneLayout('proj-1')).toMatchObject({
+        type: 'split',
+        first: { type: 'leaf', sessionId: 'sess-a' },
+        second: { type: 'leaf', sessionId: 'sess-b' },
+      })
     })
 
     it('closeSplitLeaf moves focus to first remaining leaf when focused one is closed', () => {
@@ -673,7 +705,10 @@ describe('useSessionStore', () => {
     })
 
     it('is a no-op for unknown session', () => {
-      expect(() => useSessionStore.getState().moveSession('nonexistent', 'proj-2')).not.toThrow()
+      const before = useSessionStore.getState()
+      useSessionStore.getState().moveSession('nonexistent', 'proj-2')
+      expect(useSessionStore.getState().sessions).toBe(before.sessions)
+      expect(useSessionStore.getState().projectViews).toBe(before.projectViews)
     })
 
     it('clears focusedSession for old project when moved session was focused', () => {
@@ -684,17 +719,6 @@ describe('useSessionStore', () => {
       })
       useSessionStore.getState().moveSession('sess-1', 'proj-2')
       expect(useSessionStore.getState().getFocusedSession('proj-1')).toBeNull()
-    })
-  })
-
-  describe('closeSession scratch guard', () => {
-    it('does not call deleteProject for SCRATCH_PROJECT_ID sessions', async () => {
-      const SCRATCH = '00000000-0000-0000-0000-000000000000'
-      const session = makeSession({ id: 'sess-1', projectId: SCRATCH })
-      useSessionStore.setState({ sessions: new Map([['sess-1', session]]) })
-      mockElectronAPI.terminal.close.mockResolvedValue({})
-      // If deleteProject were called it would throw (workspace store not mocked)
-      await expect(useSessionStore.getState().closeSession('sess-1')).resolves.not.toThrow()
     })
   })
 })

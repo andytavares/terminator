@@ -28,7 +28,7 @@ function renderDialog(overrides: Partial<React.ComponentProps<typeof Dialog>> = 
 }
 
 beforeEach(() => {
-  delete (window as unknown as Record<string, unknown>)[MODAL_DEPTH_KEY]
+  delete window[MODAL_DEPTH_KEY]
 })
 
 describe('Dialog', () => {
@@ -177,13 +177,13 @@ describe('Dialog', () => {
   describe('modal depth', () => {
     it('registers while open so the exit gesture stands down', () => {
       renderDialog()
-      expect((window as unknown as Record<string, number>)[MODAL_DEPTH_KEY]).toBe(1)
+      expect(window[MODAL_DEPTH_KEY]).toBe(1)
     })
 
     it('releases on close', () => {
       const { unmount } = renderDialog()
       unmount()
-      expect((window as unknown as Record<string, number>)[MODAL_DEPTH_KEY]).toBe(0)
+      expect(window[MODAL_DEPTH_KEY]).toBe(0)
     })
 
     it('counts nested dialogs', () => {
@@ -191,11 +191,11 @@ describe('Dialog', () => {
       const second = render(
         <Dialog title="Second" actions={[{ label: 'Ok', onSelect: noop }]} onDismiss={noop} />
       )
-      expect((window as unknown as Record<string, number>)[MODAL_DEPTH_KEY]).toBe(2)
+      expect(window[MODAL_DEPTH_KEY]).toBe(2)
       second.unmount()
-      expect((window as unknown as Record<string, number>)[MODAL_DEPTH_KEY]).toBe(1)
+      expect(window[MODAL_DEPTH_KEY]).toBe(1)
       first.unmount()
-      expect((window as unknown as Record<string, number>)[MODAL_DEPTH_KEY]).toBe(0)
+      expect(window[MODAL_DEPTH_KEY]).toBe(0)
     })
   })
 

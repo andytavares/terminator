@@ -15,17 +15,10 @@ function git(...args: string[]): void {
   execFileSync('git', args, { cwd: repo, encoding: 'utf8' })
 }
 
-type Api = {
-  electronAPI: {
-    settings: { updateGlobal(patch: unknown): Promise<unknown> }
-    git: { listBranches(path: string): Promise<{ branches: { name: string }[] }> }
-  }
-}
-
 async function setPatterns(patterns: string[]): Promise<void> {
   await handle.page.evaluate(
     (p) =>
-      (window as unknown as Api).electronAPI.settings.updateGlobal({
+      window.electronAPI.settings.updateGlobal({
         git: { branchExcludePatterns: p },
       }),
     patterns
@@ -33,10 +26,7 @@ async function setPatterns(patterns: string[]): Promise<void> {
 }
 
 async function branchNames(): Promise<string[]> {
-  const r = await handle.page.evaluate(
-    (path) => (window as unknown as Api).electronAPI.git.listBranches(path),
-    repo
-  )
+  const r = await handle.page.evaluate((path) => window.electronAPI.git.listBranches(path), repo)
   return r.branches.map((b) => b.name).sort()
 }
 

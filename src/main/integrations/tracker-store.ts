@@ -68,9 +68,9 @@ function decrypt(encoded: string): string | null {
   }
 }
 
-async function read(): Promise<StoreFile> {
+async function read(file: string): Promise<StoreFile> {
   try {
-    const raw = await fs.readFile(filePath(), 'utf8')
+    const raw = await fs.readFile(file, 'utf8')
     const parsed: unknown = JSON.parse(raw)
     return typeof parsed === 'object' && parsed !== null ? (parsed as StoreFile) : {}
   } catch {
@@ -79,23 +79,30 @@ async function read(): Promise<StoreFile> {
   }
 }
 
-async function write(data: StoreFile): Promise<void> {
-  await writeJsonAtomic(filePath(), data)
+async function write(file: string, data: StoreFile): Promise<void> {
+  await writeJsonAtomic(file, data)
 }
 
-// Each change reads, edits and writes the whole file. Two at once (blurring one
-// tracker's field by clicking the other's Disconnect) would each write over the
-// other's, so changes run one after another.
-let lastChange: Promise<unknown> = Promise.resolve()
+// Each change reads, edits and writes the whole file. Two at once (two
+// trackers answering one listMine, or blurring one tracker's field by clicking
+// the other's Disconnect) would each write over the other's, and a read could
+// miss a change under way. So every access waits for the ones asked for
+// before it, and takes the file's path when it is asked for.
+let queue: Promise<unknown> = Promise.resolve()
+
+function serialized<T>(op: (file: string) => Promise<T>): Promise<T> {
+  const file = filePath()
+  const run = queue.then(() => op(file))
+  queue = run.catch(() => undefined)
+  return run
+}
 
 function change(edit: (data: StoreFile) => void): Promise<void> {
-  const next = lastChange.then(async () => {
-    const data = await read()
+  return serialized(async (file) => {
+    const data = await read(file)
     edit(data)
-    await write(data)
+    await write(file, data)
   })
-  lastChange = next.catch(() => undefined)
-  return next
 }
 
 function update(tracker: TrackerId, patch: Partial<StoredTracker>): Promise<void> {
@@ -121,7 +128,7 @@ export async function setCredential(cred: StoredCredential): Promise<void> {
 }
 
 export async function getCredential(tracker: TrackerId): Promise<StoredCredential | null> {
-  const entry = (await read())[tracker]
+  const entry = (await serialized(read))[tracker]
   if (entry?.secret === undefined) return null
   const secret = decrypt(entry.secret)
   if (secret === null) return null
@@ -157,7 +164,7 @@ export async function setMine(tracker: TrackerId, mine: MineSelector): Promise<v
 }
 
 export async function getMine(tracker: TrackerId): Promise<MineSelector> {
-  return (await read())[tracker]?.mine ?? defaultMine(tracker)
+  return (await serialized(read))[tracker]?.mine ?? defaultMine(tracker)
 }
 
 /**
@@ -165,7 +172,7 @@ export async function getMine(tracker: TrackerId): Promise<MineSelector> {
  * exists and which account it proved to belong to.
  */
 export async function listConnections(): Promise<TrackerConnection[]> {
-  const data = await read()
+  const data = await serialized(read)
   return TRACKERS.map((tracker) => {
     const entry = data[tracker] ?? {}
     return {

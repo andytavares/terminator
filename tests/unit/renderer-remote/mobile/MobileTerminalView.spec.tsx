@@ -81,10 +81,12 @@ const mockWs = {
     if (event === 'message') capturedMessageHandler = handler
   }),
 }
-const WsMockCtor = vi.fn(function () {
-  return mockWs
-}) as unknown as typeof WebSocket
-;(WsMockCtor as unknown as { OPEN: number }).OPEN = 1
+const WsMockCtor = Object.assign(
+  vi.fn(function () {
+    return mockWs
+  }),
+  { OPEN: 1 }
+)
 vi.stubGlobal('WebSocket', WsMockCtor)
 
 beforeEach(() => {
@@ -184,14 +186,22 @@ describe('MobileTerminalView', () => {
     expect(mockWs.send).toHaveBeenCalledWith('\x03')
   })
 
-  it('does not crash when getWsTicket rejects', async () => {
+  it('opens no socket and starts reconnecting when no ticket can be had', async () => {
     mockGetWsTicket.mockRejectedValue(new Error('network error'))
+    const onOpenWsFailed = vi.fn()
+    const { useReconnect } = await import('../../../../src/renderer-remote/hooks/useReconnect')
+    vi.mocked(useReconnect).mockReturnValue({
+      status: 'connecting',
+      retry: vi.fn(),
+      onOpenWsFailed,
+    })
     const { MobileTerminalView } = await import(
       '../../../../src/renderer-remote/components/MobileTerminalView'
     )
-    expect(() =>
-      render(<MobileTerminalView sessionId="s1" cwd="/tmp" onBack={vi.fn()} />)
-    ).not.toThrow()
+    render(<MobileTerminalView sessionId="s1" cwd="/tmp" onBack={vi.fn()} />)
+    await act(async () => {})
+    expect(WsMockCtor).not.toHaveBeenCalled()
+    expect(onOpenWsFailed).toHaveBeenCalledTimes(1)
   })
 
   it('closes previous WebSocket when openWs is called a second time', async () => {

@@ -46,11 +46,7 @@ test('/app/ browser remote renderer loads and the IPC bridge serves workspace:li
   //    The password is stored only as a hash, so the test keeps the one it chose.
   await page.evaluate(
     async ({ port, password }) => {
-      const bridge = (
-        window as unknown as {
-          electronAPI: { extensionBridge: { invoke: (c: string, p: unknown) => Promise<unknown> } }
-        }
-      ).electronAPI.extensionBridge
+      const bridge = window.electronAPI.extensionBridge
       await bridge.invoke('remote:update-password', { password })
       await bridge.invoke('remote:port-change', { port })
       await bridge.invoke('remote:toggle', { enabled: true })
@@ -100,11 +96,7 @@ test('/app/ browser remote renderer loads and the IPC bridge serves workspace:li
 
   // Disable the server again so it doesn't linger past the test.
   await page.evaluate(async () => {
-    const bridge = (
-      window as unknown as {
-        electronAPI: { extensionBridge: { invoke: (c: string, p: unknown) => Promise<unknown> } }
-      }
-    ).electronAPI.extensionBridge
+    const bridge = window.electronAPI.extensionBridge
     await bridge.invoke('remote:toggle', { enabled: false })
   })
 })

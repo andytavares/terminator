@@ -10,9 +10,8 @@
     "esModuleInterop": true,
     "outDir": "out/main",
     "rootDir": ".",
-    "baseUrl": ".",
     "paths": {
-      "@shared/*": ["src/shared/*"]
+      "@shared/*": ["./src/shared/*"]
     }
   },
   "include": ["src/main/**/*", "src/shared/**/*"]

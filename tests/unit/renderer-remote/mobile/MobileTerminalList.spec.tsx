@@ -113,22 +113,6 @@ describe('MobileTerminalList', () => {
     expect(mockOnCreateTerminal).toHaveBeenCalledWith('w1', '/Users/me/projects')
   })
 
-  it('renders gracefully with empty terminals list', async () => {
-    const { MobileTerminalList } = await import(
-      '../../../../src/renderer-remote/components/MobileTerminalList'
-    )
-    const { container } = render(
-      <MobileTerminalList
-        workspaces={[workspace]}
-        terminals={[]}
-        onSelectTerminal={mockOnSelectTerminal}
-        onCreateTerminal={mockOnCreateTerminal}
-        onAssignWorkspace={mockOnAssignWorkspace}
-      />
-    )
-    expect(container).toBeTruthy()
-  })
-
   it('shows terminal under matching workspace by cwd prefix', async () => {
     const terminal: TerminalSession = {
       sessionId: 's-ws',

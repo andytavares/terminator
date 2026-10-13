@@ -158,7 +158,7 @@ export function GlobalSettings(): JSX.Element {
             className="settings-section__input"
             min={1}
             max={43200}
-            defaultValue={Math.round((globalSettings.sidebar?.staleAfterMs ?? 7_200_000) / 60_000)}
+            defaultValue={Math.round(globalSettings.sidebar.staleAfterMs / 60_000)}
             onBlur={(e) => {
               const minutes = Number(e.target.value)
               if (!Number.isFinite(minutes) || minutes < 1 || minutes > 43200) return
@@ -196,7 +196,7 @@ export function GlobalSettings(): JSX.Element {
           <label className="settings-section__label">Branch Exclude Patterns</label>
           <textarea
             className="settings-section__input settings-section__textarea"
-            defaultValue={(globalSettings.git.branchExcludePatterns ?? []).join('\n')}
+            defaultValue={globalSettings.git.branchExcludePatterns.join('\n')}
             placeholder={'gh-readonly-queue/*\nrenovate/*'}
             rows={4}
             onBlur={(e) => {

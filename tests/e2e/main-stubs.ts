@@ -8,10 +8,7 @@ import type { ElectronApplication } from '@playwright/test'
 /** Makes the native folder picker answer `folder`, as if the operator had chosen it. */
 export async function answerFolderPicker(app: ElectronApplication, folder: string): Promise<void> {
   await app.evaluate(({ dialog }, chosen) => {
-    dialog.showOpenDialog = (async () => ({
-      canceled: false,
-      filePaths: [chosen],
-    })) as unknown as typeof dialog.showOpenDialog
+    dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [chosen] })
   }, folder)
 }
 

@@ -1,6 +1,7 @@
 import { vi, type Mock } from 'vitest'
 import type { StoreApi } from 'zustand'
 import type {
+  Extension,
   Issue,
   IssueSummary,
   Project,
@@ -51,6 +52,19 @@ export function terminalSessionOf(
     createdAt: CREATED,
     lastActivityAt: 0,
     agentState: 'idle',
+    ...overrides,
+  }
+}
+
+/** An installed extension, as main lists it. */
+export function extensionOf(overrides: Partial<Extension> & Pick<Extension, 'id'>): Extension {
+  return {
+    name: overrides.id,
+    version: '1.0.0',
+    description: '',
+    entryPoint: `/extensions/${overrides.id}/main.cjs`,
+    status: 'enabled',
+    installedAt: CREATED,
     ...overrides,
   }
 }
@@ -111,6 +125,19 @@ export function sessionRecordOf(
     updatedAt: CREATED,
     ...overrides,
   }
+}
+
+/**
+ * Put a real renderer store back in its initial state, with `overrides` on
+ * top. Its own actions and getters stay, so a spec sees what the store does;
+ * `overrides` replaces only what it names (an action that reaches the main
+ * process, say).
+ */
+export function resetStore<State extends object>(
+  store: Pick<StoreApi<State>, 'getInitialState' | 'setState'>,
+  overrides: Partial<State> = {}
+): void {
+  store.setState({ ...store.getInitialState(), ...overrides }, true)
 }
 
 /** A store's state with every function a `vi.fn()` of the same signature. */

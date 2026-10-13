@@ -1,10 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { Terminal } from '@xterm/xterm'
+import { Terminal, type IBuffer, type IBufferNamespace, type IBufferLine } from '@xterm/xterm'
 import {
   TerminalInstance,
   XTERM_THEMES,
 } from '../../../../src/renderer/components/terminal/TerminalSession'
 import { MAX_WEBGL_CONTEXTS } from '../../../../src/renderer/terminal/webgl-contexts'
+import { installElectronApi } from '../../../support/electron-api'
+import { partialFake } from '../../../support/fakes'
 
 const mockResizeObserver = vi.fn().mockImplementation(function () {
   return {
@@ -113,16 +115,13 @@ const mockSetSessionIdle = vi.fn()
 const ACTIVITY_HOOKS = { onBusy: () => mockSetSessionBusy(), onIdle: () => mockSetSessionIdle() }
 
 // Mock canvas getContext so character-width measurement works under jsdom
-const mockMeasureText = vi.fn().mockReturnValue({ width: 8 })
-const mockFakeCtx = {
+const mockMeasureText = vi.fn(() => partialFake<TextMetrics>({ width: 8 }))
+const mockFakeCtx = partialFake<CanvasRenderingContext2D>({
   font: '',
   fillStyle: '',
   measureText: mockMeasureText,
-  toJSON: vi.fn(),
-}
-vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(
-  () => mockFakeCtx as unknown as CanvasRenderingContext2D
-)
+})
+vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => mockFakeCtx)
 
 const mockSubscribe = vi.fn()
 const mockAttach = vi.fn()
@@ -143,12 +142,11 @@ beforeEach(async () => {
   budgetHolder.current = new WebglContextBudget(MAX_WEBGL_CONTEXTS)
   mockPlatform = 'MacIntel'
   vi.clearAllMocks()
-  mockMeasureText.mockReturnValue({ width: 8 })
   mockSubscribe.mockReturnValue(mockUnsubscribe)
   mockAttach.mockResolvedValue({ released: false })
   mockOpenExternal.mockResolvedValue({ ok: true })
   mockOpenPath.mockResolvedValue({ ok: true })
-  ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
+  installElectronApi({
     terminal: {
       input: mockInput,
       resize: mockResize,
@@ -158,8 +156,16 @@ beforeEach(async () => {
       openExternal: mockOpenExternal,
       openPath: mockOpenPath,
     },
-  }
+  })
 })
+
+/** Puts a screen of `rows` rows from `buffer` behind the instance's (faked) xterm. */
+function showScreen(instance: TerminalInstance, rows: number, buffer: Partial<IBuffer>): void {
+  Object.defineProperty(instance.terminal, 'rows', { value: rows })
+  Object.defineProperty(instance.terminal, 'buffer', {
+    value: partialFake<IBufferNamespace>({ active: partialFake<IBuffer>(buffer) }),
+  })
+}
 
 describe('TerminalInstance', () => {
   it('pastes \\n when Cmd+Enter is pressed via custom key handler', () => {
@@ -306,11 +312,10 @@ describe('TerminalInstance', () => {
   it('reads the visible screen as one string per row, trailing spaces trimmed', () => {
     const instance = new TerminalInstance('ses-1', 1000)
     const translate = vi.fn((trimRight?: boolean) => (trimRight ? 'row' : 'row   '))
-    const getLine = vi.fn((_line: number) => ({ translateToString: translate }))
-    ;(instance.terminal as unknown as { rows: number }).rows = 3
-    ;(instance.terminal as unknown as { buffer: unknown }).buffer = {
-      active: { viewportY: 40, getLine },
-    }
+    const getLine = vi.fn((_line: number) =>
+      partialFake<IBufferLine>({ translateToString: translate })
+    )
+    showScreen(instance, 3, { viewportY: 40, getLine })
     expect(instance.readVisibleRows()).toEqual(['row', 'row', 'row'])
     expect(getLine.mock.calls.map((c) => c[0])).toEqual([40, 41, 42])
   })
@@ -323,10 +328,7 @@ describe('TerminalInstance', () => {
 
   it('reads a missing buffer line as an empty row', () => {
     const instance = new TerminalInstance('ses-1', 1000)
-    ;(instance.terminal as unknown as { rows: number }).rows = 2
-    ;(instance.terminal as unknown as { buffer: unknown }).buffer = {
-      active: { viewportY: 0, getLine: () => undefined },
-    }
+    showScreen(instance, 2, { viewportY: 0, getLine: () => undefined })
     expect(instance.readVisibleRows()).toEqual(['', ''])
   })
 

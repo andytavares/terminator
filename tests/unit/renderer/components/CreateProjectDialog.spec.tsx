@@ -1,5 +1,5 @@
 import React from 'react'
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { useSettingsStore } from '../../../../src/renderer/stores/settings.store'
@@ -7,23 +7,33 @@ import { CreateProjectDialog } from '../../../../src/renderer/components/sidebar
 import { issueSummaryOf, projectOf, seedStore, workspaceOf } from '../../../support/renderer-stores'
 import type { IssueSummary } from '../../../../src/shared/types/index'
 import { DEFAULT_GLOBAL_SETTINGS } from '../../../../src/shared/schemas/settings.schema'
+import type { ElectronAPI } from '../../../../src/shared/electron-api/api-type'
+import { installElectronApi } from '../../../support/electron-api'
 
 const mockCreateProject = vi.fn()
 
-function setupGitAPI(overrides: Record<string, unknown> = {}): void {
-  ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
-    git: {
-      isRepo: vi.fn().mockResolvedValue({ isRepo: false }),
-      listBranches: vi.fn().mockResolvedValue({ branches: [] }),
-      listWorktrees: vi.fn().mockResolvedValue({ worktrees: [] }),
-      suggestWorktreePath: vi.fn().mockResolvedValue({ path: '/wt/branch' }),
-      createWorktree: vi.fn().mockResolvedValue({ success: true }),
-      createBranch: vi.fn().mockResolvedValue({ success: true }),
-      checkout: vi.fn().mockResolvedValue({ success: true }),
-      currentBranch: vi.fn().mockResolvedValue({ branch: 'main' }),
-      ...overrides,
-    },
+type GitApi = ElectronAPI['git']
+
+/** The repository the dialog asks main about: none, until a spec says otherwise. */
+function gitFake() {
+  return {
+    isRepo: vi.fn<GitApi['isRepo']>(async () => ({ isRepo: false })),
+    listBranches: vi.fn<GitApi['listBranches']>(async () => ({ branches: [] })),
+    listWorktrees: vi.fn<GitApi['listWorktrees']>(async () => ({ worktrees: [] })),
+    suggestWorktreePath: vi.fn<GitApi['suggestWorktreePath']>(async () => ({ path: '/wt/branch' })),
+    createWorktree: vi.fn<GitApi['createWorktree']>(async () => ({ success: true })),
+    createBranch: vi.fn<GitApi['createBranch']>(async () => ({ success: true })),
+    checkout: vi.fn<GitApi['checkout']>(async () => ({ success: true })),
+    currentBranch: vi.fn<GitApi['currentBranch']>(async () => ({ branch: 'main' })),
+    fetch: vi.fn<GitApi['fetch']>(async () => ({ success: true })),
   }
+}
+
+let gitApi: ReturnType<typeof gitFake>
+
+function setupGitAPI(overrides: Partial<ReturnType<typeof gitFake>> = {}): void {
+  gitApi = { ...gitFake(), ...overrides }
+  installElectronApi({ git: gitApi })
 }
 
 beforeEach(() => {
@@ -40,17 +50,9 @@ beforeEach(() => {
   })
 })
 
-afterEach(() => {
-  delete (globalThis as unknown as Record<string, unknown>).electronAPI
-})
-
 function setupGitWorkspace(): void {
-  ;(
-    window.electronAPI as unknown as { git: { isRepo: ReturnType<typeof vi.fn> } }
-  ).git.isRepo.mockResolvedValue({ isRepo: true, root: '/repo' })
-  ;(
-    window.electronAPI as unknown as { git: { listBranches: ReturnType<typeof vi.fn> } }
-  ).git.listBranches.mockResolvedValue({
+  gitApi.isRepo.mockResolvedValue({ isRepo: true, root: '/repo' })
+  gitApi.listBranches.mockResolvedValue({
     branches: [{ name: 'main', isCurrent: true, isRemote: false }],
   })
   seedStore(useWorkspaceStore, {
@@ -157,9 +159,7 @@ describe('CreateProjectDialog', () => {
 
   it('refuses to create a nameless card when no branch is chosen', async () => {
     setupGitWorkspace()
-    ;(
-      window.electronAPI as unknown as { git: { listBranches: ReturnType<typeof vi.fn> } }
-    ).git.listBranches.mockResolvedValue({ branches: [] })
+    gitApi.listBranches.mockResolvedValue({ branches: [] })
     render(<CreateProjectDialog workspaceId="ws-1" onClose={vi.fn()} />)
     await vi.waitFor(() => screen.getByRole('button', { name: 'Branch' }))
     fireEvent.click(screen.getByText('Create'))
@@ -341,12 +341,8 @@ describe('CreateProjectDialog', () => {
   })
 
   it('branch mode selecting a branch via dropdown fires onChange', async () => {
-    ;(
-      window.electronAPI as unknown as { git: { isRepo: ReturnType<typeof vi.fn> } }
-    ).git.isRepo.mockResolvedValue({ isRepo: true, root: '/repo' })
-    ;(
-      window.electronAPI as unknown as { git: { listBranches: ReturnType<typeof vi.fn> } }
-    ).git.listBranches.mockResolvedValue({
+    gitApi.isRepo.mockResolvedValue({ isRepo: true, root: '/repo' })
+    gitApi.listBranches.mockResolvedValue({
       branches: [
         { name: 'main', isCurrent: true, isRemote: false },
         { name: 'develop', isCurrent: false, isRemote: false },
@@ -370,12 +366,8 @@ describe('CreateProjectDialog', () => {
   })
 
   it('worktree mode selecting existing branch then new branch fires onNewBranch', async () => {
-    ;(
-      window.electronAPI as unknown as { git: { isRepo: ReturnType<typeof vi.fn> } }
-    ).git.isRepo.mockResolvedValue({ isRepo: true, root: '/repo' })
-    ;(
-      window.electronAPI as unknown as { git: { listBranches: ReturnType<typeof vi.fn> } }
-    ).git.listBranches.mockResolvedValue({
+    gitApi.isRepo.mockResolvedValue({ isRepo: true, root: '/repo' })
+    gitApi.listBranches.mockResolvedValue({
       branches: [
         { name: 'main', isCurrent: true, isRemote: false },
         { name: 'develop', isCurrent: false, isRemote: false },
@@ -415,9 +407,7 @@ describe('CreateProjectDialog', () => {
 
   it('shows error when createBranch fails', async () => {
     setupGitWorkspace()
-    ;(
-      window.electronAPI as unknown as { git: { createBranch: ReturnType<typeof vi.fn> } }
-    ).git.createBranch.mockResolvedValue({ error: 'already exists' })
+    gitApi.createBranch.mockResolvedValue({ error: 'already exists' })
     render(<CreateProjectDialog workspaceId="ws-1" onClose={vi.fn()} />)
     await vi.waitFor(() => screen.getByRole('button', { name: 'Branch' }))
     fireEvent.click(screen.getByText('main'))
@@ -451,9 +441,7 @@ describe('CreateProjectDialog', () => {
 
   it('shows error when createWorktree fails', async () => {
     setupGitWorkspace()
-    ;(
-      window.electronAPI as unknown as { git: { createWorktree: ReturnType<typeof vi.fn> } }
-    ).git.createWorktree.mockResolvedValue({ error: 'no space' })
+    gitApi.createWorktree.mockResolvedValue({ error: 'no space' })
     render(<CreateProjectDialog workspaceId="ws-1" onClose={vi.fn()} />)
     await vi.waitFor(() => screen.getByText('Worktree'))
     fireEvent.click(screen.getByText('Worktree'))
@@ -617,12 +605,10 @@ describe('CreateProjectDialog — from an issue', () => {
     /** A createWorktree that stays unresolved until the test lets it finish. */
     function pending(): { finish: () => void } {
       let release = (): void => {}
-      const gate = new Promise((resolve) => {
+      const gate = new Promise<{ success: true }>((resolve) => {
         release = () => resolve({ success: true })
       })
-      ;(
-        window.electronAPI as unknown as { git: { createWorktree: ReturnType<typeof vi.fn> } }
-      ).git.createWorktree.mockReturnValue(gate)
+      gitApi.createWorktree.mockReturnValue(gate)
       return { finish: () => release() }
     }
 
@@ -645,10 +631,8 @@ describe('CreateProjectDialog — from an issue', () => {
       expect((button as HTMLButtonElement).disabled).toBe(true)
 
       fireEvent.click(button)
-      const git = window.electronAPI as unknown as {
-        git: { createWorktree: ReturnType<typeof vi.fn> }
-      }
-      expect(git.git.createWorktree).toHaveBeenCalledTimes(1)
+
+      expect(gitApi.createWorktree).toHaveBeenCalledTimes(1)
       gate.finish()
     })
 
@@ -673,9 +657,7 @@ describe('CreateProjectDialog — from an issue', () => {
 
     it('offers Create again when git refused, so the operator can fix and retry', async () => {
       setupGitWorkspace()
-      ;(
-        window.electronAPI as unknown as { git: { createWorktree: ReturnType<typeof vi.fn> } }
-      ).git.createWorktree.mockResolvedValue({ error: 'already exists' })
+      gitApi.createWorktree.mockResolvedValue({ error: 'already exists' })
       render(<CreateProjectDialog workspaceId="ws-1" onClose={vi.fn()} />)
       await vi.waitFor(() => screen.getByRole('button', { name: 'Worktree' }))
       fireEvent.click(screen.getByRole('button', { name: 'Worktree' }))
@@ -692,8 +674,8 @@ describe('CreateProjectDialog — from an issue', () => {
 })
 
 describe('CreateProjectDialog branch names and fetching', () => {
-  function git(): Record<string, ReturnType<typeof vi.fn>> {
-    return (window.electronAPI as unknown as { git: Record<string, ReturnType<typeof vi.fn>> }).git
+  function git(): ReturnType<typeof gitFake> {
+    return gitApi
   }
 
   async function openWorktreeMode(): Promise<void> {
@@ -753,7 +735,7 @@ describe('CreateProjectDialog branch names and fetching', () => {
 
   it('fetches and relists the branches when refresh is pressed', async () => {
     setupGitWorkspace()
-    git().fetch = vi.fn().mockResolvedValue({ success: true })
+    git().fetch.mockResolvedValue({ success: true })
     await openWorktreeMode()
     git().listBranches.mockResolvedValue({
       branches: [
@@ -769,7 +751,7 @@ describe('CreateProjectDialog branch names and fetching', () => {
 
   it('says so when the fetch fails', async () => {
     setupGitWorkspace()
-    git().fetch = vi.fn().mockResolvedValue({ error: 'Could not resolve host: github.com' })
+    git().fetch.mockResolvedValue({ error: 'Could not resolve host: github.com' })
     await openWorktreeMode()
     fireEvent.click(screen.getByRole('button', { name: 'Fetch branches' }))
     await vi.waitFor(() => screen.getByText('Could not fetch: Could not resolve host: github.com'))

@@ -80,8 +80,6 @@ const EDITOR_ERRORS: Record<string, string> = {
   VALIDATION_ERROR: 'That folder could not be opened.',
 }
 
-const DEFAULT_STALE_AFTER_MS = 2 * 60 * 60 * 1000
-
 function readStoredWidth(): number {
   try {
     const raw = localStorage.getItem(SIDEBAR_WIDTH_KEY)
@@ -169,7 +167,7 @@ export function UnifiedSidebar({
   )
   /** Branches that were printing at the last render, so one settling refreshes its statistics. */
   const busyBranches = useRef(new Set<string>())
-  const staleAfterMs = resolveSettings().sidebar?.staleAfterMs ?? DEFAULT_STALE_AFTER_MS
+  const staleAfterMs = resolveSettings().sidebar.staleAfterMs
   const { createSession } = useTerminalSession()
   const workspaceTabs = useExtensionRegistry((s) => s.workspaceTabs)
 

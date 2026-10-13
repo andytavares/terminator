@@ -1,9 +1,11 @@
 import React from 'react'
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { SettingsPanel } from '../../../../src/renderer/components/settings/SettingsPanel'
-import { seedStore } from '../../../support/renderer-stores'
+import { extensionOf, seedStore } from '../../../support/renderer-stores'
+import { installElectronApi } from '../../../support/electron-api'
+import type { ElectronAPI } from '../../../../src/shared/electron-api/api-type'
 
 const { mockDispatchNotification } = vi.hoisted(() => ({ mockDispatchNotification: vi.fn() }))
 vi.mock('../../../../src/renderer/lib/notifications', () => ({
@@ -18,32 +20,36 @@ vi.mock('../../../../src/renderer/components/settings/WorkspaceSettings', () => 
   ),
 }))
 
+type ExtensionApi = ElectronAPI['extension']
+
+/** The main process as the Settings panel reaches it. */
+function fakeApi() {
+  return {
+    extension: {
+      list: vi.fn<ExtensionApi['list']>(async () => ({ extensions: [] })),
+      install: vi.fn<ExtensionApi['install']>(),
+      toggle: vi.fn<ExtensionApi['toggle']>(),
+      uninstall: vi.fn<ExtensionApi['uninstall']>(async () => ({ ok: true })),
+      reload: vi.fn<ExtensionApi['reload']>(async (id) => ({ extension: extensionOf({ id }) })),
+      getSettingsSchemas: vi.fn<ExtensionApi['getSettingsSchemas']>(async () => ({ schemas: [] })),
+      getSettingsValues: vi.fn<ExtensionApi['getSettingsValues']>(async () => ({ values: {} })),
+      updateSetting: vi.fn<ExtensionApi['updateSetting']>(async () => ({ ok: true })),
+      onListChanged: vi.fn<ExtensionApi['onListChanged']>(() => () => {}),
+    },
+    dialog: { openDirectory: vi.fn<ElectronAPI['dialog']['openDirectory']>() },
+    extensionBridge: {
+      invoke: vi.fn<ElectronAPI['extensionBridge']['invoke']>(async () => ({ data: { ok: true } })),
+    },
+  }
+}
+
+let api: ReturnType<typeof fakeApi>
+
 beforeEach(() => {
   vi.clearAllMocks()
   seedStore(useWorkspaceStore, { activeWorkspaceId: null })
-  ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
-    extension: {
-      list: vi.fn().mockResolvedValue({ extensions: [] }),
-      install: vi.fn(),
-      toggle: vi.fn(),
-      uninstall: vi.fn().mockResolvedValue({ ok: true }),
-      reload: vi.fn().mockResolvedValue({ extension: {} }),
-      getSettingsSchemas: vi.fn().mockResolvedValue({ schemas: [] }),
-      getSettingsValues: vi.fn().mockResolvedValue({ values: {} }),
-      updateSetting: vi.fn().mockResolvedValue({ ok: true }),
-      onListChanged: vi.fn().mockReturnValue(vi.fn()),
-    },
-    dialog: {
-      openDirectory: vi.fn(),
-    },
-    extensionBridge: {
-      invoke: vi.fn().mockResolvedValue({ data: { ok: true } }),
-    },
-  }
-})
-
-afterEach(() => {
-  delete (globalThis as unknown as Record<string, unknown>).electronAPI
+  api = fakeApi()
+  installElectronApi(api)
 })
 
 describe('SettingsPanel', () => {
@@ -124,9 +130,7 @@ describe('SettingsPanel', () => {
 
 describe('ExtensionsSection', () => {
   beforeEach(() => {
-    ;(
-      window.electronAPI as unknown as { extension: { list: ReturnType<typeof vi.fn> } }
-    ).extension.list.mockResolvedValue({ extensions: [] })
+    api.extension.list.mockResolvedValue({ extensions: [] })
   })
 
   it('shows empty message when no extensions', async () => {
@@ -136,10 +140,13 @@ describe('ExtensionsSection', () => {
   })
 
   it('renders installed extensions list', async () => {
-    const ext = { id: 'com.test', name: 'Test Extension', version: '1.0.0', status: 'enabled' }
-    ;(
-      window.electronAPI as unknown as { extension: { list: ReturnType<typeof vi.fn> } }
-    ).extension.list.mockResolvedValue({ extensions: [ext] })
+    const ext = extensionOf({
+      id: 'com.test',
+      name: 'Test Extension',
+      version: '1.0.0',
+      status: 'enabled',
+    })
+    api.extension.list.mockResolvedValue({ extensions: [ext] })
     render(<SettingsPanel onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Extensions'))
     await waitFor(() => expect(screen.getByText('Test Extension')).toBeTruthy())
@@ -148,16 +155,14 @@ describe('ExtensionsSection', () => {
   })
 
   it('shows a failed extension as error, with why on its status', async () => {
-    const ext = {
+    const ext = extensionOf({
       id: 'com.lost',
       name: 'Lost Ext',
       version: '1.0.0',
       status: 'error',
       errorMessage: 'Extension host exited with code 134',
-    }
-    ;(
-      window.electronAPI as unknown as { extension: { list: ReturnType<typeof vi.fn> } }
-    ).extension.list.mockResolvedValue({ extensions: [ext] })
+    })
+    api.extension.list.mockResolvedValue({ extensions: [ext] })
     render(<SettingsPanel onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Extensions'))
     const status = await screen.findByText('error')
@@ -167,18 +172,23 @@ describe('ExtensionsSection', () => {
 
   // The host can fail, or a backend come back, while this panel is open.
   it('reads the list again when main says it changed', async () => {
-    const extension = (
-      window.electronAPI as unknown as {
-        extension: { list: ReturnType<typeof vi.fn>; onListChanged: ReturnType<typeof vi.fn> }
-      }
-    ).extension
-    const running = { id: 'com.lost', name: 'Lost Ext', version: '1.0.0', status: 'enabled' }
+    const extension = api.extension
+    const running = extensionOf({
+      id: 'com.lost',
+      name: 'Lost Ext',
+      version: '1.0.0',
+      status: 'enabled',
+    })
     extension.list.mockResolvedValue({ extensions: [running] })
     render(<SettingsPanel onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Extensions'))
     await screen.findByText('enabled')
 
-    const failed = { ...running, status: 'error', errorMessage: 'Extension host exited' }
+    const failed = extensionOf({
+      ...running,
+      status: 'error',
+      errorMessage: 'Extension host exited',
+    })
     extension.list.mockResolvedValue({ extensions: [failed] })
     const announce = extension.onListChanged.mock.calls[0][0] as () => void
     act(() => announce())
@@ -189,9 +199,7 @@ describe('ExtensionsSection', () => {
 
   it('stops listening for list changes when it closes', async () => {
     const unsubscribe = vi.fn()
-    const extension = (
-      window.electronAPI as unknown as { extension: { onListChanged: ReturnType<typeof vi.fn> } }
-    ).extension
+    const extension = api.extension
     extension.onListChanged.mockReturnValue(unsubscribe)
     const { unmount } = render(<SettingsPanel onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Extensions'))
@@ -203,20 +211,26 @@ describe('ExtensionsSection', () => {
   })
 
   it('shows Disable button for enabled extensions', async () => {
-    const ext = { id: 'com.test', name: 'Test Ext', version: '1.0.0', status: 'enabled' }
-    ;(
-      window.electronAPI as unknown as { extension: { list: ReturnType<typeof vi.fn> } }
-    ).extension.list.mockResolvedValue({ extensions: [ext] })
+    const ext = extensionOf({
+      id: 'com.test',
+      name: 'Test Ext',
+      version: '1.0.0',
+      status: 'enabled',
+    })
+    api.extension.list.mockResolvedValue({ extensions: [ext] })
     render(<SettingsPanel onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Extensions'))
     await waitFor(() => expect(screen.getByText('Disable')).toBeTruthy())
   })
 
   it('shows Enable button for disabled extensions', async () => {
-    const ext = { id: 'com.test', name: 'Test Ext', version: '1.0.0', status: 'disabled' }
-    ;(
-      window.electronAPI as unknown as { extension: { list: ReturnType<typeof vi.fn> } }
-    ).extension.list.mockResolvedValue({ extensions: [ext] })
+    const ext = extensionOf({
+      id: 'com.test',
+      name: 'Test Ext',
+      version: '1.0.0',
+      status: 'disabled',
+    })
+    api.extension.list.mockResolvedValue({ extensions: [ext] })
     render(<SettingsPanel onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Extensions'))
     await waitFor(() => expect(screen.getByText('Enable')).toBeTruthy())
@@ -229,31 +243,25 @@ describe('ExtensionsSection', () => {
   })
 
   it('calls openDirectory when install button is clicked', async () => {
-    ;(
-      window.electronAPI as unknown as { dialog: { openDirectory: ReturnType<typeof vi.fn> } }
-    ).dialog.openDirectory.mockResolvedValue({ cancelled: true })
+    api.dialog.openDirectory.mockResolvedValue({ cancelled: true })
     render(<SettingsPanel onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Extensions'))
     await waitFor(() => screen.getByText('Install from Directory'))
     fireEvent.click(screen.getByText('Install from Directory'))
-    await waitFor(() =>
-      expect(
-        (window.electronAPI as unknown as { dialog: { openDirectory: ReturnType<typeof vi.fn> } })
-          .dialog.openDirectory
-      ).toHaveBeenCalled()
-    )
+    await waitFor(() => expect(api.dialog.openDirectory).toHaveBeenCalled())
   })
 
   it('installs extension and shows it in list', async () => {
-    const newExt = { id: 'com.new', name: 'New Ext', version: '2.0.0', status: 'enabled' }
-    ;(
-      window.electronAPI as unknown as { dialog: { openDirectory: ReturnType<typeof vi.fn> } }
-    ).dialog.openDirectory.mockResolvedValue({
+    const newExt = extensionOf({
+      id: 'com.new',
+      name: 'New Ext',
+      version: '2.0.0',
+      status: 'enabled',
+    })
+    api.dialog.openDirectory.mockResolvedValue({
       filePath: '/path/to/ext',
     })
-    ;(
-      window.electronAPI as unknown as { extension: { install: ReturnType<typeof vi.fn> } }
-    ).extension.install.mockResolvedValue({ extension: newExt })
+    api.extension.install.mockResolvedValue({ extension: newExt })
     render(<SettingsPanel onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Extensions'))
     await waitFor(() => screen.getByText('Install from Directory'))
@@ -264,19 +272,11 @@ describe('ExtensionsSection', () => {
   // Main announces the changed list while the install is answering, so the
   // re-read can already hold the new extension: it must be listed once.
   it('lists an installed extension once when the list was re-read first', async () => {
-    const newExt = { id: 'com.new', name: 'New Ext', version: '2.0.0', status: 'enabled' }
-    const api = window.electronAPI as unknown as {
-      dialog: { openDirectory: ReturnType<typeof vi.fn> }
-      extension: { install: ReturnType<typeof vi.fn>; list: ReturnType<typeof vi.fn> }
-    }
+    const newExt = extensionOf({ id: 'com.new', name: 'New Ext', version: '2.0.0' })
     api.dialog.openDirectory.mockResolvedValue({ filePath: '/path/to/ext' })
     api.extension.install.mockImplementation(async () => {
       api.extension.list.mockResolvedValue({ extensions: [newExt] })
-      const announce = (
-        window.electronAPI as unknown as {
-          extension: { onListChanged: ReturnType<typeof vi.fn> }
-        }
-      ).extension.onListChanged.mock.calls[0][0] as () => void
+      const announce = api.extension.onListChanged.mock.calls[0][0] as () => void
       announce()
       await new Promise((resolve) => setTimeout(resolve, 0))
       return { extension: newExt }
@@ -289,12 +289,8 @@ describe('ExtensionsSection', () => {
   })
 
   it('shows toast on install error', async () => {
-    ;(
-      window.electronAPI as unknown as { dialog: { openDirectory: ReturnType<typeof vi.fn> } }
-    ).dialog.openDirectory.mockResolvedValue({ filePath: '/path' })
-    ;(
-      window.electronAPI as unknown as { extension: { install: ReturnType<typeof vi.fn> } }
-    ).extension.install.mockResolvedValue({
+    api.dialog.openDirectory.mockResolvedValue({ filePath: '/path' })
+    api.extension.install.mockResolvedValue({
       error: 'INVALID_MANIFEST',
     })
     render(<SettingsPanel onClose={vi.fn()} />)
@@ -309,35 +305,32 @@ describe('ExtensionsSection', () => {
   })
 
   it('toggles extension enable/disable', async () => {
-    const ext = { id: 'com.test', name: 'Test Ext', version: '1.0.0', status: 'enabled' }
-    ;(
-      window.electronAPI as unknown as { extension: { list: ReturnType<typeof vi.fn> } }
-    ).extension.list.mockResolvedValue({ extensions: [ext] })
-    ;(
-      window.electronAPI as unknown as { extension: { toggle: ReturnType<typeof vi.fn> } }
-    ).extension.toggle.mockResolvedValue({
+    const ext = extensionOf({
+      id: 'com.test',
+      name: 'Test Ext',
+      version: '1.0.0',
+      status: 'enabled',
+    })
+    api.extension.list.mockResolvedValue({ extensions: [ext] })
+    api.extension.toggle.mockResolvedValue({
       extension: { ...ext, status: 'disabled' },
     })
     render(<SettingsPanel onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Extensions'))
     await waitFor(() => screen.getByText('Disable'))
     fireEvent.click(screen.getByText('Disable'))
-    await waitFor(() =>
-      expect(
-        (window.electronAPI as unknown as { extension: { toggle: ReturnType<typeof vi.fn> } })
-          .extension.toggle
-      ).toHaveBeenCalledWith('com.test', false)
-    )
+    await waitFor(() => expect(api.extension.toggle).toHaveBeenCalledWith('com.test', false))
   })
 
   it('reloads extension and shows toast', async () => {
-    const ext = { id: 'com.test', name: 'Test Ext', version: '1.0.0', status: 'enabled' }
-    ;(
-      window.electronAPI as unknown as { extension: { list: ReturnType<typeof vi.fn> } }
-    ).extension.list.mockResolvedValue({ extensions: [ext] })
-    ;(
-      window.electronAPI as unknown as { extension: { reload: ReturnType<typeof vi.fn> } }
-    ).extension.reload.mockResolvedValue({ extension: { ...ext, version: '1.0.1' } })
+    const ext = extensionOf({
+      id: 'com.test',
+      name: 'Test Ext',
+      version: '1.0.0',
+      status: 'enabled',
+    })
+    api.extension.list.mockResolvedValue({ extensions: [ext] })
+    api.extension.reload.mockResolvedValue({ extension: { ...ext, version: '1.0.1' } })
     render(<SettingsPanel onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Extensions'))
     await waitFor(() => screen.getByText('Reload'))
@@ -350,13 +343,14 @@ describe('ExtensionsSection', () => {
   })
 
   it('shows toast when reload fails', async () => {
-    const ext = { id: 'com.test', name: 'Test Ext', version: '1.0.0', status: 'enabled' }
-    ;(
-      window.electronAPI as unknown as { extension: { list: ReturnType<typeof vi.fn> } }
-    ).extension.list.mockResolvedValue({ extensions: [ext] })
-    ;(
-      window.electronAPI as unknown as { extension: { reload: ReturnType<typeof vi.fn> } }
-    ).extension.reload.mockResolvedValue({ error: 'RELOAD_FAILED' })
+    const ext = extensionOf({
+      id: 'com.test',
+      name: 'Test Ext',
+      version: '1.0.0',
+      status: 'enabled',
+    })
+    api.extension.list.mockResolvedValue({ extensions: [ext] })
+    api.extension.reload.mockResolvedValue({ error: 'RELOAD_FAILED' })
     render(<SettingsPanel onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Extensions'))
     await waitFor(() => screen.getByText('Reload'))
@@ -369,57 +363,52 @@ describe('ExtensionsSection', () => {
   })
 
   it('uninstalls extension when confirm is accepted', async () => {
-    const ext = { id: 'com.test', name: 'Test Ext', version: '1.0.0', status: 'enabled' }
-    ;(
-      window.electronAPI as unknown as { extension: { list: ReturnType<typeof vi.fn> } }
-    ).extension.list.mockResolvedValue({ extensions: [ext] })
+    const ext = extensionOf({
+      id: 'com.test',
+      name: 'Test Ext',
+      version: '1.0.0',
+      status: 'enabled',
+    })
+    api.extension.list.mockResolvedValue({ extensions: [ext] })
     vi.stubGlobal('confirm', vi.fn().mockReturnValue(true))
     render(<SettingsPanel onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Extensions'))
     await waitFor(() => screen.getByText('Uninstall'))
     fireEvent.click(screen.getByText('Uninstall'))
-    await waitFor(() =>
-      expect(
-        (window.electronAPI as unknown as { extension: { uninstall: ReturnType<typeof vi.fn> } })
-          .extension.uninstall
-      ).toHaveBeenCalledWith('com.test')
-    )
+    await waitFor(() => expect(api.extension.uninstall).toHaveBeenCalledWith('com.test'))
     vi.unstubAllGlobals()
   })
 
   it('does not uninstall when confirm is declined', async () => {
-    const ext = { id: 'com.test', name: 'Test Ext', version: '1.0.0', status: 'enabled' }
-    ;(
-      window.electronAPI as unknown as { extension: { list: ReturnType<typeof vi.fn> } }
-    ).extension.list.mockResolvedValue({ extensions: [ext] })
+    const ext = extensionOf({
+      id: 'com.test',
+      name: 'Test Ext',
+      version: '1.0.0',
+      status: 'enabled',
+    })
+    api.extension.list.mockResolvedValue({ extensions: [ext] })
     vi.stubGlobal('confirm', vi.fn().mockReturnValue(false))
     render(<SettingsPanel onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Extensions'))
     await waitFor(() => screen.getByText('Uninstall'))
     fireEvent.click(screen.getByText('Uninstall'))
     await new Promise((r) => setTimeout(r, 50))
-    expect(
-      (window.electronAPI as unknown as { extension: { uninstall: ReturnType<typeof vi.fn> } })
-        .extension.uninstall
-    ).not.toHaveBeenCalled()
+    expect(api.extension.uninstall).not.toHaveBeenCalled()
     vi.unstubAllGlobals()
   })
 
   it('upgrades extension via Browse + install', async () => {
-    const ext = { id: 'com.test', name: 'Test Ext', version: '1.0.0', status: 'enabled' }
+    const ext = extensionOf({
+      id: 'com.test',
+      name: 'Test Ext',
+      version: '1.0.0',
+      status: 'enabled',
+    })
     const upgraded = { ...ext, version: '2.0.0' }
-    ;(
-      window.electronAPI as unknown as { extension: { list: ReturnType<typeof vi.fn> } }
-    ).extension.list.mockResolvedValue({ extensions: [ext] })
-    ;(
-      window.electronAPI as unknown as { dialog: { openDirectory: ReturnType<typeof vi.fn> } }
-    ).dialog.openDirectory.mockResolvedValue({ filePath: '/path/to/upgrade' })
-    ;(
-      window.electronAPI as unknown as { extension: { uninstall: ReturnType<typeof vi.fn> } }
-    ).extension.uninstall.mockResolvedValue({ ok: true })
-    ;(
-      window.electronAPI as unknown as { extension: { install: ReturnType<typeof vi.fn> } }
-    ).extension.install.mockResolvedValue({ extension: upgraded })
+    api.extension.list.mockResolvedValue({ extensions: [ext] })
+    api.dialog.openDirectory.mockResolvedValue({ filePath: '/path/to/upgrade' })
+    api.extension.uninstall.mockResolvedValue({ ok: true })
+    api.extension.install.mockResolvedValue({ extension: upgraded })
     render(<SettingsPanel onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Extensions'))
     await waitFor(() => screen.getByText('Upgrade'))
@@ -432,19 +421,16 @@ describe('ExtensionsSection', () => {
   })
 
   it('shows error toast when upgrade install step fails', async () => {
-    const ext = { id: 'com.test', name: 'Test Ext', version: '1.0.0', status: 'enabled' }
-    ;(
-      window.electronAPI as unknown as { extension: { list: ReturnType<typeof vi.fn> } }
-    ).extension.list.mockResolvedValue({ extensions: [ext] })
-    ;(
-      window.electronAPI as unknown as { dialog: { openDirectory: ReturnType<typeof vi.fn> } }
-    ).dialog.openDirectory.mockResolvedValue({ filePath: '/path/to/upgrade' })
-    ;(
-      window.electronAPI as unknown as { extension: { uninstall: ReturnType<typeof vi.fn> } }
-    ).extension.uninstall.mockResolvedValue({ ok: true })
-    ;(
-      window.electronAPI as unknown as { extension: { install: ReturnType<typeof vi.fn> } }
-    ).extension.install.mockResolvedValue({ error: 'INVALID_MANIFEST' })
+    const ext = extensionOf({
+      id: 'com.test',
+      name: 'Test Ext',
+      version: '1.0.0',
+      status: 'enabled',
+    })
+    api.extension.list.mockResolvedValue({ extensions: [ext] })
+    api.dialog.openDirectory.mockResolvedValue({ filePath: '/path/to/upgrade' })
+    api.extension.uninstall.mockResolvedValue({ ok: true })
+    api.extension.install.mockResolvedValue({ error: 'INVALID_MANIFEST' })
     render(<SettingsPanel onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Extensions'))
     await waitFor(() => screen.getByText('Upgrade'))
@@ -457,16 +443,15 @@ describe('ExtensionsSection', () => {
   })
 
   it('shows error toast when upgrade uninstall step fails', async () => {
-    const ext = { id: 'com.test', name: 'Test Ext', version: '1.0.0', status: 'enabled' }
-    ;(
-      window.electronAPI as unknown as { extension: { list: ReturnType<typeof vi.fn> } }
-    ).extension.list.mockResolvedValue({ extensions: [ext] })
-    ;(
-      window.electronAPI as unknown as { dialog: { openDirectory: ReturnType<typeof vi.fn> } }
-    ).dialog.openDirectory.mockResolvedValue({ filePath: '/path/to/upgrade' })
-    ;(
-      window.electronAPI as unknown as { extension: { uninstall: ReturnType<typeof vi.fn> } }
-    ).extension.uninstall.mockResolvedValue({ error: 'UNINSTALL_FAILED' })
+    const ext = extensionOf({
+      id: 'com.test',
+      name: 'Test Ext',
+      version: '1.0.0',
+      status: 'enabled',
+    })
+    api.extension.list.mockResolvedValue({ extensions: [ext] })
+    api.dialog.openDirectory.mockResolvedValue({ filePath: '/path/to/upgrade' })
+    api.extension.uninstall.mockResolvedValue({ error: 'UNINSTALL_FAILED' })
     render(<SettingsPanel onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Extensions'))
     await waitFor(() => screen.getByText('Upgrade'))
@@ -479,34 +464,31 @@ describe('ExtensionsSection', () => {
   })
 
   it('skips upgrade when directory dialog is cancelled', async () => {
-    const ext = { id: 'com.test', name: 'Test Ext', version: '1.0.0', status: 'enabled' }
-    ;(
-      window.electronAPI as unknown as { extension: { list: ReturnType<typeof vi.fn> } }
-    ).extension.list.mockResolvedValue({ extensions: [ext] })
-    ;(
-      window.electronAPI as unknown as { dialog: { openDirectory: ReturnType<typeof vi.fn> } }
-    ).dialog.openDirectory.mockResolvedValue({ cancelled: true })
+    const ext = extensionOf({
+      id: 'com.test',
+      name: 'Test Ext',
+      version: '1.0.0',
+      status: 'enabled',
+    })
+    api.extension.list.mockResolvedValue({ extensions: [ext] })
+    api.dialog.openDirectory.mockResolvedValue({ cancelled: true })
     render(<SettingsPanel onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Extensions'))
     await waitFor(() => screen.getByText('Upgrade'))
     fireEvent.click(screen.getByText('Upgrade'))
     await new Promise((r) => setTimeout(r, 50))
-    expect(
-      (window.electronAPI as unknown as { extension: { uninstall: ReturnType<typeof vi.fn> } })
-        .extension.uninstall
-    ).not.toHaveBeenCalled()
+    expect(api.extension.uninstall).not.toHaveBeenCalled()
   })
 
   it('renders ExtensionSettingRow for extension with schema', async () => {
-    const ext = { id: 'com.test', name: 'Test Ext', version: '1.0.0', status: 'enabled' }
-    const extAPI = window.electronAPI as unknown as {
-      extension: {
-        list: ReturnType<typeof vi.fn>
-        getSettingsSchemas: ReturnType<typeof vi.fn>
-      }
-    }
-    extAPI.extension.list.mockResolvedValue({ extensions: [ext] })
-    extAPI.extension.getSettingsSchemas.mockResolvedValue({
+    const ext = extensionOf({
+      id: 'com.test',
+      name: 'Test Ext',
+      version: '1.0.0',
+      status: 'enabled',
+    })
+    api.extension.list.mockResolvedValue({ extensions: [ext] })
+    api.extension.getSettingsSchemas.mockResolvedValue({
       schemas: [
         {
           extensionId: 'com.test',
@@ -530,16 +512,14 @@ describe('ExtensionsSection', () => {
   })
 
   it('ExtensionSettingRow calls updateSetting after debounce', async () => {
-    const ext = { id: 'com.test', name: 'Test Ext', version: '1.0.0', status: 'enabled' }
-    const extAPI = window.electronAPI as unknown as {
-      extension: {
-        list: ReturnType<typeof vi.fn>
-        getSettingsSchemas: ReturnType<typeof vi.fn>
-        updateSetting: ReturnType<typeof vi.fn>
-      }
-    }
-    extAPI.extension.list.mockResolvedValue({ extensions: [ext] })
-    extAPI.extension.getSettingsSchemas.mockResolvedValue({
+    const ext = extensionOf({
+      id: 'com.test',
+      name: 'Test Ext',
+      version: '1.0.0',
+      status: 'enabled',
+    })
+    api.extension.list.mockResolvedValue({ extensions: [ext] })
+    api.extension.getSettingsSchemas.mockResolvedValue({
       schemas: [
         {
           extensionId: 'com.test',
@@ -562,21 +542,20 @@ describe('ExtensionsSection', () => {
     fireEvent.change(screen.getByDisplayValue('hello'), { target: { value: 'world' } })
     // Wait for debounce timer (400ms) to fire
     await waitFor(
-      () => expect(extAPI.extension.updateSetting).toHaveBeenCalledWith('com.test.myKey', 'world'),
+      () => expect(api.extension.updateSetting).toHaveBeenCalledWith('com.test.myKey', 'world'),
       { timeout: 2000 }
     )
   })
 
   it('ExtensionSettingRow renders boolean select', async () => {
-    const ext = { id: 'com.test', name: 'Test Ext', version: '1.0.0', status: 'enabled' }
-    const extAPI = window.electronAPI as unknown as {
-      extension: {
-        list: ReturnType<typeof vi.fn>
-        getSettingsSchemas: ReturnType<typeof vi.fn>
-      }
-    }
-    extAPI.extension.list.mockResolvedValue({ extensions: [ext] })
-    extAPI.extension.getSettingsSchemas.mockResolvedValue({
+    const ext = extensionOf({
+      id: 'com.test',
+      name: 'Test Ext',
+      version: '1.0.0',
+      status: 'enabled',
+    })
+    api.extension.list.mockResolvedValue({ extensions: [ext] })
+    api.extension.getSettingsSchemas.mockResolvedValue({
       schemas: [
         {
           extensionId: 'com.test',
@@ -601,17 +580,14 @@ describe('ExtensionsSection', () => {
   })
 
   it('groups per-notification-kind boolean settings into a 4-column table instead of individual switches', async () => {
-    const ext = { id: 'com.test', name: 'Test Ext', version: '1.0.0', status: 'enabled' }
-    const extAPI = window.electronAPI as unknown as {
-      extension: {
-        list: ReturnType<typeof vi.fn>
-        getSettingsSchemas: ReturnType<typeof vi.fn>
-        getSettingsValues: ReturnType<typeof vi.fn>
-        updateSetting: ReturnType<typeof vi.fn>
-      }
-    }
-    extAPI.extension.list.mockResolvedValue({ extensions: [ext] })
-    extAPI.extension.getSettingsSchemas.mockResolvedValue({
+    const ext = extensionOf({
+      id: 'com.test',
+      name: 'Test Ext',
+      version: '1.0.0',
+      status: 'enabled',
+    })
+    api.extension.list.mockResolvedValue({ extensions: [ext] })
+    api.extension.getSettingsSchemas.mockResolvedValue({
       schemas: [
         {
           extensionId: 'com.test',
@@ -649,7 +625,7 @@ describe('ExtensionsSection', () => {
     expect(checkboxes).toHaveLength(3)
     fireEvent.click(checkboxes[0])
     await waitFor(() =>
-      expect(extAPI.extension.updateSetting).toHaveBeenCalledWith(
+      expect(api.extension.updateSetting).toHaveBeenCalledWith(
         'com.test.notify.taskCompleted.system',
         false
       )
@@ -657,15 +633,14 @@ describe('ExtensionsSection', () => {
   })
 
   it('ExtensionSettingRow renders enum select', async () => {
-    const ext = { id: 'com.test', name: 'Test Ext', version: '1.0.0', status: 'enabled' }
-    const extAPI = window.electronAPI as unknown as {
-      extension: {
-        list: ReturnType<typeof vi.fn>
-        getSettingsSchemas: ReturnType<typeof vi.fn>
-      }
-    }
-    extAPI.extension.list.mockResolvedValue({ extensions: [ext] })
-    extAPI.extension.getSettingsSchemas.mockResolvedValue({
+    const ext = extensionOf({
+      id: 'com.test',
+      name: 'Test Ext',
+      version: '1.0.0',
+      status: 'enabled',
+    })
+    api.extension.list.mockResolvedValue({ extensions: [ext] })
+    api.extension.getSettingsSchemas.mockResolvedValue({
       schemas: [
         {
           extensionId: 'com.test',
@@ -693,15 +668,14 @@ describe('ExtensionsSection', () => {
   })
 
   it('toggleSettingsExpand collapses panel when clicked again', async () => {
-    const ext = { id: 'com.test', name: 'Test Ext', version: '1.0.0', status: 'enabled' }
-    const extAPI = window.electronAPI as unknown as {
-      extension: {
-        list: ReturnType<typeof vi.fn>
-        getSettingsSchemas: ReturnType<typeof vi.fn>
-      }
-    }
-    extAPI.extension.list.mockResolvedValue({ extensions: [ext] })
-    extAPI.extension.getSettingsSchemas.mockResolvedValue({
+    const ext = extensionOf({
+      id: 'com.test',
+      name: 'Test Ext',
+      version: '1.0.0',
+      status: 'enabled',
+    })
+    api.extension.list.mockResolvedValue({ extensions: [ext] })
+    api.extension.getSettingsSchemas.mockResolvedValue({
       schemas: [
         {
           extensionId: 'com.test',
@@ -739,16 +713,14 @@ describe('ExtensionsSection', () => {
         confirmMessage?: string
       } = {}
     ) {
-      const ext = { id: 'com.test', name: 'Test Ext', version: '1.0.0', status: 'enabled' }
-      const extAPI = window.electronAPI as unknown as {
-        extension: {
-          list: ReturnType<typeof vi.fn>
-          getSettingsSchemas: ReturnType<typeof vi.fn>
-        }
-        extensionBridge: { invoke: ReturnType<typeof vi.fn> }
-      }
-      extAPI.extension.list.mockResolvedValue({ extensions: [ext] })
-      extAPI.extension.getSettingsSchemas.mockResolvedValue({
+      const ext = extensionOf({
+        id: 'com.test',
+        name: 'Test Ext',
+        version: '1.0.0',
+        status: 'enabled',
+      })
+      api.extension.list.mockResolvedValue({ extensions: [ext] })
+      api.extension.getSettingsSchemas.mockResolvedValue({
         schemas: [
           {
             extensionId: 'com.test',
@@ -766,7 +738,6 @@ describe('ExtensionsSection', () => {
           },
         ],
       })
-      return extAPI
     }
 
     async function openSettings() {
@@ -778,9 +749,7 @@ describe('ExtensionsSection', () => {
     }
 
     beforeEach(() => {
-      ;(window.electronAPI as unknown as Record<string, unknown>).extensionBridge = {
-        invoke: vi.fn().mockResolvedValue({ data: { ok: true } }),
-      }
+      api.extensionBridge.invoke.mockResolvedValue({ data: { ok: true } })
     })
 
     it('renders action button with label and description', async () => {
@@ -805,8 +774,8 @@ describe('ExtensionsSection', () => {
     })
 
     it('shows error toast when result contains { error }', async () => {
-      const extAPI = setupExtWithAction()
-      extAPI.extensionBridge.invoke.mockResolvedValue({ error: 'DB locked' })
+      setupExtWithAction()
+      api.extensionBridge.invoke.mockResolvedValue({ error: 'DB locked' })
       await openSettings()
       fireEvent.click(screen.getByText('Do Thing'))
       await waitFor(() =>
@@ -820,8 +789,8 @@ describe('ExtensionsSection', () => {
     })
 
     it('shows error toast when invoke rejects', async () => {
-      const extAPI = setupExtWithAction()
-      extAPI.extensionBridge.invoke.mockRejectedValue(new Error('IPC failed'))
+      setupExtWithAction()
+      api.extensionBridge.invoke.mockRejectedValue(new Error('IPC failed'))
       await openSettings()
       fireEvent.click(screen.getByText('Do Thing'))
       await waitFor(() =>
@@ -842,8 +811,8 @@ describe('ExtensionsSection', () => {
     })
 
     it('shows warning toast when repair result has non-ok integrity', async () => {
-      const extAPI = setupExtWithAction()
-      extAPI.extensionBridge.invoke.mockResolvedValue({ data: { integrity: 'corruption found' } })
+      setupExtWithAction()
+      api.extensionBridge.invoke.mockResolvedValue({ data: { integrity: 'corruption found' } })
       await openSettings()
       fireEvent.click(screen.getByText('Do Thing'))
       await waitFor(() =>
@@ -857,8 +826,8 @@ describe('ExtensionsSection', () => {
     })
 
     it('shows success toast when repair result integrity is ok', async () => {
-      const extAPI = setupExtWithAction()
-      extAPI.extensionBridge.invoke.mockResolvedValue({ data: { integrity: 'ok' } })
+      setupExtWithAction()
+      api.extensionBridge.invoke.mockResolvedValue({ data: { integrity: 'ok' } })
       await openSettings()
       fireEvent.click(screen.getByText('Do Thing'))
       await waitFor(() =>
@@ -872,7 +841,7 @@ describe('ExtensionsSection', () => {
     })
 
     it('cancels action when confirm dialog is rejected', async () => {
-      const extAPI = setupExtWithAction({
+      setupExtWithAction({
         confirmMessage: 'Are you sure?',
         danger: true,
       })
@@ -880,33 +849,32 @@ describe('ExtensionsSection', () => {
       await openSettings()
       fireEvent.click(screen.getByText('Do Thing'))
       await new Promise((r) => setTimeout(r, 50))
-      expect(extAPI.extensionBridge.invoke).not.toHaveBeenCalled()
+      expect(api.extensionBridge.invoke).not.toHaveBeenCalled()
       vi.restoreAllMocks()
     })
 
     it('proceeds when confirm dialog is accepted', async () => {
-      const extAPI = setupExtWithAction({
+      setupExtWithAction({
         confirmMessage: 'Are you sure?',
         danger: true,
       })
       vi.spyOn(window, 'confirm').mockReturnValue(true)
       await openSettings()
       fireEvent.click(screen.getByText('Do Thing'))
-      await waitFor(() => expect(extAPI.extensionBridge.invoke).toHaveBeenCalled())
+      await waitFor(() => expect(api.extensionBridge.invoke).toHaveBeenCalled())
       vi.restoreAllMocks()
     })
   })
 
   it('shows schema description when present', async () => {
-    const ext = { id: 'com.test', name: 'Test Ext', version: '1.0.0', status: 'enabled' }
-    const extAPI = window.electronAPI as unknown as {
-      extension: {
-        list: ReturnType<typeof vi.fn>
-        getSettingsSchemas: ReturnType<typeof vi.fn>
-      }
-    }
-    extAPI.extension.list.mockResolvedValue({ extensions: [ext] })
-    extAPI.extension.getSettingsSchemas.mockResolvedValue({
+    const ext = extensionOf({
+      id: 'com.test',
+      name: 'Test Ext',
+      version: '1.0.0',
+      status: 'enabled',
+    })
+    api.extension.list.mockResolvedValue({ extensions: [ext] })
+    api.extension.getSettingsSchemas.mockResolvedValue({
       schemas: [
         {
           extensionId: 'com.test',
@@ -926,17 +894,14 @@ describe('ExtensionsSection', () => {
   })
 
   it('renders folder-type setting with Choose button and updates value when folder picked', async () => {
-    const ext = { id: 'com.test', name: 'Test Ext', version: '1.0.0', status: 'enabled' }
-    const extAPI = window.electronAPI as unknown as {
-      extension: {
-        list: ReturnType<typeof vi.fn>
-        getSettingsSchemas: ReturnType<typeof vi.fn>
-        updateSetting: ReturnType<typeof vi.fn>
-      }
-      dialog: { openDirectory: ReturnType<typeof vi.fn> }
-    }
-    extAPI.extension.list.mockResolvedValue({ extensions: [ext] })
-    extAPI.extension.getSettingsSchemas.mockResolvedValue({
+    const ext = extensionOf({
+      id: 'com.test',
+      name: 'Test Ext',
+      version: '1.0.0',
+      status: 'enabled',
+    })
+    api.extension.list.mockResolvedValue({ extensions: [ext] })
+    api.extension.getSettingsSchemas.mockResolvedValue({
       schemas: [
         {
           extensionId: 'com.test',
@@ -947,7 +912,7 @@ describe('ExtensionsSection', () => {
         },
       ],
     })
-    extAPI.dialog.openDirectory.mockResolvedValue({ filePath: '/my/path' })
+    api.dialog.openDirectory.mockResolvedValue({ filePath: '/my/path' })
     render(<SettingsPanel onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Extensions'))
     await waitFor(() => screen.getByTitle('Configure'))
@@ -956,22 +921,20 @@ describe('ExtensionsSection', () => {
     fireEvent.click(screen.getByText('Choose…'))
     // Wait for the debounce timer (400ms) to fire so saveTimer is cleared before unmount
     await waitFor(
-      () =>
-        expect(extAPI.extension.updateSetting).toHaveBeenCalledWith('com.test.folder', '/my/path'),
+      () => expect(api.extension.updateSetting).toHaveBeenCalledWith('com.test.folder', '/my/path'),
       { timeout: 2000 }
     )
   })
 
   it('renders number-type setting as number input', async () => {
-    const ext = { id: 'com.test', name: 'Test Ext', version: '1.0.0', status: 'enabled' }
-    const extAPI = window.electronAPI as unknown as {
-      extension: {
-        list: ReturnType<typeof vi.fn>
-        getSettingsSchemas: ReturnType<typeof vi.fn>
-      }
-    }
-    extAPI.extension.list.mockResolvedValue({ extensions: [ext] })
-    extAPI.extension.getSettingsSchemas.mockResolvedValue({
+    const ext = extensionOf({
+      id: 'com.test',
+      name: 'Test Ext',
+      version: '1.0.0',
+      status: 'enabled',
+    })
+    api.extension.list.mockResolvedValue({ extensions: [ext] })
+    api.extension.getSettingsSchemas.mockResolvedValue({
       schemas: [
         {
           extensionId: 'com.test',
@@ -992,33 +955,30 @@ describe('ExtensionsSection', () => {
   })
 
   it('toggle with error response calls toggle API', async () => {
-    const ext = { id: 'com.test', name: 'Test Ext', version: '1.0.0', status: 'enabled' }
-    ;(
-      window.electronAPI as unknown as { extension: { list: ReturnType<typeof vi.fn> } }
-    ).extension.list.mockResolvedValue({ extensions: [ext] })
-    ;(
-      window.electronAPI as unknown as { extension: { toggle: ReturnType<typeof vi.fn> } }
-    ).extension.toggle.mockResolvedValue({ error: 'TOGGLE_FAILED' })
+    const ext = extensionOf({
+      id: 'com.test',
+      name: 'Test Ext',
+      version: '1.0.0',
+      status: 'enabled',
+    })
+    api.extension.list.mockResolvedValue({ extensions: [ext] })
+    api.extension.toggle.mockResolvedValue({ error: 'TOGGLE_FAILED' })
     render(<SettingsPanel onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Extensions'))
     await waitFor(() => screen.getByText('Disable'))
     fireEvent.click(screen.getByText('Disable'))
-    await waitFor(() =>
-      expect(
-        (window.electronAPI as unknown as { extension: { toggle: ReturnType<typeof vi.fn> } })
-          .extension.toggle
-      ).toHaveBeenCalledWith('com.test', false)
-    )
+    await waitFor(() => expect(api.extension.toggle).toHaveBeenCalledWith('com.test', false))
   })
 
   it('uninstall with error response shows error toast', async () => {
-    const ext = { id: 'com.test', name: 'Test Ext', version: '1.0.0', status: 'enabled' }
-    ;(
-      window.electronAPI as unknown as { extension: { list: ReturnType<typeof vi.fn> } }
-    ).extension.list.mockResolvedValue({ extensions: [ext] })
-    ;(
-      window.electronAPI as unknown as { extension: { uninstall: ReturnType<typeof vi.fn> } }
-    ).extension.uninstall.mockResolvedValue({ error: 'PERM_DENIED' })
+    const ext = extensionOf({
+      id: 'com.test',
+      name: 'Test Ext',
+      version: '1.0.0',
+      status: 'enabled',
+    })
+    api.extension.list.mockResolvedValue({ extensions: [ext] })
+    api.extension.uninstall.mockResolvedValue({ error: 'PERM_DENIED' })
     vi.stubGlobal('confirm', vi.fn().mockReturnValue(true))
     render(<SettingsPanel onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Extensions'))
@@ -1033,16 +993,14 @@ describe('ExtensionsSection', () => {
   })
 
   it('folder-type setting shows Not set placeholder when value is empty', async () => {
-    const ext = { id: 'com.test', name: 'Test Ext', version: '1.0.0', status: 'enabled' }
-    const extAPI = window.electronAPI as unknown as {
-      extension: {
-        list: ReturnType<typeof vi.fn>
-        getSettingsSchemas: ReturnType<typeof vi.fn>
-        getSettingsValues: ReturnType<typeof vi.fn>
-      }
-    }
-    extAPI.extension.list.mockResolvedValue({ extensions: [ext] })
-    extAPI.extension.getSettingsSchemas.mockResolvedValue({
+    const ext = extensionOf({
+      id: 'com.test',
+      name: 'Test Ext',
+      version: '1.0.0',
+      status: 'enabled',
+    })
+    api.extension.list.mockResolvedValue({ extensions: [ext] })
+    api.extension.getSettingsSchemas.mockResolvedValue({
       schemas: [
         {
           extensionId: 'com.test',
@@ -1053,7 +1011,7 @@ describe('ExtensionsSection', () => {
         },
       ],
     })
-    extAPI.extension.getSettingsValues.mockResolvedValue({ values: { 'com.test.folder': '' } })
+    api.extension.getSettingsValues.mockResolvedValue({ values: { 'com.test.folder': '' } })
     render(<SettingsPanel onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Extensions'))
     await waitFor(() => screen.getByTitle('Configure'))

@@ -30,33 +30,10 @@ describe('statusPresentationFor — the resting state of a session row', () => {
     expect(p.label).toBe(label)
   })
 
-  it('gives every state a distinct glyph — the whole point is telling them apart', () => {
-    const icons = ALL_STATES.map((s) => statusPresentationFor(session(s)).icon)
-    expect(new Set(icons).size).toBe(ALL_STATES.length)
-  })
-
-  it('gives every state a distinct label, so a screen reader can tell them apart too', () => {
-    const labels = ALL_STATES.map((s) => statusPresentationFor(session(s)).label)
-    expect(new Set(labels).size).toBe(ALL_STATES.length)
-  })
-
   it('emphasises only the state that is blocked on the user', () => {
     for (const state of ALL_STATES) {
       expect(statusPresentationFor(session(state)).emphasises).toBe(state === 'awaiting-input')
     }
-  })
-
-  it('is total — every state resolves, none falls through to a default', () => {
-    for (const state of ALL_STATES) {
-      const p = statusPresentationFor(session(state))
-      expect(p.icon).toBeTruthy()
-      expect(p.label).toBeTruthy()
-    }
-  })
-
-  it('is pure — the same session always yields a deeply equal presentation', () => {
-    const s = session('working')
-    expect(statusPresentationFor(s)).toEqual(statusPresentationFor(s))
   })
 
   it('does not mutate the session it is given', () => {

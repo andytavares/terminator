@@ -67,19 +67,8 @@ describe('toErrorKind', () => {
 
   it('never lets a raw HTTP status or SDK error escape as a kind', () => {
     // The taxonomy is closed. Anything not in it must land on 'failed'.
-    const kinds = [
-      toErrorKind({ status: 429 }),
-      toErrorKind({ type: 'Ratelimited' }),
-      toErrorKind(new Error('429')),
-    ]
-    const allowed = [
-      'not-connected',
-      'auth-failed',
-      'rate-limited',
-      'unavailable',
-      'not-found',
-      'failed',
-    ]
-    for (const k of kinds) expect(allowed).toContain(k)
+    expect(toErrorKind({ status: 429 })).toBe('failed')
+    expect(toErrorKind({ type: 'Ratelimited' })).toBe('failed')
+    expect(toErrorKind(new Error('429'))).toBe('failed')
   })
 })

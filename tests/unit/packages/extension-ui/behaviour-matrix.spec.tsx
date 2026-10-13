@@ -70,15 +70,15 @@ describe('behaviour matrix: Dialog', () => {
   })
 
   it('counts toward the modal depth the exit gesture reads', () => {
-    expect(getModalDepth(window as unknown as Record<string, unknown>)).toBe(0)
+    expect(getModalDepth(window)).toBe(0)
     const { unmount } = render(
       <Dialog title="X" onDismiss={vi.fn()} actions={[]}>
         <p>body</p>
       </Dialog>
     )
-    expect(getModalDepth(window as unknown as Record<string, unknown>)).toBe(1)
+    expect(getModalDepth(window)).toBe(1)
     unmount()
-    expect(getModalDepth(window as unknown as Record<string, unknown>)).toBe(0)
+    expect(getModalDepth(window)).toBe(0)
   })
 })
 
@@ -186,8 +186,8 @@ describe('behaviour matrix: useDismissible', () => {
   it('counts toward modal depth — the guard the three Notepad surfaces lacked', () => {
     const onDismiss = vi.fn()
     const { unmount } = render(<Custom onDismiss={onDismiss} />)
-    expect(getModalDepth(window as unknown as Record<string, unknown>)).toBe(1)
+    expect(getModalDepth(window)).toBe(1)
     unmount()
-    expect(getModalDepth(window as unknown as Record<string, unknown>)).toBe(0)
+    expect(getModalDepth(window)).toBe(0)
   })
 })

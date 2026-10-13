@@ -101,7 +101,7 @@ export function Dialog({
   })
 
   useEffect(() => {
-    const registry = createModalDepthRegistry(window as unknown as Record<string, unknown>)
+    const registry = createModalDepthRegistry(window)
     const release = registry.release()
     const restoreFocus = panelRef.current ? captureFocus(panelRef.current, opener) : () => {}
 

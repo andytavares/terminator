@@ -52,10 +52,8 @@ describe('git-integration extension: git:status IPC handler', () => {
 
   it('returns error for non-repo path', async () => {
     vi.mocked(gitService.getStatus).mockRejectedValue(new Error('not a git repository'))
-    const result = (await getHandler('git:status')({ path: '/tmp/not-a-repo', maxFiles: 500 })) as {
-      error: string
-    }
-    expect(result.error).toBeDefined()
+    const result = await getHandler('git:status')({ path: '/tmp/not-a-repo', maxFiles: 500 })
+    expect(result).toEqual({ error: 'Error: not a git repository' })
   })
 })
 
@@ -125,6 +123,7 @@ describe('git-integration extension: git:stage / git:unstage IPC handlers', () =
       repoRoot: '/tmp/repo',
       paths: ['src/main.ts'],
     })
+    expect(gitService.unstageFiles).toHaveBeenCalledWith('/tmp/repo', ['src/main.ts'])
     expect(result).toMatchObject({ success: true })
   })
 })

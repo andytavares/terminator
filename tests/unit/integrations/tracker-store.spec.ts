@@ -100,7 +100,7 @@ describe('tracker-store — secrets at rest', () => {
 describe('tracker-store — connection view', () => {
   it('reports a connection without ever exposing the secret', async () => {
     const store = await load()
-    await store.setCredential({ tracker: 'linear', apiKey: 'k' })
+    await store.setCredential({ tracker: 'linear', apiKey: 'lin-secret' })
     await store.setAccount('linear', { name: 'Andrew', email: 'a@b.c' })
 
     const [linear] = (await store.listConnections()).filter((c) => c.tracker === 'linear')
@@ -109,7 +109,7 @@ describe('tracker-store — connection view', () => {
       connected: true,
       account: { name: 'Andrew', email: 'a@b.c' },
     })
-    expect(JSON.stringify(linear)).not.toContain('"k"')
+    expect(JSON.stringify(linear)).not.toContain('lin-secret')
   })
 
   it('reports every tracker, connected or not', async () => {
@@ -133,6 +133,30 @@ describe('tracker-store — connection view', () => {
     await store.setMine('linear', { kind: 'assignee', email: 'me@x.c' })
     const linear = (await store.listConnections()).find((c) => c.tracker === 'linear')
     expect(linear?.mine).toEqual({ kind: 'assignee', email: 'me@x.c' })
+  })
+})
+
+describe('tracker-store — concurrent writes', () => {
+  // Two trackers answered at once (listMine across both) record their states
+  // at once; each write must keep the other's.
+  it('keeps both of two errors recorded at the same time', async () => {
+    const store = await load()
+    await Promise.all([
+      store.setLastError('linear', 'auth-failed'),
+      store.setLastError('jira', 'unavailable'),
+    ])
+    const errors = (await store.listConnections()).map((c) => [c.tracker, c.lastError])
+    expect(errors).toEqual([
+      ['linear', 'auth-failed'],
+      ['jira', 'unavailable'],
+    ])
+  })
+
+  it('answers a read after the writes already asked for', async () => {
+    const store = await load()
+    void store.setLastError('linear', 'auth-failed')
+    const linear = (await store.listConnections()).find((c) => c.tracker === 'linear')
+    expect(linear?.lastError).toBe('auth-failed')
   })
 })
 

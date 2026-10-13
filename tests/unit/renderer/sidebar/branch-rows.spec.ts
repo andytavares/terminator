@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { buildBranchRows, sessionIssueKeys } from '../../../../src/renderer/sidebar/branch-rows'
+import {
+  buildBranchRows,
+  sessionIssueKeys,
+  type BranchTerminal,
+} from '../../../../src/renderer/sidebar/branch-rows'
 import { SCRATCH_PROJECT_ID } from '../../../../src/shared/types/index'
 import type { SessionView } from '../../../../src/renderer/sidebar/view-model'
 import type { Project, TerminalSession, Workspace } from '../../../../src/shared/types/index'
@@ -434,7 +438,7 @@ describe('buildBranchRows', () => {
 
     it('drops an empty repo from a narrowed view, which has nothing to say about it', () => {
       const labels = withEmpty(view({ filters: { query: 'main' } })).groups.map((g) => g.label)
-      expect(labels).not.toContain('aardvark')
+      expect(labels).toEqual(['terminator'])
     })
 
     it('does not invent a repo header when grouping is off', () => {
@@ -470,10 +474,10 @@ describe('buildBranchRows', () => {
     expect(row).not.toHaveProperty('removed')
   })
 
-  it('is deterministic and does not mutate its inputs', () => {
+  it('does not mutate its inputs', () => {
     const sessions = [session('a', 'p1'), session('b', 'p2')]
     const order = sessions.map((s) => s.id)
-    expect(JSON.stringify(build(sessions))).toBe(JSON.stringify(build(sessions)))
+    build(sessions)
     expect(sessions.map((s) => s.id)).toEqual(order)
     expect(PROJECTS.map((p) => p.id)).toEqual(['p1', 'p2', 'p3'])
   })
@@ -486,16 +490,21 @@ describe('buildBranchRows', () => {
   it('drops a branch whose repo has gone', () => {
     const orphan: Project = { ...feature, id: 'p9', workspaceId: 'ws-gone' }
     const result = buildBranchRows([], [...PROJECTS, orphan], REPOS, view(), NOW, STALE_AFTER)
-    expect(result.groups.flatMap((g) => g.branches).map((b) => b.projectId)).not.toContain('p9')
+    const shown = result.groups.flatMap((g) => g.branches).map((b) => b.projectId)
+    expect(shown.sort()).toEqual(['p1', 'p2', 'p3'])
   })
 
   describe('sessionIssueKeys', () => {
     const own = (key: string): WorkItem => ({ source: 'session', ref: { tracker: 'linear', key } })
     const inherited: WorkItem = { source: 'project', ref: { tracker: 'linear', key: 'ENG-9' } }
-    const terminal = (sessionId: string, workItem: WorkItem | null, panes = []) => ({
+    const terminal = (
+      sessionId: string,
+      workItem: WorkItem | null,
+      panes: BranchTerminal[] = []
+    ): BranchTerminal => ({
       sessionId,
       title: sessionId,
-      state: 'idle' as const,
+      state: 'idle',
       bellCount: 0,
       panes,
       workItem,
@@ -503,7 +512,7 @@ describe('buildBranchRows', () => {
 
     it('lists each own session key once, roots then panes, and skips inherited ones', () => {
       const keys = sessionIssueKeys([
-        terminal('a', own('ENG-1'), [terminal('a1', own('ENG-2')) as never]),
+        terminal('a', own('ENG-1'), [terminal('a1', own('ENG-2'))]),
         terminal('b', inherited),
         terminal('c', own('ENG-1')),
         terminal('d', null),

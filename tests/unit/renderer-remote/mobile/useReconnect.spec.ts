@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
+import { partialFake } from '../../../support/fakes'
 
 // Must be jsdom for document.addEventListener
 describe('useReconnect', () => {
@@ -169,15 +170,19 @@ describe('useReconnect', () => {
 
   it('clears reconnecting status when new ws fires onopen', async () => {
     const { useReconnect } = await import('../../../../src/renderer-remote/hooks/useReconnect')
-    const listeners: Record<string, (() => void)[]> = {}
-    const ws = {
-      readyState: 3, // starts CLOSED
-      addEventListener: (ev: string, fn: () => void) => {
-        listeners[ev] = listeners[ev] ?? []
-        listeners[ev].push(fn)
-      },
-      removeEventListener: (_ev: string, _fn: () => void) => undefined,
-    } as unknown as WebSocket
+    // A socket is an EventTarget with a ready state; the hook needs nothing else.
+    const socket = (readyState: WebSocket['readyState']) => {
+      const events = new EventTarget()
+      return partialFake<WebSocket>({
+        readyState,
+        addEventListener: (type: string, listener: EventListenerOrEventListenerObject) =>
+          events.addEventListener(type, listener),
+        removeEventListener: (type: string, listener: EventListenerOrEventListenerObject) =>
+          events.removeEventListener(type, listener),
+        dispatchEvent: (event: Event) => events.dispatchEvent(event),
+      })
+    }
+    const ws = socket(3) // CLOSED
 
     const { result, rerender } = renderHook(
       ({ currentWs }) => useReconnect(mockOpenWs, currentWs),
@@ -191,20 +196,13 @@ describe('useReconnect', () => {
     expect(result.current.status).toBe('reconnecting')
 
     // Simulate new socket passed in after openWs called
-    const openWs2 = {
-      readyState: 0, // CONNECTING
-      addEventListener: (ev: string, fn: () => void) => {
-        listeners[ev] = listeners[ev] ?? []
-        listeners[ev].push(fn)
-      },
-      removeEventListener: (_ev: string, _fn: () => void) => undefined,
-    } as unknown as WebSocket
+    const openWs2 = socket(0) // CONNECTING
 
     rerender({ currentWs: openWs2 })
 
     // Fire onopen — status should clear
     act(() => {
-      listeners['open']?.forEach((fn) => fn())
+      openWs2.dispatchEvent(new Event('open'))
     })
 
     expect(result.current.status).toBe('connected')

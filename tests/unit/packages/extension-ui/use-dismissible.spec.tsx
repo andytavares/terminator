@@ -90,11 +90,11 @@ describe('useDismissible', () => {
   })
 
   it('counts toward the open-surface depth', () => {
-    delete (window as unknown as Record<string, unknown>)[MODAL_DEPTH_KEY]
+    delete window[MODAL_DEPTH_KEY]
     const { unmount } = render(<Panel onDismiss={() => {}} />)
-    expect((window as unknown as Record<string, number>)[MODAL_DEPTH_KEY]).toBe(1)
+    expect(window[MODAL_DEPTH_KEY]).toBe(1)
     unmount()
-    expect((window as unknown as Record<string, number>)[MODAL_DEPTH_KEY]).toBe(0)
+    expect(window[MODAL_DEPTH_KEY]).toBe(0)
   })
 
   // A picker opened inside a dialog must not take the dialog down with it.
@@ -178,7 +178,7 @@ describe('alsoInside', () => {
 
 describe('enabled', () => {
   it('binds nothing while the surface is closed', () => {
-    delete (window as unknown as Record<string, unknown>)[MODAL_DEPTH_KEY]
+    delete window[MODAL_DEPTH_KEY]
     const onDismiss = vi.fn()
     function Closed(): JSX.Element {
       const ref = useRef<HTMLDivElement>(null)
@@ -188,6 +188,6 @@ describe('enabled', () => {
     render(<Closed />)
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(onDismiss).not.toHaveBeenCalled()
-    expect((window as unknown as Record<string, number>)[MODAL_DEPTH_KEY] ?? 0).toBe(0)
+    expect(window[MODAL_DEPTH_KEY] ?? 0).toBe(0)
   })
 })

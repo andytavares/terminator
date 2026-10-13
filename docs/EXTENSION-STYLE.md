@@ -13,7 +13,7 @@ whatever name they have.
 Enforcement: the three vocabulary rules below are `no-restricted-syntax`
 selectors in `eslint.config.mjs`, scoped to `extensions/*/src/**/*.tsx` and
 `packages/extension-ui/src/**/*.tsx`. Their fixture spec is
-`tests/unit/lint/extension-vocabulary.spec.ts`. Everything else here is a
+`tests/unit/lint/extension-rules.spec.ts`. Everything else here is a
 convention a reviewer applies.
 
 ---

@@ -86,13 +86,7 @@ async function pressEscape(times: number, gapMs = 100): Promise<void> {
 function extensionShowing(): Promise<boolean> {
   return handle.app.evaluate(({ BrowserWindow }) => {
     const win = BrowserWindow.getAllWindows()[0]
-    const views = (
-      win as unknown as {
-        contentView: {
-          children: { getVisible(): boolean; getBounds(): { width: number; height: number } }[]
-        }
-      }
-    ).contentView.children
+    const views = win.contentView.children
     return views.some((v) => {
       const b = v.getBounds()
       return v.getVisible() && b.width > 100 && b.height > 100
