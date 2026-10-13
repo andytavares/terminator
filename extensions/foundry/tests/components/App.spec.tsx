@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react'
 import React from 'react'
 import { App } from '../../src/renderer/App.js'
 import { draftOrder } from '../../src/order/draft.js'
@@ -326,13 +326,42 @@ function aWaitingOrderTests() {
 }
 
 function aWorkspaceChangeTests() {
+  it('has nowhere to start an order once the workspace closes', async () => {
+    render(<App />)
+    const idea = await screen.findByRole('textbox', {
+      name: 'Describe what you want built or fixed',
+    })
+    expect((idea as HTMLInputElement).disabled).toBe(false)
+    act(() => everyHandler['workspace:changed'].forEach((handler) => handler({})))
+    await waitFor(() => expect((idea as HTMLInputElement).disabled).toBe(true))
+  })
+
   it('closes settings when the workspace changes underneath it', async () => {
     render(<App />)
     fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
     await waitFor(() => screen.getByRole('button', { name: /back/i }))
-    bridgeHandlers['workspace:changed']({ repoRoot: '/other' })
+    act(() =>
+      everyHandler['workspace:changed'].forEach((handler) => handler({ repoRoot: '/other' }))
+    )
     await waitFor(() => expect(screen.getByText(/no orders yet/i)).toBeTruthy())
   })
+}
+
+/** The counts read once, then a read that fails after the next change. */
+async function keepsTheLastCountWhenAReadFails(): Promise<void> {
+  let reads = 0
+  mockBridgeInvoke.mockImplementation(async (channel: string, payload?: unknown) => {
+    if (channel !== 'foundry:attention') return channel in replies ? replies[channel](payload) : {}
+    reads += 1
+    if (reads > 1) throw new Error('the extension host restarted')
+    return { inbox: 2, forge: 1 }
+  })
+  render(<App />)
+  await screen.findByRole('button', { name: 'Forge, 3 waiting on you' })
+
+  everyHandler['foundry:changed'].forEach((handler) => handler({ kind: 'gates', orderId: 'WO-1' }))
+  await waitFor(() => expect(reads).toBe(2))
+  expect(screen.getByRole('button', { name: 'Forge, 3 waiting on you' })).toBeTruthy()
 }
 
 describe('the counts on the chrome', () => {
@@ -352,6 +381,8 @@ describe('the counts on the chrome', () => {
     )
     await waitFor(() => expect(asked()).toHaveLength(2))
   })
+
+  it('leave the last count up when a later read fails', keepsTheLastCountWhenAReadFails)
 
   it('are read again when the workspace switches, which writes nothing to say so', async () => {
     render(<App />)
@@ -438,6 +469,8 @@ describe('the Factory view toggle', () => {
   describe('flipping back', flippingBackTests)
   describe('a gated hall', aGatedHallTests)
   describe('a hall band without a gate', aHallBandWithoutAGateTests)
+  describe('an unreadable view', unreadableViewTests)
+  describe('leaving a hall', leavingAHallTests)
 })
 
 function whereItIsOfferedAndStartsTests() {
@@ -484,6 +517,60 @@ function switchingTests() {
         screen.getByRole('button', { name: 'Factory view' }).getAttribute('aria-pressed')
       ).toBe('true')
     )
+  })
+}
+
+/** A view changed to List elsewhere while this one showed the factory. */
+async function followsABroadcastBackToTheList(): Promise<void> {
+  currentView = 'factory'
+  render(<App />)
+  await waitFor(() =>
+    expect(screen.getByRole('button', { name: 'Factory view' }).getAttribute('aria-pressed')).toBe(
+      'true'
+    )
+  )
+  act(() => bridgeHandlers['foundry:ui.view-changed']({ view: 'list' }))
+  await waitFor(() =>
+    expect(screen.getByRole('button', { name: 'List view' }).getAttribute('aria-pressed')).toBe(
+      'true'
+    )
+  )
+}
+
+function unreadableViewTests() {
+  it('starts on List when the saved view cannot be read', async () => {
+    mockBridgeInvoke.mockImplementation(async (channel: string, payload?: unknown) => {
+      if (channel === 'foundry:ui.view') throw new Error('settings unavailable')
+      return channel in replies ? replies[channel](payload) : {}
+    })
+    render(<App />)
+    await waitFor(() => expect(mockBridgeInvoke).toHaveBeenCalledWith('foundry:ui.view'))
+    expect(screen.getByRole('button', { name: 'List view' }).getAttribute('aria-pressed')).toBe(
+      'true'
+    )
+  })
+
+  it('opens on the Forge when an earlier new-order request cannot be read', async () => {
+    mockBridgeInvoke.mockImplementation(async (channel: string, payload?: unknown) => {
+      if (channel === 'foundry:ui.consume-pending-new-order') throw new Error('host gone')
+      return channel in replies ? replies[channel](payload) : {}
+    })
+    render(<App />)
+    await waitFor(() =>
+      expect(mockBridgeInvoke).toHaveBeenCalledWith('foundry:ui.consume-pending-new-order')
+    )
+    expect(screen.getByRole('button', { name: 'Forge' }).getAttribute('aria-pressed')).toBe('true')
+  })
+
+  it('follows a view change broadcast back to the list', followsABroadcastBackToTheList)
+}
+
+function leavingAHallTests() {
+  it('comes back from a hall to the grid of every hall', async () => {
+    await openWorkingHall()
+    fireEvent.click(await screen.findByRole('button', { name: 'All halls' }))
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'All halls' })).toBeNull())
+    expect(screen.getByRole('button', { name: /Working order/ })).toBeTruthy()
   })
 }
 

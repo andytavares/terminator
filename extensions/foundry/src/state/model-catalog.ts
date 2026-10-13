@@ -97,22 +97,25 @@ export async function fetchLiveModels(
         'anthropic-version': '2023-06-01',
       },
     })
-    if (!response.ok) return []
-    const body = (await response.json()) as ModelsApiResponse
-    if (!Array.isArray(body.data)) return []
-    return body.data
-      .filter(
-        (model): model is { id: string; display_name?: unknown } =>
-          typeof model.id === 'string' && model.id !== ''
-      )
-      .map((model) => ({
-        id: model.id,
-        label: typeof model.display_name === 'string' ? model.display_name : model.id,
-        floating: false,
-      }))
+    return response.ok ? choicesIn((await response.json()) as ModelsApiResponse) : []
   } catch {
     return []
   }
+}
+
+/** The pinnable models in a /v1/models answer, skipping any entry without an id. */
+function choicesIn(body: ModelsApiResponse): ModelChoice[] {
+  if (!Array.isArray(body.data)) return []
+  return body.data
+    .filter(
+      (model): model is { id: string; display_name?: unknown } =>
+        typeof model.id === 'string' && model.id !== ''
+    )
+    .map((model) => ({
+      id: model.id,
+      label: typeof model.display_name === 'string' ? model.display_name : model.id,
+      floating: false,
+    }))
 }
 
 /**

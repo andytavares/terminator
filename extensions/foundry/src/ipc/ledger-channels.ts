@@ -151,12 +151,10 @@ export function createLedgerChannels(deps: LedgerDeps): LedgerChannels {
     }
 
     if (!accept) {
-      await declineProposal(
-        deps.dataRoot(),
-        proposalId,
-        reason ?? 'declined by the operator',
-        found.asserts
-      )
+      await declineProposal(deps.dataRoot(), proposalId, {
+        reason: reason ?? 'declined by the operator',
+        asserts: found.asserts,
+      })
       return { ok: true, accepted: false }
     }
 
@@ -194,7 +192,7 @@ export function createLedgerChannels(deps: LedgerDeps): LedgerChannels {
     }
 
     const reason = payload.reason ?? 'removed by the operator'
-    const removed = await removeRule(deps.dataRoot(), ruleId, reason, accepted.asserts)
+    const removed = await removeRule(deps.dataRoot(), ruleId, { reason, asserts: accepted.asserts })
     return { ok: true, removed, reason, at: deps.now() }
   }
 

@@ -34,6 +34,8 @@ describe('probeToolchain', () => {
   describe('package.json', packageJsonTests)
   describe('coverage and configs', coverageAndConfigsTests)
   describe('other languages', otherLanguagesTests)
+  describe('tool configs', toolConfigsTests)
+  describe('go', goTests)
   describe('makefiles and CI', makefilesAndCiTests)
   describe('precedence and e2e', precedenceAndE2eTests)
   describe('nothing executed or written', nothingExecutedOrWrittenTests)
@@ -101,6 +103,58 @@ function otherLanguagesTests() {
     const t = probeToolchain(repo)
     expect(t.test).toEqual({ command: 'cargo test', source: 'config' })
     expect(t.build).toEqual({ command: 'cargo build', source: 'config' })
+  })
+}
+
+function toolConfigsTests() {
+  it('falls back to jest, eslint, prettier and playwright by their configs', () => {
+    write('jest.config.js', 'module.exports = {}')
+    write('eslint.config.mjs', 'export default []')
+    write('.prettierrc', '{}')
+    write('playwright.config.ts', 'export default {}')
+    const t = probeToolchain(repo)
+    expect(t.test).toEqual({ command: 'npx jest', source: 'config' })
+    expect(t.lint).toEqual({ command: 'npx eslint .', source: 'config' })
+    expect(t.format).toEqual({ command: 'npx prettier --check .', source: 'config' })
+    expect(t.e2e).toEqual({ command: 'npx playwright test', source: 'config' })
+  })
+
+  it('prefers vitest to jest when a repository has both configs', () => {
+    write('jest.config.js', 'module.exports = {}')
+    write('vitest.config.ts', 'export default {}')
+    expect(probeToolchain(repo).test?.command).toBe('npx vitest run')
+  })
+
+  it('does not read a pyproject that names no pytest as a test command', () => {
+    write('pyproject.toml', '[project]\nname = "x"\n')
+    expect(probeToolchain(repo).test).toBeNull()
+  })
+
+  it('never infers a coverage command from a tool being present', () => {
+    write('vitest.config.ts', 'export default {}')
+    write('Cargo.toml', '[package]\nname = "x"\n')
+    expect(probeToolchain(repo).coverage).toBeNull()
+  })
+}
+
+function goTests() {
+  it('recognises a go module, and nothing for the checks go has no stock tool for', () => {
+    write('go.mod', 'module example.com/x\n')
+    const t = probeToolchain(repo)
+    expect(t.test).toEqual({ command: 'go test ./...', source: 'config' })
+    expect(t.build).toEqual({ command: 'go build ./...', source: 'config' })
+    expect(t.lint).toBeNull()
+    expect(t.format).toBeNull()
+  })
+
+  it('takes cargo over go in a repository with both manifests', () => {
+    write('go.mod', 'module example.com/x\n')
+    write('Cargo.toml', '[package]\nname = "x"\n')
+    const t = probeToolchain(repo)
+    expect(t.test?.command).toBe('cargo test')
+    expect(t.build?.command).toBe('cargo build')
+    expect(t.lint?.command).toBe('cargo clippy')
+    expect(t.format?.command).toBe('cargo fmt --check')
   })
 }
 
