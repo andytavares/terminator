@@ -25,7 +25,6 @@ function deps(over: Partial<SeedDeps> = {}): SeedDeps {
     now: () => '2026-09-06T10:00:00.000Z',
     newId: () => 'WO-0906-abc',
     readIssue: vi.fn(async () => null),
-    existingOrderFor: () => null,
     ...over,
   }
 }
@@ -124,7 +123,7 @@ function lanesAndIssuesTests() {
 describe('seedOrder from a tracker issue', () => {
   describe('the ticket branch', theTicketBranchTests)
   describe('what is seeded', whatIsSeededTests)
-  describe('repeats and unreadable issues', repeatsAndUnreadableIssuesTests)
+  describe('unreadable issues', unreadableIssuesTests)
   describe('the stated outcome', theStatedOutcomeTests)
   describe('no heading and a bare title', noHeadingAndABareTitleTests)
 })
@@ -189,16 +188,7 @@ function whatIsSeededTests() {
   })
 }
 
-function repeatsAndUnreadableIssuesTests() {
-  it('offers the existing order when the same issue is seeded twice', async () => {
-    const r = await seedOrder(
-      { kind: 'tracker', tracker: 'linear', key: 'TAV-42', repoPaths: [repo] },
-      deps({ existingOrderFor: () => ({ id: 'WO-0905-zzz', title: 'already seeded' }) })
-    )
-    expect('existing' in r).toBe(true)
-    if ('existing' in r) expect(r.existing.id).toBe('WO-0905-zzz')
-  })
-
+function unreadableIssuesTests() {
   it('reports an issue it cannot read rather than seeding an empty order', async () => {
     const r = await seedOrder(
       { kind: 'tracker', tracker: 'linear', key: 'TAV-99', repoPaths: [repo] },

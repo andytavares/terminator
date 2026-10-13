@@ -109,7 +109,6 @@ async function promoteSignal(
     }
   )
   if ('error' in seeded) return seeded
-  if ('existing' in seeded) return seeded
 
   // The order is a draft, nothing more: the Forge still has to converge it.
   await deps.orderStore.save(seeded.order)
