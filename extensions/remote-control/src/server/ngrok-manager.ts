@@ -2,8 +2,12 @@ import { spawn, execSync, type ChildProcess } from 'child_process'
 import { networkInterfaces } from 'os'
 
 // Packaged Electron apps launch without the user's shell, so Homebrew paths are absent.
+// They come after the person's own PATH, so an ngrok they put first is the one that runs.
 const EXTRA_PATH = ['/opt/homebrew/bin', '/usr/local/bin', '/usr/bin', '/bin'].join(':')
-const EXTENDED_ENV = { ...process.env, PATH: `${EXTRA_PATH}:${process.env.PATH ?? ''}` }
+const EXTENDED_ENV = {
+  ...process.env,
+  PATH: [process.env.PATH, EXTRA_PATH].filter(Boolean).join(':'),
+}
 
 const POLL_INTERVAL_MS = 500
 const MAX_POLLS = 60
