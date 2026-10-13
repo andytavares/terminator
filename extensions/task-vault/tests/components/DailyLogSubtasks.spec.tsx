@@ -1,7 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup, fireEvent, within } from '@testing-library/react'
-import { installBridge, eventually, task } from './helpers/bridge'
+import { installVaultBridge, eventually, task } from './helpers/bridge'
 import type { IndexedTask } from '../../src/vault/types'
 
 vi.mock('../../src/utils/notify', () => ({ notify: vi.fn() }))
@@ -15,7 +15,7 @@ vi.setConfig({ testTimeout: 30_000 })
 
 type Props = React.ComponentProps<typeof DailyLog>
 
-let bridge: ReturnType<typeof installBridge>
+let bridge: ReturnType<typeof installVaultBridge>
 
 function renderTask(one: IndexedTask) {
   const props: Props = {
@@ -46,7 +46,7 @@ const SESSIONS = [
 
 function installTerminal(sessions: unknown[] = SESSIONS) {
   const listSessions = vi.fn(async () => sessions)
-  bridge = installBridge({
+  bridge = installVaultBridge({
     terminal: { listSessions },
     workspace: { list: vi.fn(async () => ({ workspaces: [{ id: 'w1', name: 'Work' }] })) },
     project: { list: vi.fn(async () => ({ projects: [{ id: 'pr1', name: 'App' }] })) },
@@ -265,7 +265,7 @@ async function unhandledRejectionsDuring(run: () => Promise<void>): Promise<unkn
 
 function unlistableTests() {
   it('says no session is open when the session list fails, leaving no rejection unhandled', async () => {
-    bridge = installBridge({
+    bridge = installVaultBridge({
       terminal: { listSessions: vi.fn(async () => Promise.reject(new Error('host gone'))) },
       workspace: { list: vi.fn(async () => Promise.reject(new Error('host gone'))) },
       project: { list: vi.fn(async () => ({ projects: [] })) },
@@ -279,7 +279,7 @@ function unlistableTests() {
   })
 
   it('still lists the sessions, by tab, when the workspaces cannot be read', async () => {
-    bridge = installBridge({
+    bridge = installVaultBridge({
       terminal: { listSessions: vi.fn(async () => SESSIONS) },
       workspace: { list: vi.fn(async () => Promise.reject(new Error('host gone'))) },
       project: { list: vi.fn(async () => ({ projects: [] })) },

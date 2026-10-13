@@ -1,14 +1,14 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup, fireEvent, act, within } from '@testing-library/react'
-import { installBridge, eventually, project, task } from './helpers/bridge'
+import { installVaultBridge, eventually, project, task } from './helpers/bridge'
 import { invalidateSmartInputCache } from '../../src/components/SmartTaskInput'
 import { useVaultNavStore } from '../../src/stores/vault-nav.store'
 import { ProjectsBrowser } from '../../src/components/ProjectsBrowser'
 
 vi.setConfig({ testTimeout: 30_000 })
 
-let bridge: ReturnType<typeof installBridge>
+let bridge: ReturnType<typeof installVaultBridge>
 const listSessions = vi.fn()
 
 const LAUNCH = project('Launch', { area: 'Work', deadline: '2026-03-01', nextActionCount: 2 })
@@ -21,7 +21,7 @@ beforeEach(() => {
   listSessions.mockResolvedValue([
     { sessionId: 'sess-12345678', projectId: 'pr1', tabTitle: 'zsh' },
   ])
-  bridge = installBridge({
+  bridge = installVaultBridge({
     extension: { getSettingsValues: vi.fn().mockResolvedValue({ values: {} }) },
     terminal: { listSessions },
     workspace: { list: vi.fn().mockResolvedValue({ workspaces: [{ id: 'w1', name: 'Home' }] }) },

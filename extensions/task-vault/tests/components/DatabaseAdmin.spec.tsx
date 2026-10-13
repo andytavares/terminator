@@ -1,15 +1,15 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup, fireEvent, within } from '@testing-library/react'
-import { installBridge, eventually } from './helpers/bridge'
+import { installVaultBridge, eventually } from './helpers/bridge'
 import { DatabaseAdmin } from '../../src/components/DatabaseAdmin'
 
 vi.setConfig({ testTimeout: 30_000 })
 
-let bridge: ReturnType<typeof installBridge>
+let bridge: ReturnType<typeof installVaultBridge>
 
 beforeEach(() => {
-  bridge = installBridge()
+  bridge = installVaultBridge()
   bridge.responses['task-vault:admin:table-stats'] = { stats: { tasks: 3, areas: 1 } }
   bridge.responses['task-vault:admin:run-query'] = (payload: unknown) => {
     const { sql } = payload as { sql: string }

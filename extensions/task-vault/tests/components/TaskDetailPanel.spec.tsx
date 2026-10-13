@@ -1,7 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup, fireEvent } from '@testing-library/react'
-import { installBridge, eventually } from './helpers/bridge'
+import { installVaultBridge, eventually } from './helpers/bridge'
 
 vi.mock('../../src/utils/open-in-browser', () => ({ openInBrowser: vi.fn() }))
 
@@ -9,10 +9,10 @@ import { TaskDetailPanel } from '../../src/components/TaskDetailPanel'
 
 vi.setConfig({ testTimeout: 30_000 })
 
-let bridge: ReturnType<typeof installBridge>
+let bridge: ReturnType<typeof installVaultBridge>
 
 beforeEach(() => {
-  bridge = installBridge()
+  bridge = installVaultBridge()
   bridge.responses['task-vault:vault:get-task-detail'] = {
     description: 'Ship **it**',
     acceptanceCriteria: '',

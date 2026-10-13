@@ -1,7 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup, fireEvent, act } from '@testing-library/react'
-import { installBridge, eventually, task } from './helpers/bridge'
+import { installVaultBridge, eventually, task } from './helpers/bridge'
 
 /** The props each stubbed view was last rendered with. */
 const seen: Record<string, Record<string, unknown>> = {}
@@ -32,7 +32,7 @@ import { partialFake } from '../../../../tests/support/fakes'
 
 vi.setConfig({ testTimeout: 30_000 })
 
-let bridge: ReturnType<typeof installBridge>
+let bridge: ReturnType<typeof installVaultBridge>
 
 function localToday(offset = 0): string {
   const d = new Date()
@@ -50,7 +50,7 @@ const LOG = {
 beforeEach(() => {
   vi.mocked(notify).mockClear()
   for (const key of Object.keys(seen)) delete seen[key]
-  bridge = installBridge({
+  bridge = installVaultBridge({
     extension: { getSettingsValues: vi.fn().mockResolvedValue({ values: {} }) },
   })
   bridge.responses['task-vault:vault:get-today'] = LOG

@@ -6,21 +6,10 @@ vi.mock('electron', () => ({
   app: { getPath: vi.fn(() => '/tmp') },
 }))
 import { ipcMain } from 'electron'
-import { dispatchChannel, type ChannelSpec, type ExtensionAPI } from '@terminator/extension-sdk'
-import { partialFake } from '../../../../../tests/support/fakes'
 
-// Adapter: registerHandler forwards to the electron ipcMain mocks so existing
-// capture/assert code (ipcMain.handle calls, removeHandler assertions) still works.
-const mockApi = partialFake<ExtensionAPI>({
-  ipc: partialFake<ExtensionAPI['ipc']>({
-    registerHandler: (spec: ChannelSpec) => {
-      vi.mocked(ipcMain.handle)(spec.channel, (_e, payload: unknown) =>
-        dispatchChannel(spec, payload)
-      )
-      return { dispose: () => vi.mocked(ipcMain.removeHandler)(spec.channel) }
-    },
-  }),
-})
+import { apiOverIpcMain } from '../support/ipc-main-api'
+
+const mockApi = apiOverIpcMain()
 
 import { wrapDb } from '../../../../../src/main/db/index'
 import { applyNotepadSchema } from '../../../src/db/db'

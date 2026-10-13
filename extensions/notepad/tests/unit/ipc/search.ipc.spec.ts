@@ -1,20 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ipcMain } from 'electron'
-import { dispatchChannel, type ChannelSpec, type ExtensionAPI } from '@terminator/extension-sdk'
-import { partialFake } from '../../../../../tests/support/fakes'
 
-// Adapter: registerHandler forwards to the electron ipcMain mocks so existing
-// capture/assert code (ipcMain.handle calls, removeHandler assertions) still works.
-const mockApi = partialFake<ExtensionAPI>({
-  ipc: partialFake<ExtensionAPI['ipc']>({
-    registerHandler: (spec: ChannelSpec) => {
-      vi.mocked(ipcMain.handle)(spec.channel, (_e, payload: unknown) =>
-        dispatchChannel(spec, payload)
-      )
-      return { dispose: () => vi.mocked(ipcMain.removeHandler)(spec.channel) }
-    },
-  }),
-})
+import { apiOverIpcMain } from '../support/ipc-main-api'
+
+const mockApi = apiOverIpcMain()
 import { DatabaseSync } from 'node:sqlite'
 
 vi.mock('electron', () => ({
@@ -221,11 +210,11 @@ function searchNotesBasicTextQueryCaseWildcardTests() {
     await insertNote('n1', ['Über den Wolken', 'Die Freiheit wäre grenzenlos'])
     await insertNote('n2', ['Café', 'CRÈME BRÛLÉE'])
 
-    const ids = async (query: string) =>
+    const idsMatching = async (query: string) =>
       ((await searchNotes(db, { query })) as { data: { id: string }[] }).data.map((r) => r.id)
-    expect(await ids('über')).toEqual(['n1'])
-    expect(await ids('WÄRE')).toEqual(['n1'])
-    expect(await ids('crème brûlée')).toEqual(['n2'])
+    expect(await idsMatching('über')).toEqual(['n1'])
+    expect(await idsMatching('WÄRE')).toEqual(['n1'])
+    expect(await idsMatching('crème brûlée')).toEqual(['n2'])
   })
 
   it('matches % and _ as the characters typed', async () => {

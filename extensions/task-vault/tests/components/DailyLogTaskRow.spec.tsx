@@ -1,7 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup, fireEvent, act } from '@testing-library/react'
-import { installBridge, eventually, task } from './helpers/bridge'
+import { installVaultBridge, eventually, task } from './helpers/bridge'
 import type { IndexedTask } from '../../src/vault/types'
 
 vi.mock('../../src/utils/notify', () => ({ notify: vi.fn() }))
@@ -16,7 +16,7 @@ vi.setConfig({ testTimeout: 30_000 })
 
 type Props = React.ComponentProps<typeof DailyLog>
 
-let bridge: ReturnType<typeof installBridge>
+let bridge: ReturnType<typeof installVaultBridge>
 
 function renderTask(one: IndexedTask, overrides: Partial<Props> = {}) {
   const props: Props = {
@@ -36,7 +36,7 @@ const lastNotice = () => vi.mocked(notify).mock.calls.at(-1)
 
 beforeEach(() => {
   vi.mocked(notify).mockClear()
-  bridge = installBridge()
+  bridge = installVaultBridge()
 })
 
 afterEach(() => {

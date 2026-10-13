@@ -1,10 +1,10 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup, fireEvent, act } from '@testing-library/react'
-import { installBridge, eventually, project, task } from './helpers/bridge'
+import { installVaultBridge, eventually, project, task } from './helpers/bridge'
 import { ArchiveView } from '../../src/components/ArchiveView'
 
-let bridge: ReturnType<typeof installBridge>
+let bridge: ReturnType<typeof installVaultBridge>
 
 const ARCHIVE = {
   tasks: [
@@ -17,7 +17,7 @@ const ARCHIVE = {
 }
 
 beforeEach(() => {
-  bridge = installBridge()
+  bridge = installVaultBridge()
   bridge.responses['task-vault:vault:list-archive'] = ARCHIVE
   vi.spyOn(window, 'confirm').mockReturnValue(true)
 })

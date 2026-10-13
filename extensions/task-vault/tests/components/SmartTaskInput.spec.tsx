@@ -1,10 +1,10 @@
 import React, { useState } from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest'
 import { render, screen, cleanup, fireEvent, act } from '@testing-library/react'
-import { installBridge, eventually, project } from './helpers/bridge'
+import { installVaultBridge, eventually, project } from './helpers/bridge'
 import { SmartTaskInput, invalidateSmartInputCache } from '../../src/components/SmartTaskInput'
 
-let bridge: ReturnType<typeof installBridge>
+let bridge: ReturnType<typeof installVaultBridge>
 const getSettingsValues = vi.fn()
 
 beforeEach(() => {
@@ -12,7 +12,7 @@ beforeEach(() => {
   getSettingsValues.mockResolvedValue({
     values: { 'terminator.task-vault.contexts': 'home, desk' },
   })
-  bridge = installBridge({ extension: { getSettingsValues } })
+  bridge = installVaultBridge({ extension: { getSettingsValues } })
   bridge.responses['task-vault:projects:list'] = {
     projects: [project('Launch Plan'), project('Garden')],
   }

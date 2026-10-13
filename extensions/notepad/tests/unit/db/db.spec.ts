@@ -23,7 +23,7 @@ describe('randomUUID', () => {
   })
 })
 
-describe('settings composite PK (extension_id, key)', settingsCompositePKExtensionIdTests)
+describe('settings composite PK (extension_id, key)', notepadSettingsKeyTests)
 
 function applyNotepadSchemaTests() {
   describe('tables', applyNotepadSchemaTablesTests)
@@ -85,13 +85,13 @@ function applyNotepadSchemaCascadesTests() {
   })
 }
 
-function settingsCompositePKExtensionIdTests() {
+function notepadSettingsKeyTests() {
   beforeEach(async () => {
     await applyNotepadSchema(db)
   })
 
   describe('independent extensions', settingsCompositePKExtensionIdIndependentExtensionsTests)
-  describe('duplicates', settingsCompositePKExtensionIdDuplicatesTests)
+  describe('duplicates', notepadSettingsDuplicateKeyTests)
 }
 
 function settingsCompositePKExtensionIdIndependentExtensionsTests() {
@@ -115,7 +115,7 @@ function settingsCompositePKExtensionIdIndependentExtensionsTests() {
   })
 }
 
-function settingsCompositePKExtensionIdDuplicatesTests() {
+function notepadSettingsDuplicateKeyTests() {
   it('duplicate (extension_id, key) insert is rejected by PK constraint', async () => {
     await db.run(`INSERT INTO settings (extension_id, key, value) VALUES (?, ?, ?)`, [
       'notepad',

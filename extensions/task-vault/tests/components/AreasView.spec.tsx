@@ -1,14 +1,14 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup, fireEvent, act } from '@testing-library/react'
-import { installBridge, eventually, task } from './helpers/bridge'
+import { installVaultBridge, eventually, task } from './helpers/bridge'
 import { invalidateSmartInputCache } from '../../src/components/SmartTaskInput'
 import { useVaultNavStore } from '../../src/stores/vault-nav.store'
 import { AreasView } from '../../src/components/AreasView'
 
 vi.setConfig({ testTimeout: 30_000 })
 
-let bridge: ReturnType<typeof installBridge>
+let bridge: ReturnType<typeof installVaultBridge>
 
 function areaProject(name: string, open: number, total = 4) {
   return {
@@ -58,7 +58,7 @@ const OLD = {
 
 beforeEach(() => {
   invalidateSmartInputCache()
-  bridge = installBridge({
+  bridge = installVaultBridge({
     extension: { getSettingsValues: vi.fn().mockResolvedValue({ values: {} }) },
   })
   bridge.responses['task-vault:vault:list-areas'] = (payload: unknown) => {

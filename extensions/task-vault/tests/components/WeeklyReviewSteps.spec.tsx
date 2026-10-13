@@ -1,16 +1,16 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup, fireEvent } from '@testing-library/react'
-import { installBridge, eventually, project, task } from './helpers/bridge'
+import { installVaultBridge, eventually, project, task } from './helpers/bridge'
 import { WeeklyReviewStep1GetClear } from '../../src/components/WeeklyReviewStep1GetClear'
 import { WeeklyReviewStep3Projects } from '../../src/components/WeeklyReviewStep3Projects'
 import { WeeklyReviewStep5Someday } from '../../src/components/WeeklyReviewStep5Someday'
 import { WeeklyReviewStep6Reflect } from '../../src/components/WeeklyReviewStep6Reflect'
 
-let bridge: ReturnType<typeof installBridge>
+let bridge: ReturnType<typeof installVaultBridge>
 
 beforeEach(() => {
-  bridge = installBridge()
+  bridge = installVaultBridge()
 })
 
 afterEach(() => cleanup())

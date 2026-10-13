@@ -1,7 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup, act, fireEvent } from '@testing-library/react'
-import { installBridge, eventually } from './helpers/note-surface'
+import { installNotepadBridge, eventually } from './helpers/note-surface'
 import type { DiagramComment, DiagramListItem } from '../../src/db/types'
 
 const APP_STATE = {
@@ -39,7 +39,7 @@ vi.mock('@excalidraw/excalidraw', async () => {
 
 vi.setConfig({ testTimeout: 30_000 })
 
-const bridge = installBridge()
+const bridge = installNotepadBridge()
 
 import { DiagramView } from '../../src/components/DiagramView'
 import { useNotesStore } from '../../src/stores/notes.store'

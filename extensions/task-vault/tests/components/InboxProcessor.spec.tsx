@@ -1,14 +1,14 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup, fireEvent, act } from '@testing-library/react'
-import { installBridge, eventually, project, task } from './helpers/bridge'
+import { installVaultBridge, eventually, project, task } from './helpers/bridge'
 import { FileToPicker } from '../../src/components/FileToPicker'
 import { InboxProcessor } from '../../src/components/InboxProcessor'
 
-let bridge: ReturnType<typeof installBridge>
+let bridge: ReturnType<typeof installVaultBridge>
 
 beforeEach(() => {
-  bridge = installBridge()
+  bridge = installVaultBridge()
   bridge.responses['task-vault:projects:list'] = {
     projects: [project('Launch', { area: 'Work' }), project('Garden')],
   }

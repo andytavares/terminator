@@ -1,7 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup, fireEvent, act } from '@testing-library/react'
-import { installBridge, eventually } from './helpers/bridge'
+import { installVaultBridge, eventually } from './helpers/bridge'
 
 vi.mock('../../src/utils/open-in-browser', () => ({ openInBrowser: vi.fn() }))
 
@@ -45,10 +45,10 @@ const TASKS = [
   { id: 't3', text: 'Loose', status: 'open' },
 ]
 
-let bridge: ReturnType<typeof installBridge>
+let bridge: ReturnType<typeof installVaultBridge>
 
 beforeEach(() => {
-  bridge = installBridge()
+  bridge = installVaultBridge()
   bridge.responses['task-vault:kanban:get-config'] = CONFIG
   bridge.responses['task-vault:kanban:list-tasks'] = { tasks: TASKS }
   bridge.responses['task-vault:vault:get-task-detail'] = {

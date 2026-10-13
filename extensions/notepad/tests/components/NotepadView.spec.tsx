@@ -2,10 +2,10 @@ import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup, act, fireEvent } from '@testing-library/react'
 import {
-  installBridge,
+  installNotepadBridge,
   listItem,
-  comment,
-  editorView,
+  anchoredComment,
+  mountedEditorView,
   eventually,
   typeAtEnd,
   storeSettings,
@@ -21,7 +21,7 @@ vi.mock('../../src/components/DiagramView', () => ({
 
 vi.setConfig({ testTimeout: 30_000 })
 
-const bridge = installBridge()
+const bridge = installNotepadBridge()
 
 import { NotepadView } from '../../src/components/NotepadView'
 import { useNotesStore } from '../../src/stores/notes.store'
@@ -53,13 +53,13 @@ afterEach(() => {
 })
 
 /** Opens the panel on note n1, answering its lists, body and comments. */
-async function openNote(comments = [comment('c1', 'hello', [7, 12])]) {
+async function openNote(comments = [anchoredComment('c1', 'hello', [7, 12])]) {
   bridge.responses['terminator.notepad:notes.list'] = { data: [listItem('n1', 'Plan', ['work'])] }
   bridge.responses['terminator.notepad:notes.get'] = { data: { body: BODY } }
   bridge.responses['terminator.notepad:comments.list'] = { data: comments }
   useNotesStore.setState({ notes: [listItem('n1', 'Plan', ['work'])], selectedNoteId: 'n1' })
   render(<NotepadView />)
-  await eventually(() => expect(editorView().state.doc.toString()).toBe(BODY))
+  await eventually(() => expect(mountedEditorView().state.doc.toString()).toBe(BODY))
 }
 
 describe('NotepadView loading', () => {
@@ -101,13 +101,16 @@ describe('NotepadView opening a note', () => {
     expect(document.querySelector('.cm-editor')).toBeNull()
 
     await act(async () => answerBody({ data: { body: BODY } }))
-    await eventually(() => expect(editorView().state.doc.toString()).toBe(BODY))
+    await eventually(() => expect(mountedEditorView().state.doc.toString()).toBe(BODY))
   })
 })
 
 describe('NotepadView re-anchoring comments on load', () => {
   it('moves a comment to where its quote now is, and orphans one whose quote is gone', async () => {
-    await openNote([comment('c1', 'hello', [0, 5]), comment('c2', 'vanished', [0, 8])])
+    await openNote([
+      anchoredComment('c1', 'hello', [0, 5]),
+      anchoredComment('c2', 'vanished', [0, 8]),
+    ])
     const byId = new Map(useCommentsStore.getState().comments.map((c) => [c.id, c]))
     expect(byId.get('c1')).toMatchObject({ startOffset: 7, endOffset: 12, status: 'open' })
     expect(byId.get('c2')?.status).toBe('orphaned')
@@ -166,7 +169,7 @@ describe('NotepadView changes from another surface', () => {
         originId: 'another-window',
       })
     )
-    expect(editorView().state.doc.toString()).toBe('# New\nfrom the window')
+    expect(mountedEditorView().state.doc.toString()).toBe('# New\nfrom the window')
     expect(useNotesStore.getState().notes[0].title).toBe('New')
   })
 
