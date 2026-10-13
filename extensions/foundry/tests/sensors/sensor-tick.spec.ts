@@ -54,6 +54,12 @@ async function signals(): Promise<Signals['signals']> {
 }
 
 describe('a minute after a sensor was enabled', () => {
+  describe('assigned issues', assignedIssuesTests)
+  describe('failing workflows', failingWorkflowsTests)
+  describe('nothing on', nothingOnTests)
+})
+
+function assignedIssuesTests() {
   it('collects the operator’s assigned issues as signals', async () => {
     vi.mocked(host.issues.listMine).mockResolvedValue({
       issues: [{ key: 'ENG-7', title: 'Login is slow', url: 'https://linear.app/ENG-7' }],
@@ -70,7 +76,9 @@ describe('a minute after a sensor was enabled', () => {
       expect((await signals()).map((s) => s.title)).toEqual(['Login is slow'])
     )
   })
+}
 
+function failingWorkflowsTests() {
   it('collects workflows failing on the base branch through gh, in the sensor’s repository', async () => {
     host.gh.mockImplementation(async ({ args }: { args: string[] }) => {
       const stdout =
@@ -100,13 +108,15 @@ describe('a minute after a sensor was enabled', () => {
     )
     expect(host.gh).toHaveBeenCalledWith(expect.objectContaining({ cwd: '/repos/app' }))
   })
+}
 
+function nothingOnTests() {
   it('runs nothing while every sensor is off', async () => {
     await vi.advanceTimersByTimeAsync(60_000)
     expect(host.gh).not.toHaveBeenCalled()
     expect(host.issues.listMine).not.toHaveBeenCalled()
   })
-})
+}
 
 describe('a signal made into work', () => {
   it('becomes a draft order for the repositories the operator chose', async () => {

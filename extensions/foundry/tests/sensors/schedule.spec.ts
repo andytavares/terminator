@@ -62,17 +62,22 @@ describe('dueSensors', () => {
   })
 })
 
-describe('runSensor', () => {
-  function fakeCollectDeps(over: Partial<CollectDeps> = {}): CollectDeps {
-    return {
-      exec: async () => ({ exitCode: 0, stdout: '[]', stderr: '', timedOut: false }),
-      cwd: '/repo',
-      issues: null,
-      now: () => '2026-01-01T00:20:00.000Z',
-      ...over,
-    }
+function fakeCollectDeps(over: Partial<CollectDeps> = {}): CollectDeps {
+  return {
+    exec: async () => ({ exitCode: 0, stdout: '[]', stderr: '', timedOut: false }),
+    cwd: '/repo',
+    issues: null,
+    now: () => '2026-01-01T00:20:00.000Z',
+    ...over,
   }
+}
 
+describe('runSensor', () => {
+  describe('recording', recordingTests)
+  describe('failures', failuresTests)
+})
+
+function recordingTests() {
   it('records a signal collected this run and remembers when it ran', async () => {
     const root = tempRoot()
     const store = createSignalStore(root)
@@ -108,7 +113,9 @@ describe('runSensor', () => {
       lastProblem: null,
     })
   })
+}
 
+function failuresTests() {
   it('stores the problem and records nothing when the collector fails', async () => {
     const root = tempRoot()
     const store = createSignalStore(root)
@@ -131,4 +138,4 @@ describe('runSensor', () => {
     const states = await store.sensorState()
     expect(states['ci-flake'].lastProblem).toMatch(/gh issue list failed/)
   })
-})
+}

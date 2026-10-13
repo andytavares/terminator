@@ -37,6 +37,12 @@ function gate(over: Partial<Parameters<typeof raiseGate>[0]> = {}): Gate {
 }
 
 describe('raiseGate', () => {
+  describe('what a gate carries', whatAGateCarriesTests)
+  describe('refusals and options', refusalsAndOptionsTests)
+  describe('defaults and budgets', defaultsAndBudgetsTests)
+})
+
+function whatAGateCarriesTests() {
   it('carries the rule, the reason and what happens if it is ignored', () => {
     const g = gate()
     expect(g.rule).toBe('risk.p0')
@@ -56,7 +62,9 @@ describe('raiseGate', () => {
     expect(g.options.map((o) => o.id)).toEqual(['take_over', 'accept_debt', 'hold'])
     expect(() => gate({ rule: 'verify.repeat-fail', omitOptions: ['hold'] })).toThrow(/hold/)
   })
+}
 
+function refusalsAndOptionsTests() {
   it('refuses a gate that cannot say why it exists', () => {
     expect(() => gate({ why: '   ' })).toThrow(UnattributedGateError)
   })
@@ -75,7 +83,9 @@ describe('raiseGate', () => {
     const g = gate({ rule: rule as GateRuleId })
     expect(g.options.map((o) => o.id)).toContain(g.defaultIfIgnored)
   })
+}
 
+function defaultsAndBudgetsTests() {
   it('never defaults the merge decision to anything that ships', () => {
     expect(gate({ rule: 'ready-for-review' }).defaultIfIgnored).toBe('hold')
   })
@@ -89,7 +99,7 @@ describe('raiseGate', () => {
     expect(gate({ rule: 'budget.exceeded', breach }).breach).toEqual(breach)
     expect(gate().breach).toBeNull()
   })
-})
+}
 
 describe('decide', () => {
   it('records the operator choice, the note and when', () => {
@@ -143,6 +153,15 @@ describe('isOverdue', () => {
 })
 
 describe('autonomy', () => {
+  describe('live rules', liveRulesTests)
+  describe('settings', settingsTests)
+})
+
+function ranked(over: Partial<Parameters<typeof raiseGate>[0]> & { blockedUnits?: number } = {}) {
+  return gate(over)
+}
+
+function liveRulesTests() {
   it('keeps the unconditional rules live at every setting', () => {
     for (const level of AUTONOMY_LEVELS) {
       for (const rule of UNCONDITIONAL) expect(isLive(rule, level)).toBe(true)
@@ -158,7 +177,9 @@ describe('autonomy', () => {
     expect(isLive('unit.boundary', 'standard')).toBe(false)
     expect(isLive('unit.boundary', 'lights-out')).toBe(false)
   })
+}
 
+function settingsTests() {
   it('asks about a repeat failure at standard, and not at lights-out', () => {
     for (const rule of ['verify.repeat-fail', 'verify.base-fail', 'forge-defect'] as GateRuleId[]) {
       expect(isLive(rule, 'standard')).toBe(true)
@@ -179,13 +200,15 @@ describe('autonomy', () => {
   it('never silences a draft whose CI stays red, even at lights-out', () => {
     expect(isLive('ci.red', 'lights-out')).toBe(true)
   })
-})
+}
 
 describe('ranking', () => {
-  function ranked(over: Partial<Parameters<typeof raiseGate>[0]> & { blockedUnits?: number } = {}) {
-    return gate(over)
-  }
+  describe('ranking', rankingTests)
+  describe('the queue and ties', theQueueAndTiesTests)
+  describe('summaries', summariesTests)
+})
 
+function rankingTests() {
   it('ranks a decision that unblocks more work above one that unblocks less', () => {
     const many = ranked({ id: 'G-many', blockedUnits: 3 })
     const few = ranked({ id: 'G-few', blockedUnits: 0 })
@@ -207,7 +230,9 @@ describe('ranking', () => {
   it('still ranks a gate that blocks nothing above zero', () => {
     expect(rankOf(ranked({ blockedUnits: 0, riskGrade: 'P3' }))).toBeGreaterThan(0)
   })
+}
 
+function theQueueAndTiesTests() {
   it('leaves decided gates out of the queue', () => {
     const answered = decide(ranked({ id: 'done' }), 'approve', '', 'now')
     expect(rankInbox([answered, ranked({ id: 'open' })]).map((g) => g.id)).toEqual(['open'])
@@ -218,7 +243,9 @@ describe('ranking', () => {
     const second = ranked({ id: 'second', at: '2026-09-06T11:00:00.000Z' })
     expect(rankInbox([second, first]).map((g) => g.id)).toEqual(['first', 'second'])
   })
+}
 
+function summariesTests() {
   it('summarises what is waiting and what was decided without anyone', () => {
     const automatic = applyDefault(ranked({ id: 'auto' }), 'now')
     const summary = summariseInbox([
@@ -232,7 +259,7 @@ describe('ranking', () => {
   it('summarises an empty inbox as nothing waiting', () => {
     expect(summariseInbox([])).toEqual({ waiting: 0, orders: 0, automatic: 0 })
   })
-})
+}
 
 // ── A run whose agents are gone ─────────────────────────────────────────
 //
@@ -242,6 +269,11 @@ describe('ranking', () => {
 // busy for hours and had died when the application closed.
 
 describe('run.interrupted', () => {
+  describe('live at every setting', runInterruptedLiveTests)
+  describe('options and wording', runInterruptedOptionsTests)
+})
+
+function runInterruptedLiveTests() {
   it('is live at every autonomy setting', () => {
     for (const level of AUTONOMY_LEVELS) expect(isLive('run.interrupted', level)).toBe(true)
   })
@@ -251,7 +283,9 @@ describe('run.interrupted', () => {
       expect(silencedRules(level)).not.toContain('run.interrupted')
     }
   })
+}
 
+function runInterruptedOptionsTests() {
   it('offers picking the run back up, and stopping it', () => {
     const gate = raiseGate({
       id: 'g',
@@ -279,7 +313,7 @@ describe('run.interrupted', () => {
   it('says what it is in words somebody who did not write it can read', () => {
     expect(ruleInWords('run.interrupted')).toMatch(/agents/)
   })
-})
+}
 
 // ── A draft whose CI stays red ──────────────────────────────────────────
 //
@@ -289,6 +323,11 @@ describe('run.interrupted', () => {
 // to prevent.
 
 describe('ci.red', () => {
+  describe('live at every setting', ciRedLiveTests)
+  describe('options and wording', ciRedOptionsTests)
+})
+
+function ciRedLiveTests() {
   it('is live at every autonomy setting', () => {
     for (const level of AUTONOMY_LEVELS) expect(isLive('ci.red', level)).toBe(true)
   })
@@ -298,7 +337,9 @@ describe('ci.red', () => {
       expect(silencedRules(level)).not.toContain('ci.red')
     }
   })
+}
 
+function ciRedOptionsTests() {
   it('offers another round, and holding', () => {
     const gate = raiseGate({
       id: 'g',
@@ -327,7 +368,7 @@ describe('ci.red', () => {
   it('says what it is in words somebody who did not write it can read', () => {
     expect(ruleInWords('ci.red')).toMatch(/CI/)
   })
-})
+}
 
 // ── A draft that no longer rebases cleanly ──────────────────────────────
 //
@@ -338,6 +379,11 @@ describe('ci.red', () => {
 // own is exactly the failure it exists to prevent.
 
 describe('refinery.conflict', () => {
+  describe('live at every setting', refineryConflictLiveTests)
+  describe('options and wording', refineryConflictOptionsTests)
+})
+
+function refineryConflictLiveTests() {
   it('is live at every autonomy setting', () => {
     for (const level of AUTONOMY_LEVELS) expect(isLive('refinery.conflict', level)).toBe(true)
   })
@@ -347,7 +393,9 @@ describe('refinery.conflict', () => {
       expect(silencedRules(level)).not.toContain('refinery.conflict')
     }
   })
+}
 
+function refineryConflictOptionsTests() {
   it('offers taking it over, and holding', () => {
     const gate = raiseGate({
       id: 'g',
@@ -376,7 +424,7 @@ describe('refinery.conflict', () => {
   it('says what it is in words somebody who did not write it can read', () => {
     expect(ruleInWords('refinery.conflict')).toMatch(/rebase/)
   })
-})
+}
 
 describe('defaultInWords', () => {
   it('names the default by its option label when the gate offers it', () => {

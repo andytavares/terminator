@@ -40,6 +40,11 @@ async function ledger(): Promise<Array<{ action: string; actor: string }>> {
 }
 
 describe('an agreed order from a tracker issue', () => {
+  describe('the agreed order comment', theAgreedOrderCommentTests)
+  describe('the state move', theStateMoveTests)
+})
+
+function theAgreedOrderCommentTests() {
   it('comments the agreed order on the issue and records it as the write-back rule', async () => {
     const order = trackedOrder()
     await writeBack(order, 'agreed', writeBackDepsFor(root, order, issuesPortFor(host.api)))
@@ -50,7 +55,9 @@ describe('an agreed order from a tracker issue', () => {
     )
     expect((await ledger()).map((entry) => entry.actor)).toEqual(['rule:writeback'])
   })
+}
 
+function theStateMoveTests() {
   it('moves the issue to the state the operator mapped, and lets the tracker choose where none is', async () => {
     const mapped = trackedOrder({
       stateMapping: { started: 'state-42', in_review: null, done: null },
@@ -76,4 +83,4 @@ describe('an agreed order from a tracker issue', () => {
     expect(host.issues.states).toHaveBeenCalledWith('linear', 'ENG-1')
     expect(report).toMatchObject({ transitions: 'supported', unreachable: ['in_review', 'done'] })
   })
-})
+}

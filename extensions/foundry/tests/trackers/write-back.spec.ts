@@ -63,6 +63,12 @@ beforeEach(() => {
 })
 
 describe('the capability check happens at agreement (FR-059a)', () => {
+  describe('the capability', theCapabilityTests)
+  describe('candidate states', candidateStatesTests)
+  describe('no issue or no answer', noIssueOrNoAnswerTests)
+})
+
+function theCapabilityTests() {
   it('reports state write-back as supported for a tracker that supports it', async () => {
     const report = await checkCapability(order(), deps())
     expect(report.transitions).toBe('supported')
@@ -88,7 +94,9 @@ describe('the capability check happens at agreement (FR-059a)', () => {
     await checkCapability(order(), deps())
     expect(record).not.toHaveBeenCalled()
   })
+}
 
+function candidateStatesTests() {
   it('reports the candidate states so the operator can adjust the mapping (FR-060)', async () => {
     const report = await checkCapability(order(), deps())
     expect(report.states.map((s) => s.id)).toEqual(['st-progress', 'st-review', 'st-done'])
@@ -111,7 +119,9 @@ describe('the capability check happens at agreement (FR-059a)', () => {
     const report = await checkCapability(order(), deps({ issues }))
     expect(report.unreachable).toEqual(['in_review'])
   })
+}
 
+function noIssueOrNoAnswerTests() {
   it('is a no-op for an order with no source issue', async () => {
     const typed = order({ source: { kind: 'typed', tracker: null, key: null, url: null } })
     const report = await checkCapability(typed, deps())
@@ -125,7 +135,7 @@ describe('the capability check happens at agreement (FR-059a)', () => {
     expect(report.states).toEqual([])
     expect(report.transitions).toBe('supported')
   })
-})
+}
 
 describe('the summary comment (FR-058)', () => {
   it('writes the rendered order to the issue on agreement', async () => {
@@ -152,6 +162,11 @@ describe('the summary comment (FR-058)', () => {
 })
 
 describe('the state move (FR-059)', () => {
+  describe('moving', movingTests)
+  describe('unsupported trackers', unsupportedTrackersTests)
+})
+
+function movingTests() {
   it('maps each event to the intent it means', () => {
     expect(INTENT_FOR_EVENT.started).toBe('started')
     expect(INTENT_FOR_EVENT.draft_opened).toBe('in_review')
@@ -174,7 +189,9 @@ describe('the state move (FR-059)', () => {
     )
     expect(issues.transition).toHaveBeenCalledWith('linear', 'TAV-42', 'in_review', 'st-progress')
   })
+}
 
+function unsupportedTrackersTests() {
   it('never moves an issue on a tracker that cannot be moved, and never comments that it did', async () => {
     const issues = port({ supportsTransitions: vi.fn(() => false) })
     const results = await writeBack(order(), 'started', deps({ issues }))
@@ -189,7 +206,7 @@ describe('the state move (FR-059)', () => {
     const unsupported = record.mock.calls.filter((c) => c[0] === 'writeback.unsupported')
     expect(unsupported).toHaveLength(1)
   })
-})
+}
 
 describe('the pull request link (FR-061)', () => {
   it('comments the links on the issue when a draft opens', async () => {
@@ -225,6 +242,11 @@ describe('the pull request link (FR-061)', () => {
 })
 
 describe('a failed write never affects the work (FR-063)', () => {
+  describe('failure', failureTests)
+  describe('retries', retriesTests)
+})
+
+function failureTests() {
   it('retries a failure', async () => {
     const comment = vi.fn(async () => Promise.reject(new Error('rate limited')))
     await writeBack(order(), 'agreed', deps({ issues: port({ comment }) }))
@@ -251,7 +273,9 @@ describe('a failed write never affects the work (FR-063)', () => {
       Array
     )
   })
+}
 
+function retriesTests() {
   it('succeeds on the retry when the first attempt was a blip', async () => {
     let calls = 0
     const comment = vi.fn(async () => {
@@ -281,7 +305,7 @@ describe('a failed write never affects the work (FR-063)', () => {
     expect(results.some((r) => r.ok)).toBe(true)
     expect(issues.comment).toHaveBeenCalled()
   })
-})
+}
 
 describe('an order with nothing to write back to', () => {
   it('writes nothing for a typed idea', async () => {
@@ -299,6 +323,11 @@ describe('an order with nothing to write back to', () => {
 })
 
 describe('successful writes are recorded too', () => {
+  describe('the state named', theStateNamedTests)
+  describe('failures and missing review states', failuresAndMissingReviewStatesTests)
+})
+
+function theStateNamedTests() {
   it('records writeback.ok for a state move, naming the state the ticket moved to', async () => {
     await writeBack(order(), 'draft_opened', deps({ issues: port() }), { pulls: [] })
     expect(record).toHaveBeenCalledWith('writeback.ok', 'TAV-42', 'TAV-42 moved to In Review')
@@ -321,7 +350,9 @@ describe('successful writes are recorded too', () => {
       merged: 'done',
     })
   })
+}
 
+function failuresAndMissingReviewStatesTests() {
   it('records no writeback.ok for a write that failed', async () => {
     const issues = port({ transition: vi.fn(async () => Promise.reject(new Error('boom'))) })
     await writeBack(order(), 'started', deps({ issues }))
@@ -341,4 +372,4 @@ describe('successful writes are recorded too', () => {
       expect.stringContaining('stays In Progress because the team has no review state')
     )
   })
-})
+}

@@ -17,6 +17,11 @@ import { makeTempDir } from '../../../tests/support/temp-dir'
 // once an order spans repositories and "the working directory" is ambiguous.
 
 describe('resolveDataRoot', () => {
+  describe('the default location', theDefaultLocationTests)
+  describe('a configured path', aConfiguredPathTests)
+})
+
+function theDefaultLocationTests() {
   it('defaults to a .foundry directory beside the working directory', () => {
     const r = resolveDataRoot('', '/repos/terminator')
     expect(r.root).toBe(path.join('/repos/terminator', '.foundry'))
@@ -28,7 +33,9 @@ describe('resolveDataRoot', () => {
       resolveDataRoot('', '/repos/terminator').root
     )
   })
+}
 
+function aConfiguredPathTests() {
   it('uses a configured absolute path for every repository', () => {
     const a = resolveDataRoot('/var/foundry', '/repos/terminator')
     const b = resolveDataRoot('/var/foundry', '/repos/other')
@@ -54,7 +61,7 @@ describe('resolveDataRoot', () => {
     expect(resolveDataRoot('  /var/foundry  ', '/repos/x').root).toBe('/var/foundry')
     expect(resolveDataRoot('   ', '/repos/x').usingDefault).toBe(true)
   })
-})
+}
 
 describe('paths under the root', () => {
   const root = '/var/foundry'
@@ -74,9 +81,9 @@ describe('paths under the root', () => {
   })
 })
 
-describe('ensureWritable', () => {
-  let tmp: string
+let tmp: string
 
+describe('ensureWritable', () => {
   beforeEach(() => {
     tmp = makeTempDir('foundry-root-')
   })
@@ -85,6 +92,11 @@ describe('ensureWritable', () => {
     fs.rmSync(tmp, { recursive: true, force: true })
   })
 
+  describe('a root that can be written', aRootThatCanBeWrittenTests)
+  describe('a root that cannot be written', aRootThatCannotBeWrittenTests)
+})
+
+function aRootThatCanBeWrittenTests() {
   it('creates the root when it does not exist yet', async () => {
     const root = path.join(tmp, 'nested', 'foundry')
     const r = await ensureWritable(root)
@@ -95,7 +107,9 @@ describe('ensureWritable', () => {
   it('accepts a root that already exists', async () => {
     expect((await ensureWritable(tmp)).ok).toBe(true)
   })
+}
 
+function aRootThatCannotBeWrittenTests() {
   it('reports a root it cannot create, naming the path', async () => {
     // A file where the parent directory should be: no one can create under it.
     const wall = path.join(tmp, 'wall')
@@ -112,7 +126,7 @@ describe('ensureWritable', () => {
     expect(r.ok).toBe(false)
     if (!r.ok) expect(r.reason).toMatch(/not a directory/i)
   })
-})
+}
 
 // This took whatever it was given and built the directories to match. A live
 // run filed its `ship.draft_opened` entry by the entry's *subject* — a pull

@@ -49,6 +49,11 @@ describe.skipIf(!RUNNABLE)('the Linear provider, against the real API', () => {
     }
   })
 
+  describe('reading the workflow', readingTheWorkflowTests)
+  describe('moving the issue', movingTheIssueTests)
+})
+
+function readingTheWorkflowTests() {
   it('reads the real workflow rather than an assumed one', () => {
     expect(states.length).toBeGreaterThan(2)
 
@@ -87,7 +92,9 @@ describe.skipIf(!RUNNABLE)('the Linear provider, against the real API', () => {
     expect(named.length).toBeGreaterThan(0)
     expect(named.length).toBeLessThanOrEqual(3)
   })
+}
 
+function movingTheIssueTests() {
   it('actually moves the issue, and Linear reports the new state', async () => {
     const target = states.find((state) => state.intent === 'started')
     expect(target, 'this workflow has no started state to move to').toBeDefined()
@@ -114,4 +121,4 @@ describe.skipIf(!RUNNABLE)('the Linear provider, against the real API', () => {
       provider.transition!(cred, ISSUE, 'started', '00000000-0000-0000-0000-000000000000')
     ).rejects.toThrow(/not available/)
   })
-})
+}

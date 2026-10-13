@@ -19,6 +19,13 @@ source:
 `
 
 describe('parseSensor', () => {
+  describe('parsing', parsingTests)
+  describe('refusals', refusalsTests)
+  describe('malformed and newer', malformedAndNewerTests)
+  describe('tracker sources', trackerSourcesTests)
+})
+
+function parsingTests() {
   it('parses a well-formed sensor', () => {
     const r = parseSensor(SENSOR, 'ci-main-red.yaml')
     expect(r.ok).toBe(true)
@@ -35,7 +42,9 @@ describe('parseSensor', () => {
     expect(r.ok).toBe(false)
     if (!r.ok) expect(r.reason).toMatch(/other-name/)
   })
+}
 
+function refusalsTests() {
   it('refuses an interval shorter than 5 minutes', () => {
     const r = parseSensor(SENSOR.replace('every: 30m', 'every: 1m'), 'ci-main-red.yaml')
     expect(r.ok).toBe(false)
@@ -50,7 +59,9 @@ describe('parseSensor', () => {
     const r = parseSensor(SENSOR.replace('severity: high', 'severity: extreme'), 'ci-main-red.yaml')
     expect(r.ok).toBe(false)
   })
+}
 
+function malformedAndNewerTests() {
   it('reports malformed YAML by path instead of throwing', () => {
     const r = parseSensor('id: [unclosed\n', 'broken.yaml')
     expect(r.ok).toBe(false)
@@ -64,7 +75,9 @@ describe('parseSensor', () => {
     )
     expect(r.ok).toBe(false)
   })
+}
 
+function trackerSourcesTests() {
   it('parses the tracker source kind, with a null query meaning "your assigned issues"', () => {
     const tracker = `
 schemaVersion: ${SENSOR_SCHEMA_VERSION}
@@ -81,7 +94,7 @@ source:
     expect(r.ok).toBe(true)
     if (r.ok) expect(r.value.source).toEqual({ kind: 'tracker', query: null, limit: 25 })
   })
-})
+}
 
 describe('everyMs', () => {
   it('converts minutes', () => {

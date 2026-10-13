@@ -47,6 +47,17 @@ function order(id: string, questions: OpenQuestion[], status?: WorkOrder['status
 }
 
 describe('countAttention', () => {
+  describe('undecided gates', undecidedGatesTests)
+  describe('silenced gates and questions', silencedGatesAndQuestionsTests)
+  describe('answered and stale questions', answeredAndStaleQuestionsTests)
+  describe('held calls and signals', heldCallsAndSignalsTests)
+  describe('nothing waiting', nothingWaitingTests)
+  describe('orders waiting on you', ordersWaitingOnYouTests)
+  describe('double counting', doubleCountingTests)
+  describe("Foundry's move", foundrysMoveTests)
+})
+
+function undecidedGatesTests() {
   it('counts undecided gates as the inbox badge', () => {
     const counts = countAttention({
       gates: [gate({ id: 'G-1' }), gate({ id: 'G-2', rule: 'unit.boundary' })],
@@ -73,7 +84,9 @@ describe('countAttention', () => {
       })
     ).toMatchObject({ inbox: 0 })
   })
+}
 
+function silencedGatesAndQuestionsTests() {
   it('does not count a gate this autonomy setting silences', () => {
     // The badge has to mean the same thing the inbox does. A count that
     // includes rows the inbox filters out is a badge you learn to ignore.
@@ -99,7 +112,9 @@ describe('countAttention', () => {
     expect(counts.forge).toBe(3)
     expect(counts.byOrder).toEqual({ 'WO-1': 2, 'WO-2': 1 })
   })
+}
 
+function answeredAndStaleQuestionsTests() {
   it('leaves an answered question out', () => {
     const answered = { ...question('q1'), answer: 'yes' }
     const counts = countAttention({
@@ -128,7 +143,9 @@ describe('countAttention', () => {
       expect(counts.forge, status).toBe(0)
     }
   })
+}
 
+function heldCallsAndSignalsTests() {
   it('adds held tool calls to the Forge count', () => {
     // The Floor is reached through the Forge tab, so an ask waiting there has
     // to raise that tab's badge or it is invisible from anywhere else.
@@ -159,7 +176,9 @@ describe('countAttention', () => {
     })
     expect(counts).toEqual({ inbox: 0, forge: 0, byOrder: {} })
   })
+}
 
+function nothingWaitingTests() {
   it('is zero across the board when nothing is waiting', () => {
     expect(
       countAttention({
@@ -175,7 +194,9 @@ describe('countAttention', () => {
       byOrder: {},
     })
   })
+}
 
+function ordersWaitingOnYouTests() {
   // WO-1008-287 sat amended and ready with both badges at zero and the Inbox
   // saying "Nothing needs you". Anything whose turn is the operator's, and
   // that no gate or question already counts, is counted here.
@@ -203,7 +224,9 @@ describe('countAttention', () => {
     })
     expect(counts.inbox).toBe(1)
   })
+}
 
+function doubleCountingTests() {
   it('does not count an order twice when its questions are already counted', () => {
     const counts = countAttention({
       gates: [],
@@ -227,7 +250,9 @@ describe('countAttention', () => {
     })
     expect(counts).toMatchObject({ inbox: 0, forge: 1 })
   })
+}
 
+function foundrysMoveTests() {
   it('leaves out an order that is Foundry\u2019s move', () => {
     const counts = countAttention({
       gates: [],
@@ -238,7 +263,7 @@ describe('countAttention', () => {
     })
     expect(counts.inbox).toBe(0)
   })
-})
+}
 
 function standing(over: Partial<StandingInput>): StandingInput {
   return {

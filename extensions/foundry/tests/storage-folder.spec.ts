@@ -54,6 +54,12 @@ describe('with no workspace open and no data directory set', () => {
 })
 
 describe('the first activation after the move to its own folder', () => {
+  describe('moving the records', movingTheRecordsTests)
+  describe('records already moved', recordsAlreadyMovedTests)
+  describe('lane worktrees', laneWorktreesTests)
+})
+
+function movingTheRecordsTests() {
   it('moves the records and the runtime state out of userData', async () => {
     const host = fakeHost(() => '')
     const userData = userDataOf(host)
@@ -72,7 +78,9 @@ describe('the first activation after the move to its own folder', () => {
     expect(fs.existsSync(path.join(userData, 'foundry'))).toBe(false)
     expect(fs.existsSync(path.join(userData, 'foundry-runtime'))).toBe(false)
   })
+}
 
+function recordsAlreadyMovedTests() {
   it('keeps the records already in its folder and leaves the old ones where they are', async () => {
     const host = fakeHost(() => '')
     const old = path.join(userDataOf(host), 'foundry', '.foundry', 'orders', 'WO-1', 'ledger.jsonl')
@@ -95,7 +103,9 @@ describe('the first activation after the move to its own folder', () => {
       expect.stringContaining(path.join(userDataOf(host), 'foundry'))
     )
   })
+}
 
+function laneWorktreesTests() {
   it('reconnects a lane worktree that moved with the records to its repository', async () => {
     const host = fakeHost(() => '')
     const repo = await seededRepository(temporaryDirectory('fdry-moved-lane'), 'widgets')
@@ -113,4 +123,4 @@ describe('the first activation after the move to its own folder', () => {
     await realGit({ command: 'git', args: ['worktree', 'prune'], cwd: repo })
     expect((await worktrees()).stdout).toContain(newLane)
   })
-})
+}

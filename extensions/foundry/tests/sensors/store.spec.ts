@@ -36,6 +36,14 @@ function signal(overrides: Partial<Signal> = {}): Signal {
 }
 
 describe('createSignalStore', () => {
+  describe('saving and listing', savingAndListingTests)
+  describe('skipping', skippingTests)
+  describe('getting and empty state', gettingAndEmptyStateTests)
+  describe('merging state', mergingStateTests)
+  describe('the signals directory', theSignalsDirectoryTests)
+})
+
+function savingAndListingTests() {
   it('saves then lists signals', async () => {
     const root = tempRoot()
     const store = createSignalStore(root)
@@ -59,7 +67,9 @@ describe('createSignalStore', () => {
     expect(listed[0].status).toBe('promoted')
     expect(listed[0].orderId).toBe('order-1')
   })
+}
 
+function skippingTests() {
   it('skips an identical save, appending nothing', async () => {
     const root = tempRoot()
     const store = createSignalStore(root)
@@ -83,7 +93,9 @@ describe('createSignalStore', () => {
     const listed = await store.list()
     expect(listed).toEqual([signal()])
   })
+}
 
+function gettingAndEmptyStateTests() {
   it('gets a signal by id, or null when absent', async () => {
     const root = tempRoot()
     const store = createSignalStore(root)
@@ -97,7 +109,9 @@ describe('createSignalStore', () => {
     const store = createSignalStore(root)
     expect(await store.sensorState()).toEqual({})
   })
+}
 
+function mergingStateTests() {
   it('merges and persists sensor state across a new store instance', async () => {
     const root = tempRoot()
     const store = createSignalStore(root)
@@ -128,7 +142,9 @@ describe('createSignalStore', () => {
 
     expect(merged['sensor-a'].repoPath).toBeNull()
   })
+}
 
+function theSignalsDirectoryTests() {
   it('writes nothing outside <dataRoot>/signals', async () => {
     const root = tempRoot()
     const store = createSignalStore(root)
@@ -141,4 +157,4 @@ describe('createSignalStore', () => {
     const signalsEntries = fs.readdirSync(path.join(root, 'signals')).sort()
     expect(signalsEntries).toEqual(['signals.jsonl', 'state.json'])
   })
-})
+}

@@ -17,6 +17,15 @@ function item(key: string, url: string, title = 'Flaky test'): SensedItem {
 }
 
 describe('mergeSensed', () => {
+  describe('collapsing', collapsingTests)
+  describe('duplicates', duplicatesTests)
+  describe('distinct keys', distinctKeysTests)
+  describe('reopening', reopeningTests)
+  describe('promoted signals', promotedSignalsTests)
+  describe('other sensors', otherSensorsTests)
+})
+
+function collapsingTests() {
   it('collapses seven runs of one workflow into one signal', () => {
     let signals: Signal[] = []
     for (let i = 0; i < 7; i++) {
@@ -32,7 +41,9 @@ describe('mergeSensed', () => {
     expect(signals[0].occurrences).toBe(7)
     expect(signals[0].evidence).toHaveLength(7)
   })
+}
 
+function duplicatesTests() {
   it('counts the same run seen twice only once', () => {
     let signals: Signal[] = []
     signals = mergeSensed(
@@ -53,7 +64,9 @@ describe('mergeSensed', () => {
     expect(signals[0].occurrences).toBe(1)
     expect(signals[0].evidence).toHaveLength(1)
   })
+}
 
+function distinctKeysTests() {
   it('creates two signals for two distinct keys', () => {
     const signals = mergeSensed(
       [],
@@ -69,7 +82,9 @@ describe('mergeSensed', () => {
     expect(signals[0].dismissedAt).toBeNull()
     expect(signals[0].orderId).toBeNull()
   })
+}
 
+function reopeningTests() {
   it('reopens a dismissed signal only once occurrences reach ceil(dismissedAt * 1.5)', () => {
     // Build a dismissed signal at occurrences=4 -> dismissedAt=4, reopen threshold=ceil(6)=6
     let signals: Signal[] = mergeSensed(
@@ -111,7 +126,9 @@ describe('mergeSensed', () => {
     expect(signals[0].dismissedAt).toBeNull()
     expect(signals[0].occurrences).toBe(6)
   })
+}
 
+function promotedSignalsTests() {
   it('keeps accumulating a promoted signal, staying promoted', () => {
     let signals: Signal[] = mergeSensed(
       [],
@@ -132,7 +149,9 @@ describe('mergeSensed', () => {
     expect(signals[0].orderId).toBe('order-1')
     expect(signals[0].occurrences).toBe(2)
   })
+}
 
+function otherSensorsTests() {
   it('leaves signals from other sensors untouched', () => {
     const other: Signal = {
       id: 'other-1',
@@ -157,9 +176,14 @@ describe('mergeSensed', () => {
     )
     expect(signals).toContainEqual(other)
   })
-})
+}
 
 describe('ranked', () => {
+  describe('ordering', orderingTests)
+  describe('ties', tiesTests)
+})
+
+function orderingTests() {
   it('orders open signals by impact desc, hides dismissed/promoted', () => {
     const high: Signal = {
       id: 'high',
@@ -195,7 +219,9 @@ describe('ranked', () => {
     const result = ranked([medium, dismissed, promoted, high])
     expect(result.map((s) => s.id)).toEqual(['high', 'medium'])
   })
+}
 
+function tiesTests() {
   it('breaks ties by lastSeen desc', () => {
     const a: Signal = {
       id: 'a',
@@ -214,7 +240,7 @@ describe('ranked', () => {
     const b: Signal = { ...a, id: 'b', lastSeen: '2026-01-05T00:00:00.000Z' }
     expect(ranked([a, b]).map((s) => s.id)).toEqual(['b', 'a'])
   })
-})
+}
 
 describe('dismiss', () => {
   it('sets status dismissed and dismissedAt to occurrences', () => {

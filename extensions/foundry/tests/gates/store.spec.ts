@@ -28,6 +28,13 @@ function shipGate(): ReturnType<typeof raiseGate> {
 }
 
 describe('askOnce', () => {
+  describe('asking and holding', askingAndHoldingTests)
+  describe('the shipping decision', theShippingDecisionTests)
+  describe('other orders', otherOrdersTests)
+  describe('other questions', otherQuestionsTests)
+})
+
+function askingAndHoldingTests() {
   it('puts a new question in front of the operator and holds', async () => {
     const store = createGateStore(root)
     expect(await askOnce(store, shipGate())).toBe('hold')
@@ -47,7 +54,9 @@ describe('askOnce', () => {
     expect(await askOnce(store, shipGate())).toBe('hold')
     expect((await store.get('WO-0928-0bb-ship'))?.decision).toBeNull()
   })
+}
 
+function theShippingDecisionTests() {
   it('takes an approval of the finished change as the shipping decision', async () => {
     const store = createGateStore(root)
     const afterWork = raiseGate({
@@ -64,7 +73,9 @@ describe('askOnce', () => {
     expect(await askOnce(store, shipGate())).toBe('approve')
     expect(await store.get('WO-0928-0bb-ship')).toBeNull()
   })
+}
 
+function otherOrdersTests() {
   it('does not take another order’s approval as this one’s', async () => {
     const store = createGateStore(root)
     const elsewhere = raiseGate({
@@ -80,7 +91,9 @@ describe('askOnce', () => {
     await store.save(decide(elsewhere, 'approve', '', '2026-09-28T19:11:00.000Z'))
     expect(await askOnce(store, shipGate())).toBe('hold')
   })
+}
 
+function otherQuestionsTests() {
   it('does not take an approval of a different question as the shipping decision', async () => {
     const store = createGateStore(root)
     const budget = raiseGate({
@@ -96,4 +109,4 @@ describe('askOnce', () => {
     await store.save(decide(budget, 'raise', '', '2026-09-28T19:11:00.000Z'))
     expect(await askOnce(store, shipGate())).toBe('hold')
   })
-})
+}
