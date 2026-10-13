@@ -19,6 +19,7 @@ export type { Rung } from './rung.js'
 
 import type { Rung } from './rung.js'
 
+/** @internal */
 export interface ResolvedFile {
   readonly name: string
   readonly rung: Rung
@@ -64,6 +65,7 @@ function candidates(kind: Kind, name: string, sources: ResolveSources): [Rung, s
  * The rung is returned rather than discarded because "which recipe ran" is not
  * the whole answer — "and which of the three it came from" is what makes a
  * surprising run explicable, and it is recorded in the ledger for that reason.
+ * @internal
  */
 export function resolveFile(
   kind: Kind,
@@ -126,6 +128,7 @@ export function resolveRule(name: string, sources: ResolveSources) {
   return resolveParsed<Rule>('rules', name, sources, parseRule)
 }
 
+/** @internal */
 export function resolveSensor(name: string, sources: ResolveSources) {
   return resolveParsed<SensorDef>('sensors', name, sources, parseSensor)
 }
@@ -187,6 +190,7 @@ function skillCandidates(id: string, sources: ResolveSources): [Rung, string][] 
   ]
 }
 
+/** @internal */
 export function resolveSkill(id: string, sources: ResolveSources): ResolvedSkill | null {
   for (const [rung, dir] of skillCandidates(id, sources)) {
     if (fs.existsSync(path.join(dir, 'SKILL.md'))) return { id, rung, dir }

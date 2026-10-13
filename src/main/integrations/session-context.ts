@@ -27,6 +27,7 @@ function sessionContextFilePath(sessionId: string): string {
   return path.join(sessionContextDir(), `${sessionId}.json`)
 }
 
+/** @internal */
 export async function writeSessionContext(sessionId: string, context: AgentContext): Promise<void> {
   await fs.mkdir(sessionContextDir(), { recursive: true })
   await writeJsonAtomic(sessionContextFilePath(sessionId), context)

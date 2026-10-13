@@ -3,6 +3,7 @@ import { Download, ChevronRight, ChevronDown } from 'lucide-react'
 import { notify } from '../utils/notify'
 import { IconButton } from '@terminator/extension-ui'
 
+/** @internal */
 export interface ReviewAction {
   id: string
   step: number
@@ -53,6 +54,7 @@ const ACTION_ORDER = [
   'task-deleted',
 ]
 
+/** @internal */
 export function formatReviewDate(iso: string): string {
   const date = new Date(iso)
   if (Number.isNaN(date.getTime())) return iso
@@ -63,7 +65,10 @@ export function formatReviewDate(iso: string): string {
   })
 }
 
-/** Groups a review's actions into the sections the detail view renders. */
+/**
+ * Groups a review's actions into the sections the detail view renders.
+ * @internal
+ */
 export function groupActions(actions: ReviewAction[]): { kind: string; items: ReviewAction[] }[] {
   return ACTION_ORDER.map((kind) => ({
     kind,

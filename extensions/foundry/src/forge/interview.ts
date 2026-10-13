@@ -11,6 +11,7 @@ import type { OpenQuestion } from '../order/schema.js'
 // budget is not a display limit — it is the thing that keeps intake from
 // degenerating into an interrogation, which is what the tool this replaces did.
 
+/** @internal */
 export const QUESTION_BUDGET = 3
 
 /**

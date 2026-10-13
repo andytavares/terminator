@@ -1,7 +1,13 @@
-/** One animation frame: output is sent at most this long after it arrives. */
+/**
+ * One animation frame: output is sent at most this long after it arrives.
+ * @internal
+ */
 export const OUTPUT_FLUSH_INTERVAL_MS = 16
 
-/** A batch this large is sent at once instead of waiting for the frame. */
+/**
+ * A batch this large is sent at once instead of waiting for the frame.
+ * @internal
+ */
 export const OUTPUT_FLUSH_MAX_CHARS = 128 * 1024
 
 /**

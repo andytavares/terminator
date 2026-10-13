@@ -55,6 +55,7 @@ export interface Workspace {
   tags: string[]
 }
 
+/** @internal */
 export interface Project {
   id: string
   workspaceId: string
@@ -94,6 +95,7 @@ export async function listWorkspaces(): Promise<Workspace[]> {
   return res.json()
 }
 
+/** @internal */
 export async function listProjects(workspaceId: string): Promise<Project[]> {
   const res = await apiFetch(`/api/projects?workspaceId=${encodeURIComponent(workspaceId)}`)
   if (!res.ok) throw new Error(`listProjects failed: ${res.status}`)

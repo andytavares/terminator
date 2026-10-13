@@ -15,6 +15,7 @@ import type { Role } from '../recipe/parse.js'
 // structural — the runner refuses to start a non-resumable role with a session
 // to resume — is.
 
+/** @internal */
 export class ResumeForbiddenError extends Error {
   readonly code = 'ROLE_MAY_NOT_RESUME'
   constructor(roleId: string) {

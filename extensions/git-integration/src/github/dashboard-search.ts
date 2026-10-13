@@ -6,6 +6,7 @@ import { queueRiskLevel } from './pr-review-service'
 // `search does not reliably accept @me` for team-review-requested-user, so LOGIN
 // is substituted with the viewer's login before the query is sent.
 
+/** @internal */
 export const DASHBOARD_QUERIES: Record<DashboardSection, string> = {
   're-review': 'is:pr is:open archived:false reviewed-by:@me -author:@me sort:created-desc',
   requested: 'is:pr is:open archived:false user-review-requested:@me sort:created-desc',

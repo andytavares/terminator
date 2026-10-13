@@ -15,6 +15,7 @@ const MARK = '__TERMINATOR_PATH__'
  * an interactive rc file (.zshrc), which a login-only shell does not read. The
  * rc file may print, so only the value between the markers is taken. Any
  * failure keeps the PATH the app already has.
+ * @internal
  */
 export async function adoptLoginShellPath(env: NodeJS.ProcessEnv = process.env): Promise<void> {
   if (!env.SHELL) return

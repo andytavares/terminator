@@ -51,7 +51,10 @@ const SEAT_FURNITURE: ReadonlySet<PropKind> = new Set(['restbench', 'sofa', 'pla
 // wall: sorted at its floor it would be drawn over everyone inside.
 const WALL_KINDS: ReadonlySet<PropKind> = new Set(['partition'])
 
-/** The y a prop sorts at against crew and crates: its top, its first row, or its floor edge. */
+/**
+ * The y a prop sorts at against crew and crates: its top, its first row, or its floor edge.
+ * @internal
+ */
 export function drawOrderY(prop: HallProp): number {
   if (WALL_KINDS.has(prop.kind)) return (prop.y + 1) * TILE_PX
   return SEAT_FURNITURE.has(prop.kind) ? prop.y * TILE_PX : (prop.y + prop.h) * TILE_PX
@@ -61,6 +64,7 @@ export function drawOrderY(prop: HallProp): number {
  * What the world is doing at the fixtures, in the terms the art draws it:
  * each station's newest open tool, the fresh verdicts, and which shared
  * fixtures somebody is standing at and using. Pure, so it needs no canvas.
+ * @internal
  */
 export function sceneActivity(
   world: World

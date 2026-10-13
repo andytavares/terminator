@@ -22,6 +22,7 @@ const EMPTY: DiffSummary = { files: 0, added: 0, removed: 0 }
  * Parses `git diff --numstat` output: `<added>\t<removed>\t<path>` per file,
  * with `-` in both count columns for binary files. A file `weighLines` rejects
  * still counts as changed, but its lines do not.
+ * @internal
  */
 export function parseDiffStat(
   stdout: string,
@@ -54,7 +55,10 @@ export function parseDiffStat(
   return { files, added, removed }
 }
 
-/** The paths a change touched. Risk grading is meaningless without them. */
+/**
+ * The paths a change touched. Risk grading is meaningless without them.
+ * @internal
+ */
 export function parseChangedFiles(stdout: string): string[] {
   const files: string[] = []
   for (const line of stdout.split('\n')) {

@@ -1,5 +1,6 @@
 import { watch, type FSWatcher } from 'fs'
 
+/** @internal */
 export interface FsChangeEvent {
   projectRoot: string
   eventType: 'change' | 'rename'
@@ -8,6 +9,7 @@ export interface FsChangeEvent {
 
 type ChangeHandler = (event: FsChangeEvent) => void
 
+/** @internal */
 export class FsWatcherService {
   private watcher: FSWatcher | null = null
   private pollInterval: ReturnType<typeof setInterval> | null = null

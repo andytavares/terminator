@@ -12,8 +12,10 @@ import type { Budgets } from '../order/schema.js'
 /** Occupying an agent right now. */
 const IN_FLIGHT: readonly RunNode['state'][] = ['running']
 
+/** @internal */
 export const MAX_ATTEMPTS = 2
 
+/** @internal */
 export function inFlight(graph: RunGraph): RunNode[] {
   return graph.nodes.filter((n) => IN_FLIGHT.includes(n.state))
 }

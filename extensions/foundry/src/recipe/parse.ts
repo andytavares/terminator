@@ -14,6 +14,7 @@ export type { ParseResult } from './yaml-file.js'
 // Nothing here throws. A malformed file is reported by path and excluded, so
 // one bad file in the operator's directory cannot take the whole surface down.
 
+/** @internal */
 export const RECIPE_SCHEMA_VERSION = 1
 
 // A skill id becomes a directory name — `<dir>/skills/<id>/SKILL.md` — so it
@@ -34,6 +35,7 @@ function badSkillIds(ids: readonly string[]): string[] {
  * over units, a barrier for lane merge order, a human decision, an agent role
  * and a shell command. A recipe that wants arbitrary logic wants a role — a
  * prompt and an output schema — not code in a data file.
+ * @internal
  */
 export const STEP_KINDS = ['agent', 'run', 'gate', 'fanout', 'join'] as const
 export type StepKind = (typeof STEP_KINDS)[number]

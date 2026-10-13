@@ -12,6 +12,7 @@ import { isQuickActionsLeader } from '../../../shared/quick-actions-leader'
 const IDLE_DEBOUNCE_MS = 1500
 
 // xterm 6 draws its own scrollbar, so the slider colours live in the theme, not CSS.
+/** @internal */
 export const XTERM_THEMES = {
   dark: {
     background: '#1e1e1e',

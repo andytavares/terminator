@@ -62,6 +62,7 @@ export function reviewPrompt(input: ReviewPromptInput): string {
  *
  * The scout now runs beside the first draft rather than ahead of it, so the
  * architect may never have seen these; the red team is the reader that does.
+ * @internal
  */
 export function scoutFindingsSection(order: WorkOrder): string | null {
   const { entryPoints, priorArt, conventions } = order.context

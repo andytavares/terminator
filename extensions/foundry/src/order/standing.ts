@@ -61,6 +61,7 @@ export interface Standing {
   readonly gateId: string | null
 }
 
+/** @internal */
 export interface StandingInput {
   readonly status: WorkOrder['status']
   /** Null before the line has built one, or when it cannot be read. */
@@ -138,6 +139,7 @@ function plural(n: number, one: string, many: string): string {
  * run each condition has stopped. A gate halts the whole line, so it outranks
  * a held tool call, which stops one agent — and a run can be in both at once,
  * which is exactly the case that produced a screen naming neither.
+ * @internal
  */
 export function standingOf(input: StandingInput): Standing {
   const nodes = input.graph?.nodes ?? []

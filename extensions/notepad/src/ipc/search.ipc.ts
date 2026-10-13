@@ -130,6 +130,7 @@ function containsText(row: SearchRow, textQuery: string): boolean {
   return row.title.toLowerCase().includes(wanted) || row.body.toLowerCase().includes(wanted)
 }
 
+/** @internal */
 export async function searchNotes(
   db: ExtensionDB,
   args: z.infer<typeof searchSchema>

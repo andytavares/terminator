@@ -6,6 +6,7 @@ import { HALL } from './palette.js'
 // rect kit. The caller clears the canvas first (Paint has no clearRect) and
 // lays the live screen over the tube rectangle `monitorTube` returns.
 
+/** @internal */
 export interface TubeRect {
   readonly x: number
   readonly y: number
@@ -13,6 +14,7 @@ export interface TubeRect {
   readonly h: number
 }
 
+/** @internal */
 export function monitorTube(w: number, h: number): TubeRect {
   return { x: 6, y: 6, w: w - 12, h: h - 27 }
 }

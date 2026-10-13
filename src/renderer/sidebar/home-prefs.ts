@@ -23,8 +23,10 @@ export interface HomePrefs {
   hideExited: boolean
 }
 
+/** @internal */
 export const HOME_PREFS_KEY = 'terminator.home.prefs'
 
+/** @internal */
 export const DEFAULT_HOME_PREFS: HomePrefs = {
   layout: 'ledger',
   groupBy: 'workspace-project',

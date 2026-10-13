@@ -8,7 +8,9 @@ import type {
 import { getGlobalSettings } from '../storage/settings-store'
 import type { NotificationAction, SerializedNotification } from '../../shared/types/index'
 
-export type { NotificationTarget, NotificationType }
+export type { NotificationTarget }
+/** @internal */
+export type { NotificationType }
 
 /**
  * Resolves an extension's own per-notification-key target settings. Injected
@@ -37,6 +39,7 @@ export function setExtensionNotificationSettingReader(
  * Reserved rather than arbitrary so a caller cannot declare a button that
  * silently becomes the row's click target — and so the renderer can ask for it
  * without the author having to name it.
+ * @internal
  */
 export const OPEN_ACTION_ID = '__open__'
 

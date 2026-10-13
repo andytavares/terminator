@@ -34,7 +34,10 @@ import { FindingsSchema } from '../order/proposal.js'
 // difference here is that a role may only write the artefacts its own
 // `writes:` declares, so the channel is a permission rather than an open door.
 
-/** What each `writes:` target is, as JSON, and where it lands on the order. */
+/**
+ * What each `writes:` target is, as JSON, and where it lands on the order.
+ * @internal
+ */
 export const COLLECTABLE = {
   /**
    * What the agent *read*. Not what Foundry measured.
@@ -88,6 +91,7 @@ const SHAPES: Record<Collectable, z.ZodTypeAny> = {
   document: DocumentHandBackSchema,
 }
 
+/** @internal */
 export interface RungOutput {
   readonly findings?: z.infer<typeof FindingsSchema>
   readonly redTeam?: readonly z.infer<typeof AgentFindingSchema>[]
@@ -98,6 +102,7 @@ export interface RungOutput {
   readonly note: string
 }
 
+/** @internal */
 export class RungOutputRejected extends Error {
   readonly code = 'RUNG_OUTPUT_REJECTED'
   constructor(reason: string) {
@@ -294,6 +299,7 @@ export function rungOutputContract(
  * for the same reason it does on a proposal: a rung carrying `status` is
  * refused out loud rather than having the field quietly dropped, because an
  * agent that tried it will try again.
+ * @internal
  */
 export function parseRungOutput(value: unknown, writes: readonly Collectable[]): RungOutput {
   const shape: Record<string, z.ZodTypeAny> = { note: z.string().default('') }
@@ -311,6 +317,7 @@ export function parseRungOutput(value: unknown, writes: readonly Collectable[]):
   return parsed.data as RungOutput
 }
 
+/** @internal */
 export interface ApplyRungInput {
   readonly role: string
   readonly output: RungOutput
@@ -320,6 +327,7 @@ export interface ApplyRungInput {
   readonly round?: number
 }
 
+/** @internal */
 export interface AppliedRungOutput {
   readonly order: WorkOrder
   /** What the rung said it found, for the ledger. Empty when it said nothing. */
@@ -381,6 +389,7 @@ const DUPLICATE_BAR = 0.6
  *   - **plan** and **acceptance** are *reported*. The graph was compiled from
  *     the agreed plan before this rung ran, so applying a new one would orphan
  *     every node already in flight. It becomes a question instead.
+ * @internal
  */
 export function applyRungOutput(order: WorkOrder, input: ApplyRungInput): AppliedRungOutput {
   const { output, role, at, round = 0 } = input

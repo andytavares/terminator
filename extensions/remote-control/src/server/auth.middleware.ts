@@ -13,6 +13,7 @@ const NGROK_PATTERN = /\.ngrok(-free)?\.app$|\.ngrok(-free)?\.dev$|\.ngrok\.io$/
 const PRIVATE_IP_PATTERN =
   /^(10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+|192\.168\.\d+\.\d+)$/
 
+/** @internal */
 export function isAllowedHost(rawHost: string): boolean {
   // Strip port safely: IPv4/hostname have one colon max; IPv6 uses [addr]:port bracket notation
   const stripped = rawHost.startsWith('[')

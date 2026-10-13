@@ -7,7 +7,10 @@
 // the same note. autosaveNote broadcasts on NOTES_CHANGED_CHANNEL after every
 // successful write; every surface adopts foreign writes and ignores its own.
 
-/** Push channel announcing a saved note body. Must match notes.ipc.ts. */
+/**
+ * Push channel announcing a saved note body. Must match notes.ipc.ts.
+ * @internal
+ */
 export const NOTES_CHANGED_CHANNEL = 'terminator.notepad:notes.changed'
 
 /**
@@ -27,6 +30,7 @@ export interface NoteChangedEvent {
   originId: string | null
 }
 
+/** @internal */
 export function parseNoteChangedEvent(data: unknown): NoteChangedEvent | null {
   if (typeof data !== 'object' || data === null) return null
   const e = data as Partial<NoteChangedEvent>
@@ -41,7 +45,10 @@ export function parseNoteChangedEvent(data: unknown): NoteChangedEvent | null {
   }
 }
 
-/** True when the change came from another surface and should be adopted here. */
+/**
+ * True when the change came from another surface and should be adopted here.
+ * @internal
+ */
 export function isForeignChange(event: NoteChangedEvent): boolean {
   return event.originId !== ORIGIN_ID
 }

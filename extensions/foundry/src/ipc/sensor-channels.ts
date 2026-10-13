@@ -32,6 +32,7 @@ const DEFAULT_STATE: SensorState = {
   lastProblem: null,
 }
 
+/** @internal */
 export interface AvailableSensor {
   readonly def: SensorDef
   readonly rung: string

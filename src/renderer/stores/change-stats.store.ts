@@ -5,6 +5,7 @@ import type { ChangeStats } from '../../shared/schemas/git.schema'
  * How long a cached answer stays good. The sidebar re-renders on every session
  * state change; without a window here that would be one `git diff` spawn per
  * branch per render.
+ * @internal
  */
 export const CHANGE_STATS_TTL_MS = 15_000
 

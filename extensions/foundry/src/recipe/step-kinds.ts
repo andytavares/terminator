@@ -15,7 +15,10 @@ export interface ExpectFailure {
   readonly actual: unknown
 }
 
-/** `plan.units`, optionally filtered: `plan.units[role=builder]`. */
+/**
+ * `plan.units`, optionally filtered: `plan.units[role=builder]`.
+ * @internal
+ */
 export function selectOver(expression: string, order: WorkOrder): PlanUnit[] {
   const match = /^plan\.units(?:\[(\w+)=([\w.-]+)\])?(?:\s+by\s+lane)?$/.exec(expression.trim())
   if (match === null) return []

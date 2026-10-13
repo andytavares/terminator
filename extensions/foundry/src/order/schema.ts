@@ -14,6 +14,7 @@ import { CHECK_NAMES } from '../verify/check-names.js'
 
 export const SCHEMA_VERSION = 1
 
+/** @internal */
 export class SchemaVersionTooNewError extends Error {
   readonly code = 'ORDER_SCHEMA_TOO_NEW'
   constructor(found: number, known: number) {
@@ -239,7 +240,10 @@ export const RED_TEAM_CATEGORIES = [
 
 export type RedTeamCategory = (typeof RED_TEAM_CATEGORIES)[number]
 
-/** The categories that stop a hand-off. Everything else is a note. */
+/**
+ * The categories that stop a hand-off. Everything else is a note.
+ * @internal
+ */
 export const BLOCKING_CATEGORIES: readonly RedTeamCategory[] = RED_TEAM_CATEGORIES.slice(0, 3)
 
 /**

@@ -4,6 +4,7 @@
  * without stealing those. Two presses in quick succession is the exit gesture:
  * the first still reaches the extension, the second means the user pressed it
  * again because nothing visible happened.
+ * @internal
  */
 export const DOUBLE_ESCAPE_WINDOW_MS = 500
 

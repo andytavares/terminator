@@ -39,6 +39,7 @@ export interface ModelChoice {
  * says. That is the correct default for a console that is wrapping somebody
  * else's CLI, and it is what the pilot did — by accident — for its whole life
  * before the setting was wired up.
+ * @internal
  */
 export const MODEL_ALIASES: readonly ModelChoice[] = [
   { id: '', label: 'Use my Claude Code default', floating: true },
@@ -81,6 +82,7 @@ function apiCredential(env: NodeJS.ProcessEnv): { header: string; value: string 
  * working list on their own, so a settings page that cannot reach the API is
  * degraded, not broken, and must not surface an error for something the
  * operator never asked for.
+ * @internal
  */
 export async function fetchLiveModels(
   env: NodeJS.ProcessEnv = process.env,

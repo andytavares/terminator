@@ -14,6 +14,7 @@ import type { FrameNode, Timeline, ToolEntry, GraphFrame, CiFrame } from './repl
 // records each tool call it has not recorded before. Nothing here decides
 // anything; a line that will not parse is skipped, never fatal.
 
+/** @internal */
 export const TIMELINE_FILE = 'run-timeline.jsonl'
 
 const NodeStateSchema = z.enum(['waiting', 'running', 'passed', 'failed', 'blocked', 'skipped'])

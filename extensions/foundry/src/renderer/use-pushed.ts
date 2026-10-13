@@ -10,7 +10,10 @@ export interface ChangeFilter {
 /** Every kind of record an order's state is drawn from. */
 export const ANY_RECORD: readonly ChangeKind[] = ['order', 'graph', 'gates', 'ledger', 'live']
 
-/** A change with no order of its own (a held tool call) concerns every view of that kind. */
+/**
+ * A change with no order of its own (a held tool call) concerns every view of that kind.
+ * @internal
+ */
 export function isRelevant(change: FoundryChange, filter: ChangeFilter): boolean {
   if (!filter.kinds.includes(change.kind)) return false
   return filter.orderId === undefined || change.orderId === '' || change.orderId === filter.orderId

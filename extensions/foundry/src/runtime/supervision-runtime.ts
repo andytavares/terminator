@@ -29,6 +29,7 @@ import { gotoRun, startPaletteRefresh, stopPaletteRefresh } from './palette-comm
  * basename is the order id. A firing for a run whose feature directory is not
  * one writes nothing rather than inventing a place for it: reading any
  * directory's grandparent as the root wrote `<parent>/orders/<name>/ledger.jsonl`.
+ * @internal
  */
 export async function recordStall(
   featureDir: string,

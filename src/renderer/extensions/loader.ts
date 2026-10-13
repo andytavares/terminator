@@ -23,6 +23,7 @@ function makePortalComponent(
   }
 }
 
+/** @internal */
 export function registerWebviewExtension(
   ext: Extension,
   registry: ReturnType<typeof useExtensionRegistry.getState>

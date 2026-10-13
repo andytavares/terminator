@@ -4,6 +4,7 @@ import { z } from 'zod'
 
 const SignalValueSchema = z.enum(['pass', 'warn', 'fail', 'unknown'])
 
+/** @internal */
 export const SignalDotsSchema = z.object({
   tests: SignalValueSchema,
   coverage: SignalValueSchema,
@@ -15,6 +16,7 @@ export const SignalDotsSchema = z.object({
 
 // ─── Risk score ───────────────────────────────────────────────────────────────
 
+/** @internal */
 export const RiskScoreSchema = z.object({
   level: z.enum(['low', 'medium', 'high']),
   composite: z.number().nullable(),
@@ -33,6 +35,7 @@ export const RiskScoreSchema = z.object({
 
 // ─── File metrics (raw input to computeRiskScore) ────────────────────────────
 
+/** @internal */
 export const FileMetricsSchema = z.object({
   path: z.string(),
   additions: z.number(),
@@ -48,6 +51,7 @@ export const FileMetricsSchema = z.object({
 
 // ─── Changed file ─────────────────────────────────────────────────────────────
 
+/** @internal */
 export const PrChangedFileSchema = z.object({
   path: z.string(),
   oldPath: z.string().optional(),
@@ -63,6 +67,7 @@ export const PrChangedFileSchema = z.object({
 
 // ─── Chapter ──────────────────────────────────────────────────────────────────
 
+/** @internal */
 export const ChapterSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -294,6 +299,7 @@ export interface IssueComment {
 
 // ─── Inline comments ─────────────────────────────────────────────────────────
 
+/** @internal */
 export const InlineCommentSchema = z.object({
   id: z.number(),
   author: z.string(),
@@ -312,6 +318,7 @@ export const InlineCommentSchema = z.object({
   parentId: z.number().nullable(),
 })
 
+/** @internal */
 export const ThreadSchema = z.object({
   id: z.string(),
   path: z.string(),

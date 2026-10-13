@@ -23,6 +23,7 @@ export interface ConnectedDevice {
  * Deliberately coarse. "iPhone" is what someone holding the phone will look
  * for; the full user-agent string is noise and, on a screen that also shows an
  * access credential, noise worth not printing.
+ * @internal
  */
 export function deviceLabel(userAgent: string | undefined): string {
   if (!userAgent) return 'Unknown device'

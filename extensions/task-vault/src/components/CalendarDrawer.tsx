@@ -41,6 +41,7 @@ const STATUS_DOT_CLASS: Record<string, string> = {
 
 const DOT_ORDER = ['open', 'in-progress', 'in-review', 'blocked', 'done', 'migrated', 'cancelled']
 
+/** @internal */
 export function statusDotStyle(
   status: string,
   lanes: KanbanLane[]

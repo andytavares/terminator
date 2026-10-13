@@ -15,6 +15,7 @@ import * as path from 'node:path'
 
 export const DEFAULT_DIR_NAME = '.foundry'
 
+/** @internal */
 export class RelativeDataDirError extends Error {
   readonly code = 'RELATIVE_DATA_DIR'
   constructor(value: string) {
@@ -47,7 +48,10 @@ export function resolveDataRoot(setting: string | undefined, workdir: string): D
   return { root: configured, usingDefault: false }
 }
 
-/** An order id that does not name a directory under `orders/`. */
+/**
+ * An order id that does not name a directory under `orders/`.
+ * @internal
+ */
 export class OrderIdEscapesRootError extends Error {
   readonly code = 'ORDER_ID_ESCAPES_ROOT'
   constructor(orderId: string) {
