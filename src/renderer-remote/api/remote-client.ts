@@ -32,10 +32,6 @@ export async function createTerminal(opts: CreateTerminalOptions): Promise<{ ses
   return res.json()
 }
 
-export async function deleteTerminal(sessionId: string): Promise<void> {
-  await apiFetch(`/api/terminals/${sessionId}`, { method: 'DELETE' })
-}
-
 export async function resizeTerminal(sessionId: string, cols: number, rows: number): Promise<void> {
   await apiFetch(`/api/terminals/${sessionId}/resize`, {
     method: 'POST',

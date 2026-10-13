@@ -343,7 +343,6 @@ export type Budgets = z.infer<typeof BudgetsSchema>
 export type RiskAssessment = z.infer<typeof RiskSchema>
 export type Assumption = z.infer<typeof AssumptionSchema>
 export type OpenQuestion = z.infer<typeof OpenQuestionSchema>
-export type RedTeamFinding = z.infer<typeof RedTeamFindingSchema>
 export type WriteBack = z.infer<typeof WriteBackSchema>
 export type StateMapping = z.infer<typeof StateMappingSchema>
 export type TransitionIntent = z.infer<typeof TransitionIntentSchema>

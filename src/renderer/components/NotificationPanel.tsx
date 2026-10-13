@@ -3,7 +3,6 @@ import React, { useEffect, useCallback, useRef } from 'react'
 import { Bell, Info, CheckCircle, AlertTriangle, XCircle } from 'lucide-react'
 import { RelativeTime } from '@terminator/extension-ui'
 import { useNotificationStore, type Notification } from '../stores/notification.store'
-import { AlertBadge } from './AlertBadge'
 import './NotificationPanel.css'
 
 function TypeIcon({ type }: { type: string }): JSX.Element {
@@ -106,26 +105,6 @@ function NotificationItem({
         ×
       </button>
     </div>
-  )
-}
-
-export function BellButton({
-  unreadCount,
-  onClick,
-}: {
-  unreadCount: number
-  onClick: () => void
-}): JSX.Element {
-  return (
-    <button
-      className={`notif-bell${unreadCount > 0 ? ' notif-bell--active' : ''}`}
-      onClick={onClick}
-      title="Notifications"
-      aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`}
-    >
-      <Bell size={15} />
-      <AlertBadge count={unreadCount} className="alert-badge--tab" />
-    </button>
   )
 }
 

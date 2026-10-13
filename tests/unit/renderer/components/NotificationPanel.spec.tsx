@@ -17,10 +17,7 @@ installElectronApi({
   extension: { setLeftInset: mockSetLeftInset },
 })
 
-import {
-  NotificationPanel,
-  BellButton,
-} from '../../../../src/renderer/components/NotificationPanel'
+import { NotificationPanel } from '../../../../src/renderer/components/NotificationPanel'
 import { installElectronApi } from '../../../support/electron-api'
 
 function makeNotif(overrides: Partial<Notification> = {}): Notification {
@@ -200,33 +197,6 @@ describe('NotificationPanel', () => {
     render(<NotificationPanel />)
     const time = screen.getByText('2 minutes ago')
     expect(time.getAttribute('datetime')).toBe(new Date(timestamp).toISOString())
-  })
-})
-
-describe('BellButton', () => {
-  afterEach(() => {
-    cleanup()
-  })
-
-  it('renders without active class when unreadCount is 0', () => {
-    render(<BellButton unreadCount={0} onClick={vi.fn()} />)
-    const btn = screen.getByTitle('Notifications')
-    expect(btn.className).not.toContain('notif-bell--active')
-    expect(btn.getAttribute('aria-label')).toBe('Notifications')
-  })
-
-  it('renders with active class and unread label when unreadCount > 0', () => {
-    render(<BellButton unreadCount={3} onClick={vi.fn()} />)
-    const btn = screen.getByTitle('Notifications')
-    expect(btn.className).toContain('notif-bell--active')
-    expect(btn.getAttribute('aria-label')).toBe('Notifications (3 unread)')
-  })
-
-  it('calls onClick when clicked', () => {
-    const onClick = vi.fn()
-    render(<BellButton unreadCount={0} onClick={onClick} />)
-    fireEvent.click(screen.getByTitle('Notifications'))
-    expect(onClick).toHaveBeenCalled()
   })
 })
 

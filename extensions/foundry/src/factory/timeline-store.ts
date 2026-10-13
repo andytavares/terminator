@@ -78,11 +78,6 @@ interface Recorded {
 }
 const recorded = new Map<string, Recorded>()
 
-/** Drop what this process remembers writing. Tests stand in for a restart with it. */
-export function forgetTimelines(): void {
-  recorded.clear()
-}
-
 function fileOf(dir: string): string {
   return path.join(dir, TIMELINE_FILE)
 }

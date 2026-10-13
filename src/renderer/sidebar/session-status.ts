@@ -1,4 +1,4 @@
-import type { AgentState, TerminalSession } from '../../shared/types/index'
+import type { AgentState } from '../../shared/types/index'
 
 // The resting presentation of a session. Pure: no clock, no store, no I/O —
 // same rule the rest of this directory follows, and what makes the four states
@@ -32,18 +32,13 @@ const PRESENTATION: Record<AgentState, StatusPresentation> = {
 }
 
 /**
- * How a session presents at rest.
+ * How a session in `state` presents at rest.
  *
- * Reads `agentState` and nothing else. Selection is deliberately not an input:
+ * Takes the state and nothing else. Selection is deliberately not an input:
  * it is the row's surface, and conflating the two is the defect this replaces —
  * the old row spent its only glyph on "is this the row you clicked", leaving
  * running, idle and waiting indistinguishable.
  */
-export function statusPresentationFor(session: TerminalSession): StatusPresentation {
-  return statusPresentationForState(session.agentState)
-}
-
-/** The same presentation, for a surface that holds a state rather than a session. */
 export function statusPresentationForState(state: AgentState): StatusPresentation {
   return PRESENTATION[state]
 }

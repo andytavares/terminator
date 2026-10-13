@@ -1,13 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import {
-  mulberry32,
-  rect,
-  bevel,
-  rivets,
-  wear,
-  scanlines,
-  glow,
-} from '../../../src/factory/art/kit.js'
+import { mulberry32, rect, bevel, rivets, wear, glow } from '../../../src/factory/art/kit.js'
 import { createRecordingPaint } from './paint-fake.js'
 
 describe('factory/art/kit', () => {
@@ -69,15 +61,6 @@ describe('factory/art/kit', () => {
   it('wear draws nothing impossible for a zero-size tile', () => {
     const paint = createRecordingPaint()
     expect(() => wear(paint, 0, 0, 0, 0, 1, '#111')).not.toThrow()
-  })
-
-  it('scanlines draws one faint row every two pixels down the whole frame', () => {
-    const paint = createRecordingPaint()
-    scanlines(paint, 32, 8)
-    const rows = paint.calls.filter((c) => c.op === 'fillRect')
-    expect(rows).toHaveLength(4)
-    expect(rows[0]).toMatchObject({ x: 0, y: 0, w: 32, h: 1 })
-    expect(rows[3]).toMatchObject({ x: 0, y: 6, w: 32, h: 1 })
   })
 
   it('glow paints a radial gradient from full colour to transparent', () => {

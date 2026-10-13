@@ -50,18 +50,6 @@ describe('createTerminal', () => {
   })
 })
 
-describe('deleteTerminal', () => {
-  it('DELETE /api/terminals/:sessionId', async () => {
-    mockFetch.mockResolvedValueOnce({ ok: true })
-    const { deleteTerminal } = await import('../../../src/renderer-remote/api/remote-client')
-    await deleteTerminal('s1')
-    expect(mockFetch).toHaveBeenCalledWith(
-      '/api/terminals/s1',
-      expect.objectContaining({ method: 'DELETE' })
-    )
-  })
-})
-
 describe('resizeTerminal', () => {
   it('POST /api/terminals/:sessionId/resize with cols and rows', async () => {
     mockFetch.mockResolvedValueOnce({ ok: true })

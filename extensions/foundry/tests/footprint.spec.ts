@@ -2,14 +2,7 @@ import { describe, it, expect } from 'vitest'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import {
-  resolveDataRoot,
-  untrackedNotice,
-  orderDir,
-  unitDir,
-  laneDir,
-  ledgerPath,
-} from '../src/data-root.js'
+import { resolveDataRoot, untrackedNotice, orderDir, ledgerPath } from '../src/data-root.js'
 
 // The footprint promise, held by a test rather than by good intentions.
 //
@@ -65,12 +58,7 @@ describe('the repository footprint', () => {
   })
 
   it('routes every record path through the data root', () => {
-    for (const helper of [
-      orderDir('/root', 'WO-1'),
-      unitDir('/root', 'WO-1', 'U-1'),
-      laneDir('/root', 'WO-1', 1, 'repo'),
-      ledgerPath('/root', 'WO-1'),
-    ]) {
+    for (const helper of [orderDir('/root', 'WO-1'), ledgerPath('/root', 'WO-1')]) {
       expect(helper.startsWith('/root/')).toBe(true)
     }
   })

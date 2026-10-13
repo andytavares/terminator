@@ -4,8 +4,10 @@ import { readiness } from '../../src/forge/readiness.js'
 import type { LoopFacts, ReadinessInput } from '../../src/forge/readiness.js'
 import { draftOrder } from '../../src/order/draft.js'
 import { compileOrder } from '../../src/order/compile.js'
-import type { WorkOrder, RedTeamFinding } from '../../src/order/schema.js'
+import type { WorkOrder } from '../../src/order/schema.js'
 import type { IntakeOutcome } from '../../src/forge/intake-outcome.js'
+
+type RedTeamFinding = WorkOrder['redTeam'][number]
 
 // readiness() is the one answer every Forge surface reads (ADR 074). The
 // fixture below mirrors WO-0928-9c6, the order whose screen disagreed with

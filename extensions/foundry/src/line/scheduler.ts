@@ -29,15 +29,6 @@ function dependenciesSettled(graph: RunGraph, node: RunNode): boolean {
   })
 }
 
-function anyDependencyFailed(graph: RunGraph, node: RunNode): boolean {
-  return node.dependsOn.some((id) => {
-    const dependency = nodeById(graph, id)
-    return (
-      dependency !== undefined && (dependency.state === 'failed' || dependency.state === 'blocked')
-    )
-  })
-}
-
 /**
  * What could start, in graph order, limited by the agent budget.
  *
@@ -52,13 +43,6 @@ export function readyNodes(graph: RunGraph, budgets: Budgets): RunNode[] {
   const gates = eligible.filter((n) => n.kind === 'gate')
   const work = eligible.filter((n) => n.kind !== 'gate').slice(0, capacity)
   return [...gates, ...work]
-}
-
-/** Nodes that can never start because something they wait on failed. */
-export function blockedNodes(graph: RunGraph): RunNode[] {
-  return graph.nodes.filter(
-    (n) => n.state !== 'passed' && n.state !== 'skipped' && anyDependencyFailed(graph, n)
-  )
 }
 
 /**

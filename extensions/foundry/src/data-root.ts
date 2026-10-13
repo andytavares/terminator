@@ -81,21 +81,6 @@ export function orderDir(root: string, orderId: string): string {
   return target
 }
 
-/**
- * Reserved by the data-root contract, and proved by `footprint.spec.ts` to sit
- * under the root like everything else. Nothing writes per-unit records yet;
- * when something does, this is where they go — and deleting it to satisfy a
- * reachability grep would remove the proof along with the path.
- */
-export function unitDir(root: string, orderId: string, unitId: string): string {
-  return path.join(orderDir(root, orderId), 'units', unitId)
-}
-
-/** Named by merge order first so a directory listing reads in merge order. */
-export function laneDir(root: string, orderId: string, ord: number, repo: string): string {
-  return path.join(orderDir(root, orderId), 'lanes', `${ord}-${repo}`)
-}
-
 export function ledgerPath(root: string, orderId: string): string {
   return path.join(orderDir(root, orderId), 'ledger.jsonl')
 }

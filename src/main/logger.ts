@@ -71,11 +71,6 @@ export function writeFromRenderer(level: LogLevel, namespace: string, message: s
   write(level, namespace, message)
 }
 
-export function getLogPath(): string {
-  getStream()
-  return logPath
-}
-
 export const logger = {
   debug: (msg: string, ...meta: unknown[]) => write('debug', 'main', format(msg, meta)),
   info: (msg: string, ...meta: unknown[]) => write('info', 'main', format(msg, meta)),

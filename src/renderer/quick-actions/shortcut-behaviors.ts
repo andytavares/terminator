@@ -81,15 +81,6 @@ export function cycleWorkspace(delta: number, deps: WorkspaceCycleDeps): void {
   setExpandedWorkspaceIds(new Set([workspaces[next].id]))
 }
 
-export function switchToWorkspace(
-  index: number,
-  deps: Pick<WorkspaceCycleDeps, 'workspaces' | 'setActiveWorkspace' | 'setExpandedWorkspaceIds'>
-): void {
-  if (!deps.workspaces[index]) return
-  deps.setActiveWorkspace(deps.workspaces[index].id)
-  deps.setExpandedWorkspaceIds(new Set([deps.workspaces[index].id]))
-}
-
 export interface TabCycleDeps {
   getSessionsForProject(projectId: string): { id: string }[]
   getActiveSessionForProject(projectId: string): string | null | undefined
