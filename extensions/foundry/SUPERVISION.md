@@ -808,7 +808,7 @@ waiting on it and sends you to the terminal.
   a registry reloaded from disk would describe runs that no longer exist. What
   survives is the **graph**, not the sessions — see "A run whose agents are
   gone" for how the two are reconciled when the application reopens.
-- **On disk**, under `userData/foundry-runtime/` — the feed
+- **On disk**, under `runtime/` in Foundry's own `api.paths.globalStorage` — the feed
   (`feed.jsonl`), mute rules, and the per-session
   `--settings` files and hook script.
 - **In the browser** — when you last read the feed. That is a property of the

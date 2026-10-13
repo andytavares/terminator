@@ -102,7 +102,7 @@ export function useCommentHover() {
   return { commentHover, setCommentHover, cancelHoverHide, scheduleHoverHide }
 }
 
-export type CommentHoverControls = ReturnType<typeof useCommentHover>
+type CommentHoverControls = ReturnType<typeof useCommentHover>
 
 /** The comment id of the highlighted anchor under the pointer, if any. */
 export function hoveredAnchor(e: React.MouseEvent<HTMLDivElement>) {
@@ -135,7 +135,7 @@ export function useCommentDraft() {
   return { pendingAnchor, composingAnchor, setComposingAnchor, onSelectionChange, startComposing }
 }
 
-export type CommentDraft = ReturnType<typeof useCommentDraft>
+type CommentDraft = ReturnType<typeof useCommentDraft>
 
 interface EditorOverlayProps {
   draft: CommentDraft

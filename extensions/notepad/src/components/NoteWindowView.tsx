@@ -9,7 +9,6 @@ import { NoteEditor, applyExternalDoc, scrollToPosition } from '../editor/NoteEd
 import { ORIGIN_ID, onForeignNoteChange } from '../editor/noteSync'
 import {
   AUTOSAVE_DELAY_MS,
-  deriveNoteTitle,
   reanchorAfterSave,
   reanchorComments,
   schedulePersist,
@@ -26,6 +25,7 @@ import {
   type ViewRef,
 } from './noteSurface'
 import type { Comment } from '../db/types'
+import { noteTitle } from '../db/note-title'
 
 const NOTE_ID = new URLSearchParams(window.location.search).get('noteId') ?? ''
 
@@ -190,16 +190,14 @@ function useWindowAutosave(note: NoteData | null, setNote: SetNote, editorViewRe
 /** Resolves to the saved title, or null when the save failed. */
 async function saveWindowNote(note: NoteData, body: string): Promise<string | null> {
   useEditorStore.getState().markSaving()
-  const title = deriveNoteTitle(body)
+  const title = noteTitle(body)
   try {
-    await window.electronAPI.extensionBridge.invoke('terminator.notepad:notes.autosave', {
-      id: note.id,
-      title,
-      body,
-      tags: note.tags,
-      originId: ORIGIN_ID,
-    })
-    return title
+    const saved = await window.electronAPI.extensionBridge.invoke(
+      'terminator.notepad:notes.autosave',
+      { id: note.id, title, body, tags: note.tags, originId: ORIGIN_ID }
+    )
+    // A title set by hand is kept by the save, so the stored one is shown.
+    return (saved as { data?: { title?: string } }).data?.title ?? title
   } catch {
     return null
   }

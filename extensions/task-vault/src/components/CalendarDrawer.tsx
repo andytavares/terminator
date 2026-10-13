@@ -29,7 +29,7 @@ interface GridProps {
   lanes: KanbanLane[]
 }
 
-export const STATUS_DOT_CLASS: Record<string, string> = {
+const STATUS_DOT_CLASS: Record<string, string> = {
   open: 'cal-dot--open',
   'in-progress': 'cal-dot--progress',
   'in-review': 'cal-dot--review',

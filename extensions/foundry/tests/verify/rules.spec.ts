@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import * as path from 'node:path'
 import {
   acceptProposal,
@@ -14,6 +13,7 @@ import { propose } from '../../src/ledger/curator.js'
 import { resolveRule } from '../../src/recipe/resolve.js'
 import type { ResolveSources } from '../../src/recipe/resolve.js'
 import type { LedgerEntry } from '../../src/ledger/append.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 // A rule the operator accepted is in force from the next run, carries the
 // entries it was derived from, and can be taken away again.
@@ -51,8 +51,8 @@ function proposal() {
 }
 
 beforeEach(() => {
-  root = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-rules-'))
-  repo = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-rules-repo-'))
+  root = makeTempDir('fdry-rules-')
+  repo = makeTempDir('fdry-rules-repo-')
 })
 
 afterEach(() => {

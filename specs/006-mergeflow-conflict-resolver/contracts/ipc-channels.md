@@ -1,5 +1,11 @@
 # Contract: MergeFlow IPC Channels
 
+> **Superseded. Kept as history.** This contract records what was decided when the feature was
+> specified, and is not edited. The code no longer has `git:conflict-blocks` and `git:merge-ai-suggest`. Do not build against it. The
+> current contract lives in:
+>
+> - `extensions/git-integration/src/ipc/merge-flow.ipc.ts` and `extensions/git-integration/src/schemas/merge-flow.schema.ts`: each channel is a `ChannelSpec` whose zod schema is its payload contract ([ADR 096](../../../docs/adr/096-every-ipc-channel-has-a-schema.md))
+
 **Version**: 1.0.0  
 **Date**: 2026-05-25  
 **Branch**: `006-mergeflow-conflict-resolver`  

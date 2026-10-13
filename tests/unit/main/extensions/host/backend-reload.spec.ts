@@ -38,7 +38,7 @@ import { ExtensionHostProcess } from '../../../../../src/main/extensions/host/ho
 import { HostRuntime } from '../../../../../src/main/extensions/host/host-runtime'
 import { requireLoader } from '../../../../../src/main/extensions/host/backend-loader'
 import { RpcEndpoint, type MessageLink } from '../../../../../src/main/extensions/host/rpc-endpoint'
-import type { HostSnapshot } from '../../../../../src/main/extensions/host/snapshot'
+import { hostSnapshot } from '../../../../support/host-snapshot'
 
 /** What the backends below write when they activate: the code that ran. */
 const ran = globalThis as { backendVersion?: string }
@@ -62,19 +62,6 @@ afterEach(() => {
 function link(port: MessagePort): MessageLink {
   ports.push(port)
   return { post: (m) => port.postMessage(m), listen: (receive) => port.on('message', receive) }
-}
-
-function snapshot(): HostSnapshot {
-  return {
-    databasePath: ':memory:',
-    paths: { app: '/app', userData: '/data' },
-    settings: {},
-    workspaces: { workspaces: [], projects: {} },
-    trackers: {
-      linear: { transitions: true, create: true },
-      jira: { transitions: true, create: false },
-    },
-  }
 }
 
 /** The extension directory: a manifest, a backend, and a module the backend requires. */
@@ -113,7 +100,7 @@ async function extensionHost(): Promise<ExtensionHost> {
       new HostRuntime(new RpcEndpoint(link(port2)), initial, {} as ExtensionDB, loader)
       return { link: link(port1), onExit: () => {}, kill: () => {} }
     },
-    snapshot,
+    snapshot: () => hostSnapshot(),
     apiFor: (id) => host?.hostedApi(id),
     onBackendsFailed: () => {},
     log: () => {},

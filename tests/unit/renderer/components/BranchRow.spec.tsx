@@ -14,6 +14,7 @@ function row(patch: Partial<BranchRowData> = {}): BranchRowData {
     state: 'idle',
     stateCount: 1,
     sessionCount: 1,
+    terminals: [],
     lastActivityAt: NOW,
     workspaceId: 'ws-1',
     ...patch,

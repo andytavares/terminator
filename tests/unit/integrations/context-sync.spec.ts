@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import * as path from 'node:path'
 import type { Issue } from '../../../src/shared/types/index'
+import { makeTempDir } from '../../support/temp-dir'
 
 let userData: string
 let projectDir: string
@@ -61,8 +61,8 @@ function settingsFile(): string {
 
 beforeEach(async () => {
   vi.resetModules()
-  userData = fs.mkdtempSync(path.join(os.tmpdir(), 'context-sync-ud-'))
-  projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'context-sync-proj-'))
+  userData = makeTempDir('context-sync-ud-')
+  projectDir = makeTempDir('context-sync-proj-')
   workspaces = await import('../../../src/main/storage/workspace-store')
   links = await import('../../../src/main/integrations/issue-link-store')
   const created = workspaces.createWorkspace({

@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import * as path from 'node:path'
 
 import { createSignalStore } from '../../src/sensors/store'
 import type { Signal } from '../../src/sensors/types'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 function tempRoot(): string {
-  return fs.mkdtempSync(path.join(os.tmpdir(), 'foundry-signal-store-'))
+  return makeTempDir('foundry-signal-store-')
 }
 
 function signal(overrides: Partial<Signal> = {}): Signal {

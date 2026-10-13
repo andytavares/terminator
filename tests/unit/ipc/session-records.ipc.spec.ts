@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import * as path from 'node:path'
 import type { Issue, SessionRecord, SessionSnapshot } from '../../../src/shared/types/index'
 import { RETENTION_MS } from '../../../src/shared/session-records/retention'
+import { makeTempDir } from '../../support/temp-dir'
 
 type Handler = (event: unknown, payload?: unknown) => unknown
 const handlers = vi.hoisted(() => new Map<string, Handler>())
@@ -93,7 +93,7 @@ function contextFile(sessionId: string): string {
 beforeEach(async () => {
   vi.clearAllMocks()
   vi.resetModules()
-  userData = fs.mkdtempSync(path.join(os.tmpdir(), 'session-records-ipc-'))
+  userData = makeTempDir('session-records-ipc-')
   sent = []
   window = openWindow()
   tracker.get.mockResolvedValue(NW_88)
@@ -245,7 +245,7 @@ describe('whether a conversation can still be resumed', () => {
   let transcript: string
 
   beforeEach(() => {
-    transcript = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'ipc-transcript-')), 'c.jsonl')
+    transcript = path.join(makeTempDir('ipc-transcript-'), 'c.jsonl')
     fs.writeFileSync(transcript, '{}')
   })
 

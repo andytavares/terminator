@@ -10,7 +10,7 @@ import {
   X,
 } from 'lucide-react'
 import { Button, ConfirmDialog, useDismissible } from '@terminator/extension-ui'
-import { useNotesStore } from '../stores/notes.store'
+import { loadLibrary, useNotesStore } from '../stores/notes.store'
 import { useFilterStore } from '../stores/filter.store'
 import { EmptyState } from './EmptyState'
 import { ItemEditModal, ItemRow, type DragProps, type EditModalState } from './NoteListItems'
@@ -25,7 +25,6 @@ import {
   moveToFolder,
   noResultsText,
   planDrop,
-  reloadLists,
   renameFolder,
   tagsInUse,
   toggleArchived,
@@ -524,7 +523,7 @@ function FolderRenameInput({ folder, ui }: { folder: Folder; ui: ListUi }): Reac
   const commit = async (value: string) => {
     await renameFolder(folder.id, value || folder.name)
     ui.setRenamingFolderId(null)
-    await reloadLists()
+    await loadLibrary()
   }
   return (
     <input
@@ -607,7 +606,7 @@ function ListOverlays({ ui }: { ui: ListUi }): React.JSX.Element {
         <ItemEditModal
           state={ui.editModal}
           onClose={() => ui.setEditModal(null)}
-          onSaved={() => void reloadLists()}
+          onSaved={() => void loadLibrary()}
         />
       )}
       {folderDeletePending && <FolderDeleteConfirm ui={ui} folderId={folderDeletePending} />}

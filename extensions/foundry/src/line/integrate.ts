@@ -184,7 +184,7 @@ export class PushRefusedError extends Error {
   }
 }
 
-export class PullRequestFailedError extends Error {
+class PullRequestFailedError extends Error {
   readonly code = 'PR_FAILED'
   constructor(what: string, result: ExecResult) {
     super(`${what}: ${detailFor(result)}`)
@@ -365,6 +365,45 @@ export async function readPulls(root: string, orderId: string): Promise<LanePull
 async function writeBody(file: string, contents: string): Promise<void> {
   await fs.promises.mkdir(path.dirname(file), { recursive: true })
   await fs.promises.writeFile(file, contents, 'utf8')
+}
+
+/** Writes `body` to the pull request's body file and has gh put it on the pull request. */
+async function rewriteBody(pull: LanePullRequest, body: string, deps: IntegrateDeps) {
+  await writeBody(pull.bodyPath, body)
+  return deps.exec({
+    command: 'gh',
+    args: ['pr', 'edit', pull.url, '--body-file', pull.bodyPath],
+    cwd: pull.cwd,
+    timeoutMs: 60_000,
+  })
+}
+
+/** A question about the order's open drafts, which are its evidence. */
+interface DraftsAsk {
+  readonly id: string
+  readonly rule: Parameters<typeof raiseGate>[0]['rule']
+  readonly summary: string
+  readonly why: string
+  readonly pulls: readonly LanePullRequest[]
+  /** What the ledger records once the gate is raised. */
+  readonly action: string
+}
+
+async function raiseOnDrafts(ask: DraftsAsk, order: WorkOrder, deps: IntegrateDeps) {
+  const gate = raiseGate({
+    id: ask.id,
+    rule: ask.rule,
+    orderId: order.id,
+    summary: ask.summary,
+    why: ask.why,
+    evidence: ask.pulls.map((pull) => ({ kind: 'report_file' as const, path: pull.bodyPath })),
+    riskGrade: order.risk.grade,
+    blockedUnits: 0,
+    at: deps.now(),
+  })
+  await deps.raiseGate?.(gate)
+  await deps.record(ask.action, order.id, gate.why)
+  return gate
 }
 
 /**
@@ -706,13 +745,7 @@ export async function openDrafts(
   // whose body already had every URL when it was created.
   if (created > 0 && pulls.length > 1) {
     for (const pull of pulls.slice(0, -1)) {
-      await writeBody(pull.bodyPath, prBody(order, shipment, pull.lane, pulls))
-      const edited = await deps.exec({
-        command: 'gh',
-        args: ['pr', 'edit', pull.url, '--body-file', pull.bodyPath],
-        cwd: pull.cwd,
-        timeoutMs: 60_000,
-      })
+      const edited = await rewriteBody(pull, prBody(order, shipment, pull.lane, pulls), deps)
       // A failed cross-link is cosmetic. The drafts are open and the work is
       // pushed; losing that over a description would be the worse failure.
       if (edited.exitCode !== 0) {
@@ -754,13 +787,7 @@ export async function refreshBodies(
   deps: IntegrateDeps
 ): Promise<void> {
   for (const pull of pulls) {
-    await writeBody(pull.bodyPath, prBody(order, shipment, pull.lane, pulls))
-    const edited = await deps.exec({
-      command: 'gh',
-      args: ['pr', 'edit', pull.url, '--body-file', pull.bodyPath],
-      cwd: pull.cwd,
-      timeoutMs: 60_000,
-    })
+    const edited = await rewriteBody(pull, prBody(order, shipment, pull.lane, pulls), deps)
     if (edited.exitCode !== 0) {
       await deps.record(
         'ship.body_refresh_failed',
@@ -831,19 +858,18 @@ export async function finishShipping(
       .map((check) => check.name)
       .join(', ')
     const tail = ci.excerpt.split('\n').slice(-20).join('\n')
-    const gate = raiseGate({
-      id: `${order.id}-ci-red`,
-      rule: 'ci.red',
-      orderId: order.id,
-      summary: `CI is still red on ${names} for ${order.title}`,
-      why: `**${ci.rounds} automatic rounds ran and CI is still red.**\n\n\`\`\`\n${tail}\n\`\`\``,
-      evidence: pulls.map((pull) => ({ kind: 'report_file' as const, path: pull.bodyPath })),
-      riskGrade: order.risk.grade,
-      blockedUnits: 0,
-      at: deps.now(),
-    })
-    await deps.raiseGate?.(gate)
-    await deps.record('ship.ci_red', order.id, gate.why)
+    const gate = await raiseOnDrafts(
+      {
+        id: `${order.id}-ci-red`,
+        rule: 'ci.red',
+        summary: `CI is still red on ${names} for ${order.title}`,
+        why: `**${ci.rounds} automatic rounds ran and CI is still red.**\n\n\`\`\`\n${tail}\n\`\`\``,
+        pulls,
+        action: 'ship.ci_red',
+      },
+      order,
+      deps
+    )
     return { pulls, bodyPaths, held: true, reason: gate.why, gate }
   }
 
@@ -860,29 +886,28 @@ export async function finishShipping(
   // autonomy setting, so a lights-out run reaches exactly this point and stops.
   const unmeasured = shipment.ladder?.unmeasured ?? []
   const rules = shipment.rulesInForce ?? []
-  const gate = raiseGate({
-    id: `${order.id}-ready`,
-    rule: 'ready-for-review',
-    orderId: order.id,
-    summary: `Mark ${pulls.length === 1 ? 'the draft' : `${pulls.length} drafts`} for ${order.title} ready?`,
-    why: [
-      `**${order.plan.units.length} ${order.plan.units.length === 1 ? 'unit' : 'units'}.**${ciNote === '' ? '' : ` ${ciNote}`}`,
-      '### Acceptance\n\n' + acceptanceLines(order, shipment).join('\n'),
-      '### Inspection\n\n' + inspectionLines(shipment).join('\n'),
-      unmeasured.length === 0
-        ? ''
-        : '### Not measured here\n\n' + unmeasured.map((name) => `- ${name}`).join('\n'),
-      rules.length === 0 ? '' : '### Judged against\n\n' + rules.map(ruleBullet).join('\n'),
-    ]
-      .filter((block) => block !== '')
-      .join('\n\n'),
-    evidence: pulls.map((pull) => ({ kind: 'report_file' as const, path: pull.bodyPath })),
-    riskGrade: order.risk.grade,
-    blockedUnits: 0,
-    at: deps.now(),
-  })
-  await deps.raiseGate?.(gate)
-  await deps.record('ship.ready_asked', order.id, gate.why)
+  const gate = await raiseOnDrafts(
+    {
+      id: `${order.id}-ready`,
+      rule: 'ready-for-review',
+      summary: `Mark ${pulls.length === 1 ? 'the draft' : `${pulls.length} drafts`} for ${order.title} ready?`,
+      why: [
+        `**${order.plan.units.length} ${order.plan.units.length === 1 ? 'unit' : 'units'}.**${ciNote === '' ? '' : ` ${ciNote}`}`,
+        '### Acceptance\n\n' + acceptanceLines(order, shipment).join('\n'),
+        '### Inspection\n\n' + inspectionLines(shipment).join('\n'),
+        unmeasured.length === 0
+          ? ''
+          : '### Not measured here\n\n' + unmeasured.map((name) => `- ${name}`).join('\n'),
+        rules.length === 0 ? '' : '### Judged against\n\n' + rules.map(ruleBullet).join('\n'),
+      ]
+        .filter((block) => block !== '')
+        .join('\n\n'),
+      pulls,
+      action: 'ship.ready_asked',
+    },
+    order,
+    deps
+  )
 
   return { pulls, bodyPaths, held: false, reason: '', gate }
 }

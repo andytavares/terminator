@@ -117,15 +117,6 @@
 }
 
 .rs-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 11.5px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  border: 1px solid var(--tm-border-strong);
-  color: var(--tm-text-secondary);
-  white-space: nowrap;
   background: transparent;
 }
 
@@ -146,15 +137,6 @@
 }
 
 .rs-pip {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 16px;
-  height: 16px;
-  border-radius: 8px;
-  background: var(--tm-accent-dim);
-  color: var(--tm-accent-text);
-  font: 600 10px/1 var(--tm-font-ui);
   cursor: pointer;
   border: 0;
   padding: 0 3px;
@@ -328,17 +310,6 @@
 .rs-note-composer-actions {
   display: flex;
   gap: 6px;
-}
-
-.rs-band {
-  margin: 10px 14px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  background: var(--tm-accent-dim);
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  flex-wrap: wrap;
 }
 
 .diff-gap-row {

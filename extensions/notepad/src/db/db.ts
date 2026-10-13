@@ -94,4 +94,23 @@ const DIAGRAM_SCHEMA = `    CREATE TABLE IF NOT EXISTS diagrams (
 
 export async function applyNotepadSchema(db: ExtensionDB): Promise<void> {
   await db.exec(NOTE_SCHEMA + '\n\n' + COMMENT_SCHEMA + '\n\n' + DIAGRAM_SCHEMA)
+  await addColumnIfMissing(db, {
+    table: 'notes',
+    column: 'title_set_by_hand',
+    definition: 'INTEGER NOT NULL DEFAULT 0',
+  })
+}
+
+/** A column a table created by an earlier version of this schema may lack. */
+interface ColumnSpec {
+  table: string
+  column: string
+  definition: string
+}
+
+/** Adds a column to a table created by an earlier version of this schema. */
+async function addColumnIfMissing(db: ExtensionDB, spec: ColumnSpec): Promise<void> {
+  const { table, column, definition } = spec
+  const present = await db.get('SELECT 1 FROM pragma_table_info(?) WHERE name = ?', [table, column])
+  if (!present) await db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`)
 }

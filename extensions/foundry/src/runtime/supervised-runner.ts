@@ -20,7 +20,7 @@ import type { WatchedRun } from './stall-watcher.js'
  * It was one of ten fixed phase names. It is a string now because the shape of
  * work is chosen per order, so the set of steps is not knowable here.
  */
-export type StepLabel = string
+type StepLabel = string
 
 // Running a phase where the operator can see it.
 //
@@ -100,11 +100,12 @@ export interface StartSupervisedRunOptions {
    * The conversation is over, with the terminal's exit code when there is one.
    *
    * Zero when the runtime reported a clean `SessionEnd`; whatever the shell
-   * exited with when the tab was closed or the process died. A phase that
+   * exited with when the process died, and null when closing the tab or a
+   * signal ended it. A phase that
    * crashed must not land in `awaiting_review`, which is an approval gate over
    * nothing.
    */
-  onEnd?: (exitCode: number) => void
+  onEnd?: (exitCode: number | null) => void
 }
 
 /**
@@ -114,13 +115,13 @@ export interface StartSupervisedRunOptions {
  * the same conversation: the terminal, the session id and the transcript are
  * the card's, but "which phase finished" is not.
  */
-export interface PhaseCallbacks {
+interface PhaseCallbacks {
   onPending: (pending: PendingPermission) => void
   onResolved: (requestId: string, decision: PermissionOutcome) => void
   /** The ladder refused something without asking. Only refusals are reported. */
   onAutoDenied?: (toolName: string, reason: string) => void
   onTurnEnd?: (turns: number) => void
-  onEnd?: (exitCode: number) => void
+  onEnd?: (exitCode: number | null) => void
 }
 
 export interface RunCommandOptions {
@@ -160,7 +161,9 @@ export interface SupervisedRunner {
    * verdict is the exit status, so a model in between adds cost and a
    * transcript to read back, and nothing else.
    *
-   * Null when no project or tab could be opened — "not measured", never a pass.
+   * Null when no project or tab could be opened, or when the command ended
+   * without an exit status (a signal, or its tab closed first) — "not
+   * measured", never a pass.
    */
   runCommand(options: RunCommandOptions): Promise<number | null>
   /** The card's open conversation, if it still has one. */ /**
@@ -204,6 +207,30 @@ export interface SupervisedRunner {
  */
 function oneLine(text: string): string {
   return text.replace(/\r?\n/g, ' ').trim()
+}
+
+/**
+ * The shell's arguments for a check: read the user's startup files, then
+ * become the script.
+ *
+ * A check was typed into the tab's interactive login shell, so what the
+ * startup files export (JAVA_HOME, GOPATH, nvm's PATH) reached it; the app
+ * adopts only PATH from them. `-i -l -c` reads the same files that shell did:
+ * zsh reads .zshenv, .zprofile, .zshrc and .zlogin for an interactive login
+ * shell (https://zsh.sourceforge.io/Doc/Release/Files.html), and bash reads
+ * /etc/profile and the first of ~/.bash_profile, ~/.bash_login, ~/.profile,
+ * where ~/.bashrc is usually sourced from
+ * (https://www.gnu.org/software/bash/manual/html_node/Bash-Startup-Files.html).
+ * `-i` makes a shell interactive even with `-c` in both.
+ *
+ * `exec` then replaces that shell with `$SHELL script`, which is what was
+ * typed before: the process the core watches is the script's, so its exit
+ * code is the command's, and the interactive shell is not left in between to
+ * report its own. The paths are single-quoted, which every POSIX shell, zsh
+ * and fish read alike.
+ */
+function startupFilesThen(shell: string, script: string): string[] {
+  return ['-i', '-l', '-c', `exec ${shellQuote(shell)} ${shellQuote(script)}`]
 }
 
 /** Escape. Ends the turn and keeps the session, which is what makes a redirect land. */
@@ -319,9 +346,9 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
   /**
    * A script that shows the command, then runs it and exits with its status.
    *
-   * A file for the same reason the agent launch is one: a typed line past
-   * `MAX_CANON` is mangled. Run by the shell rather than `exec`ed, so a
-   * command with `&&` in it still works.
+   * The terminal runs it as its own process, so its exit status is the tab's.
+   * The command is run by the shell rather than `exec`ed, so a command with
+   * `&&` in it still works.
    */
   function writeCommandScript(id: string, command: string, logPath?: string): string {
     const dir = path.join(stateDir, 'launch')
@@ -477,7 +504,7 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
       // `session_end` only arrives when the runtime exits cleanly enough to
       // fire its hook.
       const detachExit =
-        api.pty.onExit?.(terminalSessionId, (exitCode: number) => {
+        api.pty.onExit?.(terminalSessionId, (exitCode: number | null) => {
           phase.current.onEnd?.(exitCode)
           end(sessionId, exitCode === 0)
         }) ?? null
@@ -561,30 +588,23 @@ export function createSupervisedRunner(options: SupervisedRunnerOptions): Superv
       })
       if (project === null) return null
 
-      const terminalSessionId = await api.pty.openTerminal({
+      // The script is the tab's own process, so the exit the core reports is
+      // the command's, and null when a signal or a closed tab ended it first.
+      const script = writeCommandScript(randomUUID(), options.command, options.logPath)
+      const shell = process.env.SHELL ?? '/bin/sh'
+      const exit = await api.pty.runInTerminal({
         projectId: project.id,
         cwd: options.worktreePath,
         tabTitle: options.title,
         type: 'human',
+        file: shell,
+        args: startupFilesThen(shell, script),
       })
-      if (terminalSessionId === null) return null
-
-      return new Promise((resolve) => {
-        // The shell exits with the command's status, so the tab's own exit is
-        // the verdict. A failure stays open, exited, as the record of what
-        // ran; a pass closes, and its output is in the log. The verdict goes
-        // first and the close is optional: an installed host older than
-        // `closeTerminalTab` threw here, and the pass never reached the run.
-        api.pty.onExit?.(terminalSessionId, (exitCode: number) => {
-          resolve(exitCode)
-          if (exitCode === 0) api.pty.closeTerminalTab?.(terminalSessionId)
-        })
-        const script = writeCommandScript(randomUUID(), options.command, options.logPath)
-        api.pty.write(
-          terminalSessionId,
-          `${shellQuote(process.env.SHELL ?? '/bin/sh')} ${shellQuote(script)}; exit $?\r`
-        )
-      })
+      if (exit === null) return null
+      // A failure stays open, exited, as the record of what ran; a pass
+      // closes, and its output is in the log.
+      if (exit.exitCode === 0) api.pty.closeTerminalTab(exit.sessionId)
+      return exit.exitCode
     },
 
     continueRun(sessionId, next): SupervisedRun | null {

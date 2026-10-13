@@ -1,5 +1,14 @@
 # Contract: Extension API
 
+> **Superseded. Kept as history.** This contract records what was decided when the feature was
+> specified, and is not edited. The code no longer has the `sidebar`, `topBar`, `contextMenu`, `keyboard`, `fs` and `app` namespaces, the two-argument `ipc.registerHandler`, and a backend in the main process. Do not build against it. The
+> current contract lives in:
+>
+> - `packages/extension-sdk/types/api.d.ts`: the `ExtensionAPI`, which the core implements in `src/main/extensions/api.ts`
+> - `packages/extension-sdk/types/renderer.d.ts`: the `window.electronAPI` an extension view receives (for the Webview Renderer API section)
+> - `src/shared/schemas/extension.schema.ts` (`ExtensionManifestSchema`) and [The manifest](../../../docs/EXTENSION-DEVELOPMENT.md#the-manifest)
+> - [ADR 094](../../../docs/adr/094-extensions-follow-the-vs-code-model.md) and [ADR 096](../../../docs/adr/096-every-ipc-channel-has-a-schema.md)
+
 **Version**: 2.0.0  
 **Date**: 2026-06-24  
 **Branch**: `eextension`

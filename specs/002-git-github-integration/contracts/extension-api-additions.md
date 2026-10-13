@@ -1,5 +1,12 @@
 # Contract: Extension API Additions (v1.1.0)
 
+> **Superseded. Kept as history.** This contract records what was decided when the feature was
+> specified, and is not edited. The code no longer has `sidebar.registerPanel`, `topBar`, `fs.watch`, `api.app.version` and the two-argument `ipc.registerHandler`. Do not build against it. The
+> current contract lives in:
+>
+> - `packages/extension-sdk/types/api.d.ts`: the `ExtensionAPI`, which the core implements in `src/main/extensions/api.ts`
+> - [ADR 094](../../../docs/adr/094-extensions-follow-the-vs-code-model.md) and [ADR 096](../../../docs/adr/096-every-ipc-channel-has-a-schema.md)
+
 **Version**: 1.1.0 (extends v1.0.0 from `001-extension-first-terminal`)
 **Date**: 2026-05-07
 **Branch**: `002-git-github-integration`

@@ -282,9 +282,14 @@
   flex-shrink: 0;
 }
 
+/* A small square button in a task row's actions */
 .daily-log__complete-btn,
 .daily-log__migrate-btn,
-.daily-log__link-btn {
+.daily-log__link-btn,
+.daily-log__edit-btn,
+.daily-log__cancel-task-btn,
+.daily-log__delete-btn,
+.daily-log__linked-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -319,19 +324,6 @@
 }
 
 .daily-log__linked-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: none;
-  border: 1px solid var(--tm-border-strong);
-  border-radius: var(--tm-radius-xs, 4px);
-  color: var(--tm-text-secondary);
-  font-size: 12px;
-  padding: 2px 6px;
-  cursor: pointer;
-  transition:
-    background 0.1s,
-    color 0.1s;
   line-height: 1;
 }
 
@@ -342,8 +334,10 @@
   gap: 4px;
 }
 
+/* The input of an inline picker */
 .daily-log__link-picker input,
-.daily-log__migrate-picker input {
+.daily-log__migrate-picker input,
+.projects-browser__link-picker input {
   height: auto;
   background: var(--tm-bg-input);
   border: 1px solid var(--tm-border-strong);
@@ -352,6 +346,10 @@
   font-size: 12px;
   padding: 3px 8px;
   outline: none;
+}
+
+.daily-log__link-picker input,
+.daily-log__migrate-picker input {
   color-scheme: dark;
 }
 
@@ -495,14 +493,6 @@
 }
 
 .projects-browser__link-picker input {
-  height: auto;
-  background: var(--tm-bg-input);
-  border: 1px solid var(--tm-border-strong);
-  border-radius: var(--tm-radius-xs, 4px);
-  color: var(--tm-text-primary);
-  font-size: 12px;
-  padding: 3px 8px;
-  outline: none;
   width: 180px;
 }
 
@@ -963,16 +953,25 @@
   margin-top: 4px;
 }
 
-.inbox-processor__dest-input {
-  width: 100%;
-  box-sizing: border-box;
+/* A text field */
+.inbox-processor__dest-input,
+.inbox-view__capture-input,
+.create-project-form__field input,
+.area-combobox input,
+.area-detail__add-input,
+.smart-input__field {
   background: var(--tm-bg-input);
   border: 1px solid var(--tm-border-strong);
   border-radius: var(--tm-radius-sm, 6px);
   color: var(--tm-text-primary);
+  outline: none;
+}
+
+.inbox-processor__dest-input {
+  width: 100%;
+  box-sizing: border-box;
   font-size: 13px;
   padding: 8px 12px;
-  outline: none;
   margin-bottom: 10px;
 }
 
@@ -1033,24 +1032,6 @@
   flex-shrink: 0;
 }
 
-.daily-log__edit-btn,
-.daily-log__cancel-task-btn,
-.daily-log__delete-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: none;
-  border: 1px solid var(--tm-border-strong);
-  border-radius: var(--tm-radius-xs, 4px);
-  color: var(--tm-text-secondary);
-  font-size: 12px;
-  padding: 2px 6px;
-  cursor: pointer;
-  transition:
-    background 0.1s,
-    color 0.1s;
-}
-
 .daily-log__edit-btn:hover {
   background: var(--tm-accent-dim);
   color: var(--tm-accent-text);
@@ -1071,15 +1052,22 @@
   flex: 1;
 }
 
-.daily-log__edit-input {
+/* An inline text field, already focused for typing */
+.daily-log__edit-input,
+.daily-log__add-input,
+.inbox-item__edit-input,
+.areas-view__create-input {
   flex: 1;
   background: var(--tm-bg-input);
   border: 1px solid var(--tm-accent);
   border-radius: var(--tm-radius-xs, 4px);
   color: var(--tm-text-primary);
   font-size: 13px;
-  padding: 3px 8px;
   outline: none;
+}
+
+.daily-log__edit-input {
+  padding: 3px 8px;
 }
 
 .daily-log__add-btn {
@@ -1114,14 +1102,7 @@
 }
 
 .daily-log__add-input {
-  flex: 1;
-  background: var(--tm-bg-input);
-  border: 1px solid var(--tm-accent);
-  border-radius: var(--tm-radius-xs, 4px);
-  color: var(--tm-text-primary);
-  font-size: 13px;
   padding: 6px 10px;
-  outline: none;
 }
 
 /* ── Inbox View ────────────────────────────────────────────────── */
@@ -1170,13 +1151,8 @@
 
 .inbox-view__capture-input {
   flex: 1;
-  background: var(--tm-bg-input);
-  border: 1px solid var(--tm-border-strong);
-  border-radius: var(--tm-radius-sm, 6px);
-  color: var(--tm-text-primary);
   font-size: 14px;
   padding: 10px 14px;
-  outline: none;
 }
 
 .inbox-view__capture-input:focus {
@@ -1211,7 +1187,9 @@
   color: var(--tm-text-secondary);
 }
 
-.inbox-view__back-btn {
+/* Back to the list */
+.inbox-view__back-btn,
+.area-detail__back-btn {
   background: none;
   border: 1px solid var(--tm-border-strong);
   border-radius: var(--tm-radius-xs, 4px);
@@ -1297,14 +1275,7 @@
 }
 
 .inbox-item__edit-input {
-  flex: 1;
-  background: var(--tm-bg-input);
-  border: 1px solid var(--tm-accent);
-  border-radius: var(--tm-radius-xs, 4px);
-  color: var(--tm-text-primary);
-  font-size: 13px;
   padding: 4px 8px;
-  outline: none;
 }
 
 /* ── Projects Browser — additions ──────────────────────────────── */
@@ -1508,12 +1479,17 @@
   margin: 0 0 16px;
 }
 
-.create-project-form__error {
+/* A form error */
+.create-project-form__error,
+.areas-view__create-error {
   background: color-mix(in srgb, var(--tm-danger) 10%, transparent);
   border: 1px solid color-mix(in srgb, var(--tm-danger) 30%, transparent);
   border-radius: var(--tm-radius-xs, 4px);
   color: var(--tv-color-danger);
   font-size: 12px;
+}
+
+.create-project-form__error {
   padding: 8px 12px;
   margin-bottom: 12px;
 }
@@ -1532,13 +1508,8 @@
 }
 
 .create-project-form__field input {
-  background: var(--tm-bg-input);
-  border: 1px solid var(--tm-border-strong);
-  border-radius: var(--tm-radius-sm, 6px);
-  color: var(--tm-text-primary);
   font-size: 13px;
   padding: 8px 12px;
-  outline: none;
   color-scheme: dark;
 }
 
@@ -1554,13 +1525,8 @@
 .area-combobox input {
   width: 100%;
   box-sizing: border-box;
-  background: var(--tm-bg-input);
-  border: 1px solid var(--tm-border-strong);
-  border-radius: var(--tm-radius-sm, 6px);
-  color: var(--tm-text-primary);
   font-size: 13px;
   padding: 6px 10px;
-  outline: none;
   font-family: var(--font-ui, sans-serif);
 }
 
@@ -1663,14 +1629,7 @@
 }
 
 .areas-view__create-input {
-  flex: 1;
-  background: var(--tm-bg-input);
-  border: 1px solid var(--tm-accent);
-  border-radius: var(--tm-radius-xs, 4px);
-  color: var(--tm-text-primary);
-  font-size: 13px;
   padding: 7px 12px;
-  outline: none;
 }
 
 .areas-view__grid {
@@ -1736,13 +1695,6 @@
 }
 
 .area-detail__back-btn {
-  background: none;
-  border: 1px solid var(--tm-border-strong);
-  border-radius: var(--tm-radius-xs, 4px);
-  color: var(--tm-text-secondary);
-  font-size: 12px;
-  padding: 4px 10px;
-  cursor: pointer;
   transition: background 0.1s;
 }
 
@@ -1758,13 +1710,8 @@
 
 .area-detail__add-input {
   flex: 1;
-  background: var(--tm-bg-input);
-  border: 1px solid var(--tm-border-strong);
-  border-radius: var(--tm-radius-sm, 6px);
-  color: var(--tm-text-primary);
   font-size: 13px;
   padding: 8px 12px;
-  outline: none;
 }
 
 .area-detail__add-input:focus {
@@ -1983,11 +1930,6 @@
 }
 
 .areas-view__create-error {
-  background: color-mix(in srgb, var(--tm-danger) 10%, transparent);
-  border: 1px solid color-mix(in srgb, var(--tm-danger) 30%, transparent);
-  border-radius: var(--tm-radius-xs, 4px);
-  color: var(--tv-color-danger);
-  font-size: 12px;
   padding: 6px 10px;
   margin-bottom: 8px;
 }
@@ -2010,7 +1952,9 @@
   background: var(--tm-accent-dim);
 }
 
-.inbox-item__picker {
+/* A picker that opens under an item */
+.inbox-item__picker,
+.file-to-picker {
   width: 100%;
   margin-top: 8px;
   background: var(--tm-bg-elevated);
@@ -2067,14 +2011,6 @@
 }
 
 /* ── FileToPicker ──────────────────────────────────────────────── */
-.file-to-picker {
-  width: 100%;
-  margin-top: 8px;
-  background: var(--tm-bg-elevated);
-  border: 1px solid var(--tm-border-strong);
-  border-radius: var(--tm-radius-sm, 6px);
-  overflow: hidden;
-}
 
 .file-to-picker__header {
   display: flex;
@@ -2173,13 +2109,8 @@
 .smart-input__field {
   width: 100%;
   box-sizing: border-box;
-  background: var(--tm-bg-input);
-  border: 1px solid var(--tm-border-strong);
-  border-radius: var(--tm-radius-sm, 6px);
-  color: var(--tm-text-primary);
   font-size: 13px;
   padding: 7px 12px;
-  outline: none;
   font-family: var(--font-ui, sans-serif);
 }
 
@@ -3598,17 +3529,6 @@ h2.daily-log__date {
 
 .wr-step__capture-input {
   flex: 1;
-  background: var(--tm-bg-input);
-  border: 1px solid var(--tm-border);
-  border-radius: 6px;
-  color: var(--tm-text-primary);
-  font-size: 13px;
-  padding: 7px 10px;
-  outline: none;
-}
-
-.wr-step__capture-input:focus {
-  border-color: var(--tm-accent);
 }
 
 .wr-step__captured-list {
@@ -5176,16 +5096,22 @@ h2.daily-log__date {
   color: var(--tm-text-secondary);
 }
 
-.daily-log__block-modal-textarea {
+/* A field in a modal */
+.daily-log__block-modal-textarea,
+.interval-picker__date-input,
+.interval-picker__time-input {
   background: var(--tm-bg-base);
   border: 1px solid var(--tm-border-strong);
   border-radius: var(--tm-radius-sm, 6px);
   color: var(--tm-text-primary);
   font-size: 13px;
   font-family: inherit;
+  outline: none;
+}
+
+.daily-log__block-modal-textarea {
   padding: 8px;
   resize: vertical;
-  outline: none;
   transition: border-color 0.15s;
 }
 
@@ -5227,20 +5153,8 @@ h2.daily-log__date {
   border-color: var(--tm-border-strong);
 }
 
-.interval-picker__btn--active {
-  background: var(--tm-accent-dim, color-mix(in srgb, var(--tm-accent) 18%, transparent));
-  border-color: var(--tm-accent);
-  color: var(--tm-accent-text);
-}
-
 .interval-picker__btn--custom {
   color: var(--tm-text-secondary);
-}
-
-.interval-picker__btn--custom.interval-picker__btn--active {
-  background: var(--tm-accent-dim, color-mix(in srgb, var(--tm-accent) 18%, transparent));
-  border-color: var(--tm-accent);
-  color: var(--tm-accent-text);
 }
 
 .interval-picker__custom-row {
@@ -5250,14 +5164,7 @@ h2.daily-log__date {
 
 .interval-picker__date-input,
 .interval-picker__time-input {
-  background: var(--tm-bg-base);
-  border: 1px solid var(--tm-border-strong);
-  border-radius: var(--tm-radius-sm, 6px);
-  color: var(--tm-text-primary);
-  font-size: 13px;
-  font-family: inherit;
   padding: 6px 8px;
-  outline: none;
   color-scheme: dark;
   flex: 1;
 }
@@ -5303,12 +5210,6 @@ h2.daily-log__date {
   background: var(--tm-bg-card-hover);
   color: var(--tm-text-primary);
   border-color: var(--tm-border-strong);
-}
-
-.recurrence-modal__day-btn--active {
-  background: var(--tm-accent-dim, color-mix(in srgb, var(--tm-accent) 18%, transparent));
-  border-color: var(--tm-accent);
-  color: var(--tm-accent-text);
 }
 
 .recurrence-modal__count-row {
@@ -5781,6 +5682,10 @@ h2.daily-log__date {
   border-color: var(--tm-accent);
 }
 
+/* The chosen option. After each button's base rule, so it wins. */
+.recurrence-modal__day-btn--active,
+.interval-picker__btn--active,
+.interval-picker__btn--custom.interval-picker__btn--active,
 .dtp__chip--active {
   background: var(--tm-accent-dim, color-mix(in srgb, var(--tm-accent) 18%, transparent));
   border-color: var(--tm-accent);

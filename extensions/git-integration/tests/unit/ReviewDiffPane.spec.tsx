@@ -1,6 +1,10 @@
 import React from 'react'
-import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from 'vitest'
+import { describe, it, beforeAll, expect, vi, beforeEach, afterEach, afterAll } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+// Imported with the file rather than inside a test: the pane's module graph
+// (highlight.js among it) takes about a second to load under vitest, and a
+// test that imported it paid that against its own five-second timeout.
+import { ReviewDiffPane } from '../../src/components/pr-review/ReviewDiffPane'
 
 // The pane reads both stores through selectors; these resolve them against the state each test sets.
 const { prStoreMock, uiStoreMock, highlightSpy, rowRenderSpy } = vi.hoisted(() => ({
@@ -270,9 +274,14 @@ afterEach(() => {
 })
 
 async function renderPane(props: Partial<typeof defaultProps> = {}) {
-  const { ReviewDiffPane } = await import('../../src/components/pr-review/ReviewDiffPane')
   return render(<ReviewDiffPane {...defaultProps} {...props} />)
 }
+
+// The first import compiles the component tree, which on a loaded machine takes longer
+// than one test's 5 s; load it once here so every test times only its own work.
+beforeAll(async () => {
+  await import('../../src/components/pr-review/ReviewDiffPane')
+}, 60_000)
 
 describe('ReviewDiffPane', () => {
   it('renders file path in header', async () => {
@@ -1771,7 +1780,6 @@ describe('ReviewDiffPane expandable context', () => {
     )
     await waitFor(() => expect(expandedRows(container).length).toBe(20))
 
-    const { ReviewDiffPane } = await import('../../src/components/pr-review/ReviewDiffPane')
     const other = { ...mockFile, path: 'src/bar.ts' }
     mockPrFileDiff.mockResolvedValue({ diff: { ...twoHunkDiff, path: 'src/bar.ts' } })
     rerender(<ReviewDiffPane {...defaultProps} file={other} />)
@@ -1948,6 +1956,10 @@ describe('ReviewDiffPane — fetch and render cost', () => {
     expect(rowRenderSpy).not.toHaveBeenCalled()
   })
 
+  // Every row mounted beyond the viewport is render work a jump through a long file pays
+  // for: the viewport (800 px) plus at most half of it again.
+  const MOUNTED_ROWS_CAP = (800 / ROW_PX) * 1.5
+
   it('mounts only the rows near the viewport of a 2,000-line file', async () => {
     layOut(800)
     mockPrFileDiff.mockResolvedValue({ diff: longDiff(2000) })
@@ -1956,7 +1968,7 @@ describe('ReviewDiffPane — fetch and render cost', () => {
 
     const mounted = container.querySelectorAll('tr.diff-line').length
     expect(mounted).toBeGreaterThan(800 / ROW_PX - 1)
-    expect(mounted).toBeLessThan(100)
+    expect(mounted).toBeLessThan(MOUNTED_ROWS_CAP)
     expect(container.querySelector('[data-new-line="1500"]')).toBeNull()
   })
 
@@ -1975,6 +1987,6 @@ describe('ReviewDiffPane — fetch and render cost', () => {
         Number(row.dataset.newLine)
       )
     await waitFor(() => expect(Math.min(...mountedLines())).toBeGreaterThan(1000))
-    expect(mountedLines().length).toBeLessThan(100)
+    expect(mountedLines().length).toBeLessThan(MOUNTED_ROWS_CAP)
   })
 })

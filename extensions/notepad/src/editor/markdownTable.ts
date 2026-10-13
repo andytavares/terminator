@@ -151,7 +151,7 @@ function parseBodyRows(lines: string[], lineStarts: number[], columnCount: numbe
 // which covers the realistic cases without pulling a full inline parser into
 // the widget.
 
-export type InlineSpanType = 'text' | 'code' | 'strong' | 'em' | 'del' | 'link'
+type InlineSpanType = 'text' | 'code' | 'strong' | 'em' | 'del' | 'link'
 
 export interface InlineSpan {
   type: InlineSpanType

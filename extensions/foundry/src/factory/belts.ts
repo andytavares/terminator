@@ -14,7 +14,7 @@ import { findPath } from './path.js'
 // ties resolve the same way every time.
 
 export type Side = 'N' | 'S' | 'E' | 'W'
-export type BeltTileKind = 'straight' | 'corner' | 'split' | 'merge' | 'cross'
+type BeltTileKind = 'straight' | 'corner' | 'split' | 'merge' | 'cross'
 
 export interface BeltTile {
   readonly x: number

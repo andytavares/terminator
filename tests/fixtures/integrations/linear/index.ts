@@ -22,14 +22,14 @@ export interface FakeLinearIssue {
   team?: Promise<FakeLinearTeam | null>
 }
 
-export interface FakeLinearComment {
+interface FakeLinearComment {
   body: string
   createdAt: string
   user: Promise<{ name: string } | null>
 }
 
 /** One row of a team's workflow, as `team.states()` returns it. */
-export interface FakeLinearState {
+interface FakeLinearState {
   id: string
   name: string
   type: string
@@ -66,7 +66,7 @@ export function makeTeam(over: Partial<FakeLinearTeam> = {}): FakeLinearTeam {
 
 export const VIEWER = { name: 'Andrew', email: 'andrew.tavares87@gmail.com' }
 
-export function makeComment(over: Partial<FakeLinearComment> = {}): FakeLinearComment {
+function makeComment(over: Partial<FakeLinearComment> = {}): FakeLinearComment {
   return {
     body: 'Fold the credential migration into P0.',
     createdAt: '2026-08-22T10:00:00.000Z',

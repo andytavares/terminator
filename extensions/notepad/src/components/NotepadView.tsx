@@ -1,11 +1,10 @@
 import './notepad.css'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Button } from '@terminator/extension-ui'
-import { useNotesStore } from '../stores/notes.store'
+import { loadLibrary, useNotesStore } from '../stores/notes.store'
 import { useEditorStore } from '../stores/editor.store'
 import { useCommentsStore } from '../stores/comments.store'
 import { NoteList } from './NoteList'
-import { loadLists } from './noteListModel'
 import { NoteOutline } from './NoteOutline'
 import { EmptyState } from './EmptyState'
 import { DiagramView } from './DiagramView'
@@ -15,7 +14,6 @@ import { NoteEditor, applyExternalDoc, scrollToPosition } from '../editor/NoteEd
 import { ORIGIN_ID, onForeignNoteChange } from '../editor/noteSync'
 import {
   AUTOSAVE_DELAY_MS,
-  deriveNoteTitle,
   reanchorAfterSave,
   reanchorComments,
   schedulePersist,
@@ -33,6 +31,7 @@ import {
 } from './noteSurface'
 import type { EditorView } from '@codemirror/view'
 import type { Comment, NoteListItem } from '../db/types'
+import { noteTitle } from '../db/note-title'
 
 type TimerRef = React.MutableRefObject<ReturnType<typeof setTimeout> | null>
 
@@ -157,7 +156,9 @@ function useNotepadShortcuts(toggles: PanelToggles): void {
 function shortcutAction(e: KeyboardEvent): 'comments' | 'search' | null {
   const mod = e.metaKey || e.ctrlKey
   if (mod && e.altKey && e.code === 'KeyM') return 'comments'
-  if (mod && e.shiftKey && e.key === 'f') return 'search'
+  // With Shift held, Control reports the capital letter
+  // (https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/key).
+  if (mod && e.shiftKey && e.key.toLowerCase() === 'f') return 'search'
   return null
 }
 
@@ -169,7 +170,7 @@ function shortcutAction(e: KeyboardEvent): 'comments' | 'search' | null {
  */
 function useListsAndSelectionPush(): void {
   useEffect(() => {
-    loadLists().catch((err) => console.error('[notepad] Failed to load list', err))
+    void loadLibrary()
   }, [])
   useEffect(() => {
     return window.electronAPI.extensionBridge.on(
@@ -340,7 +341,7 @@ function flushUnsavedNote(noteId: string, autosaveTimerRef: TimerRef): void {
   window.electronAPI.extensionBridge
     .invoke('terminator.notepad:notes.autosave', {
       id: noteId,
-      title: deriveNoteTitle(bodyDraft),
+      title: noteTitle(bodyDraft),
       body: bodyDraft,
       tags: n?.tags ?? [],
       originId: ORIGIN_ID,
@@ -393,19 +394,17 @@ async function autosaveNote(noteId: string, body: string): Promise<void> {
   const editor = useEditorStore.getState()
   editor.markSaving()
   const note = useNotesStore.getState().notes.find((n) => n.id === noteId)
-  const title = deriveNoteTitle(body)
+  const derivedTitle = noteTitle(body)
   try {
-    await window.electronAPI.extensionBridge.invoke('terminator.notepad:notes.autosave', {
-      id: noteId,
-      title,
-      body,
-      tags: note?.tags ?? [],
-      originId: ORIGIN_ID,
-    })
+    const saved = await window.electronAPI.extensionBridge.invoke(
+      'terminator.notepad:notes.autosave',
+      { id: noteId, title: derivedTitle, body, tags: note?.tags ?? [], originId: ORIGIN_ID }
+    )
     editor.markSaved()
     const notesStore = useNotesStore.getState()
     notesStore.patchNote(noteId, {
-      title,
+      // A title set by hand is kept by the save, so the stored one is shown.
+      title: (saved as { data?: { title?: string } }).data?.title ?? derivedTitle,
       updatedAt: new Date().toISOString(),
       bodyPreview: body.slice(0, 120),
     })

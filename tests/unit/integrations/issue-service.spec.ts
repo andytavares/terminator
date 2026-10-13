@@ -13,6 +13,7 @@ function summary(tracker: TrackerId, key: string): IssueSummary {
     url: `https://example/${key}`,
     state: { name: 'In Progress', type: 'started' },
     assignee: null,
+    branchName: null,
   }
 }
 

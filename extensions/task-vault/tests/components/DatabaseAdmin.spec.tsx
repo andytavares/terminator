@@ -60,6 +60,7 @@ function typeSql(sql: string) {
 describe('DatabaseAdmin tables', tablesTests)
 describe('DatabaseAdmin queries', queryTests)
 describe('DatabaseAdmin confirmations', confirmTests)
+describe('DatabaseAdmin reloading the vault', reloadTests)
 
 function tablesTests() {
   it('shows table counts, browses a table, and refreshes', async () => {
@@ -147,5 +148,30 @@ function confirmTests() {
     await shows(/^2 rows/)
     fireEvent.click(screen.getAllByRole('button', { name: 'Delete this row' })[1])
     expect(screen.getByText('DELETE FROM tasks WHERE id = 2')).toBeTruthy()
+  })
+}
+
+/** Answers the way task-vault:admin:run-query does: rows for a read, rows: [] and a count for a write. */
+function answerQueries(result: { rows: unknown[]; changes: number }): void {
+  bridge.responses['task-vault:admin:run-query'] = result
+}
+
+function reloadTests() {
+  it('tells the vault to reload after a query that changed rows', async () => {
+    answerQueries({ rows: [], changes: 1 })
+    const onWrite = renderAdmin()
+    typeSql("UPDATE tasks SET text = 'x'")
+    fireEvent.click(screen.getByTitle('Run (⌘↵)'))
+    await shows(/^1 row affected/)
+    expect(onWrite).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not reload after a read', async () => {
+    answerQueries({ rows: [{ text: 'Water the plants' }], changes: 0 })
+    const onWrite = renderAdmin()
+    typeSql('SELECT text FROM tasks')
+    fireEvent.click(screen.getByTitle('Run (⌘↵)'))
+    expect(await screen.findByText('Water the plants')).toBeTruthy()
+    expect(onWrite).not.toHaveBeenCalled()
   })
 }

@@ -11,7 +11,7 @@ export interface GithubAccess {
   getToken: () => string
   /**
    * Where gh runs when it needs no checkout (`GH_REPO`, `gh api user`):
-   * `api.paths.userData`, a directory the core lets gh run in (ADR 102).
+   * this extension's own `api.paths.globalStorage`, a shell root (ADR 103).
    */
   noCheckoutCwd: string
 }

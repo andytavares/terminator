@@ -60,20 +60,43 @@ interface DiffCodeViewProps {
   lang?: string
 }
 
+/** One line of a conflict side: its number, its +/- and its highlighted code. */
+function CodeLine({
+  cls,
+  num,
+  prefix,
+  html,
+}: {
+  cls: string
+  num: string
+  prefix: string
+  html: string
+}): JSX.Element {
+  return (
+    <div className={`conflict-line ${cls}`}>
+      <span className="conflict-line__num">{num}</span>
+      <span className="conflict-line__prefix">{prefix}</span>
+      <span
+        className="conflict-line__text hljs"
+        dangerouslySetInnerHTML={{ __html: html || ' ' }}
+      />
+    </div>
+  )
+}
+
 function DiffCodeView({ contextBefore, diffLines, contextAfter, side, lang }: DiffCodeViewProps) {
   let lineNum = 1
   const rows: React.ReactNode[] = []
 
   contextBefore.forEach((line, idx) => {
     rows.push(
-      <div key={`b${idx}`} className="conflict-line conflict-line--context">
-        <span className="conflict-line__num">{lineNum++}</span>
-        <span className="conflict-line__prefix"> </span>
-        <span
-          className="conflict-line__text hljs"
-          dangerouslySetInnerHTML={{ __html: highlightLine(line, lang) || ' ' }}
-        />
-      </div>
+      <CodeLine
+        key={`b${idx}`}
+        cls="conflict-line--context"
+        num={String(lineNum++)}
+        prefix=" "
+        html={highlightLine(line, lang)}
+      />
     )
   })
 
@@ -88,27 +111,25 @@ function DiffCodeView({ contextBefore, diffLines, contextAfter, side, lang }: Di
     const prefix = type === 'added' ? '+' : type === 'removed' ? '-' : ' '
     const num = type === 'removed' ? '' : String(lineNum++)
     rows.push(
-      <div key={`d${idx}`} className={`conflict-line ${cls}`}>
-        <span className="conflict-line__num">{num}</span>
-        <span className="conflict-line__prefix">{prefix}</span>
-        <span
-          className="conflict-line__text hljs"
-          dangerouslySetInnerHTML={{ __html: highlightLine(line, lang) || ' ' }}
-        />
-      </div>
+      <CodeLine
+        key={`d${idx}`}
+        cls={cls}
+        num={num}
+        prefix={prefix}
+        html={highlightLine(line, lang)}
+      />
     )
   })
 
   contextAfter.forEach((line, idx) => {
     rows.push(
-      <div key={`a${idx}`} className="conflict-line conflict-line--context">
-        <span className="conflict-line__num">{lineNum++}</span>
-        <span className="conflict-line__prefix"> </span>
-        <span
-          className="conflict-line__text hljs"
-          dangerouslySetInnerHTML={{ __html: highlightLine(line, lang) || ' ' }}
-        />
-      </div>
+      <CodeLine
+        key={`a${idx}`}
+        cls="conflict-line--context"
+        num={String(lineNum++)}
+        prefix=" "
+        html={highlightLine(line, lang)}
+      />
     )
   })
 

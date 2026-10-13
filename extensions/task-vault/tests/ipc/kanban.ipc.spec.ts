@@ -129,6 +129,12 @@ function configTests() {
     expect(await invoke('task-vault:kanban:get-config')).toEqual(config)
   })
 
+  it("keeps a lane's calendar dot colour", async () => {
+    const coloured = { ...config, lanes: [{ ...config.lanes[0], dotColor: '#ff8800' }] }
+    await invoke('task-vault:kanban:save-config', coloured)
+    expect(await invoke('task-vault:kanban:get-config')).toEqual(coloured)
+  })
+
   it('replaces the stored config on a second save instead of adding a row', async () => {
     await invoke('task-vault:kanban:save-config', config)
     await invoke('task-vault:kanban:save-config', { ...config, swimlaneGrouping: 'area' })

@@ -9,17 +9,9 @@ import { useCommentsStore } from '../stores/comments.store'
 import type { Comment } from '../db/types'
 
 export const AUTOSAVE_DELAY_MS = 800
-export const ANCHOR_DEBOUNCE_MS = 2000
+const ANCHOR_DEBOUNCE_MS = 2000
 const CARD_HEIGHT_EST = 110
 const CARD_GAP = 8
-
-/** A note's title: its first heading, else its first non-blank line, else a placeholder. */
-export function deriveNoteTitle(body: string): string {
-  const headingMatch = /^#{1,6}\s+(.+)/m.exec(body)
-  if (headingMatch) return headingMatch[1].trim()
-  const firstLine = body.split('\n').find((l) => l.trim().length > 0)
-  return firstLine?.trim().slice(0, 120) ?? 'Untitled note'
-}
 
 interface AnchorUpdate {
   id: string
@@ -65,12 +57,12 @@ function applyReanchoring(comments: Comment[], updates: AnchorUpdate[], orphanId
   })
 }
 
-export function hasReanchorChanges(r: Reanchoring): boolean {
+function hasReanchorChanges(r: Reanchoring): boolean {
   return r.anchorUpdates.length > 0 || r.orphanIds.length > 0
 }
 
 /** Writes moved anchors and orphaned comments back; a failure is logged, not thrown. */
-export async function persistReanchoring(r: Reanchoring): Promise<void> {
+async function persistReanchoring(r: Reanchoring): Promise<void> {
   const bridge = window.electronAPI.extensionBridge
   await Promise.all([
     ...r.anchorUpdates.map((u) =>

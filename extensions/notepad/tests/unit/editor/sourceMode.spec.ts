@@ -4,11 +4,12 @@ import { markdown } from '@codemirror/lang-markdown'
 import { GFM } from '@lezer/markdown'
 import type { Decoration } from '@codemirror/view'
 import { buildDecorations, livePreviewPlugin } from '../../../src/editor/livePreview'
+import { parsedState } from '../support/parsed-state'
 
 const TABLE = ['| Name | Count |', '| --- | --- |', '| apples | 3 |'].join('\n')
 
 function makeState(doc: string, cursor: number, extensions: unknown[] = []) {
-  return EditorState.create({
+  return parsedState({
     doc,
     selection: { anchor: cursor },
     extensions: [markdown({ extensions: [GFM] }), ...(extensions as never[])],

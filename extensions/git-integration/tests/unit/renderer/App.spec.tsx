@@ -1,6 +1,10 @@
 import React from 'react'
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, act } from '@testing-library/react'
+// Imported with the file, not inside each test: App reads the URL when it
+// renders, so nothing needs a fresh module, and the first test no longer
+// loads the review dashboard's module graph inside its own five seconds.
+import { App } from '../../../src/renderer/App'
 
 vi.mock('../../../src/components/GitFullView', () => ({
   GitFullView: ({ repoRoot }: { repoRoot: string | null }) => (
@@ -35,49 +39,39 @@ beforeEach(() => {
   })
 })
 
-afterEach(() => {
-  vi.resetModules()
-})
-
 describe('git-integration renderer App', () => {
-  it('passes repoRoot from URL to GitFullView', async () => {
+  it('passes repoRoot from URL to GitFullView', () => {
     setSearch({ view: 'project', repoRoot: '/my/repo' })
-    const { App } = await import('../../../src/renderer/App')
     render(<App />)
     expect(screen.getByTestId('git-full-view').getAttribute('data-repo-root')).toBe('/my/repo')
   })
 
-  it('renders GitFullView for ?view=project', async () => {
+  it('renders GitFullView for ?view=project', () => {
     setSearch({ view: 'project', repoRoot: '/my/repo' })
-    const { App } = await import('../../../src/renderer/App')
     render(<App />)
     expect(screen.getByTestId('git-full-view')).toBeDefined()
   })
 
-  it('renders PrReviewTab for ?view=code-reviews', async () => {
+  it('renders PrReviewTab for ?view=code-reviews', () => {
     setSearch({ view: 'code-reviews', repoRoot: '' })
-    const { App } = await import('../../../src/renderer/App')
     render(<App />)
     expect(screen.getByTestId('pr-review-tab')).toBeDefined()
   })
 
-  it('renders PrReviewTab for ?view=pr-review', async () => {
+  it('renders PrReviewTab for ?view=pr-review', () => {
     setSearch({ view: 'pr-review', repoRoot: '/my/repo' })
-    const { App } = await import('../../../src/renderer/App')
     render(<App />)
     expect(screen.getByTestId('pr-review-tab')).toBeDefined()
   })
 
-  it('subscribes to workspace:changed for live repoRoot updates', async () => {
+  it('subscribes to workspace:changed for live repoRoot updates', () => {
     setSearch({ view: 'project', repoRoot: '/my/repo' })
-    const { App } = await import('../../../src/renderer/App')
     render(<App />)
     expect(mockBridgeOn).toHaveBeenCalledWith('workspace:changed', expect.any(Function))
   })
 
-  it('updates repoRoot when workspace:changed fires', async () => {
+  it('updates repoRoot when workspace:changed fires', () => {
     setSearch({ view: 'project', repoRoot: '/initial/repo' })
-    const { App } = await import('../../../src/renderer/App')
     render(<App />)
     const handler = mockBridgeOn.mock.calls.find(([ch]) => ch === 'workspace:changed')?.[1]
     act(() => {

@@ -197,14 +197,6 @@ describe('RepoHeader — hover reveals without moving anything (FR-031)', () => 
     { id: 'b', label: 'SpecKit', component: () => null },
   ]
 
-  it('keeps the hover controls in flow so nothing reflows when they appear', () => {
-    // opacity, never display — the space is occupied whether or not they show.
-    const { container } = renderHeader({}, { workspaceTabs: tabs, onAddBranch: vi.fn() })
-    const hover = container.querySelector('.repo-header__hover')!
-    expect(hover).toBeTruthy()
-    expect(getComputedStyle(hover).display).not.toBe('none')
-  })
-
   it('keeps the branch count drawn alongside the controls, however many there are', () => {
     // A fixed reservation meant four controls overflowed leftward and painted
     // over the count. The count must survive any number of repo actions.

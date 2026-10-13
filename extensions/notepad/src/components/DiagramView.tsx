@@ -406,6 +406,20 @@ export function DiagramView({ diagramId }: DiagramViewProps): React.JSX.Element 
   )
 }
 
+/** Saves a renamed diagram, then shows the new title in the note list at once. */
+async function saveDiagramTitle(diagramId: string, title: string, tags: string[]): Promise<void> {
+  try {
+    await window.electronAPI.extensionBridge.invoke('terminator.notepad:diagrams.autosave', {
+      id: diagramId,
+      title,
+      tags,
+    })
+    useNotesStore.getState().patchDiagram(diagramId, { title, updatedAt: new Date().toISOString() })
+  } catch (err) {
+    console.error('[notepad] DiagramView: title save failed', err)
+  }
+}
+
 function DiagramTitle(props: { diagramId: string; doc: DiagramDocument }): React.JSX.Element {
   const { diagramId, doc } = props
   const { title, tags } = doc
@@ -415,9 +429,7 @@ function DiagramTitle(props: { diagramId: string; doc: DiagramDocument }): React
     const trimmed = draft.trim() || 'Untitled diagram'
     doc.setTitle(trimmed)
     setDraftTitle(null)
-    await window.electronAPI.extensionBridge
-      .invoke('terminator.notepad:diagrams.autosave', { id: diagramId, title: trimmed, tags })
-      .catch((err) => console.error('[notepad] DiagramView: title save failed', err))
+    await saveDiagramTitle(diagramId, trimmed, tags)
   }
 
   return (

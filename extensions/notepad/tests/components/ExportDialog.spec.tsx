@@ -5,8 +5,12 @@ import { useNotesStore } from '../../src/stores/notes.store'
 import type { NoteListItem } from '../../src/db/types'
 
 const mockInvoke = vi.fn()
+const mockSettings = vi.fn().mockResolvedValue({ values: {} })
 Object.defineProperty(window, 'electronAPI', {
-  value: { extensionBridge: { invoke: mockInvoke } },
+  value: {
+    extensionBridge: { invoke: mockInvoke },
+    extension: { getSettingsValues: mockSettings },
+  },
   writable: true,
   configurable: true,
 })
@@ -24,6 +28,7 @@ const dummyNote: NoteListItem = {
 }
 
 describe('ExportDialog', exportDialogTests)
+describe('ExportDialog settings', exportDialogSettingsTests)
 
 function exportDialogTests() {
   beforeEach(() => {
@@ -160,5 +165,49 @@ function exportDialogRunningTests() {
         expect.objectContaining({ folder: '~/Documents/Terminator Notes', scope: 'all' })
       )
     })
+  })
+}
+
+function exportDialogSettingsTests() {
+  beforeEach(() => {
+    mockInvoke.mockReset().mockResolvedValue({ data: { exported: 1, diagrams: 0 } })
+    useNotesStore.setState({ notes: [dummyNote], diagrams: [] })
+  })
+  describe('chosen in Settings', exportDialogSettingsChosenTests)
+  describe('unusable in Settings', exportDialogSettingsUnusableTests)
+}
+
+function exportDialogSettingsChosenTests() {
+  it('starts on the comment format and folder chosen in Settings', async () => {
+    mockSettings.mockResolvedValueOnce({
+      values: {
+        'terminator.notepad.commentExportFormat': 'inline',
+        'terminator.notepad.exportPath': '/tmp/my-notes',
+      },
+    })
+    render(<ExportDialog onClose={vi.fn()} />)
+
+    await waitFor(() => expect(screen.getByDisplayValue('/tmp/my-notes')).toBeTruthy())
+    expect(screen.getByRole('button', { name: 'Inline HTML' }).className).toContain('--active')
+    fireEvent.click(screen.getByRole('button', { name: 'Export 1 note' }))
+    await waitFor(() =>
+      expect(mockInvoke).toHaveBeenCalledWith(
+        'terminator.notepad:export.run',
+        expect.objectContaining({ folder: '/tmp/my-notes', commentFormat: 'inline' })
+      )
+    )
+  })
+}
+
+function exportDialogSettingsUnusableTests() {
+  it('keeps its own defaults when Settings holds nothing it can use', async () => {
+    mockSettings.mockResolvedValueOnce({
+      values: { 'terminator.notepad.commentExportFormat': 'carrier pigeon' },
+    })
+    render(<ExportDialog onClose={vi.fn()} />)
+
+    await waitFor(() => expect(mockSettings).toHaveBeenCalled())
+    expect(screen.getByRole('button', { name: 'Sidecar JSON' }).className).toContain('--active')
+    expect(screen.getByDisplayValue('~/Documents/Terminator Notes')).toBeTruthy()
   })
 }

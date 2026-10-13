@@ -1,5 +1,11 @@
 # IPC Channels: SpecKit Pilot Revamp
 
+> **Superseded. Kept as history.** This contract records what was decided when the feature was
+> specified, and is not edited. The code no longer has the `speckit:*` channels. Do not build against it. The
+> current contract lives in:
+>
+> - `extensions/foundry/src/ipc/`: the SpecKit Pilot became Foundry and its `speckit:*` channels became `foundry:*` ([ADR 040](../../../docs/adr/040-the-work-order-is-the-contract.md), `CHANGELOG.md`)
+
 **Date**: 2026-06-27
 **Spec**: [spec.md](../spec.md)
 

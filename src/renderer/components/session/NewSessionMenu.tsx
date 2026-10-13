@@ -1,7 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React from 'react'
 import { Plus } from 'lucide-react'
-import { closeAllContextMenus } from '../ContextMenu'
-import { useMenuPlacement } from '../use-menu-placement'
+import { useMenu } from '../sidebar/menu'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import '../sidebar/SidebarMenu.css'
 
@@ -18,23 +17,9 @@ interface Props {
  * and the scratch terminal that belongs to none of them.
  */
 export function NewSessionMenu({ onStartInBranch, onStartScratch }: Props): JSX.Element {
-  const [open, setOpen] = useState(false)
-  const buttonRef = useRef<HTMLButtonElement>(null)
-  const panelRef = useRef<HTMLDivElement>(null)
-  const placement = useMenuPlacement(open, buttonRef, panelRef)
+  const { open, close, toggle, buttonRef, panelRef, placement } = useMenu()
   const workspaces = useWorkspaceStore((s) => s.workspaces)
   const projectsByWorkspaceId = useWorkspaceStore((s) => s.projectsByWorkspaceId)
-
-  useEffect(() => {
-    if (!open) return
-    const close = (): void => setOpen(false)
-    window.addEventListener('click', close)
-    window.addEventListener('close-context-menus', close)
-    return () => {
-      window.removeEventListener('click', close)
-      window.removeEventListener('close-context-menus', close)
-    }
-  }, [open])
 
   const repos = workspaces
     .map((w) => ({ repo: w, branches: projectsByWorkspaceId.get(w.id) ?? [] }))
@@ -42,7 +27,7 @@ export function NewSessionMenu({ onStartInBranch, onStartScratch }: Props): JSX.
 
   function choose(run: () => void): void {
     run()
-    setOpen(false)
+    close()
   }
 
   return (
@@ -53,10 +38,7 @@ export function NewSessionMenu({ onStartInBranch, onStartScratch }: Props): JSX.
         className={`sidebar-menu__button${open ? ' sidebar-menu__button--on' : ''}`}
         aria-expanded={open}
         aria-label="New terminal"
-        onClick={() => {
-          closeAllContextMenus()
-          setOpen((v) => !v)
-        }}
+        onClick={toggle}
       >
         <Plus aria-hidden="true" />
         <span className="sidebar-menu__label">New terminal</span>

@@ -7,11 +7,8 @@ import {
   type ChannelSpec,
   type ExtensionAPI,
 } from '@terminator/extension-sdk'
-import {
-  createRemoteServer,
-  PortInUseError,
-  type RemoteServerHandle,
-} from './server/remote-server.js'
+import type { RemoteServerHandle } from './server/remote-server.js'
+import { PortInUseError } from './server/port-in-use-error.js'
 import { NgrokManager, generateCaddyfile } from './server/ngrok-manager.js'
 import { CredentialStore } from './server/credential-store.js'
 
@@ -139,6 +136,8 @@ async function startServer(context: RemoteControlContext): Promise<void> {
   if (!context.credentials.hasPassword()) return refuseWithoutPassword(api)
   const port = getPort(api)
   try {
+    // fastify and the routes cost the extension host 25 MB: loaded when the server starts.
+    const { createRemoteServer } = await import('./server/remote-server.js')
     remoteServer = await createRemoteServer({
       port,
       appPath: api.paths.app,
@@ -193,6 +192,14 @@ async function openTunnel(api: ExtensionAPI, port: number): Promise<void> {
     broadcastListening(api, port, { publicUrl: null, ngrokInstalled: false })
     return
   }
+  await connectTunnel(api, port)
+}
+
+/**
+ * Opens the ngrok tunnel to `port` and broadcasts the public address, or why
+ * there is none. A tunnel that later drops broadcasts the local address alone.
+ */
+async function connectTunnel(api: ExtensionAPI, port: number): Promise<void> {
   const authToken = getNgrokAuthToken(api)
   try {
     const publicUrl = await startTunnel(api, port, authToken)
@@ -217,21 +224,14 @@ async function startTunnel(
   ngrokManager.setOnCrash(() => {
     currentPublicUrl = null
     api.window.broadcast('remote:tunnel-disconnected', {})
-    broadcastListening(api, port, { publicUrl: null })
+    broadcastListening(api, port, { publicUrl: null, ngrokInstalled: true })
   })
   return publicUrl
 }
 
 async function reconnectTunnel(api: ExtensionAPI): Promise<void> {
   ngrokManager.stop()
-  const port = getPort(api)
-  try {
-    const publicUrl = await startTunnel(api, port, getNgrokAuthToken(api))
-    broadcastListening(api, port, { publicUrl })
-  } catch (err) {
-    currentPublicUrl = null
-    broadcastListening(api, port, { publicUrl: null, ngrokError: String(err) })
-  }
+  await connectTunnel(api, getPort(api))
 }
 
 async function stopServer(api: ExtensionAPI): Promise<void> {

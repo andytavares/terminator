@@ -38,6 +38,9 @@ vi.mock('electron-store', async () =>
 
 import { globalRegistry } from '../../../src/main/extensions/api'
 import { registerExtensionHandlers } from '../../../src/main/ipc/extension.ipc'
+import type { ExtensionHost } from '../../../src/main/extensions/extension-host'
+import type { ExtensionViewHost } from '../../../src/main/extensions/extension-view-host'
+import { partialFake } from '../../support/fakes'
 
 const mockExtensionHost = {
   listExtensions: vi.fn(),
@@ -47,6 +50,7 @@ const mockExtensionHost = {
   reload: vi.fn(),
   whenActivated: vi.fn().mockResolvedValue(undefined),
 }
+const extensionHost = partialFake<ExtensionHost>(mockExtensionHost)
 
 function captureHandle(channel: string): (event: unknown, payload?: unknown) => unknown {
   const calls = vi.mocked(ipcMain.handle).mock.calls
@@ -59,11 +63,7 @@ describe('extension IPC handlers', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     ;(globalRegistry.settingsSections as Map<string, unknown>).clear()
-    registerExtensionHandlers(
-      mockExtensionHost as Parameters<typeof registerExtensionHandlers>[0],
-      vi.fn(),
-      () => null
-    )
+    registerExtensionHandlers(extensionHost, vi.fn(), () => null)
   })
 
   describe('extension:list', () => {
@@ -144,11 +144,7 @@ describe('extension IPC handlers', () => {
     it('calls broadcast with extension:renderer-reload on successful reload', async () => {
       const broadcast = vi.fn()
       vi.clearAllMocks()
-      registerExtensionHandlers(
-        mockExtensionHost as Parameters<typeof registerExtensionHandlers>[0],
-        broadcast,
-        () => null
-      )
+      registerExtensionHandlers(extensionHost, broadcast, () => null)
       const ext = { id: 'com.test', status: 'enabled' }
       mockExtensionHost.reload.mockResolvedValue({ extension: ext })
       const handler = captureHandle('extension:reload')
@@ -159,11 +155,7 @@ describe('extension IPC handlers', () => {
     it('does not call broadcast when reload fails', async () => {
       const broadcast = vi.fn()
       vi.clearAllMocks()
-      registerExtensionHandlers(
-        mockExtensionHost as Parameters<typeof registerExtensionHandlers>[0],
-        broadcast,
-        () => null
-      )
+      registerExtensionHandlers(extensionHost, broadcast, () => null)
       mockExtensionHost.reload.mockResolvedValue({ error: 'NOT_FOUND' })
       const handler = captureHandle('extension:reload')
       await handler({}, { id: 'missing' })
@@ -175,10 +167,8 @@ describe('extension IPC handlers', () => {
     it("places the extension's view where the renderer's placeholder is", async () => {
       const updatePanelBounds = vi.fn().mockResolvedValue(undefined)
       vi.clearAllMocks()
-      registerExtensionHandlers(
-        mockExtensionHost as Parameters<typeof registerExtensionHandlers>[0],
-        vi.fn(),
-        () => ({ updatePanelBounds }) as never
+      registerExtensionHandlers(extensionHost, vi.fn(), () =>
+        partialFake<ExtensionViewHost>({ updatePanelBounds })
       )
       const ext = { id: 'com.test', name: 'Test' }
       mockExtensionHost.listExtensions.mockReturnValue([ext])
@@ -199,10 +189,8 @@ describe('extension IPC handlers', () => {
       mockExtensionHost.whenActivated.mockReturnValueOnce(
         new Promise<void>((resolve) => (finishActivation = resolve))
       )
-      registerExtensionHandlers(
-        mockExtensionHost as Parameters<typeof registerExtensionHandlers>[0],
-        vi.fn(),
-        () => ({ updatePanelBounds }) as never
+      registerExtensionHandlers(extensionHost, vi.fn(), () =>
+        partialFake<ExtensionViewHost>({ updatePanelBounds })
       )
       const bounds = { x: 0, y: 0, width: 1, height: 1 }
       const pending = captureHandle('extension:update-panel-bounds')(

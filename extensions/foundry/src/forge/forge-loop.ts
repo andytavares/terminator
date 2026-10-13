@@ -52,7 +52,11 @@ export interface ForgeLoopDeps {
 /** The Forge's turns, reviews and hand-offs, entered from a channel or a decision. */
 export interface ForgeLoop {
   readonly convergeWithFollowUps: (ask: ArchitectAsk) => Promise<ConvergeStarted>
-  readonly convergeMaybeScouted: (order: WorkOrder, message: string) => Promise<ConvergeStarted>
+  readonly convergeMaybeScouted: (
+    order: WorkOrder,
+    message: string,
+    recordStart?: RecordStart
+  ) => Promise<ConvergeStarted>
   readonly onReleased: (order: WorkOrder) => void
 }
 
@@ -63,7 +67,7 @@ interface Forge extends ForgeLoopDeps {
 }
 
 /** One architect turn the loop asked for, and where in the loop it sits. */
-export interface ArchitectAsk {
+interface ArchitectAsk {
   readonly order: WorkOrder
   readonly message: string
   readonly autoTurns: number
@@ -73,7 +77,12 @@ export interface ArchitectAsk {
   // Undefined for every operator- or auto-turn-started call, which is a
   // fresh chain: the next review the redraft earns starts at round 1.
   readonly loopRound?: number
+  /** Writes the turn's start to the ledger; see `convergeWithFollowUps`. */
+  readonly recordStart?: RecordStart
 }
+
+/** Writes the ledger line that says an architect turn started, or could not. */
+type RecordStart = (started: ConvergeStarted) => Promise<void>
 
 /** One red-team round: the order it attacks, which round, and what changed since the last. */
 interface Review {
@@ -107,7 +116,8 @@ export function createForgeLoop(
   const forge: Forge = { api, dataRoot, deciding, channels }
   return {
     convergeWithFollowUps: (ask) => convergeWithFollowUps(forge, ask),
-    convergeMaybeScouted: (order, message) => convergeMaybeScouted(forge, order, message),
+    convergeMaybeScouted: (order, message, recordStart) =>
+      convergeMaybeScouted(forge, order, message, recordStart),
     onReleased: (order) => onReleased(forge, order),
   }
 }
@@ -129,16 +139,33 @@ const plural = (count: number, word: string): string => `${word}${count === 1 ? 
  * click "Ask for the gap to be closed" (spec 062). Only unanswered questions,
  * or a plan still failing when the turns run out, reach the operator.
  */
-function convergeWithFollowUps(forge: Forge, ask: ArchitectAsk): Promise<ConvergeStarted> {
+async function convergeWithFollowUps(forge: Forge, ask: ArchitectAsk): Promise<ConvergeStarted> {
   const { order } = ask
-  return convergeOnce(forge.api, {
-    root: forge.dataRoot(),
-    order,
-    message: ask.message,
-    loop: ask.loopRound !== undefined,
-    onFinished: (outcome) =>
-      forge.deciding.during(order.id, () => afterArchitectTurn(forge, ask, outcome)),
+  // The turn's end waits for its start to be on the ledger. A turn can end
+  // before the caller has written that it started, and what happens next is
+  // read from the ledger: a start written after the redraft reads as an
+  // architect still running, and a follow-up's start written late is missing
+  // from the count of follow-ups.
+  let startWritten = (): void => undefined
+  const written = new Promise<void>((resolve) => {
+    startWritten = resolve
   })
+  try {
+    const started = await convergeOnce(forge.api, {
+      root: forge.dataRoot(),
+      order,
+      message: ask.message,
+      loop: ask.loopRound !== undefined,
+      onFinished: async (outcome) => {
+        await written
+        await forge.deciding.during(order.id, () => afterArchitectTurn(forge, ask, outcome))
+      },
+    })
+    await ask.recordStart?.(started)
+    return started
+  } finally {
+    startWritten()
+  }
 }
 
 async function continueAutomatically(
@@ -149,18 +176,19 @@ async function continueAutomatically(
   const { order } = ask
   const root = forge.dataRoot()
   await endPreviousTurn(order.id)
-  const started = await convergeWithFollowUps(forge, {
+  await convergeWithFollowUps(forge, {
     order: next.from,
     message: next.message,
     autoTurns: ask.autoTurns + 1,
     loopRound: ask.loopRound,
-  })
-  await recordLoopEntry(root, {
-    orderId: order.id,
-    actor: 'role:architect',
-    action: started.ok ? 'converge.followed_up' : 'converge.refused',
-    subject: started.ok ? started.sessionId : order.id,
-    reason: started.ok ? next.why : started.reason,
+    recordStart: (started) =>
+      recordLoopEntry(root, {
+        orderId: order.id,
+        actor: 'role:architect',
+        action: started.ok ? 'converge.followed_up' : 'converge.refused',
+        subject: started.ok ? started.sessionId : order.id,
+        reason: started.ok ? next.why : started.reason,
+      }),
   })
 }
 
@@ -443,18 +471,19 @@ async function reviewExhausted(forge: Forge, { root, order: updated }: ReviewAt)
 // architect was in fact fixing the findings.
 async function startFixTurn(forge: Forge, review: ReviewAt, message: string): Promise<void> {
   const { root, order: updated, round } = review
-  const started = await convergeWithFollowUps(forge, {
+  await convergeWithFollowUps(forge, {
     order: updated,
     message,
     autoTurns: 0,
     loopRound: round + 1,
-  })
-  await recordLoopEntry(root, {
-    orderId: updated.id,
-    actor: 'role:architect',
-    action: started.ok ? 'converge.started' : 'converge.refused',
-    subject: started.ok ? started.sessionId : updated.id,
-    reason: started.ok ? `red team round ${round} fix` : started.reason,
+    recordStart: (started) =>
+      recordLoopEntry(root, {
+        orderId: updated.id,
+        actor: 'role:architect',
+        action: started.ok ? 'converge.started' : 'converge.refused',
+        subject: started.ok ? started.sessionId : updated.id,
+        reason: started.ok ? `red team round ${round} fix` : started.reason,
+      }),
   })
 }
 
@@ -571,21 +600,22 @@ async function convergeAfterRelease(
   next: Extract<ReleaseNext, { kind: 'fix' | 'follow-up' }>
 ): Promise<void> {
   const fix = next.kind === 'fix' ? next : null
-  const started = await convergeWithFollowUps(forge, {
+  const startedAction = fix !== null ? 'converge.started' : 'converge.followed_up'
+  const startedReason =
+    fix !== null ? `red team round ${fix.round} fix` : 'closing the failing checks on its own'
+  await convergeWithFollowUps(forge, {
     order,
     message: next.message,
     autoTurns: fix !== null ? 0 : 1,
     loopRound: fix !== null ? fix.round + 1 : undefined,
-  })
-  const startedAction = fix !== null ? 'converge.started' : 'converge.followed_up'
-  const startedReason =
-    fix !== null ? `red team round ${fix.round} fix` : 'closing the failing checks on its own'
-  await recordLoopEntry(root, {
-    orderId: order.id,
-    actor: 'role:architect',
-    action: started.ok ? startedAction : 'converge.refused',
-    subject: started.ok ? started.sessionId : order.id,
-    reason: started.ok ? startedReason : started.reason,
+    recordStart: (started) =>
+      recordLoopEntry(root, {
+        orderId: order.id,
+        actor: 'role:architect',
+        action: started.ok ? startedAction : 'converge.refused',
+        subject: started.ok ? started.sessionId : order.id,
+        reason: started.ok ? startedReason : started.reason,
+      }),
   })
 }
 
@@ -604,7 +634,8 @@ async function convergeAfterRelease(
 function convergeMaybeScouted(
   forge: Forge,
   order: WorkOrder,
-  message: string
+  message: string,
+  recordStart?: RecordStart
 ): Promise<ConvergeStarted> {
   const root = forge.dataRoot()
   return scoutedConverge(
@@ -615,6 +646,7 @@ function convergeMaybeScouted(
           order: architectOrder,
           message: architectMessage,
           autoTurns: 0,
+          recordStart,
         }),
     },
     order,

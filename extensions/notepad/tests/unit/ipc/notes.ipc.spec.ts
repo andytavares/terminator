@@ -221,6 +221,8 @@ function autosaveNoteTests() {
   describe('broadcasting', autosaveNoteBroadcastingTests)
   describe('broadcast content', autosaveNoteBroadcastContentTests)
   describe('missing notes and callbacks', autosaveNoteMissingNotesCallbacksTests)
+  describe('titles set by hand', autosaveNoteTitleSetByHandTests)
+  describe('derived titles', autosaveNoteDerivedTitleTests)
 }
 
 function autosaveNoteSavingTests() {
@@ -550,5 +552,47 @@ function inlineTagParsingAutosaveMergingTests() {
     const names = noteTags.map((r) => r.name)
     expect(names).toContain('explicit')
     expect(names).toContain('inline')
+  })
+}
+
+function autosaveNoteTitleSetByHandTests() {
+  it('keeps a title set by hand when later saves derive another', async () => {
+    const created = await createNote(db, { title: 'Groceries', body: 'milk' })
+    const id = (created as { data: { id: string } }).data.id
+    await autosaveNote(db, {
+      id,
+      title: 'Weekly shop',
+      body: 'milk',
+      tags: [],
+      titleSetByHand: true,
+    })
+    const broadcast = vi.fn()
+
+    const result = await autosaveNote(
+      db,
+      { id, title: 'milk and eggs', body: 'milk and eggs', tags: [] },
+      broadcast
+    )
+
+    expect(result).toMatchObject({ data: { title: 'Weekly shop' } })
+    const note = ((await getNote(db, { id })) as { data: { title: string; body: string } }).data
+    expect(note).toMatchObject({ title: 'Weekly shop', body: 'milk and eggs' })
+    expect(broadcast.mock.calls[0][1]).toMatchObject({ title: 'Weekly shop' })
+  })
+}
+
+function autosaveNoteDerivedTitleTests() {
+  it('keeps deriving the title of a note whose title was never set by hand', async () => {
+    const created = await createNote(db, { title: 'Groceries', body: 'milk' })
+    const id = (created as { data: { id: string } }).data.id
+
+    const result = await autosaveNote(db, {
+      id,
+      title: 'milk and eggs',
+      body: 'milk and eggs',
+      tags: [],
+    })
+
+    expect(result).toMatchObject({ data: { title: 'milk and eggs' } })
   })
 }

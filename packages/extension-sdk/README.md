@@ -1,72 +1,79 @@
 # @terminator/extension-sdk
 
 The Extension API every Terminator extension is written against, and the helpers they share.
-The core implements `types/api.d.ts`; the compiler checks it does (ADR 094).
+`types/api.d.ts` declares the API; the core implements it in `src/main/extensions/api.ts` and the
+compiler checks the two agree ([ADR 094](../../docs/adr/094-extensions-follow-the-vs-code-model.md)).
+The version is `4.0.0`; `CHANGELOG.md` lists each version's changes and how to migrate.
 
-Since 4.0.0 an extension's backend runs in the extension host, a separate process, and the API
-crosses a `MessagePort`: values the core holds are promises or snapshots it pushes, callbacks are
-called by id, and the backend cannot import `electron` (use `api.paths`, `api.dialog`,
-`api.window`). See `CHANGELOG.md` for the migration from 3.x and
-`docs/EXTENSION-DEVELOPMENT.md#where-your-backend-runs`.
+This README is a map of the package. How to write an extension (the manifest, the backend, the
+view, the build and every API namespace) is in the
+[Extension Development Guide](../../docs/EXTENSION-DEVELOPMENT.md).
+
+## What the package exports
 
 An extension imports only this package, `@terminator/extension-ui` and the npm packages in its
 own `package.json`. `npm run lint` rejects anything else, including core source and other
-extensions.
+extensions ([What an extension may import](../../docs/EXTENSION-DEVELOPMENT.md#what-an-extension-may-import)).
 
-| Entry                                      | What it holds                                                                                           |
-| ------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
-| `@terminator/extension-sdk`                | `ExtensionAPI`, `ExtensionDB`, the issue-tracker types, `defineChannel`, `dispatchChannel`, `noPayload` |
-| `@terminator/extension-sdk/renderer`       | `invoke<T>(channel, payload = {})`, `mountExtension(<App />)`                                           |
-| `@terminator/extension-sdk/node`           | `writeJsonAtomic(path, value)`                                                                          |
-| `@terminator/extension-sdk/types/renderer` | The `window.electronAPI` an extension view receives (loaded through `tsconfig`)                         |
+| Entry                                      | Source                | What it holds                                                                                                                                                       |
+| ------------------------------------------ | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@terminator/extension-sdk`                | `src/index.ts`        | The types in `types/api.d.ts`, `types/issues.d.ts`, `types/github.d.ts` and `types/extensions.d.ts`; `ChannelSpec`, `defineChannel`, `dispatchChannel`, `noPayload` |
+| `@terminator/extension-sdk/renderer`       | `src/renderer.tsx`    | `invoke<T>(channel, payload = {})` and `mountExtension(<App />)`, for an extension's view                                                                           |
+| `@terminator/extension-sdk/node`           | `src/node.ts`         | `writeJsonAtomic(path, value)`                                                                                                                                      |
+| `@terminator/extension-sdk/types/renderer` | `types/renderer.d.ts` | `ElectronAPI`, the `window.electronAPI` an extension view receives (`tsconfig.extension.json` loads it)                                                             |
 
-The main entry also declares `GithubAPI` (`api.github`, pull requests over gh), the shell
-option and result types (`ShellExecOptions`, `ShellExecResult`), and the built-in extensions'
-APIs (`TaskVaultAPI`, `BuiltInExtensionExports`).
+The declaration files:
 
-Source-only TypeScript, with `react`, `react-dom` and `zod` as peer dependencies. See
-`CHANGELOG.md`.
+| File                    | Declares                                                                                                                                            |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `types/api.d.ts`        | `ExtensionAPI`, the object passed to `activate`, and its types: `Disposable`, `ExtensionDB`, `PtyManagerAPI`, `ShellExecOptions`, `ShellExecResult` |
+| `types/github.d.ts`     | `GithubAPI` (`api.github`) and its request and pull-request types                                                                                   |
+| `types/issues.d.ts`     | The issue-tracker types behind `api.issues`, such as `TrackerId`, `Issue` and `IssueSummary`                                                        |
+| `types/extensions.d.ts` | The built-in extensions' APIs: `TaskVaultAPI` and `BuiltInExtensionExports`, which types `api.extensions.get`                                       |
+| `types/renderer.d.ts`   | `ElectronAPI`, the view's `window.electronAPI`                                                                                                      |
 
-## Using another extension's API
+Source-only TypeScript, with `react`, `react-dom` and `zod` as peer dependencies. It is a
+workspace package: an extension under `extensions/` declares it in its own `package.json` at the
+version in this package's `package.json` ([Dependencies](../../docs/EXTENSION-DEVELOPMENT.md#dependencies)).
 
-An extension's API is the value its `activate` returns. List the provider in your manifest and
-read it through the API; never import its source:
+## Where a backend runs
 
-```jsonc
-{ "id": "com.example.planner", "extensionDependencies": ["terminator.task-vault"] }
-```
+Since 4.0.0 every extension backend runs in the extension host, one Electron `utilityProcess`
+that `src/main/extensions/host/host-process.ts` starts and `src/main/extensions/host/entry.ts`
+runs. The API crosses a `MessagePort`: a value the core holds is a promise or a snapshot the core
+pushes, a callback is called by id, and `electron` cannot be imported (use `api.paths`,
+`api.dialog` and `api.window`). See
+[Where your backend runs](../../docs/EXTENSION-DEVELOPMENT.md#where-your-backend-runs).
 
-```typescript
-const vault = api.extensions.get('terminator.task-vault') // TaskVaultAPI
-```
+The manifest's `main` is the backend: a CommonJS file exporting `activate(api)` and optionally
+`deactivate()`. What `activate` returns is the extension's API for other extensions, which a
+consumer that lists the provider in `extensionDependencies` reads with `api.extensions.get(id)`
+([Another extension's API](../../docs/EXTENSION-DEVELOPMENT.md#another-extensions-api)).
 
-The host activates the provider first. A missing, failed, disabled or cyclic dependency fails
-your activation with a message naming it, and `get` throws for an id you did not declare.
+## A minimal extension
 
-## Installation
-
-```
-npm install --save-dev @terminator/extension-sdk
-```
-
-## Quick Start
-
-### Extension structure
+`npm run create-extension -- my-extension` writes `extensions/my-extension/` with a
+`manifest.json` and a plain-JavaScript backend, `extensions/my-extension/src/index.js`
+([Quick start](../../docs/EXTENSION-DEVELOPMENT.md#quick-start)). The built-in extensions are laid
+out like this ([Anatomy of an extension](../../docs/EXTENSION-DEVELOPMENT.md#anatomy-of-an-extension)):
 
 ```
 my-extension/
-├── manifest.json          ← declares id, main, renderer, contributes
-├── dist/
-│   ├── main.cjs           ← backend entry (activate/deactivate), run in the extension host
-│   └── index.html         ← webview entry (renderer UI)
-└── src/
-    ├── index.ts           ← main process source
-    └── renderer/
-        ├── App.tsx
-        └── main.tsx
+├── manifest.json            id, main, renderer, contributes
+├── package.json             its own dependencies and the build:renderer script
+├── src/
+│   ├── index.ts             backend: activate(api) / deactivate()
+│   ├── index.js             esbuild output of index.ts, named by manifest.main (gitignored)
+│   └── renderer/
+│       ├── main.tsx         view entry: mountExtension(<App />)
+│       └── App.tsx          routes on the ?view= parameter
+├── index.html               view document
+├── vite.renderer.config.ts  builds the view into dist/
+└── dist/index.html          the built view, named by manifest.renderer
 ```
 
-### `manifest.json`
+`manifest.json`, validated by `ExtensionManifestSchema` in `src/shared/schemas/extension.schema.ts`
+([The manifest](../../docs/EXTENSION-DEVELOPMENT.md#the-manifest)):
 
 ```json
 {
@@ -74,20 +81,21 @@ my-extension/
   "name": "My Tool",
   "version": "1.0.0",
   "description": "Example extension",
-  "main": "dist/main.cjs",
+  "main": "src/index.js",
   "renderer": "dist/index.html",
   "minAppVersion": "0.1.0",
   "contributes": {
-    "globalTab": {
-      "label": "My Tool",
-      "icon": "wrench",
-      "view": "main"
-    }
+    "globalTab": { "label": "My Tool", "icon": "wrench", "view": "main" }
   }
 }
 ```
 
-### Backend (`src/index.ts`)
+The `contributes` keys are `globalTab`, `workspaceTab`, `projectTab`, `sidebarPanel`,
+`windowViews`, `commands`, `quickActions` and `shellRoots`; the guide's
+[`contributes`](../../docs/EXTENSION-DEVELOPMENT.md#contributes) table gives each one's fields.
+
+The backend, `src/index.ts`. Every channel is a `ChannelSpec` whose payload is parsed with its
+zod `schema` before `run` sees it ([ADR 096](../../docs/adr/096-every-ipc-channel-has-a-schema.md)):
 
 ```typescript
 import { z } from 'zod'
@@ -95,11 +103,9 @@ import { defineChannel, type ExtensionAPI } from '@terminator/extension-sdk'
 
 export function activate(api: ExtensionAPI): void {
   api.log.info('My extension activated')
-
-  // The payload is parsed with `schema` before `run` sees it (ADR 096).
   api.ipc.registerHandler(
     defineChannel({
-      channel: 'my-ext:hello',
+      channel: 'my-tool:hello',
       schema: z.string(),
       invalid: { error: 'VALIDATION_ERROR' },
       run: (name) => ({ greeting: `Hello, ${name}!` }),
@@ -110,121 +116,34 @@ export function activate(api: ExtensionAPI): void {
 export function deactivate(): void {}
 ```
 
-### Renderer (`src/renderer/App.tsx`)
+The view, `src/renderer/App.tsx`, calls the channel and listens for what the backend broadcasts
+with `api.window.broadcast`
+([Talking to your backend](../../docs/EXTENSION-DEVELOPMENT.md#talking-to-your-backend)):
 
 ```typescript
 import { invoke } from '@terminator/extension-sdk/renderer'
 
-const result = await invoke<{ greeting: string }>('my-ext:hello', 'World')
-
-// Subscribe to events
-const off = window.electronAPI.extensionBridge.on('my-ext:update', (data) => {
-  console.log('Update:', data)
-})
-// Call off() to unsubscribe
+const result = await invoke<{ greeting: string }>('my-tool:hello', 'World')
+const off = window.electronAPI.extensionBridge.on('my-tool:update', (data) => console.log(data))
 ```
 
-## Shared UI — `@terminator/extension-ui`
+## Building
 
-UI components live next door:
+`npm run build:extensions` (`scripts/build-extensions.cjs`) builds every directory under
+`extensions/`: esbuild bundles `src/index.ts` into the file `manifest.main` names, and when the
+extension has a `vite.renderer.config.ts` it runs that extension's `npm run build:renderer`
+(`vite build --config vite.renderer.config.ts`) into `dist/`. `npm run dev` and `npm run build`
+run it first. The guide's [Setting up a view](../../docs/EXTENSION-DEVELOPMENT.md#setting-up-a-view)
+has the `index.html` and `vite.renderer.config.ts` to start from.
 
-```bash
-npm install @terminator/extension-ui
-```
+An extension outside `extensions/` is built by its own scripts, then installed from Settings →
+Extensions → **Install from Directory**; **Reload** there runs its backend again from disk and
+remounts its views without rebuilding the app
+([Installing, reloading and disabling](../../docs/EXTENSION-DEVELOPMENT.md#installing-reloading-and-disabling)).
 
-Your extension renders in its own `WebContentsView`, which loads neither the host
-stylesheet nor the host's components — so without this package every extension
-ends up writing its own dialog, and they end up disagreeing about what Escape
-does. It ships `Dialog`, `ConfirmDialog`, `Popover`, `ToastRegion`, `EmptyState`,
-`IconButton`, `useDismissible` and the layer scale, source-only, with `react`,
-`react-dom` and `lucide-react` as peer dependencies.
+## The design system
 
-```tsx
-import { ConfirmDialog } from '@terminator/extension-ui'
-;<ConfirmDialog
-  title="Delete this note?"
-  body="It is removed from this machine and cannot be recovered."
-  confirmLabel="Delete"
-  tone="danger"
-  onConfirm={remove}
-  onDismiss={close}
-/>
-```
-
-Two behaviours you would otherwise have to implement yourself, and one you
-cannot discover from the DOM:
-
-- Escape closes only the **innermost** open surface.
-- Stacking comes from `LAYERS` / `var(--tm-layer-*)`, not from raw numbers.
-- The host's double-Escape "exit extension" gesture must stand down while a
-  modal is open. `Dialog` reports depth over `electronAPI.ui.setModalDepth`; a
-  hand-rolled modal that does not will let a user's second Escape close your
-  extension and discard whatever they were typing.
-
-Colours, spacing and radii come from the `--tm-*` tokens the host injects into
-your document. They carry both light and dark, and the host sets `data-theme` on
-your `<html>` — so a hardcoded hex is a colour that cannot follow the theme.
-
-See `docs/EXTENSION-STYLE.md` for the house rules and
-`docs/EXTENSION-DEVELOPMENT.md` for the full API.
-
-## Manifest `contributes`
-
-| Surface       | Key            | Fields                                     |
-| ------------- | -------------- | ------------------------------------------ |
-| Global tab    | `globalTab`    | `label`, `icon?`, `view?`                  |
-| Workspace tab | `workspaceTab` | `label`, `icon?`, `view?`                  |
-| Project tab   | `projectTab`   | `label`, `view?`                           |
-| Sidebar panel | `sidebarPanel` | `label`, `icon?`, `defaultOpen?`, `view?`  |
-| Window views  | `windowViews`  | `[{ id, view }]`                           |
-| Commands      | `commands`     | `[{ id, label, shortcut?, description? }]` |
-| Shell roots   | `shellRoots`   | `[settingKey]`                             |
-
-The `view` string is passed as `?view=VALUE` in the webview URL, letting one `index.html` serve multiple surfaces.
-
-`shellRoots` lists keys of your own `folder` settings (each starting with your extension id)
-whose directories `api.shell.exec` and `api.github` may run in, besides the workspace folders,
-the project worktrees and `api.paths.userData`. A key outside your id refuses the manifest at
-load; a key you never register with `settings.register` as a `folder` adds nothing (ADR 102).
-
-## Icon names
-
-`contributes.*.icon` takes one of the names `iconFromName` knows
-(`src/renderer/extensions/icon-from-name.ts`), such as `puzzle`, `wrench`, `terminal`,
-`git-branch`, `database`, `list` or `calendar`.
-
-## Build setup (Vite example)
-
-```typescript
-// vite.renderer.config.ts
-import { resolve } from 'path'
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-
-export default defineConfig({
-  root: resolve(__dirname),
-  plugins: [react()],
-  build: {
-    outDir: resolve(__dirname, 'dist'),
-    emptyOutDir: true, // the esbuild main bundle goes to src/, so nothing else lives in dist/
-    rollupOptions: { input: resolve(__dirname, 'index.html') },
-  },
-})
-```
-
-Add to `package.json`:
-
-```json
-{
-  "scripts": {
-    "build:renderer": "vite build --config vite.renderer.config.ts"
-  }
-}
-```
-
-## Installing locally
-
-1. Build your extension: `npm run build:renderer`
-2. Open Terminator → Settings → Extensions → Install Extension
-3. Point at your extension directory
-4. After edits, click Reload — no app rebuild required
+A view's UI comes from `@terminator/extension-ui` (`packages/extension-ui`): its components,
+the `--tm-*` tokens the host injects into the view, and its fonts. See
+[The design system](../../docs/EXTENSION-DEVELOPMENT.md#the-design-system--terminatorextension-ui)
+and `docs/EXTENSION-STYLE.md`.

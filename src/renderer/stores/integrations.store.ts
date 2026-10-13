@@ -14,13 +14,13 @@ import type {
 // whether a tracker is connected and which account proved it, and that is all
 // any surface here needs to render.
 
-export interface ConnectLinearInput {
+interface ConnectLinearInput {
   tracker: 'linear'
   apiKey: string
   email?: string | null
 }
 
-export interface ConnectJiraInput {
+interface ConnectJiraInput {
   tracker: 'jira'
   site: string
   email: string

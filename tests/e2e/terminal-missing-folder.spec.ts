@@ -1,8 +1,13 @@
 import { test, expect } from '@playwright/test'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { launchApp, closeApp, createWorkspace, addAndSelectProject, AppHandle } from './helpers'
+import { rmSync } from 'node:fs'
+import {
+  launchApp,
+  closeApp,
+  createWorkspace,
+  addAndSelectProject,
+  AppHandle,
+  e2eTempDir,
+} from './helpers'
 
 // A branch whose folder has gone — a worktree removed outside the app, a repo
 // deleted — used to get a terminal all the same: node-pty forked, could not
@@ -18,7 +23,7 @@ test.afterAll(async () => {
 })
 
 test('a branch whose folder is gone says so instead of opening a dead terminal', async () => {
-  folder = mkdtempSync(join(tmpdir(), 'terminator-gone-'))
+  folder = e2eTempDir('terminator-gone-')
   handle = await launchApp()
   const { page } = handle
 

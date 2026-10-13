@@ -8,6 +8,7 @@ import {
   writesOutside,
 } from '../../src/runtime/autonomy-policy.js'
 import type { Autonomy } from '../../src/gates/autonomy.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 // FR-029: every action is held against a decision — automatic where the
 // setting allows it, and by asking where it does not. The automatic half did
@@ -220,7 +221,7 @@ describe('a write outside the checkout (FR-050)', () => {
     // The checkout is reached through a symlink, so its real path is its
     // other name on every platform, not only where the temp dir is one.
     beforeEach(() => {
-      base = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-outside-'))
+      base = makeTempDir('fdry-outside-')
       fs.mkdirSync(path.join(base, 'real', 'src'), { recursive: true })
       checkout = path.join(base, 'link')
       fs.symlinkSync(path.join(base, 'real'), checkout)

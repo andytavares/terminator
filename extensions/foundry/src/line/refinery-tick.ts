@@ -11,13 +11,13 @@ import type { RestackResult } from './restack.js'
 // do, rebased and re-checked, conflict, or a transient failure) are each one
 // assertion against a fake, not a real checkout.
 
-export interface RefineryCandidate {
+interface RefineryCandidate {
   readonly order: { readonly id: string; readonly title: string }
   /** The pulls this order has opened. Empty means nothing to watch yet. */
   readonly pulls: readonly { readonly url: string }[]
 }
 
-export interface RefineryLane {
+interface RefineryLane {
   readonly cwd: string
   readonly branch: string
   readonly base: string

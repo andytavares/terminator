@@ -14,10 +14,6 @@ async function tableNames(db: ExtensionDB): Promise<string[]> {
   return rows.map((r) => r.table_name)
 }
 
-function listTables({ db }: IpcContext) {
-  return orErrorString(async () => ({ tables: await tableNames(db) }))
-}
-
 function tableStats({ db }: IpcContext) {
   return orErrorString(async () => {
     const stats: Record<string, number> = {}
@@ -48,7 +44,6 @@ function runQuery({ db }: IpcContext, args: z.infer<typeof RunQueryRequestSchema
 
 /** The database console: desktop-only, since it reads and writes any table. */
 const ADMIN_ROUTES = [
-  localRoute('task-vault:admin:list-tables', noPayload, listTables),
   localRoute('task-vault:admin:table-stats', noPayload, tableStats),
   localRoute('task-vault:admin:run-query', RunQueryRequestSchema, runQuery),
 ]

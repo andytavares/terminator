@@ -3,7 +3,9 @@ import React, { useEffect } from 'react'
 import { useSettingsStore } from '../../stores/settings.store'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import { QuickActionsSettings } from './QuickActionsSettings'
+import '@terminator/extension-ui/settings-fields.css'
 import './SettingsPanel.css'
+import { ThemeChoices } from './ThemeChoices'
 
 interface Props {
   workspaceId: string
@@ -59,17 +61,10 @@ export function WorkspaceSettings({ workspaceId }: Props): JSX.Element {
         <div className="settings-section__field">
           <label className="settings-section__label">Theme</label>
           <div className="settings-section__radio-group">
-            {(['dark', 'light'] as const).map((t) => (
-              <label key={t} className="settings-section__radio">
-                <input
-                  type="radio"
-                  value={t}
-                  checked={effectiveTheme === t}
-                  onChange={() => updateWorkspaceTheme(workspaceId, t)}
-                />
-                {t.charAt(0).toUpperCase() + t.slice(1)}
-              </label>
-            ))}
+            <ThemeChoices
+              checked={effectiveTheme}
+              onChange={(t) => updateWorkspaceTheme(workspaceId, t)}
+            />
             <label className="settings-section__radio">
               <input
                 type="radio"

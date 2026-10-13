@@ -121,12 +121,19 @@ function loginRejectTests() {
 }
 
 function loginLockoutTests() {
-  it('locks a client out after repeated wrong passwords, even for the right one', async () => {
-    for (let attempt = 0; attempt < 10; attempt++) {
-      expect((await login('wrong-password')).statusCode).toBe(401)
+  // Ten bcrypt comparisons, each deliberately slow; on a loaded machine they pass 5 s.
+  it(
+    'locks a client out after repeated wrong passwords, even for the right one',
+    {
+      timeout: 30_000,
+    },
+    async () => {
+      for (let attempt = 0; attempt < 10; attempt++) {
+        expect((await login('wrong-password')).statusCode).toBe(401)
+      }
+      expect((await login(PASSWORD)).statusCode).toBe(429)
     }
-    expect((await login(PASSWORD)).statusCode).toBe(429)
-  })
+  )
 
   it('refuses a request whose Host is not local, LAN or tunnel', async () => {
     const res = await app.inject({

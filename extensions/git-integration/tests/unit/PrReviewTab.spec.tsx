@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { PrReviewTab } from '../../src/components/pr-review/PrReviewTab'
 import { usePrReviewStore } from '../../src/stores/pr-review.store'
 import * as githubModule from '../../src/api/github'
@@ -143,6 +143,19 @@ beforeEach(() => {
 afterEach(() => {
   delete (globalThis as unknown as Record<string, unknown>).electronAPI
 })
+
+/**
+ * Opens the queue's PR inside an async act, which returns only once the open flow's
+ * awaited calls and every render they schedule have run
+ * (https://react.dev/reference/react/act). A test that ended on a timer instead left
+ * those renders to the cleanup, after electronAPI was gone, and on a busy machine the
+ * effect that subscribes through it threw there and broke React for the rest of the file.
+ */
+async function openPr() {
+  await act(async () => {
+    fireEvent.click(screen.getByText('Open PR'))
+  })
+}
 
 describe('PrReviewTab', () => {
   it('shows empty message when repoRoot is null', () => {
@@ -290,8 +303,7 @@ describe('PrReviewTab', () => {
       cb({ number: 1, headSHA: 'headA' })
     )
     render(<PrReviewTab repoRoot="/repo" />)
-    fireEvent.click(screen.getByText('Open PR'))
-    await new Promise((r) => setTimeout(r, 0))
+    await openPr()
     expect(githubModule.githubAPI.sessionGet).toHaveBeenCalledWith('/repo:::1')
     expect(githubModule.githubAPI.sessionGet).toHaveBeenCalledWith('/repo:::1:::headA')
   })
@@ -329,8 +341,7 @@ describe('PrReviewTab', () => {
       cb({ number: 1, headSHA: 'newSha' })
     )
     render(<PrReviewTab repoRoot="/repo" />)
-    fireEvent.click(screen.getByText('Open PR'))
-    await new Promise((r) => setTimeout(r, 0))
+    await openPr()
     expect(githubModule.githubAPI.prCompare).toHaveBeenCalledWith('/repo', 'oldSha', 'newSha')
     expect(mockReconcileHead).toHaveBeenCalledWith(
       '/repo',
@@ -371,8 +382,22 @@ describe('PrReviewTab', () => {
       cb({ number: 1, headSHA: 'newSha' })
     )
     render(<PrReviewTab repoRoot="/repo" />)
-    fireEvent.click(screen.getByText('Open PR'))
-    await new Promise((r) => setTimeout(r, 0))
+    await openPr()
     expect(mockReconcileHead).toHaveBeenCalledWith('/repo', 1, 'newSha', 'all', [])
+  })
+})
+
+describe('PrReviewTab — a review submitted in another window', () => {
+  it('reloads the queue, so the pull request shows its new approval and review state', async () => {
+    const loadQueue = vi.fn().mockResolvedValue(undefined)
+    const { useLoadPrQueue } = await import('../../src/hooks/usePrReview')
+    vi.mocked(useLoadPrQueue).mockReturnValue(loadQueue)
+    render(<PrReviewTab repoRoot="/repo" />)
+    const onReviewsChanged = mockOn.mock.calls.find(([channel]) => channel === 'reviews:changed')
+
+    expect(onReviewsChanged).toBeDefined()
+    loadQueue.mockClear()
+    onReviewsChanged![1]({})
+    expect(loadQueue).toHaveBeenCalledTimes(1)
   })
 })

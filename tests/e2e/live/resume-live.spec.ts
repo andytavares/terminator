@@ -1,17 +1,17 @@
 import { test, expect, type Page } from '@playwright/test'
 import { execSync } from 'node:child_process'
-import {
-  copyFileSync,
-  existsSync,
-  mkdtempSync,
-  readFileSync,
-  readdirSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs'
+import { copyFileSync, existsSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { AppHandle, launchApp, closeApp, createWorkspace, addAndSelectProject } from '../helpers'
+import {
+  AppHandle,
+  launchApp,
+  closeApp,
+  createWorkspace,
+  addAndSelectProject,
+  e2eTempDir,
+  terminalRows,
+} from '../helpers'
 
 // The run that proves the feature: a real Claude Code conversation, ended, then
 // brought back from Home and asked what it was told before it ended.
@@ -44,11 +44,7 @@ test.afterAll(async () => {
 })
 
 async function rows(page: Page): Promise<string> {
-  return page.evaluate(() =>
-    [...document.querySelectorAll('.terminal-pane .xterm-rows > div')]
-      .map((row) => (row.textContent ?? '').split(String.fromCharCode(160)).join(' '))
-      .join('\n')
-  )
+  return (await terminalRows(page)).join('\n')
 }
 
 async function type(page: Page, text: string): Promise<void> {
@@ -65,7 +61,7 @@ async function openHome(page: Page): Promise<void> {
 
 test('a real conversation is captured, ended, and brought back', async () => {
   test.setTimeout(300_000)
-  folder = mkdtempSync(join(tmpdir(), 'resume-live-'))
+  folder = e2eTempDir('resume-live-')
   const report: Record<string, unknown> = {
     claude: execSync('claude --version').toString().trim(),
   }

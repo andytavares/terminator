@@ -4,6 +4,7 @@ const { build } = require('esbuild')
 const { resolve } = require('path')
 const { readdirSync, existsSync, readFileSync } = require('fs')
 const { spawn } = require('child_process')
+const { EXTENSION_EXTERNALS } = require('./extension-externals.cjs')
 
 const root = resolve(__dirname, '..')
 const extensionsDir = resolve(root, 'extensions')
@@ -51,26 +52,7 @@ async function buildExtension(name) {
     format: 'cjs',
     outfile,
     plugins: [rawTextImports],
-    external: [
-      'electron',
-      'electron-store',
-      'zod',
-      'node-pty',
-      'chokidar',
-      'fsevents',
-      'gray-matter',
-      'node-ical',
-      '@modelcontextprotocol/sdk',
-      // Remote Control's server. Root dependencies, resolved from node_modules
-      // at runtime; bundled, they made a 2.1 MB main-process file.
-      'fastify',
-      '@fastify/static',
-      '@fastify/websocket',
-      // Git Integration's parser. Loads its .wasm files relative to its own
-      // module path, which a bundle would move.
-      'web-tree-sitter',
-      '@vscode/tree-sitter-wasm',
-    ],
+    external: EXTENSION_EXTERNALS,
     logLevel: 'info',
   })
 

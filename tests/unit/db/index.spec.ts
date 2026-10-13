@@ -1,10 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { DatabaseSync } from 'node:sqlite'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { rmSync } from 'node:fs'
 import type { ExtensionDB } from '@terminator/extension-sdk'
 import { wrapDb, initAppDb, getAppDb, closeAppDb, healthCheck } from '../../../src/main/db/index'
+import { makeTempDir } from '../../support/temp-dir'
 
 describe('ExtensionDB over node:sqlite', () => {
   let db: ExtensionDB
@@ -159,7 +158,7 @@ describe('app database', () => {
   let userData: string
 
   beforeEach(() => {
-    userData = mkdtempSync(join(tmpdir(), 'app-db-'))
+    userData = makeTempDir('app-db-')
   })
 
   afterEach(() => {

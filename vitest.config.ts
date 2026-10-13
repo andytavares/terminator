@@ -11,6 +11,19 @@ const JSDOM_INCLUDE = [
   'extensions/*/tests/**/*.spec.tsx',
 ]
 
+// Notepad's and git-integration's DOM specs run in happy-dom, not jsdom. They
+// mount CodeMirror and the design system, which inject stylesheets, and jsdom
+// validates every declaration it parses (cssstyle, css-tree, css-color), with
+// no option to turn that off. CodeMirror's 5 KB of theme CSS took 150-250 ms
+// on the first view of each file, and the first test of a file 1-2 s,
+// which went past the five-second timeout on a busy machine. happy-dom parses
+// the same CSS in a few milliseconds, and every spec in both passes unchanged.
+// https://vitest.dev/guide/environment
+const HAPPY_DOM_INCLUDE = [
+  'extensions/notepad/tests/**/*.spec.tsx',
+  'extensions/git-integration/tests/**/*.spec.tsx',
+]
+
 const NODE_INCLUDE = [
   'tests/unit/**/*.spec.ts',
   'tests/unit/**/*.spec.js',
@@ -27,6 +40,7 @@ const NODE_INCLUDE = [
 export default defineConfig({
   test: {
     globals: true,
+    globalSetup: ['tests/global-setup.ts'],
     setupFiles: ['tests/setup.ts'],
     // Vitest turns every stylesheet into an empty string, `?raw` imports included.
     // The design system's token file is read as text, so those keep their content.
@@ -54,6 +68,9 @@ export default defineConfig({
             // they would report "skipped", and a skip in a green suite is a
             // check nobody notices is missing.
             'extensions/*/tests/live/**',
+            // Wall-clock budgets run alone, in `npm run test:perf`
+            // (vitest.perf.config.ts): beside every other spec they measure the load.
+            '**/*.perf.spec.ts',
           ],
         },
       },
@@ -63,6 +80,15 @@ export default defineConfig({
           name: 'jsdom',
           environment: 'jsdom',
           include: JSDOM_INCLUDE,
+          exclude: [...configDefaults.exclude, ...HAPPY_DOM_INCLUDE],
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: 'happy-dom',
+          environment: 'happy-dom',
+          include: HAPPY_DOM_INCLUDE,
         },
       },
     ],
@@ -81,6 +107,7 @@ export default defineConfig({
       exclude: [
         'vitest.config.ts',
         'vitest.live.config.ts',
+        'vitest.perf.config.ts',
         'playwright.config.ts',
         'packages/*/vite.config.ts',
         'src/renderer/index.tsx',

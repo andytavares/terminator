@@ -108,13 +108,9 @@ describe('linear provider — search', () => {
     const provider = providerWith({ searchIssues })
     const result = await provider.search(CRED, 'sidebar', 15)
 
-    // Search has no state filter, so it returns completed issues
-    expect(searchIssues).toHaveBeenCalledWith(
-      expect.not.objectContaining({ filter: expect.anything() })
-    )
-    expect(searchIssues).toHaveBeenCalledWith(
-      expect.objectContaining({ term: 'sidebar', first: 15 })
-    )
+    // The SDK takes the term first, then the other variables
+    // (LinearClient.searchIssues(term, variables)); search has no state filter.
+    expect(searchIssues).toHaveBeenCalledWith('sidebar', { first: 15 })
     // Both completed and open issues are returned
     expect(result).toHaveLength(2)
     expect(result[0].state.type).toBe('completed')

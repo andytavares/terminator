@@ -15,6 +15,7 @@ import {
   RenameProjectRequestSchema,
 } from '../schemas/vault.schema'
 import type { ProjectStatus } from '../vault/types'
+import { setProjectStatus } from '../vault/project-status'
 import {
   rowToTask,
   rowToProject,
@@ -172,33 +173,12 @@ async function deleteProject({ db }: IpcContext, args: z.infer<typeof DeleteProj
   return { success: true }
 }
 
-async function findProject(db: ExtensionDB, nameOrId: string) {
-  const byName = await db.get<{ id: string }>(`SELECT id FROM projects WHERE name=?`, [nameOrId])
-  return byName ?? (await db.get<{ id: string }>(`SELECT id FROM projects WHERE id=?`, [nameOrId]))
-}
-
 async function updateStatus(
   { db }: IpcContext,
   args: z.infer<typeof UpdateProjectStatusRequestSchema>
 ) {
   const { projectFilePath: projectName, status } = args
-  const now = nowIso()
-  const proj = await findProject(db, projectName)
-  if (!proj) return { error: 'NOT_FOUND' }
-  if (status === 'archived') {
-    await db.run(
-      `WITH RECURSIVE subtree(id) AS (
-           SELECT id FROM tasks WHERE project_id=? AND parent_id IS NULL
-           UNION ALL
-           SELECT t.id FROM tasks t JOIN subtree s ON t.parent_id = s.id
-         )
-         UPDATE tasks SET status='cancelled', updated_at=?
-         WHERE id IN (SELECT id FROM subtree)
-           AND status IN ('open','in-progress','in-review','blocked')`,
-      [proj.id, now]
-    )
-  }
-  await db.run(`UPDATE projects SET status=?, updated_at=? WHERE id=?`, [status, now, proj.id])
+  if (!(await setProjectStatus(db, projectName, status))) return { error: 'NOT_FOUND' }
   indexUpdated()
   return { success: true }
 }

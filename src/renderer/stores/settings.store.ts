@@ -6,6 +6,7 @@ import type {
   QuickActionsSettings,
   WorkspaceSettings,
 } from '../../shared/types/index'
+import { defaultGlobalSettings } from '../../shared/settings-defaults'
 
 interface SettingsState {
   globalSettings: GlobalSettings | null
@@ -34,20 +35,8 @@ interface SettingsState {
   resolveSettings: (workspaceId?: string | null) => GlobalSettings
 }
 
-const DEFAULT_SETTINGS: GlobalSettings = {
-  appearance: { theme: 'dark' },
-  terminal: {
-    scrollbackLimit: 10000,
-    defaultShell: '/bin/zsh',
-    promptForName: false,
-  },
-  git: { worktreeBaseDir: '', branchExcludePatterns: [] },
-  extensions: {},
-  ui: { hasSeenWelcome: false, editor: '' },
-  sidebar: { staleAfterMs: 2 * 60 * 60 * 1000 },
-  notifications: { defaultTargets: ['system', 'center', 'toast'], overrides: {} },
-  quickActions: { pins: [], usage: [], directUse: [], custom: [] },
-}
+// The main process answers with $SHELL; this stands in until it does.
+const DEFAULT_SETTINGS = defaultGlobalSettings('/bin/zsh')
 
 function mergeSettings(
   global: GlobalSettings,

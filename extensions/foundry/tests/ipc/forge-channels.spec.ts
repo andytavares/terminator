@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import * as path from 'node:path'
 import { dispatchChannel } from '@terminator/extension-sdk'
 import { createForgeChannels, forgeChannelSpecs } from '../../src/ipc/forge-channels.js'
@@ -13,6 +12,7 @@ import type { Standing } from '../../src/order/standing.js'
 import type { OrderStore } from '../../src/order/store.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import type { CompileResult } from '../../src/order/compile.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 let root: string
 let repo: string
@@ -41,8 +41,8 @@ function send(channel: string, payload: unknown): Promise<unknown> {
 }
 
 beforeEach(() => {
-  root = fs.mkdtempSync(path.join(os.tmpdir(), 'foundry-ipc-'))
-  repo = fs.mkdtempSync(path.join(os.tmpdir(), 'foundry-ipc-repo-'))
+  root = makeTempDir('foundry-ipc-')
+  repo = makeTempDir('foundry-ipc-repo-')
   fs.writeFileSync(
     path.join(repo, 'package.json'),
     JSON.stringify({ scripts: { test: 'vitest run' } })
@@ -179,7 +179,8 @@ describe('foundry:order.turn', () => {
 
     expect(converge).toHaveBeenCalledWith(
       expect.objectContaining({ id: order.id }),
-      'what about resize?'
+      'what about resize?',
+      expect.any(Function)
     )
     expect(r.error).toBeUndefined()
     expect(r.converging).toBe('sess-arch')
@@ -1131,7 +1132,11 @@ describe('free text reaches the architect', () => {
     const c = createForgeChannels(forgeDeps({ converge }))
 
     await c.turn({ id: seed.order.id, message: 'the second unit is not needed' })
-    expect(converge).toHaveBeenCalledWith(expect.anything(), 'the second unit is not needed')
+    expect(converge).toHaveBeenCalledWith(
+      expect.anything(),
+      'the second unit is not needed',
+      expect.any(Function)
+    )
   })
 
   it('leaves striking an assumption and answering a question alone', async () => {

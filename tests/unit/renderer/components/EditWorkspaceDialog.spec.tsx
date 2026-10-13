@@ -4,32 +4,31 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { EditWorkspaceDialog } from '../../../../src/renderer/components/sidebar/EditWorkspaceDialog'
 import type { Workspace } from '../../../../src/shared/types/index'
-import { seedStore } from '../../../support/renderer-stores'
+import { workspaceOf } from '../../../support/renderer-stores'
 
-const mockUpdateWorkspace = vi.fn()
 const mockOpenDirectory = vi.fn()
+/** The main process's answer to an update: the workspace as written. */
+const mockUpdateWorkspace = vi.fn(
+  async (input: Partial<Workspace>): Promise<{ workspace: Workspace } | { error: string }> => ({
+    workspace: { ...ws, ...input },
+  })
+)
 
-const ws: Workspace = {
+const ws = workspaceOf({
   id: 'ws-1',
   name: 'My Work',
   folderPath: '/home/work',
-  color: '#4A90E2',
   tags: ['tag1'],
-  createdAt: '2024-01-01T00:00:00Z',
-  updatedAt: '2024-01-01T00:00:00Z',
-}
+})
 
 beforeEach(() => {
   vi.clearAllMocks()
-  mockUpdateWorkspace.mockReturnValue({ workspace: ws })
   mockOpenDirectory.mockResolvedValue({ filePath: '/new/path' })
   ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
     dialog: { openDirectory: mockOpenDirectory },
+    workspace: { update: mockUpdateWorkspace },
   }
-  seedStore(useWorkspaceStore, {
-    workspaces: [ws],
-    updateWorkspace: mockUpdateWorkspace,
-  })
+  useWorkspaceStore.setState({ ...useWorkspaceStore.getInitialState(), workspaces: [ws] })
 })
 
 afterEach(() => {
@@ -57,18 +56,16 @@ describe('EditWorkspaceDialog', () => {
     expect(screen.getByText('Name is required')).toBeTruthy()
   })
 
-  it('calls updateWorkspace on valid submit', async () => {
+  it('saves the new name to the workspace', async () => {
     const onClose = vi.fn()
     render(<EditWorkspaceDialog workspace={ws} onClose={onClose} />)
     fireEvent.change(screen.getByDisplayValue('My Work'), { target: { value: 'New Name' } })
     fireEvent.click(screen.getByText('Save'))
-    await vi.waitFor(() => expect(mockUpdateWorkspace).toHaveBeenCalled())
-  })
-
-  it('renders color swatches', () => {
-    const { container } = render(<EditWorkspaceDialog workspace={ws} onClose={vi.fn()} />)
-    const swatches = container.querySelectorAll('.dialog__color-swatch')
-    expect(swatches.length).toBeGreaterThan(0)
+    await vi.waitFor(() =>
+      expect(useWorkspaceStore.getState().workspaces).toEqual([
+        expect.objectContaining({ id: 'ws-1', name: 'New Name', folderPath: '/home/work' }),
+      ])
+    )
   })
 
   it('renders folder path field', () => {
@@ -123,11 +120,7 @@ describe('EditWorkspaceDialog', () => {
   })
 
   it('shows error when duplicate name on blur', () => {
-    const otherWs = { ...ws, id: 'ws-2', name: 'Other' }
-    seedStore(useWorkspaceStore, {
-      workspaces: [ws, otherWs],
-      updateWorkspace: mockUpdateWorkspace,
-    })
+    useWorkspaceStore.setState({ workspaces: [ws, workspaceOf({ id: 'ws-2', name: 'Other' })] })
     render(<EditWorkspaceDialog workspace={ws} onClose={vi.fn()} />)
     const nameInput = screen.getByDisplayValue('My Work')
     fireEvent.change(nameInput, { target: { value: 'Other' } })
@@ -144,7 +137,6 @@ describe('EditWorkspaceDialog', () => {
 
   it('closes after successful save', async () => {
     const onClose = vi.fn()
-    mockUpdateWorkspace.mockResolvedValue({ workspace: ws })
     render(<EditWorkspaceDialog workspace={ws} onClose={onClose} />)
     fireEvent.click(screen.getByText('Save'))
     await vi.waitFor(() => expect(onClose).toHaveBeenCalled())
@@ -159,7 +151,7 @@ describe('EditWorkspaceDialog', () => {
   })
 
   it('surfaces a name error when updateWorkspace reports DUPLICATE_NAME', async () => {
-    mockUpdateWorkspace.mockResolvedValue({ error: 'DUPLICATE_NAME' })
+    mockUpdateWorkspace.mockResolvedValueOnce({ error: 'DUPLICATE_NAME' })
     const onClose = vi.fn()
     render(<EditWorkspaceDialog workspace={ws} onClose={onClose} />)
     fireEvent.change(screen.getByDisplayValue('My Work'), { target: { value: 'Renamed' } })
@@ -169,7 +161,7 @@ describe('EditWorkspaceDialog', () => {
   })
 
   it('surfaces a generic error when updateWorkspace fails for another reason', async () => {
-    mockUpdateWorkspace.mockResolvedValue({ error: 'BACKEND_DOWN' })
+    mockUpdateWorkspace.mockResolvedValueOnce({ error: 'BACKEND_DOWN' })
     render(<EditWorkspaceDialog workspace={ws} onClose={vi.fn()} />)
     fireEvent.change(screen.getByDisplayValue('My Work'), { target: { value: 'Renamed' } })
     fireEvent.click(screen.getByText('Save'))

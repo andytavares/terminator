@@ -7,13 +7,12 @@
  * cover that — but that the channel a surface calls reaches it. Every bug this
  * branch shipped was in exactly that gap.
  */
-import { tmpdir as tmpdirForUserData } from 'node:os'
+import { freshGlobalStorage } from '../helpers/foundry-host.js'
 
-// A real directory. The supervision runtime writes its feed, mutes and
-// per-session settings under userData, and a path that does not exist fails at
-// mkdir. `node:fs` is mocked in some of these specs, so nothing is created
-// here — the OS temp directory is already there.
-const USER_DATA = tmpdirForUserData()
+// A real userData, created before any spec mocks `node:fs`: the supervision
+// runtime writes its feed, mutes and per-session settings in Foundry's own
+// folder under it.
+const GLOBAL_STORAGE = freshGlobalStorage()
 
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest'
 import { dispatchChannel, type ChannelSpec, type ExtensionAPI } from '@terminator/extension-sdk'
@@ -26,9 +25,6 @@ vi.mock('electron', () => ({
     encryptString: vi.fn(),
     decryptString: vi.fn(),
   },
-  // A real directory: the supervision runtime writes its feed, mutes and
-  // per-session settings under userData, and a path that does not exist fails
-  // at mkdir.
 }))
 
 const runner = {
@@ -127,7 +123,7 @@ beforeAll(async () => {
     shell: { exec },
     notifications: { showToast, createNotification },
     log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
-    paths: { app: '', userData: USER_DATA },
+    paths: { app: '', globalStorage: GLOBAL_STORAGE },
     settings: {
       register: vi.fn().mockReturnValue({ dispose: vi.fn() }),
       get: vi.fn(),

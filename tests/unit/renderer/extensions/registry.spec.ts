@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import type { ComponentType } from 'react'
 
-const NullComponent = null as unknown as ComponentType<Record<string, unknown>>
+/** A component that draws nothing; registrations only need one to hold. */
+const NullComponent = (): null => null
 
 import {
   useExtensionRegistry,
@@ -157,7 +157,7 @@ describe('useExtensionRegistry', () => {
     })
 
     it('overwrites existing view with same id', () => {
-      const comp2 = null as unknown as ComponentType<{ repoRoot: string | null }>
+      const comp2 = (): null => null
       useExtensionRegistry.getState().registerWindowView('pr-review', NullComponent)
       useExtensionRegistry.getState().registerWindowView('pr-review', comp2)
       expect(useExtensionRegistry.getState().windowViews.get('pr-review')).toBe(comp2)

@@ -6,68 +6,40 @@ import { useSettingsStore } from '../../../../src/renderer/stores/settings.store
 import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
 import { useTerminalSession } from '../../../../src/renderer/hooks/useTerminalSession'
 import { CORE_SHORTCUTS } from '../../../../src/renderer/quick-actions/core-actions'
+import { projectOf, terminalSessionOf, workspaceOf } from '../../../support/renderer-stores'
 
-vi.mock('../../../../src/renderer/stores/workspace.store', () => ({
-  useWorkspaceStore: Object.assign(vi.fn(), { getState: vi.fn() }),
-}))
-vi.mock('../../../../src/renderer/stores/session.store', () => ({
-  useSessionStore: Object.assign(vi.fn(), { getState: vi.fn() }),
-}))
-vi.mock('../../../../src/renderer/stores/settings.store', () => ({ useSettingsStore: vi.fn() }))
-vi.mock('../../../../src/renderer/extensions/registry', () => ({
-  useExtensionRegistry: Object.assign(vi.fn(), { getState: vi.fn() }),
-  matchesAccelerator: vi.fn().mockReturnValue(false),
-}))
 vi.mock('../../../../src/renderer/hooks/useTerminalSession', () => ({
   useTerminalSession: vi.fn(),
 }))
 
-const workspace1 = { id: 'ws-1', name: 'WS 1', folderPath: '/ws1', color: '#fff', tags: [] }
+const workspace1 = workspaceOf({ id: 'ws-1', name: 'WS 1', folderPath: '/ws1', color: '#fff' })
 
 beforeEach(() => {
   vi.clearAllMocks()
-  ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
-    terminal: { input: vi.fn() },
-  }
-  vi.mocked(useWorkspaceStore).mockReturnValue({
+  // The real stores, with only the actions that reach the main process replaced.
+  useWorkspaceStore.setState({
+    ...useWorkspaceStore.getInitialState(),
     workspaces: [workspace1],
     activeWorkspaceId: 'ws-1',
-    setActiveWorkspace: vi.fn(),
     activeProjectId: 'proj-1',
-    resolveActiveCwd: vi.fn().mockReturnValue('/ws1'),
-    setExpandedWorkspaceIds: vi.fn(),
-  } as unknown as ReturnType<typeof useWorkspaceStore>)
-  vi.mocked(useSessionStore).mockReturnValue({
-    getActiveSessionForProject: vi.fn().mockReturnValue('ses-1'),
-    setActiveSessionForProject: vi.fn(),
-    getSessionsForProject: vi.fn().mockReturnValue([{ id: 'ses-1' }, { id: 'ses-2' }]),
-    getPaneLayout: vi.fn().mockReturnValue(null),
-    getFocusedSession: vi.fn().mockReturnValue(null),
-    closeSplitLeaf: vi.fn(),
+    projectsByWorkspaceId: new Map([['ws-1', [projectOf({ id: 'proj-1', workspaceId: 'ws-1' })]]]),
+    loadProjects: vi.fn().mockResolvedValue(undefined),
+  })
+  useSessionStore.setState({
+    ...useSessionStore.getInitialState(),
+    sessions: new Map([
+      ['ses-1', terminalSessionOf({ id: 'ses-1', projectId: 'proj-1' })],
+      ['ses-2', terminalSessionOf({ id: 'ses-2', projectId: 'proj-1' })],
+    ]),
+    projectViews: new Map([['proj-1', { activeSessionId: 'ses-1', terminalCounter: 0 }]]),
     closeSession: vi.fn().mockResolvedValue(undefined),
-  } as unknown as ReturnType<typeof useSessionStore>)
-  vi.mocked(useWorkspaceStore.getState).mockReturnValue({
-    setActiveProject: vi.fn(),
-  } as unknown as ReturnType<typeof useWorkspaceStore.getState>)
-  vi.mocked(useSessionStore.getState).mockReturnValue({
-    sessions: new Map(),
-    requestFocus: vi.fn(),
-  } as unknown as ReturnType<typeof useSessionStore.getState>)
-  vi.mocked(useSettingsStore).mockReturnValue({
-    resolveSettings: vi.fn().mockReturnValue({ terminal: { scrollbackLimit: 5000 } }),
-  } as unknown as ReturnType<typeof useSettingsStore>)
-  vi.mocked(useExtensionRegistry).mockReturnValue({
-    keyboardShortcuts: [],
-  } as unknown as ReturnType<typeof useExtensionRegistry>)
-  vi.mocked(useExtensionRegistry.getState).mockReturnValue({
-    setActiveGlobalTab: vi.fn(),
-    setActiveWorkspaceTab: vi.fn(),
-    setActiveProjectTab: vi.fn(),
-  } as unknown as ReturnType<typeof useExtensionRegistry.getState>)
+  })
+  useSettingsStore.setState(useSettingsStore.getInitialState(), true)
+  useExtensionRegistry.setState(useExtensionRegistry.getInitialState(), true)
   vi.mocked(useTerminalSession).mockReturnValue({
     createSession: vi.fn().mockResolvedValue('session-id'),
     splitSession: vi.fn().mockResolvedValue(undefined),
-  } as unknown as ReturnType<typeof useTerminalSession>)
+  })
 })
 
 // A menu accelerator has no renderer keydown (e.g. Cmd+Shift+H, Cmd+B), so this

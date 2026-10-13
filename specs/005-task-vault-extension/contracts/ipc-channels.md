@@ -1,5 +1,11 @@
 # Contract: Task Vault IPC Channels
 
+> **Superseded. Kept as history.** This contract records what was decided when the feature was
+> specified, and is not edited. The code no longer has `task-vault:ics:get-events`, and it lists only part of the channels the extension registers today. Do not build against it. The
+> current contract lives in:
+>
+> - `extensions/task-vault/src/ipc/`: each channel is a `ChannelSpec` whose zod schema is its payload contract ([ADR 096](../../../docs/adr/096-every-ipc-channel-has-a-schema.md))
+
 **Version**: 1.0.0  
 **Date**: 2026-05-19  
 **Feature**: `005-task-vault-extension`

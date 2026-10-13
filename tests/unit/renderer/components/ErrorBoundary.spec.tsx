@@ -2,22 +2,13 @@ import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 
-const { mockLogError } = vi.hoisted(() => ({ mockLogError: vi.fn() }))
-vi.mock('../../../../src/renderer/logger.ts', () => ({
-  makeRendererLogger: () => ({
-    debug: vi.fn(),
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: mockLogError,
-  }),
-}))
-
 import { ErrorBoundary } from '../../../../src/renderer/components/ErrorBoundary'
+import { useLogStore } from '../../../../src/renderer/stores/log.store'
 
 // Suppress expected console.error output from React's own boundary reporting
 beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => {})
-  mockLogError.mockClear()
+  useLogStore.setState({ entries: [] })
 })
 
 afterEach(() => {
@@ -27,6 +18,12 @@ afterEach(() => {
 function ThrowingChild({ shouldThrow }: { shouldThrow: boolean }): JSX.Element {
   if (shouldThrow) throw new Error('Test render error')
   return <div>Content renders fine</div>
+}
+
+/** Throws until the test says the fault is gone. */
+const fault = { present: true }
+function FlakyChild(): JSX.Element {
+  return <ThrowingChild shouldThrow={fault.present} />
 }
 
 describe('ErrorBoundary', () => {
@@ -58,26 +55,33 @@ describe('ErrorBoundary', () => {
     expect(screen.getByRole('button', { name: /try to recover/i })).toBeTruthy()
   })
 
-  it('logs error when child throws', () => {
+  it('writes the error to the application log', () => {
     render(
       <ErrorBoundary>
         <ThrowingChild shouldThrow={true} />
       </ErrorBoundary>
     )
-    expect(mockLogError).toHaveBeenCalled()
+    expect(useLogStore.getState().entries).toContainEqual(
+      expect.objectContaining({
+        level: 'error',
+        message: expect.stringContaining(
+          '[error-boundary] Unhandled render error: Test render error'
+        ),
+      })
+    )
   })
 
-  it('clears error state when recovery button is clicked', () => {
+  it('renders the children again once recovery is asked for', () => {
+    fault.present = true
     render(
       <ErrorBoundary>
-        <ThrowingChild shouldThrow={true} />
+        <FlakyChild />
       </ErrorBoundary>
     )
-    const btn = screen.getByRole('button', { name: /try to recover/i })
-    fireEvent.click(btn)
-    // After recovery, the children should attempt to render again
-    // (they'll throw again, but the boundary resets its state)
-    expect(btn).toBeTruthy()
+    fault.present = false
+    fireEvent.click(screen.getByRole('button', { name: /try to recover/i }))
+    expect(screen.getByText('Content renders fine')).toBeTruthy()
+    expect(screen.queryByText('Something went wrong')).toBeNull()
   })
 
   it('uses theme tokens for ALL fallback colors — no hardcoded hex anywhere (light-mode safe)', () => {

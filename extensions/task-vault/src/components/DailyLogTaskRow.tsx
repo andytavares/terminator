@@ -15,7 +15,7 @@ import {
 } from 'lucide-react'
 import type { IndexedTask, TaskStatus } from '../vault/types'
 import { DateTimePicker } from './DateTimePicker'
-import { SmartTaskInput } from './SmartTaskInput'
+import { TaskTextEditor, draftOf } from './inline-edits'
 import { StatusIcon } from './DailyLogStatusIcon'
 import { SessionPicker } from './DailyLogSessionPicker'
 import type { SessionChoice } from './DailyLogSessionPicker'
@@ -318,22 +318,7 @@ function TaskMarker({ row }: RowProps): React.JSX.Element {
 }
 
 function TaskEditor({ row }: RowProps): React.JSX.Element {
-  const { edit } = row
-  return (
-    <span className="daily-log__task-edit">
-      <SmartTaskInput
-        autoFocus
-        value={edit.editText}
-        onChange={edit.setEditText}
-        onSubmit={edit.save}
-        onCancel={() => edit.setEditing(false)}
-      />
-      <Button variant="primary" onClick={() => void edit.save()}>
-        Save
-      </Button>
-      <IconButton icon={X} label="Cancel edit" size="sm" onClick={() => edit.setEditing(false)} />
-    </span>
-  )
+  return <TaskTextEditor draft={draftOf(row.edit)} className="daily-log__task-edit" />
 }
 
 function textTitle(row: Row): string {

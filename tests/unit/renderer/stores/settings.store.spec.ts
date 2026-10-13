@@ -16,8 +16,9 @@ Object.defineProperty(globalThis, 'window', {
 })
 
 import { useSettingsStore } from '../../../../src/renderer/stores/settings.store'
+import type { GlobalSettings } from '../../../../src/shared/schemas/settings.schema'
 
-const DEFAULT_SETTINGS = {
+const DEFAULT_SETTINGS: GlobalSettings = {
   appearance: { theme: 'dark' },
   terminal: {
     scrollbackLimit: 10000,
@@ -173,7 +174,10 @@ describe('useSettingsStore', () => {
       useSettingsStore.setState({
         globalSettings: DEFAULT_SETTINGS,
         workspaceSettings: new Map([
-          ['ws-1', { overrides: { appearance: { theme: 'light' as const } } }],
+          [
+            'ws-1',
+            { workspaceId: 'ws-1', extensions: {}, overrides: { appearance: { theme: 'light' } } },
+          ],
         ]),
       })
       const resolved = useSettingsStore.getState().resolveSettings('ws-1')
@@ -190,7 +194,10 @@ describe('useSettingsStore', () => {
       useSettingsStore.setState({
         globalSettings: { ...DEFAULT_SETTINGS, appearance: { theme: 'dark' as const } },
         workspaceSettings: new Map([
-          ['ws-1', { overrides: { appearance: { theme: 'light' as const } } }],
+          [
+            'ws-1',
+            { workspaceId: 'ws-1', extensions: {}, overrides: { appearance: { theme: 'light' } } },
+          ],
         ]),
       })
       const resolved = useSettingsStore.getState().resolveSettings(null)

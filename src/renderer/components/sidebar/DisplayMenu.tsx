@@ -1,8 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React from 'react'
 import { SlidersHorizontal } from 'lucide-react'
 import type { GroupKey, SessionView, SortKey } from '../../sidebar/view-model'
-import { closeAllContextMenus } from '../ContextMenu'
-import { useMenuPlacement } from '../use-menu-placement'
+import { MenuChoice, useMenu } from './menu'
 import './SidebarMenu.css'
 
 /**
@@ -30,21 +29,7 @@ export interface DisplayMenuProps {
 
 /** How the branch list is arranged: grouping and sort, behind one control. */
 export function DisplayMenu({ view, onChangeView }: DisplayMenuProps): JSX.Element {
-  const [open, setOpen] = useState(false)
-  const buttonRef = useRef<HTMLButtonElement>(null)
-  const panelRef = useRef<HTMLDivElement>(null)
-  const placement = useMenuPlacement(open, buttonRef, panelRef)
-
-  useEffect(() => {
-    if (!open) return
-    const close = (): void => setOpen(false)
-    window.addEventListener('click', close)
-    window.addEventListener('close-context-menus', close)
-    return () => {
-      window.removeEventListener('click', close)
-      window.removeEventListener('close-context-menus', close)
-    }
-  }, [open])
+  const { open, close, toggle, buttonRef, panelRef, placement } = useMenu()
 
   return (
     <div className="sidebar-menu" onClick={(e) => e.stopPropagation()}>
@@ -54,10 +39,7 @@ export function DisplayMenu({ view, onChangeView }: DisplayMenuProps): JSX.Eleme
         className="sidebar-menu__button"
         aria-expanded={open}
         aria-label="Display"
-        onClick={() => {
-          closeAllContextMenus()
-          setOpen((v) => !v)
-        }}
+        onClick={toggle}
       >
         <SlidersHorizontal aria-hidden="true" />
         <span className="sidebar-menu__label">Display</span>
@@ -67,37 +49,31 @@ export function DisplayMenu({ view, onChangeView }: DisplayMenuProps): JSX.Eleme
         <div ref={panelRef} className="sidebar-menu__panel" role="menu" style={placement}>
           <div className="sidebar-menu__heading">Group</div>
           {(Object.keys(GROUP_LABELS) as GroupKey[]).map((key) => (
-            <button
+            <MenuChoice
               key={key}
-              type="button"
-              role="menuitemradio"
-              aria-checked={view.groupBy === key}
-              className={`sidebar-menu__item${view.groupBy === key ? ' sidebar-menu__item--on' : ''}`}
-              onClick={() => {
+              checked={view.groupBy === key}
+              onSelect={() => {
                 onChangeView({ groupBy: key })
-                setOpen(false)
+                close()
               }}
             >
               {GROUP_LABELS[key]}
-            </button>
+            </MenuChoice>
           ))}
 
           <div className="sidebar-menu__separator" />
           <div className="sidebar-menu__heading">Sort</div>
           {(Object.keys(SORT_LABELS) as SortKey[]).map((key) => (
-            <button
+            <MenuChoice
               key={key}
-              type="button"
-              role="menuitemradio"
-              aria-checked={view.sortBy === key}
-              className={`sidebar-menu__item${view.sortBy === key ? ' sidebar-menu__item--on' : ''}`}
-              onClick={() => {
+              checked={view.sortBy === key}
+              onSelect={() => {
                 onChangeView({ sortBy: key })
-                setOpen(false)
+                close()
               }}
             >
               {SORT_LABELS[key]}
-            </button>
+            </MenuChoice>
           ))}
         </div>
       )}

@@ -213,7 +213,11 @@ function noteListItemContextMenuArchivingTests() {
 
 function noteListItemContextMenuDeletingTests() {
   it('restores, and permanently deletes once confirmed, an archived note', async () => {
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    // happy-dom has no window.confirm to spy on, so the test provides one.
+    vi.stubGlobal(
+      'confirm',
+      vi.fn(() => true)
+    )
     useNotesStore.setState({
       notes: [note('n1', 'Old', { archivedAt: '2026-01-01' })],
       selectedNoteId: 'n1',
@@ -227,7 +231,7 @@ function noteListItemContextMenuDeletingTests() {
     await eventually(() => expect(useNotesStore.getState().selectedNoteId).toBeNull())
     expect(bridge.calls('terminator.notepad:notes.hardDelete')).toEqual([{ id: 'n1' }])
     expect(bridge.calls('terminator.notepad:notes.restore')).toEqual([{ id: 'n1' }])
-    confirm.mockRestore()
+    vi.unstubAllGlobals()
   })
 }
 

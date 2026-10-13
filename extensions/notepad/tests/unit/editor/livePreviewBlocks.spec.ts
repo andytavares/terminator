@@ -4,11 +4,12 @@ import { markdown } from '@codemirror/lang-markdown'
 import { GFM } from '@lezer/markdown'
 import type { Decoration, DecorationSet } from '@codemirror/view'
 import { buildDecorations } from '../../../src/editor/livePreview'
+import { parsedState } from '../support/parsed-state'
 
 // GFM must be enabled for Table nodes to exist at all — this mirrors the
 // parser configuration NoteEditor builds.
 function makeState(doc: string, readOnly = false) {
-  return EditorState.create({
+  return parsedState({
     doc,
     extensions: [markdown({ extensions: [GFM] }), EditorState.readOnly.of(readOnly)],
   })

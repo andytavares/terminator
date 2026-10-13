@@ -28,7 +28,7 @@ import {
 import { removeWorktree } from '../git/git-service.js'
 import { emitProjectDelete } from '../extensions/workspace-events.js'
 
-interface ActiveWorkspaceContext {
+export interface ActiveWorkspaceContext {
   workspaceId: string | null
   projectId: string | null
   repoRoot: string | null
@@ -42,10 +42,6 @@ let activeContext: ActiveWorkspaceContext = {
 
 export function setActiveWorkspaceContext(ctx: ActiveWorkspaceContext): void {
   activeContext = ctx
-}
-
-export function getActiveWorkspaceContext(): ActiveWorkspaceContext {
-  return activeContext
 }
 
 const IdSchema = z.object({ id: z.string().min(1) })

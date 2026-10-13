@@ -81,7 +81,7 @@ describe('jira provider — listMine', () => {
 
   it('follows nextPageToken until the last page', async () => {
     let call = 0
-    const fetchMock = vi.fn(async () => {
+    const fetchMock = vi.fn(async (_url: string | URL) => {
       call += 1
       const body = call === 1 ? SEARCH_PAGE_1 : SEARCH_PAGE_2
       return {

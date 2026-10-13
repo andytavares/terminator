@@ -56,7 +56,7 @@ import type {
   TransferInputSchema,
 } from '../schemas/session-records.schema'
 
-export type RemoteBehavior = 'same' | 'omit' | 'stub'
+type RemoteBehavior = 'same' | 'omit' | 'stub'
 
 /**
  * Whether extension views (WebContentsViews running an extension's renderer)
@@ -75,7 +75,7 @@ export interface Signature<Method extends BridgeMethod> {
   readonly [signatureType]?: Method
 }
 
-export function signature<Method extends BridgeMethod>(): Signature<Method> {
+function signature<Method extends BridgeMethod>(): Signature<Method> {
   return {}
 }
 
@@ -108,7 +108,7 @@ export interface ChannelSpec<
 }
 
 /** Declares one method; infers its path and signature so both reach the derived types. */
-export function method<
+function method<
   const Path extends string,
   Method extends BridgeMethod,
   const View extends ExtensionViewBehavior | undefined = undefined,
@@ -117,6 +117,19 @@ export function method<
 }
 
 type Unsubscribe = () => void
+
+/** An event pushed as `{ id }` about one extension, which the handler receives as the id. */
+function extensionIdEvent<const Path extends string>(path: Path, channel: string) {
+  return method({
+    path,
+    kind: 'event',
+    channel,
+    signature: signature<(handler: (id: string) => void) => Unsubscribe>(),
+    toHandlerArgs: (args) => [(args[0] as { id: string }).id],
+    remote: 'omit',
+    extensionView: 'shared',
+  })
+}
 type Failure = { error: string }
 type DetailedFailure = { error: string; message?: string }
 type SessionRecordResult<Data> = Promise<{ data: Data } | { error: string; message: string }>
@@ -268,9 +281,10 @@ export const ELECTRON_API_MANIFEST = [
     path: 'terminal.onProcessExit',
     kind: 'event',
     channel: 'terminal:process-exit',
-    signature: signature<(handler: (sessionId: string, exitCode: number) => void) => Unsubscribe>(),
+    signature:
+      signature<(handler: (sessionId: string, exitCode: number | null) => void) => Unsubscribe>(),
     toHandlerArgs: (args) => {
-      const p = args[0] as { sessionId: string; exitCode: number }
+      const p = args[0] as { sessionId: string; exitCode: number | null }
       return [p.sessionId, p.exitCode]
     },
     extensionView: 'shared',
@@ -327,6 +341,21 @@ export const ELECTRON_API_MANIFEST = [
     >(),
     remote: 'omit',
     extensionView: 'shared',
+  }),
+  method({
+    // The app renderer says what is on screen; workspace.getActive answers from it.
+    path: 'workspace.setActive',
+    kind: 'send',
+    channel: 'workspace:active-changed',
+    signature:
+      signature<
+        (context: {
+          workspaceId: string | null
+          projectId: string | null
+          repoRoot: string | null
+        }) => void
+      >(),
+    remote: 'omit',
   }),
 
   // ── project ───────────────────────────────────────────────────────────────
@@ -859,24 +888,8 @@ export const ELECTRON_API_MANIFEST = [
     remote: 'omit',
     extensionView: 'shared',
   }),
-  method({
-    path: 'extensionEvents.onExtensionPanelLoaded',
-    kind: 'event',
-    channel: 'extension:panel-loaded',
-    signature: signature<(handler: (id: string) => void) => Unsubscribe>(),
-    toHandlerArgs: (args) => [(args[0] as { id: string }).id],
-    remote: 'omit',
-    extensionView: 'shared',
-  }),
-  method({
-    path: 'extensionEvents.onExtensionRendererReload',
-    kind: 'event',
-    channel: 'extension:renderer-reload',
-    signature: signature<(handler: (id: string) => void) => Unsubscribe>(),
-    toHandlerArgs: (args) => [(args[0] as { id: string }).id],
-    remote: 'omit',
-    extensionView: 'shared',
-  }),
+  extensionIdEvent('extensionEvents.onExtensionPanelLoaded', 'extension:panel-loaded'),
+  extensionIdEvent('extensionEvents.onExtensionRendererReload', 'extension:renderer-reload'),
   // Emitted when the double-Escape exit gesture fires inside an extension
   // WebContentsView. Native only: remote extension panels are iframes in the
   // host page, so their Escape never leaves the renderer.

@@ -1,5 +1,12 @@
 # Contract: what this feature must NOT change
 
+> **Superseded. Kept as history.** This contract records what was decided when the feature was
+> specified, and is not edited. The code no longer has `api.sidebar.registerItem`, `registerWorkspaceTab`, `registerPanel`, `api.commands.registerCommand` and `api.project`. Do not build against it. The
+> current contract lives in:
+>
+> - `packages/extension-sdk/types/api.d.ts`: the `ExtensionAPI`, which the core implements in `src/main/extensions/api.ts`
+> - `src/shared/schemas/extension.schema.ts` (`ExtensionManifestSchema`) and [The manifest](../../../docs/EXTENSION-DEVELOPMENT.md#the-manifest)
+
 **Feature**: `034-declutter-sidebar`
 
 FR-037 says the contribution contracts by which extensions register surfaces are unchanged — only where and how densely they are drawn may change. This document is the list, because the sidebar is the host for five contribution points and this feature rebuilds the host.

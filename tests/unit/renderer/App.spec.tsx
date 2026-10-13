@@ -23,7 +23,6 @@ vi.mock('../../../src/renderer/stores/session.store', () => ({
   useSessionStore: Object.assign(vi.fn(), { getState: vi.fn() }),
 }))
 vi.mock('../../../src/renderer/stores/toast.store', () => ({ useToastStore: vi.fn() }))
-vi.mock('../../../src/renderer/stores/log.store', () => ({ installLogInterceptor: vi.fn() }))
 vi.mock('../../../src/renderer/extensions/registry', () => {
   const useExtensionRegistry = vi.fn()
   ;(useExtensionRegistry as unknown as { getState: () => unknown }).getState = vi.fn(() => ({
@@ -38,7 +37,7 @@ vi.mock('../../../src/renderer/extensions/registry', () => {
 })
 vi.mock('../../../src/renderer/extensions/loader', () => ({}))
 const mockUseSessionFacts = vi.fn(() => [] as Array<{ sessionId: string; workItem: unknown }>)
-const mockUseIssue = vi.fn(() => null as { url: string } | null)
+const mockUseIssue = vi.fn((_ref: unknown): { url: string } | null => null)
 vi.mock('../../../src/renderer/components/session/useSessionFacts', () => ({
   useSessionFacts: () => mockUseSessionFacts(),
   useIssue: (ref: unknown) => mockUseIssue(ref),
@@ -445,7 +444,7 @@ describe('App', () => {
   })
 
   it('opens SettingsPanel via menu:open-settings IPC event', async () => {
-    let openSettingsCb: (() => void) | null = null
+    let openSettingsCb: (() => void) | undefined
     ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
       terminal: { onProcessExit: vi.fn().mockReturnValue(mockUnsubscribe) },
       extensionEvents: {
@@ -469,7 +468,7 @@ describe('App', () => {
   })
 
   it('closes SettingsPanel when onClose is called', async () => {
-    let openSettingsCb: (() => void) | null = null
+    let openSettingsCb: (() => void) | undefined
     ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
       terminal: { onProcessExit: vi.fn().mockReturnValue(mockUnsubscribe) },
       extensionEvents: {
@@ -635,7 +634,7 @@ describe('App', () => {
   })
 
   it('calls onMenuOpenSettings extensionEvent to open settings panel', async () => {
-    let openSettingsCallback: (() => void) | null = null
+    let openSettingsCallback: (() => void) | undefined
     ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
       terminal: { onProcessExit: vi.fn().mockReturnValue(mockUnsubscribe) },
       extensionEvents: {
@@ -905,7 +904,7 @@ describe('App', () => {
         projectViews: new Map([['proj-1', { terminalCounter: 0, activeSessionId: 'ses-active' }]]),
       } as unknown as ReturnType<typeof useSessionStore>)
 
-      let closeTabCallback: (() => void) | null = null
+      let closeTabCallback: (() => void) | undefined
       ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
         terminal: { onProcessExit: vi.fn().mockReturnValue(mockUnsubscribe) },
         extensionEvents: {
@@ -947,7 +946,7 @@ describe('App', () => {
         projectViews: new Map(),
       } as unknown as ReturnType<typeof useSessionStore>)
 
-      let closeTabCallback: (() => void) | null = null
+      let closeTabCallback: (() => void) | undefined
       ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
         terminal: { onProcessExit: vi.fn().mockReturnValue(mockUnsubscribe) },
         extensionEvents: {
@@ -980,7 +979,10 @@ describe('App', () => {
       const SCRATCH_PROJECT_ID = '00000000-0000-0000-0000-000000000000'
       const mockCloseSession = vi.fn().mockResolvedValue(undefined)
       const mockCreateSession = vi.fn().mockResolvedValue('ses-scratch')
-      vi.mocked(useTerminalSession).mockReturnValue({ createSession: mockCreateSession })
+      vi.mocked(useTerminalSession).mockReturnValue({
+        createSession: mockCreateSession,
+        splitSession: vi.fn(),
+      })
       setupMocks({
         activeProjectId: null,
         activeWorkspaceId: 'ws-1',
@@ -1001,7 +1003,7 @@ describe('App', () => {
         ]),
       } as unknown as ReturnType<typeof useSessionStore>)
 
-      let closeTabCallback: (() => void) | null = null
+      let closeTabCallback: (() => void) | undefined
       ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
         terminal: { onProcessExit: vi.fn().mockReturnValue(mockUnsubscribe) },
         extensionEvents: {
@@ -1048,7 +1050,7 @@ describe('App', () => {
         projectViews: new Map(),
       } as unknown as ReturnType<typeof useSessionStore>)
 
-      let closeTabCallback: (() => void) | null = null
+      let closeTabCallback: (() => void) | undefined
       ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
         terminal: { onProcessExit: vi.fn().mockReturnValue(mockUnsubscribe) },
         extensionEvents: {
@@ -1094,7 +1096,7 @@ describe('App', () => {
   })
 
   it('closes AboutDialog when onClose is called', async () => {
-    let openAboutCb: (() => void) | null = null
+    let openAboutCb: (() => void) | undefined
     ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
       terminal: { onProcessExit: vi.fn().mockReturnValue(mockUnsubscribe) },
       extensionEvents: {
@@ -1125,7 +1127,10 @@ describe('App', () => {
 
   it('renders scratch terminal after handleNewScratch resolves', async () => {
     const mockCreateSession = vi.fn().mockResolvedValue('sess-scratch')
-    vi.mocked(useTerminalSession).mockReturnValue({ createSession: mockCreateSession })
+    vi.mocked(useTerminalSession).mockReturnValue({
+      createSession: mockCreateSession,
+      splitSession: vi.fn(),
+    })
     setupMocks({ scratchActive: true })
     render(<App />)
     capturedShortcutCallbacks.onNewScratch?.()
@@ -1168,7 +1173,7 @@ describe('App', () => {
   })
 
   it('triggers handleProcessExit when onProcessExit callback fires', () => {
-    let processExitCb: ((sessionId: string, exitCode: number) => void) | null = null
+    let processExitCb: ((sessionId: string, exitCode: number) => void) | undefined
     ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
       terminal: {
         onProcessExit: (cb: (sessionId: string, exitCode: number) => void) => {
@@ -1192,7 +1197,7 @@ describe('App', () => {
   })
 
   it('opens AboutDialog when onMenuOpenAbout event fires', async () => {
-    let openAboutCb: (() => void) | null = null
+    let openAboutCb: (() => void) | undefined
     ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
       terminal: { onProcessExit: vi.fn().mockReturnValue(mockUnsubscribe) },
       extensionEvents: {
@@ -1222,7 +1227,7 @@ describe('App', () => {
 
   it('toggles sidebar when onMenuToggleSidebar event fires', async () => {
     setupMocks({ activeWorkspaceId: 'ws-1' })
-    let toggleSidebarCb: (() => void) | null = null
+    let toggleSidebarCb: (() => void) | undefined
     ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
       terminal: { onProcessExit: vi.fn().mockReturnValue(mockUnsubscribe) },
       extensionEvents: {
@@ -1476,7 +1481,10 @@ describe('App', () => {
 
     it("keeps the reason a branch's first terminal failed to open", async () => {
       const mockCreateSession = vi.fn().mockRejectedValue(new Error('spawn EBADF'))
-      vi.mocked(useTerminalSession).mockReturnValue({ createSession: mockCreateSession })
+      vi.mocked(useTerminalSession).mockReturnValue({
+        createSession: mockCreateSession,
+        splitSession: vi.fn(),
+      })
       setupMocks({ activeProjectId: 'proj-1', activeWorkspaceId: 'ws-1' })
       render(<App />)
       await waitFor(() =>
@@ -1490,7 +1498,10 @@ describe('App', () => {
         .fn()
         .mockRejectedValueOnce(new Error('spawn EBADF'))
         .mockResolvedValue('ses-1')
-      vi.mocked(useTerminalSession).mockReturnValue({ createSession: mockCreateSession })
+      vi.mocked(useTerminalSession).mockReturnValue({
+        createSession: mockCreateSession,
+        splitSession: vi.fn(),
+      })
       setupMocks({ activeProjectId: 'proj-1', activeWorkspaceId: 'ws-1' })
       render(<App />)
       await waitFor(() =>
@@ -1505,7 +1516,10 @@ describe('App', () => {
   describe('handleNewTab', () => {
     it('does nothing when there is no active project and scratchActive is false', () => {
       const mockCreateSession = vi.fn().mockResolvedValue('ses-1')
-      vi.mocked(useTerminalSession).mockReturnValue({ createSession: mockCreateSession })
+      vi.mocked(useTerminalSession).mockReturnValue({
+        createSession: mockCreateSession,
+        splitSession: vi.fn(),
+      })
       setupMocks({ activeProjectId: null, scratchActive: false })
       render(<App />)
       capturedShortcutCallbacks.onNewTab?.()
@@ -1514,7 +1528,10 @@ describe('App', () => {
 
     it('calls createSession when promptForName is false and a project is active', () => {
       const mockCreateSession = vi.fn().mockResolvedValue('ses-1')
-      vi.mocked(useTerminalSession).mockReturnValue({ createSession: mockCreateSession })
+      vi.mocked(useTerminalSession).mockReturnValue({
+        createSession: mockCreateSession,
+        splitSession: vi.fn(),
+      })
       setupMocks({ activeProjectId: 'proj-1', activeWorkspaceId: 'ws-1' })
       // Default resolveSettings returns { terminal: { scrollbackLimit: 5000 } } — no promptForName
       render(<App />)
@@ -1524,7 +1541,10 @@ describe('App', () => {
 
     it('shows NameTerminalDialog when promptForName is true', async () => {
       const mockCreateSession = vi.fn().mockResolvedValue('ses-1')
-      vi.mocked(useTerminalSession).mockReturnValue({ createSession: mockCreateSession })
+      vi.mocked(useTerminalSession).mockReturnValue({
+        createSession: mockCreateSession,
+        splitSession: vi.fn(),
+      })
       setupMocks({ activeProjectId: 'proj-1', activeWorkspaceId: 'ws-1' })
       vi.mocked(useSettingsStore).mockReturnValue({
         loadSettings: mockLoadSettings,
@@ -1546,7 +1566,10 @@ describe('App', () => {
 
     it('NameTerminalDialog onConfirm calls createSession and closes dialog', async () => {
       const mockCreateSession = vi.fn().mockResolvedValue('ses-1')
-      vi.mocked(useTerminalSession).mockReturnValue({ createSession: mockCreateSession })
+      vi.mocked(useTerminalSession).mockReturnValue({
+        createSession: mockCreateSession,
+        splitSession: vi.fn(),
+      })
       setupMocks({ activeProjectId: 'proj-1', activeWorkspaceId: 'ws-1' })
       vi.mocked(useSettingsStore).mockReturnValue({
         loadSettings: mockLoadSettings,
@@ -1570,7 +1593,10 @@ describe('App', () => {
 
     it('NameTerminalDialog onCancel closes dialog without creating a named session', async () => {
       const mockCreateSession = vi.fn().mockResolvedValue('ses-1')
-      vi.mocked(useTerminalSession).mockReturnValue({ createSession: mockCreateSession })
+      vi.mocked(useTerminalSession).mockReturnValue({
+        createSession: mockCreateSession,
+        splitSession: vi.fn(),
+      })
       setupMocks({ activeProjectId: 'proj-1', activeWorkspaceId: 'ws-1' })
       vi.mocked(useSettingsStore).mockReturnValue({
         loadSettings: mockLoadSettings,
@@ -2064,7 +2090,18 @@ describe('App — Quick Actions branch coverage (context, surfaces, custom vars,
 
   it('enables a custom action referencing {issue} once the project has a linked issue', async () => {
     useIntegrationsStore.setState({
-      links: new Map([['proj-1', { key: 'ABC-1', tracker: 'linear' }]]),
+      links: new Map([
+        [
+          'proj-1',
+          {
+            projectId: 'proj-1',
+            tracker: 'linear',
+            key: 'ABC-1',
+            injectContext: false,
+            linkedAt: '',
+          },
+        ],
+      ]),
     })
     setupMocks({
       activeProjectId: 'proj-1',

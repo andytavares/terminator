@@ -30,6 +30,7 @@ describe('FileToPicker', fileToPickerTests)
 describe('FileToPicker keyboard', fileToPickerKeyboardTests)
 describe('InboxProcessor', inboxProcessorTests)
 describe('InboxProcessor filing', inboxProcessorFilingTests)
+describe('InboxProcessor while the inbox reloads', inboxProcessorReloadTests)
 
 function fileToPickerTests() {
   it('lists projects with their area, then areas', async () => {
@@ -214,5 +215,28 @@ function inboxProcessorFilingLeavingTests() {
     expect(bridge.calls('task-vault:vault:process-inbox-item')[0]).toMatchObject({
       action: 'someday',
     })
+  })
+}
+
+const FIRST = task('t1', 'Old flyer')
+const SECOND = task('t2', 'Write a novel')
+const THIRD = task('t3', 'Reply to Sam')
+
+function inboxProcessorReloadTests() {
+  it('offers the next item when the inbox reloads without the one just processed', async () => {
+    const onDone = vi.fn()
+    const { rerender } = render(<InboxProcessor items={[FIRST, SECOND, THIRD]} onDone={onDone} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Trash it' }))
+    // What InboxView does when the vault broadcasts that the index changed.
+    rerender(<InboxProcessor items={[SECOND, THIRD]} onDone={onDone} />)
+    await screen.findByText(/^2 of/)
+    expect(screen.getByText('Write a novel')).toBeTruthy()
+  })
+
+  it('finishes after the last item it was opened with', async () => {
+    const onDone = vi.fn()
+    render(<InboxProcessor items={[FIRST]} onDone={onDone} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Incubate — Backlog' }))
+    await eventually(() => expect(onDone).toHaveBeenCalledTimes(1))
   })
 }

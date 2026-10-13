@@ -9,16 +9,10 @@ import { ciLabel } from '../../line/ci-label.js'
 import { Button, usePolling } from '@terminator/extension-ui'
 import { usePushed, ANY_RECORD } from '../../renderer/use-pushed.js'
 import { invoke } from '@terminator/extension-sdk/renderer'
+import { readSignals, type SensorRow, type SignalsRead } from '../signals-read.js'
 
 // The Factory's front door: every order in the workspace, as a hall card, in
 // place of the list rows `Orders.tsx` draws in List mode.
-
-/** A sensor as `sensors.list` answers it — just enough to offer its own
- *  repository as the default a crate's promotion asks for. */
-interface SensorRow {
-  readonly def: { readonly id: string }
-  readonly state: { readonly repoPath: string | null }
-}
 
 export interface FactoryOrderRow {
   readonly id: string
@@ -195,11 +189,6 @@ function newestFirst(a: FactoryOrderRow, b: FactoryOrderRow): number {
  *  tick and announce nothing; orders and metrics are pushed. */
 const SIGNALS_POLL_MS = 4000
 
-interface SignalsRead {
-  readonly signals: Signal[]
-  readonly sensors: SensorRow[]
-}
-
 async function readOrders(): Promise<FactoryOrderRow[]> {
   const r = (await invoke('foundry:order.list')) as { orders?: FactoryOrderRow[] }
   // Newest first, with the id breaking ties rather than whatever order the
@@ -212,14 +201,6 @@ async function readMetrics(window: '30d' | 'all'): Promise<FactoryMetrics | null
     | FactoryMetrics
     | { error: string }
   return 'error' in r ? null : r
-}
-
-async function readSignals(): Promise<SignalsRead> {
-  const [sig, sen] = await Promise.all([
-    invoke('foundry:signals.list') as Promise<{ signals?: Signal[] }>,
-    invoke('foundry:sensors.list') as Promise<{ sensors?: SensorRow[] }>,
-  ])
-  return { signals: sig.signals ?? [], sensors: sen.sensors ?? [] }
 }
 
 export function FactorySite({ onOpen }: FactorySiteProps): JSX.Element {

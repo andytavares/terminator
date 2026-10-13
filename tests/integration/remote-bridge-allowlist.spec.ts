@@ -57,7 +57,7 @@ describe('remote bridge allowlist (integration: real route + real allowlist)', (
       sendChannel: () => {},
       onWindowEvent: () => () => {},
       // Exactly what api.ipc.isRemoteAccessible does in production.
-      isRemoteAccessible: (channel) => REMOTE_ACCESSIBLE_CHANNELS.has(channel),
+      isRemoteAccessible: async (channel) => REMOTE_ACCESSIBLE_CHANNELS.has(channel),
     })
     await app.listen({ port: 0, host: '127.0.0.1' })
     const addr = app.server.address() as { port: number; address: string }

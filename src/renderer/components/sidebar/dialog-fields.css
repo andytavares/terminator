@@ -13,7 +13,9 @@
   margin-bottom: 5px;
 }
 
-.dialog__input {
+/* A dialog's text input, and a branch picker's trigger drawn as one. */
+.dialog__input,
+.branch-select__trigger {
   width: 100%;
   background: var(--bg-input);
   border: 1px solid var(--border-strong);
@@ -22,8 +24,11 @@
   font-size: 12px;
   font-family: var(--font-ui);
   color: var(--text-primary);
-  outline: none;
   transition: border-color 0.15s;
+}
+
+.dialog__input {
+  outline: none;
 }
 
 .dialog__input:focus {

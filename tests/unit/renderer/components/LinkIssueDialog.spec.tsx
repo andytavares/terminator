@@ -3,36 +3,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { LinkIssueDialog } from '../../../../src/renderer/components/integrations/LinkIssueDialog'
 import { useIntegrationsStore } from '../../../../src/renderer/stores/integrations.store'
-import type { IssueSummary, TrackerConnection } from '../../../../src/shared/types/index'
-
-vi.mock('../../../../src/renderer/stores/modal.store', () => ({ useModalEffect: () => {} }))
+import { useModalStore } from '../../../../src/renderer/stores/modal.store'
+import { issueSummaryOf, trackerConnectionOf } from '../../../support/renderer-stores'
 
 const P = '11111111-1111-4111-8111-111111111111'
-
-function summary(over: Partial<IssueSummary> = {}): IssueSummary {
-  return {
-    tracker: 'linear',
-    id: 'id-1',
-    key: 'TAV-42',
-    title: 'Unify Linear connections',
-    url: 'https://linear.app/tav/issue/TAV-42',
-    state: { name: 'In Progress', type: 'started' },
-    assignee: null,
-    branchName: null,
-    ...over,
-  }
-}
-
-function connected(): TrackerConnection {
-  return {
-    tracker: 'linear',
-    connected: true,
-    account: { name: 'A', email: 'a@b.co' },
-    site: null,
-    mine: { kind: 'assignee', email: null },
-    lastError: null,
-  }
-}
 
 const listMine = vi.fn()
 const searchIssues = vi.fn()
@@ -41,19 +15,19 @@ const loadConnections = vi.fn()
 
 beforeEach(() => {
   vi.clearAllMocks()
-  listMine.mockResolvedValue({ issues: [summary()], failures: [] })
+  listMine.mockResolvedValue({ issues: [issueSummaryOf()], failures: [] })
   searchIssues.mockResolvedValue({ issues: [], failures: [] })
   linkIssue.mockResolvedValue(true)
   loadConnections.mockResolvedValue(undefined)
   useIntegrationsStore.setState({
-    connections: [connected()],
-    links: new Map(),
-    issues: new Map(),
+    ...useIntegrationsStore.getInitialState(),
+    connections: [trackerConnectionOf()],
     listMine,
     searchIssues,
     linkIssue,
     loadConnections,
-  } as never)
+  })
+  useModalStore.setState(useModalStore.getInitialState(), true)
 })
 
 afterEach(() => vi.useRealTimers())
@@ -75,7 +49,7 @@ describe('LinkIssueDialog — opening', () => {
 
   it('shows which tracker each issue came from', async () => {
     listMine.mockResolvedValue({
-      issues: [summary(), summary({ tracker: 'jira', key: 'TAV-7', id: 'id-2' })],
+      issues: [issueSummaryOf(), issueSummaryOf({ tracker: 'jira', key: 'TAV-7', id: 'id-2' })],
       failures: [],
     })
     open()
@@ -98,7 +72,7 @@ describe('LinkIssueDialog — opening', () => {
 describe('LinkIssueDialog — partial failures', () => {
   it('shows what arrived and names the tracker that did not', async () => {
     listMine.mockResolvedValue({
-      issues: [summary()],
+      issues: [issueSummaryOf()],
       failures: [{ tracker: 'jira', error: 'auth-failed' }],
     })
     open()
@@ -111,7 +85,7 @@ describe('LinkIssueDialog — partial failures', () => {
 
   it('names an unconnected tracker without hiding the other one', async () => {
     listMine.mockResolvedValue({
-      issues: [summary()],
+      issues: [issueSummaryOf()],
       failures: [{ tracker: 'jira', error: 'not-connected' }],
     })
     open()
@@ -221,7 +195,7 @@ describe('LinkIssueDialog — linking', () => {
 
 describe('LinkIssueDialog — not connected', () => {
   it('points at settings instead of showing an empty list', async () => {
-    useIntegrationsStore.setState({ connections: [] } as never)
+    useIntegrationsStore.setState({ connections: [] })
     open()
 
     expect(await screen.findByText(/No issue tracker is connected/)).toBeTruthy()
@@ -232,6 +206,14 @@ describe('LinkIssueDialog — not connected', () => {
 })
 
 describe('LinkIssueDialog — dismissal', () => {
+  it('counts as an open modal until it closes', async () => {
+    const { unmount } = open()
+    await screen.findByText('TAV-42')
+    expect(useModalStore.getState().depth).toBe(1)
+    unmount()
+    expect(useModalStore.getState().depth).toBe(0)
+  })
+
   it('closes on Cancel', async () => {
     const onClose = vi.fn()
     open({ onClose })

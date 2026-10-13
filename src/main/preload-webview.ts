@@ -60,10 +60,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.send('terminal:resize', { sessionId, cols, rows }),
     closeAll: () => ipcRenderer.invoke('terminal:close-all'),
     cleanupOrphans: () => ipcRenderer.invoke('terminal:cleanup-orphans'),
-    onProcessExit: (handler: (sessionId: string, exitCode: number) => void) => {
+    onProcessExit: (handler: (sessionId: string, exitCode: number | null) => void) => {
       const listener = (
         _event: Electron.IpcRendererEvent,
-        payload: { sessionId: string; exitCode: number }
+        payload: { sessionId: string; exitCode: number | null }
       ) => handler(payload.sessionId, payload.exitCode)
       ipcRenderer.on('terminal:process-exit', listener)
       return () => ipcRenderer.removeListener('terminal:process-exit', listener)

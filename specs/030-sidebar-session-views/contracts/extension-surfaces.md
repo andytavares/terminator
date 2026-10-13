@@ -1,5 +1,12 @@
 # Contract: Extension Surfaces
 
+> **Superseded. Kept as history.** This contract records what was decided when the feature was
+> specified, and is not edited. The code no longer has `api.sidebar.registerItem`, `api.sidebar.togglePanel` and the `extension:get-sidebar-items` / `extension:sidebar-item-click` channels; an extension contributes surfaces only through its manifest. Do not build against it. The
+> current contract lives in:
+>
+> - `packages/extension-sdk/types/api.d.ts`: the `ExtensionAPI`, which the core implements in `src/main/extensions/api.ts`
+> - `src/shared/schemas/extension.schema.ts` (`ExtensionManifestSchema`) and [The manifest](../../../docs/EXTENSION-DEVELOPMENT.md#the-manifest); `src/renderer/extensions/loader.ts` turns `contributes` into surfaces
+
 **This is the acceptance gate for the feature.** Flattening the sidebar removes the elements that two of
 these surfaces hang on, and a third has never had a working host at all. Every cell in the matrix below is
 asserted by

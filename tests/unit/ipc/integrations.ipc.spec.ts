@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import * as path from 'node:path'
 import type { Issue } from '../../../src/shared/types/index'
+import { makeTempDir } from '../../support/temp-dir'
 
 type Handler = (event: unknown, payload?: unknown) => unknown
 const handlers = vi.hoisted(() => new Map<string, Handler>())
@@ -114,8 +114,8 @@ const projectSettings = () => path.join(projectDir, '.claude', 'settings.local.j
 beforeEach(async () => {
   vi.clearAllMocks()
   vi.resetModules()
-  userData = fs.mkdtempSync(path.join(os.tmpdir(), 'integrations-ipc-ud-'))
-  projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'integrations-ipc-proj-'))
+  userData = makeTempDir('integrations-ipc-ud-')
+  projectDir = makeTempDir('integrations-ipc-proj-')
   sent = []
   verify.linear.mockResolvedValue({ name: 'Andrew', email: 'a@b.c' })
   verify.jira.mockResolvedValue({ name: 'Andrew', email: 'a@b.c', site: 's.atlassian.net' })

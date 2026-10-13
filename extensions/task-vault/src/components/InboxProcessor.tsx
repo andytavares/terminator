@@ -51,16 +51,19 @@ function submitDecision(item: IndexedTask, decision: Decision): Promise<unknown>
 /** Steps through the items one decision at a time; returns the current item and `decide`. */
 function useInboxQueue(props: InboxProcessorProps) {
   const { items, onDone, reviewId = null } = props
+  // The list it was opened with: the inbox reloads as each item is filed, and
+  // walking the shrinking list by index would skip the item after each one.
+  const [queue] = useState(items)
   const [currentIdx, setCurrentIdx] = useState(0)
   const [step, setStep] = useState<InboxStep>('actionable')
   const [isProcessing, setIsProcessing] = useState(false)
   const { refreshInboxCount } = useVaultStore()
-  const current = items[currentIdx]
+  const current = queue[currentIdx]
 
   function advanceToNext() {
     setIsProcessing(false)
     setStep('actionable')
-    if (currentIdx + 1 >= items.length) onDone()
+    if (currentIdx + 1 >= queue.length) onDone()
     else setCurrentIdx(currentIdx + 1)
   }
 
@@ -77,7 +80,7 @@ function useInboxQueue(props: InboxProcessorProps) {
     }
   }
 
-  return { current, currentIdx, step, setStep, decide }
+  return { current, currentIdx, total: queue.length, step, setStep, decide }
 }
 
 /** Files to a new area (created first, in the path form resolveSource expects) or a new project. */
@@ -167,7 +170,7 @@ function ItemCard({ item }: { item: IndexedTask }): React.JSX.Element {
 }
 
 export function InboxProcessor(props: InboxProcessorProps): React.JSX.Element {
-  const { current, currentIdx, step, setStep, decide } = useInboxQueue(props)
+  const { current, currentIdx, total, step, setStep, decide } = useInboxQueue(props)
   if (!current) {
     return <div className="inbox-processor__empty">All items processed!</div>
   }
@@ -175,7 +178,7 @@ export function InboxProcessor(props: InboxProcessorProps): React.JSX.Element {
   return (
     <div className="inbox-processor">
       <div className="inbox-processor__progress">
-        {currentIdx + 1} of {props.items.length}
+        {currentIdx + 1} of {total}
       </div>
       <ItemCard item={current} />
       <Step item={current} setStep={setStep} decide={decide} />

@@ -1,12 +1,12 @@
 import React, { useState } from 'react'
-import { Button, IconButton } from '@terminator/extension-ui'
-import { CalendarCheck, ChevronDown, ChevronRight, Trash2, X } from 'lucide-react'
+import { IconButton } from '@terminator/extension-ui'
+import { CalendarCheck, ChevronDown, ChevronRight, Trash2 } from 'lucide-react'
 import type { IndexedTask } from '../vault/types'
-import { SmartTaskInput } from './SmartTaskInput'
+import { TaskTextEditor, draftOf } from './inline-edits'
 import { bindId, invokeVault, pointerWhen, rawTaskText } from './daily-log-format'
 
 /** What the backlog rows can do; each is optional. */
-export interface BacklogActions {
+interface BacklogActions {
   onPickUpToday?: (taskId: string) => Promise<void>
   onDelete?: (taskId: string) => Promise<void>
   onRefreshBacklog?: () => Promise<void>
@@ -62,21 +62,7 @@ function useBacklogEdit(task: IndexedTask, onRefreshBacklog?: () => Promise<void
 }
 
 function BacklogEditor({ edit }: BacklogEditProps): React.JSX.Element {
-  return (
-    <span className="daily-log__task-edit">
-      <SmartTaskInput
-        autoFocus
-        value={edit.editText}
-        onChange={edit.setEditText}
-        onSubmit={edit.save}
-        onCancel={() => edit.setEditing(false)}
-      />
-      <Button variant="primary" onClick={() => void edit.save()}>
-        Save
-      </Button>
-      <IconButton icon={X} label="Cancel edit" size="sm" onClick={() => edit.setEditing(false)} />
-    </span>
-  )
+  return <TaskTextEditor draft={draftOf(edit)} className="daily-log__task-edit" />
 }
 
 /** One tag after the task text, when the task has it. */

@@ -54,6 +54,21 @@ const focusTrackPlugin = ViewPlugin.define((view) => {
 // ── Widgets ──────────────────────────────────────────────────────
 
 /* v8 ignore start */
+/** A click on the link opens `url` in the system browser (a new window outside the app). */
+function openOnClick(link: HTMLAnchorElement, url: string): void {
+  link.addEventListener('click', (e) => {
+    e.preventDefault()
+    const api = (
+      window as unknown as { electronAPI?: { shell?: { openExternal?: (u: string) => void } } }
+    ).electronAPI
+    if (api?.shell?.openExternal) {
+      api.shell.openExternal(url)
+    } else {
+      window.open(url, '_blank', 'noopener')
+    }
+  })
+}
+
 class BulletWidget extends WidgetType {
   toDOM(): HTMLElement {
     const span = document.createElement('span')
@@ -125,10 +140,7 @@ class LinkWidget extends WidgetType {
     a.textContent = this.label
     a.className = 'notepad-link-widget'
     a.title = this.url
-    a.addEventListener('click', (e) => {
-      e.preventDefault()
-      openExternalLink(this.url)
-    })
+    openOnClick(a, this.url)
     return a
   }
 
@@ -188,18 +200,6 @@ function appendInline(parent: HTMLElement, text: string): void {
   }
 }
 
-/** Opens a link in the system browser, or a new window outside Electron. */
-function openExternalLink(url: string): void {
-  const api = (
-    window as unknown as { electronAPI?: { shell?: { openExternal?: (u: string) => void } } }
-  ).electronAPI
-  if (api?.shell?.openExternal) {
-    api.shell.openExternal(url)
-  } else {
-    window.open(url, '_blank', 'noopener')
-  }
-}
-
 const INLINE_SPAN_TAGS = { code: 'code', strong: 'strong', em: 'em', del: 'del' } as const
 
 function inlineSpanToDOM(span: InlineSpan): Node {
@@ -217,10 +217,7 @@ function inlineLinkToDOM(text: string, href: string): Node {
   el.textContent = text
   el.href = href
   el.title = href
-  el.addEventListener('click', (e) => {
-    e.preventDefault()
-    openExternalLink(href)
-  })
+  openOnClick(el, href)
   return el
 }
 
@@ -695,7 +692,9 @@ const livePreviewDecorations = StateField.define<DecorationSet>({
   },
   update(decos, tr) {
     const focusChanged = tr.effects.some((e) => e.is(setEditorFocused))
-    if (tr.docChanged || tr.selection || focusChanged) {
+    // The first parse is time-boxed; the rest of the tree arrives later on its own.
+    const treeChanged = syntaxTree(tr.state) !== syntaxTree(tr.startState)
+    if (tr.docChanged || tr.selection || focusChanged || treeChanged) {
       const focused = tr.state.field(editorFocusedField)
       return buildDecorations(tr.state, tr.state.selection.main, focused)
     }

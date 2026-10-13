@@ -79,7 +79,8 @@ function createForge(
     priorArtFor: (paths) => priorArtFor(dataRoot(), paths),
     // The redraft lands here, when the architect's turn ends — minutes after
     // the channel that started it answered.
-    converge: (order, message) => loop.convergeMaybeScouted(order, message),
+    converge: (order, message, recordStart) =>
+      loop.convergeMaybeScouted(order, message, recordStart),
     // FR-059a: asked when the order is agreed, so an issue that will never
     // move is known before the run rather than after it.
     capability: (order) => checkCapability(order, writeBackDepsFor(dataRoot(), order, issuesPort)),

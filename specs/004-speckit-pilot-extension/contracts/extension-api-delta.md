@@ -1,5 +1,12 @@
 # ExtensionAPI Delta: SpecKit Pilot Extension
 
+> **Superseded. Kept as history.** This contract records what was decided when the feature was
+> specified, and is not edited. The code no longer has `sidebar.registerPanel`, `topBar.registerMenuItem`, `fs.watch` and `keyboard.register`. Do not build against it. The
+> current contract lives in:
+>
+> - `packages/extension-sdk/types/api.d.ts`: the `ExtensionAPI`, which the core implements in `src/main/extensions/api.ts`
+> - [ADR 094](../../../docs/adr/094-extensions-follow-the-vs-code-model.md)
+
 **Feature**: `004-speckit-pilot-extension` | **Date**: 2026-05-10
 
 This document records that the SpecKit Pilot extension uses **no new ExtensionAPI surface**. All interactions use ExtensionAPI v1.1.0 as published.

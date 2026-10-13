@@ -54,7 +54,7 @@ function CaptureRow({ capture }: { capture: Capture }): React.JSX.Element {
     <div className="wr-step__capture-row">
       <input
         autoFocus
-        className="wr-step__capture-input"
+        className="tmui-input wr-step__capture-input"
         placeholder="Add to inbox…"
         value={text}
         onChange={(e) => setText(e.target.value)}

@@ -1,5 +1,12 @@
 # IPC Channels: Markdown Notepad Extension
 
+> **Superseded. Kept as history.** This contract records what was decided when the feature was
+> specified, and is not edited. The code no longer has the two-argument `api.ipc.registerHandler(channel, handler)` and `window.electronAPI.ipc.invoke`; the channel names below still exist, and a view calls them with `extensionBridge.invoke`. Do not build against it. The
+> current contract lives in:
+>
+> - `extensions/notepad/src/ipc/`: each channel is a `ChannelSpec` whose zod schema is its payload contract ([ADR 096](../../../docs/adr/096-every-ipc-channel-has-a-schema.md))
+> - `packages/extension-sdk/types/renderer.d.ts`: the `window.electronAPI` an extension view receives
+
 **Extension ID**: `terminator.notepad`  
 **Channel prefix**: `terminator.notepad:`  
 **Date**: 2026-06-18  

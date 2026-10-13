@@ -1,8 +1,10 @@
 import { vi } from 'vitest'
+import { join } from 'node:path'
 import type { ChannelSpec, ExtensionAPI } from '@terminator/extension-sdk'
 import { activate, deactivate } from '../../../src/index.ts'
+import { makeTempDir } from '../../../../../tests/support/temp-dir'
 
-export interface RegisteredChannel {
+interface RegisteredChannel {
   spec: ChannelSpec
   remoteAccessible: boolean
 }
@@ -13,15 +15,25 @@ export interface FakeWorkspace {
   worktreePaths: string[]
 }
 
+/** A `paths.globalStorage` in a fresh userData, `<userData>/extensions/<id>`, not created yet. */
+export function freshGlobalStorage(): string {
+  const userData = makeTempDir('git-integration-user-data-')
+  return join(userData, 'extensions', 'terminator.git-integration')
+}
+
 /**
  * Activates git-integration against a stand-in API and returns every channel
- * it registered, with the shell and gh entry points as spies.
+ * it registered, with the shell, gh and the log's warn as spies.
  */
-export function activateCapturingChannels(workspace?: FakeWorkspace) {
+export function activateCapturingChannels(
+  workspace?: FakeWorkspace,
+  globalStorage = freshGlobalStorage()
+) {
   const channels: RegisteredChannel[] = []
   const disposable = { dispose: () => {} }
   const exec = vi.fn()
   const githubApi = vi.fn()
+  const warn = vi.fn()
   const api = {
     ipc: {
       registerHandler: (spec: ChannelSpec, opts?: { remoteAccessible?: boolean }) => {
@@ -34,7 +46,8 @@ export function activateCapturingChannels(workspace?: FakeWorkspace) {
       register: () => disposable,
       isBranchExcluded: async () => false,
     },
-    paths: { app: '/app', userData: '/user-data' },
+    paths: { app: '/app', globalStorage },
+    log: { debug: () => {}, info: () => {}, warn, error: () => {} },
     commands: { register: () => disposable },
     window: { broadcast: () => {}, openAuxiliary: () => {} },
     nativeMenu: { addViewMenuItem: () => disposable },
@@ -54,5 +67,5 @@ export function activateCapturingChannels(workspace?: FakeWorkspace) {
   } as unknown as ExtensionAPI
   activate(api)
   deactivate()
-  return { channels, exec, githubApi }
+  return { channels, exec, githubApi, warn }
 }

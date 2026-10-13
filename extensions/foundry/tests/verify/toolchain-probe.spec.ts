@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import * as path from 'node:path'
 import { probeToolchain, installCommandFor } from '../../src/verify/toolchain-probe.js'
 import { CHECK_NAMES } from '../../src/verify/check-names.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 // The probe is what makes "works in any repository, with nothing installed"
 // true rather than a claim. It reads manifests and never executes them: FR-070
@@ -22,7 +22,7 @@ function write(rel: string, body: string): void {
 }
 
 beforeEach(() => {
-  repo = fs.mkdtempSync(path.join(os.tmpdir(), 'foundry-probe-'))
+  repo = makeTempDir('foundry-probe-')
 })
 
 afterEach(() => {

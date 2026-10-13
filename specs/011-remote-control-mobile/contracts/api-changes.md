@@ -1,5 +1,9 @@
 # API Contract Changes: Remote Control Mobile UI
 
+> **Kept as history.** This contract records what was decided when the feature was specified, and
+> is not edited. One detail differs from the code: the terminal stream is a WebSocket at `/ws/terminals/:sessionId`
+> (`src/renderer-remote/components/MobileTerminalView.tsx`), not `GET (WS) /api/terminals/:sessionId`.
+
 **Feature**: `specs/011-remote-control-mobile`
 **Date**: 2026-06-19
 

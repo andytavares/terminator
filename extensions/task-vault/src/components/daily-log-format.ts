@@ -64,7 +64,7 @@ function pad(n: number): string {
 }
 
 /** A local date as YYYY-MM-DD. */
-export function ymd(d: Date): string {
+function ymd(d: Date): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
 
@@ -120,7 +120,7 @@ function meridiem(hour: number): string {
   return 'PM'
 }
 
-export function format12h(hhmm: string): string {
+function format12h(hhmm: string): string {
   const parts = hhmm.split(':')
   const h = parseInt(parts[0] ?? '0', 10)
   const mStr = parts[1] ?? '00'
@@ -128,7 +128,7 @@ export function format12h(hhmm: string): string {
 }
 
 /** The weekday numbers of a 'weekly:1,3' rule. */
-export function weeklyDays(rule: string): number[] {
+function weeklyDays(rule: string): number[] {
   return rule
     .slice('weekly:'.length)
     .split(',')

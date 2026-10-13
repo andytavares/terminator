@@ -25,7 +25,7 @@ interface Props {
 const SEVERITY_RANK: Record<string, number> = { 'must-fix': 3, suggestion: 2, question: 1, nit: 0 }
 
 /** "Yesterday 17:42" / "Today 09:10", or how long before, for the resume card (S2). */
-export function formatResumeTime(iso: string): string {
+function formatResumeTime(iso: string): string {
   const then = new Date(iso)
   if (Number.isNaN(then.getTime())) return ''
   const now = new Date()

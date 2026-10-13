@@ -2,11 +2,11 @@
 // changes its menus and drag-and-drop make. Kept free of React so the list
 // component stays a thin view over it.
 
-import { useNotesStore } from '../stores/notes.store'
-import type { DiagramListItem, Folder, NoteListItem, SearchResult, Tag } from '../db/types'
+import { loadLibrary, useNotesStore } from '../stores/notes.store'
+import type { DiagramListItem, NoteListItem, SearchResult, Tag } from '../db/types'
 
 export type ItemKind = 'note' | 'diagram'
-export type ListedNote = NoteListItem | SearchResult
+type ListedNote = NoteListItem | SearchResult
 
 export type MixedItem =
   | { kind: 'note'; item: ListedNote }
@@ -16,29 +16,6 @@ export type MixedItem =
 export interface ItemRef {
   id: string
   type: ItemKind
-}
-
-/** Loads the note, diagram and folder lists into the store. */
-export async function loadLists(): Promise<void> {
-  const bridge = window.electronAPI.extensionBridge
-  const [notesResult, diagramsResult, foldersResult] = await Promise.all([
-    bridge.invoke('terminator.notepad:notes.list', { includeArchived: true }),
-    bridge.invoke('terminator.notepad:diagrams.list', { includeArchived: true }),
-    bridge.invoke('terminator.notepad:folders.list', {}),
-  ])
-  const store = useNotesStore.getState()
-  const listOf = (result: unknown) => (result as { data?: unknown[] }).data
-  const notesData = listOf(notesResult)
-  if (Array.isArray(notesData)) store.setNotes(notesData as NoteListItem[])
-  const diagramsData = listOf(diagramsResult)
-  if (Array.isArray(diagramsData)) store.setDiagrams(diagramsData as DiagramListItem[])
-  const foldersData = listOf(foldersResult)
-  if (Array.isArray(foldersData)) store.setFolders(foldersData as Folder[])
-}
-
-/** Reloads the lists after a change; a failure is logged. */
-export async function reloadLists(): Promise<void> {
-  await loadLists().catch((err) => console.error('[notepad] Failed to reload', err))
 }
 
 /** Every tag in use, with how many notes and diagrams carry it. */
@@ -79,7 +56,7 @@ function sortOrderOf(entry: MixedItem): number {
 }
 
 /** Notes and diagrams together, by sort order and then most recently updated. */
-export function mergeSorted(notes: ListedNote[], diagrams: DiagramListItem[]): MixedItem[] {
+function mergeSorted(notes: ListedNote[], diagrams: DiagramListItem[]): MixedItem[] {
   const mixed: MixedItem[] = [
     ...notes.map((n) => ({ kind: 'note' as const, item: n })),
     ...diagrams.map((d) => ({ kind: 'diagram' as const, item: d })),
@@ -194,7 +171,7 @@ export async function applyDrop(dragged: ItemRef, plan: DropPlan): Promise<void>
     )
   }
   await Promise.all(ops)
-  await reloadLists()
+  await loadLibrary()
 }
 
 /** Moves an item into a folder, or out to the root with null. */
@@ -202,7 +179,7 @@ export async function moveToFolder(item: ItemRef, folderId: string | null): Prom
   await window.electronAPI.extensionBridge
     .invoke('terminator.notepad:folders.move', { items: [item], folderId })
     .catch(console.error)
-  await reloadLists()
+  await loadLibrary()
 }
 
 function channelBase(type: ItemKind): string {
@@ -214,7 +191,7 @@ export async function toggleArchived(item: ItemRef, isArchived: boolean): Promis
   await window.electronAPI.extensionBridge
     .invoke(`${channelBase(item.type)}.${action}`, { id: item.id })
     .catch(console.error)
-  await reloadLists()
+  await loadLibrary()
 }
 
 /** Deletes an archived item for good, once confirmed, and drops it from the selection. */
@@ -233,7 +210,7 @@ export async function deleteForGood(item: ItemRef, isArchived: boolean): Promise
   if (item.type === 'diagram' && store.selectedDiagramId === item.id) {
     store.setSelectedDiagram(null)
   }
-  await reloadLists()
+  await loadLibrary()
 }
 
 /** Renames a folder; the caller reloads the lists once it has closed the rename. */
@@ -247,5 +224,5 @@ export async function deleteFolder(folderId: string): Promise<void> {
   await window.electronAPI.extensionBridge
     .invoke('terminator.notepad:folders.delete', { id: folderId })
     .catch(console.error)
-  await reloadLists()
+  await loadLibrary()
 }

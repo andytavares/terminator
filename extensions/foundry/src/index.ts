@@ -3,6 +3,7 @@ import type { ExtensionAPI } from '@terminator/extension-sdk'
 import { disposables } from './ipc/register.js'
 import type { ActivationContext } from './ipc/register.js'
 import { noteUntrackedDataRoot, resolveFoundryDataRoot } from './workspace-root.js'
+import { moveFromSharedUserData } from './storage-folder.js'
 import { connectIndexes } from './state/live-index.js'
 import { startSupervisionRuntime, stopSupervisionRuntime } from './runtime/supervision-runtime.js'
 import { startSensorTick, stopSensorTick } from './sensors/sensor-tick.js'
@@ -31,6 +32,8 @@ import { registerSettings } from './state/settings-schema.js'
  * ambiguous and two writers resolving it independently could disagree.
  */
 export function activate(api: ExtensionAPI): void {
+  // Before anything opens the records or the runtime state.
+  moveFromSharedUserData(api)
   connectIndexes(api)
   // Activation cannot be async — the host calls it synchronously — so the
   // runtime comes up in the background.

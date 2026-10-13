@@ -4,7 +4,7 @@ import { useSessionRecordsStore } from '../stores/session-records.store'
 import { useSettingsStore } from '../stores/settings.store'
 import { useExtensionRegistry } from '../extensions/registry'
 import { createTerminalSession } from './session-controller'
-import { navigateToSession } from './navigate-to-session'
+import { revealSession } from './navigate-to-session'
 import { planResume } from '../sidebar/resume'
 import type { SessionFacts } from '../sidebar/session-facts'
 import { SCRATCH_PROJECT_ID } from '../../shared/types/index'
@@ -30,7 +30,7 @@ export async function startSessionInBranch(projectId: string): Promise<void> {
   const cwd = project.worktreePath ?? workspace?.folderPath ?? '~'
   try {
     const sessionId = await createTerminalSession(projectId, 'human', '', cwd, scrollbackLimit)
-    navigateToSession(sessionId)
+    revealSession(sessionId)
   } catch {
     // The controller has already said why; Home stays where it is.
   }
@@ -96,5 +96,5 @@ export async function resumeSession(facts: SessionFacts): Promise<void> {
   const previous = useSessionStore.getState().sessions.get(plan.fromSessionId)
   if (previous !== undefined) await useSessionStore.getState().closeSession(plan.fromSessionId)
 
-  navigateToSession(sessionId)
+  revealSession(sessionId)
 }

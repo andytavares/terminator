@@ -1,9 +1,8 @@
 import { test, expect } from '@playwright/test'
 import { execSync } from 'node:child_process'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { AppHandle, launchApp, closeApp, createWorkspace } from './helpers'
+import { AppHandle, launchApp, closeApp, createWorkspace, e2eTempDir } from './helpers'
 import { CONTRAST_PROBE, type Probe } from './contrast-probe'
 
 /**
@@ -20,7 +19,7 @@ let repo: string
 
 /** A repository mid-merge, with one file genuinely conflicted. */
 function makeConflictedRepo(): string {
-  const dir = mkdtempSync(join(tmpdir(), 'terminator-e2e-conflict-'))
+  const dir = e2eTempDir('terminator-e2e-conflict-')
   const run = (c: string) => execSync(c, { cwd: dir })
   run('git init -b main')
   run('git config user.email "test@test.com"')

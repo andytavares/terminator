@@ -1,5 +1,9 @@
 # Contract: Change Statistics IPC
 
+> **Kept as history.** This contract records what was decided when the feature was specified, and
+> is not edited. One detail differs from the code: the preload is `src/main/preload.ts`, and the channel is declared in
+> `src/shared/electron-api/manifest.ts` (ADR 096); there is no `src/preload/index.ts`.
+
 **Feature**: `032-branch-first-sidebar`
 
 One new main-process capability and one new IPC channel. Follows the existing `git-service → git.ipc → preload → renderer store` path used by every other git feature in core.

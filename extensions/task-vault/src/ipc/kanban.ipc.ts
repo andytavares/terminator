@@ -46,6 +46,7 @@ const SaveConfigSchema = z.object({
       taskStatuses: z.array(
         z.enum(['open', 'done', 'migrated', 'cancelled', 'in-progress', 'in-review', 'blocked'])
       ),
+      dotColor: z.string().optional(),
     })
   ),
   swimlaneGrouping: z.enum(['none', 'project', 'area']),

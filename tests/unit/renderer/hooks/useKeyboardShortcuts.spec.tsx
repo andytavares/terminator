@@ -86,7 +86,7 @@ function setupMocks(
   vi.mocked(useTerminalSession).mockReturnValue({
     createSession: mockCreateSession,
     splitSession: mockSplitSession,
-  } as unknown as ReturnType<typeof useWorkspaceStore>)
+  })
 }
 
 beforeEach(() => {
@@ -544,7 +544,7 @@ describe('session navigation shortcuts (FR-032)', () => {
     storeSessions = new Map([
       ['a', mkSession('a', 'p1', { lastAttendedAt: 300 })],
       ['b', mkSession('b', 'p2', { lastAttendedAt: 200 })],
-      ['c', mkSession('c', 'p3', { lastAttendedAt: 100, agentState: 'awaiting-input' })],
+      ['c', mkSession('c', 'p3', { lastAttendedAt: 100, bellCount: 1 })],
     ])
     setupMocks({ activeProjectId: 'p1' })
     mockGetActiveSessionForProject.mockReturnValue('a')

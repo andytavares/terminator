@@ -6,16 +6,16 @@ import './SidebarHeader.css'
 interface SidebarHeaderProps {
   onSearchFocus: () => void
   onAddWorkspace: () => void
-  searchQuery?: string
-  onSearchChange?: (q: string) => void
-  onSearchClear?: () => void
+  searchQuery: string
+  onSearchChange: (q: string) => void
+  onSearchClear: () => void
   /** The Filter and Display menus, which act on the list below. */
   children?: React.ReactNode
 }
 
 export function SidebarHeader({
   onAddWorkspace,
-  searchQuery = '',
+  searchQuery,
   onSearchChange,
   onSearchClear,
   children,
@@ -23,11 +23,7 @@ export function SidebarHeader({
   return (
     <div className="sidebar-header">
       <div className="sidebar-header__search-row">
-        <SidebarSearch
-          query={searchQuery}
-          onChange={onSearchChange ?? (() => {})}
-          onClear={onSearchClear ?? (() => {})}
-        />
+        <SidebarSearch query={searchQuery} onChange={onSearchChange} onClear={onSearchClear} />
         {children}
         <button
           className="sidebar-header__add"

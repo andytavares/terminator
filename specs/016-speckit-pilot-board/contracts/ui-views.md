@@ -1,5 +1,11 @@
 # Contract: UI Views (SpecKit Pilot Board)
 
+> **Superseded. Kept as history.** This contract records what was decided when the feature was
+> specified, and is not edited. The code no longer has the board and the `speckit:*` events its views listen to. Do not build against it. The
+> current contract lives in:
+>
+> - `extensions/foundry/src/ipc/`: the SpecKit Pilot became Foundry and its `speckit:*` channels became `foundry:*` ([ADR 040](../../../docs/adr/040-the-work-order-is-the-contract.md), `CHANGELOG.md`)
+
 All components live under `extensions/speckit-pilot/src/renderer/components/`. Colors
 via inherited `--tm-*` tokens only; icons `lucide-react`, flat, `currentColor`, size
 via CSS (Constitution XII).

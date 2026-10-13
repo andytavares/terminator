@@ -6,6 +6,7 @@ import { WorkspaceSettings } from './WorkspaceSettings'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import { useModalEffect } from '../../stores/modal.store'
 import { dispatchNotification } from '../../lib/notifications'
+import '@terminator/extension-ui/settings-fields.css'
 import './SettingsPanel.css'
 
 type Section = 'global' | 'workspace' | 'integrations' | 'extensions'
@@ -207,7 +208,9 @@ function ExtensionsSection(): JSX.Element {
     if ('cancelled' in result) return
     const installResult = await window.electronAPI.extension.install(result.filePath)
     if ('extension' in installResult) {
-      setExtensions((prev) => [...prev, installResult.extension])
+      // The list main announced may already hold it.
+      const installed = installResult.extension
+      setExtensions((prev) => [...prev.filter((e) => e.id !== installed.id), installed])
       dispatchNotification({
         type: 'info',
         title: 'Extension installed',

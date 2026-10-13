@@ -17,14 +17,13 @@ describe('registerAdminIpcHandlers', registerAdminIpcHandlersTests)
 
 function registerAdminIpcHandlersTests() {
   describe('registration', registerAdminIpcHandlersRegistrationTests)
-  registerAdminIpcHandlersListTablesTests()
+  registerAdminIpcHandlersChannelTests()
 }
 
 function registerAdminIpcHandlersRegistrationTests() {
-  it('registers the three admin channels and dispose removes them', () => {
+  it('registers the two admin channels and dispose removes them', () => {
     const dispose = registerAdminIpcHandlers(harness.api, db)
     expect(harness.channels().sort()).toEqual([
-      'task-vault:admin:list-tables',
       'task-vault:admin:run-query',
       'task-vault:admin:table-stats',
     ])
@@ -35,8 +34,7 @@ function registerAdminIpcHandlersRegistrationTests() {
 
 const runQuery = (sql: string) => harness.invoke('task-vault:admin:run-query', { sql })
 
-function registerAdminIpcHandlersListTablesTests() {
-  describe('list-tables', listTablesTests)
+function registerAdminIpcHandlersChannelTests() {
   describe('table-stats', tableStatsTests)
   describe('run-query', runQueryTests)
 }
@@ -118,31 +116,6 @@ function runQueryErrorsTests() {
   })
 }
 
-function listTablesTests() {
-  it('lists the tables of the database, sorted', async () => {
-    registerAdminIpcHandlers(harness.api, db)
-    const result = (await harness.invoke('task-vault:admin:list-tables')) as { tables: string[] }
-    expect(result.tables).toEqual([
-      'area_archive_changes',
-      'areas',
-      'projects',
-      'settings',
-      'tasks',
-      'weekly_review_actions',
-      'weekly_reviews',
-    ])
-  })
-
-  it('returns the error when the database is closed', async () => {
-    const database = new DatabaseSync(':memory:')
-    const closed = wrapDb(database)
-    database.close()
-    registerAdminIpcHandlers(harness.api, closed)
-    const result = (await harness.invoke('task-vault:admin:list-tables')) as { error: string }
-    expect(result.error).toMatch(/not open/)
-  })
-}
-
 function tableStatsTests() {
   it('counts the rows of every table', async () => {
     await seedArea(db, 'a1', 'Work')
@@ -153,5 +126,14 @@ function tableStatsTests() {
       stats: Record<string, number>
     }
     expect(result.stats).toMatchObject({ tasks: 1, areas: 2, projects: 0 })
+  })
+
+  it('returns the error when the database is closed', async () => {
+    const database = new DatabaseSync(':memory:')
+    const closed = wrapDb(database)
+    database.close()
+    registerAdminIpcHandlers(harness.api, closed)
+    const result = (await harness.invoke('task-vault:admin:table-stats')) as { error: string }
+    expect(result.error).toMatch(/not open/)
   })
 }

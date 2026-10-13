@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import { useNotesStore } from '../stores/notes.store'
 import { NoteEditor } from '../editor/NoteEditor'
+import { noteTitle } from '../db/note-title'
 import type { DiagramListItem } from '../db/types'
 import { Button, SegmentedControl, useDismissible } from '@terminator/extension-ui'
 
@@ -17,12 +18,10 @@ function toFilenameSlug(title: string): string {
   )
 }
 
-function deriveTitle(body: string): string {
-  const headingMatch = /^#{1,6}\s+(.+)/m.exec(body)
-  if (headingMatch) return headingMatch[1].trim()
-  const firstLine = body.split('\n').find((l) => l.trim().length > 0)
-  if (firstLine) return firstLine.trim().slice(0, 120)
-  return 'Untitled note'
+/** The tags with `raw` added as a tag (lower case, spaces as dashes), unless blank or present. */
+function withTag(tags: string[], raw: string): string[] {
+  const tag = raw.trim().toLowerCase().replace(/\s+/g, '-')
+  return tag && !tags.includes(tag) ? [...tags, tag] : tags
 }
 
 type CreateKind = 'note' | 'diagram' | 'folder'
@@ -96,20 +95,6 @@ const CREATE_KINDS = [
   { value: 'folder', label: 'Folder' },
 ] as const
 
-/** How a typed tag is stored: lower case, spaces as hyphens. */
-function normalizeTag(raw: string): string {
-  return raw.trim().toLowerCase().replace(/\s+/g, '-')
-}
-
-/**
- * The tags to save, including one still in the input: onBlur fires before
- * onClick, but React 18 batching means its setTags may not have applied yet.
- */
-function tagsWithPending(tags: string[], tagInput: string): string[] {
-  const pendingTag = normalizeTag(tagInput)
-  return pendingTag && !tags.includes(pendingTag) ? [...tags, pendingTag] : tags
-}
-
 /** Re-lists a collection into the store; resolves to the list, if one came back. */
 async function listInto<T>(channel: string, payload: object, store: (items: T[]) => void) {
   const result = await window.electronAPI.extensionBridge.invoke(channel, payload)
@@ -153,13 +138,15 @@ async function createDiagram(diagram: Omit<NewNote, 'body'>): Promise<void> {
 /** Creates the folder, diagram or note the draft describes. */
 async function saveDraft(draft: QuickCreateDraft): Promise<void> {
   const { type, title, body } = draft
-  const tags = tagsWithPending(draft.tags, draft.tagInput)
+  // Includes a tag still in the input: onBlur fires before onClick, but React 18
+  // batching means its setTags may not have applied yet.
+  const tags = withTag(draft.tags, draft.tagInput)
   if (type === 'folder') {
     await createFolder(title.trim())
   } else if (type === 'diagram') {
     await createDiagram({ title: title.trim() || 'Untitled diagram', tags })
   } else {
-    await createNote({ title: title.trim() || deriveTitle(body), body, tags })
+    await createNote({ title: title.trim() || noteTitle(body), body, tags })
   }
 }
 
@@ -236,10 +223,7 @@ function useOpenDefaults(open: boolean, draft: QuickCreateDraft, titleRef: Title
 function useTagEditing(draft: QuickCreateDraft) {
   const { tags, setTags, tagInput, setTagInput } = draft
   function addTag(raw: string) {
-    const trimmed = normalizeTag(raw)
-    if (trimmed && !tags.includes(trimmed)) {
-      setTags((prev) => [...prev, trimmed])
-    }
+    setTags((prev) => withTag(prev, raw))
     setTagInput('')
   }
 

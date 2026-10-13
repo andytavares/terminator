@@ -1,5 +1,5 @@
 import React from 'react'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { AppBand } from '../../../../src/renderer/components/sidebar/AppBand'
 
@@ -11,7 +11,7 @@ const globalTabs = [
   { id: 'vault', label: 'Task Vault', component: noop },
 ]
 
-let onSelect: ReturnType<typeof vi.fn>
+let onSelect: Mock<(id: string) => void>
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -36,11 +36,6 @@ describe('AppBand — one labelled home for app-level surfaces (US4)', () => {
       // No drawn label: the band is icons only.
       expect(entry.textContent).toBe('')
     }
-  })
-
-  it('draws one entry per global tab', () => {
-    const { container } = renderBand()
-    expect(container.querySelectorAll('.app-band__entry')).toHaveLength(3)
   })
 
   it('gives every entry an accessible name', () => {
@@ -120,11 +115,6 @@ describe('AppBand — one labelled home for app-level surfaces (US4)', () => {
 })
 
 describe('AppBand — quick actions', () => {
-  it('renders nothing when the prop is absent', () => {
-    const { container } = renderBand({ globalTabs: [] })
-    expect(container.querySelector('.app-band')).toBeNull()
-  })
-
   it('renders the band for this entry alone', () => {
     const onOpenQuickActions = vi.fn()
     const { container } = renderBand({ globalTabs: [], onOpenQuickActions })

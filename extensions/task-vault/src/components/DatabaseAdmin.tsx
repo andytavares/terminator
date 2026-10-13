@@ -122,7 +122,8 @@ async function executeQuery(querySql: string): Promise<{ result: QueryResult; wr
       }
     }
     const result = { rows: res.rows ?? [], changes: res.changes ?? 0, elapsed, sourceSql: querySql }
-    return { result, wrote: !res.rows }
+    // A write answers with an empty row list too, so it shows as rows it changed.
+    return { result, wrote: result.changes > 0 }
   } catch (err) {
     const result = {
       rows: [],

@@ -21,7 +21,7 @@ export function parseRemoteRepo(root: string): { owner: string; name: string } |
 }
 
 /** The path with symlinks resolved, so a link inside a project cannot lead out of it. */
-function canonical(path: string): string {
+export function canonical(path: string): string {
   try {
     return realpathSync(path)
   } catch {
@@ -35,7 +35,7 @@ function isInside(root: string, path: string): boolean {
 }
 
 /** True for a `gh:owner/name` root, or a directory that is or lies inside a workspace root. */
-export function isWorkspaceRepoRoot(repoRoot: string): boolean {
+function isWorkspaceRepoRoot(repoRoot: string): boolean {
   if (parseRemoteRepo(repoRoot)) return true
   const path = canonical(repoRoot)
   return listWorkspaceRoots()

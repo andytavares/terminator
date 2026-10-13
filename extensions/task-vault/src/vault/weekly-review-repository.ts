@@ -5,9 +5,9 @@ import { randomUUID } from './db'
 // trace beyond a single inbox task holding the reflection text as a sentence,
 // so there was no way to look back at what was promoted, archived, or dropped.
 
-export type ReviewStatus = 'in_progress' | 'completed'
+type ReviewStatus = 'in_progress' | 'completed'
 
-export type ReviewActionKind =
+type ReviewActionKind =
   | 'captured'
   | 'inbox-processed'
   | 'project-status'
@@ -17,7 +17,7 @@ export type ReviewActionKind =
   | 'task-deleted'
   | 'task-kept'
 
-export type ReviewEntityType = 'task' | 'project'
+type ReviewEntityType = 'task' | 'project'
 
 export interface WeeklyReviewAction {
   id: string
@@ -71,7 +71,7 @@ type ActionRow = {
   created_at: string
 }
 
-export function rowToReview(row: ReviewRow): WeeklyReview {
+function rowToReview(row: ReviewRow): WeeklyReview {
   return {
     id: row.id,
     startedAt: row.started_at,
@@ -83,7 +83,7 @@ export function rowToReview(row: ReviewRow): WeeklyReview {
   }
 }
 
-export function rowToAction(row: ActionRow): WeeklyReviewAction {
+function rowToAction(row: ActionRow): WeeklyReviewAction {
   return {
     id: row.id,
     reviewId: row.review_id,

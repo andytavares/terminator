@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
@@ -8,6 +8,7 @@ import {
   createWorkspace,
   addAndSelectProject,
   type AppHandle,
+  e2eTempDir,
 } from '../helpers'
 
 // Retakes the user-guide screenshots of Home and the Overview wall, with a
@@ -44,7 +45,7 @@ async function describe(page: Page, group: string, text: string): Promise<void> 
 test('capture Home and the Overview wall', async () => {
   test.setTimeout(180_000)
   mkdirSync(REVIEW, { recursive: true })
-  const folder = mkdtempSync(join(tmpdir(), 'home-shots-'))
+  const folder = e2eTempDir('home-shots-')
   handle = await launchApp()
   const { page } = handle
   await page.setViewportSize({ width: 1440, height: 900 })

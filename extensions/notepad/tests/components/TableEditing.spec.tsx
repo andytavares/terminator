@@ -1,9 +1,9 @@
-import { describe, it, expect, afterEach } from 'vitest'
+import { describe, it, expect, afterEach, vi } from 'vitest'
 import { EditorState } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 import { markdown } from '@codemirror/lang-markdown'
+import { forceParsing, syntaxTree } from '@codemirror/language'
 import { GFM } from '@lezer/markdown'
-import { forceParsing } from '@codemirror/language'
 import { cursorCharRight, cursorCharLeft } from '@codemirror/commands'
 import { livePreviewPlugin } from '../../src/editor/livePreview'
 
@@ -21,7 +21,7 @@ afterEach(() => {
   view = null
 })
 
-function mountDoc(doc: string, cursor: number): EditorView {
+function createView(doc: string, cursor: number): EditorView {
   const parent = document.createElement('div')
   document.body.appendChild(parent)
   view = new EditorView({
@@ -32,12 +32,20 @@ function mountDoc(doc: string, cursor: number): EditorView {
     }),
     parent,
   })
-  // The parser works to a time budget, so on a loaded machine the first tree
-  // can stop short of the table. Finish parsing, then re-select so the
-  // decorations are rebuilt from the whole tree.
-  forceParsing(view, doc.length, 5000)
-  view.dispatch({ selection: { anchor: cursor } })
   return view
+}
+
+/**
+ * Finishes the parse now, as the background parse does a moment later. Each
+ * transaction's own parse stops after 20ms, which a loaded machine can hit.
+ */
+function finishParsing(v: EditorView): EditorView {
+  forceParsing(v, v.state.doc.length, Infinity)
+  return v
+}
+
+function mountDoc(doc: string, cursor: number): EditorView {
+  return finishParsing(createView(doc, cursor))
 }
 
 function mount(cursor: number): EditorView {
@@ -49,12 +57,51 @@ function type(v: EditorView, text: string): void {
   for (const char of text) {
     const at = v.state.selection.main.head
     v.dispatch({ changes: { from: at, insert: char }, selection: { anchor: at + 1 } })
+    finishParsing(v)
   }
 }
 
 const tableRendered = (v: EditorView) => v.dom.querySelector('.notepad-table') !== null
 
+// CodeMirror's first parse of a new state stops once 20ms have passed
+// (Work.Apply in @codemirror/language) and the rest is parsed in the
+// background. A clock that jumps that far on every reading is a machine too
+// loaded to finish the first parse.
+const FIRST_PARSE_BUDGET_MS = 20
+
+function mountOnALoadedMachine(cursor: number): EditorView {
+  let now = Date.now()
+  const clock = vi.spyOn(Date, 'now').mockImplementation(() => (now += FIRST_PARSE_BUDGET_MS + 1))
+  try {
+    return createView(DOC, cursor)
+  } finally {
+    clock.mockRestore()
+  }
+}
+
 describe('editing a rendered table', editingRenderedTableTests)
+
+describe('a table the first parse did not reach', () => {
+  // A new editor parses only its first few thousand characters at once and
+  // the rest in the background, so a table further down arrives later.
+  it('renders once the background parse reaches it', async () => {
+    const doc = `${'filler line\n'.repeat(1500)}\n${TABLE}\n`
+    const v = createView(doc, 0)
+    expect(syntaxTree(v.state).length).toBeLessThan(doc.length)
+
+    await vi.waitFor(() => expect(syntaxTree(v.state).length).toBe(doc.length), {
+      timeout: 10_000,
+    })
+    const widgets: string[] = []
+    for (const source of v.state.facet(EditorView.decorations)) {
+      const set = typeof source === 'function' ? source(v) : source
+      set.between(0, doc.length, (_from, _to, deco) => {
+        widgets.push(deco.spec.widget?.constructor.name ?? '')
+      })
+    }
+    expect(widgets).toContain('TableWidget')
+  })
+})
 
 describe('writing a fenced code block', () => {
   it('keeps the fence and language visible as they are typed', () => {
@@ -86,17 +133,35 @@ describe('writing a fenced code block', () => {
 })
 
 function editingRenderedTableTests() {
+  describe('rendering', editingRenderedTableRenderingTests)
   describe('clicking', editingRenderedTableClickingTests)
   describe('typing', editingRenderedTableTypingTests)
   describe('keyboard', editingRenderedTableKeyboardTests)
   describe('leaving', editingRenderedTableLeavingTests)
 }
 
-function editingRenderedTableClickingTests() {
+function editingRenderedTableRenderingTests() {
   it('renders the table while the caret is elsewhere', () => {
     expect(tableRendered(mount(0))).toBe(true)
   })
 
+  it('renders the table once the background parse reaches it', () => {
+    // The background parse is scheduled with setTimeout where there is no requestIdleCallback.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      const v = mountOnALoadedMachine(0)
+      expect(tableRendered(v)).toBe(false)
+
+      vi.runAllTimers()
+
+      expect(tableRendered(v)).toBe(true)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+}
+
+function editingRenderedTableClickingTests() {
   it('clicking a body cell puts the caret in that cell', () => {
     const v = mount(0)
     const cell = v.dom.querySelectorAll<HTMLElement>('.notepad-table tbody td')[0]
@@ -171,6 +236,7 @@ function editingRenderedTableLeavingTests() {
   it('reflects an edit in the re-rendered table', () => {
     const v = mount(DOC.indexOf('apples'))
     v.dispatch({ changes: { from: DOC.indexOf('apples'), insert: 'green ' } })
+    finishParsing(v)
     v.dispatch({ selection: { anchor: 0 } })
 
     expect(tableRendered(v)).toBe(true)

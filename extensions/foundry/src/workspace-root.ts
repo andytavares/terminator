@@ -3,6 +3,7 @@ import * as path from 'node:path'
 
 import type { ResolveSources } from './recipe/resolve.js'
 import { resolveDataRoot, untrackedNotice } from './data-root.js'
+import { fallbackRecordsBase } from './storage-folder.js'
 
 /** Where the chosen model lives, on the side of the bridge that launches runs. */
 /**
@@ -60,10 +61,6 @@ export function resolveSources(api: ExtensionAPI, root: string): ResolveSources 
   }
 }
 
-function fallbackDataRoot(userData: string): string {
-  return path.join(userData, 'foundry')
-}
-
 /**
  * Where Foundry keeps its records.
  *
@@ -97,7 +94,7 @@ export function resolveFoundryDataRoot(api: ExtensionAPI): string {
   const memo = dataRootMemo.get(key)
   if (memo !== undefined) return memo
 
-  const base = workdir ?? fallbackDataRoot(api.paths.userData)
+  const base = workdir ?? fallbackRecordsBase(api)
   let root: string
   try {
     root = resolveDataRoot(configured, base).root

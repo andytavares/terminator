@@ -1,5 +1,12 @@
 # Contract: Extension API v1.2.0 Additions
 
+> **Superseded. Kept as history.** This contract records what was decided when the feature was
+> specified, and is not edited. The code no longer has `sidebar.registerGlobalTab` (now the manifest's `contributes.globalTab`), `sidebar.registerPanel` and `workspace.onDelete` / `onProjectDelete`. Do not build against it. The
+> current contract lives in:
+>
+> - `packages/extension-sdk/types/api.d.ts`: the `ExtensionAPI`, which the core implements in `src/main/extensions/api.ts`
+> - `src/shared/schemas/extension.schema.ts` (`ExtensionManifestSchema`) and [The manifest](../../../docs/EXTENSION-DEVELOPMENT.md#the-manifest)
+
 **Version**: 1.2.0 (MINOR — additive only, no breaking changes)  
 **Date**: 2026-05-19  
 **Supersedes**: Extension API v1.1.x  

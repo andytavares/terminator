@@ -16,7 +16,7 @@ const RunsPayload = z.object({
   headSHA: z.string().min(1),
 })
 
-export interface OpenTerminalInput {
+interface OpenTerminalInput {
   repoRoot: string
   cwd: string
   title: string
@@ -38,26 +38,42 @@ function storeKey(repoRoot: string, prNumber: number, headSHA: string): string {
   return `${repoRoot}:::${prNumber}:::${headSHA}`
 }
 
-function loadRuns(repoRoot: string, prNumber: number, headSHA: string): AgentRun[] {
-  return (store().get(storeKey(repoRoot, prNumber, headSHA)) as AgentRun[] | undefined) ?? []
+async function loadRuns(repoRoot: string, prNumber: number, headSHA: string): Promise<AgentRun[]> {
+  return (
+    ((await store()).get(storeKey(repoRoot, prNumber, headSHA)) as AgentRun[] | undefined) ?? []
+  )
 }
 
-function saveRuns(repoRoot: string, prNumber: number, headSHA: string, runs: AgentRun[]): void {
-  store().set(storeKey(repoRoot, prNumber, headSHA), runs)
+async function saveRuns(
+  repoRoot: string,
+  prNumber: number,
+  headSHA: string,
+  runs: AgentRun[]
+): Promise<void> {
+  const runsStore = await store()
+  runsStore.set(storeKey(repoRoot, prNumber, headSHA), runs)
 }
 
-function upsertRun(repoRoot: string, prNumber: number, headSHA: string, run: AgentRun): void {
-  const runs = loadRuns(repoRoot, prNumber, headSHA)
+// Reads and writes in one turn once the store is open, so two upserts never lose one.
+async function upsertRun(
+  repoRoot: string,
+  prNumber: number,
+  headSHA: string,
+  run: AgentRun
+): Promise<void> {
+  const runsStore = await store()
+  const key = storeKey(repoRoot, prNumber, headSHA)
+  const runs = (runsStore.get(key) as AgentRun[] | undefined) ?? []
   const idx = runs.findIndex((r) => r.id === run.id)
   if (idx >= 0) runs[idx] = run
   else runs.unshift(run)
-  saveRuns(repoRoot, prNumber, headSHA, runs)
+  runsStore.set(key, runs)
 }
 
-function findStoredRun(
+async function findStoredRun(
   runId: string
-): { run: AgentRun; repoRoot: string; prNumber: number; headSHA: string } | null {
-  const all = store().store as Record<string, AgentRun[]>
+): Promise<{ run: AgentRun; repoRoot: string; prNumber: number; headSHA: string } | null> {
+  const all = (await store()).store as Record<string, AgentRun[]>
   for (const [key, runs] of Object.entries(all)) {
     const found = runs?.find((r) => r.id === runId)
     if (found) {
@@ -145,7 +161,7 @@ export function registerReviewAgentHandlers(register: RegisterFn, deps: ReviewAg
         }
 
         runningByScope.set(runningKey, run)
-        upsertRun(input.repoRoot, input.prNumber, input.headSHA, run)
+        await upsertRun(input.repoRoot, input.prNumber, input.headSHA, run)
 
         void (async () => {
           try {
@@ -175,7 +191,7 @@ export function registerReviewAgentHandlers(register: RegisterFn, deps: ReviewAg
             const finished = await done
             runningByScope.delete(runningKey)
             liveRuns.delete(run.id)
-            upsertRun(input.repoRoot, input.prNumber, input.headSHA, finished)
+            await upsertRun(input.repoRoot, input.prNumber, input.headSHA, finished)
             deps.broadcast('review-agent:event', { run: finished })
           } catch (e) {
             const failed: AgentRun = {
@@ -186,7 +202,7 @@ export function registerReviewAgentHandlers(register: RegisterFn, deps: ReviewAg
             }
             runningByScope.delete(runningKey)
             liveRuns.delete(run.id)
-            upsertRun(input.repoRoot, input.prNumber, input.headSHA, failed)
+            await upsertRun(input.repoRoot, input.prNumber, input.headSHA, failed)
             deps.broadcast('review-agent:event', { run: failed })
           }
         })()
@@ -226,8 +242,8 @@ export function registerReviewAgentHandlers(register: RegisterFn, deps: ReviewAg
       channel: 'review-agent:list',
       schema: RunsPayload,
       invalid: VALIDATION_ERROR,
-      run: ({ repoRoot, prNumber, headSHA }) => ({
-        runs: loadRuns(repoRoot, prNumber, headSHA),
+      run: async ({ repoRoot, prNumber, headSHA }) => ({
+        runs: await loadRuns(repoRoot, prNumber, headSHA),
       }),
     })
   )
@@ -237,13 +253,13 @@ export function registerReviewAgentHandlers(register: RegisterFn, deps: ReviewAg
       channel: 'review-agent:dismiss',
       schema: RunsPayload.extend({ runId: z.string().min(1), findingId: z.string().min(1) }),
       invalid: VALIDATION_ERROR,
-      run: ({ repoRoot, prNumber, headSHA, runId, findingId }) => {
-        const runs = loadRuns(repoRoot, prNumber, headSHA)
+      run: async ({ repoRoot, prNumber, headSHA, runId, findingId }) => {
+        const runs = await loadRuns(repoRoot, prNumber, headSHA)
         const run = runs.find((r) => r.id === runId)
         const finding = run?.findings.find((f) => f.id === findingId)
         if (!run || !finding) return { error: 'NOT_FOUND' }
         finding.dismissed = true
-        saveRuns(repoRoot, prNumber, headSHA, runs)
+        await saveRuns(repoRoot, prNumber, headSHA, runs)
         return { ok: true }
       },
     })
@@ -255,7 +271,7 @@ export function registerReviewAgentHandlers(register: RegisterFn, deps: ReviewAg
       schema: RunIdPayload,
       invalid: VALIDATION_ERROR,
       run: async ({ runId }) => {
-        const found = findStoredRun(runId)
+        const found = await findStoredRun(runId)
         if (!found) return { error: 'NOT_FOUND' }
         const cwd = await ensureWorktree(found.repoRoot, found.prNumber, found.headSHA)
         deps.openTerminal({

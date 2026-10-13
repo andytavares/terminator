@@ -2,14 +2,7 @@
 
 ## Extension Isolation (MANDATORY)
 
-This is a **fully isolated extension**. The core application knows nothing about this extension until it is installed. Violations break the architecture.
-
-### What extensions MAY do
-
-- Import `@terminator/extension-sdk`, `@terminator/extension-ui` and this extension's own dependencies — nothing from the core's `src/` and nothing from another extension (ADR 094; `npm run lint` rejects any other import)
-- Call core IPC via `window.electronAPI.{terminal,workspace,project,git,shell,fs,settings,...}` for **core-owned channels only**
-- Call own IPC via `window.electronAPI.extensionBridge.invoke('task-vault:...')`
-- Register IPC handlers in `src/index.ts` via `api.ipc.registerHandler()`
+The rules every extension follows are in `extensions/CLAUDE.md`; this extension's channels are `task-vault:*`.
 
 ### Core git channels available (core-owned, safe to call directly)
 
@@ -43,3 +36,7 @@ Add deps to `extensions/task-vault/package.json` only. npm workspaces hoist them
 ## Terminal Linking
 
 When showing a terminal selector, list sessions with `window.electronAPI.terminal.listSessions()` in the view or `api.pty.listSessions()` in the backend. Never import the core's stores, and never expose terminal-link logic through the core preload.
+
+## End-to-end tests
+
+`tests/e2e/task-vault-*.spec.ts` drive every channel this extension registers in the real app, through its own view (`tests/e2e/task-vault-harness.ts`). A new channel gets a step there that does what a user does and reads back what was stored; a channel no view calls is driven as a remote client calls it (`task-vault-remote-api.spec.ts`).

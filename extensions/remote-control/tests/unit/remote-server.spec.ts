@@ -1,8 +1,21 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { readFileSync, readdirSync, existsSync } from 'fs'
+import { createServer, type AddressInfo, type Server } from 'net'
 import { hashPassword } from '../../src/server/password-hash'
 
 const PASSWORD = 'correct-password'
+
+// Every server here listens on a port the OS picks (0), never a fixed one: a fixed
+// port is shared by every test run on the machine, so two runs at once (another
+// checkout, CI shards) made start() fail with PortInUseError at random.
+const ANY_PORT = 0
+
+/** A port held by a plain TCP server on all interfaces, as the remote server binds. */
+async function occupiedPort(): Promise<{ port: number; holder: Server }> {
+  const holder = createServer()
+  await new Promise<void>((resolve) => holder.listen(0, '0.0.0.0', resolve))
+  return { port: (holder.address() as AddressInfo).port, holder }
+}
 
 vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs')>()
@@ -139,7 +152,7 @@ function getWithCookie(url: string, cookie?: string) {
 beforeEach(async () => {
   const storedHash = await hashPassword(PASSWORD)
   mockDeps.getPasswordHash.mockReturnValue(storedHash)
-  remoteServer = await createServerOnPort(7683)
+  remoteServer = await createServerOnPort(ANY_PORT)
   await remoteServer.start()
 })
 
@@ -434,7 +447,7 @@ describe('RemoteServer /ext/* extension routes', () => {
 
   it('GET /ext/<id>/ is publicly accessible (no session gate on extension statics)', async () => {
     mockInstalledExtensions(['task-vault'], BUILT_EXTENSION)
-    const extServer = await createServerOnPort(7685)
+    const extServer = await createServerOnPort(ANY_PORT)
     const res = await extServer.inject({ method: 'GET', url: `/ext/${EXTENSION_ID}/` })
     // No 403 — extension static assets have no session gate
     expect(res.statusCode).not.toBe(403)
@@ -442,7 +455,7 @@ describe('RemoteServer /ext/* extension routes', () => {
 
   it('GET /ext/<id>/ returns 200 with shim and base CSS injected when renderer is built', async () => {
     mockInstalledExtensions(['task-vault'], BUILT_EXTENSION)
-    const extServer = await createServerOnPort(7685)
+    const extServer = await createServerOnPort(ANY_PORT)
     const res = await extServer.inject({ method: 'GET', url: `/ext/${EXTENSION_ID}/` })
     expect(res.statusCode).toBe(200)
     expect(res.headers['content-type']).toContain('text/html')
@@ -458,7 +471,7 @@ describe('RemoteServer /ext/* extensions without a renderer', () => {
   it('GET /ext/<id>/ returns 503 when renderer is not built', async () => {
     // The extension's index.html is missing
     mockInstalledExtensions(['task-vault'], { [`${EXT_DIR}/manifest.json`]: MANIFEST })
-    const extServer = await createServerOnPort(7685)
+    const extServer = await createServerOnPort(ANY_PORT)
     const res = await extServer.inject({ method: 'GET', url: `/ext/${EXTENSION_ID}/` })
     expect(res.statusCode).toBe(503)
     expect(res.body).toContain(EXTENSION_ID)
@@ -477,7 +490,7 @@ describe('RemoteServer /ext/* extensions it cannot serve', () => {
         renderer: 'dist/index.html',
       }),
     })
-    const extServer = await createServerOnPort(7685)
+    const extServer = await createServerOnPort(ANY_PORT)
     for (const id of ['com.headless', 'com.unbuilt']) {
       const res = await extServer.inject({ method: 'GET', url: `/ext/${id}/` })
       expect(res.statusCode).toBe(404)
@@ -489,24 +502,37 @@ describe('RemoteServer /ext/* extensions it cannot serve', () => {
     vi.mocked(readdirSync).mockImplementation(() => {
       throw new Error('EACCES')
     })
-    const extServer = await createServerOnPort(7685)
+    const extServer = await createServerOnPort(ANY_PORT)
     const res = await extServer.inject({ method: 'GET', url: `/ext/${EXTENSION_ID}/` })
     expect(res.statusCode).toBe(404)
   })
 })
 
 describe('RemoteServer EADDRINUSE handling', () => {
+  let taken: { port: number; holder: Server }
+
+  beforeEach(async () => {
+    taken = await occupiedPort()
+  })
+
+  afterEach(async () => {
+    await new Promise((resolve) => taken.holder.close(resolve))
+  })
+
   it('start() with port in use rejects with PortInUseError', async () => {
-    const { PortInUseError } = await import('../../src/server/remote-server')
-    const conflictServer = await createServerOnPort(7683, { ...mockDeps, onPortInUse: vi.fn() })
+    const { PortInUseError } = await import('../../src/server/port-in-use-error')
+    const conflictServer = await createServerOnPort(taken.port, {
+      ...mockDeps,
+      onPortInUse: vi.fn(),
+    })
     await expect(conflictServer.start()).rejects.toThrow(PortInUseError)
   })
 
   it('start() with port in use calls onPortInUse', async () => {
     const onPortInUse = vi.fn()
-    const conflictServer = await createServerOnPort(7683, { ...mockDeps, onPortInUse })
+    const conflictServer = await createServerOnPort(taken.port, { ...mockDeps, onPortInUse })
     await conflictServer.start().catch(() => {})
-    expect(onPortInUse).toHaveBeenCalledWith(7683)
+    expect(onPortInUse).toHaveBeenCalledWith(taken.port)
   })
 
   it('start() rethrows a listen failure other than a port in use', async () => {

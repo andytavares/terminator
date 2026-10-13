@@ -12,6 +12,7 @@ import {
 } from '../../../../../src/main/extensions/host/host-process'
 import { HostRuntime } from '../../../../../src/main/extensions/host/host-runtime'
 import { RpcEndpoint, type MessageLink } from '../../../../../src/main/extensions/host/rpc-endpoint'
+import { hostSnapshot } from '../../../../support/host-snapshot'
 import type { HostSnapshot } from '../../../../../src/main/extensions/host/snapshot'
 
 const ports: MessagePort[] = []
@@ -22,19 +23,6 @@ afterEach(() => {
 function link(port: MessagePort): MessageLink {
   ports.push(port)
   return { post: (m) => port.postMessage(m), listen: (receive) => port.on('message', receive) }
-}
-
-function snapshot(): HostSnapshot {
-  return {
-    databasePath: ':memory:',
-    paths: { app: '/app', userData: '/data' },
-    settings: { 'demo.greeting': 'hello' },
-    workspaces: { workspaces: [], projects: {} },
-    trackers: {
-      linear: { transitions: true, create: true },
-      jira: { transitions: true, create: false },
-    },
-  }
 }
 
 /** The main side of the API the server calls into: only what these backends use. */
@@ -91,7 +79,7 @@ function harness(modules: Record<string, BackendModule> = {}) {
   const onBackendsFailed = vi.fn()
   const process = new ExtensionHostProcess({
     spawn: spawned,
-    snapshot,
+    snapshot: () => hostSnapshot({ settings: { 'demo.greeting': 'hello' } }),
     apiFor: (id) => (id === 'demo' ? main.api : undefined),
     onBackendsFailed,
     log: () => {},
@@ -109,6 +97,28 @@ describe('extension backends in the extension host', () => {
 
     await expect(dispatchChannel(spec, { name: 'Ada' })).resolves.toBe('hello, Ada')
     await expect(dispatchChannel(spec, { name: 3 })).resolves.toEqual({ error: 'VALIDATION_ERROR' })
+  })
+
+  it("gives the backend the app's directory and its own folder under userData", async () => {
+    const paths = {
+      activate(api: ExtensionAPI) {
+        api.ipc.registerHandler(
+          defineChannel({
+            channel: 'demo:paths',
+            schema: z.object({}),
+            invalid: { error: 'VALIDATION_ERROR' },
+            run: () => api.paths,
+          })
+        )
+      },
+    }
+    const { main, process, record } = harness({ '/demo/main.cjs': paths })
+    await process.activate(record)
+
+    await expect(dispatchChannel(main.channels.get('demo:paths')!, {})).resolves.toEqual({
+      app: '/app',
+      globalStorage: '/data/extensions/demo',
+    })
   })
 
   it('reads settings from the snapshot main pushes', async () => {

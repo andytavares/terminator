@@ -1,0 +1,13 @@
+{
+  "id": "e2e.probe",
+  "name": "E2E Probe",
+  "version": "1.0.0",
+  "description": "A minimal extension the e2e specs install from a folder, as an operator would.",
+  "main": "index.cjs",
+  "renderer": "view.html",
+  "minAppVersion": "0.1.0",
+  "contributes": {
+    "projectTab": { "label": "Probe", "view": "project" },
+    "quickActions": { "group": { "mnemonic": "g", "label": "Probe" } }
+  }
+}

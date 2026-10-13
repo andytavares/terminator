@@ -2,6 +2,7 @@ import { _electron as electron, ElectronApplication, Page, expect } from '@playw
 import { mkdtempSync } from 'node:fs'
 import { dirname, delimiter, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { saveIpcTrace, startIpcTrace } from './ipc-trace'
 
 // Shared e2e harness. Every spec launches the real Electron app in an isolated,
 // throwaway profile (via Chromium's --user-data-dir, which Electron honours for
@@ -21,7 +22,7 @@ export interface AppHandle {
  * everything in one place after every worker has exited, and `closeApp`
  * never has to delete anything itself.
  */
-function e2eRunRoot(): string {
+export function e2eRunRoot(): string {
   const root = process.env.TERMINATOR_E2E_RUN_ROOT
   if (!root) {
     throw new Error(
@@ -31,8 +32,17 @@ function e2eRunRoot(): string {
   return root
 }
 
+/**
+ * A new directory under this run's root, for a spec's repository or folder.
+ * `tests/e2e/global-teardown.ts` removes it with the root, whether the spec
+ * passed or failed; one made in the OS temp directory stayed there.
+ */
+export function e2eTempDir(prefix: string): string {
+  return mkdtempSync(join(e2eRunRoot(), prefix))
+}
+
 function e2eProfileDir(): string {
-  return mkdtempSync(join(e2eRunRoot(), 'profile-'))
+  return e2eTempDir('profile-')
 }
 
 /**
@@ -56,7 +66,7 @@ const CLAUDE_STUB_DIR = join(dirname(fileURLToPath(import.meta.url)), 'fixtures'
 const CLAUDE_STUB_ZDOTDIR = join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'zdotdir')
 
 /** The environment every e2e-launched Electron process gets. */
-export function e2eEnv(): NodeJS.ProcessEnv {
+function e2eEnv(): NodeJS.ProcessEnv {
   return {
     ...process.env,
     NODE_ENV: 'test',
@@ -72,13 +82,26 @@ export function e2eEnv(): NodeJS.ProcessEnv {
 /**
  * `userDataDir` relaunches onto an existing profile, for a spec that proves
  * something survives a restart; `closeApp` never deletes it, so relaunching
- * after a close just works.
+ * after a close just works. `env` adds to the app's environment, e.g. the
+ * stub GitHub's (`tests/e2e/github-stub.ts`).
  */
 // Inside the 30s hook timeout, so a launch that hangs fails with the app's own
 // output instead of a bare "hook timeout exceeded" that says nothing about why.
 const LAUNCH_DEADLINE_MS = 25_000
 
-export async function launchApp(userDataDir: string = e2eProfileDir()): Promise<AppHandle> {
+/**
+ * Extra Electron switches for this machine, space-separated in
+ * E2E_ELECTRON_ARGS. A Linux runner sets `--no-sandbox`: Chromium's sandbox
+ * needs a setuid helper or user namespaces the runner does not grant.
+ */
+function machineArgs(): string[] {
+  return (process.env.E2E_ELECTRON_ARGS ?? '').split(' ').filter(Boolean)
+}
+
+export async function launchApp(
+  userDataDir: string = e2eProfileDir(),
+  env: Record<string, string> = {}
+): Promise<AppHandle> {
   const deadline = Date.now() + LAUNCH_DEADLINE_MS
   const remaining = () => Math.max(1, deadline - Date.now())
   const app = await electron.launch({
@@ -86,8 +109,14 @@ export async function launchApp(userDataDir: string = e2eProfileDir()): Promise<
     // modal "reopen windows?" alert on the next launch of the same bundle,
     // which blocks startup until firstWindow times out. The argument domain
     // turns that restore off for this process only.
-    args: ['.', `--user-data-dir=${userDataDir}`, '-ApplePersistenceIgnoreState', 'YES'],
-    env: e2eEnv(),
+    args: [
+      '.',
+      ...machineArgs(),
+      `--user-data-dir=${userDataDir}`,
+      '-ApplePersistenceIgnoreState',
+      'YES',
+    ],
+    env: { ...e2eEnv(), ...env },
     timeout: remaining(),
   })
   const output: string[] = []
@@ -98,9 +127,11 @@ export async function launchApp(userDataDir: string = e2eProfileDir()): Promise<
   app.process().stdout?.on('data', keep)
   app.process().stderr?.on('data', keep)
   try {
+    await startIpcTrace(app)
     const page = await app.firstWindow({ timeout: remaining() })
     await page.waitForLoadState('domcontentloaded', { timeout: remaining() })
     await page.waitForSelector('.unified-sidebar', { timeout: remaining() })
+    await moveWindowOffPointer(app)
     return { app, page, userDataDir }
   } catch (error) {
     await closeApp({ app, page: undefined as unknown as Page, userDataDir })
@@ -110,6 +141,26 @@ export async function launchApp(userDataDir: string = e2eProfileDir()): Promise<
       { cause: error }
     )
   }
+}
+
+/**
+ * Moves the app's window so the X server's own pointer is outside it, on Linux.
+ *
+ * Chromium on X11 synthesizes a mousemove at the real pointer whenever a view
+ * under it is added, removed or resized, as an extension view is when its
+ * extension activates. Xvfb parks the pointer at the centre of the screen,
+ * inside the window, and that move carries no pressed button, so it lands
+ * between Playwright's mouse down and mouse move and Chromium abandons the drag:
+ * `dragTo` returned and nothing was dropped. macOS does not synthesize it.
+ */
+async function moveWindowOffPointer(app: ElectronApplication): Promise<void> {
+  if (process.platform !== 'linux') return
+  await app.evaluate(({ BrowserWindow, screen }) => {
+    const pointer = screen.getCursorScreenPoint()
+    for (const window of BrowserWindow.getAllWindows()) {
+      window.setPosition(window.getBounds().x, pointer.y + 1)
+    }
+  })
 }
 
 // How long to wait for a graceful Electron shutdown before force-killing. A
@@ -124,6 +175,7 @@ export async function closeApp(handle: AppHandle | undefined): Promise<void> {
   // Capture the OS process up front: once app.close() resolves, Playwright
   // tears down its internal handle and app.process() would throw.
   const proc = handle.app.process()
+  await saveIpcTrace(handle.app)
   // Bound the graceful close: a lingering PTY, git watcher, or extension host
   // can keep the process alive so app.close() never resolves. Race it against a
   // timeout, then force-kill whatever is left. The .catch keeps a close() that
@@ -221,4 +273,74 @@ export async function selectProject(
   projectName: string
 ): Promise<void> {
   await projectGroup(page, projectName).click()
+}
+
+/** The Quick Actions panel. */
+export function quickActionsPanel(page: Page) {
+  return page.getByRole('dialog', { name: 'Quick actions' })
+}
+
+const exactly = (text: string): RegExp =>
+  new RegExp(`^${text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`)
+
+/**
+ * Runs a Quick Action the way an operator finds one they have no key for: the
+ * band's Quick actions button, `/`, its name, then its row. The panel records
+ * the run in `quickActions.usage`, which is how the coverage map counts it.
+ */
+export async function runQuickAction(page: Page, label: string): Promise<void> {
+  await page.locator('.app-band__entry[aria-label="Quick actions (⌘P)"]').click()
+  const panel = quickActionsPanel(page)
+  await expect(panel).toBeFocused({ timeout: 10000 })
+  await page.keyboard.press('/')
+  await page.keyboard.type(label)
+  await panel
+    .locator('.qa-row')
+    .filter({ has: page.locator('.qa-row__label', { hasText: exactly(label) }) })
+    .first()
+    .click()
+  await expect(panel).toBeHidden({ timeout: 15000 })
+}
+
+/** Opens Settings with ⌘, (Ctrl+, off macOS) on the named section. */
+export async function openSettings(page: Page, section: string): Promise<void> {
+  if (!(await page.locator('.settings-panel').isVisible())) {
+    await page.keyboard.press('ControlOrMeta+,')
+  }
+  await expect(page.locator('.settings-panel')).toBeVisible()
+  await page.locator('.settings-panel__nav-item', { hasText: section }).click()
+}
+
+/** Closes Settings with its close button. */
+export async function closeSettings(page: Page): Promise<void> {
+  await page.locator('.settings-panel__close').click()
+  await expect(page.locator('.settings-panel')).toBeHidden()
+}
+
+/**
+ * Runs `script` inside the first extension view whose URL contains `urlPart`:
+ * a WebContentsView of its own, which the page cannot reach.
+ */
+export function inExtensionView<T>(handle: AppHandle, urlPart: string, script: string): Promise<T> {
+  return handle.app.evaluate(
+    async ({ webContents }, { part, source }) => {
+      const view = webContents
+        .getAllWebContents()
+        .find((contents) => !contents.isDestroyed() && contents.getURL().includes(part))
+      if (!view) throw new Error(`no extension view loaded for ${part}`)
+      return view.executeJavaScript(source) as Promise<unknown>
+    },
+    { part: urlPart, source: script }
+  ) as Promise<T>
+}
+
+/** The window as the app sets it up, with `src/renderer/terminal/terminal-rows.ts`. */
+export type TerminalRowsWindow = Window & { terminatorE2E: { terminalRows(): string[] } }
+
+/**
+ * The rows every open terminal shows, read from xterm's buffer. Under the
+ * WebGL renderer the terminal is a canvas and the DOM holds none of its text.
+ */
+export function terminalRows(page: Page): Promise<string[]> {
+  return page.evaluate(() => (window as unknown as TerminalRowsWindow).terminatorE2E.terminalRows())
 }

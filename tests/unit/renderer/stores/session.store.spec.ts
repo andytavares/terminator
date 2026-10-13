@@ -14,6 +14,8 @@ Object.defineProperty(globalThis, 'window', {
 
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import type { TerminalSession } from '../../../../src/shared/types/index'
+import type { TerminalInstance } from '../../../../src/renderer/components/terminal/TerminalSession'
+import { partialFake } from '../../../support/fakes'
 
 function makeSession(overrides: Partial<TerminalSession> = {}): TerminalSession {
   return {
@@ -160,7 +162,7 @@ describe('useSessionStore', () => {
       const dispose = vi.fn()
       useSessionStore.setState({
         sessions: new Map([['sess-1', session]]),
-        terminalInstances: new Map([['sess-1', { dispose }]]),
+        terminalInstances: new Map([['sess-1', partialFake<TerminalInstance>({ dispose })]]),
       })
       mockElectronAPI.terminal.close.mockResolvedValue({})
       await useSessionStore.getState().closeSession('sess-1')
@@ -269,6 +271,21 @@ describe('useSessionStore', () => {
       })
       useSessionStore.getState().setActiveSessionForProject('proj-1', 'sess-1')
       expect(useSessionStore.getState().getBellCountForSession('sess-1')).toBe(0)
+    })
+
+    // A session whose process ended stays ended, whichever tab is selected.
+    it('leaves a closed session closed, selected or not', () => {
+      const ended = makeSession({ id: 'sess-1', status: 'closed' })
+      const other = makeSession({ id: 'sess-2', status: 'closed' })
+      useSessionStore.setState({
+        sessions: new Map([
+          ['sess-1', ended],
+          ['sess-2', other],
+        ]),
+      })
+      useSessionStore.getState().setActiveSessionForProject('proj-1', 'sess-2')
+      expect(useSessionStore.getState().sessions.get('sess-1')?.status).toBe('closed')
+      expect(useSessionStore.getState().sessions.get('sess-2')?.status).toBe('closed')
     })
 
     it('sets activeSessionIdByProject for the project', () => {

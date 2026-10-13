@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import * as path from 'node:path'
 import type { Issue, SessionSnapshot, WorkItemRef } from '../../../src/shared/types/index'
+import { makeTempDir } from '../../support/temp-dir'
 
 let userData: string
 
@@ -60,7 +60,7 @@ function contextFile(): string {
 }
 
 beforeEach(() => {
-  userData = fs.mkdtempSync(path.join(os.tmpdir(), 'session-context-ud-'))
+  userData = makeTempDir('session-context-ud-')
 })
 
 describe('syncSessionContext — linked', () => {

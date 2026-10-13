@@ -93,18 +93,19 @@ describe('cycleMostRecentlyAttended', () => {
   })
 })
 
+// Waiting is derived from the bell, never stored: each session here rang.
 describe('jumpToNextAwaitingInput', () => {
   it('goes to the first waiting session when no project is active', () => {
-    addSession('a', 'p1', { agentState: 'awaiting-input' })
-    addSession('b', 'p2', { agentState: 'awaiting-input' })
+    addSession('a', 'p1', { bellCount: 1 })
+    addSession('b', 'p2', { bellCount: 1 })
     const deps = navDeps()
     jumpToNextAwaitingInput(null, deps)
     expect(deps.setActiveSessionForProject).toHaveBeenCalledWith('p1', 'a')
   })
 
   it('moves past the waiting session already shown', () => {
-    addSession('a', 'p1', { agentState: 'awaiting-input' })
-    addSession('b', 'p2', { agentState: 'awaiting-input' })
+    addSession('a', 'p1', { bellCount: 1 })
+    addSession('b', 'p2', { bellCount: 1 })
     const deps = navDeps('a')
     jumpToNextAwaitingInput('p1', deps)
     expect(deps.setActiveSessionForProject).toHaveBeenCalledWith('p2', 'b')

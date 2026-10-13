@@ -20,6 +20,8 @@ import type { IndexedProject, IndexedTask } from '../vault/types'
 import { useVaultStore } from '../stores/vault.store'
 import { SmartTaskInput } from './SmartTaskInput'
 import { useIndexReload } from './vault-hooks'
+import { RenameRow, TaskTextEditor, useTaskTextDraft } from './inline-edits'
+import { SessionOptions, useTerminalSessions } from './terminal-sessions'
 
 interface AreaOption {
   name: string
@@ -33,12 +35,6 @@ interface ComboOption {
 }
 
 type StatusFilter = 'active' | 'archived' | 'all'
-
-interface Session {
-  sessionId: string
-  projectId: string
-  tabTitle: string
-}
 
 interface CreateProjectFormProps {
   onCreated: () => void
@@ -59,10 +55,8 @@ interface ComboboxProps {
   existingAreas: AreaOption[]
 }
 
-type Directory = ReturnType<typeof useSessionDirectory>
-
 interface PickerProps {
-  dir: Directory
+  open: boolean
   onSelect: (sessionId: string) => void
   onClose: () => void
 }
@@ -262,49 +256,10 @@ function AreaCombobox(props: ComboboxProps): React.JSX.Element {
   )
 }
 
-/**
- * Terminal sessions, and the workspaces and projects that name them, read over the
- * bridge while the picker is open. This used to import the host's workspace store
- * directly — a Principle II violation, and simply broken: this view bundles its own
- * copy of that module, so the store it read was a second, empty instance.
- */
-function useSessionDirectory(linking: boolean) {
-  const [activeSessions, setActiveSessions] = useState<Session[]>([])
-  const [workspaces, setWorkspaces] = useState<Array<{ id: string; name: string }>>([])
-  const [projects, setProjects] = useState<
-    Array<{ id: string; name: string; workspaceId: string }>
-  >([])
-  useEffect(() => {
-    if (!linking) return
-    void window.electronAPI.terminal.listSessions().then(setActiveSessions)
-    void (async () => {
-      const { workspaces: list } = await window.electronAPI.workspace.list()
-      setWorkspaces(list)
-      const perWorkspace = await Promise.all(
-        list.map(async (workspace) => {
-          const { projects: own } = await window.electronAPI.project.list(workspace.id)
-          return own.map((project) => ({ ...project, workspaceId: workspace.id }))
-        })
-      )
-      setProjects(perWorkspace.flat())
-    })()
-  }, [linking])
-  return { activeSessions, workspaces, projects }
-}
-
-/** "Workspace › Project › Tab" for a session, or its short id when nothing names it. */
-function sessionLabel(s: Session, dir: Directory): string {
-  const project = dir.projects.find((p) => p.id === s.projectId)
-  const workspace = project ? dir.workspaces.find((w) => w.id === project.workspaceId) : undefined
-  const parts: string[] = []
-  if (workspace) parts.push(workspace.name)
-  if (project) parts.push(project.name)
-  if (s.tabTitle) parts.push(s.tabTitle)
-  return parts.length ? parts.join(' › ') : s.sessionId.slice(0, 8)
-}
-
-function SessionPicker({ dir, onSelect, onClose }: PickerProps): React.JSX.Element {
-  if (dir.activeSessions.length === 0) {
+/** Picks one of the open terminal sessions, loaded while the picker is open. */
+function SessionPicker({ open, onSelect, onClose }: PickerProps): React.JSX.Element {
+  const { sessions, labelOf } = useTerminalSessions(open)
+  if (sessions.length === 0) {
     return (
       <span className="projects-browser__link-picker">
         <span className="tv-text-muted-sm">No active sessions</span>
@@ -315,14 +270,7 @@ function SessionPicker({ dir, onSelect, onClose }: PickerProps): React.JSX.Eleme
   return (
     <span className="projects-browser__link-picker">
       <select autoFocus defaultValue="" onChange={(e) => onSelect(e.target.value)}>
-        <option disabled value="">
-          Select terminal…
-        </option>
-        {dir.activeSessions.map((s) => (
-          <option key={s.sessionId} value={s.sessionId}>
-            {sessionLabel(s, dir)}
-          </option>
-        ))}
+        <SessionOptions sessions={sessions} labelOf={labelOf} placeholder="Select terminal…" />
       </select>
       <IconButton icon={X} label="Close" size="sm" onClick={onClose} />
     </span>
@@ -344,7 +292,6 @@ function useLink(filePath: string) {
 
 function LinkToTerminator({ filePath }: { filePath: string }): React.JSX.Element {
   const { linking, setLinking, linked, link } = useLink(filePath)
-  const dir = useSessionDirectory(linking)
   if (linked) {
     return (
       <span className="projects-browser__linked-badge" title="Linked">
@@ -360,7 +307,11 @@ function LinkToTerminator({ filePath }: { filePath: string }): React.JSX.Element
     )
   }
   return (
-    <SessionPicker dir={dir} onSelect={(id) => void link(id)} onClose={() => setLinking(false)} />
+    <SessionPicker
+      open={linking}
+      onSelect={(id) => void link(id)}
+      onClose={() => setLinking(false)}
+    />
   )
 }
 
@@ -605,39 +556,9 @@ function TaskStatusIcon({ task }: { task: IndexedTask }): React.JSX.Element {
   )
 }
 
-/** A task's text with its tags written back out, for editing. */
-function taggedText(t: IndexedTask): string {
-  const parts = [t.text]
-  if (t.project) parts.push(`@${t.project}`)
-  if (t.context) parts.push(`+${t.context}`)
-  if (t.area) parts.push(`#${t.area}`)
-  if (t.dueDate) parts.push(`due:${t.dueDate}`)
-  return parts.join(' ')
-}
-
 function TaskEditor({ task, tasks, onDone }: EditorProps): React.JSX.Element {
-  const [editText, setEditText] = useState(() => taggedText(task))
-  async function save() {
-    if (!editText.trim()) return
-    await invoke('task-vault:vault:edit-task', { taskId: task.id, text: editText.trim() })
-    onDone()
-    await tasks.reload()
-  }
-  return (
-    <span className="projects-browser__task-edit">
-      <SmartTaskInput
-        autoFocus
-        value={editText}
-        onChange={setEditText}
-        onSubmit={() => void save()}
-        onCancel={onDone}
-      />
-      <Button variant="primary" size="sm" onClick={() => void save()}>
-        Save
-      </Button>
-      <IconButton icon={X} label="Cancel edit" size="sm" onClick={onDone} />
-    </span>
-  )
+  const draft = useTaskTextDraft(task, onDone, tasks.reload)
+  return <TaskTextEditor draft={draft} className="projects-browser__task-edit" saveSize="sm" />
 }
 
 function TaskText({ task, onEdit }: { task: IndexedTask; onEdit: () => void }) {
@@ -943,32 +864,9 @@ function useBrowser(): Browser {
   return { list, rename, deadline, selectedProjectName, updateStatus, remove }
 }
 
-function RenameRow({ rename }: { rename: RenameProject }): React.JSX.Element {
-  return (
-    <div className="area-detail__rename-row projects-browser__rename-row">
-      <input
-        autoFocus
-        className="area-detail__rename-input projects-browser__rename-input"
-        value={rename.renameText}
-        onChange={(e) => rename.setRenameText(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') void rename.save()
-          if (e.key === 'Escape') rename.cancel()
-        }}
-      />
-      <Button variant="primary" size="sm" onClick={() => void rename.save()}>
-        Save
-      </Button>
-      <IconButton icon={X} label="Cancel rename" size="sm" onClick={rename.cancel} />
-      {rename.renameError && (
-        <span className="area-detail__rename-error">{rename.renameError}</span>
-      )}
-    </div>
-  )
-}
-
 function ProjectName({ project, browser }: CardProps): React.JSX.Element {
-  if (browser.rename.renamingProject === project.name) return <RenameRow rename={browser.rename} />
+  if (browser.rename.renamingProject === project.name)
+    return <RenameRow rename={browser.rename} scope="projects-browser" />
   return (
     <span className="projects-browser__name-wrap">
       <span className="projects-browser__name">{project.name}</span>

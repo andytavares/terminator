@@ -4,7 +4,8 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { useSettingsStore } from '../../../../src/renderer/stores/settings.store'
 import { CreateProjectDialog } from '../../../../src/renderer/components/sidebar/CreateProjectDialog'
-import { projectOf, seedStore, workspaceOf } from '../../../support/renderer-stores'
+import { issueSummaryOf, projectOf, seedStore, workspaceOf } from '../../../support/renderer-stores'
+import type { IssueSummary } from '../../../../src/shared/types/index'
 import { DEFAULT_GLOBAL_SETTINGS } from '../../../../src/shared/schemas/settings.schema'
 
 const mockCreateProject = vi.fn()
@@ -84,12 +85,12 @@ describe('CreateProjectDialog', () => {
     const nameInput = screen.getAllByRole('textbox')[0]
     fireEvent.change(nameInput, { target: { value: 'My App' } })
     fireEvent.click(screen.getByText('Create'))
-    await vi.waitFor(() => expect(mockCreateProject).toHaveBeenCalled())
-  })
-
-  it('renders Create button', () => {
-    render(<CreateProjectDialog workspaceId="ws-1" onClose={vi.fn()} />)
-    expect(screen.getByText('Create')).toBeTruthy()
+    await vi.waitFor(() =>
+      expect(mockCreateProject).toHaveBeenCalledWith(
+        expect.objectContaining({ workspaceId: 'ws-1', name: 'My App' })
+      )
+    )
+    await vi.waitFor(() => expect(onClose).toHaveBeenCalled())
   })
 
   it('sets name error on blur when name is empty', () => {
@@ -293,7 +294,7 @@ describe('CreateProjectDialog', () => {
     await vi.waitFor(() => {
       const inputs = screen.getAllByRole('textbox')
       const pathInput = inputs[inputs.length - 1] as HTMLInputElement
-      return pathInput.value.includes('.worktrees')
+      expect(pathInput.value).toContain('.worktrees')
     })
   })
 
@@ -326,7 +327,7 @@ describe('CreateProjectDialog', () => {
     const inputs = screen.getAllByRole('textbox')
     const worktreeInput = inputs[inputs.length - 1]
     fireEvent.change(worktreeInput, { target: { value: '/custom/wt/path' } })
-    expect(worktreeInput).toBeTruthy()
+    expect((worktreeInput as HTMLInputElement).value).toBe('/custom/wt/path')
   })
 
   it('clicking Branch tab switches back from worktree mode', async () => {
@@ -489,22 +490,17 @@ describe('CreateProjectDialog', () => {
 // ── Starting from an issue (US5) ────────────────────────────────────────────
 
 describe('CreateProjectDialog — from an issue', () => {
-  const ISSUE = {
-    tracker: 'linear' as const,
-    id: 'id-1',
+  const ISSUE = issueSummaryOf({
     key: 'TAV-42',
     title: 'Unify Linear connections behind one core service',
-    url: 'https://linear.app/tav/issue/TAV-42',
-    state: { name: 'In Progress', type: 'started' as const },
-    assignee: null,
     branchName: 'andrew/tav-42-unify-linear',
-  }
-  const JIRA_ISSUE = { ...ISSUE, tracker: 'jira' as const, key: 'TAV-7', branchName: null }
+  })
+  const JIRA_ISSUE = issueSummaryOf({ ...ISSUE, tracker: 'jira', key: 'TAV-7', branchName: null })
 
   const listMine = vi.fn()
   const linkIssue = vi.fn()
 
-  async function openWithIssues(connected = true, issues = [ISSUE]) {
+  async function openWithIssues(connected = true, issues: IssueSummary[] = [ISSUE]) {
     const { useIntegrationsStore } = await import(
       '../../../../src/renderer/stores/integrations.store'
     )

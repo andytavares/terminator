@@ -13,7 +13,7 @@ export interface MovedMark {
   expanded: boolean
 }
 
-export interface GapView {
+interface GapView {
   above: DiffLine[]
   hidden: number | null
   below: DiffLine[]

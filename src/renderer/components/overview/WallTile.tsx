@@ -7,22 +7,16 @@ import { ResumeButton } from '../session/ResumeButton'
 import { CloseSessionButton } from '../session/CloseSessionButton'
 import { useIssue } from '../session/useSessionFacts'
 import { formatRelativeTime } from '../../sidebar/relative-time'
-import type { SessionFacts } from '../../sidebar/session-facts'
+import type { SessionActions, SessionFacts } from '../../sidebar/session-facts'
 import type { WallPlacement } from '../../sidebar/wall-order'
 import type { ProcessMetrics } from '../../../shared/types/index'
 import './WallTile.css'
 
-interface Props {
+interface Props extends SessionActions {
   facts: SessionFacts
   placement: WallPlacement
   metrics: ProcessMetrics | null
   now: number
-  onOpen: (sessionId: string) => void
-  onSaveDescription: (facts: SessionFacts, description: string | null) => void
-  onLink?: (facts: SessionFacts) => void
-  onResume?: (facts: SessionFacts) => void
-  onCloseSession?: (facts: SessionFacts) => void
-  onForgetSession?: (facts: SessionFacts) => void
   /** Buttons answering a waiting prompt, drawn in the footer. */
   answers?: React.ReactNode
 }

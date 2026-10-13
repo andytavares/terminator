@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createRunChannels, proposeRecipe, readRunGraph } from '../../src/ipc/run-channels.js'
@@ -16,6 +15,7 @@ import type { ToolActivity } from '../../src/runtime/transcript-tailer.js'
 import { readTimeline, forgetTimelines } from '../../src/factory/timeline-store.js'
 import { writeCiState } from '../../src/line/ci-state.js'
 import type { CiState } from '../../src/line/ci-state.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 // Everything that can refuse a run refuses before any work begins. An order
 // that fails half way through because a recipe could not run here has already
@@ -84,8 +84,8 @@ function order(over: Partial<WorkOrder> = {}): WorkOrder {
 }
 
 beforeEach(() => {
-  dataRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-run-'))
-  repo = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-run-repo-'))
+  dataRoot = makeTempDir('fdry-run-')
+  repo = makeTempDir('fdry-run-repo-')
   fs.writeFileSync(path.join(repo, 'package.json'), JSON.stringify({ scripts: { test: 'vitest' } }))
   store = createOrderStore(dataRoot)
 })
@@ -654,7 +654,7 @@ describe('a graph written before a node could carry a lane', () => {
 describe('the records location', () => {
   it('refuses to start when the records location cannot be written to, before any work begins', async () => {
     await store.save(order())
-    const wall = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-wall-'))
+    const wall = makeTempDir('fdry-wall-')
     fs.chmodSync(wall, 0o500)
     const blocked = createRunChannels(
       runDeps({

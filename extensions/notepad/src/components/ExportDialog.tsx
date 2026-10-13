@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useEffect } from 'react'
 import { Button, Dialog } from '@terminator/extension-ui'
 import { useNotesStore } from '../stores/notes.store'
 import type { NoteListItem } from '../db/types'
@@ -69,6 +69,30 @@ function previewSlug(title: string, id: string): string {
   )
 }
 
+const COMMENT_FORMATS: readonly CommentFormat[] = ['sidecar', 'inline', 'both']
+
+/** The export folder and comment format Notepad's settings choose, where they choose one. */
+function settingsDefaults(values: Record<string, unknown>): Partial<ExportOptions> {
+  const folder = values['terminator.notepad.exportPath']
+  const format = values['terminator.notepad.commentExportFormat'] as CommentFormat
+  return {
+    ...(typeof folder === 'string' && folder.trim() ? { folder } : {}),
+    ...(COMMENT_FORMATS.includes(format) ? { commentFormat: format } : {}),
+  }
+}
+
+/** Starts the options on the export folder and comment format set in Notepad's settings, once read. */
+function useExportSettings(setOptions: React.Dispatch<React.SetStateAction<ExportOptions>>): void {
+  useEffect(() => {
+    void window.electronAPI.extension
+      .getSettingsValues()
+      .then(({ values }) =>
+        setOptions((previous) => ({ ...previous, ...settingsDefaults(values) }))
+      )
+      .catch(() => {})
+  }, [setOptions])
+}
+
 function segmentClass(active: boolean): string {
   return `notepad-segmented__btn${active ? ' notepad-segmented__btn--active' : ''}`
 }
@@ -91,6 +115,7 @@ export function ExportDialog({ onClose, noteId }: ExportDialogProps): React.JSX.
   const previewNote = noteId ? notes.find((n) => n.id === noteId) : notes[0]
   const [options, setOptions] = useState<ExportOptions>(DEFAULT_OPTIONS)
   const update: OptionsUpdate = (patch) => setOptions((previous) => ({ ...previous, ...patch }))
+  useExportSettings(setOptions)
   const { running, exportResult, handleExport } = useExportRun(options, noteId)
 
   const { scopeCount, diagramCount } = useExportCounts(options)
@@ -221,7 +246,7 @@ function FolderField({ options, update }: OptionFieldProps): React.JSX.Element {
       <div className="notepad-export-dialog__field-label">Destination folder</div>
       <div className="notepad-export-dialog__folder-row">
         <input
-          className="notepad-export-dialog__folder-input"
+          className="tmui-input notepad-export-dialog__folder-input"
           value={options.folder}
           onChange={(e) => update({ folder: e.target.value })}
           spellCheck={false}

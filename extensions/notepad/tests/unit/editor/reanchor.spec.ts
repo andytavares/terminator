@@ -30,6 +30,7 @@ function reanchorCommentTests() {
   describe('found', reanchorCommentFoundTests)
   describe('orphaned', reanchorCommentOrphanedTests)
   describe('ambiguous quotes', reanchorCommentAmbiguousQuotesTests)
+  describe('a changed context', reanchorCommentChangedContextTests)
 }
 
 function reanchorCommentFoundTests() {
@@ -89,5 +90,27 @@ function reanchorCommentAmbiguousQuotesTests() {
     )
     expect(result.status).toBe('ok')
     expect(result.newFrom).toBe(0)
+  })
+}
+
+function reanchorCommentChangedContextTests() {
+  it('keeps the quote when text typed inside its prefix changes the context', () => {
+    // "Note: " typed at the start of the line breaks the stored prefix.
+    const comment = makeComment({
+      startOffset: 19,
+      endOffset: 29,
+      quote: 'jumps over',
+      prefix: '# Review\nThe quick ',
+      suffix: ' the dog.',
+    })
+    const result = reanchorComment(comment, '# Review\nNote: The quick jumps over the dog.')
+    expect(result.status).toBe('ok')
+    expect(result.newFrom).toBe(25)
+  })
+
+  it('picks the occurrence nearest the old place when context no longer matches', () => {
+    const comment = makeComment({ startOffset: 14, endOffset: 19, prefix: 'XX ', suffix: '?' })
+    const result = reanchorComment(comment, 'world, and then world again')
+    expect(result.newFrom).toBe(16)
   })
 }

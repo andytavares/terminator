@@ -219,6 +219,92 @@ function syncViewed(
   }
 }
 
+type ReviewFields = Pick<
+  PrReviewStore,
+  | 'activePr'
+  | 'currentChapterId'
+  | 'currentFilePath'
+  | 'viewedFiles'
+  | 'fileOrderOverrides'
+  | 'scrollPosition'
+  | 'pausedAt'
+  | 'viewedAt'
+  | 'changedSince'
+  | 'newSinceLook'
+  | 'lastSeenHeadSHA'
+  | 'historyRewritten'
+  | 'lastAccessedAt'
+  | 'notes'
+  | 'drafts'
+  | 'threads'
+  | 'issueComments'
+  | 'rateLimitState'
+>
+
+/** The review fields a fresh pull request starts from, and `reset` returns to. */
+function freshReview(): ReviewFields {
+  return {
+    activePr: null,
+    currentChapterId: null,
+    currentFilePath: null,
+    viewedFiles: new Set(),
+    fileOrderOverrides: {},
+    scrollPosition: null,
+    pausedAt: null,
+    viewedAt: {},
+    changedSince: new Set(),
+    newSinceLook: new Set(),
+    lastSeenHeadSHA: null,
+    historyRewritten: false,
+    lastAccessedAt: null,
+    notes: [],
+    drafts: [],
+    threads: {},
+    issueComments: [],
+    rateLimitState: null,
+  }
+}
+
+type ChangedFile = PrReviewDetail['chapters'][number]['files'][number]
+
+/** The pull request with one file of one chapter replaced by `change(file)`. */
+function patchChapterFile(
+  pr: PrReviewDetail,
+  at: { chapterId: string; filePath: string },
+  change: (file: ChangedFile) => ChangedFile
+): PrReviewDetail {
+  const chapters = pr.chapters.map((chapter) => {
+    if (chapter.id !== at.chapterId) return chapter
+    return {
+      ...chapter,
+      files: chapter.files.map((f) => (f.path === at.filePath ? change(f) : f)),
+    }
+  })
+  return { ...pr, chapters }
+}
+
+/** The file with its complexity delta recorded and its composite risk adjusted for it. */
+function withComplexity(f: ChangedFile, complexityDelta: number): ChangedFile {
+  const prevComposite = f.riskScore.composite ?? 0
+  // Simple adjustment: apply complexity weight (0.10 * 80) relative to thresholds
+  const compContrib = complexityDelta <= 0 ? 0 : Math.min(1, complexityDelta / 15) * 0.1 * 80
+  const newComposite = Math.min(
+    100,
+    Math.round(f.riskScore.metrics.changeSize != null ? prevComposite + compContrib : prevComposite)
+  )
+  const level: 'low' | 'medium' | 'high' =
+    newComposite >= 67 ? 'high' : newComposite >= 34 ? 'medium' : 'low'
+  return {
+    ...f,
+    riskScore: {
+      ...f.riskScore,
+      composite: newComposite || null,
+      level,
+      metrics: { ...f.riskScore.metrics, complexityDelta },
+    },
+  }
+}
+
 export const usePrReviewStore = create<PrReviewStore>((set, get) => ({
   prQueue: [],
   queueLoading: false,
@@ -227,24 +313,7 @@ export const usePrReviewStore = create<PrReviewStore>((set, get) => ({
   hasMorePrs: false,
   totalPrCount: null,
   nextPrCursor: undefined,
-  activePr: null,
-  currentChapterId: null,
-  currentFilePath: null,
-  viewedFiles: new Set(),
-  fileOrderOverrides: {},
-  scrollPosition: null,
-  pausedAt: null,
-  viewedAt: {},
-  changedSince: new Set(),
-  newSinceLook: new Set(),
-  lastSeenHeadSHA: null,
-  historyRewritten: false,
-  lastAccessedAt: null,
-  notes: [],
-  drafts: [],
-  threads: {},
-  issueComments: [],
-  rateLimitState: null,
+  ...freshReview(),
   currentUserLogin: null,
 
   setQueue: (prs) => set({ prQueue: prs }),
@@ -355,14 +424,12 @@ export const usePrReviewStore = create<PrReviewStore>((set, get) => ({
   updateFileRiskScore: (chapterId, filePath, riskScore) =>
     set((state) => {
       if (!state.activePr) return {}
-      const chapters = state.activePr.chapters.map((chapter) => {
-        if (chapter.id !== chapterId) return chapter
-        return {
-          ...chapter,
-          files: chapter.files.map((f) => (f.path === filePath ? { ...f, riskScore } : f)),
-        }
-      })
-      return { activePr: { ...state.activePr, chapters } }
+      return {
+        activePr: patchChapterFile(state.activePr, { chapterId, filePath }, (f) => ({
+          ...f,
+          riskScore,
+        })),
+      }
     }),
 
   updateFileRiskScores: (scores) =>
@@ -378,37 +445,11 @@ export const usePrReviewStore = create<PrReviewStore>((set, get) => ({
   patchFileComplexity: (chapterId, filePath, complexityDelta) =>
     set((state) => {
       if (!state.activePr) return {}
-      const chapters = state.activePr.chapters.map((chapter) => {
-        if (chapter.id !== chapterId) return chapter
-        return {
-          ...chapter,
-          files: chapter.files.map((f) => {
-            if (f.path !== filePath) return f
-            const prevComposite = f.riskScore.composite ?? 0
-            // Simple adjustment: apply complexity weight (0.10 * 80) relative to thresholds
-            const compContrib =
-              complexityDelta <= 0 ? 0 : Math.min(1, complexityDelta / 15) * 0.1 * 80
-            const newComposite = Math.min(
-              100,
-              Math.round(
-                f.riskScore.metrics.changeSize != null ? prevComposite + compContrib : prevComposite
-              )
-            )
-            const level: 'low' | 'medium' | 'high' =
-              newComposite >= 67 ? 'high' : newComposite >= 34 ? 'medium' : 'low'
-            return {
-              ...f,
-              riskScore: {
-                ...f.riskScore,
-                composite: newComposite || null,
-                level,
-                metrics: { ...f.riskScore.metrics, complexityDelta },
-              },
-            }
-          }),
-        }
-      })
-      return { activePr: { ...state.activePr, chapters } }
+      return {
+        activePr: patchChapterFile(state.activePr, { chapterId, filePath }, (f) =>
+          withComplexity(f, complexityDelta)
+        ),
+      }
     }),
 
   updateQueuePrRisk: (prNumber, riskLevel, signalDots) =>
@@ -503,25 +544,5 @@ export const usePrReviewStore = create<PrReviewStore>((set, get) => ({
     persistSession(get(), repoRoot, prNumber, headSHA)
   },
 
-  reset: () =>
-    set({
-      activePr: null,
-      currentChapterId: null,
-      currentFilePath: null,
-      viewedFiles: new Set(),
-      fileOrderOverrides: {},
-      scrollPosition: null,
-      pausedAt: null,
-      viewedAt: {},
-      changedSince: new Set(),
-      newSinceLook: new Set(),
-      lastSeenHeadSHA: null,
-      historyRewritten: false,
-      lastAccessedAt: null,
-      notes: [],
-      drafts: [],
-      threads: {},
-      issueComments: [],
-      rateLimitState: null,
-    }),
+  reset: () => set(freshReview()),
 }))

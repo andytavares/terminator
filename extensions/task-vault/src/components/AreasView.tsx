@@ -9,7 +9,6 @@ import {
   Pencil,
   Timer,
   Trash2,
-  X,
   type LucideIcon,
 } from 'lucide-react'
 import type { IndexedTask } from '../vault/types'
@@ -17,6 +16,7 @@ import { SmartTaskInput, invalidateSmartInputCache } from './SmartTaskInput'
 import { useVaultStore } from '../stores/vault.store'
 import { Button, IconButton } from '@terminator/extension-ui'
 import { useIndexReload } from './vault-hooks'
+import { RenameRow, TaskTextEditor, useTaskTextDraft } from './inline-edits'
 
 interface AreaProject {
   id: string
@@ -495,16 +495,6 @@ function AddAreaTask({ area, tasks }: { area: AreaData; tasks: AreaTasks }): Rea
   )
 }
 
-/** A task's text with its tags written back out, for editing. */
-function taggedText(task: IndexedTask): string {
-  const parts = [task.text]
-  if (task.project) parts.push(`@${task.project}`)
-  if (task.context) parts.push(`+${task.context}`)
-  if (task.area) parts.push(`#${task.area}`)
-  if (task.dueDate) parts.push(`due:${task.dueDate}`)
-  return parts.join(' ')
-}
-
 const STATUS_ICONS: Record<string, LucideIcon> = {
   done: CheckCircle2,
   migrated: ArrowRightCircle,
@@ -520,28 +510,8 @@ function TaskStatusIcon(props: { status: string }): React.JSX.Element {
 }
 
 function AreaTaskEditor({ task, tasks, onDone }: TaskEditorProps): React.JSX.Element {
-  const [editText, setEditText] = useState(() => taggedText(task))
-  async function save() {
-    if (!editText.trim()) return
-    await invoke('task-vault:vault:edit-task', { taskId: task.id, text: editText.trim() })
-    onDone()
-    await tasks.reloadTasks()
-  }
-  return (
-    <span className="area-detail__task-edit">
-      <SmartTaskInput
-        autoFocus
-        value={editText}
-        onChange={setEditText}
-        onSubmit={() => void save()}
-        onCancel={onDone}
-      />
-      <Button variant="primary" size="sm" onClick={() => void save()}>
-        Save
-      </Button>
-      <IconButton icon={X} label="Cancel edit" size="sm" onClick={onDone} />
-    </span>
-  )
+  const draft = useTaskTextDraft(task, onDone, tasks.reloadTasks)
+  return <TaskTextEditor draft={draft} className="area-detail__task-edit" saveSize="sm" />
 }
 
 function AreaTaskText(props: { task: IndexedTask; onEdit: () => void }): React.JSX.Element {
@@ -633,30 +603,6 @@ function useRename(area: AreaData, onRefresh: () => Promise<void>) {
     await onRefresh()
   }
   return { renamingArea, renameText, setRenameText, renameError, open, cancel, save }
-}
-
-function RenameRow({ rename }: { rename: Rename }): React.JSX.Element {
-  return (
-    <div className="area-detail__rename-row">
-      <input
-        autoFocus
-        className="area-detail__rename-input"
-        value={rename.renameText}
-        onChange={(e) => rename.setRenameText(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') void rename.save()
-          if (e.key === 'Escape') rename.cancel()
-        }}
-      />
-      <Button variant="primary" size="sm" onClick={() => void rename.save()}>
-        Save
-      </Button>
-      <IconButton icon={X} label="Cancel rename" size="sm" onClick={rename.cancel} />
-      {rename.renameError && (
-        <span className="area-detail__rename-error">{rename.renameError}</span>
-      )}
-    </div>
-  )
 }
 
 function AreaTitle({ area, rename }: { area: AreaData; rename: Rename }): React.JSX.Element {
