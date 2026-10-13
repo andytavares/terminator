@@ -9,8 +9,9 @@ export interface PaintGradient {
   addColorStop(offset: number, color: string): void
 }
 
-export interface Paint {
-  fillStyle: string | PaintGradient
+// Generic over the gradient so a real canvas hands back its own CanvasGradient.
+export interface Paint<Gradient extends PaintGradient = PaintGradient> {
+  set fillStyle(value: string | Gradient)
   globalCompositeOperation: string
   fillRect(x: number, y: number, w: number, h: number): void
   createRadialGradient(
@@ -20,7 +21,7 @@ export interface Paint {
     x1: number,
     y1: number,
     r1: number
-  ): PaintGradient
+  ): Gradient
   drawImage(image: CanvasImageSource, dx: number, dy: number): void
 }
 
