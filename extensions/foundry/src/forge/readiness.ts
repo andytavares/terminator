@@ -958,7 +958,7 @@ function buildHandOffLock(input: ReadinessInput): string | null {
     const lock = rule(facts)
     if (lock !== undefined) return lock
   }
-  return null
+  return decisionsLock(facts)
 }
 
 const handedOffLock: LockRule = ({ input: { order, agreed, clock } }) => {
@@ -1005,7 +1005,13 @@ const heldLock: LockRule = ({ input: { loop, compile, clock } }) => {
   return `Held by you since ${clock(loop.heldAt)}. Let it continue, or hand off yourself once nothing is running.`
 }
 
-const decisionsLock: LockRule = ({ rule5Applies, openBlocking, openQuestions, input }) => {
+/** The last word on a draft nothing else locks: what is still to decide, or nothing. */
+const decisionsLock = ({
+  rule5Applies,
+  openBlocking,
+  openQuestions,
+  input,
+}: StripFacts): string | null => {
   if (rule5Applies) return `${openBlocking.length} red-team findings need your decision.`
   if (openQuestions.length > 0) {
     return `${openQuestions.length} questions need your answer. The architect was less than 90% sure.`
@@ -1013,13 +1019,7 @@ const decisionsLock: LockRule = ({ rule5Applies, openBlocking, openQuestions, in
   return input.compile.failures.length > 0 ? input.compile.failures[0].detail : null
 }
 
-const LOCK_RULES: readonly LockRule[] = [
-  handedOffLock,
-  runningLock,
-  refusedLock,
-  heldLock,
-  decisionsLock,
-]
+const LOCK_RULES: readonly LockRule[] = [handedOffLock, runningLock, refusedLock, heldLock]
 
 function buildRedraftLock(input: ReadinessInput, handOffLockText: string | null): string | null {
   const { order, intake, clock } = input

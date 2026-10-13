@@ -347,11 +347,9 @@ async function create(deps: ForgeDeps, payload: CreateInput): Promise<unknown> {
     newId: () => newOrderId(new Date(deps.now())),
     readIssue: deps.readIssue,
     priorArtFor: deps.priorArtFor,
-    existingOrderFor: () => null,
   })
 
   if ('error' in seeded) return seeded
-  if ('existing' in seeded) return seeded
 
   const existing = await existingFor(deps, seeded.order)
   if (existing !== null) return { existing }

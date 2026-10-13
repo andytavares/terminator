@@ -39,10 +39,6 @@ export interface SeedDeps {
   readonly now: () => string
   readonly newId: () => string
   readonly readIssue?: (tracker: 'linear' | 'jira', key: string) => Promise<IssueLike | null>
-  readonly existingOrderFor?: (
-    tracker: 'linear' | 'jira',
-    key: string
-  ) => { id: string; title: string } | null
   /**
    * What was already decided about these files (FR-077).
    *
@@ -61,10 +57,7 @@ export type SeedInput =
   | { kind: 'tracker'; tracker: 'linear' | 'jira'; key: string; repoPaths: readonly string[] }
   | { kind: 'signal'; signalId: string; repoPaths: readonly string[] }
 
-export type SeedResult =
-  | { order: WorkOrder; unavailableChecks: CheckName[] }
-  | { existing: { id: string; title: string } }
-  | { error: string }
+export type SeedResult = { order: WorkOrder; unavailableChecks: CheckName[] } | { error: string }
 
 /**
  * File paths named in a sentence.
@@ -115,7 +108,7 @@ interface Origin {
   readonly branchName: string | null
 }
 
-type Read = { origin: Origin } | { existing: { id: string; title: string } } | { error: string }
+type Read = { origin: Origin } | { error: string }
 
 export async function seedOrder(input: SeedInput, deps: SeedDeps): Promise<SeedResult> {
   if (input.repoPaths.length === 0) {
@@ -157,8 +150,6 @@ async function trackerOrigin(
   { tracker, key }: Extract<SeedInput, { kind: 'tracker' }>,
   deps: SeedDeps
 ): Promise<Read> {
-  const existing = deps.existingOrderFor?.(tracker, key) ?? null
-  if (existing !== null) return { existing }
   const issue = (await deps.readIssue?.(tracker, key)) ?? null
   if (issue === null) return { error: `Could not read ${key} from ${tracker}.` }
   // A description is often absent and that is fine — the title is still a

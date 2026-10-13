@@ -284,15 +284,11 @@ export function raiseGate(input: RaiseInput): Gate {
  * A default naming an option the gate does not offer would produce a decision
  * nobody could have made. Caught when the gate is raised rather than at the
  * moment a deadline passes, unattended, which is the worst possible time to
- * find out.
+ * find out. Every shape in `RULE_SHAPE` offers its own default (its spec
+ * checks each rule), so the one way to lose it is a caller omitting it.
  */
 function assertDefaultOffered(rule: GateRuleId, omitted: readonly string[]): void {
   const shape = RULE_SHAPE[rule]
-  if (!shape.options.some((option) => option.id === shape.defaultIfIgnored)) {
-    throw new Error(
-      `The "${rule}" rule defaults to "${shape.defaultIfIgnored}", which is not one of the options it offers.`
-    )
-  }
   if (omitted.includes(shape.defaultIfIgnored)) {
     throw new Error(
       `The "${rule}" rule defaults to "${shape.defaultIfIgnored}", so that option cannot be omitted.`

@@ -782,3 +782,58 @@ function realCrossoverTests(map: HallMap) {
     for (const t of map.crossovers) expect(clearOf(map, t)).toBe(true)
   })
 }
+
+// Two hand-built graphs where, once the floor is merely whole, a station's
+// walk to the breakroom door still runs a long way round the belts, so the
+// layout opens more crossovers on that way.
+const SEAT_WAY_PAIR = graph([
+  rn({ id: 'n0', kind: 'fanout', lane: 2 }),
+  rn({ id: 'n1', kind: 'run', lane: 4, dependsOn: ['n0'] }),
+  rn({ id: 'n2', kind: 'fanout', lane: 4, dependsOn: ['n0'] }),
+  rn({ id: 'n3', kind: 'fanout', dependsOn: ['n1', 'n2'] }),
+  rn({ id: 'n4', kind: 'agent', lane: 1, dependsOn: ['n1', 'n2'] }),
+  rn({ id: 'n5', kind: 'fanout', lane: 4, dependsOn: ['n0', 'n2', 'n4'] }),
+])
+const SEAT_WAY_SINGLE = graph([
+  rn({ id: 'n0', kind: 'agent' }),
+  rn({ id: 'n1', kind: 'gate', dependsOn: ['n0'] }),
+  rn({ id: 'n2', kind: 'agent', lane: 1, dependsOn: ['n1'] }),
+  rn({ id: 'n3', kind: 'agent', dependsOn: ['n0'] }),
+])
+
+/** The walk grid with every belt tile open: how a station would walk if no belt were in the way. */
+function beltFree(map: HallMap): boolean[][] {
+  const free = map.walk.map((row) => [...row])
+  for (const t of map.beltTiles) free[t.y][t.x] = false
+  return free
+}
+
+function seatOf(map: HallMap, nodeId: string): Tile {
+  return map.props.find((p) => p.nodeId === nodeId && p.seat !== null)?.seat as Tile
+}
+
+describe("layoutHall — crossovers on a station's way to the breakroom", () => {
+  it('opens a clear pair of crossovers where a station would detour round the belts', () => {
+    const map = layoutHall(SEAT_WAY_PAIR)
+    const open = new Set(map.crossovers.map(tileKey))
+    const way = findPath(beltFree(map), { from: seatOf(map, 'n4'), to: map.breakroom.door[0] })
+    const crossed = way.filter((t) => open.has(tileKey(t)))
+    expect(crossed.length).toBeGreaterThan(0)
+    for (const t of crossed) {
+      expect(pairedAlongBelt(map, t)).toBe(true)
+      expect(clearOf(map, t)).toBe(true)
+    }
+  })
+
+  it('opens a single crossover when no clear pair lies on the way, so no station detours', () => {
+    const map = layoutHall(SEAT_WAY_SINGLE)
+    expect(map.crossovers).toHaveLength(1)
+    const free = beltFree(map)
+    const door = map.breakroom.door[0]
+    for (const p of stationsOf(map.props)) {
+      const from = p.seat as Tile
+      const walked = findPath(map.walk, { from, to: door }).length
+      expect(walked).toBe(findPath(free, { from, to: door }).length)
+    }
+  })
+})

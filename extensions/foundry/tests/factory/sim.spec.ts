@@ -18,7 +18,7 @@ import type { Crew, World } from '../../src/factory/sim.js'
 import { tileOf } from '../../src/factory/sim.js'
 import { direct } from '../../src/factory/director.js'
 import { layoutHall } from '../../src/factory/layout.js'
-import type { HallMap, RestSeat } from '../../src/factory/layout.js'
+import type { HallMap, RestSeat, Tile } from '../../src/factory/layout.js'
 import { buildRunGraph, withNode } from '../../src/line/run-graph.js'
 import { parseRecipe } from '../../src/recipe/parse.js'
 import type { Recipe } from '../../src/recipe/parse.js'
@@ -728,7 +728,7 @@ describe('idle crew wander', () => {
 // can stand aside. Only `walk` is read by the crew's movement.
 const ROWS = ['#########', '.........', '###.###.#', '#########']
 const walk = ROWS.map((row) => row.split('').map((ch) => ch === '#'))
-const corridor = { walk, solid: walk, restSeats: [], props: [] } as unknown as HallMap
+const corridor = partialFake<HallMap>({ walk, solid: walk, restSeats: [], props: [] })
 /** A crew member of `nodeId` walking `from` one tile to its `goal`, to `then` there. */
 function member(
   nodeId: string,
@@ -895,7 +895,47 @@ describe('crew are solid', () => {
   describe('head-on', headOnTests)
   describe('a passing place', aPassingPlaceTests)
   describe('absent crew and determinism', absentCrewAndDeterminismTests)
+  describe('a dead end', aDeadEndTests)
 })
+
+// A one-tile corridor closed at its west end, with `c` standing at the end of it.
+const DEAD_END = ['#####', '#....', '#####'].map((row) => row.split('').map((ch) => ch === '#'))
+const deadEnd = partialFake<HallMap>({ walk: DEAD_END, solid: DEAD_END, restSeats: [], props: [] })
+
+/** `b`, bound for a rest, between `c` and `a`; `a`, bound for work past them both. */
+function hemmedIn(): World {
+  const c = { ...member('c', { from: { x: 1, y: 1 }, goal: { x: 1, y: 1 } }, 'idle'), goal: null }
+  return {
+    ...world([
+      c,
+      member('b', { from: { x: 2, y: 1 }, goal: { x: 4, y: 1 } }, 'couch'),
+      member('a', { from: { x: 3, y: 1 }, goal: { x: 1, y: 1 } }, 'type'),
+    ]),
+    map: deadEnd,
+  }
+}
+
+const tileOfCrew = (w: World, id: string): Tile => tileOf(crewOf(w, id).x, crewOf(w, id).y)
+
+function aDeadEndTests() {
+  it('the one giving way, with nowhere to step aside or back, waits where it stands', () => {
+    const worlds = ticked(hemmedIn(), 40)
+    for (const w of worlds) {
+      expect(sharedTile(w)).toBeNull()
+      expect(tileOfCrew(w, 'b')).toEqual({ x: 2, y: 1 })
+    }
+    const b = crewOf(worlds[worlds.length - 1], 'b')
+    expect(b.anim).toBe('idle')
+    expect(b.blockedMs).toBeGreaterThan(0)
+  })
+
+  it('the one who outranks, stuck behind someone stuck too, backs off to make room', () => {
+    const worlds = ticked(hemmedIn(), 100)
+    for (const w of worlds.filter((v) => v.clockMs <= 800)) expect(tileOfCrew(w, 'a').x).toBe(3)
+    expect(worlds.some((w) => tileOfCrew(w, 'a').x === 4)).toBe(true)
+    for (const w of worlds) expect(sharedTile(w)).toBeNull()
+  })
+}
 
 const realGraph = (): RunGraph =>
   JSON.parse(
