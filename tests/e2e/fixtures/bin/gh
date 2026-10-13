@@ -5,12 +5,15 @@
 // there and answered as gh would answer it. Otherwise this is the real gh, the
 // next one on PATH, so specs that start no stub run exactly as before.
 import { spawnSync } from 'node:child_process'
-import { accessSync, constants, readFileSync } from 'node:fs'
-import { delimiter, dirname, join } from 'node:path'
+import { accessSync, constants, readFileSync, realpathSync } from 'node:fs'
+import { delimiter, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 // The package is an ES module, so this extensionless script is one too.
-const ownDirectory = dirname(fileURLToPath(import.meta.url))
+// PATH can name this folder as fixtures/zdotdir/../bin (fixtures/zdotdir/.zprofile)
+// or through a symlink, so a candidate is compared by its real path: one that
+// was this script ran itself until fork failed (macOS run 38380127678).
+const ownPath = realpathSync(fileURLToPath(import.meta.url))
 
 function stubUrl() {
   const configHome = process.env.XDG_CONFIG_HOME
@@ -22,15 +25,18 @@ function stubUrl() {
   }
 }
 
+function isOtherGh(candidate) {
+  try {
+    accessSync(candidate, constants.X_OK)
+    return realpathSync(candidate) !== ownPath
+  } catch {
+    return false
+  }
+}
+
 function realGh() {
   for (const directory of (process.env.PATH || '').split(delimiter)) {
-    if (!directory || directory === ownDirectory) continue
-    try {
-      accessSync(join(directory, 'gh'), constants.X_OK)
-      return join(directory, 'gh')
-    } catch {
-      // not in this directory
-    }
+    if (directory && isOtherGh(join(directory, 'gh'))) return join(directory, 'gh')
   }
   return null
 }
