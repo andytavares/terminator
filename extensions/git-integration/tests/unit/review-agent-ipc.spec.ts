@@ -77,38 +77,68 @@ function makeDoneRun(overrides: Partial<AgentRun> = {}): AgentRun {
   }
 }
 
+/** A start request for `scope` on PR 1 at sha1, overridden by `overrides`. */
+function startPayload(overrides: Record<string, unknown> = {}) {
+  return {
+    repoRoot: '/repo',
+    prNumber: 1,
+    headSHA: 'sha1',
+    baseRefName: 'main',
+    scope,
+    request: 'review',
+    ...overrides,
+  }
+}
+
+/** A run whose completion the test decides. */
+function deferredRun() {
+  let resolveDone: (r: AgentRun) => void = () => {}
+  const done = new Promise<AgentRun>((r) => {
+    resolveDone = r
+  })
+  return { done, resolveDone: (r: AgentRun) => resolveDone(r) }
+}
+
+const tick = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+/** An undismissed nit on line 1 of a.ts. */
+function nitFinding(id: string): AgentRun['findings'][number] {
+  return {
+    id,
+    severity: 'nit',
+    path: 'a.ts',
+    startLine: 1,
+    endLine: 1,
+    side: 'RIGHT',
+    title: 't',
+    body: 'b',
+    suggestedCode: null,
+    dismissed: false,
+  }
+}
+
 beforeEach(() => {
   storeState.data = {}
 })
 
 describe('review-agent IPC', () => {
   it('review-agent:start returns a running run immediately, then broadcasts on finish', async () => {
-    let resolveDone: (r: AgentRun) => void = () => {}
-    const donePromise = new Promise<AgentRun>((r) => {
-      resolveDone = r
-    })
+    const { done: donePromise, resolveDone } = deferredRun()
     const cancel = vi.fn()
     const runReview = vi.fn(() => ({ runId: 'run-done', done: donePromise, cancel }))
     const ensureWorktree = vi.fn(async () => '/wt')
 
     const { handlers, broadcast } = captureHandlers({ ensureWorktree, runReview })
 
-    const result = (await handlers['review-agent:start']({
-      repoRoot: '/repo',
-      prNumber: 1,
-      headSHA: 'sha1',
-      baseRefName: 'main',
-      title: 't',
-      body: 'b',
-      scope,
-      request: 'review',
-    })) as { run: AgentRun }
+    const result = (await handlers['review-agent:start'](
+      startPayload({ title: 't', body: 'b' })
+    )) as { run: AgentRun }
 
     expect(result.run.status).toBe('running')
     expect(broadcast).not.toHaveBeenCalled()
 
     resolveDone(makeDoneRun({ id: result.run.id }))
-    await new Promise((r) => setTimeout(r, 10))
+    await tick(10)
 
     expect(broadcast).toHaveBeenCalledWith(
       'review-agent:event',
@@ -119,31 +149,14 @@ describe('review-agent IPC', () => {
 
 describe('review-agent IPC — a second start with the same scope while running returns the same running run', () => {
   it('a second start with the same scope while running returns the same running run', async () => {
-    let resolveDone: (r: AgentRun) => void = () => {}
-    const donePromise = new Promise<AgentRun>((r) => {
-      resolveDone = r
-    })
+    const { done: donePromise, resolveDone } = deferredRun()
     const runReview = vi.fn(() => ({ runId: 'x', done: donePromise, cancel: vi.fn() }))
     const ensureWorktree = vi.fn(async () => '/wt')
     const { handlers } = captureHandlers({ ensureWorktree, runReview })
 
-    const first = (await handlers['review-agent:start']({
-      repoRoot: '/repo',
-      prNumber: 1,
-      headSHA: 'sha1',
-      baseRefName: 'main',
-      scope,
-      request: 'review',
-    })) as { run: AgentRun }
+    const first = (await handlers['review-agent:start'](startPayload())) as { run: AgentRun }
 
-    const second = (await handlers['review-agent:start']({
-      repoRoot: '/repo',
-      prNumber: 1,
-      headSHA: 'sha1',
-      baseRefName: 'main',
-      scope,
-      request: 'review',
-    })) as { run: AgentRun }
+    const second = (await handlers['review-agent:start'](startPayload())) as { run: AgentRun }
 
     expect(second.run.id).toBe(first.run.id)
     expect(runReview).toHaveBeenCalledTimes(1)
@@ -161,39 +174,19 @@ describe('review-agent IPC — uses the model override when given, else the sett
     const ensureWorktree = vi.fn(async () => '/wt')
     const { handlers, settings } = captureHandlers({ ensureWorktree, runReview })
 
-    await handlers['review-agent:start']({
-      repoRoot: '/repo',
-      prNumber: 1,
-      headSHA: 'sha1',
-      baseRefName: 'main',
-      scope,
-      request: 'review',
-    })
-    await new Promise((r) => setTimeout(r, 5))
+    await handlers['review-agent:start'](startPayload())
+    await tick(5)
     expect(runReview.mock.calls[0][0].model).toBe('sonnet')
 
     settings['terminator.git-integration.review.agentModel'] = 'opus'
-    await handlers['review-agent:start']({
-      repoRoot: '/repo',
-      prNumber: 2,
-      headSHA: 'sha2',
-      baseRefName: 'main',
-      scope,
-      request: 'review',
-    })
-    await new Promise((r) => setTimeout(r, 5))
+    await handlers['review-agent:start'](startPayload({ prNumber: 2, headSHA: 'sha2' }))
+    await tick(5)
     expect(runReview.mock.calls[1][0].model).toBe('opus')
 
-    await handlers['review-agent:start']({
-      repoRoot: '/repo',
-      prNumber: 3,
-      headSHA: 'sha3',
-      baseRefName: 'main',
-      scope,
-      request: 'review',
-      model: 'sonnet',
-    })
-    await new Promise((r) => setTimeout(r, 5))
+    await handlers['review-agent:start'](
+      startPayload({ prNumber: 3, headSHA: 'sha3', model: 'sonnet' })
+    )
+    await tick(5)
     expect(runReview.mock.calls[2][0].model).toBe('sonnet')
   })
 })
@@ -208,19 +201,12 @@ describe('review-agent IPC — passes no effort for the Default choice or an uns
     const ensureWorktree = vi.fn(async () => '/wt')
     const { handlers, settings } = captureHandlers({ ensureWorktree, runReview })
     const start = (prNumber: number) =>
-      handlers['review-agent:start']({
-        repoRoot: '/repo',
-        prNumber,
-        headSHA: `sha${prNumber}`,
-        baseRefName: 'main',
-        scope,
-        request: 'review',
-      })
+      handlers['review-agent:start'](startPayload({ prNumber, headSHA: `sha${prNumber}` }))
 
     for (const [i, value] of (['default', '', 'high'] as const).entries()) {
       settings['terminator.git-integration.review.agentEffort'] = value
       await start(i + 1)
-      await new Promise((r) => setTimeout(r, 5))
+      await tick(5)
     }
 
     expect(runReview.mock.calls.map((c) => c[0].effort)).toEqual([undefined, undefined, 'high'])
@@ -244,15 +230,8 @@ describe('review-agent IPC — review-agent:cancel cancels a live run', () => {
     const ensureWorktree = vi.fn(async () => '/wt')
     const { handlers } = captureHandlers({ ensureWorktree, runReview })
 
-    const started = (await handlers['review-agent:start']({
-      repoRoot: '/repo',
-      prNumber: 1,
-      headSHA: 'sha1',
-      baseRefName: 'main',
-      scope,
-      request: 'review',
-    })) as { run: AgentRun }
-    await new Promise((r) => setTimeout(r, 10))
+    const started = (await handlers['review-agent:start'](startPayload())) as { run: AgentRun }
+    await tick(10)
 
     const result = await handlers['review-agent:cancel']({ runId: started.run.id })
     expect(result).toEqual({ ok: true })
@@ -286,20 +265,7 @@ describe('review-agent IPC — review-agent:dismiss marks a finding dismissed an
     const { handlers } = captureHandlers({})
     const run = makeDoneRun({
       id: 'run-1',
-      findings: [
-        {
-          id: 'f1',
-          severity: 'nit',
-          path: 'a.ts',
-          startLine: 1,
-          endLine: 1,
-          side: 'RIGHT',
-          title: 't',
-          body: 'b',
-          suggestedCode: null,
-          dismissed: false,
-        },
-      ],
+      findings: [nitFinding('f1')],
     })
     storeState.data['/repo:::1:::sha1'] = [run]
 

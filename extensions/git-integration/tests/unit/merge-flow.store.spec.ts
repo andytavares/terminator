@@ -3,47 +3,56 @@ import { act } from '@testing-library/react'
 import { useMergeFlowStore } from '../../src/stores/merge-flow.store'
 import type { ConflictSession, ConflictResolution } from '../../src/schemas/merge-flow.schema'
 
+type ConflictFile = ConflictSession['files'][number]
+type Block = ConflictFile['blocks'][number]
+
+/** An unresolved block of `filePath`, numbered `index`, with the given sides and conflict text. */
+function makeBlock(
+  filePath: string,
+  index: number,
+  texts: Pick<Block, 'oursText' | 'theirsText' | 'originalConflictText'>
+): Block {
+  return {
+    blockId: `${filePath}#${index}`,
+    index,
+    baseText: '',
+    contextBefore: [],
+    contextAfter: [],
+    isResolved: false,
+    ...texts,
+  }
+}
+
+/** An unresolved file holding `blocks`, by authors at the given commits. */
+function makeFile(
+  filePath: string,
+  blocks: Block[],
+  authors: Pick<ConflictFile, 'oursAuthor' | 'theirsAuthor' | 'conflictDescription'>
+): ConflictFile {
+  return { filePath, conflictCount: blocks.length, resolvedCount: 0, blocks, ...authors }
+}
+
 function makeSession(overrides: Partial<ConflictSession> = {}): ConflictSession {
+  const foo = 'src/foo.ts'
+  const blocks = [0, 1].map((i) =>
+    makeBlock(foo, i, {
+      oursText: `ours${i}`,
+      theirsText: `theirs${i}`,
+      originalConflictText: '<<<',
+    })
+  )
+  const authors = {
+    conflictDescription: 'desc',
+    oursAuthor: { name: 'Alice', commitHash: 'abc', timestamp: '2026-01-01T00:00:00Z' },
+    theirsAuthor: { name: 'Bob', commitHash: 'def', timestamp: '2026-01-01T00:00:00Z' },
+  }
   return {
     repoRoot: '/repo',
     isRebase: false,
     totalConflicts: 2,
     totalResolved: 0,
     startedAt: new Date().toISOString(),
-    files: [
-      {
-        filePath: 'src/foo.ts',
-        conflictCount: 2,
-        resolvedCount: 0,
-        conflictDescription: 'desc',
-        oursAuthor: { name: 'Alice', commitHash: 'abc', timestamp: '2026-01-01T00:00:00Z' },
-        theirsAuthor: { name: 'Bob', commitHash: 'def', timestamp: '2026-01-01T00:00:00Z' },
-        blocks: [
-          {
-            blockId: 'src/foo.ts#0',
-            index: 0,
-            oursText: 'ours0',
-            theirsText: 'theirs0',
-            baseText: '',
-            contextBefore: [],
-            contextAfter: [],
-            originalConflictText: '<<<',
-            isResolved: false,
-          },
-          {
-            blockId: 'src/foo.ts#1',
-            index: 1,
-            oursText: 'ours1',
-            theirsText: 'theirs1',
-            baseText: '',
-            contextBefore: [],
-            contextAfter: [],
-            originalConflictText: '<<<',
-            isResolved: false,
-          },
-        ],
-      },
-    ],
+    files: [makeFile(foo, blocks, authors)],
     ...overrides,
   }
 }
@@ -223,6 +232,21 @@ describe('isComplete selector', () => {
   })
 })
 
+/** A file with one unresolved block whose sides are "<name>-ours" and "<name>-theirs". */
+function oneBlockFile(name: string): ConflictFile {
+  const filePath = `src/${name}.ts`
+  const block = makeBlock(filePath, 0, {
+    oursText: `${name}-ours`,
+    theirsText: `${name}-theirs`,
+    originalConflictText: `<<<${name}>>>`,
+  })
+  return makeFile(filePath, [block], {
+    conflictDescription: '',
+    oursAuthor: { name: 'A', commitHash: 'a', timestamp: '2026-01-01T00:00:00Z' },
+    theirsAuthor: { name: 'B', commitHash: 'b', timestamp: '2026-01-01T00:00:00Z' },
+  })
+}
+
 function makeTwoFileSession(): ConflictSession {
   return {
     repoRoot: '/repo',
@@ -230,51 +254,25 @@ function makeTwoFileSession(): ConflictSession {
     totalConflicts: 2,
     totalResolved: 0,
     startedAt: new Date().toISOString(),
-    files: [
-      {
-        filePath: 'src/alpha.ts',
-        conflictCount: 1,
-        resolvedCount: 0,
-        conflictDescription: '',
-        oursAuthor: { name: 'A', commitHash: 'a', timestamp: '2026-01-01T00:00:00Z' },
-        theirsAuthor: { name: 'B', commitHash: 'b', timestamp: '2026-01-01T00:00:00Z' },
-        blocks: [
-          {
-            blockId: 'src/alpha.ts#0',
-            index: 0,
-            oursText: 'alpha-ours',
-            theirsText: 'alpha-theirs',
-            baseText: '',
-            contextBefore: [],
-            contextAfter: [],
-            originalConflictText: '<<<alpha>>>',
-            isResolved: false,
-          },
-        ],
-      },
-      {
-        filePath: 'src/beta.ts',
-        conflictCount: 1,
-        resolvedCount: 0,
-        conflictDescription: '',
-        oursAuthor: { name: 'A', commitHash: 'a', timestamp: '2026-01-01T00:00:00Z' },
-        theirsAuthor: { name: 'B', commitHash: 'b', timestamp: '2026-01-01T00:00:00Z' },
-        blocks: [
-          {
-            blockId: 'src/beta.ts#0',
-            index: 0,
-            oursText: 'beta-ours',
-            theirsText: 'beta-theirs',
-            baseText: '',
-            contextBefore: [],
-            contextAfter: [],
-            originalConflictText: '<<<beta>>>',
-            isResolved: false,
-          },
-        ],
-      },
-    ],
+    files: [oneBlockFile('alpha'), oneBlockFile('beta')],
   }
+}
+
+/** Resolves alpha with "ours", then moves to beta and resolves it with "theirs". */
+function resolveBothFiles() {
+  act(() => {
+    useMergeFlowStore.getState().confirmDecision('src/alpha.ts#0', {
+      blockId: 'src/alpha.ts#0',
+      resolvedText: 'alpha-resolved',
+      strategy: 'ours',
+    })
+    useMergeFlowStore.getState().setActiveFile(1)
+    useMergeFlowStore.getState().confirmDecision('src/beta.ts#0', {
+      blockId: 'src/beta.ts#0',
+      resolvedText: 'beta-resolved',
+      strategy: 'theirs',
+    })
+  })
 }
 
 describe('cross-file undo', () => {
@@ -329,20 +327,7 @@ describe('cross-file undo — undo reverses only the most recent decision regard
     act(() => {
       useMergeFlowStore.getState().startSession(makeTwoFileSession())
     })
-    // Confirm both files
-    act(() => {
-      useMergeFlowStore.getState().confirmDecision('src/alpha.ts#0', {
-        blockId: 'src/alpha.ts#0',
-        resolvedText: 'alpha-resolved',
-        strategy: 'ours',
-      })
-      useMergeFlowStore.getState().setActiveFile(1)
-      useMergeFlowStore.getState().confirmDecision('src/beta.ts#0', {
-        blockId: 'src/beta.ts#0',
-        resolvedText: 'beta-resolved',
-        strategy: 'theirs',
-      })
-    })
+    resolveBothFiles()
     expect(useMergeFlowStore.getState().session!.totalResolved).toBe(2)
 
     // Navigate back to file A, then undo — should undo file B's decision (most recent)

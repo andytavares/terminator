@@ -184,79 +184,109 @@ describe('githubAPI bridge — prIssueCommentAdd calls correct channel', () => {
   })
 })
 
+type Api = (typeof import('../../src/api/github'))['githubAPI']
+type BridgeCall = [(api: Api) => Promise<unknown>, [string, unknown]]
+
+const REVAMP_CALLS: BridgeCall[] = [
+  [(api) => api.dashboardSearch(), ['github:dashboard-search', {}]],
+  [
+    (api) =>
+      api.fileViewedSet({
+        repoRoot: '/repo',
+        prNumber: 211,
+        path: 'scripts/e2e-shard.ts',
+        viewed: true,
+      }),
+    [
+      'github:file-viewed-set',
+      { repoRoot: '/repo', prNumber: 211, path: 'scripts/e2e-shard.ts', viewed: true },
+    ],
+  ],
+  [
+    (api) => api.prCompare('/repo', 'aaa111', 'bbb222'),
+    ['github:pr-compare', { repoRoot: '/repo', fromSha: 'aaa111', toSha: 'bbb222' }],
+  ],
+  [
+    (api) => api.cloneRepo('andytavares/terminator', '/Users/me/src'),
+    ['github:clone-repo', { repo: 'andytavares/terminator', folder: '/Users/me/src' }],
+  ],
+  [(api) => api.reviewSettings(), ['github:review-settings', {}]],
+  [(api) => api.accessibleRepos(), ['github:accessible-repos', {}]],
+  [(api) => api.accessibleRepos(true), ['github:accessible-repos', { refresh: true }]],
+  [
+    (api) => api.setReviewRepos(['acme/widgets']),
+    ['github:review-repos-set', { repos: ['acme/widgets'] }],
+  ],
+  [
+    (api) => api.testsForBlock({ repoRoot: '/repo', headSHA: 'h', path: 'a.ts', code: 'x' }),
+    ['github:tests-for-block', { repoRoot: '/repo', headSHA: 'h', path: 'a.ts', code: 'x' }],
+  ],
+]
+
+const BATCH_CALLS: BridgeCall[] = [
+  [
+    (api) => api.filesMetrics('/repo', ['a.ts', 'b.ts']),
+    ['github:files-metrics', { repoRoot: '/repo', paths: ['a.ts', 'b.ts'] }],
+  ],
+  [
+    (api) =>
+      api.filesViewedSet({
+        repoRoot: '/repo',
+        prNumber: 211,
+        nodeId: 'PR_node1',
+        paths: ['a.ts'],
+        viewed: true,
+      }),
+    [
+      'github:files-viewed-set',
+      { repoRoot: '/repo', prNumber: 211, nodeId: 'PR_node1', paths: ['a.ts'], viewed: true },
+    ],
+  ],
+  [
+    (api) =>
+      api.prFileDiff({
+        repoRoot: '/repo',
+        prNumber: 211,
+        path: 'a.ts',
+        ...{ baseRef: 'main', headSHA: 'abc' },
+      }),
+    [
+      'github:pr-file-diff',
+      { repoRoot: '/repo', prNumber: 211, path: 'a.ts', baseRef: 'main', headSHA: 'abc' },
+    ],
+  ],
+  [
+    (api) =>
+      api.fileViewedSet({
+        repoRoot: '/repo',
+        prNumber: 211,
+        path: 'a.ts',
+        viewed: true,
+        nodeId: 'PR_node1',
+      }),
+    [
+      'github:file-viewed-set',
+      { repoRoot: '/repo', prNumber: 211, path: 'a.ts', viewed: true, nodeId: 'PR_node1' },
+    ],
+  ],
+]
+
+/** Makes each call in order, then checks the bridge saw exactly the expected channel and payload. */
+async function expectBridgeCalls(calls: BridgeCall[]) {
+  const { githubAPI } = await import('../../src/api/github')
+  for (const [call] of calls) await call(githubAPI)
+  expect(mockInvoke.mock.calls).toEqual(calls.map(([, expected]) => expected))
+}
+
 describe('githubAPI bridge — review revamp channels send the payloads their handlers validate', () => {
   it('review revamp channels send the payloads their handlers validate', async () => {
-    const { githubAPI } = await import('../../src/api/github')
-    await githubAPI.dashboardSearch()
-    await githubAPI.fileViewedSet({
-      repoRoot: '/repo',
-      prNumber: 211,
-      path: 'scripts/e2e-shard.ts',
-      viewed: true,
-    })
-    await githubAPI.prCompare('/repo', 'aaa111', 'bbb222')
-    await githubAPI.cloneRepo('andytavares/terminator', '/Users/me/src')
-    await githubAPI.reviewSettings()
-    await githubAPI.accessibleRepos()
-    await githubAPI.accessibleRepos(true)
-    await githubAPI.setReviewRepos(['acme/widgets'])
-    await githubAPI.testsForBlock({ repoRoot: '/repo', headSHA: 'h', path: 'a.ts', code: 'x' })
-    expect(mockInvoke.mock.calls).toEqual([
-      ['github:dashboard-search', {}],
-      [
-        'github:file-viewed-set',
-        { repoRoot: '/repo', prNumber: 211, path: 'scripts/e2e-shard.ts', viewed: true },
-      ],
-      ['github:pr-compare', { repoRoot: '/repo', fromSha: 'aaa111', toSha: 'bbb222' }],
-      ['github:clone-repo', { repo: 'andytavares/terminator', folder: '/Users/me/src' }],
-      ['github:review-settings', {}],
-      ['github:accessible-repos', {}],
-      ['github:accessible-repos', { refresh: true }],
-      ['github:review-repos-set', { repos: ['acme/widgets'] }],
-      ['github:tests-for-block', { repoRoot: '/repo', headSHA: 'h', path: 'a.ts', code: 'x' }],
-    ])
+    await expectBridgeCalls(REVAMP_CALLS)
   })
 })
 
 describe('githubAPI bridge — batch channels send the payloads their handlers validate', () => {
   it('batch channels send the payloads their handlers validate', async () => {
-    const { githubAPI } = await import('../../src/api/github')
-    await githubAPI.filesMetrics('/repo', ['a.ts', 'b.ts'])
-    await githubAPI.filesViewedSet({
-      repoRoot: '/repo',
-      prNumber: 211,
-      nodeId: 'PR_node1',
-      paths: ['a.ts'],
-      viewed: true,
-    })
-    await githubAPI.prFileDiff({
-      repoRoot: '/repo',
-      prNumber: 211,
-      path: 'a.ts',
-      ...{ baseRef: 'main', headSHA: 'abc' },
-    })
-    await githubAPI.fileViewedSet({
-      repoRoot: '/repo',
-      prNumber: 211,
-      path: 'a.ts',
-      viewed: true,
-      nodeId: 'PR_node1',
-    })
-    expect(mockInvoke.mock.calls).toEqual([
-      ['github:files-metrics', { repoRoot: '/repo', paths: ['a.ts', 'b.ts'] }],
-      [
-        'github:files-viewed-set',
-        { repoRoot: '/repo', prNumber: 211, nodeId: 'PR_node1', paths: ['a.ts'], viewed: true },
-      ],
-      [
-        'github:pr-file-diff',
-        { repoRoot: '/repo', prNumber: 211, path: 'a.ts', baseRef: 'main', headSHA: 'abc' },
-      ],
-      [
-        'github:file-viewed-set',
-        { repoRoot: '/repo', prNumber: 211, path: 'a.ts', viewed: true, nodeId: 'PR_node1' },
-      ],
-    ])
+    await expectBridgeCalls(BATCH_CALLS)
   })
 })
 

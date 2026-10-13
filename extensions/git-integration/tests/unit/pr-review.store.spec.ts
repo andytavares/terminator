@@ -128,37 +128,34 @@ describe('pr-review store — session v2 — unmarking forgets the viewed SHA an
   })
 })
 
+const HEAD_A = { repoRoot: REPO, prNumber: 211, headSHA: 'aaa111' }
+
+/** Adds a draft (then rewords it) and a private note to the session. */
+function addDraftAndNote(store: ReturnType<typeof usePrReviewStore.getState>) {
+  store.addDraft(HEAD_A, {
+    id: 'd1',
+    path: 'src/hooks/usePrReview.ts',
+    line: 317,
+    startLine: null,
+    side: 'RIGHT',
+    body: 'computeRiskScore runs twice per file here (312 and 317).',
+    fromFindingId: 'f1',
+  })
+  store.updateDraft(HEAD_A, 'd1', 'Keep the scores from the loop.')
+  store.addNote(HEAD_A, {
+    id: 'n1',
+    path: 'src/hooks/usePrReview.ts',
+    line: 312,
+    body: 'why is this recomputed??',
+    createdAt: '2026-09-27T10:00:00.000Z',
+  })
+}
+
 describe('pr-review store — session v2 — drafts and notes persist with the session', () => {
   it('drafts and notes persist with the session', () => {
     const store = usePrReviewStore.getState()
     store.initSession(session())
-    store.addDraft(
-      { repoRoot: REPO, prNumber: 211, headSHA: 'aaa111' },
-      {
-        id: 'd1',
-        path: 'src/hooks/usePrReview.ts',
-        line: 317,
-        startLine: null,
-        side: 'RIGHT',
-        body: 'computeRiskScore runs twice per file here (312 and 317).',
-        fromFindingId: 'f1',
-      }
-    )
-    store.updateDraft(
-      { repoRoot: REPO, prNumber: 211, headSHA: 'aaa111' },
-      'd1',
-      'Keep the scores from the loop.'
-    )
-    store.addNote(
-      { repoRoot: REPO, prNumber: 211, headSHA: 'aaa111' },
-      {
-        id: 'n1',
-        path: 'src/hooks/usePrReview.ts',
-        line: 312,
-        body: 'why is this recomputed??',
-        createdAt: '2026-09-27T10:00:00.000Z',
-      }
-    )
+    addDraftAndNote(store)
     let s = usePrReviewStore.getState()
     expect(s.drafts[0].body).toBe('Keep the scores from the loop.')
     expect(s.notes).toHaveLength(1)
@@ -166,17 +163,14 @@ describe('pr-review store — session v2 — drafts and notes persist with the s
     expect(persisted.drafts).toHaveLength(1)
     expect(persisted.notes[0].body).toBe('why is this recomputed??')
 
-    store.removeNote({ repoRoot: REPO, prNumber: 211, headSHA: 'aaa111' }, 'n1')
-    store.removeDraft({ repoRoot: REPO, prNumber: 211, headSHA: 'aaa111' }, 'd1')
+    store.removeNote(HEAD_A, 'n1')
+    store.removeDraft(HEAD_A, 'd1')
     s = usePrReviewStore.getState()
     expect(s.notes).toHaveLength(0)
     expect(s.drafts).toHaveLength(0)
 
-    store.addDraft(
-      { repoRoot: REPO, prNumber: 211, headSHA: 'aaa111' },
-      { ...persisted.drafts[0], id: 'd2' }
-    )
-    store.clearDrafts({ repoRoot: REPO, prNumber: 211, headSHA: 'aaa111' })
+    store.addDraft(HEAD_A, { ...persisted.drafts[0], id: 'd2' })
+    store.clearDrafts(HEAD_A)
     expect(usePrReviewStore.getState().drafts).toHaveLength(0)
   })
 })
