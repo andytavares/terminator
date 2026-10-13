@@ -15,6 +15,14 @@ function makeDeps(overrides: Partial<CoreActionDeps> = {}): CoreActionDeps {
     sessions: [{ id: 's1', projectId: 'p1', tabTitle: 'Terminal 1', projectName: 'main' }],
     issueLink: { key: 'ABC-1', tracker: 'linear' },
     issue: { url: 'https://example.com' },
+    ...handlers(),
+    ...overrides,
+  }
+}
+
+/** A fake for every handler an action can run. */
+function handlers() {
+  return {
     onNewTab: vi.fn(),
     onSplit: vi.fn(),
     onClosePane: vi.fn(),
@@ -38,7 +46,6 @@ function makeDeps(overrides: Partial<CoreActionDeps> = {}): CoreActionDeps {
     onToggleSidebar: vi.fn(),
     onOpenSettings: vi.fn(),
     onToggleLog: vi.fn(),
-    ...overrides,
   }
 }
 
@@ -186,5 +193,62 @@ describe('CORE_SHORTCUTS', () => {
     expect(
       entry.match({ key: 'k', metaKey: false, ctrlKey: false, shiftKey: false, altKey: false })
     ).toBe(false)
+  })
+})
+
+const HANDLED_BY: [string, keyof CoreActionDeps, unknown[]][] = [
+  ['core.new-tab', 'onNewTab', []],
+  ['core.split-horizontal', 'onSplit', ['horizontal']],
+  ['core.close-tab', 'onClosePane', []],
+  ['core.new-scratch', 'onNewScratch', []],
+  ['core.edit-note', 'onEditNote', []],
+  ['core.prev-tab', 'onCycleTab', [-1]],
+  ['core.next-tab', 'onCycleTab', [1]],
+  ['core.cycle-recent-prev', 'onCycleRecentSession', [-1]],
+  ['core.cycle-recent-next', 'onCycleRecentSession', [1]],
+  ['core.next-waiting', 'onNextWaiting', []],
+  ['session:s1', 'onSelectSession', [expect.objectContaining({ id: 's1', projectId: 'p1' })]],
+  ['core.resume', 'onResume', []],
+  ['core.switch-workspace-ws-1', 'onSwitchWorkspace', ['ws-1']],
+  ['core.cycle-workspace-next', 'onCycleWorkspace', [1]],
+  ['core.cycle-workspace-prev', 'onCycleWorkspace', [-1]],
+  ['core.view-issue', 'onViewIssue', []],
+  ['core.copy-issue-key', 'onCopyIssueKey', []],
+  ['core.open-issue', 'onOpenIssue', []],
+  ['core.open-home', 'onHome', []],
+  ['core.toggle-overview', 'onOverview', []],
+  ['core.next-waiting-top', 'onNextWaiting', []],
+  ['core.toggle-sidebar', 'onToggleSidebar', []],
+  ['core.open-settings', 'onOpenSettings', []],
+  ['core.toggle-log', 'onToggleLog', []],
+]
+
+describe('buildCoreActions — every action runs its own handler', () => {
+  it.each(HANDLED_BY)('%s runs %s', (id, handler, args) => {
+    const deps = makeDeps()
+    buildCoreActions(deps)
+      .find((a) => a.id === id)!
+      .run()
+    expect(deps[handler]).toHaveBeenCalledWith(...args)
+  })
+})
+
+describe('buildCoreActions — issue labels name the linked issue', () => {
+  it('names a Jira issue and its tracker', () => {
+    const actions = buildCoreActions(makeDeps({ issueLink: { key: 'J-7', tracker: 'jira' } }))
+    const label = (id: string) => actions.find((a) => a.id === id)!.label
+    expect(label('core.link-issue')).toBe('Change linked issue')
+    expect(label('core.view-issue')).toBe('View J-7')
+    expect(label('core.copy-issue-key')).toBe('Copy issue key (J-7)')
+    expect(label('core.open-issue')).toBe('Open J-7 in Jira')
+  })
+
+  it('says what it would do when nothing is linked', () => {
+    const actions = buildCoreActions(makeDeps({ issueLink: null }))
+    const label = (id: string) => actions.find((a) => a.id === id)!.label
+    expect(label('core.link-issue')).toBe('Link issue')
+    expect(label('core.view-issue')).toBe('View linked issue')
+    expect(label('core.copy-issue-key')).toBe('Copy issue key')
+    expect(label('core.open-issue')).toBe('Open issue in tracker')
   })
 })

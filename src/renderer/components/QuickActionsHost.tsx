@@ -85,18 +85,22 @@ function useExtensionQuickActions(
   return useMemo(
     () =>
       buildExtensionActions(
-        registered,
-        declared,
+        {
+          registered,
+          declared,
+          renderer: commands.map((c) => ({
+            id: c.id,
+            label: c.label,
+            description: c.description,
+            shortcut: c.shortcut,
+            action: c.action,
+          })),
+        },
         groups,
-        context,
-        (key, ctx) => void window.electronAPI.extension.executeCommand(key, ctx),
-        commands.map((c) => ({
-          id: c.id,
-          label: c.label,
-          description: c.description,
-          shortcut: c.shortcut,
-          action: c.action,
-        }))
+        {
+          ctx: context,
+          execute: (key, ctx) => void window.electronAPI.extension.executeCommand(key, ctx),
+        }
       ),
     [registered, declared, groups, context, commands]
   )
@@ -255,7 +259,11 @@ export function QuickActionsHost(props: QuickActionsHostProps): JSX.Element {
   const customActions = useCustomQuickActions(target)
   const { surfaces, activateSurface } = props
   const surfaceActions = useMemo(
-    () => buildSurfaceActions(surfaces, groups, activateSurface, [...coreActions, ...extActions]),
+    () =>
+      buildSurfaceActions(surfaces, activateSurface, {
+        groups,
+        taken: [...coreActions, ...extActions],
+      }),
     [surfaces, groups, activateSurface, coreActions, extActions]
   )
   const actions = useMemo(

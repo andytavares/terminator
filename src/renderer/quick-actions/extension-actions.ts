@@ -46,54 +46,61 @@ function groupFor(extensionId: string, groups: QuickActionGroup[]): string {
   return groups.find((g) => g.owner === extensionId)?.id ?? 'top'
 }
 
-export function buildExtensionActions(
-  registered: RegisteredCommand[],
-  declared: DeclaredCommand[],
-  groups: QuickActionGroup[],
-  ctx: ActionContext,
-  execute: (key: string, ctx: ActionContext) => void,
-  rendererCommands: RendererCommand[] = []
-): QuickAction[] {
-  const actions: QuickAction[] = []
-  const registeredIds = new Set(registered.map((c) => `${c.extensionId}:${c.id}`))
+/** The commands extensions offer: registered at run time, declared in manifests, and the renderer's own. */
+export interface ExtensionCommands {
+  registered: RegisteredCommand[]
+  declared: DeclaredCommand[]
+  renderer?: RendererCommand[]
+}
 
-  for (const cmd of registered) {
-    actions.push({
-      id: `ext:${cmd.extensionId}.command.${cmd.id}`,
-      label: cmd.label,
-      group: groupFor(cmd.extensionId, groups),
-      mnemonic: cmd.mnemonic,
-      shortcut: cmd.shortcut,
-      description: cmd.description,
-      disabledReason: requiresReason(cmd.requires, ctx),
-      run: () => execute(cmd.key, ctx),
-    })
+/** How a registered command runs: in this context, through `execute`. */
+export interface CommandInvocation {
+  ctx: ActionContext
+  execute: (key: string, ctx: ActionContext) => void
+}
+
+function commandAction(
+  cmd: RegisteredCommand | DeclaredCommand,
+  groups: QuickActionGroup[]
+): Omit<QuickAction, 'run'> {
+  return {
+    id: `ext:${cmd.extensionId}.command.${cmd.id}`,
+    label: cmd.label,
+    group: groupFor(cmd.extensionId, groups),
+    mnemonic: cmd.mnemonic,
+    shortcut: cmd.shortcut,
+    description: cmd.description,
   }
+}
 
-  for (const cmd of declared) {
-    if (registeredIds.has(`${cmd.extensionId}:${cmd.id}`)) continue
-    actions.push({
-      id: `ext:${cmd.extensionId}.command.${cmd.id}`,
-      label: cmd.label,
-      group: groupFor(cmd.extensionId, groups),
-      mnemonic: cmd.mnemonic,
-      shortcut: cmd.shortcut,
-      description: cmd.description,
+function rendererAction(cmd: RendererCommand): QuickAction {
+  return {
+    id: `renderer:${cmd.id}`,
+    label: cmd.label,
+    group: 'top',
+    shortcut: cmd.shortcut,
+    description: cmd.description,
+    run: cmd.action,
+  }
+}
+
+export function buildExtensionActions(
+  { registered, declared, renderer = [] }: ExtensionCommands,
+  groups: QuickActionGroup[],
+  { ctx, execute }: CommandInvocation
+): QuickAction[] {
+  const registeredIds = new Set(registered.map((c) => `${c.extensionId}:${c.id}`))
+  const live = registered.map((cmd) => ({
+    ...commandAction(cmd, groups),
+    disabledReason: requiresReason(cmd.requires, ctx),
+    run: () => execute(cmd.key, ctx),
+  }))
+  const missing = declared
+    .filter((cmd) => !registeredIds.has(`${cmd.extensionId}:${cmd.id}`))
+    .map((cmd) => ({
+      ...commandAction(cmd, groups),
       disabledReason: 'Extension did not register this command',
       run: () => {},
-    })
-  }
-
-  for (const cmd of rendererCommands) {
-    actions.push({
-      id: `renderer:${cmd.id}`,
-      label: cmd.label,
-      group: 'top',
-      shortcut: cmd.shortcut,
-      description: cmd.description,
-      run: cmd.action,
-    })
-  }
-
-  return actions
+    }))
+  return [...live, ...missing, ...renderer.map(rendererAction)]
 }

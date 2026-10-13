@@ -7,6 +7,7 @@ import { useExtensionRegistry } from '../../../../src/renderer/extensions/regist
 import { useTerminalSession } from '../../../../src/renderer/hooks/useTerminalSession'
 import { CORE_SHORTCUTS } from '../../../../src/renderer/quick-actions/core-actions'
 import { projectOf, terminalSessionOf, workspaceOf } from '../../../support/renderer-stores'
+import { installElectronApi } from '../../../support/electron-api'
 
 vi.mock('../../../../src/renderer/hooks/useTerminalSession', () => ({
   useTerminalSession: vi.fn(),
@@ -49,37 +50,76 @@ const HOOK_HANDLED = new Set(
   CORE_SHORTCUTS.map((s) => s.actionId).filter((id) => !MENU_ONLY.has(id))
 )
 
+type ShortcutEntry = (typeof CORE_SHORTCUTS)[number]
+
+const KEYS = [
+  'a',
+  'b',
+  'd',
+  'e',
+  'i',
+  'k',
+  'l',
+  't',
+  'w',
+  '1',
+  '=',
+  '-',
+  '[',
+  ']',
+  'ArrowLeft',
+  'ArrowRight',
+  ',',
+  '`',
+]
+
+function candidatesFor() {
+  return KEYS.flatMap((key) =>
+    [false, true].map((shiftKey) => ({
+      key,
+      shiftKey,
+      metaKey: true,
+      ctrlKey: false,
+      altKey: false,
+    }))
+  )
+}
+
+/** A KeyboardEvent-shaped input the entry's own matcher accepts. */
+function keyEventFor(entry: ShortcutEntry) {
+  const sample = { key: 'k', metaKey: true, ctrlKey: false, shiftKey: false, altKey: false }
+  const withKey = entry.actionId === 'core.switch-workspace' ? { ...sample, key: '1' } : sample
+  return candidatesFor().find((candidate) => entry.match(candidate)) ?? withKey
+}
+
+async function renderShortcuts(onDirectShortcut: (actionId: string) => void) {
+  // ⌘K clears the focused terminal, which reaches the main process.
+  installElectronApi({ terminal: { input: vi.fn() } })
+  const { useKeyboardShortcuts } = await import(
+    '../../../../src/renderer/hooks/useKeyboardShortcuts'
+  )
+  return renderHook(() =>
+    useKeyboardShortcuts({
+      onOpenSettings: vi.fn(),
+      onToggleLog: vi.fn(),
+      onOpenCommandPalette: vi.fn(),
+      onToggleOverview: vi.fn(),
+      onNewScratch: vi.fn(),
+      onEditSessionNote: vi.fn(),
+      onDirectShortcut,
+    })
+  )
+}
+
+const hookHandled = CORE_SHORTCUTS.filter((entry) => HOOK_HANDLED.has(entry.actionId))
+
 describe('CORE_SHORTCUTS conflict guard (AC 4)', () => {
-  it('fires onDirectShortcut with the matching action id for every hook-handled entry', async () => {
-    const { useKeyboardShortcuts } = await import(
-      '../../../../src/renderer/hooks/useKeyboardShortcuts'
-    )
-    for (const entry of CORE_SHORTCUTS) {
-      if (!HOOK_HANDLED.has(entry.actionId)) continue
+  it.each(hookHandled.map((entry) => [entry.actionId, entry] as const))(
+    'fires onDirectShortcut with %s for its own keys',
+    async (_actionId, entry) => {
       const onDirectShortcut = vi.fn()
-      const { unmount } = renderHook(() =>
-        useKeyboardShortcuts({
-          onOpenSettings: vi.fn(),
-          onToggleLog: vi.fn(),
-          onOpenCommandPalette: vi.fn(),
-          onToggleOverview: vi.fn(),
-          onNewScratch: vi.fn(),
-          onEditSessionNote: vi.fn(),
-          onDirectShortcut,
-        })
-      )
-      const sample = { key: 'k', metaKey: true, ctrlKey: false, shiftKey: false, altKey: false }
-      const withKey = (
-        entry.actionId === 'core.switch-workspace' ? { ...sample, key: '1' } : sample
-      ) as typeof sample
-      // Reconstruct a KeyboardEvent-shaped input the entry's own matcher accepts.
-      let keyEvent = withKey
-      for (const candidate of candidatesFor()) {
-        if (entry.match(candidate)) {
-          keyEvent = candidate
-          break
-        }
-      }
+      const { unmount } = await renderShortcuts(onDirectShortcut)
+      const keyEvent = keyEventFor(entry)
       window.dispatchEvent(
         new KeyboardEvent('keydown', {
           key: keyEvent.key,
@@ -91,43 +131,5 @@ describe('CORE_SHORTCUTS conflict guard (AC 4)', () => {
       expect(onDirectShortcut, `entry ${entry.actionId}`).toHaveBeenCalledWith(entry.actionId)
       unmount()
     }
-  })
+  )
 })
-
-function candidatesFor() {
-  const base = { metaKey: true, ctrlKey: false, altKey: false }
-  const keys = [
-    'a',
-    'b',
-    'd',
-    'e',
-    'i',
-    'k',
-    'l',
-    't',
-    'w',
-    '1',
-    '=',
-    '-',
-    '[',
-    ']',
-    'ArrowLeft',
-    'ArrowRight',
-    ',',
-    '`',
-  ]
-  const shiftOptions = [false, true]
-  const candidates: {
-    key: string
-    metaKey: boolean
-    ctrlKey: boolean
-    shiftKey: boolean
-    altKey: boolean
-  }[] = []
-  for (const key of keys) {
-    for (const shiftKey of shiftOptions) {
-      candidates.push({ ...base, key, shiftKey })
-    }
-  }
-  return candidates
-}
