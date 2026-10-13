@@ -20,7 +20,10 @@ import { partialFake } from '../../../../tests/support/fakes'
 // What the operator wrote in the settings page, as each reader hands it on.
 
 function host(values: Record<string, unknown> = {}): ExtensionAPI {
-  return { settings: { get: (key: string) => values[key] } } as unknown as ExtensionAPI
+  const settings = partialFake<ExtensionAPI['settings']>({
+    get: <T>(key: string) => values[key] as T,
+  })
+  return partialFake<ExtensionAPI>({ settings })
 }
 
 describe('settings the operator never touched', () => {
@@ -77,24 +80,24 @@ describe('lists the operator wrote, one item per line', () => {
 
 // Both lists are workspace-scoped: the core answers the own value of the
 // workspace holding the repository, else the global one.
+const READ_ONLY = 'terminator.foundry.readOnlyTools'
+const CRITICAL = 'terminator.foundry.criticalPaths'
+
+/** Settings as the core resolves them, with `own` values by workspace folder. */
+function scoped(
+  global: Record<string, unknown>,
+  own: Record<string, Record<string, unknown>>
+): ExtensionAPI {
+  const ownFor = (repoPath?: string) =>
+    Object.entries(own).find(([folder]) => repoPath?.startsWith(folder))?.[1]
+  const settings = partialFake<ExtensionAPI['settings']>({
+    get: <T>(key: string, scope?: SettingScope) =>
+      (ownFor(scope?.repoPath)?.[key] ?? global[key]) as T,
+  })
+  return partialFake<ExtensionAPI>({ settings })
+}
+
 describe("the lists for an order's repositories", () => {
-  const READ_ONLY = 'terminator.foundry.readOnlyTools'
-  const CRITICAL = 'terminator.foundry.criticalPaths'
-
-  /** Settings as the core resolves them, with `own` values by workspace folder. */
-  function scoped(
-    global: Record<string, unknown>,
-    own: Record<string, Record<string, unknown>>
-  ): ExtensionAPI {
-    const ownFor = (repoPath?: string) =>
-      Object.entries(own).find(([folder]) => repoPath?.startsWith(folder))?.[1]
-    const settings = partialFake<ExtensionAPI['settings']>({
-      get: <T>(key: string, scope?: SettingScope) =>
-        (ownFor(scope?.repoPath)?.[key] ?? global[key]) as T,
-    })
-    return partialFake<ExtensionAPI>({ settings })
-  }
-
   it("reads the read-only tools of the repository's workspace, else the global list", () => {
     const api = scoped(
       { [READ_ONLY]: ['mcp__docs__get'] },
