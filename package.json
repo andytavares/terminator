@@ -32,7 +32,7 @@
     "lint:unused": "knip",
     "lint:unused:production": "knip --production",
     "lint:duplicates": "jscpd",
-    "typecheck": "tsc --noEmit -p tsconfig.main.json && tsc --noEmit -p tsconfig.renderer.json && tsc --noEmit -p tsconfig.shared.json && tsc --noEmit -p tsconfig.test.json && tsc --noEmit -p packages/extension-ui && tsc --noEmit -p packages/extension-sdk && npm run typecheck:extensions",
+    "typecheck": "tsc --noEmit -p tsconfig.main.json && tsc --noEmit -p tsconfig.renderer.json && tsc --noEmit -p tsconfig.shared.json && tsc --noEmit -p tsconfig.test.json && tsc --noEmit -p packages/extension-ui && tsc --noEmit -p packages/extension-ui/tsconfig.test.json && tsc --noEmit -p packages/extension-sdk && npm run typecheck:extensions",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "create-extension": "node scripts/create-extension.cjs",
