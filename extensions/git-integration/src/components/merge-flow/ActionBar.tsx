@@ -10,50 +10,50 @@ interface Props {
   onConfirm: () => void
 }
 
-export function ActionBar({
-  pendingResolution,
-  onKeepMine,
-  onKeepTheirs,
-  onKeepBoth,
-  onEdit,
-  onConfirm,
-}: Props) {
+/** Keep mine or keep theirs: pressed while it is the pending choice. */
+function KeepSideButton(props: {
+  side: 'ours' | 'theirs'
+  pending: string | undefined
+  onClick: () => void
+}) {
+  const [label, key, indicator] =
+    props.side === 'ours' ? ['Keep mine', 'M', 'mine'] : ['Keep theirs', 'T', 'theirs']
+  const pressed = props.pending === props.side
+  return (
+    <Button
+      size="sm"
+      variant={pressed ? 'primary' : 'secondary'}
+      aria-pressed={pressed}
+      onClick={props.onClick}
+      title={`${label} [${key}]`}
+    >
+      <span
+        className={`action-bar__indicator action-bar__indicator--${indicator}`}
+        aria-hidden="true"
+      />
+      {label} <kbd className="tmui-kbd">{key}</kbd>
+    </Button>
+  )
+}
+
+export function ActionBar(props: Props) {
+  const { pendingResolution } = props
+  const pending = pendingResolution?.strategy
   return (
     <div className="action-bar">
       <div className="action-bar__left">
-        <Button
-          size="sm"
-          variant={pendingResolution?.strategy === 'ours' ? 'primary' : 'secondary'}
-          aria-pressed={pendingResolution?.strategy === 'ours'}
-          onClick={onKeepMine}
-          title="Keep mine [M]"
-        >
-          <span className="action-bar__indicator action-bar__indicator--mine" aria-hidden="true" />
-          Keep mine <kbd className="tmui-kbd">M</kbd>
-        </Button>
-        <Button
-          size="sm"
-          variant={pendingResolution?.strategy === 'theirs' ? 'primary' : 'secondary'}
-          aria-pressed={pendingResolution?.strategy === 'theirs'}
-          onClick={onKeepTheirs}
-          title="Keep theirs [T]"
-        >
-          <span
-            className="action-bar__indicator action-bar__indicator--theirs"
-            aria-hidden="true"
-          />
-          Keep theirs <kbd className="tmui-kbd">T</kbd>
-        </Button>
-        <Button size="sm" onClick={onKeepBoth} title="Keep both [B]">
+        <KeepSideButton side="ours" pending={pending} onClick={props.onKeepMine} />
+        <KeepSideButton side="theirs" pending={pending} onClick={props.onKeepTheirs} />
+        <Button size="sm" onClick={props.onKeepBoth} title="Keep both [B]">
           Keep both <kbd className="tmui-kbd">B</kbd>
         </Button>
-        <Button size="sm" onClick={onEdit} title="Edit manually [E]">
+        <Button size="sm" onClick={props.onEdit} title="Edit manually [E]">
           Edit manually <kbd className="tmui-kbd">E</kbd>
         </Button>
       </div>
       <div className="action-bar__right">
         {pendingResolution && (
-          <Button size="sm" variant="primary" onClick={onConfirm} title="Confirm [Enter]">
+          <Button size="sm" variant="primary" onClick={props.onConfirm} title="Confirm [Enter]">
             Confirm <kbd className="tmui-kbd">↵</kbd>
           </Button>
         )}

@@ -249,7 +249,7 @@ describe('splitTerminalSession', () => {
 
   it('creates a session pinned to the focused session and splits the pane', async () => {
     addSession('focused-1')
-    useSessionStore.getState().setFocusedSession('proj-1', 'focused-1')
+    useSessionStore.getState().setActiveSessionForProject('proj-1', 'focused-1')
     await splitTerminalSession('proj-1', 'vertical', '/repo', 5000)
     expect(sessionOf('session-123')).toMatchObject({
       projectId: 'proj-1',
@@ -261,9 +261,19 @@ describe('splitTerminalSession', () => {
     expect(useSessionStore.getState().getFocusedSession('proj-1')).toBe('session-123')
   })
 
+  it('splits the focused pane of the split on screen, not the active tab', async () => {
+    addSession('root-1')
+    addSession('pane-1', { parentSessionId: 'root-1' })
+    useSessionStore.getState().setActiveSessionForProject('proj-1', 'root-1')
+    useSessionStore.getState().activateSplit('proj-1', 'root-1', 'pane-1', 'vertical')
+    await splitTerminalSession('proj-1', 'horizontal', '/repo', 5000)
+    expect(sessionOf('session-123')!.parentSessionId).toBe('root-1')
+    expect(leafIds(layoutOf('proj-1')!)).toEqual(['root-1', 'pane-1', 'session-123'])
+  })
+
   it('pins to the focused session root when the focused session is itself a split child', async () => {
     addSession('child-1', { parentSessionId: 'root-1' })
-    useSessionStore.getState().setFocusedSession('proj-1', 'child-1')
+    useSessionStore.getState().setActiveSessionForProject('proj-1', 'child-1')
     await splitTerminalSession('proj-1', 'horizontal', '/repo', 5000)
     expect(sessionOf('session-123')!.parentSessionId).toBe('root-1')
   })
@@ -278,7 +288,7 @@ describe('splitTerminalSession', () => {
 
   it('wires the same bell handling into split instances', async () => {
     addSession('focused-1')
-    useSessionStore.getState().setFocusedSession('proj-1', 'focused-1')
+    useSessionStore.getState().setActiveSessionForProject('proj-1', 'focused-1')
     await splitTerminalSession('proj-1', 'horizontal', '/repo', 5000)
     useSessionStore.getState().renameSession('session-123', 'Split Tab')
     useSessionStore.getState().setActiveSessionForProject('proj-1', 'focused-1')

@@ -40,7 +40,7 @@ await githubAPI.prFileDiff(...)    // NOT window.electronAPI.github.prFileDiff(.
 
 ### Running git and gh
 
-Every command goes through the core (ADR 094). git runs through `runGit` (`src/shell/run-git.ts`) over `api.shell.exec`, which `activate` binds; gh runs through `api.github` (pull request verbs, `repositories`, and `api` for REST and GraphQL), reached in `src/ipc/github.ipc.ts` through a `GithubTarget` from `githubTarget(repoRoot, access)`. Never import `child_process` for git or gh; the only process this extension starts itself is the review agent's `claude`, which `shell.exec` does not run. A view never runs a command: it invokes a channel (PR creation is `github:pr-create`). Specs bind the runner with `tests/unit/support/shell.ts`. The core runs git and gh only inside a workspace folder, a project root, this extension's own `api.paths.globalStorage` or the review clone folder, which `manifest.json` declares in `contributes.shellRoots` (ADR 102, ADR 103); a gh call that needs no checkout (a `gh:owner/name` root, `gh api user`) runs in `GithubAccess.noCheckoutCwd`, which `activate` sets to that folder. Anything else rejects with `CwdOutOfScopeError`.
+Every command goes through the core (ADR 094). git runs through `runGit` (`src/shell/run-git.ts`) over `api.shell.exec`, which `activate` binds; gh runs through `api.github` (pull request verbs, `repositories`, and `api` for REST and GraphQL), reached in the channel modules under `src/ipc/github/` through a `GithubTarget` from `githubTarget(repoRoot, access)` (`src/ipc/github/context.ts`). Never import `child_process` for git or gh; the only process this extension starts itself is the review agent's `claude`, which `shell.exec` does not run. A view never runs a command: it invokes a channel (PR creation is `github:pr-create`). Specs bind the runner with `tests/unit/support/shell.ts`. The core runs git and gh only inside a workspace folder, a project root, this extension's own `api.paths.globalStorage` or the review clone folder, which `manifest.json` declares in `contributes.shellRoots` (ADR 102, ADR 103); a gh call that needs no checkout (a `gh:owner/name` root, `gh api user`) runs in `GithubAccess.noCheckoutCwd`, which `activate` sets to that folder. Anything else rejects with `CwdOutOfScopeError`.
 
 ### End-to-end specs
 
@@ -62,7 +62,7 @@ PR descriptions, templates and comments are rendered only through `src/component
 
 ### Lint and typecheck
 
-`npx tsc -p extensions/git-integration/tsconfig.json` and `npx eslint extensions/git-integration` must both exit 0; fix a React Compiler finding at its cause, do not silence it. The React Compiler rules apply: derive state during render instead of syncing it in an effect, read and write refs in handlers and effects, never during render.
+`npx tsc -p extensions/git-integration/tsconfig.json` and `npx eslint extensions/git-integration` must both exit 0; fix a React Compiler finding at its cause, do not silence it. ESLint also holds every function here, specs included, to at most 30 lines (blank lines and comments aside), complexity 10 and three parameters (`eslint.config.mjs`); pass more values as one named object, and split a long spec `describe` into several. The React Compiler rules apply: derive state during render instead of syncing it in an effect, read and write refs in handlers and effects, never during render.
 
 ### What extensions MUST NOT do
 

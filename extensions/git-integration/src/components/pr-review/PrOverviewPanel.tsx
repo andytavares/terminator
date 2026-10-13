@@ -27,6 +27,7 @@ import { StatusChecksBar } from './StatusChecksBar'
 import { RichContent } from './RichContent'
 import { InsightsPanel } from './InsightsPanel'
 import type { PrReviewDetail, IssueComment } from '../../schemas/pr-review.schema'
+import { choose } from '../text'
 
 interface Props {
   repoRoot: string
@@ -39,405 +40,561 @@ interface Props {
   onStartMergeFlow?: (worktreePath: string) => void
 }
 
-export function PrOverviewPanel({
-  repoRoot,
-  pr,
-  sessionStatus,
-  onStartReview,
-  onClose,
-  onRefresh,
-  onPopOut,
-  onStartMergeFlow,
-}: Props) {
-  const { viewedFiles, issueComments, currentUserLogin } = usePrReviewStore()
-  const loadIssueComments = useLoadIssueComments(repoRoot)
+type SessionStatus = Props['sessionStatus']
+type IssueRef = NonNullable<PrReviewDetail['issueRefs']>[number]
+
+const START_LABEL: Record<SessionStatus, string> = {
+  'not-started': 'Start Review',
+  'in-progress': 'Continue Review',
+  paused: 'Resume Review',
+}
+
+/** "Start Review", or "Resume Review · 3 of 9 viewed" for a review already under way. */
+function startLabel(status: SessionStatus, viewedCount: number, totalFiles: number): string {
+  const base = START_LABEL[status]
+  if (status === 'not-started' || totalFiles === 0) return base
+  return `${base} · ${viewedCount} of ${totalFiles} viewed`
+}
+
+function isRequestedOf(pr: PrReviewDetail, login: string | null): boolean {
+  if (!login) return false
+  return Boolean(pr.requestedReviewers?.includes(login) || pr.assigneeLogins?.includes(login))
+}
+
+/** `> `-quoted text to reply under, with a blank line for the answer. */
+function quoteForReply(body: string): string {
+  const quoted = body
+    .split('\n')
+    .map((line) => `> ${line}`)
+    .join('\n')
+  return `${quoted}\n\n`
+}
+
+/** A flag that is set while `action` runs. */
+function useBusyFlag() {
+  const [busy, setBusy] = useState(false)
+  const run = async (action: () => Promise<unknown>) => {
+    setBusy(true)
+    try {
+      await action()
+    } finally {
+      setBusy(false)
+    }
+  }
+  return { busy, run }
+}
+
+/** Like useBusyFlag, and keeps the problem `action` reports, or the error it throws. */
+function useBusyAction() {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const run = async (action: () => Promise<string | null>) => {
+    setBusy(true)
+    setError(null)
+    try {
+      setError(await action())
+    } catch (e) {
+      setError(String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+  return { busy, error, run }
+}
+
+type BusyFlag = ReturnType<typeof useBusyFlag>
+
+async function updateBranch(props: Props): Promise<string | null> {
+  const result = await githubAPI.prUpdateBranch(props.repoRoot, props.pr.number)
+  if (result && typeof result === 'object' && 'error' in result) {
+    return String((result as { error: string }).error)
+  }
+  await props.onRefresh?.()
+  return null
+}
+
+/** Merges the base into a worktree of the PR's branch and opens the merge flow on its conflicts. */
+async function resolveConflicts(props: Props): Promise<string | null> {
+  const { repoRoot, pr } = props
+  const { path: worktreePath } = await window.electronAPI.git.suggestWorktreePath(
+    repoRoot,
+    pr.headRefName
+  )
+  const mergeResult = await mergeFlowAPI.preparePrWorktree({
+    repoRoot,
+    worktreePath,
+    headRefName: pr.headRefName,
+    baseRefName: pr.baseRefName,
+  })
+  if ('error' in mergeResult) return `Could not prepare merge: ${mergeResult.error}`
+  if (!mergeResult.hasConflicts) return 'No conflicts found — the PR may already be clean.'
+  props.onStartMergeFlow?.(worktreePath)
+  return null
+}
+
+function useOverviewActions(props: Props, loadIssueComments: (prNumber: number) => Promise<void>) {
+  const refresh = useBusyFlag()
+  const markReady = useBusyFlag()
+  const update = useBusyAction()
+  const merge = useBusyAction()
+  const { repoRoot, pr, onRefresh } = props
+  return {
+    refresh,
+    markReady,
+    update,
+    merge,
+    handleRefresh: () =>
+      refresh.run(() => Promise.all([onRefresh?.(), loadIssueComments(pr.number)])),
+    handleMarkReady: () =>
+      markReady.run(async () => {
+        await githubAPI.prMarkReady(repoRoot, pr.number)
+        await onRefresh?.()
+      }),
+    handleUpdateBranch: () => update.run(() => updateBranch(props)),
+    handleResolveConflicts: () => merge.run(() => resolveConflicts(props)),
+  }
+}
+
+type OverviewActions = ReturnType<typeof useOverviewActions>
+
+/** Posts the comment to the PR's conversation, then reloads it; throws what GitHub refused. */
+async function postIssueComment(props: Props, body: string): Promise<void> {
+  const result = await githubAPI.prIssueCommentAdd({
+    repoRoot: props.repoRoot,
+    prNumber: props.pr.number,
+    body,
+  })
+  if ('error' in result) throw new Error((result as { error: string }).error)
+}
+
+/** The discussion's comment box: its text, tab, sending state and the reply-by-quoting action. */
+function useIssueComment(props: Props, loadIssueComments: (prNumber: number) => Promise<void>) {
   const [commentBody, setCommentBody] = useState('')
   const [commentTab, setCommentTab] = useState<'write' | 'preview'>('write')
-  const [submitting, setSubmitting] = useState(false)
-  const [commentError, setCommentError] = useState<string | null>(null)
-  const [refreshing, setRefreshing] = useState(false)
-  const [markingReady, setMarkingReady] = useState(false)
-  const [updatingBranch, setUpdatingBranch] = useState(false)
-  const [updateBranchError, setUpdateBranchError] = useState<string | null>(null)
-  const [preparingMerge, setPreparingMerge] = useState(false)
-  const [mergeError, setMergeError] = useState<string | null>(null)
+  const send = useBusyAction()
   const composerRef = useRef<HTMLTextAreaElement>(null)
-
-  const handleRefresh = async () => {
-    setRefreshing(true)
-    try {
-      await Promise.all([onRefresh?.(), loadIssueComments(pr.number)])
-    } finally {
-      setRefreshing(false)
-    }
-  }
-
-  useEffect(() => {
-    loadIssueComments(pr.number)
-  }, [loadIssueComments, pr.number])
-
-  const totalFiles = pr.chapters.reduce((n, c) => n + c.files.length, 0)
-  const viewedCount = viewedFiles.size
-  const isResume = sessionStatus === 'in-progress' || sessionStatus === 'paused'
-  const [discussionOpen, setDiscussionOpen] = useState(false)
-  const [issueRefsExpanded, setIssueRefsExpanded] = useState(true)
-
-  const youAreRequested =
-    !!currentUserLogin &&
-    (pr.requestedReviewers?.includes(currentUserLogin) ||
-      pr.assigneeLogins?.includes(currentUserLogin))
-  const startLabel =
-    (sessionStatus === 'paused' ? 'Resume Review' : isResume ? 'Continue Review' : 'Start Review') +
-    (isResume && totalFiles > 0 ? ` · ${viewedCount} of ${totalFiles} viewed` : '')
-
-  const handleMarkReady = async () => {
-    setMarkingReady(true)
-    try {
-      await githubAPI.prMarkReady(repoRoot, pr.number)
-      await onRefresh?.()
-    } finally {
-      setMarkingReady(false)
-    }
-  }
-
-  const handleUpdateBranch = async () => {
-    setUpdatingBranch(true)
-    setUpdateBranchError(null)
-    try {
-      const result = await githubAPI.prUpdateBranch(repoRoot, pr.number)
-      if (result && typeof result === 'object' && 'error' in result) {
-        setUpdateBranchError(String((result as { error: string }).error))
-      } else {
-        await onRefresh?.()
-      }
-    } catch (e) {
-      setUpdateBranchError(String(e))
-    } finally {
-      setUpdatingBranch(false)
-    }
-  }
-
-  const handleResolveConflicts = async () => {
-    setPreparingMerge(true)
-    setMergeError(null)
-    try {
-      const { path: worktreePath } = await window.electronAPI.git.suggestWorktreePath(
-        repoRoot,
-        pr.headRefName
-      )
-
-      const mergeResult = await mergeFlowAPI.preparePrWorktree(
-        repoRoot,
-        worktreePath,
-        pr.headRefName,
-        pr.baseRefName
-      )
-      if ('error' in mergeResult) {
-        setMergeError(`Could not prepare merge: ${mergeResult.error}`)
-        return
-      }
-      if (!mergeResult.hasConflicts) {
-        setMergeError('No conflicts found — the PR may already be clean.')
-        return
-      }
-
-      onStartMergeFlow?.(worktreePath)
-    } catch (e) {
-      setMergeError(String(e))
-    } finally {
-      setPreparingMerge(false)
-    }
-  }
-
-  const handleReply = (comment: IssueComment) => {
-    const quoted = comment.body
-      .split('\n')
-      .map((line) => `> ${line}`)
-      .join('\n')
-    setCommentBody(`${quoted}\n\n`)
-    setTimeout(() => {
-      composerRef.current?.focus()
-      const len = composerRef.current?.value.length ?? 0
-      composerRef.current?.setSelectionRange(len, len)
-    }, 0)
-  }
-
   const handleCommentSubmit = async () => {
     if (!commentBody.trim()) return
-    setSubmitting(true)
-    setCommentError(null)
-    try {
-      const result = await githubAPI.prIssueCommentAdd({
-        repoRoot,
-        prNumber: pr.number,
-        body: commentBody,
-      })
-      if ('error' in result) throw new Error((result as { error: string }).error)
+    await send.run(async () => {
+      await postIssueComment(props, commentBody)
       setCommentBody('')
-      await loadIssueComments(pr.number)
-    } catch (e) {
-      setCommentError(String(e))
-    } finally {
-      setSubmitting(false)
-    }
+      await loadIssueComments(props.pr.number)
+      return null
+    })
   }
+  const handleReply = (comment: IssueComment) => {
+    setCommentBody(quoteForReply(comment.body))
+    setTimeout(() => focusAtEnd(composerRef.current), 0)
+  }
+  const box = {
+    commentBody,
+    setCommentBody,
+    commentTab,
+    setCommentTab,
+    submitting: send.busy,
+    commentError: send.error,
+    handleCommentSubmit,
+    handleReply,
+  }
+  return { box, composerRef }
+}
 
+type IssueCommentBox = ReturnType<typeof useIssueComment>['box']
+type ComposerRef = React.RefObject<HTMLTextAreaElement>
+
+function focusAtEnd(box: HTMLTextAreaElement | null): void {
+  box?.focus()
+  const len = box?.value.length ?? 0
+  box?.setSelectionRange(len, len)
+}
+
+function Chevron({ open }: { open: boolean }) {
   return (
-    <div className="pr-overview">
-      <div className="pr-review-topbar">
-        <span className="pr-review-topbar-title">
-          <span className="pr-overview-pr-num">#{pr.number}</span>
-          {pr.isDraft && <span className="pr-draft-badge">Draft</span>} {pr.title}
+    <span className="pr-overview-section-toggle">
+      {open && <ChevronDown aria-hidden="true" />}
+      {!open && <ChevronRight aria-hidden="true" />}
+    </span>
+  )
+}
+
+interface TopBarProps {
+  props: Props
+  refresh: BusyFlag
+  onRefresh: () => void
+}
+
+function TopBarActions(bar: TopBarProps) {
+  const { props, refresh } = bar
+  return (
+    <div className="pr-review-topbar-actions">
+      <IconButton
+        icon={RefreshCw}
+        className={choose(refresh.busy, 'pr-refresh-btn--spinning', undefined)}
+        onClick={bar.onRefresh}
+        disabled={refresh.busy}
+        label="Reload pull request"
+      />
+      {props.onPopOut && (
+        <Button
+          variant="ghost"
+          size="sm"
+          icon={ExternalLink}
+          onClick={props.onPopOut}
+          title="Open in focused window"
+        >
+          Pop out
+        </Button>
+      )}
+      <IconButton icon={X} label="Close" onClick={props.onClose} />
+    </div>
+  )
+}
+
+function OverviewTopBar(bar: TopBarProps) {
+  const { pr } = bar.props
+  return (
+    <div className="pr-review-topbar">
+      <span className="pr-review-topbar-title">
+        <span className="pr-overview-pr-num">#{pr.number}</span>
+        {pr.isDraft && <span className="pr-draft-badge">Draft</span>} {pr.title}
+      </span>
+      <TopBarActions props={bar.props} refresh={bar.refresh} onRefresh={bar.onRefresh} />
+    </div>
+  )
+}
+
+function Reviewers({ pr, youAreRequested }: { pr: PrReviewDetail; youAreRequested: boolean }) {
+  const approved = (pr.approvals?.length ?? 0) > 0
+  const requested = pr.requestedReviewers ?? []
+  return (
+    <>
+      {approved && (
+        <span className="pr-overview-approvals-label">
+          Approved by {(pr.approvals ?? []).map((a) => a.author).join(', ')}
         </span>
-        <div className="pr-review-topbar-actions">
-          <IconButton
-            icon={RefreshCw}
-            className={refreshing ? 'pr-refresh-btn--spinning' : undefined}
-            onClick={handleRefresh}
-            disabled={refreshing}
-            label="Reload pull request"
-          />
-          {onPopOut && (
-            <Button
-              variant="ghost"
-              size="sm"
-              icon={ExternalLink}
-              onClick={onPopOut}
-              title="Open in focused window"
-            >
-              Pop out
-            </Button>
-          )}
-          <IconButton icon={X} label="Close" onClick={onClose} />
-        </div>
+      )}
+      {requested.length > 0 && (
+        <span className="pr-overview-approvals-label pr-overview-approvals-label--pending">
+          {choose(approved, 'Awaiting', 'Review requested from')} {requested.join(', ')}
+        </span>
+      )}
+      {youAreRequested && (
+        <span
+          className="pr-overview-your-review-badge"
+          title="You have been requested to review this PR"
+        >
+          <Eye aria-hidden="true" />
+          Your review requested
+        </span>
+      )}
+    </>
+  )
+}
+
+function MergeStateBadge({ pr }: { pr: PrReviewDetail }) {
+  if (pr.mergeStateStatus === 'behind') {
+    return (
+      <span className="pr-merge-state-badge pr-merge-state-badge--behind">
+        <ArrowDown aria-hidden="true" /> Behind {pr.baseRefName}
+      </span>
+    )
+  }
+  if (pr.mergeStateStatus !== 'dirty') return null
+  return (
+    <span className="pr-merge-state-badge pr-merge-state-badge--dirty">
+      <TriangleAlert aria-hidden="true" /> Conflicts
+    </span>
+  )
+}
+
+function StatusBlock({ pr, youAreRequested }: { pr: PrReviewDetail; youAreRequested: boolean }) {
+  const checks = pr.statusChecks ?? []
+  return (
+    <section className="pr-overview-block pr-overview-status" aria-label="Status">
+      <StatusChecksBar detailed checks={checks} />
+      <div className="pr-overview-meta">
+        <Reviewers pr={pr} youAreRequested={youAreRequested} />
+        <span className="pr-overview-meta-author">{pr.author}</span>
+        <span className="pr-overview-meta-branch">
+          {pr.headRefName} → {pr.baseRefName}
+        </span>
+        <RelativeTime value={pr.openedAt} />
+        <MergeStateBadge pr={pr} />
       </div>
+    </section>
+  )
+}
 
-      <div className="pr-overview-body-scroll">
-        <section className="pr-overview-block pr-overview-status" aria-label="Status">
-          <StatusChecksBar checks={pr.statusChecks ?? []} detailed />
-          <div className="pr-overview-meta">
-            {pr.approvals && pr.approvals.length > 0 && (
-              <span className="pr-overview-approvals-label">
-                Approved by {pr.approvals.map((a) => a.author).join(', ')}
-              </span>
-            )}
-            {pr.requestedReviewers && pr.requestedReviewers.length > 0 && (
-              <span className="pr-overview-approvals-label pr-overview-approvals-label--pending">
-                {pr.approvals && pr.approvals.length > 0 ? 'Awaiting' : 'Review requested from'}{' '}
-                {pr.requestedReviewers.join(', ')}
-              </span>
-            )}
-            {youAreRequested && (
-              <span
-                className="pr-overview-your-review-badge"
-                title="You have been requested to review this PR"
-              >
-                <Eye aria-hidden="true" />
-                Your review requested
-              </span>
-            )}
-            <span className="pr-overview-meta-author">{pr.author}</span>
-            <span className="pr-overview-meta-branch">
-              {pr.headRefName} → {pr.baseRefName}
-            </span>
-            <RelativeTime value={pr.openedAt} />
-            {pr.mergeStateStatus === 'behind' && (
-              <span className="pr-merge-state-badge pr-merge-state-badge--behind">
-                <ArrowDown aria-hidden="true" /> Behind {pr.baseRefName}
-              </span>
-            )}
-            {pr.mergeStateStatus === 'dirty' && (
-              <span className="pr-merge-state-badge pr-merge-state-badge--dirty">
-                <TriangleAlert aria-hidden="true" /> Conflicts
-              </span>
-            )}
-          </div>
-        </section>
+function IssueRefName({ issueRef }: { issueRef: IssueRef }) {
+  const { url } = issueRef
+  if (!url) return <span className="pr-overview-issue-ref-label">{issueRef.ref}</span>
+  return (
+    <a
+      href={url}
+      onClick={(e) => {
+        e.preventDefault()
+        window.electronAPI.shell.openExternal(url).catch(() => {})
+      }}
+      className="pr-overview-issue-ref-link"
+    >
+      {issueRef.ref}
+    </a>
+  )
+}
 
-        <section className="pr-overview-block">
-          <InsightsPanel pr={pr} />
-        </section>
+function IssueRefItem({ issueRef }: { issueRef: IssueRef }) {
+  return (
+    <li className="pr-overview-issue-ref">
+      <IssueRefName issueRef={issueRef} />
+      {issueRef.title !== undefined && (
+        <span className="pr-overview-issue-ref-title">{issueRef.title}</span>
+      )}
+      {issueRef.state !== undefined && (
+        <span className="pr-overview-issue-ref-state">{issueRef.state}</span>
+      )}
+      <span className="pr-overview-issue-ref-type">{issueRef.type}</span>
+    </li>
+  )
+}
 
-        {/* Issue context */}
-        {pr.issueRefs && pr.issueRefs.length > 0 && (
-          <div className="pr-overview-block">
-            <h3
-              className="pr-overview-section-title pr-overview-section-title--collapsible"
-              onClick={() => setIssueRefsExpanded((v) => !v)}
-              role="button"
-              aria-expanded={issueRefsExpanded}
-            >
-              Context
-              <span className="pr-overview-section-toggle">
-                {issueRefsExpanded ? (
-                  <ChevronDown aria-hidden="true" />
-                ) : (
-                  <ChevronRight aria-hidden="true" />
-                )}
-              </span>
-            </h3>
-            {issueRefsExpanded && (
-              <ul className="pr-overview-issue-refs">
-                {pr.issueRefs.map((ref, i) => (
-                  <li key={i} className="pr-overview-issue-ref">
-                    {ref.url ? (
-                      <a
-                        href={ref.url}
-                        onClick={(e) => {
-                          e.preventDefault()
-                          if (ref.url)
-                            window.electronAPI.shell.openExternal(ref.url).catch(() => {})
-                        }}
-                        className="pr-overview-issue-ref-link"
-                      >
-                        {ref.ref}
-                      </a>
-                    ) : (
-                      <span className="pr-overview-issue-ref-label">{ref.ref}</span>
-                    )}
-                    {ref.title !== undefined && (
-                      <span className="pr-overview-issue-ref-title">{ref.title}</span>
-                    )}
-                    {ref.state !== undefined && (
-                      <span className="pr-overview-issue-ref-state">{ref.state}</span>
-                    )}
-                    <span className="pr-overview-issue-ref-type">{ref.type}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        )}
+function IssueContext({ issueRefs }: { issueRefs: IssueRef[] }) {
+  const [expanded, setExpanded] = useState(true)
+  return (
+    <div className="pr-overview-block">
+      <h3
+        aria-expanded={expanded}
+        className="pr-overview-section-title pr-overview-section-title--collapsible"
+        onClick={() => setExpanded((v) => !v)}
+        role="button"
+      >
+        Context
+        <Chevron open={expanded} />
+      </h3>
+      {expanded && (
+        <ul className="pr-overview-issue-refs">
+          {issueRefs.map((ref, i) => (
+            <IssueRefItem key={i} issueRef={ref} />
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
 
-        {/* PR description */}
-        {pr.body ? (
-          <div className="pr-overview-block">
-            <h3 className="pr-overview-section-title">Description</h3>
-            <div className="pr-overview-description">
-              <RichContent>{pr.body}</RichContent>
-            </div>
-          </div>
-        ) : (
-          <div className="pr-overview-block pr-overview-no-desc">No description provided.</div>
-        )}
-
-        {/* Discussion */}
-        <div className="pr-overview-block">
-          <button
-            className="pr-overview-section-title pr-overview-discussion-toggle"
-            onClick={() => setDiscussionOpen((v) => !v)}
-            aria-expanded={discussionOpen}
-          >
-            Discussion · {issueComments.length}
-            <span className="pr-overview-section-toggle">
-              {discussionOpen ? (
-                <ChevronDown aria-hidden="true" />
-              ) : (
-                <ChevronRight aria-hidden="true" />
-              )}
-            </span>
-          </button>
-
-          {discussionOpen && issueComments.length > 0 && (
-            <div className="pr-issue-comment-list">
-              {issueComments.map((comment) => (
-                <IssueCommentItem key={comment.id} comment={comment} onReply={handleReply} />
-              ))}
-            </div>
-          )}
-
-          {discussionOpen && (
-            <div className="comment-composer pr-issue-composer">
-              <TabsRoot selectedId={commentTab} onSelect={setCommentTab}>
-                <TabList label="Comment">
-                  <Tab id="write">Write</Tab>
-                  <Tab id="preview">Preview</Tab>
-                </TabList>
-                <TabPanel id="write">
-                  <textarea
-                    ref={composerRef}
-                    className="comment-composer-textarea"
-                    value={commentBody}
-                    onChange={(e) => setCommentBody(e.target.value)}
-                    placeholder="Leave a comment…"
-                    rows={4}
-                    disabled={submitting}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleCommentSubmit()
-                    }}
-                  />
-                </TabPanel>
-                <TabPanel id="preview">
-                  <div className="comment-composer-preview">
-                    {commentBody.trim() ? (
-                      <RichContent>{commentBody}</RichContent>
-                    ) : (
-                      <em>Nothing to preview.</em>
-                    )}
-                  </div>
-                </TabPanel>
-              </TabsRoot>
-
-              {commentError && <p className="comment-composer-error">{commentError}</p>}
-              <div className="comment-composer-actions">
-                <span className="pr-issue-composer-hint">⌘↵ to submit</span>
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={handleCommentSubmit}
-                  disabled={submitting || !commentBody.trim()}
-                >
-                  {submitting ? 'Submitting…' : 'Comment'}
-                </Button>
-              </div>
-            </div>
-          )}
-        </div>
+function Description({ body }: { body: string | null | undefined }) {
+  if (!body)
+    return <div className="pr-overview-block pr-overview-no-desc">No description provided.</div>
+  return (
+    <div className="pr-overview-block">
+      <h3 className="pr-overview-section-title">Description</h3>
+      <div className="pr-overview-description">
+        <RichContent>{body}</RichContent>
       </div>
+    </div>
+  )
+}
 
-      {/* CTA */}
-      <div className="pr-overview-cta">
-        {updateBranchError && <p className="pr-update-branch-error">{updateBranchError}</p>}
-        {mergeError && <p className="pr-update-branch-error">{mergeError}</p>}
-        {pr.mergeStateStatus === 'behind' && (
-          <Button
-            icon={updatingBranch ? undefined : ArrowDown}
-            onClick={handleUpdateBranch}
-            disabled={updatingBranch}
-          >
-            {updatingBranch ? 'Updating…' : `Update from ${pr.baseRefName}`}
-          </Button>
-        )}
-        {pr.mergeStateStatus === 'dirty' && (
-          <Button
-            variant="danger"
-            icon={preparingMerge ? undefined : ArrowRight}
-            onClick={handleResolveConflicts}
-            disabled={preparingMerge}
-          >
-            {preparingMerge ? 'Preparing merge…' : 'Resolve conflicts'}
-          </Button>
-        )}
-        {pr.isDraft && (
-          <Button onClick={handleMarkReady} disabled={markingReady}>
-            {markingReady ? 'Marking ready…' : 'Mark as Ready'}
-          </Button>
-        )}
-        <Button variant="primary" onClick={onStartReview}>
-          {startLabel}
+function WriteBox({ box, composerRef }: { box: IssueCommentBox; composerRef: ComposerRef }) {
+  return (
+    <textarea
+      ref={composerRef}
+      className="comment-composer-textarea"
+      value={box.commentBody}
+      onChange={(e) => box.setCommentBody(e.target.value)}
+      placeholder="Leave a comment…"
+      rows={4}
+      disabled={box.submitting}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) box.handleCommentSubmit()
+      }}
+    />
+  )
+}
+
+function ComposerTabs({ box, composerRef }: { box: IssueCommentBox; composerRef: ComposerRef }) {
+  const { commentBody } = box
+  return (
+    <TabsRoot selectedId={box.commentTab} onSelect={box.setCommentTab}>
+      <TabList label="Comment">
+        <Tab id="write">Write</Tab>
+        <Tab id="preview">Preview</Tab>
+      </TabList>
+      <TabPanel id="write">
+        <WriteBox box={box} composerRef={composerRef} />
+      </TabPanel>
+      <TabPanel id="preview">
+        <div className="comment-composer-preview">
+          {commentBody.trim() && <RichContent>{commentBody}</RichContent>}
+          {!commentBody.trim() && <em>Nothing to preview.</em>}
+        </div>
+      </TabPanel>
+    </TabsRoot>
+  )
+}
+
+function DiscussionComposer({
+  box,
+  composerRef,
+}: {
+  box: IssueCommentBox
+  composerRef: ComposerRef
+}) {
+  return (
+    <div className="comment-composer pr-issue-composer">
+      <ComposerTabs box={box} composerRef={composerRef} />
+      {box.commentError && <p className="comment-composer-error">{box.commentError}</p>}
+      <div className="comment-composer-actions">
+        <span className="pr-issue-composer-hint">⌘↵ to submit</span>
+        <Button
+          variant="primary"
+          size="sm"
+          onClick={box.handleCommentSubmit}
+          disabled={box.submitting || !box.commentBody.trim()}
+        >
+          {choose(box.submitting, 'Submitting…', 'Comment')}
         </Button>
       </div>
     </div>
   )
 }
 
-function IssueCommentItem({
-  comment,
-  onReply,
-}: {
+interface DiscussionProps {
+  comments: IssueComment[]
+  box: IssueCommentBox
+  composerRef: ComposerRef
+}
+
+function Discussion({ comments, box, composerRef }: DiscussionProps) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="pr-overview-block">
+      <button
+        aria-expanded={open}
+        className="pr-overview-section-title pr-overview-discussion-toggle"
+        onClick={() => setOpen((v) => !v)}
+      >
+        Discussion · {comments.length}
+        <Chevron open={open} />
+      </button>
+      {open && comments.length > 0 && (
+        <div className="pr-issue-comment-list">
+          {comments.map((comment) => (
+            <IssueCommentItem key={comment.id} comment={comment} onReply={box.handleReply} />
+          ))}
+        </div>
+      )}
+      {open && <DiscussionComposer box={box} composerRef={composerRef} />}
+    </div>
+  )
+}
+
+function BranchButtons({ pr, actions }: { pr: PrReviewDetail; actions: OverviewActions }) {
+  const { update, merge } = actions
+  return (
+    <>
+      {pr.mergeStateStatus === 'behind' && (
+        <Button
+          icon={choose(update.busy, undefined, ArrowDown)}
+          onClick={actions.handleUpdateBranch}
+          disabled={update.busy}
+        >
+          {choose(update.busy, 'Updating…', `Update from ${pr.baseRefName}`)}
+        </Button>
+      )}
+      {pr.mergeStateStatus === 'dirty' && (
+        <Button
+          variant="danger"
+          icon={choose(merge.busy, undefined, ArrowRight)}
+          onClick={actions.handleResolveConflicts}
+          disabled={merge.busy}
+        >
+          {choose(merge.busy, 'Preparing merge…', 'Resolve conflicts')}
+        </Button>
+      )}
+    </>
+  )
+}
+
+function CtaBar(props: {
+  pr: PrReviewDetail
+  actions: OverviewActions
+  startLabel: string
+  onStartReview: () => void
+}) {
+  const { pr, actions } = props
+  return (
+    <div className="pr-overview-cta">
+      {actions.update.error && <p className="pr-update-branch-error">{actions.update.error}</p>}
+      {actions.merge.error && <p className="pr-update-branch-error">{actions.merge.error}</p>}
+      <BranchButtons pr={pr} actions={actions} />
+      {pr.isDraft && (
+        <Button onClick={actions.handleMarkReady} disabled={actions.markReady.busy}>
+          {choose(actions.markReady.busy, 'Marking ready…', 'Mark as Ready')}
+        </Button>
+      )}
+      <Button variant="primary" onClick={props.onStartReview}>
+        {props.startLabel}
+      </Button>
+    </div>
+  )
+}
+
+function OverviewBody(props: {
+  pr: PrReviewDetail
+  comments: IssueComment[]
+  box: IssueCommentBox
+  composerRef: ComposerRef
+  youAreRequested: boolean
+}) {
+  const { pr } = props
+  return (
+    <div className="pr-overview-body-scroll">
+      <StatusBlock pr={pr} youAreRequested={props.youAreRequested} />
+      <section className="pr-overview-block">
+        <InsightsPanel pr={pr} />
+      </section>
+      {pr.issueRefs && pr.issueRefs.length > 0 && <IssueContext issueRefs={pr.issueRefs} />}
+      <Description body={pr.body} />
+      <Discussion comments={props.comments} box={props.box} composerRef={props.composerRef} />
+    </div>
+  )
+}
+
+export function PrOverviewPanel(props: Props) {
+  const { repoRoot, pr } = props
+  const { viewedFiles, issueComments, currentUserLogin } = usePrReviewStore()
+  const loadIssueComments = useLoadIssueComments(repoRoot)
+  const actions = useOverviewActions(props, loadIssueComments)
+  const { box, composerRef } = useIssueComment(props, loadIssueComments)
+  useEffect(() => {
+    loadIssueComments(pr.number)
+  }, [loadIssueComments, pr.number])
+  const totalFiles = pr.chapters.reduce((n, c) => n + c.files.length, 0)
+  return (
+    <div className="pr-overview">
+      <OverviewTopBar props={props} refresh={actions.refresh} onRefresh={actions.handleRefresh} />
+      <OverviewBody
+        pr={pr}
+        comments={issueComments}
+        box={box}
+        composerRef={composerRef}
+        youAreRequested={isRequestedOf(pr, currentUserLogin)}
+      />
+      <CtaBar
+        pr={pr}
+        actions={actions}
+        startLabel={startLabel(props.sessionStatus, viewedFiles.size, totalFiles)}
+        onStartReview={props.onStartReview}
+      />
+    </div>
+  )
+}
+
+function IssueCommentItem(props: {
   comment: IssueComment
   onReply: (comment: IssueComment) => void
 }) {
+  const { comment } = props
   return (
     <div className="pr-issue-comment">
       <div className="pr-issue-comment-header">
@@ -452,7 +609,7 @@ function IssueCommentItem({
         <time className="inline-comment-time" dateTime={comment.createdAt}>
           <RelativeTime value={comment.createdAt} />
         </time>
-        <Button variant="ghost" size="sm" onClick={() => onReply(comment)}>
+        <Button variant="ghost" size="sm" onClick={() => props.onReply(comment)}>
           Reply
         </Button>
       </div>

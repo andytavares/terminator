@@ -151,6 +151,8 @@ Split panes let you view multiple terminals side by side without leaving the cur
 
 Splits are **recursive** — each pane can be split again. Drag the divider bar to resize. Click a pane to focus it; a blue border marks the focused pane. `Cmd+W` closes the focused pane (collapsing the split) or the active tab when there is no split.
 
+A split belongs to the tab it was made in. A new tab opens on its own terminal, which takes the keyboard; going back to the split tab shows its panes again.
+
 > **Note:** Split panes require an active branch session. Scratch sessions do not support splits.
 
 ---

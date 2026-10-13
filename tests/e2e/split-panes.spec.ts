@@ -1,5 +1,16 @@
 import { test, expect } from '@playwright/test'
-import { AppHandle, launchApp, closeApp, createWorkspace } from './helpers'
+import { mkdtempSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import {
+  AppHandle,
+  addAndSelectProject,
+  closeApp,
+  createWorkspace,
+  launchApp,
+  runQuickAction,
+  terminalRowsIn,
+} from './helpers'
 
 /**
  * A split pane you can see, reach and close.
@@ -90,5 +101,48 @@ test.describe.serial('split panes', () => {
     await expect(rows, 'closing the pane removes its row').toHaveCount(1, { timeout: 10000 })
     // One pane left means no split, so no per-pane titlebars either.
     await expect(handle.page.locator('.xterm')).toHaveCount(1, { timeout: 10000 })
+  })
+})
+
+/**
+ * A new tab opened while the branch is split.
+ *
+ * The split belongs to the tab it was made in. The new tab shows its own
+ * terminal, which takes the keyboard, and the split comes back with its tab.
+ */
+test.describe.serial('a new tab beside a split', () => {
+  let app: AppHandle
+  const sessionTabs = () => app.page.locator('.tab-bar__tab--session')
+  const visibleScreens = () =>
+    app.page.locator('.terminal-pane .xterm-screen').filter({ visible: true })
+
+  test.beforeAll(async () => {
+    app = await launchApp()
+    await createWorkspace(app.page, 'Split', mkdtempSync(join(tmpdir(), 'terminator-e2e-split-')))
+    await addAndSelectProject(app.page, 'Split', 'panes')
+  })
+
+  test.afterAll(async () => closeApp(app))
+
+  test('New tab after Split down shows the new terminal, and typing reaches it', async () => {
+    const { page } = app
+    await runQuickAction(page, 'Split down')
+    await expect(visibleScreens()).toHaveCount(2, { timeout: 15000 })
+    await runQuickAction(page, 'New tab')
+    await expect(sessionTabs()).toHaveCount(2)
+    await expect(sessionTabs().last()).toHaveClass(/tab-bar__tab--active/)
+    await expect(visibleScreens()).toHaveCount(1, { timeout: 15000 })
+    await page.keyboard.type('echo typed-into-new-tab')
+    await page.keyboard.press('Enter')
+    const rows = async () => (await terminalRowsIn(visibleScreens().first())).join('\n')
+    await expect.poll(rows).toContain('typed-into-new-tab')
+  })
+
+  test('going back to the first tab shows its split again', async () => {
+    await sessionTabs().first().click()
+    await expect(visibleScreens()).toHaveCount(2, { timeout: 15000 })
+    for (const screen of await visibleScreens().all()) {
+      expect((await terminalRowsIn(screen)).join('\n')).not.toContain('typed-into-new-tab')
+    }
   })
 })

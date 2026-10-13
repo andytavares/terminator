@@ -67,22 +67,22 @@ beforeEach(() => {
   } as unknown as ReturnType<typeof usePrReviewStore>)
 })
 
-describe('FullFileList', () => {
-  const defaultProps = {
-    pr: makePr([
-      {
-        id: 'ch-1',
-        name: 'Core',
-        estimatedMinutes: 10,
-        files: [makeFile('src/foo.ts'), makeFile('src/bar.ts')],
-      },
-    ]),
-    repoRoot: '/repo',
-    headSHA: 'abc',
-    currentFilePath: null,
-    onSelectFile: vi.fn(),
-  }
+const defaultProps = {
+  pr: makePr([
+    {
+      id: 'ch-1',
+      name: 'Core',
+      estimatedMinutes: 10,
+      files: [makeFile('src/foo.ts'), makeFile('src/bar.ts')],
+    },
+  ]),
+  repoRoot: '/repo',
+  headSHA: 'abc',
+  currentFilePath: null,
+  onSelectFile: vi.fn(),
+}
 
+describe('FullFileList', () => {
   it('renders chapter name', () => {
     render(<FullFileList {...defaultProps} />)
     expect(screen.getByText('Core')).toBeTruthy()
@@ -106,7 +106,9 @@ describe('FullFileList', () => {
     fireEvent.click(screen.getByText('foo.ts'))
     expect(onSelectFile).toHaveBeenCalledWith('src/foo.ts', 'ch-1')
   })
+})
 
+describe('FullFileList — toggles chapter collapsed state when header is clicked', () => {
   it('toggles chapter collapsed state when header is clicked', () => {
     render(<FullFileList {...defaultProps} />)
     const chapterHeader = screen.getByRole('button', { name: /Chapter 1/ })
@@ -131,7 +133,9 @@ describe('FullFileList', () => {
     expect(activeRow?.getAttribute('aria-current')).toBe('true')
     expect(container.querySelectorAll('[aria-current]')).toHaveLength(1)
   })
+})
 
+describe('FullFileList — shows progress per chapter', () => {
   it('shows progress per chapter', () => {
     render(<FullFileList {...defaultProps} />)
     expect(screen.getByText('0/2')).toBeTruthy()
@@ -156,7 +160,9 @@ describe('FullFileList', () => {
     expect(rows[0].getAttribute('title')).toBe('src/bar.ts')
     expect(rows[1].getAttribute('title')).toBe('src/foo.ts')
   })
+})
 
+describe('FullFileList — shows changed for a file the store lists as changed since viewed', () => {
   it('shows "changed" for a file the store lists as changed since viewed', () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
       viewedFiles: new Set<string>(),
@@ -178,7 +184,9 @@ describe('FullFileList', () => {
     render(<FullFileList {...defaultProps} />)
     expect(screen.getByText('viewed')).toBeTruthy()
   })
+})
 
+describe('FullFileList — shows new file for a file a push added since your last look', () => {
   it('shows "new file" for a file a push added since your last look', () => {
     const pr = makePr([
       {
@@ -197,7 +205,9 @@ describe('FullFileList', () => {
     render(<FullFileList {...defaultProps} pr={pr} />)
     expect(screen.getByText('new file')).toBeTruthy()
   })
+})
 
+describe('FullFileList — does not call an added file new on a first review', () => {
   it('does not call an added file new on a first review', () => {
     const pr = makePr([
       {
@@ -216,7 +226,9 @@ describe('FullFileList', () => {
     render(<FullFileList {...defaultProps} pr={pr} />)
     expect(screen.queryByText('new file')).toBeNull()
   })
+})
 
+describe('FullFileList — shows the reading-order reason under the file name', () => {
   it('shows the reading-order reason under the file name', () => {
     const pr = makePr([
       {

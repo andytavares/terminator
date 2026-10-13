@@ -106,6 +106,13 @@ async function renderView(
   return render(<GitFullView repoRoot={repoRoot} />)
 }
 
+/** Renders the view for /repo and opens the PR dialog. */
+async function renderWithPrDialogOpen() {
+  await renderView()
+  fireEvent.click(screen.getByText('Open PR'))
+  await waitFor(() => screen.getByTestId('pr-dialog'))
+}
+
 // The first import compiles the component tree, which on a loaded machine takes longer
 // than one test's 5 s; load it once here so every test times only its own work.
 beforeAll(async () => {
@@ -133,7 +140,9 @@ describe('GitFullView', () => {
     await renderView()
     expect(screen.getByText('Stage at least one file to commit')).toBeTruthy()
   })
+})
 
+describe('GitFullView — shows Enter a commit message hint when files staged but no message', () => {
   it('shows "Enter a commit message" hint when files staged but no message', async () => {
     const stagedFile = { path: 'src/foo.ts', staged: true, status: 'M' }
     setupStore({ status: { branch: 'feature', files: [stagedFile] } })
@@ -146,7 +155,9 @@ describe('GitFullView', () => {
     const btn = screen.getByText('Commit')
     expect(btn).toHaveProperty('disabled', true)
   })
+})
 
+describe('GitFullView — calls commit when Commit is clicked with staged files and message', () => {
   it('calls commit when Commit is clicked with staged files and message', async () => {
     const stagedFile = { path: 'src/foo.ts', staged: true, status: 'M' }
     setupStore({ status: { branch: 'feature', files: [stagedFile] } })
@@ -164,7 +175,9 @@ describe('GitFullView', () => {
       })
     )
   })
+})
 
+describe('GitFullView — shows commit error message when commit returns error', () => {
   it('shows commit error message when commit returns error', async () => {
     mockGitCommit.mockResolvedValue({ error: 'NOTHING_TO_COMMIT' })
     const stagedFile = { path: 'src/foo.ts', staged: true, status: 'M' }
@@ -180,7 +193,9 @@ describe('GitFullView', () => {
       ).toBeTruthy()
     )
   })
+})
 
+describe('GitFullView — calls commit and push when Commit & Push is clicked', () => {
   it('calls commit and push when Commit & Push is clicked', async () => {
     const stagedFile = { path: 'src/foo.ts', staged: true, status: 'M' }
     setupStore({ status: { branch: 'feature', files: [stagedFile] } })
@@ -200,34 +215,39 @@ describe('GitFullView', () => {
     fireEvent.click(screen.getByText('Open PR'))
     await waitFor(() => expect(screen.getByTestId('pr-dialog')).toBeTruthy())
   })
+})
 
+describe('GitFullView — closes PR dialog when ClosePrDialog is clicked', () => {
   it('closes PR dialog when ClosePrDialog is clicked', async () => {
-    await renderView()
-    fireEvent.click(screen.getByText('Open PR'))
-    await waitFor(() => screen.getByTestId('pr-dialog'))
+    await renderWithPrDialogOpen()
     fireEvent.click(screen.getByText('ClosePrDialog'))
     expect(screen.queryByTestId('pr-dialog')).toBeNull()
   })
 
   it('closes PR dialog and dispatches event when PR is created', async () => {
     const dispatchSpy = vi.spyOn(window, 'dispatchEvent')
-    await renderView()
-    fireEvent.click(screen.getByText('Open PR'))
-    await waitFor(() => screen.getByTestId('pr-dialog'))
+    await renderWithPrDialogOpen()
     fireEvent.click(screen.getByText('CreatePr'))
     expect(screen.queryByTestId('pr-dialog')).toBeNull()
     expect(dispatchSpy).toHaveBeenCalled()
     dispatchSpy.mockRestore()
   })
 
+  it('shows char count when commit message exceeds 50 chars', async () => {
+    await renderView()
+    const msg = 'a'.repeat(51)
+    fireEvent.change(screen.getByPlaceholderText('Commit message…'), { target: { value: msg } })
+    expect(screen.getByText('51 chars')).toBeTruthy()
+  })
+})
+
+describe('GitFullView — the pull request Open PR created', () => {
   it('shows the created pull request with a link that opens it, and announces it', async () => {
     const openExternal = vi.fn().mockResolvedValue(undefined)
     Object.assign((globalThis as unknown as { electronAPI: object }).electronAPI, {
       shell: { openExternal },
     })
-    await renderView()
-    fireEvent.click(screen.getByText('Open PR'))
-    await waitFor(() => screen.getByTestId('pr-dialog'))
+    await renderWithPrDialogOpen()
     fireEvent.click(screen.getByText('CreatePr'))
 
     fireEvent.click(await screen.findByRole('link', { name: '#42 PR' }))
@@ -237,14 +257,9 @@ describe('GitFullView', () => {
       expect.objectContaining({ type: 'success', key: 'prCreated', title: 'Opened #42 PR' })
     )
   })
+})
 
-  it('shows char count when commit message exceeds 50 chars', async () => {
-    await renderView()
-    const msg = 'a'.repeat(51)
-    fireEvent.change(screen.getByPlaceholderText('Commit message…'), { target: { value: msg } })
-    expect(screen.getByText('51 chars')).toBeTruthy()
-  })
-
+describe('GitFullView — fetches diff when file is selected', () => {
   it('fetches diff when file is selected', async () => {
     await renderView()
     fireEvent.click(screen.getByText('SelectFile'))
@@ -265,7 +280,9 @@ describe('GitFullView', () => {
       expect(mockSetDiff).toHaveBeenCalledWith('unstaged:src/foo.ts', { hunks: [] })
     )
   })
+})
 
+describe('GitFullView — does not refetch when the same side of the file is already cached', () => {
   it('does not refetch when the same side of the file is already cached', async () => {
     await renderView('/repo', { diffCache: new Map([['unstaged:src/foo.ts', { hunks: [] }]]) })
     fireEvent.click(screen.getByText('SelectFile'))
@@ -278,7 +295,9 @@ describe('GitFullView', () => {
     fireEvent.click(screen.getByText('SelectFile'))
     await waitFor(() => expect(mockGitDiffFile).toHaveBeenCalledTimes(1))
   })
+})
 
+describe('GitFullView — shows hook output when commit fails due to hook failure', () => {
   it('shows hook output when commit fails due to hook failure', async () => {
     mockGitCommit.mockResolvedValue({
       error: 'HOOK_FAILED',
@@ -296,7 +315,9 @@ describe('GitFullView', () => {
     expect(screen.getByText('Hook output')).toBeTruthy()
     expect(screen.getByText('Commit without hooks')).toBeTruthy()
   })
+})
 
+describe('GitFullView — commits with --no-verify when Commit without hooks is clicked', () => {
   it('commits with --no-verify when Commit without hooks is clicked', async () => {
     mockGitCommit
       .mockResolvedValueOnce({
@@ -323,7 +344,9 @@ describe('GitFullView', () => {
       })
     )
   })
+})
 
+describe('GitFullView — shows running hooks status text while committing', () => {
   it('shows running hooks status text while committing', async () => {
     let resolve: (v: unknown) => void
     mockGitCommit.mockImplementation(
@@ -342,7 +365,9 @@ describe('GitFullView', () => {
     await waitFor(() => expect(screen.getByText(/Running pre-commit hooks/)).toBeTruthy())
     resolve!({ commitHash: 'abc' })
   })
+})
 
+describe('GitFullView — shows push error when push fails after commit & push', () => {
   it('shows push error when push fails after commit & push', async () => {
     mockGitPush.mockResolvedValue({ error: 'REJECTED' })
     const stagedFile = { path: 'src/foo.ts', staged: true, status: 'M' }
@@ -364,7 +389,9 @@ describe('GitFullView', () => {
     channelHandlers.get('git:focus-commit-message')?.({ repoRoot: '/repo' })
     await waitFor(() => expect(document.activeElement).toBe(textarea))
   })
+})
 
+describe('GitFullView — ignores git:focus-commit-message for a different repo', () => {
   it('ignores git:focus-commit-message for a different repo', async () => {
     await renderView('/repo')
     const textarea = screen.getByPlaceholderText('Commit message…')
@@ -382,6 +409,40 @@ describe('GitFullView', () => {
   it('ignores git:open-pr-dialog for a different repo', async () => {
     await renderView('/repo')
     channelHandlers.get('git:open-pr-dialog')?.({ repoRoot: '/other-repo' })
+    expect(screen.queryByTestId('pr-dialog')).toBeNull()
+  })
+})
+
+describe('GitFullView — a Commit… or Create PR… run before the view existed', () => {
+  /** Answers git:ui.consume-pending-request with `request`, the rest as beforeEach does. */
+  function leavePendingRequest(request: { kind: string; repoRoot: string } | null) {
+    const answer = mockInvoke.getMockImplementation()!
+    mockInvoke.mockImplementation((channel: string, payload: unknown) =>
+      channel === 'git:ui.consume-pending-request'
+        ? Promise.resolve({ request })
+        : answer(channel, payload)
+    )
+  }
+
+  it('focuses the commit message box for a pending Commit… on this repo', async () => {
+    leavePendingRequest({ kind: 'commit', repoRoot: '/repo' })
+    await renderView('/repo')
+    const textarea = screen.getByPlaceholderText('Commit message…')
+    await waitFor(() => expect(document.activeElement).toBe(textarea))
+  })
+
+  it('opens the PR dialog for a pending Create PR… on this repo', async () => {
+    leavePendingRequest({ kind: 'pull-request', repoRoot: '/repo' })
+    await renderView('/repo')
+    await waitFor(() => expect(screen.getByTestId('pr-dialog')).toBeTruthy())
+  })
+
+  it("leaves another repository's pending request alone", async () => {
+    leavePendingRequest({ kind: 'pull-request', repoRoot: '/other-repo' })
+    await renderView('/repo')
+    await waitFor(() =>
+      expect(mockInvoke).toHaveBeenCalledWith('git:ui.consume-pending-request', {})
+    )
     expect(screen.queryByTestId('pr-dialog')).toBeNull()
   })
 })

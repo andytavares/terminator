@@ -2,6 +2,7 @@ import React, { useMemo, useState, useRef } from 'react'
 import hljs from '../utils/hljs'
 import { Button, SegmentedControl } from '@terminator/extension-ui'
 import type { FileDiff, DiffLine, DiffHunk } from '../schemas/git.schema'
+import { choose } from './text'
 import { useSplitDrag } from '../hooks/useSplitDrag'
 
 type ViewMode = 'unified' | 'split'
@@ -14,52 +15,56 @@ interface FileDiffViewProps {
 
 // ── Language detection ────────────────────────────────────────────────────────
 
-export function detectLanguage(path: string): string | undefined {
-  const ext = path.split('.').pop()?.toLowerCase()
-  const map: Record<string, string> = {
-    ts: 'typescript',
-    tsx: 'typescript',
-    js: 'javascript',
-    jsx: 'javascript',
-    mjs: 'javascript',
-    cjs: 'javascript',
-    py: 'python',
-    rs: 'rust',
-    go: 'go',
-    java: 'java',
-    kt: 'kotlin',
-    swift: 'swift',
-    c: 'c',
-    h: 'c',
-    cpp: 'cpp',
-    cc: 'cpp',
-    cxx: 'cpp',
-    hpp: 'cpp',
-    cs: 'csharp',
-    rb: 'ruby',
-    php: 'php',
-    css: 'css',
-    scss: 'scss',
-    less: 'less',
-    html: 'xml',
-    htm: 'xml',
-    xml: 'xml',
-    svg: 'xml',
-    json: 'json',
-    yaml: 'yaml',
-    yml: 'yaml',
-    toml: 'toml',
-    md: 'markdown',
-    sh: 'bash',
-    bash: 'bash',
-    zsh: 'bash',
-    sql: 'sql',
-  }
-  return ext ? map[ext] : undefined
+const LANGUAGES: Record<string, string> = {
+  ts: 'typescript',
+  tsx: 'typescript',
+  js: 'javascript',
+  jsx: 'javascript',
+  mjs: 'javascript',
+  cjs: 'javascript',
+  py: 'python',
+  rs: 'rust',
+  go: 'go',
+  java: 'java',
+  kt: 'kotlin',
+  swift: 'swift',
+  c: 'c',
+  h: 'c',
+  cpp: 'cpp',
+  cc: 'cpp',
+  cxx: 'cpp',
+  hpp: 'cpp',
+  cs: 'csharp',
+  rb: 'ruby',
+  php: 'php',
+  css: 'css',
+  scss: 'scss',
+  less: 'less',
+  html: 'xml',
+  htm: 'xml',
+  xml: 'xml',
+  svg: 'xml',
+  json: 'json',
+  yaml: 'yaml',
+  yml: 'yaml',
+  toml: 'toml',
+  md: 'markdown',
+  sh: 'bash',
+  bash: 'bash',
+  zsh: 'bash',
+  sql: 'sql',
 }
 
+export function detectLanguage(path: string): string | undefined {
+  const ext = path.split('.').pop()?.toLowerCase()
+  if (!ext) return undefined
+  return LANGUAGES[ext]
+}
+
+const HTML_ESCAPES: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;' }
+
 function escapeHtml(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  return s.replace(new RegExp('[&<>]', 'g'), (ch) => HTML_ESCAPES[ch])
 }
 
 export function highlight(content: string, lang: string | undefined): string {
@@ -73,14 +78,15 @@ export function highlight(content: string, lang: string | undefined): string {
 
 // ── Unified view ──────────────────────────────────────────────────────────────
 
+const LINE_PREFIX: Record<DiffLine['type'], string> = { add: '+', remove: '-', context: ' ' }
+
 function UnifiedRow({ line, lang }: { line: DiffLine; lang: string | undefined }): JSX.Element {
-  const prefix = line.type === 'add' ? '+' : line.type === 'remove' ? '-' : ' '
   const html = useMemo(() => highlight(line.content, lang), [line.content, lang])
   return (
     <tr className={`diff-line diff-line--${line.type}`}>
       <td className="diff-line__old-num">{line.oldLineNumber ?? ''}</td>
       <td className="diff-line__new-num">{line.newLineNumber ?? ''}</td>
-      <td className="diff-line__prefix">{prefix}</td>
+      <td className="diff-line__prefix">{LINE_PREFIX[line.type]}</td>
       <td className="diff-line__content">
         <pre dangerouslySetInnerHTML={{ __html: html }} />
       </td>
@@ -88,23 +94,28 @@ function UnifiedRow({ line, lang }: { line: DiffLine; lang: string | undefined }
   )
 }
 
-function UnifiedTable({
-  hunks,
-  lang,
-}: {
+interface TableProps {
   hunks: DiffHunk[]
   lang: string | undefined
-}): JSX.Element {
+}
+
+function HunkHeader(props: { header: string; colSpan: number }) {
+  return (
+    <tr>
+      <td colSpan={props.colSpan} className="diff-hunk-header">
+        {props.header}
+      </td>
+    </tr>
+  )
+}
+
+function UnifiedTable({ hunks, lang }: TableProps): JSX.Element {
   return (
     <table className="diff-table">
       <tbody>
         {hunks.map((hunk, hi) => (
           <React.Fragment key={hi}>
-            <tr>
-              <td colSpan={4} className="diff-hunk-header">
-                {hunk.header}
-              </td>
-            </tr>
+            <HunkHeader header={hunk.header} colSpan={4} />
             {hunk.lines.map((line, li) => (
               <UnifiedRow key={`${hi}-${li}`} line={line} lang={lang} />
             ))}
@@ -121,6 +132,25 @@ export type SplitRow =
   | { kind: 'context'; line: DiffLine }
   | { kind: 'change'; oldLine: DiffLine | null; newLine: DiffLine | null }
 
+/** The lines of `type` starting at `start`. */
+function runOf(lines: DiffLine[], start: number, type: DiffLine['type']): DiffLine[] {
+  const run: DiffLine[] = []
+  while (start + run.length < lines.length && lines[start + run.length].type === type) {
+    run.push(lines[start + run.length])
+  }
+  return run
+}
+
+/** Removed and added lines side by side, row by row; the longer side runs on alone. */
+function pairChanges(removes: DiffLine[], adds: DiffLine[]): SplitRow[] {
+  const count = Math.max(removes.length, adds.length)
+  return Array.from({ length: count }, (_, j) => ({
+    kind: 'change' as const,
+    oldLine: removes[j] ?? null,
+    newLine: adds[j] ?? null,
+  }))
+}
+
 export function buildSplitRows(lines: DiffLine[]): SplitRow[] {
   const rows: SplitRow[] = []
   let i = 0
@@ -129,103 +159,101 @@ export function buildSplitRows(lines: DiffLine[]): SplitRow[] {
       rows.push({ kind: 'context', line: lines[i++] })
       continue
     }
-    const removes: DiffLine[] = []
-    const adds: DiffLine[] = []
-    while (i < lines.length && lines[i].type === 'remove') removes.push(lines[i++])
-    while (i < lines.length && lines[i].type === 'add') adds.push(lines[i++])
-    const pairs = Math.min(removes.length, adds.length)
-    for (let j = 0; j < pairs; j++) {
-      rows.push({ kind: 'change', oldLine: removes[j], newLine: adds[j] })
-    }
-    for (let j = pairs; j < removes.length; j++) {
-      rows.push({ kind: 'change', oldLine: removes[j], newLine: null })
-    }
-    for (let j = pairs; j < adds.length; j++) {
-      rows.push({ kind: 'change', oldLine: null, newLine: adds[j] })
-    }
+    const removes = runOf(lines, i, 'remove')
+    const adds = runOf(lines, i + removes.length, 'add')
+    rows.push(...pairChanges(removes, adds))
+    i += removes.length + adds.length
   }
   return rows
 }
 
-function SplitCell({
-  line,
-  side,
-  lang,
-}: {
-  line: DiffLine | null
-  side: 'old' | 'new'
-  lang: string | undefined
-}): JSX.Element {
-  const html = useMemo(() => (line ? highlight(line.content, lang) : ''), [line, lang])
-  const sideClass =
-    side === 'old' ? ' diff-line__content--old-side' : ' diff-line__content--new-side'
-  if (!line) {
-    return (
-      <>
-        <td className="diff-line__old-num" />
-        <td className={`diff-line__content diff-line__content--empty${sideClass}`} />
-      </>
-    )
-  }
-  const lineNum = side === 'old' ? line.oldLineNumber : line.newLineNumber
-  const baseCls =
-    line.type === 'remove'
-      ? 'diff-line__content diff-line__content--remove'
-      : line.type === 'add'
-        ? 'diff-line__content diff-line__content--add'
-        : 'diff-line__content'
+type SplitSide = 'old' | 'new'
+
+const CONTENT_CLASS: Record<DiffLine['type'], string> = {
+  remove: 'diff-line__content diff-line__content--remove',
+  add: 'diff-line__content diff-line__content--add',
+  context: 'diff-line__content',
+}
+
+function sideClassOf(side: SplitSide): string {
+  return choose(side === 'old', ' diff-line__content--old-side', ' diff-line__content--new-side')
+}
+
+function sideLineNumber(line: DiffLine, side: SplitSide): number | null | undefined {
+  if (side === 'old') return line.oldLineNumber
+  return line.newLineNumber
+}
+
+function SplitCode(props: { line: DiffLine; side: SplitSide; lang: string | undefined }) {
+  const { line, side, lang } = props
+  const html = useMemo(() => highlight(line.content, lang), [line, lang])
   return (
     <>
-      <td className="diff-line__old-num">{lineNum ?? ''}</td>
-      <td className={`${baseCls}${sideClass}`}>
+      <td className="diff-line__old-num">{sideLineNumber(line, side) ?? ''}</td>
+      <td className={`${CONTENT_CLASS[line.type]}${sideClassOf(side)}`}>
         <pre dangerouslySetInnerHTML={{ __html: html }} />
       </td>
     </>
   )
 }
 
-function SplitTable({
-  hunks,
-  lang,
-  onDividerMouseDown,
-}: {
-  hunks: DiffHunk[]
-  lang: string | undefined
+function SplitCell(props: { line: DiffLine | null; side: SplitSide; lang: string | undefined }) {
+  if (props.line) return <SplitCode line={props.line} side={props.side} lang={props.lang} />
+  return (
+    <>
+      <td className="diff-line__old-num" />
+      <td className={`diff-line__content diff-line__content--empty${sideClassOf(props.side)}`} />
+    </>
+  )
+}
+
+interface SplitTableProps extends TableProps {
   onDividerMouseDown: (e: React.MouseEvent) => void
-}): JSX.Element {
+}
+
+function rowSides(row: SplitRow): {
+  oldLine: DiffLine | null
+  newLine: DiffLine | null
+  cls: string
+} {
+  if (row.kind === 'context') {
+    return { oldLine: row.line, newLine: row.line, cls: 'diff-line diff-line--context' }
+  }
+  return { oldLine: row.oldLine, newLine: row.newLine, cls: 'diff-line' }
+}
+
+function SplitTableRow(props: {
+  row: SplitRow
+  lang: string | undefined
+  onDividerMouseDown: SplitTableProps['onDividerMouseDown']
+}) {
+  const { oldLine, newLine, cls } = rowSides(props.row)
+  return (
+    <tr className={cls}>
+      <SplitCell line={oldLine} side="old" lang={props.lang} />
+      <td className="diff-table__split-divider" onMouseDown={props.onDividerMouseDown} />
+      <SplitCell line={newLine} side="new" lang={props.lang} />
+    </tr>
+  )
+}
+
+function SplitTable({ hunks, lang, onDividerMouseDown }: SplitTableProps) {
   return (
     <table className="diff-table diff-table--split">
       <tbody>
-        {hunks.map((hunk, hi) => {
-          const rows = buildSplitRows(hunk.lines)
-          return (
-            <React.Fragment key={hi}>
-              <tr>
-                <td colSpan={5} className="diff-hunk-header">
-                  {hunk.header}
-                </td>
-              </tr>
-              {rows.map((row, ri) => {
-                if (row.kind === 'context') {
-                  return (
-                    <tr key={ri} className="diff-line diff-line--context">
-                      <SplitCell line={row.line} side="old" lang={lang} />
-                      <td className="diff-table__split-divider" onMouseDown={onDividerMouseDown} />
-                      <SplitCell line={row.line} side="new" lang={lang} />
-                    </tr>
-                  )
-                }
-                return (
-                  <tr key={ri} className="diff-line">
-                    <SplitCell line={row.oldLine} side="old" lang={lang} />
-                    <td className="diff-table__split-divider" onMouseDown={onDividerMouseDown} />
-                    <SplitCell line={row.newLine} side="new" lang={lang} />
-                  </tr>
-                )
-              })}
-            </React.Fragment>
-          )
-        })}
+        {hunks.map((hunk, hi) => (
+          <React.Fragment key={hi}>
+            <HunkHeader header={hunk.header} colSpan={5} />
+            {buildSplitRows(hunk.lines).map((row, ri) => (
+              <SplitTableRow
+                key={ri}
+                row={row}
+                lang={lang}
+                onDividerMouseDown={onDividerMouseDown}
+              />
+            ))}
+          </React.Fragment>
+        ))}
       </tbody>
     </table>
   )
@@ -233,72 +261,115 @@ function SplitTable({
 
 // ── FileDiffView ──────────────────────────────────────────────────────────────
 
-export function FileDiffView({ diff, isStale, onRefresh }: FileDiffViewProps): JSX.Element {
-  const [viewMode, setViewMode] = useState<ViewMode>('unified')
+/** The split divider, measured against the diff's scroll area. */
+function useDiffDivider() {
   const scrollRef = useRef<HTMLDivElement>(null)
-  const { splitLeftPct, onDividerMouseDown: handleDividerMouseDown } = useSplitDrag(scrollRef)
+  const { splitLeftPct, onDividerMouseDown } = useSplitDrag(scrollRef)
+  return { splitLeftPct, scrollRef, onDividerMouseDown }
+}
 
-  if (!diff) {
-    return (
-      <div className="file-diff-view file-diff-view--empty">Select a file to view its diff.</div>
-    )
-  }
+const LAYOUT_OPTIONS = [
+  { value: 'unified', label: 'Unified' },
+  { value: 'split', label: 'Split' },
+] as const
 
-  if (diff.isBinary) {
-    return (
-      <div className="file-diff-view file-diff-view--binary">Binary file — no diff available.</div>
-    )
-  }
+function fileTitle(diff: FileDiff): string {
+  if (diff.oldPath) return `${diff.oldPath} → ${diff.path}`
+  return diff.path
+}
 
-  const lang = detectLanguage(diff.path)
-
+function DiffToolbar(props: {
+  diff: FileDiff
+  viewMode: ViewMode
+  setViewMode: (m: ViewMode) => void
+}) {
   return (
-    <div className="file-diff-view">
-      <div className="file-diff-view__toolbar">
-        <span className="file-diff-view__filename">
-          {diff.oldPath ? `${diff.oldPath} → ${diff.path}` : diff.path}
-        </span>
-        <SegmentedControl
-          label="Diff layout"
-          size="sm"
-          options={[
-            { value: 'unified', label: 'Unified' },
-            { value: 'split', label: 'Split' },
-          ]}
-          value={viewMode}
-          onChange={setViewMode}
-        />
-      </div>
+    <div className="file-diff-view__toolbar">
+      <span className="file-diff-view__filename">{fileTitle(props.diff)}</span>
+      <SegmentedControl
+        label="Diff layout"
+        size="sm"
+        options={[...LAYOUT_OPTIONS]}
+        value={props.viewMode}
+        onChange={props.setViewMode}
+      />
+    </div>
+  )
+}
 
-      {isStale && (
+function DiffNotices({ props }: { props: FileDiffViewProps & { diff: FileDiff } }) {
+  return (
+    <>
+      {props.isStale && (
         <div className="file-diff-view__stale-banner">
           File changed while viewing.{' '}
-          {onRefresh && (
-            <Button size="sm" onClick={onRefresh}>
+          {props.onRefresh && (
+            <Button size="sm" onClick={props.onRefresh}>
               Refresh
             </Button>
           )}
         </div>
       )}
-      {diff.truncated && (
+      {props.diff.truncated && (
         <div className="file-diff-view__truncation-notice">Diff truncated at 500 KB.</div>
       )}
+    </>
+  )
+}
 
-      <div
-        className="file-diff-view__scroll"
-        ref={scrollRef}
-        style={
-          viewMode === 'split'
-            ? ({ '--split-left': `${splitLeftPct}%` } as React.CSSProperties)
-            : undefined
-        }
-      >
-        {viewMode === 'unified' ? (
-          <UnifiedTable hunks={diff.hunks} lang={lang} />
-        ) : (
-          <SplitTable hunks={diff.hunks} lang={lang} onDividerMouseDown={handleDividerMouseDown} />
-        )}
-      </div>
+type SplitDivider = ReturnType<typeof useDiffDivider>
+
+interface ViewState {
+  viewMode: ViewMode
+  setViewMode: (m: ViewMode) => void
+  divider: SplitDivider
+}
+
+function DiffBody({ diff, view }: { diff: FileDiff; view: ViewState }) {
+  const { splitLeftPct, scrollRef, onDividerMouseDown } = view.divider
+  const { viewMode } = view
+  const lang = detectLanguage(diff.path)
+  const splitStyle = { '--split-left': `${splitLeftPct}%` } as React.CSSProperties
+  return (
+    <div
+      className="file-diff-view__scroll"
+      ref={scrollRef}
+      style={choose(viewMode === 'split', splitStyle, undefined)}
+    >
+      {viewMode === 'unified' && <UnifiedTable hunks={diff.hunks} lang={lang} />}
+      {viewMode === 'split' && (
+        <SplitTable hunks={diff.hunks} lang={lang} onDividerMouseDown={onDividerMouseDown} />
+      )}
     </div>
   )
+}
+
+function LoadedDiff(props: FileDiffViewProps & { diff: FileDiff; view: ViewState }) {
+  const { view } = props
+  return (
+    <div className="file-diff-view">
+      <DiffToolbar diff={props.diff} viewMode={view.viewMode} setViewMode={view.setViewMode} />
+      <DiffNotices props={props} />
+      <DiffBody diff={props.diff} view={view} />
+    </div>
+  )
+}
+
+export function FileDiffView(props: FileDiffViewProps): JSX.Element {
+  const { diff } = props
+  // The layout and divider position outlive the file shown, so they stay as files change.
+  const [viewMode, setViewMode] = useState<ViewMode>('unified')
+  const divider = useDiffDivider()
+  if (!diff) {
+    return (
+      <div className="file-diff-view file-diff-view--empty">Select a file to view its diff.</div>
+    )
+  }
+  if (diff.isBinary) {
+    return (
+      <div className="file-diff-view file-diff-view--binary">Binary file — no diff available.</div>
+    )
+  }
+  const view = { viewMode, setViewMode, divider }
+  return <LoadedDiff diff={diff} isStale={props.isStale} onRefresh={props.onRefresh} view={view} />
 }

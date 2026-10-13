@@ -65,7 +65,9 @@ describe('RepoPicker', () => {
     fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'zzz' } })
     expect(screen.getByText('No repositories match')).toBeTruthy()
   })
+})
 
+describe('RepoPicker — group checkbox selects the whole group and is indeterminate when partial', () => {
   it('group checkbox selects the whole group and is indeterminate when partial', async () => {
     const s = setup()
     render(<RepoPicker initial={[]} onClose={s.onClose} onSaved={s.onSaved} />)
@@ -83,7 +85,9 @@ describe('RepoPicker', () => {
     fireEvent.click(group)
     expect(box('acme/api').checked).toBe(false)
   })
+})
 
+describe('RepoPicker — Select all shown only takes the filtered rows, Clear empties', () => {
   it('Select all shown only takes the filtered rows, Clear empties', async () => {
     const s = setup()
     render(<RepoPicker initial={[]} onClose={s.onClose} onSaved={s.onSaved} />)
@@ -106,7 +110,9 @@ describe('RepoPicker', () => {
       repos: ['octo/cli', 'acme/web'],
     })
   })
+})
 
+describe('RepoPicker — sends an empty selection as []', () => {
   it('sends an empty selection as []', async () => {
     const s = setup()
     render(<RepoPicker initial={[]} onClose={s.onClose} onSaved={s.onSaved} />)
@@ -125,7 +131,9 @@ describe('RepoPicker', () => {
       expect(s.invoke).toHaveBeenCalledWith('github:accessible-repos', { refresh: true })
     )
   })
+})
 
+describe('RepoPicker — shows the error with Retry that reloads', () => {
   it('shows the error with Retry that reloads', async () => {
     const s = setup({ error: 'gh: not logged in' })
     render(<RepoPicker initial={[]} onClose={s.onClose} onSaved={s.onSaved} />)

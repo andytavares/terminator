@@ -71,6 +71,44 @@ Each entry: what was decided, why, and how to undo it.
     "Commit without hooks" for plain git hook failures, atomic merge-flow writes.
 14. No worker may install system packages or run `npm install` in a shared container.
 
+## Known advisories
+
+Checked 2026-10-13 at 311df92. `npm audit` reports 10 (2 low, 8 moderate), exit 1;
+`npm audit --audit-level=high` (the CI gate) exits 0. Both advisories below stay because no
+released upgrade removes them. `overrides` were not used: they would force versions the parents
+do not declare.
+
+1. **katex 0.16.47, low** ([GHSA-238p-pmpm-9mq7](https://github.com/advisories/GHSA-238p-pmpm-9mq7)).
+   Path: `extensions/notepad` → `mermaid@11.16.1` → `katex@^0.16.45`. Affected `>=0.11.0 <0.18.2`;
+   the only fix is 0.18.2. KaTeX does not pollute prototypes itself: it reads an already polluted
+   `Object.prototype` (for example an inherited `trust`) as settings. Notepad renders only the
+   user's own notes, so exploiting it needs a separate prototype-pollution bug in the renderer first.
+   - mermaid 12.1.0 does not fix it: every release from 11.17.0 to 12.1.0 declares `katex: ^0.16.47`
+     (`npm view "mermaid@>=11.16.1" dependencies.katex`), and a caret on 0.x stays within 0.16
+     ([node-semver caret ranges](https://github.com/npm/node-semver#caret-ranges-123-025-004)).
+     12.0.0 also makes ELK the default layout and changes themes
+     ([12.0.0 notes](https://github.com/mermaid-js/mermaid/releases/tag/mermaid%4012.0.0),
+     [12.1.0 notes](https://github.com/mermaid-js/mermaid/releases/tag/mermaid%4012.1.0)),
+     so upgrading now changes every diagram and clears nothing.
+   - The fix is merged upstream but unreleased: [#8411](https://github.com/mermaid-js/mermaid/pull/8411)
+     (katex `^0.18.0`, merged to `develop` 2026-10-09), included in the open release PR
+     [#8428](https://github.com/mermaid-js/mermaid/pull/8428) (12.2.0). Upgrade notepad's mermaid
+     when 12.2.0 is published, keeping `layout: 'dagre', theme: 'default', look: 'classic'` if the
+     old look is wanted, and rerun `tests/e2e/notepad-diagrams.spec.ts`.
+2. **sprintf-js 1.1.3, moderate** ([GHSA-hp3w-g68c-fv3c](https://github.com/advisories/GHSA-hp3w-g68c-fv3c)).
+   Path: `electron-builder@26.15.3` → `app-builder-lib@26.15.3` → `@electron/get@3.1.0` →
+   (optional) `global-agent@3.0.0` → `roarr@2.15.4` → `sprintf-js@1.1.3`. Affected `<=1.1.3`, no
+   patched version. A format string with an out-of-range precision throws a `RangeError`.
+   - Not reachable: build-time packaging only, never shipped in the app. `@electron/get` loads
+     `global-agent` only when `ELECTRON_GET_USE_PROXY` is set (`dist/cjs/index.js`, `proxy.js`),
+     and every `global-agent` log call passes a literal message with no precision specifier
+     (`grep -rhE "^\s*\}, '|log\.\w+\('" node_modules/global-agent/dist`).
+   - No stable upgrade: `@electron/get` 5.x drops `global-agent`, and `global-agent` 4.x drops
+     `roarr`, but `app-builder-lib` 26.15.3 (`latest`) and 26.17.0 (`v26` tag) both declare
+     `@electron/get: ^3.0.0` (`npm view app-builder-lib@26.17.0 dependencies.@electron/get`). Only
+     the prerelease `27.0.0-alpha.10` (`next`) moves to `^5.0.0`. Move to electron-builder 27 once it
+     is released as stable ([releases](https://github.com/electron-userland/electron-builder/releases)).
+
 ## How to continue
 
 - Node 24 (`.nvmrc`). `npm ci`, then `npm run dev`.

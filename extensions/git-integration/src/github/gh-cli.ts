@@ -68,6 +68,26 @@ export function stateForSearch(query: string): { state: SearchState; text: strin
 
 // ─── Co-change affinity (language-agnostic Signal 3) ─────────────────────────
 
+/** The files each commit in `git log --name-only --format=%H` output touched. */
+function filesPerCommit(log: string): string[][] {
+  const commits: string[][] = [[]]
+  for (const line of log.split('\n').map((l) => l.trim())) {
+    if (/^[0-9a-f]{40}$/.test(line)) commits.push([])
+    else if (line) commits[commits.length - 1].push(line)
+  }
+  return commits
+}
+
+/** Records that every pair of `files` changed together. */
+function addPairs(affinity: Map<string, string[]>, files: string[]): void {
+  if (files.length < 2) return
+  for (const a of files) {
+    for (const b of files) {
+      if (a !== b) affinity.set(a, [...(affinity.get(a) ?? []), b])
+    }
+  }
+}
+
 export async function computeCoChangeAffinityFromGit(
   repoRoot: string,
   files: string[]
@@ -77,32 +97,11 @@ export async function computeCoChangeAffinityFromGit(
   try {
     const raw = await runGit(repoRoot, ['log', '--name-only', '--format=%H', '--since=90 days ago'])
     const fileSet = new Set(files)
-    const lines = raw.split('\n')
-    let currentFiles: string[] = []
-
-    const flushCommit = () => {
-      const prFilesInCommit = currentFiles.filter((f) => fileSet.has(f))
-      if (prFilesInCommit.length >= 2) {
-        for (const a of prFilesInCommit) {
-          for (const b of prFilesInCommit) {
-            if (a === b) continue
-            const existing = affinity.get(a) ?? []
-            existing.push(b)
-            affinity.set(a, existing)
-          }
-        }
-      }
-      currentFiles = []
-    }
-
-    for (const line of lines) {
-      if (/^[0-9a-f]{40}$/.test(line.trim())) {
-        flushCommit()
-      } else if (line.trim()) {
-        currentFiles.push(line.trim())
-      }
-    }
-    flushCommit()
+    for (const commit of filesPerCommit(raw))
+      addPairs(
+        affinity,
+        commit.filter((f) => fileSet.has(f))
+      )
   } catch {
     // co-change is best-effort — failures degrade gracefully to Signal 1+2 only
   }

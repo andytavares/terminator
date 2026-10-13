@@ -33,20 +33,20 @@ function run(id: string, status: AgentRun['status']): AgentRun {
   }
 }
 
-describe('review UI store', () => {
-  beforeEach(() => {
-    localStorage.clear()
-    useReviewUiStore.setState({
-      commentVisibility: 'all',
-      agentNotesOn: true,
-      diffRange: 'since',
-      fileListHidden: false,
-      diffViewMode: 'unified',
-      hideFormattingHunks: true,
-    })
-    useReviewUiStore.getState().resetForPr()
+beforeEach(() => {
+  localStorage.clear()
+  useReviewUiStore.setState({
+    commentVisibility: 'all',
+    agentNotesOn: true,
+    diffRange: 'since',
+    fileListHidden: false,
+    diffViewMode: 'unified',
+    hideFormattingHunks: true,
   })
+  useReviewUiStore.getState().resetForPr()
+})
 
+describe('review UI store', () => {
   it('cycles comment visibility all → unresolved → hidden → all and remembers it', () => {
     const s = useReviewUiStore.getState()
     s.cycleCommentVisibility()
@@ -66,7 +66,9 @@ describe('review UI store', () => {
     const saved = JSON.parse(localStorage.getItem(PREFS_KEY)!)
     expect(saved).toMatchObject({ agentNotesOn: false, diffRange: 'whole', fileListHidden: true })
   })
+})
 
+describe('review UI store — defaults both list sorts to newest and remembers a change per list', () => {
   it('defaults both list sorts to newest and remembers a change per list', () => {
     expect(useReviewUiStore.getState()).toMatchObject({
       queueSort: 'newest',
@@ -89,7 +91,9 @@ describe('review UI store', () => {
     const { useReviewUiStore: fresh } = await import('../../src/stores/review-ui.store')
     expect(fresh.getState()).toMatchObject({ queueSort: 'newest', dashboardSort: 'closest' })
   })
+})
 
+describe('review UI store — upserts agent runs newest first without duplicates', () => {
   it('upserts agent runs newest first without duplicates', () => {
     const s = useReviewUiStore.getState()
     s.upsertAgentRun(run('a', 'running'))
@@ -114,7 +118,9 @@ describe('review UI store', () => {
     const saved = JSON.parse(localStorage.getItem(PREFS_KEY)!)
     expect(saved).toMatchObject({ diffViewMode: 'split', hideFormattingHunks: false })
   })
+})
 
+describe('review UI store — loads persisted diffViewMode and hideFormattingHunks from localStorage on module init', () => {
   it('loads persisted diffViewMode and hideFormattingHunks from localStorage on module init', async () => {
     localStorage.setItem(
       PREFS_KEY,
@@ -137,7 +143,9 @@ describe('review UI store', () => {
       hideFormattingHunks: true,
     })
   })
+})
 
+describe('review UI store — resetForPr clears per-PR state but keeps preferences', () => {
   it('resetForPr clears per-PR state but keeps preferences', () => {
     const s = useReviewUiStore.getState()
     s.setCommentVisibility('hidden')

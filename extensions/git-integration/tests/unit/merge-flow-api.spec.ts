@@ -24,7 +24,14 @@ describe('mergeFlowAPI bridge', () => {
 
   it('resolveConflict calls correct channel with all args', async () => {
     const { mergeFlowAPI } = await import('../../src/api/merge-flow')
-    await mergeFlowAPI.resolveConflict('/repo', 'src/foo.ts#0', 'resolved', 'ours', 'prev', 'orig')
+    await mergeFlowAPI.resolveConflict({
+      repoRoot: '/repo',
+      blockId: 'src/foo.ts#0',
+      resolvedText: 'resolved',
+      strategy: 'ours',
+      currentResolvedText: 'prev',
+      originalConflictText: 'orig',
+    })
     expect(mockInvoke).toHaveBeenCalledWith('git:resolve-conflict', {
       repoRoot: '/repo',
       blockId: 'src/foo.ts#0',
@@ -34,10 +41,17 @@ describe('mergeFlowAPI bridge', () => {
       originalConflictText: 'orig',
     })
   })
+})
 
+describe('mergeFlowAPI bridge — resolveConflict calls correct channel without optional args', () => {
   it('resolveConflict calls correct channel without optional args', async () => {
     const { mergeFlowAPI } = await import('../../src/api/merge-flow')
-    await mergeFlowAPI.resolveConflict('/repo', 'src/foo.ts#0', 'resolved', 'theirs')
+    await mergeFlowAPI.resolveConflict({
+      repoRoot: '/repo',
+      blockId: 'src/foo.ts#0',
+      resolvedText: 'resolved',
+      strategy: 'theirs',
+    })
     expect(mockInvoke).toHaveBeenCalledWith('git:resolve-conflict', {
       repoRoot: '/repo',
       blockId: 'src/foo.ts#0',
@@ -47,10 +61,17 @@ describe('mergeFlowAPI bridge', () => {
       originalConflictText: undefined,
     })
   })
+})
 
+describe('mergeFlowAPI bridge — resolveConflict calls correct channel without optional args — undoResolve calls correct channel', () => {
   it('undoResolve calls correct channel', async () => {
     const { mergeFlowAPI } = await import('../../src/api/merge-flow')
-    await mergeFlowAPI.undoResolve('/repo', 'src/foo.ts#0', 'resolved', 'original')
+    await mergeFlowAPI.undoResolve({
+      repoRoot: '/repo',
+      blockId: 'src/foo.ts#0',
+      resolvedText: 'resolved',
+      originalConflictText: 'original',
+    })
     expect(mockInvoke).toHaveBeenCalledWith('git:undo-resolve', {
       repoRoot: '/repo',
       blockId: 'src/foo.ts#0',
@@ -58,7 +79,9 @@ describe('mergeFlowAPI bridge', () => {
       originalConflictText: 'original',
     })
   })
+})
 
+describe('mergeFlowAPI bridge — mergeCommit calls correct channel', () => {
   it('mergeCommit calls correct channel', async () => {
     const { mergeFlowAPI } = await import('../../src/api/merge-flow')
     await mergeFlowAPI.mergeCommit('/repo', ['src/foo.ts', 'src/bar.ts'], 'Merge conflict resolved')
@@ -74,7 +97,9 @@ describe('mergeFlowAPI bridge', () => {
     await mergeFlowAPI.restoreSession('/repo')
     expect(mockInvoke).toHaveBeenCalledWith('git:session-restore', { repoRoot: '/repo' })
   })
+})
 
+describe('mergeFlowAPI bridge — persistSession calls correct channel', () => {
   it('persistSession calls correct channel', async () => {
     const { mergeFlowAPI } = await import('../../src/api/merge-flow')
     const session = {
@@ -97,7 +122,9 @@ describe('mergeFlowAPI bridge', () => {
     await mergeFlowAPI.clearSession('/repo')
     expect(mockInvoke).toHaveBeenCalledWith('git:session-clear', { repoRoot: '/repo' })
   })
+})
 
+describe('mergeFlowAPI bridge — resetSession calls correct channel', () => {
   it('resetSession calls correct channel', async () => {
     const { mergeFlowAPI } = await import('../../src/api/merge-flow')
     const files = [{ filePath: 'src/foo.ts' }, { filePath: 'src/bar.ts' }]
@@ -107,7 +134,12 @@ describe('mergeFlowAPI bridge', () => {
 
   it('preparePrWorktree calls correct channel', async () => {
     const { mergeFlowAPI } = await import('../../src/api/merge-flow')
-    await mergeFlowAPI.preparePrWorktree('/repo', '/tmp/wt', 'feature/branch', 'main')
+    await mergeFlowAPI.preparePrWorktree({
+      repoRoot: '/repo',
+      worktreePath: '/tmp/wt',
+      headRefName: 'feature/branch',
+      baseRefName: 'main',
+    })
     expect(mockInvoke).toHaveBeenCalledWith('git:prepare-pr-worktree', {
       repoRoot: '/repo',
       worktreePath: '/tmp/wt',

@@ -51,7 +51,9 @@ describe('langFromBlockId', () => {
   it('maps .rs extension to rust', () => {
     expect(langFromBlockId('src/foo.rs#0')).toBe('rust')
   })
+})
 
+describe('langFromBlockId — data files, Dockerfiles and unknown names', () => {
   it('maps .json extension to json', () => {
     expect(langFromBlockId('config/settings.json#0')).toBe('json')
   })
@@ -101,7 +103,9 @@ describe('highlightBlock', () => {
     expect(mockHighlightAuto).toHaveBeenCalled()
     expect(result).toBe('<auto>')
   })
+})
 
+describe('highlightBlock — returns escaped html when hljs throws', () => {
   it('returns escaped html when hljs throws', () => {
     mockHighlight.mockImplementation(() => {
       throw new Error('hljs error')
@@ -126,7 +130,9 @@ describe('highlightLine', () => {
     expect(mockHighlight).toHaveBeenCalledWith('const x = 1', { language: 'typescript' })
     expect(result).toBe('<highlighted>')
   })
+})
 
+describe('highlightLine — fallbacks', () => {
   it('returns escaped html when no lang provided', () => {
     const result = highlightLine('const x = 1')
     expect(result).toBe('const x = 1')

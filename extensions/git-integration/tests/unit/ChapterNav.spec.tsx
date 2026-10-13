@@ -59,7 +59,9 @@ describe('ChapterNav', () => {
     fireEvent.click(screen.getByText('Tests'))
     expect(mockSetCurrentChapter).toHaveBeenCalledWith('c2')
   })
+})
 
+describe('ChapterNav — marks active chapter with aria-selected=true', () => {
   it('marks active chapter with aria-selected=true', () => {
     setupStore({ currentChapterId: 'c1', viewedFiles: new Set<string>() })
     const chapters = [makeChapter('c1', 'Core'), makeChapter('c2', 'Tests')]
@@ -82,7 +84,9 @@ describe('ChapterNav', () => {
     expect(screen.getByText('2 files · 5m')).toBeTruthy()
     expect(screen.getByText('1 file · 5m')).toBeTruthy()
   })
+})
 
+describe('ChapterNav — renders tablist with correct aria-label', () => {
   it('renders tablist with correct aria-label', () => {
     const chapters = [makeChapter('c1', 'Core'), makeChapter('c2', 'Tests')]
     render(<ChapterNav chapters={chapters} />)
@@ -99,55 +103,57 @@ describe('ChapterNav', () => {
     expect(screen.getByRole('tab', { name: 'Core, 1 file, viewed' })).toBeTruthy()
     expect(screen.getByRole('tab', { name: 'Tests, 2 files' })).toBeTruthy()
   })
+})
 
-  describe('keyboard model', () => {
-    const three = [makeChapter('c1', 'Core'), makeChapter('c2', 'Tests'), makeChapter('c3', 'Docs')]
+const three = [makeChapter('c1', 'Core'), makeChapter('c2', 'Tests'), makeChapter('c3', 'Docs')]
 
-    it('gives tabIndex 0 only to the active tab, falling back to the first chapter', () => {
-      const { unmount } = render(<ChapterNav chapters={three} />)
-      expect(screen.getAllByRole('tab').map((t) => t.tabIndex)).toEqual([0, -1, -1])
-      unmount()
-      setupStore({ currentChapterId: 'c2' })
-      render(<ChapterNav chapters={three} />)
-      expect(screen.getAllByRole('tab').map((t) => t.tabIndex)).toEqual([-1, 0, -1])
-    })
+describe('ChapterNav (continued) — keyboard model', () => {
+  it('gives tabIndex 0 only to the active tab, falling back to the first chapter', () => {
+    const { unmount } = render(<ChapterNav chapters={three} />)
+    expect(screen.getAllByRole('tab').map((t) => t.tabIndex)).toEqual([0, -1, -1])
+    unmount()
+    setupStore({ currentChapterId: 'c2' })
+    render(<ChapterNav chapters={three} />)
+    expect(screen.getAllByRole('tab').map((t) => t.tabIndex)).toEqual([-1, 0, -1])
+  })
 
-    it('declares a vertical tablist', () => {
-      render(<ChapterNav chapters={three} />)
-      expect(screen.getByRole('tablist').getAttribute('aria-orientation')).toBe('vertical')
-    })
+  it('declares a vertical tablist', () => {
+    render(<ChapterNav chapters={three} />)
+    expect(screen.getByRole('tablist').getAttribute('aria-orientation')).toBe('vertical')
+  })
 
-    it('ArrowDown focuses and activates the next tab', () => {
-      const onSelect = vi.fn()
-      render(<ChapterNav chapters={three} onSelectChapter={onSelect} />)
-      const tabs = screen.getAllByRole('tab')
-      tabs[0].focus()
-      fireEvent.keyDown(tabs[0], { key: 'ArrowDown' })
-      expect(document.activeElement).toBe(tabs[1])
-      expect(mockSetCurrentChapter).toHaveBeenCalledWith('c2')
-      expect(onSelect).toHaveBeenCalledWith('c2')
-    })
+  it('ArrowDown focuses and activates the next tab', () => {
+    const onSelect = vi.fn()
+    render(<ChapterNav chapters={three} onSelectChapter={onSelect} />)
+    const tabs = screen.getAllByRole('tab')
+    tabs[0].focus()
+    fireEvent.keyDown(tabs[0], { key: 'ArrowDown' })
+    expect(document.activeElement).toBe(tabs[1])
+    expect(mockSetCurrentChapter).toHaveBeenCalledWith('c2')
+    expect(onSelect).toHaveBeenCalledWith('c2')
+  })
+})
 
-    it('ArrowDown wraps from last to first and ArrowUp wraps from first to last', () => {
-      render(<ChapterNav chapters={three} />)
-      const tabs = screen.getAllByRole('tab')
-      tabs[2].focus()
-      fireEvent.keyDown(tabs[2], { key: 'ArrowDown' })
-      expect(document.activeElement).toBe(tabs[0])
-      fireEvent.keyDown(tabs[0], { key: 'ArrowUp' })
-      expect(document.activeElement).toBe(tabs[2])
-      expect(mockSetCurrentChapter).toHaveBeenLastCalledWith('c3')
-    })
+describe('ChapterNav (continued) — keyboard model — ArrowDown wraps from last to first and ArrowUp wraps from first to last', () => {
+  it('ArrowDown wraps from last to first and ArrowUp wraps from first to last', () => {
+    render(<ChapterNav chapters={three} />)
+    const tabs = screen.getAllByRole('tab')
+    tabs[2].focus()
+    fireEvent.keyDown(tabs[2], { key: 'ArrowDown' })
+    expect(document.activeElement).toBe(tabs[0])
+    fireEvent.keyDown(tabs[0], { key: 'ArrowUp' })
+    expect(document.activeElement).toBe(tabs[2])
+    expect(mockSetCurrentChapter).toHaveBeenLastCalledWith('c3')
+  })
 
-    it('Home and End go to the first and last tab', () => {
-      render(<ChapterNav chapters={three} />)
-      const tabs = screen.getAllByRole('tab')
-      tabs[1].focus()
-      fireEvent.keyDown(tabs[1], { key: 'End' })
-      expect(document.activeElement).toBe(tabs[2])
-      fireEvent.keyDown(tabs[2], { key: 'Home' })
-      expect(document.activeElement).toBe(tabs[0])
-      expect(mockSetCurrentChapter).toHaveBeenLastCalledWith('c1')
-    })
+  it('Home and End go to the first and last tab', () => {
+    render(<ChapterNav chapters={three} />)
+    const tabs = screen.getAllByRole('tab')
+    tabs[1].focus()
+    fireEvent.keyDown(tabs[1], { key: 'End' })
+    expect(document.activeElement).toBe(tabs[2])
+    fireEvent.keyDown(tabs[2], { key: 'Home' })
+    expect(document.activeElement).toBe(tabs[0])
+    expect(mockSetCurrentChapter).toHaveBeenLastCalledWith('c1')
   })
 })

@@ -1,5 +1,6 @@
 import React from 'react'
 import type { RiskScore } from '../../schemas/pr-review.schema'
+import { choose, plural } from '../text'
 
 interface Props {
   riskScore: RiskScore
@@ -23,156 +24,173 @@ interface Chip {
   status: 'pass' | 'warn' | 'fail' | 'unknown'
 }
 
-export function HealthChips({
-  riskScore,
-  ciStatus,
-  lintStatus,
-  coverageStatus,
-  dryViolationCount,
-}: Props) {
-  const { metrics } = riskScore
+type Status = Chip['status']
+type Metrics = RiskScore['metrics']
 
-  const ciChipStatus: Chip['status'] =
-    ciStatus === 'passing'
-      ? 'pass'
-      : ciStatus === 'failing'
-        ? 'fail'
-        : ciStatus === 'pending'
-          ? 'warn'
-          : 'unknown'
+/** 'pass' up to `passMax`, 'warn' up to `warnMax`, 'fail' above; 'unknown' when not measured. */
+function bandStatus(value: number | null | undefined, passMax: number, warnMax: number): Status {
+  if (value == null) return 'unknown'
+  if (value <= passMax) return 'pass'
+  if (value <= warnMax) return 'warn'
+  return 'fail'
+}
 
-  const ciChipValue =
-    ciStatus === 'passing'
-      ? 'passing'
-      : ciStatus === 'failing'
-        ? 'failing'
-        : ciStatus === 'pending'
-          ? 'pending'
-          : null
+const CI_STATUS = new Map<string, Status>([
+  ['passing', 'pass'],
+  ['failing', 'fail'],
+  ['pending', 'warn'],
+])
 
-  // Prefer per-file coverage from metrics, fall back to PR-level coverageStatus
+const LINT_VALUE = new Map<string, string>([
+  ['pass', 'clean'],
+  ['fail', 'errors'],
+  ['warn', 'warnings'],
+])
+
+function testsChip(metrics: Metrics): Chip {
+  const present = metrics.testFilePresent
+  const known = present != null
+  return {
+    label: 'Tests',
+    tooltip: 'Whether a test file exists alongside this changed file.',
+    value: choose(known, choose(present, 'present', 'missing'), null),
+    status: choose<Status>(known, choose<Status>(present, 'pass', 'fail'), 'unknown'),
+  }
+}
+
+function signedDelta(delta: number | null): string | null {
+  if (delta == null) return null
+  if (delta === 0) return '±0'
+  if (delta > 0) return `+${delta}`
+  return `${delta}`
+}
+
+function complexityStatus(delta: number | null): Status {
+  if (delta == null) return 'unknown'
+  if (delta <= 0) return 'pass'
+  if (delta < 5) return 'warn'
+  return 'fail'
+}
+
+function complexityChip(metrics: Metrics): Chip {
+  return {
+    label: 'Complexity',
+    tooltip:
+      'Cyclomatic complexity delta — how much more complex this file became after the change. ≤0=pass, <5=warn, ≥5=fail.',
+    value: signedDelta(metrics.complexityDelta),
+    status: complexityStatus(metrics.complexityDelta),
+  }
+}
+
+function coverageStatusOf(covPct: number | null, fallback: Props['coverageStatus']): Status {
+  if (covPct == null) return fallback ?? 'unknown'
+  if (covPct >= 80) return 'pass'
+  if (covPct >= 50) return 'warn'
+  return 'fail'
+}
+
+/** Per-file coverage from the metrics, falling back to the PR-level coverage status. */
+function coverageChip(metrics: Metrics, coverageStatus: Props['coverageStatus']): Chip {
   const covPct = metrics.patchCoverage
-  const covStatus: Chip['status'] =
-    covPct != null
-      ? covPct >= 80
-        ? 'pass'
-        : covPct >= 50
-          ? 'warn'
-          : 'fail'
-      : (coverageStatus ?? 'unknown')
-  const covValue = covPct != null ? `${covPct}%` : null
+  return {
+    label: 'Coverage',
+    tooltip:
+      'Patch coverage — percentage of changed lines covered by tests. ≥80%=pass, ≥50%=warn, <50%=fail.',
+    value: choose(covPct != null, `${covPct}%`, null),
+    status: coverageStatusOf(covPct, coverageStatus),
+  }
+}
 
-  const chips: Chip[] = [
-    {
-      label: 'Tests',
-      tooltip: 'Whether a test file exists alongside this changed file.',
-      value:
-        metrics.testFilePresent == null ? null : metrics.testFilePresent ? 'present' : 'missing',
-      status:
-        metrics.testFilePresent == null ? 'unknown' : metrics.testFilePresent ? 'pass' : 'fail',
-    },
-    {
-      label: 'Complexity',
-      tooltip:
-        'Cyclomatic complexity delta — how much more complex this file became after the change. ≤0=pass, <5=warn, ≥5=fail.',
-      value:
-        metrics.complexityDelta == null
-          ? null
-          : metrics.complexityDelta === 0
-            ? '±0'
-            : metrics.complexityDelta > 0
-              ? `+${metrics.complexityDelta}`
-              : `${metrics.complexityDelta}`,
-      status:
-        metrics.complexityDelta == null
-          ? 'unknown'
-          : metrics.complexityDelta <= 0
-            ? 'pass'
-            : metrics.complexityDelta < 5
-              ? 'warn'
-              : 'fail',
-    },
-    {
-      label: 'Coverage',
-      tooltip:
-        'Patch coverage — percentage of changed lines covered by tests. ≥80%=pass, ≥50%=warn, <50%=fail.',
-      value: covValue,
-      status: covStatus,
-    },
-    {
-      label: 'Lint',
-      tooltip: 'Lint status for this file — whether the linter reports errors or warnings.',
-      value:
-        lintStatus === 'pass'
-          ? 'clean'
-          : lintStatus === 'fail'
-            ? 'errors'
-            : lintStatus === 'warn'
-              ? 'warnings'
-              : null,
-      status: lintStatus ?? 'unknown',
-    },
-    {
-      label: 'CI',
-      tooltip: 'Continuous integration pipeline status for this PR.',
-      value: ciChipValue,
-      status: ciChipStatus,
-    },
-    {
-      label: 'Churn',
-      tooltip:
-        'File churn rate — how many times this file was changed in the last 90 days. ≤5=pass, ≤20=warn, >20=fail.',
-      value: metrics.churn90d == null ? null : `${metrics.churn90d}x/90d`,
-      status:
-        metrics.churn90d == null
-          ? 'unknown'
-          : metrics.churn90d <= 5
-            ? 'pass'
-            : metrics.churn90d <= 20
-              ? 'warn'
-              : 'fail',
-    },
-    {
-      label: 'Blast',
-      tooltip:
-        'Blast radius — number of other files that import this file. ≤5=pass, ≤30=warn, >30=fail.',
-      value: metrics.blastRadius == null ? null : `${metrics.blastRadius} importers`,
-      status:
-        metrics.blastRadius == null
-          ? 'unknown'
-          : metrics.blastRadius <= 5
-            ? 'pass'
-            : metrics.blastRadius <= 30
-              ? 'warn'
-              : 'fail',
-    },
-    {
-      label: 'Duplication',
-      tooltip:
-        'Duplicate code detection — similar blocks found in multiple files in this PR. 0=pass, warn if violations found.',
-      value:
-        dryViolationCount == null
-          ? null
-          : dryViolationCount === 0
-            ? 'clean'
-            : `${dryViolationCount} dup${dryViolationCount !== 1 ? 's' : ''}`,
-      status: dryViolationCount == null ? 'unknown' : dryViolationCount === 0 ? 'pass' : 'warn',
-    },
+function lintChip(lintStatus: Props['lintStatus']): Chip {
+  return {
+    label: 'Lint',
+    tooltip: 'Lint status for this file — whether the linter reports errors or warnings.',
+    value: LINT_VALUE.get(lintStatus ?? '') ?? null,
+    status: lintStatus ?? 'unknown',
+  }
+}
+
+function ciChip(ciStatus: Props['ciStatus']): Chip {
+  const status = CI_STATUS.get(ciStatus ?? '') ?? 'unknown'
+  return {
+    label: 'CI',
+    tooltip: 'Continuous integration pipeline status for this PR.',
+    value: choose(status !== 'unknown', ciStatus ?? null, null),
+    status,
+  }
+}
+
+function churnChip(metrics: Metrics): Chip {
+  const churn = metrics.churn90d
+  return {
+    label: 'Churn',
+    tooltip:
+      'File churn rate — how many times this file was changed in the last 90 days. ≤5=pass, ≤20=warn, >20=fail.',
+    value: choose(churn != null, `${churn}x/90d`, null),
+    status: bandStatus(churn, 5, 20),
+  }
+}
+
+function blastChip(metrics: Metrics): Chip {
+  const blast = metrics.blastRadius
+  return {
+    label: 'Blast',
+    tooltip:
+      'Blast radius — number of other files that import this file. ≤5=pass, ≤30=warn, >30=fail.',
+    value: choose(blast != null, `${blast} importers`, null),
+    status: bandStatus(blast, 5, 30),
+  }
+}
+
+function duplicationValue(count: number | undefined): string | null {
+  if (count == null) return null
+  if (count === 0) return 'clean'
+  return `${count} ${plural(count, 'dup')}`
+}
+
+function duplicationChip(count: number | undefined): Chip {
+  return {
+    label: 'Duplication',
+    tooltip:
+      'Duplicate code detection — similar blocks found in multiple files in this PR. 0=pass, warn if violations found.',
+    value: duplicationValue(count),
+    status: bandStatus(count, 0, Infinity),
+  }
+}
+
+function healthChips(props: Props): Chip[] {
+  const { metrics } = props.riskScore
+  return [
+    testsChip(metrics),
+    complexityChip(metrics),
+    coverageChip(metrics, props.coverageStatus),
+    lintChip(props.lintStatus),
+    ciChip(props.ciStatus),
+    churnChip(metrics),
+    blastChip(metrics),
+    duplicationChip(props.dryViolationCount),
   ]
+}
 
-  const orderedChips = [...chips].sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status])
+function chipText(chip: Chip): string {
+  if (chip.status === 'unknown') return 'unknown'
+  return chip.value ?? 'unknown'
+}
+
+export function HealthChips(props: Props) {
+  const ordered = healthChips(props).sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status])
   return (
     <div className="health-list" aria-label="File health signals">
       <h3 className="health-list-title">Health</h3>
       <dl>
-        {orderedChips.map((chip) => (
+        {ordered.map((chip) => (
           <div key={chip.label} className="health-list-row" title={chip.tooltip}>
             <dt className="health-list-label">{chip.label}</dt>
             <dd
               className={`health-list-value health-list-value--${chip.status}`}
               data-status={chip.status}
             >
-              {chip.status === 'unknown' ? 'unknown' : (chip.value ?? 'unknown')}
+              {chipText(chip)}
             </dd>
           </div>
         ))}

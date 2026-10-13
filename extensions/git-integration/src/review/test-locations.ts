@@ -1,4 +1,5 @@
 import { analyseSnippet, symbolFromHunkHeader } from './symbols.js'
+import type { PrHead } from '../schemas/pr-review.schema.js'
 
 type RunGit = (cwd: string, args: string[]) => Promise<string>
 
@@ -40,21 +41,20 @@ function parseGrepLine(line: string, prefix: string, names: string[]): TestLocat
   return { path: match[1], line: Number(match[2]), symbol, text }
 }
 
-/**
- * Every line of a test file that mentions one of `symbols`, searched at the
- * PR's head commit so tests added by the PR are found. Falls back to the
- * checkout when that commit has not been fetched.
- */
-export async function findTestLocations(
-  repoRoot: string,
-  headSHA: string,
-  symbols: string[],
+/** The grep output for `names` and the prefix git puts on each line of it. */
+interface GrepResult {
+  out: string
+  prefix: string
+}
+
+/** Greps the test files at `headSHA`, or the checkout when that commit has not been fetched. */
+async function grepAtHeadOrCheckout(
+  head: Pick<PrHead, 'repoRoot' | 'headSHA'>,
+  names: string[],
   runGit: RunGit
-): Promise<TestLocation[]> {
-  const names = symbols.filter((s) => IDENTIFIER.test(s))
-  if (names.length === 0 || repoRoot.startsWith('gh:')) return []
+): Promise<GrepResult | null> {
   const grep = (rev: string | null) =>
-    runGit(repoRoot, [
+    runGit(head.repoRoot, [
       'grep',
       '-n',
       '-w',
@@ -64,23 +64,33 @@ export async function findTestLocations(
       '--',
       ...TEST_PATHSPECS,
     ])
-  let out: string
-  let prefix = ''
   try {
-    out = await grep(headSHA)
-    prefix = `${headSHA}:`
+    return { out: await grep(head.headSHA), prefix: `${head.headSHA}:` }
   } catch (e) {
     // git grep exits 1 when nothing matches; anything else means the commit is not here.
-    if ((e as { code?: number }).code === 1) return []
-    try {
-      out = await grep(null)
-    } catch {
-      return []
-    }
+    if ((e as { code?: number }).code === 1) return null
   }
+  try {
+    return { out: await grep(null), prefix: '' }
+  } catch {
+    return null
+  }
+}
+
+/** Every test-file line mentioning one of `symbols`, searched at the PR's head commit so
+ * tests the PR adds are found; the checkout when that commit has not been fetched. */
+export async function findTestLocations(
+  head: Pick<PrHead, 'repoRoot' | 'headSHA'>,
+  symbols: string[],
+  runGit: RunGit
+): Promise<TestLocation[]> {
+  const names = symbols.filter((s) => IDENTIFIER.test(s))
+  if (names.length === 0 || head.repoRoot.startsWith('gh:')) return []
+  const grepped = await grepAtHeadOrCheckout(head, names, runGit)
+  if (!grepped) return []
   const locations: TestLocation[] = []
-  for (const line of out.split('\n')) {
-    const loc = parseGrepLine(line, prefix, names)
+  for (const line of grepped.out.split('\n')) {
+    const loc = parseGrepLine(line, grepped.prefix, names)
     if (loc) locations.push(loc)
     if (locations.length === MAX_LOCATIONS) break
   }

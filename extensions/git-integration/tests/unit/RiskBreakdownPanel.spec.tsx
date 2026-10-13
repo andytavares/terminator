@@ -65,7 +65,9 @@ describe('RiskBreakdownPanel', () => {
     expect(container.querySelector('.risk-composite-score')?.textContent).toBe('60')
     expect(container.querySelector('.risk-composite-max')?.textContent).toBe(' / 100')
   })
+})
 
+describe('RiskBreakdownPanel — does not render composite score when null', () => {
   it('does not render composite score when null', () => {
     render(
       <RiskBreakdownPanel
@@ -88,7 +90,9 @@ describe('RiskBreakdownPanel', () => {
     expect(screen.getByText('Patch coverage')).toBeTruthy()
     expect(screen.getByText('Test file')).toBeTruthy()
   })
+})
 
+describe('RiskBreakdownPanel — shows ? for unknown metric values', () => {
   it('shows "?" for unknown metric values', () => {
     const riskScore = makeRiskScore()
     riskScore.metrics.churn90d = null
@@ -114,7 +118,9 @@ describe('RiskBreakdownPanel', () => {
     expect(screen.getByText('bar.ts')).toBeTruthy()
     expect(screen.getByText('baz.ts')).toBeTruthy()
   })
+})
 
+describe('RiskBreakdownPanel — calls openPath when importer is clicked', () => {
   it('calls openPath when importer is clicked', () => {
     const riskScore = makeRiskScore({ topImporters: ['src/bar.ts'], importerCount: 1 })
     render(<RiskBreakdownPanel filePath="src/foo.ts" riskScore={riskScore} repoRoot="/repo" />)
@@ -137,7 +143,9 @@ describe('RiskBreakdownPanel', () => {
     expect(screen.getByText('f.ts')).toBeTruthy()
     expect(screen.getByText('Collapse')).toBeTruthy()
   })
+})
 
+describe('RiskBreakdownPanel — shows test file as present when testFilePresent is true', () => {
   it('shows test file as present when testFilePresent is true', () => {
     render(
       <RiskBreakdownPanel filePath="src/foo.ts" riskScore={makeRiskScore()} repoRoot="/repo" />

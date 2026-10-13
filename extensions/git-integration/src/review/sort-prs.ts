@@ -20,7 +20,8 @@ export function mergeReadiness(pr: SortablePr): number {
   const approved = pr.reviewDecision === 'approved' || (pr.approvalCount ?? 0) > 0
   if (!approved) return 2
   const ciClear = pr.ciStatus === 'passing' || pr.ciStatus === 'none'
-  return ciClear && pr.mergeStateStatus !== 'dirty' ? 0 : 1
+  if (!ciClear || pr.mergeStateStatus === 'dirty') return 1
+  return 0
 }
 
 const hasSession = (pr: SortablePr) =>
