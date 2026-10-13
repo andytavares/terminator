@@ -29,57 +29,52 @@ function mergeOne(existing: Signal, items: readonly SensedItem[], now: string): 
   return { ...existing, evidence, occurrences, lastSeen: now }
 }
 
-export function mergeSensed(
-  existing: readonly Signal[],
-  sensor: { id: string; severity: Severity },
-  items: readonly SensedItem[],
-  now: string,
-  newId: () => string
-): Signal[] {
+/** What one run of a sensor found, when, and how to name a signal it has not seen before. */
+export interface Sweep {
+  readonly items: readonly SensedItem[]
+  readonly now: string
+  readonly newId: () => string
+}
+
+type SensorOf = { id: string; severity: Severity }
+
+export function mergeSensed(existing: readonly Signal[], sensor: SensorOf, sweep: Sweep): Signal[] {
+  const byKey = groupByKey(sweep.items)
+  const ours = (signal: Signal): boolean => signal.sensorId === sensor.id
+  const merged = existing.map((signal) => {
+    const group = ours(signal) ? byKey.get(signal.key) : undefined
+    return group === undefined ? signal : mergeOne(signal, group, sweep.now)
+  })
+  const known = new Set(existing.filter(ours).map((signal) => signal.key))
+  const fresh = [...byKey]
+    .filter(([key]) => !known.has(key))
+    .map(([, group]) => newSignal(sensor, group, sweep))
+  return [...merged, ...fresh]
+}
+
+function groupByKey(items: readonly SensedItem[]): Map<string, SensedItem[]> {
   const byKey = new Map<string, SensedItem[]>()
-  for (const item of items) {
-    const group = byKey.get(item.key)
-    if (group) group.push(item)
-    else byKey.set(item.key, [item])
+  for (const item of items) byKey.set(item.key, [...(byKey.get(item.key) ?? []), item])
+  return byKey
+}
+
+/** A signal for a key this sensor has never raised, from every item that names it. */
+function newSignal(sensor: SensorOf, group: readonly SensedItem[], sweep: Sweep): Signal {
+  const evidenceByUrl = new Map(group.map((item) => [item.evidence.url, item.evidence]))
+  return {
+    id: sweep.newId(),
+    sensorId: sensor.id,
+    key: group[0].key,
+    title: group[0].title,
+    evidence: [...evidenceByUrl.values()],
+    occurrences: evidenceByUrl.size,
+    severity: sensor.severity,
+    firstSeen: sweep.now,
+    lastSeen: sweep.now,
+    status: 'open',
+    dismissedAt: null,
+    orderId: null,
   }
-
-  const result: Signal[] = []
-  const handledKeys = new Set<string>()
-
-  for (const signal of existing) {
-    if (signal.sensorId !== sensor.id) {
-      result.push(signal)
-      continue
-    }
-    const group = byKey.get(signal.key)
-    if (!group) {
-      result.push(signal)
-      continue
-    }
-    handledKeys.add(signal.key)
-    result.push(mergeOne(signal, group, now))
-  }
-
-  for (const [key, group] of byKey) {
-    if (handledKeys.has(key)) continue
-    const evidenceByUrl = new Map(group.map((item) => [item.evidence.url, item.evidence]))
-    result.push({
-      id: newId(),
-      sensorId: sensor.id,
-      key,
-      title: group[0].title,
-      evidence: [...evidenceByUrl.values()],
-      occurrences: evidenceByUrl.size,
-      severity: sensor.severity,
-      firstSeen: now,
-      lastSeen: now,
-      status: 'open',
-      dismissedAt: null,
-      orderId: null,
-    })
-  }
-
-  return result
 }
 
 export function ranked(signals: readonly Signal[]): Signal[] {

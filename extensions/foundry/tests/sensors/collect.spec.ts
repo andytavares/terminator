@@ -232,6 +232,15 @@ function issueProblemsTests() {
     expect(result.problem).toMatch(/gh issue list/)
   })
 
+  it('dates an issue gh gave no update time by when it was sensed', async () => {
+    const [crash] = CRASHES
+    const exec = queuedExec([ok(JSON.stringify([{ ...crash, updatedAt: undefined }]))])
+
+    const result = await collect(issuesSource, deps({ exec }))
+
+    expect(result.items[0].evidence.at).toBe('2026-09-26T00:00:00.000Z')
+  })
+
   it('reports a problem when gh issue list returns output that does not parse', async () => {
     const exec = queuedExec([ok('not json')])
 

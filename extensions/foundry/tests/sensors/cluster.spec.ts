@@ -16,11 +16,21 @@ function item(key: string, url: string, title = 'Flaky test'): SensedItem {
   return { key, title, evidence: evidence(url) }
 }
 
+/** The CI sensor every case merges for. */
+const CI = { id: 'ci', severity: 'medium' as const }
+
+/** One run of the CI sensor at `now`, finding `items`. */
+function sweptAt(now: string, items: SensedItem[]) {
+  return { items, now, newId }
+}
+
 describe('mergeSensed', () => {
   describe('collapsing', collapsingTests)
   describe('duplicates', duplicatesTests)
   describe('distinct keys', distinctKeysTests)
   describe('reopening', reopeningTests)
+  describe('untouched keys', untouchedKeysTests)
+  describe('no recorded count', noRecordedCountTests)
   describe('promoted signals', promotedSignalsTests)
   describe('other sensors', otherSensorsTests)
 })
@@ -31,10 +41,8 @@ function collapsingTests() {
     for (let i = 0; i < 7; i++) {
       signals = mergeSensed(
         signals,
-        { id: 'ci', severity: 'medium' },
-        [item('wf-a', `https://ci/run/${i}`)],
-        '2026-01-01T00:00:00.000Z',
-        newId
+        CI,
+        sweptAt('2026-01-01T00:00:00.000Z', [item('wf-a', `https://ci/run/${i}`)])
       )
     }
     expect(signals).toHaveLength(1)
@@ -48,17 +56,13 @@ function duplicatesTests() {
     let signals: Signal[] = []
     signals = mergeSensed(
       signals,
-      { id: 'ci', severity: 'medium' },
-      [item('wf-a', 'https://ci/run/1')],
-      '2026-01-01T00:00:00.000Z',
-      newId
+      CI,
+      sweptAt('2026-01-01T00:00:00.000Z', [item('wf-a', 'https://ci/run/1')])
     )
     signals = mergeSensed(
       signals,
-      { id: 'ci', severity: 'medium' },
-      [item('wf-a', 'https://ci/run/1')],
-      '2026-01-02T00:00:00.000Z',
-      newId
+      CI,
+      sweptAt('2026-01-02T00:00:00.000Z', [item('wf-a', 'https://ci/run/1')])
     )
     expect(signals).toHaveLength(1)
     expect(signals[0].occurrences).toBe(1)
@@ -70,10 +74,11 @@ function distinctKeysTests() {
   it('creates two signals for two distinct keys', () => {
     const signals = mergeSensed(
       [],
-      { id: 'ci', severity: 'medium' },
-      [item('wf-a', 'https://ci/run/1'), item('wf-b', 'https://ci/run/2')],
-      '2026-01-01T00:00:00.000Z',
-      newId
+      CI,
+      sweptAt('2026-01-01T00:00:00.000Z', [
+        item('wf-a', 'https://ci/run/1'),
+        item('wf-b', 'https://ci/run/2'),
+      ])
     )
     expect(signals).toHaveLength(2)
     expect(signals[0].status).toBe('open')
@@ -84,20 +89,54 @@ function distinctKeysTests() {
   })
 }
 
+function untouchedKeysTests() {
+  it('leaves a signal of this sensor alone when this run saw nothing for its key', () => {
+    const before = mergeSensed(
+      [],
+      CI,
+      sweptAt('2026-01-01T00:00:00.000Z', [item('wf-a', 'https://ci/run/1')])
+    )
+    const after = mergeSensed(
+      before,
+      CI,
+      sweptAt('2026-01-02T00:00:00.000Z', [item('wf-b', 'https://ci/run/2')])
+    )
+    expect(after).toHaveLength(2)
+    expect(after[0]).toBe(before[0])
+    expect(after[1].key).toBe('wf-b')
+  })
+}
+
+function noRecordedCountTests() {
+  it('reopens a dismissed signal with no recorded count on its next new evidence', () => {
+    const [first] = mergeSensed(
+      [],
+      CI,
+      sweptAt('2026-01-01T00:00:00.000Z', [item('wf-a', 'https://ci/run/1')])
+    )
+    const dismissed: Signal = { ...first, status: 'dismissed', dismissedAt: null }
+    const [after] = mergeSensed(
+      [dismissed],
+      CI,
+      sweptAt('2026-01-02T00:00:00.000Z', [item('wf-a', 'https://ci/run/2')])
+    )
+    expect(after.status).toBe('open')
+    expect(after.lastSeen).toBe('2026-01-02T00:00:00.000Z')
+  })
+}
+
+/** Failed runs of workflow wf-a, by run number. */
+function runsOfA(...runs: number[]): SensedItem[] {
+  return runs.map((run) => item('wf-a', `https://ci/run/${run}`))
+}
+
 function reopeningTests() {
   it('reopens a dismissed signal only once occurrences reach ceil(dismissedAt * 1.5)', () => {
     // Build a dismissed signal at occurrences=4 -> dismissedAt=4, reopen threshold=ceil(6)=6
     let signals: Signal[] = mergeSensed(
       [],
-      { id: 'ci', severity: 'medium' },
-      [
-        item('wf-a', 'https://ci/run/1'),
-        item('wf-a', 'https://ci/run/2'),
-        item('wf-a', 'https://ci/run/3'),
-        item('wf-a', 'https://ci/run/4'),
-      ],
-      '2026-01-01T00:00:00.000Z',
-      newId
+      CI,
+      sweptAt('2026-01-01T00:00:00.000Z', runsOfA(1, 2, 3, 4))
     )
     signals = [dismiss(signals[0])]
     expect(signals[0].status).toBe('dismissed')
@@ -106,10 +145,8 @@ function reopeningTests() {
     // occurrences -> 5: stays dismissed
     signals = mergeSensed(
       signals,
-      { id: 'ci', severity: 'medium' },
-      [item('wf-a', 'https://ci/run/5')],
-      '2026-01-02T00:00:00.000Z',
-      newId
+      CI,
+      sweptAt('2026-01-02T00:00:00.000Z', [item('wf-a', 'https://ci/run/5')])
     )
     expect(signals[0].status).toBe('dismissed')
     expect(signals[0].occurrences).toBe(5)
@@ -117,10 +154,8 @@ function reopeningTests() {
     // occurrences -> 6: reopens
     signals = mergeSensed(
       signals,
-      { id: 'ci', severity: 'medium' },
-      [item('wf-a', 'https://ci/run/6')],
-      '2026-01-03T00:00:00.000Z',
-      newId
+      CI,
+      sweptAt('2026-01-03T00:00:00.000Z', [item('wf-a', 'https://ci/run/6')])
     )
     expect(signals[0].status).toBe('open')
     expect(signals[0].dismissedAt).toBeNull()
@@ -132,18 +167,14 @@ function promotedSignalsTests() {
   it('keeps accumulating a promoted signal, staying promoted', () => {
     let signals: Signal[] = mergeSensed(
       [],
-      { id: 'ci', severity: 'medium' },
-      [item('wf-a', 'https://ci/run/1')],
-      '2026-01-01T00:00:00.000Z',
-      newId
+      CI,
+      sweptAt('2026-01-01T00:00:00.000Z', [item('wf-a', 'https://ci/run/1')])
     )
     signals = [promote(signals[0], 'order-1')]
     signals = mergeSensed(
       signals,
-      { id: 'ci', severity: 'medium' },
-      [item('wf-a', 'https://ci/run/2')],
-      '2026-01-02T00:00:00.000Z',
-      newId
+      CI,
+      sweptAt('2026-01-02T00:00:00.000Z', [item('wf-a', 'https://ci/run/2')])
     )
     expect(signals[0].status).toBe('promoted')
     expect(signals[0].orderId).toBe('order-1')
@@ -169,10 +200,8 @@ function otherSensorsTests() {
     }
     const signals = mergeSensed(
       [other],
-      { id: 'ci', severity: 'medium' },
-      [item('wf-a', 'https://ci/run/2')],
-      '2026-01-02T00:00:00.000Z',
-      newId
+      CI,
+      sweptAt('2026-01-02T00:00:00.000Z', [item('wf-a', 'https://ci/run/2')])
     )
     expect(signals).toContainEqual(other)
   })

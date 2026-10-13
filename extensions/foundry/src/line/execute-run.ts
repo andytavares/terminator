@@ -69,7 +69,7 @@ export async function executeRun(api: ExtensionAPI, run: OrderRun): Promise<void
   const { order } = tail
 
   // The issue moves the moment work starts, not when somebody remembers.
-  await writeBack(order, 'started', writeBackDepsFor(tail.root, order, tail.issuesPort))
+  await writeBack(order, { event: 'started' }, writeBackDepsFor(tail.root, order, tail.issuesPort))
 
   const shipDeps = shipDepsFor(tail)
   // The draft opens before the final check, and the check runs while CI does
@@ -137,9 +137,11 @@ function shipDepsFor(tail: RunTail): IntegrateDeps {
     // The ticket moves to In Review when the draft opens, not when the CI
     // watch that follows it ends.
     onDraftOpened: async (pulls) => {
-      await writeBack(order, 'draft_opened', writeBackDepsFor(root, order, tail.issuesPort), {
-        pulls: pulls.map((pull) => ({ repo: pull.repo, url: pull.url })),
-      })
+      await writeBack(
+        order,
+        { event: 'draft_opened', pulls: pulls.map((pull) => ({ repo: pull.repo, url: pull.url })) },
+        writeBackDepsFor(root, order, tail.issuesPort)
+      )
     },
     watchCi: (pulls) => watchCi(tail, pulls),
   }

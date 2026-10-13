@@ -168,7 +168,7 @@ async function moveIssueToDone(
 ): Promise<void> {
   const order = await store.load(orderId)
   if (order !== null) {
-    await writeBack(order, 'merged', writeBackDepsFor(root, order, issuesPortFor(api)))
+    await writeBack(order, { event: 'merged' }, writeBackDepsFor(root, order, issuesPortFor(api)))
   }
 }
 

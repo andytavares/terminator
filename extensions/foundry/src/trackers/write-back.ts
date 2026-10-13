@@ -24,15 +24,16 @@ interface TrackerStateOption {
 }
 
 /** The slice of `ExtensionAPI.issues` this needs. Nothing else is reachable. */
+/** One issue, on one tracker. */
+export interface IssueRef {
+  readonly tracker: string
+  readonly key: string
+}
+
 export interface IssuesPort {
-  comment(tracker: string, key: string, body: string): Promise<void>
-  transition(
-    tracker: string,
-    key: string,
-    intent: TransitionIntent,
-    optionId?: string
-  ): Promise<void>
-  states(tracker: string, key: string): Promise<TrackerStateOption[]>
+  comment(issue: IssueRef, body: string): Promise<void>
+  transition(issue: IssueRef, intent: TransitionIntent, optionId?: string): Promise<void>
+  states(issue: IssueRef): Promise<TrackerStateOption[]>
   supportsTransitions(tracker: string): boolean
 }
 
@@ -100,7 +101,7 @@ export interface CapabilityReport {
 
 const INTENTS: readonly TransitionIntent[] = ['started', 'in_review', 'done']
 
-function sourceIssue(order: WorkOrder): { tracker: string; key: string } | null {
+function sourceIssue(order: WorkOrder): IssueRef | null {
   const { tracker, key } = order.source
   if (tracker === null || key === null || key === '') return null
   return { tracker, key }
@@ -142,7 +143,7 @@ export async function checkCapability(
   // the mapping later.
   let states: TrackerStateOption[]
   try {
-    states = [...(await deps.issues.states(issue.tracker, issue.key))]
+    states = [...(await deps.issues.states(issue))]
   } catch {
     states = []
   }
@@ -155,17 +156,22 @@ export async function checkCapability(
   }
 }
 
+/** One write to the tracker: which, about what, and what to record once it is done. */
+interface Write {
+  readonly write: WriteBackResult['write']
+  readonly subject: string
+  readonly done: string
+}
+
 /**
  * Do one write, retrying a failure and never retrying an unsupported one.
  *
  * Nothing here throws. The caller is the Line, and the Line must not care.
  */
 async function attempt(
-  write: WriteBackResult['write'],
-  subject: string,
+  { write, subject, done }: Write,
   work: () => Promise<void>,
-  deps: WriteBackDeps,
-  done: string
+  deps: WriteBackDeps
 ): Promise<WriteBackResult> {
   for (let n = 1; n <= MAX_ATTEMPTS; n++) {
     try {
@@ -198,9 +204,19 @@ function linkComment(order: WorkOrder, pulls: readonly { repo: string; url: stri
   return lines.join('\n')
 }
 
-export interface WriteBackPayload {
+/** A moment in an order's life worth telling the tracker about. */
+export interface WriteBackMoment {
+  readonly event: WriteBackEvent
   /** The drafts just opened. Only meaningful for `draft_opened`. */
   readonly pulls?: readonly { repo: string; url: string }[]
+}
+
+/** Everything one write-back reads: the order, its issue, the moment, and the tracker. */
+interface WriteBackRun {
+  readonly order: WorkOrder
+  readonly issue: IssueRef
+  readonly moment: WriteBackMoment
+  readonly deps: WriteBackDeps
 }
 
 /**
@@ -212,69 +228,76 @@ export interface WriteBackPayload {
  */
 export async function writeBack(
   order: WorkOrder,
-  event: WriteBackEvent,
-  deps: WriteBackDeps,
-  payload: WriteBackPayload = {}
+  moment: WriteBackMoment,
+  deps: WriteBackDeps
 ): Promise<WriteBackResult[]> {
   const issue = sourceIssue(order)
   if (issue === null) return []
-
-  const enabled = new Set(order.writeBack)
+  const run: WriteBackRun = { order, issue, moment, deps }
   const results: WriteBackResult[] = []
-
-  if (enabled.has('summary_comment') && (event === 'agreed' || event === 'amended')) {
-    results.push(
-      await attempt(
-        'summary_comment',
-        issue.key,
-        () => deps.issues.comment(issue.tracker, issue.key, renderOrder(order)),
-        deps,
-        `the agreed order was commented on ${issue.key}`
-      )
-    )
+  for (const write of [summaryComment, statusMove, prLink]) {
+    const result = await write(run)
+    if (result !== null) results.push(result)
   }
-
-  const intent = INTENT_FOR_EVENT[event]
-  if (enabled.has('status') && intent !== null) {
-    if (!deps.issues.supportsTransitions(issue.tracker)) {
-      // Never emulated. A tracker that cannot move an issue does not get a
-      // comment saying it moved.
-      const reason = `${issue.tracker} cannot be asked to move ${issue.key}, so "${intent}" was not written.`
-      await deps.record('writeback.unsupported', issue.key, reason)
-      results.push({ write: 'status', ok: false, unsupported: true, reason })
-    } else {
-      results.push(
-        await attempt(
-          'status',
-          issue.key,
-          async () => {
-            try {
-              await deps.issues.transition(issue.tracker, issue.key, intent, deps.mapping?.[intent])
-            } catch (error) {
-              throw intent === 'in_review' && deps.mapping?.[intent] === undefined
-                ? withNoReviewState(error, issue.key)
-                : error
-            }
-          },
-          deps,
-          `${issue.key} moved to ${STATE_WORDS[intent]}`
-        )
-      )
-    }
-  }
-
-  const pulls = payload.pulls ?? []
-  if (enabled.has('pr_link') && event === 'draft_opened' && pulls.length > 0) {
-    results.push(
-      await attempt(
-        'pr_link',
-        issue.key,
-        () => deps.issues.comment(issue.tracker, issue.key, linkComment(order, pulls)),
-        deps,
-        `${pulls.length} pull request link${pulls.length === 1 ? '' : 's'} commented on ${issue.key}`
-      )
-    )
-  }
-
   return results
+}
+
+async function summaryComment(run: WriteBackRun): Promise<WriteBackResult | null> {
+  const { order, issue, moment, deps } = run
+  if (!order.writeBack.includes('summary_comment')) return null
+  if (moment.event !== 'agreed' && moment.event !== 'amended') return null
+  return attempt(
+    {
+      write: 'summary_comment',
+      subject: issue.key,
+      done: `the agreed order was commented on ${issue.key}`,
+    },
+    () => deps.issues.comment(issue, renderOrder(order)),
+    deps
+  )
+}
+
+async function statusMove(run: WriteBackRun): Promise<WriteBackResult | null> {
+  const { order, issue, moment, deps } = run
+  const intent = INTENT_FOR_EVENT[moment.event]
+  if (!order.writeBack.includes('status') || intent === null) return null
+  if (!deps.issues.supportsTransitions(issue.tracker)) {
+    // Never emulated. A tracker that cannot move an issue does not get a
+    // comment saying it moved.
+    const reason = `${issue.tracker} cannot be asked to move ${issue.key}, so "${intent}" was not written.`
+    await deps.record('writeback.unsupported', issue.key, reason)
+    return { write: 'status', ok: false, unsupported: true, reason }
+  }
+  return attempt(
+    { write: 'status', subject: issue.key, done: `${issue.key} moved to ${STATE_WORDS[intent]}` },
+    () => moveIssue(run, intent),
+    deps
+  )
+}
+
+async function moveIssue({ issue, deps }: WriteBackRun, intent: TransitionIntent): Promise<void> {
+  const optionId = deps.mapping?.[intent]
+  try {
+    await deps.issues.transition(issue, intent, optionId)
+  } catch (error) {
+    throw intent === 'in_review' && optionId === undefined
+      ? withNoReviewState(error, issue.key)
+      : error
+  }
+}
+
+async function prLink(run: WriteBackRun): Promise<WriteBackResult | null> {
+  const { order, issue, moment, deps } = run
+  const pulls = moment.pulls ?? []
+  if (!order.writeBack.includes('pr_link') || moment.event !== 'draft_opened') return null
+  if (pulls.length === 0) return null
+  return attempt(
+    {
+      write: 'pr_link',
+      subject: issue.key,
+      done: `${pulls.length} pull request link${pulls.length === 1 ? '' : 's'} commented on ${issue.key}`,
+    },
+    () => deps.issues.comment(issue, linkComment(order, pulls)),
+    deps
+  )
 }
