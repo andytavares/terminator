@@ -1,8 +1,7 @@
 import React, { useEffect, useRef } from 'react'
-import { captureFocus } from './focus-trap'
 import { nestedLayerValue } from './layers'
-import { createModalDepthRegistry } from './modal-depth'
 import { useContainingLayer } from './Dialog'
+import { useDismissible } from './useDismissible'
 import './extension-ui.css'
 
 export interface PopoverProps {
@@ -33,62 +32,11 @@ export function Popover({ label, children, onDismiss, className }: PopoverProps)
   const parentLayer = useContainingLayer()
   const zIndex = nestedLayerValue('overlay', parentLayer)
 
-  const dismissRef = useRef(onDismiss)
-  useEffect(() => {
-    dismissRef.current = onDismiss
-  })
-
-  useEffect(() => {
-    const registry = createModalDepthRegistry(window)
-    const release = registry.release()
-    // Focus moves in, but is not trapped: Tab may leave, and that is correct for
-    // a surface the rest of the view is still usable behind.
-    const restoreFocus = ref.current ? captureFocus(ref.current) : () => {}
-
-    function onKeyDown(e: KeyboardEvent): void {
-      if (e.key !== 'Escape') return
-      if (!isInnermostSurface(ref.current)) return
-      e.stopPropagation()
-      dismissRef.current()
-    }
-
-    function onPointerDown(e: MouseEvent): void {
-      if (ref.current && !ref.current.contains(e.target as Node)) dismissRef.current()
-    }
-
-    /**
-     * Keep it on screen.
-     *
-     * The surface is absolutely positioned against whatever the caller
-     * anchored it to, and a control near the right or bottom edge — the caret
-     * beside a commit button, say — puts the panel half outside the view with
-     * no way to scroll to it. Measured after mount and nudged back, because
-     * the overflow depends on the rendered width, which nothing knows in
-     * advance.
-     */
-    const el = ref.current
-    if (el) {
-      const margin = 8
-      const box = el.getBoundingClientRect()
-      const overflowRight = box.right - (window.innerWidth - margin)
-      if (overflowRight > 0) el.style.marginLeft = `${-overflowRight}px`
-      const overflowBottom = box.bottom - (window.innerHeight - margin)
-      if (overflowBottom > 0) el.style.marginTop = `${-overflowBottom}px`
-    }
-
-    document.addEventListener('keydown', onKeyDown)
-    // Deferred a tick: the click that opened this popover is still propagating,
-    // and would otherwise close it immediately.
-    const timer = setTimeout(() => document.addEventListener('mousedown', onPointerDown), 0)
-
-    return () => {
-      clearTimeout(timer)
-      document.removeEventListener('keydown', onKeyDown)
-      document.removeEventListener('mousedown', onPointerDown)
-      restoreFocus()
-      release()
-    }
-  }, [])
+  // Escape, an outside click, the open-surface depth and focus moving in. Focus
+  // is not trapped: Tab may leave, which is correct for a surface the rest of
+  // the view is still usable behind.
+  useDismissible({ ref, onDismiss })
+  useEffect(() => keepOnScreen(ref.current), [])
 
   return (
     <div
@@ -104,9 +52,21 @@ export function Popover({ label, children, onDismiss, className }: PopoverProps)
   )
 }
 
-/** The most recently opened surface, dialog or popover, owns Escape. */
-function isInnermostSurface(el: HTMLElement | null): boolean {
-  if (!el) return false
-  const surfaces = Array.from(document.querySelectorAll('[data-tmui-panel],[data-tmui-surface]'))
-  return surfaces[surfaces.length - 1] === el
+/**
+ * Keep it on screen.
+ *
+ * The surface is absolutely positioned against whatever the caller anchored it
+ * to, and a control near the right or bottom edge — the caret beside a commit
+ * button, say — puts the panel half outside the view with no way to scroll to
+ * it. Measured after mount and nudged back, because the overflow depends on the
+ * rendered width, which nothing knows in advance.
+ */
+function keepOnScreen(el: HTMLElement | null): void {
+  if (!el) return
+  const margin = 8
+  const box = el.getBoundingClientRect()
+  const overflowRight = box.right - (window.innerWidth - margin)
+  if (overflowRight > 0) el.style.marginLeft = `${-overflowRight}px`
+  const overflowBottom = box.bottom - (window.innerHeight - margin)
+  if (overflowBottom > 0) el.style.marginTop = `${-overflowBottom}px`
 }
