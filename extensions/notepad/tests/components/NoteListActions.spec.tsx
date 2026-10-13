@@ -121,10 +121,7 @@ describe('NoteList item context menu', noteListItemContextMenuTests)
 
 type DragKind = 'dragStart' | 'dragOver' | 'drop'
 
-/**
- * jsdom has no DragEvent, so drag events would be plain Events without a
- * pointer position or a DataTransfer. This one carries both.
- */
+/** jsdom has no DragEvent; this one carries a pointer position and a DataTransfer. */
 class TestDragEvent extends MouseEvent {
   dataTransfer = { effectAllowed: '', dropEffect: '' }
 }

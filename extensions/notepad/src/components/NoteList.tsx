@@ -116,10 +116,8 @@ export function NoteList(): React.JSX.Element {
   )
 }
 
-/**
- * Text search runs over IPC (tags are filtered client-side). A newer query
- * supersedes a pending one; clearing the query drops the results at once.
- */
+/** Tags are filtered client-side; text search runs over IPC. A newer query supersedes a pending
+ *  one, and clearing the query drops the results at once. */
 function useSearchResults(searchQuery: string): SearchResult[] | null {
   const [searchResults, setSearchResults] = useState<SearchResult[] | null>(null)
   const [resultsQuery, setResultsQuery] = useState(searchQuery)
@@ -200,11 +198,8 @@ function useDragState() {
   }
 }
 
-/**
- * Reordering by dropping beside an item, moving into a folder by dropping on
- * its header, and out of one by dropping on the list. Rows and headers stop a
- * dragover once handled: the list behind clears every drop target on dragover.
- */
+/** Drop beside an item to reorder, on a folder header to move in, on the list to move out. Rows
+ *  and headers stop a handled dragover: the list behind clears every drop target on dragover. */
 function useListDrag(model: ListModel) {
   const state = useDragState()
   return {

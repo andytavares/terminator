@@ -242,19 +242,9 @@ function useTagEditing(draft: QuickCreateDraft) {
   return { addTag, removeTag, handleTagKeyDown }
 }
 
-/**
- * Escape, focus, and — the part this was missing — a place in the open-surface
- * count that the double-Escape "leave the extension" gesture reads.
- *
- * Without it, the host saw no open modal here. Focus in the composer was
- * saved by the text-field guard, but focus on any button in this overlay was
- * not: two Escapes closed Notepad and took the draft with it. That is the
- * defect this feature exists to fix, and this surface had been missed.
- *
- * `captureEscape` keeps the original reason for the capture-phase listener
- * this replaces: CodeMirror stops propagation before the document sees it.
- * The backdrop owns the outside click.
- */
+/** useDismissible counts this overlay as an open surface, so double-Escape cannot close Notepad
+ *  with the draft in it; `captureEscape` is needed because CodeMirror stops propagation. More:
+ *  README.md, "Why the editor behaves as it does". */
 export function QuickCreateOverlay(): React.JSX.Element | null {
   const showQuickCreate = useNotesStore((s) => s.showQuickCreate)
   const draft = useQuickCreateDraft()

@@ -80,12 +80,8 @@ function useOpenResult(onClose: () => void) {
   )
 }
 
-/**
- * useDismissible gives Escape, focus, and a place in the open-surface count the
- * double-Escape "leave the extension" gesture reads — which this palette was
- * missing, so two Escapes with focus off the input closed Notepad instead of
- * the search. The backdrop owns the outside click.
- */
+/** useDismissible counts this palette as an open surface: without it, two Escapes with focus off
+ *  the input closed Notepad instead of the search. The backdrop owns the outside click. */
 export function SearchOverlay({ onClose }: SearchOverlayProps): React.JSX.Element {
   const surfaceRef = useRef<HTMLDivElement>(null)
   const [query, setQuery] = useState('')

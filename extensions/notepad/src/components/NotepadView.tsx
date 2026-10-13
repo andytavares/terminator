@@ -117,15 +117,9 @@ function EmptyNotepad({ search }: { search: React.ReactNode }): React.JSX.Elemen
   )
 }
 
-/**
- * Cmd+Alt+M toggles the comment margin. Handled here rather than via globalShortcut so it
- * fires only while Terminator is focused and this view is mounted. The chord matches the
- * CommandOrControl+Alt+M accelerator this replaced — keep them in sync so the binding
- * users already know does not silently move.
- *
- * Matched on e.code, not e.key: on macOS Option+M emits the dead-key character 'µ', so an
- * e.key === 'm' comparison never fires while Alt is held. Cmd+Shift+F opens search.
- */
+/** Cmd+Alt+M toggles the comment margin and Cmd+Shift+F opens search, only while this view is
+ *  focused. Matched on e.code, not e.key: macOS Option+M types 'µ'. Why not globalShortcut, and
+ *  why the chord must stay: README.md, "Why the editor behaves as it does". */
 function useNotepadShortcuts(toggles: PanelToggles): void {
   const { setShowComments, setReadingMode, setShowExport, setShowSearch } = toggles
   useEffect(() => {
@@ -159,12 +153,8 @@ function shortcutAction(e: KeyboardEvent): 'comments' | 'search' | null {
   return null
 }
 
-/**
- * Loads the lists on mount. The open-in-window push selects its note. The tab activation is the main
- * process's job and it already does it (index.ts broadcasts
- * extension:activate-global-tab). Calling the core registry from here reached a
- * *copy* of that store bundled into this view, so it moved nothing.
- */
+/** Loads the lists on mount; the open-in-window push selects its note. The main process activates
+ *  the tab: a call to the core registry from here reached a bundled copy and moved nothing. */
 function useListsAndSelectionPush(): void {
   useEffect(() => {
     void loadLibrary()
@@ -239,10 +229,8 @@ function useNoteSession(selectedNoteId: string | null) {
 
 type NoteSession = ReturnType<typeof useNoteSession>
 
-/**
- * Loads the selected note's body and comments, and on leaving a note flushes an
- * unsaved edit. Resolves to the id of the note whose body is in the editor.
- */
+/** Loads the selected note's body and comments, and flushes an unsaved edit on leaving a note.
+ *  Resolves to the id of the note whose body is in the editor. */
 function useOpenNote(noteId: string | null, autosaveTimerRef: TimerRef, activeIdRef: IdRef) {
   const [loadedNoteId, setLoadedNoteId] = useState<string | null>(null)
   const anchorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -275,12 +263,8 @@ interface NoteLoad {
   onLoaded: (noteId: string) => void
 }
 
-/**
- * Reads the body (from the in-session cache when there is one, so content is
- * never lost to a race between a cleanup flush and this read) and the comments,
- * re-anchoring the comments to the body. Does nothing when the note is gone or
- * another note was opened meanwhile.
- */
+/** Reads the body from the in-session cache when there is one, so a cleanup flush cannot race
+ *  this read, then re-anchors the comments to it. Does nothing once another note is open. */
 async function loadNoteAndComments(noteId: string, load: NoteLoad): Promise<void> {
   const { activeIdRef, anchorTimerRef } = load
   const cachedBody = useNotesStore.getState().bodyCache[noteId]
@@ -314,18 +298,13 @@ async function readNoteBody(noteId: string, cachedBody: string | undefined) {
   return (result as { data?: { body: string } }).data
 }
 
-/**
- * Flushes a pending autosave for the note being left. Checks isDirty rather
- * than the timer: if the timer already fired but its save is in flight (or
- * failed), the timer is null while the edit is still unsaved. The body is
- * cached optimistically so navigating back never reads stale DB data, even if
- * this fire-and-forget flush races the next notes.get.
- */
 /** Stops the pending timers, as the view goes away. */
 function clearTimers(timers: TimerRef[]): void {
   for (const timer of timers) if (timer.current) clearTimeout(timer.current)
 }
 
+/** Checks isDirty, not the timer: a fired timer whose save is in flight or failed is null while
+ *  the edit is unsaved. The body is cached so navigating back never reads stale DB data. */
 function flushUnsavedNote(noteId: string, autosaveTimerRef: TimerRef): void {
   const { bodyDraft, isDirty } = useEditorStore.getState()
   if (autosaveTimerRef.current) {
@@ -346,12 +325,8 @@ function flushUnsavedNote(noteId: string, autosaveTimerRef: TimerRef): void {
     .catch((err) => console.error('[notepad] flush autosave failed', err))
 }
 
-/**
- * Adopts bodies saved by another surface (a popped-out note window) so the
- * panel never serves — or re-saves — a stale copy of the same note. A local
- * edit still in flight is newer than the push, so it is left alone: its own
- * save will win and re-broadcast.
- */
+/** Adopts bodies another surface saved, so the panel never serves or re-saves a stale copy. A
+ *  local edit in flight is newer, so it is left alone: its own save wins and re-broadcasts. */
 function useForeignNoteAdoption(activeIdRef: IdRef, editorViewRef: ViewRef): void {
   useEffect(() => {
     return onForeignNoteChange((event) => {

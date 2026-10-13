@@ -84,11 +84,8 @@ function parseScene(sceneJson: string): SceneData {
   }
 }
 
-/**
- * Reads the diagram from the in-session scene cache when it has one, so
- * content is never lost to a race between a cleanup flush and a DB read. Title
- * and tags then come from the always-up-to-date diagrams list.
- */
+/** Reads the in-session scene cache first, so content is never lost to a race between a cleanup
+ *  flush and a DB read. Title and tags then come from the always-current diagrams list. */
 async function readDiagram(diagramId: string): Promise<DiagramRecord | undefined> {
   const { diagramCache, diagrams } = useNotesStore.getState()
   const cachedScene = diagramCache[diagramId]
@@ -210,10 +207,8 @@ interface AutosaveRefs {
   tagsRef: React.MutableRefObject<string[]>
 }
 
-/**
- * Saves the scene once drawing pauses. A scene not yet saved — or whose save
- * failed — is flushed when the diagram closes.
- */
+/** Saves the scene once drawing pauses; a scene not yet saved, or whose save failed, is flushed
+ *  when the diagram closes. */
 function useDiagramAutosave(diagramId: string, doc: DiagramDocument) {
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
   const refs: AutosaveRefs = {
@@ -257,10 +252,8 @@ async function runAutosave(
   }
 }
 
-/**
- * Writes a pending scene when the diagram closes, cached optimistically so
- * navigating back never reads stale DB data.
- */
+/** Writes a pending scene when the diagram closes, cached optimistically so navigating back never
+ *  reads stale DB data. */
 function useFlushOnClose(diagramId: string, refs: AutosaveRefs): void {
   useEffect(() => {
     return () => {
@@ -511,10 +504,7 @@ interface DiagramCanvasProps {
   commenting: DiagramCommentControls
 }
 
-/**
- * The canvas, with the comment pins and popovers over it. In comment mode a
- * transparent overlay captures clicks before Excalidraw sees them.
- */
+/** In comment mode a transparent overlay captures clicks before Excalidraw sees them. */
 function DiagramCanvas(props: DiagramCanvasProps): React.JSX.Element {
   const { diagramId, doc, canvas, commenting } = props
   const { commentMode, pendingPin, setPendingPin } = commenting

@@ -27,10 +27,7 @@ interface CardLayoutOptions {
   panelRef?: PanelRef
 }
 
-/**
- * Re-applies the comment highlights and re-lays out the cards whenever the
- * comments change.
- */
+/** Re-applies the comment highlights and re-lays out the cards whenever the comments change. */
 export function useCommentCards(viewRef: ViewRef, comments: Comment[], options: CardLayoutOptions) {
   const [anchorTops, setAnchorTops] = useState<Record<string, number>>({})
   const [panelContentHeight, setPanelContentHeight] = useState(0)
@@ -111,11 +108,8 @@ export function hoveredAnchor(e: React.MouseEvent<HTMLDivElement>) {
   return anchor && id ? { anchor, id } : null
 }
 
-/**
- * Highlights the stored comments in a freshly mounted view at once, so React
- * Strict Mode's double mount does not leave the second view bare: the anchors
- * effect does not re-run when its dependencies are unchanged.
- */
+/** Highlights at once, so React Strict Mode's double mount does not leave the second view bare:
+ *  the anchors effect does not re-run when its dependencies are unchanged. */
 export function applyStoredAnchors(view: EditorView): void {
   applyAnchors(view, visibleAnchors(useCommentsStore.getState().comments))
 }

@@ -179,17 +179,11 @@ const AutosaveNotePayload = z.object({
   titleSetByHand: z.boolean().optional(),
 })
 
-/**
- * Push channel announcing a saved note body to every open notepad surface.
- * @internal
- */
+/** Push channel announcing a saved note body to every open notepad surface. @internal */
 export const NOTES_CHANGED_CHANNEL = 'terminator.notepad:notes.changed'
 
 type NotesBroadcast = (channel: string, data: unknown) => void
-/**
- * The title to store: one set by hand now or before wins over the one the
- * renderer derived from the body.
- */
+/** A title set by hand, now or before, wins over the one the renderer derived from the body. */
 async function titleToStore(
   tx: ExtensionDB,
   args: z.infer<typeof AutosaveNotePayload>

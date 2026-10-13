@@ -370,10 +370,7 @@ interface DecorationContext {
   onCursorLine: boolean
 }
 
-/**
- * Adds a node's decorations. Returning false skips its children; returning
- * nothing lets the tree walk continue into them.
- */
+/** Adds a node's decorations. Returning false skips its children; nothing lets the walk go on. */
 type NodeDecorator = (node: SyntaxNodeRef, ctx: DecorationContext) => false | void
 
 // focused defaults to true so callers that don't pass it (e.g. tests) get the
@@ -471,18 +468,9 @@ function caretWithin(ctx: DecorationContext, range: TextRange): boolean {
   return !ctx.state.readOnly && ctx.cursorPos >= range.from && ctx.cursorPos <= range.to
 }
 
-/**
- * While the caret is on the opening fence line the user is still typing the
- * ``` and its language, so nothing may render — otherwise the line collapses
- * out from under them mid-keystroke. Deliberately not gated on `focused`: that
- * flag only flips on a focus-change event, so a stale false made a half-typed
- * fence disappear.
- *
- * A fence with no body yet is a block under construction; leaving it raw is
- * what makes it appear only once there is something to show. With the caret in
- * the body, the code is styled but both fences stay visible, so the language
- * stays readable and clickable while editing.
- */
+/** Raw while the caret is on the opening fence or the block has no body yet; with the caret in
+ *  the body both fences stay visible. Not gated on `focused`. Why: README.md, "Why the editor
+ *  behaves as it does". */
 function decorateFencedCode(node: SyntaxNodeRef, ctx: DecorationContext): false {
   const openingLine = ctx.state.doc.lineAt(node.from)
   const codeText = node.node.getChild('CodeText')
@@ -504,13 +492,9 @@ function decorateFencedCode(node: SyntaxNodeRef, ctx: DecorationContext): false 
   return false
 }
 
-/**
- * Opening fence: the line collapses to zero height through a line class, and
- * the fence text is replaced but not its trailing newline (codeText.from - 1),
- * so the code line keeps its own .cm-line element and its line decoration.
- * Closing fence: codeText.to is the newline ending the last code line, so the
- * closing fence line starts at codeText.to + 1.
- */
+/** The opening fence line collapses through a line class, replacing the fence text but not its
+ *  newline (codeText.from - 1), so the first code line keeps its .cm-line; codeText.to is the
+ *  newline ending the last code line, so the closing fence starts at codeText.to + 1. */
 function renderCodeBlock(node: SyntaxNodeRef, ctx: DecorationContext, codeText: TextRange): void {
   const { state, builder } = ctx
   const fenceLine = state.doc.lineAt(node.from)
@@ -524,22 +508,9 @@ function renderCodeBlock(node: SyntaxNodeRef, ctx: DecorationContext, codeText: 
   builder.add(closingLineFrom, node.to, Decoration.replace({}))
 }
 
-/**
- * Rendered as a whole: a table only reads as a grid if every row is replaced at
- * once. Raw pipes come back while the caret is inside, matching how FencedCode
- * behaves.
- *
- * Deliberately not gated on `focused`: that flag only flips on a focus-change
- * event, so a stale false kept the table rendered even with the caret inside
- * it — the caret then had nowhere to land and the table could not be edited at
- * all, by mouse or keyboard.
- *
- * Defensive checks: a Table node always carries a delimiter row, so parseTable
- * should never reject it, and falling through leaves the raw pipes visible
- * rather than throwing inside the state field. A block widget may only replace
- * whole lines; Table nodes do span whole lines, but a mismatch would throw and
- * take the whole editor down, so it falls back to an inline replace.
- */
+/** Rendered whole, since a table reads as a grid only when every row is replaced; raw pipes come
+ *  back while the caret is inside. Why it is not gated on `focused`, and its two fallbacks:
+ *  README.md, "Why the editor behaves as it does". */
 function decorateTable(node: SyntaxNodeRef, ctx: DecorationContext): false {
   if (caretWithin(ctx, node)) return false
   const { state, builder } = ctx
@@ -558,12 +529,8 @@ function decorateTable(node: SyntaxNodeRef, ctx: DecorationContext): false {
   return false
 }
 
-/**
- * GitHub alerts (`> [!NOTE]`) are not a lezer construct — they parse as an
- * ordinary blockquote, so the marker is matched textually here. An ordinary
- * blockquote is left to QuoteMark. Not gated on `focused`, for the same reason
- * as Table above.
- */
+/** GitHub alerts (`> [!NOTE]`) parse as an ordinary blockquote, so the marker is matched as text;
+ *  a plain blockquote is left to QuoteMark. Not gated on `focused`, as with tables. */
 function decorateBlockquote(node: SyntaxNodeRef, ctx: DecorationContext): false | void {
   const firstLine = ctx.state.doc.lineAt(node.from)
   const kind = parseAlertMarker(firstLine.text)
