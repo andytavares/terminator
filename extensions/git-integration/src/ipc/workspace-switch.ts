@@ -2,7 +2,7 @@ import { isAbsolute } from 'path'
 import type { ChannelSpec } from '@terminator/extension-sdk'
 
 /** What a channel answers for a repository whose workspace switched Git Integration off. */
-export const GIT_DISABLED = { error: 'GIT_DISABLED' }
+const GIT_DISABLED = { error: 'GIT_DISABLED' }
 
 /** The repository a payload names: its `repoRoot`, else `path` (git:status), when absolute. */
 function repositoryOf(payload: unknown): string | undefined {
