@@ -308,23 +308,37 @@ const RoleSchema = z.object({
 export type Role = z.infer<typeof RoleSchema>
 
 export function parseRole(text: string, file: string): ParseResult<Role> {
+  const parsed = parseNamedFile(RoleSchema, text, file)
+  if (!parsed.ok) return parsed
+  const bad = badSkillIds(parsed.value.skills)
+  if (bad.length > 0) {
+    return yamlFailure(
+      file,
+      `role "${parsed.value.id}" names skill "${bad[0]}", which is not a valid skill id`
+    )
+  }
+  return parsed
+}
+
+/** A schema for a file named by its `id`. */
+type NamedSchema = z.ZodType<{ id: string }, z.ZodTypeDef, unknown>
+
+/** A role or rule file: YAML at a known version, valid for `schema`, named by its id. */
+function parseNamedFile<S extends NamedSchema>(
+  schema: S,
+  text: string,
+  file: string
+): ParseResult<z.output<S>> {
   const loaded = loadYaml(text, file)
   if (!loaded.ok) return loaded
   const versionProblem = checkVersion(loaded.value, file, RECIPE_SCHEMA_VERSION)
   if (versionProblem !== null) return versionProblem
-
-  const parsed = RoleSchema.safeParse(loaded.value)
-  if (!parsed.success)
+  const parsed = schema.safeParse(loaded.value)
+  if (!parsed.success) {
     return yamlFailure(file, parsed.error.issues.map((i) => i.message).join('; '))
+  }
   if (!idMatchesFile(parsed.data.id, file)) {
     return yamlFailure(file, `declares id "${parsed.data.id}", which does not match the filename`)
-  }
-  const bad = badSkillIds(parsed.data.skills)
-  if (bad.length > 0) {
-    return yamlFailure(
-      file,
-      `role "${parsed.data.id}" names skill "${bad[0]}", which is not a valid skill id`
-    )
   }
   return { ok: true, value: parsed.data }
 }
@@ -350,16 +364,5 @@ const RuleSchema = z.object({
 export type Rule = z.infer<typeof RuleSchema>
 
 export function parseRule(text: string, file: string): ParseResult<Rule> {
-  const loaded = loadYaml(text, file)
-  if (!loaded.ok) return loaded
-  const versionProblem = checkVersion(loaded.value, file, RECIPE_SCHEMA_VERSION)
-  if (versionProblem !== null) return versionProblem
-
-  const parsed = RuleSchema.safeParse(loaded.value)
-  if (!parsed.success)
-    return yamlFailure(file, parsed.error.issues.map((i) => i.message).join('; '))
-  if (!idMatchesFile(parsed.data.id, file)) {
-    return yamlFailure(file, `declares id "${parsed.data.id}", which does not match the filename`)
-  }
-  return { ok: true, value: parsed.data }
+  return parseNamedFile(RuleSchema, text, file)
 }
