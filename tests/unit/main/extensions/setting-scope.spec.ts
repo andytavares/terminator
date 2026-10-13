@@ -42,6 +42,10 @@ describe('workspaceOwning', () => {
     expect(workspaceOwning('/elsewhere', workspaces)).toBeUndefined()
     expect(workspaceOwning('/code/api-old', workspaces)).toBeUndefined()
   })
+
+  it('names the workspace for a folder inside it whose name starts with two dots', () => {
+    expect(workspaceOwning('/code/api/..drafts', workspaces)).toBe('ws-api')
+  })
 })
 
 describe('storedSettingValue', () => {
