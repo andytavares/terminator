@@ -3,7 +3,16 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import React from 'react'
 import { EmptyState } from '../../src/components/EmptyState'
 
-describe('EmptyState', () => {
+describe('EmptyState', emptyStateTests)
+
+function emptyStateTests() {
+  describe('text', emptyStateTextTests)
+  describe('new note', emptyStateNewNoteTests)
+  describe('import', emptyStateImportTests)
+  describe('icon', emptyStateIconTests)
+}
+
+function emptyStateTextTests() {
   it('renders "No notes yet" heading', () => {
     render(<EmptyState />)
     expect(screen.getByText('No notes yet')).toBeDefined()
@@ -18,7 +27,9 @@ describe('EmptyState', () => {
     render(<EmptyState />)
     expect(screen.getByText(/Tip:/i)).toBeDefined()
   })
+}
 
+function emptyStateNewNoteTests() {
   it('renders New note button', () => {
     render(<EmptyState />)
     expect(screen.getByText(/New note/i)).toBeDefined()
@@ -30,7 +41,9 @@ describe('EmptyState', () => {
     fireEvent.click(screen.getByText(/New note/i))
     expect(onNewNote).toHaveBeenCalledOnce()
   })
+}
 
+function emptyStateImportTests() {
   it('renders Import button when onImport is provided', () => {
     render(<EmptyState onImport={vi.fn()} />)
     expect(screen.getByText(/Import a folder/i)).toBeDefined()
@@ -47,9 +60,11 @@ describe('EmptyState', () => {
     fireEvent.click(screen.getByText(/Import a folder/i))
     expect(onImport).toHaveBeenCalledOnce()
   })
+}
 
+function emptyStateIconTests() {
   it('renders pencil icon', () => {
     const { container } = render(<EmptyState />)
     expect(container.querySelector('.notepad-empty-state__icon')).toBeTruthy()
   })
-})
+}

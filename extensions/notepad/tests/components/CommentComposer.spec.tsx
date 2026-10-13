@@ -22,11 +22,19 @@ const baseAnchor = {
   suffix: ' this',
 }
 
-describe('CommentComposer', () => {
+describe('CommentComposer', commentComposerTests)
+
+function commentComposerTests() {
   beforeEach(() => {
     mockInvoke.mockClear()
   })
 
+  describe('editing', commentComposerEditingTests)
+  describe('submitting', commentComposerSubmittingTests)
+  describe('cancelling', commentComposerCancellingTests)
+}
+
+function commentComposerEditingTests() {
   it('renders a textarea for the comment body', () => {
     render(<CommentComposer anchor={baseAnchor} onClose={vi.fn()} onCreated={vi.fn()} />)
     expect(screen.getByRole('textbox')).toBeTruthy()
@@ -37,7 +45,9 @@ describe('CommentComposer', () => {
     const btn = screen.getByRole('button', { name: /add comment/i })
     expect((btn as HTMLButtonElement).disabled).toBe(true)
   })
+}
 
+function commentComposerSubmittingTests() {
   it('submit calls comments.create IPC with anchor data', async () => {
     const onCreated = vi.fn()
     render(<CommentComposer anchor={baseAnchor} onClose={vi.fn()} onCreated={onCreated} />)
@@ -57,7 +67,9 @@ describe('CommentComposer', () => {
     })
     expect(onCreated).toHaveBeenCalled()
   })
+}
 
+function commentComposerCancellingTests() {
   it('cancel button calls onClose without saving', () => {
     const onClose = vi.fn()
     render(<CommentComposer anchor={baseAnchor} onClose={onClose} onCreated={vi.fn()} />)
@@ -72,4 +84,4 @@ describe('CommentComposer', () => {
     fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Escape' })
     expect(onClose).toHaveBeenCalled()
   })
-})
+}

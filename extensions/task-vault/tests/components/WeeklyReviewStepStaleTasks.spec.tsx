@@ -45,7 +45,17 @@ beforeEach(() => {
   mockInvoke.mockResolvedValue({ success: true })
 })
 
-describe('WeeklyReviewStepStaleTasks', () => {
+describe('WeeklyReviewStepStaleTasks', weeklyReviewStepStaleTasksTests)
+
+function weeklyReviewStepStaleTasksTests() {
+  describe('listing', weeklyReviewStepStaleTasksListingTests)
+  describe('moving', weeklyReviewStepStaleTasksMovingTests)
+  describe('keeping', weeklyReviewStepStaleTasksKeepingTests)
+  describe('failures', weeklyReviewStepStaleTasksFailuresTests)
+  describe('more failures', weeklyReviewStepStaleTasksMoreFailuresTests)
+}
+
+function weeklyReviewStepStaleTasksListingTests() {
   it('shows "no stale tasks" when list is empty', () => {
     const onComplete = vi.fn()
     render(
@@ -69,7 +79,9 @@ describe('WeeklyReviewStepStaleTasks', () => {
     )
     expect(screen.getByText(/14 days/i)).toBeTruthy()
   })
+}
 
+function weeklyReviewStepStaleTasksMovingTests() {
   it('backlog action removes task from list and calls process-inbox-item', async () => {
     const task = makeTask({ id: 'task-abc', text: 'Stale backlog test' })
     render(
@@ -98,7 +110,9 @@ describe('WeeklyReviewStepStaleTasks', () => {
     })
     expect(screen.queryByText('Stale delete test')).toBeNull()
   })
+}
 
+function weeklyReviewStepStaleTasksKeepingTests() {
   it('keep action removes task from list and calls reset-today-since', async () => {
     const task = makeTask({ id: 'task-keep', text: 'Stale keep test' })
     render(
@@ -121,7 +135,9 @@ describe('WeeklyReviewStepStaleTasks', () => {
     fireEvent.click(screen.getByRole('button', { name: /next/i }))
     expect(onComplete).toHaveBeenCalled()
   })
+}
 
+function weeklyReviewStepStaleTasksFailuresTests() {
   it('backlog error: keeps task in list and shows toast', async () => {
     mockInvoke.mockResolvedValue({ error: 'DB_ERROR' })
     const task = makeTask({ id: 'task-err', text: 'Backlog fail task' })
@@ -134,7 +150,9 @@ describe('WeeklyReviewStepStaleTasks', () => {
     )
     expect(screen.getByText('Backlog fail task')).toBeTruthy()
   })
+}
 
+function weeklyReviewStepStaleTasksMoreFailuresTests() {
   it('delete error: keeps task in list and shows toast', async () => {
     mockInvoke.mockResolvedValue({ error: 'DB_ERROR' })
     const task = makeTask({ id: 'task-err2', text: 'Delete fail task' })
@@ -160,4 +178,4 @@ describe('WeeklyReviewStepStaleTasks', () => {
     )
     expect(screen.getByText('Keep fail task')).toBeTruthy()
   })
-})
+}

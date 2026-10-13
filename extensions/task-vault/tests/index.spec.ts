@@ -57,7 +57,72 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-describe('scheduleWeeklyReviewNudge interval guard', () => {
+describe('scheduleWeeklyReviewNudge interval guard', scheduleWeeklyReviewNudgeIntervalGuardTests)
+
+describe('task-vault manifest quick action', () => {
+  it('declares a Task Vault group and a mnemonic on the capture command', () => {
+    const manifest = JSON.parse(readFileSync(join(__dirname, '../manifest.json'), 'utf-8')) as {
+      contributes: {
+        quickActions?: { group?: { mnemonic?: string; label?: string } }
+        commands?: { id: string; mnemonic?: string; label?: string }[]
+      }
+    }
+
+    expect(manifest.contributes.quickActions?.group).toEqual({
+      mnemonic: 'v',
+      label: 'Task Vault',
+    })
+
+    const command = manifest.contributes.commands?.find(
+      (c) => c.id === 'task-vault:capture-to-inbox'
+    )
+    expect(command?.mnemonic).toBe('c')
+    expect(command?.label).toBe('Capture to inbox')
+  })
+})
+
+describe(
+  'task-vault activate() quick-actions command registration',
+  taskVaultActivateQuickActionsTests
+)
+
+describe('task-vault activate() exports (ADR 094)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('returns an API whose open() takes the operator to the destination it was given', async () => {
+    const { api } = makeApi()
+    const { activate } = await import('../src/index.ts')
+    const { openInVault } = await import('../src/navigation.js')
+    const vault = await activate(api)
+    vault.open({ taskId: 'task-1', view: 'daily' })
+
+    expect(openInVault).toHaveBeenCalledWith(api, { taskId: 'task-1', view: 'daily' })
+  })
+
+  it('returns an API whose openCapture() opens the capture overlay, as the command does', async () => {
+    const { api } = makeApi()
+    const { activate } = await import('../src/index.ts')
+    const vault = await activate(api)
+    vault.openCapture()
+
+    expect(api.window.raise).toHaveBeenCalled()
+    expect(api.window.broadcast).toHaveBeenCalledWith('task-vault:push:open-capture', undefined)
+    expect(api.window.broadcast).toHaveBeenCalledWith(
+      'extension:activate-global-tab',
+      'terminator.task-vault'
+    )
+    expect(api.window.focusSelf).toHaveBeenCalledWith('main')
+  })
+})
+
+function scheduleWeeklyReviewNudgeIntervalGuardTests() {
+  describe('with the guard', scheduleWeeklyReviewNudgeIntervalGuardGuardTests)
+  describe('without the guard', scheduleWeeklyReviewNudgeIntervalGuardWithoutGuardTests)
+}
+
+function scheduleWeeklyReviewNudgeIntervalGuardGuardTests() {
   it('guard pattern: second call clears the first interval before scheduling a new one', () => {
     const setIntervalSpy = vi.spyOn(globalThis, 'setInterval')
     const clearIntervalSpy = vi.spyOn(globalThis, 'clearInterval')
@@ -86,7 +151,9 @@ describe('scheduleWeeklyReviewNudge interval guard', () => {
     setIntervalSpy.mockRestore()
     clearIntervalSpy.mockRestore()
   })
+}
 
+function scheduleWeeklyReviewNudgeIntervalGuardWithoutGuardTests() {
   it('without guard: double-call creates two intervals (this is the bug being fixed)', () => {
     const setIntervalSpy = vi.spyOn(globalThis, 'setInterval')
     const intervals: ReturnType<typeof setInterval>[] = []
@@ -104,31 +171,9 @@ describe('scheduleWeeklyReviewNudge interval guard', () => {
     for (const id of intervals) clearInterval(id)
     setIntervalSpy.mockRestore()
   })
-})
+}
 
-describe('task-vault manifest quick action', () => {
-  it('declares a Task Vault group and a mnemonic on the capture command', () => {
-    const manifest = JSON.parse(readFileSync(join(__dirname, '../manifest.json'), 'utf-8')) as {
-      contributes: {
-        quickActions?: { group?: { mnemonic?: string; label?: string } }
-        commands?: { id: string; mnemonic?: string; label?: string }[]
-      }
-    }
-
-    expect(manifest.contributes.quickActions?.group).toEqual({
-      mnemonic: 'v',
-      label: 'Task Vault',
-    })
-
-    const command = manifest.contributes.commands?.find(
-      (c) => c.id === 'task-vault:capture-to-inbox'
-    )
-    expect(command?.mnemonic).toBe('c')
-    expect(command?.label).toBe('Capture to inbox')
-  })
-})
-
-describe('task-vault activate() quick-actions command registration', () => {
+function taskVaultActivateQuickActionsTests() {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.useFakeTimers()
@@ -138,6 +183,13 @@ describe('task-vault activate() quick-actions command registration', () => {
     vi.useRealTimers()
   })
 
+  describe('registering', taskVaultActivateQuickActionsRegisteringTests)
+  describe('running', taskVaultActivateQuickActionsRunningTests)
+  describe('without a shortcut', taskVaultActivateQuickActionsWithoutShortcutTests)
+  describe('disposing', taskVaultActivateQuickActionsDisposingTests)
+}
+
+function taskVaultActivateQuickActionsRegisteringTests() {
   it('registers the manifest command id with its label and mnemonic', async () => {
     const { api } = makeApi()
     const { activate } = await import('../src/index.ts')
@@ -154,7 +206,9 @@ describe('task-vault activate() quick-actions command registration', () => {
       expect.any(Function)
     )
   })
+}
 
+function taskVaultActivateQuickActionsRunningTests() {
   it('running the registered command opens the capture overlay, same as the hotkey', async () => {
     const { api } = makeApi()
     const { activate } = await import('../src/index.ts')
@@ -173,7 +227,9 @@ describe('task-vault activate() quick-actions command registration', () => {
     expect(channels).toContain('extension:activate-global-tab')
     expect(api.window.focusSelf).toHaveBeenCalledWith('main')
   })
+}
 
+function taskVaultActivateQuickActionsWithoutShortcutTests() {
   it('registers the command even when the global shortcut registration throws', async () => {
     const { api, globalShortcutRegister, commandsRegister } = makeApi()
     globalShortcutRegister.mockRejectedValue(new Error('shortcut claimed by another app'))
@@ -195,7 +251,9 @@ describe('task-vault activate() quick-actions command registration', () => {
     )
     expect(channels).toContain('extension:activate-global-tab')
   })
+}
 
+function taskVaultActivateQuickActionsDisposingTests() {
   it('deactivate disposes the registered command', async () => {
     const { api, commandsRegister } = makeApi()
     const { activate, deactivate } = await import('../src/index.ts')
@@ -210,37 +268,4 @@ describe('task-vault activate() quick-actions command registration', () => {
 
     expect(disposable.dispose).toHaveBeenCalled()
   })
-})
-
-describe('task-vault activate() exports (ADR 094)', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-  })
-
-  it('returns an API whose open() takes the operator to the destination it was given', async () => {
-    const { api } = makeApi()
-    const { activate } = await import('../src/index.ts')
-    const { openInVault } = await import('../src/navigation.js')
-
-    const vault = await activate(api)
-    vault.open({ taskId: 'task-1', view: 'daily' })
-
-    expect(openInVault).toHaveBeenCalledWith(api, { taskId: 'task-1', view: 'daily' })
-  })
-
-  it('returns an API whose openCapture() opens the capture overlay, as the command does', async () => {
-    const { api } = makeApi()
-    const { activate } = await import('../src/index.ts')
-
-    const vault = await activate(api)
-    vault.openCapture()
-
-    expect(api.window.raise).toHaveBeenCalled()
-    expect(api.window.broadcast).toHaveBeenCalledWith('task-vault:push:open-capture', undefined)
-    expect(api.window.broadcast).toHaveBeenCalledWith(
-      'extension:activate-global-tab',
-      'terminator.task-vault'
-    )
-    expect(api.window.focusSelf).toHaveBeenCalledWith('main')
-  })
-})
+}

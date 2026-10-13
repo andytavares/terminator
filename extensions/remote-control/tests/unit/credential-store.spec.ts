@@ -14,7 +14,9 @@ function memorySettings(initial: Record<string, unknown> = {}) {
   }
 }
 
-describe('credential store', () => {
+describe('credential store', credentialStoreTests)
+
+function credentialStoreTests() {
   it('has no password until one is set', () => {
     expect(new CredentialStore(memorySettings(), KEYS).hasPassword()).toBe(false)
   })
@@ -28,36 +30,45 @@ describe('credential store', () => {
     expect(JSON.stringify([...settings.values.values()])).not.toContain('s3cret-passphrase')
   })
 
-  describe('migrating what earlier versions stored', () => {
-    it('hashes a stored plaintext password, keeps it working, and erases the plaintext', async () => {
-      const settings = memorySettings({ pw: 'old-plaintext', hash: BCRYPT })
-      const store = new CredentialStore(settings, KEYS)
-      expect(await store.migrateLegacy()).toBe('migrated')
-      expect(await verifyPassword('old-plaintext', store.getPasswordHash())).toBe(true)
-      expect(JSON.stringify([...settings.values.values()])).not.toContain('old-plaintext')
-    })
+  describe('migrating what earlier versions stored', credentialMigrationTests)
+}
 
-    it('invalidates a bcrypt hash that has no plaintext beside it', async () => {
-      const settings = memorySettings({ pw: '', hash: BCRYPT })
-      const store = new CredentialStore(settings, KEYS)
-      expect(await store.migrateLegacy()).toBe('invalidated')
-      expect(store.hasPassword()).toBe(false)
-      expect(store.getPasswordHash()).toBe('')
-    })
+function credentialMigrationTests() {
+  describe('plaintext and bcrypt values', credentialLegacyValueTests)
+  describe('a current or absent hash', credentialCurrentHashTests)
+}
 
-    it('erases a plaintext left beside a current hash without changing the hash', async () => {
-      const current = await hashPassword('new-password')
-      const settings = memorySettings({ pw: 'leftover', hash: current })
-      const store = new CredentialStore(settings, KEYS)
-      expect(await store.migrateLegacy()).toBe('current')
-      expect(store.getPasswordHash()).toBe(current)
-      expect(settings.values.get('pw')).toBe('')
-    })
-
-    it('does nothing when no password was ever set', async () => {
-      const store = new CredentialStore(memorySettings(), KEYS)
-      expect(await store.migrateLegacy()).toBe('current')
-      expect(store.hasPassword()).toBe(false)
-    })
+function credentialLegacyValueTests() {
+  it('hashes a stored plaintext password, keeps it working, and erases the plaintext', async () => {
+    const settings = memorySettings({ pw: 'old-plaintext', hash: BCRYPT })
+    const store = new CredentialStore(settings, KEYS)
+    expect(await store.migrateLegacy()).toBe('migrated')
+    expect(await verifyPassword('old-plaintext', store.getPasswordHash())).toBe(true)
+    expect(JSON.stringify([...settings.values.values()])).not.toContain('old-plaintext')
   })
-})
+
+  it('invalidates a bcrypt hash that has no plaintext beside it', async () => {
+    const settings = memorySettings({ pw: '', hash: BCRYPT })
+    const store = new CredentialStore(settings, KEYS)
+    expect(await store.migrateLegacy()).toBe('invalidated')
+    expect(store.hasPassword()).toBe(false)
+    expect(store.getPasswordHash()).toBe('')
+  })
+}
+
+function credentialCurrentHashTests() {
+  it('erases a plaintext left beside a current hash without changing the hash', async () => {
+    const current = await hashPassword('new-password')
+    const settings = memorySettings({ pw: 'leftover', hash: current })
+    const store = new CredentialStore(settings, KEYS)
+    expect(await store.migrateLegacy()).toBe('current')
+    expect(store.getPasswordHash()).toBe(current)
+    expect(settings.values.get('pw')).toBe('')
+  })
+
+  it('does nothing when no password was ever set', async () => {
+    const store = new CredentialStore(memorySettings(), KEYS)
+    expect(await store.migrateLegacy()).toBe('current')
+    expect(store.hasPassword()).toBe(false)
+  })
+}

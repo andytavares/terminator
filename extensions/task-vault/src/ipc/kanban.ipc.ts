@@ -1,8 +1,9 @@
 import { z } from 'zod'
 import { noPayload, type ExtensionAPI, type ExtensionDB } from '@terminator/extension-sdk'
-import { createIpcRegistrar } from './register'
+import { registerRoutes, route, type IpcContext } from './register'
 import type { KanbanConfig, TaskStatus } from '../vault/types'
 import { DEFAULT_KANBAN_CONFIG } from '../vault/types'
+import { nowIso, orErrorString } from './vault-shared'
 
 async function readConfig(db: ExtensionDB): Promise<KanbanConfig> {
   try {
@@ -51,29 +52,46 @@ const SaveConfigSchema = z.object({
   swimlaneGrouping: z.enum(['none', 'project', 'area']),
 })
 
-export function registerKanbanIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {
-  const { handleRemote, cleanup } = createIpcRegistrar(api)
-  handleRemote('task-vault:kanban:get-config', noPayload, async () => {
-    try {
-      return await readConfig(db)
-    } catch (err) {
-      return { error: String(err) }
-    }
-  })
+function getConfig({ db }: IpcContext) {
+  return orErrorString(() => readConfig(db))
+}
 
-  handleRemote('task-vault:kanban:save-config', SaveConfigSchema, async (config) => {
-    try {
-      await writeConfig(db, config)
-      return { ok: true }
-    } catch (err) {
-      return { error: String(err) }
-    }
+function saveConfig({ db }: IpcContext, config: z.infer<typeof SaveConfigSchema>) {
+  return orErrorString(async () => {
+    await writeConfig(db, config)
+    return { ok: true }
   })
+}
 
-  handleRemote('task-vault:kanban:list-tasks', noPayload, async () => {
-    try {
-      const rows = await db.query<Record<string, unknown>>(
-        `SELECT t.id, t.text, t.status, p.name AS project, t.context, a.name AS area,
+/** A task's description from its metadata blob; undefined when absent or unreadable. */
+function descriptionOf(metadata: unknown): string | undefined {
+  try {
+    const meta = JSON.parse((metadata as string) || '{}') as Record<string, string>
+    return meta.description || undefined
+  } catch {
+    return undefined
+  }
+}
+
+/** One card on the board. */
+function toCard(r: Record<string, unknown>) {
+  return {
+    id: r.id as string,
+    text: r.text as string,
+    status: r.status as TaskStatus,
+    project: (r.project as string) || undefined,
+    context: (r.context as string) || undefined,
+    area: (r.area as string) || undefined,
+    dueDate: (r.due_date as string) || undefined,
+    terminatorLinks: JSON.parse((r.terminator_links as string) || '[]') as string[],
+    description: descriptionOf(r.metadata),
+  }
+}
+
+function listTasks({ db }: IpcContext) {
+  return orErrorString(async () => {
+    const rows = await db.query<Record<string, unknown>>(
+      `SELECT t.id, t.text, t.status, p.name AS project, t.context, a.name AS area,
                 t.due_date, t.terminator_links, t.metadata
          FROM tasks t
          LEFT JOIN projects p ON t.project_id = p.id
@@ -81,61 +99,45 @@ export function registerKanbanIpcHandlers(api: ExtensionAPI, db: ExtensionDB): (
          WHERE t.status NOT IN ('migrated', 'cancelled')
            AND t.parent_id IS NULL
          ORDER BY t.sort_order, t.created_at`
-      )
-      const tasks = rows.map((r) => {
-        let description: string | undefined
-        try {
-          const meta = JSON.parse((r.metadata as string) || '{}') as Record<string, string>
-          description = meta.description || undefined
-        } catch {
-          description = undefined
-        }
-        return {
-          id: r.id as string,
-          text: r.text as string,
-          status: r.status as TaskStatus,
-          project: (r.project as string) || undefined,
-          context: (r.context as string) || undefined,
-          area: (r.area as string) || undefined,
-          dueDate: (r.due_date as string) || undefined,
-          terminatorLinks: JSON.parse((r.terminator_links as string) || '[]') as string[],
-          description,
-        }
-      })
-      return { tasks }
-    } catch (err) {
-      return { error: String(err) }
-    }
+    )
+    return { tasks: rows.map(toCard) }
   })
+}
 
-  handleRemote('task-vault:kanban:list-contexts', noPayload, async () => {
-    try {
-      const rows = await db.query<{ context: string }>(
-        `SELECT DISTINCT context FROM tasks
+function listContexts({ db }: IpcContext) {
+  return orErrorString(async () => {
+    const rows = await db.query<{ context: string }>(
+      `SELECT DISTINCT context FROM tasks
          WHERE context IS NOT NULL AND context != ''
          ORDER BY context`
-      )
-      return { contexts: rows.map((r) => r.context) }
-    } catch (err) {
-      return { error: String(err) }
-    }
+    )
+    return { contexts: rows.map((r) => r.context) }
   })
+}
 
-  handleRemote('task-vault:kanban:move-task', MoveTaskSchema, async ({ taskId, toStatus }) => {
-    try {
-      const now = new Date().toISOString()
-      const existing = await db.get<{ id: string }>(`SELECT id FROM tasks WHERE id=?`, [taskId])
-      if (!existing) return { error: 'Task not found' }
-      await db.run(`UPDATE tasks SET status = ?, updated_at = ? WHERE id = ?`, [
-        toStatus,
-        now,
-        taskId,
-      ])
-      return { ok: true }
-    } catch (err) {
-      return { error: String(err) }
-    }
+function moveTask({ db }: IpcContext, args: z.infer<typeof MoveTaskSchema>) {
+  const { taskId, toStatus } = args
+  return orErrorString(async () => {
+    const now = nowIso()
+    const existing = await db.get<{ id: string }>(`SELECT id FROM tasks WHERE id=?`, [taskId])
+    if (!existing) return { error: 'Task not found' }
+    await db.run(`UPDATE tasks SET status = ?, updated_at = ? WHERE id = ?`, [
+      toStatus,
+      now,
+      taskId,
+    ])
+    return { ok: true }
   })
+}
 
-  return cleanup
+const KANBAN_ROUTES = [
+  route('task-vault:kanban:get-config', noPayload, getConfig),
+  route('task-vault:kanban:save-config', SaveConfigSchema, saveConfig),
+  route('task-vault:kanban:list-tasks', noPayload, listTasks),
+  route('task-vault:kanban:list-contexts', noPayload, listContexts),
+  route('task-vault:kanban:move-task', MoveTaskSchema, moveTask),
+]
+
+export function registerKanbanIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {
+  return registerRoutes({ api, db }, KANBAN_ROUTES)
 }

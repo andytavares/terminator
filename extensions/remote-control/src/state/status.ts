@@ -67,65 +67,68 @@ export function reduceStatus(previous: RemoteStatus, message: StatusBroadcast): 
   const port = message.port ?? portOf(previous) ?? DEFAULT_PORT
 
   // A hard error arrives on its own, without the enabled/url fields.
-  if (message.error === 'PORT_IN_USE') {
-    return {
-      kind: 'failed',
-      port,
-      failure: {
-        reason: 'port-in-use',
-        message: `Port ${port} is already in use.`,
-        resolution:
-          'Another program is listening on it. Pick a different port, or quit that program.',
-      },
-    }
-  }
-
-  if (message.error === 'PASSWORD_REQUIRED') {
-    return {
-      kind: 'failed',
-      port,
-      failure: {
-        reason: 'password-required',
-        message: message.message ?? 'Remote Control needs a password before it can start.',
-        resolution: 'Open Settings below and set a password, or generate one.',
-      },
-    }
-  }
+  const hardError = hardErrorStatus(message, port)
+  if (hardError) return hardError
 
   if (message.enabled === false) return OFF
 
   if (message.enabled !== true) return previous
 
-  const localUrl = message.lanUrl ?? localUrlOf(previous) ?? ''
-  const publicUrl = message.publicUrl ?? null
+  return enabledStatus(previous, message, port)
+}
 
-  if (message.ngrokError) {
-    // Missing credential is not a failure: the local address still works, and
-    // saying "failed" would be wrong about what the user can currently do.
-    if (isMissingCredential(message.ngrokError)) {
-      return { kind: 'on', port, localUrl, publicUrl: null, reach: 'local-only' }
-    }
-    return {
-      kind: 'failed',
-      port,
-      failure: {
-        reason: 'tunnel-unreachable',
-        message: 'The public address could not be created.',
-        resolution: message.ngrokError,
-      },
-    }
+function hardErrorStatus(message: StatusBroadcast, port: number): RemoteStatus | null {
+  if (message.error === 'PORT_IN_USE') {
+    return failed(port, {
+      reason: 'port-in-use',
+      message: `Port ${port} is already in use.`,
+      resolution:
+        'Another program is listening on it. Pick a different port, or quit that program.',
+    })
   }
+  if (message.error === 'PASSWORD_REQUIRED') {
+    return failed(port, {
+      reason: 'password-required',
+      message: message.message ?? 'Remote Control needs a password before it can start.',
+      resolution: 'Open Settings below and set a password, or generate one.',
+    })
+  }
+  return null
+}
 
+/** The status of an enabled server, from the addresses and tunnel error it reports. */
+function enabledStatus(
+  previous: RemoteStatus,
+  message: StatusBroadcast,
+  port: number
+): RemoteStatus {
+  const localUrl = message.lanUrl ?? localUrlOf(previous) ?? ''
+  if (message.ngrokError) return tunnelErrorStatus(message.ngrokError, port, localUrl)
+  return listeningStatus(port, localUrl, message.publicUrl ?? null)
+}
+
+function listeningStatus(port: number, localUrl: string, publicUrl: string | null): RemoteStatus {
   // Enabled, no address yet: still coming up.
   if (!localUrl && !publicUrl) return { kind: 'starting', port }
+  const reach = publicUrl ? 'public' : 'local-only'
+  return { kind: 'on', port, localUrl, publicUrl, reach }
+}
 
-  return {
-    kind: 'on',
-    port,
-    localUrl,
-    publicUrl,
-    reach: publicUrl ? 'public' : 'local-only',
+function tunnelErrorStatus(ngrokError: string, port: number, localUrl: string): RemoteStatus {
+  // Missing credential is not a failure: the local address still works, and
+  // saying "failed" would be wrong about what the user can currently do.
+  if (isMissingCredential(ngrokError)) {
+    return { kind: 'on', port, localUrl, publicUrl: null, reach: 'local-only' }
   }
+  return failed(port, {
+    reason: 'tunnel-unreachable',
+    message: 'The public address could not be created.',
+    resolution: ngrokError,
+  })
+}
+
+function failed(port: number, failure: RemoteFailure): RemoteStatus {
+  return { kind: 'failed', port, failure }
 }
 
 /** The tunnel dropped while devices were connected. */

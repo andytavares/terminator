@@ -6,10 +6,33 @@ interface PasswordFieldProps {
   onChanged: () => void
 }
 
-function updatePassword(password: string): Promise<{ password?: string }> {
+interface PasswordEntryProps {
+  onSet: (password: string) => Promise<void>
+  onGenerate: () => Promise<void>
+}
+
+interface GeneratedPasswordProps {
+  password: string
+  onDone: () => void
+}
+
+const ROW_STYLE: React.CSSProperties = {
+  display: 'flex',
+  gap: 6,
+  alignItems: 'center',
+  marginTop: 6,
+}
+const NO_SHRINK: React.CSSProperties = { flexShrink: 0 }
+
+/** What `remote:update-password` answers: the password, when it generated one. */
+interface PasswordUpdate {
+  password?: string
+}
+
+function updatePassword(password: string): Promise<PasswordUpdate> {
   return window.electronAPI.extensionBridge
     .invoke('remote:update-password', { password })
-    .then((result) => (result ?? {}) as { password?: string })
+    .then((result) => (result ?? {}) as PasswordUpdate)
 }
 
 /**
@@ -18,12 +41,10 @@ function updatePassword(password: string): Promise<{ password?: string }> {
  * generated one is shown here once, straight after it is made.
  */
 export function PasswordField({ hasPassword, onChanged }: PasswordFieldProps): React.JSX.Element {
-  const [draft, setDraft] = useState('')
   const [generated, setGenerated] = useState<string | null>(null)
 
-  async function setChosen(): Promise<void> {
-    await updatePassword(draft.trim())
-    setDraft('')
+  async function setChosen(password: string): Promise<void> {
+    await updatePassword(password)
     onChanged()
   }
 
@@ -36,47 +57,71 @@ export function PasswordField({ hasPassword, onChanged }: PasswordFieldProps): R
   return (
     <div className="settings-section__field">
       <label className="settings-section__label">Password</label>
-      <span className="settings-section__hint">
-        {hasPassword ? 'A password is set.' : 'No password is set, so Remote Control cannot start.'}{' '}
-        It is stored only as a hash, so it cannot be shown again. Set your own or generate one.
-      </span>
-      <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 6 }}>
-        <input
-          type="password"
-          className="settings-section__input"
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          placeholder="New password"
-          style={{ flex: 1 }}
-        />
-        <Button
-          size="sm"
-          style={{ flexShrink: 0 }}
-          disabled={draft.trim() === ''}
-          onClick={() => void setChosen()}
-        >
-          Set password
-        </Button>
-        <Button size="sm" style={{ flexShrink: 0 }} onClick={() => void generate()}>
-          Generate new
-        </Button>
-      </div>
+      <PasswordHint hasPassword={hasPassword} />
+      <PasswordEntry onSet={setChosen} onGenerate={generate} />
       {generated !== null && (
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 6 }}>
-          <code style={{ userSelect: 'all', wordBreak: 'break-all' }}>{generated}</code>
-          <Button
-            size="sm"
-            style={{ flexShrink: 0 }}
-            onClick={() => void navigator.clipboard.writeText(generated)}
-          >
-            Copy
-          </Button>
-          <Button size="sm" style={{ flexShrink: 0 }} onClick={() => setGenerated(null)}>
-            Done
-          </Button>
-          <span className="settings-section__hint">Copy it now: it will not be shown again.</span>
-        </div>
+        <GeneratedPassword password={generated} onDone={() => setGenerated(null)} />
       )}
+    </div>
+  )
+}
+
+/** A draft password to set, or a request to generate one. */
+function PasswordEntry({ onSet, onGenerate }: PasswordEntryProps): React.JSX.Element {
+  const [draft, setDraft] = useState('')
+  const setChosen = () => onSet(draft.trim()).then(() => setDraft(''))
+
+  return (
+    <div style={ROW_STYLE}>
+      <input
+        type="password"
+        className="settings-section__input"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        placeholder="New password"
+        style={{ flex: 1 }}
+      />
+      <Button
+        size="sm"
+        style={NO_SHRINK}
+        disabled={draft.trim() === ''}
+        onClick={() => void setChosen()}
+      >
+        Set password
+      </Button>
+      <Button size="sm" style={NO_SHRINK} onClick={() => void onGenerate()}>
+        Generate new
+      </Button>
+    </div>
+  )
+}
+
+function PasswordHint({ hasPassword }: { hasPassword: boolean }): React.JSX.Element {
+  return (
+    <span className="settings-section__hint">
+      {hasPassword ? 'A password is set.' : 'No password is set, so Remote Control cannot start.'}{' '}
+      It is stored only as a hash, so it cannot be shown again. Set your own or generate one.
+    </span>
+  )
+}
+
+/** A generated password, shown once with a way to copy it. */
+function GeneratedPassword(props: GeneratedPasswordProps): React.JSX.Element {
+  const { password, onDone } = props
+  return (
+    <div style={ROW_STYLE}>
+      <code style={{ userSelect: 'all', wordBreak: 'break-all' }}>{password}</code>
+      <Button
+        size="sm"
+        style={NO_SHRINK}
+        onClick={() => void navigator.clipboard.writeText(password)}
+      >
+        Copy
+      </Button>
+      <Button size="sm" style={NO_SHRINK} onClick={onDone}>
+        Done
+      </Button>
+      <span className="settings-section__hint">Copy it now: it will not be shown again.</span>
     </div>
   )
 }

@@ -10,7 +10,31 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-describe('useExtensionToastStore', () => {
+describe('useExtensionToastStore', useExtensionToastStoreTests)
+
+describe('addExtensionToast', () => {
+  it('adds a toast via the store', () => {
+    addExtensionToast('warning', 'Watch out')
+    expect(useExtensionToastStore.getState().toasts).toHaveLength(1)
+    expect(useExtensionToastStore.getState().toasts[0]).toMatchObject({
+      type: 'warning',
+      message: 'Watch out',
+    })
+  })
+
+  it('forwards onClick', () => {
+    const onClick = vi.fn()
+    addExtensionToast('success', 'Done', { onClick })
+    expect(useExtensionToastStore.getState().toasts[0].onClick).toBe(onClick)
+  })
+})
+
+function useExtensionToastStoreTests() {
+  describe('adding and removing', useExtensionToastStoreAddingRemovingTests)
+  describe('durations', useExtensionToastStoreDurationsTests)
+}
+
+function useExtensionToastStoreAddingRemovingTests() {
   it('adds a toast and removes it after duration', () => {
     useExtensionToastStore.getState().addToast({ type: 'success', message: 'Done', duration: 1000 })
     expect(useExtensionToastStore.getState().toasts).toHaveLength(1)
@@ -35,7 +59,9 @@ describe('useExtensionToastStore', () => {
     useExtensionToastStore.getState().addToast({ type: 'info', message: 'Click me', onClick })
     expect(useExtensionToastStore.getState().toasts[0].onClick).toBe(onClick)
   })
+}
 
+function useExtensionToastStoreDurationsTests() {
   it('uses 6000ms default duration for errors', () => {
     useExtensionToastStore.getState().addToast({ type: 'error', message: 'Error' })
     vi.advanceTimersByTime(5999)
@@ -51,21 +77,4 @@ describe('useExtensionToastStore', () => {
     vi.advanceTimersByTime(1)
     expect(useExtensionToastStore.getState().toasts).toHaveLength(0)
   })
-})
-
-describe('addExtensionToast', () => {
-  it('adds a toast via the store', () => {
-    addExtensionToast('warning', 'Watch out')
-    expect(useExtensionToastStore.getState().toasts).toHaveLength(1)
-    expect(useExtensionToastStore.getState().toasts[0]).toMatchObject({
-      type: 'warning',
-      message: 'Watch out',
-    })
-  })
-
-  it('forwards onClick', () => {
-    const onClick = vi.fn()
-    addExtensionToast('success', 'Done', { onClick })
-    expect(useExtensionToastStore.getState().toasts[0].onClick).toBe(onClick)
-  })
-})
+}

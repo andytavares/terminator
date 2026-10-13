@@ -33,11 +33,19 @@ describe('applyTaskVaultSchema', () => {
   })
 })
 
-describe('settings composite PK (extension_id, key)', () => {
+describe('settings composite PK (extension_id, key)', settingsCompositePKExtensionIdTests)
+
+function settingsCompositePKExtensionIdTests() {
   beforeEach(async () => {
     await applyTaskVaultSchema(db)
   })
 
+  describe('independent', settingsCompositePKExtensionIdIndependentTests)
+  describe('duplicates', settingsCompositePKExtensionIdDuplicatesTests)
+  describe('upserts', settingsCompositePKExtensionIdUpsertsTests)
+}
+
+function settingsCompositePKExtensionIdIndependentTests() {
   it('two different extension_ids can hold the same key independently', async () => {
     await db.run(`INSERT INTO settings (extension_id, key, value) VALUES (?, ?, ?)`, [
       'task-vault',
@@ -56,7 +64,9 @@ describe('settings composite PK (extension_id, key)', () => {
     expect(rows[0]).toMatchObject({ extension_id: 'other-ext' })
     expect(rows[1]).toMatchObject({ extension_id: 'task-vault' })
   })
+}
 
+function settingsCompositePKExtensionIdDuplicatesTests() {
   it('duplicate (extension_id, key) insert is rejected by PK constraint', async () => {
     await db.run(`INSERT INTO settings (extension_id, key, value) VALUES (?, ?, ?)`, [
       'task-vault',
@@ -71,7 +81,9 @@ describe('settings composite PK (extension_id, key)', () => {
       ])
     ).rejects.toThrow()
   })
+}
 
+function settingsCompositePKExtensionIdUpsertsTests() {
   it('ON CONFLICT (extension_id, key) upsert updates value correctly', async () => {
     await db.run(
       `INSERT INTO settings (extension_id, key, value) VALUES (?, ?, ?)
@@ -88,4 +100,4 @@ describe('settings composite PK (extension_id, key)', () => {
     )
     expect(row?.value).toBe('14')
   })
-})
+}

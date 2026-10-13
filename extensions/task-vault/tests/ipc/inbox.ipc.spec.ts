@@ -34,7 +34,20 @@ beforeEach(async () => {
 const processItem = (payload: unknown) =>
   harness.invoke('task-vault:vault:process-inbox-item', payload)
 
-describe('task-vault:vault:process-inbox-item', () => {
+describe('task-vault:vault:process-inbox-item', taskVaultVaultProcessInboxTests)
+
+function taskVaultVaultProcessInboxTests() {
+  describe('trash and do-now', taskVaultVaultProcessInboxTrashDoNowTests)
+  describe('someday', taskVaultVaultProcessInboxSomedayTests)
+  describe(
+    'filing to existing destinations',
+    taskVaultVaultProcessInboxFilingExistingDestinationsTests
+  )
+  describe('filing to new projects', taskVaultVaultProcessInboxFilingNewProjectsTests)
+  describe('errors', taskVaultVaultProcessInboxErrorsTests)
+}
+
+function taskVaultVaultProcessInboxTrashDoNowTests() {
   it('trash cancels the item and its subtasks', async () => {
     expect(await processItem({ taskId: TASK_ID, action: 'trash' })).toMatchObject({
       success: true,
@@ -57,7 +70,9 @@ describe('task-vault:vault:process-inbox-item', () => {
       source_ref: localDate(),
     })
   })
+}
 
+function taskVaultVaultProcessInboxSomedayTests() {
   it('someday files the task and its subtasks, clearing source_ref and today_since so it is not immediately stale on return', async () => {
     await db.run(
       `UPDATE tasks SET source='daily', source_ref='2026-01-01', today_since='2026-01-01'`
@@ -75,7 +90,9 @@ describe('task-vault:vault:process-inbox-item', () => {
       })
     }
   })
+}
 
+function taskVaultVaultProcessInboxFilingExistingDestinationsTests() {
   it('file with an existing project destination links the task to that project', async () => {
     await seedProject(db, 'p-alpha', 'alpha')
 
@@ -101,7 +118,9 @@ describe('task-vault:vault:process-inbox-item', () => {
 
     expect(await taskRow(db, TASK_ID)).toMatchObject({ area_id: 'a-home', project_id: null })
   })
+}
 
+function taskVaultVaultProcessInboxFilingNewProjectsTests() {
   it('file with newProjectName creates the project when missing and links the task', async () => {
     await processItem({ taskId: TASK_ID, action: 'file', newProjectName: 'Brand New Project' })
 
@@ -120,7 +139,9 @@ describe('task-vault:vault:process-inbox-item', () => {
     expect(await db.query('SELECT id FROM projects')).toHaveLength(1)
     expect(await taskRow(db, TASK_ID)).toMatchObject({ project_id: 'p-existing' })
   })
+}
 
+function taskVaultVaultProcessInboxErrorsTests() {
   it('file without destination or newProjectName returns an error and leaves the task', async () => {
     const result = await processItem({ taskId: TASK_ID, action: 'file' })
 
@@ -133,4 +154,4 @@ describe('task-vault:vault:process-inbox-item', () => {
       error: 'STALE_ID',
     })
   })
-})
+}

@@ -1,9 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { SessionStore } from '../../src/server/session-store'
 
-describe('SessionStore', () => {
-  let store: SessionStore
+let store: SessionStore
 
+describe('SessionStore', sessionStoreTests)
+
+function sessionStoreTests() {
   beforeEach(() => {
     vi.useFakeTimers()
     store = new SessionStore({ cookieName: 'app-session', cookiePath: '/app', ttlMs: 60_000 })
@@ -13,6 +15,12 @@ describe('SessionStore', () => {
     vi.useRealTimers()
   })
 
+  describe('issuing and validating', sessionStoreIssueTests)
+  describe('expiry', sessionStoreExpiryTests)
+  describe('clearing', sessionStoreClearTests)
+}
+
+function sessionStoreIssueTests() {
   it('issues a token with an HttpOnly, path-scoped, Max-Age cookie', () => {
     const { token, setCookie } = store.issueSession()
     expect(token).toMatch(/^[0-9a-f]{64}$/)
@@ -31,7 +39,9 @@ describe('SessionStore', () => {
     expect(store.hasValidSession('app-session=deadbeef')).toBe(false)
     expect(store.hasValidSession('mobile-session=deadbeef')).toBe(false)
   })
+}
 
+function sessionStoreExpiryTests() {
   it('expires tokens after the TTL and forgets them on the failed check', () => {
     const { token } = store.issueSession()
     vi.advanceTimersByTime(60_001)
@@ -51,11 +61,13 @@ describe('SessionStore', () => {
     expect(store.hasValidSession(`app-session=${fresh}`)).toBe(true)
     expect(store.hasValidSession(`app-session=${old}`)).toBe(false)
   })
+}
 
+function sessionStoreClearTests() {
   it('clear drops every session', () => {
     store.issueSession()
     store.issueSession()
     store.clear()
     expect(store.size).toBe(0)
   })
-})
+}

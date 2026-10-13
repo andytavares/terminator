@@ -2,7 +2,7 @@ import React, { useMemo } from 'react'
 import { PanelRightClose } from 'lucide-react'
 import { IconButton } from '@terminator/extension-ui'
 import { useEditorStore } from '../stores/editor.store'
-import { parseOutline } from '../editor/outline'
+import { parseOutline, type OutlineHeading } from '../editor/outline'
 
 interface NoteOutlineProps {
   /** Called with the heading's document offset when one is clicked. */
@@ -22,7 +22,6 @@ interface NoteOutlineProps {
 export function NoteOutline({ onSelect, onClose }: NoteOutlineProps): React.JSX.Element {
   const bodyDraft = useEditorStore((s) => s.bodyDraft)
   const headings = useMemo(() => parseOutline(bodyDraft), [bodyDraft])
-  const topLevel = headings.length > 0 ? Math.min(...headings.map((h) => h.level)) : 1
 
   return (
     <div className="notepad-outline">
@@ -35,20 +34,32 @@ export function NoteOutline({ onSelect, onClose }: NoteOutlineProps): React.JSX.
       {headings.length === 0 ? (
         <div className="notepad-outline__empty">No headings yet</div>
       ) : (
-        <div className="notepad-outline__items">
-          {headings.map((heading) => (
-            <button
-              key={heading.from}
-              className="notepad-outline__item"
-              style={{ ['--outline-depth' as string]: heading.level - topLevel }}
-              title={heading.text}
-              onClick={() => onSelect(heading.from)}
-            >
-              {heading.text}
-            </button>
-          ))}
-        </div>
+        <OutlineItems headings={headings} onSelect={onSelect} />
       )}
+    </div>
+  )
+}
+
+interface OutlineItemsProps {
+  headings: OutlineHeading[]
+  onSelect: (pos: number) => void
+}
+
+function OutlineItems({ headings, onSelect }: OutlineItemsProps): React.JSX.Element {
+  const topLevel = Math.min(...headings.map((h) => h.level))
+  return (
+    <div className="notepad-outline__items">
+      {headings.map((heading) => (
+        <button
+          key={heading.from}
+          className="notepad-outline__item"
+          style={{ ['--outline-depth' as string]: heading.level - topLevel }}
+          title={heading.text}
+          onClick={() => onSelect(heading.from)}
+        >
+          {heading.text}
+        </button>
+      ))}
     </div>
   )
 }

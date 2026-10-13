@@ -10,7 +10,28 @@ beforeEach(() => {
   db = wrapDb(new DatabaseSync(':memory:'))
 })
 
-describe('applyNotepadSchema', () => {
+describe('applyNotepadSchema', applyNotepadSchemaTests)
+
+describe('randomUUID', () => {
+  it('returns a valid UUID string', () => {
+    const id = randomUUID()
+    expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)
+  })
+
+  it('generates unique values', () => {
+    expect(randomUUID()).not.toBe(randomUUID())
+  })
+})
+
+describe('settings composite PK (extension_id, key)', settingsCompositePKExtensionIdTests)
+
+function applyNotepadSchemaTests() {
+  describe('tables', applyNotepadSchemaTablesTests)
+  describe('an earlier schema', applyNotepadSchemaEarlierSchemaTests)
+  describe('cascades', applyNotepadSchemaCascadesTests)
+}
+
+function applyNotepadSchemaTablesTests() {
   it('creates all required tables', async () => {
     await applyNotepadSchema(db)
     const rows = await db.query<{ name: string }>(
@@ -29,6 +50,13 @@ describe('applyNotepadSchema', () => {
     ])
   })
 
+  it('is idempotent — safe to call twice', async () => {
+    await applyNotepadSchema(db)
+    await expect(applyNotepadSchema(db)).resolves.not.toThrow()
+  })
+}
+
+function applyNotepadSchemaEarlierSchemaTests() {
   it('gives notes from an earlier schema a title that still follows the body', async () => {
     await db.exec(
       `CREATE TABLE notes (id TEXT PRIMARY KEY, title TEXT NOT NULL DEFAULT 'Untitled note', body TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, updated_at TEXT NOT NULL, archived_at TEXT, sort_order REAL NOT NULL DEFAULT 0, folder_id TEXT);
@@ -39,12 +67,9 @@ describe('applyNotepadSchema', () => {
       title_set_by_hand: 0,
     })
   })
+}
 
-  it('is idempotent — safe to call twice', async () => {
-    await applyNotepadSchema(db)
-    await expect(applyNotepadSchema(db)).resolves.not.toThrow()
-  })
-
+function applyNotepadSchemaCascadesTests() {
   it('deleting a note deletes its tag links and comments but keeps the tag', async () => {
     await applyNotepadSchema(db)
     await db.exec(`
@@ -58,24 +83,18 @@ describe('applyNotepadSchema', () => {
     expect(await db.query('SELECT * FROM comments')).toEqual([])
     expect(await db.query('SELECT * FROM tags')).toHaveLength(1)
   })
-})
+}
 
-describe('randomUUID', () => {
-  it('returns a valid UUID string', () => {
-    const id = randomUUID()
-    expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)
-  })
-
-  it('generates unique values', () => {
-    expect(randomUUID()).not.toBe(randomUUID())
-  })
-})
-
-describe('settings composite PK (extension_id, key)', () => {
+function settingsCompositePKExtensionIdTests() {
   beforeEach(async () => {
     await applyNotepadSchema(db)
   })
 
+  describe('independent extensions', settingsCompositePKExtensionIdIndependentExtensionsTests)
+  describe('duplicates', settingsCompositePKExtensionIdDuplicatesTests)
+}
+
+function settingsCompositePKExtensionIdIndependentExtensionsTests() {
   it('two different extension_ids can hold the same key independently', async () => {
     await db.run(`INSERT INTO settings (extension_id, key, value) VALUES (?, ?, ?)`, [
       'notepad',
@@ -94,7 +113,9 @@ describe('settings composite PK (extension_id, key)', () => {
     expect(rows[0]).toMatchObject({ extension_id: 'notepad', value: 'dark' })
     expect(rows[1]).toMatchObject({ extension_id: 'other-ext', value: 'light' })
   })
+}
 
+function settingsCompositePKExtensionIdDuplicatesTests() {
   it('duplicate (extension_id, key) insert is rejected by PK constraint', async () => {
     await db.run(`INSERT INTO settings (extension_id, key, value) VALUES (?, ?, ?)`, [
       'notepad',
@@ -109,4 +130,4 @@ describe('settings composite PK (extension_id, key)', () => {
       ])
     ).rejects.toThrow()
   })
-})
+}

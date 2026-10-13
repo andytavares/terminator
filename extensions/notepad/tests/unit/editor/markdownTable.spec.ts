@@ -9,52 +9,9 @@ import {
   splitTableRow,
 } from '../../../src/editor/markdownTable'
 
-describe('splitTableRow', () => {
-  const texts = (line: string) => splitTableRow(line).map((c) => c.text)
+const texts = (line: string) => splitTableRow(line).map((c) => c.text)
 
-  it('splits a fenced row into cells', () => {
-    expect(texts('| a | b | c |')).toEqual(['a', 'b', 'c'])
-  })
-
-  it('splits an unfenced row', () => {
-    expect(texts('a | b | c')).toEqual(['a', 'b', 'c'])
-  })
-
-  it('trims surrounding whitespace from each cell', () => {
-    expect(texts('|   padded   |  cells |')).toEqual(['padded', 'cells'])
-  })
-
-  it('keeps empty interior cells so columns stay aligned', () => {
-    expect(texts('| a |  | c |')).toEqual(['a', '', 'c'])
-  })
-
-  it('does not split on an escaped pipe', () => {
-    expect(texts('| a \\| b | c |')).toEqual(['a \\| b', 'c'])
-  })
-
-  it('handles a single-column row', () => {
-    expect(texts('| only |')).toEqual(['only'])
-  })
-
-  // Offsets are what let a click on a rendered cell put the caret in the right
-  // place in the source.
-  it('reports where each cell text starts', () => {
-    const line = '| a | b |'
-    const cells = splitTableRow(line)
-    expect(cells.map((c) => c.offset)).toEqual([line.indexOf('a'), line.indexOf('b')])
-  })
-
-  it('points past the padding, at the first visible character', () => {
-    const line = '|    spaced    |'
-    expect(splitTableRow(line)[0].offset).toBe(line.indexOf('s'))
-  })
-
-  it('reports an offset for an empty cell', () => {
-    const cells = splitTableRow('| a |  | c |')
-    expect(cells[1].offset).toBeGreaterThan(cells[0].offset)
-    expect(cells[1].offset).toBeLessThan(cells[2].offset)
-  })
-})
+describe('splitTableRow', splitTableRowTests)
 
 describe('parseDelimiterRow', () => {
   it('returns null alignment for a plain delimiter row', () => {
@@ -78,13 +35,73 @@ describe('parseDelimiterRow', () => {
   })
 })
 
-describe('parseTable', () => {
-  const table = ['| Name | Count |', '| --- | ---: |', '| apples | 3 |', '| pears | 12 |'].join(
-    '\n'
-  )
+const table = ['| Name | Count |', '| --- | ---: |', '| apples | 3 |', '| pears | 12 |'].join('\n')
+const rowTexts = (source: string) => parseTable(source)?.rows.map((row) => row.map((c) => c.text))
 
-  const rowTexts = (source: string) => parseTable(source)?.rows.map((row) => row.map((c) => c.text))
+describe('parseTable', parseTableTests)
+describe('parseInlineSpans', parseInlineSpansTests)
+describe('parseAlertMarker', parseAlertMarkerTests)
 
+function splitTableRowTests() {
+  describe('splitting', splitTableRowSplittingTests)
+  describe('offsets', splitTableRowOffsetsTests)
+}
+
+function splitTableRowSplittingTests() {
+  it('splits a fenced row into cells', () => {
+    expect(texts('| a | b | c |')).toEqual(['a', 'b', 'c'])
+  })
+
+  it('splits an unfenced row', () => {
+    expect(texts('a | b | c')).toEqual(['a', 'b', 'c'])
+  })
+
+  it('trims surrounding whitespace from each cell', () => {
+    expect(texts('|   padded   |  cells |')).toEqual(['padded', 'cells'])
+  })
+
+  it('keeps empty interior cells so columns stay aligned', () => {
+    expect(texts('| a |  | c |')).toEqual(['a', '', 'c'])
+  })
+
+  it('does not split on an escaped pipe', () => {
+    expect(texts('| a \\| b | c |')).toEqual(['a \\| b', 'c'])
+  })
+
+  it('handles a single-column row', () => {
+    expect(texts('| only |')).toEqual(['only'])
+  })
+}
+
+function splitTableRowOffsetsTests() {
+  // Offsets are what let a click on a rendered cell put the caret in the right
+  // place in the source.
+  it('reports where each cell text starts', () => {
+    const line = '| a | b |'
+    const cells = splitTableRow(line)
+    expect(cells.map((c) => c.offset)).toEqual([line.indexOf('a'), line.indexOf('b')])
+  })
+
+  it('points past the padding, at the first visible character', () => {
+    const line = '|    spaced    |'
+    expect(splitTableRow(line)[0].offset).toBe(line.indexOf('s'))
+  })
+
+  it('reports an offset for an empty cell', () => {
+    const cells = splitTableRow('| a |  | c |')
+    expect(cells[1].offset).toBeGreaterThan(cells[0].offset)
+    expect(cells[1].offset).toBeLessThan(cells[2].offset)
+  })
+}
+
+function parseTableTests() {
+  describe('parsing', parseTableParsingTests)
+  describe('rows', parseTableRowsTests)
+  describe('offsets', parseTableOffsetsTests)
+  describe('rejecting', parseTableRejectingTests)
+}
+
+function parseTableParsingTests() {
   it('parses header, alignment, and rows', () => {
     const parsed = parseTable(table)
     expect(parsed?.header.map((c) => c.text)).toEqual(['Name', 'Count'])
@@ -101,7 +118,9 @@ describe('parseTable', () => {
     expect(parsed?.align).toEqual([null, null])
     expect(parsed?.rows).toEqual([])
   })
+}
 
+function parseTableRowsTests() {
   it('pads short rows to the header column count', () => {
     expect(rowTexts('| A | B | C |\n| --- | --- | --- |\n| only |')).toEqual([['only', '', '']])
   })
@@ -113,7 +132,9 @@ describe('parseTable', () => {
   it('skips blank lines between rows', () => {
     expect(rowTexts('| A |\n| --- |\n| x |\n\n')).toEqual([['x']])
   })
+}
 
+function parseTableOffsetsTests() {
   it('reports cell offsets against the whole table source', () => {
     const parsed = parseTable(table)
     expect(parsed?.header[0].offset).toBe(table.indexOf('Name'))
@@ -132,7 +153,9 @@ describe('parseTable', () => {
     const parsed = parseTable(source)
     expect(parsed?.rows[1][0].offset).toBe(source.lastIndexOf('y'))
   })
+}
 
+function parseTableRejectingTests() {
   it('returns null without a delimiter row', () => {
     expect(parseTable('| A | B |\n| x | y |')).toBeNull()
   })
@@ -140,9 +163,16 @@ describe('parseTable', () => {
   it('returns null for a single line', () => {
     expect(parseTable('| A | B |')).toBeNull()
   })
-})
+}
 
-describe('parseInlineSpans', () => {
+function parseInlineSpansTests() {
+  describe('plain text', parseInlineSpansPlainTextTests)
+  describe('markup', parseInlineSpansMarkupTests)
+  describe('links and mixed text', parseInlineSpansLinksMixedTextTests)
+  describe('escapes', parseInlineSpansEscapesTests)
+}
+
+function parseInlineSpansPlainTextTests() {
   it('returns a single text span for plain text', () => {
     expect(parseInlineSpans('just words')).toEqual([{ type: 'text', text: 'just words' }])
   })
@@ -150,7 +180,9 @@ describe('parseInlineSpans', () => {
   it('returns nothing for an empty cell', () => {
     expect(parseInlineSpans('')).toEqual([])
   })
+}
 
+function parseInlineSpansMarkupTests() {
   it('parses bold', () => {
     expect(parseInlineSpans('**loud**')).toEqual([{ type: 'strong', text: 'loud' }])
   })
@@ -174,7 +206,9 @@ describe('parseInlineSpans', () => {
   it('parses strikethrough', () => {
     expect(parseInlineSpans('~~gone~~')).toEqual([{ type: 'del', text: 'gone' }])
   })
+}
 
+function parseInlineSpansLinksMixedTextTests() {
   it('parses a link with its href', () => {
     expect(parseInlineSpans('[docs](https://example.com)')).toEqual([
       { type: 'link', text: 'docs', href: 'https://example.com' },
@@ -196,7 +230,9 @@ describe('parseInlineSpans', () => {
       { type: 'code', text: 'b' },
     ])
   })
+}
 
+function parseInlineSpansEscapesTests() {
   it('unescapes pipes that were escaped to survive cell splitting', () => {
     expect(parseInlineSpans('a \\| b')).toEqual([{ type: 'text', text: 'a | b' }])
   })
@@ -204,9 +240,14 @@ describe('parseInlineSpans', () => {
   it('leaves an unmatched marker as literal text', () => {
     expect(parseInlineSpans('2 * 3 = 6')).toEqual([{ type: 'text', text: '2 * 3 = 6' }])
   })
-})
+}
 
-describe('parseAlertMarker', () => {
+function parseAlertMarkerTests() {
+  describe('recognising', parseAlertMarkerRecognisingTests)
+  describe('rejecting', parseAlertMarkerRejectingTests)
+}
+
+function parseAlertMarkerRecognisingTests() {
   it.each(ALERT_KINDS)('recognises the %s alert', (kind) => {
     expect(parseAlertMarker(`> [!${kind.toUpperCase()}]`)).toBe(kind)
   })
@@ -218,7 +259,9 @@ describe('parseAlertMarker', () => {
   it('tolerates extra spacing', () => {
     expect(parseAlertMarker('>   [!TIP]   ')).toBe('tip')
   })
+}
 
+function parseAlertMarkerRejectingTests() {
   it('rejects an unknown alert type', () => {
     expect(parseAlertMarker('> [!DANGER]')).toBeNull()
   })
@@ -238,4 +281,4 @@ describe('parseAlertMarker', () => {
   it('has a label for every kind', () => {
     for (const kind of ALERT_KINDS) expect(ALERT_LABELS[kind]).toBeTruthy()
   })
-})
+}

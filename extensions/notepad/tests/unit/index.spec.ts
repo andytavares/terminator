@@ -48,11 +48,44 @@ function makeApi() {
   return { api, register }
 }
 
-describe('notepad activate() global shortcut registrations', () => {
+describe(
+  'notepad activate() global shortcut registrations',
+  notepadActivateGlobalShortcutRegistrationsTests
+)
+
+describe('notepad manifest quick action', () => {
+  it('declares a Notes group and a mnemonic on the quick-create command', () => {
+    const manifest = JSON.parse(readFileSync(join(__dirname, '../../manifest.json'), 'utf-8')) as {
+      contributes: {
+        quickActions?: { group?: { mnemonic?: string; label?: string } }
+        commands?: { id: string; mnemonic?: string; shortcut?: string; label?: string }[]
+      }
+    }
+
+    expect(manifest.contributes.quickActions?.group).toEqual({ mnemonic: 'n', label: 'Notes' })
+
+    const command = manifest.contributes.commands?.find((c) => c.id === 'notepad:quick-create')
+    expect(command?.mnemonic).toBe('n')
+    expect(command?.shortcut).toBe('⌘⇧N')
+    expect(command?.label).toBe('New note')
+  })
+})
+
+describe(
+  'notepad activate() quick-actions command registration',
+  notepadActivateQuickActionsCommandTests
+)
+
+function notepadActivateGlobalShortcutRegistrationsTests() {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
+  describe('global shortcuts', notepadActivateGlobalShortcutRegistrationsGlobalShortcutsTests)
+  describe('View menu', notepadActivateGlobalShortcutRegistrationsViewMenuTests)
+}
+
+function notepadActivateGlobalShortcutRegistrationsGlobalShortcutsTests() {
   it('does not claim Cmd+Shift+F as an OS-level global shortcut', async () => {
     const { api, register } = makeApi()
     const { activate } = await import('../../src/index.ts')
@@ -71,7 +104,9 @@ describe('notepad activate() global shortcut registrations', () => {
 
     expect(register).not.toHaveBeenCalled()
   })
+}
 
+function notepadActivateGlobalShortcutRegistrationsViewMenuTests() {
   it('exposes New Note as a focused-only View menu accelerator', async () => {
     const { api } = makeApi()
     const { activate } = await import('../../src/index.ts')
@@ -99,31 +134,19 @@ describe('notepad activate() global shortcut registrations', () => {
     expect(channels).toContain('terminator.notepad:ui.openQuickCreate')
     expect(channels).toContain('extension:activate-global-tab')
   })
-})
+}
 
-describe('notepad manifest quick action', () => {
-  it('declares a Notes group and a mnemonic on the quick-create command', () => {
-    const manifest = JSON.parse(readFileSync(join(__dirname, '../../manifest.json'), 'utf-8')) as {
-      contributes: {
-        quickActions?: { group?: { mnemonic?: string; label?: string } }
-        commands?: { id: string; mnemonic?: string; shortcut?: string; label?: string }[]
-      }
-    }
-
-    expect(manifest.contributes.quickActions?.group).toEqual({ mnemonic: 'n', label: 'Notes' })
-
-    const command = manifest.contributes.commands?.find((c) => c.id === 'notepad:quick-create')
-    expect(command?.mnemonic).toBe('n')
-    expect(command?.shortcut).toBe('⌘⇧N')
-    expect(command?.label).toBe('New note')
-  })
-})
-
-describe('notepad activate() quick-actions command registration', () => {
+function notepadActivateQuickActionsCommandTests() {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
+  describe('registration', notepadActivateQuickActionsCommandRegistrationTests)
+  describe('running', notepadActivateQuickActionsCommandRunningTests)
+  describe('disposal', notepadActivateQuickActionsCommandDisposalTests)
+}
+
+function notepadActivateQuickActionsCommandRegistrationTests() {
   it('registers the manifest command id with its label and mnemonic', async () => {
     const { api } = makeApi()
     const { activate } = await import('../../src/index.ts')
@@ -142,7 +165,9 @@ describe('notepad activate() quick-actions command registration', () => {
       expect.any(Function)
     )
   })
+}
 
+function notepadActivateQuickActionsCommandRunningTests() {
   it('running the registered command does what the View-menu item does', async () => {
     const { api } = makeApi()
     const { activate } = await import('../../src/index.ts')
@@ -161,7 +186,9 @@ describe('notepad activate() quick-actions command registration', () => {
     expect(channels).toContain('terminator.notepad:ui.openQuickCreate')
     expect(channels).toContain('extension:activate-global-tab')
   })
+}
 
+function notepadActivateQuickActionsCommandDisposalTests() {
   it('deactivate disposes the registered command', async () => {
     const { api } = makeApi()
     const { activate, deactivate } = await import('../../src/index.ts')
@@ -177,4 +204,4 @@ describe('notepad activate() quick-actions command registration', () => {
 
     expect(disposable.dispose).toHaveBeenCalled()
   })
-})
+}

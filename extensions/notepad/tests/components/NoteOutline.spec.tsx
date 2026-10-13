@@ -16,12 +16,20 @@ function depths(container: HTMLElement): string[] {
   )
 }
 
-describe('NoteOutline', () => {
+describe('NoteOutline', noteOutlineTests)
+
+function noteOutlineTests() {
   beforeEach(() => {
     cleanup()
     setBody('')
   })
 
+  describe('listing headings', noteOutlineListingHeadingsTests)
+  describe('selecting', noteOutlineSelectingTests)
+  describe('updating', noteOutlineUpdatingTests)
+}
+
+function noteOutlineListingHeadingsTests() {
   it('lists every heading in the open note', () => {
     setBody(BODY)
     render(<NoteOutline onSelect={vi.fn()} onClose={vi.fn()} />)
@@ -41,7 +49,9 @@ describe('NoteOutline', () => {
     const { container } = render(<NoteOutline onSelect={vi.fn()} onClose={vi.fn()} />)
     expect(depths(container)).toEqual(['0', '1'])
   })
+}
 
+function noteOutlineSelectingTests() {
   it('reports the heading offset when one is clicked', () => {
     setBody(BODY)
     const onSelect = vi.fn()
@@ -61,7 +71,9 @@ describe('NoteOutline', () => {
     render(<NoteOutline onSelect={vi.fn()} onClose={vi.fn()} />)
     expect(screen.getByText('4')).toBeTruthy()
   })
+}
 
+function noteOutlineUpdatingTests() {
   it('closes from its own header, without reaching for the toolbar', () => {
     setBody(BODY)
     const onClose = vi.fn()
@@ -78,4 +90,4 @@ describe('NoteOutline', () => {
     act(() => setBody('# One\n## Two'))
     expect(container.querySelectorAll('.notepad-outline__item')).toHaveLength(2)
   })
-})
+}

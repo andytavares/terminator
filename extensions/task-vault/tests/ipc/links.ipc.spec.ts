@@ -96,47 +96,7 @@ describe('task-vault:links:remove', () => {
   })
 })
 
-describe('task-vault:links:get-for-terminator-target', () => {
-  it('returns the tasks and projects linked to the target and no others', async () => {
-    await seedTask(db, { id: 'linked', terminatorLinks: JSON.stringify([TARGET]) })
-    await seedTask(db, { id: 'other', terminatorLinks: JSON.stringify([OTHER]) })
-    await seedTask(db, { id: 'none' })
-    await seedProject(db, 'p1', 'alpha')
-    await seedProject(db, 'p2', 'beta')
-    await db.run(`UPDATE projects SET terminator_links = ? WHERE id = 'p1'`, [
-      JSON.stringify([TARGET]),
-    ])
-
-    const result = (await invoke('task-vault:links:get-for-terminator-target', {
-      targetId: TARGET,
-    })) as { tasks: { id: string }[]; projects: { name: string }[] }
-
-    expect(result.tasks.map((task) => task.id)).toEqual(['linked'])
-    expect(result.projects.map((project) => project.name)).toEqual(['alpha'])
-  })
-
-  it('names the area of a linked project', async () => {
-    await seedArea(db, 'a1', 'Work')
-    await seedProject(db, 'p1', 'alpha', { areaId: 'a1' })
-    await db.run(`UPDATE projects SET terminator_links = ? WHERE id = 'p1'`, [
-      JSON.stringify([TARGET]),
-    ])
-
-    const result = (await invoke('task-vault:links:get-for-terminator-target', {
-      targetId: TARGET,
-    })) as { projects: { name: string; area?: string }[] }
-
-    expect(result.projects).toMatchObject([{ name: 'alpha', area: 'Work' }])
-  })
-
-  it('returns empty lists when nothing links to the target', async () => {
-    await seedTask(db, { id: 'other', terminatorLinks: JSON.stringify([OTHER]) })
-
-    expect(
-      await invoke('task-vault:links:get-for-terminator-target', { targetId: TARGET })
-    ).toEqual({ tasks: [], projects: [] })
-  })
-})
+describe('task-vault:links:get-for-terminator-target', taskVaultLinksGetTerminatorTests)
 
 describe('database errors', () => {
   let closed: ExtensionDB
@@ -186,3 +146,52 @@ describe('registerLinksIpcHandlers', () => {
     expect(await taskRow(db, 't2')).toMatchObject({ terminator_links: '[]' })
   })
 })
+
+function taskVaultLinksGetTerminatorTests() {
+  describe('linked', taskVaultLinksGetTerminatorLinkedTests)
+  describe('areas and nothing', taskVaultLinksGetTerminatorAreasNothingTests)
+}
+
+function taskVaultLinksGetTerminatorLinkedTests() {
+  it('returns the tasks and projects linked to the target and no others', async () => {
+    await seedTask(db, { id: 'linked', terminatorLinks: JSON.stringify([TARGET]) })
+    await seedTask(db, { id: 'other', terminatorLinks: JSON.stringify([OTHER]) })
+    await seedTask(db, { id: 'none' })
+    await seedProject(db, 'p1', 'alpha')
+    await seedProject(db, 'p2', 'beta')
+    await db.run(`UPDATE projects SET terminator_links = ? WHERE id = 'p1'`, [
+      JSON.stringify([TARGET]),
+    ])
+
+    const result = (await invoke('task-vault:links:get-for-terminator-target', {
+      targetId: TARGET,
+    })) as { tasks: { id: string }[]; projects: { name: string }[] }
+
+    expect(result.tasks.map((task) => task.id)).toEqual(['linked'])
+    expect(result.projects.map((project) => project.name)).toEqual(['alpha'])
+  })
+}
+
+function taskVaultLinksGetTerminatorAreasNothingTests() {
+  it('names the area of a linked project', async () => {
+    await seedArea(db, 'a1', 'Work')
+    await seedProject(db, 'p1', { name: 'alpha', areaId: 'a1' })
+    await db.run(`UPDATE projects SET terminator_links = ? WHERE id = 'p1'`, [
+      JSON.stringify([TARGET]),
+    ])
+
+    const result = (await invoke('task-vault:links:get-for-terminator-target', {
+      targetId: TARGET,
+    })) as { projects: { name: string; area?: string }[] }
+
+    expect(result.projects).toMatchObject([{ name: 'alpha', area: 'Work' }])
+  })
+
+  it('returns empty lists when nothing links to the target', async () => {
+    await seedTask(db, { id: 'other', terminatorLinks: JSON.stringify([OTHER]) })
+
+    expect(
+      await invoke('task-vault:links:get-for-terminator-target', { targetId: TARGET })
+    ).toEqual({ tasks: [], projects: [] })
+  })
+}

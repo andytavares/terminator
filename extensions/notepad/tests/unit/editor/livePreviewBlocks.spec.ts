@@ -37,9 +37,23 @@ function classes(decos: Collected[]): string[] {
   return decos.map((d) => d.spec.class).filter(Boolean) as string[]
 }
 
-describe('buildDecorations — tables', () => {
-  const TABLE = ['| Name | Count |', '| --- | ---: |', '| apples | 3 |'].join('\n')
+const TABLE = ['| Name | Count |', '| --- | ---: |', '| apples | 3 |'].join('\n')
 
+describe('buildDecorations — tables', buildDecorationsTablesTests)
+
+const ALERT = '> [!WARNING]\n> Mind the gap.'
+
+describe('buildDecorations — alerts', buildDecorationsAlertsTests)
+
+function buildDecorationsTablesTests() {
+  describe('rendering', buildDecorationsTablesRenderingTests)
+  describe('block widget', buildDecorationsTablesBlockWidgetTests)
+  describe('read-only and focus', buildDecorationsTablesReadOnlyFocusTests)
+  describe('before focus', buildDecorationsTablesBeforeFocusTests)
+  describe('non-tables', buildDecorationsTablesNonTablesTests)
+}
+
+function buildDecorationsTablesRenderingTests() {
   it('replaces the whole table with a table widget', () => {
     const doc = `${TABLE}\n\ntrailing paragraph`
     const state = makeState(doc)
@@ -57,7 +71,9 @@ describe('buildDecorations — tables', () => {
     expect(table.from).toBe(0)
     expect(table.to).toBe(TABLE.length)
   })
+}
 
+function buildDecorationsTablesBlockWidgetTests() {
   it('renders as a block widget when the table occupies whole lines', () => {
     const doc = `${TABLE}\n\ntrailing paragraph`
     const state = makeState(doc)
@@ -73,7 +89,9 @@ describe('buildDecorations — tables', () => {
 
     expect(widgetNames(decos)).not.toContain('TableWidget')
   })
+}
 
+function buildDecorationsTablesReadOnlyFocusTests() {
   it('still renders the table in read-only mode with the cursor inside', () => {
     const state = makeState(`${TABLE}\n`, true)
     const decos = collect(buildDecorations(state, { anchor: 3 }, true), state.doc.length)
@@ -91,7 +109,9 @@ describe('buildDecorations — tables', () => {
 
     expect(widgetNames(decos)).not.toContain('TableWidget')
   })
+}
 
+function buildDecorationsTablesBeforeFocusTests() {
   it('renders the table with the caret outside even before focus registers', () => {
     const doc = `${TABLE}\n\nafter`
     const state = makeState(doc)
@@ -114,7 +134,9 @@ describe('buildDecorations — tables', () => {
       widgetNames(collect(buildDecorations(state, { anchor: tableStart }), doc.length))
     ).not.toContain('TableWidget')
   })
+}
 
+function buildDecorationsTablesNonTablesTests() {
   it('leaves a pipe-looking paragraph that is not a table alone', () => {
     const doc = 'a | b\nnot a delimiter row\n'
     const state = makeState(doc)
@@ -122,11 +144,17 @@ describe('buildDecorations — tables', () => {
 
     expect(widgetNames(decos)).not.toContain('TableWidget')
   })
-})
+}
 
-describe('buildDecorations — alerts', () => {
-  const ALERT = '> [!WARNING]\n> Mind the gap.'
+function buildDecorationsAlertsTests() {
+  describe('marker line', buildDecorationsAlertsMarkerLineTests)
+  describe('body lines', buildDecorationsAlertsBodyLinesTests)
+  describe('longer alerts', buildDecorationsAlertsLongerAlertsTests)
+  describe('editing', buildDecorationsAlertsEditingTests)
+  describe('unknown kinds', buildDecorationsAlertsUnknownKindsTests)
+}
 
+function buildDecorationsAlertsMarkerLineTests() {
   it('replaces the marker line with an alert header widget', () => {
     const doc = `${ALERT}\n\nafter`
     const state = makeState(doc)
@@ -139,16 +167,16 @@ describe('buildDecorations — alerts', () => {
     const doc = `${ALERT}\n\nafter`
     const state = makeState(doc)
     const decos = collect(buildDecorations(state, { anchor: doc.length }), doc.length)
-
     const alertLines = classes(decos).filter((c) => c.includes('notepad-alert--warning'))
     expect(alertLines).toHaveLength(2)
   })
+}
 
+function buildDecorationsAlertsBodyLinesTests() {
   it('hides the quote marker on body lines', () => {
     const doc = `${ALERT}\n\nafter`
     const state = makeState(doc)
     const decos = collect(buildDecorations(state, { anchor: doc.length }), doc.length)
-
     const bodyLineStart = doc.indexOf('> Mind')
     const hidden = decos.find(
       (d) => d.from === bodyLineStart && d.to === bodyLineStart + 2 && !d.spec.class
@@ -163,12 +191,13 @@ describe('buildDecorations — alerts', () => {
 
     expect(classes(decos).some((c) => c.includes('notepad-alert--tip'))).toBe(true)
   })
+}
 
+function buildDecorationsAlertsLongerAlertsTests() {
   it('handles a multi-paragraph alert', () => {
     const doc = '> [!NOTE]\n> First.\n>\n> Second.\n\nafter'
     const state = makeState(doc)
     const decos = collect(buildDecorations(state, { anchor: doc.length }), doc.length)
-
     const alertLines = classes(decos).filter((c) => c.includes('notepad-alert--note'))
     expect(alertLines).toHaveLength(4)
   })
@@ -178,11 +207,12 @@ describe('buildDecorations — alerts', () => {
     const doc = '> [!NOTE]\n> First line\nlazy continuation\n\nafter'
     const state = makeState(doc)
     const decos = collect(buildDecorations(state, { anchor: doc.length }), doc.length)
-
     const alertLines = classes(decos).filter((c) => c.includes('notepad-alert--note'))
     expect(alertLines).toHaveLength(3)
   })
+}
 
+function buildDecorationsAlertsEditingTests() {
   it('shows raw markdown while the cursor is inside the alert', () => {
     const state = makeState(`${ALERT}\n`)
     const decos = collect(buildDecorations(state, { anchor: 4 }, true), state.doc.length)
@@ -198,7 +228,9 @@ describe('buildDecorations — alerts', () => {
     expect(widgetNames(decos)).not.toContain('AlertHeaderWidget')
     expect(classes(decos).some((c) => c.includes('notepad-blockquote-line'))).toBe(true)
   })
+}
 
+function buildDecorationsAlertsUnknownKindsTests() {
   it('treats an unknown alert type as an ordinary blockquote', () => {
     const doc = '> [!DANGER]\n> nope\n\nafter'
     const state = makeState(doc)
@@ -206,4 +238,4 @@ describe('buildDecorations — alerts', () => {
 
     expect(widgetNames(decos)).not.toContain('AlertHeaderWidget')
   })
-})
+}

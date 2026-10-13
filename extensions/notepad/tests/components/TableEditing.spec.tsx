@@ -79,99 +79,27 @@ function mountOnALoadedMachine(cursor: number): EditorView {
   }
 }
 
-describe('editing a rendered table', () => {
-  it('renders the table while the caret is elsewhere', () => {
-    expect(tableRendered(mount(0))).toBe(true)
-  })
+describe('editing a rendered table', editingRenderedTableTests)
 
-  it('renders the table once the background parse reaches it', () => {
-    // The background parse is scheduled with setTimeout where there is no requestIdleCallback.
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
-    try {
-      const v = mountOnALoadedMachine(0)
-      expect(tableRendered(v)).toBe(false)
+describe('a table the first parse did not reach', () => {
+  // A new editor parses only its first few thousand characters at once and
+  // the rest in the background, so a table further down arrives later.
+  it('renders once the background parse reaches it', async () => {
+    const doc = `${'filler line\n'.repeat(1500)}\n${TABLE}\n`
+    const v = createView(doc, 0)
+    expect(syntaxTree(v.state).length).toBeLessThan(doc.length)
 
-      vi.runAllTimers()
-
-      expect(tableRendered(v)).toBe(true)
-    } finally {
-      vi.useRealTimers()
+    await vi.waitFor(() => expect(syntaxTree(v.state).length).toBe(doc.length), {
+      timeout: 10_000,
+    })
+    const widgets: string[] = []
+    for (const source of v.state.facet(EditorView.decorations)) {
+      const set = typeof source === 'function' ? source(v) : source
+      set.between(0, doc.length, (_from, _to, deco) => {
+        widgets.push(deco.spec.widget?.constructor.name ?? '')
+      })
     }
-  })
-
-  it('clicking a body cell puts the caret in that cell', () => {
-    const v = mount(0)
-    const cell = v.dom.querySelectorAll<HTMLElement>('.notepad-table tbody td')[0]
-    cell.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))
-
-    expect(v.state.selection.main.head).toBe(DOC.indexOf('apples'))
-  })
-
-  it('clicking a cell reveals the raw markdown so it can be typed into', () => {
-    const v = mount(0)
-    const cell = v.dom.querySelectorAll<HTMLElement>('.notepad-table tbody td')[0]
-    cell.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))
-
-    expect(tableRendered(v)).toBe(false)
-    expect(v.dom.textContent).toContain('| apples | 3 |')
-  })
-
-  it('clicking a header cell puts the caret in the header source', () => {
-    const v = mount(0)
-    const cell = v.dom.querySelectorAll<HTMLElement>('.notepad-table thead th')[1]
-    cell.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))
-
-    expect(v.state.selection.main.head).toBe(DOC.indexOf('Count'))
-  })
-
-  it('typing after a click edits the cell rather than the whole table', () => {
-    const v = mount(0)
-    const cell = v.dom.querySelectorAll<HTMLElement>('.notepad-table tbody td')[0]
-    cell.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))
-
-    const at = v.state.selection.main.head
-    v.dispatch({ changes: { from: at, insert: 'green ' } })
-
-    expect(v.state.doc.toString()).toContain('| green apples | 3 |')
-  })
-
-  it('the caret can walk into the table from the line above', () => {
-    // Just before the table's first character.
-    const v = mount(DOC.indexOf('| Name') - 1)
-    expect(tableRendered(v)).toBe(true)
-
-    cursorCharRight(v)
-
-    expect(v.state.selection.main.head).toBeGreaterThanOrEqual(DOC.indexOf('| Name'))
-    expect(tableRendered(v)).toBe(false)
-  })
-
-  it('the caret can walk into the table from the line below', () => {
-    const tableEnd = DOC.indexOf('| apples | 3 |') + '| apples | 3 |'.length
-    const v = mount(tableEnd + 1)
-    cursorCharLeft(v)
-
-    expect(v.state.selection.main.head).toBeLessThanOrEqual(tableEnd)
-    expect(tableRendered(v)).toBe(false)
-  })
-
-  it('re-renders once the caret leaves the table again', () => {
-    const v = mount(DOC.indexOf('apples'))
-    expect(tableRendered(v)).toBe(false)
-
-    v.dispatch({ selection: { anchor: 0 } })
-
-    expect(tableRendered(v)).toBe(true)
-  })
-
-  it('reflects an edit in the re-rendered table', () => {
-    const v = mount(DOC.indexOf('apples'))
-    v.dispatch({ changes: { from: DOC.indexOf('apples'), insert: 'green ' } })
-    finishParsing(v)
-    v.dispatch({ selection: { anchor: 0 } })
-
-    expect(tableRendered(v)).toBe(true)
-    expect(v.dom.querySelector('.notepad-table tbody td')?.textContent).toBe('green apples')
+    expect(widgets).toContain('TableWidget')
   })
 })
 
@@ -204,24 +132,114 @@ describe('writing a fenced code block', () => {
   })
 })
 
-describe('a table the first parse did not reach', () => {
-  // A new editor parses only its first few thousand characters at once and
-  // the rest in the background, so a table further down arrives later.
-  it('renders once the background parse reaches it', async () => {
-    const doc = `${'filler line\n'.repeat(1500)}\n${TABLE}\n`
-    const v = createView(doc, 0)
-    expect(syntaxTree(v.state).length).toBeLessThan(doc.length)
+function editingRenderedTableTests() {
+  describe('rendering', editingRenderedTableRenderingTests)
+  describe('clicking', editingRenderedTableClickingTests)
+  describe('typing', editingRenderedTableTypingTests)
+  describe('keyboard', editingRenderedTableKeyboardTests)
+  describe('leaving', editingRenderedTableLeavingTests)
+}
 
-    await vi.waitFor(() => expect(syntaxTree(v.state).length).toBe(doc.length), {
-      timeout: 10_000,
-    })
-    const widgets: string[] = []
-    for (const source of v.state.facet(EditorView.decorations)) {
-      const set = typeof source === 'function' ? source(v) : source
-      set.between(0, doc.length, (_from, _to, deco) => {
-        widgets.push(deco.spec.widget?.constructor.name ?? '')
-      })
-    }
-    expect(widgets).toContain('TableWidget')
+function editingRenderedTableRenderingTests() {
+  it('renders the table while the caret is elsewhere', () => {
+    expect(tableRendered(mount(0))).toBe(true)
   })
-})
+
+  it('renders the table once the background parse reaches it', () => {
+    // The background parse is scheduled with setTimeout where there is no requestIdleCallback.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      const v = mountOnALoadedMachine(0)
+      expect(tableRendered(v)).toBe(false)
+
+      vi.runAllTimers()
+
+      expect(tableRendered(v)).toBe(true)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+}
+
+function editingRenderedTableClickingTests() {
+  it('clicking a body cell puts the caret in that cell', () => {
+    const v = mount(0)
+    const cell = v.dom.querySelectorAll<HTMLElement>('.notepad-table tbody td')[0]
+    cell.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))
+
+    expect(v.state.selection.main.head).toBe(DOC.indexOf('apples'))
+  })
+
+  it('clicking a cell reveals the raw markdown so it can be typed into', () => {
+    const v = mount(0)
+    const cell = v.dom.querySelectorAll<HTMLElement>('.notepad-table tbody td')[0]
+    cell.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))
+
+    expect(tableRendered(v)).toBe(false)
+    expect(v.dom.textContent).toContain('| apples | 3 |')
+  })
+
+  it('clicking a header cell puts the caret in the header source', () => {
+    const v = mount(0)
+    const cell = v.dom.querySelectorAll<HTMLElement>('.notepad-table thead th')[1]
+    cell.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))
+
+    expect(v.state.selection.main.head).toBe(DOC.indexOf('Count'))
+  })
+}
+
+function editingRenderedTableTypingTests() {
+  it('typing after a click edits the cell rather than the whole table', () => {
+    const v = mount(0)
+    const cell = v.dom.querySelectorAll<HTMLElement>('.notepad-table tbody td')[0]
+    cell.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))
+
+    const at = v.state.selection.main.head
+    v.dispatch({ changes: { from: at, insert: 'green ' } })
+
+    expect(v.state.doc.toString()).toContain('| green apples | 3 |')
+  })
+}
+
+function editingRenderedTableKeyboardTests() {
+  it('the caret can walk into the table from the line above', () => {
+    // Just before the table's first character.
+    const v = mount(DOC.indexOf('| Name') - 1)
+    expect(tableRendered(v)).toBe(true)
+
+    cursorCharRight(v)
+
+    expect(v.state.selection.main.head).toBeGreaterThanOrEqual(DOC.indexOf('| Name'))
+    expect(tableRendered(v)).toBe(false)
+  })
+
+  it('the caret can walk into the table from the line below', () => {
+    const tableEnd = DOC.indexOf('| apples | 3 |') + '| apples | 3 |'.length
+    const v = mount(tableEnd + 1)
+    cursorCharLeft(v)
+
+    expect(v.state.selection.main.head).toBeLessThanOrEqual(tableEnd)
+    expect(tableRendered(v)).toBe(false)
+  })
+}
+
+function editingRenderedTableLeavingTests() {
+  it('re-renders once the caret leaves the table again', () => {
+    const v = mount(DOC.indexOf('apples'))
+    expect(tableRendered(v)).toBe(false)
+
+    v.dispatch({ selection: { anchor: 0 } })
+
+    expect(tableRendered(v)).toBe(true)
+  })
+
+  it('reflects an edit in the re-rendered table', () => {
+    const v = mount(DOC.indexOf('apples'))
+    v.dispatch({ changes: { from: DOC.indexOf('apples'), insert: 'green ' } })
+    finishParsing(v)
+    v.dispatch({ selection: { anchor: 0 } })
+
+    expect(tableRendered(v)).toBe(true)
+    expect(v.dom.querySelector('.notepad-table tbody td')?.textContent).toBe('green apples')
+  })
+}

@@ -16,39 +16,7 @@ describe('localDate', () => {
   })
 })
 
-describe('parseRecurrenceRule', () => {
-  it('parses daily', () => {
-    expect(parseRecurrenceRule('daily')).toEqual({ kind: 'daily' })
-  })
-
-  it('parses biweekly', () => {
-    expect(parseRecurrenceRule('biweekly')).toEqual({ kind: 'biweekly' })
-  })
-
-  it('parses monthly', () => {
-    expect(parseRecurrenceRule('monthly')).toEqual({ kind: 'monthly' })
-  })
-
-  it('parses plain weekly', () => {
-    expect(parseRecurrenceRule('weekly')).toEqual({ kind: 'weekly', days: [] })
-  })
-
-  it('parses weekly:1,3 with days', () => {
-    expect(parseRecurrenceRule('weekly:1,3')).toEqual({ kind: 'weekly', days: [1, 3] })
-  })
-
-  it('parses weekly with a single day', () => {
-    expect(parseRecurrenceRule('weekly:5')).toEqual({ kind: 'weekly', days: [5] })
-  })
-
-  it('throws InvalidRecurrenceRuleError on unknown input', () => {
-    expect(() => parseRecurrenceRule('unknown')).toThrow(InvalidRecurrenceRuleError)
-  })
-
-  it('throws on empty string', () => {
-    expect(() => parseRecurrenceRule('')).toThrow(InvalidRecurrenceRuleError)
-  })
-})
+describe('parseRecurrenceRule', parseRecurrenceRuleTests)
 
 describe('computeNextDueDate', () => {
   it('adds one day for daily', () => {
@@ -77,3 +45,47 @@ describe('computeNextDueDate', () => {
     expect(computeNextDueDate('2024-03-15', { kind: 'weekly', days: [1, 3] })).toBe('2024-03-18')
   })
 })
+
+function parseRecurrenceRuleTests() {
+  describe('intervals', parseRecurrenceRuleIntervalsTests)
+  describe('weekdays', parseRecurrenceRuleWeekdaysTests)
+  describe('invalid rules', parseRecurrenceRuleInvalidRulesTests)
+}
+
+function parseRecurrenceRuleIntervalsTests() {
+  it('parses daily', () => {
+    expect(parseRecurrenceRule('daily')).toEqual({ kind: 'daily' })
+  })
+
+  it('parses biweekly', () => {
+    expect(parseRecurrenceRule('biweekly')).toEqual({ kind: 'biweekly' })
+  })
+
+  it('parses monthly', () => {
+    expect(parseRecurrenceRule('monthly')).toEqual({ kind: 'monthly' })
+  })
+
+  it('parses plain weekly', () => {
+    expect(parseRecurrenceRule('weekly')).toEqual({ kind: 'weekly', days: [] })
+  })
+}
+
+function parseRecurrenceRuleWeekdaysTests() {
+  it('parses weekly:1,3 with days', () => {
+    expect(parseRecurrenceRule('weekly:1,3')).toEqual({ kind: 'weekly', days: [1, 3] })
+  })
+
+  it('parses weekly with a single day', () => {
+    expect(parseRecurrenceRule('weekly:5')).toEqual({ kind: 'weekly', days: [5] })
+  })
+}
+
+function parseRecurrenceRuleInvalidRulesTests() {
+  it('throws InvalidRecurrenceRuleError on unknown input', () => {
+    expect(() => parseRecurrenceRule('unknown')).toThrow(InvalidRecurrenceRuleError)
+  })
+
+  it('throws on empty string', () => {
+    expect(() => parseRecurrenceRule('')).toThrow(InvalidRecurrenceRuleError)
+  })
+}

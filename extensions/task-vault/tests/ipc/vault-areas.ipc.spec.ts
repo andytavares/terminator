@@ -27,92 +27,30 @@ beforeEach(async () => {
 })
 
 const invoke = (channel: string, payload?: unknown) => harness.invoke(channel, payload)
-
 const areaRow = (name: string) =>
   db.get<Record<string, unknown>>(`SELECT * FROM areas WHERE name = ?`, [name])
 const projectRow = (id: string) =>
   db.get<Record<string, unknown>>(`SELECT * FROM projects WHERE id = ?`, [id])
 
-describe('task-vault:vault:list-areas', () => {
-  type AreaSummary = {
+type AreaSummary = {
+  name: string
+  status: string
+  taskCount: number
+  openTaskCount: number
+  tasks: { id: string }[]
+  projects: {
     name: string
-    status: string
-    taskCount: number
-    openTaskCount: number
-    tasks: { id: string }[]
-    projects: {
-      name: string
-      nextActionCount: number
-      isStale: boolean
-      totalTaskCount: number
-      doneTaskCount: number
-    }[]
-  }
-  const listAreas = (payload?: unknown) =>
-    invoke('task-vault:vault:list-areas', payload) as Promise<{ areas: AreaSummary[] }>
+    nextActionCount: number
+    isStale: boolean
+    totalTaskCount: number
+    doneTaskCount: number
+  }[]
+}
 
-  it('returns no areas for an empty database', async () => {
-    expect(await listAreas()).toEqual({ areas: [] })
-  })
+const listAreas = (payload?: unknown) =>
+  invoke('task-vault:vault:list-areas', payload) as Promise<{ areas: AreaSummary[] }>
 
-  it('returns active areas by default, ordered by name; archived ones on request', async () => {
-    await seedArea(db, 'a2', 'Work')
-    await seedArea(db, 'a1', 'Home')
-    await seedArea(db, 'a3', 'Old', 'archived')
-
-    expect((await listAreas()).areas.map((area) => area.name)).toEqual(['Home', 'Work'])
-    expect((await listAreas({ status: 'archived' })).areas.map((area) => area.name)).toEqual([
-      'Old',
-    ])
-    expect((await listAreas({ status: 'all' })).areas.map((area) => area.name)).toEqual([
-      'Home',
-      'Old',
-      'Work',
-    ])
-  })
-
-  it('summarises tasks, projects and combined counts per area', async () => {
-    await seedArea(db, 'a1', 'Work')
-    await seedProject(db, 'p1', 'Work Project', { areaId: 'a1' })
-    await seedTask(db, { id: 'area-open', areaId: 'a1' })
-    await seedTask(db, { id: 'area-done', areaId: 'a1', status: 'done' })
-    await seedTask(db, { id: 'project-open', projectId: 'p1' })
-    await seedTask(db, { id: 'project-done', projectId: 'p1', status: 'done' })
-    await seedTask(db, { id: 'project-sub', projectId: 'p1', parentId: 'project-open' })
-    await seedTask(db, { id: 'elsewhere' })
-
-    const [work] = (await listAreas()).areas
-
-    expect(work.tasks.map((task) => task.id)).toEqual(['area-open'])
-    expect(work.openTaskCount).toBe(2)
-    expect(work.taskCount).toBe(4)
-    expect(work.projects).toMatchObject([
-      {
-        name: 'Work Project',
-        nextActionCount: 2,
-        isStale: false,
-        totalTaskCount: 2,
-        doneTaskCount: 1,
-      },
-    ])
-  })
-
-  it('names the area on each listed project', async () => {
-    await seedArea(db, 'a1', 'Work')
-    await seedProject(db, 'p1', 'Work Project', { areaId: 'a1' })
-
-    const [work] = (await listAreas()).areas
-
-    expect(work.projects).toMatchObject([{ name: 'Work Project', area: 'Work' }])
-  })
-
-  it('returns the error when the database fails', async () => {
-    await db.exec('DROP TABLE areas')
-    expect(await invoke('task-vault:vault:list-areas')).toMatchObject({
-      error: expect.stringContaining('no such table'),
-    })
-  })
-})
+describe('task-vault:vault:list-areas', taskVaultVaultListAreasTests)
 
 describe('task-vault:vault:create-area', () => {
   it('creates an active area named in display form', async () => {
@@ -161,10 +99,94 @@ describe('task-vault:vault:rename-area', () => {
   })
 })
 
-describe('task-vault:vault:archive-area and restore-area', () => {
+const archive = () => invoke('task-vault:vault:archive-area', { areaName: 'Work' })
+
+describe('task-vault:vault:archive-area and restore-area', taskVaultVaultArchiveAreaTests)
+describe('task-vault:vault:delete-area', taskVaultVaultDeleteAreaTests)
+
+const update = (payload: unknown) => invoke('task-vault:vault:update-project-status', payload)
+
+describe('task-vault:vault:update-project-status', taskVaultVaultUpdateProjectTests)
+describe('task-vault:vault:list-someday and someday-to-today', taskVaultVaultListSomedayTests)
+
+function taskVaultVaultListAreasTests() {
+  describe('listing', taskVaultVaultListAreasListingTests)
+  describe('summaries', taskVaultVaultListAreasSummariesTests)
+  describe('project areas and errors', taskVaultVaultListAreasProjectAreasErrorsTests)
+}
+
+function taskVaultVaultListAreasListingTests() {
+  it('returns no areas for an empty database', async () => {
+    expect(await listAreas()).toEqual({ areas: [] })
+  })
+
+  it('returns active areas by default, ordered by name; archived ones on request', async () => {
+    await seedArea(db, 'a2', 'Work')
+    await seedArea(db, 'a1', 'Home')
+    await seedArea(db, 'a3', { name: 'Old', status: 'archived' })
+
+    expect((await listAreas()).areas.map((area) => area.name)).toEqual(['Home', 'Work'])
+    expect((await listAreas({ status: 'archived' })).areas.map((area) => area.name)).toEqual([
+      'Old',
+    ])
+    expect((await listAreas({ status: 'all' })).areas.map((area) => area.name)).toEqual([
+      'Home',
+      'Old',
+      'Work',
+    ])
+  })
+}
+
+function taskVaultVaultListAreasSummariesTests() {
+  it('summarises tasks, projects and combined counts per area', async () => {
+    await seedArea(db, 'a1', 'Work')
+    await seedProject(db, 'p1', { name: 'Work Project', areaId: 'a1' })
+    await seedTask(db, { id: 'area-open', areaId: 'a1' })
+    await seedTask(db, { id: 'area-done', areaId: 'a1', status: 'done' })
+    await seedTask(db, { id: 'project-open', projectId: 'p1' })
+    await seedTask(db, { id: 'project-done', projectId: 'p1', status: 'done' })
+    await seedTask(db, { id: 'project-sub', projectId: 'p1', parentId: 'project-open' })
+    await seedTask(db, { id: 'elsewhere' })
+
+    const [work] = (await listAreas()).areas
+
+    expect(work.tasks.map((task) => task.id)).toEqual(['area-open'])
+    expect(work.openTaskCount).toBe(2)
+    expect(work.taskCount).toBe(4)
+    expect(work.projects).toMatchObject([
+      {
+        name: 'Work Project',
+        nextActionCount: 2,
+        isStale: false,
+        totalTaskCount: 2,
+        doneTaskCount: 1,
+      },
+    ])
+  })
+}
+
+function taskVaultVaultListAreasProjectAreasErrorsTests() {
+  it('names the area on each listed project', async () => {
+    await seedArea(db, 'a1', 'Work')
+    await seedProject(db, 'p1', { name: 'Work Project', areaId: 'a1' })
+
+    const [work] = (await listAreas()).areas
+
+    expect(work.projects).toMatchObject([{ name: 'Work Project', area: 'Work' }])
+  })
+
+  it('returns the error when the database fails', async () => {
+    await db.exec('DROP TABLE areas')
+    expect(await invoke('task-vault:vault:list-areas')).toMatchObject({
+      error: expect.stringContaining('no such table'),
+    })
+  })
+}
+
+function taskVaultVaultArchiveAreaTests() {
   beforeEach(async () => {
     await seedArea(db, 'a1', 'Work')
-    await seedProject(db, 'p1', 'Work Project', { areaId: 'a1' })
+    await seedProject(db, 'p1', { name: 'Work Project', areaId: 'a1' })
     await seedTask(db, { id: 'project-task', projectId: 'p1' })
     await seedTask(db, { id: 'project-sub', parentId: 'project-task', status: 'blocked' })
     await seedTask(db, { id: 'area-task', areaId: 'a1', status: 'in-progress' })
@@ -173,8 +195,15 @@ describe('task-vault:vault:archive-area and restore-area', () => {
     await seedTask(db, { id: 'elsewhere' })
   })
 
-  const archive = () => invoke('task-vault:vault:archive-area', { areaName: 'Work' })
+  describe('archiving', taskVaultVaultArchiveAreaArchivingTests)
+  describe('restoring tasks', taskVaultVaultArchiveAreaRestoringTasksTests)
+  describe('restoring subtasks', taskVaultVaultArchiveAreaRestoringSubtasksTests)
+  describe('restoring after changes', taskVaultVaultArchiveAreaRestoringAfterChangesTests)
+  describe('legacy archives', taskVaultVaultArchiveAreaLegacyArchivesTests)
+  describe('missing areas', taskVaultVaultArchiveAreaMissingAreasTests)
+}
 
+function taskVaultVaultArchiveAreaArchivingTests() {
   it('archives the area and its projects and cancels their unfinished tasks', async () => {
     expect(await archive()).toMatchObject({ success: true })
 
@@ -196,7 +225,9 @@ describe('task-vault:vault:archive-area and restore-area', () => {
       key: 'areaArchived',
     })
   })
+}
 
+function taskVaultVaultArchiveAreaRestoringTasksTests() {
   it('restore reopens the tasks the archive cancelled but not ones the user cancelled earlier', async () => {
     await db.run(
       `UPDATE tasks SET updated_at = '2026-01-01T00:00:00.000Z' WHERE id = 'user-cancelled'`
@@ -213,7 +244,9 @@ describe('task-vault:vault:archive-area and restore-area', () => {
     expect(await taskRow(db, 'area-task')).toMatchObject({ status: 'in-progress' })
     expect(await taskRow(db, 'user-cancelled')).toMatchObject({ status: 'cancelled' })
   })
+}
 
+function taskVaultVaultArchiveAreaRestoringSubtasksTests() {
   it('restore reopens subtasks the archive cancelled and leaves user-cancelled subtasks cancelled', async () => {
     await seedTask(db, { id: 'area-sub', parentId: 'area-task' })
     await seedTask(db, { id: 'area-sub-cancelled', parentId: 'area-task', status: 'cancelled' })
@@ -231,7 +264,9 @@ describe('task-vault:vault:archive-area and restore-area', () => {
     expect(await taskRow(db, 'area-sub-cancelled')).toMatchObject({ status: 'cancelled' })
     expect(await taskRow(db, 'project-sub-cancelled')).toMatchObject({ status: 'cancelled' })
   })
+}
 
+function taskVaultVaultArchiveAreaRestoringAfterChangesTests() {
   it('restore still reopens what archive cancelled after the area was renamed', async () => {
     await archive()
     await invoke('task-vault:vault:rename-area', { areaFilePath: 'Work', newName: 'Job' })
@@ -243,8 +278,8 @@ describe('task-vault:vault:archive-area and restore-area', () => {
   })
 
   it('restore keeps a project that was not active before the archive as it was', async () => {
-    await seedProject(db, 'parked', 'Parked', { areaId: 'a1', status: 'someday' })
-    await seedProject(db, 'finished', 'Finished', { areaId: 'a1', status: 'archived' })
+    await seedProject(db, 'parked', { name: 'Parked', areaId: 'a1', status: 'someday' })
+    await seedProject(db, 'finished', { name: 'Finished', areaId: 'a1', status: 'archived' })
     await archive()
 
     await invoke('task-vault:vault:restore-area', { areaName: 'Work' })
@@ -253,7 +288,9 @@ describe('task-vault:vault:archive-area and restore-area', () => {
     expect(await projectRow('parked')).toMatchObject({ status: 'someday' })
     expect(await projectRow('finished')).toMatchObject({ status: 'archived' })
   })
+}
 
+function taskVaultVaultArchiveAreaLegacyArchivesTests() {
   it('restores an area archived before changes were recorded by matching the archive time', async () => {
     const archivedAt = '2026-02-01T10:00:00.000Z'
     await db.run(`UPDATE areas SET status='archived', updated_at=? WHERE id='a1'`, [archivedAt])
@@ -270,7 +307,9 @@ describe('task-vault:vault:archive-area and restore-area', () => {
     }
     expect(await taskRow(db, 'user-cancelled')).toMatchObject({ status: 'cancelled' })
   })
+}
 
+function taskVaultVaultArchiveAreaMissingAreasTests() {
   it.each(['archive-area', 'restore-area'])(
     '%s returns NOT_FOUND for an unknown area',
     async (name) => {
@@ -279,18 +318,23 @@ describe('task-vault:vault:archive-area and restore-area', () => {
       })
     }
   )
-})
+}
 
-describe('task-vault:vault:delete-area', () => {
+function taskVaultVaultDeleteAreaTests() {
   beforeEach(async () => {
-    await seedArea(db, 'a1', 'Work', 'archived')
-    await seedProject(db, 'p1', 'Work Project', { areaId: 'a1', status: 'archived' })
+    await seedArea(db, 'a1', { name: 'Work', status: 'archived' })
+    await seedProject(db, 'p1', { name: 'Work Project', areaId: 'a1', status: 'archived' })
     await seedTask(db, { id: 'project-task', projectId: 'p1' })
     await seedTask(db, { id: 'project-sub', parentId: 'project-task' })
     await seedTask(db, { id: 'area-task', areaId: 'a1' })
     await seedTask(db, { id: 'elsewhere' })
   })
 
+  describe('deleting', taskVaultVaultDeleteAreaDeletingTests)
+  describe('refusing', taskVaultVaultDeleteAreaRefusingTests)
+}
+
+function taskVaultVaultDeleteAreaDeletingTests() {
   it('deletes an archived area with its projects and tasks', async () => {
     expect(
       await invoke('task-vault:vault:delete-area', { areaFilePath: 'areas/Work.md' })
@@ -302,7 +346,9 @@ describe('task-vault:vault:delete-area', () => {
       'elsewhere',
     ])
   })
+}
 
+function taskVaultVaultDeleteAreaRefusingTests() {
   it('returns MUST_ARCHIVE_FIRST for an active area and keeps everything', async () => {
     await db.run(`UPDATE areas SET status = 'active'`)
 
@@ -318,9 +364,9 @@ describe('task-vault:vault:delete-area', () => {
       await invoke('task-vault:vault:delete-area', { areaFilePath: 'areas/Ghost.md' })
     ).toMatchObject({ error: 'NOT_FOUND' })
   })
-})
+}
 
-describe('task-vault:vault:update-project-status', () => {
+function taskVaultVaultUpdateProjectTests() {
   beforeEach(async () => {
     await seedProject(db, 'proj-1', 'MyProject')
     await seedTask(db, { id: 'open', projectId: 'proj-1' })
@@ -328,8 +374,11 @@ describe('task-vault:vault:update-project-status', () => {
     await seedTask(db, { id: 'done', projectId: 'proj-1', status: 'done' })
   })
 
-  const update = (payload: unknown) => invoke('task-vault:vault:update-project-status', payload)
+  describe('updating', taskVaultVaultUpdateProjectUpdatingTests)
+  describe('archiving', taskVaultVaultUpdateProjectArchivingTests)
+}
 
+function taskVaultVaultUpdateProjectUpdatingTests() {
   it('updates a project found by name, leaving its tasks alone', async () => {
     expect(await update({ projectFilePath: 'MyProject', status: 'someday' })).toEqual({
       success: true,
@@ -342,7 +391,9 @@ describe('task-vault:vault:update-project-status', () => {
   it('falls back to the project id', async () => {
     expect(await update({ projectFilePath: 'proj-1', status: 'active' })).toEqual({ success: true })
   })
+}
 
+function taskVaultVaultUpdateProjectArchivingTests() {
   it('cancels the unfinished tasks, subtasks included, and notifies when archiving', async () => {
     expect(await update({ projectFilePath: 'MyProject', status: 'archived' })).toEqual({
       success: true,
@@ -365,14 +416,19 @@ describe('task-vault:vault:update-project-status', () => {
       error: 'NOT_FOUND',
     })
   })
-})
+}
 
-describe('task-vault:vault:list-someday and someday-to-today', () => {
+function taskVaultVaultListSomedayTests() {
+  describe('listing', taskVaultVaultListSomedayListingTests)
+  describe('moving to today', taskVaultVaultListSomedayMovingTodayTests)
+}
+
+function taskVaultVaultListSomedayListingTests() {
   it('lists open top-level someday tasks and someday projects', async () => {
     await seedTask(db, { id: 'parked', source: 'someday' })
     await seedTask(db, { id: 'parked-sub', source: 'someday', parentId: 'parked' })
     await seedTask(db, { id: 'parked-done', source: 'someday', status: 'done' })
-    await seedProject(db, 'p1', 'Maybe', { status: 'someday' })
+    await seedProject(db, 'p1', { name: 'Maybe', status: 'someday' })
     await seedProject(db, 'p2', 'Live')
 
     const result = (await invoke('task-vault:vault:list-someday')) as {
@@ -386,7 +442,7 @@ describe('task-vault:vault:list-someday and someday-to-today', () => {
 
   it('names the area of a someday project', async () => {
     await seedArea(db, 'a1', 'Home')
-    await seedProject(db, 'p1', 'Maybe', { status: 'someday', areaId: 'a1' })
+    await seedProject(db, 'p1', { name: 'Maybe', status: 'someday', areaId: 'a1' })
 
     const result = (await invoke('task-vault:vault:list-someday')) as {
       projects: { name: string; area?: string }[]
@@ -394,7 +450,9 @@ describe('task-vault:vault:list-someday and someday-to-today', () => {
 
     expect(result.projects).toMatchObject([{ name: 'Maybe', area: 'Home' }])
   })
+}
 
+function taskVaultVaultListSomedayMovingTodayTests() {
   it('moves a someday task and its subtasks to today and opens it', async () => {
     await seedTask(db, { id: 'parked', source: 'someday', status: 'cancelled' })
     await seedTask(db, { id: 'parked-sub', source: 'someday', parentId: 'parked' })
@@ -412,4 +470,4 @@ describe('task-vault:vault:list-someday and someday-to-today', () => {
       source_ref: localDate(),
     })
   })
-})
+}

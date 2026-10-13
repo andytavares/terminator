@@ -19,11 +19,18 @@ const mockComment: Comment = {
   replies: [],
 }
 
-describe('comments.store', () => {
+describe('comments.store', commentsStoreTests)
+
+function commentsStoreTests() {
   beforeEach(() => {
     useCommentsStore.setState({ comments: [], loading: false })
   })
 
+  describe('setting comments', commentsStoreSettingCommentsTests)
+  describe('changing comments', commentsStoreChangingCommentsTests)
+}
+
+function commentsStoreSettingCommentsTests() {
   it('starts with empty comments', () => {
     expect(useCommentsStore.getState().comments).toEqual([])
   })
@@ -37,7 +44,9 @@ describe('comments.store', () => {
     useCommentsStore.getState().addComment(mockComment)
     expect(useCommentsStore.getState().comments).toHaveLength(1)
   })
+}
 
+function commentsStoreChangingCommentsTests() {
   it('removeComment removes by id', () => {
     useCommentsStore.setState({ comments: [mockComment], loading: false })
     useCommentsStore.getState().removeComment('c1')
@@ -56,4 +65,4 @@ describe('comments.store', () => {
     useCommentsStore.getState().setLoading(true)
     expect(useCommentsStore.getState().loading).toBe(true)
   })
-})
+}

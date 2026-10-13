@@ -59,12 +59,11 @@ export async function seedTask(
   return row.id
 }
 
-export async function seedArea(
-  db: ExtensionDB,
-  id: string,
-  name: string,
-  status = 'active'
-): Promise<string> {
+/** An area's name, or its name and status (active when omitted). */
+export type AreaSeed = string | { name: string; status?: string }
+
+export async function seedArea(db: ExtensionDB, id: string, area: AreaSeed): Promise<string> {
+  const { name, status = 'active' } = typeof area === 'string' ? { name: area } : area
   await db.run(
     `INSERT INTO areas (id, name, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
     [id, name, status, NOW, NOW]
@@ -72,15 +71,18 @@ export async function seedArea(
   return id
 }
 
+/** A project's name, or its name with a status and area. */
+export type ProjectSeed = string | { name: string; status?: string; areaId?: string | null }
+
 export async function seedProject(
   db: ExtensionDB,
   id: string,
-  name: string,
-  fields: { status?: string; areaId?: string | null } = {}
+  project: ProjectSeed
 ): Promise<string> {
+  const fields = typeof project === 'string' ? { name: project } : project
   await db.run(
     `INSERT INTO projects (id, name, status, area_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`,
-    [id, name, fields.status ?? 'active', fields.areaId ?? null, NOW, NOW]
+    [id, fields.name, fields.status ?? 'active', fields.areaId ?? null, NOW, NOW]
   )
   return id
 }

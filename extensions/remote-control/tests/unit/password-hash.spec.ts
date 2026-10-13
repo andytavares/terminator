@@ -3,7 +3,14 @@ import { hashPassword, isPasswordHash, verifyPassword } from '../../src/server/p
 
 const BCRYPT = '$2a$10$abcdefghijklmnopqrstuuABCDEFGHIJKLMNOPQRSTUVWXYZ01234'
 
-describe('password-hash', () => {
+describe('password-hash', passwordHashTests)
+
+function passwordHashTests() {
+  describe('hashing and verifying', passwordHashVerifyTests)
+  describe('recognising stored values', passwordHashFormatTests)
+}
+
+function passwordHashVerifyTests() {
   it('accepts the password it hashed', async () => {
     const stored = await hashPassword('correct horse')
     expect(await verifyPassword('correct horse', stored)).toBe(true)
@@ -23,7 +30,9 @@ describe('password-hash', () => {
     expect(first).not.toEqual(second)
     expect(await verifyPassword('correct horse', second)).toBe(true)
   })
+}
 
+function passwordHashFormatTests() {
   it('rejects a stored value that is not a scrypt hash instead of throwing', async () => {
     expect(await verifyPassword('anything', BCRYPT)).toBe(false)
     expect(await verifyPassword('anything', '')).toBe(false)
@@ -37,4 +46,4 @@ describe('password-hash', () => {
     expect(isPasswordHash(BCRYPT)).toBe(false)
     expect(isPasswordHash('')).toBe(false)
   })
-})
+}
