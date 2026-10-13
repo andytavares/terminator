@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { builderUnit } from '../helpers/order-parts.js'
 import { coverageMatrix } from '../../src/order/coverage-matrix.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
@@ -30,16 +31,7 @@ function order(criteria: string[], units: { id: string; satisfies: string[] }[])
     })),
     plan: {
       ...base.plan,
-      units: units.map((u) => ({
-        id: u.id,
-        title: u.id,
-        role: 'builder',
-        lane: 1,
-        dependsOn: [],
-        satisfies: u.satisfies,
-        touches: [],
-        verify: [],
-      })),
+      units: units.map((u) => builderUnit(u.id, { satisfies: u.satisfies })),
     },
   }
 }

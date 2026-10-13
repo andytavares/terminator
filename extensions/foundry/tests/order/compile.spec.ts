@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { builderUnit, testCriterion } from '../helpers/order-parts.js'
 import { compileOrder, agreeOrder, CHECK_IDS } from '../../src/order/compile.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
@@ -10,6 +11,24 @@ import type { WorkOrder } from '../../src/order/schema.js'
 // and decoration in a gate is worse than no gate — it teaches you to trust a
 // green you have not earned.
 
+/** The row's last glyph: a command proves it renders, a screenshot that it is not clipped. */
+function glyphCriteria(): WorkOrder['acceptance'] {
+  return [
+    testCriterion('AC-1', {
+      statement: 'a full-width row renders its final glyph',
+      priority: 'P0',
+      verify: { kind: 'test', command: 'npx vitest run', assert: 'exit_code == 0' },
+    }),
+    // The unit touches a stylesheet, and a command cannot say whether the
+    // glyph renders — which is the whole of FR-040, and the reason this
+    // fixture used to be refused by the check that enforces it.
+    testCriterion('AC-2', {
+      statement: 'the last column is not clipped, in the running application',
+      verify: { kind: 'screenshot', target: 'a full-width terminal row' },
+    }),
+  ]
+}
+
 function complete(over: Partial<WorkOrder> = {}): WorkOrder {
   const base = draftOrder({
     id: 'WO-0101-aaa',
@@ -20,39 +39,16 @@ function complete(over: Partial<WorkOrder> = {}): WorkOrder {
   })
   return {
     ...base,
-    acceptance: [
-      {
-        id: 'AC-1',
-        statement: 'a full-width row renders its final glyph',
-        priority: 'P0',
-        verify: { kind: 'test', command: 'npx vitest run', assert: 'exit_code == 0' },
-        unverifiable: null,
-      },
-      // The unit touches a stylesheet, and a command cannot say whether the
-      // glyph renders — which is the whole of FR-040, and the reason this
-      // fixture used to be refused by the check that enforces it.
-      {
-        id: 'AC-2',
-        statement: 'the last column is not clipped, in the running application',
-        priority: 'P1',
-        verify: { kind: 'screenshot', target: 'a full-width terminal row' },
-        unverifiable: null,
-      },
-    ],
+    acceptance: glyphCriteria(),
     risk: { grade: 'P2', triggers: [], blastRadius: ['src/'], criticalPaths: [] },
     plan: {
       ...base.plan,
       units: [
-        {
-          id: 'U-1',
+        builderUnit('U-1', {
           title: 'widen the row container',
-          role: 'builder',
-          lane: 1,
-          dependsOn: [],
           satisfies: ['AC-1', 'AC-2'],
           touches: ['src/styles.css'],
-          verify: [],
-        },
+        }),
       ],
     },
     ...over,
@@ -64,15 +60,7 @@ function failures(order: WorkOrder): string[] {
 }
 
 describe('compileOrder', () => {
-  it('passes a complete order with no failures at all', () => {
-    const result = compileOrder(complete())
-    expect(result.ok).toBe(true)
-    expect(result.failures).toEqual([])
-  })
-
-  it('knows exactly five checks', () => {
-    expect(CHECK_IDS).toHaveLength(5)
-  })
+  describe('the five checks', theFiveChecksTests)
 
   describe('1 — no open questions', () => {
     describe('an unanswered question', anUnansweredQuestionTests)
@@ -89,37 +77,7 @@ describe('compileOrder', () => {
     describe('quoting', quotingTests)
     describe('no criteria and both directions', noCriteriaAndBothDirectionsTests)
   })
-
-  describe('4 — risk graded against the plan', () => {
-    it('fails when units touch files but nothing was declared as the blast radius', () => {
-      const order = complete({
-        risk: { grade: 'P2', triggers: [], blastRadius: [], criticalPaths: [] },
-      })
-      expect(failures(order)).toContain('risk')
-    })
-
-    it('fails when a unit touches something outside the declared blast radius', () => {
-      const order = complete()
-      order.plan.units[0].touches = ['src/styles.css', 'scripts/release.sh']
-      expect(failures(order)).toContain('risk')
-      const f = compileOrder(order).failures.find((x) => x.check === 'risk')
-      expect(f?.detail).toContain('scripts/release.sh')
-    })
-
-    it('passes when every touched path is inside the blast radius', () => {
-      const order = complete()
-      order.plan.units[0].touches = ['src/a.css', 'src/b.ts']
-      expect(failures(order)).not.toContain('risk')
-    })
-
-    it('does not demand a blast radius from a plan that touches nothing yet', () => {
-      const order = complete({
-        risk: { grade: 'P3', triggers: [], blastRadius: [], criticalPaths: [] },
-      })
-      order.plan.units[0].touches = []
-      expect(failures(order)).not.toContain('risk')
-    })
-  })
+  describe('4 — risk graded against the plan', when4RiskGradedAgainstThePlanTests)
 
   describe('5 — the adversarial pass is resolved', () => {
     describe('open blocking findings', openBlockingFindingsTests)
@@ -128,7 +86,53 @@ describe('compileOrder', () => {
     describe('notes', notesTests)
     describe('the failure detail', theFailureDetailTests)
   })
+  describe('counts and every failure', countsAndEveryFailureTests)
+})
 
+function theFiveChecksTests() {
+  it('passes a complete order with no failures at all', () => {
+    const result = compileOrder(complete())
+    expect(result.ok).toBe(true)
+    expect(result.failures).toEqual([])
+  })
+
+  it('knows exactly five checks', () => {
+    expect(CHECK_IDS).toHaveLength(5)
+  })
+}
+
+function when4RiskGradedAgainstThePlanTests() {
+  it('fails when units touch files but nothing was declared as the blast radius', () => {
+    const order = complete({
+      risk: { grade: 'P2', triggers: [], blastRadius: [], criticalPaths: [] },
+    })
+    expect(failures(order)).toContain('risk')
+  })
+
+  it('fails when a unit touches something outside the declared blast radius', () => {
+    const order = complete()
+    order.plan.units[0].touches = ['src/styles.css', 'scripts/release.sh']
+    expect(failures(order)).toContain('risk')
+    const f = compileOrder(order).failures.find((x) => x.check === 'risk')
+    expect(f?.detail).toContain('scripts/release.sh')
+  })
+
+  it('passes when every touched path is inside the blast radius', () => {
+    const order = complete()
+    order.plan.units[0].touches = ['src/a.css', 'src/b.ts']
+    expect(failures(order)).not.toContain('risk')
+  })
+
+  it('does not demand a blast radius from a plan that touches nothing yet', () => {
+    const order = complete({
+      risk: { grade: 'P3', triggers: [], blastRadius: [], criticalPaths: [] },
+    })
+    order.plan.units[0].touches = []
+    expect(failures(order)).not.toContain('risk')
+  })
+}
+
+function countsAndEveryFailureTests() {
   // ADR 056: a count of files is not a budget. It refused plans for being
   // honest about their size and halted runs that had already done the work.
   it('does not hold a plan to a count of files, however many it touches', () => {
@@ -159,7 +163,7 @@ describe('compileOrder', () => {
     const checks = failures(order)
     expect(checks).toEqual(expect.arrayContaining(['questions', 'coverage', 'redTeam']))
   })
-})
+}
 
 function anUnansweredQuestionTests() {
   it('fails while a question is unanswered', () => {
@@ -264,16 +268,7 @@ function criteriaAndUnitsTests() {
 
   it('fails when a unit satisfies no criterion', () => {
     const order = complete()
-    order.plan.units.push({
-      id: 'U-2',
-      title: 'extra',
-      role: 'builder',
-      lane: 1,
-      dependsOn: [],
-      satisfies: [],
-      touches: [],
-      verify: [],
-    })
+    order.plan.units.push(builderUnit('U-2', { title: 'extra' }))
     const f = compileOrder(order).failures.find((x) => x.check === 'coverage')
     expect(f?.subjectIds).toContain('U-2')
   })
@@ -292,16 +287,7 @@ function quotingTests() {
 
   it('quotes the orphan unit and a dangling claim by title, not id', () => {
     const order = complete()
-    order.plan.units.push({
-      id: 'U-2',
-      title: 'rename the config key',
-      role: 'builder',
-      lane: 1,
-      dependsOn: [],
-      satisfies: [],
-      touches: [],
-      verify: [],
-    })
+    order.plan.units.push(builderUnit('U-2', { title: 'rename the config key' }))
     order.plan.units[0].satisfies.push('AC-9')
     const f = compileOrder(order).failures.find((x) => x.check === 'coverage')
     expect(f?.detail).toContain('“rename the config key” satisfies no criterion.')
@@ -319,23 +305,8 @@ function noCriteriaAndBothDirectionsTests() {
     const order = complete()
     // AC-3, because the fixture already carries the screenshot criterion
     // FR-040 requires of a change to a stylesheet.
-    order.acceptance.push({
-      id: 'AC-3',
-      statement: 'x',
-      priority: 'P1',
-      verify: { kind: 'test', command: 'npm test', assert: 'exit_code == 0' },
-      unverifiable: null,
-    })
-    order.plan.units.push({
-      id: 'U-2',
-      title: 'extra',
-      role: 'builder',
-      lane: 1,
-      dependsOn: [],
-      satisfies: [],
-      touches: [],
-      verify: [],
-    })
+    order.acceptance.push(testCriterion('AC-3', { statement: 'x' }))
+    order.plan.units.push(builderUnit('U-2', { title: 'extra' }))
     const f = compileOrder(order).failures.find((x) => x.check === 'coverage')
     expect(f?.subjectIds).toEqual(expect.arrayContaining(['AC-3', 'U-2']))
   })

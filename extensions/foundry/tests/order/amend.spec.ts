@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { builderUnit, testCriterion } from '../helpers/order-parts.js'
 import { amendOrder } from '../../src/order/amend.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
@@ -24,29 +25,10 @@ function agreed(): WorkOrder {
     ...base,
     status: 'agreed',
     agreedAt: '2026-09-06T11:00:00.000Z',
-    acceptance: [
-      {
-        id: 'AC-1',
-        statement: 'a',
-        priority: 'P1',
-        verify: { kind: 'test', command: 'npm test', assert: 'exit_code == 0' },
-        unverifiable: null,
-      },
-    ],
+    acceptance: [testCriterion('AC-1', { statement: 'a' })],
     plan: {
       ...base.plan,
-      units: [
-        {
-          id: 'U-1',
-          title: 'one',
-          role: 'builder',
-          lane: 1,
-          dependsOn: [],
-          satisfies: ['AC-1'],
-          touches: [],
-          verify: [],
-        },
-      ],
+      units: [builderUnit('U-1', { title: 'one', satisfies: ['AC-1'] })],
     },
   }
 }

@@ -46,27 +46,43 @@ describe('collect: github-runs', () => {
 
 const issuesSource: SensorSource = { kind: 'github-issues', label: 'bug', limit: 20 }
 
+/** Two failed runs on main, of two different workflows. */
+const FAILED_RUNS = [
+  {
+    databaseId: 1,
+    displayTitle: 'fix: flaky test',
+    headSha: 'abc123',
+    workflowName: 'CI',
+    createdAt: '2026-09-25T10:00:00.000Z',
+    url: 'https://github.com/o/r/actions/runs/1',
+  },
+  {
+    databaseId: 2,
+    displayTitle: 'chore: bump deps',
+    headSha: 'def456',
+    workflowName: 'Lint',
+    createdAt: '2026-09-25T11:00:00.000Z',
+    url: 'https://github.com/o/r/actions/runs/2',
+  },
+]
+
+/** How the runs sensor asks gh for main's last five failed runs. */
+const RUN_LIST_ARGS = [
+  'run',
+  'list',
+  '--branch',
+  'main',
+  '--status',
+  'failure',
+  '--limit',
+  '5',
+  '--json',
+  'databaseId,displayTitle,headSha,workflowName,createdAt,url',
+]
+
 function mappingRunsTests() {
   it('maps failed runs to one item each, keyed by workflow', async () => {
-    const runs = [
-      {
-        databaseId: 1,
-        displayTitle: 'fix: flaky test',
-        headSha: 'abc123',
-        workflowName: 'CI',
-        createdAt: '2026-09-25T10:00:00.000Z',
-        url: 'https://github.com/o/r/actions/runs/1',
-      },
-      {
-        databaseId: 2,
-        displayTitle: 'chore: bump deps',
-        headSha: 'def456',
-        workflowName: 'Lint',
-        createdAt: '2026-09-25T11:00:00.000Z',
-        url: 'https://github.com/o/r/actions/runs/2',
-      },
-    ]
-    const exec = queuedExec([ok(JSON.stringify(runs))])
+    const exec = queuedExec([ok(JSON.stringify(FAILED_RUNS))])
     const result = await collect(runsSource, deps({ exec }))
 
     expect(result.problem).toBeNull()
@@ -84,22 +100,7 @@ function mappingRunsTests() {
     expect(result.items[1].key).toBe('workflow:Lint')
 
     expect(exec).toHaveBeenCalledWith(
-      expect.objectContaining({
-        command: 'gh',
-        args: [
-          'run',
-          'list',
-          '--branch',
-          'main',
-          '--status',
-          'failure',
-          '--limit',
-          '5',
-          '--json',
-          'databaseId,displayTitle,headSha,workflowName,createdAt,url',
-        ],
-        cwd: '/repos/app',
-      })
+      expect.objectContaining({ command: 'gh', args: RUN_LIST_ARGS, cwd: '/repos/app' })
     )
   })
 }
@@ -173,23 +174,39 @@ function trackerDeps(over: Partial<CollectDeps> = {}): CollectDeps {
   return deps({ issues: { search, listMine }, ...over })
 }
 
+/** Two open bugs whose titles differ only in a number inside a path. */
+const CRASHES = [
+  {
+    number: 42,
+    title: 'Crash in /api/42',
+    url: 'https://github.com/o/r/issues/42',
+    updatedAt: 't1',
+  },
+  {
+    number: 77,
+    title: 'Crash in /api/77',
+    url: 'https://github.com/o/r/issues/77',
+    updatedAt: 't2',
+  },
+]
+
+/** How the issues sensor asks gh for the twenty newest open bugs. */
+const ISSUE_LIST_ARGS = [
+  'issue',
+  'list',
+  '--label',
+  'bug',
+  '--state',
+  'open',
+  '--limit',
+  '20',
+  '--json',
+  'number,title,url,updatedAt',
+]
+
 function normalisingTitlesTests() {
   it('normalises titles with digits and paths into one shared key', async () => {
-    const issues = [
-      {
-        number: 42,
-        title: 'Crash in /api/42',
-        url: 'https://github.com/o/r/issues/42',
-        updatedAt: 't1',
-      },
-      {
-        number: 77,
-        title: 'Crash in /api/77',
-        url: 'https://github.com/o/r/issues/77',
-        updatedAt: 't2',
-      },
-    ]
-    const exec = queuedExec([ok(JSON.stringify(issues))])
+    const exec = queuedExec([ok(JSON.stringify(CRASHES))])
 
     const result = await collect(issuesSource, deps({ exec }))
 
@@ -200,22 +217,7 @@ function normalisingTitlesTests() {
     expect(result.items[0].evidence.kind).toBe('issue')
 
     expect(exec).toHaveBeenCalledWith(
-      expect.objectContaining({
-        command: 'gh',
-        args: [
-          'issue',
-          'list',
-          '--label',
-          'bug',
-          '--state',
-          'open',
-          '--limit',
-          '20',
-          '--json',
-          'number,title,url,updatedAt',
-        ],
-        cwd: '/repos/app',
-      })
+      expect.objectContaining({ command: 'gh', args: ISSUE_LIST_ARGS, cwd: '/repos/app' })
     )
   })
 }

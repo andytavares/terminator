@@ -183,36 +183,33 @@ describe('ranked', () => {
   describe('ties', tiesTests)
 })
 
+/** An open CI signal first seen on New Year's Day, seen once per url in `urls`. */
+function openSignal(id: string, urls: string[], over: Partial<Signal> = {}): Signal {
+  return {
+    id,
+    sensorId: 'ci',
+    key: `k-${id}`,
+    title: id,
+    evidence: urls.map((url) => evidence(url)),
+    occurrences: urls.length,
+    severity: 'medium',
+    firstSeen: '2026-01-01T00:00:00.000Z',
+    lastSeen: '2026-01-01T00:00:00.000Z',
+    status: 'open',
+    dismissedAt: null,
+    orderId: null,
+    ...over,
+  }
+}
+
 function orderingTests() {
   it('orders open signals by impact desc, hides dismissed/promoted', () => {
-    const high: Signal = {
-      id: 'high',
-      sensorId: 'ci',
-      key: 'k-high',
+    const high = openSignal('high', ['u1', 'u2'], {
       title: 'High',
-      evidence: [evidence('u1'), evidence('u2')],
-      occurrences: 2,
       severity: 'high',
-      firstSeen: '2026-01-01T00:00:00.000Z',
       lastSeen: '2026-01-02T00:00:00.000Z',
-      status: 'open',
-      dismissedAt: null,
-      orderId: null,
-    }
-    const medium: Signal = {
-      id: 'medium',
-      sensorId: 'ci',
-      key: 'k-medium',
-      title: 'Medium',
-      evidence: [evidence('u1'), evidence('u2'), evidence('u3')],
-      occurrences: 3,
-      severity: 'medium',
-      firstSeen: '2026-01-01T00:00:00.000Z',
-      lastSeen: '2026-01-01T00:00:00.000Z',
-      status: 'open',
-      dismissedAt: null,
-      orderId: null,
-    }
+    })
+    const medium = openSignal('medium', ['u1', 'u2', 'u3'], { title: 'Medium' })
     const dismissed: Signal = { ...high, id: 'dismissed', status: 'dismissed', dismissedAt: 2 }
     const promoted: Signal = { ...high, id: 'promoted', status: 'promoted', orderId: 'order-1' }
 

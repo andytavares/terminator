@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { builderUnit } from '../helpers/order-parts.js'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -250,6 +251,16 @@ describe('the shape whose product is a document', () => {
 })
 
 const direct = recipe('direct.yaml')
+
+/** The test and lint commands a probe found in package.json, or null where it found none. */
+function probed(opts: { test: boolean; lint: boolean }) {
+  const found = (command: string) => ({ command, source: 'package.json' })
+  return {
+    test: opts.test ? found('npm test') : null,
+    lint: opts.lint ? found('npm run lint') : null,
+  }
+}
+
 function graphFor(opts: { test: boolean; lint: boolean; grade: 'P2' | 'P3'; triggers?: boolean }) {
   const base = draftOrder({
     id: 'WO-1',
@@ -258,7 +269,6 @@ function graphFor(opts: { test: boolean; lint: boolean; grade: 'P2' | 'P3'; trig
     repoPaths: ['/repo'],
     now: '2026-10-05T10:00:00.000Z',
   })
-  const found = (command: string) => ({ command, source: 'package.json' })
   const o = {
     ...base,
     risk: {
@@ -266,28 +276,10 @@ function graphFor(opts: { test: boolean; lint: boolean; grade: 'P2' | 'P3'; trig
       grade: opts.grade,
       triggers: opts.triggers === true ? ['secrets' as const] : [],
     },
-    context: {
-      ...base.context,
-      toolchain: {
-        ...base.context.toolchain,
-        test: opts.test ? found('npm test') : null,
-        lint: opts.lint ? found('npm run lint') : null,
-      },
-    },
+    context: { ...base.context, toolchain: { ...base.context.toolchain, ...probed(opts) } },
     plan: {
       ...base.plan,
-      units: [
-        {
-          id: 'U-1',
-          title: 'a',
-          role: 'builder',
-          lane: 1,
-          dependsOn: [],
-          satisfies: ['AC-1'],
-          touches: [],
-          verify: [],
-        },
-      ],
+      units: [builderUnit('U-1', { title: 'a', satisfies: ['AC-1'] })],
     },
   }
   return buildRunGraph(o, direct)

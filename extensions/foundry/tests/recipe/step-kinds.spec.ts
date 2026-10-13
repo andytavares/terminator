@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { builderUnit } from '../helpers/order-parts.js'
 import {
   selectOver,
   evaluateWhen,
@@ -26,26 +27,8 @@ function order(over: Partial<WorkOrder> = {}): WorkOrder {
     plan: {
       ...base.plan,
       units: [
-        {
-          id: 'U-1',
-          title: 'a',
-          role: 'builder',
-          lane: 1,
-          dependsOn: [],
-          satisfies: ['AC-1'],
-          touches: [],
-          verify: [],
-        },
-        {
-          id: 'U-2',
-          title: 'b',
-          role: 'scribe',
-          lane: 1,
-          dependsOn: [],
-          satisfies: ['AC-1'],
-          touches: [],
-          verify: [],
-        },
+        builderUnit('U-1', { title: 'a', satisfies: ['AC-1'] }),
+        builderUnit('U-2', { title: 'b', role: 'scribe', satisfies: ['AC-1'] }),
       ],
     },
     ...over,

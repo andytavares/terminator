@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { builderUnit, testCriterion } from '../helpers/order-parts.js'
 import { renderOrder } from '../../src/order/render.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
@@ -7,6 +8,21 @@ import type { WorkOrder } from '../../src/order/schema.js'
 // application, in a bare terminal and as a tracker comment, which is why it is
 // plain markdown — the least decorated version is the one that survives all
 // three.
+
+/** The row's last glyph: a command proves it renders, a screenshot that it is not clipped. */
+function glyphCriteria(): WorkOrder['acceptance'] {
+  return [
+    testCriterion('AC-1', {
+      statement: 'a full-width row renders its final glyph',
+      priority: 'P0',
+      verify: { kind: 'test', command: 'npx vitest run', assert: 'exit_code == 0' },
+    }),
+    testCriterion('AC-2', {
+      statement: 'the last column is not clipped, in the running application',
+      verify: { kind: 'screenshot', target: 'a full-width row' },
+    }),
+  ]
+}
 
 function order(over: Partial<WorkOrder> = {}): WorkOrder {
   const base = draftOrder({
@@ -24,35 +40,15 @@ function order(over: Partial<WorkOrder> = {}): WorkOrder {
       nonGoals: ['scrollbar styling'],
     },
     risk: { grade: 'P2', triggers: [], blastRadius: ['src/'], criticalPaths: [] },
-    acceptance: [
-      {
-        id: 'AC-1',
-        statement: 'a full-width row renders its final glyph',
-        priority: 'P0',
-        verify: { kind: 'test', command: 'npx vitest run', assert: 'exit_code == 0' },
-        unverifiable: null,
-      },
-      {
-        id: 'AC-2',
-        statement: 'the last column is not clipped, in the running application',
-        priority: 'P1',
-        verify: { kind: 'screenshot' as const, target: 'a full-width row' },
-        unverifiable: null,
-      },
-    ],
+    acceptance: glyphCriteria(),
     plan: {
       ...base.plan,
       units: [
-        {
-          id: 'U-1',
+        builderUnit('U-1', {
           title: 'widen the row',
-          role: 'builder',
-          lane: 1,
-          dependsOn: [],
           satisfies: ['AC-1', 'AC-2'],
           touches: ['src/a.css'],
-          verify: [],
-        },
+        }),
       ],
     },
     ...over,

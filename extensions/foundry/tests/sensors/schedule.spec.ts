@@ -77,22 +77,23 @@ describe('runSensor', () => {
   describe('failures', failuresTests)
 })
 
+/** gh listing one open bug. */
+const LOGIN_CRASHES = {
+  exitCode: 0,
+  stdout: JSON.stringify([
+    { title: 'Login crashes', url: 'https://x/1', updatedAt: '2026-01-01T00:00:00.000Z' },
+  ]),
+  stderr: '',
+  timedOut: false,
+}
+
 function recordingTests() {
   it('records a signal collected this run and remembers when it ran', async () => {
     const root = tempRoot()
     const store = createSignalStore(root)
     const def = sensor({ source: { kind: 'github-issues', label: 'bug', limit: 5 } })
 
-    const collectDeps = fakeCollectDeps({
-      exec: async () => ({
-        exitCode: 0,
-        stdout: JSON.stringify([
-          { title: 'Login crashes', url: 'https://x/1', updatedAt: '2026-01-01T00:00:00.000Z' },
-        ]),
-        stderr: '',
-        timedOut: false,
-      }),
-    })
+    const collectDeps = fakeCollectDeps({ exec: async () => LOGIN_CRASHES })
 
     const result = await runSensor(def, {
       store,

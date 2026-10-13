@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { testCriterion } from '../helpers/order-parts.js'
 import {
   sharedFilesFor,
   collidingLanes,
@@ -43,15 +44,7 @@ function order(over: Partial<WorkOrder> = {}): WorkOrder {
     ...base,
     intent: { problem: 'p', outcome: 'o', nonGoals: [] },
     risk: { grade: 'P2', triggers: [], blastRadius: ['proto/', 'src/'], criticalPaths: [] },
-    acceptance: [
-      {
-        id: 'AC-1',
-        statement: 'a session id is a ULID',
-        priority: 'P1',
-        verify: { kind: 'test', command: 'npm test', assert: 'exit_code == 0' },
-        unverifiable: null,
-      },
-    ],
+    acceptance: [testCriterion('AC-1', { statement: 'a session id is a ULID' })],
     plan: {
       ...base.plan,
       lanes: [
@@ -379,13 +372,10 @@ function theEscapeTests() {
   it('takes the same escape every criterion has, in writing', () => {
     const accepted = uiOrder({
       acceptance: [
-        {
-          id: 'AC-1',
+        testCriterion('AC-1', {
           statement: 'it looks right',
-          priority: 'P1',
-          verify: { kind: 'test', command: 'npm test', assert: 'exit_code == 0' },
           unverifiable: { accepted: true, reason: 'no display in this environment' },
-        },
+        }),
       ],
     })
     expect(compileOrder(accepted).ok).toBe(true)

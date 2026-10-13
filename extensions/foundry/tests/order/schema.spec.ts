@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { builderUnit, testCriterion } from '../helpers/order-parts.js'
 import {
   parseWorkOrder,
   SCHEMA_VERSION,
@@ -16,6 +17,44 @@ import type { WorkOrder } from '../../src/order/schema.js'
 // half-understood agreement is worse than an unreadable one — the failure mode
 // of a partial read is a plan executed against terms nobody agreed to.
 
+/** The criterion a command proves: the row's last glyph renders. */
+function finalGlyph(): WorkOrder['acceptance'][number] {
+  return testCriterion('AC-1', {
+    statement: 'a full-width row renders its final glyph',
+    priority: 'P0',
+    verify: { kind: 'test', command: 'npx vitest run', assert: 'exit_code == 0' },
+  })
+}
+
+/** One repository, nothing probed and nothing read yet. */
+function validContext(): WorkOrder['context'] {
+  return {
+    repos: [
+      {
+        name: 'terminator',
+        path: '/repos/terminator',
+        lane: 1,
+        baseBranch: 'main',
+        headBranch: 'x',
+      },
+    ],
+    toolchain: { test: null, lint: null, format: null, coverage: null, e2e: null, build: null },
+    entryPoints: [],
+    priorArt: [],
+    conventions: [],
+    houseDocs: [],
+  }
+}
+
+/** One unit in one lane, satisfying the one criterion. */
+function validPlan(): WorkOrder['plan'] {
+  return {
+    units: [builderUnit('U-1', { title: 'fix', satisfies: ['AC-1'], touches: ['src/a.css'] })],
+    lanes: [{ ord: 1, repo: 'terminator', branch: 'x', role: null, blocks: [], blockedBy: [] }],
+    sharedFiles: [],
+  }
+}
+
 function valid(): unknown {
   return {
     schemaVersion: SCHEMA_VERSION,
@@ -27,49 +66,11 @@ function valid(): unknown {
     recipe: null,
     recipeOverriddenBy: null,
     intent: { problem: 'p', outcome: 'o', nonGoals: [] },
-    context: {
-      repos: [
-        {
-          name: 'terminator',
-          path: '/repos/terminator',
-          lane: 1,
-          baseBranch: 'main',
-          headBranch: 'x',
-        },
-      ],
-      toolchain: { test: null, lint: null, format: null, coverage: null, e2e: null, build: null },
-      entryPoints: [],
-      priorArt: [],
-      conventions: [],
-      houseDocs: [],
-    },
-    acceptance: [
-      {
-        id: 'AC-1',
-        statement: 'a full-width row renders its final glyph',
-        priority: 'P0',
-        verify: { kind: 'test', command: 'npx vitest run', assert: 'exit_code == 0' },
-        unverifiable: null,
-      },
-    ],
+    context: validContext(),
+    acceptance: [finalGlyph()],
     risk: { grade: 'P2', triggers: [], blastRadius: [], criticalPaths: [] },
     budgets: { agents: 3, wallClockMinutes: 45, tokens: null },
-    plan: {
-      units: [
-        {
-          id: 'U-1',
-          title: 'fix',
-          role: 'builder',
-          lane: 1,
-          dependsOn: [],
-          satisfies: ['AC-1'],
-          touches: ['src/a.css'],
-          verify: [],
-        },
-      ],
-      lanes: [{ ord: 1, repo: 'terminator', branch: 'x', role: null, blocks: [], blockedBy: [] }],
-      sharedFiles: [],
-    },
+    plan: validPlan(),
     assumptions: [],
     openQuestions: [],
     redTeam: [],

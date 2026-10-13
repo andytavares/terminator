@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { builderUnit } from '../helpers/order-parts.js'
 import { parseProposal, applyProposal, ProposalRejected } from '../../src/order/proposal.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
@@ -142,38 +143,23 @@ function struckAssumptionsTests() {
   })
 }
 
+/** The question of which store to use, answered with `answer` or not yet. */
+function whichStore(answer: string | null) {
+  return {
+    id: 'Q-1',
+    text: 'which store?',
+    why: '',
+    options: [],
+    recommended: null,
+    answer,
+    rank: 0,
+  }
+}
+
 function answeredQuestionsTests() {
   it('keeps an answered question answered', () => {
-    const before = order({
-      openQuestions: [
-        {
-          id: 'Q-1',
-          text: 'which store?',
-          why: '',
-          options: [],
-          recommended: null,
-          answer: 'Redis',
-          rank: 0,
-        },
-      ],
-    })
-    const after = applyProposal(
-      before,
-      parseProposal({
-        openQuestions: [
-          {
-            id: 'Q-1',
-            text: 'which store?',
-            why: '',
-            options: [],
-            recommended: null,
-            answer: null,
-            rank: 0,
-          },
-        ],
-      }),
-      NOW
-    )
+    const before = order({ openQuestions: [whichStore('Redis')] })
+    const after = applyProposal(before, parseProposal({ openQuestions: [whichStore(null)] }), NOW)
     expect(after.openQuestions[0].answer).toBe('Redis')
   })
 }
@@ -193,16 +179,7 @@ function newAssumptionsAndPlansTests() {
   // for the halves it had been told not to restate.
   it('merges a partial plan over the one on the order', () => {
     const before = order()
-    const unit = {
-      id: 'U-9',
-      title: 'filter in the query',
-      role: 'builder',
-      lane: 1,
-      dependsOn: [],
-      satisfies: [],
-      touches: ['src/'],
-      verify: [],
-    }
+    const unit = builderUnit('U-9', { title: 'filter in the query', touches: ['src/'] })
     const after = applyProposal(before, parseProposal({ plan: { units: [unit] } }), NOW)
     expect(after.plan.units.map((u) => u.id)).toEqual(['U-9'])
     expect(after.plan.lanes).toEqual(before.plan.lanes)

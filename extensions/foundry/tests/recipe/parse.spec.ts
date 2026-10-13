@@ -145,9 +145,9 @@ function missingFieldsTests() {
   // Each step kind carries its own obligation, and the message has to name the
   // step: a recipe file is edited by hand, so "something is wrong" is not help.
   it.each([
-    ['agent', 'a role', 'kind: agent\n    role: builder', 'kind: agent'],
-    ['run', 'a command', 'kind: agent\n    role: builder', 'kind: run'],
-  ])('rejects a %s step with no %s', (_kind, _need, from, to) => {
+    ['agent', 'a role', { from: 'kind: agent\n    role: builder', to: 'kind: agent' }],
+    ['run', 'a command', { from: 'kind: agent\n    role: builder', to: 'kind: run' }],
+  ])('rejects a %s step with no %s', (_kind, _need, { from, to }) => {
     const r = parseRecipe(RECIPE.replace(from, to), 'bugfix.yaml')
     expect(r.ok).toBe(false)
     if (!r.ok) expect(r.reason).toMatch(/reproduce/)
