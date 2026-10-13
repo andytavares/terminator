@@ -47,7 +47,9 @@ describe('buildThreads', () => {
     expect(threads).toHaveLength(1)
     expect(threads[0].comments).toHaveLength(3)
   })
+})
 
+describe('buildThreads — ordering and metadata', () => {
   it('sorts comments by createdAt within a thread', () => {
     const comments = [
       makeComment({ id: 3, threadId: 't-1', createdAt: '2024-01-03T00:00:00Z' }),
@@ -75,7 +77,9 @@ describe('buildThreads', () => {
     expect(threads[0].startLine).toBe(38)
     expect(threads[0].side).toBe('LEFT')
   })
+})
 
+describe('buildThreads — outdated and collapsed threads', () => {
   it('marks thread as outdated when any comment is outdated', () => {
     const comments = [
       makeComment({ id: 1, threadId: 't-1', outdated: false }),
@@ -101,7 +105,9 @@ describe('buildThreads', () => {
     const threads = buildThreads(comments)
     expect(threads[0].collapsed).toBe(true)
   })
+})
 
+describe('buildThreads — short threads and ids', () => {
   it('does not collapse thread with fewer than 4 replies', () => {
     const comments = [
       makeComment({ id: 1, threadId: 't-1' }),
@@ -117,7 +123,9 @@ describe('buildThreads', () => {
     const threads = buildThreads([comment])
     expect(threads[0].id).toBe('my-unique-thread')
   })
+})
 
+describe('buildThreads — several threads', () => {
   it('handles multiple separate threads correctly', () => {
     const comments = [
       makeComment({ id: 1, threadId: 't-1', path: 'src/a.ts', line: 10 }),

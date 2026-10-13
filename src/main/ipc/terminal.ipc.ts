@@ -1,5 +1,5 @@
 import { onChannel } from './channel-registrar.js'
-import { defineChannel } from '@terminator/extension-sdk'
+import { defineChannel, type ChannelSpec } from '@terminator/extension-sdk'
 import { registerInvokeTable, noPayload } from './invoke-table.js'
 import { getLink } from '../integrations/issue-link-store.js'
 import { readContextFile } from '../integrations/agent-context.js'
@@ -108,59 +108,62 @@ interface TerminalContext {
   relay: OutputRelay
 }
 
-// PtyManager owns session state (see ADR-024); this layer only translates IPC
-// payloads and relays output/exit pushes to the renderer window.
-export function registerTerminalHandlers(
-  ptyManager: PtyManager,
-  getWindow: () => BrowserWindow | null,
-  relay: OutputRelay
-): void {
-  const sessionIdPayload = z.object({ sessionId: z.string() })
+const sessionIdPayload = z.object({ sessionId: z.string() })
 
-  registerInvokeTable([
-    defineChannel({
-      channel: 'terminal:create',
-      schema: CreateTerminalSchema,
-      invalid: (error: z.ZodError) => ({ error: 'VALIDATION_ERROR', message: error.message }),
-      run: (input) => createTerminal({ ptyManager, getWindow, relay }, input),
-      // Reported rather than thrown, so the renderer can say which folder is
-      // gone. A branch whose worktree was deleted outside the app otherwise
-      // produced a tab that died instantly with nothing written in it.
-      onError: (err) => {
-        if (err instanceof MissingCwdError) return { error: 'CWD_MISSING', message: err.message }
-        throw err
-      },
-    }),
-    defineChannel({
-      channel: 'terminal:list-sessions',
-      schema: noPayload,
-      invalid: [],
-      run: () =>
-        // Only sessions created through terminal:create carry project metadata;
-        // legacy api.pty.spawn sessions are 'app'-origin too but have no tab in
-        // the renderer, matching the pre-authority registry's contents.
-        ptyManager
-          .listSessions()
-          .filter((s) => s.origin === 'app' && s.projectId !== undefined)
-          .map(({ sessionId, projectId, tabTitle, type }) => ({
-            sessionId,
-            projectId,
-            tabTitle,
-            type,
-          })),
-    }),
-    defineChannel({
-      channel: 'terminal:attach',
-      schema: sessionIdPayload,
-      invalid: { released: false },
-      // A terminal is on screen and ready to be written to. Anything the process
-      // printed before now was held back rather than dropped.
-      run: ({ sessionId }) => {
-        // A renderer attaching owes nothing for output an earlier one was sent.
-        relay.reset(sessionId)
-        return { released: ptyManager.releaseOutput(sessionId) }
-      },
-    }),
+function createChannel(context: TerminalContext): ChannelSpec {
+  return defineChannel({
+    channel: 'terminal:create',
+    schema: CreateTerminalSchema,
+    invalid: (error: z.ZodError) => ({ error: 'VALIDATION_ERROR', message: error.message }),
+    run: (input) => createTerminal(context, input),
+    // Reported rather than thrown, so the renderer can say which folder is
+    // gone. A branch whose worktree was deleted outside the app otherwise
+    // produced a tab that died instantly with nothing written in it.
+    onError: (err) => {
+      if (err instanceof MissingCwdError) return { error: 'CWD_MISSING', message: err.message }
+      throw err
+    },
+  })
+}
+
+function listSessionsChannel(ptyManager: PtyManager): ChannelSpec {
+  return defineChannel({
+    channel: 'terminal:list-sessions',
+    schema: noPayload,
+    invalid: [],
+    run: () =>
+      // Only sessions created through terminal:create carry project metadata;
+      // legacy api.pty.spawn sessions are 'app'-origin too but have no tab in
+      // the renderer, matching the pre-authority registry's contents.
+      ptyManager
+        .listSessions()
+        .filter((s) => s.origin === 'app' && s.projectId !== undefined)
+        .map(({ sessionId, projectId, tabTitle, type }) => ({
+          sessionId,
+          projectId,
+          tabTitle,
+          type,
+        })),
+  })
+}
+
+function attachChannel({ ptyManager, relay }: TerminalContext): ChannelSpec {
+  return defineChannel({
+    channel: 'terminal:attach',
+    schema: sessionIdPayload,
+    invalid: { released: false },
+    // A terminal is on screen and ready to be written to. Anything the process
+    // printed before now was held back rather than dropped.
+    run: ({ sessionId }) => {
+      // A renderer attaching owes nothing for output an earlier one was sent.
+      relay.reset(sessionId)
+      return { released: ptyManager.releaseOutput(sessionId) }
+    },
+  })
+}
+
+function closeChannels(ptyManager: PtyManager): ChannelSpec[] {
+  return [
     defineChannel({
       channel: 'terminal:close',
       schema: sessionIdPayload,
@@ -187,8 +190,11 @@ export function registerTerminalHandlers(
       invalid: { error: 'VALIDATION_ERROR' },
       run: () => ptyManager.cleanupOrphans(),
     }),
-  ])
+  ]
+}
 
+/** Keystrokes, flow-control acknowledgements and resizes: sent, never answered. */
+function registerStreamHandlers({ ptyManager, relay }: TerminalContext): void {
   onChannel('terminal:input', (_event, payload) => {
     const parsed = TerminalInputSchema.safeParse(payload)
     if (parsed.success) {
@@ -207,6 +213,23 @@ export function registerTerminalHandlers(
       ptyManager.resize(parsed.data.sessionId, parsed.data.cols, parsed.data.rows)
     }
   })
+}
+
+// PtyManager owns session state (see ADR-024); this layer only translates IPC
+// payloads and relays output/exit pushes to the renderer window.
+export function registerTerminalHandlers(
+  ptyManager: PtyManager,
+  getWindow: () => BrowserWindow | null,
+  relay: OutputRelay
+): void {
+  const context: TerminalContext = { ptyManager, getWindow, relay }
+  registerInvokeTable([
+    createChannel(context),
+    listSessionsChannel(ptyManager),
+    attachChannel(context),
+    ...closeChannels(ptyManager),
+  ])
+  registerStreamHandlers(context)
 }
 
 function createTerminal(

@@ -219,4 +219,21 @@ export default defineConfig([
       'max-params': ['error', 3],
     },
   },
+  {
+    // The same function size limits for the main process, the shared code and
+    // the tests that cover them. Add a directory here once all of its
+    // functions, tests included, meet them.
+    files: [
+      'src/{main,shared}/**/*.{ts,tsx}',
+      'tests/unit/{agents,db,extensions,fs,git,github,integrations,ipc,main,notifications,schemas,sessions,shared,shell,storage,terminal}/**/*.{ts,tsx}',
+      'tests/unit/logger.spec.ts',
+      'tests/integration/{ipc,terminal}/**/*.{ts,tsx}',
+      'tests/integration/remote-bridge-allowlist.spec.ts',
+    ],
+    rules: {
+      'max-lines-per-function': ['error', { max: 30, skipBlankLines: true, skipComments: true }],
+      complexity: ['error', 10],
+      'max-params': ['error', 3],
+    },
+  },
 ])

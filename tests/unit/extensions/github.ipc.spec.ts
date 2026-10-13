@@ -111,7 +111,9 @@ describe('github:list-open-prs', () => {
     }
     expect(result.error).toBe('RATE_LIMITED')
   })
+})
 
+describe('github:list-open-prs — search', () => {
   it('looks up a single PR by number when search is a digit string', async () => {
     mockResolve(JSON.stringify(QUEUE_PR))
     const result = (await getHandler('github:list-open-prs')({
@@ -174,7 +176,9 @@ describe('github:pr-inline-comments', () => {
     })) as { error: string }
     expect(result.error).toBe('RATE_LIMITED')
   })
+})
 
+describe('github:pr-inline-comments — top-level comments', () => {
   it('returns parsed comments on success', async () => {
     const rawComment = {
       id: 1,
@@ -200,7 +204,9 @@ describe('github:pr-inline-comments', () => {
     expect(result.comments[0].body).toBe('LGTM')
     expect(result.comments[0].isReply).toBe(false)
   })
+})
 
+describe('github:pr-inline-comments — replies', () => {
   it('correctly marks replies', async () => {
     const rawReply = {
       id: 2,
@@ -242,7 +248,9 @@ describe('github:pr-comment-reply', () => {
     })) as { error: string }
     expect(result.error).toContain('unauthorized')
   })
+})
 
+describe('github:pr-comment-reply — success', () => {
   it('returns posted comment on success', async () => {
     const rawReply = {
       id: 7,
@@ -302,7 +310,9 @@ describe('github:pr-review-submit', () => {
       expect(result.reviewId).toBe(1)
     }
   })
+})
 
+describe('github:pr-review-submit — failure', () => {
   it('returns error string on gh failure', async () => {
     customMock().mockRejectedValueOnce(new Error('forbidden'))
     const result = (await getHandler('github:pr-review-submit')({
@@ -317,20 +327,20 @@ describe('github:pr-review-submit', () => {
 
 // ─── github:sessions-for-repo ────────────────────────────────────────────────
 
-describe('github:sessions-for-repo', () => {
-  const validSession = {
-    repoRoot: '/repo',
-    prNumber: 42,
-    headSHA: 'abc1234',
-    currentChapterId: null,
-    currentFilePath: null,
-    viewedFiles: [],
-    fileOrderOverrides: {},
-    scrollPosition: null,
-    pausedAt: null,
-    lastAccessedAt: '2024-01-01T00:00:00.000Z',
-  }
+const validSession = {
+  repoRoot: '/repo',
+  prNumber: 42,
+  headSHA: 'abc1234',
+  currentChapterId: null,
+  currentFilePath: null,
+  viewedFiles: [],
+  fileOrderOverrides: {},
+  scrollPosition: null,
+  pausedAt: null,
+  lastAccessedAt: '2024-01-01T00:00:00.000Z',
+}
 
+describe('github:sessions-for-repo', () => {
   it('returns empty sessions when no keys match repoRoot', async () => {
     storeData['/other:::42:::abc'] = validSession
     const result = (await getHandler('github:sessions-for-repo')({ repoRoot: '/repo' })) as {
@@ -386,7 +396,9 @@ describe('github:session-get', () => {
     }
     expect(result.session).toMatchObject({ prNumber: 42, repoRoot: '/repo' })
   })
+})
 
+describe('github:session-get — invalid data', () => {
   it('returns session null when stored data fails schema validation', async () => {
     storeData['bad-key'] = { invalid: true }
     const result = (await getHandler('github:session-get')({ key: 'bad-key' })) as { session: null }

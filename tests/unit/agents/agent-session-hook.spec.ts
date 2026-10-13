@@ -31,22 +31,22 @@ beforeEach(() => {
 
 // The script is run for real: what matters is what it writes and what it prints,
 // and asserting on the source string would prove neither.
-describe('the capture script, executed', () => {
-  async function run(
-    payload: unknown,
-    env: Record<string, string> = { TERMINATOR_SESSION_ID: 'sess-1' }
-  ): Promise<{ out: string; dir: string }> {
-    const mod = await load()
-    const scriptPath = await mod.installCaptureScript(userData)
-    const dir = path.join(userData, 'agent-sessions')
-    const out = execFileSync(process.execPath, [scriptPath, dir], {
-      encoding: 'utf8',
-      input: typeof payload === 'string' ? payload : JSON.stringify(payload),
-      env: { ...process.env, ...env },
-    })
-    return { out, dir }
-  }
+async function run(
+  payload: unknown,
+  env: Record<string, string> = { TERMINATOR_SESSION_ID: 'sess-1' }
+): Promise<{ out: string; dir: string }> {
+  const mod = await load()
+  const scriptPath = await mod.installCaptureScript(userData)
+  const dir = path.join(userData, 'agent-sessions')
+  const out = execFileSync(process.execPath, [scriptPath, dir], {
+    encoding: 'utf8',
+    input: typeof payload === 'string' ? payload : JSON.stringify(payload),
+    env: { ...process.env, ...env },
+  })
+  return { out, dir }
+}
 
+describe('the capture script, executed', () => {
   it('writes the conversation under the terminal it ran in, and says nothing', async () => {
     const { out, dir } = await run(PAYLOAD)
     expect(out).toBe('')
@@ -69,7 +69,9 @@ describe('the capture script, executed', () => {
     expect(written.sessionId).toBe('second-id')
     expect(fs.readdirSync(dir)).toEqual(['sess-1.json'])
   })
+})
 
+describe('the capture script, executed — terminals it does not own', () => {
   it('keeps two terminals apart', async () => {
     await run(PAYLOAD)
     const { dir } = await run(
@@ -87,7 +89,9 @@ describe('the capture script, executed', () => {
     expect(out).toBe('')
     expect(fs.existsSync(dir) ? fs.readdirSync(dir) : []).toEqual([])
   })
+})
 
+describe('the capture script, executed — unusable input', () => {
   it.each([['not json at all'], [''], [JSON.stringify({ hook_event_name: 'SessionStart' })]])(
     'exits quietly on input it cannot use: %s',
     async (input) => {
@@ -109,80 +113,88 @@ describe('the capture script, executed', () => {
     })
     expect(out).toBe('')
   })
+})
 
-  describe('printing the session’s own agent context', () => {
-    let sessionContextDir: string
+let sessionContextDir: string
 
-    async function runWithSessionContext(
-      env: Record<string, string> = { TERMINATOR_SESSION_ID: 'sess-1' }
-    ): Promise<{ out: string; dir: string }> {
-      const mod = await load()
-      const scriptPath = await mod.installCaptureScript(userData)
-      const dir = path.join(userData, 'agent-sessions')
-      const out = execFileSync(process.execPath, [scriptPath, dir, sessionContextDir], {
-        encoding: 'utf8',
-        input: JSON.stringify(PAYLOAD),
-        env: { ...process.env, ...env },
-      })
-      return { out, dir }
-    }
+async function runWithSessionContext(
+  env: Record<string, string> = { TERMINATOR_SESSION_ID: 'sess-1' }
+): Promise<{ out: string; dir: string }> {
+  const mod = await load()
+  const scriptPath = await mod.installCaptureScript(userData)
+  const dir = path.join(userData, 'agent-sessions')
+  const out = execFileSync(process.execPath, [scriptPath, dir, sessionContextDir], {
+    encoding: 'utf8',
+    input: JSON.stringify(PAYLOAD),
+    env: { ...process.env, ...env },
+  })
+  return { out, dir }
+}
 
-    beforeEach(() => {
-      sessionContextDir = makeTempDir('agent-hook-sctx-')
-    })
+function useSessionContextDir(): void {
+  beforeEach(() => {
+    sessionContextDir = makeTempDir('agent-hook-sctx-')
+  })
+}
 
-    it('prints additionalContext when the terminal has a session context file', async () => {
-      fs.writeFileSync(
-        path.join(sessionContextDir, 'sess-1.json'),
-        JSON.stringify({ markdown: '# Linked issue: TAV-42', key: 'TAV-42' }),
-        'utf8'
-      )
-      const { out, dir } = await runWithSessionContext()
-      const parsed = JSON.parse(out)
-      expect(parsed.hookSpecificOutput.hookEventName).toBe('SessionStart')
-      expect(parsed.hookSpecificOutput.additionalContext).toBe('# Linked issue: TAV-42')
-      expect(parsed.hookSpecificOutput.sessionTitle).toBe('TAV-42')
-      // The report is still written — printing context is additional, not instead.
-      expect(fs.existsSync(path.join(dir, 'sess-1.json'))).toBe(true)
-    })
+describe('the capture script, executed — printing the session’s own agent context', () => {
+  useSessionContextDir()
 
-    it('prints nothing when the terminal has no session context file', async () => {
-      const { out, dir } = await runWithSessionContext()
-      expect(out).toBe('')
-      expect(fs.existsSync(path.join(dir, 'sess-1.json'))).toBe(true)
-    })
+  it('prints additionalContext when the terminal has a session context file', async () => {
+    fs.writeFileSync(
+      path.join(sessionContextDir, 'sess-1.json'),
+      JSON.stringify({ markdown: '# Linked issue: TAV-42', key: 'TAV-42' }),
+      'utf8'
+    )
+    const { out, dir } = await runWithSessionContext()
+    const parsed = JSON.parse(out)
+    expect(parsed.hookSpecificOutput.hookEventName).toBe('SessionStart')
+    expect(parsed.hookSpecificOutput.additionalContext).toBe('# Linked issue: TAV-42')
+    expect(parsed.hookSpecificOutput.sessionTitle).toBe('TAV-42')
+    // The report is still written — printing context is additional, not instead.
+    expect(fs.existsSync(path.join(dir, 'sess-1.json'))).toBe(true)
+  })
 
-    it('prints nothing when the session context has no markdown', async () => {
-      fs.writeFileSync(
-        path.join(sessionContextDir, 'sess-1.json'),
-        JSON.stringify({ markdown: '', key: 'TAV-42' }),
-        'utf8'
-      )
-      const { out } = await runWithSessionContext()
-      expect(out).toBe('')
-    })
-
-    it('prints nothing for a terminal this app does not own', async () => {
-      const { out } = await runWithSessionContext({ TERMINATOR_SESSION_ID: '' })
-      expect(out).toBe('')
-    })
+  it('prints nothing when the terminal has no session context file', async () => {
+    const { out, dir } = await runWithSessionContext()
+    expect(out).toBe('')
+    expect(fs.existsSync(path.join(dir, 'sess-1.json'))).toBe(true)
   })
 })
 
+describe('the capture script, executed — empty or foreign session context', () => {
+  useSessionContextDir()
+
+  it('prints nothing when the session context has no markdown', async () => {
+    fs.writeFileSync(
+      path.join(sessionContextDir, 'sess-1.json'),
+      JSON.stringify({ markdown: '', key: 'TAV-42' }),
+      'utf8'
+    )
+    const { out } = await runWithSessionContext()
+    expect(out).toBe('')
+  })
+
+  it('prints nothing for a terminal this app does not own', async () => {
+    const { out } = await runWithSessionContext({ TERMINATOR_SESSION_ID: '' })
+    expect(out).toBe('')
+  })
+})
+
+const settingsPath = (): string => path.join(home, '.claude', 'settings.json')
+/** The settings file as JSON, read as the shape the case expects. */
+const read = <T = { hooks: unknown }>(): T => JSON.parse(fs.readFileSync(settingsPath(), 'utf8'))
+
+async function install(): Promise<void> {
+  const mod = await load()
+  const scriptPath = await mod.installCaptureScript(userData)
+  await mod.installUserHook({
+    execPath: '/Applications/Terminator.app/Contents/MacOS/Terminator',
+    scriptPath,
+  })
+}
+
 describe('installing the hook in the operator’s Claude settings', () => {
-  const settingsPath = (): string => path.join(home, '.claude', 'settings.json')
-  /** The settings file as JSON, read as the shape the case expects. */
-  const read = <T = { hooks: unknown }>(): T => JSON.parse(fs.readFileSync(settingsPath(), 'utf8'))
-
-  async function install(): Promise<void> {
-    const mod = await load()
-    const scriptPath = await mod.installCaptureScript(userData)
-    await mod.installUserHook({
-      execPath: '/Applications/Terminator.app/Contents/MacOS/Terminator',
-      scriptPath,
-    })
-  }
-
   it('creates the file with one SessionStart entry when there is none', async () => {
     await install()
     const hooks = read().hooks as {
@@ -212,7 +224,9 @@ describe('installing the hook in the operator’s Claude settings', () => {
     expect(settings.hooks.SessionStart).toHaveLength(2)
     expect(JSON.stringify(settings.hooks.SessionStart)).toContain('theirs.sh')
   })
+})
 
+describe('installing the hook — repeats and unreadable settings', () => {
   it('is idempotent: installing twice leaves one entry of ours', async () => {
     await install()
     await install()
@@ -226,7 +240,9 @@ describe('installing the hook in the operator’s Claude settings', () => {
     await expect(install()).rejects.toThrow()
     expect(fs.readFileSync(settingsPath(), 'utf8')).toBe('{ this is not json')
   })
+})
 
+describe('installing the hook — entries from earlier installs', () => {
   it('replaces an entry left by another install of this application', async () => {
     fs.mkdirSync(path.join(home, '.claude'), { recursive: true })
     fs.writeFileSync(
@@ -247,7 +263,9 @@ describe('installing the hook in the operator’s Claude settings', () => {
     expect(hooks.SessionStart).toHaveLength(1)
     expect(hooks.SessionStart[0].hooks[0].command).not.toContain('/some/old/profile/')
   })
+})
 
+describe('installing the hook — collapsing earlier installs', () => {
   // Found in a real settings file: eight entries, one per development profile,
   // because only the first was ever replaced.
   it('collapses every entry left by earlier installs into one, keeping the rest', async () => {
@@ -267,7 +285,9 @@ describe('installing the hook in the operator’s Claude settings', () => {
     expect(hooks.SessionStart[0]).toEqual(theirs)
     expect(hooks.SessionStart[1].hooks[0].command).not.toContain('/profile-')
   })
+})
 
+describe('installing the hook — a missing script', () => {
   it('does nothing rather than failing when its script has gone', async () => {
     const mod = await load()
     const scriptPath = await mod.installCaptureScript(userData)

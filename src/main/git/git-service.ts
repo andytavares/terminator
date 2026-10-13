@@ -76,6 +76,37 @@ export async function getCurrentBranch(dirPath: string): Promise<string> {
   return branch || 'HEAD'
 }
 
+/**
+ * One line of `git branch --format=%(HEAD)|%(refname)` as a branch, or null for
+ * a ref no configured remote owns, a remote's HEAD, or a pull ref.
+ */
+function branchFromRef(line: string, remotePrefixes: string[]): Branch | null {
+  const [head, ref] = line.split('|')
+  if (ref.startsWith('refs/heads/')) {
+    return { name: ref.slice('refs/heads/'.length), isCurrent: head === '*', isRemote: false }
+  }
+  const prefix = remotePrefixes.find((p) => ref.startsWith(p))
+  if (prefix === undefined) return null
+  const name = ref.slice(prefix.length)
+  if (name === 'HEAD' || name.startsWith('pull/')) return null
+  return { name, isCurrent: false, isRemote: true }
+}
+
+/**
+ * Local branches, then each remote branch whose name nothing local or on another
+ * remote already carries; git's checkout and worktree add resolve the bare name to it.
+ */
+function withoutShadowedRemotes(branches: Branch[]): Branch[] {
+  const local = branches.filter((b) => !b.isRemote)
+  const seen = new Set(local.map((b) => b.name))
+  const remote = branches.filter((b) => {
+    if (!b.isRemote || seen.has(b.name)) return false
+    seen.add(b.name)
+    return true
+  })
+  return [...local, ...remote]
+}
+
 export async function listBranches(dirPath: string): Promise<Branch[]> {
   // Full refnames: `refname:short` prints a remote-tracking branch as
   // `origin/main`, indistinguishable from a local branch with a slash in it.
@@ -89,38 +120,12 @@ export async function listBranches(dirPath: string): Promise<Branch[]> {
     .split('\n')
     .filter(Boolean)
     .map((r) => `refs/remotes/${r}/`)
-  const local: Branch[] = []
-  const remote: Branch[] = []
-
-  for (const line of output.split('\n').filter(Boolean)) {
-    const [head, ref] = line.split('|')
-    if (ref.startsWith('refs/heads/')) {
-      local.push({
-        name: ref.slice('refs/heads/'.length),
-        isCurrent: head === '*',
-        isRemote: false,
-      })
-      continue
-    }
-    const prefix = prefixes.find((p) => ref.startsWith(p))
-    if (prefix === undefined) continue
-    const name = ref.slice(prefix.length)
-    if (name === 'HEAD' || name.startsWith('pull/')) continue
-    remote.push({ name, isCurrent: false, isRemote: true })
-  }
-
-  // A remote branch is listed only when nothing local or on another remote
-  // already carries its name; git's checkout and worktree add resolve the bare
-  // name to it.
-  const seen = new Set(local.map((b) => b.name))
-  return [
-    ...local,
-    ...remote.filter((b) => {
-      if (seen.has(b.name)) return false
-      seen.add(b.name)
-      return true
-    }),
-  ]
+  const branches = output
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => branchFromRef(line, prefixes))
+    .filter((branch): branch is Branch => branch !== null)
+  return withoutShadowedRemotes(branches)
 }
 
 export async function fetchRemotes(dirPath: string): Promise<void> {
@@ -169,12 +174,20 @@ export function suggestWorktreePath(repoRoot: string, branch: string, baseDir?: 
   return join(dir, safeBranch)
 }
 
-export async function createWorktree(
-  repoRoot: string,
-  worktreePath: string,
-  branch: string,
+export interface CreateWorktreeRequest {
+  repoRoot: string
+  worktreePath: string
+  branch: string
+  /** Create `branch` with the worktree, rather than check out one that exists. */
   isNewBranch: boolean
-): Promise<void> {
+}
+
+export async function createWorktree({
+  repoRoot,
+  worktreePath,
+  branch,
+  isNewBranch,
+}: CreateWorktreeRequest): Promise<void> {
   if (isNewBranch) {
     await git(['worktree', 'add', '-b', branch, worktreePath], repoRoot)
   } else {

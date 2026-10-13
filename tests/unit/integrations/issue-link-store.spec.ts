@@ -42,7 +42,9 @@ describe('issue-link-store — set and read', () => {
     const store = await load()
     expect(store.getLink(P1)).toBeNull()
   })
+})
 
+describe('issue-link-store — several links', () => {
   it('keeps links for different projects apart', async () => {
     const store = await load()
     await store.setLink({ projectId: P1, tracker: 'linear', key: 'TAV-42', injectContext: true })
@@ -152,7 +154,9 @@ describe('issue-link-store — persistence', () => {
     await expect(store.loadLinks()).resolves.toBeUndefined()
     expect(store.getLink(P1)).toBeNull()
   })
+})
 
+describe('issue-link-store — stored entries', () => {
   it('ignores stored entries that are not links', async () => {
     // The file is on disk and hand-editable; a malformed row must not take
     // out the rest of the operator's links.
@@ -182,7 +186,9 @@ describe('issue-link-store — persistence', () => {
     await store.loadLinks()
     expect(store.listLinks()).toEqual([])
   })
+})
 
+describe('issue-link-store — stored fields', () => {
   it('defaults injection on for a stored entry that omits it', async () => {
     fs.writeFileSync(
       path.join(userData, 'issue-links.json'),
@@ -204,7 +210,9 @@ describe('issue-link-store — persistence', () => {
     await store.loadLinks()
     expect(store.getLink(P1)?.injectContext).toBe(false)
   })
+})
 
+describe('issue-link-store — stored timestamps and temp files', () => {
   it('stamps a link that was stored without a timestamp', async () => {
     fs.writeFileSync(
       path.join(userData, 'issue-links.json'),

@@ -171,7 +171,9 @@ describe('integrations:connect', () => {
     expect(result).toEqual({ error: 'auth-failed', message: 'Authentication required' })
     expect(await connection('jira')).toMatchObject({ connected: false, account: null })
   })
+})
 
+describe('integrations:connect — what it stores', () => {
   it('records the account the credential proved to belong to', async () => {
     await invoke('integrations:connect', { tracker: 'linear', apiKey: 'k' })
     expect((await connection('linear'))?.account).toEqual({ name: 'Andrew', email: 'a@b.c' })
@@ -426,7 +428,9 @@ describe('integrations — agent context', () => {
     expect(result).toMatchObject({ error: 'failed', message: expect.any(String) })
     expect(links.getLink(P)).toBeNull()
   })
+})
 
+describe('integrations — agent context when unlinking and previewing', () => {
   it('removes what it wrote when a link is cleared', async () => {
     const before = fs.readdirSync(projectDir)
     await invoke('integrations:link-set', { projectId: P, tracker: 'linear', key: 'TAV-42' })

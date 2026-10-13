@@ -107,6 +107,39 @@ describe('legacyImportPending', () => {
 // Each case starts a Postgres in WebAssembly twice (fixture, then import).
 vi.setConfig({ testTimeout: 60_000 })
 
+const IMPORTED_NOTES = [
+  {
+    id: 'n1',
+    title: 'Résumé 日本語',
+    body: 'line one\nline "two"',
+    sort_order: 1.5,
+    archived_at: null,
+  },
+  { id: 'n2', title: 'Second', body: '', sort_order: 0, archived_at: null },
+]
+
+// The child row comes first in the legacy table.
+const IMPORTED_TASKS = [
+  {
+    id: 'child',
+    parent_id: 'parent',
+    area_id: 'a1',
+    sort_order: 2,
+    recurrence_end_count: 5,
+    status: 'open',
+    metadata: '{}',
+  },
+  {
+    id: 'parent',
+    parent_id: null,
+    area_id: 'a1',
+    sort_order: 1,
+    recurrence_end_count: null,
+    status: 'open',
+    metadata: '{}',
+  },
+]
+
 describe('importLegacyDatabase', () => {
   it('copies every row of the tables that exist in both databases', async () => {
     await createLegacyDatabase()
@@ -117,16 +150,7 @@ describe('importLegacyDatabase', () => {
     const notes = await db.query<Record<string, unknown>>(
       `SELECT id, title, body, sort_order, archived_at FROM notes ORDER BY id`
     )
-    expect(notes.map((note) => ({ ...note }))).toEqual([
-      {
-        id: 'n1',
-        title: 'Résumé 日本語',
-        body: 'line one\nline "two"',
-        sort_order: 1.5,
-        archived_at: null,
-      },
-      { id: 'n2', title: 'Second', body: '', sort_order: 0, archived_at: null },
-    ])
+    expect(notes.map((note) => ({ ...note }))).toEqual(IMPORTED_NOTES)
     expect(await db.query('SELECT note_id, tag_id FROM note_tags')).toHaveLength(1)
     expect(await db.query('SELECT name FROM tags')).toHaveLength(1)
     const settings = await db.query<{ extension_id: string; key: string }>(
@@ -146,29 +170,12 @@ describe('importLegacyDatabase', () => {
       `SELECT id, parent_id, area_id, sort_order, recurrence_end_count, status, metadata
        FROM tasks ORDER BY id`
     )
-    expect(tasks.map((task) => ({ ...task }))).toEqual([
-      {
-        id: 'child',
-        parent_id: 'parent',
-        area_id: 'a1',
-        sort_order: 2,
-        recurrence_end_count: 5,
-        status: 'open',
-        metadata: '{}',
-      },
-      {
-        id: 'parent',
-        parent_id: null,
-        area_id: 'a1',
-        sort_order: 1,
-        recurrence_end_count: null,
-        status: 'open',
-        metadata: '{}',
-      },
-    ])
+    expect(tasks.map((task) => ({ ...task }))).toEqual(IMPORTED_TASKS)
     expect(await db.query('PRAGMA foreign_key_check')).toEqual([])
   })
+})
 
+describe('importLegacyDatabase — schema drift and leftovers', () => {
   it('skips tables and columns the new schema no longer has', async () => {
     await createLegacyDatabase()
     const db = await newDatabaseWithExtensionTables()
@@ -206,7 +213,9 @@ describe('importLegacyDatabase', () => {
 
     expect(readdirSync(join(userData, 'app.pglite')).sort()).toEqual(before)
   })
+})
 
+describe('importLegacyDatabase — failures', () => {
   it('imports nothing and logs the error when the legacy database cannot be opened', async () => {
     mkdirSync(join(userData, 'app.pglite'))
     writeFileSync(join(userData, 'app.pglite', 'PG_VERSION'), 'not a database')
@@ -221,7 +230,9 @@ describe('importLegacyDatabase', () => {
     )
     expect(readdirSync(join(userData, 'app.pglite'))).toEqual(['PG_VERSION'])
   })
+})
 
+describe('importLegacyDatabase — rollback', () => {
   it('rolls back every table when a row cannot be copied', async () => {
     await createLegacyDatabase(
       LEGACY_SCHEMA +

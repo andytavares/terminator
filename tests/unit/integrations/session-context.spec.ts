@@ -80,7 +80,9 @@ describe('syncSessionContext — linked', () => {
     const context = await mod.syncSessionContext(SESSION_ID, service())
     expect(context?.chars).toBeGreaterThan(0)
   })
+})
 
+describe('syncSessionContext — linked, tracker unavailable', () => {
   it('keeps the previous context when the tracker cannot be reached', async () => {
     const mod = await load()
     await records.setLink(SNAPSHOT, TAV_42)

@@ -60,7 +60,9 @@ describe('tracker-store — round trip', () => {
     const store = await load()
     await expect(store.getCredential('linear')).resolves.toBeNull()
   })
+})
 
+describe('tracker-store — reload', () => {
   it('survives a reload — the file is the source of truth', async () => {
     const first = await load()
     await first.setCredential({ tracker: 'linear', apiKey: 'lin_key' })
@@ -118,7 +120,9 @@ describe('tracker-store — connection view', () => {
     expect(connections.map((c) => c.tracker).sort()).toEqual(['jira', 'linear'])
     expect(connections.every((c) => c.connected === false)).toBe(true)
   })
+})
 
+describe('tracker-store — mine selector', () => {
   it('defaults the mine selector per tracker', async () => {
     const store = await load()
     const connections = await store.listConnections()
@@ -195,20 +199,20 @@ describe('tracker-store — resilience', () => {
   })
 })
 
+function writeLegacy(contents: Record<string, unknown>): void {
+  fs.writeFileSync(
+    path.join(userData, 'speckit-pilot-creds.json'),
+    JSON.stringify(contents),
+    'utf8'
+  )
+}
+
+/** The extension encrypted with safeStorage and base64'd the result. */
+function legacyEncrypt(value: string): string {
+  return Buffer.from(`enc:${value}`, 'utf8').toString('base64')
+}
+
 describe('tracker-store — migration from the extension (FR-004)', () => {
-  function writeLegacy(contents: Record<string, unknown>): void {
-    fs.writeFileSync(
-      path.join(userData, 'speckit-pilot-creds.json'),
-      JSON.stringify(contents),
-      'utf8'
-    )
-  }
-
-  /** The extension encrypted with safeStorage and base64'd the result. */
-  function legacyEncrypt(value: string): string {
-    return Buffer.from(`enc:${value}`, 'utf8').toString('base64')
-  }
-
   it('adopts a Linear key and its email', async () => {
     writeLegacy({ linearKey: legacyEncrypt('legacy-linear'), linearEmail: 'me@x.c' })
     const store = await load()
@@ -221,7 +225,9 @@ describe('tracker-store — migration from the extension (FR-004)', () => {
     const linear = (await store.listConnections()).find((c) => c.tracker === 'linear')
     expect(linear?.mine).toEqual({ kind: 'assignee', email: 'me@x.c' })
   })
+})
 
+describe('tracker-store — migrating Jira', () => {
   it('adopts Jira credentials and its JQL', async () => {
     writeLegacy({
       jiraCreds: {
@@ -243,7 +249,9 @@ describe('tracker-store — migration from the extension (FR-004)', () => {
     const jira = (await store.listConnections()).find((c) => c.tracker === 'jira')
     expect(jira?.mine).toEqual({ kind: 'query', jql: 'assignee = currentUser()' })
   })
+})
 
+describe('tracker-store — migration runs once', () => {
   it('renames the legacy file so the migration runs once', async () => {
     writeLegacy({ linearKey: legacyEncrypt('legacy-linear') })
     const store = await load()

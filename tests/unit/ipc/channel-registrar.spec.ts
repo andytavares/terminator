@@ -32,6 +32,14 @@ describe('handleChannel()', () => {
     handleChannel('test:channel', fn)
     expect(ipcInvokeRegistry.get('test:channel')?.handler).toBe(fn)
   })
+})
+
+describe('handleChannel() — remote access', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    ipcInvokeRegistry.clear()
+    ipcSendRegistry.clear()
+  })
 
   it('defaults remoteAccessible from the core allowlist — allowlisted channel', () => {
     const allowlisted = [...REMOTE_ACCESSIBLE_CHANNELS][0]

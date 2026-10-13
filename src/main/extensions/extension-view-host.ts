@@ -34,6 +34,15 @@ interface BoundsRect {
   height: number
 }
 
+/** Where one extension view goes, as the renderer measured it. */
+export interface PanelPlacement {
+  extensionId: string
+  viewParam: string
+  bounds: BoundsRect
+  visible: boolean
+  repoRoot?: string | null
+}
+
 interface ViewEntry {
   view: InstanceType<typeof WebContentsView>
   extensionId: string
@@ -90,10 +99,7 @@ export class ExtensionViewHost {
   private leftInset = 0
   // Bounds updates can arrive while createView is still awaiting loadURL; the
   // latest one per view is applied once creation finishes.
-  private pendingBounds = new Map<
-    string,
-    { bounds: BoundsRect; visible: boolean; repoRoot?: string | null }
-  >()
+  private pendingBounds = new Map<string, PanelPlacement>()
   private creatingViews = new Set<string>()
   // The extension view that currently holds keyboard focus, or null when focus
   // sits in the main renderer. Electron restores focus to the window's own
@@ -156,34 +162,22 @@ export class ExtensionViewHost {
    */
   async updatePanelBounds(
     resolveExt: () => Extension | undefined,
-    extensionId: string,
-    viewParam: string,
-    bounds: BoundsRect,
-    visible: boolean,
-    repoRoot?: string | null
+    placement: PanelPlacement
   ): Promise<void> {
-    if (this.hasView(extensionId, viewParam)) {
-      this.handleBoundsUpdate(extensionId, viewParam, bounds, visible, repoRoot)
+    if (this.hasView(placement.extensionId, placement.viewParam)) {
+      this.handleBoundsUpdate(placement)
       return
     }
 
-    const viewKey = `${extensionId}:${viewParam}`
-    this.pendingBounds.set(viewKey, { bounds, visible, repoRoot })
+    const viewKey = `${placement.extensionId}:${placement.viewParam}`
+    this.pendingBounds.set(viewKey, placement)
     if (this.creatingViews.has(viewKey)) return
     this.creatingViews.add(viewKey)
     try {
       const ext = resolveExt()
-      if (ext) await this.createView(ext, viewParam, repoRoot)
+      if (ext) await this.createView(ext, placement.viewParam, placement.repoRoot)
       const latest = this.pendingBounds.get(viewKey)
-      if (latest) {
-        this.handleBoundsUpdate(
-          extensionId,
-          viewParam,
-          latest.bounds,
-          latest.visible,
-          latest.repoRoot
-        )
-      }
+      if (latest) this.handleBoundsUpdate(latest)
     } finally {
       this.creatingViews.delete(viewKey)
       this.pendingBounds.delete(viewKey)
@@ -194,6 +188,31 @@ export class ExtensionViewHost {
     if (!ext.rendererUrl) return
 
     const url = buildUrl(ext.rendererUrl, viewParam, repoRoot)
+    const view = this.newView(`${ext.id}:${viewParam}`)
+    view.webContents.on('did-finish-load', () =>
+      this.onViewLoaded(view, { extensionId: ext.id, viewParam, repoRoot })
+    )
+
+    try {
+      await view.webContents.loadURL(url)
+    } catch (e) {
+      logger.warn(`Failed to load ${url}: ${e instanceof Error ? e.message : String(e)}`)
+    }
+
+    this.mainWindow.contentView.addChildView(view)
+    const entry: ViewEntry = {
+      view,
+      extensionId: ext.id,
+      viewParam,
+      lastRepoRoot: repoRoot ?? null,
+      lastBounds: null,
+      lastVisible: false,
+    }
+    this.views.set(ext.id, [...(this.views.get(ext.id) ?? []), entry])
+  }
+
+  /** A view for one extension page, with the focus and keyboard wiring every view needs. */
+  private newView(viewKey: string): InstanceType<typeof WebContentsView> {
     const view = new WebContentsView({
       webPreferences: {
         session: electronSession.fromPartition('ext-views'),
@@ -202,8 +221,6 @@ export class ExtensionViewHost {
         nodeIntegration: false,
       },
     })
-
-    const viewKey = `${ext.id}:${viewParam}`
     view.webContents.on('focus', () => this.noteFocused(viewKey))
 
     // ⌘P (mac) / Ctrl+P (else) is the quick-actions leader everywhere else in
@@ -215,37 +232,23 @@ export class ExtensionViewHost {
       this.mainWindow.webContents.focus()
       this.mainWindow.webContents.send('quick-actions:open')
     })
+    return view
+  }
 
-    view.webContents.on('did-finish-load', () => {
-      view.webContents.insertCSS(EXTENSION_BASE_CSS).catch(() => {})
-      void applyTheme(view.webContents, this.theme)
-      this.mainWindow.webContents.send('extension:panel-loaded', { id: ext.id, viewParam })
-      // Send current workspace context so extension doesn't need to wait for a change event.
-      if (repoRoot != null) {
-        view.webContents.send('workspace:changed', { repoRoot })
-      }
+  private onViewLoaded(
+    view: InstanceType<typeof WebContentsView>,
+    loaded: Omit<PanelPlacement, 'bounds' | 'visible'>
+  ): void {
+    view.webContents.insertCSS(EXTENSION_BASE_CSS).catch(() => {})
+    void applyTheme(view.webContents, this.theme)
+    this.mainWindow.webContents.send('extension:panel-loaded', {
+      id: loaded.extensionId,
+      viewParam: loaded.viewParam,
     })
-
-    try {
-      await view.webContents.loadURL(url)
-    } catch (e) {
-      logger.warn(`Failed to load ${url}: ${e instanceof Error ? e.message : String(e)}`)
+    // Send current workspace context so extension doesn't need to wait for a change event.
+    if (loaded.repoRoot != null) {
+      view.webContents.send('workspace:changed', { repoRoot: loaded.repoRoot })
     }
-
-    this.mainWindow.contentView.addChildView(view)
-
-    const existing = this.views.get(ext.id) ?? []
-    this.views.set(ext.id, [
-      ...existing,
-      {
-        view,
-        extensionId: ext.id,
-        viewParam,
-        lastRepoRoot: repoRoot ?? null,
-        lastBounds: null,
-        lastVisible: false,
-      },
-    ])
   }
 
   focusView(extensionId: string, viewParam: string): void {
@@ -276,13 +279,7 @@ export class ExtensionViewHost {
     }
   }
 
-  handleBoundsUpdate(
-    extensionId: string,
-    viewParam: string,
-    bounds: BoundsRect,
-    visible: boolean,
-    repoRoot?: string | null
-  ): void {
+  handleBoundsUpdate({ extensionId, viewParam, bounds, visible, repoRoot }: PanelPlacement): void {
     const entries = this.views.get(extensionId)
     if (!entries) return
     const entry = entries.find((e) => e.viewParam === viewParam)

@@ -111,6 +111,14 @@ function baseEnvironment(): NodeJS.ProcessEnv {
   }
 }
 
+/** stderr, or why the command did not run to completion when it said nothing itself. */
+function stderrOf(error: ExecFileException | null, stderr: string | Buffer): string | Buffer {
+  // A string code means the command did not run to completion (e.g. ENOENT); say why.
+  const reason = typeof error?.code === 'string' && stderr.length === 0 ? error.message : ''
+  if (!reason) return stderr
+  return typeof stderr === 'string' ? reason : Buffer.from(reason)
+}
+
 function toOutput(
   error: ExecFileException | null,
   stdout: string | Buffer,
@@ -120,10 +128,7 @@ function toOutput(
   const timedOut = error?.killed === true && error.code == null
   const exceededMaxBuffer = error?.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER'
   const exitCode = !error ? 0 : timedOut ? TIMEOUT_EXIT_CODE : numericExitCode(error.code)
-  // A string code means the command did not run to completion (e.g. ENOENT); say why.
-  const reason = typeof error?.code === 'string' && stderr.length === 0 ? error.message : ''
-  const failure = typeof stderr === 'string' ? reason : Buffer.from(reason)
-  return { exitCode, stdout, stderr: reason ? failure : stderr, timedOut, exceededMaxBuffer }
+  return { exitCode, stdout, stderr: stderrOf(error, stderr), timedOut, exceededMaxBuffer }
 }
 
 export function execShell(

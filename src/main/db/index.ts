@@ -22,6 +22,59 @@ function statements(database: DatabaseSync): Statements {
   }
 }
 
+interface TransactionSql {
+  begin: string
+  commit: string
+  rollback: string
+}
+
+/** Runs `body` between `begin` and `commit`, rolling back and rethrowing when it throws. */
+async function guarded<T>(
+  database: DatabaseSync,
+  sql: TransactionSql,
+  body: () => Promise<T>
+): Promise<T> {
+  database.exec(sql.begin)
+  try {
+    const result = await body()
+    database.exec(sql.commit)
+    return result
+  } catch (error) {
+    database.exec(sql.rollback)
+    throw error
+  }
+}
+
+/** The handle a transaction body receives: a nested transaction is a savepoint. */
+function nestedTransactions(database: DatabaseSync, direct: Statements): ExtensionDB {
+  let savepoints = 0
+  const withinTransaction: ExtensionDB = {
+    ...direct,
+    transaction<T>(fn: (tx: ExtensionDB) => Promise<T>): Promise<T> {
+      const savepoint = `sp_${++savepoints}`
+      const sql = {
+        begin: `SAVEPOINT ${savepoint}`,
+        commit: `RELEASE ${savepoint}`,
+        rollback: `ROLLBACK TO ${savepoint}; RELEASE ${savepoint}`,
+      }
+      return guarded(database, sql, () => fn(withinTransaction))
+    },
+  }
+  return withinTransaction
+}
+
+/** Runs each task after the one before it has settled. */
+function sequential(): <T>(task: () => Promise<T>) => Promise<T> {
+  let tail: Promise<unknown> = Promise.resolve()
+  return (task) => {
+    const result = tail.then(task)
+    tail = result.catch(() => undefined)
+    return result
+  }
+}
+
+const TOP_LEVEL: TransactionSql = { begin: 'BEGIN', commit: 'COMMIT', rollback: 'ROLLBACK' }
+
 /**
  * Wraps one synchronous connection in the async ExtensionDB interface. Statements
  * and transactions run one at a time, in call order: a statement issued while a
@@ -29,42 +82,8 @@ function statements(database: DatabaseSync): Statements {
  */
 export function wrapDb(database: DatabaseSync): ExtensionDB {
   const direct = statements(database)
-  let tail: Promise<unknown> = Promise.resolve()
-  let savepoints = 0
-
-  const inOrder = <T>(task: () => Promise<T>): Promise<T> => {
-    const result = tail.then(task)
-    tail = result.catch(() => undefined)
-    return result
-  }
-
-  const withinTransaction: ExtensionDB = {
-    ...direct,
-    async transaction<T>(fn: (tx: ExtensionDB) => Promise<T>): Promise<T> {
-      const savepoint = `sp_${++savepoints}`
-      database.exec(`SAVEPOINT ${savepoint}`)
-      try {
-        const result = await fn(withinTransaction)
-        database.exec(`RELEASE ${savepoint}`)
-        return result
-      } catch (error) {
-        database.exec(`ROLLBACK TO ${savepoint}; RELEASE ${savepoint}`)
-        throw error
-      }
-    },
-  }
-
-  async function transaction<T>(fn: (tx: ExtensionDB) => Promise<T>): Promise<T> {
-    database.exec('BEGIN')
-    try {
-      const result = await fn(withinTransaction)
-      database.exec('COMMIT')
-      return result
-    } catch (error) {
-      database.exec('ROLLBACK')
-      throw error
-    }
-  }
+  const inOrder = sequential()
+  const nested = nestedTransactions(database, direct)
 
   return {
     exec: (sql) => inOrder(() => direct.exec(sql)),
@@ -73,7 +92,7 @@ export function wrapDb(database: DatabaseSync): ExtensionDB {
     get: <T extends Record<string, unknown>>(sql: string, params?: unknown[]) =>
       inOrder(() => direct.get<T>(sql, params)),
     run: (sql, params) => inOrder(() => direct.run(sql, params)),
-    transaction: (fn) => inOrder(() => transaction(fn)),
+    transaction: (fn) => inOrder(() => guarded(database, TOP_LEVEL, () => fn(nested))),
   }
 }
 

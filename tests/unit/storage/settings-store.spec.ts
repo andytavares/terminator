@@ -26,10 +26,14 @@ vi.mock('electron-store', () => {
 
 vi.mock('electron', () => ({ app: { getPath: () => '/tmp' } }))
 
-describe('settings-store', () => {
+function useEmptyStores(): void {
   beforeEach(() => {
     vi.resetModules()
   })
+}
+
+describe('settings-store', () => {
+  useEmptyStores()
 
   it('getGlobalSettings returns defaults', async () => {
     const { getGlobalSettings } = await import('../../../src/main/storage/settings-store')
@@ -51,6 +55,10 @@ describe('settings-store', () => {
     expect(settings.notifications.defaultTargets).toEqual(['toast'])
     expect(settings.notifications.overrides).toEqual({})
   })
+})
+
+describe('settings-store — notification overrides and merging', () => {
+  useEmptyStores()
 
   it('updateGlobalSettings patches a single core notification override without clobbering others', async () => {
     const { getGlobalSettings, updateGlobalSettings } = await import(
@@ -77,6 +85,10 @@ describe('settings-store', () => {
     const settings = getGlobalSettings()
     expect(settings.appearance.theme).toBe('light')
   })
+})
+
+describe('settings-store — refused values', () => {
+  useEmptyStores()
 
   it('updateGlobalSettings refuses a value the settings schema rejects and keeps what was stored', async () => {
     const { getGlobalSettings, updateGlobalSettings } = await import(
@@ -94,6 +106,10 @@ describe('settings-store', () => {
     expect(() => updateWorkspaceSettings('ws-bad', { appearance: { theme: 'purple' } })).toThrow()
     expect(getWorkspaceSettings('ws-bad').overrides).toEqual({})
   })
+})
+
+describe('settings-store — workspace overrides', () => {
+  useEmptyStores()
 
   it('getWorkspaceSettings returns global defaults when no override', async () => {
     const { getWorkspaceSettings } = await import('../../../src/main/storage/settings-store')

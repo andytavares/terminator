@@ -1,7 +1,8 @@
 import { z } from 'zod'
 import { defineChannel } from '@terminator/extension-sdk'
-import type { CommandContribution, Disposable, ExtensionAPI } from '@terminator/extension-sdk'
+import type { Disposable, ExtensionAPI } from '@terminator/extension-sdk'
 import type { RpcEndpoint } from './rpc-endpoint.js'
+import type { ApiCall, ChannelRegistration, CommandRegistration, CommandRun } from './messages.js'
 import { reviveCallbacks } from './callbacks.js'
 
 /**
@@ -98,19 +99,13 @@ export class ExtensionApiServer {
     private readonly endpoint: RpcEndpoint,
     private readonly apiFor: (extensionId: string) => ExtensionAPI | undefined
   ) {
-    endpoint.handle('api', (id: string, path: string, params: unknown[], handleId?: number) =>
-      this.call(id, path, params, handleId)
-    )
+    endpoint.handle('api', (call: ApiCall) => this.call(call))
     endpoint.handle('release', (id: string, handleId: number) => this.release(id, handleId))
-    endpoint.handle(
-      'channel.register',
-      (id: string, channel: string, remote: boolean, handleId: number) =>
-        this.registerChannel(id, channel, remote, handleId)
+    endpoint.handle('channel.register', (registration: ChannelRegistration) =>
+      this.registerChannel(registration)
     )
-    endpoint.handle(
-      'command.register',
-      (id: string, command: CommandContribution, takesArgs: boolean, handleId: number) =>
-        this.registerCommand(id, command, takesArgs, handleId)
+    endpoint.handle('command.register', (registration: CommandRegistration) =>
+      this.registerCommand(registration)
     )
   }
 
@@ -120,7 +115,7 @@ export class ExtensionApiServer {
     this.handles.delete(extensionId)
   }
 
-  private async call(extensionId: string, path: string, params: unknown[], handleId?: number) {
+  private async call({ extensionId, path, params, handleId }: ApiCall) {
     if (!CROSSING_MEMBERS.has(path)) throw new Error(`"${path}" is not part of the Extension API`)
     const { owner, member } = memberAt(this.requireApi(extensionId), path)
     const revived = reviveCallbacks(params, (callbackId) => (...args: unknown[]) => {
@@ -132,7 +127,8 @@ export class ExtensionApiServer {
     return undefined
   }
 
-  private registerChannel(extensionId: string, channel: string, remote: boolean, handleId: number) {
+  private registerChannel({ extensionId, handleId, params }: ChannelRegistration) {
+    const [channel, remote] = params
     const spec = defineChannel({
       channel,
       // The extension's own schema runs in the extension host, before its `run`.
@@ -146,17 +142,14 @@ export class ExtensionApiServer {
     this.keep(extensionId, handleId, registration)
   }
 
-  private registerCommand(
-    extensionId: string,
-    command: CommandContribution,
-    takesArgs: boolean,
-    handleId: number
-  ) {
+  private registerCommand({ extensionId, handleId, params }: CommandRegistration) {
+    const [command, takesArgs] = params
     const contribution = { ...command, args: takesArgs ? z.unknown() : undefined }
     const registration = this.requireApi(extensionId).commands.register(
       contribution,
       async (context, args) => {
-        await this.endpoint.request('command.run', extensionId, command.id, context, args)
+        const run: CommandRun = { extensionId, commandId: command.id, context, args }
+        await this.endpoint.request('command.run', run)
       }
     )
     this.keep(extensionId, handleId, registration)

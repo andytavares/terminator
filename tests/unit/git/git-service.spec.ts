@@ -81,16 +81,16 @@ describe('getCurrentBranch', () => {
 
 // ─── listBranches ─────────────────────────────────────────────────────────────
 
-describe('listBranches', () => {
-  // The shape `git branch -a --format=%(HEAD)|%(refname)` prints: full refs,
-  // remote-tracking ones under refs/remotes/<remote>/. `git remote` answers
-  // second.
-  function mockRefs(refs: string, remotes = 'origin\nupstream\n') {
-    customMock().mockImplementation((_cmd, args) =>
-      Promise.resolve({ stdout: args[0] === 'remote' ? remotes : refs, stderr: '' })
-    )
-  }
+// The shape `git branch -a --format=%(HEAD)|%(refname)` prints: full refs,
+// remote-tracking ones under refs/remotes/<remote>/. `git remote` answers
+// second.
+function mockRefs(refs: string, remotes = 'origin\nupstream\n') {
+  customMock().mockImplementation((_cmd, args) =>
+    Promise.resolve({ stdout: args[0] === 'remote' ? remotes : refs, stderr: '' })
+  )
+}
 
+describe('listBranches', () => {
   it('lists local branches', async () => {
     mockRefs(' |refs/heads/main\n |refs/heads/feature/x\n')
     const branches = await listBranches('/repo')
@@ -111,7 +111,9 @@ describe('listBranches', () => {
     const names = (await listBranches('/repo')).map((b) => b.name)
     expect(names.some((n) => n.startsWith('origin') || n.startsWith('upstream'))).toBe(false)
   })
+})
 
+describe('listBranches — remote branches', () => {
   it('lists a branch that exists only on a remote by its bare name', async () => {
     mockRefs(' |refs/heads/main\n |refs/remotes/origin/main\n |refs/remotes/origin/remote-only\n')
     const branches = await listBranches('/repo')
@@ -135,7 +137,9 @@ describe('listBranches', () => {
     const branches = await listBranches('/repo')
     expect(branches.map((b) => b.name)).toEqual(['main'])
   })
+})
 
+describe('listBranches — refs that are not branches', () => {
   it('filters out pull request refs', async () => {
     mockRefs(
       ' |refs/heads/main\n |refs/remotes/origin/pull/123/head\n |refs/remotes/origin/pull/456/head\n'
@@ -242,7 +246,12 @@ describe('listWorktrees', () => {
 describe('createWorktree', () => {
   it('uses -b flag when creating a new branch', async () => {
     mockResolve('')
-    await createWorktree('/repo', '/worktrees/new-feature', 'new-feature', true)
+    await createWorktree({
+      repoRoot: '/repo',
+      worktreePath: '/worktrees/new-feature',
+      branch: 'new-feature',
+      isNewBranch: true,
+    })
     expect(customMock().mock.calls[0][1]).toEqual([
       'worktree',
       'add',
@@ -254,7 +263,12 @@ describe('createWorktree', () => {
 
   it('does not use -b flag for existing branch', async () => {
     mockResolve('')
-    await createWorktree('/repo', '/worktrees/main', 'main', false)
+    await createWorktree({
+      repoRoot: '/repo',
+      worktreePath: '/worktrees/main',
+      branch: 'main',
+      isNewBranch: false,
+    })
     expect(customMock().mock.calls[0][1]).toEqual(['worktree', 'add', '/worktrees/main', 'main'])
   })
 })
@@ -290,7 +304,9 @@ describe('getChangeStats', () => {
     expect(args).toEqual(['diff', '--numstat', 'HEAD'])
     expect(opts).toMatchObject({ cwd: '/repo' })
   })
+})
 
+describe('getChangeStats — edge cases', () => {
   it('counts a binary file but adds nothing for it — git reports dashes, not numbers', async () => {
     mockResolve(['5\t2\tsrc/a.ts', '-\t-\tassets/logo.png'].join('\n'))
     expect(await getChangeStats('/repo')).toEqual({ added: 5, removed: 2, files: 2 })

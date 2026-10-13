@@ -22,9 +22,13 @@ function fakeSource() {
   }
 }
 
-describe('BatchedPtyStream', () => {
+function useFakeFrameTimers(): void {
   beforeEach(() => vi.useFakeTimers())
   afterEach(() => vi.useRealTimers())
+}
+
+describe('BatchedPtyStream', () => {
+  useFakeFrameTimers()
 
   it('delivers the chunks of one frame as one batch', () => {
     const source = fakeSource()
@@ -49,6 +53,10 @@ describe('BatchedPtyStream', () => {
     source.exit(3)
     expect(events).toEqual(['last words', 'exit 3'])
   })
+})
+
+describe('BatchedPtyStream — disposal', () => {
+  useFakeFrameTimers()
 
   it('stops delivering once disposed, including a batch still pending', () => {
     const source = fakeSource()

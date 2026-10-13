@@ -76,7 +76,9 @@ describe('makeSnapshotFor', () => {
     const project = addProject()
     expect(snapshotFor(session({ projectId: project.id }))?.branch).toBeNull()
   })
+})
 
+describe('makeSnapshotFor — missing projects', () => {
   it('describes a terminal whose project has gone, without inventing one', () => {
     const project = addProject()
     workspaces.deleteProject(project.id)
@@ -95,7 +97,9 @@ describe('makeSnapshotFor', () => {
       tabTitle: '',
     })
   })
+})
 
+describe('makeSnapshotFor — terminals that have gone', () => {
   // The premise of the whole feature: a conversation outlives its terminal. A
   // report that lands after the terminal died — the agent's own exit is what
   // ends it — must still attach to the session it names.

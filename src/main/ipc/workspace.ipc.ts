@@ -51,98 +51,94 @@ const validationError = (error: z.ZodError) => ({
   message: error.message,
 })
 
+const workspaceChannels: ChannelSpec[] = [
+  defineChannel({
+    channel: 'workspace:get-active',
+    schema: noPayload,
+    invalid: validationError,
+    run: () => activeContext,
+  }),
+  defineChannel({
+    channel: 'workspace:list',
+    schema: noPayload,
+    invalid: validationError,
+    run: () => ({ workspaces: listWorkspaces() }),
+  }),
+  defineChannel({
+    channel: 'workspace:create',
+    schema: CreateWorkspaceInputSchema,
+    invalid: validationError,
+    run: (input) => createWorkspace(input),
+  }),
+  defineChannel({
+    channel: 'workspace:update',
+    schema: UpdateWorkspaceInputSchema,
+    invalid: validationError,
+    run: (input) => updateWorkspace(input),
+  }),
+  defineChannel({
+    channel: 'workspace:delete',
+    schema: IdSchema,
+    invalid: failed,
+    run: ({ id }) => deleteWorkspace(id),
+  }),
+  defineChannel({
+    channel: 'workspace:reorder',
+    schema: ReorderWorkspacesSchema,
+    invalid: failed,
+    run: (input) => reorderWorkspaces(input),
+  }),
+]
+
+const projectChannels: ChannelSpec[] = [
+  defineChannel({
+    channel: 'project:list',
+    schema: z.object({ workspaceId: z.string().min(1) }),
+    invalid: { projects: [] },
+    run: ({ workspaceId }) => ({ projects: listProjects(workspaceId) }),
+  }),
+  defineChannel({
+    channel: 'project:create',
+    schema: CreateProjectInputSchema,
+    invalid: validationError,
+    run: (input) => {
+      const result = createProject(input)
+      if ('project' in result) {
+        BrowserWindow.getAllWindows().forEach((win) => {
+          win.webContents.send('workspace:project-added', result.project)
+        })
+      }
+      return result
+    },
+  }),
+  defineChannel({
+    channel: 'project:update-branch',
+    schema: UpdateProjectBranchSchema,
+    invalid: validationError,
+    run: (input) => updateProjectBranch(input),
+  }),
+  defineChannel({
+    channel: 'project:rename',
+    schema: RenameProjectSchema,
+    invalid: validationError,
+    run: (input) => renameProject(input),
+  }),
+  defineChannel({
+    channel: 'project:reorder',
+    schema: ReorderProjectsSchema,
+    invalid: failed,
+    run: (input) => reorderProjects(input),
+  }),
+  defineChannel({
+    channel: 'project:delete',
+    schema: IdSchema,
+    invalid: failed,
+    run: ({ id }) => removeProject(id),
+  }),
+]
+
 export function registerWorkspaceHandlers(): void {
-  registerInvokeTable([...workspaceSpecs(), ...projectSpecs()])
-}
-
-function workspaceSpecs(): ChannelSpec[] {
-  return [
-    defineChannel({
-      channel: 'workspace:get-active',
-      schema: noPayload,
-      invalid: validationError,
-      run: () => activeContext,
-    }),
-    defineChannel({
-      channel: 'workspace:list',
-      schema: noPayload,
-      invalid: validationError,
-      run: () => ({ workspaces: listWorkspaces() }),
-    }),
-    defineChannel({
-      channel: 'workspace:create',
-      schema: CreateWorkspaceInputSchema,
-      invalid: validationError,
-      run: (input) => createWorkspace(input),
-    }),
-    defineChannel({
-      channel: 'workspace:update',
-      schema: UpdateWorkspaceInputSchema,
-      invalid: validationError,
-      run: (input) => updateWorkspace(input),
-    }),
-    defineChannel({
-      channel: 'workspace:delete',
-      schema: IdSchema,
-      invalid: failed,
-      run: ({ id }) => deleteWorkspace(id),
-    }),
-    defineChannel({
-      channel: 'workspace:reorder',
-      schema: ReorderWorkspacesSchema,
-      invalid: failed,
-      run: (input) => reorderWorkspaces(input),
-    }),
-  ]
-}
-
-function projectSpecs(): ChannelSpec[] {
-  return [
-    defineChannel({
-      channel: 'project:list',
-      schema: z.object({ workspaceId: z.string().min(1) }),
-      invalid: { projects: [] },
-      run: ({ workspaceId }) => ({ projects: listProjects(workspaceId) }),
-    }),
-    defineChannel({
-      channel: 'project:create',
-      schema: CreateProjectInputSchema,
-      invalid: validationError,
-      run: (input) => {
-        const result = createProject(input)
-        if ('project' in result) {
-          BrowserWindow.getAllWindows().forEach((win) => {
-            win.webContents.send('workspace:project-added', result.project)
-          })
-        }
-        return result
-      },
-    }),
-    defineChannel({
-      channel: 'project:update-branch',
-      schema: UpdateProjectBranchSchema,
-      invalid: validationError,
-      run: (input) => updateProjectBranch(input),
-    }),
-    defineChannel({
-      channel: 'project:rename',
-      schema: RenameProjectSchema,
-      invalid: validationError,
-      run: (input) => renameProject(input),
-    }),
-    defineChannel({
-      channel: 'project:reorder',
-      schema: ReorderProjectsSchema,
-      invalid: failed,
-      run: (input) => reorderProjects(input),
-    }),
-    defineChannel({
-      channel: 'project:delete',
-      schema: IdSchema,
-      invalid: failed,
-      run: ({ id }) => removeProject(id),
-    }),
-  ]
+  registerInvokeTable([...workspaceChannels, ...projectChannels])
 }
 
 async function removeProject(id: string): Promise<{ success: boolean }> {

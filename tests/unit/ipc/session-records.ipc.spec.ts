@@ -149,7 +149,9 @@ describe('session-records:set-description', () => {
     expect(result).toEqual({ data: null })
     expect(await list()).toEqual([])
   })
+})
 
+describe('session-records:set-description — refused writes', () => {
   it('reports a write to a closed record', async () => {
     await records.setDescription(SNAP, 'd')
     await records.markClosed('s1', new Date())
@@ -197,7 +199,9 @@ describe('session-records:set-link', () => {
     expect(result).toEqual({ data: null })
     expect(await list()).toEqual([])
   })
+})
 
+describe('session-records:set-link — agent context', () => {
   it('writes the session’s own agent context for the linked issue', async () => {
     await invoke('session-records:set-link', {
       session: SNAP,
@@ -241,13 +245,17 @@ describe('session-records:changed', () => {
   })
 })
 
-describe('whether a conversation can still be resumed', () => {
-  let transcript: string
+let transcript: string
 
+function useTranscriptFile(): void {
   beforeEach(() => {
     transcript = path.join(makeTempDir('ipc-transcript-'), 'c.jsonl')
     fs.writeFileSync(transcript, '{}')
   })
+}
+
+describe('whether a conversation can still be resumed', () => {
+  useTranscriptFile()
 
   it('is resumable while the transcript is there', async () => {
     await records.setAgent(SNAP, conversation(transcript))
@@ -269,6 +277,10 @@ describe('whether a conversation can still be resumed', () => {
     fs.rmSync(transcript)
     expect((await list())[0].resumable).toBe(false)
   })
+})
+
+describe('whether a conversation can still be resumed — no conversation and pushed changes', () => {
+  useTranscriptFile()
 
   it('is not resumable when there was never a conversation', async () => {
     await records.setDescription(SNAP, 'd')

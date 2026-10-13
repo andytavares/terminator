@@ -2,7 +2,13 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 import { MessageChannel, type MessagePort } from 'node:worker_threads'
 import { z } from 'zod'
 import { defineChannel, dispatchChannel } from '@terminator/extension-sdk'
-import type { ChannelSpec, ExtensionAPI, ExtensionDB } from '@terminator/extension-sdk'
+import type {
+  ChannelSpec,
+  CommandContext,
+  CommandContribution,
+  ExtensionAPI,
+  ExtensionDB,
+} from '@terminator/extension-sdk'
 
 vi.mock('electron', () => ({ utilityProcess: {}, MessageChannelMain: class {} }))
 
@@ -27,27 +33,53 @@ function link(port: MessagePort): MessageLink {
   return { post: (m) => port.postMessage(m), listen: (receive) => port.on('message', receive) }
 }
 
-/** The main side of the API the server calls into: only what these backends use. */
-function mainApi() {
+/** Main's command registry, as far as these backends reach it. */
+function commandsInMain() {
+  const commands = new Map<string, (context: CommandContext, args?: unknown) => unknown>()
+  const api = partialFake<ExtensionAPI['commands']>({
+    register: (command: CommandContribution, handler: never) => {
+      commands.set(command.id, handler)
+      return { dispose: () => void commands.delete(command.id) }
+    },
+  })
+  return { commands, api }
+}
+
+/** Main's channel registry and a session's output listeners. */
+function channelsAndOutputInMain() {
   const channels = new Map<string, ChannelSpec>()
   const dataListeners: Array<(data: string) => void> = []
+  const ipc = partialFake<ExtensionAPI['ipc']>({
+    registerHandler: (spec: ChannelSpec) => {
+      channels.set(spec.channel, spec)
+      return { dispose: () => void channels.delete(spec.channel) }
+    },
+  })
+  const pty = partialFake<ExtensionAPI['pty']>({
+    onData: (_session: string, listener: (data: string) => void) => {
+      dataListeners.push(listener)
+      return () => void dataListeners.splice(dataListeners.indexOf(listener), 1)
+    },
+  })
+  return { channels, dataListeners, ipc, pty }
+}
+
+/** The main side of the API the server calls into: only what these backends use. */
+function mainApi() {
   const broadcast = vi.fn<ExtensionAPI['window']['broadcast']>()
+  const transition = vi.fn<ExtensionAPI['issues']['transition']>(async () => undefined)
+  const setSetting = vi.fn<ExtensionAPI['settings']['set']>()
+  const { commands, api: commandsApi } = commandsInMain()
+  const { channels, dataListeners, ipc, pty } = channelsAndOutputInMain()
   const api = partialFake<ExtensionAPI>({
-    ipc: partialFake<ExtensionAPI['ipc']>({
-      registerHandler: (spec: ChannelSpec) => {
-        channels.set(spec.channel, spec)
-        return { dispose: () => void channels.delete(spec.channel) }
-      },
-    }),
-    pty: partialFake<ExtensionAPI['pty']>({
-      onData: (_session: string, listener: (data: string) => void) => {
-        dataListeners.push(listener)
-        return () => void dataListeners.splice(dataListeners.indexOf(listener), 1)
-      },
-    }),
+    issues: partialFake<ExtensionAPI['issues']>({ transition }),
+    settings: partialFake<ExtensionAPI['settings']>({ set: setSetting }),
+    commands: commandsApi,
+    ipc,
+    pty,
     window: partialFake<ExtensionAPI['window']>({ broadcast }),
   })
-  return { api, broadcast, channels, dataListeners }
+  return { api, broadcast, channels, commands, dataListeners, setSetting, transition }
 }
 
 /** A backend that registers a validated channel and relays a session's output. */
@@ -74,7 +106,7 @@ function harness(modules: Record<string, BackendModule> = {}) {
     const { port1, port2 } = new MessageChannel()
     const endpoint = new RpcEndpoint(link(port2))
     const loader = { load: (entry: string) => modules[entry] ?? backend, forget: () => {} }
-    new HostRuntime(endpoint, initial, {} as ExtensionDB, loader)
+    new HostRuntime(endpoint, { snapshot: initial, db: {} as ExtensionDB, loader })
     return { link: link(port1), onExit: (listener) => exits.push(listener), kill: vi.fn() }
   })
   const onBackendsFailed = vi.fn()
@@ -121,7 +153,9 @@ describe('extension backends in the extension host', () => {
       globalStorage: '/data/extensions/demo',
     })
   })
+})
 
+describe('extension backends — settings and listeners', () => {
   it('reads settings from the snapshot main pushes', async () => {
     const { main, process, record } = harness()
     await process.activate(record)
@@ -151,7 +185,9 @@ describe('extension backends in the extension host', () => {
     expect(main.channels.has('demo:greet')).toBe(false)
     expect(main.dataListeners).toHaveLength(0)
   })
+})
 
+describe('extension backends — restarts', () => {
   it('starts the host again once after it exits, and activates its backends again', async () => {
     const { main, process, record, spawned, crash, onBackendsFailed } = harness()
     await process.activate(record)
@@ -173,7 +209,9 @@ describe('extension backends in the extension host', () => {
     expect(onBackendsFailed).toHaveBeenCalledWith(['demo'], 'Extension host exited with code 134')
     expect(spawned).toHaveBeenCalledTimes(2)
   })
+})
 
+describe('extension backends — dependencies', () => {
   it('hands a backend the exports of a dependency it declared, and refuses one it did not', async () => {
     const seen: unknown[] = []
     const provider: BackendModule = { activate: () => ({ secret: 1 }) }
@@ -197,7 +235,20 @@ describe('extension backends in the extension host', () => {
     ).rejects.toThrow('Extension "snoop" did not declare "provider" in extensionDependencies')
     expect(seen).toEqual([{ secret: 1 }])
   })
+})
 
+/** Activates /p.cjs as "provider", then /c.cjs as "consumer", which depends on it. */
+async function activateProviderThenConsumer(process: ExtensionHostProcess): Promise<void> {
+  await process.activate({ id: 'provider', entryPoint: '/p.cjs', directory: '/', dependencies: [] })
+  await process.activate({
+    id: 'consumer',
+    entryPoint: '/c.cjs',
+    directory: '/',
+    dependencies: ['provider'],
+  })
+}
+
+describe('extension backends — dependencies across a restart', () => {
   it('activates backends again in dependency order: a consumer sees its provider after a restart', async () => {
     const seen: unknown[] = []
     const provider: BackendModule = {
@@ -210,18 +261,7 @@ describe('extension backends in the extension host', () => {
       activate: (api) => seen.push(api.extensions.get<{ greet(): string }>('provider')?.greet()),
     }
     const { process, crash, onBackendsFailed } = harness({ '/p.cjs': provider, '/c.cjs': consumer })
-    await process.activate({
-      id: 'provider',
-      entryPoint: '/p.cjs',
-      directory: '/',
-      dependencies: [],
-    })
-    await process.activate({
-      id: 'consumer',
-      entryPoint: '/c.cjs',
-      directory: '/',
-      dependencies: ['provider'],
-    })
+    await activateProviderThenConsumer(process)
 
     crash(1)
 
@@ -229,7 +269,9 @@ describe('extension backends in the extension host', () => {
     expect(seen).toEqual(['hello', 'hello'])
     expect(onBackendsFailed).not.toHaveBeenCalled()
   })
+})
 
+describe('extension backends — a provider that does not come back', () => {
   it('fails a consumer whose provider does not come back after a restart', async () => {
     let providerStarts = 0
     const provider: BackendModule = {
@@ -240,18 +282,7 @@ describe('extension backends in the extension host', () => {
     }
     const consumer: BackendModule = { activate: vi.fn() }
     const { process, crash, onBackendsFailed } = harness({ '/p.cjs': provider, '/c.cjs': consumer })
-    await process.activate({
-      id: 'provider',
-      entryPoint: '/p.cjs',
-      directory: '/',
-      dependencies: [],
-    })
-    await process.activate({
-      id: 'consumer',
-      entryPoint: '/c.cjs',
-      directory: '/',
-      dependencies: ['provider'],
-    })
+    await activateProviderThenConsumer(process)
 
     crash(1)
 
@@ -261,5 +292,52 @@ describe('extension backends in the extension host', () => {
       'Extension host exited with code 1; restart failed: Extension dependency "provider" failed to activate'
     )
     expect(consumer.activate).toHaveBeenCalledTimes(1)
+  })
+})
+
+const NO_CONTEXT: CommandContext = { projectId: null, sessionId: null, repoRoot: null }
+
+describe('calls a backend makes to main', () => {
+  it('carries every argument of a call to main and waits for its answer', async () => {
+    const mover: BackendModule = {
+      activate: (api) => api.issues.transition('linear', 'TAV-1', 'started', 'opt-1'),
+    }
+    const { main, process, record } = harness({ '/demo/main.cjs': mover })
+    await process.activate(record)
+    expect(main.transition).toHaveBeenCalledWith('linear', 'TAV-1', 'started', 'opt-1')
+  })
+
+  it('delivers a call that does not wait for an answer', async () => {
+    const setter: BackendModule = { activate: (api) => api.settings.set('demo.size', 3) }
+    const { main, process, record } = harness({ '/demo/main.cjs': setter })
+    await process.activate(record)
+    await vi.waitFor(() => expect(main.setSetting).toHaveBeenCalledWith('demo.size', 3))
+  })
+})
+
+describe('commands a backend registers', () => {
+  it('runs the backend handler when main runs the command, with its arguments', async () => {
+    const ran: unknown[] = []
+    const greeter: BackendModule = {
+      activate: (api) =>
+        void api.commands.register(
+          { id: 'hello', label: 'Hello', args: z.object({ name: z.string() }) },
+          (_context, args) => void ran.push(args)
+        ),
+    }
+    const { main, process, record } = harness({ '/demo/main.cjs': greeter })
+    await process.activate(record)
+    await vi.waitFor(() => expect(main.commands.has('hello')).toBe(true))
+    await main.commands.get('hello')!(NO_CONTEXT, { name: 'Ada' })
+    expect(ran).toEqual([{ name: 'Ada' }])
+  })
+
+  it('ends the registration in main when the backend disposes it', async () => {
+    const once: BackendModule = {
+      activate: (api) => api.commands.register({ id: 'once', label: 'Once' }, () => {}).dispose(),
+    }
+    const { main, process, record } = harness({ '/demo/main.cjs': once })
+    await process.activate(record)
+    await vi.waitFor(() => expect(main.commands.has('once')).toBe(false))
   })
 })
