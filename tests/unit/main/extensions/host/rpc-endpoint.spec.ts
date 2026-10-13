@@ -54,7 +54,9 @@ describe('RpcEndpoint', () => {
     expect((failure as Error).message).toContain('/elsewhere')
     expect(failure).not.toHaveProperty('code')
   })
+})
 
+describe('RpcEndpoint — unhandled methods and events', () => {
   it('rejects a request for a method nobody handles', async () => {
     const { host } = pair()
     await expect(host.request('nothing')).rejects.toThrow('No handler for "nothing"')
@@ -75,7 +77,9 @@ describe('RpcEndpoint', () => {
     await done
     expect(received).toEqual(['a', 'b', 'c'])
   })
+})
 
+describe('RpcEndpoint — failures', () => {
   it('reports an event handler that throws instead of losing it', async () => {
     const { port1, port2 } = new MessageChannel()
     const onEventError = vi.fn()

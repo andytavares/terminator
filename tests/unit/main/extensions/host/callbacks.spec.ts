@@ -31,7 +31,9 @@ describe('callbacks across the port', () => {
     expect(params[0]).toBe(bytes)
     expect(params.slice(1)).toEqual([null, 'text'])
   })
+})
 
+describe('callbacks across the port — reviving', () => {
   it('calls the callback a revived function names, with its arguments', () => {
     const registry = new CallbackRegistry()
     const listener = vi.fn()

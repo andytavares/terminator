@@ -315,6 +315,7 @@ Three classes share the work in main:
 | `host/callbacks.ts`                            | both           | A function argument becomes `{ $callback: id }`; main calls it back with a `callback` event                                            |
 | `host/api-server.ts`                           | main           | Runs each call on that extension's `ExtensionAPI` from `api.ts`, for members in `CROSSING_MEMBERS` only; keeps registrations by id     |
 | `host/rpc-endpoint.ts`                         | both           | Requests with answers, events without, errors with their `name`                                                                        |
+| `host/messages.ts`                             | both           | One record per message: an `ApiCall` (`extensionId`, `path`, `params`, `handleId` for a registration), a registration, a `CommandRun`  |
 
 Values the core holds cross as promises, except `settings.get`, `workspace.list` / `listProjects` and `issues.supports*`, which read a snapshot main pushes on every change (`onExtensionSettingsChanged`, `onWorkspacesChanged`). `pty.onData` arrives batched, one message per frame (`src/main/extensions/pty-stream.ts`), every batch before the exit. A channel's or command's schema stays in the extension host, which validates the payload before `run`.
 
