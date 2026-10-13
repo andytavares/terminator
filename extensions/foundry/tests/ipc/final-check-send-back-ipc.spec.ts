@@ -22,42 +22,11 @@ import { raiseGate } from '../../src/gates/rules.js'
 import type { Gate } from '../../src/gates/rules.js'
 import type { Evidence } from '../../src/verify/verdict.js'
 import type { RunGraph, RunNode } from '../../src/line/run-graph.js'
-
-vi.mock('electron', () => ({
-  BrowserWindow: { getAllWindows: vi.fn().mockReturnValue([]) },
-  safeStorage: {
-    isEncryptionAvailable: vi.fn().mockReturnValue(false),
-    encryptString: vi.fn(),
-    decryptString: vi.fn(),
-  },
-}))
+import { theRunner } from '../helpers/supervision-mocks.js'
 
 /** Agents that start and never finish: the reopened nodes stay where they were put. */
-const runner = {
-  start: vi.fn(),
-  resolve: vi.fn(),
-  handBackToTerminal: vi.fn(),
-  interrupt: vi.fn(),
-  stop: vi.fn().mockReturnValue(true),
-  send: vi.fn().mockReturnValue(true),
-  terminalFor: vi.fn().mockReturnValue(null),
-  watchable: vi.fn().mockReturnValue([]),
-  dispose: vi.fn(),
-}
-
-vi.mock('../../src/runtime/supervised-runner.js', () => ({
-  createSupervisedRunner: () => runner,
-}))
-
-vi.mock('../../src/runtime/control-server.js', () => ({
-  createControlServer: vi.fn().mockResolvedValue({
-    url: 'http://127.0.0.1:1/pretooluse',
-    eventUrl: 'http://127.0.0.1:1/event',
-    token: 'token',
-    register: vi.fn().mockReturnValue(() => {}),
-    close: vi.fn(),
-  }),
-}))
+vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
+vi.mock('../../src/runtime/control-server.js', () => import('../helpers/supervision-mocks.js'))
 
 let dataDir = ''
 let host: FoundryHost
@@ -119,7 +88,7 @@ async function seedFailedFinalCheck(gates: readonly Gate[]): Promise<void> {
 
 /** The graph once the executor the resume hands it to has started the reopened nodes. */
 async function sentBack(): Promise<RunGraph> {
-  await vi.waitFor(() => expect(runner.start).toHaveBeenCalled())
+  await vi.waitFor(() => expect(theRunner.start).toHaveBeenCalled())
   return JSON.parse(fs.readFileSync(path.join(orderDir(), 'run-graph.json'), 'utf8')) as RunGraph
 }
 
@@ -134,8 +103,8 @@ beforeAll(async () => {
 
 beforeEach(() => {
   orderId = `WO-${++orders}`
-  runner.start.mockReset()
-  runner.start.mockImplementation(() => new Promise(() => {}))
+  theRunner.start.mockReset()
+  theRunner.start.mockImplementation(() => new Promise(() => {}))
 })
 
 describe('sending a failed final check back', () => {

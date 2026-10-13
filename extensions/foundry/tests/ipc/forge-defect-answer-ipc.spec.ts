@@ -21,41 +21,10 @@ import { createOrderStore } from '../../src/order/store.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import type { Gate } from '../../src/gates/rules.js'
+import { theRunner } from '../helpers/supervision-mocks.js'
 
-vi.mock('electron', () => ({
-  BrowserWindow: { getAllWindows: vi.fn().mockReturnValue([]) },
-  safeStorage: {
-    isEncryptionAvailable: vi.fn().mockReturnValue(false),
-    encryptString: vi.fn(),
-    decryptString: vi.fn(),
-  },
-}))
-
-const runner = {
-  start: vi.fn(),
-  resolve: vi.fn(),
-  handBackToTerminal: vi.fn(),
-  interrupt: vi.fn(),
-  stop: vi.fn().mockReturnValue(true),
-  send: vi.fn().mockReturnValue(true),
-  terminalFor: vi.fn().mockReturnValue(null),
-  watchable: vi.fn().mockReturnValue([]),
-  dispose: vi.fn(),
-}
-
-vi.mock('../../src/runtime/supervised-runner.js', () => ({
-  createSupervisedRunner: () => runner,
-}))
-
-vi.mock('../../src/runtime/control-server.js', () => ({
-  createControlServer: vi.fn().mockResolvedValue({
-    url: 'http://127.0.0.1:1/pretooluse',
-    eventUrl: 'http://127.0.0.1:1/event',
-    token: 'token',
-    register: vi.fn().mockReturnValue(() => {}),
-    close: vi.fn(),
-  }),
-}))
+vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
+vi.mock('../../src/runtime/control-server.js', () => import('../helpers/supervision-mocks.js'))
 
 let dataDir = ''
 let host: FoundryHost
@@ -110,13 +79,12 @@ beforeAll(async () => {
 })
 
 beforeEach(() => {
-  runner.start.mockReset()
-  runner.start.mockImplementation(
-    async (input: { onRegistered?: (run: { sessionId: string }) => void }) => {
-      input.onRegistered?.({ sessionId: 'architect-session' })
-      return { sessionId: 'architect-session' }
-    }
-  )
+  theRunner.start.mockReset()
+  theRunner.start.mockImplementation(async (...args: unknown[]) => {
+    const input = args[0] as StartInput
+    input.onRegistered?.({ sessionId: 'architect-session' })
+    return { sessionId: 'architect-session' }
+  })
 })
 
 describe('answering a forge-defect gate', () => {
@@ -175,7 +143,8 @@ function slowNextRead(file: string): { arm: () => void; restore: () => void } {
 
 /** An architect that amends the order, then has the next order read come back late. */
 function architectAmendsThenReadsLate(armSlowRead: () => void): void {
-  runner.start.mockImplementation(async (input: StartInput) => {
+  theRunner.start.mockImplementation(async (...args: unknown[]) => {
+    const input = args[0] as StartInput
     const sessionId = `${input.phase}-session`
     if (input.phase === 'architect') {
       writeAmendment()
@@ -203,7 +172,8 @@ function cleanOrder(): WorkOrder {
   }
 }
 function architectAmends(): void {
-  runner.start.mockImplementation(async (input: StartInput) => {
+  theRunner.start.mockImplementation(async (...args: unknown[]) => {
+    const input = args[0] as StartInput
     const sessionId = `${input.phase}-session`
     input.onRegistered?.({ sessionId })
     if (input.phase === 'architect') {
@@ -245,8 +215,8 @@ function startingTheArchitectTests() {
     })) as { ok: boolean; actionError?: string }
 
     expect(r.actionError).toBeUndefined()
-    expect(runner.start).toHaveBeenCalledTimes(1)
-    const started = runner.start.mock.calls[0][0] as { phase: string; prompt: string }
+    expect(theRunner.start).toHaveBeenCalledTimes(1)
+    const started = theRunner.start.mock.calls[0][0] as { phase: string; prompt: string }
     expect(started.phase).toBe('architect')
     expect(started.prompt).toContain('RT-2')
   })
@@ -277,7 +247,7 @@ function resumeFailuresTests() {
 
     expect(r.actionError).toContain('draft')
     expect(ledger()).toContain('gate.action_failed')
-    expect(runner.start).not.toHaveBeenCalled()
+    expect(theRunner.start).not.toHaveBeenCalled()
   })
 }
 

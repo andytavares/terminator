@@ -12,9 +12,6 @@ import type { FoundryHost } from '../helpers/foundry-host.js'
 import { createOrderStore } from '../../src/order/store.js'
 import { draftOrder } from '../../src/order/draft.js'
 
-const userData = vi.hoisted(() => ({ path: '' }))
-
-vi.mock('electron', () => ({ app: { getPath: () => userData.path } }))
 vi.mock('../../src/runtime/control-server.js', () => ({
   createControlServer: async () => {
     throw new Error('EADDRINUSE')
@@ -27,7 +24,6 @@ let host: FoundryHost
 
 beforeAll(async () => {
   const parent = temporaryDirectory('fdry-no-runtime')
-  userData.path = path.join(parent, 'user-data')
   vi.stubEnv('HOME', path.join(parent, 'home'))
   dataDir = path.join(parent, 'records')
   repo = await seededRepository(parent)

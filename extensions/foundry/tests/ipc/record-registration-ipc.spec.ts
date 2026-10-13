@@ -12,18 +12,8 @@ import type { FoundryHost } from '../helpers/foundry-host.js'
 import { createOrderStore } from '../../src/order/store.js'
 import { draftOrder } from '../../src/order/draft.js'
 
-const runner = vi.hoisted(() => ({ current: null as unknown }))
-
-vi.mock('../../src/runtime/supervised-runner.js', () => ({
-  createSupervisedRunner: () => runner.current,
-}))
-vi.mock('../../src/runtime/control-server.js', async () => {
-  const { quietControlServer } = await import('../helpers/foundry-host.js')
-  return { createControlServer: async () => quietControlServer() }
-})
-
-const { fakeRunner } = await import('../helpers/foundry-host.js')
-runner.current = fakeRunner()
+vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
+vi.mock('../../src/runtime/control-server.js', () => import('../helpers/supervision-mocks.js'))
 
 let dataDir = ''
 let host: FoundryHost

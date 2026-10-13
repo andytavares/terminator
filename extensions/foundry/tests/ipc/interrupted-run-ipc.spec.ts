@@ -21,45 +21,14 @@ import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import type { RunGraph } from '../../src/line/run-graph.js'
 import type { Gate } from '../../src/gates/rules.js'
-
-vi.mock('electron', () => ({
-  BrowserWindow: { getAllWindows: vi.fn().mockReturnValue([]) },
-  safeStorage: {
-    isEncryptionAvailable: vi.fn().mockReturnValue(false),
-    encryptString: vi.fn(),
-    decryptString: vi.fn(),
-  },
-}))
+import { theRunner } from '../helpers/supervision-mocks.js'
 
 /**
  * Nothing is running. That is the state a fresh application is always in —
  * every agent's terminal was a child of the process that died with it.
  */
-const runner = {
-  start: vi.fn(),
-  resolve: vi.fn(),
-  handBackToTerminal: vi.fn(),
-  interrupt: vi.fn(),
-  stop: vi.fn().mockReturnValue(true),
-  send: vi.fn().mockReturnValue(true),
-  terminalFor: vi.fn().mockReturnValue(null),
-  watchable: vi.fn().mockReturnValue([]),
-  dispose: vi.fn(),
-}
-
-vi.mock('../../src/runtime/supervised-runner.js', () => ({
-  createSupervisedRunner: () => runner,
-}))
-
-vi.mock('../../src/runtime/control-server.js', () => ({
-  createControlServer: vi.fn().mockResolvedValue({
-    url: 'http://127.0.0.1:1/pretooluse',
-    eventUrl: 'http://127.0.0.1:1/event',
-    token: 'token',
-    register: vi.fn().mockReturnValue(() => {}),
-    close: vi.fn(),
-  }),
-}))
+vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
+vi.mock('../../src/runtime/control-server.js', () => import('../helpers/supervision-mocks.js'))
 
 /** Read by the extension through `settings.get`; a fresh one per test. */
 let dataDir = ''
@@ -149,14 +118,18 @@ beforeAll(async () => {
  * the reclaimed node again. Read the graph after that, not while it races.
  */
 async function restarted(): Promise<RunGraph> {
-  await vi.waitFor(() => expect(runner.start).toHaveBeenCalledTimes(1))
+  await vi.waitFor(() => expect(theRunner.start).toHaveBeenCalledTimes(1))
   return graphOnDisk()
 }
 
 beforeEach(() => {
-  runner.start.mockClear()
-  runner.terminalFor.mockReturnValue(null)
-  runner.stop.mockReturnValue(true)
+  // This spec stops at the restart: a start that throws leaves the node as resuming put it
+  // and ends that executor before the next test resumes the same order.
+  theRunner.start.mockClear().mockImplementation(() => {
+    throw new Error('no agent starts in this spec')
+  })
+  theRunner.terminalFor.mockReturnValue(null)
+  theRunner.stop.mockReturnValue(true)
 })
 
 describe('a fresh application opening on a run the last one left in flight', () => {
@@ -201,7 +174,7 @@ function onceOnlyAndLiveAgentsTests() {
   })
 
   it('leaves a run alone whose agents are still in their terminals', async () => {
-    runner.terminalFor.mockReturnValue({ terminalSessionId: 't1', projectId: 'p1' })
+    theRunner.terminalFor.mockReturnValue({ terminalSessionId: 't1', projectId: 'p1' })
     await seedInterruptedRun()
     await call('foundry:attention')
     expect(gatesOnDisk()).toEqual([])
@@ -315,7 +288,7 @@ const RAISED = {
 
 describe('stopping a run whose agents are still alive', () => {
   it('ends each one, saying why, before the order is cancelled', async () => {
-    runner.terminalFor.mockReturnValue({ terminalSessionId: 't1', projectId: 'p1' })
+    theRunner.terminalFor.mockReturnValue({ terminalSessionId: 't1', projectId: 'p1' })
     await seedInterruptedRun()
     // Raised by hand: with live agents nothing adopts it, which is the point.
     const store = createOrderStore(dataDir)
@@ -326,7 +299,7 @@ describe('stopping a run whose agents are still alive', () => {
     )
 
     await call('foundry:inbox.decide', { gateId: 'WO-1-budget', option: 'stop' })
-    expect(runner.stop).toHaveBeenCalledWith(
+    expect(theRunner.stop).toHaveBeenCalledWith(
       'session-from-a-dead-process',
       expect.stringContaining('a run going past its time or agent budget')
     )

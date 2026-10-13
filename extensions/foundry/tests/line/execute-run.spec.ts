@@ -16,24 +16,14 @@ import { createGateStore } from '../../src/gates/store.js'
 import { checkoutPath } from '../../src/line/worktree.js'
 import { readGraph } from '../../src/state/live-index.js'
 import type { WorkOrder } from '../../src/order/schema.js'
+import { theRunner } from '../helpers/supervision-mocks.js'
 
 // These cases drive real git and give each step up to 20 s (the vi.waitFor
 // calls below); the 5 s default case timeout cut them off first on a busy machine.
 vi.setConfig({ testTimeout: 45_000 })
 
-const runner = vi.hoisted(() => ({ current: null as unknown }))
-
-vi.mock('../../src/runtime/supervised-runner.js', () => ({
-  createSupervisedRunner: () => runner.current,
-}))
-vi.mock('../../src/runtime/control-server.js', async () => {
-  const { quietControlServer } = await import('../helpers/foundry-host.js')
-  return { createControlServer: async () => quietControlServer() }
-})
-
-const { fakeRunner } = await import('../helpers/foundry-host.js')
-const theRunner = fakeRunner()
-runner.current = theRunner
+vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
+vi.mock('../../src/runtime/control-server.js', () => import('../helpers/supervision-mocks.js'))
 
 const PULL = 'https://github.com/owner/app/pull/7'
 

@@ -3,8 +3,8 @@
  *
  * Real files under a temporary records location and real `git`; `gh` and the
  * tracker answer from what a spec gives them, because both reach the network.
- * A spec mocks `electron`, the supervised runner and the control server itself
- * (`vi.mock` is per file) and hands over the runner from `fakeRunner`.
+ * A spec mocks the supervised runner and the control server itself (`vi.mock`
+ * is per file), with `supervision-mocks.ts`, and drives its `theRunner`.
  */
 import { execFile } from 'node:child_process'
 import * as fs from 'node:fs'

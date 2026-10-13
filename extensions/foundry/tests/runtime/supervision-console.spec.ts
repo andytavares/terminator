@@ -11,22 +11,10 @@ import { activateFoundry, deactivate } from '../helpers/foundry-activation.js'
 import { createOrderStore } from '../../src/order/store.js'
 import { draftOrder } from '../../src/order/draft.js'
 import { orderDir } from '../../src/data-root.js'
+import { theRunner } from '../helpers/supervision-mocks.js'
 
-const userData = vi.hoisted(() => ({ path: '' }))
-const runner = vi.hoisted(() => ({ current: null as unknown }))
-
-vi.mock('electron', () => ({ app: { getPath: () => userData.path } }))
-vi.mock('../../src/runtime/supervised-runner.js', () => ({
-  createSupervisedRunner: () => runner.current,
-}))
-vi.mock('../../src/runtime/control-server.js', async () => {
-  const { quietControlServer } = await import('../helpers/foundry-host.js')
-  return { createControlServer: async () => quietControlServer() }
-})
-
-const { fakeRunner } = await import('../helpers/foundry-host.js')
-const theRunner = fakeRunner()
-runner.current = theRunner
+vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
+vi.mock('../../src/runtime/control-server.js', () => import('../helpers/supervision-mocks.js'))
 
 const { runtime, stallFirings } = await import('../../src/runtime/runtime-state.ts')
 const { startPaletteRefresh, stopPaletteRefresh } = await import(
@@ -38,7 +26,6 @@ let dataDir = ''
 let host: FoundryHost
 
 beforeAll(async () => {
-  userData.path = temporaryDirectory('fdry-userdata')
   vi.stubEnv('HOME', temporaryDirectory('fdry-home'))
   host = fakeHost(() => dataDir)
   await activateFoundry(host)

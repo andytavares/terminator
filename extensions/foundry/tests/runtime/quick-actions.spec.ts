@@ -17,30 +17,8 @@ import { activate } from '../../src/index.ts'
 import type { ExtensionAPI, CommandContribution } from '@terminator/extension-sdk'
 import type { startSupervisionRuntime as startSupervisionRuntimeType } from '../../src/runtime/supervision-runtime.js'
 
-vi.mock('electron', () => ({
-  BrowserWindow: { getAllWindows: vi.fn().mockReturnValue([]) },
-  safeStorage: {
-    isEncryptionAvailable: vi.fn().mockReturnValue(false),
-    encryptString: vi.fn(),
-    decryptString: vi.fn(),
-  },
-}))
-
-const runner = {
-  start: vi.fn(),
-  resolve: vi.fn(),
-  handBackToTerminal: vi.fn(),
-  interrupt: vi.fn(),
-  stop: vi.fn().mockReturnValue(true),
-  send: vi.fn().mockReturnValue(true),
-  terminalFor: vi.fn().mockReturnValue(null),
-  watchable: vi.fn().mockReturnValue([]),
-  dispose: vi.fn(),
-}
-
-vi.mock('../../src/runtime/supervised-runner.js', () => ({
-  createSupervisedRunner: () => runner,
-}))
+vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
+vi.mock('../../src/runtime/control-server.js', () => import('../helpers/supervision-mocks.js'))
 
 vi.mock('../../src/runner/agent-runner.js', async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>
@@ -49,16 +27,6 @@ vi.mock('../../src/runner/agent-runner.js', async (importOriginal) => {
     setPermissionSink: () => {},
   }
 })
-
-vi.mock('../../src/runtime/control-server.js', () => ({
-  createControlServer: vi.fn().mockResolvedValue({
-    url: 'http://127.0.0.1:1/pretooluse',
-    eventUrl: 'http://127.0.0.1:1/event',
-    token: 'token',
-    register: vi.fn().mockReturnValue(() => {}),
-    close: vi.fn(),
-  }),
-}))
 
 vi.mock('../../src/runtime/transcript-excerpt.js', () => ({
   readTranscriptTail: vi.fn().mockReturnValue([]),

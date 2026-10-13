@@ -14,24 +14,8 @@ import { describe, it, expect, vi, beforeAll } from 'vitest'
 import { activate } from '../src/index.ts'
 import { dispatchChannel, type ChannelSpec, type ExtensionAPI } from '@terminator/extension-sdk'
 
-vi.mock('electron', () => ({
-  BrowserWindow: { getAllWindows: vi.fn().mockReturnValue([]) },
-  safeStorage: { isEncryptionAvailable: vi.fn().mockReturnValue(false) },
-}))
-
-vi.mock('../src/runtime/supervised-runner.js', () => ({
-  createSupervisedRunner: () => ({ watchable: vi.fn().mockReturnValue([]), dispose: vi.fn() }),
-}))
-
-vi.mock('../src/runtime/control-server.js', () => ({
-  createControlServer: vi.fn().mockResolvedValue({
-    url: 'http://127.0.0.1:1/pretooluse',
-    eventUrl: 'http://127.0.0.1:1/event',
-    token: 'token',
-    register: vi.fn().mockReturnValue(() => {}),
-    close: vi.fn(),
-  }),
-}))
+vi.mock('../src/runtime/supervised-runner.js', () => import('./helpers/supervision-mocks.js'))
+vi.mock('../src/runtime/control-server.js', () => import('./helpers/supervision-mocks.js'))
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const contract = fs.readFileSync(

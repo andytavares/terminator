@@ -16,24 +16,12 @@ import { draftOrder } from '../../src/order/draft.js'
 import { orderDir } from '../../src/data-root.js'
 import { rungOutputPath } from '../../src/line/rung-output.js'
 import type { WorkOrder } from '../../src/order/schema.js'
+import { theRunner } from '../helpers/supervision-mocks.js'
 
-const userData = vi.hoisted(() => ({ path: '' }))
-const runner = vi.hoisted(() => ({ current: null as unknown }))
-
-vi.mock('electron', () => ({ app: { getPath: () => userData.path } }))
-vi.mock('../../src/runtime/supervised-runner.js', () => ({
-  createSupervisedRunner: () => runner.current,
-}))
-vi.mock('../../src/runtime/control-server.js', async () => {
-  const { quietControlServer } = await import('../helpers/foundry-host.js')
-  return { createControlServer: async () => quietControlServer() }
-})
+vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
+vi.mock('../../src/runtime/control-server.js', () => import('../helpers/supervision-mocks.js'))
 
 vi.setConfig({ testTimeout: 20_000 })
-
-const { fakeRunner } = await import('../helpers/foundry-host.js')
-const theRunner = fakeRunner()
-runner.current = theRunner
 
 let dataDir = ''
 let repo = ''
@@ -44,7 +32,6 @@ let writes: Partial<Record<'architect' | 'red-team' | 'scout', (round: number) =
 
 beforeAll(async () => {
   const parent = temporaryDirectory('fdry-forge-loop')
-  userData.path = path.join(parent, 'user-data')
   vi.stubEnv('HOME', path.join(parent, 'home'))
   host = fakeHost(() => dataDir)
   await activateFoundry(host)
