@@ -538,6 +538,8 @@ The Git integration is a workspace-scoped extension that surfaces git tooling di
 
 The **Git** tab above the terminal is where git lives. It lists the changed files, each state named (**Changed**, **New**, **Added**, **Deleted**, **Renamed**, **Conflict**); stages and unstages them; commits; and shows a syntax-highlighted diff of the selected file (red for removed lines, green for added). It refreshes on file changes.
 
+Two settings in **Settings → Extensions → Git Integration** change it. **Max displayed changed files** (500 by default) is how many changed files the list shows; with more, it says "Showing first N files." **Add sign-off to commits** commits with [`--signoff`](https://git-scm.com/docs/git-commit#Documentation/git-commit.txt---signoff), which ends the message with a `Signed-off-by:` line naming you.
+
 ### The pull request queue
 
 The queue opens with one line of triage — how many are waiting on you, how many are high risk,

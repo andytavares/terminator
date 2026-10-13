@@ -70,6 +70,14 @@ Each entry: what was decided, why, and how to undo it.
 13. git-integration bugs the coverage specs found were fixed: PR-created confirmation with a link,
     "Commit without hooks" for plain git hook failures, atomic merge-flow writes.
 14. No worker may install system packages or run `npm install` in a shared container.
+15. Git Integration's **Add sign-off to commits** and **Max displayed changed files** are
+    implemented, not removed: the README promised both. `git:commit` and `git:status` read them on
+    every call (`src/git-settings.ts`); sign-off is
+    [`git commit --signoff`](https://git-scm.com/docs/git-commit#Documentation/git-commit.txt---signoff),
+    and the file limit is clamped to its declared 10–5000. The `signOff` (commit) and `maxFiles`
+    (status) payload fields went: the view always sent `signOff: false` and never sent `maxFiles`,
+    so a payload could override the setting with a value nobody chose. Undo: revert the commit and
+    give the payload fields back.
 
 ## Known advisories
 

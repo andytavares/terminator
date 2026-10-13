@@ -9,12 +9,12 @@ import {
   createWorkspace,
   inExtensionView,
   launchApp,
-  openSettings,
   projectGroup,
   runQuickAction,
 } from './helpers'
 import { foundryChannel, makeFixtureRepo } from './foundry-harness'
 import { answerFolderPicker } from './main-stubs'
+import { openExtensionSettings, settingRow } from './extension-settings-page'
 
 // Every setting every bundled extension declares, written the way an operator
 // writes it: Settings → Extensions → the extension's ⚙ page, one control at a
@@ -68,22 +68,6 @@ function chosenValue(key: string, def: SettingDef, folder: string): unknown {
   return `e2e ${key.split('.').pop()}`
 }
 
-const escaped = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-
-function settingsPanel(page: Page, name: string): Locator {
-  return page
-    .locator('.extension-item-wrapper')
-    .filter({ has: page.locator('.extension-item__name', { hasText: new RegExp(`^${name}$`) }) })
-}
-
-function settingRow(panel: Locator, label: string): Locator {
-  return panel.locator('.extension-setting-row').filter({
-    has: panel.page().locator('.extension-setting-row__label', {
-      hasText: new RegExp(`^${escaped(label)}`),
-    }),
-  })
-}
-
 function notifyBox(panel: Locator, key: string, def: SettingDef): Locator {
   const target = NOTIFY.exec(key)![3]
   return panel.getByRole('checkbox', {
@@ -93,14 +77,8 @@ function notifyBox(panel: Locator, key: string, def: SettingDef): Locator {
 }
 
 /** Opens one extension's settings page. */
-async function openPage(page: Page, schema: Schema): Promise<Locator> {
-  await openSettings(page, 'Extensions')
-  const panel = settingsPanel(page, schema.label)
-  if ((await panel.locator('.extension-settings-panel').count()) === 0) {
-    await panel.getByTitle('Configure').click()
-  }
-  await expect(panel.locator('.extension-settings-panel')).toBeVisible()
-  return panel
+function openPage(page: Page, schema: Schema): Promise<Locator> {
+  return openExtensionSettings(page, schema.label)
 }
 
 /** One setting and the value a spec writes to, or expects of, it. */

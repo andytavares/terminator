@@ -10,7 +10,7 @@ export type CommitResult =
 const bridge = () => window.electronAPI.extensionBridge
 
 export const gitAPI = {
-  status: (path: string, maxFiles?: number) => bridge().invoke('git:status', { path, maxFiles }),
+  status: (path: string) => bridge().invoke('git:status', { path }),
 
   diffFile: (payload: { repoRoot: string; path: string; staged: boolean; isUntracked?: boolean }) =>
     bridge().invoke('git:diff-file', payload),
@@ -20,7 +20,7 @@ export const gitAPI = {
   unstage: (repoRoot: string, paths: string[]) =>
     bridge().invoke('git:unstage', { repoRoot, paths }),
 
-  commit: (payload: { repoRoot: string; message: string; signOff?: boolean; noVerify?: boolean }) =>
+  commit: (payload: { repoRoot: string; message: string; noVerify?: boolean }) =>
     invoke<CommitResult>('git:commit', payload),
 
   commitOutputPoll: (repoRoot: string) => bridge().invoke('git:commit-output-poll', { repoRoot }),
