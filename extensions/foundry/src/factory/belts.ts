@@ -129,7 +129,7 @@ export function routeBelts(
       const a = byNode.get(fromId)
       const b = byNode.get(node.id)
       if (!a || !b) continue
-      router.route({
+      router.routeLeg({
         fromId,
         toId: node.id,
         start: { x: a.x + a.w, y: a.y },
@@ -137,7 +137,7 @@ export function routeBelts(
       })
     }
   }
-  return router.result()
+  return router.finish()
 }
 
 /** The belts laid so far, and the tiles they share. */
@@ -170,7 +170,7 @@ class BeltRouter {
     )
   }
 
-  route(leg: Leg): void {
+  routeLeg(leg: Leg): void {
     const path = new BeltSearch(this, leg).run() ?? [
       leg.start,
       ...findPath(this.floor.solid, { from: leg.start, to: leg.goal }),
@@ -210,7 +210,7 @@ class BeltRouter {
     return c
   }
 
-  result(): RouteBeltsResult {
+  finish(): RouteBeltsResult {
     for (const c of this.cells.values()) c.kind = kindOf(c)
     const beltTiles: BeltTile[] = [...this.cells.entries()].map(([k, c]) => {
       const [x, y] = k.split(',').map(Number)
@@ -265,7 +265,7 @@ class BeltSearch {
     return ((t.y * this.router.floor.width + t.x) << 2) | d
   }
 
-  private tileOf(s: number): Tile {
+  private tileOfState(s: number): Tile {
     const { width } = this.router.floor
     return { x: (s >> 2) % width, y: Math.floor((s >> 2) / width) }
   }
@@ -279,7 +279,7 @@ class BeltSearch {
     while (this.heap.a.length) {
       const [dcur, s] = this.heap.pop()
       if (dcur > this.dist[s]) continue
-      const t = this.tileOf(s)
+      const t = this.tileOfState(s)
       if (t.x === goal.x && t.y === goal.y) return this.pathTo(s)
       this.expand(s, { dcur, t })
     }
@@ -288,7 +288,7 @@ class BeltSearch {
 
   private pathTo(end: number): Tile[] {
     const path: Tile[] = []
-    for (let s = end; s >= 0; s = this.prev[s]) path.unshift(this.tileOf(s))
+    for (let s = end; s >= 0; s = this.prev[s]) path.unshift(this.tileOfState(s))
     return path
   }
 
@@ -298,7 +298,7 @@ class BeltSearch {
     const onCross = here !== undefined && !this.router.compatible(here, this.leg)
     for (let nd2 = 0; nd2 < 4; nd2++) {
       if (onCross && nd2 !== d) continue
-      const step = this.step(t, { d, nd2 })
+      const step = this.stepFrom(t, { d, nd2 })
       if (step === null) continue
       const ns = this.sid(step.n, nd2)
       if (dcur + step.cost < this.dist[ns]) {
@@ -310,7 +310,10 @@ class BeltSearch {
   }
 
   /** The tile one step from `t` heading `SIDES[nd2]`, and what the step costs; null when it is no way. */
-  private step(t: Tile, { d, nd2 }: { d: number; nd2: number }): { n: Tile; cost: number } | null {
+  private stepFrom(
+    t: Tile,
+    { d, nd2 }: { d: number; nd2: number }
+  ): { n: Tile; cost: number } | null {
     const { start, goal } = this.leg
     const { role } = this.router.floor
     const dir = SIDES[nd2]

@@ -67,7 +67,11 @@ async function runCommandNode(run: Execution, node: RunNode, command: string): P
     const name = /toolchain\.(\w+)/.exec(command)?.[1] ?? node.stepId
     return { node, skipped: true, skipReason: `no ${name} command in this repository` }
   }
-  const logPath = path.join(run.dir(), 'runs', `${safeFilename(node.id)}.${node.attempts}.log`)
+  const logPath = path.join(
+    run.recordsDir(),
+    'runs',
+    `${safeFilename(node.id)}.${node.attempts}.log`
+  )
   const exitCode = await deps.runCommand({ node, command: resolved, title: node.stepId, logPath })
   const roleId = node.role
   return {
@@ -155,7 +159,7 @@ function resumeFor(run: Execution, node: RunNode): string | undefined {
 async function mountNodeSkills(run: Execution, node: RunNode): Promise<string | null> {
   const skillIds = skillsFor(run.recipe, node, run.roles)
   if (skillIds.length === 0) return null
-  const skillsMount = path.join(run.dir(), 'skills-mount', safeFilename(node.id))
+  const skillsMount = path.join(run.recordsDir(), 'skills-mount', safeFilename(node.id))
   const { skills } = resolveSkills(skillIds, run.deps.sources)
   mountSkills(skillsMount, skills)
   await run.deps.record(

@@ -428,7 +428,7 @@ export function layoutHall(
     wait,
   }
   crossings.openSeatWays(hall.props, room.door[0])
-  return hall.map({ room, crossings, anchors, hasCi })
+  return hall.finishedMap({ room, crossings, anchors, hasCi })
 }
 
 /** What `HallBuilder.map` assembles the finished hall from. */
@@ -489,7 +489,7 @@ class HallBuilder {
   }
 
   /** The finished hall. */
-  map({ room, crossings, anchors, hasCi }: Finished): HallMap {
+  finishedMap({ room, crossings, anchors, hasCi }: Finished): HallMap {
     return {
       width: this.width,
       height: this.height,

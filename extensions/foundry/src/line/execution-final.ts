@@ -137,7 +137,7 @@ class FinalClimb {
 
   logPath(name: string, suffix: string): string {
     const file = `final-${safeFilename(name.toLowerCase())}.${this.climbedAt}${suffix}.log`
-    return path.join(this.run.dir(), 'runs', file)
+    return path.join(this.run.recordsDir(), 'runs', file)
   }
 
   /** One climb, with each step's log kept so a gate can show what it saw. */
@@ -297,7 +297,7 @@ async function raiseAfterWork(run: Execution, after: AfterWork): Promise<void> {
       risk.grade === order.risk.grade
         ? ''
         : ` — it was planned as ${gradeInWords(order.risk.grade)}`
-    run.halted = await run.raise('risk.p0', {
+    run.halted = await run.stopAtGate('risk.p0', {
       summary: `${order.title} graded ${gradeInWords(risk.grade)} once it was done${planned}`,
       why: `${inspection.reason} Triggered by ${inspection.unplanned.join(', ')}.`,
     })
@@ -340,7 +340,10 @@ async function raiseFailedCheck(run: Execution, { climbed, climber }: AfterWork)
       : BASE_UNKNOWN
   const baseBranch = run.order.context.repos[0]?.baseBranch ?? 'the base branch'
   if (base.onBase === 'fails' && base.failed !== null) {
-    run.halted = await run.raise('verify.base-fail', baseFailAsk(run, { failed, base, baseBranch }))
+    run.halted = await run.stopAtGate(
+      'verify.base-fail',
+      baseFailAsk(run, { failed, base, baseBranch })
+    )
     return
   }
   const sentBack = run.priorGates.filter(
@@ -349,7 +352,7 @@ async function raiseFailedCheck(run: Execution, { climbed, climber }: AfterWork)
   ).length
   const capped = sentBack >= MAX_FINAL_SEND_BACKS
   const note = baseNote({ failed, base, baseBranch, installFault: climbed.installFault })
-  run.halted = await run.raise('verify.repeat-fail', {
+  run.halted = await run.stopAtGate('verify.repeat-fail', {
     evidence: failed.evidence,
     summary: `${run.order.title} did not pass verification`,
     why: `${failed.why}${note}${capped ? ' It has been sent back twice; take over, accept the debt, or hold.' : ''}`,

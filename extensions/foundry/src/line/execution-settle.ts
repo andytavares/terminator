@@ -102,7 +102,7 @@ async function filed(
   await run.deps.record('rung.collected', node.id, note)
   if (collected.defect !== null) {
     const summary = `${run.order.title} is contradicted by its own ${roleId}`
-    const stops = await run.raise('forge-defect', {
+    const stops = await run.stopAtGate('forge-defect', {
       summary,
       why: collected.defect,
       nodeId: node.id,
@@ -301,7 +301,7 @@ async function failNode(run: Execution, ran: Ran, short: Shortfall): Promise<voi
   run.awaitingDecision.push(node.id)
   // Two failures is a pattern, not bad luck. The third attempt is a decision
   // rather than a retry, and this is where it is asked for.
-  const stops = await run.raise('verify.repeat-fail', repeatFailAsk(ran, short))
+  const stops = await run.stopAtGate('verify.repeat-fail', repeatFailAsk(ran, short))
   run.halted = stops || run.halted
 }
 

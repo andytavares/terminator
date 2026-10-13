@@ -53,7 +53,7 @@ export async function runWaves(run: Execution): Promise<void> {
 async function stoppedByBudget(run: Execution): Promise<boolean> {
   const breach = await run.currentBreach()
   if (breach === null) return false
-  run.halted = await run.raise('budget.exceeded', {
+  run.halted = await run.stopAtGate('budget.exceeded', {
     summary: `${run.order.title} has gone past its ${breach.kind.replace('_', ' ')} budget`,
     why: `The order budgets ${breach.limit} and this run is at ${Math.round(breach.actual)}.`,
     breach,
@@ -69,7 +69,7 @@ async function stoppedByBudget(run: Execution): Promise<boolean> {
 async function noteStall(run: Execution): Promise<void> {
   const { current, order } = run
   if (!hasStalled(current, order.budgets)) return
-  run.halted = await run.raise('verify.repeat-fail', {
+  run.halted = await run.stopAtGate('verify.repeat-fail', {
     summary: `${order.title} cannot go any further on its own`,
     why: stalledWhy(current, (id) => `**${nodeLabel(order, nodeById(current, id) as RunNode)}**`),
     // The node the Inbox's "Send back" should retry — not just that
@@ -97,7 +97,7 @@ async function stopsAt(run: Execution, blocking: RunNode): Promise<boolean> {
     return true
   }
   const rule: GateRuleId = isGateRule(declared) ? declared : 'unit.boundary'
-  run.halted = await run.raise(rule, {
+  run.halted = await run.stopAtGate(rule, {
     summary: `${run.order.title} reached the "${blocking.stepId}" checkpoint`,
     why: `The "${run.recipe.id}" shape of work stops here by design.`,
     nodeId: blocking.id,
@@ -144,7 +144,7 @@ async function runWave(run: Execution): Promise<boolean> {
   const waved = await run.waveOrBreach(wave)
   if ('breach' in waved) {
     const { breach } = waved
-    run.halted = await run.raise('budget.exceeded', {
+    run.halted = await run.stopAtGate('budget.exceeded', {
       summary: `${run.order.title} has gone past its ${breach.kind.replace('_', ' ')} budget`,
       why:
         `The order budgets ${breach.limit} and this run is at ${Math.round(breach.actual)}. ` +

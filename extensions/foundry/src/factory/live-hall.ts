@@ -66,7 +66,7 @@ export function createLiveHall(): LiveHall {
       hall.eventListeners.add(listener)
       return () => hall.eventListeners.delete(listener)
     },
-    observe: (observation, labels, nowMs) => hall.observe(observation, { labels, nowMs }),
+    observe: (observation, labels, nowMs) => hall.observeRun(observation, { labels, nowMs }),
     releaseDue: (labels, nowMs) => hall.releaseDue(labels, nowMs),
   }
 }
@@ -90,7 +90,7 @@ class LiveHallState {
     for (const listener of this.sceneListeners) listener()
   }
 
-  private play(released: ReturnType<typeof release>, nowMs: number): void {
+  private playReleased(released: ReturnType<typeof release>, nowMs: number): void {
     this.beats = released.beats
     this.world.current = direct(this.world.current as World, released.events, nowMs)
     this.publish({ shown: released.beats.shown, queue: this.world.current.queue })
@@ -105,7 +105,7 @@ class LiveHallState {
     this.publish({ map, shown: this.beats.shown, queue: this.world.current.queue })
   }
 
-  observe(observation: Observation, { labels, nowMs }: { labels: Labels; nowMs: number }): void {
+  observeRun(observation: Observation, { labels, nowMs }: { labels: Labels; nowMs: number }): void {
     const key = mapKeyOf(observation)
     if (this.mapKey !== key) return this.rebuild(observation, labels, key)
     const seen = diffObservation(this.previous, observation)
@@ -115,7 +115,7 @@ class LiveHallState {
       nowMs
     )
     const released = release(held, nowMs)
-    this.play(released, nowMs)
+    this.playReleased(released, nowMs)
     this.previous = observation
     for (const listener of this.eventListeners) listener(released.events, labels)
   }
@@ -125,7 +125,7 @@ class LiveHallState {
     if (beats === null || beats.held.length === 0 || this.world.current === null) return
     const released = release(beats, nowMs)
     if (released.events.length === 0) return
-    this.play(released, nowMs)
+    this.playReleased(released, nowMs)
     for (const listener of this.eventListeners) listener(released.events, labels)
   }
 }

@@ -81,7 +81,7 @@ export class Execution {
   }
 
   /** The order's own directory under the data root. */
-  dir(): string {
+  recordsDir(): string {
     return orderDir(this.deps.sources.dataRoot, this.order.id)
   }
 
@@ -124,7 +124,7 @@ export class Execution {
     const role = this.roles.get(roleId)
     if (role === null || collectableWrites(role).length === 0) return null
     try {
-      return rungOutputPath(this.dir(), node.id)
+      return rungOutputPath(this.recordsDir(), node.id)
     } catch {
       // A node id a recipe gave that would not sit under this order. Refusing
       // the channel is right; failing the run over it is not.
@@ -137,7 +137,7 @@ export class Execution {
     if (roleId === null) return null
     const role = this.roles.get(roleId)
     if (!collectableWrites(role).includes('document')) return null
-    return path.join(this.dir(), 'outputs')
+    return path.join(this.recordsDir(), 'outputs')
   }
 
   /**
@@ -148,7 +148,7 @@ export class Execution {
    * about, with nowhere to put the question, still stops: continuing past a
    * decision nobody could take is the failure the gates exist to prevent.
    */
-  async raise(rule: GateRuleId, ask: GateAsk): Promise<boolean> {
+  async stopAtGate(rule: GateRuleId, ask: GateAsk): Promise<boolean> {
     if (!isLive(rule, this.deps.autonomy)) return false
     const nodeId = ask.nodeId ?? null
     const approved = this.priorGates.some(
@@ -156,14 +156,14 @@ export class Execution {
     )
     if (approved) return false
     this.gateSeq += 1
-    const gate = this.gateFor(rule, { ...ask, nodeId })
+    const gate = this.newGate(rule, { ...ask, nodeId })
     this.gates.push(gate)
     this.deps.onEvent({ type: 'gate', gate })
     await this.deps.raise(gate)
     return true
   }
 
-  private gateFor(rule: GateRuleId, ask: GateAsk & { nodeId: string | null }): Gate {
+  private newGate(rule: GateRuleId, ask: GateAsk & { nodeId: string | null }): Gate {
     return raiseGate({
       id: `${this.order.id}-${rule}-${this.gateSeq}`,
       rule,

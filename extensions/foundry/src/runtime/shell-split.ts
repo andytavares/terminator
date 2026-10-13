@@ -255,7 +255,7 @@ function parenSubstitution(command: string, from: number): { inner: string; end:
 }
 
 export function readShell(command: string): ShellReading {
-  return new ShellReader(command).read()
+  return new ShellReader(command).readAll()
 }
 
 /**
@@ -284,9 +284,9 @@ class ShellReader {
     this.command = command
   }
 
-  read(): ShellReading {
+  readAll(): ShellReading {
     for (this.i = 0; this.i < this.command.length && !this.stopped; this.i += 1) {
-      this.step(this.command[this.i])
+      this.consume(this.command[this.i])
     }
     this.segments.push(this.current)
     return {
@@ -300,7 +300,7 @@ class ShellReader {
     }
   }
 
-  private step(char: string): void {
+  private consume(char: string): void {
     if (this.escape(char)) return
     if (this.quote !== null) {
       this.inQuote(char)
