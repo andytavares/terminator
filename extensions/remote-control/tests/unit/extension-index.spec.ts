@@ -171,6 +171,29 @@ function extensionIndexTests() {
 
   describe('startServer failure handling', startServerFailureTests)
   describe('remote:tunnel-reconnect', tunnelReconnectTests)
+  describe('the settings a start reads', startSettingsTests)
+}
+
+function startSettingsTests() {
+  it('caps viewers at "Max Concurrent Viewers" and opens the tunnel with "ngrok Auth Token"', async () => {
+    mockNgrokIsInstalled.mockReturnValue(true)
+    const { handler } = await activateWithSettings({
+      [`${EXT}.passwordHash`]: currentHash,
+      [`${EXT}.port`]: 7681,
+      [`${EXT}.maxSubscribers`]: 13,
+      [`${EXT}.ngrokAuthToken`]: 'ngrok-token',
+    })
+
+    await handler('remote:toggle')({ enabled: true })
+    await vi.waitFor(() => expect(mockNgrokStart).toHaveBeenCalled())
+    await queueDrained()
+
+    const [{ deps }] = mockCreateRemoteServer.mock.calls[0] as [
+      { deps: { getMaxSubscribers: () => number } },
+    ]
+    expect(deps.getMaxSubscribers()).toBe(13)
+    expect(mockNgrokStart).toHaveBeenCalledWith(7681, 'ngrok-token')
+  })
 }
 
 function startServerFailureTests() {
