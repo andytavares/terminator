@@ -1541,6 +1541,14 @@ describe('what configuration a new order starts with', () => {
     expect(r.order.risk.criticalPaths).toEqual(['src/main/auth/**', 'src/main/billing/**'])
   })
 
+  it("reads the critical paths of the order's repositories, a workspace-scoped list", async () => {
+    const byRepository: Record<string, string[]> = { [repo]: ['src/main/auth/**'] }
+    const r = await seeded({
+      criticalPaths: (repoPaths) => repoPaths.flatMap((path) => byRepository[path] ?? []),
+    })
+    expect(r.order.risk.criticalPaths).toEqual(['src/main/auth/**'])
+  })
+
   it('declares none when the operator declared none — never inferred', async () => {
     const r = await seeded({})
     expect(r.order.risk.criticalPaths).toEqual([])

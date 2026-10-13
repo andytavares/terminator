@@ -154,7 +154,7 @@ function toolDecisionFor({
       mayUseTool: input.mayUseTool,
       docsOnly: input.docsOnly,
       isProbed: (name, given) => isProbedCommand(order, name, given),
-      readOnlyTools: readOnlyTools(api),
+      readOnlyTools: readOnlyTools(api, checkout.origin),
       autonomy: autonomyFor(api),
       letModeDecide: letAutoModeDecide(api),
       worktreePath: checkout.path,

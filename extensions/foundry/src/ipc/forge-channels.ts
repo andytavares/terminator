@@ -175,11 +175,12 @@ export interface ForgeDeps {
    */
   readonly budgetDefaults: () => Omit<Budgets, 'tokens'>
   /**
-   * The paths the operator declared critical (FR-043). Workspace-scoped and
-   * operator-declared: Foundry never infers this list, and an order that
-   * cannot see it grades a change to a critical path as if it were ordinary.
+   * The paths the operator declared critical (FR-043) for the workspaces of
+   * these repositories. Workspace-scoped and operator-declared: Foundry never
+   * infers this list, and an order that cannot see it grades a change to a
+   * critical path as if it were ordinary.
    */
-  readonly criticalPaths: () => readonly string[]
+  readonly criticalPaths: (repoPaths: readonly string[]) => readonly string[]
   /** Past decisions about the files a new idea names (FR-077). */
   readonly priorArtFor: (paths: readonly string[]) => Promise<string[]>
   /**
@@ -356,7 +357,7 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
       },
       risk: {
         ...seeded.order.risk,
-        criticalPaths: [...deps.criticalPaths()],
+        criticalPaths: [...deps.criticalPaths(repoPaths)],
       },
     }
 

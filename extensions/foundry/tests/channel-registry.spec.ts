@@ -194,7 +194,7 @@ describe('which ledger a shipping entry goes in', () => {
 // still infers nothing.
 describe('tools the operator says only read', () => {
   it('is passed to the decision, so it can be consulted at all', () => {
-    expect(src).toContain('readOnlyTools: readOnlyTools(api)')
+    expect(src).toContain('readOnlyTools: readOnlyTools(api, checkout.origin)')
   })
 
   it('is a declared setting, so there is somewhere to declare it', () => {
@@ -204,7 +204,7 @@ describe('tools the operator says only read', () => {
   it('reads the list rather than guessing from a name', () => {
     const fn = src.slice(src.indexOf('function readOnlyTools'))
     const body = fn.slice(0, fn.indexOf('\n}'))
-    expect(body).toContain("get<string[]>('terminator.foundry.readOnlyTools')")
+    expect(body).toContain("get<string[]>('terminator.foundry.readOnlyTools', { repoPath })")
     expect(body).not.toMatch(/startsWith\('mcp__'\)|includes\('get_'\)|\/read|search\//)
   })
 })

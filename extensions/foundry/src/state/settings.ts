@@ -16,8 +16,8 @@ export const ASK_MODEL_SETTING_KEY = 'terminator.foundry.askModel'
  * guessing about writes — and the whole point of the read-only policy is that
  * a review cannot change what it is reviewing.
  */
-export function readOnlyTools(api: ExtensionAPI): string[] {
-  return api.settings?.get<string[]>('terminator.foundry.readOnlyTools') ?? []
+export function readOnlyTools(api: ExtensionAPI, repoPath: string): string[] {
+  return api.settings?.get<string[]>('terminator.foundry.readOnlyTools', { repoPath }) ?? []
 }
 
 const LINE_LIST_SETTINGS = ['terminator.foundry.readOnlyTools', 'terminator.foundry.criticalPaths']
@@ -134,7 +134,12 @@ export function defaultBudgets(api: ExtensionAPI): Omit<Budgets, 'tokens'> {
   }
 }
 
-/** The operator's critical paths, one glob per line (FR-043). Never inferred. */
-export function declaredCriticalPaths(api: ExtensionAPI): string[] {
-  return [...new Set(api.settings?.get<string[]>('terminator.foundry.criticalPaths') ?? [])]
+/**
+ * The operator's critical paths, one glob per line (FR-043), for every
+ * repository's workspace (the list is workspace-scoped). Never inferred.
+ */
+export function declaredCriticalPaths(api: ExtensionAPI, repoPaths: readonly string[]): string[] {
+  const listFor = (repoPath: string) =>
+    api.settings?.get<string[]>('terminator.foundry.criticalPaths', { repoPath }) ?? []
+  return [...new Set(repoPaths.flatMap(listFor))]
 }

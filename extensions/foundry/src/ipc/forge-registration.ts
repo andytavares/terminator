@@ -76,7 +76,7 @@ function createForge(
     standingSources,
     writeBackDefault: () => defaultWriteBack(api),
     budgetDefaults: () => defaultBudgets(api),
-    criticalPaths: () => declaredCriticalPaths(api),
+    criticalPaths: (repoPaths) => declaredCriticalPaths(api, repoPaths),
     priorArtFor: (paths) => priorArtFor(dataRoot(), paths),
     // The redraft lands here, when the architect's turn ends — minutes after
     // the channel that started it answered.

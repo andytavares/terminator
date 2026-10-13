@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import type { ExtensionAPI } from '@terminator/extension-sdk'
+import type { ExtensionAPI, SettingScope } from '@terminator/extension-sdk'
 
 import {
   readOnlyTools,
@@ -40,8 +40,8 @@ describe('settings the operator never touched', () => {
   })
 
   it('declare no read-only tools and no critical paths', () => {
-    expect(readOnlyTools(nothing)).toEqual([])
-    expect(declaredCriticalPaths(nothing)).toEqual([])
+    expect(readOnlyTools(nothing, '/code/api')).toEqual([])
+    expect(declaredCriticalPaths(nothing, ['/code/api'])).toEqual([])
   })
 })
 
@@ -70,8 +70,50 @@ describe('lists the operator wrote, one item per line', () => {
       'terminator.foundry.readOnlyTools': ['mcp__docs__get', 'mcp__docs__search'],
       'terminator.foundry.criticalPaths': ['src/auth/**', 'src/auth/**', 'migrations/**'],
     })
-    expect(readOnlyTools(written)).toEqual(['mcp__docs__get', 'mcp__docs__search'])
-    expect(declaredCriticalPaths(written)).toEqual(['src/auth/**', 'migrations/**'])
+    expect(readOnlyTools(written, '/code/api')).toEqual(['mcp__docs__get', 'mcp__docs__search'])
+    expect(declaredCriticalPaths(written, ['/code/api'])).toEqual(['src/auth/**', 'migrations/**'])
+  })
+})
+
+// Both lists are workspace-scoped: the core answers the own value of the
+// workspace holding the repository, else the global one.
+describe("the lists for an order's repositories", () => {
+  const READ_ONLY = 'terminator.foundry.readOnlyTools'
+  const CRITICAL = 'terminator.foundry.criticalPaths'
+
+  /** Settings as the core resolves them, with `own` values by workspace folder. */
+  function scoped(
+    global: Record<string, unknown>,
+    own: Record<string, Record<string, unknown>>
+  ): ExtensionAPI {
+    const ownFor = (repoPath?: string) =>
+      Object.entries(own).find(([folder]) => repoPath?.startsWith(folder))?.[1]
+    const settings = partialFake<ExtensionAPI['settings']>({
+      get: <T>(key: string, scope?: SettingScope) =>
+        (ownFor(scope?.repoPath)?.[key] ?? global[key]) as T,
+    })
+    return partialFake<ExtensionAPI>({ settings })
+  }
+
+  it("reads the read-only tools of the repository's workspace, else the global list", () => {
+    const api = scoped(
+      { [READ_ONLY]: ['mcp__docs__get'] },
+      { '/code/api': { [READ_ONLY]: ['mcp__api__read'] } }
+    )
+    expect(readOnlyTools(api, '/code/api')).toEqual(['mcp__api__read'])
+    expect(readOnlyTools(api, '/code/web')).toEqual(['mcp__docs__get'])
+  })
+
+  it("gathers the critical paths of every repository's workspace, each once", () => {
+    const api = scoped(
+      { [CRITICAL]: ['migrations/**'] },
+      { '/code/api': { [CRITICAL]: ['src/auth/**', 'migrations/**'] } }
+    )
+    expect(declaredCriticalPaths(api, ['/code/api', '/code/web'])).toEqual([
+      'src/auth/**',
+      'migrations/**',
+    ])
+    expect(declaredCriticalPaths(api, ['/code/web'])).toEqual(['migrations/**'])
   })
 })
 
