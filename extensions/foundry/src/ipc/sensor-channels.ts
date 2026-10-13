@@ -63,111 +63,123 @@ function nextDueAt(state: SensorState, def: SensorDef, now: string): string | nu
 }
 
 export function createSensorChannels(deps: SensorChannelDeps): SensorChannels {
-  async function list(): Promise<unknown> {
-    const signals = ranked(await deps.store.list())
-    return { signals, counts: { open: signals.length } }
+  return {
+    list: () => list(deps),
+    dismiss: (payload) => dismissSignal(deps, payload),
+    promote: (payload) => promoteSignal(deps, payload),
+    sensorsList: () => sensorsList(deps),
+    sensorsSet: (payload) => sensorsSet(deps, payload),
+    sensorsRunNow: (payload) => sensorsRunNow(deps, payload),
   }
+}
 
-  async function dismissSignal(payload: z.infer<typeof IdPayload>): Promise<unknown> {
-    const signal = await deps.store.get(payload.id)
-    if (signal === null) return { error: `No signal ${payload.id}.` }
+async function list(deps: SensorChannelDeps): Promise<unknown> {
+  const signals = ranked(await deps.store.list())
+  return { signals, counts: { open: signals.length } }
+}
 
-    const dismissed = dismiss(signal)
-    await deps.store.save([dismissed])
-    return { signal: dismissed }
-  }
+async function dismissSignal(
+  deps: SensorChannelDeps,
+  payload: z.infer<typeof IdPayload>
+): Promise<unknown> {
+  const signal = await deps.store.get(payload.id)
+  if (signal === null) return { error: `No signal ${payload.id}.` }
 
-  async function promoteSignal(payload: z.infer<typeof PromotePayload>): Promise<unknown> {
-    const { id, repoPaths } = payload
+  const dismissed = dismiss(signal)
+  await deps.store.save([dismissed])
+  return { signal: dismissed }
+}
 
-    const signal = await deps.store.get(id)
-    if (signal === null) return { error: `No signal ${id}.` }
+async function promoteSignal(
+  deps: SensorChannelDeps,
+  payload: z.infer<typeof PromotePayload>
+): Promise<unknown> {
+  const { id, repoPaths } = payload
 
-    const seeded = await seedOrder(
-      { kind: 'signal', signalId: id, repoPaths },
-      {
-        now: deps.now,
-        newId: deps.newId,
-        readSignal: async (signalId) => deps.store.get(signalId),
-      }
-    )
-    if ('error' in seeded) return seeded
-    if ('existing' in seeded) return seeded
+  const signal = await deps.store.get(id)
+  if (signal === null) return { error: `No signal ${id}.` }
 
-    // The order is a draft, nothing more: the Forge still has to converge it.
-    await deps.orderStore.save(seeded.order)
-    await deps.store.save([promote(signal, seeded.order.id)])
-    await deps.orderStore.record({
-      at: deps.now(),
-      orderId: seeded.order.id,
-      actor: 'operator',
-      action: 'signal.promoted',
-      subject: id,
-      reason: `promoted from signal ${id}`,
-      evidence: [],
-    })
-
-    return { order: seeded.order }
-  }
-
-  async function sensorsList(): Promise<unknown> {
-    const states = await deps.store.sensorState()
-    const now = deps.now()
-    return {
-      sensors: deps.availableSensors().map(({ def, rung }) => {
-        const state = states[def.id] ?? DEFAULT_STATE
-        return { def, rung, state, nextDueAt: nextDueAt(state, def, now) }
-      }),
-    }
-  }
-
-  async function sensorsSet(payload: z.infer<typeof SetPayload>): Promise<unknown> {
-    const { id, enabled, repoPath } = payload
-
-    const states = await deps.store.sensorState()
-    // The store keeps only what was ever patched — an id absent from
-    // `state.json` is absent, not defaulted (see store.ts). Merged against the
-    // default here, once, so what gets written is always a whole state and a
-    // later reader never has to apply the default itself.
-    const current: SensorState = { ...DEFAULT_STATE, ...states[id] }
-    const next: SensorState = {
-      ...current,
-      enabled: enabled ?? current.enabled,
-      repoPath: repoPath === undefined ? current.repoPath : repoPath,
-    }
-
-    if (next.enabled && next.repoPath === null) {
-      return { error: 'A sensor needs a repository before it can be enabled.' }
-    }
-
-    const updated = await deps.store.setSensorState(id, next)
-    return { state: updated[id] }
-  }
-
-  async function sensorsRunNow(payload: z.infer<typeof IdPayload>): Promise<unknown> {
-    const found = deps.availableSensors().find(({ def }) => def.id === payload.id)
-    if (found === undefined) return { error: `No sensor ${payload.id}.` }
-
-    const states = await deps.store.sensorState()
-    const state = states[found.def.id] ?? DEFAULT_STATE
-    if (state.repoPath === null) return { error: 'This sensor has no repository set.' }
-
-    return runSensor(found.def, {
-      store: deps.store,
-      collectDeps: deps.collectDepsFor(state.repoPath),
+  const seeded = await seedOrder(
+    { kind: 'signal', signalId: id, repoPaths },
+    {
       now: deps.now,
       newId: deps.newId,
-    })
+      readSignal: async (signalId) => deps.store.get(signalId),
+    }
+  )
+  if ('error' in seeded) return seeded
+  if ('existing' in seeded) return seeded
+
+  // The order is a draft, nothing more: the Forge still has to converge it.
+  await deps.orderStore.save(seeded.order)
+  await deps.store.save([promote(signal, seeded.order.id)])
+  await deps.orderStore.record({
+    at: deps.now(),
+    orderId: seeded.order.id,
+    actor: 'operator',
+    action: 'signal.promoted',
+    subject: id,
+    reason: `promoted from signal ${id}`,
+    evidence: [],
+  })
+
+  return { order: seeded.order }
+}
+
+async function sensorsList(deps: SensorChannelDeps): Promise<unknown> {
+  const states = await deps.store.sensorState()
+  const now = deps.now()
+  return {
+    sensors: deps.availableSensors().map(({ def, rung }) => {
+      const state = states[def.id] ?? DEFAULT_STATE
+      return { def, rung, state, nextDueAt: nextDueAt(state, def, now) }
+    }),
+  }
+}
+
+async function sensorsSet(
+  deps: SensorChannelDeps,
+  payload: z.infer<typeof SetPayload>
+): Promise<unknown> {
+  const { id, enabled, repoPath } = payload
+
+  const states = await deps.store.sensorState()
+  // The store keeps only what was ever patched — an id absent from
+  // `state.json` is absent, not defaulted (see store.ts). Merged against the
+  // default here, once, so what gets written is always a whole state and a
+  // later reader never has to apply the default itself.
+  const current: SensorState = { ...DEFAULT_STATE, ...states[id] }
+  const next: SensorState = {
+    ...current,
+    enabled: enabled ?? current.enabled,
+    repoPath: repoPath === undefined ? current.repoPath : repoPath,
   }
 
-  return {
-    list,
-    dismiss: dismissSignal,
-    promote: promoteSignal,
-    sensorsList,
-    sensorsSet,
-    sensorsRunNow,
+  if (next.enabled && next.repoPath === null) {
+    return { error: 'A sensor needs a repository before it can be enabled.' }
   }
+
+  const updated = await deps.store.setSensorState(id, next)
+  return { state: updated[id] }
+}
+
+async function sensorsRunNow(
+  deps: SensorChannelDeps,
+  payload: z.infer<typeof IdPayload>
+): Promise<unknown> {
+  const found = deps.availableSensors().find(({ def }) => def.id === payload.id)
+  if (found === undefined) return { error: `No sensor ${payload.id}.` }
+
+  const states = await deps.store.sensorState()
+  const state = states[found.def.id] ?? DEFAULT_STATE
+  if (state.repoPath === null) return { error: 'This sensor has no repository set.' }
+
+  return runSensor(found.def, {
+    store: deps.store,
+    collectDeps: deps.collectDepsFor(state.repoPath),
+    now: deps.now,
+    newId: deps.newId,
+  })
 }
 
 /** The sensor surface's channels, each with the schema its payload is parsed with (ADR 096). */
