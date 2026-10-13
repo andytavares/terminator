@@ -32,109 +32,103 @@ function setUpUseExtensionRegistry(): void {
   })
 }
 
-describe('useExtensionRegistry', () => {
+describe('useExtensionRegistry — registerSidebarPanel', () => {
   setUpUseExtensionRegistry()
 
-  describe('registerSidebarPanel', () => {
-    it('adds panel to sidebarPanels map', () => {
-      const panel = { id: 'git', label: 'Git', component: NullComponent }
-      useExtensionRegistry.getState().registerSidebarPanel(panel)
-      expect(useExtensionRegistry.getState().sidebarPanels.has('git')).toBe(true)
-    })
+  it('adds panel to sidebarPanels map', () => {
+    const panel = { id: 'git', label: 'Git', component: NullComponent }
+    useExtensionRegistry.getState().registerSidebarPanel(panel)
+    expect(useExtensionRegistry.getState().sidebarPanels.has('git')).toBe(true)
+  })
 
-    it('opens panel when defaultOpen is true', () => {
-      const panel = { id: 'git', label: 'Git', component: NullComponent, defaultOpen: true }
-      useExtensionRegistry.getState().registerSidebarPanel(panel)
-      expect(useExtensionRegistry.getState().openPanels.has('git')).toBe(true)
-    })
+  it('opens panel when defaultOpen is true', () => {
+    const panel = { id: 'git', label: 'Git', component: NullComponent, defaultOpen: true }
+    useExtensionRegistry.getState().registerSidebarPanel(panel)
+    expect(useExtensionRegistry.getState().openPanels.has('git')).toBe(true)
+  })
 
-    it('does not open panel when defaultOpen is false', () => {
-      const panel = { id: 'git', label: 'Git', component: NullComponent, defaultOpen: false }
-      useExtensionRegistry.getState().registerSidebarPanel(panel)
-      expect(useExtensionRegistry.getState().openPanels.has('git')).toBe(false)
-    })
+  it('does not open panel when defaultOpen is false', () => {
+    const panel = { id: 'git', label: 'Git', component: NullComponent, defaultOpen: false }
+    useExtensionRegistry.getState().registerSidebarPanel(panel)
+    expect(useExtensionRegistry.getState().openPanels.has('git')).toBe(false)
+  })
 
-    it('returns dispose function that removes the panel', () => {
-      const panel = { id: 'git', label: 'Git', component: NullComponent }
-      const dispose = useExtensionRegistry.getState().registerSidebarPanel(panel)
-      dispose()
-      expect(useExtensionRegistry.getState().sidebarPanels.has('git')).toBe(false)
-    })
+  it('returns dispose function that removes the panel', () => {
+    const panel = { id: 'git', label: 'Git', component: NullComponent }
+    const dispose = useExtensionRegistry.getState().registerSidebarPanel(panel)
+    dispose()
+    expect(useExtensionRegistry.getState().sidebarPanels.has('git')).toBe(false)
+  })
 
-    it('dispose also removes panel from openPanels', () => {
-      const panel = { id: 'git', label: 'Git', component: NullComponent, defaultOpen: true }
-      const dispose = useExtensionRegistry.getState().registerSidebarPanel(panel)
-      dispose()
-      expect(useExtensionRegistry.getState().openPanels.has('git')).toBe(false)
-    })
+  it('dispose also removes panel from openPanels', () => {
+    const panel = { id: 'git', label: 'Git', component: NullComponent, defaultOpen: true }
+    const dispose = useExtensionRegistry.getState().registerSidebarPanel(panel)
+    dispose()
+    expect(useExtensionRegistry.getState().openPanels.has('git')).toBe(false)
   })
 })
 
 describe('useExtensionRegistry — registerProjectTab', () => {
   setUpUseExtensionRegistry()
 
-  describe('registerProjectTab', () => {
-    it('adds tab to projectTabs map', () => {
-      const tab = { id: 'pr-review', label: 'PR Review', component: NullComponent }
-      useExtensionRegistry.getState().registerProjectTab(tab)
-      expect(useExtensionRegistry.getState().projectTabs.has('pr-review')).toBe(true)
-    })
+  it('adds tab to projectTabs map', () => {
+    const tab = { id: 'pr-review', label: 'PR Review', component: NullComponent }
+    useExtensionRegistry.getState().registerProjectTab(tab)
+    expect(useExtensionRegistry.getState().projectTabs.has('pr-review')).toBe(true)
+  })
 
-    it('returns dispose function that removes the tab', () => {
-      const tab = { id: 'pr-review', label: 'PR Review', component: NullComponent }
-      const dispose = useExtensionRegistry.getState().registerProjectTab(tab)
-      dispose()
-      expect(useExtensionRegistry.getState().projectTabs.has('pr-review')).toBe(false)
-    })
+  it('returns dispose function that removes the tab', () => {
+    const tab = { id: 'pr-review', label: 'PR Review', component: NullComponent }
+    const dispose = useExtensionRegistry.getState().registerProjectTab(tab)
+    dispose()
+    expect(useExtensionRegistry.getState().projectTabs.has('pr-review')).toBe(false)
+  })
 
-    it('clears activeProjectTabId when active tab is disposed', () => {
-      const tab = { id: 'pr-review', label: 'PR Review', component: NullComponent }
-      const dispose = useExtensionRegistry.getState().registerProjectTab(tab)
-      useExtensionRegistry.setState({ activeProjectTabId: 'pr-review' })
-      dispose()
-      expect(useExtensionRegistry.getState().activeProjectTabId).toBeNull()
-    })
+  it('clears activeProjectTabId when active tab is disposed', () => {
+    const tab = { id: 'pr-review', label: 'PR Review', component: NullComponent }
+    const dispose = useExtensionRegistry.getState().registerProjectTab(tab)
+    useExtensionRegistry.setState({ activeProjectTabId: 'pr-review' })
+    dispose()
+    expect(useExtensionRegistry.getState().activeProjectTabId).toBeNull()
+  })
 
-    it('does not clear activeProjectTabId when a different tab is disposed', () => {
-      const tab = { id: 'pr-review', label: 'PR Review', component: NullComponent }
-      const dispose = useExtensionRegistry.getState().registerProjectTab(tab)
-      useExtensionRegistry.setState({ activeProjectTabId: 'other-tab' })
-      dispose()
-      expect(useExtensionRegistry.getState().activeProjectTabId).toBe('other-tab')
-    })
+  it('does not clear activeProjectTabId when a different tab is disposed', () => {
+    const tab = { id: 'pr-review', label: 'PR Review', component: NullComponent }
+    const dispose = useExtensionRegistry.getState().registerProjectTab(tab)
+    useExtensionRegistry.setState({ activeProjectTabId: 'other-tab' })
+    dispose()
+    expect(useExtensionRegistry.getState().activeProjectTabId).toBe('other-tab')
   })
 })
 
 describe('useExtensionRegistry — registerKeyboardShortcut', () => {
   setUpUseExtensionRegistry()
 
-  describe('registerKeyboardShortcut', () => {
-    it('adds shortcut to keyboardShortcuts array', () => {
-      const shortcut = { accelerator: 'CmdOrCtrl+Shift+G', action: () => {} }
-      useExtensionRegistry.getState().registerKeyboardShortcut(shortcut)
-      expect(useExtensionRegistry.getState().keyboardShortcuts).toHaveLength(1)
-      expect(useExtensionRegistry.getState().keyboardShortcuts[0].accelerator).toBe(
-        'CmdOrCtrl+Shift+G'
-      )
-    })
+  it('adds shortcut to keyboardShortcuts array', () => {
+    const shortcut = { accelerator: 'CmdOrCtrl+Shift+G', action: () => {} }
+    useExtensionRegistry.getState().registerKeyboardShortcut(shortcut)
+    expect(useExtensionRegistry.getState().keyboardShortcuts).toHaveLength(1)
+    expect(useExtensionRegistry.getState().keyboardShortcuts[0].accelerator).toBe(
+      'CmdOrCtrl+Shift+G'
+    )
+  })
 
-    it('returns dispose function that removes the shortcut', () => {
-      const shortcut = { accelerator: 'CmdOrCtrl+Shift+G', action: () => {} }
-      const dispose = useExtensionRegistry.getState().registerKeyboardShortcut(shortcut)
-      dispose()
-      expect(useExtensionRegistry.getState().keyboardShortcuts).toHaveLength(0)
-    })
+  it('returns dispose function that removes the shortcut', () => {
+    const shortcut = { accelerator: 'CmdOrCtrl+Shift+G', action: () => {} }
+    const dispose = useExtensionRegistry.getState().registerKeyboardShortcut(shortcut)
+    dispose()
+    expect(useExtensionRegistry.getState().keyboardShortcuts).toHaveLength(0)
+  })
 
-    it('only removes the exact shortcut instance, not others', () => {
-      const sc1 = { accelerator: 'CmdOrCtrl+G', action: () => {} }
-      const sc2 = { accelerator: 'CmdOrCtrl+H', action: () => {} }
-      const dispose1 = useExtensionRegistry.getState().registerKeyboardShortcut(sc1)
-      useExtensionRegistry.getState().registerKeyboardShortcut(sc2)
-      dispose1()
-      const remaining = useExtensionRegistry.getState().keyboardShortcuts
-      expect(remaining).toHaveLength(1)
-      expect(remaining[0].accelerator).toBe('CmdOrCtrl+H')
-    })
+  it('only removes the exact shortcut instance, not others', () => {
+    const sc1 = { accelerator: 'CmdOrCtrl+G', action: () => {} }
+    const sc2 = { accelerator: 'CmdOrCtrl+H', action: () => {} }
+    const dispose1 = useExtensionRegistry.getState().registerKeyboardShortcut(sc1)
+    useExtensionRegistry.getState().registerKeyboardShortcut(sc2)
+    dispose1()
+    const remaining = useExtensionRegistry.getState().keyboardShortcuts
+    expect(remaining).toHaveLength(1)
+    expect(remaining[0].accelerator).toBe('CmdOrCtrl+H')
   })
 })
 
@@ -171,64 +165,58 @@ describe('useExtensionRegistry — togglePanel', () => {
 describe('useExtensionRegistry — registerWindowView', () => {
   setUpUseExtensionRegistry()
 
-  describe('registerWindowView', () => {
-    it('adds view to windowViews map', () => {
-      useExtensionRegistry.getState().registerWindowView('pr-review', NullComponent)
-      expect(useExtensionRegistry.getState().windowViews.has('pr-review')).toBe(true)
-    })
+  it('adds view to windowViews map', () => {
+    useExtensionRegistry.getState().registerWindowView('pr-review', NullComponent)
+    expect(useExtensionRegistry.getState().windowViews.has('pr-review')).toBe(true)
+  })
 
-    it('overwrites existing view with same id', () => {
-      const comp2 = (): null => null
-      useExtensionRegistry.getState().registerWindowView('pr-review', NullComponent)
-      useExtensionRegistry.getState().registerWindowView('pr-review', comp2)
-      expect(useExtensionRegistry.getState().windowViews.get('pr-review')).toBe(comp2)
-    })
+  it('overwrites existing view with same id', () => {
+    const comp2 = (): null => null
+    useExtensionRegistry.getState().registerWindowView('pr-review', NullComponent)
+    useExtensionRegistry.getState().registerWindowView('pr-review', comp2)
+    expect(useExtensionRegistry.getState().windowViews.get('pr-review')).toBe(comp2)
   })
 })
 
 describe('useExtensionRegistry — registerGlobalTab', () => {
   setUpUseExtensionRegistry()
 
-  describe('registerGlobalTab', () => {
-    it('adds tab to globalTabs map', () => {
-      const tab = { id: 'task-vault', label: 'Tasks', component: NullComponent }
-      useExtensionRegistry.getState().registerGlobalTab(tab)
-      expect(useExtensionRegistry.getState().globalTabs.has('task-vault')).toBe(true)
-    })
+  it('adds tab to globalTabs map', () => {
+    const tab = { id: 'task-vault', label: 'Tasks', component: NullComponent }
+    useExtensionRegistry.getState().registerGlobalTab(tab)
+    expect(useExtensionRegistry.getState().globalTabs.has('task-vault')).toBe(true)
+  })
 
-    it('returns dispose function that removes the tab', () => {
-      const tab = { id: 'task-vault', label: 'Tasks', component: NullComponent }
-      const dispose = useExtensionRegistry.getState().registerGlobalTab(tab)
-      dispose()
-      expect(useExtensionRegistry.getState().globalTabs.has('task-vault')).toBe(false)
-    })
+  it('returns dispose function that removes the tab', () => {
+    const tab = { id: 'task-vault', label: 'Tasks', component: NullComponent }
+    const dispose = useExtensionRegistry.getState().registerGlobalTab(tab)
+    dispose()
+    expect(useExtensionRegistry.getState().globalTabs.has('task-vault')).toBe(false)
+  })
 
-    it('clears activeGlobalTabId when active tab is disposed', () => {
-      const tab = { id: 'task-vault', label: 'Tasks', component: NullComponent }
-      const dispose = useExtensionRegistry.getState().registerGlobalTab(tab)
-      useExtensionRegistry.setState({ activeGlobalTabId: 'task-vault' })
-      dispose()
-      expect(useExtensionRegistry.getState().activeGlobalTabId).toBeNull()
-    })
+  it('clears activeGlobalTabId when active tab is disposed', () => {
+    const tab = { id: 'task-vault', label: 'Tasks', component: NullComponent }
+    const dispose = useExtensionRegistry.getState().registerGlobalTab(tab)
+    useExtensionRegistry.setState({ activeGlobalTabId: 'task-vault' })
+    dispose()
+    expect(useExtensionRegistry.getState().activeGlobalTabId).toBeNull()
   })
 })
 
 describe('useExtensionRegistry — registerCommand', () => {
   setUpUseExtensionRegistry()
 
-  describe('registerCommand', () => {
-    it('adds command to commands array', () => {
-      const cmd = { id: 'test', label: 'Test', action: () => {} }
-      useExtensionRegistry.getState().registerCommand(cmd)
-      expect(useExtensionRegistry.getState().commands.some((c) => c.id === 'test')).toBe(true)
-    })
+  it('adds command to commands array', () => {
+    const cmd = { id: 'test', label: 'Test', action: () => {} }
+    useExtensionRegistry.getState().registerCommand(cmd)
+    expect(useExtensionRegistry.getState().commands.some((c) => c.id === 'test')).toBe(true)
+  })
 
-    it('returns dispose function that removes the command', () => {
-      const cmd = { id: 'test2', label: 'Test2', action: () => {} }
-      const dispose = useExtensionRegistry.getState().registerCommand(cmd)
-      dispose()
-      expect(useExtensionRegistry.getState().commands.some((c) => c.id === 'test2')).toBe(false)
-    })
+  it('returns dispose function that removes the command', () => {
+    const cmd = { id: 'test2', label: 'Test2', action: () => {} }
+    const dispose = useExtensionRegistry.getState().registerCommand(cmd)
+    dispose()
+    expect(useExtensionRegistry.getState().commands.some((c) => c.id === 'test2')).toBe(false)
   })
 })
 
@@ -269,110 +257,102 @@ describe('useExtensionRegistry — updateCommand', () => {
 describe('useExtensionRegistry — registerOverlay', () => {
   setUpUseExtensionRegistry()
 
-  describe('registerOverlay', () => {
-    it('adds component to overlays array', () => {
-      useExtensionRegistry.getState().registerOverlay(NullComponent)
-      expect(useExtensionRegistry.getState().overlays).toHaveLength(1)
-    })
+  it('adds component to overlays array', () => {
+    useExtensionRegistry.getState().registerOverlay(NullComponent)
+    expect(useExtensionRegistry.getState().overlays).toHaveLength(1)
+  })
 
-    it('returns dispose function that removes the overlay', () => {
-      const dispose = useExtensionRegistry.getState().registerOverlay(NullComponent)
-      dispose()
-      expect(useExtensionRegistry.getState().overlays).toHaveLength(0)
-    })
+  it('returns dispose function that removes the overlay', () => {
+    const dispose = useExtensionRegistry.getState().registerOverlay(NullComponent)
+    dispose()
+    expect(useExtensionRegistry.getState().overlays).toHaveLength(0)
   })
 })
 
 describe('useExtensionRegistry — registerWorkspaceTab', () => {
   setUpUseExtensionRegistry()
 
-  describe('registerWorkspaceTab', () => {
-    it('adds tab to workspaceTabs map', () => {
-      const tab = { id: 'code-reviews', label: 'Code Reviews', component: NullComponent }
-      useExtensionRegistry.getState().registerWorkspaceTab(tab)
-      expect(useExtensionRegistry.getState().workspaceTabs.has('code-reviews')).toBe(true)
-    })
+  it('adds tab to workspaceTabs map', () => {
+    const tab = { id: 'code-reviews', label: 'Code Reviews', component: NullComponent }
+    useExtensionRegistry.getState().registerWorkspaceTab(tab)
+    expect(useExtensionRegistry.getState().workspaceTabs.has('code-reviews')).toBe(true)
+  })
 
-    it('returns dispose function that removes the tab', () => {
-      const tab = { id: 'code-reviews', label: 'Code Reviews', component: NullComponent }
-      const dispose = useExtensionRegistry.getState().registerWorkspaceTab(tab)
-      dispose()
-      expect(useExtensionRegistry.getState().workspaceTabs.has('code-reviews')).toBe(false)
-    })
+  it('returns dispose function that removes the tab', () => {
+    const tab = { id: 'code-reviews', label: 'Code Reviews', component: NullComponent }
+    const dispose = useExtensionRegistry.getState().registerWorkspaceTab(tab)
+    dispose()
+    expect(useExtensionRegistry.getState().workspaceTabs.has('code-reviews')).toBe(false)
+  })
 
-    it('clears activeWorkspaceTabId when active tab is disposed', () => {
-      const tab = { id: 'code-reviews', label: 'Code Reviews', component: NullComponent }
-      const dispose = useExtensionRegistry.getState().registerWorkspaceTab(tab)
-      useExtensionRegistry.setState({ activeWorkspaceTabId: 'code-reviews' })
-      dispose()
-      expect(useExtensionRegistry.getState().activeWorkspaceTabId).toBeNull()
-    })
+  it('clears activeWorkspaceTabId when active tab is disposed', () => {
+    const tab = { id: 'code-reviews', label: 'Code Reviews', component: NullComponent }
+    const dispose = useExtensionRegistry.getState().registerWorkspaceTab(tab)
+    useExtensionRegistry.setState({ activeWorkspaceTabId: 'code-reviews' })
+    dispose()
+    expect(useExtensionRegistry.getState().activeWorkspaceTabId).toBeNull()
+  })
 
-    it('does not clear activeWorkspaceTabId when a different tab is disposed', () => {
-      const tab = { id: 'code-reviews', label: 'Code Reviews', component: NullComponent }
-      const dispose = useExtensionRegistry.getState().registerWorkspaceTab(tab)
-      useExtensionRegistry.setState({ activeWorkspaceTabId: 'other-tab' })
-      dispose()
-      expect(useExtensionRegistry.getState().activeWorkspaceTabId).toBe('other-tab')
-    })
+  it('does not clear activeWorkspaceTabId when a different tab is disposed', () => {
+    const tab = { id: 'code-reviews', label: 'Code Reviews', component: NullComponent }
+    const dispose = useExtensionRegistry.getState().registerWorkspaceTab(tab)
+    useExtensionRegistry.setState({ activeWorkspaceTabId: 'other-tab' })
+    dispose()
+    expect(useExtensionRegistry.getState().activeWorkspaceTabId).toBe('other-tab')
   })
 })
 
 describe('useExtensionRegistry — setActiveGlobalTab', () => {
   setUpUseExtensionRegistry()
 
-  describe('setActiveGlobalTab', () => {
-    it('sets activeGlobalTabId', () => {
-      useExtensionRegistry.getState().setActiveGlobalTab('task-vault')
-      expect(useExtensionRegistry.getState().activeGlobalTabId).toBe('task-vault')
-    })
+  it('sets activeGlobalTabId', () => {
+    useExtensionRegistry.getState().setActiveGlobalTab('task-vault')
+    expect(useExtensionRegistry.getState().activeGlobalTabId).toBe('task-vault')
+  })
 
-    it('clears activeWorkspaceTabId when activating a global tab', () => {
-      useExtensionRegistry.setState({ activeWorkspaceTabId: 'code-reviews' })
-      useExtensionRegistry.getState().setActiveGlobalTab('task-vault')
-      expect(useExtensionRegistry.getState().activeWorkspaceTabId).toBeNull()
-    })
+  it('clears activeWorkspaceTabId when activating a global tab', () => {
+    useExtensionRegistry.setState({ activeWorkspaceTabId: 'code-reviews' })
+    useExtensionRegistry.getState().setActiveGlobalTab('task-vault')
+    expect(useExtensionRegistry.getState().activeWorkspaceTabId).toBeNull()
+  })
 
-    it('clears activeProjectTabId when activating a global tab', () => {
-      useExtensionRegistry.setState({ activeProjectTabId: 'git' })
-      useExtensionRegistry.getState().setActiveGlobalTab('task-vault')
-      expect(useExtensionRegistry.getState().activeProjectTabId).toBeNull()
-    })
+  it('clears activeProjectTabId when activating a global tab', () => {
+    useExtensionRegistry.setState({ activeProjectTabId: 'git' })
+    useExtensionRegistry.getState().setActiveGlobalTab('task-vault')
+    expect(useExtensionRegistry.getState().activeProjectTabId).toBeNull()
+  })
 
-    it('does not clear activeProjectTabId when setting global tab to null', () => {
-      useExtensionRegistry.setState({ activeProjectTabId: 'git' })
-      useExtensionRegistry.getState().setActiveGlobalTab(null)
-      expect(useExtensionRegistry.getState().activeProjectTabId).toBe('git')
-    })
+  it('does not clear activeProjectTabId when setting global tab to null', () => {
+    useExtensionRegistry.setState({ activeProjectTabId: 'git' })
+    useExtensionRegistry.getState().setActiveGlobalTab(null)
+    expect(useExtensionRegistry.getState().activeProjectTabId).toBe('git')
   })
 })
 
 describe('useExtensionRegistry — setActiveWorkspaceTab', () => {
   setUpUseExtensionRegistry()
 
-  describe('setActiveWorkspaceTab', () => {
-    it('sets activeWorkspaceTabId', () => {
-      useExtensionRegistry.getState().setActiveWorkspaceTab('code-reviews')
-      expect(useExtensionRegistry.getState().activeWorkspaceTabId).toBe('code-reviews')
-    })
+  it('sets activeWorkspaceTabId', () => {
+    useExtensionRegistry.getState().setActiveWorkspaceTab('code-reviews')
+    expect(useExtensionRegistry.getState().activeWorkspaceTabId).toBe('code-reviews')
+  })
 
-    it('clears activeGlobalTabId when activating a workspace tab', () => {
-      useExtensionRegistry.setState({ activeGlobalTabId: 'task-vault' })
-      useExtensionRegistry.getState().setActiveWorkspaceTab('code-reviews')
-      expect(useExtensionRegistry.getState().activeGlobalTabId).toBeNull()
-    })
+  it('clears activeGlobalTabId when activating a workspace tab', () => {
+    useExtensionRegistry.setState({ activeGlobalTabId: 'task-vault' })
+    useExtensionRegistry.getState().setActiveWorkspaceTab('code-reviews')
+    expect(useExtensionRegistry.getState().activeGlobalTabId).toBeNull()
+  })
 
-    it('clears activeProjectTabId when activating a workspace tab', () => {
-      useExtensionRegistry.setState({ activeProjectTabId: 'git' })
-      useExtensionRegistry.getState().setActiveWorkspaceTab('code-reviews')
-      expect(useExtensionRegistry.getState().activeProjectTabId).toBeNull()
-    })
+  it('clears activeProjectTabId when activating a workspace tab', () => {
+    useExtensionRegistry.setState({ activeProjectTabId: 'git' })
+    useExtensionRegistry.getState().setActiveWorkspaceTab('code-reviews')
+    expect(useExtensionRegistry.getState().activeProjectTabId).toBeNull()
+  })
 
-    it('does not clear activeProjectTabId when setting workspace tab to null', () => {
-      useExtensionRegistry.setState({ activeProjectTabId: 'git' })
-      useExtensionRegistry.getState().setActiveWorkspaceTab(null)
-      expect(useExtensionRegistry.getState().activeProjectTabId).toBe('git')
-    })
+  it('does not clear activeProjectTabId when setting workspace tab to null', () => {
+    useExtensionRegistry.setState({ activeProjectTabId: 'git' })
+    useExtensionRegistry.getState().setActiveWorkspaceTab(null)
+    expect(useExtensionRegistry.getState().activeProjectTabId).toBe('git')
   })
 })
 
@@ -410,29 +390,27 @@ describe('useExtensionRegistry — setActiveGlobalTabWithNavigation', () => {
 describe('useExtensionRegistry — dismissSurfaces', () => {
   setUpUseExtensionRegistry()
 
-  describe('dismissSurfaces', () => {
-    it('clears a core global tab such as Home, which the Escape exit leaves alone', () => {
-      useExtensionRegistry.getState().setActiveGlobalTab('core.home')
-      expect(useExtensionRegistry.getState().dismissSurfaces()).toBe(true)
-      expect(useExtensionRegistry.getState().activeGlobalTabId).toBeNull()
-    })
+  it('clears a core global tab such as Home, which the Escape exit leaves alone', () => {
+    useExtensionRegistry.getState().setActiveGlobalTab('core.home')
+    expect(useExtensionRegistry.getState().dismissSurfaces()).toBe(true)
+    expect(useExtensionRegistry.getState().activeGlobalTabId).toBeNull()
+  })
 
-    it('clears the workspace and project tab slots too', () => {
-      useExtensionRegistry.setState({
-        activeWorkspaceTabId: 'foundry',
-        activeProjectTabId: 'git',
-      })
-      expect(useExtensionRegistry.getState().dismissSurfaces()).toBe(true)
-      const state = useExtensionRegistry.getState()
-      expect(state.activeWorkspaceTabId).toBeNull()
-      expect(state.activeProjectTabId).toBeNull()
+  it('clears the workspace and project tab slots too', () => {
+    useExtensionRegistry.setState({
+      activeWorkspaceTabId: 'foundry',
+      activeProjectTabId: 'git',
     })
+    expect(useExtensionRegistry.getState().dismissSurfaces()).toBe(true)
+    const state = useExtensionRegistry.getState()
+    expect(state.activeWorkspaceTabId).toBeNull()
+    expect(state.activeProjectTabId).toBeNull()
+  })
 
-    it('reports false and leaves sidebar panels open when no surface is showing', () => {
-      useExtensionRegistry.setState({ openPanels: new Set(['git-panel']) })
-      expect(useExtensionRegistry.getState().dismissSurfaces()).toBe(false)
-      expect(useExtensionRegistry.getState().openPanels.has('git-panel')).toBe(true)
-    })
+  it('reports false and leaves sidebar panels open when no surface is showing', () => {
+    useExtensionRegistry.setState({ openPanels: new Set(['git-panel']) })
+    expect(useExtensionRegistry.getState().dismissSurfaces()).toBe(false)
+    expect(useExtensionRegistry.getState().openPanels.has('git-panel')).toBe(true)
   })
 })
 

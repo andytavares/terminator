@@ -133,7 +133,9 @@ describe('useKeyboardShortcuts — cycles to next workspace on Cmd+=, expanding 
     pressKey('=', { metaKey: true })
     expect(workspaces().activeWorkspaceId).toBeNull()
   })
+})
 
+describe('useKeyboardShortcuts — cycles to next workspace on Cmd+=, expanding only it — creates new session on Cmd+T when project is active', () => {
   it('creates new session on Cmd+T when project is active', () => {
     setup({ activeProjectId: 'proj-1' })
     renderHook(() => useKeyboardShortcuts())
@@ -336,7 +338,9 @@ describe('useKeyboardShortcuts — Cmd+W closes focused split pane when in split
     await waitFor(() => expect(sessions().sessions.has('ses-active')).toBe(false))
     expect(sessions().sessions.has('ses-other')).toBe(true)
   })
+})
 
+describe('useKeyboardShortcuts — Cmd+W closes focused split pane when in split mode — Cmd+W does nothing when no activeProjectId', () => {
   it('Cmd+W does nothing when no activeProjectId', async () => {
     withTabs('proj-1', ['ses-active'], 'ses-active')
     renderHook(() => useKeyboardShortcuts())
@@ -381,7 +385,9 @@ describe('useKeyboardShortcuts — scratch mode — scratchProjectId overrides a
       scrollbackLimit: 5000,
     })
   })
+})
 
+describe('useKeyboardShortcuts — scratch mode — scratchProjectId overrides activeProjectId — Cmd+Shift+D splits the scratch terminal horizontally', () => {
   it('Cmd+Shift+D splits the scratch terminal horizontally', () => {
     renderHook(() => useKeyboardShortcuts(scratch))
     pressKey('d', { metaKey: true, shiftKey: true })
