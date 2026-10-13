@@ -1,17 +1,9 @@
 import React, { createContext, useContext, useId, useLayoutEffect, useState } from 'react'
 import './extension-ui.css'
 
-/*
- * The WAI-ARIA Authoring Practices tabs pattern, with automatic activation:
- * arrow keys move focus and select, Home and End jump to the ends, and only the
- * selected tab is in the Tab order.
- * https://www.w3.org/WAI/ARIA/apg/patterns/tabs/
- *
- * Built from parts, as Radix Tabs (Root, List, Trigger, Content) and React Aria
- * (Tabs, TabList, Tab, TabPanel) are, so a tab list can share a toolbar row with
- * other controls and its panels render wherever the caller puts them. `Tabs` is
- * the same parts assembled for the common case of a list over its panel.
- */
+/* WAI-ARIA tabs with automatic activation (https://www.w3.org/WAI/ARIA/apg/patterns/tabs/).
+ * Built from parts, as Radix and React Aria tabs are, so a tab list can share a toolbar row and
+ * its panels render where the caller puts them; `Tabs` assembles them as a list over its panel. */
 
 export type TabOrientation = 'horizontal' | 'vertical'
 
@@ -115,11 +107,8 @@ export function TabList({
 export interface TabProps {
   id: string
   disabled?: boolean
-  /**
-   * The tab's name when its content is more than words, such as a count:
-   * "Needs you, 3" for `Needs you<span>3</span>`, which would otherwise be read
-   * as "Needs you3".
-   */
+  /** The tab's name when its content is more than words, such as a count: "Needs you, 3" for
+   * `Needs you<span>3</span>`, which would otherwise be read as "Needs you3". */
   accessibleName?: string
   className?: string
   children: React.ReactNode

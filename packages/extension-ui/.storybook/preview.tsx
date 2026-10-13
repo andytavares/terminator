@@ -7,10 +7,8 @@ import '../src/controls.css'
 
 type Theme = 'dark' | 'light'
 
-/**
- * Stamps the theme on the document the way the app does for an extension view:
- * dark is the default and carries no attribute, light sets `data-theme`.
- */
+/** Stamps the theme on the document the way the app does for an extension view: dark is the
+ * default and carries no attribute, light sets `data-theme`. */
 function ThemeFrame({ theme, children }: { theme: Theme; children: React.ReactNode }): JSX.Element {
   useLayoutEffect(() => {
     const root = document.documentElement

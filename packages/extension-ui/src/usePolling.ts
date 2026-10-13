@@ -1,10 +1,7 @@
 import { useEffect } from 'react'
 
-/**
- * Calls `tick` every `intervalMs` while the view is visible, and not at all
- * while it is hidden; coming back to visible ticks once at once. Returns what
- * stops it.
- */
+/** Calls `tick` every `intervalMs` while the view is visible, and not at all while it is hidden;
+ * coming back to visible ticks once at once. Returns what stops it. */
 export function everyWhileVisible(tick: () => void, intervalMs: number): () => void {
   let timer: ReturnType<typeof setInterval> | null = null
   const start = (): void => {
@@ -30,14 +27,9 @@ export function everyWhileVisible(tick: () => void, intervalMs: number): () => v
   }
 }
 
-/**
- * A poll for data nothing announces when it changes. Data that has a change
- * event belongs on that event instead.
- *
- * Read now, then every `intervalMs` while mounted and visible, and hand each
- * answer to `show`. Reading and showing are separate so that state is only set
- * in the callback of a read — never synchronously in the effect body.
- */
+/** Polls data nothing announces a change of (data with a change event belongs on that event):
+ * reads now, then every `intervalMs` while mounted and visible, handing each answer to `show`, so
+ * state is set only in a read's callback, never synchronously in the effect body. */
 export function usePolling<T>(
   read: () => Promise<T>,
   show: (answer: T) => void,

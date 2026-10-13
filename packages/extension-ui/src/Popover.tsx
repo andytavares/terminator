@@ -52,15 +52,9 @@ export function Popover({ label, children, onDismiss, className }: PopoverProps)
   )
 }
 
-/**
- * Keep it on screen.
- *
- * The surface is absolutely positioned against whatever the caller anchored it
- * to, and a control near the right or bottom edge — the caret beside a commit
- * button, say — puts the panel half outside the view with no way to scroll to
- * it. Measured after mount and nudged back, because the overflow depends on the
- * rendered width, which nothing knows in advance.
- */
+/** Keeps it on screen: anchored near the right or bottom edge, the panel would sit half outside
+ * the view with no way to scroll to it. Measured after mount and nudged back, because the overflow
+ * depends on the rendered width, which nothing knows in advance. */
 function keepOnScreen(el: HTMLElement | null): void {
   if (!el) return
   const margin = 8

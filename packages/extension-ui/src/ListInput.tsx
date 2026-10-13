@@ -1,12 +1,9 @@
 import React, { useState } from 'react'
 import './extension-ui.css'
 
-/*
- * A list of short strings edited as text, one item per line: globs, tool
- * names, repositories. Each line is trimmed and blank lines are skipped, so
- * the list handed back never holds an empty item. The box keeps what is being
- * typed, a new empty line included, and adopts a list changed from outside.
- */
+/* A list of short strings (globs, tool names, repositories) edited as text, one per line, trimmed,
+ * blank lines skipped, so the list never holds an empty item. The box keeps what is being typed, a
+ * new empty line included, and adopts a list changed from outside. */
 
 export interface ListInputProps {
   /** Names the box for assistive technology: "Critical paths". */

@@ -21,10 +21,8 @@ export interface DialogAction {
   disabled?: boolean
   /** Display-only hint, e.g. "⌘↵". */
   shortcut?: string
-  /**
-   * The dialog's form submission: Enter in a field runs it, as in any form.
-   * At most one action submits; the panel becomes a `<form>` when one does.
-   */
+  /** The dialog's form submission: Enter in a field runs it, as in any form. At most one action
+   * submits; the panel becomes a `<form>` when one does. */
   submit?: boolean
 }
 
@@ -96,10 +94,8 @@ export function Dialog(props: DialogProps): JSX.Element {
   )
 }
 
-/**
- * Escape, focus moved in and restored to the opener, and the modal depth.
- * Returns the latest `dismissible`, which the scrim's click reads.
- */
+/** Escape, focus moved in and restored to the opener, and the modal depth. Returns the latest
+ * `dismissible`, which the scrim's click reads. */
 function useModalBehaviour(
   panelRef: React.RefObject<HTMLElement>,
   { onDismiss, dismissible }: Pick<DialogProps, 'onDismiss'> & { dismissible: boolean }

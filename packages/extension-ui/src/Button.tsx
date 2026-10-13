@@ -7,10 +7,8 @@ export type ButtonSize = 'sm' | 'md'
 
 export interface ButtonProps
   extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'className' | 'children'> {
-  /**
-   * What the press means, not how loud it is. Two buttons side by side get one
-   * visual weight between them: at most one is primary.
-   */
+  /** What the press means, not how loud it is. Two buttons side by side get one visual weight
+   * between them: at most one is primary. */
   variant?: ButtonVariant
   size?: ButtonSize
   /** A lucide icon before the label. Sized by the stylesheet, never by a prop. */
