@@ -273,3 +273,63 @@ describe('LogbookView — the detail of a closed session — ends the selected s
     expect(screen.getByText('Conversation no longer available')).toBeTruthy()
   })
 })
+
+const scratch = fact({
+  sessionId: 's',
+  name: 'scratch-shell',
+  projectId: null,
+  workspaceName: null,
+  workspaceColor: null,
+  projectName: null,
+  branch: null,
+})
+
+describe('LogbookView — a session that belongs to no branch', () => {
+  it('lists it by its name, and says it has no branch', () => {
+    render(
+      <LogbookView {...props} groups={buildLogbook([scratch], '', titles)} selected={scratch} />
+    )
+    const option = screen.getByRole('option')
+    expect(within(option).getByText('scratch-shell')).toBeTruthy()
+    expect(option.style.getPropertyValue('--rail')).toBe('')
+    const detail = screen.getByRole('region', { name: 'Session details' })
+    expect(within(detail).getByText('No branch')).toBeTruthy()
+  })
+
+  it('still suggests the operator’s own tickets for it', async () => {
+    render(<LogbookView {...props} selected={scratch} />)
+    expect(await screen.findByRole('button', { name: 'NW-84 429s under light load' })).toBeTruthy()
+  })
+})
+
+describe('LogbookView — keys and facts it leaves alone', () => {
+  it('selects only on Enter or Space', () => {
+    render(<LogbookView {...props} />)
+    fireEvent.keyDown(screen.getByRole('option', { name: /Bundle size/ }), { key: 'a' })
+    expect(props.onSelect).not.toHaveBeenCalled()
+  })
+
+  it('saves only on Cmd or Ctrl with Enter', () => {
+    render(<LogbookView {...props} selected={undescribed} />)
+    const box = screen.getByRole('textbox', { name: 'What is this session doing?' })
+    fireEvent.change(box, { target: { value: 'typing' } })
+    fireEvent.keyDown(box, { key: 'Enter' })
+    expect(props.onSaveDescription).not.toHaveBeenCalled()
+    fireEvent.keyDown(box, { key: 'Enter', ctrlKey: true })
+    expect(props.onSaveDescription).toHaveBeenCalledWith(undescribed, 'typing')
+  })
+
+  it('names the git branch only when it differs from the branch', () => {
+    render(<LogbookView {...props} selected={{ ...undescribed, branch: 'northwind-api' }} />)
+    expect(screen.queryByText('Git branch')).toBeNull()
+  })
+
+  it('dates a closed session by its start when its close was not recorded', () => {
+    render(<LogbookView {...props} selected={{ ...closed, closedAt: null }} />)
+    const started = new Date(closed.startedAt).toLocaleString(undefined, {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    })
+    expect(screen.getByText(`Closed ${started}`)).toBeTruthy()
+  })
+})

@@ -4,16 +4,9 @@ import { Search } from 'lucide-react'
 import { WallTile } from './WallTile'
 import { useIssueTitles, useSessionFacts } from '../session/useSessionFacts'
 import { useMetricsStore } from '../../stores/metrics.store'
-import { useSessionRecordsStore } from '../../stores/session-records.store'
 import { useExtensionRegistry } from '../../extensions/registry'
-import { revealSession } from '../../terminal/navigate-to-session'
-import { closeSessionFromFacts } from '../../terminal/close-session'
 import { NewSessionMenu } from '../session/NewSessionMenu'
-import {
-  resumeSession,
-  startScratchSession,
-  startSessionInBranch,
-} from '../../terminal/start-session'
+import { startScratchSession, startSessionInBranch } from '../../terminal/start-session'
 import { answersFor } from '../session/answers'
 import { SessionLinkDialog } from '../session/SessionLinkDialog'
 import { useNow } from '../session/useNow'
@@ -26,7 +19,8 @@ import {
   type WallPrefs,
   type WallThenBy,
 } from '../../sidebar/wall-prefs'
-import type { SessionActions, SessionFacts } from '../../sidebar/session-facts'
+import type { SessionFacts } from '../../sidebar/session-facts'
+import { SESSION_ACTIONS } from '../session/session-actions'
 import type { ProcessMetrics } from '../../../shared/types/index'
 import '../screen-chrome.css'
 import './OverviewScreen.css'
@@ -298,7 +292,7 @@ function WallGrid({ shown, prefs, processes, onLink }: WallGridProps): JSX.Eleme
           now={now}
           onLink={onLink}
           answers={answersFor(factsById.get(placement.sessionId)!)}
-          {...TILE_ACTIONS}
+          {...SESSION_ACTIONS}
         />
       ))}
     </div>
@@ -320,14 +314,4 @@ function BandHeadings({ needsCount, hasRest }: { needsCount: number; hasRest: bo
       )}
     </>
   )
-}
-
-/** What every tile does, the same for each. */
-const TILE_ACTIONS: SessionActions = {
-  onOpen: revealSession,
-  onSaveDescription: (target, description) =>
-    void useSessionRecordsStore.getState().setDescription(target.snapshot, description),
-  onResume: (facts) => void resumeSession(facts),
-  onCloseSession: (facts) => void closeSessionFromFacts(facts),
-  onForgetSession: (facts) => void useSessionRecordsStore.getState().forget(facts.sessionId),
 }
