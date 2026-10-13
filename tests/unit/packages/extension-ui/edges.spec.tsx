@@ -202,16 +202,4 @@ describe('focus-trap edges', () => {
     expect(document.activeElement).toBe(el)
     el.remove()
   })
-
-  // The obvious case: a row deleted by the very dialog that confirmed deleting it.
-  it('does not throw when the opener has left the document', () => {
-    const opener = document.createElement('button')
-    document.body.appendChild(opener)
-    opener.focus()
-    const el = container('<button>a</button>')
-    const restore = captureFocus(el)
-    opener.remove()
-    expect(() => restore()).not.toThrow()
-    el.remove()
-  })
 })

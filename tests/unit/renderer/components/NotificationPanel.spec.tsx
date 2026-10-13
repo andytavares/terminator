@@ -9,18 +9,19 @@ const mockDismiss = vi.fn().mockResolvedValue({ ok: true })
 const mockSetLeftInset = vi.fn()
 
 // In jsdom, globalThis === window, so setting globalThis.electronAPI sets window.electronAPI
-;(globalThis as unknown as Record<string, unknown>).electronAPI = {
+installElectronApi({
   notifications: {
     dismiss: mockDismiss,
     triggerAction: mockTriggerAction,
   },
   extension: { setLeftInset: mockSetLeftInset },
-}
+})
 
 import {
   NotificationPanel,
   BellButton,
 } from '../../../../src/renderer/components/NotificationPanel'
+import { installElectronApi } from '../../../support/electron-api'
 
 function makeNotif(overrides: Partial<Notification> = {}): Notification {
   return {

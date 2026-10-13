@@ -1,22 +1,32 @@
 import React from 'react'
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { PrDialog } from '../../../extensions/git-integration/src/components/PrDialog'
 import type { PullRequest } from '../../../extensions/git-integration/src/schemas/git.schema'
+import type { ElectronAPI } from '../../../src/shared/electron-api/api-type'
+import { installElectronApi } from '../../support/electron-api'
 
-const mockShellExec = vi.fn()
-const mockListBranches = vi.fn()
-const mockReadFile = vi.fn()
-const mockInvoke = vi.fn()
+const mockShellExec = vi.fn<ElectronAPI['shell']['exec']>()
+const mockListBranches = vi.fn<ElectronAPI['git']['listBranches']>()
+const mockReadFile = vi.fn<ElectronAPI['fs']['readFile']>()
+const mockInvoke = vi.fn<ElectronAPI['extensionBridge']['invoke']>()
+
+/** What `git`/`gh` printed and how it exited, as shell.exec answers. */
+const ran = (exitCode: number, stdout = '', stderr = '') => ({
+  exitCode,
+  stdout,
+  stderr,
+  timedOut: false,
+})
 
 beforeEach(() => {
-  vi.clearAllMocks()
-  ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
+  vi.resetAllMocks()
+  installElectronApi({
     shell: { exec: mockShellExec },
     extensionBridge: { invoke: mockInvoke },
     git: { listBranches: mockListBranches },
     fs: { readFile: mockReadFile },
-  }
+  })
   mockListBranches.mockResolvedValue({
     branches: [
       { name: 'main', isCurrent: false, isRemote: false },
@@ -24,10 +34,6 @@ beforeEach(() => {
     ],
   })
   mockReadFile.mockResolvedValue({ error: 'not found' })
-})
-
-afterEach(() => {
-  delete (globalThis as unknown as Record<string, unknown>).electronAPI
 })
 
 const defaultProps = {
@@ -51,8 +57,7 @@ describe('PrDialog', () => {
     const onClose = vi.fn()
     render(<PrDialog {...defaultProps} onClose={onClose} />)
     await waitFor(() => screen.getByRole('dialog'))
-    const overlay = document.querySelector('.tmui-dialog__scrim')
-    if (overlay) fireEvent.click(overlay)
+    fireEvent.click(document.querySelector('.tmui-dialog__scrim')!)
     expect(onClose).toHaveBeenCalled()
   })
 
@@ -145,8 +150,8 @@ describe('PrDialog', () => {
   it('creates PR and calls onCreated on success', async () => {
     const onCreated = vi.fn()
     mockShellExec
-      .mockResolvedValueOnce({ exitCode: 0, stdout: '5', stderr: '' }) // checkCommitsAhead
-      .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }) // push
+      .mockResolvedValueOnce(ran(0, '5', '')) // checkCommitsAhead
+      .mockResolvedValueOnce(ran(0, '', '')) // push
     mockInvoke.mockResolvedValueOnce({ number: 99, url: 'https://github.com/foo/bar/pull/99' })
 
     render(<PrDialog {...defaultProps} onCreated={onCreated} />)
@@ -167,9 +172,7 @@ describe('PrDialog', () => {
   })
 
   it('shows error when PR creation fails', async () => {
-    mockShellExec
-      .mockResolvedValueOnce({ exitCode: 0, stdout: '3', stderr: '' })
-      .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' })
+    mockShellExec.mockResolvedValueOnce(ran(0, '3', '')).mockResolvedValueOnce(ran(0, '', ''))
     mockInvoke.mockResolvedValueOnce({ error: 'gh error' })
 
     render(<PrDialog {...defaultProps} />)
@@ -179,7 +182,7 @@ describe('PrDialog', () => {
   })
 
   it('shows error when no commits ahead of base', async () => {
-    mockShellExec.mockResolvedValue({ exitCode: 0, stdout: '0', stderr: '' })
+    mockShellExec.mockResolvedValue(ran(0, '0', ''))
     render(<PrDialog {...defaultProps} />)
     await waitFor(() => screen.getByRole('dialog'))
     fireEvent.click(screen.getByText('Create PR'))
@@ -188,8 +191,8 @@ describe('PrDialog', () => {
 
   it('shows error when push fails', async () => {
     mockShellExec
-      .mockResolvedValueOnce({ exitCode: 0, stdout: '2', stderr: '' })
-      .mockResolvedValueOnce({ exitCode: 1, stdout: '', stderr: 'push failed' })
+      .mockResolvedValueOnce(ran(0, '2', ''))
+      .mockResolvedValueOnce(ran(1, '', 'push failed'))
 
     render(<PrDialog {...defaultProps} />)
     await waitFor(() => screen.getByRole('dialog'))

@@ -1,10 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { Terminal } from '@xterm/xterm'
+import { Terminal, type IBuffer, type IBufferNamespace, type IBufferLine } from '@xterm/xterm'
 import {
   TerminalInstance,
   XTERM_THEMES,
 } from '../../../../src/renderer/components/terminal/TerminalSession'
 import { MAX_WEBGL_CONTEXTS } from '../../../../src/renderer/terminal/webgl-contexts'
+import { installElectronApi } from '../../../support/electron-api'
+import { partialFake } from '../../../support/fakes'
 
 const mockResizeObserver = vi.fn().mockImplementation(function () {
   return {
@@ -113,16 +115,13 @@ const mockSetSessionIdle = vi.fn()
 const ACTIVITY_HOOKS = { onBusy: () => mockSetSessionBusy(), onIdle: () => mockSetSessionIdle() }
 
 // Mock canvas getContext so character-width measurement works under jsdom
-const mockMeasureText = vi.fn().mockReturnValue({ width: 8 })
-const mockFakeCtx = {
+const mockMeasureText = vi.fn(() => partialFake<TextMetrics>({ width: 8 }))
+const mockFakeCtx = partialFake<CanvasRenderingContext2D>({
   font: '',
   fillStyle: '',
   measureText: mockMeasureText,
-  toJSON: vi.fn(),
-}
-vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(
-  () => mockFakeCtx as unknown as CanvasRenderingContext2D
-)
+})
+vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => mockFakeCtx)
 
 const mockSubscribe = vi.fn()
 const mockAttach = vi.fn()
@@ -143,12 +142,11 @@ beforeEach(async () => {
   budgetHolder.current = new WebglContextBudget(MAX_WEBGL_CONTEXTS)
   mockPlatform = 'MacIntel'
   vi.clearAllMocks()
-  mockMeasureText.mockReturnValue({ width: 8 })
   mockSubscribe.mockReturnValue(mockUnsubscribe)
   mockAttach.mockResolvedValue({ released: false })
   mockOpenExternal.mockResolvedValue({ ok: true })
   mockOpenPath.mockResolvedValue({ ok: true })
-  ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
+  installElectronApi({
     terminal: {
       input: mockInput,
       resize: mockResize,
@@ -158,8 +156,16 @@ beforeEach(async () => {
       openExternal: mockOpenExternal,
       openPath: mockOpenPath,
     },
-  }
+  })
 })
+
+/** Puts a screen of `rows` rows from `buffer` behind the instance's (faked) xterm. */
+function showScreen(instance: TerminalInstance, rows: number, buffer: Partial<IBuffer>): void {
+  Object.defineProperty(instance.terminal, 'rows', { value: rows })
+  Object.defineProperty(instance.terminal, 'buffer', {
+    value: partialFake<IBufferNamespace>({ active: partialFake<IBuffer>(buffer) }),
+  })
+}
 
 describe('TerminalInstance', () => {
   it('pastes \\n when Cmd+Enter is pressed via custom key handler', () => {
@@ -306,11 +312,10 @@ describe('TerminalInstance', () => {
   it('reads the visible screen as one string per row, trailing spaces trimmed', () => {
     const instance = new TerminalInstance('ses-1', 1000)
     const translate = vi.fn((trimRight?: boolean) => (trimRight ? 'row' : 'row   '))
-    const getLine = vi.fn((_line: number) => ({ translateToString: translate }))
-    ;(instance.terminal as unknown as { rows: number }).rows = 3
-    ;(instance.terminal as unknown as { buffer: unknown }).buffer = {
-      active: { viewportY: 40, getLine },
-    }
+    const getLine = vi.fn((_line: number) =>
+      partialFake<IBufferLine>({ translateToString: translate })
+    )
+    showScreen(instance, 3, { viewportY: 40, getLine })
     expect(instance.readVisibleRows()).toEqual(['row', 'row', 'row'])
     expect(getLine.mock.calls.map((c) => c[0])).toEqual([40, 41, 42])
   })
@@ -323,10 +328,7 @@ describe('TerminalInstance', () => {
 
   it('reads a missing buffer line as an empty row', () => {
     const instance = new TerminalInstance('ses-1', 1000)
-    ;(instance.terminal as unknown as { rows: number }).rows = 2
-    ;(instance.terminal as unknown as { buffer: unknown }).buffer = {
-      active: { viewportY: 0, getLine: () => undefined },
-    }
+    showScreen(instance, 2, { viewportY: 0, getLine: () => undefined })
     expect(instance.readVisibleRows()).toEqual(['', ''])
   })
 
@@ -770,12 +772,28 @@ describe('TerminalInstance', () => {
   })
 
   describe('link interaction (hover overlay + cmd+click)', () => {
-    // charW=8 (mocked measureText), lineHeight=ceil(13*1.2)=16, viewportY=0
-    // getBoundingClientRect() returns {left:0,top:0,...} in jsdom, so clientX/Y == relX/Y
+    // xterm draws 80 × 24 cells of 8 × 16 px from the screen's top left, which
+    // jsdom puts at 0,0 along with the terminal's element; viewportY=0.
+
+    /** Gives the mocked terminal the `.xterm-screen` xterm sizes to its cells. */
+    function drawScreen(
+      termMock: Record<string, unknown>,
+      cell: { width: number; height: number },
+      screen = { left: 0, top: 0 }
+    ) {
+      const screenElement = document.createElement('div')
+      screenElement.className = 'xterm-screen'
+      screenElement.getBoundingClientRect = () =>
+        new DOMRect(screen.left, screen.top, 80 * cell.width, 24 * cell.height)
+      const xtermElement = document.createElement('div')
+      xtermElement.appendChild(screenElement)
+      Object.assign(termMock, { element: xtermElement, rows: 24, cols: 80 })
+    }
 
     function makeInstanceWithLine(lineText: string) {
       const instance = new TerminalInstance('ses-link', 1000)
       const termMock = vi.mocked(Terminal).mock.results.at(-1)!.value
+      drawScreen(termMock, { width: 8, height: 16 })
       Object.defineProperty(termMock, 'buffer', {
         value: makeMockBuffer(24, 80, lineText, 0),
         configurable: true,
@@ -1049,11 +1067,98 @@ describe('TerminalInstance', () => {
         expect(mockOpenPath).not.toHaveBeenCalled()
       })
 
+      it('neither underlines nor opens before xterm has drawn a screen', () => {
+        const instance = new TerminalInstance('ses-unopened', 1000)
+        const termMock = vi.mocked(Terminal).mock.results.at(-1)!.value
+        Object.defineProperty(termMock, 'buffer', {
+          value: makeMockBuffer(24, 80, 'https://example.com', 0),
+          configurable: true,
+        })
+        fire(instance.element, 'mousemove', { metaKey: true, clientX: 8, clientY: 0 })
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Meta', bubbles: true }))
+        fire(instance.element, 'mousedown', { metaKey: true, clientX: 8, clientY: 0 })
+        expect(instance.linkOverlay?.style.display).toBe('none')
+        expect(mockOpenExternal).not.toHaveBeenCalled()
+      })
+
       it('removes listeners on dispose — no action after dispose', () => {
         const instance = makeInstanceWithLine('https://example.com')
         instance.dispose()
         fire(instance.element, 'mousedown', { metaKey: true, clientX: 8, clientY: 0 })
         expect(mockOpenExternal).not.toHaveBeenCalled()
+      })
+    })
+
+    // The WebGL renderer leaves no `.xterm-rows` to measure, and xterm draws
+    // its cells from `.xterm-screen`, inside the padding the pane gives `.xterm`.
+    describe('on the cells xterm draws', () => {
+      const CELL = { width: 7, height: 18 }
+
+      function makeDrawnTerminal(lines: Record<number, string>, screen = { left: 0, top: 0 }) {
+        const instance = new TerminalInstance('ses-drawn', 1000)
+        const termMock = vi.mocked(Terminal).mock.results.at(-1)!.value
+        drawScreen(termMock, CELL, screen)
+        Object.defineProperty(termMock, 'buffer', {
+          value: {
+            active: {
+              viewportY: 0,
+              getLine: (row: number) => ({ translateToString: () => lines[row] ?? '' }),
+            },
+          },
+          configurable: true,
+        })
+        return instance
+      }
+
+      const atCell = (col: number, row: number, screen = { left: 0, top: 0 }) => ({
+        metaKey: true,
+        clientX: screen.left + (col + 0.5) * CELL.width,
+        clientY: screen.top + (row + 0.5) * CELL.height,
+      })
+
+      it('opens the link on the row clicked, at the height xterm draws its rows', () => {
+        const instance = makeDrawnTerminal({ 5: 'https://example.com/row-five' })
+        fire(instance.element, 'mousedown', atCell(2, 5))
+        expect(mockOpenExternal).toHaveBeenCalledWith('https://example.com/row-five')
+      })
+
+      it('counts rows and columns from where the screen starts, inside the padding', () => {
+        const padding = { left: 12, top: 6 }
+        const instance = makeDrawnTerminal({ 0: '/tmp/notes.txt' }, padding)
+        fire(instance.element, 'mousedown', {
+          ...atCell(0, 0, padding),
+          clientY: padding.top + CELL.height - 1,
+        })
+        expect(mockOpenPath).toHaveBeenCalledWith('/tmp/notes.txt')
+      })
+
+      it('opens nothing on a row past the end of the buffer', () => {
+        const instance = makeDrawnTerminal({})
+        const termMock = vi.mocked(Terminal).mock.results.at(-1)!.value
+        termMock.buffer.active.getLine = () => undefined
+        fire(instance.element, 'mousedown', atCell(0, 0))
+        expect(mockOpenExternal).not.toHaveBeenCalled()
+        expect(mockOpenPath).not.toHaveBeenCalled()
+      })
+
+      it('swallows a refusal to open, so a click never throws', async () => {
+        mockOpenExternal.mockRejectedValueOnce(new Error('no browser'))
+        mockOpenPath.mockRejectedValueOnce(new Error('no app'))
+        const instance = makeDrawnTerminal({ 0: 'https://example.com', 1: '/tmp/a.txt' })
+        fire(instance.element, 'mousedown', atCell(0, 0))
+        fire(instance.element, 'mousedown', atCell(0, 1))
+        await Promise.resolve()
+        expect(mockOpenExternal).toHaveBeenCalledWith('https://example.com')
+        expect(mockOpenPath).toHaveBeenCalledWith('/tmp/a.txt')
+      })
+
+      it('underlines the link at the row and columns xterm draws it in', () => {
+        const padding = { left: 12, top: 6 }
+        const instance = makeDrawnTerminal({ 3: 'see https://example.com' }, padding)
+        fire(instance.element, 'mousemove', atCell(5, 3, padding))
+        expect(instance.linkOverlay?.style.left).toBe(`${12 + 4 * CELL.width}px`)
+        expect(instance.linkOverlay?.style.top).toBe(`${6 + 4 * CELL.height - 1}px`)
+        expect(instance.linkOverlay?.style.width).toBe(`${19 * CELL.width}px`)
       })
     })
   })

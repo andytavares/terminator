@@ -110,11 +110,6 @@ describe('App', () => {
     fireEvent.change(screen.getByPlaceholderText('Password'), { target: { value: 'pw' } })
     fireEvent.click(screen.getByRole('button', { name: 'Connect' }))
     await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/mobile/?t=mob-tok'))
-    const [[, mobileTicketOpts]] = mockFetch.mock.calls.slice(-1) as [[string, RequestInit]]
-    expect(
-      (mobileTicketOpts as RequestInit & { url?: string }) || mockFetch.mock.calls[1][0]
-    ).toBeTruthy()
-    // Verify mobile-ticket endpoint was called (second fetch call)
     expect(mockFetch.mock.calls[1][0]).toBe('/api/mobile-ticket')
     Object.defineProperty(window, 'innerWidth', { value: 1024, configurable: true })
   })

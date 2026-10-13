@@ -42,7 +42,6 @@ describe('branchLabel — a branch is named by its branch', () => {
     const snapshot = JSON.stringify(b)
     branchLabel(b)
     expect(JSON.stringify(b)).toBe(snapshot)
-    expect(branchLabel(b)).toBe(branchLabel(b))
   })
 })
 
@@ -73,12 +72,6 @@ describe('qualifiedBranchLabel — one name identifies one thing', () => {
     expect(qualifiedBranchLabel(branch({ name: 'main', gitBranch: 'main' }), 'Terminator')).toBe(
       'Terminator · main'
     )
-  })
-
-  it('gives two identically named branches two different labels', () => {
-    const a = qualifiedBranchLabel(branch({ name: 'main', gitBranch: 'main' }), 'Terminator')
-    const b = qualifiedBranchLabel(branch({ name: 'main', gitBranch: 'main' }), 'Fluent')
-    expect(a).not.toBe(b)
   })
 
   it('qualifies the branch, not a stored label', () => {

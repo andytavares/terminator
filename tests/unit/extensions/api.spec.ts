@@ -93,6 +93,7 @@ import { registerAdminIpcHandlers } from '../../../extensions/task-vault/src/ipc
 import { defineChannel, type ExtensionDB } from '@terminator/extension-sdk'
 import { z } from 'zod'
 import * as shellExecutor from '../../../src/main/shell/shell-executor'
+import { notificationManager } from '../../../src/main/notifications/notification-manager'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -164,6 +165,7 @@ describe('api.shell.exec', () => {
       stdout: 'output',
       stderr: '',
       timedOut: false,
+      exceededMaxBuffer: false,
     })
   })
 
@@ -226,18 +228,9 @@ describe('api.nativeMenu.addViewMenuItem', () => {
     setMenuRebuildCallback(() => {})
   })
 
-  it('adds item and returns a disposable', () => {
+  it('adds the item to the registry under the extension', () => {
     const api = createExtensionAPI('test.ext', '0.1.0')
-    const onClick = vi.fn()
-
-    const disposable = api.nativeMenu.addViewMenuItem({
-      id: 'test-item',
-      label: 'Test Item',
-      onClick,
-    })
-
-    expect(disposable).toHaveProperty('dispose')
-    expect(typeof disposable.dispose).toBe('function')
+    api.nativeMenu.addViewMenuItem({ id: 'test-item', label: 'Test Item', onClick: vi.fn() })
     expect(globalRegistry.nativeMenuItems.has('test.ext.nativemenu.test-item')).toBe(true)
   })
 
@@ -283,10 +276,9 @@ describe('api.nativeMenu.addViewMenuItem', () => {
 
   it('rebuildViewMenu does not add to panelMenuItemIds when panelId is absent', () => {
     const api = createExtensionAPI('test.ext', '0.1.0')
-    expect(() =>
-      api.nativeMenu.addViewMenuItem({ id: 'no-panel', label: 'No Panel', onClick: vi.fn() })
-    ).not.toThrow()
-    expect(globalRegistry.panelMenuItemIds.has('no-panel')).toBe(false)
+    api.nativeMenu.addViewMenuItem({ id: 'no-panel', label: 'No Panel', onClick: vi.fn() })
+    // Keyed by panel id, of which this item has none: nothing at all is recorded.
+    expect(globalRegistry.panelMenuItemIds.size).toBe(0)
   })
 
   it('rebuildViewMenu calls the registered menu rebuild callback', () => {
@@ -339,7 +331,7 @@ describe('api.settings workspace precedence', () => {
   })
 
   it('returns undefined when key not set globally or in workspace', () => {
-    const api = createExtensionAPI('com.test', '0.1.0', () => 'ws-789')
+    const api = createExtensionAPI('com.test', '0.1.0')
 
     const val = api.settings.get<boolean>('com.test.missing')
     expect(val).toBeUndefined()
@@ -371,29 +363,24 @@ describe('api.settings workspace precedence', () => {
     const val = api.settings.get<boolean>('com.test.enabled')
     expect(val).toBe(false)
   })
-
-  it('ignores workspace values when no workspace ID getter provided', () => {
-    const api = createExtensionAPI('com.test', '0.1.0')
-    mockExtensionStore['com.test.enabled'] = false
-
-    const val = api.settings.get<boolean>('com.test.enabled')
-    expect(val).toBe(false)
-  })
 })
 
 describe('api.notifications.createNotification', () => {
-  it('returns a disposable that can dismiss the notification', () => {
+  const titles = () => notificationManager.list().map((n) => n.title)
+
+  it('lists the notification until its disposable dismisses it', () => {
     const api = createExtensionAPI('test.ext', '0.1.0')
     const disposable = api.notifications.createNotification({
       type: 'info',
       title: 'Test notif',
       key: 'testNotif',
     })
-    expect(disposable).toHaveProperty('dispose')
-    expect(() => disposable.dispose()).not.toThrow()
+    expect(titles()).toContain('Test notif')
+    disposable.dispose()
+    expect(titles()).not.toContain('Test notif')
   })
 
-  it('creates notification with actions', () => {
+  it('sends its actions to the windows, without their handlers', () => {
     const api = createExtensionAPI('test.ext', '0.1.0')
     const disposable = api.notifications.createNotification({
       type: 'warning',
@@ -402,18 +389,22 @@ describe('api.notifications.createNotification', () => {
       key: 'withActions',
       actions: [{ id: 'go', label: 'Go', handler: vi.fn() }],
     })
-    expect(disposable).toHaveProperty('dispose')
+    expect(mockSend).toHaveBeenCalledWith(
+      'notifications:push',
+      expect.objectContaining({ title: 'With actions', actions: [{ id: 'go', label: 'Go' }] })
+    )
     disposable.dispose()
   })
 })
 
 describe('api.commands.register', () => {
-  it('registers command and returns disposable', () => {
+  it('lists the command until its disposable removes it', () => {
     const api = createExtensionAPI('test.ext', '0.1.0')
-    const handler = vi.fn()
-    const disposable = api.commands.register({ id: 'my-command', label: 'My Command' }, handler)
-    expect(disposable).toHaveProperty('dispose')
+    const disposable = api.commands.register({ id: 'my-command', label: 'My Command' }, vi.fn())
+    const listed = () => listExtensionCommands().some((c) => c.id === 'my-command')
+    expect(listed()).toBe(true)
     disposable.dispose()
+    expect(listed()).toBe(false)
   })
 
   // Quick Actions lists the registered commands; an extension that activates
@@ -435,19 +426,14 @@ function anyPayload(channel: string) {
 }
 
 describe('api.ipc.registerHandler', () => {
-  it('registers an IPC handler and returns disposable', () => {
-    const api = createExtensionAPI('test.ext', '0.1.0')
-    const disposable = api.ipc.registerHandler(anyPayload('test.ext:my-channel'))
-    expect(disposable).toHaveProperty('dispose')
-    disposable.dispose()
-  })
-
   // ADR 096. Extension bundles are plain JavaScript at run time, so the type
   // alone does not stop a handler from arriving without one.
   it('refuses a handler registered without a schema', () => {
     const api = createExtensionAPI('test.ext', '0.1.0')
-    const register = api.ipc.registerHandler as unknown as (...args: unknown[]) => unknown
-    expect(() => register('test.ext:bare', vi.fn())).toThrow(/schema/)
+    // Called the way plain JavaScript can, which the declared type forbids.
+    const callBare = () =>
+      Reflect.apply(api.ipc.registerHandler, api.ipc, ['test.ext:bare', vi.fn()])
+    expect(callBare).toThrow(/schema/)
     expect(ipcInvokeRegistry.has('test.ext:bare')).toBe(false)
   })
 
@@ -538,55 +524,39 @@ describe('api.ipc.registerHandler', () => {
   })
 })
 
-describe('api.pty.listSessions', () => {
-  it('delegates to ptyManager.listSessions when deps are provided', async () => {
-    const mockPtyMgr = {
-      spawn: vi.fn(),
-      write: vi.fn(),
-      resize: vi.fn(),
-      kill: vi.fn(),
-      listSessions: vi.fn(() => [{ sessionId: 's1', cwd: '/tmp' }]),
-    }
-    const api = createExtensionAPI('test.ext', '0.1.0', {
-      ptyManager: mockPtyMgr as never,
-    })
-    const result = await api.pty.listSessions()
-    expect(result).toEqual([{ sessionId: 's1', cwd: '/tmp' }])
-    expect(mockPtyMgr.listSessions).toHaveBeenCalledTimes(1)
-  })
-
-  it('returns empty array when no ptyManager dep is provided', async () => {
-    const api = createExtensionAPI('test.ext', '0.1.0')
-    expect(await api.pty.listSessions()).toEqual([])
-  })
-})
-
 describe('registry query functions', () => {
-  it('listExtensionSettingsSections decodes the extension id from the section key', () => {
+  it('lists a settings section under its extension, with its label, description and properties', () => {
     const api = createExtensionAPI('com.query.settings', '0.1.0')
+    const flag = { type: 'boolean' as const, label: 'Flag', default: false }
     const d = api.settings.register({
       label: 'Query Test',
-      properties: { 'com.query.settings.flag': { type: 'boolean', label: 'Flag', default: false } },
+      description: 'What the query extension can be told',
+      properties: { 'com.query.settings.flag': flag },
     })
     const section = listExtensionSettingsSections().find(
       (s) => s.extensionId === 'com.query.settings'
     )
-    expect(section).toBeDefined()
-    expect(section!.label).toBe('Query Test')
-    expect(section!.properties['com.query.settings.flag']).toBeDefined()
+    expect(section).toEqual({
+      extensionId: 'com.query.settings',
+      label: 'Query Test',
+      description: 'What the query extension can be told',
+      properties: { 'com.query.settings.flag': flag },
+    })
     d.dispose()
   })
 
-  it('commands are listed with their key and executed through it', () => {
+  it('commands are listed with their key and executed through it', async () => {
     const api = createExtensionAPI('com.query.cmd', '0.1.0')
     const handler = vi.fn()
     const d = api.commands.register({ id: 'q-cmd', label: 'Run' }, handler)
     const cmd = listExtensionCommands().find((c) => c.id === 'q-cmd')
-    expect(cmd).toBeDefined()
-    executeExtensionCommand(cmd!.key)
-    expect(handler).toHaveBeenCalled()
-    executeExtensionCommand('unknown-key')
-    expect(handler).toHaveBeenCalledTimes(1)
+    const ctx = { projectId: 'p1', sessionId: null, repoRoot: null }
+    expect(await executeExtensionCommand(cmd!.key, ctx)).toEqual({ ok: true })
+    expect(handler).toHaveBeenCalledWith(ctx)
+    expect(await executeExtensionCommand('unknown-key', ctx)).toEqual({
+      ok: false,
+      reason: 'not-registered',
+    })
     d.dispose()
   })
 

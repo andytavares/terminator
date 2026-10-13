@@ -135,17 +135,9 @@ test('Re-initialize in Settings reapplies the schema and reports success', async
   await taskVaultSettingsAction('Re-initialize')
   await expect
     .poll(async () =>
-      (
-        await handle.page.evaluate(() =>
-          (
-            window as unknown as {
-              electronAPI: {
-                notifications: { list(): Promise<{ title: string; message?: string }[]> }
-              }
-            }
-          ).electronAPI.notifications.list()
-        )
-      ).map((notification) => `${notification.title}: ${notification.message}`)
+      (await handle.page.evaluate(() => window.electronAPI.notifications.list())).map(
+        (notification) => `${notification.title}: ${notification.message}`
+      )
     )
     .toContain('Re-initialize: Done')
   // The vault still works on the re-initialised database.

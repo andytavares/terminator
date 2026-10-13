@@ -58,15 +58,15 @@ export async function syncSessionContext(
   service: IssueService
 ): Promise<AgentContext | null> {
   const record = listRecords().find((r) => r.sessionId === sessionId)
-  const link = record?.link ?? null
 
-  if (link === null) {
+  if (!record?.link) {
     await deleteSessionContext(sessionId)
     return null
   }
 
+  const { link } = record
   const issue = await service.get(link.tracker, link.key).catch(() => null)
-  const context = buildAgentContext(record?.projectId ?? sessionId, issue)
+  const context = buildAgentContext(record.projectId, issue)
   if (context === null) return null
 
   await writeSessionContext(sessionId, context)

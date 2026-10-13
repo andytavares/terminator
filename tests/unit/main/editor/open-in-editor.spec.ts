@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from 'vitest'
 
 const execFile = vi.fn()
 const access = vi.fn()
@@ -29,8 +29,13 @@ afterAll(() => {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  process.env.PATH = '/usr/local/bin:/usr/bin'
+  // Stubbed, so the worker's own PATH is back for the next spec file.
+  vi.stubEnv('PATH', '/usr/local/bin:/usr/bin')
   execFile.mockImplementation((_c: string, _a: string[], cb: (e: Error | null) => void) => cb(null))
+})
+
+afterEach(() => {
+  vi.unstubAllEnvs()
 })
 
 describe('detectEditor', () => {
@@ -65,7 +70,7 @@ describe('detectEditor', () => {
   })
 
   it('survives an empty PATH', async () => {
-    process.env.PATH = ''
+    vi.stubEnv('PATH', '')
     present('/Applications/Cursor.app')
     expect((await detectEditor())?.id).toBe('cursor')
   })

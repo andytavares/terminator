@@ -1,5 +1,5 @@
 import React from 'react'
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { useSettingsStore } from '../../../../src/renderer/stores/settings.store'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
@@ -7,6 +7,7 @@ import { WorkspaceSettings } from '../../../../src/renderer/components/settings/
 import { seedStore, workspaceOf } from '../../../support/renderer-stores'
 import { DEFAULT_GLOBAL_SETTINGS } from '../../../../src/shared/schemas/settings.schema'
 import type { GlobalSettings as GlobalSettingsValue } from '../../../../src/shared/types'
+import { installElectronApi } from '../../../support/electron-api'
 
 const mockUpdateTheme = vi.fn()
 const mockUpdateScrollback = vi.fn()
@@ -30,9 +31,9 @@ beforeEach(() => {
   vi.clearAllMocks()
   mockLoadSettings.mockResolvedValue(undefined)
   mockUpdateWorkspace.mockResolvedValue(undefined)
-  ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
+  installElectronApi({
     settings: { updateWorkspace: mockUpdateWorkspace },
-  }
+  })
   seedStore(useSettingsStore, {
     globalSettings,
     workspaceSettings: new Map(),
@@ -46,10 +47,6 @@ beforeEach(() => {
   seedStore(useWorkspaceStore, {
     workspaces: [workspaceOf({ id: 'ws-1', name: 'My Workspace' })],
   })
-})
-
-afterEach(() => {
-  delete (globalThis as unknown as Record<string, unknown>).electronAPI
 })
 
 describe('WorkspaceSettings', () => {

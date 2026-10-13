@@ -1,9 +1,10 @@
 import { test, expect, chromium, type Browser, type Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 import { build } from 'esbuild'
-import { readFileSync, readdirSync, mkdirSync, statSync } from 'node:fs'
+import { mkdirSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { cssFiles, extensionBaseCss } from './extension-base-css'
 
 // WCAG 2.1 AA contrast gate for the git-integration surfaces, in both themes.
 // It renders the real components with fixture data in plain Chromium (no
@@ -15,22 +16,6 @@ import { fileURLToPath } from 'node:url'
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 const COMPONENTS = join(ROOT, 'extensions/git-integration/src/components')
 const SHOTS = join(ROOT, 'test-results/git-integration-contrast')
-
-// The stylesheet core injects into every extension view (EXTENSION_BASE_CSS).
-function baseCss(): string {
-  const ui = join(ROOT, 'packages/extension-ui/src')
-  return ['tokens.css', 'extension-base.css']
-    .map((f) => readFileSync(join(ui, f), 'utf8'))
-    .join('\n')
-}
-
-function cssFiles(dir: string): string[] {
-  return readdirSync(dir).flatMap((name) => {
-    const p = join(dir, name)
-    if (statSync(p).isDirectory()) return cssFiles(p)
-    return name.endsWith('.css') ? [p] : []
-  })
-}
 
 // Computed in the page: composite every translucent layer from `el` up onto the
 // first opaque one. Chromium reports color-mix() as color(srgb r g b / a).
@@ -169,11 +154,11 @@ for (const theme of ['dark', 'light'] as const) {
         const themeAttr = theme === 'light' ? ' data-theme="light"' : ''
         await page.setContent(
           `<!doctype html><html lang="en"${themeAttr}><head><meta charset="utf-8"><title>${surface.name}</title>` +
-            `<style>${baseCss()}</style><style>${bundleCss}</style></head><body><div id="app"></div></body></html>`
+            `<style>${extensionBaseCss(ROOT)}</style><style>${bundleCss}</style></head><body><div id="app"></div></body></html>`
         )
         await page.evaluate(
           (n) => {
-            ;(window as unknown as { __SURFACE__: string }).__SURFACE__ = n
+            window.__SURFACE__ = n
           },
           surface.name.replace('-mine', '')
         )

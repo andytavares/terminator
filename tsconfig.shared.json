@@ -10,6 +10,7 @@
     "isolatedModules": true,
     "noEmit": true,
     "skipLibCheck": true,
+    "types": ["node"],
     "outDir": "out/shared",
     "rootDir": "src/shared"
   },

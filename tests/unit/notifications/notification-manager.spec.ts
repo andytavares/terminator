@@ -200,10 +200,17 @@ describe('NotificationManager.create — settings-driven target resolution', () 
     Object.defineProperty(process, 'platform', { value: originalPlatform, configurable: true })
   })
 
-  it('registers a failed handler on the system notification', () => {
+  it('logs a system notification the operating system failed to show', () => {
     withDefaultTargets('system')
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     notificationManager.create({ type: 'info', title: 'Sys', key: 'sysFailKey' })
-    expect(mockNotificationOn).toHaveBeenCalledWith('failed', expect.any(Function))
+    const failed = mockNotificationOn.mock.calls.find((c) => c[0] === 'failed')![1]
+    failed({}, 'denied by the user')
+    expect(warn).toHaveBeenCalledWith(
+      '[notifications] system notification failed:',
+      'denied by the user'
+    )
+    warn.mockRestore()
   })
 
   it('wires the first action handler to the system notification click event', () => {
@@ -312,8 +319,7 @@ describe('NotificationManager.create — broadcast', () => {
 
 describe('NotificationManager.list', () => {
   it('returns empty array when no notifications exist', () => {
-    const result = notificationManager.list()
-    expect(Array.isArray(result)).toBe(true)
+    expect(notificationManager.list()).toEqual([])
   })
 
   it('returns created notifications', () => {
@@ -396,7 +402,7 @@ describe('taking you to the thing a notification is about', () => {
 
   it('leaves a bare report unclickable, rather than a link to nowhere', () => {
     notificationManager.create({ type: 'info', title: 'Area archived', key: 'k' })
-    expect(notificationManager.list()[0].clickable).toBeFalsy()
+    expect(notificationManager.list()[0].clickable).toBe(false)
   })
 
   it('does not render the destination as a button beside the real answers', () => {

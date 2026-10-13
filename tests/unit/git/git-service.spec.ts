@@ -1,32 +1,27 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { promisify } from 'node:util'
 
-// git-service.ts does: const execFile = promisify(execFileCb)
-// Node's real execFile has a [util.promisify.custom] symbol that makes promisify
-// resolve with {stdout, stderr}. Our mock must replicate that by attaching a
-// vi.fn() to the well-known symbol so util.promisify delegates to it.
+// git-service.ts runs `promisify(execFile)`. Node's execFile carries a
+// [util.promisify.custom] function that resolves with { stdout, stderr };
+// the fake carries one too, and it is the function every case drives.
+type PromisifiedExecFile = (
+  command: string,
+  args: string[],
+  options: { cwd: string }
+) => Promise<{ stdout: string; stderr: string }>
+const execFileCustom = vi.hoisted(() => vi.fn<PromisifiedExecFile>())
+const customMock = () => execFileCustom
 
-const PROMISIFY_CUSTOM = Symbol.for('nodejs.util.promisify.custom')
+vi.mock('child_process', () => ({
+  execFile: Object.assign(vi.fn(), { [promisify.custom]: execFileCustom }),
+}))
 
-const { execFileMock } = vi.hoisted(() => {
-  const CUSTOM = Symbol.for('nodejs.util.promisify.custom')
-  const execFileMock = vi.fn()
-  ;(execFileMock as unknown as Record<symbol, ReturnType<typeof vi.fn>>)[CUSTOM] = vi.fn()
-  return { execFileMock }
-})
-
-vi.mock('child_process', () => ({ execFile: execFileMock }))
-
-// Convenience helpers — update the promisify.custom mock (the path actually invoked)
 function mockResolve(stdout: string) {
-  ;(execFileMock as unknown as Record<symbol, ReturnType<typeof vi.fn>>)[
-    PROMISIFY_CUSTOM
-  ].mockResolvedValue({ stdout, stderr: '' })
+  customMock().mockResolvedValue({ stdout, stderr: '' })
 }
 
 function mockReject(message: string) {
-  ;(execFileMock as unknown as Record<symbol, ReturnType<typeof vi.fn>>)[
-    PROMISIFY_CUSTOM
-  ].mockRejectedValue(new Error(message))
+  customMock().mockRejectedValue(new Error(message))
 }
 
 import {
@@ -42,9 +37,6 @@ import {
   removeWorktree,
   getChangeStats,
 } from '../../../src/main/git/git-service'
-
-const customMock = () =>
-  (execFileMock as unknown as Record<symbol, ReturnType<typeof vi.fn>>)[PROMISIFY_CUSTOM]
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -94,7 +86,7 @@ describe('listBranches', () => {
   // remote-tracking ones under refs/remotes/<remote>/. `git remote` answers
   // second.
   function mockRefs(refs: string, remotes = 'origin\nupstream\n') {
-    customMock().mockImplementation((_cmd: string, args: string[]) =>
+    customMock().mockImplementation((_cmd, args) =>
       Promise.resolve({ stdout: args[0] === 'remote' ? remotes : refs, stderr: '' })
     )
   }
@@ -189,9 +181,7 @@ describe('checkoutBranch', () => {
   it('calls git checkout with the branch name', async () => {
     mockResolve('')
     await checkoutBranch('/repo', 'feature/new')
-    const args: string[] = customMock().mock.calls[0][1]
-    expect(args).toContain('checkout')
-    expect(args).toContain('feature/new')
+    expect(customMock().mock.calls[0][1]).toEqual(['checkout', 'feature/new'])
   })
 })
 
@@ -209,7 +199,9 @@ describe('suggestWorktreePath', () => {
   })
 
   it('replaces slashes, backslashes, colons, and spaces in branch name', () => {
-    expect(suggestWorktreePath('/repo', 'feat/my branch:v2')).toContain('feat-my-branch-v2')
+    expect(suggestWorktreePath('/repo', 'feat\\my branch:v2')).toBe(
+      '/repo/.worktrees/feat-my-branch-v2'
+    )
   })
 })
 
@@ -251,17 +243,19 @@ describe('createWorktree', () => {
   it('uses -b flag when creating a new branch', async () => {
     mockResolve('')
     await createWorktree('/repo', '/worktrees/new-feature', 'new-feature', true)
-    const args: string[] = customMock().mock.calls[0][1]
-    expect(args).toContain('-b')
-    expect(args).toContain('new-feature')
+    expect(customMock().mock.calls[0][1]).toEqual([
+      'worktree',
+      'add',
+      '-b',
+      'new-feature',
+      '/worktrees/new-feature',
+    ])
   })
 
   it('does not use -b flag for existing branch', async () => {
     mockResolve('')
     await createWorktree('/repo', '/worktrees/main', 'main', false)
-    const args: string[] = customMock().mock.calls[0][1]
-    expect(args).not.toContain('-b')
-    expect(args).toContain('main')
+    expect(customMock().mock.calls[0][1]).toEqual(['worktree', 'add', '/worktrees/main', 'main'])
   })
 })
 
@@ -271,10 +265,12 @@ describe('removeWorktree', () => {
   it('calls git worktree remove --force', async () => {
     mockResolve('')
     await removeWorktree('/repo', '/worktrees/old-feature')
-    const args: string[] = customMock().mock.calls[0][1]
-    expect(args).toContain('remove')
-    expect(args).toContain('--force')
-    expect(args).toContain('/worktrees/old-feature')
+    expect(customMock().mock.calls[0][1]).toEqual([
+      'worktree',
+      'remove',
+      '--force',
+      '/worktrees/old-feature',
+    ])
   })
 })
 

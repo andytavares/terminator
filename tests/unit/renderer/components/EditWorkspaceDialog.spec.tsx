@@ -1,21 +1,22 @@
 import React from 'react'
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { EditWorkspaceDialog } from '../../../../src/renderer/components/sidebar/EditWorkspaceDialog'
-import type { Workspace } from '../../../../src/shared/types/index'
+import type { ElectronAPI } from '../../../../src/shared/electron-api/api-type'
+import { UpdateWorkspaceInputSchema } from '../../../../src/shared/schemas/workspace.schema'
 import { workspaceOf } from '../../../support/renderer-stores'
+import { installElectronApi } from '../../../support/electron-api'
 
-const mockOpenDirectory = vi.fn()
+const mockOpenDirectory = vi.fn<ElectronAPI['dialog']['openDirectory']>()
 /** The main process's answer to an update: the workspace as written. */
-const mockUpdateWorkspace = vi.fn(
-  async (input: Partial<Workspace>): Promise<{ workspace: Workspace } | { error: string }> => ({
-    workspace: { ...ws, ...input },
-  })
-)
+const mockUpdateWorkspace = vi.fn<ElectronAPI['workspace']['update']>(async (payload) => ({
+  workspace: { ...ws, ...UpdateWorkspaceInputSchema.parse(payload) },
+}))
 
+const WS_ID = '00000000-0000-4000-8000-000000000001'
 const ws = workspaceOf({
-  id: 'ws-1',
+  id: WS_ID,
   name: 'My Work',
   folderPath: '/home/work',
   tags: ['tag1'],
@@ -24,15 +25,11 @@ const ws = workspaceOf({
 beforeEach(() => {
   vi.clearAllMocks()
   mockOpenDirectory.mockResolvedValue({ filePath: '/new/path' })
-  ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
+  installElectronApi({
     dialog: { openDirectory: mockOpenDirectory },
     workspace: { update: mockUpdateWorkspace },
-  }
+  })
   useWorkspaceStore.setState({ ...useWorkspaceStore.getInitialState(), workspaces: [ws] })
-})
-
-afterEach(() => {
-  delete (globalThis as unknown as Record<string, unknown>).electronAPI
 })
 
 describe('EditWorkspaceDialog', () => {
@@ -63,7 +60,7 @@ describe('EditWorkspaceDialog', () => {
     fireEvent.click(screen.getByText('Save'))
     await vi.waitFor(() =>
       expect(useWorkspaceStore.getState().workspaces).toEqual([
-        expect.objectContaining({ id: 'ws-1', name: 'New Name', folderPath: '/home/work' }),
+        expect.objectContaining({ id: WS_ID, name: 'New Name', folderPath: '/home/work' }),
       ])
     )
   })

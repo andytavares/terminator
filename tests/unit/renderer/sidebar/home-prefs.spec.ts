@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import {
   DEFAULT_HOME_PREFS,
   HOME_PREFS_KEY,
@@ -16,6 +16,10 @@ beforeEach(() => {
   })
 })
 
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
+
 describe('loadHomePrefs', () => {
   it('opens on the Ledger, grouped by workspace and project, needs-you first', () => {
     expect(loadHomePrefs()).toEqual({
@@ -26,7 +30,6 @@ describe('loadHomePrefs', () => {
       previewSelected: true,
       hideExited: false,
     })
-    expect(DEFAULT_HOME_PREFS.layout).toBe('ledger')
   })
 
   it('reads back what was saved', () => {

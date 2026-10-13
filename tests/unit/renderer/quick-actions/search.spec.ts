@@ -24,8 +24,10 @@ describe('searchActions', () => {
   })
 
   it('matches through the group label', () => {
-    const results = searchActions(actions, groups, 'push', 50)
-    expect(results.map((a) => a.id)).toContain('git.push')
+    // Neither git label contains "git"; the group label does. "Split right
+    // terminal" holds g, i and t in order, so it matches as a subsequence.
+    const results = searchActions(actions, groups, 'git', 50)
+    expect(results.map((a) => a.id)).toEqual(['git.push', 'git.pull', 'terminal.split'])
   })
 
   it('matches through the description', () => {
@@ -59,6 +61,6 @@ describe('searchActions', () => {
 
   it('respects the limit', () => {
     const results = searchActions(actions, groups, 'e', 2)
-    expect(results.length).toBeLessThanOrEqual(2)
+    expect(results).toHaveLength(2)
   })
 })

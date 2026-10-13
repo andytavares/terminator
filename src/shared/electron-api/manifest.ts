@@ -142,6 +142,7 @@ type CommandContext = {
 interface ExtensionSettingsSchema {
   extensionId: string
   label: string
+  description?: string
   properties: Record<
     string,
     {

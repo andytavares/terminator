@@ -7,6 +7,7 @@ import { TerminalPane } from '../../../../src/renderer/components/terminal/Termi
 import { useModalStore } from '../../../../src/renderer/stores/modal.store'
 import { seedStore } from '../../../support/renderer-stores'
 import type { PaneNode } from '../../../../src/shared/types/index'
+import { installElectronApi } from '../../../support/electron-api'
 
 vi.mock('../../../../src/renderer/components/terminal/LeafPane', () => ({
   LeafPane: ({ sessionId }: { sessionId: string }) => (
@@ -23,6 +24,14 @@ const mockGetPaneLayout = vi.fn<(projectId: string) => PaneNode | null>(() => nu
 const mockSetSplitRatio = vi.fn()
 
 const mockSetFocusedSession = vi.fn()
+
+// Electron 32+ dropped File.path; the preload's getFilePath is what knows it.
+const filePaths = new WeakMap<File, string>()
+function fileAt(path: string): File {
+  const file = new File([], path.slice(path.lastIndexOf('/') + 1))
+  filePaths.set(file, path)
+  return file
+}
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -41,15 +50,14 @@ beforeEach(() => {
   mockGetActive.mockReturnValue(null)
   mockGetInstance.mockReturnValue(undefined)
   mockGetPaneLayout.mockReturnValue(null)
-  ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
+  installElectronApi({
     terminal: { input: mockTerminalInput },
-    getFilePath: (f: File) => (f as unknown as { path: string }).path,
-  }
+    getFilePath: (file: File) => filePaths.get(file) ?? '',
+  })
 })
 
 afterEach(() => {
   useTerminalOpenErrorStore.setState({ errors: {}, retries: {} })
-  delete (globalThis as unknown as Record<string, unknown>).electronAPI
 })
 
 describe('TerminalPane', () => {
@@ -131,7 +139,7 @@ describe('TerminalPane', () => {
     })
     const { container } = render(<TerminalPane projectId="proj-1" />)
     const pane = container.querySelector('.terminal-pane')!
-    const file = Object.assign(new File([], 'report.pdf'), { path: '/Users/me/report.pdf' })
+    const file = fileAt('/Users/me/report.pdf')
     fireEvent.drop(pane, { dataTransfer: { files: [file], types: ['Files'] } })
     expect(mockPaste).toHaveBeenCalledWith('/Users/me/report.pdf')
   })
@@ -147,7 +155,7 @@ describe('TerminalPane', () => {
     })
     const { container } = render(<TerminalPane projectId="proj-1" />)
     const pane = container.querySelector('.terminal-pane')!
-    const file = Object.assign(new File([], 'my file.png'), { path: '/Users/me/my file.png' })
+    const file = fileAt('/Users/me/my file.png')
     fireEvent.drop(pane, { dataTransfer: { files: [file], types: ['Files'] } })
     expect(mockPaste).toHaveBeenCalledWith("'/Users/me/my file.png'")
   })
@@ -163,8 +171,8 @@ describe('TerminalPane', () => {
     })
     const { container } = render(<TerminalPane projectId="proj-1" />)
     const pane = container.querySelector('.terminal-pane')!
-    const f1 = Object.assign(new File([], 'a.txt'), { path: '/a.txt' })
-    const f2 = Object.assign(new File([], 'b.txt'), { path: '/b.txt' })
+    const f1 = fileAt('/a.txt')
+    const f2 = fileAt('/b.txt')
     fireEvent.drop(pane, { dataTransfer: { files: [f1, f2], types: ['Files'] } })
     expect(mockPaste).toHaveBeenCalledWith('/a.txt /b.txt')
   })
@@ -180,7 +188,7 @@ describe('TerminalPane', () => {
     })
     const { container } = render(<TerminalPane projectId="proj-1" />)
     const pane = container.querySelector('.terminal-pane')!
-    const file = Object.assign(new File([], 'x.txt'), { path: '/x.txt' })
+    const file = fileAt('/x.txt')
     fireEvent.drop(pane, { dataTransfer: { files: [file], types: ['Files'] } })
     expect(mockPaste).not.toHaveBeenCalled()
   })

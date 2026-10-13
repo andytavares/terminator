@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process'
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
-import { createServer, type IncomingMessage, type ServerResponse } from 'node:https'
+import type { IncomingMessage, ServerResponse } from 'node:http'
+import { createServer } from 'node:https'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'

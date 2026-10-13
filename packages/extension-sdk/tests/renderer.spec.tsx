@@ -1,13 +1,20 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { act } from 'react'
 import { invoke, mountExtension } from '@terminator/extension-sdk/renderer'
+import type { ElectronAPI } from '../types/renderer'
 
 describe('invoke', () => {
   const bridgeInvoke = vi.fn()
 
   beforeEach(() => {
     bridgeInvoke.mockReset().mockResolvedValue({ ok: true })
-    window.electronAPI = { extensionBridge: { invoke: bridgeInvoke } } as never
+    // Only the bridge's invoke, with its real type; the rest of the API is absent.
+    const extensionBridge: Partial<ElectronAPI['extensionBridge']> = { invoke: bridgeInvoke }
+    Object.defineProperty(window, 'electronAPI', {
+      value: { extensionBridge },
+      configurable: true,
+      writable: true,
+    })
   })
 
   it('sends the payload to the channel and resolves with the reply', async () => {

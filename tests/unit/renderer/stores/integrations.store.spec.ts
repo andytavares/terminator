@@ -55,7 +55,7 @@ describe('integrations store — loading', () => {
   it('stores what the main process reports', async () => {
     api.status.mockResolvedValue({ connections: [connection()] })
     await useIntegrationsStore.getState().loadConnections()
-    expect(useIntegrationsStore.getState().connections).toHaveLength(1)
+    expect(useIntegrationsStore.getState().connections).toEqual([connection()])
     expect(useIntegrationsStore.getState().loading).toBe(false)
   })
 
@@ -80,7 +80,7 @@ describe('integrations store — connect', () => {
     const ok = await useIntegrationsStore.getState().connect({ tracker: 'linear', apiKey: 'k' })
 
     expect(ok).toBe(true)
-    expect(api.status).toHaveBeenCalled()
+    expect(useIntegrationsStore.getState().connections).toEqual([connection()])
     expect(useIntegrationsStore.getState().connectError.linear).toBeUndefined()
   })
 
@@ -124,11 +124,12 @@ describe('integrations store — connect', () => {
 
 describe('integrations store — disconnect and mine', () => {
   it('disconnects and reloads', async () => {
+    useIntegrationsStore.setState({ connections: [connection()] })
     api.disconnect.mockResolvedValue({ ok: true })
     api.status.mockResolvedValue({ connections: [] })
     await useIntegrationsStore.getState().disconnect('linear')
     expect(api.disconnect).toHaveBeenCalledWith({ tracker: 'linear' })
-    expect(api.status).toHaveBeenCalled()
+    expect(useIntegrationsStore.getState().connections).toEqual([])
   })
 
   it('stores a mine selector and reloads', async () => {
@@ -327,7 +328,7 @@ describe('integrations store — links', () => {
     api.search.mockResolvedValue({ issues: [ISSUE], failures: [] })
     const result = await useIntegrationsStore.getState().searchIssues('sidebar')
     expect(api.search).toHaveBeenCalledWith({ term: 'sidebar' })
-    expect(result.issues).toHaveLength(1)
+    expect(result).toEqual({ issues: [ISSUE], failures: [] })
   })
 })
 

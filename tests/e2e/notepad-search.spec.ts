@@ -127,17 +127,9 @@ test('Re-initialise database in Settings keeps the notes', async () => {
 
   await expect
     .poll(async () =>
-      (
-        await page.evaluate(() =>
-          (
-            window as unknown as {
-              electronAPI: {
-                notifications: { list(): Promise<{ title: string; message?: string }[]> }
-              }
-            }
-          ).electronAPI.notifications.list()
-        )
-      ).map((notification) => `${notification.title}: ${notification.message}`)
+      (await page.evaluate(() => window.electronAPI.notifications.list())).map(
+        (notification) => `${notification.title}: ${notification.message}`
+      )
     )
     .toContain('Re-initialise database: Done')
   expect(await storedNotes(notepad)).toHaveLength(3)

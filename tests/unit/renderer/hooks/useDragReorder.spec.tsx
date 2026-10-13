@@ -2,11 +2,12 @@ import React from 'react'
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useDragReorder } from '../../../../src/renderer/hooks/useDragReorder'
+import { partialFake } from '../../../support/fakes'
 
 const items = ['a', 'b', 'c']
 
 function dragEvent(): React.DragEvent {
-  return { preventDefault: vi.fn() } as unknown as React.DragEvent
+  return partialFake<React.DragEvent>({ preventDefault: vi.fn() })
 }
 
 let onReorder: Mock<(reordered: string[]) => void>

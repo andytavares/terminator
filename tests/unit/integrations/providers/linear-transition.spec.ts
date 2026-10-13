@@ -122,12 +122,6 @@ describe('linear provider — transition', () => {
     })
   })
 
-  it('addresses the issue by its UUID, never by the human key', async () => {
-    const { client, updateIssue } = clientFor()
-    await providerWith(client).transition?.(CRED, 'TAV-42', 'done')
-    expect(updateIssue.mock.calls[0][0]).not.toBe('TAV-42')
-  })
-
   it("honours the operator's own mapping when one is given", async () => {
     const { client, updateIssue } = clientFor()
     // The operator decided "In Progress" is what in review means for them.

@@ -35,8 +35,7 @@ export async function startIpcTrace(app: ElectronApplication): Promise<void> {
       seen.add(JSON.stringify([kind, channel, naming.includes(channel) ? payload : null]))
     // Electron keeps ipcMain.handle's handlers in this map and reads it on every invoke.
     type Handler = (event: unknown, ...args: unknown[]) => unknown
-    const handlers = (ipcMain as unknown as { _invokeHandlers: Map<string, Handler> })
-      ._invokeHandlers
+    const handlers: Map<string, Handler> = Reflect.get(ipcMain, '_invokeHandlers')
     const traced = (channel: string, handler: Handler): Handler => {
       return (event, ...args) => (note('invoke', channel, args[0]), handler(event, ...args))
     }

@@ -138,6 +138,7 @@ describe('useSettingsStore', () => {
       expect(mockElectronAPI.settings.updateGlobal).toHaveBeenCalledWith({
         git: { worktreeBaseDir: '/my/worktrees' },
       })
+      expect(useSettingsStore.getState().globalSettings).toEqual(updated)
     })
   })
 
@@ -150,6 +151,7 @@ describe('useSettingsStore', () => {
       expect(mockElectronAPI.settings.updateWorkspace).toHaveBeenCalledWith('ws-1', {
         git: { worktreeBaseDir: '/ws/worktrees' },
       })
+      expect(useSettingsStore.getState().workspaceSettings.get('ws-1')).toEqual(wsSettings)
     })
 
     it('calls updateWorkspace with undefined git override when dir is undefined', async () => {

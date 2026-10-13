@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { ipcMain } from 'electron'
+import { homedir } from 'node:os'
+import * as pty from 'node-pty'
 import { OUTPUT_FLUSH_INTERVAL_MS } from '../../../src/main/terminal/output-batcher'
 
 // Mock electron
@@ -35,14 +37,14 @@ vi.mock('electron-store', () => {
 })
 
 // Mock node-pty
-const mockPty = {
+const mockPty = vi.hoisted(() => ({
   onData: vi.fn(),
   onExit: vi.fn(),
   write: vi.fn(),
   resize: vi.fn(),
   kill: vi.fn(),
   pid: 12345,
-}
+}))
 vi.mock('node-pty', () => ({
   spawn: vi.fn().mockReturnValue(mockPty),
 }))
@@ -122,12 +124,14 @@ describe('terminal IPC handlers', () => {
         cwd: '/home/user',
       }
 
-      const result = await handlerMap['terminal:create']({}, payload)
-      expect(result).toHaveProperty('sessionId')
+      await handlerMap['terminal:create']({}, payload)
+      expect(await handlerMap['terminal:list-sessions']({}, undefined)).toMatchObject([
+        { type: 'agent', tabTitle: 'AI Agent' },
+      ])
     })
 
     it('expands ~ to home directory', async () => {
-      const result = await handlerMap['terminal:create'](
+      await handlerMap['terminal:create'](
         {},
         {
           projectId: '550e8400-e29b-41d4-a716-446655440006',
@@ -136,11 +140,15 @@ describe('terminal IPC handlers', () => {
           cwd: '~',
         }
       )
-      expect(result).toHaveProperty('sessionId')
+      expect(pty.spawn).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.any(Array),
+        expect.objectContaining({ cwd: homedir() })
+      )
     })
 
     it('uses explicit shell when provided', async () => {
-      const result = await handlerMap['terminal:create'](
+      await handlerMap['terminal:create'](
         {},
         {
           projectId: '550e8400-e29b-41d4-a716-446655440007',
@@ -150,7 +158,7 @@ describe('terminal IPC handlers', () => {
           shell: '/bin/bash',
         }
       )
-      expect(result).toHaveProperty('sessionId')
+      expect(pty.spawn).toHaveBeenCalledWith('/bin/bash', expect.any(Array), expect.anything())
     })
   })
 
@@ -228,15 +236,15 @@ describe('terminal IPC handlers', () => {
       )
 
       const result = await handlerMap['terminal:close-all']({}, undefined)
-      expect(result).toMatchObject({ terminatedCount: expect.any(Number) })
+      expect(result).toEqual({ terminatedCount: 1 })
       expect(mockPty.kill).toHaveBeenCalled()
     })
   })
 
   describe('terminal:cleanup-orphans', () => {
-    it('returns a cleanedCount result', async () => {
+    it('cleans nothing when no earlier run left processes behind', async () => {
       const result = await handlerMap['terminal:cleanup-orphans']({}, undefined)
-      expect(result).toMatchObject({ cleanedCount: expect.any(Number) })
+      expect(result).toEqual({ cleanedCount: 0 })
     })
   })
 
@@ -302,8 +310,8 @@ describe('terminal IPC handlers', () => {
           cwd: '/tmp',
         }
       )
-      const onDataH = mockPty.onData.mock.calls.at(-1)?.[0] as (d: string) => void
-      onDataH?.('data')
+      const onDataH = mockPty.onData.mock.calls.at(-1)![0] as (d: string) => void
+      onDataH('data')
       vi.advanceTimersByTime(OUTPUT_FLUSH_INTERVAL_MS)
       expect(mockSend).not.toHaveBeenCalled()
       vi.useRealTimers()
@@ -332,8 +340,8 @@ describe('terminal IPC handlers', () => {
       )
 
       // Trigger the onData callback (covers the data→send path)
-      const onDataHandler = mockPty.onData.mock.calls.at(-1)?.[0] as (d: string) => void
-      onDataHandler?.('hello')
+      const onDataHandler = mockPty.onData.mock.calls.at(-1)![0] as (d: string) => void
+      onDataHandler('hello')
       vi.advanceTimersByTime(OUTPUT_FLUSH_INTERVAL_MS)
       expect(mockSend).toHaveBeenCalledWith(
         'terminal:output',
@@ -341,10 +349,10 @@ describe('terminal IPC handlers', () => {
       )
 
       // Trigger the onExit callback (covers registry cleanup + exit send path)
-      const onExitWrapper = mockPty.onExit.mock.calls.at(-1)?.[0] as (e: {
+      const onExitWrapper = mockPty.onExit.mock.calls.at(-1)![0] as (e: {
         exitCode: number
       }) => void
-      onExitWrapper?.({ exitCode: 0 })
+      onExitWrapper({ exitCode: 0 })
       expect(mockSend).toHaveBeenCalledWith(
         'terminal:process-exit',
         expect.objectContaining({ exitCode: 0 })
@@ -352,11 +360,7 @@ describe('terminal IPC handlers', () => {
 
       vi.useRealTimers()
       const result = await handlerMap['terminal:list-sessions']({}, undefined)
-      expect(
-        (result as unknown[]).every(
-          (s: unknown) => (s as Record<string, unknown>).tabTitle !== 'Exiting'
-        )
-      ).toBe(true)
+      expect(result).toEqual([])
     })
   })
 })

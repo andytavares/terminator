@@ -5,7 +5,6 @@ import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { useSessionRecordsStore } from '../../../../src/renderer/stores/session-records.store'
 import { TabBar } from '../../../../src/renderer/components/terminal/TabBar'
-import type { ComponentType } from 'react'
 import { projectOf, seedStore, workspaceOf } from '../../../support/renderer-stores'
 
 const records = {
@@ -112,7 +111,7 @@ describe('TabBar', () => {
         {
           id: 'git',
           label: 'Git',
-          component: null as unknown as ComponentType<{ repoRoot: string | null }>,
+          component: () => null,
         },
       ],
     })
@@ -131,7 +130,7 @@ describe('TabBar', () => {
         {
           id: 'git',
           label: 'Git',
-          component: null as unknown as ComponentType<{ repoRoot: string | null }>,
+          component: () => null,
         },
       ],
     })
@@ -187,7 +186,7 @@ describe('TabBar', () => {
         {
           id: 'git',
           label: 'Git',
-          component: null as unknown as ComponentType<{ repoRoot: string | null }>,
+          component: () => null,
         },
       ],
       onSelectProjectTab,
@@ -203,7 +202,7 @@ describe('TabBar', () => {
         {
           id: 'git',
           label: 'Git',
-          component: null as unknown as ComponentType<{ repoRoot: string | null }>,
+          component: () => null,
         },
       ],
       onSelectProjectTab,
