@@ -65,7 +65,9 @@ describe('linear provider — listMine', () => {
     )
     expect(result).toHaveLength(1)
   })
+})
 
+describe('linear provider — listMine summaries', () => {
   it('normalises state type and carries the tracker label through', async () => {
     const provider = providerWith({ issues: vi.fn().mockResolvedValue({ nodes: [DONE_ISSUE] }) })
     const [issue] = await provider.listMine(CRED, { kind: 'assignee', email: 'a@b.c' }, 10)
@@ -85,7 +87,9 @@ describe('linear provider — listMine', () => {
     const [issue] = await provider.listMine(CRED, { kind: 'assignee', email: 'a@b.c' }, 10)
     expect(issue.branchName).toBeNull()
   })
+})
 
+describe('linear provider — listMine relations and rate limits', () => {
   it('resolves the assignee relation rather than leaving a promise', async () => {
     const provider = providerWith({ issues: vi.fn().mockResolvedValue({ nodes: [makeIssue()] }) })
     const [issue] = await provider.listMine(CRED, { kind: 'assignee', email: 'a@b.c' }, 10)
@@ -114,6 +118,18 @@ describe('linear provider — search', () => {
     // Both completed and open issues are returned
     expect(result).toHaveLength(2)
     expect(result[0].state.type).toBe('completed')
+  })
+
+  it('returns an empty list when search answers with no connection', async () => {
+    const provider = providerWith({ searchIssues: vi.fn().mockResolvedValue(null) })
+    await expect(provider.search(CRED, 'sidebar', 15)).resolves.toEqual([])
+  })
+
+  it("reads a query-shaped selector as the viewer's own issues", async () => {
+    const assignedIssues = vi.fn().mockResolvedValue({ nodes: [makeIssue()] })
+    const provider = providerWith({ viewer: Promise.resolve({ ...VIEWER, assignedIssues }) })
+    await expect(provider.listMine(CRED, { kind: 'query', jql: 'x' }, 5)).resolves.toHaveLength(1)
+    expect(assignedIssues).toHaveBeenCalledTimes(1)
   })
 })
 
@@ -145,7 +161,9 @@ describe('linear provider — get', () => {
     })
     await expect(provider.get(CRED, 'TAV-999')).resolves.toBeNull()
   })
+})
 
+describe('linear provider — get bounds and defaults', () => {
   it('bounds comments to the five most recent', async () => {
     const many = Array.from({ length: 9 }, (_, i) => ({
       body: `c${i}`,
@@ -230,7 +248,9 @@ describe('linear provider — hostile and incomplete responses', () => {
       branchName: null,
     })
   })
+})
 
+describe('linear provider — unknown states', () => {
   it('falls back to backlog for a state type Linear adds later', async () => {
     const provider = providerWith({
       issue: vi
@@ -252,7 +272,9 @@ describe('linear provider — hostile and incomplete responses', () => {
       state: { name: 'Unknown', type: 'backlog' },
     })
   })
+})
 
+describe('linear provider — empty relations', () => {
   it('handles a comment whose author relation is empty', async () => {
     const provider = providerWith({
       issue: vi.fn().mockResolvedValue(
@@ -273,7 +295,9 @@ describe('linear provider — hostile and incomplete responses', () => {
     const issue = await provider.get(CRED, 'TAV-42')
     expect(issue?.comments[0]).toMatchObject({ author: 'Unknown', body: 'orphan' })
   })
+})
 
+describe('linear provider — empty connections', () => {
   it('returns an empty list when a connection has no nodes', async () => {
     const provider = providerWith({ issues: vi.fn().mockResolvedValue(null) })
     await expect(
@@ -318,7 +342,9 @@ describe('linear provider — error mapping', () => {
     })
     await expect(provider.search(CRED, 'x', 5)).rejects.toMatchObject({ kind })
   })
+})
 
+describe('linear provider — error mapping without a wait or for get', () => {
   it('rate-limits without a stated period still map, carrying no wait', async () => {
     const provider = providerWith({
       searchIssues: vi
