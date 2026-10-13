@@ -55,6 +55,20 @@ function complete(over: Partial<WorkOrder> = {}): WorkOrder {
   }
 }
 
+type Question = WorkOrder['openQuestions'][number]
+
+/** A question with nothing but its id and, when given, its answer. */
+const question = (id: string, answer: string | null = null): Question => ({
+  id,
+  text: 'q',
+  why: '',
+  options: [],
+  recommended: null,
+  answer,
+  rank: 1,
+  confidence: null,
+})
+
 function failures(order: WorkOrder): string[] {
   return compileOrder(order).failures.map((f) => f.check)
 }
@@ -145,9 +159,7 @@ function countsAndEveryFailureTests() {
   it('reports every failing check at once, not the first', () => {
     const order = complete({
       acceptance: [],
-      openQuestions: [
-        { id: 'Q-1', text: 'q', why: '', options: [], recommended: null, answer: null, rank: 1 },
-      ],
+      openQuestions: [question('Q-1')],
       redTeam: [
         {
           id: 'RT-1',
@@ -177,6 +189,7 @@ function anUnansweredQuestionTests() {
           recommended: null,
           answer: null,
           rank: 1,
+          confidence: null,
         },
       ],
     })
@@ -187,18 +200,14 @@ function anUnansweredQuestionTests() {
 function answeredAndNamedTests() {
   it('passes once every question is answered', () => {
     const order = complete({
-      openQuestions: [
-        { id: 'Q-1', text: 'q', why: '', options: [], recommended: null, answer: 'no', rank: 1 },
-      ],
+      openQuestions: [question('Q-1', 'no')],
     })
     expect(failures(order)).not.toContain('questions')
   })
 
   it('names the question that is holding it up', () => {
     const order = complete({
-      openQuestions: [
-        { id: 'Q-7', text: 'q', why: '', options: [], recommended: null, answer: null, rank: 1 },
-      ],
+      openQuestions: [question('Q-7')],
     })
     const f = compileOrder(order).failures.find((x) => x.check === 'questions')
     expect(f?.subjectIds).toEqual(['Q-7'])

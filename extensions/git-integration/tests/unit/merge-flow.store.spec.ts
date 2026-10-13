@@ -192,7 +192,9 @@ describe('undoLastDecision — pops the last decision from undo stack and naviga
     })
     expect(useMergeFlowStore.getState().activeBlockIndex).toBe(1)
 
-    let decision: ReturnType<typeof useMergeFlowStore.getState.undoLastDecision> | null = null
+    let decision: ReturnType<
+      ReturnType<typeof useMergeFlowStore.getState>['undoLastDecision']
+    > | null = null
     act(() => {
       decision = useMergeFlowStore.getState().undoLastDecision()
     })

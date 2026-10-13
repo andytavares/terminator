@@ -1,7 +1,7 @@
 import React from 'react'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 import { render } from '@testing-library/react'
-import { useReviewKeys } from '../../src/hooks/useReviewKeys'
+import { useReviewKeys, type ReviewKeyHandlers } from '../../src/hooks/useReviewKeys'
 import { useReviewUiStore, REVIEW_KEY_EVENTS } from '../../src/stores/review-ui.store'
 
 function TestHarness({ handlers }: { handlers: Parameters<typeof useReviewKeys>[0] }) {
@@ -18,27 +18,18 @@ function fireKey(key: string, opts: Partial<KeyboardEventInit> = {}, target?: Ev
   ;(target ?? window).dispatchEvent(event)
 }
 
-let handlers: {
-  nextFile: ReturnType<typeof vi.fn>
-  prevFile: ReturnType<typeof vi.fn>
-  nextChapter: ReturnType<typeof vi.fn>
-  prevChapter: ReturnType<typeof vi.fn>
-  nextUnviewedFile: ReturnType<typeof vi.fn>
-  markViewed: ReturnType<typeof vi.fn>
-  toggleInsights: ReturnType<typeof vi.fn>
-  openSubmit: ReturnType<typeof vi.fn>
-}
+let handlers: Record<Exclude<keyof ReviewKeyHandlers, 'toggleFileList'>, Mock<() => void>>
 
 beforeEach(() => {
   handlers = {
-    nextFile: vi.fn(),
-    prevFile: vi.fn(),
-    nextChapter: vi.fn(),
-    prevChapter: vi.fn(),
-    nextUnviewedFile: vi.fn(),
-    markViewed: vi.fn(),
-    toggleInsights: vi.fn(),
-    openSubmit: vi.fn(),
+    nextFile: vi.fn<() => void>(),
+    prevFile: vi.fn<() => void>(),
+    nextChapter: vi.fn<() => void>(),
+    prevChapter: vi.fn<() => void>(),
+    nextUnviewedFile: vi.fn<() => void>(),
+    markViewed: vi.fn<() => void>(),
+    toggleInsights: vi.fn<() => void>(),
+    openSubmit: vi.fn<() => void>(),
   }
   useReviewUiStore.setState({
     diffRange: 'since',

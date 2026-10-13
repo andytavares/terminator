@@ -39,6 +39,7 @@ task-vault/
 ├── manifest.json            id, entry points, the surfaces it contributes
 ├── package.json             its own npm dependencies and the build:renderer script
 ├── tsconfig.json            extends ../../tsconfig.extension.json (typecheck only)
+├── tsconfig.test.json       extends tsconfig.json and adds tests/ (typecheck only)
 ├── src/
 │   ├── index.ts             backend: activate(api) / deactivate()
 │   ├── index.js             esbuild output of index.ts (gitignored, never edited)

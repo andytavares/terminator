@@ -121,7 +121,7 @@ function raisedGatesTests() {
 
 const TAV_15 = {
   kind: 'tracker' as const,
-  tracker: 'linear',
+  tracker: 'linear' as const,
   key: 'TAV-15',
   url: 'https://linear.app/team/issue/TAV-15',
 }
@@ -542,7 +542,7 @@ describe('a gate store whose root follows the workspace', () => {
   })
 })
 
-function decided(rule: Parameters<typeof gate>[0]['rule'], option: string) {
+function decided(rule: NonNullable<Parameters<typeof gate>[0]>['rule'], option: string) {
   const act = vi.fn(async () => undefined)
   return {
     act,
@@ -575,7 +575,7 @@ function carryingTheChoiceTests() {
   })
 
   it('names the node, so a send-back knows what to retry', async () => {
-    const act = vi.fn(async () => undefined)
+    const act = vi.fn<InboxDeps['act']>(async () => undefined)
     await createGateStore(root).save(gate({ rule: 'verify.repeat-fail', nodeId: 'build:U-1' }))
     const c = createInboxChannels(inboxDeps({ autonomy: () => 'escorted', act }))
     await c.decide({ gateId: 'G-1', option: 'send_back' })

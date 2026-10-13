@@ -6,11 +6,13 @@ import type { RiskScore } from '../../src/schemas/pr-review.schema'
 
 function makeRiskScore(overrides: Partial<RiskScore['metrics']> = {}): RiskScore {
   return {
-    score: 30,
     level: 'low',
+    composite: 30,
+    dominantDriver: '',
+    topImporters: [],
+    importerCount: 0,
     metrics: {
-      linesChanged: 10,
-      filesChanged: 1,
+      changeSize: 10,
       testFilePresent: true,
       complexityDelta: 0,
       churn90d: 2,

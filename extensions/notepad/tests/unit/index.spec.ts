@@ -34,7 +34,9 @@ vi.mock('../../src/ipc/folders.ipc', () => ({
 }))
 
 function makeApi() {
-  const register = vi.fn(() => ({ dispose: vi.fn() }))
+  const register = vi.fn<ExtensionAPI['globalShortcut']['register']>(async () => ({
+    dispose: vi.fn(),
+  }))
   const api = {
     db: {},
     ipc: { registerHandler: vi.fn(() => ({ dispose: vi.fn() })) },

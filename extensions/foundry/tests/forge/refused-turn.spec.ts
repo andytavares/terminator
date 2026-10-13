@@ -177,7 +177,7 @@ function theSurfaceTests() {
     // What the Forge polls. Before this it was the document and the checks,
     // and a refusal changes neither — so the screen said "The architect is
     // working…" over a turn that had ended, for ever.
-    const polled = (await c.compile({ id: 'WO-0909-6db', commit: false })) as {
+    const polled = (await c.compile({ id: 'WO-0909-6db', commit: false, automatic: false })) as {
       intake: { kind: string; reason: string }
     }
     expect(polled.intake.kind).toBe('refused')

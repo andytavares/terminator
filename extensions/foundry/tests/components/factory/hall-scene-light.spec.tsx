@@ -49,7 +49,17 @@ function map(props: HallProp[] = []): HallMap {
 }
 
 function world(on: HallMap, crew: Crew[] = []): World {
-  return { map: on, crew, crates: [], gatesWaiting: [], openCalls: [], verdicts: [], clockMs: 0 }
+  return {
+    map: on,
+    crew,
+    crates: [],
+    gatesWaiting: [],
+    openCalls: [],
+    verdicts: [],
+    clockMs: 0,
+    ci: null,
+    queue: null,
+  }
 }
 
 const scanning: Crew = {

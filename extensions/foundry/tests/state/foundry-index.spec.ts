@@ -59,12 +59,14 @@ describe('the Foundry index', () => {
 
 function readingFromDiskTests() {
   it('reads from disk again after a failed read instead of keeping the failure', async () => {
-    const source = disk()
+    const read = disk()
     let fail = true
-    const orders = source.orders
-    source.orders = async () => {
-      if (fail) throw new Error('disk unavailable')
-      return orders()
+    const source = {
+      ...read,
+      orders: async () => {
+        if (fail) throw new Error('disk unavailable')
+        return read.orders()
+      },
     }
     const index = createFoundryIndexes(
       () => source,
@@ -142,13 +144,15 @@ function ledgersTests() {
   })
 
   it('does not double-count an entry written while the ledger was still loading', async () => {
-    const source = disk()
     let release: () => void = () => {}
     const held = new Promise<void>((resolve) => (release = resolve))
     // The disk read has already seen the entry that the write below reports.
-    source.ledger = async () => {
-      await held
-      return [entry('WO-1', 'first'), entry('WO-1', 'second')]
+    const source = {
+      ...disk(),
+      ledger: async () => {
+        await held
+        return [entry('WO-1', 'first'), entry('WO-1', 'second')]
+      },
     }
     const index = createFoundryIndexes(() => source, vi.fn()).forRoot('/data')
     const loading = index.ledger('WO-1')

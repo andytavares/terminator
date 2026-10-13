@@ -33,6 +33,7 @@ function question(id: string): OpenQuestion {
     recommended: 0,
     answer: null,
     rank: 1,
+    confidence: null,
   }
 }
 

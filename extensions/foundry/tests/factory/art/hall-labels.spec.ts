@@ -151,10 +151,9 @@ describe('the queue plate', () => {
 })
 
 const tower = fixture('dispatch', { x: 38, y: 8 })
+const LAMP_COLOURS: readonly string[] = [HALL.green, HALL.amber, HALL.red]
 const lamps = (calls: readonly PaintCall[]): Fill[] =>
-  fills(calls).filter(
-    (c) => c.w === 3 && c.h === 3 && [HALL.green, HALL.amber, HALL.red].includes(c.style as string)
-  )
+  fills(calls).filter((c) => c.w === 3 && c.h === 3 && LAMP_COLOURS.includes(c.style as string))
 
 describe('the CI tower', () => {
   describe('tower bounds', towerBoundsTests)

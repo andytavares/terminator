@@ -46,8 +46,8 @@ function recorder(fails: (args: readonly string[]) => boolean = () => false) {
   const exec = async (o: { command: 'git' | 'gh'; args: string[]; cwd: string }) => {
     calls.push({ command: o.command, args: o.args, cwd: o.cwd })
     return fails(o.args)
-      ? { exitCode: 1, stdout: '', stderr: 'no such worktree' }
-      : { exitCode: 0, stdout: '', stderr: '' }
+      ? { exitCode: 1, stdout: '', stderr: 'no such worktree', timedOut: false }
+      : { exitCode: 0, stdout: '', stderr: '', timedOut: false }
   }
   return { calls, exec }
 }

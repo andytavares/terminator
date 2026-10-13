@@ -89,7 +89,7 @@ describe('CompletionScreen — calls mergeCommit on commit button click', () => 
   it('calls mergeCommit on commit button click', async () => {
     mockMergeCommit.mockResolvedValueOnce({ commitHash: 'abc123' })
     const onExit = vi.fn()
-    render(<CompletionScreen repoRoot="/repo" onExit={onExit} />)
+    render(<CompletionScreen repoRoot="/repo" onBack={vi.fn()} onExit={onExit} />)
     fireEvent.click(screen.getByText(/Commit merge/i))
     await waitFor(() => {
       expect(mockMergeCommit).toHaveBeenCalledWith(
@@ -103,7 +103,7 @@ describe('CompletionScreen — calls mergeCommit on commit button click', () => 
   it('calls onExit after successful commit', async () => {
     mockMergeCommit.mockResolvedValueOnce({ commitHash: 'abc123' })
     const onExit = vi.fn()
-    render(<CompletionScreen repoRoot="/repo" onExit={onExit} />)
+    render(<CompletionScreen repoRoot="/repo" onBack={vi.fn()} onExit={onExit} />)
     fireEvent.click(screen.getByText(/Commit merge/i))
     await waitFor(() => {
       expect(onExit).toHaveBeenCalledOnce()
@@ -115,7 +115,7 @@ describe('CompletionScreen — shows error toast and stays on screen if commit f
   it('shows error toast and stays on screen if commit fails', async () => {
     mockMergeCommit.mockResolvedValueOnce({ error: 'hook failed' })
     const onExit = vi.fn()
-    render(<CompletionScreen repoRoot="/repo" onExit={onExit} />)
+    render(<CompletionScreen repoRoot="/repo" onBack={vi.fn()} onExit={onExit} />)
     fireEvent.click(screen.getByText(/Commit merge/i))
     await waitFor(() => {
       expect(mockNotify).toHaveBeenCalledWith({

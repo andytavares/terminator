@@ -4,7 +4,7 @@ import { render, screen, act } from '@testing-library/react'
 
 const mockSetShowCaptureModal = vi.fn()
 const mockSetView = vi.fn()
-const mockOn = vi.fn(() => vi.fn())
+const mockOn = vi.fn<Window['electronAPI']['extensionBridge']['on']>(() => vi.fn())
 const mockInvoke = vi.fn()
 
 vi.mock('../../src/components/TaskVaultView', () => ({
@@ -82,7 +82,7 @@ function taskVaultRendererAppCaptureCommandTests() {
     const { App } = await import('../../src/renderer/App')
     render(<App />)
     const [, handler] = mockOn.mock.calls[0]
-    handler()
+    handler(undefined)
     expect(mockSetShowCaptureModal).toHaveBeenCalledWith(true)
   })
 

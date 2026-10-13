@@ -31,6 +31,9 @@ function forgeDeps(over: Partial<ForgeDeps> = {}): ForgeDeps {
   return { store, now: () => NOW, ...quietForgeSeams(() => root), ...over }
 }
 
+/** A compile payload as the channel's schema leaves it: one the operator asked for. */
+const compiling = (id: string, commit: boolean) => ({ id, commit, automatic: false })
+
 function channels(readIssue?: ReturnType<typeof vi.fn>) {
   return createForgeChannels(forgeDeps({ readIssue: readIssue as never }))
 }
@@ -79,6 +82,7 @@ async function seeded(): Promise<WorkOrder> {
         recommended: 0,
         answer: null,
         rank: 1,
+        confidence: null,
       },
     ],
   }
@@ -224,14 +228,14 @@ describe('foundry:order.compile', () => {
 function previewingAndAgreeingTests() {
   it('previews the checks without committing when asked not to', async () => {
     const order = await completeOrder()
-    const r = (await channels().compile({ id: order.id, commit: false })) as OrderView
+    const r = (await channels().compile(compiling(order.id, false))) as OrderView
     expect(r.compile.ok).toBe(true)
     expect((await store.load(order.id))?.status).toBe('draft')
   })
 
   it('agrees a complete order and stamps when', async () => {
     const order = await completeOrder()
-    const r = (await channels().compile({ id: order.id, commit: true })) as OrderView
+    const r = (await channels().compile(compiling(order.id, true))) as OrderView
     expect(r.order.status).toBe('agreed')
     expect((await store.load(order.id))?.agreedAt).toBe('2026-09-06T10:00:00.000Z')
   })
@@ -241,7 +245,7 @@ function previewingAndAgreeingTests() {
       source: { kind: 'typed', text: 'x' },
       repoPaths: [repo],
     })) as OrderView
-    const out = (await channels().compile({ id: r.order.id, commit: true })) as OrderView
+    const out = (await channels().compile(compiling(r.order.id, true))) as OrderView
     expect(out.compile.ok).toBe(false)
     expect(out.order.status).toBe('draft')
     expect(out.compile.failures.map((f) => f.check)).toContain('coverage')
@@ -251,7 +255,7 @@ function previewingAndAgreeingTests() {
 function theLedgerTests() {
   it('records the agreement in the ledger', async () => {
     const order = await completeOrder()
-    await channels().compile({ id: order.id, commit: true })
+    await channels().compile(compiling(order.id, true))
     expect(fs.readFileSync(path.join(root, 'orders', order.id, 'ledger.jsonl'), 'utf8')).toContain(
       'order.agreed'
     )
@@ -275,14 +279,14 @@ function theLedgerTests() {
 
 function unknownOrdersAndNoRefineryTests() {
   it('reports an order it cannot find', async () => {
-    expect(await channels().compile({ id: 'WO-nope', commit: true })).toEqual({
+    expect(await channels().compile(compiling('WO-nope', true))).toEqual({
       error: 'No order WO-nope.',
     })
   })
 
   it('carries no advisory when nothing has wired the refinery', async () => {
     const order = await completeOrder()
-    const r = (await channels().compile({ id: order.id, commit: true })) as OrderView & {
+    const r = (await channels().compile(compiling(order.id, true))) as OrderView & {
       advisory: string | null
     }
     expect(r.advisory).toBeNull()
@@ -307,7 +311,7 @@ function theRefineryAdvisoryTests() {
         ],
       })
     )
-    const r = (await c.compile({ id: order.id, commit: true })) as OrderView & {
+    const r = (await c.compile(compiling(order.id, true))) as OrderView & {
       advisory: string | null
     }
     expect(r.advisory).toContain('WO-earlier')
@@ -444,6 +448,7 @@ function openQuestionsTests() {
           recommended: 0,
           answer: null,
           rank: 1,
+          confidence: null,
         },
       ],
     })
@@ -630,7 +635,8 @@ function compileFlagsAndAgreedOrdersTests() {
       source: { kind: 'typed', text: 'x' },
       repoPaths: [repo],
     })) as OrderView
-    const r = (await channels().compile({ id: seeded.order.id })) as OrderView
+    // Through the channel's schema, which is what supplies the missing flag.
+    const r = (await send('foundry:order.compile', { id: seeded.order.id })) as OrderView
     expect(r.order.status).toBe('draft')
   })
 
@@ -640,7 +646,7 @@ function compileFlagsAndAgreedOrdersTests() {
       repoPaths: [repo],
     })) as OrderView
     await store.save({ ...seeded.order, status: 'running' })
-    const r = (await channels().compile({ id: seeded.order.id, commit: true })) as OrderView
+    const r = (await channels().compile(compiling(seeded.order.id, true))) as OrderView
     expect(r.compile.ok).toBe(false)
   })
 }
@@ -720,7 +726,7 @@ function askingAtAgreementTests() {
     await store.save(await agreeable())
     const channels = createForgeChannels(forgeDeps({ capability }))
 
-    const result = (await channels.compile({ id: 'WO-1', commit: true })) as {
+    const result = (await channels.compile(compiling('WO-1', true))) as {
       capability?: { transitions: string }
     }
     expect(capability).toHaveBeenCalled()
@@ -737,7 +743,7 @@ function askingAtAgreementTests() {
     await store.save(await agreeable())
     const channels = createForgeChannels(forgeDeps({ capability }))
 
-    await channels.compile({ id: 'WO-1', commit: false })
+    await channels.compile(compiling('WO-1', false))
     expect(capability).not.toHaveBeenCalled()
   })
 }
@@ -750,7 +756,9 @@ function trackerFailuresTests() {
       forgeDeps({ capability: async () => Promise.reject(new Error('offline')) })
     )
 
-    const result = (await channels.compile({ id: 'WO-1', commit: true })) as { order: WorkOrder }
+    const result = (await channels.compile(compiling('WO-1', true))) as {
+      order: WorkOrder
+    }
     expect(result.order.status).toBe('agreed')
   })
 
@@ -761,7 +769,9 @@ function trackerFailuresTests() {
       forgeDeps({ onAgreed: async () => Promise.reject(new Error('rate limited')) })
     )
 
-    const result = (await channels.compile({ id: 'WO-1', commit: true })) as { order: WorkOrder }
+    const result = (await channels.compile(compiling('WO-1', true))) as {
+      order: WorkOrder
+    }
     expect(result.order.status).toBe('agreed')
     expect((await store.load('WO-1'))?.status).toBe('agreed')
   })
@@ -791,10 +801,7 @@ function writingBackTests() {
     const onAgreed = vi.fn(async () => undefined)
     const store = createOrderStore(root)
     await store.save(await agreeable())
-    await createForgeChannels(forgeDeps({ onAgreed })).compile({
-      id: 'WO-1',
-      commit: true,
-    })
+    await createForgeChannels(forgeDeps({ onAgreed })).compile(compiling('WO-1', true))
     expect(onAgreed).toHaveBeenCalledWith(expect.objectContaining({ status: 'agreed' }))
   })
 }
@@ -910,6 +917,7 @@ const UNSETTLED: Pick<WorkOrder, 'openQuestions' | 'redTeam'> = {
       recommended: 0,
       answer: null,
       rank: 1,
+      confidence: null,
     },
     {
       id: 'Q-2',
@@ -919,6 +927,7 @@ const UNSETTLED: Pick<WorkOrder, 'openQuestions' | 'redTeam'> = {
       recommended: 0,
       answer: null,
       rank: 1,
+      confidence: null,
     },
   ],
   redTeam: [
@@ -1029,7 +1038,7 @@ function theLastTurnTests() {
     )
     await c.converge({ id: seed.order.id })
 
-    const r = (await c.compile({ id: seed.order.id, commit: false })) as {
+    const r = (await c.compile(compiling(seed.order.id, false))) as {
       intake: { kind: string; reason?: string }
     }
     expect(r.intake.kind).toBe('refused')
@@ -1060,7 +1069,7 @@ function aRunningTurnTests() {
       autoTurn: null,
     })
 
-    const polled = (await c.compile({ id: seed.order.id, commit: false })) as {
+    const polled = (await c.compile(compiling(seed.order.id, false))) as {
       intake: { kind: string }
     }
     expect(polled.intake.kind).toBe('running')
@@ -1156,7 +1165,10 @@ function answersAndAcceptsTests() {
 function fixesAndAsksTests() {
   it('folds every fix and ask into exactly one converge call naming every finding', async () => {
     const order = await withQuestionsAndFindings()
-    const converge = vi.fn(async () => ({ ok: true as const, sessionId: 'sess-arch' }))
+    const converge = vi.fn<ForgeDeps['converge']>(async () => ({
+      ok: true as const,
+      sessionId: 'sess-arch',
+    }))
     const c = createForgeChannels(forgeDeps({ converge }))
 
     await c.converge({
@@ -1168,7 +1180,7 @@ function fixesAndAsksTests() {
     })
 
     expect(converge).toHaveBeenCalledTimes(1)
-    const [, message] = converge.mock.calls[0] as [WorkOrder, string]
+    const [, message] = converge.mock.calls[0]
     expect(message).toContain('RT-1')
     expect(message).toContain('finding one is wrong')
     expect(message).toContain('RT-2')
@@ -1348,7 +1360,7 @@ function unblockingCompileTests() {
     }
     // The one check this used to fail for ever, because nothing could clear a
     // finding.
-    const compiled = (await channels().compile({ id: o.id, commit: false })) as {
+    const compiled = (await channels().compile(compiling(o.id, false))) as {
       compile: { failures: { check: string }[] }
     }
     expect(compiled.compile.failures.map((f) => f.check)).not.toContain('redTeam')
@@ -1445,7 +1457,7 @@ function theFalsifiableCheckTests() {
     const o = await withCriterion()
     await store.save(blockedOnAPicture(o))
 
-    const before = (await channels().compile({ id: o.id, commit: false })) as {
+    const before = (await channels().compile(compiling(o.id, false))) as {
       compile: { failures: { check: string }[] }
     }
     expect(before.compile.failures.map((f) => f.check)).toContain('verifiable')
@@ -1455,7 +1467,7 @@ function theFalsifiableCheckTests() {
       unverifiable: { criterionId: 'AC-1', reason: 'there is no display in this environment' },
     })
 
-    const after = (await channels().compile({ id: o.id, commit: false })) as {
+    const after = (await channels().compile(compiling(o.id, false))) as {
       compile: { failures: { check: string }[] }
     }
     expect(after.compile.failures.map((f) => f.check)).not.toContain('verifiable')
@@ -1799,7 +1811,7 @@ describe('the backend facts every Forge response carries', () => {
 function compileAndConvergeTests() {
   it('carries loop, agreed and turnEndedAt on compile, alongside intake', async () => {
     const seed = await drafted()
-    const r = (await channels().compile({ id: seed.order.id, commit: false })) as OrderView & {
+    const r = (await channels().compile(compiling(seed.order.id, false))) as OrderView & {
       loop: { rounds: unknown[]; heldAt: null; exhausted: boolean }
       agreed: unknown
       turnEndedAt: string | null
@@ -1828,7 +1840,7 @@ function compileAndConvergeTests() {
 function whoAgreedTests() {
   it('says who agreed the order once it is agreed', async () => {
     const order = await completeOrder()
-    const r = (await channels().compile({ id: order.id, commit: true })) as OrderView & {
+    const r = (await channels().compile(compiling(order.id, true))) as OrderView & {
       agreed: { at: string; by: string } | null
     }
     expect(r.compile.ok).toBe(true)
@@ -1839,7 +1851,7 @@ function whoAgreedTests() {
 describe('foundry:order.compile — who agrees', () => {
   it('records the operator even when a caller names the rule, since only a person hands off', async () => {
     const order = await completeOrder()
-    const r = (await channels().compile({
+    const r = (await send('foundry:order.compile', {
       id: order.id,
       commit: true,
       actor: 'rule:forge',
@@ -1854,7 +1866,7 @@ describe('foundry:order.compile — who agrees', () => {
 
   it('defaults to the operator, with the plain reason', async () => {
     const order = await completeOrder()
-    await channels().compile({ id: order.id, commit: true })
+    await channels().compile(compiling(order.id, true))
 
     const entries = await store.entries(order.id)
     const agreedEntry = entries.find((e) => e.action === 'order.agreed')

@@ -1,22 +1,20 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { ipcMain } from 'electron'
-import { dispatchChannel, type ChannelSpec } from '@terminator/extension-sdk'
+import { dispatchChannel, type ChannelSpec, type ExtensionAPI } from '@terminator/extension-sdk'
+import { partialFake } from '../../../../../tests/support/fakes'
 
 // Adapter: registerHandler forwards to the electron ipcMain mocks so existing
 // capture/assert code (ipcMain.handle calls, removeHandler assertions) still works.
-const mockApi = {
-  ipc: {
+const mockApi = partialFake<ExtensionAPI>({
+  ipc: partialFake<ExtensionAPI['ipc']>({
     registerHandler: (spec: ChannelSpec) => {
-      ;(ipcMain.handle as unknown as ReturnType<typeof vi.fn>)(
-        spec.channel,
-        (_e: unknown, payload: unknown) => dispatchChannel(spec, payload)
+      vi.mocked(ipcMain.handle)(spec.channel, (_e, payload: unknown) =>
+        dispatchChannel(spec, payload)
       )
-      return {
-        dispose: () => (ipcMain.removeHandler as unknown as ReturnType<typeof vi.fn>)(spec.channel),
-      }
+      return { dispose: () => vi.mocked(ipcMain.removeHandler)(spec.channel) }
     },
-  },
-} as unknown as import('../../../../../src/main/extensions/api').ExtensionAPI
+  }),
+})
 import { DatabaseSync } from 'node:sqlite'
 
 vi.mock('electron', () => ({

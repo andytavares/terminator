@@ -3,6 +3,7 @@ import { useEffect } from 'react'
 import { renderHook, act } from '@testing-library/react'
 import { usePrReviewStore } from '../../src/stores/pr-review.store'
 import { reviewQueuePr } from './support/review-queue-pr'
+import { PrReviewDetailSchema, type PrChangedFile } from '../../src/schemas/pr-review.schema'
 import {
   useLoadPrQueue,
   useLoadPrDetail,
@@ -103,7 +104,8 @@ const mockPrReviewDetail = mockPrReviewDetailAPI
 const mockFileMetrics = mockFileMetricsAPI
 const mockPrInlineComments = mockPrInlineCommentsAPI
 
-const validActivePr = {
+// Parsed as the review channel's answer is, so the schema's defaults are filled in.
+const validActivePr = PrReviewDetailSchema.parse({
   number: 42,
   title: 'Test PR',
   body: '',
@@ -117,7 +119,7 @@ const validActivePr = {
   lintStatus: 'pass' as const,
   coverageStatus: 'pass' as const,
   chapters: [],
-}
+})
 
 const NO_METRICS = {
   changeSize: null,
@@ -131,7 +133,7 @@ const NO_METRICS = {
 type ChangedFile = ReturnType<typeof file>
 
 /** A modified file at `path` in `tier`, with a low risk score and no metrics yet. */
-function file(path: string, tier: 1 | 2 | 3 = 1) {
+function file(path: string, tier: 1 | 2 | 3 = 1): PrChangedFile {
   return {
     path,
     changeType: 'modified' as const,
@@ -143,11 +145,11 @@ function file(path: string, tier: 1 | 2 | 3 = 1) {
     estimatedMinutes: 1,
     riskScore: {
       level: 'low' as const,
-      composite: null as number | null,
+      composite: null,
       dominantDriver: '',
       topImporters: [],
       importerCount: 0,
-      metrics: { ...NO_METRICS } as Record<keyof typeof NO_METRICS, number | null>,
+      metrics: { ...NO_METRICS },
     },
   }
 }

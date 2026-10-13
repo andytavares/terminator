@@ -121,7 +121,7 @@ function orderFor(recipeId: string, lanes: number[]): WorkOrder {
   return {
     ...base,
     recipe: recipeId,
-    risk: { ...base.risk, triggers: ['db_migration'] },
+    risk: { ...base.risk, triggers: ['migration'] },
     plan: {
       ...base.plan,
       units: lanes.map((lane) => unit(`U-${lane}`, lane)),
@@ -147,6 +147,7 @@ describe('workAnimFor', () => {
   it('scans at a rig and types everywhere else', () => {
     const map = layoutHall(graph())
     for (const prop of map.props) {
+      if (prop.nodeId === null) continue
       const expected = prop.kind === 'rig' ? 'scan' : 'type'
       expect(workAnimFor(map, prop.nodeId)).toBe(expected)
     }

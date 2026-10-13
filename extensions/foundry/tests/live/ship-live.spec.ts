@@ -141,8 +141,7 @@ function verifiedShipment(): Shipment {
         nodeId: 'n-verify',
         result: 'pass',
         reason: '',
-        command: 'npm test',
-        exitCode: 0,
+        evidence: [{ kind: 'exit_code', exitCode: 0 }],
         producedBy: { role: 'verifier', sessionId: 'sess-verifier' },
         at: new Date().toISOString(),
       },
@@ -155,14 +154,22 @@ function verifiedShipment(): Shipment {
 
 const PASSED_LADDER: Shipment['ladder'] = {
   steps: [
-    { rung: 'L0', name: 'Lint', result: 'pass', reason: '', exitCode: 0 },
-    { rung: 'L1', name: "The unit's own tests", result: 'pass', reason: '', exitCode: 0 },
+    { rung: 'L0', name: 'Lint', result: 'pass', reason: '', exitCode: 0, command: null },
+    {
+      rung: 'L1',
+      name: "The unit's own tests",
+      result: 'pass',
+      reason: '',
+      exitCode: 0,
+      command: null,
+    },
     {
       rung: 'L3',
       name: 'Independent verification',
       result: 'elsewhere',
       reason: 'by the verifier on each unit — see the criteria table',
       exitCode: null,
+      command: null,
     },
   ],
   stoppedAt: null,

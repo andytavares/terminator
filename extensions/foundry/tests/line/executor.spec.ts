@@ -4,7 +4,7 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { execute, opensPullRequest, skillsFor } from '../../src/line/executor.js'
-import type { ExecutorEvent, RunPlan, StartedRun } from '../../src/line/executor.js'
+import type { ExecutorDeps, ExecutorEvent, RunPlan, StartedRun } from '../../src/line/executor.js'
 import { buildRunGraph } from '../../src/line/run-graph.js'
 import { idleExecutorSeams } from './idle-executor-seams.js'
 import { retry } from '../../src/line/scheduler.js'
@@ -145,10 +145,9 @@ function order(units = [unit('U-1'), unit('U-2')], over: Partial<WorkOrder> = {}
   }
 }
 
-function deps(
-  run: (input: Parameters<Parameters<typeof execute>[3]['run']>[0]) => Promise<StartedRun>,
-  events: ExecutorEvent[] = []
-) {
+type RunInput = Parameters<ExecutorDeps['run']>[0]
+
+function deps(run: (input: RunInput) => Promise<StartedRun>, events: ExecutorEvent[] = []) {
   return {
     ...idleExecutorSeams(),
     run,
@@ -161,7 +160,7 @@ function deps(
   }
 }
 
-const ok = async (input: { node: { id: string } }): Promise<StartedRun> => ({
+const ok = async (input: RunInput): Promise<StartedRun> => ({
   sessionId: `sess-${input.node.id}`,
   exitCode: 0,
 })
@@ -1742,12 +1741,10 @@ steps:
 `
 async function tiers(): Promise<{ role: string | null; modelTier: string }[]> {
   const seen: { role: string | null; modelTier: string }[] = []
-  const run = vi.fn(
-    async (input: { node: { id: string }; role: string | null; modelTier: string }) => {
-      seen.push({ role: input.role, modelTier: input.modelTier })
-      return ok(input)
-    }
-  )
+  const run = vi.fn(async (input: RunInput) => {
+    seen.push({ role: input.role, modelTier: input.modelTier })
+    return ok(input)
+  })
   const o = order([unit('U-1')])
   const r = recipe(TIERED)
   await execute(planOf(o, r), deps(run as never))
@@ -1881,12 +1878,10 @@ function scribeAndBuilderTests() {
 function aNodeWithNoRoleTests() {
   it('asks for the deep tier for a node with no role, so the operator choice stands', async () => {
     const seen: string[] = []
-    const run = vi.fn(
-      async (input: { node: { id: string }; role: string | null; modelTier: string }) => {
-        if (input.role === null) seen.push(input.modelTier)
-        return ok(input)
-      }
-    )
+    const run = vi.fn(async (input: RunInput) => {
+      if (input.role === null) seen.push(input.modelTier)
+      return ok(input)
+    })
     const roleless = `
 schemaVersion: 1
 id: direct
@@ -1947,12 +1942,10 @@ function deadlinesTests() {
 function freshConversationsTests() {
   it('offers no session to resume where the step asked for a fresh one', async () => {
     const seen: { node: string; resumeSessionId: string | undefined }[] = []
-    const run = vi.fn(
-      async (input: { node: { id: string }; resumeSessionId: string | undefined }) => {
-        seen.push({ node: input.node.id, resumeSessionId: input.resumeSessionId })
-        return ok(input)
-      }
-    )
+    const run = vi.fn(async (input: RunInput) => {
+      seen.push({ node: input.node.id, resumeSessionId: input.resumeSessionId })
+      return ok(input)
+    })
     // Two units, so the builder has a second node of its own role to resume
     // into — which is the case the step's `context: fresh` has to override.
     const o = order([unit('U-1'), unit('U-2', { dependsOn: ['U-1'] })])
@@ -2497,12 +2490,10 @@ steps:
 `
 async function efforts(text = SHAPED): Promise<{ role: string | null; effort: unknown }[]> {
   const seen: { role: string | null; effort: unknown }[] = []
-  const run = vi.fn(
-    async (input: { node: { id: string }; role: string | null; effort: unknown }) => {
-      seen.push({ role: input.role, effort: input.effort })
-      return ok(input)
-    }
-  )
+  const run = vi.fn(async (input: RunInput) => {
+    seen.push({ role: input.role, effort: input.effort })
+    return ok(input)
+  })
   const o = order([unit('U-1')])
   const r = recipe(text)
   await execute(planOf(o, r), deps(run as never))
@@ -2620,7 +2611,7 @@ function commandStepsTests() {
   it('runs a command step as a command, not as an agent', async () => {
     const o = order([])
     const buildRuns = vi.fn(ok)
-    const runCommand = vi.fn(async () => 0)
+    const runCommand = vi.fn<ExecutorDeps['runCommand']>(async () => 0)
     await execute(planOf(o, recipe(REWORK)), {
       ...deps(buildRuns),
       runCommand,
@@ -2749,7 +2740,7 @@ describe('a resumed session is ended before it is resumed', () => {
     const order2 = order([unit('U-1'), unit('U-2', { dependsOn: ['U-1'] })])
     const ended: string[] = []
     const seenAtRunTime = new Set<string>()
-    const run = vi.fn(async (input: { node: { id: string }; resumeSessionId?: string }) => {
+    const run = vi.fn(async (input: RunInput) => {
       if (input.resumeSessionId !== undefined) seenAtRunTime.add(input.resumeSessionId)
       return ok(input)
     })
@@ -2857,7 +2848,7 @@ function mountingTests() {
       path.join(dataRoot, 'orders', o.id, 'skills-mount', 'build_U-1')
     )
     expect(
-      fs.existsSync(path.join(build?.skillsMount, '.claude', 'skills', 'ci-fix', 'SKILL.md'))
+      fs.existsSync(path.join(build?.skillsMount ?? '', '.claude', 'skills', 'ci-fix', 'SKILL.md'))
     ).toBe(true)
 
     // The verifier declares no skills at all.

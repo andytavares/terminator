@@ -61,6 +61,7 @@ function makeNote(overrides: Partial<ReviewNote> = {}): ReviewNote {
     id: 'n1',
     path: 'forge/amend.ts',
     line: 118,
+    side: 'RIGHT',
     body: 'why does amendOrder skip the ledger here??',
     createdAt: '2025-01-01T00:00:00Z',
     ...overrides,

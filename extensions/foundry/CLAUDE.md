@@ -175,6 +175,6 @@ A spec's temporary directory comes from `temporaryDirectory` in `tests/helpers/f
 
 ## Typecheck
 
-`npm run typecheck` checks the core, both packages and every extension (`typecheck:extensions` runs `tsc -p extensions/foundry/tsconfig.json`, which extends `tsconfig.extension.json`). The root `npx tsc --noEmit` checks nothing: the root `tsconfig.json` is `files: []` with project references. Neither `npm run build:extensions` (esbuild) nor the vite renderer build typechecks anything either — both strip types.
+`npm run typecheck` checks the core, both packages and every extension (`typecheck:extensions` runs `tsc -p extensions/foundry/tsconfig.json`, which extends `tsconfig.extension.json`, for `src/`, then `tsc -p extensions/foundry/tsconfig.test.json` for the specs under `tests/`). Vitest strips types, so a spec that no longer matches the type it builds — an order missing a field the schema now fills in, a mock whose arguments are untyped — runs green and is caught only by that second check. The root `npx tsc --noEmit` checks nothing: the root `tsconfig.json` is `files: []` with project references. Neither `npm run build:extensions` (esbuild) nor the vite renderer build typechecks anything either — both strip types.
 
 A type error the typecheck would catch — a `Record` keyed by a union missing a member, for example — otherwise ships through a green build, clean lint and passing unit tests, and blanks every Foundry surface at runtime.

@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, beforeAll, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
+import type { FileDiff } from '../../src/schemas/git.schema'
 
 vi.mock('../../src/utils/hljs', () => ({
   default: {
@@ -10,7 +11,7 @@ vi.mock('../../src/utils/hljs', () => ({
   },
 }))
 
-const makeDiff = (overrides: Record<string, unknown> = {}) => ({
+const makeDiff = (overrides: Partial<FileDiff> = {}): FileDiff => ({
   path: 'src/foo.ts',
   isBinary: false,
   truncated: false,
@@ -27,7 +28,9 @@ const makeDiff = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 })
 
-async function renderDiff(props: Record<string, unknown> = {}) {
+async function renderDiff(
+  props: { diff?: FileDiff; isStale?: boolean; onRefresh?: () => void } = {}
+) {
   const { FileDiffView } = await import('../../src/components/FileDiffView')
   return render(<FileDiffView diff={props.diff ?? makeDiff()} {...props} />)
 }

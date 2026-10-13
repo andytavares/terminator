@@ -42,6 +42,8 @@ function makePr(overrides: Partial<ReviewQueuePR> = {}): ReviewQueuePR {
     approvedBy: [],
     requestedReviewers: [],
     assigneeLogins: [],
+    viewedFileCount: 0,
+    mergeStateStatus: 'unknown',
     ...overrides,
   }
 }

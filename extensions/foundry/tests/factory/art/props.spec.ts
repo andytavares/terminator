@@ -90,6 +90,8 @@ function crew(overrides: Partial<Crew>): Crew {
     goal: null,
     then: 'idle',
     present: true,
+    restSeat: null,
+    settle: null,
     ...overrides,
   }
 }

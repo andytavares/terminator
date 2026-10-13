@@ -25,6 +25,8 @@ const dummyNote: NoteListItem = {
   archivedAt: null,
   tags: [],
   bodyPreview: '',
+  sortOrder: 0,
+  folderId: null,
 }
 
 describe('ExportDialog', exportDialogTests)

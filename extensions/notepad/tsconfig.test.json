@@ -1,0 +1,19 @@
+{
+  // Type-checks this extension's specs (`npm run typecheck:extensions`), the
+  // way the root tsconfig.test.json does the core's. Vitest strips types and
+  // tsconfig.json includes src/ only, so this is the only check the specs get.
+  // It starts from tsconfig.json and adds Vitest's globals (vitest.config.ts
+  // sets `globals: true`). The sources and the root tests/support helpers the
+  // specs import are checked through those imports.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    // The specs run on Node 24 (.nvmrc), not in the bundle's ES2022 target.
+    "lib": ["ES2024", "DOM", "DOM.Iterable"],
+    // A spec that activates the extension imports `src/index.ts` by name, not
+    // the esbuild bundle beside it, which vi.mock cannot reach into.
+    "allowImportingTsExtensions": true,
+    "types": ["node", "vite/client", "vitest/globals", "@terminator/extension-sdk/types/renderer"]
+  },
+  "include": ["tests/**/*.ts", "tests/**/*.tsx"]
+}

@@ -222,7 +222,7 @@ function weeklyReviewInboxRefreshTests() {
 
     // weekly-review was called twice: once at mount, once on step 1 completion
     const reviewCalls = mockInvoke.mock.calls.filter(
-      ([ch]: [string]) => ch === 'task-vault:projects:weekly-review'
+      ([ch]) => ch === 'task-vault:projects:weekly-review'
     )
     expect(reviewCalls.length).toBeGreaterThanOrEqual(2)
 

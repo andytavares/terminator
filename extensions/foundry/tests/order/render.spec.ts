@@ -253,28 +253,25 @@ function settledFindingsTests() {
   })
 }
 
+type Question = WorkOrder['openQuestions'][number]
+
+const question = (id: string, text: string, answer: string | null): Question => ({
+  id,
+  text,
+  why: '',
+  options: [],
+  recommended: null,
+  answer,
+  rank: 1,
+  confidence: null,
+})
+
 function questionsTests() {
   it('shows unanswered questions and hides answered ones', () => {
     const o = order({
       openQuestions: [
-        {
-          id: 'Q-1',
-          text: 'still open?',
-          why: '',
-          options: [],
-          recommended: null,
-          answer: null,
-          rank: 1,
-        },
-        {
-          id: 'Q-2',
-          text: 'already settled?',
-          why: '',
-          options: [],
-          recommended: null,
-          answer: 'yes',
-          rank: 1,
-        },
+        question('Q-1', 'still open?', null),
+        question('Q-2', 'already settled?', 'yes'),
       ],
     })
     const out = renderOrder(o)

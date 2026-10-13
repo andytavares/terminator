@@ -2,6 +2,7 @@ import React from 'react'
 import { describe, it, beforeAll, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { usePrReviewStore } from '../../src/stores/pr-review.store'
+import { PrReviewDetailSchema } from '../../src/schemas/pr-review.schema'
 
 vi.mock('../../src/stores/pr-review.store', () => ({ usePrReviewStore: vi.fn() }))
 vi.mock('../../src/hooks/usePrReview', () => ({ useLoadInlineComments: vi.fn(() => vi.fn()) }))
@@ -85,7 +86,8 @@ const mockChapter = {
   files: [mockFile],
 }
 
-const mockPr = {
+// Parsed as the review channel's answer is, so the schema's defaults are filled in.
+const mockPr = PrReviewDetailSchema.parse({
   number: 1,
   title: 'PR',
   body: '',
@@ -99,7 +101,7 @@ const mockPr = {
   lintStatus: 'pass' as const,
   coverageStatus: 'pass' as const,
   chapters: [mockChapter],
-}
+})
 
 const mockMarkFilesViewed = vi.fn()
 const mockClose = vi.fn()

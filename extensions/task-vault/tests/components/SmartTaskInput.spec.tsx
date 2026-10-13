@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest'
 import { render, screen, cleanup, fireEvent, act } from '@testing-library/react'
 import { installBridge, eventually, project } from './helpers/bridge'
 import { SmartTaskInput, invalidateSmartInputCache } from '../../src/components/SmartTaskInput'
@@ -22,8 +22,8 @@ beforeEach(() => {
 afterEach(() => cleanup())
 
 interface Spies {
-  onSubmit: ReturnType<typeof vi.fn>
-  onCancel: ReturnType<typeof vi.fn>
+  onSubmit: Mock<() => void>
+  onCancel: Mock<() => void>
   changes: string[]
 }
 
@@ -44,7 +44,7 @@ function Harness({ spies, initial }: { spies: Spies; initial: string }) {
 }
 
 async function renderInput(initial = '') {
-  const spies: Spies = { onSubmit: vi.fn(), onCancel: vi.fn(), changes: [] }
+  const spies: Spies = { onSubmit: vi.fn<() => void>(), onCancel: vi.fn<() => void>(), changes: [] }
   render(<Harness spies={spies} initial={initial} />)
   await eventually(() => expect(getSettingsValues).toHaveBeenCalled())
   await act(async () => {})

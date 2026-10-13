@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import Fastify from 'fastify'
-import type { FastifyInstance } from 'fastify'
+import type { FastifyInstance, InjectOptions } from 'fastify'
 import { isAllowedHost, registerAuthMiddleware } from '../../src/server/auth.middleware'
 
 const VALID_COOKIE = 'remote-session=valid-token'
@@ -21,7 +21,7 @@ async function buildApp(extraRoutes?: (app: FastifyInstance) => void): Promise<F
 
 /** Answer one request on an app of its own, closed again before the caller asserts. */
 async function injectIntoFreshApp(
-  request: Parameters<FastifyInstance['inject']>[0],
+  request: InjectOptions,
   extraRoutes?: (app: FastifyInstance) => void
 ) {
   const app = await buildApp(extraRoutes)

@@ -4,6 +4,7 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { ChapterFileList } from '../../src/components/pr-review/ChapterFileList'
 import { usePrReviewStore } from '../../src/stores/pr-review.store'
 import type { Chapter, RiskScore } from '../../src/schemas/pr-review.schema'
+import { changedFile } from './support/pr-review-file'
 
 vi.mock('../../src/stores/pr-review.store', () => ({
   usePrReviewStore: vi.fn(),
@@ -13,11 +14,13 @@ const mockReorderFiles = vi.fn()
 
 function makeRiskScore(): RiskScore {
   return {
-    score: 10,
     level: 'low',
+    composite: 10,
+    dominantDriver: '',
+    topImporters: [],
+    importerCount: 0,
     metrics: {
-      linesChanged: 5,
-      filesChanged: 1,
+      changeSize: 5,
       testFilePresent: true,
       complexityDelta: 0,
       churn90d: 1,
@@ -32,25 +35,21 @@ function makeChapter(): Chapter {
     id: 'ch-1',
     name: 'Core',
     estimatedMinutes: 5,
+    status: 'not-started',
     files: [
-      {
-        path: 'src/foo.ts',
-        status: 'modified',
+      changedFile('src/foo.ts', {
         additions: 3,
         deletions: 1,
-        tier: 1,
         riskScore: makeRiskScore(),
         whyHere: 'Core logic',
-      },
-      {
-        path: 'src/bar.ts',
-        status: 'added',
+      }),
+      changedFile('src/bar.ts', {
+        changeType: 'added',
         additions: 10,
-        deletions: 0,
         tier: 2,
         riskScore: makeRiskScore(),
         whyHere: 'New feature',
-      },
+      }),
     ],
   }
 }

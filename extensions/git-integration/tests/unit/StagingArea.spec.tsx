@@ -51,7 +51,7 @@ const STATUS_BADGE_TEXT: Record<string, string> = {
 
 function setupStore(
   files: ReturnType<typeof makeFile>[] = [],
-  overrides: Record<string, unknown> = {}
+  overrides: { status?: Record<string, unknown>; selectedFile?: unknown } = {}
 ) {
   mockStore({
     status:

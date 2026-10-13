@@ -50,7 +50,7 @@ function orderFor(recipeId: string, lanes: number[]): WorkOrder {
   return {
     ...base,
     recipe: recipeId,
-    risk: { ...base.risk, triggers: ['db_migration'] },
+    risk: { ...base.risk, triggers: ['migration'] },
     plan: {
       ...base.plan,
       units: lanes.map((lane) => unit(`U-${lane}`, lane)),
@@ -85,6 +85,8 @@ function rn(over: Partial<RunNode> & Pick<RunNode, 'id' | 'kind'>): RunNode {
     role: null,
     dependsOn: [],
     attempts: 0,
+    reworks: 0,
+    feedback: [],
     sessionId: null,
     worktreePath: null,
     startedAt: null,

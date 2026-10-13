@@ -3,7 +3,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { FullFileList } from '../../src/components/pr-review/FullFileList'
 import { usePrReviewStore } from '../../src/stores/pr-review.store'
-import type { PrReviewDetail, RiskScore } from '../../src/schemas/pr-review.schema'
+import {
+  PrReviewDetailSchema,
+  type PrReviewDetail,
+  type RiskScore,
+} from '../../src/schemas/pr-review.schema'
+import { changedFile } from './support/pr-review-file'
 
 vi.mock('../../src/stores/pr-review.store', () => ({
   usePrReviewStore: vi.fn(),
@@ -15,11 +20,13 @@ vi.mock('../../src/github/pr-review-service', () => ({
 
 function makeRiskScore(): RiskScore {
   return {
-    score: 10,
     level: 'low',
+    composite: 10,
+    dominantDriver: '',
+    topImporters: [],
+    importerCount: 0,
     metrics: {
-      linesChanged: 5,
-      filesChanged: 1,
+      changeSize: 5,
       testFilePresent: true,
       complexityDelta: 0,
       churn90d: 1,
@@ -29,34 +36,25 @@ function makeRiskScore(): RiskScore {
   }
 }
 
+// Parsed as the review channel's answer is, so the schema's defaults are filled in.
 function makePr(chapters: PrReviewDetail['chapters']): PrReviewDetail {
-  return {
+  return PrReviewDetailSchema.parse({
     number: 1,
     title: 'My PR',
     body: '',
-    headSHA: 'abc',
-    headRef: 'feature',
-    baseRef: 'main',
     author: 'alice',
     authorAvatarUrl: '',
-    state: 'open',
-    isDraft: false,
-    createdAt: '2024-01-01T00:00:00Z',
-    updatedAt: '2024-01-01T00:00:00Z',
+    openedAt: '2024-01-01T00:00:00Z',
+    headRefName: 'feature',
+    baseRefName: 'main',
+    headSHA: 'abc',
+    ciStatus: 'none',
     chapters,
-    threads: [],
-  }
+  })
 }
 
 function makeFile(path: string) {
-  return {
-    path,
-    status: 'modified' as const,
-    additions: 5,
-    deletions: 2,
-    tier: 1,
-    riskScore: makeRiskScore(),
-  }
+  return changedFile(path, { additions: 5, deletions: 2, riskScore: makeRiskScore() })
 }
 
 beforeEach(() => {
@@ -73,6 +71,7 @@ const defaultProps = {
       id: 'ch-1',
       name: 'Core',
       estimatedMinutes: 10,
+      status: 'not-started',
       files: [makeFile('src/foo.ts'), makeFile('src/bar.ts')],
     },
   ]),
@@ -193,6 +192,7 @@ describe('FullFileList — shows new file for a file a push added since your las
         id: 'ch-1',
         name: 'Core',
         estimatedMinutes: 10,
+        status: 'not-started',
         files: [{ ...makeFile('src/new.ts'), changeType: 'added' }],
       },
     ])
@@ -214,6 +214,7 @@ describe('FullFileList — does not call an added file new on a first review', (
         id: 'ch-1',
         name: 'Core',
         estimatedMinutes: 10,
+        status: 'not-started',
         files: [{ ...makeFile('src/new.ts'), changeType: 'added' }],
       },
     ])
@@ -235,6 +236,7 @@ describe('FullFileList — shows the reading-order reason under the file name', 
         id: 'ch-1',
         name: 'Core',
         estimatedMinutes: 10,
+        status: 'not-started',
         files: [makeFile('src/foo.ts')],
       },
     ])

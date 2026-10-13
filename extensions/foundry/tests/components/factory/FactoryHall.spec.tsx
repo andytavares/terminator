@@ -1,6 +1,6 @@
 import { createChangeBus } from '../../helpers/change-bus.js'
 import React from 'react'
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest'
 import { act, render, screen, waitFor, fireEvent, within } from '@testing-library/react'
 import { FactoryHall } from '../../../src/components/factory/FactoryHall.js'
 import { raiseGate } from '../../../src/gates/rules.js'
@@ -49,7 +49,7 @@ function view(over: Record<string, unknown> = {}) {
   }
 }
 
-let invoke: ReturnType<typeof vi.fn>
+let invoke: Mock<Window['electronAPI']['extensionBridge']['invoke']>
 const openExternal = vi.fn()
 
 interface MountProps {
@@ -623,7 +623,7 @@ function theSiteAndFailuresTests() {
     ;(window as unknown as Record<string, unknown>).electronAPI = {
       extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
     }
-    render(<FactoryHall orderId="WO-1" onBack={vi.fn()} />)
+    render(<FactoryHall orderId="WO-1" onOpenInList={vi.fn()} onBack={vi.fn()} />)
     await waitFor(() => screen.getByRole('button', { name: /Build the thing/ }))
     fireEvent.click(screen.getByRole('button', { name: /Build the thing/ }))
     await waitFor(() => screen.getByRole('button', { name: /ATTACH/ }))

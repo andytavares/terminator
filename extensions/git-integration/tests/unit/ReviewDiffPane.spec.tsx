@@ -5,6 +5,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 // (highlight.js among it) takes about a second to load under vitest, and a
 // test that imported it paid that against its own five-second timeout.
 import { ReviewDiffPane } from '../../src/components/pr-review/ReviewDiffPane'
+import { PrReviewDetailSchema, type PrChangedFile } from '../../src/schemas/pr-review.schema'
 
 // The pane reads both stores through selectors; these resolve them against the state each test sets.
 const { prStoreMock, uiStoreMock, highlightSpy, rowRenderSpy } = vi.hoisted(() => ({
@@ -157,7 +158,7 @@ function baseReviewUiStoreState() {
   }
 }
 
-const mockFile = {
+const mockFile: PrChangedFile = {
   path: 'src/foo.ts',
   changeType: 'modified' as const,
   additions: 5,
@@ -183,7 +184,8 @@ const mockFile = {
   },
 }
 
-const mockPr = {
+// Parsed as the review channel's answer is, so the schema's defaults are filled in.
+const mockPr = PrReviewDetailSchema.parse({
   number: 1,
   title: 'PR',
   body: '',
@@ -205,10 +207,10 @@ const mockPr = {
       files: [mockFile],
     },
   ],
-  readingOrder: [] as never[],
-  movedBlocks: [] as never[],
+  readingOrder: [],
+  movedBlocks: [],
   insights: null,
-}
+})
 
 const defaultProps = {
   repoRoot: '/repo',
@@ -247,8 +249,8 @@ function layOut(scrollerPx: number) {
 afterAll(() => {
   Object.defineProperty(HTMLElement.prototype, 'offsetHeight', jsdomOffsetHeight)
   Object.defineProperty(HTMLElement.prototype, 'offsetWidth', jsdomOffsetWidth)
-  delete (HTMLElement.prototype as Partial<HTMLElement>).clientHeight
-  delete (HTMLElement.prototype as Partial<HTMLElement>).scrollHeight
+  Reflect.deleteProperty(HTMLElement.prototype, 'clientHeight')
+  Reflect.deleteProperty(HTMLElement.prototype, 'scrollHeight')
 })
 
 beforeEach(() => {

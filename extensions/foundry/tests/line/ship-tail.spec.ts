@@ -19,20 +19,22 @@ function check(over: Partial<Check> = {}): Check {
 
 const PULL = { url: 'https://github.com/o/r/pull/1', cwd: '/repo' }
 
+type CiRoundsInput = Parameters<typeof ciRounds>[0]
+
 function harness(verdicts: CiVerdict[], opts: { sendBack?: boolean } = {}) {
   let call = 0
-  const watch = vi.fn(async (): Promise<CiVerdict> => {
+  const watch = vi.fn<CiRoundsInput['watch']>(async () => {
     const v = verdicts[Math.min(call, verdicts.length - 1)]
     call += 1
     return v
   })
-  const failedLogs = vi.fn(
-    async (checks: readonly Check[]) => `log for ${checks.map((c) => c.name).join(',')}`
+  const failedLogs = vi.fn<CiRoundsInput['failedLogs']>(
+    async (checks) => `log for ${checks.map((c) => c.name).join(',')}`
   )
-  const sendBack = vi.fn(async () => opts.sendBack ?? true)
-  const record = vi.fn(async () => {})
+  const sendBack = vi.fn<CiRoundsInput['sendBack']>(async () => opts.sendBack ?? true)
+  const record = vi.fn<CiRoundsInput['record']>(async () => {})
   const states: CiState[] = []
-  const state = vi.fn(async (s: Omit<CiState, 'at'>) => {
+  const state = vi.fn<CiRoundsInput['state']>(async (s) => {
     states.push({ ...s, at: 'x' })
   })
   return { watch, failedLogs, sendBack, record, state, states }
@@ -428,6 +430,7 @@ describe('settleShip', () => {
 })
 
 const feedback: Feedback = {
+  from: 'ci',
   attempt: 1,
   source: 'ci',
   command: null,

@@ -13,11 +13,13 @@ import {
   parseDiff,
 } from '../../src/github/pr-review-service'
 import { ReviewSessionSchema } from '../../src/schemas/pr-review.schema'
-import type { PrChangedFile, ReviewSession, FileMetrics } from '../../src/schemas/pr-review.schema'
+import type { PrChangedFile, FileMetrics } from '../../src/schemas/pr-review.schema'
+import type { z } from 'zod'
 
 // ─── Session persistence schema (T037) ───────────────────────────────────────
 
-const validSession: ReviewSession = {
+// A session as stored before v2: the fields v2 added are left to the schema's defaults.
+const validSession: z.input<typeof ReviewSessionSchema> = {
   repoRoot: '/home/user/repo',
   prNumber: 42,
   headSHA: 'abc123',
