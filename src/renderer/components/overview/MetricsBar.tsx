@@ -17,57 +17,17 @@ interface Props {
 }
 
 export function MetricsBar({ system }: Props): JSX.Element {
-  if (!system) {
-    return (
-      <div className="metrics-bar">
-        <div className="metrics-bar__item">
-          <span className="metrics-bar__label">CPU</span>
-          <span className="skeleton skeleton--metrics" />
-        </div>
-        <div className="metrics-bar__item">
-          <span className="metrics-bar__label">MEM</span>
-          <span className="skeleton skeleton--metrics" />
-        </div>
-        <div className="metrics-bar__item">
-          <span className="metrics-bar__label">NET</span>
-          <span className="skeleton skeleton--metrics" />
-        </div>
-      </div>
-    )
-  }
-
+  if (!system) return <MetricsPlaceholder />
   const cpuPct = Math.round(system.cpuPercent)
-  const cpuColor = cpuPct >= 90 ? '#e03131' : cpuPct >= 70 ? '#f08c00' : 'var(--accent)'
-
+  const memPct = (system.memUsedBytes / system.memTotalBytes) * 100
   return (
     <div className="metrics-bar">
-      <div className="metrics-bar__item">
-        <span className="metrics-bar__label">CPU</span>
-        <div className="metrics-bar__bar-track">
-          <div
-            className="metrics-bar__bar-fill"
-            style={{ width: `${cpuPct}%`, background: cpuColor }}
-          />
-        </div>
-        <span className="metrics-bar__value">{cpuPct}%</span>
-      </div>
-
-      <div className="metrics-bar__item">
-        <span className="metrics-bar__label">MEM</span>
-        <div className="metrics-bar__bar-track">
-          <div
-            className="metrics-bar__bar-fill"
-            style={{
-              width: `${(system.memUsedBytes / system.memTotalBytes) * 100}%`,
-              background: 'var(--accent)',
-            }}
-          />
-        </div>
-        <span className="metrics-bar__value">
-          {formatGiB(system.memUsedBytes)} / {formatGiB(system.memTotalBytes)} GB
-        </span>
-      </div>
-
+      <BarMetric label="CPU" percent={cpuPct} colour={cpuColour(cpuPct)}>
+        {cpuPct}%
+      </BarMetric>
+      <BarMetric label="MEM" percent={memPct} colour="var(--accent)">
+        {formatGiB(system.memUsedBytes)} / {formatGiB(system.memTotalBytes)} GB
+      </BarMetric>
       <div className="metrics-bar__item">
         <span className="metrics-bar__label">NET</span>
         <span className="metrics-bar__value">
@@ -75,6 +35,49 @@ export function MetricsBar({ system }: Props): JSX.Element {
           {formatBytesPerSec(system.netOutBytesPerSec)}
         </span>
       </div>
+    </div>
+  )
+}
+
+/** Amber from 70%, red from 90%. */
+function cpuColour(percent: number): string {
+  if (percent >= 90) return '#e03131'
+  return percent >= 70 ? '#f08c00' : 'var(--accent)'
+}
+
+/** Each metric's label over a skeleton, until the first sample arrives. */
+function MetricsPlaceholder(): JSX.Element {
+  return (
+    <div className="metrics-bar">
+      {['CPU', 'MEM', 'NET'].map((label) => (
+        <div key={label} className="metrics-bar__item">
+          <span className="metrics-bar__label">{label}</span>
+          <span className="skeleton skeleton--metrics" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+interface BarMetricProps {
+  label: string
+  percent: number
+  colour: string
+  /** The reading beside the bar. */
+  children: React.ReactNode
+}
+
+function BarMetric({ label, percent, colour, children }: BarMetricProps): JSX.Element {
+  return (
+    <div className="metrics-bar__item">
+      <span className="metrics-bar__label">{label}</span>
+      <div className="metrics-bar__bar-track">
+        <div
+          className="metrics-bar__bar-fill"
+          style={{ width: `${percent}%`, background: colour }}
+        />
+      </div>
+      <span className="metrics-bar__value">{children}</span>
     </div>
   )
 }

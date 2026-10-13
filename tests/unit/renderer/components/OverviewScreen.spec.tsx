@@ -285,3 +285,44 @@ describe('OverviewScreen — the Monitor wall — opens the link dialog for a se
     expect(closeFromFacts).toHaveBeenCalled()
   })
 })
+
+describe('OverviewScreen — starting and resuming from the wall', () => {
+  it('starts a terminal in a branch from its bar', async () => {
+    const { useWorkspaceStore } = await import('../../../../src/renderer/stores/workspace.store')
+    const { startSessionInBranch } = await import('../../../../src/renderer/terminal/start-session')
+    const { workspaceOf, projectOf } = await import('../../../support/renderer-stores')
+    useWorkspaceStore.setState({
+      workspaces: [workspaceOf({ id: 'w1', name: 'repo' })],
+      projectsByWorkspaceId: new Map([
+        ['w1', [projectOf({ id: 'p1', workspaceId: 'w1', name: 'main' })]],
+      ]),
+    })
+    render(<OverviewScreen />)
+    fireEvent.click(screen.getByRole('button', { name: 'New terminal' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'New terminal in repo / main' }))
+    expect(startSessionInBranch).toHaveBeenCalledWith('p1')
+  })
+})
+
+describe('OverviewScreen — starting and resuming from the wall — resumes a stopped session whose conversation is still there', () => {
+  it('resumes a stopped session whose conversation is still there', async () => {
+    const { resumeSession } = await import('../../../../src/renderer/terminal/start-session')
+    const stopped = fact({
+      sessionId: 'r',
+      name: 'claude',
+      state: 'exited',
+      agent: {
+        provider: 'claude',
+        sessionId: 'conv-1',
+        transcriptPath: '/t/c.jsonl',
+        cwd: '/code/repo',
+        capturedAt: '2026-09-15T18:00:00.000Z',
+      },
+      resumable: true,
+    })
+    state.facts = [stopped]
+    render(<OverviewScreen />)
+    fireEvent.click(screen.getByRole('button', { name: 'Resume claude' }))
+    expect(resumeSession).toHaveBeenCalledWith(stopped)
+  })
+})

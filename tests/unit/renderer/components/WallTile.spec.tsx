@@ -218,3 +218,23 @@ describe('WallTile — ends the session from its tile without opening it', () =>
     expect(screen.getByRole('article').className).not.toContain('wall-tile--needs')
   })
 })
+
+describe('WallTile — what does not open it', () => {
+  it('ignores a click on the footer itself', () => {
+    const { container } = render(<WallTile {...props} />)
+    fireEvent.click(container.querySelector('.wall-tile__foot')!)
+    expect(props.onOpen).not.toHaveBeenCalled()
+  })
+
+  it('ignores keys other than Enter, and Enter from inside the tile', () => {
+    render(<WallTile {...props} />)
+    fireEvent.keyDown(screen.getByRole('article'), { key: ' ' })
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Open claude' }), { key: 'Enter' })
+    expect(props.onOpen).not.toHaveBeenCalled()
+  })
+
+  it('draws no edge colour for a session with no workspace colour', () => {
+    render(<WallTile {...props} facts={{ ...facts, workspaceColor: null }} />)
+    expect(screen.getByRole('article').style.getPropertyValue('--rail')).toBe('')
+  })
+})

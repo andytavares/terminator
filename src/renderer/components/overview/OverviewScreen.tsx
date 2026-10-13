@@ -26,7 +26,8 @@ import {
   type WallPrefs,
   type WallThenBy,
 } from '../../sidebar/wall-prefs'
-import type { SessionFacts } from '../../sidebar/session-facts'
+import type { SessionActions, SessionFacts } from '../../sidebar/session-facts'
+import type { ProcessMetrics } from '../../../shared/types/index'
 import '../screen-chrome.css'
 import './OverviewScreen.css'
 
@@ -50,22 +51,73 @@ const THEN_BY: Array<{ value: WallThenBy; label: string }> = [
  * by CSS `order` — see placeWall for why a tile must never be re-parented.
  */
 export function OverviewScreen(): JSX.Element {
-  const facts = useSessionFacts()
-  const titles = useIssueTitles()
-  const setDescription = useSessionRecordsStore((s) => s.setDescription)
-  const forgetSession = useSessionRecordsStore((s) => s.forget)
-  const { processesBySessionId, startPolling, stopPolling } = useMetricsStore(
-    useShallow((s) => ({
-      processesBySessionId: s.processesBySessionId,
-      startPolling: s.startPolling,
-      stopPolling: s.stopPolling,
-    }))
-  )
-
-  const [prefs, setPrefs] = useState<WallPrefs>(loadWallPrefs)
+  const [prefs, update] = useWallPrefs()
   const [text, setText] = useState('')
   const [linking, setLinking] = useState<SessionFacts | null>(null)
+  const { open, shown } = useWallSessions(text)
+  const processes = useWallMetrics(open)
 
+  return (
+    <div className="wall">
+      <WallBar
+        openCount={open.length}
+        prefs={prefs}
+        update={update}
+        text={text}
+        setText={setText}
+      />
+      <WallBody
+        open={open}
+        shown={shown}
+        clearText={() => setText('')}
+        grid={{ prefs, processes, onLink: setLinking }}
+      />
+      {linking !== null && <SessionLinkDialog facts={linking} onClose={() => setLinking(null)} />}
+    </div>
+  )
+}
+
+interface WallBodyProps {
+  open: SessionFacts[]
+  shown: SessionFacts[]
+  clearText: () => void
+  grid: Omit<WallGridProps, 'shown'>
+}
+
+/** The tiles, or why there are none and the way out. */
+function WallBody({ open, shown, clearText, grid }: WallBodyProps): JSX.Element {
+  return (
+    <div className="wall__body">
+      {open.length === 0 ? (
+        <WallEmpty
+          message="No terminals are open"
+          action="Go to terminals"
+          onAction={() => useExtensionRegistry.getState().setActiveGlobalTab(null)}
+        />
+      ) : shown.length === 0 ? (
+        <WallEmpty message="No sessions match" action="Clear filters" onAction={clearText} />
+      ) : (
+        <WallGrid shown={shown} {...grid} />
+      )}
+    </div>
+  )
+}
+
+/** The open sessions, and those of them the filter text matches. */
+function useWallSessions(text: string) {
+  const facts = useSessionFacts()
+  const titles = useIssueTitles()
+  const open = useMemo(() => facts.filter((f) => !f.isClosed), [facts])
+  const shown = useMemo(
+    () => open.filter((f) => matchesFilter(f, text, titles)),
+    [open, text, titles]
+  )
+  return { open, shown }
+}
+
+/** The wall's arrangement, saved as it changes. */
+function useWallPrefs(): [WallPrefs, (patch: Partial<WallPrefs>) => void] {
+  const [prefs, setPrefs] = useState<WallPrefs>(loadWallPrefs)
   function update(patch: Partial<WallPrefs>): void {
     setPrefs((current) => {
       const next = { ...current, ...patch }
@@ -73,17 +125,18 @@ export function OverviewScreen(): JSX.Element {
       return next
     })
   }
+  return [prefs, update]
+}
 
-  const open = useMemo(() => facts.filter((f) => !f.isClosed), [facts])
-  const shown = useMemo(
-    () => open.filter((f) => matchesFilter(f, text, titles)),
-    [open, text, titles]
+/** Polls the process load of the open sessions while the wall is up. */
+function useWallMetrics(open: SessionFacts[]) {
+  const { processesBySessionId, startPolling, stopPolling } = useMetricsStore(
+    useShallow((s) => ({
+      processesBySessionId: s.processesBySessionId,
+      startPolling: s.startPolling,
+      stopPolling: s.stopPolling,
+    }))
   )
-  const wall = useMemo(() => placeWall(shown, prefs), [shown, prefs])
-  const factsById = new Map(shown.map((f) => [f.sessionId, f]))
-  const hasRest = wall.placements.length > wall.needsCount
-  const now = useNow()
-
   const sessionIdsKey = open.map((f) => f.sessionId).join(',')
   useEffect(() => {
     if (sessionIdsKey === '') {
@@ -105,123 +158,176 @@ export function OverviewScreen(): JSX.Element {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionIdsKey])
+  return processesBySessionId
+}
 
-  function saveDescription(target: SessionFacts, description: string | null): void {
-    void setDescription(target.snapshot, description)
-  }
+interface WallBarProps {
+  openCount: number
+  prefs: WallPrefs
+  update: (patch: Partial<WallPrefs>) => void
+  text: string
+  setText: (text: string) => void
+}
 
+/** The title and count, New terminal, the arrangement controls and the filter. */
+function WallBar({ openCount, prefs, update, text, setText }: WallBarProps): JSX.Element {
   return (
-    <div className="wall">
-      <div className="wall__bar">
-        <h2 className="wall__title">Overview</h2>
-        <span className="wall__meta">
-          {open.length} live {open.length === 1 ? 'terminal' : 'terminals'}
-        </span>
-        <NewSessionMenu
-          onStartInBranch={(projectId) => void startSessionInBranch(projectId)}
-          onStartScratch={() => void startScratchSession()}
+    <div className="wall__bar">
+      <h2 className="wall__title">Overview</h2>
+      <span className="wall__meta">
+        {openCount} live {openCount === 1 ? 'terminal' : 'terminals'}
+      </span>
+      <NewSessionMenu
+        onStartInBranch={(projectId) => void startSessionInBranch(projectId)}
+        onStartScratch={() => void startScratchSession()}
+      />
+      <WallArrangement prefs={prefs} update={update} />
+      <label className="wall__search">
+        <Search aria-hidden="true" />
+        <input
+          type="search"
+          aria-label="Filter sessions"
+          placeholder="Filter sessions"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
         />
-        <div className="wall__sizes" role="radiogroup" aria-label="Tile size">
-          {SIZES.map((size) => (
-            <button
-              key={size.value}
-              type="button"
-              role="radio"
-              aria-label={size.label}
-              aria-checked={prefs.size === size.value}
-              className="wall__size"
-              onClick={() => update({ size: size.value })}
-            >
-              {size.short}
-            </button>
-          ))}
-        </div>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={prefs.pinNeeds}
-          className="wall__toggle"
-          onClick={() => update({ pinNeeds: !prefs.pinNeeds })}
-        >
-          Pin sessions that need you
-        </button>
-        <label className="wall__select">
-          <span>Then by</span>
-          <select
-            aria-label="Then by"
-            value={prefs.thenBy}
-            onChange={(e) => update({ thenBy: e.target.value as WallThenBy })}
-          >
-            {THEN_BY.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="wall__search">
-          <Search aria-hidden="true" />
-          <input
-            type="search"
-            aria-label="Filter sessions"
-            placeholder="Filter sessions"
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-          />
-        </label>
-      </div>
-
-      <div className="wall__body">
-        {open.length === 0 ? (
-          <div className="wall__empty">
-            <p>No terminals are open</p>
-            <button
-              type="button"
-              className="wall__empty-action"
-              onClick={() => useExtensionRegistry.getState().setActiveGlobalTab(null)}
-            >
-              Go to terminals
-            </button>
-          </div>
-        ) : shown.length === 0 ? (
-          <div className="wall__empty">
-            <p>No sessions match</p>
-            <button type="button" className="wall__empty-action" onClick={() => setText('')}>
-              Clear filters
-            </button>
-          </div>
-        ) : (
-          <div className="wall__grid" data-size={prefs.size}>
-            {wall.needsCount > 0 && (
-              <h3 className="wall__band" style={{ order: 0 }}>
-                Needs you
-              </h3>
-            )}
-            {wall.needsCount > 0 && hasRest && (
-              <h3 className="wall__band" style={{ order: wall.needsCount + 1 }}>
-                Everything else
-              </h3>
-            )}
-            {wall.placements.map((placement) => (
-              <WallTile
-                key={placement.sessionId}
-                facts={factsById.get(placement.sessionId)!}
-                placement={placement}
-                metrics={processesBySessionId.get(placement.sessionId) ?? null}
-                now={now}
-                onOpen={revealSession}
-                onSaveDescription={saveDescription}
-                onLink={setLinking}
-                onResume={(facts) => void resumeSession(facts)}
-                onCloseSession={(facts) => void closeSessionFromFacts(facts)}
-                onForgetSession={(facts) => void forgetSession(facts.sessionId)}
-                answers={answersFor(factsById.get(placement.sessionId)!)}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-      {linking !== null && <SessionLinkDialog facts={linking} onClose={() => setLinking(null)} />}
+      </label>
     </div>
   )
+}
+
+/** Tile size, pinning what needs you, and what orders the rest. */
+function WallArrangement({ prefs, update }: Pick<WallBarProps, 'prefs' | 'update'>) {
+  return (
+    <>
+      <SizeChoices prefs={prefs} update={update} />
+      <button
+        type="button"
+        role="switch"
+        aria-checked={prefs.pinNeeds}
+        className="wall__toggle"
+        onClick={() => update({ pinNeeds: !prefs.pinNeeds })}
+      >
+        Pin sessions that need you
+      </button>
+      <ThenBySelect prefs={prefs} update={update} />
+    </>
+  )
+}
+
+function SizeChoices({ prefs, update }: Pick<WallBarProps, 'prefs' | 'update'>): JSX.Element {
+  return (
+    <div className="wall__sizes" role="radiogroup" aria-label="Tile size">
+      {SIZES.map((size) => (
+        <button
+          key={size.value}
+          type="button"
+          role="radio"
+          aria-label={size.label}
+          aria-checked={prefs.size === size.value}
+          className="wall__size"
+          onClick={() => update({ size: size.value })}
+        >
+          {size.short}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function ThenBySelect({ prefs, update }: Pick<WallBarProps, 'prefs' | 'update'>): JSX.Element {
+  return (
+    <label className="wall__select">
+      <span>Then by</span>
+      <select
+        aria-label="Then by"
+        value={prefs.thenBy}
+        onChange={(e) => update({ thenBy: e.target.value as WallThenBy })}
+      >
+        {THEN_BY.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  )
+}
+
+interface WallEmptyProps {
+  message: string
+  action: string
+  onAction: () => void
+}
+
+function WallEmpty({ message, action, onAction }: WallEmptyProps): JSX.Element {
+  return (
+    <div className="wall__empty">
+      <p>{message}</p>
+      <button type="button" className="wall__empty-action" onClick={onAction}>
+        {action}
+      </button>
+    </div>
+  )
+}
+
+interface WallGridProps {
+  shown: SessionFacts[]
+  prefs: WallPrefs
+  processes: Map<string, ProcessMetrics>
+  onLink: (facts: SessionFacts) => void
+}
+
+/** The band headings and every tile, as siblings in one grid. */
+function WallGrid({ shown, prefs, processes, onLink }: WallGridProps): JSX.Element {
+  const wall = useMemo(() => placeWall(shown, prefs), [shown, prefs])
+  const factsById = new Map(shown.map((f) => [f.sessionId, f]))
+  const now = useNow()
+  return (
+    <div className="wall__grid" data-size={prefs.size}>
+      <BandHeadings
+        needsCount={wall.needsCount}
+        hasRest={wall.placements.length > wall.needsCount}
+      />
+      {wall.placements.map((placement) => (
+        <WallTile
+          key={placement.sessionId}
+          facts={factsById.get(placement.sessionId)!}
+          placement={placement}
+          metrics={processes.get(placement.sessionId) ?? null}
+          now={now}
+          onLink={onLink}
+          answers={answersFor(factsById.get(placement.sessionId)!)}
+          {...TILE_ACTIONS}
+        />
+      ))}
+    </div>
+  )
+}
+
+/** "Needs you" over the pinned tiles and "Everything else" after them, when both exist. */
+function BandHeadings({ needsCount, hasRest }: { needsCount: number; hasRest: boolean }) {
+  if (needsCount === 0) return null
+  return (
+    <>
+      <h3 className="wall__band" style={{ order: 0 }}>
+        Needs you
+      </h3>
+      {hasRest && (
+        <h3 className="wall__band" style={{ order: needsCount + 1 }}>
+          Everything else
+        </h3>
+      )}
+    </>
+  )
+}
+
+/** What every tile does, the same for each. */
+const TILE_ACTIONS: SessionActions = {
+  onOpen: revealSession,
+  onSaveDescription: (target, description) =>
+    void useSessionRecordsStore.getState().setDescription(target.snapshot, description),
+  onResume: (facts) => void resumeSession(facts),
+  onCloseSession: (facts) => void closeSessionFromFacts(facts),
+  onForgetSession: (facts) => void useSessionRecordsStore.getState().forget(facts.sessionId),
 }
