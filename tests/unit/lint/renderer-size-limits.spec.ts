@@ -6,7 +6,9 @@ import path from 'node:path'
  * The function size limits `eslint.config.mjs` applies to the renderer, the
  * remote client, the extension SDK and design system, and their tests,
  * checked against the real config: at most 30 lines (blank lines and comments
- * aside), complexity 10 and three parameters.
+ * aside), complexity 10 and three parameters. As in extension-rules.spec.ts,
+ * loading the config imports typescript-eslint and the TypeScript compiler,
+ * so the module loads it once, before any case runs.
  */
 
 const repoRoot = path.resolve(__dirname, '../../..')
@@ -14,6 +16,10 @@ const eslint = new ESLint({
   cwd: repoRoot,
   overrideConfigFile: path.join(repoRoot, 'eslint.config.mjs'),
 })
+// The first lint of each kind of file also loads the parser and the rules it runs.
+for (const file of ['src/renderer/warm-up.ts', 'src/renderer/WarmUp.tsx']) {
+  await eslint.lintText('export const a = 1\n', { filePath: path.join(repoRoot, file) })
+}
 
 const SIZE_RULES = new Set(['max-lines-per-function', 'complexity', 'max-params'])
 
