@@ -1610,7 +1610,7 @@ function anApprovedRegradeTests() {
     })
     const asked = first.gates.find((g) => g.rule === 'risk.p0')
     if (asked === undefined) throw new Error('expected the regrade to be asked about')
-    const approved = decide(asked, 'approve', '', '2026-09-28T19:12:26.193Z')
+    const approved = decide(asked, { option: 'approve', note: '', at: '2026-09-28T19:12:26.193Z' })
 
     const resumed = await execute(o, recipe(), first.graph, {
       ...deps(vi.fn(ok)),
@@ -1633,7 +1633,7 @@ function aHeldRegradeTests() {
     })
     const asked = first.gates.find((g) => g.rule === 'risk.p0')
     if (asked === undefined) throw new Error('expected the regrade to be asked about')
-    const held = decide(asked, 'hold', '', '2026-09-28T19:12:26.193Z')
+    const held = decide(asked, { option: 'hold', note: '', at: '2026-09-28T19:12:26.193Z' })
 
     const resumed = await execute(o, recipe(), first.graph, {
       ...deps(vi.fn(ok)),

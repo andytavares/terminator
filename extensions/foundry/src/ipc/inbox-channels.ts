@@ -169,7 +169,7 @@ export function createInboxChannels(deps: InboxDeps): InboxChannels {
 
     let decided
     try {
-      decided = decide(gate, payload.option, payload.note ?? '', deps.now())
+      decided = decide(gate, { option: payload.option, note: payload.note ?? '', at: deps.now() })
     } catch (error) {
       return { error: (error as Error).message }
     }

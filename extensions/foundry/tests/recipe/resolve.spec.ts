@@ -295,6 +295,23 @@ function countsAndUnknownKindsTests() {
     expect(checkRequirements([{ kind: 'repos', value: '1' }], order()).available).toBe(true)
   })
 
+  it('compares with at most and fewer than, and says how many the order has', () => {
+    expect(checkRequirements([{ kind: 'repos', value: '<=1' }], order()).available).toBe(true)
+    expect(checkRequirements([{ kind: 'repos', value: '<2' }], order()).available).toBe(true)
+    const r = checkRequirements([{ kind: 'repos', value: '<1' }], order())
+    expect(r.unmet).toEqual(['needs < 1 repositories, this order has 1'])
+  })
+
+  it('withholds a recipe whose repository count it cannot read', () => {
+    const r = checkRequirements([{ kind: 'repos', value: 'several' }], order())
+    expect(r.unmet).toEqual(['unreadable repos requirement'])
+  })
+
+  it('treats a kind named like a built-in property as unknown, not as a check', () => {
+    const r = checkRequirements([{ kind: 'toString', value: '1' }], order())
+    expect(r.unmet).toEqual(['unknown requirement "toString"'])
+  })
+
   it('treats an unknown requirement kind as unmet, never as satisfied', () => {
     const r = checkRequirements([{ kind: 'phase_of_moon', value: 'full' }], order())
     expect(r.available).toBe(false)

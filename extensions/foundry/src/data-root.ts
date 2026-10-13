@@ -92,8 +92,12 @@ export function unitDir(root: string, orderId: string, unitId: string): string {
 }
 
 /** Named by merge order first so a directory listing reads in merge order. */
-export function laneDir(root: string, orderId: string, ord: number, repo: string): string {
-  return path.join(orderDir(root, orderId), 'lanes', `${ord}-${repo}`)
+export function laneDir(
+  root: string,
+  orderId: string,
+  lane: { readonly ord: number; readonly repo: string }
+): string {
+  return path.join(orderDir(root, orderId), 'lanes', `${lane.ord}-${lane.repo}`)
 }
 
 export function ledgerPath(root: string, orderId: string): string {

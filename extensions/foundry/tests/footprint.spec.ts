@@ -75,7 +75,7 @@ function theDataRootTests() {
     for (const helper of [
       orderDir('/root', 'WO-1'),
       unitDir('/root', 'WO-1', 'U-1'),
-      laneDir('/root', 'WO-1', 1, 'repo'),
+      laneDir('/root', 'WO-1', { ord: 1, repo: 'repo' }),
       ledgerPath('/root', 'WO-1'),
     ]) {
       expect(helper.startsWith('/root/')).toBe(true)

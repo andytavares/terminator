@@ -103,7 +103,11 @@ function defaultsAndBudgetsTests() {
 
 describe('decide', () => {
   it('records the operator choice, the note and when', () => {
-    const g = decide(gate(), 'approve', 'read the diff', '2026-09-06T11:00:00.000Z')
+    const g = decide(gate(), {
+      option: 'approve',
+      note: 'read the diff',
+      at: '2026-09-06T11:00:00.000Z',
+    })
     expect(g.decision).toEqual({
       option: 'approve',
       by: 'operator',
@@ -113,12 +117,16 @@ describe('decide', () => {
   })
 
   it('refuses an option the gate never offered', () => {
-    expect(() => decide(gate(), 'ship_it', '', 'now')).toThrow(/not one of the options/)
+    expect(() => decide(gate(), { option: 'ship_it', note: '', at: 'now' })).toThrow(
+      /not one of the options/
+    )
   })
 
   it('refuses to decide the same gate twice', () => {
-    const once = decide(gate(), 'approve', '', 'now')
-    expect(() => decide(once, 'send_back', '', 'later')).toThrow(AlreadyDecidedError)
+    const once = decide(gate(), { option: 'approve', note: '', at: 'now' })
+    expect(() => decide(once, { option: 'send_back', note: '', at: 'later' })).toThrow(
+      AlreadyDecidedError
+    )
   })
 })
 
@@ -130,7 +138,7 @@ describe('applyDefault', () => {
   })
 
   it('leaves a gate the operator already answered alone', () => {
-    const answered = decide(gate(), 'approve', '', 'now')
+    const answered = decide(gate(), { option: 'approve', note: '', at: 'now' })
     expect(applyDefault(answered, 'later')).toEqual(answered)
   })
 })
@@ -147,7 +155,11 @@ describe('isOverdue', () => {
   })
 
   it('is never overdue once it has been decided', () => {
-    const g = decide(gate({ deadline: '2026-09-06T11:00:00.000Z' }), 'approve', '', 'now')
+    const g = decide(gate({ deadline: '2026-09-06T11:00:00.000Z' }), {
+      option: 'approve',
+      note: '',
+      at: 'now',
+    })
     expect(isOverdue(g, '2099-01-01T00:00:00.000Z')).toBe(false)
   })
 })
@@ -234,7 +246,7 @@ function rankingTests() {
 
 function theQueueAndTiesTests() {
   it('leaves decided gates out of the queue', () => {
-    const answered = decide(ranked({ id: 'done' }), 'approve', '', 'now')
+    const answered = decide(ranked({ id: 'done' }), { option: 'approve', note: '', at: 'now' })
     expect(rankInbox([answered, ranked({ id: 'open' })]).map((g) => g.id)).toEqual(['open'])
   })
 

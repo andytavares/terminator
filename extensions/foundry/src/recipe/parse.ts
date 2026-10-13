@@ -49,6 +49,40 @@ export type StepKind = (typeof STEP_KINDS)[number]
 const EFFORT_LEVELS = ['low', 'medium', 'high', 'xhigh', 'max'] as const
 export type EffortLevel = (typeof EFFORT_LEVELS)[number]
 
+/** The fields a step must declare for its kind. */
+interface StepFields {
+  readonly kind: string
+  readonly role?: unknown
+  readonly command?: unknown
+  readonly over?: unknown
+  readonly step?: unknown
+  readonly rule?: unknown
+  readonly defaultIfIgnored?: unknown
+}
+
+/** What a step of its kind needs and does not declare, in words. */
+function missingFor(step: StepFields): string[] {
+  switch (step.kind) {
+    case 'agent':
+      return step.role === undefined ? ['a role'] : []
+    case 'run':
+      return step.command === undefined ? ['a command'] : []
+    case 'fanout':
+      return step.over === undefined || step.step === undefined ? ['both `over` and `step`'] : []
+    case 'gate':
+      return missingForGate(step)
+    default:
+      return []
+  }
+}
+
+function missingForGate(step: StepFields): string[] {
+  const missing = step.rule === undefined ? ['a rule'] : []
+  // A gate with no stated default is a gate that stops the line for ever when
+  // nobody answers it. Saying what silence means is the contract.
+  return step.defaultIfIgnored === undefined ? [...missing, 'a defaultIfIgnored'] : missing
+}
+
 const StepSchema = z
   .object({
     id: z.string().min(1),
@@ -79,19 +113,8 @@ const StepSchema = z
       .optional(),
   })
   .superRefine((step, ctx) => {
-    const need = (field: string): void => {
+    for (const field of missingFor(step)) {
       ctx.addIssue({ code: 'custom', message: `step "${step.id}" (${step.kind}) needs ${field}` })
-    }
-    if (step.kind === 'agent' && step.role === undefined) need('a role')
-    if (step.kind === 'run' && step.command === undefined) need('a command')
-    if (step.kind === 'fanout' && (step.over === undefined || step.step === undefined)) {
-      need('both `over` and `step`')
-    }
-    if (step.kind === 'gate') {
-      if (step.rule === undefined) need('a rule')
-      // A gate with no stated default is a gate that stops the line for ever
-      // when nobody answers it. Saying what silence means is the contract.
-      if (step.defaultIfIgnored === undefined) need('a defaultIfIgnored')
     }
   })
 
@@ -160,43 +183,62 @@ export function parseRecipe(text: string, file: string): ParseResult<Recipe> {
     return fail(file, `declares id "${recipe.id}", which does not match the filename`)
   }
 
-  const seen = new Set<string>()
-  for (const step of recipe.steps) {
-    if (seen.has(step.id)) return fail(file, `has more than one step called "${step.id}"`)
-    seen.add(step.id)
-  }
-  for (const step of recipe.steps) {
-    for (const after of step.after) {
-      if (!seen.has(after)) {
-        return fail(file, `step "${step.id}" waits on "${after}", which does not exist`)
-      }
-    }
-  }
-  for (const step of recipe.steps) {
-    const bad = badSkillIds(step.skills ?? [])
-    if (bad.length > 0) {
-      return fail(file, `step "${step.id}" names skill "${bad[0]}", which is not a valid skill id`)
-    }
-  }
-  const cycle = findCycle(recipe.steps)
-  if (cycle !== null) return fail(file, `has a cycle in its step graph, through "${cycle}"`)
-
+  const problem = stepGraphProblem(recipe.steps)
+  if (problem !== null) return fail(file, problem)
   const onFailProblem = checkOnFail(recipe.steps, file)
   if (onFailProblem !== null) return onFailProblem
+  const ci = ciProblem(recipe)
+  return ci === null ? { ok: true, value: recipe } : fail(file, ci)
+}
 
-  if (recipe.ci !== undefined) {
-    const hasReadyForReviewGate = recipe.steps.some(
-      (step) => step.kind === 'gate' && step.rule === 'ready-for-review'
-    )
-    if (!hasReadyForReviewGate) {
-      return fail(
-        file,
-        'declares ci, but opens no ready-for-review gate — there is no draft for CI to watch'
-      )
+/** The first thing wrong with how the steps name and wait on each other, in words. */
+function stepGraphProblem(steps: readonly Step[]): string | null {
+  return duplicateStep(steps) ?? unknownWait(steps) ?? badSkill(steps) ?? cycleIn(steps)
+}
+
+function duplicateStep(steps: readonly Step[]): string | null {
+  const seen = new Set<string>()
+  for (const step of steps) {
+    if (seen.has(step.id)) return `has more than one step called "${step.id}"`
+    seen.add(step.id)
+  }
+  return null
+}
+
+function unknownWait(steps: readonly Step[]): string | null {
+  const ids = new Set(steps.map((step) => step.id))
+  for (const step of steps) {
+    const missing = step.after.find((after) => !ids.has(after))
+    if (missing !== undefined) {
+      return `step "${step.id}" waits on "${missing}", which does not exist`
     }
   }
+  return null
+}
 
-  return { ok: true, value: recipe }
+function badSkill(steps: readonly Step[]): string | null {
+  for (const step of steps) {
+    const bad = badSkillIds(step.skills ?? [])
+    if (bad.length > 0)
+      return `step "${step.id}" names skill "${bad[0]}", which is not a valid skill id`
+  }
+  return null
+}
+
+function cycleIn(steps: readonly Step[]): string | null {
+  const cycle = findCycle(steps)
+  return cycle === null ? null : `has a cycle in its step graph, through "${cycle}"`
+}
+
+/** A recipe that declares ci needs a ready-for-review gate to open the draft CI watches. */
+function ciProblem(recipe: Recipe): string | null {
+  if (recipe.ci === undefined) return null
+  const opensADraft = recipe.steps.some(
+    (step) => step.kind === 'gate' && step.rule === 'ready-for-review'
+  )
+  return opensADraft
+    ? null
+    : 'declares ci, but opens no ready-for-review gate — there is no draft for CI to watch'
 }
 
 /** Every id reachable by walking `after`, transitively — a step's upstream. */

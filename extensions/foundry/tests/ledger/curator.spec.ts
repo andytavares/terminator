@@ -213,6 +213,13 @@ function otherActionsTests() {
     expect(propose({ entries: silent })).toEqual([])
   })
 
+  it('ignores a reason that is nothing but the identifiers it names', () => {
+    const named = Array.from({ length: 5 }, (_, n) =>
+      entry({ at: `2026-09-0${n + 1}T10:00:00.000Z`, reason: '`U-1` src/a.ts 42' })
+    )
+    expect(propose({ entries: named })).toEqual([])
+  })
+
   it('names the actions it reads, rather than reading everything', () => {
     expect(REJECTION_ACTIONS).toContain('review.rejected')
     expect(REJECTION_ACTIONS).not.toContain('order.agreed')

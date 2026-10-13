@@ -115,6 +115,8 @@ function countsReachAndUnreadableTests() {
 
   it('reaches only the collections it names, and no further', () => {
     expect(evaluateWhen('budgets.agents count > 0', order())).toBe(false)
+    expect(evaluateWhen('budgets.agents is empty', order())).toBe(false)
+    expect(evaluateWhen('budgets.agents is not empty', order())).toBe(false)
   })
 
   it('is false for an expression it cannot read — a step that runs because nobody could read its condition is the worse failure', () => {
@@ -279,6 +281,21 @@ function collectionTestsTests() {
   it('states an emptiness test on another collection', () => {
     expect(whenSkipReason('plan.sharedFiles is not empty', order())).toBe(
       'runs only when plan.sharedFiles is not empty; it is empty'
+    )
+  })
+
+  it('states an emptiness test that wanted the collection empty', () => {
+    expect(whenSkipReason('plan.units is empty', order())).toBe(
+      'runs only when plan.units is empty; it has 2'
+    )
+  })
+
+  it('counts a collection it does not reach as none', () => {
+    expect(whenSkipReason('budgets.agents count > 0', order())).toBe(
+      'runs only when budgets.agents count > 0; it has 0'
+    )
+    expect(whenSkipReason('budgets.agents is empty', order())).toBe(
+      'runs only when budgets.agents is empty; it has 0'
     )
   })
 

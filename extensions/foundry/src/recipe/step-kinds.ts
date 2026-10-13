@@ -131,6 +131,82 @@ function collectionAt(path: string, order: WorkOrder): unknown[] | null {
 const GRADE_CONDITION = /^risk\.grade\s+is\s+(not\s+)?(P[0-3])$/
 
 /**
+ * One form a `when` condition can take: what it matches, whether it holds for
+ * an order, and the record of a step it kept from running.
+ */
+interface ConditionForm {
+  readonly pattern: RegExp
+  readonly holds: (match: RegExpExecArray, order: WorkOrder) => boolean
+  readonly whyNot: (match: RegExpExecArray, order: WorkOrder) => string
+}
+
+const TOOLCHAIN_SET: ConditionForm = {
+  pattern: /^toolchain\.(\w+)\s+is\s+(not\s+)?set$/,
+  holds: ([, check, negated], order) => {
+    if (!(CHECK_NAMES as readonly string[]).includes(check)) return false
+    const measured = order.context.toolchain[check as CheckName] !== null
+    return negated === undefined ? measured : !measured
+  },
+  whyNot: ([, check, negated]) =>
+    negated === undefined
+      ? `runs only when the repository has a ${check} command; it has none`
+      : `runs only when the repository has no ${check} command; it has one`,
+}
+
+const GRADE_IS: ConditionForm = {
+  pattern: GRADE_CONDITION,
+  holds: ([, negated, grade], order) => (order.risk.grade === grade) === (negated === undefined),
+  whyNot: ([, negated, grade], order) =>
+    negated === undefined
+      ? `runs only when the change is graded ${grade}; it is graded ${order.risk.grade}`
+      : `runs only when the change is not graded ${grade}; it is graded ${order.risk.grade}`,
+}
+
+const EMPTINESS: ConditionForm = {
+  pattern: /^([\w.]+)\s+is\s+(not\s+)?empty$/,
+  holds: ([, path, negated], order) => {
+    const items = collectionAt(path, order)
+    if (items === null) return false
+    return negated === undefined ? items.length === 0 : items.length > 0
+  },
+  whyNot: ([, path, negated], order) => emptinessWhyNot(path, negated === undefined, order),
+}
+
+function emptinessWhyNot(path: string, wantedEmpty: boolean, order: WorkOrder): string {
+  const size = collectionAt(path, order)?.length ?? 0
+  if (path === 'risk.triggers') {
+    return wantedEmpty
+      ? `runs only when no risk triggers fire; this order has ${size}`
+      : 'runs only when risk triggers fire; this order has none'
+  }
+  return wantedEmpty
+    ? `runs only when ${path} is empty; it has ${size}`
+    : `runs only when ${path} is not empty; it is empty`
+}
+
+const COUNT: ConditionForm = {
+  pattern: /^([\w.]+)\s+count\s+(>=|<=|>|<|==|!=)\s+(\d+)$/,
+  holds: ([, path, operator, bound], order) => {
+    const items = collectionAt(path, order)
+    if (items === null) return false
+    return compareNumbers(items.length, operator, Number(bound))
+  },
+  whyNot: ([text, path], order) =>
+    `runs only when ${text}; it has ${collectionAt(path, order)?.length ?? 0}`,
+}
+
+/** In the order they are tried: the first form that matches decides. */
+const CONDITION_FORMS: readonly ConditionForm[] = [TOOLCHAIN_SET, GRADE_IS, EMPTINESS, COUNT]
+
+function formOf(text: string): { form: ConditionForm; match: RegExpExecArray } | null {
+  for (const form of CONDITION_FORMS) {
+    const match = form.pattern.exec(text)
+    if (match !== null) return { form, match }
+  }
+  return null
+}
+
+/**
  * `risk.triggers is not empty`, `plan.lanes count > 1`.
  *
  * An expression this cannot parse is **false**, never true: a step that runs
@@ -138,36 +214,8 @@ const GRADE_CONDITION = /^risk\.grade\s+is\s+(not\s+)?(P[0-3])$/
  */
 export function evaluateWhen(expression: string | undefined, order: WorkOrder): boolean {
   if (expression === undefined || expression.trim() === '') return true
-
-  const toolchainSet = /^toolchain\.(\w+)\s+is\s+(not\s+)?set$/.exec(expression.trim())
-  if (toolchainSet !== null) {
-    const [, check, negated] = toolchainSet
-    if (!(CHECK_NAMES as readonly string[]).includes(check)) return false
-    const measured = order.context.toolchain[check as CheckName] !== null
-    return negated === undefined ? measured : !measured
-  }
-
-  const grade = GRADE_CONDITION.exec(expression.trim())
-  if (grade !== null) {
-    const matches = order.risk.grade === grade[2]
-    return grade[1] === undefined ? matches : !matches
-  }
-
-  const emptiness = /^([\w.]+)\s+is\s+(not\s+)?empty$/.exec(expression.trim())
-  if (emptiness !== null) {
-    const items = collectionAt(emptiness[1], order)
-    if (items === null) return false
-    return emptiness[2] === undefined ? items.length === 0 : items.length > 0
-  }
-
-  const count = /^([\w.]+)\s+count\s+(>=|<=|>|<|==|!=)\s+(\d+)$/.exec(expression.trim())
-  if (count !== null) {
-    const items = collectionAt(count[1], order)
-    if (items === null) return false
-    return compareNumbers(items.length, count[2], Number(count[3]))
-  }
-
-  return false
+  const read = formOf(expression.trim())
+  return read === null ? false : read.form.holds(read.match, order)
 }
 
 /**
@@ -178,43 +226,8 @@ export function evaluateWhen(expression: string | undefined, order: WorkOrder): 
  */
 export function whenSkipReason(expression: string, order: WorkOrder): string {
   const text = expression.trim()
-
-  const toolchainSet = /^toolchain\.(\w+)\s+is\s+(not\s+)?set$/.exec(text)
-  if (toolchainSet !== null) {
-    const [, check, negated] = toolchainSet
-    return negated === undefined
-      ? `runs only when the repository has a ${check} command; it has none`
-      : `runs only when the repository has no ${check} command; it has one`
-  }
-
-  const grade = GRADE_CONDITION.exec(text)
-  if (grade !== null) {
-    return grade[1] === undefined
-      ? `runs only when the change is graded ${grade[2]}; it is graded ${order.risk.grade}`
-      : `runs only when the change is not graded ${grade[2]}; it is graded ${order.risk.grade}`
-  }
-
-  const emptiness = /^([\w.]+)\s+is\s+(not\s+)?empty$/.exec(text)
-  if (emptiness !== null) {
-    const [, path, negated] = emptiness
-    const size = collectionAt(path, order)?.length ?? 0
-    if (path === 'risk.triggers') {
-      return negated === undefined
-        ? `runs only when no risk triggers fire; this order has ${size}`
-        : 'runs only when risk triggers fire; this order has none'
-    }
-    return negated === undefined
-      ? `runs only when ${path} is empty; it has ${size}`
-      : `runs only when ${path} is not empty; it is empty`
-  }
-
-  const count = /^([\w.]+)\s+count\s+(>=|<=|>|<|==|!=)\s+(\d+)$/.exec(text)
-  if (count !== null) {
-    const size = collectionAt(count[1], order)?.length ?? 0
-    return `runs only when ${text}; it has ${size}`
-  }
-
-  return `condition "${text}" was false`
+  const read = formOf(text)
+  return read === null ? `condition "${text}" was false` : read.form.whyNot(read.match, order)
 }
 
 function compareNumbers(left: number, operator: string, right: number): boolean {

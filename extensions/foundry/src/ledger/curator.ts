@@ -124,41 +124,47 @@ export function propose(input: ProposeInput): Proposal[] {
   const threshold = input.threshold ?? REPETITION_THRESHOLD
   const already = new Set([...(input.existingRuleIds ?? []), ...(input.rejectedIds ?? [])])
 
+  const proposals: Proposal[] = []
+  for (const [normalised, entries] of rejectionsByReason(input.entries)) {
+    if (entries.length < threshold) continue
+    const proposal = proposalFor(normalised, entries)
+    if (!already.has(proposal.id)) proposals.push(proposal)
+  }
+
+  // Most-repeated first: the strongest argument goes at the top.
+  return proposals.sort((a, b) => b.occurrences - a.occurrences || a.id.localeCompare(b.id))
+}
+
+/** Every rejection with a reason, grouped by that reason once normalised. */
+function rejectionsByReason(entries: readonly LedgerEntry[]): Map<string, LedgerEntry[]> {
   const groups = new Map<string, LedgerEntry[]>()
-  for (const entry of input.entries) {
+  for (const entry of entries) {
     if (!isRejection(entry)) continue
     const key = normaliseReason(entry.reason)
     if (key === '') continue
     groups.set(key, [...(groups.get(key) ?? []), entry])
   }
+  return groups
+}
 
-  const proposals: Proposal[] = []
-  for (const [normalised, entries] of groups) {
-    if (entries.length < threshold) continue
-    const id = `curator-${slugFor(normalised)}`
-    if (already.has(id)) continue
-
-    const citations = entries.map((entry) => ({
-      ref: citationRef(entry),
-      at: entry.at,
-      actor: entry.actor,
-      action: entry.action,
-      subject: entry.subject,
-      reason: entry.reason,
-    }))
-
-    proposals.push({
-      id,
-      // The operator's own most recent words, not a paraphrase — a rule they
-      // do not recognise is one they cannot judge.
-      asserts: entries[entries.length - 1].reason.trim(),
-      rung: rungFor(normalised),
-      origin: `curator:${citations.map((c) => c.ref).join(',')}`,
-      citations,
-      occurrences: entries.length,
-    })
+/** The rule one repeated rejection argues for, citing every entry that made it. */
+function proposalFor(normalised: string, entries: readonly LedgerEntry[]): Proposal {
+  const citations = entries.map((entry) => ({
+    ref: citationRef(entry),
+    at: entry.at,
+    actor: entry.actor,
+    action: entry.action,
+    subject: entry.subject,
+    reason: entry.reason,
+  }))
+  return {
+    id: `curator-${slugFor(normalised)}`,
+    // The operator's own most recent words, not a paraphrase — a rule they
+    // do not recognise is one they cannot judge.
+    asserts: entries[entries.length - 1].reason.trim(),
+    rung: rungFor(normalised),
+    origin: `curator:${citations.map((c) => c.ref).join(',')}`,
+    citations,
+    occurrences: entries.length,
   }
-
-  // Most-repeated first: the strongest argument goes at the top.
-  return proposals.sort((a, b) => b.occurrences - a.occurrences || a.id.localeCompare(b.id))
 }

@@ -43,14 +43,18 @@ function askingAndHoldingTests() {
 
   it('takes the approval already on file rather than asking again', async () => {
     const store = createGateStore(root)
-    await store.save(decide(shipGate(), 'approve', '', '2026-09-28T19:18:00.000Z'))
+    await store.save(
+      decide(shipGate(), { option: 'approve', note: '', at: '2026-09-28T19:18:00.000Z' })
+    )
     expect(await askOnce(store, shipGate())).toBe('approve')
     expect((await store.get('WO-0928-0bb-ship'))?.decision?.option).toBe('approve')
   })
 
   it('asks again after a hold', async () => {
     const store = createGateStore(root)
-    await store.save(decide(shipGate(), 'hold', '', '2026-09-28T19:18:00.000Z'))
+    await store.save(
+      decide(shipGate(), { option: 'hold', note: '', at: '2026-09-28T19:18:00.000Z' })
+    )
     expect(await askOnce(store, shipGate())).toBe('hold')
     expect((await store.get('WO-0928-0bb-ship'))?.decision).toBeNull()
   })
@@ -69,7 +73,9 @@ function theShippingDecisionTests() {
       blockedUnits: 1,
       at: '2026-09-28T19:10:00.000Z',
     })
-    await store.save(decide(afterWork, 'approve', '', '2026-09-28T19:11:00.000Z'))
+    await store.save(
+      decide(afterWork, { option: 'approve', note: '', at: '2026-09-28T19:11:00.000Z' })
+    )
     expect(await askOnce(store, shipGate())).toBe('approve')
     expect(await store.get('WO-0928-0bb-ship')).toBeNull()
   })
@@ -88,7 +94,9 @@ function otherOrdersTests() {
       blockedUnits: 1,
       at: '2026-09-28T19:10:00.000Z',
     })
-    await store.save(decide(elsewhere, 'approve', '', '2026-09-28T19:11:00.000Z'))
+    await store.save(
+      decide(elsewhere, { option: 'approve', note: '', at: '2026-09-28T19:11:00.000Z' })
+    )
     expect(await askOnce(store, shipGate())).toBe('hold')
   })
 }
@@ -106,7 +114,7 @@ function otherQuestionsTests() {
       blockedUnits: 1,
       at: '2026-09-28T19:10:00.000Z',
     })
-    await store.save(decide(budget, 'raise', '', '2026-09-28T19:11:00.000Z'))
+    await store.save(decide(budget, { option: 'raise', note: '', at: '2026-09-28T19:11:00.000Z' }))
     expect(await askOnce(store, shipGate())).toBe('hold')
   })
 }

@@ -75,7 +75,7 @@ describe('paths under the root', () => {
   })
 
   it('names a lane directory by merge order and repository, so it sorts', () => {
-    expect(laneDir(root, 'WO-0913-c71', 1, 'api-contracts')).toBe(
+    expect(laneDir(root, 'WO-0913-c71', { ord: 1, repo: 'api-contracts' })).toBe(
       '/var/foundry/orders/WO-0913-c71/lanes/1-api-contracts'
     )
   })
