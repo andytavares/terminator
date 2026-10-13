@@ -14,7 +14,6 @@ Minor: 4.1.0. Every addition is optional, so an extension built for 4.0.0 runs u
   but nothing stored or read a per-workspace value.
 - A view's `extension.onSettingsChanged` handler receives a `SettingsChange`, `{ workspaceId }`:
   the workspace whose own value changed, or `null` for a global value.
-
 - `@terminator/extension-sdk/vite`: `extensionViewConfig(directory, { plugins, chunkSizeWarningLimit? })`,
   the Vite config of an extension's view (`index.html` built to `dist/` with relative URLs).
 - A `list` setting type (`SettingDefinition.type`): the value is a `string[]`, which Settings
