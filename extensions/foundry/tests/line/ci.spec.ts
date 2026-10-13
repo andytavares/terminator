@@ -41,6 +41,15 @@ function noopSleep() {
 }
 
 describe('watchChecks', () => {
+  describe('passing and failing', passingAndFailingTests)
+  describe('no checks yet', noChecksYetTests)
+  describe('waiting for checks to appear', waitingForChecksToAppearTests)
+  describe('runs already judged', runsAlreadyJudgedTests)
+  describe('cancel and unreadable output', cancelAndUnreadableOutputTests)
+  describe('timing out and polling', timingOutAndPollingTests)
+})
+
+function passingAndFailingTests() {
   it('pending then pass is green after one sleep', async () => {
     const exec = queuedExec([ok([check({ bucket: 'pending' })]), ok([check({ bucket: 'pass' })])])
     const sleep = vi.fn(noopSleep())
@@ -60,7 +69,9 @@ describe('watchChecks', () => {
     const verdict = await watchChecks(pull, exec, { sleep: noopSleep() })
     expect(verdict.kind).toBe('green')
   })
+}
 
+function noChecksYetTests() {
   it('empty checks list is not_measured once the wait for checks is over, never green', async () => {
     const exec = queuedExec([ok([]), ok([]), ok([])])
     const sleep = vi.fn(noopSleep())
@@ -82,7 +93,9 @@ describe('watchChecks', () => {
       expect(verdict.reason).toMatch(/no checks/i)
     }
   })
+}
 
+function waitingForChecksToAppearTests() {
   // Seen live: the draft was polled two seconds after `gh pr create`, before
   // GitHub had registered the workflow that started seven seconds later.
   it('waits for checks to appear after the draft opens', async () => {
@@ -95,7 +108,9 @@ describe('watchChecks', () => {
     const verdict = await watchChecks(pull, exec, { sleep: noopSleep() })
     expect(verdict.kind).toBe('red')
   })
+}
 
+function runsAlreadyJudgedTests() {
   // Seen live: right after a fix was pushed, `gh pr checks` still listed the
   // previous commit's failed run, and a second round began for a fix that had
   // already worked.
@@ -122,7 +137,9 @@ describe('watchChecks', () => {
     })
     expect(verdict.kind).toBe('not_measured')
   })
+}
 
+function cancelAndUnreadableOutputTests() {
   it('cancel is red', async () => {
     const exec = queuedExec([ok([check({ bucket: 'cancel' })])])
     const verdict = await watchChecks(pull, exec, { sleep: noopSleep() })
@@ -137,7 +154,9 @@ describe('watchChecks', () => {
       expect(verdict.reason).toBe('gh: some other failure')
     }
   })
+}
 
+function timingOutAndPollingTests() {
   it('times out after timeoutMs/pollMs polls while still pending', async () => {
     const results = Array.from({ length: 4 }, () => ok([check({ bucket: 'pending' })]))
     const exec = queuedExec(results)
@@ -157,9 +176,14 @@ describe('watchChecks', () => {
     expect(onPoll).toHaveBeenCalledTimes(2)
     expect(onPoll.mock.calls[0][0][0].bucket).toBe('pending')
   })
-})
+}
 
 describe('failedLogs', () => {
+  describe('run logs', runLogsTests)
+  describe('checks without a run, and failures', checksWithoutARunAndFailuresTests)
+})
+
+function runLogsTests() {
   it('extracts the run id from the link, dedupes two jobs of one run, truncates, survives a failure', async () => {
     const checks: Check[] = [
       check({
@@ -183,7 +207,9 @@ describe('failedLogs', () => {
     expect(out.split('\n').length).toBeLessThanOrEqual(200)
     expect(out).toContain('line 249')
   })
+}
 
+function checksWithoutARunAndFailuresTests() {
   it('lists a check by name and link when the link has no run id', async () => {
     const checks: Check[] = [check({ bucket: 'cancel', link: 'https://example.com/no-run-id' })]
     const exec = vi.fn(async () => {
@@ -207,4 +233,4 @@ describe('failedLogs', () => {
     const out = await failedLogs(checks, '/repos/app', exec)
     expect(out).toContain('could not be read')
   })
-})
+}

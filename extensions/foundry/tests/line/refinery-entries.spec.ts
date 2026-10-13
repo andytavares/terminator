@@ -59,6 +59,12 @@ function deps(over: Partial<QueueEntriesDeps> = {}): QueueEntriesDeps {
 }
 
 describe('queueEntries', () => {
+  describe('which orders', whichOrdersTests)
+  describe('files touched', filesTouchedTests)
+  describe('merged and shipped', mergedAndShippedTests)
+})
+
+function whichOrdersTests() {
   it('skips drafts and cancelled orders', async () => {
     const entries = await queueEntries(
       [order({ status: 'draft' }), order({ status: 'cancelled' })],
@@ -79,7 +85,9 @@ describe('queueEntries', () => {
       merged: false,
     })
   })
+}
 
+function filesTouchedTests() {
   it('uses the checkout observed files when there is one', async () => {
     const entries = await queueEntries(
       [order()],
@@ -100,7 +108,9 @@ describe('queueEntries', () => {
     )
     expect(entries[0]?.files).toEqual([])
   })
+}
 
+function mergedAndShippedTests() {
   it('carries the merged flag from its dep', async () => {
     const entries = await queueEntries([order()], deps({ merged: () => true }))
     expect(entries[0]?.merged).toBe(true)
@@ -110,4 +120,4 @@ describe('queueEntries', () => {
     const entries = await queueEntries([order({ status: 'shipped' })], deps())
     expect(entries).toHaveLength(1)
   })
-})
+}

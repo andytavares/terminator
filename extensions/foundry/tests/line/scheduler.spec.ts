@@ -78,6 +78,12 @@ function graph(units = [unit('U-1'), unit('U-2'), unit('U-3')]): RunGraph {
 }
 
 describe('readyNodes', () => {
+  describe('readiness and the budget', readinessAndTheBudgetTests)
+  describe('dependencies', dependenciesTests)
+  describe('gates', gatesTests)
+})
+
+function readinessAndTheBudgetTests() {
   it('offers only what has nothing left to wait for', () => {
     expect(readyNodes(graph(), BUDGETS).map((n) => n.id)).toEqual(['build:U-1', 'build:U-2'])
   })
@@ -91,7 +97,9 @@ describe('readyNodes', () => {
     const g = withNode(graph(), 'build:U-1', { state: 'running' })
     expect(readyNodes(g, BUDGETS).filter((n) => n.kind !== 'gate')).toHaveLength(1)
   })
+}
 
+function dependenciesTests() {
   it('does not offer a node whose dependency has not passed', () => {
     expect(readyNodes(graph(), BUDGETS).map((n) => n.id)).not.toContain('integrate')
   })
@@ -112,7 +120,9 @@ describe('readyNodes', () => {
     const g = graph([unit('U-1'), unit('U-2', ['U-1'])])
     expect(readyNodes(g, BUDGETS).map((n) => n.id)).toEqual(['build:U-1'])
   })
+}
 
+function gatesTests() {
   it('never counts a gate against the budget — it waits on a person, not an agent', () => {
     let g = graph([unit('U-1')])
     g = markPassed(g, 'build:U-1', 'now')
@@ -120,7 +130,7 @@ describe('readyNodes', () => {
     g = withNode(g, 'build:U-1', { state: 'running' })
     expect(readyNodes(g, { ...BUDGETS, agents: 1 }).map((n) => n.id)).toContain('ship')
   })
-})
+}
 
 describe('startReady', () => {
   it('moves what can start into running and stamps when', () => {
@@ -219,6 +229,12 @@ describe('blockedNodes and blockedReason', () => {
 })
 
 describe('stalledWhy', () => {
+  describe('the failed step', theFailedStepTests)
+  describe('several or last failures', severalOrLastFailuresTests)
+  describe('nothing failed', nothingFailedTests)
+})
+
+function theFailedStepTests() {
   it('names the failed step, why it failed, and everything held up behind it', () => {
     const g = markFailed(
       graph([unit('U-1')]),
@@ -240,7 +256,9 @@ describe('stalledWhy', () => {
     const g = markFailed(graph([unit('U-1')]), 'build:U-1', 'at').graph
     expect(stalledWhy(g)).toMatch(/^build:U-1 failed\.\n/)
   })
+}
 
+function severalOrLastFailuresTests() {
   it('lists every failed step when more than one failed', () => {
     let g = graph([unit('U-1'), unit('U-2')])
     g = markFailed(g, 'build:U-1', 'at', 'exited 1').graph
@@ -256,7 +274,9 @@ describe('stalledWhy', () => {
     g = markFailed(g, 'ship', 'at', 'exited 1').graph
     expect(stalledWhy(g)).toBe('ship failed: exited 1.')
   })
+}
 
+function nothingFailedTests() {
   it('says what each step waits on when nothing failed', () => {
     let g = graph([unit('U-1')])
     g = withNode(g, 'build:U-1', { dependsOn: ['ship'] })
@@ -265,7 +285,7 @@ describe('stalledWhy', () => {
         '- build:U-1 is waiting on ship\n- integrate is waiting on build:U-1\n- ship is waiting on integrate'
     )
   })
-})
+}
 
 describe('isComplete and hasStalled', () => {
   it('is not complete while anything is outstanding', () => {
@@ -373,37 +393,70 @@ describe('raisedLimitProblem', () => {
   })
 })
 
+const mkNode = (over: Partial<RunNode> & Pick<RunNode, 'id' | 'stepId'>): RunNode => ({
+  kind: 'agent',
+  state: 'passed',
+  unitIds: [],
+  lane: null,
+  role: null,
+  dependsOn: [],
+  attempts: 1,
+  reworks: 0,
+  feedback: [],
+  sessionId: null,
+  worktreePath: null,
+  startedAt: null,
+  endedAt: 'ended',
+  ...over,
+})
+const rg = (nodes: RunNode[]): RunGraph => ({ orderId: 'WO-1', recipe: 'r', nodes })
+const fb = (over: Partial<Feedback> = {}): Feedback => ({
+  from: 'lint',
+  attempt: 1,
+  source: 'check',
+  command: 'npm run lint',
+  exitCode: 1,
+  excerpt: 'error',
+  logPath: null,
+  ...over,
+})
+
 describe('rework', () => {
-  const mkNode = (over: Partial<RunNode> & Pick<RunNode, 'id' | 'stepId'>): RunNode => ({
-    kind: 'agent',
-    state: 'passed',
-    unitIds: [],
-    lane: null,
-    role: null,
-    dependsOn: [],
-    attempts: 1,
-    reworks: 0,
-    feedback: [],
-    sessionId: null,
-    worktreePath: null,
-    startedAt: null,
-    endedAt: 'ended',
-    ...over,
-  })
+  describe('the target and between', theTargetAndBetweenTests)
+  describe('downstream nodes', downstreamNodesTests)
+  describe('two lanes', twoLanesTests)
+  describe('every target', everyTargetTests)
+  describe('unchanged graphs', unchangedGraphsTests)
+  describe('attempts', attemptsTests)
+})
 
-  const rg = (nodes: RunNode[]): RunGraph => ({ orderId: 'WO-1', recipe: 'r', nodes })
+const mk = (over: Partial<RunNode> & Pick<RunNode, 'id' | 'stepId'>): RunNode => ({
+  kind: 'agent',
+  state: 'passed',
+  unitIds: [],
+  lane: 1,
+  role: null,
+  dependsOn: [],
+  attempts: 1,
+  reworks: 0,
+  feedback: [],
+  sessionId: 's',
+  worktreePath: null,
+  startedAt: 'started',
+  endedAt: 'ended',
+  ...over,
+})
+const failure: Feedback = {
+  from: 'final check',
+  attempt: 1,
+  source: 'check',
+  command: 'npm run test:e2e',
+  exitCode: 1,
+  excerpt: 'Error: Process failed to launch!',
+  logPath: '/data/runs/final-integration.1.log',
+}
 
-  const fb = (over: Partial<Feedback> = {}): Feedback => ({
-    from: 'lint',
-    attempt: 1,
-    source: 'check',
-    command: 'npm run lint',
-    exitCode: 1,
-    excerpt: 'error',
-    logPath: null,
-    ...over,
-  })
-
+function theTargetAndBetweenTests() {
   it('sends a one-lane build back with the failure attached', () => {
     const graph = rg([
       mkNode({ id: 'build', stepId: 'build', lane: 1, state: 'passed' }),
@@ -429,7 +482,9 @@ describe('rework', () => {
     expect(nodeById(after, 'fmt')?.endedAt).toBeNull()
     expect(nodeById(after, 'fmt')?.feedback).toEqual([])
   })
+}
 
+function downstreamNodesTests() {
   it('leaves a node downstream of the failure alone unless it was blocked', () => {
     const graph = rg([
       mkNode({ id: 'build', stepId: 'build', lane: 1, state: 'passed' }),
@@ -450,7 +505,9 @@ describe('rework', () => {
     expect(nodeById(after, 'verify')?.state).toBe('waiting')
     expect(nodeById(after, 'verify')?.feedback).toEqual([])
   })
+}
 
+function twoLanesTests() {
   it('resets only the lane the failed node belongs to, in a two-lane build', () => {
     const graph = rg([
       mkNode({ id: 'build:lane1', stepId: 'build', lane: 1, state: 'passed' }),
@@ -469,7 +526,9 @@ describe('rework', () => {
     expect(nodeById(after, 'build:lane2')?.state).toBe('passed')
     expect(nodeById(after, 'build:lane2')?.feedback).toEqual([])
   })
+}
 
+function everyTargetTests() {
   it('uses every target when none of them share the failed node lowest lane', () => {
     const graph = rg([
       mkNode({ id: 'build:lane1', stepId: 'build', lane: 1, state: 'passed' }),
@@ -486,7 +545,9 @@ describe('rework', () => {
     expect(nodeById(after, 'build:lane1')?.state).toBe('waiting')
     expect(nodeById(after, 'build:lane2')?.state).toBe('waiting')
   })
+}
 
+function unchangedGraphsTests() {
   it('leaves the graph unchanged for an unknown failed node', () => {
     const graph = rg([
       mkNode({ id: 'build', stepId: 'build', lane: 1, state: 'passed' }),
@@ -502,7 +563,9 @@ describe('rework', () => {
     ])
     expect(rework(graph, 'lint', 'nope', fb())).toEqual(graph)
   })
+}
 
+function attemptsTests() {
   it('does not touch attempts — the next start counts that', () => {
     const graph = rg([
       mkNode({ id: 'build', stepId: 'build', lane: 1, state: 'passed', attempts: 1 }),
@@ -512,35 +575,13 @@ describe('rework', () => {
     expect(nodeById(after, 'build')?.attempts).toBe(1)
     expect(nodeById(after, 'lint')?.attempts).toBe(2)
   })
-})
+}
 
 describe('sendBack after the final check failed', () => {
-  const mk = (over: Partial<RunNode> & Pick<RunNode, 'id' | 'stepId'>): RunNode => ({
-    kind: 'agent',
-    state: 'passed',
-    unitIds: [],
-    lane: 1,
-    role: null,
-    dependsOn: [],
-    attempts: 1,
-    reworks: 0,
-    feedback: [],
-    sessionId: 's',
-    worktreePath: null,
-    startedAt: 'started',
-    endedAt: 'ended',
-    ...over,
-  })
-  const failure: Feedback = {
-    from: 'final check',
-    attempt: 1,
-    source: 'check',
-    command: 'npm run test:e2e',
-    exitCode: 1,
-    excerpt: 'Error: Process failed to launch!',
-    logPath: '/data/runs/final-integration.1.log',
-  }
+  describe('the builder reopened', theBuilderReopenedTests)
+})
 
+function theBuilderReopenedTests() {
   it('reopens the builder with the failure, and everything after it', () => {
     const g: RunGraph = {
       orderId: 'WO-1',
@@ -562,4 +603,4 @@ describe('sendBack after the final check failed', () => {
     expect(byId('unrelated').state).toBe('passed')
     expect(isComplete(next)).toBe(false)
   })
-})
+}

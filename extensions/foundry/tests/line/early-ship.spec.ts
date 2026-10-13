@@ -144,6 +144,13 @@ describe('opening before the final check', () => {
 })
 
 describe('after the final check', () => {
+  describe('the ready question', theReadyQuestionTests)
+  describe('CI', ciTests)
+  describe('after the check wrote', afterTheCheckWroteTests)
+  describe('failures and re-entry', failuresAndReEntryTests)
+})
+
+function theReadyQuestionTests() {
   it('raises the ready question when the check passed and CI is green', async () => {
     const green: CiOutcome = { kind: 'green', checks: [] }
     const { early, raised } = setup({ watchCi: vi.fn(async () => green) })
@@ -161,7 +168,9 @@ describe('after the final check', () => {
     expect(raised).toEqual([])
     expect(calls.filter((c) => c === 'gh pr create')).toHaveLength(1)
   })
+}
 
+function ciTests() {
   it('waits for CI before asking, even when the check finished first', async () => {
     let release: (value: CiOutcome) => void = () => undefined
     const slow = new Promise<CiOutcome>((resolve) => (release = resolve))
@@ -183,7 +192,9 @@ describe('after the final check', () => {
     expect(done?.gate?.rule).toBe('ci.red')
     expect(raised).toEqual(['ci.red'])
   })
+}
 
+function afterTheCheckWroteTests() {
   it('commits what the check wrote, pushes it, and watches CI again on that commit', async () => {
     const watchCi = vi.fn(async () => ({ kind: 'green', checks: [] }) as CiOutcome)
     const { early, calls } = setup({ watchCi }, true)
@@ -198,7 +209,9 @@ describe('after the final check', () => {
     const { early } = setup()
     expect(await early.finish(outcome())).toBeNull()
   })
+}
 
+function failuresAndReEntryTests() {
   it('surfaces a CI watch that threw rather than swallowing it', async () => {
     const { early } = setup({ watchCi: vi.fn(async () => Promise.reject(new Error('gh down'))) })
     await early.beforeFinalCheck({ risk: risk('P3'), verdicts: [] })
@@ -213,4 +226,4 @@ describe('after the final check', () => {
     expect(second.calls.filter((c) => c === 'gh pr create')).toHaveLength(0)
     expect(second.calls.some((c) => c.startsWith('git push'))).toBe(true)
   })
-})
+}

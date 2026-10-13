@@ -39,6 +39,18 @@ function harness(verdicts: CiVerdict[], opts: { sendBack?: boolean } = {}) {
 }
 
 describe('ciRounds', () => {
+  describe('the next round', theNextRoundTests)
+  describe('writing the checks', writingTheChecksTests)
+  describe('no ci', noCiTests)
+  describe('green', greenTests)
+  describe('not measured', notMeasuredTests)
+  describe('red then green', redThenGreenTests)
+  describe('exhausted rounds', exhaustedRoundsTests)
+  describe('halting', haltingTests)
+  describe('two pulls', twoPullsTests)
+})
+
+function theNextRoundTests() {
   it('watches the next round past the runs the last one judged', async () => {
     const red = check({ bucket: 'fail', link: 'https://github.com/o/r/actions/runs/111/job/1' })
     const h = harness([
@@ -52,7 +64,9 @@ describe('ciRounds', () => {
     expect([...firstIgnored]).toEqual([])
     expect([...secondIgnored]).toEqual(['111'])
   })
+}
 
+function writingTheChecksTests() {
   it('writes the checks while they are watched, once per change in what is passing', async () => {
     const h = harness([])
     h.watch.mockImplementation(async (_pull, onPoll) => {
@@ -78,7 +92,9 @@ describe('ciRounds', () => {
     expect(watching).toHaveLength(1)
     expect(watching[0][1]).toBe(PULL.url)
   })
+}
 
+function noCiTests() {
   it('declares none when the recipe has no ci', async () => {
     const h = harness([])
     const outcome = await ciRounds({
@@ -94,7 +110,9 @@ describe('ciRounds', () => {
     expect(h.watch).not.toHaveBeenCalled()
     expect(h.state).not.toHaveBeenCalled()
   })
+}
 
+function greenTests() {
   it('is green the first time, never calling sendBack', async () => {
     const h = harness([{ kind: 'green', checks: [check()] }])
     const outcome = await ciRounds({
@@ -110,7 +128,9 @@ describe('ciRounds', () => {
     expect(h.sendBack).not.toHaveBeenCalled()
     expect(h.record).toHaveBeenCalledWith('ci.green', expect.any(String), expect.any(String))
   })
+}
 
+function notMeasuredTests() {
   it('is not_measured the first time and never turns green', async () => {
     const h = harness([{ kind: 'not_measured', checks: [], reason: 'no checks were reported' }])
     const outcome = await ciRounds({
@@ -130,7 +150,9 @@ describe('ciRounds', () => {
       'no checks were reported'
     )
   })
+}
 
+function redThenGreenTests() {
   it('goes red then green: one round, one ci.round record, feedback carries the log', async () => {
     const red = { kind: 'red' as const, checks: [check({ name: 'lint', bucket: 'fail' })] }
     const green = { kind: 'green' as const, checks: [check({ name: 'lint' })] }
@@ -157,7 +179,9 @@ describe('ciRounds', () => {
     expect(feedback.excerpt).toContain('log for lint')
     expect(h.states.map((s) => s.status)).toEqual(['watching', 'reworking', 'watching', 'green'])
   })
+}
 
+function exhaustedRoundsTests() {
   it('exhausts rounds: red three times with max 2 rounds sendBack, then a red outcome', async () => {
     const red = { kind: 'red' as const, checks: [check({ name: 'lint', bucket: 'fail' })] }
     const h = harness([red, red, red])
@@ -175,7 +199,9 @@ describe('ciRounds', () => {
     if (outcome.kind === 'red') expect(outcome.rounds).toBe(2)
     expect(h.record.mock.calls.at(-1)?.[0]).toBe('ci.exhausted')
   })
+}
 
+function haltingTests() {
   it('halts when sendBack reports it could not finish', async () => {
     const red = { kind: 'red' as const, checks: [check({ name: 'lint', bucket: 'fail' })] }
     const h = harness([red], { sendBack: false })
@@ -191,7 +217,9 @@ describe('ciRounds', () => {
     expect(outcome).toEqual({ kind: 'halted', reason: expect.any(String) })
     expect(h.sendBack).toHaveBeenCalledTimes(1)
   })
+}
 
+function twoPullsTests() {
   it('is red when one of two pulls is red', async () => {
     const green: CiVerdict = { kind: 'green', checks: [check()] }
     const red: CiVerdict = { kind: 'red', checks: [check({ name: 'lint', bucket: 'fail' })] }
@@ -216,7 +244,7 @@ describe('ciRounds', () => {
     expect(outcome.kind).toBe('red')
     void n
   })
-})
+}
 
 function recipe(yaml: string): Recipe {
   const parsed = parseRecipe(yaml, 't.yaml')
@@ -225,6 +253,13 @@ function recipe(yaml: string): Recipe {
 }
 
 describe('ciReworkTarget', () => {
+  describe('onFail', onfailTests)
+  describe('fan-out builders', fanOutBuildersTests)
+  describe('builder steps', builderStepsTests)
+  describe('no target', noTargetTests)
+})
+
+function onfailTests() {
   it('names the onFail rework target when a step declares one', () => {
     const r = recipe(`
 schemaVersion: 1
@@ -248,7 +283,9 @@ steps:
 `)
     expect(ciReworkTarget(r)).toBe('build')
   })
+}
 
+function fanOutBuildersTests() {
   it('falls back to the first fanout step whose inner step is a builder', () => {
     const r = recipe(`
 schemaVersion: 1
@@ -266,7 +303,9 @@ steps:
 `)
     expect(ciReworkTarget(r)).toBe('build')
   })
+}
 
+function builderStepsTests() {
   it('falls back to the first agent step whose role is builder', () => {
     const r = recipe(`
 schemaVersion: 1
@@ -283,7 +322,9 @@ steps:
 `)
     expect(ciReworkTarget(r)).toBe('build')
   })
+}
 
+function noTargetTests() {
   it('is null when the recipe has no onFail and no builder', () => {
     const r = recipe(`
 schemaVersion: 1
@@ -300,7 +341,7 @@ steps:
 `)
     expect(ciReworkTarget(r)).toBeNull()
   })
-})
+}
 
 describe('shipNodeId', () => {
   it('names the ready-for-review gate step', () => {
@@ -365,16 +406,20 @@ describe('settleShip', () => {
   })
 })
 
-describe('a CI send-back during the final check', () => {
-  const feedback: Feedback = {
-    attempt: 1,
-    source: 'ci',
-    command: null,
-    exitCode: 1,
-    excerpt: 'red',
-    logPath: null,
-  }
+const feedback: Feedback = {
+  attempt: 1,
+  source: 'ci',
+  command: null,
+  exitCode: 1,
+  excerpt: 'red',
+  logPath: null,
+}
 
+describe('a CI send-back during the final check', () => {
+  describe('waiting for the final check', waitingForTheFinalCheckTests)
+})
+
+function waitingForTheFinalCheckTests() {
   it('waits for the final check, then sends back when it passed', async () => {
     const check = settledOnce<boolean>()
     const sendBack = vi.fn(async () => true)
@@ -403,4 +448,4 @@ describe('a CI send-back during the final check', () => {
     check.settle(false)
     await expect(check.settled).resolves.toBe(true)
   })
-})
+}

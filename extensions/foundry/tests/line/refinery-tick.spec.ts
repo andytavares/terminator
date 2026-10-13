@@ -60,6 +60,18 @@ function baseDeps(over: Partial<RefineryTickDeps> = {}): RefineryTickDeps & {
 }
 
 describe('refineryTick', () => {
+  describe('nothing merged', nothingMergedTests)
+  describe('restacking', restackingTests)
+  describe('already recorded', alreadyRecordedTests)
+  describe('already restacked', alreadyRestackedTests)
+  describe('conflicts', conflictsTests)
+  describe('failed restacks', failedRestacksTests)
+})
+
+const pulls = [{ url: 'u1' }, { url: 'u2' }]
+const candidate = async () => [{ order: { id: 'WO-1', title: 'A' }, pulls }]
+
+function nothingMergedTests() {
   it('does nothing when nothing has merged', async () => {
     const deps = baseDeps({
       candidates: async () => [{ order: { id: 'WO-1', title: 'A' }, pulls: [{ url: 'u1' }] }],
@@ -73,7 +85,9 @@ describe('refineryTick', () => {
     expect(deps.records).toEqual([])
     expect(deps.entries).not.toHaveBeenCalled()
   })
+}
 
+function restackingTests() {
   it('writes mergedAt once and restacks + CI-watches an overlapping later order', async () => {
     const deps = baseDeps({
       candidates: async () => [
@@ -96,7 +110,9 @@ describe('refineryTick', () => {
     expect(deps.watched).toEqual(['WO-2'])
     expect(deps.records.map((r) => r.action)).toEqual(['refinery.merged', 'refinery.rebased'])
   })
+}
 
+function alreadyRecordedTests() {
   it('does not re-check gh once mergedAt is already recorded', async () => {
     const viewPr = vi.fn(async () => ({ merged: true }))
     const deps = baseDeps({
@@ -115,7 +131,9 @@ describe('refineryTick', () => {
 
     expect(viewPr).not.toHaveBeenCalled()
   })
+}
 
+function alreadyRestackedTests() {
   it('skips an order already restacked for that predecessor', async () => {
     const restack = vi.fn(async () => ({ kind: 'rebased' as const, pushed: true }))
     const deps = baseDeps({
@@ -136,7 +154,9 @@ describe('refineryTick', () => {
     expect(restack).not.toHaveBeenCalled()
     expect(deps.watched).toEqual([])
   })
+}
 
+function conflictsTests() {
   it('raises refinery.conflict on a conflicting rebase, once', async () => {
     const deps = baseDeps({
       candidates: async () => [
@@ -163,7 +183,9 @@ describe('refineryTick', () => {
     expect(deps.states.get('WO-2')?.restackedFor ?? []).toEqual([])
     expect(deps.watched).toEqual([])
   })
+}
 
+function failedRestacksTests() {
   it('records a failed restack without marking it restacked, so it retries next tick', async () => {
     const restack = vi.fn(async () => ({ kind: 'failed' as const, reason: 'network blip' }))
     const deps = baseDeps({
@@ -188,12 +210,14 @@ describe('refineryTick', () => {
     expect(deps.states.get('WO-2')?.restackedFor).toEqual(['WO-1'])
     expect(deps.watched).toEqual(['WO-2'])
   })
-})
+}
 
 describe('refineryTick tells the tracker when an order is merged', () => {
-  const pulls = [{ url: 'u1' }, { url: 'u2' }]
-  const candidate = async () => [{ order: { id: 'WO-1', title: 'A' }, pulls }]
+  describe('once all lanes merged', onceAllLanesMergedTests)
+  describe('tracker failures', trackerFailuresTests)
+})
 
+function onceAllLanesMergedTests() {
   it('calls onMerged once, however many ticks see the merge', async () => {
     const onMerged = vi.fn(async () => undefined)
     const deps = baseDeps({
@@ -224,7 +248,9 @@ describe('refineryTick tells the tracker when an order is merged', () => {
     await refineryTick(deps)
     expect(onMerged).toHaveBeenCalledTimes(1)
   })
+}
 
+function trackerFailuresTests() {
   it('carries on when the tracker write throws', async () => {
     const deps = baseDeps({
       candidates: candidate,
@@ -234,4 +260,4 @@ describe('refineryTick tells the tracker when an order is merged', () => {
     await refineryTick(deps)
     expect(deps.states.get('WO-1')?.mergedAt).not.toBeNull()
   })
-})
+}

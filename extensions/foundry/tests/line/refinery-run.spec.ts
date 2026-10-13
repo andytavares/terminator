@@ -113,6 +113,12 @@ beforeEach(async () => {
 })
 
 describe('a minute after an order merged', () => {
+  describe('rebasing', rebasingTests)
+  describe('a failed rebase', aFailedRebaseTests)
+  describe('the merged issue', theMergedIssueTests)
+})
+
+function rebasingTests() {
   it('rebases the order queued behind it on the same files and checks it again', async () => {
     await shipBoth()
     await mergeFirst()
@@ -138,7 +144,9 @@ describe('a minute after an order merged', () => {
     })
     expect(carriesTheMerge.exitCode).toBe(0)
   })
+}
 
+function aFailedRebaseTests() {
   it('puts an order that no longer rebases in front of the operator', async () => {
     await shipBoth()
     // main moves under WO-2's own file with different contents.
@@ -159,7 +167,9 @@ describe('a minute after an order merged', () => {
       evidence: [{ kind: 'diff', path: 'wo-2.css' }],
     })
   })
+}
 
+function theMergedIssueTests() {
   it('moves the merged order’s issue to done', async () => {
     vi.mocked(host.issues.supportsTransitions).mockReturnValue(true)
     try {
@@ -187,4 +197,4 @@ describe('a minute after an order merged', () => {
       vi.mocked(host.issues.supportsTransitions).mockReturnValue(false)
     }
   })
-})
+}

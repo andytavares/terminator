@@ -156,6 +156,23 @@ function git(cwd: string, ...args: string[]) {
 }
 
 describe('an agent node', () => {
+  describe('launching', launchingTests)
+  describe('failing and never starting', failingAndNeverStartingTests)
+  describe('asking about a tool', askingAboutAToolTests)
+  describe('refused tools', refusedToolsTests)
+  describe('resuming', resumingTests)
+})
+
+const step: LadderStep = {
+  rung: 'L2',
+  name: 'test',
+  command: 'npm test',
+  status: 'runnable',
+  reason: '',
+  check: 'test',
+}
+
+function launchingTests() {
   it('runs in the lane checkout under the records location, and is over when its turn ends', async () => {
     const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph })
     const { started } = agentStarts('builder-1')
@@ -180,7 +197,9 @@ describe('an agent node', () => {
     void deps.run(runInput({ role: 'scribe', modelTier: 'fast' }))
     expect((await started).model).toBe('haiku')
   })
+}
 
+function failingAndNeverStartingTests() {
   it('that ends with a failure is archived as stopped and reports its exit status', async () => {
     const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph })
     const { started } = agentStarts('builder-2')
@@ -207,7 +226,9 @@ describe('an agent node', () => {
       exitCode: null,
     })
   })
+}
 
+function askingAboutAToolTests() {
   it('that asks about a tool is held for the operator and said so in the feed', async () => {
     const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph })
     const { started } = agentStarts('builder-3')
@@ -232,7 +253,9 @@ describe('an agent node', () => {
     expect(pendingPermissions.sessionFor('req-1')).toBeNull()
     expect(strandedAgents.get('builder-3')).toMatchObject({ orderId: 'WO-1' })
   })
+}
 
+function refusedToolsTests() {
   it('that is refused a tool says so in the feed', async () => {
     const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph })
     const { started } = agentStarts('verifier-1')
@@ -246,7 +269,9 @@ describe('an agent node', () => {
       'refused Write: a verifier does not edit'
     )
   })
+}
 
+function resumingTests() {
   it('carries on the conversation a resumed run recorded on its graph', async () => {
     const resumed = withNode(graph, builderNode().id, { sessionId: 'earlier-builder' })
     const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph: resumed })
@@ -266,18 +291,14 @@ describe('an agent node', () => {
     await deps.endSession('builder-old')
     expect(runner.stop).toHaveBeenCalledWith('builder-old', 'continuing the lane in its next step')
   })
-})
+}
 
 describe('a check rung', () => {
-  const step: LadderStep = {
-    rung: 'L2',
-    name: 'test',
-    command: 'npm test',
-    status: 'runnable',
-    reason: '',
-    check: 'test',
-  }
+  describe('running and re-running', runningAndReRunningTests)
+  describe('nothing to measure and the base branch', nothingToMeasureAndTheBaseBranchTests)
+})
 
+function runningAndReRunningTests() {
   it('runs in a terminal of its own, and is not run again on the same commit once it passed', async () => {
     const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph })
     const log = path.join(root, 'logs', 'test.log')
@@ -295,7 +316,9 @@ describe('a check rung', () => {
     await deps.runStep(step, path.join(root, 'test.log'))
     expect(runner.runCommand).toHaveBeenCalledTimes(2)
   })
+}
 
+function nothingToMeasureAndTheBaseBranchTests() {
   it('measures nothing when there is no command or no runtime', async () => {
     const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph })
     expect(await deps.runStep({ ...step, command: null }, '/x.log')).toBeNull()
@@ -323,7 +346,7 @@ describe('a check rung', () => {
     await deps.releaseBase()
     expect(fs.existsSync(ran.worktreePath)).toBe(false)
   })
-})
+}
 
 describe('a recipe command and a reinstall', () => {
   it('runs a recipe command in the lane checkout', async () => {
@@ -375,16 +398,23 @@ describe('committing a node', () => {
   })
 })
 
-describe('what a rung hands back', () => {
-  const outputPath = (): string => path.join(orderDir(root, 'WO-1'), 'scout.json')
+const outputPath = (): string => path.join(orderDir(root, 'WO-1'), 'scout.json')
 
+describe('what a rung hands back', () => {
+  describe('nothing written', nothingWrittenTests)
+  describe('what it wrote', whatItWroteTests)
+})
+
+function nothingWrittenTests() {
   it('is nothing when the rung wrote nothing', async () => {
     const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph })
     expect(
       await deps.collect({ nodeId: 'scout', role: 'scout', outputPath: outputPath() })
     ).toBeNull()
   })
+}
 
+function whatItWroteTests() {
   it('goes onto the order when it is readable', async () => {
     const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph })
     fs.writeFileSync(
@@ -410,9 +440,16 @@ describe('what a rung hands back', () => {
     ).toBeNull()
     expect(await ledger()).toContain('rung.refused')
   })
-})
+}
 
 describe('the run’s records', () => {
+  describe('gates', gatesTests)
+  describe('verdicts', verdictsTests)
+  describe('the graph', theGraphTests)
+  describe('measuring the change', measuringTheChangeTests)
+})
+
+function gatesTests() {
   it('raises a gate on the inbox and names it on the ledger', async () => {
     const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph })
     await deps.raise(
@@ -429,7 +466,9 @@ describe('the run’s records', () => {
     expect((await createGateStore(root).list()).map((gate) => gate.id)).toEqual(['WO-1-conflict'])
     expect(await ledger()).toContain('gate.raised')
   })
+}
 
+function verdictsTests() {
   it('records a verdict and nothing for any other event', async () => {
     const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph })
     deps.onEvent({
@@ -452,7 +491,9 @@ describe('the run’s records', () => {
       'fail: still blue'
     )
   })
+}
 
+function theGraphTests() {
   it('writes the graph on every change, and the files a checkout changed once a step settles', async () => {
     const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph })
     const checkout = checkoutPath(root, order, 'app')
@@ -471,7 +512,9 @@ describe('the run’s records', () => {
       ).nodes.find((node: RunNode) => node.role === 'builder').state
     ).toBe('passed')
   })
+}
 
+function measuringTheChangeTests() {
   it('measures what the work changed, leaving lockfiles out of the line count', async () => {
     const { deps } = await buildExecutorDeps(host.api, { root, order, recipe, graph })
     const checkout = checkoutPath(root, order, 'app')
@@ -484,4 +527,4 @@ describe('the run’s records', () => {
     expect(change.linesChanged).toBe(2)
     expect((await deps.observe()).elapsedMinutes).toBeLessThan(1)
   })
-})
+}

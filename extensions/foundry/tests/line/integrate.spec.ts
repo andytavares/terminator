@@ -115,6 +115,17 @@ beforeEach(() => {
 })
 
 describe('the command line', () => {
+  describe('the draft command', theDraftCommandTests)
+  describe('the body and the worktree', theBodyAndTheWorktreeTests)
+  describe('pushing', pushingTests)
+  describe('push failures', pushFailuresTests)
+  describe('carrying failures through', carryingFailuresThroughTests)
+  describe('gh failing silently', ghFailingSilentlyTests)
+  describe('both streams', bothStreamsTests)
+  describe('a push failing on stdout', aPushFailingOnStdoutTests)
+})
+
+function theDraftCommandTests() {
   it('opens a draft, not a review request', async () => {
     const d = deps()
     await shipOrder(order(), { verdicts: [verdict()], findings: [] }, d)
@@ -141,7 +152,9 @@ describe('the command line', () => {
     // written by an agent. Through argv it is a quoting bug waiting to happen.
     expect(args).not.toContain('--body')
   })
+}
 
+function theBodyAndTheWorktreeTests() {
   it('writes the body to the order directory and points gh at that file', async () => {
     const d = deps()
     await shipOrder(order(), { verdicts: [verdict()], findings: [] }, d)
@@ -169,7 +182,9 @@ describe('the command line', () => {
     expect(callsTo(d.exec, 'gh', 'create')[0].cwd).toBe(expected)
     expect(expected).not.toBe('/repos/app')
   })
+}
 
+function pushingTests() {
   it('pushes the branch before asking gh to open anything', async () => {
     const d = deps()
     await shipOrder(order(), { verdicts: [verdict()], findings: [] }, d)
@@ -192,7 +207,9 @@ describe('the command line', () => {
     const result = await shipOrder(order(), { verdicts: [verdict()], findings: [] }, deps())
     expect(result.pulls[0].url).toBe('https://github.com/tav/app/pull/7')
   })
+}
 
+function pushFailuresTests() {
   it('refuses to open a pull request when the push failed', async () => {
     const exec = vi.fn(async () => ({
       exitCode: 1,
@@ -215,7 +232,9 @@ describe('the command line', () => {
     )
     expect(callsTo(exec, 'gh')).toHaveLength(0)
   })
+}
 
+function carryingFailuresThroughTests() {
   it('carries the push failure through rather than summarising it away', async () => {
     const exec = vi.fn(async () => ({
       exitCode: 1,
@@ -246,7 +265,9 @@ describe('the command line', () => {
       shipOrder(order(), { verdicts: [verdict()], findings: [] }, deps({ exec: exec as never }))
     ).rejects.toThrow(/already exists/)
   })
+}
 
+function ghFailingSilentlyTests() {
   it('falls back to the exit code when gh failed with nothing on either stream', async () => {
     const exec = vi.fn(async (options: { command: string }) =>
       options.command === 'git'
@@ -261,7 +282,9 @@ describe('the command line', () => {
     expect(err.message).toContain('exit code 1')
     expect(err.message.endsWith(': ')).toBe(false)
   })
+}
 
+function bothStreamsTests() {
   it('prefers stderr over stdout when gh wrote to both', async () => {
     const exec = vi.fn(async (options: { command: string }) =>
       options.command === 'git'
@@ -281,7 +304,9 @@ describe('the command line', () => {
     expect(err.message).toContain('fatal: no such ref')
     expect(err.message).not.toContain('some progress output')
   })
+}
 
+function aPushFailingOnStdoutTests() {
   it('falls back to stdout for a push failure too', async () => {
     const exec = vi.fn(async () => ({
       exitCode: 1,
@@ -293,7 +318,7 @@ describe('the command line', () => {
       shipOrder(order(), { verdicts: [verdict()], findings: [] }, deps({ exec: exec as never }))
     ).rejects.toThrow(/refused anyway/)
   })
-})
+}
 
 describe('marking ready', () => {
   it('calls gh pr ready on the pull request it opened', async () => {
@@ -323,6 +348,13 @@ describe('marking ready', () => {
 })
 
 describe('risk-ordered shipping (FR-055)', () => {
+  describe('when to gate', whenToGateTests)
+  describe('P0', p0Tests)
+  describe('holding', holdingTests)
+  describe('P2 and naming the grade', p2AndNamingTheGradeTests)
+})
+
+function whenToGateTests() {
   it('gates before pushing for the two highest grades', () => {
     expect(GATED_GRADES).toEqual(['P0', 'P1'])
     expect(shipModeFor(order({ risk: { ...order().risk, grade: 'P0' } }))).toBe('gate_then_push')
@@ -333,7 +365,9 @@ describe('risk-ordered shipping (FR-055)', () => {
     expect(shipModeFor(order({ risk: { ...order().risk, grade: 'P2' } }))).toBe('push_then_gate')
     expect(shipModeFor(order({ risk: { ...order().risk, grade: 'P3' } }))).toBe('push_then_gate')
   })
+}
 
+function p0Tests() {
   it('takes the decision before anything reaches the remote at P0', async () => {
     const seen: string[] = []
     const d = deps({
@@ -358,7 +392,9 @@ describe('risk-ordered shipping (FR-055)', () => {
     )
     expect(seen[0]).toBe('decided')
   })
+}
 
+function holdingTests() {
   it('pushes nothing when the operator holds a P0', async () => {
     const d = deps({ decide: vi.fn(async () => 'hold') })
     const result = await shipOrder(
@@ -381,7 +417,9 @@ describe('risk-ordered shipping (FR-055)', () => {
       'The elevated risk shipping decision is waiting on you, so nothing was pushed yet.'
     )
   })
+}
 
+function p2AndNamingTheGradeTests() {
   it('asks nobody before pushing at P2', async () => {
     const d = deps({ risk: undefined })
     await shipOrder(
@@ -401,7 +439,7 @@ describe('risk-ordered shipping (FR-055)', () => {
     )
     expect(decide.mock.calls[0][0]).toMatchObject({ rule: 'risk.p0', riskGrade: 'P1' })
   })
-})
+}
 
 describe('the setting that turns pushing off (FR-054)', () => {
   it('pushes nothing when draft-first is off, and says so', async () => {
@@ -420,6 +458,12 @@ describe('the setting that turns pushing off (FR-054)', () => {
 })
 
 describe('the pull request body (FR-056)', () => {
+  describe('summary and verdicts', summaryAndVerdictsTests)
+  describe('inspection', inspectionTests)
+  describe('provenance', provenanceTests)
+})
+
+function summaryAndVerdictsTests() {
   it('carries a written summary of the work', () => {
     const body = prBody(order(), { verdicts: [verdict()], findings: [] })
     expect(body).toContain('Refuse an expired refresh token')
@@ -445,7 +489,9 @@ describe('the pull request body (FR-056)', () => {
     expect(body).toMatch(/not measured/i)
     expect(body).toContain('no lint command in this repository')
   })
+}
 
+function inspectionTests() {
   it('carries inspection findings when there were any', () => {
     const body = prBody(order(), {
       verdicts: [verdict()],
@@ -468,7 +514,9 @@ describe('the pull request body (FR-056)', () => {
     expect(body).toContain('Not run: graded P3 with no risk triggers')
     expect(body).not.toContain('Nothing found.')
   })
+}
 
+function provenanceTests() {
   it('names the order it came from', () => {
     expect(prBody(order(), { verdicts: [], findings: [] })).toContain('WO-1')
   })
@@ -476,7 +524,7 @@ describe('the pull request body (FR-056)', () => {
   it('marks itself as a draft opened by the factory, not by a person', () => {
     expect(prBody(order(), { verdicts: [], findings: [] })).toMatch(/Foundry/)
   })
-})
+}
 
 describe('remembering what was opened', () => {
   it('writes the drafts down, so a decision taken later knows which one it means', async () => {
@@ -504,6 +552,82 @@ describe('remembering what was opened', () => {
 })
 
 describe('the branches a happy path never reaches', () => {
+  describe('the worst verdict', theWorstVerdictTests)
+  describe('units', unitsTests)
+  describe('criteria and intent', criteriaAndIntentTests)
+  describe('triggers', triggersTests)
+  describe('what gh printed', whatGhPrintedTests)
+})
+
+function twoLanes(over: Partial<WorkOrder> = {}): WorkOrder {
+  const base = order()
+  return {
+    ...base,
+    context: {
+      ...base.context,
+      repos: [
+        {
+          name: 'proto',
+          path: '/repos/proto',
+          lane: 1,
+          baseBranch: 'main',
+          headBranch: 'f/wo-1',
+        },
+        { name: 'cli', path: '/repos/cli', lane: 2, baseBranch: 'main', headBranch: 'f/wo-1' },
+      ],
+    },
+    plan: {
+      ...base.plan,
+      sharedFiles: ['proto/session.proto'],
+      lanes: [
+        { ord: 1, repo: 'proto', branch: '', role: 'producer', blocks: [2], blockedBy: [] },
+        { ord: 2, repo: 'cli', branch: '', role: 'consumer', blocks: [], blockedBy: [1] },
+      ],
+      units: [
+        {
+          id: 'U-1',
+          title: 'the contract',
+          role: 'builder',
+          lane: 1,
+          dependsOn: [],
+          satisfies: ['AC-1'],
+          touches: ['proto/session.proto'],
+          verify: [],
+        },
+        {
+          id: 'U-2',
+          title: 'adopt it',
+          role: 'builder',
+          lane: 2,
+          dependsOn: [],
+          satisfies: ['AC-1'],
+          touches: ['proto/session.proto'],
+          verify: [],
+        },
+      ],
+    },
+    ...over,
+  }
+}
+/** A client that hands each `gh pr create` its own URL. */
+function multiDeps() {
+  let created = 0
+  const exec = vi.fn(async (options: { command: string; args: string[] }) => {
+    if (options.command === 'gh' && options.args[1] === 'create') {
+      created += 1
+      return {
+        exitCode: 0,
+        stdout: `https://github.com/tav/r/pull/${created}\n`,
+        stderr: '',
+        timedOut: false,
+      }
+    }
+    return { exitCode: 0, stdout: '', stderr: '', timedOut: false }
+  })
+  return deps({ exec: exec as never })
+}
+
+function theWorstVerdictTests() {
   it('reports the worst verdict for a criterion, not the first', () => {
     const body = prBody(order(), {
       verdicts: [
@@ -526,7 +650,9 @@ describe('the branches a happy path never reaches', () => {
     })
     expect(body).toMatch(/not measured/i)
   })
+}
 
+function unitsTests() {
   it('lists the units that did the work', () => {
     const withUnits = order({
       plan: {
@@ -553,7 +679,9 @@ describe('the branches a happy path never reaches', () => {
   it('says there are no units rather than leaving the section blank', () => {
     expect(prBody(order(), { verdicts: [], findings: [] })).toContain('_No units._')
   })
+}
 
+function criteriaAndIntentTests() {
   it('says there are no criteria rather than printing an empty table', () => {
     const body = prBody(order({ acceptance: [] }), { verdicts: [], findings: [] })
     expect(body).toContain('_No criteria._')
@@ -567,7 +695,9 @@ describe('the branches a happy path never reaches', () => {
     expect(body).toContain('expired tokens are accepted')
     expect(body).toContain('they are refused')
   })
+}
 
+function triggersTests() {
   it('names the risk triggers in the shipping gate when there are any', async () => {
     const decide = vi.fn(async () => 'approve')
     await shipOrder(
@@ -577,7 +707,9 @@ describe('the branches a happy path never reaches', () => {
     )
     expect((decide.mock.calls[0][0] as { why: string }).why).toContain('secrets')
   })
+}
 
+function whatGhPrintedTests() {
   it('reports a refused pull request rather than returning an empty URL', async () => {
     const exec = vi.fn(async (options: { command: string }) =>
       options.command === 'git'
@@ -598,78 +730,32 @@ describe('the branches a happy path never reaches', () => {
     )
     expect(result.pulls[0].url).toBe('')
   })
-})
+}
 
 describe('one order across several repositories (FR-067, FR-068)', () => {
-  function twoLanes(over: Partial<WorkOrder> = {}): WorkOrder {
-    const base = order()
-    return {
-      ...base,
-      context: {
-        ...base.context,
-        repos: [
-          {
-            name: 'proto',
-            path: '/repos/proto',
-            lane: 1,
-            baseBranch: 'main',
-            headBranch: 'f/wo-1',
-          },
-          { name: 'cli', path: '/repos/cli', lane: 2, baseBranch: 'main', headBranch: 'f/wo-1' },
-        ],
-      },
-      plan: {
-        ...base.plan,
-        sharedFiles: ['proto/session.proto'],
-        lanes: [
-          { ord: 1, repo: 'proto', branch: '', role: 'producer', blocks: [2], blockedBy: [] },
-          { ord: 2, repo: 'cli', branch: '', role: 'consumer', blocks: [], blockedBy: [1] },
-        ],
-        units: [
-          {
-            id: 'U-1',
-            title: 'the contract',
-            role: 'builder',
-            lane: 1,
-            dependsOn: [],
-            satisfies: ['AC-1'],
-            touches: ['proto/session.proto'],
-            verify: [],
-          },
-          {
-            id: 'U-2',
-            title: 'adopt it',
-            role: 'builder',
-            lane: 2,
-            dependsOn: [],
-            satisfies: ['AC-1'],
-            touches: ['proto/session.proto'],
-            verify: [],
-          },
-        ],
-      },
-      ...over,
-    }
-  }
+  describe('merge order', mergeOrderTests)
+  describe('shared files and cross-links', sharedFilesAndCrossLinksTests)
+  describe('a failed cross-link', aFailedCrossLinkTests)
+  describe('single-repository orders', singleRepositoryOrdersTests)
+  describe('one shipping decision', oneShippingDecisionTests)
+})
 
-  /** A client that hands each `gh pr create` its own URL. */
-  function multiDeps() {
-    let created = 0
-    const exec = vi.fn(async (options: { command: string; args: string[] }) => {
-      if (options.command === 'gh' && options.args[1] === 'create') {
-        created += 1
-        return {
-          exitCode: 0,
-          stdout: `https://github.com/tav/r/pull/${created}\n`,
-          stderr: '',
-          timedOut: false,
-        }
-      }
-      return { exitCode: 0, stdout: '', stderr: '', timedOut: false }
-    })
-    return deps({ exec: exec as never })
-  }
+const ladderOk = {
+  steps: [
+    {
+      rung: 'L1' as const,
+      name: "The unit's own tests",
+      result: 'pass' as const,
+      reason: '',
+      exitCode: 0,
+    },
+  ],
+  stoppedAt: null,
+  unmeasured: [],
+  ok: true,
+}
 
+function mergeOrderTests() {
   it('opens one draft per repository', async () => {
     const d = multiDeps()
     const result = await shipOrder(twoLanes(), { verdicts: [verdict()], findings: [] }, d)
@@ -692,7 +778,9 @@ describe('one order across several repositories (FR-067, FR-068)', () => {
     expect(consumer).toContain('Do not merge this before lane 1')
     expect(consumer).toContain('https://github.com/tav/r/pull/1')
   })
+}
 
+function sharedFilesAndCrossLinksTests() {
   it('names the shared file on both, not only on the producer', async () => {
     const d = multiDeps()
     const result = await shipOrder(twoLanes(), { verdicts: [verdict()], findings: [] }, d)
@@ -709,7 +797,9 @@ describe('one order across several repositories (FR-067, FR-068)', () => {
     expect(edits).toHaveLength(1)
     expect(edits[0].args).toContain('https://github.com/tav/r/pull/1')
   })
+}
 
+function aFailedCrossLinkTests() {
   it('records a failed cross-link rather than losing the drafts over a description', async () => {
     let created = 0
     const exec = vi.fn(async (options: { command: string; args: string[] }) => {
@@ -736,7 +826,9 @@ describe('one order across several repositories (FR-067, FR-068)', () => {
       expect.stringContaining('could not edit')
     )
   })
+}
 
+function singleRepositoryOrdersTests() {
   it('says nothing about lanes on a single-repository order', async () => {
     const d = deps()
     const result = await shipOrder(order(), { verdicts: [verdict()], findings: [] }, d)
@@ -748,7 +840,9 @@ describe('one order across several repositories (FR-067, FR-068)', () => {
     await shipOrder(order(), { verdicts: [verdict()], findings: [] }, d)
     expect(callsTo(d.exec, 'gh', 'edit')).toHaveLength(0)
   })
+}
 
+function oneShippingDecisionTests() {
   it('takes one shipping decision for the whole order, not one per lane', async () => {
     const decide = vi.fn(async () => 'approve')
     const d = multiDeps()
@@ -759,24 +853,18 @@ describe('one order across several repositories (FR-067, FR-068)', () => {
     )
     expect(decide).toHaveBeenCalledTimes(1)
   })
-})
+}
 
 describe('the decision the operator is finally offered (FR-057)', () => {
-  const ladderOk = {
-    steps: [
-      {
-        rung: 'L1' as const,
-        name: "The unit's own tests",
-        result: 'pass' as const,
-        reason: '',
-        exitCode: 0,
-      },
-    ],
-    stoppedAt: null,
-    unmeasured: [],
-    ok: true,
-  }
+  describe('the question', theQuestionTests)
+  describe('not measured', notMeasuredTests)
+  describe('the inspection', theInspectionTests)
+  describe('markdown', markdownTests)
+  describe('no verdicts and the body', noVerdictsAndTheBodyTests)
+  describe('nothing pushed', nothingPushedTests)
+})
 
+function theQuestionTests() {
   it('is whether to mark it ready, not whether to create it', async () => {
     const raiseGate = vi.fn(async () => undefined)
     const result = await shipOrder(
@@ -798,7 +886,9 @@ describe('the decision the operator is finally offered (FR-057)', () => {
     )
     expect(result.gate?.defaultIfIgnored).toBe('hold')
   })
+}
 
+function notMeasuredTests() {
   it('says what was never measured, so a bare repository cannot look checked', async () => {
     const result = await shipOrder(
       order(),
@@ -813,7 +903,9 @@ describe('the decision the operator is finally offered (FR-057)', () => {
     expect(result.gate?.why).toContain('- Lint')
     expect(result.gate?.why).toContain('- Repository gate')
   })
+}
 
+function theInspectionTests() {
   it('says the inspection found nothing only when it ran', async () => {
     const result = await shipOrder(
       order(),
@@ -842,7 +934,9 @@ describe('the decision the operator is finally offered (FR-057)', () => {
     expect(result.gate?.why).toContain('- Not run: graded P3 with no risk triggers')
     expect(result.gate?.why).not.toContain('Found nothing')
   })
+}
 
+function markdownTests() {
   it('writes the decision as Markdown with one fact per line', async () => {
     const result = await shipOrder(
       order(),
@@ -860,7 +954,9 @@ describe('the decision the operator is finally offered (FR-057)', () => {
     expect(why).toContain('### Judged against\n\n- Tests come first · every unit')
     expect(why).toContain('- No secrets · the whole order')
   })
+}
 
+function noVerdictsAndTheBodyTests() {
   it('does not call an order with no verdicts passed', async () => {
     const result = await shipOrder(
       order(),
@@ -879,7 +975,9 @@ describe('the decision the operator is finally offered (FR-057)', () => {
     )
     expect(result.gate?.evidence[0]).toMatchObject({ kind: 'report_file' })
   })
+}
 
+function nothingPushedTests() {
   it('raises nothing when nothing was pushed', async () => {
     const raiseGate = vi.fn(async () => undefined)
     const result = await shipOrder(
@@ -890,7 +988,7 @@ describe('the decision the operator is finally offered (FR-057)', () => {
     expect(result.gate).toBeUndefined()
     expect(raiseGate).not.toHaveBeenCalled()
   })
-})
+}
 
 describe('the body reports the climb (FR-056)', () => {
   it('names every rung and its result', () => {
@@ -958,6 +1056,18 @@ describe('the rungs decided somewhere else', () => {
   })
 })
 
+function withNoHeadBranch(over: Partial<WorkOrder> = {}): WorkOrder {
+  const o = order()
+  return {
+    ...o,
+    context: {
+      ...o.context,
+      repos: o.context.repos.map((repo) => ({ ...repo, headBranch: '' })),
+    },
+    ...over,
+  }
+}
+
 // `context.repos[].headBranch` is initialised empty by `draftOrder` and
 // written by nothing. Reading it raw pushed `HEAD:` and asked GitHub for a
 // pull request with `--head ''`. Every test above accepted that, because every
@@ -965,18 +1075,11 @@ describe('the rungs decided somewhere else', () => {
 // was never real. A live run against GitHub refused it on the first try:
 // `fatal: invalid refspec 'HEAD:'`.
 describe('the branch shipping actually pushes', () => {
-  function withNoHeadBranch(over: Partial<WorkOrder> = {}): WorkOrder {
-    const o = order()
-    return {
-      ...o,
-      context: {
-        ...o.context,
-        repos: o.context.repos.map((repo) => ({ ...repo, headBranch: '' })),
-      },
-      ...over,
-    }
-  }
+  describe('the derived branch', theDerivedBranchTests)
+  describe('the lane branch', theLaneBranchTests)
+})
 
+function theDerivedBranchTests() {
   /** What `branchFor` derives for this order when nothing declared one. */
   const DERIVED = 'foundry/wo-1'
 
@@ -1001,7 +1104,9 @@ describe('the branch shipping actually pushes', () => {
     const [create] = callsTo(d.exec, 'gh', 'create')
     expect(create.args[create.args.indexOf('--head') + 1]).toBe(DERIVED)
   })
+}
 
+function theLaneBranchTests() {
   it("prefers the lane's declared branch, which is the tracker's own name", async () => {
     const o = withNoHeadBranch()
     const d = deps()
@@ -1019,13 +1124,31 @@ describe('the branch shipping actually pushes', () => {
     const [push] = callsTo(d.exec, 'git')
     expect(push.args).toContain('HEAD:andy/tav-42-session-ttl')
   })
-})
+}
+
+function check(over: Partial<Check> = {}): Check {
+  return { name: 'build', bucket: 'pass', link: '', workflow: 'ci', ...over }
+}
 
 describe('shipping waits for CI before it asks "mark it ready?" (D2)', () => {
-  function check(over: Partial<Check> = {}): Check {
-    return { name: 'build', bucket: 'pass', link: '', workflow: 'ci', ...over }
-  }
+  describe('no CI watch', noCiWatchTests)
+  describe('the draft-opened callback', theDraftOpenedCallbackTests)
+  describe('the ready gate note', theReadyGateNoteTests)
+  describe('red CI', redCiTests)
+  describe('ship.ci_red', shipCiRedTests)
+  describe('halted watches and none', haltedWatchesAndNoneTests)
+})
 
+const pull = {
+  lane: 1,
+  repo: 'app',
+  cwd: '/repos/app',
+  branch: 'foundry/wo-1',
+  url: 'https://github.com/tav/app/pull/7',
+  bodyPath: '/x/pull-request-lane-1.md',
+}
+
+function noCiWatchTests() {
   it('is unchanged, byte for byte, when there is no watchCi', async () => {
     const raiseGate = vi.fn(async () => undefined)
     const result = await shipOrder(
@@ -1037,7 +1160,9 @@ describe('shipping waits for CI before it asks "mark it ready?" (D2)', () => {
     expect(result.gate?.why).not.toContain('CI')
     expect(result.held).toBe(false)
   })
+}
 
+function theDraftOpenedCallbackTests() {
   it('tells the caller the drafts are open before the CI watch starts', async () => {
     const calls: string[] = []
     const onDraftOpened = vi.fn(async () => {
@@ -1067,7 +1192,9 @@ describe('shipping waits for CI before it asks "mark it ready?" (D2)', () => {
     )
     expect(result.held).toBe(false)
   })
+}
 
+function theReadyGateNoteTests() {
   it('adds "CI passed: N checks." to the ready gate when CI is green', async () => {
     const outcome: CiOutcome = { kind: 'green', checks: [check(), check({ name: 'lint' })] }
     const watchCi = vi.fn(async () => outcome)
@@ -1095,7 +1222,9 @@ describe('shipping waits for CI before it asks "mark it ready?" (D2)', () => {
     expect(result.gate?.why).not.toMatch(/CI passed/)
     expect(result.held).toBe(false)
   })
+}
 
+function redCiTests() {
   it('raises exactly one ci.red gate, and no ready-for-review gate, when CI stayed red', async () => {
     const raiseGate = vi.fn(async () => undefined)
     const outcome: CiOutcome = {
@@ -1122,7 +1251,9 @@ describe('shipping waits for CI before it asks "mark it ready?" (D2)', () => {
     expect(result.gate?.why).not.toContain('line 9\n')
     expect(result.held).toBe(true)
   })
+}
 
+function shipCiRedTests() {
   it('records ship.ci_red when CI stayed red', async () => {
     const record = vi.fn(async () => undefined)
     const outcome: CiOutcome = {
@@ -1138,7 +1269,9 @@ describe('shipping waits for CI before it asks "mark it ready?" (D2)', () => {
     )
     expect(record).toHaveBeenCalledWith('ship.ci_red', 'WO-1', expect.any(String))
   })
+}
 
+function haltedWatchesAndNoneTests() {
   it('raises nothing and records ship.ci_halted when watching CI halted', async () => {
     const raiseGate = vi.fn(async () => undefined)
     const record = vi.fn(async () => undefined)
@@ -1165,22 +1298,37 @@ describe('shipping waits for CI before it asks "mark it ready?" (D2)', () => {
     expect(result.gate?.rule).toBe('ready-for-review')
     expect(result.gate?.why).not.toContain('CI')
   })
-})
+}
 
 describe('finishShipping', () => {
-  const pull = {
-    lane: 1,
-    repo: 'app',
-    cwd: '/repos/app',
-    branch: 'foundry/wo-1',
-    url: 'https://github.com/tav/app/pull/7',
-    bodyPath: '/x/pull-request-lane-1.md',
-  }
+  describe('CI stayed red', ciStayedRedTests)
+  describe('CI green', ciGreenTests)
+})
 
-  function check(over: Partial<Check> = {}): Check {
-    return { name: 'build', bucket: 'pass', link: '', workflow: 'ci', ...over }
+function twoLanesOrder(): WorkOrder {
+  const base = order()
+  return {
+    ...base,
+    context: {
+      ...base.context,
+      repos: [
+        {
+          name: 'proto',
+          path: '/repos/proto',
+          lane: 1,
+          baseBranch: 'main',
+          headBranch: 'f/wo-1',
+        },
+        { name: 'cli', path: '/repos/cli', lane: 2, baseBranch: 'main', headBranch: 'f/wo-1' },
+      ],
+    },
   }
+}
+function multiDepsForPush() {
+  return deps()
+}
 
+function ciStayedRedTests() {
   it('raises a ci.red gate, not ready-for-review, when CI stayed red', async () => {
     const raiseGate = vi.fn(async () => undefined)
     const ci: CiOutcome = {
@@ -1201,7 +1349,9 @@ describe('finishShipping', () => {
     expect(result.gate?.rule).toBe('ci.red')
     expect(result.held).toBe(true)
   })
+}
 
+function ciGreenTests() {
   it('raises a ready-for-review gate carrying the CI note when CI is green', async () => {
     const raiseGate = vi.fn(async () => undefined)
     const ci: CiOutcome = { kind: 'green', checks: [check()] }
@@ -1218,9 +1368,35 @@ describe('finishShipping', () => {
     expect(result.gate?.why).toContain('CI passed: 1 checks.')
     expect(result.held).toBe(false)
   })
-})
+}
 
 describe('pushLanes (D2)', () => {
+  describe('lane order', laneOrderTests)
+  describe('no gh', noGhTests)
+})
+
+const OPEN = 'https://github.com/andytavares/terminator/pull/248'
+function withOpenPull(list: { exitCode: number; stdout: string }) {
+  const d = deps()
+  d.exec.mockImplementation(async (options: { command: string; args: string[] }) => {
+    if (options.command === 'gh' && options.args[1] === 'list') {
+      return { ...list, stderr: '', timedOut: false }
+    }
+    return {
+      exitCode: 0,
+      stdout: 'https://github.com/tav/app/pull/7\n',
+      stderr: '',
+      timedOut: false,
+    }
+  })
+  return d
+}
+const listing = (isDraft: boolean) => ({
+  exitCode: 0,
+  stdout: JSON.stringify([{ url: OPEN, number: 248, isDraft }]),
+})
+
+function laneOrderTests() {
   it('pushes every lane in lane order, from its checkout path', async () => {
     const d = multiDepsForPush()
     await pushLanes(twoLanesOrder(), d)
@@ -1230,37 +1406,15 @@ describe('pushLanes (D2)', () => {
     expect(pushes[0].cwd).toBe(checkoutPath(root, twoLanesOrder(), 'proto'))
     expect(pushes[1].cwd).toBe(checkoutPath(root, twoLanesOrder(), 'cli'))
   })
+}
 
+function noGhTests() {
   it('never calls gh', async () => {
     const d = multiDepsForPush()
     await pushLanes(twoLanesOrder(), d)
     expect(callsTo(d.exec, 'gh')).toHaveLength(0)
   })
-
-  function twoLanesOrder(): WorkOrder {
-    const base = order()
-    return {
-      ...base,
-      context: {
-        ...base.context,
-        repos: [
-          {
-            name: 'proto',
-            path: '/repos/proto',
-            lane: 1,
-            baseBranch: 'main',
-            headBranch: 'f/wo-1',
-          },
-          { name: 'cli', path: '/repos/cli', lane: 2, baseBranch: 'main', headBranch: 'f/wo-1' },
-        ],
-      },
-    }
-  }
-
-  function multiDepsForPush() {
-    return deps()
-  }
-})
+}
 
 describe('opening drafts apart from watching them (ADR 085)', () => {
   it('opens and records the drafts without watching CI or raising the ready question', async () => {
@@ -1290,84 +1444,9 @@ describe('opening drafts apart from watching them (ADR 085)', () => {
   })
 
   describe('a pull request that is already open on the branch', () => {
-    const OPEN = 'https://github.com/andytavares/terminator/pull/248'
-
-    function withOpenPull(list: { exitCode: number; stdout: string }) {
-      const d = deps()
-      d.exec.mockImplementation(async (options: { command: string; args: string[] }) => {
-        if (options.command === 'gh' && options.args[1] === 'list') {
-          return { ...list, stderr: '', timedOut: false }
-        }
-        return {
-          exitCode: 0,
-          stdout: 'https://github.com/tav/app/pull/7\n',
-          stderr: '',
-          timedOut: false,
-        }
-      })
-      return d
-    }
-
-    const listing = (isDraft: boolean) => ({
-      exitCode: 0,
-      stdout: JSON.stringify([{ url: OPEN, number: 248, isDraft }]),
-    })
-
-    it('adopts it: retitles it, takes it back to draft, and opens no second one', async () => {
-      const d = withOpenPull(listing(false))
-      const result = await openDrafts(order(), { verdicts: [], findings: [] }, d)
-      expect(result.pulls[0].url).toBe(OPEN)
-      const edit = callsTo(d.exec, 'gh', 'edit')
-      expect(edit).toHaveLength(1)
-      expect(edit[0].args).toEqual(
-        expect.arrayContaining([OPEN, '--title', order().title, '--body-file'])
-      )
-      expect(callsTo(d.exec, 'gh', 'ready').map((c) => c.args)).toEqual([
-        ['pr', 'ready', '--undo', OPEN],
-      ])
-      expect(callsTo(d.exec, 'gh', 'create')).toHaveLength(0)
-      expect((await readPulls(root, 'WO-1'))[0].url).toBe(OPEN)
-      expect(d.record).toHaveBeenCalledWith('ship.draft_adopted', OPEN, expect.any(String))
-    })
-
-    it('leaves an adopted draft as a draft', async () => {
-      const d = withOpenPull(listing(true))
-      const result = await openDrafts(order(), { verdicts: [], findings: [] }, d)
-      expect(result.pulls[0].url).toBe(OPEN)
-      expect(callsTo(d.exec, 'gh', 'ready')).toHaveLength(0)
-      expect(callsTo(d.exec, 'gh', 'create')).toHaveLength(0)
-    })
-
-    it('keeps shipping when the retitle or the return to draft fails', async () => {
-      const d = deps()
-      d.exec.mockImplementation(async (options: { command: string; args: string[] }) => {
-        const verb = options.command === 'gh' ? options.args[1] : ''
-        if (verb === 'list') return { ...listing(false), stderr: '', timedOut: false }
-        if (verb === 'edit' || verb === 'ready') {
-          return { exitCode: 1, stdout: '', stderr: 'nope', timedOut: false }
-        }
-        return { exitCode: 0, stdout: '', stderr: '', timedOut: false }
-      })
-      const result = await openDrafts(order(), { verdicts: [], findings: [] }, d)
-      expect(result.pulls[0].url).toBe(OPEN)
-      expect(d.record).toHaveBeenCalledWith('ship.adopt_edit_failed', OPEN, expect.any(String))
-      expect(d.record).toHaveBeenCalledWith('ship.undraft_failed', OPEN, expect.any(String))
-      expect(d.record).toHaveBeenCalledWith('ship.draft_adopted', OPEN, expect.any(String))
-    })
-
-    it('creates one when nothing is open', async () => {
-      const d = withOpenPull({ exitCode: 0, stdout: '[]' })
-      const result = await openDrafts(order(), { verdicts: [], findings: [] }, d)
-      expect(callsTo(d.exec, 'gh', 'create')).toHaveLength(1)
-      expect(result.pulls[0].url).toBe('https://github.com/tav/app/pull/7')
-    })
-
-    it('creates one when the lookup fails', async () => {
-      const d = withOpenPull({ exitCode: 1, stdout: '' })
-      const result = await openDrafts(order(), { verdicts: [], findings: [] }, d)
-      expect(callsTo(d.exec, 'gh', 'create')).toHaveLength(1)
-      expect(result.pulls[0].url).toBe('https://github.com/tav/app/pull/7')
-    })
+    describe('adopting', adoptingTests)
+    describe('failed edits', failedEditsTests)
+    describe('creating one', creatingOneTests)
   })
 
   it('shipOrder is still opening then watching, in that order', async () => {
@@ -1405,3 +1484,65 @@ describe('opening drafts apart from watching them (ADR 085)', () => {
     expect(callsTo(clean.exec, 'git').some((c) => c.args[0] === 'push')).toBe(false)
   })
 })
+
+function adoptingTests() {
+  it('adopts it: retitles it, takes it back to draft, and opens no second one', async () => {
+    const d = withOpenPull(listing(false))
+    const result = await openDrafts(order(), { verdicts: [], findings: [] }, d)
+    expect(result.pulls[0].url).toBe(OPEN)
+    const edit = callsTo(d.exec, 'gh', 'edit')
+    expect(edit).toHaveLength(1)
+    expect(edit[0].args).toEqual(
+      expect.arrayContaining([OPEN, '--title', order().title, '--body-file'])
+    )
+    expect(callsTo(d.exec, 'gh', 'ready').map((c) => c.args)).toEqual([
+      ['pr', 'ready', '--undo', OPEN],
+    ])
+    expect(callsTo(d.exec, 'gh', 'create')).toHaveLength(0)
+    expect((await readPulls(root, 'WO-1'))[0].url).toBe(OPEN)
+    expect(d.record).toHaveBeenCalledWith('ship.draft_adopted', OPEN, expect.any(String))
+  })
+
+  it('leaves an adopted draft as a draft', async () => {
+    const d = withOpenPull(listing(true))
+    const result = await openDrafts(order(), { verdicts: [], findings: [] }, d)
+    expect(result.pulls[0].url).toBe(OPEN)
+    expect(callsTo(d.exec, 'gh', 'ready')).toHaveLength(0)
+    expect(callsTo(d.exec, 'gh', 'create')).toHaveLength(0)
+  })
+}
+
+function failedEditsTests() {
+  it('keeps shipping when the retitle or the return to draft fails', async () => {
+    const d = deps()
+    d.exec.mockImplementation(async (options: { command: string; args: string[] }) => {
+      const verb = options.command === 'gh' ? options.args[1] : ''
+      if (verb === 'list') return { ...listing(false), stderr: '', timedOut: false }
+      if (verb === 'edit' || verb === 'ready') {
+        return { exitCode: 1, stdout: '', stderr: 'nope', timedOut: false }
+      }
+      return { exitCode: 0, stdout: '', stderr: '', timedOut: false }
+    })
+    const result = await openDrafts(order(), { verdicts: [], findings: [] }, d)
+    expect(result.pulls[0].url).toBe(OPEN)
+    expect(d.record).toHaveBeenCalledWith('ship.adopt_edit_failed', OPEN, expect.any(String))
+    expect(d.record).toHaveBeenCalledWith('ship.undraft_failed', OPEN, expect.any(String))
+    expect(d.record).toHaveBeenCalledWith('ship.draft_adopted', OPEN, expect.any(String))
+  })
+}
+
+function creatingOneTests() {
+  it('creates one when nothing is open', async () => {
+    const d = withOpenPull({ exitCode: 0, stdout: '[]' })
+    const result = await openDrafts(order(), { verdicts: [], findings: [] }, d)
+    expect(callsTo(d.exec, 'gh', 'create')).toHaveLength(1)
+    expect(result.pulls[0].url).toBe('https://github.com/tav/app/pull/7')
+  })
+
+  it('creates one when the lookup fails', async () => {
+    const d = withOpenPull({ exitCode: 1, stdout: '' })
+    const result = await openDrafts(order(), { verdicts: [], findings: [] }, d)
+    expect(callsTo(d.exec, 'gh', 'create')).toHaveLength(1)
+    expect(result.pulls[0].url).toBe('https://github.com/tav/app/pull/7')
+  })
+}

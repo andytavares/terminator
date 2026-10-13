@@ -98,6 +98,17 @@ afterEach(() => {
 })
 
 describe('tearDownRun', () => {
+  describe('the worktree', theWorktreeTests)
+  describe('the sidebar project', theSidebarProjectTests)
+  describe('the branch', theBranchTests)
+  describe('every lane', everyLaneTests)
+  describe('records', recordsTests)
+  describe('git failures', gitFailuresTests)
+  describe('unremovable records and twice', unremovableRecordsAndTwiceTests)
+  describe('repositories outside the order', repositoriesOutsideTheOrderTests)
+})
+
+function theWorktreeTests() {
   it('removes the worktree from the repository that owns it, not from the data root', async () => {
     const { calls, exec } = recorder()
     await tearDownRun(order(), { exec, root })
@@ -115,7 +126,9 @@ describe('tearDownRun', () => {
     const order_ = calls.map((c) => c.args.slice(0, 2).join(' '))
     expect(order_.indexOf('worktree prune')).toBeGreaterThan(order_.indexOf('worktree remove'))
   })
+}
 
+function theSidebarProjectTests() {
   it("removes the sidebar project that pointed at the lane's checkout", async () => {
     const { exec } = recorder()
     const removeProjectAt = vi.fn(() => true)
@@ -131,13 +144,17 @@ describe('tearDownRun', () => {
     const result = await tearDownRun(order(), { exec, root, removeProjectAt: () => false })
     expect(result.removed.some((r) => r.startsWith('the project'))).toBe(false)
   })
+}
 
+function theBranchTests() {
   it('deletes the branch the lane was working on', async () => {
     const { calls, exec } = recorder()
     await tearDownRun(order(), { exec, root })
     expect(calls.some((c) => c.args[0] === 'branch' && c.args.includes('wip'))).toBe(true)
   })
+}
 
+function everyLaneTests() {
   it('takes every lane, not just the first', async () => {
     const second = makeTempDir('fdry-teardown-repo2-')
     const base = order()
@@ -170,7 +187,9 @@ describe('tearDownRun', () => {
     expect(calls.filter((c) => c.args[0] === 'worktree' && c.args[1] === 'remove')).toHaveLength(2)
     fs.rmSync(second, { recursive: true, force: true })
   })
+}
 
+function recordsTests() {
   it('removes everything the run wrote', async () => {
     const dir = seedRunArtefacts()
     const { exec } = recorder()
@@ -199,7 +218,9 @@ describe('tearDownRun', () => {
     expect(result.removed.join(' ')).toContain('wip')
     expect(result.failed).toEqual([])
   })
+}
 
+function gitFailuresTests() {
   // Best effort, always. A repository that has already been moved or deleted
   // must not strand the order in `running` forever.
   it('carries on past a git failure and names it rather than throwing', async () => {
@@ -222,7 +243,9 @@ describe('tearDownRun', () => {
     expect(result.removed.join(' ')).toContain('the run graph')
     expect(fs.existsSync(path.join(dir, 'run-graph.json'))).toBe(false)
   })
+}
 
+function unremovableRecordsAndTwiceTests() {
   // The records location can be read-only — a data directory on a mounted
   // volume, or one the operator locked. The teardown says which part it could
   // not remove rather than throwing out of the IPC handler.
@@ -244,7 +267,9 @@ describe('tearDownRun', () => {
     await tearDownRun(order(), { exec, root })
     await expect(tearDownRun(order(), { exec, root })).resolves.toBeDefined()
   })
+}
 
+function repositoriesOutsideTheOrderTests() {
   // A lane whose repository is not in `context.repos` — an order edited after
   // its lanes were planned. There is nothing to remove and nowhere to run git,
   // so it is skipped rather than guessed at.
@@ -271,7 +296,7 @@ describe('tearDownRun', () => {
     await tearDownRun(order({ plan: { ...order().plan, lanes: [] } }), { exec, root })
     expect(calls.filter((c) => c.args[0] === 'branch')).toEqual([])
   })
-})
+}
 
 describe('deleteOrder', () => {
   it('takes the whole directory, ledger included', async () => {

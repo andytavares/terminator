@@ -21,6 +21,11 @@ function exec(responses: Record<string, { exitCode: number; stdout?: string; std
 }
 
 describe('commitWorktree', () => {
+  describe('commits', commitsTests)
+  describe('refusals', refusalsTests)
+})
+
+function commitsTests() {
   it('commits what is dirty and says so', async () => {
     const { run, calls } = exec({ status: { exitCode: 0, stdout: ' M src/a.ts\n' } })
     expect(await commitWorktree('/work', 'final check: format', run)).toEqual({ kind: 'committed' })
@@ -36,7 +41,9 @@ describe('commitWorktree', () => {
     expect(await commitWorktree('/work', 'm', run)).toEqual({ kind: 'clean' })
     expect(calls).toHaveLength(1)
   })
+}
 
+function refusalsTests() {
   it('reports a refusal when git could not stage or commit, so nothing is pushed as if it had', async () => {
     const staged = exec({ status: { exitCode: 0, stdout: 'M a' }, add: { exitCode: 1 } })
     expect((await commitWorktree('/work', 'm', staged.run)).kind).toBe('refused')
@@ -61,7 +68,7 @@ describe('commitWorktree', () => {
       output: '[STARTED] vitest related --run\n✖ 2 tests failed',
     })
   })
-})
+}
 
 describe('commitWorktree when the commit does not finish', () => {
   it('waits long enough for the commit hooks, and refuses a commit that timed out', async () => {
