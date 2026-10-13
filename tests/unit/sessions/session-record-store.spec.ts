@@ -465,8 +465,6 @@ describe('session-record-store — forgetting', () => {
 })
 
 describe('session-record-store — forgetting what retention drops', () => {
-  // Asked to forget a session: everything the record held goes with it.
-
   it('deletes the agent context of a record dropped by retention on load', async () => {
     const stale = {
       ...SNAP,
@@ -484,8 +482,6 @@ describe('session-record-store — forgetting what retention drops', () => {
 })
 
 describe('session-record-store — what cannot be forgotten', () => {
-  // Asked to forget a session: everything the record held goes with it.
-
   it('refuses to forget a session that is still open', async () => {
     const store = await load()
     await store.setDescription(SNAP, 'why')

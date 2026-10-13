@@ -78,11 +78,6 @@ describe('PtyManager — a cwd that is not there', () => {
 describe('PtyManager — a cwd that is a file', () => {
   usePtyMocks()
 
-  // node-pty does not fail this spawn — the child forks, cannot chdir, and
-  // exits 1 with no output, which reaches the operator as a tab that opens
-  // and instantly dies showing nothing. Refusing up front is the only point
-  // at which the reason still exists.
-
   it('refuses a cwd that exists but is a file', async () => {
     const { PtyManager, MissingCwdError } = await import('../../../src/main/terminal/pty-manager')
     const pty = await import('node-pty')
@@ -616,11 +611,6 @@ describe('holding output until something is on screen to show it', () => {
 })
 
 describe('holding output — terminals that never hold', () => {
-  // A terminal the application opened starts producing output while the tab
-  // that will show it does not exist yet. Delivered live, everything in that
-  // window is dropped — for a supervised agent that means the launch command
-  // and its first output are simply missing from the terminal you open.
-
   it('holds nothing for a terminal the operator opened themselves', async () => {
     const { mgr, emit } = await controlledManager(0)
     spawn(mgr, false)
@@ -643,11 +633,6 @@ describe('holding output — terminals that never hold', () => {
 })
 
 describe('holding output — releasing once and bounding', () => {
-  // A terminal the application opened starts producing output while the tab
-  // that will show it does not exist yet. Delivered live, everything in that
-  // window is dropped — for a supervised agent that means the launch command
-  // and its first output are simply missing from the terminal you open.
-
   it('releases only once, so a second attach does not replay the whole session', async () => {
     const { mgr, emit } = await controlledManager(0)
     spawn(mgr, true)
@@ -699,11 +684,6 @@ describe('a process that dies before anything is on screen', () => {
 })
 
 describe('a process that dies — unknown and repeated attaches', () => {
-  // The case this hold exists for, and the one it used to miss: a bad flag, a
-  // missing binary, the wrong cwd. The session was deleted on exit and its held
-  // output went with it, leaving exactly the blank terminal the operator then
-  // reports as "nothing ever shows up".
-
   it('reports nothing for a session it never knew', async () => {
     const { mgr } = await controlledManager(1)
     expect(mgr.releaseOutput('never-existed')).toBe(false)
