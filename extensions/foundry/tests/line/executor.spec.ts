@@ -2223,7 +2223,7 @@ interface HeldAgent {
     node: { id: string }
     onStarted?: (sessionId: string) => void
   }) => Promise<StartedRun>
-  release: () => void
+  releaseAgent: () => void
 }
 
 /** An agent that reports its session at once and ends its turn only when released. */
@@ -2237,14 +2237,14 @@ function heldAgent(): HeldAgent {
     await blocked
     return { sessionId: `sess-${input.node.id}`, exitCode: 0 }
   }
-  return { run, release: () => release() }
+  return { run, releaseAgent: () => release() }
 }
 
 function theMomentTheAgentExistsTests() {
   it('puts the session on the node the moment the agent exists', async () => {
     const o = order([unit('U-1')])
     const seen: (string | null)[] = []
-    const { run, release: released } = heldAgent()
+    const { run, releaseAgent: released } = heldAgent()
 
     const running = execute(planOf(o), {
       ...deps(run as never),

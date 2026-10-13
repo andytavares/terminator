@@ -119,7 +119,7 @@ type StartInput = {
 
 /** Makes the next read of `file`, once armed, come back 100 ms late, holding the order as it was
  * before whatever wrote it in the meantime. */
-function slowNextRead(file: string): { arm: () => void; restore: () => void } {
+function slowNextRead(file: string): { delayNextRead: () => void; restore: () => void } {
   const readFile = fs.promises.readFile
   let armed = false
   const spy = vi.spyOn(fs.promises, 'readFile').mockImplementation((async (
@@ -133,7 +133,7 @@ function slowNextRead(file: string): { arm: () => void; restore: () => void } {
     }
     return contents
   }) as typeof fs.promises.readFile)
-  return { arm: () => (armed = true), restore: () => spy.mockRestore() }
+  return { delayNextRead: () => (armed = true), restore: () => spy.mockRestore() }
 }
 
 /** An architect that amends the order, then has the next order read come back late. */
@@ -310,7 +310,7 @@ function theOrderBeforeTests() {
   it('never puts the order from before the amendment back', async () => {
     await seed(true)
     const slow = slowNextRead(path.join(dataDir, 'orders', 'WO-1', 'order.json'))
-    architectAmendsThenReadsLate(slow.arm)
+    architectAmendsThenReadsLate(slow.delayNextRead)
 
     try {
       await host.call('foundry:inbox.decide', { gateId: 'WO-1-forge-defect', option: 'answer' })
