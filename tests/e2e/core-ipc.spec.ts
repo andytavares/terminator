@@ -14,6 +14,7 @@ import {
   quickActionsPanel,
   runQuickAction,
   terminalRowsIn,
+  visibleTerminalScreen,
   workspaceRow,
 } from './helpers'
 import { git, makeFixtureRepo } from './foundry-harness'
@@ -205,11 +206,7 @@ test.describe.serial('cards, terminals and notifications in a plain folder', () 
   test('a URL in a terminal opens in the browser on ⌘-click (Ctrl-click off macOS)', async () => {
     const { page, app } = handle
     await projectGroup(page, 'notebook').click()
-    // Two terminals on screen, so the click has to find the row in the right one.
-    await runQuickAction(page, 'Split down')
-    const screens = page.locator('.terminal-pane .xterm-screen')
-    await expect(screens).toHaveCount(2, { timeout: 15000 })
-    await printAndModClick(screens.last(), 'https://example.com/e2e-link')
+    await printAndModClick(visibleTerminalScreen(page), 'https://example.com/e2e-link')
     await expect.poll(() => shellOpens(app)).toContain('https://example.com/e2e-link')
   })
 
@@ -217,7 +214,7 @@ test.describe.serial('cards, terminals and notifications in a plain folder', () 
     const { page, app } = handle
     const file = join(folder, 'notes.txt')
     writeFileSync(file, 'hello')
-    await printAndModClick(page.locator('.terminal-pane .xterm-screen').first(), file)
+    await printAndModClick(visibleTerminalScreen(page), file)
     await expect.poll(() => shellOpens(app)).toContain(file)
   })
 

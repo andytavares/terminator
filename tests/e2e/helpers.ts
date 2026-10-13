@@ -348,6 +348,11 @@ export function terminalRows(page: Page): Promise<string[]> {
   return page.evaluate(() => (window as unknown as TerminalRowsWindow).terminatorE2E.terminalRows())
 }
 
+/** The screen (`.xterm-screen`) of the first terminal that is on screen. */
+export function visibleTerminalScreen(page: Page): Locator {
+  return page.locator('.xterm-screen').filter({ visible: true }).first()
+}
+
 /** The rows of the one terminal drawn in `screen`, a pane's `.xterm-screen`, top to bottom. */
 export function terminalRowsIn(screen: Locator): Promise<string[]> {
   return screen.evaluate((element) =>

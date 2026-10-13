@@ -2,7 +2,13 @@ import { test, expect, type Page } from '@playwright/test'
 import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { closeApp, launchApp, type AppHandle } from './helpers'
+import {
+  closeApp,
+  launchApp,
+  terminalRowsIn,
+  visibleTerminalScreen,
+  type AppHandle,
+} from './helpers'
 import { makeRepoWithRemote, openCodeReviews, openRepo, pushBranch } from './git-harness'
 import { startGithubStub, type GithubStub } from './github-stub'
 
@@ -93,9 +99,11 @@ test('a running review can be continued in a terminal, then cancelled', async ()
   const tab = handle.page.locator('.tab-bar__tab').filter({ hasText: 'Review #1' })
   await expect(tab).toBeVisible({ timeout: 15000 })
   await tab.click()
-  await expect(handle.page.locator('.xterm-rows', { hasText: 'claude-stub --resume' })).toBeVisible(
-    { timeout: 15000 }
-  )
+  const screen = visibleTerminalScreen(handle.page)
+  await expect(screen).toBeVisible({ timeout: 15000 })
+  await expect
+    .poll(async () => (await terminalRowsIn(screen)).join('\n'), { timeout: 15000 })
+    .toContain('claude-stub --resume')
 
   await openCodeReviews(handle, 'Agent Review')
   await panel(view).getByRole('button', { name: 'Cancel' }).click()
