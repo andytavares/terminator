@@ -16,6 +16,7 @@ import {
 } from '../schemas/vault.schema'
 import type { ProjectStatus } from '../vault/types'
 import { setProjectStatus } from '../vault/project-status'
+import { staleDaysThreshold } from '../stale-threshold'
 import {
   rowToTask,
   rowToProject,
@@ -52,17 +53,6 @@ async function listProjects({ db }: IpcContext, args: z.infer<typeof ListProject
     statusFilter
   )
   return { projects: await Promise.all(rows.map((p) => withNextActions(db, p))) }
-}
-
-/** The configured stale threshold in days; 7 when unset or unreadable. */
-async function staleDaysThreshold(db: ExtensionDB): Promise<number> {
-  const thresholdRow = await db.get<{ value: string }>(
-    `SELECT value FROM settings WHERE extension_id='task-vault' AND key='stale_days_threshold'`
-  )
-  if (!thresholdRow?.value) return 7
-  const parsed = parseInt(thresholdRow.value, 10)
-  if (Number.isFinite(parsed)) return parsed
-  return 7
 }
 
 /** The local date `days` days ago, as YYYY-MM-DD. */
@@ -118,10 +108,10 @@ async function reviewTasks(db: ExtensionDB) {
   }
 }
 
-async function weeklyReview({ db }: IpcContext) {
+async function weeklyReview({ api, db }: IpcContext) {
   const { inboxItems, somedayTasks, completedLastWeek } = await reviewTasks(db)
   const projects = await reviewProjects(db)
-  const threshold = await staleDaysThreshold(db)
+  const threshold = staleDaysThreshold(api)
   return {
     inboxItems,
     ...projects,

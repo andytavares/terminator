@@ -132,14 +132,15 @@ describe('StagingArea — states', () => {
 })
 
 describe('StagingArea — states — shows truncation banner when truncated is true', () => {
-  it('shows truncation banner when truncated is true', () => {
+  it('shows truncation banner, naming how many files the setting let through', () => {
+    const files = Array.from({ length: 10 }, (_, i) => makeFile('modified', false, `f${i}.ts`))
     mockStore({
-      status: { branch: 'main', files: [], truncated: true, hasConflicts: false },
+      status: { branch: 'main', files, truncated: true, hasConflicts: false },
       setStatus: mockSetStatus,
       selectedFile: null,
     })
     render(<StagingArea repoRoot="/repo" onFileSelect={vi.fn()} />)
-    expect(screen.getByText('Showing first 500 files.')).toBeTruthy()
+    expect(screen.getByText('Showing first 10 files.')).toBeTruthy()
   })
 
   it('renders staged and unstaged files in correct sections', () => {

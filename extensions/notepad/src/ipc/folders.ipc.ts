@@ -5,6 +5,7 @@ import { createIpcRegistrar, IdPayload } from './register'
 
 const CreateFolderPayload = z.object({ name: z.string().min(1) })
 
+/** @internal */
 export async function createFolder(
   db: ExtensionDB,
   args: z.infer<typeof CreateFolderPayload>
@@ -30,6 +31,7 @@ export async function createFolder(
   return { data: { id, name, sortOrder, createdAt: now } }
 }
 
+/** @internal */
 export async function listFolders(db: ExtensionDB): Promise<Record<string, unknown>> {
   const rows = await db.query<{
     id: string
@@ -50,6 +52,7 @@ export async function listFolders(db: ExtensionDB): Promise<Record<string, unkno
 
 const RenameFolderPayload = z.object({ id: z.string(), name: z.string().min(1) })
 
+/** @internal */
 export async function renameFolder(
   db: ExtensionDB,
   args: z.infer<typeof RenameFolderPayload>
@@ -61,6 +64,7 @@ export async function renameFolder(
   return { data: { ok: true } }
 }
 
+/** @internal */
 export async function deleteFolder(
   db: ExtensionDB,
   args: z.infer<typeof IdPayload>
@@ -82,6 +86,7 @@ const MoveItemsToFolderPayload = z.object({
   folderId: z.string().nullable(),
 })
 
+/** @internal */
 export async function moveItemsToFolder(
   db: ExtensionDB,
   args: z.infer<typeof MoveItemsToFolderPayload>

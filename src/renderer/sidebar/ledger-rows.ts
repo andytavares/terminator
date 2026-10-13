@@ -9,12 +9,11 @@ export interface LedgerGroup {
   facts: SessionFacts[]
 }
 
+/** @internal */
 export interface LedgerFilters {
   needsYou: boolean
   text: string
 }
-
-export const NO_FILTERS: LedgerFilters = { needsYou: false, text: '' }
 
 const NO_BRANCH = 'No branch'
 const ALL_SESSIONS = 'All sessions'

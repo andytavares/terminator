@@ -13,7 +13,7 @@ import { decideTool } from '../runtime/tool-decision.js'
 import { trustRepository, isProbedCommand } from '../runtime/agent-policy.js'
 import { runtime, strandedAgents } from '../runtime/runtime-state.js'
 import { notePending, noteResolved } from '../runtime/held-calls.js'
-import { readOnlyTools, autonomyFor, modelForTier } from '../state/settings.js'
+import { readOnlyTools, autonomyFor, letAutoModeDecide, modelForTier } from '../state/settings.js'
 import { announceLive } from '../state/live-index.js'
 
 type NodeInput = Parameters<ExecutorDeps['run']>[0]
@@ -156,7 +156,7 @@ function toolDecisionFor({
       isProbed: (name, given) => isProbedCommand(order, name, given),
       readOnlyTools: readOnlyTools(api),
       autonomy: autonomyFor(api),
-      letModeDecide: api.settings?.get<boolean>('terminator.foundry.letAutoModeDecide') ?? true,
+      letModeDecide: letAutoModeDecide(api),
       worktreePath: checkout.path,
       outputPath: input.outputPath ?? null,
       outputsDir: input.outputsDir ?? null,

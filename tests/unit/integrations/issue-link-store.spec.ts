@@ -12,6 +12,11 @@ async function load() {
   return import('../../../src/main/integrations/issue-link-store')
 }
 
+/** What the store last wrote to disk. */
+function storedLinks(): { projectId: string; key: string }[] {
+  return JSON.parse(fs.readFileSync(path.join(userData, 'issue-links.json'), 'utf8'))
+}
+
 const P1 = '11111111-1111-4111-8111-111111111111'
 const P2 = '22222222-2222-4222-8222-222222222222'
 
@@ -81,7 +86,7 @@ describe('issue-link-store — one issue per project (FR-033)', () => {
     await store.setLink({ projectId: P1, tracker: 'jira', key: 'TAV-7', injectContext: false })
 
     expect(store.getLink(P1)).toMatchObject({ tracker: 'jira', key: 'TAV-7' })
-    expect(store.listLinks().filter((l) => l.projectId === P1)).toHaveLength(1)
+    expect(storedLinks().filter((link) => link.projectId === P1)).toHaveLength(1)
   })
 
   it('carries the previous injection setting when none is given', async () => {
@@ -176,15 +181,18 @@ describe('issue-link-store — stored entries', () => {
     const store = await load()
     await store.loadLinks()
 
-    expect(store.listLinks()).toHaveLength(1)
     expect(store.getLink(P1)?.key).toBe('TAV-42')
+    expect(store.getLink(P2)).toBeNull()
+    // Writing back keeps the one link it read and nothing else.
+    await store.setInjectContext(P1, false)
+    expect(storedLinks().map((link) => link.key)).toEqual(['TAV-42'])
   })
 
   it('treats a stored file that is not a list as no links', async () => {
     fs.writeFileSync(path.join(userData, 'issue-links.json'), '{"nope":true}', 'utf8')
     const store = await load()
     await store.loadLinks()
-    expect(store.listLinks()).toEqual([])
+    expect(store.getLink(P1)).toBeNull()
   })
 })
 

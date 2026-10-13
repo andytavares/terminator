@@ -14,7 +14,10 @@ export function installBridge() {
   Object.defineProperty(window, 'electronAPI', {
     value: {
       extensionBridge: { invoke, on },
-      extension: { getSettingsValues: vi.fn().mockResolvedValue({ values: {} }) },
+      extension: {
+        getSettingsValues: vi.fn().mockResolvedValue({ values: {} }),
+        onSettingsChanged: vi.fn(() => () => {}),
+      },
     },
     writable: true,
     configurable: true,
@@ -23,6 +26,16 @@ export function installBridge() {
   const calls = (channel: string) =>
     invoke.mock.calls.filter(([ch]) => ch === channel).map((call) => (call as unknown[])[1])
   return { responses, invoke, push, calls }
+}
+
+/** Answers getSettingsValues with `values`, as Notepad's settings page stores them. */
+export function storeSettings(values: Record<string, unknown>): void {
+  vi.mocked(window.electronAPI.extension.getSettingsValues).mockResolvedValue({ values })
+}
+
+/** Resolves after `ms` of real time. */
+export function elapse(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
 export function listItem(id: string, title: string, tags: string[] = []): NoteListItem {

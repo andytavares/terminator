@@ -43,6 +43,7 @@ function err(msg: string) {
   return { error: msg }
 }
 
+/** @internal */
 export async function listComments(
   db: ExtensionDB,
   args: z.infer<typeof ListPayload>
@@ -70,6 +71,7 @@ export async function listComments(
   return { data: comments }
 }
 
+/** @internal */
 export async function createComment(
   db: ExtensionDB,
   args: z.infer<typeof CreatePayload>
@@ -89,6 +91,7 @@ export async function createComment(
   return { data: { id, createdAt: now } }
 }
 
+/** @internal */
 export async function replyComment(
   db: ExtensionDB,
   args: z.infer<typeof ReplyPayload>
@@ -116,6 +119,7 @@ export async function replyComment(
   return { data: { id, createdAt: now } }
 }
 
+/** @internal */
 export async function updateComment(
   db: ExtensionDB,
   args: z.infer<typeof UpdatePayload>
@@ -126,6 +130,7 @@ export async function updateComment(
   return { data: { updatedAt: now } }
 }
 
+/** @internal */
 export async function deleteComment(
   db: ExtensionDB,
   args: z.infer<typeof IdPayload>
@@ -135,6 +140,7 @@ export async function deleteComment(
   return { data: { ok: true } }
 }
 
+/** @internal */
 export async function resolveComment(
   db: ExtensionDB,
   args: z.infer<typeof ResolvePayload>
@@ -146,6 +152,7 @@ export async function resolveComment(
   return { data: { status } }
 }
 
+/** @internal */
 export async function updateAnchor(
   db: ExtensionDB,
   args: z.infer<typeof UpdateAnchorPayload>
@@ -159,6 +166,7 @@ export async function updateAnchor(
   return { data: { ok: true } }
 }
 
+/** @internal */
 export async function markOrphaned(
   db: ExtensionDB,
   args: z.infer<typeof IdPayload>

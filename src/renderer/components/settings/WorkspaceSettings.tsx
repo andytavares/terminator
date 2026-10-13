@@ -33,16 +33,7 @@ export function WorkspaceSettings({ workspaceId }: Props): JSX.Element {
       <div className="settings-section">
         <h3 className="settings-section__title">Settings for: {name ?? workspaceId}</h3>
         <p className="settings-section__desc">Override global defaults for this workspace.</p>
-        <ThemeField {...field} overridden={!!overrides?.appearance?.theme} />
-        <ScrollbackField {...field} />
-        <h3 className="settings-section__title" style={{ marginTop: 20 }}>
-          Git
-        </h3>
-        <WorktreeDirField {...field} overridden={overrides?.git?.worktreeBaseDir !== undefined} />
-        <BranchExcludeField
-          {...field}
-          overridden={overrides?.git?.branchExcludePatterns !== undefined}
-        />
+        <WorkspaceFields field={field} own={ownSettings(overrides)} />
       </div>
       <QuickActionsSettings scope="workspace" workspaceId={workspaceId} />
     </>
@@ -51,12 +42,52 @@ export function WorkspaceSettings({ workspaceId }: Props): JSX.Element {
 
 type Overrides = WorkspaceSettingsValue['overrides'] | undefined
 
+/** Which settings this workspace sets for itself, so each can be handed back to the global value. */
+function ownSettings(overrides: Overrides) {
+  return {
+    theme: !!overrides?.appearance?.theme,
+    defaultShell: !!overrides?.terminal?.defaultShell,
+    worktreeBaseDir: overrides?.git?.worktreeBaseDir !== undefined,
+    branchExcludePatterns: overrides?.git?.branchExcludePatterns !== undefined,
+  }
+}
+
+interface WorkspaceFieldsProps {
+  field: Omit<FieldProps, 'overridden'>
+  own: ReturnType<typeof ownSettings>
+}
+
+function WorkspaceFields({ field, own }: WorkspaceFieldsProps): JSX.Element {
+  return (
+    <>
+      <ThemeField {...field} overridden={own.theme} />
+      <ScrollbackField {...field} />
+      <DefaultShellField {...field} overridden={own.defaultShell} />
+      <h3 className="settings-section__title" style={{ marginTop: 20 }}>
+        Git
+      </h3>
+      <WorktreeDirField {...field} overridden={own.worktreeBaseDir} />
+      <BranchExcludeField {...field} overridden={own.branchExcludePatterns} />
+    </>
+  )
+}
+
 /** Each setting as it applies here: this workspace's override, else the global value. */
 function effectiveSettings(overrides: Overrides, global: GlobalSettings) {
   return {
     theme: overrides?.appearance?.theme ?? global.appearance.theme,
-    scrollback: overrides?.terminal?.scrollbackLimit ?? global.terminal.scrollbackLimit,
+    ...effectiveTerminal(overrides?.terminal, global.terminal),
     ...effectiveGit(overrides?.git, global.git),
+  }
+}
+
+function effectiveTerminal(
+  terminal: NonNullable<Overrides>['terminal'],
+  global: GlobalSettings['terminal']
+) {
+  return {
+    scrollback: terminal?.scrollbackLimit ?? global.scrollbackLimit,
+    defaultShell: terminal?.defaultShell ?? global.defaultShell,
   }
 }
 
@@ -118,11 +149,35 @@ function ScrollbackField({ workspaceId, effective }: FieldProps): JSX.Element {
       <button
         className="settings-section__btn-link"
         onClick={() =>
-          window.electronAPI.settings.updateWorkspace(workspaceId, { terminal: undefined })
+          window.electronAPI.settings.updateWorkspace(workspaceId, {
+            terminal: { scrollbackLimit: undefined },
+          })
         }
       >
         Use global default
       </button>
+    </div>
+  )
+}
+
+/** The shell this workspace's terminals open in; empty keeps the global one. */
+function DefaultShellField({ workspaceId, effective, overridden }: FieldProps): JSX.Element {
+  const update = useSettingsStore((s) => s.updateWorkspaceDefaultShell)
+  return (
+    <div className="settings-section__field">
+      <label className="settings-section__label">Default Shell</label>
+      <input
+        type="text"
+        aria-label="Default Shell"
+        className="settings-section__input"
+        key={effective.defaultShell}
+        defaultValue={effective.defaultShell}
+        onBlur={(e) => {
+          const shell = e.target.value.trim()
+          if (shell && shell !== effective.defaultShell) void update(workspaceId, shell)
+        }}
+      />
+      {overridden && <UseGlobalButton onClick={() => void update(workspaceId, undefined)} />}
     </div>
   )
 }

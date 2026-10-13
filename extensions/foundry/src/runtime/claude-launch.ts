@@ -107,6 +107,7 @@ export function shellQuote(value: string): string {
  *
  * The third time this pair of names has cost something here — the trust
  * dialog and the write-outside check were the other two.
+ * @internal
  */
 export function transcriptPathFor(cwd: string, sessionId: string, home = homedir()): string {
   const encoded = realPath(cwd).replace(/[/.]/g, '-')
@@ -152,6 +153,7 @@ interface HookCommandOptions {
  * would have them answering each other's permission requests. Nothing is
  * written into the repository — the operator's own `.claude/settings.json` is
  * never touched.
+ * @internal
  */
 export function buildSettings(options: HookCommandOptions): unknown {
   return {

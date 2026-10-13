@@ -16,7 +16,8 @@ The phases in `docs/research/perf/` and the ADRs 093–105 record each decision.
 - node:sqlite replaces PGlite (ADR 099); Remote Control credentials (ADR 100).
 - Shell exec limited to declared roots (ADR 102); per-extension data folders (ADR 103).
 - CI gates: typecheck of every project, coverage on the patch (ADR 095), one version per dependency
-  (syncpack), unused code (knip, ADR 104), duplicate code (jscpd, ADR 105), temp-dir leak check,
+  (syncpack), unused code (knip, ADR 104), code only tests reach (knip --production, ADR 107),
+  duplicate code (jscpd, ADR 105), temp-dir leak check,
   selective e2e (`scripts/e2e-select.mjs`), perf budgets (`npm run test:perf`), Storybook stories.
 - Design system in Storybook (ADR 098); Linux baselines come from the `update-story-baselines`
   label workflow (`.github/workflows/story-baselines.yml`).
@@ -33,13 +34,15 @@ The phases in `docs/research/perf/` and the ADRs 093–105 record each decision.
    functions, including `ExtensionsSection` and `executor.execute`), then turn the ESLint rule on
    for them.
 2. Clean-gate final report items: 929 repeated names and 255 runs of comments.
-3. Settings that nothing reads: `autosaveMs`, `editorFontSize`, `mcpSidecar`, git
-   `commit.signOff`, `maxDisplayedFiles`, `staleThresholdDays`. Each is implemented with a test of
-   its effect, or removed with its migration.
-4. Foundry `readOnlyTools` and `criticalPaths` settings need multi-line input.
-5. Tests for the effect of each remaining setting.
-6. Remote Control: 4 of 9 channels are driven end to end; the other 5 need e2e.
-7. `knip --production` as a second gate.
+3. Done: the settings nothing read are implemented or removed (decisions 15–18).
+4. Done: list settings are edited one item per line (decision 19).
+5. Every declared setting now has a test of its effect. In progress: `workspaceScoped` extension
+   settings (git `enabled` and `commit.signOff`, Foundry's two lists) are documented in
+   `docs/EXTENSION-DEVELOPMENT.md` and the git README as "can be overridden per workspace", but
+   the core stores one value per key. Decision 21: build it, since the docs promise it and the
+   `extensions` records in both settings schemas already exist for it.
+6. Done: Remote Control's 9 channels are driven end to end (`remote-control.spec.ts`).
+7. Done: `knip --production` is a second gate (ADR 107).
 8. Final review, the PR description with a "How to read this change" section, CI green on the head.
 
 ## Decisions made without the user
@@ -70,6 +73,58 @@ Each entry: what was decided, why, and how to undo it.
 13. git-integration bugs the coverage specs found were fixed: PR-created confirmation with a link,
     "Commit without hooks" for plain git hook failures, atomic merge-flow writes.
 14. No worker may install system packages or run `npm install` in a shared container.
+15. Git Integration's **Add sign-off to commits** and **Max displayed changed files** are
+    implemented, not removed: the README promised both. `git:commit` and `git:status` read them on
+    every call (`src/git-settings.ts`); sign-off is
+    [`git commit --signoff`](https://git-scm.com/docs/git-commit#Documentation/git-commit.txt---signoff),
+    and the file limit is clamped to its declared 10–5000. The `signOff` (commit) and `maxFiles`
+    (status) payload fields went: the view always sent `signOff: false` and never sent `maxFiles`,
+    so a payload could override the setting with a value nobody chose. Undo: revert the commit and
+    give the payload fields back.
+16. Notepad's **Enable MCP sidecar** setting is removed. Nothing implements a Notepad MCP
+    sidecar: spec 010 deferred it to a polish phase that never came, and ADR-020 removed the only
+    MCP sidecar the app had (Task Vault's), superseded by the Remote Control bridge. There is no
+    settings migration: a stored value is inert, since nothing reads it and the settings page lists
+    only declared keys, and the extension-settings store has no delete. Undo: put the declaration
+    back in `extensions/notepad/src/index.ts`.
+17. Notepad's **Autosave debounce** and **Editor font size** are implemented. The delay applies
+    to notes in the panel and in pop-out windows; diagrams keep their own 1.2 s, since a scene is
+    written whole and the setting speaks of notes. Each is clamped (100–10000 ms, 8–32 px) and an
+    emptied field falls back to its default (`src/notepad-settings.ts`). A view re-reads them on
+    the new `extension.onSettingsChanged` (the core broadcasts `extension:settings-changed`): an
+    extension view gets no focus or visibility event when Settings closes, measured under xvfb.
+    Undo: revert the notepad commit; the SDK event can stay, it has no other cost.
+18. Task Vault's `staleThresholdDays` now sets when a task is stale, and is labelled **Stale
+    Task Threshold (days)**. It was declared as "days without modification before a project is
+    considered stale", which the product does not do: a project is stale when it has no open next
+    action (GTD), and that stays. What did use a days threshold was task staleness on Today and the
+    review's Stale step, read from a `stale_days_threshold` row only the remote channel could set.
+    The setting is now that threshold, default 7 (what users had, not the declared 14), 1–365.
+    Activation moves an existing row into the setting and deletes it; `set-stale-threshold` writes
+    the setting. Undo: revert the commit; a moved value then lives only in the setting, so put it
+    back with `task-vault:settings:set-stale-threshold` from the previous build.
+19. Settings has a `list` setting type, stored as a `string[]` and edited one item per line in
+    the design system's new `ListInput` (trimmed, blank lines dropped). Foundry's
+    `readOnlyTools` and `criticalPaths` use it. They were text settings read one item per line,
+    so Foundry's activation turns a stored text value into its list once
+    (`migrateLineListSettings`, `src/state/settings.ts`). A list type, rather than a multi-line
+    flag on `string`, because the value is a list everywhere it is read. Its story needs a Linux
+    baseline from the `update-story-baselines` label (decision 1). Undo: revert both commits;
+    a migrated value is then a `string[]` the old readers do not split, so set the two lists
+    again.
+20. Workspace settings: a workspace's own **Default Shell** is applied, and **Use global
+    default** works. The schema and the user guide offered a per-workspace shell, but Settings had
+    no field for it and terminals always opened the global shell; main now resolves a project's
+    shell through its workspace (`src/main/terminal/default-shell.ts`), for the app's terminals and
+    for `api.pty.openTerminal`. "Use global default" sent `{ key: undefined }`, which the store's
+    merge skipped, so no override could be handed back; a workspace patch now removes a key it sets
+    to undefined (`mergeOverrides`), and each reset names only its own setting. Undo: revert the
+    commit; the field goes and overrides become sticky again.
+21. `workspaceScoped` extension settings are built rather than dropped. The SDK docs and the git
+    README promise a per-workspace override, the user asked for every documented feature to work,
+    and both settings schemas already hold an unused `extensions` record for these values. The
+    change to `api.settings.get` is additive (an optional workspace), so no extension breaks. Undo:
+    remove `workspaceScoped` and the `extensions` records, and the docs' per-workspace wording.
 
 ## Known advisories
 

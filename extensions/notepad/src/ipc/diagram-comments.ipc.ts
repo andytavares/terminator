@@ -41,6 +41,7 @@ const CreateDiagramCommentPayload = z.object({
   sceneY: z.number().optional(),
 })
 
+/** @internal */
 export async function createDiagramComment(
   db: ExtensionDB,
   args: z.infer<typeof CreateDiagramCommentPayload>
@@ -76,6 +77,7 @@ const ListDiagramCommentsPayload = z.object({
   includeResolved: z.boolean().optional(),
 })
 
+/** @internal */
 export async function listDiagramComments(
   db: ExtensionDB,
   args: z.infer<typeof ListDiagramCommentsPayload>
@@ -114,6 +116,7 @@ function repliesByParent(rows: DbDiagramComment[]): Map<string, DbDiagramComment
   return childMap
 }
 
+/** @internal */
 export async function resolveDiagramComment(
   db: ExtensionDB,
   args: z.infer<typeof IdPayload>
@@ -131,6 +134,7 @@ export async function resolveDiagramComment(
   return { data: { ok: true } }
 }
 
+/** @internal */
 export async function deleteDiagramComment(
   db: ExtensionDB,
   args: z.infer<typeof IdPayload>

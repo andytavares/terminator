@@ -28,6 +28,7 @@ import type { ForgeLoop } from '../forge/forge-loop.js'
  *
  * One line per past decision, newest first and bounded — the point is to tell
  * the Architect "this was decided before", not to hand it the whole ledger.
+ * @internal
  */
 export async function priorArtFor(root: string, paths: readonly string[]): Promise<string[]> {
   const store = orderStoreAt(root)

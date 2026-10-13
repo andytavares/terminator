@@ -18,17 +18,6 @@ import { findingHeadline } from '../order/finding-headline.js'
 // so a verifier does not get the builder's justification and a scout does not
 // get the plan. The list is a permission, not a preference.
 
-/** Everything a role can ask for. Anything else in `reads:` is ignored. */
-export const READABLE = [
-  'unit',
-  'criteria',
-  'context',
-  'rules',
-  'order',
-  'conventions',
-  'feedback',
-] as const
-
 export interface BriefInput {
   readonly order: WorkOrder
   readonly role: Role | null

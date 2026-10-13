@@ -72,13 +72,17 @@ export type SeedResult =
  * Deliberately crude — something with a slash and an extension. An idea that
  * names no file gets no prior art, which is better than a fuzzy match that
  * dredges up decisions about something else and presents them as relevant.
+ * @internal
  */
 export function pathsNamedIn(text: string): string[] {
   const matches = text.match(/[A-Za-z0-9_.@/-]+\.[A-Za-z0-9]{1,6}\b/g) ?? []
   return [...new Set(matches.filter((token) => token.includes('/')))]
 }
 
-/** Whatever the repository says about itself. Absence is a normal answer. */
+/**
+ * Whatever the repository says about itself. Absence is a normal answer.
+ * @internal
+ */
 export function houseDocsIn(repoPath: string): string[] {
   return HOUSE_DOCS.filter((rel) => fs.existsSync(path.join(repoPath, rel)))
 }

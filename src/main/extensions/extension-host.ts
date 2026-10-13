@@ -439,6 +439,7 @@ export class ExtensionHost {
   }
 }
 
+/** @internal */
 export function isVersionCompatible(minVersion: string, appVersion: string): boolean {
   const cleanMin = minVersion.replace(/^[>=^~]+/, '')
   const min = cleanMin.split('.').map(Number)

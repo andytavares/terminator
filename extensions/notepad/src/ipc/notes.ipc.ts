@@ -44,6 +44,7 @@ const CreateNotePayload = z
   .strict()
   .default({})
 
+/** @internal */
 export async function createNote(
   db: ExtensionDB,
   args: z.infer<typeof CreateNotePayload>
@@ -85,6 +86,7 @@ type NoteListRow = {
   folder_id: string | null
 }
 
+/** @internal */
 export async function listNotes(
   db: ExtensionDB,
   args: z.infer<typeof ListNotesPayload>
@@ -145,6 +147,7 @@ function splitTagNames(tags: string): string[] {
   return tags.split(',').filter(Boolean)
 }
 
+/** @internal */
 export async function getNote(
   db: ExtensionDB,
   args: z.infer<typeof IdPayload>
@@ -176,7 +179,10 @@ const AutosaveNotePayload = z.object({
   titleSetByHand: z.boolean().optional(),
 })
 
-/** Push channel announcing a saved note body to every open notepad surface. */
+/**
+ * Push channel announcing a saved note body to every open notepad surface.
+ * @internal
+ */
 export const NOTES_CHANGED_CHANNEL = 'terminator.notepad:notes.changed'
 
 type NotesBroadcast = (channel: string, data: unknown) => void
@@ -226,6 +232,7 @@ async function saveNote(
   return { title, tags }
 }
 
+/** @internal */
 export async function autosaveNote(
   db: ExtensionDB,
   args: z.infer<typeof AutosaveNotePayload>,
@@ -248,6 +255,7 @@ export async function autosaveNote(
   return { data: { updatedAt: now, title } }
 }
 
+/** @internal */
 export async function archiveNote(
   db: ExtensionDB,
   args: z.infer<typeof IdPayload>
@@ -262,6 +270,7 @@ export async function archiveNote(
   return { data: { archivedAt } }
 }
 
+/** @internal */
 export async function restoreNote(
   db: ExtensionDB,
   args: z.infer<typeof IdPayload>
@@ -276,6 +285,7 @@ export async function restoreNote(
   return { data: { ok: true } }
 }
 
+/** @internal */
 export async function hardDeleteNote(
   db: ExtensionDB,
   args: z.infer<typeof IdPayload>
@@ -290,6 +300,7 @@ export async function hardDeleteNote(
 
 // ---- Tags IPC handlers ----
 
+/** @internal */
 export async function listTags(db: ExtensionDB): Promise<Record<string, unknown>> {
   const rows = await db.query<{ id: string; name: string; note_count: number }>(
     `SELECT t.id, t.name, COUNT(nt.note_id) AS note_count
@@ -306,6 +317,7 @@ export async function listTags(db: ExtensionDB): Promise<Record<string, unknown>
 
 const RenameTagPayload = z.object({ id: z.string(), name: z.string().min(1) })
 
+/** @internal */
 export async function renameTag(
   db: ExtensionDB,
   args: z.infer<typeof RenameTagPayload>
@@ -314,6 +326,7 @@ export async function renameTag(
   return { data: { ok: true } }
 }
 
+/** @internal */
 export async function deleteTag(
   db: ExtensionDB,
   args: z.infer<typeof IdPayload>
@@ -335,6 +348,7 @@ const ReorderItemsPayload = z.object({
   items: z.array(z.object({ id: z.string(), type: z.enum(['note', 'diagram']) })),
 })
 
+/** @internal */
 export async function reorderItems(
   db: ExtensionDB,
   args: z.infer<typeof ReorderItemsPayload>

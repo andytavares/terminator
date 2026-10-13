@@ -128,8 +128,8 @@ describe('syncSessionContext — unlinked', () => {
   })
 })
 
-describe('writeSessionContext / readSessionContext / deleteSessionContext', () => {
-  it('round-trips a context, and reads null once deleted', async () => {
+describe('writeSessionContext / deleteSessionContext', () => {
+  it('writes a context to the session file, and removes it once deleted', async () => {
     const mod = await load()
     const context = {
       projectId: P,
@@ -141,10 +141,10 @@ describe('writeSessionContext / readSessionContext / deleteSessionContext', () =
       builtAt: '2026-09-15T10:00:00.000Z',
     }
     await mod.writeSessionContext(SESSION_ID, context)
-    expect(await mod.readSessionContext(SESSION_ID)).toEqual(context)
+    expect(JSON.parse(fs.readFileSync(contextFile(), 'utf8'))).toEqual(context)
 
     await mod.deleteSessionContext(SESSION_ID)
-    expect(await mod.readSessionContext(SESSION_ID)).toBeNull()
+    expect(fs.existsSync(contextFile())).toBe(false)
   })
 
   it('is harmless to delete a context that was never written', async () => {

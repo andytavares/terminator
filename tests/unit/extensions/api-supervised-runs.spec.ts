@@ -42,6 +42,7 @@ const refusals: Array<{ error: string }> = []
 vi.mock('../../../src/main/storage/workspace-store', () => ({
   listWorkspaces: () => [{ id: 'ws-1', name: 'Alpha', folderPath: '/projects/alpha' }],
   listProjects: (workspaceId: string) => projects.filter((p) => p.workspaceId === workspaceId),
+  getProjectById: (id: string) => projects.find((p) => p.id === id),
   deleteProject: vi.fn(),
   createProject: (input: Record<string, unknown>) => {
     const refusal = refusals.shift()

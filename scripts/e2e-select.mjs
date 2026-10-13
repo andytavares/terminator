@@ -41,6 +41,7 @@ export const IMPACT_MAP = [
       'merge-flow.spec.ts',
       'merge-flow-resolve.spec.ts',
       'git-commit-flow.spec.ts',
+      'git-settings.spec.ts',
       'pr-review-*.spec.ts',
       'review-*.spec.ts',
       'extension-commands.spec.ts',
@@ -59,7 +60,7 @@ export const IMPACT_MAP = [
   },
   {
     globs: ['extensions/remote-control/**', 'src/renderer-remote/**'],
-    specs: ['remote-app.spec.ts', ...EXTENSION_TRIO],
+    specs: ['remote-app.spec.ts', 'remote-control.spec.ts', ...EXTENSION_TRIO],
   },
   {
     globs: ['extensions/task-vault/**'],

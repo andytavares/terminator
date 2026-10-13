@@ -27,19 +27,10 @@ function sessionContextFilePath(sessionId: string): string {
   return path.join(sessionContextDir(), `${sessionId}.json`)
 }
 
+/** @internal */
 export async function writeSessionContext(sessionId: string, context: AgentContext): Promise<void> {
   await fs.mkdir(sessionContextDir(), { recursive: true })
   await writeJsonAtomic(sessionContextFilePath(sessionId), context)
-}
-
-/** What was last written, or null. Never throws — a missing file is an answer. */
-export async function readSessionContext(sessionId: string): Promise<AgentContext | null> {
-  try {
-    const parsed: unknown = JSON.parse(await fs.readFile(sessionContextFilePath(sessionId), 'utf8'))
-    return typeof parsed === 'object' && parsed !== null ? (parsed as AgentContext) : null
-  } catch {
-    return null
-  }
 }
 
 export async function deleteSessionContext(sessionId: string): Promise<void> {

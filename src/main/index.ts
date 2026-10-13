@@ -530,7 +530,11 @@ app.whenReady().then(async () => {
   extensionHost.setDeps(extensionDeps(terminalRelay, userData))
 
   // The extension host's synchronous getters read these; main pushes every change.
-  onExtensionSettingsChanged(() => extensionHostProcess.pushSettings(getAllExtensionSettings()))
+  // Views re-read on extension:settings-changed, so a change made in Settings applies at once.
+  onExtensionSettingsChanged(() => {
+    extensionHostProcess.pushSettings(getAllExtensionSettings())
+    broadcastToWindows('extension:settings-changed', null)
+  })
   onWorkspacesChanged(() => extensionHostProcess.pushWorkspaces(workspacesOf(coreView.workspace)))
   setupMenu()
   createWindow()

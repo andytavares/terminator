@@ -80,3 +80,17 @@ describe('settings:update-workspace', () => {
     })
   })
 })
+
+describe('settings:update-workspace — handing an override back', () => {
+  it('hands a setting back to the global value when the patch sets it to undefined', async () => {
+    const theme = { appearance: { theme: 'light' } }
+    await invoke('settings:update-workspace', { workspaceId: 'ws-3', patch: theme })
+
+    const reply = await invoke('settings:update-workspace', {
+      workspaceId: 'ws-3',
+      patch: { appearance: undefined },
+    })
+
+    expect(reply).toEqual({ settings: { workspaceId: 'ws-3', overrides: {}, extensions: {} } })
+  })
+})

@@ -29,6 +29,7 @@ export async function ensureHookScript(): Promise<string> {
  * A worktree project has its own path; a plain one lives at its workspace's
  * folder. Null when the project is gone, which is not an error — it just means
  * there is nothing to write into.
+ * @internal
  */
 export function projectDirectory(projectId: string): string | null {
   const project = getProjectById(projectId)

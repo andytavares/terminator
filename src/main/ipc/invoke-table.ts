@@ -9,16 +9,8 @@ import { handleChannel } from './channel-registrar.js'
 
 export { noPayload } from '@terminator/extension-sdk'
 
-const registeredSpecs = new Map<string, ChannelSpec>()
-
-/** The table row a channel was registered from; undefined for a channel not registered here. */
-export function registeredInvokeSpec(channel: string): ChannelSpec | undefined {
-  return registeredSpecs.get(channel)
-}
-
 export function registerInvokeTable(specs: ReadonlyArray<ChannelSpec>): void {
   for (const spec of specs) {
-    registeredSpecs.set(spec.channel, spec)
     handleChannel(spec.channel, (_event, payload) => dispatchChannel(spec, payload))
   }
 }

@@ -1,10 +1,10 @@
 import { describe, it, expect, vi } from 'vitest'
 import {
   buildCoreActions,
-  CORE_SHORTCUTS,
   type CoreActionDeps,
 } from '../../../../src/renderer/quick-actions/core-actions'
-import { CORE_GROUPS, findMnemonicConflicts } from '../../../../src/renderer/quick-actions/groups'
+import { CORE_GROUPS } from '../../../../src/renderer/quick-actions/groups'
+import { CORE_SHORTCUTS, findMnemonicConflicts } from '../../../support/quick-actions'
 
 function makeDeps(overrides: Partial<CoreActionDeps> = {}): CoreActionDeps {
   return {

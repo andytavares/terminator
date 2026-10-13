@@ -198,6 +198,7 @@ const VENDING_MARGIN = 2
  * Where the baked vending machine stands: the first spot along the wall that
  * clears every wall fixture (a three-tile scoreboard among them), the
  * whiteboard and the extinguisher sign.
+ * @internal
  */
 export function vendingDecorX(map: Pick<HallMap, 'width' | 'props'>): number {
   const wallPx = map.width * TILE_PX

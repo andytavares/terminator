@@ -3,6 +3,7 @@ import type { QuickAction, QuickActionGroup } from './types'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
+/** @internal */
 export function frecencyScore(u: ActionUsage, now: number): number {
   const ageMs = now - u.lastUsedAt
   let weight: number

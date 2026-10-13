@@ -15,6 +15,7 @@ const QuickActionsGroupSchema = z.object({
   label: z.string().min(1),
 })
 
+/** @internal */
 export const ExtensionContributesSchema = z
   .object({
     globalTab: SurfaceContributionSchema.optional(),

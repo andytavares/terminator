@@ -98,10 +98,6 @@ export function getLink(projectId: string): IssueLink | null {
   return links.get(projectId) ?? null
 }
 
-export function listLinks(): IssueLink[] {
-  return [...links.values()]
-}
-
 export async function setInjectContext(projectId: string, inject: boolean): Promise<void> {
   const existing = links.get(projectId)
   if (existing === undefined) return

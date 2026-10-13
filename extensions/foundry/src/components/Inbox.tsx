@@ -75,6 +75,7 @@ async function readInbox(): Promise<InboxView> {
   return (await invoke('foundry:inbox.list')) as InboxView
 }
 
+/** @internal */
 export const SIGNAL_POLL_MS = 4000
 
 export function Inbox({

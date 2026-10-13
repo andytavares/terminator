@@ -4,10 +4,16 @@
 // file) fills the renderer's queue and memory. Units are string lengths, counted
 // the same way on both sides of the IPC.
 
-/** Above this many unacknowledged characters the process is paused. */
+/**
+ * Above this many unacknowledged characters the process is paused.
+ * @internal
+ */
 export const HIGH_WATERMARK_CHARS = 1024 * 1024
 
-/** A paused process resumes once unacknowledged characters fall below this. */
+/**
+ * A paused process resumes once unacknowledged characters fall below this.
+ * @internal
+ */
 export const LOW_WATERMARK_CHARS = 256 * 1024
 
 export interface PausableOutput {

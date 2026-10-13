@@ -1,8 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import {
-  allocateExtensionGroups,
-  findMnemonicConflicts,
-} from '../../../../src/renderer/quick-actions/groups'
+import { allocateExtensionGroups } from '../../../../src/renderer/quick-actions/groups'
+import { findMnemonicConflicts } from '../../../support/quick-actions'
 import type { QuickAction, QuickActionGroup } from '../../../../src/renderer/quick-actions/types'
 
 function action(id: string, group: string, mnemonic?: string): QuickAction {

@@ -17,6 +17,7 @@ const execFileAsync = promisify(execFileCb)
 const DIFF_CAP_BYTES = 200 * 1024
 const DEFAULT_TIMEOUT_MS = 5 * 60_000
 
+/** @internal */
 export type ExecFn = (
   cmd: 'git',
   args: string[],
@@ -27,7 +28,10 @@ const defaultExec: ExecFn = async (_cmd, args, opts) => ({
   stdout: await runGit(opts.cwd, args, { raw: true, maxBuffer: 20 * 1024 * 1024 }),
 })
 
-/** Minimal shape a spawned `claude` child needs — real ChildProcess satisfies this. */
+/**
+ * Minimal shape a spawned `claude` child needs — real ChildProcess satisfies this.
+ * @internal
+ */
 export interface SpawnedProcess {
   stdin: { write(data: string): void; end(): void }
   stdout: { on(event: 'data', cb: (d: Buffer | string) => void): void }
@@ -51,7 +55,10 @@ function defaultSpawn(
   return spawnCb(cmd, args, { cwd: opts.cwd, env: opts.env }) as unknown as SpawnedProcess
 }
 
-/** The last absolute path in a shell's `command -v` output; rc files may print before it. */
+/**
+ * The last absolute path in a shell's `command -v` output; rc files may print before it.
+ * @internal
+ */
 export function claudeFromShellOutput(stdout: string): string | null {
   const paths = stdout
     .split('\n')
@@ -86,6 +93,7 @@ async function defaultResolveClaude(): Promise<string> {
 
 // ─── Prompt ────────────────────────────────────────────────────────────────
 
+/** @internal */
 export interface BuildAgentPromptInput {
   scope: AgentScope
   request: 'review' | 'explain' | 'ask'
@@ -153,6 +161,7 @@ function requestNotes(input: BuildAgentPromptInput): string[] {
   return notes
 }
 
+/** @internal */
 export function buildAgentPrompt(input: BuildAgentPromptInput): string {
   const scopeLine = `Scope: ${describeScope(input.scope)}, at PR head ${input.pr.headSHA}, in a private worktree.`
   const severities = `Use these severities exactly, and only these: ${FINDING_SEVERITIES.join(', ')}.`
@@ -203,6 +212,7 @@ function walkthroughEntryJsonSchema(): Record<string, unknown> {
   }
 }
 
+/** @internal */
 export function buildAgentJsonSchema(): Record<string, unknown> {
   return {
     type: 'object',
@@ -218,6 +228,7 @@ export function buildAgentJsonSchema(): Record<string, unknown> {
 
 // ─── claude CLI args ───────────────────────────────────────────────────────
 
+/** @internal */
 export interface BuildClaudeArgsInput {
   sessionId: string
   model: string
@@ -225,6 +236,7 @@ export interface BuildClaudeArgsInput {
   schemaJson: string
 }
 
+/** @internal */
 export function buildClaudeArgs(input: BuildClaudeArgsInput): string[] {
   const args = [
     '-p',
@@ -245,7 +257,10 @@ export function buildClaudeArgs(input: BuildClaudeArgsInput): string[] {
 
 // ─── Diff text ─────────────────────────────────────────────────────────────
 
-/** Where to diff: the PR's worktree, its base branch and head, narrowed to `scope`. */
+/**
+ * Where to diff: the PR's worktree, its base branch and head, narrowed to `scope`.
+ * @internal
+ */
 export interface DiffTarget {
   worktreePath: string
   baseRefName: string
@@ -295,6 +310,7 @@ function cappedDiff(diffText: string): { diffText: string; truncated: boolean } 
   return { diffText: diffText.slice(0, DIFF_CAP_BYTES), truncated: true }
 }
 
+/** @internal */
 export async function buildDiffText(
   target: DiffTarget,
   exec: ExecFn = defaultExec

@@ -8,7 +8,10 @@ function isSubsequence(query: string, text: string): boolean {
   return qi === query.length
 }
 
-/** The most results a search shows. */
+/**
+ * The most results a search shows.
+ * @internal
+ */
 export const MAX_RESULTS = 50
 
 /**

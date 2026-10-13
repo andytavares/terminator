@@ -1,8 +1,10 @@
 // Chromium keeps at most 16 live WebGL contexts per page and silently drops the
 // oldest beyond that. Terminals take contexts from this budget, which stays under
 // the cap to leave room for the canvases other views create.
+/** @internal */
 export const MAX_WEBGL_CONTEXTS = 12
 
+/** @internal */
 export class WebglContextBudget {
   private readonly holders = new Set<string>()
 

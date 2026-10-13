@@ -107,6 +107,7 @@ function registerWindowsAndShortcuts(
   }
 }
 
+/** @internal */
 export function registerWebviewExtension(ext: Extension, registry: Registry): void {
   if (!ext.contributes) return
   registerFullTabs(ext, ext.contributes, registry)

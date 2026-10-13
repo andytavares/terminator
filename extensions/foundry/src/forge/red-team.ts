@@ -13,6 +13,7 @@ import type { RedTeamCategory, WorkOrder } from '../order/schema.js'
 // never disagree with themselves, and cost nothing to run on every turn. An
 // agent pass adds judgement on top of these; it does not replace them.
 
+/** @internal */
 export interface Finding {
   readonly rule: string
   readonly severity: 'low' | 'medium' | 'high'
@@ -116,6 +117,7 @@ const ATTACKS: readonly Attack[] = [
   },
 ]
 
+/** @internal */
 export function structuralFindings(order: WorkOrder): Finding[] {
   return ATTACKS.flatMap(({ subjects, ...attack }) => {
     const subjectIds = subjects(order)

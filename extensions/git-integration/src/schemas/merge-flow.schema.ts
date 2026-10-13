@@ -8,12 +8,14 @@ export const ResolutionStrategySchema = z.enum([
   'manual',
 ])
 
+/** @internal */
 export const GitAuthorSchema = z.object({
   name: z.string().min(1),
   commitHash: z.string().min(1),
   timestamp: z.string().min(1),
 })
 
+/** @internal */
 export const ConflictBlockSchema = z.object({
   blockId: z.string().min(1),
   index: z.number().int().min(0),
@@ -28,6 +30,7 @@ export const ConflictBlockSchema = z.object({
   strategy: ResolutionStrategySchema.optional(),
 })
 
+/** @internal */
 export const ConflictFileSchema = z.object({
   filePath: z.string().min(1),
   conflictCount: z.number().int().min(0),
@@ -38,6 +41,7 @@ export const ConflictFileSchema = z.object({
   conflictDescription: z.string(),
 })
 
+/** @internal */
 export const ConflictSessionSchema = z.object({
   repoRoot: z.string().min(1),
   files: z.array(ConflictFileSchema),
@@ -49,12 +53,14 @@ export const ConflictSessionSchema = z.object({
   theirsBranch: z.string().optional(),
 })
 
+/** @internal */
 export const ConflictResolutionSchema = z.object({
   blockId: z.string().min(1),
   resolvedText: z.string(),
   strategy: ResolutionStrategySchema,
 })
 
+/** @internal */
 export const ResolutionDecisionSchema = z.object({
   blockId: z.string().min(1),
   resolvedText: z.string(),

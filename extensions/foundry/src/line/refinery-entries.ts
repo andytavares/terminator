@@ -16,6 +16,7 @@ import { readRefineryState } from './refinery-state.js'
 // I/O stays behind `deps` so this is exercisable with fakes rather than a real
 // checkout and a real `gh`.
 
+/** @internal */
 export interface QueueEntriesDeps {
   /** The pulls this order has opened so far, if any. */
   readonly readPulls: (orderId: string) => Promise<readonly { readonly repo: string }[]>
@@ -32,6 +33,7 @@ export interface QueueEntriesDeps {
  * to the plan's own declared `touches` for that lane — an order that queued
  * behind another before its worktree existed still has something for
  * `advisory` and `laterOverlapping` to compare against.
+ * @internal
  */
 export async function queueEntries(
   orders: readonly WorkOrder[],

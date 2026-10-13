@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { testCriterion } from '../helpers/order-parts.js'
-import { brief, READABLE } from '../../src/line/brief.js'
+import { brief } from '../../src/line/brief.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { PlanUnit, WorkOrder } from '../../src/order/schema.js'
 import type { Role, Rule } from '../../src/recipe/parse.js'
@@ -135,7 +135,6 @@ describe('what each role may read is declared, not assumed', () => {
   describe('blocking findings', blockingFindingsTests)
   describe('lanes', lanesTests)
   describe('verifiers and silent roles', verifiersAndSilentRolesTests)
-  describe('what a role can ask for', whatARoleCanAskForTests)
 })
 
 function theBuilderBriefTests() {
@@ -250,20 +249,6 @@ function verifiersAndSilentRolesTests() {
     expect(text).toContain('Refuse an expired refresh token')
     expect(text).not.toContain('no-stubs')
     expect(text).not.toContain('src/auth/session.ts')
-  })
-}
-
-function whatARoleCanAskForTests() {
-  it('offers a closed set of things a role can ask for', () => {
-    expect([...READABLE]).toEqual([
-      'unit',
-      'criteria',
-      'context',
-      'rules',
-      'order',
-      'conventions',
-      'feedback',
-    ])
   })
 }
 

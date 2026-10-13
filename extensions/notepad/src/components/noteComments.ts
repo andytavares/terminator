@@ -8,7 +8,6 @@ import { commentAnchorField, type CommentAnchor } from '../editor/commentField'
 import { useCommentsStore } from '../stores/comments.store'
 import type { Comment } from '../db/types'
 
-export const AUTOSAVE_DELAY_MS = 800
 const ANCHOR_DEBOUNCE_MS = 2000
 const CARD_HEIGHT_EST = 110
 const CARD_GAP = 8

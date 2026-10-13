@@ -170,7 +170,6 @@ describe('GitFullView — calls commit when Commit is clicked with staged files 
       expect(mockGitCommit).toHaveBeenCalledWith({
         repoRoot: '/repo',
         message: 'fix: something',
-        signOff: false,
         noVerify: false,
       })
     )
@@ -339,7 +338,6 @@ describe('GitFullView — commits with --no-verify when Commit without hooks is 
       expect(mockGitCommit).toHaveBeenCalledWith({
         repoRoot: '/repo',
         message: 'fix: skip hooks',
-        signOff: false,
         noVerify: true,
       })
     )

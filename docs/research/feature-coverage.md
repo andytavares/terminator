@@ -30,7 +30,7 @@ node scripts/feature-coverage.mjs <inventory.json> <dir>
 - **Git Integration: 57 of 57**, since `git-commit-flow`, `merge-flow-resolve`, `pr-review-diff`, `pr-review-queue`, `review-agent` and `review-dashboard`, against real local repositories with a bare `origin` and a stub GitHub at the gh CLI (`tests/e2e/github-stub.ts`). The 57th is `git:ui.consume-pending-request`, added by this work.
 - **Task Vault: 68 of 68, Notepad: 43 of 43**, since the 13 `task-vault-*` and `notepad-*` specs. Driving them found ten bugs, each fixed with a failing test first: the GTD clarify flow skipped every other inbox item, a kanban lane's dot colour was never saved, a write in the SQL console did not refresh the vault, dragging a note to reorder never saved, search ignored case only for ASCII, Ctrl+Shift+F did nothing on Linux and Windows, typing near a comment orphaned it, renaming a diagram left the list stale, the export's comment formats wrote no comments, and live preview left raw whatever the first parse of a long note did not reach.
 - **Foundry: 60 of 60** is real but shallow: `foundry-channels.spec.ts` invokes every Foundry channel on purpose, so a full count says the channels answer, not that Foundry's flows are exercised.
-- **Remote Control: 4 of 9.** Its device, tunnel, Caddyfile, viewer-limit and ngrok-token channels are never run; `extension-settings.spec.ts` writes the limit and the token through the generic settings page instead.
+- **Remote Control: 9 of 9**, since `remote-control.spec.ts` (2026-10-13; this table's run predates it, and the five rows it adds come from that spec's own trace, `E2E_IPC_TRACE=<dir> npx playwright test tests/e2e/remote-control.spec.ts tests/e2e/remote-app.spec.ts --workers=1`, 7 passed). Each channel is driven from the Remote Control view, and its effect read in the real remote renderer (`src/renderer-remote`) in Chromium against the real server: the account token opens the public address of a stand-in ngrok (`tests/e2e/fixtures/ngrok-bin/ngrok`), Reconnect restores a dropped one while a phone stays connected, a phone over the viewer limit is turned away, Disconnect ends a phone's connection, and Copy Caddyfile names the address the remote renderer is served from. The same spec checks the remote renderer itself can drive none of the nine: each is local-only, so its bridge answers "channel not remote-accessible". Driving them found four bugs, each fixed with a failing test first: nothing called `remote:tunnel-reconnect` and a dropped tunnel's notice was overwritten at once by the next status broadcast; a phone turned away by the viewer limit, or disconnected from the view, was told nothing and looked connected; the view kept counting against the old viewer limit until it was reopened; and ngrok was looked up in the Homebrew folders before the person's own PATH.
 
 ## Regenerate
 
@@ -51,7 +51,7 @@ The last command prints everything from here down.
 | terminator.foundry IPC          | 60     | 60    | 100%  |
 | terminator.git-integration IPC  | 57     | 57    | 100%  |
 | terminator.notepad IPC          | 43     | 43    | 100%  |
-| terminator.remote-control IPC   | 4      | 9     | 44%   |
+| terminator.remote-control IPC   | 9      | 9     | 100%  |
 | terminator.task-vault IPC       | 68     | 68    | 100%  |
 | Commands (Quick Actions, menus) | 8      | 8     | 100%  |
 | Core Quick Actions              | 28     | 28    | 100%  |
@@ -359,22 +359,21 @@ The last command prints everything from here down.
 
 </details>
 
-### terminator.remote-control IPC: 4 of 9 driven
+### terminator.remote-control IPC: 9 of 9 driven
 
-Not driven by any spec:
-
-- `remote:caddyfile`
-- `remote:disconnect-device`
-- `remote:tunnel-reconnect`
-- `remote:update-max-subscribers`
-- `remote:update-ngrok-token`
+All nine are local-only: `remote-control.spec.ts` also invokes each from the remote renderer's bridge and gets "channel not remote-accessible" for every one.
 
 <details><summary>Driven, and by which specs</summary>
 
-- `remote:get-settings`: extension-keyboard.spec.ts, extension-settings.spec.ts, extension-smoke.spec.ts, extension-themes.spec.ts, remote-app.spec.ts
-- `remote:port-change`: remote-app.spec.ts
-- `remote:toggle`: remote-app.spec.ts
-- `remote:update-password`: remote-app.spec.ts
+- `remote:caddyfile`: remote-control.spec.ts
+- `remote:disconnect-device`: remote-control.spec.ts
+- `remote:get-settings`: extension-keyboard.spec.ts, extension-settings.spec.ts, extension-smoke.spec.ts, extension-themes.spec.ts, remote-app.spec.ts, remote-control.spec.ts
+- `remote:port-change`: remote-app.spec.ts, remote-control.spec.ts
+- `remote:toggle`: remote-app.spec.ts, remote-control.spec.ts
+- `remote:tunnel-reconnect`: remote-control.spec.ts
+- `remote:update-max-subscribers`: remote-control.spec.ts
+- `remote:update-ngrok-token`: remote-control.spec.ts
+- `remote:update-password`: remote-app.spec.ts, remote-control.spec.ts
 
 </details>
 

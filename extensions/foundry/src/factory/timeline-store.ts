@@ -14,6 +14,7 @@ import type { FrameNode, Timeline, ToolEntry, GraphFrame, CiFrame } from './repl
 // records each tool call it has not recorded before. Nothing here decides
 // anything; a line that will not parse is skipped, never fatal.
 
+/** @internal */
 export const TIMELINE_FILE = 'run-timeline.jsonl'
 
 const NodeStateSchema = z.enum(['waiting', 'running', 'passed', 'failed', 'blocked', 'skipped'])
@@ -77,11 +78,6 @@ interface Recorded {
   tools: Set<string>
 }
 const recorded = new Map<string, Recorded>()
-
-/** Drop what this process remembers writing. Tests stand in for a restart with it. */
-export function forgetTimelines(): void {
-  recorded.clear()
-}
 
 function fileOf(dir: string): string {
   return path.join(dir, TIMELINE_FILE)

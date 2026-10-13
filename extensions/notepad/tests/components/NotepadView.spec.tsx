@@ -8,6 +8,8 @@ import {
   editorView,
   eventually,
   typeAtEnd,
+  storeSettings,
+  elapse,
 } from './helpers/note-surface'
 
 vi.mock('../../src/components/NoteList', () => ({
@@ -26,6 +28,8 @@ import { useNotesStore } from '../../src/stores/notes.store'
 import { useEditorStore } from '../../src/stores/editor.store'
 import { useCommentsStore } from '../../src/stores/comments.store'
 import { NOTES_CHANGED_CHANNEL } from '../../src/editor/noteSync'
+import { useNotepadSettingsStore } from '../../src/stores/settings.store'
+import { notepadSettingsFrom } from '../../src/notepad-settings'
 
 const BODY = '# Plan\nhello world'
 
@@ -154,5 +158,31 @@ describe('NotepadView changes from another surface', () => {
     expect(margin.hidden).toBe(false)
     fireEvent.keyDown(document, { metaKey: true, altKey: true, code: 'KeyM' })
     expect(margin.hidden).toBe(true)
+  })
+})
+
+describe('NotepadView with Notepad settings changed', () => {
+  beforeEach(() => useNotepadSettingsStore.setState(notepadSettingsFrom({})))
+  afterEach(() => storeSettings({}))
+
+  it('waits the configured autosave delay before saving an edit', async () => {
+    storeSettings({ 'terminator.notepad.autosaveMs': 2000 })
+    await openNote()
+    await eventually(() => expect(useNotepadSettingsStore.getState().autosaveMs).toBe(2000))
+    act(() => typeAtEnd('!'))
+    await elapse(1200)
+    expect(bridge.calls('terminator.notepad:notes.autosave')).toEqual([])
+    await eventually(() =>
+      expect(bridge.calls('terminator.notepad:notes.autosave')).toHaveLength(1)
+    )
+  })
+
+  it('draws the editor at the configured font size', async () => {
+    storeSettings({ 'terminator.notepad.editorFontSize': 20 })
+    await openNote()
+    const editor = document.querySelector<HTMLElement>('.notepad-editor-cm')!
+    await eventually(() =>
+      expect(editor.style.getPropertyValue('--notepad-editor-font-size')).toBe('20px')
+    )
   })
 })

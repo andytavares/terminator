@@ -52,7 +52,7 @@ describe('useGitStatus', () => {
     await act(async () => {
       await Promise.resolve()
     })
-    expect(mockGitStatus).toHaveBeenCalledWith({ path: '/repo', maxFiles: undefined })
+    expect(mockGitStatus).toHaveBeenCalledWith({ path: '/repo' })
   })
 })
 

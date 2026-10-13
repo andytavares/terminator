@@ -325,6 +325,7 @@ export function architectModel(
   return message === undefined || message.trim() === '' ? models.draft : models.ask
 }
 
+/** @internal */
 export class NoArchitectError extends Error {
   readonly code = 'NO_ARCHITECT'
   constructor(reason: string) {

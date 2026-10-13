@@ -9,6 +9,10 @@ vi.mock('../../src/components/SearchOverlay', () => ({
 Object.defineProperty(window, 'electronAPI', {
   value: {
     extensionBridge: { invoke: vi.fn().mockResolvedValue({ data: [] }), on: vi.fn(() => vi.fn()) },
+    extension: {
+      getSettingsValues: vi.fn().mockResolvedValue({ values: {} }),
+      onSettingsChanged: vi.fn(() => () => {}),
+    },
   },
   writable: true,
   configurable: true,

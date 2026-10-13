@@ -934,3 +934,23 @@ describe('CreateProjectDialog — the worktree branch list', () => {
     await vi.waitFor(() => expect(listedBranches()).toEqual(['main', 'free']))
   })
 })
+
+describe('CreateProjectDialog — the Worktree Base Directory setting', () => {
+  it("puts a new worktree under the workspace's base directory", async () => {
+    setupGitWorkspace()
+    const settings = {
+      ...DEFAULT_GLOBAL_SETTINGS,
+      git: { ...DEFAULT_GLOBAL_SETTINGS.git, worktreeBaseDir: '/wt-base' },
+    }
+    seedStore(useSettingsStore, { resolveSettings: vi.fn().mockReturnValue(settings) })
+    await openWorktreeMode()
+
+    fireEvent.change(screen.getByPlaceholderText('feature/my-feature'), {
+      target: { value: 'feature/login' },
+    })
+
+    await vi.waitFor(() =>
+      expect(git().suggestWorktreePath).toHaveBeenCalledWith('/repo', 'feature/login', '/wt-base')
+    )
+  })
+})

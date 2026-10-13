@@ -24,7 +24,10 @@ import { gradeInWords } from '../runtime/review/risk-grade.js'
 // operator decides before anything reaches the remote, because a force-pushed
 // branch is cheap to undo and a leaked migration is not.
 
-/** The grades whose decision is taken before anything is pushed. */
+/**
+ * The grades whose decision is taken before anything is pushed.
+ * @internal
+ */
 export const GATED_GRADES = ['P0', 'P1'] as const
 
 export type ShipMode = 'gate_then_push' | 'push_then_gate'
@@ -174,6 +177,7 @@ function detailFor(result: ExecResult): string {
   return `exit code ${result.exitCode}`
 }
 
+/** @internal */
 export class PushRefusedError extends Error {
   readonly code = 'PUSH_REFUSED'
   constructor(repo: string, result: ExecResult) {
@@ -276,6 +280,7 @@ function laneWarnings(mine: ReturnType<typeof laneViews>[number] | undefined): s
  *
  * A verdict per criterion, in a table, including the ones nothing checked —
  * FR-056 asks for every criterion, and "every" is the load-bearing word.
+ * @internal
  */
 export function prBody(
   order: WorkOrder,

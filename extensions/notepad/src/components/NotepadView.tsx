@@ -12,12 +12,8 @@ import { ExportDialog } from './ExportDialog'
 import { SearchOverlay } from './SearchOverlay'
 import { NoteEditor, applyExternalDoc, scrollToPosition } from '../editor/NoteEditor'
 import { ORIGIN_ID, onForeignNoteChange } from '../editor/noteSync'
-import {
-  AUTOSAVE_DELAY_MS,
-  reanchorAfterSave,
-  reanchorComments,
-  schedulePersist,
-} from './noteComments'
+import { reanchorAfterSave, reanchorComments, schedulePersist } from './noteComments'
+import { useNotepadSettings, useNotepadSettingsStore } from '../stores/settings.store'
 import {
   CommentColumn,
   EditorCommentOverlays,
@@ -61,6 +57,7 @@ async function reloadNoteList(): Promise<void> {
 
 export function NotepadView(): React.JSX.Element {
   const toggles = usePanelToggles()
+  useNotepadSettings()
   const { selectedNoteId, selectedDiagramId, notes, diagrams } = useNotesStore()
   // The session outlives the editor pane: it flushes an edit when a diagram is
   // opened and keeps cached bodies current while none is showing.
@@ -382,7 +379,7 @@ function useAutosave(noteId: string | null, autosaveTimerRef: TimerRef) {
       if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current)
       autosaveTimerRef.current = setTimeout(
         () => void autosaveNote(noteId, newBody),
-        AUTOSAVE_DELAY_MS
+        useNotepadSettingsStore.getState().autosaveMs
       )
     },
     [noteId] // eslint-disable-line react-hooks/exhaustive-deps

@@ -14,7 +14,7 @@ import { probeToolchain } from '../../src/verify/toolchain-probe.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import type { RunGraph } from '../../src/line/run-graph.js'
 import type { ToolActivity } from '../../src/runtime/transcript-tailer.js'
-import { readTimeline, forgetTimelines } from '../../src/factory/timeline-store.js'
+import { readTimeline } from '../../src/factory/timeline-store.js'
 import { writeCiState } from '../../src/line/ci-state.js'
 import type { CiState } from '../../src/line/ci-state.js'
 import { makeTempDir } from '../../../../tests/support/temp-dir'
@@ -1294,8 +1294,6 @@ function attachingTests() {
 }
 
 describe('the run timeline', () => {
-  beforeEach(() => forgetTimelines())
-
   describe('recording frames', recordingFramesTests)
   describe('the timeline', theTimelineTests)
 })

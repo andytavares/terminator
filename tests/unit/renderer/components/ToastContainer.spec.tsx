@@ -1,7 +1,8 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
-import { useToastStore, type Toast } from '../../../../src/renderer/stores/toast.store'
+import type { QueuedToast as Toast } from '@terminator/extension-ui'
+import { useToastStore } from '../../../../src/renderer/stores/toast.store'
 import { ToastContainer } from '../../../../src/renderer/components/ToastContainer'
 
 function withToasts(toasts: Array<Omit<Toast, 'duration'>>): void {

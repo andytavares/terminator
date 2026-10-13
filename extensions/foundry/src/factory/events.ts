@@ -70,6 +70,7 @@ export type FactoryEvent =
 
 const ARCHIVE_TOOLS = new Set(['Read', 'Grep', 'Glob', 'LS', 'NotebookRead'])
 
+/** @internal */
 export function toolProp(toolName: string, isShell: boolean): ToolProp {
   if (isShell) return 'rack'
   if (ARCHIVE_TOOLS.has(toolName)) return 'archive'

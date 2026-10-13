@@ -221,6 +221,7 @@ function inlineLinkToDOM(text: string, href: string): Node {
   return el
 }
 
+/** @internal */
 export class TableWidget extends WidgetType {
   constructor(
     readonly source: string,
@@ -297,6 +298,7 @@ const ALERT_GLYPHS: Record<AlertKind, string> = {
   caution: '✕',
 }
 
+/** @internal */
 export class AlertHeaderWidget extends WidgetType {
   constructor(readonly kind: AlertKind) {
     super()
@@ -378,6 +380,7 @@ type NodeDecorator = (node: SyntaxNodeRef, ctx: DecorationContext) => false | vo
 
 // focused defaults to true so callers that don't pass it (e.g. tests) get the
 // original cursor-line raw-reveal behaviour.
+/** @internal */
 export function buildDecorations(
   state: EditorState,
   selection: { anchor: number },

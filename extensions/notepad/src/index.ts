@@ -10,6 +10,7 @@ import { registerDiagramsIpcHandlers } from './ipc/diagrams.ipc'
 import { registerDiagramCommentsIpcHandlers } from './ipc/diagram-comments.ipc'
 import { registerFoldersIpcHandlers } from './ipc/folders.ipc'
 import { VALIDATION_ERROR } from './ipc/register'
+import { NOTEPAD_SETTING_BOUNDS } from './notepad-settings'
 
 /** The note or diagram a dedicated window opens on. */
 const WindowTarget = z.object({ id: z.string().min(1) })
@@ -76,8 +77,10 @@ const NOTEPAD_SETTINGS: Record<string, SettingDefinition> = {
   'terminator.notepad.autosaveMs': {
     type: 'number',
     label: 'Autosave debounce',
-    description: 'Idle delay before write (ms)',
-    default: 800,
+    description: 'How long typing must pause before a note is saved (ms)',
+    default: NOTEPAD_SETTING_BOUNDS.autosaveMs.default,
+    min: NOTEPAD_SETTING_BOUNDS.autosaveMs.min,
+    max: NOTEPAD_SETTING_BOUNDS.autosaveMs.max,
   },
   'terminator.notepad.defaultTags': {
     type: 'string',
@@ -89,7 +92,9 @@ const NOTEPAD_SETTINGS: Record<string, SettingDefinition> = {
     type: 'number',
     label: 'Editor font size',
     description: 'Font size in pixels',
-    default: 14,
+    default: NOTEPAD_SETTING_BOUNDS.editorFontSize.default,
+    min: NOTEPAD_SETTING_BOUNDS.editorFontSize.min,
+    max: NOTEPAD_SETTING_BOUNDS.editorFontSize.max,
   },
   'terminator.notepad.db.reinit': {
     type: 'action',
@@ -97,12 +102,6 @@ const NOTEPAD_SETTINGS: Record<string, SettingDefinition> = {
     description: 'Re-apply schema and migrations without deleting data',
     channel: 'terminator.notepad:db.reinit',
     default: null,
-  },
-  'terminator.notepad.mcpSidecar': {
-    type: 'boolean',
-    label: 'Enable MCP sidecar',
-    description: 'Let agents read/search notes',
-    default: false,
   },
 }
 

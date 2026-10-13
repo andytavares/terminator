@@ -1,54 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { rowToNote, rowToTag, rowToComment, rowToSearchResult } from '../../../src/db/mappers'
+import { rowToNote, rowToComment } from '../../../src/db/mappers'
 
 describe('rowToNote', rowToNoteTests)
 
-describe('rowToTag', () => {
-  it('maps a DB row to a Tag domain object', () => {
-    const row = { id: 't1', name: 'infra', note_count: 3 }
-    const tag = rowToTag(row)
-    expect(tag.id).toBe('t1')
-    expect(tag.name).toBe('infra')
-    expect(tag.noteCount).toBe(3)
-  })
-
-  it('handles zero note count', () => {
-    const row = { id: 't2', name: 'empty', note_count: 0 }
-    expect(rowToTag(row).noteCount).toBe(0)
-  })
-})
-
 describe('rowToComment', rowToCommentTests)
-
-describe('rowToSearchResult', () => {
-  it('maps a DB row to a SearchResult', () => {
-    const row = {
-      id: 'n1',
-      title: 'Auth Notes',
-      snippet: '…<mark>auth</mark>…',
-      tags: 'infra',
-      updated_at: '2026-01-01T00:00:00Z',
-      archived_at: null,
-    }
-    const result = rowToSearchResult(row)
-    expect(result.id).toBe('n1')
-    expect(result.snippet).toContain('<mark>auth</mark>')
-    expect(result.tags).toEqual(['infra'])
-    expect(result.archivedAt).toBeNull()
-  })
-
-  it('handles multiple tags in search result', () => {
-    const row = {
-      id: 'n2',
-      title: 'Multi',
-      snippet: 'foo',
-      tags: 'a,b,c',
-      updated_at: '2026-01-01T00:00:00Z',
-      archived_at: null,
-    }
-    expect(rowToSearchResult(row).tags).toEqual(['a', 'b', 'c'])
-  })
-})
 
 function rowToNoteTests() {
   describe('mapping', rowToNoteMappingTests)

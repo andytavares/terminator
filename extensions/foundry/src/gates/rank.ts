@@ -16,6 +16,7 @@ const RISK_WEIGHT: Record<Gate['riskGrade'], number> = { P0: 8, P1: 4, P2: 2, P3
  * A gate that blocks nothing still ranks above zero, because a decision
  * waiting on nobody is still a decision — it just sits below anything that is
  * holding work up.
+ * @internal
  */
 export function rankOf(gate: Gate): number {
   return (gate.blockedUnits + 1) * RISK_WEIGHT[gate.riskGrade]

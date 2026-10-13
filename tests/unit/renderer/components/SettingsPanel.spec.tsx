@@ -978,6 +978,27 @@ describe('ExtensionsSection — editing each kind of setting', () => {
   })
 })
 
+describe('ExtensionsSection — a list setting', () => {
+  setUpExtensionsSection()
+
+  const LIST = { 'com.test.paths': { type: 'list', label: 'Paths', default: [] } }
+
+  it('is edited in a multi-line box, one item per line', async () => {
+    await openSettingsOf(LIST, { 'com.test.paths': ['src/auth/**', 'migrations/**'] })
+    const box = screen.getByRole('textbox', { name: 'Paths' }) as HTMLTextAreaElement
+    expect(box.tagName).toBe('TEXTAREA')
+    expect(box.value).toBe('src/auth/**\nmigrations/**')
+  })
+
+  it('is saved as a list of the lines typed, blank ones dropped', async () => {
+    await openSettingsOf(LIST)
+    fireEvent.change(screen.getByRole('textbox', { name: 'Paths' }), {
+      target: { value: 'src/auth/**\n\n  docs/** ' },
+    })
+    await saved('com.test.paths', ['src/auth/**', 'docs/**'])
+  })
+})
+
 describe('ExtensionsSection — settings at the edges', () => {
   setUpExtensionsSection()
 

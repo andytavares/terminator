@@ -8,6 +8,7 @@ export type RecurrenceRule =
   | { kind: 'monthly' }
   | { kind: 'weekly'; days: number[] } // days: 0=Sun … 6=Sat; empty = every 7 days
 
+/** @internal */
 export class InvalidRecurrenceRuleError extends Error {
   constructor(raw: string) {
     super(`Invalid recurrence rule: "${raw}"`)

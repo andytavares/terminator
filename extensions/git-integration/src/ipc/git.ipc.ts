@@ -22,17 +22,22 @@ const RepoRootPayload = z.object({ repoRoot: RepoRoot })
 const CommitPayload = z.object({
   repoRoot: RepoRoot,
   message: z.string(),
-  signOff: z.boolean().optional(),
   noVerify: z.boolean().optional(),
 })
 
-async function commitCollectingOutput(payload: z.infer<typeof CommitPayload>) {
-  const { repoRoot, message, signOff, noVerify } = payload
+/** The Git settings the channels read on every call, so a change applies to the next one. */
+export interface GitSettings {
+  signOff(): boolean
+  maxDisplayedFiles(): number
+}
+
+async function commitCollectingOutput(payload: z.infer<typeof CommitPayload>, signOff: boolean) {
+  const { repoRoot, message, noVerify } = payload
   if (!message.trim()) return { error: 'EMPTY_MESSAGE' }
   commitOutputBuffer.set(repoRoot, [])
   const appendCommitLine = (line: string) => commitOutputBuffer.get(repoRoot)?.push(line)
   const result = await commitChanges(repoRoot, message, {
-    signOff: signOff ?? false,
+    signOff,
     noVerify: noVerify ?? false,
     onOutput: appendCommitLine,
   })
@@ -48,14 +53,26 @@ function takeCommitOutput({ repoRoot }: z.infer<typeof RepoRootPayload>) {
   return { lines }
 }
 
+/** The channels whose answer a setting decides. */
+function settingChannels(settings: GitSettings): ChannelSpec[] {
+  return [
+    defineChannel({
+      channel: 'git:status',
+      schema: z.object({ path: RepoRoot }),
+      invalid: VALIDATION_ERROR,
+      run: ({ path }) => getStatus(path, settings.maxDisplayedFiles()),
+      onError: errorEnvelope,
+    }),
+    defineChannel({
+      channel: 'git:commit',
+      schema: CommitPayload,
+      invalid: VALIDATION_ERROR,
+      run: (payload) => commitCollectingOutput(payload, settings.signOff()),
+    }),
+  ]
+}
+
 const GIT_CHANNELS: ChannelSpec[] = [
-  defineChannel({
-    channel: 'git:status',
-    schema: z.object({ path: RepoRoot, maxFiles: z.number().int().positive().optional() }),
-    invalid: VALIDATION_ERROR,
-    run: ({ path, maxFiles }) => getStatus(path, maxFiles ?? 500),
-    onError: errorEnvelope,
-  }),
   defineChannel({
     channel: 'git:diff-file',
     schema: z.object({
@@ -92,12 +109,6 @@ const GIT_CHANNELS: ChannelSpec[] = [
     onError: errorEnvelope,
   }),
   defineChannel({
-    channel: 'git:commit',
-    schema: CommitPayload,
-    invalid: VALIDATION_ERROR,
-    run: commitCollectingOutput,
-  }),
-  defineChannel({
     channel: 'git:commit-output-poll',
     schema: RepoRootPayload,
     invalid: { lines: [] as string[] },
@@ -111,8 +122,8 @@ const GIT_CHANNELS: ChannelSpec[] = [
   }),
 ]
 
-export function registerGitExtensionHandlers(registerRaw: RegisterFn): void {
+export function registerGitExtensionHandlers(registerRaw: RegisterFn, settings: GitSettings): void {
   const register = withTiming(registerRaw)
-  for (const spec of GIT_CHANNELS) register(spec)
+  for (const spec of [...settingChannels(settings), ...GIT_CHANNELS]) register(spec)
   registerMergeFlowHandlers(register)
 }

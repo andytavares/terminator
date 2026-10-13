@@ -71,6 +71,7 @@ const RECENT_WINDOW = 8
  * A shell call still in flight is the load-bearing fact here: without it every
  * test suite longer than the threshold reads as a stall, which the spec calls
  * the obvious first bug and makes the gate on shipping this at all.
+ * @internal
  */
 export function factsFrom(
   run: WatchedRun,

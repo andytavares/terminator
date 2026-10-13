@@ -274,7 +274,7 @@ working again as soon as you reconnect.
 
 ### Per-workspace overrides
 
-Expand any workspace in Settings to override the global theme, scrollback limit, and default shell for sessions in that workspace.
+Expand any workspace in Settings to override the global theme, scrollback limit, and default shell for sessions in that workspace. A new terminal in one of its projects opens in the workspace's own shell. **Use global default** beside a setting hands that one setting back to the global value and leaves the workspace's other overrides alone.
 
 Themes switch immediately across the entire app — no restart required. Terminal colours re-apply live via a `MutationObserver`.
 
@@ -537,6 +537,8 @@ The Git integration is a workspace-scoped extension that surfaces git tooling di
 ![Git tab](screenshots/07-git-tab.png)
 
 The **Git** tab above the terminal is where git lives. It lists the changed files, each state named (**Changed**, **New**, **Added**, **Deleted**, **Renamed**, **Conflict**); stages and unstages them; commits; and shows a syntax-highlighted diff of the selected file (red for removed lines, green for added). It refreshes on file changes.
+
+Two settings in **Settings → Extensions → Git Integration** change it. **Max displayed changed files** (500 by default) is how many changed files the list shows; with more, it says "Showing first N files." **Add sign-off to commits** commits with [`--signoff`](https://git-scm.com/docs/git-commit#Documentation/git-commit.txt---signoff), which ends the message with a `Signed-off-by:` line naming you.
 
 ### The pull request queue
 
@@ -1015,6 +1017,7 @@ The **new item dialog** offers three types:
 - **Full-text search** — type in the search bar to filter notes by content.
 - **Multi-tag filter** — click the Tags button in the sidebar to open a multiselect dropdown and filter by one or more tags simultaneously.
 - **Import/export** — export all notes and diagrams as a zip (`.md` files + `.excalidraw.json` files).
+- **Settings** — in **Settings → Extensions → Notepad**: **Editor font size** (14 px by default, 8–32) and **Autosave debounce**, how long typing must pause before a note is saved (800 ms by default, 100–10000). Both apply as soon as they are changed, in the panel and in popped-out note windows. Diagrams keep their own 1.2 s save delay.
 
 ### Diagram features
 
@@ -1058,6 +1061,15 @@ The calendar on the right marks each day by what is on it, and hovering a day sa
 
 The six steps are named as you go — **Get clear**, **Inbox**, **Projects**, **Stale**, **Someday**,
 **Reflect** — instead of counting "Step 3 of 6" without saying what step 3 is.
+
+An open task left on Today rolls over to the next day. Once it has rolled over for **Stale Task
+Threshold (days)** (Settings → Extensions → Task Vault, 7 by default), Today marks it **stale** and
+the review's **Stale** step lists it. A project is stale for a different reason: it has no open
+next action.
+
+On **Weekly Review Day** (0 = Sunday … 6 = Saturday, Sunday by default) a notification says the
+review is ready; clicking it opens the review. The day is checked each day, so a new choice
+applies from the next check.
 
 ### Quick capture
 
@@ -1107,14 +1119,15 @@ network or over the internet.
 Open the **Remote Control** tab. The top of the screen answers the question you came to ask —
 whether it is on, and how to reach it:
 
-| It says                             | Meaning                                                                                        |
-| ----------------------------------- | ---------------------------------------------------------------------------------------------- |
-| **Off**                             | Your terminals are not reachable from any browser. **Turn on** starts the server.              |
-| **Starting…**                       | Opening the port and creating an address.                                                      |
-| **On — reachable on this network**  | The address works for devices on your network. Add an account token in Settings to go further. |
-| **On — reachable from any browser** | There is a public address.                                                                     |
-| A failure, in words                 | What went wrong and what fixes it — e.g. the port is already in use, so pick another or quit   |
-|                                     | whatever is listening on it.                                                                   |
+| It says                                 | Meaning                                                                                                                                |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| **Off**                                 | Your terminals are not reachable from any browser. **Turn on** starts the server.                                                      |
+| **Starting…**                           | Opening the port and creating an address.                                                                                              |
+| **On — reachable on this network**      | The address works for devices on your network. Add an account token in Settings to go further.                                         |
+| **On — reachable from any browser**     | There is a public address.                                                                                                             |
+| A failure, in words                     | What went wrong and what fixes it — e.g. the port is already in use, so pick another or quit                                           |
+|                                         | whatever is listening on it.                                                                                                           |
+| **The public address stopped working.** | The tunnel dropped. **Reconnect** makes a new public address without restarting the server, so devices on your network stay connected. |
 
 When it is on you get the address, a **QR code**, and the password. Point a phone camera at the
 code and it connects — the code carries the password, so on the everyday path the credential never
@@ -1130,11 +1143,18 @@ into your terminals.**
 on each row. The list is live: it changes as devices come and go, because "who currently has
 shell access" is not a question to answer with a stale list.
 
+A device you disconnect is told so ("The desktop app disconnected this device.") and does not
+reconnect by itself; it can only come back by its own **Retry**. To keep it out, change the
+password.
+
 ### Settings
 
 Port, viewer limit, password and the account token for a public address are under **Settings**
 at the bottom of the screen, collapsed until you want them. The summary line shows the port and
 viewer limit without opening it.
+
+The viewer limit is how many browsers may watch one terminal at once. One more is turned away and
+told why, with a **Retry** for when someone leaves.
 
 ### Accessing terminals in a browser
 

@@ -24,7 +24,10 @@ export interface Callout {
   readonly at: number
 }
 
-/** The pinned wait's id: one at a time, so it keeps its place in a stack. */
+/**
+ * The pinned wait's id: one at a time, so it keeps its place in a stack.
+ * @internal
+ */
 export const CI_WAITING_ID = 'ci-waiting'
 
 /**
@@ -132,6 +135,7 @@ const RAISE: { readonly [K in FactoryEvent['kind']]: Raiser<K> } = {
  *
  * Short on purpose: the station's nameplate already says which step it is,
  * so the callout only says what just happened to it.
+ * @internal
  */
 export function calloutFor(
   event: FactoryEvent,

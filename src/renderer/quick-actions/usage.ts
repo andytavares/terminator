@@ -15,6 +15,7 @@ export function togglePin(pins: string[], id: string): string[] {
   return pins.includes(id) ? pins.filter((p) => p !== id) : [...pins, id]
 }
 
+/** @internal */
 export const HINT_LIMIT = 3
 
 /** Counts a shortcut use up to HINT_LIMIT; past it the same list comes back, so nothing needs saving. */

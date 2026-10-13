@@ -33,13 +33,15 @@ Configure under **Settings → Git Integration**. `activate` (`src/index.ts`) re
 | ----------------------------------------------------------------- | ------- | --------- | --------- | -------------------------------------------------------------- |
 | `terminator.git-integration.git.enabled`                          | boolean | `true`    | workspace | Enable/disable the entire extension                            |
 | `terminator.git-integration.git.githubToken`                      | string  | `''`      | global    | Token passed to gh as `GH_TOKEN`; stored as a secret           |
-| `terminator.git-integration.git.commit.signOff`                   | boolean | `false`   | workspace | Append `--signoff` to commits                                  |
-| `terminator.git-integration.git.maxDisplayedFiles`                | number  | `500`     | global    | Cap on changed files shown (10–5000)                           |
+| `terminator.git-integration.git.commit.signOff`                   | boolean | `false`   | workspace | Commit with `--signoff` (a `Signed-off-by` trailer)            |
+| `terminator.git-integration.git.maxDisplayedFiles`                | number  | `500`     | global    | Changed files the Git tab lists at most (10–5000)              |
 | `terminator.git-integration.review.agentModel`                    | enum    | `sonnet`  | global    | Review agent model: `opus` or `sonnet`                         |
 | `terminator.git-integration.review.agentEffort`                   | enum    | `default` | global    | Review agent effort: `default`, `low`, `medium`, `high`        |
 | `terminator.git-integration.review.cloneFolder`                   | folder  | `''`      | global    | Where "Clone and review" clones; empty keeps reviews diff-only |
 | `terminator.git-integration.review.agentTimeoutMinutes`           | number  | `5`       | global    | Review agent timeout (1–30)                                    |
 | `terminator.git-integration.notify.<event>.{system,center,toast}` | boolean | `true`    | global    | Where each notification is delivered                           |
+
+`git:commit` and `git:status` read the two Git settings on every call (`src/git-settings.ts`), so a change applies to the next commit and the next status refresh. With more changed files than **Max displayed changed files**, the Git tab lists that many and says so.
 
 ## Requirements
 

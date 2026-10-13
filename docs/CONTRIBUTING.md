@@ -79,7 +79,7 @@ E2E runs with no retries, so a test that fails once fails the build ([ADR 070](a
 - Never sleep. Wait on the condition you assert next: a locator assertion, or `expect.poll`. ESLint rejects `waitForTimeout` in `tests/e2e`.
 - Every test passes alone (`npx playwright test tests/e2e/<file>:<line>`), unless it is part of a `test.describe.serial` story, which runs as a whole. Use serial only for a sequence that cannot be split.
 - Before sending keys to a surface you just opened, assert that it has focus.
-- Launch the app through `launchApp()`. It isolates the profile, runs the terminals on a fixture zsh config (`tests/e2e/fixtures/zdotdir`) whose `claude` is a stub, so no real agent runs, and turns off macOS window restore, whose crash prompt blocks startup. A launch that does not reach the sidebar in 25 s fails with each window's state (its URL, whether it was still loading, whether its renderer crashed, or that main did not answer) and the app's own output. Close it with `closeApp()`: it returns only once the app's process has exited (killing it after 5 s), then fails the spec if any process the app started is still running 3 s later, and kills those (`tests/e2e/leftover-processes.ts`). Leaked processes add up on a CI runner until `fork` fails with `EAGAIN`; a process your feature starts must end when the app quits.
+- Launch the app through `launchApp()`. It isolates the profile, runs the terminals on a fixture zsh config (`tests/e2e/fixtures/zdotdir`) whose `claude` is a stub, so no real agent runs, and turns off macOS window restore, whose crash prompt blocks startup. A launch that does not reach the sidebar in 25 s fails with each window's state (its URL, whether it was still loading, whether its renderer crashed, or that main did not answer) and the app's own output. Close it with `closeApp()`: it returns only once the app's process has exited (killing it after 5 s), then fails the spec if any process the app started is still running 3 s later, and kills those (`tests/e2e/leftover-processes.ts`). It finds them by the launch's marker in their environment and by the app's process tree taken just before the close, which also covers the git and gh commands the core runs with an environment of their own. Leaked processes add up on a CI runner until `fork` fails with `EAGAIN`; a process your feature starts must end when the app quits. CI prints the runner user's processes against its limit before and after each macOS E2E step (`scripts/process-census.sh`).
 - Read what a terminal shows with `terminalRows(page)` from `tests/e2e/helpers.ts`, never from `.xterm-rows`. A visible terminal draws with WebGL into a canvas and the DOM holds none of its text; `terminalRows` reads xterm's buffer through `window.terminatorE2E`, which the app sets up in `src/renderer/terminal/terminal-rows.ts`. It reads every open terminal, hidden ones too, one after another; when the row's terminal or its place on screen matters, read one pane with `terminalRowsIn(screen)`, where `screen` is that pane's `.xterm-screen` (`visibleTerminalScreen(page)` for the first one on screen). To run the specs on the WebGL renderer, as macOS does, on Linux: `E2E_ELECTRON_ARGS="--no-sandbox --use-gl=angle --use-angle=swiftshader --enable-unsafe-swiftshader --ignore-gpu-blocklist"`.
 - A new spec goes in `scripts/e2e-select.mjs`: under the extension it covers, or in `CORE_SPECS`. The selector's unit test fails for a spec that is in neither.
 - CI runs only the specs your diff selects, plus the smoke set. Changed specs run three times. To see what your branch selects: `node scripts/e2e-select.mjs origin/main`.
@@ -100,6 +100,7 @@ npm run build:extensions   # compile all extensions
 npm run lint       # ESLint (zero errors required)
 npm run lint:deps  # syncpack: exact versions, one per package
 npm run lint:unused  # knip: no unused files, exports or dependencies
+npm run lint:unused:production  # knip --production: no code that only tests reach
 npm run lint:duplicates  # jscpd: no copy-pasted code
 npm run typecheck  # TypeScript type check (no emit — zero errors required)
 npm run format     # Prettier (auto-fixes)
@@ -120,6 +121,14 @@ Tests are functions too, so a `describe` callback longer than 30 lines is split 
 - Unused and unreachable: delete it, with any test that covers only it (Constitution VI).
 - Exported but used only in its own file: drop the `export`.
 - Reached in a way knip cannot see (loaded by path at run time, a global declaration): add it to `knip.jsonc` with a comment that says how it is reached, and check that claim with `grep`.
+
+`npm run lint:unused:production` runs the same configuration in knip's [production mode](https://knip.dev/features/production-mode), which leaves out tests and stories, and must report nothing too ([ADR 107](adr/107-production-only-unused-code-is-a-ci-gate.md)). A finding there is code that only a test reaches:
+
+- Nothing in the app calls it: delete it with its tests.
+- It is what a spec expects, not what the app does (a table of shortcuts, a list of sanctioned operations): move it beside the spec.
+- It is a test seam (a clock setter, a reset): fake what the app reads instead (`vi.useFakeTimers`, `vi.resetModules`) and delete the seam.
+- The app runs it from inside its own file, and a spec tests it directly: drop the `export` and test it through its caller, or tag it `/** @internal */` ([knip](https://knip.dev/reference/jsdoc-tsdoc-tags#internal)).
+- A new production entry (an extension's `src/index.ts`, a file loaded by path): end its pattern in `knip.jsonc` with `!`.
 
 `npm run lint:duplicates` runs [jscpd](https://github.com/kucherenko/jscpd) with `.jscpd.json` and must find no clones ([ADR 105](adr/105-duplicate-code-is-a-ci-gate.md)). A clone is a block of at least 6 lines and 60 tokens that appears twice in `src`, `packages` or `extensions`. Specs, `tests` and `stories` folders are not checked. When it reports one, move the code to the one place both copies may import:
 
@@ -256,7 +265,7 @@ Per the constitution (Principle IV):
 Before opening a PR, verify:
 
 - [ ] All tests pass (`npm test`)
-- [ ] `npm run lint`, `npm run lint:deps`, `npm run lint:unused`, `npm run lint:duplicates` and `npm run typecheck` pass with 0 errors
+- [ ] `npm run lint`, `npm run lint:deps`, `npm run lint:unused`, `npm run lint:unused:production`, `npm run lint:duplicates` and `npm run typecheck` pass with 0 errors
 - [ ] `npm run format:check` passes
 - [ ] `npm run build:extensions` succeeds (no compile errors)
 - [ ] No unused imports, variables, or dead code introduced

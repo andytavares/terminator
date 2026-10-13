@@ -5,6 +5,7 @@ import { dispatchChannel } from '@terminator/extension-sdk'
 import type { ChannelSpec, ExtensionAPI, ExtensionDB } from '@terminator/extension-sdk'
 import { applyTaskVaultSchema } from '../../src/vault/db'
 import { insertTask, type NewTaskRow } from '../../src/vault/task-repository'
+import { partialFake } from '../../../../tests/support/fakes'
 
 /** A real in-memory SQLite database with the task-vault schema applied. */
 export async function createVaultDb(): Promise<ExtensionDB> {
@@ -13,23 +14,39 @@ export async function createVaultDb(): Promise<ExtensionDB> {
   return db
 }
 
+/** Settings as the core keeps them for the extension: what was set, read back. */
+function storedSettings(): ExtensionAPI['settings'] & { values: Map<string, unknown> } {
+  const values = new Map<string, unknown>()
+  return {
+    ...partialFake<ExtensionAPI['settings']>({
+      get: <T>(key: string) => values.get(key) as T | undefined,
+      set: (key: string, value: unknown) => void values.set(key, value),
+    }),
+    values,
+  }
+}
+
 /** Stands in for the ExtensionAPI: collects the channels an extension registers. */
 export function createIpcHarness() {
   const specs = new Map<string, ChannelSpec>()
   const createNotification = vi.fn()
-  const api = {
-    ipc: {
+  const settings = storedSettings()
+  const api = partialFake<ExtensionAPI>({
+    ipc: partialFake<ExtensionAPI['ipc']>({
       registerHandler: (spec: ChannelSpec) => {
         specs.set(spec.channel, spec)
-        return { dispose: () => specs.delete(spec.channel) }
+        return { dispose: () => void specs.delete(spec.channel) }
       },
-    },
-    notifications: { createNotification },
-  } as unknown as ExtensionAPI
+    }),
+    notifications: partialFake<ExtensionAPI['notifications']>({ createNotification }),
+    settings,
+  })
 
   return {
     api,
     createNotification,
+    /** The extension's stored settings, by key. */
+    settings: settings.values,
     channels: () => [...specs.keys()],
     specs: () => [...specs.values()],
     /** What a renderer's invoke reaches: the registered channel, payload parsing included. */

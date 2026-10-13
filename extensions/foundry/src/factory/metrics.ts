@@ -93,6 +93,7 @@ function timesOf({
   }
 }
 
+/** @internal */
 export function orderMetrics(records: OrderRecords): OrderMetrics {
   const { order, ledger, gates, graph } = records
   const shipped = ledger.some((e) => e.action === 'ship.draft_opened')

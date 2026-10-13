@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { Button, Popover } from '@terminator/extension-ui'
 import './view-menu.css'
 
+/** @internal */
 export interface Use {
   symbol: string
   definedInStep: number

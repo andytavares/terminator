@@ -14,11 +14,13 @@ import {
   lighterRedTeamModel,
 } from '../../src/forge/review-loop.js'
 import { draftOrder } from '../../src/order/draft.js'
-import type { WorkOrder, RedTeamFinding } from '../../src/order/schema.js'
+import type { WorkOrder } from '../../src/order/schema.js'
 import { resolveRole } from '../../src/recipe/resolve.js'
 import type { Role } from '../../src/recipe/parse.js'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
+
+type RedTeamFinding = WorkOrder['redTeam'][number]
 
 // The loop that argues before agreement.
 //

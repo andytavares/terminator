@@ -1,6 +1,9 @@
 import type { SessionView } from './view-model'
 
-/** One key, matching the existing ad-hoc sidebar keys (width, expanded, collapsed). */
+/**
+ * One key, matching the existing ad-hoc sidebar keys (width, expanded, collapsed).
+ * @internal
+ */
 export const VIEWS_STORAGE_KEY = 'terminator.sidebar.views'
 
 /**

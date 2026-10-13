@@ -238,6 +238,7 @@ export interface RaiseInput {
   readonly omitOptions?: readonly string[]
 }
 
+/** @internal */
 export class UnattributedGateError extends Error {
   readonly code = 'UNATTRIBUTED_GATE'
   constructor() {
@@ -299,6 +300,7 @@ function assertDefaultOffered(rule: GateRuleId, omitted: readonly string[]): voi
   }
 }
 
+/** @internal */
 export class AlreadyDecidedError extends Error {
   readonly code = 'GATE_ALREADY_DECIDED'
   constructor(id: string) {

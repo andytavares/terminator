@@ -1,20 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import {
-  mulberry32,
-  rect,
-  bevel,
-  rivets,
-  wear,
-  scanlines,
-  glow,
-} from '../../../src/factory/art/kit.js'
+import { mulberry32, rect, bevel, rivets, wear, glow } from '../../../src/factory/art/kit.js'
 import { createRecordingPaint } from './paint-fake.js'
 
 describe('factory/art/kit', () => {
   describe('mulberry32', mulberry32Tests)
   describe('rect, bevel and rivets', rectBevelAndRivetsTests)
   describe('wear', wearTests)
-  describe('scanlines and glow', scanlinesAndGlowTests)
+  describe('glow', glowTests)
 })
 
 function mulberry32Tests() {
@@ -83,16 +75,7 @@ function wearTests() {
   })
 }
 
-function scanlinesAndGlowTests() {
-  it('scanlines draws one faint row every two pixels down the whole frame', () => {
-    const paint = createRecordingPaint()
-    scanlines(paint, { width: 32, height: 8 })
-    const rows = paint.calls.filter((c) => c.op === 'fillRect')
-    expect(rows).toHaveLength(4)
-    expect(rows[0]).toMatchObject({ x: 0, y: 0, w: 32, h: 1 })
-    expect(rows[3]).toMatchObject({ x: 0, y: 6, w: 32, h: 1 })
-  })
-
+function glowTests() {
   it('glow paints a radial gradient from full colour to transparent', () => {
     const paint = createRecordingPaint()
     glow(paint, [10, 10, 5], { rgba0: 'rgba(1,2,3,.5)', rgba1: 'rgba(1,2,3,0)' })

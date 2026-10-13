@@ -17,6 +17,11 @@ const ON: RemoteStatus = {
 describe('reduceStatus', reduceStatusTests)
 
 describe('tunnelDropped', () => {
+  describe('the drop', tunnelDropTests)
+  describe('what follows it', tunnelDropFollowUpTests)
+})
+
+function tunnelDropTests() {
   it('moves a running server to a named failure', () => {
     const next = tunnelDropped(ON)
     expect(next.kind).toBe('failed')
@@ -28,7 +33,32 @@ describe('tunnelDropped', () => {
   it('leaves a status that was never on alone', () => {
     expect(tunnelDropped(OFF)).toBe(OFF)
   })
-})
+}
+
+function tunnelDropFollowUpTests() {
+  it('outlasts the listening broadcast that follows the drop, which has no public address', () => {
+    // The extension broadcasts remote:tunnel-disconnected, then the local address alone.
+    const dropped = tunnelDropped(ON)
+    const next = reduceStatus(dropped, {
+      enabled: true,
+      port: 7681,
+      lanUrl: 'http://192.168.1.4:7681',
+      publicUrl: null,
+      ngrokInstalled: true,
+    })
+    expect(next).toBe(dropped)
+  })
+
+  it('gives way once the tunnel is back', () => {
+    const next = reduceStatus(tunnelDropped(ON), {
+      enabled: true,
+      port: 7681,
+      lanUrl: 'http://192.168.1.4:7681',
+      publicUrl: 'https://brave-otter-7.ngrok.app',
+    })
+    expect(next).toMatchObject({ kind: 'on', publicUrl: 'https://brave-otter-7.ngrok.app' })
+  })
+}
 
 function reduceStatusTests() {
   describe('coming up', reduceStatusStartupTests)
