@@ -16,11 +16,9 @@ interface PickerProps {
   onChange: (v: string) => void
 }
 
-/**
- * Plain inputs standing in for SmartTaskInput and DateTimePicker, which have specs of
- * their own: Enter submits, Escape cancels, and a picker is named by its mode.
- * Use as `vi.mock('<path to the component>', () => import('./helpers/input-stubs'))`.
- */
+/** Plain inputs for SmartTaskInput and DateTimePicker, which have specs of their own: Enter
+ *  submits, Escape cancels, a picker is named by its mode. Use as
+ *  `vi.mock('<path to the component>', () => import('./helpers/input-stubs'))`. */
 export function SmartTaskInput(props: TaskInputProps): React.JSX.Element {
   return (
     <input

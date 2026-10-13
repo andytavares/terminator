@@ -162,13 +162,9 @@ async function notifyOneDueTask() {
   return { api, call }
 }
 
-/**
- * It used to be an "Open Vault" action broadcasting `task-vault:navigate-task` — a
- * channel with no listener anywhere in the extension, so it opened nothing and went
- * nowhere. Opening the task is what clicking the row does now, through the path the
- * calendar already used: the window, then the vault's tab — the view is created on
- * activation, so saying where to go before that is a broadcast to nobody.
- */
+/** Opening the task is what clicking the row does, through the calendar's path: the window, then
+ *  the vault's tab. The "Open Vault" action this replaced broadcast `task-vault:navigate-task`,
+ *  a channel nothing listened on, before the view that would hear it existed. */
 describe('clicking a due-task notification', () => {
   it('takes you to the task rather than offering a button that did not', async () => {
     const { api, call } = await notifyOneDueTask()
@@ -230,10 +226,8 @@ describe(
   startTaskSchedulerSchedulerNeverInsertsTaskTests
 )
 
-// ── action handler navigation ──────────────────────────────────────────────────
-// System-notification click handling now lives entirely in notificationManager
-// (src/main/notifications/notification-manager.spec.ts) — it wires the OS
-// bubble's click event to actions[0].handler(), the same handler tested here.
+// ── action handler navigation ── notificationManager (src/main/notifications) wires the OS
+// bubble's click to actions[0].handler(), the same handler tested here.
 
 describe('startTaskScheduler — action handler navigation', () => {
   it('takes you to the blocked task, on the day it was blocked', async () => {
@@ -292,11 +286,9 @@ describe('startTaskScheduler — midnight dedup reset', () => {
 })
 
 describe('telling every window something changed', () => {
-  // Still the vault's push channel — the task and project IPC handlers use it
-  // to say the index moved. Only the notifications stopped: they navigate now,
-  // and navigating is a different thing from announcing.
-  // The backend runs in the extension host (ADR 094), which has no windows: the
-  // core's window broadcast, bound at activation, is the only way out.
+  // Still the vault's push channel: the IPC handlers announce index moves on it; notifications
+  // navigate instead. The backend runs in the extension host (ADR 094), which has no windows,
+  // so the window broadcast bound at activation is the only way out.
   it('sends through the broadcast activate bound', () => {
     const send = vi.fn()
     bindBroadcast(send)

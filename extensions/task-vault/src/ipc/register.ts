@@ -18,11 +18,9 @@ type Register = <S extends z.ZodType>(
   run: (args: z.infer<S>) => Promise<unknown> | unknown
 ) => void
 
-// All task-vault IPC channels register through the ExtensionAPI — never through
-// ipcMain directly (Extension Isolation). Each declares the schema its payload
-// is parsed with before `run` sees it (ADR 096). A channel is local-only
-// unless it registers through handleRemote. With `onError`, a channel whose
-// run throws answers with it instead of rejecting.
+// Channels register through the ExtensionAPI, never ipcMain (Extension Isolation), each with the
+// schema its payload is parsed with (ADR 096); local-only unless registered through handleRemote.
+// With `onError`, a channel whose run throws answers with it instead of rejecting.
 export function createIpcRegistrar(
   api: ExtensionAPI,
   onError?: (err: unknown) => unknown

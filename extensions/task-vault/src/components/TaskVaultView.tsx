@@ -330,10 +330,8 @@ function reloadViewedDay(): void {
   else void useVaultDataStore.getState().loadToday()
 }
 
-/**
- * Opens a navigation target: the day (or today), then the task, then an explicit
- * view — after the task, because navigating to a task puts you on the daily log.
- */
+/** Opens the day (or today), then the task, then an explicit view: after the task, because
+ *  navigating to a task puts you on the daily log. */
 function followNavigation(target: NavigationTarget): void {
   const nav = useVaultNavStore.getState()
   const data = useVaultDataStore.getState()
@@ -344,12 +342,8 @@ function followNavigation(target: NavigationTarget): void {
   if (target.view) nav.setView(target.view)
 }
 
-/**
- * Navigation from the calendar arrives on `task-vault:navigate`; one sent before this
- * view existed is popped from main on mount. A second path used to read the core
- * registry's pendingNavigations map — but this view bundles its own copy of that
- * store, so nothing was ever put in the map it was reading.
- */
+/** Calendar navigation arrives on `task-vault:navigate`; one sent before this view existed is
+ *  popped from main on mount. (The core registry's map is not read: this view bundles a copy.) */
 function useNavigationRequests(): void {
   useEffect(() => {
     return window.electronAPI.extensionBridge.on('task-vault:navigate', (data) => {
@@ -366,11 +360,8 @@ function useNavigationRequests(): void {
   }, [])
 }
 
-/**
- * Resets to today whenever the vault panel becomes visible from hidden, so "open vault"
- * lands on today while in-session navigation is kept. skipNextVisibilityReset suppresses
- * it when a calendar navigation already set the target before the panel showed.
- */
+/** Resets to today when the panel becomes visible from hidden, so "open vault" lands on today;
+ *  skipNextVisibilityReset spares a calendar navigation that set the target first. */
 function useVisibilityReset(): void {
   useEffect(() => {
     function onVisibilityChange() {
@@ -626,11 +617,8 @@ function ViewModeToggles(): React.JSX.Element {
   )
 }
 
-/**
- * The view toggles carried `title` alone, so enumerating every button in the running
- * view returned neither: a tooltip is not a label, and never appears for keyboard or
- * touch. IconButton takes the label as a required prop.
- */
+/** Every view toggle is an IconButton, whose label is required: the toggles once carried `title`
+ *  alone, and a tooltip is not a label and never appears for keyboard or touch. */
 function VaultToolbar(props: ToolbarProps): React.JSX.Element {
   const { activeView } = useVaultStore()
   return (

@@ -83,11 +83,8 @@ function CapturedList({ items }: { items: string[] }): React.JSX.Element | null 
   )
 }
 
-/**
- * The filled button always advances. It used to read "Nothing to add — Next",
- * which made the loudest control on every step of a six-step wizard the one
- * that skips it. Skipping stays available, as a link.
- */
+/** The filled button always advances; skipping is a link. It once read "Nothing to add — Next",
+ *  which made the loudest control on every step of the wizard the one that skips it. */
 function StepActions(props: { canSkip: boolean; onComplete: () => void }): React.JSX.Element {
   const { canSkip, onComplete } = props
   return (

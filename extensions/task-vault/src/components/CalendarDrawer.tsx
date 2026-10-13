@@ -162,11 +162,8 @@ function useSelectedDay(todayStr: string) {
   return { selectedDate, pickedADay, selectedDayTasks, loadingDay, pick, refreshTasks }
 }
 
-/**
- * Refreshes the month dots AND the selected day's tasks whenever any task changes.
- * This covers both the embedded drawer (same WebContentsView as TaskVaultView) and
- * the standalone calendar panel (separate WebContentsView with its own store).
- */
+/** Refreshes the month dots and the selected day's tasks whenever any task changes, both in the
+ *  embedded drawer and in the standalone calendar panel, which has its own store. */
 function useIndexRefresh(loadMonth: () => Promise<void>, day: SelectedDay) {
   const selectedDateRef = useRef(day.selectedDate)
   useEffect(() => {
@@ -267,10 +264,7 @@ function MonthGrid(props: GridProps): React.JSX.Element {
   )
 }
 
-/**
- * Until a day is picked, the panel shows the week rather than today's tasks —
- * the same list the main column is already showing.
- */
+/** Until a day is picked, the panel shows the week: today's tasks are already the main column. */
 function WeekSummary({ dayMap, todayStr }: { dayMap: DayMap; todayStr: string }) {
   return (
     <div className="cal-drawer__week">

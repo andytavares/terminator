@@ -97,12 +97,8 @@ function withDefaults(props: DailyLogProps): DailyLogProps & typeof DEFAULTS {
   return { ...DEFAULTS, ...definedFields(props) } as DailyLogProps & typeof DEFAULTS
 }
 
-/**
- * The day's tasks in the context filter: rolled over, then today's active before its
- * finished ones. One empty state, not three: the day is empty when it holds no tasks
- * at all and the backlog under it is empty too; anything less and the sections speak
- * for themselves.
- */
+/** The day's tasks in the context filter: rolled over, then today's active before its finished.
+ *  One empty state, not three: the day is empty only when it and the backlog under it are. */
 function partitionDay(day: Day) {
   const { selectedContexts } = day
   const matches = (t: IndexedTask) =>

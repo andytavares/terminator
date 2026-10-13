@@ -156,10 +156,8 @@ function useTaskEdit(task: IndexedTask, onRefresh: () => Promise<void>) {
   return { editing, setEditing, editText, setEditText, start, save }
 }
 
-/**
- * A click selects after a short wait, so a second click can turn it into an edit;
- * a task that cannot be edited selects at once.
- */
+/** A click selects after a short wait, so a second click can turn it into an edit; a task that
+ *  cannot be edited selects at once. */
 function useClickToSelect(canEdit: boolean, onSelect: (() => void) | undefined, edit: () => void) {
   const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {

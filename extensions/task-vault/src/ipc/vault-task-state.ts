@@ -161,10 +161,8 @@ async function cancelTask({ db }: IpcContext, args: z.infer<typeof CancelTaskReq
   return { success: true }
 }
 
-/**
- * Undoes a migration: drops the twin (and its subtasks), reopens migrated subtasks,
- * and returns the metadata without the twin pointer — or null for an unknown task.
- */
+/** Undoes a migration: drops the twin (and its subtasks), reopens migrated subtasks, and returns
+ *  the metadata without the twin pointer, or null for an unknown task. */
 async function dropMigrationTwin(db: ExtensionDB, taskId: string, now: string) {
   const meta = await readTaskMeta(db, taskId)
   if (!meta) return null

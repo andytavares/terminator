@@ -138,10 +138,8 @@ function useAreaList() {
   return { areas, isLoading, error, statusFilter, changeStatusFilter, load }
 }
 
-/**
- * The area open in the detail view, re-derived whenever the list or the requested
- * area changes: an area no longer listed (deleted or renamed) closes the detail.
- */
+/** The area open in the detail view, re-derived whenever the list or the requested area changes:
+ *  an area no longer listed (deleted or renamed) closes the detail. */
 function useSelectedArea(areas: AreaData[], selectedAreaName: string | null) {
   const [selectedArea, setSelectedArea] = useState<AreaData | null>(null)
   const [syncedSource, setSyncedSource] = useState({ areas, selectedAreaName })

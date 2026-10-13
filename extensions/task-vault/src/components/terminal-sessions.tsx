@@ -6,11 +6,8 @@ export interface TerminalSession {
   tabTitle: string
 }
 
-/**
- * The open terminal sessions, read over the bridge (never from the core's
- * stores), and a label for each: workspace › project › tab. Loads while
- * `enabled`.
- */
+/** The open terminal sessions, read over the bridge (never from the core's stores), with a label
+ *  for each: workspace › project › tab. Loads while `enabled`. */
 export function useTerminalSessions(enabled: boolean): {
   sessions: TerminalSession[]
   labelOf: (session: TerminalSession) => string

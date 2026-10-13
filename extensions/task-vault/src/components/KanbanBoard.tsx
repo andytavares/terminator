@@ -117,10 +117,8 @@ function CardTags({ task }: { task: KanbanTask }): React.JSX.Element {
   )
 }
 
-/**
- * A card. A click right after a drag does not select it (the flag resets a tick
- * after the drag ends), and a link in the description opens itself instead.
- */
+/** A click right after a drag does not select the card (the flag resets a tick after the drag
+ *  ends), and a link in the description opens itself instead. */
 function KanbanCard({ task, board }: { task: KanbanTask; board: Board }): React.JSX.Element {
   const selected = board.selectedTaskId === task.id
   const gestures = useCardGestures(task, board)

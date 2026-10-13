@@ -104,10 +104,8 @@ export interface RecurrenceEndColumns {
   metadata?: string | null
 }
 
-/**
- * End-conditions for a task row: columns first, metadata fallback when the
- * columns say 'none' (matching the historical read semantics).
- */
+/** End-conditions for a task row: the columns first, the metadata when they say 'none', as rows
+ *  were always read. */
 export function readRecurrenceEndState(row: RecurrenceEndColumns): RecurrenceEndMeta {
   const fromColumns = endStateFromColumns(row)
   if (fromColumns.endType !== 'none') return fromColumns

@@ -1,11 +1,8 @@
 import type { ExtensionDB } from '@terminator/extension-sdk'
 import type { ProjectStatus } from './types'
 
-/**
- * Sets the status of the project named (or with id) `project`. Archiving it also
- * cancels every unfinished task in it, subtasks included. False when there is
- * no such project.
- */
+/** Sets the status of the project named (or with id) `project`; archiving also cancels its
+ *  unfinished tasks, subtasks included. False when there is no such project. */
 export async function setProjectStatus(
   db: ExtensionDB,
   project: string,

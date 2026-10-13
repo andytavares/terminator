@@ -205,12 +205,8 @@ function answerWithCapturedItem(): void {
     })
 }
 
-/**
- * The step 1 advance button sits inside the step content, not the header nav.
- * It used to read "Nothing to add — Next", which made the loudest control on
- * the screen the one that skips the step; it now says where it goes, and
- * skipping is a link beside it.
- */
+/** Step 1's advance button sits in the step content, not the header nav, and says where it goes;
+ *  skipping is a link beside it (it once read "Nothing to add — Next"). */
 function weeklyReviewInboxRefreshTests() {
   it('re-fetches inbox items when advancing from Step 1 so captures appear in Step 2', async () => {
     answerWithCapturedItem()

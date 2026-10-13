@@ -184,10 +184,8 @@ function parseMeta(metadata: string): Record<string, string> | null {
   }
 }
 
-/**
- * Whether a blocked task is due a check-in: its interval (or custom date) has passed,
- * and, for a repeating interval, a full interval has passed since the last check-in.
- */
+/** A blocked task is due a check-in once its interval (or custom date) has passed and, for a
+ *  repeating interval, a full interval has passed since the last check-in. */
 function checkInDue(tick: Tick, task: BlockedRow, interval: string): boolean {
   const blockedAt = new Date(task.updated_at).getTime()
   const targetTs = getTargetTimestamp(interval, blockedAt)

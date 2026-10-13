@@ -52,11 +52,8 @@ function fetchReviewPayload(): Promise<WeeklyReviewPayload> {
   ) as Promise<WeeklyReviewPayload>
 }
 
-/**
- * Identifies the persisted review every step records its actions against.
- * Resumes the open review rather than forking a second record, which matters
- * because the step is restored from sessionStorage.
- */
+/** The persisted review every step records its actions against. It resumes the open review
+ *  rather than forking a second record, because the step is restored from sessionStorage. */
 function useReviewRecord(): string | null {
   const [reviewId, setReviewId] = useState<string | null>(null)
   useEffect(() => {
@@ -82,11 +79,8 @@ function useReviewData() {
   return { payload, setPayload, isLoading }
 }
 
-/**
- * Refreshes the inbox before mounting Step 2 so captures from Get Clear appear
- * immediately: Step 2 reads its items only at mount time. A failure is non-fatal,
- * since Step 2 then shows items from the initial load.
- */
+/** Step 2 reads its items only at mount, so the inbox is refreshed first and Get Clear's captures
+ *  show at once. A failure is not fatal: Step 2 then shows the initial load. */
 function refreshInbox(setPayload: SetPayload): Promise<void> {
   return fetchReviewPayload()
     .then((fresh) => {

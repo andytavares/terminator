@@ -66,10 +66,8 @@ interface TriggerProps {
   onToggle: () => void
 }
 
-// ── Value format conventions ──────────────────────────────────────
-// mode='date'     → value = 'YYYY-MM-DD'
-// mode='time'     → value = 'HH:MM'   (24h internally)
-// mode='datetime' → value = 'YYYY-MM-DDTHH:MM'
+// ── Value format conventions: 'YYYY-MM-DD' for mode='date', 'HH:MM' (24h) for mode='time' and
+// 'YYYY-MM-DDTHH:MM' for mode='datetime' ──
 
 // ── Helpers ───────────────────────────────────────────────────────
 
@@ -284,11 +282,8 @@ function popoverPosition(rect: DOMRect): { top: number; left: number } {
   return { top, left: rect.left }
 }
 
-/**
- * Whether the popover is open, and where. Escape and click-outside come from the
- * shared hook; the trigger counts as inside so clicking it to close does not
- * dismiss and immediately reopen.
- */
+/** Whether the popover is open, and where. The trigger counts as inside the shared dismiss hook,
+ *  so a click on it to close does not dismiss and immediately reopen. */
 function usePopover(defaultOpen: boolean | undefined) {
   const [open, setOpen] = useState(false)
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null)

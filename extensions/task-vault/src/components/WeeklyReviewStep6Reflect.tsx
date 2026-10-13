@@ -26,11 +26,8 @@ function ReflectionField({ label, value, onChange }: FieldProps): React.JSX.Elem
   )
 }
 
-/**
- * The reflection is stored on the review record itself. It used to be
- * flattened into a single inbox task, which made the review unreadable
- * afterwards and cluttered the inbox.
- */
+/** The reflection is stored on the review record, not flattened into an inbox task as it once
+ *  was, which made the review unreadable afterwards and cluttered the inbox. */
 async function completeReview(reviewId: string | null, answers: Record<string, string>) {
   if (!reviewId) return
   await window.electronAPI.extensionBridge

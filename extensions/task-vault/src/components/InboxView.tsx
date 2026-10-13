@@ -64,10 +64,8 @@ async function fetchInbox(): Promise<InboxOutcome> {
   }
 }
 
-/**
- * The inbox items, reloaded on demand and whenever the index changes. Each load
- * keeps the store's inboxCount in sync so the sidebar badge is always accurate.
- */
+/** The inbox items, reloaded on demand and whenever the index changes. Each load keeps the
+ *  store's inboxCount in step, so the sidebar badge is right. */
 function useInbox() {
   const [items, setItems] = useState<IndexedTask[]>([])
   const [isLoading, setIsLoading] = useState(true)

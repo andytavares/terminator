@@ -40,10 +40,8 @@ export function draftOf(edit: TaskEditState): TaskTextDraft {
   }
 }
 
-/**
- * A task's tagged text as a draft: a blank one saves nothing; Save writes it,
- * closes the editor and then reloads what shows the task.
- */
+/** A task's tagged text as a draft: a blank one saves nothing; Save writes it, closes the editor
+ *  and then reloads what shows the task. */
 export function useTaskTextDraft(
   task: IndexedTask,
   close: () => void,

@@ -224,11 +224,8 @@ function usePicker(props: PickerProps) {
   return { query, setQuery, loading, options, highlighted, setHighlighted, select, onKeyDown }
 }
 
-/**
- * Picks where to file a task. Escape already worked while focus sat in the field;
- * useDismissible adds the two that did not — a click outside, and focus returning
- * to whatever opened it.
- */
+/** Picks where to file a task. useDismissible adds what Escape in the field did not cover: a click
+ *  outside, and focus returning to whatever opened it. */
 export function FileToPicker(props: PickerProps): React.JSX.Element {
   const picker = usePicker(props)
   const inputRef = useRef<HTMLInputElement>(null)

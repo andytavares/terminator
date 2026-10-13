@@ -68,13 +68,8 @@ function ymd(d: Date): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
 
-/**
- * The heading spent its largest type on the least useful fact.
- *
- * "Saturday" was set at ~48px with the date it belongs to as secondary text
- * underneath. You know what day it is; the date is what you are navigating by,
- * so they share one line and the date carries the weight.
- */
+/** The date shares the weekday's line and carries the weight: you navigate by the date, and you
+ *  know what day it is (the weekday was once ~48px with the date small beneath it). */
 export function formatDate(iso: string): { weekday: string; detail: string } {
   const [y, m, d] = iso.split('-').map(Number)
   const dt = new Date(y, m - 1, d)
@@ -204,11 +199,8 @@ export function isStaleSince(todaySince: string | undefined, thresholdDays?: num
   return todaySince <= ymd(cutoff)
 }
 
-/**
- * Leads back to the task. No tab activation here: this row is already inside the
- * vault view, so the user is looking at it. The call that used to be here reached a
- * copy of the core registry bundled into this view and moved nothing.
- */
+/** Leads back to the task, already inside the vault view. (A tab activation once here reached a
+ *  copy of the core registry bundled into this view and moved nothing.) */
 export function makeTaskNavHandler(taskId: string): () => void {
   return () => useVaultNavStore.getState().navigateToTask(taskId)
 }

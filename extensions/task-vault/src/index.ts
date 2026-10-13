@@ -271,10 +271,8 @@ async function registerCaptureShortcut(api: ExtensionAPI): Promise<void> {
   }
 }
 
-/**
- * Registered unconditionally: the quick-actions command must not depend on
- * the global hotkey having claimed its accelerator.
- */
+/** Registered unconditionally: the quick-actions command must not depend on the global hotkey
+ *  having claimed its accelerator. */
 function registerCaptureCommand(api: ExtensionAPI): void {
   disposables.push(
     api.commands.register(
