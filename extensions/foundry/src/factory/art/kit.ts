@@ -5,6 +5,7 @@
 // shape is exactly the handful of CanvasRenderingContext2D members the art
 // actually uses, never the whole API.
 
+/** What a radial gradient takes; specs fake one. @internal */
 export interface PaintGradient {
   addColorStop(offset: number, color: string): void
 }
