@@ -170,11 +170,8 @@ async function hasVerifyHook(repoRoot: string): Promise<boolean> {
   return installed.includes(true)
 }
 
-/**
- * A hook that exits non-zero aborts the commit, and git prints nothing of its
- * own beside the hook's output (https://git-scm.com/docs/githooks#_pre_commit);
- * git's own failures say `fatal:` or `error:`.
- */
+/** A hook exiting non-zero aborts the commit and git prints nothing beside the hook's output
+ *  (https://git-scm.com/docs/githooks#_pre_commit); git's own failures say `fatal:` or `error:`. */
 async function plainHookFailed(repoRoot: string, output: string): Promise<boolean> {
   if (/^(fatal|error):/m.test(output)) return false
   return hasVerifyHook(repoRoot).catch(() => false)

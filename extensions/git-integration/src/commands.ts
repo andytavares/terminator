@@ -20,12 +20,9 @@ const PENDING_REQUEST_MS = 5000
 let pendingRequest: ViewRequest | null = null
 let pendingTimer: ReturnType<typeof setTimeout> | null = null
 
-/**
- * Brings the Git tab forward and asks its view to act. A view that is already
- * open hears the broadcast; one the tab is only now creating collects the
- * request on mount (consumePendingViewRequest), within five seconds, the shape
- * Notepad and Foundry use for the same race.
- */
+/** Brings the Git tab forward and asks its view to act. An open view hears the broadcast; one the
+ *  tab is only now creating collects it on mount (consumePendingViewRequest), within five seconds,
+ *  as Notepad and Foundry do for the same race. */
 function requestOfView(api: ExtensionAPI, request: ViewRequest): void {
   api.window.showSelf('project')
   api.window.broadcast(VIEW_REQUEST_CHANNEL[request.kind], { repoRoot: request.repoRoot })

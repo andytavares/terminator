@@ -5,10 +5,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { runAgentReview, type RunAgentReviewInput } from '../../src/review/review-agent'
 
-// A real `claude` starts processes of its own (its tools' shells, MCP servers).
-// Cancelling a review, which the extension does for every run as it is
-// deactivated, must end those too, not only `claude`. The stand-in claude here
-// starts a `sleep` and writes the sleep's pid down.
+// A real `claude` starts processes of its own (tools' shells, MCP servers); cancelling a review,
+// as deactivation does for every run, must end those too. This stand-in claude starts a `sleep`
+// and writes its pid down.
 
 const scratch = mkdtempSync(join(tmpdir(), 'review-agent-group-'))
 const pidFile = join(scratch, 'grandchild.pid')

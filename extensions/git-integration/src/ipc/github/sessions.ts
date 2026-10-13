@@ -16,10 +16,8 @@ interface KeyedSession {
 const sessionStore = () => namedStore('pr-review-sessions')
 const activeReviewStore = () => namedStore('pr-active-reviews')
 
-/**
- * One session per PR. v2 keys are "repo:::pr"; v1 keys are "repo:::pr:::sha".
- * When both exist for the same PR, the new key wins — it's the one v2 code keeps current.
- */
+/** One session per PR. v2 keys are "repo:::pr"; v1 keys are "repo:::pr:::sha". When both exist for
+ *  a PR the v2 key wins: it is the one v2 code keeps current. */
 export function sessionsForRepo(
   stored: Record<string, unknown>,
   repoRoot: string
@@ -54,10 +52,8 @@ async function activeReviewsFor(repoRoot: string): Promise<unknown[]> {
     .map((entry) => entry.pr)
 }
 
-/**
- * Forgets a PR: its active-review snapshot and its sessions, "repo:::pr" and v1's
- * "repo:::pr:::sha", so it does not reappear as in progress on the next load.
- */
+/** Forgets a PR: its active-review snapshot and its sessions, "repo:::pr" and v1's
+ *  "repo:::pr:::sha", so it does not reappear as in progress on the next load. */
 async function removeActiveReview(repoRoot: string, prNumber: number): Promise<void> {
   const [activeReviews, sessions] = await Promise.all([activeReviewStore(), sessionStore()])
   activeReviews.delete(`${repoRoot}:${prNumber}`)
@@ -127,10 +123,8 @@ function sessionChannels(): ChannelSpec[] {
   return [sessionsForRepoChannel(), sessionGetChannel(), sessionSetChannel()]
 }
 
-/**
- * A ReviewQueuePR snapshot per in-progress review, keyed "<repoRoot>:<prNumber>", so it shows
- * on every load whichever page it falls on; removed when dismissed or closed.
- */
+/** A ReviewQueuePR snapshot per in-progress review, keyed "<repoRoot>:<prNumber>", so it shows on
+ *  every load whichever page it falls on; removed when dismissed or closed. */
 function saveActiveReviewChannel(): ChannelSpec {
   return defineChannel({
     channel: 'github:save-active-review',

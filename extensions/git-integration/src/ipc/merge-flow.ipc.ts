@@ -79,11 +79,9 @@ async function readBlockFile(repoRoot: string, blockId: string): Promise<BlockFi
   return { fullPath, filePath, index, content: await readFile(fullPath, 'utf-8') }
 }
 
-/**
- * The text a resolution replaces: the block's original conflict text, which stays findable
- * however many blocks are resolved; else its previous resolution; else (for sessions started
- * before the text was kept) the block at its index. Null when no markers remain for it.
- */
+/** The text a resolution replaces: the block's original conflict text (findable however many
+ *  blocks are resolved), else its previous resolution, else (sessions from before the text was
+ *  kept) the block at its index. Null when no markers remain for it. */
 function textToReplace(file: BlockFile, payload: z.infer<typeof ResolvePayload>): string | null {
   const { originalConflictText, currentResolvedText } = payload
   if (originalConflictText && file.content.includes(originalConflictText))
@@ -93,10 +91,8 @@ function textToReplace(file: BlockFile, payload: z.infer<typeof ResolvePayload>)
   return target?.originalConflictText ?? null
 }
 
-/**
- * A block with no markers left was consumed by an earlier resolution; that still answers
- * success, so the session can finish navigating, and the file stays as it is.
- */
+/** A block with no markers left was consumed by an earlier resolution; that still answers success,
+ *  so the session can finish navigating, and the file stays as it is. */
 async function resolveConflict(payload: z.infer<typeof ResolvePayload>) {
   const file = await readBlockFile(payload.repoRoot, payload.blockId)
   const from = textToReplace(file, payload)
@@ -116,10 +112,8 @@ async function undoResolve(payload: z.infer<typeof UndoPayload>) {
   return { success: true }
 }
 
-/**
- * Pushes to the branch's upstream, named explicitly: the local branch (conflict-resolve/foo)
- * differs from the remote one (origin/foo). Best-effort: a local merge may have no upstream.
- */
+/** Pushes to the branch's upstream, named explicitly: the local branch (conflict-resolve/foo)
+ *  differs from the remote one (origin/foo). Best-effort: a local merge may have no upstream. */
 async function pushToUpstream(repoRoot: string): Promise<string | undefined> {
   try {
     const upstream = await git(
@@ -148,10 +142,8 @@ async function mergeCommit(repoRoot: string, resolvedFilePaths: string[], commit
   return { commitHash, pushError: await pushToUpstream(repoRoot) }
 }
 
-/**
- * The first of `refs` missing locally. Nothing is fetched: a fetch changes shared git state and
- * can collide with other work in the repo; the caller's status polling keeps the refs current.
- */
+/** The first of `refs` missing locally. Nothing is fetched: a fetch changes shared git state and can
+ *  collide with other work in the repo; the caller's status polling keeps the refs current. */
 async function missingRef(repoRoot: string, refs: string[]): Promise<string | undefined> {
   const present = await Promise.all(
     refs.map((ref) =>
@@ -182,10 +174,8 @@ function removeWorktree(payload: z.infer<typeof PreparePayload>): Promise<unknow
   return git(args, payload.repoRoot).catch(() => {})
 }
 
-/**
- * A worktree of the PR's remote head on a fresh local branch, conflict-resolve/<head>, so it is
- * never "already checked out" elsewhere, then the base merged in to produce conflict markers.
- */
+/** A worktree of the PR's remote head on a fresh local branch, conflict-resolve/<head>, so it is
+ *  never "already checked out" elsewhere, then the base merged in to produce conflict markers. */
 async function preparePrWorktree(payload: z.infer<typeof PreparePayload>) {
   const headRemote = `origin/${payload.headRefName}`
   const baseRemote = `origin/${payload.baseRefName}`

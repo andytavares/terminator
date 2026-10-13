@@ -78,10 +78,8 @@ type ListRef = React.RefObject<VirtualDiffListHandle>
 
 type PaneState = ReturnType<typeof useReviewDiffPane>
 
-/**
- * Which diff to show. Only a since-range view reads when the file was last viewed: depending
- * on the whole viewedAt map would refetch the open file every time it is marked viewed.
- */
+/** Which diff to show. Only a since-range view reads when the file was last viewed: depending on
+ *  the whole viewedAt map would refetch the open file every time it is marked viewed. */
 function diffRequest(props: Props, store: ReviewStore, ui: UiStore) {
   const { pr, file } = props
   const changedSince = store.changedSince.has(file.path)

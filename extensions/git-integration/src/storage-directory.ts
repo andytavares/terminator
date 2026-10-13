@@ -15,11 +15,8 @@ type StoreName = (typeof STORE_NAMES)[number]
 
 let directory: string | undefined
 
-/**
- * Opens this extension's own folder, `api.paths.globalStorage`, for the stores,
- * after moving the ones earlier builds kept in the shared userData folder. The
- * extension host has no `electron.app` for electron-store to find it with.
- */
+/** Opens `api.paths.globalStorage` for the stores, after moving the ones earlier builds kept in the
+ *  shared userData folder. The extension host has no `electron.app` for electron-store. */
 export function openStorageDirectory(api: ExtensionAPI): string {
   const folder = api.paths.globalStorage
   moveFromUserData(
@@ -33,10 +30,8 @@ export function openStorageDirectory(api: ExtensionAPI): string {
 
 const opened = new Map<StoreName, Promise<Store<Record<string, unknown>>>>()
 
-/**
- * The named store in that directory, opened on first use. electron-store is
- * imported then, not at activation: it costs the extension host 17 MB.
- */
+/** The named store in that directory, opened on first use. electron-store is imported then, not at
+ *  activation: it costs the extension host 17 MB. */
 export function namedStore<T = unknown>(name: StoreName): Promise<Store<Record<string, T>>> {
   let store = opened.get(name)
   if (!store) {

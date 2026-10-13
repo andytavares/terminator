@@ -28,11 +28,8 @@ function inRange(lineNum: number, a: number, b: number): boolean {
   return lineNum >= Math.min(a, b) && lineNum <= Math.max(a, b)
 }
 
-/**
- * Gutter drag selects lines; it no longer opens the composer. The float bar (SelectionBar)
- * that appears under the selection offers Comment, Ask agent, Explain and Add note instead.
- * Releasing the mouse anywhere ends the drag and stores the selection.
- */
+/** A gutter drag selects lines and, released anywhere, stores the selection; the SelectionBar under
+ *  it then offers Comment, Ask agent, Explain and Add note. */
 function useDragEnd(
   target: SelectionTarget,
   refs: { drag: { current: DragState }; justEnded: { current: boolean } },

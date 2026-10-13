@@ -76,10 +76,8 @@ async function loadFullDiff(req: DiffRequest, cb: LoadCallbacks, note: string | 
   }
 }
 
-/**
- * Shows the file's part of the comparison; otherwise says which note the whole diff, shown
- * instead, carries: the rewritten-history note when the history was rewritten.
- */
+/** Shows the file's part of the comparison; otherwise says which note the whole diff shown instead
+ *  carries: the rewritten-history note when the history was rewritten. */
 function showComparison(cmp: CompareAnswer, req: DiffRequest, cb: LoadCallbacks) {
   if ('error' in cmp) return { fallbackNote: null }
   if (cmp.rewritten) {
@@ -162,10 +160,8 @@ function sinceNoteOf(cached: CachedDiff | undefined, rewrittenFor: string | null
   return null
 }
 
-/**
- * The file's diff for the current range, cached per key: the diff once loaded, the error
- * when it failed, the note to show beside it, and whether it is still loading.
- */
+/** The file's diff for the current range, cached per key: the diff once loaded, the error when it
+ *  failed, the note to show beside it, and whether it is still loading. */
 export function useDiffLoad(req: DiffRequest, isBinary: boolean) {
   const [diffCache, setDiffCache] = useState<Map<string, CachedDiff>>(() => new Map())
   const [diffFailure, setDiffFailure] = useState<{ key: string; message: string } | null>(null)

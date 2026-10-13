@@ -9,10 +9,8 @@ import { runGit } from '../shell/run-git.js'
 export interface GithubAccess {
   github: GithubAPI
   getToken: () => string
-  /**
-   * Where gh runs when it needs no checkout (`GH_REPO`, `gh api user`):
-   * this extension's own `api.paths.globalStorage`, a shell root (ADR 103).
-   */
+  /** Where gh runs when it needs no checkout (`GH_REPO`, `gh api user`): this extension's own
+   *  `api.paths.globalStorage`, a shell root (ADR 103). */
   noCheckoutCwd: string
 }
 

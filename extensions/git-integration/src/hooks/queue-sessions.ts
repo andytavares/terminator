@@ -44,10 +44,8 @@ async function stillOpen(repoRoot: string, numbers: number[]): Promise<Set<numbe
   return new Set(numbers)
 }
 
-/**
- * In-progress reviews saved as active that are not on this page and are still open, so an
- * in-progress PR shows whichever page it falls on; a closed or merged one leaves the store.
- */
+/** In-progress reviews saved as active, not on this page and still open, so an in-progress PR shows
+ *  whichever page it falls on; a closed or merged one leaves the store. */
 async function openOrphans(
   repoRoot: string,
   prs: ReviewQueuePR[],
@@ -68,10 +66,8 @@ async function openOrphans(
     .map((pr) => withSession(pr, latestByPr.get(pr.number)))
 }
 
-/**
- * Each PR with its stored session's progress, after any open orphans. An appended page skips
- * the orphans, which the first page already added. Best-effort: on failure, `prs` as they are.
- */
+/** Each PR with its stored session's progress, after any open orphans (an appended page skips them:
+ *  the first page added them). Best-effort: on failure, `prs` as they are. */
 export async function mergeSessionStatuses(
   repoRoot: string,
   prs: ReviewQueuePR[],

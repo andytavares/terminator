@@ -25,10 +25,7 @@ const defaultExec: ExecFn = async (_cmd, args, opts) => ({
   stdout: await runGit(opts.cwd, args, { raw: true, maxBuffer: 20 * 1024 * 1024 }),
 })
 
-/**
- * Minimal shape a spawned `claude` child needs — real ChildProcess satisfies this.
- * @internal
- */
+/** Minimal shape a spawned `claude` child needs; a real ChildProcess satisfies it. @internal */
 export interface SpawnedProcess {
   stdin: { write(data: string): void; end(): void }
   stdout: { on(event: 'data', cb: (d: Buffer | string) => void): void }
@@ -44,12 +41,9 @@ type SpawnFn = (
   opts: { cwd: string; env: Record<string, string> }
 ) => SpawnedProcess
 
-/**
- * claude leads a process group of its own, and kill() signals the whole group,
- * so cancelling a run also ends what claude started (its tools' shells, MCP
- * servers): https://nodejs.org/api/child_process.html#optionsdetached. Not on
- * Windows, where `detached` gives the child a console of its own instead.
- */
+/** claude leads its own process group and kill() signals the whole group, so a cancel also ends
+ *  what claude started (https://nodejs.org/api/child_process.html#optionsdetached). Not on Windows,
+ *  where `detached` gives the child a console of its own instead. */
 const OWN_PROCESS_GROUP = process.platform !== 'win32'
 
 /** Signals `child` and, on POSIX, every process in its group. */
@@ -72,10 +66,8 @@ function defaultSpawn(
   return Object.assign(child, { kill })
 }
 
-/**
- * The last absolute path in a shell's `command -v` output; rc files may print before it.
- * @internal
- */
+/** The last absolute path in a shell's `command -v` output; rc files may print before it.
+ *  @internal */
 export function claudeFromShellOutput(stdout: string): string | null {
   const paths = stdout
     .split('\n')
@@ -101,11 +93,8 @@ async function defaultResolveClaude(control: RunControl): Promise<string> {
 
 const LOGIN_SHELL_TIMEOUT_MS = 10_000
 
-/**
- * The output of `command -v claude` in the login shell, or '' when it fails.
- * The shell leads a process group of its own, which its timeout and a cancel
- * of the run stop whole: the person's rc files can start processes of their own.
- */
+/** `command -v claude` in the login shell, or '' when it fails. The shell leads its own process
+ *  group, which its timeout and a cancel stop whole: rc files can start processes of their own. */
 function askLoginShell(control: RunControl): Promise<string> {
   return new Promise((resolve) => {
     const shell = spawnCb(process.env.SHELL || '/bin/zsh', ['-ilc', 'command -v claude'], {
@@ -291,10 +280,7 @@ export function buildClaudeArgs(input: BuildClaudeArgsInput): string[] {
 
 // ─── Diff text ─────────────────────────────────────────────────────────────
 
-/**
- * Where to diff: the PR's worktree, its base branch and head, narrowed to `scope`.
- * @internal
- */
+/** Where to diff: the PR's worktree, its base branch and head, narrowed to `scope`. @internal */
 export interface DiffTarget {
   worktreePath: string
   baseRefName: string

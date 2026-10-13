@@ -217,10 +217,8 @@ function registerChannels(api: ExtensionAPI, roots: ChannelRoots): void {
   disposables.push(reviewAgent)
 }
 
-/**
- * Bridges this extension's renderer (an isolated webview, no direct access to
- * api.notifications) to the shared notification dispatcher.
- */
+/** Bridges this extension's renderer (an isolated webview, with no api.notifications) to the shared
+ *  notification dispatcher. */
 function notifyChannel(api: ExtensionAPI): ChannelSpec {
   return defineChannel({
     channel: 'git:notify',

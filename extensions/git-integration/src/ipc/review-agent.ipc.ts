@@ -277,11 +277,8 @@ function storedRunChannels(deps: ReviewAgentDeps): ChannelSpec[] {
   ]
 }
 
-/**
- * Registers the review agent's channels. Disposing the result cancels every run
- * still going: its `claude` is this process's child, and an extension host that
- * quits does not take its children with it, so a run left alone outlives the app.
- */
+/** Disposing the result cancels every run still going: its `claude` is this process's child, and
+ *  a quitting extension host leaves its children running, so a run left alone outlives the app. */
 export function registerReviewAgentHandlers(
   register: RegisterFn,
   deps: ReviewAgentDeps

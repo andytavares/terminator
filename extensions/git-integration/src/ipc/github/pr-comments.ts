@@ -64,10 +64,8 @@ function specificError(
   return undefined
 }
 
-/**
- * GitHub's own reason a review was refused, else gh's output, else the error. gh api writes
- * GitHub's JSON error to stdout; stderr only says "gh: Unprocessable Entity (HTTP 422)".
- */
+/** GitHub's own reason a review was refused, else gh's output, else the error. gh api writes the
+ *  JSON error to stdout; stderr only says "gh: Unprocessable Entity (HTTP 422)". */
 function reviewSubmitError(e: unknown): { error: string } {
   const err = e as { stderr?: string; stdout?: string }
   const ghOutput = (err.stdout || err.stderr || '').trim()
@@ -118,10 +116,8 @@ async function inlineComments(ctx: GithubContext, at: PrAt) {
   return { comments, resolvedCommentIds: await resolvedCommentIds(ctx, at) }
 }
 
-/**
- * Issue comments and review bodies, oldest first. A body submitted with "Submit review"
- * lives at /pulls/{n}/reviews, not /issues/{n}/comments, so the two are merged.
- */
+/** Issue comments and review bodies, oldest first. A body sent with "Submit review" lives at
+ *  /pulls/{n}/reviews, not /issues/{n}/comments, so the two are merged. */
 async function issueComments(ctx: GithubContext, at: PrAt) {
   const [issueRaw, reviewsRaw] = await Promise.all([
     ctx.api(at.repoRoot, {
@@ -158,10 +154,8 @@ function reviewComment(c: DraftComment): Record<string, unknown> {
   return entry
 }
 
-/**
- * Submits a review. Drafts (S5) go in the same POST, so they land as one review rather than
- * separate calls; an empty body is left out, since GitHub rejects it for some events.
- */
+/** Submits a review. Drafts (S5) go in the same POST, so they land as one review; an empty body is
+ *  left out, since GitHub rejects it for some events. */
 async function submitReview(ctx: GithubContext, payload: z.infer<typeof ReviewSubmitPayload>) {
   const { repoRoot, prNumber, event, body, comments } = payload
   const { owner, repo } = await ctx.ownerAndName(repoRoot)

@@ -171,11 +171,8 @@ function ChangedSinceItem({ count }: { count: number }) {
   )
 }
 
-/**
- * S2: shown over the diff area when a stored session's lastAccessedAt is
- * more than 15 minutes old, so the reviewer sees where they left off before
- * anything else renders.
- */
+/** S2: shown over the diff area when a stored session's lastAccessedAt is over 15 minutes old, so
+ *  the reviewer sees where they left off before anything else renders. */
 export function ResumeCard(props: Props) {
   const findings = unopenedFindingsOf(props.agentRuns)
   const { notes, drafts, changedSinceCount } = props

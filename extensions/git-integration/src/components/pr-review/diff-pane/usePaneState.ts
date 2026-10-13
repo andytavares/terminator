@@ -247,11 +247,9 @@ function splitRowsOf(diff: FileDiff | null) {
   return (diff?.hunks ?? []).map((hunk) => buildSplitRows(hunk.lines))
 }
 
-/**
- * Feeds the diff's complexity delta into the file's risk score whenever the diff changes.
- * The chapters and the store action are read through refs: as dependencies they would loop
- * (patching updates the PR's chapters, which would refetch the diff and blank the pane).
- */
+/** Feeds the diff's complexity delta into the file's risk score. The chapters and the store action
+ *  are read through refs: as dependencies they would loop (patching updates the chapters, which
+ *  would refetch the diff and blank the pane). */
 export function useComplexityPatch(target: ComplexityTarget) {
   const patchRef = useRef(target.patchFileComplexity)
   const chaptersRef = useRef<Chapter[]>(target.chapters)

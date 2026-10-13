@@ -19,10 +19,8 @@ export interface GapView {
   below: DiffLine[]
 }
 
-/**
- * One entry of the review diff's virtual list. Each renders as its own block so
- * the list can mount only the entries near the viewport.
- */
+/** One entry of the review diff's virtual list, rendered as its own block so the list can mount
+ *  only the entries near the viewport. */
 export type DiffItem =
   | { kind: 'notice'; key: string; hiddenCount: number }
   | { kind: 'gap-line'; key: string; line: DiffLine }

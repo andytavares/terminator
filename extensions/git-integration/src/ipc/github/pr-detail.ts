@@ -93,10 +93,8 @@ function assigneeLoginsOf(meta: RawRecord): string[] {
   return assignees.map((a) => String(a.login ?? '')).filter(Boolean)
 }
 
-/**
- * The PR's check rollup; when it is empty (checks queued but not yet reported), its head's
- * check suites, so "Expected" checks show. Best-effort: a failed lookup keeps the rollup.
- */
+/** The PR's check rollup; when empty (checks queued, not yet reported), its head's check suites, so
+ *  "Expected" checks show. Best-effort: a failed lookup keeps the rollup. */
 async function checkRollup(ctx: GithubContext, meta: RawRecord, where: RepoAt) {
   const rollup = meta.statusCheckRollup
   const headSHA = String(meta.headRefOid ?? '')

@@ -52,10 +52,8 @@ const KEY_ACTIONS: Record<string, KeyAction> = {
   '?': (_h, ui) => ui.setKeyboardHelpOpen(!ui.keyboardHelpOpen),
 }
 
-/**
- * Handles the `g d` chord (peek definition): `g` starts it, `d` within a second ends it.
- * True when the key was part of the chord; any other key cancels a started one.
- */
+/** The `g d` chord (peek definition): `g` starts it, `d` within a second ends it. True when the key
+ *  was part of the chord; any other key cancels a started one. */
 function chordKey(key: string, gPressedAtRef: { current: number | null }): boolean {
   if (key === 'g') {
     gPressedAtRef.current = Date.now()

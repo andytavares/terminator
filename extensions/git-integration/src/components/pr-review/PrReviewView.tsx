@@ -63,10 +63,8 @@ const LIST_MODE_OPTIONS = [
 type ReviewStore = ReturnType<typeof usePrReviewStore.getState>
 type FileOrder = ReviewStore['fileOrderOverrides']
 
-/**
- * In focus mode each chapter keeps only its medium and high risk files and an all-low chapter
- * is dropped; if that would drop every chapter (the whole PR is low risk) all are shown.
- */
+/** In focus mode each chapter keeps only its medium and high risk files and an all-low chapter is
+ *  dropped; if that would drop every chapter (the whole PR is low risk) all are shown. */
 function focusedPr(pr: PrReviewDetail, focusMode: boolean): PrReviewDetail {
   if (!focusMode) return pr
   const filteredChapters = pr.chapters

@@ -59,11 +59,8 @@ function useQueueRefresh(onRefresh: Props['onRefresh']) {
 
 type QueueRefresh = ReturnType<typeof useQueueRefresh>
 
-/**
- * One line of triage, not four tiles. Two of the four routinely read "0", half the row
- * spent saying nothing is wrong, and two labels carried instructions inside them. A label
- * names a metric; what to do with it belongs in the grouping below, which already says.
- */
+/** One line of triage, not four tiles: a label names a metric, and what to do about it belongs in
+ *  the grouping below. Why: README.md, "Why the review screen works as it does". */
 function TriageBand({ store, refresh }: { store: QueueStore; refresh: QueueRefresh }) {
   const { prQueue, totalPrCount } = store
   // Reading time is only knowable for the PRs actually loaded, so it is

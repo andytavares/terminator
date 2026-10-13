@@ -73,10 +73,8 @@ async function writeResolution(deps: ResolveDeps, choice: Pending): Promise<bool
   return false
 }
 
-/**
- * Saves the session (read after the decision, so the new text is in it), then finishes or
- * moves on. Re-resolving an already-resolved block stays on it so the user can keep reviewing.
- */
+/** Saves the session (read after the decision, so the new text is in it), then finishes or moves
+ *  on. Re-resolving an already-resolved block stays on it so the user can keep reviewing. */
 function afterDecision(deps: ResolveDeps, wasAlreadyResolved: boolean): void {
   const current = useMergeFlowStore.getState().session
   if (!current) return

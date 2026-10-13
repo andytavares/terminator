@@ -72,10 +72,8 @@ function requestFor(request: ComposerRequest | null, path: string): ComposerRequ
   return request
 }
 
-/**
- * A request from elsewhere (the agent panel, a finding) opens the composer in this file,
- * prefilled, then clears the one-shot request.
- */
+/** A request from elsewhere (the agent panel, a finding) opens the composer in this file,
+ *  prefilled, then clears the one-shot request. */
 export function useComposerRequest(source: ComposerRequestSource): void {
   const { composerRequest, requestComposer } = source
   const requestForThisFile = requestFor(composerRequest, source.path)
@@ -89,11 +87,8 @@ export function useComposerRequest(source: ComposerRequestSource): void {
   }, [requestForThisFile, requestComposer])
 }
 
-/**
- * Moves between hunks; past the first or last it moves to the previous or next file. Which
- * hunk was last scrolled to is kept, since jsdom (and some real layouts) cannot be trusted
- * to report bounding-rect positions.
- */
+/** Moves between hunks, past the first or last into the previous or next file. The last hunk
+ *  scrolled to is kept, since jsdom (and some real layouts) report untrustworthy rects. */
 export function useHunkNav(src: HunkNavSource) {
   const { items, diffKey, onPrevFile, onNextFile, listRef } = src
   const currentHunkIndexRef = useRef(0)
@@ -166,10 +161,8 @@ function keyEventHandlers(src: KeyEventSource): Array<[string, () => void]> {
   ]
 }
 
-/**
- * REVIEW_KEY_EVENTS: the surface-level key handler (useReviewKeys, owned elsewhere) raises
- * these; only the pane knows its hunks and selection.
- */
+/** REVIEW_KEY_EVENTS: the surface-level key handler (useReviewKeys) raises these; only the pane
+ *  knows its hunks and selection. */
 export function useReviewKeyEvents(src: KeyEventSource): void {
   const { selection, path, diff, scrollHunkIntoView, openAgentPanel, selectionTouchesRevealed } =
     src

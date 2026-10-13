@@ -42,10 +42,8 @@ function commentedLineKeys(threads: Thread[]): Set<string> {
   return set
 }
 
-/**
- * Comment visibility (R2): all shows every thread (resolved dimmed); unresolved hides
- * resolved and outdated; hidden shows none, only a pip.
- */
+/** Comment visibility (R2): all shows every thread (resolved dimmed); unresolved hides resolved and
+ *  outdated; hidden shows none, only a pip. */
 function visibleThreads(all: Thread[], visibility: CommentVisibility): Thread[] {
   if (visibility === 'hidden') return []
   if (visibility === 'unresolved') return all.filter((t) => !t.resolved && !t.outdated)
@@ -126,10 +124,8 @@ function chipsFor(insights: Insights, path: string): Map<number, GutterChip> {
   return chips
 }
 
-/**
- * The gutter column is as wide as the widest chip it holds; a table squeezes an unsized
- * cell below its content, which let the chip overlap the code.
- */
+/** As wide as the widest chip it holds: a table squeezes an unsized cell below its content, which
+ *  let the chip overlap the code. */
 function gutterWidthFor(insights: Insights, path: string): number {
   const labels = risingFunctions(insights, path).map((fn) => chipFor(fn, insights).label)
   const widest = Math.max(0, ...labels.map((l) => l.length))

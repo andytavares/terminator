@@ -1,9 +1,7 @@
 import { dispatchChannel, type ChannelSpec } from '@terminator/extension-sdk'
 
-/**
- * Collects the channels a `register*Handlers` function registers and answers
- * an invoke of one as the core does: the payload is parsed before `run`.
- */
+/** Collects the channels a `register*Handlers` function registers and answers an invoke of one as
+ *  the core does: the payload is parsed before `run`. */
 export function channelRegistry() {
   const specs = new Map<string, ChannelSpec>()
   return {

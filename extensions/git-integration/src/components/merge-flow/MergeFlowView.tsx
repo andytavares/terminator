@@ -116,11 +116,8 @@ function useFlowActions(): FlowContext['store'] {
   )
 }
 
-/**
- * The merge flow's state. The session outlives the view: it is kept until the merge is
- * committed or aborted, and opens once per repository, with the context of the render that
- * opened it.
- */
+/** The session outlives the view: kept until the merge is committed or aborted, and opened once
+ *  per repository, with the context of the render that opened it. */
 function useMergeFlow(props: Props) {
   const { repoRoot, onExit } = props
   const session = useMergeFlowStore((s) => s.session)

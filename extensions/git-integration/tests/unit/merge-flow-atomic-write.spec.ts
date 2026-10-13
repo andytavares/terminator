@@ -14,9 +14,8 @@ import { registerMergeFlowHandlers } from '../../src/ipc/merge-flow.ipc'
 import { bindWorkspaceRoots } from '../../src/ipc/repo-root'
 import { channelRegistry } from './support/channels'
 
-// A decision in the Conflict Solver rewrites the conflicted file on disk.
-// Written in place, a reader in between (git, an editor, a watcher) sees it
-// empty; replaced by rename, it sees the old file or the new one, never less
+// A Conflict Solver decision rewrites the file. Written in place, a reader in between (git, an
+// editor, a watcher) sees it empty; replaced by rename it sees the old file or the new one
 // (https://nodejs.org/api/fs.html#fspromisesrenameoldpath-newpath, rename(2)).
 
 const CONFLICT = '<<<<<<< HEAD\nours\n=======\ntheirs\n>>>>>>> feature'

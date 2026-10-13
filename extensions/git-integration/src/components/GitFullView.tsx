@@ -61,10 +61,8 @@ interface PendingRequestTargets {
   openPrDialog: () => void
 }
 
-/**
- * A Commit… or Create PR… run before this view existed broadcast to nobody; the
- * request waits in the backend for the view to collect it on mount.
- */
+/** A Commit… or Create PR… run before this view existed broadcast to nobody; the request waits
+ *  in the backend for the view to collect it on mount. */
 function usePendingViewRequest(repoRoot: string | null, targets: PendingRequestTargets): void {
   const { commitMessageRef, openPrDialog } = targets
   useEffect(() => {
@@ -133,10 +131,8 @@ function useFileDiff(repoRoot: string | null) {
   return { selectedDiff: cached || null, handleFileSelect }
 }
 
-/**
- * The commit's progress: "hooks" while hook output streams in, "committing" after three
- * quiet seconds. Hook output is polled every 300ms while a commit runs.
- */
+/** The commit's progress: "hooks" while hook output streams in, "committing" after three quiet
+ *  seconds. Hook output is polled every 300ms while a commit runs. */
 function useCommitPhase() {
   const [commitPhase, setCommitPhase] = useState<CommitPhase>('idle')
   const [hookLines, setHookLines] = useState<string[]>([])

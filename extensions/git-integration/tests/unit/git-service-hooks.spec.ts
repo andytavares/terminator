@@ -6,10 +6,9 @@ import { join } from 'path'
 import { commitChanges } from '../../src/git/git-service'
 import { bindRealShell } from './support/shell'
 
-// A hook git runs for `git commit` and `--no-verify` skips (pre-commit,
-// commit-msg) aborts the commit by exiting non-zero, and git adds nothing of
-// its own to what the hook printed (https://git-scm.com/docs/githooks#_pre_commit).
-// These run real git against real hooks.
+// A hook `git commit` runs and `--no-verify` skips (pre-commit, commit-msg) aborts by exiting
+// non-zero, and git adds nothing to what it printed
+// (https://git-scm.com/docs/githooks#_pre_commit). These run real git against real hooks.
 
 const env = Object.fromEntries(
   Object.entries(process.env).filter(([k]) => !k.startsWith('GIT_'))

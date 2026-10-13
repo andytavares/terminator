@@ -701,10 +701,8 @@ const CI_STATUS_BY_SIGNAL: Record<SignalValue, ReviewQueuePR['ciStatus']> = {
   unknown: 'none',
 }
 
-/**
- * Failed beats running beats succeeded; skipped, neutral or cancelled checks never
- * decide it, so a rollup of only those is unknown.
- */
+/** Failed beats running beats succeeded; skipped, neutral or cancelled checks never decide it, so a
+ *  rollup of only those is unknown. */
 function rollupVerdict(states: string[], failed: Set<string>, running: Set<string>): SignalValue {
   if (states.some((s) => failed.has(s))) return 'fail'
   if (states.some((s) => running.has(s))) return 'warn'

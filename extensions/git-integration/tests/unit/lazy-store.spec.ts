@@ -3,10 +3,9 @@ import { rmSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { dispatchChannel } from '@terminator/extension-sdk'
 
-// electron-store costs the extension host 17 MB (docs/research/perf/
-// 2026-10-12-extension-host.md). It loads when a channel first reads or writes
-// a store, not at activation. Vitest runs a vi.mock factory when the module is
-// first imported, so `loaded` records it.
+// electron-store costs the host 17 MB (docs/research/perf/2026-10-12-extension-host.md), so it
+// loads when a channel first uses a store, not at activation. Vitest runs a vi.mock factory when
+// the module is first imported, so `loaded` records it.
 
 const loaded = vi.hoisted(() => ({ store: false }))
 

@@ -59,6 +59,13 @@ The extension has the two halves every extension has ([Extension Development Gui
 - **Backend** (`src/index.ts`, bundled by `npm run build:extensions` into `src/index.js`, the manifest's `main`) — runs in the extension host. `activate` registers the settings, the `git:*`, `github:*`, merge-flow and review-agent channels (`src/ipc/`), the Quick Actions commands (`src/commands.ts`), the review command (`src/review-command.ts`) and the View menu's "Code Reviews in New Window".
 - **View** (`src/renderer/main.tsx`, built by `npm run build:renderer` into `dist/index.html`, the manifest's `renderer`) — `src/renderer/App.tsx` routes on `?view=`: `project` shows `GitFullView` (the Git tab), `code-reviews` and `pr-review` show `PrReviewTab`, and `reviews` shows `ReviewDashboard`. It calls its own channels through the bridge modules in `src/api/`. The Git tab refreshes on the core's file-change events and on an interval (`src/hooks/useGitStatus.ts`).
 
+## Why the review screen works as it does
+
+Reasoning the code comments point to (`src/components/pr-review/`).
+
+- **The queue pages itself** (`PrReviewTab.tsx`, `useAutoPaging`). The queue is meant to be worked top to bottom, and a "Load more pull requests" button made finishing it a manual chore, while the summary above it could count only the rows already held, so it reported the page size as the total. Pages now follow on their own, bounded so a repository with thousands of open pull requests cannot turn one screen into hundreds of API calls. Past the bound the summary still states the real total from `totalCount`, and search reaches anything the list has not got to.
+- **Triage is one line, not four tiles** (`ReviewQueue.tsx`, `TriageBand`). Two of the four tiles routinely read "0", so half the row spent saying nothing was wrong, and two labels carried instructions inside them. A label names a metric; what to do with it belongs in the grouping below, which already says.
+
 ## Development
 
 This extension is a first-party bundled extension. Its source lives inside the repository at `extensions/git-integration/`; `CLAUDE.md` holds its development rules.
