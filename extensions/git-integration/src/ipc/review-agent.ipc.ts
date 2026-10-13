@@ -5,7 +5,12 @@ import { AgentScopeSchema, AGENT_REQUESTS, type AgentRun } from '../schemas/revi
 import type { PrHead } from '../schemas/pr-review.schema.js'
 import { ensureReviewWorktree } from '../review/worktree.js'
 import { runAgentReview } from '../review/review-agent.js'
-import { defineChannel, noPayload, type ChannelSpec } from '@terminator/extension-sdk'
+import {
+  defineChannel,
+  noPayload,
+  type ChannelSpec,
+  type Disposable,
+} from '@terminator/extension-sdk'
 import { RepoRoot } from './repo-root.js'
 import { VALIDATION_ERROR, errorEnvelope, type RegisterFn } from './register.js'
 
@@ -272,7 +277,15 @@ function storedRunChannels(deps: ReviewAgentDeps): ChannelSpec[] {
   ]
 }
 
-export function registerReviewAgentHandlers(register: RegisterFn, deps: ReviewAgentDeps): void {
+/**
+ * Registers the review agent's channels. Disposing the result cancels every run
+ * still going: its `claude` is this process's child, and an extension host that
+ * quits does not take its children with it, so a run left alone outlives the app.
+ */
+export function registerReviewAgentHandlers(
+  register: RegisterFn,
+  deps: ReviewAgentDeps
+): Disposable {
   const ctx: AgentContext = {
     deps,
     ensureWorktree: deps.ensureWorktree ?? ensureReviewWorktree,
@@ -281,4 +294,5 @@ export function registerReviewAgentHandlers(register: RegisterFn, deps: ReviewAg
     liveRuns: new Map(),
   }
   for (const spec of [...runChannels(ctx), ...storedRunChannels(deps)]) register(spec)
+  return { dispose: () => ctx.liveRuns.forEach((cancel) => cancel()) }
 }

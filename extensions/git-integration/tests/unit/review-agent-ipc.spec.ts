@@ -40,10 +40,10 @@ function captureHandlers(deps: Partial<ReviewAgentDeps>) {
     ...deps,
   }
   bindWorkspaceRoots(() => ['/repo'])
-  registerReviewAgentHandlers((spec) => {
+  const registration = registerReviewAgentHandlers((spec) => {
     handlers[spec.channel] = (payload) => dispatchChannel(spec, payload)
   }, fullDeps)
-  return { handlers, broadcast, openTerminal, settings }
+  return { handlers, broadcast, openTerminal, settings, registration }
 }
 
 const scope = {
@@ -236,6 +236,19 @@ describe('review-agent IPC — review-agent:cancel cancels a live run', () => {
     const result = await handlers['review-agent:cancel']({ runId: started.run.id })
     expect(result).toEqual({ ok: true })
     expect(cancel).toHaveBeenCalled()
+  })
+
+  it('disposing the handlers cancels every live run, so no agent outlives the extension', async () => {
+    const cancel = vi.fn()
+    const runReview = vi.fn(() => ({ runId: 'x', done: new Promise<AgentRun>(() => {}), cancel }))
+    const ensureWorktree = vi.fn(async () => '/wt')
+    const { handlers, registration } = captureHandlers({ ensureWorktree, runReview })
+    await handlers['review-agent:start'](startPayload())
+    await vi.waitFor(() => expect(runReview).toHaveBeenCalled())
+
+    registration.dispose()
+
+    expect(cancel).toHaveBeenCalledTimes(1)
   })
 
   it('review-agent:cancel returns ok:false for an unknown run', async () => {

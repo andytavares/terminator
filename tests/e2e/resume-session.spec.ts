@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   AppHandle,
@@ -63,8 +63,12 @@ function reportConversation(
 ): void {
   const dir = join(profile, 'agent-sessions')
   mkdirSync(dir, { recursive: true })
+  const target = join(dir, `${terminalSessionId}.json`)
+  // Written aside and renamed into place, as the hook does
+  // (src/main/agents/agent-session-hook.ts): the watcher consumes a report as
+  // soon as its name appears, and one written in place could be read empty.
   writeFileSync(
-    join(dir, `${terminalSessionId}.json`),
+    `${target}.tmp`,
     JSON.stringify({
       terminal: terminalSessionId,
       provider: 'claude',
@@ -75,6 +79,7 @@ function reportConversation(
       at: new Date().toISOString(),
     })
   )
+  renameSync(`${target}.tmp`, target)
 }
 
 /**

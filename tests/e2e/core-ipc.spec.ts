@@ -262,8 +262,14 @@ async function quickActionsOpenInsideView(handle: AppHandle): Promise<void> {
     view.sendInputEvent({ type: 'keyDown', keyCode: 'P', modifiers })
     view.sendInputEvent({ type: 'keyUp', keyCode: 'P', modifiers })
   }, NOTES)
-  await expect(quickActionsPanel(handle.page)).toBeVisible()
+  const panel = quickActionsPanel(handle.page)
+  await expect(panel).toBeVisible()
+  // Escape closes the panel from inside it; pressed before focus has moved
+  // there from the extension's view, it closed nothing and the open panel
+  // covered the sidebar for the next test.
+  await expect(panel).toBeFocused()
   await handle.page.keyboard.press('Escape')
+  await expect(panel).toBeHidden()
 }
 
 async function viewGetActiveNamesSelection(handle: AppHandle, folder: string): Promise<void> {
