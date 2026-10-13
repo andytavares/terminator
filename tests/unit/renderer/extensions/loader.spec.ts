@@ -130,32 +130,32 @@ describe('initExtensions — manifest-driven (contributes) registration — does
 })
 
 describe('registerWebviewExtension — default view params', () => {
-  const register = (contributes: Extension['contributes']) =>
+  const registerContributions = (contributes: Extension['contributes']) =>
     registerWebviewExtension(makeExt({ contributes }), registryState())
 
   it('hosts the "main" view in a global tab that names none, with no icon', () => {
-    register({ globalTab: { label: 'X' } })
+    registerContributions({ globalTab: { label: 'X' } })
     const tab = registryState().globalTabs.get('com.test.ext')!
     expect(tab).toMatchObject({ view: 'main', icon: undefined })
     expect(portalOf(tab.component, {})).toBe('com.test.ext:main')
   })
 
   it('hosts the "workspace" view in a workspace tab that names none, with no icon', () => {
-    register({ workspaceTab: { label: 'WS' } })
+    registerContributions({ workspaceTab: { label: 'WS' } })
     const tab = registryState().workspaceTabs.get('com.test.ext')!
     expect(tab).toMatchObject({ view: 'workspace', icon: undefined })
     expect(portalOf(tab.component, {})).toBe('com.test.ext:workspace')
   })
 
   it('hosts the "project" view in a project tab that names none', () => {
-    register({ projectTab: { label: 'Proj' } })
+    registerContributions({ projectTab: { label: 'Proj' } })
     const tab = registryState().projectTabs.get('com.test.ext')!
     expect(tab.view).toBe('project')
     expect(portalOf(tab.component, { repoRoot: null })).toBe('com.test.ext:project')
   })
 
   it('hosts the "sidebar" view in a sidebar panel that names none', () => {
-    register({ sidebarPanel: { label: 'Panel' } })
+    registerContributions({ sidebarPanel: { label: 'Panel' } })
     const panel = registryState().sidebarPanels.get('com.test.ext')!
     expect(panel.view).toBe('sidebar')
     expect(portalOf(panel.component, { repoRoot: null, onClose: () => {} })).toBe(

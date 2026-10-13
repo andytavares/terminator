@@ -37,7 +37,7 @@ export interface GithubStub {
   calls: GhCall[]
   openPullRequest(input: NewStubPullRequest): StubPullRequest
   pullRequest(number: number): StubPullRequest
-  close(): Promise<void>
+  shutDown(): Promise<void>
 }
 
 /** Starts the stub; pass its `env` to `launchApp`. */
@@ -57,7 +57,7 @@ export async function startGithubStub(options: GithubStubOptions): Promise<Githu
     pullRequest: (number) => findPullRequest(context, number),
     // Drops idle and in-flight connections first, so a call the app left
     // open when a test failed cannot keep close() pending.
-    close: () => {
+    shutDown: () => {
       server.closeAllConnections()
       return new Promise((resolve) => server.close(() => resolve()))
     },

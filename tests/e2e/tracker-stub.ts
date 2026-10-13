@@ -23,7 +23,7 @@ export interface TrackerStub {
   jira: JiraState
   /** Each tunnel the app opened and each TLS handshake it refused, for a failure message. */
   diagnostics: string[]
-  close(): Promise<void>
+  shutDown(): Promise<void>
 }
 
 // Every extension and the digest are written out, so the certificates do not
@@ -132,6 +132,6 @@ export async function startTrackerStub(linear: LinearState, jira: JiraState): Pr
     linear,
     jira,
     diagnostics,
-    close: () => closeProxy(proxy, tunnels),
+    shutDown: () => closeProxy(proxy, tunnels),
   }
 }

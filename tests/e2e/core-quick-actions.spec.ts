@@ -277,7 +277,7 @@ test.describe.serial('issue actions, against a local Jira', () => {
 
   test.afterAll(async () => {
     await closeApp(tracked)
-    await stub.close()
+    await stub.shutDown()
   })
 
   test('Link issue to branch attaches a searched issue to the branch', () =>

@@ -28,7 +28,7 @@ export interface JiraStub {
   requests: string[]
   /** Comments the app posted, by issue key, as plain text. */
   comments: Map<string, string[]>
-  close(): Promise<void>
+  shutDown(): Promise<void>
 }
 
 const OPERATOR = 'operator@example.com'
@@ -195,6 +195,6 @@ export async function startJiraStub(issues: StubIssue[]): Promise<JiraStub> {
     caPath,
     requests,
     comments,
-    close: () => new Promise((resolve) => server.close(() => resolve())),
+    shutDown: () => new Promise((resolve) => server.close(() => resolve())),
   }
 }

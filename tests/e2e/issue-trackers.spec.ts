@@ -93,7 +93,7 @@ test.afterAll(async () => {
   try {
     await closeApp(handle)
   } finally {
-    await stub?.close()
+    await stub?.shutDown()
     if (repo) rmSync(repo, { recursive: true, force: true })
   }
 })

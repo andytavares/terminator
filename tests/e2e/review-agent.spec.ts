@@ -65,7 +65,7 @@ test.beforeAll(async () => {
 
 test.afterAll(async () => {
   await closeApp(handle)
-  await stub?.close()
+  await stub?.shutDown()
   for (const dir of [repo, `${repo}-link`, bare, replyDir]) {
     if (dir) rmSync(dir, { recursive: true, force: true })
   }

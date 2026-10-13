@@ -44,7 +44,7 @@ test.beforeAll(async () => {
 
 test.afterAll(async () => {
   await closeApp(handle)
-  await stub.close()
+  await stub.shutDown()
 })
 
 async function connectingProvesCredential(): Promise<void> {
