@@ -347,50 +347,53 @@ function noPreviousObservationTests() {
   })
 }
 
-describe('describeEvent', () => {
-  const labels = { a: 'Builder', b: 'Reviewer' }
+const LABELS = { a: 'Builder', b: 'Reviewer' }
 
-  it.each<[FactoryEvent, string]>([
-    [
-      { kind: 'node-state', nodeId: 'a', from: 'waiting', to: 'running' },
-      'Builder is now running.',
-    ],
-    [{ kind: 'orphaned', nodeId: 'a' }, "Builder's agent is gone."],
-    [{ kind: 'stranded', nodeId: 'a', on: true }, 'Builder is waiting on you.'],
-    [{ kind: 'stranded', nodeId: 'a', on: false }, 'Builder is back to work.'],
-    [
-      { kind: 'tool', nodeId: 'a', prop: 'archive', callId: 'c1', open: true, at: 0 },
-      'Builder is using the archive.',
-    ],
-    [
-      { kind: 'tool', nodeId: 'a', prop: 'rack', callId: 'c1', open: false, at: 0 },
-      'Builder is done with the rack.',
-    ],
-    [
-      { kind: 'handoff', fromNodeId: 'a', toNodeId: 'b', targetStarted: false },
-      'Builder handed off to Reviewer.',
-    ],
-    [{ kind: 'gate', nodeId: 'a', waiting: true }, 'Builder is waiting at the gate.'],
-    [{ kind: 'gate', nodeId: 'a', waiting: false }, "Builder's gate cleared."],
-    [
-      { kind: 'rework', fromNodeId: 'b', toNodeId: 'a', round: 2 },
-      'Reviewer sent Builder back (round 2).',
-    ],
-  ])('describes %o as %s', (event, sentence) => {
-    expect(describeEvent(event, labels)).toBe(sentence)
+/** What happens at a station, and the sentence that says it. */
+const STATION_SENTENCES: [FactoryEvent, string][] = [
+  [{ kind: 'node-state', nodeId: 'a', from: 'waiting', to: 'running' }, 'Builder is now running.'],
+  [{ kind: 'orphaned', nodeId: 'a' }, "Builder's agent is gone."],
+  [{ kind: 'stranded', nodeId: 'a', on: true }, 'Builder is waiting on you.'],
+  [{ kind: 'stranded', nodeId: 'a', on: false }, 'Builder is back to work.'],
+  [
+    { kind: 'tool', nodeId: 'a', prop: 'archive', callId: 'c1', open: true, at: 0 },
+    'Builder is using the archive.',
+  ],
+  [
+    { kind: 'tool', nodeId: 'a', prop: 'rack', callId: 'c1', open: false, at: 0 },
+    'Builder is done with the rack.',
+  ],
+  [
+    { kind: 'handoff', fromNodeId: 'a', toNodeId: 'b', targetStarted: false },
+    'Builder handed off to Reviewer.',
+  ],
+  [{ kind: 'gate', nodeId: 'a', waiting: true }, 'Builder is waiting at the gate.'],
+  [{ kind: 'gate', nodeId: 'a', waiting: false }, "Builder's gate cleared."],
+  [
+    { kind: 'rework', fromNodeId: 'b', toNodeId: 'a', round: 2 },
+    'Reviewer sent Builder back (round 2).',
+  ],
+]
+
+/** What happens to the order as a whole, and the sentence that says it. */
+const ORDER_SENTENCES: [FactoryEvent, string][] = [
+  [{ kind: 'ci-round', round: 2, max: 3 }, 'CI round 2 of 3.'],
+  [{ kind: 'ci-check', name: 'test', bucket: 'fail' }, 'test is now fail.'],
+  [{ kind: 'queued', position: 2, behind: ['Other order'] }, 'Queued 2nd, behind Other order.'],
+  [{ kind: 'queued', position: 1, behind: [] }, 'Queued 1st.'],
+]
+
+describe('describeEvent', () => {
+  it.each(STATION_SENTENCES)('describes %o as %s', (event, sentence) => {
+    expect(describeEvent(event, LABELS)).toBe(sentence)
   })
 
   it('falls back to the node id when there is no label', () => {
     expect(describeEvent({ kind: 'orphaned', nodeId: 'zzz' }, {})).toBe("zzz's agent is gone.")
   })
 
-  it.each<[FactoryEvent, string]>([
-    [{ kind: 'ci-round', round: 2, max: 3 }, 'CI round 2 of 3.'],
-    [{ kind: 'ci-check', name: 'test', bucket: 'fail' }, 'test is now fail.'],
-    [{ kind: 'queued', position: 2, behind: ['Other order'] }, 'Queued 2nd, behind Other order.'],
-    [{ kind: 'queued', position: 1, behind: [] }, 'Queued 1st.'],
-  ])('describes %o as %s', (event, sentence) => {
-    expect(describeEvent(event, labels)).toBe(sentence)
+  it.each(ORDER_SENTENCES)('describes %o as %s', (event, sentence) => {
+    expect(describeEvent(event, LABELS)).toBe(sentence)
   })
 })
 

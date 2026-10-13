@@ -39,12 +39,7 @@ function gate(over: Partial<Gate> & Pick<Gate, 'id' | 'orderId' | 'raisedAt'>): 
   }
 }
 
-function order(
-  id: string,
-  title: string,
-  createdAt: string,
-  over: Partial<WorkOrder> = {}
-): WorkOrder {
+function order(id: string, title: string, createdAt: string): WorkOrder {
   const base = draftOrder({
     id,
     title,
@@ -52,7 +47,7 @@ function order(
     repoPaths: ['/repo/one'],
     now: createdAt,
   })
-  return { ...base, ...over }
+  return base
 }
 
 // Order A: clean shipped order. Seeded and run both an hour apart, ships a
@@ -176,13 +171,14 @@ const recordsC: OrderRecords = { order: orderC, ledger: ledgerC, gates: gatesC, 
 
 // Order D: never shipped. Two Forge decisions (A-Q-*), one struck, plus one
 // follow-up. Not counted in any "per shipped order" average.
-const orderD = order('WO-D', 'Order D', '2026-09-14T23:00:00.000Z', {
+const orderD = {
+  ...order('WO-D', 'Order D', '2026-09-14T23:00:00.000Z'),
   assumptions: [
     { id: 'A-Q-1', text: 'q1', struck: true, affects: [] },
     { id: 'A-Q-2', text: 'q2', struck: false, affects: [] },
     { id: 'A-OTHER', text: 'not a forge decision', struck: true, affects: [] },
   ],
-})
+}
 const ledgerD: LedgerEntry[] = [
   entry({ orderId: 'WO-D', action: 'order.seeded', at: '2026-09-15T00:00:00.000Z' }),
   entry({ orderId: 'WO-D', action: 'converge.followed_up', at: '2026-09-15T01:00:00.000Z' }),

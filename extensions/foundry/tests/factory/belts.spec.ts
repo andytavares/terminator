@@ -25,7 +25,8 @@ function node(over: Partial<RunNode> & Pick<RunNode, 'id'>): RunNode {
   }
 }
 
-function station(id: string, x: number, y: number, w = 1): HallProp {
+/** A one-row desk for node `id` whose top-left tile is `[x, y]`. */
+function station(id: string, [x, y]: [number, number], w = 1): HallProp {
   return {
     id: `station-${id}`,
     kind: 'desk',
@@ -64,8 +65,8 @@ describe('routeBelts', () => {
 
 function straightBeltsTests() {
   it('routes a straight belt on the belt row when source and target share a row', () => {
-    const a = station('a', 0, 2, 2)
-    const b = station('b', 6, 2, 2)
+    const a = station('a', [0, 2], 2)
+    const b = station('b', [6, 2], 2)
     const nodes = [node({ id: 'a' }), node({ id: 'b', dependsOn: ['a'] })]
     const byNode = new Map([
       ['a', a],
@@ -85,9 +86,9 @@ function straightBeltsTests() {
 
 function splitsTests() {
   it('gives the shared tile of two belts from the same source a split, in graph order', () => {
-    const a = station('a', 0, 2, 1)
-    const b = station('b', 5, 2, 1)
-    const c = station('c', 5, 5, 1)
+    const a = station('a', [0, 2], 1)
+    const b = station('b', [5, 2], 1)
+    const c = station('c', [5, 5], 1)
     const nodes = [
       node({ id: 'a' }),
       node({ id: 'b', dependsOn: ['a'] }),
@@ -117,8 +118,8 @@ function bfsFallbackTests() {
     // Every row is 'wall', so a horizontal step is never legal for the
     // routed search — it cannot reach a target one column removed no matter
     // how it turns, and must fall back to findPath over `solid`.
-    const a = station('a', 0, 2, 1)
-    const b = station('b', 4, 2, 1)
+    const a = station('a', [0, 2], 1)
+    const b = station('b', [4, 2], 1)
     const nodes = [node({ id: 'a' }), node({ id: 'b', dependsOn: ['a'] })]
     const byNode = new Map([
       ['a', a],
@@ -141,7 +142,7 @@ function bfsFallbackTests() {
 
 function missingStationsTests() {
   it('skips an edge whose source or target station is missing from the map', () => {
-    const b = station('b', 4, 2, 1)
+    const b = station('b', [4, 2], 1)
     const nodes = [node({ id: 'b', dependsOn: ['ghost'] })]
     const byNode = new Map([['b', b]])
     const solid = openFloor(6, 5)

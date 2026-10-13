@@ -39,16 +39,19 @@ const base: RunGraph = {
   ],
 }
 
-function tool(
-  at: number,
-  sessionId: string,
-  callId: string,
-  kind: ToolActivity['kind'] = 'tool_started'
-) {
+/** A Read the session `sessionId` started at `at`. */
+function tool(at: number, sessionId: string, callId: string) {
   return {
     at,
     sessionId,
-    activity: { kind, toolName: 'Read', callId, isShell: false, path: null, at } as ToolActivity,
+    activity: {
+      kind: 'tool_started',
+      toolName: 'Read',
+      callId,
+      isShell: false,
+      path: null,
+      at,
+    } as ToolActivity,
   }
 }
 

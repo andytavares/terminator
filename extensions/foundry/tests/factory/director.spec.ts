@@ -671,21 +671,21 @@ describe('direct: rework', () => {
   describe('neither side crewed', neitherSideCrewedTests)
 })
 
+const realWorld = (): World => worldFor(realGraph())
+
+const crewOf = (world: World, id: string): Crew => world.crew.find((c) => c.nodeId === id)!
+
+const adjacent = (a: { x: number; y: number }, b: { x: number; y: number }): boolean =>
+  Math.abs(a.x - b.x) + Math.abs(a.y - b.y) === 1
+
+/** The world after `fromNodeId` sends its work back to `toNodeId`, in round 1. */
+const reworked = (world: World, fromNodeId: string, toNodeId: string): World =>
+  direct(world, [{ kind: 'rework', fromNodeId, toNodeId, round: 1 }], 0)
+
 function carryingTheBoxTests() {
-  const realWorld = (): World => worldFor(realGraph())
-
-  const crewOf = (world: World, id: string): Crew => world.crew.find((c) => c.nodeId === id)!
-
-  const adjacent = (a: { x: number; y: number }, b: { x: number; y: number }): boolean =>
-    Math.abs(a.x - b.x) + Math.abs(a.y - b.y) === 1
-
   it('has the check carry the box to the node it sent back, with no crate on a belt', () => {
     const world = realWorld()
-    const next = direct(
-      world,
-      [{ kind: 'rework', fromNodeId: 'verify', toNodeId: 'build:lane-1', round: 1 }],
-      0
-    )
+    const next = reworked(world, 'verify', 'build:lane-1')
     const verifier = crewOf(next, 'verify')
     expect(verifier.carrying).toBe(true)
     expect(adjacent(verifier.goal!, seatOf(world.map, 'build:lane-1')!)).toBe(true)
@@ -695,11 +695,7 @@ function carryingTheBoxTests() {
 
   it('has the target walk to a check with no crew and bring the box back', () => {
     const world = realWorld()
-    const next = direct(
-      world,
-      [{ kind: 'rework', fromNodeId: 'ship', toNodeId: 'inspect', round: 1 }],
-      0
-    )
+    const next = reworked(world, 'ship', 'inspect')
     const inspector = crewOf(next, 'inspect')
     expect(inspector.carrying).toBeFalsy()
     expect(adjacent(inspector.goal!, seatOf(world.map, 'ship')!)).toBe(true)

@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { partialFake } from '../../../../tests/support/fakes'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import {
@@ -96,13 +97,17 @@ function recipeFrom(file: string, dir = SHIPPED_RECIPES): Recipe {
   return parsed.value
 }
 
-function unit(
-  id: string,
-  lane: number,
-  dependsOn: string[] = [],
-  role = 'builder'
-): WorkOrder['plan']['units'][number] {
-  return { id, title: id, role, lane, dependsOn, satisfies: ['AC-1'], touches: [], verify: [] }
+function unit(id: string, lane: number): WorkOrder['plan']['units'][number] {
+  return {
+    id,
+    title: id,
+    role: 'builder',
+    lane,
+    dependsOn: [],
+    satisfies: ['AC-1'],
+    touches: [],
+    verify: [],
+  }
 }
 
 function orderFor(recipeId: string, lanes: number[]): WorkOrder {
@@ -724,10 +729,10 @@ describe('idle crew wander', () => {
 const ROWS = ['#########', '.........', '###.###.#', '#########']
 const walk = ROWS.map((row) => row.split('').map((ch) => ch === '#'))
 const corridor = { walk, solid: walk, restSeats: [], props: [] } as unknown as HallMap
+/** A crew member of `nodeId` walking `from` one tile to its `goal`, to `then` there. */
 function member(
   nodeId: string,
-  from: { x: number; y: number },
-  goal: { x: number; y: number },
+  { from, goal }: { from: { x: number; y: number }; goal: { x: number; y: number } },
   then: Crew['then']
 ): Crew {
   const c = tileCenter(from)
@@ -781,6 +786,37 @@ function sharedTile(w: World): string | null {
   }
   return null
 }
+
+/** Runs `start`, keeping every tile two present crew members stood on at once. */
+function runWatchingOverlap(start: World, ticks: number): { end: World; shared: string[] } {
+  const shared: string[] = []
+  const end = run(start, ticks, (w) => {
+    const k = sharedTile(w)
+    if (k !== null) shared.push(k)
+  })
+  return { end, shared }
+}
+
+/** Every world `start` passes through in `count` ticks of 16 ms. */
+function ticked(start: World, count: number): World[] {
+  const worlds: World[] = []
+  let w = start
+  for (let i = 0; i < count; i++) {
+    w = tick(w, 16)
+    worlds.push(w)
+  }
+  return worlds
+}
+
+// A corridor with a 3x3 room in the middle to pass in.
+const ROOM = [
+  '#############',
+  '#####...#####',
+  '.............',
+  '#####...#####',
+  '#############',
+].map((row) => row.split('').map((ch) => ch === '#'))
+const room = partialFake<HallMap>({ walk: ROOM, solid: ROOM, restSeats: [], props: [] })
 
 function loiterPointsTests() {
   it('picks loiter points from the map alone: free, reachable floor, in a fixed order', () => {
@@ -884,14 +920,10 @@ const sendBack = (toNodeId: string): World =>
 function headOnTests() {
   it('two crew sent head-on never share a tile and both arrive', () => {
     const start = world([
-      member('a', { x: 0, y: 1 }, { x: 8, y: 1 }, 'type'),
-      member('b', { x: 8, y: 1 }, { x: 0, y: 1 }, 'couch'),
+      member('a', { from: { x: 0, y: 1 }, goal: { x: 8, y: 1 } }, 'type'),
+      member('b', { from: { x: 8, y: 1 }, goal: { x: 0, y: 1 } }, 'couch'),
     ])
-    const shared: string[] = []
-    const end = run(start, 3000, (w) => {
-      const k = sharedTile(w)
-      if (k !== null) shared.push(k)
-    })
+    const { end, shared } = runWatchingOverlap(start, 3000)
     expect(shared).toEqual([])
     expect(end.crew.map((c) => [c.goal, tileOf(c.x, c.y)])).toEqual([
       [null, { x: 8, y: 1 }],
@@ -902,36 +934,19 @@ function headOnTests() {
 
 function aPassingPlaceTests() {
   it('four crew sent both ways through one passing place all arrive', () => {
-    // A corridor with a 3x3 room in the middle to pass in. All four end in the
-    // room, so nobody ends up parked in the corridor itself.
-    const ROOM = [
-      '#############',
-      '#####...#####',
-      '.............',
-      '#####...#####',
-      '#############',
-    ].map((row) => row.split('').map((ch) => ch === '#'))
+    // All four end in the room, so nobody ends up parked in the corridor itself.
     const start = {
       ...world([
-        member('a', { x: 0, y: 2 }, { x: 7, y: 3 }, 'type'),
-        member('b', { x: 12, y: 2 }, { x: 5, y: 1 }, 'type'),
-        member('c', { x: 1, y: 2 }, { x: 6, y: 3 }, 'couch'),
-        member('d', { x: 11, y: 2 }, { x: 6, y: 1 }, 'couch'),
+        member('a', { from: { x: 0, y: 2 }, goal: { x: 7, y: 3 } }, 'type'),
+        member('b', { from: { x: 12, y: 2 }, goal: { x: 5, y: 1 } }, 'type'),
+        member('c', { from: { x: 1, y: 2 }, goal: { x: 6, y: 3 } }, 'couch'),
+        member('d', { from: { x: 11, y: 2 }, goal: { x: 6, y: 1 } }, 'couch'),
       ]),
-      map: { walk: ROOM, solid: ROOM, restSeats: [], props: [] } as unknown as HallMap,
+      map: room,
     }
-    const shared: string[] = []
-    const end = run(start, 3000, (w) => {
-      const k = sharedTile(w)
-      if (k !== null) shared.push(k)
-    })
+    const { end, shared } = runWatchingOverlap(start, 3000)
     expect(shared).toEqual([])
-    expect(end.crew.map((c) => [c.goal, c.path.length])).toEqual([
-      [null, 0],
-      [null, 0],
-      [null, 0],
-      [null, 0],
-    ])
+    expect(end.crew.every((c) => c.goal === null && c.path.length === 0)).toBe(true)
     expect(end.crew.map((c) => tileOf(c.x, c.y))).toEqual([
       { x: 7, y: 3 },
       { x: 5, y: 1 },
@@ -944,31 +959,24 @@ function aPassingPlaceTests() {
 function absentCrewAndDeterminismTests() {
   it('a crew member who is not present does not block anyone', () => {
     const away = {
-      ...member('away', { x: 4, y: 1 }, { x: 4, y: 1 }, 'idle'),
+      ...member('away', { from: { x: 4, y: 1 }, goal: { x: 4, y: 1 } }, 'idle'),
       goal: null,
       present: false,
     }
-    const end = run(world([member('a', { x: 0, y: 1 }, { x: 8, y: 1 }, 'type'), away]), 1000)
+    const end = run(
+      world([member('a', { from: { x: 0, y: 1 }, goal: { x: 8, y: 1 } }, 'type'), away]),
+      1000
+    )
     expect(tileOf(end.crew[0].x, end.crew[0].y)).toEqual({ x: 8, y: 1 })
   })
 
   it('ticks twice to identical worlds', () => {
     const make = (): World =>
       world([
-        member('a', { x: 0, y: 1 }, { x: 8, y: 1 }, 'type'),
-        member('b', { x: 8, y: 1 }, { x: 0, y: 1 }, 'couch'),
+        member('a', { from: { x: 0, y: 1 }, goal: { x: 8, y: 1 } }, 'type'),
+        member('b', { from: { x: 8, y: 1 }, goal: { x: 0, y: 1 } }, 'couch'),
       ])
-    const a: World[] = []
-    const b: World[] = []
-    let wa = make()
-    let wb = make()
-    for (let i = 0; i < 600; i++) {
-      wa = tick(wa, 16)
-      wb = tick(wb, 16)
-      a.push(wa)
-      b.push(wb)
-    }
-    expect(a).toEqual(b)
+    expect(ticked(make(), 600)).toEqual(ticked(make(), 600))
   })
 }
 
@@ -977,27 +985,34 @@ describe('tick: a box carried back to an earlier station', () => {
   describe('cancelled errands', cancelledErrandsTests)
 })
 
+/**
+ * Ticks until the verifier's errand is over, failing the moment two present
+ * crew members share a tile, and says whether it carried the box on the way.
+ */
+function walkTheErrand(start: World): { world: World; carried: boolean } {
+  let world = start
+  let carried = false
+  for (let i = 0; i < 4000 && crewOf(world, 'verify').errand !== undefined; i++) {
+    world = tick(world, 50)
+    carried ||= crewOf(world, 'verify').carrying === true
+    expect(sharedTile(world)).toBeNull()
+  }
+  return { world, carried }
+}
+
 function carryingTheBoxTests() {
   it.each([
     ['build:lane-1', 0],
     ['lint', 1],
   ])('carries the box to %s and walks home without overlap (%i crate parked)', (target, parked) => {
-    let world = sendBack(target)
     const at = crewOf(settled(), 'verify')
     const home = tileOf(at.x, at.y)
     const homeAnim = at.anim
-    let carriedWhileWalking = false
-    for (let i = 0; i < 4000 && crewOf(world, 'verify').errand !== undefined; i++) {
-      world = tick(world, 50)
-      carriedWhileWalking ||= crewOf(world, 'verify').carrying === true
-      const tiles = world.crew
-        .filter((c) => c.present)
-        .map((c) => `${tileOf(c.x, c.y).x},${tileOf(c.x, c.y).y}`)
-      expect(new Set(tiles).size).toBe(tiles.length)
-    }
+    const walked = walkTheErrand(sendBack(target))
+    let world = walked.world
     for (let i = 0; i < 400; i++) world = tick(world, 50)
     const verifier = crewOf(world, 'verify')
-    expect(carriedWhileWalking).toBe(true)
+    expect(walked.carried).toBe(true)
     expect(verifier.errand).toBeUndefined()
     expect(verifier.carrying).toBe(false)
     expect(tileOf(verifier.x, verifier.y)).toEqual(home)
