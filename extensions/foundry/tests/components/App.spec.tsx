@@ -53,7 +53,7 @@ function compiledShapingOrder() {
   const shapingOrder = draftOrder({
     id: 'WO-2',
     title: 'Still shaping',
-    source: { kind: 'typed', text: 'still shaping' },
+    source: { kind: 'typed', tracker: null, key: null, url: null },
     repoPaths: ['/repo'],
     now: '2026-09-06T10:00:00.000Z',
   })

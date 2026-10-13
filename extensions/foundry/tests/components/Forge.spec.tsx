@@ -768,6 +768,7 @@ function withFinding() {
         text: 'the outcome restates the problem',
         status: 'open' as const,
         reason: '',
+        round: 0,
       },
     ],
   }
@@ -848,6 +849,7 @@ const TWO_QUESTIONS = [
     recommended: 0,
     answer: null,
     rank: 2,
+    confidence: null,
   },
   {
     id: 'Q-2',
@@ -857,6 +859,7 @@ const TWO_QUESTIONS = [
     recommended: 0,
     answer: null,
     rank: 1,
+    confidence: null,
   },
 ]
 
@@ -942,6 +945,7 @@ function whileTheArchitectWorksTests() {
           text: 'the outcome restates the problem',
           status: 'open' as const,
           reason: '',
+          round: 0,
         },
       ],
     })
@@ -1008,6 +1012,7 @@ const TWO_FINDINGS = [
     text: 'finding one',
     status: 'open' as const,
     reason: '',
+    round: 0,
   },
   {
     id: 'RT-2',
@@ -1016,6 +1021,7 @@ const TWO_FINDINGS = [
     text: 'finding two',
     status: 'open' as const,
     reason: '',
+    round: 0,
   },
 ]
 
@@ -1188,6 +1194,8 @@ const open = (text: string) => ({
   text,
   status: 'open' as const,
   reason: '',
+  category: 'wrong-outcome' as const,
+  round: 0,
 })
 
 describe('reading a finding', () => {
@@ -1872,6 +1880,8 @@ const md = {
       text: 'The plan never touches **the picker**',
       status: 'open' as const,
       reason: '',
+      category: 'wrong-outcome' as const,
+      round: 0,
     },
   ],
 }
@@ -2082,6 +2092,7 @@ const BLOCKING_AND_NOTE = [
     text: 'note one',
     status: 'open' as const,
     reason: '',
+    round: 0,
   },
 ]
 

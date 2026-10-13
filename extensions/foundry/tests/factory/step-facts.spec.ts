@@ -14,6 +14,8 @@ function node(id: string, over: Partial<RunNode> = {}): RunNode {
     role: null,
     dependsOn: [],
     attempts: 1,
+    reworks: 0,
+    feedback: [],
     sessionId: null,
     worktreePath: null,
     startedAt: null,
@@ -76,7 +78,7 @@ function theShipGateTests() {
         node: graph.nodes[3],
         graph,
         labels,
-        pulls: [{ repo: 'a/b', url: 'u', number: 233 }],
+        pulls: [{ number: 233 }],
         ci: ci(['pass', 'pass', 'pending']) as never,
         waiting: [readyGate()],
       })

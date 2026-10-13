@@ -254,7 +254,7 @@ const direct = recipe('direct.yaml')
 
 /** The test and lint commands a probe found in package.json, or null where it found none. */
 function probed(opts: { test: boolean; lint: boolean }) {
-  const found = (command: string) => ({ command, source: 'package.json' })
+  const found = (command: string) => ({ command, source: 'package.json' as const })
   return {
     test: opts.test ? found('npm test') : null,
     lint: opts.lint ? found('npm run lint') : null,

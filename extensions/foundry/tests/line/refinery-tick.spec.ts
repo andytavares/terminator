@@ -260,16 +260,17 @@ function onceAllLanesMergedTests() {
 
   it('waits for every lane before it says merged', async () => {
     const onMerged = vi.fn(async () => undefined)
+    let secondMerged = false
     const deps = baseDeps({
       candidates: candidate,
-      viewPr: async (url) => ({ merged: url === 'u1' }),
+      viewPr: async (url) => ({ merged: url === 'u1' || secondMerged }),
       onMerged,
     })
 
     await refineryTick(deps)
     expect(onMerged).not.toHaveBeenCalled()
 
-    deps.viewPr = async () => ({ merged: true })
+    secondMerged = true
     await refineryTick(deps)
     expect(onMerged).toHaveBeenCalledTimes(1)
   })

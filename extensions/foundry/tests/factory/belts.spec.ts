@@ -18,6 +18,8 @@ function node(over: Partial<RunNode> & Pick<RunNode, 'id'>): RunNode {
     role: null,
     dependsOn: [],
     attempts: 0,
+    reworks: 0,
+    feedback: [],
     sessionId: null,
     worktreePath: null,
     startedAt: null,

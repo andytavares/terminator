@@ -316,7 +316,17 @@ function reviewerAndAcceptedFindingsTests() {
   // A reviewer's finding is judgement, not a rule this pass can re-run.
   it('leaves a reviewer’s finding open, since nothing here can decide it', () => {
     const before = order({
-      redTeam: [{ id: 'RT-reviewer-1', severity: 'high', text: 'x', status: 'open', reason: '' }],
+      redTeam: [
+        {
+          id: 'RT-reviewer-1',
+          severity: 'high',
+          text: 'x',
+          status: 'open',
+          reason: '',
+          category: 'wrong-outcome',
+          round: 0,
+        },
+      ],
     })
     expect(settleFindings(before).redTeam[0].status).toBe('open')
   })

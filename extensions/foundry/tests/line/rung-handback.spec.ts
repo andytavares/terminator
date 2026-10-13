@@ -181,6 +181,7 @@ function expectMayWriteItsOutput(
     worktreePath: repo,
     outputPath: input.outputPath,
     skillsMount: null,
+    letModeDecide: false,
   })
   expect(decision, `${input.node.id} was refused its own output file`).toEqual({
     allow: true,

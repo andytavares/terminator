@@ -74,6 +74,13 @@ function write(value: unknown): string {
   fs.writeFileSync(file, typeof value === 'string' ? value : JSON.stringify(value))
   return file
 }
+type Finding = WorkOrder['redTeam'][number]
+
+/** A red-team finding as the order schema fills one in: open, with no reason yet. */
+function finding(over: Partial<Finding> & Pick<Finding, 'id' | 'severity' | 'text'>): Finding {
+  return { status: 'open', reason: '', category: 'wrong-outcome', round: 0, ...over }
+}
+
 const CRITERION = testCriterion('AC-1', {
   statement: 'an expired token is refused',
   priority: 'P0',
@@ -122,14 +129,8 @@ function openFindingsTests() {
     const plan = convergeBrief({
       order: order({
         redTeam: [
-          {
-            id: 'RT-no-non-goals',
-            severity: 'low',
-            text: 'The order excludes nothing.',
-            status: 'open',
-            reason: '',
-          },
-          { id: 'RT-done', severity: 'low', text: 'Settled.', status: 'resolved', reason: '' },
+          finding({ id: 'RT-no-non-goals', severity: 'low', text: 'The order excludes nothing.' }),
+          finding({ id: 'RT-done', severity: 'low', text: 'Settled.', status: 'resolved' }),
         ],
       }),
       root,
@@ -373,8 +374,8 @@ function dismissedFindingsTests() {
     })
     const before = order({
       redTeam: [
-        { id: 'RT-no-non-goals', severity: 'low', text: 't', status: 'open', reason: '' },
-        { id: 'RT-no-runnable-check', severity: 'high', text: 't', status: 'open', reason: '' },
+        finding({ id: 'RT-no-non-goals', severity: 'low', text: 't' }),
+        finding({ id: 'RT-no-runnable-check', severity: 'high', text: 't' }),
       ],
     })
     const result = readProposal(before, file, 'now')
@@ -420,13 +421,7 @@ function clearedFindingsTests() {
     })
     const before = order({
       redTeam: [
-        {
-          id: 'RT-no-non-goals',
-          severity: 'low',
-          text: 'The order excludes nothing.',
-          status: 'open',
-          reason: '',
-        },
+        finding({ id: 'RT-no-non-goals', severity: 'low', text: 'The order excludes nothing.' }),
       ],
     })
     const result = readProposal(before, file, 'now')
@@ -444,13 +439,11 @@ function reviewerFindingsTests() {
     })
     const before = order({
       redTeam: [
-        {
+        finding({
           id: 'RT-red-team-1',
           severity: 'high',
           text: 'The handler filters after a fixed limit: 50 fetch.',
-          status: 'open',
-          reason: '',
-        },
+        }),
       ],
     })
     const result = readProposal(before, file, 'now')

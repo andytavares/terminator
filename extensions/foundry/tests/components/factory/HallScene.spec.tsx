@@ -40,7 +40,17 @@ function fakeMap(): HallMap {
 }
 
 function fakeWorld(map: HallMap): World {
-  return { map, crew: [], crates: [], gatesWaiting: [], openCalls: [], verdicts: [], clockMs: 0 }
+  return {
+    map,
+    crew: [],
+    crates: [],
+    gatesWaiting: [],
+    openCalls: [],
+    verdicts: [],
+    clockMs: 0,
+    ci: null,
+    queue: null,
+  }
 }
 
 function fakeContext2D(fillRectSpy: ReturnType<typeof vi.fn>) {
@@ -58,7 +68,7 @@ const standAt = (tile: { x: number; y: number }, over: Partial<Crew> = {}): Crew
   role: null,
   x: tile.x * 16 + 8,
   y: tile.y * 16 + 12,
-  facing: 'down',
+  facing: 'S',
   anim: 'reach',
   path: [],
   goal: null,

@@ -23,6 +23,8 @@ function node(id: string, over: Partial<RunNode> = {}): RunNode {
     role: 'builder',
     dependsOn: [],
     attempts: 0,
+    reworks: 0,
+    feedback: [],
     sessionId: null,
     worktreePath: null,
     startedAt: null,

@@ -32,6 +32,7 @@ const QUESTIONS: OpenQuestion[] = [
     recommended: 0,
     answer: null,
     rank: 9,
+    confidence: null,
   },
   {
     id: 'q-2',
@@ -41,6 +42,7 @@ const QUESTIONS: OpenQuestion[] = [
     recommended: 0,
     answer: null,
     rank: 4,
+    confidence: null,
   },
 ]
 
@@ -254,9 +256,9 @@ describe('the Floor puts a held tool call above the run graph', () => {
     const band = container.querySelector('.fdry-needs-you')
     const lane = container.querySelector('.fdry-lane')
     expect(lane, 'no lane rendered, so the ordering assertion proves nothing').not.toBeNull()
-    expect(band?.compareDocumentPosition(lane as Node) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
-      Node.DOCUMENT_POSITION_FOLLOWING
-    )
+    expect(
+      (band?.compareDocumentPosition(lane as Node) ?? 0) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
   })
 
   it('is absent when nothing is held', async () => {

@@ -728,7 +728,7 @@ describe('acting on a session that is not there', () => {
   // Every one of these is reachable from the panel: it polls every five
   // seconds, so a row can be clicked after the run behind it has ended.
   it('refuses to answer a tool call for it, rather than reporting success', () => {
-    expect(runner().resolve('gone', 'request-1', { permissionDecision: 'allow' })).toBe(false)
+    expect(runner().resolve('gone', 'request-1', { allow: true })).toBe(false)
   })
 
   it('shrugs off handing one back to a terminal that is not there', () => {

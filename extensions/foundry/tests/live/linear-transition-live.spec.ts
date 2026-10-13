@@ -37,7 +37,7 @@ describe.skipIf(!RUNNABLE)('the Linear provider, against the real API', () => {
     expect(provider.transition, 'the Linear provider must implement transition').toBeDefined()
     states = await provider.states!(cred, ISSUE)
     const issue = await provider.get(cred, ISSUE)
-    original = issue?.status ?? null
+    original = issue?.state.name ?? null
   })
 
   afterAll(async () => {
@@ -103,7 +103,7 @@ function movingTheIssueTests() {
 
     // Read it back from Linear rather than trusting that the mutation resolved.
     const after = await provider.get(cred, ISSUE)
-    expect(after?.status).toBe(target?.name)
+    expect(after?.state.name).toBe(target?.name)
   })
 
   it("honours the operator's own mapping over the type rule", async () => {
@@ -113,7 +113,7 @@ function movingTheIssueTests() {
     if (anywhere === undefined) return
     await provider.transition!(cred, ISSUE, 'done', anywhere.id)
     const after = await provider.get(cred, ISSUE)
-    expect(after?.status).toBe(anywhere.name)
+    expect(after?.state.name).toBe(anywhere.name)
   })
 
   it('refuses an override naming a state this workflow does not have', async () => {

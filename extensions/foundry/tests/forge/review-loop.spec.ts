@@ -291,7 +291,8 @@ const unit = (id: string, lane: number): WorkOrder['plan']['units'][number] => (
   lane,
   touches: ['src/a.ts'],
   dependsOn: [],
-  acceptance: [],
+  satisfies: [],
+  verify: [],
 })
 const small = (over: Partial<WorkOrder> = {}): WorkOrder => {
   const base = order()

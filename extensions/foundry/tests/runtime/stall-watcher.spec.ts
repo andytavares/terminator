@@ -3,7 +3,7 @@ import { rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { createStallWatcher, factsFrom, type WatchedRun } from '../../src/runtime/stall-watcher.js'
 import type { StallFiring } from '../../src/runtime/evaluate-stall.js'
-import { readTranscript } from '../../src/runtime/transcript-tailer.js'
+import { readTranscript, type ToolActivity } from '../../src/runtime/transcript-tailer.js'
 import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 // A run that is blocked tells you: it raises a permission request and the board
@@ -67,11 +67,14 @@ function watch(runs: WatchedRun[], now: number) {
   return { fired, watcher }
 }
 
+/** A tool call that names no file. */
+const toolCall = (call: Omit<ToolActivity, 'path'>): ToolActivity => ({ ...call, path: null })
+
 describe('reading what a run has been doing', () => {
   it('takes the last tool call as its most recent activity', () => {
     const activity = [
-      { kind: 'tool_started' as const, toolName: 'Read', callId: 'a', isShell: false, at: 1_000 },
-      { kind: 'tool_started' as const, toolName: 'Edit', callId: 'b', isShell: false, at: 5_000 },
+      toolCall({ kind: 'tool_started', toolName: 'Read', callId: 'a', isShell: false, at: 1_000 }),
+      toolCall({ kind: 'tool_started', toolName: 'Edit', callId: 'b', isShell: false, at: 5_000 }),
     ]
     expect(factsFrom(run(), activity).lastToolActivityAt).toBe(5_000)
   })
@@ -82,15 +85,15 @@ describe('reading what a run has been doing', () => {
 
   it('notices a shell call still in flight', () => {
     const activity = [
-      { kind: 'tool_started' as const, toolName: 'Bash', callId: 'a', isShell: true, at: 1_000 },
+      toolCall({ kind: 'tool_started', toolName: 'Bash', callId: 'a', isShell: true, at: 1_000 }),
     ]
     expect(factsFrom(run(), activity).openShellStartedAt).toBe(1_000)
   })
 
   it('clears it once the command finishes', () => {
     const activity = [
-      { kind: 'tool_started' as const, toolName: 'Bash', callId: 'a', isShell: true, at: 1_000 },
-      { kind: 'tool_finished' as const, toolName: '', callId: 'a', isShell: false, at: 2_000 },
+      toolCall({ kind: 'tool_started', toolName: 'Bash', callId: 'a', isShell: true, at: 1_000 }),
+      toolCall({ kind: 'tool_finished', toolName: '', callId: 'a', isShell: false, at: 2_000 }),
     ]
     expect(factsFrom(run(), activity).openShellStartedAt).toBeNull()
   })

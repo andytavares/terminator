@@ -143,7 +143,7 @@ describe('auto-decision by the autonomy ladder', () => {
 
 function anAllowingDeciderTests() {
   it('resolves without ever publishing a request when the decider allows it', async () => {
-    const events: SessionEvent[] = []
+    const events: PendingPermission[] = []
     const bridge = createPermissionBridge({
       sessionId: 's1',
       now: () => 1_000,
@@ -161,7 +161,7 @@ function anAllowingDeciderTests() {
 
 function anAbstainingDeciderTests() {
   it('still prompts when the decider abstains', async () => {
-    const events: SessionEvent[] = []
+    const events: PendingPermission[] = []
     const autoDecide = vi.fn().mockReturnValue(null)
     const bridge = createPermissionBridge({
       sessionId: 's1',
@@ -206,7 +206,7 @@ describe('shutdown', () => {
 })
 
 function ask(toolName: string, input: unknown) {
-  const events: SessionEvent[] = []
+  const events: PendingPermission[] = []
   const bridge = createPermissionBridge({
     sessionId: 's1',
     now: () => 1_000,

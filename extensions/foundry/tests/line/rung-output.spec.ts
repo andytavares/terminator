@@ -28,6 +28,7 @@ function role(over: Partial<Role> = {}): Role {
   return {
     schemaVersion: 1,
     id: 'scout',
+    skills: [],
     modelTier: 'fast',
     allowResume: false,
     reads: ['repo'],

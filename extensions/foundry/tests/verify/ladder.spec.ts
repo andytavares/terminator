@@ -9,6 +9,8 @@ import { CHECK_NAMES } from '../../src/verify/check-names.js'
 import type { Toolchain } from '../../src/verify/toolchain-probe.js'
 import type { RiskAssessment } from '../../src/order/schema.js'
 import { makeTempDir } from '../../../../tests/support/temp-dir'
+import { partialFake } from '../../../../tests/support/fakes'
+import type { Rule } from '../../src/recipe/parse.js'
 
 // Two properties matter more than the ordering: a failure stops the climb at
 // its own rung, and a rung with no command reports "not measured" and is never
@@ -421,10 +423,10 @@ function malformedRulesTests() {
 describe('rulesAtRung', () => {
   it('picks the rules that belong at one rung', () => {
     const rules = [
-      { id: 'a', rung: 'L2' },
-      { id: 'b', rung: 'L3' },
-      { id: 'c', rung: 'L2' },
-    ] as Parameters<typeof rulesAtRung>[0]
+      partialFake<Rule>({ id: 'a', rung: 'L2' }),
+      partialFake<Rule>({ id: 'b', rung: 'L3' }),
+      partialFake<Rule>({ id: 'c', rung: 'L2' }),
+    ]
     expect(rulesAtRung(rules, 'L2').map((r) => r.id)).toEqual(['a', 'c'])
   })
 })

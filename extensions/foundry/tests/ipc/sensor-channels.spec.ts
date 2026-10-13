@@ -83,7 +83,7 @@ describe('foundry:signals.list', () => {
     await seedSignal(store, { id: 'sig-open', status: 'open' })
     await seedSignal(store, { id: 'sig-dismissed', status: 'dismissed', dismissedAt: 1 })
 
-    const result = (await c.list({})) as { signals: Signal[]; counts: { open: number } }
+    const result = (await c.list()) as { signals: Signal[]; counts: { open: number } }
     expect(result.signals.map((s) => s.id)).toEqual(['sig-open'])
     expect(result.counts.open).toBe(1)
   })
@@ -133,7 +133,7 @@ describe('foundry:signals.promote', () => {
 describe('foundry:sensors.list', () => {
   it('lists every available sensor with a defaulted state', async () => {
     const { c } = channels()
-    const result = (await c.sensorsList({})) as {
+    const result = (await c.sensorsList()) as {
       sensors: { def: SensorDef; state: unknown; nextDueAt: string | null }[]
     }
     expect(result.sensors).toHaveLength(1)
@@ -151,7 +151,7 @@ describe('foundry:sensors.list', () => {
     const { c } = channels()
     await c.sensorsSet({ id: 'ci-flake', repoPath: repo, enabled: true })
 
-    const result = (await c.sensorsList({})) as { sensors: { nextDueAt: string | null }[] }
+    const result = (await c.sensorsList()) as { sensors: { nextDueAt: string | null }[] }
     expect(result.sensors[0].nextDueAt).toBe('2026-01-01T00:20:00.000Z')
   })
 
@@ -160,7 +160,7 @@ describe('foundry:sensors.list', () => {
     await c.sensorsSet({ id: 'ci-flake', repoPath: repo, enabled: true })
     await c.sensorsRunNow({ id: 'ci-flake' })
 
-    const result = (await c.sensorsList({})) as { sensors: { nextDueAt: string | null }[] }
+    const result = (await c.sensorsList()) as { sensors: { nextDueAt: string | null }[] }
     expect(result.sensors[0].nextDueAt).toBe('2026-01-01T00:35:00.000Z')
   })
 })

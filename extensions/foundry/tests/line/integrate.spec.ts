@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 import { builderUnit, testCriterion } from '../helpers/order-parts.js'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
@@ -16,13 +16,14 @@ import {
   watchAndFinish,
   commitAndPushLanes,
 } from '../../src/line/integrate.js'
-import type { IntegrateDeps, ShippedDrafts } from '../../src/line/integrate.js'
+import type { IntegrateDeps, ShellExec, ShippedDrafts } from '../../src/line/integrate.js'
 import { checkoutPath } from '../../src/line/worktree.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import { makeVerdict } from '../../src/verify/verdict.js'
 import type { Verdict } from '../../src/verify/verdict.js'
 import type { CiOutcome } from '../../src/line/ship-tail.js'
+import type { LadderOutcome } from '../../src/verify/ladder.js'
 import type { Check } from '../../src/line/ci.js'
 import { makeTempDir } from '../../../../tests/support/temp-dir'
 
@@ -75,14 +76,14 @@ function verdict(over: Partial<Parameters<typeof makeVerdict>[0]> = {}): Verdict
     reason: '',
     evidence: [{ kind: 'exit_code', exitCode: 0 }],
     producedBy: { role: 'verifier', sessionId: 's-verify' },
+    nodeSessionId: null,
+    at: '2026-09-06T10:00:00.000Z',
     ...over,
   })
 }
 
-function deps(
-  over: Partial<IntegrateDeps> = {}
-): IntegrateDeps & { exec: ReturnType<typeof vi.fn> } {
-  const exec = vi.fn(async (options: { command: string; args: string[] }) => {
+function deps(over: Partial<IntegrateDeps> = {}): IntegrateDeps & { exec: Mock<ShellExec> } {
+  const exec = vi.fn<ShellExec>(async (options) => {
     if (options.command === 'gh' && options.args[1] === 'create') {
       return {
         exitCode: 0,
@@ -94,19 +95,19 @@ function deps(
     return { exitCode: 0, stdout: '', stderr: '', timedOut: false }
   })
   return {
-    exec: exec as never,
+    exec,
     root,
     now: () => '2026-09-06T12:00:00.000Z',
     autoOpen: true,
     decide: vi.fn(async () => 'approve'),
     record: vi.fn(async () => undefined),
     ...over,
-  } as IntegrateDeps & { exec: ReturnType<typeof vi.fn> }
+  } as IntegrateDeps & { exec: Mock<ShellExec> }
 }
 
-function callsTo(exec: ReturnType<typeof vi.fn>, command: string, verb?: string) {
+function callsTo(exec: Mock<ShellExec>, command: string, verb?: string) {
   return exec.mock.calls
-    .map((call) => call[0] as { command: string; args: string[]; cwd: string })
+    .map((call) => call[0])
     .filter((call) => call.command === command && (verb === undefined || call.args[1] === verb))
 }
 
@@ -274,11 +275,14 @@ function ghFailingSilentlyTests() {
         ? { exitCode: 0, stdout: '', stderr: '', timedOut: false }
         : { exitCode: 1, stdout: '', stderr: '', timedOut: false }
     )
-    const err: Error = await shipOrder(
+    const err = await shipOrder(
       order(),
       { verdicts: [verdict()], findings: [] },
       deps({ exec: exec as never })
-    ).catch((e: Error) => e)
+    ).then(
+      () => new Error('shipOrder resolved'),
+      (e: Error) => e
+    )
     expect(err.message).toContain('exit code 1')
     expect(err.message.endsWith(': ')).toBe(false)
   })
@@ -296,11 +300,14 @@ function bothStreamsTests() {
             timedOut: false,
           }
     )
-    const err: Error = await shipOrder(
+    const err = await shipOrder(
       order(),
       { verdicts: [verdict()], findings: [] },
       deps({ exec: exec as never })
-    ).catch((e: Error) => e)
+    ).then(
+      () => new Error('shipOrder resolved'),
+      (e: Error) => e
+    )
     expect(err.message).toContain('fatal: no such ref')
     expect(err.message).not.toContain('some progress output')
   })
@@ -421,7 +428,7 @@ function holdingTests() {
 
 function p2AndNamingTheGradeTests() {
   it('asks nobody before pushing at P2', async () => {
-    const d = deps({ risk: undefined })
+    const d = deps()
     await shipOrder(
       order({ risk: { ...order().risk, grade: 'P2' } }),
       { verdicts: [verdict()], findings: [] },
@@ -431,7 +438,7 @@ function p2AndNamingTheGradeTests() {
   })
 
   it('names the risk grade in the gate it raises, since the rule id does not', async () => {
-    const decide = vi.fn(async () => 'approve')
+    const decide = vi.fn<IntegrateDeps['decide']>(async () => 'approve')
     await shipOrder(
       order({ risk: { ...order().risk, grade: 'P1' } }),
       { verdicts: [verdict()], findings: [] },
@@ -687,7 +694,7 @@ function criteriaAndIntentTests() {
 
 function triggersTests() {
   it('names the risk triggers in the shipping gate when there are any', async () => {
-    const decide = vi.fn(async () => 'approve')
+    const decide = vi.fn<IntegrateDeps['decide']>(async () => 'approve')
     await shipOrder(
       order({ risk: { grade: 'P0', triggers: ['secrets'], blastRadius: [], criticalPaths: [] } }),
       { verdicts: [verdict()], findings: [] },
@@ -736,6 +743,7 @@ const ladderOk = {
       result: 'pass' as const,
       reason: '',
       exitCode: 0,
+      command: null,
     },
   ],
   stoppedAt: null,
@@ -832,7 +840,7 @@ function singleRepositoryOrdersTests() {
 
 function oneShippingDecisionTests() {
   it('takes one shipping decision for the whole order, not one per lane', async () => {
-    const decide = vi.fn(async () => 'approve')
+    const decide = vi.fn<IntegrateDeps['decide']>(async () => 'approve')
     const d = multiDeps()
     await shipOrder(
       twoLanes({ risk: { grade: 'P0', triggers: [], blastRadius: [], criticalPaths: [] } }),
@@ -978,26 +986,30 @@ function nothingPushedTests() {
   })
 }
 
+/** Lint passed and the repository gate had no command to run. */
+const UNMEASURED_GATE: LadderOutcome = {
+  steps: [
+    { rung: 'L0', name: 'Lint', result: 'pass', reason: '', exitCode: 0, command: null },
+    {
+      rung: 'L2',
+      name: 'Repository gate',
+      result: 'not_measured',
+      reason: 'this repository has no coverage command',
+      exitCode: null,
+      command: null,
+    },
+  ],
+  stoppedAt: null,
+  unmeasured: ['Repository gate'],
+  ok: true,
+}
+
 describe('the body reports the climb (FR-056)', () => {
   it('names every rung and its result', () => {
     const body = prBody(order(), {
       verdicts: [verdict()],
       findings: [],
-      ladder: {
-        steps: [
-          { rung: 'L0', name: 'Lint', result: 'pass', reason: '', exitCode: 0 },
-          {
-            rung: 'L2',
-            name: 'Repository gate',
-            result: 'not_measured',
-            reason: 'this repository has no coverage command',
-            exitCode: null,
-          },
-        ],
-        stoppedAt: null,
-        unmeasured: ['Repository gate'],
-        ok: true,
-      },
+      ladder: UNMEASURED_GATE,
     })
     expect(body).toContain('Lint')
     expect(body).toContain('not measured — this repository has no coverage command')
@@ -1016,15 +1028,16 @@ describe('the body reports the climb (FR-056)', () => {
 // them "not measured" — three phantom gaps in every pull request, on the one
 // signal the design cannot afford to have people skim.
 describe('the rungs decided somewhere else', () => {
-  const CLIMB = {
+  const CLIMB: LadderOutcome = {
     steps: [
-      { rung: 'L0' as const, name: 'Lint', result: 'pass' as const, reason: '', exitCode: 0 },
+      { rung: 'L0', name: 'Lint', result: 'pass', reason: '', exitCode: 0, command: null },
       {
-        rung: 'L3' as const,
+        rung: 'L3',
         name: 'Independent verification',
-        result: 'elsewhere' as const,
+        result: 'elsewhere',
         reason: 'by the verifier on each unit — see the criteria table',
         exitCode: null,
+        command: null,
       },
     ],
     stoppedAt: null,
@@ -1607,11 +1620,11 @@ function oneHouseRuleTests() {
 function crossLinksThatFailTests() {
   it('records a cross-link it could not write back, and keeps the drafts', async () => {
     const d = multiDeps()
-    const opened = d.exec.getMockImplementation()
-    d.exec.mockImplementation(async (options: { command: string; args: string[] }) =>
+    const opened = d.exec.getMockImplementation()!
+    d.exec.mockImplementation(async (options) =>
       options.command === 'gh' && options.args[1] === 'edit'
         ? { exitCode: 1, stdout: '', stderr: 'rate limited', timedOut: false }
-        : opened?.(options)
+        : opened(options)
     )
     const result = await openDrafts(twoLanes(), { verdicts: [], findings: [] }, d)
     expect(result.pulls).toHaveLength(2)

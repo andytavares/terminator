@@ -333,7 +333,7 @@ describe('removing an accepted check (FR-081)', () => {
 function listingAndRemovingTests() {
   it('lists what the operator accepted, and nothing that shipped with the tool', async () => {
     const id = await accept()
-    const view = (await channels().rulesInForce({})) as {
+    const view = (await channels().rulesInForce()) as {
       rules: { id: string; rung: string }[]
     }
     expect(view.rules.map((rule) => rule.id)).toEqual([id])
@@ -355,7 +355,7 @@ function recordingTheRemovalTests() {
   it('records the removal, with the reason, where it can be read back', async () => {
     const id = await accept()
     await channels().removeAcceptedRule({ ruleId: id, reason: 'it fired on everything' })
-    const view = (await channels().rulesInForce({})) as {
+    const view = (await channels().rulesInForce()) as {
       declined: { id: string; reason: string; asserts: string | null }[]
     }
     expect(view.declined).toEqual([
@@ -387,7 +387,7 @@ function proposingAndRefusingTests() {
 
 describe('the skills in force', () => {
   it('lists every skill available, each with the rung it comes from', async () => {
-    const view = (await channels().rulesInForce({})) as {
+    const view = (await channels().rulesInForce()) as {
       skills: { id: string; rung: string }[]
     }
     const ciFix = view.skills.find((s) => s.id === 'ci-fix')

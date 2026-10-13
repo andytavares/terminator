@@ -153,6 +153,7 @@ function whichStore(answer: string | null) {
     recommended: null,
     answer,
     rank: 0,
+    confidence: null,
   }
 }
 

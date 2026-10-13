@@ -94,6 +94,7 @@ function startRun(sessionId = 'session-1'): void {
     phase: 'implement',
     worktreePath: '/repo/.worktrees/thing',
     branch: 'feat/thing',
+    baseBranch: null,
     terminalSessionId: 'terminal-1',
     transcriptPath: '/t.jsonl',
     startedAt: 0,

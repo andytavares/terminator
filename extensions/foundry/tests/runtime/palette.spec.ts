@@ -12,6 +12,7 @@ const run = (over: Partial<Run> = {}): Run => ({
   phase: 'implement',
   worktreePath: '/wt/thing',
   branch: 'feat/thing',
+  baseBranch: null,
   terminalSessionId: 'terminal-1',
   transcriptPath: '/t.jsonl',
   startedAt: 0,

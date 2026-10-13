@@ -745,7 +745,7 @@ function channelsWithActivity(activityFor: (sessionId: string) => ToolActivity[]
     })
   )
 }
-async function startedGraph(): Promise<{ id: string; sessionId: string | null }[]> {
+async function startedGraph(): Promise<readonly { id: string; sessionId: string | null }[]> {
   await store.save(order())
   const r = (await channels().start({ id: 'WO-1' })) as { graph: RunGraph }
   return r.graph.nodes
@@ -945,7 +945,7 @@ async function started(execute?: ReturnType<typeof vi.fn>) {
 function handingOverTests() {
   it('hands the graph to whatever executes it', async () => {
     await store.save(order())
-    const execute = vi.fn(async () => undefined)
+    const execute = vi.fn<RunDeps['execute']>(async () => undefined)
     const r = (await createRunChannels(
       runDeps({
         execute,
@@ -1001,7 +1001,7 @@ function failuresAndRefusalsTests() {
   })
 
   it('runs nothing for an order that was refused', async () => {
-    const execute = vi.fn(async () => undefined)
+    const execute = vi.fn<RunDeps['execute']>(async () => undefined)
     await createRunChannels(
       runDeps({
         execute,
@@ -1020,7 +1020,7 @@ describe('foundry:run.resume', () => {
 
 function pickingUpTests() {
   it('picks the run back up from the graph on disk', async () => {
-    const execute = vi.fn(async () => undefined)
+    const execute = vi.fn<RunDeps['execute']>(async () => undefined)
     const channels = await started(execute)
     execute.mockClear()
 
@@ -1036,7 +1036,7 @@ function pickingUpTests() {
 
 function retryingTests() {
   it('retries the node the operator sent back', async () => {
-    const execute = vi.fn(async () => undefined)
+    const execute = vi.fn<RunDeps['execute']>(async () => undefined)
     const channels = await started(execute)
 
     // Fail a node, as a run would.
@@ -1061,7 +1061,7 @@ function retryingTests() {
   })
 
   it('leaves everything else where it was', async () => {
-    const execute = vi.fn(async () => undefined)
+    const execute = vi.fn<RunDeps['execute']>(async () => undefined)
     const channels = await started(execute)
     execute.mockClear()
 
@@ -1076,7 +1076,7 @@ function recordingTheResumeTests() {
   // retry that goes on to succeed still reads `stopped`, because the ledger's
   // newest run-shaped line stays the old failure for ever.
   it('records that the run was resumed', async () => {
-    const execute = vi.fn(async () => undefined)
+    const execute = vi.fn<RunDeps['execute']>(async () => undefined)
     const channels = await started(execute)
 
     await channels.resume({ id: 'WO-1' })
@@ -1145,11 +1145,9 @@ describe('a start is never refused for finished turns waiting on review', () => 
 
   it('starts even when a legacy gate says there is no room', async () => {
     await store.save(order())
-    const legacy = createRunChannels(
-      runDeps({
-        backpressure: full,
-      })
-    )
+    // Not a RunDeps field any more: the old gate rides along as a stray property.
+    const legacyDeps = { ...runDeps(), backpressure: full }
+    const legacy = createRunChannels(legacyDeps)
     const r = (await legacy.start({ id: 'WO-1' })) as { error?: string }
     expect(r.error).toBeUndefined()
     expect((await store.load('WO-1'))?.status).toBe('running')
@@ -1205,7 +1203,7 @@ describe('a run whose agents are gone', () => {
 
 function takingNodesBackTests() {
   it('resume takes the node back so the scheduler can offer it again', async () => {
-    const execute = vi.fn(async () => undefined)
+    const execute = vi.fn<RunDeps['execute']>(async () => undefined)
     const channels = await runningOrder({ execute: execute as never, isLive: nothingLive })
     const { nodeId } = withRunning()
     execute.mockClear()
@@ -1234,7 +1232,7 @@ function takingNodesBackTests() {
 
 function liveAgentsAndRunningExecutorsTests() {
   it('leaves a node alone whose agent is still in its terminal', async () => {
-    const execute = vi.fn(async () => undefined)
+    const execute = vi.fn<RunDeps['execute']>(async () => undefined)
     const channels = await runningOrder({ execute: execute as never, isLive: everythingLive })
     const { nodeId } = withRunning()
     execute.mockClear()
@@ -1245,7 +1243,7 @@ function liveAgentsAndRunningExecutorsTests() {
   })
 
   it('refuses to resume, and starts no second executor, while one is already running this order', async () => {
-    const execute = vi.fn(async () => undefined)
+    const execute = vi.fn<RunDeps['execute']>(async () => undefined)
     const channels = await runningOrder({
       execute: execute as never,
       isLive: nothingLive,

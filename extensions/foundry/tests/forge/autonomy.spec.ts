@@ -6,7 +6,6 @@ import {
   dismissConfidentFindings,
   followUpFor,
   retryForRefusal,
-  MAX_AUTO_TURNS,
 } from '../../src/forge/autonomy.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
@@ -57,6 +56,8 @@ const findings = [
     text: 't',
     status: 'open' as const,
     reason: '',
+    category: 'wrong-outcome' as const,
+    round: 0,
   },
   {
     id: 'RT-fully-serial-plan',
@@ -64,6 +65,8 @@ const findings = [
     text: 't',
     status: 'open' as const,
     reason: '',
+    category: 'wrong-outcome' as const,
+    round: 0,
   },
   {
     id: 'RT-no-runnable-check',
@@ -71,6 +74,8 @@ const findings = [
     text: 't',
     status: 'open' as const,
     reason: '',
+    category: 'wrong-outcome' as const,
+    round: 0,
   },
 ]
 
