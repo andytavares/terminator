@@ -37,28 +37,48 @@ export function AppBand({
       {tabs.map((tab) => (
         <Entry
           key={tab.id}
-          label={
-            (tab.badge ?? 0) > 0 && tab.badgeLabel ? `${tab.label}, ${tab.badgeLabel}` : tab.label
-          }
+          label={entryLabel(tab)}
           icon={tab.icon}
           active={activeId === tab.id}
           badge={tab.badge}
           onClick={() => onSelect(tab.id)}
         />
       ))}
+      <AppEntries {...{ unreadNotifications, onBellClick, onOpenQuickActions }} />
+    </div>
+  )
+}
+
+/** Quick Actions and the bell, set apart at the end of the row. */
+function AppEntries({
+  unreadNotifications = 0,
+  onBellClick,
+  onOpenQuickActions,
+}: Pick<AppBandProps, 'unreadNotifications' | 'onBellClick' | 'onOpenQuickActions'>) {
+  return (
+    <>
       {(onOpenQuickActions || onBellClick) && <span className="app-band__spacer" />}
       {onOpenQuickActions && (
         <Entry label="Quick actions (⌘P)" icon={<Command />} onClick={onOpenQuickActions} />
       )}
-      {onBellClick && (
-        <Entry
-          label={`Notifications${unreadNotifications > 0 ? ` (${unreadNotifications} unread)` : ''}`}
-          icon={<Bell />}
-          badge={unreadNotifications}
-          onClick={onBellClick}
-        />
-      )}
-    </div>
+      {onBellClick && <BellEntry unread={unreadNotifications} onClick={onBellClick} />}
+    </>
+  )
+}
+
+/** A tab's name, and while it is badged what the badge counts. */
+function entryLabel(tab: GlobalTabRegistration): string {
+  return (tab.badge ?? 0) > 0 && tab.badgeLabel ? `${tab.label}, ${tab.badgeLabel}` : tab.label
+}
+
+function BellEntry({ unread, onClick }: { unread: number; onClick: () => void }): JSX.Element {
+  return (
+    <Entry
+      label={`Notifications${unread > 0 ? ` (${unread} unread)` : ''}`}
+      icon={<Bell />}
+      badge={unread}
+      onClick={onClick}
+    />
   )
 }
 

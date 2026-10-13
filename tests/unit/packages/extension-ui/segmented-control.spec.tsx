@@ -49,7 +49,9 @@ describe('SegmentedControl', () => {
     fireEvent.click(option('Diagram'))
     expect(option('Diagram').getAttribute('aria-checked')).toBe('true')
   })
+})
 
+describe('SegmentedControl — moves focus and the choice with the arrow keys, skipping a disabled option', () => {
   it('moves focus and the choice with the arrow keys, skipping a disabled option', () => {
     render(<Harness initial="diagram" />)
     option('Diagram').focus()
@@ -78,7 +80,9 @@ describe('SegmentedControl', () => {
     fireEvent.keyDown(option('Note'), { key: 'a' })
     expect(onChange).not.toHaveBeenCalled()
   })
+})
 
+describe('SegmentedControl — leaves a disabled option unpressable', () => {
   it('leaves a disabled option unpressable', () => {
     const onChange = vi.fn()
     render(<SegmentedControl label="Kind" options={OPTIONS} value="note" onChange={onChange} />)

@@ -51,6 +51,69 @@ function measureCharWidth(fontSize: number): number {
   return 8
 }
 
+const currentTheme = () =>
+  document.documentElement.dataset.theme === 'light' ? XTERM_THEMES.light : XTERM_THEMES.dark
+
+function createTerminal(
+  scrollbackLimit: number,
+  theme: (typeof XTERM_THEMES)[keyof typeof XTERM_THEMES]
+): Terminal {
+  return new Terminal({
+    scrollback: scrollbackLimit,
+    fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+    fontSize: 13,
+    lineHeight: 1.2,
+    theme,
+    cursorBlink: true,
+  })
+}
+
+/** Repaints the terminal in the app's theme whenever the theme changes. */
+function followTheme(terminal: Terminal): MutationObserver {
+  const observer = new MutationObserver(() => {
+    terminal.options.theme = currentTheme()
+  })
+  observer.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ['data-theme'],
+  })
+  return observer
+}
+
+/** False for a key the terminal must not handle itself. */
+function handleCustomKey(terminal: Terminal, e: KeyboardEvent): boolean {
+  // The quick-actions leader belongs to the app. Off macOS it is Ctrl+P, which
+  // xterm would send to the shell as ^P and stop from reaching the app's listener.
+  if (isLeader(e)) return false
+  // Cmd+Enter / Shift+Enter — send a literal newline to the running program.
+  // terminal.paste() wraps in bracketed-paste sequences when the program has enabled
+  // that mode (e.g. claude CLI), so the program receives a newline without executing.
+  // Note: Shift+Enter is intercepted unconditionally — programs that handle it
+  // natively (e.g. IPython) will not receive the raw key event.
+  if ((e.metaKey || e.shiftKey) && e.key === 'Enter' && e.type === 'keydown') {
+    // Must call preventDefault() ourselves — xterm does NOT call it when the custom
+    // handler returns false. Without this, the browser fires a subsequent `input` event
+    // on xterm's textarea, which xterm forwards to the PTY as \r (submitting the line).
+    e.preventDefault()
+    terminal.paste('\n')
+    return false
+  }
+  return true
+}
+
+const PREVIEW_FONT_SIZE = 13
+
+/** The terminal's size in pixels at its own font, before a preview scales it. */
+function naturalSize(cols: number, rows: number) {
+  const lineHeight = Math.ceil(PREVIEW_FONT_SIZE * 1.2)
+  const charW = measureCharWidth(PREVIEW_FONT_SIZE)
+  return {
+    lineHeight,
+    naturalW: Math.ceil(cols * charW + 12),
+    naturalH: rows * lineHeight + 8,
+  }
+}
+
 /**
  * Activity callbacks wired by the session controller. TerminalInstance is a
  * pure view object: it emits these events and never touches a store.
@@ -83,51 +146,31 @@ export class TerminalInstance {
   constructor(sessionId: string, scrollbackLimit: number, hooks?: TerminalInstanceHooks) {
     this.sessionId = sessionId
     this.hooks = hooks
-    const initialTheme =
-      document.documentElement.dataset.theme === 'light' ? XTERM_THEMES.light : XTERM_THEMES.dark
-    this.terminal = new Terminal({
-      scrollback: scrollbackLimit,
-      fontFamily: 'Menlo, Monaco, "Courier New", monospace',
-      fontSize: 13,
-      lineHeight: 1.2,
-      theme: initialTheme,
-      cursorBlink: true,
-    })
+    const initialTheme = currentTheme()
+    this.terminal = createTerminal(scrollbackLimit, initialTheme)
     this.fitAddon = new FitAddon()
     this.terminal.loadAddon(this.fitAddon)
     this.terminal.options.theme = initialTheme
-    this.themeObserver = new MutationObserver(() => {
-      this.terminal.options.theme =
-        document.documentElement.dataset.theme === 'light' ? XTERM_THEMES.light : XTERM_THEMES.dark
-    })
-    this.themeObserver.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['data-theme'],
-    })
+    this.themeObserver = followTheme(this.terminal)
 
     this.element = document.createElement('div')
     this.element.style.cssText = 'width:100%;height:100%;position:relative;'
 
-    this.terminal.attachCustomKeyEventHandler((e) => {
-      // The quick-actions leader belongs to the app. Off macOS it is Ctrl+P, which
-      // xterm would send to the shell as ^P and stop from reaching the app's listener.
-      if (isLeader(e)) return false
-      // Cmd+Enter / Shift+Enter — send a literal newline to the running program.
-      // terminal.paste() wraps in bracketed-paste sequences when the program has enabled
-      // that mode (e.g. claude CLI), so the program receives a newline without executing.
-      // Note: Shift+Enter is intercepted unconditionally — programs that handle it
-      // natively (e.g. IPython) will not receive the raw key event.
-      if ((e.metaKey || e.shiftKey) && e.key === 'Enter' && e.type === 'keydown') {
-        // Must call preventDefault() ourselves — xterm does NOT call it when the custom
-        // handler returns false. Without this, the browser fires a subsequent `input` event
-        // on xterm's textarea, which xterm forwards to the PTY as \r (submitting the line).
-        e.preventDefault()
-        this.terminal.paste('\n')
-        return false
-      }
-      return true
-    })
+    this.terminal.attachCustomKeyEventHandler((e) => handleCustomKey(this.terminal, e))
+    this.wireToPty(sessionId)
+    this.registerLinkProviders()
+    this.outputUnsubscribe = this.subscribeToOutput(sessionId)
 
+    // Subscribed first, then attached: anything the process printed before this
+    // terminal existed on screen has been held back, and is delivered now. A
+    // terminal the operator opened themselves has nothing held and this is a
+    // no-op; one the application opened — a supervised agent — would otherwise
+    // be missing its launch command and everything up to the moment it appeared.
+    void window.electronAPI.terminal.attach(sessionId)
+  }
+
+  /** Keystrokes and size go to the PTY; the bell goes to whoever asked to hear it. */
+  private wireToPty(sessionId: string): void {
     this.terminal.onData((data) => {
       window.electronAPI.terminal.input(sessionId, data)
     })
@@ -136,13 +179,14 @@ export class TerminalInstance {
       window.electronAPI.terminal.resize(sessionId, cols, rows)
     })
 
-    if (hooks?.onBell) {
-      this.terminal.onBell(hooks.onBell)
+    if (this.hooks?.onBell) {
+      this.terminal.onBell(this.hooks.onBell)
     }
+  }
 
-    this.registerLinkProviders()
-
-    this.outputUnsubscribe = subscribeToSessionOutput(sessionId, (data, written) => {
+  /** Writes the session's output, reporting busy on each chunk and idle once it stops. */
+  private subscribeToOutput(sessionId: string): () => void {
+    return subscribeToSessionOutput(sessionId, (data, written) => {
       this.terminal.write(data, written)
       this.hooks?.onBusy?.()
       if (this.busyTimer !== null) clearTimeout(this.busyTimer)
@@ -151,13 +195,6 @@ export class TerminalInstance {
         this.hooks?.onIdle?.()
       }, IDLE_DEBOUNCE_MS)
     })
-
-    // Subscribed first, then attached: anything the process printed before this
-    // terminal existed on screen has been held back, and is delivered now. A
-    // terminal the operator opened themselves has nothing held and this is a
-    // no-op; one the application opened — a supervised agent — would otherwise
-    // be missing its launch command and everything up to the moment it appeared.
-    void window.electronAPI.terminal.attach(sessionId)
   }
 
   private registerLinkProviders(): void {
@@ -238,21 +275,13 @@ export class TerminalInstance {
     if (!this.opened) return null
     const { cols, rows } = this.terminal
     if (!cols || !rows) return null
-
-    // Compute natural pixel dimensions using the same font metrics as the terminal.
-    const fontSize = 13
-    const lineHeight = Math.ceil(fontSize * 1.2)
-    const charW = measureCharWidth(fontSize)
-    const naturalW = Math.ceil(cols * charW + 12)
-    const naturalH = rows * lineHeight + 8
+    const size = naturalSize(cols, rows)
 
     const place = (): void => {
       const { scale, translateY } = previewWindow({
         rows,
         cursorY: this.terminal.buffer.active.cursorY,
-        lineHeight,
-        naturalW,
-        naturalH,
+        ...size,
         containerW: container.offsetWidth || 220,
         containerH: container.offsetHeight || 150,
       })
@@ -261,13 +290,7 @@ export class TerminalInstance {
 
     // A tile is a scaled thumbnail of a live terminal; it never takes a GPU context.
     this.disableWebgl()
-    this.element.style.width = `${naturalW}px`
-    this.element.style.height = `${naturalH}px`
-    this.element.style.transformOrigin = 'top left'
-    this.element.style.pointerEvents = 'none'
-    // A preview is for reading. Its xterm input stays out of the tab order, or
-    // tabbing through Home would type into the session behind a thumbnail.
-    this.terminal.textarea?.setAttribute('tabindex', '-1')
+    this.styleAsPreview(size)
     place()
     container.appendChild(this.element)
     // The cursor moves as output arrives; the window follows it on each render.
@@ -275,14 +298,28 @@ export class TerminalInstance {
 
     return () => {
       following.dispose()
-      this.terminal.textarea?.removeAttribute('tabindex')
-      this.element.style.width = '100%'
-      this.element.style.height = '100%'
-      this.element.style.transform = ''
-      this.element.style.transformOrigin = ''
-      this.element.style.pointerEvents = ''
-      this.element.parentElement?.removeChild(this.element)
+      this.restoreFromPreview()
     }
+  }
+
+  private styleAsPreview({ naturalW, naturalH }: { naturalW: number; naturalH: number }): void {
+    this.element.style.width = `${naturalW}px`
+    this.element.style.height = `${naturalH}px`
+    this.element.style.transformOrigin = 'top left'
+    this.element.style.pointerEvents = 'none'
+    // A preview is for reading. Its xterm input stays out of the tab order, or
+    // tabbing through Home would type into the session behind a thumbnail.
+    this.terminal.textarea?.setAttribute('tabindex', '-1')
+  }
+
+  private restoreFromPreview(): void {
+    this.terminal.textarea?.removeAttribute('tabindex')
+    this.element.style.width = '100%'
+    this.element.style.height = '100%'
+    this.element.style.transform = ''
+    this.element.style.transformOrigin = ''
+    this.element.style.pointerEvents = ''
+    this.element.parentElement?.removeChild(this.element)
   }
 
   // Remove from DOM without destroying the xterm instance.

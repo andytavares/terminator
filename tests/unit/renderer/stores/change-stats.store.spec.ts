@@ -53,7 +53,9 @@ describe('change-stats store — lazy, cached, never awaited by render', () => {
     await flush()
     expect(changeStats).toHaveBeenCalledTimes(1)
   })
+})
 
+describe('change-stats store — lazy, cached, never awaited by render — refetches one millisecond past the TTL', () => {
   it('refetches one millisecond past the TTL', async () => {
     store().ensure('b1', '/repo', 1000)
     await flush()
@@ -79,7 +81,9 @@ describe('change-stats store — lazy, cached, never awaited by render', () => {
     expect(store().statsFor('b1')?.state).toBe('ready')
     expect(store().statsFor('b2')?.state).toBe('ready')
   })
+})
 
+describe('change-stats store — lazy, cached, never awaited by render — records an error envelope as an error with no stats', () => {
   it('records an error envelope as an error with no stats', async () => {
     changeStats.mockResolvedValue({ error: 'not a git repository' })
     store().ensure('b1', '/tmp', 1000)
@@ -102,7 +106,9 @@ describe('change-stats store — lazy, cached, never awaited by render', () => {
     await flush()
     expect(changeStats).toHaveBeenCalledTimes(1)
   })
+})
 
+describe('change-stats store — lazy, cached, never awaited by render — refetches after invalidate, even inside the TTL', () => {
   it('refetches after invalidate, even inside the TTL', async () => {
     store().ensure('b1', '/repo', 1000)
     await flush()
@@ -129,11 +135,21 @@ describe('change-stats store — lazy, cached, never awaited by render', () => {
     expect(store().statsFor('b1')).toBeUndefined()
     expect(store().statsFor('b2')).toBeUndefined()
   })
+})
 
+describe('change-stats store — lazy, cached, never awaited by render — records unavailable rather than throwing when the git API is absent', () => {
   it('records unavailable rather than throwing when the git API is absent', async () => {
     vi.stubGlobal('window', {})
     store().ensure('b1', '/repo', 1000)
     await flush()
     expect(store().statsFor('b1')).toMatchObject({ state: 'error', stats: null })
+  })
+})
+
+describe('change-stats store — invalidating a branch it never asked about', () => {
+  it('changes nothing', () => {
+    const before = store().entries
+    store().invalidate('never-seen')
+    expect(store().entries).toBe(before)
   })
 })

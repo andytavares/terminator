@@ -31,7 +31,9 @@ describe('allocateExtensionGroups', () => {
       '"gadgets" wanted mnemonic "g" but it was taken by "git-integration"; assigned "d" instead.',
     ])
   })
+})
 
+describe('allocateExtensionGroups — falls back to the first free a-z letter when no letter of the label is free', () => {
   it('falls back to the first free a-z letter when no letter of the label is free', () => {
     const { groups, warnings } = allocateExtensionGroups([
       { extensionId: 'one', mnemonic: 'p', label: 'Ppp' },
@@ -54,7 +56,9 @@ describe('allocateExtensionGroups', () => {
       '"terminal-plus" wanted mnemonic "t" but it was taken; assigned "e" instead.',
     ])
   })
+})
 
+describe('allocateExtensionGroups — assigns no group when every a-z letter is exhausted', () => {
   it('assigns no group when every a-z letter is exhausted', () => {
     const requests = Array.from({ length: 26 }, (_, i) => ({
       extensionId: `ext-${i}`,

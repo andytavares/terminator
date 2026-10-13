@@ -35,6 +35,19 @@ function firstFreeLetter(used: Set<string>): string | null {
   return null
 }
 
+/** Why a group did not get the letter it asked for, and what it got instead. */
+function takenWarning(
+  req: ExtensionGroupRequest,
+  assigned: string | null,
+  groups: QuickActionGroup[]
+): string {
+  const wanted = `"${req.extensionId}" wanted mnemonic "${req.mnemonic}"`
+  if (!assigned) return `${wanted} but no group letter was free.`
+  const takenBy = groups.find((g) => g.mnemonic === req.mnemonic)
+  const by = takenBy ? ` by "${takenBy.owner}"` : ''
+  return `${wanted} but it was taken${by}; assigned "${assigned}" instead.`
+}
+
 export function allocateExtensionGroups(requests: ExtensionGroupRequest[]): {
   groups: QuickActionGroup[]
   warnings: string[]
@@ -46,29 +59,11 @@ export function allocateExtensionGroups(requests: ExtensionGroupRequest[]): {
   for (const req of requests) {
     const wanted = req.mnemonic
     const wantedTaken = wanted !== undefined && used.has(wanted)
-    let assigned: string | null
-
-    if (wanted !== undefined && !wantedTaken) {
-      assigned = wanted
-    } else {
-      assigned = firstFreeLabelLetter(req.label, used) ?? firstFreeLetter(used)
-    }
-
-    if (wanted !== undefined && wantedTaken) {
-      if (assigned) {
-        const takenBy = groups.find((g) => g.mnemonic === wanted)
-        warnings.push(
-          `"${req.extensionId}" wanted mnemonic "${wanted}" but it was taken${
-            takenBy ? ` by "${takenBy.owner}"` : ''
-          }; assigned "${assigned}" instead.`
-        )
-      } else {
-        warnings.push(
-          `"${req.extensionId}" wanted mnemonic "${wanted}" but no group letter was free.`
-        )
-      }
-    }
-
+    const assigned =
+      wanted !== undefined && !wantedTaken
+        ? wanted
+        : (firstFreeLabelLetter(req.label, used) ?? firstFreeLetter(used))
+    if (wantedTaken) warnings.push(takenWarning(req, assigned, groups))
     if (!assigned) continue
 
     used.add(assigned)

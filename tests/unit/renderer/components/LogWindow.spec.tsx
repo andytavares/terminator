@@ -36,7 +36,9 @@ describe('LogWindow', () => {
     expect(screen.getByText(/^INFO$/)).toBeTruthy()
     expect(screen.getByText(/^ERR/)).toBeTruthy()
   })
+})
 
+describe('LogWindow — empties the log when Clear is clicked', () => {
   it('empties the log when Clear is clicked', () => {
     useLogStore.setState({
       entries: [{ id: 1, level: 'info', message: 'started up', timestamp: '12:00:00' }],
@@ -60,7 +62,9 @@ describe('LogWindow', () => {
     fireEvent.keyDown(window, { key: 'Escape' })
     expect(onClose).toHaveBeenCalled()
   })
+})
 
+describe('LogWindow — renders warn and log level labels', () => {
   it('renders warn and log level labels', () => {
     useLogStore.setState({
       entries: [

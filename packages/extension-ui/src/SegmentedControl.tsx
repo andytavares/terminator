@@ -54,6 +54,28 @@ function nextRadio(group: HTMLElement, from: Element, key: string): HTMLButtonEl
   return radios[(current + step + radios.length) % radios.length]
 }
 
+/** Arrow keys, Home and End move focus and the choice together. */
+function moveChoice<Value extends string>(
+  event: React.KeyboardEvent<HTMLDivElement>,
+  onChange: (value: Value) => void
+): void {
+  const next = nextRadio(event.currentTarget, event.target as Element, event.key)
+  if (!next) return
+  event.preventDefault()
+  next.focus()
+  // Every value on a radio here came from `options`, so it is a Value.
+  onChange(next.dataset.value as Value)
+}
+
+/** The option in the Tab order: the chosen one, or with nothing chosen the first enabled. */
+function focusableValue<Value extends string>(
+  options: readonly SegmentedOption<Value>[],
+  value: Value
+): Value | undefined {
+  const chosen = options.some((option) => option.value === value)
+  return chosen ? value : options.find((option) => !option.disabled)?.value
+}
+
 export function SegmentedControl<Value extends string>({
   label,
   options,
@@ -62,42 +84,56 @@ export function SegmentedControl<Value extends string>({
   size = 'md',
   className,
 }: SegmentedControlProps<Value>): JSX.Element {
-  const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>): void => {
-    const next = nextRadio(event.currentTarget, event.target as Element, event.key)
-    if (!next) return
-    event.preventDefault()
-    next.focus()
-    // Every value on a radio here came from `options`, so it is a Value.
-    onChange(next.dataset.value as Value)
-  }
   const classes = ['tmui-segmented', `tmui-segmented--${size}`, className]
-  // With nothing chosen the group still needs one way in from the keyboard.
-  const chosen = options.some((option) => option.value === value)
-  const focusable = chosen ? value : options.find((option) => !option.disabled)?.value
+  const focusable = focusableValue(options, value)
   return (
     <div
       role="radiogroup"
       aria-label={label}
       className={classes.filter(Boolean).join(' ')}
-      onKeyDown={onKeyDown}
+      onKeyDown={(event) => moveChoice(event, onChange)}
     >
       {options.map((option) => (
-        <button
+        <SegmentedOptionButton
           key={option.value}
-          type="button"
-          role="radio"
-          data-value={option.value}
-          aria-checked={option.value === value}
-          aria-label={option.accessibleName}
-          title={option.title}
-          tabIndex={option.value === focusable ? 0 : -1}
-          disabled={option.disabled}
-          className="tmui-segmented__option"
-          onClick={() => onChange(option.value)}
-        >
-          {option.label}
-        </button>
+          option={option}
+          checked={option.value === value}
+          focusable={option.value === focusable}
+          onChange={onChange}
+        />
       ))}
     </div>
+  )
+}
+
+interface SegmentedOptionButtonProps<Value extends string> {
+  option: SegmentedOption<Value>
+  checked: boolean
+  /** The one option in the Tab order. */
+  focusable: boolean
+  onChange: (value: Value) => void
+}
+
+function SegmentedOptionButton<Value extends string>({
+  option,
+  checked,
+  focusable,
+  onChange,
+}: SegmentedOptionButtonProps<Value>): JSX.Element {
+  return (
+    <button
+      type="button"
+      role="radio"
+      data-value={option.value}
+      aria-checked={checked}
+      aria-label={option.accessibleName}
+      title={option.title}
+      tabIndex={focusable ? 0 : -1}
+      disabled={option.disabled}
+      className="tmui-segmented__option"
+      onClick={() => onChange(option.value)}
+    >
+      {option.label}
+    </button>
   )
 }

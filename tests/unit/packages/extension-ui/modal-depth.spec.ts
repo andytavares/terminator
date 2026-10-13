@@ -10,12 +10,17 @@ import {
 // the double-Escape detector that must yield to it both live in the same view,
 // so the count never has to travel (research R2).
 
-describe('modal depth registry', () => {
-  let host: ModalDepthHost
+let host: ModalDepthHost
 
+/** The hooks every "modal depth registry" describe registers. */
+function setUpModalDepthRegistry(): void {
   beforeEach(() => {
     host = {}
   })
+}
+
+describe('modal depth registry', () => {
+  setUpModalDepthRegistry()
 
   it('starts at zero', () => {
     const registry = createModalDepthRegistry(host)
@@ -41,6 +46,10 @@ describe('modal depth registry', () => {
     registry.pop()
     expect(registry.current()).toBe(0)
   })
+})
+
+describe('modal depth registry — floors at zero when popped more than pushed', () => {
+  setUpModalDepthRegistry()
 
   // A stuck count silently disables the exit gesture for the rest of the
   // session, which is worse than the bug being fixed.
@@ -74,6 +83,10 @@ describe('modal depth registry', () => {
     releaseOuter()
     expect(registry.current()).toBe(0)
   })
+})
+
+describe('modal depth registry — publishes the count on the host object so a preload script can read it', () => {
+  setUpModalDepthRegistry()
 
   it('publishes the count on the host object so a preload script can read it', () => {
     const registry = createModalDepthRegistry(host)
@@ -89,6 +102,10 @@ describe('modal depth registry', () => {
     a.push()
     expect(b.current()).toBe(1)
   })
+})
+
+describe('modal depth registry — getModalDepth', () => {
+  setUpModalDepthRegistry()
 
   describe('getModalDepth', () => {
     it('reads the published count', () => {

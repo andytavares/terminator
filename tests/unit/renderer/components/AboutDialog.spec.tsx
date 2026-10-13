@@ -55,7 +55,9 @@ describe('AboutDialog', () => {
     fireEvent.click(document.querySelector('.tmui-dialog__scrim')!)
     expect(onClose).toHaveBeenCalled()
   })
+})
 
+describe('AboutDialog — does not call onClose when dialog body is clicked', () => {
   it('does not call onClose when dialog body is clicked', async () => {
     const onClose = vi.fn()
     render(<AboutDialog onClose={onClose} />)
@@ -79,7 +81,9 @@ describe('AboutDialog', () => {
     expect(dashes.length).toBeGreaterThan(0)
     dashes.forEach((dd) => expect(dd.textContent).toBe('—'))
   })
+})
 
+describe('AboutDialog — keeps the placeholders when the app info cannot be read', () => {
   it('keeps the placeholders when the app info cannot be read', async () => {
     mockGetInfo.mockRejectedValue(new Error('IPC gone'))
     render(<AboutDialog onClose={vi.fn()} />)
@@ -106,7 +110,9 @@ describe('AboutDialog', () => {
     render(<AboutDialog onClose={vi.fn()} />)
     await waitFor(() => expect(screen.getByText('Error — IPC error')).toBeTruthy())
   })
+})
 
+describe('AboutDialog — does not close when non-Escape key is pressed', () => {
   it('does not close when non-Escape key is pressed', async () => {
     const onClose = vi.fn()
     render(<AboutDialog onClose={onClose} />)

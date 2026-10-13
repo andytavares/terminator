@@ -65,7 +65,9 @@ describe('planCustomAction — prompt actions', () => {
     })
     expect(plan).toEqual({ ok: false, reason: 'Claude is mid-turn' })
   })
+})
 
+describe('planCustomAction — prompt actions — plans an input with bracketed paste and enter when the agent is idle', () => {
   it('plans an input with bracketed paste and enter when the agent is idle', () => {
     const plan = planCustomAction(promptAction({ body: 'hello {branch}' }), {
       focused: { sessionId: 's1', isAgent: true, agentState: 'idle' },
@@ -121,7 +123,9 @@ describe('planCustomAction — shell actions', () => {
       reason: 'Focused terminal is running Claude, use a new tab',
     })
   })
+})
 
+describe('planCustomAction — shell actions — plans an input on the focused non-agent terminal', () => {
   it('plans an input on the focused non-agent terminal', () => {
     const plan = planCustomAction(shellAction({ target: 'focused', body: 'ls' }), {
       focused: { sessionId: 's1', isAgent: false, agentState: 'idle' },
@@ -148,7 +152,9 @@ describe('planCustomAction — shell actions', () => {
     })
     expect(plan).toEqual({ ok: true, kind: 'new-tab', projectId: 'p1', data: 'echo feat/x\r' })
   })
+})
 
+describe('planCustomAction — shell actions — refuses a shell body over 1024 bytes after expansion', () => {
   it('refuses a shell body over 1024 bytes after expansion', () => {
     const long = 'x'.repeat(MAX_TYPED_LINE_BYTES + 1)
     const plan = planCustomAction(shellAction({ target: 'new-tab', body: long }), {
@@ -168,7 +174,9 @@ describe('planCustomAction — shell actions', () => {
     })
     expect(plan.ok).toBe(true)
   })
+})
 
+describe('planCustomAction — shell actions — counts multi-byte characters correctly: under 1024 chars but over 1024 bytes is refused', () => {
   it('counts multi-byte characters correctly: under 1024 chars but over 1024 bytes is refused', () => {
     // Each '€' is 3 bytes in UTF-8. 400 of them is 400 chars but 1200 bytes.
     const body = '€'.repeat(400)

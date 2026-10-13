@@ -18,7 +18,9 @@ describe('LedgerDisplayMenu', () => {
       'false'
     )
   })
+})
 
+describe('LedgerDisplayMenu — shows the current grouping, sort, columns and options', () => {
   it('shows the current grouping, sort, columns and options', () => {
     open()
     expect(screen.getByRole('menu', { name: 'Display options' })).toBeTruthy()
@@ -40,7 +42,9 @@ describe('LedgerDisplayMenu', () => {
         .getAttribute('aria-checked')
     ).toBe('false')
   })
+})
 
+describe('LedgerDisplayMenu — changes grouping and sort, closing the menu', () => {
   it('changes grouping and sort, closing the menu', () => {
     const onChange = open()
     fireEvent.click(screen.getByRole('menuitemradio', { name: 'Branch' }))
@@ -67,7 +71,9 @@ describe('LedgerDisplayMenu', () => {
     expect(onChange).toHaveBeenCalledWith({ previewSelected: false })
     expect(onChange).toHaveBeenCalledWith({ hideExited: true })
   })
+})
 
+describe('LedgerDisplayMenu — closes on a click anywhere else', () => {
   it('closes on a click anywhere else', () => {
     open()
     fireEvent.click(document.body)

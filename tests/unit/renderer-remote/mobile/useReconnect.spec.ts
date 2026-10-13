@@ -3,9 +3,10 @@ import { renderHook, act } from '@testing-library/react'
 import { partialFake } from '../../../support/fakes'
 
 // Must be jsdom for document.addEventListener
-describe('useReconnect', () => {
-  const mockOpenWs = vi.fn()
+const mockOpenWs = vi.fn()
 
+/** The hooks every "useReconnect" describe registers. */
+function setUpUseReconnect(): void {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.useFakeTimers()
@@ -18,6 +19,10 @@ describe('useReconnect', () => {
   afterEach(() => {
     vi.useRealTimers()
   })
+}
+
+describe('useReconnect', () => {
+  setUpUseReconnect()
 
   it('returns status "connected" when ws is open', async () => {
     const { useReconnect } = await import('../../../../src/renderer-remote/hooks/useReconnect')
@@ -41,6 +46,10 @@ describe('useReconnect', () => {
     const { result } = renderHook(() => useReconnect(mockOpenWs, null))
     expect(result.current.status).toBe('connecting')
   })
+})
+
+describe('useReconnect — calls openWs when page becomes visible and ws is closed', () => {
+  setUpUseReconnect()
 
   it('calls openWs when page becomes visible and ws is closed', async () => {
     const { useReconnect } = await import('../../../../src/renderer-remote/hooks/useReconnect')
@@ -66,6 +75,10 @@ describe('useReconnect', () => {
 
     expect(mockOpenWs).not.toHaveBeenCalled()
   })
+})
+
+describe('useReconnect — sets status to "reconnecting" after first reconnect attempt', () => {
+  setUpUseReconnect()
 
   it('sets status to "reconnecting" after first reconnect attempt', async () => {
     const { useReconnect } = await import('../../../../src/renderer-remote/hooks/useReconnect')
@@ -78,6 +91,10 @@ describe('useReconnect', () => {
 
     expect(result.current.status).toBe('reconnecting')
   })
+})
+
+describe('useReconnect — sets status to "disconnected" after 3 failed attempts', () => {
+  setUpUseReconnect()
 
   it('sets status to "disconnected" after 3 failed attempts', async () => {
     const { useReconnect } = await import('../../../../src/renderer-remote/hooks/useReconnect')
@@ -105,6 +122,10 @@ describe('useReconnect', () => {
 
     expect(result.current.status).toBe('disconnected')
   })
+})
+
+describe('useReconnect — does not call openWs again while socket is still CONNECTING but counts the attempt', () => {
+  setUpUseReconnect()
 
   it('does not call openWs again while socket is still CONNECTING but counts the attempt', async () => {
     const { useReconnect } = await import('../../../../src/renderer-remote/hooks/useReconnect')
@@ -129,6 +150,10 @@ describe('useReconnect', () => {
     expect(mockOpenWs).not.toHaveBeenCalled()
     expect(result.current.status).toBe('disconnected')
   })
+})
+
+describe('useReconnect — onOpenWsFailed enters the reconnect loop when initial openWs throws', () => {
+  setUpUseReconnect()
 
   it('onOpenWsFailed enters the reconnect loop when initial openWs throws', async () => {
     const { useReconnect } = await import('../../../../src/renderer-remote/hooks/useReconnect')
@@ -146,6 +171,10 @@ describe('useReconnect', () => {
     })
     expect(mockOpenWs).toHaveBeenCalled()
   })
+})
+
+describe('useReconnect — onOpenWsFailed sets disconnected after 3 failures', () => {
+  setUpUseReconnect()
 
   it('onOpenWsFailed sets disconnected after 3 failures', async () => {
     const { useReconnect } = await import('../../../../src/renderer-remote/hooks/useReconnect')
@@ -167,21 +196,26 @@ describe('useReconnect', () => {
 
     expect(result.current.status).toBe('disconnected')
   })
+})
+
+// A socket is an EventTarget with a ready state; the hook needs nothing else.
+function socket(readyState: WebSocket['readyState']) {
+  const events = new EventTarget()
+  return partialFake<WebSocket>({
+    readyState,
+    addEventListener: (type: string, listener: EventListenerOrEventListenerObject) =>
+      events.addEventListener(type, listener),
+    removeEventListener: (type: string, listener: EventListenerOrEventListenerObject) =>
+      events.removeEventListener(type, listener),
+    dispatchEvent: (event: Event) => events.dispatchEvent(event),
+  })
+}
+
+describe('useReconnect — clears reconnecting status when new ws fires onopen', () => {
+  setUpUseReconnect()
 
   it('clears reconnecting status when new ws fires onopen', async () => {
     const { useReconnect } = await import('../../../../src/renderer-remote/hooks/useReconnect')
-    // A socket is an EventTarget with a ready state; the hook needs nothing else.
-    const socket = (readyState: WebSocket['readyState']) => {
-      const events = new EventTarget()
-      return partialFake<WebSocket>({
-        readyState,
-        addEventListener: (type: string, listener: EventListenerOrEventListenerObject) =>
-          events.addEventListener(type, listener),
-        removeEventListener: (type: string, listener: EventListenerOrEventListenerObject) =>
-          events.removeEventListener(type, listener),
-        dispatchEvent: (event: Event) => events.dispatchEvent(event),
-      })
-    }
     const ws = socket(3) // CLOSED
 
     const { result, rerender } = renderHook(
@@ -207,6 +241,10 @@ describe('useReconnect', () => {
 
     expect(result.current.status).toBe('connected')
   })
+})
+
+describe('useReconnect — retry() resets attempt count and starts reconnect', () => {
+  setUpUseReconnect()
 
   it('retry() resets attempt count and starts reconnect', async () => {
     const { useReconnect } = await import('../../../../src/renderer-remote/hooks/useReconnect')
@@ -229,43 +267,45 @@ describe('useReconnect', () => {
     expect(result.current.status).toBe('reconnecting')
     expect(mockOpenWs).toHaveBeenCalled()
   })
+})
 
-  describe('a socket the server closes on purpose', () => {
-    // An EventTarget with a ready state: all the hook reads of a socket.
-    const socket = (readyState: WebSocket['readyState']) => {
-      const events = new EventTarget()
-      return partialFake<WebSocket>({
-        readyState,
-        addEventListener: (type: string, listener: EventListenerOrEventListenerObject) =>
-          events.addEventListener(type, listener),
-        removeEventListener: (type: string, listener: EventListenerOrEventListenerObject) =>
-          events.removeEventListener(type, listener),
-        dispatchEvent: (event: Event) => events.dispatchEvent(event),
-      })
-    }
-
-    it.each([
-      [4003, 'full'],
-      [4004, 'removed'],
-    ] as const)(
-      'says why on close code %i, and does not come back by itself',
-      async (code, status) => {
-        const { useReconnect } = await import('../../../../src/renderer-remote/hooks/useReconnect')
-        const ws = socket(1)
-        const { result } = renderHook(() => useReconnect(mockOpenWs, ws))
-        act(() => {
-          ws.dispatchEvent(new CloseEvent('close', { code }))
-        })
-        expect(result.current.status).toBe(status)
-        act(() => {
-          document.dispatchEvent(new Event('visibilitychange'))
-        })
-        await act(async () => {
-          vi.advanceTimersByTime(6000)
-        })
-        expect(mockOpenWs).not.toHaveBeenCalled()
-        expect(result.current.status).toBe(status)
-      }
-    )
+/** An EventTarget with a ready state: all the hook reads of a socket. */
+function eventSocket(readyState: WebSocket['readyState']): WebSocket {
+  const events = new EventTarget()
+  return partialFake<WebSocket>({
+    readyState,
+    addEventListener: (type: string, listener: EventListenerOrEventListenerObject) =>
+      events.addEventListener(type, listener),
+    removeEventListener: (type: string, listener: EventListenerOrEventListenerObject) =>
+      events.removeEventListener(type, listener),
+    dispatchEvent: (event: Event) => events.dispatchEvent(event),
   })
+}
+
+/** The server closes the socket with `code`; the hook says `status` and stays there. */
+async function closedOnPurpose(code: number, status: string): Promise<void> {
+  const { useReconnect } = await import('../../../../src/renderer-remote/hooks/useReconnect')
+  const ws = eventSocket(1)
+  const { result } = renderHook(() => useReconnect(mockOpenWs, ws))
+  act(() => {
+    ws.dispatchEvent(new CloseEvent('close', { code }))
+  })
+  expect(result.current.status).toBe(status)
+  act(() => {
+    document.dispatchEvent(new Event('visibilitychange'))
+  })
+  await act(async () => {
+    vi.advanceTimersByTime(6000)
+  })
+  expect(mockOpenWs).not.toHaveBeenCalled()
+  expect(result.current.status).toBe(status)
+}
+
+describe('useReconnect — a socket the server closes on purpose', () => {
+  setUpUseReconnect()
+
+  it.each([
+    [4003, 'full'],
+    [4004, 'removed'],
+  ])('says why on close code %i, and does not come back by itself', closedOnPurpose)
 })

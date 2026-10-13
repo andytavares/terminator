@@ -60,7 +60,9 @@ describe('useDismissible', () => {
     fireEvent.mouseDown(screen.getByRole('button', { name: 'Inside' }))
     expect(onDismiss).not.toHaveBeenCalled()
   })
+})
 
+describe('useDismissible — leaves the outside click alone when the surface owns its own', () => {
   it('leaves the outside click alone when the surface owns its own', async () => {
     const onDismiss = vi.fn()
     render(<Panel onDismiss={onDismiss} closeOnOutsideClick={false} />)
@@ -88,7 +90,9 @@ describe('useDismissible', () => {
     expect(document.activeElement).toBe(opener)
     opener.remove()
   })
+})
 
+describe('useDismissible — counts toward the open-surface depth', () => {
   it('counts toward the open-surface depth', () => {
     delete window[MODAL_DEPTH_KEY]
     const { unmount } = render(<Panel onDismiss={() => {}} />)
@@ -142,23 +146,23 @@ describe('a re-rendered onDismiss', () => {
   })
 })
 
-describe('alsoInside', () => {
-  function Anchored({ onDismiss }: { onDismiss: () => void }): JSX.Element {
-    const trigger = useRef<HTMLButtonElement>(null)
-    const surface = useRef<HTMLDivElement>(null)
-    useDismissible({ ref: surface, onDismiss, alsoInside: [trigger] })
-    return (
-      <>
-        <button type="button" ref={trigger}>
-          Open
-        </button>
-        <div ref={surface} data-tmui-surface="">
-          <button type="button">Inside</button>
-        </div>
-      </>
-    )
-  }
+function Anchored({ onDismiss }: { onDismiss: () => void }): JSX.Element {
+  const trigger = useRef<HTMLButtonElement>(null)
+  const surface = useRef<HTMLDivElement>(null)
+  useDismissible({ ref: surface, onDismiss, alsoInside: [trigger] })
+  return (
+    <>
+      <button type="button" ref={trigger}>
+        Open
+      </button>
+      <div ref={surface} data-tmui-surface="">
+        <button type="button">Inside</button>
+      </div>
+    </>
+  )
+}
 
+describe('alsoInside', () => {
   it('treats a click on the trigger as inside', async () => {
     const onDismiss = vi.fn()
     render(<Anchored onDismiss={onDismiss} />)

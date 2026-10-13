@@ -6,7 +6,7 @@ import type { AgentState, Project, TerminalSession, Workspace } from '../../shar
 import type { WorkItem } from './work-item'
 
 /** A terminal's own work item, keyed by session id. Absent when nothing links it. */
-export type WorkItemsBySession = ReadonlyMap<string, WorkItem | null>
+type WorkItemsBySession = ReadonlyMap<string, WorkItem | null>
 
 /**
  * One terminal under a branch, and the panes split off it.
@@ -77,18 +77,29 @@ export interface BranchRowsResult {
   total: number
 }
 
+/** What the sidebar's rows are built from. */
+export interface BranchRowsSource {
+  sessions: TerminalSession[]
+  projects: Project[]
+  workspaces: Workspace[]
+  /** A terminal's own work item, keyed by session id. */
+  workItems?: WorkItemsBySession
+}
+
+/** When a terminal counts as stale: quiet for longer than `staleAfterMs` before `now`. */
+export interface StaleClock {
+  now: number
+  staleAfterMs: number
+}
+
 /** Grouping everything under one heading needs a stable identity for it. */
 const ALL_KEY = '__all__'
 
-function matchesQuery(
-  row: { label: string },
-  repoName: string,
-  sessions: TerminalSession[],
-  query: string
-): boolean {
-  if (row.label.toLowerCase().includes(query)) return true
-  if (repoName.toLowerCase().includes(query)) return true
-  return sessions.some((s) => s.tabTitle.toLowerCase().includes(query))
+/** A branch on its way to the list: its row, its repo and its own terminals. */
+interface Candidate {
+  row: BranchRow
+  repo: Workspace
+  own: TerminalSession[]
 }
 
 /**
@@ -100,20 +111,20 @@ function matchesQuery(
  */
 type OrderIndex = Map<string, number>
 
-function compareBranches(a: BranchRow, b: BranchRow, sortBy: SortKey, order: OrderIndex): number {
-  switch (sortBy) {
-    case 'manual':
-      return (order.get(a.projectId) ?? 0) - (order.get(b.projectId) ?? 0)
-    case 'name':
-      return a.label.localeCompare(b.label)
-    case 'status':
-      return STATUS_ORDER.indexOf(a.state) - STATUS_ORDER.indexOf(b.state)
-    case 'oldest':
-      return (a.lastActivityAt ?? 0) - (b.lastActivityAt ?? 0)
-    case 'recent':
-    default:
-      return (b.lastActivityAt ?? 0) - (a.lastActivityAt ?? 0)
+type Comparator<T> = (a: T, b: T) => number
+
+const activity = (row: { lastActivityAt: number | null }): number => row.lastActivityAt ?? 0
+
+function branchComparator(sortBy: SortKey, order: OrderIndex): Comparator<BranchRow> {
+  const position = (row: BranchRow): number => order.get(row.projectId) ?? 0
+  const comparators: Record<SortKey, Comparator<BranchRow>> = {
+    manual: (a, b) => position(a) - position(b),
+    name: (a, b) => a.label.localeCompare(b.label),
+    status: (a, b) => STATUS_ORDER.indexOf(a.state) - STATUS_ORDER.indexOf(b.state),
+    oldest: (a, b) => activity(a) - activity(b),
+    recent: (a, b) => activity(b) - activity(a),
   }
+  return comparators[sortBy] ?? comparators.recent
 }
 
 /** Newest across the repo's branches; null when nothing under it has run. */
@@ -136,21 +147,18 @@ function groupSeverity(group: RepoGroup): number {
  * a fixed order rather than wherever the fold left them. `manual` takes no such
  * fallback — an alphabetical tie-break is exactly what would eat a drag.
  */
-function compareGroups(a: RepoGroup, b: RepoGroup, sortBy: SortKey, order: OrderIndex): number {
-  const byName = a.label.localeCompare(b.label)
-  switch (sortBy) {
-    case 'manual':
-      return (order.get(a.workspaceId) ?? 0) - (order.get(b.workspaceId) ?? 0)
-    case 'name':
-      return byName
-    case 'status':
-      return groupSeverity(a) - groupSeverity(b) || byName
-    case 'oldest':
-      return (groupActivity(a) ?? 0) - (groupActivity(b) ?? 0) || byName
-    case 'recent':
-    default:
-      return (groupActivity(b) ?? 0) - (groupActivity(a) ?? 0) || byName
+function groupComparator(sortBy: SortKey, order: OrderIndex): Comparator<RepoGroup> {
+  const position = (group: RepoGroup): number => order.get(group.workspaceId) ?? 0
+  const recency = (group: RepoGroup): number => groupActivity(group) ?? 0
+  const byName: Comparator<RepoGroup> = (a, b) => a.label.localeCompare(b.label)
+  const comparators: Record<SortKey, Comparator<RepoGroup>> = {
+    manual: (a, b) => position(a) - position(b),
+    name: byName,
+    status: (a, b) => groupSeverity(a) - groupSeverity(b) || byName(a, b),
+    oldest: (a, b) => recency(a) - recency(b) || byName(a, b),
+    recent: (a, b) => recency(b) - recency(a) || byName(a, b),
   }
+  return comparators[sortBy] ?? comparators.recent
 }
 
 /**
@@ -176,86 +184,66 @@ function emptyGroup(repo: Workspace, flat: boolean): RepoGroup {
   }
 }
 
-/**
- * The sidebar's list: repos, and the branches under them.
- *
- * Written beside `buildGroups` rather than replacing it, so the switch can land
- * under a passing suite. The difference that matters is BR-1: **every branch is
- * a row, whether or not a terminal is open on it**, unconditionally. `buildGroups`
- * seeded empty project buckets only while the view was un-narrowed; here a
- * branch is the unit of work and exists in its own right, so only a filter can
- * hide it.
- *
- * A filter lifts one level: a branch matches when any of its terminals matches.
- * A branch with no terminals therefore matches only an unfiltered view — except
- * `hideStale`, which is a standing preference about abandoned work and has
- * nothing to say about a branch nobody has started yet.
- *
- * Deliberately absent: change statistics and the linked issue key. Both arrive
- * from stores on their own schedule, and folding them in here would make the
- * result a function of when git or the tracker last answered, which is exactly
- * the determinism this layer exists to protect (ADR-031).
- */
-export function buildBranchRows(
-  sessions: TerminalSession[],
-  projects: Project[],
-  workspaces: Workspace[],
-  view: SessionView,
-  now: number,
-  staleAfterMs: number,
-  workItems: WorkItemsBySession = new Map()
-): BranchRowsResult {
-  const workspaceById = new Map(workspaces.map((w) => [w.id, w]))
-  const { query, states, projectIds, hideStale, staleOnly } = view.filters
-  const normalisedQuery = query?.trim().toLowerCase()
-
-  const sessionsByProject = new Map<string, TerminalSession[]>()
+/** Each project's terminals, and the scratch terminals that belong to no branch. */
+function sessionsByProject(sessions: TerminalSession[]) {
+  const byProject = new Map<string, TerminalSession[]>()
   const scratch: TerminalSession[] = []
   for (const session of sessions) {
     if (session.projectId === SCRATCH_PROJECT_ID) {
       scratch.push(session)
       continue
     }
-    const bucket = sessionsByProject.get(session.projectId)
-    if (bucket === undefined) sessionsByProject.set(session.projectId, [session])
+    const bucket = byProject.get(session.projectId)
+    if (bucket === undefined) byProject.set(session.projectId, [session])
     else bucket.push(session)
   }
+  return { byProject, scratch }
+}
 
-  const candidates = projects.filter((p) => workspaceById.has(p.workspaceId))
-  const total = candidates.length
-
-  const kept: Array<{ project: Project; row: BranchRow; repo: Workspace }> = []
-
-  for (const project of candidates) {
-    const repo = workspaceById.get(project.workspaceId)!
-    const own = sessionsByProject.get(project.id) ?? []
-    const state = aggregateBranchState(own)
-    const row: BranchRow = {
-      projectId: project.id,
-      label: branchLabel(project),
-      isWorktree: project.isWorktree,
-      state,
-      stateCount: countInState(own, state),
-      sessionCount: own.length,
-      terminals: buildTerminals(own, workItems),
-      lastActivityAt: own.length === 0 ? null : Math.max(...own.map((s) => s.lastActivityAt)),
-      workspaceId: project.workspaceId,
-    }
-
-    if (normalisedQuery !== undefined && !matchesQuery(row, repo.name, own, normalisedQuery)) {
-      continue
-    }
-    if (projectIds !== undefined && !projectIds.includes(project.id)) continue
-    if (states !== undefined && !own.some((s) => states.includes(s.agentState))) continue
-    if (staleOnly === true && !own.some((s) => isStale(s, now, staleAfterMs))) continue
-    // A branch nobody has opened is not abandoned work, so hideStale passes it by.
-    if (hideStale === true && own.length > 0 && own.every((s) => isStale(s, now, staleAfterMs))) {
-      continue
-    }
-
-    kept.push({ project, row, repo })
+function branchRow(
+  project: Project,
+  own: TerminalSession[],
+  workItems: WorkItemsBySession
+): BranchRow {
+  const state = aggregateBranchState(own)
+  return {
+    projectId: project.id,
+    label: branchLabel(project),
+    isWorktree: project.isWorktree,
+    state,
+    stateCount: countInState(own, state),
+    sessionCount: own.length,
+    terminals: buildTerminals(own, workItems),
+    lastActivityAt: own.length === 0 ? null : Math.max(...own.map((s) => s.lastActivityAt)),
+    workspaceId: project.workspaceId,
   }
+}
 
+/** The query, the branch list and the states: each lifts one level, from terminal to branch. */
+function matchesNarrowing(filters: SessionView['filters'], { row, repo, own }: Candidate): boolean {
+  const query = filters.query?.trim().toLowerCase()
+  const names = [row.label, repo.name, ...own.map((s) => s.tabTitle)]
+  if (query !== undefined && !names.some((name) => name.toLowerCase().includes(query))) {
+    return false
+  }
+  if (filters.projectIds !== undefined && !filters.projectIds.includes(row.projectId)) return false
+  const { states } = filters
+  return states === undefined || own.some((s) => states.includes(s.agentState))
+}
+
+function matchesStaleness(
+  filters: SessionView['filters'],
+  own: TerminalSession[],
+  clock: StaleClock
+): boolean {
+  const stale = (s: TerminalSession): boolean => isStale(s, clock.now, clock.staleAfterMs)
+  if (filters.staleOnly === true && !own.some(stale)) return false
+  // A branch nobody has opened is not abandoned work, so hideStale passes it by.
+  return !(filters.hideStale === true && own.length > 0 && own.every(stale))
+}
+
+/** The kept branches under their repos, or under one heading when grouping is off. */
+function groupBranches(kept: Candidate[], view: SessionView, workspaces: Workspace[]) {
   const grouped = new Map<string, RepoGroup>()
   for (const { row, repo } of kept) {
     const key = view.groupBy === 'none' ? ALL_KEY : repo.id
@@ -279,21 +267,60 @@ export function buildBranchRows(
       if (!grouped.has(repo.id)) grouped.set(repo.id, emptyGroup(repo, false))
     }
   }
+  return [...grouped.values()]
+}
 
-  const projectOrder: OrderIndex = new Map(projects.map((p, i) => [p.id, i]))
-  const workspaceOrder: OrderIndex = new Map(workspaces.map((w, i) => [w.id, i]))
-
-  const groups = [...grouped.values()]
+function sortGroups(groups: RepoGroup[], sortBy: SortKey, source: BranchRowsSource): RepoGroup[] {
+  const byBranch = branchComparator(sortBy, new Map(source.projects.map((p, i) => [p.id, i])))
+  const byRepo = groupComparator(sortBy, new Map(source.workspaces.map((w, i) => [w.id, i])))
+  return groups
     .map((group) => ({
       ...group,
-      branches: [...group.branches].sort((a, b) =>
-        compareBranches(a, b, view.sortBy, projectOrder)
-      ),
+      branches: [...group.branches].sort(byBranch),
       branchCount: group.branches.length,
     }))
-    .sort((a, b) => compareGroups(a, b, view.sortBy, workspaceOrder))
+    .sort(byRepo)
+}
 
-  return { groups, scratch, shown: kept.length, total }
+/**
+ * The sidebar's list: repos, and the branches under them.
+ *
+ * Written beside `buildGroups` rather than replacing it, so the switch can land
+ * under a passing suite. The difference that matters is BR-1: **every branch is
+ * a row, whether or not a terminal is open on it**, unconditionally. `buildGroups`
+ * seeded empty project buckets only while the view was un-narrowed; here a
+ * branch is the unit of work and exists in its own right, so only a filter can
+ * hide it.
+ *
+ * A filter lifts one level: a branch matches when any of its terminals matches.
+ * A branch with no terminals therefore matches only an unfiltered view — except
+ * `hideStale`, which is a standing preference about abandoned work and has
+ * nothing to say about a branch nobody has started yet.
+ *
+ * Deliberately absent: change statistics and the linked issue key. Both arrive
+ * from stores on their own schedule, and folding them in here would make the
+ * result a function of when git or the tracker last answered, which is exactly
+ * the determinism this layer exists to protect (ADR-031).
+ */
+export function buildBranchRows(
+  source: BranchRowsSource,
+  view: SessionView,
+  clock: StaleClock
+): BranchRowsResult {
+  const workspaceById = new Map(source.workspaces.map((w) => [w.id, w]))
+  const { byProject, scratch } = sessionsByProject(source.sessions)
+  const candidates = source.projects.filter((p) => workspaceById.has(p.workspaceId))
+  const kept = candidates
+    .map((project): Candidate => {
+      const own = byProject.get(project.id) ?? []
+      const row = branchRow(project, own, source.workItems ?? new Map())
+      return { row, repo: workspaceById.get(project.workspaceId)!, own }
+    })
+    .filter(
+      (c) => matchesNarrowing(view.filters, c) && matchesStaleness(view.filters, c.own, clock)
+    )
+  const groups = sortGroups(groupBranches(kept, view, source.workspaces), view.sortBy, source)
+  return { groups, scratch, shown: kept.length, total: candidates.length }
 }
 
 /** Roots first, each carrying the panes pinned to it. */

@@ -25,16 +25,20 @@ export function fact(patch: Partial<SessionFacts> = {}): SessionFacts {
     choicePrompt: null,
     agent: null,
     resumable: false,
-    snapshot: {
-      sessionId,
-      projectId: 'p1',
-      workspaceName: 'Personal',
-      projectName: 'terminator',
-      branch: 'main',
-      tabTitle: 'zsh',
-      shell: '/bin/zsh',
-      startedAt: '2026-09-15T10:00:00.000Z',
-    },
+    snapshot: snapshot(sessionId),
     ...patch,
+  }
+}
+
+function snapshot(sessionId: string): SessionFacts['snapshot'] {
+  return {
+    sessionId,
+    projectId: 'p1',
+    workspaceName: 'Personal',
+    projectName: 'terminator',
+    branch: 'main',
+    tabTitle: 'zsh',
+    shell: '/bin/zsh',
+    startedAt: '2026-09-15T10:00:00.000Z',
   }
 }

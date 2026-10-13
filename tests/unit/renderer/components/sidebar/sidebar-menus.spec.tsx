@@ -39,3 +39,35 @@ describe('sidebar menus', () => {
     expect(screen.getByRole('menu').style.position).toBe('fixed')
   })
 })
+
+function renderFilter(onChangeView = vi.fn(), activeViewId = 'all'): void {
+  render(
+    <FilterMenu
+      views={[{ ...VIEW, filters: { query: 'api' } }]}
+      activeViewId={activeViewId}
+      onSelectView={vi.fn()}
+      onChangeView={onChangeView}
+      hideStaleUnavailable={false}
+      shown={1}
+      total={1}
+      onShowAll={vi.fn()}
+    />
+  )
+  fireEvent.click(screen.getByRole('button', { name: 'Filter' }))
+}
+
+describe('sidebar menus — Hide stale', () => {
+  it('turns the toggle on, keeping the active view’s other filters', () => {
+    const onChangeView = vi.fn()
+    renderFilter(onChangeView)
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: 'Hide stale' }))
+    expect(onChangeView).toHaveBeenCalledWith({ filters: { query: 'api', hideStale: true } })
+  })
+
+  it('falls back to the first view when the active id is unknown', () => {
+    const onChangeView = vi.fn()
+    renderFilter(onChangeView, 'gone')
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: 'Hide stale' }))
+    expect(onChangeView).toHaveBeenCalledWith({ filters: { query: 'api', hideStale: true } })
+  })
+})

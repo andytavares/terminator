@@ -62,7 +62,9 @@ describe('WallTile', () => {
     render(<WallTile {...props} />)
     expect(screen.getByRole('textbox', { name: 'What is this session doing?' })).toBeTruthy()
   })
+})
 
+describe('WallTile — names a session with no project', () => {
   it('names a session with no project', () => {
     render(
       <WallTile
@@ -91,7 +93,9 @@ describe('WallTile', () => {
     expect(props.onOpen).not.toHaveBeenCalled()
     expect(props.onSaveDescription).toHaveBeenCalledWith(facts, 'why')
   })
+})
 
+describe('WallTile — carries its position and span as style alone', () => {
   it('carries its position and span as style alone', () => {
     render(
       <WallTile {...props} placement={{ sessionId: 's1', band: 'needs', order: 1, span: 2 }} />
@@ -121,7 +125,9 @@ describe('WallTile', () => {
     render(<WallTile {...props} metrics={{ pid: 1, cpuPercent: 12.5, rssBytes }} />)
     expect(screen.getByText(text)).toBeTruthy()
   })
+})
 
+describe('WallTile — draws answers in its footer when a prompt is waiting', () => {
   it('draws answers in its footer when a prompt is waiting', () => {
     render(<WallTile {...props} answers={<button type="button">1. Yes</button>} />)
     expect(within(screen.getByRole('article')).getByRole('button', { name: '1. Yes' })).toBeTruthy()
@@ -134,7 +140,9 @@ describe('WallTile', () => {
     expect(onLink).toHaveBeenCalledWith(facts)
     expect(props.onOpen).not.toHaveBeenCalled()
   })
+})
 
+describe('WallTile — offers Resume on a stopped session whose conversation is still there', () => {
   it('offers Resume on a stopped session whose conversation is still there', () => {
     const onResume = vi.fn()
     render(
@@ -159,7 +167,9 @@ describe('WallTile', () => {
     expect(onResume).toHaveBeenCalled()
     expect(props.onOpen).not.toHaveBeenCalled()
   })
+})
 
+describe('WallTile — says when a stopped session’s conversation has gone', () => {
   it('says when a stopped session’s conversation has gone', () => {
     render(
       <WallTile
@@ -182,7 +192,9 @@ describe('WallTile', () => {
     expect(screen.getByText('Conversation no longer available')).toBeTruthy()
     expect(screen.queryByRole('button', { name: /^Resume/ })).toBeNull()
   })
+})
 
+describe('WallTile — ends the session from its tile without opening it', () => {
   it('ends the session from its tile without opening it', () => {
     const onCloseSession = vi.fn()
     render(<WallTile {...props} onCloseSession={onCloseSession} />)
@@ -204,5 +216,25 @@ describe('WallTile', () => {
   it('does not mark a working tile as needs-you', () => {
     render(<WallTile {...props} facts={{ ...facts, state: 'working' }} />)
     expect(screen.getByRole('article').className).not.toContain('wall-tile--needs')
+  })
+})
+
+describe('WallTile — what does not open it', () => {
+  it('ignores a click on the footer itself', () => {
+    const { container } = render(<WallTile {...props} />)
+    fireEvent.click(container.querySelector('.wall-tile__foot')!)
+    expect(props.onOpen).not.toHaveBeenCalled()
+  })
+
+  it('ignores keys other than Enter, and Enter from inside the tile', () => {
+    render(<WallTile {...props} />)
+    fireEvent.keyDown(screen.getByRole('article'), { key: ' ' })
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Open claude' }), { key: 'Enter' })
+    expect(props.onOpen).not.toHaveBeenCalled()
+  })
+
+  it('draws no edge colour for a session with no workspace colour', () => {
+    render(<WallTile {...props} facts={{ ...facts, workspaceColor: null }} />)
+    expect(screen.getByRole('article').style.getPropertyValue('--rail')).toBe('')
   })
 })

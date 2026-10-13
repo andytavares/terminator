@@ -15,17 +15,8 @@ const LEVEL_LABEL: Record<LogLevel, string> = {
   error: 'ERR ',
 }
 
-export function LogWindow({ onClose }: Props): JSX.Element {
-  const { entries, clear } = useLogStore(
-    useShallow((s) => ({ entries: s.entries, clear: s.clear }))
-  )
-  const bottomRef = useRef<HTMLDivElement>(null)
-  const listRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [entries.length])
-
+/** Escape anywhere in the window closes the log. */
+function useCloseOnEscape(onClose: () => void): void {
   useEffect(() => {
     function handleKey(e: KeyboardEvent): void {
       if (e.key === 'Escape') onClose()
@@ -33,21 +24,23 @@ export function LogWindow({ onClose }: Props): JSX.Element {
     window.addEventListener('keydown', handleKey)
     return () => window.removeEventListener('keydown', handleKey)
   }, [onClose])
+}
+
+export function LogWindow({ onClose }: Props): JSX.Element {
+  const { entries, clear } = useLogStore(
+    useShallow((s) => ({ entries: s.entries, clear: s.clear }))
+  )
+  const bottomRef = useRef<HTMLDivElement>(null)
+  const listRef = useRef<HTMLDivElement>(null)
+  useCloseOnEscape(onClose)
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [entries.length])
 
   return (
     <div className="log-window" role="dialog" aria-label="Application Logs">
-      <div className="log-window__header">
-        <span className="log-window__title">Application Logs</span>
-        <div className="log-window__actions">
-          <button className="log-window__btn" onClick={clear}>
-            Clear
-          </button>
-          <button className="log-window__btn log-window__btn--close" onClick={onClose}>
-            ✕
-          </button>
-        </div>
-      </div>
-
+      <LogHeader onClear={clear} onClose={onClose} />
       <div className="log-window__body" ref={listRef}>
         {entries.length === 0 && <div className="log-window__empty">No log entries yet.</div>}
         {entries.map((entry) => (
@@ -58,6 +51,22 @@ export function LogWindow({ onClose }: Props): JSX.Element {
           </div>
         ))}
         <div ref={bottomRef} />
+      </div>
+    </div>
+  )
+}
+
+function LogHeader({ onClear, onClose }: { onClear: () => void; onClose: () => void }) {
+  return (
+    <div className="log-window__header">
+      <span className="log-window__title">Application Logs</span>
+      <div className="log-window__actions">
+        <button className="log-window__btn" onClick={onClear}>
+          Clear
+        </button>
+        <button className="log-window__btn log-window__btn--close" onClick={onClose}>
+          ✕
+        </button>
       </div>
     </div>
   )

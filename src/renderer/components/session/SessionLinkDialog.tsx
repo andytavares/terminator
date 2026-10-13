@@ -21,36 +21,9 @@ interface Props {
 export function SessionLinkDialog({ facts, onClose }: Props): JSX.Element {
   useModalEffect()
   const connected = useIntegrationsStore((s) => s.isAnyConnected())
-  const setLink = useSessionRecordsStore((s) => s.setLink)
   const [selected, setSelected] = useState<IssueSummary | null>(null)
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const { busy, error, write } = useLinkWrite(facts, onClose)
   const own = facts.workItem?.source === 'session' ? facts.workItem.ref : null
-
-  async function write(
-    ref: { tracker: IssueSummary['tracker']; key: string } | null
-  ): Promise<void> {
-    setBusy(true)
-    const ok = await setLink(facts.snapshot, ref)
-    setBusy(false)
-    if (!ok) {
-      setError('Could not link that issue. Nothing was changed.')
-      return
-    }
-    onClose()
-  }
-
-  const actions: DialogAction[] = [
-    ...(own ? [{ label: 'Remove session link', disabled: busy, onSelect: () => write(null) }] : []),
-    { label: 'Cancel', onSelect: onClose },
-    {
-      label: selected === null ? 'Link issue' : `Link ${selected.key}`,
-      tone: 'primary',
-      disabled: selected === null || busy,
-      onSelect: () =>
-        selected ? write({ tracker: selected.tracker, key: selected.key }) : undefined,
-    },
-  ]
 
   // The dialog renders inside a row or tile; its keys stay its own. Escape still
   // reaches the document, where the dialog (and the picker's dropdown) answer it.
@@ -61,25 +34,13 @@ export function SessionLinkDialog({ facts, onClose }: Props): JSX.Element {
         if (e.key !== 'Escape') e.stopPropagation()
       }}
     >
-      <Dialog title="Link a work item" onDismiss={onClose} actions={actions}>
-        <p className="tmui-dialog__description">
-          {own
-            ? `${facts.name} is linked to ${own.key}. A new link replaces it for this session only.`
-            : `Linking ${facts.name} to a ticket applies to this session only.`}
-        </p>
-
-        {connected ? (
-          <IssuePicker
-            selected={selected}
-            onSelect={setSelected}
-            onClear={() => setSelected(null)}
-          />
-        ) : (
-          <p className="tmui-dialog__description" role="alert">
-            No issue tracker is connected. Connect Linear or Jira in Settings → Integrations.
-          </p>
-        )}
-
+      <Dialog
+        title="Link a work item"
+        onDismiss={onClose}
+        actions={linkActions({ own: own !== null, selected, busy, write }, onClose)}
+      >
+        <p className="tmui-dialog__description">{linkScope(facts.name, own?.key)}</p>
+        <PickerOrNotice connected={connected} selected={selected} onSelect={setSelected} />
         {error !== null && (
           <p className="tmui-dialog__description" role="alert">
             {error}
@@ -88,4 +49,74 @@ export function SessionLinkDialog({ facts, onClose }: Props): JSX.Element {
       </Dialog>
     </div>
   )
+}
+
+/** That a link here is this session's alone, and what it replaces. */
+function linkScope(name: string, ownKey: string | undefined): string {
+  return ownKey
+    ? `${name} is linked to ${ownKey}. A new link replaces it for this session only.`
+    : `Linking ${name} to a ticket applies to this session only.`
+}
+
+type LinkRef = { tracker: IssueSummary['tracker']; key: string } | null
+
+/** Writing the session's link, and saying so when it did not take. */
+function useLinkWrite(facts: SessionFacts, onClose: () => void) {
+  const setLink = useSessionRecordsStore((s) => s.setLink)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  async function write(ref: LinkRef): Promise<void> {
+    setBusy(true)
+    const ok = await setLink(facts.snapshot, ref)
+    setBusy(false)
+    if (!ok) {
+      setError('Could not link that issue. Nothing was changed.')
+      return
+    }
+    onClose()
+  }
+  return { busy, error, write }
+}
+
+interface LinkState {
+  /** Whether the session has a link of its own to remove. */
+  own: boolean
+  selected: IssueSummary | null
+  busy: boolean
+  write: (ref: LinkRef) => Promise<void>
+}
+
+function linkActions(
+  { own, selected, busy, write }: LinkState,
+  onClose: () => void
+): DialogAction[] {
+  return [
+    ...(own ? [{ label: 'Remove session link', disabled: busy, onSelect: () => write(null) }] : []),
+    { label: 'Cancel', onSelect: onClose },
+    {
+      label: selected === null ? 'Link issue' : `Link ${selected.key}`,
+      tone: 'primary',
+      disabled: selected === null || busy,
+      onSelect: () =>
+        selected ? write({ tracker: selected.tracker, key: selected.key }) : undefined,
+    },
+  ]
+}
+
+interface PickerProps {
+  connected: boolean
+  selected: IssueSummary | null
+  onSelect: (issue: IssueSummary | null) => void
+}
+
+/** The issue picker, or where to connect a tracker when none is. */
+function PickerOrNotice({ connected, selected, onSelect }: PickerProps): JSX.Element {
+  if (!connected) {
+    return (
+      <p className="tmui-dialog__description" role="alert">
+        No issue tracker is connected. Connect Linear or Jira in Settings → Integrations.
+      </p>
+    )
+  }
+  return <IssuePicker selected={selected} onSelect={onSelect} onClear={() => onSelect(null)} />
 }

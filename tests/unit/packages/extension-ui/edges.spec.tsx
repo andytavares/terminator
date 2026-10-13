@@ -44,7 +44,9 @@ describe('IconButton edges', () => {
       'Stop this run interrupting, without hiding what it does'
     )
   })
+})
 
+describe('IconButton edges — reports the unpressed state of a toggle', () => {
   it('reports the unpressed state of a toggle', () => {
     render(<IconButton icon={FileText} label="List view" pressed={false} onClick={() => {}} />)
     expect(screen.getByRole('button', { name: 'List view' }).getAttribute('aria-pressed')).toBe(
@@ -74,7 +76,9 @@ describe('Popover edges', () => {
     fireEvent.keyDown(document, { key: 'Enter' })
     expect(onDismiss).not.toHaveBeenCalled()
   })
+})
 
+describe('Popover edges — leaves the outer surface alone when Escape reaches a nested one', () => {
   it('leaves the outer surface alone when Escape reaches a nested one', () => {
     const onOuter = vi.fn()
     const onInner = vi.fn()
@@ -117,7 +121,9 @@ describe('Toast edges', () => {
     expect(onDismiss).not.toHaveBeenCalled()
     vi.useRealTimers()
   })
+})
 
+describe('Toast edges — treats a zero duration as sticky', () => {
   it('treats a zero duration as sticky', () => {
     vi.useFakeTimers()
     const onDismiss = vi.fn()
@@ -135,15 +141,15 @@ describe('Toast edges', () => {
   })
 })
 
-describe('focus-trap edges', () => {
-  function container(html: string): HTMLElement {
-    const el = document.createElement('div')
-    el.setAttribute('data-tmui-panel', '')
-    el.innerHTML = html
-    document.body.appendChild(el)
-    return el
-  }
+function container(html: string): HTMLElement {
+  const el = document.createElement('div')
+  el.setAttribute('data-tmui-panel', '')
+  el.innerHTML = html
+  document.body.appendChild(el)
+  return el
+}
 
+describe('focus-trap edges', () => {
   it('finds nothing focusable in an empty surface', () => {
     const el = container('<p>nothing here</p>')
     expect(focusableWithin(el)).toHaveLength(0)
@@ -175,7 +181,9 @@ describe('focus-trap edges', () => {
     expect(trapTab(el, false)).toBe(false)
     el.remove()
   })
+})
 
+describe('focus-trap edges — leaves Shift+Tab alone in the middle of the order', () => {
   it('leaves Shift+Tab alone in the middle of the order', () => {
     const el = container('<button>a</button><button>b</button><button>c</button>')
     const buttons = el.querySelectorAll('button')

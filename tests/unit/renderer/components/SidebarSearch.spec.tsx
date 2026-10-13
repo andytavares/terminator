@@ -36,7 +36,9 @@ describe('SidebarSearch', () => {
     render(<SidebarSearch query="" onChange={vi.fn()} onClear={vi.fn()} />)
     expect(screen.queryByRole('button', { name: /clear/i })).toBeNull()
   })
+})
 
+describe('SidebarSearch — clear button calls onClear', () => {
   it('clear button calls onClear', () => {
     const onClear = vi.fn()
     render(<SidebarSearch query="something" onChange={vi.fn()} onClear={onClear} />)

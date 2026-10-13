@@ -126,7 +126,9 @@ describe('MobileTerminalView', () => {
     fireEvent.click(screen.getByRole('button', { name: /back/i }))
     expect(onBack).toHaveBeenCalledTimes(1)
   })
+})
 
+describe('MobileTerminalView — shows reconnecting banner when status is reconnecting', () => {
   it('shows reconnecting banner when status is reconnecting', async () => {
     const { useReconnect } = await import('../../../../src/renderer-remote/hooks/useReconnect')
     vi.mocked(useReconnect).mockReturnValue({
@@ -154,7 +156,9 @@ describe('MobileTerminalView', () => {
     render(<MobileTerminalView sessionId="s1" cwd="/tmp" onBack={vi.fn()} />)
     expect(screen.getByRole('button', { name: /retry/i })).toBeTruthy()
   })
+})
 
+describe('MobileTerminalView — says why it was turned away', () => {
   it.each([
     ['full', /already has as many viewers as allowed/],
     ['removed', /disconnected this device/],
@@ -171,7 +175,9 @@ describe('MobileTerminalView', () => {
       expect(screen.getByRole('button', { name: /retry/i })).toBeTruthy()
     }
   )
+})
 
+describe('MobileTerminalView — renders MobileControlToolbar', () => {
   it('renders MobileControlToolbar', async () => {
     const { useReconnect } = await import('../../../../src/renderer-remote/hooks/useReconnect')
     vi.mocked(useReconnect).mockReturnValue({
@@ -185,7 +191,9 @@ describe('MobileTerminalView', () => {
     render(<MobileTerminalView sessionId="s1" cwd="/tmp" onBack={vi.fn()} />)
     expect(screen.getByText('ctrl-c')).toBeTruthy()
   })
+})
 
+describe('MobileTerminalView — sends key sequence to WebSocket when toolbar key is pressed', () => {
   it('sends key sequence to WebSocket when toolbar key is pressed', async () => {
     const { useReconnect } = await import('../../../../src/renderer-remote/hooks/useReconnect')
     vi.mocked(useReconnect).mockReturnValue({
@@ -202,7 +210,9 @@ describe('MobileTerminalView', () => {
     fireEvent.click(screen.getByText('ctrl-c'))
     expect(mockWs.send).toHaveBeenCalledWith('\x03')
   })
+})
 
+describe('MobileTerminalView — opens no socket and starts reconnecting when no ticket can be had', () => {
   it('opens no socket and starts reconnecting when no ticket can be had', async () => {
     mockGetWsTicket.mockRejectedValue(new Error('network error'))
     const onOpenWsFailed = vi.fn()
@@ -233,7 +243,9 @@ describe('MobileTerminalView', () => {
     await act(async () => {})
     expect(mockWs.close).toHaveBeenCalled()
   })
+})
 
+describe('MobileTerminalView — writes incoming message data to terminal when at bottom (no scrollToLine)', () => {
   it('writes incoming message data to terminal when at bottom (no scrollToLine)', async () => {
     mockTermBuffer.baseY = 76 // 76 + 24 >= 100 → at bottom
     mockGetWsTicket.mockResolvedValue('ticket-abc')
@@ -262,7 +274,9 @@ describe('MobileTerminalView', () => {
     expect(mockTerm.write).toHaveBeenCalled()
     expect(mockTerm.scrollToLine).toHaveBeenCalledWith(0)
   })
+})
 
+describe('MobileTerminalView — forwards xterm onData keystrokes to WebSocket', () => {
   it('forwards xterm onData keystrokes to WebSocket', async () => {
     const { MobileTerminalView } = await import(
       '../../../../src/renderer-remote/components/MobileTerminalView'

@@ -90,7 +90,9 @@ describe('MobileApp', () => {
     fireEvent.click(screen.getByText('back'))
     expect(screen.getByText('open terminal')).toBeTruthy()
   })
+})
 
+describe('MobileApp — calls listWorkspaces and listTerminals on mount', () => {
   it('calls listWorkspaces and listTerminals on mount', async () => {
     mockListWorkspaces.mockResolvedValue([])
     mockListTerminals.mockResolvedValue([])
@@ -117,7 +119,9 @@ describe('MobileApp', () => {
       expect(mockListTerminals).toHaveBeenCalledTimes(2) // once on mount, once after assign
     })
   })
+})
 
+describe('MobileApp — onCreateTerminal calls createTerminal and navigates to terminal view', () => {
   it('onCreateTerminal calls createTerminal and navigates to terminal view', async () => {
     const { createTerminal } = await import('../../../../src/renderer-remote/api/remote-client')
     vi.mocked(createTerminal).mockResolvedValue({ sessionId: 'new-s1' })
@@ -133,5 +137,45 @@ describe('MobileApp', () => {
       expect(createTerminal).toHaveBeenCalledWith({ cwd: '/workspace', tabTitle: 'Remote' })
       expect(screen.getByText('terminal:new-s1')).toBeTruthy()
     })
+  })
+})
+
+describe('MobileApp when the server fails', () => {
+  it('still shows the list when the first listings fail', async () => {
+    mockListWorkspaces.mockRejectedValue(new Error('offline'))
+    mockListTerminals.mockRejectedValue(new Error('offline'))
+    const { MobileApp } = await import('../../../../src/renderer-remote/MobileApp')
+    render(<MobileApp />)
+    await waitFor(() => expect(mockListTerminals).toHaveBeenCalledTimes(1))
+    expect(screen.getByText('open terminal')).toBeTruthy()
+  })
+
+  it('stays on the list when a new terminal cannot be made', async () => {
+    const { createTerminal } = await import('../../../../src/renderer-remote/api/remote-client')
+    vi.mocked(createTerminal).mockRejectedValue(new Error('refused'))
+    const { MobileApp } = await import('../../../../src/renderer-remote/MobileApp')
+    render(<MobileApp />)
+    await act(async () => {
+      fireEvent.click(screen.getByText('new terminal'))
+    })
+    expect(createTerminal).toHaveBeenCalledTimes(1)
+    expect(screen.getByText('open terminal')).toBeTruthy()
+  })
+})
+
+describe('MobileApp when the server fails — refreshes the terminals after a failed assignment and on the way back', () => {
+  it('refreshes the terminals after a failed assignment and on the way back', async () => {
+    mockAssignTerminalWorkspace.mockRejectedValue(new Error('refused'))
+    mockListTerminals.mockRejectedValue(new Error('offline'))
+    const { MobileApp } = await import('../../../../src/renderer-remote/MobileApp')
+    render(<MobileApp />)
+    await act(async () => {
+      fireEvent.click(screen.getByText('assign workspace'))
+    })
+    await waitFor(() => expect(mockListTerminals).toHaveBeenCalledTimes(2))
+    fireEvent.click(screen.getByText('open terminal'))
+    fireEvent.click(screen.getByText('back'))
+    expect(mockListTerminals).toHaveBeenCalledTimes(3)
+    expect(screen.getByText('open terminal')).toBeTruthy()
   })
 })

@@ -54,7 +54,9 @@ describe('ErrorBoundary', () => {
     )
     expect(screen.getByRole('button', { name: /try to recover/i })).toBeTruthy()
   })
+})
 
+describe('ErrorBoundary — writes the error to the application log', () => {
   it('writes the error to the application log', () => {
     render(
       <ErrorBoundary>
@@ -83,7 +85,9 @@ describe('ErrorBoundary', () => {
     expect(screen.getByText('Content renders fine')).toBeTruthy()
     expect(screen.queryByText('Something went wrong')).toBeNull()
   })
+})
 
+describe('ErrorBoundary — uses theme tokens for ALL fallback colors — no hardcoded hex anywhere (light-mode safe)', () => {
   it('uses theme tokens for ALL fallback colors — no hardcoded hex anywhere (light-mode safe)', () => {
     const { container } = render(
       <ErrorBoundary>

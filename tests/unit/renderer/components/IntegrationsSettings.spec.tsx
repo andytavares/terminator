@@ -81,7 +81,9 @@ describe('IntegrationsSettings — rendering', () => {
     ])
     await waitFor(() => expect(screen.getByText(/tav.atlassian.net/)).toBeTruthy())
   })
+})
 
+describe('IntegrationsSettings — rendering — says a working credential has started failing rather than showing an empty list', () => {
   it('says a working credential has started failing rather than showing an empty list', async () => {
     await renderWith([
       connection({
@@ -142,7 +144,9 @@ describe('IntegrationsSettings — connecting', () => {
     // Nothing was sent anywhere just by typing.
     expect(api.connect).not.toHaveBeenCalled()
   })
+})
 
+describe('IntegrationsSettings — connecting — masks the Jira token too', () => {
   it('masks the Jira token too', async () => {
     await renderWith([connection(), JIRA_DISCONNECTED])
     const token = screen.getByLabelText('API token') as HTMLInputElement
@@ -167,7 +171,9 @@ describe('IntegrationsSettings — connecting', () => {
 
     await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('Authentication'))
   })
+})
 
+describe('IntegrationsSettings — connecting — clears the rejection as soon as the operator types again', () => {
   it('clears the rejection as soon as the operator types again', async () => {
     api.connect.mockResolvedValue({ error: 'auth-failed', message: 'Authentication required' })
     await renderWith([connection(), JIRA_DISCONNECTED])
@@ -192,7 +198,9 @@ describe('IntegrationsSettings — connecting', () => {
     fireEvent.change(screen.getByLabelText('API token'), { target: { value: 'tok' } })
     expect((screen.getByText('Connect Jira') as HTMLButtonElement).disabled).toBe(false)
   })
+})
 
+describe('IntegrationsSettings — connecting — sends the Jira query along with the credential', () => {
   it('sends the Jira query along with the credential', async () => {
     api.connect.mockResolvedValue({ connection: JIRA_DISCONNECTED })
     await renderWith([connection(), JIRA_DISCONNECTED])
@@ -245,7 +253,9 @@ describe('IntegrationsSettings — connected actions', () => {
       })
     )
   })
+})
 
+describe('IntegrationsSettings — connected actions — stores an edited JQL on blur', () => {
   it('stores an edited JQL on blur', async () => {
     api.setMine.mockResolvedValue({ ok: true })
     await renderWith([
@@ -270,7 +280,9 @@ describe('IntegrationsSettings — connected actions', () => {
       })
     )
   })
+})
 
+describe('IntegrationsSettings — connected actions — re-checks the connection when Test is pressed', () => {
   it('re-checks the connection when Test is pressed', async () => {
     await renderWith([
       connection({ connected: true, account: { name: 'A', email: 'a@b.co' } }),
@@ -321,5 +333,73 @@ describe('IntegrationsSettings — live updates', () => {
     await waitFor(() => expect(api.status).toHaveBeenCalled())
     // Renders the section rather than blanking out.
     expect(screen.getByText('Linear')).toBeTruthy()
+  })
+})
+
+describe('IntegrationsSettings — the less common answers', () => {
+  it('says Connected when main proved the credential but named no account, or only a name', async () => {
+    await renderWith([
+      connection({ connected: true }),
+      connection({
+        tracker: 'jira',
+        connected: true,
+        account: { name: 'Andrew', email: '' },
+        mine: { kind: 'query', jql: 'project = TAV' },
+      }),
+    ])
+    expect(await screen.findByText('Connected')).toBeTruthy()
+    expect(screen.getByText('Connected as Andrew')).toBeTruthy()
+    expect((screen.getByLabelText('My issues (JQL)') as HTMLInputElement).value).toBe(
+      'project = TAV'
+    )
+  })
+})
+
+describe('IntegrationsSettings — the less common answers — sends the optional assignee email, trimmed, and clears it once connected', () => {
+  it('sends the optional assignee email, trimmed, and clears it once connected', async () => {
+    api.connect.mockResolvedValue({ connection: connection({ connected: true }) })
+    await renderWith([connection(), JIRA_DISCONNECTED])
+    fireEvent.change(screen.getByLabelText('API key'), { target: { value: 'k' } })
+    fireEvent.change(screen.getByLabelText('Assigned-issue lookup (optional)'), {
+      target: { value: '  me@x.co ' },
+    })
+    fireEvent.click(screen.getByText('Connect Linear'))
+    await waitFor(() =>
+      expect(api.connect).toHaveBeenCalledWith({ tracker: 'linear', apiKey: 'k', email: 'me@x.co' })
+    )
+  })
+
+  it('keeps the Jira site and email after a rejection, says why, and sends an edited query', async () => {
+    api.connect.mockResolvedValue({ error: 'auth-failed', message: 'Token rejected' })
+    await renderWith([connection(), JIRA_DISCONNECTED])
+    fireEvent.change(screen.getByLabelText('Site'), { target: { value: 'tav.atlassian.net' } })
+    fireEvent.change(screen.getByLabelText('Account email'), { target: { value: 'a@b.co' } })
+    fireEvent.change(screen.getByLabelText('API token'), { target: { value: 'tok' } })
+    fireEvent.change(screen.getByLabelText('My issues (JQL)'), { target: { value: 'project = X' } })
+    fireEvent.click(screen.getByText('Connect Jira'))
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('Token rejected'))
+    expect(api.connect).toHaveBeenCalledWith(expect.objectContaining({ jql: 'project = X' }))
+    expect((screen.getByLabelText('Site') as HTMLInputElement).value).toBe('tav.atlassian.net')
+    expect((screen.getByLabelText('Account email') as HTMLInputElement).value).toBe('a@b.co')
+    expect((screen.getByLabelText('API token') as HTMLInputElement).value).toBe('')
+  })
+})
+
+describe('IntegrationsSettings — the less common answers — stores a cleared assignee lookup as the key’s own account', () => {
+  it('stores a cleared assignee lookup as the key’s own account', async () => {
+    api.setMine.mockResolvedValue({ ok: true })
+    await renderWith([
+      connection({ connected: true, mine: { kind: 'assignee', email: 'old@x.co' } }),
+      JIRA_DISCONNECTED,
+    ])
+    const input = await screen.findByLabelText('Assigned-issue lookup')
+    fireEvent.change(input, { target: { value: '  ' } })
+    fireEvent.blur(input)
+    await waitFor(() =>
+      expect(api.setMine).toHaveBeenCalledWith({
+        tracker: 'linear',
+        mine: { kind: 'assignee', email: null },
+      })
+    )
   })
 })

@@ -94,7 +94,9 @@ describe('buildSessionFacts', () => {
       latestLine: '14 passed, 2 failed',
     })
   })
+})
 
+describe("buildSessionFacts — derives the state from the session's signals, since nothing stores it", () => {
   it("derives the state from the session's signals, since nothing stores it", () => {
     const stored = { ...session, agentState: 'idle' as const }
     const facts = buildSessionFacts({
@@ -121,7 +123,9 @@ describe('buildSessionFacts', () => {
     })
     expect(facts.map((f) => f.sessionId)).toEqual(['s1', 's2'])
   })
+})
 
+describe("buildSessionFacts — adds the agent tag to an agent session, after the workspace's own tags", () => {
   it("adds the agent tag to an agent session, after the workspace's own tags", () => {
     const [facts] = buildSessionFacts({ ...empty, sessions: [{ ...session, type: 'agent' }] })
     expect(facts.tags).toEqual(['client', 'api', 'agent'])
@@ -136,7 +140,9 @@ describe('buildSessionFacts', () => {
     expect(facts.description).toBe('Reproducing the staging 429s')
     expect(facts.workItem).toEqual({ source: 'session', ref: { tracker: 'linear', key: 'NW-88' } })
   })
+})
 
+describe("buildSessionFacts — uses the project's link when the session has none", () => {
   it("uses the project's link when the session has none", () => {
     const link: IssueLink = {
       projectId: 'p1',
@@ -161,7 +167,9 @@ describe('buildSessionFacts', () => {
     expect(facts.state).toBe('exited')
     expect(facts.isClosed).toBe(false)
   })
+})
 
+describe('buildSessionFacts — includes a closed record, read from its snapshot', () => {
   it('includes a closed record, read from its snapshot', () => {
     const [facts] = buildSessionFacts({
       ...empty,
@@ -182,7 +190,9 @@ describe('buildSessionFacts', () => {
       tags: [],
     })
   })
+})
 
+describe('buildSessionFacts — does not list a record twice when its session is still open', () => {
   it('does not list a record twice when its session is still open', () => {
     const facts = buildSessionFacts({
       ...empty,
@@ -207,7 +217,9 @@ describe('buildSessionFacts', () => {
       tags: [],
     })
   })
+})
 
+describe('buildSessionFacts — gives a scratch terminal no location and no colour', () => {
   it('gives a scratch terminal no location and no colour', () => {
     const [facts] = buildSessionFacts({
       ...empty,
@@ -238,7 +250,9 @@ describe('buildSessionFacts', () => {
     const [never] = buildSessionFacts({ ...empty, sessions: [session] })
     expect(never.lastAttendedAt).toBeNull()
   })
+})
 
+describe('buildSessionFacts — has no lastAttendedAt for a closed record', () => {
   it('has no lastAttendedAt for a closed record', () => {
     const [facts] = buildSessionFacts({
       ...empty,
@@ -265,7 +279,9 @@ describe('buildSessionFacts', () => {
       startedAt: '2026-09-15T10:00:00.000Z',
     })
   })
+})
 
+describe('buildSessionFacts — carries a choice prompt from the session', () => {
   it('carries a choice prompt from the session', () => {
     const prompt = { question: 'Proceed?', options: [{ number: 1, label: 'Yes' }] }
     const [facts] = buildSessionFacts({
@@ -291,7 +307,9 @@ describe('buildSessionFacts', () => {
     expect(facts.agent).toEqual(conversation)
     expect(facts.resumable).toBe(true)
   })
+})
 
+describe('buildSessionFacts — has no conversation for a session nothing reported one for', () => {
   it('has no conversation for a session nothing reported one for', () => {
     const [facts] = buildSessionFacts({ ...empty, sessions: [session] })
     expect(facts.agent).toBeNull()
@@ -314,7 +332,9 @@ describe('buildSessionFacts', () => {
     })
     expect(facts).toMatchObject({ isClosed: true, agent: conversation, resumable: true })
   })
+})
 
+describe('buildSessionFacts — leaves Closed once its record has moved to the session that resumed it', () => {
   // What resuming leaves behind: the record moved off the closed session onto
   // the terminal that took it over. It must read as one open session, not as a
   // live one beside a ghost of itself under Closed.

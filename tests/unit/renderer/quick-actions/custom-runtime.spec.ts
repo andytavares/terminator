@@ -70,7 +70,9 @@ describe('buildCustomQuickActions', () => {
     const actions = buildCustomQuickActions([shellAction()], makeEnv(), makeDeps())
     expect(actions[0].disabledReason).toBeUndefined()
   })
+})
 
+describe('buildCustomQuickActions — re-plans at run time and refuses when state changed since the panel opened', () => {
   it('re-plans at run time and refuses when state changed since the panel opened', () => {
     const deps = makeDeps()
     const env = makeEnv({ focused: { sessionId: 's1', isAgent: true, agentState: 'idle' } })
@@ -95,7 +97,9 @@ describe('buildCustomQuickActions', () => {
     await actions[0].run()
     expect(deps.input).toHaveBeenCalledWith('s1', 'ls\r')
   })
+})
 
+describe('buildCustomQuickActions — runs a new-tab plan by opening a tab then writing to its session', () => {
   it('runs a new-tab plan by opening a tab then writing to its session', async () => {
     const deps = makeDeps()
     const env = makeEnv({ focused: null, projectId: 'p1' })
@@ -124,7 +128,9 @@ describe('buildCustomQuickActions', () => {
     expect(deps.openTab).not.toHaveBeenCalled()
     expect(deps.notify).toHaveBeenCalledWith(`Command is longer than ${MAX_TYPED_LINE_BYTES} bytes`)
   })
+})
 
+describe('buildCustomQuickActions — sends bracketed-paste bytes for a prompt', () => {
   it('sends bracketed-paste bytes for a prompt', async () => {
     const deps = makeDeps()
     const env = makeEnv({ focused: { sessionId: 's1', isAgent: true, agentState: 'idle' } })

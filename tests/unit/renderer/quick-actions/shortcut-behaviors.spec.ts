@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import {
   cycleMostRecentlyAttended,
   jumpToNextAwaitingInput,
+  switchToWorkspace,
   cycleTab,
   clearTerminal,
   splitPane,
@@ -14,7 +15,7 @@ import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.sto
 import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
 import type { TerminalSession } from '../../../../src/shared/types/index'
 import type { ElectronAPI } from '../../../../src/shared/electron-api/api-type'
-import { resetStore, terminalSessionOf } from '../../../support/renderer-stores'
+import { resetStore, terminalSessionOf, workspaceOf } from '../../../support/renderer-stores'
 import { installElectronApi } from '../../../support/electron-api'
 
 // What reaches the main process: keystrokes for a terminal, and notifications.
@@ -86,7 +87,9 @@ describe('cycleMostRecentlyAttended', () => {
     cycleMostRecentlyAttended('p1', -1, sessions())
     expect(shownIn('p1')).toBe('b')
   })
+})
 
+describe('cycleMostRecentlyAttended — ignores closed sessions and does nothing with fewer than two', () => {
   it('ignores closed sessions and does nothing with fewer than two', () => {
     addSession('a', 'p1', { lastAttendedAt: 300 })
     addSession('b', 'p1', { lastAttendedAt: 200, status: 'closed' })
@@ -121,6 +124,26 @@ describe('jumpToNextAwaitingInput', () => {
     jumpToNextAwaitingInput('p1', sessions())
     expect(workspaces().activeProjectId).toBeNull()
     expect(sessions().focusRequest).toBeNull()
+  })
+})
+
+describe('switchToWorkspace', () => {
+  beforeEach(() => {
+    installElectronApi({ project: { list: async () => ({ projects: [] }) } })
+    resetStore(useWorkspaceStore, {
+      workspaces: [workspaceOf({ id: 'w1' }), workspaceOf({ id: 'w2' })],
+    })
+  })
+
+  it('switches to and expands the workspace at that position', () => {
+    switchToWorkspace(1, workspaces())
+    expect(workspaces().activeWorkspaceId).toBe('w2')
+    expect(workspaces().expandedWorkspaceIds).toEqual(new Set(['w2']))
+  })
+
+  it('does nothing past the last workspace', () => {
+    switchToWorkspace(4, workspaces())
+    expect(workspaces().activeWorkspaceId).toBeNull()
   })
 })
 
@@ -186,18 +209,18 @@ describe('splitPane', () => {
   })
 })
 
-describe('closeFocusedPane', () => {
-  function deps(overrides: Partial<ClosePaneDeps> = {}): ClosePaneDeps {
-    return {
-      getPaneLayout: () => null,
-      getFocusedSession: () => null,
-      closeSplitLeaf: vi.fn(),
-      closeSession: vi.fn(() => Promise.resolve()),
-      getActiveSessionForProject: () => null,
-      ...overrides,
-    }
+function deps(overrides: Partial<ClosePaneDeps> = {}): ClosePaneDeps {
+  return {
+    getPaneLayout: () => null,
+    getFocusedSession: () => null,
+    closeSplitLeaf: vi.fn(),
+    closeSession: vi.fn(() => Promise.resolve()),
+    getActiveSessionForProject: () => null,
+    ...overrides,
   }
+}
 
+describe('closeFocusedPane', () => {
   it('closes the focused leaf of a split and reports a failed close', async () => {
     const d = deps({
       getPaneLayout: () => ({}),

@@ -31,7 +31,9 @@ describe('MobileControlToolbar', () => {
     fireEvent.pointerDown(screen.getByLabelText('Ctrl+D'))
     expect(onKey).toHaveBeenCalledWith('\x04')
   })
+})
 
+describe('MobileControlToolbar — calls onKey with \\t when Tab is clicked', () => {
   it('calls onKey with \\t when Tab is clicked', async () => {
     const onKey = vi.fn()
     const { MobileControlToolbar } = await import(
@@ -61,7 +63,9 @@ describe('MobileControlToolbar', () => {
     fireEvent.pointerDown(screen.getByLabelText('↑'))
     expect(onKey).toHaveBeenCalledWith('\x1b[A')
   })
+})
 
+describe('MobileControlToolbar — calls onKey with \\x1b[B when ↓ is clicked', () => {
   it('calls onKey with \\x1b[B when ↓ is clicked', async () => {
     const onKey = vi.fn()
     const { MobileControlToolbar } = await import(

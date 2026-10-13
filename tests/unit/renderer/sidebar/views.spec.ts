@@ -48,43 +48,52 @@ afterEach(() => {
   localStorage.clear()
 })
 
-describe('built-in views', () => {
-  const NOW = 10_000_000
-  const STALE_AFTER = 60_000
-  const repo: Workspace = {
-    id: 'w1',
-    name: 'repo',
-    folderPath: '/repo',
-    color: '#111',
-    tags: [],
-    createdAt: '',
-    updatedAt: '',
-  }
-  const branch = (id: string): Project => ({
-    id,
-    workspaceId: 'w1',
-    name: id,
-    gitBranch: id,
-    isWorktree: false,
-    createdAt: '',
-    updatedAt: '',
+const NOW = 10_000_000
+
+const STALE_AFTER = 60_000
+
+const repo: Workspace = {
+  id: 'w1',
+  name: 'repo',
+  folderPath: '/repo',
+  color: '#111',
+  tags: [],
+  createdAt: '',
+  updatedAt: '',
+}
+
+const branch = (id: string): Project => ({
+  id,
+  workspaceId: 'w1',
+  name: id,
+  gitBranch: id,
+  isWorktree: false,
+  createdAt: '',
+  updatedAt: '',
+})
+
+const terminal = (projectId: string, agentState: AgentState, lastActivityAt = NOW) =>
+  terminalSessionOf({ id: `s-${projectId}`, projectId, agentState, lastActivityAt })
+
+const sessions: TerminalSession[] = [
+  terminal('working', 'working'),
+  terminal('waiting', 'awaiting-input'),
+  terminal('idle', 'idle'),
+  terminal('quiet', 'idle', NOW - STALE_AFTER - 1),
+]
+
+const projects = ['working', 'waiting', 'idle', 'quiet'].map(branch)
+
+const shownBy = (id: string): string[] => {
+  const view = BUILT_IN_VIEWS.find((v) => v.id === id)!
+  const { groups } = buildBranchRows({ sessions, projects, workspaces: [repo] }, view, {
+    now: NOW,
+    staleAfterMs: STALE_AFTER,
   })
-  const terminal = (projectId: string, agentState: AgentState, lastActivityAt = NOW) =>
-    terminalSessionOf({ id: `s-${projectId}`, projectId, agentState, lastActivityAt })
-  const sessions: TerminalSession[] = [
-    terminal('working', 'working'),
-    terminal('waiting', 'awaiting-input'),
-    terminal('idle', 'idle'),
-    terminal('quiet', 'idle', NOW - STALE_AFTER - 1),
-  ]
-  const projects = ['working', 'waiting', 'idle', 'quiet'].map(branch)
+  return groups.flatMap((g) => g.branches.map((b) => b.projectId)).sort()
+}
 
-  const shownBy = (id: string): string[] => {
-    const view = BUILT_IN_VIEWS.find((v) => v.id === id)!
-    const { groups } = buildBranchRows(sessions, projects, [repo], view, NOW, STALE_AFTER)
-    return groups.flatMap((g) => g.branches.map((b) => b.projectId)).sort()
-  }
-
+describe('built-in views', () => {
   it.each([
     ['everything', ['idle', 'quiet', 'waiting', 'working']],
     ['needs-me', ['waiting']],
@@ -124,7 +133,9 @@ describe('loadViews', () => {
     localStorage.setItem(VIEWS_STORAGE_KEY, JSON.stringify({ id: 'x' }))
     expect(loadViews()).toEqual(BUILT_IN_VIEWS)
   })
+})
 
+describe('loadViews — drops stored entries that are not shaped like a view', () => {
   it('drops stored entries that are not shaped like a view', () => {
     localStorage.setItem(
       VIEWS_STORAGE_KEY,
@@ -185,7 +196,9 @@ describe('saveViews', () => {
     saveViews(hidden)
     expect(loadViews().find((v) => v.id === 'everything')!.filters).toEqual({ hideStale: true })
   })
+})
 
+describe('saveViews — an override can never rename or re-id a built-in', () => {
   it('an override can never rename or re-id a built-in', () => {
     localStorage.setItem(
       VIEWS_STORAGE_KEY,
@@ -216,7 +229,9 @@ describe('saveViews', () => {
     saveViews(BUILT_IN_VIEWS)
     expect(JSON.parse(localStorage.getItem(VIEWS_STORAGE_KEY)!).custom).toEqual([])
   })
+})
 
+describe('saveViews — swallows a storage write failure instead of breaking the sidebar', () => {
   it('swallows a storage write failure instead of breaking the sidebar', () => {
     vi.spyOn(localStorageStub, 'setItem').mockImplementation(() => {
       throw new Error('quota')
@@ -225,12 +240,17 @@ describe('saveViews', () => {
   })
 })
 
-describe('a preference naming a retired option (VW-1)', () => {
+/** The hooks every "a preference naming a retired option (VW-1)" describe registers. */
+function setUpAPreferenceNamingA(): void {
   // The grouping options narrowed when the list became one of branches. A
   // preference written before that names a key which no longer exists, and it
   // must degrade to the built-in's own default rather than empty the sidebar —
   // the same treatment loadViews already gives corrupt storage.
   beforeEach(() => localStorage.clear())
+}
+
+describe('a preference naming a retired option (VW-1)', () => {
+  setUpAPreferenceNamingA()
 
   it.each(['status', 'project', 'branch'])(
     'falls back to the built-in default when the stored grouping is %s',
@@ -256,6 +276,10 @@ describe('a preference naming a retired option (VW-1)', () => {
     expect(everything.groupBy).toBe('workspace')
     expect(everything.sortBy).toBe('name')
   })
+})
+
+describe('a preference naming a retired option (VW-1) — falls back when the stored sort is one that no longer exists', () => {
+  setUpAPreferenceNamingA()
 
   it('falls back when the stored sort is one that no longer exists', () => {
     localStorage.setItem(

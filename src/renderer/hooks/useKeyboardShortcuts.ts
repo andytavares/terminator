@@ -1,5 +1,4 @@
-import { useShallow } from 'zustand/react/shallow'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useWorkspaceStore } from '../stores/workspace.store'
 import { useSessionStore } from '../stores/session.store'
 import { useTerminalSession } from './useTerminalSession'
@@ -14,6 +13,7 @@ import {
   newTerminalTab,
   splitPane,
   closeFocusedPane,
+  switchToWorkspace,
 } from '../quick-actions/shortcut-behaviors'
 
 interface Options {
@@ -34,303 +34,234 @@ interface Options {
   onDirectShortcut?: (actionId: string) => void
 }
 
-export function useKeyboardShortcuts({
-  onOpenSettings,
-  onToggleLog,
-  onOpenCommandPalette,
-  onToggleOverview,
-  onNewScratch,
-  onNewTab,
-  onEditSessionNote,
-  scratchProjectId,
-  onDirectShortcut,
-}: Options = {}): void {
-  const {
-    workspaces,
-    activeWorkspaceId,
-    setActiveWorkspace,
-    activeProjectId,
-    resolveActiveCwd,
-    setExpandedWorkspaceIds,
-  } = useWorkspaceStore(
-    useShallow((s) => ({
-      workspaces: s.workspaces,
-      activeWorkspaceId: s.activeWorkspaceId,
-      setActiveWorkspace: s.setActiveWorkspace,
-      activeProjectId: s.activeProjectId,
-      resolveActiveCwd: s.resolveActiveCwd,
-      setExpandedWorkspaceIds: s.setExpandedWorkspaceIds,
-    }))
-  )
-  const {
-    getActiveSessionForProject,
-    setActiveSessionForProject,
-    getSessionsForProject,
-    getPaneLayout,
-    getFocusedSession,
-    closeSplitLeaf,
-    closeSession,
-  } = useSessionStore(
-    useShallow((s) => ({
-      getActiveSessionForProject: s.getActiveSessionForProject,
-      setActiveSessionForProject: s.setActiveSessionForProject,
-      getSessionsForProject: s.getSessionsForProject,
-      getPaneLayout: s.getPaneLayout,
-      getFocusedSession: s.getFocusedSession,
-      closeSplitLeaf: s.closeSplitLeaf,
-      closeSession: s.closeSession,
-    }))
-  )
-  const { createSession, splitSession } = useTerminalSession()
-  const { resolveSettings } = useSettingsStore(
-    useShallow((s) => ({ resolveSettings: s.resolveSettings }))
-  )
-  const { keyboardShortcuts } = useExtensionRegistry()
+/** What a keydown is handled against: the caller's callbacks, the extensions' shortcuts, the terminals. */
+interface ShortcutContext {
+  options: Options
+  keyboardShortcuts: ReturnType<typeof useExtensionRegistry.getState>['keyboardShortcuts']
+  terminals: ReturnType<typeof useTerminalSession>
+}
 
-  const effectiveProjectId = scratchProjectId ?? activeProjectId
+/** Where a key was pressed: an xterm takes Cmd+K and the arrows, a text field keeps them. */
+interface KeyTarget {
+  isMeta: boolean
+  inTextField: boolean
+}
+
+/**
+ * One core shortcut: when it applies, the CORE_SHORTCUTS action id it reports
+ * (none for Cmd+P, which is no action, and for Cmd+1–9, which reports only when
+ * there is a workspace to switch to), and what it does.
+ */
+interface CoreKey {
+  test(e: KeyboardEvent, at: KeyTarget): boolean
+  actionId?: string | ((e: KeyboardEvent) => string)
+  run(c: ShortcutContext, e: KeyboardEvent): void
+}
+
+const projectOf = (c: ShortcutContext): string | null =>
+  c.options.scratchProjectId ?? useWorkspaceStore.getState().activeProjectId
+
+/** What newTerminalTab and splitPane read: the settings, the cwd and the terminal factory. */
+function terminalDeps(c: ShortcutContext) {
+  const workspaces = useWorkspaceStore.getState()
+  return {
+    resolveSettings: useSettingsStore.getState().resolveSettings,
+    resolveActiveCwd: workspaces.resolveActiveCwd,
+    activeWorkspaceId: workspaces.activeWorkspaceId,
+    ...c.terminals,
+  }
+}
+
+// Checked before the extensions' own shortcuts, so no extension can take them.
+const APP_KEYS: CoreKey[] = [
+  {
+    test: (e, at) => at.isMeta && e.key === ',',
+    actionId: 'core.open-settings',
+    run: (c) => c.options.onOpenSettings?.(),
+  },
+  // Cmd+P: open command palette
+  { test: (e, at) => at.isMeta && e.key === 'p', run: (c) => c.options.onOpenCommandPalette?.() },
+  {
+    test: (e, at) => at.isMeta && e.shiftKey && e.key === 'l',
+    actionId: 'core.toggle-log',
+    run: (c) => c.options.onToggleLog?.(),
+  },
+  // Cmd+Shift+E: toggle overview tab. Not Cmd+Shift+I — that is the "Open Extension
+  // DevTools" menu accelerator, and Electron menu accelerators consume the key before
+  // the renderer ever sees it, which made this branch unreachable.
+  {
+    test: (e, at) => at.isMeta && e.shiftKey && e.key === 'e',
+    actionId: 'core.toggle-overview',
+    run: (c) => c.options.onToggleOverview?.(),
+  },
+  {
+    test: (e, at) => at.isMeta && e.shiftKey && e.key === 't',
+    actionId: 'core.new-scratch',
+    run: (c) => c.options.onNewScratch?.(),
+  },
+]
+
+const WORKSPACE_KEYS: CoreKey[] = [
+  // Cmd+1–9: switch to nth workspace, expand it, collapse all others
+  {
+    test: (e, at) => at.isMeta && e.key >= '1' && e.key <= '9',
+    run: (c, e) => {
+      const workspaces = useWorkspaceStore.getState()
+      const index = parseInt(e.key, 10) - 1
+      if (workspaces.workspaces[index]) c.options.onDirectShortcut?.('core.switch-workspace')
+      switchToWorkspace(index, workspaces)
+    },
+  },
+  {
+    test: (e, at) => at.isMeta && (e.key === '=' || e.key === '+'),
+    actionId: 'core.cycle-workspace-next',
+    run: () => cycleWorkspace(1, useWorkspaceStore.getState()),
+  },
+  {
+    test: (e, at) => at.isMeta && e.key === '-',
+    actionId: 'core.cycle-workspace-prev',
+    run: () => cycleWorkspace(-1, useWorkspaceStore.getState()),
+  },
+]
+
+const TERMINAL_KEYS: CoreKey[] = [
+  // Cmd+K: clear terminal screen (skip if typing — Cmd+K kills to line start in text fields)
+  {
+    test: (e, at) => at.isMeta && e.key === 'k' && !at.inTextField,
+    actionId: 'core.clear',
+    run: (c) => clearTerminal(projectOf(c), useSessionStore.getState()),
+  },
+  {
+    test: (e, at) => at.isMeta && e.key === 't',
+    actionId: 'core.new-tab',
+    run: (c) =>
+      c.options.onNewTab ? c.options.onNewTab() : newTerminalTab(projectOf(c), terminalDeps(c)),
+  },
+  // Cmd+D splits side by side, Cmd+Shift+D top and bottom. The effective
+  // project rather than the active one, so a scratch terminal splits too — it
+  // used to do nothing at all there, and say nothing, which reads as the
+  // feature having been removed rather than as not applying.
+  {
+    test: (e, at) => at.isMeta && !e.shiftKey && e.key === 'd',
+    actionId: 'core.split-vertical',
+    run: (c) => splitPane(projectOf(c), 'vertical', terminalDeps(c)),
+  },
+  {
+    test: (e, at) => at.isMeta && e.shiftKey && e.key === 'd',
+    actionId: 'core.split-horizontal',
+    run: (c) => splitPane(projectOf(c), 'horizontal', terminalDeps(c)),
+  },
+  // Cmd+W: close focused split pane (or active tab if not in split mode)
+  {
+    test: (e, at) => at.isMeta && e.key === 'w',
+    actionId: 'core.close-tab',
+    run: (c) => closeFocusedPane(projectOf(c), useSessionStore.getState()),
+  },
+]
+
+const SESSION_KEYS: CoreKey[] = [
+  // Cmd+] / Cmd+[: cycle recently attended sessions across project
+  // boundaries. lastAttendedAt is what makes "recently used" meaningful;
+  // this is its only consumer.
+  {
+    test: (e, at) => at.isMeta && (e.key === ']' || e.key === '[') && !at.inTextField,
+    actionId: (e) => (e.key === ']' ? 'core.cycle-recent-next' : 'core.cycle-recent-prev'),
+    run: (c, e) =>
+      cycleMostRecentlyAttended(projectOf(c), e.key === ']' ? 1 : -1, useSessionStore.getState()),
+  },
+  {
+    test: (e, at) => at.isMeta && e.shiftKey && (e.key === 'a' || e.key === 'A') && !at.inTextField,
+    actionId: 'core.next-waiting',
+    run: (c) => jumpToNextAwaitingInput(projectOf(c), useSessionStore.getState()),
+  },
+  {
+    test: (e, at) =>
+      at.isMeta && !e.shiftKey && (e.key === 'i' || e.key === 'I') && !at.inTextField,
+    actionId: 'core.edit-note',
+    run: (c) => c.options.onEditSessionNote?.(),
+  },
+  // Cmd+Left / Cmd+Right: previous and next tab (skip if typing — they move within text)
+  {
+    test: (e, at) => at.isMeta && e.key === 'ArrowLeft' && !at.inTextField,
+    actionId: 'core.prev-tab',
+    run: (c) => cycleTabIn(projectOf(c), -1),
+  },
+  {
+    test: (e, at) => at.isMeta && e.key === 'ArrowRight' && !at.inTextField,
+    actionId: 'core.next-tab',
+    run: (c) => cycleTabIn(projectOf(c), 1),
+  },
+]
+
+function cycleTabIn(projectId: string | null, delta: number): void {
+  if (projectId) cycleTab(projectId, delta, useSessionStore.getState())
+}
+
+function keyTarget(e: KeyboardEvent): KeyTarget {
+  const inXterm = e.target instanceof HTMLElement && !!e.target.closest('.xterm')
+  const inTextField =
+    !inXterm &&
+    (e.target instanceof HTMLInputElement ||
+      e.target instanceof HTMLTextAreaElement ||
+      (e.target instanceof HTMLElement && e.target.isContentEditable))
+  return { isMeta: e.metaKey || e.ctrlKey, inTextField }
+}
+
+/** Runs the first of `keys` the event matches; false when none does. */
+function runCoreKey(
+  keys: CoreKey[],
+  e: KeyboardEvent,
+  { c, at }: { c: ShortcutContext; at: KeyTarget }
+): boolean {
+  const key = keys.find((k) => k.test(e, at))
+  if (!key) return false
+  e.preventDefault()
+  if (key.actionId !== undefined) {
+    c.options.onDirectShortcut?.(typeof key.actionId === 'string' ? key.actionId : key.actionId(e))
+  }
+  key.run(c, e)
+  return true
+}
+
+const MODIFIERS = ['CmdOrCtrl', 'Cmd', 'Ctrl', 'Alt', 'Option', 'Shift']
+
+/** Extension-registered shortcuts; a bare-key one does not fire while typing in a field. */
+function runExtensionShortcut(e: KeyboardEvent, c: ShortcutContext, at: KeyTarget): boolean {
+  for (const shortcut of c.keyboardShortcuts) {
+    if (!matchesAccelerator(e, shortcut.accelerator)) continue
+    const hasModifier = MODIFIERS.some((m) => shortcut.accelerator.includes(m))
+    if (at.inTextField && !hasModifier) continue
+    e.preventDefault()
+    shortcut.action()
+    return true
+  }
+  return false
+}
+
+function handleKeyDown(e: KeyboardEvent, c: ShortcutContext): void {
+  const at = keyTarget(e)
+  if (runCoreKey(APP_KEYS, e, { c, at })) return
+  if (runExtensionShortcut(e, c, at)) return
+  for (const keys of [WORKSPACE_KEYS, TERMINAL_KEYS, SESSION_KEYS]) {
+    if (runCoreKey(keys, e, { c, at })) return
+  }
+}
+
+/**
+ * The app's keyboard shortcuts, on the window. The store state they act on is
+ * read when the key is pressed; the caller's callbacks are always its latest.
+ */
+export function useKeyboardShortcuts(options: Options = {}): void {
+  const { keyboardShortcuts } = useExtensionRegistry()
+  const terminals = useTerminalSession()
+  const latest = useRef<ShortcutContext>({ options, keyboardShortcuts, terminals })
+  useEffect(() => {
+    latest.current = { options, keyboardShortcuts, terminals }
+  })
 
   useEffect(() => {
-    const workspaceCycleDeps = {
-      workspaces,
-      activeWorkspaceId,
-      setActiveWorkspace,
-      setExpandedWorkspaceIds,
-    }
-    const tabCycleDeps = {
-      getSessionsForProject,
-      getActiveSessionForProject,
-      setActiveSessionForProject,
-    }
-    const newTabDeps = { resolveSettings, resolveActiveCwd, activeWorkspaceId, createSession }
-    const splitDeps = { resolveSettings, resolveActiveCwd, activeWorkspaceId, splitSession }
-    const closePaneDeps = {
-      getPaneLayout,
-      getFocusedSession,
-      closeSplitLeaf,
-      closeSession,
-      getActiveSessionForProject,
-    }
-
-    function handleKeyDown(e: KeyboardEvent): void {
-      const isMeta = e.metaKey || e.ctrlKey
-      const inXterm = e.target instanceof HTMLElement && !!e.target.closest('.xterm')
-      const inTextField =
-        !inXterm &&
-        (e.target instanceof HTMLInputElement ||
-          e.target instanceof HTMLTextAreaElement ||
-          (e.target instanceof HTMLElement && e.target.isContentEditable))
-
-      if (isMeta && e.key === ',') {
-        e.preventDefault()
-        onDirectShortcut?.('core.open-settings')
-        onOpenSettings?.()
-        return
-      }
-
-      // Cmd+P: open command palette
-      if (isMeta && e.key === 'p') {
-        e.preventDefault()
-        onOpenCommandPalette?.()
-        return
-      }
-
-      // Cmd+Shift+L: toggle log window
-      if (isMeta && e.shiftKey && e.key === 'l') {
-        e.preventDefault()
-        onDirectShortcut?.('core.toggle-log')
-        onToggleLog?.()
-        return
-      }
-
-      // Cmd+Shift+E: toggle overview tab. Not Cmd+Shift+I — that is the "Open Extension
-      // DevTools" menu accelerator, and Electron menu accelerators consume the key before
-      // the renderer ever sees it, which made this branch unreachable.
-      if (isMeta && e.shiftKey && e.key === 'e') {
-        e.preventDefault()
-        onDirectShortcut?.('core.toggle-overview')
-        onToggleOverview?.()
-        return
-      }
-
-      // Cmd+Shift+T: new scratch terminal
-      if (isMeta && e.shiftKey && e.key === 't') {
-        e.preventDefault()
-        onDirectShortcut?.('core.new-scratch')
-        onNewScratch?.()
-        return
-      }
-
-      // Extension-registered keyboard shortcuts — skip bare-key shortcuts when focus is in a text field
-      for (const shortcut of keyboardShortcuts) {
-        if (matchesAccelerator(e, shortcut.accelerator)) {
-          // Bare-key shortcuts (no Cmd/Ctrl/Alt/Shift) must not fire while typing
-          const hasModifier =
-            shortcut.accelerator.includes('CmdOrCtrl') ||
-            shortcut.accelerator.includes('Cmd') ||
-            shortcut.accelerator.includes('Ctrl') ||
-            shortcut.accelerator.includes('Alt') ||
-            shortcut.accelerator.includes('Option') ||
-            shortcut.accelerator.includes('Shift')
-          if (inTextField && !hasModifier) continue
-          e.preventDefault()
-          shortcut.action()
-          return
-        }
-      }
-
-      // Cmd+1–9: switch to nth workspace, expand it, collapse all others
-      if (isMeta && e.key >= '1' && e.key <= '9') {
-        e.preventDefault()
-        const idx = parseInt(e.key, 10) - 1
-        if (workspaces[idx]) {
-          onDirectShortcut?.('core.switch-workspace')
-          setActiveWorkspace(workspaces[idx].id)
-          setExpandedWorkspaceIds(new Set([workspaces[idx].id]))
-        }
-        return
-      }
-
-      // Cmd+= or Cmd++: next workspace
-      if (isMeta && (e.key === '=' || e.key === '+')) {
-        e.preventDefault()
-        onDirectShortcut?.('core.cycle-workspace-next')
-        cycleWorkspace(1, workspaceCycleDeps)
-        return
-      }
-
-      // Cmd+-: previous workspace
-      if (isMeta && e.key === '-') {
-        e.preventDefault()
-        onDirectShortcut?.('core.cycle-workspace-prev')
-        cycleWorkspace(-1, workspaceCycleDeps)
-        return
-      }
-
-      // Cmd+K: clear terminal screen (skip if typing — Cmd+K kills to line start in text fields)
-      if (isMeta && e.key === 'k' && !inTextField) {
-        e.preventDefault()
-        onDirectShortcut?.('core.clear')
-        clearTerminal(effectiveProjectId, { getActiveSessionForProject })
-        return
-      }
-
-      // Cmd+T: new tab
-      if (isMeta && e.key === 't') {
-        e.preventDefault()
-        onDirectShortcut?.('core.new-tab')
-        if (onNewTab) {
-          onNewTab()
-        } else {
-          newTerminalTab(effectiveProjectId, newTabDeps)
-        }
-        return
-      }
-
-      // Cmd+D: split vertically (side by side). `effectiveProjectId` rather
-      // than `activeProjectId`, so a scratch terminal splits too — it used to
-      // do nothing at all there, and say nothing, which reads as the feature
-      // having been removed rather than as not applying.
-      if (isMeta && !e.shiftKey && e.key === 'd') {
-        e.preventDefault()
-        onDirectShortcut?.('core.split-vertical')
-        splitPane(effectiveProjectId, 'vertical', splitDeps)
-        return
-      }
-
-      // Cmd+Shift+D: split horizontally (top / bottom).
-      if (isMeta && e.shiftKey && e.key === 'd') {
-        e.preventDefault()
-        onDirectShortcut?.('core.split-horizontal')
-        splitPane(effectiveProjectId, 'horizontal', splitDeps)
-        return
-      }
-
-      // Cmd+W: close focused split pane (or active tab if not in split mode)
-      if (isMeta && e.key === 'w') {
-        e.preventDefault()
-        onDirectShortcut?.('core.close-tab')
-        closeFocusedPane(effectiveProjectId, closePaneDeps)
-        return
-      }
-
-      // Cmd+] / Cmd+[: cycle recently attended sessions across project
-      // boundaries. lastAttendedAt is what makes "recently used" meaningful;
-      // this is its only consumer.
-      if (isMeta && (e.key === ']' || e.key === '[') && !inTextField) {
-        e.preventDefault()
-        onDirectShortcut?.(e.key === ']' ? 'core.cycle-recent-next' : 'core.cycle-recent-prev')
-        cycleMostRecentlyAttended(effectiveProjectId, e.key === ']' ? 1 : -1, {
-          getActiveSessionForProject,
-          setActiveSessionForProject,
-        })
-        return
-      }
-
-      // Cmd+Shift+A: jump to the next session waiting on you.
-      if (isMeta && e.shiftKey && (e.key === 'a' || e.key === 'A') && !inTextField) {
-        e.preventDefault()
-        onDirectShortcut?.('core.next-waiting')
-        jumpToNextAwaitingInput(effectiveProjectId, {
-          getActiveSessionForProject,
-          setActiveSessionForProject,
-        })
-        return
-      }
-
-      // Cmd+I: edit the focused session's description.
-      if (isMeta && !e.shiftKey && (e.key === 'i' || e.key === 'I') && !inTextField) {
-        e.preventDefault()
-        onDirectShortcut?.('core.edit-note')
-        onEditSessionNote?.()
-        return
-      }
-
-      // Cmd+Left: previous tab (skip if typing — Cmd+Left/Right navigates within text)
-      if (isMeta && e.key === 'ArrowLeft' && !inTextField) {
-        e.preventDefault()
-        onDirectShortcut?.('core.prev-tab')
-        if (effectiveProjectId) cycleTab(effectiveProjectId, -1, tabCycleDeps)
-        return
-      }
-
-      // Cmd+Right: next tab (skip if typing)
-      if (isMeta && e.key === 'ArrowRight' && !inTextField) {
-        e.preventDefault()
-        onDirectShortcut?.('core.next-tab')
-        if (effectiveProjectId) cycleTab(effectiveProjectId, 1, tabCycleDeps)
-        return
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [
-    workspaces,
-    activeWorkspaceId,
-    activeProjectId,
-    scratchProjectId,
-    effectiveProjectId,
-    keyboardShortcuts,
-    onEditSessionNote,
-    setActiveSessionForProject,
-    getActiveSessionForProject,
-    setActiveWorkspace,
-    resolveSettings,
-    resolveActiveCwd,
-    createSession,
-    splitSession,
-    getSessionsForProject,
-    getActiveSessionForProject,
-    setActiveSessionForProject,
-    getPaneLayout,
-    getFocusedSession,
-    closeSplitLeaf,
-    closeSession,
-    onOpenSettings,
-    onToggleLog,
-    onOpenCommandPalette,
-    onToggleOverview,
-    onNewScratch,
-    onDirectShortcut,
-  ])
+    const onKeyDown = (e: KeyboardEvent): void => handleKeyDown(e, latest.current)
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
 }

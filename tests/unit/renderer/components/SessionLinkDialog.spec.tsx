@@ -84,7 +84,9 @@ describe('SessionLinkDialog', () => {
     expect(useSessionRecordsStore.getState().records.size).toBe(0)
     expect(onClose).not.toHaveBeenCalled()
   })
+})
 
+describe("SessionLinkDialog — removes the session's own link, which falls back to the branch's", () => {
   it("removes the session's own link, which falls back to the branch's", async () => {
     const own = fact({ workItem: { source: 'session', ref: { tracker: 'linear', key: 'NW-91' } } })
     useSessionRecordsStore.setState({
@@ -111,7 +113,9 @@ describe('SessionLinkDialog', () => {
     render(<SessionLinkDialog facts={inherited} onClose={onClose} />)
     expect(screen.queryByRole('button', { name: 'Remove session link' })).toBeNull()
   })
+})
 
+describe('SessionLinkDialog — says where to connect a tracker when none is', () => {
   it('says where to connect a tracker when none is', () => {
     useIntegrationsStore.setState({ connections: [] })
     render(<SessionLinkDialog facts={fact()} onClose={onClose} />)
@@ -138,7 +142,9 @@ describe('SessionLinkDialog', () => {
       true
     )
   })
+})
 
+describe('SessionLinkDialog — keeps its keys from reaching the row or tile behind it', () => {
   it('keeps its keys from reaching the row or tile behind it', () => {
     const behind = vi.fn()
     render(
@@ -169,7 +175,9 @@ describe('SessionLinkDialog', () => {
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(onClose).not.toHaveBeenCalled()
   })
+})
 
+describe('SessionLinkDialog — leaves other keys to the dialog, without reaching the row behind it', () => {
   it('leaves other keys to the dialog, without reaching the row behind it', () => {
     const behind = vi.fn()
     render(

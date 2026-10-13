@@ -73,8 +73,8 @@ const sidebarProps = {
   now: NOW,
 }
 
-beforeEach(() => {
-  vi.clearAllMocks()
+/** One saved sidebar view per grouping, so each test can open the sidebar under any of them. */
+function saveGroupingViews(): void {
   localStorage.clear()
   localStorage.setItem(
     'terminator.sidebar.views',
@@ -88,7 +88,11 @@ beforeEach(() => {
       }))
     )
   )
-  // The real stores. Only loading a repo's branches reaches the main process.
+}
+
+/** The real stores, holding one repo with one branch and its terminal. */
+function seedStores(): void {
+  // Only loading a repo's branches reaches the main process.
   useWorkspaceStore.setState({
     ...useWorkspaceStore.getInitialState(),
     workspaces: [ws1],
@@ -107,13 +111,23 @@ beforeEach(() => {
       terminal: { ...DEFAULT_GLOBAL_SETTINGS.terminal, scrollbackLimit: 5000 },
     },
   })
-  // What the fake extension contributed, in the real registry.
+}
+
+/** What the fake extension contributed, in the real registry. */
+function seedRegistry(): void {
   useExtensionRegistry.setState(useExtensionRegistry.getInitialState(), true)
   useExtensionRegistry.setState({
     globalTabs: new Map([[globalTab.id, globalTab]]),
     workspaceTabs: new Map([[workspaceTab.id, workspaceTab]]),
     projectTabs: new Map([[projectTab.id, projectTab]]),
   })
+}
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  saveGroupingViews()
+  seedStores()
+  seedRegistry()
 })
 
 const commandLabels = (): string[] =>
@@ -153,7 +167,9 @@ describe.each(GROUPINGS)('every extension surface survives %s grouping', (groupB
     }
     expect(onSelectWorkspaceTab).toHaveBeenCalledWith('ws-1', 'fake.wstab')
   })
+})
 
+describe.each(GROUPINGS)('the branch scope survives %s grouping', (groupBy) => {
   it('surface 4: selecting a branch leaves activeProjectId resolved for the project tab', () => {
     const { container } = renderSidebar(groupBy)
     fireEvent.click(container.querySelector('.branch-row')!)
@@ -163,7 +179,13 @@ describe.each(GROUPINGS)('every extension surface survives %s grouping', (groupB
   it('a new terminal can be created for the branch scope', () => {
     const { container } = renderSidebar(groupBy)
     fireEvent.click(container.querySelector('.branch-row__action')!)
-    expect(mockCreateSession).toHaveBeenCalledWith('p1', 'human', '', '/b', 5000)
+    expect(mockCreateSession).toHaveBeenCalledWith({
+      projectId: 'p1',
+      type: 'human',
+      title: '',
+      cwd: '/b',
+      scrollbackLimit: 5000,
+    })
   })
 })
 
@@ -179,7 +201,13 @@ describe('scope actions are reachable from the command palette (FR-027)', () => 
       .getState()
       .commands.find((c) => c.label === 'New terminal — Backend · main')!
     command.action()
-    expect(mockCreateSession).toHaveBeenCalledWith('p1', 'human', '', '/b', 5000)
+    expect(mockCreateSession).toHaveBeenCalledWith({
+      projectId: 'p1',
+      type: 'human',
+      title: '',
+      cwd: '/b',
+      scrollbackLimit: 5000,
+    })
   })
 
   it('disposes its commands on unmount so they cannot outlive the sidebar', () => {
@@ -218,7 +246,9 @@ describe('the extension API surface is unchanged', () => {
       'workspaceTab',
     ])
   })
+})
 
+describe('the extension API surface is unchanged — the renderer-facing extension API still exposes exactly its known members', () => {
   it('the renderer-facing extension API still exposes exactly its known members', async () => {
     const state: Record<string, unknown> = { ...useExtensionRegistry.getState() }
     const rendererApi = [

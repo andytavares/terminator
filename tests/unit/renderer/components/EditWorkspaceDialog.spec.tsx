@@ -52,7 +52,9 @@ describe('EditWorkspaceDialog', () => {
     fireEvent.blur(nameInput)
     expect(screen.getByText('Name is required')).toBeTruthy()
   })
+})
 
+describe('EditWorkspaceDialog — saves the new name to the workspace', () => {
   it('saves the new name to the workspace', async () => {
     const onClose = vi.fn()
     render(<EditWorkspaceDialog workspace={ws} onClose={onClose} />)
@@ -76,7 +78,9 @@ describe('EditWorkspaceDialog', () => {
     await vi.waitFor(() => expect(screen.getByDisplayValue('/new/path')).toBeTruthy())
     expect(mockOpenDirectory).toHaveBeenCalled()
   })
+})
 
+describe('EditWorkspaceDialog — does not update folder path when Browse is cancelled', () => {
   it('does not update folder path when Browse is cancelled', async () => {
     mockOpenDirectory.mockResolvedValue({ cancelled: true })
     render(<EditWorkspaceDialog workspace={ws} onClose={vi.fn()} />)
@@ -105,7 +109,9 @@ describe('EditWorkspaceDialog', () => {
     fireEvent.change(tagsInput, { target: { value: 'tag1, tag2' } })
     expect(screen.getByDisplayValue('tag1, tag2')).toBeTruthy()
   })
+})
 
+describe('EditWorkspaceDialog — clears nameError when name input changes', () => {
   it('clears nameError when name input changes', () => {
     render(<EditWorkspaceDialog workspace={ws} onClose={vi.fn()} />)
     const nameInput = screen.getByDisplayValue('My Work')
@@ -131,7 +137,9 @@ describe('EditWorkspaceDialog', () => {
     fireEvent.click(screen.getByText('Edit Workspace').closest('.tmui-dialog__scrim')!)
     expect(onClose).toHaveBeenCalled()
   })
+})
 
+describe('EditWorkspaceDialog — closes after successful save', () => {
   it('closes after successful save', async () => {
     const onClose = vi.fn()
     render(<EditWorkspaceDialog workspace={ws} onClose={onClose} />)
@@ -156,7 +164,9 @@ describe('EditWorkspaceDialog', () => {
     await screen.findByText('A workspace with this name already exists')
     expect(onClose).not.toHaveBeenCalled()
   })
+})
 
+describe('EditWorkspaceDialog — surfaces a generic error when updateWorkspace fails for another reason', () => {
   it('surfaces a generic error when updateWorkspace fails for another reason', async () => {
     mockUpdateWorkspace.mockResolvedValueOnce({ error: 'BACKEND_DOWN' })
     render(<EditWorkspaceDialog workspace={ws} onClose={vi.fn()} />)

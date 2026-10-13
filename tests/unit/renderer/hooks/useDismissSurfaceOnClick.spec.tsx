@@ -21,15 +21,15 @@ const active = () => {
   return [s.activeGlobalTabId, s.activeWorkspaceTabId, s.activeProjectTabId]
 }
 
-describe('useDismissSurfaceOnClick', () => {
-  beforeEach(() => {
-    useExtensionRegistry.setState({
-      activeGlobalTabId: null,
-      activeWorkspaceTabId: null,
-      activeProjectTabId: null,
-    })
+beforeEach(() => {
+  useExtensionRegistry.setState({
+    activeGlobalTabId: null,
+    activeWorkspaceTabId: null,
+    activeProjectTabId: null,
   })
+})
 
+describe('useDismissSurfaceOnClick', () => {
   it.each(['core.home', 'core.overview', 'notepad'])(
     'a click that changes nothing dismisses %s',
     (tabId) => {
@@ -60,7 +60,9 @@ describe('useDismissSurfaceOnClick', () => {
     fireEvent.click(getByText('toggle off'))
     expect(active()).toEqual([null, null, null])
   })
+})
 
+describe('useDismissSurfaceOnClick — ignores a click whose propagation was stopped', () => {
   it('ignores a click whose propagation was stopped', () => {
     useExtensionRegistry.getState().setActiveGlobalTab('core.home')
     const { getByText } = render(<Harness />)
