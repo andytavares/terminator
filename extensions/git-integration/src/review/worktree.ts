@@ -5,7 +5,7 @@ import type { PrHead } from '../schemas/pr-review.schema.js'
 
 const DEFAULT_MAX_WORKTREES = 5
 
-export interface ExecFn {
+interface ExecFn {
   (cmd: 'git', args: string[], opts: { cwd: string }): Promise<{ stdout: string }>
 }
 
@@ -78,14 +78,27 @@ async function addWorktreeAt(head: PrHead, dir: string, exec: ExecFn): Promise<v
   await exec('git', ['worktree', 'add', '--detach', dir, headSHA], { cwd: repoRoot })
 }
 
+// The worktree each in-flight call is preparing, by directory.
+const preparing = new Map<string, Promise<string>>()
+
 /**
  * Ensures a detached git worktree exists at the PR head, reusing one already
  * checked out at that SHA and keeping only the most recently used few around.
+ * A call made while another is still preparing the same worktree (a running
+ * review's "Continue in terminal") waits for it instead of racing `git worktree add`.
  */
-export async function ensureReviewWorktree(head: PrHead, deps: WorktreeDeps = {}): Promise<string> {
+export function ensureReviewWorktree(head: PrHead, deps: WorktreeDeps = {}): Promise<string> {
+  const dir = worktreeDir(head.repoRoot, head.prNumber, head.headSHA)
+  const inFlight = preparing.get(dir)
+  if (inFlight) return inFlight
+  const ready = prepareWorktree(head, dir, deps).finally(() => preparing.delete(dir))
+  preparing.set(dir, ready)
+  return ready
+}
+
+async function prepareWorktree(head: PrHead, dir: string, deps: WorktreeDeps): Promise<string> {
   const exec = deps.exec ?? defaultExec
   const { repoRoot } = head
-  const dir = worktreeDir(repoRoot, head.prNumber, head.headSHA)
   await exec('git', ['worktree', 'prune'], { cwd: repoRoot }).catch(() => {})
   if (!(await isCheckedOutAt(dir, head.headSHA, exec))) await addWorktreeAt(head, dir, exec)
   markUsed(dir)

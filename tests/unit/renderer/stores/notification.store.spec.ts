@@ -22,6 +22,7 @@ function makeNotif(overrides: Partial<SerializedNotification> = {}): SerializedN
     type: 'info',
     title: 'Test notification',
     timestamp: Date.now(),
+    targets: ['center'],
     ...overrides,
   }
 }

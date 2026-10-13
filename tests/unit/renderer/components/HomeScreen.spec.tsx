@@ -5,10 +5,7 @@ import { fact } from '../sidebar/fixtures/facts'
 import type { SessionFacts } from '../../../../src/renderer/sidebar/session-facts'
 
 const state = vi.hoisted(() => ({ facts: [] as SessionFacts[] }))
-const setDescription = vi.hoisted(() => vi.fn().mockResolvedValue(true))
-const setLink = vi.hoisted(() => vi.fn().mockResolvedValue(true))
 const navigate = vi.hoisted(() => vi.fn())
-const setActiveGlobalTab = vi.hoisted(() => vi.fn())
 
 vi.mock('../../../../src/renderer/components/session/useSessionFacts', () => ({
   useSessionFacts: () => state.facts,
@@ -18,45 +15,17 @@ vi.mock('../../../../src/renderer/components/session/useSessionFacts', () => ({
 vi.mock('../../../../src/renderer/components/session/LivePreview', () => ({
   LivePreview: () => <div />,
 }))
-vi.mock('../../../../src/renderer/stores/session-records.store', () => ({
-  useSessionRecordsStore: (select: (s: unknown) => unknown) =>
-    select({ forget, setDescription, setLink }),
-}))
 vi.mock('../../../../src/renderer/terminal/close-session', () => ({
   closeSessionFromFacts: closeSession,
 }))
-// One object for every render, as a real store's actions are: a fresh function
-// per render would re-run every effect that depends on one, for ever.
-const integrations = vi.hoisted(() => ({
-  isAnyConnected: () => true,
-  listMine: async () => ({
-    issues: [{ tracker: 'linear', key: 'NW-84', title: '429s', state: { name: 'Todo' } }],
-    failures: [],
-  }),
-  issueFor: () => null,
-}))
-vi.mock('../../../../src/renderer/stores/integrations.store', () => ({
-  useIntegrationsStore: (select: (s: unknown) => unknown) => select(integrations),
-}))
 const started = vi.hoisted(() => ({ inBranch: vi.fn(), scratch: vi.fn() }))
-const forget = vi.hoisted(() => vi.fn())
 const closeSession = vi.hoisted(() => vi.fn())
 vi.mock('../../../../src/renderer/terminal/start-session', () => ({
   startSessionInBranch: started.inBranch,
   startScratchSession: started.scratch,
 }))
-vi.mock('../../../../src/renderer/stores/workspace.store', () => ({
-  useWorkspaceStore: (select: (s: unknown) => unknown) =>
-    select({
-      workspaces: [{ id: 'w1', name: 'terminator' }],
-      projectsByWorkspaceId: new Map([['w1', [{ id: 'p1', workspaceId: 'w1', name: 'main' }]]]),
-    }),
-}))
 vi.mock('../../../../src/renderer/terminal/navigate-to-session', () => ({
-  navigateToSession: navigate,
-}))
-vi.mock('../../../../src/renderer/extensions/registry', () => ({
-  useExtensionRegistry: { getState: () => ({ setActiveGlobalTab }) },
+  revealSession: navigate,
 }))
 
 vi.mock('../../../../src/renderer/components/session/SessionLinkDialog', () => ({
@@ -70,10 +39,47 @@ vi.mock('../../../../src/renderer/components/session/SessionLinkDialog', () => (
 }))
 
 import { HomeScreen } from '../../../../src/renderer/components/home/HomeScreen'
+import { useSessionRecordsStore } from '../../../../src/renderer/stores/session-records.store'
+import { useIntegrationsStore } from '../../../../src/renderer/stores/integrations.store'
+import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
+import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
+import {
+  issueSummaryOf,
+  projectOf,
+  seedStore,
+  trackerConnectionOf,
+  workspaceOf,
+  type SeededStore,
+} from '../../../support/renderer-stores'
+
+let records: SeededStore<typeof useSessionRecordsStore>
 
 beforeEach(() => {
   vi.clearAllMocks()
   localStorage.clear()
+  records = seedStore(useSessionRecordsStore)
+  records.setDescription.mockResolvedValue(true)
+  records.setLink.mockResolvedValue(true)
+  // The real getters (isAnyConnected, issueFor) read this state; only the
+  // tracker call is replaced. One function for every render, as a real
+  // store's actions are: a fresh one per render would re-run its effects.
+  useIntegrationsStore.setState({
+    ...useIntegrationsStore.getInitialState(),
+    connections: [trackerConnectionOf()],
+    listMine: vi.fn().mockResolvedValue({
+      issues: [
+        issueSummaryOf({ key: 'NW-84', title: '429s', state: { name: 'Todo', type: 'unstarted' } }),
+      ],
+      failures: [],
+    }),
+  })
+  seedStore(useWorkspaceStore, {
+    workspaces: [workspaceOf({ id: 'w1', name: 'terminator' })],
+    projectsByWorkspaceId: new Map([
+      ['w1', [projectOf({ id: 'p1', workspaceId: 'w1', name: 'main' })]],
+    ]),
+  })
+  useExtensionRegistry.setState(useExtensionRegistry.getInitialState(), true)
   state.facts = [
     fact({ sessionId: 'a', name: 'claude', state: 'awaiting-input' }),
     fact({ sessionId: 'b', name: 'zsh', description: 'Checking bundle size' }),
@@ -117,7 +123,10 @@ describe('HomeScreen', () => {
     await act(async () => {
       fireEvent.keyDown(box, { key: 'Enter' })
     })
-    expect(setDescription).toHaveBeenCalledWith(state.facts[0].snapshot, 'Session home view')
+    expect(records.setDescription).toHaveBeenCalledWith(
+      state.facts[0].snapshot,
+      'Session home view'
+    )
   })
 
   it('narrows the list as the filter is typed', () => {
@@ -141,10 +150,11 @@ describe('HomeScreen', () => {
 
   it('says no terminals are open, and offers the way to them', () => {
     state.facts = []
+    useExtensionRegistry.getState().setActiveGlobalTab('core.home')
     render(<HomeScreen />)
     expect(screen.getByText('No terminals are open')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Go to terminals' }))
-    expect(setActiveGlobalTab).toHaveBeenCalledWith(null)
+    expect(useExtensionRegistry.getState().activeGlobalTabId).toBeNull()
   })
 
   // Both ends of a session's life are on the row it is drawn on.
@@ -166,7 +176,7 @@ describe('HomeScreen', () => {
     ]
     render(<HomeScreen />)
     fireEvent.click(screen.getByRole('button', { name: 'Remove old from the list' }))
-    expect(forget).toHaveBeenCalledWith('c')
+    expect(records.forget).toHaveBeenCalledWith('c')
   })
 
   it('still shows closed history when no terminal is open', () => {
@@ -213,7 +223,7 @@ describe('HomeScreen', () => {
     render(<HomeScreen />)
     fireEvent.click(screen.getByRole('option', { name: /Checking bundle size/ }))
     fireEvent.click(await screen.findByRole('button', { name: 'NW-84 429s' }))
-    expect(setLink).toHaveBeenCalledWith(state.facts[1].snapshot, {
+    expect(records.setLink).toHaveBeenCalledWith(state.facts[1].snapshot, {
       tracker: 'linear',
       key: 'NW-84',
     })

@@ -2,6 +2,7 @@ import React from 'react'
 import { ViewMenu } from '../ViewMenu'
 import { UsesPopover } from '../UsesPopover'
 import type { PrChangedFile, PrHead, ReadingStep } from '../../../schemas/pr-review.schema'
+import { splitPath } from '../../text'
 
 type ReadingStepUse = ReadingStep['uses'][number]
 
@@ -20,16 +21,9 @@ export interface FileHeaderProps {
 
 const RISK_LABEL = { high: 'High risk', medium: 'Medium risk', low: 'Low risk' } as const
 
-/** "src/app/" and "main.ts" from "src/app/main.ts". */
-function splitPath(path: string): { dirName: string; baseName: string } {
-  const slash = path.lastIndexOf('/')
-  if (slash < 0) return { dirName: '', baseName: path }
-  return { dirName: path.slice(0, slash + 1), baseName: path.slice(slash + 1) }
-}
-
 function FileTitle(props: { file: PrChangedFile }) {
   const { file } = props
-  const { dirName, baseName } = splitPath(file.path)
+  const { dir: dirName, name: baseName } = splitPath(file.path)
   return (
     <span className="rs-p" title={file.path}>
       {dirName && <span className="rs-p-dir">{dirName}</span>}

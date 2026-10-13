@@ -1,9 +1,8 @@
 import { test, expect } from '@playwright/test'
 import { execSync } from 'node:child_process'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { AppHandle, launchApp, closeApp, createWorkspace } from './helpers'
+import { AppHandle, launchApp, closeApp, createWorkspace, e2eTempDir } from './helpers'
 
 /**
  * The whole-class checks `extension-smoke.spec.ts` runs, for the extension it
@@ -89,7 +88,7 @@ function inGit(viewParam: string, script: string): Promise<Report> {
 }
 
 test.beforeAll(async () => {
-  repo = mkdtempSync(join(tmpdir(), 'terminator-e2e-gitsmoke-'))
+  repo = e2eTempDir('terminator-e2e-gitsmoke-')
   const run = (c: string) => execSync(c, { cwd: repo })
   run('git init -b main')
   run('git config user.email "test@test.com"')

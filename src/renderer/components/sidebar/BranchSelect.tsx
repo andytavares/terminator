@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { RefreshCw } from 'lucide-react'
 import type { Branch } from '../../../shared/types/index'
+import './dialog-fields.css'
 import './BranchSelect.css'
 
 interface Props {

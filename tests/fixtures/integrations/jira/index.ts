@@ -11,7 +11,7 @@ export const MYSELF = {
 }
 
 /** An ADF description exercising the node types FR-014 names. */
-export const ADF_DESCRIPTION = {
+const ADF_DESCRIPTION = {
   type: 'doc',
   version: 1,
   content: [
@@ -95,7 +95,7 @@ export const COMMENTS = {
   ],
 }
 
-export const SITE = 'tav.atlassian.net'
+const SITE = 'tav.atlassian.net'
 export const CREDENTIAL = {
   tracker: 'jira' as const,
   site: SITE,

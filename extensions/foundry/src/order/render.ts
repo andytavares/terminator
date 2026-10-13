@@ -2,6 +2,7 @@ import { coverageMatrix } from './coverage-matrix.js'
 import { compileOrder } from './compile.js'
 import { isBlocking } from './schema.js'
 import type { Budgets, OrderStatus, WorkOrder } from './schema.js'
+import { findingHeadline } from './finding-headline.js'
 
 // The order, rendered for a person.
 //
@@ -29,22 +30,6 @@ function verifyLine(order: WorkOrder, criterionId: string): string {
     case 'screenshot':
       return `screenshot · ${v.target}`
   }
-}
-
-/**
- * The claim in a finding's text, without its evidence.
- *
- * Mirrors `findingParts` in `Forge.tsx` exactly: a first line if the text has
- * one, otherwise its first sentence. Duplicated rather than imported because
- * that module is a React component; this one runs wherever an order is
- * rendered, including outside the application.
- */
-function findingHeadline(text: string): string {
-  const trimmed = text.trim()
-  const newline = trimmed.indexOf('\n')
-  if (newline !== -1) return trimmed.slice(0, newline).trim()
-  const sentence = /^(.+?[.!?])\s+(?=[A-Z`'"(])/s.exec(trimmed)
-  return sentence === null ? trimmed : sentence[1]
 }
 
 /** The two enforced budgets, e.g. "3 agents · 45 minutes". */

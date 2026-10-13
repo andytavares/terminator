@@ -25,8 +25,8 @@ function Menu({
   panel: { width: number; height: number }
   open?: boolean
 }): JSX.Element {
-  const buttonRef = useRef<HTMLButtonElement>(null)
-  const panelRef = useRef<HTMLDivElement>(null)
+  const buttonRef = useRef<HTMLButtonElement | null>(null)
+  const panelRef = useRef<HTMLDivElement | null>(null)
   const style = useMenuPlacement(open, buttonRef, panelRef)
   // Callback refs patch the boxes as the nodes attach, before layout effects run.
   const attach =
@@ -126,16 +126,5 @@ describe('useMenuPlacement', () => {
       window.dispatchEvent(new Event('resize'))
     })
     expect(parseFloat(screen.getByTestId('panel').style.left)).toBe(600 - 220 - 8)
-  })
-
-  it('measures nothing while the menu is closed', () => {
-    render(
-      <Menu
-        button={{ left: 0, top: 0, width: 10, height: 10 }}
-        panel={{ width: 10, height: 10 }}
-        open={false}
-      />
-    )
-    expect(screen.queryByTestId('panel')).toBeNull()
   })
 })

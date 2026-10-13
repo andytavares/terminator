@@ -193,8 +193,15 @@ export interface ForgeDeps {
    * The redraft lands later, through the store, and the surface sees it on its
    * next read. A seam, so this file starts no sessions and knows nothing about
    * terminals.
+   *
+   * `recordStart` writes the turn's start to the ledger, and the turn's end
+   * waits for it, so its redraft is never on the ledger before its start.
    */
-  readonly converge: (order: WorkOrder, message: string) => Promise<ConvergeStarted>
+  readonly converge: (
+    order: WorkOrder,
+    message: string,
+    recordStart: (started: ConvergeStarted) => Promise<void>
+  ) => Promise<ConvergeStarted>
   /**
    * What the source tracker can be asked to do, and the states it offers.
    *
@@ -471,6 +478,22 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
     return view(order)
   }
 
+  function recordArchitectStart(
+    order: WorkOrder,
+    message: string | undefined,
+    started: ConvergeStarted
+  ): Promise<void> {
+    return deps.store.record({
+      at: deps.now(),
+      orderId: order.id,
+      actor: 'role:architect',
+      action: started.ok ? 'converge.started' : 'converge.refused',
+      subject: started.ok ? started.sessionId : order.id,
+      reason: started.ok ? (message === undefined ? 'drafting the plan' : message) : started.reason,
+      evidence: [],
+    })
+  }
+
   /**
    * Start one architect turn, on the order and with the message given.
    *
@@ -479,17 +502,14 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
    * place that starts a session and one place that records it.
    */
   async function runArchitectTurn(order: WorkOrder, message?: string): Promise<unknown> {
-    const started = await deps.converge(order, message ?? '')
+    // Once, from inside the turn when the architect starts, or here when
+    // `converge` answered without starting one.
+    let recorded: Promise<void> | null = null
+    const recordStart = (s: ConvergeStarted): Promise<void> =>
+      (recorded ??= recordArchitectStart(order, message, s))
+    const started = await deps.converge(order, message ?? '', recordStart)
+    await recordStart(started)
     if (!started.ok) {
-      await deps.store.record({
-        at: deps.now(),
-        orderId: order.id,
-        actor: 'role:architect',
-        action: 'converge.refused',
-        subject: order.id,
-        reason: started.reason,
-        evidence: [],
-      })
       return {
         ...view(order),
         error: started.reason,
@@ -497,15 +517,6 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
       }
     }
 
-    await deps.store.record({
-      at: deps.now(),
-      orderId: order.id,
-      actor: 'role:architect',
-      action: 'converge.started',
-      subject: started.sessionId,
-      reason: message === undefined ? 'drafting the plan' : message,
-      evidence: [],
-    })
     // The order as it stands, plus the session the architect is working in —
     // so the surface can say it is running and take the operator to it.
     //

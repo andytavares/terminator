@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, writeFileSync, chmodSync, mkdirSync, rmSync, symlinkSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync, chmodSync, mkdirSync, rmSync, symlinkSync } from 'node:fs'
 import { join } from 'node:path'
 import { ipcMain } from 'electron'
+import { makeTempDir } from '../../support/temp-dir'
 
 const { mockOpenPath, mockOpenExternal } = vi.hoisted(() => ({
   mockOpenPath: vi.fn(),
@@ -31,7 +31,7 @@ describe('shell:exec IPC handler', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
-    scratch = mkdtempSync(join(tmpdir(), 'shell-ipc-'))
+    scratch = makeTempDir('shell-ipc-')
     const git = join(scratch, 'git')
     writeFileSync(git, '#!/bin/sh\necho "$@"\npwd\n')
     chmodSync(git, 0o755)

@@ -17,7 +17,7 @@ export interface Rect {
 /** A board's height above its wall row: icon, gap, two-pixel digits, frame. */
 export const BOARD_HEIGHT = 26
 /** The queue plate: sixteen square, so a one-pixel digit has air round it. */
-export const PLATE_SIZE = 16
+const PLATE_SIZE = 16
 /** The tower's body, and the beacon that sits on top of it. */
 export const TOWER_HEIGHT = 24
 export const BEACON_HEIGHT = 3

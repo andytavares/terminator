@@ -2,10 +2,10 @@ import { create, type StoreApi } from 'zustand'
 import { SORT_MODES, type SortMode } from '../review/sort-prs'
 import type { AgentRun, AgentScope } from '../schemas/review-agent.schema'
 
-export type AgentRequest = 'review' | 'explain' | 'ask'
+type AgentRequest = 'review' | 'explain' | 'ask'
 
 export type CommentVisibility = 'all' | 'unresolved' | 'hidden'
-export type DiffRange = 'since' | 'whole'
+type DiffRange = 'since' | 'whole'
 export type DiffViewMode = 'unified' | 'split'
 
 /** A line range the reviewer has selected in the diff, for the float bar and the agent. */

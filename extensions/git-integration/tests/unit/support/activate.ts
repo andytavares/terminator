@@ -1,8 +1,10 @@
 import { vi } from 'vitest'
+import { join } from 'node:path'
 import type { ChannelSpec, ExtensionAPI } from '@terminator/extension-sdk'
 import { activate, deactivate } from '../../../src/index.ts'
+import { makeTempDir } from '../../../../../tests/support/temp-dir'
 
-export interface RegisteredChannel {
+interface RegisteredChannel {
   spec: ChannelSpec
   remoteAccessible: boolean
 }
@@ -13,13 +15,31 @@ export interface FakeWorkspace {
   worktreePaths: string[]
 }
 
+/** A `paths.globalStorage` in a fresh userData, `<userData>/extensions/<id>`, not created yet. */
+export function freshGlobalStorage(): string {
+  const userData = makeTempDir('git-integration-user-data-')
+  return join(userData, 'extensions', 'terminator.git-integration')
+}
+
 const disposable = { dispose: () => {} }
+
+interface ApiSpies {
+  exec: ReturnType<typeof vi.fn>
+  githubApi: ReturnType<typeof vi.fn>
+  warn: ReturnType<typeof vi.fn>
+}
+
+/** Where the stand-in API says the workspace and this extension's own folder are. */
+interface ApiPlaces {
+  workspace?: FakeWorkspace
+  globalStorage: string
+}
 
 /** A stand-in ExtensionAPI whose registerHandler collects into `channels`. */
 function capturingApi(
   channels: RegisteredChannel[],
-  spies: { exec: ReturnType<typeof vi.fn>; githubApi: ReturnType<typeof vi.fn> },
-  workspace?: FakeWorkspace
+  spies: ApiSpies,
+  places: ApiPlaces
 ): ExtensionAPI {
   return {
     ipc: {
@@ -33,12 +53,13 @@ function capturingApi(
       register: () => disposable,
       isBranchExcluded: async () => false,
     },
-    paths: { app: '/app', userData: '/user-data' },
+    paths: { app: '/app', globalStorage: places.globalStorage },
+    log: { debug: () => {}, info: () => {}, warn: spies.warn, error: () => {} },
     commands: { register: () => disposable },
     window: { broadcast: () => {}, openAuxiliary: () => {} },
     nativeMenu: { addViewMenuItem: () => disposable },
     notifications: { showToast: () => {}, createNotification: () => disposable },
-    workspace: fakeWorkspaceApi(workspace),
+    workspace: fakeWorkspaceApi(places.workspace),
     shell: { exec: spies.exec },
     github: {
       api: spies.githubApi,
@@ -60,12 +81,14 @@ function fakeWorkspaceApi(workspace?: FakeWorkspace) {
   }
 }
 
-/** Activates git-integration on a stand-in API; returns its channels and the shell and gh spies. */
-export function activateCapturingChannels(workspace?: FakeWorkspace) {
+/** Activates git-integration on a stand-in API; returns its channels and the shell, gh and log warn spies. */
+export function activateCapturingChannels(
+  workspace?: FakeWorkspace,
+  globalStorage = freshGlobalStorage()
+) {
   const channels: RegisteredChannel[] = []
-  const exec = vi.fn()
-  const githubApi = vi.fn()
-  activate(capturingApi(channels, { exec, githubApi }, workspace))
+  const spies = { exec: vi.fn(), githubApi: vi.fn(), warn: vi.fn() }
+  activate(capturingApi(channels, spies, { workspace, globalStorage }))
   deactivate()
-  return { channels, exec, githubApi }
+  return { channels, ...spies }
 }

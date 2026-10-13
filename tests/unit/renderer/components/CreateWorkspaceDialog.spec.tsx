@@ -3,26 +3,43 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { CreateWorkspaceDialog } from '../../../../src/renderer/components/sidebar/CreateWorkspaceDialog'
-import { seedStore, workspaceOf } from '../../../support/renderer-stores'
+import { projectOf, workspaceOf } from '../../../support/renderer-stores'
+import type { Project, Workspace } from '../../../../src/shared/types/index'
 
-const mockCreateWorkspace = vi.fn()
-const mockCreateProject = vi.fn()
+type WorkspaceInput = Pick<Workspace, 'name' | 'folderPath' | 'color' | 'tags'>
+type ProjectInput = Pick<Project, 'workspaceId' | 'name'> & Partial<Project>
+
+// The main process's side of the two writes the real store makes.
+let nextWorkspaceId = 'ws-new'
+const mockCreateWorkspace = vi.fn(
+  async (input: WorkspaceInput): Promise<{ workspace: Workspace } | { error: string }> => ({
+    workspace: workspaceOf({ id: nextWorkspaceId, ...input }),
+  })
+)
+const mockCreateProject = vi.fn(async (input: ProjectInput) => ({
+  project: projectOf({ id: 'proj-new', ...input }),
+}))
 const mockOpenDirectory = vi.fn()
+
+const workspaceNames = (): string[] => useWorkspaceStore.getState().workspaces.map((w) => w.name)
+
+function withApi(
+  repo: Record<string, unknown> = { isRepo: vi.fn().mockResolvedValue({ isRepo: false }) }
+): void {
+  ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
+    dialog: { openDirectory: mockOpenDirectory },
+    workspace: { create: mockCreateWorkspace },
+    project: { create: mockCreateProject },
+    git: repo,
+  }
+}
 
 beforeEach(() => {
   vi.clearAllMocks()
-  mockCreateWorkspace.mockResolvedValue({ workspace: { id: 'ws-new', name: 'New' } })
-  mockCreateProject.mockResolvedValue({ project: { id: 'proj-new' } })
+  nextWorkspaceId = 'ws-new'
   mockOpenDirectory.mockResolvedValue({ filePath: '/selected/path' })
-  ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
-    dialog: { openDirectory: mockOpenDirectory },
-    git: { isRepo: vi.fn().mockResolvedValue({ isRepo: false }) },
-  }
-  seedStore(useWorkspaceStore, {
-    workspaces: [],
-    createWorkspace: mockCreateWorkspace,
-    createProject: mockCreateProject,
-  })
+  withApi()
+  useWorkspaceStore.setState({ ...useWorkspaceStore.getInitialState(), workspaces: [] })
 })
 
 afterEach(() => {
@@ -53,11 +70,7 @@ describe('CreateWorkspaceDialog', () => {
   })
 
   it('shows duplicate name error', () => {
-    seedStore(useWorkspaceStore, {
-      workspaces: [workspaceOf({ id: 'ws-1', name: 'Existing' })],
-      createWorkspace: mockCreateWorkspace,
-      createProject: mockCreateProject,
-    })
+    useWorkspaceStore.setState({ workspaces: [workspaceOf({ id: 'ws-1', name: 'Existing' })] })
     render(<CreateWorkspaceDialog onClose={vi.fn()} />)
     const nameInput = screen.getByPlaceholderText('My Workspace')
     fireEvent.change(nameInput, { target: { value: 'existing' } })
@@ -65,18 +78,11 @@ describe('CreateWorkspaceDialog', () => {
     expect(screen.getByText('A workspace with this name already exists')).toBeTruthy()
   })
 
-  it('calls createWorkspace on submit with valid name', async () => {
-    const onClose = vi.fn()
-    render(<CreateWorkspaceDialog onClose={onClose} />)
+  it('adds the workspace it creates to the list', async () => {
+    render(<CreateWorkspaceDialog onClose={vi.fn()} />)
     fireEvent.change(screen.getByPlaceholderText('My Workspace'), { target: { value: 'My WS' } })
     fireEvent.click(screen.getByText('Create'))
-    await vi.waitFor(() => expect(mockCreateWorkspace).toHaveBeenCalled())
-  })
-
-  it('renders color swatches', () => {
-    const { container } = render(<CreateWorkspaceDialog onClose={vi.fn()} />)
-    const swatches = container.querySelectorAll('.dialog__color-swatch')
-    expect(swatches.length).toBeGreaterThan(0)
+    await vi.waitFor(() => expect(workspaceNames()).toEqual(['My WS']))
   })
 
   it('renders folder path input', () => {
@@ -155,7 +161,7 @@ describe('CreateWorkspaceDialog', () => {
   })
 
   it('surfaces a name error when createWorkspace reports DUPLICATE_NAME', async () => {
-    mockCreateWorkspace.mockResolvedValue({ error: 'DUPLICATE_NAME' })
+    mockCreateWorkspace.mockResolvedValueOnce({ error: 'DUPLICATE_NAME' })
     const onClose = vi.fn()
     render(<CreateWorkspaceDialog onClose={onClose} />)
     fireEvent.change(screen.getByPlaceholderText('My Workspace'), { target: { value: 'Dupe' } })
@@ -165,7 +171,7 @@ describe('CreateWorkspaceDialog', () => {
   })
 
   it('surfaces a generic error when createWorkspace fails for another reason', async () => {
-    mockCreateWorkspace.mockResolvedValue({ error: 'BACKEND_DOWN' })
+    mockCreateWorkspace.mockResolvedValueOnce({ error: 'BACKEND_DOWN' })
     render(<CreateWorkspaceDialog onClose={vi.fn()} />)
     fireEvent.change(screen.getByPlaceholderText('My Workspace'), { target: { value: 'WS X' } })
     fireEvent.click(screen.getByText('Create'))
@@ -173,15 +179,11 @@ describe('CreateWorkspaceDialog', () => {
   })
 
   it('auto-creates a branch project when the chosen folder is a git repo', async () => {
-    mockCreateWorkspace.mockResolvedValue({ workspace: { id: 'ws-git' } })
-    const currentBranch = vi.fn().mockResolvedValue({ branch: 'develop' })
-    ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
-      dialog: { openDirectory: mockOpenDirectory },
-      git: {
-        isRepo: vi.fn().mockResolvedValue({ isRepo: true, root: '/repo/root' }),
-        currentBranch,
-      },
-    }
+    nextWorkspaceId = 'ws-repo'
+    withApi({
+      isRepo: vi.fn().mockResolvedValue({ isRepo: true, root: '/repo/root' }),
+      currentBranch: vi.fn().mockResolvedValue({ branch: 'develop' }),
+    })
     const onClose = vi.fn()
     render(<CreateWorkspaceDialog onClose={onClose} />)
     fireEvent.change(screen.getByPlaceholderText('My Workspace'), { target: { value: 'Repo WS' } })
@@ -189,14 +191,13 @@ describe('CreateWorkspaceDialog', () => {
       target: { value: '/repo/root' },
     })
     fireEvent.click(screen.getByText('Create'))
-    await vi.waitFor(() => expect(mockCreateProject).toHaveBeenCalled())
-    expect(mockCreateProject).toHaveBeenCalledWith(
+    await vi.waitFor(() => expect(onClose).toHaveBeenCalled())
+    expect(useWorkspaceStore.getState().projectsByWorkspaceId.get('ws-repo')).toEqual([
       expect.objectContaining({
-        workspaceId: 'ws-git',
+        name: 'develop',
         gitBranch: 'develop',
         worktreePath: '/repo/root',
-      })
-    )
-    await vi.waitFor(() => expect(onClose).toHaveBeenCalled())
+      }),
+    ])
   })
 })

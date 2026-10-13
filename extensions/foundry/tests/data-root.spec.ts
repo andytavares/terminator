@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import * as path from 'node:path'
 import {
   resolveDataRoot,
@@ -11,6 +10,7 @@ import {
   laneDir,
   ensureWritable,
 } from '../src/data-root.js'
+import { makeTempDir } from '../../../tests/support/temp-dir'
 
 // Where Foundry writes is one setting with two behaviours (FR-074), and it is
 // resolved once so that two writers can never disagree about it — a real hazard
@@ -78,7 +78,7 @@ describe('ensureWritable', () => {
   let tmp: string
 
   beforeEach(() => {
-    tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'foundry-root-'))
+    tmp = makeTempDir('foundry-root-')
   })
 
   afterEach(() => {
@@ -97,11 +97,10 @@ describe('ensureWritable', () => {
   })
 
   it('reports a root it cannot create, naming the path', async () => {
+    // A file where the parent directory should be: no one can create under it.
     const wall = path.join(tmp, 'wall')
-    fs.mkdirSync(wall)
-    fs.chmodSync(wall, 0o500)
+    fs.writeFileSync(wall, '')
     const r = await ensureWritable(path.join(wall, 'foundry'))
-    fs.chmodSync(wall, 0o700)
     expect(r.ok).toBe(false)
     if (!r.ok) expect(r.reason).toContain(path.join(wall, 'foundry'))
   })

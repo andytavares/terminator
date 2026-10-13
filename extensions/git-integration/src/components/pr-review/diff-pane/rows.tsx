@@ -104,7 +104,7 @@ function rowProps(at: LineRef, expanded: boolean) {
   }
 }
 
-export function UnifiedTable(props: { ctx: PaneContext; children: React.ReactNode }) {
+function UnifiedTable(props: { ctx: PaneContext; children: React.ReactNode }) {
   const { ctx, children } = props
   const { numColWidth } = ctx.layout
   return (

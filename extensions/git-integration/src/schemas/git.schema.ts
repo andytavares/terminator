@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-export type FileStatus =
+type FileStatus =
   | 'modified'
   | 'added'
   | 'deleted'

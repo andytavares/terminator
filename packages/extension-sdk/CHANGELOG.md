@@ -1,5 +1,22 @@
 # Changelog — @terminator/extension-sdk
 
+## Unreleased
+
+### Added
+
+- `@terminator/extension-sdk/vite`: `extensionViewConfig(directory, { plugins, chunkSizeWarningLimit? })`,
+  the Vite config of an extension's view (`index.html` built to `dist/` with relative URLs).
+
+### Fixed
+
+- `workspace.getActive()` in a view answered `{ workspaceId: null, projectId: null, repoRoot:
+null }` whatever was on screen: nothing told the core what the main window showed. The app
+  renderer now reports it (`workspace.setActive`, internal to the app), and views also receive it
+  as `workspace:changed`.
+- A view's `extensionEvents.onSelectProjectTab` subscription is driven by a broadcast of
+  `extension:select-project-tab` with `{ tabId }`, the payload the core always read; the
+  e2e probe extension (`tests/e2e/fixtures/extensions/probe`) is its first sender.
+
 ## 4.0.0
 
 Every member of the Extension API now crosses a process boundary: extension backends run in
@@ -19,12 +36,17 @@ stays in the extension host and the core calls it by id.
 - `pty.onData` delivers output in batches of at most one per frame, every batch before the
   session's exit. `pty.onData` and `pty.onExit` always return a disposer: a session that does
   not exist never calls the listener (they returned `null`).
+- `pty.onExit` passes `number | null`: `null` when a signal ended the process, closing its tab
+  included. node-pty reports such a process as exit code 0, and the core passed that 0 on, so a
+  terminal killed before its process finished read as a success.
 - `ipc.isRemoteAccessible(channel)` returns `Promise<boolean>`.
 - `shell.exec` and every `github` call reject with an error named `CwdOutOfScopeError`, and run
   nothing, when `cwd` is outside the extension's shell roots: the workspace folders, the project
-  worktrees, `paths.userData`, and the folder settings `contributes.shellRoots` declares. Both
-  sides are compared after resolving symlinks (ADR 102). A gh call whose `cwd` does not matter,
-  because it names `repository`, passes `paths.userData`; the home directory is not a root.
+  worktrees, the extension's own `paths.globalStorage`, and the folder settings
+  `contributes.shellRoots` declares. Both sides are compared after resolving symlinks (ADR 102,
+  ADR 103). A gh call whose `cwd` does not matter, because it names `repository`, passes
+  `paths.globalStorage`; the home directory is not a root, and neither is any other extension's
+  folder.
 - `settings.get` and `workspace.list` / `listProjects` stay synchronous and read a snapshot the
   core pushes on every change. `issues.supportsTransitions` / `supportsCreate` are fixed facts
   of a tracker and stay synchronous.
@@ -32,9 +54,20 @@ stays in the extension host and the core calls it by id.
 ### Added
 
 - `pty.openTerminal(input)`: replaces `openTerminalTab`, as a promise.
+- `pty.runInTerminal(input)`, with `RunInTerminalInput` and `TerminalExit`: runs a program as
+  the process of a new tab, nothing typed into a shell, and resolves when it ends with
+  `{ sessionId, exitCode }`; `exitCode` is `null` when a signal or a closed tab ended it. Resolves
+  `null`, running nothing, when there is no window. The exit is subscribed in the tick the process
+  is spawned, so one that exits at once is not missed.
+- `SpawnSessionOptions.args`: arguments for `shell`, in place of the login flag `-l`.
 - `workspace.addProject(input)`: replaces `createProject`, as a promise.
-- `paths.app` and `paths.userData`: the application's directory and the per-user data
-  directory, for what used to come from `electron.app`.
+- `paths.app`: the application's directory, for what used to come from `electron.app`.
+- `paths.globalStorage`: the extension's own data folder, `<userData>/extensions/<id>`, which no
+  other extension shares; VS Code's `ExtensionContext.globalStorageUri`. The extension creates it
+  when it first writes (ADR 103).
+- `moveFromUserData(api, moves)` from `@terminator/extension-sdk/node`: moves what an extension
+  kept in the shared userData folder into `paths.globalStorage` at activation, each path only while
+  its new location does not exist; when both exist it leaves both and logs where the old one is.
 - `dialog.showOpenDialog(options)` / `showSaveDialog(options)`: the file dialogs, for what used
   to come from `electron.dialog`.
 - `window.raise()`: restores and focuses every application window, for what used to come from
@@ -47,11 +80,14 @@ stays in the extension host and the core calls it by id.
 
 - `pty.openTerminalTab` and `workspace.createProject`, the synchronous forms of
   `pty.openTerminal` and `workspace.addProject`.
+- `paths.userData`, which earlier 4.0.0 builds had: the application's whole data folder, shared by
+  every extension and a shell root for each. Use `paths.globalStorage`, and `moveFromUserData` for
+  data an extension already wrote there (ADR 103).
 
 ### Migrating from 3.x
 
 - An extension backend cannot import `electron`: use `api.paths`, `api.dialog` and
-  `api.window`. A store such as electron-store needs `cwd: api.paths.userData`.
+  `api.window`. A store such as electron-store needs `cwd: api.paths.globalStorage`.
 - Await the members above. A filter that needs `isBranchExcluded` asks for each candidate first,
   then filters synchronously.
 

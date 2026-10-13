@@ -19,7 +19,7 @@ function fmtShare(value: number | null): string {
   return value === null ? '—' : `${Math.round(value * 100)}%`
 }
 
-export function metricsTiles(metrics: FactoryMetrics): readonly [string, string][] {
+function metricsTiles(metrics: FactoryMetrics): readonly [string, string][] {
   return [
     ['Shipped', String(metrics.shipped)],
     ['Median lead time', fmtDuration(metrics.medianLeadTimeMs)],

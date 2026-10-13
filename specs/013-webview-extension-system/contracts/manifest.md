@@ -1,5 +1,11 @@
 # Contract: Extension Manifest (`manifest.json`)
 
+> **Superseded. Kept as history.** This contract records what was decided when the feature was
+> specified, and is not edited. The code no longer has a manifest without `extensionDependencies`, `quickActions`, `shellRoots`, or a command's `mnemonic` and `requires`, and rules (`contributes` required with `renderer`, a command id pattern) the schema does not enforce. Do not build against it. The
+> current contract lives in:
+>
+> - `src/shared/schemas/extension.schema.ts` (`ExtensionManifestSchema`) and [The manifest](../../../docs/EXTENSION-DEVELOPMENT.md#the-manifest)
+
 **Version**: 2.0.0
 **Feature**: 013-webview-extension-system
 **Date**: 2026-06-24

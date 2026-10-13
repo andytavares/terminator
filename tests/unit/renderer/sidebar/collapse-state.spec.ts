@@ -28,8 +28,8 @@ describe('loadCollapseState', () => {
   })
 
   it('reads back what was saved', () => {
-    saveCollapseState({ project: ['p1'] })
-    expect(loadCollapseState()).toEqual({ project: ['p1'] })
+    saveCollapseState({ workspace: ['p1'] })
+    expect(loadCollapseState()).toEqual({ workspace: ['p1'] })
   })
 
   it('degrades to empty on unparseable JSON rather than throwing', () => {
@@ -45,9 +45,9 @@ describe('loadCollapseState', () => {
   it('ignores entries whose value is not a list of strings', () => {
     localStorage.setItem(
       COLLAPSE_STORAGE_KEY,
-      JSON.stringify({ project: ['p1'], status: 'nope', branch: [1, 2] })
+      JSON.stringify({ workspace: ['p1'], none: 'nope', branch: [1, 2] })
     )
-    expect(loadCollapseState()).toEqual({ project: ['p1'] })
+    expect(loadCollapseState()).toEqual({ workspace: ['p1'] })
   })
 
   it('survives storage throwing on read', () => {
@@ -63,46 +63,48 @@ describe('saveCollapseState', () => {
     vi.spyOn(localStorageStub, 'setItem').mockImplementation(() => {
       throw new Error('quota')
     })
-    expect(() => saveCollapseState({ project: ['p1'] })).not.toThrow()
+    expect(() => saveCollapseState({ workspace: ['p1'] })).not.toThrow()
   })
 })
 
 describe('isCollapsed', () => {
   it('reports expanded when nothing is stored', () => {
-    expect(isCollapsed({}, 'project', 'p1')).toBe(false)
+    expect(isCollapsed({}, 'workspace', 'p1')).toBe(false)
   })
 
   it('reports collapsed for a stored key', () => {
-    expect(isCollapsed({ project: ['p1'] }, 'project', 'p1')).toBe(true)
+    expect(isCollapsed({ workspace: ['p1'] }, 'workspace', 'p1')).toBe(true)
   })
 
-  it('keeps grouping modes isolated — collapsing a project does not collapse a status group', () => {
-    const state = { project: ['p1'] }
-    expect(isCollapsed(state, 'status', 'p1')).toBe(false)
+  it('keeps grouping modes isolated — collapsing a repo does not collapse the same key in the ungrouped list', () => {
+    const state = { workspace: ['p1'] }
+    expect(isCollapsed(state, 'none', 'p1')).toBe(false)
   })
 })
 
 describe('toggleCollapsed', () => {
   it('collapses an expanded group', () => {
-    expect(toggleCollapsed({}, 'project', 'p1')).toEqual({ project: ['p1'] })
+    expect(toggleCollapsed({}, 'workspace', 'p1')).toEqual({ workspace: ['p1'] })
   })
 
   it('expands a collapsed group', () => {
-    expect(toggleCollapsed({ project: ['p1'] }, 'project', 'p1')).toEqual({ project: [] })
+    expect(toggleCollapsed({ workspace: ['p1'] }, 'workspace', 'p1')).toEqual({ workspace: [] })
   })
 
   it('leaves other groups in the same mode alone', () => {
-    expect(toggleCollapsed({ project: ['p1', 'p2'] }, 'project', 'p1')).toEqual({ project: ['p2'] })
+    expect(toggleCollapsed({ workspace: ['p1', 'p2'] }, 'workspace', 'p1')).toEqual({
+      workspace: ['p2'],
+    })
   })
 
   it('leaves other grouping modes alone', () => {
-    const next = toggleCollapsed({ status: ['idle'] }, 'project', 'p1')
-    expect(next).toEqual({ status: ['idle'], project: ['p1'] })
+    const next = toggleCollapsed({ none: ['idle'] }, 'workspace', 'p1')
+    expect(next).toEqual({ none: ['idle'], workspace: ['p1'] })
   })
 
   it('does not mutate the state it was given', () => {
-    const state = { project: ['p1'] }
-    toggleCollapsed(state, 'project', 'p2')
-    expect(state).toEqual({ project: ['p1'] })
+    const state = { workspace: ['p1'] }
+    toggleCollapsed(state, 'workspace', 'p2')
+    expect(state).toEqual({ workspace: ['p1'] })
   })
 })

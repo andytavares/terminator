@@ -1,6 +1,4 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { DatabaseSync } from 'node:sqlite'
-import { wrapDb } from '../../../../src/main/db/index'
 import type { ExtensionDB } from '@terminator/extension-sdk'
 import { registerAdminIpcHandlers } from '../../src/ipc/admin.ipc.js'
 import { createIpcHarness, createVaultDb, seedArea, seedTask } from '../support/vault-db'
@@ -14,40 +12,14 @@ beforeEach(async () => {
 })
 
 describe('registerAdminIpcHandlers', () => {
-  it('registers the three admin channels and dispose removes them', () => {
+  it('registers the two admin channels and dispose removes them', () => {
     const dispose = registerAdminIpcHandlers(harness.api, db)
     expect(harness.channels().sort()).toEqual([
-      'task-vault:admin:list-tables',
       'task-vault:admin:run-query',
       'task-vault:admin:table-stats',
     ])
     dispose()
     expect(harness.channels()).toEqual([])
-  })
-
-  describe('list-tables', () => {
-    it('lists the tables of the database, sorted', async () => {
-      registerAdminIpcHandlers(harness.api, db)
-      const result = (await harness.invoke('task-vault:admin:list-tables')) as { tables: string[] }
-      expect(result.tables).toEqual([
-        'area_archive_changes',
-        'areas',
-        'projects',
-        'settings',
-        'tasks',
-        'weekly_review_actions',
-        'weekly_reviews',
-      ])
-    })
-
-    it('returns the error when the database is closed', async () => {
-      const database = new DatabaseSync(':memory:')
-      const closed = wrapDb(database)
-      database.close()
-      registerAdminIpcHandlers(harness.api, closed)
-      const result = (await harness.invoke('task-vault:admin:list-tables')) as { error: string }
-      expect(result.error).toMatch(/not open/)
-    })
   })
 
   describe('table-stats', () => {

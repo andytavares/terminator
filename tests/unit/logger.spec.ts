@@ -11,11 +11,11 @@ const mockStream = {
   on: vi.fn(),
 }
 
-let mockExistsSync = vi.fn(() => false)
+let mockExistsSync = vi.fn((..._args: unknown[]) => false)
 let mockStatSyncSize = 0
-const mockStatSync = vi.fn(() => ({ size: mockStatSyncSize }))
+const mockStatSync = vi.fn((..._args: unknown[]) => ({ size: mockStatSyncSize }))
 const mockRenameSync = vi.fn()
-const mockCreateWriteStream = vi.fn(() => mockStream)
+const mockCreateWriteStream = vi.fn((..._args: unknown[]) => mockStream)
 
 vi.mock('fs', () => ({
   createWriteStream: (...args: unknown[]) => mockCreateWriteStream(...args),

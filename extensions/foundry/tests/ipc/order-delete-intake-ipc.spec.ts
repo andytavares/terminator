@@ -9,10 +9,12 @@
  * (run 36342472487, foundry-intake.spec.ts:216).
  */
 import { tmpdir } from 'node:os'
+import { freshGlobalStorage } from '../helpers/foundry-host.js'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
-const USER_DATA = tmpdir()
+const GLOBAL_STORAGE = freshGlobalStorage()
 
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest'
 import { vi } from 'vitest'
@@ -98,7 +100,7 @@ beforeAll(async () => {
     shell: { exec: vi.fn().mockResolvedValue({ exitCode: 0, stdout: '', stderr: '' }) },
     notifications: { showToast: vi.fn(), createNotification: vi.fn() },
     log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
-    paths: { app: '', userData: USER_DATA },
+    paths: { app: '', globalStorage: GLOBAL_STORAGE },
     settings: {
       register: vi.fn().mockReturnValue({ dispose: vi.fn() }),
       get: settingsGet,
@@ -156,7 +158,7 @@ beforeEach(() => {
 
 describe('deleting an order while its scout is still reading', () => {
   it('starts nothing more for it once the scout ends, and leaves nothing on disk', async () => {
-    dataDir = fs.mkdtempSync(path.join(tmpdir(), 'fdry-delete-intake-'))
+    dataDir = makeTempDir('fdry-delete-intake-')
     await createOrderStore(dataDir).save(order())
 
     // The architect starts at seed, beside the scout rather than after it.

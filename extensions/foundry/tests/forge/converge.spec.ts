@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
@@ -13,6 +12,7 @@ import { EVIDENCE_KINDS, LANE_ROLES, RISK_TRIGGERS } from '../../src/order/schem
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import { orderDir } from '../../src/data-root.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 // Converging an order.
 //
@@ -44,8 +44,8 @@ function order(over: Partial<WorkOrder> = {}): WorkOrder {
 }
 
 beforeEach(() => {
-  root = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-converge-'))
-  repo = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-converge-repo-'))
+  root = makeTempDir('fdry-converge-')
+  repo = makeTempDir('fdry-converge-repo-')
 })
 
 afterEach(() => {

@@ -1,6 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   AppHandle,
@@ -9,6 +8,7 @@ import {
   createWorkspace,
   addAndSelectProject,
   selectProject,
+  e2eTempDir,
 } from './helpers'
 
 // Resume against the running app. A conversation is reported exactly as the
@@ -25,7 +25,7 @@ let folder: string
 let transcript: string
 
 test.beforeEach(() => {
-  folder = mkdtempSync(join(tmpdir(), 'resume-'))
+  folder = e2eTempDir('resume-')
   transcript = join(folder, 'conversation.jsonl')
   writeFileSync(transcript, '{}\n')
 })

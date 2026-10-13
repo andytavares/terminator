@@ -5,7 +5,7 @@ import { useMergeFlowStore } from '../../stores/merge-flow.store'
 import { mergeFlowAPI } from '../../api/merge-flow'
 import { notificationsAPI } from '../../api/notifications'
 import type { ConflictFile, ConflictSession } from '../../schemas/merge-flow.schema'
-import { choose, plural } from '../text'
+import { choose, plural, splitPath } from '../text'
 
 interface Props {
   repoRoot: string
@@ -80,12 +80,6 @@ function getLangBadge(filePath: string): { label: string; bg: string } {
   const ext = filePath.split('.').pop()?.toLowerCase() ?? ''
   if (Object.hasOwn(LANG_BADGES, ext)) return LANG_BADGES[ext]
   return { label: ext.slice(0, 3).toUpperCase() || '?', bg: '#4b5563' }
-}
-
-function splitPath(filePath: string): { dir: string; name: string } {
-  const idx = filePath.lastIndexOf('/')
-  if (idx === -1) return { dir: '', name: filePath }
-  return { dir: filePath.slice(0, idx + 1), name: filePath.slice(idx + 1) }
 }
 
 function defaultCommitMessage(session: ConflictSession | null): string {

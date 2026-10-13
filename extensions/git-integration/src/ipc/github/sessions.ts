@@ -20,10 +20,13 @@ const activeReviewStore = () => namedStore('pr-active-reviews')
  * One session per PR. v2 keys are "repo:::pr"; v1 keys are "repo:::pr:::sha".
  * When both exist for the same PR, the new key wins — it's the one v2 code keeps current.
  */
-export function sessionsForRepo(repoRoot: string): ReviewSession[] {
+export function sessionsForRepo(
+  stored: Record<string, unknown>,
+  repoRoot: string
+): ReviewSession[] {
   const prefix = `${repoRoot}:::`
   const byPrNumber = new Map<number, KeyedSession>()
-  for (const [key, value] of Object.entries(sessionStore().store)) {
+  for (const [key, value] of Object.entries(stored)) {
     const result = key.startsWith(prefix) ? ReviewSessionSchema.safeParse(value) : null
     if (!result?.success) continue
     const isNewKey = !key.slice(prefix.length).includes(':::')
@@ -35,8 +38,13 @@ export function sessionsForRepo(repoRoot: string): ReviewSession[] {
   return Array.from(byPrNumber.values()).map((v) => v.session)
 }
 
-function activeReviewsFor(repoRoot: string): unknown[] {
-  return Object.values(activeReviewStore().store)
+/** Every stored review session, keyed as `sessionsForRepo` reads them. */
+export async function storedSessions(): Promise<Record<string, unknown>> {
+  return (await sessionStore()).store
+}
+
+async function activeReviewsFor(repoRoot: string): Promise<unknown[]> {
+  return Object.values((await activeReviewStore()).store)
     .filter(
       (entry): entry is { repoRoot: string; pr: unknown } =>
         typeof entry === 'object' &&
@@ -46,12 +54,16 @@ function activeReviewsFor(repoRoot: string): unknown[] {
     .map((entry) => entry.pr)
 }
 
-/** Forgets a PR: its active-review snapshot and every v1 session saved for it. */
-function removeActiveReview(repoRoot: string, prNumber: number): void {
-  activeReviewStore().delete(`${repoRoot}:${prNumber}`)
-  const sessionPrefix = `${repoRoot}:::${prNumber}:::`
-  for (const key of Object.keys(sessionStore().store)) {
-    if (key.startsWith(sessionPrefix)) sessionStore().delete(key)
+/**
+ * Forgets a PR: its active-review snapshot and its sessions, "repo:::pr" and v1's
+ * "repo:::pr:::sha", so it does not reappear as in progress on the next load.
+ */
+async function removeActiveReview(repoRoot: string, prNumber: number): Promise<void> {
+  const [activeReviews, sessions] = await Promise.all([activeReviewStore(), sessionStore()])
+  activeReviews.delete(`${repoRoot}:${prNumber}`)
+  const sessionKey = `${repoRoot}:::${prNumber}`
+  for (const key of Object.keys(sessions.store)) {
+    if (key === sessionKey || key.startsWith(`${sessionKey}:::`)) sessions.delete(key)
   }
 }
 
@@ -67,10 +79,11 @@ async function pruneActiveReviews(ctx: GithubContext, repoRoot: string, prNumber
     })
   )
   const openNumbers: number[] = []
+  const activeReviews = await activeReviewStore()
   for (const r of results) {
     if (r.status !== 'fulfilled') continue
     if (r.value.state === 'OPEN') openNumbers.push(r.value.number)
-    else activeReviewStore().delete(`${repoRoot}:${r.value.number}`)
+    else activeReviews.delete(`${repoRoot}:${r.value.number}`)
   }
   return { openNumbers }
 }
@@ -80,7 +93,7 @@ function sessionsForRepoChannel(): ChannelSpec {
     channel: 'github:sessions-for-repo',
     schema: RepoRootPayload,
     invalid: { sessions: [] },
-    run: ({ repoRoot }) => ({ sessions: sessionsForRepo(repoRoot) }),
+    run: async ({ repoRoot }) => ({ sessions: sessionsForRepo(await storedSessions(), repoRoot) }),
   })
 }
 
@@ -89,8 +102,8 @@ function sessionGetChannel(): ChannelSpec {
     channel: 'github:session-get',
     schema: z.object({ key: z.string().min(1) }),
     invalid: { session: null },
-    run: ({ key }) => {
-      const result = ReviewSessionSchema.safeParse(sessionStore().get(key))
+    run: async ({ key }) => {
+      const result = ReviewSessionSchema.safeParse((await sessionStore()).get(key))
       return { session: result.success ? result.data : null }
     },
   })
@@ -101,8 +114,9 @@ function sessionSetChannel(): ChannelSpec {
     channel: 'github:session-set',
     schema: z.object({ key: z.string().min(1), session: ReviewSessionSchema }),
     invalid: VALIDATION_ERROR,
-    run: ({ key, session }) => {
-      sessionStore().set(key, session)
+    run: async ({ key, session }) => {
+      const sessions = await sessionStore()
+      sessions.set(key, session)
       return { ok: true as const }
     },
     onError: errorEnvelope,
@@ -122,8 +136,9 @@ function saveActiveReviewChannel(): ChannelSpec {
     channel: 'github:save-active-review',
     schema: z.object({ repoRoot: RepoRoot, pr: ReviewQueuePRSchema }),
     invalid: VALIDATION_ERROR,
-    run: ({ repoRoot, pr }) => {
-      activeReviewStore().set(`${repoRoot}:${pr.number}`, { repoRoot, pr })
+    run: async ({ repoRoot, pr }) => {
+      const activeReviews = await activeReviewStore()
+      activeReviews.set(`${repoRoot}:${pr.number}`, { repoRoot, pr })
       return { ok: true as const }
     },
     onError: errorEnvelope,
@@ -135,7 +150,7 @@ function activeReviewsChannel(): ChannelSpec {
     channel: 'github:active-reviews-for-repo',
     schema: RepoRootPayload,
     invalid: VALIDATION_ERROR,
-    run: ({ repoRoot }) => ({ prs: activeReviewsFor(repoRoot) }),
+    run: async ({ repoRoot }) => ({ prs: await activeReviewsFor(repoRoot) }),
     onError: errorEnvelope,
   })
 }
@@ -145,8 +160,8 @@ function removeActiveReviewChannel(): ChannelSpec {
     channel: 'github:remove-active-review',
     schema: PullRequestPayload,
     invalid: VALIDATION_ERROR,
-    run: ({ repoRoot, prNumber }) => {
-      removeActiveReview(repoRoot, prNumber)
+    run: async ({ repoRoot, prNumber }) => {
+      await removeActiveReview(repoRoot, prNumber)
       return { ok: true as const }
     },
     onError: errorEnvelope,

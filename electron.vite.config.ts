@@ -4,9 +4,13 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   main: {
-    // The design system is source-only TypeScript and CSS (`?raw`), so it is
-    // bundled instead of left to be required from node_modules.
-    plugins: [externalizeDepsPlugin({ exclude: ['@terminator/extension-ui'] })],
+    // The SDK and the design system are source-only TypeScript (and CSS, `?raw`),
+    // so they are bundled instead of left to be required from node_modules.
+    plugins: [
+      externalizeDepsPlugin({
+        exclude: ['@terminator/extension-sdk', '@terminator/extension-ui'],
+      }),
+    ],
     build: {
       rollupOptions: {
         input: {

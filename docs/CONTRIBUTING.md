@@ -10,16 +10,12 @@ cd terminator
 nvm use            # Node 24.21.0, from .nvmrc: the Node that Electron 44 ships
 
 # Install all dependencies from the root: npm resolves every workspace (versions are pinned — do not use --legacy-peer-deps without cause)
-# node-pty is NAPI-based (ABI-stable), so its `npm install` build works across
-# Electron versions with no separate rebuild step.
+# node-pty loads the N-API prebuilds it ships (macOS, Linux, Windows; x64 and arm64);
+# its install script is denied in `allowScripts`, so nothing is compiled.
 npm install
 ```
 
-**macOS with Python 3.12+**: node-pty's native build requires `setuptools`:
-
-```bash
-pip3 install setuptools --break-system-packages
-```
+Electron 44 no longer downloads its binary when it is installed: it does so on first run or through its `install-electron` bin ([breaking changes](https://github.com/electron/electron/blob/v44.7.0/docs/breaking-changes.md)). electron-vite does not run that bin, so `predev` and `prepreview` call `install-electron` before starting the app; it returns at once when the binary is already there.
 
 ---
 
@@ -33,16 +29,35 @@ npm run dev        # Electron + hot-reload via electron-vite
 
 A dev run uses its own profile, `…/@andytavares/terminator-dev`, so it can run beside the installed app without sharing its database.
 
+### Check that the app starts
+
+```bash
+node scripts/smoke-start.mjs dev                  # npm run dev
+npm run build && node scripts/smoke-start.mjs preview
+node scripts/smoke-start.mjs exec <executable>    # a packaged app
+```
+
+Starts the app on a fresh profile and passes when the main log says `App ready`, every extension under `extensions/` logs `Extension <id> activated`, and nothing logs an error or an uncaught exception, in main or a renderer (renderer console output reaches it through `ELECTRON_ENABLE_LOGGING`). It then asks Electron to quit and requires exit code 0. On Linux it turns the Chromium sandbox off and needs a display (`xvfb-run -a`). CI's `Start` job runs the first two on macOS and Linux from a clean `npm ci`, and on Linux packages the app (`npx electron-builder --linux dir --publish never`) and runs the third against `dist/linux-unpacked`.
+
+### Packaging
+
+`electron-builder.cjs` is the packaging configuration. electron-builder ships only the root package's production dependencies, so the bundled extensions and the packages their backends require at run time (`scripts/extension-externals.cjs`, closed over `package-lock.json` by `scripts/extension-runtime-modules.cjs`) are copied in explicitly, to `app.asar/extensions` and `app.asar/extensions/node_modules`. A package an extension backend adds to the esbuild `external` list ships by being in `scripts/extension-externals.cjs`; nothing else needs editing.
+
 ### Run tests
 
 ```bash
 npm test                # Unit + integration (Vitest), core and extensions
 npm run test:watch      # Watch mode
 npm run test:e2e        # E2E — launches real Electron app (Playwright)
+npm run test:perf       # Wall-clock budgets (*.perf.spec.ts), one file at a time
 npm run test:coverage   # Coverage report in coverage/
 npm run test:stories    # The design system's Storybook stories, run as tests
 npm run test:visual     # The design system's screenshot tests
 ```
+
+**Temporary directories.** A spec makes one with `makeTempDir(prefix)` from `tests/support/temp-dir.ts`, never with `mkdtempSync` in `os.tmpdir()`: `tests/setup.ts` removes every one after the spec file ends, passed or failed. An E2E spec uses `e2eTempDir(prefix)` from `tests/e2e/helpers.ts`, which `tests/e2e/global-teardown.ts` removes with the run's root. CI runs each unit shard through `node scripts/check-temp-leaks.mjs`, which points `TMPDIR` at an empty directory and fails if anything is left in it; run it locally the same way, `node scripts/check-temp-leaks.mjs npx vitest run`. Specs that skipped this once left ~22,000 folders in `/tmp` in a day and filled the disk.
+
+A spec that asserts a wall-clock budget is named `*.perf.spec.ts`. `npm test` leaves it out, because beside every other spec in parallel it measures the load; `npm run test:perf` (`vitest.perf.config.ts`) runs it alone, and CI's `Perf budgets` job runs that.
 
 Coverage is gated by Codecov on the pull request, not locally ([ADR 095](adr/095-coverage-is-gated-by-codecov.md)). `codecov/patch` needs 80% of the lines your change adds or modifies, and `codecov/project` must not drop. A test covers a scenario the running app can produce; a branch no real caller can reach is deleted, not tested.
 
@@ -55,6 +70,8 @@ node scripts/perf/app-metrics.mjs --runs=5 --throughput
 
 Prints the median start-up milestones (process attached, window, DOM ready, sidebar), memory per process type after the app settles, and the time to print 50 MB in a terminal. A change that claims a speed-up records this before and after in its commit.
 
+`--extensions=each` measures the extension host instead: its memory with no extension, with a probe that loads nothing, with each bundled extension alone and with all of them ([2026-10-12 results](research/perf/2026-10-12-extension-host.md)).
+
 ### E2E rules
 
 E2E runs with no retries, so a test that fails once fails the build ([ADR 070](adr/070-e2e-is-deterministic-and-selective.md)).
@@ -63,6 +80,7 @@ E2E runs with no retries, so a test that fails once fails the build ([ADR 070](a
 - Every test passes alone (`npx playwright test tests/e2e/<file>:<line>`), unless it is part of a `test.describe.serial` story, which runs as a whole. Use serial only for a sequence that cannot be split.
 - Before sending keys to a surface you just opened, assert that it has focus.
 - Launch the app through `launchApp()`. It isolates the profile, runs the terminals on a fixture zsh config (`tests/e2e/fixtures/zdotdir`) whose `claude` is a stub, so no real agent runs, and turns off macOS window restore, whose crash prompt blocks startup.
+- Read what a terminal shows with `terminalRows(page)` from `tests/e2e/helpers.ts`, never from `.xterm-rows`. A visible terminal draws with WebGL into a canvas and the DOM holds none of its text; `terminalRows` reads xterm's buffer through `window.terminatorE2E`, which the app sets up in `src/renderer/terminal/terminal-rows.ts`.
 - A new spec goes in `scripts/e2e-select.mjs`: under the extension it covers, or in `CORE_SPECS`. The selector's unit test fails for a spec that is in neither.
 - CI runs only the specs your diff selects, plus the smoke set. Changed specs run three times. To see what your branch selects: `node scripts/e2e-select.mjs origin/main`.
 
@@ -81,11 +99,27 @@ npm run build:extensions   # compile all extensions
 ```bash
 npm run lint       # ESLint (zero errors required)
 npm run lint:deps  # syncpack: exact versions, one per package
+npm run lint:unused  # knip: no unused files, exports or dependencies
+npm run lint:duplicates  # jscpd: no copy-pasted code
 npm run typecheck  # TypeScript type check (no emit — zero errors required)
 npm run format     # Prettier (auto-fixes)
 ```
 
-The root `npx tsc --noEmit` checks nothing; use `npm run typecheck`, which checks main, renderer, shared, both packages and every extension. Both `lint` and `typecheck` must pass with **0 errors** before opening a PR. Warnings are acceptable but should not accumulate.
+The root `npx tsc --noEmit` checks nothing; use `npm run typecheck`, which checks main, renderer, shared, the core's specs (`tsconfig.test.json`: `tests/unit` and `tests/integration` outside the extension and package directories), both packages and every extension. Both `lint` and `typecheck` must pass with **0 errors** before opening a PR. Warnings are acceptable but should not accumulate.
+
+`npm run lint:unused` runs [knip](https://knip.dev) with `knip.jsonc` and must report nothing ([ADR 104](adr/104-unused-code-is-a-ci-gate.md)). Its plugins find the entry points: electron-vite's main, preload and renderer inputs, each extension's `src/index.ts` and view, Vite, Vitest, Playwright and Storybook configs, and the `exports` of the SDK and the design system, which are their public API. When it reports something:
+
+- Unused and unreachable: delete it, with any test that covers only it (Constitution VI).
+- Exported but used only in its own file: drop the `export`.
+- Reached in a way knip cannot see (loaded by path at run time, a global declaration): add it to `knip.jsonc` with a comment that says how it is reached, and check that claim with `grep`.
+
+`npm run lint:duplicates` runs [jscpd](https://github.com/kucherenko/jscpd) with `.jscpd.json` and must find no clones ([ADR 105](adr/105-duplicate-code-is-a-ci-gate.md)). A clone is a block of at least 6 lines and 60 tokens that appears twice in `src`, `packages` or `extensions`. Specs, `tests` and `stories` folders are not checked. When it reports one, move the code to the one place both copies may import:
+
+- Inside one extension: a module of that extension.
+- Between the core and an extension, or between two extensions: `@terminator/extension-ui` (views, styles) or `@terminator/extension-sdk` (everything else). An extension never imports another extension or the core.
+- CSS: group the shared declarations into one rule. Put it where no selector in it loses to a rule it used to follow.
+
+Do not add a path to `ignore` to make a clone go away. The gate uses jscpd 5.4.1 ([npm](https://www.npmjs.com/package/jscpd/v/5.4.1)), the Rust rewrite with no JavaScript dependencies. It does not use 4.x, which pulls in `braces` through `fast-glob`, affected by [GHSA-vfj7-8cjw-p6xm](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm) with no patched release.
 
 ---
 
@@ -205,7 +239,7 @@ Per the constitution (Principle IV):
 | `postcss`            | 8.5.24          | [GHSA-fxqj-rqcc-2cmp](https://github.com/advisories/GHSA-fxqj-rqcc-2cmp), [GHSA-r28c-9q8g-f849](https://github.com/advisories/GHSA-r28c-9q8g-f849) |
 | `tar`                | 7.5.22          | [GHSA-r292-9mhp-454m](https://github.com/advisories/GHSA-r292-9mhp-454m), [GHSA-23hp-3jrh-7fpw](https://github.com/advisories/GHSA-23hp-3jrh-7fpw) |
 
-Dependency install scripts are blocked by npm unless listed in `allowScripts` in `package.json` ([npm docs](https://docs.npmjs.com/cli/v11/commands/npm-install-scripts)). Review a new one with `npm install-scripts ls` before approving it.
+`allowScripts` in `package.json` records which dependencies may run install scripts ([npm docs](https://docs.npmjs.com/cli/v11/commands/npm-install-scripts)). npm 11 runs an unreviewed script and lists it after the install; a later npm release will block it. List unreviewed ones with `npm install-scripts ls` and approve or deny each before it lands.
 
 ---
 
@@ -214,7 +248,7 @@ Dependency install scripts are blocked by npm unless listed in `allowScripts` in
 Before opening a PR, verify:
 
 - [ ] All tests pass (`npm test`)
-- [ ] `npm run lint`, `npm run lint:deps` and `npm run typecheck` pass with 0 errors
+- [ ] `npm run lint`, `npm run lint:deps`, `npm run lint:unused`, `npm run lint:duplicates` and `npm run typecheck` pass with 0 errors
 - [ ] `npm run format:check` passes
 - [ ] `npm run build:extensions` succeeds (no compile errors)
 - [ ] No unused imports, variables, or dead code introduced

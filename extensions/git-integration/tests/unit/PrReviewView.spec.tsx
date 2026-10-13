@@ -1,5 +1,5 @@
 import React from 'react'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, beforeAll, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { usePrReviewStore } from '../../src/stores/pr-review.store'
 
@@ -144,6 +144,12 @@ async function renderView(
     />
   )
 }
+
+// The first import compiles the component tree, which on a loaded machine takes longer
+// than one test's 5 s; load it once here so every test times only its own work.
+beforeAll(async () => {
+  await import('../../src/components/pr-review/PrReviewView')
+}, 60_000)
 
 describe('PrReviewView', () => {
   it('renders the diff pane when chapter and file are available', async () => {

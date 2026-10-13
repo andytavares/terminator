@@ -8,17 +8,6 @@ const RunQueryRequestSchema = z.object({ sql: z.string() })
 
 export function registerAdminIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {
   const { handle, cleanup } = createIpcRegistrar(api)
-  handle('task-vault:admin:list-tables', noPayload, async () => {
-    try {
-      const rows = await db.query<{ table_name: string }>(
-        `SELECT name AS table_name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name`
-      )
-      return { tables: rows.map((r) => r.table_name) }
-    } catch (err) {
-      return { error: String(err) }
-    }
-  })
-
   handle('task-vault:admin:table-stats', noPayload, async () => {
     try {
       const tableRows = await db.query<{ table_name: string }>(

@@ -199,41 +199,21 @@ export function QuickActionsSettings(props: Props): JSX.Element {
             />
           </div>
 
-          <div className="settings-section__field">
-            <label className="settings-section__label" htmlFor="qa-action-kind">
-              Kind
-            </label>
-            <select
-              id="qa-action-kind"
-              className="settings-section__input"
-              value={draft.kind}
-              onChange={(e) => handleKindChange(e.target.value as CustomActionKind)}
-            >
-              {KIND_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </div>
+          <SelectField
+            id="qa-action-kind"
+            label="Kind"
+            value={draft.kind}
+            options={KIND_OPTIONS}
+            onChange={handleKindChange}
+          />
 
-          <div className="settings-section__field">
-            <label className="settings-section__label" htmlFor="qa-action-target">
-              Target
-            </label>
-            <select
-              id="qa-action-target"
-              className="settings-section__input"
-              value={draft.target}
-              onChange={(e) => setDraft({ ...draft, target: e.target.value as CustomActionTarget })}
-            >
-              {TARGET_OPTIONS[draft.kind].map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </div>
+          <SelectField
+            id="qa-action-target"
+            label="Target"
+            value={draft.target}
+            options={TARGET_OPTIONS[draft.kind]}
+            onChange={(target) => setDraft({ ...draft, target })}
+          />
 
           <div className="settings-section__field">
             <label className="settings-section__label" htmlFor="qa-action-body">
@@ -263,6 +243,43 @@ export function QuickActionsSettings(props: Props): JSX.Element {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+interface SelectFieldProps<Value extends string> {
+  id: string
+  label: string
+  value: Value
+  options: ReadonlyArray<{ value: Value; label: string }>
+  onChange: (value: Value) => void
+}
+
+/** A labelled drop-down of the custom-action form. */
+function SelectField<Value extends string>({
+  id,
+  label,
+  value,
+  options,
+  onChange,
+}: SelectFieldProps<Value>): JSX.Element {
+  return (
+    <div className="settings-section__field">
+      <label className="settings-section__label" htmlFor={id}>
+        {label}
+      </label>
+      <select
+        id={id}
+        className="settings-section__input"
+        value={value}
+        onChange={(e) => onChange(e.target.value as Value)}
+      >
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
     </div>
   )
 }

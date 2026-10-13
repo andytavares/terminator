@@ -1,5 +1,12 @@
 # Contract: `api.ui` and `@terminator/extension-ui`
 
+> **Superseded. Kept as history.** This contract records what was decided when the feature was
+> specified, and is not edited. The code no longer has `api.ui`; a backend shows a toast with `api.notifications.showToast`. Do not build against it. The
+> current contract lives in:
+>
+> - `packages/extension-sdk/types/api.d.ts`: the `ExtensionAPI`, which the core implements in `src/main/extensions/api.ts`
+> - `packages/extension-ui/src/index.ts`: the design system's exports ([ADR 098](../../../docs/adr/098-one-design-system-documented-in-storybook.md))
+
 **Feature**: `036-extension-ux-remediation` | **Status**: proposed | **Contract version**: Extension API v1.3.0
 
 This is the surface the feature publishes. It is **additive**: every existing member of

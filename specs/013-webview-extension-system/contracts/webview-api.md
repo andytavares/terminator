@@ -1,5 +1,12 @@
 # Contract: Webview Renderer API (`window.electronAPI`)
 
+> **Superseded. Kept as history.** This contract records what was decided when the feature was
+> specified, and is not edited. The code no longer has `git.status` / `diff` / `log` / `branches`, `terminal.write` / `kill`, `extensionBridge.emit`, `db.query` / `execute`, `dialog.openFile` / `saveFile` and `notification.show`. Do not build against it. The
+> current contract lives in:
+>
+> - `packages/extension-sdk/types/renderer.d.ts`: the `window.electronAPI` an extension view receives
+> - `src/shared/electron-api/manifest.ts`: every core channel and the renderer's `window.electronAPI`
+
 **Version**: 2.0.0
 **Feature**: 013-webview-extension-system
 **Date**: 2026-06-24

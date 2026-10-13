@@ -61,14 +61,14 @@ export interface TestsControl {
   prPaths: Set<string>
 }
 
-export interface PaneLayout {
+interface PaneLayout {
   numColWidth: number
   splitLeftPct: number
   onSplitDividerMouseDown: (e: React.MouseEvent) => void
 }
 
 /** The view settings and store actions the rows use. */
-export interface PaneActions {
+interface PaneActions {
   commentVisibility: CommentVisibility
   agentNotesOn: boolean
   showHiddenComments: () => void

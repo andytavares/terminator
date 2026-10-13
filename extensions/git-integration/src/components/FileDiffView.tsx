@@ -3,7 +3,7 @@ import hljs from '../utils/hljs'
 import { Button, SegmentedControl } from '@terminator/extension-ui'
 import type { FileDiff, DiffLine, DiffHunk } from '../schemas/git.schema'
 import { choose } from './text'
-import { useSplitDivider } from '../hooks/useSplitDivider'
+import { useSplitDrag } from '../hooks/useSplitDrag'
 
 type ViewMode = 'unified' | 'split'
 
@@ -264,7 +264,7 @@ function SplitTable({ hunks, lang, onDividerMouseDown }: SplitTableProps) {
 /** The split divider, measured against the diff's scroll area. */
 function useDiffDivider() {
   const scrollRef = useRef<HTMLDivElement>(null)
-  const { splitLeftPct, onDividerMouseDown } = useSplitDivider(scrollRef)
+  const { splitLeftPct, onDividerMouseDown } = useSplitDrag(scrollRef)
   return { splitLeftPct, scrollRef, onDividerMouseDown }
 }
 

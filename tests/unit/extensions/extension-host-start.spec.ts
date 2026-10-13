@@ -32,11 +32,21 @@ vi.mock('../../../src/main/storage/extension-settings-store', () => ({
   getAllExtensionSettings: () => ({}),
 }))
 
+// What the host writes to the main log, which `scripts/smoke-start.mjs` reads
+// to tell that every bundled extension came up.
+const logged: string[] = []
+vi.mock('../../../src/main/logger', () => {
+  const write = (message: string) => logged.push(message)
+  const log = { debug: write, info: write, warn: write, error: write }
+  return { makeLogger: () => log, logger: log }
+})
+
 let bundle: string
 
 beforeEach(() => {
   vi.resetModules()
   storeData.extensions = []
+  logged.length = 0
   bundle = join(os.tmpdir(), `ext-bundle-${Date.now()}-${Math.random()}`)
 })
 
@@ -91,12 +101,15 @@ describe('ExtensionHost.start', () => {
   it('activates extensions concurrently: one waits for another to have started', async () => {
     let markPeerStarted = () => {}
     const peerStarted = new Promise<void>((resolve) => (markPeerStarted = resolve))
-    const timeout = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('peer never started')), 1000)
-    )
+    // Cleared once the race is decided: left running, it rejected a promise
+    // nothing awaited any more, and vitest failed the run on the stray rejection.
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const timeout = new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error('peer never started')), 1000)
+    })
     const { host, backendHost } = await newHost({
       'com.waiter': async () => {
-        await Promise.race([peerStarted, timeout])
+        await Promise.race([peerStarted, timeout]).finally(() => clearTimeout(timer))
       },
       'com.peer': () => markPeerStarted(),
     })
@@ -126,6 +139,26 @@ describe('ExtensionHost.start', () => {
     expect(extensions['com.broken']).toMatchObject({ status: 'error', errorMessage: 'boom' })
     expect(extensions['com.healthy']).toMatchObject({ status: 'enabled' })
     expect(backendHost.activated.map((record) => record.id)).toEqual(['com.healthy'])
+  })
+
+  it('logs every extension it activates, new or stored, and never one that failed', async () => {
+    writeBundle({ 'com.stored': [] })
+    storeData.extensions = [storedRecord('com.stored', 'enabled')]
+    const { host } = await newHost({
+      'com.broken': () => {
+        throw new Error('boom')
+      },
+    })
+
+    await host.start({
+      bundledDirectory: writeBundle({ 'com.new': [], 'com.broken': [] }),
+      beforeActivation: ready,
+    })
+
+    expect(logged).toContain('Extension com.stored activated')
+    expect(logged).toContain('Extension com.new activated')
+    expect(logged).not.toContain('Extension com.broken activated')
+    expect(logged).toContain('Extension com.broken failed to load: boom')
   })
 
   it('lists extensions as soon as start is called, before any is activated, and activates only after beforeActivation', async () => {

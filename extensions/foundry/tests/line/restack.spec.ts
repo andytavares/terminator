@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { execFile, execFileSync } from 'node:child_process'
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import * as path from 'node:path'
 import { restack } from '../../src/line/restack.js'
 import type { ExecResult, ShellExec } from '../../src/line/integrate.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 // Real git in temp dirs, never the real repository. A known hazard: unscrubbed
 // GIT_DIR/GIT_INDEX_FILE/GIT_WORK_TREE from the outer test run leak into
@@ -37,7 +37,7 @@ let lane: string
 let other: string
 
 beforeEach(() => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-restack-'))
+  const root = makeTempDir('fdry-restack-')
   origin = path.join(root, 'origin.git')
   lane = path.join(root, 'lane')
   other = path.join(root, 'other')

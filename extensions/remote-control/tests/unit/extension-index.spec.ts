@@ -12,12 +12,6 @@ const mockNgrokIsInstalled = vi.hoisted(() => vi.fn(() => false))
 
 vi.mock('../../src/server/remote-server', () => ({
   createRemoteServer: mockCreateRemoteServer,
-  PortInUseError: class PortInUseError extends Error {
-    constructor(port: number) {
-      super(`Port ${port} is already in use.`)
-      this.name = 'PortInUseError'
-    }
-  },
 }))
 
 const mockNgrokStart = vi.hoisted(() => vi.fn().mockResolvedValue('https://example.ngrok.app'))
@@ -53,7 +47,7 @@ function makeApi() {
       isRemoteAccessible: vi.fn().mockResolvedValue(false),
     },
     window: { broadcast: mockBroadcast },
-    paths: { app: '/app', userData: '/user-data' },
+    paths: { app: '/app', globalStorage: '/user-data/extensions/terminator.remote-control' },
     pty: {},
     workspace: { list: vi.fn(() => []), listProjects: vi.fn(() => []) },
   }
@@ -105,6 +99,16 @@ async function setupAndGetToggleHandler(
 
 let currentHash = ''
 
+/**
+ * Waits for every server start or stop the extension has queued: deactivate awaits
+ * that queue first. Toggling only queues the start, which imports the server module
+ * and so takes as long as the machine needs; a fixed sleep raced it.
+ */
+async function queueDrained(): Promise<void> {
+  const { deactivate } = await import('../../src/index.ts')
+  await deactivate()
+}
+
 describe('remote-control extension index', () => {
   beforeAll(async () => {
     currentHash = await hashPassword('existing-password')
@@ -126,8 +130,7 @@ describe('remote-control extension index', () => {
       const toggleHandler = await setupAndGetToggleHandler(serverHandle)
 
       await toggleHandler({ enabled: true })
-      // Flush the enqueued microtasks
-      await new Promise((resolve) => setTimeout(resolve, 10))
+      await queueDrained()
 
       expect(mockSettingsSet).toHaveBeenCalledWith('terminator.remote-control.enabled', false)
       expect(mockBroadcast).toHaveBeenCalledWith('remote:status', {
@@ -137,12 +140,12 @@ describe('remote-control extension index', () => {
     })
 
     it('on PortInUseError, does NOT set enabled=false (user intent preserved)', async () => {
-      const { PortInUseError } = await import('../../src/server/remote-server')
+      const { PortInUseError } = await import('../../src/server/port-in-use-error')
       const serverHandle = makeServerHandle(() => Promise.reject(new PortInUseError(7681)))
       const toggleHandler = await setupAndGetToggleHandler(serverHandle)
 
       await toggleHandler({ enabled: true })
-      await new Promise((resolve) => setTimeout(resolve, 10))
+      await queueDrained()
 
       const enabledFalseCalls = mockSettingsSet.mock.calls.filter(
         ([key, val]: [string, unknown]) =>
@@ -156,7 +159,7 @@ describe('remote-control extension index', () => {
       const toggleHandler = await setupAndGetToggleHandler(serverHandle)
 
       await toggleHandler({ enabled: true })
-      await new Promise((resolve) => setTimeout(resolve, 10))
+      await queueDrained()
 
       expect(mockBroadcast).not.toHaveBeenCalledWith(
         'remote:status',
@@ -186,16 +189,17 @@ describe('remote-control extension index', () => {
       // Start the server so remoteServer is set
       const toggleHandler = registeredHandler('remote:toggle')
       await toggleHandler({ enabled: true })
-      await new Promise((resolve) => setTimeout(resolve, 20))
+      // The start opens the tunnel last, so its crash handler marks the start as done.
+      await vi.waitFor(() => expect(mockNgrokSetOnCrash).toHaveBeenCalled())
 
       mockNgrokSetOnCrash.mockClear()
+      mockBroadcast.mockClear()
 
       const reconnectHandler = registeredHandler('remote:tunnel-reconnect')
 
       await reconnectHandler()
-      await new Promise((resolve) => setTimeout(resolve, 50))
 
-      expect(mockNgrokSetOnCrash).toHaveBeenCalled()
+      await vi.waitFor(() => expect(mockNgrokSetOnCrash).toHaveBeenCalled())
       expect(mockBroadcast).toHaveBeenCalledWith(
         'remote:status',
         expect.objectContaining({ publicUrl: 'https://example.ngrok.app' })
@@ -213,8 +217,6 @@ async function activateWithSettings(initial: Record<string, unknown>) {
   mockCreateRemoteServer.mockResolvedValue(makeServerHandle())
   const { activate } = await import('../../src/index.ts')
   activate(makeApi() as never)
-  // Activation queues the credential migration; hashing takes real time.
-  await new Promise((resolve) => setTimeout(resolve, 300))
   const handler = (channel: string) =>
     registeredHandler(channel) as (payload?: unknown) => Promise<Record<string, unknown>>
   return { values, handler }
@@ -270,7 +272,11 @@ describe('remote-control credentials', () => {
       [`${EXT}.password`]: 'earlier-version-password',
       [`${EXT}.passwordHash`]: BCRYPT,
     })
-    expect(JSON.stringify([...values.values()])).not.toContain('earlier-version-password')
+    // Activation queues the migration, which hashes with bcrypt: wait for it, however long.
+    await vi.waitFor(
+      () => expect(JSON.stringify([...values.values()])).not.toContain('earlier-version-password'),
+      { timeout: 15_000 }
+    )
     expect(
       await verifyPassword('earlier-version-password', values.get(`${EXT}.passwordHash`) as string)
     ).toBe(true)
@@ -281,7 +287,7 @@ describe('remote-control credentials', () => {
       [`${EXT}.enabled`]: true,
       [`${EXT}.passwordHash`]: BCRYPT,
     })
-    expect(values.get(`${EXT}.enabled`)).toBe(false)
+    await vi.waitFor(() => expect(values.get(`${EXT}.enabled`)).toBe(false), { timeout: 15_000 })
     expect(mockCreateRemoteServer).not.toHaveBeenCalled()
     expect(mockBroadcast).toHaveBeenCalledWith('remote:status', {
       enabled: false,

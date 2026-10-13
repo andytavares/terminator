@@ -250,6 +250,13 @@ async function fetchContexts(): Promise<string[] | null> {
   return null
 }
 
+/** Where the calendar sends the vault: a date's log, a task in it, a view. */
+interface VaultNavigation {
+  date?: string
+  taskId?: string
+  view?: 'daily' | 'review'
+}
+
 export function TaskVaultView(): React.JSX.Element {
   const {
     todayLog,
@@ -348,14 +355,9 @@ export function TaskVaultView(): React.JSX.Element {
     return () => document.removeEventListener('visibilitychange', onVisibilityChange)
   }, [loadToday])
 
-  // Handle navigation from the in-app calendar sidebar / standalone calendar panel.
-  useEffect(() => {
-    return window.electronAPI.extensionBridge.on('task-vault:navigate', (data) => {
-      const { date, taskId, view } = (data ?? {}) as {
-        date?: string
-        taskId?: string
-        view?: 'daily' | 'review'
-      }
+  // Go where a calendar navigation points: a date (else today), a task, a view.
+  const goTo = useCallback(
+    ({ date, taskId, view }: VaultNavigation) => {
       useVaultNavStore.getState().setSkipNextVisibilityReset(true)
       if (date) void loadDate(date)
       else void loadToday()
@@ -363,8 +365,16 @@ export function TaskVaultView(): React.JSX.Element {
       // After the task, because `navigateToTask` puts you on the daily log —
       // an explicit view is the caller overriding that, not competing with it.
       if (view) useVaultNavStore.getState().setView(view)
-    })
-  }, [loadDate, loadToday])
+    },
+    [loadDate, loadToday]
+  )
+
+  // Handle navigation from the in-app calendar sidebar / standalone calendar panel.
+  useEffect(() => {
+    return window.electronAPI.extensionBridge.on('task-vault:navigate', (data) =>
+      goTo((data ?? {}) as VaultNavigation)
+    )
+  }, [goTo])
 
   // Cold-start: if this view mounted because of a calendar navigation (before the
   // WebContentsView existed), the broadcast was lost — pop the pending nav from main.
@@ -376,21 +386,12 @@ export function TaskVaultView(): React.JSX.Element {
           null
         )
         if (!nav || typeof nav !== 'object') return
-        const { date, taskId, view } = nav as {
-          date?: string
-          taskId?: string
-          view?: 'daily' | 'review'
-        }
-        useVaultNavStore.getState().setSkipNextVisibilityReset(true)
-        if (date) void loadDate(date)
-        else void loadToday()
-        if (taskId) useVaultNavStore.getState().navigateToTask(taskId, date)
-        if (view) useVaultNavStore.getState().setView(view)
+        goTo(nav as VaultNavigation)
       } catch {
         // non-critical
       }
     })()
-  }, [loadDate, loadToday])
+  }, [goTo])
 
   useEffect(() => {
     const vd = useVaultNavStore.getState().viewingDate

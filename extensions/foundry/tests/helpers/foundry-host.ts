@@ -8,12 +8,12 @@
  */
 import { execFile } from 'node:child_process'
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import * as path from 'node:path'
 import { vi } from 'vitest'
 import { dispatchChannel, type ChannelSpec, type ExtensionAPI } from '@terminator/extension-sdk'
 
 import type { ExecResult, ShellExec } from '../../src/line/integrate.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 /** The runner's surface every Foundry module reaches, as `vi.fn`s a spec can drive. */
 export function fakeRunner() {
@@ -85,6 +85,8 @@ export interface FoundryHost {
   readonly exec: ReturnType<typeof vi.fn>
   readonly issues: ExtensionAPI['issues']
   readonly workspaces: Array<{ id: string; folderPath: string }>
+  /** `api.paths.globalStorage`, `<userData>/extensions/terminator.foundry`, not created yet. */
+  readonly globalStorage: string
 }
 
 const noIssues = (): ExtensionAPI['issues'] =>
@@ -102,9 +104,14 @@ const noIssues = (): ExtensionAPI['issues'] =>
     supportsCreate: vi.fn(() => false),
   }) as unknown as ExtensionAPI['issues']
 
+/** A `paths.globalStorage` in a fresh userData, `<userData>/extensions/terminator.foundry`. */
+export function freshGlobalStorage(): string {
+  return path.join(temporaryDirectory('foundry-user-data'), 'extensions', 'terminator.foundry')
+}
+
 /** A host whose records location is `dataDir()` and which has nothing connected. */
 export function fakeHost(dataDir: () => string): FoundryHost {
-  const userData = temporaryDirectory('foundry-user-data')
+  const globalStorage = freshGlobalStorage()
   const handlers = new Map<string, ChannelSpec>()
   const settings = new Map<string, unknown>()
   const commands = new Map<string, () => void>()
@@ -156,9 +163,9 @@ export function fakeHost(dataDir: () => string): FoundryHost {
       deleteProject: vi.fn(),
     },
     issues,
-    // Foundry keeps its runtime state under userData: a throw-away one per
+    // Foundry keeps its runtime state in its own folder: a throw-away one per
     // host, so a spec never writes it into the working tree.
-    paths: { app: path.resolve(__dirname, '../..'), userData },
+    paths: { app: path.resolve(__dirname, '../..'), globalStorage },
     app: { version: '0.0.0-test' },
   } as unknown as ExtensionAPI
 
@@ -178,12 +185,13 @@ export function fakeHost(dataDir: () => string): FoundryHost {
     exec,
     issues,
     workspaces,
+    globalStorage,
   }
 }
 
 /** A fresh temporary directory under the OS temp directory. */
 export function temporaryDirectory(prefix: string): string {
-  return fs.mkdtempSync(path.join(os.tmpdir(), `${prefix}-`))
+  return makeTempDir(`${prefix}-`)
 }
 
 /**

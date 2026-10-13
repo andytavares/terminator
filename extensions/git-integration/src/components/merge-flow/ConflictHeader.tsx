@@ -3,7 +3,7 @@ import { ArrowLeft, ChevronLeft, ChevronRight, RotateCcw, Undo2, X } from 'lucid
 import { Button, IconButton } from '@terminator/extension-ui'
 import { useMergeFlowStore } from '../../stores/merge-flow.store'
 import type { ConflictFile } from '../../schemas/merge-flow.schema'
-import { choose } from '../text'
+import { choose, splitPath } from '../text'
 
 interface Props {
   onBack: () => void
@@ -26,13 +26,6 @@ function conflictPosition(files: MergeFile[], activeFile: number, activeBlock: n
   const inActive = files[activeFile]?.blocks.length ?? 0
   const number = before + Math.min(Math.max(activeBlock, 0), inActive) + 1
   return { number, total: blocksIn(files) }
-}
-
-/** "src/app/" and "main.ts" from "src/app/main.ts". */
-function splitPath(filePath: string): { dir: string; name: string } {
-  const slashIdx = filePath.lastIndexOf('/')
-  if (slashIdx === -1) return { dir: '', name: filePath }
-  return { dir: filePath.slice(0, slashIdx + 1), name: filePath.slice(slashIdx + 1) }
 }
 
 function Breadcrumb(props: { filePath: string; onBack: () => void }) {

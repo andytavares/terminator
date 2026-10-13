@@ -338,7 +338,6 @@ export type OrderStatus = WorkOrder['status']
 export type AcceptanceCriterion = z.infer<typeof AcceptanceSchema>
 export type PlanUnit = z.infer<typeof UnitSchema>
 export type Lane = z.infer<typeof LaneSchema>
-export type Verify = z.infer<typeof VerifySchema>
 export type OrderSource = z.infer<typeof SourceSchema>
 export type Budgets = z.infer<typeof BudgetsSchema>
 export type RiskAssessment = z.infer<typeof RiskSchema>

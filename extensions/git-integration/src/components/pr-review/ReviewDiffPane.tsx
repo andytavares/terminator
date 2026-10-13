@@ -2,7 +2,7 @@ import React, { useCallback, useMemo, useRef } from 'react'
 import { VirtualDiffList, type VirtualDiffListHandle } from './VirtualDiffList'
 import { detectLanguage } from '../FileDiffView'
 import { useLoadInlineComments } from '../../hooks/usePrReview'
-import { useSplitDivider } from '../../hooks/useSplitDivider'
+import { useSplitDrag } from '../../hooks/useSplitDrag'
 import type { PrChangedFile, PrReviewDetail, PrHead } from '../../schemas/pr-review.schema'
 import type { FileDiff } from '../../schemas/git.schema'
 import type { DiffItem } from '../../review/diff-items'
@@ -288,7 +288,7 @@ function useReviewDiffPane(props: Props, scrollRef: ScrollRef, listRef: ListRef)
   const { pr, file } = props
   const usesWithDef = useUsesWithDefinition(pr, file.path)
   const nav = useNavigation(w, usesWithDef, listRef)
-  const divider = useSplitDivider(scrollRef)
+  const divider = useSplitDrag(scrollRef)
   const refreshComments = useLoadInlineComments(props.repoRoot)
   const { setCommentVisibility } = w.ui
   const showHiddenComments = useCallback(() => setCommentVisibility('all'), [setCommentVisibility])

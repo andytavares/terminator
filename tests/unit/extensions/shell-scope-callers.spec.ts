@@ -1,17 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import {
-  chmodSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  realpathSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs'
-import { tmpdir } from 'node:os'
+import { chmodSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { dispatchChannel, type ChannelSpec, type ExtensionAPI } from '@terminator/extension-sdk'
 import { FakeBackendHost } from './fake-backend-host'
+import { makeTempDir } from '../../support/temp-dir'
 
 // Every legitimate caller ADR-006's workspace-only rule would have refused, run
 // with the cwd its real code computes, through the real check (ADR 102): the
@@ -19,7 +11,8 @@ import { FakeBackendHost } from './fake-backend-host'
 // stand-ins on PATH that record where they ran.
 
 vi.mock('electron', () => ({
-  app: { getPath: () => tmpdir(), getVersion: () => '0.1.0' },
+  // The logger writes terminator.log under logs; a spec scratch keeps it out of the temp root.
+  app: { getPath: () => scratch, getVersion: () => '0.1.0' },
 }))
 
 const storeData: Record<string, unknown> = { extensions: [] }
@@ -92,7 +85,7 @@ beforeEach(() => {
   workspaces.length = 0
   projects.length = 0
   for (const key of Object.keys(settings)) delete settings[key]
-  scratch = realpathSync(mkdtempSync(join(tmpdir(), 'shell-callers-')))
+  scratch = realpathSync(makeTempDir('shell-callers-'))
   userData = directory('user-data')
   ran = join(scratch, 'ran.log')
   const bin = directory('bin')
@@ -142,11 +135,11 @@ describe('Foundry', () => {
     return { root, lane }
   }
 
-  it('runs git in its records root under api.paths.userData, and in a lane there, with no workspace open', async () => {
+  it('runs git in its records root in api.paths.globalStorage, and in a lane there, with no workspace open', async () => {
     const api = await foundry()
     const { root, lane } = await lanePath(api)
 
-    expect(root.startsWith(join(userData, 'foundry'))).toBe(true)
+    expect(root.startsWith(join(userData, 'extensions', 'terminator.foundry'))).toBe(true)
     expect((await gitIn(api, root)).exitCode).toBe(0)
     expect((await gitIn(api, lane)).exitCode).toBe(0)
     expect(ranIn()).toEqual([root, lane])
@@ -179,7 +172,12 @@ describe('git-integration', () => {
       '../../../extensions/git-integration/src/ipc/github.ipc'
     )
     const channels: Record<string, (payload: unknown) => Promise<unknown>> = {}
-    const access = { github: api.github, getToken: () => '', noCheckoutCwd: api.paths.userData }
+    mkdirSync(api.paths.globalStorage, { recursive: true })
+    const access = {
+      github: api.github,
+      getToken: () => '',
+      noCheckoutCwd: api.paths.globalStorage,
+    }
     registerGithubHandlers((spec: ChannelSpec) => {
       channels[spec.channel] = (payload) => dispatchChannel(spec, payload)
     }, access)
@@ -197,7 +195,7 @@ describe('git-integration', () => {
     expect(ranIn()).toEqual([clones])
   })
 
-  it('runs gh with no checkout in api.paths.userData: a gh: root, the repositories, the dashboard', async () => {
+  it('runs gh with no checkout in api.paths.globalStorage: a gh: root, the repositories, the dashboard', async () => {
     writeFileSync(join(scratch, 'out'), '')
     const channels = await githubChannels()
 
@@ -209,6 +207,8 @@ describe('git-integration', () => {
     })
     await channels['github:dashboard-search']({})
 
-    expect(new Set(ranIn())).toEqual(new Set([userData]))
+    expect(new Set(ranIn())).toEqual(
+      new Set([join(userData, 'extensions', 'terminator.git-integration')])
+    )
   })
 })

@@ -141,7 +141,7 @@ interface SessionState {
   stampActivity: (sessionId: string, now: number) => void
   setActiveSessionForProject: (projectId: string, sessionId: string, now?: number) => void
   getActiveSessionForProject: (projectId: string) => string | null
-  handleProcessExit: (sessionId: string, exitCode: number) => void
+  handleProcessExit: (sessionId: string, exitCode: number | null) => void
   incrementBellCount: (sessionId: string) => void
   clearBellCount: (sessionId: string) => void
   getBellCountForSession: (sessionId: string) => number
@@ -406,7 +406,13 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       for (const [id, session] of sessions) {
         if (session.projectId !== projectId) continue
         const isActive = id === sessionId
-        const status = isActive ? ('active' as const) : ('backgrounded' as const)
+        // An ended process stays ended: selecting its tab does not revive it.
+        const status =
+          session.status === 'closed'
+            ? ('closed' as const)
+            : isActive
+              ? ('active' as const)
+              : ('backgrounded' as const)
         const bellCount = isActive ? undefined : session.bellCount
         sessions.set(id, {
           ...session,

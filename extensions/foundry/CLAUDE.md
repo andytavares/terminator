@@ -12,9 +12,11 @@ Foundry creates or modifies **exactly one thing** in a repository it works on: t
 
 Everything Foundry needs to run ships inside this extension. A repository contributes information, never installation. A repository _may_ carry its own `.foundry/recipes/…` and those win, but no repository is ever required to have one.
 
-Foundry's own records go to `terminator.foundry.dataDir` when set, and to `<workdir>/.foundry/` when it is not. That path is resolved **once**, by `src/data-root.ts`; every writer receives an absolute path and never resolves it again.
+Foundry's own records go to `terminator.foundry.dataDir` when set, and to `<workdir>/.foundry/` when it is not; with no workspace open, `<workdir>` is `records/` in Foundry's own `api.paths.globalStorage`. That path is resolved **once**, by `src/data-root.ts`; every writer receives an absolute path and never resolves it again.
 
 A lane worktree is the one exception, and it is not really an exception: `src/line/worktree.ts`'s `provisionDependencies` symlinks the origin checkout's installed `node_modules` into the lane's worktree — a fresh `git worktree add` has none, so every check command fails before it reads the change — but only into a directory the repository's own `.gitignore` already covers. It checks with `git check-ignore` after linking and removes the link again if that says otherwise, so a repository that does not ignore `node_modules` gets nothing added, and none ever gets an untracked file it did not already tolerate.
+
+Foundry's folder holds `records/` and the supervision runtime's `runtime/`. Earlier builds kept them in the shared userData folder as `foundry/` and `foundry-runtime/`; `moveFromSharedUserData` (`src/storage-folder.ts`) moves them on the first activation, unless the new one exists, and runs `git worktree repair` in each lane worktree that moved with the records (ADR 103).
 
 ### 2. Nothing is assumed about a repository's toolchain
 
@@ -87,6 +89,7 @@ the owning module, never back into `index.ts`.
 | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
 | Registering a channel (`reg`), the disposables, `ActivationContext`                | `src/ipc/register.ts`                                                                             |
 | Where the records live, the untracked notice, the three rungs (`resolveSources`)   | `src/workspace-root.ts` (at `src/` because `resolveSources` finds the built-ins from `__dirname`) |
+| Foundry's own folder, moving its data out of the shared userData folder            | `src/storage-folder.ts`                                                                           |
 | The in-memory index, `announceLive`, `indexFor`, the store helpers                 | `src/state/live-index.ts`                                                                         |
 | Setting readers (autonomy, models, budgets, critical paths, read-only tools)       | `src/state/settings.ts`                                                                           |
 | The settings page contribution                                                     | `src/state/settings-schema.ts`                                                                    |
@@ -121,9 +124,9 @@ This is a fully isolated extension. The core application knows nothing about it.
 - Call its own IPC via `window.electronAPI.extensionBridge.invoke('foundry:…')`
 - Register IPC channels through `reg` in `src/ipc/register.ts`, each a `ChannelSpec` with the zod schema of its payload (`foundryChannel` in `src/ipc/channel.ts`; ADR 096). The schema sits beside the module that answers the channel, the host parses the payload before `run` sees it, and `run` takes the parsed type — never parse or cast a payload by hand. `tests/channel-schemas.spec.ts` checks every registered channel has one; a test of one schema's rules is zod's concern, not this repository's
 - Use `api.shell.exec` for `git` and `gh` — those are the only two commands the core allowlist admits (`src/main/shell/shell-executor.ts`). Core's default timeout is 10 seconds, so a call that can take longer passes `timeoutMs` (`git commit` 300 s, rebase and push 120 s), and a result with `timedOut` set is a failure that says it timed out
-- Run each `api.shell.exec` inside a root the core allows (ADR 102): a workspace folder, a project worktree, `api.paths.userData`, or `terminator.foundry.dataDir`, which `manifest.json` declares in `contributes.shellRoots`. Every records root `src/workspace-root.ts` resolves, and every lane worktree under it, is inside one of those. Anywhere else rejects with `CwdOutOfScopeError` and runs nothing
+- Run each `api.shell.exec` inside a root the core allows (ADR 102, ADR 103): a workspace folder, a project worktree, Foundry's own `api.paths.globalStorage`, or `terminator.foundry.dataDir`, which `manifest.json` declares in `contributes.shellRoots`. Every records root `src/workspace-root.ts` resolves, and every lane worktree under it, is inside one of those. Anywhere else rejects with `CwdOutOfScopeError` and runs nothing
 
-Verification commands (`npm test`, `pytest`, …) do **not** run through `api.shell.exec` and do **not** run as hidden child processes. Each runs in a terminal tab of its own in the lane's checkout (`SupervisedRunner.runCommand`), so its output is visible, and its verdict is that tab's exit status — no agent runs it and no transcript is read back.
+Verification commands (`npm test`, `pytest`, …) do **not** run through `api.shell.exec` and do **not** run as hidden child processes. Each runs in a terminal tab of its own in the lane's checkout (`SupervisedRunner.runCommand`), so its output is visible, and its verdict is that tab's exit status — no agent runs it and no transcript is read back. The command's script is the tab's own process (`api.pty.runInTerminal`): nothing is typed into a shell, and the exit code is the one node-pty reports. The tab starts as `$SHELL -i -l -c "exec $SHELL <script>"`, so the user's startup files (`.zshrc`, `.bash_profile`) are read as they were for a typed command, and what they export (`JAVA_HOME`, `GOPATH`, nvm) reaches the check; `exec` leaves the script, not that shell, as the process whose exit is reported. A command a signal ended, or whose tab was closed before it finished, has no exit code; `runCommand` returns `null` and the check reports "not measured" (rule 2), never a pass.
 
 ### What this extension MUST NOT do
 
@@ -148,6 +151,8 @@ Declared in `extensions/foundry/package.json` only, at the one version the repos
 `npm run build:extensions` bundles `src/index.ts` to `src/index.js` with esbuild. That output is a **build artefact**: gitignored, never edited by hand. Change the TypeScript and rebuild.
 
 Extension specs live in `tests/` and are matched by the root `vitest.config.ts`. Note that `vi.mock` cannot intercept a module esbuild has inlined — any spec that calls `activate()` must import `../../src/index.ts`, not the bundle. `tests/helpers/foundry-host.ts` activates Foundry over a host with real files, real `git` and a `gh` the spec answers for; `tests/helpers/line-run.ts` adds an agreed order and agents that do its work. Reuse them rather than writing another host.
+
+A spec's temporary directory comes from `temporaryDirectory` in `tests/helpers/foundry-host.ts` (or `makeTempDir` from the root `tests/support/temp-dir.ts`), which the root `tests/setup.ts` removes when the spec file ends, passed or failed. Never `mkdtempSync` in `os.tmpdir()` directly: the CI unit job fails a run that leaves anything in the temporary directory (`scripts/check-temp-leaks.mjs`). `tests/live/` runs without `tests/setup.ts` and removes its own.
 
 ## Typecheck
 

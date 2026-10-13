@@ -151,7 +151,7 @@ describe('select()', () => {
     const mappedGlobs = IMPACT_MAP.flatMap((rule) => rule.specs)
     const allCoveringGlobs = [...mappedGlobs, ...SMOKE_SPECS, ...CORE_SPECS]
 
-    const toRegExp = (glob) =>
+    const toRegExp = (glob: string) =>
       new RegExp('^' + glob.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*') + '$')
 
     for (const file of specFiles) {

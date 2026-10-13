@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import * as path from 'node:path'
 import { appendEntry, readEntries } from '../../src/ledger/append.js'
 import type { LedgerEntry } from '../../src/ledger/append.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 // The ledger is the record of every decision, by whom or by what rule, and why
 // (FR-078). It is append-only: a reversal is a new entry, never a rewritten
@@ -27,7 +27,7 @@ function entry(over: Partial<LedgerEntry> = {}): LedgerEntry {
 }
 
 beforeEach(() => {
-  dir = fs.mkdtempSync(path.join(os.tmpdir(), 'foundry-ledger-'))
+  dir = makeTempDir('foundry-ledger-')
   file = path.join(dir, 'ledger.jsonl')
 })
 

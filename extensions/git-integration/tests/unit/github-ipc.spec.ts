@@ -44,8 +44,9 @@ import {
 bindShellToStub(mockExecFile)
 bindWorkspaceRoots(() => ['/repo', '/other', '/Users/me/repos/widgets'])
 
-// api.paths.userData: where gh runs when it needs no checkout, inside a root the core allows.
-const USER_DATA = '/Users/me/Library/Application Support/Terminator'
+// api.paths.globalStorage: where gh runs when it needs no checkout, inside a root the core allows.
+const GLOBAL_STORAGE =
+  '/Users/me/Library/Application Support/Terminator/extensions/terminator.git-integration'
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -62,7 +63,7 @@ function captureHandlers(
   const handlers: Record<string, Handler> = {}
   registerGithubHandlers(
     answerInto(handlers),
-    { github: githubOverStub(mockExecFile), getToken: () => '', noCheckoutCwd: USER_DATA },
+    { github: githubOverStub(mockExecFile), getToken: () => '', noCheckoutCwd: GLOBAL_STORAGE },
     { getReviewRepos, isBranchExcluded }
   )
   return handlers
@@ -73,7 +74,7 @@ function captureHandlersWithToken(token: string): Record<string, Handler> {
   registerGithubHandlers(answerInto(handlers), {
     github: githubOverStub(mockExecFile),
     getToken: () => token,
-    noCheckoutCwd: USER_DATA,
+    noCheckoutCwd: GLOBAL_STORAGE,
   })
   return handlers
 }
@@ -2022,6 +2023,58 @@ describe('github:pr-create', () => {
   })
 })
 
+describe('git:pr-status', () => {
+  let handlers: Record<string, Handler>
+  const openPr = {
+    number: 4,
+    title: 'Greet in either order',
+    body: 'Adds a greeting.',
+    url: 'https://github.com/o/r/pull/4',
+    state: 'OPEN',
+    isDraft: true,
+    baseRefName: 'main',
+    headRefName: 'feat/greeting',
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    handlers = captureHandlers()
+  })
+
+  it("answers the checkout's branch's open pull request", async () => {
+    mockGitSuccess('feat/greeting\n')
+    mockGitSuccess(JSON.stringify(openPr))
+
+    const result = await handlers['git:pr-status']({ repoRoot: '/repo' })
+
+    expect(result).toEqual({ pr: { ...openPr, state: 'open' } })
+    expect(mockExecFile.mock.calls[0].slice(0, 2)).toEqual(['git', ['branch', '--show-current']])
+    const [command, args] = mockExecFile.mock.calls[1]
+    expect([command, args.slice(0, 3)]).toEqual(['gh', ['pr', 'view', 'feat/greeting']])
+  })
+
+  it('answers null when the branch has no pull request', async () => {
+    mockGitSuccess('feat/greeting\n')
+    mockGitFailure('no pull requests found for branch "feat/greeting"')
+
+    expect(await handlers['git:pr-status']({ repoRoot: '/repo' })).toEqual({ pr: null })
+  })
+
+  it("answers null when the branch's pull request is merged, so a new one can be opened", async () => {
+    mockGitSuccess('feat/greeting\n')
+    mockGitSuccess(JSON.stringify({ ...openPr, state: 'MERGED' }))
+
+    expect(await handlers['git:pr-status']({ repoRoot: '/repo' })).toEqual({ pr: null })
+  })
+
+  it('answers null on a detached HEAD without asking GitHub', async () => {
+    mockGitSuccess('\n')
+
+    expect(await handlers['git:pr-status']({ repoRoot: '/repo' })).toEqual({ pr: null })
+    expect(mockExecFile).toHaveBeenCalledTimes(1)
+  })
+})
+
 describe('github:pr-mark-ready', () => {
   let handlers: Record<string, Handler>
 
@@ -2398,6 +2451,44 @@ describe('github:remove-active-review — store side-effects — returns { error
 
   afterEach(() => {
     vi.restoreAllMocks()
+  })
+
+  it("deletes the pull request's own session key, so a refresh does not bring it back as paused", async () => {
+    vi.spyOn(ElectronStore.prototype, 'set').mockImplementation(function (
+      this: { store: Record<string, unknown> },
+      key: string,
+      value: unknown
+    ) {
+      this.store[key] = value
+    })
+    vi.spyOn(ElectronStore.prototype, 'delete').mockImplementation(function (
+      this: { store: Record<string, unknown> },
+      key: string
+    ) {
+      delete this.store[key]
+    })
+    const session = (prNumber: number) => ({
+      repoRoot: '/repo',
+      prNumber,
+      headSHA: 'abc123',
+      currentChapterId: null,
+      currentFilePath: null,
+      viewedFiles: [],
+      fileOrderOverrides: {},
+      scrollPosition: null,
+      pausedAt: '2026-01-01T00:00:00Z',
+      lastAccessedAt: '2026-01-01T00:00:00Z',
+    })
+    await handlers['github:session-set']({ key: '/repo:::42', session: session(42) })
+    await handlers['github:session-set']({ key: '/repo:::420', session: session(420) })
+
+    await handlers['github:remove-active-review']({ repoRoot: '/repo', prNumber: 42 })
+
+    const { sessions } = (await handlers['github:sessions-for-repo']({ repoRoot: '/repo' })) as {
+      sessions: Array<{ prNumber: number }>
+    }
+    expect(sessions.map((s) => s.prNumber)).toEqual([420])
+    delete sessionData['/repo:::420']
   })
 
   it('returns { error } when activeReviewStore.delete throws (line 846)', async () => {
@@ -2810,7 +2901,7 @@ describe('review revamp — edge branches — maps ssh remotes, and ignores non-
     const hs: Record<string, Handler> = {}
     registerGithubHandlers(
       answerInto(hs),
-      { github: githubOverStub(mockExecFile), getToken: () => '', noCheckoutCwd: USER_DATA },
+      { github: githubOverStub(mockExecFile), getToken: () => '', noCheckoutCwd: GLOBAL_STORAGE },
       { listProjectRoots: () => ['/src/widgets', '/src/gadgets', '/src/broken'] }
     )
     const node = (repo: string, number: number) => ({
@@ -2852,11 +2943,11 @@ describe('github:dashboard-search', () => {
     mockExecFile.mockReset()
   })
 
-  it('runs gh from api.paths.userData, builds the dashboard, and maps local roots', async () => {
+  it('runs gh from api.paths.globalStorage, builds the dashboard, and maps local roots', async () => {
     const handlers: Record<string, Handler> = {}
     registerGithubHandlers(
       answerInto(handlers),
-      { github: githubOverStub(mockExecFile), getToken: () => '', noCheckoutCwd: USER_DATA },
+      { github: githubOverStub(mockExecFile), getToken: () => '', noCheckoutCwd: GLOBAL_STORAGE },
       { listProjectRoots: () => ['/Users/me/repos/widgets'] }
     )
 
@@ -2905,7 +2996,7 @@ describe('github:dashboard-search', () => {
     expect(result.prs[0].localRepoRoot).toBe('/Users/me/repos/widgets')
 
     const userCallOpts = mockExecFile.mock.calls[0][2] as { cwd?: string }
-    expect(userCallOpts.cwd).toBe(USER_DATA)
+    expect(userCallOpts.cwd).toBe(GLOBAL_STORAGE)
   })
 })
 
@@ -3039,7 +3130,7 @@ describe('github:dashboard-search — returns catchError shape when the login lo
     registerGithubHandlers(answerInto(handlers), {
       github: githubOverStub(mockExecFile),
       getToken: () => '',
-      noCheckoutCwd: USER_DATA,
+      noCheckoutCwd: GLOBAL_STORAGE,
     })
     mockGitFailure('boom')
     const result = (await handlers['github:dashboard-search']({})) as { error: string }
@@ -3095,7 +3186,11 @@ describe('github:accessible-repos', () => {
       'user/repos?affiliation=owner,collaborator,organization_member&per_page=100',
       '--paginate',
     ])
-    expect(options).toMatchObject({ cwd: USER_DATA, maxBuffer: 50 * 1024 * 1024, timeout: 60_000 })
+    expect(options).toMatchObject({
+      cwd: GLOBAL_STORAGE,
+      maxBuffer: 50 * 1024 * 1024,
+      timeout: 60_000,
+    })
   })
 })
 
@@ -3132,7 +3227,7 @@ describe('gh: pseudo-root (uncloned repo)', () => {
     handlers = captureHandlers()
   })
 
-  it('routes github:pr-mark-ready through GH_REPO with cwd in api.paths.userData, no git spawned', async () => {
+  it('routes github:pr-mark-ready through GH_REPO with cwd in api.paths.globalStorage, no git spawned', async () => {
     mockExecFile.mockImplementationOnce(stubPrints(''))
     const result = (await handlers['github:pr-mark-ready']({
       repoRoot: 'gh:acme/widgets',
@@ -3147,7 +3242,7 @@ describe('gh: pseudo-root (uncloned repo)', () => {
     ]
     expect(cmd).not.toBe('git')
     expect(args).toEqual(['pr', 'ready', '6'])
-    expect(callOpts.cwd).toBe(USER_DATA)
+    expect(callOpts.cwd).toBe(GLOBAL_STORAGE)
     // Passed per call, so concurrent calls for different repos cannot see each other's.
     expect(callOpts.env?.GH_REPO).toBe('acme/widgets')
     expect(process.env.GH_REPO).toBeUndefined()
@@ -3626,7 +3721,7 @@ describe('github:dashboard-search sessions and cap', () => {
     const handlers: Record<string, Handler> = {}
     registerGithubHandlers(
       answerInto(handlers),
-      { github: githubOverStub(mockExecFile), getToken: () => '', noCheckoutCwd: USER_DATA },
+      { github: githubOverStub(mockExecFile), getToken: () => '', noCheckoutCwd: GLOBAL_STORAGE },
       { listProjectRoots: () => ['/Users/me/repos/widgets'] }
     )
     mockDashboardExec(

@@ -33,7 +33,7 @@ export type GateRuleId = (typeof GATE_RULES)[number]
  */
 const RULE_IN_WORDS: Record<GateRuleId, string> = {
   'risk.p0': 'changes that turn out to be riskier than planned',
-  'budget.exceeded': 'a run going past its time, files or agent budget',
+  'budget.exceeded': 'a run going past its time or agent budget',
   'ready-for-review': 'whether a draft is ready for review',
   'verify.repeat-fail': 'work that keeps failing its checks',
   'verify.base-fail': 'a check that already fails on the base branch',
@@ -57,7 +57,7 @@ export interface GateOption {
   readonly consequence: string
 }
 
-export interface GateDecision {
+interface GateDecision {
   readonly option: string
   readonly by: 'operator' | 'default'
   readonly note: string

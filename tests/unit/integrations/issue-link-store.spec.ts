@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import * as path from 'node:path'
+import { makeTempDir } from '../../support/temp-dir'
 
 let userData: string
 
@@ -16,7 +16,7 @@ const P1 = '11111111-1111-4111-8111-111111111111'
 const P2 = '22222222-2222-4222-8222-222222222222'
 
 beforeEach(() => {
-  userData = fs.mkdtempSync(path.join(os.tmpdir(), 'issue-link-store-'))
+  userData = makeTempDir('issue-link-store-')
 })
 
 describe('issue-link-store — set and read', () => {

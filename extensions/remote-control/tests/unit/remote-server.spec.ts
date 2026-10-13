@@ -1,8 +1,21 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { readFileSync, readdirSync, existsSync } from 'fs'
+import { createServer, type AddressInfo, type Server } from 'net'
 import { hashPassword } from '../../src/server/password-hash'
 
 const PASSWORD = 'correct-password'
+
+// Every server here listens on a port the OS picks (0), never a fixed one: a fixed
+// port is shared by every test run on the machine, so two runs at once (another
+// checkout, CI shards) made start() fail with PortInUseError at random.
+const ANY_PORT = 0
+
+/** A port held by a plain TCP server on all interfaces, as the remote server binds. */
+async function occupiedPort(): Promise<{ port: number; holder: Server }> {
+  const holder = createServer()
+  await new Promise<void>((resolve) => holder.listen(0, '0.0.0.0', resolve))
+  return { port: (holder.address() as AddressInfo).port, holder }
+}
 
 vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs')>()
@@ -104,7 +117,7 @@ describe('RemoteServer', () => {
     mockDeps.getPasswordHash.mockReturnValue(storedHash)
     const { createRemoteServer } = await import('../../src/server/remote-server')
     remoteServer = await createRemoteServer({
-      port: 7683,
+      port: ANY_PORT,
       appPath: '/mock/app',
       ptyManager: mockPtyManager as never,
       deps: mockDeps,
@@ -463,7 +476,7 @@ describe('RemoteServer', () => {
 
       const { createRemoteServer } = await import('../../src/server/remote-server')
       extServer = await createRemoteServer({
-        port: 7685,
+        port: ANY_PORT,
         appPath: '/mock/app',
         ptyManager: mockPtyManager as never,
         deps: mockDeps,
@@ -506,12 +519,21 @@ describe('RemoteServer', () => {
   })
 
   describe('EADDRINUSE handling', () => {
+    let taken: { port: number; holder: Server }
+
+    beforeEach(async () => {
+      taken = await occupiedPort()
+    })
+
+    afterEach(async () => {
+      await new Promise((resolve) => taken.holder.close(resolve))
+    })
+
     it('start() with port in use rejects with PortInUseError', async () => {
-      const { createRemoteServer: create2, PortInUseError } = await import(
-        '../../src/server/remote-server'
-      )
+      const { createRemoteServer: create2 } = await import('../../src/server/remote-server')
+      const { PortInUseError } = await import('../../src/server/port-in-use-error')
       const conflictServer = await create2({
-        port: 7683,
+        port: taken.port,
         appPath: '/mock/app',
         ptyManager: mockPtyManager as never,
         deps: { ...mockDeps, onPortInUse: vi.fn() },
@@ -523,13 +545,13 @@ describe('RemoteServer', () => {
       const { createRemoteServer: create2 } = await import('../../src/server/remote-server')
       const onPortInUse = vi.fn()
       const conflictServer = await create2({
-        port: 7683,
+        port: taken.port,
         appPath: '/mock/app',
         ptyManager: mockPtyManager as never,
         deps: { ...mockDeps, onPortInUse },
       })
       await conflictServer.start().catch(() => {})
-      expect(onPortInUse).toHaveBeenCalledWith(7683)
+      expect(onPortInUse).toHaveBeenCalledWith(taken.port)
     })
   })
 })

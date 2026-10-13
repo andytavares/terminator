@@ -1,6 +1,6 @@
 import { matchesFilter, type IssueTitles } from './session-filter'
 import type { HomePrefs } from './home-prefs'
-import type { SessionFacts } from './session-facts'
+import { byRecentlyOpened, byStarted, type SessionFacts } from './session-facts'
 import { standingRank } from './view-model'
 
 export interface LedgerGroup {
@@ -26,17 +26,6 @@ function groupLabel(facts: SessionFacts, groupBy: HomePrefs['groupBy']): string 
   if (facts.projectName === null) return NO_BRANCH
   if (groupBy === 'project') return facts.projectName
   return `${facts.workspaceName ?? NO_BRANCH} / ${facts.projectName}`
-}
-
-const byStarted = (a: SessionFacts, b: SessionFacts): number =>
-  Date.parse(a.startedAt) - Date.parse(b.startedAt)
-
-/** Most recently opened first, a session that has never been attended sorting last. */
-const byRecentlyOpened = (a: SessionFacts, b: SessionFacts): number => {
-  if (a.lastAttendedAt === null && b.lastAttendedAt === null) return byStarted(a, b)
-  if (a.lastAttendedAt === null) return 1
-  if (b.lastAttendedAt === null) return -1
-  return b.lastAttendedAt - a.lastAttendedAt || byStarted(a, b)
 }
 
 function compare(sort: HomePrefs['sort']) {

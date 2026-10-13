@@ -142,7 +142,7 @@ export function parseTable(source: string): ParsedTable | null {
 // which covers the realistic cases without pulling a full inline parser into
 // the widget.
 
-export type InlineSpanType = 'text' | 'code' | 'strong' | 'em' | 'del' | 'link'
+type InlineSpanType = 'text' | 'code' | 'strong' | 'em' | 'del' | 'link'
 
 export interface InlineSpan {
   type: InlineSpanType

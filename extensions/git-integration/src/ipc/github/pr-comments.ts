@@ -68,7 +68,7 @@ function specificError(
  * GitHub's own reason a review was refused, else gh's output, else the error. gh api writes
  * GitHub's JSON error to stdout; stderr only says "gh: Unprocessable Entity (HTTP 422)".
  */
-export function reviewSubmitError(e: unknown): { error: string } {
+function reviewSubmitError(e: unknown): { error: string } {
   const err = e as { stderr?: string; stdout?: string }
   const ghOutput = (err.stdout || err.stderr || '').trim()
   const jsonMatch = ghOutput.match(/\{[\s\S]*?\}/)

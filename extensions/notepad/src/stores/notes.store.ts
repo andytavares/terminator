@@ -63,3 +63,25 @@ export const useNotesStore = create<NotesState>((set) => ({
   setDiagramCache: (id, sceneJson) =>
     set((s) => ({ diagramCache: { ...s.diagramCache, [id]: sceneJson } })),
 }))
+
+/** Fetches the note, diagram and folder lists (archived included) into the store. */
+export async function loadLibrary(): Promise<void> {
+  const bridge = window.electronAPI.extensionBridge
+  try {
+    const [notes, diagrams, folders] = await Promise.all([
+      bridge.invoke('terminator.notepad:notes.list', { includeArchived: true }),
+      bridge.invoke('terminator.notepad:diagrams.list', { includeArchived: true }),
+      bridge.invoke('terminator.notepad:folders.list', {}),
+    ])
+    const store = useNotesStore.getState()
+    const listed = (result: unknown) => (result as { data?: unknown[] }).data
+    const notesData = listed(notes)
+    if (Array.isArray(notesData)) store.setNotes(notesData as NoteListItem[])
+    const diagramsData = listed(diagrams)
+    if (Array.isArray(diagramsData)) store.setDiagrams(diagramsData as DiagramListItem[])
+    const foldersData = listed(folders)
+    if (Array.isArray(foldersData)) store.setFolders(foldersData as Folder[])
+  } catch (err) {
+    console.error('[notepad] Failed to load the lists', err)
+  }
+}

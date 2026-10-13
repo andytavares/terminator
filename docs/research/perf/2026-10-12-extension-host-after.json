@@ -1,0 +1,121 @@
+{
+  "none": {
+    "runs": 5,
+    "hostMB": null,
+    "probedRuns": 0,
+    "insideHostMB": null,
+    "totalMB": 503
+  },
+  "perf.probe": {
+    "runs": 5,
+    "hostMB": {
+      "workingSet": 99,
+      "peakWorkingSet": 99
+    },
+    "probedRuns": 5,
+    "insideHostMB": {
+      "rss": 98.5,
+      "heapTotal": 4.5,
+      "heapUsed": 3.3,
+      "external": 2.3,
+      "arrayBuffers": 0
+    },
+    "totalMB": 605
+  },
+  "terminator.foundry": {
+    "runs": 5,
+    "hostMB": {
+      "workingSet": 108,
+      "peakWorkingSet": 108
+    },
+    "probedRuns": 5,
+    "insideHostMB": {
+      "rss": 107.4,
+      "heapTotal": 10,
+      "heapUsed": 7,
+      "external": 2.6,
+      "arrayBuffers": 0
+    },
+    "totalMB": 613
+  },
+  "terminator.git-integration": {
+    "runs": 5,
+    "hostMB": {
+      "workingSet": 104,
+      "peakWorkingSet": 104
+    },
+    "probedRuns": 5,
+    "insideHostMB": {
+      "rss": 103.9,
+      "heapTotal": 7.8,
+      "heapUsed": 5.8,
+      "external": 2.3,
+      "arrayBuffers": 0
+    },
+    "totalMB": 608
+  },
+  "terminator.notepad": {
+    "runs": 5,
+    "hostMB": {
+      "workingSet": 103,
+      "peakWorkingSet": 103
+    },
+    "probedRuns": 5,
+    "insideHostMB": {
+      "rss": 102.9,
+      "heapTotal": 6.6,
+      "heapUsed": 4.6,
+      "external": 2.3,
+      "arrayBuffers": 0
+    },
+    "totalMB": 608
+  },
+  "terminator.remote-control": {
+    "runs": 5,
+    "hostMB": {
+      "workingSet": 102,
+      "peakWorkingSet": 102
+    },
+    "probedRuns": 5,
+    "insideHostMB": {
+      "rss": 102,
+      "heapTotal": 6.2,
+      "heapUsed": 4.1,
+      "external": 2.3,
+      "arrayBuffers": 0
+    },
+    "totalMB": 608
+  },
+  "terminator.task-vault": {
+    "runs": 5,
+    "hostMB": {
+      "workingSet": 104,
+      "peakWorkingSet": 104
+    },
+    "probedRuns": 5,
+    "insideHostMB": {
+      "rss": 103.5,
+      "heapTotal": 6.8,
+      "heapUsed": 4.8,
+      "external": 2.3,
+      "arrayBuffers": 0
+    },
+    "totalMB": 608
+  },
+  "all": {
+    "runs": 5,
+    "hostMB": {
+      "workingSet": 115,
+      "peakWorkingSet": 115
+    },
+    "probedRuns": 5,
+    "insideHostMB": {
+      "rss": 114.7,
+      "heapTotal": 13.2,
+      "heapUsed": 10.4,
+      "external": 2.6,
+      "arrayBuffers": 0
+    },
+    "totalMB": 624
+  }
+}

@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createRunChannels } from '../../src/ipc/run-channels.js'
@@ -13,6 +12,7 @@ import type { OrderStore } from '../../src/order/store.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import type { Standing } from '../../src/order/standing.js'
 import type { Gate } from '../../src/gates/rules.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 // What `run.observe` has to hand a surface before that surface can say what to
 // do next. Before this it returned the graph and nothing else, so the Floor
@@ -115,8 +115,8 @@ function gate(over: Partial<Parameters<typeof raiseGate>[0]> = {}): Gate {
 }
 
 beforeEach(() => {
-  dataRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-standing-'))
-  repo = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-standing-repo-'))
+  dataRoot = makeTempDir('fdry-standing-')
+  repo = makeTempDir('fdry-standing-repo-')
   fs.writeFileSync(path.join(repo, 'package.json'), JSON.stringify({ scripts: { test: 'vitest' } }))
   store = createOrderStore(dataRoot)
 })

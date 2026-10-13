@@ -6,7 +6,7 @@ import { useReviewUiStore } from '../../stores/review-ui.store'
 import { sortPrs } from '../../review/sort-prs'
 import { SortSelect } from './SortSelect'
 import type { ReviewQueuePR } from '../../schemas/pr-review.schema'
-import { DiffSize, RowMeta, shortAge, type MetaPart } from './DiffSize'
+import { PrRow, shortAge, type MetaPart } from './DiffSize'
 import { choose } from '../text'
 import './review-dashboard.css'
 
@@ -160,7 +160,7 @@ function QueueRows(props: QueueRowsProps) {
         <span className="rd-ct">{store.totalPrCount ?? prQueue.length}</span>
       </h3>
       {sortPrs(prQueue, queueSort).map((pr) => (
-        <PrRow
+        <QueueRow
           key={pr.number}
           pr={pr}
           onOpen={props.onOpenPr}
@@ -195,7 +195,7 @@ export function ReviewQueue({ onOpenPr, onRefresh, onDismissPr }: Props) {
   )
 }
 
-interface PrRowProps {
+interface QueueRowProps {
   pr: ReviewQueuePR
   onOpen: (pr: ReviewQueuePR) => void
   onDismiss?: (prNumber: number) => Promise<void>
@@ -253,54 +253,21 @@ function DismissButton(props: {
   )
 }
 
-function RowActions({ row }: { row: PrRowProps }) {
-  const { pr, onDismiss } = row
+function QueueRow(props: QueueRowProps) {
+  const { pr, onDismiss } = props
   const isSession = pr.sessionStatus === 'paused' || pr.sessionStatus === 'in-progress'
   // A control says what happens when it is used: every one of these opens the diff.
-  const actionLabel = ACTION_LABEL[pr.sessionStatus] ?? 'Review'
+  const label = ACTION_LABEL[pr.sessionStatus] ?? 'Review'
   return (
-    <span className="rd-actions">
-      <Button
-        size="sm"
-        variant={choose(isSession, 'primary' as const, 'secondary' as const)}
-        className={choose(isSession, 'rd-row-action rd-always', 'rd-row-action')}
-        onClick={(e) => {
-          e.stopPropagation()
-          row.onOpen(pr)
-        }}
-      >
-        {actionLabel}
-      </Button>
+    <PrRow
+      pr={pr}
+      onOpen={() => props.onOpen(pr)}
+      meta={rowMetaParts(pr, isMine(pr, props.currentUserLogin))}
+      action={{ label, primary: isSession, always: isSession }}
+    >
       {onDismiss && pr.sessionStatus !== 'not-started' && (
         <DismissButton prNumber={pr.number} onDismiss={onDismiss} />
       )}
-    </span>
-  )
-}
-
-function PrRow(props: PrRowProps) {
-  const { pr } = props
-  const open = () => props.onOpen(pr)
-  return (
-    <div
-      className="rd-row rd-row--clickable"
-      tabIndex={0}
-      onClick={open}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') open()
-      }}
-    >
-      <span className="rd-ti">
-        <span className="rd-t1">
-          <span className="rd-no">#{pr.number}</span> <span>{pr.title}</span>
-        </span>
-        <RowMeta parts={rowMetaParts(pr, isMine(pr, props.currentUserLogin))} />
-      </span>
-      <span className="rd-side">
-        <DiffSize additions={pr.additions} deletions={pr.deletions} fileCount={pr.fileCount} />
-        <span className="rd-num">~{pr.estimatedMinutes} min</span>
-      </span>
-      <RowActions row={props} />
-    </div>
+    </PrRow>
   )
 }

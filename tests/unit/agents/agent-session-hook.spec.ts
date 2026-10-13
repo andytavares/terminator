@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { execFileSync } from 'node:child_process'
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import * as path from 'node:path'
+import { makeTempDir } from '../../support/temp-dir'
 
 let userData: string
 let home: string
@@ -25,8 +25,8 @@ const PAYLOAD = {
 }
 
 beforeEach(() => {
-  userData = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-hook-ud-'))
-  home = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-hook-home-'))
+  userData = makeTempDir('agent-hook-ud-')
+  home = makeTempDir('agent-hook-home-')
 })
 
 // The script is run for real: what matters is what it writes and what it prints,
@@ -128,7 +128,7 @@ describe('the capture script, executed', () => {
     }
 
     beforeEach(() => {
-      sessionContextDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-hook-sctx-'))
+      sessionContextDir = makeTempDir('agent-hook-sctx-')
     })
 
     it('prints additionalContext when the terminal has a session context file', async () => {

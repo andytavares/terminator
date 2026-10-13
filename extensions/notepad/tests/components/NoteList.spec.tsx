@@ -236,9 +236,21 @@ describe('NoteList edit dialog', () => {
     })
     expect(mockInvoke).toHaveBeenCalledWith(
       'terminator.notepad:notes.autosave',
-      expect.objectContaining({ id: 'n1', title: 'Renamed', tags: ['work'] })
+      expect.objectContaining({ id: 'n1', title: 'Renamed', tags: ['work'], titleSetByHand: true })
     )
     expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('leaves the title deriving from the body when only the tags change', async () => {
+    openEditDialog()
+    const title = screen.getByPlaceholderText('Title')
+    await act(async () => {
+      fireEvent.submit(title.closest('form')!)
+    })
+    expect(mockInvoke).toHaveBeenCalledWith(
+      'terminator.notepad:notes.autosave',
+      expect.objectContaining({ id: 'n1', title: 'First Note', titleSetByHand: false })
+    )
   })
 
   it('moves Tab from the last control back to the first', () => {
@@ -278,5 +290,82 @@ describe('NoteList archived section', () => {
     expect(toggle.getAttribute('aria-expanded')).toBe('false')
     fireEvent.click(toggle)
     expect(toggle.getAttribute('aria-expanded')).toBe('true')
+  })
+})
+
+describe('NoteList drag to reorder', () => {
+  beforeEach(() => {
+    cleanup()
+    mockInvoke.mockClear()
+    useNotesStore.setState({
+      notes: [note1, note2],
+      folders: [],
+      selectedNoteId: null,
+      archivedVisible: false,
+    })
+    useFilterStore.setState({ searchQuery: '', activeTagIds: [], includeArchived: false })
+  })
+
+  it('saves the new order when a note is dropped below another', async () => {
+    render(<NoteList />)
+    const row = (title: string) => screen.getByText(title).closest('button') as HTMLElement
+    const dataTransfer = { effectAllowed: '', dropEffect: '' }
+
+    fireEvent.dragStart(row('First Note'), { dataTransfer })
+    // jsdom drag events carry no pointer position, which reads as the lower half.
+    fireEvent.dragOver(row('Second Note'), { dataTransfer })
+    await act(async () => {
+      fireEvent.drop(row('Second Note'), { dataTransfer })
+    })
+
+    expect(mockInvoke).toHaveBeenCalledWith('terminator.notepad:notes.reorder', {
+      items: [
+        { id: 'n2', type: 'note' },
+        { id: 'n1', type: 'note' },
+      ],
+    })
+  })
+
+  it('moves a note dropped beside one in a folder into that folder', async () => {
+    useNotesStore.setState({
+      notes: [note1, { ...note2, folderId: 'f1' }],
+      folders: [{ id: 'f1', name: 'Work', sortOrder: 0, createdAt: '' }],
+    })
+    render(<NoteList />)
+    const row = (title: string) => screen.getByText(title).closest('button') as HTMLElement
+    const dataTransfer = { effectAllowed: '', dropEffect: '' }
+
+    fireEvent.dragStart(row('First Note'), { dataTransfer })
+    fireEvent.dragOver(row('Second Note'), { dataTransfer })
+    await act(async () => {
+      fireEvent.drop(row('Second Note'), { dataTransfer })
+    })
+
+    expect(mockInvoke).toHaveBeenCalledWith('terminator.notepad:folders.move', {
+      items: [{ id: 'n1', type: 'note' }],
+      folderId: 'f1',
+    })
+    expect(mockInvoke).toHaveBeenCalledWith('terminator.notepad:notes.reorder', {
+      items: [
+        { id: 'n2', type: 'note' },
+        { id: 'n1', type: 'note' },
+      ],
+    })
+  })
+
+  it('saves nothing for a drop with no row under the pointer', async () => {
+    render(<NoteList />)
+    const row = (title: string) => screen.getByText(title).closest('button') as HTMLElement
+    const dataTransfer = { effectAllowed: '', dropEffect: '' }
+
+    fireEvent.dragStart(row('First Note'), { dataTransfer })
+    await act(async () => {
+      fireEvent.drop(row('Second Note'), { dataTransfer })
+    })
+
+    expect(mockInvoke).not.toHaveBeenCalledWith(
+      'terminator.notepad:notes.reorder',
+      expect.anything()
+    )
   })
 })

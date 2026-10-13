@@ -29,6 +29,17 @@ describe('applyNotepadSchema', () => {
     ])
   })
 
+  it('gives notes from an earlier schema a title that still follows the body', async () => {
+    await db.exec(
+      `CREATE TABLE notes (id TEXT PRIMARY KEY, title TEXT NOT NULL DEFAULT 'Untitled note', body TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, updated_at TEXT NOT NULL, archived_at TEXT, sort_order REAL NOT NULL DEFAULT 0, folder_id TEXT);
+       INSERT INTO notes (id, created_at, updated_at) VALUES ('old', 't', 't');`
+    )
+    await applyNotepadSchema(db)
+    expect(await db.get('SELECT title_set_by_hand FROM notes WHERE id = ?', ['old'])).toEqual({
+      title_set_by_hand: 0,
+    })
+  })
+
   it('is idempotent — safe to call twice', async () => {
     await applyNotepadSchema(db)
     await expect(applyNotepadSchema(db)).resolves.not.toThrow()

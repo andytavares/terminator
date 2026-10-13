@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { OutputRelay } from '../../../src/main/terminal/output-relay'
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest'
+import { OutputRelay, type RendererSend } from '../../../src/main/terminal/output-relay'
 import { OUTPUT_FLUSH_INTERVAL_MS } from '../../../src/main/terminal/output-batcher'
 import { HIGH_WATERMARK_CHARS, LOW_WATERMARK_CHARS } from '../../../src/main/terminal/flow-control'
 
@@ -18,7 +18,7 @@ function makeFakePtyManager() {
 
 describe('OutputRelay', () => {
   let ptyManager: ReturnType<typeof makeFakePtyManager>
-  let send: ReturnType<typeof vi.fn>
+  let send: Mock<RendererSend>
   let relay: OutputRelay
 
   beforeEach(() => {

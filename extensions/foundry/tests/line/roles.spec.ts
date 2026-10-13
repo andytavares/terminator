@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createRoleRegistry, ResumeForbiddenError } from '../../src/line/roles.js'
 import type { ResolveSources } from '../../src/recipe/resolve.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 // The single most important invariant in the whole design lives here: a
 // verifier may not resume a conversation. The builder's justification is in
@@ -21,8 +21,8 @@ function sources(): ResolveSources {
 }
 
 beforeEach(() => {
-  dataRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-roles-data-'))
-  repo = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-roles-repo-'))
+  dataRoot = makeTempDir('fdry-roles-data-')
+  repo = makeTempDir('fdry-roles-repo-')
 })
 
 afterEach(() => {

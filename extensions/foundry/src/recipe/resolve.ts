@@ -16,7 +16,7 @@ import type { SensorDef } from '../sensors/types.js'
 export type Kind = 'recipes' | 'roles' | 'rules' | 'sensors'
 
 export type { Rung } from './rung.js'
-export { rungInWords } from './rung.js'
+
 import type { Rung } from './rung.js'
 
 export interface ResolvedFile {

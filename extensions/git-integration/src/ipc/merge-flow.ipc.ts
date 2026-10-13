@@ -1,5 +1,6 @@
 import { z } from 'zod'
-import { readFile, writeFile } from 'fs/promises'
+import { readFile } from 'fs/promises'
+import { writeFileAtomic } from '../utils/write-atomic.js'
 import { isAbsolute } from 'path'
 import { namedStore } from '../storage-directory.js'
 import { defineChannel, type ChannelSpec } from '@terminator/extension-sdk'
@@ -100,7 +101,7 @@ async function resolveConflict(payload: z.infer<typeof ResolvePayload>) {
   const file = await readBlockFile(payload.repoRoot, payload.blockId)
   const from = textToReplace(file, payload)
   if (from !== null) {
-    await writeFile(file.fullPath, file.content.replace(from, payload.resolvedText), 'utf-8')
+    await writeFileAtomic(file.fullPath, file.content.replace(from, payload.resolvedText))
   }
   return { success: true }
 }
@@ -111,7 +112,7 @@ async function undoResolve(payload: z.infer<typeof UndoPayload>) {
     return { error: 'Resolved text not found in file — file may have changed since resolution.' }
   }
   const updated = file.content.replace(payload.resolvedText, payload.originalConflictText)
-  await writeFile(file.fullPath, updated, 'utf-8')
+  await writeFileAtomic(file.fullPath, updated)
   return { success: true }
 }
 
@@ -207,12 +208,13 @@ async function preparePrWorktree(payload: z.infer<typeof PreparePayload>) {
 
 /** The stored session, while conflicts remain and it has some; otherwise it is dropped. */
 async function restoreSession(repoRoot: string) {
-  const stored = store().get(sessionKey(repoRoot)) as { totalConflicts?: number } | undefined
+  const sessions = await store()
+  const stored = sessions.get(sessionKey(repoRoot)) as { totalConflicts?: number } | undefined
   if (!stored) return { session: null }
   const conflicted = await listConflictedFiles(repoRoot).catch(() => [])
   // An empty session is stale, e.g. from a broken Start Over.
   if (conflicted.length === 0 || !stored.totalConflicts) {
-    store().delete(sessionKey(repoRoot))
+    sessions.delete(sessionKey(repoRoot))
     return { session: null }
   }
   return { session: stored }
@@ -224,7 +226,8 @@ async function resetSession(repoRoot: string, files: Array<{ filePath: string }>
     // --conflict=merge re-creates the markers whether or not a block's resolvedText was saved.
     await git(['checkout', '--conflict=merge', '--', file.filePath], repoRoot)
   }
-  store().delete(sessionKey(repoRoot))
+  const sessions = await store()
+  sessions.delete(sessionKey(repoRoot))
   return { success: true }
 }
 
@@ -289,8 +292,9 @@ function sessionChannels(): ChannelSpec[] {
       channel: 'git:session-persist',
       schema: z.object({ repoRoot: RepoRoot, session: z.unknown() }),
       invalid: VALIDATION_ERROR,
-      run: ({ repoRoot, session }) => {
-        store().set(sessionKey(repoRoot), session)
+      run: async ({ repoRoot, session }) => {
+        const sessions = await store()
+        sessions.set(sessionKey(repoRoot), session)
         return { success: true }
       },
       onError: errorEnvelope,
@@ -305,8 +309,9 @@ function sessionEndChannels(): ChannelSpec[] {
       channel: 'git:session-clear',
       schema: RepoRootPayload,
       invalid: { success: true },
-      run: ({ repoRoot }) => {
-        store().delete(sessionKey(repoRoot))
+      run: async ({ repoRoot }) => {
+        const sessions = await store()
+        sessions.delete(sessionKey(repoRoot))
         return { success: true }
       },
       onError: () => ({ success: true }),

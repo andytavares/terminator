@@ -82,24 +82,29 @@ function storeKey(head: PrHead): string {
   return `${head.repoRoot}:::${head.prNumber}:::${head.headSHA}`
 }
 
-function loadRuns(head: PrHead): AgentRun[] {
-  return (store().get(storeKey(head)) as AgentRun[] | undefined) ?? []
+type RunStore = Awaited<ReturnType<typeof store>>
+
+function runsIn(runStore: RunStore, head: PrHead): AgentRun[] {
+  return (runStore.get(storeKey(head)) as AgentRun[] | undefined) ?? []
 }
 
-function saveRuns(head: PrHead, runs: AgentRun[]): void {
-  store().set(storeKey(head), runs)
+async function loadRuns(head: PrHead): Promise<AgentRun[]> {
+  return runsIn(await store(), head)
 }
 
-function upsertRun(head: PrHead, run: AgentRun): void {
-  const runs = loadRuns(head)
+// Reads and writes in one turn once the store is open, so two upserts never lose one.
+async function upsertRun(head: PrHead, run: AgentRun): Promise<void> {
+  const runStore = await store()
+  const runs = runsIn(runStore, head)
   const idx = runs.findIndex((r) => r.id === run.id)
   if (idx >= 0) runs[idx] = run
   else runs.unshift(run)
-  saveRuns(head, runs)
+  runStore.set(storeKey(head), runs)
 }
 
-function findStoredRun(runId: string): (PrHead & { run: AgentRun }) | null {
-  for (const [key, runs] of Object.entries(store().store as Record<string, AgentRun[]>)) {
+async function findStoredRun(runId: string): Promise<(PrHead & { run: AgentRun }) | null> {
+  const all = (await store()).store as Record<string, AgentRun[]>
+  for (const [key, runs] of Object.entries(all)) {
     const found = runs?.find((r) => r.id === runId)
     if (!found) continue
     const [repoRoot, prNumberStr, headSHA] = key.split(':::')
@@ -145,10 +150,10 @@ function newRun(input: StartInput, sessionId: string): AgentRun {
 }
 
 /** Stores the run's outcome under its PR head, forgets it as running, and tells the views. */
-function finishRun(ctx: AgentContext, slot: RunSlot, finished: AgentRun): void {
+async function finishRun(ctx: AgentContext, slot: RunSlot, finished: AgentRun): Promise<void> {
   ctx.runningByScope.delete(slot.runningKey)
   ctx.liveRuns.delete(slot.run.id)
-  upsertRun(slot.head, finished)
+  await upsertRun(slot.head, finished)
   ctx.deps.broadcast('review-agent:event', { run: finished })
 }
 
@@ -169,38 +174,39 @@ async function executeRun(ctx: AgentContext, input: StartInput, slot: RunSlot) {
       timeoutMs,
     })
     ctx.liveRuns.set(run.id, cancel)
-    finishRun(ctx, slot, await done)
+    await finishRun(ctx, slot, await done)
   } catch (e) {
     const finishedAt = new Date().toISOString()
-    finishRun(ctx, slot, { ...run, status: 'failed', finishedAt, error: String(e) })
+    await finishRun(ctx, slot, { ...run, status: 'failed', finishedAt, error: String(e) })
   }
 }
 
 /** Starts a run for the PR and scope, or answers the one already running for them. */
-function startRun(ctx: AgentContext, input: StartInput): { run: AgentRun } {
+async function startRun(ctx: AgentContext, input: StartInput): Promise<{ run: AgentRun }> {
   const runningKey = `${input.repoRoot}:::${input.prNumber}:::${JSON.stringify(input.scope)}`
   const existing = ctx.runningByScope.get(runningKey)
   if (existing && existing.status === 'running') return { run: existing }
   const run = newRun(input, randomUUID())
   ctx.runningByScope.set(runningKey, run)
-  upsertRun(input, run)
+  await upsertRun(input, run)
   void executeRun(ctx, input, { run, runningKey, head: headOf(input) })
   return { run }
 }
 
-function dismissFinding(input: PrHead & { runId: string; findingId: string }) {
-  const runs = loadRuns(input)
+async function dismissFinding(input: PrHead & { runId: string; findingId: string }) {
+  const runStore = await store()
+  const runs = runsIn(runStore, input)
   const run = runs.find((r) => r.id === input.runId)
   const finding = run?.findings.find((f) => f.id === input.findingId)
   if (!run || !finding) return { error: 'NOT_FOUND' }
   finding.dismissed = true
-  saveRuns(input, runs)
+  runStore.set(storeKey(input), runs)
   return { ok: true }
 }
 
 /** Opens a terminal resuming the run's claude session, in its PR head's worktree. */
 async function openRunTerminal(ctx: AgentContext, runId: string) {
-  const found = findStoredRun(runId)
+  const found = await findStoredRun(runId)
   if (!found) return { error: 'NOT_FOUND' }
   const cwd = await ctx.ensureWorktree(found)
   ctx.deps.openTerminal({
@@ -255,7 +261,7 @@ function storedRunChannels(deps: ReviewAgentDeps): ChannelSpec[] {
       channel: 'review-agent:list',
       schema: RunsPayload,
       invalid: VALIDATION_ERROR,
-      run: (head) => ({ runs: loadRuns(head) }),
+      run: async (head) => ({ runs: await loadRuns(head) }),
     }),
     defineChannel({
       channel: 'review-agent:dismiss',

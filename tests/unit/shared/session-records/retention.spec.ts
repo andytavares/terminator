@@ -14,6 +14,7 @@ function record(sessionId: string, closedAt?: number): SessionRecord {
     tabTitle: 'zsh',
     shell: '/bin/zsh',
     description: 'why',
+    agent: null,
     link: null,
     startedAt: '2026-08-01T00:00:00.000Z',
     updatedAt: '2026-08-01T00:00:00.000Z',

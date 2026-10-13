@@ -67,6 +67,36 @@ async function cloneRepo(ctx: GithubContext, repo: string, folder: string) {
   return { repoRoot: join(folder, name) }
 }
 
+const PR_STATUS_FIELDS = [
+  'number',
+  'title',
+  'body',
+  'url',
+  'state',
+  'isDraft',
+  'baseRefName',
+  'headRefName',
+]
+
+/** The open pull request from the checkout's branch, which Open PR shows instead of opening a second. */
+async function openPullRequestForBranch(ctx: GithubContext, repoRoot: string) {
+  const branch = (await runGit(repoRoot, ['branch', '--show-current'])).trim()
+  if (!branch) return { pr: null }
+  const pr = await ctx.github.pullRequests.view(ctx.target(repoRoot), branch, PR_STATUS_FIELDS)
+  return { pr: pr.state === 'OPEN' ? { ...pr, state: 'open' } : null }
+}
+
+// gh fails when the branch has no pull request; the dialog then opens one.
+function prStatusChannel(ctx: GithubContext): ChannelSpec {
+  return defineChannel({
+    channel: 'git:pr-status',
+    schema: RepoRootPayload,
+    invalid: VALIDATION_ERROR,
+    run: ({ repoRoot }) => openPullRequestForBranch(ctx, repoRoot),
+    onError: () => ({ pr: null }),
+  })
+}
+
 function prCreateChannel(ctx: GithubContext): ChannelSpec {
   return defineChannel({
     channel: 'github:pr-create',
@@ -105,7 +135,12 @@ function updateBranchChannel(ctx: GithubContext): ChannelSpec {
 }
 
 function pullRequestVerbs(ctx: GithubContext): ChannelSpec[] {
-  return [prCreateChannel(ctx), markReadyChannel(ctx), updateBranchChannel(ctx)]
+  return [
+    prStatusChannel(ctx),
+    prCreateChannel(ctx),
+    markReadyChannel(ctx),
+    updateBranchChannel(ctx),
+  ]
 }
 
 function currentUserChannel(ctx: GithubContext): ChannelSpec {

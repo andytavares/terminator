@@ -15,7 +15,7 @@ export function legacyImportPending(userData: string): boolean {
 }
 
 // postgres.wasm and postgres.data are the two files unpacked from the asar (see
-// asarUnpack in electron-builder.yml), so they are passed in explicitly.
+// asarUnpack in electron-builder.cjs), so they are passed in explicitly.
 async function openLegacyDatabase(dataDir: string): Promise<PGlite> {
   const { PGlite } = await import('@electric-sql/pglite')
   const distDir = path.dirname(createRequire(import.meta.url).resolve('@electric-sql/pglite'))

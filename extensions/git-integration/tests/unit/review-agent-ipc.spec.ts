@@ -99,8 +99,6 @@ function deferredRun() {
   return { done, resolveDone: (r: AgentRun) => resolveDone(r) }
 }
 
-const tick = (ms: number) => new Promise((r) => setTimeout(r, ms))
-
 /** An undismissed nit on line 1 of a.ts. */
 function nitFinding(id: string): AgentRun['findings'][number] {
   return {
@@ -138,11 +136,13 @@ describe('review-agent IPC', () => {
     expect(broadcast).not.toHaveBeenCalled()
 
     resolveDone(makeDoneRun({ id: result.run.id }))
-    await tick(10)
 
-    expect(broadcast).toHaveBeenCalledWith(
-      'review-agent:event',
-      expect.objectContaining({ run: expect.objectContaining({ status: 'done' }) })
+    // The run finishes in the background and stores itself before it broadcasts.
+    await vi.waitFor(() =>
+      expect(broadcast).toHaveBeenCalledWith(
+        'review-agent:event',
+        expect.objectContaining({ run: expect.objectContaining({ status: 'done' }) })
+      )
     )
   })
 })
@@ -175,18 +175,18 @@ describe('review-agent IPC — uses the model override when given, else the sett
     const { handlers, settings } = captureHandlers({ ensureWorktree, runReview })
 
     await handlers['review-agent:start'](startPayload())
-    await tick(5)
+    await vi.waitFor(() => expect(runReview).toHaveBeenCalledTimes(1))
     expect(runReview.mock.calls[0][0].model).toBe('sonnet')
 
     settings['terminator.git-integration.review.agentModel'] = 'opus'
     await handlers['review-agent:start'](startPayload({ prNumber: 2, headSHA: 'sha2' }))
-    await tick(5)
+    await vi.waitFor(() => expect(runReview).toHaveBeenCalledTimes(2))
     expect(runReview.mock.calls[1][0].model).toBe('opus')
 
     await handlers['review-agent:start'](
       startPayload({ prNumber: 3, headSHA: 'sha3', model: 'sonnet' })
     )
-    await tick(5)
+    await vi.waitFor(() => expect(runReview).toHaveBeenCalledTimes(3))
     expect(runReview.mock.calls[2][0].model).toBe('sonnet')
   })
 })
@@ -206,7 +206,7 @@ describe('review-agent IPC — passes no effort for the Default choice or an uns
     for (const [i, value] of (['default', '', 'high'] as const).entries()) {
       settings['terminator.git-integration.review.agentEffort'] = value
       await start(i + 1)
-      await tick(5)
+      await vi.waitFor(() => expect(runReview).toHaveBeenCalledTimes(i + 1))
     }
 
     expect(runReview.mock.calls.map((c) => c[0].effort)).toEqual([undefined, undefined, 'high'])
@@ -231,7 +231,7 @@ describe('review-agent IPC — review-agent:cancel cancels a live run', () => {
     const { handlers } = captureHandlers({ ensureWorktree, runReview })
 
     const started = (await handlers['review-agent:start'](startPayload())) as { run: AgentRun }
-    await tick(10)
+    await vi.waitFor(() => expect(runReview).toHaveBeenCalled())
 
     const result = await handlers['review-agent:cancel']({ runId: started.run.id })
     expect(result).toEqual({ ok: true })

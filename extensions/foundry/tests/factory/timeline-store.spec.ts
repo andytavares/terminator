@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import fs from 'node:fs'
-import os from 'node:os'
 import path from 'node:path'
 import {
   recordGraph,
@@ -12,6 +11,7 @@ import {
 } from '../../src/factory/timeline-store.js'
 import type { RunGraph, RunNode } from '../../src/line/run-graph.js'
 import type { ToolActivity } from '../../src/runtime/transcript-tailer.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 function node(id: string, over: Partial<RunNode> = {}): RunNode {
   return {
@@ -49,7 +49,7 @@ function call(
 let dir: string
 
 beforeEach(() => {
-  dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-timeline-'))
+  dir = makeTempDir('fdry-timeline-')
   forgetTimelines()
 })
 

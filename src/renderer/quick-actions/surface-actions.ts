@@ -1,6 +1,6 @@
 import type { QuickAction, QuickActionGroup } from './types'
 
-export type SurfaceKind = 'global' | 'workspace' | 'project' | 'sidebar'
+type SurfaceKind = 'global' | 'workspace' | 'project' | 'sidebar'
 
 export interface SurfaceRegistration {
   extensionId: string

@@ -178,6 +178,11 @@ function useQueue(repoRoot: string | null) {
     if (repoRoot) loadQueue()
   }, [repoRoot, loadQueue])
   useAutoPaging(repoRoot, loadQueue)
+  // A review submitted in the pop-out window (window:review-submitted) changes this list.
+  useEffect(
+    () => window.electronAPI.extensionBridge.on('reviews:changed', () => void loadQueue()),
+    [loadQueue]
+  )
   const handleRefreshQueue = useCallback(
     async (options?: { search?: string }) => {
       await loadQueue({ search: options?.search })

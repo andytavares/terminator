@@ -109,12 +109,6 @@ const GIT_CHANNELS: ChannelSpec[] = [
     invalid: VALIDATION_ERROR,
     run: ({ repoRoot }) => pushBranch(repoRoot),
   }),
-  defineChannel({
-    channel: 'git:pr-status',
-    schema: RepoRootPayload,
-    invalid: VALIDATION_ERROR,
-    run: () => ({ pr: null }),
-  }),
 ]
 
 export function registerGitExtensionHandlers(registerRaw: RegisterFn): void {

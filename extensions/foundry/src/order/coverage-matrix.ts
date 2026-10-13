@@ -10,7 +10,7 @@ import type { WorkOrder } from './schema.js'
 // It is deliberately a matrix rather than a judgement. Nobody has to read a
 // plan carefully and notice what is missing; the gap is a coordinate.
 
-export interface DanglingRef {
+interface DanglingRef {
   readonly unitId: string
   readonly criterionId: string
 }

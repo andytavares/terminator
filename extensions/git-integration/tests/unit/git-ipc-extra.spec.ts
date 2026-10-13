@@ -232,10 +232,3 @@ describe('git:push handler (lines 96-110)', () => {
     expect(result.error).toBe('NO_UPSTREAM')
   })
 })
-
-describe('git:pr-status stub', () => {
-  it('git:pr-status returns { pr: null }', async () => {
-    const result = await getHandler('git:pr-status')({ repoRoot: '/repo' })
-    expect(result).toEqual({ pr: null })
-  })
-})

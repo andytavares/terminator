@@ -182,12 +182,7 @@ export function useTests(source: TestsSource): TestsControl {
   }
 }
 
-export function movedKey(block: {
-  fromPath: string
-  fromLine: number
-  toPath: string
-  toLine: number
-}) {
+function movedKey(block: { fromPath: string; fromLine: number; toPath: string; toLine: number }) {
   return `${block.fromPath}:${block.fromLine}->${block.toPath}:${block.toLine}`
 }
 

@@ -11,7 +11,7 @@ const PORT = 6007
 // operating system still do, so each platform keeps its own baselines
 // (https://playwright.dev/docs/test-snapshots). CI compares on Linux only.
 export default defineConfig({
-  testDir: path.join(dirname, 'visual'),
+  testDir: 'visual',
   testMatch: '**/*.visual.ts',
   snapshotPathTemplate: '{testDir}/__screenshots__/{platform}/{arg}{ext}',
   fullyParallel: true,

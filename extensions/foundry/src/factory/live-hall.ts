@@ -22,7 +22,7 @@ export function statesOf(graph: RunGraph): Record<string, NodeState> {
 }
 
 /** What a render of the live hall needs; replaced, never mutated, when it changes. */
-export interface LiveScene {
+interface LiveScene {
   readonly map: HallMap | null
   /** What each station is showing: the states the beat scheduler has released so far. */
   readonly shown: Readonly<Record<string, NodeState>>

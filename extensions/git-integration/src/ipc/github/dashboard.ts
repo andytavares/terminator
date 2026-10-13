@@ -14,7 +14,7 @@ import {
 import { runGit } from '../../shell/run-git.js'
 import { VALIDATION_ERROR } from '../register.js'
 import { catchError, type AccessibleRepo, type GithubContext } from './context.js'
-import { sessionsForRepo } from './sessions.js'
+import { sessionsForRepo, storedSessions } from './sessions.js'
 
 type SectionResults = Record<string, { issueCount?: number; nodes?: unknown[] }>
 
@@ -160,11 +160,11 @@ async function searchSections(
 }
 
 /** Each PR with the progress of its local review session, when there is one. */
-function withSessionProgress(prs: DashboardPR[]): DashboardPR[] {
+function withSessionProgress(prs: DashboardPR[], stored: Record<string, unknown>): DashboardPR[] {
   const sessionsByRoot = new Map<string, Map<number, ReviewSession>>()
   const sessionsIn = (root: string) => {
     if (!sessionsByRoot.has(root)) {
-      sessionsByRoot.set(root, new Map(sessionsForRepo(root).map((s) => [s.prNumber, s])))
+      sessionsByRoot.set(root, new Map(sessionsForRepo(stored, root).map((s) => [s.prNumber, s])))
     }
     return sessionsByRoot.get(root)!
   }
@@ -191,11 +191,12 @@ async function dashboardSearch(ctx: GithubContext) {
     isBranchExcluded,
     dashboardBranches(data, localRoots)
   )
+  const prs = parseDashboard(data, { login, localRoots }, excluded)
   const capped = [...results.matched]
     .filter(([, { issueCount, returned }]) => issueCount > returned)
     .map(([section]) => section)
   return {
-    prs: withSessionProgress(parseDashboard(data, { login, localRoots }, excluded)),
+    prs: withSessionProgress(prs, await storedSessions()),
     capped,
     login,
     fetchedAt: new Date().toISOString(),

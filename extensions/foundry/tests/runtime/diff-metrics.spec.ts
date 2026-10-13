@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, rmSync, writeFileSync } from 'fs'
-import { tmpdir } from 'os'
+import { rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import {
   parseDiffStat,
@@ -8,6 +7,7 @@ import {
   parseChangedFiles,
   readChangedFiles,
 } from '../../src/runtime/diff-metrics.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 // The diff summary drives two decisions: whether a finished session enters the
 // review queue at all (FR-045), and the >300-line P1 trigger (FR-048).
@@ -79,7 +79,7 @@ describe('counting the lines in a file git has never seen', () => {
   let dir: string
 
   beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), 'session-metrics-'))
+    dir = makeTempDir('session-metrics-')
   })
 
   afterEach(() => rmSync(dir, { recursive: true, force: true, maxRetries: 5 }))

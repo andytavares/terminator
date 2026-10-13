@@ -12,8 +12,8 @@ const api = {
   listMine: vi.fn(),
   search: vi.fn(),
   getIssue: vi.fn(),
-  onStatusChanged: vi.fn(() => () => {}),
-  onLinkChanged: vi.fn(() => () => {}),
+  onStatusChanged: vi.fn((_handler: (payload: unknown) => void): (() => void) => () => {}),
+  onLinkChanged: vi.fn((_handler: (payload: unknown) => void): (() => void) => () => {}),
 }
 
 // A .spec.ts under tests/unit runs in the node project, which has no DOM — the

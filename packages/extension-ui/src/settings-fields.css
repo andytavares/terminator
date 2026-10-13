@@ -1,0 +1,67 @@
+/* The fields of a settings form: a section title, a field, its label and its
+   input, and a hint under it. The core's settings panel and an extension's own
+   settings view (Remote Control's) draw their forms with these classes. */
+
+.settings-section__title {
+  font-size: 11px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  color: var(--tm-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.settings-section__field {
+  margin-bottom: 16px;
+}
+
+.settings-section__label {
+  display: block;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--tm-text-muted);
+  margin-bottom: 6px;
+}
+
+.settings-section__label--inline {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+  font-size: 12px;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--tm-text-primary);
+}
+
+.settings-section__input {
+  background: var(--tm-bg-input);
+  border: 1px solid var(--tm-border-strong);
+  border-radius: var(--tm-radius-sm);
+  padding: 6px 9px;
+  font-size: 12px;
+  font-family: var(--tm-font-mono);
+  color: var(--tm-text-primary);
+  width: 200px;
+  transition: border-color 0.15s;
+}
+
+.settings-section__input:focus {
+  border-color: var(--tm-accent);
+}
+
+.settings-section__hint {
+  display: block;
+  font-size: 10px;
+  color: var(--tm-text-muted);
+  margin-top: 4px;
+  line-height: 1.5;
+}
+
+.settings-section__hint code {
+  font-family: var(--tm-font-mono);
+  background: var(--tm-overlay-soft);
+  padding: 1px 4px;
+  border-radius: 3px;
+}

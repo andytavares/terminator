@@ -13,7 +13,7 @@ vi.mock('../../src/git/git-service', () => ({
 }))
 
 import * as gitService from '../../src/git/git-service'
-import { registerQuickActionCommands } from '../../src/commands'
+import { consumePendingViewRequest, registerQuickActionCommands } from '../../src/commands'
 
 type Handler = (ctx: CommandContext) => void | Promise<void>
 
@@ -215,6 +215,31 @@ describe('registerQuickActionCommands (continued)', () => {
 
       expect(showSelf).not.toHaveBeenCalled()
       expect(broadcast).not.toHaveBeenCalled()
+    })
+  })
+
+  // The Git view may not exist yet when the command runs: the broadcast then
+  // reaches nobody, so the request waits for the view to ask for it.
+  describe('a request made before the Git view exists', () => {
+    it.each([
+      ['commit', 'commit'],
+      ['create-pr', 'pull-request'],
+    ] as const)('%s leaves a %s request the view collects once', (id, kind) => {
+      const { api, registrations } = buildMockApi()
+      registerQuickActionCommands(api as never)
+      registrations.find((r) => r.command.id === id)!.handler(ctx('/repo'))
+      expect(consumePendingViewRequest()).toEqual({ kind, repoRoot: '/repo' })
+      expect(consumePendingViewRequest()).toBeNull()
+    })
+
+    it('lapses after five seconds, so a view opened later is not surprised', () => {
+      vi.useFakeTimers()
+      const { api, registrations } = buildMockApi()
+      registerQuickActionCommands(api as never)
+      registrations.find((r) => r.command.id === 'commit')!.handler(ctx('/repo'))
+      vi.advanceTimersByTime(5000)
+      expect(consumePendingViewRequest()).toBeNull()
+      vi.useRealTimers()
     })
   })
 })

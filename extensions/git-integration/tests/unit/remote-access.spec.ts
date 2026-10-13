@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest'
-import { mkdtempSync, mkdirSync, rmSync, symlinkSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, rmSync, symlinkSync } from 'node:fs'
 import { join } from 'node:path'
 import { dispatchChannel } from '@terminator/extension-sdk'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 vi.mock('electron-store', () => ({
   default: class {
@@ -83,7 +83,7 @@ interface ScratchDirs {
 function useScratchDirs(): ScratchDirs {
   const dirs = {} as ScratchDirs
   beforeAll(() => {
-    dirs.scratch = mkdtempSync(join(tmpdir(), 'gi-roots-'))
+    dirs.scratch = makeTempDir('gi-roots-')
     dirs.workspaceFolder = join(dirs.scratch, 'workspace')
     dirs.project = join(dirs.scratch, 'project-worktree')
     dirs.outside = join(dirs.scratch, 'elsewhere')

@@ -15,7 +15,7 @@ import type { AgentState, TerminalSession } from '../../shared/types/index'
 export type GroupKey = 'workspace' | 'none'
 export type SortKey = 'recent' | 'oldest' | 'name' | 'status' | 'manual'
 
-export interface SessionFilters {
+interface SessionFilters {
   query?: string
   states?: AgentState[]
   projectIds?: string[]

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import type { PtyManager } from '../../../src/main/terminal/pty-manager'
 
 const mockPty = {
   pid: 12345,
@@ -24,7 +25,7 @@ vi.mock('electron', () => ({
 
 const fsMock = vi.hoisted(() => ({
   // Every cwd is a real directory unless a test says otherwise.
-  statSync: vi.fn(() => ({ isDirectory: () => true })),
+  statSync: vi.fn((): { isDirectory: () => boolean } => ({ isDirectory: () => true })),
 }))
 
 vi.mock('fs', () => ({
@@ -520,7 +521,7 @@ describe('holding output until something is on screen to show it', () => {
     }
   }
 
-  const spawn = (mgr: { spawnSession: (o: unknown) => unknown }, holdOutput: boolean) =>
+  const spawn = (mgr: PtyManager, holdOutput: boolean) =>
     mgr.spawnSession({
       sessionId: 's1',
       cwd: '/repo',
@@ -624,7 +625,7 @@ describe('a process that dies before anything is on screen', () => {
     }
   }
 
-  const spawnHeld = (mgr: { spawnSession: (o: unknown) => unknown }) =>
+  const spawnHeld = (mgr: PtyManager) =>
     mgr.spawnSession({
       sessionId: 'dead',
       cwd: '/repo',

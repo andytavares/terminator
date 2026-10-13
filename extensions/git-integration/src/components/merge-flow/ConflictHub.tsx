@@ -3,7 +3,7 @@ import { ArrowRight, Check, Info, RotateCcw, X } from 'lucide-react'
 import { Button, IconButton } from '@terminator/extension-ui'
 import { useMergeFlowStore } from '../../stores/merge-flow.store'
 import type { ConflictFile, ConflictSession } from '../../schemas/merge-flow.schema'
-import { choose, plural } from '../text'
+import { choose, plural, splitPath } from '../text'
 
 interface Props {
   onSelectFile: (fileIndex: number) => void
@@ -57,12 +57,6 @@ function getDotColor(file: ConflictFile): string {
   return '#6b7280'
 }
 
-function formatFilePath(filePath: string): { dir: string; name: string } {
-  const idx = filePath.lastIndexOf('/')
-  if (idx === -1) return { dir: '', name: filePath }
-  return { dir: filePath.slice(0, idx + 1), name: filePath.slice(idx + 1) }
-}
-
 interface FileCardProps {
   file: ConflictFile
   index: number
@@ -114,7 +108,7 @@ function CountTag({ file, isResolved }: { file: ConflictFile; isResolved: boolea
 
 function FileInfo({ card }: { card: FileCardProps }) {
   const { file } = card
-  const { dir, name } = formatFilePath(file.filePath)
+  const { dir, name } = splitPath(file.filePath)
   const ours = authorLabel(file.oursAuthor.name, card.oursBranch)
   const theirs = authorLabel(file.theirsAuthor.name, card.theirsBranch)
   return (

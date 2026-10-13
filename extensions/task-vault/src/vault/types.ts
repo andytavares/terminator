@@ -58,34 +58,6 @@ export interface DailyLog {
   exists: boolean
 }
 
-export interface InboxItem extends Task {
-  capturedAt?: string
-  source?: 'quick-capture' | 'mcp' | 'manual'
-}
-
-export interface Project {
-  filePath: string
-  name: string
-  status: ProjectStatus
-  deadline?: string
-  area?: string
-  created: string
-  outcome?: string
-  nextActions: Task[]
-  allTasks: Task[]
-  isStale: boolean
-  lastModified: Date
-  terminatorLinks: string[]
-}
-
-export interface Area {
-  filePath: string
-  name: string
-  area: string
-  tasks: Task[]
-  terminatorLinks: string[]
-}
-
 export interface IndexedTask {
   id: string
   filePath: string
@@ -123,14 +95,4 @@ export interface IndexedProject {
   nextActionCount: number
   lastModified: string
   terminatorLinks: string[]
-}
-
-export interface CalendarEvent {
-  uid: string
-  summary: string
-  startDate: Date
-  endDate: Date
-  allDay: boolean
-  location?: string
-  description?: string
 }

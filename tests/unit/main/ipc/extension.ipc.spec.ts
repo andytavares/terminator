@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 
 type Handler = (event: unknown, payload: unknown) => unknown
 
@@ -23,19 +23,20 @@ vi.mock('../../../../src/main/extensions/api.js', () => ({
 
 import { registerExtensionHandlers } from '../../../../src/main/ipc/extension.ipc'
 import type { ExtensionHost } from '../../../../src/main/extensions/extension-host'
+import { partialFake } from '../../../support/fakes'
 
 function makeExtensionHost(overrides: Partial<ExtensionHost> = {}): ExtensionHost {
-  return {
+  return partialFake<ExtensionHost>({
     listExtensions: vi.fn(() => []),
     load: vi.fn(),
     toggle: vi.fn(),
     uninstall: vi.fn(),
     reload: vi.fn(),
     ...overrides,
-  } as unknown as ExtensionHost
+  })
 }
 
-let broadcast: ReturnType<typeof vi.fn>
+let broadcast: Mock<(channel: string, data: unknown) => void>
 const noViewHost = () => null
 
 beforeEach(() => {

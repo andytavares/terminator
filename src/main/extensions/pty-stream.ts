@@ -29,7 +29,7 @@ export class BatchedPtyStream {
     }
   }
 
-  onExit(sessionId: string, listener: (exitCode: number) => void): () => void {
+  onExit(sessionId: string, listener: (exitCode: number | null) => void): () => void {
     const dispose = this.source.onExit(sessionId, (exitCode) => {
       this.flush(sessionId)
       listener(exitCode)

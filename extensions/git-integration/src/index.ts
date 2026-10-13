@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { defineChannel } from '@terminator/extension-sdk'
+import { defineChannel, noPayload } from '@terminator/extension-sdk'
 import type {
   ChannelSpec,
   ExtensionAPI,
@@ -8,13 +8,14 @@ import type {
 } from '@terminator/extension-sdk'
 import { registerGitExtensionHandlers } from './ipc/git.ipc.js'
 import { bindWorkspaceRoots } from './ipc/repo-root.js'
+import { projectForCheckout } from './review/terminal-project.js'
 import { VALIDATION_ERROR, type RegisterFn } from './ipc/register.js'
 import { registerGithubHandlers, type GithubHandlerOptions } from './ipc/github.ipc.js'
 import { registerReviewAgentHandlers, type OpenTerminalInput } from './ipc/review-agent.ipc.js'
-import { registerQuickActionCommands } from './commands.js'
+import { consumePendingViewRequest, registerQuickActionCommands } from './commands.js'
 import { remoteAccessFor } from './remote-access.js'
 import { bindShell } from './shell/run-git.js'
-import { setStoreDirectory } from './storage-directory.js'
+import { openStorageDirectory } from './storage-directory.js'
 import {
   openPrReviewWindow,
   registerReviewPullRequestCommand,
@@ -51,6 +52,7 @@ const NOTIFICATION_KEYS: { key: string; label: string }[] = [
   { key: 'pushFailed', label: 'Push failed' },
   { key: 'pullSucceeded', label: 'Pull succeeded' },
   { key: 'pullFailed', label: 'Pull failed' },
+  { key: 'prCreated', label: 'Pull request opened' },
 ]
 
 function buildNotificationSettingProperties(): Record<string, SettingDefinition> {
@@ -153,17 +155,9 @@ function bindRoots(api: ExtensionAPI, projectRoots: () => string[]): void {
   ])
 }
 
-function findProjectId(api: ExtensionAPI, repoRoot: string): string | undefined {
-  for (const ws of api.workspace.list()) {
-    const match = api.workspace.listProjects(ws.id).find((p) => p.worktreePath === repoRoot)
-    if (match) return match.id
-  }
-  return undefined
-}
-
 /** Opens an agent terminal in the project the repo belongs to and types the command into it. */
 async function openAgentTerminal(api: ExtensionAPI, input: OpenTerminalInput): Promise<void> {
-  const projectId = findProjectId(api, input.repoRoot)
+  const projectId = projectForCheckout(api.workspace, input.repoRoot)
   if (!projectId) return
   const sessionId = await api.pty.openTerminal({
     projectId,
@@ -174,17 +168,23 @@ async function openAgentTerminal(api: ExtensionAPI, input: OpenTerminalInput): P
   if (sessionId) api.pty.write(sessionId, `${input.command}\r`)
 }
 
-function registerGithub(api: ExtensionAPI, registerFn: RegisterFn, projectRoots: () => string[]) {
+/** The workspace's project roots, and the extension's own folder, where a gh call that needs no checkout runs. */
+interface ChannelRoots {
+  projectRoots: () => string[]
+  storage: string
+}
+
+function registerGithub(api: ExtensionAPI, registerFn: RegisterFn, roots: ChannelRoots) {
   const access = {
     github: api.github,
     getToken: () => api.settings.get<string>(`${SETTING}.git.githubToken`) ?? '',
-    noCheckoutCwd: api.paths.userData,
+    noCheckoutCwd: roots.storage,
   }
   const options: GithubHandlerOptions = {
     // Optional: an older host has no issues namespace, and the review view
     // then renders references exactly as it does today.
     issues: api.issues,
-    listProjectRoots: projectRoots,
+    listProjectRoots: roots.projectRoots,
     getReviewRepos: () => api.settings.get<string[]>(`${SETTING}.review.repos`) ?? [],
     // Settings → Git → Branch Exclude Patterns, matched by the core.
     isBranchExcluded: (branch, repoPath) => api.settings.isBranchExcluded(branch, repoPath),
@@ -193,12 +193,13 @@ function registerGithub(api: ExtensionAPI, registerFn: RegisterFn, projectRoots:
 }
 
 /** Every channel this extension answers, each with its remote-access rule. */
-function registerChannels(api: ExtensionAPI, projectRoots: () => string[]): void {
+function registerChannels(api: ExtensionAPI, roots: ChannelRoots): void {
   const registerFn = (spec: ChannelSpec) => {
     disposables.push(api.ipc.registerHandler(spec, remoteAccessFor(spec.channel)))
   }
   registerGitExtensionHandlers(registerFn)
-  registerGithub(api, registerFn, projectRoots)
+  registerFn(pendingRequestChannel())
+  registerGithub(api, registerFn, roots)
   // Read-only review agent: headless `claude -p` in a detached PR-head worktree.
   registerReviewAgentHandlers(registerFn, {
     getSetting: (key) => api.settings.get(key),
@@ -223,6 +224,16 @@ function notifyChannel(api: ExtensionAPI): ChannelSpec {
   })
 }
 
+/** Hands the Git view the Commit… or Create PR… request a command left before the view existed. */
+function pendingRequestChannel(): ChannelSpec {
+  return defineChannel({
+    channel: 'git:ui.consume-pending-request',
+    schema: noPayload,
+    invalid: VALIDATION_ERROR,
+    run: () => ({ request: consumePendingViewRequest() }),
+  })
+}
+
 function openReviewWindowChannel(api: ExtensionAPI): ChannelSpec {
   return defineChannel({
     channel: 'window:open-pr-review',
@@ -235,7 +246,7 @@ function openReviewWindowChannel(api: ExtensionAPI): ChannelSpec {
   })
 }
 
-/** Commands, settings, the view menu item and the two window channels. */
+/** Commands, the view menu item and the two window channels. */
 function contributions(api: ExtensionAPI): Disposable[] {
   return [
     ...registerQuickActionCommands(api),
@@ -243,7 +254,6 @@ function contributions(api: ExtensionAPI): Disposable[] {
     registerReviewSubmittedRelay(api),
     ...registerReviewSettings(api),
     api.ipc.registerHandler(notifyChannel(api)),
-    api.settings.register({ label: 'Git Integration', properties: SETTINGS }),
     api.nativeMenu.addViewMenuItem({
       id: 'open-pr-review',
       label: 'Code Reviews in New Window',
@@ -254,13 +264,16 @@ function contributions(api: ExtensionAPI): Disposable[] {
 }
 
 export function activate(api: ExtensionAPI): void {
+  // Registered before the enabled check: switched off, the extension registers
+  // nothing else, and the settings page is the only way back on.
+  disposables.push(api.settings.register({ label: 'Git Integration', properties: SETTINGS }))
   const enabled = api.settings.get<boolean>(`${SETTING}.git.enabled`) ?? true
   if (!enabled) return
   bindShell(api.shell)
-  setStoreDirectory(api.paths.userData)
+  const storage = openStorageDirectory(api)
   const projectRoots = projectRootsOf(api)
   bindRoots(api, projectRoots)
-  registerChannels(api, projectRoots)
+  registerChannels(api, { projectRoots, storage })
   disposables.push(...contributions(api))
 }
 

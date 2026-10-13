@@ -1,5 +1,5 @@
 import React from 'react'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { QuickActions } from '../../../../src/renderer/components/QuickActions'
 import type { QuickAction, QuickActionGroup } from '../../../../src/renderer/quick-actions/types'
@@ -55,9 +55,9 @@ function makeActions(): QuickAction[] {
   ]
 }
 
-let onRun: ReturnType<typeof vi.fn>
-let onTogglePin: ReturnType<typeof vi.fn>
-let onClose: ReturnType<typeof vi.fn>
+let onRun: Mock<(action: QuickAction) => void>
+let onTogglePin: Mock<(id: string) => void>
+let onClose: Mock<() => void>
 
 beforeEach(() => {
   onRun = vi.fn()
@@ -108,12 +108,11 @@ describe('QuickActions — top level', () => {
   })
 
   it('shows a pin glyph on a pinned row', () => {
-    const { container } = renderPanel()
+    renderPanel()
     const pushRow = screen.getByText('Push').closest('.qa-row')!
     expect(pushRow.querySelector('.qa-pin-indicator')).toBeTruthy()
     const splitRow = screen.getByText('Split right').closest('.qa-row')!
     expect(splitRow.querySelector('.qa-pin-indicator')).toBeNull()
-    expect(container).toBeTruthy()
   })
 
   it('omits the context section when there is no context group', () => {
@@ -229,10 +228,10 @@ describe('QuickActions — search mode', () => {
   it('navigates results with arrow keys', () => {
     renderPanel()
     fireEvent.keyDown(window, { key: '/' })
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'p' } })
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'split' } })
     fireEvent.keyDown(window, { key: 'ArrowDown' })
     fireEvent.keyDown(window, { key: 'Enter' })
-    expect(onRun).toHaveBeenCalled()
+    expect(onRun).toHaveBeenCalledWith(expect.objectContaining({ id: 'terminal.split-down' }))
   })
 })
 

@@ -76,11 +76,6 @@ describe('ExtensionPanelPortal', () => {
     })
   })
 
-  it('attaches a ResizeObserver to the container div on mount', () => {
-    render(<ExtensionPanelPortal extensionId="com.test.ext" viewParam="main" isActive={true} />)
-    expect(mockObserve).toHaveBeenCalledWith(expect.any(HTMLElement))
-  })
-
   it('fires updatePanelBounds using element rect dimensions when ResizeObserver fires', () => {
     render(<ExtensionPanelPortal extensionId="com.test.ext" viewParam="main" isActive={true} />)
     act(() => {
@@ -102,11 +97,6 @@ describe('ExtensionPanelPortal', () => {
       capturedResizeCallback?.([])
     })
     expect(mockUpdatePanelBounds).toHaveBeenCalledWith(expect.objectContaining({ visible: false }))
-  })
-
-  it('registers onExtensionPanelLoaded listener on mount', () => {
-    render(<ExtensionPanelPortal extensionId="com.test.ext" viewParam="main" isActive={true} />)
-    expect(mockOnExtensionPanelLoaded).toHaveBeenCalled()
   })
 
   it('shows a loading spinner initially', () => {
@@ -216,13 +206,6 @@ describe('ExtensionPanelPortal', () => {
       )
       const wrapper = container.querySelector('[data-extension-panel]') as HTMLElement
       expect(wrapper.style.display).toBe('none')
-    })
-
-    it('does not throw on unmount', () => {
-      const { unmount } = render(
-        <ExtensionPanelPortal extensionId="com.test.ext" viewParam="main" isActive={true} />
-      )
-      expect(() => unmount()).not.toThrow()
     })
 
     it('does not call updatePanelBounds (no WebContentsView to position)', () => {

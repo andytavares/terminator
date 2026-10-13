@@ -475,6 +475,19 @@ describe('ReviewDashboard — does not show Clone and review when no clone folde
   })
 })
 
+describe('ReviewDashboard — says "1 repository" for a selection of one', () => {
+  it('says "1 repository" for a selection of one', async () => {
+    mockInvoke(
+      { prs: [pr210], login: 'andytavares', fetchedAt: new Date().toISOString() },
+      { repos: ['acme/api'] }
+    )
+    render(<ReviewDashboard />)
+    expect(
+      await screen.findByRole('button', { name: '1 repository, choose repositories' })
+    ).toBeTruthy()
+  })
+})
+
 describe('ReviewDashboard — labels the scope button All repositories when nothing is selected', () => {
   it('labels the scope button All repositories when nothing is selected', async () => {
     mockInvoke({ prs: [pr210], login: 'andytavares', fetchedAt: new Date().toISOString() })

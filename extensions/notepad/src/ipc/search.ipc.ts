@@ -83,63 +83,54 @@ function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
+/** The notes query for the tag filters and the archive switch; the text is matched after. */
+function buildTagQuery(
+  includeTags: string[],
+  excludeTags: string[],
+  includeArchived: boolean
+): { sql: string; params: unknown[] } {
+  const joins = [
+    `LEFT JOIN note_tags nt_all ON nt_all.note_id = n.id`,
+    `LEFT JOIN tags t_all ON t_all.id = nt_all.tag_id`,
+  ]
+  includeTags.forEach((_, i) =>
+    joins.push(
+      `JOIN note_tags nt_inc${i} ON nt_inc${i}.note_id = n.id`,
+      `JOIN tags t_inc${i} ON t_inc${i}.id = nt_inc${i}.tag_id AND LOWER(t_inc${i}.name) = ?`
+    )
+  )
+  const excluded = `NOT EXISTS (SELECT 1 FROM note_tags nx JOIN tags tx ON nx.tag_id = tx.id WHERE nx.note_id = n.id AND LOWER(tx.name) = ?)`
+  const conditions = [
+    ...(includeArchived ? [] : ['n.archived_at IS NULL']),
+    ...excludeTags.map(() => excluded),
+  ]
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
+  const sql = `SELECT n.id, n.title, n.body, n.updated_at, n.archived_at,
+            GROUP_CONCAT(t_all.name, ',') AS tags
+     FROM notes n
+     ${joins.join('\n           ')}
+     ${where}
+     GROUP BY n.id, n.title, n.body, n.updated_at, n.archived_at
+     ORDER BY n.updated_at DESC`
+  return { sql, params: [...includeTags, ...excludeTags] }
+}
+
+// SQLite's LIKE and LOWER fold ASCII case only (https://www.sqlite.org/lang_expr.html#like),
+// so the text is matched here, where toLowerCase folds every script, and % or _ mean themselves.
+function containsText(row: SearchRow, textQuery: string): boolean {
+  const wanted = textQuery.toLowerCase()
+  return row.title.toLowerCase().includes(wanted) || row.body.toLowerCase().includes(wanted)
+}
+
 export async function searchNotes(
   db: ExtensionDB,
   args: z.infer<typeof searchSchema>
 ): Promise<{ data: SearchResult[] } | { error: string }> {
-  const { query, includeArchived = false } = args
-  const { textQuery, includeTags, excludeTags } = parseTagFilters(query)
-
-  const joinParams: unknown[] = []
-  const whereParams: unknown[] = []
-  const whereConditions: string[] = []
-
-  const joinClauses: string[] = [
-    `LEFT JOIN note_tags nt_all ON nt_all.note_id = n.id`,
-    `LEFT JOIN tags t_all ON t_all.id = nt_all.tag_id`,
-  ]
-
-  if (!includeArchived) {
-    whereConditions.push('n.archived_at IS NULL')
-  }
-
-  if (textQuery) {
-    // LIKE replaces FTS5 and is case-insensitive for ASCII only (ADR-019, ADR-099); full scan on large sets.
-    whereConditions.push(`(n.title LIKE ? OR n.body LIKE ?)`)
-    whereParams.push(`%${textQuery}%`, `%${textQuery}%`)
-  }
-
-  for (let i = 0; i < includeTags.length; i++) {
-    const na = `nt_inc${i}`
-    const ta = `t_inc${i}`
-    joinClauses.push(
-      `JOIN note_tags ${na} ON ${na}.note_id = n.id`,
-      `JOIN tags ${ta} ON ${ta}.id = ${na}.tag_id AND LOWER(${ta}.name) = ?`
-    )
-    joinParams.push(includeTags[i])
-  }
-
-  for (const tag of excludeTags) {
-    whereConditions.push(
-      `NOT EXISTS (SELECT 1 FROM note_tags nx JOIN tags tx ON nx.tag_id = tx.id WHERE nx.note_id = n.id AND LOWER(tx.name) = ?)`
-    )
-    whereParams.push(tag)
-  }
-
-  const joinSql = joinClauses.join('\n           ')
-  const whereSql = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : ''
-
-  const rows = await db.query<SearchRow>(
-    `SELECT n.id, n.title, n.body, n.updated_at, n.archived_at,
-            GROUP_CONCAT(t_all.name, ',') AS tags
-     FROM notes n
-     ${joinSql}
-     ${whereSql}
-     GROUP BY n.id, n.title, n.body, n.updated_at, n.archived_at
-     ORDER BY n.updated_at DESC`,
-    [...joinParams, ...whereParams]
+  const { textQuery, includeTags, excludeTags } = parseTagFilters(args.query)
+  const { sql, params } = buildTagQuery(includeTags, excludeTags, args.includeArchived ?? false)
+  const rows = (await db.query<SearchRow>(sql, params)).filter(
+    (row) => !textQuery || containsText(row, textQuery)
   )
-
   const data: SearchResult[] = rows.map((r) => ({
     id: r.id,
     title: r.title,
@@ -148,7 +139,6 @@ export async function searchNotes(
     updatedAt: r.updated_at,
     archivedAt: r.archived_at,
   }))
-
   return { data }
 }
 

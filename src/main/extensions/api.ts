@@ -11,6 +11,7 @@ import type {
   IssueListResult,
   NativeMenuItemContribution,
   NewIssueInput,
+  OpenTerminalTabInput,
   ProjectSnapshot,
   RegisterHandlerOptions,
   SessionSnapshot,
@@ -19,6 +20,7 @@ import type {
   TrackerConnection,
   TrackerId,
   TrackerStateOption,
+  TerminalExit,
   TrackerTeam,
   TransitionIntent,
   WorkspaceSnapshot,
@@ -31,7 +33,7 @@ import { branchExcludePatternsFor } from '../git/branch-exclude-settings.js'
 /** Outcome of running a command by id: `reason` is 'not-registered' or 'invalid-args: …'. */
 export type CommandRunResult = { ok: true } | { ok: false; reason: string }
 
-export interface BridgeDeps {
+interface BridgeDeps {
   invokeRegistry: Map<string, import('../remote/ipc-registry.js').IpcRegistryEntry>
   sendRegistry: Map<string, (event: never, payload: unknown) => void>
   eventBus: import('events').EventEmitter
@@ -50,6 +52,7 @@ import {
   type ShellExecInput,
 } from '../shell/shell-executor.js'
 import { extensionShellRoots } from './shell-roots.js'
+import { extensionPaths, type AppPaths } from './extension-paths.js'
 import { createGithubApi } from '../github/github-api.js'
 import {
   notificationManager,
@@ -293,8 +296,8 @@ export interface ExtensionAPIDeps {
   focusExtensionView?: (extensionId: string, viewParam: string) => void
   bridge?: BridgeDeps
   db?: ExtensionDB
-  /** `api.paths`: the application's directory and the per-user data directory. */
-  paths?: ExtensionAPI['paths']
+  /** The directories `api.paths` is built from for each extension. */
+  paths?: AppPaths
   /** The manifest's `contributes.shellRoots`: settings naming directories git and gh may run in. */
   shellRootSettings?: readonly string[]
 }
@@ -308,6 +311,54 @@ function ptyStreamOf(ptyManager: PtyManager): BatchedPtyStream {
   const stream = new BatchedPtyStream(ptyManager)
   ptyStreams.set(ptyManager, stream)
   return stream
+}
+
+/** A tab's terminal: the program it runs, and that program's arguments if it is not a shell. */
+type TabInput = Omit<OpenTerminalTabInput, 'shell'> & { shell: string; args?: string[] }
+
+/**
+ * Spawns a terminal and puts it on screen as an ordinary tab. Null, spawning
+ * nothing, when there is no window to show it in.
+ */
+function openTab(
+  ptyManager: PtyManager,
+  deps: ExtensionAPIDeps | undefined,
+  input: TabInput
+): string | null {
+  if (!deps?.broadcastToWindows || !deps.terminalRelay) return null
+  const sessionId = randomUUID()
+  ptyManager.spawnSession({
+    sessionId,
+    cwd: input.cwd,
+    shell: input.shell,
+    args: input.args,
+    type: input.type ?? 'agent',
+    origin: 'app',
+    projectId: input.projectId,
+    tabTitle: input.tabTitle,
+    // The tab does not exist yet: the renderer has to be told, adopt it,
+    // render, and mount an xterm before anything is listening.
+    holdOutput: true,
+  })
+  deps.terminalRelay.start(sessionId)
+  deps.broadcastToWindows('terminal:adopt', {
+    sessionId,
+    projectId: input.projectId,
+    tabTitle: input.tabTitle,
+    scrollbackLimit: input.scrollbackLimit ?? getGlobalSettings().terminal.scrollbackLimit,
+  })
+  return sessionId
+}
+
+/**
+ * How the session's process ends. Subscribed in the tick that spawned it, so a
+ * process that exits at once is not missed, as one subscribed across the
+ * extension host's port could be.
+ */
+function exitOf(ptyManager: PtyManager, sessionId: string): Promise<TerminalExit> {
+  return new Promise((resolve) => {
+    ptyManager.onExit(sessionId, (exitCode) => resolve({ sessionId, exitCode }))
+  })
 }
 
 function focusedOrFirstWindow(): BrowserWindow | undefined {
@@ -355,11 +406,11 @@ export function createExtensionAPI(
     return deps.ptyManager
   }
 
-  const paths = deps?.paths ?? { app: '', userData: '' }
+  const paths = extensionPaths(deps?.paths ?? { app: '', userData: '' }, extensionId)
   // Every git and gh this extension runs, through shell or github, starts inside a root (ADR 102).
   const execInScope = async (input: ShellExecInput) => {
     const roots = extensionShellRoots({
-      userData: paths.userData,
+      globalStorage: paths.globalStorage,
       declaredKeys: deps?.shellRootSettings ?? [],
       schema: globalRegistry.settingsSections.get(`${extensionId}.settings`),
       readSetting: (key) => api.settings.get(key),
@@ -392,7 +443,13 @@ export function createExtensionAPI(
       register(schema: ExtensionSettingsSchema): Disposable {
         const key = `${extensionId}.settings`
         globalRegistry.settingsSections.set(key, schema)
-        return disposable(() => globalRegistry.settingsSections.delete(key))
+        // Settings → Extensions re-reads on this, as Quick Actions does on
+        // commands-changed: a page registered after the panel opened shows.
+        deps?.broadcastToWindows?.('extension:list-changed', null)
+        return disposable(() => {
+          globalRegistry.settingsSections.delete(key)
+          deps?.broadcastToWindows?.('extension:list-changed', null)
+        })
       },
       get<T>(key: string): T | undefined {
         const stored = getExtensionSetting(key)
@@ -646,32 +703,13 @@ export function createExtensionAPI(
         return requirePty().spawnSession(opts)
       },
       async openTerminal(input): Promise<string | null> {
+        const shell = input.shell ?? getGlobalSettings().terminal.defaultShell
+        return openTab(requirePty(), deps, { ...input, shell })
+      },
+      async runInTerminal(input): Promise<TerminalExit | null> {
         const ptyManager = requirePty()
-        if (!deps?.broadcastToWindows || !deps.terminalRelay) return null
-
-        const sessionId = randomUUID()
-        ptyManager.spawnSession({
-          sessionId,
-          cwd: input.cwd,
-          shell: input.shell ?? getGlobalSettings().terminal.defaultShell,
-          type: input.type ?? 'agent',
-          origin: 'app',
-          projectId: input.projectId,
-          tabTitle: input.tabTitle,
-          // The tab does not exist yet: the renderer has to be told, adopt it,
-          // render, and mount an xterm before anything is listening.
-          holdOutput: true,
-        })
-
-        deps.terminalRelay.start(sessionId)
-
-        deps.broadcastToWindows('terminal:adopt', {
-          sessionId,
-          projectId: input.projectId,
-          tabTitle: input.tabTitle,
-          scrollbackLimit: input.scrollbackLimit ?? getGlobalSettings().terminal.scrollbackLimit,
-        })
-        return sessionId
+        const sessionId = openTab(ptyManager, deps, { ...input, shell: input.file })
+        return sessionId === null ? null : exitOf(ptyManager, sessionId)
       },
       closeTerminalTab(sessionId): void {
         // The renderer owns the tab list; its close also ends the process

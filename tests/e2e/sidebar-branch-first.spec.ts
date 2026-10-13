@@ -1,9 +1,8 @@
 import { test, expect } from '@playwright/test'
 import { execSync } from 'node:child_process'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { AppHandle, launchApp, closeApp, createWorkspace } from './helpers'
+import { AppHandle, launchApp, closeApp, createWorkspace, e2eTempDir } from './helpers'
 
 // End-to-end cover for the branch-first sidebar. Everything here is asserted
 // against the real app with a real git repository, because every defect this
@@ -13,7 +12,7 @@ let handle: AppHandle
 let repo: string
 
 test.beforeAll(async () => {
-  repo = mkdtempSync(join(tmpdir(), 'branch-first-'))
+  repo = e2eTempDir('branch-first-')
   const run = (c: string): void => {
     execSync(c, { cwd: repo, stdio: 'ignore' })
   }

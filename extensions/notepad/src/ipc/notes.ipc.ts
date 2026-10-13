@@ -2,17 +2,15 @@ import { z } from 'zod'
 import { randomUUID } from '../db/db'
 import { noPayload, type ExtensionDB, type ExtensionAPI } from '@terminator/extension-sdk'
 import { createIpcRegistrar, IdPayload } from './register'
+import { rowToNote, type NoteRow } from '../db/mappers'
+import { noteTitle } from '../db/note-title'
 
-function deriveTitle(body: string): string {
-  const headingMatch = /^#{1,6}\s+(.+)/m.exec(body)
-  if (headingMatch) return headingMatch[1].trim()
-  const firstLine = body.split('\n').find((l) => l.trim().length > 0)
-  if (firstLine) return firstLine.trim().slice(0, 120)
-  return 'Untitled note'
-}
-
-// Upsert tags and reconcile note_tags; safe to call within an open transaction.
-async function reconcileTags(db: ExtensionDB, noteId: string, tagNames: string[]): Promise<void> {
+/** Upserts the tags and makes them the note's whole tag set; safe within an open transaction. */
+export async function reconcileTags(
+  db: ExtensionDB,
+  noteId: string,
+  tagNames: string[]
+): Promise<void> {
   const normalized = tagNames.map((t) => t.toLowerCase().trim()).filter(Boolean)
 
   const tagIds: string[] = []
@@ -51,7 +49,7 @@ export async function createNote(
   args: z.infer<typeof CreateNotePayload>
 ): Promise<Record<string, unknown>> {
   const body = args.body ?? ''
-  const title = args.title?.trim() || deriveTitle(body)
+  const title = args.title?.trim() || noteTitle(body)
   const id = randomUUID()
   const now = new Date().toISOString()
 
@@ -134,15 +132,7 @@ export async function getNote(
   db: ExtensionDB,
   args: z.infer<typeof IdPayload>
 ): Promise<Record<string, unknown>> {
-  const row = await db.get<{
-    id: string
-    title: string
-    body: string
-    created_at: string
-    updated_at: string
-    archived_at: string | null
-    tags: string
-  }>(
+  const row = await db.get<NoteRow>(
     `SELECT n.id, n.title, n.body, n.created_at, n.updated_at, n.archived_at,
             COALESCE((
               SELECT GROUP_CONCAT(t.name, ',')
@@ -155,17 +145,7 @@ export async function getNote(
 
   if (!row) return { error: 'NOTE_NOT_FOUND' }
 
-  return {
-    data: {
-      id: row.id,
-      title: row.title,
-      body: row.body,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
-      archivedAt: row.archived_at,
-      tags: row.tags ? row.tags.split(',').filter(Boolean) : [],
-    },
-  }
+  return { data: rowToNote(row) }
 }
 
 const AutosaveNotePayload = z.object({
@@ -176,49 +156,79 @@ const AutosaveNotePayload = z.object({
   // Identifies the renderer that saved, so it can ignore the echo of its own
   // write instead of stomping on newer keystrokes.
   originId: z.string().optional(),
+  // True when the user typed the title; from then on it is no longer derived from the body.
+  titleSetByHand: z.boolean().optional(),
 })
 
 /** Push channel announcing a saved note body to every open notepad surface. */
 export const NOTES_CHANGED_CHANNEL = 'terminator.notepad:notes.changed'
+
+/**
+ * The title to store: one set by hand now or before wins over the one the
+ * renderer derived from the body.
+ */
+async function titleToStore(
+  tx: ExtensionDB,
+  args: z.infer<typeof AutosaveNotePayload>
+): Promise<string> {
+  if (args.titleSetByHand) {
+    await tx.run('UPDATE notes SET title_set_by_hand=1 WHERE id=?', [args.id])
+    return args.title
+  }
+  const row = await tx.get<{ title: string; title_set_by_hand: number }>(
+    'SELECT title, title_set_by_hand FROM notes WHERE id=?',
+    [args.id]
+  )
+  return row?.title_set_by_hand ? row.title : args.title
+}
+
+/** The note's tags with the inline #tags written in its body. */
+function withInlineTags(tags: string[], body: string): string[] {
+  const inlineTags = Array.from(body.matchAll(/#([a-z0-9_-]+)/gi), (m) => m[1])
+  return Array.from(new Set([...tags, ...inlineTags]))
+}
+
+/** Writes the note's title, body and tags; answers the title and tags it stored. */
+async function saveNote(
+  db: ExtensionDB,
+  args: z.infer<typeof AutosaveNotePayload>,
+  now: string
+): Promise<{ title: string; tags: string[] }> {
+  const tags = withInlineTags(args.tags, args.body)
+  let title = args.title
+  await db.transaction(async (tx) => {
+    title = await titleToStore(tx, args)
+    await tx.run('UPDATE notes SET title=?, body=?, updated_at=? WHERE id=?', [
+      title,
+      args.body,
+      now,
+      args.id,
+    ])
+    await reconcileTags(tx, args.id, tags)
+  })
+  return { title, tags }
+}
 
 export async function autosaveNote(
   db: ExtensionDB,
   args: z.infer<typeof AutosaveNotePayload>,
   broadcast?: (channel: string, data: unknown) => void
 ): Promise<Record<string, unknown>> {
-  const { id, title, body, tags, originId } = args
+  const { id, body, originId } = args
   const now = new Date().toISOString()
 
   const existing = await db.get<{ id: string }>('SELECT id FROM notes WHERE id=?', [id])
   if (!existing) return { error: 'NOTE_NOT_FOUND' }
 
-  // Parse inline #tags from body and merge with explicit tags array
-  const inlineTags = Array.from(body.matchAll(/#([a-z0-9_-]+)/gi), (m) => m[1])
-  const mergedTags = Array.from(new Set([...tags, ...inlineTags]))
-
-  await db.transaction(async (tx) => {
-    await tx.run('UPDATE notes SET title=?, body=?, updated_at=? WHERE id=?', [
-      title,
-      body,
-      now,
-      id,
-    ])
-    await reconcileTags(tx, id, mergedTags)
-  })
+  const { title, tags: mergedTags } = await saveNote(db, args, now)
 
   // The docked panel and a popped-out note window are separate renderers with
   // separate in-memory body caches. Without this push each keeps serving (and
   // re-saving) its own stale copy, so the same note shows different content.
-  broadcast?.(NOTES_CHANGED_CHANNEL, {
-    id,
-    title,
-    body,
-    tags: mergedTags,
-    updatedAt: now,
-    originId: originId ?? null,
-  })
+  const changed = { id, title, body, tags: mergedTags, updatedAt: now, originId: originId ?? null }
+  broadcast?.(NOTES_CHANGED_CHANNEL, changed)
 
-  return { data: { updatedAt: now } }
+  return { data: { updatedAt: now, title } }
 }
 
 export async function archiveNote(

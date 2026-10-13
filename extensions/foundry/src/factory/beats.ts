@@ -15,7 +15,7 @@ import { VERDICT_MS, WALK_PX_PER_S } from './sim.js'
 // release the same beats, live or in a replay.
 
 /** How long a crate takes to ride a two-tile belt (34px/s over 32px, `sim.ts`). */
-export const CRATE_RIDE_MS = 940
+const CRATE_RIDE_MS = 940
 
 /** What an upstream step's last animation needs before the step it feeds may begin its own. */
 export const MIN_DWELL_MS = CRATE_RIDE_MS + VERDICT_MS

@@ -9,7 +9,7 @@ import * as path from 'node:path'
 // a read-modify-write — and it is what makes the curator's citations mean
 // something later, since the entry it cites cannot have changed underneath it.
 
-export interface LedgerEvidence {
+interface LedgerEvidence {
   readonly kind: string
   readonly path?: string
   readonly excerpt?: string
@@ -27,7 +27,7 @@ export interface LedgerEntry {
   readonly evidence: readonly LedgerEvidence[]
 }
 
-export class UnattributedEntryError extends Error {
+class UnattributedEntryError extends Error {
   readonly code = 'UNATTRIBUTED_LEDGER_ENTRY'
   constructor(missing: 'actor' | 'action') {
     super(

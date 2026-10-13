@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import * as path from 'node:path'
 import {
   resolveFile,
@@ -15,6 +14,7 @@ import type { ResolveSources } from '../../src/recipe/resolve.js'
 import { checkRequirements } from '../../src/recipe/requirements.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 // Three rungs, most specific first. The middle one — a definition carried by
 // the repository being worked on — is what lets a team ship a house recipe
@@ -38,9 +38,9 @@ function recipe(id: string, extra = ''): string {
 }
 
 beforeEach(() => {
-  dataRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-data-'))
-  repo = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-repo-'))
-  builtIn = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-built-'))
+  dataRoot = makeTempDir('fdry-data-')
+  repo = makeTempDir('fdry-repo-')
+  builtIn = makeTempDir('fdry-built-')
 })
 
 afterEach(() => {

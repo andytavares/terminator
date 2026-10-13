@@ -46,7 +46,7 @@ const DecidePayload = z.object({
 const RemovePayload = z.object({ ruleId: z.string(), reason: z.string().optional() })
 
 /** A check the operator accepted, as the surface that can remove it needs it. */
-export interface AcceptedRule {
+interface AcceptedRule {
   readonly id: string
   readonly asserts: string
   readonly rung: string

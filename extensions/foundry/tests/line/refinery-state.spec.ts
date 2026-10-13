@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import * as path from 'node:path'
 import {
   readRefineryState,
@@ -10,11 +9,12 @@ import {
 } from '../../src/line/refinery-state.js'
 import { raiseGate } from '../../src/gates/rules.js'
 import type { Gate } from '../../src/gates/rules.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 let root: string
 
 beforeEach(() => {
-  root = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-refinery-state-'))
+  root = makeTempDir('fdry-refinery-state-')
 })
 
 afterEach(() => {

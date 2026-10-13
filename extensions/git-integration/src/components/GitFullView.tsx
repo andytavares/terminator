@@ -9,6 +9,7 @@ import { useResizePanel } from '../hooks/useResizePanel'
 import { StagingArea } from './StagingArea'
 import { FileDiffView } from './FileDiffView'
 import { PrDialog } from './PrDialog'
+import { PrCreatedNotice } from './PrCreatedNotice'
 import type { FileDiff, PullRequest } from '../schemas/git.schema'
 import { gitAPI, type CommitResult } from '../api/git'
 import { MergeFlowView } from './merge-flow/MergeFlowView'
@@ -47,6 +48,37 @@ function useBridgeTrigger(event: string, repoRoot: string | null, action: () => 
       if (!targetRoot || targetRoot === repoRoot) actionRef.current()
     })
   }, [event, repoRoot])
+}
+
+/** What a Commit… or Create PR… command asked of this view. */
+interface ViewRequest {
+  kind: string
+  repoRoot: string
+}
+
+interface PendingRequestTargets {
+  commitMessageRef: React.RefObject<HTMLTextAreaElement>
+  openPrDialog: () => void
+}
+
+/**
+ * A Commit… or Create PR… run before this view existed broadcast to nobody; the
+ * request waits in the backend for the view to collect it on mount.
+ */
+function usePendingViewRequest(repoRoot: string | null, targets: PendingRequestTargets): void {
+  const { commitMessageRef, openPrDialog } = targets
+  useEffect(() => {
+    if (!repoRoot) return
+    void window.electronAPI.extensionBridge
+      .invoke('git:ui.consume-pending-request', {})
+      .then((result) => {
+        const request = (result as { request?: ViewRequest | null })?.request
+        if (!request || request.repoRoot !== repoRoot) return
+        if (request.kind === 'commit') commitMessageRef.current?.focus()
+        else openPrDialog()
+      })
+      .catch(() => {})
+  }, [repoRoot, commitMessageRef, openPrDialog])
 }
 
 interface DiffRequest {
@@ -285,7 +317,8 @@ function usePrDialog(repoRoot: string | null) {
     setShowPrDialog(false)
     window.dispatchEvent(new CustomEvent('git:pr-created', { detail: { pr } }))
   }, [])
-  return { showPrDialog, setShowPrDialog, existingPr, handleOpenPr, handlePrCreated }
+  const openPrDialog = useCallback(() => setShowPrDialog(true), [])
+  return { showPrDialog, setShowPrDialog, existingPr, handleOpenPr, handlePrCreated, openPrDialog }
 }
 
 type PrDialogState = ReturnType<typeof usePrDialog>
@@ -395,14 +428,14 @@ function CommitButtons({ flow, onOpenPr }: { flow: CommitFlow; onOpenPr: () => v
 
 interface CommitSectionProps {
   repoRoot: string | null
+  commitMessageRef: React.RefObject<HTMLTextAreaElement>
   flow: CommitFlow
   stagedCount: number
   onOpenPr: () => void
 }
 
 function CommitSection(props: CommitSectionProps) {
-  const { flow } = props
-  const commitMessageRef = useRef<HTMLTextAreaElement | null>(null)
+  const { flow, commitMessageRef } = props
   // Quick action "Commit…" (extensions/git-integration/src/commands.ts) brings this
   // view forward via api.window.showSelf, then broadcasts this to focus the box.
   useBridgeTrigger('git:focus-commit-message', props.repoRoot, () =>
@@ -419,6 +452,7 @@ function CommitSection(props: CommitSectionProps) {
         rows={3}
       />
       <CharCount count={flow.commitMessage.length} />
+      <PrCreatedNotice />
       <CommitError flow={flow} />
       <div className="git-view__commit-actions">
         <CommitHint flow={flow} stagedCount={props.stagedCount} />
@@ -430,6 +464,7 @@ function CommitSection(props: CommitSectionProps) {
 
 interface ChangesPaneProps {
   repoRoot: string
+  commitMessageRef: React.RefObject<HTMLTextAreaElement>
   width: number
   flow: CommitFlow
   pr: PrDialogState
@@ -454,6 +489,7 @@ function ChangesPane(props: ChangesPaneProps) {
       </div>
       <CommitSection
         repoRoot={repoRoot}
+        commitMessageRef={props.commitMessageRef}
         flow={flow}
         stagedCount={stagedCount}
         onOpenPr={props.pr.handleOpenPr}
@@ -485,7 +521,9 @@ function useGitFullView(repoRoot: string | null) {
   const { selectedDiff, handleFileSelect } = useFileDiff(repoRoot)
   const flow = useCommitFlow(repoRoot, status?.files.some((f) => f.staged) ?? false)
   const pr = usePrDialog(repoRoot)
-  return { resize, view, setView, selectedDiff, handleFileSelect, flow, pr }
+  const commitMessageRef = useRef<HTMLTextAreaElement>(null)
+  usePendingViewRequest(repoRoot, { commitMessageRef, openPrDialog: pr.openPrDialog })
+  return { resize, view, setView, selectedDiff, handleFileSelect, flow, pr, commitMessageRef }
 }
 
 export function GitFullView({ repoRoot }: Props): JSX.Element {
@@ -504,6 +542,7 @@ export function GitFullView({ repoRoot }: Props): JSX.Element {
       <div className="git-resize-handle" onMouseDown={g.resize.handleMouseDown} />
       <ChangesPane
         repoRoot={repoRoot}
+        commitMessageRef={g.commitMessageRef}
         width={g.resize.size}
         flow={g.flow}
         pr={g.pr}

@@ -7,9 +7,9 @@
  * that what reaches `api.commands.register` carries the group's category and
  * mnemonic rule, and that the static command actually brings Foundry forward.
  */
-import { tmpdir as tmpdirForUserData } from 'node:os'
+import { freshGlobalStorage } from '../helpers/foundry-host.js'
 
-const USER_DATA = tmpdirForUserData()
+const GLOBAL_STORAGE = freshGlobalStorage()
 
 import { describe, it, expect, vi, beforeAll, afterEach } from 'vitest'
 import type { ExtensionAPI, CommandContribution } from '@terminator/extension-sdk'
@@ -126,7 +126,7 @@ beforeAll(async () => {
       createNotification: vi.fn().mockReturnValue({ dispose: vi.fn() }),
     },
     log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
-    paths: { app: '', userData: USER_DATA },
+    paths: { app: '', globalStorage: GLOBAL_STORAGE },
     settings: {
       register: vi.fn().mockReturnValue({ dispose: vi.fn() }),
       get: vi.fn(),

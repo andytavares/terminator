@@ -11,6 +11,7 @@ import type { IssueTitles } from '../../sidebar/session-filter'
 import type { SessionFacts } from '../../sidebar/session-facts'
 import type { IssueSummary } from '../../../shared/types/index'
 import { DESCRIPTION_MAX_LENGTH } from '../../../shared/schemas/session-records.schema'
+import '../screen-chrome.css'
 import './LogbookView.css'
 
 interface Props {

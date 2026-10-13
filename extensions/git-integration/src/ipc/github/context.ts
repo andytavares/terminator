@@ -59,7 +59,7 @@ export const isOverflow = (e: unknown) =>
   exceededMaxBuffer(e) || (e as { exceededMaxBuffer?: boolean } | null)?.exceededMaxBuffer === true
 
 /** Where gh runs for a repoRoot: the checkout, or the no-checkout directory and GH_REPO. */
-export function githubTarget(repoRoot: string, access: GithubAccess): GithubTarget {
+function githubTarget(repoRoot: string, access: GithubAccess): GithubTarget {
   const remote = parseRemoteRepo(repoRoot)
   const token = access.getToken()
   const as = token ? { token } : {}

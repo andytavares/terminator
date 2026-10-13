@@ -1,9 +1,8 @@
 import { test, expect } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
-import { launchApp, closeApp, createWorkspace, type AppHandle } from './helpers'
+import { launchApp, closeApp, createWorkspace, type AppHandle, e2eTempDir } from './helpers'
 
 // Opening the application on a run the last one left in flight.
 //
@@ -280,7 +279,7 @@ async function openFoundry(): Promise<void> {
 
 test.beforeAll(async () => {
   test.setTimeout(180_000)
-  repo = mkdtempSync(join(tmpdir(), 'foundry-resume-repo-'))
+  repo = e2eTempDir('foundry-resume-repo-')
   git('init', '-b', 'main')
   git('config', 'user.email', 'e2e@example.com')
   git('config', 'user.name', 'E2E')

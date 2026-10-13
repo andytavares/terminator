@@ -57,7 +57,7 @@ export interface InboxDeps {
   readonly waiting: () => Promise<readonly WaitingRow[]>
 }
 
-export interface WaitingRow {
+interface WaitingRow {
   readonly orderId: string
   readonly title: string
   readonly headline: string

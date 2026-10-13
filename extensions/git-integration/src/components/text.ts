@@ -9,3 +9,10 @@ export function choose<T>(condition: unknown, yes: T, no: T): T {
   if (condition) return yes
   return no
 }
+
+/** "src/app/" and "main.ts" from "src/app/main.ts". */
+export function splitPath(filePath: string): { dir: string; name: string } {
+  const slash = filePath.lastIndexOf('/')
+  if (slash === -1) return { dir: '', name: filePath }
+  return { dir: filePath.slice(0, slash + 1), name: filePath.slice(slash + 1) }
+}

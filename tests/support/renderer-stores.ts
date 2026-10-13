@@ -1,6 +1,15 @@
 import { vi, type Mock } from 'vitest'
 import type { StoreApi } from 'zustand'
-import type { Project, TerminalSession, Workspace } from '../../src/shared/types/index'
+import type {
+  Issue,
+  IssueSummary,
+  Project,
+  SessionRecordListing,
+  SessionSnapshot,
+  TerminalSession,
+  TrackerConnection,
+  Workspace,
+} from '../../src/shared/types/index'
 
 const CREATED = '2026-01-01T00:00:00.000Z'
 
@@ -42,6 +51,64 @@ export function terminalSessionOf(
     createdAt: CREATED,
     lastActivityAt: 0,
     agentState: 'idle',
+    ...overrides,
+  }
+}
+
+/** A connected Linear tracker, for the integrations store's `connections`. */
+export function trackerConnectionOf(overrides: Partial<TrackerConnection> = {}): TrackerConnection {
+  return {
+    tracker: 'linear',
+    connected: true,
+    account: { name: 'Andrew', email: 'a@b.co' },
+    site: null,
+    mine: { kind: 'assignee', email: null },
+    lastError: null,
+    ...overrides,
+  }
+}
+
+/** A complete issue summary, as `listMine` and `searchIssues` return them. */
+export function issueSummaryOf(overrides: Partial<IssueSummary> = {}): IssueSummary {
+  const key = overrides.key ?? 'TAV-42'
+  return {
+    tracker: 'linear',
+    id: `id-${key}`,
+    key,
+    title: 'Unify Linear connections',
+    url: `https://linear.app/tav/issue/${key}`,
+    state: { name: 'In Progress', type: 'started' },
+    assignee: null,
+    branchName: null,
+    ...overrides,
+  }
+}
+
+/** A complete issue, as the integrations store holds a project's linked one. */
+export function issueOf(overrides: Partial<Issue> = {}): Issue {
+  return {
+    ...issueSummaryOf(overrides),
+    description: '',
+    labels: [],
+    completed: false,
+    updatedAt: CREATED,
+    comments: [],
+    ...overrides,
+  }
+}
+
+/** The record the main process keeps for a session, as the session-records store holds it. */
+export function sessionRecordOf(
+  snapshot: SessionSnapshot,
+  overrides: Partial<SessionRecordListing> = {}
+): SessionRecordListing {
+  return {
+    ...snapshot,
+    description: null,
+    link: null,
+    agent: null,
+    resumable: false,
+    updatedAt: CREATED,
     ...overrides,
   }
 }

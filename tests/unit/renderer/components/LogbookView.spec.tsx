@@ -1,41 +1,20 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, within, waitFor } from '@testing-library/react'
-import type { IssueSummary } from '../../../../src/shared/types/index'
-
-const integrations = vi.hoisted(() => ({
-  connected: true,
-  listMine: vi.fn(),
-  issueFor: vi.fn(),
-}))
-
 vi.mock('../../../../src/renderer/components/session/LivePreview', () => ({
   LivePreview: ({ sessionId }: { sessionId: string }) => (
     <div data-testid={`preview-${sessionId}`} />
   ),
 }))
-vi.mock('../../../../src/renderer/stores/integrations.store', () => ({
-  useIntegrationsStore: (select: (s: unknown) => unknown) =>
-    select({
-      isAnyConnected: () => integrations.connected,
-      listMine: integrations.listMine,
-      issueFor: integrations.issueFor,
-    }),
-}))
-
 import { LogbookView } from '../../../../src/renderer/components/home/LogbookView'
 import { buildLogbook } from '../../../../src/renderer/sidebar/logbook-groups'
 import { fact } from '../sidebar/fixtures/facts'
+import { useIntegrationsStore } from '../../../../src/renderer/stores/integrations.store'
+import { issueOf, issueSummaryOf, trackerConnectionOf } from '../../../support/renderer-stores'
 
 const NOW = Date.parse('2026-09-15T12:00:00.000Z')
 const titles = new Map([['linear:NW-88', 'Rate limit per API key']])
-const issue = (key: string, title: string): IssueSummary =>
-  ({
-    tracker: 'linear',
-    key,
-    title,
-    state: { name: 'In Progress', type: 'started' },
-  }) as IssueSummary
+const listMine = vi.fn()
 
 const undescribed = fact({
   sessionId: 'u',
@@ -68,12 +47,17 @@ let props: React.ComponentProps<typeof LogbookView>
 
 beforeEach(() => {
   vi.clearAllMocks()
-  integrations.connected = true
-  integrations.listMine.mockResolvedValue({
-    issues: [issue('NW-84', '429s under light load')],
+  listMine.mockResolvedValue({
+    issues: [issueSummaryOf({ key: 'NW-84', title: '429s under light load' })],
     failures: [],
   })
-  integrations.issueFor.mockReturnValue(null)
+  // The real getters (isAnyConnected, issueFor) read this state; only the
+  // tracker call is replaced.
+  useIntegrationsStore.setState({
+    ...useIntegrationsStore.getInitialState(),
+    connections: [trackerConnectionOf()],
+    listMine,
+  })
   props = {
     groups: buildLogbook(facts, '', titles),
     selected: null,
@@ -181,7 +165,9 @@ describe('LogbookView — the detail of an open session', () => {
   })
 
   it("offers the branch's own ticket first when the session is linked elsewhere", async () => {
-    integrations.issueFor.mockReturnValue(issue('P-1', 'Project ticket'))
+    useIntegrationsStore.setState({
+      issues: new Map([['p1', issueOf({ key: 'P-1', title: 'Project ticket' })]]),
+    })
     const own = {
       ...undescribed,
       projectId: 'p1',
@@ -195,9 +181,9 @@ describe('LogbookView — the detail of an open session', () => {
   })
 
   it('suggests nothing when no tracker is connected', async () => {
-    integrations.connected = false
+    useIntegrationsStore.setState({ connections: [trackerConnectionOf({ connected: false })] })
     render(<LogbookView {...props} selected={undescribed} />)
-    await waitFor(() => expect(integrations.listMine).not.toHaveBeenCalled())
+    await waitFor(() => expect(listMine).not.toHaveBeenCalled())
     expect(screen.queryByRole('list', { name: 'Suggested work items' })).toBeNull()
   })
 

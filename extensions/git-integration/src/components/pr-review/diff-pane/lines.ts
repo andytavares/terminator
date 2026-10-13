@@ -3,7 +3,7 @@ import type { LineSelection } from '../../../stores/review-ui.store'
 import type { Side } from './types'
 
 /** The line's number on `side`: the old file's on the left, the new file's on the right. */
-export function lineNumberOn(line: DiffLine, side: Side): number | null | undefined {
+function lineNumberOn(line: DiffLine, side: Side): number | null | undefined {
   if (side === 'LEFT') return line.oldLineNumber
   return line.newLineNumber
 }

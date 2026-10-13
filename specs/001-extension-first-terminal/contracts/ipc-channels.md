@@ -1,5 +1,13 @@
 # Contract: Electron IPC Channels
 
+> **Superseded. Kept as history.** This contract records what was decided when the feature was
+> specified, and is not edited. The code no longer has many channels listed here (the `speckit:*` set, `github:file-metrics`, `menu:open-pr-review-window` and others) and extension channels registered by the core. Do not build against it. The
+> current contract lives in:
+>
+> - `src/shared/electron-api/manifest.ts`: every core channel and the renderer's `window.electronAPI`
+> - each extension's own `src/ipc/`: each channel is a `ChannelSpec` whose zod schema is its payload contract ([ADR 096](../../../docs/adr/096-every-ipc-channel-has-a-schema.md))
+> - [ADR 094](../../../docs/adr/094-extensions-follow-the-vs-code-model.md) and [ADR 096](../../../docs/adr/096-every-ipc-channel-has-a-schema.md)
+
 **Version**: 1.0.0  
 **Date**: 2026-05-05  
 **Branch**: `001-extension-first-terminal`

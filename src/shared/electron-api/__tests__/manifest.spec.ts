@@ -153,6 +153,7 @@ describe('remoteAccessibleCoreChannels()', () => {
       'extension:update-panel-bounds',
       'extension:set-bottom-inset',
       'workspace:get-active',
+      'workspace:active-changed',
       'db:health',
       'menu:set-panel-checked',
       'workspace:project-added',

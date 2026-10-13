@@ -63,7 +63,7 @@ export function stubFails(error: StubError): ExecFileStub {
 }
 
 /** shell.exec answered by an execFile stub, which sees the cwd, env and limits it was given. */
-export function execOverStub(stub: ExecFileStub): Exec {
+function execOverStub(stub: ExecFileStub): Exec {
   return ((options: Parameters<Exec>[0] & { input?: string }) =>
     new Promise<ShellExecResult>((resolve) => {
       const { cwd, env, timeoutMs, maxBuffer, input } = options

@@ -1,12 +1,12 @@
 import React from 'react'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { NameTerminalDialog } from '../../../../src/renderer/components/NameTerminalDialog'
 
 describe('NameTerminalDialog', () => {
   const defaultName = 'Terminal 1'
-  let onConfirm: ReturnType<typeof vi.fn>
-  let onCancel: ReturnType<typeof vi.fn>
+  let onConfirm: Mock<(name: string) => void>
+  let onCancel: Mock<() => void>
 
   beforeEach(() => {
     onConfirm = vi.fn()

@@ -2,7 +2,6 @@ import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, cleanup } from '@testing-library/react'
 import { useNotificationStore } from '../../../../src/renderer/stores/notification.store'
-import type { SerializedNotification } from '../../../../src/shared/types/index'
 import type { Notification } from '../../../../src/renderer/stores/notification.store'
 
 const mockTriggerAction = vi.fn().mockResolvedValue({ ok: true })
@@ -23,12 +22,13 @@ import {
   BellButton,
 } from '../../../../src/renderer/components/NotificationPanel'
 
-function makeNotif(overrides: Partial<SerializedNotification> = {}): Notification {
+function makeNotif(overrides: Partial<Notification> = {}): Notification {
   return {
     id: crypto.randomUUID(),
     type: 'info',
     title: 'Test notification',
     timestamp: Date.now(),
+    targets: ['center'],
     read: false,
     ...overrides,
   }
@@ -156,25 +156,20 @@ describe('NotificationPanel', () => {
     expect(screen.queryByText('core')).toBeNull()
   })
 
-  it('renders success type icon class', () => {
-    const n = makeNotif({ type: 'success' })
-    useNotificationStore.setState({ notifications: [n], panelOpen: true, unreadCount: 1 })
+  it('draws each type as its own shape', () => {
+    useNotificationStore.setState({
+      notifications: (['info', 'success', 'warning', 'error'] as const).map((type) =>
+        makeNotif({ id: type, type })
+      ),
+      panelOpen: true,
+      unreadCount: 4,
+    })
     const { container } = render(<NotificationPanel />)
-    expect(container.querySelector('.notif-item__type-icon')).toBeTruthy()
-  })
-
-  it('renders warning type icon', () => {
-    const n = makeNotif({ type: 'warning' })
-    useNotificationStore.setState({ notifications: [n], panelOpen: true, unreadCount: 1 })
-    const { container } = render(<NotificationPanel />)
-    expect(container.querySelector('.notif-item__type-icon')).toBeTruthy()
-  })
-
-  it('renders error type icon', () => {
-    const n = makeNotif({ type: 'error' })
-    useNotificationStore.setState({ notifications: [n], panelOpen: true, unreadCount: 1 })
-    const { container } = render(<NotificationPanel />)
-    expect(container.querySelector('.notif-item__type-icon')).toBeTruthy()
+    const shapes = [...container.querySelectorAll('.notif-item__type-icon')].map((icon) =>
+      icon.getAttribute('class')
+    )
+    expect(shapes).toHaveLength(4)
+    expect(new Set(shapes).size).toBe(4)
   })
 
   it('clicking a notification with onClick calls it and closes panel', () => {
@@ -247,10 +242,14 @@ describe('opening the drawer without blanking what is behind it', () => {
     // WebContentsView while a modal is open. That is right for a centred
     // dialog and wrong for a drawer down one edge: the whole application went
     // black to show a 340px panel.
+    // jsdom lays nothing out; the drawer's right edge is what a browser would measure.
+    const measure = vi
+      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockReturnValue(new DOMRect(0, 0, 339.5, 800))
     useNotificationStore.setState({ notifications: [], panelOpen: true, unreadCount: 0 })
     render(<NotificationPanel />)
-    expect(mockSetLeftInset).toHaveBeenCalled()
-    expect(mockSetLeftInset.mock.calls.at(-1)![0]).toBeGreaterThanOrEqual(0)
+    measure.mockRestore()
+    expect(mockSetLeftInset).toHaveBeenLastCalledWith(340)
   })
 
   it('gives the strip back when it closes', () => {

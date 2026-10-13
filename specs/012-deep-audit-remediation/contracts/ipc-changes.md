@@ -1,5 +1,13 @@
 # IPC Contract Changes: Deep Audit Remediation
 
+> **Superseded. Kept as history.** This contract records what was decided when the feature was
+> specified, and is not edited. The code no longer has the patched `ipcMain.handle(channel, listener, { remoteAccessible })` and `src/renderer/electron.d.ts`. Do not build against it. The
+> current contract lives in:
+>
+> - `src/shared/electron-api/manifest.ts`: every core channel and the renderer's `window.electronAPI`; its `remote` field decides what the remote bridge admits ([ADR 023](../../../docs/adr/023-channel-manifest-and-declared-remote-access.md))
+> - `src/main/remote/remote-accessible-channels.ts`
+> - [ADR 096](../../../docs/adr/096-every-ipc-channel-has-a-schema.md)
+
 This document captures all IPC channel additions and semantic changes introduced by this feature. All new channels must also appear in `specs/001-extension-first-terminal/contracts/ipc-channels.md` and `src/renderer/electron.d.ts`.
 
 ---

@@ -3,9 +3,9 @@ import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import { parseFrontMatter, stringifyFrontMatter } from './front-matter'
-import { randomUUID } from '../db/db'
 import { noPayload, type ExtensionDB, type ExtensionAPI } from '@terminator/extension-sdk'
 import { createIpcRegistrar } from './register'
+import { reconcileTags } from './notes.ipc'
 
 // ──────────────────────────────────────────────────────────────
 // Pure utilities
@@ -70,101 +70,178 @@ function buildExistingIdMap(folder: string): Map<string, string> {
   return map
 }
 
-export async function exportNotes(
-  db: ExtensionDB,
-  args: z.infer<typeof exportSchema>
-): Promise<{ data: { exported: number; diagrams: number } } | { error: string }> {
-  const {
-    folder,
-    scope = 'all',
-    noteId,
-    tagId,
-    includeFrontmatter = true,
-    overwriteById = true,
-    includeDiagrams = false,
-  } = args
-  const resolvedFolder = folder.replace(/^~(?=$|\/)/, os.homedir())
+type CommentFormat = NonNullable<z.infer<typeof exportSchema>['commentFormat']>
 
-  let querySql = `SELECT n.id, n.title, n.body, n.created_at, n.updated_at, n.archived_at,
+interface ExportedComment {
+  id: string
+  body: string
+  quote: string | null
+  status: string
+  createdAt: string
+  replies: { id: string; body: string; createdAt: string }[]
+}
+
+type CommentRow = {
+  id: string
+  parent_id: string | null
+  body: string
+  quote: string | null
+  status: string
+  created_at: string
+}
+
+/** A note's comment threads, each with its replies, oldest first. */
+async function noteComments(db: ExtensionDB, noteId: string): Promise<ExportedComment[]> {
+  const rows = await db.query<CommentRow>(
+    `SELECT id, parent_id, body, quote, status, created_at FROM comments WHERE note_id=? ORDER BY created_at`,
+    [noteId]
+  )
+  const repliesTo = (parentId: string) =>
+    rows
+      .filter((r) => r.parent_id === parentId)
+      .map((r) => ({ id: r.id, body: r.body, createdAt: r.created_at }))
+  return rows
+    .filter((r) => r.parent_id === null)
+    .map((r) => ({ ...rowFields(r), replies: repliesTo(r.id) }))
+}
+
+function rowFields(r: CommentRow): Omit<ExportedComment, 'replies'> {
+  return { id: r.id, body: r.body, quote: r.quote, status: r.status, createdAt: r.created_at }
+}
+
+/** An HTML comment cannot contain "--", so a body that does is kept readable without it. */
+function htmlComment(text: string): string {
+  return `<!-- ${text.replace(/--/g, '- -')} -->`
+}
+
+/** The markdown with the comments appended as HTML comments, for the inline formats. */
+function withInlineComments(
+  markdown: string,
+  comments: ExportedComment[],
+  format: CommentFormat
+): string {
+  if (comments.length === 0 || (format !== 'inline' && format !== 'both')) return markdown
+  const lines = comments.flatMap((c) => [
+    htmlComment(`comment on "${c.quote ?? ''}": ${c.body}`),
+    ...c.replies.map((r) => htmlComment(`reply: ${r.body}`)),
+  ])
+  return `${markdown.trimEnd()}\n\n${lines.join('\n')}\n`
+}
+
+/** Writes the comments to `<note>.comments.json` beside the note, for the sidecar formats. */
+function writeSidecar(markdownPath: string, comments: ExportedComment[], format: CommentFormat) {
+  if (comments.length === 0 || (format !== 'sidecar' && format !== 'both')) return
+  const sidecarPath = markdownPath.replace(/\.md$/, '.comments.json')
+  fs.writeFileSync(sidecarPath, JSON.stringify(comments, null, 2), 'utf-8')
+}
+
+type ExportArgs = z.infer<typeof exportSchema>
+
+/** Where and how each note is written. */
+interface NoteExport {
+  folder: string
+  existing: Map<string, string>
+  overwriteById: boolean
+  includeFrontmatter: boolean
+  commentFormat: CommentFormat
+}
+
+/** The notes in the export's scope, newest first, each with its tags joined by commas. */
+function scopedNotesQuery({ scope = 'all', noteId, tagId }: ExportArgs): {
+  sql: string
+  params: unknown[]
+} {
+  const select = `SELECT n.id, n.title, n.body, n.created_at, n.updated_at, n.archived_at,
                          GROUP_CONCAT(t.name, ',') AS tags
                   FROM notes n
                   LEFT JOIN note_tags nt ON nt.note_id = n.id
                   LEFT JOIN tags t ON t.id = nt.tag_id`
-
-  const params: unknown[] = []
-
-  if (scope === 'note' && noteId) {
-    querySql += ' WHERE n.id = ?'
-    params.push(noteId)
-  } else if (scope === 'tag' && tagId) {
-    querySql += ' WHERE n.id IN (SELECT note_id FROM note_tags WHERE tag_id = ?)'
-    params.push(tagId)
-  }
-
-  querySql +=
+  const group =
     ' GROUP BY n.id, n.title, n.body, n.created_at, n.updated_at, n.archived_at ORDER BY n.updated_at DESC'
-
-  const notes = await db.query<NoteRow>(querySql, params)
-
-  const existingMap = buildExistingIdMap(resolvedFolder)
-  fs.mkdirSync(resolvedFolder, { recursive: true })
-
-  for (const note of notes) {
-    const tags = note.tags ? note.tags.split(',').filter(Boolean) : []
-    const slug = toSlug(note.title, note.id)
-    const existingFilename = overwriteById ? existingMap.get(note.id) : undefined
-    const filename = existingFilename ?? `${slug}.md`
-
-    let fileContent: string
-    if (includeFrontmatter) {
-      const frontmatter = {
-        id: note.id,
-        title: note.title,
-        tags,
-        created: note.created_at,
-        updated: note.updated_at,
-      }
-      fileContent = stringifyFrontMatter(note.body, frontmatter)
-    } else {
-      fileContent = note.body
-    }
-
-    fs.writeFileSync(path.join(resolvedFolder, filename), fileContent, 'utf-8')
+  if (scope === 'note' && noteId)
+    return { sql: `${select} WHERE n.id = ?${group}`, params: [noteId] }
+  if (scope === 'tag' && tagId) {
+    const where = ' WHERE n.id IN (SELECT note_id FROM note_tags WHERE tag_id = ?)'
+    return { sql: `${select}${where}${group}`, params: [tagId] }
   }
+  return { sql: `${select}${group}`, params: [] }
+}
 
-  let diagramsExported = 0
-  if (includeDiagrams && scope === 'all') {
-    const diagrams = await db.query<DiagramRow>(
-      `SELECT id, title, scene_json, created_at, updated_at FROM diagrams WHERE archived_at IS NULL ORDER BY updated_at DESC`
-    )
-    const diagramsFolder = path.join(resolvedFolder, 'diagrams')
-    fs.mkdirSync(diagramsFolder, { recursive: true })
-    for (const d of diagrams) {
-      const slug = toSlug(d.title, d.id)
-      let sceneData: Record<string, unknown> = {}
-      try {
-        sceneData = JSON.parse(d.scene_json || '{}') as Record<string, unknown>
-      } catch {
-        // use empty scene
-      }
-      const excalidrawFile = {
-        type: 'excalidraw',
-        version: 2,
-        source: 'terminator-notepad',
-        elements: (sceneData.elements as unknown[]) ?? [],
-        appState: (sceneData.appState as Record<string, unknown>) ?? {},
-        files: {},
-      }
-      fs.writeFileSync(
-        path.join(diagramsFolder, `${slug}.excalidraw`),
-        JSON.stringify(excalidrawFile, null, 2),
-        'utf-8'
-      )
-      diagramsExported++
-    }
+function noteMarkdown(note: NoteRow, includeFrontmatter: boolean): string {
+  if (!includeFrontmatter) return note.body
+  const tags = note.tags ? note.tags.split(',').filter(Boolean) : []
+  return stringifyFrontMatter(note.body, {
+    id: note.id,
+    title: note.title,
+    tags,
+    created: note.created_at,
+    updated: note.updated_at,
+  })
+}
+
+/** Writes one note, and its comments in the format asked for. */
+async function exportNote(db: ExtensionDB, note: NoteRow, to: NoteExport): Promise<void> {
+  const existingFilename = to.overwriteById ? to.existing.get(note.id) : undefined
+  const filename = existingFilename ?? `${toSlug(note.title, note.id)}.md`
+  const comments = to.commentFormat === 'none' ? [] : await noteComments(db, note.id)
+  const markdownPath = path.join(to.folder, filename)
+  const markdown = noteMarkdown(note, to.includeFrontmatter)
+  fs.writeFileSync(markdownPath, withInlineComments(markdown, comments, to.commentFormat), 'utf-8')
+  writeSidecar(markdownPath, comments, to.commentFormat)
+}
+
+/** A diagram as an .excalidraw file (https://docs.excalidraw.com/docs/codebase/json-schema). */
+function excalidrawFile(sceneJson: string): Record<string, unknown> {
+  let scene: Record<string, unknown> = {}
+  try {
+    scene = JSON.parse(sceneJson || '{}') as Record<string, unknown>
+  } catch {
+    // An unreadable scene exports as an empty one.
   }
+  return {
+    type: 'excalidraw',
+    version: 2,
+    source: 'terminator-notepad',
+    elements: (scene.elements as unknown[]) ?? [],
+    appState: (scene.appState as Record<string, unknown>) ?? {},
+    files: {},
+  }
+}
 
-  return { data: { exported: notes.length, diagrams: diagramsExported } }
+/** Writes every active diagram into `diagrams/` under the folder; answers how many. */
+async function exportDiagrams(db: ExtensionDB, folder: string): Promise<number> {
+  const diagrams = await db.query<DiagramRow>(
+    `SELECT id, title, scene_json, created_at, updated_at FROM diagrams WHERE archived_at IS NULL ORDER BY updated_at DESC`
+  )
+  const diagramsFolder = path.join(folder, 'diagrams')
+  fs.mkdirSync(diagramsFolder, { recursive: true })
+  for (const d of diagrams) {
+    const file = path.join(diagramsFolder, `${toSlug(d.title, d.id)}.excalidraw`)
+    fs.writeFileSync(file, JSON.stringify(excalidrawFile(d.scene_json), null, 2), 'utf-8')
+  }
+  return diagrams.length
+}
+
+export async function exportNotes(
+  db: ExtensionDB,
+  args: ExportArgs
+): Promise<{ data: { exported: number; diagrams: number } } | { error: string }> {
+  const folder = args.folder.replace(/^~(?=$|\/)/, os.homedir())
+  const { sql, params } = scopedNotesQuery(args)
+  const notes = await db.query<NoteRow>(sql, params)
+  const to: NoteExport = {
+    folder,
+    existing: buildExistingIdMap(folder),
+    overwriteById: args.overwriteById ?? true,
+    includeFrontmatter: args.includeFrontmatter ?? true,
+    commentFormat: args.commentFormat ?? 'none',
+  }
+  fs.mkdirSync(folder, { recursive: true })
+  for (const note of notes) await exportNote(db, note, to)
+
+  const withDiagrams = args.includeDiagrams === true && (args.scope ?? 'all') === 'all'
+  const diagrams = withDiagrams ? await exportDiagrams(db, folder) : 0
+  return { data: { exported: notes.length, diagrams } }
 }
 
 // ──────────────────────────────────────────────────────────────
@@ -211,23 +288,7 @@ export async function importNotes(
             updatedAt,
             id,
           ])
-          await tx.run('DELETE FROM note_tags WHERE note_id=?', [id])
-          for (const tagName of tags) {
-            const normalized = tagName.toLowerCase().trim()
-            if (!normalized) continue
-            let tagRow = await tx.get<{ id: string }>('SELECT id FROM tags WHERE name=?', [
-              normalized,
-            ])
-            if (!tagRow) {
-              const tagId = randomUUID()
-              await tx.run('INSERT INTO tags (id, name) VALUES (?, ?)', [tagId, normalized])
-              tagRow = { id: tagId }
-            }
-            await tx.run(
-              'INSERT INTO note_tags (note_id, tag_id) VALUES (?, ?) ON CONFLICT DO NOTHING',
-              [id, tagRow.id]
-            )
-          }
+          await reconcileTags(tx, id, tags)
         })
         updated++
       } else {
@@ -236,22 +297,7 @@ export async function importNotes(
             'INSERT INTO notes (id, title, body, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
             [id, title, body.trim(), createdAt, updatedAt]
           )
-          for (const tagName of tags) {
-            const normalized = tagName.toLowerCase().trim()
-            if (!normalized) continue
-            let tagRow = await tx.get<{ id: string }>('SELECT id FROM tags WHERE name=?', [
-              normalized,
-            ])
-            if (!tagRow) {
-              const tagId = randomUUID()
-              await tx.run('INSERT INTO tags (id, name) VALUES (?, ?)', [tagId, normalized])
-              tagRow = { id: tagId }
-            }
-            await tx.run(
-              'INSERT INTO note_tags (note_id, tag_id) VALUES (?, ?) ON CONFLICT DO NOTHING',
-              [id, tagRow.id]
-            )
-          }
+          await reconcileTags(tx, id, tags)
         })
         imported++
       }

@@ -13,7 +13,7 @@ import { githubAPI } from '../../api/github'
 import { DashboardPRSchema, type DashboardPR } from '../../schemas/pr-review.schema'
 import { dashboardToSortable, sortPrs } from '../../review/sort-prs'
 import { useReviewUiStore } from '../../stores/review-ui.store'
-import { DiffSize, RowMeta, shortAge, type MetaPart } from './DiffSize'
+import { PrRow, shortAge, type MetaPart } from './DiffSize'
 import { SortSelect } from './SortSelect'
 import { RepoPicker } from './RepoPicker'
 import { choose, plural } from '../text'
@@ -53,7 +53,7 @@ type DashboardResult = z.infer<typeof DashboardResultSchema>
 type FailedSection = z.infer<typeof FailedSectionSchema>
 
 /** The command that failed carries the whole GraphQL query; the reader needs only gh's own line. */
-export function shortError(message: string): string {
+function shortError(message: string): string {
   const at = message.lastIndexOf('gh:')
   if (at >= 0) return message.slice(at).split('\n')[0].trim()
   const lines = message.split('\n').filter((l) => l.trim())
@@ -224,58 +224,34 @@ function CloneButton(props: {
   )
 }
 
-function DashboardRowActions({ cfg, ctx }: { cfg: RowConfig; ctx: RowContext }) {
-  const { pr } = cfg
-  const session = hasSession(pr)
+/** Clone and review, for a pull request not cloned yet, and why the last clone failed. */
+function CloneActions({ pr, ctx }: { pr: DashboardPR; ctx: RowContext }) {
   const cloneState = ctx.cloneStatus[pr.number]
   return (
-    <span className="rd-actions">
-      <Button
-        size="sm"
-        variant={choose(session || cfg.primary, 'primary' as const, 'secondary' as const)}
-        className={choose(session, 'rd-row-action rd-always', 'rd-row-action')}
-        onClick={(e) => {
-          e.stopPropagation()
-          ctx.onOpen(pr)
-        }}
-      >
-        {rowButtonLabel(cfg)}
-      </Button>
+    <>
       {!pr.localRepoRoot && !!ctx.cloneFolder && (
         <CloneButton pr={pr} state={cloneState} onClone={ctx.onClone} />
       )}
       {cloneState?.status === 'error' && (
         <span className="rd-clone-error">{cloneState.message}</span>
       )}
-    </span>
+    </>
   )
 }
 
 function Row({ cfg, ctx }: { cfg: RowConfig; ctx: RowContext }): JSX.Element {
   const { pr } = cfg
-  const handle = () => ctx.onOpen(pr)
+  const session = hasSession(pr)
   return (
-    <div
-      data-testid={`row-${pr.number}`}
-      className="rd-row rd-row--clickable"
-      tabIndex={0}
-      onClick={handle}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') handle()
-      }}
+    <PrRow
+      pr={pr}
+      testId={`row-${pr.number}`}
+      onOpen={() => ctx.onOpen(pr)}
+      meta={rowParts(cfg, ctx.showRepo)}
+      action={{ label: rowButtonLabel(cfg), primary: session || cfg.primary, always: session }}
     >
-      <span className="rd-ti">
-        <span className="rd-t1">
-          <span className="rd-no">#{pr.number}</span> <span>{pr.title}</span>
-        </span>
-        <RowMeta parts={rowParts(cfg, ctx.showRepo)} />
-      </span>
-      <span className="rd-side">
-        <DiffSize additions={pr.additions} deletions={pr.deletions} fileCount={pr.fileCount} />
-        <span className="rd-num">~{pr.estimatedMinutes} min</span>
-      </span>
-      <DashboardRowActions cfg={cfg} ctx={ctx} />
-    </div>
+      <CloneActions pr={pr} ctx={ctx} />
+    </PrRow>
   )
 }
 
@@ -602,8 +578,8 @@ function DashboardTabs({ groups, capped }: { groups: Groups; capped: string[] })
 
 function scopeLabelOf(selectedCount: number, scopedTo: number): string {
   const scopeCount = selectedCount || scopedTo
-  if (scopeCount > 0) return `${scopeCount} repositories`
-  return 'All repositories'
+  if (scopeCount === 0) return 'All repositories'
+  return `${scopeCount} ${plural(scopeCount, 'repository', 'repositories')}`
 }
 
 function updatedText(fetchedAt: Date | null): string {
