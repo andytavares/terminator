@@ -189,6 +189,19 @@ function joinStrokesTests() {
     const b = schedule(settled(), { events: [passed('doc', 'waiting')], nodes }, 0)
     expect(b.held).toHaveLength(1)
   })
+
+  it('counts a join as seen running when that start is still held from an earlier poll', () => {
+    const started: FactoryEvent = {
+      kind: 'node-state',
+      nodeId: 'integrate',
+      from: 'waiting',
+      to: 'running',
+    }
+    const first = schedule(settled(), { events: [started], nodes }, 0)
+    const second = schedule(first, { events: [passed('integrate')], nodes }, 100)
+    const out = drain(second, 0, 3000)
+    expect(out.map((o) => (o.event as { to: NodeState }).to)).toEqual(['running', 'passed'])
+  })
 }
 
 describe('beat scheduler: rework', () => {
