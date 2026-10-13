@@ -136,7 +136,7 @@ Then open the app normally. You only need to run this once.
 | `npm run lint:unused`            | knip: no unused files, exports or dependencies                                   |
 | `npm run lint:unused:production` | knip --production: no code that only tests reach                                 |
 | `npm run lint:duplicates`        | jscpd: no copy-pasted code                                                       |
-| `npm run typecheck`              | TypeScript check of main, renderer, shared, packages and extensions (no emit)    |
+| `npm run typecheck`              | TypeScript check of the core, packages and extensions, specs included (no emit)  |
 | `npm run format`                 | Prettier format                                                                  |
 | `npm run format:check`           | Check formatting without writing files (CI)                                      |
 | `npm run create-extension`       | Scaffold a new extension                                                         |
