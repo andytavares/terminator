@@ -26,6 +26,31 @@ function sourceOf(hunks: DiffHunk[], overrides: Partial<DiffItemSource> = {}): D
 
 const keysOf = (source: DiffItemSource) => buildDiffItems(source).map((item) => item.key)
 
+/** A mark for a line inside a collapsed moved block; `isStart` for the line that opens it. */
+const collapsedMark = (isStart: boolean): MovedMark => ({
+  block: {
+    fromPath: 'a.ts',
+    fromLine: 1,
+    toPath: 'b.ts',
+    toLine: 1,
+    lineCount: 3,
+    symbol: null,
+  },
+  side: 'RIGHT',
+  key: 'a.ts:1->b.ts:1',
+  isStart,
+  expanded: false,
+})
+
+/** A movedMark that hides exactly one line: `lineNum` read on `side`. */
+const hidingOnly =
+  (side: 'LEFT' | 'RIGHT', lineNum: number) =>
+  (n: number, s: 'LEFT' | 'RIGHT'): MovedMark | null =>
+    s === side && n === lineNum ? collapsedMark(false) : null
+
+const removedAt7: DiffLine = { type: 'remove', content: 'x', oldLineNumber: 7, newLineNumber: null }
+const addedAt8: DiffLine = { type: 'add', content: 'y', oldLineNumber: null, newLineNumber: 8 }
+
 describe('buildDiffItems()', () => {
   it('orders the top gap, each hunk header and rows, its hotspot, and the gaps after it', () => {
     const hunks = [hunkOf('@@ a', [context(5)]), hunkOf('@@ b', [context(9)])]
@@ -55,27 +80,30 @@ describe('buildDiffItems()', () => {
     expect(items[0]).toEqual({ kind: 'notice', key: 'notice', hiddenCount: 1 })
     expect(items.map((i) => i.key)).toEqual(['notice', '1-header', '1-0'])
   })
+})
 
+describe('buildDiffItems() — moved blocks', () => {
   it('drops the lines of a collapsed moved block but keeps the line that opens it', () => {
     const lines = [1, 2, 3].map(
       (n): DiffLine => ({ ...context(n), type: 'add', oldLineNumber: null })
     )
-    const mark = (isStart: boolean): MovedMark => ({
-      block: {
-        fromPath: 'a.ts',
-        fromLine: 1,
-        toPath: 'b.ts',
-        toLine: 1,
-        lineCount: 3,
-        symbol: null,
-      },
-      side: 'RIGHT',
-      key: 'a.ts:1->b.ts:1',
-      isStart,
-      expanded: false,
-    })
-    const source = sourceOf([hunkOf('@@ a', lines)], { movedMark: (n) => mark(n === 1) })
+    const source = sourceOf([hunkOf('@@ a', lines)], { movedMark: (n) => collapsedMark(n === 1) })
     expect(keysOf(source)).toEqual(['0-header', '0-0'])
     expect(keysOf({ ...source, mode: 'split' })).toEqual(['0-header', '0-row-0'])
+  })
+
+  it('reads a removed unified line on the left, by its old line number', () => {
+    const hunks = [hunkOf('@@ a', [context(5), removedAt7, addedAt8])]
+    const source = sourceOf(hunks, { movedMark: hidingOnly('LEFT', 7) })
+    expect(keysOf(source)).toEqual(['0-header', '0-0', '0-2'])
+  })
+
+  it('hides a split row by either side, each read by its own line number', () => {
+    const hunks = [hunkOf('@@ a', [context(5), removedAt7, addedAt8])]
+    const visibleSplitKeys = (movedMark: DiffItemSource['movedMark']) =>
+      keysOf(sourceOf(hunks, { mode: 'split', movedMark }))
+    expect(visibleSplitKeys(hidingOnly('LEFT', 7))).toEqual(['0-header', '0-row-0'])
+    expect(visibleSplitKeys(hidingOnly('RIGHT', 8))).toEqual(['0-header', '0-row-0'])
+    expect(visibleSplitKeys(hidingOnly('LEFT', 5))).toEqual(['0-header', '0-row-1'])
   })
 })

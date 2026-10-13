@@ -1,10 +1,13 @@
 import { existsSync, readdirSync, statSync, utimesSync } from 'fs'
 import { join } from 'path'
 import { runGit } from '../shell/run-git.js'
+import type { PrHead } from '../schemas/pr-review.schema.js'
 
 const DEFAULT_MAX_WORKTREES = 5
 
-type ExecFn = (cmd: 'git', args: string[], opts: { cwd: string }) => Promise<{ stdout: string }>
+interface ExecFn {
+  (cmd: 'git', args: string[], opts: { cwd: string }): Promise<{ stdout: string }>
+}
 
 export interface WorktreeDeps {
   exec?: ExecFn
@@ -56,11 +59,23 @@ async function pruneOldWorktrees(repoRoot: string, exec: ExecFn, max: number): P
   }
 }
 
-interface ReviewCheckout {
-  repoRoot: string
-  prNumber: number
-  headSHA: string
-  dir: string
+/** Whether `dir` is a worktree checked out at `headSHA`. */
+async function isCheckedOutAt(dir: string, headSHA: string, exec: ExecFn): Promise<boolean> {
+  if (!existsSync(dir)) return false
+  try {
+    const { stdout } = await exec('git', ['rev-parse', 'HEAD'], { cwd: dir })
+    return stdout.trim() === headSHA
+  } catch {
+    // dir exists but isn't a valid worktree at this SHA — it is recreated
+    return false
+  }
+}
+
+async function addWorktreeAt(head: PrHead, dir: string, exec: ExecFn): Promise<void> {
+  const { repoRoot, prNumber, headSHA } = head
+  const ref = `pull/${prNumber}/head:refs/terminator/review/${prNumber}/${headSHA}`
+  await exec('git', ['fetch', 'origin', ref], { cwd: repoRoot })
+  await exec('git', ['worktree', 'add', '--detach', dir, headSHA], { cwd: repoRoot })
 }
 
 // The worktree each in-flight call is preparing, by directory.
@@ -72,49 +87,21 @@ const preparing = new Map<string, Promise<string>>()
  * A call made while another is still preparing the same worktree (a running
  * review's "Continue in terminal") waits for it instead of racing `git worktree add`.
  */
-export function ensureReviewWorktree(
-  repoRoot: string,
-  prNumber: number,
-  headSHA: string,
-  deps: WorktreeDeps = {}
-): Promise<string> {
-  const dir = worktreeDir(repoRoot, prNumber, headSHA)
+export function ensureReviewWorktree(head: PrHead, deps: WorktreeDeps = {}): Promise<string> {
+  const dir = worktreeDir(head.repoRoot, head.prNumber, head.headSHA)
   const inFlight = preparing.get(dir)
   if (inFlight) return inFlight
-  const ready = prepareWorktree({ repoRoot, prNumber, headSHA, dir }, deps).finally(() =>
-    preparing.delete(dir)
-  )
+  const ready = prepareWorktree(head, dir, deps).finally(() => preparing.delete(dir))
   preparing.set(dir, ready)
   return ready
 }
 
-async function prepareWorktree(checkout: ReviewCheckout, deps: WorktreeDeps): Promise<string> {
-  const { repoRoot, prNumber, headSHA, dir } = checkout
+async function prepareWorktree(head: PrHead, dir: string, deps: WorktreeDeps): Promise<string> {
   const exec = deps.exec ?? defaultExec
-  const maxWorktrees = deps.maxWorktrees ?? DEFAULT_MAX_WORKTREES
-
+  const { repoRoot } = head
   await exec('git', ['worktree', 'prune'], { cwd: repoRoot }).catch(() => {})
-
-  if (existsSync(dir)) {
-    try {
-      const { stdout } = await exec('git', ['rev-parse', 'HEAD'], { cwd: dir })
-      if (stdout.trim() === headSHA) {
-        markUsed(dir)
-        await pruneOldWorktrees(repoRoot, exec, maxWorktrees)
-        return dir
-      }
-    } catch {
-      // dir exists but isn't a valid worktree at this SHA — recreate below
-    }
-  }
-
-  await exec(
-    'git',
-    ['fetch', 'origin', `pull/${prNumber}/head:refs/terminator/review/${prNumber}/${headSHA}`],
-    { cwd: repoRoot }
-  )
-  await exec('git', ['worktree', 'add', '--detach', dir, headSHA], { cwd: repoRoot })
+  if (!(await isCheckedOutAt(dir, head.headSHA, exec))) await addWorktreeAt(head, dir, exec)
   markUsed(dir)
-  await pruneOldWorktrees(repoRoot, exec, maxWorktrees)
+  await pruneOldWorktrees(repoRoot, exec, deps.maxWorktrees ?? DEFAULT_MAX_WORKTREES)
   return dir
 }

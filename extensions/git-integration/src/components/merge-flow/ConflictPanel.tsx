@@ -1,6 +1,7 @@
 import React from 'react'
 import type { ConflictBlock, GitAuthor } from '../../schemas/merge-flow.schema'
 import { langFromBlockId, highlightLine } from '../../utils/syntax'
+import { choose } from '../text'
 
 interface DiffLine {
   line: string
@@ -9,47 +10,63 @@ interface DiffLine {
 
 const MAX_DIFF_LINES = 300
 
-function computeLineDiff(base: string, modified: string): DiffLine[] {
-  const split = (s: string) => {
-    const lines = s.split('\n')
-    if (lines.length > 0 && lines[lines.length - 1] === '') lines.pop()
-    return lines
-  }
-  const a = split(base)
-  const b = split(modified)
+/** The text's lines, without the empty one a trailing newline leaves. */
+function splitLines(text: string): string[] {
+  const lines = text.split('\n')
+  if (lines.length > 0 && lines[lines.length - 1] === '') lines.pop()
+  return lines
+}
 
-  if (a.length === 0) return b.map((line) => ({ line, type: 'added' as const }))
-  if (b.length === 0) return a.map((line) => ({ line, type: 'removed' as const }))
-  if (a.length + b.length > MAX_DIFF_LINES) {
-    return b.map((line) => ({ line, type: 'added' as const }))
-  }
+interface LcsTable {
+  a: string[]
+  b: string[]
+  dp: number[][]
+}
 
-  const n = a.length
-  const m = b.length
-  const dp: number[][] = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0))
-  for (let i = 1; i <= n; i++) {
-    for (let j = 1; j <= m; j++) {
-      dp[i][j] = a[i - 1] === b[j - 1] ? dp[i - 1][j - 1] + 1 : Math.max(dp[i - 1][j], dp[i][j - 1])
+/** dp[i][j] is the longest common subsequence of a's first i lines and b's first j. */
+function lcsTable(a: string[], b: string[]): LcsTable {
+  const dp: number[][] = Array.from({ length: a.length + 1 }, () => new Array(b.length + 1).fill(0))
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      if (a[i - 1] === b[j - 1]) dp[i][j] = dp[i - 1][j - 1] + 1
+      else dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1])
     }
   }
+  return { a, b, dp }
+}
 
+/** Which way the walk back from (i, j) goes: a shared line, a line only in b, or one only in a. */
+function nextStep(t: LcsTable, i: number, j: number): DiffLine['type'] {
+  if (i > 0 && j > 0 && t.a[i - 1] === t.b[j - 1]) return 'common'
+  if (j > 0 && (i === 0 || t.dp[i][j - 1] >= t.dp[i - 1][j])) return 'added'
+  return 'removed'
+}
+
+function walkBack(t: LcsTable): DiffLine[] {
   const result: DiffLine[] = []
-  let i = n
-  let j = m
+  let i = t.a.length
+  let j = t.b.length
   while (i > 0 || j > 0) {
-    if (i > 0 && j > 0 && a[i - 1] === b[j - 1]) {
-      result.unshift({ line: a[i - 1], type: 'common' })
-      i--
-      j--
-    } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
-      result.unshift({ line: b[j - 1], type: 'added' })
-      j--
-    } else {
-      result.unshift({ line: a[i - 1], type: 'removed' })
-      i--
-    }
+    const type = nextStep(t, i, j)
+    if (type === 'added') result.unshift({ line: t.b[j - 1], type })
+    else result.unshift({ line: t.a[i - 1], type })
+    if (type !== 'added') i--
+    if (type !== 'removed') j--
   }
   return result
+}
+
+function allAs(lines: string[], type: DiffLine['type']): DiffLine[] {
+  return lines.map((line) => ({ line, type }))
+}
+
+function computeLineDiff(base: string, modified: string): DiffLine[] {
+  const a = splitLines(base)
+  const b = splitLines(modified)
+  if (a.length === 0) return allAs(b, 'added')
+  if (b.length === 0) return allAs(a, 'removed')
+  if (a.length + b.length > MAX_DIFF_LINES) return allAs(b, 'added')
+  return walkBack(lcsTable(a, b))
 }
 
 interface DiffCodeViewProps {
@@ -60,80 +77,63 @@ interface DiffCodeViewProps {
   lang?: string
 }
 
-/** One line of a conflict side: its number, its +/- and its highlighted code. */
-function CodeLine({
-  cls,
-  num,
-  prefix,
-  html,
-}: {
+interface CodeRow {
+  key: string
   cls: string
   num: string
   prefix: string
-  html: string
-}): JSX.Element {
-  return (
-    <div className={`conflict-line ${cls}`}>
-      <span className="conflict-line__num">{num}</span>
-      <span className="conflict-line__prefix">{prefix}</span>
-      <span
-        className="conflict-line__text hljs"
-        dangerouslySetInnerHTML={{ __html: html || ' ' }}
-      />
-    </div>
-  )
+  line: string
 }
 
-function DiffCodeView({ contextBefore, diffLines, contextAfter, side, lang }: DiffCodeViewProps) {
+const DIFF_PREFIX: Record<DiffLine['type'], string> = { added: '+', removed: '-', common: ' ' }
+
+function diffLineClass(type: DiffLine['type'], side: DiffCodeViewProps['side']): string {
+  if (type === 'removed') return 'conflict-line--removed'
+  if (type === 'common') return 'conflict-line--common'
+  return choose(side === 'ours', 'conflict-line--ours-added', 'conflict-line--theirs-added')
+}
+
+/** Context, diff and context rows, numbered on the new side: removed lines take no number. */
+function codeRows(props: DiffCodeViewProps): CodeRow[] {
   let lineNum = 1
-  const rows: React.ReactNode[] = []
-
-  contextBefore.forEach((line, idx) => {
-    rows.push(
-      <CodeLine
-        key={`b${idx}`}
-        cls="conflict-line--context"
-        num={String(lineNum++)}
-        prefix=" "
-        html={highlightLine(line, lang)}
-      />
-    )
+  const next = () => String(lineNum++)
+  const numberFor = (type: DiffLine['type']) => {
+    if (type === 'removed') return ''
+    return next()
+  }
+  const context = (keyPrefix: string) => (line: string, idx: number) => ({
+    key: `${keyPrefix}${idx}`,
+    cls: 'conflict-line--context',
+    num: next(),
+    prefix: ' ',
+    line,
   })
+  const before = props.contextBefore.map(context('b'))
+  const diff = props.diffLines.map(({ line, type }, idx) => ({
+    key: `d${idx}`,
+    cls: diffLineClass(type, props.side),
+    num: numberFor(type),
+    prefix: DIFF_PREFIX[type],
+    line,
+  }))
+  return [...before, ...diff, ...props.contextAfter.map(context('a'))]
+}
 
-  diffLines.forEach(({ line, type }, idx) => {
-    const addedClass = side === 'ours' ? 'conflict-line--ours-added' : 'conflict-line--theirs-added'
-    const cls =
-      type === 'added'
-        ? addedClass
-        : type === 'removed'
-          ? 'conflict-line--removed'
-          : 'conflict-line--common'
-    const prefix = type === 'added' ? '+' : type === 'removed' ? '-' : ' '
-    const num = type === 'removed' ? '' : String(lineNum++)
-    rows.push(
-      <CodeLine
-        key={`d${idx}`}
-        cls={cls}
-        num={num}
-        prefix={prefix}
-        html={highlightLine(line, lang)}
-      />
-    )
-  })
-
-  contextAfter.forEach((line, idx) => {
-    rows.push(
-      <CodeLine
-        key={`a${idx}`}
-        cls="conflict-line--context"
-        num={String(lineNum++)}
-        prefix=" "
-        html={highlightLine(line, lang)}
-      />
-    )
-  })
-
-  return <div className="conflict-panel__diff-view">{rows}</div>
+function DiffCodeView(props: DiffCodeViewProps) {
+  return (
+    <div className="conflict-panel__diff-view">
+      {codeRows(props).map((row) => (
+        <div key={row.key} className={`conflict-line ${row.cls}`}>
+          <span className="conflict-line__num">{row.num}</span>
+          <span className="conflict-line__prefix">{row.prefix}</span>
+          <span
+            className="conflict-line__text hljs"
+            dangerouslySetInnerHTML={{ __html: highlightLine(row.line, props.lang) || ' ' }}
+          />
+        </div>
+      ))}
+    </div>
+  )
 }
 
 interface Props {
@@ -146,71 +146,75 @@ interface Props {
   onSelectTheirs: () => void
 }
 
-export function ConflictPanel({
-  block,
-  isRebase,
-  pendingStrategy,
-  oursAuthor,
-  theirsAuthor,
-  onSelectMine,
-  onSelectTheirs,
-}: Props) {
-  const mineLabel = isRebase ? 'Theirs (branch)' : 'Your version'
-  const theirsLabel = isRebase ? 'Your version' : 'Incoming changes'
+interface SideProps {
+  side: 'ours' | 'theirs'
+  label: string
+  author?: GitAuthor
+  selected: boolean
+  onSelect: () => void
+  block: ConflictBlock
+}
 
-  const lang = langFromBlockId(block.blockId)
-  const oursDiff = computeLineDiff(block.baseText, block.oursText)
-  const theirsDiff = computeLineDiff(block.baseText, block.theirsText)
+function SideLabel({ panel: props }: { panel: SideProps }) {
+  const { author } = props
+  return (
+    <div className={`conflict-panel__label conflict-panel__label--${props.side}`}>
+      <span className="conflict-panel__label-text">{props.label}</span>
+      {author && (
+        <span className="conflict-panel__author">
+          {author.name} · <code>{author.commitHash.slice(0, 7)}</code>
+        </span>
+      )}
+    </div>
+  )
+}
 
+function SidePanel({ panel }: { panel: SideProps }) {
+  const { block, side } = panel
+  const text = choose(side === 'ours', block.oursText, block.theirsText)
+  const selected = choose(panel.selected, ' conflict-panel__side--selected', '')
+  return (
+    <div
+      className={`conflict-panel__side conflict-panel__side--${side}${selected}`}
+      role="button"
+      tabIndex={0}
+      onClick={panel.onSelect}
+      onKeyDown={(e) => e.key === 'Enter' && panel.onSelect()}
+    >
+      <SideLabel panel={panel} />
+      <DiffCodeView
+        contextBefore={block.contextBefore}
+        diffLines={computeLineDiff(block.baseText, text)}
+        contextAfter={block.contextAfter}
+        side={side}
+        lang={langFromBlockId(block.blockId)}
+      />
+    </div>
+  )
+}
+
+export function ConflictPanel(props: Props) {
+  const { block, isRebase, pendingStrategy } = props
+  const ours: SideProps = {
+    side: 'ours',
+    label: choose(isRebase, 'Theirs (branch)', 'Your version'),
+    author: props.oursAuthor,
+    selected: pendingStrategy === 'ours',
+    onSelect: props.onSelectMine,
+    block,
+  }
+  const theirs: SideProps = {
+    side: 'theirs',
+    label: choose(isRebase, 'Your version', 'Incoming changes'),
+    author: props.theirsAuthor,
+    selected: pendingStrategy === 'theirs',
+    onSelect: props.onSelectTheirs,
+    block,
+  }
   return (
     <div className="conflict-panel">
-      <div
-        className={`conflict-panel__side conflict-panel__side--ours${pendingStrategy === 'ours' ? ' conflict-panel__side--selected' : ''}`}
-        role="button"
-        tabIndex={0}
-        onClick={onSelectMine}
-        onKeyDown={(e) => e.key === 'Enter' && onSelectMine()}
-      >
-        <div className="conflict-panel__label conflict-panel__label--ours">
-          <span className="conflict-panel__label-text">{mineLabel}</span>
-          {oursAuthor && (
-            <span className="conflict-panel__author">
-              {oursAuthor.name} · <code>{oursAuthor.commitHash.slice(0, 7)}</code>
-            </span>
-          )}
-        </div>
-        <DiffCodeView
-          contextBefore={block.contextBefore}
-          diffLines={oursDiff}
-          contextAfter={block.contextAfter}
-          side="ours"
-          lang={lang}
-        />
-      </div>
-
-      <div
-        className={`conflict-panel__side conflict-panel__side--theirs${pendingStrategy === 'theirs' ? ' conflict-panel__side--selected' : ''}`}
-        role="button"
-        tabIndex={0}
-        onClick={onSelectTheirs}
-        onKeyDown={(e) => e.key === 'Enter' && onSelectTheirs()}
-      >
-        <div className="conflict-panel__label conflict-panel__label--theirs">
-          <span className="conflict-panel__label-text">{theirsLabel}</span>
-          {theirsAuthor && (
-            <span className="conflict-panel__author">
-              {theirsAuthor.name} · <code>{theirsAuthor.commitHash.slice(0, 7)}</code>
-            </span>
-          )}
-        </div>
-        <DiffCodeView
-          contextBefore={block.contextBefore}
-          diffLines={theirsDiff}
-          contextAfter={block.contextAfter}
-          side="theirs"
-          lang={lang}
-        />
-      </div>
+      <SidePanel panel={ours} />
+      <SidePanel panel={theirs} />
     </div>
   )
 }

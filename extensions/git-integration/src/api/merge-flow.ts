@@ -1,34 +1,28 @@
 import type { ConflictSession, ResolutionStrategy } from '../schemas/merge-flow.schema'
 import { invoke } from '@terminator/extension-sdk/renderer'
 
+/** A conflict block of a checkout, and the text it was resolved to. */
+interface BlockText {
+  repoRoot: string
+  blockId: string
+  resolvedText: string
+}
+
 export const mergeFlowAPI = {
   listConflicts: (repoRoot: string): Promise<ConflictSession | { error: string }> =>
     invoke('git:conflicts-list', { repoRoot }),
 
   resolveConflict: (
-    repoRoot: string,
-    blockId: string,
-    resolvedText: string,
-    strategy: ResolutionStrategy,
-    currentResolvedText?: string,
-    originalConflictText?: string
-  ): Promise<{ success: true } | { error: string }> =>
-    invoke('git:resolve-conflict', {
-      repoRoot,
-      blockId,
-      resolvedText,
-      strategy,
-      currentResolvedText,
-      originalConflictText,
-    }),
+    resolution: BlockText & {
+      strategy: ResolutionStrategy
+      currentResolvedText?: string
+      originalConflictText?: string
+    }
+  ): Promise<{ success: true } | { error: string }> => invoke('git:resolve-conflict', resolution),
 
   undoResolve: (
-    repoRoot: string,
-    blockId: string,
-    resolvedText: string,
-    originalConflictText: string
-  ): Promise<{ success: true } | { error: string }> =>
-    invoke('git:undo-resolve', { repoRoot, blockId, resolvedText, originalConflictText }),
+    undo: BlockText & { originalConflictText: string }
+  ): Promise<{ success: true } | { error: string }> => invoke('git:undo-resolve', undo),
 
   mergeCommit: (
     repoRoot: string,
@@ -55,16 +49,11 @@ export const mergeFlowAPI = {
   ): Promise<{ success: true } | { error: string }> =>
     invoke('git:session-reset', { repoRoot, files }),
 
-  preparePrWorktree: (
-    repoRoot: string,
-    worktreePath: string,
-    headRefName: string,
+  preparePrWorktree: (worktree: {
+    repoRoot: string
+    worktreePath: string
+    headRefName: string
     baseRefName: string
-  ): Promise<{ hasConflicts: boolean } | { error: string }> =>
-    invoke('git:prepare-pr-worktree', {
-      repoRoot,
-      worktreePath,
-      headRefName,
-      baseRefName,
-    }),
+  }): Promise<{ hasConflicts: boolean } | { error: string }> =>
+    invoke('git:prepare-pr-worktree', worktree),
 }

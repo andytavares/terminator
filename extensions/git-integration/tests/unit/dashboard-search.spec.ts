@@ -7,6 +7,11 @@ import {
   resolveBranchExclusions,
 } from '../../src/github/dashboard-search'
 
+/** A PR's `commits` field whose latest commit carries `rollup` as its status check rollup. */
+function commitsWithRollup(oid: string, rollup: unknown, committedDate = '2026-01-01') {
+  return { nodes: [{ commit: { oid, committedDate, statusCheckRollup: rollup } }] }
+}
+
 function prNode(overrides: Record<string, unknown> = {}) {
   return {
     number: 1,
@@ -23,17 +28,7 @@ function prNode(overrides: Record<string, unknown> = {}) {
     reviewDecision: 'REVIEW_REQUIRED',
     reviewRequests: { totalCount: 1 },
     reviewThreads: { nodes: [{ isResolved: true }, { isResolved: false }] },
-    commits: {
-      nodes: [
-        {
-          commit: {
-            oid: 'a',
-            committedDate: '2026-01-01T00:00:00Z',
-            statusCheckRollup: { state: 'SUCCESS' },
-          },
-        },
-      ],
-    },
+    commits: commitsWithRollup('a', { state: 'SUCCESS' }, '2026-01-01T00:00:00Z'),
     latestReviews: { nodes: [] },
     ...overrides,
   }
@@ -57,12 +52,11 @@ describe('DASHBOARD_QUERIES', () => {
   })
 })
 
-describe('buildSectionQueries', () => {
-  const sections = ['involved', 'mine', 're-review', 'requested', 'team']
-  const repoCount = (search: string) => search.match(/ repo:/g)?.length ?? 0
+const sections = ['involved', 'mine', 're-review', 'requested', 'team']
 
-  // GitHub resolves aliased searches one after another inside a single request,
-  // so one combined query took the sum of every section and hit the ~10 s cutoff.
+const repoCount = (search: string) => search.match(/ repo:/g)?.length ?? 0
+
+describe('buildSectionQueries', () => {
   it('builds one query per section, each holding exactly one search', () => {
     const queries = buildSectionQueries('bob')
     expect(queries.map((q) => q.section).sort()).toEqual(sections)
@@ -76,7 +70,9 @@ describe('buildSectionQueries', () => {
     expect(byName.team).toContain('team-review-requested-user:bob')
     expect(byName.team).not.toContain('LOGIN')
   })
+})
 
+describe('buildSectionQueries — splits 450 repositories into chunks of at most 200 per section', () => {
   it('splits 450 repositories into chunks of at most 200 per section', () => {
     const repos = Array.from({ length: 450 }, (_, i) => `acme/repo-${i}`)
     const queries = buildSectionQueries('bob', repos)
@@ -98,7 +94,9 @@ describe('buildSectionQueries', () => {
     )
     expect(first.query).toContain(`${DASHBOARD_QUERIES.mine} repo:acme/widgets repo:acme/gadgets"`)
   })
+})
 
+describe('buildSectionQueries — sorts every section newest first and asks for the match count', () => {
   it('sorts every section newest first and asks for the match count', () => {
     for (const { query } of buildSectionQueries('bob')) {
       expect(query).toContain('sort:created-desc')
@@ -119,7 +117,7 @@ describe('parseDashboard', () => {
         involved: { nodes: [] },
       },
     }
-    const [pr] = parseDashboard(raw, 'alice', new Map())
+    const [pr] = parseDashboard(raw, { login: 'alice', localRoots: new Map() })
     expect(pr.section).toBe('mine')
     expect(pr.repo).toBe('acme/widgets')
     expect(pr.riskLevel).toBe('medium') // 150 total hits the medium threshold
@@ -129,7 +127,9 @@ describe('parseDashboard', () => {
     expect(pr.unresolvedThreads).toBe(1)
     expect(pr.localRepoRoot).toBeNull()
   })
+})
 
+describe('parseDashboard — leaves out pull requests whose source branch is excluded', () => {
   // Settings → Git → Branch Exclude Patterns: a pull request opened from an
   // excluded branch (a bot's renovate/*, a merge queue's gh-readonly-queue/*)
   // is not one to review, in any section.
@@ -147,14 +147,20 @@ describe('parseDashboard', () => {
     }
     const localRoots = new Map([['acme/widgets', '/Users/me/repos/widgets']])
     const asked: Array<[string, string | undefined]> = []
-    const prs = parseDashboard(raw, 'alice', localRoots, (branch, repoPath) => {
-      asked.push([branch, repoPath])
-      return branch.startsWith('renovate/')
-    })
+    const prs = parseDashboard(
+      raw,
+      { login: 'alice', localRoots: localRoots },
+      (branch, repoPath) => {
+        asked.push([branch, repoPath])
+        return branch.startsWith('renovate/')
+      }
+    )
     expect(prs.map((pr) => pr.number)).toEqual([2])
     expect(asked).toContainEqual(['renovate/vitest-4', '/Users/me/repos/widgets'])
   })
+})
 
+describe('parseDashboard — asks for the source branch in the search query', () => {
   it('asks for the source branch in the search query', () => {
     expect(buildSectionQueries('alice')[0].query).toContain('headRefName')
   })
@@ -162,57 +168,31 @@ describe('parseDashboard', () => {
   it('resolves localRepoRoot from the provided map', () => {
     const raw = { data: { mine: { nodes: [prNode()] } } }
     const localRoots = new Map([['acme/widgets', '/Users/me/repos/widgets']])
-    const [pr] = parseDashboard(raw, 'alice', localRoots)
+    const [pr] = parseDashboard(raw, { login: 'alice', localRoots: localRoots })
     expect(pr.localRepoRoot).toBe('/Users/me/repos/widgets')
   })
+})
 
+describe('parseDashboard — CI status', () => {
   it('maps ciStatus from the latest commit statusCheckRollup', () => {
-    const failing = prNode({
-      commits: {
-        nodes: [
-          {
-            commit: {
-              oid: 'a',
-              committedDate: '2026-01-01',
-              statusCheckRollup: { state: 'FAILURE' },
-            },
-          },
-        ],
-      },
-    })
-    const pending = prNode({
-      number: 2,
-      commits: {
-        nodes: [
-          {
-            commit: {
-              oid: 'b',
-              committedDate: '2026-01-01',
-              statusCheckRollup: { state: 'PENDING' },
-            },
-          },
-        ],
-      },
-    })
-    const none = prNode({
-      number: 3,
-      commits: {
-        nodes: [{ commit: { oid: 'c', committedDate: '2026-01-01', statusCheckRollup: null } }],
-      },
-    })
+    const failing = prNode({ commits: commitsWithRollup('a', { state: 'FAILURE' }) })
+    const pending = prNode({ number: 2, commits: commitsWithRollup('b', { state: 'PENDING' }) })
+    const none = prNode({ number: 3, commits: commitsWithRollup('c', null) })
     const raw = { data: { mine: { nodes: [failing, pending, none] } } }
-    const [a, b, c] = parseDashboard(raw, 'alice', new Map())
+    const [a, b, c] = parseDashboard(raw, { login: 'alice', localRoots: new Map() })
     expect(a.ciStatus).toBe('failing')
     expect(b.ciStatus).toBe('pending')
     expect(c.ciStatus).toBe('none')
   })
+})
 
+describe('parseDashboard — review decision', () => {
   it('maps reviewDecision values, defaulting unknown to none', () => {
     const approved = prNode({ reviewDecision: 'APPROVED' })
     const changesRequested = prNode({ number: 2, reviewDecision: 'CHANGES_REQUESTED' })
     const unknown = prNode({ number: 3, reviewDecision: null })
     const raw = { data: { mine: { nodes: [approved, changesRequested, unknown] } } }
-    const [a, b, c] = parseDashboard(raw, 'alice', new Map())
+    const [a, b, c] = parseDashboard(raw, { login: 'alice', localRoots: new Map() })
     expect(a.reviewDecision).toBe('approved')
     expect(b.reviewDecision).toBe('changes-requested')
     expect(c.reviewDecision).toBe('none')
@@ -230,10 +210,12 @@ describe('parseDashboard', () => {
       },
     })
     const raw = { data: { mine: { nodes: [node] } } }
-    const [pr] = parseDashboard(raw, 'alice', new Map())
+    const [pr] = parseDashboard(raw, { login: 'alice', localRoots: new Map() })
     expect(pr.reviewerCount).toBe(4) // 2 requested + 2 distinct (carol, dave)
   })
+})
 
+describe('parseDashboard — computes commitsSinceMyReview by counting commits after my latest review', () => {
   it('computes commitsSinceMyReview by counting commits after my latest review', () => {
     const node = prNode({
       commits: {
@@ -250,10 +232,12 @@ describe('parseDashboard', () => {
       },
     })
     const raw = { data: { reReview: { nodes: [node] } } }
-    const [pr] = parseDashboard(raw, 'alice', new Map())
+    const [pr] = parseDashboard(raw, { login: 'alice', localRoots: new Map() })
     expect(pr.commitsSinceMyReview).toBe(2)
   })
+})
 
+describe('parseDashboard — drops re-review rows with no commits since my review', () => {
   it('drops re-review rows with no commits since my review', () => {
     const node = prNode({
       commits: {
@@ -268,17 +252,19 @@ describe('parseDashboard', () => {
       },
     })
     const raw = { data: { reReview: { nodes: [node] } } }
-    const result = parseDashboard(raw, 'alice', new Map())
+    const result = parseDashboard(raw, { login: 'alice', localRoots: new Map() })
     expect(result).toHaveLength(0)
   })
 
   it('returns 0 commitsSinceMyReview when I have no review on the PR', () => {
     const node = prNode({ latestReviews: { nodes: [] } })
     const raw = { data: { mine: { nodes: [node] } } }
-    const [pr] = parseDashboard(raw, 'alice', new Map())
+    const [pr] = parseDashboard(raw, { login: 'alice', localRoots: new Map() })
     expect(pr.commitsSinceMyReview).toBe(0)
   })
+})
 
+describe('parseDashboard — dedupes across sections by precedence requested > re-review > team > involved', () => {
   it('dedupes across sections by precedence requested > re-review > team > involved', () => {
     const shared = prNode({ number: 9 })
     const sharedRequested = prNode({ number: 9 })
@@ -294,11 +280,13 @@ describe('parseDashboard', () => {
     shared.latestReviews.nodes = [
       { author: { login: 'alice' }, submittedAt: '2020-01-01', commit: { oid: 'a' } },
     ]
-    const result = parseDashboard(raw, 'alice', new Map())
+    const result = parseDashboard(raw, { login: 'alice', localRoots: new Map() })
     expect(result).toHaveLength(1)
     expect(result[0].section).toBe('requested')
   })
+})
 
+describe('parseDashboard — keeps a re-review row the reviewer was not re-requested on', () => {
   it('keeps a re-review row the reviewer was not re-requested on', () => {
     const shared = prNode({ number: 9 })
     shared.latestReviews.nodes = [
@@ -307,10 +295,12 @@ describe('parseDashboard', () => {
     const raw = {
       data: { reReview: { nodes: [shared] }, team: { nodes: [prNode({ number: 9 })] } },
     }
-    const result = parseDashboard(raw, 'alice', new Map())
+    const result = parseDashboard(raw, { login: 'alice', localRoots: new Map() })
     expect(result.map((r) => r.section)).toEqual(['re-review'])
   })
+})
 
+describe('parseDashboard — keeps mine rows independent of dedup against other sections', () => {
   it('keeps mine rows independent of dedup against other sections', () => {
     const node = prNode({ number: 9 })
     const raw = {
@@ -322,19 +312,21 @@ describe('parseDashboard', () => {
         mine: { nodes: [{ ...node }] },
       },
     }
-    const result = parseDashboard(raw, 'alice', new Map())
+    const result = parseDashboard(raw, { login: 'alice', localRoots: new Map() })
     expect(result).toHaveLength(2)
     expect(result.map((r) => r.section).sort()).toEqual(['involved', 'mine'])
   })
 
   it('handles a missing data payload gracefully', () => {
-    expect(parseDashboard({}, 'alice', new Map())).toEqual([])
+    expect(parseDashboard({}, { login: 'alice', localRoots: new Map() })).toEqual([])
   })
+})
 
+describe('parseDashboard — flags a high-risk large PR', () => {
   it('flags a high-risk large PR', () => {
     const node = prNode({ additions: 300, deletions: 200 })
     const raw = { data: { mine: { nodes: [node] } } }
-    const [pr] = parseDashboard(raw, 'alice', new Map())
+    const [pr] = parseDashboard(raw, { login: 'alice', localRoots: new Map() })
     expect(pr.riskLevel).toBe('high')
     expect(pr.estimatedMinutes).toBe(9) // ceil(500/60)
   })

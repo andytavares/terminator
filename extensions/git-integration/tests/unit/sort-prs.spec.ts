@@ -62,7 +62,9 @@ describe('sortPrs', () => {
     ]
     expect(ids(sortPrs(list, 'closest'))).toEqual([6, 5, 4, 3, 2, 1])
   })
+})
 
+describe('sortPrs — started', () => {
   it('started puts sessions first, then viewed fraction descending, then newest', () => {
     const list = [
       pr(1),
@@ -82,7 +84,9 @@ describe('sortPrs', () => {
     ]
     expect(ids(sortPrs(list, 'started'))).toEqual([2, 1])
   })
+})
 
+describe('sortPrs — the input and dashboard rows', () => {
   it('never mutates the input', () => {
     const list = [pr(3), pr(1), pr(2)]
     const copy = [...list]

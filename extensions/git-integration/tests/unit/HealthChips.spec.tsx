@@ -53,7 +53,9 @@ describe('HealthChips', () => {
     )
     expect(statusOf(container, 'Tests')).toBe('fail')
   })
+})
 
+describe('HealthChips — shows unknown for null testFilePresent', () => {
   it('shows unknown for null testFilePresent', () => {
     const { container } = render(
       <HealthChips riskScore={makeRiskScore({ testFilePresent: null })} />
@@ -76,7 +78,9 @@ describe('HealthChips', () => {
     render(<HealthChips riskScore={makeRiskScore()} ciStatus="pending" />)
     expect(screen.getByText('pending')).toBeTruthy()
   })
+})
 
+describe('HealthChips — shows coverage percentage from metrics', () => {
   it('shows coverage percentage from metrics', () => {
     render(<HealthChips riskScore={makeRiskScore({ patchCoverage: 75 })} />)
     expect(screen.getByText('75%')).toBeTruthy()
@@ -101,7 +105,9 @@ describe('HealthChips', () => {
     render(<HealthChips riskScore={makeRiskScore({ complexityDelta: 0 })} />)
     expect(screen.getByText('±0')).toBeTruthy()
   })
+})
 
+describe('HealthChips — shows complexity delta as negative for negative values', () => {
   it('shows complexity delta as negative for negative values', () => {
     render(<HealthChips riskScore={makeRiskScore({ complexityDelta: -2 })} />)
     expect(screen.getByText('-2')).toBeTruthy()
@@ -126,7 +132,9 @@ describe('HealthChips', () => {
     render(<HealthChips riskScore={makeRiskScore()} lintStatus="pass" />)
     expect(screen.getByText('clean')).toBeTruthy()
   })
+})
 
+describe('HealthChips — shows lint errors for fail status', () => {
   it('shows lint errors for fail status', () => {
     render(<HealthChips riskScore={makeRiskScore()} lintStatus="fail" />)
     expect(screen.getByText('errors')).toBeTruthy()
@@ -142,57 +150,61 @@ describe('HealthChips', () => {
     expect(screen.getByLabelText('File health signals')).toBeTruthy()
     expect(container.querySelectorAll('dt')).toHaveLength(8)
   })
+})
 
-  describe('list', () => {
-    it('renders a titled dl list', () => {
-      const { container } = render(<HealthChips riskScore={makeRiskScore()} />)
-      expect(screen.getByText('Health')).toBeTruthy()
-      expect(container.querySelector('dl')).toBeTruthy()
-    })
+describe('HealthChips (continued) — list', () => {
+  it('renders a titled dl list', () => {
+    const { container } = render(<HealthChips riskScore={makeRiskScore()} />)
+    expect(screen.getByText('Health')).toBeTruthy()
+    expect(container.querySelector('dl')).toBeTruthy()
+  })
+})
 
-    it('orders rows fail, then warn, then pass, then unknown', () => {
-      const { container } = render(
-        <HealthChips
-          riskScore={makeRiskScore({ testFilePresent: false, complexityDelta: 3, churn90d: null })}
-          ciStatus="passing"
-        />
-      )
-      const labels = Array.from(container.querySelectorAll('dt')).map((el) => el.textContent)
-      const statuses = Array.from(container.querySelectorAll('dd')).map((el) =>
-        el.getAttribute('data-status')
-      )
-      // fail (Tests) must come before warn (Complexity), which comes before
-      // pass (Coverage, CI), which comes before unknown (Churn, Blast, Duplication, Lint)
-      const failIdx = statuses.indexOf('fail')
-      const warnIdx = statuses.indexOf('warn')
-      const passIdx = statuses.indexOf('pass')
-      const unknownIdx = statuses.indexOf('unknown')
-      expect(failIdx).toBeLessThan(warnIdx)
-      expect(warnIdx).toBeLessThan(passIdx)
-      expect(passIdx).toBeLessThan(unknownIdx)
-      expect(labels).toContain('Tests')
-    })
+describe('HealthChips (continued) — list — orders rows fail, then warn, then pass, then unknown', () => {
+  it('orders rows fail, then warn, then pass, then unknown', () => {
+    const { container } = render(
+      <HealthChips
+        riskScore={makeRiskScore({ testFilePresent: false, complexityDelta: 3, churn90d: null })}
+        ciStatus="passing"
+      />
+    )
+    const labels = Array.from(container.querySelectorAll('dt')).map((el) => el.textContent)
+    const statuses = Array.from(container.querySelectorAll('dd')).map((el) =>
+      el.getAttribute('data-status')
+    )
+    // fail (Tests) must come before warn (Complexity), which comes before
+    // pass (Coverage, CI), which comes before unknown (Churn, Blast, Duplication, Lint)
+    const failIdx = statuses.indexOf('fail')
+    const warnIdx = statuses.indexOf('warn')
+    const passIdx = statuses.indexOf('pass')
+    const unknownIdx = statuses.indexOf('unknown')
+    expect(failIdx).toBeLessThan(warnIdx)
+    expect(warnIdx).toBeLessThan(passIdx)
+    expect(passIdx).toBeLessThan(unknownIdx)
+    expect(labels).toContain('Tests')
+  })
+})
 
-    it('shows "unknown" as the value text for unknown status rows', () => {
-      render(<HealthChips riskScore={makeRiskScore({ churn90d: null })} />)
-      const unknownValues = screen.getAllByText('unknown')
-      expect(unknownValues.length).toBeGreaterThan(0)
-    })
+describe('HealthChips (continued) — list — shows unknown as the value text for unknown status rows', () => {
+  it('shows "unknown" as the value text for unknown status rows', () => {
+    render(<HealthChips riskScore={makeRiskScore({ churn90d: null })} />)
+    const unknownValues = screen.getAllByText('unknown')
+    expect(unknownValues.length).toBeGreaterThan(0)
+  })
 
-    it('keeps the tooltip as a title attribute on each row', () => {
-      const { container } = render(<HealthChips riskScore={makeRiskScore()} />)
-      const row = Array.from(container.querySelectorAll('div[title]')).find((el) =>
-        el.textContent?.includes('Tests')
-      )
-      expect(row?.getAttribute('title')).toContain('test file')
-    })
+  it('keeps the tooltip as a title attribute on each row', () => {
+    const { container } = render(<HealthChips riskScore={makeRiskScore()} />)
+    const row = Array.from(container.querySelectorAll('div[title]')).find((el) =>
+      el.textContent?.includes('Tests')
+    )
+    expect(row?.getAttribute('title')).toContain('test file')
+  })
 
-    it('colours the value text by status', () => {
-      const { container } = render(
-        <HealthChips riskScore={makeRiskScore({ testFilePresent: false })} />
-      )
-      const failValue = container.querySelector('dd[data-status="fail"]')
-      expect(failValue).toBeTruthy()
-    })
+  it('colours the value text by status', () => {
+    const { container } = render(
+      <HealthChips riskScore={makeRiskScore({ testFilePresent: false })} />
+    )
+    const failValue = container.querySelector('dd[data-status="fail"]')
+    expect(failValue).toBeTruthy()
   })
 })

@@ -1,41 +1,23 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 
-/**
- * Enables a panel to be resized by dragging a divider element.
- * @param initialSize - Starting size in pixels
- * @param min - Minimum size in pixels
- * @param max - Maximum size in pixels
- * @param direction - 1 if dragging right increases size (left panels), -1 if dragging right decreases size (right panels)
- */
-export function useResizePanel(
-  initialSize: number,
-  min: number,
-  max: number,
-  direction: 1 | -1 = 1
+interface Drag {
+  active: boolean
+  startX: number
+  startSize: number
+}
+
+/** While a drag is active, each mouse move sets the size from how far the mouse has gone. */
+function useDragListeners(
+  dragRef: { current: Drag },
+  sizeFor: (delta: number) => number,
+  setSize: (size: number) => void
 ) {
-  const [size, setSize] = useState(initialSize)
-  const isDragging = useRef(false)
-  const startX = useRef(0)
-  const startSize = useRef(initialSize)
-
-  const handleMouseDown = useCallback(
-    (e: React.MouseEvent) => {
-      isDragging.current = true
-      startX.current = e.clientX
-      startSize.current = size
-      e.preventDefault()
-    },
-    [size]
-  )
-
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
-      if (!isDragging.current) return
-      const delta = (e.clientX - startX.current) * direction
-      setSize(Math.max(min, Math.min(max, startSize.current + delta)))
+      if (dragRef.current.active) setSize(sizeFor(e.clientX - dragRef.current.startX))
     }
     const onUp = () => {
-      isDragging.current = false
+      dragRef.current.active = false
     }
     window.addEventListener('mousemove', onMove)
     window.addEventListener('mouseup', onUp)
@@ -43,7 +25,34 @@ export function useResizePanel(
       window.removeEventListener('mousemove', onMove)
       window.removeEventListener('mouseup', onUp)
     }
-  }, [min, max, direction])
+  }, [dragRef, sizeFor, setSize])
+}
 
+/**
+ * Enables a panel to be resized by dragging a divider element.
+ * @param initialSize - Starting size in pixels
+ * @param bounds - Smallest and largest size in pixels
+ * @param direction - 1 if dragging right increases size (left panels), -1 if dragging right decreases size (right panels)
+ */
+export function useResizePanel(
+  initialSize: number,
+  bounds: { min: number; max: number },
+  direction: 1 | -1 = 1
+) {
+  const { min, max } = bounds
+  const [size, setSize] = useState(initialSize)
+  const dragRef = useRef<Drag>({ active: false, startX: 0, startSize: initialSize })
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      dragRef.current = { active: true, startX: e.clientX, startSize: size }
+      e.preventDefault()
+    },
+    [size]
+  )
+  const sizeFor = useCallback(
+    (delta: number) => Math.max(min, Math.min(max, dragRef.current.startSize + delta * direction)),
+    [min, max, direction]
+  )
+  useDragListeners(dragRef, sizeFor, setSize)
   return { size, handleMouseDown }
 }

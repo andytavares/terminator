@@ -20,7 +20,35 @@ describe('loadLanguageFor()', () => {
   })
 })
 
-describe('analyseSnippet()', () => {
+const BRANCHY_SOURCE = `
+export function branchy(a: number, b: number, c: number) {
+  if (a) {
+    // noop
+  } else if (b) {
+    // noop
+  }
+  for (let i = 0; i < a; i++) {}
+  while (b) {}
+  switch (c) {
+    case 1:
+      break
+    default:
+      break
+  }
+  try {
+    doThing()
+  } catch (e) {
+    handle(e)
+  }
+  const z = a ? b : c
+  const y = a && b
+  const w = a || b
+  const v = a ?? b
+  return z
+}
+`
+
+describe('analyseSnippet() — grammar and memory', () => {
   it('frees its syntax tree once the analysis is read', async () => {
     const free = vi.spyOn(Tree.prototype, 'delete')
     const result = await analyseSnippet('src/freed.ts', 'export function freed() { return 1 }')
@@ -33,7 +61,9 @@ describe('analyseSnippet()', () => {
     const result = await analyseSnippet('README.md', '# hello')
     expect(result).toBeNull()
   })
+})
 
+describe('analyseSnippet() — definitions', () => {
   it('collects function, class, interface, type, enum and exported-const definitions', async () => {
     const code = `
 export function computeRiskScore(metrics: FileMetrics): RiskScore {
@@ -61,7 +91,9 @@ const localHelper = 1
     // Non-exported const is a local binding, not a shared definition.
     expect(result!.definitions).not.toContain('localHelper')
   })
+})
 
+describe('analyseSnippet() — references', () => {
   it('collects references, excluding local bindings and keywords', async () => {
     const code = `
 import { RiskScore } from './schema'
@@ -82,36 +114,11 @@ export function usePrReview() {
     expect(result!.references).not.toContain('if')
     expect(result!.references).not.toContain('return')
   })
+})
 
+describe('analyseSnippet() — branches', () => {
   it('counts if/else-if, loops, switch case, catch, ternary and short-circuit branches', async () => {
-    const code = `
-export function branchy(a: number, b: number, c: number) {
-  if (a) {
-    // noop
-  } else if (b) {
-    // noop
-  }
-  for (let i = 0; i < a; i++) {}
-  while (b) {}
-  switch (c) {
-    case 1:
-      break
-    default:
-      break
-  }
-  try {
-    doThing()
-  } catch (e) {
-    handle(e)
-  }
-  const z = a ? b : c
-  const y = a && b
-  const w = a || b
-  const v = a ?? b
-  return z
-}
-`
-    const result = await analyseSnippet('src/branchy.ts', code)
+    const result = await analyseSnippet('src/branchy.ts', BRANCHY_SOURCE)
     expect(result).not.toBeNull()
     // if, else-if, for, while, switch case, catch, ternary, &&, ||, ?? = 10
     expect(result!.branches).toBe(10)
@@ -131,7 +138,9 @@ export function notBranchy() {
     expect(result).not.toBeNull()
     expect(result!.branches).toBe(0)
   })
+})
 
+describe('analyseSnippet() — function names', () => {
   it('names a generator function declaration and a named function expression', async () => {
     const code = `
 export function* genFn() {
@@ -162,7 +171,16 @@ export function callIt() {
     // variable_declarator parent, so functionName() falls through to null.
     expect(result!.functions.map((fn) => fn.name)).toEqual(['callIt'])
   })
+})
 
+const LOCALS_SOURCE = `
+export function locals(req: number, opt?: number) {
+  for (const key in table) use(key, req, opt)
+  try { run() } catch (err) { report(err) }
+}
+`
+
+describe('analyseSnippet() — local bindings', () => {
   it('pulls every bound identifier out of a destructuring pattern', async () => {
     const code = `
 export function destructure(obj: { a: number; b: number }) {
@@ -177,6 +195,22 @@ export function destructure(obj: { a: number; b: number }) {
     expect(result!.references).not.toContain('b')
   })
 
+  it('treats parameters, catch bindings and for-in variables as local', async () => {
+    const result = await analyseSnippet('src/locals.ts', LOCALS_SOURCE)
+    expect(result!.references).toEqual(expect.arrayContaining(['table', 'use', 'run', 'report']))
+    for (const local of ['req', 'opt', 'key', 'err'])
+      expect(result!.references).not.toContain(local)
+  })
+
+  it('treats the plain parameters of a JavaScript function as local', async () => {
+    const result = await analyseSnippet('src/sum.js', 'function sum(a, b) { return a + b + c }')
+    expect(result!.references).toContain('c')
+    expect(result!.references).not.toContain('a')
+    expect(result!.references).not.toContain('b')
+  })
+})
+
+describe('analyseSnippet() — exported functions and methods', () => {
   it('resolves the enclosing symbol for arrow-function const exports', async () => {
     const code = `
 export const computeRiskScore = (metrics: FileMetrics): RiskScore => {

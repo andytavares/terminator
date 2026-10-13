@@ -41,9 +41,11 @@ function exitingProcess() {
 
 type ExecCb = (err: Error | null, out?: { stdout: string }) => void
 function shellPrints(stdout: string | Error) {
-  execFile.mockImplementation((_cmd: string, _args: string[], _opts: unknown, cb: ExecCb) =>
-    stdout instanceof Error ? cb(stdout) : cb(null, { stdout })
-  )
+  // promisify(execFile) calls (cmd, args, opts, callback); only the callback matters here.
+  execFile.mockImplementation((...execArgs: unknown[]) => {
+    const cb = execArgs.at(-1) as ExecCb
+    return stdout instanceof Error ? cb(stdout) : cb(null, { stdout })
+  })
 }
 
 async function spawnedCommands(runs: number) {
@@ -83,7 +85,9 @@ describe('runAgentReview without an injected claude resolver', () => {
     expect(await spawnedCommands(2)).toEqual(['claude', 'claude'])
     expect(execFile).toHaveBeenCalledTimes(2)
   })
+})
 
+describe('runAgentReview without an injected claude resolver — falls back to a bare claude when the shell itself fails', () => {
   it('falls back to a bare claude when the shell itself fails', async () => {
     shellPrints(new Error('zsh: timeout'))
 

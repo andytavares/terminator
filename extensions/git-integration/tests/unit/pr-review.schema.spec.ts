@@ -124,7 +124,9 @@ describe('RiskScoreSchema', () => {
   it('rejects invalid risk level', () => {
     expect(RiskScoreSchema.safeParse({ ...validRiskScore, level: 'critical' }).success).toBe(false)
   })
+})
 
+describe('RiskScoreSchema — accepts null metric values', () => {
   it('accepts null metric values', () => {
     const score = {
       ...validRiskScore,
@@ -225,20 +227,20 @@ describe('ReviewQueuePRSchema', () => {
   })
 })
 
-describe('ReviewSessionSchema', () => {
-  const validSession = {
-    repoRoot: '/home/user/project',
-    prNumber: 42,
-    headSHA: 'abc1234',
-    currentChapterId: 'ch-1',
-    currentFilePath: 'src/app.ts',
-    viewedFiles: ['src/app.ts'],
-    fileOrderOverrides: { 'ch-1': ['src/a.ts', 'src/b.ts'] },
-    scrollPosition: 100,
-    pausedAt: null,
-    lastAccessedAt: '2024-01-01T00:00:00.000Z',
-  }
+const validSession = {
+  repoRoot: '/home/user/project',
+  prNumber: 42,
+  headSHA: 'abc1234',
+  currentChapterId: 'ch-1',
+  currentFilePath: 'src/app.ts',
+  viewedFiles: ['src/app.ts'],
+  fileOrderOverrides: { 'ch-1': ['src/a.ts', 'src/b.ts'] },
+  scrollPosition: 100,
+  pausedAt: null,
+  lastAccessedAt: '2024-01-01T00:00:00.000Z',
+}
 
+describe('ReviewSessionSchema', () => {
   it('accepts valid session', () => {
     expect(ReviewSessionSchema.safeParse(validSession).success).toBe(true)
   })
@@ -260,7 +262,9 @@ describe('ReviewSessionSchema', () => {
       true
     )
   })
+})
 
+describe('ReviewSessionSchema — accepts non-null pausedAt timestamp', () => {
   it('accepts non-null pausedAt timestamp', () => {
     expect(
       ReviewSessionSchema.safeParse({ ...validSession, pausedAt: '2024-01-01T12:00:00.000Z' })
@@ -278,25 +282,25 @@ describe('ReviewSessionSchema', () => {
   })
 })
 
-describe('InlineCommentSchema', () => {
-  const validComment = {
-    id: 1,
-    author: 'alice',
-    authorAvatarUrl: 'https://example.com/alice.png',
-    body: 'LGTM',
-    createdAt: '2024-01-01T00:00:00Z',
-    updatedAt: '2024-01-01T00:00:00Z',
-    path: 'src/app.ts',
-    line: 42,
-    startLine: null,
-    side: 'RIGHT' as const,
-    diffHunk: '@@ -1,3 +1,4 @@',
-    outdated: false,
-    threadId: 'thread-1',
-    isReply: false,
-    parentId: null,
-  }
+const validComment = {
+  id: 1,
+  author: 'alice',
+  authorAvatarUrl: 'https://example.com/alice.png',
+  body: 'LGTM',
+  createdAt: '2024-01-01T00:00:00Z',
+  updatedAt: '2024-01-01T00:00:00Z',
+  path: 'src/app.ts',
+  line: 42,
+  startLine: null,
+  side: 'RIGHT' as const,
+  diffHunk: '@@ -1,3 +1,4 @@',
+  outdated: false,
+  threadId: 'thread-1',
+  isReply: false,
+  parentId: null,
+}
 
+describe('InlineCommentSchema', () => {
   it('accepts valid inline comment', () => {
     expect(InlineCommentSchema.safeParse(validComment).success).toBe(true)
   })

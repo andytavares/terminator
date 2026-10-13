@@ -4,6 +4,7 @@ import { ArrowRight } from 'lucide-react'
 import { useReviewUiStore } from '../../stores/review-ui.store'
 import type { PrReviewDetail, ReviewNote, DraftComment } from '../../schemas/pr-review.schema'
 import type { AgentRun } from '../../schemas/review-agent.schema'
+import { plural } from '../text'
 
 interface Props {
   pr: PrReviewDetail
@@ -39,119 +40,156 @@ function formatResumeTime(iso: string): string {
   return formatRelativeTime(then, now)
 }
 
+type Finding = AgentRun['findings'][number]
+
+/** Findings from finished runs that were not dismissed. */
+function unopenedFindingsOf(agentRuns: AgentRun[]): Finding[] {
+  return agentRuns
+    .filter((r) => r.status === 'done')
+    .flatMap((r) => r.findings)
+    .filter((f) => !f.dismissed)
+}
+
+function highestSeverity(findings: Finding[]): string | null {
+  let top: string | null = null
+  for (const f of findings) {
+    if (!top || SEVERITY_RANK[f.severity] > SEVERITY_RANK[top]) top = f.severity
+  }
+  return top
+}
+
+/** A note holding "??" is one the reviewer meant as a question. */
+function questionNoteOf(notes: ReviewNote[]): ReviewNote | undefined {
+  return notes.find((n) => n.body.includes('??'))
+}
+
+function lineSuffix(lastLine: number | null): string {
+  if (lastLine == null) return ''
+  return ` line ${lastLine}`
+}
+
+function questionSuffix(note: ReviewNote | undefined): string {
+  if (!note) return ''
+  return `, 1 is a question: "${note.body}"`
+}
+
+function ResumeHead({ card: props }: { card: Props }) {
+  return (
+    <div className="rc-resume-head">
+      <b>Where you left off · #{props.pr.number}</b>
+      <span className="rc-note">
+        {formatResumeTime(props.lastAccessedAt)} · {props.viewedCount} of {props.totalFiles} files
+        viewed
+      </span>
+      <span className="rc-sp" style={{ flex: 1 }} />
+      <Button variant="primary" size="sm" onClick={props.onContinue}>
+        Continue <kbd className="tmui-kbd">↵</kbd>
+      </Button>
+    </div>
+  )
+}
+
+function PositionItem({ card: props }: { card: Props }) {
+  const chapterIndex = props.pr.chapters.findIndex((c) => c.id === props.currentChapterId)
+  return (
+    <li>
+      <span>
+        <ArrowRight aria-hidden="true" />
+      </span>
+      <span>
+        Chapter {chapterIndex + 1} · <code>{props.currentFilePath}</code>
+        {lineSuffix(props.lastLine)}
+      </span>
+      <span className="rc-note">last position</span>
+    </li>
+  )
+}
+
+/** The agent scope for a note: its line, on the new side. */
+function noteScope(note: ReviewNote) {
+  return {
+    kind: 'lines' as const,
+    path: note.path,
+    startLine: note.line,
+    endLine: note.line,
+    side: 'RIGHT' as const,
+    chapter: null,
+  }
+}
+
+function NotesItem({ notes }: { notes: ReviewNote[] }) {
+  const openAgentPanel = useReviewUiStore((s) => s.openAgentPanel)
+  const questionNote = questionNoteOf(notes)
+  const askAgent = (note: ReviewNote) => openAgentPanel(noteScope(note), 'ask')
+  return (
+    <li>
+      <span className="rc-pip">{notes.length}</span>
+      <span>
+        {notes.length} {plural(notes.length, 'note')}
+        {questionSuffix(questionNote)}
+      </span>
+      {questionNote && (
+        <Button size="sm" onClick={() => askAgent(questionNote)}>
+          Ask agent
+        </Button>
+      )}
+    </li>
+  )
+}
+
+function FindingsItem({ findings }: { findings: Finding[] }) {
+  return (
+    <li>
+      <span className="rc-pip rc-ag">{findings.length}</span>
+      <span>
+        {findings.length} agent {plural(findings.length, 'finding')} you haven&apos;t opened
+      </span>
+      <span className="rc-note">{highestSeverity(findings)}</span>
+    </li>
+  )
+}
+
+function DraftsItem(props: { count: number; onReviewDrafts: () => void }) {
+  return (
+    <li>
+      <span className="rc-pip">{props.count}</span>
+      <span>{props.count} draft comments not yet submitted</span>
+      <Button size="sm" onClick={props.onReviewDrafts}>
+        Review drafts
+      </Button>
+    </li>
+  )
+}
+
+function ChangedSinceItem({ count }: { count: number }) {
+  return (
+    <li>
+      <span style={{ color: 'var(--tm-warning)' }}>●</span>
+      <span>1 push since · {count} viewed files changed</span>
+      <span className="rc-note">S1</span>
+    </li>
+  )
+}
+
 /**
  * S2: shown over the diff area when a stored session's lastAccessedAt is
  * more than 15 minutes old, so the reviewer sees where they left off before
  * anything else renders.
  */
-export function ResumeCard({
-  pr,
-  lastAccessedAt,
-  viewedCount,
-  totalFiles,
-  currentChapterId,
-  currentFilePath,
-  lastLine,
-  notes,
-  drafts,
-  agentRuns,
-  changedSinceCount,
-  onContinue,
-  onReviewDrafts,
-}: Props) {
-  const openAgentPanel = useReviewUiStore((s) => s.openAgentPanel)
-
-  const chapterIndex = pr.chapters.findIndex((c) => c.id === currentChapterId)
-  const questionNote = notes.find((n) => n.body.includes('??'))
-  const unopenedFindings = agentRuns
-    .filter((r) => r.status === 'done')
-    .flatMap((r) => r.findings)
-    .filter((f) => !f.dismissed)
-  const highestSeverity = unopenedFindings.reduce<string | null>((top, f) => {
-    if (!top) return f.severity
-    return SEVERITY_RANK[f.severity] > SEVERITY_RANK[top] ? f.severity : top
-  }, null)
-
-  const handleAskAgent = () => {
-    if (!questionNote) return
-    openAgentPanel(
-      {
-        kind: 'lines',
-        path: questionNote.path,
-        startLine: questionNote.line,
-        endLine: questionNote.line,
-        side: 'RIGHT',
-        chapter: null,
-      },
-      'ask'
-    )
-  }
-
+export function ResumeCard(props: Props) {
+  const findings = unopenedFindingsOf(props.agentRuns)
+  const { notes, drafts, changedSinceCount } = props
   return (
     <div className="rc-resume">
-      <div className="rc-resume-head">
-        <b>Where you left off · #{pr.number}</b>
-        <span className="rc-note">
-          {formatResumeTime(lastAccessedAt)} · {viewedCount} of {totalFiles} files viewed
-        </span>
-        <span className="rc-sp" style={{ flex: 1 }} />
-        <Button variant="primary" size="sm" onClick={onContinue}>
-          Continue <kbd className="tmui-kbd">↵</kbd>
-        </Button>
-      </div>
+      <ResumeHead card={props} />
       <ul>
-        {currentFilePath && (
-          <li>
-            <span>
-              <ArrowRight aria-hidden="true" />
-            </span>
-            <span>
-              Chapter {chapterIndex + 1} · <code>{currentFilePath}</code>
-              {lastLine != null ? ` line ${lastLine}` : ''}
-            </span>
-            <span className="rc-note">last position</span>
-          </li>
-        )}
-        {notes.length > 0 && (
-          <li>
-            <span className="rc-pip">{notes.length}</span>
-            <span>
-              {notes.length} note{notes.length === 1 ? '' : 's'}
-              {questionNote ? `, 1 is a question: "${questionNote.body}"` : ''}
-            </span>
-            {questionNote && (
-              <Button size="sm" onClick={handleAskAgent}>
-                Ask agent
-              </Button>
-            )}
-          </li>
-        )}
-        {unopenedFindings.length > 0 && (
-          <li>
-            <span className="rc-pip rc-ag">{unopenedFindings.length}</span>
-            <span>
-              {unopenedFindings.length} agent finding{unopenedFindings.length === 1 ? '' : 's'} you
-              haven&apos;t opened
-            </span>
-            <span className="rc-note">{highestSeverity}</span>
-          </li>
-        )}
+        {props.currentFilePath && <PositionItem card={props} />}
+        {notes.length > 0 && <NotesItem notes={notes} />}
+        {findings.length > 0 && <FindingsItem findings={findings} />}
         {drafts.length > 0 && (
-          <li>
-            <span className="rc-pip">{drafts.length}</span>
-            <span>{drafts.length} draft comments not yet submitted</span>
-            <Button size="sm" onClick={onReviewDrafts}>
-              Review drafts
-            </Button>
-          </li>
+          <DraftsItem count={drafts.length} onReviewDrafts={props.onReviewDrafts} />
         )}
-        {changedSinceCount > 0 && (
-          <li>
-            <span style={{ color: 'var(--tm-warning)' }}>●</span>
-            <span>1 push since · {changedSinceCount} viewed files changed</span>
-            <span className="rc-note">S1</span>
-          </li>
-        )}
+        {changedSinceCount > 0 && <ChangedSinceItem count={changedSinceCount} />}
       </ul>
     </div>
   )

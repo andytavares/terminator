@@ -107,20 +107,21 @@ describe('ConflictResolver', () => {
     expect(screen.getByText('Preview').parentElement!.textContent).toContain('const x = 100')
     expect(mockResolveConflict).not.toHaveBeenCalled()
   })
+})
 
+describe('ConflictResolver — resolves with the chosen side and moves to the next conflict', () => {
   it('resolves with the chosen side and moves to the next conflict', async () => {
     renderResolver(2)
     fireEvent.click(screen.getByText(/Keep mine/))
     fireEvent.click(screen.getByText(/Confirm/))
     await waitFor(() => expect(useMergeFlowStore.getState().activeBlockIndex).toBe(1))
-    expect(mockResolveConflict).toHaveBeenCalledWith(
-      '/repo',
-      'src/foo.ts#0',
-      'const x = 0',
-      'ours',
-      undefined,
-      makeBlock(0).originalConflictText
-    )
+    expect(mockResolveConflict).toHaveBeenCalledWith({
+      repoRoot: '/repo',
+      blockId: 'src/foo.ts#0',
+      resolvedText: 'const x = 0',
+      strategy: 'ours',
+      originalConflictText: makeBlock(0).originalConflictText,
+    })
     expect(mockPersistSession).toHaveBeenCalledOnce()
     expect(useMergeFlowStore.getState().session!.files[0].blocks[0].isResolved).toBe(true)
   })
@@ -130,21 +131,23 @@ describe('ConflictResolver', () => {
     fireEvent.click(screen.getByText(/Keep theirs/))
     fireEvent.click(screen.getByText(/Confirm/))
     await waitFor(() => expect(onComplete).toHaveBeenCalledOnce())
-    expect(mockResolveConflict.mock.calls[0][2]).toBe('const x = 100')
+    expect(mockResolveConflict.mock.calls[0][0].resolvedText).toBe('const x = 100')
   })
+})
 
+describe('ConflictResolver — keeps the conflict unresolved and reports the error when resolving fails', () => {
   it('keeps the conflict unresolved and reports the error when resolving fails', async () => {
     mockResolveConflict.mockResolvedValue({ error: 'git add failed' })
     const { onComplete } = renderResolver(1)
     fireEvent.click(screen.getByText(/Keep mine/))
     fireEvent.click(screen.getByText(/Confirm/))
     await waitFor(() => expect(mockNotify).toHaveBeenCalled())
-    expect(mockNotify).toHaveBeenCalledWith(
-      'error',
-      'Could not resolve conflict',
-      'conflictResolveFailed',
-      'git add failed'
-    )
+    expect(mockNotify).toHaveBeenCalledWith({
+      type: 'error',
+      title: 'Could not resolve conflict',
+      key: 'conflictResolveFailed',
+      message: 'git add failed',
+    })
     expect(activeBlock().isResolved).toBe(false)
     expect(onComplete).not.toHaveBeenCalled()
   })
@@ -155,9 +158,14 @@ describe('ConflictResolver', () => {
     fireEvent.keyDown(window, { key: 't' })
     fireEvent.keyDown(window, { key: 'Enter' })
     await waitFor(() => expect(mockResolveConflict).toHaveBeenCalledOnce())
-    expect(mockResolveConflict.mock.calls[0].slice(2, 4)).toEqual(['const x = 100', 'theirs'])
+    expect(mockResolveConflict.mock.calls[0][0]).toMatchObject({
+      resolvedText: 'const x = 100',
+      strategy: 'theirs',
+    })
   })
+})
 
+describe('ConflictResolver — navigates between conflicts with the arrow keys', () => {
   it('navigates between conflicts with the arrow keys', () => {
     renderResolver(2)
     fireEvent.keyDown(window, { key: 'ArrowRight' })
@@ -173,7 +181,9 @@ describe('ConflictResolver', () => {
     fireEvent.keyDown(window, { key: 'ArrowRight' })
     expect(screen.queryByText(/Confirm/)).toBeNull()
   })
+})
 
+describe('ConflictResolver — resolves with the edited text and strategy manual from the editor', () => {
   it('resolves with the edited text and strategy manual from the editor', async () => {
     const { container } = renderResolver(1)
     fireEvent.click(screen.getByText(/Edit manually/))
@@ -184,7 +194,10 @@ describe('ConflictResolver', () => {
     })
     fireEvent.click(screen.getByRole('button', { name: /Save/ }))
     await waitFor(() => expect(mockResolveConflict).toHaveBeenCalledOnce())
-    expect(mockResolveConflict.mock.calls[0].slice(2, 4)).toEqual(['const x = 42', 'manual'])
+    expect(mockResolveConflict.mock.calls[0][0]).toMatchObject({
+      resolvedText: 'const x = 42',
+      strategy: 'manual',
+    })
   })
 
   it('pushes the other side into the open editor on Keep theirs, without resolving', () => {
@@ -196,7 +209,9 @@ describe('ConflictResolver', () => {
     expect(view.state.doc.toString()).toBe('const x = 100')
     expect(mockResolveConflict).not.toHaveBeenCalled()
   })
+})
 
+describe('ConflictResolver — undoes the last decision and tells the main process', () => {
   it('undoes the last decision and tells the main process', async () => {
     renderResolver(2)
     fireEvent.click(screen.getByText(/Keep mine/))
@@ -204,12 +219,12 @@ describe('ConflictResolver', () => {
     await waitFor(() => expect(useMergeFlowStore.getState().activeBlockIndex).toBe(1))
     fireEvent.click(screen.getByText(/Undo/))
     await waitFor(() => expect(mockUndoResolve).toHaveBeenCalledOnce())
-    expect(mockUndoResolve).toHaveBeenCalledWith(
-      '/repo',
-      'src/foo.ts#0',
-      'const x = 0',
-      makeBlock(0).originalConflictText
-    )
+    expect(mockUndoResolve).toHaveBeenCalledWith({
+      repoRoot: '/repo',
+      blockId: 'src/foo.ts#0',
+      resolvedText: 'const x = 0',
+      originalConflictText: makeBlock(0).originalConflictText,
+    })
     expect(useMergeFlowStore.getState().session!.files[0].blocks[0].isResolved).toBe(false)
     expect(useMergeFlowStore.getState().activeBlockIndex).toBe(0)
   })
@@ -219,9 +234,9 @@ describe('ConflictResolver', () => {
     fireEvent.click(screen.getByText(/Keep both/))
     fireEvent.click(screen.getByText(/Use this order/))
     await waitFor(() => expect(mockResolveConflict).toHaveBeenCalledOnce())
-    expect(mockResolveConflict.mock.calls[0][3]).toBe('both-ours-first')
-    expect(mockResolveConflict.mock.calls[0][2]).toContain('const x = 0')
-    expect(mockResolveConflict.mock.calls[0][2]).toContain('const x = 100')
+    expect(mockResolveConflict.mock.calls[0][0].strategy).toBe('both-ours-first')
+    expect(mockResolveConflict.mock.calls[0][0].resolvedText).toContain('const x = 0')
+    expect(mockResolveConflict.mock.calls[0][0].resolvedText).toContain('const x = 100')
   })
 })
 
@@ -240,7 +255,9 @@ describe('ConflictPanel', () => {
     expect(container.textContent).toContain('const x = 1')
     expect(container.textContent).toContain('const x = 2')
   })
+})
 
+describe('ConflictPanel — shows Your version and Incoming changes labels for non-rebase', () => {
   it('shows Your version and Incoming changes labels for non-rebase', () => {
     render(
       <ConflictPanel
@@ -254,7 +271,9 @@ describe('ConflictPanel', () => {
     expect(screen.getByText('Your version')).toBeTruthy()
     expect(screen.getByText('Incoming changes')).toBeTruthy()
   })
+})
 
+describe('ConflictPanel — inverts labels for rebase', () => {
   it('inverts labels for rebase', () => {
     render(
       <ConflictPanel
@@ -269,7 +288,9 @@ describe('ConflictPanel', () => {
     // rebase theirs label shows "Your version"
     expect(screen.getAllByText('Your version').length).toBeGreaterThan(0)
   })
+})
 
+describe('ConflictPanel — marks ours side selected when pendingStrategy is ours', () => {
   it('marks ours side selected when pendingStrategy is ours', () => {
     const { container } = render(
       <ConflictPanel
@@ -283,7 +304,9 @@ describe('ConflictPanel', () => {
     const selected = container.querySelector('.conflict-panel__side--selected')
     expect(selected).toBeTruthy()
   })
+})
 
+describe('ConflictPanel — calls onSelectMine when ours side clicked', () => {
   it('calls onSelectMine when ours side clicked', () => {
     const onSelectMine = vi.fn()
     render(
@@ -330,7 +353,9 @@ describe('ActionBar', () => {
     expect(screen.getByText(/Keep both/i)).toBeTruthy()
     expect(screen.getByText(/Edit/i)).toBeTruthy()
   })
+})
 
+describe('ActionBar — shows Confirm button when pendingResolution is set', () => {
   it('shows Confirm button when pendingResolution is set', () => {
     render(
       <ActionBar
@@ -344,7 +369,9 @@ describe('ActionBar', () => {
     )
     expect(screen.getByText(/Confirm/i)).toBeTruthy()
   })
+})
 
+describe('ActionBar — hides Confirm when no pendingResolution', () => {
   it('hides Confirm when no pendingResolution', () => {
     render(
       <ActionBar
@@ -358,7 +385,9 @@ describe('ActionBar', () => {
     )
     expect(screen.queryByText(/Confirm/i)).toBeNull()
   })
+})
 
+describe('ActionBar — calls onKeepMine when button clicked', () => {
   it('calls onKeepMine when button clicked', () => {
     const onKeepMine = vi.fn()
     render(

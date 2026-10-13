@@ -33,12 +33,12 @@ function resetStore() {
   })
 }
 
-describe('ViewMenu', () => {
-  beforeEach(() => {
-    localStorage.clear()
-    resetStore()
-  })
+beforeEach(() => {
+  localStorage.clear()
+  resetStore()
+})
 
+describe('ViewMenu', () => {
   it('opens the popover and shows the default state with no dot', async () => {
     render(<ViewMenu />)
     expect(screen.getByRole('button', { name: 'View' })).toBeTruthy()
@@ -62,7 +62,9 @@ describe('ViewMenu', () => {
     render(<ViewMenu />)
     expect(screen.getByRole('button', { name: 'View (changed)' })).toBeTruthy()
   })
+})
 
+describe('ViewMenu — says comments are hidden in the button name, not as separate text', () => {
   it('says comments are hidden in the button name, not as separate text', () => {
     useReviewUiStore.getState().setCommentVisibility('hidden')
     const { container } = render(<ViewMenu />)
@@ -87,7 +89,9 @@ describe('ViewMenu', () => {
     await userEvent.click(screen.getByRole('radio', { name: 'Unified' }))
     expect(useReviewUiStore.getState().diffViewMode).toBe('unified')
   })
+})
 
+describe('ViewMenu — turns agent notes back on via the On button', () => {
   it('turns agent notes back on via the On button', async () => {
     useReviewUiStore.getState().setAgentNotesOn(false)
     render(<ViewMenu />)
@@ -112,7 +116,9 @@ describe('ViewMenu', () => {
     expect(useReviewUiStore.getState().hideFormattingHunks).toBe(false)
     expect(toggle.getAttribute('aria-checked')).toBe('false')
   })
+})
 
+describe('ViewMenu — renders the sinceNote when provided', () => {
   it('renders the sinceNote when provided', async () => {
     render(<ViewMenu sinceNote="Showing a1b2… head" />)
     await userEvent.click(screen.getByRole('button', { name: 'View' }))

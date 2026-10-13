@@ -39,28 +39,28 @@ function step(n: number, path: string, reason: string): ReadingStep {
   return { step: n, path, symbol: null, reason, uses: [] }
 }
 
-describe('applyReadingOrder', () => {
-  // buildChapters' real output for the risk-score example (see the design doc).
-  const chapters = [
-    chapter('ui', [
-      'src/components/pr-review/ReviewDiffPane.tsx',
-      'src/components/pr-review/HealthChips.tsx',
-      'src/components/pr-review/RiskBreakdownPanel.tsx',
-    ]),
-    chapter('hooks', ['src/hooks/usePrReview.ts']),
-    chapter('data-layer', ['src/github/pr-review-service.ts', 'src/schemas/pr-review.schema.ts']),
-    chapter('tests', ['tests/unit/risk-score.spec.ts']),
-  ]
-  const order = [
-    step(1, 'src/schemas/pr-review.schema.ts', 'Defines RiskScore · depends on nothing in this PR'),
-    step(2, 'src/github/pr-review-service.ts', 'Uses RiskScore (step 1)'),
-    step(3, 'tests/unit/risk-score.spec.ts', 'Tests step 2, read right after it'),
-    step(4, 'src/hooks/usePrReview.ts', 'Calls computeRiskScore (step 2)'),
-    step(5, 'src/components/pr-review/HealthChips.tsx', 'Uses RiskScore (step 1)'),
-    step(6, 'src/components/pr-review/RiskBreakdownPanel.tsx', 'Uses RiskScore (step 1)'),
-    step(7, 'src/components/pr-review/ReviewDiffPane.tsx', 'Renders HealthChips (step 5)'),
-  ]
+const chapters = [
+  chapter('ui', [
+    'src/components/pr-review/ReviewDiffPane.tsx',
+    'src/components/pr-review/HealthChips.tsx',
+    'src/components/pr-review/RiskBreakdownPanel.tsx',
+  ]),
+  chapter('hooks', ['src/hooks/usePrReview.ts']),
+  chapter('data-layer', ['src/github/pr-review-service.ts', 'src/schemas/pr-review.schema.ts']),
+  chapter('tests', ['tests/unit/risk-score.spec.ts']),
+]
 
+const order = [
+  step(1, 'src/schemas/pr-review.schema.ts', 'Defines RiskScore · depends on nothing in this PR'),
+  step(2, 'src/github/pr-review-service.ts', 'Uses RiskScore (step 1)'),
+  step(3, 'tests/unit/risk-score.spec.ts', 'Tests step 2, read right after it'),
+  step(4, 'src/hooks/usePrReview.ts', 'Calls computeRiskScore (step 2)'),
+  step(5, 'src/components/pr-review/HealthChips.tsx', 'Uses RiskScore (step 1)'),
+  step(6, 'src/components/pr-review/RiskBreakdownPanel.tsx', 'Uses RiskScore (step 1)'),
+  step(7, 'src/components/pr-review/ReviewDiffPane.tsx', 'Renders HealthChips (step 5)'),
+]
+
+describe('applyReadingOrder', () => {
   it('orders chapters by their earliest step and files by step, with the step reason', () => {
     const out = applyReadingOrder(chapters, order)
     expect(out.map((c) => c.id)).toEqual(['data-layer', 'tests', 'hooks', 'ui'])

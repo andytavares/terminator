@@ -13,9 +13,9 @@ Object.defineProperty(window, 'electronAPI', {
 // The sanitising, link and HTML behaviour belongs to the design system's
 // Markdown and is specified in tests/unit/packages/extension-ui/markdown.spec.tsx;
 // this file covers what the review UI adds to it.
-describe('RichContent', () => {
-  beforeEach(() => mockOpenExternal.mockClear())
+beforeEach(() => mockOpenExternal.mockClear())
 
+describe('RichContent', () => {
   it('keeps the rich-content class the review stylesheet targets', () => {
     const { container } = render(<RichContent className="extra">Content</RichContent>)
     expect(container.querySelector('.rich-content.extra')).not.toBeNull()
@@ -40,7 +40,9 @@ describe('RichContent', () => {
       'plain words'
     )
   })
+})
 
+describe('RichContent — leaves inline code unhighlighted', () => {
   it('leaves inline code unhighlighted', () => {
     const { container } = render(<RichContent>{'run `npm ci`'}</RichContent>)
     expect(container.querySelector('code.hljs')).toBeNull()
