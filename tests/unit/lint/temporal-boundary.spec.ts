@@ -30,8 +30,10 @@ function errorsUsingTemporal(name: string): string[] {
       ? ts.createSourceFile(probe, USES_TEMPORAL, languageVersion)
       : readSourceFile(fileName, languageVersion)
   const program = ts.createProgram({ rootNames: [probe], options, host })
-  return ts
-    .getPreEmitDiagnostics(program)
+  // The probe's own diagnostics only: checking every declaration file the config loads took
+  // over 5 s on CI and answers a question this spec does not ask.
+  return program
+    .getSemanticDiagnostics(program.getSourceFile(probe))
     .map((diagnostic) => ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'))
 }
 
@@ -43,9 +45,17 @@ function viewEntry(): string {
   return path.join(extensionRoot, source)
 }
 
+// Type-checked as the file loads, as renderer-size-limits.spec warms ESLint: a program's first
+// build loads TypeScript and its libraries, which on a busy CI runner outlasted a test's 5 s.
+const ERRORS = {
+  view: errorsUsingTemporal('tsconfig.view.json'),
+  backend: errorsUsingTemporal('tsconfig.json'),
+  specs: errorsUsingTemporal('tsconfig.test.json'),
+}
+
 describe('Temporal in Task Vault', () => {
   it('is not a name the view can use', () => {
-    expect(errorsUsingTemporal('tsconfig.view.json')).toEqual(["Cannot find name 'Temporal'."])
+    expect(ERRORS.view).toEqual(["Cannot find name 'Temporal'."])
   })
 
   it('is checked from the module the view page loads, through everything it imports', () => {
@@ -53,10 +63,10 @@ describe('Temporal in Task Vault', () => {
   })
 
   it('type-checks in the backend', () => {
-    expect(errorsUsingTemporal('tsconfig.json')).toEqual([])
+    expect(ERRORS.backend).toEqual([])
   })
 
   it('type-checks in the specs', () => {
-    expect(errorsUsingTemporal('tsconfig.test.json')).toEqual([])
+    expect(ERRORS.specs).toEqual([])
   })
 })
