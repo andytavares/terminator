@@ -12,23 +12,24 @@ Two tools measure them, and they disagree, so both are reported:
 
 ## Where it stands
 
-Measured 2026-10-14 at `ab990397`, after the clean-up passes. This section replaces the numbers in
+Measured 2026-10-14 at `fe2e2a89`, after the clean-up passes. This section replaces the numbers in
 the sections below, which record the first measurement.
 
-| Rule                                                  | First measurement | Now   | Command                                                                              |
-| ----------------------------------------------------- | ----------------- | ----- | ------------------------------------------------------------------------------------ |
-| Functions over the limits (ESLint, every file)        | 1                 | 0     | `npm run lint`                                                                       |
-| Explicit `any`, counting ones behind `eslint-disable` | 25                | 0     | `npx eslint . --no-inline-config --rule '@typescript-eslint/no-explicit-any: error'` |
-| `as unknown as` lines                                 | 256               | 0     | `git grep -n 'as unknown as' -- '*.ts' '*.tsx' '*.mts' '*.js' '*.mjs' '*.cjs'`       |
-| Coverage-ignore comments                              | 30                | 0     | `git grep -niE '(istanbul\|v8\|c8) ignore' -- '*.ts' '*.tsx'`                        |
-| Comment runs over 3 lines (gate.py)                   | 986               | 6     | `uv run --script findings.py origin/main..HEAD` (the script below)                   |
-| Repeated names (gate.py)                              | 2,807             | 1,084 | same                                                                                 |
-| Size and ratchet (gate.py, lizard)                    | 277               | 276   | same; ESLint reports 0                                                               |
+| Rule                                                  | First measurement | Now | Command                                                                              |
+| ----------------------------------------------------- | ----------------- | --- | ------------------------------------------------------------------------------------ |
+| Functions over the limits (ESLint, every file)        | 1                 | 0   | `npm run lint`                                                                       |
+| Explicit `any`, counting ones behind `eslint-disable` | 25                | 0   | `npx eslint . --no-inline-config --rule '@typescript-eslint/no-explicit-any: error'` |
+| `as unknown as` lines                                 | 256               | 0   | `git grep -n 'as unknown as' -- '*.ts' '*.tsx' '*.mts' '*.js' '*.mjs' '*.cjs'`       |
+| Coverage-ignore comments                              | 30                | 0   | `git grep -niE '(istanbul\|v8\|c8) ignore' -- '*.ts' '*.tsx'`                        |
+| Comment runs over 3 lines (gate.py)                   | 986               | 6   | `uv run --script findings.py origin/main..HEAD` (the script below)                   |
+| Repeated names (gate.py)                              | 2,807             | 0   | same                                                                                 |
+| Size and ratchet (gate.py, lizard)                    | 277               | 278 | same; ESLint reports 0                                                               |
 
-The gate reads `.clean-gate.json`: it skips PNGs, which it could not decode, and 20 names that are
-never a function someone defined twice. lizard gives an anonymous callback the name of the call or
-keyword before it (`return`, `describe`, `useEffect`); Storybook requires `render` and `play`; the
-extension host calls `activate` and `deactivate`.
+The gate reads `.clean-gate.json`: it skips PNGs, which it could not decode, and the names the
+owner asked it to skip: those an interface, a `vi.mock`, an event handler or a call site gives
+(`run`, `dispose`, `onKeyDown`), which lizard counts as function definitions, and the names lizard
+invents for an anonymous callback (`return`, `describe`, `useEffect`). Functions that only shared a
+generic name were renamed for what they do, and copies were merged.
 
 What is left, all listed in [clean-gate-findings.tsv](clean-gate-findings.tsv):
 
@@ -36,13 +37,7 @@ What is left, all listed in [clean-gate-findings.tsv](clean-gate-findings.tsv):
   new extension, not comments of that file. Three are file headers (`types/api.d.ts`,
   `electron-api/manifest.ts`), which the rule allows; the gate reports them because line 1 itself
   did not change.
-- **1,084 repeated names across 395 names.** They are members of object literals that an
-  interface names: `run` (139, the `run` of each `ChannelSpec`), `list` (25), `dispose` (16),
-  `register` (15), and spec fakes of those interfaces. Renaming a member means renaming the
-  interface, which moves the repeat. `ignoreNames` is by name for the whole repository, so adding
-  `run` or `list` would also hide a real copy. The fix belongs in gate.py: do not count an object
-  literal's members as function definitions.
-- **276 size and ratchet findings.** lizard counts each field of a destructured parameter and loses
+- **278 size and ratchet findings.** lizard counts each field of a destructured parameter and loses
   the end of a function after some generics and template literals. ESLint parses TypeScript and
   reports none over the limits.
 

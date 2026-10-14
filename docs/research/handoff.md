@@ -34,13 +34,13 @@ The phases in `docs/research/perf/` and the ADRs 093–105 record each decision.
 
 1. Done: function size limits for Foundry, the core and every other file; the ESLint rule is on
    for all of them (decision 33).
-2. Done, apart from what the gate itself must change: `docs/research/clean-gate.md` has the
-   numbers and the commands. Comment runs went from 986 to 6, repeated names from 2,807 to 1,084,
-   and no `as unknown as`, explicit `any` or coverage-ignore comment is left. The 1,084 are
-   members of object literals that an interface names (`run`, `list`, `dispose`); gate.py counts
-   them as function definitions, and `ignoreNames` cannot skip them without hiding real copies.
-   The helpers the extensions each kept a copy of are in the SDK (`createIpcRegistrar`,
-   `validationError`, `plural`, `openInBrowser`, `shellQuote`), and `defineChannel` has no cast.
+2. Done: the clean gate. `docs/research/clean-gate.md` has the numbers and the commands. Comment
+   runs went from 986 to 6 and no `as unknown as`, explicit `any` or coverage-ignore comment is
+   left. Repeated names went from 2,807 to the count in that report: real duplicates were merged
+   or renamed, and `.clean-gate.json` lists the names an interface, a mock, an event handler or a
+   call site gives, which the owner asked the gate to skip. The helpers the extensions each kept
+   a copy of are in the SDK (`createIpcRegistrar`, `validationError`, `plural`, `openInBrowser`,
+   `shellQuote`), and `defineChannel` has no cast.
 
 3. Done: the settings nothing read are implemented or removed (decisions 15–18).
 4. Done: list settings are edited one item per line (decision 19).
@@ -51,6 +51,11 @@ The phases in `docs/research/perf/` and the ADRs 093–105 record each decision.
 6. Done: Remote Control's 9 channels are driven end to end (`remote-control.spec.ts`).
 7. Done: `knip --production` is a second gate (ADR 107).
 8. Done: final review and the PR description with a "How to read this change" section.
+9. Done: every modal is the design system's `ModalShell`, a native `<dialog>`, centred in its
+   window; `tests/e2e/modal-centre.ts` measures each (ADR 110).
+10. Done: the Git tab follows a per-view file watch and no longer polls (ADR 109).
+11. Done: Task Vault's backend computes dates with `Temporal`; its view does not (ADR 108).
+12. Done: design tokens have one name, `--tm-*`; the core's aliases are gone.
 
 ## Decisions made without the user
 
@@ -176,6 +181,17 @@ Each entry: what was decided, why, and how to undo it.
     is an error (`16439dd`). The two `any`s left are behind `eslint-disable` comments that say why
     (`src/main/ipc/channel-registrar.ts`, `src/main/storage/cached-store.ts`). Undo: revert it.
 
+## Decisions the owner made (2026-10-13)
+
+- Task Vault stays, as a core extension. Foundry stays an extension. Remote Control over the LAN
+  without TLS is accepted.
+- A monthly task due on the 31st repeats on the last day of a shorter month (Jan 31, then Feb 28).
+  It used to skip that month.
+- The notification drawer is not a modal: the app stays usable beside it.
+- `@terminator/extension-sdk` is 5.0.0, for the change in who owns a view's file watch.
+- The clean gate skips the names in `.clean-gate.json`.
+- Modals use the native `<dialog>` element and are always centred, horizontally and vertically.
+
 ## Known advisories
 
 Checked 2026-10-13 at 311df92. `npm audit` reports 10 (2 low, 8 moderate), exit 1;
@@ -245,6 +261,7 @@ do not declare.
    A watch belongs to the view that asked for it; the remote browser client has none and still
    polls. Git processes started in one idle minute with the Git tab open went from 54 to 14
    (the Git tab's own, 40 to 0); the method is in the ADR. Three things are left as they were:
+
    - The 14 are the core sidebar's polls: `useBranchSync` (`git branch --show-current` every
      5 s per card) and the change count. The view API watches trees and the branch is one file,
      so a watch per card would cost more than the poll.
@@ -255,6 +272,16 @@ do not declare.
      git config sends trace2 to a daemon (`rmSync` of the spec's own clone, `ENOTEMPTY`). It
      passes with `GIT_TRACE2_EVENT=0`, which `tests/setup.ts` sets for vitest and nothing sets
      for Playwright.
+
+9. **`remote-control.spec.ts` fails on a machine already running ngrok.** The extension reads
+   the tunnel from `127.0.0.1:4040`, which a real `ngrok` holds, so the spec's stand-in never
+   shows the public address. CI is not affected.
+10. **The native dialog was not run on a real iPhone.** WebKit was checked with Playwright's
+    WebKit build on macOS (`packages/extension-ui/visual/modal-keys.visual.ts`).
+11. **An e2e teardown reported "The app left 1 process running" twice in eleven batch runs**, on
+    a machine that was also running three other test suites, right after the file watch landed.
+    Ten runs alone did not repeat it and the process was not identified. If it returns, the
+    message names the process (`tests/e2e/leftover-processes.ts`).
 
 ## How to continue
 
