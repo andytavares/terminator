@@ -16,7 +16,8 @@ function host(values: Record<string, unknown>, showToast = vi.fn()): ExtensionAP
     set: (key: string, value: unknown) => void (values[key] = value),
   })
   const notifications = partialFake<ExtensionAPI['notifications']>({ showToast })
-  return partialFake<ExtensionAPI>({ settings, notifications })
+  const paths = partialFake<ExtensionAPI['paths']>({ globalStorage: '/app-data/foundry' })
+  return partialFake<ExtensionAPI>({ settings, notifications, paths })
 }
 
 describe('settings the operator changed', () => {
@@ -59,5 +60,13 @@ describe('the untracked records notice', () => {
     }
     noteUntrackedDataRoot(host(seen, showToast), '/repos/app/.foundry')
     expect(showToast).not.toHaveBeenCalled()
+  })
+
+  it("is not shown, or remembered, while the records are in the app's own folder", () => {
+    const values: Record<string, unknown> = { 'terminator.foundry.dataDir': '' }
+    const showToast = vi.fn()
+    noteUntrackedDataRoot(host(values, showToast), '/app-data/foundry/records/.foundry')
+    expect(showToast).not.toHaveBeenCalled()
+    expect(values['terminator.foundry.untrackedNoticeSeen']).toBeUndefined()
   })
 })

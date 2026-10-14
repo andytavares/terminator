@@ -7,9 +7,11 @@ import { fallbackRecordsBase } from './storage-folder.js'
 import type { ActivationContext } from './ipc/register.js'
 
 // Tell the operator once that the default records location is untracked. Best effort:
-// no notification surface or settings answer may stop the extension loading.
+// no notification surface or settings answer may stop the extension loading. With no workspace
+// open the records are in Foundry's own folder, inside no repository: nothing to say yet.
 export function noteUntrackedDataRoot(api: ExtensionAPI, root: string): void {
   try {
+    if (path.dirname(root) === fallbackRecordsBase(api)) return
     const configured = api.settings?.get<string>('terminator.foundry.dataDir') ?? ''
     const notice = untrackedNotice({ root, usingDefault: configured.trim() === '' })
     if (notice === null) return
