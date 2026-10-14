@@ -1,0 +1,61 @@
+tests/unit/renderer/components/SettingsPanel.spec.tsx
+  s_c9dd89ad1f6c54::t_9bafe51fe58f15 112
+  s_c9dd89ad1f6c54::t_8cc496b73b5d7a 8
+  s_c9dd89ad1f6c54::t_5e60f776fd33a2 57-58,60
+tests/e2e/quick-actions.spec.ts
+  s_c9dd89ad1f6c54::t_a55fb257d80aa5 43,238
+  s_c9dd89ad1f6c54::t_2bb1521a161aeb 13,44
+  s_c9dd89ad1f6c54::t_91e6d8332c572a 184
+tests/e2e/core-quick-actions.spec.ts
+  s_c9dd89ad1f6c54::t_2a721a2f32a28e 148
+tests/e2e/git-commit-flow.spec.ts
+  s_c9dd89ad1f6c54::t_030d60da8409a7 158
+  s_c9dd89ad1f6c54::t_fe9e8f153a4718 8,121
+src/renderer/components/settings/SettingsPanel.tsx
+  s_c9dd89ad1f6c54::t_348d4c5c8ab07f 1-2
+  s_c9dd89ad1f6c54::t_148e1b1f162944 24-27,29-35
+tests/e2e/helpers.ts
+  s_c9dd89ad1f6c54::t_a55fb257d80aa5 384
+tests/e2e/core-ipc.spec.ts
+  s_c9dd89ad1f6c54::t_a55fb257d80aa5 264
+tests/unit/renderer/components/QuickActions.spec.tsx
+  s_c9dd89ad1f6c54::t_7582b4a849dcca 6
+  s_c9dd89ad1f6c54::t_a01531b7c2144c 254-261
+tests/unit/renderer/components/NotificationPanel.spec.tsx
+  s_c9dd89ad1f6c54::t_3e78615233aaa7 59,62
+src/renderer/components/QuickActions.tsx
+  s_c9dd89ad1f6c54::t_851433cb5bad22 56-57,62
+  s_c9dd89ad1f6c54::t_e55b115856cdaf 156-158
+  s_c9dd89ad1f6c54::t_d292409f76ad34 3
+src/renderer/components/LogWindow.tsx
+  s_c9dd89ad1f6c54::t_2a721a2f32a28e 33
+src/renderer/components/settings/SettingsPanel.css
+  s_c9dd89ad1f6c54::t_2e3b8c7faea7bd 2
+tests/e2e/settings.spec.ts
+  s_c9dd89ad1f6c54::t_fe9e8f153a4718 11,45
+src/renderer/components/QuickActions.css
+  s_c9dd89ad1f6c54::t_379b8cd9c54039 1
+  s_c9dd89ad1f6c54::t_730ff45e3cd684 15-23
+tests/e2e/extension-lifecycle.spec.ts
+  s_c9dd89ad1f6c54::t_2a721a2f32a28e 72
+src/renderer/components/NotificationPanel.tsx
+  s_c9dd89ad1f6c54::t_71d4b71a0d0164 175
+tests/unit/renderer/components/LogWindow.spec.tsx
+  s_c9dd89ad1f6c54::t_169dc3c97e2a53 15,17
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e0f572098f74d08f544eb19729c5f1a27c571c93",
+  "prompts": {},
+  "sessions": {
+    "s_c9dd89ad1f6c54": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ee6b7f82-c708-43d8-8c1f-eefe55f692a9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
