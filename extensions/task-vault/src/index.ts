@@ -28,6 +28,7 @@ import {
   setSchedulerTick,
 } from './notifications/task-scheduler.js'
 import { openInVault, popPendingNavigation } from './navigation.js'
+import { zonedNow } from './vault/clock.js'
 
 // Every notification kind task-vault ever raises, so the user can independently
 // choose its delivery target(s) (system/in-app/toast) in this extension's own
@@ -319,35 +320,35 @@ export async function activate(api: ExtensionAPI): Promise<TaskVaultAPI> {
   }
 }
 
-let reviewNudgeInterval: ReturnType<typeof setInterval> | null = null
+let reviewNudgeTimer: ReturnType<typeof setTimeout> | null = null
+
+function clearReviewNudgeTimer(): void {
+  if (reviewNudgeTimer === null) return
+  clearTimeout(reviewNudgeTimer)
+  reviewNudgeTimer = null
+}
+
+function nudgeWeeklyReview(api: ExtensionAPI): void {
+  // A notification rather than a toast: a toast is transient and has nothing
+  // to click, so "open Task Vault to start" was an instruction to go and do
+  // the navigation yourself. This one is the link.
+  api.notifications.createNotification({
+    type: 'info',
+    title: 'Weekly review is ready',
+    key: 'weeklyReviewReady',
+    onClick: () => openInVault(api, { view: 'review' }),
+  })
+}
 
 /** Checks daily whether today is the review day; the setting is read at each check, so a change applies. */
 function scheduleWeeklyReviewNudge(api: ExtensionAPI): void {
-  if (reviewNudgeInterval !== null) {
-    clearInterval(reviewNudgeInterval)
-    reviewNudgeInterval = null
-  }
-  function checkAndNudge() {
-    const now = new Date()
-    if (now.getDay() !== weeklyReviewDay(api)) return
-    // A notification rather than a toast: a toast is transient and has nothing
-    // to click, so "open Task Vault to start" was an instruction to go and do
-    // the navigation yourself. This one is the link.
-    api.notifications.createNotification({
-      type: 'info',
-      title: 'Weekly review is ready',
-      key: 'weeklyReviewReady',
-      onClick: () => openInVault(api, { view: 'review' }),
-    })
-  }
-
-  checkAndNudge()
-  reviewNudgeInterval = setInterval(
-    () => {
-      checkAndNudge()
-    },
-    24 * 60 * 60 * 1000
-  )
+  clearReviewNudgeTimer()
+  const now = zonedNow()
+  // Temporal counts Sunday as 7; the setting counts it as 0.
+  if (now.dayOfWeek % 7 === weeklyReviewDay(api)) nudgeWeeklyReview(api)
+  // The same time tomorrow, not 24 hours on: when the clocks change, 24 hours can step over a date.
+  const untilTomorrow = now.add({ days: 1 }).epochMilliseconds - now.epochMilliseconds
+  reviewNudgeTimer = setTimeout(() => scheduleWeeklyReviewNudge(api), untilTomorrow)
 }
 
 function openCaptureOverlay(api: ExtensionAPI): void {
@@ -373,10 +374,7 @@ export async function deactivate(): Promise<void> {
   _schedulerStarted = false
   _pendingCapture = false
   clearPendingCaptureTimer()
-  if (reviewNudgeInterval !== null) {
-    clearInterval(reviewNudgeInterval)
-    reviewNudgeInterval = null
-  }
+  clearReviewNudgeTimer()
   for (const d of disposables) {
     d.dispose()
   }

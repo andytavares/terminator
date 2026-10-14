@@ -171,6 +171,35 @@ function weeklyReviewNudgeTests() {
 
     expect(reviewNudges(api)).toBe(1)
   })
+
+  describe('the daily check', weeklyReviewNudgeDailyCheckTests)
+}
+
+function weeklyReviewNudgeDailyCheckTests() {
+  it('comes on a review day that has 23 hours, when the app was started late the evening before', async () => {
+    vi.stubEnv('TZ', 'America/New_York')
+    // Saturday 23:30; the clocks go forward on Sunday, so 24 hours later is Monday 00:30.
+    vi.setSystemTime(new Date('2026-03-07T23:30:00'))
+    const { api } = makeApi({ [REVIEW_DAY]: '0' })
+    const { activate, deactivate } = await import('../src/index.ts')
+    await activate(api)
+    vi.advanceTimersByTime(DAY_MS)
+    await deactivate()
+    vi.unstubAllEnvs()
+
+    expect(reviewNudges(api)).toBe(1)
+  })
+
+  it('checks once a day for as long as the app runs', async () => {
+    const { api } = makeApi({ [REVIEW_DAY]: '3' })
+    const { activate, deactivate } = await import('../src/index.ts')
+    await activate(api)
+    vi.advanceTimersByTime(14 * DAY_MS)
+    await deactivate()
+    vi.advanceTimersByTime(14 * DAY_MS)
+
+    expect(reviewNudges(api)).toBe(3)
+  })
 }
 
 function taskVaultActivateQuickActionsTests() {
