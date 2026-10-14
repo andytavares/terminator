@@ -30,7 +30,6 @@ export function NameTerminalDialog({ defaultName, onConfirm, onCancel }: Props) 
         ref={inputRef}
         type="text"
         aria-label="Terminal name"
-        className="settings-section__input"
         placeholder={defaultName}
         value={name}
         onChange={(e) => setName(e.target.value)}

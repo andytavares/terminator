@@ -39,6 +39,8 @@ should define a colour.
 | `Markdown`                                       | react-markdown with GFM and sanitised raw HTML (ADR 091); `inline`, `fetchesNothing`                                          |
 | `RelativeTime`, `formatRelativeTime`             | "5 minutes ago" through `Intl.RelativeTimeFormat`                                                                             |
 
+**Fields** — no component: every `input`, `textarea` and `select` is the themed field from `controls.css` at one element's weight, so any class refines it. A field inside a box that draws the edge sets `border: none; padding: 0; outline: none` and the box takes `:focus-within`.
+
 **Behaviour** — `usePolling(read, show, intervalMs)`, `everyWhileVisible(tick, intervalMs)`, `useDismissible`,
 the modal-depth registry and the layer scale (`LAYERS`, `layerValue`).
 

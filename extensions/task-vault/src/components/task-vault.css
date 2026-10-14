@@ -2011,6 +2011,7 @@
   flex: 1;
   background: none;
   border: none;
+  padding: 0;
   color: var(--tm-text-primary);
   font-size: 13px;
   outline: none;

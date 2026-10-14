@@ -84,6 +84,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- Every text field, textarea and select is the design system's field (`controls.css`): themed background, border, padding, placeholder, and an accent edge with a soft ring on focus. A field whose class lived in a sheet not loaded yet was the white OS widget; the terminal-name dialog showed one until Settings had been opened once. Fields inside a box that draws its own edge (searches with an icon) keep their look, and the sidebar search box now shows focus
 - Extension toasts no longer sit under the extension's view. While an extension's view is on screen (or its frame, in the browser), the core leaves that extension's toasts to the view; every bundled extension view now draws its own (`PushedToasts` in the design system, Task Vault's own region). Elsewhere the core draws them as before
 - Reviews: a row's Open and Clone and review buttons no longer cover its size and reading time on hover
 - Review screen: the unified diff spans the pane again. The Git tab's stylesheet made every diff row a flex box, squeezing the code column to 200px and hiding the hunk header

@@ -18,6 +18,7 @@
   min-width: 0;
   background: transparent;
   border: none;
+  padding: 0;
   outline: none;
   color: var(--tm-text-primary);
   font-family: var(--tm-font-ui);

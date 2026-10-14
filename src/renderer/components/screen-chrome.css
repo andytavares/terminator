@@ -80,6 +80,7 @@
   flex: 1;
   min-width: 0;
   border: 0;
+  padding: 0;
   outline: none;
   background: transparent;
   color: var(--tm-text-primary);
