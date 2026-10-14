@@ -1,0 +1,37 @@
+tests/e2e/task-vault-projects.spec.ts
+  s_dc878271adf24d::t_5e4ae4414e971d 116
+  s_dc878271adf24d::t_ee268b13da94d0 4
+tests/e2e/task-vault-harness.ts
+  s_dc878271adf24d::t_5e4ae4414e971d 1,65-71
+  s_dc878271adf24d::t_409d5f1a91981a 72
+extensions/task-vault/src/components/task-vault.css
+  s_dc878271adf24d::t_4c5b807c620310 453-454,2318-2319,2473-2474,2485-2486,3264-3265,3350-3351,3783-3784,4707-4708,4858-4859,5051-5052,5965-5966
+  s_dc878271adf24d::t_817eca3a7f6248 3773-3776,3785-3786,4703-4704,4709-4710,4854-4855,4860-4861
+tests/e2e/task-vault-today.spec.ts
+  s_dc878271adf24d::t_f91a14be8e4858 261,263-266
+  s_dc878271adf24d::t_ee268b13da94d0 11,41-43,233-235
+  s_dc878271adf24d::t_5e4ae4414e971d 239
+  s_dc878271adf24d::t_dc843e6d2e9107 270-277
+  s_dc878271adf24d::t_817eca3a7f6248 278-282
+tests/e2e/helpers.ts
+  s_dc878271adf24d::t_c14985c794414e 178-200,212
+tests/e2e/task-vault-links.spec.ts
+  s_dc878271adf24d::t_ee268b13da94d0 11-17,53-55,75-77
+  s_dc878271adf24d::t_5e4ae4414e971d 52,56,74,78
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "84b523232389ea128622b86bb5530f4a4e1bb3fe",
+  "prompts": {},
+  "sessions": {
+    "s_dc878271adf24d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "45251aad-8da0-4892-86db-9ec0654f5a1f",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
