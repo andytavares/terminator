@@ -74,6 +74,12 @@ export function e2ePath(...firstDirs: string[]): string {
   return [...firstDirs, CLAUDE_STUB_DIR, process.env.PATH ?? ''].join(delimiter)
 }
 
+/** The env that puts stub folders first on the app's PATH. The app adopts the login shell's PATH
+ * ahead of the one it was launched with, so the fixture's .zprofile re-adds them as E2E_PATH_FIRST. */
+export function stubsFirst(...dirs: string[]): Record<string, string> {
+  return { PATH: e2ePath(...dirs), E2E_PATH_FIRST: dirs.join(delimiter) }
+}
+
 /** The environment every e2e-launched Electron process gets. */
 function e2eEnv(): Record<string, string> {
   // Electron's launch takes defined strings only; an unset variable is left out.

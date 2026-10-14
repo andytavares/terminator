@@ -2,12 +2,14 @@
 // Stand-in for the ngrok agent, for tests/e2e/remote-control.spec.ts only: that
 // spec puts this folder first on the app's PATH, and no other spec does.
 //
-// `ngrok http <port> [--authtoken <token>]`, as Remote Control runs it
-// (extensions/remote-control/src/server/ngrok-manager.ts). With the one token the
-// spec saves, it answers the agent API on :4040 as ngrok does, with one https
+// `ngrok http <port> --config <files> [--authtoken <token>]`, as Remote Control runs
+// it (extensions/remote-control/src/server/ngrok-manager.ts). With the one token the
+// spec saves, it answers the agent API at the web_addr the last config file names,
+// as ngrok does when it merges them, with one https
 // tunnel to <port>, until it is stopped. Without that token it fails the way
 // ngrok fails without an account. GET /e2e/crash makes it exit as a crashed
 // agent would, so the spec can drop the tunnel.
+import { readFileSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 
 const STUB_TOKEN = 'e2e-ngrok-token'
@@ -17,6 +19,12 @@ const args = process.argv.slice(2)
 const port = args[1]
 const tokenAt = args.indexOf('--authtoken')
 const token = tokenAt === -1 ? undefined : args[tokenAt + 1]
+const configAt = args.indexOf('--config')
+const configs = configAt === -1 ? [] : args[configAt + 1].split(',')
+const webAddr = configs
+  .map((file) => /web_addr:\s*([\d.]+):(\d+)/.exec(readFileSync(file, 'utf8')))
+  .filter(Boolean)
+  .at(-1) ?? [null, '127.0.0.1', '4040']
 
 if (args[0] !== 'http' || !port) {
   process.stderr.write(`ngrok stub: unexpected arguments: ${args.join(' ')}\n`)
@@ -44,4 +52,9 @@ createServer((request, response) => {
   }
   response.statusCode = 404
   response.end()
-}).listen(4040)
+}).listen(Number(webAddr[2]), webAddr[1], () => {
+  // Where the spec reaches this agent's API: its port is the app's choice, not 4040.
+  if (process.env.E2E_NGROK_API_FILE) {
+    writeFileSync(process.env.E2E_NGROK_API_FILE, `http://${webAddr[1]}:${webAddr[2]}`)
+  }
+})
