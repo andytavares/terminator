@@ -1,0 +1,44 @@
+packages/extension-sdk/types/renderer.d.ts
+  s_c9dd89ad1f6c54::t_dcc858f8864ee6 127
+packages/extension-sdk/README.md
+  s_c9dd89ad1f6c54::t_5d674666c1c818 6
+package.json
+  s_c9dd89ad1f6c54::t_5d674666c1c818 62
+packages/extension-sdk/package.json
+  s_c9dd89ad1f6c54::t_5d674666c1c818 3
+extensions/git-integration/package.json
+  s_c9dd89ad1f6c54::t_5d674666c1c818 16
+extensions/remote-control/package.json
+  s_c9dd89ad1f6c54::t_5d674666c1c818 12
+docs/EXTENSION-DEVELOPMENT.md
+  s_c9dd89ad1f6c54::t_5d674666c1c818 211,551
+  s_c9dd89ad1f6c54::t_dcc858f8864ee6 559
+extensions/notepad/package.json
+  s_c9dd89ad1f6c54::t_5d674666c1c818 29
+extensions/task-vault/package.json
+  s_c9dd89ad1f6c54::t_5d674666c1c818 10
+extensions/foundry/package.json
+  s_c9dd89ad1f6c54::t_5d674666c1c818 10
+packages/extension-sdk/types/api.d.ts
+  s_c9dd89ad1f6c54::t_dcc858f8864ee6 63,80,87,324
+packages/extension-sdk/CHANGELOG.md
+  s_c9dd89ad1f6c54::t_5d674666c1c818 3,5-7,37
+package-lock.json
+  s_c9dd89ad1f6c54::t_ae967adb481794 17,71,93,129,146,164,16764
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "6b8ab2a85c8f2f2108ef721edc65514d51206ae9",
+  "prompts": {},
+  "sessions": {
+    "s_c9dd89ad1f6c54": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ee6b7f82-c708-43d8-8c1f-eefe55f692a9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
