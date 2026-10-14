@@ -1,0 +1,26 @@
+tests/e2e/git-integration-contrast.entry.tsx
+  s_c9dd89ad1f6c54::t_05ffcc9493c8e8 334
+extensions/git-integration/src/hooks/useGitStatus.ts
+  s_c9dd89ad1f6c54::t_ec47dc55bd2b93 75-76,82,95
+extensions/git-integration/tests/unit/useGitStatus.spec.tsx
+  s_c9dd89ad1f6c54::t_ed474faa2e2ecd 23,40-45,56-59,186-202,204
+  s_c9dd89ad1f6c54::t_12f968d9ee0519 203,205-206
+extensions/git-integration/tests/unit/GitFullView.disabled.spec.tsx
+  s_c9dd89ad1f6c54::t_05ffcc9493c8e8 20
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d6091a44e1ea9d5ee298c4fc2a69f34d2aec14a9",
+  "prompts": {},
+  "sessions": {
+    "s_c9dd89ad1f6c54": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ee6b7f82-c708-43d8-8c1f-eefe55f692a9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
