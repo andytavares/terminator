@@ -252,3 +252,12 @@ test('a task rolled over from last week is marked stale until kept', async () =>
   const kept = (await todayTasks(vault)).find((task) => task.text === 'Renew the domain')
   expect(kept).toMatchObject({ todaySince: localDate() })
 })
+
+test("resting the pointer on a row's icon names it", async () => {
+  await addTaskToToday('Book the room')
+  const row = dailyLogTaskRow(vault, 'Book the room')
+  await row.hover()
+  await row.getByRole('button', { name: 'Mark as blocked', exact: true }).hover()
+  await expect(vault.locator('.tmui-tooltip')).toHaveText('Mark as blocked')
+  await expect(vault.locator('.tmui-tooltip')).toBeVisible()
+})

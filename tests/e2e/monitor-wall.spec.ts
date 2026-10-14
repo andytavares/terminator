@@ -120,3 +120,11 @@ test("the wall's size and pinning survive a restart", async () => {
     handle.page.getByRole('switch', { name: 'Pin sessions that need you' })
   ).toHaveAttribute('aria-checked', 'false')
 })
+
+test("keyboard focus on the rail's Overview icon names it", async () => {
+  handle = await launchApp()
+  // Focus, not hover: the sibling apps this file launches at once move the real pointer.
+  await handle.page.getByRole('button', { name: 'Overview' }).focus()
+  await expect(handle.page.locator('.tmui-tooltip')).toHaveText('Overview')
+  await expect(handle.page.locator('.tmui-tooltip')).toBeVisible()
+})

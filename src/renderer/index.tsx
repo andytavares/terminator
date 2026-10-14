@@ -10,9 +10,11 @@ import { useSettingsStore } from './stores/settings.store'
 import { initExtensions } from './extensions/loader'
 import { installLogInterceptor } from './logger'
 import { exposeTerminalRows } from './terminal/terminal-rows'
+import { installIconTooltips } from '@terminator/extension-ui'
 
 installLogInterceptor()
 exposeTerminalRows()
+installIconTooltips()
 
 const view = new URLSearchParams(window.location.search).get('view')
 

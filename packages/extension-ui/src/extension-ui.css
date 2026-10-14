@@ -360,9 +360,10 @@
   max-width: 380px;
 }
 
-/* A surface raised over the view: a toast, a popover. */
+/* A surface raised over the view: a toast, a popover, a tooltip. */
 .tmui-toast,
-.tmui-popover {
+.tmui-popover,
+.tmui-tooltip {
   border: 1px solid var(--tm-border-strong);
   border-radius: var(--tm-radius-sm, 6px);
   background: var(--tm-bg-elevated);
@@ -703,4 +704,20 @@
   color: inherit;
   font-size: inherit;
   line-height: inherit;
+}
+
+/* An icon-only control's name (icon-tooltips.ts). A popover in the top layer, so the
+   UA's centred [popover] box is undone; the script sets top and left. */
+.tmui-tooltip {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  max-width: 280px;
+  padding: 3px 8px;
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
 }

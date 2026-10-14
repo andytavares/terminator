@@ -53,6 +53,7 @@ export { ConfirmDialog } from './ConfirmDialog'
 export type { ConfirmDialogProps } from './ConfirmDialog'
 
 export { Toast, ToastRegion } from './Toast'
+export { installIconTooltips } from './icon-tooltips'
 export { createToastStore } from './toast-store'
 export type { QueuedToast, ToastQueue } from './toast-store'
 export type { ToastItem, ToastProps, ToastRegionProps, ToastTone } from './Toast'
