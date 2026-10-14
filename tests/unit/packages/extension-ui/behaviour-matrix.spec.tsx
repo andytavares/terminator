@@ -6,6 +6,7 @@ import { ConfirmDialog } from '../../../../packages/extension-ui/src/ConfirmDial
 import { Popover } from '../../../../packages/extension-ui/src/Popover'
 import { useDismissible } from '../../../../packages/extension-ui/src/useDismissible'
 import { getModalDepth } from '../../../../packages/extension-ui/src/modal-depth'
+import { pressOutside } from '../../../support/modal'
 
 /**
  * SC-002, as a measurement rather than an inference.
@@ -30,6 +31,16 @@ const CHECKS = [
   'dismissible from outside',
 ]
 
+// A native dialog opened as a modal is announced as one and holds focus without being told to.
+// A test DOM does neither, so what is asserted here is that the dialog is that element, opened.
+const BY_THE_BROWSER = `${CHECKS[2]} and ${CHECKS[3]}, by the browser`
+
+function expectOpenNativeDialog(): void {
+  const dialog = screen.getByRole('dialog')
+  expect(dialog.tagName).toBe('DIALOG')
+  expect(dialog.hasAttribute('open')).toBe(true)
+}
+
 const openRenameDialog = (onDismiss = vi.fn()) => {
   render(
     <Dialog title="Rename" onDismiss={onDismiss} actions={[{ label: 'Go', onSelect: vi.fn() }]}>
@@ -51,21 +62,14 @@ describe('behaviour matrix: Dialog', () => {
     expect(screen.getByRole('dialog')).toBeTruthy()
   })
 
-  it(CHECKS[2], () => {
+  it(BY_THE_BROWSER, () => {
     openRenameDialog()
-    expect(screen.getByRole('dialog').getAttribute('aria-modal')).toBe('true')
-  })
-
-  it(CHECKS[3], () => {
-    openRenameDialog()
-    // Focus moved into the surface rather than being left behind it.
-    expect(screen.getByRole('dialog').contains(document.activeElement)).toBe(true)
+    expectOpenNativeDialog()
   })
 
   it(CHECKS[4], () => {
     const onDismiss = openRenameDialog()
-    fireEvent.mouseDown(document.querySelector('.tmui-dialog__scrim') as Element)
-    fireEvent.click(document.querySelector('.tmui-dialog__scrim') as Element)
+    pressOutside(screen.getByRole('dialog'))
     expect(onDismiss).toHaveBeenCalled()
   })
 })
@@ -106,22 +110,13 @@ describe('behaviour matrix: ConfirmDialog', () => {
     openConfirmDialog()
     expect(screen.getByRole('dialog')).toBeTruthy()
   })
-  it(CHECKS[2], () => {
+  it(BY_THE_BROWSER, () => {
     openConfirmDialog()
-    expect(screen.getByRole('dialog').getAttribute('aria-modal')).toBe('true')
-  })
-})
-
-describe('behaviour matrix: ConfirmDialog — continued', () => {
-  it(CHECKS[3], () => {
-    openConfirmDialog()
-    expect(screen.getByRole('dialog').contains(document.activeElement)).toBe(true)
+    expectOpenNativeDialog()
   })
   it(CHECKS[4], () => {
     const onDismiss = openConfirmDialog()
-    const scrim = document.querySelector('.tmui-dialog__scrim') as Element
-    fireEvent.mouseDown(scrim)
-    fireEvent.click(scrim)
+    pressOutside(screen.getByRole('dialog'))
     expect(onDismiss).toHaveBeenCalled()
   })
 })

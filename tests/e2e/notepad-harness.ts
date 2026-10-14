@@ -1,6 +1,7 @@
 import { expect, type Page } from '@playwright/test'
 import type { AppHandle } from './helpers'
 import { invokeChannel, openFromAppBand } from './extension-page'
+import { expectCentredInWindow } from './modal-centre'
 
 // Shared by the tests/e2e/notepad-*.spec.ts files: opening Notepad, creating
 // items through its New dialog, and reading back what it stored.
@@ -32,6 +33,7 @@ export async function createItem(
   const newButton = notepad.getByRole('button', { name: /^New/ }).first()
   await newButton.click()
   const dialog = notepad.locator('.notepad-quick-create')
+  await expectCentredInWindow(dialog, 'Notepad: New item')
   await dialog.getByRole('radio', { name: kind }).click()
   await dialog.getByPlaceholder('Title').fill(title)
   await dialog.getByRole('button', { name: /^Save/ }).click()

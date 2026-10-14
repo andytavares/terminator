@@ -9,6 +9,7 @@ import {
   type StoredTask,
   localDate,
 } from './task-vault-harness'
+import { expectCentredInWindow } from './modal-centre'
 
 // The daily log: everything a user does to a task on today's page, each read
 // back from what the vault stored.
@@ -98,6 +99,7 @@ test('completing a task strikes it through, and restoring reopens it', async () 
 
 test('blocking a task records why, and unblocking clears it', async () => {
   await rowAction('Book the venue', 'Mark as blocked')
+  await expectCentredInWindow(vault.getByRole('dialog'), 'Task Vault: Mark as blocked')
   await vault
     .getByPlaceholder('Waiting on design review, blocked by dependency…')
     .fill('Waiting on the budget')
@@ -117,6 +119,7 @@ test('blocking a task records why, and unblocking clears it', async () => {
 
 test('a recurrence can be set on a task and removed again', async () => {
   await rowAction('Book the venue', 'Set recurrence')
+  await expectCentredInWindow(vault.getByRole('dialog'), 'Task Vault: Set recurrence')
   await vault.getByRole('button', { name: 'Daily', exact: true }).click()
   await vault.getByRole('button', { name: 'Save', exact: true }).click()
 

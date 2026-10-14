@@ -4848,16 +4848,7 @@ h2.daily-log__date {
   opacity: 0.7;
 }
 
-.db-admin__confirm-backdrop {
-  position: fixed;
-  inset: 0;
-  background: var(--tm-scrim);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: var(--tm-layer-toast);
-}
-
+/* A modal shell (a native dialog): it centres this and draws the backdrop. */
 .db-admin__confirm {
   background: var(--tm-bg-base);
   border: 1px solid var(--tm-border);
@@ -5044,16 +5035,7 @@ h2.daily-log__date {
 }
 
 /* ── Block modal ─────────────────────────────────────────────────── */
-.daily-log__block-modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background: var(--tm-scrim);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: var(--tm-layer-modal);
-}
-
+/* A modal shell (a native dialog): it centres this and draws the backdrop. */
 .daily-log__block-modal {
   background: var(--tm-bg-surface);
   border: 1px solid var(--tm-border);

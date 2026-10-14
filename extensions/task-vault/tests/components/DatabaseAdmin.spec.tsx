@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup, fireEvent, within } from '@testing-library/react'
 import { installVaultBridge, eventually } from './helpers/bridge'
 import { DatabaseAdmin } from '../../src/components/DatabaseAdmin'
+import { pressOutside } from '../../../../tests/support/modal'
 
 vi.setConfig({ testTimeout: 30_000 })
 
@@ -133,7 +134,7 @@ function confirmTests() {
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(screen.queryByText('Run destructive query?')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Delete all cancelled tasks' }))
-    fireEvent.click(document.querySelector('.db-admin__confirm-backdrop')!)
+    pressOutside(screen.getByRole('dialog', { name: 'Run destructive query?' }))
     expect(queriesRun()).toEqual([])
   })
 

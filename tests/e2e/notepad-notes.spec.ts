@@ -2,6 +2,7 @@ import { test, expect, type Page } from '@playwright/test'
 import { AppHandle, launchApp, closeApp } from './helpers'
 import { invokeChannel } from './extension-page'
 import { createItem, noteRow, openNotepad, storedNote, storedNotes } from './notepad-harness'
+import { expectCentredInWindow } from './modal-centre'
 
 // Notes in Notepad: writing them, tables in them, titles and tags, archiving
 // and deleting, ordering, folders, and finding them again by search. Each step
@@ -70,6 +71,7 @@ test('a markdown table renders as a grid, and editing a cell saves the markdown'
 test("a note's title and tags are edited from its menu", async () => {
   await contextMenu('Groceries', 'Edit title & tags')
   const dialog = notepad.getByRole('dialog', { name: 'Edit note' })
+  await expectCentredInWindow(dialog, 'Notepad: Edit note')
   await dialog.getByLabel('Title').fill('Weekly groceries')
   await dialog.getByPlaceholder('Add tags…').fill('home')
   await dialog.getByPlaceholder('Add tags…').press('Enter')

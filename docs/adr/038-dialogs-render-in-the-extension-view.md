@@ -1,6 +1,6 @@
 # ADR 038: A dialog renders in the view that opened it
 
-**Status**: Accepted
+**Status**: Accepted. [ADR 108](108-modal-surfaces-use-the-native-dialog-element.md) changes how a dialog is rendered and how modals stack: the native `<dialog>` element replaces the scrim, the "innermost surface" Escape gate and `nestedLayerValue()` described below. Where a dialog renders, and the per-document modal depth, stand.
 
 **Date**: 2026-09-05
 

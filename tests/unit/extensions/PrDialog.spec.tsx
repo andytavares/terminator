@@ -5,6 +5,7 @@ import { PrDialog } from '../../../extensions/git-integration/src/components/PrD
 import type { PullRequest } from '../../../extensions/git-integration/src/schemas/git.schema'
 import type { ElectronAPI } from '../../../src/shared/electron-api/api-type'
 import { installElectronApi } from '../../support/electron-api'
+import { pressOutside } from '../../support/modal'
 
 const mockShellExec = vi.fn<ElectronAPI['shell']['exec']>()
 const mockListBranches = vi.fn<ElectronAPI['git']['listBranches']>()
@@ -57,7 +58,7 @@ describe('PrDialog', () => {
     const onClose = vi.fn()
     render(<PrDialog {...defaultProps} onClose={onClose} />)
     await waitFor(() => screen.getByRole('dialog'))
-    fireEvent.click(document.querySelector('.tmui-dialog__scrim')!)
+    pressOutside(screen.getByRole('dialog'))
     expect(onClose).toHaveBeenCalled()
   })
 

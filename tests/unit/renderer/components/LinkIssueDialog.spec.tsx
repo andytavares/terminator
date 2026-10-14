@@ -5,6 +5,7 @@ import { LinkIssueDialog } from '../../../../src/renderer/components/integration
 import { useIntegrationsStore } from '../../../../src/renderer/stores/integrations.store'
 import { useModalStore } from '../../../../src/renderer/stores/modal.store'
 import { issueSummaryOf, trackerConnectionOf } from '../../../support/renderer-stores'
+import { pressOutside } from '../../../support/modal'
 
 const P = '11111111-1111-4111-8111-111111111111'
 
@@ -234,13 +235,13 @@ describe('LinkIssueDialog — dismissal', () => {
 
   it('closes when the backdrop is clicked but not the dialog itself', async () => {
     const onClose = vi.fn()
-    const { container } = open({ onClose })
+    open({ onClose })
     await screen.findByText('TAV-42')
 
-    fireEvent.click(container.querySelector('.tmui-dialog__panel') as Element)
+    fireEvent.mouseDown(screen.getByRole('dialog'))
     expect(onClose).not.toHaveBeenCalled()
 
-    fireEvent.click(container.querySelector('.tmui-dialog__scrim') as Element)
+    pressOutside(screen.getByRole('dialog'))
     expect(onClose).toHaveBeenCalled()
   })
 })

@@ -166,7 +166,7 @@ shape or a position.
 ## 9. Layering
 
 Stacking comes from the published scale in `@terminator/extension-ui`:
-`layerValue()` / `nestedLayerValue()` in TypeScript, `var(--tm-layer-*)` in CSS.
+`layerValue()` in TypeScript, `var(--tm-layer-*)` in CSS. A modal surface is a `ModalShell`, which the browser stacks itself (ADR 108).
 A raw `z-index` number is how 38 unmanaged values ended up deciding order by
 whoever picked the biggest.
 

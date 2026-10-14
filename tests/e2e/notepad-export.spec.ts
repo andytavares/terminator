@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { AppHandle, launchApp, closeApp } from './helpers'
 import { answerNextOpenDialog, invokeChannel } from './extension-page'
 import { noteRow, openNotepad } from './notepad-harness'
+import { expectCentredInWindow } from './modal-centre'
 
 // Exporting Notepad to a folder of markdown: notes with front matter, their
 // comments in the format chosen, and diagrams as .excalidraw files.
@@ -60,6 +61,7 @@ async function exportTo(format: 'Sidecar JSON' | 'Inline HTML' | 'Both'): Promis
   const folder = mkdtempSync(join(tmpdir(), 'notepad-export-'))
   await notepad.getByRole('button', { name: 'Export', exact: true }).first().click()
   const dialog = notepad.getByRole('dialog', { name: 'Export to markdown' })
+  await expectCentredInWindow(dialog, 'Notepad: Export to markdown')
   await answerNextOpenDialog(handle, folder)
   await dialog.getByRole('button', { name: 'Choose folder' }).click()
   await expect(dialog.getByLabel('Destination folder')).toHaveValue(folder)

@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { AppHandle, launchApp, closeApp } from './helpers'
 import { answerNextOpenDialog, invokeChannel } from './extension-page'
 import { noteRow, openNotepad, storedNotes } from './notepad-harness'
+import { expectCentredInWindow } from './modal-centre'
 
 // Bringing notes in from a folder of markdown, and finding them again: the
 // list's search box and the ⌘⇧F overlay, with text in any script, and tags.
@@ -79,6 +80,7 @@ test('the ⌘⇧F overlay searches across notes and filters by tag', async () =>
   await notepad.keyboard.press('ControlOrMeta+Shift+F')
   const overlay = notepad.locator('.notepad-search-overlay')
   await expect(overlay).toBeVisible()
+  await expectCentredInWindow(overlay, 'Notepad: Search notes')
 
   await overlay.getByPlaceholder('Search across all notes').fill('tag:reise')
   await expect(overlay).toContainText('Über den Wolken')

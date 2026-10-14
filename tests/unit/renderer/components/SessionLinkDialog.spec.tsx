@@ -35,6 +35,7 @@ import {
   sessionRecordOf,
   trackerConnectionOf,
 } from '../../../support/renderer-stores'
+import { pressOutside } from '../../../support/modal'
 
 const onClose = vi.fn()
 // The main process's answer to a link write: the record with the link applied.
@@ -127,10 +128,10 @@ describe('SessionLinkDialog — says where to connect a tracker when none is', (
   })
 
   it('closes on Cancel and on the backdrop, not on the dialog itself', () => {
-    const { container } = render(<SessionLinkDialog facts={fact()} onClose={onClose} />)
+    render(<SessionLinkDialog facts={fact()} onClose={onClose} />)
     fireEvent.click(screen.getByRole('dialog'))
     expect(onClose).not.toHaveBeenCalled()
-    fireEvent.click(container.querySelector('.tmui-dialog__scrim')!)
+    pressOutside(screen.getByRole('dialog'))
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(onClose).toHaveBeenCalledTimes(2)
   })

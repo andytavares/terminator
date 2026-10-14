@@ -92,6 +92,25 @@ describe('useDismissible — leaves the outside click alone when the surface own
   })
 })
 
+function EmptyPanel(): JSX.Element {
+  const ref = useRef<HTMLDivElement>(null)
+  useDismissible({ ref, onDismiss: () => {} })
+  return <div ref={ref} data-tmui-surface="" tabIndex={-1} aria-label="Legend" role="group" />
+}
+
+describe('useDismissible — where focus goes', () => {
+  it('focuses the surface itself when it holds nothing focusable', () => {
+    render(<EmptyPanel />)
+    expect(document.activeElement).toBe(screen.getByRole('group', { name: 'Legend' }))
+  })
+
+  // Inside a modal shell the key's default asks the dialog to close as well.
+  it('prevents the default of the Escape it answers', () => {
+    render(<Panel onDismiss={() => {}} />)
+    expect(fireEvent.keyDown(document.body, { key: 'Escape' })).toBe(false)
+  })
+})
+
 describe('useDismissible — counts toward the open-surface depth', () => {
   it('counts toward the open-surface depth', () => {
     delete window[MODAL_DEPTH_KEY]

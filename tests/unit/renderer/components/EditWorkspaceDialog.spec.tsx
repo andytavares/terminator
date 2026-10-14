@@ -7,6 +7,7 @@ import type { ElectronAPI } from '../../../../src/shared/electron-api/api-type'
 import { UpdateWorkspaceInputSchema } from '../../../../src/shared/schemas/workspace.schema'
 import { workspaceFixture } from '../../../support/renderer-stores'
 import { installElectronApi } from '../../../support/electron-api'
+import { pressOutside } from '../../../support/modal'
 
 const mockOpenDirectory = vi.fn<ElectronAPI['dialog']['openDirectory']>()
 /** The main process's answer to an update: the workspace as written. */
@@ -136,7 +137,7 @@ describe('EditWorkspaceDialog — clears nameError when name input changes', () 
   it('calls onClose when overlay is clicked', () => {
     const onClose = vi.fn()
     render(<EditWorkspaceDialog workspace={ws} onClose={onClose} />)
-    fireEvent.click(screen.getByText('Edit Workspace').closest('.tmui-dialog__scrim')!)
+    pressOutside(screen.getByRole('dialog'))
     expect(onClose).toHaveBeenCalled()
   })
 })

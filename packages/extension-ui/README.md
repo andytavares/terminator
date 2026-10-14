@@ -29,16 +29,58 @@ should define a colour.
 | `Tabs`; `TabsRoot`, `TabList`, `Tab`, `TabPanel` | WAI-ARIA tabs: arrow keys, Home, End, roving `tabindex`; assembled or in parts                                              |
 | `SegmentedControl`                               | one choice out of a few, as joined buttons: WAI-ARIA radio group; sm, md                                                    |
 | `ListInput`, `listItems`                         | a list of short strings edited one item per line (globs, tool names); trimmed, blank lines dropped                          |
-| `Dialog`, `ConfirmDialog`                        | a modal question or form; yes or no                                                                                         |
+| `ModalShell`                                     | the modal behaviour around any content: a native `<dialog>`; `label` or `labelledBy`, `className`, `dismissible`            |
+| `Dialog`, `ConfirmDialog`                        | the shell with a title, a body and one to three actions; yes or no                                                          |
 | `Popover`                                        | a dismissible, non-modal surface anchored to a control                                                                      |
-| `ToastRegion`, `Toast`                           | transient messages                                                                                                          |
+| `ToastRegion`, `Toast`                           | transient messages; shown inside the modal shell on top while one is open                                                   |
 | `EmptyState`                                     | heading, one line of why, and the control that fills it                                                                     |
 | `Markdown`                                       | react-markdown with GFM and sanitised raw HTML (ADR 091); `inline`, `fetchesNothing`                                        |
 | `RelativeTime`, `formatRelativeTime`             | "5 minutes ago" through `Intl.RelativeTimeFormat`                                                                           |
 
-**Behaviour** — `usePolling(read, show, intervalMs)`, `everyWhileVisible(tick, intervalMs)`, `useDismissible`, the focus
-trap, the modal-depth registry and the layer scale (`LAYERS`, `layerValue`,
-`nestedLayerValue`).
+**Behaviour** — `usePolling(read, show, intervalMs)`, `everyWhileVisible(tick, intervalMs)`, `useDismissible`,
+the modal-depth registry and the layer scale (`LAYERS`, `layerValue`).
+
+## Modal surfaces
+
+Every modal surface is a `ModalShell` ([ADR 108](../../docs/adr/108-modal-surfaces-use-the-native-dialog-element.md)):
+a native `<dialog>` opened with `showModal()` for as long as it is mounted. The
+browser keeps focus inside, makes the page behind inert, paints the shell above
+every `z-index`, and returns focus to what had it. The shell draws the backdrop
+(`--tm-scrim`) and centres itself in the window on both axes; the look is the
+caller's `className`. No class, offset or transform moves a modal off centre:
+the shell's placement is `!important`. Content taller than the window scrolls
+inside the shell.
+
+```tsx
+<ModalShell label="Settings" className="settings-panel" onDismiss={close}>
+  …
+</ModalShell>
+```
+
+- `onDismiss` runs for Escape, a phone's back gesture and a press on the backdrop;
+  the caller then unmounts the shell. `dismissible={false}` refuses all three, for
+  a surface holding unsaved work, which must offer its own way out.
+- Focus opens on the first control inside, or on the field with `autoFocus`.
+  Put the safe choice first: `Dialog` lists Cancel before the action and puts its
+  close control last in the document.
+- A caller with its own Escape (Quick Actions) handles the keydown and prevents
+  its default; the shell is then not asked to close.
+- What opens from inside a shell must be inside it, because everything outside is
+  inert. `Popover` and `useDismissible` panels render in place; `ToastRegion`
+  moves itself; a surface you portal to `document.body` must portal to
+  `trigger.closest('dialog') ?? document.body` instead.
+- A shell's entrance animation is opacity only: the shell refuses `transform`,
+  which would move it and make it the containing block of a toast shown in it.
+- An e2e spec that opens a modal measures it with `expectCentredInWindow`
+  (`tests/e2e/modal-centre.ts`): the box's centre within 1px of the window's.
+- Do not put `tabindex` on the shell. A surface that needs a place for focus to
+  rest gives an element inside it `tabIndex={-1}`.
+
+In a unit test the DOM supplies only `showModal()`, `close()` and the `cancel`
+event after Escape (`tests/support/native-dialog.ts`); `pressOutside` from
+`tests/support/modal.ts` presses the backdrop. Focus and the inert page are
+asserted in the stories and in `visual/modal-keys.visual.ts`, which presses real
+keys against the built Storybook.
 
 **Fonts** — `@terminator/extension-ui/fonts` imports the IBM Plex Sans and Mono
 faces the tokens name. Every document imports it once from its entry: the core
@@ -46,8 +88,8 @@ renderer, the Storybook preview and each extension view (`extensions/<name>/src/
 because an extension view inherits nothing from the core and injected CSS cannot
 carry font files. The bundler copies the woff2 files next to the view's script.
 
-`Dialog` actions take `submit: true`: the panel becomes a `<form>`, so Enter in a
-field runs that action once. A field with `autoFocus` keeps focus when the dialog
+`Dialog` actions take `submit: true`: the content sits in a `<form>`, so Enter in a
+field runs that action once. A field with `autoFocus` takes focus when the dialog
 opens, and focus still returns to the control that opened it.
 
 `Tabs` follows the [WAI-ARIA tabs pattern](https://www.w3.org/WAI/ARIA/apg/patterns/tabs/)

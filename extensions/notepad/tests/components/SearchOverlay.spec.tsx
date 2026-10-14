@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, fireEvent, screen, cleanup, act } from '@testing-library/react'
+import { pressOutside } from '../../../../tests/support/modal'
 
 const mockInvoke = vi.fn().mockResolvedValue({ data: [] })
 const mockOn = vi.fn().mockReturnValue(vi.fn())
@@ -45,9 +46,8 @@ function searchOverlayClosingTests() {
 
   it('calls onClose when backdrop clicked', () => {
     const onClose = vi.fn()
-    const { container } = render(<SearchOverlay onClose={onClose} />)
-    const backdrop = container.querySelector('.notepad-overlay-backdrop')!
-    fireEvent.click(backdrop)
+    render(<SearchOverlay onClose={onClose} />)
+    pressOutside(screen.getByRole('dialog', { name: 'Search notes' }))
     expect(onClose).toHaveBeenCalled()
   })
 }

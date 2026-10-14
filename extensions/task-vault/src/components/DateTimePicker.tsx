@@ -282,11 +282,19 @@ function popoverPosition(rect: DOMRect): { top: number; left: number } {
   return { top, left: rect.left }
 }
 
+/** Where the popover is drawn, and the element it is drawn into: the modal dialog its trigger is
+ *  in, because everything outside an open one is inert and painted over, else the page. */
+interface PopoverPlace {
+  top: number
+  left: number
+  host: Element
+}
+
 /** Whether the popover is open, and where. The trigger counts as inside the shared dismiss hook,
  *  so a click on it to close does not dismiss and immediately reopen. */
 function usePopover(defaultOpen: boolean | undefined) {
   const [open, setOpen] = useState(false)
-  const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
+  const [pos, setPos] = useState<PopoverPlace | null>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const popoverRef = useRef<HTMLDivElement>(null)
   useDismissible({
@@ -297,8 +305,10 @@ function usePopover(defaultOpen: boolean | undefined) {
     enabled: open,
   })
   const openPicker = useCallback(() => {
-    if (!triggerRef.current) return
-    setPos(popoverPosition(triggerRef.current.getBoundingClientRect()))
+    const trigger = triggerRef.current
+    if (!trigger) return
+    const host = trigger.closest('dialog') ?? document.body
+    setPos({ ...popoverPosition(trigger.getBoundingClientRect()), host })
     setOpen(true)
   }, [])
   useEffect(() => {
@@ -590,7 +600,7 @@ export function DateTimePicker(props: DateTimePickerProps): React.JSX.Element {
             pos={pos}
             onDone={() => setOpen(false)}
           />,
-          document.body
+          pos.host
         )}
     </div>
   )

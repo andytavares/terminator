@@ -10,6 +10,7 @@ import {
   terminalSessionOf,
   workspaceFixture,
 } from '../../../support/renderer-stores'
+import { pressOutside } from '../../../support/modal'
 
 vi.mock('../../../../src/renderer/components/sidebar/CreateWorkspaceDialog', () => ({
   CreateWorkspaceDialog: ({ onClose }: { onClose: () => void }) => (
@@ -98,7 +99,7 @@ describe('MoveSessionDialog', () => {
 
   it('calls onClose when clicking overlay', () => {
     render(<MoveSessionDialog sessionId="sess-1" onClose={mockOnClose} />)
-    fireEvent.click(document.querySelector('.tmui-dialog__scrim')!)
+    pressOutside(screen.getByRole('dialog'))
     expect(mockOnClose).toHaveBeenCalled()
   })
 

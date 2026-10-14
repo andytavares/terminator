@@ -285,7 +285,7 @@ function noteListEditDialogTests() {
 function noteListEditDialogOpeningSavingTests() {
   it('is a modal dialog named for what it edits, with the title field focused', () => {
     const dialog = openEditDialog()
-    expect(dialog.getAttribute('aria-modal')).toBe('true')
+    expect(dialog.tagName).toBe('DIALOG')
     expect(document.activeElement).toBe(screen.getByPlaceholderText('Title'))
   })
 
@@ -319,14 +319,6 @@ function noteListEditDialogTitleDerivingTests() {
 }
 
 function noteListEditDialogKeyboardTests() {
-  it('moves Tab from the last control back to the first', () => {
-    openEditDialog()
-    const save = screen.getByRole('button', { name: /Save/ })
-    save.focus()
-    fireEvent.keyDown(save, { key: 'Tab' })
-    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Close' }))
-  })
-
   it('closes on Escape without saving', () => {
     openEditDialog()
     fireEvent.keyDown(document, { key: 'Escape' })

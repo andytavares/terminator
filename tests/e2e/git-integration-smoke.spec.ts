@@ -47,7 +47,7 @@ const PROBE = `(() => {
     }
   }
   const sideScrollers = []
-  for (const el of document.querySelectorAll('.tmui-dialog__panel, [role=dialog]')) {
+  for (const el of document.querySelectorAll('dialog, [role=dialog]')) {
     if (el.scrollWidth - el.clientWidth > 1) {
       sideScrollers.push((el.className || 'dialog') + ' +' + (el.scrollWidth - el.clientWidth) + 'px')
     }

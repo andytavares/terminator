@@ -1,6 +1,8 @@
 import React, { useEffect, useRef } from 'react'
 import { X } from 'lucide-react'
+import { createPortal } from 'react-dom'
 import { layerValue } from './layers'
+import { useTopModal } from './modal-stack'
 import './extension-ui.css'
 
 /** Matches the core's existing ToastType, so migrating its store is not an API change. */
@@ -88,9 +90,17 @@ export interface ToastRegionProps {
   onDismiss: (id: string) => void
 }
 
-/** Mount once per view. Sits above every other layer, including modals. */
+/** Mount once per view. Sits above every other layer. While a modal shell is open the region
+ * renders inside the one on top: outside it, a toast would be inert and painted over. Its toasts
+ * mount afresh on that move, so each one's time on screen starts again. */
 export function ToastRegion({ toasts, onDismiss }: ToastRegionProps): JSX.Element | null {
+  const modal = useTopModal()
   if (toasts.length === 0) return null
+  const region = <ToastList toasts={toasts} onDismiss={onDismiss} />
+  return modal ? createPortal(region, modal) : region
+}
+
+function ToastList({ toasts, onDismiss }: ToastRegionProps): JSX.Element {
   return (
     <div className="tmui-toast-region" style={{ zIndex: layerValue('toast') }}>
       {toasts.map((toast) => (

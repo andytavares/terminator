@@ -5,7 +5,6 @@ import {
   layerCssDeclarations,
   layerCssVar,
   layerValue,
-  nestedLayerValue,
 } from '../../../../packages/extension-ui/src/layers'
 
 // The scale replaces 14 unmanaged z-index values (1 … 9999) spread across the
@@ -28,42 +27,6 @@ describe('layer scale', () => {
 })
 
 describe('layer scale — the nesting rule', () => {
-  // The one case naive ordering gets wrong: a picker opened from inside a
-  // dialog. `overlay` is numerically below `modal`, so a picker taking the
-  // bare overlay value renders behind the dialog that opened it.
-  it('renders a picker opened inside a dialog above that dialog', () => {
-    const dialog = layerValue('modal')
-    const picker = nestedLayerValue('overlay', dialog)
-    expect(picker).toBeGreaterThan(dialog)
-  })
-
-  it('keeps a confirmation opened from a dialog above its parent', () => {
-    const outer = layerValue('modal')
-    const inner = nestedLayerValue('modal', outer)
-    expect(inner).toBeGreaterThan(outer)
-  })
-
-  it('stacks three levels in the order they were opened', () => {
-    const panel = layerValue('panel')
-    const dialog = nestedLayerValue('modal', panel)
-    const picker = nestedLayerValue('overlay', dialog)
-    expect(dialog).toBeGreaterThan(panel)
-    expect(picker).toBeGreaterThan(dialog)
-  })
-
-  it('falls back to the bare layer value when nothing contains it', () => {
-    expect(nestedLayerValue('modal', null)).toBe(LAYERS.modal)
-  })
-
-  // A toast must clear every layer whatever raised it, so nesting must never
-  // drag it below something else.
-  it('never resolves a toast below a modal, however deeply nested', () => {
-    const deep = nestedLayerValue('modal', nestedLayerValue('modal', layerValue('modal')))
-    expect(layerValue('toast')).toBeGreaterThan(deep)
-  })
-})
-
-describe('layer scale — the CSS surface stylesheets reference', () => {
   it('names every layer as a --tm-layer-* custom property', () => {
     for (const name of LAYER_NAMES) {
       expect(layerCssVar(name)).toBe(`--tm-layer-${name}`)

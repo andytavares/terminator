@@ -175,7 +175,7 @@ const STYLE_REPORT = `(() => {
         // A dialog scrolls down, never sideways — its own title and close
         // control are the first things to leave when it does.
         const sideScrollers = []
-        for (const el of document.querySelectorAll('.tmui-dialog__panel, [role=dialog]')) {
+        for (const el of document.querySelectorAll('dialog, [role=dialog]')) {
           if (el.scrollWidth - el.clientWidth > 1) {
             sideScrollers.push(
               (el.className || 'dialog') + ' overflows by ' + (el.scrollWidth - el.clientWidth) + 'px'

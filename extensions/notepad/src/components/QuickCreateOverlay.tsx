@@ -5,7 +5,7 @@ import { useNotesStore } from '../stores/notes.store'
 import { NoteEditor } from '../editor/NoteEditor'
 import { noteTitle } from '../db/note-title'
 import type { DiagramListItem } from '../db/types'
-import { Button, SegmentedControl, useDismissible } from '@terminator/extension-ui'
+import { Button, ModalShell, SegmentedControl } from '@terminator/extension-ui'
 import { tagEditing, withTag } from './tagEditing'
 
 function toFilenameSlug(title: string): string {
@@ -38,12 +38,6 @@ type QuickCreateDraft = ReturnType<typeof useQuickCreateDraft>
 
 interface DraftProps {
   draft: QuickCreateDraft
-}
-
-interface QuickCreateSurfaceProps {
-  surfaceRef: React.RefObject<HTMLDivElement>
-  draft: QuickCreateDraft
-  children: React.ReactNode
 }
 
 interface SaveProps extends DraftProps {
@@ -223,27 +217,23 @@ function useTagEditing(draft: QuickCreateDraft) {
   return { ...tagEditing({ tags, updateTags: setTags, tagInput, setTagInput }), removeTag }
 }
 
-/** useDismissible counts this overlay as an open surface, so double-Escape cannot close Notepad
- *  with the draft in it; `captureEscape` is needed because CodeMirror stops propagation. More:
- *  README.md, "Why the editor behaves as it does". */
+/** The modal shell counts this overlay as an open surface, so double-Escape cannot close Notepad
+ *  with the draft in it, and its Escape is the dialog's own close request, which the editor
+ *  stopping the key's propagation does not prevent. */
 export function QuickCreateOverlay(): React.JSX.Element | null {
   const showQuickCreate = useNotesStore((s) => s.showQuickCreate)
   const draft = useQuickCreateDraft()
   const handleSave = saveHandler(draft)
   const titleRef = useRef<HTMLInputElement>(null)
-  const surfaceRef = useRef<HTMLDivElement>(null)
   useOpenDefaults(showQuickCreate, draft, titleRef)
-  useDismissible({
-    ref: surfaceRef,
-    onDismiss: draft.close,
-    closeOnOutsideClick: false,
-    captureEscape: true,
-    enabled: showQuickCreate,
-  })
 
   if (!showQuickCreate) return null
   return (
-    <QuickCreateSurface surfaceRef={surfaceRef} draft={draft}>
+    <ModalShell
+      label={draft.type === 'folder' ? 'New folder' : `New ${draft.type}`}
+      className="notepad-quick-create"
+      onDismiss={draft.close}
+    >
       <QuickCreateHeader draft={draft} />
       <div className="notepad-quick-create__divider" />
       <TitleInput titleRef={titleRef} draft={draft} onSave={handleSave} />
@@ -254,30 +244,7 @@ export function QuickCreateOverlay(): React.JSX.Element | null {
         </div>
       )}
       <QuickCreateFooter draft={draft} onSave={handleSave} />
-    </QuickCreateSurface>
-  )
-}
-
-function QuickCreateSurface(props: QuickCreateSurfaceProps): React.JSX.Element {
-  const { draft, surfaceRef, children } = props
-  return (
-    <div
-      className="notepad-overlay-backdrop"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) draft.close()
-      }}
-    >
-      <div
-        ref={surfaceRef}
-        data-tmui-surface=""
-        className="notepad-quick-create"
-        role="dialog"
-        aria-modal="true"
-        aria-label={draft.type === 'folder' ? 'New folder' : `New ${draft.type}`}
-      >
-        {children}
-      </div>
-    </div>
+    </ModalShell>
   )
 }
 

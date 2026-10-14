@@ -1,6 +1,6 @@
 import './notepad.css'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { RelativeTime, useDismissible } from '@terminator/extension-ui'
+import { ModalShell, RelativeTime } from '@terminator/extension-ui'
 import { Search, X } from 'lucide-react'
 import type { SearchResult } from '../db/types'
 import { useNotesStore } from '../stores/notes.store'
@@ -22,12 +22,6 @@ interface SearchResultsProps {
   search: NoteSearch
   query: string
   openResult: (result: SearchResult) => void
-}
-
-interface SearchSurfaceProps {
-  surfaceRef: React.RefObject<HTMLDivElement>
-  onClose: () => void
-  children: React.ReactNode
 }
 
 interface SearchResultRowProps {
@@ -80,20 +74,18 @@ function useOpenResult(onClose: () => void) {
   )
 }
 
-/** useDismissible counts this palette as an open surface: without it, two Escapes with focus off
- *  the input closed Notepad instead of the search. The backdrop owns the outside click. */
+/** The modal shell counts this palette as an open surface: without that, two Escapes with focus
+ *  off the input closed Notepad instead of the search. */
 export function SearchOverlay({ onClose }: SearchOverlayProps): React.JSX.Element {
-  const surfaceRef = useRef<HTMLDivElement>(null)
   const [query, setQuery] = useState('')
   const [activeTagFilter, setActiveTagFilter] = useState<string | null>(null)
   const search = useNoteSearch(query, activeTagFilter)
   const openResult = useOpenResult(onClose)
 
-  useDismissible({ ref: surfaceRef, onDismiss: onClose, closeOnOutsideClick: false })
   useResultKeyboard(search, openResult)
 
   return (
-    <SearchSurface surfaceRef={surfaceRef} onClose={onClose}>
+    <ModalShell label="Search notes" className="notepad-search-overlay" onDismiss={onClose}>
       <SearchInputRow query={query} setQuery={setQuery} search={search} />
       <TagFilters
         tagCounts={search.tagCounts}
@@ -101,30 +93,7 @@ export function SearchOverlay({ onClose }: SearchOverlayProps): React.JSX.Elemen
         setActiveTagFilter={setActiveTagFilter}
       />
       <SearchResults search={search} query={query} openResult={openResult} />
-    </SearchSurface>
-  )
-}
-
-/** The backdrop, which owns the outside click, and the dialog surface on it. */
-function SearchSurface({ surfaceRef, onClose, children }: SearchSurfaceProps): React.JSX.Element {
-  return (
-    <div
-      className="notepad-overlay-backdrop"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose()
-      }}
-    >
-      <div
-        data-tmui-surface=""
-        aria-label="Search notes"
-        aria-modal="true"
-        ref={surfaceRef}
-        className="notepad-search-overlay"
-        role="dialog"
-      >
-        {children}
-      </div>
-    </div>
+    </ModalShell>
   )
 }
 
