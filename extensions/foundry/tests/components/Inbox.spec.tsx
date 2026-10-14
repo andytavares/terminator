@@ -14,7 +14,7 @@ import { timesInvoked } from '../helpers/bridge-calls.js'
 
 let invoke: ReturnType<typeof vi.fn>
 let bus = createChangeBus()
-const openExternal = vi.fn()
+const openExternal = vi.fn(async () => ({ ok: true as const }))
 
 function gate(over: Partial<Parameters<typeof raiseGate>[0]> = {}) {
   return raiseGate({

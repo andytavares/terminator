@@ -958,7 +958,7 @@ Extension view (ext://terminator.notepad/dist/index.html)
      plus QuickCreateOverlay, SearchOverlay and ExportDialog
 ```
 
-Channels are named `terminator.notepad:<name>` and register through `createIpcRegistrar` (`src/ipc/register.ts`): `handle` for local-only channels, `handleRemote` for the ones the remote client may call. File import and export stay local.
+Channels are named `terminator.notepad:<name>` and register through `notepadChannels` (`src/ipc/register.ts`), the SDK's `createIpcRegistrar` with Notepad's invalid-payload answer: `handle` for local-only channels, `handleRemote` for the ones the remote client may call. File import and export stay local.
 
 #### Database
 

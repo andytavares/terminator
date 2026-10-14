@@ -3,7 +3,7 @@ import { ChevronLeft } from 'lucide-react'
 import { Button, IconButton } from '@terminator/extension-ui'
 import type { DraftComment } from '../../schemas/pr-review.schema'
 import './review-footer.css'
-import { plural } from '../text'
+import { plural } from '@terminator/extension-sdk'
 
 export interface ReviewFooterProps {
   drafts: DraftComment[]

@@ -4,7 +4,7 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 import { parseFrontMatter, stringifyFrontMatter } from './front-matter'
 import { noPayload, type ExtensionDB, type ExtensionAPI } from '@terminator/extension-sdk'
-import { createIpcRegistrar } from './register'
+import { notepadChannels } from './register'
 import { reconcileTags } from './notes.ipc'
 
 // ──────────────────────────────────────────────────────────────
@@ -342,7 +342,7 @@ async function insertImportedNote(db: ExtensionDB, note: ImportedNote): Promise<
 // ──────────────────────────────────────────────────────────────
 
 export function registerExportIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {
-  const { handle, cleanup } = createIpcRegistrar(api)
+  const { handle, cleanup } = notepadChannels(api)
   handle('terminator.notepad:export.pickFolder', noPayload, async () => {
     const result = await api.dialog.showOpenDialog({
       properties: ['openDirectory', 'createDirectory'],

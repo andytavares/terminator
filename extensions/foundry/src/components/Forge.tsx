@@ -1,5 +1,5 @@
 import { Button, Markdown } from '@terminator/extension-ui'
-import { openInBrowser } from './ExternalLink.js'
+import { openInBrowser } from '@terminator/extension-sdk/renderer'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Check,

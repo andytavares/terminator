@@ -1,6 +1,7 @@
 import React from 'react'
 import type { RiskScore } from '../../schemas/pr-review.schema'
-import { choose, plural } from '../text'
+import { plural } from '@terminator/extension-sdk'
+import { choose } from '../text'
 
 interface Props {
   riskScore: RiskScore

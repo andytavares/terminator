@@ -1,6 +1,7 @@
 import React from 'react'
 import type { PrChangedFile, PrReviewDetail } from '../../schemas/pr-review.schema'
-import { choose, plural } from '../text'
+import { plural } from '@terminator/extension-sdk'
+import { choose } from '../text'
 import './insights.css'
 
 interface Props {

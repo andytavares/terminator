@@ -11,7 +11,7 @@ import { hallNode, hallView, pullRequestChecks } from '../../helpers/hall-views.
 // 220,000 fillRect calls in the transcript test alone, past five seconds on a loaded machine.
 
 let invoke: Mock<Window['electronAPI']['extensionBridge']['invoke']>
-const openExternal = vi.fn()
+const openExternal = vi.fn(async () => ({ ok: true as const }))
 
 interface MountProps {
   view?: Record<string, unknown>

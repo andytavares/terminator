@@ -171,12 +171,12 @@ requires the entry point again. Packages from outside that directory stay loaded
 
 An extension imports only `@terminator/extension-sdk`, the design system `@terminator/extension-ui`, npm packages declared in its own `package.json`, and its own files. Core source (`src/**`), another extension and any other workspace package are off limits. `eslint.config.mjs` enforces it: `npm run lint` fails on a relative import that leaves the extension's directory or on any other `@terminator/*` package.
 
-| Entry                                      | What it holds                                                                                                                                    |
-| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `@terminator/extension-sdk`                | `ExtensionAPI` and its types, `ExtensionDB`, the issue-tracker and GitHub types, `defineChannel`, `dispatchChannel`, `noPayload`, `TaskVaultAPI` |
-| `@terminator/extension-sdk/renderer`       | `invoke<T>(channel, payload = {})` for your own channels, and `mountExtension(<App />)`, which renders into `#app`                               |
-| `@terminator/extension-sdk/node`           | `writeJsonAtomic(path, value)`: JSON through a temporary file and a rename, so a reader never sees half a file                                   |
-| `@terminator/extension-sdk/types/renderer` | The `window.electronAPI` a view receives. `tsconfig.extension.json` loads it.                                                                    |
+| Entry                                      | What it holds                                                                                                                                                                                       |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@terminator/extension-sdk`                | `ExtensionAPI` and its types, `ExtensionDB`, the issue-tracker and GitHub types, `defineChannel`, `dispatchChannel`, `noPayload`, `createIpcRegistrar`, `validationError`, `plural`, `TaskVaultAPI` |
+| `@terminator/extension-sdk/renderer`       | `invoke<T>(channel, payload = {})` for your own channels, `mountExtension(<App />)`, which renders into `#app`, and `openInBrowser(url)`                                                            |
+| `@terminator/extension-sdk/node`           | `writeJsonAtomic(path, value)`: JSON through a temporary file and a rename, so a reader never sees half a file; `shellQuote(value)`                                                                 |
+| `@terminator/extension-sdk/types/renderer` | The `window.electronAPI` a view receives. `tsconfig.extension.json` loads it.                                                                                                                       |
 
 ### Another extension's API
 

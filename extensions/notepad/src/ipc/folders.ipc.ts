@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { randomUUID } from '../db/db'
 import { noPayload, type ExtensionDB, type ExtensionAPI } from '@terminator/extension-sdk'
-import { createIpcRegistrar, IdPayload } from './register'
+import { notepadChannels, IdPayload } from './register'
 
 const CreateFolderPayload = z.object({ name: z.string().min(1) })
 
@@ -112,7 +112,7 @@ export async function moveItemsToFolder(
 }
 
 export function registerFoldersIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {
-  const { handleRemote, cleanup } = createIpcRegistrar(api)
+  const { handleRemote, cleanup } = notepadChannels(api)
   handleRemote('terminator.notepad:folders.create', CreateFolderPayload, (args) =>
     createFolder(db, args)
   )

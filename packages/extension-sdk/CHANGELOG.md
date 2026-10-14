@@ -7,7 +7,14 @@ Minor: 4.1.0. Every addition is optional, so an extension built for 4.0.0 runs u
 ### Added
 
 - `@terminator/extension-sdk/node`: `shellQuote(value)`, a value single-quoted for a POSIX shell.
-  The core's hook commands use it; Foundry kept a copy of the same function.
+  The core's hook commands and Foundry's launch lines use it.
+- `createIpcRegistrar(api, { invalid?, onError? })`: `handle` for desktop-only channels,
+  `handleRemote` for ones the remote client may call, and `cleanup`. Notepad and Task Vault each
+  kept a copy. `invalid` defaults to the new `validationError(error)`, the answer
+  `{ error: 'VALIDATION_ERROR', message }` the core's channels give.
+- `plural(count, word, many?)`, which git-integration and Foundry each kept a copy of.
+- `@terminator/extension-sdk/renderer`: `openInBrowser(url)`, a view's way to open an address in
+  the person's browser. Task Vault and Foundry each kept a copy.
 - `settings.get(key, { repoPath })` (`SettingScope`): a `workspaceScoped` setting resolves to the
   value the workspace owning `repoPath` sets for itself, else the global value, else the schema's
   default. Without a scope it is the global value, as before. Workspace Settings shows every

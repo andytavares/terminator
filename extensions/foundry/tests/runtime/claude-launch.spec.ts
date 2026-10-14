@@ -7,10 +7,10 @@ import { join } from 'path'
 import {
   buildLaunchSpec,
   buildSettings,
-  shellQuote,
   transcriptPathFor,
   resumableIn,
 } from '../../src/runtime/claude-launch.js'
+import { shellQuote } from '@terminator/extension-sdk/node'
 import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 let directory: string
@@ -34,21 +34,6 @@ const options = () => ({
   controlToken: 'abc123',
   nodePath: '/opt/Terminator.app/Contents/MacOS/Terminator',
   claudePath: 'claude',
-})
-
-describe('shellQuote', () => {
-  it('quotes a plain value', () => {
-    expect(shellQuote('hello')).toBe(`'hello'`)
-  })
-
-  it('survives a value containing a quote, which a prompt very often does', () => {
-    // The POSIX idiom: close the quote, escape one, reopen.
-    expect(shellQuote(`don't`)).toBe(`'don'\\''t'`)
-  })
-
-  it('leaves a path with spaces in one argument', () => {
-    expect(shellQuote('/Application Support/a b')).toBe(`'/Application Support/a b'`)
-  })
 })
 
 // A conversation is filed under the directory it ran in. One begun elsewhere —

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { Disposable, ExtensionAPI } from '../types/api'
 
 export type * from '../types/api'
 export type * from '../types/issues'
@@ -48,5 +49,51 @@ export async function dispatchChannel(spec: ChannelSpec, payload: unknown): Prom
   } catch (e) {
     if (spec.onError) return spec.onError(e)
     throw e
+  }
+}
+
+/** The response to a payload a channel's schema rejects. */
+export function validationError(error: z.ZodError): { error: string; message: string } {
+  return { error: 'VALIDATION_ERROR', message: error.message }
+}
+
+/** `word` when `count` is one, else its plural (`word` + "s" unless `many` is given). */
+export function plural(count: number, word: string, many = `${word}s`): string {
+  return count === 1 ? word : many
+}
+
+/** Registers one channel: its name, the schema its payload is parsed with, and its handler. */
+export type ChannelRegistrar = <S extends z.ZodType>(
+  channel: string,
+  schema: S,
+  run: (args: z.infer<S>) => Promise<unknown> | unknown
+) => void
+
+/** What every channel of one registrar answers when its payload is rejected or its run throws. */
+export interface ChannelAnswers {
+  /** Defaults to `validationError`. */
+  invalid?: ChannelSpec['invalid']
+  /** Without it, a channel whose run throws rejects the invoke. */
+  onError?: ChannelSpec['onError']
+}
+
+/** An extension's channel registrar: `handle` for the desktop only, `handleRemote` for the remote
+ * browser client too, and `cleanup` to unregister them all on deactivate (ADR 096). */
+export function createIpcRegistrar(
+  api: ExtensionAPI,
+  answers: ChannelAnswers = {}
+): { handle: ChannelRegistrar; handleRemote: ChannelRegistrar; cleanup(): void } {
+  const disposables: Disposable[] = []
+  const { invalid = validationError, onError } = answers
+  const registrarFor =
+    (remoteAccessible: boolean): ChannelRegistrar =>
+    (channel, schema, run) => {
+      const spec = defineChannel({ channel, schema, invalid, run, onError })
+      disposables.push(api.ipc.registerHandler(spec, { remoteAccessible }))
+    }
+  return {
+    handle: registrarFor(false),
+    handleRemote: registrarFor(true),
+    cleanup: () => disposables.forEach((disposable) => disposable.dispose()),
   }
 }

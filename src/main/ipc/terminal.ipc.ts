@@ -1,6 +1,5 @@
 import { onChannel } from './channel-registrar.js'
-import { defineChannel, type ChannelSpec } from '@terminator/extension-sdk'
-import { validationError } from './validation-error.js'
+import { defineChannel, type ChannelSpec, validationError } from '@terminator/extension-sdk'
 import { registerInvokeTable, noPayload } from './invoke-table.js'
 import { getLink } from '../integrations/issue-link-store.js'
 import { readContextFile } from '../integrations/agent-context.js'

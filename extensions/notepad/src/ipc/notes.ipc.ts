@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { randomUUID } from '../db/db'
 import { noPayload, type ExtensionDB, type ExtensionAPI } from '@terminator/extension-sdk'
-import { createIpcRegistrar, IdPayload } from './register'
+import { notepadChannels, IdPayload } from './register'
 import { rowToNote, type NoteRow } from '../db/mappers'
 import { noteTitle } from '../db/note-title'
 
@@ -330,7 +330,7 @@ export async function deleteTag(
 }
 
 export function registerTagsIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {
-  const { handleRemote, cleanup } = createIpcRegistrar(api)
+  const { handleRemote, cleanup } = notepadChannels(api)
   handleRemote('terminator.notepad:tags.list', noPayload, () => listTags(db))
   handleRemote('terminator.notepad:tags.rename', RenameTagPayload, (args) => renameTag(db, args))
   handleRemote('terminator.notepad:tags.delete', IdPayload, (args) => deleteTag(db, args))
@@ -364,7 +364,7 @@ export async function reorderItems(
 // ---- IPC Registration ----
 
 export function registerNotesIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {
-  const { handleRemote, cleanup } = createIpcRegistrar(api)
+  const { handleRemote, cleanup } = notepadChannels(api)
   const broadcastToSurfaces = (channel: string, data: unknown) =>
     api.window.broadcast(channel, data)
   handleRemote('terminator.notepad:notes.create', CreateNotePayload, (args) => createNote(db, args))

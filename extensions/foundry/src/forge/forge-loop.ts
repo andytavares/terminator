@@ -41,7 +41,7 @@ import { lighterRedTeam, defaultModel } from '../state/settings.js'
 import { endLiveSession } from '../runtime/runtime-state.js'
 import { convergeOnce, readOnlyRound } from './intake-turn.js'
 import type { Deciding } from '../ipc/standing.js'
-import { plural } from '../order/standing.js'
+import { plural } from '@terminator/extension-sdk'
 
 /** What the loop needs that is built after it: the channels an order is agreed and started through. */
 export interface ForgeLoopDeps {

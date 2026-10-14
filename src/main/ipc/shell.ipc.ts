@@ -1,8 +1,7 @@
 import { shell } from 'electron'
 import { homedir } from 'os'
 import { z } from 'zod'
-import { defineChannel } from '@terminator/extension-sdk'
-import { validationError } from './validation-error.js'
+import { defineChannel, validationError } from '@terminator/extension-sdk'
 import { registerInvokeTable } from './invoke-table.js'
 import {
   execShell,

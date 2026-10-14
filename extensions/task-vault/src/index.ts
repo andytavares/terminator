@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { noPayload } from '@terminator/extension-sdk'
+import { createIpcRegistrar, noPayload } from '@terminator/extension-sdk'
 import type {
   ExtensionAPI,
   ExtensionDB,
@@ -12,7 +12,7 @@ import { registerVaultIpcHandlers } from './ipc/vault.ipc.js'
 import { registerProjectsIpcHandlers } from './ipc/projects.ipc.js'
 import { registerLinksIpcHandlers } from './ipc/links.ipc.js'
 import { registerKanbanIpcHandlers } from './ipc/kanban.ipc.js'
-import { createIpcRegistrar, errorResult } from './ipc/register.js'
+import { errorResult } from './ipc/register.js'
 import { registerAdminIpcHandlers } from './ipc/admin.ipc.js'
 import { registerWeeklyReviewIpcHandlers } from './ipc/weekly-review.ipc.js'
 import { applyTaskVaultSchema } from './vault/db.js'
@@ -302,7 +302,7 @@ export async function activate(api: ExtensionAPI): Promise<TaskVaultAPI> {
       properties: { ...BASE_SETTINGS, ...buildNotificationSettingProperties() },
     })
   )
-  const ownIpc = createIpcRegistrar(api, errorResult)
+  const ownIpc = createIpcRegistrar(api, { onError: errorResult })
   disposables.push({ dispose: ownIpc.cleanup })
   registerDbActions(ownIpc, db)
   registerFeatureIpc(api, db)

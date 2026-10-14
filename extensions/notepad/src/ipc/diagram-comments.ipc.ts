@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { randomUUID } from '../db/db'
 import type { DiagramComment } from '../db/types'
 import type { ExtensionDB, ExtensionAPI } from '@terminator/extension-sdk'
-import { createIpcRegistrar, IdPayload } from './register'
+import { notepadChannels, IdPayload } from './register'
 
 type DbDiagramComment = {
   id: string
@@ -144,7 +144,7 @@ export async function deleteDiagramComment(
 }
 
 export function registerDiagramCommentsIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {
-  const { handleRemote, cleanup } = createIpcRegistrar(api)
+  const { handleRemote, cleanup } = notepadChannels(api)
   handleRemote('terminator.notepad:diagram-comments.create', CreateDiagramCommentPayload, (args) =>
     createDiagramComment(db, args)
   )

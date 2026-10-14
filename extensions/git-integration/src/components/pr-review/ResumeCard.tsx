@@ -4,7 +4,7 @@ import { ArrowRight } from 'lucide-react'
 import { useReviewUiStore } from '../../stores/review-ui.store'
 import type { PrReviewDetail, ReviewNote, DraftComment } from '../../schemas/pr-review.schema'
 import type { AgentRun } from '../../schemas/review-agent.schema'
-import { plural } from '../text'
+import { plural } from '@terminator/extension-sdk'
 
 interface Props {
   pr: PrReviewDetail

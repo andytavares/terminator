@@ -3,7 +3,8 @@ import { ArrowRight, Check, Info, RotateCcw, X } from 'lucide-react'
 import { Button, IconButton } from '@terminator/extension-ui'
 import { useMergeFlowStore } from '../../stores/merge-flow.store'
 import type { ConflictFile, ConflictSession } from '../../schemas/merge-flow.schema'
-import { choose, plural, splitPath } from '../text'
+import { plural } from '@terminator/extension-sdk'
+import { choose, splitPath } from '../text'
 
 interface Props {
   onSelectFile: (fileIndex: number) => void

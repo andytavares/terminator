@@ -1,9 +1,5 @@
 import React from 'react'
-
-/** Opens an address in the person's browser: a view cannot open a window of its own. */
-export function openInBrowser(url: string): void {
-  void window.electronAPI.shell?.openExternal(url)
-}
+import { openInBrowser } from '@terminator/extension-sdk/renderer'
 
 // A link that opens in the person's browser. A view has no window-open handler, so
 // `target="_blank"` goes nowhere: the href stays for the status bar and assistive

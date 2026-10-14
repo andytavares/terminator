@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { randomUUID } from '../db/db'
 import type { ExtensionDB, ExtensionAPI } from '@terminator/extension-sdk'
-import { createIpcRegistrar, IdPayload } from './register'
+import { notepadChannels, IdPayload } from './register'
 
 const CreateDiagramPayload = z
   .object({
@@ -216,7 +216,7 @@ export async function hardDeleteDiagram(
 }
 
 export function registerDiagramsIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {
-  const { handleRemote, cleanup } = createIpcRegistrar(api)
+  const { handleRemote, cleanup } = notepadChannels(api)
   handleRemote('terminator.notepad:diagrams.create', CreateDiagramPayload, (args) =>
     createDiagram(db, args)
   )

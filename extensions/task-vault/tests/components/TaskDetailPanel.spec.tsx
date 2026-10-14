@@ -3,16 +3,16 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup, fireEvent } from '@testing-library/react'
 import { installVaultBridge, eventually } from './helpers/bridge'
 
-vi.mock('../../src/utils/open-in-browser', () => ({ openInBrowser: vi.fn() }))
-
 import { TaskDetailPanel } from '../../src/components/TaskDetailPanel'
 
 vi.setConfig({ testTimeout: 30_000 })
 
+const openExternal = vi.fn(async () => ({ ok: true as const }))
+
 let bridge: ReturnType<typeof installVaultBridge>
 
 beforeEach(() => {
-  bridge = installVaultBridge()
+  bridge = installVaultBridge({ shell: { openExternal } })
   bridge.responses['task-vault:vault:get-task-detail'] = {
     description: 'Ship **it**',
     acceptanceCriteria: '',
@@ -103,6 +103,7 @@ function editingTogglingAndLinksTests() {
   it('opens a link in the text instead of editing', async () => {
     renderDetailPanel()
     fireEvent.click(await screen.findByText('docs'))
+    expect(openExternal).toHaveBeenCalledWith('https://example.com')
     expect(screen.queryByRole('textbox')).toBeNull()
   })
 }

@@ -1,3 +1,4 @@
+import { plural } from '@terminator/extension-sdk'
 import type { Gate } from '../gates/rules.js'
 import type { RunGraph } from '../line/run-graph.js'
 import { nodeLabel } from '../line/run-graph.js'
@@ -126,10 +127,6 @@ export interface StandingInput {
   readonly shaping: boolean
   /** The first check a draft has not cleared, in words. Draft orders only. */
   readonly blocker: string | null
-}
-
-export function plural(n: number, one: string, many: string): string {
-  return n === 1 ? one : many
 }
 
 /** What every rule below reads off the graph and the gates, worked out once. */

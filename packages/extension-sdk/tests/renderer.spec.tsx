@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { act } from 'react'
-import { invoke, mountExtension } from '@terminator/extension-sdk/renderer'
+import { invoke, mountExtension, openInBrowser } from '@terminator/extension-sdk/renderer'
 import type { ElectronAPI } from '../types/renderer'
 
 describe('invoke', () => {
@@ -41,5 +41,37 @@ describe('mountExtension', () => {
 
   it('refuses a page without #app', () => {
     expect(() => mountExtension(<p>hello</p>)).toThrow('No #app element')
+  })
+})
+
+describe('openInBrowser', () => {
+  function shellOpening(openExternal: ElectronAPI['shell']['openExternal']): void {
+    const shell: Partial<ElectronAPI['shell']> = { openExternal }
+    Object.defineProperty(window, 'electronAPI', {
+      value: { shell },
+      configurable: true,
+      writable: true,
+    })
+  }
+
+  it("hands the address to the person's browser", () => {
+    const opened = vi.fn().mockResolvedValue(undefined)
+    shellOpening(opened)
+
+    openInBrowser('https://example.com/pull/7')
+
+    expect(opened).toHaveBeenCalledWith('https://example.com/pull/7')
+  })
+
+  it('leaves no unhandled rejection when the address cannot be opened', async () => {
+    const unhandled = vi.fn()
+    process.once('unhandledRejection', unhandled)
+    shellOpening(() => Promise.reject(new Error('no browser')))
+
+    openInBrowser('https://example.com')
+    await new Promise((resolve) => setImmediate(resolve))
+
+    process.off('unhandledRejection', unhandled)
+    expect(unhandled).not.toHaveBeenCalled()
   })
 })

@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import type { ExtensionDB, ExtensionAPI } from '@terminator/extension-sdk'
-import { createIpcRegistrar } from './register'
+import { notepadChannels } from './register'
 import type { SearchResult } from '../db/types'
 
 const searchSchema = z.object({
@@ -152,7 +152,7 @@ export async function searchNotes(
 }
 
 export function registerSearchIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {
-  const { handleRemote, cleanup } = createIpcRegistrar(api)
+  const { handleRemote, cleanup } = notepadChannels(api)
   handleRemote('terminator.notepad:search.query', searchSchema, (args) => searchNotes(db, args))
 
   return cleanup

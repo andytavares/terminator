@@ -1,6 +1,6 @@
 import React from 'react'
 import { Button } from '@terminator/extension-ui'
-import { plural } from '../text'
+import { plural } from '@terminator/extension-sdk'
 
 interface DiffSizeProps {
   additions: number

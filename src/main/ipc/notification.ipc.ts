@@ -1,7 +1,6 @@
 import { BrowserWindow } from 'electron'
 import { z } from 'zod'
-import { defineChannel, type ChannelSpec } from '@terminator/extension-sdk'
-import { validationError } from './validation-error.js'
+import { defineChannel, type ChannelSpec, validationError } from '@terminator/extension-sdk'
 import { registerInvokeTable, noPayload } from './invoke-table.js'
 import { notificationManager } from '../notifications/notification-manager'
 import { sendToWindow } from '../safe-send'

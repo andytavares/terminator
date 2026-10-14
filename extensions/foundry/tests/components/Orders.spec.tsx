@@ -15,7 +15,7 @@ function mount(orders: unknown[], props: Record<string, unknown> = {}) {
     if (channel === 'foundry:order.list') return { orders }
     return {}
   })
-  const openExternal = vi.fn()
+  const openExternal = vi.fn(async () => ({ ok: true as const }))
   Object.assign(window, {
     electronAPI: {
       extensionBridge: { invoke, on: bus.on },

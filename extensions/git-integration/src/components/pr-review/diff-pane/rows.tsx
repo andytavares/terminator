@@ -5,7 +5,7 @@ import { SplitLineRow, UnifiedLineRow } from '../DiffLineRows'
 import { EXPAND_STEP } from '../../../review/expand-gaps'
 import type { DiffItem, MovedMark } from '../../../review/diff-items'
 import type { DiffHunk, DiffLine } from '../../../schemas/git.schema'
-import { plural } from '../../text'
+import { plural } from '@terminator/extension-sdk'
 import type { PaneContext, Side } from './types'
 import {
   AnnotationContent,

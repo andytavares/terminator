@@ -1,7 +1,6 @@
 import { z } from 'zod'
 import { BrowserWindow } from 'electron'
-import { defineChannel, type ChannelSpec } from '@terminator/extension-sdk'
-import { validationError } from './validation-error.js'
+import { defineChannel, type ChannelSpec, validationError } from '@terminator/extension-sdk'
 import { registerInvokeTable, noPayload } from './invoke-table.js'
 import {
   CreateProjectInputSchema,

@@ -3,8 +3,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup, fireEvent, act } from '@testing-library/react'
 import { installVaultBridge, eventually } from './helpers/bridge'
 
-vi.mock('../../src/utils/open-in-browser', () => ({ openInBrowser: vi.fn() }))
-
 const store = {
   selectedContexts: [] as string[],
   setKanbanLanes: vi.fn(),
@@ -16,6 +14,8 @@ vi.mock('../../src/stores/vault.store', () => ({ useVaultStore: () => store }))
 import { KanbanBoard } from '../../src/components/KanbanBoard'
 
 vi.setConfig({ testTimeout: 30_000 })
+
+const openExternal = vi.fn(async () => ({ ok: true as const }))
 
 class TestDragEvent extends MouseEvent {
   dataTransfer = { effectAllowed: '', dropEffect: '', setData: () => {}, getData: () => '' }
@@ -48,7 +48,7 @@ const TASKS = [
 let bridge: ReturnType<typeof installVaultBridge>
 
 beforeEach(() => {
-  bridge = installVaultBridge()
+  bridge = installVaultBridge({ shell: { openExternal } })
   bridge.responses['task-vault:kanban:get-config'] = CONFIG
   bridge.responses['task-vault:kanban:list-tasks'] = { tasks: TASKS }
   bridge.responses['task-vault:vault:get-task-detail'] = {
@@ -133,6 +133,7 @@ function cardSelectingTests() {
   it('opens a link in a description without selecting the card, and shows tags', async () => {
     render(<KanbanBoard />)
     fireEvent.click(await screen.findByText('x'))
+    expect(openExternal).toHaveBeenCalledWith('https://x.y')
     expect(cardWithText('Write').className).not.toContain('--selected')
     expect(screen.getByText('due:2026-02-02')).toBeTruthy()
   })

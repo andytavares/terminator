@@ -3,7 +3,7 @@ import { Sparkles, TriangleAlert, MoreHorizontal, X } from 'lucide-react'
 import { Button, IconButton, Popover } from '@terminator/extension-ui'
 import { StatusChecksBar } from './StatusChecksBar'
 import type { StatusCheck } from '../../schemas/pr-review.schema'
-import { plural } from '../text'
+import { plural } from '@terminator/extension-sdk'
 import './review-header.css'
 
 export interface ReviewHeaderProps {

@@ -15,12 +15,12 @@ An extension imports only this package, `@terminator/extension-ui` and the npm p
 own `package.json`. `npm run lint` rejects anything else, including core source and other
 extensions ([What an extension may import](../../docs/EXTENSION-DEVELOPMENT.md#what-an-extension-may-import)).
 
-| Entry                                      | Source                | What it holds                                                                                                                                                       |
-| ------------------------------------------ | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@terminator/extension-sdk`                | `src/index.ts`        | The types in `types/api.d.ts`, `types/issues.d.ts`, `types/github.d.ts` and `types/extensions.d.ts`; `ChannelSpec`, `defineChannel`, `dispatchChannel`, `noPayload` |
-| `@terminator/extension-sdk/renderer`       | `src/renderer.tsx`    | `invoke<T>(channel, payload = {})` and `mountExtension(<App />)`, for an extension's view                                                                           |
-| `@terminator/extension-sdk/node`           | `src/node.ts`         | `writeJsonAtomic(path, value)`                                                                                                                                      |
-| `@terminator/extension-sdk/types/renderer` | `types/renderer.d.ts` | `ElectronAPI`, the `window.electronAPI` an extension view receives (`tsconfig.extension.json` loads it)                                                             |
+| Entry                                      | Source                | What it holds                                                                                                                                                                                                          |
+| ------------------------------------------ | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@terminator/extension-sdk`                | `src/index.ts`        | The types in `types/api.d.ts`, `types/issues.d.ts`, `types/github.d.ts` and `types/extensions.d.ts`; `ChannelSpec`, `defineChannel`, `dispatchChannel`, `noPayload`, `createIpcRegistrar`, `validationError`, `plural` |
+| `@terminator/extension-sdk/renderer`       | `src/renderer.tsx`    | `invoke<T>(channel, payload = {})`, `mountExtension(<App />)` and `openInBrowser(url)`, for an extension's view                                                                                                        |
+| `@terminator/extension-sdk/node`           | `src/node.ts`         | `writeJsonAtomic(path, value)`, `shellQuote(value)`                                                                                                                                                                    |
+| `@terminator/extension-sdk/types/renderer` | `types/renderer.d.ts` | `ElectronAPI`, the `window.electronAPI` an extension view receives (`tsconfig.extension.json` loads it)                                                                                                                |
 
 The declaration files:
 

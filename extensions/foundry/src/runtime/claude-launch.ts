@@ -1,3 +1,4 @@
+import { shellQuote } from '@terminator/extension-sdk/node'
 import { writeFileSync, mkdirSync } from 'fs'
 import { isAbsolute, join } from 'path'
 import { homedir } from 'os'
@@ -76,11 +77,6 @@ export interface LaunchSpecOptions {
  * large is accepted at all.
  */
 const HOOK_TIMEOUT_SECONDS = 43_200
-
-/** Single-quoted for a POSIX shell, which is what the terminal is running. */
-export function shellQuote(value: string): string {
-  return `'${value.replace(/'/g, `'\\''`)}'`
-}
 
 /**
  * Where Claude Code keeps a session's transcript.

@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { rowToComment, type CommentRow } from '../db/mappers'
 import type { Comment } from '../db/types'
 import type { ExtensionDB, ExtensionAPI } from '@terminator/extension-sdk'
-import { createIpcRegistrar, IdPayload } from './register'
+import { notepadChannels, IdPayload } from './register'
 
 const ListPayload = z.object({
   noteId: z.string(),
@@ -178,7 +178,7 @@ export async function markOrphaned(
 }
 
 export function registerCommentsIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {
-  const { handleRemote, cleanup } = createIpcRegistrar(api)
+  const { handleRemote, cleanup } = notepadChannels(api)
   handleRemote('terminator.notepad:comments.list', ListPayload, (args) => listComments(db, args))
   handleRemote('terminator.notepad:comments.create', CreatePayload, (args) =>
     createComment(db, args)

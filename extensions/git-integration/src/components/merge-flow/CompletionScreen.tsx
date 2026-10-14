@@ -5,7 +5,8 @@ import { useMergeFlowStore } from '../../stores/merge-flow.store'
 import { mergeFlowAPI } from '../../api/merge-flow'
 import { notificationsAPI } from '../../api/notifications'
 import type { ConflictFile, ConflictSession } from '../../schemas/merge-flow.schema'
-import { choose, plural, splitPath } from '../text'
+import { plural } from '@terminator/extension-sdk'
+import { choose, splitPath } from '../text'
 
 interface Props {
   repoRoot: string

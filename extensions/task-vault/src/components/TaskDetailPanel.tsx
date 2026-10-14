@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { X, Eye, Pencil } from 'lucide-react'
 import { Button, IconButton, Markdown } from '@terminator/extension-ui'
-import { openInBrowser } from '../utils/open-in-browser'
+import { openInBrowser } from '@terminator/extension-sdk/renderer'
 
 interface TaskDetail {
   description: string

@@ -6,7 +6,7 @@ import { useVaultStore } from '../stores/vault.store'
 import { KanbanLaneEditor } from './KanbanLaneEditor'
 import { TaskDetailPanel } from './TaskDetailPanel'
 import { Button, Markdown } from '@terminator/extension-ui'
-import { openInBrowser } from '../utils/open-in-browser'
+import { openInBrowser } from '@terminator/extension-sdk/renderer'
 import { useIndexReload } from './vault-hooks'
 
 interface KanbanTask {

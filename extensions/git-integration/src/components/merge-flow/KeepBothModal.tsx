@@ -3,7 +3,8 @@ import { ArrowDown, TriangleAlert } from 'lucide-react'
 import { Dialog, RelativeTime, SegmentedControl } from '@terminator/extension-ui'
 import type { ConflictBlock, GitAuthor } from '../../schemas/merge-flow.schema'
 import { highlightBlock, langFromBlockId } from '../../utils/syntax'
-import { choose, plural } from '../text'
+import { plural } from '@terminator/extension-sdk'
+import { choose } from '../text'
 
 interface Props {
   block: ConflictBlock

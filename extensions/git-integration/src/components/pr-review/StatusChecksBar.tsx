@@ -1,7 +1,8 @@
 import React, { useState } from 'react'
 import { Check, CircleDashed, CircleHelp, Minus, X, type LucideIcon } from 'lucide-react'
 import type { StatusCheck } from '../../schemas/pr-review.schema'
-import { choose, plural } from '../text'
+import { plural } from '@terminator/extension-sdk'
+import { choose } from '../text'
 
 interface Props {
   checks: StatusCheck[]

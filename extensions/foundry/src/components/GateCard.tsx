@@ -6,7 +6,7 @@ import { gradeInWords } from '../runtime/review/risk-grade.js'
 import { GateEvidence } from './GateEvidence.js'
 import { RaiseBudgetForm } from './BudgetForm.js'
 import { Button, IconButton, Markdown } from '@terminator/extension-ui'
-import { openInBrowser } from './ExternalLink.js'
+import { openInBrowser } from '@terminator/extension-sdk/renderer'
 import { OrderLinks } from './OrderLinks.js'
 
 // One gate, one line.
