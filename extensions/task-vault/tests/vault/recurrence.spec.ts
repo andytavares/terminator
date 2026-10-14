@@ -1,20 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import {
-  localDate,
   computeNextDueDate,
   parseRecurrenceRule,
   InvalidRecurrenceRuleError,
 } from '../../src/vault/recurrence'
-
-describe('localDate', () => {
-  it('formats a date as YYYY-MM-DD', () => {
-    expect(localDate(new Date(2024, 0, 5))).toBe('2024-01-05')
-  })
-
-  it('pads single-digit month and day', () => {
-    expect(localDate(new Date(2024, 2, 9))).toBe('2024-03-09')
-  })
-})
 
 describe('parseRecurrenceRule', parseRecurrenceRuleTests)
 

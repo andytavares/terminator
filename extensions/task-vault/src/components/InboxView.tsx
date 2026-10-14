@@ -8,7 +8,7 @@ import { useVaultDataStore } from '../stores/vault-data.store'
 import { useIndexReload } from './vault-hooks'
 import { Button, IconButton } from '@terminator/extension-ui'
 import { invokeVault } from './daily-log-format'
-import { localDate } from '../vault/recurrence'
+import { localDate } from '../utils/local-date'
 
 type InboxOutcome = { tasks?: IndexedTask[] } | { error: string }
 

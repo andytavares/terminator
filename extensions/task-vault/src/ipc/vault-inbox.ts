@@ -3,7 +3,8 @@ import type { ExtensionDB } from '@terminator/extension-sdk'
 import { route, type IpcContext } from './register'
 import { randomUUID } from '../vault/db'
 import { ProcessInboxRequestSchema } from '../schemas/vault.schema'
-import { indexUpdated, nowIso, resolveSource, today } from './vault-shared'
+import { indexUpdated, nowIso, resolveSource } from './vault-shared'
+import { today } from '../vault/clock'
 
 type ProcessArgs = z.infer<typeof ProcessInboxRequestSchema>
 

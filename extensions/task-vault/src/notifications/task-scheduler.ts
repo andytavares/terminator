@@ -1,6 +1,6 @@
 import type { ExtensionAPI, ExtensionDB, Disposable } from '@terminator/extension-sdk'
 import { openInVault } from '../navigation.js'
-import { localDate } from '../vault/recurrence'
+import { localDate } from '../utils/local-date'
 
 let _tick: (() => void) | null = null
 

@@ -1,7 +1,7 @@
 import type { z } from 'zod'
 import type { ExtensionDB } from '@terminator/extension-sdk'
 import { route, type IpcContext } from './register'
-import { localDate } from '../vault/recurrence'
+import { localDate } from '../utils/local-date'
 import {
   GetProjectTasksRequestSchema,
   ListArchiveRequestSchema,

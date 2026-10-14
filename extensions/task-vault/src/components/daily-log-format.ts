@@ -1,7 +1,7 @@
 import type React from 'react'
 import type { IndexedTask } from '../vault/types'
 import { useVaultNavStore } from '../stores/vault-nav.store'
-import { localDate } from '../vault/recurrence'
+import { localDate } from '../utils/local-date'
 
 export type EndType = 'none' | 'on_date' | 'after_count'
 
