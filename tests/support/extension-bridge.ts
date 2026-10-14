@@ -2,10 +2,8 @@ import { vi } from 'vitest'
 
 type Responder = unknown | ((payload: unknown) => unknown)
 
-/**
- * Installs a fake `window.electronAPI` whose extension bridge answers invokes by channel (a value,
- * or a function of the payload; `fallback` otherwise), and lets a test push to its subscribers.
- */
+/** Installs a fake `window.electronAPI` whose extension bridge answers invokes by channel (a value,
+ * or a function of the payload; `fallback` otherwise), and lets a test push to its subscribers. */
 export function installExtensionBridge(fallback: unknown, extra: Record<string, unknown> = {}) {
   const responses: Record<string, Responder> = {}
   const subscribers = new Map<string, (data: unknown) => void>()

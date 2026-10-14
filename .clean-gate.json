@@ -1,0 +1,28 @@
+{
+  "ignoreNames": [
+    "main",
+    "__init__",
+    "constructor",
+    "return",
+    "function",
+    "undefined",
+    "describe",
+    "test",
+    "beforeEach",
+    "act",
+    "then",
+    "where",
+    "has",
+    "is",
+    "not",
+    "useEffect",
+    "useCallback",
+    "useState",
+    "requestAnimationFrame",
+    "render",
+    "play",
+    "activate",
+    "deactivate"
+  ],
+  "ignorePaths": ["*.png"]
+}

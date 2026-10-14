@@ -6,11 +6,9 @@ export type * from '../types/issues'
 export type * from '../types/extensions'
 export type * from '../types/github'
 
-/**
- * One invoke channel: its payload schema, the response to a payload the
- * schema rejects, and how to answer a valid one. The core registers its own
- * channels in this shape, and so does `api.ipc.registerHandler` (ADR 096).
- */
+/** One invoke channel: its payload schema, the response to a payload the schema rejects, and how
+ * to answer a valid one. The core registers its own channels in this shape, and so does
+ * `api.ipc.registerHandler` (ADR 096). */
 export interface ChannelSpec<S extends z.ZodType = z.ZodType> {
   channel: string
   schema: S
@@ -22,10 +20,8 @@ export interface ChannelSpec<S extends z.ZodType = z.ZodType> {
   onError?: (e: unknown) => unknown
 }
 
-/**
- * Payload of a channel that takes none: the desktop renderer sends nothing,
- * the remote bridge sends `{}` in its place.
- */
+/** Payload of a channel that takes none: the desktop renderer sends nothing, the remote bridge
+ * sends `{}` in its place. */
 export const noPayload = z.union([z.undefined(), z.object({})])
 
 /** Declares one channel so `run` gets its own schema's payload type. The registry holds channels
@@ -34,10 +30,8 @@ export function defineChannel<S extends z.ZodType>(spec: ChannelSpec<S>): Channe
   return { ...spec, run: (args) => spec.run(args) }
 }
 
-/**
- * Answers one invoke of `spec`: parses the payload, returns the declared
- * invalid response when the schema rejects it, and otherwise runs the channel.
- */
+/** Answers one invoke of `spec`: parses the payload, returns the declared invalid response when
+ * the schema rejects it, and otherwise runs the channel. */
 export async function dispatchChannel(spec: ChannelSpec, payload: unknown): Promise<unknown> {
   const parsed = spec.schema.safeParse(payload)
   if (!parsed.success) {
