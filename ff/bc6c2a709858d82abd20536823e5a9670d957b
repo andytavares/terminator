@@ -1,0 +1,38 @@
+extensions/foundry/src/line/roles.ts
+  s_c9dd89ad1f6c54::t_e2954493d62908 80,96,101-104
+  s_c9dd89ad1f6c54::t_b36be5b747d5ed 90
+extensions/foundry/src/runtime/workspace-trust.ts
+  s_c9dd89ad1f6c54::t_e2954493d62908 33,78
+extensions/foundry/tests/sensors/built-ins.spec.ts
+  s_c9dd89ad1f6c54::t_e2954493d62908 15,26,36
+src/main/integrations/providers/linear.provider.ts
+  s_c9dd89ad1f6c54::t_e2954493d62908 323,449
+extensions/foundry/src/gates/store.ts
+  s_c9dd89ad1f6c54::t_e2954493d62908 36,72,85
+packages/extension-ui/src/modal-depth.ts
+  s_c9dd89ad1f6c54::t_e2954493d62908 64,88-90,113
+src/main/integrations/providers/jira.provider.ts
+  s_c9dd89ad1f6c54::t_b36be5b747d5ed 311
+  s_c9dd89ad1f6c54::t_e2954493d62908 291
+src/main/integrations/tracker-store.ts
+  s_c9dd89ad1f6c54::t_e2954493d62908 71,100
+  s_c9dd89ad1f6c54::t_f9b3a0f92645fd 129,165,173
+extensions/foundry/tests/recipe/built-ins.spec.ts
+  s_c9dd89ad1f6c54::t_e2954493d62908 25,33,63,361,399,406,412,425,444,449,458,470,540,679
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "ffbc6c2a709858d82abd20536823e5a9670d957b",
+  "prompts": {},
+  "sessions": {
+    "s_c9dd89ad1f6c54": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ee6b7f82-c708-43d8-8c1f-eefe55f692a9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
