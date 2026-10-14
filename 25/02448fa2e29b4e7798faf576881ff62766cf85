@@ -1,0 +1,24 @@
+tests/integration/scripts/create-extension.spec.js
+  s_c9dd89ad1f6c54::t_6a5604e546880a 1,3,6,21
+tests/support/temp-dir.ts
+  s_c9dd89ad1f6c54::t_6a5604e546880a 1,9-10,12
+tests/unit/support/temp-dir.spec.ts
+  s_c9dd89ad1f6c54::t_6a5604e546880a 2,12,16-19
+  s_c9dd89ad1f6c54::t_509ff4e9ab7c49 20-21
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2502448fa2e29b4e7798faf576881ff62766cf85",
+  "prompts": {},
+  "sessions": {
+    "s_c9dd89ad1f6c54": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ee6b7f82-c708-43d8-8c1f-eefe55f692a9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
