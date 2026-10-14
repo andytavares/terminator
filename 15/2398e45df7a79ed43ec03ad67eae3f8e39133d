@@ -1,0 +1,125 @@
+extensions/notepad/src/ipc/notes.ipc.ts
+  s_c9dd89ad1f6c54::t_6a5604e546880a 4,333,367
+extensions/foundry/src/components/factory/FactoryHall.tsx
+  s_c9dd89ad1f6c54::t_6a5604e546880a 46
+extensions/foundry/src/components/Ledger.tsx
+  s_c9dd89ad1f6c54::t_6a5604e546880a 8
+docs/EXTENSION-DEVELOPMENT.md
+  s_c9dd89ad1f6c54::t_7fdb208214ae46 174-179
+extensions/git-integration/src/components/merge-flow/CompletionScreen.tsx
+  s_c9dd89ad1f6c54::t_6a5604e546880a 8-9
+extensions/notepad/src/ipc/export.ipc.ts
+  s_c9dd89ad1f6c54::t_6a5604e546880a 7,345
+packages/extension-sdk/CHANGELOG.md
+  s_c9dd89ad1f6c54::t_7fdb208214ae46 10-17
+extensions/git-integration/src/components/pr-review/ReviewDashboard.tsx
+  s_c9dd89ad1f6c54::t_6a5604e546880a 19-20
+extensions/git-integration/src/components/merge-flow/ConflictHub.tsx
+  s_c9dd89ad1f6c54::t_6a5604e546880a 6-7
+packages/extension-sdk/src/index.ts
+  s_c9dd89ad1f6c54::t_6a5604e546880a 2,54-97
+  s_c9dd89ad1f6c54::t_b6a99600e5305a 98-99
+extensions/git-integration/src/components/pr-review/DiffSize.tsx
+  s_c9dd89ad1f6c54::t_6a5604e546880a 3
+extensions/notepad/src/ipc/folders.ipc.ts
+  s_c9dd89ad1f6c54::t_6a5604e546880a 4,115
+extensions/foundry/src/runtime/claude-launch.ts
+  s_c9dd89ad1f6c54::t_6a5604e546880a 1
+src/main/ipc/shell.ipc.ts
+  s_c9dd89ad1f6c54::t_6a5604e546880a 4
+extensions/task-vault/src/components/KanbanBoard.tsx
+  s_c9dd89ad1f6c54::t_6a5604e546880a 9
+extensions/notepad/src/ipc/search.ipc.ts
+  s_c9dd89ad1f6c54::t_6a5604e546880a 3,155
+extensions/task-vault/src/components/TaskDetailPanel.tsx
+  s_c9dd89ad1f6c54::t_6a5604e546880a 4
+src/main/ipc/workspace.ipc.ts
+  s_c9dd89ad1f6c54::t_6a5604e546880a 3
+extensions/git-integration/src/components/pr-review/HealthChips.tsx
+  s_c9dd89ad1f6c54::t_6a5604e546880a 3-4
+extensions/git-integration/src/components/pr-review/ReviewFooter.tsx
+  s_c9dd89ad1f6c54::t_6a5604e546880a 6
+extensions/foundry/src/runtime/supervised-runner.ts
+  s_c9dd89ad1f6c54::t_6a5604e546880a 5-6
+extensions/foundry/tests/runtime/claude-launch.spec.ts
+  s_c9dd89ad1f6c54::t_6a5604e546880a 13
+packages/extension-sdk/tests/index.spec.ts
+  s_c9dd89ad1f6c54::t_ef7ac0d4a26706 89-91
+  s_c9dd89ad1f6c54::t_6a5604e546880a 1-77,83-88,92-113
+  s_c9dd89ad1f6c54::t_7fdb208214ae46 78-82
+extensions/foundry/src/components/ExternalLink.tsx
+  s_c9dd89ad1f6c54::t_6a5604e546880a 2
+packages/extension-sdk/tests/renderer.spec.tsx
+  s_c9dd89ad1f6c54::t_b6a99600e5305a 76-77
+  s_c9dd89ad1f6c54::t_6a5604e546880a 3,46-75
+extensions/foundry/tests/components/Inbox.spec.tsx
+  s_c9dd89ad1f6c54::t_1abd54e45cbd80 17
+extensions/task-vault/tests/components/KanbanBoardActions.spec.tsx
+  s_c9dd89ad1f6c54::t_1abd54e45cbd80 18-19,51,136
+extensions/task-vault/tests/components/TaskDetailPanel.spec.tsx
+  s_c9dd89ad1f6c54::t_1abd54e45cbd80 10-11,15,106
+docs/ARCHITECTURE.md
+  s_c9dd89ad1f6c54::t_7fdb208214ae46 961
+extensions/notepad/src/ipc/register.ts
+  s_c9dd89ad1f6c54::t_6a5604e546880a 2-3,11-14
+extensions/git-integration/src/components/pr-review/diff-pane/rows.tsx
+  s_c9dd89ad1f6c54::t_6a5604e546880a 8
+extensions/foundry/src/components/Forge.tsx
+  s_c9dd89ad1f6c54::t_6a5604e546880a 2
+extensions/git-integration/src/components/pr-review/ResumeCard.tsx
+  s_c9dd89ad1f6c54::t_6a5604e546880a 7
+packages/extension-sdk/src/renderer.tsx
+  s_c9dd89ad1f6c54::t_6a5604e546880a 17-21
+extensions/git-integration/src/components/pr-review/StatusChecksBar.tsx
+  s_c9dd89ad1f6c54::t_6a5604e546880a 4-5
+extensions/task-vault/src/index.ts
+  s_c9dd89ad1f6c54::t_6a5604e546880a 2,15,305
+src/main/ipc/notification.ipc.ts
+  s_c9dd89ad1f6c54::t_6a5604e546880a 3
+extensions/git-integration/src/components/pr-review/InsightsPanel.tsx
+  s_c9dd89ad1f6c54::t_6a5604e546880a 3-4
+extensions/foundry/tests/components/Orders.spec.tsx
+  s_c9dd89ad1f6c54::t_1abd54e45cbd80 18
+extensions/notepad/src/ipc/comments.ipc.ts
+  s_c9dd89ad1f6c54::t_6a5604e546880a 6,181
+extensions/task-vault/src/ipc/register.ts
+  s_c9dd89ad1f6c54::t_6a5604e546880a 2-3,44
+extensions/git-integration/src/components/merge-flow/KeepBothModal.tsx
+  s_c9dd89ad1f6c54::t_6a5604e546880a 6-7
+extensions/foundry/src/components/GateCard.tsx
+  s_c9dd89ad1f6c54::t_6a5604e546880a 9
+extensions/notepad/src/ipc/diagrams.ipc.ts
+  s_c9dd89ad1f6c54::t_6a5604e546880a 4,219
+extensions/foundry/src/forge/forge-loop.ts
+  s_c9dd89ad1f6c54::t_6a5604e546880a 44
+extensions/foundry/tests/components/factory/FactoryHall.spec.tsx
+  s_c9dd89ad1f6c54::t_1abd54e45cbd80 14
+extensions/foundry/src/order/standing.ts
+  s_c9dd89ad1f6c54::t_6a5604e546880a 1
+packages/extension-sdk/README.md
+  s_c9dd89ad1f6c54::t_7fdb208214ae46 18-23
+src/main/ipc/terminal.ipc.ts
+  s_c9dd89ad1f6c54::t_6a5604e546880a 2
+extensions/foundry/src/components/Floor.tsx
+  s_c9dd89ad1f6c54::t_6a5604e546880a 26-27
+extensions/git-integration/src/components/pr-review/ReviewHeader.tsx
+  s_c9dd89ad1f6c54::t_6a5604e546880a 6
+extensions/notepad/src/ipc/diagram-comments.ipc.ts
+  s_c9dd89ad1f6c54::t_6a5604e546880a 5,147
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "152398e45df7a79ed43ec03ad67eae3f8e39133d",
+  "prompts": {},
+  "sessions": {
+    "s_c9dd89ad1f6c54": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ee6b7f82-c708-43d8-8c1f-eefe55f692a9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
