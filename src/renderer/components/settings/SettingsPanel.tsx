@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState } from 'react'
+import { ModalShell } from '@terminator/extension-ui'
 import { GlobalSettings } from './GlobalSettings'
 import { IntegrationsSettings } from './IntegrationsSettings'
 import { WorkspaceSettings } from './WorkspaceSettings'
@@ -18,51 +19,21 @@ export function SettingsPanel({ onClose }: Props): JSX.Element {
   useModalEffect()
   const [section, setSection] = useState<Section>('global')
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId)
-  const panelRef = usePanelFocus()
-  useEscapeToClose(onClose)
 
   return (
-    <div className="settings-overlay" onClick={onClose}>
-      <div
-        ref={panelRef}
-        className="settings-panel"
-        role="dialog"
-        aria-label="Settings"
-        tabIndex={-1}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="settings-panel__sidebar">
-          <h2 className="settings-panel__title">Settings</h2>
-          <SettingsNav section={section} onSelect={setSection} hasWorkspace={!!activeWorkspaceId} />
-        </div>
-        <div className="settings-panel__content">
-          <button className="settings-panel__close" onClick={onClose}>
-            ✕
-          </button>
-          <SectionContent section={section} workspaceId={activeWorkspaceId} />
-        </div>
+    <ModalShell label="Settings" className="settings-panel" onDismiss={onClose}>
+      <div className="settings-panel__sidebar">
+        <h2 className="settings-panel__title">Settings</h2>
+        <SettingsNav section={section} onSelect={setSection} hasWorkspace={!!activeWorkspaceId} />
       </div>
-    </div>
+      <div className="settings-panel__content">
+        <button className="settings-panel__close" onClick={onClose}>
+          ✕
+        </button>
+        <SectionContent section={section} workspaceId={activeWorkspaceId} />
+      </div>
+    </ModalShell>
   )
-}
-
-/** The terminal's xterm stops Escape from propagating, so the panel takes focus as it opens. */
-function usePanelFocus() {
-  const panelRef = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    panelRef.current?.focus()
-  }, [])
-  return panelRef
-}
-
-function useEscapeToClose(onClose: () => void): void {
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent): void {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [onClose])
 }
 
 const SECTIONS: Array<{ section: Section; label: string }> = [

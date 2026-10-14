@@ -5,6 +5,7 @@ import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.sto
 import { SettingsPanel } from '../../../../src/renderer/components/settings/SettingsPanel'
 import { extensionOf, seedStore } from '../../../support/renderer-stores'
 import { installElectronApi } from '../../../support/electron-api'
+import { pressOutside } from '../../../support/modal'
 import type { ElectronAPI } from '../../../../src/shared/electron-api/api-type'
 
 const { mockDispatchNotification } = vi.hoisted(() => ({ mockDispatchNotification: vi.fn() }))
@@ -53,13 +54,10 @@ beforeEach(() => {
 })
 
 describe('SettingsPanel', () => {
-  it('takes focus from the terminal when it opens, so its Escape is not swallowed', () => {
-    const terminalInput = document.createElement('textarea')
-    document.body.appendChild(terminalInput)
-    terminalInput.focus()
+  // Opened as a native modal dialog, it takes focus from the terminal: tests/e2e/settings.spec.ts.
+  it('is a modal shell named Settings', () => {
     render(<SettingsPanel onClose={vi.fn()} />)
-    expect(document.activeElement).toBe(screen.getByRole('dialog', { name: 'Settings' }))
-    terminalInput.remove()
+    expect(screen.getByRole('dialog', { name: 'Settings' }).tagName).toBe('DIALOG')
   })
 
   it('renders Settings title', () => {
@@ -111,7 +109,7 @@ describe('SettingsPanel — shows Workspace Settings nav when a workspace is act
   it('calls onClose when overlay is clicked', () => {
     const onClose = vi.fn()
     render(<SettingsPanel onClose={onClose} />)
-    fireEvent.click(screen.getByText('Settings').closest('.settings-overlay')!)
+    pressOutside(screen.getByRole('dialog', { name: 'Settings' }))
     expect(onClose).toHaveBeenCalled()
   })
 })

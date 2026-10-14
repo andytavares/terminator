@@ -381,7 +381,7 @@ const exactly = (text: string): RegExp =>
 export async function runQuickActionFromPanel(page: Page, label: string): Promise<void> {
   await page.locator('.app-band__entry[aria-label="Quick actions (⌘P)"]').click()
   const panel = quickActionsPanel(page)
-  await expect(panel).toBeFocused({ timeout: 10000 })
+  await expect(panel.locator(':focus')).toHaveCount(1, { timeout: 10000 })
   await page.keyboard.press('/')
   await page.keyboard.type(label)
   await panel

@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { QuickActions } from '../../../../src/renderer/components/QuickActions'
 import type { QuickAction, QuickActionGroup } from '../../../../src/renderer/quick-actions/types'
+import { pressOutside } from '../../../support/modal'
 
 vi.mock('../../../../src/renderer/components/QuickActions.css', () => ({}))
 
@@ -250,9 +251,14 @@ describe('QuickActions — closing', () => {
   })
 
   it('closes on an outside mousedown', () => {
-    const { container } = renderPanel()
-    const overlay = container.querySelector('.qa-overlay')!
-    fireEvent.mouseDown(overlay)
+    renderPanel()
+    pressOutside(screen.getByRole('dialog', { name: 'Quick actions' }))
+    expect(onClose).toHaveBeenCalledOnce()
+  })
+
+  it('closes on a close request that is not Escape, such as a back gesture', () => {
+    renderPanel()
+    fireEvent(screen.getByRole('dialog'), new Event('cancel', { cancelable: true }))
     expect(onClose).toHaveBeenCalledOnce()
   })
 

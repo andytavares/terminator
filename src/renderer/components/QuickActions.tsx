@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronRight, Pin, PinOff } from 'lucide-react'
+import { ModalShell } from '@terminator/extension-ui'
 import type { QuickAction, QuickActionGroup } from '../quick-actions/types'
 import { searchActions } from '../quick-actions/search'
 import { orderGroups } from '../quick-actions/rank'
@@ -52,21 +53,13 @@ export function QuickActions(props: QuickActionsProps): JSX.Element {
   useQuickActionKeys(props, panel, rows)
 
   return (
-    <div className="qa-overlay" onMouseDown={props.onClose}>
-      <div
-        ref={panelRef}
-        className="qa-panel"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Quick actions"
-        tabIndex={-1}
-        onMouseDown={(e) => e.stopPropagation()}
-      >
+    <ModalShell label="Quick actions" className="qa-panel" onDismiss={props.onClose}>
+      <div ref={panelRef} className="qa-panel__frame" tabIndex={-1}>
         <PanelHeader {...props} panel={panel} rows={rows} inputRef={inputRef} />
         <PanelBody {...props} panel={panel} rows={rows} />
         <PanelFooter mode={panel.mode} statusMessage={panel.statusMessage} />
       </div>
-    </div>
+    </ModalShell>
   )
 }
 
@@ -160,9 +153,9 @@ function useHighlightReset(
   }
 }
 
-/** Focus follows the mode: the search box while searching, else the panel, from mount. Left on the
- * terminal, xterm's capture-phase Escape handler stops the event before this window-level listener,
- * and the panel would never close on Escape. */
+/** Focus follows the mode: the search box while searching, else the panel's frame, from mount.
+ * Left where the dialog opens it, on a row's pin button, Enter and Space would press that button
+ * as well as run the highlighted row. */
 function usePanelFocus(mode: Mode) {
   const inputRef = useRef<HTMLInputElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)

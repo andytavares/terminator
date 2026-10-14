@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { closeApp, launchApp, type AppHandle } from './helpers'
 import { git, makeRepoWithRemote, openGitTab, openRepo, projectTab, writeFile } from './git-harness'
 import { startGithubStub, type GithubStub } from './github-stub'
+import { expectCentredInWindow } from './modal-centre'
 
 /** The Git tab on a feature branch: diff, stage, commit through a pre-commit hook (passing
  * and failing), push, open a pull request on the stub GitHub, and the Git Quick Actions. */
@@ -117,6 +118,7 @@ test('Open PR pushes the branch and opens a pull request on GitHub', async () =>
   const view = await openGitTab(handle)
   await view.getByRole('button', { name: 'Open PR' }).click()
   const dialog = view.getByRole('dialog', { name: 'Open Pull Request' })
+  await expectCentredInWindow(dialog, 'Git: Open Pull Request')
   await expect(dialog.getByPlaceholder('Describe your changes…')).toHaveValue('## What changed\n')
   await dialog.getByPlaceholder('Pull request title').fill('Greet in either order')
   await dialog.getByPlaceholder('Describe your changes…').fill('Adds a greeting.')
@@ -153,7 +155,7 @@ async function runGitQuickAction(mnemonic: string): Promise<void> {
   const { page } = handle
   await page.keyboard.press('Meta+p')
   const panel = page.getByRole('dialog', { name: 'Quick actions' })
-  await expect(panel).toBeFocused({ timeout: 10000 })
+  await expect(panel.locator(':focus')).toHaveCount(1, { timeout: 10000 })
   await page.keyboard.press('g')
   await expect(page.getByRole('listbox', { name: 'Git' })).toBeVisible()
   await page.keyboard.press(mnemonic)

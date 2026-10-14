@@ -30,7 +30,7 @@ export function LogWindow({ onClose }: Props): JSX.Element {
   }, [entries.length])
 
   return (
-    <div className="log-window" role="dialog" aria-label="Application Logs">
+    <div className="log-window" role="region" aria-label="Application Logs">
       <LogHeader onClear={clear} onClose={onClose} />
       <div className="log-window__body" ref={listRef}>
         {entries.length === 0 && <div className="log-window__empty">No log entries yet.</div>}

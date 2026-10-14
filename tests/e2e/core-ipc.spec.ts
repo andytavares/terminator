@@ -261,7 +261,7 @@ async function quickActionsOpenInsideView(handle: AppHandle): Promise<void> {
   // Escape closes the panel from inside it; pressed before focus has moved
   // there from the extension's view, it closed nothing and the open panel
   // covered the sidebar for the next test.
-  await expect(panel).toBeFocused()
+  await expect(panel.locator(':focus')).toHaveCount(1)
   await handle.page.keyboard.press('Escape')
   await expect(panel).toBeHidden()
 }

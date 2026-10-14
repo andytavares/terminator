@@ -145,7 +145,7 @@ async function overviewTogglesWall(): Promise<void> {
 
 async function toggleLogWindowOpensLog(): Promise<void> {
   const { page } = handle
-  const log = page.getByRole('dialog', { name: 'Application Logs' })
+  const log = page.getByRole('region', { name: 'Application Logs' })
   await runQuickActionFromPanel(page, 'Toggle log window')
   await expect(log).toBeVisible()
   // The log covers the bottom of the band, Quick actions button included.

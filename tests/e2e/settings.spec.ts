@@ -8,6 +8,7 @@ import {
   readTerminalRows,
 } from './helpers'
 import { openExtensionSettings } from './extension-settings-page'
+import { expectCentredInWindow } from './modal-centre'
 
 let handle: AppHandle
 
@@ -41,6 +42,7 @@ test('US5-1: opening global settings shows configuration categories', async () =
   const { page } = handle
   await openSettings(page)
   await expect(page.locator('.settings-panel')).toBeVisible()
+  await expectCentredInWindow(page.getByRole('dialog', { name: 'Settings' }), 'Settings')
   await expect(
     page.locator('.settings-panel__nav-item').filter({ hasText: 'Appearance & Terminal' })
   ).toBeVisible()

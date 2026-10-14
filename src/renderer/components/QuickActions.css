@@ -1,24 +1,4 @@
-.qa-overlay {
-  position: fixed;
-  inset: 0;
-  background: var(--scrim, rgba(0, 0, 0, 0.5));
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding-top: 15vh;
-  z-index: 9000;
-  animation: qa-overlay-in 0.1s ease;
-}
-
-@keyframes qa-overlay-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
+/* The modal shell (a native dialog) draws the backdrop and centres it in the window. */
 .qa-panel {
   width: 560px;
   max-width: calc(100vw - 48px);
@@ -32,14 +12,21 @@
   animation: qa-panel-in 0.12s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+/* The frame holds focus while no field does, so every key reaches the panel's listener. */
+.qa-panel__frame {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  outline: none;
+}
+
+/* Opacity only: a transform would make the panel the containing block of a toast shown in it. */
 @keyframes qa-panel-in {
   from {
     opacity: 0;
-    transform: translateY(-8px) scale(0.97);
   }
   to {
     opacity: 1;
-    transform: translateY(0) scale(1);
   }
 }
 

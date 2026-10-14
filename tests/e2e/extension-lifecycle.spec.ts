@@ -69,7 +69,7 @@ async function tabAndQuickActionsGroupShow(): Promise<void> {
   await expect(group.locator('.qa-key').first()).toHaveText('p')
   await page.keyboard.press('Escape')
   await runQuickActionFromPanel(page, 'Toggle log window')
-  await expect(page.getByRole('dialog', { name: 'Application Logs' })).toContainText(CLASH)
+  await expect(page.getByRole('region', { name: 'Application Logs' })).toContainText(CLASH)
   await page.locator('.log-window__btn--close').click()
   const logFile = join(await app.evaluate(({ app: a }) => a.getPath('logs')), 'terminator.log')
   await expect.poll(() => readFileSync(logFile, 'utf8')).toContain(CLASH)
