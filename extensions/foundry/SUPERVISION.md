@@ -336,7 +336,9 @@ visible. The launch script now unsets the rest before `exec`.
 Identity and transport only. A preference such as `CLAUDE_EFFORT` is the
 operator's and is left alone.
 
-One variable goes the other way: every launch sets `FOUNDRY_RUN=1`. The
+One variable goes the other way: every launch sets `FOUNDRY_RUN=1`, on the
+launch script's export line (`exec VAR=1 claude` is not valid shell, so it
+cannot ride on the command). The
 operator's own Claude Code configuration (user-level hooks, plugins, `CLAUDE.md`)
 loads in every agent this runtime starts, because `--settings` adds to it rather
 than replacing it. The variable lets those hooks tell a Foundry agent from the
@@ -368,6 +370,11 @@ So the launch is written to `<stateDir>/launch/<session>.sh` and the terminal is
 told to run that file. The script `cat`s itself through a quoted heredoc before
 `exec`, so the whole command still appears in the terminal and what an agent was
 told is readable there — which is the point of running it in a terminal at all.
+
+The typed line ends `; exit`, so the tab's shell leaves with the script's
+status. A launch that dies early (a missing binary, a refused session id) then
+ends the run through the terminal's exit, instead of leaving a live shell and a
+run that never ends.
 
 The guard is the one that matters rather than the one that is easy: no line the
 runner types may reach `MAX_CANON`.

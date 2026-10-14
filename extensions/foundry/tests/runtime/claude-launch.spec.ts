@@ -253,7 +253,9 @@ function thePromptAndTheWorkingCopyTests() {
   })
 
   it('marks the session as Foundry’s, then starts the claude binary the terminal runs', () => {
-    expect(buildLaunchSpec(options()).command.startsWith('FOUNDRY_RUN=1 claude ')).toBe(true)
+    const { command } = buildLaunchSpec(options())
+    expect(command.startsWith('claude ')).toBe(true)
+    expect(command).not.toContain('FOUNDRY_RUN')
   })
 }
 
@@ -282,7 +284,9 @@ describe('buildLaunchSpec — what it falls back to', () => {
 
   it('finds claude on PATH, when no path to it is named', () => {
     const { claudePath: _unused, ...rest } = options()
-    expect(buildLaunchSpec(rest).command.startsWith('FOUNDRY_RUN=1 claude ')).toBe(true)
+    const { command } = buildLaunchSpec(rest)
+    expect(command.startsWith('claude ')).toBe(true)
+    expect(command).not.toContain('FOUNDRY_RUN')
   })
 })
 

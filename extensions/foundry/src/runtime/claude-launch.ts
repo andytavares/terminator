@@ -252,9 +252,6 @@ function optionalFlag(flag: string, value: string | undefined): string[] {
 /** The command line that starts, or resumes, the agent. */
 function claudeCommand(options: LaunchSpecOptions, settingsPath: string): string {
   return [
-    // Lets the operator's own Claude Code hooks tell a Foundry agent from the
-    // operator's sessions; their settings load in every session we start.
-    'FOUNDRY_RUN=1',
     options.claudePath ?? 'claude',
     // `--resume` for a conversation that already exists, `--session-id` only
     // for one being created. The runtime refuses a `--session-id` it has seen
