@@ -5,6 +5,7 @@ import { tmpdir } from 'os'
 import { join } from 'path'
 import { ensureReviewWorktree } from '../../src/review/worktree.js'
 import { bindRealShell } from './support/shell'
+import { GIT_FREE_ENV } from './support/git-repo'
 import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 interface GitCall {
@@ -121,13 +122,8 @@ describe('ensureReviewWorktree — pruning', () => {
   })
 })
 
-// Scrub GIT_* so a hook's environment can never point these commands at the real repo.
-const scrubbedGitEnv = Object.fromEntries(
-  Object.entries(process.env).filter(([k]) => !k.startsWith('GIT_') || k === 'GIT_TRACE2_EVENT')
-) as NodeJS.ProcessEnv
-
 const git = (cwd: string, args: string[], input?: string) =>
-  execFileSync('git', args, { cwd, env: scrubbedGitEnv, input, encoding: 'utf-8' }).trim()
+  execFileSync('git', args, { cwd, env: GIT_FREE_ENV, input, encoding: 'utf-8' }).trim()
 
 /** fast-import input: an empty `main`, a PR head adding shard.ts, then the head's SHA on stdout. */
 function pullRequestStream(): string {
@@ -172,7 +168,7 @@ describe('ensureReviewWorktree against real git', () => {
 
   beforeEach(() => {
     dir = makeTempDir('review-worktree-real-')
-    bindRealShell(scrubbedGitEnv)
+    bindRealShell(GIT_FREE_ENV)
   })
 
   afterEach(() => {
