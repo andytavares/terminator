@@ -270,18 +270,18 @@ function taskVaultProjectsWeeklyReviewSomedayCompletedTests() {
 function taskVaultProjectsWeeklyReviewStaleTasksTests() {
   it('returns daily tasks that have been on today for longer than the stale threshold', async () => {
     harness.settings.set('terminator.task-vault.staleThresholdDays', 3)
-    const daysAgo = (days: number) => localDate(new Date(Date.now() - days * 86400000))
+    const localDateDaysBack = (days: number) => localDate(new Date(Date.now() - days * 86400000))
     await seedTask(db, {
       id: 'stale',
       source: 'daily',
-      sourceRef: daysAgo(0),
-      todaySince: daysAgo(5),
+      sourceRef: localDateDaysBack(0),
+      todaySince: localDateDaysBack(5),
     })
     await seedTask(db, {
       id: 'fresh',
       source: 'daily',
-      sourceRef: daysAgo(0),
-      todaySince: daysAgo(1),
+      sourceRef: localDateDaysBack(0),
+      todaySince: localDateDaysBack(1),
     })
 
     const result = await weeklyReviewVia()

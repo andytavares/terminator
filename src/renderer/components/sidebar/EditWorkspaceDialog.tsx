@@ -38,7 +38,7 @@ function useEditWorkspace(workspace: Workspace, onClose: () => void) {
       workspaces.some((w) => w.name.toLowerCase() === value.toLowerCase() && w.id !== workspace.id)
   )
 
-  async function saveWorkspaceEdit(): Promise<void> {
+  async function submitWorkspaceEdit(): Promise<void> {
     if (!form.nameIsValid()) return
     const { name, folderPath, color } = form.draft
     const result = await updateWorkspace({
@@ -51,5 +51,5 @@ function useEditWorkspace(workspace: Workspace, onClose: () => void) {
     if (!showSaveError(form, result, 'Failed to update workspace')) onClose()
   }
 
-  return { form, save: saveWorkspaceEdit }
+  return { form, save: submitWorkspaceEdit }
 }

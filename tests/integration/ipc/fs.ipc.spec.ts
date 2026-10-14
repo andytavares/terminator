@@ -4,6 +4,7 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import type { WebContents } from 'electron'
 import { makeTempDir } from '../../support/temp-dir'
+import { nextLoopTurn, openWatches } from '../../support/watches'
 import { partialFake } from '../../support/fakes'
 
 type Handler = (event: unknown, payload?: unknown) => unknown
@@ -66,11 +67,6 @@ async function changeUntilTold(root: string, view: View): Promise<void> {
     expect(told).toBe(true)
   }, LOOKS)
 }
-
-const openWatches = () =>
-  process.getActiveResourcesInfo().filter((resource) => resource === 'FSEventWrap').length
-/** A closed watch leaves the list of active resources on the event loop's next turn. */
-const nextLoopTurn = () => new Promise((resolve) => setTimeout(resolve, 0))
 
 const views: View[] = []
 function openView(): View {

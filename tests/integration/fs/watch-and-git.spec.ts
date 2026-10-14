@@ -15,7 +15,7 @@ const FENCE = 'fence.txt'
 /** Looks less often than a burst takes to settle, or each look's write would keep it open. */
 const LOOKS = { interval: 250, timeout: 10_000 }
 
-function repositoryWithOneCommit(): string {
+function repositoryWithOneTrackedFile(): string {
   const repo = makeTempDir('status-read-')
   const git = (...args: string[]) => execFileSync('git', args, { cwd: repo })
   git('init', '-q', '-b', 'main')
@@ -72,7 +72,7 @@ async function passFence(repo: string, batches: FsChangeBatch[]): Promise<void> 
 
 describe('git commands run outside the app', () => {
   it('git add is reported every time, though it changes only the index', async () => {
-    const repo = repositoryWithOneCommit()
+    const repo = repositoryWithOneTrackedFile()
     for (const name of ['a.txt', 'b.txt', 'c.txt']) fs.writeFileSync(path.join(repo, name), name)
     const batches: FsChangeBatch[] = []
     const listener = (batch: FsChangeBatch) => batches.push(batch)
@@ -91,14 +91,14 @@ describe('git commands run outside the app', () => {
 
 describe('the app’s own git reads', () => {
   it('status, as an extension runs it, is read once for one saved file', async () => {
-    const repo = repositoryWithOneCommit()
+    const repo = repositoryWithOneTrackedFile()
     const status = () =>
       execShell({ command: 'git', args: ['status', '--porcelain=v1', '-z'], cwd: repo })
     expect(await readsAfterOneSave(repo, status)).toBe(1)
   })
 
   it('the sidebar’s change count is read once for one saved file', async () => {
-    const repo = repositoryWithOneCommit()
+    const repo = repositoryWithOneTrackedFile()
     expect(await readsAfterOneSave(repo, () => getChangeStats(repo))).toBe(1)
   })
 })

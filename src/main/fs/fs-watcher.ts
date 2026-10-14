@@ -72,7 +72,9 @@ class WatchedRoot {
     private readonly timing: WatchTiming,
     watch: TreeWatch
   ) {
-    this.burst = new ChangeBurst(timing, (eventType, filenames) => this.tell(eventType, filenames))
+    this.burst = new ChangeBurst(timing, (eventType, filenames) =>
+      this.tellListeners(eventType, filenames)
+    )
     try {
       this.stopWatching = watch(root, {
         onChange: (eventType, path) =>
@@ -93,10 +95,10 @@ class WatchedRoot {
   /** A tree that cannot be watched is reported as changed on an interval (ADR 005). */
   private pollInstead(): void {
     this.stopWatching()
-    this.poll ??= setInterval(() => this.tell('change', [null]), this.timing.pollMs)
+    this.poll ??= setInterval(() => this.tellListeners('change', [null]), this.timing.pollMs)
   }
 
-  private tell(eventType: TreeEventType, filenames: Array<string | null>): void {
+  private tellListeners(eventType: TreeEventType, filenames: Array<string | null>): void {
     for (const listener of this.listeners) {
       try {
         listener({ projectRoot: this.root, eventType, filenames })
