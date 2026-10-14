@@ -173,3 +173,32 @@ test('a Git tab diff row lays out as a table row', async () => {
     await context.close()
   }
 })
+
+test('a review row with two actions keeps them clear of the size column', async () => {
+  const { page, context } = await render(`<div class="rd-rows" style="width:1100px">
+    <div class="rd-row rd-row--clickable">
+      <span class="rd-ti"><span class="rd-t1"><span class="rd-no">#11</span>
+        <span>NO/NC switches, per-pin debounce, and show-night reliability</span></span></span>
+      <span class="rd-side"><span class="rd-num">+3,068 −201 · 63 files</span>
+        <span class="rd-num">~55 min</span></span>
+      <span class="rd-actions">
+        <button class="tmui-button tmui-button--secondary tmui-button--sm rd-row-action">Open</button>
+        <button class="tmui-button tmui-button--secondary tmui-button--sm rd-row-action">Clone and review</button>
+      </span>
+    </div></div>`)
+  try {
+    const edges = await page.evaluate(() => ({
+      sizeRight: document.querySelector('.rd-side')!.getBoundingClientRect().right,
+      actionsLeft: Math.min(
+        ...[...document.querySelectorAll('.rd-row-action')].map(
+          (b) => b.getBoundingClientRect().left
+        )
+      ),
+    }))
+    expect(edges.actionsLeft, 'the first action starts after the size column').toBeGreaterThan(
+      edges.sizeRight
+    )
+  } finally {
+    await context.close()
+  }
+})
