@@ -255,6 +255,21 @@ function postRefusal(sessionId: string, refused: { tool: string; reason: string 
   })
 }
 
+// What a turn left: a session that exited non-zero with no file says its code.
+function endedOutcome(launch: ArchitectLaunch, deadline: boolean, code: number | null) {
+  const { turn, plan } = launch
+  if (deadline && code === null) {
+    return { ok: false as const, reason: 'The architect could not be started.' }
+  }
+  if (deadline && code !== 0 && !fs.existsSync(plan.proposalPath)) {
+    return {
+      ok: false as const,
+      reason: `The architect's terminal exited with code ${code} before it wrote a plan. Its tab is still open.`,
+    }
+  }
+  return readProposal(turn.order, plan.proposalPath, new Date().toISOString())
+}
+
 // Take the proposal if it is there. A turn ending is not the architect finishing (it
 // may write on a later turn), so a turn counts only when the file exists; the
 // session ending is the deadline, and then the answer is whatever it left.
@@ -276,10 +291,7 @@ function collectProposal(launch: ArchitectLaunch, deadline: boolean, code: numbe
     intakeSessions.delete(order.id)
     announceLive(order.id)
   }
-  const outcome =
-    !deadline || code !== null
-      ? readProposal(order, plan.proposalPath, new Date().toISOString())
-      : { ok: false as const, reason: 'The architect could not be started.' }
+  const outcome = endedOutcome(launch, deadline, code)
   void launch.memory.remembered().then(() => turn.onFinished(outcome))
   launch.answer({ ok: false, reason: 'The architect ended before it started.' })
 }
