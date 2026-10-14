@@ -1,0 +1,36 @@
+src/renderer/components/sidebar/EditWorkspaceDialog.tsx
+  s_c9dd89ad1f6c54::t_f4bbaf1dd1d2fe 41,54
+extensions/git-integration/tests/unit/status-watch-roots.spec.ts
+  s_c9dd89ad1f6c54::t_f4bbaf1dd1d2fe 9,25,30,37
+tests/integration/ipc/fs.ipc.spec.ts
+  s_c9dd89ad1f6c54::t_b160bde832fa59 7
+extensions/task-vault/tests/ipc/projects.ipc.spec.ts
+  s_c9dd89ad1f6c54::t_f4bbaf1dd1d2fe 273,277-278,283-284
+src/main/fs/fs-watcher.ts
+  s_c9dd89ad1f6c54::t_f4bbaf1dd1d2fe 75-77,98,101
+.clean-gate.json
+  s_c9dd89ad1f6c54::t_f4bbaf1dd1d2fe 399-410
+  s_c9dd89ad1f6c54::t_4d4eaebd88670e 380-398
+tests/integration/fs/watch-and-git.spec.ts
+  s_c9dd89ad1f6c54::t_f4bbaf1dd1d2fe 18,75,94,101
+tests/support/watches.ts
+  s_c9dd89ad1f6c54::t_f4bbaf1dd1d2fe 1-6
+tests/unit/fs/tree-watch.spec.ts
+  s_c9dd89ad1f6c54::t_f4bbaf1dd1d2fe 5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "fe2e2a8956580a02c64aa1b194b8927ccaff311c",
+  "prompts": {},
+  "sessions": {
+    "s_c9dd89ad1f6c54": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ee6b7f82-c708-43d8-8c1f-eefe55f692a9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
