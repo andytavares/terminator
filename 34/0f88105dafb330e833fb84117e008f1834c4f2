@@ -1,0 +1,39 @@
+extensions/task-vault/tests/ipc/projects.ipc.spec.ts
+  s_c9dd89ad1f6c54::t_d7f08c8b77bbc8 1,12,255-266
+  s_c9dd89ad1f6c54::t_53f0a54fb814b7 267
+extensions/task-vault/tests/support/clock.ts
+  s_c9dd89ad1f6c54::t_fe96df1fdf17c8 1-14
+extensions/task-vault/src/vault/clock.ts
+  s_c9dd89ad1f6c54::t_5231cfa03fa473 23-27
+CHANGELOG.md
+  s_c9dd89ad1f6c54::t_4c966939e03873 85
+extensions/task-vault/tests/ipc/vault-handlers.ipc.spec.ts
+  s_c9dd89ad1f6c54::t_d5b3af0f71e0af 919-928
+  s_c9dd89ad1f6c54::t_d7f08c8b77bbc8 1,13,856,884-918,929
+  s_c9dd89ad1f6c54::t_cce211937a0ee0 930
+extensions/task-vault/tests/vault/clock.spec.ts
+  s_c9dd89ad1f6c54::t_d7f08c8b77bbc8 1-3,5,49-59
+  s_c9dd89ad1f6c54::t_9fdf0f9281e280 60
+extensions/task-vault/src/ipc/projects.ipc.ts
+  s_c9dd89ad1f6c54::t_5231cfa03fa473 29,89
+extensions/task-vault/src/ipc/vault-queries.ts
+  s_c9dd89ad1f6c54::t_5231cfa03fa473 4,125
+extensions/task-vault/src/schemas/vault.schema.ts
+  s_c9dd89ad1f6c54::t_297bf70aec68fb 138
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "340f88105dafb330e833fb84117e008f1834c4f2",
+  "prompts": {},
+  "sessions": {
+    "s_c9dd89ad1f6c54": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ee6b7f82-c708-43d8-8c1f-eefe55f692a9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
