@@ -1,0 +1,35 @@
+extensions/foundry/SUPERVISION.md
+  s_b1c4d88360506f::t_763d400a6b3665 374-378
+  s_b1c4d88360506f::t_52344ff9f1a3fa 339-341
+extensions/foundry/tests/runtime/claude-launch.spec.ts
+  s_b1c4d88360506f::t_5370d2cb702421 256-258,287-289
+extensions/foundry/tests/runtime/supervised-runner.spec.ts
+  s_b1c4d88360506f::t_5370d2cb702421 1087-1099,1101-1102,1105-1109,1111-1116
+  s_b1c4d88360506f::t_2af17073693ab2 1067-1084,1100,1110
+  s_b1c4d88360506f::t_52344ff9f1a3fa 1085-1086,1103-1104
+  s_b1c4d88360506f::t_b7397150a749a7 496-504
+extensions/foundry/src/runtime/supervised-runner.ts
+  s_b1c4d88360506f::t_039ef891b59b5d 606,611
+  s_b1c4d88360506f::t_52344ff9f1a3fa 596-598
+extensions/foundry/src/forge/intake-turn.ts
+  s_b1c4d88360506f::t_ec7f95cdbc92bc 258
+  s_b1c4d88360506f::t_5370d2cb702421 259-272,294
+extensions/foundry/tests/forge/intake-turn-ends.spec.ts
+  s_b1c4d88360506f::t_63ea496eaae2f3 121-122,124,151-167
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e05f3e7e0e02c2620ad078b95422e0e5ab8f1ca8",
+  "prompts": {},
+  "sessions": {
+    "s_b1c4d88360506f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1ef90e9e-5d40-41e3-9550-9077984cef40",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
