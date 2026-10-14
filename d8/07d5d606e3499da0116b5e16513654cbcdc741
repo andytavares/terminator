@@ -1,0 +1,43 @@
+tests/e2e/notepad-outline.spec.ts
+  s_8d3b597c1cfae3::t_e12ad56467a00c 175,178,206,219,222-223,231
+  s_8d3b597c1cfae3::t_58f9cdd0bb2e71 176,220
+extensions/notepad/src/components/NotepadView.tsx
+  s_8d3b597c1cfae3::t_71ec95654cbefb 4,400-416,420-421,425-430,432,439,442-446,449-453
+  s_8d3b597c1cfae3::t_e14ce4b9919376 3
+extensions/notepad/tests/components/NotepadView.spec.tsx
+  s_8d3b597c1cfae3::t_552313714fc8a8 210,213,215-241,243,245-256,258-259
+  s_8d3b597c1cfae3::t_d6f9d7848bfcfd 211-212,214,242,244
+  s_8d3b597c1cfae3::t_c9942a58098a62 257
+extensions/notepad/src/stores/editor.store.ts
+  s_8d3b597c1cfae3::t_71ec95654cbefb 16,31
+extensions/notepad/tests/components/NoteWindowView.spec.tsx
+  s_8d3b597c1cfae3::t_710071761c6c6a 3,126-146
+  s_8d3b597c1cfae3::t_482c3fca037909 147
+extensions/notepad/src/components/notepad.css
+  s_8d3b597c1cfae3::t_cbdd62643c3218 37,45,50-54
+  s_8d3b597c1cfae3::t_0e2e1c068e2edf 55-56
+extensions/notepad/tests/unit/stores/editor.store.spec.ts
+  s_8d3b597c1cfae3::t_cbdd62643c3218 61,63,65-67
+docs/user-guide/USER-GUIDE.md
+  s_8d3b597c1cfae3::t_39a09f9438f192 1015-1016
+extensions/notepad/src/components/NoteWindowView.tsx
+  s_8d3b597c1cfae3::t_c9942a58098a62 3-4,223-227,230,233-234,236-244,246
+extensions/notepad/README.md
+  s_8d3b597c1cfae3::t_39a09f9438f192 10
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d807d5d606e3499da0116b5e16513654cbcdc741",
+  "prompts": {},
+  "sessions": {
+    "s_8d3b597c1cfae3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "29dd3ff7-d9bc-427b-b307-10e350139ba8",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
