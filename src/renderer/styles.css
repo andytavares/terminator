@@ -251,3 +251,9 @@ button {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--tm-text-secondary);
 }
+
+/* xterm's stylesheet paints its viewport black, padding included. Left clear, the padding shows
+   the element around the terminal, which TerminalInstance paints in the terminal's own colour. */
+.terminal-surround .xterm .xterm-viewport {
+  background-color: transparent;
+}

@@ -1280,6 +1280,22 @@ describe('TerminalInstance — xterm theming', () => {
   })
 })
 
+describe('TerminalInstance — the padding around the terminal', () => {
+  setUpTerminalInstanceXtermTheming()
+
+  it("is painted in the terminal's own background, so no edge shows around it", () => {
+    const instance = new TerminalInstance('ses-edge', 1000)
+    expect(instance.element.style.backgroundColor).toBe('rgb(30, 30, 30)')
+  })
+
+  it('follows the theme when it changes', () => {
+    const instance = new TerminalInstance('ses-edge-light', 1000)
+    document.documentElement.dataset.theme = 'light'
+    observerCallback([], {} as MutationObserver)
+    expect(instance.element.style.backgroundColor).toBe('rgb(245, 245, 245)')
+  })
+})
+
 describe('TerminalInstance — xterm theming — sets light theme on construction when data-theme="light"', () => {
   setUpTerminalInstanceXtermTheming()
 

@@ -68,11 +68,17 @@ function createTerminal(
   })
 }
 
+/** The theme on the terminal and on the element around it: xterm paints its cells, and the padding
+ * between them and the pane's edge shows that element. */
+function paintTheme(terminal: Terminal, surround: HTMLElement): void {
+  const theme = currentTheme()
+  terminal.options.theme = theme
+  surround.style.backgroundColor = theme.background
+}
+
 /** Repaints the terminal in the app's theme whenever the theme changes. */
-function followTheme(terminal: Terminal): MutationObserver {
-  const observer = new MutationObserver(() => {
-    terminal.options.theme = currentTheme()
-  })
+function followTheme(terminal: Terminal, surround: HTMLElement): MutationObserver {
+  const observer = new MutationObserver(() => paintTheme(terminal, surround))
   observer.observe(document.documentElement, {
     attributes: true,
     attributeFilter: ['data-theme'],
@@ -148,11 +154,11 @@ export class TerminalInstance {
     this.terminal = createTerminal(scrollbackLimit, initialTheme)
     this.fitAddon = new FitAddon()
     this.terminal.loadAddon(this.fitAddon)
-    this.terminal.options.theme = initialTheme
-    this.themeObserver = followTheme(this.terminal)
-
     this.element = document.createElement('div')
+    this.element.className = 'terminal-surround'
     this.element.style.cssText = 'width:100%;height:100%;position:relative;'
+    paintTheme(this.terminal, this.element)
+    this.themeObserver = followTheme(this.terminal, this.element)
 
     this.terminal.attachCustomKeyEventHandler((e) => handleCustomKey(this.terminal, e))
     this.wireToPty(sessionId)

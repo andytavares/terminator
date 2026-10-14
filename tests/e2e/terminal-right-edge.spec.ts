@@ -209,3 +209,16 @@ test('split-pane: rendered text never extends under the scrollbar', async () => 
   expect(g.screenRight).toBeLessThanOrEqual(g.viewportContentRight)
   expect(g.renderedRight).toBeLessThanOrEqual(g.viewportContentRight)
 })
+
+test("the padding around the terminal is the terminal's own colour, so no edge shows", async () => {
+  const { page } = handle
+  const colours = await page.evaluate(() => {
+    const xterm = document.querySelector('.xterm')!
+    return {
+      surround: getComputedStyle(xterm.parentElement!).backgroundColor,
+      padding: getComputedStyle(xterm.querySelector('.xterm-viewport')!).backgroundColor,
+    }
+  })
+  // XTERM_THEMES.dark.background behind a clear viewport: the padding shows the cells' colour.
+  expect(colours).toEqual({ surround: 'rgb(30, 30, 30)', padding: 'rgba(0, 0, 0, 0)' })
+})
