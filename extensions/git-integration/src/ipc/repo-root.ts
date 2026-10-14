@@ -29,7 +29,8 @@ export function canonical(path: string): string {
   }
 }
 
-function isInside(root: string, path: string): boolean {
+/** True when `path` is `root` or lies under it. */
+export function isInside(root: string, path: string): boolean {
   const fromRoot = relative(root, path)
   return fromRoot === '' || (fromRoot.split(sep)[0] !== '..' && !isAbsolute(fromRoot))
 }

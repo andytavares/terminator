@@ -4,6 +4,7 @@ import { stripVTControlCharacters } from 'util'
 import type { GitStatus, FileDiff } from '../schemas/git.schema.js'
 import { parseStatus, parseDiff } from './git-parser.js'
 import { GitCommandError, runGit } from '../shell/run-git.js'
+import { canonical, isInside } from '../ipc/repo-root.js'
 
 const GIT_TIMEOUT = 10_000
 const HOOK_TIMEOUT = 120_000
@@ -45,6 +46,18 @@ export async function getStatus(repoRoot: string, maxFiles: number = 500): Promi
   ])
   const partial = parseStatus(statusOut, maxFiles)
   return { ...partial, branch: branch || 'HEAD' }
+}
+
+/** The directories whose changes can change `repoRoot`'s status: `repoRoot`, and the repository's
+ * git directory when it is outside it. A linked worktree keeps its index and HEAD there
+ * (https://git-scm.com/docs/git-worktree#_details), so a `git add` in one changes nothing in it. */
+export async function statusWatchRoots(repoRoot: string): Promise<string[]> {
+  const gitDirectory = await gitInRepo(
+    ['rev-parse', '--path-format=absolute', '--git-common-dir'],
+    repoRoot
+  )
+  const isWithinRoot = isInside(canonical(repoRoot), canonical(gitDirectory))
+  return isWithinRoot ? [repoRoot] : [repoRoot, gitDirectory]
 }
 
 function runDiff(args: string[], repoRoot: string): Promise<string> {

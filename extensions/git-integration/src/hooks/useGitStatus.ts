@@ -11,48 +11,92 @@ interface StatusSink {
 
 type StatusAnswer = GitStatus | { error: string }
 
+/** How often status is read where no watch can be had: the remote browser client. */
+const UNWATCHED_READ_MS = 3000
+
 /** Keeps the status, or none for an error, and whether the workspace switched the extension off. */
 function keepStatus(sink: StatusSink, result: StatusAnswer): void {
   sink.setDisabled('error' in result && result.error === 'GIT_DISABLED')
   sink.setStatus('error' in result ? null : result)
 }
 
-/** A refresh that never overlaps itself and stops writing once `isCancelled` says so. */
+async function readStatus(repoRoot: string, sink: StatusSink, isCancelled: () => boolean) {
+  try {
+    const result = (await gitAPI.status(repoRoot)) as StatusAnswer
+    if (!isCancelled()) keepStatus(sink, result)
+  } catch {
+    if (!isCancelled()) sink.setStatus(null)
+  } finally {
+    if (!isCancelled()) sink.setLoading(false)
+  }
+}
+
+/** A refresh that never overlaps itself: asked for during a read, it reads once more after it,
+ * so a change the running read was too early to see is not lost. */
 function statusRefresher(repoRoot: string, sink: StatusSink, isCancelled: () => boolean) {
-  let inFlight = false
+  let reading = false
+  let askedMeanwhile = false
   return async function refresh(): Promise<void> {
-    if (isCancelled() || inFlight) return
-    inFlight = true
-    try {
-      const result = (await gitAPI.status(repoRoot)) as StatusAnswer
-      if (!isCancelled()) keepStatus(sink, result)
-    } catch {
-      if (!isCancelled()) sink.setStatus(null)
-    } finally {
-      inFlight = false
-      if (!isCancelled()) sink.setLoading(false)
+    if (isCancelled()) return
+    if (reading) {
+      askedMeanwhile = true
+      return
     }
+    reading = true
+    await readStatus(repoRoot, sink, isCancelled)
+    reading = false
+    if (!askedMeanwhile) return
+    askedMeanwhile = false
+    await refresh()
   }
 }
 
-/** Refreshes on file changes, on an interval while visible, and when the view becomes visible. */
-function pollStatus(refresh: () => Promise<void>, intervalMs: number): () => void {
-  const unsubFs = window.electronAPI.fs.onChanged(() => void refresh())
-  const interval = setInterval(() => {
+/** The git directory is watched too where it is outside the folder; the folder alone is, where
+ * git cannot say (not a repository, or the remote client, which has no such channel). */
+async function watchRootsOf(repoRoot: string): Promise<string[]> {
+  try {
+    const answer = await gitAPI.watchRoots(repoRoot)
+    return 'roots' in answer ? answer.roots : [repoRoot]
+  } catch {
+    return [repoRoot]
+  }
+}
+
+/** Starts the watches of `repoRoot`. False when one did not start, as none does remotely. */
+async function startWatching(repoRoot: string, isCancelled: () => boolean): Promise<boolean> {
+  const roots = await watchRootsOf(repoRoot)
+  if (isCancelled()) return false
+  const answers = await Promise.all(roots.map((root) => window.electronAPI.fs.watchStart(root)))
+  return answers.every((answer) => 'ok' in answer)
+}
+
+type Refresh = () => Promise<void>
+
+/** Reads status now and on every change the watch reports; returns the way to stop. */
+function followChanges(repoRoot: string, refresh: Refresh, isCancelled: () => boolean): () => void {
+  const readIfVisible = () => {
     if (document.visibilityState !== 'hidden') void refresh()
-  }, intervalMs)
-  const onVisibility = () => {
-    if (document.visibilityState === 'visible') void refresh()
   }
-  document.addEventListener('visibilitychange', onVisibility)
+  const unsubscribe = window.electronAPI.fs.onChanged(readIfVisible)
+  document.addEventListener('visibilitychange', readIfVisible)
+  let unwatchedRead: ReturnType<typeof setInterval> | undefined
+  // The first read comes after the watch has started: a change made before the read is in it,
+  // and one made after has an event. macOS arms a watch a moment after it starts and has no
+  // signal for it; a change in that moment is read on the next event, or when the view is shown.
+  void startWatching(repoRoot, isCancelled).then((isWatching) => {
+    if (isCancelled()) return
+    void refresh()
+    if (!isWatching) unwatchedRead = setInterval(readIfVisible, UNWATCHED_READ_MS)
+  })
   return () => {
-    unsubFs()
-    clearInterval(interval)
-    document.removeEventListener('visibilitychange', onVisibility)
+    unsubscribe()
+    document.removeEventListener('visibilitychange', readIfVisible)
+    clearInterval(unwatchedRead)
+    void window.electronAPI.fs.watchStop()
   }
 }
 
-export function useGitStatus(repoRoot: string | null, refreshIntervalMs = 3000): void {
+export function useGitStatus(repoRoot: string | null): void {
   const setStatus = useGitStore((s) => s.setStatus)
   const setDisabled = useGitStore((s) => s.setDisabled)
   const setLoading = useGitStore((s) => s.setLoading)
@@ -62,14 +106,13 @@ export function useGitStatus(repoRoot: string | null, refreshIntervalMs = 3000):
       return
     }
     let cancelled = false
-    const sink = { setStatus, setDisabled, setLoading }
-    const refresh = statusRefresher(repoRoot, sink, () => cancelled)
+    const isCancelled = () => cancelled
+    const refresh = statusRefresher(repoRoot, { setStatus, setDisabled, setLoading }, isCancelled)
     setLoading(true)
-    void refresh()
-    const stopPolling = pollStatus(refresh, refreshIntervalMs)
+    const stopFollowing = followChanges(repoRoot, refresh, isCancelled)
     return () => {
       cancelled = true
-      stopPolling()
+      stopFollowing()
     }
-  }, [repoRoot, refreshIntervalMs, setStatus, setDisabled, setLoading])
+  }, [repoRoot, setStatus, setDisabled, setLoading])
 }

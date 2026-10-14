@@ -326,7 +326,11 @@ window.electronAPI = electronApiOf({
     invoke: (channel: string) => Promise.resolve(channels[channel] ?? null),
     on: () => () => {},
   },
-  fs: { onChanged: () => () => {} },
+  fs: {
+    onChanged: () => () => {},
+    watchStart: async () => ({ ok: true as const }),
+    watchStop: async () => ({ ok: true as const }),
+  },
 })
 
 function PrRail(): JSX.Element {
