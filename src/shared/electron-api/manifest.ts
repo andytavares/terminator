@@ -813,12 +813,15 @@ export const ELECTRON_API_MANIFEST = [
   }),
 
   // ── fs ────────────────────────────────────────────────────────────────────
+  // A watch belongs to the view that asked (ADR 108). A browser client has no view the desktop
+  // can tell, so its three watch methods are stand-ins: watchStart answers WATCH_UNAVAILABLE.
   method({
     path: 'fs.watchStart',
     kind: 'invoke',
     channel: 'fs:watch-start',
     signature: signature<(projectRoot: string) => Promise<{ ok: true } | Failure>>(),
     toPayload: (projectRoot) => ({ projectRoot }),
+    remote: 'stub',
     extensionView: 'shared',
   }),
   method({
@@ -826,6 +829,7 @@ export const ELECTRON_API_MANIFEST = [
     kind: 'invoke',
     channel: 'fs:watch-stop',
     signature: signature<() => Promise<{ ok: true }>>(),
+    remote: 'stub',
     extensionView: 'shared',
   }),
   method({
@@ -843,6 +847,7 @@ export const ELECTRON_API_MANIFEST = [
         ) => Unsubscribe
       >(),
     toHandlerArgs: (args) => [args[0]],
+    remote: 'stub',
     extensionView: 'shared',
   }),
   method({

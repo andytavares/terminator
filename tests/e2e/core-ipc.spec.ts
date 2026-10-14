@@ -279,24 +279,38 @@ async function viewGetActiveNamesSelection(handle: AppHandle, folder: string): P
   expect(active.repoRoot).toBe(folder)
 }
 
+/** Writes in each directory again on every look, until the view is told about `expected`: macOS
+ * arms a watch a moment after it starts, and a change made before that has no event. */
+async function writeUntilViewIsTold(handle: AppHandle, directories: string[], expected: string) {
+  const roots = () => fromView<string[]>(handle, 'window.__fsEvents.map((e) => e.projectRoot)')
+  await expect
+    .poll(async () => {
+      for (const directory of directories)
+        writeFileSync(join(directory, 'file.txt'), `${Date.now()}`)
+      return roots()
+    })
+    .toContain(expected)
+  return roots()
+}
+
 async function viewFileWatchReportsUntilStopped(handle: AppHandle, folder: string): Promise<void> {
   const watched = join(folder, 'watched')
   const other = join(folder, 'other')
   mkdirSync(watched)
   mkdirSync(other)
+  await handle.page.evaluate(
+    '(window.__windowFsEvents = [], window.electronAPI.fs.onChanged((e) => window.__windowFsEvents.push(e)), null)'
+  )
   await fromView(
     handle,
     `(window.__fsEvents = [], api.fs.onChanged((e) => window.__fsEvents.push(e)), api.fs.watchStart(${JSON.stringify(watched)}))`
   )
-  writeFileSync(join(watched, 'first.txt'), '1')
-  const roots = () => fromView<string[]>(handle, 'window.__fsEvents.map((e) => e.projectRoot)')
-  await expect.poll(roots).toContain(watched)
+  await writeUntilViewIsTold(handle, [watched], watched)
+  // The view asked, so the view is told: the window, which did not, hears nothing.
+  expect(await handle.page.evaluate('window.__windowFsEvents')).toEqual([])
   expect(await fromView(handle, 'api.fs.watchStop()')).toEqual({ ok: true })
   await fromView(handle, `(window.__fsEvents = [], api.fs.watchStart(${JSON.stringify(other)}))`)
-  writeFileSync(join(watched, 'after-stop.txt'), '2')
-  writeFileSync(join(other, 'second.txt'), '3')
-  await expect.poll(roots).toContain(other)
-  expect(await roots()).not.toContain(watched)
+  expect(await writeUntilViewIsTold(handle, [watched, other], other)).not.toContain(watched)
   await fromView(handle, 'api.fs.watchStop()')
 }
 

@@ -88,15 +88,12 @@ const EXPECTED_REMOTE_CHANNELS = [
   'notifications:dismiss',
   'notifications:trigger-action',
   'fs:read-file',
-  'fs:watch-start',
-  'fs:watch-stop',
   'shell:exec',
   'shell:open-path',
   'log:write',
   // Push-event channels the /app/ shim subscribes to. These were silently
   // rejected before the manifest existed (the old hand-written allowlist
   // missed them), so remote /app/ never received these pushes.
-  'fs:changed',
   'notifications:push',
   'extension:toggle-panel',
   'extension:select-project-tab',
@@ -133,6 +130,10 @@ const EXPECTED_REMOTE_CHANNELS = [
 ]
 
 const INTERNAL_ONLY_CHANNELS = [
+  // A file watch reports to the desktop view that asked for it (ADR 108).
+  'fs:watch-start',
+  'fs:watch-stop',
+  'fs:changed',
   'dialog:open-directory',
   'shell:open-external',
   'extension:update-panel-bounds',
