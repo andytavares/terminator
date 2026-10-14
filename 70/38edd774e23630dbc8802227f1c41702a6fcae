@@ -1,0 +1,74 @@
+tests/e2e/control-alignment.ts
+  s_dc878271adf24d::t_62a36f8d122bd3 1-2,5-10,28-29,66-68,70,75-80
+  s_dc878271adf24d::t_a878c1aa3e39c7 3-4,11-16,18-27,30-57,59-65,69,72-74
+  s_dc878271adf24d::t_6ce787b5e1bee0 17,58,71
+src/renderer/components/session/CloseSessionButton.tsx
+  s_dc878271adf24d::t_275b4bd6d07b5f 3,27-29,31,38
+tests/e2e/foundry-forge.spec.ts
+  s_dc878271adf24d::t_eefbe7dca870de 6-7,301-303
+extensions/task-vault/src/components/DailyLogSubtasks.tsx
+  s_dc878271adf24d::t_fcd7646cd93bb9 72
+tests/e2e/git-commit-flow.spec.ts
+  s_dc878271adf24d::t_63714e82d90418 6,74
+packages/extension-ui/src/IconButton.tsx
+  s_dc878271adf24d::t_bc0ce99713d9dd 26-27
+extensions/task-vault/src/components/InboxView.tsx
+  s_dc878271adf24d::t_fcd7646cd93bb9 307
+extensions/git-integration/src/components/pr-review/ReviewFooter.tsx
+  s_dc878271adf24d::t_1179c50707df59 31,42,54,64,66
+  s_dc878271adf24d::t_55ccec286287b0 68
+src/renderer/components/settings/SettingsPanel.css
+  s_dc878271adf24d::t_de899d5ff73e0b 268-272,298
+tests/e2e/pr-review-diff.spec.ts
+  s_dc878271adf24d::t_eefbe7dca870de 4
+  s_dc878271adf24d::t_63714e82d90418 94
+extensions/git-integration/src/components/pr-review/review-surface.css
+  s_dc878271adf24d::t_e0a1f0776ff9d0 343-345
+packages/extension-ui/src/tokens.css
+  s_dc878271adf24d::t_759443bddbad94 13,15
+tests/e2e/design-system-fields.spec.ts
+  s_dc878271adf24d::t_1f0bff56916040 2-3,68-88,111-114
+  s_dc878271adf24d::t_01faeb972ca470 6,89-97,99-110
+  s_dc878271adf24d::t_3dcf5125558430 98
+src/renderer/components/session/WorkItemCell.css
+  s_dc878271adf24d::t_de899d5ff73e0b 73
+  s_dc878271adf24d::t_04766a5bd6509d 35-36
+tests/e2e/merge-flow-resolve.spec.ts
+  s_dc878271adf24d::t_eefbe7dca870de 6,108,110-112
+tests/e2e/control-alignment.spec.ts
+  s_dc878271adf24d::t_4995329e554d09 37
+  s_dc878271adf24d::t_7d79d2e13c756a 1-36,38-110
+packages/extension-ui/src/extension-ui.css
+  s_dc878271adf24d::t_759443bddbad94 121-124,145-146,205-207,227-228
+CHANGELOG.md
+  s_dc878271adf24d::t_bc0ce99713d9dd 87-89
+scripts/e2e-select.mjs
+  s_dc878271adf24d::t_ddd3123b2e9a70 15-16,18,117
+extensions/task-vault/src/components/inline-edits.tsx
+  s_dc878271adf24d::t_fcd7646cd93bb9 85
+tests/e2e/review-dashboard.spec.ts
+  s_dc878271adf24d::t_eefbe7dca870de 6,54-55,58-59
+packages/extension-ui/README.md
+  s_dc878271adf24d::t_bc0ce99713d9dd 25-42
+src/renderer/components/overview/WallTile.tsx
+  s_dc878271adf24d::t_275b4bd6d07b5f 96-99,104
+  s_dc878271adf24d::t_8d3d4030ef2fea 3
+extensions/task-vault/src/components/DailyLogTaskRow.tsx
+  s_dc878271adf24d::t_55ccec286287b0 409,529
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "7038edd774e23630dbc8802227f1c41702a6fcae",
+  "prompts": {},
+  "sessions": {
+    "s_dc878271adf24d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "45251aad-8da0-4892-86db-9ec0654f5a1f",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
