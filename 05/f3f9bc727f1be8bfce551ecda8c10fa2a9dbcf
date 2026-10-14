@@ -1,0 +1,27 @@
+extensions/task-vault/CLAUDE.md
+  s_c9dd89ad1f6c54::t_ee8249e2bf4940 44
+package.json
+  s_c9dd89ad1f6c54::t_2816edf2784749 41
+extensions/task-vault/src/vault/clock.ts
+  s_c9dd89ad1f6c54::t_ee8249e2bf4940 16
+tsconfig.test.json
+  s_c9dd89ad1f6c54::t_94b043e443de31 12-14
+docs/adr/108-temporal-in-extension-backends-not-in-views.md
+  s_c9dd89ad1f6c54::t_ee8249e2bf4940 21,38
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "05f3f9bc727f1be8bfce551ecda8c10fa2a9dbcf",
+  "prompts": {},
+  "sessions": {
+    "s_c9dd89ad1f6c54": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ee6b7f82-c708-43d8-8c1f-eefe55f692a9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
