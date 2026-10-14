@@ -65,21 +65,52 @@ function consumeDirectory(directory: string, options: WatcherOptions): void {
   }
 }
 
-/** Watches for reported conversations (`fs.watch`, ADR-005) and returns the way to stop. Reports
- * written while the app was closed have no event, so the directory is also read once at startup,
- * after the watch is armed so that nothing falls between. */
+const ARMED_PROBE = '.armed'
+const PROBE_RETRY_MS = 50
+const PROBE_TRIES = 40
+
+/** Writes the probe file until the watch reports it, which is the only proof the watch is armed:
+ * macOS arms `fs.watch` a moment after it returns and has no event for it
+ * (https://nodejs.org/api/fs.html#caveats). Returns how to stop trying. */
+function probeUntilArmed(directory: string, isArmed: () => boolean): () => void {
+  const probe = path.join(directory, ARMED_PROBE)
+  let timer: NodeJS.Timeout | undefined
+  const tryOnce = (triesLeft: number): void => {
+    if (isArmed() || triesLeft === 0) return
+    fs.writeFileSync(probe, String(triesLeft))
+    timer = setTimeout(() => tryOnce(triesLeft - 1), PROBE_RETRY_MS)
+  }
+  tryOnce(PROBE_TRIES)
+  return () => {
+    clearTimeout(timer)
+    fs.rmSync(probe, { force: true })
+  }
+}
+
+/** Watches for reported conversations (`fs.watch`, ADR-005) and returns the way to stop. The
+ * directory is read at startup, for reports written while the app was closed, and once more when
+ * the watch proves it is armed, for reports written before that. */
 export function startAgentSessionWatcher(options: WatcherOptions): () => void {
   const directory = reportDirectory()
   fs.mkdirSync(directory, { recursive: true })
+  let armed = false
+  let stopProbing = (): void => undefined
 
   const watcher = fs.watch(directory, (_event, name) => {
-    // Some platforms deliver an event without saying which file.
-    if (name === null) consumeDirectory(directory, options)
+    if (!armed) {
+      armed = true
+      stopProbing()
+      consumeDirectory(directory, options)
+    } else if (name === null) consumeDirectory(directory, options)
     else if (name.endsWith('.json')) consume(path.join(directory, name), options)
   })
   watcher.on('error', (error) =>
     logger.error('agent session report watch failed', { error: String(error) })
   )
   consumeDirectory(directory, options)
-  return () => watcher.close()
+  stopProbing = probeUntilArmed(directory, () => armed)
+  return () => {
+    stopProbing()
+    watcher.close()
+  }
 }

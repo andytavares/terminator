@@ -180,7 +180,7 @@ describe('the agent session watcher — deleting reports', () => {
     await write('gone', 'conv-1')
     const mod = await load()
     stop = mod.startAgentSessionWatcher({ snapshotFor: () => null })
-    expect(fs.readdirSync(dir)).toEqual([])
+    expect(fs.readdirSync(dir).filter((name) => name.endsWith('.json'))).toEqual([])
     expect(recorded).toEqual([])
   })
 })
@@ -203,11 +203,12 @@ describe('the agent session watcher — startup and other files', () => {
     expect(fs.readdirSync(dir)).toEqual(['notes.txt'])
   })
 
-  it('does not sweep on a timer', async () => {
+  it('keeps no timer once it has stopped probing for an armed watch', async () => {
     vi.useFakeTimers()
     try {
       const mod = await load()
       stop = mod.startAgentSessionWatcher({ snapshotFor: (id) => snapshot(id) })
+      vi.advanceTimersByTime(2_000)
       expect(vi.getTimerCount()).toBe(0)
     } finally {
       vi.useRealTimers()

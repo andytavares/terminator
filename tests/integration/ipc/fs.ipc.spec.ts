@@ -41,13 +41,15 @@ afterEach(async () => {
 describe('fs:watch-start / fs:watch-stop', () => {
   it('tells the window about a file that changes in the project', async () => {
     expect(await invoke('fs:watch-start', { projectRoot })).toEqual({ ok: true })
-    fs.writeFileSync(path.join(projectRoot, 'a.ts'), 'x')
-    await vi.waitFor(() =>
+    // Changed again on each look: macOS arms a watch a moment after `fs.watch` returns, and a
+    // change made before that has no event (https://nodejs.org/api/fs.html#caveats).
+    await vi.waitFor(() => {
+      fs.writeFileSync(path.join(projectRoot, 'a.ts'), 'x')
       expect(window!.webContents.send).toHaveBeenCalledWith(
         'fs:changed',
         expect.objectContaining({ projectRoot, filename: 'a.ts' })
       )
-    )
+    })
   })
 
   it('says nothing once watching has stopped', async () => {
