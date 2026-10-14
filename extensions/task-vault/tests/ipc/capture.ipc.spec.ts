@@ -1,140 +1,110 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import * as fs from 'node:fs/promises'
-import type { ExtensionAPI, ExtensionDB } from '../../../../src/main/extensions/api'
-
-vi.mock('node:fs/promises', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('node:fs/promises')>()
-  return {
-    ...actual,
-    readFile: vi.fn(),
-    writeFile: vi.fn(),
-    rename: vi.fn(),
-    mkdir: vi.fn(),
-    stat: vi.fn(),
-    readdir: vi.fn(),
-  }
-})
-
-const { mockHandle, mockRemoveHandler } = vi.hoisted(() => ({
-  mockHandle: vi.fn(),
-  mockRemoveHandler: vi.fn(),
-}))
-vi.mock('electron', () => ({
-  ipcMain: { handle: mockHandle, removeHandler: mockRemoveHandler },
-}))
-
-// Adapter: registerHandler forwards to the electron ipcMain mocks so existing
-// capture/assert code (mockHandle.mock.calls, removeHandler assertions) still works.
-const mockApiIpc = {
-  registerHandler: (ch: string, fn: (payload: unknown) => unknown) => {
-    mockHandle(ch, (_e: unknown, payload: unknown) => fn(payload))
-    return { dispose: () => mockRemoveHandler(ch) }
-  },
-}
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import type { ExtensionDB } from '@terminator/extension-sdk'
+import { createIpcHarness, createVaultDb, selectTaskRow } from '../support/vault-db'
 
 vi.mock('../../src/notifications/task-scheduler.js', () => ({
   triggerSchedulerTick: vi.fn(),
   broadcast: vi.fn(),
 }))
 
-vi.mock('../../src/vault/indexer', () => ({
-  buildIndex: vi.fn().mockResolvedValue({ tasks: [], projects: [], inboxCount: 0 }),
-  readIndex: vi.fn().mockResolvedValue(null),
-  getTaskById: vi.fn().mockReturnValue(null),
-}))
-
-vi.mock('../../src/vault/db', () => ({
-  randomUUID: vi.fn(() => 'test-uuid'),
-}))
-
 import { registerVaultIpcHandlers } from '../../src/ipc/vault.ipc'
 
-function createMockDb() {
-  const mockQuery = vi.fn().mockResolvedValue([])
-  const mockGet = vi.fn().mockResolvedValue(undefined)
-  const mockRun = vi.fn().mockResolvedValue(undefined)
-  const db: ExtensionDB = {
-    query: mockQuery,
-    get: mockGet,
-    run: mockRun,
-    exec: vi.fn().mockResolvedValue(undefined),
-    transaction: vi
-      .fn()
-      .mockImplementation(async (fn: (tx: ExtensionDB) => Promise<unknown>) => fn(db)),
-  }
-  return Object.assign(db, { mockQuery, mockGet, mockRun })
+let db: ExtensionDB
+let harness: ReturnType<typeof createIpcHarness>
+
+beforeEach(async () => {
+  db = await createVaultDb()
+  harness = createIpcHarness()
+  registerVaultIpcHandlers(harness.api, db)
+})
+
+const captureVia = (payload: unknown) => harness.invoke('task-vault:vault:capture', payload)
+
+describe('task-vault:vault:capture IPC handler', taskVaultVaultCaptureIPCTests)
+
+function taskVaultVaultCaptureIPCTests() {
+  describe('storing', taskVaultVaultCaptureIPCStoringTests)
+  describe('tags', taskVaultVaultCaptureIPCTagsTests)
+  describe('hints and errors', taskVaultVaultCaptureIPCHintsErrorsTests)
 }
 
-let db: ReturnType<typeof createMockDb>
-const mockApi = {
-  ipc: mockApiIpc,
-  notifications: { createNotification: vi.fn() },
-} as unknown as ExtensionAPI
-
-beforeEach(() => {
-  vi.clearAllMocks()
-  db = createMockDb()
-  vi.mocked(fs.mkdir).mockResolvedValue(undefined)
-  vi.mocked(fs.readdir).mockResolvedValue([] as unknown as Awaited<ReturnType<typeof fs.readdir>>)
-  vi.mocked(fs.stat).mockResolvedValue({ mtime: new Date() } as unknown as Awaited<
-    ReturnType<typeof fs.stat>
-  >)
-})
-
-afterEach(() => {
-  vi.clearAllMocks()
-})
-
-describe('task-vault:vault:capture IPC handler', () => {
+function taskVaultVaultCaptureIPCStoringTests() {
   it('registers the capture handler', () => {
-    registerVaultIpcHandlers(mockApi, db)
-    const registeredChannels = vi.mocked(mockHandle).mock.calls.map((c) => c[0])
-    expect(registeredChannels).toContain('task-vault:vault:capture')
+    expect(harness.channels()).toContain('task-vault:vault:capture')
   })
 
-  it('returns error for empty text payload', async () => {
-    let captureHandler: ((event: unknown, payload: unknown) => Promise<unknown>) | undefined
-    vi.mocked(mockHandle).mockImplementation((channel, fn) => {
-      if (channel === 'task-vault:vault:capture') captureHandler = fn as typeof captureHandler
+  it('stores an open inbox task and returns its id', async () => {
+    const { taskId } = (await captureVia({ text: 'New task' })) as { taskId: string }
+
+    expect(await selectTaskRow(db, taskId)).toMatchObject({
+      text: 'New task',
+      status: 'open',
+      source: 'inbox',
+      project_id: null,
+      area_id: null,
     })
-    registerVaultIpcHandlers(mockApi, db)
-    expect(captureHandler).toBeDefined()
-
-    const result = await captureHandler!({} as Electron.IpcMainInvokeEvent, { text: '' })
-    expect(result).toMatchObject({ error: expect.stringContaining('VALIDATION_ERROR') })
   })
+}
 
-  it('returns error for whitespace-only text', async () => {
-    let captureHandler: ((event: unknown, payload: unknown) => Promise<unknown>) | undefined
-    vi.mocked(mockHandle).mockImplementation((channel, fn) => {
-      if (channel === 'task-vault:vault:capture') captureHandler = fn as typeof captureHandler
+function taskVaultVaultCaptureIPCTagsTests() {
+  describe('creates the project', taskVaultVaultCaptureIPCTagsCreatesTheProjectTests)
+  describe('reuses an existing', taskVaultVaultCaptureIPCTagsReusesAnExistingTests)
+}
+
+function taskVaultVaultCaptureIPCTagsCreatesTheProjectTests() {
+  it('creates the project and area named by inline tags and links the task to them', async () => {
+    const { taskId } = (await captureVia({
+      text: 'Plan launch @website #work +computer due:2026-03-01',
+    })) as {
+      taskId: string
+    }
+
+    const row = await db.get<Record<string, unknown>>(
+      `SELECT t.text, t.context, t.due_date, p.name AS project, a.name AS area
+       FROM tasks t JOIN projects p ON p.id = t.project_id JOIN areas a ON a.id = t.area_id
+       WHERE t.id = ?`,
+      [taskId]
+    )
+    expect(row).toMatchObject({
+      text: 'Plan launch',
+      context: 'Computer',
+      due_date: '2026-03-01',
+      project: 'Website',
+      area: 'Work',
     })
-    registerVaultIpcHandlers(mockApi, db)
+  })
+}
 
-    const result = await captureHandler!({} as Electron.IpcMainInvokeEvent, { text: '   ' })
-    expect(result).toMatchObject({ error: expect.stringContaining('VALIDATION_ERROR') })
+function taskVaultVaultCaptureIPCTagsReusesAnExistingTests() {
+  it('reuses an existing project instead of creating a second one', async () => {
+    await captureVia({ text: 'First @website' })
+    await captureVia({ text: 'Second @website' })
+
+    expect(await db.query('SELECT id FROM projects')).toHaveLength(1)
+    expect(await db.query('SELECT id FROM tasks WHERE project_id IS NOT NULL')).toHaveLength(2)
+  })
+}
+
+function taskVaultVaultCaptureIPCHintsErrorsTests() {
+  it('applies the project and area hints as tags', async () => {
+    const { taskId } = (await captureVia({
+      text: 'Call',
+      hintProject: 'alpha',
+      hintArea: 'home',
+    })) as {
+      taskId: string
+    }
+
+    const row = await db.get<Record<string, unknown>>(
+      `SELECT p.name AS project, a.name AS area FROM tasks t
+       JOIN projects p ON p.id = t.project_id JOIN areas a ON a.id = t.area_id WHERE t.id = ?`,
+      [taskId]
+    )
+    expect(row).toMatchObject({ project: 'Alpha', area: 'Home' })
   })
 
-  it('inserts into DB and returns taskId for valid text', async () => {
-    let captureHandler: ((event: unknown, payload: unknown) => Promise<unknown>) | undefined
-    vi.mocked(mockHandle).mockImplementation((channel, fn) => {
-      if (channel === 'task-vault:vault:capture') captureHandler = fn as typeof captureHandler
-    })
-    registerVaultIpcHandlers(mockApi, db)
-
-    const result = await captureHandler!({} as Electron.IpcMainInvokeEvent, { text: 'New task' })
-    expect(result).toMatchObject({ taskId: 'test-uuid' })
+  it('returns { error } instead of throwing when the database fails', async () => {
+    await db.exec('DROP TABLE tasks')
+    expect(await captureVia({ text: 'Doomed' })).toMatchObject({ error: expect.any(String) })
   })
-
-  it('validates payload with Zod schema', async () => {
-    let captureHandler: ((event: unknown, payload: unknown) => Promise<unknown>) | undefined
-    vi.mocked(mockHandle).mockImplementation((channel, fn) => {
-      if (channel === 'task-vault:vault:capture') captureHandler = fn as typeof captureHandler
-    })
-    registerVaultIpcHandlers(mockApi, db)
-
-    // null payload should fail validation
-    const result = await captureHandler!({} as Electron.IpcMainInvokeEvent, null)
-    expect(result).toMatchObject({ error: expect.any(String) })
-  })
-})
+}

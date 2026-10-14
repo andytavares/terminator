@@ -13,8 +13,8 @@
      depth here — every row in the sidebar leads with one, so stepping that
      column is what makes the tree readable at a glance. */
   padding: 0 10px 0 47px;
-  color: var(--text-secondary);
-  font-family: var(--font-ui);
+  color: var(--tm-text-secondary);
+  font-family: var(--tm-font-ui);
   font-size: 11.5px;
   user-select: none;
   cursor: pointer;
@@ -27,16 +27,16 @@
 }
 
 .terminal-row:hover {
-  background: var(--bg-card-hover);
+  background: var(--tm-bg-card-hover);
 }
 
 .terminal-row--selected {
-  background: var(--bg-card-hover);
-  color: var(--text-primary);
+  background: var(--tm-bg-card-hover);
+  color: var(--tm-text-primary);
 }
 
 .terminal-row:focus-visible {
-  outline: 2px solid var(--text-primary);
+  outline: 2px solid var(--tm-text-primary);
   outline-offset: -2px;
 }
 
@@ -69,17 +69,17 @@
    key alone is the whole fact, so a badge or border would say it twice. */
 .terminal-row__key {
   flex: 0 0 auto;
-  font-family: var(--font-mono);
+  font-family: var(--tm-font-mono);
   font-size: 10px;
-  color: var(--text-muted);
+  color: var(--tm-text-muted);
   white-space: nowrap;
 }
 
 .terminal-row__bell {
   flex: 0 0 auto;
-  font-family: var(--font-mono);
+  font-family: var(--tm-font-mono);
   font-size: 9.5px;
-  color: var(--text-primary);
+  color: var(--tm-text-primary);
   font-variant-numeric: tabular-nums;
 }
 
@@ -93,9 +93,9 @@
   place-items: center;
   padding: 0;
   border: 0;
-  border-radius: var(--radius-sm, 4px);
+  border-radius: var(--tm-radius-sm, 4px);
   background: transparent;
-  color: var(--text-muted);
+  color: var(--tm-text-muted);
   cursor: pointer;
   opacity: 0;
   transition: opacity 0.12s;
@@ -114,5 +114,5 @@
 
 .terminal-row__close:hover {
   opacity: 1;
-  color: var(--text-primary);
+  color: var(--tm-text-primary);
 }

@@ -26,6 +26,19 @@ describe('linear provider — teams', () => {
       { id: 't2', key: 'OPS', name: 'Ops' },
     ])
   })
+
+  it('skips a team with no id and names the rest from what Linear gave', async () => {
+    const teams = vi.fn().mockResolvedValue({ nodes: [{ key: 'X', name: 'No id' }, { id: 't3' }] })
+    const provider = providerWith({ viewer: Promise.resolve({ name: 'A', email: 'a@b.c', teams }) })
+    await expect(provider.teams?.(CRED)).resolves.toEqual([{ id: 't3', key: '', name: 't3' }])
+  })
+})
+
+describe('linear provider — teams without an accessor', () => {
+  it('lists no teams when the viewer has no teams accessor', async () => {
+    const provider = providerWith({ viewer: Promise.resolve({ name: 'A', email: 'a@b.c' }) })
+    await expect(provider.teams?.(CRED)).resolves.toEqual([])
+  })
 })
 
 describe('linear provider — create', () => {
@@ -46,7 +59,9 @@ describe('linear provider — create', () => {
     expect(issue?.key).toBe('TAV-42')
     expect(issue?.branchName).toBe('andrew/tav-42-unify-linear')
   })
+})
 
+describe('linear provider — create refusals', () => {
   it('rejects when Linear reports the create failed', async () => {
     const createIssue = vi.fn().mockResolvedValue({ success: false })
     await expect(

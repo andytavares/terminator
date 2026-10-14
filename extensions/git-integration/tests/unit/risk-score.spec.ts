@@ -26,6 +26,7 @@ const baseMetrics = (overrides: Partial<FileMetrics> = {}): FileMetrics => ({
 const makeDiff = (hunks: Array<{ adds: string[]; removes: string[] }>): FileDiff => ({
   path: 'src/auth.ts',
   isBinary: false,
+  truncated: false,
   hunks: hunks.map((h, i) => ({
     header: `@@ -${i * 10 + 1},10 +${i * 10 + 1},10 @@`,
     lines: [
@@ -64,7 +65,9 @@ describe('computeRiskScore()', () => {
     const score = computeRiskScore(low, others)
     expect(score.level).toBe('low')
   })
+})
 
+describe('computeRiskScore() — returns high risk for the most extreme file in the set', () => {
   it('returns high risk for the most extreme file in the set', () => {
     const high = baseMetrics({
       churn90d: 100,
@@ -80,7 +83,9 @@ describe('computeRiskScore()', () => {
     expect(score.composite).not.toBeNull()
     expect(score.composite!).toBeGreaterThan(66)
   })
+})
 
+describe('computeRiskScore() — all-null numeric metrics (except testFilePresent) returns composite null', () => {
   it('all-null numeric metrics (except testFilePresent) returns composite null', () => {
     const m = baseMetrics({
       churn90d: null,
@@ -105,7 +110,9 @@ describe('computeRiskScore()', () => {
       expect(scoreWithout.composite).toBeGreaterThan(scoreWith.composite)
     }
   })
+})
 
+describe('computeRiskScore() — sets dominantDriver to a non-empty string', () => {
   it('sets dominantDriver to a non-empty string', () => {
     const m = baseMetrics()
     const score = computeRiskScore(m, [m])
@@ -121,7 +128,9 @@ describe('computeRiskScore()', () => {
     const score = computeRiskScore(m, [m])
     expect(score.topImporters.length).toBeLessThanOrEqual(5)
   })
+})
 
+describe('computeRiskScore() — composite is between 0 and 100', () => {
   it('composite is between 0 and 100', () => {
     const high = baseMetrics({
       churn90d: 200,
@@ -166,7 +175,9 @@ describe('detectComplexityHotspots()', () => {
     ])
     expect(detectComplexityHotspots(diff)).toHaveLength(0)
   })
+})
 
+describe('detectComplexityHotspots() — flags a hunk with 5 or more added decision points', () => {
   it('flags a hunk with 5 or more added decision points', () => {
     const diff = makeDiff([
       {
@@ -193,7 +204,9 @@ describe('detectComplexityHotspots()', () => {
     const diff = makeDiff([{ adds: addLines, removes: removeLines }])
     expect(detectComplexityHotspots(diff)).toHaveLength(0)
   })
+})
 
+describe('detectComplexityHotspots() — annotation message includes the delta count', () => {
   it('annotation message includes the delta count', () => {
     const diff = makeDiff([
       {

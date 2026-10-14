@@ -27,10 +27,3 @@ export function amendOrder(order: WorkOrder, input: AmendInput): WorkOrder {
     },
   }
 }
-
-export interface LateFinding {
-  readonly id: string
-  readonly severity: 'low' | 'medium' | 'high'
-  readonly text: string
-  readonly at: string
-}

@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { buildReadingOrder } from '../../src/review/reading-order'
+import { parsePrFiles } from '../../src/review/parsed-file'
+
+const readingOrderOf = (files: unknown[]) => buildReadingOrder(parsePrFiles(files))
 
 // ─── Acceptance fixture: 7 real paths from this PR's own diff ─────────────────
 // Sizes are tuned so tie-breaking (higher additions+deletions first among free
@@ -108,30 +111,23 @@ const readmeFile = {
   patch: ['@@ -1,1 +1,1 @@', '-old text', '+new text'].join('\n'),
 }
 
+const ACCEPTANCE_FILES_IN_READING_ORDER = [
+  schemaFile,
+  serviceFile,
+  specFile,
+  useHookFile,
+  healthChipsFile,
+  riskBreakdownFile,
+  reviewDiffPaneFile,
+  readmeFile,
+]
+
 describe('buildReadingOrder() — acceptance', () => {
   it('orders the 7 real files by definitions-first reading order, with the unknown-language file still appearing', async () => {
-    const steps = await buildReadingOrder([
-      schemaFile,
-      serviceFile,
-      specFile,
-      useHookFile,
-      healthChipsFile,
-      riskBreakdownFile,
-      reviewDiffPaneFile,
-      readmeFile,
-    ])
+    const steps = await readingOrderOf(ACCEPTANCE_FILES_IN_READING_ORDER)
 
     const paths = steps.map((s) => s.path)
-    expect(paths).toEqual([
-      schemaFile.path,
-      serviceFile.path,
-      specFile.path,
-      useHookFile.path,
-      healthChipsFile.path,
-      riskBreakdownFile.path,
-      reviewDiffPaneFile.path,
-      readmeFile.path,
-    ])
+    expect(paths).toEqual(ACCEPTANCE_FILES_IN_READING_ORDER.map((f) => f.path))
 
     const byPath = new Map(steps.map((s) => [s.path, s]))
     expect(byPath.get(schemaFile.path)?.reason).toBe(
@@ -173,7 +169,7 @@ describe('buildReadingOrder() — cycles', () => {
         '+}',
       ].join('\n'),
     }
-    const steps = await buildReadingOrder([a, b])
+    const steps = await readingOrderOf([a, b])
     const positions = new Map(steps.map((s) => [s.path, s.step]))
     expect(Math.abs(positions.get('src/a.ts')! - positions.get('src/b.ts')!)).toBe(1)
   })
@@ -181,7 +177,7 @@ describe('buildReadingOrder() — cycles', () => {
 
 describe('buildReadingOrder() — edge cases', () => {
   it('returns [] for no files', async () => {
-    expect(await buildReadingOrder([])).toEqual([])
+    expect(await readingOrderOf([])).toEqual([])
   })
 
   it('still returns a step for a file whose test-reference has no in-PR definer', async () => {
@@ -196,7 +192,7 @@ describe('buildReadingOrder() — edge cases', () => {
         '+})',
       ].join('\n'),
     }
-    const steps = await buildReadingOrder([orphanSpec])
+    const steps = await readingOrderOf([orphanSpec])
     expect(steps).toHaveLength(1)
     expect(steps[0].path).toBe(orphanSpec.path)
   })
@@ -223,7 +219,62 @@ describe('buildReadingOrder() — reference wording', () => {
         ].join('\n'),
       },
     ]
-    const order = await buildReadingOrder(files)
+    const order = await readingOrderOf(files)
     expect(order.find((s) => s.path.endsWith('utils.ts'))?.reason).toBe('Uses Priority (step 1)')
+  })
+})
+
+describe('buildReadingOrder() — the reference a reason names', () => {
+  it('names the call, not an earlier type use, when a file does both', async () => {
+    const types = {
+      path: 'src/types.ts',
+      additions: 10,
+      deletions: 0,
+      patch: '@@ -0,0 +1,1 @@\n+export type Weight = number',
+    }
+    const scale = {
+      path: 'src/scale.ts',
+      additions: 3,
+      deletions: 0,
+      patch: '@@ -0,0 +1,3 @@\n+export function scale(n: number) {\n+  return n * 2\n+}',
+    }
+    const user = {
+      path: 'src/user.ts',
+      additions: 1,
+      deletions: 0,
+      patch: '@@ -0,0 +1,1 @@\n+export const w: Weight = scale(1)',
+    }
+    const order = await readingOrderOf([types, scale, user])
+    expect(order.find((s) => s.path === 'src/user.ts')?.reason).toBe('Calls scale (step 2)')
+  })
+})
+
+describe('buildReadingOrder() — files outside the dependency graph', () => {
+  it('puts a lock file last, after the code it was listed before', async () => {
+    const lock = {
+      path: 'package-lock.json',
+      additions: 2,
+      deletions: 2,
+      patch: '@@ -1,1 +1,1 @@\n-"a": "1"\n+"a": "2"',
+    }
+    const order = await readingOrderOf([lock, schemaFile])
+    expect(order.map((s) => s.path)).toEqual([schemaFile.path, 'package-lock.json'])
+  })
+
+  it('adds no ordering edge for a symbol only a test file defines', async () => {
+    const helperSpec = {
+      path: 'tests/unit/thing.spec.ts',
+      additions: 3,
+      deletions: 0,
+      patch: '@@ -0,0 +1,3 @@\n+export function makeThing() {\n+  return useThing()\n+}',
+    }
+    const source = {
+      path: 'src/thing.ts',
+      additions: 3,
+      deletions: 0,
+      patch: '@@ -0,0 +1,3 @@\n+export function useThing() {\n+  return makeThing()\n+}',
+    }
+    const order = await readingOrderOf([helperSpec, source])
+    expect(order.map((s) => s.path)).toEqual(['src/thing.ts', 'tests/unit/thing.spec.ts'])
   })
 })

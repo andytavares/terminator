@@ -1,0 +1,70 @@
+// Unused files, exports and dependencies: `npm run lint:unused`.
+// https://knip.dev/reference/configuration
+// https://knip.dev/features/monorepos-and-workspaces
+// Plugins find most entries on their own: electron-vite (main, preload and
+// renderer inputs), vite, vitest, playwright, storybook and the package.json
+// `exports` of the SDK and the design system, whose exports are their API.
+//
+// Production mode, `npm run lint:unused:production` (ADR 107): a pattern ending
+// in `!` is production code, and a negated one ending in `!` is left out of the
+// production run only. Tests, their helpers and stories are not shipped, so a
+// file or export only they reach is reported there.
+// https://knip.dev/features/production-mode
+{
+  "$schema": "https://unpkg.com/knip@6.39.0/schema-jsonc.json",
+  "workspaces": {
+    ".": {
+      "entry": [
+        "scripts/**/*.{cjs,mjs,mts,js}",
+        // The global declaration of window.electronAPI: tsconfig.renderer.json's
+        // `include` reaches it, no import does.
+        "src/renderer/electron-api.d.ts!",
+        // Bundled by esbuild from a string: git-integration-contrast.spec.ts:139.
+        "tests/e2e/git-integration-contrast.entry.tsx",
+        // electron-builder reads its config file by name
+        // (https://www.electron.build/configuration); `npm run package`.
+        "electron-builder.cjs",
+        // Installed by path as an extension: extension-lifecycle.spec.ts:25.
+        "tests/e2e/fixtures/extensions/probe/*.{cjs,js}",
+      ],
+      // Tools the e2e stubs call on the runner's PATH: openssl makes the stub
+      // servers' throwaway CA (tracker-stub.ts, jira-stub.ts) and jq shapes the
+      // gh stub's --jq output (github-stub-gh.ts). Both ship on GitHub's runners.
+      // src/**/__tests__/ holds specs and their helpers, as tests/ does.
+      "project": ["**/*.{js,mjs,cjs,jsx,ts,tsx,mts,cts}!", "!tests/**!", "!src/**/__tests__/**!"],
+      "ignoreBinaries": ["openssl", "jq"],
+      "vite": { "config": ["vite.config.remote.ts"] },
+      "vitest": { "config": ["vitest.config.ts", "vitest.live.config.ts"] },
+      // tests/integration/remote-bridge-allowlist.spec.ts drives Remote Control's
+      // bridge route against the core's allowlist, so it imports the server
+      // packages that extensions/remote-control/package.json declares.
+      "ignoreDependencies": ["fastify", "@fastify/websocket"],
+    },
+    "packages/extension-ui": {
+      "project": ["**/*.{js,mjs,cjs,jsx,ts,tsx,mts,cts}!", "!stories/**!"],
+      "playwright": { "config": ["playwright.visual.config.ts"] },
+      "vitest": { "config": ["vitest.stories.config.ts"] },
+    },
+    "extensions/*": {
+      "entry": ["src/index.ts!"],
+      "project": ["**/*.{js,mjs,cjs,jsx,ts,tsx,mts,cts}!", "!tests/**!"],
+      "vite": { "config": ["vite.renderer.config.ts"] },
+    },
+    "extensions/git-integration": {
+      "entry": ["src/index.ts!"],
+      "project": ["**/*.{js,mjs,cjs,jsx,ts,tsx,mts,cts}!", "!tests/**!"],
+      "vite": { "config": ["vite.renderer.config.ts"] },
+      // Loaded by path at run time: require.resolve of each grammar's .wasm,
+      // src/review/symbols.ts:52.
+      "ignoreDependencies": ["@vscode/tree-sitter-wasm"],
+    },
+    "extensions/remote-control": {
+      "entry": ["src/index.ts!"],
+      "project": ["**/*.{js,mjs,cjs,jsx,ts,tsx,mts,cts}!", "!tests/**!"],
+      "vite": { "config": ["vite.renderer.config.ts"] },
+      // The ngrok CLI the user installs; found with `which ngrok`,
+      // src/server/ngrok-manager.ts:37.
+      "ignoreBinaries": ["ngrok"],
+    },
+  },
+}

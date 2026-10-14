@@ -1,11 +1,13 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { mkdirSync, realpathSync, rmSync, symlinkSync } from 'node:fs'
+import { join } from 'node:path'
 import {
   assertCommandAllowed,
   assertCwdInScope,
-  execShell,
   CommandNotAllowedError,
   CwdOutOfScopeError,
 } from '../../../src/main/shell/shell-executor'
+import { makeTempDir } from '../../support/temp-dir'
 
 // ─── assertCommandAllowed ─────────────────────────────────────────────────────
 
@@ -26,177 +28,118 @@ describe('assertCommandAllowed', () => {
     expect(() => assertCommandAllowed('curl')).toThrow(CommandNotAllowedError)
   })
 
-  it('thrown error has COMMAND_NOT_ALLOWED code', () => {
+  /** What assertCommandAllowed throws for `command`; undefined when it lets it through. */
+  function refusalOf(command: string): unknown {
     try {
-      assertCommandAllowed('bash')
-    } catch (e) {
-      expect((e as CommandNotAllowedError).code).toBe('COMMAND_NOT_ALLOWED')
+      assertCommandAllowed(command)
+    } catch (error) {
+      return error
     }
+  }
+
+  it('thrown error has COMMAND_NOT_ALLOWED code', () => {
+    expect(refusalOf('bash')).toMatchObject({ code: 'COMMAND_NOT_ALLOWED' })
   })
 
   it('thrown error message names the disallowed command', () => {
-    try {
-      assertCommandAllowed('node')
-    } catch (e) {
-      expect((e as Error).message).toContain('node')
-    }
+    expect(refusalOf('node')).toMatchObject({ message: expect.stringContaining('"node"') })
   })
 })
 
 // ─── assertCwdInScope ─────────────────────────────────────────────────────────
 
-describe('assertCwdInScope', () => {
-  it('allows cwd exactly equal to workspaceRoot', () => {
-    expect(() => assertCwdInScope('/workspace', '/workspace')).not.toThrow()
-  })
+// Real directories: the check resolves symlinks, so it is only meaningful on a real disk.
+let scratch: string
+let root: string
+let otherRoot: string
+let outside: string
 
-  it('allows cwd inside workspaceRoot', () => {
-    expect(() => assertCwdInScope('/workspace/src/components', '/workspace')).not.toThrow()
-  })
-
-  it('allows deeply nested cwd inside workspaceRoot', () => {
-    expect(() => assertCwdInScope('/workspace/a/b/c/d', '/workspace')).not.toThrow()
-  })
-
-  it('throws CwdOutOfScopeError when cwd is outside workspaceRoot', () => {
-    expect(() => assertCwdInScope('/etc/passwd', '/workspace')).toThrow(CwdOutOfScopeError)
-  })
-
-  it('throws CwdOutOfScopeError for path traversal attempt (../escape)', () => {
-    // Even though resolve would handle this, the raw relative check catches it
-    expect(() => assertCwdInScope('/workspace/../etc', '/workspace')).toThrow(CwdOutOfScopeError)
-  })
-
-  it('throws CwdOutOfScopeError when cwd is relative', () => {
-    expect(() => assertCwdInScope('relative/path', '/workspace')).toThrow(CwdOutOfScopeError)
-  })
-
-  it('throws CwdOutOfScopeError when workspaceRoot is relative', () => {
-    expect(() => assertCwdInScope('/workspace/src', 'relative/root')).toThrow(CwdOutOfScopeError)
-  })
-
-  it('thrown error has CWD_OUT_OF_SCOPE code', () => {
-    try {
-      assertCwdInScope('/etc', '/workspace')
-    } catch (e) {
-      expect((e as CwdOutOfScopeError).code).toBe('CWD_OUT_OF_SCOPE')
+function useScopeDirectories(): void {
+  beforeEach(() => {
+    scratch = realpathSync(makeTempDir('cwd-scope-'))
+    root = join(scratch, 'root')
+    otherRoot = join(scratch, 'other')
+    outside = join(scratch, 'outside')
+    for (const directory of [join(root, 'src', 'deep'), otherRoot, outside]) {
+      mkdirSync(directory, { recursive: true })
     }
   })
+
+  afterEach(() => rmSync(scratch, { recursive: true, force: true }))
+}
+
+describe('assertCwdInScope', () => {
+  useScopeDirectories()
+
+  it('allows the root itself and any directory below it', async () => {
+    await expect(assertCwdInScope(root, [root])).resolves.toBeUndefined()
+    await expect(assertCwdInScope(join(root, 'src', 'deep'), [root])).resolves.toBeUndefined()
+  })
+
+  it('allows a directory inside any one of several roots', async () => {
+    await expect(assertCwdInScope(otherRoot, [root, otherRoot])).resolves.toBeUndefined()
+  })
+
+  it('allows a directory below a root that does not exist yet', async () => {
+    const clone = join(root, 'not-cloned-yet')
+    await expect(assertCwdInScope(clone, [root])).resolves.toBeUndefined()
+  })
 })
 
-// ─── execShell ────────────────────────────────────────────────────────────────
+describe('assertCwdInScope — escapes', () => {
+  useScopeDirectories()
 
-vi.mock('child_process', async () => {
-  const actual = await vi.importActual<typeof import('child_process')>('child_process')
-  return { ...actual, execFile: vi.fn() }
+  it('refuses a directory outside every root', async () => {
+    await expect(assertCwdInScope(outside, [root, otherRoot])).rejects.toThrow(CwdOutOfScopeError)
+  })
+
+  // Written out, not joined: path.join would fold the `..` away before the check saw it.
+  it('refuses a `..` escape out of a root', async () => {
+    await expect(assertCwdInScope(`${root}/src/../../outside`, [root])).rejects.toThrow(
+      CwdOutOfScopeError
+    )
+  })
+
+  it('refuses a symlink inside a root that leads out of it', async () => {
+    const link = join(root, 'escape')
+    symlinkSync(outside, link)
+    await expect(assertCwdInScope(link, [root])).rejects.toThrow(CwdOutOfScopeError)
+  })
+
+  it('refuses `..` taken after a symlink, which the operating system resolves outside', async () => {
+    mkdirSync(join(outside, 'child'))
+    symlinkSync(join(outside, 'child'), join(root, 'into-child'))
+    await expect(assertCwdInScope(`${root}/into-child/..`, [root])).rejects.toThrow(
+      CwdOutOfScopeError
+    )
+  })
 })
 
-import { execFile } from 'child_process'
-import type { ExecFileOptions, ChildProcess, ExecException } from 'child_process'
+describe('assertCwdInScope — look-alikes, symlinked roots and errors', () => {
+  useScopeDirectories()
 
-type ExecFileCallback = (error: ExecException | null, stdout: string, stderr: string) => void
-
-const mockExecFile = vi.mocked(execFile)
-
-describe('execShell', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
+  it('refuses a sibling whose name only starts with the root', async () => {
+    const sibling = `${root}-sibling`
+    mkdirSync(sibling)
+    await expect(assertCwdInScope(sibling, [root])).rejects.toThrow(CwdOutOfScopeError)
   })
 
-  it('resolves with exitCode 0 and stdout on success', async () => {
-    mockExecFile.mockImplementation(
-      (_cmd: string, _args: string[], _opts: ExecFileOptions, callback: ExecFileCallback) => {
-        callback(null, 'hello\n', '')
-        return { on: vi.fn() } as unknown as ChildProcess
-      }
-    )
-
-    const result = await execShell({ command: 'git', args: ['--version'], cwd: '/tmp' })
-    expect(result.exitCode).toBe(0)
-    expect(result.stdout).toBe('hello\n')
-    expect(result.stderr).toBe('')
-    expect(result.timedOut).toBe(false)
+  it('allows a root reached through a symlink, compared after resolving both', async () => {
+    const linkedRoot = join(scratch, 'linked-root')
+    symlinkSync(root, linkedRoot)
+    await expect(assertCwdInScope(join(root, 'src'), [linkedRoot])).resolves.toBeUndefined()
   })
 
-  it('resolves with non-zero exitCode when process fails', async () => {
-    const err = Object.assign(new Error('exit 1'), { code: 1 })
-    mockExecFile.mockImplementation(
-      (_cmd: string, _args: string[], _opts: ExecFileOptions, callback: ExecFileCallback) => {
-        callback(err, '', 'error output')
-        return { on: vi.fn() } as unknown as ChildProcess
-      }
+  it('refuses a relative cwd, and ignores a relative or empty root', async () => {
+    await expect(assertCwdInScope('relative/path', [root])).rejects.toThrow(CwdOutOfScopeError)
+    await expect(assertCwdInScope(join(root, 'src'), ['relative/root', ''])).rejects.toThrow(
+      CwdOutOfScopeError
     )
-
-    const result = await execShell({ command: 'git', args: ['fail'], cwd: '/tmp' })
-    expect(result.exitCode).toBe(1)
-    expect(result.stderr).toBe('error output')
-    expect(result.timedOut).toBe(false)
   })
 
-  it('resolves with exitCode 1 when error code is non-numeric', async () => {
-    const err = Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
-    mockExecFile.mockImplementation(
-      (_cmd: string, _args: string[], _opts: ExecFileOptions, callback: ExecFileCallback) => {
-        callback(err, '', '')
-        return { on: vi.fn() } as unknown as ChildProcess
-      }
-    )
-
-    const result = await execShell({ command: 'git', args: ['status'], cwd: '/tmp' })
-    expect(result.exitCode).toBe(1)
-  })
-
-  // A command that never started (not on PATH) has no stderr of its own; without
-  // the spawn error a caller could only report "exit code 1".
-  it('reports the spawn error as stderr when the command could not be started', async () => {
-    const err = Object.assign(new Error('spawn gh ENOENT'), { code: 'ENOENT' })
-    mockExecFile.mockImplementation(
-      (_cmd: string, _args: string[], _opts: ExecFileOptions, callback: ExecFileCallback) => {
-        callback(err, '', '')
-        return { on: vi.fn() } as unknown as ChildProcess
-      }
-    )
-
-    const result = await execShell({ command: 'gh', args: ['pr', 'create'], cwd: '/tmp' })
-    expect(result.exitCode).toBe(1)
-    expect(result.stderr).toBe('spawn gh ENOENT')
-  })
-
-  it('marks timedOut when SIGTERM close signal fires before callback', async () => {
-    mockExecFile.mockImplementation(
-      (_cmd: string, _args: string[], _opts: ExecFileOptions, callback: ExecFileCallback) => {
-        let closeHandler: ((code: null, signal: string) => void) | null = null
-        const child = {
-          on: (event: string, handler: (...args: unknown[]) => void) => {
-            if (event === 'close') closeHandler = handler
-          },
-        }
-        // Simulate real Node.js timeout: close event fires first, then the callback
-        setTimeout(() => {
-          closeHandler?.(null, 'SIGTERM')
-          callback(Object.assign(new Error('timeout'), { code: null }), '', '')
-        }, 0)
-        return child as unknown as ChildProcess
-      }
-    )
-
-    const result = await execShell({ command: 'git', args: ['status'], cwd: '/tmp', timeoutMs: 1 })
-    expect(result.timedOut).toBe(true)
-  })
-
-  it('passes sanitized env variables to child process', async () => {
-    let capturedOpts: ExecFileOptions | null = null
-    mockExecFile.mockImplementation(
-      (_cmd: string, _args: string[], opts: ExecFileOptions, callback: ExecFileCallback) => {
-        capturedOpts = opts
-        callback(null, '', '')
-        return { on: vi.fn() } as unknown as ChildProcess
-      }
-    )
-
-    await execShell({ command: 'git', args: ['status'], cwd: '/tmp' })
-    expect(capturedOpts.env).toHaveProperty('GIT_TERMINAL_PROMPT', '0')
-    // Should not pass arbitrary env vars (not in allowlist)
-    expect(capturedOpts.env).not.toHaveProperty('AWS_SECRET_ACCESS_KEY')
+  it('rejects with an error named CwdOutOfScopeError that names the directory', async () => {
+    const refusal = await assertCwdInScope(outside, [root]).catch((error: unknown) => error)
+    expect(refusal).toMatchObject({ name: 'CwdOutOfScopeError', code: 'CWD_OUT_OF_SCOPE' })
+    expect((refusal as Error).message).toContain(outside)
   })
 })

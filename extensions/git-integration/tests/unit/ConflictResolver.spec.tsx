@@ -1,10 +1,12 @@
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import React from 'react'
+import { EditorView } from '@codemirror/view'
 
 const mockResolveConflict = vi.fn()
 const mockPersistSession = vi.fn()
 const mockUndoResolve = vi.fn()
+const mockNotify = vi.fn()
 
 vi.mock('../../src/api/merge-flow', () => ({
   mergeFlowAPI: {
@@ -15,95 +17,51 @@ vi.mock('../../src/api/merge-flow', () => ({
 }))
 
 vi.mock('../../src/api/notifications', () => ({
-  notificationsAPI: { notify: vi.fn() },
+  notificationsAPI: { notify: (...a: unknown[]) => mockNotify(...a) },
 }))
 
-let mockStoreState: Record<string, unknown> = {}
-vi.mock('../../src/stores/merge-flow.store', () => ({
-  useMergeFlowStore: (selector?: (s: unknown) => unknown) => {
-    if (typeof selector === 'function') return selector(mockStoreState)
-    return mockStoreState
-  },
-}))
-
-// ManualEditor now uses CodeMirror — shim it with a plain textarea for tests
-vi.mock('../../src/components/merge-flow/ManualEditor', () => {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const React = require('react')
-  const CONFLICT_MARKER_RE = /^(<{7}.*|={7}|>{7}.*)\n?/gm
-  function strip(t: string) {
-    return t.replace(CONFLICT_MARKER_RE, '')
-  }
-  function pick(block: Record<string, unknown>) {
-    if (block.isResolved && block.resolvedText) return block.resolvedText as string
-    const o = strip(String(block.oursText ?? ''))
-    const t = strip(String(block.theirsText ?? ''))
-    return o.length > t.length ? o : t
-  }
-  function ManualEditor({
-    block,
-    onSave,
-    onCancel,
-  }: {
-    block: Record<string, unknown>
-    onSave: (t: string) => void
-    onCancel: () => void
-  }) {
-    const [text, setText] = React.useState(pick(block))
-    return React.createElement(
-      'div',
-      { className: 'manual-editor' },
-      React.createElement('button', { onClick: onCancel }, 'Cancel'),
-      React.createElement('textarea', {
-        value: text,
-        onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => setText(e.target.value),
-      }),
-      React.createElement(
-        'button',
-        { onClick: () => onSave(text), disabled: !text.trim() },
-        'Save & confirm'
-      )
-    )
-  }
-  return { ManualEditor }
-})
-
+import { ConflictResolver } from '../../src/components/merge-flow/ConflictResolver'
+import { useMergeFlowStore } from '../../src/stores/merge-flow.store'
 import { ConflictPanel } from '../../src/components/merge-flow/ConflictPanel'
 import { ActionBar } from '../../src/components/merge-flow/ActionBar'
 import { ResultPreviewStrip } from '../../src/components/merge-flow/ResultPreviewStrip'
-import { KeepBothModal } from '../../src/components/merge-flow/KeepBothModal'
-import { ManualEditor } from '../../src/components/merge-flow/ManualEditor'
-import { ConflictHeader } from '../../src/components/merge-flow/ConflictHeader'
 
-const baseBlock = {
-  blockId: 'src/foo.ts#0',
-  index: 0,
-  oursText: 'const x = 1',
-  theirsText: 'const x = 2',
-  baseText: '',
-  contextBefore: ['// before'],
-  contextAfter: ['// after'],
-  originalConflictText: '<<<<<<< HEAD\nconst x = 1\n=======\nconst x = 2\n>>>>>>> branch',
-  isResolved: false,
+function conflictBlock(index: number, overrides: Record<string, unknown> = {}) {
+  return {
+    blockId: `src/foo.ts#${index}`,
+    index,
+    oursText: `const x = ${index}`,
+    theirsText: `const x = ${index + 100}`,
+    baseText: '',
+    contextBefore: ['// before'],
+    contextAfter: ['// after'],
+    originalConflictText: `<<<<<<< HEAD\nconst x = ${index}\n=======\nconst x = ${index + 100}\n>>>>>>> branch`,
+    isResolved: false,
+    ...overrides,
+  }
 }
 
-const baseSession = {
-  repoRoot: '/repo',
-  isRebase: false,
-  totalConflicts: 1,
-  totalResolved: 0,
-  startedAt: '',
-  files: [
-    {
-      filePath: 'src/foo.ts',
-      conflictCount: 1,
-      resolvedCount: 0,
-      conflictDescription: 'desc',
-      oursAuthor: { name: 'Alice', commitHash: 'abc', timestamp: '' },
-      theirsAuthor: { name: 'Bob', commitHash: 'def', timestamp: '' },
-      blocks: [baseBlock],
-    },
-  ],
+const baseBlock = conflictBlock(0, { oursText: 'const x = 1', theirsText: 'const x = 2' })
+
+function sessionWithBlocks(blockCount: number) {
+  return {
+    repoRoot: '/repo',
+    isRebase: false,
+    totalConflicts: blockCount,
+    totalResolved: 0,
+    startedAt: '',
+    files: [
+      {
+        filePath: 'src/foo.ts',
+        conflictCount: blockCount,
+        resolvedCount: 0,
+        conflictDescription: 'both sides edited x',
+        oursAuthor: { name: 'Alice', commitHash: 'abc', timestamp: '' },
+        theirsAuthor: { name: 'Bob', commitHash: 'def', timestamp: '' },
+        blocks: Array.from({ length: blockCount }, (_, i) => conflictBlock(i)),
+      },
+    ],
+  }
 }
 
 beforeEach(() => {
@@ -111,18 +69,175 @@ beforeEach(() => {
   mockResolveConflict.mockResolvedValue({ success: true })
   mockPersistSession.mockResolvedValue({ success: true })
   mockUndoResolve.mockResolvedValue({ success: true })
-  mockStoreState = {
-    session: baseSession,
-    activeFileIndex: 0,
-    activeBlockIndex: 0,
-    isKeepBothOpen: false,
-    goToNextBlock: vi.fn(),
-    goToPrevBlock: vi.fn(),
-    openKeepBoth: vi.fn(),
-    closeKeepBoth: vi.fn(),
-    confirmDecision: vi.fn(),
-    undoLastDecision: vi.fn(),
-  }
+  useMergeFlowStore.getState().clearSession()
+})
+
+function renderResolver(blockCount: number) {
+  useMergeFlowStore.getState().startSession(sessionWithBlocks(blockCount) as never)
+  const handlers = { onBack: vi.fn(), onComplete: vi.fn() }
+  const view = render(<ConflictResolver repoRoot="/repo" {...handlers} />)
+  return { ...view, ...handlers }
+}
+
+function activeBlock() {
+  const { session, activeFileIndex, activeBlockIndex } = useMergeFlowStore.getState()
+  return session!.files[activeFileIndex].blocks[activeBlockIndex]
+}
+
+describe('ConflictResolver', () => {
+  it('renders nothing when there is no session', () => {
+    const { container } = render(
+      <ConflictResolver repoRoot="/repo" onBack={vi.fn()} onComplete={vi.fn()} />
+    )
+    expect(container.firstChild).toBeNull()
+  })
+
+  it('shows the file description, progress and both sides of the active block', () => {
+    const { container } = renderResolver(2)
+    expect(screen.getByText('both sides edited x')).toBeTruthy()
+    expect(screen.getByText(/Conflict 1 of 2/)).toBeTruthy()
+    expect(container.textContent).toContain('const x = 0')
+    expect(container.textContent).toContain('const x = 100')
+  })
+
+  it('previews the chosen side, and sends nothing until confirmed', () => {
+    renderResolver(2)
+    expect(screen.queryByText(/Confirm/)).toBeNull()
+    fireEvent.click(screen.getByText(/Keep theirs/))
+    expect(screen.getByText('Preview').parentElement!.textContent).toContain('const x = 100')
+    expect(mockResolveConflict).not.toHaveBeenCalled()
+  })
+})
+
+describe('ConflictResolver — resolves with the chosen side and moves to the next conflict', () => {
+  it('resolves with the chosen side and moves to the next conflict', async () => {
+    renderResolver(2)
+    fireEvent.click(screen.getByText(/Keep mine/))
+    fireEvent.click(screen.getByText(/Confirm/))
+    await waitFor(() => expect(useMergeFlowStore.getState().activeBlockIndex).toBe(1))
+    expect(mockResolveConflict).toHaveBeenCalledWith({
+      repoRoot: '/repo',
+      blockId: 'src/foo.ts#0',
+      resolvedText: 'const x = 0',
+      strategy: 'ours',
+      originalConflictText: conflictBlock(0).originalConflictText,
+    })
+    expect(mockPersistSession).toHaveBeenCalledOnce()
+    expect(useMergeFlowStore.getState().session!.files[0].blocks[0].isResolved).toBe(true)
+  })
+
+  it('calls onComplete when the last unresolved conflict is resolved', async () => {
+    const { onComplete } = renderResolver(1)
+    fireEvent.click(screen.getByText(/Keep theirs/))
+    fireEvent.click(screen.getByText(/Confirm/))
+    await waitFor(() => expect(onComplete).toHaveBeenCalledOnce())
+    expect(mockResolveConflict.mock.calls[0][0].resolvedText).toBe('const x = 100')
+  })
+})
+
+describe('ConflictResolver — keeps the conflict unresolved and reports the error when resolving fails', () => {
+  it('keeps the conflict unresolved and reports the error when resolving fails', async () => {
+    mockResolveConflict.mockResolvedValue({ error: 'git add failed' })
+    const { onComplete } = renderResolver(1)
+    fireEvent.click(screen.getByText(/Keep mine/))
+    fireEvent.click(screen.getByText(/Confirm/))
+    await waitFor(() => expect(mockNotify).toHaveBeenCalled())
+    expect(mockNotify).toHaveBeenCalledWith({
+      type: 'error',
+      title: 'Could not resolve conflict',
+      key: 'conflictResolveFailed',
+      message: 'git add failed',
+    })
+    expect(activeBlock().isResolved).toBe(false)
+    expect(onComplete).not.toHaveBeenCalled()
+  })
+
+  it('selects with M and T and confirms with Enter', async () => {
+    renderResolver(2)
+    fireEvent.keyDown(window, { key: 'm' })
+    fireEvent.keyDown(window, { key: 't' })
+    fireEvent.keyDown(window, { key: 'Enter' })
+    await waitFor(() => expect(mockResolveConflict).toHaveBeenCalledOnce())
+    expect(mockResolveConflict.mock.calls[0][0]).toMatchObject({
+      resolvedText: 'const x = 100',
+      strategy: 'theirs',
+    })
+  })
+})
+
+describe('ConflictResolver — navigates between conflicts with the arrow keys', () => {
+  it('navigates between conflicts with the arrow keys', () => {
+    renderResolver(2)
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    expect(useMergeFlowStore.getState().activeBlockIndex).toBe(1)
+    fireEvent.keyDown(window, { key: 'ArrowLeft' })
+    expect(useMergeFlowStore.getState().activeBlockIndex).toBe(0)
+  })
+
+  it('clears a pending choice when moving to another conflict', () => {
+    renderResolver(2)
+    fireEvent.click(screen.getByText(/Keep mine/))
+    expect(screen.getByText(/Confirm/)).toBeTruthy()
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    expect(screen.queryByText(/Confirm/)).toBeNull()
+  })
+})
+
+describe('ConflictResolver — resolves with the edited text and strategy manual from the editor', () => {
+  it('resolves with the edited text and strategy manual from the editor', async () => {
+    const { container } = renderResolver(1)
+    fireEvent.click(screen.getByText(/Edit manually/))
+    const content = container.querySelector('.cm-content') as HTMLElement
+    const view = EditorView.findFromDOM(content.parentElement!.parentElement as HTMLElement)!
+    act(() => {
+      view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: 'const x = 42' } })
+    })
+    fireEvent.click(screen.getByRole('button', { name: /Save/ }))
+    await waitFor(() => expect(mockResolveConflict).toHaveBeenCalledOnce())
+    expect(mockResolveConflict.mock.calls[0][0]).toMatchObject({
+      resolvedText: 'const x = 42',
+      strategy: 'manual',
+    })
+  })
+
+  it('pushes the other side into the open editor on Keep theirs, without resolving', () => {
+    const { container } = renderResolver(1)
+    fireEvent.click(screen.getByText(/Edit manually/))
+    fireEvent.click(screen.getByText(/Keep theirs/))
+    const content = container.querySelector('.cm-content') as HTMLElement
+    const view = EditorView.findFromDOM(content.parentElement!.parentElement as HTMLElement)!
+    expect(view.state.doc.toString()).toBe('const x = 100')
+    expect(mockResolveConflict).not.toHaveBeenCalled()
+  })
+})
+
+describe('ConflictResolver — undoes the last decision and tells the main process', () => {
+  it('undoes the last decision and tells the main process', async () => {
+    renderResolver(2)
+    fireEvent.click(screen.getByText(/Keep mine/))
+    fireEvent.click(screen.getByText(/Confirm/))
+    await waitFor(() => expect(useMergeFlowStore.getState().activeBlockIndex).toBe(1))
+    fireEvent.click(screen.getByText(/Undo/))
+    await waitFor(() => expect(mockUndoResolve).toHaveBeenCalledOnce())
+    expect(mockUndoResolve).toHaveBeenCalledWith({
+      repoRoot: '/repo',
+      blockId: 'src/foo.ts#0',
+      resolvedText: 'const x = 0',
+      originalConflictText: conflictBlock(0).originalConflictText,
+    })
+    expect(useMergeFlowStore.getState().session!.files[0].blocks[0].isResolved).toBe(false)
+    expect(useMergeFlowStore.getState().activeBlockIndex).toBe(0)
+  })
+
+  it('resolves through Keep both in the order chosen in the modal', async () => {
+    renderResolver(2)
+    fireEvent.click(screen.getByText(/Keep both/))
+    fireEvent.click(screen.getByText(/Use this order/))
+    await waitFor(() => expect(mockResolveConflict).toHaveBeenCalledOnce())
+    expect(mockResolveConflict.mock.calls[0][0].strategy).toBe('both-ours-first')
+    expect(mockResolveConflict.mock.calls[0][0].resolvedText).toContain('const x = 0')
+    expect(mockResolveConflict.mock.calls[0][0].resolvedText).toContain('const x = 100')
+  })
 })
 
 describe('ConflictPanel', () => {
@@ -140,7 +255,9 @@ describe('ConflictPanel', () => {
     expect(container.textContent).toContain('const x = 1')
     expect(container.textContent).toContain('const x = 2')
   })
+})
 
+describe('ConflictPanel — shows Your version and Incoming changes labels for non-rebase', () => {
   it('shows Your version and Incoming changes labels for non-rebase', () => {
     render(
       <ConflictPanel
@@ -154,7 +271,9 @@ describe('ConflictPanel', () => {
     expect(screen.getByText('Your version')).toBeTruthy()
     expect(screen.getByText('Incoming changes')).toBeTruthy()
   })
+})
 
+describe('ConflictPanel — inverts labels for rebase', () => {
   it('inverts labels for rebase', () => {
     render(
       <ConflictPanel
@@ -169,7 +288,9 @@ describe('ConflictPanel', () => {
     // rebase theirs label shows "Your version"
     expect(screen.getAllByText('Your version').length).toBeGreaterThan(0)
   })
+})
 
+describe('ConflictPanel — marks ours side selected when pendingStrategy is ours', () => {
   it('marks ours side selected when pendingStrategy is ours', () => {
     const { container } = render(
       <ConflictPanel
@@ -183,7 +304,9 @@ describe('ConflictPanel', () => {
     const selected = container.querySelector('.conflict-panel__side--selected')
     expect(selected).toBeTruthy()
   })
+})
 
+describe('ConflictPanel — calls onSelectMine when ours side clicked', () => {
   it('calls onSelectMine when ours side clicked', () => {
     const onSelectMine = vi.fn()
     render(
@@ -230,7 +353,9 @@ describe('ActionBar', () => {
     expect(screen.getByText(/Keep both/i)).toBeTruthy()
     expect(screen.getByText(/Edit/i)).toBeTruthy()
   })
+})
 
+describe('ActionBar — shows Confirm button when pendingResolution is set', () => {
   it('shows Confirm button when pendingResolution is set', () => {
     render(
       <ActionBar
@@ -244,7 +369,9 @@ describe('ActionBar', () => {
     )
     expect(screen.getByText(/Confirm/i)).toBeTruthy()
   })
+})
 
+describe('ActionBar — hides Confirm when no pendingResolution', () => {
   it('hides Confirm when no pendingResolution', () => {
     render(
       <ActionBar
@@ -258,7 +385,9 @@ describe('ActionBar', () => {
     )
     expect(screen.queryByText(/Confirm/i)).toBeNull()
   })
+})
 
+describe('ActionBar — calls onKeepMine when button clicked', () => {
   it('calls onKeepMine when button clicked', () => {
     const onKeepMine = vi.fn()
     render(
@@ -273,125 +402,5 @@ describe('ActionBar', () => {
     )
     fireEvent.click(screen.getByText(/Keep mine/i))
     expect(onKeepMine).toHaveBeenCalledOnce()
-  })
-})
-
-describe('KeepBothModal', () => {
-  it('renders preview of both sides', () => {
-    const { container } = render(
-      <KeepBothModal block={baseBlock} onConfirm={vi.fn()} onCancel={vi.fn()} />
-    )
-    expect(container.textContent).toContain('const x = 1')
-    expect(container.textContent).toContain('const x = 2')
-  })
-
-  it('calls onConfirm with merged text when confirmed', () => {
-    const onConfirm = vi.fn()
-    render(<KeepBothModal block={baseBlock} onConfirm={onConfirm} onCancel={vi.fn()} />)
-    fireEvent.click(screen.getByText(/Use this order/i))
-    expect(onConfirm).toHaveBeenCalledWith(
-      expect.stringContaining('const x = 1'),
-      'both-ours-first'
-    )
-  })
-
-  it('calls onCancel when cancelled', () => {
-    const onCancel = vi.fn()
-    render(<KeepBothModal block={baseBlock} onConfirm={vi.fn()} onCancel={onCancel} />)
-    fireEvent.click(screen.getByText(/Cancel/i))
-    expect(onCancel).toHaveBeenCalledOnce()
-  })
-})
-
-describe('ManualEditor', () => {
-  it('renders textarea with initial text', () => {
-    render(<ManualEditor block={baseBlock} onSave={vi.fn()} onCancel={vi.fn()} />)
-    const textarea = screen.getByRole('textbox') as HTMLTextAreaElement
-    // equal-length ours/theirs → theirs wins per heuristic
-    expect(textarea.value).toContain('const x = 2')
-  })
-
-  it('calls onSave with edited text', () => {
-    const onSave = vi.fn()
-    render(<ManualEditor block={baseBlock} onSave={onSave} onCancel={vi.fn()} />)
-    const textarea = screen.getByRole('textbox')
-    fireEvent.change(textarea, { target: { value: 'const x = 42' } })
-    fireEvent.click(screen.getByRole('button', { name: /Save/i }))
-    expect(onSave).toHaveBeenCalledWith('const x = 42')
-  })
-
-  it('calls onCancel when cancelled', () => {
-    const onCancel = vi.fn()
-    render(<ManualEditor block={baseBlock} onSave={vi.fn()} onCancel={onCancel} />)
-    fireEvent.click(screen.getByText(/Cancel/i))
-    expect(onCancel).toHaveBeenCalledOnce()
-  })
-})
-
-describe('ConflictHeader', () => {
-  it('renders breadcrumb with filename and progress', () => {
-    const { container } = render(
-      <ConflictHeader
-        onBack={vi.fn()}
-        onUndo={vi.fn()}
-        canUndo={false}
-        onPrev={vi.fn()}
-        onNext={vi.fn()}
-        canPrev={false}
-        canNext={false}
-      />
-    )
-    expect(container.textContent).toContain('foo.ts')
-    expect(screen.getByText(/Conflict 1 of 1/)).toBeTruthy()
-  })
-
-  it('calls onBack when back button clicked', () => {
-    const onBack = vi.fn()
-    render(
-      <ConflictHeader
-        onBack={onBack}
-        onUndo={vi.fn()}
-        canUndo={false}
-        onPrev={vi.fn()}
-        onNext={vi.fn()}
-        canPrev={false}
-        canNext={false}
-      />
-    )
-    fireEvent.click(screen.getByText(/Files/i))
-    expect(onBack).toHaveBeenCalledOnce()
-  })
-
-  it('calls onUndo when undo button clicked', () => {
-    const onUndo = vi.fn()
-    render(
-      <ConflictHeader
-        onBack={vi.fn()}
-        onUndo={onUndo}
-        canUndo={true}
-        onPrev={vi.fn()}
-        onNext={vi.fn()}
-        canPrev={false}
-        canNext={false}
-      />
-    )
-    fireEvent.click(screen.getByText(/Undo/i))
-    expect(onUndo).toHaveBeenCalledOnce()
-  })
-
-  it('renders progress dots for each block', () => {
-    const { container } = render(
-      <ConflictHeader
-        onBack={vi.fn()}
-        onUndo={vi.fn()}
-        canUndo={false}
-        onPrev={vi.fn()}
-        onNext={vi.fn()}
-        canPrev={false}
-        canNext={false}
-      />
-    )
-    const dots = container.querySelectorAll('.conflict-header__dot')
-    expect(dots.length).toBe(1) // 1 block in base session
   })
 })

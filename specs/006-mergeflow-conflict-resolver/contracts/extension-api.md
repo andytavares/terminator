@@ -1,5 +1,11 @@
 # Contract: MergeFlow Extension API Surface
 
+> **Superseded. Kept as history.** This contract records what was decided when the feature was
+> specified, and is not edited. The code no longer has `getConflictBlocks`, `requestAiSuggestion` and the AI suggestion panel state. Do not build against it. The
+> current contract lives in:
+>
+> - `extensions/git-integration/src/api/merge-flow.ts` and `extensions/git-integration/src/stores/merge-flow.store.ts`
+
 **Version**: 1.0.0  
 **Date**: 2026-05-25  
 **Branch**: `006-mergeflow-conflict-resolver`

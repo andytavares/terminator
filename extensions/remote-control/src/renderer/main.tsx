@@ -1,8 +1,7 @@
 import React from 'react'
-import { createRoot } from 'react-dom/client'
-import './styles.css'
+import { mountExtension } from '@terminator/extension-sdk/renderer'
+import '@terminator/extension-ui/fonts'
+import '@terminator/extension-ui/settings-fields.css'
 import { App } from './App'
 
-const el = document.getElementById('app')
-if (!el) throw new Error('No #app element')
-createRoot(el).render(<App />)
+mountExtension(<App />)

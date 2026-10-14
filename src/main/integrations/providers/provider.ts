@@ -5,6 +5,13 @@ import type {
   TrackerAccount,
   TrackerId,
 } from '../../../shared/types/index.js'
+import type {
+  NewIssueInput,
+  TrackerStateOption,
+  TrackerTeam,
+  TransitionIntent,
+} from '@terminator/extension-sdk'
+export type { NewIssueInput, TrackerStateOption, TrackerTeam, TransitionIntent }
 
 // One interface, two implementations.
 //
@@ -105,81 +112,4 @@ export interface TrackerProvider {
    * workflow pair: callers ask `IssueService.supportsCreate` first.
    */
   create?(cred: StoredCredential, input: NewIssueInput): Promise<Issue>
-}
-
-/**
- * The complete set of operations a provider may expose.
- *
- * Exported so the contract can be asserted in a test rather than merely
- * described in a comment. FR-034 and SC-014 say no field of an issue is ever
- * modified; 037's FR-059 carved out exactly one exception, the issue's own
- * workflow position. "We didn't write that method" is not something anything
- * checks, so provider.spec.ts checks it.
- */
-export const PROVIDER_OPERATIONS = [
-  'verify',
-  'listMine',
-  'search',
-  'get',
-  'comment',
-  'states',
-  'transition',
-  'teams',
-  'create',
-] as const
-
-/**
- * The operations permitted to write to a tracker.
- *
- * Three. `transition` is narrow by construction: it moves an issue along its
- * own workflow and can do nothing else. `create` files a new issue the
- * operator asked for (ADR-061); neither can set a field of an existing one.
- */
-export const PROVIDER_WRITE_OPERATIONS = ['comment', 'transition', 'create'] as const
-
-/**
- * The optional half of the surface.
- *
- * A provider is complete without these; `PROVIDER_OPERATIONS` is what a
- * provider *may* expose, not what it must.
- */
-export const PROVIDER_OPTIONAL_OPERATIONS = ['states', 'transition', 'teams', 'create'] as const
-
-/**
- * The workflow positions an issue can be asked to move to.
- *
- * An intent rather than a state identifier because "in review" is not a fact
- * about a tracker — it is a decision about which of their states means that.
- * A `setState(stateId)` signature pushes that resolution onto every caller,
- * so every caller re-implements it.
- */
-export type TransitionIntent = 'started' | 'in_review' | 'done'
-
-/** Every intent, for a caller that needs to offer the operator all of them. */
-export const TRANSITION_INTENTS: readonly TransitionIntent[] = ['started', 'in_review', 'done']
-
-/** One position an issue could be moved to, as this tracker describes it. */
-export interface TrackerStateOption {
-  /** Provider-native identifier: a Linear state id, or a Jira transition id. */
-  readonly id: string
-  readonly name: string
-  /** Which intent this option satisfies, as the provider understands it. */
-  readonly intent: TransitionIntent | null
-  /** False when the tracker will not accept it from the issue's current status. */
-  readonly available: boolean
-}
-
-/** A team an issue can be filed in. */
-export interface TrackerTeam {
-  readonly id: string
-  /** The prefix of the team's issue keys, e.g. `TAV`. */
-  readonly key: string
-  readonly name: string
-}
-
-/** What `create` files. The description is markdown. */
-export interface NewIssueInput {
-  readonly teamId: string
-  readonly title: string
-  readonly description: string
 }

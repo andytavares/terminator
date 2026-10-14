@@ -17,6 +17,7 @@ function q(over: Partial<OpenQuestion> = {}): OpenQuestion {
     recommended: 0,
     answer: null,
     rank: 1,
+    confidence: null,
     ...over,
   }
 }

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import * as path from 'node:path'
+import { makeTempDir } from '../../support/temp-dir'
 
 let userData: string
 
@@ -31,7 +31,7 @@ function credsPath(): string {
 }
 
 beforeEach(() => {
-  userData = fs.mkdtempSync(path.join(os.tmpdir(), 'tracker-store-'))
+  userData = makeTempDir('tracker-store-')
   keychain.available = true
 })
 
@@ -60,7 +60,9 @@ describe('tracker-store — round trip', () => {
     const store = await load()
     await expect(store.getCredential('linear')).resolves.toBeNull()
   })
+})
 
+describe('tracker-store — reload', () => {
   it('survives a reload — the file is the source of truth', async () => {
     const first = await load()
     await first.setCredential({ tracker: 'linear', apiKey: 'lin_key' })
@@ -100,7 +102,7 @@ describe('tracker-store — secrets at rest', () => {
 describe('tracker-store — connection view', () => {
   it('reports a connection without ever exposing the secret', async () => {
     const store = await load()
-    await store.setCredential({ tracker: 'linear', apiKey: 'k' })
+    await store.setCredential({ tracker: 'linear', apiKey: 'lin-secret' })
     await store.setAccount('linear', { name: 'Andrew', email: 'a@b.c' })
 
     const [linear] = (await store.listConnections()).filter((c) => c.tracker === 'linear')
@@ -109,7 +111,7 @@ describe('tracker-store — connection view', () => {
       connected: true,
       account: { name: 'Andrew', email: 'a@b.c' },
     })
-    expect(JSON.stringify(linear)).not.toContain('"k"')
+    expect(JSON.stringify(linear)).not.toContain('lin-secret')
   })
 
   it('reports every tracker, connected or not', async () => {
@@ -118,7 +120,9 @@ describe('tracker-store — connection view', () => {
     expect(connections.map((c) => c.tracker).sort()).toEqual(['jira', 'linear'])
     expect(connections.every((c) => c.connected === false)).toBe(true)
   })
+})
 
+describe('tracker-store — mine selector', () => {
   it('defaults the mine selector per tracker', async () => {
     const store = await load()
     const connections = await store.listConnections()
@@ -133,6 +137,30 @@ describe('tracker-store — connection view', () => {
     await store.setMine('linear', { kind: 'assignee', email: 'me@x.c' })
     const linear = (await store.listConnections()).find((c) => c.tracker === 'linear')
     expect(linear?.mine).toEqual({ kind: 'assignee', email: 'me@x.c' })
+  })
+})
+
+describe('tracker-store — concurrent writes', () => {
+  // Two trackers answered at once (listMine across both) record their states
+  // at once; each write must keep the other's.
+  it('keeps both of two errors recorded at the same time', async () => {
+    const store = await load()
+    await Promise.all([
+      store.setLastError('linear', 'auth-failed'),
+      store.setLastError('jira', 'unavailable'),
+    ])
+    const errors = (await store.listConnections()).map((c) => [c.tracker, c.lastError])
+    expect(errors).toEqual([
+      ['linear', 'auth-failed'],
+      ['jira', 'unavailable'],
+    ])
+  })
+
+  it('answers a read after the writes already asked for', async () => {
+    const store = await load()
+    void store.setLastError('linear', 'auth-failed')
+    const linear = (await store.listConnections()).find((c) => c.tracker === 'linear')
+    expect(linear?.lastError).toBe('auth-failed')
   })
 })
 
@@ -171,20 +199,20 @@ describe('tracker-store — resilience', () => {
   })
 })
 
+function writeLegacy(contents: Record<string, unknown>): void {
+  fs.writeFileSync(
+    path.join(userData, 'speckit-pilot-creds.json'),
+    JSON.stringify(contents),
+    'utf8'
+  )
+}
+
+/** The extension encrypted with safeStorage and base64'd the result. */
+function legacyEncrypt(value: string): string {
+  return Buffer.from(`enc:${value}`, 'utf8').toString('base64')
+}
+
 describe('tracker-store — migration from the extension (FR-004)', () => {
-  function writeLegacy(contents: Record<string, unknown>): void {
-    fs.writeFileSync(
-      path.join(userData, 'speckit-pilot-creds.json'),
-      JSON.stringify(contents),
-      'utf8'
-    )
-  }
-
-  /** The extension encrypted with safeStorage and base64'd the result. */
-  function legacyEncrypt(value: string): string {
-    return Buffer.from(`enc:${value}`, 'utf8').toString('base64')
-  }
-
   it('adopts a Linear key and its email', async () => {
     writeLegacy({ linearKey: legacyEncrypt('legacy-linear'), linearEmail: 'me@x.c' })
     const store = await load()
@@ -197,7 +225,9 @@ describe('tracker-store — migration from the extension (FR-004)', () => {
     const linear = (await store.listConnections()).find((c) => c.tracker === 'linear')
     expect(linear?.mine).toEqual({ kind: 'assignee', email: 'me@x.c' })
   })
+})
 
+describe('tracker-store — migrating Jira', () => {
   it('adopts Jira credentials and its JQL', async () => {
     writeLegacy({
       jiraCreds: {
@@ -219,7 +249,9 @@ describe('tracker-store — migration from the extension (FR-004)', () => {
     const jira = (await store.listConnections()).find((c) => c.tracker === 'jira')
     expect(jira?.mine).toEqual({ kind: 'query', jql: 'assignee = currentUser()' })
   })
+})
 
+describe('tracker-store — migration runs once', () => {
   it('renames the legacy file so the migration runs once', async () => {
     writeLegacy({ linearKey: legacyEncrypt('legacy-linear') })
     const store = await load()
@@ -252,5 +284,25 @@ describe('tracker-store — migration from the extension (FR-004)', () => {
     fs.writeFileSync(path.join(userData, 'speckit-pilot-creds.json'), '{{{', 'utf8')
     const store = await load()
     await expect(store.migrateLegacyCredentials()).resolves.toBeUndefined()
+  })
+})
+
+describe('tracker-store — concurrent changes', () => {
+  it('keeps both of two changes made at once, as editing one tracker and disconnecting the other does', async () => {
+    const store = await load()
+    await store.setCredential({ tracker: 'linear', apiKey: 'lin_key' })
+    await store.setCredential({ tracker: 'jira', site: 's', email: 'a@b.c', apiToken: 'tok' })
+
+    // Blurring the Linear field and clicking Jira's Disconnect send both together.
+    await Promise.all([
+      store.setMine('linear', { kind: 'assignee', email: 'grace@acme.dev' }),
+      store.clearCredential('jira'),
+    ])
+
+    await expect(store.getMine('linear')).resolves.toEqual({
+      kind: 'assignee',
+      email: 'grace@acme.dev',
+    })
+    await expect(store.getCredential('jira')).resolves.toBeNull()
   })
 })

@@ -1,5 +1,6 @@
 import React from 'react'
 import { X } from 'lucide-react'
+import { IconButton, Tab, TabList, TabPanel, TabsRoot } from '@terminator/extension-ui'
 import type { RiskScore } from '../../schemas/pr-review.schema'
 import { RiskBreakdownPanel } from './RiskBreakdownPanel'
 import { HealthChips } from './HealthChips'
@@ -25,70 +26,69 @@ export interface ReviewInspectorProps {
   } | null
 }
 
-export function ReviewInspector({
-  tab,
-  onTabChange,
-  onClose,
-  agentAvailable,
-  agentFindingCount,
-  agent,
-  file,
-}: ReviewInspectorProps) {
-  const fileAvailable = file != null
-  const activeTab: InspectorTab = tab === 'agent' && !agentAvailable ? 'file' : tab
-  const resolvedTab: InspectorTab = activeTab === 'file' && !fileAvailable ? 'agent' : activeTab
+type InspectorFile = NonNullable<ReviewInspectorProps['file']>
 
+/** The tab to show: the asked-for one unless it has nothing to show. */
+function resolveTab(props: ReviewInspectorProps): InspectorTab {
+  if (props.tab === 'agent' && props.agentAvailable) return 'agent'
+  if (props.file != null) return 'file'
+  return 'agent'
+}
+
+function agentTabName(count: number): string | undefined {
+  if (count > 0) return `Agent, ${count}`
+  return undefined
+}
+
+function InspectorTabs({ inspector: props }: { inspector: ReviewInspectorProps }) {
+  const count = props.agentFindingCount
   return (
-    <div className="ri-root">
-      <div className="ri-header">
-        <div className="ri-tablist" role="tablist" aria-label="Inspector">
-          {agentAvailable && (
-            <button
-              type="button"
-              role="tab"
-              aria-selected={resolvedTab === 'agent'}
-              className={`ri-tab${resolvedTab === 'agent' ? ' ri-tab--active' : ''}`}
-              onClick={() => onTabChange('agent')}
-            >
-              Agent
-              {agentFindingCount > 0 && <span className="ri-tab-badge">{agentFindingCount}</span>}
-            </button>
-          )}
-          {fileAvailable && (
-            <button
-              type="button"
-              role="tab"
-              aria-selected={resolvedTab === 'file'}
-              className={`ri-tab${resolvedTab === 'file' ? ' ri-tab--active' : ''}`}
-              onClick={() => onTabChange('file')}
-            >
-              File
-            </button>
-          )}
-        </div>
-        <button type="button" className="ri-close" aria-label="Close inspector" onClick={onClose}>
-          <X className="tm-icon-sm" />
-        </button>
-      </div>
-      <div className="ri-panel" role="tabpanel">
-        {resolvedTab === 'agent' && agentAvailable && agent}
-        {resolvedTab === 'file' && file && (
-          <>
-            <RiskBreakdownPanel
-              filePath={file.path}
-              riskScore={file.riskScore}
-              repoRoot={file.repoRoot}
-            />
-            <HealthChips
-              riskScore={file.riskScore}
-              ciStatus={file.ciStatus}
-              lintStatus={file.lintStatus}
-              coverageStatus={file.coverageStatus}
-              dryViolationCount={file.dryViolationCount}
-            />
-          </>
+    <div className="ri-header">
+      <TabList label="Inspector" className="ri-tablist">
+        {props.agentAvailable && (
+          <Tab id="agent" accessibleName={agentTabName(count)}>
+            Agent
+            {count > 0 && <span className="ri-tab-badge">{count}</span>}
+          </Tab>
         )}
-      </div>
+        {props.file != null && <Tab id="file">File</Tab>}
+      </TabList>
+      <IconButton icon={X} size="sm" label="Close inspector" onClick={props.onClose} />
     </div>
+  )
+}
+
+function FilePanel({ file }: { file: InspectorFile }) {
+  return (
+    <TabPanel id="file" className="ri-panel">
+      <RiskBreakdownPanel
+        filePath={file.path}
+        riskScore={file.riskScore}
+        repoRoot={file.repoRoot}
+      />
+      <HealthChips
+        riskScore={file.riskScore}
+        ciStatus={file.ciStatus}
+        lintStatus={file.lintStatus}
+        coverageStatus={file.coverageStatus}
+        dryViolationCount={file.dryViolationCount}
+      />
+    </TabPanel>
+  )
+}
+
+export function ReviewInspector(props: ReviewInspectorProps) {
+  return (
+    <TabsRoot selectedId={resolveTab(props)} onSelect={props.onTabChange}>
+      <div className="ri-root">
+        <InspectorTabs inspector={props} />
+        {props.agentAvailable && (
+          <TabPanel id="agent" className="ri-panel">
+            {props.agent}
+          </TabPanel>
+        )}
+        {props.file && <FilePanel file={props.file} />}
+      </div>
+    </TabsRoot>
   )
 }

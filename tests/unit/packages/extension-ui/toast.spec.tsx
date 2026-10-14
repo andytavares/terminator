@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
+import { ModalShell } from '../../../../packages/extension-ui/src/ModalShell'
 import { Toast, ToastRegion } from '../../../../packages/extension-ui/src/Toast'
 
 beforeEach(() => vi.useFakeTimers())
@@ -36,7 +37,9 @@ describe('Toast', () => {
     act(() => void vi.advanceTimersByTime(60_000))
     expect(onDismiss).not.toHaveBeenCalled()
   })
+})
 
+describe('Toast — offers somewhere to go as a named button', () => {
   /**
    * The container this replaced made the whole toast a click target with
    * nothing on screen to say so — an affordance the reader cannot see is one
@@ -82,11 +85,47 @@ describe('ToastRegion', () => {
     expect(onDismiss).toHaveBeenCalledWith('b')
   })
 
-  it('sits above every other layer, modals included', () => {
+  it('sits above every other layer', () => {
     const { container } = render(
       <ToastRegion toasts={[{ id: 'a', message: 'Saved' }]} onDismiss={vi.fn()} />
     )
     const region = container.querySelector('.tmui-toast-region') as HTMLElement
     expect(Number(region.style.zIndex)).toBe(400)
+  })
+})
+
+function AppWithToast({ modals }: { modals: string[] }): JSX.Element {
+  return (
+    <>
+      {modals.map((label) => (
+        <ModalShell key={label} label={label} onDismiss={() => {}}>
+          <button>Done</button>
+        </ModalShell>
+      ))}
+      <ToastRegion toasts={[{ id: 'a', message: 'Saved' }]} onDismiss={() => {}} />
+    </>
+  )
+}
+
+// Everything outside an open modal dialog is inert and painted over, a toast included.
+describe('ToastRegion — while a modal shell is open', () => {
+  const holderOf = (toast: HTMLElement) => toast.closest('dialog')?.getAttribute('aria-label')
+
+  it('renders in the page when none is open', () => {
+    render(<AppWithToast modals={[]} />)
+    expect(screen.getByRole('status').closest('dialog')).toBeNull()
+  })
+
+  it('renders inside the shell opened last', () => {
+    render(<AppWithToast modals={['Settings', 'Reset']} />)
+    expect(holderOf(screen.getByRole('status'))).toBe('Reset')
+  })
+
+  it('moves to the shell beneath, then back to the page, as they close', () => {
+    const { rerender } = render(<AppWithToast modals={['Settings', 'Reset']} />)
+    rerender(<AppWithToast modals={['Settings']} />)
+    expect(holderOf(screen.getByRole('status'))).toBe('Settings')
+    rerender(<AppWithToast modals={[]} />)
+    expect(screen.getByRole('status').closest('dialog')).toBeNull()
   })
 })

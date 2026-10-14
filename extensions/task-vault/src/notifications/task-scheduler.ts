@@ -1,6 +1,6 @@
-import { BrowserWindow } from 'electron'
-import type { ExtensionAPI, ExtensionDB, Disposable } from '../../../../src/main/extensions/api.js'
+import type { ExtensionAPI, ExtensionDB, Disposable } from '@terminator/extension-sdk'
 import { openInVault } from '../navigation.js'
+import { today, zonedAt, zonedNow } from '../vault/clock'
 
 let _tick: (() => void) | null = null
 
@@ -12,32 +12,221 @@ export function triggerSchedulerTick(): void {
   _tick?.()
 }
 
-const UNIT_MS: Record<string, number> = {
-  min: 60_000,
-  hour: 3_600_000,
-  day: 86_400_000,
-  week: 7 * 86_400_000,
-  month: 30 * 86_400_000,
+const DURATION_UNIT = {
+  min: 'minutes',
+  hour: 'hours',
+  day: 'days',
+  week: 'weeks',
+  month: 'months',
+} as const
+
+/** The interval a check-in such as "2-day" names, or null when it is a custom date. */
+function parseInterval(value: string): Temporal.Duration | null {
+  const match = /^(\d+)-(min|hour|day|week|month)s?$/.exec(value)
+  if (!match) return null
+  const unit = DURATION_UNIT[match[2] as keyof typeof DURATION_UNIT]
+  return Temporal.Duration.from({ [unit]: parseInt(match[1]) })
 }
 
-function parseIntervalMs(value: string): number {
-  const m = value.match(/^(\d+)-(min|hour|day|week|month)s?$/)
-  if (!m) return Infinity
-  const unit = UNIT_MS[m[2]]
-  return unit !== undefined ? parseInt(m[1]) * unit : Infinity
-}
+let _broadcast: ((channel: string, data: unknown) => void) | null = null
 
-function getTargetTimestamp(value: string, blockedAt: number): number {
-  const intervalMs = parseIntervalMs(value)
-  if (intervalMs !== Infinity) return blockedAt + intervalMs
-  const ts = new Date(value).getTime()
-  return isNaN(ts) ? Infinity : ts
+/** Where `broadcast` sends: `api.window.broadcast`, bound by `activate`. */
+export function bindBroadcast(send: (channel: string, data: unknown) => void): void {
+  _broadcast = send
 }
 
 export function broadcast(channel: string, data: unknown): void {
-  BrowserWindow.getAllWindows().forEach((win) => {
-    if (!win.isDestroyed()) win.webContents.send(channel, data)
+  _broadcast?.(channel, data)
+}
+
+/** What the scheduler remembers between ticks. */
+interface SchedulerState {
+  notifiedDueIds: Set<string>
+  dueTaskNotifs: Map<string, Disposable>
+  lastNotifiedBlocked: Map<string, number>
+  blockedTaskNotifs: Map<string, Disposable>
+  lastDay: string
+  isStartup: boolean
+}
+
+/** One tick: the scheduler's inputs and the clock it reads once. */
+interface Tick {
+  api: ExtensionAPI
+  db: ExtensionDB
+  state: SchedulerState
+  now: Temporal.ZonedDateTime
+  today: string
+  wasStartup: boolean
+}
+
+type DueRow = {
+  id: string
+  text: string
+  due_date: string
+  source_ref: string | null
+  project_id: string | null
+  context: string | null
+  area_id: string | null
+  recurrence_notify_at: string | null
+  metadata: string
+}
+
+type BlockedRow = {
+  id: string
+  text: string
+  updated_at: string
+  metadata: string
+  source_ref: string | null
+}
+
+/** Minutes after midnight of an "HH:MM" time; missing parts default to 9:00. */
+function minutesOf(time: string): number {
+  const [h = '9', m = '0'] = time.split(':')
+  return parseInt(h) * 60 + parseInt(m)
+}
+
+/** A new day forgets which tasks were already announced as due. */
+function rollDay(state: SchedulerState, today: string): void {
+  if (today === state.lastDay) return
+  state.notifiedDueIds.clear()
+  state.lastDay = today
+}
+
+/** Dismisses tracked notifications whose task now matches `condition`; returns their ids. */
+async function dismissResolved(
+  db: ExtensionDB,
+  notifs: Map<string, Disposable>,
+  condition: string
+): Promise<string[]> {
+  if (notifs.size === 0) return []
+  const trackedIds = Array.from(notifs.keys())
+  const placeholders = trackedIds.map(() => '?').join(',')
+  const resolved = await db.query<{ id: string }>(
+    `SELECT id FROM tasks WHERE id IN (${placeholders}) AND ${condition}`,
+    trackedIds
+  )
+  for (const row of resolved) {
+    notifs.get(row.id)?.dispose()
+    notifs.delete(row.id)
+  }
+  return resolved.map((row) => row.id)
+}
+
+async function dismissFinished(tick: Tick): Promise<void> {
+  const { db, state } = tick
+  const finished = await dismissResolved(
+    db,
+    state.dueTaskNotifs,
+    `status IN ('done','cancelled','migrated')`
+  )
+  for (const id of finished) state.notifiedDueIds.delete(id)
+  await dismissResolved(db, state.blockedTaskNotifs, `status != 'blocked'`)
+}
+
+/** Whether a due task should be announced now: overdue, at startup, or past its alert time. */
+function dueAlertReached(tick: Tick, task: DueRow): boolean {
+  if (tick.wasStartup || task.due_date < tick.today) return true
+  const globalAlertTime =
+    tick.api.settings.get<string>('terminator.task-vault.dueDateAlertTime') ?? '09:00'
+  const alertMinutes = minutesOf(task.recurrence_notify_at ?? globalAlertTime)
+  const currentMinutes = tick.now.hour * 60 + tick.now.minute
+  return currentMinutes >= alertMinutes
+}
+
+function announceDue(tick: Tick, task: DueRow): void {
+  const { api, state } = tick
+  const isOverdue = task.due_date < tick.today
+  const taskId = task.id
+  const date = task.source_ref ?? undefined
+  state.notifiedDueIds.add(taskId)
+  const notif = api.notifications.createNotification({
+    type: isOverdue ? 'error' : 'warning',
+    title: isOverdue ? `Overdue: ${task.text}` : `Due today: ${task.text}`,
+    key: 'dueTaskReminder',
+    // Was an "Open Vault" button, which is the wrong shape: opening the
+    // task is what clicking the notification should do, not a choice
+    // beside it. The row is the link now.
+    onClick: () => openInVault(api, { taskId, date }),
   })
+  state.dueTaskNotifs.set(taskId, notif)
+}
+
+async function notifyDueTasks(tick: Tick): Promise<void> {
+  const dueTasks = await tick.db.query<DueRow>(
+    `SELECT id, text, due_date, source_ref, project_id, context, area_id,
+                recurrence_notify_at, metadata FROM tasks
+         WHERE status='open' AND due_date IS NOT NULL AND due_date <= ? AND parent_id IS NULL`,
+    [tick.today]
+  )
+  for (const task of dueTasks) {
+    if (tick.state.notifiedDueIds.has(task.id)) continue
+    if (dueAlertReached(tick, task)) announceDue(tick, task)
+  }
+}
+
+function parseMeta(metadata: string): Record<string, string> | null {
+  try {
+    return JSON.parse(metadata) as Record<string, string>
+  } catch {
+    return null
+  }
+}
+
+/** A blocked task is due a check-in a full interval after it was blocked or last checked in, or
+ *  once, when its custom date has passed. Days, weeks and months are the calendar's: a day later
+ *  is the same time tomorrow, whatever the clocks did. */
+function checkInDue(tick: Tick, task: BlockedRow, interval: string): boolean {
+  // Date.parse reads what an import or an older version stored; not a date is never due.
+  const blockedAt = Date.parse(task.updated_at)
+  if (Number.isNaN(blockedAt)) return false
+  const lastNotified = tick.state.lastNotifiedBlocked.get(task.id) ?? blockedAt
+  const every = parseInterval(interval)
+  if (every) return Temporal.ZonedDateTime.compare(tick.now, zonedAt(lastNotified).add(every)) >= 0
+  const customDate = Date.parse(interval)
+  return customDate <= tick.now.epochMilliseconds && lastNotified < customDate
+}
+
+function announceCheckIn(tick: Tick, task: BlockedRow, reason: string | undefined): void {
+  const { api, state } = tick
+  const taskId = task.id
+  const date = task.source_ref ?? undefined
+  state.lastNotifiedBlocked.set(taskId, tick.now.epochMilliseconds)
+  state.blockedTaskNotifs.get(taskId)?.dispose()
+  const notif = api.notifications.createNotification({
+    type: 'info',
+    title: `Check in: ${task.text}`,
+    message: reason,
+    key: 'blockedTaskCheckin',
+    onClick: () => openInVault(api, { taskId, date }),
+  })
+  state.blockedTaskNotifs.set(taskId, notif)
+}
+
+async function notifyBlockedTasks(tick: Tick): Promise<void> {
+  const blockedTasks = await tick.db.query<BlockedRow>(
+    `SELECT id, text, updated_at, metadata, source_ref FROM tasks
+         WHERE status='blocked' AND metadata IS NOT NULL AND parent_id IS NULL`
+  )
+  for (const task of blockedTasks) {
+    const meta = parseMeta(task.metadata)
+    const interval = meta?.blocked_check_interval
+    if (!meta || !interval || !checkInDue(tick, task, interval)) continue
+    announceCheckIn(tick, task, meta.blocked_reason ?? undefined)
+  }
+}
+
+async function runTick(api: ExtensionAPI, db: ExtensionDB, state: SchedulerState): Promise<void> {
+  const wasStartup = state.isStartup
+  try {
+    const now = zonedNow()
+    const tick = { api, db, state, now, today: now.toPlainDate().toString(), wasStartup }
+    rollDay(state, tick.today)
+    await dismissFinished(tick)
+    await notifyDueTasks(tick)
+    await notifyBlockedTasks(tick)
+  } catch {
+    // ignore errors during tick
+  }
 }
 
 export function startTaskScheduler(
@@ -49,178 +238,20 @@ export function startTaskScheduler(
   tickAsync: () => Promise<void>
   startupPromise: Promise<void>
 } {
-  const notifiedDueIds = new Set<string>()
-  const dueTaskNotifs = new Map<string, Disposable>()
-  const lastNotifiedBlocked = new Map<string, number>()
-  const blockedTaskNotifs = new Map<string, Disposable>()
-  let lastDay = new Date().toDateString()
-  let isStartup = true
-
-  async function tickAsync(): Promise<void> {
-    const wasStartup = isStartup
-    try {
-      const now = Date.now()
-      const nowDate = new Date()
-      const pad = (n: number): string => String(n).padStart(2, '0')
-      const today = `${nowDate.getFullYear()}-${pad(nowDate.getMonth() + 1)}-${pad(nowDate.getDate())}`
-
-      const currentDay = new Date().toDateString()
-      if (currentDay !== lastDay) {
-        notifiedDueIds.clear()
-        lastDay = currentDay
-      }
-
-      if (dueTaskNotifs.size > 0) {
-        const trackedIds = Array.from(dueTaskNotifs.keys())
-        const placeholders = trackedIds.map(() => '?').join(',')
-        type StatusRow = { id: string }
-        const resolved = await db.query<StatusRow>(
-          `SELECT id FROM tasks WHERE id IN (${placeholders}) AND status IN ('done','cancelled','migrated')`,
-          trackedIds
-        )
-        for (const row of resolved) {
-          dueTaskNotifs.get(row.id)?.dispose()
-          dueTaskNotifs.delete(row.id)
-          notifiedDueIds.delete(row.id)
-        }
-      }
-
-      if (blockedTaskNotifs.size > 0) {
-        const trackedIds = Array.from(blockedTaskNotifs.keys())
-        const placeholders = trackedIds.map(() => '?').join(',')
-        type StatusRow = { id: string }
-        const resolved = await db.query<StatusRow>(
-          `SELECT id FROM tasks WHERE id IN (${placeholders}) AND status != 'blocked'`,
-          trackedIds
-        )
-        for (const row of resolved) {
-          blockedTaskNotifs.get(row.id)?.dispose()
-          blockedTaskNotifs.delete(row.id)
-        }
-      }
-
-      const globalAlertTimeSetting =
-        api.settings.get<string>('terminator.task-vault.dueDateAlertTime') ?? '09:00'
-      const [globalAlertHourStr = '9', globalAlertMinStr = '0'] = globalAlertTimeSetting.split(':')
-      const globalAlertTotalMinutes =
-        parseInt(globalAlertHourStr) * 60 + parseInt(globalAlertMinStr)
-      const currentTotalMinutes = nowDate.getHours() * 60 + nowDate.getMinutes()
-
-      type DueRow = {
-        id: string
-        text: string
-        due_date: string
-        source_ref: string | null
-        project_id: string | null
-        context: string | null
-        area_id: string | null
-        recurrence_notify_at: string | null
-        metadata: string
-      }
-      const dueTasks = await db.query<DueRow>(
-        `SELECT id, text, due_date, source_ref, project_id, context, area_id,
-                recurrence_notify_at, metadata FROM tasks
-         WHERE status='open' AND due_date IS NOT NULL AND due_date <= ? AND parent_id IS NULL`,
-        [today]
-      )
-
-      for (const task of dueTasks) {
-        if (notifiedDueIds.has(task.id)) continue
-
-        const isOverdue = task.due_date < today
-
-        let taskAlertMinutes = globalAlertTotalMinutes
-        if (task.recurrence_notify_at) {
-          const [h = '9', m = '0'] = task.recurrence_notify_at.split(':')
-          taskAlertMinutes = parseInt(h) * 60 + parseInt(m)
-        }
-
-        if (!wasStartup && !isOverdue && currentTotalMinutes < taskAlertMinutes) continue
-
-        notifiedDueIds.add(task.id)
-        const taskId = task.id
-        const taskDate = task.source_ref ?? null
-        const notifTitle = isOverdue ? `Overdue: ${task.text}` : `Due today: ${task.text}`
-        const notif = api.notifications.createNotification({
-          type: isOverdue ? 'error' : 'warning',
-          title: notifTitle,
-          key: 'dueTaskReminder',
-          // Was an "Open Vault" button, which is the wrong shape: opening the
-          // task is what clicking the notification should do, not a choice
-          // beside it. The row is the link now.
-          onClick: () => openInVault(api, { taskId, date: taskDate ?? undefined }),
-        })
-        dueTaskNotifs.set(task.id, notif)
-      }
-
-      type BlockedRow = {
-        id: string
-        text: string
-        updated_at: string
-        metadata: string
-        source_ref: string | null
-      }
-      const blockedTasks = await db.query<BlockedRow>(
-        `SELECT id, text, updated_at, metadata, source_ref FROM tasks
-         WHERE status='blocked' AND metadata IS NOT NULL AND parent_id IS NULL`
-      )
-
-      for (const task of blockedTasks) {
-        let meta: Record<string, string> = {}
-        try {
-          meta = JSON.parse(task.metadata) as Record<string, string>
-        } catch {
-          continue
-        }
-        const interval = meta.blocked_check_interval
-        if (!interval) continue
-
-        const blockedAt = new Date(task.updated_at).getTime()
-        const targetTs = getTargetTimestamp(interval, blockedAt)
-        if (!isFinite(targetTs) || now < targetTs) continue
-
-        const isCustom = parseIntervalMs(interval) === Infinity
-        const lastNotified = lastNotifiedBlocked.get(task.id) ?? blockedAt
-
-        if (isCustom) {
-          if (lastNotified >= targetTs) continue
-        } else {
-          const intervalMs = parseIntervalMs(interval)
-          if (now - lastNotified < intervalMs) continue
-        }
-
-        lastNotifiedBlocked.set(task.id, now)
-        const taskId = task.id
-        const taskDate = task.source_ref ?? null
-
-        blockedTaskNotifs.get(task.id)?.dispose()
-
-        const blockedTitle = `Check in: ${task.text}`
-        const notif = api.notifications.createNotification({
-          type: 'info',
-          title: blockedTitle,
-          message: meta.blocked_reason ?? undefined,
-          key: 'blockedTaskCheckin',
-          onClick: () => openInVault(api, { taskId, date: taskDate ?? undefined }),
-        })
-        blockedTaskNotifs.set(task.id, notif)
-      }
-    } catch {
-      // ignore errors during tick
-    }
+  const state: SchedulerState = {
+    notifiedDueIds: new Set(),
+    dueTaskNotifs: new Map(),
+    lastNotifiedBlocked: new Map(),
+    blockedTaskNotifs: new Map(),
+    lastDay: today(),
+    isStartup: true,
   }
-
-  function tick(): void {
+  const tickAsync = (): Promise<void> => runTick(api, db, state)
+  const tick = (): void => {
     tickAsync().catch(() => {})
   }
-
   const startupPromise = tickAsync().catch(() => {})
-  isStartup = false
+  state.isStartup = false
   const intervalId = setInterval(tick, 15_000)
-  return {
-    dispose: () => clearInterval(intervalId),
-    tick,
-    tickAsync,
-    startupPromise,
-  }
+  return { dispose: () => clearInterval(intervalId), tick, tickAsync, startupPromise }
 }

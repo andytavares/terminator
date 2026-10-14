@@ -1,43 +1,109 @@
 import React, { useState } from 'react'
 import { Check } from 'lucide-react'
 import { logReviewAction } from '../utils/review-log'
+import { Button } from '@terminator/extension-ui'
 
 interface Props {
   onComplete: () => void
   reviewId: string | null
 }
 
-export function WeeklyReviewStep1GetClear({ onComplete, reviewId }: Props): React.JSX.Element {
+interface Capture {
+  text: string
+  setText: (text: string) => void
+  adding: boolean
+  captured: string[]
+  add: () => Promise<void>
+}
+
+/** Sends typed text to the inbox, remembering what this step captured. */
+function useReviewCapture(reviewId: string | null): Capture {
   const [text, setText] = useState('')
   const [adding, setAdding] = useState(false)
   const [captured, setCaptured] = useState<string[]>([])
 
-  async function handleAdd() {
-    if (!text.trim()) return
+  async function addReviewCapture() {
+    const item = text.trim()
+    if (!item) return
     setAdding(true)
     try {
       const result = (await window.electronAPI.extensionBridge.invoke('task-vault:vault:add-task', {
         filePath: 'inbox.md',
-        text: text.trim(),
+        text: item,
       })) as { error?: string }
       if (result?.error) return
       logReviewAction(reviewId, {
         step: 1,
         action: 'captured',
         entityType: 'task',
-        entityLabel: text.trim(),
+        entityLabel: item,
       })
-      setCaptured((prev) => [...prev, text.trim()])
+      setCaptured((prev) => [...prev, item])
       setText('')
     } finally {
       setAdding(false)
     }
   }
 
-  function handleKey(e: React.KeyboardEvent) {
-    if (e.key === 'Enter') void handleAdd()
-  }
+  return { text, setText, adding, captured, add: addReviewCapture }
+}
 
+function ReviewCaptureRow({ capture }: { capture: Capture }): React.JSX.Element {
+  const { text, setText, adding, add } = capture
+  return (
+    <div className="wr-step__capture-row">
+      <input
+        autoFocus
+        className="tmui-input wr-step__capture-input"
+        placeholder="Add to inbox…"
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') void add()
+        }}
+        disabled={adding}
+      />
+      <Button variant="primary" onClick={() => void add()} disabled={adding || !text.trim()}>
+        Add
+      </Button>
+    </div>
+  )
+}
+
+function CapturedList({ items }: { items: string[] }): React.JSX.Element | null {
+  if (items.length === 0) return null
+  return (
+    <ul className="wr-step__captured-list">
+      {items.map((item, i) => (
+        <li key={i} className="wr-step__captured-item">
+          <Check aria-hidden="true" /> {item}
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+/** The filled button always advances; skipping is a link. It once read "Nothing to add — Next",
+ *  which made the loudest control on every step of the wizard the one that skips it. */
+function StepActions(props: { canSkip: boolean; onComplete: () => void }): React.JSX.Element {
+  const { canSkip, onComplete } = props
+  return (
+    <div className="wr-step__actions">
+      {canSkip && (
+        <Button variant="ghost" className="wr-step__skip" onClick={onComplete}>
+          Nothing loose — skip
+        </Button>
+      )}
+      <span className="wr-step__actions-spacer" />
+      <Button variant="primary" onClick={onComplete}>
+        Next: inbox
+      </Button>
+    </div>
+  )
+}
+
+export function WeeklyReviewStep1GetClear({ onComplete, reviewId }: Props): React.JSX.Element {
+  const capture = useReviewCapture(reviewId)
   return (
     <div className="wr-step wr-step-1">
       <h3>Step 1: Get Clear</h3>
@@ -45,50 +111,9 @@ export function WeeklyReviewStep1GetClear({ onComplete, reviewId }: Props): Reac
         Capture any loose items not yet in your inbox — physical papers, email, sticky notes, open
         browser tabs.
       </p>
-
-      <div className="wr-step__capture-row">
-        <input
-          className="wr-step__capture-input"
-          placeholder="Add to inbox…"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={handleKey}
-          disabled={adding}
-          autoFocus
-        />
-        <button
-          className="tv-btn tv-btn--primary"
-          onClick={() => void handleAdd()}
-          disabled={adding || !text.trim()}
-        >
-          Add
-        </button>
-      </div>
-
-      {captured.length > 0 && (
-        <ul className="wr-step__captured-list">
-          {captured.map((item, i) => (
-            <li key={i} className="wr-step__captured-item">
-              <Check aria-hidden="true" /> {item}
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {/* The filled button always advances. It used to read "Nothing to add —
-          Next", which made the loudest control on every step of a six-step
-          wizard the one that skips it. Skipping stays available, as a link. */}
-      <div className="wr-step__actions">
-        {captured.length === 0 && (
-          <button type="button" className="wr-step__skip" onClick={onComplete}>
-            Nothing loose — skip
-          </button>
-        )}
-        <span className="wr-step__actions-spacer" />
-        <button type="button" className="tv-btn tv-btn--primary" onClick={onComplete}>
-          Next: inbox
-        </button>
-      </div>
+      <ReviewCaptureRow capture={capture} />
+      <CapturedList items={capture.captured} />
+      <StepActions canSkip={capture.captured.length === 0} onComplete={onComplete} />
     </div>
   )
 }

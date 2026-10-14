@@ -1,15 +1,16 @@
 import React from 'react'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useDragReorder } from '../../../../src/renderer/hooks/useDragReorder'
+import { partialFake } from '../../../support/fakes'
 
 const items = ['a', 'b', 'c']
 
 function dragEvent(): React.DragEvent {
-  return { preventDefault: vi.fn() } as unknown as React.DragEvent
+  return partialFake<React.DragEvent>({ preventDefault: vi.fn() })
 }
 
-let onReorder: ReturnType<typeof vi.fn>
+let onReorder: Mock<(reordered: string[]) => void>
 
 beforeEach(() => {
   onReorder = vi.fn()
@@ -42,7 +43,9 @@ describe('useDragReorder', () => {
     act(() => result.current.getItemProps(2).onDrop())
     expect(onReorder).toHaveBeenCalledWith(['b', 'c', 'a'])
   })
+})
 
+describe('useDragReorder — reorders backward on drop', () => {
   it('reorders backward on drop', () => {
     const { result } = renderHook(() => useDragReorder(items, onReorder))
     act(() => result.current.getItemProps(2).onDragStart())
@@ -70,7 +73,9 @@ describe('useDragReorder', () => {
     act(() => result.current.getItemProps(2).onDrop())
     expect(result.current.dragOverIndex).toBeNull()
   })
+})
 
+describe('useDragReorder — clears state on drag end so an abandoned drag cannot reorder later', () => {
   it('clears state on drag end so an abandoned drag cannot reorder later', () => {
     const { result } = renderHook(() => useDragReorder(items, onReorder))
     act(() => result.current.getItemProps(0).onDragStart())

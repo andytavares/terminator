@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { builderUnit, testCriterion } from '../helpers/order-parts.js'
 import {
   structuralFindings,
   applyFindings,
@@ -17,6 +18,23 @@ import type { WorkOrder } from '../../src/order/schema.js'
 // need a model and never disagree with themselves. An agent pass adds
 // judgement on top, but these fire every time and cost nothing.
 
+const CLIPPED_ROWS: WorkOrder['intent'] = {
+  problem: 'rows are clipped',
+  outcome: 'rows are not clipped',
+  nonGoals: ['scrollbar styling'],
+}
+
+const FINAL_GLYPH = testCriterion('AC-1', {
+  statement: 'a full-width row renders its final glyph',
+  priority: 'P0',
+})
+
+const WIDEN_THE_ROW = builderUnit('U-1', {
+  title: 'widen the row',
+  satisfies: ['AC-1'],
+  touches: ['src/a.css'],
+})
+
 function order(over: Partial<WorkOrder> = {}): WorkOrder {
   const base = draftOrder({
     id: 'WO-0101-aaa',
@@ -27,11 +45,7 @@ function order(over: Partial<WorkOrder> = {}): WorkOrder {
   })
   return {
     ...base,
-    intent: {
-      problem: 'rows are clipped',
-      outcome: 'rows are not clipped',
-      nonGoals: ['scrollbar styling'],
-    },
+    intent: CLIPPED_ROWS,
     // A well-formed order has been through Scout, so its toolchain is filled.
     // Leaving it empty here would make every fixture trip `no-runnable-check`.
     context: {
@@ -41,30 +55,8 @@ function order(over: Partial<WorkOrder> = {}): WorkOrder {
         test: { command: 'npm test', source: 'package.json' as const },
       },
     },
-    acceptance: [
-      {
-        id: 'AC-1',
-        statement: 'a full-width row renders its final glyph',
-        priority: 'P0',
-        verify: { kind: 'test', command: 'npm test', assert: 'exit_code == 0' },
-        unverifiable: null,
-      },
-    ],
-    plan: {
-      ...base.plan,
-      units: [
-        {
-          id: 'U-1',
-          title: 'widen the row',
-          role: 'builder',
-          lane: 1,
-          dependsOn: [],
-          satisfies: ['AC-1'],
-          touches: ['src/a.css'],
-          verify: [],
-        },
-      ],
-    },
+    acceptance: [{ ...FINAL_GLYPH }],
+    plan: { ...base.plan, units: [{ ...WIDEN_THE_ROW }] },
     ...over,
   }
 }
@@ -74,6 +66,15 @@ function ids(o: WorkOrder): string[] {
 }
 
 describe('structuralFindings', () => {
+  describe('outcomes and scope', outcomesAndScopeTests)
+  describe('criteria and units', redTeamCriteriaAndUnitsTests)
+  describe('dependency chains', dependencyChainsTests)
+  describe('judgements', judgementsTests)
+  describe('untouched files and unavailable checks', untouchedFilesAndUnavailableChecksTests)
+  describe('categories', categoriesTests)
+})
+
+function outcomesAndScopeTests() {
   it('finds nothing wrong with a well-formed order', () => {
     expect(structuralFindings(order())).toEqual([])
   })
@@ -89,7 +90,9 @@ describe('structuralFindings', () => {
     const o = order({ intent: { problem: 'p', outcome: 'o', nonGoals: [] } })
     expect(ids(o)).toContain('no-non-goals')
   })
+}
 
+function redTeamCriteriaAndUnitsTests() {
   it('attacks a criterion whose statement is not falsifiable', () => {
     const o = order()
     o.acceptance[0].statement = 'the terminal works better'
@@ -108,54 +111,37 @@ describe('structuralFindings', () => {
     o.plan.units[0].touches = []
     expect(ids(o)).toContain('unit-touches-nothing')
   })
+}
 
+function dependencyChainsTests() {
   it('attacks a dependency chain with no parallelism when there is more than one unit', () => {
     const o = order()
     o.plan.units = [
-      {
-        id: 'U-1',
-        title: 'a',
-        role: 'builder',
-        lane: 1,
-        dependsOn: [],
-        satisfies: ['AC-1'],
-        touches: ['src/a'],
-        verify: [],
-      },
-      {
-        id: 'U-2',
+      builderUnit('U-1', { title: 'a', satisfies: ['AC-1'], touches: ['src/a'] }),
+      builderUnit('U-2', {
         title: 'b',
-        role: 'builder',
-        lane: 1,
         dependsOn: ['U-1'],
         satisfies: ['AC-1'],
         touches: ['src/b'],
-        verify: [],
-      },
-      {
-        id: 'U-3',
+      }),
+      builderUnit('U-3', {
         title: 'c',
-        role: 'builder',
-        lane: 1,
         dependsOn: ['U-2'],
         satisfies: ['AC-1'],
         touches: ['src/c'],
-        verify: [],
-      },
-      {
-        id: 'U-4',
+      }),
+      builderUnit('U-4', {
         title: 'd',
-        role: 'builder',
-        lane: 1,
         dependsOn: ['U-3'],
         satisfies: ['AC-1'],
         touches: ['src/d'],
-        verify: [],
-      },
+      }),
     ]
     expect(ids(o)).toContain('fully-serial-plan')
   })
+}
 
+function judgementsTests() {
   it('attacks a P0 criterion proved only by a judgement', () => {
     const o = order()
     o.acceptance[0].verify = { kind: 'judge', rubric: 'looks right', evidence: ['screenshot'] }
@@ -168,7 +154,9 @@ describe('structuralFindings', () => {
     o.acceptance[0].verify = { kind: 'judge', rubric: 'looks right', evidence: ['screenshot'] }
     expect(ids(o)).not.toContain('p0-judged-not-run')
   })
+}
 
+function untouchedFilesAndUnavailableChecksTests() {
   it('attacks a plan that touches a file no criterion could be about', () => {
     const o = order()
     o.plan.units[0].touches = ['src/a.css', '.github/workflows/release.yml']
@@ -184,7 +172,9 @@ describe('structuralFindings', () => {
   it('does not raise the unavailable-check finding when the repository has a test command', () => {
     expect(ids(order())).not.toContain('no-runnable-check')
   })
+}
 
+function categoriesTests() {
   it('categorises every rule as the design decides, blocking or not', () => {
     const expected: Record<string, string> = {
       'outcome-restates-problem': 'unprovable',
@@ -207,9 +197,14 @@ describe('structuralFindings', () => {
       expect(finding.category).toBe(expected[finding.rule])
     }
   })
-})
+}
 
 describe('applyFindings', () => {
+  describe('adding', redTeamAddingTests)
+  describe('repeats and non-blocking', repeatsAndNonBlockingTests)
+})
+
+function redTeamAddingTests() {
   it('adds every finding as open, so none can be forgotten', () => {
     const o = applyFindings(
       order({ intent: { problem: 'p', outcome: 'p', nonGoals: [] } }),
@@ -232,7 +227,9 @@ describe('applyFindings', () => {
     expect(after.redTeam).toEqual([])
     expect(after.status).toBe('agreed')
   })
+}
 
+function repeatsAndNonBlockingTests() {
   it('does not raise the same finding twice across two passes', () => {
     const dirty = order({ intent: { problem: 'p', outcome: 'p', nonGoals: [] } })
     const once = applyFindings(dirty, '2026-09-06T12:00:00.000Z')
@@ -252,7 +249,7 @@ describe('applyFindings', () => {
     expect(after.redTeam[0].category).toBe('scope')
     expect(after.status).toBe('agreed')
   })
-})
+}
 
 describe('resolveFindings and acceptFinding', () => {
   const dirty = (): WorkOrder => order({ intent: { problem: 'p', outcome: 'p', nonGoals: [] } })
@@ -285,14 +282,19 @@ describe('resolveFindings and acceptFinding', () => {
   })
 })
 
+function raised(over: Partial<WorkOrder> = {}): WorkOrder {
+  return applyFindings(order({ intent: { ...order().intent, nonGoals: [] }, ...over }), 'now')
+}
+
 // Asking the architect to clear a finding is only worth something if the
 // redraft that clears it also closes it. The structural pass is deterministic,
 // so whether one of its findings still holds is a fact, not an opinion.
 describe('settleFindings', () => {
-  function raised(over: Partial<WorkOrder> = {}): WorkOrder {
-    return applyFindings(order({ intent: { ...order().intent, nonGoals: [] }, ...over }), 'now')
-  }
+  describe('structural findings', structuralFindingsTests)
+  describe('reviewer and accepted findings', reviewerAndAcceptedFindingsTests)
+})
 
+function structuralFindingsTests() {
   it('resolves a structural finding the order no longer trips', () => {
     const before = raised()
     expect(before.redTeam.find((f) => f.id === 'RT-no-non-goals')?.status).toBe('open')
@@ -308,11 +310,23 @@ describe('settleFindings', () => {
       'open'
     )
   })
+}
 
+function reviewerAndAcceptedFindingsTests() {
   // A reviewer's finding is judgement, not a rule this pass can re-run.
   it('leaves a reviewer’s finding open, since nothing here can decide it', () => {
     const before = order({
-      redTeam: [{ id: 'RT-reviewer-1', severity: 'high', text: 'x', status: 'open', reason: '' }],
+      redTeam: [
+        {
+          id: 'RT-reviewer-1',
+          severity: 'high',
+          text: 'x',
+          status: 'open',
+          reason: '',
+          category: 'wrong-outcome',
+          round: 0,
+        },
+      ],
     })
     expect(settleFindings(before).redTeam[0].status).toBe('open')
   })
@@ -323,4 +337,4 @@ describe('settleFindings', () => {
       'accepted'
     )
   })
-})
+}

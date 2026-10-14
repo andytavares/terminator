@@ -28,52 +28,59 @@ export class ErrorBoundary extends React.Component<Props, State> {
   render(): React.ReactNode {
     if (this.state.error) {
       return (
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            height: '100vh',
-            gap: 16,
-            fontFamily: 'monospace',
-            background: 'var(--bg-base)',
-            color: 'var(--danger)',
-            padding: 32,
-          }}
-        >
-          <div style={{ fontSize: 32 }}>⚠</div>
-          <div style={{ fontSize: 16, fontWeight: 600 }}>Something went wrong</div>
-          <div
-            style={{
-              fontSize: 12,
-              color: 'var(--text-secondary)',
-              maxWidth: 480,
-              textAlign: 'center',
-              lineHeight: 1.6,
-            }}
-          >
-            {this.state.error.message}
-          </div>
-          <button
-            style={{
-              marginTop: 8,
-              padding: '7px 20px',
-              background: 'color-mix(in srgb, var(--danger) 15%, transparent)',
-              border: '1px solid color-mix(in srgb, var(--danger) 40%, transparent)',
-              borderRadius: 6,
-              color: 'var(--danger)',
-              fontFamily: 'monospace',
-              fontSize: 12,
-              cursor: 'pointer',
-            }}
-            onClick={() => this.setState({ error: null })}
-          >
-            Try to recover
-          </button>
-        </div>
+        <ErrorScreen
+          message={this.state.error.message}
+          onRecover={() => this.setState({ error: null })}
+        />
       )
     }
     return this.props.children
   }
+}
+
+const SCREEN_STYLE: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  justifyContent: 'center',
+  height: '100vh',
+  gap: 16,
+  fontFamily: 'monospace',
+  background: 'var(--tm-bg-base)',
+  color: 'var(--tm-danger)',
+  padding: 32,
+}
+
+const MESSAGE_STYLE: React.CSSProperties = {
+  fontSize: 12,
+  color: 'var(--tm-text-secondary)',
+  maxWidth: 480,
+  textAlign: 'center',
+  lineHeight: 1.6,
+}
+
+const RECOVER_STYLE: React.CSSProperties = {
+  marginTop: 8,
+  padding: '7px 20px',
+  background: 'color-mix(in srgb, var(--tm-danger) 15%, transparent)',
+  border: '1px solid color-mix(in srgb, var(--tm-danger) 40%, transparent)',
+  borderRadius: 6,
+  color: 'var(--tm-danger)',
+  fontFamily: 'monospace',
+  fontSize: 12,
+  cursor: 'pointer',
+}
+
+/** What shows in place of a tree that threw while rendering. */
+function ErrorScreen({ message, onRecover }: { message: string; onRecover: () => void }) {
+  return (
+    <div style={SCREEN_STYLE}>
+      <div style={{ fontSize: 32 }}>⚠</div>
+      <div style={{ fontSize: 16, fontWeight: 600 }}>Something went wrong</div>
+      <div style={MESSAGE_STYLE}>{message}</div>
+      <button style={RECOVER_STYLE} onClick={onRecover}>
+        Try to recover
+      </button>
+    </div>
+  )
 }

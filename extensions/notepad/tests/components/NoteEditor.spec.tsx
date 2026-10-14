@@ -14,13 +14,15 @@ vi.mock('@codemirror/view', () => {
     }
   })
   // Static methods that NoteEditor uses
-  ;(EditorView as unknown as Record<string, unknown>).updateListener = { of: vi.fn(() => ({})) }
-  ;(EditorView as unknown as Record<string, unknown>).theme = vi.fn(() => ({}))
-  ;(EditorView as unknown as Record<string, unknown>).lineWrapping = {}
-  ;(EditorView as unknown as Record<string, unknown>).scrollIntoView = vi.fn((pos, opts) => ({
-    scrollTo: pos,
-    opts,
-  }))
+  Object.assign(EditorView, { updateListener: { of: vi.fn(() => ({})) } })
+  Object.assign(EditorView, { theme: vi.fn(() => ({})) })
+  Object.assign(EditorView, { lineWrapping: {} })
+  Object.assign(EditorView, {
+    scrollIntoView: vi.fn((pos, opts) => ({
+      scrollTo: pos,
+      opts,
+    })),
+  })
   return {
     EditorView,
     keymap: { of: vi.fn(() => ({})) },
@@ -96,8 +98,69 @@ import {
   scrollToPosition,
 } from '../../src/editor/NoteEditor'
 import type { EditorView } from '@codemirror/view'
+import { partialFake } from '../../../../tests/support/fakes'
 
-describe('NoteEditor', () => {
+describe('NoteEditor', noteEditorTests)
+
+describe('applyAnchors', () => {
+  it('calls view.dispatch with setAnchors effect', () => {
+    const mockView = partialFake<EditorView>({ dispatch: vi.fn() })
+    applyAnchors(mockView, [{ id: 'c1', from: 0, to: 5 }])
+    expect(mockView.dispatch).toHaveBeenCalledWith({ effects: expect.any(Array) })
+  })
+
+  it('does nothing when view is null', () => {
+    expect(() => applyAnchors(null, [])).not.toThrow()
+  })
+})
+
+describe('setEditorHoverAnchor', () => {
+  it('dispatches setHoveredAnchor effect', () => {
+    const mockView = partialFake<EditorView>({ dispatch: vi.fn() })
+    setEditorHoverAnchor(mockView, 'c1')
+    expect(mockView.dispatch).toHaveBeenCalledWith({ effects: expect.any(Array) })
+  })
+
+  it('does nothing when view is null', () => {
+    expect(() => setEditorHoverAnchor(null, null)).not.toThrow()
+  })
+})
+
+describe('scrollToAnchor', () => {
+  it('dispatches selection and focuses the view', () => {
+    const mockView = partialFake<EditorView>({ dispatch: vi.fn(), focus: vi.fn() })
+    scrollToAnchor(mockView, 5, 10)
+    expect(mockView.dispatch).toHaveBeenCalledWith({
+      selection: { anchor: 5, head: 10 },
+      scrollIntoView: true,
+    })
+    expect(mockView.focus).toHaveBeenCalled()
+  })
+
+  it('does nothing when view is null', () => {
+    expect(() => scrollToAnchor(null, 0, 5)).not.toThrow()
+  })
+})
+
+function viewWithDoc(length: number) {
+  return partialFake<EditorView>({
+    state: partialFake<EditorView['state']>({
+      doc: partialFake<EditorView['state']['doc']>({ length }),
+    }),
+    dispatch: vi.fn(),
+    focus: vi.fn(),
+  })
+}
+
+describe('scrollToPosition', scrollToPositionTests)
+
+function noteEditorTests() {
+  describe('mounting', noteEditorMountingTests)
+  describe('default mode', noteEditorDefaultModeTests)
+  describe('switching mode', noteEditorSwitchingModeTests)
+}
+
+function noteEditorMountingTests() {
   it('renders the editor container div', () => {
     const { container } = render(<NoteEditor initialDoc="# Test" onChange={vi.fn()} />)
     expect(container.querySelector('.notepad-editor-cm')).toBeTruthy()
@@ -114,7 +177,9 @@ describe('NoteEditor', () => {
     render(<NoteEditor initialDoc="hello" onChange={vi.fn()} onAnchorsReady={onAnchorsReady} />)
     expect(onAnchorsReady).toHaveBeenCalledWith(expect.any(Function))
   })
+}
 
+function noteEditorDefaultModeTests() {
   // Source mode is expressed by configuring the live-preview compartment with
   // nothing in it, so the raw markdown shows through.
   it('configures the preview compartment with the plugin by default', () => {
@@ -128,7 +193,9 @@ describe('NoteEditor', () => {
     render(<NoteEditor initialDoc="# Test" onChange={vi.fn()} sourceMode />)
     expect(compartmentOf).toHaveBeenCalledWith([])
   })
+}
 
+function noteEditorSwitchingModeTests() {
   it('reconfigures the compartment when the mode is switched on', () => {
     const { rerender } = render(<NoteEditor initialDoc="# Test" onChange={vi.fn()} />)
     compartmentReconfigure.mockClear()
@@ -142,57 +209,9 @@ describe('NoteEditor', () => {
     rerender(<NoteEditor initialDoc="# Test" onChange={vi.fn()} />)
     expect(compartmentReconfigure).toHaveBeenCalledWith({})
   })
-})
+}
 
-describe('applyAnchors', () => {
-  it('calls view.dispatch with setAnchors effect', () => {
-    const mockView = { dispatch: vi.fn() } as unknown as EditorView
-    applyAnchors(mockView, [{ id: 'c1', from: 0, to: 5 }])
-    expect(mockView.dispatch).toHaveBeenCalledWith({ effects: expect.any(Array) })
-  })
-
-  it('does nothing when view is null', () => {
-    expect(() => applyAnchors(null, [])).not.toThrow()
-  })
-})
-
-describe('setEditorHoverAnchor', () => {
-  it('dispatches setHoveredAnchor effect', () => {
-    const mockView = { dispatch: vi.fn() } as unknown as EditorView
-    setEditorHoverAnchor(mockView, 'c1')
-    expect(mockView.dispatch).toHaveBeenCalledWith({ effects: expect.any(Array) })
-  })
-
-  it('does nothing when view is null', () => {
-    expect(() => setEditorHoverAnchor(null, null)).not.toThrow()
-  })
-})
-
-describe('scrollToAnchor', () => {
-  it('dispatches selection and focuses the view', () => {
-    const mockView = { dispatch: vi.fn(), focus: vi.fn() } as unknown as EditorView
-    scrollToAnchor(mockView, 5, 10)
-    expect(mockView.dispatch).toHaveBeenCalledWith({
-      selection: { anchor: 5, head: 10 },
-      scrollIntoView: true,
-    })
-    expect(mockView.focus).toHaveBeenCalled()
-  })
-
-  it('does nothing when view is null', () => {
-    expect(() => scrollToAnchor(null, 0, 5)).not.toThrow()
-  })
-})
-
-describe('scrollToPosition', () => {
-  function viewWithDoc(length: number) {
-    return {
-      state: { doc: { length } },
-      dispatch: vi.fn(),
-      focus: vi.fn(),
-    } as unknown as EditorView
-  }
-
+function scrollToPositionTests() {
   it('puts the caret at the position and scrolls it to the top of the viewport', () => {
     const mockView = viewWithDoc(100)
     scrollToPosition(mockView, 42)
@@ -215,4 +234,4 @@ describe('scrollToPosition', () => {
   it('does nothing when view is null', () => {
     expect(() => scrollToPosition(null, 0)).not.toThrow()
   })
-})
+}

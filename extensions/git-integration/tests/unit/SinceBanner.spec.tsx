@@ -23,7 +23,9 @@ describe('SinceBanner', () => {
     expect(screen.getByText(/51 still viewed/)).toBeTruthy()
     expect(screen.getByText(/4 files changed/)).toBeTruthy()
   })
+})
 
+describe('SinceBanner — shows history-rewritten text instead of the commit count when rewritten', () => {
   it('shows history-rewritten text instead of the commit count when rewritten', () => {
     render(
       <SinceBanner
@@ -37,7 +39,9 @@ describe('SinceBanner', () => {
     expect(screen.getByText('History rewritten since you last looked')).toBeTruthy()
     expect(screen.queryByText('3 commits since you last looked')).toBeNull()
   })
+})
 
+describe('SinceBanner — calls setDiffRange when the seg buttons are clicked', () => {
   it('calls setDiffRange when the seg buttons are clicked', () => {
     render(
       <SinceBanner
@@ -53,8 +57,10 @@ describe('SinceBanner', () => {
     fireEvent.click(screen.getByText(/Since my review/))
     expect(useReviewUiStore.getState().diffRange).toBe('since')
   })
+})
 
-  it('marks the active seg button as pressed', () => {
+describe('SinceBanner — checks the chosen diff range', () => {
+  it('checks the chosen diff range', () => {
     render(
       <SinceBanner
         commitCount={1}
@@ -64,12 +70,14 @@ describe('SinceBanner', () => {
         historyRewritten={false}
       />
     )
-    const sinceBtn = screen.getByText(/Since my review/).closest('button')!
-    const wholeBtn = screen.getByText('Whole PR').closest('button')!
-    expect(sinceBtn.getAttribute('aria-pressed')).toBe('true')
-    expect(wholeBtn.getAttribute('aria-pressed')).toBe('false')
+    const since = screen.getByRole('radio', { name: 'Since my review' })
+    const whole = screen.getByRole('radio', { name: 'Whole PR' })
+    expect(since.getAttribute('aria-checked')).toBe('true')
+    expect(whole.getAttribute('aria-checked')).toBe('false')
   })
+})
 
+describe('SinceBanner — uses singular commit for a single commit', () => {
   it('uses singular "commit" for a single commit', () => {
     render(
       <SinceBanner

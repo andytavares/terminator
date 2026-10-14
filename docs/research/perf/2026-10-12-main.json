@@ -1,0 +1,30 @@
+{
+  "runs": 5,
+  "startupMs": {
+    "attached": 380,
+    "windowAt": 3373,
+    "domReady": 3374,
+    "sidebar": 4246
+  },
+  "memoryMB": {
+    "Browser": 401,
+    "GPU": 136,
+    "Utility": 79,
+    "Tab": 127
+  },
+  "throughputMs": 1679,
+  "renderedMs": 2710,
+  "throughputRunsMs": [1679, 1693, 1600, 1718, 1651],
+  "memoryAfterThroughputMB": {
+    "Browser": 416,
+    "GPU": 149,
+    "Utility": 79,
+    "Tab": 319
+  },
+  "throughputCpuSeconds": {
+    "Browser": 1.55,
+    "GPU": 0.93,
+    "Utility": 0,
+    "Tab": 3.1
+  }
+}

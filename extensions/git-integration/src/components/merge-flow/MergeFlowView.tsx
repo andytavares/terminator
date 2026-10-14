@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 import { useMergeFlowStore } from '../../stores/merge-flow.store'
 import { mergeFlowAPI } from '../../api/merge-flow'
 import { notificationsAPI } from '../../api/notifications'
 import { ConflictHub } from './ConflictHub'
 import { ConflictResolver } from './ConflictResolver'
 import { CompletionScreen } from './CompletionScreen'
+import type { ConflictSession } from '../../schemas/merge-flow.schema'
 import './merge-flow.css'
 
 interface Props {
@@ -12,158 +14,182 @@ interface Props {
   onExit: () => void
 }
 
-export function MergeFlowView({ repoRoot, onExit }: Props) {
+type FlowStore = ReturnType<typeof useMergeFlowStore.getState>
+
+interface FlowContext {
+  repoRoot: string
+  onExit: () => void
+  store: Pick<FlowStore, 'startSession' | 'setLoading' | 'setError' | 'clearSession'>
+  view: { setIsComplete: (complete: boolean) => void; setActiveFile: (index: number) => void }
+}
+
+function notifyError(title: string, key: string, message: string): void {
+  void notificationsAPI.notify({ type: 'error', title, key, message })
+}
+
+/** Restores a stored session that still has conflicts; true when one was restored. */
+async function restoreFlowSession(ctx: FlowContext): Promise<boolean> {
+  const { session } = await mergeFlowAPI.restoreSession(ctx.repoRoot)
+  // A stored session with no conflicts is stale.
+  if (!session || !(session.totalConflicts > 0)) return false
+  ctx.store.startSession(session)
+  if (session.totalResolved >= session.totalConflicts) ctx.view.setIsComplete(true)
+  ctx.store.setLoading(false)
+  return true
+}
+
+/** Starts a session from the repository's conflicts, saved so it can be restored. */
+async function startFromConflicts(ctx: FlowContext, failure: { title: string; key: string }) {
+  const result = await mergeFlowAPI.listConflicts(ctx.repoRoot)
+  if ('error' in result) {
+    notifyError(failure.title, failure.key, result.error)
+    ctx.onExit()
+    return null
+  }
+  return result
+}
+
+function beginSession(ctx: FlowContext, session: ConflictSession): void {
+  ctx.store.startSession(session)
+  void mergeFlowAPI.persistSession(ctx.repoRoot, session)
+}
+
+/** Builds a fresh session; leaves when there are no conflicts or they cannot be read. */
+async function startFreshSession(ctx: FlowContext): Promise<void> {
+  const failure = { title: 'Could not load conflicts', key: 'loadConflictsFailed' }
+  const result = await startFromConflicts(ctx, failure)
+  if (!result) return
+  if (result.files.length === 0) {
+    void notificationsAPI.notify({
+      type: 'info',
+      title: 'No merge conflicts found.',
+      key: 'noConflictsFound',
+    })
+    ctx.onExit()
+    return
+  }
+  beginSession(ctx, result)
+}
+
+async function openSession(ctx: FlowContext): Promise<void> {
+  ctx.store.setLoading(true)
+  try {
+    if (await restoreFlowSession(ctx)) return
+    await startFreshSession(ctx)
+  } catch (e) {
+    ctx.store.setError(String(e))
+    notifyError('Could not open conflict resolver', 'openResolverFailed', String(e))
+    ctx.onExit()
+  } finally {
+    ctx.store.setLoading(false)
+  }
+}
+
+/** Resets every file to its conflicted state and starts again from the hub. */
+async function startOver(ctx: FlowContext, session: ConflictSession): Promise<void> {
+  try {
+    const files = session.files.map((f) => ({ filePath: f.filePath }))
+    const result = await mergeFlowAPI.resetSession(ctx.repoRoot, files)
+    if ('error' in result) return notifyError('Could not reset', 'resetFailed', result.error)
+    ctx.store.clearSession()
+    ctx.view.setIsComplete(false)
+    ctx.view.setActiveFile(-1)
+    ctx.store.setLoading(true)
+    const failure = { title: 'Could not reload conflicts', key: 'reloadConflictsFailed' }
+    const fresh = await startFromConflicts(ctx, failure)
+    if (fresh) beginSession(ctx, fresh)
+  } catch (e) {
+    notifyError('Start over failed', 'startOverFailed', String(e))
+  } finally {
+    ctx.store.setLoading(false)
+  }
+}
+
+function useFlowActions(): FlowContext['store'] {
+  return useMergeFlowStore(
+    useShallow((s) => ({
+      startSession: s.startSession,
+      setLoading: s.setLoading,
+      setError: s.setError,
+      clearSession: s.clearSession,
+    }))
+  )
+}
+
+/** The session outlives the view: kept until the merge is committed or aborted, and opened once
+ *  per repository, with the context of the render that opened it. */
+function useMergeFlow(props: Props) {
+  const { repoRoot, onExit } = props
   const session = useMergeFlowStore((s) => s.session)
   const isLoading = useMergeFlowStore((s) => s.isLoading)
-  const startSession = useMergeFlowStore((s) => s.startSession)
-  const setLoading = useMergeFlowStore((s) => s.setLoading)
-  const setError = useMergeFlowStore((s) => s.setError)
-  const clearSession = useMergeFlowStore((s) => s.clearSession)
-
-  const [activeFileIndex, setActiveFileIndexLocal] = useState<number>(-1)
+  const store = useFlowActions()
+  const [activeFileIndex, setActiveFile] = useState<number>(-1)
   const [isComplete, setIsComplete] = useState(false)
-
+  const ctx: FlowContext = { repoRoot, onExit, store, view: { setIsComplete, setActiveFile } }
   useEffect(() => {
-    async function init() {
-      setLoading(true)
-      try {
-        // Try to restore an in-progress session — skip stale empty sessions
-        const restored = await mergeFlowAPI.restoreSession(repoRoot)
-        if (restored.session && restored.session.totalConflicts > 0) {
-          startSession(restored.session)
-          if (
-            restored.session.totalConflicts > 0 &&
-            restored.session.totalResolved >= restored.session.totalConflicts
-          ) {
-            setIsComplete(true)
-          }
-          setLoading(false)
-          return
-        }
-        // No valid persisted session — build a fresh one from the actual conflict state
-        const result = await mergeFlowAPI.listConflicts(repoRoot)
-        if ('error' in result) {
-          void notificationsAPI.notify(
-            'error',
-            'Could not load conflicts',
-            'loadConflictsFailed',
-            result.error
-          )
-          onExit()
-          return
-        }
-        if (result.files.length === 0) {
-          void notificationsAPI.notify('info', 'No merge conflicts found.', 'noConflictsFound')
-          onExit()
-          return
-        }
-        startSession(result)
-        void mergeFlowAPI.persistSession(repoRoot, result)
-      } catch (e) {
-        setError(String(e))
-        void notificationsAPI.notify(
-          'error',
-          'Could not open conflict resolver',
-          'openResolverFailed',
-          String(e)
-        )
-        onExit()
-      } finally {
-        setLoading(false)
-      }
-    }
-    void init()
-    return () => {
-      // Do not clear session on unmount — session persists until commit or abort
-    }
+    void openSession(ctx)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [repoRoot])
-
-  async function handleStartOver() {
-    if (!session) return
-    try {
-      const result = await mergeFlowAPI.resetSession(
-        repoRoot,
-        session.files.map((f) => ({
-          filePath: f.filePath,
-        }))
-      )
-      if ('error' in result) {
-        void notificationsAPI.notify('error', 'Could not reset', 'resetFailed', result.error)
-        return
-      }
-      clearSession()
-      setIsComplete(false)
-      setActiveFileIndexLocal(-1)
-      // Re-init
-      setLoading(true)
-      const fresh = await mergeFlowAPI.listConflicts(repoRoot)
-      if ('error' in fresh) {
-        void notificationsAPI.notify(
-          'error',
-          'Could not reload conflicts',
-          'reloadConflictsFailed',
-          fresh.error
-        )
-        onExit()
-        return
-      }
-      startSession(fresh)
-      void mergeFlowAPI.persistSession(repoRoot, fresh)
-    } catch (e) {
-      void notificationsAPI.notify('error', 'Start over failed', 'startOverFailed', String(e))
-    } finally {
-      setLoading(false)
-    }
+  const handleStartOver = async () => {
+    if (session) await startOver(ctx, session)
   }
-
-  function handleExit() {
-    clearSession()
+  const handleExit = () => {
+    store.clearSession()
     onExit()
   }
-
-  if (isLoading) {
-    return <div className="merge-flow-view merge-flow-view--loading">Loading conflicts…</div>
+  return {
+    session,
+    isLoading,
+    isComplete,
+    setIsComplete,
+    activeFileIndex,
+    setActiveFile,
+    handleStartOver,
+    handleExit,
   }
+}
 
-  if (!session) {
-    return <div className="merge-flow-view merge-flow-view--loading">Loading conflicts…</div>
-  }
+type MergeFlow = ReturnType<typeof useMergeFlow>
 
-  if (isComplete) {
+function FlowScreen({ flow, repoRoot }: { flow: MergeFlow; repoRoot: string }) {
+  const { session } = flow
+  if (flow.isComplete) {
     return (
-      <div className="merge-flow-view">
-        <CompletionScreen
-          repoRoot={repoRoot}
-          onBack={() => setIsComplete(false)}
-          onExit={handleExit}
-        />
-      </div>
+      <CompletionScreen
+        repoRoot={repoRoot}
+        onBack={() => flow.setIsComplete(false)}
+        onExit={flow.handleExit}
+      />
     )
   }
-
-  if (activeFileIndex >= 0 && session.files[activeFileIndex]) {
+  if (flow.activeFileIndex >= 0 && session?.files[flow.activeFileIndex]) {
     return (
-      <div className="merge-flow-view">
-        <ConflictResolver
-          repoRoot={repoRoot}
-          onBack={() => setActiveFileIndexLocal(-1)}
-          onComplete={() => setIsComplete(true)}
-          onStartOver={handleStartOver}
-          onExit={handleExit}
-        />
-      </div>
+      <ConflictResolver
+        repoRoot={repoRoot}
+        onBack={() => flow.setActiveFile(-1)}
+        onComplete={() => flow.setIsComplete(true)}
+        onStartOver={flow.handleStartOver}
+        onExit={flow.handleExit}
+      />
     )
   }
+  return (
+    <ConflictHub
+      onSelectFile={flow.setActiveFile}
+      onStartOver={flow.handleStartOver}
+      onExit={flow.handleExit}
+    />
+  )
+}
 
+export function MergeFlowView(props: Props) {
+  const flow = useMergeFlow(props)
+  if (flow.isLoading || !flow.session) {
+    return <div className="merge-flow-view merge-flow-view--loading">Loading conflicts…</div>
+  }
   return (
     <div className="merge-flow-view">
-      <ConflictHub
-        onSelectFile={(i) => {
-          setActiveFileIndexLocal(i)
-        }}
-        onStartOver={handleStartOver}
-        onExit={handleExit}
-      />
+      <FlowScreen flow={flow} repoRoot={props.repoRoot} />
     </div>
   )
 }

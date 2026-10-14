@@ -1,0 +1,165 @@
+import type { ExtensionAPI } from '@terminator/extension-sdk'
+
+import { ruleInWords } from '../gates/rules.js'
+import { pushLanes } from './integrate.js'
+import type { ShellExec } from './integrate.js'
+import { watchChecks, failedLogs } from './ci.js'
+import type { Check, CiVerdict } from './ci.js'
+import { ciReworkTarget, shipNodeId, settleShip } from './ship-tail.js'
+import { writeCiState } from './ci-state.js'
+import type { CiState } from './ci-state.js'
+import { rework } from './scheduler.js'
+import { executePlan, opensPullRequest } from './executor.js'
+import type { RunOutcome, ExecutorDeps } from './executor.js'
+import type { RunGraph, Feedback } from './run-graph.js'
+import type { Recipe } from '../recipe/parse.js'
+import type { IntegrateDeps } from './integrate.js'
+import type { WorkOrder } from '../order/schema.js'
+
+import { indexFor, orderStoreAt, writeGraph } from '../state/live-index.js'
+import { isoNow, shellExecOf } from '../host-calls.js'
+
+// Why a finished run opened nothing, in one sentence, read in the order `shippable`
+// checks so it names the first thing that stopped it.
+export function whyNotShipped(recipe: Recipe, outcome: RunOutcome): string {
+  if (!opensPullRequest(recipe)) {
+    return `the "${recipe.id}" shape opens nothing — it is a question, not a change`
+  }
+  if (!outcome.complete) return 'not every node finished'
+  if (outcome.gates.length > 0) {
+    return `held by ${outcome.gates.map((gate) => ruleInWords(gate.rule)).join(', ')}`
+  }
+  if (outcome.ladder === null) return 'verification never ran, so nothing has been checked'
+  if (!outcome.ladder.ok) {
+    const failedStep = outcome.ladder.steps.find((step) => step.result === 'fail') ?? null
+    return outcome.ladder.stoppedAt === null || failedStep === null
+      ? `verification could not measure ${outcome.ladder.unmeasured.join(', ')}`
+      : `verification stopped at ${failedStep.name}`
+  }
+  return 'it was not shippable, and this build cannot say which check said so'
+}
+
+// Files the shipping entries under `orderId`, never the entry's subject: that is the
+// pull request URL for `ship.draft_opened`, which once filed the run's draft under a
+// ledger at `.foundry/orders/https:/github.com/...`.
+export function integrateDepsFor(api: ExtensionAPI, root: string, orderId: string): IntegrateDeps {
+  return {
+    exec: shellExecOf(api),
+    root,
+    now: isoNow,
+    autoOpen: api.settings?.get<boolean>('terminator.foundry.autoOpenDraftPr') ?? true,
+    // Nothing in the extension host answers a gate; the operator does, through
+    // the inbox. A shipping decision reaching this seam means it was never
+    // raised, and holding is the only safe reading of that.
+    decide: async () => 'hold',
+    record: async (action, subject, reason) => {
+      await orderStoreAt(root).record({
+        at: new Date().toISOString(),
+        orderId,
+        actor: 'rule:ship',
+        action,
+        subject,
+        reason,
+        evidence: [],
+      })
+    },
+  }
+}
+
+/** The parts of a CI round that both the run and the inbox share. */
+export interface CiRoundDeps {
+  watch: (
+    pull: { url: string; cwd: string },
+    onPoll: (checks: readonly Check[]) => void,
+    judged: ReadonlySet<string>
+  ) => Promise<CiVerdict>
+  failedLogs: (checks: readonly Check[], cwd: string) => Promise<string>
+  record: (action: string, subject: string, reason: string) => Promise<void>
+  state: (state: Omit<CiState, 'at'>) => Promise<void>
+}
+
+// The parts of a CI round shared by the run that opened the drafts and a later
+// "another round": watching checks, reading a failure's log, recording the round.
+// `sendBack` differs (the inbox must rebuild graph and deps), so it is not here.
+export function ciRoundDepsFor(root: string, orderId: string, exec: ShellExec): CiRoundDeps {
+  return {
+    watch: (pull, onPoll, judged) =>
+      watchChecks(pull, exec, {
+        sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
+        onPoll,
+        ignoreRuns: judged,
+      }),
+    failedLogs: (checks, cwd) => failedLogs(checks, cwd, exec),
+    record: (action, subject, reason) => recordCiEntry(root, orderId, { action, subject, reason }),
+    state: async (state) => {
+      await writeCiState(root, orderId, { ...state, at: new Date().toISOString() })
+      indexFor(root).announce({ kind: 'graph', orderId })
+    },
+  }
+}
+
+async function recordCiEntry(
+  root: string,
+  orderId: string,
+  entry: { action: string; subject: string; reason: string }
+): Promise<void> {
+  await orderStoreAt(root).record({
+    at: new Date().toISOString(),
+    orderId,
+    actor: 'rule:ci',
+    action: entry.action,
+    subject: entry.subject,
+    reason: entry.reason,
+    evidence: [],
+  })
+}
+
+// Where a run's tail works: records, shape, order, and the graph each round leaves.
+// `graphRef` is a box because a `ci.red` round answered later from the inbox must see
+// the graph the previous round left, with no running executor holding it.
+export interface ShipRun {
+  readonly root: string
+  readonly order: WorkOrder
+  readonly recipe: Recipe
+  readonly graphRef: { current: RunGraph }
+}
+
+// The fix round for a red check: rework back to the builder, rerun the executor from
+// there, and if shippable, push the fixed branches onto the open drafts.
+export function ciSendBackFor(
+  run: ShipRun,
+  deps: { executorDeps: ExecutorDeps; integrateDeps: IntegrateDeps }
+): (feedback: Feedback) => Promise<boolean> {
+  const { root, order, recipe, graphRef } = run
+  return async (feedback) => {
+    const target = ciReworkTarget(recipe)
+    const shipId = shipNodeId(recipe)
+    if (target === null || shipId === null) return false
+
+    graphRef.current = rework(graphRef.current, shipId, { to: target, feedback })
+    await writeGraph(root, graphRef.current)
+
+    const outcome = await executePlan({ order, recipe, graph: graphRef.current }, deps.executorDeps)
+    graphRef.current = outcome.graph
+    await writeGraph(root, graphRef.current)
+
+    if (!outcome.shippable) return false
+    await pushLanes(order, deps.integrateDeps)
+    return true
+  }
+}
+
+// Settle the ship node after the tail: passed once the ready-for-review question was
+// raised, waiting otherwise; one neither running nor (when asked) waiting is left.
+export async function settleShipNode(
+  run: Pick<ShipRun, 'root' | 'recipe' | 'graphRef'>,
+  asked: boolean
+): Promise<void> {
+  const { root, recipe, graphRef } = run
+  const shipId = shipNodeId(recipe)
+  if (shipId === null) return
+  const settled = settleShip(graphRef.current, shipId, { asked, at: new Date().toISOString() })
+  if (settled === graphRef.current) return
+  graphRef.current = settled
+  await writeGraph(root, graphRef.current)
+}

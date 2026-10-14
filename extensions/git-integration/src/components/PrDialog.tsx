@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react'
-import { Dialog } from '@terminator/extension-ui'
-import { marked } from 'marked'
+import { Dialog, Tab, TabList, TabPanel, TabsRoot } from '@terminator/extension-ui'
 import type { PullRequest } from '../schemas/git.schema'
+import { RichContent } from './pr-review/RichContent'
+import { githubAPI } from '../api/github'
+import { choose } from './text'
 
 interface Branch {
   name: string
@@ -17,7 +19,19 @@ interface PrDialogProps {
   onCreated: (pr: PullRequest) => void
 }
 
-async function pushBranch(repoRoot: string): Promise<{ error: string } | null> {
+interface Failure {
+  error: string
+}
+
+interface AheadCount {
+  count: number
+}
+
+interface CreatedPr {
+  pr: PullRequest
+}
+
+async function pushBeforePr(repoRoot: string): Promise<Failure | null> {
   const result = await window.electronAPI.shell.exec({
     command: 'git',
     args: ['push', '--set-upstream', 'origin', 'HEAD'],
@@ -29,10 +43,13 @@ async function pushBranch(repoRoot: string): Promise<{ error: string } | null> {
   return null
 }
 
-async function checkCommitsAhead(
-  repoRoot: string,
-  base: string
-): Promise<{ count: number } | { error: string }> {
+function countOrZero(stdout: string): number {
+  const count = parseInt(stdout.trim(), 10)
+  if (isNaN(count)) return 0
+  return count
+}
+
+async function checkCommitsAhead(repoRoot: string, base: string): Promise<AheadCount | Failure> {
   // Try local base branch first; fall back to origin/<base> if local doesn't exist
   for (const ref of [base, `origin/${base}`]) {
     const result = await window.electronAPI.shell.exec({
@@ -40,62 +57,66 @@ async function checkCommitsAhead(
       args: ['rev-list', '--count', `${ref}..HEAD`],
       cwd: repoRoot,
     })
-    if (!('error' in result) && result.exitCode === 0) {
-      const count = parseInt(result.stdout.trim(), 10)
-      return { count: isNaN(count) ? 0 : count }
-    }
+    if (!('error' in result) && result.exitCode === 0) return { count: countOrZero(result.stdout) }
   }
   return { error: 'could not determine commit count' }
 }
 
-async function ghPrCreate(
-  repoRoot: string,
-  branch: string,
-  title: string,
-  body: string,
-  base: string,
-  isDraft: boolean,
+/** What the dialog asks GitHub to open. */
+interface PrDraft {
+  repoRoot: string
+  branch: string
+  title: string
+  body: string
+  base: string
+  isDraft: boolean
+}
+
+/** Checks there is something to merge, then pushes the branch so gh can find it on the remote. */
+async function prepareBranch(
+  draft: PrDraft,
   onStatus: (msg: string) => void
-): Promise<{ pr: PullRequest } | { error: string }> {
-  // Check for commits ahead before pushing — avoids a wasted push + cryptic GitHub error
+): Promise<Failure | null> {
   onStatus('Checking for commits…')
-  const ahead = await checkCommitsAhead(repoRoot, base)
+  const ahead = await checkCommitsAhead(draft.repoRoot, draft.base)
   if (!('error' in ahead) && ahead.count === 0) {
-    return { error: `No commits ahead of "${base}". Commit your changes before opening a PR.` }
+    return {
+      error: `No commits ahead of "${draft.base}". Commit your changes before opening a PR.`,
+    }
   }
-
-  // Push the branch first so gh can find it on the remote
   onStatus('Pushing branch…')
-  const pushErr = await pushBranch(repoRoot)
-  if (pushErr) return pushErr
+  return pushBeforePr(draft.repoRoot)
+}
 
+async function ghPrCreate(
+  draft: PrDraft,
+  onStatus: (msg: string) => void
+): Promise<CreatedPr | Failure> {
+  const prepareError = await prepareBranch(draft, onStatus)
+  if (prepareError) return prepareError
   onStatus('Creating pull request…')
-  const args = ['pr', 'create', '--title', title, '--body', body, '--base', base, '--head', branch]
-  if (isDraft) args.push('--draft')
-  const result = await window.electronAPI.shell.exec({
-    command: 'gh',
-    args,
-    cwd: repoRoot,
-    timeoutMs: 30000,
+  const { repoRoot, title, body, base, isDraft } = draft
+  const result = await githubAPI.prCreate({
+    repoRoot,
+    title,
+    body,
+    base,
+    head: draft.branch,
+    draft: isDraft,
   })
   if ('error' in result) return { error: result.error }
-  if (result.exitCode !== 0) return { error: result.stderr || 'gh pr create failed' }
-  // Parse the PR URL from stdout to get number
-  const url = result.stdout.trim()
-  const match = url.match(/\/pull\/(\d+)$/)
-  const number = match ? parseInt(match[1], 10) : 0
-  return {
-    pr: {
-      number,
-      title,
-      body,
-      url,
-      state: 'open',
-      isDraft,
-      baseRefName: base,
-      headRefName: branch,
-    } as PullRequest,
+  const { number, url } = result
+  const pr = {
+    number,
+    title,
+    body,
+    url,
+    state: 'open',
+    isDraft,
+    baseRefName: base,
+    headRefName: draft.branch,
   }
+  return { pr: pr as PullRequest }
 }
 
 type DescriptionMode = 'write' | 'preview'
@@ -115,29 +136,25 @@ async function loadPrTemplate(repoRoot: string): Promise<string> {
   return ''
 }
 
-export function PrDialog({
-  repoRoot,
-  branch,
-  existingPr,
-  onClose,
-  onCreated,
-}: PrDialogProps): JSX.Element {
-  const [title, setTitle] = useState(() =>
-    branch.replace(/^(feat|fix|chore|docs|refactor)\//i, '').replace(/-/g, ' ')
-  )
-  const [body, setBody] = useState('')
+/** "feat/add-login" becomes "add login". */
+function titleFromBranch(branch: string): string {
+  return branch
+    .replace(new RegExp('^(feat|fix|chore|docs|refactor)/', 'i'), '')
+    .replaceAll('-', ' ')
+}
+
+/** Prefer main or master among local branches, else the first one. */
+function defaultBase(local: Branch[]): string | undefined {
+  const preferred = local.find((b) => b.name === 'main' || b.name === 'master')
+  return (preferred ?? local[0])?.name
+}
+
+/** The repository's other branches, its PR template, and a sensible base. */
+function useBranchChoices(props: PrDialogProps, setBody: (body: string) => void) {
+  const { repoRoot, branch } = props
   const [base, setBase] = useState('main')
-  const [isDraft, setIsDraft] = useState(false)
-  const [isCreating, setIsCreating] = useState(false)
-  const [creatingStatus, setCreatingStatus] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [descMode, setDescMode] = useState<DescriptionMode>('write')
   const [localBranches, setLocalBranches] = useState<Branch[]>([])
   const [remoteBranches, setRemoteBranches] = useState<Branch[]>([])
-  const [baseFilter, setBaseFilter] = useState('')
-
-  const isDefaultBranch = branch === 'main' || branch === 'master'
-
   useEffect(() => {
     void loadPrTemplate(repoRoot).then((template) => {
       if (template) setBody(template)
@@ -146,39 +163,49 @@ export function PrDialog({
       if (!('branches' in result)) return
       const others = result.branches.filter((b) => b.name !== branch)
       const local = others.filter((b) => !b.isRemote)
-      const remote = others.filter((b) => b.isRemote)
       setLocalBranches(local)
-      setRemoteBranches(remote)
-      // Pick a sensible default base: prefer main/master among local branches
-      const preferred = local.find((b) => b.name === 'main' || b.name === 'master')
-      if (preferred) setBase(preferred.name)
-      else if (local[0]) setBase(local[0].name)
+      setRemoteBranches(others.filter((b) => b.isRemote))
+      const picked = defaultBase(local)
+      if (picked) setBase(picked)
     })
-  }, [repoRoot, branch])
+  }, [repoRoot, branch, setBody])
+  return { base, setBase, localBranches, remoteBranches }
+}
 
+function usePrForm(props: PrDialogProps) {
+  const [title, setTitle] = useState(() => titleFromBranch(props.branch))
+  const [body, setBody] = useState('')
+  const [isDraft, setIsDraft] = useState(false)
+  const branches = useBranchChoices(props, setBody)
+  return { title, setTitle, body, setBody, isDraft, setIsDraft, ...branches }
+}
+
+type PrForm = ReturnType<typeof usePrForm>
+
+function draftOf(props: PrDialogProps, form: PrForm): PrDraft {
+  return {
+    repoRoot: props.repoRoot,
+    branch: props.branch,
+    title: form.title.trim(),
+    body: form.body,
+    base: form.base,
+    isDraft: form.isDraft,
+  }
+}
+
+function usePrCreate(props: PrDialogProps, form: PrForm) {
+  const [isCreating, setIsCreating] = useState(false)
+  const [creatingStatus, setCreatingStatus] = useState('')
+  const [error, setError] = useState<string | null>(null)
   const handleCreate = async (): Promise<void> => {
-    if (!title.trim()) {
-      setError('Title is required')
-      return
-    }
+    if (!form.title.trim()) return setError('Title is required')
     setIsCreating(true)
     setCreatingStatus('')
     setError(null)
     try {
-      const result = await ghPrCreate(
-        repoRoot,
-        branch,
-        title.trim(),
-        body,
-        base,
-        isDraft,
-        setCreatingStatus
-      )
-      if ('error' in result) {
-        setError(result.error)
-      } else {
-        onCreated(result.pr)
-      }
+      const result = await ghPrCreate(draftOf(props, form), setCreatingStatus)
+      if ('error' in result) setError(result.error)
+      else props.onCreated(result.pr)
     } catch (err) {
       setError(String(err))
     } finally {
@@ -186,139 +213,170 @@ export function PrDialog({
       setCreatingStatus('')
     }
   }
+  return { isCreating, creatingStatus, error, handleCreate }
+}
 
-  const previewHtml = marked.parse(body || '*No description*') as string
+type PrCreate = ReturnType<typeof usePrCreate>
 
-  const submitLabel = isCreating ? '…' : isDraft ? 'Create Draft PR' : 'Create PR'
+function submitLabel(isCreating: boolean, isDraft: boolean): string {
+  if (isCreating) return '…'
+  return choose(isDraft, 'Create Draft PR', 'Create PR')
+}
 
+function prDialogActions(props: PrDialogProps, form: PrForm, create: PrCreate) {
+  const { isCreating } = create
+  return [
+    { label: 'Cancel', disabled: isCreating, onSelect: props.onClose },
+    {
+      label: submitLabel(isCreating, form.isDraft),
+      tone: 'primary' as const,
+      disabled: isCreating || !form.title.trim() || !!props.existingPr,
+      onSelect: () => void create.handleCreate(),
+    },
+  ]
+}
+
+function ExistingPr({ pr }: { pr: PullRequest }) {
+  return (
+    <div className="pr-dialog__existing-pr">
+      A PR already exists:{' '}
+      <a
+        href={pr.url}
+        onClick={(e) => {
+          e.preventDefault()
+          window.electronAPI.shell.openExternal(pr.url).catch(() => {})
+        }}
+      >
+        #{pr.number}: {pr.title}
+      </a>
+    </div>
+  )
+}
+
+function TitleField({ form }: { form: PrForm }) {
+  return (
+    <div className="pr-dialog__field">
+      <label className="pr-dialog__label">Title</label>
+      <input
+        className="pr-dialog__input"
+        value={form.title}
+        onChange={(e) => form.setTitle(e.target.value)}
+        placeholder="Pull request title"
+      />
+    </div>
+  )
+}
+
+function DescriptionField({ form }: { form: PrForm }) {
+  const [descMode, setDescMode] = useState<DescriptionMode>('write')
+  return (
+    <TabsRoot selectedId={descMode} onSelect={setDescMode}>
+      <div className="pr-dialog__field">
+        <div className="pr-dialog__inline pr-dialog__desc-header">
+          <label className="pr-dialog__label">Description</label>
+          <TabList label="Description">
+            <Tab id="write">Write</Tab>
+            <Tab id="preview">Preview</Tab>
+          </TabList>
+        </div>
+        <TabPanel id="write">
+          <textarea
+            className="pr-dialog__textarea"
+            value={form.body}
+            onChange={(e) => form.setBody(e.target.value)}
+            placeholder="Describe your changes… (Markdown supported)"
+            rows={8}
+          />
+        </TabPanel>
+        <TabPanel id="preview">
+          <RichContent className="pr-dialog__preview">
+            {form.body || '*No description*'}
+          </RichContent>
+        </TabPanel>
+      </div>
+    </TabsRoot>
+  )
+}
+
+function BranchGroup({ label, branches }: { label: string; branches: Branch[] }) {
+  if (branches.length === 0) return null
+  return (
+    <optgroup label={label}>
+      {branches.map((b) => (
+        <option key={b.name} value={b.name}>
+          {b.name}
+        </option>
+      ))}
+    </optgroup>
+  )
+}
+
+function BaseField({ form }: { form: PrForm }) {
+  const [baseFilter, setBaseFilter] = useState('')
+  const matchesBaseFilter = (b: Branch) => b.name.toLowerCase().includes(baseFilter.toLowerCase())
+  return (
+    <div className="pr-dialog__field pr-dialog__field--flex">
+      <label className="pr-dialog__label">Base branch</label>
+      <input
+        className="pr-dialog__input"
+        placeholder="Filter branches…"
+        value={baseFilter}
+        onChange={(e) => setBaseFilter(e.target.value)}
+        style={{ marginBottom: 4 }}
+      />
+      <select
+        className="pr-dialog__input pr-dialog__select"
+        value={form.base}
+        onChange={(e) => form.setBase(e.target.value)}
+        size={6}
+      >
+        <BranchGroup label="Local" branches={form.localBranches.filter(matchesBaseFilter)} />
+        <BranchGroup label="Remote" branches={form.remoteBranches.filter(matchesBaseFilter)} />
+      </select>
+    </div>
+  )
+}
+
+function BaseAndDraft({ form }: { form: PrForm }) {
+  return (
+    <div className="pr-dialog__inline">
+      <BaseField form={form} />
+      <label className="pr-dialog__draft-toggle">
+        <input
+          type="checkbox"
+          checked={form.isDraft}
+          onChange={(e) => form.setIsDraft(e.target.checked)}
+        />
+        Draft
+      </label>
+    </div>
+  )
+}
+
+export function PrDialog(props: PrDialogProps): JSX.Element {
+  const { branch, existingPr } = props
+  const form = usePrForm(props)
+  const create = usePrCreate(props, form)
+  const isDefaultBranch = branch === 'main' || branch === 'master'
   return (
     <Dialog
       title="Open Pull Request"
-      onDismiss={onClose}
-      actions={[
-        { label: 'Cancel', disabled: isCreating, onSelect: onClose },
-        {
-          label: submitLabel,
-          tone: 'primary',
-          disabled: isCreating || !title.trim() || !!existingPr,
-          onSelect: () => void handleCreate(),
-        },
-      ]}
+      onDismiss={props.onClose}
+      actions={prDialogActions(props, form, create)}
     >
-      {existingPr && (
-        <div className="pr-dialog__existing-pr">
-          A PR already exists:{' '}
-          <a
-            href={existingPr.url}
-            onClick={(e) => {
-              e.preventDefault()
-              window.electronAPI.shell.openExternal(existingPr.url).catch(() => {})
-            }}
-          >
-            #{existingPr.number}: {existingPr.title}
-          </a>
-        </div>
-      )}
-
+      {existingPr && <ExistingPr pr={existingPr} />}
       {isDefaultBranch && (
         <div className="pr-dialog__warning">
           Warning: creating a PR from the default branch ({branch}).
         </div>
       )}
-
-      <div className="pr-dialog__field">
-        <label className="pr-dialog__label">Title</label>
-        <input
-          className="pr-dialog__input"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="Pull request title"
-        />
-      </div>
-
-      <div className="pr-dialog__field">
-        <div className="pr-dialog__inline pr-dialog__desc-header">
-          <label className="pr-dialog__label">Description</label>
-          <div className="pr-dialog__mode-toggle">
-            <button
-              className={`pr-dialog__mode-btn${descMode === 'write' ? ' pr-dialog__mode-btn--active' : ''}`}
-              onClick={() => setDescMode('write')}
-            >
-              Write
-            </button>
-            <button
-              className={`pr-dialog__mode-btn${descMode === 'preview' ? ' pr-dialog__mode-btn--active' : ''}`}
-              onClick={() => setDescMode('preview')}
-            >
-              Preview
-            </button>
-          </div>
-        </div>
-        {descMode === 'write' ? (
-          <textarea
-            className="pr-dialog__textarea"
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            placeholder="Describe your changes… (Markdown supported)"
-            rows={8}
-          />
-        ) : (
-          <div className="pr-dialog__preview" dangerouslySetInnerHTML={{ __html: previewHtml }} />
-        )}
-      </div>
-
-      <div className="pr-dialog__inline">
-        <div className="pr-dialog__field pr-dialog__field--flex">
-          <label className="pr-dialog__label">Base branch</label>
-          <input
-            className="pr-dialog__input"
-            placeholder="Filter branches…"
-            value={baseFilter}
-            onChange={(e) => setBaseFilter(e.target.value)}
-            style={{ marginBottom: 4 }}
-          />
-          <select
-            className="pr-dialog__input pr-dialog__select"
-            value={base}
-            onChange={(e) => setBase(e.target.value)}
-            size={6}
-          >
-            {localBranches.filter((b) => b.name.toLowerCase().includes(baseFilter.toLowerCase()))
-              .length > 0 && (
-              <optgroup label="Local">
-                {localBranches
-                  .filter((b) => b.name.toLowerCase().includes(baseFilter.toLowerCase()))
-                  .map((b) => (
-                    <option key={b.name} value={b.name}>
-                      {b.name}
-                    </option>
-                  ))}
-              </optgroup>
-            )}
-            {remoteBranches.filter((b) => b.name.toLowerCase().includes(baseFilter.toLowerCase()))
-              .length > 0 && (
-              <optgroup label="Remote">
-                {remoteBranches
-                  .filter((b) => b.name.toLowerCase().includes(baseFilter.toLowerCase()))
-                  .map((b) => (
-                    <option key={b.name} value={b.name}>
-                      {b.name}
-                    </option>
-                  ))}
-              </optgroup>
-            )}
-          </select>
-        </div>
-
-        <label className="pr-dialog__draft-toggle">
-          <input type="checkbox" checked={isDraft} onChange={(e) => setIsDraft(e.target.checked)} />
-          Draft
-        </label>
-      </div>
-
-      {error && <div className="pr-dialog__error">{error}</div>}
-
-      {isCreating && creatingStatus && <p className="pr-dialog__status">{creatingStatus}</p>}
+      <TitleField form={form} />
+      <DescriptionField form={form} />
+      <BaseAndDraft form={form} />
+      {create.error && <div className="pr-dialog__error">{create.error}</div>}
+      {create.isCreating && create.creatingStatus && (
+        <p className="pr-dialog__status">{create.creatingStatus}</p>
+      )}
     </Dialog>
   )
 }

@@ -1,14 +1,15 @@
-import { create } from 'zustand'
+import { create, type StoreApi } from 'zustand'
 import type { ChangeStats } from '../../shared/schemas/git.schema'
 
 /**
  * How long a cached answer stays good. The sidebar re-renders on every session
  * state change; without a window here that would be one `git diff` spawn per
  * branch per render.
+ * @internal
  */
 export const CHANGE_STATS_TTL_MS = 15_000
 
-export interface ChangeStatsEntry {
+interface ChangeStatsEntry {
   stats: ChangeStats | null
   /** Epoch ms, supplied by the caller — this store holds no clock. */
   fetchedAt: number
@@ -35,6 +36,32 @@ interface ChangeStatsState {
  */
 const inFlight = new Set<string>()
 
+type SetChangeStats = StoreApi<ChangeStatsState>['setState']
+
+/** Asks git for the branch's statistics and records the answer, or the failure, at `now`. */
+function fetchStats(
+  set: SetChangeStats,
+  branch: { branchId: string; cwd: string },
+  now: number
+): void {
+  const settle = (stats: ChangeStats | null): void => {
+    inFlight.delete(branch.branchId)
+    const entry: ChangeStatsEntry = { stats, fetchedAt: now, state: stats ? 'ready' : 'error' }
+    set((s) => ({ entries: new Map(s.entries).set(branch.branchId, entry) }))
+  }
+
+  // The API is absent in the remote renderer and before preload attaches.
+  // Treat that as "statistics unavailable", never as a crash — the row is
+  // supposed to survive git being unreachable.
+  const api = window.electronAPI?.git
+  if (!api?.changeStats) return settle(null)
+
+  void api
+    .changeStats(branch.cwd)
+    .then((result) => settle('error' in result ? null : result))
+    .catch(() => settle(null))
+}
+
 export const useChangeStatsStore = create<ChangeStatsState>((set, get) => ({
   entries: new Map(),
 
@@ -46,36 +73,8 @@ export const useChangeStatsStore = create<ChangeStatsState>((set, get) => ({
     // on the same schedule as one it can rather than on every render.
     if (existing && now - existing.fetchedAt <= CHANGE_STATS_TTL_MS) return
     if (inFlight.has(branchId)) return
-
     inFlight.add(branchId)
-    const settle = (entry: ChangeStatsEntry): void => {
-      inFlight.delete(branchId)
-      set((s) => {
-        const entries = new Map(s.entries)
-        entries.set(branchId, entry)
-        return { entries }
-      })
-    }
-
-    // The API is absent in the remote renderer and before preload attaches.
-    // Treat that as "statistics unavailable", never as a crash — the row is
-    // supposed to survive git being unreachable.
-    const api = window.electronAPI?.git
-    if (!api?.changeStats) {
-      settle({ stats: null, fetchedAt: now, state: 'error' })
-      return
-    }
-
-    void api
-      .changeStats(cwd)
-      .then((result) => {
-        if ('error' in result) {
-          settle({ stats: null, fetchedAt: now, state: 'error' })
-          return
-        }
-        settle({ stats: result, fetchedAt: now, state: 'ready' })
-      })
-      .catch(() => settle({ stats: null, fetchedAt: now, state: 'error' }))
+    fetchStats(set, { branchId, cwd }, now)
   },
 
   invalidate: (branchId) => {

@@ -8,67 +8,23 @@
  * an order nobody had any more. On CI the sidebar row came back for good
  * (run 36342472487, foundry-intake.spec.ts:216).
  */
-import { tmpdir } from 'node:os'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
+import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest'
 
-const USER_DATA = tmpdir()
-
-import { describe, it, expect, beforeAll, beforeEach } from 'vitest'
-import { vi } from 'vitest'
-import type { ExtensionAPI } from '../../../../src/main/extensions/api.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
+import { fakeHost, type FoundryHost } from '../helpers/foundry-host.js'
+import { activateFoundry } from '../helpers/foundry-activation.js'
 import { createOrderStore } from '../../src/order/store.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
+import { theRunner } from '../helpers/supervision-mocks.js'
 
-vi.mock('electron', () => ({
-  BrowserWindow: { getAllWindows: vi.fn().mockReturnValue([]) },
-  safeStorage: {
-    isEncryptionAvailable: vi.fn().mockReturnValue(false),
-    encryptString: vi.fn(),
-    decryptString: vi.fn(),
-  },
-  app: { getPath: vi.fn().mockReturnValue(USER_DATA) },
-}))
+vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
+vi.mock('../../src/runtime/control-server.js', () => import('../helpers/supervision-mocks.js'))
 
-const runner = {
-  start: vi.fn(),
-  resolve: vi.fn(),
-  handBackToTerminal: vi.fn(),
-  interrupt: vi.fn(),
-  stop: vi.fn().mockReturnValue(true),
-  send: vi.fn().mockReturnValue(true),
-  terminalFor: vi.fn().mockReturnValue(null),
-  watchable: vi.fn().mockReturnValue([]),
-  dispose: vi.fn(),
-}
-
-vi.mock('../../src/runtime/supervised-runner.js', () => ({
-  createSupervisedRunner: () => runner,
-}))
-
-vi.mock('../../src/runtime/control-server.js', () => ({
-  createControlServer: vi.fn().mockResolvedValue({
-    url: 'http://127.0.0.1:1/pretooluse',
-    eventUrl: 'http://127.0.0.1:1/event',
-    token: 'token',
-    register: vi.fn().mockReturnValue(() => {}),
-    close: vi.fn(),
-  }),
-}))
-
-let getHandler: (channel: string) => ((payload: unknown) => Promise<unknown>) | undefined
-let api: ExtensionAPI
 let dataDir = ''
-const settingsGet = vi.fn((key: string) =>
-  key === 'terminator.foundry.dataDir' ? dataDir : undefined
-)
-
-function call(channel: string, payload: unknown = {}): Promise<unknown> {
-  const handler = getHandler(channel)
-  if (handler === undefined) throw new Error(`${channel} is not registered`)
-  return handler(payload)
-}
+let host: FoundryHost
 
 function order(over: Partial<WorkOrder> = {}): WorkOrder {
   const base = draftOrder({
@@ -82,60 +38,9 @@ function order(over: Partial<WorkOrder> = {}): WorkOrder {
 }
 
 beforeAll(async () => {
-  const handlers = new Map<string, (payload: unknown) => Promise<unknown>>()
-  api = {
-    ipc: {
-      registerHandler: vi.fn((channel: string, handler: (payload: unknown) => Promise<unknown>) => {
-        handlers.set(channel, handler)
-        return { dispose: vi.fn() }
-      }),
-      invokeChannel: vi.fn(),
-      sendChannel: vi.fn(),
-      onWindowEvent: vi.fn().mockReturnValue(() => {}),
-      isRemoteAccessible: vi.fn().mockReturnValue(false),
-    },
-    window: { broadcast: vi.fn(), openAuxiliary: vi.fn(), focusSelf: vi.fn(), showSelf: vi.fn() },
-    commands: { register: vi.fn().mockReturnValue({ dispose: vi.fn() }), setEnabled: vi.fn() },
-    shell: { exec: vi.fn().mockResolvedValue({ exitCode: 0, stdout: '', stderr: '' }) },
-    notifications: { showToast: vi.fn(), createNotification: vi.fn() },
-    log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
-    settings: {
-      register: vi.fn().mockReturnValue({ dispose: vi.fn() }),
-      get: settingsGet,
-      set: vi.fn(),
-      resolveWorktreeBaseDir: vi.fn().mockReturnValue(path.join(tmpdir(), 'fdry-worktrees')),
-    },
-    terminal: {
-      onSessionCreate: vi.fn().mockReturnValue({ dispose: vi.fn() }),
-      onSessionClose: vi.fn().mockReturnValue({ dispose: vi.fn() }),
-    },
-    workspace: {
-      list: vi.fn().mockReturnValue([]),
-      listProjects: vi.fn().mockReturnValue([]),
-      createProject: vi.fn(),
-      deleteProject: vi.fn(),
-      onDelete: vi.fn().mockReturnValue({ dispose: vi.fn() }),
-      onProjectDelete: vi.fn().mockReturnValue({ dispose: vi.fn() }),
-    },
-    pty: {
-      spawn: vi.fn(),
-      write: vi.fn(),
-      resize: vi.fn(),
-      kill: vi.fn(),
-      listSessions: vi.fn().mockReturnValue([]),
-      attachOnData: vi.fn().mockReturnValue(null),
-      attachOnExit: vi.fn().mockReturnValue(null),
-      openTerminalTab: vi.fn(),
-    },
-    app: { version: '0.0.0-test' },
-  } as unknown as ExtensionAPI
-
-  const { activate, startSupervisionRuntime } = await import('../../src/index.ts')
-  activate(api)
-  getHandler = (channel) => handlers.get(channel)
-  if ((await startSupervisionRuntime(api)) === null) {
-    throw new Error('the supervision runtime did not start')
-  }
+  host = fakeHost(() => dataDir)
+  host.exec.mockResolvedValue({ exitCode: 0, stdout: '', stderr: '', timedOut: false })
+  await activateFoundry(host)
 })
 
 type Started = {
@@ -145,9 +50,10 @@ type Started = {
 }
 
 beforeEach(() => {
-  runner.start.mockReset()
-  runner.start.mockImplementation(async (input: Started) => {
-    const sessionId = `session-${runner.start.mock.calls.length}`
+  theRunner.start.mockReset()
+  theRunner.start.mockImplementation(async (...args: unknown[]) => {
+    const input = args[0] as Started
+    const sessionId = `session-${theRunner.start.mock.calls.length}`
     input.onRegistered?.({ sessionId })
     return { sessionId }
   })
@@ -155,21 +61,21 @@ beforeEach(() => {
 
 describe('deleting an order while its scout is still reading', () => {
   it('starts nothing more for it once the scout ends, and leaves nothing on disk', async () => {
-    dataDir = fs.mkdtempSync(path.join(tmpdir(), 'fdry-delete-intake-'))
+    dataDir = makeTempDir('fdry-delete-intake-')
     await createOrderStore(dataDir).save(order())
 
     // The architect starts at seed, beside the scout rather than after it.
-    await call('foundry:order.converge', { id: 'WO-1' })
-    expect(runner.start).toHaveBeenCalledTimes(2)
-    const started = runner.start.mock.calls.map((c) => c[0] as Started)
+    await host.call('foundry:order.converge', { id: 'WO-1' })
+    expect(theRunner.start).toHaveBeenCalledTimes(2)
+    const started = theRunner.start.mock.calls.map((c) => c[0] as Started)
 
-    await call('foundry:order.delete', { id: 'WO-1' })
+    await host.call('foundry:order.delete', { id: 'WO-1' })
     // Deleting the project closes both terminals.
     for (const run of started) run.onEnd?.(0)
     // What would follow is a chain of file reads and writes; let it run out.
     await new Promise((settle) => setTimeout(settle, 200))
 
-    expect(runner.start).toHaveBeenCalledTimes(2)
+    expect(theRunner.start).toHaveBeenCalledTimes(2)
     expect(fs.existsSync(path.join(dataDir, 'orders', 'WO-1'))).toBe(false)
   })
 })

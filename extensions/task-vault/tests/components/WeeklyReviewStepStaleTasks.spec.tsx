@@ -36,6 +36,13 @@ function makeTask(overrides: Partial<IndexedTask> = {}): IndexedTask {
   }
 }
 
+type StaleStepProps = React.ComponentProps<typeof WeeklyReviewStepStaleTasks>
+
+/** The step outside a recorded review, so nothing it does is logged. */
+function StaleStep(props: Omit<StaleStepProps, 'reviewId'>) {
+  return <WeeklyReviewStepStaleTasks reviewId={null} {...props} />
+}
+
 afterEach(() => {
   cleanup()
   vi.clearAllMocks()
@@ -45,36 +52,40 @@ beforeEach(() => {
   mockInvoke.mockResolvedValue({ success: true })
 })
 
-describe('WeeklyReviewStepStaleTasks', () => {
+describe('WeeklyReviewStepStaleTasks', weeklyReviewStepStaleTasksTests)
+
+function weeklyReviewStepStaleTasksTests() {
+  describe('listing', weeklyReviewStepStaleTasksListingTests)
+  describe('moving', weeklyReviewStepStaleTasksMovingTests)
+  describe('keeping', weeklyReviewStepStaleTasksKeepingTests)
+  describe('failures', weeklyReviewStepStaleTasksFailuresTests)
+  describe('more failures', weeklyReviewStepStaleTasksMoreFailuresTests)
+}
+
+function weeklyReviewStepStaleTasksListingTests() {
   it('shows "no stale tasks" when list is empty', () => {
     const onComplete = vi.fn()
-    render(
-      <WeeklyReviewStepStaleTasks staleTasks={[]} staleDaysThreshold={7} onComplete={onComplete} />
-    )
+    render(<StaleStep staleTasks={[]} staleDaysThreshold={7} onComplete={onComplete} />)
     expect(screen.getByText(/no stale tasks/i)).toBeTruthy()
   })
 
   it('renders stale tasks with text', () => {
     const task = makeTask({ text: 'Fix the thing', todaySince: '2024-01-01' })
-    render(
-      <WeeklyReviewStepStaleTasks staleTasks={[task]} staleDaysThreshold={7} onComplete={vi.fn()} />
-    )
+    render(<StaleStep staleTasks={[task]} staleDaysThreshold={7} onComplete={vi.fn()} />)
     expect(screen.getByText('Fix the thing')).toBeTruthy()
     expect(screen.getByText(/since 2024-01-01/i)).toBeTruthy()
   })
 
   it('shows threshold in description', () => {
-    render(
-      <WeeklyReviewStepStaleTasks staleTasks={[]} staleDaysThreshold={14} onComplete={vi.fn()} />
-    )
+    render(<StaleStep staleTasks={[]} staleDaysThreshold={14} onComplete={vi.fn()} />)
     expect(screen.getByText(/14 days/i)).toBeTruthy()
   })
+}
 
+function weeklyReviewStepStaleTasksMovingTests() {
   it('backlog action removes task from list and calls process-inbox-item', async () => {
     const task = makeTask({ id: 'task-abc', text: 'Stale backlog test' })
-    render(
-      <WeeklyReviewStepStaleTasks staleTasks={[task]} staleDaysThreshold={7} onComplete={vi.fn()} />
-    )
+    render(<StaleStep staleTasks={[task]} staleDaysThreshold={7} onComplete={vi.fn()} />)
     fireEvent.click(screen.getByRole('button', { name: /backlog/i }))
     await waitFor(() => {
       expect(mockInvoke).toHaveBeenCalledWith(
@@ -87,9 +98,7 @@ describe('WeeklyReviewStepStaleTasks', () => {
 
   it('delete action removes task from list and calls cancel-task', async () => {
     const task = makeTask({ id: 'task-del', text: 'Stale delete test' })
-    render(
-      <WeeklyReviewStepStaleTasks staleTasks={[task]} staleDaysThreshold={7} onComplete={vi.fn()} />
-    )
+    render(<StaleStep staleTasks={[task]} staleDaysThreshold={7} onComplete={vi.fn()} />)
     fireEvent.click(screen.getByRole('button', { name: /delete/i }))
     await waitFor(() => {
       expect(mockInvoke).toHaveBeenCalledWith('task-vault:vault:cancel-task', {
@@ -98,12 +107,12 @@ describe('WeeklyReviewStepStaleTasks', () => {
     })
     expect(screen.queryByText('Stale delete test')).toBeNull()
   })
+}
 
+function weeklyReviewStepStaleTasksKeepingTests() {
   it('keep action removes task from list and calls reset-today-since', async () => {
     const task = makeTask({ id: 'task-keep', text: 'Stale keep test' })
-    render(
-      <WeeklyReviewStepStaleTasks staleTasks={[task]} staleDaysThreshold={7} onComplete={vi.fn()} />
-    )
+    render(<StaleStep staleTasks={[task]} staleDaysThreshold={7} onComplete={vi.fn()} />)
     fireEvent.click(screen.getByRole('button', { name: /keep/i }))
     await waitFor(() => {
       expect(mockInvoke).toHaveBeenCalledWith('task-vault:vault:reset-today-since', {
@@ -115,32 +124,30 @@ describe('WeeklyReviewStepStaleTasks', () => {
 
   it('calls onComplete when Next button is clicked', () => {
     const onComplete = vi.fn()
-    render(
-      <WeeklyReviewStepStaleTasks staleTasks={[]} staleDaysThreshold={7} onComplete={onComplete} />
-    )
+    render(<StaleStep staleTasks={[]} staleDaysThreshold={7} onComplete={onComplete} />)
     fireEvent.click(screen.getByRole('button', { name: /next/i }))
     expect(onComplete).toHaveBeenCalled()
   })
+}
 
+function weeklyReviewStepStaleTasksFailuresTests() {
   it('backlog error: keeps task in list and shows toast', async () => {
     mockInvoke.mockResolvedValue({ error: 'DB_ERROR' })
     const task = makeTask({ id: 'task-err', text: 'Backlog fail task' })
-    render(
-      <WeeklyReviewStepStaleTasks staleTasks={[task]} staleDaysThreshold={7} onComplete={vi.fn()} />
-    )
+    render(<StaleStep staleTasks={[task]} staleDaysThreshold={7} onComplete={vi.fn()} />)
     fireEvent.click(screen.getByRole('button', { name: /backlog/i }))
     await waitFor(() =>
       expect(mockNotify).toHaveBeenCalledWith('error', expect.any(String), 'staleTaskBacklogFailed')
     )
     expect(screen.getByText('Backlog fail task')).toBeTruthy()
   })
+}
 
+function weeklyReviewStepStaleTasksMoreFailuresTests() {
   it('delete error: keeps task in list and shows toast', async () => {
     mockInvoke.mockResolvedValue({ error: 'DB_ERROR' })
     const task = makeTask({ id: 'task-err2', text: 'Delete fail task' })
-    render(
-      <WeeklyReviewStepStaleTasks staleTasks={[task]} staleDaysThreshold={7} onComplete={vi.fn()} />
-    )
+    render(<StaleStep staleTasks={[task]} staleDaysThreshold={7} onComplete={vi.fn()} />)
     fireEvent.click(screen.getByRole('button', { name: /delete/i }))
     await waitFor(() =>
       expect(mockNotify).toHaveBeenCalledWith('error', expect.any(String), 'staleTaskDeleteFailed')
@@ -151,13 +158,11 @@ describe('WeeklyReviewStepStaleTasks', () => {
   it('keep error: keeps task in list and shows toast', async () => {
     mockInvoke.mockResolvedValue({ error: 'DB_ERROR' })
     const task = makeTask({ id: 'task-err3', text: 'Keep fail task' })
-    render(
-      <WeeklyReviewStepStaleTasks staleTasks={[task]} staleDaysThreshold={7} onComplete={vi.fn()} />
-    )
+    render(<StaleStep staleTasks={[task]} staleDaysThreshold={7} onComplete={vi.fn()} />)
     fireEvent.click(screen.getByRole('button', { name: /keep/i }))
     await waitFor(() =>
       expect(mockNotify).toHaveBeenCalledWith('error', expect.any(String), 'staleTaskResetFailed')
     )
     expect(screen.getByText('Keep fail task')).toBeTruthy()
   })
-})
+}

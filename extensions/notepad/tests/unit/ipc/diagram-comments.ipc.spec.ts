@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach, vi, beforeAll, afterAll } from 'vitest'
-import { PGlite } from '@electric-sql/pglite'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { DatabaseSync } from 'node:sqlite'
 
 vi.mock('electron', () => ({
   ipcMain: { handle: vi.fn(), removeHandler: vi.fn() },
@@ -7,21 +7,9 @@ vi.mock('electron', () => ({
 }))
 import { ipcMain } from 'electron'
 
-// Adapter: registerHandler forwards to the electron ipcMain mocks so existing
-// capture/assert code (ipcMain.handle calls, removeHandler assertions) still works.
-const mockApi = {
-  ipc: {
-    registerHandler: (ch: string, fn: (payload: unknown) => unknown) => {
-      ;(ipcMain.handle as unknown as ReturnType<typeof vi.fn>)(
-        ch,
-        (_e: unknown, payload: unknown) => fn(payload)
-      )
-      return {
-        dispose: () => (ipcMain.removeHandler as unknown as ReturnType<typeof vi.fn>)(ch),
-      }
-    },
-  },
-} as unknown as import('../../../../../src/main/extensions/api').ExtensionAPI
+import { apiOverIpcMain } from '../support/ipc-main-api'
+
+const mockApi = apiOverIpcMain()
 
 import { wrapDb } from '../../../../../src/main/db/index'
 import { applyNotepadSchema } from '../../../src/db/db'
@@ -33,27 +21,14 @@ import {
   deleteDiagramComment,
   registerDiagramCommentsIpcHandlers,
 } from '../../../src/ipc/diagram-comments.ipc'
-import type { ExtensionDB } from '../../../../../src/main/db/index'
+import type { ExtensionDB } from '@terminator/extension-sdk'
 
-let pg: PGlite
 let db: ExtensionDB
 let diagramId: string
 
-let tables: string
-
-beforeAll(async () => {
-  pg = new PGlite()
-  await pg.waitReady
-  db = wrapDb(pg)
+beforeEach(async () => {
+  db = wrapDb(new DatabaseSync(':memory:'))
   await applyNotepadSchema(db)
-  const { rows } = await pg.query<{ names: string }>(
-    "SELECT string_agg(quote_ident(tablename), ', ') AS names FROM pg_tables WHERE schemaname = 'public'"
-  )
-  tables = rows[0].names
-})
-
-afterAll(async () => {
-  await pg.close()
 })
 
 beforeEach(async () => {
@@ -61,103 +36,8 @@ beforeEach(async () => {
   diagramId = (r as { data: { id: string } }).data.id
 })
 
-afterEach(async () => {
-  await pg.exec(`TRUNCATE ${tables} RESTART IDENTITY CASCADE`)
-})
-
-describe('createDiagramComment', () => {
-  it('creates a root comment at given coordinates', async () => {
-    const result = await createDiagramComment(db, {
-      diagramId,
-      body: 'Check this element',
-      sceneX: 100,
-      sceneY: 200,
-    })
-    expect(result).toHaveProperty('data.id')
-    expect(result).toHaveProperty('data.createdAt')
-  })
-
-  it('creates a reply comment with parentId', async () => {
-    const root = await createDiagramComment(db, {
-      diagramId,
-      body: 'Root comment',
-      sceneX: 0,
-      sceneY: 0,
-    })
-    const parentId = (root as { data: { id: string } }).data.id
-    const reply = await createDiagramComment(db, { diagramId, parentId, body: 'Reply' })
-    expect(reply).toHaveProperty('data.id')
-  })
-
-  it('returns DIAGRAM_NOT_FOUND for unknown diagramId', async () => {
-    const result = await createDiagramComment(db, {
-      diagramId: 'nope',
-      body: 'hi',
-      sceneX: 0,
-      sceneY: 0,
-    })
-    expect(result).toEqual({ error: 'DIAGRAM_NOT_FOUND' })
-  })
-
-  it('returns VALIDATION_ERROR for missing body', async () => {
-    const result = await createDiagramComment(db, { diagramId, sceneX: 0, sceneY: 0 })
-    expect(result).toEqual({ error: 'VALIDATION_ERROR' })
-  })
-})
-
-describe('listDiagramComments', () => {
-  it('returns empty list when no comments', async () => {
-    const result = await listDiagramComments(db, { diagramId })
-    expect((result as { data: unknown[] }).data).toEqual([])
-  })
-
-  it('nests replies under their parent', async () => {
-    const root = await createDiagramComment(db, { diagramId, body: 'Root', sceneX: 10, sceneY: 20 })
-    const parentId = (root as { data: { id: string } }).data.id
-    await createDiagramComment(db, { diagramId, parentId, body: 'Reply' })
-
-    const result = await listDiagramComments(db, { diagramId })
-    const data = (result as { data: { body: string; replies: { body: string }[] }[] }).data
-    expect(data).toHaveLength(1)
-    expect(data[0].body).toBe('Root')
-    expect(data[0].replies).toHaveLength(1)
-    expect(data[0].replies[0].body).toBe('Reply')
-  })
-
-  it('stores sceneX and sceneY', async () => {
-    await createDiagramComment(db, { diagramId, body: 'Pin', sceneX: 42.5, sceneY: 99.1 })
-    const result = await listDiagramComments(db, { diagramId })
-    const data = (result as { data: { sceneX: number; sceneY: number }[] }).data
-    expect(Number(data[0].sceneX)).toBeCloseTo(42.5)
-    expect(Number(data[0].sceneY)).toBeCloseTo(99.1)
-  })
-
-  it('excludes resolved comments by default', async () => {
-    const r = await createDiagramComment(db, {
-      diagramId,
-      body: 'To resolve',
-      sceneX: 0,
-      sceneY: 0,
-    })
-    const id = (r as { data: { id: string } }).data.id
-    await resolveDiagramComment(db, { id })
-    const result = await listDiagramComments(db, { diagramId })
-    expect((result as { data: unknown[] }).data).toHaveLength(0)
-  })
-
-  it('includes resolved comments when includeResolved=true', async () => {
-    const r = await createDiagramComment(db, { diagramId, body: 'Resolved', sceneX: 0, sceneY: 0 })
-    const id = (r as { data: { id: string } }).data.id
-    await resolveDiagramComment(db, { id })
-    const result = await listDiagramComments(db, { diagramId, includeResolved: true })
-    expect((result as { data: unknown[] }).data).toHaveLength(1)
-  })
-
-  it('returns VALIDATION_ERROR for invalid payload', async () => {
-    const result = await listDiagramComments(db, {})
-    expect(result).toEqual({ error: 'VALIDATION_ERROR' })
-  })
-})
+describe('createDiagramComment', createDiagramCommentTests)
+describe('listDiagramComments', listDiagramCommentsTests)
 
 describe('resolveDiagramComment', () => {
   it('resolves a comment and its replies', async () => {
@@ -189,12 +69,13 @@ describe('deleteDiagramComment', () => {
 
 describe('registerDiagramCommentsIpcHandlers', () => {
   it('dispatches each registered handler to its function', async () => {
-    ;(ipcMain.handle as unknown as ReturnType<typeof vi.fn>).mockClear()
+    vi.mocked(ipcMain.handle).mockClear()
     const dispose = registerDiagramCommentsIpcHandlers(mockApi, db)
     const get = (ch: string) =>
-      (ipcMain.handle as unknown as ReturnType<typeof vi.fn>).mock.calls.find(
-        ([c]) => c === ch
-      )![1] as (e: unknown, payload?: unknown) => Promise<unknown>
+      vi.mocked(ipcMain.handle).mock.calls.find(([c]) => c === ch)![1] as (
+        e: unknown,
+        payload?: unknown
+      ) => Promise<unknown>
 
     // Invalid payloads still prove the dispatch reaches each function: every
     // handler validates and answers with a structured VALIDATION_ERROR.
@@ -216,3 +97,104 @@ describe('registerDiagramCommentsIpcHandlers', () => {
     dispose()
   })
 })
+
+function createDiagramCommentTests() {
+  describe('creating', createDiagramCommentCreatingTests)
+  describe('unknown diagrams', createDiagramCommentUnknownDiagramsTests)
+}
+
+function createDiagramCommentCreatingTests() {
+  it('creates a root comment at given coordinates', async () => {
+    const result = await createDiagramComment(db, {
+      diagramId,
+      body: 'Check this element',
+      sceneX: 100,
+      sceneY: 200,
+    })
+    expect(result).toHaveProperty('data.id')
+    expect(result).toHaveProperty('data.createdAt')
+  })
+
+  it('creates a reply comment with parentId', async () => {
+    const root = await createDiagramComment(db, {
+      diagramId,
+      body: 'Root comment',
+      sceneX: 0,
+      sceneY: 0,
+    })
+    const parentId = (root as { data: { id: string } }).data.id
+    const reply = await createDiagramComment(db, { diagramId, parentId, body: 'Reply' })
+    expect(reply).toHaveProperty('data.id')
+  })
+}
+
+function createDiagramCommentUnknownDiagramsTests() {
+  it('returns DIAGRAM_NOT_FOUND for unknown diagramId', async () => {
+    const result = await createDiagramComment(db, {
+      diagramId: 'nope',
+      body: 'hi',
+      sceneX: 0,
+      sceneY: 0,
+    })
+    expect(result).toEqual({ error: 'DIAGRAM_NOT_FOUND' })
+  })
+}
+
+function listDiagramCommentsTests() {
+  describe('listing', listDiagramCommentsListingTests)
+  describe('positions', listDiagramCommentsPositionsTests)
+  describe('resolved comments', listDiagramCommentsResolvedCommentsTests)
+}
+
+function listDiagramCommentsListingTests() {
+  it('returns empty list when no comments', async () => {
+    const result = await listDiagramComments(db, { diagramId })
+    expect((result as { data: unknown[] }).data).toEqual([])
+  })
+
+  it('nests replies under their parent', async () => {
+    const root = await createDiagramComment(db, { diagramId, body: 'Root', sceneX: 10, sceneY: 20 })
+    const parentId = (root as { data: { id: string } }).data.id
+    await createDiagramComment(db, { diagramId, parentId, body: 'Reply' })
+
+    const result = await listDiagramComments(db, { diagramId })
+    const data = (result as { data: { body: string; replies: { body: string }[] }[] }).data
+    expect(data).toHaveLength(1)
+    expect(data[0].body).toBe('Root')
+    expect(data[0].replies).toHaveLength(1)
+    expect(data[0].replies[0].body).toBe('Reply')
+  })
+}
+
+function listDiagramCommentsPositionsTests() {
+  it('stores sceneX and sceneY', async () => {
+    await createDiagramComment(db, { diagramId, body: 'Pin', sceneX: 42.5, sceneY: 99.1 })
+    const result = await listDiagramComments(db, { diagramId })
+    const data = (result as { data: { sceneX: number; sceneY: number }[] }).data
+    expect(Number(data[0].sceneX)).toBeCloseTo(42.5)
+    expect(Number(data[0].sceneY)).toBeCloseTo(99.1)
+  })
+}
+
+function listDiagramCommentsResolvedCommentsTests() {
+  it('excludes resolved comments by default', async () => {
+    const r = await createDiagramComment(db, {
+      diagramId,
+      body: 'To resolve',
+      sceneX: 0,
+      sceneY: 0,
+    })
+    const id = (r as { data: { id: string } }).data.id
+    await resolveDiagramComment(db, { id })
+    const result = await listDiagramComments(db, { diagramId })
+    expect((result as { data: unknown[] }).data).toHaveLength(0)
+  })
+
+  it('includes resolved comments when includeResolved=true', async () => {
+    const r = await createDiagramComment(db, { diagramId, body: 'Resolved', sceneX: 0, sceneY: 0 })
+    const id = (r as { data: { id: string } }).data.id
+    await resolveDiagramComment(db, { id })
+    const result = await listDiagramComments(db, { diagramId, includeResolved: true })
+    expect((result as { data: unknown[] }).data).toHaveLength(1)
+  })
+}

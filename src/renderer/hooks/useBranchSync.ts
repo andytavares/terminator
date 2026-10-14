@@ -1,3 +1,4 @@
+import { useShallow } from 'zustand/react/shallow'
 import { useEffect } from 'react'
 import { useWorkspaceStore } from '../stores/workspace.store'
 
@@ -21,18 +22,18 @@ export interface BranchSyncTarget {
  * a worktree's branch is fixed when it is created, and the only checkout a
  * plain card can see now happens in its own terminal.
  *
- * Polled, because there is no event to listen to. `fs.onChanged` looks like the
- * right seam and is not: nothing in the app calls `fs.watchStart`, so `fs:changed`
- * never fires and a subscription to it would be decoration. `git branch
- * --show-current` reads `.git/HEAD` and is cheap enough to ask for on a timer;
- * a hidden window is not asked at all.
+ * Polled, not watched. A view's file watch (ADR 109) covers a whole tree, and
+ * the branch is one file, `HEAD`: a watch per card would cost more than the
+ * `git branch --show-current` it saves. A hidden window is not asked at all.
  *
  * Worktree cards are not passed here. Every other card is checked against its
  * own tree, so two cards sharing a folder both land on the branch that folder
  * is on without one having to tell the other.
  */
 export function useBranchSync(targets: readonly BranchSyncTarget[]): void {
-  const { updateProjectBranch } = useWorkspaceStore()
+  const { updateProjectBranch } = useWorkspaceStore(
+    useShallow((s) => ({ updateProjectBranch: s.updateProjectBranch }))
+  )
   // The caller rebuilds this array every render. Keying the effect on what the
   // targets say — rather than on the array's identity — is what stops the timer
   // being torn down and restarted on every keystroke elsewhere in the app.

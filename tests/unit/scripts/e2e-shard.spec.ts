@@ -1,4 +1,8 @@
 import { describe, it, expect } from 'vitest'
+import { spawnSync } from 'node:child_process'
+import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { join, resolve } from 'node:path'
+import { makeTempDir } from '../../support/temp-dir'
 import {
   testsFromReport,
   isParallelFile,
@@ -138,4 +142,67 @@ describe('pack', () => {
     const bins = pack(heavy.slice(0, 2), 5)
     expect(bins.filter((bin) => bin.args.length === 0)).toHaveLength(3)
   })
+})
+
+/** The script run from a copy under a temp root, so `--record` writes that
+ * root's tests/e2e/timings.json and never the repository's. */
+function scriptCopy(): { root: string; script: string } {
+  const root = makeTempDir('e2e-shard-cli-')
+  mkdirSync(join(root, 'scripts'))
+  mkdirSync(join(root, 'tests', 'e2e'), { recursive: true })
+  const script = join(root, 'scripts', 'e2e-shard.mjs')
+  copyFileSync(resolve(__dirname, '../../../scripts/e2e-shard.mjs'), script)
+  return { root, script }
+}
+
+function runNodeScript(script: string, args: string[]): { status: number | null; stderr: string } {
+  const run = spawnSync(process.execPath, [script, ...args], { encoding: 'utf8' })
+  return { status: run.status, stderr: run.stderr }
+}
+
+/** A second shard's report, with one test of its own. */
+const SECOND_REPORT = {
+  stats: REPORT.stats,
+  suites: [
+    {
+      title: 'a.spec.ts',
+      file: 'a.spec.ts',
+      specs: [{ title: 'first', file: 'a.spec.ts', line: 1, tests: [result(1000, 1000)] }],
+    },
+  ],
+}
+
+describe('the command line — recording', () => {
+  it('records the timings of every report given, sorted by key', () => {
+    const { root, script } = scriptCopy()
+    const first = join(root, 'first.json')
+    const second = join(root, 'second.json')
+    writeFileSync(first, JSON.stringify(REPORT))
+    writeFileSync(second, JSON.stringify(SECOND_REPORT))
+    expect(runNodeScript(script, ['--record', first, second]).status).toBe(0)
+    const written = readFileSync(join(root, 'tests', 'e2e', 'timings.json'), 'utf8')
+    expect(written).toBe(
+      `${JSON.stringify(
+        {
+          'a.spec.ts › first': 2,
+          'session-home.spec.ts › the app opens on Home': 8,
+          'session-home.spec.ts › the Ledger › fits its surface': 11,
+        },
+        null,
+        2
+      )}\n`
+    )
+  })
+})
+
+describe('the command line — usage', () => {
+  it.each([[['0', '2']], [['3', '2']], [['1.5', '2']], [['x', 'y']]])(
+    'refuses shard arguments %j with its usage',
+    (args) => {
+      const { script } = scriptCopy()
+      const run = runNodeScript(script, args)
+      expect(run.status).not.toBe(0)
+      expect(run.stderr).toContain('usage: e2e-shard.mjs <shard> <total> [spec ...]')
+    }
+  )
 })

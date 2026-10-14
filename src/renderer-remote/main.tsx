@@ -1,5 +1,8 @@
 import React from 'react'
 import { createRoot } from 'react-dom/client'
+import '@terminator/extension-ui/fonts'
+import '@terminator/extension-ui/tokens.css'
+import '@terminator/extension-ui/controls.css'
 import '../renderer/styles.css'
 import { App } from './App'
 

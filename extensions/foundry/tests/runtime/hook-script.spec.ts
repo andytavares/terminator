@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, rmSync, readFileSync, existsSync } from 'fs'
-import { tmpdir } from 'os'
+import { rmSync, readFileSync, existsSync } from 'fs'
 import { join } from 'path'
 import { execFile } from 'child_process'
 import { createServer } from 'node:http'
 import { installHookScript, HOOK_SCRIPT_NAME } from '../../src/runtime/hook-script.js'
 import { createControlServer, type ControlServer } from '../../src/runtime/control-server.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 // The script is run, not read. It is the one part of this feature that
 // executes outside the application, in a process Claude Code owns, and the
@@ -16,7 +16,7 @@ let directory: string
 let server: ControlServer | null = null
 
 beforeEach(() => {
-  directory = mkdtempSync(join(tmpdir(), 'hook-script-'))
+  directory = makeTempDir('hook-script-')
 })
 
 afterEach(async () => {
@@ -32,16 +32,12 @@ const HOOK_INPUT = JSON.stringify({
   tool_input: { command: 'rm -rf /' },
 })
 
-function run(
-  script: string,
-  args: string[],
-  stdin: string,
-  env: Record<string, string> = {}
-): Promise<string> {
+/** Runs `argv` (the script, then its arguments) under Node, feeding it `stdin`. */
+function run(argv: string[], stdin: string, env: Record<string, string> = {}): Promise<string> {
   return new Promise((resolve, reject) => {
     const child = execFile(
       process.execPath,
-      [script, ...args],
+      argv,
       { env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', ...env } },
       (error, stdout) => (error ? reject(error) : resolve(stdout))
     )
@@ -72,12 +68,27 @@ describe('installHookScript', () => {
 })
 
 describe('the hook script, run the way Claude Code runs it', () => {
+  describe('allow and defer', allowAndDeferTests)
+  describe('the tool and input', theToolAndInputTests)
+  describe('the reason', hookScriptTheReasonTests)
+  describe('edited input', editedInputTests)
+  describe('an unreachable or refusing console', anUnreachableOrRefusingConsoleTests)
+  describe('unrecognisable answers and input', unrecognisableAnswersAndInputTests)
+  describe('exit status', exitStatusTests)
+})
+
+const STOP_INPUT = JSON.stringify({
+  session_id: 'runtime-1',
+  hook_event_name: 'Stop',
+  reason: 'end_turn',
+})
+
+function allowAndDeferTests() {
   it('reports allow as the documented hookSpecificOutput shape', async () => {
     server = await createControlServer()
     server.register('s1', { decide: async () => ({ permissionDecision: 'allow' }) })
     const stdout = await run(
-      installHookScript(directory),
-      [server.url, server.token, 's1'],
+      [installHookScript(directory), server.url, server.token, 's1'],
       HOOK_INPUT
     )
     expect(JSON.parse(stdout)).toEqual({
@@ -91,13 +102,14 @@ describe('the hook script, run the way Claude Code runs it', () => {
     server = await createControlServer()
     server.register('s1', { decide: async () => ({ permissionDecision: 'defer' }) })
     const stdout = await run(
-      installHookScript(directory),
-      [server.url, server.token, 's1'],
+      [installHookScript(directory), server.url, server.token, 's1'],
       HOOK_INPUT
     )
     expect(stdout).toBe('')
   })
+}
 
+function theToolAndInputTests() {
   it('passes the tool and its input through to the console', async () => {
     server = await createControlServer()
     let seen: unknown = null
@@ -107,14 +119,16 @@ describe('the hook script, run the way Claude Code runs it', () => {
         return { permissionDecision: 'allow' }
       },
     })
-    await run(installHookScript(directory), [server.url, server.token, 's1'], HOOK_INPUT)
+    await run([installHookScript(directory), server.url, server.token, 's1'], HOOK_INPUT)
     expect(seen).toEqual({
       sessionId: 's1',
       toolName: 'Bash',
       input: { command: 'rm -rf /' },
     })
   })
+}
 
+function hookScriptTheReasonTests() {
   it('carries the operator words back to the agent as the decision reason', async () => {
     server = await createControlServer()
     server.register('s1', {
@@ -124,8 +138,7 @@ describe('the hook script, run the way Claude Code runs it', () => {
       }),
     })
     const stdout = await run(
-      installHookScript(directory),
-      [server.url, server.token, 's1'],
+      [installHookScript(directory), server.url, server.token, 's1'],
       HOOK_INPUT
     )
     // permissionDecisionReason, inside hookSpecificOutput: verified against the
@@ -138,7 +151,9 @@ describe('the hook script, run the way Claude Code runs it', () => {
       },
     })
   })
+}
 
+function editedInputTests() {
   it('carries an edited input back inside hookSpecificOutput, where the runtime reads it', async () => {
     server = await createControlServer()
     server.register('s1', {
@@ -148,8 +163,7 @@ describe('the hook script, run the way Claude Code runs it', () => {
       }),
     })
     const stdout = await run(
-      installHookScript(directory),
-      [server.url, server.token, 's1'],
+      [installHookScript(directory), server.url, server.token, 's1'],
       HOOK_INPUT
     )
     expect(JSON.parse(stdout).hookSpecificOutput).toEqual({
@@ -158,12 +172,13 @@ describe('the hook script, run the way Claude Code runs it', () => {
       updatedInput: { command: 'ls' },
     })
   })
+}
 
+function anUnreachableOrRefusingConsoleTests() {
   it('asks in the terminal when the console cannot be reached', async () => {
     // Nothing is listening on this port: the console is closed, or crashed.
     const stdout = await run(
-      installHookScript(directory),
-      ['http://127.0.0.1:1/pretooluse', 'token', 's1'],
+      [installHookScript(directory), 'http://127.0.0.1:1/pretooluse', 'token', 's1'],
       HOOK_INPUT
     )
     expect(JSON.parse(stdout)).toEqual({
@@ -174,18 +189,19 @@ describe('the hook script, run the way Claude Code runs it', () => {
   it('asks in the terminal when the console refuses the token', async () => {
     server = await createControlServer()
     server.register('s1', { decide: async () => ({ permissionDecision: 'allow' }) })
-    const stdout = await run(installHookScript(directory), [server.url, 'wrong', 's1'], HOOK_INPUT)
+    const stdout = await run([installHookScript(directory), server.url, 'wrong', 's1'], HOOK_INPUT)
     expect(JSON.parse(stdout)).toEqual({
       hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'ask' },
     })
   })
+}
 
+function unrecognisableAnswersAndInputTests() {
   it('asks in the terminal when the console answers something unrecognisable', async () => {
     server = await createControlServer()
     server.register('s1', { decide: async () => ({ permissionDecision: 'maybe' }) as never })
     const stdout = await run(
-      installHookScript(directory),
-      [server.url, server.token, 's1'],
+      [installHookScript(directory), server.url, server.token, 's1'],
       HOOK_INPUT
     )
     expect(JSON.parse(stdout)).toEqual({
@@ -197,31 +213,31 @@ describe('the hook script, run the way Claude Code runs it', () => {
     server = await createControlServer()
     server.register('s1', { decide: async () => ({ permissionDecision: 'allow' }) })
     const stdout = await run(
-      installHookScript(directory),
-      [server.url, server.token, 's1'],
+      [installHookScript(directory), server.url, server.token, 's1'],
       'not json'
     )
     expect(JSON.parse(stdout)).toEqual({
       hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'ask' },
     })
   })
+}
 
+function exitStatusTests() {
   it('exits zero even when it denies, so the runtime reads the decision rather than an error', async () => {
     server = await createControlServer()
     server.register('s1', { decide: async () => ({ permissionDecision: 'deny' }) })
     await expect(
-      run(installHookScript(directory), [server.url, server.token, 's1'], HOOK_INPUT)
+      run([installHookScript(directory), server.url, server.token, 's1'], HOOK_INPUT)
     ).resolves.toBeTruthy()
   })
-})
+}
 
 describe('the hook script reporting a lifecycle event', () => {
-  const STOP_INPUT = JSON.stringify({
-    session_id: 'runtime-1',
-    hook_event_name: 'Stop',
-    reason: 'end_turn',
-  })
+  describe('reporting the end', reportingTheEndTests)
+  describe('staying out of the way', stayingOutOfTheWayTests)
+})
 
+function reportingTheEndTests() {
   it('tells the console the turn ended', async () => {
     server = await createControlServer()
     const seen: string[] = []
@@ -230,8 +246,7 @@ describe('the hook script reporting a lifecycle event', () => {
       onEvent: (kind) => seen.push(kind),
     })
     await run(
-      installHookScript(directory),
-      [server.eventUrl, server.token, 's1', 'stop'],
+      [installHookScript(directory), server.eventUrl, server.token, 's1', 'stop'],
       STOP_INPUT
     )
     expect(seen).toEqual(['stop'])
@@ -245,19 +260,19 @@ describe('the hook script reporting a lifecycle event', () => {
       onEvent: (kind) => seen.push(kind),
     })
     await run(
-      installHookScript(directory),
-      [server.eventUrl, server.token, 's1', 'session_end'],
+      [installHookScript(directory), server.eventUrl, server.token, 's1', 'session_end'],
       STOP_INPUT
     )
     expect(seen).toEqual(['session_end'])
   })
+}
 
+function stayingOutOfTheWayTests() {
   it('says nothing to the agent, because a lifecycle report is not a decision', async () => {
     server = await createControlServer()
     server.register('s1', { decide: async () => ({ permissionDecision: 'allow' }) })
     const stdout = await run(
-      installHookScript(directory),
-      [server.eventUrl, server.token, 's1', 'stop'],
+      [installHookScript(directory), server.eventUrl, server.token, 's1', 'stop'],
       STOP_INPUT
     )
     expect(stdout).toBe('')
@@ -266,13 +281,12 @@ describe('the hook script reporting a lifecycle event', () => {
   it('gets out of the way when the console is not listening', async () => {
     await expect(
       run(
-        installHookScript(directory),
-        ['http://127.0.0.1:1/event', 'token', 's1', 'stop'],
+        [installHookScript(directory), 'http://127.0.0.1:1/event', 'token', 's1', 'stop'],
         STOP_INPUT
       )
     ).resolves.toBe('')
   })
-})
+}
 
 // "Nothing is approved silently and nothing is blocked forever" is this
 // script's stated contract, and the second half needed the request itself to
@@ -292,8 +306,7 @@ describe('a console that accepts and never answers', () => {
       const script = installHookScript(directory)
       const started = Date.now()
       const out = await run(
-        script,
-        [`http://127.0.0.1:${port}/pretooluse`, 'token', 'session-1'],
+        [script, `http://127.0.0.1:${port}/pretooluse`, 'token', 'session-1'],
         HOOK_INPUT,
         { TERMINATOR_HOOK_ANSWER_MS: '1200' }
       )

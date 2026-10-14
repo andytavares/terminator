@@ -1,17 +1,16 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import * as fs from 'node:fs'
-import * as os from 'node:os'
-import * as path from 'node:path'
 import { writeCiState, readCiState } from '../../src/line/ci-state.js'
 import { ciLabel } from '../../src/line/ci-label.js'
 import type { CiState } from '../../src/line/ci-state.js'
-import { readTimeline, forgetTimelines } from '../../src/factory/timeline-store.js'
+import { readTimeline } from '../../src/factory/timeline-store.js'
 import { orderDir } from '../../src/data-root.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 let root: string
 
 beforeEach(() => {
-  root = fs.mkdtempSync(path.join(os.tmpdir(), 'foundry-ci-state-'))
+  root = makeTempDir('foundry-ci-state-')
 })
 
 afterEach(() => {
@@ -38,7 +37,6 @@ describe('ci-state', () => {
   })
 
   it("writes CI into the order's timeline when it changes, so a replay can show the wait", async () => {
-    forgetTimelines()
     await writeCiState(root, 'WO-1', state())
     await writeCiState(root, 'WO-1', state({ at: '2026-09-26T10:00:15.000Z' }))
     await writeCiState(root, 'WO-1', state({ status: 'green' }))

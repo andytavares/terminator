@@ -5,30 +5,6 @@
   gap: 6px;
 }
 
-.vm-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  background: var(--tm-bg-elevated);
-  border: 1px solid var(--tm-border-strong);
-  border-radius: 6px;
-  padding: 4px 8px;
-  color: var(--tm-text-primary);
-  font: inherit;
-  cursor: pointer;
-}
-
-.vm-btn:hover {
-  background: var(--tm-overlay);
-}
-
-.vm-btn--block {
-  display: flex;
-  width: 100%;
-  justify-content: space-between;
-  margin-top: 8px;
-}
-
 .vm-dot {
   width: 6px;
   height: 6px;
@@ -62,42 +38,6 @@
   color: var(--tm-text-secondary);
   font-size: 12px;
   margin-bottom: 4px;
-}
-
-.vm-kbd {
-  font: 500 11px/1 var(--tm-font-mono);
-  border: 1px solid var(--tm-border-strong);
-  border-bottom-width: 2px;
-  border-radius: 4px;
-  padding: 2px 5px;
-  color: var(--tm-text-secondary);
-  background: var(--tm-bg-elevated);
-}
-
-.vm-seg {
-  display: inline-flex;
-  border: 1px solid var(--tm-border-strong);
-  border-radius: 6px;
-  overflow: hidden;
-}
-
-.vm-seg button {
-  background: transparent;
-  border: none;
-  padding: 4px 8px;
-  color: var(--tm-text-secondary);
-  font: inherit;
-  cursor: pointer;
-}
-
-.vm-seg button + button {
-  border-left: 1px solid var(--tm-border-strong);
-}
-
-.vm-seg button[aria-pressed='true'] {
-  background: var(--tm-accent-dim);
-  color: var(--tm-accent-text);
-  font-weight: 600;
 }
 
 .vm-switch-row {

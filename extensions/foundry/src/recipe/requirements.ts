@@ -13,7 +13,7 @@ import type { CheckName } from '../verify/check-names.js'
 // quietly becomes a different pipeline is one you cannot reason about, and
 // deleting it was half the point of this feature.
 
-export interface RequirementCheck {
+interface RequirementCheck {
   readonly met: boolean
   /** Why not, in words the operator can act on. Empty when met. */
   readonly reason: string
@@ -23,62 +23,59 @@ function isCheckName(value: string): value is CheckName {
   return (CHECK_NAMES as readonly string[]).includes(value)
 }
 
-function checkOne(requirement: Requirement, order: WorkOrder): RequirementCheck {
-  switch (requirement.kind) {
-    case 'path_exists': {
-      // Checked against every repository the order names: a recipe that needs
-      // a directory needs it where the work will happen.
-      const missing = order.context.repos.filter(
-        (repo) => !fs.existsSync(path.join(repo.path, requirement.value))
-      )
-      return missing.length === 0
-        ? { met: true, reason: '' }
-        : {
-            met: false,
-            reason: `${missing.map((r) => r.name).join(', ')} has no ${requirement.value}`,
-          }
-    }
+const MET: RequirementCheck = { met: true, reason: '' }
 
-    case 'toolchain': {
-      if (!isCheckName(requirement.value)) {
-        return { met: false, reason: `unknown toolchain check "${requirement.value}"` }
-      }
-      const found = order.context.toolchain[requirement.value]
-      return found !== null
-        ? { met: true, reason: '' }
-        : {
-            met: false,
-            reason: `this repository has no ${requirement.value} command`,
-          }
-    }
-
-    case 'repos': {
-      const comparison = /^(>=|<=|>|<|==)?\s*(\d+)$/.exec(requirement.value.trim())
-      if (comparison === null) return { met: false, reason: `unreadable repos requirement` }
-      const want = Number(comparison[2])
-      const have = order.context.repos.length
-      const operator = comparison[1] ?? '=='
-      const met =
-        operator === '>='
-          ? have >= want
-          : operator === '<='
-            ? have <= want
-            : operator === '>'
-              ? have > want
-              : operator === '<'
-                ? have < want
-                : have === want
-      return met
-        ? { met: true, reason: '' }
-        : { met: false, reason: `needs ${operator} ${want} repositories, this order has ${have}` }
-    }
-
-    default:
-      // An unknown requirement kind is unmet, not ignored. Treating it as met
-      // would let a recipe from a newer build silently run here with a
-      // condition this one cannot evaluate.
-      return { met: false, reason: `unknown requirement "${requirement.kind}"` }
+/** Checked in every repository the order names: a directory is needed where work runs. */
+function pathExists(requirement: Requirement, order: WorkOrder): RequirementCheck {
+  const missing = order.context.repos.filter(
+    (repo) => !fs.existsSync(path.join(repo.path, requirement.value))
+  )
+  if (missing.length === 0) return MET
+  return {
+    met: false,
+    reason: `${missing.map((r) => r.name).join(', ')} has no ${requirement.value}`,
   }
+}
+
+function hasToolchain(requirement: Requirement, order: WorkOrder): RequirementCheck {
+  if (!isCheckName(requirement.value)) {
+    return { met: false, reason: `unknown toolchain check "${requirement.value}"` }
+  }
+  if (order.context.toolchain[requirement.value] !== null) return MET
+  return { met: false, reason: `this repository has no ${requirement.value} command` }
+}
+
+const COMPARISONS: Record<string, (have: number, want: number) => boolean> = {
+  '>=': (have, want) => have >= want,
+  '<=': (have, want) => have <= want,
+  '>': (have, want) => have > want,
+  '<': (have, want) => have < want,
+  '==': (have, want) => have === want,
+}
+
+function repoCount(requirement: Requirement, order: WorkOrder): RequirementCheck {
+  const comparison = /^(>=|<=|>|<|==)?\s*(\d+)$/.exec(requirement.value.trim())
+  if (comparison === null) return { met: false, reason: `unreadable repos requirement` }
+  const want = Number(comparison[2])
+  const have = order.context.repos.length
+  const operator = comparison[1] ?? '=='
+  if (COMPARISONS[operator](have, want)) return MET
+  return { met: false, reason: `needs ${operator} ${want} repositories, this order has ${have}` }
+}
+
+const CHECKS: Record<string, (requirement: Requirement, order: WorkOrder) => RequirementCheck> = {
+  path_exists: pathExists,
+  toolchain: hasToolchain,
+  repos: repoCount,
+}
+
+function checkOne(requirement: Requirement, order: WorkOrder): RequirementCheck {
+  const check = Object.hasOwn(CHECKS, requirement.kind) ? CHECKS[requirement.kind] : undefined
+  if (check !== undefined) return check(requirement, order)
+  // An unknown requirement kind is unmet, not ignored. Treating it as met
+  // would let a recipe from a newer build silently run here with a
+  // condition this one cannot evaluate.
+  return { met: false, reason: `unknown requirement "${requirement.kind}"` }
 }
 
 export interface RecipeAvailability {

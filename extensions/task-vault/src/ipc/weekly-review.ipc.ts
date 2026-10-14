@@ -1,9 +1,9 @@
-import { dialog } from 'electron'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { z } from 'zod'
-import type { ExtensionAPI, ExtensionDB } from '../../../../src/main/extensions/api'
-import { createIpcRegistrar } from './register'
+import type { ExtensionAPI, ExtensionDB } from '@terminator/extension-sdk'
+import { noPayload } from '@terminator/extension-sdk'
+import { localRoute, registerRoutes, route, type IpcContext } from './register'
 import {
   completeReview,
   formatReviewMarkdown,
@@ -11,8 +11,6 @@ import {
   listReviews,
   logReviewAction,
   startOrResumeReview,
-  type ReviewActionKind,
-  type ReviewEntityType,
 } from '../vault/weekly-review-repository'
 
 const ACTION_KINDS = [
@@ -45,71 +43,55 @@ const completeSchema = z.object({
 
 const idSchema = z.object({ reviewId: z.string().min(1) })
 
-const listSchema = z.object({ limit: z.number().int().positive().max(500).optional() })
+const listSchema = z.object({ limit: z.number().int().positive().max(500).optional() }).default({})
 
-export function registerWeeklyReviewIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {
-  const registrar = createIpcRegistrar(api)
-
-  function handle(channel: string, fn: (payload: unknown) => Promise<unknown>) {
-    registrar.handle(channel, async (payload) => {
-      try {
-        return await fn(payload)
-      } catch (err) {
-        return { error: err instanceof Error ? err.message : String(err) }
-      }
-    })
-  }
-
-  handle('task-vault:review:start', async () => {
-    return await startOrResumeReview(db)
-  })
-
-  handle('task-vault:review:log', async (payload) => {
-    const parsed = logSchema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    return { action: await logReviewAction(db, parsed.data) }
-  })
-
-  handle('task-vault:review:complete', async (payload) => {
-    const parsed = completeSchema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    await completeReview(db, parsed.data)
-    return { ok: true }
-  })
-
-  handle('task-vault:review:list', async (payload) => {
-    const parsed = listSchema.safeParse(payload ?? {})
-    const limit = parsed.success ? parsed.data.limit : undefined
-    return { reviews: await listReviews(db, limit) }
-  })
-
-  handle('task-vault:review:get', async (payload) => {
-    const parsed = idSchema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    const review = await getReview(db, parsed.data.reviewId)
-    if (!review) return { error: 'REVIEW_NOT_FOUND' }
-    return { review }
-  })
-
-  handle('task-vault:review:export', async (payload) => {
-    const parsed = idSchema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    const review = await getReview(db, parsed.data.reviewId)
-    if (!review) return { error: 'REVIEW_NOT_FOUND' }
-
-    const result = await dialog.showSaveDialog({
-      title: 'Export weekly review',
-      defaultPath: `weekly-review-${review.startedAt.slice(0, 10)}.md`,
-      filters: [{ name: 'Markdown', extensions: ['md'] }],
-    })
-    if (result.canceled || !result.filePath) return { canceled: true }
-
-    fs.mkdirSync(path.dirname(result.filePath), { recursive: true })
-    fs.writeFileSync(result.filePath, formatReviewMarkdown(review), 'utf8')
-    return { filePath: result.filePath }
-  })
-
-  return registrar.cleanup
+function startWeeklyReview({ db }: IpcContext) {
+  return startOrResumeReview(db)
 }
 
-export type { ReviewActionKind, ReviewEntityType }
+async function logWeeklyReviewAction({ db }: IpcContext, args: z.infer<typeof logSchema>) {
+  return { action: await logReviewAction(db, args) }
+}
+
+async function completeWeeklyReview({ db }: IpcContext, args: z.infer<typeof completeSchema>) {
+  await completeReview(db, args)
+  return { ok: true }
+}
+
+async function listWeeklyReviews({ db }: IpcContext, args: z.infer<typeof listSchema>) {
+  return { reviews: await listReviews(db, args.limit) }
+}
+
+async function getWeeklyReview({ db }: IpcContext, args: z.infer<typeof idSchema>) {
+  const review = await getReview(db, args.reviewId)
+  if (!review) return { error: 'REVIEW_NOT_FOUND' }
+  return { review }
+}
+
+/** Asks where to save a review as Markdown, then writes it there. */
+async function exportWeeklyReview({ api, db }: IpcContext, args: z.infer<typeof idSchema>) {
+  const review = await getReview(db, args.reviewId)
+  if (!review) return { error: 'REVIEW_NOT_FOUND' }
+  const result = await api.dialog.showSaveDialog({
+    title: 'Export weekly review',
+    defaultPath: `weekly-review-${review.startedAt.slice(0, 10)}.md`,
+    filters: [{ name: 'Markdown', extensions: ['md'] }],
+  })
+  if (result.canceled || !result.filePath) return { canceled: true }
+  fs.mkdirSync(path.dirname(result.filePath), { recursive: true })
+  fs.writeFileSync(result.filePath, formatReviewMarkdown(review), 'utf8')
+  return { filePath: result.filePath }
+}
+
+const REVIEW_ROUTES = [
+  route('task-vault:review:start', noPayload, startWeeklyReview),
+  route('task-vault:review:log', logSchema, logWeeklyReviewAction),
+  route('task-vault:review:complete', completeSchema, completeWeeklyReview),
+  route('task-vault:review:list', listSchema, listWeeklyReviews),
+  route('task-vault:review:get', idSchema, getWeeklyReview),
+  localRoute('task-vault:review:export', idSchema, exportWeeklyReview),
+]
+
+export function registerWeeklyReviewIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {
+  return registerRoutes({ api, db }, REVIEW_ROUTES)
+}

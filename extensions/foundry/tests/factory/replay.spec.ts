@@ -7,6 +7,8 @@ import type { Timeline } from '../../src/factory/replay.js'
 import type { Gate } from '../../src/gates/rules.js'
 import type { RunGraph, RunNode } from '../../src/line/run-graph.js'
 import type { ToolActivity } from '../../src/runtime/transcript-tailer.js'
+import { partialFake } from '../../../../tests/support/fakes'
+import { pullRequestChecks } from '../helpers/hall-views.js'
 
 const REAL_TIMELINE = '/Users/atavares/repos/orders/WO-1006-6b5/run-timeline.jsonl'
 
@@ -21,6 +23,8 @@ function node(id: string, over: Partial<RunNode> = {}): RunNode {
     role: 'builder',
     dependsOn: [],
     attempts: 0,
+    reworks: 0,
+    feedback: [],
     sessionId: null,
     worktreePath: null,
     startedAt: null,
@@ -39,16 +43,19 @@ const base: RunGraph = {
   ],
 }
 
-function tool(
-  at: number,
-  sessionId: string,
-  callId: string,
-  kind: ToolActivity['kind'] = 'tool_started'
-) {
+/** A Read the session `sessionId` started at `at`. */
+function tool(at: number, sessionId: string, callId: string) {
   return {
     at,
     sessionId,
-    activity: { kind, toolName: 'Read', callId, isShell: false, path: null, at } as ToolActivity,
+    activity: {
+      kind: 'tool_started',
+      toolName: 'Read',
+      callId,
+      isShell: false,
+      path: null,
+      at,
+    } as ToolActivity,
   }
 }
 
@@ -67,9 +74,9 @@ const timeline: Timeline = {
 }
 
 function gate(raisedAt: number, decidedAt: number | null): Gate {
-  return {
+  return partialFake<Gate>({
     id: 'g-1',
-    rule: 'merge',
+    rule: 'ready-for-review',
     orderId: 'WO-1',
     nodeId: 'g',
     summary: 'Merge?',
@@ -84,51 +91,62 @@ function gate(raisedAt: number, decidedAt: number | null): Gate {
     decision:
       decidedAt === null
         ? null
-        : { option: 'approve', at: new Date(decidedAt).toISOString(), actor: 'operator' },
-  } as unknown as Gate
+        : { option: 'approve', by: 'operator', note: '', at: new Date(decidedAt).toISOString() },
+  })
 }
 
 describe('observationAt', () => {
+  describe('frames', replayFramesTests)
+  describe('tools, gates and liveness', toolsGatesAndLivenessTests)
+})
+
+function replayFramesTests() {
   it('shows the states of the latest frame at or before the moment', () => {
-    const at3 = observationAt(timeline, [], base, 3000)
+    const at3 = observationAt({ timeline, gates: [], base }, 3000)
     expect(at3.graph.nodes.map((n) => [n.id, n.state])).toEqual([
       ['a', 'running'],
       ['b', 'waiting'],
       ['g', 'waiting'],
     ])
-    const at7 = observationAt(timeline, [], base, 7000)
+    const at7 = observationAt({ timeline, gates: [], base }, 7000)
     expect(at7.graph.nodes.find((n) => n.id === 'b')?.state).toBe('running')
     expect(at7.graph.nodes.find((n) => n.id === 'b')?.sessionId).toBe('s-b')
   })
 
   it('starts from the first frame for a moment before anything was recorded', () => {
-    const early = observationAt(timeline, [], base, 0)
+    const early = observationAt({ timeline, gates: [], base }, 0)
     expect(early.graph.nodes.find((n) => n.id === 'a')?.state).toBe('running')
   })
+}
 
+function toolsGatesAndLivenessTests() {
   it('gives each node the tool calls its own session made up to that moment', () => {
-    const at7 = observationAt(timeline, [], base, 7000)
+    const at7 = observationAt({ timeline, gates: [], base }, 7000)
     expect(at7.activity.a?.map((t) => t.callId)).toEqual(['c1'])
     expect(at7.activity.b?.map((t) => t.callId)).toEqual(['c2'])
     // a session no node ever carried belongs to nobody
-    expect(Object.values(observationAt(timeline, [], base, 10000).activity).flat()).toHaveLength(2)
-    expect(observationAt(timeline, [], base, 1500).activity).toEqual({})
+    expect(
+      Object.values(observationAt({ timeline, gates: [], base }, 10000).activity).flat()
+    ).toHaveLength(2)
+    expect(observationAt({ timeline, gates: [], base }, 1500).activity).toEqual({})
   })
 
   it('holds a gate as waiting only between being raised and being decided', () => {
     const gates = [gate(6000, 8000)]
-    expect(observationAt(timeline, gates, base, 5500).waiting).toEqual([])
-    expect(observationAt(timeline, gates, base, 7000).waiting.map((g) => g.id)).toEqual(['g-1'])
-    expect(observationAt(timeline, gates, base, 9000).waiting).toEqual([])
-    expect(observationAt(timeline, [gate(6000, null)], base, 99999).waiting).toHaveLength(1)
+    expect(observationAt({ timeline, gates, base }, 5500).waiting).toEqual([])
+    expect(observationAt({ timeline, gates, base }, 7000).waiting.map((g) => g.id)).toEqual(['g-1'])
+    expect(observationAt({ timeline, gates, base }, 9000).waiting).toEqual([])
+    expect(
+      observationAt({ timeline, gates: [gate(6000, null)], base }, 99999).waiting
+    ).toHaveLength(1)
   })
 
   it('replays no liveness it cannot know: nothing orphaned, nobody stranded', () => {
-    const at = observationAt(timeline, [], base, 7000)
+    const at = observationAt({ timeline, gates: [], base }, 7000)
     expect(at.orphaned).toEqual([])
     expect(at.stranded).toEqual([])
   })
-})
+}
 
 describe('momentsOf', () => {
   it('collects every moment that shows something, gates included, from a second before the first movement', () => {
@@ -197,36 +215,41 @@ describe('replayClock', () => {
   })
 })
 
-describe('a replay of CI', () => {
-  const pull = (buckets: ('pass' | 'pending')[]) => [
+const withCi: Timeline = {
+  ...timeline,
+  ci: [
     {
-      url: 'https://github.com/a/b/pull/1',
-      checks: buckets.map((bucket, i) => ({
-        name: `check-${i}`,
-        bucket,
-        link: '',
-        workflow: 'CI',
-      })),
+      at: 5500,
+      round: 0,
+      max: 2,
+      status: 'watching',
+      pulls: [pullRequestChecks('https://github.com/a/b/pull/1', ['pass', 'pending'])],
     },
-  ]
-  const withCi: Timeline = {
-    ...timeline,
-    ci: [
-      { at: 5500, round: 0, max: 2, status: 'watching', pulls: pull(['pass', 'pending']) },
-      { at: 7500, round: 1, max: 2, status: 'green', pulls: pull(['pass', 'pass']) },
-    ],
-  }
+    {
+      at: 7500,
+      round: 1,
+      max: 2,
+      status: 'green',
+      pulls: [pullRequestChecks('https://github.com/a/b/pull/1', ['pass', 'pass'])],
+    },
+  ],
+}
 
+describe('a replay of CI', () => {
+  describe('CI moments', ciMomentsTests)
+})
+
+function ciMomentsTests() {
   it('shows no CI before the first recorded state, and none for a recording without any', () => {
-    expect(observationAt(withCi, [], base, 5000).ci).toBeNull()
-    expect(observationAt(timeline, [], base, 9000).ci).toBeNull()
+    expect(observationAt({ timeline: withCi, gates: [], base }, 5000).ci).toBeNull()
+    expect(observationAt({ timeline, gates: [], base }, 9000).ci).toBeNull()
   })
 
   it('rebuilds the CI state the run had at that moment', () => {
-    const waiting = observationAt(withCi, [], base, 6000).ci
+    const waiting = observationAt({ timeline: withCi, gates: [], base }, 6000).ci
     expect(waiting?.status).toBe('watching')
     expect(waiting?.pulls[0].checks.map((c) => c.bucket)).toEqual(['pass', 'pending'])
-    const done = observationAt(withCi, [], base, 8000).ci
+    const done = observationAt({ timeline: withCi, gates: [], base }, 8000).ci
     expect(done?.round).toBe(1)
     expect(done?.pulls[0].checks.map((c) => c.bucket)).toEqual(['pass', 'pass'])
   })
@@ -234,11 +257,11 @@ describe('a replay of CI', () => {
   it('counts each recorded CI change as a moment worth showing', () => {
     expect(momentsOf(withCi, [])).toEqual([0, 1000, 2000, 5000, 5500, 6000, 7500])
   })
-})
+}
 
 describe.skipIf(!existsSync(REAL_TIMELINE))('a recorded run', () => {
   it('has no CI line to replay yet, which is not an error', async () => {
     const recorded = await readTimeline(dirname(REAL_TIMELINE))
-    expect(observationAt(recorded, [], base, Date.now()).ci).toBeNull()
+    expect(observationAt({ timeline: recorded, gates: [], base }, Date.now()).ci).toBeNull()
   })
 })

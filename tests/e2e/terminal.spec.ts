@@ -18,6 +18,97 @@ let handle: AppHandle
 
 const sessionTabs = () => handle.page.locator('.tab-bar__tab--session')
 
+async function sessionsSurviveSwitchingWorkspaces(): Promise<void> {
+  const { page, userDataDir } = handle
+  // Workspace A with a project (selecting it auto-creates the first session).
+  await createWorkspace(page, 'WS-Persist-A', userDataDir)
+  await addAndSelectProject(page, 'WS-Persist-A', 'Proj-A')
+  await page.keyboard.press('Meta+t') // second session
+  await expect(sessionTabs()).toHaveCount(2)
+
+  // Workspace B with its own project.
+  await createWorkspace(page, 'WS-Persist-B', userDataDir)
+  await addAndSelectProject(page, 'WS-Persist-B', 'Proj-B')
+  await expect(sessionTabs()).toHaveCount(1)
+
+  // Back to A — both sessions survived in the background.
+  await selectProject(page, 'WS-Persist-A', 'Proj-A')
+  await expect(sessionTabs()).toHaveCount(2)
+}
+
+async function terminalPaneShowsForActiveProject(): Promise<void> {
+  const { page } = handle
+  await selectProject(page, 'WS-Persist-A', 'Proj-A')
+  await expect(page.locator('.terminal-pane').first()).toBeVisible()
+}
+
+async function cmdOneExpandsFirstWorkspace(): Promise<void> {
+  const { page } = handle
+  await page.keyboard.press('Meta+1')
+  // Cmd+1 expands the first workspace and collapses the others.
+  await expect(page.locator('.branch-row').first()).toBeVisible()
+}
+
+async function cmdArrowRightCyclesSessionTabs(): Promise<void> {
+  const { page } = handle
+  await selectProject(page, 'WS-Persist-A', 'Proj-A')
+  await expect.poll(() => sessionTabs().count()).toBeGreaterThanOrEqual(2)
+
+  await sessionTabs().first().click()
+  await expect(sessionTabs().first()).toHaveClass(/tab-bar__tab--active/)
+  await page.keyboard.press('Meta+ArrowRight')
+  await expect(sessionTabs().first()).not.toHaveClass(/tab-bar__tab--active/)
+}
+
+async function cmdTOpensSessionTab(): Promise<void> {
+  const { page } = handle
+  await selectProject(page, 'WS-Persist-A', 'Proj-A')
+  const before = await sessionTabs().count()
+  await page.keyboard.press('Meta+t')
+  await expect(sessionTabs()).toHaveCount(before + 1)
+}
+
+async function closingTabRemovesIt(): Promise<void> {
+  const { page, userDataDir } = handle
+  await createWorkspace(page, 'WS-Cleanup', userDataDir)
+  await addAndSelectProject(page, 'WS-Cleanup', 'Proj-Cleanup')
+  await page.keyboard.press('Meta+t')
+  const before = await sessionTabs().count()
+  await page.locator('.tab-bar__close').last().click()
+  await expect(sessionTabs()).toHaveCount(before - 1)
+}
+
+async function backgroundSessionsSurviveNavigation(): Promise<void> {
+  const { page } = handle
+  await selectProject(page, 'WS-Persist-B', 'Proj-B')
+  await expect(sessionTabs()).toHaveCount(1)
+  await selectProject(page, 'WS-Persist-A', 'Proj-A')
+  await expect.poll(() => sessionTabs().count()).toBeGreaterThanOrEqual(2)
+}
+
+async function switchingTabsKeepsPaneMounted(): Promise<void> {
+  const { page } = handle
+  await selectProject(page, 'WS-Persist-A', 'Proj-A')
+  await expect.poll(() => sessionTabs().count()).toBeGreaterThanOrEqual(2)
+  await sessionTabs().first().click()
+  await expect(page.locator('.terminal-pane').first()).toBeVisible()
+  await sessionTabs().last().click()
+  await expect(page.locator('.terminal-pane').first()).toBeVisible()
+}
+
+async function staysResponsiveWithBackgroundSessions(): Promise<void> {
+  const { page, userDataDir } = handle
+  await createWorkspace(page, 'WS-Perf', userDataDir)
+  await addAndSelectProject(page, 'WS-Perf', 'Proj-Perf')
+  for (let i = 0; i < 4; i++) await page.keyboard.press('Meta+t')
+  await expect.poll(() => sessionTabs().count()).toBeGreaterThanOrEqual(5)
+  await sessionTabs().first().click()
+  await sessionTabs().last().click()
+  await expect(page.locator('.terminal-pane').first()).toBeVisible()
+  // The created workspace card still renders — UI not wedged.
+  await expect(workspaceRow(page, 'WS-Perf')).toBeVisible()
+}
+
 // One story: every test after the first selects a project/workspace the
 // earlier tests created (WS-Persist-A/B), so it can only run in order.
 // Serial keeps that order even when only one test is selected to run alone.
@@ -26,98 +117,38 @@ test.describe.serial('terminal sessions', () => {
     handle = await launchApp()
   })
 
-  test.afterAll(async () => {
-    await closeApp(handle)
-  })
+  test.afterAll(() => closeApp(handle))
 
-  test('US3-1: a project keeps its terminal sessions when switching workspaces', async () => {
-    const { page, userDataDir } = handle
-    // Workspace A with a project (selecting it auto-creates the first session).
-    await createWorkspace(page, 'WS-Persist-A', userDataDir)
-    await addAndSelectProject(page, 'WS-Persist-A', 'Proj-A')
-    await page.keyboard.press('Meta+t') // second session
-    await expect(sessionTabs()).toHaveCount(2)
+  test(
+    'US3-1: a project keeps its terminal sessions when switching workspaces',
+    sessionsSurviveSwitchingWorkspaces
+  )
 
-    // Workspace B with its own project.
-    await createWorkspace(page, 'WS-Persist-B', userDataDir)
-    await addAndSelectProject(page, 'WS-Persist-B', 'Proj-B')
-    await expect(sessionTabs()).toHaveCount(1)
+  test(
+    'US3-3: the terminal pane is visible when a project is active',
+    terminalPaneShowsForActiveProject
+  )
 
-    // Back to A — both sessions survived in the background.
-    await selectProject(page, 'WS-Persist-A', 'Proj-A')
-    await expect(sessionTabs()).toHaveCount(2)
-  })
+  test('US3-5: Cmd+1 activates and expands the first workspace', cmdOneExpandsFirstWorkspace)
 
-  test('US3-3: the terminal pane is visible when a project is active', async () => {
-    const { page } = handle
-    await selectProject(page, 'WS-Persist-A', 'Proj-A')
-    await expect(page.locator('.terminal-pane').first()).toBeVisible()
-  })
+  test('US3-6: Cmd+ArrowRight cycles to the next session tab', cmdArrowRightCyclesSessionTabs)
 
-  test('US3-5: Cmd+1 activates and expands the first workspace', async () => {
-    const { page } = handle
-    await page.keyboard.press('Meta+1')
-    // Cmd+1 expands the first workspace and collapses the others.
-    await expect(page.locator('.branch-row').first()).toBeVisible()
-  })
+  test('US3-7: Cmd+T opens a new session tab', cmdTOpensSessionTab)
 
-  test('US3-6: Cmd+ArrowRight cycles to the next session tab', async () => {
-    const { page } = handle
-    await selectProject(page, 'WS-Persist-A', 'Proj-A')
-    await expect.poll(() => sessionTabs().count()).toBeGreaterThanOrEqual(2)
+  test('US4-1: closing a tab removes it from the session tab bar', closingTabRemovesIt)
 
-    await sessionTabs().first().click()
-    await expect(sessionTabs().first()).toHaveClass(/tab-bar__tab--active/)
-    await page.keyboard.press('Meta+ArrowRight')
-    await expect(sessionTabs().first()).not.toHaveClass(/tab-bar__tab--active/)
-  })
+  test(
+    'US4-3: background sessions remain accessible after navigating away and back',
+    backgroundSessionsSurviveNavigation
+  )
 
-  test('US3-7: Cmd+T opens a new session tab', async () => {
-    const { page } = handle
-    await selectProject(page, 'WS-Persist-A', 'Proj-A')
-    const before = await sessionTabs().count()
-    await page.keyboard.press('Meta+t')
-    await expect(sessionTabs()).toHaveCount(before + 1)
-  })
+  test(
+    'SC-002: switching session tabs keeps a terminal pane mounted',
+    switchingTabsKeepsPaneMounted
+  )
 
-  test('US4-1: closing a tab removes it from the session tab bar', async () => {
-    const { page, userDataDir } = handle
-    await createWorkspace(page, 'WS-Cleanup', userDataDir)
-    await addAndSelectProject(page, 'WS-Cleanup', 'Proj-Cleanup')
-    await page.keyboard.press('Meta+t')
-    const before = await sessionTabs().count()
-    await page.locator('.tab-bar__close').last().click()
-    await expect(sessionTabs()).toHaveCount(before - 1)
-  })
-
-  test('US4-3: background sessions remain accessible after navigating away and back', async () => {
-    const { page } = handle
-    await selectProject(page, 'WS-Persist-B', 'Proj-B')
-    await expect(sessionTabs()).toHaveCount(1)
-    await selectProject(page, 'WS-Persist-A', 'Proj-A')
-    await expect.poll(() => sessionTabs().count()).toBeGreaterThanOrEqual(2)
-  })
-
-  test('SC-002: switching session tabs keeps a terminal pane mounted', async () => {
-    const { page } = handle
-    await selectProject(page, 'WS-Persist-A', 'Proj-A')
-    await expect.poll(() => sessionTabs().count()).toBeGreaterThanOrEqual(2)
-    await sessionTabs().first().click()
-    await expect(page.locator('.terminal-pane').first()).toBeVisible()
-    await sessionTabs().last().click()
-    await expect(page.locator('.terminal-pane').first()).toBeVisible()
-  })
-
-  test('SC-008: the UI stays responsive with several background sessions', async () => {
-    const { page, userDataDir } = handle
-    await createWorkspace(page, 'WS-Perf', userDataDir)
-    await addAndSelectProject(page, 'WS-Perf', 'Proj-Perf')
-    for (let i = 0; i < 4; i++) await page.keyboard.press('Meta+t')
-    await expect.poll(() => sessionTabs().count()).toBeGreaterThanOrEqual(5)
-    await sessionTabs().first().click()
-    await sessionTabs().last().click()
-    await expect(page.locator('.terminal-pane').first()).toBeVisible()
-    // The created workspace card still renders — UI not wedged.
-    await expect(workspaceRow(page, 'WS-Perf')).toBeVisible()
-  })
+  test(
+    'SC-008: the UI stays responsive with several background sessions',
+    staysResponsiveWithBackgroundSessions
+  )
 })

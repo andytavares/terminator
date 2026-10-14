@@ -23,6 +23,26 @@ function base() {
 }
 
 describe('makeVerdict', () => {
+  describe('passes', passesTests)
+  describe('the working session', theWorkingSessionTests)
+  describe('no session', verdictNoSessionTests)
+  describe('citations', citationsTests)
+  describe('not measured', verdictNotMeasuredTests)
+})
+
+function verdict(criterionId: string, result: Verdict['result']): Verdict {
+  return {
+    nodeId: 'n',
+    criterionId,
+    result,
+    reason: 'r',
+    evidence: [],
+    producedBy: { role: 'verifier', sessionId: 's' },
+    at: 'now',
+  }
+}
+
+function passesTests() {
   it('builds a pass with evidence', () => {
     const v = makeVerdict({
       ...base(),
@@ -33,7 +53,9 @@ describe('makeVerdict', () => {
     expect(v.result).toBe('pass')
     expect(v.at).toBe('2026-09-06T10:00:00.000Z')
   })
+}
 
+function theWorkingSessionTests() {
   it('refuses a verdict from the session that did the work', () => {
     expect(() =>
       makeVerdict({
@@ -57,7 +79,9 @@ describe('makeVerdict', () => {
       })
     ).toThrow(/own homework/)
   })
+}
 
+function verdictNoSessionTests() {
   it('allows a verdict when the work had no session of its own', () => {
     expect(() =>
       makeVerdict({
@@ -69,7 +93,9 @@ describe('makeVerdict', () => {
       })
     ).not.toThrow()
   })
+}
 
+function citationsTests() {
   it('refuses a pass that cites nothing', () => {
     expect(() => makeVerdict({ ...base(), result: 'pass', reason: '', evidence: [] })).toThrow(
       UnevidencedVerdictError
@@ -92,7 +118,9 @@ describe('makeVerdict', () => {
       })
     ).toThrow(UnevidencedVerdictError)
   })
+}
 
+function verdictNotMeasuredTests() {
   it('allows "not measured" to cite nothing, because there was nothing to cite', () => {
     const v = makeVerdict({
       ...base(),
@@ -108,21 +136,13 @@ describe('makeVerdict', () => {
       makeVerdict({ ...base(), result: 'not_measured', reason: '', evidence: [] })
     ).toThrow(UnevidencedVerdictError)
   })
-})
+}
 
 describe('summarise', () => {
-  function verdict(criterionId: string, result: Verdict['result']): Verdict {
-    return {
-      nodeId: 'n',
-      criterionId,
-      result,
-      reason: 'r',
-      evidence: [],
-      producedBy: { role: 'verifier', sessionId: 's' },
-      at: 'now',
-    }
-  }
+  describe('summaries', verdictSummariesTests)
+})
 
+function verdictSummariesTests() {
   it('counts each kind', () => {
     const s = summarise([
       verdict('AC-1', 'pass'),
@@ -146,9 +166,15 @@ describe('summarise', () => {
   it('is not ok with nothing to summarise — no verdicts is not a pass', () => {
     expect(summarise([]).ok).toBe(false)
   })
-})
+}
 
 describe('verdictFromExit', () => {
+  describe('exit statuses', verdictExitStatusesTests)
+  describe('output', outputTests)
+  describe('judging itself', judgingItselfTests)
+})
+
+function verdictExitStatusesTests() {
   it('passes on a zero exit', () => {
     const v = verdictFromExit({ ...base(), command: 'npm test', exitCode: 0 })
     expect(v.result).toBe('pass')
@@ -167,7 +193,9 @@ describe('verdictFromExit', () => {
     expect(v.result).toBe('not_measured')
     expect(v.reason).toContain('did not run here')
   })
+}
 
+function outputTests() {
   it('ignores what the command printed when deciding', () => {
     const printedPasses = verdictFromExit({
       ...base(),
@@ -188,7 +216,9 @@ describe('verdictFromExit', () => {
     expect(v.result).toBe('pass')
     expect(v.evidence.map((e) => e.kind)).toEqual(['exit_code', 'stdout'])
   })
+}
 
+function judgingItselfTests() {
   it('still refuses to let the working session judge itself', () => {
     expect(() =>
       verdictFromExit({
@@ -199,4 +229,4 @@ describe('verdictFromExit', () => {
       })
     ).toThrow(SelfVerificationError)
   })
-})
+}

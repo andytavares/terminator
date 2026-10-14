@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { builderUnit } from '../helpers/order-parts.js'
 import {
   buildRunGraph,
   nodeById,
@@ -62,36 +63,9 @@ function order(over: Partial<WorkOrder> = {}): WorkOrder {
     plan: {
       ...base.plan,
       units: [
-        {
-          id: 'U-1',
-          title: 'a',
-          role: 'builder',
-          lane: 1,
-          dependsOn: [],
-          satisfies: ['AC-1'],
-          touches: [],
-          verify: [],
-        },
-        {
-          id: 'U-2',
-          title: 'b',
-          role: 'builder',
-          lane: 1,
-          dependsOn: ['U-1'],
-          satisfies: ['AC-1'],
-          touches: [],
-          verify: [],
-        },
-        {
-          id: 'U-3',
-          title: 'c',
-          role: 'scribe',
-          lane: 1,
-          dependsOn: [],
-          satisfies: ['AC-1'],
-          touches: [],
-          verify: [],
-        },
+        builderUnit('U-1', { title: 'a', satisfies: ['AC-1'] }),
+        builderUnit('U-2', { title: 'b', dependsOn: ['U-1'], satisfies: ['AC-1'] }),
+        builderUnit('U-3', { title: 'c', role: 'scribe', satisfies: ['AC-1'] }),
       ],
     },
     ...over,
@@ -99,6 +73,13 @@ function order(over: Partial<WorkOrder> = {}): WorkOrder {
 }
 
 describe('buildRunGraph', () => {
+  describe('nodes', runGraphNodesTests)
+  describe('dependencies', runGraphDependenciesTests)
+  describe('waiting and conditions', waitingAndConditionsTests)
+  describe('provenance and empty fan-outs', provenanceAndEmptyFanOutsTests)
+})
+
+function runGraphNodesTests() {
   it('makes one node per plain step', () => {
     const graph = buildRunGraph(order(), recipe())
     expect(nodeById(graph, 'reproduce')?.kind).toBe('agent')
@@ -122,7 +103,9 @@ describe('buildRunGraph', () => {
     expect(node?.unitIds).toEqual(['U-1'])
     expect(node?.lane).toBe(1)
   })
+}
 
+function runGraphDependenciesTests() {
   it("gives a fan-out child its parent's dependencies", () => {
     const graph = buildRunGraph(order(), recipe())
     expect(nodeById(graph, 'build:U-1')?.dependsOn).toContain('reproduce')
@@ -137,7 +120,9 @@ describe('buildRunGraph', () => {
     const graph = buildRunGraph(order(), recipe())
     expect(nodeById(graph, 'inspect')?.dependsOn).toEqual(['build:U-1', 'build:U-2'])
   })
+}
 
+function waitingAndConditionsTests() {
   it('starts every node waiting', () => {
     const graph = buildRunGraph(order(), recipe())
     expect(graph.nodes.filter((n) => n.state === 'waiting').length).toBeGreaterThan(0)
@@ -165,7 +150,9 @@ describe('buildRunGraph', () => {
     o.risk.triggers = ['secrets']
     expect(nodeById(buildRunGraph(o, recipe()), 'inspect')?.state).toBe('waiting')
   })
+}
 
+function provenanceAndEmptyFanOutsTests() {
   it('records which order and recipe it came from', () => {
     const graph = buildRunGraph(order(), recipe())
     expect(graph.orderId).toBe('WO-1')
@@ -177,7 +164,7 @@ describe('buildRunGraph', () => {
     const graph = buildRunGraph(o, recipe())
     expect(graph.nodes.filter((n) => n.stepId === 'build')).toEqual([])
   })
-})
+}
 
 // Fanning out `by lane`.
 //
@@ -222,13 +209,21 @@ function laneOrder(units: WorkOrder['plan']['units'], lanes = [1]): WorkOrder {
 function unit(
   id: string,
   lane: number,
-  dependsOn: string[] = [],
-  role = 'builder'
+  dependsOn: string[] = []
 ): WorkOrder['plan']['units'][number] {
-  return { id, title: id, role, lane, dependsOn, satisfies: ['AC-1'], touches: [], verify: [] }
+  return builderUnit(id, { lane, dependsOn, satisfies: ['AC-1'] })
 }
 
 describe('a fan-out by lane', () => {
+  describe('one node per lane', oneNodePerLaneTests)
+  describe('units and filters', unitsAndFiltersTests)
+  describe('waiting', runGraphWaitingTests)
+  describe('empty filters and plan order', emptyFiltersAndPlanOrderTests)
+  describe('cycles and outside dependencies', cyclesAndOutsideDependenciesTests)
+  describe('naming', namingTests)
+})
+
+function oneNodePerLaneTests() {
   it('makes one node for seven units that share a lane', () => {
     const o = laneOrder([
       unit('U-1', 1),
@@ -253,7 +248,9 @@ describe('a fan-out by lane', () => {
       'build:lane-3',
     ])
   })
+}
 
+function unitsAndFiltersTests() {
   it('carries every unit it covers, in dependency order', () => {
     const o = laneOrder([unit('U-3', 1, ['U-1']), unit('U-1', 1), unit('U-2', 1, ['U-1'])])
     const graph = buildRunGraph(o, recipe(BY_LANE, 'bylane.yaml'))
@@ -261,11 +258,13 @@ describe('a fan-out by lane', () => {
   })
 
   it("honours the filter, so a scribe unit is not the builder lane node's work", () => {
-    const o = laneOrder([unit('U-1', 1), unit('U-2', 1, [], 'scribe')])
+    const o = laneOrder([unit('U-1', 1), { ...unit('U-2', 1), role: 'scribe' }])
     const graph = buildRunGraph(o, recipe(BY_LANE, 'bylane.yaml'))
     expect(nodeById(graph, 'build:lane-1')?.unitIds).toEqual(['U-1'])
   })
+}
 
+function runGraphWaitingTests() {
   it('waits on the lane that holds a unit it depends on', () => {
     const o = laneOrder([unit('U-1', 1), unit('U-2', 2, ['U-1'])], [1, 2])
     const graph = buildRunGraph(o, recipe(BY_LANE, 'bylane.yaml'))
@@ -283,9 +282,11 @@ describe('a fan-out by lane', () => {
     const graph = buildRunGraph(o, recipe(BY_LANE, 'bylane.yaml'))
     expect(nodeById(graph, 'verify')?.dependsOn).toEqual(['build:lane-1', 'build:lane-2'])
   })
+}
 
+function emptyFiltersAndPlanOrderTests() {
   it('produces nothing when the filter selects nothing', () => {
-    const o = laneOrder([unit('U-1', 1, [], 'scribe')])
+    const o = laneOrder([{ ...unit('U-1', 1), role: 'scribe' }])
     const graph = buildRunGraph(o, recipe(BY_LANE, 'bylane.yaml'))
     expect(graph.nodes.filter((n) => n.stepId === 'build')).toEqual([])
   })
@@ -299,7 +300,9 @@ describe('a fan-out by lane', () => {
     const graph = buildRunGraph(o, recipe(BY_LANE, 'bylane.yaml'))
     expect(nodeById(graph, 'build:lane-1')?.unitIds).toEqual(['U-1', 'U-2'])
   })
+}
 
+function cyclesAndOutsideDependenciesTests() {
   it('orders what it can and keeps the rest, when only some of them cycle', () => {
     const o = laneOrder([
       unit('U-3', 1, ['U-1']),
@@ -316,7 +319,9 @@ describe('a fan-out by lane', () => {
     const graph = buildRunGraph(o, recipe(BY_LANE, 'bylane.yaml'))
     expect(nodeById(graph, 'build:lane-1')?.dependsOn).toEqual([])
   })
+}
 
+function namingTests() {
   it('names a lane node after its lane and the work, not after one unit', () => {
     const o = laneOrder([unit('U-1', 1), unit('U-2', 1, ['U-1'])])
     const graph = buildRunGraph(o, recipe(BY_LANE, 'bylane.yaml'))
@@ -324,7 +329,7 @@ describe('a fan-out by lane', () => {
     expect(node).toBeDefined()
     expect(nodeLabel(o, node as RunNode)).toBe('builder · 2 units in repo-1')
   })
-})
+}
 
 describe('nodeById and withNode', () => {
   it('finds a node', () => {
@@ -359,8 +364,7 @@ describe('stepFor', () => {
   })
 })
 
-describe('run-graph edge cases', () => {
-  const MINIMAL = `
+const MINIMAL = `
 schemaVersion: 1
 id: minimal
 steps:
@@ -369,6 +373,42 @@ steps:
     command: make
 `
 
+describe('run-graph edge cases', () => {
+  describe('roles and selection', rolesAndSelectionTests)
+  describe('dependencies and conditions', dependenciesAndConditionsTests)
+  describe('initial state', initialStateTests)
+  describe('foreign nodes', foreignNodesTests)
+})
+
+const node = (over: Partial<RunNode> & Pick<RunNode, 'id'>): RunNode => ({
+  stepId: 'build',
+  kind: 'agent',
+  state: 'waiting',
+  unitIds: [],
+  lane: null,
+  role: null,
+  dependsOn: [],
+  attempts: 0,
+  reworks: 0,
+  feedback: [],
+  sessionId: null,
+  worktreePath: null,
+  startedAt: null,
+  endedAt: null,
+  ...over,
+})
+const withUnit = (): WorkOrder => {
+  const base = order()
+  return {
+    ...base,
+    plan: {
+      ...base.plan,
+      units: [builderUnit('U-1', { title: 'refresh the token on a 401' })],
+    },
+  }
+}
+
+function rolesAndSelectionTests() {
   it('falls back to the unit own role when a fan-out names none', () => {
     const r = parseRecipe(
       `schemaVersion: 1\nid: f\nsteps:\n  - id: build\n    kind: fanout\n    over: plan.units\n    step: { kind: agent }\n`,
@@ -393,7 +433,9 @@ steps:
     if (!r.ok) throw new Error(r.reason)
     expect(nodeById(buildRunGraph(order(), r.value), 'only')?.role).toBeNull()
   })
+}
 
+function dependenciesAndConditionsTests() {
   it('gives a step with nothing to wait for an empty dependency list', () => {
     const r = parseRecipe(MINIMAL, 'minimal.yaml')
     if (!r.ok) throw new Error(r.reason)
@@ -409,7 +451,9 @@ steps:
     const graph = buildRunGraph(order(), r.value)
     expect(graph.nodes.every((n) => n.state === 'skipped')).toBe(true)
   })
+}
 
+function initialStateTests() {
   it('starts every node with no session, no worktree and no attempts', () => {
     const r = parseRecipe(MINIMAL, 'minimal.yaml')
     if (!r.ok) throw new Error(r.reason)
@@ -427,7 +471,9 @@ steps:
     expect(node?.reworks).toBe(0)
     expect(node?.feedback).toEqual([])
   })
+}
 
+function foreignNodesTests() {
   it('has no step for a node that is not from this recipe', () => {
     const r = parseRecipe(MINIMAL, 'minimal.yaml')
     if (!r.ok) throw new Error(r.reason)
@@ -435,52 +481,51 @@ steps:
     const alien = { ...graph.nodes[0], stepId: 'elsewhere' }
     expect(stepFor(r.value, alien)).toBeUndefined()
   })
-})
+}
 
 // `n2` is the handle the graph and the ledger use. Putting it in front of an
 // operator watching a run tells them which array slot the work came from and
 // nothing about what is being built — which is the whole point of the surface.
 describe('what to call a node', () => {
-  const node = (over: Partial<RunNode> & Pick<RunNode, 'id'>): RunNode => ({
-    stepId: 'build',
-    kind: 'agent',
-    state: 'waiting',
-    unitIds: [],
-    lane: null,
-    role: null,
-    dependsOn: [],
-    attempts: 0,
-    reworks: 0,
-    feedback: [],
-    sessionId: null,
-    worktreePath: null,
-    startedAt: null,
-    endedAt: null,
-    ...over,
-  })
+  describe('units', runGraphUnitsTests)
+  describe('fallbacks', runGraphFallbacksTests)
+  describe('the whole graph', theWholeGraphTests)
+})
 
-  const withUnit = (): WorkOrder => {
-    const base = order()
-    return {
-      ...base,
-      plan: {
-        ...base.plan,
-        units: [
-          {
-            id: 'U-1',
-            title: 'refresh the token on a 401',
-            role: 'builder',
-            lane: 1,
-            dependsOn: [],
-            satisfies: [],
-            touches: [],
-            verify: [],
-          },
-        ],
-      },
-    }
-  }
+const OUTER = `
+schemaVersion: 1
+id: bugfix
+steps:
+  - id: verify
+    kind: agent
+    role: verifier
+    context: fresh
+`
+const INNER = `
+schemaVersion: 1
+id: bugfix
+steps:
+  - id: verify
+    kind: fanout
+    over: plan.units
+    step: { kind: agent, role: verifier, context: fresh }
+`
+const NEITHER = `
+schemaVersion: 1
+id: bugfix
+steps:
+  - id: build
+    kind: fanout
+    over: plan.units
+    step: { kind: agent, role: builder }
+`
+function nodeOf(text: string) {
+  const r = recipe(text)
+  const o = order()
+  return { recipe: r, node: buildRunGraph(o, r).nodes[0] }
+}
 
+function runGraphUnitsTests() {
   it("uses the unit's own title, which is what the operator asked for", () => {
     expect(nodeLabel(withUnit(), node({ id: 'n2', unitIds: ['U-1'], role: 'builder' }))).toBe(
       'builder · U-1 refresh the token on a 401'
@@ -492,7 +537,9 @@ describe('what to call a node', () => {
       'U-1 refresh the token on a 401'
     )
   })
+}
 
+function runGraphFallbacksTests() {
   it('falls back to the role for a node that is not about one unit', () => {
     expect(nodeLabel(withUnit(), node({ id: 'n1', role: 'architect' }))).toBe('architect')
   })
@@ -510,7 +557,9 @@ describe('what to call a node', () => {
       'builder'
     )
   })
+}
 
+function theWholeGraphTests() {
   it('labels every node in the graph, keyed by the id the ledger uses', () => {
     const graph = {
       orderId: 'WO-1',
@@ -522,43 +571,13 @@ describe('what to call a node', () => {
       n2: 'U-1 refresh the token on a 401',
     })
   })
-})
+}
 
 describe('a step that asks for a fresh conversation', () => {
-  const OUTER = `
-schemaVersion: 1
-id: bugfix
-steps:
-  - id: verify
-    kind: agent
-    role: verifier
-    context: fresh
-`
-  const INNER = `
-schemaVersion: 1
-id: bugfix
-steps:
-  - id: verify
-    kind: fanout
-    over: plan.units
-    step: { kind: agent, role: verifier, context: fresh }
-`
-  const NEITHER = `
-schemaVersion: 1
-id: bugfix
-steps:
-  - id: build
-    kind: fanout
-    over: plan.units
-    step: { kind: agent, role: builder }
-`
+  describe('where it is read', whereItIsReadTests)
+})
 
-  function nodeOf(text: string) {
-    const r = recipe(text)
-    const o = order()
-    return { recipe: r, node: buildRunGraph(o, r).nodes[0] }
-  }
-
+function whereItIsReadTests() {
   it('reads it from the step itself', () => {
     const { recipe: r, node } = nodeOf(OUTER)
     expect(wantsFreshContext(r, node)).toBe(true)
@@ -573,4 +592,4 @@ steps:
     const { recipe: r, node } = nodeOf(NEITHER)
     expect(wantsFreshContext(r, node)).toBe(false)
   })
-})
+}

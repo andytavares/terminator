@@ -4,19 +4,20 @@ import { render, screen, fireEvent, cleanup, act } from '@testing-library/react'
 import { StationMonitor } from '../../../src/components/factory/StationMonitor.js'
 import type { MonitorStatus } from '../../../src/components/factory/StationMonitor.js'
 import type { TranscriptLine } from '../../../src/runtime/transcript-excerpt.js'
+import { partialFake } from '../../../../../tests/support/fakes'
 
 // jsdom has no canvas: the case's 2D context is a fake, and what this spec
 // asserts is the screen, the chin and the keys — the case's own drawing is
 // covered by tests/factory/art/monitor.spec.ts.
 
 function fakeContext2D() {
-  return {
+  return partialFake<CanvasRenderingContext2D>({
     fillStyle: '#000',
     globalCompositeOperation: 'source-over',
     fillRect: vi.fn(),
     drawImage: vi.fn(),
     createRadialGradient: vi.fn(() => ({ addColorStop: vi.fn() })),
-  }
+  })
 }
 
 const LINES: TranscriptLine[] = [
@@ -56,9 +57,7 @@ function setReducedMotion(reduce: boolean) {
 }
 
 beforeEach(() => {
-  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
-    fakeContext2D() as unknown as CanvasRenderingContext2D
-  )
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(fakeContext2D())
   vi.stubGlobal(
     'ResizeObserver',
     class {
@@ -77,6 +76,19 @@ afterEach(() => {
 })
 
 describe('StationMonitor', () => {
+  describe('naming', namingTests)
+  describe('the cursor', theCursorTests)
+  describe('LED and alerts', ledAndAlertsTests)
+  describe('refusals and NO CARRIER', refusalsAndNoCarrierTests)
+  describe('lines', linesTests)
+  describe('keys', keysTests)
+  describe('powering off and on', poweringOffAndOnTests)
+  describe('following', followingTests)
+})
+
+const gate = { id: 'ship', state: 'running' as const, attempts: 0, role: null }
+
+function namingTests() {
   it('names the monitor by its upper-cased label and says what the station is doing', () => {
     mount()
     expect(screen.getByRole('heading', { name: 'FILTER LINEAR ISSUES' })).toBeTruthy()
@@ -102,7 +114,9 @@ describe('StationMonitor', () => {
     mount({ sign: null })
     expect(document.querySelector('.fdry-crt__badge')?.textContent).toBe('FILTER LINEAR ISSUES')
   })
+}
 
+function theCursorTests() {
   it('shows the cursor only while the step is running', () => {
     const shown: Record<string, boolean> = {}
     for (const status of ['running', 'waiting', 'failed', 'gone', 'idle'] as const) {
@@ -118,7 +132,9 @@ describe('StationMonitor', () => {
       idle: false,
     })
   })
+}
 
+function ledAndAlertsTests() {
   it.each([
     ['running', 'Working'],
     ['waiting', 'Needs you'],
@@ -141,7 +157,9 @@ describe('StationMonitor', () => {
     mount({ status: 'running', alert: null })
     expect(document.querySelector('.fdry-crt__alert')).toBeNull()
   })
+}
 
+function refusalsAndNoCarrierTests() {
   it('shows an attach refusal on the screen as an alert line', () => {
     mount({ attachProblem: 'That agent is no longer in a terminal.' })
     const problem = screen.getByText('That agent is no longer in a terminal.')
@@ -154,7 +172,9 @@ describe('StationMonitor', () => {
     const log = screen.getByRole('log', { name: 'Transcript' })
     expect(log.textContent?.trimEnd().endsWith('NO CARRIER')).toBe(true)
   })
+}
 
+function linesTests() {
   it('classes tool lines as tool, the agent’s words as say and yours as you', () => {
     mount()
     const log = screen.getByRole('log', { name: 'Transcript' })
@@ -168,7 +188,9 @@ describe('StationMonitor', () => {
     mount({ lines: [], status: 'idle' })
     expect(screen.getByRole('log', { name: 'Transcript' }).textContent).toBe('NOTHING YET.')
   })
+}
 
+function keysTests() {
   it('attaches from its key', () => {
     const { onAttach, onClose } = mount()
     fireEvent.click(screen.getByRole('button', { name: /ATTACH/ }))
@@ -182,7 +204,9 @@ describe('StationMonitor', () => {
     expect(onClose).toHaveBeenCalledTimes(1)
     expect(document.querySelector('.fdry-crt')?.classList.contains('is-off')).toBe(false)
   })
+}
 
+function poweringOffAndOnTests() {
   it('plays the power-off before closing when motion is allowed', () => {
     setReducedMotion(false)
     vi.useFakeTimers()
@@ -202,7 +226,9 @@ describe('StationMonitor', () => {
     mount()
     expect(document.querySelector('.fdry-crt')?.classList.contains('is-on')).toBe(false)
   })
+}
 
+function followingTests() {
   it('follows a new line unless the reader has scrolled up', () => {
     const props = {
       node: { id: 'N-1', state: 'running' as const, attempts: 1, role: null },
@@ -233,11 +259,15 @@ describe('StationMonitor', () => {
     rerender(<StationMonitor {...props} lines={[...LINES, LINES[0]!, { ...LINES[0]!, at: 10 }]} />)
     expect(log.scrollTop).toBe(100)
   })
-})
+}
 
 describe('StationMonitor on a step with no agent', () => {
+  describe('what it decided', whatItDecidedTests)
+  describe('no attach and nothing decided', noAttachAndNothingDecidedTests)
+})
+
+function whatItDecidedTests() {
   const exact = { normalizer: (t: string) => t }
-  const gate = { id: 'ship', state: 'running' as const, attempts: 0, role: null }
 
   it('says the step is automatic and shows what it decided, with no attempt count', () => {
     mount({
@@ -256,7 +286,9 @@ describe('StationMonitor on a step with no agent', () => {
     expect(document.body.textContent).not.toContain('NOTHING YET')
     expect(screen.getByText('WORKING', exact)).toBeTruthy()
   })
+}
 
+function noAttachAndNothingDecidedTests() {
   it('offers no attach key, and no cursor, for a step with no agent', () => {
     mount({ node: gate, facts: ['Joined Inspector and Scribe'], lines: [] })
     expect(screen.queryByRole('button', { name: /ATTACH/ })).toBeNull()
@@ -270,7 +302,7 @@ describe('StationMonitor on a step with no agent', () => {
       'Nothing decided yet.'
     )
   })
-})
+}
 
 describe('StationMonitor on a finished agent', () => {
   it('keeps the transcript and disables attach, naming the reason on the key', () => {

@@ -2,17 +2,23 @@ import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render } from '@testing-library/react'
 
+import { LivePreview } from '../../../../src/renderer/components/session/LivePreview'
+import { useSessionStore } from '../../../../src/renderer/stores/session.store'
+import type { TerminalInstance } from '../../../../src/renderer/components/terminal/TerminalSession'
+import { seedStore } from '../../../support/renderer-stores'
+import { partialFake } from '../../../support/fakes'
+
 const cleanup = vi.fn()
 const mountPreview = vi.fn(() => cleanup)
-const getTerminalInstance = vi.fn((id: string) => (id === 'none' ? undefined : { mountPreview }))
+// xterm does not run in jsdom: the instance is faked down to what LivePreview calls.
+const instance = partialFake<TerminalInstance>({ mountPreview })
 
-vi.mock('../../../../src/renderer/stores/session.store', () => ({
-  useSessionStore: (select: (s: unknown) => unknown) => select({ getTerminalInstance }),
-}))
-
-import { LivePreview } from '../../../../src/renderer/components/session/LivePreview'
-
-beforeEach(() => vi.clearAllMocks())
+beforeEach(() => {
+  vi.clearAllMocks()
+  seedStore(useSessionStore, {
+    getTerminalInstance: (id: string) => (id === 'none' ? undefined : instance),
+  })
+})
 
 describe('LivePreview', () => {
   it("moves the session's live terminal into its container", () => {

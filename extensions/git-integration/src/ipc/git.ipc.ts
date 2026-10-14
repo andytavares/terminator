@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { defineChannel, type ChannelSpec } from '@terminator/extension-sdk'
 import {
   getStatus,
   getDiff,
@@ -6,128 +7,132 @@ import {
   unstageFiles,
   commitChanges,
   pushBranch,
+  statusWatchRoots,
 } from '../git/git-service.js'
 import { registerMergeFlowHandlers } from './merge-flow.ipc.js'
-
-import { withTiming, type RegisterFn } from '../github/gh-cli.js'
+import { RepoRoot } from './repo-root.js'
+import { withTiming, VALIDATION_ERROR, errorEnvelope, type RegisterFn } from './register.js'
 
 // Lines emitted by the running commit process, keyed by repoRoot.
 // Cleared when commit finishes; consumed incrementally by commitOutputPoll.
 const commitOutputBuffer = new Map<string, string[]>()
 
-export function registerGitExtensionHandlers(registerRaw: RegisterFn): void {
-  const register = withTiming(registerRaw)
-  register('git:status', async (payload) => {
-    const schema = z.object({
-      path: z.string().min(1),
-      maxFiles: z.number().int().positive().optional(),
-    })
-    const parsed = schema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    try {
-      return await getStatus(parsed.data.path, parsed.data.maxFiles ?? 500)
-    } catch (e) {
-      return { error: String(e) }
-    }
-  })
+const StagePayload = z.object({ repoRoot: RepoRoot, paths: z.array(z.string()).min(1) })
+const RepoRootPayload = z.object({ repoRoot: RepoRoot })
 
-  register('git:diff-file', async (payload) => {
-    const schema = z.object({
-      repoRoot: z.string().min(1),
+const CommitPayload = z.object({
+  repoRoot: RepoRoot,
+  message: z.string(),
+  noVerify: z.boolean().optional(),
+})
+
+/** The Git settings the channels read on every call, so a change applies to the next one. */
+export interface GitSettings {
+  /** Whether a commit in `repoRoot` adds a Signed-off-by trailer (workspace-scoped). */
+  signOff(repoRoot: string): boolean
+  maxDisplayedFiles(): number
+}
+
+async function commitCollectingOutput(payload: z.infer<typeof CommitPayload>, signOff: boolean) {
+  const { repoRoot, message, noVerify } = payload
+  if (!message.trim()) return { error: 'EMPTY_MESSAGE' }
+  commitOutputBuffer.set(repoRoot, [])
+  const appendCommitLine = (line: string) => commitOutputBuffer.get(repoRoot)?.push(line)
+  const result = await commitChanges(repoRoot, message, {
+    signOff,
+    noVerify: noVerify ?? false,
+    onOutput: appendCommitLine,
+  })
+  commitOutputBuffer.delete(repoRoot)
+  return result
+}
+
+function takeCommitOutput({ repoRoot }: z.infer<typeof RepoRootPayload>) {
+  const buf = commitOutputBuffer.get(repoRoot)
+  if (!buf) return { lines: [] as string[] }
+  const lines = [...buf]
+  buf.length = 0 // consume in-place so next poll gets only new lines
+  return { lines }
+}
+
+/** The channels whose answer a setting decides. */
+function settingChannels(settings: GitSettings): ChannelSpec[] {
+  return [
+    defineChannel({
+      channel: 'git:status',
+      schema: z.object({ path: RepoRoot }),
+      invalid: VALIDATION_ERROR,
+      run: ({ path }) => getStatus(path, settings.maxDisplayedFiles()),
+      onError: errorEnvelope,
+    }),
+    defineChannel({
+      channel: 'git:commit',
+      schema: CommitPayload,
+      invalid: VALIDATION_ERROR,
+      run: (payload) => commitCollectingOutput(payload, settings.signOff(payload.repoRoot)),
+    }),
+  ]
+}
+
+const GIT_CHANNELS: ChannelSpec[] = [
+  defineChannel({
+    channel: 'git:diff-file',
+    schema: z.object({
+      repoRoot: RepoRoot,
       path: z.string().min(1),
       staged: z.boolean(),
       isUntracked: z.boolean().optional(),
-    })
-    const parsed = schema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    try {
-      const diff = await getDiff(
-        parsed.data.repoRoot,
-        parsed.data.path,
-        parsed.data.staged,
-        parsed.data.isUntracked
-      )
-      return { diff }
-    } catch (e) {
-      return { error: String(e) }
-    }
-  })
-
-  register('git:stage', async (payload) => {
-    const schema = z.object({ repoRoot: z.string().min(1), paths: z.array(z.string()).min(1) })
-    const parsed = schema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    try {
-      await stageFiles(parsed.data.repoRoot, parsed.data.paths)
+    }),
+    invalid: VALIDATION_ERROR,
+    run: async (payload) => {
+      const { staged, isUntracked } = payload
+      return { diff: await getDiff(payload.repoRoot, payload.path, { staged, isUntracked }) }
+    },
+    onError: errorEnvelope,
+  }),
+  defineChannel({
+    channel: 'git:stage',
+    schema: StagePayload,
+    invalid: VALIDATION_ERROR,
+    run: async ({ repoRoot, paths }) => {
+      await stageFiles(repoRoot, paths)
       return { success: true as const }
-    } catch (e) {
-      return { error: String(e) }
-    }
-  })
-
-  register('git:unstage', async (payload) => {
-    const schema = z.object({ repoRoot: z.string().min(1), paths: z.array(z.string()).min(1) })
-    const parsed = schema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    try {
-      await unstageFiles(parsed.data.repoRoot, parsed.data.paths)
+    },
+    onError: errorEnvelope,
+  }),
+  defineChannel({
+    channel: 'git:unstage',
+    schema: StagePayload,
+    invalid: VALIDATION_ERROR,
+    run: async ({ repoRoot, paths }) => {
+      await unstageFiles(repoRoot, paths)
       return { success: true as const }
-    } catch (e) {
-      return { error: String(e) }
-    }
-  })
+    },
+    onError: errorEnvelope,
+  }),
+  defineChannel({
+    channel: 'git:watch-roots',
+    schema: RepoRootPayload,
+    invalid: VALIDATION_ERROR,
+    run: async ({ repoRoot }) => ({ roots: await statusWatchRoots(repoRoot) }),
+    onError: errorEnvelope,
+  }),
+  defineChannel({
+    channel: 'git:commit-output-poll',
+    schema: RepoRootPayload,
+    invalid: { lines: [] as string[] },
+    run: takeCommitOutput,
+  }),
+  defineChannel({
+    channel: 'git:push',
+    schema: RepoRootPayload,
+    invalid: VALIDATION_ERROR,
+    run: ({ repoRoot }) => pushBranch(repoRoot),
+  }),
+]
 
-  register('git:commit', async (payload) => {
-    const schema = z.object({
-      repoRoot: z.string().min(1),
-      message: z.string(),
-      signOff: z.boolean().optional(),
-      noVerify: z.boolean().optional(),
-    })
-    const parsed = schema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    if (!parsed.data.message.trim()) return { error: 'EMPTY_MESSAGE' }
-    const { repoRoot } = parsed.data
-    commitOutputBuffer.set(repoRoot, [])
-    const result = await commitChanges(
-      repoRoot,
-      parsed.data.message,
-      parsed.data.signOff ?? false,
-      parsed.data.noVerify ?? false,
-      (line) => {
-        const buf = commitOutputBuffer.get(repoRoot)
-        if (buf) buf.push(line)
-      }
-    )
-    commitOutputBuffer.delete(repoRoot)
-    return result
-  })
-
-  register('git:commit-output-poll', (payload) => {
-    const schema = z.object({ repoRoot: z.string().min(1) })
-    const parsed = schema.safeParse(payload)
-    if (!parsed.success) return { lines: [] as string[] }
-    const buf = commitOutputBuffer.get(parsed.data.repoRoot)
-    if (!buf) return { lines: [] as string[] }
-    const lines = [...buf]
-    buf.length = 0 // consume in-place so next poll gets only new lines
-    return { lines }
-  })
-
-  register('git:push', async (payload) => {
-    const schema = z.object({ repoRoot: z.string().min(1) })
-    const parsed = schema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    return pushBranch(parsed.data.repoRoot)
-  })
-
-  register('git:pr-status', (_payload) => {
-    return { pr: null }
-  })
-
-  register('git:pr-create', (_payload) => {
-    return { error: 'NOT_IMPLEMENTED' }
-  })
-
+export function registerGitExtensionHandlers(registerRaw: RegisterFn, settings: GitSettings): void {
+  const register = withTiming(registerRaw)
+  for (const spec of [...settingChannels(settings), ...GIT_CHANNELS]) register(spec)
   registerMergeFlowHandlers(register)
 }

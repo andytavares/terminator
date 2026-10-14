@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url'
 // tokens) clears WCAG AA (4.5:1) both on the plain code background and on the
 // added/removed diff-line tinted backgrounds, in both themes.
 const CSS = readFileSync(
-  fileURLToPath(new URL('../../../src/renderer/styles.css', import.meta.url)),
+  fileURLToPath(new URL('../../../packages/extension-ui/src/tokens.css', import.meta.url)),
   'utf8'
 )
 
@@ -61,60 +61,63 @@ const lightBlock = CSS.slice(CSS.indexOf("[data-theme='light']"))
 
 const AA_NORMAL = 4.5
 
-const TEXT_TOKENS = ['--text-primary', '--text-secondary', '--text-muted', '--danger', '--success']
+const TEXT_TOKENS = [
+  '--tm-text-primary',
+  '--tm-text-secondary',
+  '--tm-text-muted',
+  '--tm-danger',
+  '--tm-success',
+]
 
 const SYNTAX_TOKENS = [
-  '--syntax-comment',
-  '--syntax-keyword',
-  '--syntax-string',
-  '--syntax-tag',
-  '--syntax-literal',
-  '--syntax-number',
-  '--syntax-title',
-  '--syntax-attribute',
+  '--tm-syntax-comment',
+  '--tm-syntax-keyword',
+  '--tm-syntax-string',
+  '--tm-syntax-tag',
+  '--tm-syntax-literal',
+  '--tm-syntax-number',
+  '--tm-syntax-title',
+  '--tm-syntax-attribute',
 ]
+
+/** A theme's base background, and its added and removed diff tints laid over it. */
+function diffBackgrounds(block: string) {
+  const bg = hexToRgb(token(block, '--tm-bg-base'))
+  // Each theme's own tints: the light theme defines darker ones than the dark theme.
+  const added = rgbaToken(block, '--tm-diff-added-bg')
+  const removed = rgbaToken(block, '--tm-diff-removed-bg')
+  return {
+    base: bg,
+    'added-bg': composite(bg, added.rgb, added.alpha),
+    'removed-bg': composite(bg, removed.rgb, removed.alpha),
+  }
+}
+
+/** Every token in `names` reads at AA over each of the theme's diff backgrounds. */
+function expectAAOverDiffs(themeName: string, block: string, names: readonly string[]): void {
+  const backgrounds = Object.entries(diffBackgrounds(block))
+  for (const name of names) {
+    const value = hexToRgb(token(block, name))
+    for (const [label, background] of backgrounds) {
+      expect(
+        contrast(value, background),
+        `${themeName} ${name} vs ${label}`
+      ).toBeGreaterThanOrEqual(AA_NORMAL)
+    }
+  }
+}
 
 describe('diff / syntax token contrast (WCAG AA)', () => {
   for (const [themeName, block] of [
     ['dark', rootBlock],
     ['light', lightBlock],
   ] as const) {
-    const bg = hexToRgb(token(block, '--bg-base'))
-    const added = rgbaToken(rootBlock, '--diff-added-bg')
-    const removed = rgbaToken(rootBlock, '--diff-removed-bg')
-    const addedBg = composite(bg, added.rgb, added.alpha)
-    const removedBg = composite(bg, removed.rgb, removed.alpha)
-
     it(`${themeName}: text tokens meet AA over base, added, and removed diff backgrounds`, () => {
-      for (const name of TEXT_TOKENS) {
-        const value = hexToRgb(token(block, name))
-        expect(contrast(value, bg), `${themeName} ${name} vs base`).toBeGreaterThanOrEqual(
-          AA_NORMAL
-        )
-        expect(contrast(value, addedBg), `${themeName} ${name} vs added-bg`).toBeGreaterThanOrEqual(
-          AA_NORMAL
-        )
-        expect(
-          contrast(value, removedBg),
-          `${themeName} ${name} vs removed-bg`
-        ).toBeGreaterThanOrEqual(AA_NORMAL)
-      }
+      expectAAOverDiffs(themeName, block, TEXT_TOKENS)
     })
 
     it(`${themeName}: syntax-highlight tokens meet AA over base, added, and removed diff backgrounds`, () => {
-      for (const name of SYNTAX_TOKENS) {
-        const value = hexToRgb(token(block, name))
-        expect(contrast(value, bg), `${themeName} ${name} vs base`).toBeGreaterThanOrEqual(
-          AA_NORMAL
-        )
-        expect(contrast(value, addedBg), `${themeName} ${name} vs added-bg`).toBeGreaterThanOrEqual(
-          AA_NORMAL
-        )
-        expect(
-          contrast(value, removedBg),
-          `${themeName} ${name} vs removed-bg`
-        ).toBeGreaterThanOrEqual(AA_NORMAL)
-      }
+      expectAAOverDiffs(themeName, block, SYNTAX_TOKENS)
     })
   }
 })

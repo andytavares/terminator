@@ -1,7 +1,7 @@
 import { isBlocking } from '../order/schema.js'
 import type { AcceptanceCriterion, WorkOrder } from '../order/schema.js'
 import { statusInWords } from '../order/render.js'
-import { gradeInWords } from '../runtime/review/risk-grader.js'
+import { gradeInWords } from '../runtime/review/risk-grade.js'
 import type { CheckId, CompileResult } from '../order/compile.js'
 import { refusedParts } from '../order/proposal.js'
 import { REWRITING_UNREADABLE } from './autonomy.js'
@@ -59,7 +59,7 @@ export interface ReadinessInput {
   readonly clock: (iso: string) => string
 }
 
-export type RunState = 'Running' | 'Shipped' | 'Cancelled' | 'Shipped · waiting on you'
+type RunState = 'Running' | 'Shipped' | 'Cancelled' | 'Shipped · waiting on you'
 
 function runStateOf(status: WorkOrder['status']): Exclude<RunState, 'Shipped · waiting on you'> {
   return status === 'shipped' ? 'Shipped' : status === 'cancelled' ? 'Cancelled' : 'Running'
@@ -70,10 +70,10 @@ function pillOf(status: WorkOrder['status'], turn: ReadinessInput['turn']): RunS
   return status === 'shipped' && turn === 'you' ? 'Shipped · waiting on you' : runStateOf(status)
 }
 
-export type Holder = 'you' | 'architect' | 'red team' | 'scout' | 'nobody'
+type Holder = 'you' | 'architect' | 'red team' | 'scout' | 'nobody'
 
 /** The status strip's colour: accent while the machine works, then by whose move it is. */
-export type Tone = 'working' | 'you' | 'ready' | 'bad' | 'neutral'
+type Tone = 'working' | 'you' | 'ready' | 'bad' | 'neutral'
 
 export type StripIcon = 'load' | 'user' | 'check' | 'play' | 'alert' | 'pause'
 
@@ -86,7 +86,7 @@ export type StripAction =
   | 'open-run'
   | 'draft'
 
-export interface Strip {
+interface Strip {
   readonly tone: Tone
   readonly icon: StripIcon
   readonly headline: string
@@ -94,7 +94,7 @@ export interface Strip {
   readonly actions: readonly StripAction[]
 }
 
-export type RowState = 'passed' | 'in-progress' | 'needs-you' | 'failing'
+type RowState = 'passed' | 'in-progress' | 'needs-you' | 'failing'
 
 /** One row of "Ready to hand off?": the five checks and whether anyone is changing the plan. */
 export interface Row {
@@ -104,7 +104,7 @@ export interface Row {
   readonly detail: string
 }
 
-export type StepState = 'done' | 'work' | 'you' | 'bad' | 'not-yet'
+type StepState = 'done' | 'work' | 'you' | 'bad' | 'not-yet'
 
 export type StepMark = 'number' | 'check' | 'spin' | 'alert' | 'x'
 
@@ -224,6 +224,21 @@ function openBlockingFindings(order: WorkOrder): WorkOrder['redTeam'] {
   return order.redTeam.filter((f) => f.status === 'open' && isBlocking(f))
 }
 
+// What is open on the order: blocking red-team findings, unanswered questions, and
+// whether the findings now wait on the operator (rule 5): the machine is not acting
+// on them, or has run out of rounds.
+function openWorkOf(input: Pick<ReadinessInput, 'order' | 'intake' | 'loop'>) {
+  const { order, intake, loop } = input
+  const openBlocking = openBlockingFindings(order)
+  const machineActing = intake.kind === 'running' && loop.heldAt === null
+  return {
+    openBlocking,
+    machineActing,
+    rule5Applies: openBlocking.length > 0 && (loop.exhausted || !machineActing),
+    openQuestions: order.openQuestions.filter((q) => q.answer === null),
+  }
+}
+
 function lastFinishedRound(loop: LoopFacts): LoopFacts['rounds'][number] | null {
   const finished = loop.rounds.filter((r) => r.finishedAt !== null)
   return finished.length === 0 ? null : finished[finished.length - 1]
@@ -236,224 +251,25 @@ interface HolderStrip {
   readonly strip: Strip
 }
 
+/** What the holder rules read: the input, what is open on the order, and the shape's name. */
+interface StripFacts extends ReturnType<typeof openWorkOf> {
+  readonly input: ReadinessInput
+  readonly Shape: string
+}
+
+/** One condition a draft can be in: who holds it and what the strip says, or null when it is not in it. */
+type StripRule = (facts: StripFacts) => HolderStrip | null
+
 function deriveHolderAndStrip(input: ReadinessInput): HolderStrip {
-  const { order, compile, intake, loop, agreed, shape, clock } = input
-  const Shape = capitalise(shape.name ?? 'the proposed')
-  const openBlocking = openBlockingFindings(order)
-  const machineActing = intake.kind === 'running' && loop.heldAt === null
-  const rule5Applies = openBlocking.length > 0 && (loop.exhausted || !machineActing)
-  const openQuestions = order.openQuestions.filter((q) => q.answer === null)
-
-  // 1. Not draft.
-  if (order.status !== 'draft') {
-    const n = order.plan.units.length
-    // Only an order an earlier build handed off on its own reads this way;
-    // nothing hands off automatically any more.
-    if (agreed?.by === 'automatic') {
-      return {
-        holder: 'nobody',
-        strip: {
-          tone: 'ready',
-          icon: 'play',
-          headline: `Handed off automatically at ${clock(agreed.at)}`,
-          detail: `${runStateOf(order.status)} with the ${Shape} shape, ${n} unit${pluralS(n)}.`,
-          actions: ['open-run'],
-        },
-      }
-    }
-    const t = clock(agreed?.at ?? order.agreedAt ?? '')
-    return {
-      holder: 'nobody',
-      strip: {
-        tone: 'ready',
-        icon: 'play',
-        headline: `Handed off at ${t}`,
-        detail: `${runStateOf(order.status)} with the ${Shape} shape, ${n} unit${pluralS(n)}.`,
-        actions: ['open-run'],
-      },
-    }
+  const facts: StripFacts = {
+    ...openWorkOf(input),
+    input,
+    Shape: capitalise(input.shape.name ?? 'the proposed'),
   }
-
-  // 2. Intake refused.
-  if (intake.kind === 'refused') {
-    const parts = refusedParts(intake.reason)
-    if (parts !== null) {
-      return {
-        holder: 'you',
-        strip: {
-          tone: 'bad',
-          icon: 'alert',
-          headline: `The architect's plan couldn't be read. Nothing on this order changed.`,
-          detail: `${malformedInWords(parts)} Start the turn over to have it write the plan again, or tell it what to change.`,
-          actions: ['start-over', 'tell-architect'],
-        },
-      }
-    }
-    return {
-      holder: 'you',
-      strip: {
-        tone: 'bad',
-        icon: 'alert',
-        headline: `The architect's plan was refused. Nothing on this order changed.`,
-        detail: `Why: ${intake.reason}`,
-        actions: ['tell-architect', 'start-over'],
-      },
-    }
+  for (const rule of STRIP_RULES) {
+    const found = rule(facts)
+    if (found !== null) return found
   }
-
-  // 3. Intake running.
-  if (intake.kind === 'running') {
-    const t = clock(intake.at)
-    if (intake.actor === 'scout') {
-      return {
-        holder: 'scout',
-        strip: {
-          tone: 'working',
-          icon: 'load',
-          headline: 'The scout is reading the repository',
-          detail: `Started ${t}. The architect drafts the plan next.`,
-          actions: ['watch'],
-        },
-      }
-    }
-    if (intake.actor === 'red team') {
-      const base = `Started ${t}. When it finishes clean, you can hand off.`
-      const previous = lastFinishedRound(loop)
-      const detail =
-        previous === null
-          ? base
-          : `${base} The last round took ${formatDuration(msBetween(previous.startedAt, previous.finishedAt as string))}.`
-      return {
-        holder: 'red team',
-        strip: {
-          tone: 'working',
-          icon: 'load',
-          headline: `The red team is reviewing the plan · round ${intake.round} of 3`,
-          detail,
-          actions: [loop.heldAt !== null ? 'release' : 'hold'],
-        },
-      }
-    }
-    // actor === 'architect'
-    if (intake.trigger === 'automatic' && intake.round !== null) {
-      const n = openBlocking.length
-      return {
-        holder: 'architect',
-        strip: {
-          tone: 'working',
-          icon: 'load',
-          headline: `The architect is fixing ${n} red-team finding${pluralS(n)} · round ${intake.round} of 3`,
-          detail: `Started ${t} on its own. The red team reviews the fix next. You don't need to do anything.`,
-          actions: ['hold'],
-        },
-      }
-    }
-    if (intake.trigger === 'automatic' && intake.autoTurn !== null) {
-      return {
-        holder: 'architect',
-        strip: {
-          tone: 'working',
-          icon: 'load',
-          headline: `The architect is revising the plan on its own · turn ${intake.autoTurn} of 2`,
-          detail:
-            intake.asked === REWRITING_UNREADABLE
-              ? `Started ${t}. Its last plan was in the wrong format, so it is writing it again. You don't need to do anything.`
-              : `Started ${t}. It is closing: ${failingChecksList(compile)}. You don't need to do anything.`,
-          actions: ['hold'],
-        },
-      }
-    }
-    return {
-      holder: 'architect',
-      strip: {
-        tone: 'working',
-        icon: 'load',
-        headline: 'The architect is working on your request',
-        detail: `Started ${t}. Hand-off opens when it finishes.`,
-        actions: ['watch'],
-      },
-    }
-  }
-
-  // 4. Held.
-  if (loop.heldAt !== null) {
-    return {
-      holder: 'you',
-      strip: {
-        tone: 'you',
-        icon: 'pause',
-        headline: `Held by you since ${clock(loop.heldAt)}`,
-        detail: 'Nothing moves on its own until you let it continue.',
-        actions: ['release'],
-      },
-    }
-  }
-
-  // 5. Open blocking findings that are the operator's to decide.
-  if (rule5Applies) {
-    const n = openBlocking.length
-    const phrase = n === 2 ? 'both are' : n === 1 ? 'it is' : 'all are'
-    const tail = `Nothing moves until you decide. Hand-off opens when ${phrase} decided and the architect has applied them.`
-    const detail = loop.exhausted
-      ? `The red team and the architect did not agree after 3 rounds. ${tail}`
-      : tail
-    return {
-      holder: 'you',
-      strip: {
-        tone: 'you',
-        icon: 'user',
-        headline: `${n} finding${pluralS(n)} need${n === 1 ? 's' : ''} your decision`,
-        detail,
-        actions: [],
-      },
-    }
-  }
-
-  // 6. Unanswered open questions.
-  if (openQuestions.length > 0) {
-    const n = openQuestions.length
-    return {
-      holder: 'you',
-      strip: {
-        tone: 'you',
-        icon: 'user',
-        headline: `${n} question${pluralS(n)} need${n === 1 ? 's' : ''} your answer`,
-        detail: 'The architect was less than 90% sure. Nothing moves until you answer.',
-        actions: [],
-      },
-    }
-  }
-
-  // 7. Nothing drafted yet. Criteria alone are not a plan: an order seeded
-  // from a ticket arrives with them, and no unit to satisfy them.
-  if (order.plan.units.length === 0) {
-    return {
-      holder: 'you',
-      strip: {
-        tone: 'neutral',
-        icon: 'alert',
-        headline: 'No plan yet',
-        detail: 'Press Draft the plan and the architect writes it.',
-        actions: ['draft'],
-      },
-    }
-  }
-
-  // 8. Other compile failures.
-  if (!compile.ok) {
-    const n = compile.failures.length
-    return {
-      holder: 'you',
-      strip: {
-        tone: 'bad',
-        icon: 'alert',
-        headline: `${n} check${pluralS(n)} need${n === 1 ? 's' : ''} a fix`,
-        detail: 'The automatic turns could not close them. Each failing row says what to do.',
-        actions: [],
-      },
-    }
-  }
-
   // 9. Compile ok.
   return {
     holder: 'you',
@@ -467,6 +283,245 @@ function deriveHolderAndStrip(input: ReadinessInput): HolderStrip {
     },
   }
 }
+
+/** 1. Not draft. */
+const handedOff: StripRule = ({ input, Shape }) => {
+  const { order, agreed, clock } = input
+  if (order.status === 'draft') return null
+  const n = order.plan.units.length
+  // Only an order an earlier build handed off on its own reads this way;
+  // nothing hands off automatically any more.
+  const headline =
+    agreed?.by === 'automatic'
+      ? `Handed off automatically at ${clock(agreed.at)}`
+      : `Handed off at ${clock(agreed?.at ?? order.agreedAt ?? '')}`
+  return {
+    holder: 'nobody',
+    strip: {
+      tone: 'ready',
+      icon: 'play',
+      headline,
+      detail: `${runStateOf(order.status)} with the ${Shape} shape, ${n} unit${pluralS(n)}.`,
+      actions: ['open-run'],
+    },
+  }
+}
+
+/** 2. Intake refused. */
+const intakeRefused: StripRule = ({ input }) => {
+  const { intake } = input
+  if (intake.kind !== 'refused') return null
+  const parts = refusedParts(intake.reason)
+  if (parts !== null) {
+    return {
+      holder: 'you',
+      strip: {
+        tone: 'bad',
+        icon: 'alert',
+        headline: `The architect's plan couldn't be read. Nothing on this order changed.`,
+        detail: `${malformedInWords(parts)} Start the turn over to have it write the plan again, or tell it what to change.`,
+        actions: ['start-over', 'tell-architect'],
+      },
+    }
+  }
+  return {
+    holder: 'you',
+    strip: {
+      tone: 'bad',
+      icon: 'alert',
+      headline: `The architect's plan was refused. Nothing on this order changed.`,
+      detail: `Why: ${intake.reason}`,
+      actions: ['tell-architect', 'start-over'],
+    },
+  }
+}
+
+type RunningIntake = Extract<IntakeOutcome, { kind: 'running' }>
+
+/** 3. Intake running. */
+const intakeRunning: StripRule = (facts) => {
+  const { intake } = facts.input
+  if (intake.kind !== 'running') return null
+  if (intake.actor === 'scout') return scoutReading(facts, intake)
+  if (intake.actor === 'red team') return redTeamReviewing(facts, intake)
+  return architectWorking(facts, intake)
+}
+
+function scoutReading({ input }: StripFacts, intake: RunningIntake): HolderStrip {
+  return {
+    holder: 'scout',
+    strip: {
+      tone: 'working',
+      icon: 'load',
+      headline: 'The scout is reading the repository',
+      detail: `Started ${input.clock(intake.at)}. The architect drafts the plan next.`,
+      actions: ['watch'],
+    },
+  }
+}
+
+function redTeamReviewing({ input }: StripFacts, intake: RunningIntake): HolderStrip {
+  const { loop, clock } = input
+  const base = `Started ${clock(intake.at)}. When it finishes clean, you can hand off.`
+  const previous = lastFinishedRound(loop)
+  const detail =
+    previous === null
+      ? base
+      : `${base} The last round took ${formatDuration(msBetween(previous.startedAt, previous.finishedAt as string))}.`
+  return {
+    holder: 'red team',
+    strip: {
+      tone: 'working',
+      icon: 'load',
+      headline: `The red team is reviewing the plan · round ${intake.round} of 3`,
+      detail,
+      actions: [loop.heldAt !== null ? 'release' : 'hold'],
+    },
+  }
+}
+
+function architectWorking(facts: StripFacts, intake: RunningIntake): HolderStrip {
+  const t = facts.input.clock(intake.at)
+  if (intake.trigger === 'automatic' && intake.round !== null) {
+    const n = facts.openBlocking.length
+    return {
+      holder: 'architect',
+      strip: {
+        tone: 'working',
+        icon: 'load',
+        headline: `The architect is fixing ${n} red-team finding${pluralS(n)} · round ${intake.round} of 3`,
+        detail: `Started ${t} on its own. The red team reviews the fix next. You don't need to do anything.`,
+        actions: ['hold'],
+      },
+    }
+  }
+  if (intake.trigger === 'automatic' && intake.autoTurn !== null) {
+    return architectRevising(facts, intake)
+  }
+  return {
+    holder: 'architect',
+    strip: {
+      tone: 'working',
+      icon: 'load',
+      headline: 'The architect is working on your request',
+      detail: `Started ${t}. Hand-off opens when it finishes.`,
+      actions: ['watch'],
+    },
+  }
+}
+
+function architectRevising({ input }: StripFacts, intake: RunningIntake): HolderStrip {
+  const t = input.clock(intake.at)
+  return {
+    holder: 'architect',
+    strip: {
+      tone: 'working',
+      icon: 'load',
+      headline: `The architect is revising the plan on its own · turn ${intake.autoTurn} of 2`,
+      detail:
+        intake.asked === REWRITING_UNREADABLE
+          ? `Started ${t}. Its last plan was in the wrong format, so it is writing it again. You don't need to do anything.`
+          : `Started ${t}. It is closing: ${failingChecksList(input.compile)}. You don't need to do anything.`,
+      actions: ['hold'],
+    },
+  }
+}
+
+/** 4. Held. */
+const heldForOperator: StripRule = ({ input }) => {
+  const { loop, clock } = input
+  if (loop.heldAt === null) return null
+  return {
+    holder: 'you',
+    strip: {
+      tone: 'you',
+      icon: 'pause',
+      headline: `Held by you since ${clock(loop.heldAt)}`,
+      detail: 'Nothing moves on its own until you let it continue.',
+      actions: ['release'],
+    },
+  }
+}
+
+/** 5. Open blocking findings that are the operator's to decide. */
+const findingsToDecide: StripRule = ({ input, openBlocking, rule5Applies }) => {
+  if (!rule5Applies) return null
+  const n = openBlocking.length
+  const phrase = n === 2 ? 'both are' : n === 1 ? 'it is' : 'all are'
+  const tail = `Nothing moves until you decide. Hand-off opens when ${phrase} decided and the architect has applied them.`
+  const detail = input.loop.exhausted
+    ? `The red team and the architect did not agree after 3 rounds. ${tail}`
+    : tail
+  return {
+    holder: 'you',
+    strip: {
+      tone: 'you',
+      icon: 'user',
+      headline: `${n} finding${pluralS(n)} need${n === 1 ? 's' : ''} your decision`,
+      detail,
+      actions: [],
+    },
+  }
+}
+
+/** 6. Unanswered open questions. */
+const questionsToAnswer: StripRule = ({ openQuestions }) => {
+  const n = openQuestions.length
+  if (n === 0) return null
+  return {
+    holder: 'you',
+    strip: {
+      tone: 'you',
+      icon: 'user',
+      headline: `${n} question${pluralS(n)} need${n === 1 ? 's' : ''} your answer`,
+      detail: 'The architect was less than 90% sure. Nothing moves until you answer.',
+      actions: [],
+    },
+  }
+}
+
+/** 7. Nothing drafted yet: a ticket-seeded order arrives with criteria and no unit. */
+const noPlan: StripRule = ({ input }) => {
+  if (input.order.plan.units.length > 0) return null
+  return {
+    holder: 'you',
+    strip: {
+      tone: 'neutral',
+      icon: 'alert',
+      headline: 'No plan yet',
+      detail: 'Press Draft the plan and the architect writes it.',
+      actions: ['draft'],
+    },
+  }
+}
+
+/** 8. Other compile failures. */
+const compileFailing: StripRule = ({ input }) => {
+  const { compile } = input
+  if (compile.ok) return null
+  const n = compile.failures.length
+  return {
+    holder: 'you',
+    strip: {
+      tone: 'bad',
+      icon: 'alert',
+      headline: `${n} check${pluralS(n)} need${n === 1 ? 's' : ''} a fix`,
+      detail: 'The automatic turns could not close them. Each failing row says what to do.',
+      actions: [],
+    },
+  }
+}
+
+const STRIP_RULES: readonly StripRule[] = [
+  handedOff,
+  intakeRefused,
+  intakeRunning,
+  heldForOperator,
+  findingsToDecide,
+  questionsToAnswer,
+  noPlan,
+  compileFailing,
+]
 
 // ── Rows ─────────────────────────────────────────────────────────────────
 
@@ -567,10 +622,7 @@ function checkRow(id: CheckId, input: ReadinessInput): Row {
   if (id === 'questions')
     return { id, label: ROW_LABELS[id], state: 'needs-you', detail: failure.detail }
   if (id === 'redTeam') {
-    const openBlocking = openBlockingFindings(order)
-    const machineActing = intake.kind === 'running' && loop.heldAt === null
-    const rule5Applies = openBlocking.length > 0 && (loop.exhausted || !machineActing)
-    if (rule5Applies)
+    if (openWorkOf({ order, intake, loop }).rule5Applies)
       return { id, label: ROW_LABELS[id], state: 'needs-you', detail: failure.detail }
   }
   return { id, label: ROW_LABELS[id], state: 'failing', detail: failure.detail }
@@ -637,124 +689,109 @@ interface BaseStep {
   readonly word: string
 }
 
-function nonDraftWord(id: StepId, input: ReadinessInput, Shape: string): string {
-  const { order, loop, agreed, shape, clock } = input
-  switch (id) {
-    case 'intent':
-    case 'plan':
-      return 'Agreed'
-    case 'redTeam': {
-      const last = loop.rounds.length > 0 ? loop.rounds[loop.rounds.length - 1].round : null
-      if (last === null && loop.skipped !== undefined) return `Skipped: ${loop.skipped}`
-      return last !== null ? `Clean after round ${last}` : 'Not reviewed'
-    }
-    case 'shape':
-      return `${Shape}, ${shape.yours ? 'your choice' : 'proposed'}`
-    case 'tracker':
-      return trackerWord(order)
-    case 'handOff':
-      return `Handed off ${clock(agreed?.at ?? order.agreedAt ?? '')}`
+/** What every step's word reads: the input, and the shape's name as the strip says it. */
+interface StepContext {
+  readonly input: ReadinessInput
+  readonly canHandOff: boolean
+  readonly holder: Holder
+  readonly Shape: string
+}
+
+/** A step's word once the order has been handed off. */
+const NON_DRAFT_WORDS: Record<StepId, (context: StepContext) => string> = {
+  intent: () => 'Agreed',
+  plan: () => 'Agreed',
+  redTeam: ({ input: { loop } }) => {
+    const last = loop.rounds.length > 0 ? loop.rounds[loop.rounds.length - 1].round : null
+    if (last === null && loop.skipped !== undefined) return `Skipped: ${loop.skipped}`
+    return last !== null ? `Clean after round ${last}` : 'Not reviewed'
+  },
+  shape: ({ input, Shape }) => `${Shape}, ${input.shape.yours ? 'your choice' : 'proposed'}`,
+  tracker: ({ input }) => trackerWord(input.order),
+  handOff: ({ input: { order, agreed, clock } }) =>
+    `Handed off ${clock(agreed?.at ?? order.agreedAt ?? '')}`,
+}
+
+function intentStep({ input: { order } }: StepContext): BaseStep {
+  const stated = order.intent.problem.trim() !== '' && order.intent.outcome.trim() !== ''
+  return stated
+    ? { state: 'done', mark: 'check', word: 'Done' }
+    : { state: 'you', mark: 'number', word: 'Not stated yet' }
+}
+
+function planStep(context: StepContext): BaseStep {
+  const { order, intake } = context.input
+  if (intake.kind === 'refused') return { state: 'bad', mark: 'x', word: 'Last redraft refused' }
+  const revising =
+    intake.kind === 'running' &&
+    intake.actor === 'architect' &&
+    intake.trigger === 'automatic' &&
+    intake.autoTurn !== null &&
+    intake.round === null
+  if (revising) return { state: 'work', mark: 'spin', word: `Revising ${intake.autoTurn} of 2` }
+  const { machineActing } = openWorkOf(context.input)
+  // An empty plan fails coverage by construction, so it is named before the
+  // failing checks or it would read "Needs a fix" before anything was drafted.
+  if (order.plan.units.length === 0) {
+    return machineActing
+      ? { state: 'work', mark: 'spin', word: 'Being drafted' }
+      : { state: 'you', mark: 'number', word: 'Not drafted yet' }
+  }
+  return planChecksStep(context.input, machineActing)
+}
+
+const PLAN_CHECKS: readonly string[] = ['verifiable', 'coverage', 'risk']
+
+function planChecksStep({ order, compile }: ReadinessInput, machineActing: boolean): BaseStep {
+  if (compile.failures.some((f) => PLAN_CHECKS.includes(f.check))) {
+    return machineActing
+      ? { state: 'work', mark: 'spin', word: 'Being revised' }
+      : { state: 'bad', mark: 'x', word: 'Needs a fix' }
+  }
+  if (compile.failures.some((f) => f.check === 'questions')) {
+    return { state: 'you', mark: 'alert', word: 'Needs your answer' }
+  }
+  const c = order.acceptance.length
+  const u = order.plan.units.length
+  return {
+    state: 'done',
+    mark: 'check',
+    word: `${c} criteri${c === 1 ? 'on' : 'a'}, ${u} unit${pluralS(u)}`,
   }
 }
 
-function computeBaseStep(
-  id: StepId,
-  input: ReadinessInput,
-  canHandOff: boolean,
-  holder: Holder,
-  Shape: string
-): BaseStep {
-  const { order, compile, intake, loop } = input
-  const openBlocking = openBlockingFindings(order)
-  const machineActing = intake.kind === 'running' && loop.heldAt === null
-  const rule5Applies = openBlocking.length > 0 && (loop.exhausted || !machineActing)
-
-  if (id === 'intent') {
-    const stated = order.intent.problem.trim() !== '' && order.intent.outcome.trim() !== ''
-    return stated
-      ? { state: 'done', mark: 'check', word: 'Done' }
-      : { state: 'you', mark: 'number', word: 'Not stated yet' }
+function redTeamStep({ input }: StepContext): BaseStep {
+  const { intake, loop } = input
+  const { openBlocking, rule5Applies } = openWorkOf(input)
+  if (intake.kind === 'running' && intake.actor === 'red team') {
+    return { state: 'work', mark: 'spin', word: `Reviewing, round ${intake.round} of 3` }
   }
-
-  if (id === 'plan') {
-    if (intake.kind === 'refused') {
-      return { state: 'bad', mark: 'x', word: 'Last redraft refused' }
-    }
-    if (
-      intake.kind === 'running' &&
-      intake.actor === 'architect' &&
-      intake.trigger === 'automatic' &&
-      intake.autoTurn !== null &&
-      intake.round === null
-    ) {
-      return { state: 'work', mark: 'spin', word: `Revising ${intake.autoTurn} of 2` }
-    }
-    // An empty plan fails coverage by construction, so it is named before the
-    // failing checks or it would read "Needs a fix" before anything was drafted.
-    if (order.plan.units.length === 0) {
-      return machineActing
-        ? { state: 'work', mark: 'spin', word: 'Being drafted' }
-        : { state: 'you', mark: 'number', word: 'Not drafted yet' }
-    }
-    const failingPlanCheck = compile.failures.find(
-      (f) => f.check === 'verifiable' || f.check === 'coverage' || f.check === 'risk'
-    )
-    if (failingPlanCheck !== undefined) {
-      return machineActing
-        ? { state: 'work', mark: 'spin', word: 'Being revised' }
-        : { state: 'bad', mark: 'x', word: 'Needs a fix' }
-    }
-    if (compile.failures.some((f) => f.check === 'questions')) {
-      return { state: 'you', mark: 'alert', word: 'Needs your answer' }
-    }
-    const c = order.acceptance.length
-    const u = order.plan.units.length
-    return {
-      state: 'done',
-      mark: 'check',
-      word: `${c} criteri${c === 1 ? 'on' : 'a'}, ${u} unit${pluralS(u)}`,
-    }
+  const fixing =
+    intake.kind === 'running' &&
+    intake.actor === 'architect' &&
+    intake.trigger === 'automatic' &&
+    intake.round !== null
+  if (fixing)
+    return { state: 'work', mark: 'spin', word: `Architect fixing ${openBlocking.length}` }
+  if (rule5Applies) {
+    const n = openBlocking.length
+    return { state: 'you', mark: 'alert', word: `Needs you: ${n} decision${pluralS(n)}` }
   }
+  return reviewedStep(loop, openBlocking.length)
+}
 
-  if (id === 'redTeam') {
-    if (intake.kind === 'running' && intake.actor === 'red team') {
-      return { state: 'work', mark: 'spin', word: `Reviewing, round ${intake.round} of 3` }
-    }
-    if (
-      intake.kind === 'running' &&
-      intake.actor === 'architect' &&
-      intake.trigger === 'automatic' &&
-      intake.round !== null
-    ) {
-      return { state: 'work', mark: 'spin', word: `Architect fixing ${openBlocking.length}` }
-    }
-    if (rule5Applies) {
-      const n = openBlocking.length
-      return { state: 'you', mark: 'alert', word: `Needs you: ${n} decision${pluralS(n)}` }
-    }
-    const last = lastFinishedRound(loop)
-    if (last !== null && openBlocking.length === 0) {
-      return { state: 'done', mark: 'check', word: `Clean after round ${last.round}` }
-    }
-    if (loop.skipped !== undefined && openBlocking.length === 0) {
-      return { state: 'done', mark: 'check', word: `Skipped: ${loop.skipped}` }
-    }
-    return { state: 'not-yet', mark: 'number', word: 'Not reviewed yet' }
+function reviewedStep(loop: LoopFacts, openBlocking: number): BaseStep {
+  const last = lastFinishedRound(loop)
+  if (last !== null && openBlocking === 0) {
+    return { state: 'done', mark: 'check', word: `Clean after round ${last.round}` }
   }
-
-  if (id === 'shape') {
-    return {
-      state: 'done',
-      mark: 'check',
-      word: `${Shape}, ${input.shape.yours ? 'your choice' : 'proposed'}`,
-    }
+  if (loop.skipped !== undefined && openBlocking === 0) {
+    return { state: 'done', mark: 'check', word: `Skipped: ${loop.skipped}` }
   }
+  return { state: 'not-yet', mark: 'number', word: 'Not reviewed yet' }
+}
 
-  if (id === 'tracker') {
-    return { state: 'done', mark: 'check', word: trackerWord(order) }
-  }
-
-  // handOff
+function handOffStep({ input: { intake }, canHandOff, holder }: StepContext): BaseStep {
   if (canHandOff) return { state: 'done', mark: 'number', word: 'Ready' }
   if (intake.kind === 'running') {
     return { state: 'work', mark: 'number', word: `Waiting on the ${intake.actor}` }
@@ -766,56 +803,73 @@ function computeBaseStep(
   return { state: 'not-yet', mark: 'number', word: 'Waiting' }
 }
 
+/** Each step of a draft, as it stands on its own. */
+const BASE_STEPS: Record<StepId, (context: StepContext) => BaseStep> = {
+  intent: intentStep,
+  plan: planStep,
+  redTeam: redTeamStep,
+  shape: ({ input, Shape }) => ({
+    state: 'done',
+    mark: 'check',
+    word: `${Shape}, ${input.shape.yours ? 'your choice' : 'proposed'}`,
+  }),
+  tracker: ({ input }) => ({ state: 'done', mark: 'check', word: trackerWord(input.order) }),
+  handOff: handOffStep,
+}
+
 function buildSteps(
   input: ReadinessInput,
   canHandOff: boolean,
   holder: Holder
 ): readonly StepView[] {
   const ids = orderedStepIds(input.offers)
-  const Shape = capitalise(input.shape.name ?? 'the proposed')
-
+  const context: StepContext = {
+    input,
+    canHandOff,
+    holder,
+    Shape: capitalise(input.shape.name ?? 'the proposed'),
+  }
   if (input.order.status !== 'draft') {
     return ids.map((id) => ({
       id,
       state: 'done',
       mark: 'check',
-      word: nonDraftWord(id, input, Shape),
+      word: NON_DRAFT_WORDS[id](context),
     }))
   }
+  return draftSteps(ids, context)
+}
 
-  const openBlocking = openBlockingFindings(input.order)
+// A draft's steps in order. The first step that is bad, the operator's, or worked
+// while findings are open stops the rest: every later step but hand-off is "not yet".
+function draftSteps(ids: readonly StepId[], context: StepContext): StepView[] {
+  const openBlocking = openBlockingFindings(context.input.order)
   const views: StepView[] = []
-  let triggered = false
-  let triggerId: StepId | null = null
-  let triggerState: StepState | null = null
-
+  let trigger: { id: StepId; state: StepState } | null = null
   for (const id of ids) {
-    const base = computeBaseStep(id, input, canHandOff, holder, Shape)
-    if (id === 'handOff') {
+    const base = BASE_STEPS[id](context)
+    if (id === 'handOff' || trigger === null) {
       views.push({ id, ...base })
-      continue
+    } else {
+      views.push({ id, state: 'not-yet', mark: 'number', word: waitingWord(id, base, trigger) })
     }
-    if (triggered) {
-      const word =
-        id === 'redTeam' && triggerId === 'plan' && triggerState === 'bad'
-          ? 'Waits for a plan'
-          : base.word
-      views.push({ id, state: 'not-yet', mark: 'number', word })
-      continue
-    }
-    views.push({ id, ...base })
-    if (
+    const stops =
       base.state === 'bad' ||
       base.state === 'you' ||
       (base.state === 'work' && openBlocking.length > 0)
-    ) {
-      triggered = true
-      triggerId = id
-      triggerState = base.state
-    }
+    if (id !== 'handOff' && trigger === null && stops) trigger = { id, state: base.state }
   }
-
   return views
+}
+
+function waitingWord(
+  id: StepId,
+  base: BaseStep,
+  trigger: { id: StepId; state: StepState }
+): string {
+  return id === 'redTeam' && trigger.id === 'plan' && trigger.state === 'bad'
+    ? 'Waits for a plan'
+    : base.word
 }
 
 // ── Findings ─────────────────────────────────────────────────────────────
@@ -879,70 +933,82 @@ function buildFindings(input: ReadinessInput): readonly FindingView[] {
 
 // ── Locks ────────────────────────────────────────────────────────────────
 
+// One reason hand-off may be locked: a string is the lock, null is "not locked" for
+// certain, undefined is "not this reason" and the next one is asked.
+type LockRule = (facts: StripFacts) => string | null | undefined
+
 function buildHandOffLock(input: ReadinessInput): string | null {
-  const { order, compile, intake, loop, agreed, clock } = input
-  const openBlocking = openBlockingFindings(order)
-  const machineActing = intake.kind === 'running' && loop.heldAt === null
-  const rule5Applies = openBlocking.length > 0 && (loop.exhausted || !machineActing)
-  const openQuestions = order.openQuestions.filter((q) => q.answer === null)
-
-  if (order.status !== 'draft') {
-    const t = clock(agreed?.at ?? order.agreedAt ?? '')
-    const by = agreed?.by === 'automatic' ? 'automatically' : 'by you'
-    return `Handed off at ${t} ${by}. The order is read-only.`
+  const facts: StripFacts = {
+    ...openWorkOf(input),
+    input,
+    Shape: capitalise(input.shape.name ?? 'the proposed'),
   }
+  for (const rule of LOCK_RULES) {
+    const lock = rule(facts)
+    if (lock !== undefined) return lock
+  }
+  return decisionsLock(facts)
+}
 
-  if (intake.kind === 'running') {
-    const t = clock(intake.at)
-    if (intake.actor === 'red team') {
-      return `The red team is reviewing the plan (round ${intake.round} of 3, started ${t}). Hand-off opens when it finishes.`
-    }
-    if (intake.actor === 'architect' && intake.trigger === 'automatic' && intake.round !== null) {
-      return `The architect is fixing ${openBlocking.length} red-team findings (round ${intake.round} of 3, started ${t}). Hand-off opens when it finishes.`
-    }
-    if (
-      intake.actor === 'architect' &&
-      intake.trigger === 'automatic' &&
-      intake.autoTurn !== null
-    ) {
-      const doing =
-        intake.asked === REWRITING_UNREADABLE
-          ? 'rewriting a plan it wrote in the wrong format'
-          : `closing ${failingChecksList(compile)}`
-      return `The architect is ${doing} on its own, automatic turn ${intake.autoTurn} of 2. Hand-off opens when it finishes.`
-    }
-    if (intake.actor === 'architect') {
-      return `The architect is working on your request (started ${t}). Hand-off opens when it finishes.`
-    }
+const handedOffLock: LockRule = ({ input: { order, agreed, clock } }) => {
+  if (order.status === 'draft') return undefined
+  const t = clock(agreed?.at ?? order.agreedAt ?? '')
+  const by = agreed?.by === 'automatic' ? 'automatically' : 'by you'
+  return `Handed off at ${t} ${by}. The order is read-only.`
+}
+
+const runningLock: LockRule = ({ input, openBlocking }) => {
+  const { intake, clock, compile } = input
+  if (intake.kind !== 'running') return undefined
+  const t = clock(intake.at)
+  if (intake.actor === 'red team') {
+    return `The red team is reviewing the plan (round ${intake.round} of 3, started ${t}). Hand-off opens when it finishes.`
+  }
+  if (intake.actor === 'scout') {
     return `The scout is reading the repository before the first draft (started ${t}). The architect drafts next.`
   }
-
-  if (intake.kind === 'refused') {
-    const parts = refusedParts(intake.reason)
-    if (parts !== null)
-      return `The architect's last plan couldn't be read. ${malformedInWords(parts)}`
-    return `The architect's last plan was refused: ${intake.reason}. Nothing changed.`
+  if (intake.trigger === 'automatic' && intake.round !== null) {
+    return `The architect is fixing ${openBlocking.length} red-team findings (round ${intake.round} of 3, started ${t}). Hand-off opens when it finishes.`
   }
-
-  if (loop.heldAt !== null) {
-    if (compile.ok) return null
-    return `Held by you since ${clock(loop.heldAt)}. Let it continue, or hand off yourself once nothing is running.`
+  if (intake.trigger === 'automatic' && intake.autoTurn !== null) {
+    const doing =
+      intake.asked === REWRITING_UNREADABLE
+        ? 'rewriting a plan it wrote in the wrong format'
+        : `closing ${failingChecksList(compile)}`
+    return `The architect is ${doing} on its own, automatic turn ${intake.autoTurn} of 2. Hand-off opens when it finishes.`
   }
+  return `The architect is working on your request (started ${t}). Hand-off opens when it finishes.`
+}
 
-  if (rule5Applies) {
-    return `${openBlocking.length} red-team findings need your decision.`
-  }
+const refusedLock: LockRule = ({ input: { intake } }) => {
+  if (intake.kind !== 'refused') return undefined
+  const parts = refusedParts(intake.reason)
+  if (parts !== null)
+    return `The architect's last plan couldn't be read. ${malformedInWords(parts)}`
+  return `The architect's last plan was refused: ${intake.reason}. Nothing changed.`
+}
 
+const heldLock: LockRule = ({ input: { loop, compile, clock } }) => {
+  if (loop.heldAt === null) return undefined
+  if (compile.ok) return null
+  return `Held by you since ${clock(loop.heldAt)}. Let it continue, or hand off yourself once nothing is running.`
+}
+
+/** The last word on a draft nothing else locks: what is still to decide, or nothing. */
+const decisionsLock = ({
+  rule5Applies,
+  openBlocking,
+  openQuestions,
+  input,
+}: StripFacts): string | null => {
+  if (rule5Applies) return `${openBlocking.length} red-team findings need your decision.`
   if (openQuestions.length > 0) {
     return `${openQuestions.length} questions need your answer. The architect was less than 90% sure.`
   }
-
-  if (compile.failures.length > 0) {
-    return compile.failures[0].detail
-  }
-
-  return null
+  return input.compile.failures.length > 0 ? input.compile.failures[0].detail : null
 }
+
+const LOCK_RULES: readonly LockRule[] = [handedOffLock, runningLock, refusedLock, heldLock]
 
 function buildRedraftLock(input: ReadinessInput, handOffLockText: string | null): string | null {
   const { order, intake, clock } = input

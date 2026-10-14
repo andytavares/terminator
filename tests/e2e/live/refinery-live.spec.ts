@@ -1,9 +1,9 @@
 import { test, expect } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
-import { launchApp, closeApp, createWorkspace, type AppHandle } from '../helpers'
+import { launchApp, closeApp, createWorkspace, type AppHandle, e2eTempDir } from '../helpers'
+import { writeLiveOrder } from './live-order'
 
 // A failed check sends the work back, for real (ADR-063).
 //
@@ -55,7 +55,7 @@ test.skip(REMOTE === '', 'set LIVE_REMOTE to run this')
 
 test.beforeAll(async () => {
   test.setTimeout(300_000)
-  repo = mkdtempSync(join(tmpdir(), 'foundry-live-refinery-'))
+  repo = e2eTempDir('foundry-live-refinery-')
   execFileSync('git', ['clone', REMOTE, repo])
   git('config', 'user.email', 'live@example.com')
   git('config', 'user.name', 'Live')
@@ -90,108 +90,32 @@ test.afterAll(async () => {
   if (handle !== undefined) await closeApp(handle)
 })
 
+/** The particulars of one of the refinery's two orders. */
+interface RefineryOrder {
+  id: string
+  title: string
+  problem: string
+  outcome: string
+  agreedAt: string
+}
+
 /**
  * A complete, agreed order. The Forge is what writes one normally and has its
  * own cover; what is under test here is an agent doing the work it describes.
  */
-function writeOrder(
-  ORDER: string,
-  title: string,
-  problem: string,
-  outcome: string,
-  agreedAt: string
-): void {
-  const dir = join(repo, '.foundry', 'orders', ORDER)
-  mkdirSync(dir, { recursive: true })
-  writeFileSync(
-    join(dir, 'order.json'),
-    JSON.stringify(
-      {
-        schemaVersion: 1,
-        id: ORDER,
-        title,
-        status: 'agreed',
-        source: { kind: 'typed', tracker: null, key: null, url: null },
-        writeBack: [],
-        stateMapping: { started: null, in_review: null, done: null },
-        recipe: 'direct',
-        recipeOverriddenBy: 'operator',
-        intent: {
-          problem,
-          outcome,
-          nonGoals: ['Changing how expiry is computed'],
-        },
-        context: {
-          repos: [{ name: 'live', path: repo, lane: 1, baseBranch: 'main', headBranch: '' }],
-          toolchain: {
-            test: { command: 'npm test', source: 'package.json' },
-            lint: { command: 'npm run lint', source: 'package.json' },
-            format: null,
-            coverage: null,
-            e2e: null,
-            build: null,
-          },
-          entryPoints: ['src/session.js'],
-          priorArt: [],
-          conventions: [],
-          houseDocs: [],
-        },
-        acceptance: [
-          {
-            id: 'AC-1',
-            statement: `${outcome} The existing tests still pass.`,
-            priority: 'P1',
-            verify: { kind: 'test', command: 'npm test', assert: 'exit_code == 0' },
-            unverifiable: null,
-          },
-        ],
-        // The test file as well as the source. The builder's role tells it to
-        // write the failing test first, so a unit that changes code in a tested
-        // repository touches two files — and one it writes that the order did
-        // not declare is a risk trigger. A live run was held for an operator on
-        // `outside_blast_radius` for exactly this, which was the order being
-        // wrong rather than the run.
-        risk: {
-          grade: 'P2',
-          triggers: [],
-          blastRadius: ['src/session.js', 'src/session.test.js'],
-          criticalPaths: [],
-        },
-        // Room for the whole pipeline plus the climb. At twenty minutes the
-        // budget was the thing under test: four agents and eight rungs is
-        // fifteen minutes on a good run, so a slow builder gated it rather
-        // than shipping. That the budget gate fires correctly is proven — a
-        // live run raised it, halted, left its agents in their terminals and
-        // wrote "not every node finished" — and it is not what this test is
-        // named after.
-        budgets: { agents: 1, wallClockMinutes: 45, tokens: null },
-        plan: {
-          units: [
-            {
-              id: 'U-1',
-              title,
-              role: 'builder',
-              lane: 1,
-              dependsOn: [],
-              satisfies: ['AC-1'],
-              touches: ['src/session.js', 'src/session.test.js'],
-              verify: [],
-            },
-          ],
-          lanes: [{ ord: 1, repo: 'live', branch: '', role: null, blocks: [], blockedBy: [] }],
-          sharedFiles: [],
-        },
-        assumptions: [],
-        openQuestions: [],
-        redTeam: [],
-        provenance: { forgeSession: null, decisions: [], amendments: [] },
-        createdAt: new Date().toISOString(),
-        agreedAt,
-      },
-      null,
-      2
-    )
-  )
+function writeOrder({ id, title, problem, outcome, agreedAt }: RefineryOrder): void {
+  writeLiveOrder({
+    repo,
+    id,
+    title,
+    problem,
+    outcome,
+    statement: `${outcome} The existing tests still pass.`,
+    unitTitle: title,
+    lintCommand: 'npm run lint',
+    wallClockMinutes: 45,
+    agreedAt,
+  })
 }
 
 // The refinery, for real (ADR-067): two orders change src/session.js, the
@@ -228,42 +152,45 @@ async function runToDraft(id: string): Promise<string> {
   const pulls = JSON.parse(
     readFileSync(join(repo, '.foundry', 'orders', id, 'pulls.json'), 'utf8')
   ) as { url: string }[]
-  // eslint-disable-next-line no-console
+
   console.log(`${id} drafted ${pulls[0]?.url}`)
   return pulls[0].url
 }
 
-test('a merge restacks the order queued behind it', async () => {
-  test.setTimeout(3_600_000)
-  writeOrder(
-    FIRST,
-    'Add a helper that says how long a token has left',
-    'Callers compute the time a session token has left by hand.',
-    'src/session.js exports remainingMs(issuedAt, now), the milliseconds left before expiry, never negative, added at the end of the file.',
+/** Two orders on src/session.js, the first agreed a minute before the second. */
+function writeTwoOrders(): void {
+  writeOrder({
+    id: FIRST,
+    title: 'Add a helper that says how long a token has left',
+    problem: 'Callers compute the time a session token has left by hand.',
+    outcome:
+      'src/session.js exports remainingMs(issuedAt, now), the milliseconds left before expiry, never negative, added at the end of the file.',
     // The queue is in order of agreement; two orders written in the same
     // millisecond would tie, and neither would be behind the other.
-    new Date(Date.now() - 60_000).toISOString()
-  )
-  writeOrder(
-    SECOND,
-    'Name the session TTL in minutes',
-    'TTL_MS in src/session.js is written as a bare product of numbers.',
-    'src/session.js defines TTL_MINUTES = 15 at the top and computes TTL_MS from it, with the same value as today.',
-    new Date().toISOString()
-  )
-  const firstUrl = await runToDraft(FIRST)
-  await runToDraft(SECOND)
+    agreedAt: new Date(Date.now() - 60_000).toISOString(),
+  })
+  writeOrder({
+    id: SECOND,
+    title: 'Name the session TTL in minutes',
+    problem: 'TTL_MS in src/session.js is written as a bare product of numbers.',
+    outcome:
+      'src/session.js defines TTL_MINUTES = 15 at the top and computes TTL_MS from it, with the same value as today.',
+    agreedAt: new Date().toISOString(),
+  })
+}
 
+/** The second order is queued behind the first. */
+async function expectSecondQueuedBehindFirst(): Promise<void> {
   const observed = (await foundry('foundry:run.observe', { id: SECOND })) as {
     queue: { position: number; behind: { orderId: string; files: string[] }[] } | null
   }
-  // eslint-disable-next-line no-console
+
   console.log(`queue for ${SECOND}: ${JSON.stringify(observed.queue)}`)
   expect(observed.queue?.behind.map((b) => b.orderId)).toContain(FIRST)
+}
 
-  execFileSync('gh', ['pr', 'ready', firstUrl], { cwd: repo })
-  execFileSync('gh', ['pr', 'merge', firstUrl, '--merge'], { cwd: repo })
-
+/** How the second order came out of the first one's merge: rebased, conflict, or '' by the deadline. */
+async function restackOutcome(): Promise<string> {
   const deadline = Date.now() + 15 * 60_000
   let outcome = ''
   while (Date.now() < deadline) {
@@ -273,18 +200,31 @@ test('a merge restacks the order queued behind it', async () => {
     if (outcome !== '') break
     await handle.page.waitForTimeout(15_000)
   }
-  // eslint-disable-next-line no-console
+  return outcome
+}
+
+/** The restacked branch sits on the new main. Throws, failing the test, when it does not. */
+function expectRestackedOnMain(): void {
+  git('fetch', 'origin')
+  const branch = `foundry/${SECOND.toLowerCase()}`
+  const merged = execFileSync('git', ['rev-parse', 'origin/main'], { cwd: repo }).toString().trim()
+  execFileSync('git', ['merge-base', '--is-ancestor', merged, `origin/${branch}`], { cwd: repo })
+}
+
+test('a merge restacks the order queued behind it', async () => {
+  test.setTimeout(3_600_000)
+  writeTwoOrders()
+  const firstUrl = await runToDraft(FIRST)
+  await runToDraft(SECOND)
+  await expectSecondQueuedBehindFirst()
+
+  execFileSync('gh', ['pr', 'ready', firstUrl], { cwd: repo })
+  execFileSync('gh', ['pr', 'merge', firstUrl, '--merge'], { cwd: repo })
+
+  const outcome = await restackOutcome()
+
   console.log(`first ledger:\n${ledgerOf(FIRST)}\nsecond ledger:\n${ledgerOf(SECOND)}`)
   expect(ledgerOf(FIRST)).toContain('refinery.merged')
   expect(['rebased', 'conflict']).toContain(outcome)
-
-  if (outcome === 'rebased') {
-    git('fetch', 'origin')
-    const branch = `foundry/${SECOND.toLowerCase()}`
-    const merged = execFileSync('git', ['rev-parse', 'origin/main'], { cwd: repo })
-      .toString()
-      .trim()
-    // Throws, failing the test, when main is not an ancestor of the restacked branch.
-    execFileSync('git', ['merge-base', '--is-ancestor', merged, `origin/${branch}`], { cwd: repo })
-  }
+  if (outcome === 'rebased') expectRestackedOnMain()
 })

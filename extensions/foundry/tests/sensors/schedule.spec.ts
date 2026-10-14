@@ -1,16 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import * as fs from 'node:fs'
-import * as os from 'node:os'
-import * as path from 'node:path'
 
 import { dueSensors, runSensor } from '../../src/sensors/schedule.js'
 import { createSignalStore } from '../../src/sensors/store.js'
 import type { SensorState } from '../../src/sensors/store.js'
 import type { SensorDef } from '../../src/sensors/types.js'
 import type { CollectDeps } from '../../src/sensors/collect.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 function tempRoot(): string {
-  return fs.mkdtempSync(path.join(os.tmpdir(), 'foundry-sensor-schedule-'))
+  return makeTempDir('foundry-sensor-schedule-')
 }
 
 function sensor(overrides: Partial<SensorDef> = {}): SensorDef {
@@ -64,32 +62,38 @@ describe('dueSensors', () => {
   })
 })
 
-describe('runSensor', () => {
-  function fakeCollectDeps(over: Partial<CollectDeps> = {}): CollectDeps {
-    return {
-      exec: async () => ({ exitCode: 0, stdout: '[]', stderr: '', timedOut: false }),
-      cwd: '/repo',
-      issues: null,
-      now: () => '2026-01-01T00:20:00.000Z',
-      ...over,
-    }
+function fakeCollectDeps(over: Partial<CollectDeps> = {}): CollectDeps {
+  return {
+    exec: async () => ({ exitCode: 0, stdout: '[]', stderr: '', timedOut: false }),
+    cwd: '/repo',
+    issues: null,
+    now: () => '2026-01-01T00:20:00.000Z',
+    ...over,
   }
+}
 
+describe('runSensor', () => {
+  describe('recording', scheduleRecordingTests)
+  describe('failures', scheduleFailuresTests)
+})
+
+/** gh listing one open bug. */
+const LOGIN_CRASHES = {
+  exitCode: 0,
+  stdout: JSON.stringify([
+    { title: 'Login crashes', url: 'https://x/1', updatedAt: '2026-01-01T00:00:00.000Z' },
+  ]),
+  stderr: '',
+  timedOut: false,
+}
+
+function scheduleRecordingTests() {
   it('records a signal collected this run and remembers when it ran', async () => {
     const root = tempRoot()
     const store = createSignalStore(root)
     const def = sensor({ source: { kind: 'github-issues', label: 'bug', limit: 5 } })
 
-    const collectDeps = fakeCollectDeps({
-      exec: async () => ({
-        exitCode: 0,
-        stdout: JSON.stringify([
-          { title: 'Login crashes', url: 'https://x/1', updatedAt: '2026-01-01T00:00:00.000Z' },
-        ]),
-        stderr: '',
-        timedOut: false,
-      }),
-    })
+    const collectDeps = fakeCollectDeps({ exec: async () => LOGIN_CRASHES })
 
     const result = await runSensor(def, {
       store,
@@ -110,7 +114,9 @@ describe('runSensor', () => {
       lastProblem: null,
     })
   })
+}
 
+function scheduleFailuresTests() {
   it('stores the problem and records nothing when the collector fails', async () => {
     const root = tempRoot()
     const store = createSignalStore(root)
@@ -133,4 +139,4 @@ describe('runSensor', () => {
     const states = await store.sensorState()
     expect(states['ci-flake'].lastProblem).toMatch(/gh issue list failed/)
   })
-})
+}

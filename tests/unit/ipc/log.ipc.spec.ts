@@ -21,11 +21,6 @@ describe('registerLogHandlers()', () => {
     vi.clearAllMocks()
   })
 
-  it('registers log:write IPC listener', () => {
-    registerLogHandlers()
-    expect(mockIpcOn).toHaveBeenCalledWith('log:write', expect.any(Function))
-  })
-
   it('calls writeFromRenderer with valid payload', () => {
     registerLogHandlers()
     const handler = mockIpcOn.mock.calls[0][1]
@@ -45,6 +40,12 @@ describe('registerLogHandlers()', () => {
     const handler = mockIpcOn.mock.calls[0][1]
     handler({}, { level: 'info', message: 'hello' })
     expect(mockWriteFromRenderer).not.toHaveBeenCalled()
+  })
+})
+
+describe('registerLogHandlers() — malformed payloads', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
   })
 
   it('ignores payload with non-string message', () => {

@@ -14,6 +14,8 @@ function node(id: string, over: Partial<RunNode> = {}): RunNode {
     role: null,
     dependsOn: [],
     attempts: 1,
+    reworks: 0,
+    feedback: [],
     sessionId: null,
     worktreePath: null,
     startedAt: null,
@@ -43,6 +45,12 @@ const ci = (buckets: string[]) => ({
 })
 
 describe('factory/step-facts', () => {
+  describe('agent steps and joins', agentStepsAndJoinsTests)
+  describe('the ship gate', theShipGateTests)
+  describe('other gates', otherGatesTests)
+})
+
+function agentStepsAndJoinsTests() {
   it('has nothing to say about an agent step', () => {
     expect(
       stepFacts({ node: graph.nodes[0], graph, labels, pulls: [], ci: null, waiting: [] })
@@ -61,14 +69,16 @@ describe('factory/step-facts', () => {
       'Joins Inspector and Scribe',
     ])
   })
+}
 
+function theShipGateTests() {
   it('says what the ship gate decided', () => {
     expect(
       stepFacts({
         node: graph.nodes[3],
         graph,
         labels,
-        pulls: [{ repo: 'a/b', url: 'u', number: 233 }],
+        pulls: [{ number: 233 }],
         ci: ci(['pass', 'pass', 'pending']) as never,
         waiting: [readyGate()],
       })
@@ -87,11 +97,13 @@ describe('factory/step-facts', () => {
       })
     ).toEqual(['Checks · 1 of 1 passed'])
   })
+}
 
+function otherGatesTests() {
   it('names any other open gate by its own question', () => {
     const other = { rule: 'budget.exceeded', nodeId: 'ship', summary: 'Raise the budget?' } as Gate
     expect(
       stepFacts({ node: graph.nodes[3], graph, labels, pulls: [], ci: null, waiting: [other] })
     ).toEqual(['Waiting on you · Raise the budget?'])
   })
-})
+}

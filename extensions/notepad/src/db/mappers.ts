@@ -1,6 +1,6 @@
-import type { Note, Tag, Comment, SearchResult } from './types'
+import type { Note, Comment } from './types'
 
-interface NoteRow {
+export type NoteRow = {
   id: string
   title: string
   body: string
@@ -10,13 +10,7 @@ interface NoteRow {
   tags: string | null
 }
 
-interface TagRow {
-  id: string
-  name: string
-  note_count: number
-}
-
-interface CommentRow {
+export type CommentRow = {
   id: string
   note_id: string
   parent_id: string | null
@@ -32,15 +26,6 @@ interface CommentRow {
   updated_at: string
 }
 
-interface SearchResultRow {
-  id: string
-  title: string
-  snippet: string
-  tags: string | null
-  updated_at: string
-  archived_at: string | null
-}
-
 export function rowToNote(row: NoteRow): Note {
   return {
     id: row.id,
@@ -51,10 +36,6 @@ export function rowToNote(row: NoteRow): Note {
     archivedAt: row.archived_at,
     tags: row.tags ? row.tags.split(',').filter(Boolean) : [],
   }
-}
-
-export function rowToTag(row: TagRow): Tag {
-  return { id: row.id, name: row.name, noteCount: row.note_count }
 }
 
 export function rowToComment(row: CommentRow): Comment {
@@ -73,16 +54,5 @@ export function rowToComment(row: CommentRow): Comment {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     replies: [],
-  }
-}
-
-export function rowToSearchResult(row: SearchResultRow): SearchResult {
-  return {
-    id: row.id,
-    title: row.title,
-    snippet: row.snippet,
-    tags: row.tags ? row.tags.split(',').filter(Boolean) : [],
-    updatedAt: row.updated_at,
-    archivedAt: row.archived_at,
   }
 }

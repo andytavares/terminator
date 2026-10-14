@@ -1,17 +1,16 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import fs from 'node:fs'
-import os from 'node:os'
 import path from 'node:path'
 import {
   recordGraph,
   recordTools,
   recordCi,
   readTimeline,
-  forgetTimelines,
   TIMELINE_FILE,
 } from '../../src/factory/timeline-store.js'
 import type { RunGraph, RunNode } from '../../src/line/run-graph.js'
 import type { ToolActivity } from '../../src/runtime/transcript-tailer.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 function node(id: string, over: Partial<RunNode> = {}): RunNode {
   return {
@@ -24,6 +23,8 @@ function node(id: string, over: Partial<RunNode> = {}): RunNode {
     role: 'builder',
     dependsOn: [],
     attempts: 0,
+    reworks: 0,
+    feedback: [],
     sessionId: null,
     worktreePath: null,
     startedAt: null,
@@ -48,9 +49,14 @@ function call(
 
 let dir: string
 
+/** The store as a new process loads it: nothing remembered, only what is on disk. */
+async function afterRestart(): Promise<typeof import('../../src/factory/timeline-store.js')> {
+  vi.resetModules()
+  return import('../../src/factory/timeline-store.js')
+}
+
 beforeEach(() => {
-  dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-timeline-'))
-  forgetTimelines()
+  dir = makeTempDir('fdry-timeline-')
 })
 
 afterEach(() => {
@@ -58,6 +64,31 @@ afterEach(() => {
 })
 
 describe('the run timeline', () => {
+  describe('frames', timelineStoreFramesTests)
+  describe('tool calls', toolCallsTests)
+  describe('reading', timelineStoreReadingTests)
+})
+
+const ci = (status: string, buckets: Record<string, 'pass' | 'pending' | 'fail'>, round = 0) => ({
+  round,
+  max: 2,
+  status: status as 'watching',
+  reason: '',
+  at: '2026-10-05T10:00:00.000Z',
+  pulls: [
+    {
+      url: 'https://github.com/a/b/pull/1',
+      checks: Object.entries(buckets).map(([name, bucket]) => ({
+        name,
+        bucket,
+        link: '',
+        workflow: 'CI',
+      })),
+    },
+  ],
+})
+
+function timelineStoreFramesTests() {
   it('records a frame each time the graph is written with different states, and only then', async () => {
     await recordGraph(dir, graph({ a: 'running', b: 'waiting' }), 1000)
     await recordGraph(dir, graph({ a: 'running', b: 'waiting' }), 2000)
@@ -72,16 +103,16 @@ describe('the run timeline', () => {
 
   it('does not repeat a frame after a restart forgets what it last wrote', async () => {
     await recordGraph(dir, graph({ a: 'running' }), 1000)
-    forgetTimelines()
-    await recordGraph(dir, graph({ a: 'running' }), 2000)
+    await (await afterRestart()).recordGraph(dir, graph({ a: 'running' }), 2000)
     expect((await readTimeline(dir)).frames).toHaveLength(1)
   })
+}
 
+function toolCallsTests() {
   it('records each tool call once, however many times the transcript is read', async () => {
     await recordTools(dir, 's-1', [call('c1', 10)])
     await recordTools(dir, 's-1', [call('c1', 10), call('c1', 20, 'tool_finished'), call('c2', 30)])
-    forgetTimelines()
-    await recordTools(dir, 's-1', [call('c1', 10), call('c2', 30)])
+    await (await afterRestart()).recordTools(dir, 's-1', [call('c1', 10), call('c2', 30)])
     const tools = (await readTimeline(dir)).tools
     expect(tools.map((t) => `${t.activity.callId}:${t.activity.kind}`)).toEqual([
       'c1:tool_started',
@@ -90,7 +121,9 @@ describe('the run timeline', () => {
     ])
     expect(tools[0]).toMatchObject({ at: 10, sessionId: 's-1' })
   })
+}
 
+function timelineStoreReadingTests() {
   it('reads an absent timeline as empty, and skips a line it cannot parse', async () => {
     expect(await readTimeline(dir)).toEqual({ frames: [], tools: [], ci: [] })
     await recordGraph(dir, graph({ a: 'running' }), 1000)
@@ -104,28 +137,13 @@ describe('the run timeline', () => {
     await recordTools(dir, 's-1', [call('early', 100)])
     expect((await readTimeline(dir)).tools.map((t) => t.activity.callId)).toEqual(['early', 'late'])
   })
-})
+}
 
 describe('factory/timeline-store CI', () => {
-  const ci = (status: string, buckets: Record<string, 'pass' | 'pending' | 'fail'>, round = 0) => ({
-    round,
-    max: 2,
-    status: status as 'watching',
-    reason: '',
-    at: '2026-10-05T10:00:00.000Z',
-    pulls: [
-      {
-        url: 'https://github.com/a/b/pull/1',
-        checks: Object.entries(buckets).map(([name, bucket]) => ({
-          name,
-          bucket,
-          link: '',
-          workflow: 'CI',
-        })),
-      },
-    ],
-  })
+  describe('recording CI', recordingCiTests)
+})
 
+function recordingCiTests() {
   it('records the CI state as its own line, and reads it back in order', async () => {
     await recordCi(dir, ci('watching', { lint: 'pending' }), 100)
     await recordCi(dir, ci('green', { lint: 'pass' }), 200)
@@ -141,8 +159,7 @@ describe('factory/timeline-store CI', () => {
     const same = ci('watching', { lint: 'pending' })
     await recordCi(dir, same, 100)
     await recordCi(dir, { ...same, at: 'later', reason: 'still going' }, 150)
-    forgetTimelines()
-    await recordCi(dir, same, 160)
+    await (await afterRestart()).recordCi(dir, same, 160)
     expect((await readTimeline(dir)).ci).toHaveLength(1)
     await recordCi(dir, ci('watching', { lint: 'pending' }, 1), 170)
     expect((await readTimeline(dir)).ci).toHaveLength(2)
@@ -152,4 +169,4 @@ describe('factory/timeline-store CI', () => {
     await recordCi(dir, null, 100)
     expect(fs.existsSync(path.join(dir, TIMELINE_FILE))).toBe(false)
   })
-})
+}

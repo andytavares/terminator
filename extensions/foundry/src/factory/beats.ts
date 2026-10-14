@@ -15,12 +15,12 @@ import { VERDICT_MS, WALK_PX_PER_S } from './sim.js'
 // release the same beats, live or in a replay.
 
 /** How long a crate takes to ride a two-tile belt (34px/s over 32px, `sim.ts`). */
-export const CRATE_RIDE_MS = 940
+const CRATE_RIDE_MS = 940
 
-/** What an upstream step's last animation needs before the step it feeds may begin its own. */
+/** What an upstream step's last animation needs before the step it feeds begins. @internal */
 export const MIN_DWELL_MS = CRATE_RIDE_MS + VERDICT_MS
 
-/** No event waits longer than this behind the beats ahead of it; past it the rest catch up together. */
+/** The longest an event waits behind the beats ahead; then the rest catch up. @internal */
 export const MAX_LAG_MS = 10_000
 
 /**
@@ -29,12 +29,14 @@ export const MAX_LAG_MS = 10_000
  * The scheduler sees graph nodes, not the hall map, so it cannot measure the
  * walk. This is a conservative stand-in: 30 tiles of 16px at the 46px/s walking
  * speed in `sim.ts`, a generous crossing of a laid-out hall.
+ * @internal
  */
 export const REWORK_WALK_MS = Math.round(((30 * 16) / WALK_PX_PER_S) * 1000)
 
-/** One press stroke, for a join step that passes without ever being seen running. */
+/** One press stroke, for a join step that passes without being seen running. @internal */
 export const STROKE_MS = 700
 
+/** @internal */
 export interface BeatNode {
   readonly id: string
   readonly kind: StepKind
@@ -79,62 +81,91 @@ function animates(event: FactoryEvent): boolean {
   return event.kind === 'node-state' && (event.to === 'passed' || event.to === 'failed')
 }
 
-/** Take in the events of one observation, deciding when each is due. */
-export function schedule(
-  beats: Beats,
-  events: readonly FactoryEvent[],
-  nodes: readonly BeatNode[],
-  nowMs: number
-): Beats {
-  const byId = new Map(nodes.map((n) => [n.id, n]))
-  const held = [...beats.held]
-  const shown = { ...beats.shown }
-  const lastAt = { ...beats.lastAt }
-  const lastBeat = { ...beats.lastBeat }
-  // What each node will show once everything held has been released.
-  const eventual = { ...beats.shown }
-  for (const h of held) if (h.event.kind === 'node-state') eventual[h.event.nodeId] = h.event.to
+/** One observation's worth of events, and the nodes they concern. */
+export interface Seen {
+  readonly events: readonly FactoryEvent[]
+  readonly nodes: readonly BeatNode[]
+}
 
-  const place = (event: FactoryEvent, minDue: number): number => {
+/** Take in the events of one observation, deciding when each is due. */
+export function schedule(beats: Beats, { events, nodes }: Seen, nowMs: number): Beats {
+  // Same object back, so a poll that saw nothing re-renders nothing.
+  if (events.length === 0) return beats
+  const scheduler = new Scheduler(beats, { nodes, nowMs })
+  for (const event of events) scheduler.take(event)
+  return scheduler.beats()
+}
+
+/** The beats being scheduled: copies of the held events and their clocks, added to in order. */
+class Scheduler {
+  private readonly byId: Map<string, BeatNode>
+  private readonly nowMs: number
+  private readonly held: Held[]
+  private readonly shown: Record<string, NodeState>
+  private readonly lastAt: Record<string, number>
+  private readonly lastBeat: Record<string, number>
+  /** What each node will show once everything held has been released. */
+  private readonly eventual: Record<string, NodeState>
+
+  constructor(beats: Beats, { nodes, nowMs }: Pick<Seen, 'nodes'> & { readonly nowMs: number }) {
+    this.byId = new Map(nodes.map((n) => [n.id, n]))
+    this.nowMs = nowMs
+    this.held = [...beats.held]
+    this.shown = { ...beats.shown }
+    this.lastAt = { ...beats.lastAt }
+    this.lastBeat = { ...beats.lastBeat }
+    this.eventual = { ...beats.shown }
+    for (const h of this.held) {
+      if (h.event.kind === 'node-state') this.eventual[h.event.nodeId] = h.event.to
+    }
+  }
+
+  beats(): Beats {
+    return { held: this.held, shown: this.shown, lastAt: this.lastAt, lastBeat: this.lastBeat }
+  }
+
+  take(event: FactoryEvent): void {
+    if (event.kind !== 'node-state') {
+      this.place(event, 0)
+      return
+    }
+    const unseen = !hasStarted(this.eventual[event.nodeId] ?? 'waiting')
+    if (animates(event) && unseen && this.byId.get(event.nodeId)?.kind === 'join') {
+      // A join that passes unseen still strokes once: the press animates
+      // while its step is running, so it is shown running for a stroke first.
+      const strokeAt = this.place({ ...event, to: 'running' }, 0)
+      this.place(event, strokeAt + STROKE_MS)
+    } else {
+      this.place(event, 0)
+    }
+    this.eventual[event.nodeId] = event.to
+  }
+
+  /** Holds `event` until it is due, no earlier than `minDue`; returns when that is. */
+  private place(event: FactoryEvent, minDue: number): number {
+    const { nowMs } = this
     const subject = subjectOf(event)
     if (subject === null) {
-      held.push({ event, due: nowMs })
+      this.held.push({ event, due: nowMs })
       return nowMs
     }
-    const upstreams = event.kind === 'node-state' ? (byId.get(event.nodeId)?.dependsOn ?? []) : []
+    const upstreams =
+      event.kind === 'node-state' ? (this.byId.get(event.nodeId)?.dependsOn ?? []) : []
     let due = Math.max(nowMs, minDue)
-    let floor = lastAt[subject] ?? 0
+    let floor = this.lastAt[subject] ?? 0
     for (const upstream of upstreams) {
-      const beat = lastBeat[upstream]
+      const beat = this.lastBeat[upstream]
       if (beat === undefined) continue
       due = Math.max(due, beat + MIN_DWELL_MS)
       floor = Math.max(floor, beat)
     }
     // Lag is capped, but never so far that a step lands before the one feeding it.
     due = Math.max(Math.min(due, nowMs + MAX_LAG_MS), floor)
-    held.push({ event, due })
-    lastAt[subject] = event.kind === 'rework' ? due + REWORK_WALK_MS : due
-    if (animates(event)) lastBeat[subject] = due
+    this.held.push({ event, due })
+    this.lastAt[subject] = event.kind === 'rework' ? due + REWORK_WALK_MS : due
+    if (animates(event)) this.lastBeat[subject] = due
     return due
   }
-
-  for (const event of events) {
-    if (event.kind === 'node-state') {
-      const unseen = !hasStarted(eventual[event.nodeId] ?? 'waiting')
-      if (animates(event) && unseen && byId.get(event.nodeId)?.kind === 'join') {
-        // A join that passes unseen still strokes once: the press animates
-        // while its step is running, so it is shown running for a stroke first.
-        const strokeAt = place({ ...event, to: 'running' }, 0)
-        place(event, strokeAt + STROKE_MS)
-      } else {
-        place(event, 0)
-      }
-      eventual[event.nodeId] = event.to
-    } else {
-      place(event, 0)
-    }
-  }
-  return { held, shown, lastAt, lastBeat }
 }
 
 /** The events now due, in the order they were taken in, and what is left held. */

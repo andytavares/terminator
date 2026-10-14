@@ -1,10 +1,11 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, act } from '@testing-library/react'
+import { partialFake } from '../../../../tests/support/fakes'
 
 const mockSetShowCaptureModal = vi.fn()
 const mockSetView = vi.fn()
-const mockOn = vi.fn(() => vi.fn())
+const mockOn = vi.fn<Window['electronAPI']['extensionBridge']['on']>(() => vi.fn())
 const mockInvoke = vi.fn()
 
 vi.mock('../../src/components/TaskVaultView', () => ({
@@ -34,9 +35,9 @@ function setSearch(params: Record<string, string>): void {
 
 beforeEach(() => {
   mockInvoke.mockResolvedValue({ data: { pending: false } })
-  window.electronAPI = {
+  window.electronAPI = partialFake<typeof window.electronAPI>({
     extensionBridge: { on: mockOn, invoke: mockInvoke },
-  } as unknown as typeof window.electronAPI
+  })
 })
 
 afterEach(() => {
@@ -45,7 +46,15 @@ afterEach(() => {
   mockSetShowCaptureModal.mockReset()
 })
 
-describe('task-vault renderer App', () => {
+describe('task-vault renderer App', taskVaultRendererAppTests)
+
+function taskVaultRendererAppTests() {
+  describe('views', taskVaultRendererAppViewsTests)
+  describe('capture command', taskVaultRendererAppCaptureCommandTests)
+  describe('pending capture', taskVaultRendererAppPendingCaptureTests)
+}
+
+function taskVaultRendererAppViewsTests() {
   it('renders TaskVaultView by default', async () => {
     setSearch({})
     const { App } = await import('../../src/renderer/App')
@@ -59,7 +68,9 @@ describe('task-vault renderer App', () => {
     render(<App />)
     expect(screen.getByTestId('calendar-drawer')).toBeDefined()
   })
+}
 
+function taskVaultRendererAppCaptureCommandTests() {
   it('subscribes to capture command on mount', async () => {
     setSearch({})
     const { App } = await import('../../src/renderer/App')
@@ -72,7 +83,7 @@ describe('task-vault renderer App', () => {
     const { App } = await import('../../src/renderer/App')
     render(<App />)
     const [, handler] = mockOn.mock.calls[0]
-    handler()
+    handler(undefined)
     expect(mockSetShowCaptureModal).toHaveBeenCalledWith(true)
   })
 
@@ -85,7 +96,9 @@ describe('task-vault renderer App', () => {
     unmount()
     expect(unsubscribe).toHaveBeenCalled()
   })
+}
 
+function taskVaultRendererAppPendingCaptureTests() {
   it('invokes consumePendingCapture on mount', async () => {
     setSearch({})
     const { App } = await import('../../src/renderer/App')
@@ -102,4 +115,4 @@ describe('task-vault renderer App', () => {
     await act(async () => {})
     expect(mockSetShowCaptureModal).toHaveBeenCalledWith(true)
   })
-})
+}

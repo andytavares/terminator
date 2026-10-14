@@ -6,23 +6,22 @@ import {
   headingTextStart,
   insertNewlineKeepingHeadingMarker,
 } from '../../../src/editor/headingEnter'
+import { parsedState } from '../support/parsed-state'
 
 function makeState(doc: string, cursor: number, readOnly = false) {
-  return EditorState.create({
+  return parsedState({
     doc,
     selection: { anchor: cursor },
     extensions: [markdown({ extensions: [GFM] }), EditorState.readOnly.of(readOnly)],
   })
 }
 
-/** Runs the command and returns the resulting doc, or null when it declined. */
-function run(
-  command: StateCommand,
-  doc: string,
-  cursor: number,
-  readOnly = false
-): { doc: string; cursor: number } | null {
-  const state = makeState(doc, cursor, readOnly)
+function run(command: StateCommand, doc: string, cursor: number) {
+  return runOn(command, makeState(doc, cursor))
+}
+
+/** Runs the command on a state and returns the resulting doc, or null when it declined. */
+function runOn(command: StateCommand, state: EditorState): { doc: string; cursor: number } | null {
   let next: EditorState | null = null
   const handled = command({
     state,
@@ -37,7 +36,15 @@ function run(
   }
 }
 
-describe('headingTextStart', () => {
+describe('headingTextStart', headingTextStartTests)
+describe('insertNewlineKeepingHeadingMarker', insertNewlineKeepingHeadingMarkerTests)
+
+function headingTextStartTests() {
+  describe('finding the text', headingTextStartFindingTextTests)
+  describe('not a heading', headingTextStartNotHeadingTests)
+}
+
+function headingTextStartFindingTextTests() {
   it('points just past the marker and its space', () => {
     const state = makeState('# Hello', 0)
     expect(headingTextStart(state, 0)).toBe(2)
@@ -55,7 +62,9 @@ describe('headingTextStart', () => {
     const state = makeState('##   Spaced', 0)
     expect(headingTextStart(state, 0)).toBe(5)
   })
+}
 
+function headingTextStartNotHeadingTests() {
   it('returns null for a paragraph', () => {
     const state = makeState('just text', 0)
     expect(headingTextStart(state, 0)).toBeNull()
@@ -76,9 +85,15 @@ describe('headingTextStart', () => {
     const state = makeState('####### too many', 0)
     expect(headingTextStart(state, 0)).toBeNull()
   })
-})
+}
 
-describe('insertNewlineKeepingHeadingMarker', () => {
+function insertNewlineKeepingHeadingMarkerTests() {
+  describe('pushing the heading down', insertNewlineKeepingHeadingMarkerPushingHeadingDownTests)
+  describe('declining', insertNewlineKeepingHeadingMarkerDecliningTests)
+  describe('read-only and code', insertNewlineKeepingHeadingMarkerReadOnlyCodeTests)
+}
+
+function insertNewlineKeepingHeadingMarkerPushingHeadingDownTests() {
   it('pushes the whole heading down when the caret is at the start of its text', () => {
     // The reported bug: this used to leave '# ' behind and move 'Hello' down
     // as an unformatted paragraph.
@@ -105,7 +120,9 @@ describe('insertNewlineKeepingHeadingMarker', () => {
     const result = run(insertNewlineKeepingHeadingMarker, '# Hello\nbody', 2)
     expect(result?.doc).toBe('\n# Hello\nbody')
   })
+}
 
+function insertNewlineKeepingHeadingMarkerDecliningTests() {
   it('declines mid-heading so splitting into heading plus paragraph still works', () => {
     expect(run(insertNewlineKeepingHeadingMarker, '# Hello', 5)).toBeNull()
   })
@@ -131,9 +148,11 @@ describe('insertNewlineKeepingHeadingMarker', () => {
     const handled = insertNewlineKeepingHeadingMarker({ state, dispatch: () => {} })
     expect(handled).toBe(false)
   })
+}
 
+function insertNewlineKeepingHeadingMarkerReadOnlyCodeTests() {
   it('declines in read-only mode', () => {
-    expect(run(insertNewlineKeepingHeadingMarker, '# Hello', 2, true)).toBeNull()
+    expect(runOn(insertNewlineKeepingHeadingMarker, makeState('# Hello', 2, true))).toBeNull()
   })
 
   it('declines inside a fenced code block that looks like a heading', () => {
@@ -145,4 +164,4 @@ describe('insertNewlineKeepingHeadingMarker', () => {
     const result = run(insertNewlineKeepingHeadingMarker, '# One\n\n## Two', 9)
     expect(result?.doc).toBe('# One\n\n\n## Two')
   })
-})
+}

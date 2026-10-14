@@ -1,13 +1,18 @@
-import Store from 'electron-store'
-import type { GlobalSettings, WorkspaceSettings } from '../../shared/types/index.js'
-import { DEFAULT_GLOBAL_SETTINGS } from '../../shared/schemas/settings.schema.js'
+import { CachedStore } from './cached-store.js'
+import {
+  DEFAULT_GLOBAL_SETTINGS,
+  GlobalSettingsSchema,
+  WorkspaceSettingsSchema,
+  type GlobalSettings,
+  type WorkspaceSettings,
+} from '../../shared/schemas/settings.schema.js'
 
 interface StoreSchema {
   global: GlobalSettings
   workspaces: Record<string, WorkspaceSettings>
 }
 
-const store = new Store<StoreSchema>({
+const store = new CachedStore<StoreSchema>({
   name: 'settings',
   defaults: {
     global: DEFAULT_GLOBAL_SETTINGS,
@@ -17,15 +22,13 @@ const store = new Store<StoreSchema>({
 
 export function getGlobalSettings(): GlobalSettings {
   // Always normalize against defaults so schema migrations don't surface missing fields
-  return deepMerge(
-    DEFAULT_GLOBAL_SETTINGS as unknown as GlobalSettings,
-    store.get('global') as Partial<GlobalSettings>
-  )
+  return deepMerge(DEFAULT_GLOBAL_SETTINGS, store.get('global') as Partial<GlobalSettings>)
 }
 
+/** Throws a ZodError, and stores nothing, when the merged settings break the schema. */
 export function updateGlobalSettings(patch: unknown): GlobalSettings {
   const current = getGlobalSettings()
-  const merged = deepMerge(current, patch as Partial<GlobalSettings>)
+  const merged = GlobalSettingsSchema.parse(deepMerge(current, patch as Partial<GlobalSettings>))
   store.set('global', merged)
   return merged
 }
@@ -35,14 +38,45 @@ export function getWorkspaceSettings(workspaceId: string): WorkspaceSettings {
   return workspaces[workspaceId] ?? { workspaceId, overrides: {}, extensions: {} }
 }
 
+/** Throws a ZodError, and stores nothing, when the merged override breaks the schema. */
 export function updateWorkspaceSettings(workspaceId: string, patch: unknown): WorkspaceSettings {
   const workspaces = store.get('workspaces')
   const current = workspaces[workspaceId] ?? { workspaceId, overrides: {}, extensions: {} }
+  const overrides = WorkspaceSettingsSchema.shape.overrides.parse(
+    mergeOverrides(current.overrides ?? {}, (patch as Record<string, unknown>) ?? {})
+  )
+  const updated: WorkspaceSettings = { ...current, overrides }
+  store.set('workspaces', { ...workspaces, [workspaceId]: updated })
+  return updated
+}
+
+/** The values each workspace sets for itself, by workspace id, then extension id, then key. */
+export function listWorkspaceExtensionSettings(): Record<string, WorkspaceSettings['extensions']> {
+  const workspaces = store.get('workspaces')
+  return Object.fromEntries(
+    Object.entries(workspaces).map(([id, settings]) => [id, settings.extensions ?? {}])
+  )
+}
+
+/** One extension setting's value in one workspace; no value hands it back to the global one. */
+export interface WorkspaceExtensionSettingChange {
+  extensionId: string
+  key: string
+  value?: unknown
+}
+
+export function writeWorkspaceExtensionSetting(
+  workspaceId: string,
+  change: WorkspaceExtensionSettingChange
+): WorkspaceSettings {
+  const current = getWorkspaceSettings(workspaceId)
+  const { extensionId, key, value } = change
+  const own = mergeOverrides(current.extensions?.[extensionId] ?? {}, { [key]: value })
   const updated: WorkspaceSettings = {
     ...current,
-    overrides: deepMerge(current.overrides ?? {}, (patch as Partial<GlobalSettings>) ?? {}),
+    extensions: { ...current.extensions, [extensionId]: own as Record<string, unknown> },
   }
-  store.set('workspaces', { ...workspaces, [workspaceId]: updated })
+  store.set('workspaces', { ...store.get('workspaces'), [workspaceId]: updated })
   return updated
 }
 
@@ -55,6 +89,19 @@ function deepMerge<T>(target: T, source: Partial<T>): T {
     } else if (val !== undefined) {
       result[key] = val as T[typeof key]
     }
+  }
+  return result
+}
+
+/** Like deepMerge, except that a key the patch sets to undefined is removed: that is how "Use
+ * global default" hands a setting back to the global value. */
+function mergeOverrides(target: object, patch: Record<string, unknown>): object {
+  const result: Record<string, unknown> = { ...target }
+  for (const [key, val] of Object.entries(patch)) {
+    if (val === undefined) delete result[key]
+    else if (val !== null && typeof val === 'object' && !Array.isArray(val)) {
+      result[key] = mergeOverrides((result[key] as object) ?? {}, val as Record<string, unknown>)
+    } else result[key] = val
   }
   return result
 }

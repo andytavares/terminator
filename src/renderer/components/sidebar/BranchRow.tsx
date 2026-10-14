@@ -5,7 +5,8 @@ import type { DragItemProps } from '../../hooks/useDragReorder'
 import type { ChangeStats } from '../../../shared/schemas/git.schema'
 import { StateChip } from '../session/StateChip'
 import { formatRelativeTime } from '../../sidebar/relative-time'
-import { ContextMenu, closeAllContextMenus, type ContextMenuItem } from '../ContextMenu'
+import { ContextMenu, type ContextMenuItem } from '../ContextMenu'
+import { activateOnKey, afterClosing, clickOnly, useRowMenu } from './row-events'
 import { issueMenuItems, type IssueMenuActions } from './issue-menu-items'
 import './BranchRow.css'
 
@@ -84,81 +85,11 @@ export interface BranchRowProps {
  * what is waiting, not how many terminals it has. "Two waiting" answers the
  * question the row exists for; "three terminals" does not.
  */
-export function BranchRow({
-  row,
-  selected,
-  colour,
-  now,
-  issueKey,
-  onIssueClick,
-  sessionIssueKeys = [],
-  changeStats,
-  onSelect,
-  expanded,
-  onToggleExpanded,
-  onAddTerminal,
-  onRename,
-  onRemove,
-  onOpenInEditor,
-  editorName,
-  issueActions,
-  repoActions = [],
-  dragProps,
-  dragOver = false,
-}: BranchRowProps): JSX.Element {
-  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
-  const [renaming, setRenaming] = useState(false)
-  const [draft, setDraft] = useState(row.label)
-
-  // One key element whatever the count: the branch's own key first, then the
-  // count of other keys its terminals carry, all of them in the tooltip.
-  const branchKey = issueKey != null && issueKey !== '' ? issueKey : null
-  const keys = [...new Set([...(branchKey !== null ? [branchKey] : []), ...sessionIssueKeys])]
-  const keyText = keys.length > 1 ? `${keys[0]} +${keys.length - 1}` : keys[0]
-  const hasStats = changeStats != null && (changeStats.added > 0 || changeStats.removed > 0)
-
-  function openMenu(e: React.MouseEvent): void {
-    e.preventDefault()
-    e.stopPropagation()
-    closeAllContextMenus()
-    setMenu({ x: e.clientX, y: e.clientY })
-  }
-
-  function commitRename(): void {
-    const next = draft.trim()
-    if (next.length > 0 && next !== row.label) onRename?.(next)
-    setRenaming(false)
-  }
-
-  const items: ContextMenuItem[] = [
-    // Only a branch with no branch to be named by can be renamed: everything
-    // else is named by its branch and renaming it would be a lie (ADR-034).
-    ...(onRename ? [{ label: 'Rename', onSelect: () => setRenaming(true) }] : []),
-    ...(onOpenInEditor
-      ? [
-          {
-            label: editorName ? `Open in ${editorName}` : 'Open in editor',
-            separatorBefore: onRename !== undefined,
-            onSelect: () => {
-              setMenu(null)
-              onOpenInEditor()
-            },
-          },
-        ]
-      : []),
-    ...(issueActions ? issueMenuItems(issueActions, () => setMenu(null)) : []),
-    ...repoActions.map((action, i) => ({
-      label: action.label,
-      separatorBefore: i === 0,
-      onSelect: () => {
-        setMenu(null)
-        action.onSelect()
-      },
-    })),
-    ...(onRemove
-      ? [{ label: 'Remove branch', danger: true, separatorBefore: true, onSelect: onRemove }]
-      : []),
-  ]
+export function BranchRow(props: BranchRowProps): JSX.Element {
+  const { row, selected, colour, onSelect, dragProps, dragOver = false } = props
+  const { menu, openMenu, closeMenu } = useRowMenu()
+  const rename = useRename(row.label, props.onRename)
+  const items = branchMenuItems(props, closeMenu, rename.start)
 
   return (
     <>
@@ -172,128 +103,213 @@ export function BranchRow({
         tabIndex={0}
         aria-current={selected ? 'true' : undefined}
         aria-label={`${row.label} — ${STATE_LABEL[row.state]}`}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault()
-            onSelect()
-          }
-        }}
+        onKeyDown={activateOnKey(onSelect)}
       >
-        {/* The disclosure for this branch's terminals. Drawn only when there
-            is something under it, and it takes the click without selecting the
-            branch — expanding to see what is there is not the same act as
-            switching to it. */}
-        {onToggleExpanded && row.terminals.length > 0 ? (
-          <button
-            type="button"
-            className="branch-row__disclosure"
-            aria-label={
-              expanded ? `Hide terminals in ${row.label}` : `Show terminals in ${row.label}`
-            }
-            aria-expanded={expanded}
-            onClick={(e) => {
-              e.stopPropagation()
-              onToggleExpanded()
-            }}
-          >
-            {expanded ? <ChevronDown aria-hidden="true" /> : <ChevronRight aria-hidden="true" />}
-          </button>
-        ) : (
-          <span
-            className="branch-row__disclosure branch-row__disclosure--empty"
-            aria-hidden="true"
-          />
-        )}
-
-        {/* The status gutter: one fixed column, one glyph, never anything else,
-            so finding what needs you is a scan down a single column rather than
-            a search across full-width rows. */}
-        <span className="branch-row__gutter">
-          <StateChip state={row.state} compact />
-        </span>
-
-        <span className="branch-row__kind">
-          {!row.isWorktree && <GitBranch aria-hidden="true" data-kind="branch" />}
-        </span>
-
-        {renaming ? (
-          <input
-            className="branch-row__rename"
-            value={draft}
-            autoFocus
-            onChange={(e) => setDraft(e.target.value)}
-            onBlur={commitRename}
-            onClick={(e) => e.stopPropagation()}
-            onKeyDown={(e) => {
-              e.stopPropagation()
-              if (e.key === 'Enter') commitRename()
-              if (e.key === 'Escape') {
-                setDraft(row.label)
-                setRenaming(false)
-              }
-            }}
-          />
-        ) : (
-          <span className="branch-row__name">{row.label}</span>
-        )}
-
-        <span className="branch-row__meta">
-          {keys.length > 0 &&
-            (branchKey !== null && onIssueClick ? (
-              <button
-                type="button"
-                className="branch-row__issue"
-                aria-label={`Open ${branchKey}`}
-                title={keys.join(', ')}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onIssueClick()
-                }}
-              >
-                {keyText}
-              </button>
-            ) : (
-              <span className="branch-row__issue" title={keys.join(', ')}>
-                {keyText}
-              </span>
-            ))}
-          {hasStats && (
-            <span className="branch-row__stats">
-              <b>+{changeStats!.added}</b> <i>−{changeStats!.removed}</i>
-            </span>
-          )}
-        </span>
-
-        {onAddTerminal && (
-          <span className="branch-row__hover">
-            <button
-              type="button"
-              className="branch-row__action"
-              aria-label={`New terminal in ${row.label}`}
-              title="New terminal"
-              onClick={(e) => {
-                e.stopPropagation()
-                onAddTerminal()
-              }}
-            >
-              <Plus aria-hidden="true" />
-            </button>
-          </span>
-        )}
-
-        {/* Last on the row, so it sits flush against the right edge and lands
-            in the same column as every other count in the sidebar. Anything
-            that can appear or disappear goes to its left. */}
-        {row.stateCount > 1 ? (
-          <span className="branch-row__count">{row.stateCount}</span>
-        ) : (
-          <span className="branch-row__age">
-            {row.lastActivityAt !== null ? formatRelativeTime(row.lastActivityAt, now) : ''}
-          </span>
-        )}
+        <BranchRowContent {...props} rename={rename} />
       </div>
 
-      {menu && <ContextMenu x={menu.x} y={menu.y} onDismiss={() => setMenu(null)} items={items} />}
+      {menu && <ContextMenu x={menu.x} y={menu.y} onDismiss={closeMenu} items={items} />}
     </>
+  )
+}
+
+/** Disclosure, state, kind, name (or its editor), key and stats, New terminal, then count or age. */
+function BranchRowContent(props: BranchRowProps & { rename: Rename }): JSX.Element {
+  const { row, rename } = props
+  return (
+    <>
+      <Disclosure {...props} />
+
+      {/* The status gutter: one fixed column, one glyph, never anything else,
+          so finding what needs you is a scan down a single column rather than
+          a search across full-width rows. */}
+      <span className="branch-row__gutter">
+        <StateChip state={row.state} compact />
+      </span>
+
+      <span className="branch-row__kind">
+        {!row.isWorktree && <GitBranch aria-hidden="true" data-kind="branch" />}
+      </span>
+
+      {rename.renaming ? (
+        <RenameInput rename={rename} />
+      ) : (
+        <span className="branch-row__name">{row.label}</span>
+      )}
+
+      <BranchMeta {...props} />
+      {props.onAddTerminal && <AddTerminal label={row.label} onAdd={props.onAddTerminal} />}
+      <CountOrAge row={row} now={props.now} />
+    </>
+  )
+}
+
+/** Rename, Open in the editor, the issue actions, the repo's actions, then Remove. Each that
+ * does not end the menu itself closes it first. */
+function branchMenuItems(
+  props: BranchRowProps,
+  closeMenu: () => void,
+  startRename: () => void
+): ContextMenuItem[] {
+  const { onRename, onOpenInEditor, editorName, issueActions, repoActions = [], onRemove } = props
+  // Only a branch with no branch to be named by can be renamed: everything
+  // else is named by its branch and renaming it would be a lie (ADR-034).
+  const items: ContextMenuItem[] = onRename ? [{ label: 'Rename', onSelect: startRename }] : []
+  if (onOpenInEditor) {
+    items.push({
+      label: editorName ? `Open in ${editorName}` : 'Open in editor',
+      separatorBefore: onRename !== undefined,
+      onSelect: afterClosing(closeMenu, onOpenInEditor),
+    })
+  }
+  if (issueActions) items.push(...issueMenuItems(issueActions, closeMenu))
+  repoActions.forEach((action, i) =>
+    items.push({
+      label: action.label,
+      separatorBefore: i === 0,
+      onSelect: afterClosing(closeMenu, action.onSelect),
+    })
+  )
+  if (onRemove) {
+    items.push({ label: 'Remove branch', danger: true, separatorBefore: true, onSelect: onRemove })
+  }
+  return items
+}
+
+/** The in-place rename: the draft, and committing it only when it is a real change. */
+function useRename(label: string, onRename: BranchRowProps['onRename']) {
+  const [renaming, setRenaming] = useState(false)
+  const [draft, setDraft] = useState(label)
+
+  function commit(): void {
+    const next = draft.trim()
+    if (next.length > 0 && next !== label) onRename?.(next)
+    setRenaming(false)
+  }
+
+  function cancel(): void {
+    setDraft(label)
+    setRenaming(false)
+  }
+
+  return { renaming, start: () => setRenaming(true), draft, setDraft, commit, cancel }
+}
+
+type Rename = ReturnType<typeof useRename>
+
+/** Enter or leaving commits, Escape abandons; its keys and clicks stay out of the row. */
+function RenameInput({ rename }: { rename: Rename }): JSX.Element {
+  return (
+    <input
+      className="tmui-inline-edit branch-row__rename"
+      value={rename.draft}
+      autoFocus
+      onChange={(e) => rename.setDraft(e.target.value)}
+      onBlur={rename.commit}
+      onClick={(e) => e.stopPropagation()}
+      onKeyDown={(e) => {
+        e.stopPropagation()
+        if (e.key === 'Enter') rename.commit()
+        if (e.key === 'Escape') rename.cancel()
+      }}
+    />
+  )
+}
+
+/** The disclosure for this branch's terminals. Drawn only when there is something under it, and
+ * it takes the click without selecting the branch — expanding to see what is there is not the
+ * same act as switching to it. */
+function Disclosure({ row, expanded, onToggleExpanded }: BranchRowProps): JSX.Element {
+  if (!onToggleExpanded || row.terminals.length === 0) {
+    return (
+      <span className="branch-row__disclosure branch-row__disclosure--empty" aria-hidden="true" />
+    )
+  }
+  return (
+    <button
+      type="button"
+      className="branch-row__disclosure"
+      aria-label={expanded ? `Hide terminals in ${row.label}` : `Show terminals in ${row.label}`}
+      aria-expanded={expanded}
+      onClick={clickOnly(onToggleExpanded)}
+    >
+      {expanded ? <ChevronDown aria-hidden="true" /> : <ChevronRight aria-hidden="true" />}
+    </button>
+  )
+}
+
+/** One key element whatever the count: the branch's own key first, then the count of other keys
+ * its terminals carry, all of them in the tooltip. */
+function issueKeys(issueKey: string | null | undefined, sessionIssueKeys: string[]) {
+  const branchKey = issueKey != null && issueKey !== '' ? issueKey : null
+  const keys = [...new Set([...(branchKey !== null ? [branchKey] : []), ...sessionIssueKeys])]
+  const text = keys.length > 1 ? `${keys[0]} +${keys.length - 1}` : keys[0]
+  return { branchKey, keys, text }
+}
+
+/** The issue key and the change counts. */
+function BranchMeta(props: BranchRowProps): JSX.Element {
+  const { changeStats } = props
+  const hasStats = changeStats != null && (changeStats.added > 0 || changeStats.removed > 0)
+  return (
+    <span className="branch-row__meta">
+      <IssueKey {...props} />
+      {hasStats && (
+        <span className="branch-row__stats">
+          <b>+{changeStats.added}</b> <i>−{changeStats.removed}</i>
+        </span>
+      )}
+    </span>
+  )
+}
+
+/** The key, as a button when the branch's own key can open the drawer, else plain text. */
+function IssueKey({ issueKey, sessionIssueKeys = [], onIssueClick }: BranchRowProps) {
+  const { branchKey, keys, text } = issueKeys(issueKey, sessionIssueKeys)
+  if (keys.length === 0) return null
+  if (branchKey === null || !onIssueClick) {
+    return (
+      <span className="branch-row__issue" title={keys.join(', ')}>
+        {text}
+      </span>
+    )
+  }
+  return (
+    <button
+      type="button"
+      className="branch-row__issue"
+      aria-label={`Open ${branchKey}`}
+      title={keys.join(', ')}
+      onClick={clickOnly(onIssueClick)}
+    >
+      {text}
+    </button>
+  )
+}
+
+function AddTerminal({ label, onAdd }: { label: string; onAdd: () => void }): JSX.Element {
+  return (
+    <span className="branch-row__hover">
+      <button
+        type="button"
+        className="branch-row__action"
+        aria-label={`New terminal in ${label}`}
+        title="New terminal"
+        onClick={clickOnly(onAdd)}
+      >
+        <Plus aria-hidden="true" />
+      </button>
+    </span>
+  )
+}
+
+/** Last on the row, so it sits flush against the right edge and lands in the same column as
+ * every other count in the sidebar. Anything that can appear or disappear goes to its left. */
+function CountOrAge({ row, now }: Pick<BranchRowProps, 'row' | 'now'>): JSX.Element {
+  if (row.stateCount > 1) return <span className="branch-row__count">{row.stateCount}</span>
+  return (
+    <span className="branch-row__age">
+      {row.lastActivityAt !== null ? formatRelativeTime(row.lastActivityAt, now) : ''}
+    </span>
   )
 }

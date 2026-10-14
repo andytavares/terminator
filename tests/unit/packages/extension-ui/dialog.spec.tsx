@@ -1,9 +1,10 @@
 import React, { useState } from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, act } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { Dialog } from '../../../../packages/extension-ui/src/Dialog'
 import { ConfirmDialog } from '../../../../packages/extension-ui/src/ConfirmDialog'
 import { MODAL_DEPTH_KEY } from '../../../../packages/extension-ui/src/modal-depth'
+import { pressOutside } from '../../../support/modal'
 
 // The five behaviours every dismissible surface in the product must have. They
 // were measured across the 19 extension surfaces before this package existed:
@@ -28,174 +29,154 @@ function renderDialog(overrides: Partial<React.ComponentProps<typeof Dialog>> = 
 }
 
 beforeEach(() => {
-  delete (window as unknown as Record<string, unknown>)[MODAL_DEPTH_KEY]
+  delete window[MODAL_DEPTH_KEY]
 })
 
-describe('Dialog', () => {
-  describe('announces itself', () => {
-    it('exposes a dialog role', () => {
-      renderDialog()
-      expect(screen.getByRole('dialog')).toBeTruthy()
-    })
-
-    it('marks itself modal', () => {
-      renderDialog()
-      expect(screen.getByRole('dialog').getAttribute('aria-modal')).toBe('true')
-    })
-
-    it('takes its accessible name from the title', () => {
-      renderDialog({ title: 'Remove branch?' })
-      expect(screen.getByRole('dialog', { name: 'Remove branch?' })).toBeTruthy()
-    })
+describe('Dialog — announces itself', () => {
+  it('exposes a dialog role', () => {
+    renderDialog()
+    expect(screen.getByRole('dialog')).toBeTruthy()
   })
 
-  describe('dismissal', () => {
-    it('closes on Escape', () => {
-      const { onDismiss } = renderDialog()
-      fireEvent.keyDown(document, { key: 'Escape' })
-      expect(onDismiss).toHaveBeenCalledTimes(1)
-    })
-
-    it('closes on a click outside the panel', () => {
-      const { onDismiss, container } = renderDialog()
-      fireEvent.click(container.querySelector('.tmui-dialog__scrim')!)
-      expect(onDismiss).toHaveBeenCalledTimes(1)
-    })
-
-    it('does not close on a click inside the panel', () => {
-      const { onDismiss } = renderDialog()
-      fireEvent.click(screen.getByRole('dialog'))
-      expect(onDismiss).not.toHaveBeenCalled()
-    })
-
-    it('offers a close control that dismisses', () => {
-      const { onDismiss } = renderDialog()
-      fireEvent.click(screen.getByRole('button', { name: 'Close' }))
-      expect(onDismiss).toHaveBeenCalledTimes(1)
-    })
-
-    // The one escape hatch, for a surface holding unsaved work. It suppresses
-    // the two implicit routes only — the explicit close control still works, or
-    // the dialog would be a trap.
-    describe('when dismissible is false', () => {
-      it('ignores Escape', () => {
-        const { onDismiss } = renderDialog({ dismissible: false })
-        fireEvent.keyDown(document, { key: 'Escape' })
-        expect(onDismiss).not.toHaveBeenCalled()
-      })
-
-      it('ignores an outside click', () => {
-        const { onDismiss, container } = renderDialog({ dismissible: false })
-        fireEvent.click(container.querySelector('.tmui-dialog__scrim')!)
-        expect(onDismiss).not.toHaveBeenCalled()
-      })
-
-      it('still offers the explicit close control', () => {
-        const { onDismiss } = renderDialog({ dismissible: false })
-        fireEvent.click(screen.getByRole('button', { name: 'Close' }))
-        expect(onDismiss).toHaveBeenCalledTimes(1)
-      })
-    })
+  // A native dialog opened as a modal is announced as one; the attribute is not needed.
+  it('is the native dialog element, opened', () => {
+    renderDialog()
+    expect(screen.getByRole('dialog').tagName).toBe('DIALOG')
+    expect(screen.getByRole('dialog').hasAttribute('open')).toBe(true)
   })
 
-  describe('focus', () => {
-    it('moves focus into the dialog on open', () => {
-      renderDialog()
-      expect(screen.getByRole('dialog').contains(document.activeElement)).toBe(true)
-    })
+  it('takes its accessible name from the title', () => {
+    renderDialog({ title: 'Remove branch?' })
+    expect(screen.getByRole('dialog', { name: 'Remove branch?' })).toBeTruthy()
+  })
+})
 
-    it('returns focus to whatever opened it', () => {
-      const opener = document.createElement('button')
-      document.body.appendChild(opener)
-      opener.focus()
-      expect(document.activeElement).toBe(opener)
-
-      const { unmount } = renderDialog()
-      expect(document.activeElement).not.toBe(opener)
-
-      unmount()
-      expect(document.activeElement).toBe(opener)
-      opener.remove()
-    })
-
-    it('keeps Tab inside the dialog', () => {
-      renderDialog({
-        actions: [
-          { label: 'Cancel', onSelect: noop },
-          { label: 'Remove', tone: 'danger', onSelect: noop },
-        ],
-      })
-      const panel = screen.getByRole('dialog')
-      const focusables = Array.from(
-        panel.querySelectorAll<HTMLElement>('button, [href], input, select, textarea, [tabindex]')
-      )
-      const last = focusables[focusables.length - 1]
-      last.focus()
-      fireEvent.keyDown(panel, { key: 'Tab' })
-      expect(panel.contains(document.activeElement)).toBe(true)
-      expect(document.activeElement).toBe(focusables[0])
-    })
-
-    it('wraps backwards on Shift+Tab', () => {
-      renderDialog()
-      const panel = screen.getByRole('dialog')
-      const focusables = Array.from(panel.querySelectorAll<HTMLElement>('button'))
-      focusables[0].focus()
-      fireEvent.keyDown(panel, { key: 'Tab', shiftKey: true })
-      expect(document.activeElement).toBe(focusables[focusables.length - 1])
-    })
+describe('Dialog — dismissal', () => {
+  it('closes on Escape', () => {
+    const { onDismiss } = renderDialog()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(onDismiss).toHaveBeenCalledTimes(1)
   })
 
-  describe('modal depth', () => {
-    it('registers while open so the exit gesture stands down', () => {
-      renderDialog()
-      expect((window as unknown as Record<string, number>)[MODAL_DEPTH_KEY]).toBe(1)
-    })
-
-    it('releases on close', () => {
-      const { unmount } = renderDialog()
-      unmount()
-      expect((window as unknown as Record<string, number>)[MODAL_DEPTH_KEY]).toBe(0)
-    })
-
-    it('counts nested dialogs', () => {
-      const first = renderDialog()
-      const second = render(
-        <Dialog title="Second" actions={[{ label: 'Ok', onSelect: noop }]} onDismiss={noop} />
-      )
-      expect((window as unknown as Record<string, number>)[MODAL_DEPTH_KEY]).toBe(2)
-      second.unmount()
-      expect((window as unknown as Record<string, number>)[MODAL_DEPTH_KEY]).toBe(1)
-      first.unmount()
-      expect((window as unknown as Record<string, number>)[MODAL_DEPTH_KEY]).toBe(0)
-    })
+  it('closes on a press outside the panel', () => {
+    const { onDismiss } = renderDialog()
+    pressOutside(screen.getByRole('dialog'))
+    expect(onDismiss).toHaveBeenCalledTimes(1)
   })
 
-  describe('actions', () => {
-    it('renders every action', () => {
-      renderDialog({
-        actions: [
-          { label: 'Cancel', onSelect: noop },
-          { label: 'Save brief', tone: 'primary', onSelect: noop },
-        ],
-      })
-      expect(screen.getByRole('button', { name: /Cancel/ })).toBeTruthy()
-      expect(screen.getByRole('button', { name: /Save brief/ })).toBeTruthy()
-    })
-
-    it('invokes the action that was chosen', () => {
-      const onSelect = vi.fn()
-      renderDialog({ actions: [{ label: 'Remove', onSelect }] })
-      fireEvent.click(screen.getByRole('button', { name: /Remove/ }))
-      expect(onSelect).toHaveBeenCalledTimes(1)
-    })
-
-    it('shows a shortcut hint when one is given', () => {
-      renderDialog({ actions: [{ label: 'Save', onSelect: noop, shortcut: '⌘↵' }] })
-      expect(screen.getByText('⌘↵')).toBeTruthy()
-    })
+  it('does not close on a press inside the panel', () => {
+    const { onDismiss } = renderDialog()
+    fireEvent.mouseDown(screen.getByRole('heading', { name: 'Remove branch?' }))
+    expect(onDismiss).not.toHaveBeenCalled()
   })
 
+  it('offers a close control that dismisses', () => {
+    const { onDismiss } = renderDialog()
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+    expect(onDismiss).toHaveBeenCalledTimes(1)
+  })
+})
+
+// The one escape hatch, for a surface holding unsaved work. It suppresses
+// the two implicit routes only — the explicit close control still works, or
+// the dialog would be a trap.
+describe('Dialog — dismissal — when dismissible is false', () => {
+  it('ignores Escape', () => {
+    const { onDismiss } = renderDialog({ dismissible: false })
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(onDismiss).not.toHaveBeenCalled()
+  })
+
+  it('ignores an outside press', () => {
+    const { onDismiss } = renderDialog({ dismissible: false })
+    pressOutside(screen.getByRole('dialog'))
+    expect(onDismiss).not.toHaveBeenCalled()
+  })
+
+  it('still offers the explicit close control', () => {
+    const { onDismiss } = renderDialog({ dismissible: false })
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+    expect(onDismiss).toHaveBeenCalledTimes(1)
+  })
+})
+
+// Focus moving in, staying in and returning to the opener are the browser's: the Dialog and
+// ModalShell stories and visual/modal-keys.visual.ts assert them in one.
+describe('Dialog — focus', () => {
+  it('puts the close control after the actions, so focus opens on the content', () => {
+    renderDialog()
+    const buttons = screen.getAllByRole('button').map((button) => button.textContent)
+    expect(buttons[0]).toContain('Remove')
+    expect(screen.getAllByRole('button').at(-1)?.getAttribute('aria-label')).toBe('Close')
+  })
+
+  // A form dialog focuses its first field itself; moving focus off it would
+  // blur the field and run its validation before anyone typed.
+  it('leaves focus on a field that took it as the dialog opened', () => {
+    renderDialog({
+      actions: [{ label: 'Create', onSelect: noop }],
+      children: (
+        <>
+          <input aria-label="Search" />
+          <input aria-label="Name" autoFocus />
+        </>
+      ),
+    })
+    expect(document.activeElement).toBe(screen.getByRole('textbox', { name: 'Name' }))
+  })
+})
+
+describe('Dialog — modal depth', () => {
+  it('registers while open so the exit gesture stands down', () => {
+    renderDialog()
+    expect(window[MODAL_DEPTH_KEY]).toBe(1)
+  })
+
+  it('releases on close', () => {
+    const { unmount } = renderDialog()
+    unmount()
+    expect(window[MODAL_DEPTH_KEY]).toBe(0)
+  })
+
+  it('counts nested dialogs', () => {
+    const first = renderDialog()
+    const second = render(
+      <Dialog title="Second" actions={[{ label: 'Ok', onSelect: noop }]} onDismiss={noop} />
+    )
+    expect(window[MODAL_DEPTH_KEY]).toBe(2)
+    second.unmount()
+    expect(window[MODAL_DEPTH_KEY]).toBe(1)
+    first.unmount()
+    expect(window[MODAL_DEPTH_KEY]).toBe(0)
+  })
+})
+
+describe('Dialog — actions', () => {
+  it('renders every action', () => {
+    renderDialog({
+      actions: [
+        { label: 'Cancel', onSelect: noop },
+        { label: 'Save brief', tone: 'primary', onSelect: noop },
+      ],
+    })
+    expect(screen.getByRole('button', { name: /Cancel/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /Save brief/ })).toBeTruthy()
+  })
+
+  it('invokes the action that was chosen', () => {
+    const onSelect = vi.fn()
+    renderDialog({ actions: [{ label: 'Remove', onSelect }] })
+    fireEvent.click(screen.getByRole('button', { name: /Remove/ }))
+    expect(onSelect).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows a shortcut hint when one is given', () => {
+    renderDialog({ actions: [{ label: 'Save', onSelect: noop, shortcut: '⌘↵' }] })
+    expect(screen.getByText('⌘↵')).toBeTruthy()
+  })
+})
+
+describe('Dialog — renders the body it was given', () => {
   it('renders the body it was given', () => {
     renderDialog({ children: <p>This cannot be undone.</p> })
     expect(screen.getByText('This cannot be undone.')).toBeTruthy()
@@ -239,7 +220,9 @@ describe('ConfirmDialog', () => {
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(onClose).toHaveBeenCalled()
   })
+})
 
+describe('ConfirmDialog — shows the description when given one', () => {
   it('shows the description when given one', () => {
     render(
       <ConfirmDialog
@@ -252,38 +235,37 @@ describe('ConfirmDialog', () => {
     expect(screen.getByText('Its worktree stays on disk.')).toBeTruthy()
   })
 
-  // Focus starts on the safe choice, matching the core dialog this generalises.
-  it('opens with focus on cancel rather than on the destructive action', () => {
+  // Focus opens on the first control, so the safe choice comes first.
+  it('lists cancel before the destructive action', () => {
     render(<ConfirmDialog title="Remove branch?" danger onConfirm={noop} onClose={noop} />)
-    expect((document.activeElement as HTMLElement).textContent).toContain('Cancel')
+    expect(screen.getAllByRole('button')[0].textContent).toContain('Cancel')
   })
 })
 
+function DialogInADialog({ onOuter, onInner }: { onOuter: () => void; onInner: () => void }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <Dialog
+      title="Outer"
+      actions={[{ label: 'Open inner', onSelect: () => setOpen(true) }]}
+      onDismiss={onOuter}
+    >
+      {open && (
+        <Dialog title="Inner" actions={[{ label: 'Ok', onSelect: noop }]} onDismiss={onInner} />
+      )}
+    </Dialog>
+  )
+}
+
 describe('nested surfaces', () => {
-  it('renders a dialog opened from inside a dialog above its parent', () => {
-    function Nested(): JSX.Element {
-      const [open, setOpen] = useState(false)
-      return (
-        <Dialog
-          title="Outer"
-          actions={[{ label: 'Open inner', onSelect: () => setOpen(true) }]}
-          onDismiss={noop}
-        >
-          {open && (
-            <Dialog title="Inner" actions={[{ label: 'Ok', onSelect: noop }]} onDismiss={noop} />
-          )}
-        </Dialog>
-      )
-    }
-    const { container } = render(<Nested />)
-    act(() => {
-      fireEvent.click(screen.getByRole('button', { name: /Open inner/ }))
-    })
-    const panels = Array.from(container.querySelectorAll<HTMLElement>('.tmui-dialog__panel'))
-    expect(panels).toHaveLength(2)
-    const outer = Number(panels[0].style.zIndex)
-    const inner = Number(panels[1].style.zIndex)
-    expect(inner).toBeGreaterThan(outer)
+  it('dismisses only the dialog opened from inside another on Escape', () => {
+    const onOuter = vi.fn()
+    const onInner = vi.fn()
+    render(<DialogInADialog onOuter={onOuter} onInner={onInner} />)
+    fireEvent.click(screen.getByRole('button', { name: /Open inner/ }))
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Ok' }), { key: 'Escape' })
+    expect(onInner).toHaveBeenCalledTimes(1)
+    expect(onOuter).not.toHaveBeenCalled()
   })
 })
 
@@ -316,7 +298,9 @@ describe('a disabled action', () => {
     fireEvent.click(screen.getByRole('button', { name: /Create PR/ }))
     expect(onSelect).not.toHaveBeenCalled()
   })
+})
 
+describe('a disabled action — is enabled by default', () => {
   it('is enabled by default', () => {
     render(
       <Dialog
@@ -328,5 +312,51 @@ describe('a disabled action', () => {
     expect((screen.getByRole('button', { name: /Create PR/ }) as HTMLButtonElement).disabled).toBe(
       false
     )
+  })
+})
+
+// A dialog holding fields submits on Enter, as a form does. Without it the
+// core's create and rename dialogs would lose the keyboard path they had.
+function renderForm(onSelect: () => void, disabled = false) {
+  render(
+    <Dialog
+      title="Name this terminal"
+      actions={[
+        { label: 'Cancel', onSelect: () => {} },
+        { label: 'Open', tone: 'primary', submit: true, disabled, onSelect },
+      ]}
+      onDismiss={() => {}}
+    >
+      <input aria-label="Name" />
+      <input aria-label="Colour" />
+    </Dialog>
+  )
+}
+
+describe('a submitting action', () => {
+  it('runs once when Enter is pressed in a field', () => {
+    const onSelect = vi.fn()
+    renderForm(onSelect)
+    fireEvent.submit(screen.getByRole('textbox', { name: 'Name' }))
+    expect(onSelect).toHaveBeenCalledTimes(1)
+  })
+
+  it('runs once when clicked', () => {
+    const onSelect = vi.fn()
+    renderForm(onSelect)
+    fireEvent.click(screen.getByRole('button', { name: /Open/ }))
+    expect(onSelect).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not run on Enter while disabled', () => {
+    const onSelect = vi.fn()
+    renderForm(onSelect, true)
+    fireEvent.submit(screen.getByRole('textbox', { name: 'Name' }))
+    expect(onSelect).not.toHaveBeenCalled()
+  })
+
+  it('puts the dialog content in a form', () => {
+    renderForm(() => {})
+    expect(screen.getByRole('dialog').querySelector('form')).toBeTruthy()
   })
 })

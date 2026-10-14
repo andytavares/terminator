@@ -3,47 +3,56 @@ import { act } from '@testing-library/react'
 import { useMergeFlowStore } from '../../src/stores/merge-flow.store'
 import type { ConflictSession, ConflictResolution } from '../../src/schemas/merge-flow.schema'
 
-function makeSession(overrides: Partial<ConflictSession> = {}): ConflictSession {
+type ConflictFile = ConflictSession['files'][number]
+type Block = ConflictFile['blocks'][number]
+
+/** An unresolved block of `filePath`, numbered `index`, with the given sides and conflict text. */
+function storeBlock(
+  filePath: string,
+  index: number,
+  texts: Pick<Block, 'oursText' | 'theirsText' | 'originalConflictText'>
+): Block {
+  return {
+    blockId: `${filePath}#${index}`,
+    index,
+    baseText: '',
+    contextBefore: [],
+    contextAfter: [],
+    isResolved: false,
+    ...texts,
+  }
+}
+
+/** An unresolved file holding `blocks`, by authors at the given commits. */
+function storeFile(
+  filePath: string,
+  blocks: Block[],
+  authors: Pick<ConflictFile, 'oursAuthor' | 'theirsAuthor' | 'conflictDescription'>
+): ConflictFile {
+  return { filePath, conflictCount: blocks.length, resolvedCount: 0, blocks, ...authors }
+}
+
+function conflictSessionWith(overrides: Partial<ConflictSession> = {}): ConflictSession {
+  const foo = 'src/foo.ts'
+  const blocks = [0, 1].map((i) =>
+    storeBlock(foo, i, {
+      oursText: `ours${i}`,
+      theirsText: `theirs${i}`,
+      originalConflictText: '<<<',
+    })
+  )
+  const authors = {
+    conflictDescription: 'desc',
+    oursAuthor: { name: 'Alice', commitHash: 'abc', timestamp: '2026-01-01T00:00:00Z' },
+    theirsAuthor: { name: 'Bob', commitHash: 'def', timestamp: '2026-01-01T00:00:00Z' },
+  }
   return {
     repoRoot: '/repo',
     isRebase: false,
     totalConflicts: 2,
     totalResolved: 0,
     startedAt: new Date().toISOString(),
-    files: [
-      {
-        filePath: 'src/foo.ts',
-        conflictCount: 2,
-        resolvedCount: 0,
-        conflictDescription: 'desc',
-        oursAuthor: { name: 'Alice', commitHash: 'abc', timestamp: '2026-01-01T00:00:00Z' },
-        theirsAuthor: { name: 'Bob', commitHash: 'def', timestamp: '2026-01-01T00:00:00Z' },
-        blocks: [
-          {
-            blockId: 'src/foo.ts#0',
-            index: 0,
-            oursText: 'ours0',
-            theirsText: 'theirs0',
-            baseText: '',
-            contextBefore: [],
-            contextAfter: [],
-            originalConflictText: '<<<',
-            isResolved: false,
-          },
-          {
-            blockId: 'src/foo.ts#1',
-            index: 1,
-            oursText: 'ours1',
-            theirsText: 'theirs1',
-            baseText: '',
-            contextBefore: [],
-            contextAfter: [],
-            originalConflictText: '<<<',
-            isResolved: false,
-          },
-        ],
-      },
-    ],
+    files: [storeFile(foo, blocks, authors)],
     ...overrides,
   }
 }
@@ -60,7 +69,7 @@ describe('session lifecycle', () => {
   })
 
   it('startSession sets session and resets indices', () => {
-    const session = makeSession()
+    const session = conflictSessionWith()
     act(() => {
       useMergeFlowStore.getState().startSession(session)
     })
@@ -72,7 +81,7 @@ describe('session lifecycle', () => {
 
   it('clearSession resets all state', () => {
     act(() => {
-      useMergeFlowStore.getState().startSession(makeSession())
+      useMergeFlowStore.getState().startSession(conflictSessionWith())
       useMergeFlowStore.getState().clearSession()
     })
     const state = useMergeFlowStore.getState()
@@ -84,7 +93,7 @@ describe('session lifecycle', () => {
 describe('navigation', () => {
   it('setActiveFile updates activeFileIndex', () => {
     act(() => {
-      useMergeFlowStore.getState().startSession(makeSession())
+      useMergeFlowStore.getState().startSession(conflictSessionWith())
       useMergeFlowStore.getState().setActiveFile(0)
     })
     expect(useMergeFlowStore.getState().activeFileIndex).toBe(0)
@@ -92,7 +101,7 @@ describe('navigation', () => {
 
   it('setActiveBlock updates activeBlockIndex', () => {
     act(() => {
-      useMergeFlowStore.getState().startSession(makeSession())
+      useMergeFlowStore.getState().startSession(conflictSessionWith())
       useMergeFlowStore.getState().setActiveBlock(1)
     })
     expect(useMergeFlowStore.getState().activeBlockIndex).toBe(1)
@@ -100,15 +109,17 @@ describe('navigation', () => {
 
   it('goToNextBlock advances to next block', () => {
     act(() => {
-      useMergeFlowStore.getState().startSession(makeSession())
+      useMergeFlowStore.getState().startSession(conflictSessionWith())
       useMergeFlowStore.getState().goToNextBlock()
     })
     expect(useMergeFlowStore.getState().activeBlockIndex).toBe(1)
   })
+})
 
+describe('navigation — goToNextBlock clamps at last block of last file', () => {
   it('goToNextBlock clamps at last block of last file', () => {
     act(() => {
-      useMergeFlowStore.getState().startSession(makeSession())
+      useMergeFlowStore.getState().startSession(conflictSessionWith())
       useMergeFlowStore.getState().setActiveBlock(1)
       useMergeFlowStore.getState().goToNextBlock()
     })
@@ -118,7 +129,7 @@ describe('navigation', () => {
 
   it('goToPrevBlock moves back', () => {
     act(() => {
-      useMergeFlowStore.getState().startSession(makeSession())
+      useMergeFlowStore.getState().startSession(conflictSessionWith())
       useMergeFlowStore.getState().setActiveBlock(1)
       useMergeFlowStore.getState().goToPrevBlock()
     })
@@ -127,7 +138,7 @@ describe('navigation', () => {
 
   it('goToPrevBlock clamps at first block', () => {
     act(() => {
-      useMergeFlowStore.getState().startSession(makeSession())
+      useMergeFlowStore.getState().startSession(conflictSessionWith())
       useMergeFlowStore.getState().goToPrevBlock()
     })
     expect(useMergeFlowStore.getState().activeBlockIndex).toBe(0)
@@ -136,7 +147,7 @@ describe('navigation', () => {
 
 describe('confirmDecision', () => {
   it('marks block as resolved and pushes to undo stack', () => {
-    const session = makeSession()
+    const session = conflictSessionWith()
     act(() => {
       useMergeFlowStore.getState().startSession(session)
     })
@@ -159,14 +170,16 @@ describe('confirmDecision', () => {
 describe('undoLastDecision', () => {
   it('returns null when undo stack is empty', () => {
     act(() => {
-      useMergeFlowStore.getState().startSession(makeSession())
+      useMergeFlowStore.getState().startSession(conflictSessionWith())
     })
     const decision = useMergeFlowStore.getState().undoLastDecision()
     expect(decision).toBeNull()
   })
+})
 
+describe('undoLastDecision — pops the last decision from undo stack and navigates back to that block', () => {
   it('pops the last decision from undo stack and navigates back to that block', () => {
-    const session = makeSession()
+    const session = conflictSessionWith()
     act(() => {
       useMergeFlowStore.getState().startSession(session)
       // Resolve block 0, which advances to block 1
@@ -179,7 +192,9 @@ describe('undoLastDecision', () => {
     })
     expect(useMergeFlowStore.getState().activeBlockIndex).toBe(1)
 
-    let decision: ReturnType<typeof useMergeFlowStore.getState.undoLastDecision> | null = null
+    let decision: ReturnType<
+      ReturnType<typeof useMergeFlowStore.getState>['undoLastDecision']
+    > | null = null
     act(() => {
       decision = useMergeFlowStore.getState().undoLastDecision()
     })
@@ -210,7 +225,7 @@ describe('UI modals', () => {
 
 describe('isComplete selector', () => {
   it('returns true when all conflicts resolved', () => {
-    const session = makeSession({ totalConflicts: 0, totalResolved: 0 })
+    const session = conflictSessionWith({ totalConflicts: 0, totalResolved: 0 })
     act(() => {
       useMergeFlowStore.getState().startSession({ ...session, totalConflicts: 2, totalResolved: 2 })
     })
@@ -219,61 +234,50 @@ describe('isComplete selector', () => {
   })
 })
 
-describe('cross-file undo', () => {
-  function makeTwoFileSession(): ConflictSession {
-    return {
-      repoRoot: '/repo',
-      isRebase: false,
-      totalConflicts: 2,
-      totalResolved: 0,
-      startedAt: new Date().toISOString(),
-      files: [
-        {
-          filePath: 'src/alpha.ts',
-          conflictCount: 1,
-          resolvedCount: 0,
-          conflictDescription: '',
-          oursAuthor: { name: 'A', commitHash: 'a', timestamp: '2026-01-01T00:00:00Z' },
-          theirsAuthor: { name: 'B', commitHash: 'b', timestamp: '2026-01-01T00:00:00Z' },
-          blocks: [
-            {
-              blockId: 'src/alpha.ts#0',
-              index: 0,
-              oursText: 'alpha-ours',
-              theirsText: 'alpha-theirs',
-              baseText: '',
-              contextBefore: [],
-              contextAfter: [],
-              originalConflictText: '<<<alpha>>>',
-              isResolved: false,
-            },
-          ],
-        },
-        {
-          filePath: 'src/beta.ts',
-          conflictCount: 1,
-          resolvedCount: 0,
-          conflictDescription: '',
-          oursAuthor: { name: 'A', commitHash: 'a', timestamp: '2026-01-01T00:00:00Z' },
-          theirsAuthor: { name: 'B', commitHash: 'b', timestamp: '2026-01-01T00:00:00Z' },
-          blocks: [
-            {
-              blockId: 'src/beta.ts#0',
-              index: 0,
-              oursText: 'beta-ours',
-              theirsText: 'beta-theirs',
-              baseText: '',
-              contextBefore: [],
-              contextAfter: [],
-              originalConflictText: '<<<beta>>>',
-              isResolved: false,
-            },
-          ],
-        },
-      ],
-    }
-  }
+/** A file with one unresolved block whose sides are "<name>-ours" and "<name>-theirs". */
+function oneBlockFile(name: string): ConflictFile {
+  const filePath = `src/${name}.ts`
+  const block = storeBlock(filePath, 0, {
+    oursText: `${name}-ours`,
+    theirsText: `${name}-theirs`,
+    originalConflictText: `<<<${name}>>>`,
+  })
+  return storeFile(filePath, [block], {
+    conflictDescription: '',
+    oursAuthor: { name: 'A', commitHash: 'a', timestamp: '2026-01-01T00:00:00Z' },
+    theirsAuthor: { name: 'B', commitHash: 'b', timestamp: '2026-01-01T00:00:00Z' },
+  })
+}
 
+function makeTwoFileSession(): ConflictSession {
+  return {
+    repoRoot: '/repo',
+    isRebase: false,
+    totalConflicts: 2,
+    totalResolved: 0,
+    startedAt: new Date().toISOString(),
+    files: [oneBlockFile('alpha'), oneBlockFile('beta')],
+  }
+}
+
+/** Resolves alpha with "ours", then moves to beta and resolves it with "theirs". */
+function resolveBothFiles() {
+  act(() => {
+    useMergeFlowStore.getState().confirmDecision('src/alpha.ts#0', {
+      blockId: 'src/alpha.ts#0',
+      resolvedText: 'alpha-resolved',
+      strategy: 'ours',
+    })
+    useMergeFlowStore.getState().setActiveFile(1)
+    useMergeFlowStore.getState().confirmDecision('src/beta.ts#0', {
+      blockId: 'src/beta.ts#0',
+      resolvedText: 'beta-resolved',
+      strategy: 'theirs',
+    })
+  })
+}
+
+describe('cross-file undo', () => {
   it('undo on empty stack returns null', () => {
     act(() => {
       useMergeFlowStore.getState().startSession(makeTwoFileSession())
@@ -284,7 +288,9 @@ describe('cross-file undo', () => {
     })
     expect(result!).toBeNull()
   })
+})
 
+describe('cross-file undo — undo reverses decision in file A after navigating to file B', () => {
   it('undo reverses decision in file A after navigating to file B', () => {
     act(() => {
       useMergeFlowStore.getState().startSession(makeTwoFileSession())
@@ -316,25 +322,14 @@ describe('cross-file undo', () => {
     // File B should be unaffected
     expect(useMergeFlowStore.getState().session!.files[1].resolvedCount).toBe(0)
   })
+})
 
+describe('cross-file undo — undo reverses only the most recent decision regardless of current activeFile', () => {
   it('undo reverses only the most recent decision regardless of current activeFile', () => {
     act(() => {
       useMergeFlowStore.getState().startSession(makeTwoFileSession())
     })
-    // Confirm both files
-    act(() => {
-      useMergeFlowStore.getState().confirmDecision('src/alpha.ts#0', {
-        blockId: 'src/alpha.ts#0',
-        resolvedText: 'alpha-resolved',
-        strategy: 'ours',
-      })
-      useMergeFlowStore.getState().setActiveFile(1)
-      useMergeFlowStore.getState().confirmDecision('src/beta.ts#0', {
-        blockId: 'src/beta.ts#0',
-        resolvedText: 'beta-resolved',
-        strategy: 'theirs',
-      })
-    })
+    resolveBothFiles()
     expect(useMergeFlowStore.getState().session!.totalResolved).toBe(2)
 
     // Navigate back to file A, then undo — should undo file B's decision (most recent)

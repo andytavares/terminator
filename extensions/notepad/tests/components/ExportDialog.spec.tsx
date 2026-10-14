@@ -5,8 +5,12 @@ import { useNotesStore } from '../../src/stores/notes.store'
 import type { NoteListItem } from '../../src/db/types'
 
 const mockInvoke = vi.fn()
+const mockSettings = vi.fn().mockResolvedValue({ values: {} })
 Object.defineProperty(window, 'electronAPI', {
-  value: { extensionBridge: { invoke: mockInvoke } },
+  value: {
+    extensionBridge: { invoke: mockInvoke },
+    extension: { getSettingsValues: mockSettings },
+  },
   writable: true,
   configurable: true,
 })
@@ -21,9 +25,14 @@ const dummyNote: NoteListItem = {
   archivedAt: null,
   tags: [],
   bodyPreview: '',
+  sortOrder: 0,
+  folderId: null,
 }
 
-describe('ExportDialog', () => {
+describe('ExportDialog', exportDialogTests)
+describe('ExportDialog settings', exportDialogSettingsTests)
+
+function exportDialogTests() {
   beforeEach(() => {
     mockInvoke.mockClear()
     useNotesStore.setState({
@@ -34,6 +43,15 @@ describe('ExportDialog', () => {
     })
   })
 
+  describe('the dialog', exportDialogDialogTests)
+  describe('picking a folder', exportDialogPickingFolderTests)
+  describe('scope', exportDialogScopeTests)
+  describe('options', exportDialogOptionsTests)
+  describe('export button', exportDialogExportButtonTests)
+  describe('running', exportDialogRunningTests)
+}
+
+function exportDialogDialogTests() {
   it('renders title "Export to markdown"', () => {
     render(<ExportDialog onClose={vi.fn()} />)
     expect(screen.getByText('Export to markdown')).toBeDefined()
@@ -49,7 +67,9 @@ describe('ExportDialog', () => {
     render(<ExportDialog onClose={vi.fn()} />)
     expect(screen.getByRole('button', { name: /choose folder|choose…/i })).toBeTruthy()
   })
+}
 
+function exportDialogPickingFolderTests() {
   it('folder Choose… button calls export.pickFolder IPC', async () => {
     mockInvoke.mockResolvedValueOnce({ data: '/Users/test/notes' })
     render(<ExportDialog onClose={vi.fn()} />)
@@ -67,7 +87,9 @@ describe('ExportDialog', () => {
       expect(screen.getByDisplayValue('/Users/test/notes')).toBeDefined()
     })
   })
+}
 
+function exportDialogScopeTests() {
   it('renders scope tab "All notes (0)" when no notes in store', () => {
     render(<ExportDialog onClose={vi.fn()} />)
     expect(screen.getByText('All notes (0)')).toBeDefined()
@@ -93,7 +115,9 @@ describe('ExportDialog', () => {
     render(<ExportDialog onClose={vi.fn()} />)
     expect(screen.queryByText('Selected (1)')).toBeNull()
   })
+}
 
+function exportDialogOptionsTests() {
   it('renders YAML frontmatter toggle', () => {
     render(<ExportDialog onClose={vi.fn()} />)
     expect(screen.getByText(/Include YAML frontmatter/)).toBeDefined()
@@ -110,7 +134,9 @@ describe('ExportDialog', () => {
     render(<ExportDialog onClose={vi.fn()} />)
     expect(screen.getByText(/Overwrite existing by id/)).toBeDefined()
   })
+}
 
+function exportDialogExportButtonTests() {
   it('Export button shows note count from store', () => {
     useNotesStore.setState({
       notes: [dummyNote, dummyNote],
@@ -128,7 +154,9 @@ describe('ExportDialog', () => {
     fireEvent.click(screen.getByRole('button', { name: /^cancel$/i }))
     expect(onClose).toHaveBeenCalled()
   })
+}
 
+function exportDialogRunningTests() {
   it('Export button calls export.run IPC', async () => {
     mockInvoke.mockResolvedValueOnce({ data: { exported: 1 } })
     render(<ExportDialog onClose={vi.fn()} />)
@@ -140,4 +168,48 @@ describe('ExportDialog', () => {
       )
     })
   })
-})
+}
+
+function exportDialogSettingsTests() {
+  beforeEach(() => {
+    mockInvoke.mockReset().mockResolvedValue({ data: { exported: 1, diagrams: 0 } })
+    useNotesStore.setState({ notes: [dummyNote], diagrams: [] })
+  })
+  describe('chosen in Settings', exportDialogSettingsChosenTests)
+  describe('unusable in Settings', exportDialogSettingsUnusableTests)
+}
+
+function exportDialogSettingsChosenTests() {
+  it('starts on the comment format and folder chosen in Settings', async () => {
+    mockSettings.mockResolvedValueOnce({
+      values: {
+        'terminator.notepad.commentExportFormat': 'inline',
+        'terminator.notepad.exportPath': '/tmp/my-notes',
+      },
+    })
+    render(<ExportDialog onClose={vi.fn()} />)
+
+    await waitFor(() => expect(screen.getByDisplayValue('/tmp/my-notes')).toBeTruthy())
+    expect(screen.getByRole('button', { name: 'Inline HTML' }).className).toContain('--active')
+    fireEvent.click(screen.getByRole('button', { name: 'Export 1 note' }))
+    await waitFor(() =>
+      expect(mockInvoke).toHaveBeenCalledWith(
+        'terminator.notepad:export.run',
+        expect.objectContaining({ folder: '/tmp/my-notes', commentFormat: 'inline' })
+      )
+    )
+  })
+}
+
+function exportDialogSettingsUnusableTests() {
+  it('keeps its own defaults when Settings holds nothing it can use', async () => {
+    mockSettings.mockResolvedValueOnce({
+      values: { 'terminator.notepad.commentExportFormat': 'carrier pigeon' },
+    })
+    render(<ExportDialog onClose={vi.fn()} />)
+
+    await waitFor(() => expect(mockSettings).toHaveBeenCalled())
+    expect(screen.getByRole('button', { name: 'Sidecar JSON' }).className).toContain('--active')
+    expect(screen.getByDisplayValue('~/Documents/Terminator Notes')).toBeTruthy()
+  })
+}

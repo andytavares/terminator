@@ -5,6 +5,7 @@ import type { PlanUnit, WorkOrder } from '../order/schema.js'
 import type { Role } from '../recipe/parse.js'
 import type { Rule } from '../recipe/parse.js'
 import type { Feedback } from './run-graph.js'
+import { findingHeadline } from '../order/finding-headline.js'
 
 // What an agent is actually told.
 //
@@ -16,19 +17,6 @@ import type { Feedback } from './run-graph.js'
 // What each role may read is declared on the role (`reads:`), not decided here,
 // so a verifier does not get the builder's justification and a scout does not
 // get the plan. The list is a permission, not a preference.
-
-/** Everything a role can ask for. Anything else in `reads:` is ignored. */
-export const READABLE = [
-  'unit',
-  'criteria',
-  'context',
-  'rules',
-  'order',
-  'conventions',
-  'feedback',
-] as const
-
-export type Readable = (typeof READABLE)[number]
 
 export interface BriefInput {
   readonly order: WorkOrder
@@ -132,46 +120,40 @@ function feedbackSection(feedback: readonly Feedback[]): string[] {
 }
 
 function contextSection(order: WorkOrder, role: Role | null): string[] {
-  const lines = ['## The repository', '']
-  for (const repo of order.context.repos) {
-    lines.push(`- \`${repo.name}\` — base \`${repo.baseBranch}\``)
+  const { context } = order
+  const lines = [
+    '## The repository',
+    '',
+    ...context.repos.map((repo) => `- \`${repo.name}\` — base \`${repo.baseBranch}\``),
+    '',
+    commandsLine(order, role),
+  ]
+  if (context.houseDocs.length > 0) {
+    lines.push('', `This project documents itself in: ${context.houseDocs.join(', ')}. Read it.`)
   }
+  if (context.conventions.length > 0) {
+    lines.push('', `Conventions: ${context.conventions.join('; ')}`)
+  }
+  if (context.priorArt.length > 0) {
+    lines.push('', '## Already decided about these files', '')
+    lines.push(...context.priorArt.map((line) => `- ${line}`))
+  }
+  return lines
+}
+
+// The commands the probe found. A role that may not run them is told so: an architect
+// told "use these" and then refused `npm test` spent three turns on it.
+function commandsLine(order: WorkOrder, role: Role | null): string {
   const commands = Object.entries(order.context.toolchain)
     .filter(([, found]) => found !== null)
     .map(([name, found]) => `${name}: \`${(found as { command: string }).command}\``)
-
-  // A role that may not run them is told so, rather than invited to. The
-  // architect was handed "use these; do not invent others" and then refused
-  // `npm test` by the policy, so it spent three turns on an instruction the
-  // factory would never have let it follow.
+  if (commands.length === 0) {
+    return 'No commands were found in this repository. Do not invent one — a check that cannot run reports "not measured", and inventing a command turns that into a false pass.'
+  }
   const mayRun = role === null || role.tools.includes('run_tests')
-
-  lines.push(
-    '',
-    commands.length === 0
-      ? 'No commands were found in this repository. Do not invent one — a check that cannot run reports "not measured", and inventing a command turns that into a false pass.'
-      : mayRun
-        ? `Commands found here: ${commands.join(' · ')}. Use these; do not invent others.`
-        : `Commands found here: ${commands.join(' · ')}. These are run for you, on the verification ladder — you may not run them yourself, and you do not need to.`
-  )
-  if (order.context.houseDocs.length > 0) {
-    lines.push(
-      '',
-      `This project documents itself in: ${order.context.houseDocs.join(', ')}. Read it.`
-    )
-  }
-  if (order.context.conventions.length > 0) {
-    lines.push('', `Conventions: ${order.context.conventions.join('; ')}`)
-  }
-  if (order.context.priorArt.length > 0) {
-    lines.push(
-      '',
-      '## Already decided about these files',
-      '',
-      ...order.context.priorArt.map((line) => `- ${line}`)
-    )
-  }
-  return lines
+  return mayRun
+    ? `Commands found here: ${commands.join(' · ')}. Use these; do not invent others.`
+    : `Commands found here: ${commands.join(' · ')}. These are run for you, on the verification ladder — you may not run them yourself, and you do not need to.`
 }
 
 function rulesSection(rules: readonly Rule[]): string[] {
@@ -181,21 +163,6 @@ function rulesSection(rules: readonly Rule[]): string[] {
     '',
     ...rules.map((rule) => `- **${rule.id}** (${rule.rung}) — ${rule.asserts.trim()}`),
   ]
-}
-
-/**
- * The claim in a finding's text, without its evidence.
- *
- * Mirrors `findingParts` in `Forge.tsx` and `findingHeadline` in
- * `order/render.ts` — the same rule in three places because none of them may
- * import from either of the other two.
- */
-function findingHeadline(text: string): string {
-  const trimmed = text.trim()
-  const newline = trimmed.indexOf('\n')
-  if (newline !== -1) return trimmed.slice(0, newline).trim()
-  const sentence = /^(.+?[.!?])\s+(?=[A-Z`'"(])/s.exec(trimmed)
-  return sentence === null ? trimmed : sentence[1]
 }
 
 /**
@@ -228,96 +195,95 @@ function notesSection(order: WorkOrder): string[] {
  * being enforced rather than requested.
  */
 export function brief(input: BriefInput): string {
-  const { order, role, units, rules, command, outputPath, outputsDir, feedback = [] } = input
-
+  const { order, role, command } = input
   // A `run` step is a command, not a conversation. Wrapping it in context
   // would invite an agent to reinterpret it.
-  if (command !== undefined && command.trim() !== '') {
-    return [
-      `Run this exactly, and report its exit status. Do not fix what it reports.`,
-      '',
-      '```',
-      command.trim(),
-      '```',
-    ].join('\n')
-  }
+  if (command !== undefined && command.trim() !== '') return commandBrief(command)
 
   const reads = new Set<string>(role?.reads ?? [])
-  const sections: string[] = [role?.prompt.trim() ?? '']
-
-  sections.push(
+  return [
+    role?.prompt.trim() ?? '',
     '',
     '---',
     '',
     `# ${order.title}`,
     '',
-    `Work order \`${order.id}\`, risk ${order.risk.grade}.`
-  )
+    `Work order \`${order.id}\`, risk ${order.risk.grade}.`,
+    ...intentSections(order),
+    ...workSections(input, reads),
+    ...knowledgeSections(input, reads),
+    ...outputSection(input),
+  ]
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
 
-  if (order.intent.problem.trim() !== '') {
-    sections.push('', '## The problem', '', order.intent.problem.trim())
-  }
-  if (order.intent.outcome.trim() !== '') {
-    sections.push('', '## What "done" looks like', '', order.intent.outcome.trim())
-  }
-  if (order.intent.nonGoals.length > 0) {
-    sections.push(
-      '',
-      '## Explicitly not this',
-      '',
-      ...order.intent.nonGoals.map((goal) => `- ${goal}`)
-    )
-  }
+function commandBrief(command: string): string {
+  return [
+    `Run this exactly, and report its exit status. Do not fix what it reports.`,
+    '',
+    '```',
+    command.trim(),
+    '```',
+  ].join('\n')
+}
 
+function intentSections({ intent }: WorkOrder): string[] {
+  const lines: string[] = []
+  if (intent.problem.trim() !== '') lines.push('', '## The problem', '', intent.problem.trim())
+  if (intent.outcome.trim() !== '') {
+    lines.push('', '## What "done" looks like', '', intent.outcome.trim())
+  }
+  if (intent.nonGoals.length > 0) {
+    lines.push('', '## Explicitly not this', '', ...intent.nonGoals.map((goal) => `- ${goal}`))
+  }
+  return lines
+}
+
+/** The units to build, or the criteria to judge, and why an earlier attempt came back. */
+function workSections(input: BriefInput, reads: ReadonlySet<string>): string[] {
+  const { order, units, feedback = [] } = input
+  const lines: string[] = []
   if (reads.has('unit') && units.length > 0) {
-    sections.push('', ...unitSection(order, units))
-    sections.push('', ...notesSection(order))
+    lines.push('', ...unitSection(order, units), '', ...notesSection(order))
   }
-
   // A role that reads criteria but not units gets all of them — that is the
   // verifier, which is handed the change and the criteria and nothing about
   // how the work was justified.
   if (reads.has('criteria') && !reads.has('unit')) {
-    sections.push(
-      '',
-      '## What must be true',
-      '',
+    lines.push('', '## What must be true', '')
+    lines.push(
       ...order.acceptance.map((c) => `- **${c.id}** ${c.statement} — proven by ${c.verify.kind}`)
     )
   }
+  if (reads.has('feedback') && feedback.length > 0) lines.push('', ...feedbackSection(feedback))
+  return lines
+}
 
-  if (reads.has('feedback') && feedback.length > 0) {
-    sections.push('', ...feedbackSection(feedback))
-  }
-
+/** What the role may know about the repository, its rules, the order and its assumptions. */
+function knowledgeSections(input: BriefInput, reads: ReadonlySet<string>): string[] {
+  const { order, role, rules } = input
+  const lines: string[] = []
   if (reads.has('context') || reads.has('conventions')) {
-    sections.push('', ...contextSection(order, role ?? null))
+    lines.push('', ...contextSection(order, role ?? null))
   }
-  if (reads.has('rules')) sections.push('', ...rulesSection(rules))
-  if (reads.has('order')) sections.push('', '---', '', renderOrder(order))
-
-  if (order.assumptions.filter((a) => !a.struck).length > 0 && reads.has('context')) {
-    sections.push(
-      '',
-      '## Assumed, and not verified',
-      '',
-      ...order.assumptions.filter((a) => !a.struck).map((a) => `- ${a.text}`),
-      '',
+  if (reads.has('rules')) lines.push('', ...rulesSection(rules))
+  if (reads.has('order')) lines.push('', '---', '', renderOrder(order))
+  const assumed = order.assumptions.filter((a) => !a.struck)
+  if (assumed.length > 0 && reads.has('context')) {
+    lines.push('', '## Assumed, and not verified', '', ...assumed.map((a) => `- ${a.text}`), '')
+    lines.push(
       'If one of these turns out to be wrong, stop and say so rather than working around it.'
     )
   }
+  return lines
+}
 
-  // Last, because it is what the agent does with everything above it. The
-  // Forge has always ended its brief this way; the Line ended without one, so
-  // four of the standard shape's nine steps were told what to think about and
-  // never where to put it.
-  if (outputPath !== undefined) {
-    const contract = rungOutputContract(outputPath, collectableWrites(role ?? null), { outputsDir })
-    if (contract !== '') sections.push(contract)
-  }
-
-  return sections
-    .join('\n')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim()
+// Last, because it is what the agent does with everything above: without it, steps
+// were told what to think about and never where to put it.
+function outputSection({ role, outputPath, outputsDir }: BriefInput): string[] {
+  if (outputPath === undefined) return []
+  const contract = rungOutputContract(outputPath, collectableWrites(role ?? null), { outputsDir })
+  return contract === '' ? [] : [contract]
 }

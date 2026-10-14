@@ -42,6 +42,13 @@
   gap: var(--tm-space-3);
 }
 
+/* A long headline wraps; the action beside it keeps its width. */
+.rc-band__head > button,
+.rc-device > button,
+.rc-address__row > button {
+  flex: 0 0 auto;
+}
+
 /* Principle XII: flat, inherits currentColor, sized here rather than by a prop. */
 .rc-band__glyph {
   width: 16px;
@@ -293,47 +300,6 @@
   padding-top: var(--tm-space-2);
 }
 
-/* ── Buttons ──────────────────────────────────────────────────────────── */
-
-.rc-btn {
-  padding: 5px 11px;
-  border: 1px solid var(--tm-border-strong);
-  border-radius: var(--tm-radius-sm);
-  background: transparent;
-  color: var(--tm-text-primary);
-  font: inherit;
-  font-size: 12px;
-  cursor: pointer;
-  flex: 0 0 auto;
-}
-
-.rc-btn:hover:not(:disabled) {
-  background: var(--tm-bg-card-hover);
-}
-
-.rc-btn:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
-
-.rc-btn--primary {
-  background: var(--tm-accent);
-  border-color: var(--tm-accent);
-  color: var(--tm-on-accent);
-  font-weight: 500;
-}
-
-.rc-btn--danger {
-  border-color: var(--tm-danger);
-  color: var(--tm-danger);
-}
-
-.rc-btn--ghost {
-  border-color: transparent;
-  color: var(--tm-text-secondary);
-}
-
-.rc-btn:focus-visible,
 .rc-settings__toggle:focus-visible {
   outline: 2px solid var(--tm-accent);
   outline-offset: 2px;

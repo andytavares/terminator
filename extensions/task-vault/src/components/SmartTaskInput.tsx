@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
+import { useDismissible } from '@terminator/extension-ui'
 import { DateTimePicker } from './DateTimePicker'
 
 interface SmartTaskInputProps {
@@ -12,8 +13,10 @@ interface SmartTaskInputProps {
   className?: string
 }
 
+type TriggerType = 'project' | 'area' | 'context' | 'date'
+
 interface ActiveTrigger {
-  type: 'project' | 'area' | 'context' | 'date'
+  type: TriggerType
   query: string
   triggerStart: number
   triggerChar: string
@@ -25,42 +28,28 @@ interface DropdownOption {
   isCreate?: boolean
 }
 
-// Detect which trigger is active given the text and cursor position
+/** Each trigger and the pattern that spots it before the cursor; due: comes first. */
+const TRIGGERS: { type: TriggerType; pattern: RegExp }[] = [
+  { type: 'date', pattern: /(^|\s)(due:)(\S*)$/ },
+  { type: 'project', pattern: /(^|\s)(@)(\S*)$/ },
+  { type: 'area', pattern: /(^|\s)(#)(\S*)$/ },
+  { type: 'context', pattern: /(^|\s)(\+)(\S*)$/ },
+]
+
+/** Which trigger is active given the text and cursor position. */
 function detectTrigger(text: string, cursor: number): ActiveTrigger | null {
   const before = text.slice(0, cursor)
-
-  // due: trigger — must come before @ # + to avoid false positives
-  const dueMatch = /(^|\s)(due:)(\S*)$/.exec(before)
-  if (dueMatch) {
-    const start = dueMatch.index + dueMatch[1].length
-    return { type: 'date', query: dueMatch[3], triggerStart: start, triggerChar: 'due:' }
+  for (const { type, pattern } of TRIGGERS) {
+    const match = pattern.exec(before)
+    if (match) {
+      const triggerStart = match.index + match[1].length
+      return { type, query: match[3], triggerStart, triggerChar: match[2] }
+    }
   }
-
-  // @ trigger — project
-  const projMatch = /(^|\s)(@)(\S*)$/.exec(before)
-  if (projMatch) {
-    const start = projMatch.index + projMatch[1].length
-    return { type: 'project', query: projMatch[3], triggerStart: start, triggerChar: '@' }
-  }
-
-  // # trigger — area
-  const areaMatch = /(^|\s)(#)(\S*)$/.exec(before)
-  if (areaMatch) {
-    const start = areaMatch.index + areaMatch[1].length
-    return { type: 'area', query: areaMatch[3], triggerStart: start, triggerChar: '#' }
-  }
-
-  // + trigger — context
-  const ctxMatch = /(^|\s)(\+)(\S*)$/.exec(before)
-  if (ctxMatch) {
-    const start = ctxMatch.index + ctxMatch[1].length
-    return { type: 'context', query: ctxMatch[3], triggerStart: start, triggerChar: '+' }
-  }
-
   return null
 }
 
-// Global option cache — loaded once, shared across instances
+/** Global option cache — loaded once, shared across instances. */
 const optionCache: {
   projects: DropdownOption[]
   areas: DropdownOption[]
@@ -68,9 +57,25 @@ const optionCache: {
   loaded: boolean
 } = { projects: [], areas: [], contexts: [], loaded: false }
 
+function namedOptions(result: unknown, key: 'projects' | 'areas'): DropdownOption[] | null {
+  if (!result || typeof result !== 'object' || !(key in result)) return null
+  const rows = (result as Record<string, { name: string }[]>)[key]
+  return rows.map((row) => ({ label: row.name, value: row.name }))
+}
+
+function contextOptions(settings: unknown): DropdownOption[] {
+  const values = (settings as { values: Record<string, unknown> }).values
+  const contextsStr =
+    (values['terminator.task-vault.contexts'] as string) ?? 'home,work,computer,phone,errands'
+  return contextsStr
+    .split(',')
+    .map((c) => c.trim())
+    .filter(Boolean)
+    .map((c) => ({ label: c, value: c }))
+}
+
 async function loadOptions(): Promise<void> {
   if (optionCache.loaded) return
-
   try {
     const [projectsResult, areasResult, settingsResult] = await Promise.all([
       window.electronAPI.extensionBridge.invoke('task-vault:projects:list', {
@@ -79,224 +84,285 @@ async function loadOptions(): Promise<void> {
       window.electronAPI.extensionBridge.invoke('task-vault:vault:list-areas'),
       window.electronAPI.extension.getSettingsValues(),
     ])
-
-    if (projectsResult && typeof projectsResult === 'object' && 'projects' in projectsResult) {
-      const projects = (projectsResult as { projects: { name: string; filePath: string }[] })
-        .projects
-      optionCache.projects = projects.map((p) => ({ label: p.name, value: p.name }))
-    }
-
-    if (areasResult && typeof areasResult === 'object' && 'areas' in areasResult) {
-      const areas = (areasResult as { areas: { name: string; filePath: string }[] }).areas
-      optionCache.areas = areas.map((a) => ({ label: a.name, value: a.name }))
-    }
-
-    const values = (settingsResult as { values: Record<string, unknown> }).values
-    const contextsStr =
-      (values['terminator.task-vault.contexts'] as string) ?? 'home,work,computer,phone,errands'
-    optionCache.contexts = contextsStr
-      .split(',')
-      .map((c) => c.trim())
-      .filter(Boolean)
-      .map((c) => ({ label: c, value: c }))
-
+    optionCache.projects = namedOptions(projectsResult, 'projects') ?? optionCache.projects
+    optionCache.areas = namedOptions(areasResult, 'areas') ?? optionCache.areas
+    optionCache.contexts = contextOptions(settingsResult)
     optionCache.loaded = true
   } catch {
     // fallback — no suggestions available
   }
 }
 
-export function SmartTaskInput({
-  value,
-  onChange,
-  onSubmit,
-  onCancel,
-  placeholder = 'Add task… (@project #area +context due:YYYY-MM-DD)',
-  disabled = false,
-  autoFocus = false,
-  className,
-}: SmartTaskInputProps): React.JSX.Element {
-  const inputRef = useRef<HTMLInputElement>(null)
-  const dropdownRef = useRef<HTMLDivElement>(null)
+/** Matches for a project or area query, plus a create option unless it names one exactly. */
+function withCreate(options: DropdownOption[], trigger: ActiveTrigger): DropdownOption[] {
+  const q = trigger.query.toLowerCase()
+  const qNorm = q.replace(/-/g, ' ')
+  const matches = options.filter((o) => o.label.toLowerCase().includes(qNorm))
+  const exactMatch = options.some((o) => o.label.toLowerCase() === qNorm)
+  if (q.length === 0 || exactMatch) return matches
+  return [...matches, { label: trigger.query, value: trigger.query, isCreate: true }]
+}
+
+function optionsFor(trigger: ActiveTrigger): DropdownOption[] {
+  if (trigger.type === 'project') return withCreate(optionCache.projects, trigger)
+  if (trigger.type === 'area') return withCreate(optionCache.areas, trigger)
+  if (trigger.type !== 'context') return []
+  const qNorm = trigger.query.toLowerCase().replace(/-/g, ' ')
+  return optionCache.contexts.filter((o) => o.label.toLowerCase().includes(qNorm))
+}
+
+/** Replaces the active trigger and its query with `insert`. */
+function replaceTrigger(value: string, active: ActiveTrigger, insert: string): string {
+  const before = value.slice(0, active.triggerStart)
+  const after = value.slice(active.triggerStart + active.triggerChar.length + active.query.length)
+  return `${before}${insert}${after.trimStart()}`
+}
+
+/** Creates a new project or area; the tag is inserted even if creating it fails. */
+async function createTag(type: TriggerType, name: string): Promise<void> {
+  try {
+    if (type === 'project') {
+      await window.electronAPI.extensionBridge.invoke('task-vault:projects:create', { name })
+      optionCache.projects.push({ label: name, value: name })
+    } else if (type === 'area') {
+      await window.electronAPI.extensionBridge.invoke('task-vault:vault:create-area', { name })
+      optionCache.areas.push({ label: name, value: name })
+    }
+  } catch {
+    // insert the tag even if creation fails
+  }
+}
+
+type Input = React.RefObject<HTMLInputElement | null>
+
+/** The active trigger, its suggestions, selection and date, tracked as the text changes. */
+function useTriggerState() {
   const [active, setActive] = useState<ActiveTrigger | null>(null)
   const [options, setOptions] = useState<DropdownOption[]>([])
   const [selectedIdx, setSelectedIdx] = useState(0)
   const [dateValue, setDateValue] = useState('')
   const [optionsLoaded, setOptionsLoaded] = useState(optionCache.loaded)
 
-  // Ensure options are loaded
   useEffect(() => {
-    if (!optionCache.loaded) {
-      loadOptions().then(() => setOptionsLoaded(true))
-    }
+    if (!optionCache.loaded) loadOptions().then(() => setOptionsLoaded(true))
   }, [])
 
-  const getOptionsForTrigger = useCallback(
-    (trigger: ActiveTrigger): DropdownOption[] => {
-      if (!optionsLoaded && !optionCache.loaded) return []
-      const q = trigger.query.toLowerCase()
-      const qNorm = q.replace(/-/g, ' ')
-      switch (trigger.type) {
-        case 'project': {
-          const matches = optionCache.projects.filter((o) => o.label.toLowerCase().includes(qNorm))
-          const exactMatch = optionCache.projects.some((o) => o.label.toLowerCase() === qNorm)
-          const createOpt: DropdownOption[] =
-            q.length > 0 && !exactMatch
-              ? [{ label: trigger.query, value: trigger.query, isCreate: true }]
-              : []
-          return [...matches, ...createOpt]
-        }
-        case 'area': {
-          const matches = optionCache.areas.filter((o) => o.label.toLowerCase().includes(qNorm))
-          const exactMatch = optionCache.areas.some((o) => o.label.toLowerCase() === qNorm)
-          const createOpt: DropdownOption[] =
-            q.length > 0 && !exactMatch
-              ? [{ label: trigger.query, value: trigger.query, isCreate: true }]
-              : []
-          return [...matches, ...createOpt]
-        }
-        case 'context':
-          return optionCache.contexts.filter((o) => o.label.toLowerCase().includes(qNorm))
-        default:
-          return []
-      }
-    },
-    [optionsLoaded]
-  )
-
-  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const val = e.target.value
-    const cursor = e.target.selectionStart ?? val.length
-    onChange(val)
-
-    const trigger = detectTrigger(val, cursor)
+  /** Re-reads the trigger at the cursor after an edit. */
+  function track(text: string, cursor: number) {
+    const trigger = detectTrigger(text, cursor)
     setActive(trigger)
     setSelectedIdx(0)
-
-    if (trigger && trigger.type !== 'date') {
-      setOptions(getOptionsForTrigger(trigger))
-    }
-    if (trigger?.type === 'date') {
-      setDateValue(trigger.query)
-    }
+    const loaded = optionsLoaded || optionCache.loaded
+    if (trigger && trigger.type !== 'date') setOptions(loaded ? optionsFor(trigger) : [])
+    if (trigger?.type === 'date') setDateValue(trigger.query)
   }
 
-  async function handleSelect(option: DropdownOption) {
+  return {
+    active,
+    setActive,
+    options,
+    setOptions,
+    selectedIdx,
+    setSelectedIdx,
+    dateValue,
+    setDateValue,
+    track,
+  }
+}
+
+/** The trigger state plus the edits that complete a trigger. */
+function useTriggers(props: SmartTaskInputProps, inputRef: Input) {
+  const state = useTriggerState()
+  const { active, setActive, setOptions } = state
+
+  function completeTrigger(insert: string) {
     if (!active) return
-
-    if (option.isCreate) {
-      const name = option.value
-      try {
-        if (active.type === 'project') {
-          await window.electronAPI.extensionBridge.invoke('task-vault:projects:create', { name })
-          optionCache.projects.push({ label: name, value: name })
-        } else if (active.type === 'area') {
-          await window.electronAPI.extensionBridge.invoke('task-vault:vault:create-area', { name })
-          optionCache.areas.push({ label: name, value: name })
-        }
-      } catch {
-        // insert the tag even if creation fails
-      }
-    }
-
-    const before = value.slice(0, active.triggerStart)
-    const after = value.slice(active.triggerStart + active.triggerChar.length + active.query.length)
-    const slug = option.value.replace(/ /g, '-')
-    const newValue = `${before}${active.triggerChar}${slug} ${after.trimStart()}`
-    onChange(newValue)
+    props.onChange(replaceTrigger(props.value, active, insert))
     setActive(null)
+    inputRef.current?.focus()
+  }
+
+  async function chooseOption(option: DropdownOption) {
+    if (!active) return
+    if (option.isCreate) await createTag(active.type, option.value)
+    completeTrigger(`${active.triggerChar}${option.value.replace(/ /g, '-')} `)
     setOptions([])
-    inputRef.current?.focus()
   }
 
-  function handleDateSelect(date: string) {
-    if (!active || !date) return
-    const before = value.slice(0, active.triggerStart)
-    const after = value.slice(active.triggerStart + active.triggerChar.length + active.query.length)
-    const newValue = `${before}due:${date} ${after.trimStart()}`
-    onChange(newValue)
-    setActive(null)
-    inputRef.current?.focus()
-  }
+  return { ...state, complete: completeTrigger, choose: chooseOption }
+}
 
-  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    // Convert spaces to hyphens while inside a @/#/+ trigger
-    if (active && active.type !== 'date' && e.key === ' ') {
+type Triggers = ReturnType<typeof useTriggers>
+
+/** Inside a @/#/+ tag a space becomes a hyphen, keeping the tag one word. */
+function insertHyphen(props: SmartTaskInputProps, input: HTMLInputElement, t: Triggers) {
+  const { value, onChange } = props
+  const cursor = input.selectionStart ?? value.length
+  const newVal = value.slice(0, cursor) + '-' + value.slice(cursor)
+  onChange(newVal)
+  t.track(newVal, cursor + 1)
+  requestAnimationFrame(() => input.setSelectionRange(cursor + 1, cursor + 1))
+}
+
+/** Arrow, Enter, Tab and Escape keys while suggestions are listed; returns whether handled. */
+function handleListKey(e: React.KeyboardEvent, t: Triggers): boolean {
+  const last = t.options.length - 1
+  const moves: Record<string, () => void> = {
+    ArrowDown: () => t.setSelectedIdx((i) => Math.min(i + 1, last)),
+    ArrowUp: () => t.setSelectedIdx((i) => Math.max(i - 1, 0)),
+    Enter: () => void t.choose(t.options[t.selectedIdx]),
+    Tab: () => void t.choose(t.options[t.selectedIdx]),
+  }
+  if (e.key === 'Escape') {
+    t.setActive(null)
+    return true
+  }
+  if (!Object.hasOwn(moves, e.key)) return false
+  e.preventDefault()
+  moves[e.key]()
+  return true
+}
+
+/** Escape closes an open trigger, else cancels; Enter closes an open trigger, else submits. */
+function handleFieldKey(e: React.KeyboardEvent, props: SmartTaskInputProps, t: Triggers) {
+  if (e.key === 'Escape') {
+    if (!t.active) return props.onCancel?.()
+    e.stopPropagation()
+    t.setActive(null)
+  } else if (e.key === 'Enter') {
+    e.preventDefault()
+    if (t.active) t.setActive(null)
+    else props.onSubmit()
+  }
+}
+
+function triggerKeyDownHandler(props: SmartTaskInputProps, t: Triggers) {
+  return (e: React.KeyboardEvent<HTMLInputElement>) => {
+    const inTag = t.active !== null && t.active.type !== 'date'
+    if (inTag && e.key === ' ') {
       e.preventDefault()
-      const input = inputRef.current!
-      const cursor = input.selectionStart ?? value.length
-      const newVal = value.slice(0, cursor) + '-' + value.slice(cursor)
-      const newCursor = cursor + 1
-      onChange(newVal)
-      const trigger = detectTrigger(newVal, newCursor)
-      setActive(trigger)
-      setSelectedIdx(0)
-      if (trigger && trigger.type !== 'date') {
-        setOptions(getOptionsForTrigger(trigger))
-      }
-      requestAnimationFrame(() => input.setSelectionRange(newCursor, newCursor))
-      return
+      return insertHyphen(props, e.currentTarget, t)
     }
-
-    if (active && active.type !== 'date' && options.length > 0) {
-      if (e.key === 'ArrowDown') {
-        e.preventDefault()
-        setSelectedIdx((i) => Math.min(i + 1, options.length - 1))
-        return
-      }
-      if (e.key === 'ArrowUp') {
-        e.preventDefault()
-        setSelectedIdx((i) => Math.max(i - 1, 0))
-        return
-      }
-      if (e.key === 'Enter' || e.key === 'Tab') {
-        e.preventDefault()
-        void handleSelect(options[selectedIdx])
-        return
-      }
-      if (e.key === 'Escape') {
-        setActive(null)
-        return
-      }
-    }
-
-    if (e.key === 'Escape') {
-      if (active) {
-        e.stopPropagation()
-        setActive(null)
-        return
-      }
-      onCancel?.()
-      return
-    }
-
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      if (active) {
-        // A trigger is active (date picker or dropdown with no options) — close it, don't submit
-        setActive(null)
-      } else {
-        onSubmit()
-      }
-    }
+    if (inTag && t.options.length > 0 && handleListKey(e, t)) return
+    handleFieldKey(e, props, t)
   }
+}
 
-  // Close dropdown on outside click
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (
-        !inputRef.current?.contains(e.target as Node) &&
-        !dropdownRef.current?.contains(e.target as Node)
-      ) {
-        setActive(null)
-      }
-    }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [])
+function DatePane({ t }: { t: Triggers }): React.JSX.Element {
+  return (
+    <div className="smart-input__date-picker">
+      <DateTimePicker
+        mode="date"
+        defaultOpen
+        value={t.dateValue}
+        onChange={(v) => {
+          t.setDateValue(v)
+          t.complete(v ? `due:${v} ` : '')
+        }}
+        className="dtp--full"
+      />
+    </div>
+  )
+}
 
-  const showDropdown = active !== null
+const LIST_LABELS: Partial<Record<TriggerType, string>> = {
+  project: 'Projects',
+  area: 'Areas',
+  context: 'Contexts',
+}
 
+interface OptionProps {
+  opt: DropdownOption
+  selected: boolean
+  triggerChar: string
+  onChoose: () => void
+  onHover: () => void
+}
+
+function dropdownOptionClass(opt: DropdownOption, selected: boolean): string {
+  let cls = 'smart-input__option'
+  if (selected) cls += ' smart-input__option--selected'
+  if (opt.isCreate) cls += ' smart-input__option--create'
+  return cls
+}
+
+function OptionButton(props: OptionProps): React.JSX.Element {
+  const { opt, triggerChar } = props
+  return (
+    <button
+      className={dropdownOptionClass(opt, props.selected)}
+      onClick={props.onChoose}
+      onMouseEnter={props.onHover}
+    >
+      {opt.isCreate ? (
+        <>
+          <span className="smart-input__option-create-icon">+</span>
+          Create "{triggerChar}
+          {opt.label}"
+        </>
+      ) : (
+        <>
+          <span className="smart-input__option-trigger">{triggerChar}</span>
+          {opt.label}
+        </>
+      )}
+    </button>
+  )
+}
+
+function SuggestionList({ t, active }: { t: Triggers; active: ActiveTrigger }) {
+  return (
+    <>
+      <div className="smart-input__dropdown-label">{LIST_LABELS[active.type]}</div>
+      {t.options.length === 0 && <div className="smart-input__dropdown-empty">No matches</div>}
+      {t.options.map((opt, i) => (
+        <OptionButton
+          key={opt.isCreate ? `__create__${opt.value}` : opt.value}
+          opt={opt}
+          selected={i === t.selectedIdx}
+          triggerChar={active.triggerChar}
+          onChoose={() => void t.choose(opt)}
+          onHover={() => t.setSelectedIdx(i)}
+        />
+      ))}
+    </>
+  )
+}
+
+function fieldChangeHandler(onChange: (value: string) => void, t: Triggers) {
+  return (e: React.ChangeEvent<HTMLInputElement>) => {
+    onChange(e.target.value)
+    t.track(e.target.value, e.target.selectionStart ?? e.target.value.length)
+  }
+}
+
+const DEFAULT_PLACEHOLDER = 'Add task… (@project #area +context due:YYYY-MM-DD)'
+
+interface DropdownProps {
+  dropdownRef: React.RefObject<HTMLDivElement>
+  t: Triggers
+}
+
+function TriggerDropdown({ dropdownRef, t }: DropdownProps): React.JSX.Element | null {
+  const { active } = t
+  if (!active) return null
+  return (
+    <div ref={dropdownRef} className="smart-input__dropdown">
+      {active.type === 'date' ? <DatePane t={t} /> : <SuggestionList t={t} active={active} />}
+    </div>
+  )
+}
+
+export function SmartTaskInput(props: SmartTaskInputProps): React.JSX.Element {
+  const { value, onChange, className } = props
+  const inputRef = useRef<HTMLInputElement>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+  const t = useTriggers(props, inputRef)
+  useDismissible({
+    ...{ ref: dropdownRef, alsoInside: [inputRef], manageFocus: false },
+    onDismiss: () => t.setActive(null),
+    enabled: t.active !== null,
+  })
   return (
     <div className="smart-input">
       <input
@@ -304,79 +370,18 @@ export function SmartTaskInput({
         type="text"
         className={`smart-input__field${className ? ` ${className}` : ''}`}
         value={value}
-        onChange={handleChange}
-        onKeyDown={handleKeyDown}
-        placeholder={placeholder}
-        disabled={disabled}
-        autoFocus={autoFocus}
+        onChange={fieldChangeHandler(onChange, t)}
+        onKeyDown={triggerKeyDownHandler(props, t)}
+        placeholder={props.placeholder ?? DEFAULT_PLACEHOLDER}
+        disabled={props.disabled ?? false}
+        autoFocus={props.autoFocus ?? false}
       />
-
-      {showDropdown && (
-        <div ref={dropdownRef} className="smart-input__dropdown">
-          {active?.type === 'date' ? (
-            <div className="smart-input__date-picker">
-              <DateTimePicker
-                mode="date"
-                defaultOpen
-                value={dateValue}
-                onChange={(v) => {
-                  setDateValue(v)
-                  if (v) {
-                    handleDateSelect(v)
-                  } else if (active) {
-                    const before = value.slice(0, active.triggerStart)
-                    const after = value.slice(
-                      active.triggerStart + active.triggerChar.length + active.query.length
-                    )
-                    onChange(`${before}${after.trimStart()}`)
-                    setActive(null)
-                    inputRef.current?.focus()
-                  }
-                }}
-                className="dtp--full"
-              />
-            </div>
-          ) : (
-            <>
-              <div className="smart-input__dropdown-label">
-                {active?.type === 'project' && 'Projects'}
-                {active?.type === 'area' && 'Areas'}
-                {active?.type === 'context' && 'Contexts'}
-              </div>
-              {options.length === 0 ? (
-                <div className="smart-input__dropdown-empty">No matches</div>
-              ) : (
-                options.map((opt, i) => (
-                  <button
-                    key={opt.isCreate ? `__create__${opt.value}` : opt.value}
-                    className={`smart-input__option${i === selectedIdx ? ' smart-input__option--selected' : ''}${opt.isCreate ? ' smart-input__option--create' : ''}`}
-                    onClick={() => void handleSelect(opt)}
-                    onMouseEnter={() => setSelectedIdx(i)}
-                  >
-                    {opt.isCreate ? (
-                      <>
-                        <span className="smart-input__option-create-icon">+</span>
-                        Create "{active?.triggerChar}
-                        {opt.label}"
-                      </>
-                    ) : (
-                      <>
-                        <span className="smart-input__option-trigger">{active?.triggerChar}</span>
-                        {opt.label}
-                      </>
-                    )}
-                  </button>
-                ))
-              )}
-            </>
-          )}
-        </div>
-      )}
+      <TriggerDropdown dropdownRef={dropdownRef} t={t} />
     </div>
   )
 }
 
-// Invalidate the option cache so it reloads next time
+/** Invalidates the option cache so it reloads next time. */
 export function invalidateSmartInputCache() {
   optionCache.loaded = false
   optionCache.projects = []

@@ -10,7 +10,7 @@ import type { WorkOrder } from './schema.js'
 // It is deliberately a matrix rather than a judgement. Nobody has to read a
 // plan carefully and notice what is missing; the gap is a coordinate.
 
-export interface DanglingRef {
+interface DanglingRef {
   readonly unitId: string
   readonly criterionId: string
 }
@@ -31,17 +31,24 @@ export interface CoverageMatrix {
   readonly reason: string | null
 }
 
+/** Every unit's claim on a criterion the order does not have. */
+function danglingRefsOf(order: WorkOrder, known: ReadonlySet<string>): DanglingRef[] {
+  return order.plan.units.flatMap((unit) =>
+    unit.satisfies
+      .filter((criterionId) => !known.has(criterionId))
+      .map((criterionId) => ({ unitId: unit.id, criterionId }))
+  )
+}
+
+function isEmpty(list: readonly unknown[]): boolean {
+  return list.length === 0
+}
+
 export function coverageMatrix(order: WorkOrder): CoverageMatrix {
   const criteria = order.acceptance.map((a) => a.id)
   const units = order.plan.units.map((u) => u.id)
   const known = new Set(criteria)
-
-  const danglingRefs: DanglingRef[] = []
-  for (const unit of order.plan.units) {
-    for (const criterionId of unit.satisfies) {
-      if (!known.has(criterionId)) danglingRefs.push({ unitId: unit.id, criterionId })
-    }
-  }
+  const danglingRefs = danglingRefsOf(order, known)
 
   // A reference to a criterion that does not exist attaches nothing. Counting
   // it would let a typo satisfy the coverage check, which is precisely the
@@ -67,11 +74,7 @@ export function coverageMatrix(order: WorkOrder): CoverageMatrix {
     uncoveredCriteria,
     orphanUnits,
     danglingRefs,
-    complete:
-      reason === null &&
-      uncoveredCriteria.length === 0 &&
-      orphanUnits.length === 0 &&
-      danglingRefs.length === 0,
+    complete: reason === null && [uncoveredCriteria, orphanUnits, danglingRefs].every(isEmpty),
     reason,
   }
 }

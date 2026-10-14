@@ -27,10 +27,20 @@ function gate(over: Partial<Parameters<typeof raiseGate>[0]> = {}) {
 
 beforeEach(() => {
   openExternal = vi.fn(async () => ({ ok: true }))
-  ;(window as unknown as Record<string, unknown>).electronAPI = { shell: { openExternal } }
+  Object.assign(window, { electronAPI: { shell: { openExternal } } })
 })
 
 describe('a gate collapsed to one line', () => {
+  describe('what it shows', gateCardWhatItShowsTests)
+  describe('links', gateCardLinksTests)
+  describe('answering', answeringTests)
+})
+
+function open() {
+  fireEvent.click(screen.getByText('U-4 rewrites session token refresh'))
+}
+
+function gateCardWhatItShowsTests() {
   it('shows the question, the grade, the default and the answers, and nothing else', () => {
     render(<GateCard gate={gate()} onDecide={vi.fn()} />)
     expect(screen.getByText('U-4 rewrites session token refresh')).toBeTruthy()
@@ -45,7 +55,9 @@ describe('a gate collapsed to one line', () => {
     render(<GateCard gate={gate()} onDecide={vi.fn()} />)
     expect(document.body.textContent).not.toMatch(/\bP0\b/)
   })
+}
 
+function gateCardLinksTests() {
   it('links the pull request and the ticket, opened outside the application', () => {
     render(
       <GateCard
@@ -61,7 +73,9 @@ describe('a gate collapsed to one line', () => {
     expect(openExternal).toHaveBeenCalledWith('https://linear.app/t/issue/TAV-15')
     expect(screen.queryByText(/session\.ts/)).toBeNull()
   })
+}
 
+function answeringTests() {
   it('answers from the line without opening the gate', () => {
     const onDecide = vi.fn()
     render(<GateCard gate={gate()} onDecide={onDecide} />)
@@ -76,13 +90,23 @@ describe('a gate collapsed to one line', () => {
       true
     )
   })
-})
+}
 
 describe('a gate opened', () => {
-  function open() {
-    fireEvent.click(screen.getByText('U-4 rewrites session token refresh'))
-  }
+  describe('the reason', gateCardTheReasonTests)
+  describe('evidence and answers', evidenceAndAnswersTests)
+  describe('closing', closingTests)
+})
 
+const budget = () =>
+  gate({
+    rule: 'budget.exceeded',
+    summary: 'x has gone past its wall clock budget',
+    why: 'The order budgets 45 and this run is at 46.',
+    breach: { kind: 'wall_clock', limit: 45, actual: 45.6 },
+  })
+
+function gateCardTheReasonTests() {
   it('shows why as markdown, so a list is a list', () => {
     const { container } = render(<GateCard gate={gate()} onDecide={vi.fn()} />)
     open()
@@ -95,7 +119,9 @@ describe('a gate opened', () => {
     open()
     expect(screen.getByText('the budget ran out')).toBeTruthy()
   })
+}
 
+function evidenceAndAnswersTests() {
   it('keeps the evidence closed until it is asked for', () => {
     const { container } = render(<GateCard gate={gate()} onDecide={vi.fn()} />)
     open()
@@ -109,7 +135,9 @@ describe('a gate opened', () => {
     open()
     expect(screen.getByText('The change proceeds as it stands.')).toBeTruthy()
   })
+}
 
+function closingTests() {
   it('closes again from the chevron, which says its state', () => {
     render(<GateCard gate={gate()} onDecide={vi.fn()} />)
     const chevron = screen.getByRole('button', { name: 'Show the reason' })
@@ -134,17 +162,13 @@ describe('a gate opened', () => {
     fireEvent.click(screen.getByRole('link', { name: /#233/ }))
     expect(screen.getByText(/session\.ts/)).toBeTruthy()
   })
-})
+}
 
 describe('raising a budget from the card', () => {
-  const budget = () =>
-    gate({
-      rule: 'budget.exceeded',
-      summary: 'x has gone past its wall clock budget',
-      why: 'The order budgets 45 and this run is at 46.',
-      breach: { kind: 'wall_clock', limit: 45, actual: 45.6 },
-    })
+  describe('the new limit', gateCardTheNewLimitTests)
+})
 
+function gateCardTheNewLimitTests() {
   it('asks for the new limit instead of deciding, then sends it', () => {
     const onDecide = vi.fn()
     render(<GateCard gate={budget()} onDecide={onDecide} />)
@@ -170,4 +194,4 @@ describe('raising a budget from the card', () => {
     expect(container.textContent).toContain('ordinary risk')
     expect(container.textContent).not.toContain('risk risk')
   })
-})
+}

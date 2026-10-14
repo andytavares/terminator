@@ -3,6 +3,7 @@ import { X } from 'lucide-react'
 import { StateChip } from '../session/StateChip'
 import type { BranchTerminal } from '../../sidebar/branch-rows'
 import { ContextMenu, type ContextMenuItem } from '../ContextMenu'
+import { activateOnKey, afterClosing, clickOnly } from './row-events'
 import './TerminalRow.css'
 
 export interface TerminalRowProps {
@@ -42,30 +43,10 @@ function ownKey(terminal: BranchTerminal): string | null {
  * the same column, so scanning for what needs you is still one column top to
  * bottom rather than a search across three kinds of row.
  */
-export function TerminalRow({
-  terminal,
-  nested = false,
-  selected,
-  onSelect,
-  onClose,
-  onLinkIssue,
-  onRemoveLink,
-}: TerminalRowProps): JSX.Element {
-  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
+export function TerminalRow(props: TerminalRowProps): JSX.Element {
+  const { terminal, nested = false, selected, onSelect, onClose, onLinkIssue } = props
+  const { menu, closeMenu, openMenu } = useLinkMenu(onLinkIssue !== undefined)
   const key = ownKey(terminal)
-
-  function items(): ContextMenuItem[] {
-    if (onLinkIssue === undefined) return []
-    const run = (fn?: () => void) => () => {
-      setMenu(null)
-      fn?.()
-    }
-    if (key === null) return [{ label: 'Link issue…', onSelect: run(onLinkIssue) }]
-    return [
-      { label: 'Change linked issue…', onSelect: run(onLinkIssue) },
-      { label: 'Remove session link', danger: true, onSelect: run(onRemoveLink) },
-    ]
-  }
 
   return (
     <div
@@ -75,54 +56,79 @@ export function TerminalRow({
       role="button"
       tabIndex={0}
       onClick={onSelect}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault()
-          onSelect()
-        }
-      }}
-      onContextMenu={
-        onLinkIssue === undefined
-          ? undefined
-          : (e) => {
-              e.preventDefault()
-              e.stopPropagation()
-              setMenu({ x: e.clientX, y: e.clientY })
-            }
-      }
+      onKeyDown={activateOnKey(onSelect)}
+      onContextMenu={openMenu}
     >
+      <TerminalRowContent terminal={terminal} linkKey={key} onClose={onClose} />
+      {menu && (
+        <ContextMenu
+          x={menu.x}
+          y={menu.y}
+          items={linkItems(props, key, closeMenu)}
+          onDismiss={closeMenu}
+        />
+      )}
+    </div>
+  )
+}
+
+/** Where the link menu is open, if it is; no menu at all when nothing can link. */
+function useLinkMenu(canLink: boolean) {
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
+  const openLinkMenu = (e: React.MouseEvent): void => {
+    e.preventDefault()
+    e.stopPropagation()
+    setMenu({ x: e.clientX, y: e.clientY })
+  }
+  return { menu, closeMenu: () => setMenu(null), openMenu: canLink ? openLinkMenu : undefined }
+}
+
+/** Link issue… for a session with no link of its own, else change or remove that link. Each
+ * closes the menu first. */
+function linkItems(
+  { onLinkIssue, onRemoveLink }: TerminalRowProps,
+  key: string | null,
+  closeMenu: () => void
+): ContextMenuItem[] {
+  const run = (fn?: () => void) => afterClosing(closeMenu, () => fn?.())
+  if (key === null) return [{ label: 'Link issue…', onSelect: run(onLinkIssue) }]
+  return [
+    { label: 'Change linked issue…', onSelect: run(onLinkIssue) },
+    { label: 'Remove session link', danger: true, onSelect: run(onRemoveLink) },
+  ]
+}
+
+interface ContentProps {
+  terminal: BranchTerminal
+  linkKey: string | null
+  onClose: () => void
+}
+
+/** State chip, name, own link key, unseen bells, and the close button. */
+function TerminalRowContent({ terminal, linkKey, onClose }: ContentProps): JSX.Element {
+  return (
+    <>
       <span className="terminal-row__gutter">
         <StateChip state={terminal.state} compact />
       </span>
-
       <span className="terminal-row__name" title={terminal.title}>
         {terminal.title}
       </span>
-
-      {key !== null && <span className="terminal-row__key">{key}</span>}
-
+      {linkKey !== null && <span className="terminal-row__key">{linkKey}</span>}
       {terminal.bellCount > 0 && (
         <span className="terminal-row__bell" aria-label={`${terminal.bellCount} unseen`}>
           {terminal.bellCount}
         </span>
       )}
-
       <button
         type="button"
         className="terminal-row__close"
         aria-label={`Close ${terminal.title}`}
         title="Close terminal"
-        onClick={(e) => {
-          e.stopPropagation()
-          onClose()
-        }}
+        onClick={clickOnly(onClose)}
       >
         <X aria-hidden="true" />
       </button>
-
-      {menu && (
-        <ContextMenu x={menu.x} y={menu.y} items={items()} onDismiss={() => setMenu(null)} />
-      )}
-    </div>
+    </>
   )
 }

@@ -4,10 +4,12 @@ const { mockNotificationShow, mockNotificationOn, MockNotification, mockDockBoun
   vi.hoisted(() => {
     const mockNotificationShow = vi.fn()
     const mockNotificationOn = vi.fn()
-    const MockNotification = vi.fn().mockImplementation(function () {
-      return { show: mockNotificationShow, on: mockNotificationOn }
-    })
-    Object.assign(MockNotification, { isSupported: vi.fn(() => true) })
+    const MockNotification = Object.assign(
+      vi.fn().mockImplementation(function () {
+        return { show: mockNotificationShow, on: mockNotificationOn }
+      }),
+      { isSupported: vi.fn(() => true) }
+    )
     const mockDockBounce = vi.fn()
     const mockSend = vi.fn()
     return { mockNotificationShow, mockNotificationOn, MockNotification, mockDockBounce, mockSend }
@@ -16,10 +18,10 @@ const { mockNotificationShow, mockNotificationOn, MockNotification, mockDockBoun
 const mockWin = { isDestroyed: vi.fn(() => false), webContents: { send: mockSend } }
 const mockDestroyedWin = { isDestroyed: vi.fn(() => true), webContents: { send: mockSend } }
 
-const mockGetGlobalSettings = vi.hoisted(() => vi.fn())
+const getAllWindows = vi.hoisted(() => vi.fn())
 
 vi.mock('electron', () => ({
-  BrowserWindow: { getAllWindows: vi.fn(() => [mockWin]) },
+  BrowserWindow: { getAllWindows },
   Notification: MockNotification,
   app: { dock: { bounce: mockDockBounce } },
 }))
@@ -28,20 +30,18 @@ vi.mock('crypto', () => ({
   randomUUID: vi.fn(() => 'test-uuid'),
 }))
 
-vi.mock('../../../src/main/storage/settings-store', () => ({
-  getGlobalSettings: mockGetGlobalSettings,
-}))
+vi.mock('electron-store', async () =>
+  (await import('../../support/stores')).inMemoryElectronStore()
+)
 
-import {
-  notificationManager,
-  setExtensionNotificationSettingReader,
-} from '../../../src/main/notifications/notification-manager'
-import { BrowserWindow } from 'electron'
+type Manager = typeof import('../../../src/main/notifications/notification-manager')
+
+let notificationManager: Manager['notificationManager']
+let setExtensionNotificationSettingReader: Manager['setExtensionNotificationSettingReader']
+let updateGlobalSettings: typeof import('../../../src/main/storage/settings-store').updateGlobalSettings
 
 function withDefaultTargets(...defaultTargets: Array<'system' | 'center' | 'toast'>): void {
-  mockGetGlobalSettings.mockReturnValue({
-    notifications: { defaultTargets, overrides: {} },
-  })
+  updateGlobalSettings({ notifications: { defaultTargets } })
 }
 
 function withCoreOverride(
@@ -49,16 +49,18 @@ function withCoreOverride(
   overrideTargets: Array<'system' | 'center' | 'toast'>,
   defaultTargets: Array<'system' | 'center' | 'toast'> = ['toast']
 ): void {
-  mockGetGlobalSettings.mockReturnValue({
-    notifications: { defaultTargets, overrides: { [key]: overrideTargets } },
-  })
+  updateGlobalSettings({ notifications: { defaultTargets, overrides: { [key]: overrideTargets } } })
 }
 
-beforeEach(() => {
+// Fresh modules each test, so the settings store starts from its defaults.
+beforeEach(async () => {
   vi.clearAllMocks()
-  vi.mocked(BrowserWindow.getAllWindows).mockReturnValue([mockWin] as unknown as ReturnType<
-    typeof BrowserWindow.getAllWindows
-  >)
+  vi.resetModules()
+  ;({ updateGlobalSettings } = await import('../../../src/main/storage/settings-store'))
+  ;({ notificationManager, setExtensionNotificationSettingReader } = await import(
+    '../../../src/main/notifications/notification-manager'
+  ))
+  getAllWindows.mockReturnValue([mockWin])
   MockNotification.isSupported.mockReturnValue(true)
   withDefaultTargets('system', 'center', 'toast')
   // Reset the injected extension reader to its no-registration default between tests.
@@ -92,7 +94,9 @@ describe('NotificationManager.create — settings-driven target resolution', () 
       expect.objectContaining({ targets: ['toast'] })
     )
   })
+})
 
+describe('NotificationManager.create — extension targets', () => {
   it('resolves an extension notification via the injected reader, keyed by source+key', () => {
     const reader = vi.fn().mockReturnValue(['system'])
     setExtensionNotificationSettingReader(reader)
@@ -121,7 +125,9 @@ describe('NotificationManager.create — settings-driven target resolution', () 
       expect.objectContaining({ targets: ['toast'] })
     )
   })
+})
 
+describe('NotificationManager.create — errors always toast', () => {
   it('force-includes toast for an error even when settings omit it', () => {
     withDefaultTargets('system')
     notificationManager.create({ type: 'error', title: 'Uh oh', key: 'errKey' })
@@ -144,7 +150,9 @@ describe('NotificationManager.create — settings-driven target resolution', () 
       expect.objectContaining({ targets: ['system', 'toast'] })
     )
   })
+})
 
+describe('NotificationManager.create — system notifications', () => {
   it('fires system notification when resolved targets include system', () => {
     withDefaultTargets('system')
     notificationManager.create({ type: 'info', title: 'Sys', key: 'sysKey' })
@@ -163,7 +171,9 @@ describe('NotificationManager.create — settings-driven target resolution', () 
     notificationManager.create({ type: 'info', title: 'Only sys', key: 'onlySysKey' })
     expect(mockSend).not.toHaveBeenCalled()
   })
+})
 
+describe('NotificationManager.create — persistent targets', () => {
   it('broadcasts when resolved targets includes center', () => {
     withDefaultTargets('center')
     notificationManager.create({ type: 'info', title: 'Center only', key: 'centerKey' })
@@ -181,7 +191,9 @@ describe('NotificationManager.create — settings-driven target resolution', () 
       expect.objectContaining({ targets: ['toast'] })
     )
   })
+})
 
+describe('NotificationManager.create — system support and dock', () => {
   it('skips system notification when not supported', () => {
     withDefaultTargets('system')
     MockNotification.isSupported.mockReturnValue(false)
@@ -197,13 +209,24 @@ describe('NotificationManager.create — settings-driven target resolution', () 
     expect(mockDockBounce).toHaveBeenCalledWith('critical')
     Object.defineProperty(process, 'platform', { value: originalPlatform, configurable: true })
   })
+})
 
-  it('registers a failed handler on the system notification', () => {
+describe('NotificationManager.create — system notification failures and clicks', () => {
+  it('logs a system notification the operating system failed to show', () => {
     withDefaultTargets('system')
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     notificationManager.create({ type: 'info', title: 'Sys', key: 'sysFailKey' })
-    expect(mockNotificationOn).toHaveBeenCalledWith('failed', expect.any(Function))
+    const failed = mockNotificationOn.mock.calls.find((c) => c[0] === 'failed')![1]
+    failed({}, 'denied by the user')
+    expect(warn).toHaveBeenCalledWith(
+      '[notifications] system notification failed:',
+      'denied by the user'
+    )
+    warn.mockRestore()
   })
+})
 
+describe('NotificationManager.create — system notification clicks', () => {
   it('wires the first action handler to the system notification click event', () => {
     withDefaultTargets('system')
     const handler = vi.fn()
@@ -233,7 +256,9 @@ describe('NotificationManager.create — settings-driven target resolution', () 
     clickHandler()
     expect(onClick).toHaveBeenCalledTimes(1)
   })
+})
 
+describe('NotificationManager.create — system notification click priority', () => {
   it('prefers onClick over the first action when both are present', () => {
     withDefaultTargets('system')
     const onClick = vi.fn()
@@ -269,13 +294,13 @@ describe('NotificationManager.create — broadcast', () => {
 
   it('skips destroyed windows during broadcast', () => {
     withDefaultTargets('center')
-    vi.mocked(BrowserWindow.getAllWindows).mockReturnValue([
-      mockDestroyedWin,
-    ] as unknown as ReturnType<typeof BrowserWindow.getAllWindows>)
+    getAllWindows.mockReturnValue([mockDestroyedWin])
     notificationManager.create({ type: 'info', title: 'Skip me', key: 'skipKey' })
     expect(mockSend).not.toHaveBeenCalled()
   })
+})
 
+describe('NotificationManager.create — serialized fields', () => {
   it('includes actions in serialized notification', () => {
     notificationManager.create({
       type: 'warning',
@@ -294,7 +319,9 @@ describe('NotificationManager.create — broadcast', () => {
     const payload = mockSend.mock.calls[0][1] as { actions?: unknown }
     expect(payload.actions).toBeUndefined()
   })
+})
 
+describe('NotificationManager.create — optional fields', () => {
   it('includes optional message and source', () => {
     notificationManager.create({
       type: 'error',
@@ -312,8 +339,7 @@ describe('NotificationManager.create — broadcast', () => {
 
 describe('NotificationManager.list', () => {
   it('returns empty array when no notifications exist', () => {
-    const result = notificationManager.list()
-    expect(Array.isArray(result)).toBe(true)
+    expect(notificationManager.list()).toEqual([])
   })
 
   it('returns created notifications', () => {
@@ -345,7 +371,7 @@ describe('NotificationManager.list', () => {
 describe('NotificationManager.dismiss', () => {
   it('removes the notification so it no longer appears in list', () => {
     const id = notificationManager.create({ type: 'info', title: 'To dismiss', key: 'dismissKey' })
-    notificationManager.dismiss(id)
+    notificationManager.dismissNotification(id)
     expect(notificationManager.list().some((n) => n.id === id)).toBe(false)
   })
 })
@@ -396,9 +422,11 @@ describe('taking you to the thing a notification is about', () => {
 
   it('leaves a bare report unclickable, rather than a link to nowhere', () => {
     notificationManager.create({ type: 'info', title: 'Area archived', key: 'k' })
-    expect(notificationManager.list()[0].clickable).toBeFalsy()
+    expect(notificationManager.list()[0].clickable).toBe(false)
   })
+})
 
+describe('taking you to the thing — the destination action', () => {
   it('does not render the destination as a button beside the real answers', () => {
     // Otherwise "Open" sits next to "Approve" and "Deny" as if it were a third
     // way of answering the question.
@@ -445,7 +473,9 @@ describe('acting on a notification settles it', () => {
     expect(approve).toHaveBeenCalled()
     expect(notificationManager.list().map((n) => n.id)).not.toContain(id)
   })
+})
 
+describe('acting on a notification settles it — repeat and unknown answers', () => {
   it('refuses a second answer to a question already answered', () => {
     const approve = vi.fn()
     notificationManager.create({

@@ -22,6 +22,11 @@ function harness() {
 }
 
 describe('raising a request', () => {
+  describe('the request', theRequestTests)
+  describe('summaries and ids', summariesAndIdsTests)
+})
+
+function theRequestTests() {
   it('raises a request naming the tool and what it wants to do', async () => {
     const { bridge, events } = harness()
     const pending = bridge.canUseTool('Bash', { command: 'redis-cli -h prod-cache-01' })
@@ -41,7 +46,9 @@ describe('raising a request', () => {
     bridge.resolve((events[0] as { requestId: string }).requestId, { allow: true })
     await pending
   })
+}
 
+function summariesAndIdsTests() {
   it('summarises a tool with no obvious payload without throwing', async () => {
     const { bridge, events } = harness()
     const pending = bridge.canUseTool('Read', {})
@@ -59,9 +66,15 @@ describe('raising a request', () => {
     ids.forEach((id) => bridge.resolve(id, { allow: true }))
     await Promise.all([a, b])
   })
-})
+}
 
 describe('resolving a request', () => {
+  describe('allowing and denying', allowingAndDenyingTests)
+  describe('reasons and reports', reasonsAndReportsTests)
+  describe('unknown and repeated resolutions', unknownAndRepeatedResolutionsTests)
+})
+
+function allowingAndDenyingTests() {
   it('allowing returns the documented allow shape with the input unchanged', async () => {
     const { bridge, events } = harness()
     const input = { command: 'ls' }
@@ -82,7 +95,9 @@ describe('resolving a request', () => {
       reason: 'operator declined',
     })
   })
+}
 
+function reasonsAndReportsTests() {
   it('names a reason even when the operator gave none, so the agent is not simply refused', async () => {
     const { bridge, events } = harness()
     const pending = bridge.canUseTool('Bash', { command: 'x' })
@@ -101,7 +116,9 @@ describe('resolving a request', () => {
     // waiting session it is no longer waiting.
     expect(resolved).toEqual([{ requestId, decision: 'allow' }])
   })
+}
 
+function unknownAndRepeatedResolutionsTests() {
   it('ignores a resolution for an unknown request', async () => {
     const { bridge, events } = harness()
     expect(() => bridge.resolve('never-issued', { allow: true })).not.toThrow()
@@ -117,11 +134,16 @@ describe('resolving a request', () => {
     bridge.resolve(requestId, { allow: false, reason: 'too late' })
     expect(resolved).toHaveLength(1)
   })
-})
+}
 
 describe('auto-decision by the autonomy ladder', () => {
+  describe('an allowing decider', anAllowingDeciderTests)
+  describe('an abstaining decider', anAbstainingDeciderTests)
+})
+
+function anAllowingDeciderTests() {
   it('resolves without ever publishing a request when the decider allows it', async () => {
-    const events: SessionEvent[] = []
+    const events: PendingPermission[] = []
     const bridge = createPermissionBridge({
       sessionId: 's1',
       now: () => 1_000,
@@ -135,9 +157,11 @@ describe('auto-decision by the autonomy ladder', () => {
     // No prompt was raised, so the operator was never interrupted.
     expect(events).toHaveLength(0)
   })
+}
 
+function anAbstainingDeciderTests() {
   it('still prompts when the decider abstains', async () => {
-    const events: SessionEvent[] = []
+    const events: PendingPermission[] = []
     const autoDecide = vi.fn().mockReturnValue(null)
     const bridge = createPermissionBridge({
       sessionId: 's1',
@@ -152,7 +176,7 @@ describe('auto-decision by the autonomy ladder', () => {
     bridge.resolve((events[0] as { requestId: string }).requestId, { allow: true })
     await pending
   })
-})
+}
 
 describe('a call the ladder leaves to auto mode', () => {
   it('answers with no decision, and never raises a request', async () => {
@@ -181,22 +205,44 @@ describe('shutdown', () => {
   })
 })
 
+function ask(toolName: string, input: unknown) {
+  const events: PendingPermission[] = []
+  const bridge = createPermissionBridge({
+    sessionId: 's1',
+    now: () => 1_000,
+    onPending: (p) => events.push(p),
+    onResolved: () => {},
+  })
+  void bridge.canUseTool(toolName, input)
+  return events[0] as { summary: string; detail?: string | null }
+}
+
 // FR-007. Deciding requires seeing the ask. "AskUserQuestion request" is the
 // tool's name, not its question — you cannot approve or deny that.
 
 describe('what the operator is told is being asked', () => {
-  function ask(toolName: string, input: unknown) {
-    const events: SessionEvent[] = []
-    const bridge = createPermissionBridge({
-      sessionId: 's1',
-      now: () => 1_000,
-      onPending: (p) => events.push(p),
-      onResolved: () => {},
-    })
-    void bridge.canUseTool(toolName, input)
-    return events[0] as { summary: string; detail?: string | null }
-  }
+  describe('questions', permissionBridgeQuestionsTests)
+  describe('shell requests', shellRequestsTests)
+  describe('unknown tools and bounds', unknownToolsAndBoundsTests)
+  describe('multi-line values and non-objects', multiLineValuesAndNonObjectsTests)
+  describe('empty questions', emptyQuestionsTests)
+})
 
+function bridgeFor() {
+  const events: PendingPermission[] = []
+  const bridge = createPermissionBridge({
+    sessionId: 's1',
+    now: () => 1_000,
+    onPending: (p) => events.push(p),
+    onResolved: () => {},
+  })
+  return { bridge, events }
+}
+function questionsOn(events: PendingPermission[]) {
+  return events[0].questions
+}
+
+function permissionBridgeQuestionsTests() {
   it('leads with the question itself', () => {
     const event = ask('AskUserQuestion', {
       questions: [{ question: 'Which database should the worker write to?', options: [] }],
@@ -224,7 +270,9 @@ describe('what the operator is told is being asked', () => {
     expect(event.detail).toContain('First?')
     expect(event.detail).toContain('Second?')
   })
+}
 
+function shellRequestsTests() {
   it('still leads with the command for a shell request', () => {
     const event = ask('Bash', { command: 'redis-cli -h prod-cache-01 FLUSHALL' })
     expect(event.summary).toBe('redis-cli -h prod-cache-01 FLUSHALL')
@@ -243,7 +291,9 @@ describe('what the operator is told is being asked', () => {
     const event = ask('Bash', { command })
     expect(event.detail).toContain(command)
   })
+}
 
+function unknownToolsAndBoundsTests() {
   it('shows the input of a tool it does not recognise, rather than only its name', () => {
     // An unfamiliar tool is exactly when you most need to see what it wants.
     const event = ask('SomeNewTool', { target: 'production', mode: 'destructive' })
@@ -264,7 +314,9 @@ describe('what the operator is told is being asked', () => {
     const event = ask('SomeNewTool', input)
     expect((event.detail ?? '').split('\n')).toHaveLength(24)
   })
+}
 
+function multiLineValuesAndNonObjectsTests() {
   it('puts a multi-line value on its own line so a script stays readable', () => {
     const event = ask('Write', { file_path: '/a.sh', content: 'set -e\nrm -rf build\n' })
     expect(event.detail).toContain('content:\nset -e\nrm -rf build')
@@ -275,7 +327,9 @@ describe('what the operator is told is being asked', () => {
     expect(event.summary).toBe('SomeNewTool request')
     expect(event.detail).toBeNull()
   })
+}
 
+function emptyQuestionsTests() {
   it('ignores an empty question list rather than claiming a question was asked', () => {
     const event = ask('AskUserQuestion', { questions: [] })
     expect(event.summary).toBe('AskUserQuestion request')
@@ -285,24 +339,35 @@ describe('what the operator is told is being asked', () => {
     const event = ask('AskUserQuestion', { questions: [{ options: [] }] })
     expect(event.summary).toBe('AskUserQuestion request')
   })
-})
+}
 
 // canUseTool has exactly two ways back to the agent: allow with an updated
 // input, or deny with a message. The message is the only channel that carries
 // words, so a real answer travels as a denial whose message is the answer.
 
 describe('answering rather than approving', () => {
-  function bridgeFor() {
-    const events: PendingPermission[] = []
-    const bridge = createPermissionBridge({
-      sessionId: 's1',
-      now: () => 1_000,
-      onPending: (p) => events.push(p),
-      onResolved: () => {},
-    })
-    return { bridge, events }
-  }
+  describe('answers', answersTests)
+  describe('published questions', publishedQuestionsTests)
+  describe('plain yes or no', plainYesOrNoTests)
+})
 
+// It must not block the agent indefinitely. The hook itself waits twelve
+// hours; the console handing the decision back long before that is the
+// difference between a slow answer and a run that is stuck.
+function bridgeWith(askAfterMs: number) {
+  const events: PendingPermission[] = []
+  const resolved: Array<{ requestId: string; decision: string }> = []
+  const bridge = createPermissionBridge({
+    sessionId: 's1',
+    now: () => 1_000,
+    askAfterMs,
+    onPending: (p) => events.push(p),
+    onResolved: (requestId, decision) => resolved.push({ requestId, decision }),
+  })
+  return { bridge, events, resolved }
+}
+
+function answersTests() {
   function requestIdOf(events: PendingPermission[]): string {
     return events[0].requestId
   }
@@ -325,11 +390,9 @@ describe('answering rather than approving', () => {
     bridge.resolve(requestIdOf(events), { allow: true, answer: '   ' })
     await expect(pending).resolves.toMatchObject({ permissionDecision: 'allow' })
   })
+}
 
-  function questionsOn(events: PendingPermission[]) {
-    return events[0].questions
-  }
-
+function publishedQuestionsTests() {
   it('publishes each question with its own options, so an answer can name it', () => {
     const { bridge, events } = bridgeFor()
     void bridge.canUseTool('AskUserQuestion', {
@@ -356,7 +419,9 @@ describe('answering rather than approving', () => {
       { question: 'B?', options: ['Yes', 'No'] },
     ])
   })
+}
 
+function plainYesOrNoTests() {
   it('offers no questions for a request that is a plain yes or no', () => {
     const { bridge, events } = bridgeFor()
     void bridge.canUseTool('Bash', { command: 'ls' })
@@ -368,25 +433,14 @@ describe('answering rather than approving', () => {
     void bridge.canUseTool('AskUserQuestion', { questions: [{ question: 'Why?' }] })
     expect(questionsOn(events)).toEqual([{ question: 'Why?', options: [] }])
   })
-})
+}
 
 describe('a request nobody answers', () => {
-  // It must not block the agent indefinitely. The hook itself waits twelve
-  // hours; the console handing the decision back long before that is the
-  // difference between a slow answer and a run that is stuck.
-  function bridgeWith(askAfterMs: number) {
-    const events: PendingPermission[] = []
-    const resolved: Array<{ requestId: string; decision: string }> = []
-    const bridge = createPermissionBridge({
-      sessionId: 's1',
-      now: () => 1_000,
-      askAfterMs,
-      onPending: (p) => events.push(p),
-      onResolved: (requestId, decision) => resolved.push({ requestId, decision }),
-    })
-    return { bridge, events, resolved }
-  }
+  describe('running out of time', runningOutOfTimeTests)
+  describe('handing back deliberately', handingBackDeliberatelyTests)
+})
 
+function runningOutOfTimeTests() {
   it('hands the decision back to the terminal rather than holding it', async () => {
     const { bridge } = bridgeWith(10)
     // `ask` is Claude Code's own prompt, in the terminal the operator is
@@ -410,7 +464,9 @@ describe('a request nobody answers', () => {
     await expect(pending).resolves.toMatchObject({ permissionDecision: 'allow' })
     expect(resolved).toEqual([{ requestId: events[0].requestId, decision: 'allow' }])
   })
+}
 
+function handingBackDeliberatelyTests() {
   it('can be handed back deliberately, not only by running out of time', async () => {
     const { bridge, events } = bridgeWith(10_000)
     const pending = bridge.canUseTool('Bash', { command: 'ls' })
@@ -425,7 +481,7 @@ describe('a request nobody answers', () => {
     await pending
     expect(() => bridge.handBackToTerminal(events[0].requestId)).not.toThrow()
   })
-})
+}
 
 describe('when the run ends with requests still held', () => {
   it('tells the surface they are gone, not just the agent', async () => {
@@ -473,21 +529,25 @@ describe('answering something that is no longer waiting', () => {
   })
 })
 
+function ladder(over: Record<string, unknown>) {
+  return createPermissionBridge({
+    sessionId: 's1',
+    now: () => 1_000,
+    onPending: () => undefined,
+    onResolved: () => undefined,
+    ...over,
+  } as never)
+}
+
 // A refusal taken by the ladder raised no prompt and posted nothing, so an
 // agent being turned down looked exactly like one that had gone quiet. Four
 // live runs died on refused commands, and reading the transcript was the only
 // way to find out why any of them stopped.
 describe('a refusal the ladder took on its own', () => {
-  function ladder(over: Record<string, unknown>) {
-    return createPermissionBridge({
-      sessionId: 's1',
-      now: () => 1_000,
-      onPending: () => undefined,
-      onResolved: () => undefined,
-      ...over,
-    } as never)
-  }
+  describe('ladder refusals', ladderRefusalsTests)
+})
 
+function ladderRefusalsTests() {
   it('is reported, so the console can say why the agent changed course', async () => {
     const denied: { tool: string; reason: string }[] = []
     const b = ladder({
@@ -517,4 +577,4 @@ describe('a refusal the ladder took on its own', () => {
     await b.canUseTool('Bash', { command: 'rm -rf x' })
     expect(denied).toEqual(['no reason given'])
   })
-})
+}

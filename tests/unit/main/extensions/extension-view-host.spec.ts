@@ -42,29 +42,26 @@ vi.mock('electron', () => ({
   session: { defaultSession: mockDefaultSession, fromPartition: () => mockDefaultSession },
 }))
 
-vi.mock('../../src/main/logger.js', () => ({
-  makeLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn() }),
-}))
-
-vi.mock('../../../src/main/logger.js', () => ({
-  makeLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn() }),
-}))
-
 import {
   ExtensionViewHost,
   EXTENSION_BASE_CSS,
   isQuickActionsOpenShortcut,
 } from '../../../../src/main/extensions/extension-view-host.js'
 import type { Extension } from '../../../../src/shared/types/index.js'
+import type { BrowserWindow, View, WebContents } from 'electron'
+import { partialFake } from '../../../support/fakes'
 
 const mockMainWebContentsFocus = vi.fn()
 
-function makeMainWindow() {
-  return {
-    webContents: { send: mockSend, focus: mockMainWebContentsFocus },
-    contentView: { addChildView: mockAddChildView, removeChildView: mockRemoveChildView },
-    getContentBounds: vi.fn().mockReturnValue({ x: 0, y: 0, width: 1280, height: 800 }),
-  } as unknown as Parameters<typeof ExtensionViewHost>[0]
+function makeMainWindow(): BrowserWindow {
+  return partialFake<BrowserWindow>({
+    webContents: partialFake<WebContents>({ send: mockSend, focus: mockMainWebContentsFocus }),
+    contentView: partialFake<View>({
+      addChildView: mockAddChildView,
+      removeChildView: mockRemoveChildView,
+    }),
+    getContentBounds: () => ({ x: 0, y: 0, width: 1280, height: 800 }),
+  })
 }
 
 function makeExt(overrides: Partial<Extension> = {}): Extension {
@@ -80,19 +77,27 @@ function makeExt(overrides: Partial<Extension> = {}): Extension {
   } as Extension
 }
 
-describe('ExtensionViewHost', () => {
-  let host: ExtensionViewHost
-  let mainWindow: ReturnType<typeof makeMainWindow>
+let host: ExtensionViewHost
+let mainWindow: BrowserWindow
 
+function useViewHost(): void {
   beforeEach(() => {
     vi.clearAllMocks()
     mainWindow = makeMainWindow()
-    host = new ExtensionViewHost(mainWindow as never, '/fake/preload/webview.js')
+    host = new ExtensionViewHost(mainWindow, '/fake/preload/webview.js')
   })
+}
+
+describe('ExtensionViewHost', () => {
+  useViewHost()
 
   it('hasView returns false before any view is created', () => {
     expect(host.hasView('com.test.ext', 'main')).toBe(false)
   })
+})
+
+describe('ExtensionViewHost createView', () => {
+  useViewHost()
 
   it('createView adds a WebContentsView to contentView and stores it', async () => {
     await host.createView(makeExt(), 'main')
@@ -117,8 +122,12 @@ describe('ExtensionViewHost', () => {
 
   it('createView passes viewParam as ?view= query param', async () => {
     await host.createView(makeExt(), 'sidebar')
-    expect(mockLoadURL).toHaveBeenCalledWith(expect.stringContaining('view=sidebar'))
+    expect(new URL(mockLoadURL.mock.calls[0][0]).searchParams.get('view')).toBe('sidebar')
   })
+})
+
+describe('ExtensionViewHost hasView', () => {
+  useViewHost()
 
   it('createView does nothing when ext has no rendererUrl', async () => {
     await host.createView(makeExt({ rendererUrl: undefined }), 'main')
@@ -135,6 +144,10 @@ describe('ExtensionViewHost', () => {
     await host.createView(makeExt(), 'main')
     expect(host.hasView('com.test.ext', 'sidebar')).toBe(false)
   })
+})
+
+describe('ExtensionViewHost destroy and reload', () => {
+  useViewHost()
 
   it('destroyAllViews removes views from contentView and clears the map', async () => {
     await host.createView(makeExt(), 'main')
@@ -158,10 +171,19 @@ describe('ExtensionViewHost', () => {
     host.reloadAllViews('com.unknown')
     expect(mockReload).not.toHaveBeenCalled()
   })
+})
+
+describe('ExtensionViewHost handleBoundsUpdate', () => {
+  useViewHost()
 
   it('handleBoundsUpdate sets bounds and visibility on the matching view', async () => {
     await host.createView(makeExt(), 'main')
-    host.handleBoundsUpdate('com.test.ext', 'main', { x: 10, y: 20, width: 400, height: 300 }, true)
+    host.handleBoundsUpdate({
+      extensionId: 'com.test.ext',
+      viewParam: 'main',
+      bounds: { x: 10, y: 20, width: 400, height: 300 },
+      visible: true,
+    })
     // width = winW(1280) - x(10) = 1270; height = bounds.height(300) (renderer-reported)
     expect(mockSetBounds).toHaveBeenCalledWith({ x: 10, y: 20, width: 1270, height: 300 })
     expect(mockSetVisible).toHaveBeenCalledWith(true)
@@ -169,25 +191,43 @@ describe('ExtensionViewHost', () => {
 
   it('handleBoundsUpdate sets visible: false when not visible', async () => {
     await host.createView(makeExt(), 'main')
-    host.handleBoundsUpdate('com.test.ext', 'main', { x: 0, y: 0, width: 100, height: 100 }, false)
+    host.handleBoundsUpdate({
+      extensionId: 'com.test.ext',
+      viewParam: 'main',
+      bounds: { x: 0, y: 0, width: 100, height: 100 },
+      visible: false,
+    })
     expect(mockSetVisible).toHaveBeenCalledWith(false)
   })
+})
+
+describe('ExtensionViewHost handleBoundsUpdate for unknown views', () => {
+  useViewHost()
 
   it('handleBoundsUpdate is a no-op for unknown extension', () => {
-    host.handleBoundsUpdate('com.unknown', 'main', { x: 0, y: 0, width: 100, height: 100 }, true)
+    host.handleBoundsUpdate({
+      extensionId: 'com.unknown',
+      viewParam: 'main',
+      bounds: { x: 0, y: 0, width: 100, height: 100 },
+      visible: true,
+    })
     expect(mockSetBounds).not.toHaveBeenCalled()
   })
 
   it('handleBoundsUpdate is a no-op for unknown viewParam', async () => {
     await host.createView(makeExt(), 'main')
-    host.handleBoundsUpdate(
-      'com.test.ext',
-      'sidebar',
-      { x: 0, y: 0, width: 100, height: 100 },
-      true
-    )
+    host.handleBoundsUpdate({
+      extensionId: 'com.test.ext',
+      viewParam: 'sidebar',
+      bounds: { x: 0, y: 0, width: 100, height: 100 },
+      visible: true,
+    })
     expect(mockSetBounds).not.toHaveBeenCalled()
   })
+})
+
+describe('ExtensionViewHost broadcasts', () => {
+  useViewHost()
 
   it('broadcastToAll sends to all views across all extensions', async () => {
     await host.createView(makeExt(), 'main')
@@ -216,6 +256,10 @@ describe('ExtensionViewHost', () => {
     host.broadcastToExtension('com.unknown', 'test:event', {})
     expect(mockSend).not.toHaveBeenCalled()
   })
+})
+
+describe('ExtensionViewHost page load', () => {
+  useViewHost()
 
   it('did-finish-load callback sends panel-loaded and workspace:changed when repoRoot provided', async () => {
     let finishLoadCb: (() => void) | undefined
@@ -231,6 +275,10 @@ describe('ExtensionViewHost', () => {
     })
     expect(mockSend).toHaveBeenCalledWith('workspace:changed', { repoRoot: '/repo/root' })
   })
+})
+
+describe('ExtensionViewHost page load without a repo, or failed', () => {
+  useViewHost()
 
   it('did-finish-load callback skips workspace:changed when repoRoot is null', async () => {
     let finishLoadCb: (() => void) | undefined
@@ -238,33 +286,55 @@ describe('ExtensionViewHost', () => {
       if (event === 'did-finish-load') finishLoadCb = cb
     })
     await host.createView(makeExt(), 'main', null)
-    finishLoadCb?.()
+    finishLoadCb!()
+    expect(mockSend).toHaveBeenCalledWith('extension:panel-loaded', {
+      id: 'com.test.ext',
+      viewParam: 'main',
+    })
     const workspaceCalls = mockSend.mock.calls.filter(([ch]) => ch === 'workspace:changed')
     expect(workspaceCalls).toHaveLength(0)
   })
 
+  it.each([[new Error('ERR_FAILED')], ['offline']])(
+    'keeps a view whose page failed to load (%s)',
+    async (failure) => {
+      mockLoadURL.mockRejectedValueOnce(failure)
+      await host.createView(makeExt(), 'main')
+      expect(mockAddChildView).toHaveBeenCalledTimes(1)
+      expect(host.hasView('com.test.ext', 'main')).toBe(true)
+    }
+  )
+})
+
+describe('ExtensionViewHost workspace and URL', () => {
+  useViewHost()
+
   it('handleBoundsUpdate broadcasts workspace:changed when repoRoot changes', async () => {
     await host.createView(makeExt(), 'main', '/old-root')
     vi.clearAllMocks()
-    host.handleBoundsUpdate(
-      'com.test.ext',
-      'main',
-      { x: 0, y: 0, width: 100, height: 100 },
-      true,
-      '/new-root'
-    )
+    host.handleBoundsUpdate({
+      extensionId: 'com.test.ext',
+      viewParam: 'main',
+      bounds: { x: 0, y: 0, width: 100, height: 100 },
+      visible: true,
+      repoRoot: '/new-root',
+    })
     expect(mockSend).toHaveBeenCalledWith('workspace:changed', { repoRoot: '/new-root' })
   })
 
   it('createView includes repoRoot in URL when provided', async () => {
     await host.createView(makeExt(), 'main', '/my/repo')
-    expect(mockLoadURL).toHaveBeenCalledWith(expect.stringContaining('repoRoot='))
+    expect(new URL(mockLoadURL.mock.calls[0][0]).searchParams.get('repoRoot')).toBe('/my/repo')
   })
 
   it('createView URL omits repoRoot when not provided', async () => {
     await host.createView(makeExt(), 'sidebar')
     expect(mockLoadURL).toHaveBeenCalledWith(expect.not.stringContaining('repoRoot='))
   })
+})
+
+describe('ExtensionViewHost devtools and focusView', () => {
+  useViewHost()
 
   it('openDevToolsForAll calls openDevTools on all views', async () => {
     await host.createView(makeExt(), 'main')
@@ -282,11 +352,20 @@ describe('ExtensionViewHost', () => {
     host.focusView('com.unknown', 'main')
     expect(mockFocus).not.toHaveBeenCalled()
   })
+})
+
+describe('ExtensionViewHost bottom inset', () => {
+  useViewHost()
 
   it('setBottomInset re-applies bounds with reduced height for all views that have stored bounds', async () => {
     await host.createView(makeExt(), 'main')
     // Store bounds: window is 1280x800, view at y=10, height=700
-    host.handleBoundsUpdate('com.test.ext', 'main', { x: 0, y: 10, width: 100, height: 700 }, true)
+    host.handleBoundsUpdate({
+      extensionId: 'com.test.ext',
+      viewParam: 'main',
+      bounds: { x: 0, y: 10, width: 100, height: 700 },
+      visible: true,
+    })
     vi.clearAllMocks()
 
     // After applying a 280px inset: maxH = 800 - 10 - 280 = 510, height = min(700, 510) = 510
@@ -303,33 +382,26 @@ describe('ExtensionViewHost', () => {
   })
 })
 
-describe('ExtensionViewHost focus restoration', () => {
-  let host: ExtensionViewHost
-  let mainWindow: ReturnType<typeof makeMainWindow>
+// The electron mock shares one `on` spy across every WebContentsView, so the
+// handlers are recovered positionally: one 'focus' registration per created view.
+function focusHandlers(): Array<() => void> {
+  return mockOn.mock.calls
+    .filter(([event]) => event === 'focus')
+    .map(([, handler]) => handler as () => void)
+}
 
-  // The electron mock shares one `on` spy across every WebContentsView, so the
-  // handlers are recovered positionally: one 'focus' registration per created view.
-  function focusHandlers(): Array<() => void> {
-    return mockOn.mock.calls
-      .filter(([event]) => event === 'focus')
-      .map(([, handler]) => handler as () => void)
-  }
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    mainWindow = makeMainWindow()
-    host = new ExtensionViewHost(mainWindow as never, '/fake/preload/webview.js')
+async function makeVisibleView(viewParam: string) {
+  await host.createView(makeExt(), viewParam)
+  host.handleBoundsUpdate({
+    extensionId: 'com.test.ext',
+    viewParam: viewParam,
+    bounds: { x: 0, y: 0, width: 100, height: 100 },
+    visible: true,
   })
+}
 
-  async function makeVisibleView(viewParam: string) {
-    await host.createView(makeExt(), viewParam)
-    host.handleBoundsUpdate(
-      'com.test.ext',
-      viewParam,
-      { x: 0, y: 0, width: 100, height: 100 },
-      true
-    )
-  }
+describe('ExtensionViewHost focus restoration', () => {
+  useViewHost()
 
   it('restores focus to the extension view that was focused when the window blurred', async () => {
     await makeVisibleView('main')
@@ -367,13 +439,22 @@ describe('ExtensionViewHost focus restoration', () => {
     expect(mockMainWebContentsFocus).toHaveBeenCalled()
     expect(mockFocus).not.toHaveBeenCalled()
   })
+})
+
+describe('ExtensionViewHost focus restoration fallbacks', () => {
+  useViewHost()
 
   it('falls back to the main renderer when the remembered view is hidden', async () => {
     await makeVisibleView('main')
 
     focusHandlers()[0]()
     host.captureFocusTarget()
-    host.handleBoundsUpdate('com.test.ext', 'main', { x: 0, y: 0, width: 100, height: 100 }, false)
+    host.handleBoundsUpdate({
+      extensionId: 'com.test.ext',
+      viewParam: 'main',
+      bounds: { x: 0, y: 0, width: 100, height: 100 },
+      visible: false,
+    })
     host.restoreFocus()
 
     expect(mockMainWebContentsFocus).toHaveBeenCalled()
@@ -391,6 +472,10 @@ describe('ExtensionViewHost focus restoration', () => {
     expect(mockMainWebContentsFocus).toHaveBeenCalled()
     expect(mockFocus).not.toHaveBeenCalled()
   })
+})
+
+describe('ExtensionViewHost focus restoration with several views', () => {
+  useViewHost()
 
   it('restores the correct view when several are open', async () => {
     await makeVisibleView('main')
@@ -423,32 +508,34 @@ describe('ExtensionViewHost focus restoration', () => {
 
     expect(mockMainWebContentsFocus).toHaveBeenCalled()
   })
+})
 
-  describe('findViewByWebContents', () => {
-    it('resolves the extension id and viewParam for a created view', async () => {
-      await host.createView(makeExt(), 'sidebar')
-      const { webContents } = mockAddChildView.mock.calls[0][0]
+describe('ExtensionViewHost findViewByWebContents', () => {
+  useViewHost()
 
-      expect(host.findViewByWebContents(webContents)).toEqual({
-        extensionId: 'com.test.ext',
-        viewParam: 'sidebar',
-      })
+  it('resolves the extension id and viewParam for a created view', async () => {
+    await host.createView(makeExt(), 'sidebar')
+    const { webContents } = mockAddChildView.mock.calls[0][0]
+
+    expect(host.findViewByWebContents(webContents)).toEqual({
+      extensionId: 'com.test.ext',
+      viewParam: 'sidebar',
     })
+  })
 
-    it('distinguishes two views of the same extension', async () => {
-      await host.createView(makeExt(), 'main')
-      await host.createView(makeExt(), 'sidebar')
-      const second = mockAddChildView.mock.calls[1][0].webContents
+  it('distinguishes two views of the same extension', async () => {
+    await host.createView(makeExt(), 'main')
+    await host.createView(makeExt(), 'sidebar')
+    const second = mockAddChildView.mock.calls[1][0].webContents
 
-      expect(host.findViewByWebContents(second)).toEqual({
-        extensionId: 'com.test.ext',
-        viewParam: 'sidebar',
-      })
+    expect(host.findViewByWebContents(second)).toEqual({
+      extensionId: 'com.test.ext',
+      viewParam: 'sidebar',
     })
+  })
 
-    it('returns null for webContents that belong to no extension view', () => {
-      expect(host.findViewByWebContents({} as never)).toBeNull()
-    })
+  it('returns null for webContents that belong to no extension view', () => {
+    expect(host.findViewByWebContents({} as never)).toBeNull()
   })
 })
 
@@ -477,6 +564,17 @@ describe('isQuickActionsOpenShortcut', () => {
   it('does not match Cmd+P on non-darwin', () => {
     expect(isQuickActionsOpenShortcut({ ...keyDownP, meta: true }, 'win32')).toBe(false)
   })
+})
+
+describe('isQuickActionsOpenShortcut modifiers and events', () => {
+  const keyDownP = {
+    type: 'keyDown',
+    key: 'p',
+    meta: false,
+    control: false,
+    shift: false,
+    alt: false,
+  }
 
   it('does not match with Shift held', () => {
     expect(isQuickActionsOpenShortcut({ ...keyDownP, meta: true, shift: true }, 'darwin')).toBe(
@@ -503,23 +601,16 @@ describe('isQuickActionsOpenShortcut', () => {
   })
 })
 
+function inputHandlers(): Array<(event: { preventDefault: () => void }, input: unknown) => void> {
+  return mockOn.mock.calls
+    .filter(([event]) => event === 'before-input-event')
+    .map(
+      ([, handler]) => handler as (event: { preventDefault: () => void }, input: unknown) => void
+    )
+}
+
 describe('ExtensionViewHost quick-actions leader', () => {
-  let host: ExtensionViewHost
-  let mainWindow: ReturnType<typeof makeMainWindow>
-
-  function inputHandlers(): Array<(event: { preventDefault: () => void }, input: unknown) => void> {
-    return mockOn.mock.calls
-      .filter(([event]) => event === 'before-input-event')
-      .map(
-        ([, handler]) => handler as (event: { preventDefault: () => void }, input: unknown) => void
-      )
-  }
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    mainWindow = makeMainWindow()
-    host = new ExtensionViewHost(mainWindow as never, '/fake/preload/webview.js')
-  })
+  useViewHost()
 
   it('registers a before-input-event handler on the extension view', async () => {
     await host.createView(makeExt(), 'main')
@@ -544,6 +635,10 @@ describe('ExtensionViewHost quick-actions leader', () => {
     expect(mockMainWebContentsFocus).toHaveBeenCalled()
     expect(mockSend).toHaveBeenCalledWith('quick-actions:open')
   })
+})
+
+describe('ExtensionViewHost quick-actions leader, other keys', () => {
+  useViewHost()
 
   it('ignores other keys', async () => {
     await host.createView(makeExt(), 'main')
@@ -558,25 +653,22 @@ describe('ExtensionViewHost quick-actions leader', () => {
   })
 })
 
-describe('EXTENSION_BASE_CSS', () => {
-  // Regression test: these tokens are consumed by extension diff/syntax-highlighting
-  // CSS (e.g. git-integration's FileDiffView/syntax-theme.css) but are only defined
-  // in core's own renderer/styles.css — extension webviews never load that file, so
-  // any --tm-* token used by extension CSS must also be defined here or it silently
-  // resolves to nothing (no diff highlight background, no syntax colors).
-  const requiredTokens = [
-    '--tm-diff-added-bg',
-    '--tm-diff-removed-bg',
-    '--tm-syntax-comment',
-    '--tm-syntax-keyword',
-    '--tm-syntax-string',
-    '--tm-syntax-tag',
-    '--tm-syntax-literal',
-    '--tm-syntax-number',
-    '--tm-syntax-title',
-    '--tm-syntax-attribute',
-  ]
+// Tokens extension diff and syntax CSS uses. Extension views never load the core stylesheet,
+// so a --tm-* token missing from the injected text silently resolves to nothing.
+const requiredTokens = [
+  '--tm-diff-added-bg',
+  '--tm-diff-removed-bg',
+  '--tm-syntax-comment',
+  '--tm-syntax-keyword',
+  '--tm-syntax-string',
+  '--tm-syntax-tag',
+  '--tm-syntax-literal',
+  '--tm-syntax-number',
+  '--tm-syntax-title',
+  '--tm-syntax-attribute',
+]
 
+describe('EXTENSION_BASE_CSS', () => {
   it.each(requiredTokens)('defines %s', (token) => {
     expect(EXTENSION_BASE_CSS).toMatch(new RegExp(`${token}:\\s*\\S`))
   })

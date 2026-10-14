@@ -11,13 +11,8 @@ import type { OpenQuestion } from '../order/schema.js'
 // budget is not a display limit — it is the thing that keeps intake from
 // degenerating into an interrogation, which is what the tool this replaces did.
 
+/** @internal */
 export const QUESTION_BUDGET = 3
-
-/** A question with what it holds up, before it has been given a rank. */
-export interface RankableQuestion extends OpenQuestion {
-  /** Unit and criterion ids this question would change the shape of. */
-  readonly affects: readonly string[]
-}
 
 /**
  * The questions to put in front of the operator, most consequential first.

@@ -1,16 +1,25 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { EventEmitter } from 'events'
 
 const mockSend = vi.fn()
 const mockWindow = {
   webContents: { send: mockSend, isDestroyed: vi.fn(() => false) },
   isDestroyed: vi.fn(() => false),
+  isMinimized: vi.fn(() => true),
+  restore: vi.fn(),
+  show: vi.fn(),
+  focus: vi.fn(),
 }
+const mockShowOpenDialog = vi.hoisted(() => vi.fn())
+const mockShowSaveDialog = vi.hoisted(() => vi.fn())
 
 // Mock electron before importing api.ts
 vi.mock('electron', () => ({
   BrowserWindow: {
     getAllWindows: vi.fn(() => [mockWindow]),
+    getFocusedWindow: vi.fn(() => null),
   },
+  dialog: { showOpenDialog: mockShowOpenDialog, showSaveDialog: mockShowSaveDialog },
   ipcMain: {
     handle: vi.fn(),
     removeHandler: vi.fn(),
@@ -52,7 +61,12 @@ vi.mock('../../../src/main/storage/extension-settings-store', () => ({
     mockExtensionStore[key] = value
   },
   getAllExtensionSettings: () => ({ ...mockExtensionStore }),
+  extensionSettingsSnapshot: () => ({
+    global: { ...mockExtensionStore },
+    workspaces: mockWorkspaceExtensionValues,
+  }),
 }))
+const mockWorkspaceExtensionValues: Record<string, Record<string, Record<string, unknown>>> = {}
 
 const mockGetGlobalSettings = vi.fn()
 const mockGetWorkspaceSettings = vi.fn()
@@ -75,17 +89,17 @@ import {
   globalRegistry,
   setMenuRebuildCallback,
   listExtensionSettingsSections,
-  listExtensionSidebarItems,
-  listExtensionContextMenuItems,
-  dispatchContextMenuClick,
-  dispatchSidebarItemClick,
   listExtensionCommands,
   executeExtensionCommand,
   listNativeViewMenuItems,
   getPanelMenuItemId,
 } from '../../../src/main/extensions/api'
 import { ipcInvokeRegistry } from '../../../src/main/remote/ipc-registry'
+import { registerAdminIpcHandlers } from '../../../extensions/task-vault/src/ipc/admin.ipc'
+import { defineChannel, type ExtensionDB } from '@terminator/extension-sdk'
+import { z } from 'zod'
 import * as shellExecutor from '../../../src/main/shell/shell-executor'
+import { notificationManager } from '../../../src/main/notifications/notification-manager'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -93,51 +107,8 @@ beforeEach(() => {
     notifications: { defaultTargets: ['system', 'center', 'toast'], extensionOverrides: {} },
   })
   // Reset shared registry state between tests
-  globalRegistry.sidebarPanels.clear()
-  globalRegistry.topBarItems.clear()
   globalRegistry.nativeMenuItems.clear()
   globalRegistry.settingsSections.clear()
-})
-
-describe('api.settings.resolveWorktreeBaseDir', () => {
-  beforeEach(() => {
-    mockGetGlobalSettings.mockReturnValue({ git: { worktreeBaseDir: '' } })
-    mockGetWorkspaceSettings.mockReturnValue({ workspaceId: 'w1', overrides: {}, extensions: {} })
-    mockListWorkspaces.mockReturnValue([{ id: 'w1', name: 'WS', folderPath: '/repo' }])
-  })
-
-  it('defaults to <workspacePath>/.worktrees when nothing is configured', () => {
-    const api = createExtensionAPI('test.ext', '0.1.0')
-    expect(api.settings.resolveWorktreeBaseDir('/repo')).toBe('/repo/.worktrees')
-  })
-
-  it('uses the global git.worktreeBaseDir setting when set', () => {
-    mockGetGlobalSettings.mockReturnValue({ git: { worktreeBaseDir: '/global/wt' } })
-    const api = createExtensionAPI('test.ext', '0.1.0')
-    expect(api.settings.resolveWorktreeBaseDir('/repo')).toBe('/global/wt')
-  })
-
-  it('prefers a workspace override over the global setting', () => {
-    mockGetGlobalSettings.mockReturnValue({ git: { worktreeBaseDir: '/global/wt' } })
-    mockGetWorkspaceSettings.mockReturnValue({
-      workspaceId: 'w1',
-      overrides: { git: { worktreeBaseDir: '/ws/override' } },
-      extensions: {},
-    })
-    const api = createExtensionAPI('test.ext', '0.1.0')
-    expect(api.settings.resolveWorktreeBaseDir('/repo')).toBe('/ws/override')
-  })
-
-  it('falls back to the default when the workspace path matches no known workspace', () => {
-    mockListWorkspaces.mockReturnValue([])
-    const api = createExtensionAPI('test.ext', '0.1.0')
-    expect(api.settings.resolveWorktreeBaseDir('/unknown')).toBe('/unknown/.worktrees')
-  })
-
-  it('never returns the legacy .wt directory', () => {
-    const api = createExtensionAPI('test.ext', '0.1.0')
-    expect(api.settings.resolveWorktreeBaseDir('/repo')).not.toContain('.wt/')
-  })
 })
 
 // The Git extension's review lists leave out pull requests whose source
@@ -150,34 +121,28 @@ describe('api.settings.isBranchExcluded', () => {
     mockListWorkspaces.mockReturnValue([{ id: 'w1', name: 'WS', folderPath: '/repo' }])
   })
 
-  it('matches the global patterns, across slashes', () => {
-    const api = createExtensionAPI('test.ext', '0.1.0')
-    expect(api.settings.isBranchExcluded('renovate/npm/vitest-4')).toBe(true)
-    expect(api.settings.isBranchExcluded('feature/login')).toBe(false)
+  it('matches the global patterns, across slashes', async () => {
+    const api = createExtensionAPI('test.ext')
+    expect(await api.settings.isBranchExcluded('renovate/npm/vitest-4')).toBe(true)
+    expect(await api.settings.isBranchExcluded('feature/login')).toBe(false)
   })
 
-  it('uses the override of the workspace that owns the repository', () => {
+  it('uses the override of the workspace that owns the repository', async () => {
     mockGetWorkspaceSettings.mockReturnValue({
       workspaceId: 'w1',
       overrides: { git: { branchExcludePatterns: ['dependabot/*'] } },
       extensions: {},
     })
-    const api = createExtensionAPI('test.ext', '0.1.0')
-    expect(api.settings.isBranchExcluded('dependabot/npm/x', '/repo')).toBe(true)
-    expect(api.settings.isBranchExcluded('renovate/x', '/repo')).toBe(false)
-    expect(api.settings.isBranchExcluded('renovate/x', '/elsewhere')).toBe(true)
-  })
-
-  it('excludes nothing when no pattern is set', () => {
-    mockGetGlobalSettings.mockReturnValue({ git: {} })
-    const api = createExtensionAPI('test.ext', '0.1.0')
-    expect(api.settings.isBranchExcluded('renovate/x')).toBe(false)
+    const api = createExtensionAPI('test.ext')
+    expect(await api.settings.isBranchExcluded('dependabot/npm/x', '/repo')).toBe(true)
+    expect(await api.settings.isBranchExcluded('renovate/x', '/repo')).toBe(false)
+    expect(await api.settings.isBranchExcluded('renovate/x', '/elsewhere')).toBe(true)
   })
 })
 
 describe('api.notifications.showToast', () => {
   it('routes through notificationManager, resolving targets from settings like createNotification', () => {
-    const api = createExtensionAPI('test.ext', '0.1.0')
+    const api = createExtensionAPI('test.ext')
     api.notifications.showToast('info', 'Hello toast', 'somethingHappened')
 
     expect(mockSend).toHaveBeenCalledWith(
@@ -187,7 +152,7 @@ describe('api.notifications.showToast', () => {
   })
 
   it('sends error toast with correct type', () => {
-    const api = createExtensionAPI('test.ext', '0.1.0')
+    const api = createExtensionAPI('test.ext')
     api.notifications.showToast('error', 'Something failed', 'somethingFailed')
 
     expect(mockSend).toHaveBeenCalledWith(
@@ -197,7 +162,7 @@ describe('api.notifications.showToast', () => {
   })
 })
 
-describe('api.shell.exec', () => {
+function useExecMocks(): void {
   beforeEach(() => {
     vi.mocked(shellExecutor.assertCommandAllowed).mockReset()
     vi.mocked(shellExecutor.assertCwdInScope).mockReset()
@@ -206,11 +171,16 @@ describe('api.shell.exec', () => {
       stdout: 'output',
       stderr: '',
       timedOut: false,
+      exceededMaxBuffer: false,
     })
   })
+}
+
+describe('api.shell.exec', () => {
+  useExecMocks()
 
   it('calls execShell with correct args for git command', async () => {
-    const api = createExtensionAPI('test.ext', '0.1.0')
+    const api = createExtensionAPI('test.ext')
     const result = await api.shell.exec({ command: 'git', args: ['status'], cwd: '/tmp/repo' })
 
     expect(shellExecutor.assertCommandAllowed).toHaveBeenCalledWith('git')
@@ -223,9 +193,40 @@ describe('api.shell.exec', () => {
     expect(result.exitCode).toBe(0)
     expect(result.stdout).toBe('output')
   })
+})
+
+describe('api.shell.exec — per-call options', () => {
+  useExecMocks()
+
+  it('hands the per-call buffer limit, environment and encoding to the command', async () => {
+    const api = createExtensionAPI('test.ext')
+    await api.shell.exec({
+      command: 'gh',
+      args: ['api', 'user'],
+      cwd: '/tmp/repo',
+      timeoutMs: 500,
+      maxBuffer: 2048,
+      env: { GH_REPO: 'octo/repo' },
+      encoding: 'buffer',
+    })
+
+    expect(shellExecutor.execShell).toHaveBeenCalledWith({
+      command: 'gh',
+      args: ['api', 'user'],
+      cwd: '/tmp/repo',
+      timeoutMs: 500,
+      maxBuffer: 2048,
+      env: { GH_REPO: 'octo/repo' },
+      encoding: 'buffer',
+    })
+  })
+})
+
+describe('api.shell.exec — refusals', () => {
+  useExecMocks()
 
   it('rejects with COMMAND_NOT_ALLOWED for non-allowlisted commands', async () => {
-    const api = createExtensionAPI('test.ext', '0.1.0')
+    const api = createExtensionAPI('test.ext')
     vi.mocked(shellExecutor.assertCommandAllowed).mockImplementationOnce((cmd) => {
       throw new shellExecutor.CommandNotAllowedError(cmd)
     })
@@ -236,7 +237,7 @@ describe('api.shell.exec', () => {
   })
 })
 
-describe('api.nativeMenu.addViewMenuItem', () => {
+function useMenuRegistry(): void {
   beforeEach(() => {
     globalRegistry.panelMenuItemIds.clear()
   })
@@ -244,24 +245,19 @@ describe('api.nativeMenu.addViewMenuItem', () => {
   afterEach(() => {
     setMenuRebuildCallback(() => {})
   })
+}
 
-  it('adds item and returns a disposable', () => {
-    const api = createExtensionAPI('test.ext', '0.1.0')
-    const onClick = vi.fn()
+describe('api.nativeMenu.addViewMenuItem', () => {
+  useMenuRegistry()
 
-    const disposable = api.nativeMenu.addViewMenuItem({
-      id: 'test-item',
-      label: 'Test Item',
-      onClick,
-    })
-
-    expect(disposable).toHaveProperty('dispose')
-    expect(typeof disposable.dispose).toBe('function')
+  it('adds the item to the registry under the extension', () => {
+    const api = createExtensionAPI('test.ext')
+    api.nativeMenu.addViewMenuItem({ id: 'test-item', label: 'Test Item', onClick: vi.fn() })
     expect(globalRegistry.nativeMenuItems.has('test.ext.nativemenu.test-item')).toBe(true)
   })
 
   it('dispose removes item from registry', () => {
-    const api = createExtensionAPI('test.ext', '0.1.0')
+    const api = createExtensionAPI('test.ext')
     const disposable = api.nativeMenu.addViewMenuItem({
       id: 'item-to-remove',
       label: 'Remove Me',
@@ -271,9 +267,13 @@ describe('api.nativeMenu.addViewMenuItem', () => {
     disposable.dispose()
     expect(globalRegistry.nativeMenuItems.has('test.ext.nativemenu.item-to-remove')).toBe(false)
   })
+})
+
+describe('api.nativeMenu.addViewMenuItem — panels', () => {
+  useMenuRegistry()
 
   it('stores panelId and type fields on the contribution', () => {
-    const api = createExtensionAPI('test.ext', '0.1.0')
+    const api = createExtensionAPI('test.ext')
     api.nativeMenu.addViewMenuItem({
       id: 'panel-toggle',
       label: 'Toggle Panel',
@@ -288,7 +288,7 @@ describe('api.nativeMenu.addViewMenuItem', () => {
   })
 
   it('rebuildViewMenu populates panelMenuItemIds for contributions with panelId', () => {
-    const api = createExtensionAPI('test.ext', '0.1.0')
+    const api = createExtensionAPI('test.ext')
     api.nativeMenu.addViewMenuItem({
       id: 'rebuild-test',
       label: 'Rebuild Test',
@@ -299,80 +299,33 @@ describe('api.nativeMenu.addViewMenuItem', () => {
 
     expect(globalRegistry.panelMenuItemIds.get('rebuild-panel')).toBe('ext-menu-rebuild-test')
   })
+})
+
+describe('api.nativeMenu.addViewMenuItem — menu rebuilds', () => {
+  useMenuRegistry()
 
   it('rebuildViewMenu does not add to panelMenuItemIds when panelId is absent', () => {
-    const api = createExtensionAPI('test.ext', '0.1.0')
-    expect(() =>
-      api.nativeMenu.addViewMenuItem({ id: 'no-panel', label: 'No Panel', onClick: vi.fn() })
-    ).not.toThrow()
-    expect(globalRegistry.panelMenuItemIds.has('no-panel')).toBe(false)
+    const api = createExtensionAPI('test.ext')
+    api.nativeMenu.addViewMenuItem({ id: 'no-panel', label: 'No Panel', onClick: vi.fn() })
+    // Keyed by panel id, of which this item has none: nothing at all is recorded.
+    expect(globalRegistry.panelMenuItemIds.size).toBe(0)
   })
 
   it('rebuildViewMenu calls the registered menu rebuild callback', () => {
     const mockRebuild = vi.fn()
     setMenuRebuildCallback(mockRebuild)
 
-    const api = createExtensionAPI('test.ext', '0.1.0')
+    const api = createExtensionAPI('test.ext')
     api.nativeMenu.addViewMenuItem({ id: 'cb-test', label: 'CB Test', onClick: vi.fn() })
 
     expect(mockRebuild).toHaveBeenCalled()
   })
 })
 
-describe('api.sidebar.registerPanel', () => {
-  it('registers a panel and returns a disposable', () => {
-    const api = createExtensionAPI('test.ext', '0.1.0')
-    const disposable = api.sidebar.registerPanel('right-sidebar', {
-      id: 'test-panel',
-      title: 'Test Panel',
-      component: {} as unknown,
-      defaultVisible: false,
-    })
-
-    expect(disposable).toHaveProperty('dispose')
-    expect(globalRegistry.sidebarPanels.has('test.ext.panel.right-sidebar')).toBe(true)
-  })
-
-  it('throws SLOT_ALREADY_REGISTERED when same slot registered twice by same extension', () => {
-    const api = createExtensionAPI('test.ext', '0.1.0')
-    api.sidebar.registerPanel('right-sidebar', {
-      id: 'panel-1',
-      title: 'Panel 1',
-      component: {} as unknown,
-    })
-
-    expect(() =>
-      api.sidebar.registerPanel('right-sidebar', {
-        id: 'panel-2',
-        title: 'Panel 2',
-        component: {} as unknown,
-      })
-    ).toThrow('SLOT_ALREADY_REGISTERED')
-  })
-
-  it('allows different extensions to register in same slot', () => {
-    const api1 = createExtensionAPI('ext.one', '0.1.0')
-    const api2 = createExtensionAPI('ext.two', '0.1.0')
-
-    expect(() => {
-      api1.sidebar.registerPanel('right-sidebar', {
-        id: 'p1',
-        title: 'P1',
-        component: {} as unknown,
-      })
-      api2.sidebar.registerPanel('right-sidebar', {
-        id: 'p2',
-        title: 'P2',
-        component: {} as unknown,
-      })
-    }).not.toThrow()
-  })
-})
-
 describe('api.terminal session handlers', () => {
   it('onSessionCreate registers handler and returns disposable', async () => {
     const { createExtensionAPI, globalRegistry } = await import('../../../src/main/extensions/api')
-    const api = createExtensionAPI('com.term.test', '0.1.0')
+    const api = createExtensionAPI('com.term.test')
     const handler = vi.fn()
     const disposable = api.terminal.onSessionCreate(handler)
     expect(globalRegistry.sessionCreateHandlers.has(handler)).toBe(true)
@@ -382,7 +335,7 @@ describe('api.terminal session handlers', () => {
 
   it('onSessionClose registers handler and returns disposable', async () => {
     const { createExtensionAPI, globalRegistry } = await import('../../../src/main/extensions/api')
-    const api = createExtensionAPI('com.term.test2', '0.1.0')
+    const api = createExtensionAPI('com.term.test2')
     const handler = vi.fn()
     const disposable = api.terminal.onSessionClose(handler)
     expect(globalRegistry.sessionCloseHandlers.has(handler)).toBe(true)
@@ -391,16 +344,23 @@ describe('api.terminal session handlers', () => {
   })
 })
 
-describe('api.settings workspace precedence', () => {
+function useEmptySettingsStore(): void {
   beforeEach(() => {
     // Clear mock store between tests
     for (const key of Object.keys(mockExtensionStore)) {
       delete mockExtensionStore[key]
     }
+    for (const id of Object.keys(mockWorkspaceExtensionValues)) {
+      delete mockWorkspaceExtensionValues[id]
+    }
   })
+}
+
+describe('api.settings workspace precedence', () => {
+  useEmptySettingsStore()
 
   it('returns global value when no workspace override exists', () => {
-    const api = createExtensionAPI('com.test', '0.1.0')
+    const api = createExtensionAPI('com.test')
     mockExtensionStore['com.test.enabled'] = true
 
     const val = api.settings.get<boolean>('com.test.enabled')
@@ -408,14 +368,63 @@ describe('api.settings workspace precedence', () => {
   })
 
   it('returns undefined when key not set globally or in workspace', () => {
-    const api = createExtensionAPI('com.test', '0.1.0', () => 'ws-789')
+    const api = createExtensionAPI('com.test')
 
     const val = api.settings.get<boolean>('com.test.missing')
     expect(val).toBeUndefined()
   })
+})
+
+describe('api.settings workspace precedence — a path in a workspace', () => {
+  useEmptySettingsStore()
+  beforeEach(() => {
+    mockListWorkspaces.mockReturnValue([
+      { id: 'w1', name: 'API', folderPath: '/code/api' },
+      { id: 'w2', name: 'Web', folderPath: '/code/web' },
+    ])
+    mockExtensionStore['com.test.signOff'] = false
+    mockWorkspaceExtensionValues.w1 = { 'com.test': { 'com.test.signOff': true } }
+  })
+
+  it("returns the workspace's own value for a path in it, the global one elsewhere", () => {
+    const api = createExtensionAPI('com.test')
+
+    expect(api.settings.get<boolean>('com.test.signOff', { repoPath: '/code/api' })).toBe(true)
+    expect(api.settings.get<boolean>('com.test.signOff', { repoPath: '/code/web' })).toBe(false)
+    expect(api.settings.get<boolean>('com.test.signOff')).toBe(false)
+  })
+})
+
+describe('api.settings workspace precedence — a path in a workspace that sets nothing', () => {
+  useEmptySettingsStore()
+  beforeEach(() => {
+    mockListWorkspaces.mockReturnValue([{ id: 'w1', name: 'API', folderPath: '/code/api' }])
+    mockWorkspaceExtensionValues.w1 = {}
+  })
+
+  it('returns the schema default when neither the workspace nor the global settings hold it', () => {
+    const api = createExtensionAPI('com.test')
+    api.settings.register({
+      label: 'Test',
+      properties: {
+        'com.test.signOff': {
+          type: 'boolean',
+          label: 'Sign off',
+          default: true,
+          workspaceScoped: true,
+        },
+      },
+    })
+
+    expect(api.settings.get<boolean>('com.test.signOff', { repoPath: '/code/api' })).toBe(true)
+  })
+})
+
+describe('api.settings workspace precedence — schema defaults', () => {
+  useEmptySettingsStore()
 
   it('returns schema default when key not set but schema registered', () => {
-    const api = createExtensionAPI('com.test', '0.1.0')
+    const api = createExtensionAPI('com.test')
     api.settings.register({
       label: 'Test',
       properties: {
@@ -428,7 +437,7 @@ describe('api.settings workspace precedence', () => {
   })
 
   it('returns stored value over schema default', () => {
-    const api = createExtensionAPI('com.test', '0.1.0')
+    const api = createExtensionAPI('com.test')
     api.settings.register({
       label: 'Test',
       properties: {
@@ -440,30 +449,25 @@ describe('api.settings workspace precedence', () => {
     const val = api.settings.get<boolean>('com.test.enabled')
     expect(val).toBe(false)
   })
-
-  it('ignores workspace values when no workspace ID getter provided', () => {
-    const api = createExtensionAPI('com.test', '0.1.0')
-    mockExtensionStore['com.test.enabled'] = false
-
-    const val = api.settings.get<boolean>('com.test.enabled')
-    expect(val).toBe(false)
-  })
 })
 
 describe('api.notifications.createNotification', () => {
-  it('returns a disposable that can dismiss the notification', () => {
-    const api = createExtensionAPI('test.ext', '0.1.0')
+  const notificationTitles = () => notificationManager.list().map((n) => n.title)
+
+  it('lists the notification until its disposable dismisses it', () => {
+    const api = createExtensionAPI('test.ext')
     const disposable = api.notifications.createNotification({
       type: 'info',
       title: 'Test notif',
       key: 'testNotif',
     })
-    expect(disposable).toHaveProperty('dispose')
-    expect(() => disposable.dispose()).not.toThrow()
+    expect(notificationTitles()).toContain('Test notif')
+    disposable.dispose()
+    expect(notificationTitles()).not.toContain('Test notif')
   })
 
-  it('creates notification with actions', () => {
-    const api = createExtensionAPI('test.ext', '0.1.0')
+  it('sends its actions to the windows, without their handlers', () => {
+    const api = createExtensionAPI('test.ext')
     const disposable = api.notifications.createNotification({
       type: 'warning',
       title: 'With actions',
@@ -471,55 +475,142 @@ describe('api.notifications.createNotification', () => {
       key: 'withActions',
       actions: [{ id: 'go', label: 'Go', handler: vi.fn() }],
     })
-    expect(disposable).toHaveProperty('dispose')
-    disposable.dispose()
-  })
-})
-
-describe('api.contextMenu.registerItem', () => {
-  it('registers item and returns disposable', () => {
-    const api = createExtensionAPI('test.ext', '0.1.0')
-    const onClick = vi.fn<[string], void>()
-    const disposable = api.contextMenu.registerItem('workspace', {
-      id: 'ctx-item',
-      label: 'Open',
-      onClick,
-    })
-    expect(disposable).toHaveProperty('dispose')
+    expect(mockSend).toHaveBeenCalledWith(
+      'notifications:push',
+      expect.objectContaining({ title: 'With actions', actions: [{ id: 'go', label: 'Go' }] })
+    )
     disposable.dispose()
   })
 })
 
 describe('api.commands.register', () => {
-  it('registers command and returns disposable', () => {
-    const api = createExtensionAPI('test.ext', '0.1.0')
-    const handler = vi.fn()
-    const disposable = api.commands.register({ id: 'my-command', label: 'My Command' }, handler)
-    expect(disposable).toHaveProperty('dispose')
+  it('lists the command until its disposable removes it', () => {
+    const api = createExtensionAPI('test.ext')
+    const disposable = api.commands.register({ id: 'my-command', label: 'My Command' }, vi.fn())
+    const commandListed = () => listExtensionCommands().some((c) => c.id === 'my-command')
+    expect(commandListed()).toBe(true)
+    disposable.dispose()
+    expect(commandListed()).toBe(false)
+  })
+
+  // Quick Actions lists the registered commands; an extension that activates
+  // after the panel opened must still reach it.
+  it('tells the windows when a command arrives and when it goes', () => {
+    const broadcastToWindows = vi.fn()
+    const api = createExtensionAPI('test.ext', { broadcastToWindows })
+    const disposable = api.commands.register({ id: 'push', label: 'Push' }, vi.fn())
+    expect(broadcastToWindows).toHaveBeenCalledWith('extension:commands-changed', null)
+    broadcastToWindows.mockClear()
+    disposable.dispose()
+    expect(broadcastToWindows).toHaveBeenCalledWith('extension:commands-changed', null)
+  })
+})
+
+/** A channel that takes any payload, for tests about registration itself. */
+function anyPayload(channel: string) {
+  return defineChannel({ channel, schema: z.unknown(), invalid: null, run: vi.fn() })
+}
+
+describe('api.ipc.registerHandler', () => {
+  // ADR 096. Extension bundles are plain JavaScript at run time, so the type
+  // alone does not stop a handler from arriving without one.
+  it('refuses a handler registered without a schema', () => {
+    const api = createExtensionAPI('test.ext')
+    // Called the way plain JavaScript can, which the declared type forbids.
+    const callBare = () =>
+      Reflect.apply(api.ipc.registerHandler, api.ipc, ['test.ext:bare', vi.fn()])
+    expect(callBare).toThrow(/schema/)
+    expect(ipcInvokeRegistry.has('test.ext:bare')).toBe(false)
+  })
+
+  it('keeps a channel registered without the option local-only', () => {
+    const api = createExtensionAPI('test.ext')
+    const disposable = api.ipc.registerHandler(anyPayload('test.ext:no-option'))
+    expect(ipcInvokeRegistry.get('test.ext:no-option')?.remoteAccessible).toBe(false)
+    disposable.dispose()
+    expect(ipcInvokeRegistry.has('test.ext:no-option')).toBe(false)
+  })
+})
+
+describe('api.ipc.registerHandler — remote access', () => {
+  it('makes a channel remote-accessible only when it opts in', () => {
+    const api = createExtensionAPI('test.ext')
+    const disposable = api.ipc.registerHandler(anyPayload('test.ext:opted-in'), {
+      remoteAccessible: true,
+    })
+    expect(ipcInvokeRegistry.get('test.ext:opted-in')?.remoteAccessible).toBe(true)
+    disposable.dispose()
+  })
+
+  it('keeps the task-vault SQL console and its admin channels out of the remote bridge', async () => {
+    const api = createExtensionAPI('terminator.task-vault', {
+      bridge: {
+        invokeRegistry: ipcInvokeRegistry,
+        sendRegistry: new Map(),
+        eventBus: new EventEmitter(),
+      },
+    })
+    const dispose = registerAdminIpcHandlers(api, {} as ExtensionDB)
+
+    for (const channel of ['task-vault:admin:run-query', 'task-vault:admin:table-stats']) {
+      expect(ipcInvokeRegistry.has(channel)).toBe(true)
+      expect(await api.ipc.isRemoteAccessible(channel)).toBe(false)
+    }
+    dispose()
+  })
+})
+
+describe('api.ipc.registerHandler — payloads', () => {
+  it('parses the payload of a channel registered with a schema before run sees it', async () => {
+    const api = createExtensionAPI('test.ext')
+    const run = vi.fn(({ id }: { id: string }) => ({ data: id }))
+    const disposable = api.ipc.registerHandler(
+      defineChannel({
+        channel: 'test.ext:get',
+        schema: z.object({ id: z.string() }),
+        invalid: { error: 'VALIDATION_ERROR' },
+        run,
+      })
+    )
+    const handler = ipcInvokeRegistry.get('test.ext:get')!.handler
+
+    await expect(handler(null as never, { id: 'n1', extra: true })).resolves.toEqual({
+      data: 'n1',
+    })
+    expect(run).toHaveBeenCalledWith({ id: 'n1' })
     disposable.dispose()
   })
 })
 
-describe('api.ipc.registerHandler', () => {
-  it('registers an IPC handler and returns disposable', () => {
-    const api = createExtensionAPI('test.ext', '0.1.0')
-    const handler = vi.fn().mockResolvedValue({ ok: true })
-    const disposable = api.ipc.registerHandler('test.ext:my-channel', handler)
-    expect(disposable).toHaveProperty('dispose')
-    disposable.dispose()
-  })
+describe('api.ipc.registerHandler — rejected payloads', () => {
+  it('answers a payload the schema rejects with the declared invalid response', async () => {
+    const api = createExtensionAPI('test.ext')
+    const run = vi.fn()
+    const disposable = api.ipc.registerHandler(
+      defineChannel({
+        channel: 'test.ext:strict',
+        schema: z.object({ id: z.string() }),
+        invalid: { error: 'VALIDATION_ERROR' },
+        run,
+      }),
+      { remoteAccessible: true }
+    )
+    const entry = ipcInvokeRegistry.get('test.ext:strict')!
 
-  it('records the channel as remoteAccessible by default', () => {
-    const api = createExtensionAPI('test.ext', '0.1.0')
-    const disposable = api.ipc.registerHandler('test.ext:remote-default', vi.fn())
-    expect(ipcInvokeRegistry.get('test.ext:remote-default')?.remoteAccessible).toBe(true)
+    await expect(entry.handler(null as never, { id: 7 })).resolves.toEqual({
+      error: 'VALIDATION_ERROR',
+    })
+    expect(run).not.toHaveBeenCalled()
+    expect(entry.remoteAccessible).toBe(true)
     disposable.dispose()
-    expect(ipcInvokeRegistry.has('test.ext:remote-default')).toBe(false)
+    expect(ipcInvokeRegistry.has('test.ext:strict')).toBe(false)
   })
+})
 
+describe('api.ipc.registerHandler — local-only channels', () => {
   it('honors remoteAccessible: false for local-only channels', () => {
-    const api = createExtensionAPI('test.ext', '0.1.0')
-    const disposable = api.ipc.registerHandler('test.ext:local-only', vi.fn(), {
+    const api = createExtensionAPI('test.ext')
+    const disposable = api.ipc.registerHandler(anyPayload('test.ext:local-only'), {
       remoteAccessible: false,
     })
     expect(ipcInvokeRegistry.get('test.ext:local-only')?.remoteAccessible).toBe(false)
@@ -527,183 +618,48 @@ describe('api.ipc.registerHandler', () => {
   })
 })
 
-describe('api.topBar.registerMenuItem', () => {
-  it('registers a top bar item and returns disposable', () => {
-    const api = createExtensionAPI('test.ext', '0.1.0')
-    const disposable = api.topBar.registerMenuItem({
-      id: 'tb-item',
-      label: 'My Item',
-      onClick: vi.fn(),
-    })
-    expect(globalRegistry.topBarItems.has('test.ext.topbar.tb-item')).toBe(true)
-    disposable.dispose()
-    expect(globalRegistry.topBarItems.has('test.ext.topbar.tb-item')).toBe(false)
-  })
-})
-
-describe('api.sidebar.registerGlobalTab', () => {
-  it('registers a global tab and returns disposable', () => {
-    const api = createExtensionAPI('test.ext', '0.1.0')
-    const disposable = api.sidebar.registerGlobalTab({
-      id: 'my-tab',
-      label: 'My Tab',
-      component: {} as unknown,
-    })
-    expect(disposable).toHaveProperty('dispose')
-    disposable.dispose()
-  })
-
-  it('throws GLOBAL_TAB_ALREADY_REGISTERED when same tab registered twice', () => {
-    const api = createExtensionAPI('test.ext', '0.1.0')
-    api.sidebar.registerGlobalTab({ id: 'dup-tab', label: 'Dup', component: {} as unknown })
-    expect(() =>
-      api.sidebar.registerGlobalTab({ id: 'dup-tab', label: 'Dup 2', component: {} as unknown })
-    ).toThrow('GLOBAL_TAB_ALREADY_REGISTERED')
-  })
-})
-
-describe('api.pty.listSessions', () => {
-  it('delegates to ptyManager.listSessions when deps are provided', () => {
-    const mockPtyMgr = {
-      spawn: vi.fn(),
-      write: vi.fn(),
-      resize: vi.fn(),
-      kill: vi.fn(),
-      listSessions: vi.fn(() => [{ sessionId: 's1', cwd: '/tmp' }]),
-      attachOnData: vi.fn(() => () => {}),
-    }
-    const api = createExtensionAPI('test.ext', '0.1.0', {
-      ptyManager: mockPtyMgr as never,
-    })
-    const result = api.pty.listSessions()
-    expect(result).toEqual([{ sessionId: 's1', cwd: '/tmp' }])
-    expect(mockPtyMgr.listSessions).toHaveBeenCalledTimes(1)
-  })
-
-  it('returns empty array when no ptyManager dep is provided', () => {
-    const api = createExtensionAPI('test.ext', '0.1.0')
-    expect(api.pty.listSessions()).toEqual([])
-  })
-})
-
-describe('api.pty.attachOnData', () => {
-  it('delegates to ptyManager.attachOnData when deps are provided', () => {
-    const mockDispose = vi.fn()
-    const mockPtyMgr = {
-      spawn: vi.fn(),
-      write: vi.fn(),
-      resize: vi.fn(),
-      kill: vi.fn(),
-      listSessions: vi.fn(() => []),
-      attachOnData: vi.fn(() => mockDispose),
-    }
-    const api = createExtensionAPI('test.ext', '0.1.0', {
-      ptyManager: mockPtyMgr as never,
-    })
-    const onData = vi.fn()
-    const dispose = api.pty.attachOnData('s1', onData)
-    expect(mockPtyMgr.attachOnData).toHaveBeenCalledWith('s1', onData)
-    expect(dispose).toBe(mockDispose)
-  })
-
-  it('returns null when no ptyManager dep is provided', () => {
-    const api = createExtensionAPI('test.ext', '0.1.0')
-    expect(api.pty.attachOnData('s1', vi.fn())).toBeNull()
-  })
-})
-
 describe('registry query functions', () => {
-  it('listExtensionSettingsSections decodes the extension id from the section key', () => {
-    const api = createExtensionAPI('com.query.settings', '0.1.0')
+  it('lists a settings section under its extension, with its label, description and properties', () => {
+    const api = createExtensionAPI('com.query.settings')
+    const flag = { type: 'boolean' as const, label: 'Flag', default: false }
     const d = api.settings.register({
       label: 'Query Test',
-      properties: { 'com.query.settings.flag': { type: 'boolean', label: 'Flag', default: false } },
+      description: 'What the query extension can be told',
+      properties: { 'com.query.settings.flag': flag },
     })
     const section = listExtensionSettingsSections().find(
       (s) => s.extensionId === 'com.query.settings'
     )
-    expect(section).toBeDefined()
-    expect(section!.label).toBe('Query Test')
-    expect(section!.properties['com.query.settings.flag']).toBeDefined()
+    expect(section).toEqual({
+      extensionId: 'com.query.settings',
+      label: 'Query Test',
+      description: 'What the query extension can be told',
+      properties: { 'com.query.settings.flag': flag },
+    })
     d.dispose()
   })
+})
 
-  it('listExtensionSidebarItems returns the renderer-facing shape', () => {
-    const api = createExtensionAPI('com.query.sidebar', '0.1.0')
-    const d = api.sidebar.registerItem({ id: 'q-item', label: 'Q', tooltip: 'tip' })
-    expect(listExtensionSidebarItems()).toContainEqual({ id: 'q-item', label: 'Q', tooltip: 'tip' })
-    d.dispose()
-  })
-
-  it('context menu items are listed per target and dispatched by id', () => {
-    const api = createExtensionAPI('com.query.ctx', '0.1.0')
-    const onClick = vi.fn()
-    const d = api.contextMenu.registerItem('workspace', { id: 'q-ctx', label: 'Do', onClick })
-    expect(listExtensionContextMenuItems('workspace')).toContainEqual({ id: 'q-ctx', label: 'Do' })
-    expect(listExtensionContextMenuItems('project')).toEqual([])
-    dispatchContextMenuClick('workspace', 'q-ctx', 'target-1')
-    expect(onClick).toHaveBeenCalledWith('target-1')
-    dispatchContextMenuClick('workspace', 'nope', 'target-1')
-    expect(onClick).toHaveBeenCalledTimes(1)
-    d.dispose()
-  })
-
-  it('a contributed sidebar item is dispatched by id (FR-028)', () => {
-    const api = createExtensionAPI('com.query.side', '0.1.0')
-    const onClick = vi.fn()
-    const d = api.sidebar.registerItem({ id: 'toggle', label: 'Git Changes', onClick })
-    dispatchSidebarItemClick('toggle')
-    expect(onClick).toHaveBeenCalledOnce()
-    d.dispose()
-  })
-
-  it('dispatching an unknown sidebar item id is a no-op, not a throw', () => {
-    const api = createExtensionAPI('com.query.side2', '0.1.0')
-    const onClick = vi.fn()
-    const d = api.sidebar.registerItem({ id: 'known', label: 'Known', onClick })
-    expect(() => dispatchSidebarItemClick('unknown')).not.toThrow()
-    expect(onClick).not.toHaveBeenCalled()
-    d.dispose()
-  })
-
-  it('a disposed sidebar item is no longer dispatchable', () => {
-    const api = createExtensionAPI('com.query.side3', '0.1.0')
-    const onClick = vi.fn()
-    api.sidebar.registerItem({ id: 'gone', label: 'Gone', onClick }).dispose()
-    dispatchSidebarItemClick('gone')
-    expect(onClick).not.toHaveBeenCalled()
-  })
-
-  it('togglePanel tells every window to toggle this extension panel (FR-028a)', () => {
-    const api = createExtensionAPI('com.query.toggle', '0.1.0')
-    mockSend.mockClear()
-    api.sidebar.togglePanel()
-    expect(mockSend).toHaveBeenCalledWith('extension:toggle-panel', 'com.query.toggle')
-  })
-
-  it('togglePanel drops the send when the window is already gone', () => {
-    const api = createExtensionAPI('com.query.toggle2', '0.1.0')
-    mockWindow.isDestroyed.mockReturnValueOnce(true)
-    mockSend.mockClear()
-    expect(() => api.sidebar.togglePanel()).not.toThrow()
-    expect(mockSend).not.toHaveBeenCalled()
-  })
-
-  it('commands are listed with their key and executed through it', () => {
-    const api = createExtensionAPI('com.query.cmd', '0.1.0')
+describe('registry query functions — commands and menu items', () => {
+  it('commands are listed with their key and executed through it', async () => {
+    const api = createExtensionAPI('com.query.cmd')
     const handler = vi.fn()
     const d = api.commands.register({ id: 'q-cmd', label: 'Run' }, handler)
     const cmd = listExtensionCommands().find((c) => c.id === 'q-cmd')
-    expect(cmd).toBeDefined()
-    executeExtensionCommand(cmd!.key)
-    expect(handler).toHaveBeenCalled()
-    executeExtensionCommand('unknown-key')
-    expect(handler).toHaveBeenCalledTimes(1)
+    const ctx = { projectId: 'p1', sessionId: null, repoRoot: null }
+    expect(await executeExtensionCommand(cmd!.key, ctx)).toEqual({ ok: true })
+    expect(handler).toHaveBeenCalledWith(ctx)
+    expect(await executeExtensionCommand('unknown-key', ctx)).toEqual({
+      ok: false,
+      reason: 'not-registered',
+    })
     d.dispose()
   })
+})
 
+describe('registry query functions — menu items', () => {
   it('listNativeViewMenuItems records the panel menu-item id mapping', () => {
-    const api = createExtensionAPI('com.query.menu', '0.1.0')
+    const api = createExtensionAPI('com.query.menu')
     const onClick = vi.fn()
     const d = api.nativeMenu.addViewMenuItem({
       id: 'q-menu',
@@ -719,5 +675,75 @@ describe('registry query functions', () => {
     expect(onClick).toHaveBeenCalled()
     expect(getPanelMenuItemId('q-panel')).toBe('ext-menu-q-menu')
     d.dispose()
+  })
+})
+
+// The members an extension in the extension host uses instead of Electron, which
+// it cannot import there (SDK 4.0.0).
+describe('what the extension host cannot reach itself', () => {
+  it('raise restores a minimised window and brings it forward', () => {
+    createExtensionAPI('com.raise').window.raise()
+    expect(mockWindow.restore).toHaveBeenCalled()
+    expect(mockWindow.show).toHaveBeenCalled()
+    expect(mockWindow.focus).toHaveBeenCalled()
+  })
+})
+
+describe('what the extension host cannot reach itself — open dialog', () => {
+  it('showOpenDialog opens over a window and answers with only the chosen paths', async () => {
+    mockShowOpenDialog.mockResolvedValue({ canceled: false, filePaths: ['/x'], bookmarks: [] })
+    const api = createExtensionAPI('com.dialog')
+    const result = await api.dialog.showOpenDialog({ properties: ['openDirectory'] })
+    expect(mockShowOpenDialog).toHaveBeenCalledWith(mockWindow, { properties: ['openDirectory'] })
+    expect(result).toEqual({ canceled: false, filePaths: ['/x'] })
+  })
+})
+
+describe('what the extension host cannot reach itself — dialogs without a window', () => {
+  it('showOpenDialog opens on its own when no window is open', async () => {
+    const { BrowserWindow } = await import('electron')
+    vi.mocked(BrowserWindow.getAllWindows).mockReturnValueOnce([])
+    mockShowOpenDialog.mockResolvedValue({ canceled: true, filePaths: [] })
+    const api = createExtensionAPI('com.dialog')
+    await api.dialog.showOpenDialog({ properties: ['openFile'] })
+    expect(mockShowOpenDialog).toHaveBeenLastCalledWith({ properties: ['openFile'] })
+  })
+
+  it('showSaveDialog opens over a window and answers with only the chosen path', async () => {
+    mockShowSaveDialog.mockResolvedValue({ canceled: false, filePath: '/x.txt', bookmark: 'b' })
+    const api = createExtensionAPI('com.dialog')
+    const result = await api.dialog.showSaveDialog({ defaultPath: 'x.txt' })
+    expect(mockShowSaveDialog).toHaveBeenCalledWith(mockWindow, { defaultPath: 'x.txt' })
+    expect(result).toEqual({ canceled: false, filePath: '/x.txt' })
+  })
+
+  it('showSaveDialog opens on its own when no window is open', async () => {
+    const { BrowserWindow } = await import('electron')
+    vi.mocked(BrowserWindow.getAllWindows).mockReturnValueOnce([])
+    mockShowSaveDialog.mockResolvedValue({ canceled: true, filePath: '' })
+    await createExtensionAPI('com.dialog').dialog.showSaveDialog({})
+    expect(mockShowSaveDialog).toHaveBeenLastCalledWith({})
+  })
+})
+
+describe('what the extension host cannot reach itself — refusals and paths', () => {
+  it('refuses the database before the app database is open', () => {
+    const api = createExtensionAPI('com.nodb')
+    expect(() => api.db.exec('SELECT 1')).toThrow('Extension "com.nodb": AppDB not initialized')
+  })
+
+  it("refuses another extension's exports, which only the extension host holds", () => {
+    const api = createExtensionAPI('com.exports')
+    expect(() => api.extensions.get('com.other')).toThrow(
+      '"com.other" exports are only reachable in the extension host'
+    )
+  })
+
+  it("paths are the app's directory and the extension's own folder under userData", () => {
+    const paths = { app: '/app', userData: '/data' }
+    expect(createExtensionAPI('com.paths', { paths }).paths).toEqual({
+      app: '/app',
+      globalStorage: '/data/extensions/com.paths',
+    })
   })
 })

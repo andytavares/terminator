@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { builderUnit } from '../helpers/order-parts.js'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -21,7 +22,7 @@ const root = path.resolve(here, '../..')
 const recipesDir = path.join(root, 'recipes')
 const rolesDir = path.join(root, 'roles')
 
-function read(dir: string, file: string): string {
+function readRecipeFile(dir: string, file: string): string {
   return fs.readFileSync(path.join(dir, file), 'utf8')
 }
 
@@ -29,12 +30,24 @@ const recipeFiles = fs.readdirSync(recipesDir).filter((f) => f.endsWith('.yaml')
 const roleFiles = fs.readdirSync(rolesDir).filter((f) => f.endsWith('.yaml'))
 
 function recipe(file: string): Recipe {
-  const parsed = parseRecipe(read(recipesDir, file), file)
+  const parsed = parseRecipe(readRecipeFile(recipesDir, file), file)
   if (!parsed.ok) throw new Error(parsed.reason)
   return parsed.value
 }
 
 describe('built-in recipes', () => {
+  describe('six shapes', sixShapesTests)
+  describe('steps and roles', stepsAndRolesTests)
+  describe('bugfix', bugfixTests)
+  describe('refactor and speckit', refactorAndSpeckitTests)
+  describe('requirements', requirementsTests)
+  describe('fresh verification', freshVerificationTests)
+  describe('lanes', builtInsLanesTests)
+  describe('the direct shape', theDirectShapeTests)
+  describe('the inspector', theInspectorTests)
+})
+
+function sixShapesTests() {
   it('ships six shapes: five that change the repository and one whose product is a document', () => {
     expect(recipeFiles.sort()).toEqual([
       'bugfix.yaml',
@@ -47,10 +60,12 @@ describe('built-in recipes', () => {
   })
 
   it.each(recipeFiles)('%s parses', (file) => {
-    const parsed = parseRecipe(read(recipesDir, file), file)
+    const parsed = parseRecipe(readRecipeFile(recipesDir, file), file)
     expect(parsed.ok, parsed.ok ? '' : parsed.reason).toBe(true)
   })
+}
 
+function stepsAndRolesTests() {
   it.each(recipeFiles)('%s uses only the six step kinds', (file) => {
     for (const step of recipe(file).steps) {
       expect(STEP_KINDS).toContain(step.kind)
@@ -69,7 +84,9 @@ describe('built-in recipes', () => {
       if (step.kind === 'gate') expect(step.defaultIfIgnored).toBeTruthy()
     }
   })
+}
 
+function bugfixTests() {
   it('holds a bug reproduction to failing before the fix exists', () => {
     const reproduce = recipe('bugfix.yaml').steps.find((s) => s.id === 'reproduce')
     expect(reproduce?.expect).toEqual({ suite_exit_code: '!= 0' })
@@ -82,7 +99,9 @@ describe('built-in recipes', () => {
     // directly, but a skipped lint still settles for its dependants.
     expect(flip?.after).toContain('lint')
   })
+}
 
+function refactorAndSpeckitTests() {
   it('makes a refactor characterise the behaviour before changing it', () => {
     const steps = recipe('refactor.yaml').steps
     expect(steps.find((s) => s.id === 'characterise')?.expect).toEqual({ tests_added: '>= 1' })
@@ -105,7 +124,9 @@ describe('built-in recipes', () => {
       expect(ids).toContain(phase)
     }
   })
+}
 
+function requirementsTests() {
   it('offers the speckit recipe only where the toolkit is installed', () => {
     expect(recipe('speckit.yaml').requires).toEqual([{ kind: 'path_exists', value: '.specify' }])
   })
@@ -120,7 +141,9 @@ describe('built-in recipes', () => {
       expect(recipe(file).requires).toEqual([])
     }
   })
+}
 
+function freshVerificationTests() {
   it.each(['direct.yaml', 'bugfix.yaml', 'standard.yaml', 'refactor.yaml', 'speckit.yaml'])(
     '%s verifies with a fresh context, never a resumed one',
     (file) => {
@@ -149,7 +172,9 @@ describe('built-in recipes', () => {
       .map((step) => step.id)
     expect(architects).toEqual([])
   })
+}
 
+function builtInsLanesTests() {
   // A fan-out is a claim that work can happen at the same time. Units inside
   // one lane share a worktree and a branch, so they cannot.
   it.each(recipeFiles)('%s fans out over lanes, never over units in one lane', (file) => {
@@ -158,7 +183,9 @@ describe('built-in recipes', () => {
       expect(step.over).toMatch(/ by lane$/)
     }
   })
+}
 
+function theDirectShapeTests() {
   it('checks the direct shape with the test command when there is one and a verifier when there is not', () => {
     const steps = recipe('direct.yaml').steps
     const check = steps.find((s) => s.id === 'check')
@@ -189,7 +216,9 @@ describe('built-in recipes', () => {
   it('needs nothing from the repository for the direct shape', () => {
     expect(recipe('direct.yaml').requires).toEqual([])
   })
+}
 
+function theInspectorTests() {
   it.each(['direct.yaml', 'bugfix.yaml', 'standard.yaml', 'speckit.yaml'])(
     '%s runs the inspector only on a risk trigger',
     (file) => {
@@ -198,7 +227,7 @@ describe('built-in recipes', () => {
       )
     }
   )
-})
+}
 
 // The research shape's deliverable is a document rather than a code change.
 // It is still checked by a fresh reader, because the author's own summary is
@@ -221,63 +250,54 @@ describe('the shape whose product is a document', () => {
   })
 })
 
+const direct = recipe('direct.yaml')
+
+/** The test and lint commands a probe found in package.json, or null where it found none. */
+function probed(opts: { test: boolean; lint: boolean }) {
+  const found = (command: string) => ({ command, source: 'package.json' as const })
+  return {
+    test: opts.test ? found('npm test') : null,
+    lint: opts.lint ? found('npm run lint') : null,
+  }
+}
+
+function graphFor(opts: { test: boolean; lint: boolean; grade: 'P2' | 'P3'; triggers?: boolean }) {
+  const base = draftOrder({
+    id: 'WO-1',
+    title: 'x',
+    source: { kind: 'typed', tracker: null, key: null, url: null },
+    repoPaths: ['/repo'],
+    now: '2026-10-05T10:00:00.000Z',
+  })
+  const o = {
+    ...base,
+    risk: {
+      ...base.risk,
+      grade: opts.grade,
+      triggers: opts.triggers === true ? ['secrets' as const] : [],
+    },
+    context: { ...base.context, toolchain: { ...base.context.toolchain, ...probed(opts) } },
+    plan: {
+      ...base.plan,
+      units: [builderUnit('U-1', { title: 'a', satisfies: ['AC-1'] })],
+    },
+  }
+  return buildRunGraph(o, direct)
+}
+const stateOf = (graph: ReturnType<typeof graphFor>, id: string) =>
+  graph.nodes.find((n) => n.stepId === id)?.state
+
 // The direct shape, built into a graph for the repositories it meets. Which of
 // its steps run is decided per order, and a step that does not apply must not
 // hold up the ones behind it.
 describe('the direct shape on a real graph', () => {
-  const direct = recipe('direct.yaml')
+  describe('test or verifier', testOrVerifierTests)
+  describe('documentation', documentationTests)
+  describe('the verifier start', theVerifierStartTests)
+  describe('the join', theJoinTests)
+})
 
-  function graphFor(opts: {
-    test: boolean
-    lint: boolean
-    grade: 'P2' | 'P3'
-    triggers?: boolean
-  }) {
-    const base = draftOrder({
-      id: 'WO-1',
-      title: 'x',
-      source: { kind: 'typed', tracker: null, key: null, url: null },
-      repoPaths: ['/repo'],
-      now: '2026-10-05T10:00:00.000Z',
-    })
-    const found = (command: string) => ({ command, source: 'package.json' })
-    const o = {
-      ...base,
-      risk: {
-        ...base.risk,
-        grade: opts.grade,
-        triggers: opts.triggers === true ? ['secrets' as const] : [],
-      },
-      context: {
-        ...base.context,
-        toolchain: {
-          ...base.context.toolchain,
-          test: opts.test ? found('npm test') : null,
-          lint: opts.lint ? found('npm run lint') : null,
-        },
-      },
-      plan: {
-        ...base.plan,
-        units: [
-          {
-            id: 'U-1',
-            title: 'a',
-            role: 'builder',
-            lane: 1,
-            dependsOn: [],
-            satisfies: ['AC-1'],
-            touches: [],
-            verify: [],
-          },
-        ],
-      },
-    }
-    return buildRunGraph(o, direct)
-  }
-
-  const stateOf = (graph: ReturnType<typeof graphFor>, id: string) =>
-    graph.nodes.find((n) => n.stepId === id)?.state
-
+function testOrVerifierTests() {
   it('checks with the test command and skips the verifier when the repository has one', () => {
     const graph = graphFor({ test: true, lint: true, grade: 'P2' })
     expect(stateOf(graph, 'check')).toBe('waiting')
@@ -289,7 +309,9 @@ describe('the direct shape on a real graph', () => {
     expect(stateOf(graph, 'check')).toBe('skipped')
     expect(stateOf(graph, 'verify')).toBe('waiting')
   })
+}
 
+function documentationTests() {
   it('skips the documentation pass for a P3 change and keeps it above that', () => {
     expect(stateOf(graphFor({ test: true, lint: true, grade: 'P3' }), 'document')).toBe('skipped')
     expect(stateOf(graphFor({ test: true, lint: true, grade: 'P2' }), 'document')).toBe('waiting')
@@ -301,7 +323,9 @@ describe('the direct shape on a real graph', () => {
       'runs only when the change is not graded P3; it is graded P3'
     )
   })
+}
 
+function theVerifierStartTests() {
   it('lets the verifier start once lint passes even though the test step was skipped', () => {
     const graph = graphFor({ test: false, lint: true, grade: 'P2' })
     const passed = {
@@ -315,7 +339,9 @@ describe('the direct shape on a real graph', () => {
     expect(ready).toContain('document')
     expect(ready).not.toContain('check')
   })
+}
 
+function theJoinTests() {
   it('lets the join through when every step that applied has passed and the rest were skipped', () => {
     const graph = graphFor({ test: true, lint: false, grade: 'P3' })
     const done = {
@@ -329,10 +355,10 @@ describe('the direct shape on a real graph', () => {
     const ready = readyNodes(done, { agents: null } as never).map((n) => n.stepId)
     expect(ready).toEqual(['integrate'])
   })
-})
+}
 
 describe('the author role', () => {
-  const author = parseRole(read(rolesDir, 'author.yaml'), 'author.yaml')
+  const author = parseRole(readRecipeFile(rolesDir, 'author.yaml'), 'author.yaml')
 
   it('hands back where the document is, beside writing documentation', () => {
     expect(author.ok && author.value.writes).toEqual(['docs', 'document'])
@@ -348,14 +374,20 @@ describe('the author role', () => {
 })
 
 describe('built-in roles', () => {
-  it('ships the nine roles the design names, and the author', () => {
+  describe('the roles', theRolesTests)
+  describe('resuming', builtInsResumingTests)
+  describe('writing', builtInsWritingTests)
+  describe('hand-backs', handBacksTests)
+  describe('tools and prompts', toolsAndPromptsTests)
+})
+
+function theRolesTests() {
+  it('ships the eight roles the shipped recipes use, and the author', () => {
     expect(roleFiles.map((f) => f.replace('.yaml', '')).sort()).toEqual([
       'architect',
       'author',
       'builder',
-      'foreman',
       'inspector',
-      'integrator',
       'red-team',
       'scout',
       'scribe',
@@ -364,30 +396,33 @@ describe('built-in roles', () => {
   })
 
   it.each(roleFiles)('%s parses', (file) => {
-    const parsed = parseRole(read(rolesDir, file), file)
+    const parsed = parseRole(readRecipeFile(rolesDir, file), file)
     expect(parsed.ok, parsed.ok ? '' : parsed.reason).toBe(true)
   })
+}
 
+function builtInsResumingTests() {
   it('forbids the verifier from resuming a conversation', () => {
-    const parsed = parseRole(read(rolesDir, 'verifier.yaml'), 'verifier.yaml')
+    const parsed = parseRole(readRecipeFile(rolesDir, 'verifier.yaml'), 'verifier.yaml')
     expect(parsed.ok && parsed.value.allowResume).toBe(false)
   })
 
   it('forbids the red team and the inspector from resuming either', () => {
     for (const file of ['red-team.yaml', 'inspector.yaml']) {
-      const parsed = parseRole(read(rolesDir, file), file)
+      const parsed = parseRole(readRecipeFile(rolesDir, file), file)
       expect(parsed.ok && parsed.value.allowResume).toBe(false)
     }
   })
+}
 
+function builtInsWritingTests() {
   // The property that matters is narrower than "writes nothing": the red team
-  // and the foreman do produce output — findings, a schedule — they just may
-  // not touch a checkout. Only three roles may.
-  it('lets only the builder, the integrator, the scribe and the author write to a checkout', () => {
+  // does produce output — findings — it just may not touch a checkout.
+  it('lets only the builder, the scribe and the author write to a checkout', () => {
     const CHECKOUT = ['worktree', 'integration_branch', 'docs']
-    const allowed = new Set(['builder', 'integrator', 'scribe', 'author'])
+    const allowed = new Set(['builder', 'scribe', 'author'])
     for (const file of roleFiles) {
-      const parsed = parseRole(read(rolesDir, file), file)
+      const parsed = parseRole(readRecipeFile(rolesDir, file), file)
       if (!parsed.ok) throw new Error(parsed.reason)
       const touchesCheckout = parsed.value.writes.some((w) => CHECKOUT.includes(w))
       expect(touchesCheckout, `${parsed.value.id} writes ${parsed.value.writes.join(', ')}`).toBe(
@@ -395,7 +430,9 @@ describe('built-in roles', () => {
       )
     }
   })
+}
 
+function handBacksTests() {
   // The verifier's verdict is an exit status, so it has nothing to hand back
   // and declares nothing (FR-033). The inspector is not the same case: it is
   // asked in its own prompt for findings with a severity and a line, and
@@ -404,19 +441,21 @@ describe('built-in roles', () => {
   // touch a checkout, which is the property this pair is really about and
   // which the test above enforces for every role.
   it('gives the verifier nothing to hand back, because its verdict is an exit status', () => {
-    const parsed = parseRole(read(rolesDir, 'verifier.yaml'), 'verifier.yaml')
+    const parsed = parseRole(readRecipeFile(rolesDir, 'verifier.yaml'), 'verifier.yaml')
     expect(parsed.ok && parsed.value.writes).toEqual([])
   })
 
   it('lets the inspector hand back the findings its prompt asks it for', () => {
-    const parsed = parseRole(read(rolesDir, 'inspector.yaml'), 'inspector.yaml')
+    const parsed = parseRole(readRecipeFile(rolesDir, 'inspector.yaml'), 'inspector.yaml')
     expect(parsed.ok && parsed.value.writes).toEqual(['findings'])
     expect(parsed.ok && parsed.value.tools).not.toContain('edit')
   })
+}
 
+function toolsAndPromptsTests() {
   it('gives no role an editing tool unless it may write to a checkout', () => {
     for (const file of roleFiles) {
-      const parsed = parseRole(read(rolesDir, file), file)
+      const parsed = parseRole(readRecipeFile(rolesDir, file), file)
       if (!parsed.ok) throw new Error(parsed.reason)
       if (parsed.value.tools.includes('edit')) {
         expect(
@@ -428,19 +467,13 @@ describe('built-in roles', () => {
   })
 
   it.each(roleFiles)('%s carries a prompt that says what it is for', (file) => {
-    const parsed = parseRole(read(rolesDir, file), file)
+    const parsed = parseRole(readRecipeFile(rolesDir, file), file)
     expect(parsed.ok && parsed.value.prompt.trim().length).toBeGreaterThan(40)
   })
-})
+}
 
-// Two roles ship that no built-in recipe names: the foreman and the
-// integrator. Scheduling and integration are code here, not agents. They are
-// not dead weight — an operator's own recipe may name any role (FR-021), and
-// the executor resolves a role by id with no list of which ones are "real".
-//
-// That is a claim, so it is proved rather than asserted: every shipped role
-// resolves through the same registry the executor uses, and briefs into a
-// message an agent could actually be launched with.
+// Every shipped role resolves through the same registry the executor uses, and
+// briefs into a message an agent could actually be launched with.
 describe('every shipped role is one an operator recipe could name', () => {
   const registry = createRoleRegistry({
     dataRoot: path.join(root, 'nowhere-data'),
@@ -504,7 +537,7 @@ describe('the architect and the builder, about the same files', () => {
 // honestly instead of quietly ignoring what the role declared.
 describe('what the architect may read', () => {
   it('may read the order it is writing', () => {
-    const parsed = parseRole(read(rolesDir, 'architect.yaml'), 'architect.yaml')
+    const parsed = parseRole(readRecipeFile(rolesDir, 'architect.yaml'), 'architect.yaml')
     expect(parsed.ok).toBe(true)
     expect(parsed.ok && parsed.value.reads).toContain('order')
   })
@@ -535,6 +568,12 @@ describe('the effort each built-in shape asks for', () => {
 // so a repository with a lint command catches it before the work ever
 // reaches a reviewer. It costs a terminal tab, not a session.
 describe('the lint pass every code-producing shape adds after its build', () => {
+  describe('running lint', runningLintTests)
+  describe('waiting on lint', waitingOnLintTests)
+  describe('reworking', builtInsReworkingTests)
+})
+
+function runningLintTests() {
   it.each([
     ['direct.yaml', 'build'],
     ['standard.yaml', 'build'],
@@ -555,7 +594,9 @@ describe('the lint pass every code-producing shape adds after its build', () => 
     const lint = recipe(file).steps.find((s) => s.id === 'lint')
     expect(lint?.onFail).toEqual({ rework: buildStep, max: 1 })
   })
+}
 
+function waitingOnLintTests() {
   it.each(['direct.yaml', 'standard.yaml', 'bugfix.yaml'])(
     '%s waits its next step on lint rather than the build it followed',
     (file) => {
@@ -575,7 +616,9 @@ describe('the lint pass every code-producing shape adds after its build', () => 
   it('does not add a lint step to refactor', () => {
     expect(recipe('refactor.yaml').steps.find((s) => s.id === 'lint')).toBeUndefined()
   })
+}
 
+function builtInsReworkingTests() {
   // The test run steps that follow a build gain a rework target of their
   // own, so a failing suite sends the same builder back rather than holding
   // the whole order for an operator.
@@ -594,7 +637,7 @@ describe('the lint pass every code-producing shape adds after its build', () => 
     const baseline = recipe('refactor.yaml').steps.find((s) => s.id === 'baseline')
     expect(baseline?.onFail).toBeUndefined()
   })
-})
+}
 
 // CI is watched on the draft a `ready-for-review` gate opens: every shape
 // that opens one gets two rounds back to the lane's builder before it holds
@@ -633,7 +676,7 @@ describe('ci rounds on every shape that ships code', () => {
 // has to actually be there for that to mean anything.
 describe('the built-in ci-fix skill', () => {
   it('is declared by the builder role', () => {
-    const parsed = parseRole(read(rolesDir, 'builder.yaml'), 'builder.yaml')
+    const parsed = parseRole(readRecipeFile(rolesDir, 'builder.yaml'), 'builder.yaml')
     expect(parsed.ok && parsed.value.skills).toEqual(['ci-fix'])
   })
 

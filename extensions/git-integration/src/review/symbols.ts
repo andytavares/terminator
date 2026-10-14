@@ -1,4 +1,5 @@
 import { Parser, Language, type Node } from 'web-tree-sitter'
+import type { DiffLine } from '../schemas/git.schema'
 
 // ─── Grammar loading ───────────────────────────────────────────────────────────
 
@@ -42,7 +43,8 @@ function ensureInit(): Promise<void> {
 
 const languageCache = new Map<string, Promise<Language | null>>()
 
-/** Cached per grammar, loaded lazily on first use. Returns null when `path`'s extension has no grammar. */
+/** Cached per grammar, loaded on first use; null when `path`'s extension has no grammar.
+ *  @internal */
 export function loadLanguageFor(path: string): Promise<Language | null> {
   const grammar = grammarNameFor(path)
   if (!grammar) return Promise.resolve(null)
@@ -205,24 +207,26 @@ function isExported(node: Node): boolean {
   return false
 }
 
+const DECLARED_FUNCTION_TYPES = new Set([
+  'method_definition',
+  'function_declaration',
+  'generator_function_declaration',
+])
+
+const EXPRESSION_FUNCTION_TYPES = new Set(['function_expression', 'arrow_function'])
+
+function declaratorName(node: Node | null): string | null {
+  if (node?.type !== 'variable_declarator') return null
+  return node.childForFieldName('name')?.text ?? null
+}
+
 function functionName(node: Node): string | null {
-  if (node.type === 'method_definition' || node.type === 'function_declaration') {
-    return node.childForFieldName('name')?.text ?? null
-  }
-  if (node.type === 'generator_function_declaration') {
-    return node.childForFieldName('name')?.text ?? null
-  }
-  if (node.type === 'function_expression' || node.type === 'arrow_function') {
-    const nameField = node.childForFieldName('name')?.text
-    if (nameField) return nameField
-    // export const foo = () => {} — take the enclosing variable_declarator's name
-    const declarator = node.parent
-    if (declarator?.type === 'variable_declarator') {
-      return declarator.childForFieldName('name')?.text ?? null
-    }
-    return null
-  }
-  return null
+  const ownName = node.childForFieldName('name')?.text ?? null
+  if (DECLARED_FUNCTION_TYPES.has(node.type)) return ownName
+  if (!EXPRESSION_FUNCTION_TYPES.has(node.type)) return null
+  if (ownName) return ownName
+  // export const foo = () => {} — take the enclosing variable_declarator's name
+  return declaratorName(node.parent)
 }
 
 function addIdentifierBinding(node: Node | null, into: Set<string>): void {
@@ -236,55 +240,48 @@ function addIdentifierBinding(node: Node | null, into: Set<string>): void {
   for (let i = 0; i < node.childCount; i++) addIdentifierBinding(node.child(i)!, into)
 }
 
+/** The field holding the names a node binds, for node types that bind through one field. */
+const BINDING_FIELD_BY_TYPE = new Map([
+  ['variable_declarator', 'name'],
+  ['required_parameter', 'pattern'],
+  ['optional_parameter', 'pattern'],
+  ['catch_clause', 'parameter'],
+  ['for_in_statement', 'left'],
+])
+
+function addBindingsOf(node: Node, bound: Set<string>): void {
+  const field = BINDING_FIELD_BY_TYPE.get(node.type)
+  if (field) {
+    addIdentifierBinding(node.childForFieldName(field), bound)
+    return
+  }
+  if (node.type !== 'formal_parameters') return
+  for (let i = 0; i < node.childCount; i++) {
+    const child = node.child(i)!
+    if (child.type === 'identifier') bound.add(child.text)
+  }
+}
+
 function collectBoundNames(root: Node, definitions: Set<string>): Set<string> {
   const bound = new Set<string>(definitions)
-
   function visit(node: Node): void {
-    switch (node.type) {
-      case 'variable_declarator':
-        addIdentifierBinding(node.childForFieldName('name'), bound)
-        break
-      case 'required_parameter':
-      case 'optional_parameter':
-        addIdentifierBinding(node.childForFieldName('pattern'), bound)
-        break
-      case 'catch_clause':
-        addIdentifierBinding(node.childForFieldName('parameter'), bound)
-        break
-      case 'formal_parameters':
-        for (let i = 0; i < node.childCount; i++) {
-          const child = node.child(i)!
-          if (child.type === 'identifier') bound.add(child.text)
-        }
-        break
-      case 'for_in_statement':
-        addIdentifierBinding(node.childForFieldName('left'), bound)
-        break
-      default:
-        break
-    }
+    addBindingsOf(node, bound)
     for (let i = 0; i < node.childCount; i++) visit(node.child(i)!)
   }
   visit(root)
   return bound
 }
 
+function definesName(node: Node): boolean {
+  if (DEFINITION_TYPES.has(node.type) || node.type === 'method_definition') return true
+  return node.type === 'variable_declarator' && isExported(node)
+}
+
 function collectDefinitions(root: Node): Set<string> {
   const definitions = new Set<string>()
-
   function visit(node: Node): void {
-    if (DEFINITION_TYPES.has(node.type)) {
-      const name = node.childForFieldName('name')?.text
-      if (name) definitions.add(name)
-    } else if (node.type === 'method_definition') {
-      const name = node.childForFieldName('name')?.text
-      if (name) definitions.add(name)
-    } else if (node.type === 'variable_declarator') {
-      if (isExported(node)) {
-        const name = node.childForFieldName('name')?.text
-        if (name) definitions.add(name)
-      }
-    }
+    const name = definesName(node) ? node.childForFieldName('name')?.text : undefined
+    if (name) definitions.add(name)
     for (let i = 0; i < node.childCount; i++) visit(node.child(i)!)
   }
   visit(root)
@@ -327,8 +324,13 @@ function collectFunctions(root: Node): SnippetFunction[] {
 
 const parserCache = new Map<Language, Parser>()
 
-/** Parses `code` as `path`'s language and extracts definitions, references and branch counts. Null when there is no grammar for `path`. */
-export async function analyseSnippet(path: string, code: string): Promise<SnippetAnalysis | null> {
+/** Parses `code` as `path`'s language, hands the root to `read`, then frees the tree:
+ *  web-tree-sitter trees live in WASM memory the JS GC never reclaims. Null with no grammar. */
+export async function withSyntaxTree<T>(
+  path: string,
+  code: string,
+  read: (root: Node) => T
+): Promise<T | null> {
   const language = await loadLanguageFor(path)
   if (!language) return null
 
@@ -341,20 +343,34 @@ export async function analyseSnippet(path: string, code: string): Promise<Snippe
 
   const tree = parser.parse(code)
   if (!tree) return null
-  const root = tree.rootNode
+  try {
+    return read(tree.rootNode)
+  } finally {
+    tree.delete()
+  }
+}
 
+function analyseRoot(root: Node): SnippetAnalysis {
   const definitions = collectDefinitions(root)
   const boundNames = collectBoundNames(root, definitions)
-  const references = collectReferences(root, boundNames)
-  const functions = collectFunctions(root)
-  const branches = countBranchesInWholeTree(root)
-
   return {
     definitions: [...definitions],
-    references: [...references],
-    branches,
-    functions,
+    references: [...collectReferences(root, boundNames)],
+    branches: countBranchesInWholeTree(root),
+    functions: collectFunctions(root),
   }
+}
+
+/** Parses `code` as `path`'s language and extracts definitions, references and branch counts. Null when there is no grammar for `path`. */
+export function analyseSnippet(path: string, code: string): Promise<SnippetAnalysis | null> {
+  return withSyntaxTree(path, code, analyseRoot)
+}
+
+/** Analyses diff lines as one snippet. Null when they hold no text or `path` has no grammar. */
+export function analyseLines(path: string, lines: DiffLine[]): Promise<SnippetAnalysis | null> {
+  const text = lines.map((l) => l.content).join('\n')
+  if (!text) return Promise.resolve(null)
+  return analyseSnippet(path, text)
 }
 
 function countBranchesInWholeTree(node: Node): number {

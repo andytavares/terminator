@@ -1,204 +1,210 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { FsWatcherService } from '../../../src/main/fs/fs-watcher'
+import { join } from 'node:path'
+import { FsWatcherService, type FsChangeBatch } from '../../../src/main/fs/fs-watcher'
+import type { TreeWatch, TreeWatchHandlers } from '../../../src/main/fs/tree-watch'
 
-// Mock fs.watch to control behavior in tests
-vi.mock('fs', () => {
-  let errorCb: ((err: Error) => void) | undefined
-  const mockWatcher = {
-    on: vi.fn((event: string, cb: (err: Error) => void) => {
-      if (event === 'error') errorCb = cb
-      return mockWatcher
-    }),
-    close: vi.fn(),
-    _triggerError: (err: Error) => errorCb?.(err),
+const TIMING = { settleMs: 100, maxWaitMs: 1000, pollMs: 3000 }
+
+/** A tree watch the spec drives: what each open watch reports is what the spec tells it to. */
+function fakeTrees() {
+  const open = new Map<string, TreeWatchHandlers>()
+  let refuses = false
+  const watchTree: TreeWatch = (root, handlers) => {
+    if (refuses) throw new Error('ENOSPC')
+    open.set(root, handlers)
+    return () => open.delete(root)
   }
   return {
-    watch: vi.fn(() => mockWatcher),
-    _mockWatcher: mockWatcher,
+    watchTree,
+    open,
+    refuseToStart: () => (refuses = true),
+    change: (root: string, name: string | null, type: 'change' | 'rename' = 'change') =>
+      open.get(root)?.onChange(type, name === null ? null : join(root, name)),
   }
+}
+
+let trees: ReturnType<typeof fakeTrees>
+let service: FsWatcherService
+
+/** A listener and the batches it has been given. */
+function listening(root: string): {
+  batches: FsChangeBatch[]
+  listener: (b: FsChangeBatch) => void
+} {
+  const batches: FsChangeBatch[] = []
+  const listener = (batch: FsChangeBatch) => batches.push(batch)
+  service.watch(root, listener)
+  return { batches, listener }
+}
+
+beforeEach(() => {
+  vi.useFakeTimers()
+  trees = fakeTrees()
+  service = new FsWatcherService(TIMING, trees.watchTree)
 })
 
-import * as fs from 'fs'
+afterEach(() => vi.useRealTimers())
 
-describe('FsWatcherService', () => {
-  let service: FsWatcherService
-
-  beforeEach(() => {
-    vi.useFakeTimers()
-    service = new FsWatcherService(1000)
-    vi.clearAllMocks()
+describe('FsWatcherService — one change', () => {
+  it('tells the listener once the tree has been quiet, naming the file from the root', () => {
+    const { batches } = listening('/repo')
+    trees.change('/repo', join('src', 'a.ts'))
+    expect(batches).toEqual([])
+    vi.advanceTimersByTime(TIMING.settleMs)
+    expect(batches).toEqual([
+      { projectRoot: '/repo', eventType: 'change', filenames: [join('src', 'a.ts')] },
+    ])
   })
 
-  afterEach(() => {
-    vi.useRealTimers()
+  it('says rename when a file appeared or went', () => {
+    const { batches } = listening('/repo')
+    trees.change('/repo', 'a.ts', 'change')
+    trees.change('/repo', 'b.ts', 'rename')
+    vi.advanceTimersByTime(TIMING.settleMs)
+    expect(batches.map((batch) => batch.eventType)).toEqual(['rename'])
   })
 
-  it('attaches fs.watch on watchStart', () => {
-    service.watchStart('/tmp/repo')
-    expect(fs.watch).toHaveBeenCalledWith('/tmp/repo', { recursive: true }, expect.any(Function))
+  it('passes on a change the platform did not name', () => {
+    const { batches } = listening('/repo')
+    trees.change('/repo', null)
+    vi.advanceTimersByTime(TIMING.settleMs)
+    expect(batches.map((batch) => batch.filenames)).toEqual([[null]])
+  })
+})
+
+describe('FsWatcherService — a burst of changes', () => {
+  it('tells the listener once for a thousand files changed together', () => {
+    const { batches } = listening('/repo')
+    for (let file = 0; file < 1000; file++) trees.change('/repo', `file-${file}.ts`)
+    vi.advanceTimersByTime(TIMING.settleMs)
+    expect(batches).toHaveLength(1)
+    expect(batches[0].filenames).toHaveLength(1000)
   })
 
-  it('does not re-attach if already watching same root', () => {
-    service.watchStart('/tmp/repo')
-    service.watchStart('/tmp/repo')
-    expect(fs.watch).toHaveBeenCalledTimes(1)
+  it('names a file changed many times once', () => {
+    const { batches } = listening('/repo')
+    for (let write = 0; write < 5; write++) trees.change('/repo', 'a.ts')
+    vi.advanceTimersByTime(TIMING.settleMs)
+    expect(batches.map((batch) => batch.filenames)).toEqual([['a.ts']])
   })
 
-  it('delivers change events to registered handlers', () => {
-    const handler = vi.fn()
-    service.addHandler(handler)
-    service.watchStart('/tmp/repo')
+  it('does not wait for quiet longer than the limit while changes keep coming', () => {
+    const { batches } = listening('/repo')
+    for (let elapsed = 0; elapsed < TIMING.maxWaitMs; elapsed += 50) {
+      trees.change('/repo', 'install.log')
+      vi.advanceTimersByTime(50)
+    }
+    expect(batches).toHaveLength(1)
+  })
+})
 
-    // Simulate a change event from fs.watch
-    const watchCb = (fs.watch as ReturnType<typeof vi.fn>).mock.calls[0][2]
-    watchCb('change', 'src/main.ts')
+describe('FsWatcherService — after a burst', () => {
+  it('tells the listener again for a change made after the burst was reported', () => {
+    const { batches } = listening('/repo')
+    trees.change('/repo', 'a.ts')
+    vi.advanceTimersByTime(TIMING.settleMs)
+    trees.change('/repo', 'b.ts')
+    vi.advanceTimersByTime(TIMING.settleMs)
+    expect(batches.map((batch) => batch.filenames)).toEqual([['a.ts'], ['b.ts']])
+  })
+})
 
-    expect(handler).toHaveBeenCalledWith({
-      projectRoot: '/tmp/repo',
-      eventType: 'change',
-      filename: 'src/main.ts',
+describe('FsWatcherService — several listeners', () => {
+  it('tells each listener about its own root only', () => {
+    const first = listening('/repo-a')
+    const second = listening('/repo-b')
+    trees.change('/repo-a', 'a.ts')
+    vi.advanceTimersByTime(TIMING.settleMs)
+    expect(first.batches).toHaveLength(1)
+    expect(second.batches).toEqual([])
+  })
+
+  it('opens one watch for a root two listeners share, and tells both', () => {
+    const first = listening('/repo')
+    const second = listening('/repo')
+    trees.change('/repo', 'a.ts')
+    vi.advanceTimersByTime(TIMING.settleMs)
+    expect([first.batches.length, second.batches.length]).toEqual([1, 1])
+    expect([...trees.open.keys()]).toEqual(['/repo'])
+  })
+
+  it('tells a listener once however many times it asks for the same root', () => {
+    const { batches, listener } = listening('/repo')
+    service.watch('/repo', listener)
+    trees.change('/repo', 'a.ts')
+    vi.advanceTimersByTime(TIMING.settleMs)
+    expect(batches).toHaveLength(1)
+  })
+})
+
+describe('FsWatcherService — a listener that throws', () => {
+  it('keeps telling the others when one listener throws', () => {
+    service.watch('/repo', () => {
+      throw new Error('listener failed')
     })
+    const { batches } = listening('/repo')
+    trees.change('/repo', 'a.ts')
+    vi.advanceTimersByTime(TIMING.settleMs)
+    expect(batches).toHaveLength(1)
+  })
+})
+
+describe('FsWatcherService — a listener that stops', () => {
+  it('leaves the other listener of the same root watching', () => {
+    const first = listening('/repo')
+    const second = listening('/repo')
+    service.unwatch(first.listener)
+    trees.change('/repo', 'a.ts')
+    vi.advanceTimersByTime(TIMING.settleMs)
+    expect(first.batches).toEqual([])
+    expect(second.batches).toHaveLength(1)
   })
 
-  it('falls back to polling when fs.watch throws', () => {
-    vi.mocked(fs.watch).mockImplementationOnce(() => {
-      throw new Error('ENOSYS')
-    })
-
-    const handler = vi.fn()
-    service.addHandler(handler)
-    service.watchStart('/tmp/repo')
-
-    // No fs.watch events — polling fires after intervalMs
-    vi.advanceTimersByTime(1000)
-
-    expect(handler).toHaveBeenCalledWith({
-      projectRoot: '/tmp/repo',
-      eventType: 'change',
-      filename: null,
-    })
+  it('stops every root it watched, and closes a watch nobody listens to', () => {
+    const { batches, listener } = listening('/repo-a')
+    service.watch('/repo-b', listener)
+    const other = listening('/repo-b')
+    service.unwatch(listener)
+    expect([...trees.open.keys()]).toEqual(['/repo-b'])
+    trees.change('/repo-b', 'b.ts')
+    vi.advanceTimersByTime(TIMING.settleMs)
+    expect(batches).toEqual([])
+    expect(other.batches).toHaveLength(1)
   })
 
-  it('stops watcher on watchStop', () => {
-    service.watchStart('/tmp/repo')
-    const mockClose = (fs.watch as ReturnType<typeof vi.fn>).mock.results[0].value.close
-    service.watchStop()
-    expect(mockClose).toHaveBeenCalled()
+  it('is not told about a change it stopped before hearing of', () => {
+    const { batches, listener } = listening('/repo')
+    trees.change('/repo', 'a.ts')
+    service.unwatch(listener)
+    vi.advanceTimersByTime(TIMING.maxWaitMs)
+    expect(batches).toEqual([])
+  })
+})
+
+describe('FsWatcherService — a tree that cannot be watched', () => {
+  it('reports an unnamed change on an interval when the watch cannot start', () => {
+    trees.refuseToStart()
+    const { batches } = listening('/repo')
+    vi.advanceTimersByTime(TIMING.pollMs * 2)
+    expect(batches).toEqual([
+      { projectRoot: '/repo', eventType: 'change', filenames: [null] },
+      { projectRoot: '/repo', eventType: 'change', filenames: [null] },
+    ])
   })
 
-  it('stops watching when last handler is removed', () => {
-    const handler = vi.fn()
-    service.addHandler(handler)
-    service.watchStart('/tmp/repo')
-    const mockClose = (fs.watch as ReturnType<typeof vi.fn>).mock.results[0].value.close
-
-    service.removeHandler(handler)
-    expect(mockClose).toHaveBeenCalled()
+  it('does the same from the moment a running watch fails, and closes it', () => {
+    const { batches } = listening('/repo')
+    trees.open.get('/repo')!.onError(new Error('EMFILE'))
+    expect([...trees.open.keys()]).toEqual([])
+    vi.advanceTimersByTime(TIMING.pollMs)
+    expect(batches).toHaveLength(1)
   })
 
-  it('does NOT stop when a handler is removed but others remain', () => {
-    const h1 = vi.fn()
-    const h2 = vi.fn()
-    service.addHandler(h1)
-    service.addHandler(h2)
-    service.watchStart('/tmp/repo')
-    const mockClose = (fs.watch as ReturnType<typeof vi.fn>).mock.results[0].value.close
-
-    service.removeHandler(h1) // h2 still registered → should not stop
-    expect(mockClose).not.toHaveBeenCalled()
-  })
-
-  it('falls back to polling when watcher emits an error event', () => {
-    // Reset so the first watchStart succeeds and we can trigger the error event
-    const handler = vi.fn()
-    service.addHandler(handler)
-    service.watchStart('/tmp/repo')
-
-    // Trigger the 'error' event on the watcher
-    const mockWatcherInst = (fs.watch as ReturnType<typeof vi.fn>).mock.results[0].value
-    mockWatcherInst._triggerError(new Error('ENOENT'))
-
-    // Advance time so the poll fires
-    vi.advanceTimersByTime(1000)
-
-    expect(handler).toHaveBeenCalledWith(
-      expect.objectContaining({ eventType: 'change', filename: null })
-    )
-  })
-
-  it('maps rename eventType correctly', () => {
-    const handler = vi.fn()
-    service.addHandler(handler)
-    service.watchStart('/tmp/repo')
-
-    const watchCb = (fs.watch as ReturnType<typeof vi.fn>).mock.calls[0][2]
-    watchCb('rename', 'oldfile.ts')
-
-    expect(handler).toHaveBeenCalledWith({
-      projectRoot: '/tmp/repo',
-      eventType: 'rename',
-      filename: 'oldfile.ts',
-    })
-  })
-
-  it('handles null filename from fs.watch', () => {
-    const handler = vi.fn()
-    service.addHandler(handler)
-    service.watchStart('/tmp/repo')
-
-    const watchCb = (fs.watch as ReturnType<typeof vi.fn>).mock.calls[0][2]
-    watchCb('change', null)
-
-    expect(handler).toHaveBeenCalledWith({
-      projectRoot: '/tmp/repo',
-      eventType: 'change',
-      filename: null,
-    })
-  })
-
-  it('watchStop clears pollInterval when running in polling mode', () => {
-    vi.mocked(fs.watch).mockImplementationOnce(() => {
-      throw new Error('ENOSYS')
-    })
-
-    service.watchStart('/tmp/repo')
-    // poll interval is now active
-    service.watchStop() // should clear it without error
-
-    // After stop, no more poll events
-    const handler = vi.fn()
-    service.addHandler(handler)
-    vi.advanceTimersByTime(2000)
-    expect(handler).not.toHaveBeenCalled()
-  })
-
-  it('swallows errors thrown by handlers without stopping delivery', () => {
-    const badHandler = vi.fn(() => {
-      throw new Error('handler boom')
-    })
-    const goodHandler = vi.fn()
-    service.addHandler(badHandler)
-    service.addHandler(goodHandler)
-    service.watchStart('/tmp/repo')
-
-    const watchCb = (fs.watch as ReturnType<typeof vi.fn>).mock.calls[0][2]
-    watchCb('change', 'x.ts')
-
-    expect(goodHandler).toHaveBeenCalled()
-  })
-
-  it('switches root correctly when watchStart is called with a new path', () => {
-    service.watchStart('/tmp/repo-a')
-    const closeA = (fs.watch as ReturnType<typeof vi.fn>).mock.results[0].value.close
-
-    service.watchStart('/tmp/repo-b')
-    // old watcher should have been closed
-    expect(closeA).toHaveBeenCalled()
-    // new watcher opened for repo-b
-    expect(fs.watch).toHaveBeenLastCalledWith(
-      '/tmp/repo-b',
-      { recursive: true },
-      expect.any(Function)
-    )
+  it('stops reporting when its last listener stops', () => {
+    trees.refuseToStart()
+    const { batches, listener } = listening('/repo')
+    service.unwatch(listener)
+    vi.advanceTimersByTime(TIMING.pollMs * 2)
+    expect(batches).toEqual([])
   })
 })

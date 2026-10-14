@@ -1,5 +1,5 @@
 import { matchesFilter, type IssueTitles } from './session-filter'
-import type { SessionFacts } from './session-facts'
+import { byStarted, type SessionFacts } from './session-facts'
 import type { IssueSummary } from '../../shared/types/index'
 
 export interface LogbookGroup {
@@ -16,9 +16,6 @@ const GROUPS: Array<{ key: string; label: string; match: (facts: SessionFacts) =
 
 const CLOSED = 'Closed'
 const SUGGESTIONS = 3
-
-const byStarted = (a: SessionFacts, b: SessionFacts): number =>
-  Date.parse(a.startedAt) - Date.parse(b.startedAt)
 
 /** The Logbook's list: by what each session is doing, then closed history, newest first. */
 export function buildLogbook(
@@ -68,15 +65,14 @@ export function headlineOf(
 export function suggestWorkItems(
   facts: SessionFacts,
   projectIssue: IssueSummary | null,
-  mine: readonly IssueSummary[],
-  limit = SUGGESTIONS
+  mine: readonly IssueSummary[]
 ): IssueSummary[] {
   const current = facts.workItem?.ref
   const id = (i: { tracker: string; key: string }) => `${i.tracker}:${i.key}`
   const seen = new Set(current ? [id(current)] : [])
   const out: IssueSummary[] = []
   for (const candidate of [...(projectIssue ? [projectIssue] : []), ...mine]) {
-    if (out.length === limit) break
+    if (out.length === SUGGESTIONS) break
     if (seen.has(id(candidate))) continue
     seen.add(id(candidate))
     out.push(candidate)

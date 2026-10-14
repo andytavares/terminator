@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { builderUnit, testCriterion } from '../helpers/order-parts.js'
 import {
   parseWorkOrder,
   SCHEMA_VERSION,
@@ -16,6 +17,44 @@ import type { WorkOrder } from '../../src/order/schema.js'
 // half-understood agreement is worse than an unreadable one — the failure mode
 // of a partial read is a plan executed against terms nobody agreed to.
 
+/** The criterion a command proves: the row's last glyph renders. */
+function finalGlyph(): WorkOrder['acceptance'][number] {
+  return testCriterion('AC-1', {
+    statement: 'a full-width row renders its final glyph',
+    priority: 'P0',
+    verify: { kind: 'test', command: 'npx vitest run', assert: 'exit_code == 0' },
+  })
+}
+
+/** One repository, nothing probed and nothing read yet. */
+function validContext(): WorkOrder['context'] {
+  return {
+    repos: [
+      {
+        name: 'terminator',
+        path: '/repos/terminator',
+        lane: 1,
+        baseBranch: 'main',
+        headBranch: 'x',
+      },
+    ],
+    toolchain: { test: null, lint: null, format: null, coverage: null, e2e: null, build: null },
+    entryPoints: [],
+    priorArt: [],
+    conventions: [],
+    houseDocs: [],
+  }
+}
+
+/** One unit in one lane, satisfying the one criterion. */
+function validPlan(): WorkOrder['plan'] {
+  return {
+    units: [builderUnit('U-1', { title: 'fix', satisfies: ['AC-1'], touches: ['src/a.css'] })],
+    lanes: [{ ord: 1, repo: 'terminator', branch: 'x', role: null, blocks: [], blockedBy: [] }],
+    sharedFiles: [],
+  }
+}
+
 function valid(): unknown {
   return {
     schemaVersion: SCHEMA_VERSION,
@@ -27,49 +66,11 @@ function valid(): unknown {
     recipe: null,
     recipeOverriddenBy: null,
     intent: { problem: 'p', outcome: 'o', nonGoals: [] },
-    context: {
-      repos: [
-        {
-          name: 'terminator',
-          path: '/repos/terminator',
-          lane: 1,
-          baseBranch: 'main',
-          headBranch: 'x',
-        },
-      ],
-      toolchain: { test: null, lint: null, format: null, coverage: null, e2e: null, build: null },
-      entryPoints: [],
-      priorArt: [],
-      conventions: [],
-      houseDocs: [],
-    },
-    acceptance: [
-      {
-        id: 'AC-1',
-        statement: 'a full-width row renders its final glyph',
-        priority: 'P0',
-        verify: { kind: 'test', command: 'npx vitest run', assert: 'exit_code == 0' },
-        unverifiable: null,
-      },
-    ],
+    context: validContext(),
+    acceptance: [finalGlyph()],
     risk: { grade: 'P2', triggers: [], blastRadius: [], criticalPaths: [] },
     budgets: { agents: 3, wallClockMinutes: 45, tokens: null },
-    plan: {
-      units: [
-        {
-          id: 'U-1',
-          title: 'fix',
-          role: 'builder',
-          lane: 1,
-          dependsOn: [],
-          satisfies: ['AC-1'],
-          touches: ['src/a.css'],
-          verify: [],
-        },
-      ],
-      lanes: [{ ord: 1, repo: 'terminator', branch: 'x', role: null, blocks: [], blockedBy: [] }],
-      sharedFiles: [],
-    },
+    plan: validPlan(),
     assumptions: [],
     openQuestions: [],
     redTeam: [],
@@ -80,6 +81,22 @@ function valid(): unknown {
 }
 
 describe('parseWorkOrder', () => {
+  describe('documents', documentsTests)
+  describe('versions', versionsTests)
+  describe('empty drafts and orphans', emptyDraftsAndOrphansTests)
+  describe('statuses, nulls and blocks', statusesNullsAndBlocksTests)
+  describe('the unverifiable escape', theUnverifiableEscapeTests)
+  describe('non-orders and versions', nonOrdersAndVersionsTests)
+  describe('optional collections', optionalCollectionsTests)
+  describe('optional fields', optionalFieldsTests)
+  describe('budgets', budgetsTests)
+  describe('proof', proofTests)
+  describe('red-team findings', schemaRedTeamFindingsTests)
+  describe('rounds and categories', roundsAndCategoriesTests)
+  describe('repositories', repositoriesTests)
+})
+
+function documentsTests() {
   it('accepts a well-formed order', () => {
     const order = parseWorkOrder(valid())
     expect(order.id).toBe('WO-0913-c71')
@@ -109,7 +126,9 @@ describe('parseWorkOrder', () => {
       })
     ).toThrow()
   })
+}
 
+function versionsTests() {
   it('refuses a schema version newer than it knows, rather than reading what it recognises', () => {
     const future = { ...(valid() as Record<string, unknown>), schemaVersion: SCHEMA_VERSION + 1 }
     expect(() => parseWorkOrder(future)).toThrow(SchemaVersionTooNewError)
@@ -119,7 +138,9 @@ describe('parseWorkOrder', () => {
     const future = { ...(valid() as Record<string, unknown>), schemaVersion: 99 }
     expect(() => parseWorkOrder(future)).toThrow(/99/)
   })
+}
 
+function emptyDraftsAndOrphansTests() {
   // Shape and completeness are different questions, and they are answered in
   // different places. An order with no criteria, no units, or a unit that
   // satisfies nothing is well-formed but incomplete: the schema accepts it so
@@ -145,7 +166,9 @@ describe('parseWorkOrder', () => {
     plan.units[0].satisfies = []
     expect(() => parseWorkOrder(o)).not.toThrow()
   })
+}
 
+function statusesNullsAndBlocksTests() {
   it('rejects an unknown status', () => {
     const o = valid() as Record<string, unknown>
     o.status = 'nearly'
@@ -167,7 +190,9 @@ describe('parseWorkOrder', () => {
     expect(order.plan.lanes[0].blocks).toEqual([])
     expect(order.plan.lanes[0].blockedBy).toEqual([])
   })
+}
 
+function theUnverifiableEscapeTests() {
   it('accepts a criterion accepted as unverifiable when it carries a reason', () => {
     const o = valid() as Record<string, unknown>
     const acc = o.acceptance as Record<string, unknown>[]
@@ -182,7 +207,9 @@ describe('parseWorkOrder', () => {
     acc[0].unverifiable = { accepted: true, reason: '' }
     expect(() => parseWorkOrder(o)).toThrow()
   })
+}
 
+function nonOrdersAndVersionsTests() {
   it.each([null, undefined, 'an order', 42, []])(
     'rejects %p, which is not an order at all',
     (v) => {
@@ -202,7 +229,9 @@ describe('parseWorkOrder', () => {
     const o = { ...(valid() as Record<string, unknown>), schemaVersion: SCHEMA_VERSION }
     expect(parseWorkOrder(o).schemaVersion).toBe(SCHEMA_VERSION)
   })
+}
 
+function optionalCollectionsTests() {
   it('fills the optional collections rather than leaving them undefined', () => {
     const o = valid() as Record<string, unknown>
     delete o.assumptions
@@ -221,7 +250,9 @@ describe('parseWorkOrder', () => {
     expect(order.recipeOverriddenBy).toBeNull()
     expect(order.agreedAt).toBeNull()
   })
+}
 
+function optionalFieldsTests() {
   it('fills a unit and a criterion with their optional fields', () => {
     const o = valid() as Record<string, unknown>
     const plan = o.plan as { units: Record<string, unknown>[] }
@@ -245,7 +276,9 @@ describe('parseWorkOrder', () => {
     expect(order.risk.blastRadius).toEqual([])
     expect(order.risk.criticalPaths).toEqual([])
   })
+}
 
+function budgetsTests() {
   it('defaults a token budget to unset, since a ceiling mid-unit leaves half a change', () => {
     const o = valid() as Record<string, unknown>
     delete (o.budgets as Record<string, unknown>).tokens
@@ -275,7 +308,9 @@ describe('parseWorkOrder', () => {
     o.budgets = { agents: 0, wallClockMinutes: 45, tokens: null }
     expect(() => parseWorkOrder(o)).toThrow()
   })
+}
 
+function proofTests() {
   it('accepts every kind of proof a criterion can carry', () => {
     const kinds = [
       { kind: 'command', command: 'make check', assert: 'exit_code == 0' },
@@ -299,7 +334,9 @@ describe('parseWorkOrder', () => {
     }
     expect(() => parseWorkOrder(o)).toThrow()
   })
+}
 
+function schemaRedTeamFindingsTests() {
   it('rejects a red-team finding accepted without a reason, and keeps one with', () => {
     const o = valid() as Record<string, unknown>
     o.redTeam = [{ id: 'RT-1', text: 'ambiguous', status: 'accepted', reason: '' }]
@@ -322,7 +359,9 @@ describe('parseWorkOrder', () => {
     expect(order.redTeam[0].category).toBe('wrong-outcome')
     expect(isBlocking(order.redTeam[0])).toBe(true)
   })
+}
 
+function roundsAndCategoriesTests() {
   it('defaults a red-team finding with no round to 0', () => {
     const o = valid() as Record<string, unknown>
     o.redTeam = [{ id: 'RT-1', text: 'ambiguous' }]
@@ -343,13 +382,15 @@ describe('parseWorkOrder', () => {
     o.redTeam = [{ id: 'RT-1', text: 'x', category: 'nonsense' }]
     expect(() => parseWorkOrder(o)).toThrow()
   })
+}
 
+function repositoriesTests() {
   it('rejects an order that names no repository', () => {
     const o = valid() as Record<string, unknown>
     ;(o.context as Record<string, unknown>).repos = []
     expect(() => parseWorkOrder(o)).toThrow()
   })
-})
+}
 
 describe('a signal-sourced order', () => {
   it('parses a source of kind signal, promoted from a sensor (ADR-066)', () => {
@@ -360,6 +401,12 @@ describe('a signal-sourced order', () => {
 })
 
 describe('draftOrder', () => {
+  describe('parsing and lanes', parsingAndLanesTests)
+  describe('base branches', schemaBaseBranchesTests)
+  describe('nothing assumed', nothingAssumedTests)
+})
+
+function parsingAndLanesTests() {
   it('builds a draft that parses, so the Forge always starts from a valid document', () => {
     const o = draftOrder({
       id: 'WO-0101-aaa',
@@ -384,7 +431,9 @@ describe('draftOrder', () => {
     expect(o.plan.lanes.map((l) => l.ord)).toEqual([1, 2])
     expect(o.context.repos.map((r) => r.name)).toEqual(['a', 'b'])
   })
+}
 
+function schemaBaseBranchesTests() {
   it('defaults the base branch to main, and takes one when given', () => {
     const common = {
       id: 'WO-0101-aaa',
@@ -398,7 +447,9 @@ describe('draftOrder', () => {
       'develop'
     )
   })
+}
 
+function nothingAssumedTests() {
   it('starts with every toolchain check unknown, so nothing is assumed before Scout runs', () => {
     const o = draftOrder({
       id: 'WO-0101-aaa',
@@ -422,7 +473,7 @@ describe('draftOrder', () => {
     expect(o.plan.units).toEqual([])
     expect(o.recipe).toBeNull()
   })
-})
+}
 
 describe('isBlocking', () => {
   it('blocks only wrong-outcome, regression and unprovable', () => {

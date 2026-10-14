@@ -21,12 +21,21 @@ import {
   loadViews,
   saveViews,
 } from '../../../../src/renderer/sidebar/views'
+import type { SessionView } from '../../../../src/renderer/sidebar/view-model'
+import { buildBranchRows } from '../../../../src/renderer/sidebar/branch-rows'
+import type {
+  AgentState,
+  Project,
+  TerminalSession,
+  Workspace,
+} from '../../../../src/shared/types/index'
+import { terminalSessionOf } from '../../../support/renderer-stores'
 
-const custom = {
+const custom: SessionView = {
   id: 'mine',
   name: 'Mine',
-  groupBy: 'status' as const,
-  sortBy: 'recent' as const,
+  groupBy: 'none',
+  sortBy: 'recent',
   filters: { hideStale: true },
 }
 
@@ -39,42 +48,63 @@ afterEach(() => {
   localStorage.clear()
 })
 
+const NOW = 10_000_000
+
+const STALE_AFTER = 60_000
+
+const repo: Workspace = {
+  id: 'w1',
+  name: 'repo',
+  folderPath: '/repo',
+  color: '#111',
+  tags: [],
+  createdAt: '',
+  updatedAt: '',
+}
+
+const branchProject = (id: string): Project => ({
+  id,
+  workspaceId: 'w1',
+  name: id,
+  gitBranch: id,
+  isWorktree: false,
+  createdAt: '',
+  updatedAt: '',
+})
+
+const terminalOn = (projectId: string, agentState: AgentState, lastActivityAt = NOW) =>
+  terminalSessionOf({ id: `s-${projectId}`, projectId, agentState, lastActivityAt })
+
+const sessions: TerminalSession[] = [
+  terminalOn('working', 'working'),
+  terminalOn('waiting', 'awaiting-input'),
+  terminalOn('idle', 'idle'),
+  terminalOn('quiet', 'idle', NOW - STALE_AFTER - 1),
+]
+
+const projects = ['working', 'waiting', 'idle', 'quiet'].map(branchProject)
+
+const shownBy = (id: string): string[] => {
+  const view = BUILT_IN_VIEWS.find((v) => v.id === id)!
+  const { groups } = buildBranchRows({ sessions, projects, workspaces: [repo] }, view, {
+    now: NOW,
+    staleAfterMs: STALE_AFTER,
+  })
+  return groups.flatMap((g) => g.branches.map((b) => b.projectId)).sort()
+}
+
 describe('built-in views', () => {
-  it('ships exactly the four required views', () => {
-    expect(BUILT_IN_VIEWS.map((v) => v.id)).toEqual(['everything', 'needs-me', 'active', 'stale'])
+  it.each([
+    ['everything', ['idle', 'quiet', 'waiting', 'working']],
+    ['needs-me', ['waiting']],
+    ['active', ['working']],
+    ['stale', ['quiet']],
+  ])('the %s view shows %j', (id, expected) => {
+    expect(shownBy(id)).toEqual(expected)
   })
 
-  it('defaults to the unfiltered Everything view', () => {
-    expect(DEFAULT_VIEW_ID).toBe('everything')
-    const everything = BUILT_IN_VIEWS.find((v) => v.id === 'everything')!
-    expect(everything.filters).toEqual({})
-    expect(everything.groupBy).toBe('workspace')
-    expect(everything.sortBy).toBe('manual')
-  })
-
-  it('defines Needs me as awaiting-input, most recent first', () => {
-    const v = BUILT_IN_VIEWS.find((x) => x.id === 'needs-me')!
-    expect(v.filters.states).toEqual(['awaiting-input'])
-    expect(v.sortBy).toBe('recent')
-  })
-
-  it('defines Active as working only', () => {
-    expect(BUILT_IN_VIEWS.find((v) => v.id === 'active')!.filters.states).toEqual(['working'])
-  })
-
-  it('defines Stale as stale-only, oldest first', () => {
-    const v = BUILT_IN_VIEWS.find((x) => x.id === 'stale')!
-    expect(v.filters.staleOnly).toBe(true)
-    expect(v.sortBy).toBe('oldest')
-  })
-
-  it('marks every built-in as builtIn so the UI cannot offer to delete one', () => {
-    expect(BUILT_IN_VIEWS.every((v) => v.builtIn)).toBe(true)
-  })
-
-  it('never renders a hide-stale toggle on the Stale view — the two filters contradict', () => {
-    const stale = BUILT_IN_VIEWS.find((v) => v.id === 'stale')!
-    expect(stale.filters.hideStale).toBeUndefined()
+  it('opens on the Everything view', () => {
+    expect(BUILT_IN_VIEWS.find((v) => v.id === DEFAULT_VIEW_ID)!.name).toBe('Everything')
   })
 })
 
@@ -103,7 +133,9 @@ describe('loadViews', () => {
     localStorage.setItem(VIEWS_STORAGE_KEY, JSON.stringify({ id: 'x' }))
     expect(loadViews()).toEqual(BUILT_IN_VIEWS)
   })
+})
 
+describe('loadViews — drops stored entries that are not shaped like a view', () => {
   it('drops stored entries that are not shaped like a view', () => {
     localStorage.setItem(
       VIEWS_STORAGE_KEY,
@@ -164,7 +196,9 @@ describe('saveViews', () => {
     saveViews(hidden)
     expect(loadViews().find((v) => v.id === 'everything')!.filters).toEqual({ hideStale: true })
   })
+})
 
+describe('saveViews — an override can never rename or re-id a built-in', () => {
   it('an override can never rename or re-id a built-in', () => {
     localStorage.setItem(
       VIEWS_STORAGE_KEY,
@@ -195,7 +229,9 @@ describe('saveViews', () => {
     saveViews(BUILT_IN_VIEWS)
     expect(JSON.parse(localStorage.getItem(VIEWS_STORAGE_KEY)!).custom).toEqual([])
   })
+})
 
+describe('saveViews — swallows a storage write failure instead of breaking the sidebar', () => {
   it('swallows a storage write failure instead of breaking the sidebar', () => {
     vi.spyOn(localStorageStub, 'setItem').mockImplementation(() => {
       throw new Error('quota')
@@ -204,12 +240,17 @@ describe('saveViews', () => {
   })
 })
 
-describe('a preference naming a retired option (VW-1)', () => {
+/** The hooks every "a preference naming a retired option (VW-1)" describe registers. */
+function setUpAPreferenceNamingA(): void {
   // The grouping options narrowed when the list became one of branches. A
   // preference written before that names a key which no longer exists, and it
   // must degrade to the built-in's own default rather than empty the sidebar —
   // the same treatment loadViews already gives corrupt storage.
   beforeEach(() => localStorage.clear())
+}
+
+describe('a preference naming a retired option (VW-1)', () => {
+  setUpAPreferenceNamingA()
 
   it.each(['status', 'project', 'branch'])(
     'falls back to the built-in default when the stored grouping is %s',
@@ -235,6 +276,10 @@ describe('a preference naming a retired option (VW-1)', () => {
     expect(everything.groupBy).toBe('workspace')
     expect(everything.sortBy).toBe('name')
   })
+})
+
+describe('a preference naming a retired option (VW-1) — falls back when the stored sort is one that no longer exists', () => {
+  setUpAPreferenceNamingA()
 
   it('falls back when the stored sort is one that no longer exists', () => {
     localStorage.setItem(

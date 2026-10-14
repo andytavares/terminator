@@ -37,7 +37,7 @@ describe.skipIf(!RUNNABLE)('the Linear provider, against the real API', () => {
     expect(provider.transition, 'the Linear provider must implement transition').toBeDefined()
     states = await provider.states!(cred, ISSUE)
     const issue = await provider.get(cred, ISSUE)
-    original = issue?.status ?? null
+    original = issue?.state.name ?? null
   })
 
   afterAll(async () => {
@@ -49,9 +49,14 @@ describe.skipIf(!RUNNABLE)('the Linear provider, against the real API', () => {
     }
   })
 
+  describe('reading the workflow', readingTheWorkflowTests)
+  describe('moving the issue', movingTheIssueTests)
+})
+
+function readingTheWorkflowTests() {
   it('reads the real workflow rather than an assumed one', () => {
     expect(states.length).toBeGreaterThan(2)
-    // eslint-disable-next-line no-console
+
     console.log(`workflow: ${states.map((s) => `${s.name}[${s.intent ?? '—'}]`).join(' → ')}`)
   })
 
@@ -82,12 +87,14 @@ describe.skipIf(!RUNNABLE)('the Linear provider, against the real API', () => {
 
   it('leaves backlog and cancelled states carrying no intent', () => {
     const named = states.filter((state) => state.intent !== null).map((state) => state.name)
-    // eslint-disable-next-line no-console
+
     console.log(`intents landed on: ${named.join(', ')}`)
     expect(named.length).toBeGreaterThan(0)
     expect(named.length).toBeLessThanOrEqual(3)
   })
+}
 
+function movingTheIssueTests() {
   it('actually moves the issue, and Linear reports the new state', async () => {
     const target = states.find((state) => state.intent === 'started')
     expect(target, 'this workflow has no started state to move to').toBeDefined()
@@ -96,7 +103,7 @@ describe.skipIf(!RUNNABLE)('the Linear provider, against the real API', () => {
 
     // Read it back from Linear rather than trusting that the mutation resolved.
     const after = await provider.get(cred, ISSUE)
-    expect(after?.status).toBe(target?.name)
+    expect(after?.state.name).toBe(target?.name)
   })
 
   it("honours the operator's own mapping over the type rule", async () => {
@@ -106,7 +113,7 @@ describe.skipIf(!RUNNABLE)('the Linear provider, against the real API', () => {
     if (anywhere === undefined) return
     await provider.transition!(cred, ISSUE, 'done', anywhere.id)
     const after = await provider.get(cred, ISSUE)
-    expect(after?.status).toBe(anywhere.name)
+    expect(after?.state.name).toBe(anywhere.name)
   })
 
   it('refuses an override naming a state this workflow does not have', async () => {
@@ -114,4 +121,4 @@ describe.skipIf(!RUNNABLE)('the Linear provider, against the real API', () => {
       provider.transition!(cred, ISSUE, 'started', '00000000-0000-0000-0000-000000000000')
     ).rejects.toThrow(/not available/)
   })
-})
+}

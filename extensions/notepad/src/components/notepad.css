@@ -7,7 +7,7 @@
   overflow: hidden;
   background: var(--tm-bg-base);
   color: var(--tm-text-primary);
-  font-family: var(--font-ui, system-ui, sans-serif);
+  font-family: var(--tm-font-ui, system-ui, sans-serif);
   font-size: 13px;
 }
 
@@ -92,17 +92,23 @@
   background: var(--tm-bg-card-hover);
 }
 
-.notepad-composer__body {
+/* A text field */
+.notepad-composer__body,
+.notepad-input,
+.notepad-textarea {
   width: 100%;
   box-sizing: border-box;
   background: var(--tm-bg-input);
   border: 1px solid var(--tm-border);
   border-radius: 6px;
   color: var(--tm-text-primary);
+  outline: none;
+}
+
+.notepad-composer__body {
   font-size: 12px;
   font-family: inherit;
   padding: 6px 8px;
-  outline: none;
   resize: none;
 }
 
@@ -114,38 +120,6 @@
   display: flex;
   justify-content: flex-end;
   gap: 6px;
-}
-
-.notepad-composer__cancel {
-  background: transparent;
-  border: none;
-  color: var(--tm-text-muted);
-  font-size: 11px;
-  font-family: inherit;
-  padding: 3px 8px;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.notepad-composer__cancel:hover {
-  color: var(--tm-text-primary);
-}
-
-.notepad-composer__submit {
-  background: var(--tm-accent);
-  border: none;
-  color: var(--tm-on-accent);
-  font-size: 11px;
-  font-family: inherit;
-  font-weight: 500;
-  padding: 3px 10px;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.notepad-composer__submit:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
 }
 
 .notepad-view__no-selection {
@@ -211,30 +185,6 @@
   color: var(--tm-text-muted);
   font-size: 10px;
   font-weight: 600;
-}
-
-.notepad-outline__close {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 4px;
-  border: none;
-  border-radius: 4px;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-  opacity: 0.6;
-}
-
-.notepad-outline__close:hover {
-  background: var(--tm-overlay-soft);
-  color: var(--tm-text-primary);
-  opacity: 1;
-}
-
-.notepad-outline__close svg {
-  width: 13px;
-  height: 13px;
 }
 
 .notepad-outline__title {
@@ -330,34 +280,6 @@
   flex-shrink: 0;
 }
 
-.notepad-tag-filter__btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  background: var(--tm-overlay-soft);
-  border: 1px solid var(--tm-border-strong);
-  border-radius: 5px;
-  color: var(--tm-text-muted);
-  font-size: 11px;
-  padding: 3px 8px;
-  cursor: pointer;
-  font-family: inherit;
-  transition:
-    background 80ms ease,
-    border-color 80ms ease;
-}
-
-.notepad-tag-filter__btn:hover {
-  background: var(--tm-overlay);
-  color: var(--tm-text-primary);
-}
-
-.notepad-tag-filter__btn--active {
-  background: color-mix(in srgb, var(--tm-accent) 15%, transparent);
-  border-color: color-mix(in srgb, var(--tm-accent) 40%, transparent);
-  color: var(--tm-accent-text);
-}
-
 .notepad-tag-filter__clear-x {
   display: inline-flex;
   align-items: center;
@@ -441,34 +363,6 @@
   border-top: 1px solid var(--tm-border);
   flex-shrink: 0;
   gap: 8px;
-}
-
-.notepad-btn-export {
-  font-size: 12px;
-  color: var(--tm-text-muted);
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 4px 6px;
-  font-family: inherit;
-  border-radius: 4px;
-  transition:
-    color 80ms ease,
-    background 80ms ease;
-}
-
-.notepad-btn-export:hover {
-  color: var(--tm-text-primary);
-  background: var(--tm-bg-card-hover);
-}
-
-.notepad-btn-new {
-  font-size: 12px;
-  padding: 3px 10px;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  border-radius: 5px;
 }
 
 /* Archived collapsible */
@@ -749,33 +643,6 @@
   margin-top: 4px;
 }
 
-.notepad-empty-state__new {
-  font-size: 14px;
-  padding: 10px 20px;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.notepad-btn-outline {
-  background: transparent;
-  border: 1px solid var(--tm-border);
-  color: var(--tm-text-primary);
-  font-size: 14px;
-  font-family: inherit;
-  padding: 10px 20px;
-  border-radius: 6px;
-  cursor: pointer;
-  transition:
-    background 80ms ease,
-    border-color 80ms ease;
-}
-
-.notepad-btn-outline:hover {
-  background: var(--tm-bg-card-hover);
-  border-color: var(--tm-border-strong);
-}
-
 .notepad-empty-state__tip {
   font-size: 12px;
   color: var(--tm-text-muted);
@@ -783,19 +650,13 @@
 }
 
 .notepad-kbd {
-  font-family: var(--font-mono, monospace);
+  font-family: var(--tm-font-mono, monospace);
   font-size: 11px;
   background: var(--tm-bg-input);
   border: 1px solid var(--tm-border);
   border-radius: 4px;
   padding: 1px 5px;
   color: var(--tm-text-secondary);
-}
-
-.notepad-kbd--inline {
-  font-size: 10px;
-  padding: 1px 4px;
-  line-height: 1.4;
 }
 
 /* ── Tag chips ──────────────────────────────────────────────────── */
@@ -837,91 +698,11 @@
   font-size: 11px;
 }
 
-/* ── Buttons ────────────────────────────────────────────────────── */
-.notepad-btn-ghost {
-  background: transparent;
-  border: none;
-  color: var(--tm-text-secondary);
-  font-size: 12px;
-  font-family: inherit;
-  padding: 4px 8px;
-  border-radius: 5px;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  transition:
-    background 80ms ease,
-    color 80ms ease;
-}
-
-.notepad-btn-ghost:hover {
-  background: var(--tm-bg-card-hover);
-  color: var(--tm-text-primary);
-}
-
-.notepad-btn-ghost:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.notepad-btn-primary {
-  background: var(--tm-accent);
-  border: none;
-  color: var(--tm-on-accent);
-  font-size: 13px;
-  font-family: inherit;
-  font-weight: 500;
-  padding: 6px 14px;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: opacity 80ms ease;
-}
-
-/* Was `opacity: 0.88`, which dimmed the label with the button and dropped
-   "New note" to 4.18:1 — under AA at the exact moment of interaction. */
-.notepad-btn-primary:hover {
-  background: var(--tm-accent-hover);
-}
-
-.notepad-btn-primary:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.notepad-btn-icon {
-  background: transparent;
-  border: none;
-  color: var(--tm-text-muted);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 4px;
-  border-radius: 4px;
-  line-height: 0;
-  transition:
-    color 80ms ease,
-    background 80ms ease;
-}
-
-.notepad-btn-icon:hover {
-  color: var(--tm-text-primary);
-  background: var(--tm-bg-card-hover);
-}
-
 /* ── Form inputs ────────────────────────────────────────────────── */
 .notepad-input {
-  width: 100%;
-  box-sizing: border-box;
-  background: var(--tm-bg-input);
-  border: 1px solid var(--tm-border);
-  border-radius: 6px;
-  color: var(--tm-text-primary);
   font-size: 13px;
   font-family: inherit;
   padding: 7px 10px;
-  outline: none;
   transition: border-color 100ms ease;
 }
 
@@ -934,16 +715,9 @@
 }
 
 .notepad-textarea {
-  width: 100%;
-  box-sizing: border-box;
-  background: var(--tm-bg-input);
-  border: 1px solid var(--tm-border);
-  border-radius: 6px;
-  color: var(--tm-text-primary);
   font-size: 13px;
-  font-family: var(--font-mono, monospace);
+  font-family: var(--tm-font-mono, monospace);
   padding: 8px 10px;
-  outline: none;
   resize: vertical;
   transition: border-color 100ms ease;
 }
@@ -956,76 +730,16 @@
   color: var(--tm-text-muted);
 }
 
-/* ── Compact edit dialog ────────────────────────────────────────── */
-.notepad-dialog {
-  width: 440px;
-  max-width: calc(100vw - 40px);
-  background: var(--tm-bg-elevated);
-  border: 1px solid var(--tm-border);
-  border-radius: 12px;
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
-  display: flex;
-  flex-direction: column;
-  z-index: var(--tm-layer-modal);
-  overflow: hidden;
-}
-
-.notepad-dialog__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 16px 12px;
-  border-bottom: 1px solid var(--tm-border);
-}
-
-.notepad-dialog__title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--tm-text-primary);
-}
-
-.notepad-dialog__body {
+/* ── Edit title and tags (inside the design system's Dialog) ─── */
+.notepad-edit-fields {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 16px;
-}
-
-.notepad-dialog__label {
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--tm-text-muted);
-  margin-bottom: 4px;
-}
-
-.notepad-dialog__footer {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-  padding: 12px 16px;
-  border-top: 1px solid var(--tm-border);
-}
-
-.notepad-dialog__hint {
-  flex: 1;
-  font-size: 11px;
-  color: var(--tm-text-muted);
 }
 
 /* ── Quick-create overlay ───────────────────────────────────────── */
-.notepad-overlay-backdrop {
-  position: fixed;
-  inset: 0;
-  background: var(--tm-scrim);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: var(--tm-layer-modal);
-}
-
+/* A modal shell (a native dialog): it centres this and draws the backdrop. */
 .notepad-quick-create {
-  position: relative;
   width: 520px;
   max-width: calc(100vw - 40px);
   background: var(--tm-bg-elevated);
@@ -1035,7 +749,6 @@
   display: flex;
   flex-direction: column;
   gap: 0;
-  z-index: var(--tm-layer-modal);
   overflow: hidden;
 }
 
@@ -1052,46 +765,13 @@
   color: var(--tm-text-primary);
 }
 
-.notepad-quick-create__type-tabs {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  background: var(--tm-overlay-soft);
-  border-radius: 6px;
-  padding: 2px;
-}
-
-.notepad-quick-create__type-tab {
-  padding: 3px 10px;
-  font-size: 12px;
-  font-weight: 500;
-  font-family: inherit;
-  background: transparent;
-  border: none;
-  border-radius: 4px;
-  color: var(--tm-text-secondary);
-  cursor: pointer;
-  transition:
-    background 100ms,
-    color 100ms;
-}
-
-.notepad-quick-create__type-tab:hover {
-  color: var(--tm-text-primary);
-}
-
-.notepad-quick-create__type-tab--active {
-  background: var(--tm-overlay-strong);
-  color: var(--tm-text-primary);
-}
-
 .notepad-quick-create__vault-status {
   font-size: 11px;
   color: var(--tm-text-muted);
 }
 
 .notepad-quick-create__vault-status code {
-  font-family: var(--font-mono, monospace);
+  font-family: var(--tm-font-mono, monospace);
   background: var(--tm-overlay-soft);
   padding: 0 3px;
   border-radius: 3px;
@@ -1186,25 +866,6 @@
   flex-shrink: 0;
 }
 
-.notepad-quick-create__cancel-link {
-  background: none;
-  border: none;
-  color: var(--tm-text-muted);
-  cursor: pointer;
-  font-size: 13px;
-  font-family: inherit;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 6px;
-  border-radius: 4px;
-  transition: color 80ms ease;
-}
-
-.notepad-quick-create__cancel-link:hover {
-  color: var(--tm-text-secondary);
-}
-
 /* ── Tag chip input (QuickCreate) ──────────────────────────────── */
 .notepad-tag-chip-input {
   display: flex;
@@ -1297,8 +958,9 @@
 }
 
 .notepad-editor-cm .cm-scroller {
-  font-family: var(--font-mono, 'JetBrains Mono', monospace);
-  font-size: 14px;
+  font-family: var(--tm-font-mono, 'JetBrains Mono', monospace);
+  /* Set by NoteEditor from the "Editor font size" setting. */
+  font-size: var(--notepad-editor-font-size, 14px);
   line-height: 1.65;
 }
 
@@ -1497,36 +1159,8 @@
 
 .notepad-export-dialog__folder-input {
   flex: 1;
-  background: var(--tm-bg-input);
-  border: 1px solid var(--tm-border);
-  border-radius: 6px;
-  color: var(--tm-text-primary);
-  font-size: 13px;
-  font-family: var(--font-mono, monospace);
-  padding: 7px 10px;
-  outline: none;
+  font-family: var(--tm-font-mono, monospace);
   transition: border-color 100ms ease;
-}
-
-.notepad-export-dialog__folder-input:focus {
-  border-color: var(--tm-accent, color-mix(in srgb, var(--tm-accent) 50%, transparent));
-}
-
-.notepad-export-dialog__choose-btn {
-  background: var(--tm-bg-input);
-  border: 1px solid var(--tm-border);
-  border-radius: 6px;
-  color: var(--tm-text-primary);
-  font-size: 13px;
-  font-family: inherit;
-  padding: 7px 14px;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: background 80ms ease;
-}
-
-.notepad-export-dialog__choose-btn:hover {
-  background: var(--tm-overlay-strong);
 }
 
 /* Scope segmented tabs */
@@ -1563,7 +1197,7 @@
 
 .notepad-export-dialog__preview-line {
   font-size: 12px;
-  font-family: var(--font-mono, monospace);
+  font-family: var(--tm-font-mono, monospace);
   color: var(--tm-text-muted);
   line-height: 1.7;
 }
@@ -1842,53 +1476,21 @@ input[type='checkbox'].notepad-task-checkbox {
   flex-shrink: 0;
 }
 
+/* Shown while the pointer is over the comment, or while it has focus. */
 .notepad-comment__delete-btn {
-  background: transparent;
-  border: none;
-  color: var(--tm-text-muted);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  padding: 3px;
-  border-radius: 4px;
-  line-height: 0;
   opacity: 0;
-  transition:
-    opacity 80ms ease,
-    color 80ms ease;
+  transition: opacity 80ms ease;
 }
 
-.notepad-comment:hover .notepad-comment__delete-btn {
+.notepad-comment:hover .notepad-comment__delete-btn,
+.notepad-comment__delete-btn:focus-visible {
   opacity: 1;
-}
-
-.notepad-comment__delete-btn:hover {
-  color: var(--tm-danger);
 }
 
 /* Footer action links */
 .notepad-comment__actions-row {
   display: flex;
   gap: 12px;
-}
-
-.notepad-comment__action-link {
-  background: transparent;
-  border: none;
-  color: var(--tm-text-muted);
-  font-size: 12px;
-  font-family: inherit;
-  cursor: pointer;
-  padding: 0;
-  transition: color 80ms ease;
-}
-
-.notepad-comment__action-link:hover {
-  color: var(--tm-text-secondary);
-}
-
-.notepad-comment__action-link--active {
-  color: var(--tm-success);
 }
 
 /* Inline replies (↳ reply: text) */
@@ -2039,25 +1641,6 @@ input[type='checkbox'].notepad-task-checkbox {
 .notepad-comment__icon-btn--delete:hover {
   color: var(--tm-danger);
   background: color-mix(in srgb, var(--tm-danger) 10%, transparent);
-}
-
-.notepad-comment__btn {
-  background: transparent;
-  border: 1px solid var(--tm-border);
-  color: var(--tm-text-secondary);
-  font-size: 11px;
-  font-family: inherit;
-  padding: 3px 8px;
-  border-radius: 4px;
-  cursor: pointer;
-  transition:
-    background 80ms ease,
-    border-color 80ms ease;
-}
-
-.notepad-comment__btn:hover {
-  background: var(--tm-bg-card-hover);
-  border-color: var(--tm-border-strong);
 }
 
 .notepad-comment__reply-form {
@@ -2291,8 +1874,6 @@ input[type='checkbox'].notepad-task-checkbox {
   flex-direction: column;
   overflow: hidden;
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7);
-  margin-top: 60px;
-  align-self: flex-start;
 }
 
 .notepad-search-overlay__input-row {
@@ -2558,13 +2139,6 @@ input[type='checkbox'].notepad-task-checkbox {
   opacity: 0.5;
 }
 
-.notepad-btn-new-diagram {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 8px;
-}
-
 /* ── DiagramView ─────────────────────────────────────────────── */
 
 .notepad-view__editor--diagram {
@@ -2658,11 +2232,6 @@ input[type='checkbox'].notepad-task-checkbox {
 .diagram-view__save-status {
   font-size: 11px;
   color: var(--tm-text-muted);
-}
-
-.diagram-view__comment-btn--active {
-  background: var(--tm-accent) !important;
-  color: var(--tm-on-accent) !important;
 }
 
 .diagram-view__canvas {
@@ -2787,20 +2356,6 @@ input[type='checkbox'].notepad-task-checkbox {
   display: flex;
   align-items: center;
   gap: 4px;
-}
-
-.diagram-comment-popover__resolve {
-  font-size: 11px;
-  color: var(--tm-text-muted);
-}
-
-.diagram-comment-popover__delete {
-  font-size: 11px;
-  color: var(--tm-text-muted);
-}
-
-.diagram-comment-popover__delete:hover {
-  color: var(--tm-danger);
 }
 
 .diagram-comment-popover__messages {

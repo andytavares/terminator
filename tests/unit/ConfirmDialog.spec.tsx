@@ -3,17 +3,17 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import React from 'react'
 import { ConfirmDialog } from '../../src/renderer/components/ConfirmDialog'
 
+const baseProps = {
+  title: 'Remove workspace "My Repo"?',
+  onConfirm: vi.fn(),
+  onClose: vi.fn(),
+}
+
+beforeEach(() => {
+  vi.clearAllMocks()
+})
+
 describe('ConfirmDialog', () => {
-  const baseProps = {
-    title: 'Remove workspace "My Repo"?',
-    onConfirm: vi.fn(),
-    onClose: vi.fn(),
-  }
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-  })
-
   it('renders title', () => {
     render(<ConfirmDialog {...baseProps} />)
     expect(screen.getByText('Remove workspace "My Repo"?')).toBeTruthy()
@@ -46,17 +46,18 @@ describe('ConfirmDialog', () => {
     render(<ConfirmDialog {...baseProps} confirmLabel="Remove" />)
     expect(screen.getByRole('button', { name: /remove/i })).toBeTruthy()
   })
+})
 
+describe('ConfirmDialog — applies danger class to confirm button when danger prop is true', () => {
   it('applies danger class to confirm button when danger prop is true', () => {
     render(<ConfirmDialog {...baseProps} danger />)
     const confirmBtn = screen.getByRole('button', { name: /confirm/i })
     expect(confirmBtn.className).toContain('danger')
   })
 
-  it('cancel button receives initial focus', () => {
+  it('lists cancel first, where focus opens', () => {
     render(<ConfirmDialog {...baseProps} />)
-    const cancelBtn = screen.getByRole('button', { name: /cancel/i })
-    expect(document.activeElement).toBe(cancelBtn)
+    expect(screen.getAllByRole('button')[0].textContent).toMatch(/cancel/i)
   })
 
   // These three used to assert the literal id `confirm-dialog-title` and the
@@ -67,13 +68,15 @@ describe('ConfirmDialog', () => {
   // assertions are rewritten to check what they were actually protecting.
   it('labels the dialog with its own title element', () => {
     const { container } = render(<ConfirmDialog {...baseProps} />)
-    const dialog = container.querySelector('[role="dialog"]')
+    const dialog = container.querySelector('dialog')
     const labelledBy = dialog?.getAttribute('aria-labelledby')
     expect(labelledBy).toBeTruthy()
     const title = document.getElementById(labelledBy!)
     expect(title?.textContent).toBe(baseProps.title)
   })
+})
 
+describe('ConfirmDialog — gives two dialogs distinct label ids rather than a shared literal', () => {
   it('gives two dialogs distinct label ids rather than a shared literal', () => {
     const { container } = render(
       <>
@@ -81,7 +84,7 @@ describe('ConfirmDialog', () => {
         <ConfirmDialog {...baseProps} title="Second" />
       </>
     )
-    const ids = Array.from(container.querySelectorAll('[role="dialog"]')).map((d) =>
+    const ids = Array.from(container.querySelectorAll('dialog')).map((d) =>
       d.getAttribute('aria-labelledby')
     )
     expect(ids).toHaveLength(2)

@@ -8,17 +8,34 @@ import {
   type CommentAnchor,
 } from '../../../src/editor/commentField'
 
-describe('commentAnchorField', () => {
-  const anchor1: CommentAnchor = { id: 'c1', from: 5, to: 10 }
-  const anchor2: CommentAnchor = { id: 'c2', from: 15, to: 25 }
+const anchor1: CommentAnchor = { id: 'c1', from: 5, to: 10 }
+const anchor2: CommentAnchor = { id: 'c2', from: 15, to: 25 }
 
-  function makeState() {
-    return EditorState.create({
-      doc: 'Hello world this is a test document for anchoring',
-      extensions: [commentAnchorField],
-    })
-  }
+function makeState() {
+  return EditorState.create({
+    doc: 'Hello world this is a test document for anchoring',
+    extensions: [commentAnchorField],
+  })
+}
 
+describe('commentAnchorField', commentAnchorFieldTests)
+
+function makeHoverState() {
+  return EditorState.create({
+    doc: 'Hello',
+    extensions: [hoveredAnchorField],
+  })
+}
+
+describe('hoveredAnchorField', hoveredAnchorFieldTests)
+
+function commentAnchorFieldTests() {
+  describe('setting anchors', commentAnchorFieldSettingAnchorsTests)
+  describe('mapping through edits', commentAnchorFieldMappingThroughEditsTests)
+  describe('collapse and overwrite', commentAnchorFieldCollapseOverwriteTests)
+}
+
+function commentAnchorFieldSettingAnchorsTests() {
   it('initializes with empty anchor list', () => {
     const state = makeState()
     const anchors = state.field(commentAnchorField)
@@ -33,7 +50,9 @@ describe('commentAnchorField', () => {
     expect(anchors[0].id).toBe('c1')
     expect(anchors[1].id).toBe('c2')
   })
+}
 
+function commentAnchorFieldMappingThroughEditsTests() {
   it('maps anchor positions through document changes', () => {
     let state = EditorState.create({
       doc: 'Hello world',
@@ -48,7 +67,9 @@ describe('commentAnchorField', () => {
     expect(anchors[0].from).toBe(9)
     expect(anchors[0].to).toBe(14)
   })
+}
 
+function commentAnchorFieldCollapseOverwriteTests() {
   it('removes collapsed anchors after document change', () => {
     let state = EditorState.create({
       doc: 'Hello world',
@@ -69,38 +90,31 @@ describe('commentAnchorField', () => {
     expect(anchors).toHaveLength(1)
     expect(anchors[0].id).toBe('c2')
   })
-})
+}
 
-describe('hoveredAnchorField', () => {
-  function makeState() {
-    return EditorState.create({
-      doc: 'Hello',
-      extensions: [hoveredAnchorField],
-    })
-  }
-
+function hoveredAnchorFieldTests() {
   it('initializes with null', () => {
-    const state = makeState()
+    const state = makeHoverState()
     expect(state.field(hoveredAnchorField)).toBeNull()
   })
 
   it('setHoveredAnchor sets the hovered comment id', () => {
-    let state = makeState()
+    let state = makeHoverState()
     state = state.update({ effects: [setHoveredAnchor.of('c1')] }).state
     expect(state.field(hoveredAnchorField)).toBe('c1')
   })
 
   it('setHoveredAnchor clears to null', () => {
-    let state = makeState()
+    let state = makeHoverState()
     state = state.update({ effects: [setHoveredAnchor.of('c1')] }).state
     state = state.update({ effects: [setHoveredAnchor.of(null)] }).state
     expect(state.field(hoveredAnchorField)).toBeNull()
   })
 
   it('non-matching effects leave value unchanged', () => {
-    let state = makeState()
+    let state = makeHoverState()
     state = state.update({ effects: [setHoveredAnchor.of('c2')] }).state
     state = state.update({}).state
     expect(state.field(hoveredAnchorField)).toBe('c2')
   })
-})
+}

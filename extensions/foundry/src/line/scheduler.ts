@@ -10,10 +10,12 @@ import type { Budgets } from '../order/schema.js'
 // "why is nothing running" is always answerable without watching it happen.
 
 /** Occupying an agent right now. */
-const IN_FLIGHT: readonly RunNode['state'][] = ['running', 'verifying']
+const IN_FLIGHT: readonly RunNode['state'][] = ['running']
 
+/** @internal */
 export const MAX_ATTEMPTS = 2
 
+/** @internal */
 export function inFlight(graph: RunGraph): RunNode[] {
   return graph.nodes.filter((n) => IN_FLIGHT.includes(n.state))
 }
@@ -29,15 +31,6 @@ function dependenciesSettled(graph: RunGraph, node: RunNode): boolean {
   })
 }
 
-function anyDependencyFailed(graph: RunGraph, node: RunNode): boolean {
-  return node.dependsOn.some((id) => {
-    const dependency = nodeById(graph, id)
-    return (
-      dependency !== undefined && (dependency.state === 'failed' || dependency.state === 'blocked')
-    )
-  })
-}
-
 /**
  * What could start, in graph order, limited by the agent budget.
  *
@@ -48,19 +41,10 @@ function anyDependencyFailed(graph: RunGraph, node: RunNode): boolean {
 export function readyNodes(graph: RunGraph, budgets: Budgets): RunNode[] {
   const capacity =
     budgets.agents === null ? Infinity : Math.max(0, budgets.agents - inFlight(graph).length)
-  const eligible = graph.nodes.filter(
-    (n) => (n.state === 'waiting' || n.state === 'ready') && dependenciesSettled(graph, n)
-  )
+  const eligible = graph.nodes.filter((n) => n.state === 'waiting' && dependenciesSettled(graph, n))
   const gates = eligible.filter((n) => n.kind === 'gate')
   const work = eligible.filter((n) => n.kind !== 'gate').slice(0, capacity)
   return [...gates, ...work]
-}
-
-/** Nodes that can never start because something they wait on failed. */
-export function blockedNodes(graph: RunGraph): RunNode[] {
-  return graph.nodes.filter(
-    (n) => n.state !== 'passed' && n.state !== 'skipped' && anyDependencyFailed(graph, n)
-  )
 }
 
 /**
@@ -78,7 +62,7 @@ export function blockedReason(
 ): string | null {
   const node = nodeById(graph, id)
   if (node === undefined) return null
-  if (node.state !== 'waiting' && node.state !== 'ready' && node.state !== 'blocked') return null
+  if (node.state !== 'waiting' && node.state !== 'blocked') return null
 
   const failed = node.dependsOn.filter((dep) => {
     const dependency = nodeById(graph, dep)
@@ -162,11 +146,16 @@ export interface FailResult {
   readonly needsDecision: boolean
 }
 
+/** When a node failed, and why in words when there are any. */
+export interface Failure {
+  readonly at: string
+  readonly reason?: string | null
+}
+
 export function markFailed(
   graph: RunGraph,
   id: string,
-  at: string,
-  reason: string | null = null
+  { at, reason = null }: Failure
 ): FailResult {
   const node = nodeById(graph, id)
   if (node === undefined) return { graph, needsDecision: false }
@@ -237,6 +226,13 @@ function reworkTargets(targets: readonly RunNode[], failedLane: number | null): 
   return []
 }
 
+/** Where a check's failure goes back to, and what it says. */
+export interface SendTo {
+  /** The step that has to answer the failure. */
+  readonly to: string
+  readonly feedback: Feedback
+}
+
 /**
  * Send a check's failure back to the step that has to answer it.
  *
@@ -247,29 +243,15 @@ function reworkTargets(targets: readonly RunNode[], failedLane: number | null): 
  * previous failure had already blocked, which is unblocked the same way
  * `retry` unblocks one.
  */
-export function rework(
-  graph: RunGraph,
-  failedId: string,
-  targetStepId: string,
-  feedback: Feedback
-): RunGraph {
+export function rework(graph: RunGraph, failedId: string, { to, feedback }: SendTo): RunGraph {
   const failed = nodeById(graph, failedId)
   if (failed === undefined) return graph
 
-  const candidates = graph.nodes.filter((n) => n.stepId === targetStepId)
+  const candidates = graph.nodes.filter((n) => n.stepId === to)
   if (candidates.length === 0) return graph
   const targets = reworkTargets(candidates, failed.lane)
   const chosen = targets.length > 0 ? targets : candidates
-
-  const ancestorsOfFailed = ancestorsOf(graph, failedId)
-  const between = new Set<string>()
-  for (const target of chosen) {
-    for (const id of descendantsOf(graph, target.id)) {
-      if (ancestorsOfFailed.has(id)) between.add(id)
-    }
-  }
-
-  const resetIds = new Set([...chosen.map((t) => t.id), ...between, failedId])
+  const between = onThePath(graph, chosen, failedId)
 
   let next = graph
   for (const target of chosen) {
@@ -280,17 +262,31 @@ export function rework(
       feedback: [...current.feedback, feedback],
     })
   }
-  for (const id of between) {
-    next = withNode(next, id, { state: 'waiting', endedAt: null })
-  }
+  for (const id of between) next = withNode(next, id, { state: 'waiting', endedAt: null })
   next = withNode(next, failedId, { state: 'waiting', endedAt: null, reworks: failed.reworks + 1 })
+  return unblockAfter(next, new Set([...chosen.map((t) => t.id), ...between, failedId]))
+}
 
+/** The nodes downstream of the targets that the failed node depends on. */
+function onThePath(graph: RunGraph, targets: readonly RunNode[], failedId: string): Set<string> {
+  const ancestorsOfFailed = ancestorsOf(graph, failedId)
+  const between = new Set<string>()
+  for (const target of targets) {
+    for (const id of descendantsOf(graph, target.id)) {
+      if (ancestorsOfFailed.has(id)) between.add(id)
+    }
+  }
+  return between
+}
+
+/** Every blocked node waiting on one of `resetIds` goes back to waiting. */
+function unblockAfter(graph: RunGraph, resetIds: ReadonlySet<string>): RunGraph {
+  let next = graph
   for (const n of next.nodes) {
     if (n.state === 'blocked' && n.dependsOn.some((dep) => resetIds.has(dep))) {
       next = withNode(next, n.id, { state: 'waiting' })
     }
   }
-
   return next
 }
 

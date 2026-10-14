@@ -13,6 +13,7 @@ import type { RedTeamCategory, WorkOrder } from '../order/schema.js'
 // never disagree with themselves, and cost nothing to run on every turn. An
 // agent pass adds judgement on top of these; it does not replace them.
 
+/** @internal */
 export interface Finding {
   readonly rule: string
   readonly severity: 'low' | 'medium' | 'high'
@@ -32,106 +33,96 @@ function normalise(text: string): string {
   return text.trim().toLowerCase().replace(/\s+/g, ' ')
 }
 
-export function structuralFindings(order: WorkOrder): Finding[] {
-  const findings: Finding[] = []
+/** One structural attack: what it finds, and the ids it finds it in — none when it does not fire. */
+interface Attack extends Omit<Finding, 'subjectIds'> {
+  readonly subjects: (order: WorkOrder) => readonly string[]
+}
 
-  if (
-    normalise(order.intent.problem) !== '' &&
-    normalise(order.intent.problem) === normalise(order.intent.outcome)
-  ) {
-    findings.push({
-      rule: 'outcome-restates-problem',
-      category: 'unprovable',
-      severity: 'medium',
-      text: 'The outcome repeats the problem back. Say what will be observably different, not that the problem will be gone.',
-      subjectIds: [order.id],
-    })
-  }
-
-  if (order.intent.nonGoals.length === 0) {
-    findings.push({
-      rule: 'no-non-goals',
-      category: 'scope',
-      severity: 'low',
-      text: 'The order excludes nothing. An order with no boundary is one an agent can widen without contradicting it.',
-      subjectIds: [order.id],
-    })
-  }
-
-  const vague = order.acceptance.filter((c) => VAGUE.test(c.statement))
-  if (vague.length > 0) {
-    findings.push({
-      rule: 'unfalsifiable-statement',
-      category: 'unprovable',
-      severity: 'high',
-      text: 'A criterion promises an improvement without saying how anyone would know. Give it a statement that can be false.',
-      subjectIds: vague.map((c) => c.id),
-    })
-  }
-
+const ATTACKS: readonly Attack[] = [
+  {
+    rule: 'outcome-restates-problem',
+    category: 'unprovable',
+    severity: 'medium',
+    text: 'The outcome repeats the problem back. Say what will be observably different, not that the problem will be gone.',
+    subjects: (order) => {
+      const problem = normalise(order.intent.problem)
+      return problem !== '' && problem === normalise(order.intent.outcome) ? [order.id] : []
+    },
+  },
+  {
+    rule: 'no-non-goals',
+    category: 'scope',
+    severity: 'low',
+    text: 'The order excludes nothing. An order with no boundary is one an agent can widen without contradicting it.',
+    subjects: (order) => (order.intent.nonGoals.length === 0 ? [order.id] : []),
+  },
+  {
+    rule: 'unfalsifiable-statement',
+    category: 'unprovable',
+    severity: 'high',
+    text: 'A criterion promises an improvement without saying how anyone would know. Give it a statement that can be false.',
+    subjects: (order) => order.acceptance.filter((c) => VAGUE.test(c.statement)).map((c) => c.id),
+  },
   // A P0 criterion decided only by judgement has no exit status behind it, and
   // the most important thing in the order then rests on an opinion.
-  const judgedP0 = order.acceptance.filter(
-    (c) => c.priority === 'P0' && (c.verify.kind === 'judge' || c.verify.kind === 'screenshot')
-  )
-  if (judgedP0.length > 0) {
-    findings.push({
-      rule: 'p0-judged-not-run',
-      category: 'unprovable',
-      severity: 'high',
-      text: 'The highest-priority criterion is proved only by judgement. Give it something with an exit status as well.',
-      subjectIds: judgedP0.map((c) => c.id),
-    })
-  }
-
-  const touchless = order.plan.units.filter((u) => u.touches.length === 0)
-  if (touchless.length > 0) {
-    findings.push({
-      rule: 'unit-touches-nothing',
-      category: 'process',
-      severity: 'medium',
-      text: 'A unit declares no files. Nothing can predict its collisions, and the risk grade cannot see it.',
-      subjectIds: touchless.map((u) => u.id),
-    })
-  }
-
+  {
+    rule: 'p0-judged-not-run',
+    category: 'unprovable',
+    severity: 'high',
+    text: 'The highest-priority criterion is proved only by judgement. Give it something with an exit status as well.',
+    subjects: (order) =>
+      order.acceptance
+        .filter(
+          (c) =>
+            c.priority === 'P0' && (c.verify.kind === 'judge' || c.verify.kind === 'screenshot')
+        )
+        .map((c) => c.id),
+  },
+  {
+    rule: 'unit-touches-nothing',
+    category: 'process',
+    severity: 'medium',
+    text: 'A unit declares no files. Nothing can predict its collisions, and the risk grade cannot see it.',
+    subjects: (order) => order.plan.units.filter((u) => u.touches.length === 0).map((u) => u.id),
+  },
   // Every unit waiting on the one before it means nothing runs in parallel and
   // the agent budget buys nothing. Worth challenging past a few units.
-  if (order.plan.units.length >= 3) {
-    const independent = order.plan.units.filter((u) => u.dependsOn.length === 0)
-    if (independent.length === 1) {
-      findings.push({
-        rule: 'fully-serial-plan',
-        category: 'process',
-        severity: 'low',
-        text: 'Every unit waits on the one before it, so nothing runs in parallel. Check the dependencies are real.',
-        subjectIds: order.plan.units.map((u) => u.id),
-      })
-    }
-  }
+  {
+    rule: 'fully-serial-plan',
+    category: 'process',
+    severity: 'low',
+    text: 'Every unit waits on the one before it, so nothing runs in parallel. Check the dependencies are real.',
+    subjects: ({ plan }) =>
+      plan.units.length >= 3 && plan.units.filter((u) => u.dependsOn.length === 0).length === 1
+        ? plan.units.map((u) => u.id)
+        : [],
+  },
+  {
+    rule: 'touches-release-machinery',
+    category: 'regression',
+    severity: 'high',
+    text: 'A unit changes how the project ships, not what it does. That is rarely what the order asked for.',
+    subjects: (order) =>
+      order.plan.units
+        .filter((u) => u.touches.some((p) => RELEASE_MACHINERY.test(p)))
+        .map((u) => u.id),
+  },
+  {
+    rule: 'no-runnable-check',
+    category: 'infra',
+    severity: 'high',
+    text: 'This repository has no command for any check. Nothing here can be proved by running it — decide that deliberately before starting.',
+    subjects: (order) =>
+      CHECK_NAMES.every((name) => order.context.toolchain[name] === null) ? [order.id] : [],
+  },
+]
 
-  const release = order.plan.units.filter((u) => u.touches.some((p) => RELEASE_MACHINERY.test(p)))
-  if (release.length > 0) {
-    findings.push({
-      rule: 'touches-release-machinery',
-      category: 'regression',
-      severity: 'high',
-      text: 'A unit changes how the project ships, not what it does. That is rarely what the order asked for.',
-      subjectIds: release.map((u) => u.id),
-    })
-  }
-
-  if (CHECK_NAMES.every((name) => order.context.toolchain[name] === null)) {
-    findings.push({
-      rule: 'no-runnable-check',
-      category: 'infra',
-      severity: 'high',
-      text: 'This repository has no command for any check. Nothing here can be proved by running it — decide that deliberately before starting.',
-      subjectIds: [order.id],
-    })
-  }
-
-  return findings
+/** @internal */
+export function structuralFindings(order: WorkOrder): Finding[] {
+  return ATTACKS.flatMap(({ subjects, ...attack }) => {
+    const subjectIds = subjects(order)
+    return subjectIds.length === 0 ? [] : [{ ...attack, subjectIds }]
+  })
 }
 
 /**

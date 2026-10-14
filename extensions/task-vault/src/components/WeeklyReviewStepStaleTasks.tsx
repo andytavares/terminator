@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { notify } from '../utils/notify'
 import type { IndexedTask } from '../vault/types'
 import { logReviewAction, type ReviewActionKind } from '../utils/review-log'
+import { Button } from '@terminator/extension-ui'
 
 interface Props {
   staleTasks: IndexedTask[]
@@ -10,19 +11,87 @@ interface Props {
   reviewId: string | null
 }
 
-export function WeeklyReviewStepStaleTasks({
-  staleTasks: initialTasks,
-  staleDaysThreshold,
-  onComplete,
-  reviewId,
-}: Props): React.JSX.Element {
+/** One way off the stale list: its channel, how it is logged, and what a failure says. */
+interface StaleMove {
+  channel: string
+  extra?: Record<string, unknown>
+  action: ReviewActionKind
+  failure: string
+  key: string
+}
+
+const BACKLOG: StaleMove = {
+  channel: 'task-vault:vault:process-inbox-item',
+  extra: { action: 'someday' },
+  action: 'task-backlogged',
+  failure: 'Could not move to backlog',
+  key: 'staleTaskBacklogFailed',
+}
+const DELETE: StaleMove = {
+  channel: 'task-vault:vault:cancel-task',
+  action: 'task-deleted',
+  failure: 'Could not delete task',
+  key: 'staleTaskDeleteFailed',
+}
+const KEEP: StaleMove = {
+  channel: 'task-vault:vault:reset-today-since',
+  action: 'task-kept',
+  failure: 'Could not reset task',
+  key: 'staleTaskResetFailed',
+}
+
+interface RowProps {
+  task: IndexedTask
+  onMove: (taskId: string, move: StaleMove) => void
+}
+
+function StaleTaskRow({ task, onMove }: RowProps): React.JSX.Element {
+  return (
+    <li className="wr-step__item wr-step__item--stale">
+      <span className="wr-step__project-name">
+        {task.text}
+        {task.todaySince && (
+          <span className="wr-step__stale-badge" title={`In today view since ${task.todaySince}`}>
+            since {task.todaySince}
+          </span>
+        )}
+      </span>
+      <span className="wr-step__project-actions">
+        <Button onClick={() => onMove(task.id, BACKLOG)} title="Move to backlog">
+          Backlog
+        </Button>
+        <Button variant="danger" onClick={() => onMove(task.id, DELETE)} title="Cancel task">
+          Delete
+        </Button>
+        <Button
+          variant="ghost"
+          onClick={() => onMove(task.id, KEEP)}
+          title="Keep rolling over (reset stale timer)"
+        >
+          Keep
+        </Button>
+      </span>
+    </li>
+  )
+}
+
+/** The stale tasks still to decide on, and the move that takes one off the list. */
+function useStaleTasks(initialTasks: IndexedTask[], reviewId: string | null) {
   const [tasks, setTasks] = useState(initialTasks)
 
-  function remove(taskId: string, action: ReviewActionKind) {
+  async function move(taskId: string, how: StaleMove) {
+    const result = await window.electronAPI.extensionBridge.invoke(how.channel, {
+      taskId,
+      ...how.extra,
+    })
+    if (typeof result === 'object' && result !== null && 'error' in result) {
+      notify('error', `${how.failure}: ${result.error}`, how.key)
+      return
+    }
     const task = tasks.find((t) => t.id === taskId)
     logReviewAction(reviewId, {
       step: 4,
-      action,
+      action: how.action,
       entityType: 'task',
       entityId: taskId,
       entityLabel: task?.text ?? taskId,
@@ -30,41 +99,12 @@ export function WeeklyReviewStepStaleTasks({
     setTasks((prev) => prev.filter((t) => t.id !== taskId))
   }
 
-  async function handleBacklog(taskId: string) {
-    const result = await window.electronAPI.extensionBridge.invoke(
-      'task-vault:vault:process-inbox-item',
-      { taskId, action: 'someday' }
-    )
-    if (result && 'error' in result) {
-      notify('error', `Could not move to backlog: ${result.error}`, 'staleTaskBacklogFailed')
-      return
-    }
-    remove(taskId, 'task-backlogged')
-  }
+  return { tasks, move }
+}
 
-  async function handleDelete(taskId: string) {
-    const result = await window.electronAPI.extensionBridge.invoke('task-vault:vault:cancel-task', {
-      taskId,
-    })
-    if (result && 'error' in result) {
-      notify('error', `Could not delete task: ${result.error}`, 'staleTaskDeleteFailed')
-      return
-    }
-    remove(taskId, 'task-deleted')
-  }
-
-  async function handleKeep(taskId: string) {
-    const result = await window.electronAPI.extensionBridge.invoke(
-      'task-vault:vault:reset-today-since',
-      { taskId }
-    )
-    if (result && 'error' in result) {
-      notify('error', `Could not reset task: ${result.error}`, 'staleTaskResetFailed')
-      return
-    }
-    remove(taskId, 'task-kept')
-  }
-
+export function WeeklyReviewStepStaleTasks(props: Props): React.JSX.Element {
+  const { staleDaysThreshold, onComplete } = props
+  const { tasks, move } = useStaleTasks(props.staleTasks, props.reviewId)
   return (
     <div className="wr-step wr-step-stale">
       <h3>Step 4: Stale Tasks</h3>
@@ -73,57 +113,19 @@ export function WeeklyReviewStepStaleTasks({
         {staleDaysThreshold !== 1 ? 's' : ''}. Send them to the backlog, delete them, or keep them
         as-is.
       </p>
-
       {tasks.length === 0 && (
         <p className="wr-step__done">No stale tasks — nice work staying on top of things.</p>
       )}
-
       {tasks.length > 0 && (
         <ul className="wr-step__list">
           {tasks.map((task) => (
-            <li key={task.id} className="wr-step__item wr-step__item--stale">
-              <span className="wr-step__project-name">
-                {task.text}
-                {task.todaySince && (
-                  <span
-                    className="wr-step__stale-badge"
-                    title={`In today view since ${task.todaySince}`}
-                  >
-                    since {task.todaySince}
-                  </span>
-                )}
-              </span>
-              <span className="wr-step__project-actions">
-                <button
-                  className="tv-btn tv-btn--secondary"
-                  onClick={() => void handleBacklog(task.id)}
-                  title="Move to backlog"
-                >
-                  Backlog
-                </button>
-                <button
-                  className="tv-btn tv-btn--ghost tv-btn--danger-text"
-                  onClick={() => void handleDelete(task.id)}
-                  title="Cancel task"
-                >
-                  Delete
-                </button>
-                <button
-                  className="tv-btn tv-btn--ghost"
-                  onClick={() => void handleKeep(task.id)}
-                  title="Keep rolling over (reset stale timer)"
-                >
-                  Keep
-                </button>
-              </span>
-            </li>
+            <StaleTaskRow key={task.id} task={task} onMove={(id, how) => void move(id, how)} />
           ))}
         </ul>
       )}
-
-      <button className="tv-btn tv-btn--primary" onClick={onComplete}>
+      <Button variant="primary" onClick={onComplete}>
         Next: someday
-      </button>
+      </Button>
     </div>
   )
 }

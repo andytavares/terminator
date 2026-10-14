@@ -1,5 +1,6 @@
-import { Markdown, MarkdownInline } from './Markdown.js'
-import React, { useCallback, useEffect, useState } from 'react'
+import { Button, Markdown } from '@terminator/extension-ui'
+import { openInBrowser } from '@terminator/extension-sdk/renderer'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Check,
   X,
@@ -28,6 +29,7 @@ import { PROPOSAL_FILE } from '../order/proposal.js'
 import { openingStep, forgeSteps, type StepId } from '../forge/steps.js'
 import { budgetsInWords } from '../order/render.js'
 import { BudgetForm } from './BudgetForm.js'
+import { usePushed } from '../renderer/use-pushed.js'
 import { ReasonButton } from './ReasonButton.js'
 import {
   readiness,
@@ -44,6 +46,7 @@ import {
   type StripIcon,
   type StepMark,
 } from '../forge/readiness.js'
+import { invoke } from '@terminator/extension-sdk/renderer'
 
 // The Forge.
 //
@@ -53,7 +56,7 @@ import {
 // them, and why every control that can be unavailable is unavailable. This
 // component draws what it returns and decides nothing about state itself.
 
-export interface OrderView {
+interface OrderView {
   order: WorkOrder
   compile: CompileResult
   changed?: string[]
@@ -66,9 +69,6 @@ export interface OrderView {
   turnEndedAt?: string | null
   advisory?: string | null
 }
-
-/** How often the document is refetched while the architect is working. */
-const REDRAFT_POLL_MS = 3000
 
 interface StatesView {
   capability?: CapabilityReport
@@ -253,8 +253,15 @@ function goTo(target: string): void {
   element.focus({ preventScroll: true })
 }
 
-function invoke(channel: string, payload: unknown): Promise<unknown> {
-  return window.electronAPI.extensionBridge.invoke(channel, payload)
+async function readCompiled(orderId: string): Promise<OrderView | null> {
+  const next = (await invoke('foundry:order.compile', { id: orderId, commit: false })) as
+    | OrderView
+    | { error: string }
+  return 'error' in next ? null : next
+}
+
+async function readRecipes(orderId: string): Promise<RecipesView> {
+  return (await invoke('foundry:run.recipes', { id: orderId })) as RecipesView
 }
 
 function clockOf(iso: string): string {
@@ -322,40 +329,147 @@ const GROUP_META: Record<FindingGroup, { readonly heading: string; readonly cls:
   resolved: { heading: 'Resolved', cls: 'done' },
 }
 
+/** A group's findings, each its text and where it came from. */
+function FindingRows({ findings }: { readonly findings: readonly FindingView[] }): JSX.Element {
+  return (
+    <>
+      {findings.map((finding) => (
+        <div key={finding.id} className="fdry-fnd">
+          <span className="fdry-fnd-text">
+            <Markdown inline fetchesNothing className="fdry-md-inline" onOpenLink={openInBrowser}>
+              {finding.text}
+            </Markdown>
+          </span>
+          <span className="fdry-fnd-meta">{finding.meta}</span>
+        </div>
+      ))}
+    </>
+  )
+}
+
 export function Forge({ orderId, onStarted, standing }: ForgeProps): JSX.Element {
-  const [view, setView] = useState<OrderView | null>(null)
-  const [busy, setBusy] = useState(false)
+  const state = useForgeState(orderId, onStarted)
+  if (state.view === null) {
+    return <div className="fdry-empty">Loading the order…</div>
+  }
+  return <ForgeWizard forge={deriveForge(state, state.view, standing)} />
+}
+
+/** Everything the Forge keeps, with its hooks and effects in the order they ran. */
+function useForgeState(orderId: string, onStarted: ForgeProps['onStarted']) {
+  const setFocusTarget = useFocusTarget()
+  const choices = useChoices()
+  const shown = useOrderView(orderId)
+  const tracker = useTrackerStates(orderId)
+  const shapes = useRecipes(orderId)
+  const writeBack = useWriteBack(orderId, shown.setView)
+  const edits = useOrderEdits(orderId, shown)
+  const talk = useConverge(orderId, shown)
+  const moves = useOrderMoves(orderId, { shown, shapes })
+  const handOff = useHandOff({ orderId, onStarted, shown, shapes })
+  useQueuedSettle(shown.view, choices, talk.applySettle)
+  return {
+    orderId,
+    onStarted,
+    setFocusTarget,
+    ...choices,
+    ...shown,
+    ...tracker,
+    ...writeBack,
+    handOff,
+    ...shapes,
+    ...edits,
+    ...talk,
+    ...moves,
+  }
+}
+
+type ForgeState = ReturnType<typeof useForgeState>
+
+/** Moves focus to an element by id. An object, so asking for the same target twice is two requests. */
+function useFocusTarget() {
+  const [focusTarget, setFocusTarget] = useState<{ readonly target: string } | null>(null)
+  useEffect(() => {
+    if (focusTarget !== null) goTo(focusTarget.target)
+  }, [focusTarget])
+  return setFocusTarget
+}
+
+/** What the operator has chosen on this screen and not yet sent. */
+function useChoices() {
   const [draft, setDraft] = useState('')
-  const [problem, setProblem] = useState<string | null>(null)
-  const [states, setStates] = useState<StatesView | null>(null)
-  const [moved, setMoved] = useState<string[]>([])
   const [questionChoices, setQuestionChoices] = useState<Record<string, number>>({})
   const [findingChoice, setFindingChoice] = useState<Record<string, FindingChoice>>({})
   const [queuedSettle, setQueuedSettle] = useState<Settle | null>(null)
+  const [picked, setPicked] = useState<StepId | null>(null)
+  return {
+    draft,
+    setDraft,
+    questionChoices,
+    setQuestionChoices,
+    findingChoice,
+    setFindingChoice,
+    queuedSettle,
+    setQueuedSettle,
+    picked,
+    setPicked,
+    ...useUnproven(),
+  }
+}
+
+/** The criterion being marked unprovable, and the reason typed for it. */
+function useUnproven() {
   const [unproven, setUnproven] = useState<string | null>(null)
   const [unprovenReason, setUnprovenReason] = useState('')
-  const [recipes, setRecipes] = useState<RecipesView | null>(null)
-  const [picked, setPicked] = useState<StepId | null>(null)
-  const [focusTarget, setFocusTarget] = useState<string | null>(null)
+  return { unproven, setUnproven, unprovenReason, setUnprovenReason }
+}
 
-  useEffect(() => {
-    if (focusTarget === null) return
-    goTo(focusTarget)
-    setFocusTarget(null)
-  }, [focusTarget])
+type Choices = ReturnType<typeof useChoices>
 
-  const refresh = useCallback(async () => {
-    const next = (await invoke('foundry:order.compile', { id: orderId, commit: false })) as
-      | OrderView
-      | { error: string }
-    if ('error' in next) return
-    setView(next)
-  }, [orderId])
+/** Whether a change is in flight, and what the last one said; `busyWith` brackets one. */
+function useBusy() {
+  const [busy, setBusy] = useState(false)
+  const [problem, setProblem] = useState<string | null>(null)
+  const busyWith = useCallback(async (work: () => Promise<void>): Promise<void> => {
+    setBusy(true)
+    setProblem(null)
+    try {
+      await work()
+    } finally {
+      setBusy(false)
+    }
+  }, [])
+  return { busy, setBusy, problem, setProblem, busyWith }
+}
 
-  useEffect(() => {
-    void refresh()
-  }, [refresh])
+/** The order as compiled, what the last turn moved, and reading it again. */
+function useOrderView(orderId: string) {
+  const [view, setView] = useState<OrderView | null>(null)
+  const busy = useBusy()
+  const [moved, setMoved] = useState<string[]>([])
+  const showCompiled = useCallback((next: OrderView | null): void => {
+    if (next !== null) setView(next)
+  }, [])
+  const refresh = useCallback(
+    () => readCompiled(orderId).then(showCompiled),
+    [orderId, showCompiled]
+  )
+  // While the architect is redrafting, the order, its ledger and the intake
+  // session change under this view; Foundry says when. Nothing is pushed for a
+  // settled order, so only a draft listens.
+  const readThisOrder = useCallback(() => readCompiled(orderId), [orderId])
+  usePushed(readThisOrder, showCompiled, {
+    kinds: view?.order.status === 'draft' ? ['order', 'ledger', 'live'] : [],
+    orderId,
+  })
+  return { view, setView, ...busy, moved, setMoved, refresh }
+}
 
+type Shown = ReturnType<typeof useOrderView>
+
+/** The tracker's states and this order's mapping onto them. */
+function useTrackerStates(orderId: string) {
+  const [states, setStates] = useState<StatesView | null>(null)
   useEffect(() => {
     let live = true
     void (async () => {
@@ -366,43 +480,6 @@ export function Forge({ orderId, onStarted, standing }: ForgeProps): JSX.Element
       live = false
     }
   }, [orderId])
-
-  const refreshRecipes = useCallback(async () => {
-    const next = (await invoke('foundry:run.recipes', { id: orderId })) as RecipesView
-    setRecipes(next)
-  }, [orderId])
-
-  useEffect(() => {
-    void refreshRecipes()
-  }, [refreshRecipes])
-
-  const setWriteBack = useCallback(
-    async (writeBack: WriteBack[]) => {
-      const next = (await invoke('foundry:order.writeBack', { id: orderId, writeBack })) as
-        | OrderView
-        | { error: string }
-      if ('order' in next) setView(next)
-    },
-    [orderId]
-  )
-
-  const setBudgets = useCallback(
-    async (budgets: Record<string, number | null>) => {
-      setBusy(true)
-      setProblem(null)
-      try {
-        const next = (await invoke('foundry:order.budgets', { id: orderId, budgets })) as
-          | OrderView
-          | { error: string }
-        if ('order' in next) setView(next)
-        else setProblem(next.error)
-      } finally {
-        setBusy(false)
-      }
-    },
-    [orderId]
-  )
-
   const mapIntent = useCallback(
     async (intent: TransitionIntent, optionId: string | null) => {
       const next = (await invoke('foundry:order.mapState', { id: orderId, intent, optionId })) as {
@@ -414,12 +491,51 @@ export function Forge({ orderId, onStarted, standing }: ForgeProps): JSX.Element
     },
     [orderId]
   )
+  return { states, mapIntent }
+}
 
+/** The shapes this order could take, and reading them again. */
+function useRecipes(orderId: string) {
+  const [recipes, setRecipes] = useState<RecipesView | null>(null)
+  const refreshRecipes = useCallback(() => readRecipes(orderId).then(setRecipes), [orderId])
+  useEffect(() => {
+    void readRecipes(orderId).then(setRecipes)
+  }, [orderId])
+  return { recipes, refreshRecipes }
+}
+
+type Shapes = ReturnType<typeof useRecipes>
+
+/** What this order writes back to its issue. */
+function useWriteBack(orderId: string, setView: Shown['setView']) {
+  const setWriteBack = useCallback(
+    async (writeBack: WriteBack[]) => {
+      const next = (await invoke('foundry:order.writeBack', { id: orderId, writeBack })) as
+        | OrderView
+        | { error: string }
+      if ('order' in next) setView(next)
+    },
+    [orderId, setView]
+  )
+  return { setWriteBack }
+}
+
+/** Edits that are not a turn of the architect's: budgets, and a struck or excused line. */
+function useOrderEdits(orderId: string, { setView, setProblem, setMoved, busyWith }: Shown) {
+  const setBudgets = useCallback(
+    (budgets: Record<string, number | null>) =>
+      busyWith(async () => {
+        const next = (await invoke('foundry:order.budgets', { id: orderId, budgets })) as
+          | OrderView
+          | { error: string }
+        if ('order' in next) setView(next)
+        else setProblem(next.error)
+      }),
+    [orderId, busyWith, setView, setProblem]
+  )
   const turn = useCallback(
-    async (payload: Record<string, unknown>) => {
-      setBusy(true)
-      setProblem(null)
-      try {
+    (payload: Record<string, unknown>) =>
+      busyWith(async () => {
         const next = (await invoke('foundry:order.turn', { id: orderId, ...payload })) as
           | (OrderView & { error?: string })
           | { error: string }
@@ -428,31 +544,59 @@ export function Forge({ orderId, onStarted, standing }: ForgeProps): JSX.Element
           setMoved(next.changed ?? [])
         }
         if (next.error !== undefined) setProblem(next.error)
-      } finally {
-        setBusy(false)
-      }
-    },
-    [orderId]
+      }),
+    [orderId, busyWith, setView, setMoved, setProblem]
   )
+  return { setBudgets, turn }
+}
 
-  const converge = useCallback(
-    async (message?: string) => {
-      setBusy(true)
-      setProblem(null)
-      try {
-        const next = (await invoke('foundry:order.converge', {
-          id: orderId,
-          ...(message === undefined ? {} : { message }),
-        })) as (OrderView & { error?: string; converging?: string }) | { error: string }
+/** One converge turn: a message from the operator, or a settle of the plan. */
+function useConverge(orderId: string, { setView, setProblem, busyWith }: Shown) {
+  const sendConverge = useCallback(
+    (turn: { message?: string; settle?: Settle }) =>
+      busyWith(async () => {
+        const next = (await invoke('foundry:order.converge', { id: orderId, ...turn })) as
+          | (OrderView & { error?: string; converging?: string })
+          | { error: string }
         if ('order' in next) setView(next)
         if (next.error !== undefined) setProblem(next.error)
-      } finally {
-        setBusy(false)
-      }
-    },
-    [orderId]
+      }),
+    [orderId, busyWith, setView, setProblem]
   )
+  const converge = useCallback(
+    (message?: string) => sendConverge(message === undefined ? {} : { message }),
+    [sendConverge]
+  )
+  const applySettle = useCallback((settle: Settle) => sendConverge({ settle }), [sendConverge])
+  return { converge, applySettle }
+}
 
+/** Agrees the order; what compile said, which is the order or why not. */
+async function commitOrder(orderId: string): Promise<OrderView | { error: string }> {
+  return (await invoke('foundry:order.compile', { id: orderId, commit: true })) as
+    | OrderView
+    | { error: string }
+}
+
+/** Starts the agreed order's run in the shape chosen, if one was; why not, when it did not start. */
+async function startAgreedRun(
+  orderId: string,
+  chosen: string | null | undefined
+): Promise<string | null> {
+  const started = (await invoke('foundry:run.start', {
+    id: orderId,
+    ...(chosen != null ? { recipe: chosen } : {}),
+  })) as {
+    error?: string
+    order?: { status: string }
+  }
+  return started.error ?? null
+}
+
+/** Holding the order, and picking its shape. */
+function useOrderMoves(orderId: string, { shown, shapes }: Pick<HandOffDeps, 'shown' | 'shapes'>) {
+  const { setBusy, refresh } = shown
+  const { refreshRecipes } = shapes
   const holdOrder = useCallback(
     async (held: boolean) => {
       setBusy(true)
@@ -463,9 +607,8 @@ export function Forge({ orderId, onStarted, standing }: ForgeProps): JSX.Element
         setBusy(false)
       }
     },
-    [orderId, refresh]
+    [orderId, refresh, setBusy]
   )
-
   const pickRecipe = useCallback(
     async (recipe: string | null) => {
       await invoke('foundry:order.recipe', { id: orderId, recipe })
@@ -473,298 +616,262 @@ export function Forge({ orderId, onStarted, standing }: ForgeProps): JSX.Element
     },
     [orderId, refresh, refreshRecipes]
   )
+  return { holdOrder, pickRecipe }
+}
 
-  const intake: IntakeOutcome = view?.intake ?? { kind: 'none' }
-  const drafting = intake.kind === 'running'
-  const asked = intake.kind === 'running' ? intake.asked : null
-  const locked = busy || drafting
+interface HandOffDeps {
+  readonly orderId: string
+  readonly onStarted: ForgeProps['onStarted']
+  readonly shown: Shown
+  readonly shapes: Shapes
+}
 
-  const orderStatus = view === null ? null : view.order.status
-  useEffect(() => {
-    if (orderStatus !== 'draft') return
-    const timer = setInterval(() => void refresh(), REDRAFT_POLL_MS)
-    return () => clearInterval(timer)
-  }, [orderStatus, refresh])
-
-  const applySettle = useCallback(
-    async (settle: Settle) => {
-      setBusy(true)
-      setProblem(null)
-      try {
-        const next = (await invoke('foundry:order.converge', { id: orderId, settle })) as
-          | (OrderView & { error?: string; converging?: string })
-          | { error: string }
-        if ('order' in next) setView(next)
-        if (next.error !== undefined) setProblem(next.error)
-      } finally {
-        setBusy(false)
-      }
-    },
-    [orderId]
+/** Agrees the order and starts its run in the shape chosen. */
+function useHandOff({ orderId, onStarted, shown, shapes }: HandOffDeps) {
+  const { setView, setProblem, busyWith } = shown
+  const chosen = shapes.recipes?.chosen
+  return useCallback(
+    () =>
+      busyWith(async () => {
+        const next = await commitOrder(orderId)
+        if ('error' in next) {
+          setProblem(next.error)
+          return
+        }
+        setView(next)
+        if (next.order.status !== 'agreed') return
+        const trouble = await startAgreedRun(orderId, chosen)
+        if (trouble !== null) {
+          setProblem(`The order is agreed, but the run did not start: ${trouble}`)
+          return
+        }
+        onStarted?.(orderId)
+      }),
+    [orderId, onStarted, chosen, busyWith, setView, setProblem]
   )
+}
 
+/** The turn that was queued behind is sent once; it clears when it has been. */
+function useQueuedSettle(
+  view: OrderView | null,
+  { queuedSettle, setQueuedSettle }: Choices,
+  applySettle: (settle: Settle) => Promise<void>
+): void {
+  const drafting = view?.intake?.kind === 'running'
+  const sentSettle = useRef<Settle | null>(null)
   useEffect(() => {
-    if (drafting || queuedSettle === null) return
-    const toSend = queuedSettle
-    setQueuedSettle(null)
-    void applySettle(toSend)
-  }, [drafting, queuedSettle, applySettle])
+    if (drafting || queuedSettle === null || sentSettle.current === queuedSettle) return
+    sentSettle.current = queuedSettle
+    void applySettle(queuedSettle).then(() => setQueuedSettle(null))
+  }, [drafting, queuedSettle, applySettle, setQueuedSettle])
+}
 
-  const handOff = useCallback(async () => {
-    setBusy(true)
-    setProblem(null)
-    try {
-      const next = (await invoke('foundry:order.compile', { id: orderId, commit: true })) as
-        | OrderView
-        | { error: string }
-      if ('error' in next) {
-        setProblem(next.error)
-        return
-      }
-      setView(next)
-      if (next.order.status !== 'agreed') return
-
-      const started = (await invoke('foundry:run.start', {
-        id: orderId,
-        ...(recipes?.chosen != null ? { recipe: recipes.chosen } : {}),
-      })) as {
-        error?: string
-        order?: { status: string }
-      }
-      if (started.error !== undefined) {
-        setProblem(`The order is agreed, but the run did not start: ${started.error}`)
-        return
-      }
-      onStarted?.(orderId)
-    } finally {
-      setBusy(false)
-    }
-  }, [orderId, onStarted, recipes?.chosen])
-
-  if (view === null) {
-    return <div className="fdry-empty">Loading the order…</div>
-  }
-
-  const { order, compile } = view
-  const isDraft = order.status === 'draft'
-  const matrix = coverageMatrix(order)
-  const questions = surfacedQuestions(order.openQuestions)
-  const assumptions = liveAssumptions(order)
-  const blockingFindings = order.redTeam.filter((f) => f.status === 'open' && isBlocking(f))
-
-  const offers = {
+/** The shapes on offer and whether the tracker step is: what decides which steps there are. */
+function offersOf({ recipes, states }: Pick<ForgeState, 'recipes' | 'states'>) {
+  return {
     shape: (recipes?.recipes?.length ?? 0) > 0,
     tracker: states?.capability !== undefined && states.capability.transitions !== 'no_issue',
   }
+}
 
-  const shapeName = recipes?.chosen ?? recipes?.proposed ?? order.recipe ?? null
-  const shapeYours =
-    recipes?.chosen !== null && recipes?.chosen !== undefined && recipes.chosen !== recipes.proposed
+/** The shape the operator picked, when it is not the one proposed; null otherwise. */
+function ownChoice(recipes: RecipesView | null): string | null {
+  const chosen = recipes?.chosen
+  return chosen !== null && chosen !== undefined && chosen !== recipes?.proposed ? chosen : null
+}
 
-  const r = readiness({
-    order,
-    compile,
-    intake,
+function shapeNameOf(recipes: RecipesView | null, order: WorkOrder): string | null {
+  return recipes?.chosen ?? recipes?.proposed ?? order.recipe ?? null
+}
+
+/** What the loop, the agreement and the last turn say, with what each means when absent. */
+function settledFacts(view: OrderView) {
+  return {
     loop: view.loop ?? { rounds: [], heldAt: null, exhausted: false },
     agreed: view.agreed ?? null,
     turnEndedAt: view.turnEndedAt ?? null,
-    shape: { name: shapeName, yours: shapeYours },
-    offers,
-    turn: standing?.turn,
-    clock: clockOf,
-  })
+  }
+}
 
+interface StepPlace {
+  readonly order: WorkOrder
+  readonly compile: CompileResult
+  readonly offers: ReturnType<typeof offersOf>
+  readonly picked: StepId | null
+}
+
+/** The step on screen — the one picked, or the one the order opens on — and its neighbours. */
+function stepsAround(
+  r: ReturnType<typeof readiness>,
+  { order, compile, offers, picked }: StepPlace
+) {
   const forgeStepList = forgeSteps(compile, offers)
   const pickedIndex = r.steps.findIndex((each) => each.id === picked)
   const index =
     pickedIndex !== -1
       ? pickedIndex
       : r.steps.findIndex((each) => each.id === openingStep(order, forgeStepList))
-  const stepView = r.steps[Math.max(index, 0)]
-  const previous = r.steps[index - 1]
-  const next = r.steps[index + 1]
-
-  const openStep = (id: StepId): void => {
-    setPicked(id)
-    setFocusTarget(STEP_HEADING)
+  return {
+    stepView: r.steps[Math.max(index, 0)],
+    previous: r.steps[index - 1],
+    next: r.steps[index + 1],
   }
+}
 
-  const noCriteria =
-    order.source.kind === 'tracker'
-      ? `Nothing under an acceptance heading in ${order.source.key ?? 'the ticket'}. Press “Draft the plan” and the architect will write the criteria from what it does say.`
-      : 'No criteria yet. Nothing writes them but the architect — press “Draft the plan”.'
-
-  const askReason = locked ? (r.locks.redraft ?? LOCAL_REASONS.saving) : null
-
-  /**
-   * What the operator can do about a row.
-   *
-   * A row the machine is closing offers nothing but the "Asked" marker for the
-   * ask it is answering; a failing or needs-you row offers its moves.
-   */
-  const renderMoves = (row: Row): JSX.Element | null => {
-    if (row.state === 'passed') return null
-    if (row.id === 'turn') {
-      if (row.state !== 'failing' || intake.kind !== 'refused') return null
-      const reason = intake.reason
-      return (
-        <div className="fdry-chk-moves">
-          <ReasonButton
-            reason={askReason}
-            onClick={() =>
-              void converge(
-                `Your last proposal was refused and nothing was changed. The reason: ${reason}. Write ${PROPOSAL_FILE} again, fixing exactly that and changing nothing else.`
-              )
-            }
-          >
-            {TURN_REMEDY_LABEL}
-          </ReasonButton>
-        </div>
-      )
-    }
-    const remedies = CHECK_REMEDIES[row.id]
-    if (row.state === 'in-progress') {
-      const answering = remedies.find((remedy) => remedy.kind === 'ask' && asked === remedy.message)
-      return answering === undefined ? null : (
-        <div className="fdry-chk-moves">
-          <Asked />
-        </div>
-      )
-    }
-    return (
-      <div className="fdry-chk-moves">
-        {remedies.map((remedy) => {
-          if (remedy.kind === 'ask' && drafting) {
-            return asked === remedy.message ? <Asked key={remedy.label} /> : null
-          }
-          if (remedy.kind === 'goto') {
-            return (
-              <button
-                key={remedy.label}
-                type="button"
-                className="fdry-btn"
-                onClick={() => {
-                  if (remedy.step !== null) setPicked(remedy.step)
-                  setFocusTarget(remedy.target)
-                }}
-              >
-                {remedy.label}
-              </button>
-            )
-          }
-          return (
-            <ReasonButton
-              key={remedy.label}
-              reason={askReason}
-              onClick={() => void converge(remedy.message)}
-            >
-              {remedy.label}
-            </ReasonButton>
-          )
-        })}
-      </div>
-    )
-  }
-
-  const renderRow = (row: Row): JSX.Element => (
-    <div key={row.id} className={`fdry-chk${row.state === 'in-progress' ? ' fdry-chk--work' : ''}`}>
-      <span className="fdry-chk-icon" aria-hidden="true">
-        <RowIcon state={row.state} />
-      </span>
-      <div>
-        <b>{row.label}</b>
-        <small>{row.detail}</small>
-        {renderMoves(row)}
-      </div>
-      <span className={`fdry-pill fdry-pill--${ROW_PILL[row.state].cls}`}>
-        {ROW_PILL[row.state].label}
-      </span>
-    </div>
-  )
-
-  /** A failing or in-progress plan check, on the step that clears it. */
-  const renderCheckRow = (id: CheckId): JSX.Element | null => {
-    const row = r.rows.find((each) => each.id === id)
-    return row === undefined || row.state === 'passed' ? null : renderRow(row)
-  }
-
-  /** The six hand-off rows, one per `readiness.rows` entry. */
-  const renderHandOffRow = renderRow
-
-  // Findings grouped by who acts on them, in the fixed order the rendering
-  // shows: fixing, needs-you, notes, resolved. An empty group is not shown.
-  const findingsByGroup: Record<FindingGroup, FindingView[]> = {
+// Findings grouped by who acts on them, in the order the rendering shows: fixing,
+// needs-you, notes, resolved. An empty group is not shown.
+function groupFindings(findings: readonly FindingView[]): Record<FindingGroup, FindingView[]> {
+  const byGroup: Record<FindingGroup, FindingView[]> = {
     fixing: [],
     'needs-you': [],
     notes: [],
     resolved: [],
   }
-  for (const finding of r.findings) findingsByGroup[finding.group].push(finding)
-  const needsYouFindings = findingsByGroup['needs-you']
-  const findingsDecided = needsYouFindings.filter((f) => findingDecided(findingChoice[f.id])).length
+  for (const finding of findings) byGroup[finding.group].push(finding)
+  return byGroup
+}
 
-  const openQuestions = questions
-  const questionsDecided = openQuestions.filter((q) => questionChoices[q.id] !== undefined).length
+/** What `readiness()` says of the order as kept, with what it was asked from. */
+function readinessOf(state: ForgeState, view: OrderView, standing: Standing | undefined) {
+  const { order, compile } = view
+  const intake: IntakeOutcome = view.intake ?? { kind: 'none' }
+  const offers = offersOf(state)
+  const shapeName = shapeNameOf(state.recipes, order)
+  const r = readiness({
+    order,
+    compile,
+    intake,
+    ...settledFacts(view),
+    shape: { name: shapeName, yours: ownChoice(state.recipes) !== null },
+    offers,
+    turn: standing?.turn,
+    clock: clockOf,
+  })
+  return { order, compile, intake, offers, shapeName, r }
+}
 
-  const stepNeedsYou =
-    stepView.id === 'redTeam'
-      ? { total: needsYouFindings.length, decided: findingsDecided }
-      : stepView.id === 'plan'
-        ? { total: openQuestions.length, decided: questionsDecided }
-        : { total: 0, decided: 0 }
-
-  const sendReason =
-    stepNeedsYou.total === 0
-      ? null
-      : queuedSettle !== null
-        ? LOCAL_REASONS.queued
-        : stepNeedsYou.decided === 0
-          ? LOCAL_REASONS.nothingDecided
-          : null
-
-  const sendDecisionsOnThisStep = (): void => {
-    if (stepView.id === 'redTeam') {
-      const settle = buildSettle({}, findingChoice)
-      setFindingChoice({})
-      if (drafting) {
-        setQueuedSettle(settle)
-        return
-      }
-      void applySettle(settle)
-      return
-    }
-    if (stepView.id === 'plan') {
-      const settle = buildSettle(questionChoices, {})
-      setQuestionChoices({})
-      if (drafting) {
-        setQueuedSettle(settle)
-        return
-      }
-      void applySettle(settle)
-    }
+/** Everything the Forge draws from: what it keeps, and what `readiness()` says of it. */
+function deriveForge(state: ForgeState, view: OrderView, standing: Standing | undefined) {
+  const { order, compile, intake, offers, shapeName, r } = readinessOf(state, view, standing)
+  const locked = state.busy || intake.kind === 'running'
+  const forge = {
+    ...state,
+    view,
+    order,
+    isDraft: order.status === 'draft',
+    intake,
+    drafting: intake.kind === 'running',
+    asked: intake.kind === 'running' ? intake.asked : null,
+    locked,
+    r,
+    shapeName,
+    ...stepsAround(r, { order, compile, offers, picked: state.picked }),
+    findingsByGroup: groupFindings(r.findings),
+    askReason: locked ? (r.locks.redraft ?? LOCAL_REASONS.saving) : null,
   }
+  return { ...forge, stepNeedsYou: needsYouOn(forge) }
+}
 
-  const handleAttach = (sessionId: string): void => {
-    void attachToSession(sessionId).then(setProblem)
+type ForgeModel = ReturnType<typeof deriveForge>
+interface ForgeProp {
+  readonly forge: ForgeModel
+}
+
+function decidedFindings(
+  findings: readonly FindingView[],
+  findingChoice: Readonly<Record<string, FindingChoice>>
+): number {
+  return findings.filter((f) => findingDecided(findingChoice[f.id])).length
+}
+
+function decidedQuestions(
+  questions: readonly { readonly id: string }[],
+  questionChoices: Readonly<Record<string, number>>
+): number {
+  return questions.filter((q) => questionChoices[q.id] !== undefined).length
+}
+
+interface StepDecisions extends Pick<ForgeState, 'findingChoice' | 'questionChoices'> {
+  readonly stepView: StepView
+  readonly findingsByGroup: Record<FindingGroup, FindingView[]>
+  readonly order: WorkOrder
+}
+
+/** How many decisions the step on screen asks of the operator, and how many are made. */
+function needsYouOn(forge: StepDecisions): { readonly total: number; readonly decided: number } {
+  if (forge.stepView.id === 'redTeam') {
+    const findings = forge.findingsByGroup['needs-you']
+    return { total: findings.length, decided: decidedFindings(findings, forge.findingChoice) }
   }
-
-  const runStripAction = (action: StripAction): void => {
-    if (action === 'hold') void holdOrder(true)
-    else if (action === 'release') void holdOrder(false)
-    else if (action === 'watch') {
-      if (intake.kind === 'running') handleAttach(intake.sessionId)
-    } else if (action === 'tell-architect') {
-      if (intake.kind === 'refused') {
-        void converge(
-          `Your last proposal was refused and nothing was changed. The reason: ${intake.reason}. Write ${PROPOSAL_FILE} again, fixing exactly that and changing nothing else.`
-        )
-      }
-    } else if (action === 'start-over') void converge()
-    else if (action === 'open-run') onStarted?.(orderId)
-    else if (action === 'draft') void converge()
+  if (forge.stepView.id === 'plan') {
+    const questions = surfacedQuestions(forge.order.openQuestions)
+    return { total: questions.length, decided: decidedQuestions(questions, forge.questionChoices) }
   }
+  return { total: 0, decided: 0 }
+}
 
-  const STRIP_ACTION_LABEL: Record<StripAction, string> = {
+function sendReasonOf({ stepNeedsYou, queuedSettle }: ForgeModel): string | null {
+  if (stepNeedsYou.total === 0) return null
+  if (queuedSettle !== null) return LOCAL_REASONS.queued
+  return stepNeedsYou.decided === 0 ? LOCAL_REASONS.nothingDecided : null
+}
+
+function openStep(forge: ForgeModel, id: StepId): void {
+  forge.setPicked(id)
+  forge.setFocusTarget({ target: STEP_HEADING })
+}
+
+/** The decisions made on this step, as one settle, cleared from the screen. */
+function takeDecisions(forge: ForgeModel): Settle | null {
+  if (forge.stepView.id === 'redTeam') {
+    const settle = buildSettle({}, forge.findingChoice)
+    forge.setFindingChoice({})
+    return settle
+  }
+  if (forge.stepView.id === 'plan') {
+    const settle = buildSettle(forge.questionChoices, {})
+    forge.setQuestionChoices({})
+    return settle
+  }
+  return null
+}
+
+/** Sends this step's decisions now, or queues them behind the turn the architect is taking. */
+function sendDecisionsOnThisStep(forge: ForgeModel): void {
+  const settle = takeDecisions(forge)
+  if (settle === null) return
+  if (forge.drafting) {
+    forge.setQueuedSettle(settle)
+    return
+  }
+  void forge.applySettle(settle)
+}
+
+function handleAttach(forge: ForgeModel, sessionId: string): void {
+  void attachToSession(sessionId).then(forge.setProblem)
+}
+
+/** What the architect is told after a refused proposal: the reason, and to change nothing else. */
+function refusedRetry(reason: string): string {
+  return `Your last proposal was refused and nothing was changed. The reason: ${reason}. Write ${PROPOSAL_FILE} again, fixing exactly that and changing nothing else.`
+}
+
+const STRIP_MOVES: Record<StripAction, (forge: ForgeModel) => void> = {
+  hold: (forge) => void forge.holdOrder(true),
+  release: (forge) => void forge.holdOrder(false),
+  watch: (forge) => {
+    if (forge.intake.kind === 'running') handleAttach(forge, forge.intake.sessionId)
+  },
+  'tell-architect': (forge) => {
+    if (forge.intake.kind === 'refused') void forge.converge(refusedRetry(forge.intake.reason))
+  },
+  'start-over': (forge) => void forge.converge(),
+  'open-run': (forge) => forge.onStarted?.(forge.orderId),
+  draft: (forge) => void forge.converge(),
+}
+
+function stripLabels(intake: IntakeOutcome): Record<StripAction, string> {
+  return {
     hold: 'Hold for me',
     release: 'Let it continue',
     watch: intake.kind === 'running' ? `Watch the ${intake.actor}` : 'Watch',
@@ -773,836 +880,1166 @@ export function Forge({ orderId, onStarted, standing }: ForgeProps): JSX.Element
     'open-run': 'Open the run',
     draft: 'Draft the plan',
   }
+}
 
+function ForgeWizard({ forge }: ForgeProp) {
   return (
     <div className="fdry-forge">
       <div className="fdry-wizard">
-        <header className="fdry-wiz-head">
-          <div className="fdry-wiz-title">
-            <b>{order.title}</b>
-            <div className="fdry-wiz-sub">
-              {order.source.kind === 'signal' ? (
-                <span className="fdry-chip">From a sensor signal</span>
-              ) : order.source.key !== null ? (
-                <span className="fdry-chip">
-                  {capitalise(order.source.tracker ?? '')} {order.source.key}
-                </span>
-              ) : null}
-              <span>{r.summary}</span>
-            </div>
-          </div>
-          <div className="fdry-wiz-actions">
-            {intake.kind === 'running' ? (
-              <button
-                type="button"
-                className="fdry-btn fdry-btn--quiet"
-                onClick={() => handleAttach(intake.sessionId)}
-              >
-                <Terminal aria-hidden="true" /> {STRIP_ACTION_LABEL.watch}
-              </button>
-            ) : order.provenance.forgeSession !== null ? (
-              <button
-                type="button"
-                className="fdry-btn fdry-btn--quiet"
-                onClick={() => handleAttach(order.provenance.forgeSession ?? '')}
-              >
-                <Terminal aria-hidden="true" /> Attach
-              </button>
-            ) : null}
-            {isDraft && !r.strip.actions.includes('draft') ? (
-              <ReasonButton
-                reason={r.locks.redraft}
-                className="fdry-btn"
-                onClick={() => void converge()}
-              >
-                <Wand aria-hidden="true" />
-                {order.plan.units.length === 0 ? 'Draft the plan' : 'Redraft'}
-              </ReasonButton>
-            ) : null}
-          </div>
-        </header>
-
-        <div className={`fdry-strip fdry-strip--${r.strip.tone}`}>
-          <div className="fdry-strip-who">
-            <span className="fdry-strip-icon" aria-hidden="true">
-              <StripIconGlyph icon={r.strip.icon} />
-            </span>
-            <div>
-              <b>{r.strip.headline}</b>
-              <small>{r.strip.detail}</small>
-            </div>
-          </div>
-          {r.strip.actions.length > 0 ? (
-            <div className="fdry-strip-acts">
-              {r.strip.actions.map((action) => (
-                <button
-                  key={action}
-                  type="button"
-                  className={`fdry-btn${action === 'tell-architect' ? ' fdry-btn--primary' : ''}`}
-                  onClick={() => runStripAction(action)}
-                >
-                  {action === 'hold' ? <Pause aria-hidden="true" /> : null}
-                  {action === 'watch' ? <Terminal aria-hidden="true" /> : null}
-                  {STRIP_ACTION_LABEL[action]}
-                </button>
-              ))}
-            </div>
-          ) : null}
-        </div>
-
+        <ForgeHeader forge={forge} />
+        <StatusStrip forge={forge} />
         <div className="fdry-body">
-          <nav aria-label="Steps" className="fdry-rail">
-            {r.steps.map((each, position) => (
-              <button
-                key={each.id}
-                type="button"
-                className={`fdry-rail-step fdry-rail-step--${STEP_STATE_CLASS[each.state]}${each === stepView ? ' is-on' : ''}`}
-                aria-current={each === stepView ? 'step' : undefined}
-                onClick={() => openStep(each.id)}
-              >
-                <span className="fdry-mk" aria-hidden="true">
-                  {each.mark === 'number' ? (
-                    position + 1
-                  ) : (
-                    <RailMark mark={each.mark} position={position} />
-                  )}
-                </span>
-                <span>
-                  <b>{STEP_LABELS[each.id]}</b>
-                  <small>{each.word}</small>
-                </span>
-              </button>
-            ))}
-          </nav>
-
+          <StepRail forge={forge} />
           <section className="fdry-main" aria-labelledby={STEP_HEADING}>
             <h2 className="fdry-step-h" id={STEP_HEADING} tabIndex={-1}>
-              {stepView.id === 'handOff' && !isDraft
-                ? `Agreed at ${clockOf(view.agreed?.at ?? order.agreedAt ?? '')} by ${view.agreed?.by === 'automatic' ? 'automatic hand-off' : 'you'}`
-                : STEP_TITLES[stepView.id]}
+              {stepTitle(forge)}
             </h2>
-
-            {stepView.id === 'intent' ? (
-              <>
-                <p className="fdry-step-intro">
-                  The problem and the outcome this order is for. The architect plans everything else
-                  from them.
-                </p>
-                <section className={`fdry-field ${moved.includes('intent') ? 'is-redrawn' : ''}`}>
-                  <h3 className="fdry-field-h">Problem</h3>
-                  {order.intent.problem === '' ? (
-                    <p className="fdry-note">Not stated yet.</p>
-                  ) : (
-                    <Markdown text={order.intent.problem} />
-                  )}
-                  <h3 className="fdry-field-h">Outcome</h3>
-                  {order.intent.outcome === '' ? (
-                    <p className="fdry-note">Not stated yet.</p>
-                  ) : (
-                    <Markdown text={order.intent.outcome} />
-                  )}
-                </section>
-                {order.acceptance.length === 0 ? (
-                  <p className="fdry-step-callout">{noCriteria}</p>
-                ) : null}
-              </>
-            ) : null}
-
-            {stepView.id === 'plan' ? (
-              <>
-                <p className="fdry-step-intro">
-                  What has to be true when the work is done, how each part is proven, and what the
-                  architect assumed.
-                </p>
-
-                {(['verifiable', 'coverage', 'risk'] as const).some(
-                  (id) => r.rows.find((row) => row.id === id)?.state !== 'passed'
-                ) ? (
-                  <div className="fdry-checks">
-                    {renderCheckRow('verifiable')}
-                    {renderCheckRow('coverage')}
-                    {renderCheckRow('risk')}
-                  </div>
-                ) : null}
-
-                {openQuestions.length > 0 ? (
-                  <div className="fdry-group">
-                    <div
-                      className="fdry-group-h fdry-group-h--you"
-                      id="fdry-questions-h"
-                      tabIndex={-1}
-                    >
-                      <AlertCircle aria-hidden="true" />
-                      Needs your answer{' '}
-                      <span className="fdry-cnt">
-                        {questionsDecided} of {openQuestions.length} decided
-                      </span>
-                    </div>
-                    {openQuestions.map((question) => (
-                      <div key={question.id} className="fdry-fnd">
-                        <b>
-                          <MarkdownInline text={question.text} />
-                        </b>
-                        {question.why !== '' ? <Markdown text={question.why} /> : null}
-                        <div className="fdry-fnd-acts">
-                          {question.options.map((option, optionIndex) => (
-                            <button
-                              key={option}
-                              type="button"
-                              aria-pressed={questionChoices[question.id] === optionIndex}
-                              className={
-                                questionChoices[question.id] === optionIndex ? 'fdry-btn--sel' : ''
-                              }
-                              onClick={() =>
-                                setQuestionChoices((current) => ({
-                                  ...current,
-                                  [question.id]: optionIndex,
-                                }))
-                              }
-                            >
-                              <MarkdownInline text={option} />
-                              {optionIndex === question.recommended ? ' (recommended)' : ''}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
-
-                <section
-                  className={`fdry-field ${moved.includes('acceptance') ? 'is-redrawn' : ''}`}
-                >
-                  <h3 className="fdry-field-h" id="fdry-acceptance" tabIndex={-1}>
-                    Acceptance criteria
-                  </h3>
-                  {order.acceptance.length === 0 ? (
-                    <p className="fdry-note">{noCriteria}</p>
-                  ) : (
-                    order.acceptance.map((criterion) => {
-                      const uncovered = matrix.uncoveredCriteria.includes(criterion.id)
-                      const excused = criterion.unverifiable?.accepted === true
-                      return (
-                        <div key={criterion.id} className={`fdry-ac ${uncovered ? 'is-gap' : ''}`}>
-                          <span className="fdry-ac-id">{criterion.id}</span>
-                          <div>
-                            <Markdown text={criterion.statement} />
-                            <span className="fdry-verify">
-                              proven by {criterion.verify.kind}
-                              {uncovered ? ' · no unit satisfies this' : ''}
-                            </span>
-                            {excused ? (
-                              <p className="fdry-ac-excused">
-                                accepted as unverifiable — {criterion.unverifiable?.reason}
-                              </p>
-                            ) : isDraft && unproven !== criterion.id ? (
-                              <ReasonButton
-                                className="fdry-ac-excuse"
-                                reason={askReason}
-                                onClick={() => setUnproven(criterion.id)}
-                              >
-                                Nothing here can prove this
-                              </ReasonButton>
-                            ) : null}
-                            {unproven === criterion.id && !excused ? (
-                              <form
-                                className="fdry-accept"
-                                onSubmit={(event) => {
-                                  event.preventDefault()
-                                  if (unprovenReason.trim() === '') return
-                                  void turn({
-                                    unverifiable: {
-                                      criterionId: criterion.id,
-                                      reason: unprovenReason.trim(),
-                                    },
-                                  })
-                                  setUnproven(null)
-                                  setUnprovenReason('')
-                                }}
-                              >
-                                <input
-                                  aria-label={`Why ${criterion.id} cannot be proven`}
-                                  placeholder="Why nothing can prove it…"
-                                  value={unprovenReason}
-                                  onChange={(event) => setUnprovenReason(event.target.value)}
-                                />
-                                <ReasonButton
-                                  type="submit"
-                                  reason={
-                                    unprovenReason.trim() === ''
-                                      ? LOCAL_REASONS.acceptEmpty
-                                      : askReason
-                                  }
-                                >
-                                  Accept it
-                                </ReasonButton>
-                              </form>
-                            ) : null}
-                          </div>
-                        </div>
-                      )
-                    })
-                  )}
-                </section>
-
-                {matrix.criteria.length > 0 && matrix.units.length > 0 ? (
-                  <section className="fdry-field">
-                    <h3 className="fdry-field-h">Coverage</h3>
-                    <div className="fdry-scroll">
-                      <table className="fdry-matrix">
-                        <thead>
-                          <tr>
-                            <th aria-label="criterion" />
-                            {matrix.units.map((unit) => (
-                              <th key={unit}>{unit}</th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {matrix.criteria.map((criterion, row) => (
-                            <tr key={criterion}>
-                              <td className="fdry-matrix-row">{criterion}</td>
-                              {matrix.cells[row].map((hit, column) => (
-                                <td
-                                  key={matrix.units[column]}
-                                  className={
-                                    hit
-                                      ? 'is-hit'
-                                      : matrix.uncoveredCriteria.includes(criterion)
-                                        ? 'is-gap'
-                                        : ''
-                                  }
-                                >
-                                  {hit ? '●' : '·'}
-                                </td>
-                              ))}
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </section>
-                ) : null}
-
-                {assumptions.length > 0 ? (
-                  <section
-                    className={`fdry-field ${moved.includes('assumptions') ? 'is-redrawn' : ''}`}
-                  >
-                    <h3 className="fdry-field-h">Assumptions</h3>
-                    <p className="fdry-note">
-                      Strike any that are wrong. What depended on it is redrawn.
-                    </p>
-                    <div className="fdry-assume">
-                      {assumptions.map((assumption) => (
-                        <ReasonButton
-                          key={assumption.id}
-                          reason={askReason}
-                          onClick={() => void turn({ strike: assumption.id })}
-                        >
-                          <MarkdownInline text={assumption.text} /> <X aria-hidden="true" />
-                        </ReasonButton>
-                      ))}
-                    </div>
-                  </section>
-                ) : null}
-
-                <section className="fdry-field" aria-labelledby="fdry-budgets">
-                  <h3 className="fdry-field-h" id="fdry-budgets" tabIndex={-1}>
-                    Budgets
-                  </h3>
-                  <p className="fdry-note">
-                    Where the run pauses and asks you. New orders start with the limits in Settings;
-                    these are this order&rsquo;s.
-                  </p>
-                  {isDraft ? (
-                    <BudgetForm
-                      key={JSON.stringify(order.budgets)}
-                      rows={[
-                        { key: 'agents', label: 'Agents at once', value: order.budgets.agents },
-                        {
-                          key: 'wallClockMinutes',
-                          label: 'Minutes',
-                          value: order.budgets.wallClockMinutes,
-                        },
-                      ]}
-                      submitLabel="Save budgets"
-                      disabled={locked}
-                      onSubmit={(budgets) => void setBudgets(budgets)}
-                    />
-                  ) : (
-                    <p>{budgetsInWords(order.budgets)}</p>
-                  )}
-                </section>
-              </>
-            ) : null}
-
-            {stepView.id === 'redTeam' ? (
-              <>
-                {findingsByGroup.fixing.length > 0 ? (
-                  <div className="fdry-group">
-                    <div className={`fdry-group-h fdry-group-h--${GROUP_META.fixing.cls}`}>
-                      <LoaderCircle aria-hidden="true" className="fdry-spin" />
-                      {GROUP_META.fixing.heading}{' '}
-                      <span className="fdry-cnt">{findingsByGroup.fixing.length}</span>
-                    </div>
-                    {findingsByGroup.fixing.map((finding) => (
-                      <div key={finding.id} className="fdry-fnd">
-                        <span className="fdry-fnd-text">
-                          <MarkdownInline text={finding.text} />
-                        </span>
-                        <span className="fdry-fnd-meta">{finding.meta}</span>
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
-
-                {needsYouFindings.length > 0 ? (
-                  <div className="fdry-group">
-                    <div className={`fdry-group-h fdry-group-h--${GROUP_META['needs-you'].cls}`}>
-                      <AlertCircle aria-hidden="true" />
-                      {GROUP_META['needs-you'].heading}{' '}
-                      <span className="fdry-cnt">
-                        {findingsDecided} of {needsYouFindings.length} decided
-                      </span>
-                    </div>
-                    {needsYouFindings.map((finding) => {
-                      const choice = findingChoice[finding.id]
-                      return (
-                        <div key={finding.id} className="fdry-fnd">
-                          <span className="fdry-fnd-text">
-                            <MarkdownInline text={finding.text} />
-                          </span>
-                          <span className="fdry-fnd-meta">{finding.meta}</span>
-                          <div className="fdry-fnd-acts">
-                            <button
-                              type="button"
-                              aria-pressed={choice?.mode === 'ask'}
-                              className={choice?.mode === 'ask' ? 'fdry-btn--sel' : ''}
-                              title="Have the architect change the order so this no longer holds"
-                              onClick={() =>
-                                setFindingChoice((current) => ({
-                                  ...current,
-                                  [finding.id]: { mode: 'ask', text: '' },
-                                }))
-                              }
-                            >
-                              Ask the architect
-                            </button>
-                            <button
-                              type="button"
-                              aria-pressed={choice?.mode === 'fix'}
-                              className={choice?.mode === 'fix' ? 'fdry-btn--sel' : ''}
-                              title="Say how, and the architect changes the order that way"
-                              onClick={() =>
-                                setFindingChoice((current) => ({
-                                  ...current,
-                                  [finding.id]: {
-                                    mode: 'fix',
-                                    text: choice?.mode === 'fix' ? choice.text : '',
-                                  },
-                                }))
-                              }
-                            >
-                              Fix it…
-                            </button>
-                            <button
-                              type="button"
-                              aria-pressed={choice?.mode === 'accept'}
-                              className={choice?.mode === 'accept' ? 'fdry-btn--sel' : ''}
-                              title="It stands, and here is why"
-                              onClick={() =>
-                                setFindingChoice((current) => ({
-                                  ...current,
-                                  [finding.id]: {
-                                    mode: 'accept',
-                                    text: choice?.mode === 'accept' ? choice.text : '',
-                                  },
-                                }))
-                              }
-                            >
-                              Accept it
-                            </button>
-                          </div>
-                          {choice?.mode === 'fix' ? (
-                            <textarea
-                              aria-label={`How should "${finding.text}" be fixed?`}
-                              placeholder="How should it be fixed?"
-                              rows={3}
-                              value={choice.text}
-                              onChange={(event) =>
-                                setFindingChoice((current) => ({
-                                  ...current,
-                                  [finding.id]: { mode: 'fix', text: event.target.value },
-                                }))
-                              }
-                            />
-                          ) : null}
-                          {choice?.mode === 'accept' ? (
-                            <input
-                              aria-label={`Why "${finding.text}" is accepted`}
-                              placeholder="Why it stands…"
-                              value={choice.text}
-                              onChange={(event) =>
-                                setFindingChoice((current) => ({
-                                  ...current,
-                                  [finding.id]: { mode: 'accept', text: event.target.value },
-                                }))
-                              }
-                            />
-                          ) : null}
-                        </div>
-                      )
-                    })}
-                  </div>
-                ) : null}
-
-                {findingsByGroup.notes.length > 0 ? (
-                  <div className="fdry-group">
-                    <div className={`fdry-group-h fdry-group-h--${GROUP_META.notes.cls}`}>
-                      <List aria-hidden="true" />
-                      {GROUP_META.notes.heading}{' '}
-                      <span className="fdry-cnt">{findingsByGroup.notes.length}</span>
-                    </div>
-                    {findingsByGroup.notes.map((finding) => (
-                      <div key={finding.id} className="fdry-fnd">
-                        <span className="fdry-fnd-text">
-                          <MarkdownInline text={finding.text} />
-                        </span>
-                        <span className="fdry-fnd-meta">{finding.meta}</span>
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
-
-                {findingsByGroup.resolved.length > 0 ? (
-                  <details className="fdry-group fdry-group--resolved">
-                    <summary className={`fdry-group-h fdry-group-h--${GROUP_META.resolved.cls}`}>
-                      <Check aria-hidden="true" />
-                      {GROUP_META.resolved.heading}{' '}
-                      <span className="fdry-cnt">{findingsByGroup.resolved.length}</span>
-                    </summary>
-                    {findingsByGroup.resolved.map((finding) => (
-                      <div key={finding.id} className="fdry-fnd">
-                        <span className="fdry-fnd-text">
-                          <MarkdownInline text={finding.text} />
-                        </span>
-                        <span className="fdry-fnd-meta">{finding.meta}</span>
-                      </div>
-                    ))}
-                  </details>
-                ) : null}
-
-                {blockingFindings.length === 0 &&
-                findingsByGroup.notes.length === 0 &&
-                findingsByGroup.resolved.length === 0 ? (
-                  <p className="fdry-step-intro">
-                    Nothing here blocks hand-off. An adversarial pass read the plan and left nothing
-                    that would make the change wrong.
-                  </p>
-                ) : null}
-              </>
-            ) : null}
-
-            {stepView.id === 'shape' ? (
-              <>
-                <p className="fdry-step-intro">
-                  {recipes?.proposed !== undefined
-                    ? `${capitalise(recipes.proposed)} is proposed: ${recipes.proposedWhy ?? ''}. Pick any shape. Your choice is saved and used at hand-off.`
-                    : 'Pick any shape. Your choice is saved and used at hand-off.'}
-                </p>
-                {recipes?.chosen !== null &&
-                recipes?.chosen !== undefined &&
-                recipes.chosen !== recipes.proposed ? (
-                  <div className="fdry-saved">
-                    <Check aria-hidden="true" />
-                    Saved{' '}
-                    {recipes.chosenAt !== null && recipes.chosenAt !== undefined
-                      ? clockOf(recipes.chosenAt)
-                      : ''}
-                    : {capitalise(recipes.chosen)}.
-                    <button
-                      type="button"
-                      className="fdry-btn fdry-btn--quiet"
-                      onClick={() => void pickRecipe(null)}
-                    >
-                      Use the proposal
-                    </button>
-                  </div>
-                ) : null}
-                <div className="fdry-shapes">
-                  {recipes?.recipes?.map((option) => {
-                    const isSelected = (recipes.chosen ?? recipes.proposed) === option.name
-                    if (!option.available || (!isDraft && r.locks.handOff !== null)) {
-                      const reason = !option.available
-                        ? shapeUnavailable(option.name, option.unmet)
-                        : r.locks.handOff
-                      return (
-                        <ReasonButton
-                          key={option.name}
-                          tip="fit"
-                          reason={reason}
-                          className={`fdry-shape${isSelected ? ' is-on' : ''} fdry-shape--off`}
-                        >
-                          <span className="fdry-shape-nm">
-                            <b>{capitalise(option.name)}</b>
-                            <Lock aria-hidden="true" />
-                          </span>
-                          <small>
-                            {option.available
-                              ? (option.description ?? '')
-                              : `Unavailable: ${option.unmet.join('; ')}`}
-                          </small>
-                        </ReasonButton>
-                      )
-                    }
-                    return (
-                      <button
-                        key={option.name}
-                        type="button"
-                        className={`fdry-shape${isSelected ? ' is-on' : ''}`}
-                        aria-pressed={isSelected}
-                        onClick={() => void pickRecipe(option.name)}
-                      >
-                        <span className="fdry-shape-nm">
-                          <b>{capitalise(option.name)}</b>
-                          {option.name === recipes.proposed ? (
-                            <span className="fdry-mark">Proposed</span>
-                          ) : null}
-                          {option.name === recipes.chosen && option.name !== recipes.proposed ? (
-                            <span className="fdry-mark fdry-mark--you">Your choice</span>
-                          ) : null}
-                        </span>
-                        <small>{option.description ?? ''}</small>
-                      </button>
-                    )
-                  })}
-                </div>
-              </>
-            ) : null}
-
-            {stepView.id === 'tracker' ? (
-              <>
-                <p className="fdry-step-intro">
-                  What this order tells {order.source.tracker} {order.source.key} as it moves.
-                </p>
-                {states?.capability?.transitions === 'unsupported' ? (
-                  <p className="fdry-note">
-                    {order.source.tracker} cannot be asked to move an issue, so {order.source.key}{' '}
-                    will not change state. The summary comment and the pull request links still go
-                    across.
-                  </p>
-                ) : (
-                  <section className="fdry-field">
-                    <h3 className="fdry-field-h">Workflow states</h3>
-                    <p className="fdry-note">
-                      Which of {order.source.tracker}&rsquo;s own states each moment means. Left
-                      alone, the tracker resolves it.
-                    </p>
-                    {INTENTS.map((intent) => (
-                      <label key={intent} className="fdry-map">
-                        <span>{INTENT_LABELS[intent]}</span>
-                        <select
-                          value={states?.mapping?.[intent] ?? ''}
-                          disabled={locked}
-                          onChange={(event) =>
-                            void mapIntent(
-                              intent,
-                              event.target.value === '' ? null : event.target.value
-                            )
-                          }
-                        >
-                          <option value="">
-                            {states?.capability?.unreachable.includes(intent) === true
-                              ? 'nowhere to go — skipped'
-                              : 'let the tracker decide'}
-                          </option>
-                          {states?.capability?.states.map((option) => (
-                            <option key={option.id} value={option.id}>
-                              {option.name}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    ))}
-                  </section>
-                )}
-
-                <section className="fdry-field">
-                  <h3 className="fdry-field-h">What goes back to the issue</h3>
-                  <div className="fdry-writebacks">
-                    {WRITE_BACKS.map((kind) => (
-                      <label key={kind.id} className="fdry-writeback">
-                        <input
-                          type="checkbox"
-                          checked={order.writeBack.includes(kind.id)}
-                          disabled={locked}
-                          onChange={(event) =>
-                            void setWriteBack(
-                              event.target.checked
-                                ? [...order.writeBack, kind.id]
-                                : order.writeBack.filter((w) => w !== kind.id)
-                            )
-                          }
-                        />
-                        {kind.label}
-                      </label>
-                    ))}
-                  </div>
-                </section>
-              </>
-            ) : null}
-
-            {stepView.id === 'handOff' ? (
-              <>
-                {isDraft ? (
-                  <p className="fdry-step-intro">
-                    {view.intake?.kind === 'refused'
-                      ? 'These rows describe the order as it stood before the refused turn.'
-                      : 'Hand-off agrees the order and starts the work. Every row must pass.'}
-                  </p>
-                ) : null}
-                {isDraft ? (
-                  <div className="fdry-checks">{r.rows.map(renderHandOffRow)}</div>
-                ) : (
-                  <>
-                    <p className="fdry-step-intro">
-                      All six rows passed at agreement. The order is now read-only. Changes go
-                      through the run.
-                    </p>
-                    <div className="fdry-checks">
-                      <div className="fdry-chk">
-                        <span className="fdry-chk-icon" aria-hidden="true">
-                          <Check aria-hidden="true" />
-                        </span>
-                        <div>
-                          <b>Six of six rows passed</b>
-                          <small>
-                            Questions, proof, coverage, risk, red team, nobody changing the plan.
-                          </small>
-                        </div>
-                        <span className="fdry-pill fdry-pill--pass">Agreed</span>
-                      </div>
-                      <div className="fdry-chk">
-                        <span className="fdry-chk-icon" aria-hidden="true">
-                          <Play aria-hidden="true" />
-                        </span>
-                        <div>
-                          <b>Run started with {capitalise(shapeName ?? 'the proposed')}</b>
-                          <small>
-                            {recipes?.recipes?.find((r2) => r2.name === shapeName)?.description ??
-                              ''}
-                          </small>
-                        </div>
-                        <span className="fdry-pill fdry-pill--work">{r.runState}</span>
-                      </div>
-                    </div>
-                  </>
-                )}
-                {view.unavailableChecks !== undefined && view.unavailableChecks.length > 0 ? (
-                  <section className="fdry-field">
-                    <h3 className="fdry-field-h">Not measurable here</h3>
-                    <p className="fdry-note">
-                      This repository has no command for {view.unavailableChecks.join(', ')}. Those
-                      checks will report &ldquo;not measured&rdquo; rather than passing.
-                    </p>
-                  </section>
-                ) : null}
-              </>
-            ) : null}
-
-            {isDraft ? (
-              <form
-                className="fdry-input"
-                onSubmit={(event) => {
-                  event.preventDefault()
-                  if (draft.trim() === '') return
-                  void converge(draft)
-                  setDraft('')
-                }}
-              >
-                <input
-                  aria-label="Tell the architect what is wrong, or what you want instead"
-                  placeholder="Tell the architect what's wrong, or what you want instead…"
-                  value={draft}
-                  onChange={(event) => setDraft(event.target.value)}
-                />
-                <ReasonButton
-                  type="submit"
-                  reason={
-                    r.locks.message ?? (draft.trim() === '' ? LOCAL_REASONS.emptyMessage : null)
-                  }
-                >
-                  Send
-                </ReasonButton>
-              </form>
-            ) : null}
+            <CurrentStep forge={forge} />
+            {forge.isDraft ? <MessageForm forge={forge} /> : null}
           </section>
         </div>
+        <ForgeFooter forge={forge} />
+      </div>
+    </div>
+  )
+}
 
-        {isDraft || problem !== null || view.advisory != null ? (
-          <footer className="fdry-foot">
-            {problem !== null ? <p className="fdry-problem">{problem}</p> : null}
-            {previous !== undefined ? (
-              <button type="button" className="fdry-btn" onClick={() => openStep(previous.id)}>
-                Back
-              </button>
-            ) : null}
-            {r.handOffWhy !== null && stepView.id === 'handOff' ? (
-              <span className="fdry-why">
-                <Info aria-hidden="true" />
-                {r.handOffWhy}
-              </span>
-            ) : stepNeedsYou.decided > 0 && stepNeedsYou.total !== stepNeedsYou.decided ? (
-              <span className="fdry-why">
-                <Info aria-hidden="true" />
-                Send now or decide the {stepNeedsYou.total === 2 ? 'second' : 'next'} finding first.
-                Undecided findings stay open.
-              </span>
-            ) : (
-              <span className="fdry-why" />
-            )}
+function ForgeHeader({ forge }: ForgeProp) {
+  const { order, r } = forge
+  return (
+    <header className="fdry-wiz-head">
+      <div className="fdry-wiz-title">
+        <b>{order.title}</b>
+        <div className="fdry-wiz-sub">
+          <SourceChip source={order.source} />
+          <span>{r.summary}</span>
+        </div>
+      </div>
+      <div className="fdry-wiz-actions">
+        <WatchButton forge={forge} />
+        {forge.isDraft && !r.strip.actions.includes('draft') ? (
+          <ReasonButton reason={r.locks.redraft} icon={Wand} onClick={() => void forge.converge()}>
+            {order.plan.units.length === 0 ? 'Draft the plan' : 'Redraft'}
+          </ReasonButton>
+        ) : null}
+      </div>
+    </header>
+  )
+}
 
-            {stepView.id === 'handOff' ? (
-              <>
-                {view.agreed !== undefined && !isDraft ? null : (
-                  <ReasonButton
-                    className="fdry-btn fdry-btn--primary"
-                    reason={r.locks.handOff}
-                    onClick={() => void handOff()}
-                  >
-                    {r.canHandOff ? <Play aria-hidden="true" /> : <Lock aria-hidden="true" />}
-                    {r.canHandOff
-                      ? `Hand off with ${capitalise(shapeName ?? 'the proposed')}`
-                      : 'Hand off'}
-                  </ReasonButton>
-                )}
-              </>
-            ) : stepNeedsYou.total > 0 ? (
-              <ReasonButton
-                className="fdry-btn fdry-btn--primary"
-                reason={sendReason}
-                onClick={sendDecisionsOnThisStep}
-              >
-                {stepNeedsYou.decided === 0
-                  ? 'Send decisions'
-                  : `Send ${stepNeedsYou.decided} decision${stepNeedsYou.decided === 1 ? '' : 's'}`}
-              </ReasonButton>
-            ) : next !== undefined ? (
-              <button
-                type="button"
-                className="fdry-btn fdry-btn--primary"
-                onClick={() => openStep(next.id)}
-              >
-                Next: {STEP_LABELS[next.id]}
-              </button>
-            ) : null}
+function SourceChip({ source }: { readonly source: WorkOrder['source'] }) {
+  if (source.kind === 'signal') return <span className="fdry-chip">From a sensor signal</span>
+  if (source.key === null) return null
+  return (
+    <span className="fdry-chip">
+      {capitalise(source.tracker ?? '')} {source.key}
+    </span>
+  )
+}
 
-            {stepView.id === 'handOff' && view.advisory != null ? (
-              <p className="fdry-note fdry-advisory">{view.advisory}</p>
-            ) : null}
-          </footer>
+/** Watching the architect at work, or attaching to the conversation the order was shaped in. */
+function WatchButton({ forge }: ForgeProp) {
+  const { intake, order } = forge
+  if (intake.kind === 'running') {
+    return (
+      <Button variant="ghost" icon={Terminal} onClick={() => handleAttach(forge, intake.sessionId)}>
+        {stripLabels(intake).watch}
+      </Button>
+    )
+  }
+  if (order.provenance.forgeSession === null) return null
+  return (
+    <Button
+      variant="ghost"
+      icon={Terminal}
+      onClick={() => handleAttach(forge, order.provenance.forgeSession ?? '')}
+    >
+      Attach
+    </Button>
+  )
+}
+
+function StatusStrip({ forge }: ForgeProp) {
+  const { strip } = forge.r
+  return (
+    <div className={`fdry-strip fdry-strip--${strip.tone}`}>
+      <div className="fdry-strip-who">
+        <span className="fdry-strip-icon" aria-hidden="true">
+          <StripIconGlyph icon={strip.icon} />
+        </span>
+        <div>
+          <b>{strip.headline}</b>
+          <small>{strip.detail}</small>
+        </div>
+      </div>
+      {strip.actions.length > 0 ? <StripActions forge={forge} /> : null}
+    </div>
+  )
+}
+
+function StripActions({ forge }: ForgeProp) {
+  const labels = stripLabels(forge.intake)
+  return (
+    <div className="fdry-strip-acts">
+      {forge.r.strip.actions.map((action) => (
+        <Button
+          key={action}
+          variant={action === 'tell-architect' ? 'primary' : 'secondary'}
+          icon={action === 'hold' ? Pause : action === 'watch' ? Terminal : undefined}
+          onClick={() => STRIP_MOVES[action](forge)}
+        >
+          {labels[action]}
+        </Button>
+      ))}
+    </div>
+  )
+}
+
+function StepRail({ forge }: ForgeProp) {
+  return (
+    <nav aria-label="Steps" className="fdry-rail">
+      {forge.r.steps.map((each, position) => (
+        <RailStep key={each.id} forge={forge} each={each} position={position} />
+      ))}
+    </nav>
+  )
+}
+
+interface RailStepProps extends ForgeProp {
+  readonly each: StepView
+  readonly position: number
+}
+
+function RailStep({ forge, each, position }: RailStepProps) {
+  const on = each === forge.stepView
+  return (
+    <button
+      type="button"
+      className={`fdry-rail-step fdry-rail-step--${STEP_STATE_CLASS[each.state]}${on ? ' is-on' : ''}`}
+      aria-current={on ? 'step' : undefined}
+      onClick={() => openStep(forge, each.id)}
+    >
+      <span className="fdry-mk" aria-hidden="true">
+        {each.mark === 'number' ? position + 1 : <RailMark mark={each.mark} position={position} />}
+      </span>
+      <span>
+        <b>{STEP_LABELS[each.id]}</b>
+        <small>{each.word}</small>
+      </span>
+    </button>
+  )
+}
+
+function stepTitle({ stepView, isDraft, view, order }: ForgeModel): string {
+  if (stepView.id !== 'handOff' || isDraft) return STEP_TITLES[stepView.id]
+  const by = view.agreed?.by === 'automatic' ? 'automatic hand-off' : 'you'
+  return `Agreed at ${clockOf(view.agreed?.at ?? order.agreedAt ?? '')} by ${by}`
+}
+
+const STEP_BODIES: Record<StepId, (props: ForgeProp) => JSX.Element> = {
+  intent: IntentStep,
+  plan: PlanStep,
+  redTeam: RedTeamStep,
+  shape: ShapeStep,
+  tracker: TrackerStep,
+  handOff: HandOffStep,
+}
+
+function CurrentStep({ forge }: ForgeProp) {
+  const Body = STEP_BODIES[forge.stepView.id]
+  return <Body forge={forge} />
+}
+
+function noCriteria(order: WorkOrder): string {
+  return order.source.kind === 'tracker'
+    ? `Nothing under an acceptance heading in ${order.source.key ?? 'the ticket'}. Press “Draft the plan” and the architect will write the criteria from what it does say.`
+    : 'No criteria yet. Nothing writes them but the architect — press “Draft the plan”.'
+}
+
+function redrawn(forge: ForgeModel, field: string): string {
+  return forge.moved.includes(field) ? 'is-redrawn' : ''
+}
+
+function IntentStep({ forge }: ForgeProp) {
+  const { order } = forge
+  return (
+    <>
+      <p className="fdry-step-intro">
+        The problem and the outcome this order is for. The architect plans everything else from
+        them.
+      </p>
+      <section className={`fdry-field ${redrawn(forge, 'intent')}`}>
+        <IntentField heading="Problem" text={order.intent.problem} />
+        <IntentField heading="Outcome" text={order.intent.outcome} />
+      </section>
+      {order.acceptance.length === 0 ? (
+        <p className="fdry-step-callout">{noCriteria(order)}</p>
+      ) : null}
+    </>
+  )
+}
+
+function IntentField({ heading, text }: { readonly heading: string; readonly text: string }) {
+  return (
+    <>
+      <h3 className="fdry-field-h">{heading}</h3>
+      {text === '' ? (
+        <p className="fdry-note">Not stated yet.</p>
+      ) : (
+        <Markdown fetchesNothing className="fdry-md" onOpenLink={openInBrowser}>
+          {text}
+        </Markdown>
+      )}
+    </>
+  )
+}
+
+function PlanStep({ forge }: ForgeProp) {
+  return (
+    <>
+      <p className="fdry-step-intro">
+        What has to be true when the work is done, how each part is proven, and what the architect
+        assumed.
+      </p>
+      <PlanChecks forge={forge} />
+      <QuestionsGroup forge={forge} />
+      <AcceptanceSection forge={forge} />
+      <CoverageSection order={forge.order} />
+      <AssumptionsSection forge={forge} />
+      <BudgetsSection forge={forge} />
+    </>
+  )
+}
+
+const PLAN_CHECKS = ['verifiable', 'coverage', 'risk'] as const
+
+function PlanChecks({ forge }: ForgeProp) {
+  const failing = PLAN_CHECKS.some(
+    (id) => forge.r.rows.find((row) => row.id === id)?.state !== 'passed'
+  )
+  if (!failing) return null
+  return (
+    <div className="fdry-checks">
+      {PLAN_CHECKS.map((id) => (
+        <PlanCheck key={id} forge={forge} id={id} />
+      ))}
+    </div>
+  )
+}
+
+/** A failing or in-progress plan check, on the step that clears it. */
+function PlanCheck({ forge, id }: ForgeProp & { readonly id: CheckId }) {
+  const row = forge.r.rows.find((each) => each.id === id)
+  return row === undefined || row.state === 'passed' ? null : <CheckRow forge={forge} row={row} />
+}
+
+function CheckRow({ forge, row }: ForgeProp & { readonly row: Row }) {
+  return (
+    <div className={`fdry-chk${row.state === 'in-progress' ? ' fdry-chk--work' : ''}`}>
+      <span className="fdry-chk-icon" aria-hidden="true">
+        <RowIcon state={row.state} />
+      </span>
+      <div>
+        <b>{row.label}</b>
+        <small>{row.detail}</small>
+        <RowMoves forge={forge} row={row} />
+      </div>
+      <span className={`fdry-pill fdry-pill--${ROW_PILL[row.state].cls}`}>
+        {ROW_PILL[row.state].label}
+      </span>
+    </div>
+  )
+}
+
+// What the operator can do about a row: one the machine is closing shows only the
+// "Asked" marker; a failing or needs-you row offers its moves.
+function RowMoves({ forge, row }: ForgeProp & { readonly row: Row }) {
+  if (row.state === 'passed') return null
+  if (row.id === 'turn') return <TurnMoves forge={forge} row={row} />
+  const remedies = CHECK_REMEDIES[row.id]
+  if (row.state === 'in-progress') {
+    const answering = remedies.some(
+      (remedy) => remedy.kind === 'ask' && forge.asked === remedy.message
+    )
+    return answering ? (
+      <div className="fdry-chk-moves">
+        <Asked />
+      </div>
+    ) : null
+  }
+  return (
+    <div className="fdry-chk-moves">
+      {remedies.map((remedy) => (
+        <RemedyMove key={remedy.label} forge={forge} remedy={remedy} />
+      ))}
+    </div>
+  )
+}
+
+function TurnMoves({ forge, row }: ForgeProp & { readonly row: Row }) {
+  const { intake } = forge
+  if (row.state !== 'failing' || intake.kind !== 'refused') return null
+  return (
+    <div className="fdry-chk-moves">
+      <ReasonButton
+        size="sm"
+        reason={forge.askReason}
+        onClick={() => void forge.converge(refusedRetry(intake.reason))}
+      >
+        {TURN_REMEDY_LABEL}
+      </ReasonButton>
+    </div>
+  )
+}
+
+function RemedyMove({ forge, remedy }: ForgeProp & { readonly remedy: Remedy }) {
+  if (remedy.kind === 'ask' && forge.drafting) {
+    return forge.asked === remedy.message ? <Asked /> : null
+  }
+  if (remedy.kind === 'goto') {
+    return (
+      <Button
+        size="sm"
+        onClick={() => {
+          if (remedy.step !== null) forge.setPicked(remedy.step)
+          forge.setFocusTarget({ target: remedy.target })
+        }}
+      >
+        {remedy.label}
+      </Button>
+    )
+  }
+  return (
+    <ReasonButton
+      size="sm"
+      reason={forge.askReason}
+      onClick={() => void forge.converge(remedy.message)}
+    >
+      {remedy.label}
+    </ReasonButton>
+  )
+}
+
+type Question = ReturnType<typeof surfacedQuestions>[number]
+
+function QuestionsGroup({ forge }: ForgeProp) {
+  const questions = surfacedQuestions(forge.order.openQuestions)
+  if (questions.length === 0) return null
+  return (
+    <div className="fdry-group">
+      <div className="fdry-group-h fdry-group-h--you" id="fdry-questions-h" tabIndex={-1}>
+        <AlertCircle aria-hidden="true" />
+        Needs your answer{' '}
+        <span className="fdry-cnt">
+          {decidedQuestions(questions, forge.questionChoices)} of {questions.length} decided
+        </span>
+      </div>
+      {questions.map((question) => (
+        <QuestionCard key={question.id} forge={forge} question={question} />
+      ))}
+    </div>
+  )
+}
+
+function QuestionCard({ forge, question }: ForgeProp & { readonly question: Question }) {
+  return (
+    <div className="fdry-fnd">
+      <b>
+        <Markdown inline fetchesNothing className="fdry-md-inline" onOpenLink={openInBrowser}>
+          {question.text}
+        </Markdown>
+      </b>
+      {question.why !== '' ? (
+        <Markdown fetchesNothing className="fdry-md" onOpenLink={openInBrowser}>
+          {question.why}
+        </Markdown>
+      ) : null}
+      <div className="fdry-fnd-acts">
+        {question.options.map((option, optionIndex) => (
+          <QuestionOption
+            key={option}
+            forge={forge}
+            question={question}
+            at={[option, optionIndex]}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+interface QuestionOptionProps extends ForgeProp {
+  readonly question: Question
+  readonly at: readonly [option: string, optionIndex: number]
+}
+
+function QuestionOption({ forge, question, at: [option, optionIndex] }: QuestionOptionProps) {
+  const chosen = forge.questionChoices[question.id] === optionIndex
+  return (
+    <Button
+      size="sm"
+      aria-pressed={chosen}
+      variant={chosen ? 'primary' : 'secondary'}
+      onClick={() =>
+        forge.setQuestionChoices((current) => ({
+          ...current,
+          [question.id]: optionIndex,
+        }))
+      }
+    >
+      <Markdown inline fetchesNothing className="fdry-md-inline" onOpenLink={openInBrowser}>
+        {option}
+      </Markdown>
+      {optionIndex === question.recommended ? ' (recommended)' : ''}
+    </Button>
+  )
+}
+
+type Criterion = WorkOrder['acceptance'][number]
+type Matrix = ReturnType<typeof coverageMatrix>
+
+function AcceptanceSection({ forge }: ForgeProp) {
+  const { order } = forge
+  const matrix = coverageMatrix(order)
+  return (
+    <section className={`fdry-field ${redrawn(forge, 'acceptance')}`}>
+      <h3 className="fdry-field-h" id="fdry-acceptance" tabIndex={-1}>
+        Acceptance criteria
+      </h3>
+      {order.acceptance.length === 0 ? (
+        <p className="fdry-note">{noCriteria(order)}</p>
+      ) : (
+        order.acceptance.map((criterion) => (
+          <CriterionRow key={criterion.id} forge={forge} criterion={criterion} matrix={matrix} />
+        ))
+      )}
+    </section>
+  )
+}
+
+interface CriterionProps extends ForgeProp {
+  readonly criterion: Criterion
+  readonly matrix: Matrix
+}
+
+function CriterionRow({ forge, criterion, matrix }: CriterionProps) {
+  const uncovered = matrix.uncoveredCriteria.includes(criterion.id)
+  const excused = criterion.unverifiable?.accepted === true
+  return (
+    <div className={`fdry-ac ${uncovered ? 'is-gap' : ''}`}>
+      <span className="fdry-ac-id">{criterion.id}</span>
+      <div>
+        <Markdown fetchesNothing className="fdry-md" onOpenLink={openInBrowser}>
+          {criterion.statement}
+        </Markdown>
+        <span className="fdry-verify">
+          proven by {criterion.verify.kind}
+          {uncovered ? ' · no unit satisfies this' : ''}
+        </span>
+        <CriterionExcuse forge={forge} criterion={criterion} />
+        {forge.unproven === criterion.id && !excused ? (
+          <UnprovenForm forge={forge} criterion={criterion} />
         ) : null}
       </div>
     </div>
+  )
+}
+
+function CriterionExcuse({ forge, criterion }: ForgeProp & { readonly criterion: Criterion }) {
+  if (criterion.unverifiable?.accepted === true) {
+    return (
+      <p className="fdry-ac-excused">accepted as unverifiable — {criterion.unverifiable?.reason}</p>
+    )
+  }
+  if (!forge.isDraft || forge.unproven === criterion.id) return null
+  return (
+    <ReasonButton
+      variant="ghost"
+      size="sm"
+      className="fdry-ac-excuse"
+      reason={forge.askReason}
+      onClick={() => forge.setUnproven(criterion.id)}
+    >
+      Nothing here can prove this
+    </ReasonButton>
+  )
+}
+
+/** Accepts a criterion as unprovable, with the reason typed for it. */
+function acceptUnproven(forge: ForgeModel, criterionId: string): void {
+  if (forge.unprovenReason.trim() === '') return
+  void forge.turn({
+    unverifiable: {
+      criterionId,
+      reason: forge.unprovenReason.trim(),
+    },
+  })
+  forge.setUnproven(null)
+  forge.setUnprovenReason('')
+}
+
+function UnprovenForm({ forge, criterion }: ForgeProp & { readonly criterion: Criterion }) {
+  const { unprovenReason } = forge
+  return (
+    <form
+      className="fdry-accept"
+      onSubmit={(event) => {
+        event.preventDefault()
+        acceptUnproven(forge, criterion.id)
+      }}
+    >
+      <input
+        aria-label={`Why ${criterion.id} cannot be proven`}
+        placeholder="Why nothing can prove it…"
+        value={unprovenReason}
+        onChange={(event) => forge.setUnprovenReason(event.target.value)}
+      />
+      <ReasonButton
+        type="submit"
+        size="sm"
+        reason={unprovenReason.trim() === '' ? LOCAL_REASONS.acceptEmpty : forge.askReason}
+      >
+        Accept it
+      </ReasonButton>
+    </form>
+  )
+}
+
+function CoverageSection({ order }: { readonly order: WorkOrder }) {
+  const matrix = coverageMatrix(order)
+  if (matrix.criteria.length === 0 || matrix.units.length === 0) return null
+  return (
+    <section className="fdry-field">
+      <h3 className="fdry-field-h">Coverage</h3>
+      <div className="fdry-scroll">
+        <table className="fdry-matrix">
+          <thead>
+            <tr>
+              <th aria-label="criterion" />
+              {matrix.units.map((unit) => (
+                <th key={unit}>{unit}</th>
+              ))}
+            </tr>
+          </thead>
+          <MatrixBody matrix={matrix} />
+        </table>
+      </div>
+    </section>
+  )
+}
+
+function MatrixBody({ matrix }: { readonly matrix: Matrix }) {
+  return (
+    <tbody>
+      {matrix.criteria.map((criterion, row) => (
+        <tr key={criterion}>
+          <td className="fdry-matrix-row">{criterion}</td>
+          {matrix.cells[row].map((hit, column) => (
+            <td key={matrix.units[column]} className={cellClass(matrix, [criterion, hit])}>
+              {hit ? '●' : '·'}
+            </td>
+          ))}
+        </tr>
+      ))}
+    </tbody>
+  )
+}
+
+function cellClass(matrix: Matrix, [criterion, hit]: readonly [string, boolean]): string {
+  if (hit) return 'is-hit'
+  return matrix.uncoveredCriteria.includes(criterion) ? 'is-gap' : ''
+}
+
+function AssumptionsSection({ forge }: ForgeProp) {
+  const assumptions = liveAssumptions(forge.order)
+  if (assumptions.length === 0) return null
+  return (
+    <section className={`fdry-field ${redrawn(forge, 'assumptions')}`}>
+      <h3 className="fdry-field-h">Assumptions</h3>
+      <p className="fdry-note">Strike any that are wrong. What depended on it is redrawn.</p>
+      <div className="fdry-assume">
+        {assumptions.map((assumption) => (
+          <ReasonButton
+            key={assumption.id}
+            plain
+            reason={forge.askReason}
+            onClick={() => void forge.turn({ strike: assumption.id })}
+          >
+            <Markdown inline fetchesNothing className="fdry-md-inline" onOpenLink={openInBrowser}>
+              {assumption.text}
+            </Markdown>{' '}
+            <X aria-hidden="true" />
+          </ReasonButton>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function BudgetsSection({ forge }: ForgeProp) {
+  return (
+    <section className="fdry-field" aria-labelledby="fdry-budgets">
+      <h3 className="fdry-field-h" id="fdry-budgets" tabIndex={-1}>
+        Budgets
+      </h3>
+      <p className="fdry-note">
+        Where the run pauses and asks you. New orders start with the limits in Settings; these are
+        this order&rsquo;s.
+      </p>
+      {forge.isDraft ? (
+        <DraftBudgets forge={forge} />
+      ) : (
+        <p>{budgetsInWords(forge.order.budgets)}</p>
+      )}
+    </section>
+  )
+}
+
+function DraftBudgets({ forge }: ForgeProp) {
+  const { budgets } = forge.order
+  return (
+    <BudgetForm
+      key={JSON.stringify(budgets)}
+      rows={[
+        { key: 'agents', label: 'Agents at once', value: budgets.agents },
+        {
+          key: 'wallClockMinutes',
+          label: 'Minutes',
+          value: budgets.wallClockMinutes,
+        },
+      ]}
+      submitLabel="Save budgets"
+      disabled={forge.locked}
+      onSubmit={(next) => void forge.setBudgets(next)}
+    />
+  )
+}
+
+function RedTeamStep({ forge }: ForgeProp) {
+  const groups = forge.findingsByGroup
+  const blocking = forge.order.redTeam.filter((f) => f.status === 'open' && isBlocking(f))
+  return (
+    <>
+      <FindingGroupBox
+        group="fixing"
+        findings={groups.fixing}
+        icon={<LoaderCircle aria-hidden="true" className="fdry-spin" />}
+      />
+      <NeedsYouGroup forge={forge} />
+      <FindingGroupBox group="notes" findings={groups.notes} icon={<List aria-hidden="true" />} />
+      <ResolvedGroup findings={groups.resolved} />
+      {blocking.length === 0 && groups.notes.length === 0 && groups.resolved.length === 0 ? (
+        <p className="fdry-step-intro">
+          Nothing here blocks hand-off. An adversarial pass read the plan and left nothing that
+          would make the change wrong.
+        </p>
+      ) : null}
+    </>
+  )
+}
+
+interface FindingGroupBoxProps {
+  readonly group: FindingGroup
+  readonly findings: readonly FindingView[]
+  readonly icon: React.ReactNode
+}
+
+function FindingGroupBox({ group, findings, icon }: FindingGroupBoxProps) {
+  if (findings.length === 0) return null
+  return (
+    <div className="fdry-group">
+      <div className={`fdry-group-h fdry-group-h--${GROUP_META[group].cls}`}>
+        {icon}
+        {GROUP_META[group].heading} <span className="fdry-cnt">{findings.length}</span>
+      </div>
+      <FindingRows findings={findings} />
+    </div>
+  )
+}
+
+function ResolvedGroup({ findings }: { readonly findings: readonly FindingView[] }) {
+  if (findings.length === 0) return null
+  return (
+    <details className="fdry-group fdry-group--resolved">
+      <summary className={`fdry-group-h fdry-group-h--${GROUP_META.resolved.cls}`}>
+        <Check aria-hidden="true" />
+        {GROUP_META.resolved.heading} <span className="fdry-cnt">{findings.length}</span>
+      </summary>
+      <FindingRows findings={findings} />
+    </details>
+  )
+}
+
+function NeedsYouGroup({ forge }: ForgeProp) {
+  const findings = forge.findingsByGroup['needs-you']
+  if (findings.length === 0) return null
+  return (
+    <div className="fdry-group">
+      <div className={`fdry-group-h fdry-group-h--${GROUP_META['needs-you'].cls}`}>
+        <AlertCircle aria-hidden="true" />
+        {GROUP_META['needs-you'].heading}{' '}
+        <span className="fdry-cnt">
+          {decidedFindings(findings, forge.findingChoice)} of {findings.length} decided
+        </span>
+      </div>
+      {findings.map((finding) => (
+        <NeedsYouFinding key={finding.id} forge={forge} finding={finding} />
+      ))}
+    </div>
+  )
+}
+
+/** The three answers to a blocking finding, as the buttons offer them. */
+const FINDING_MOVES: readonly {
+  readonly mode: FindingChoice['mode']
+  readonly label: string
+  readonly title: string
+}[] = [
+  {
+    mode: 'ask',
+    label: 'Ask the architect',
+    title: 'Have the architect change the order so this no longer holds',
+  },
+  {
+    mode: 'fix',
+    label: 'Fix it…',
+    title: 'Say how, and the architect changes the order that way',
+  },
+  { mode: 'accept', label: 'Accept it', title: 'It stands, and here is why' },
+]
+
+interface FindingProps {
+  readonly finding: FindingView
+  readonly choice: FindingChoice | undefined
+  readonly choose: (next: FindingChoice) => void
+}
+
+function NeedsYouFinding({ forge, finding }: ForgeProp & { readonly finding: FindingView }) {
+  const choice = forge.findingChoice[finding.id]
+  const choose = (next: FindingChoice): void =>
+    forge.setFindingChoice((current) => ({ ...current, [finding.id]: next }))
+  return (
+    <div className="fdry-fnd">
+      <span className="fdry-fnd-text">
+        <Markdown inline fetchesNothing className="fdry-md-inline" onOpenLink={openInBrowser}>
+          {finding.text}
+        </Markdown>
+      </span>
+      <span className="fdry-fnd-meta">{finding.meta}</span>
+      <div className="fdry-fnd-acts">
+        {FINDING_MOVES.map((move) => (
+          <Button
+            key={move.mode}
+            size="sm"
+            aria-pressed={choice?.mode === move.mode}
+            variant={choice?.mode === move.mode ? 'primary' : 'secondary'}
+            title={move.title}
+            onClick={() => choose({ mode: move.mode, text: keptText(choice, move.mode) })}
+          >
+            {move.label}
+          </Button>
+        ))}
+      </div>
+      <FindingText finding={finding} choice={choice} choose={choose} />
+    </div>
+  )
+}
+
+/** What was typed for a fix or an accept, kept when the same one is chosen again; an ask has none. */
+function keptText(choice: FindingChoice | undefined, mode: FindingChoice['mode']): string {
+  return mode !== 'ask' && choice?.mode === mode ? choice.text : ''
+}
+
+function FindingText({ finding, choice, choose }: FindingProps) {
+  if (choice?.mode === 'fix') {
+    return (
+      <textarea
+        aria-label={`How should "${finding.text}" be fixed?`}
+        placeholder="How should it be fixed?"
+        rows={3}
+        value={choice.text}
+        onChange={(event) => choose({ mode: 'fix', text: event.target.value })}
+      />
+    )
+  }
+  if (choice?.mode !== 'accept') return null
+  return (
+    <input
+      aria-label={`Why "${finding.text}" is accepted`}
+      placeholder="Why it stands…"
+      value={choice.text}
+      onChange={(event) => choose({ mode: 'accept', text: event.target.value })}
+    />
+  )
+}
+
+function shapeIntro(recipes: RecipesView | null): string {
+  return recipes?.proposed !== undefined
+    ? `${capitalise(recipes.proposed)} is proposed: ${recipes.proposedWhy ?? ''}. Pick any shape. Your choice is saved and used at hand-off.`
+    : 'Pick any shape. Your choice is saved and used at hand-off.'
+}
+
+function ShapeStep({ forge }: ForgeProp) {
+  const { recipes } = forge
+  return (
+    <>
+      <p className="fdry-step-intro">{shapeIntro(recipes)}</p>
+      <SavedShape forge={forge} />
+      <div className="fdry-shapes">
+        {recipes?.recipes?.map((option) => (
+          <ShapeOption key={option.name} forge={forge} recipes={recipes} option={option} />
+        ))}
+      </div>
+    </>
+  )
+}
+
+function SavedShape({ forge }: ForgeProp) {
+  const own = ownChoice(forge.recipes)
+  if (own === null) return null
+  const chosenAt = forge.recipes?.chosenAt
+  return (
+    <div className="fdry-saved">
+      <Check aria-hidden="true" />
+      Saved {chosenAt !== null && chosenAt !== undefined ? clockOf(chosenAt) : ''}:{' '}
+      {capitalise(own)}.
+      <Button variant="ghost" size="sm" onClick={() => void forge.pickRecipe(null)}>
+        Use the proposal
+      </Button>
+    </div>
+  )
+}
+
+interface ShapeOptionProps extends ForgeProp {
+  readonly recipes: RecipesView
+  readonly option: RecipeOption
+}
+
+function ShapeOption({ forge, recipes, option }: ShapeOptionProps) {
+  const isSelected = (recipes.chosen ?? recipes.proposed) === option.name
+  if (!option.available || (!forge.isDraft && forge.r.locks.handOff !== null)) {
+    const reason = !option.available
+      ? shapeUnavailable(option.name, option.unmet)
+      : forge.r.locks.handOff
+    return (
+      <ReasonButton
+        plain
+        tip="fit"
+        reason={reason}
+        className={`fdry-shape${isSelected ? ' is-on' : ''} fdry-shape--off`}
+      >
+        <span className="fdry-shape-nm">
+          <b>{capitalise(option.name)}</b>
+          <Lock aria-hidden="true" />
+        </span>
+        <small>
+          {option.available
+            ? (option.description ?? '')
+            : `Unavailable: ${option.unmet.join('; ')}`}
+        </small>
+      </ReasonButton>
+    )
+  }
+  return <OpenShape forge={forge} recipes={recipes} option={option} />
+}
+
+function OpenShape({ forge, recipes, option }: ShapeOptionProps) {
+  const isSelected = (recipes.chosen ?? recipes.proposed) === option.name
+  return (
+    <button
+      type="button"
+      className={`fdry-shape${isSelected ? ' is-on' : ''}`}
+      aria-pressed={isSelected}
+      onClick={() => void forge.pickRecipe(option.name)}
+    >
+      <span className="fdry-shape-nm">
+        <b>{capitalise(option.name)}</b>
+        {option.name === recipes.proposed ? <span className="fdry-mark">Proposed</span> : null}
+        {option.name === recipes.chosen && option.name !== recipes.proposed ? (
+          <span className="fdry-mark fdry-mark--you">Your choice</span>
+        ) : null}
+      </span>
+      <small>{option.description ?? ''}</small>
+    </button>
+  )
+}
+
+function TrackerStep({ forge }: ForgeProp) {
+  const { source } = forge.order
+  return (
+    <>
+      <p className="fdry-step-intro">
+        What this order tells {source.tracker} {source.key} as it moves.
+      </p>
+      {forge.states?.capability?.transitions === 'unsupported' ? (
+        <p className="fdry-note">
+          {source.tracker} cannot be asked to move an issue, so {source.key} will not change state.
+          The summary comment and the pull request links still go across.
+        </p>
+      ) : (
+        <WorkflowStates forge={forge} />
+      )}
+      <WriteBacks forge={forge} />
+    </>
+  )
+}
+
+function WorkflowStates({ forge }: ForgeProp) {
+  return (
+    <section className="fdry-field">
+      <h3 className="fdry-field-h">Workflow states</h3>
+      <p className="fdry-note">
+        Which of {forge.order.source.tracker}&rsquo;s own states each moment means. Left alone, the
+        tracker resolves it.
+      </p>
+      {INTENTS.map((intent) => (
+        <IntentMapping key={intent} forge={forge} intent={intent} />
+      ))}
+    </section>
+  )
+}
+
+function IntentMapping({ forge, intent }: ForgeProp & { readonly intent: TransitionIntent }) {
+  const { states } = forge
+  return (
+    <label className="fdry-map">
+      <span>{INTENT_LABELS[intent]}</span>
+      <select
+        value={states?.mapping?.[intent] ?? ''}
+        disabled={forge.locked}
+        onChange={(event) =>
+          void forge.mapIntent(intent, event.target.value === '' ? null : event.target.value)
+        }
+      >
+        <option value="">
+          {states?.capability?.unreachable.includes(intent) === true
+            ? 'nowhere to go — skipped'
+            : 'let the tracker decide'}
+        </option>
+        {states?.capability?.states.map((option) => (
+          <option key={option.id} value={option.id}>
+            {option.name}
+          </option>
+        ))}
+      </select>
+    </label>
+  )
+}
+
+function WriteBacks({ forge }: ForgeProp) {
+  const { writeBack } = forge.order
+  return (
+    <section className="fdry-field">
+      <h3 className="fdry-field-h">What goes back to the issue</h3>
+      <div className="fdry-writebacks">
+        {WRITE_BACKS.map((kind) => (
+          <label key={kind.id} className="fdry-writeback">
+            <input
+              type="checkbox"
+              checked={writeBack.includes(kind.id)}
+              disabled={forge.locked}
+              onChange={(event) =>
+                void forge.setWriteBack(
+                  event.target.checked
+                    ? [...writeBack, kind.id]
+                    : writeBack.filter((w) => w !== kind.id)
+                )
+              }
+            />
+            {kind.label}
+          </label>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function HandOffStep({ forge }: ForgeProp) {
+  const { isDraft, view } = forge
+  return (
+    <>
+      {isDraft ? (
+        <p className="fdry-step-intro">
+          {view.intake?.kind === 'refused'
+            ? 'These rows describe the order as it stood before the refused turn.'
+            : 'Hand-off agrees the order and starts the work. Every row must pass.'}
+        </p>
+      ) : null}
+      {isDraft ? (
+        <div className="fdry-checks">
+          {forge.r.rows.map((row) => (
+            <CheckRow key={row.id} forge={forge} row={row} />
+          ))}
+        </div>
+      ) : (
+        <AgreedRows forge={forge} />
+      )}
+      <Unmeasured unavailable={view.unavailableChecks} />
+    </>
+  )
+}
+
+function AgreedRows({ forge }: ForgeProp) {
+  return (
+    <>
+      <p className="fdry-step-intro">
+        All six rows passed at agreement. The order is now read-only. Changes go through the run.
+      </p>
+      <div className="fdry-checks">
+        <div className="fdry-chk">
+          <span className="fdry-chk-icon" aria-hidden="true">
+            <Check aria-hidden="true" />
+          </span>
+          <div>
+            <b>Six of six rows passed</b>
+            <small>Questions, proof, coverage, risk, red team, nobody changing the plan.</small>
+          </div>
+          <span className="fdry-pill fdry-pill--pass">Agreed</span>
+        </div>
+        <RunStartedRow forge={forge} />
+      </div>
+    </>
+  )
+}
+
+function RunStartedRow({ forge }: ForgeProp) {
+  const { shapeName } = forge
+  return (
+    <div className="fdry-chk">
+      <span className="fdry-chk-icon" aria-hidden="true">
+        <Play aria-hidden="true" />
+      </span>
+      <div>
+        <b>Run started with {capitalise(shapeName ?? 'the proposed')}</b>
+        <small>
+          {forge.recipes?.recipes?.find((r2) => r2.name === shapeName)?.description ?? ''}
+        </small>
+      </div>
+      <span className="fdry-pill fdry-pill--work">{forge.r.runState}</span>
+    </div>
+  )
+}
+
+function Unmeasured({ unavailable }: { readonly unavailable: string[] | undefined }) {
+  if (unavailable === undefined || unavailable.length === 0) return null
+  return (
+    <section className="fdry-field">
+      <h3 className="fdry-field-h">Not measurable here</h3>
+      <p className="fdry-note">
+        This repository has no command for {unavailable.join(', ')}. Those checks will report
+        &ldquo;not measured&rdquo; rather than passing.
+      </p>
+    </section>
+  )
+}
+
+function MessageForm({ forge }: ForgeProp) {
+  const { draft, setDraft } = forge
+  return (
+    <form
+      className="fdry-input"
+      onSubmit={(event) => {
+        event.preventDefault()
+        if (draft.trim() === '') return
+        void forge.converge(draft)
+        setDraft('')
+      }}
+    >
+      <input
+        aria-label="Tell the architect what is wrong, or what you want instead"
+        placeholder="Tell the architect what's wrong, or what you want instead…"
+        value={draft}
+        onChange={(event) => setDraft(event.target.value)}
+      />
+      <ReasonButton
+        type="submit"
+        variant="primary"
+        reason={forge.r.locks.message ?? (draft.trim() === '' ? LOCAL_REASONS.emptyMessage : null)}
+      >
+        Send
+      </ReasonButton>
+    </form>
+  )
+}
+
+function ForgeFooter({ forge }: ForgeProp) {
+  const { isDraft, problem, view, previous, stepView } = forge
+  if (!isDraft && problem === null && view.advisory == null) return null
+  return (
+    <footer className="fdry-foot">
+      {problem !== null ? <p className="fdry-problem">{problem}</p> : null}
+      {previous !== undefined ? (
+        <Button onClick={() => openStep(forge, previous.id)}>Back</Button>
+      ) : null}
+      <FooterWhy forge={forge} />
+      <FooterMove forge={forge} />
+      {stepView.id === 'handOff' && view.advisory != null ? (
+        <p className="fdry-note fdry-advisory">{view.advisory}</p>
+      ) : null}
+    </footer>
+  )
+}
+
+function FooterWhy({ forge }: ForgeProp) {
+  const { r, stepView, stepNeedsYou } = forge
+  if (r.handOffWhy !== null && stepView.id === 'handOff') {
+    return (
+      <span className="fdry-why">
+        <Info aria-hidden="true" />
+        {r.handOffWhy}
+      </span>
+    )
+  }
+  if (stepNeedsYou.decided === 0 || stepNeedsYou.total === stepNeedsYou.decided) {
+    return <span className="fdry-why" />
+  }
+  return (
+    <span className="fdry-why">
+      <Info aria-hidden="true" />
+      Send now or decide the {stepNeedsYou.total === 2 ? 'second' : 'next'} finding first. Undecided
+      findings stay open.
+    </span>
+  )
+}
+
+function FooterMove({ forge }: ForgeProp) {
+  const { stepView, stepNeedsYou, next } = forge
+  if (stepView.id === 'handOff') {
+    return forge.view.agreed !== undefined && !forge.isDraft ? null : (
+      <HandOffButton forge={forge} />
+    )
+  }
+  if (stepNeedsYou.total > 0) {
+    return (
+      <ReasonButton
+        variant="primary"
+        reason={sendReasonOf(forge)}
+        onClick={() => sendDecisionsOnThisStep(forge)}
+      >
+        {stepNeedsYou.decided === 0
+          ? 'Send decisions'
+          : `Send ${stepNeedsYou.decided} decision${stepNeedsYou.decided === 1 ? '' : 's'}`}
+      </ReasonButton>
+    )
+  }
+  if (next === undefined) return null
+  return (
+    <Button variant="primary" onClick={() => openStep(forge, next.id)}>
+      Next: {STEP_LABELS[next.id]}
+    </Button>
+  )
+}
+
+function HandOffButton({ forge }: ForgeProp) {
+  const { r, shapeName } = forge
+  return (
+    <ReasonButton
+      variant="primary"
+      icon={r.canHandOff ? Play : Lock}
+      reason={r.locks.handOff}
+      onClick={() => void forge.handOff()}
+    >
+      {r.canHandOff ? `Hand off with ${capitalise(shapeName ?? 'the proposed')}` : 'Hand off'}
+    </ReasonButton>
   )
 }

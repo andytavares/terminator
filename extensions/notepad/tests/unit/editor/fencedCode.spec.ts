@@ -4,9 +4,10 @@ import { markdown } from '@codemirror/lang-markdown'
 import { GFM } from '@lezer/markdown'
 import type { Decoration } from '@codemirror/view'
 import { buildDecorations } from '../../../src/editor/livePreview'
+import { parsedState } from '../support/parsed-state'
 
 function makeState(doc: string, readOnly = false) {
-  return EditorState.create({
+  return parsedState({
     doc,
     extensions: [markdown({ extensions: [GFM] }), EditorState.readOnly.of(readOnly)],
   })
@@ -19,7 +20,14 @@ interface Collected {
   widget?: string
 }
 
-function collect(doc: string, cursor: number, focused = false, readOnly = false): Collected[] {
+/** How the editor is when decorations are built. */
+interface EditorMode {
+  focused?: boolean
+  readOnly?: boolean
+}
+
+function collect(doc: string, cursor: number, mode: EditorMode = {}): Collected[] {
+  const { focused = false, readOnly = false } = mode
   const state = makeState(doc, readOnly)
   const out: Collected[] = []
   buildDecorations(state, { anchor: cursor }, focused).between(
@@ -61,9 +69,42 @@ describe('fenced code — while the block is being written', () => {
   })
 })
 
-describe('fenced code — editing the body', () => {
-  const BLOCK = '```js\ncode\n```'
+const BLOCK = '```js\ncode\n```'
 
+describe('fenced code — editing the body', fencedCodeEditingBodyTests)
+
+describe('fenced code — finished block', () => {
+  it('hides both fences once the caret leaves', () => {
+    const doc = '```js\ncode\n```\n\nafter'
+    const decos = collect(doc, doc.length)
+    expect(decos.filter((d) => d.cls === 'notepad-fence-hidden')).toHaveLength(2)
+  })
+
+  it('renders a mermaid block as a diagram once the caret leaves', () => {
+    const doc = '```mermaid\ngraph TD;\n```\n\nafter'
+    expect(collect(doc, doc.length).some((d) => d.widget === 'MermaidWidget')).toBe(true)
+  })
+
+  it('renders fully in read-only mode even with the caret inside', () => {
+    const doc = '```js\ncode\n```'
+    const decos = collect(doc, doc.indexOf('code'), { focused: true, readOnly: true })
+    expect(decos.filter((d) => d.cls === 'notepad-fence-hidden')).toHaveLength(2)
+  })
+
+  it('renders a read-only mermaid block as a diagram', () => {
+    const doc = '```mermaid\ngraph TD;\n```'
+    expect(
+      collect(doc, 12, { focused: true, readOnly: true }).some((d) => d.widget === 'MermaidWidget')
+    ).toBe(true)
+  })
+})
+
+function fencedCodeEditingBodyTests() {
+  describe('inside the body', fencedCodeInsideBodyTests)
+  describe('on the fences', fencedCodeOnFencesTests)
+}
+
+function fencedCodeInsideBodyTests() {
   it('styles the code lines once the caret is past the opening fence', () => {
     const decos = collect(BLOCK, BLOCK.indexOf('code'))
     expect(decos.some((d) => d.cls === 'notepad-code-block-line')).toBe(true)
@@ -85,7 +126,9 @@ describe('fenced code — editing the body', () => {
     const doc = '```mermaid\ngraph TD;\n```'
     expect(collect(doc, doc.indexOf('graph')).every((d) => d.widget === undefined)).toBe(true)
   })
+}
 
+function fencedCodeOnFencesTests() {
   it('goes back to raw when the caret returns to the language', () => {
     expect(collect(BLOCK, 4)).toEqual([])
   })
@@ -94,28 +137,4 @@ describe('fenced code — editing the body', () => {
     const decos = collect(BLOCK, BLOCK.length - 1)
     expect(decos.some((d) => d.cls === 'notepad-fence-hidden')).toBe(false)
   })
-})
-
-describe('fenced code — finished block', () => {
-  it('hides both fences once the caret leaves', () => {
-    const doc = '```js\ncode\n```\n\nafter'
-    const decos = collect(doc, doc.length)
-    expect(decos.filter((d) => d.cls === 'notepad-fence-hidden')).toHaveLength(2)
-  })
-
-  it('renders a mermaid block as a diagram once the caret leaves', () => {
-    const doc = '```mermaid\ngraph TD;\n```\n\nafter'
-    expect(collect(doc, doc.length).some((d) => d.widget === 'MermaidWidget')).toBe(true)
-  })
-
-  it('renders fully in read-only mode even with the caret inside', () => {
-    const doc = '```js\ncode\n```'
-    const decos = collect(doc, doc.indexOf('code'), true, true)
-    expect(decos.filter((d) => d.cls === 'notepad-fence-hidden')).toHaveLength(2)
-  })
-
-  it('renders a read-only mermaid block as a diagram', () => {
-    const doc = '```mermaid\ngraph TD;\n```'
-    expect(collect(doc, 12, true, true).some((d) => d.widget === 'MermaidWidget')).toBe(true)
-  })
-})
+}

@@ -2,9 +2,27 @@ import './notepad.css'
 import React, { useEffect, useState } from 'react'
 import { DiagramView } from './DiagramView'
 
-export function DiagramWindowView(_props: { repoRoot: string | null }): React.JSX.Element {
+export function DiagramWindowView(): React.JSX.Element {
   // Read at component init so this component is testable with a mocked location.
   const diagramId = new URLSearchParams(window.location.search).get('diagramId') ?? ''
+  useDiagramWindowTitle(diagramId)
+
+  if (!diagramId) {
+    return <div className="notepad-window-loading">No diagram ID provided</div>
+  }
+
+  return (
+    <div
+      className="notepad-window"
+      style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}
+    >
+      <DiagramView key={diagramId} diagramId={diagramId} />
+    </div>
+  )
+}
+
+/** Titles the window after the diagram, once its title has loaded. */
+function useDiagramWindowTitle(diagramId: string): void {
   const [title, setTitle] = useState('Diagram')
 
   useEffect(() => {
@@ -21,17 +39,4 @@ export function DiagramWindowView(_props: { repoRoot: string | null }): React.JS
   useEffect(() => {
     document.title = title
   }, [title])
-
-  if (!diagramId) {
-    return <div className="notepad-window-loading">No diagram ID provided</div>
-  }
-
-  return (
-    <div
-      className="notepad-window"
-      style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}
-    >
-      <DiagramView key={diagramId} diagramId={diagramId} />
-    </div>
-  )
 }

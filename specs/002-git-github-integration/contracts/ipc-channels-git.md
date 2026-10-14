@@ -1,5 +1,12 @@
 # Contract: New IPC Channels — Git & GitHub Integration
 
+> **Superseded. Kept as history.** This contract records what was decided when the feature was
+> specified, and is not edited. The code no longer has `git:pr-create` (now `github:pr-create`), `git:conflict-blocks` and `git:merge-ai-suggest`; the extension channels are no longer core channels. Do not build against it. The
+> current contract lives in:
+>
+> - `extensions/git-integration/src/ipc/git.ipc.ts`, `github.ipc.ts`, `merge-flow.ipc.ts` and `extensions/git-integration/src/schemas/`: each channel is a `ChannelSpec` whose zod schema is its payload contract ([ADR 096](../../../docs/adr/096-every-ipc-channel-has-a-schema.md))
+> - `src/shared/electron-api/manifest.ts`: every core channel and the renderer's `window.electronAPI` (the core's own `git:*` channels)
+
 **Version**: 1.0.0
 **Date**: 2026-05-07
 **Branch**: `002-git-github-integration`

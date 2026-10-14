@@ -12,7 +12,7 @@ import type { EditorState, StateCommand } from '@codemirror/state'
 
 const ATX_MARKER = /^(#{1,6})([ \t]+|$)/
 
-/** Offset just past `# `, or null when the line is not an ATX heading. */
+/** Offset just past `# `, or null when the line is not an ATX heading. @internal */
 export function headingTextStart(state: EditorState, pos: number): number | null {
   const line = state.doc.lineAt(pos)
   const match = ATX_MARKER.exec(line.text)

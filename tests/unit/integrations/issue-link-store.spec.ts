@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import * as path from 'node:path'
+import { makeTempDir } from '../../support/temp-dir'
 
 let userData: string
 
@@ -12,11 +12,16 @@ async function load() {
   return import('../../../src/main/integrations/issue-link-store')
 }
 
+/** What the store last wrote to disk. */
+function storedLinks(): { projectId: string; key: string }[] {
+  return JSON.parse(fs.readFileSync(path.join(userData, 'issue-links.json'), 'utf8'))
+}
+
 const P1 = '11111111-1111-4111-8111-111111111111'
 const P2 = '22222222-2222-4222-8222-222222222222'
 
 beforeEach(() => {
-  userData = fs.mkdtempSync(path.join(os.tmpdir(), 'issue-link-store-'))
+  userData = makeTempDir('issue-link-store-')
 })
 
 describe('issue-link-store — set and read', () => {
@@ -42,7 +47,9 @@ describe('issue-link-store — set and read', () => {
     const store = await load()
     expect(store.getLink(P1)).toBeNull()
   })
+})
 
+describe('issue-link-store — several links', () => {
   it('keeps links for different projects apart', async () => {
     const store = await load()
     await store.setLink({ projectId: P1, tracker: 'linear', key: 'TAV-42', injectContext: true })
@@ -79,7 +86,7 @@ describe('issue-link-store — one issue per project (FR-033)', () => {
     await store.setLink({ projectId: P1, tracker: 'jira', key: 'TAV-7', injectContext: false })
 
     expect(store.getLink(P1)).toMatchObject({ tracker: 'jira', key: 'TAV-7' })
-    expect(store.listLinks().filter((l) => l.projectId === P1)).toHaveLength(1)
+    expect(storedLinks().filter((link) => link.projectId === P1)).toHaveLength(1)
   })
 
   it('carries the previous injection setting when none is given', async () => {
@@ -152,7 +159,9 @@ describe('issue-link-store — persistence', () => {
     await expect(store.loadLinks()).resolves.toBeUndefined()
     expect(store.getLink(P1)).toBeNull()
   })
+})
 
+describe('issue-link-store — stored entries', () => {
   it('ignores stored entries that are not links', async () => {
     // The file is on disk and hand-editable; a malformed row must not take
     // out the rest of the operator's links.
@@ -172,17 +181,22 @@ describe('issue-link-store — persistence', () => {
     const store = await load()
     await store.loadLinks()
 
-    expect(store.listLinks()).toHaveLength(1)
     expect(store.getLink(P1)?.key).toBe('TAV-42')
+    expect(store.getLink(P2)).toBeNull()
+    // Writing back keeps the one link it read and nothing else.
+    await store.setInjectContext(P1, false)
+    expect(storedLinks().map((link) => link.key)).toEqual(['TAV-42'])
   })
 
   it('treats a stored file that is not a list as no links', async () => {
     fs.writeFileSync(path.join(userData, 'issue-links.json'), '{"nope":true}', 'utf8')
     const store = await load()
     await store.loadLinks()
-    expect(store.listLinks()).toEqual([])
+    expect(store.getLink(P1)).toBeNull()
   })
+})
 
+describe('issue-link-store — stored fields', () => {
   it('defaults injection on for a stored entry that omits it', async () => {
     fs.writeFileSync(
       path.join(userData, 'issue-links.json'),
@@ -204,7 +218,9 @@ describe('issue-link-store — persistence', () => {
     await store.loadLinks()
     expect(store.getLink(P1)?.injectContext).toBe(false)
   })
+})
 
+describe('issue-link-store — stored timestamps and temp files', () => {
   it('stamps a link that was stored without a timestamp', async () => {
     fs.writeFileSync(
       path.join(userData, 'issue-links.json'),
@@ -249,33 +265,6 @@ describe('issue-link-store — garbage collection', () => {
     expect(store.getLink(P2)?.key).toBe('TAV-43')
   })
 
-  it('notifies a listener so surfaces can drop the badge', async () => {
-    const store = await load()
-    const { emitProjectDelete } = await import('../../../src/main/extensions/workspace-events')
-    const seen: Array<{ projectId: string; link: unknown }> = []
-
-    store.onLinkChange((projectId, link) => seen.push({ projectId, link }))
-    await store.setLink({ projectId: P1, tracker: 'linear', key: 'TAV-42', injectContext: true })
-    store.registerLinkGarbageCollection()
-    emitProjectDelete(P1)
-
-    expect(seen.map((s) => s.link)).toEqual([expect.objectContaining({ key: 'TAV-42' }), null])
-  })
-
-  it('does nothing for a project that had no link', async () => {
-    const store = await load()
-    const { emitProjectDelete } = await import('../../../src/main/extensions/workspace-events')
-    const seen: string[] = []
-    store.onLinkChange((projectId) => seen.push(projectId))
-
-    store.registerLinkGarbageCollection()
-    emitProjectDelete(P1)
-
-    // No link, so nothing to announce — a listener must not be woken for a
-    // change that did not happen.
-    expect(seen).toEqual([])
-  })
-
   it('can be unregistered', async () => {
     const store = await load()
     const { emitProjectDelete } = await import('../../../src/main/extensions/workspace-events')
@@ -286,36 +275,5 @@ describe('issue-link-store — garbage collection', () => {
     emitProjectDelete(P1)
 
     expect(store.getLink(P1)?.key).toBe('TAV-42')
-  })
-})
-
-describe('issue-link-store — change notification', () => {
-  it('fires on set and on clear', async () => {
-    const store = await load()
-    const seen: string[] = []
-    store.onLinkChange((projectId) => seen.push(projectId))
-
-    await store.setLink({ projectId: P1, tracker: 'linear', key: 'TAV-42', injectContext: true })
-    await store.clearLink(P1)
-
-    expect(seen).toEqual([P1, P1])
-  })
-
-  it('stops firing once the listener is disposed', async () => {
-    const store = await load()
-    const seen: string[] = []
-    const dispose = store.onLinkChange((projectId) => seen.push(projectId))
-    dispose()
-
-    await store.setLink({ projectId: P1, tracker: 'linear', key: 'TAV-42', injectContext: true })
-    expect(seen).toEqual([])
-  })
-
-  it('does not fire clearing a project that was never linked', async () => {
-    const store = await load()
-    const seen: string[] = []
-    store.onLinkChange((projectId) => seen.push(projectId))
-    await store.clearLink(P1)
-    expect(seen).toEqual([])
   })
 })

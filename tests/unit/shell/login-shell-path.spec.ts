@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, writeFileSync, rmSync } from 'fs'
-import { tmpdir } from 'os'
+import { existsSync, readFileSync, writeFileSync, rmSync } from 'fs'
 import { join } from 'path'
 import { adoptLoginShellPath } from '../../../src/main/shell/login-shell-path'
+import { stopRunningCommands } from '../../../src/main/shell/command-runner'
+import { makeTempDir } from '../../support/temp-dir'
+import { isProcessAlive } from '../../support/processes'
 
 let dir: string
 
@@ -13,7 +15,7 @@ function fakeShell(body: string): string {
 }
 
 beforeEach(() => {
-  dir = mkdtempSync(join(tmpdir(), 'login-shell-path-'))
+  dir = makeTempDir('login-shell-path-')
 })
 
 afterEach(() => {
@@ -58,5 +60,24 @@ describe('adoptLoginShellPath', () => {
     await adoptLoginShellPath(env)
 
     expect(env.PATH).toBe('/usr/bin:/bin')
+  })
+})
+
+describe('adoptLoginShellPath while the app quits', () => {
+  // An interactive login shell runs the person's rc files, which can start
+  // processes of their own; quitting during the probe must end them too.
+  it('is stopped with whatever the login shell had started', async () => {
+    const pidFile = join(dir, 'grandchild.pid')
+    const shell = fakeShell(`sleep 30 &\necho $! > "${pidFile}"\nwait`)
+    const env: NodeJS.ProcessEnv = { SHELL: shell, PATH: '/usr/bin:/bin' }
+
+    const adopting = adoptLoginShellPath(env)
+    await expect.poll(() => existsSync(pidFile) && readFileSync(pidFile, 'utf8') !== '').toBe(true)
+    const grandchild = Number(readFileSync(pidFile, 'utf8'))
+    stopRunningCommands()
+    await adopting
+
+    expect(env.PATH).toBe('/usr/bin:/bin')
+    await expect.poll(() => isProcessAlive(grandchild)).toBe(false)
   })
 })

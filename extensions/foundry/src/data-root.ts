@@ -15,6 +15,7 @@ import * as path from 'node:path'
 
 export const DEFAULT_DIR_NAME = '.foundry'
 
+/** @internal */
 export class RelativeDataDirError extends Error {
   readonly code = 'RELATIVE_DATA_DIR'
   constructor(value: string) {
@@ -47,7 +48,7 @@ export function resolveDataRoot(setting: string | undefined, workdir: string): D
   return { root: configured, usingDefault: false }
 }
 
-/** An order id that does not name a directory under `orders/`. */
+/** An order id that does not name a directory under `orders/`. @internal */
 export class OrderIdEscapesRootError extends Error {
   readonly code = 'ORDER_ID_ESCAPES_ROOT'
   constructor(orderId: string) {
@@ -79,21 +80,6 @@ export function orderDir(root: string, orderId: string): string {
   const target = path.resolve(orders, orderId)
   if (path.dirname(target) !== orders) throw new OrderIdEscapesRootError(orderId)
   return target
-}
-
-/**
- * Reserved by the data-root contract, and proved by `footprint.spec.ts` to sit
- * under the root like everything else. Nothing writes per-unit records yet;
- * when something does, this is where they go — and deleting it to satisfy a
- * reachability grep would remove the proof along with the path.
- */
-export function unitDir(root: string, orderId: string, unitId: string): string {
-  return path.join(orderDir(root, orderId), 'units', unitId)
-}
-
-/** Named by merge order first so a directory listing reads in merge order. */
-export function laneDir(root: string, orderId: string, ord: number, repo: string): string {
-  return path.join(orderDir(root, orderId), 'lanes', `${ord}-${repo}`)
 }
 
 export function ledgerPath(root: string, orderId: string): string {

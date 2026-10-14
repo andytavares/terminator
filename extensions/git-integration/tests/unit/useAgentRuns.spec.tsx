@@ -111,7 +111,9 @@ describe('useAgentRuns', () => {
       expect(mockSetAgentRuns).toHaveBeenCalledWith([listedRun])
     })
   })
+})
 
+describe('useAgentRuns — applies events only for this pr', () => {
   it('applies events only for this pr', () => {
     const pr = makePr()
     renderHook(() => useAgentRuns('/repo', pr))

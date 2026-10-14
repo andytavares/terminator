@@ -150,6 +150,8 @@ A failing check is `being-fixed` when a machine turn is running or queued to clo
 
 Foundry's controls stay in one box: the status strip on top, a vertical step rail on the left, the open step on the right, and a bottom bar holding the way forward. The rail puts a state word under every step, so the reason is always in text as well as colour. The existing "Needs you" band moves into the status strip and the Red team step. It appears only when the holder is you.
 
+The frame bounds both columns. Before it, an operator reported: "use of space is terrible, I have to scroll so far to find the delete/discard button." Measured on that order at that window (1005x768), the rail came out 1494px beside a 1906px document in a 729px viewport, so the page was 2383px long, two thirds of the width was empty where only the rail was left, and the controls that end an order, which render after both columns, sat at 2367px: 1654px of scrolling to reach a button. `tests/e2e/foundry-forge.spec.ts` ("an open order is a frame") keeps them on screen.
+
 ## Renderings
 
 Content is from WO-0928-9c6. Where a state did not occur on that order, the caption says so. Light-theme versions are next to each file (`NN-light.png`).

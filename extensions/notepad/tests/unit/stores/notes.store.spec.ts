@@ -10,6 +10,8 @@ const mockNote: NoteListItem = {
   archivedAt: null,
   tags: [],
   bodyPreview: '',
+  sortOrder: 0,
+  folderId: null,
 }
 
 const mockDiagram: DiagramListItem = {
@@ -19,9 +21,14 @@ const mockDiagram: DiagramListItem = {
   createdAt: '2026-01-02T00:00:00Z',
   archivedAt: null,
   type: 'diagram',
+  tags: [],
+  sortOrder: 0,
+  folderId: null,
 }
 
-describe('notes.store', () => {
+describe('notes.store', notesStoreTests)
+
+function notesStoreTests() {
   beforeEach(() => {
     useNotesStore.setState({
       notes: [],
@@ -35,6 +42,14 @@ describe('notes.store', () => {
     })
   })
 
+  describe('notes', notesStoreNotesTests)
+  describe('selection', notesStoreSelectionTests)
+  describe('diagrams and archive', notesStoreDiagramsArchiveTests)
+  describe('patching', notesStorePatchingTests)
+  describe('caches', notesStoreCachesTests)
+}
+
+function notesStoreNotesTests() {
   it('starts with empty notes and no selection', () => {
     const { notes, selectedNoteId } = useNotesStore.getState()
     expect(notes).toEqual([])
@@ -52,7 +67,9 @@ describe('notes.store', () => {
     useNotesStore.getState().setNotes([])
     expect(useNotesStore.getState().notes).toHaveLength(0)
   })
+}
 
+function notesStoreSelectionTests() {
   it('setSelected sets the selected note id', () => {
     useNotesStore.getState().setSelected('n1')
     expect(useNotesStore.getState().selectedNoteId).toBe('n1')
@@ -77,7 +94,9 @@ describe('notes.store', () => {
     expect(useNotesStore.getState().selectedNoteId).toBeNull()
     expect(useNotesStore.getState().selectedDiagramId).toBe('d1')
   })
+}
 
+function notesStoreDiagramsArchiveTests() {
   it('setDiagrams replaces the diagrams list', () => {
     useNotesStore.getState().setDiagrams([mockDiagram])
     expect(useNotesStore.getState().diagrams).toHaveLength(1)
@@ -91,7 +110,9 @@ describe('notes.store', () => {
     useNotesStore.getState().toggleArchivedVisible()
     expect(useNotesStore.getState().archivedVisible).toBe(false)
   })
+}
 
+function notesStorePatchingTests() {
   it('patchNote updates matching note metadata without replacing the list', () => {
     useNotesStore.getState().setNotes([mockNote, { ...mockNote, id: 'n2', title: 'Other' }])
     useNotesStore.getState().patchNote('n1', { title: 'Updated', bodyPreview: 'preview text' })
@@ -118,7 +139,9 @@ describe('notes.store', () => {
     expect(diagrams.find((d) => d.id === 'd1')?.updatedAt).toBe('2026-06-30T00:00:00Z')
     expect(diagrams.find((d) => d.id === 'd2')?.title).toBe('D2')
   })
+}
 
+function notesStoreCachesTests() {
   it('setBodyCache stores and returns body by note id', () => {
     useNotesStore.getState().setBodyCache('n1', 'hello world')
     expect(useNotesStore.getState().bodyCache['n1']).toBe('hello world')
@@ -140,4 +163,4 @@ describe('notes.store', () => {
     expect(useNotesStore.getState().bodyCache).toEqual({})
     expect(useNotesStore.getState().diagramCache).toEqual({})
   })
-})
+}

@@ -1,13 +1,13 @@
-import type { ExtensionDB } from '../../../../src/main/extensions/api'
+import type { ExtensionDB } from '@terminator/extension-sdk'
 import { randomUUID } from './db'
 
 // Persistence for the weekly review. Before this existed the review left no
 // trace beyond a single inbox task holding the reflection text as a sentence,
 // so there was no way to look back at what was promoted, archived, or dropped.
 
-export type ReviewStatus = 'in_progress' | 'completed'
+type ReviewStatus = 'in_progress' | 'completed'
 
-export type ReviewActionKind =
+type ReviewActionKind =
   | 'captured'
   | 'inbox-processed'
   | 'project-status'
@@ -17,7 +17,7 @@ export type ReviewActionKind =
   | 'task-deleted'
   | 'task-kept'
 
-export type ReviewEntityType = 'task' | 'project'
+type ReviewEntityType = 'task' | 'project'
 
 export interface WeeklyReviewAction {
   id: string
@@ -49,7 +49,7 @@ export interface WeeklyReviewDetail extends WeeklyReview {
   actions: WeeklyReviewAction[]
 }
 
-interface ReviewRow {
+type ReviewRow = {
   id: string
   started_at: string
   completed_at: string | null
@@ -59,7 +59,7 @@ interface ReviewRow {
   try_next: string | null
 }
 
-interface ActionRow {
+type ActionRow = {
   id: string
   review_id: string
   step: string | number
@@ -71,7 +71,7 @@ interface ActionRow {
   created_at: string
 }
 
-export function rowToReview(row: ReviewRow): WeeklyReview {
+function rowToReview(row: ReviewRow): WeeklyReview {
   return {
     id: row.id,
     startedAt: row.started_at,
@@ -83,7 +83,7 @@ export function rowToReview(row: ReviewRow): WeeklyReview {
   }
 }
 
-export function rowToAction(row: ActionRow): WeeklyReviewAction {
+function rowToAction(row: ActionRow): WeeklyReviewAction {
   return {
     id: row.id,
     reviewId: row.review_id,
@@ -141,30 +141,32 @@ export interface LogActionInput {
   detail?: string | null
 }
 
-export async function logReviewAction(
-  db: ExtensionDB,
-  input: LogActionInput,
-  now = new Date().toISOString()
-): Promise<WeeklyReviewAction> {
-  const id = randomUUID()
+async function insertReviewAction(db: ExtensionDB, action: WeeklyReviewAction): Promise<void> {
   await db.run(
     `INSERT INTO weekly_review_actions
        (id, review_id, step, action, entity_type, entity_id, entity_label, detail, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
-      id,
-      input.reviewId,
-      input.step,
-      input.action,
-      input.entityType,
-      input.entityId ?? null,
-      input.entityLabel,
-      input.detail ?? null,
-      now,
+      action.id,
+      action.reviewId,
+      action.step,
+      action.action,
+      action.entityType,
+      action.entityId,
+      action.entityLabel,
+      action.detail,
+      action.createdAt,
     ]
   )
-  return {
-    id,
+}
+
+export async function logReviewAction(
+  db: ExtensionDB,
+  input: LogActionInput,
+  now = new Date().toISOString()
+): Promise<WeeklyReviewAction> {
+  const action: WeeklyReviewAction = {
+    id: randomUUID(),
     reviewId: input.reviewId,
     step: input.step,
     action: input.action,
@@ -174,6 +176,8 @@ export async function logReviewAction(
     detail: input.detail ?? null,
     createdAt: now,
   }
+  await insertReviewAction(db, action)
+  return action
 }
 
 export async function completeReview(
@@ -261,6 +265,44 @@ function formatDate(iso: string | null): string {
   return iso.slice(0, 10)
 }
 
+/** One line per recorded action. */
+function actionLine(action: WeeklyReviewAction): string {
+  if (action.detail) return `- ${action.entityLabel} — ${action.detail}`
+  return `- ${action.entityLabel}`
+}
+
+/** A section per kind of action, in the order the review flows. */
+function actionSections(review: WeeklyReviewDetail): string[] {
+  const lines: string[] = []
+  for (const kind of ACTION_ORDER) {
+    const matching = review.actions.filter((a) => a.action === kind)
+    if (matching.length === 0) continue
+    lines.push(`## ${ACTION_HEADINGS[kind]}`, '', ...matching.map(actionLine), '')
+  }
+  return lines
+}
+
+/** The reflection answers, when any was given. */
+function reflectionLines(review: WeeklyReviewDetail): string[] {
+  if (!review.worked && !review.didntWork && !review.tryNext) return []
+  return [
+    '## Reflection',
+    '',
+    `**What worked well?**`,
+    '',
+    review.worked || '—',
+    '',
+    `**What didn't work?**`,
+    '',
+    review.didntWork || '—',
+    '',
+    `**What will you try next week?**`,
+    '',
+    review.tryNext || '—',
+    '',
+  ]
+}
+
 export function formatReviewMarkdown(review: WeeklyReviewDetail): string {
   const lines: string[] = [
     `# Weekly Review — ${formatDate(review.startedAt)}`,
@@ -271,23 +313,7 @@ export function formatReviewMarkdown(review: WeeklyReviewDetail): string {
     '',
   ]
 
-  for (const kind of ACTION_ORDER) {
-    const matching = review.actions.filter((a) => a.action === kind)
-    if (matching.length === 0) continue
-    lines.push(`## ${ACTION_HEADINGS[kind]}`, '')
-    for (const action of matching) {
-      lines.push(`- ${action.entityLabel}${action.detail ? ` — ${action.detail}` : ''}`)
-    }
-    lines.push('')
-  }
-
-  if (review.worked || review.didntWork || review.tryNext) {
-    lines.push('## Reflection', '')
-    lines.push(`**What worked well?**`, '', review.worked || '—', '')
-    lines.push(`**What didn't work?**`, '', review.didntWork || '—', '')
-    lines.push(`**What will you try next week?**`, '', review.tryNext || '—', '')
-  }
-
+  lines.push(...actionSections(review), ...reflectionLines(review))
   return (
     lines
       .join('\n')

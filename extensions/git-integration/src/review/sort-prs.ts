@@ -13,17 +13,19 @@ export interface SortablePr {
   fileCount: number
 }
 
-/** Lower is closer to merging: 0 ready, 1 approved but blocked, 2 awaiting review, 3 changes requested, 4 draft. */
+/** Lower is closer to merging: 0 ready, 1 approved but blocked, 2 awaiting review, 3 changes
+ *  requested, 4 draft. @internal */
 export function mergeReadiness(pr: SortablePr): number {
   if (pr.isDraft) return 4
   if (pr.reviewDecision === 'changes-requested') return 3
   const approved = pr.reviewDecision === 'approved' || (pr.approvalCount ?? 0) > 0
   if (!approved) return 2
   const ciClear = pr.ciStatus === 'passing' || pr.ciStatus === 'none'
-  return ciClear && pr.mergeStateStatus !== 'dirty' ? 0 : 1
+  if (!ciClear || pr.mergeStateStatus === 'dirty') return 1
+  return 0
 }
 
-const hasSession = (pr: SortablePr) =>
+const isResumable = (pr: SortablePr) =>
   pr.sessionStatus === 'in-progress' || pr.sessionStatus === 'paused'
 
 const viewedFraction = (pr: SortablePr) =>
@@ -37,17 +39,13 @@ export function dashboardToSortable<T extends { createdAt: string }>(
 }
 
 /** Returns a new array; ties always fall back to the newest first. */
-export function sortPrs<T>(
-  prs: T[],
-  mode: SortMode,
-  toSortable: (pr: T) => SortablePr = (pr) => pr as unknown as SortablePr
-): T[] {
+export function sortPrs<T>(prs: T[], mode: SortMode, toSortable: (pr: T) => SortablePr): T[] {
   const byAge = (a: SortablePr, b: SortablePr) => b.openedAt.localeCompare(a.openedAt)
   const compare = (a: SortablePr, b: SortablePr): number => {
     if (mode === 'closest') return mergeReadiness(a) - mergeReadiness(b) || byAge(a, b)
     if (mode === 'started') {
       return (
-        Number(hasSession(b)) - Number(hasSession(a)) ||
+        Number(isResumable(b)) - Number(isResumable(a)) ||
         viewedFraction(b) - viewedFraction(a) ||
         byAge(a, b)
       )

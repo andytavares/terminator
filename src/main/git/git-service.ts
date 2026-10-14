@@ -1,37 +1,21 @@
-import { execFile as execFileCb } from 'child_process'
-import { promisify } from 'util'
 import { join } from 'path'
 import type { Branch, WorktreeInfo } from '../../shared/types/index.js'
-import type { GitStatus, FileDiff, ChangeStats } from '../../shared/schemas/git.schema.js'
-import { parseStatus, parseDiff } from './git-parser.js'
+import type { ChangeStats } from '../../shared/schemas/git.schema.js'
+import { runTextCommand } from '../shell/command-runner.js'
 import { GIT_ENV } from './git-env.js'
-
-const execFile = promisify(execFileCb)
 
 const GIT_TIMEOUT = 10_000
 const FETCH_TIMEOUT = 60_000
-const DIFF_MAX_BYTES = 500 * 1024
 
-async function git(args: string[], cwd: string): Promise<string> {
-  const { stdout } = await execFile('git', args, {
-    cwd,
-    timeout: GIT_TIMEOUT,
-    env: GIT_ENV,
-  })
-  return stdout.trim()
-}
-
-export async function getStatus(repoRoot: string, maxFiles: number = 500): Promise<GitStatus> {
-  const [statusOut, branch] = await Promise.all([
-    execFile('git', ['status', '--porcelain=v1', '-z'], {
-      cwd: repoRoot,
-      timeout: GIT_TIMEOUT,
-      env: GIT_ENV,
-    }).then(({ stdout }) => stdout),
-    git(['branch', '--show-current'], repoRoot).catch(() => 'HEAD'),
-  ])
-  const partial = parseStatus(statusOut, maxFiles)
-  return { ...partial, branch: branch || 'HEAD' }
+/** Runs git and resolves with its trimmed stdout, or rejects with its stderr. Through
+ * runTextCommand, so a git still running when the app quits is stopped with whatever it started
+ * (stopRunningCommands). */
+async function git(args: string[], cwd: string, timeoutMs = GIT_TIMEOUT): Promise<string> {
+  const result = await runTextCommand({ command: 'git', args, cwd, timeoutMs }, GIT_ENV)
+  if (result.exitCode !== 0) {
+    throw new Error(`Command failed: git ${args.join(' ')}\n${result.stderr}`)
+  }
+  return result.stdout.trim()
 }
 
 /**
@@ -46,7 +30,9 @@ export async function getStatus(repoRoot: string, maxFiles: number = 500): Promi
 export async function getChangeStats(cwd: string): Promise<ChangeStats> {
   let out: string
   try {
-    out = await git(['diff', '--numstat', 'HEAD'], cwd)
+    // Without the refresh, a diff after a file is saved unchanged rewrites `.git/index`, which
+    // the file watch reports (https://git-scm.com/docs/diff-config). The counts are the same.
+    out = await git(['-c', 'diff.autoRefreshIndex=false', 'diff', '--numstat', 'HEAD'], cwd)
   } catch (err) {
     // A repository with no commits has no HEAD to diff against. That is an
     // empty tree, not a failure — every other error still propagates.
@@ -73,45 +59,6 @@ export async function getChangeStats(cwd: string): Promise<ChangeStats> {
   return { added, removed, files }
 }
 
-export async function getDiff(
-  repoRoot: string,
-  filePath: string,
-  staged: boolean
-): Promise<FileDiff> {
-  const args = staged
-    ? ['diff', '--cached', '--unified=3', '--', filePath]
-    : ['diff', '--unified=3', '--', filePath]
-
-  const { stdout } = await execFile('git', args, {
-    cwd: repoRoot,
-    timeout: GIT_TIMEOUT,
-    maxBuffer: DIFF_MAX_BYTES + 1024,
-    env: GIT_ENV,
-  })
-  return { ...parseDiff(stdout, DIFF_MAX_BYTES), path: filePath }
-}
-
-export async function stageFiles(repoRoot: string, paths: string[]): Promise<void> {
-  await git(['add', '--', ...paths], repoRoot)
-}
-
-export async function unstageFiles(repoRoot: string, paths: string[]): Promise<void> {
-  await git(['restore', '--staged', '--', ...paths], repoRoot)
-}
-
-export async function commitChanges(
-  repoRoot: string,
-  message: string,
-  signOff: boolean = false
-): Promise<string> {
-  const args = ['commit', '-m', message]
-  if (signOff) args.push('--signoff')
-  const output = await git(args, repoRoot)
-  // Extract short hash from output like "[main abc1234] message"
-  const match = output.match(/\[[\w/]+ ([a-f0-9]+)\]/)
-  return match?.[1] ?? ''
-}
-
 export async function isGitRepo(dirPath: string): Promise<boolean> {
   try {
     await git(['rev-parse', '--git-dir'], dirPath)
@@ -130,6 +77,33 @@ export async function getCurrentBranch(dirPath: string): Promise<string> {
   return branch || 'HEAD'
 }
 
+/** One line of `git branch --format=%(HEAD)|%(refname)` as a branch, or null for a ref no
+ * configured remote owns, a remote's HEAD, or a pull ref. */
+function branchFromRef(line: string, remotePrefixes: string[]): Branch | null {
+  const [head, ref] = line.split('|')
+  if (ref.startsWith('refs/heads/')) {
+    return { name: ref.slice('refs/heads/'.length), isCurrent: head === '*', isRemote: false }
+  }
+  const prefix = remotePrefixes.find((p) => ref.startsWith(p))
+  if (prefix === undefined) return null
+  const name = ref.slice(prefix.length)
+  if (name === 'HEAD' || name.startsWith('pull/')) return null
+  return { name, isCurrent: false, isRemote: true }
+}
+
+/** Local branches, then each remote branch whose name nothing local or on another remote already
+ * carries; git's checkout and worktree add resolve the bare name to it. */
+function withoutShadowedRemotes(branches: Branch[]): Branch[] {
+  const local = branches.filter((b) => !b.isRemote)
+  const seen = new Set(local.map((b) => b.name))
+  const remote = branches.filter((b) => {
+    if (!b.isRemote || seen.has(b.name)) return false
+    seen.add(b.name)
+    return true
+  })
+  return [...local, ...remote]
+}
+
 export async function listBranches(dirPath: string): Promise<Branch[]> {
   // Full refnames: `refname:short` prints a remote-tracking branch as
   // `origin/main`, indistinguishable from a local branch with a slash in it.
@@ -143,46 +117,16 @@ export async function listBranches(dirPath: string): Promise<Branch[]> {
     .split('\n')
     .filter(Boolean)
     .map((r) => `refs/remotes/${r}/`)
-  const local: Branch[] = []
-  const remote: Branch[] = []
-
-  for (const line of output.split('\n').filter(Boolean)) {
-    const [head, ref] = line.split('|')
-    if (ref.startsWith('refs/heads/')) {
-      local.push({
-        name: ref.slice('refs/heads/'.length),
-        isCurrent: head === '*',
-        isRemote: false,
-      })
-      continue
-    }
-    const prefix = prefixes.find((p) => ref.startsWith(p))
-    if (prefix === undefined) continue
-    const name = ref.slice(prefix.length)
-    if (name === 'HEAD' || name.startsWith('pull/')) continue
-    remote.push({ name, isCurrent: false, isRemote: true })
-  }
-
-  // A remote branch is listed only when nothing local or on another remote
-  // already carries its name; git's checkout and worktree add resolve the bare
-  // name to it.
-  const seen = new Set(local.map((b) => b.name))
-  return [
-    ...local,
-    ...remote.filter((b) => {
-      if (seen.has(b.name)) return false
-      seen.add(b.name)
-      return true
-    }),
-  ]
+  const branches = output
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => branchFromRef(line, prefixes))
+    .filter((branch): branch is Branch => branch !== null)
+  return withoutShadowedRemotes(branches)
 }
 
 export async function fetchRemotes(dirPath: string): Promise<void> {
-  await execFile('git', ['fetch', '--all', '--prune'], {
-    cwd: dirPath,
-    timeout: FETCH_TIMEOUT,
-    env: GIT_ENV,
-  })
+  await git(['fetch', '--all', '--prune'], dirPath, FETCH_TIMEOUT)
 }
 
 export async function checkoutBranch(dirPath: string, branch: string): Promise<void> {
@@ -223,12 +167,20 @@ export function suggestWorktreePath(repoRoot: string, branch: string, baseDir?: 
   return join(dir, safeBranch)
 }
 
-export async function createWorktree(
-  repoRoot: string,
-  worktreePath: string,
-  branch: string,
+export interface CreateWorktreeRequest {
+  repoRoot: string
+  worktreePath: string
+  branch: string
+  /** Create `branch` with the worktree, rather than check out one that exists. */
   isNewBranch: boolean
-): Promise<void> {
+}
+
+export async function createWorktree({
+  repoRoot,
+  worktreePath,
+  branch,
+  isNewBranch,
+}: CreateWorktreeRequest): Promise<void> {
   if (isNewBranch) {
     await git(['worktree', 'add', '-b', branch, worktreePath], repoRoot)
   } else {

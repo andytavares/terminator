@@ -1,8 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { launchApp, closeApp, createWorkspace, type AppHandle } from './helpers'
-import { mkdtempSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { launchApp, closeApp, createWorkspace, type AppHandle, e2eTempDir } from './helpers'
 import { execFileSync } from 'node:child_process'
 
 // Nothing in an extension view should render at the browser's default size.
@@ -19,14 +16,8 @@ import { execFileSync } from 'node:child_process'
 let handle: AppHandle
 let repoPath: string
 
-test.beforeAll(async () => {
-  test.setTimeout(120_000)
-  const repo = mkdtempSync(join(tmpdir(), 'fdry-type-'))
-  repoPath = repo
-  execFileSync('git', ['init', '-q', repo])
-  execFileSync('git', ['-C', repo, 'commit', '-q', '--allow-empty', '-m', 'initial'])
-  handle = await launchApp()
-  await createWorkspace(handle.page, 'type', repo)
+/** Opens Foundry's panel, and waits for its channel and then its view to answer. */
+async function openFoundry(): Promise<void> {
   const panel = handle.page.locator('[data-extension-panel="terminator.foundry"]')
   await handle.page.locator('button[aria-label="Foundry"]').click()
   await expect(panel).toHaveCount(1, { timeout: 30_000 })
@@ -38,15 +29,7 @@ test.beforeAll(async () => {
     .poll(
       async () =>
         (await handle.page
-          .evaluate(() =>
-            (
-              window as unknown as {
-                electronAPI: {
-                  extensionBridge: { invoke(c: string, p: unknown): Promise<unknown> }
-                }
-              }
-            ).electronAPI.extensionBridge.invoke('foundry:order.list', {})
-          )
+          .evaluate(() => window.electronAPI.extensionBridge.invoke('foundry:order.list', {}))
           .catch(() => null)) !== null,
       { timeout: 30_000 }
     )
@@ -66,6 +49,17 @@ test.beforeAll(async () => {
       { timeout: 30_000 }
     )
     .toBeGreaterThan(0)
+}
+
+test.beforeAll(async () => {
+  test.setTimeout(120_000)
+  const repo = e2eTempDir('fdry-type-')
+  repoPath = repo
+  execFileSync('git', ['init', '-q', repo])
+  execFileSync('git', ['-C', repo, 'commit', '-q', '--allow-empty', '-m', 'initial'])
+  handle = await launchApp()
+  await createWorkspace(handle.page, 'type', repo)
+  await openFoundry()
 })
 
 test.afterAll(async () => {
@@ -154,7 +148,7 @@ test('an order fits the view it is shown in', async () => {
     })
     .toBeGreaterThan(0)
   const before = await overflow()
-  // eslint-disable-next-line no-console
+
   console.log(`scrollHeight ${before.scroll} vs viewport ${before.view}`)
   expect(before.scroll, 'the Forge needs scrolling to show one order').toBeLessThanOrEqual(
     before.view + 8
@@ -176,7 +170,7 @@ test('no text on any Foundry surface renders at the browser default size', async
     )
     for (const item of await oversized()) found.push({ ...item, cls: `${surface}: ${item.cls}` })
   }
-  // eslint-disable-next-line no-console
+
   console.log(JSON.stringify(found, null, 1))
   expect(found, 'these render at the untouched 16px default').toEqual([])
 })
@@ -201,7 +195,7 @@ test('controls that share a row in the Forge share one height', async () => {
     }
     return out
   })()`)
-  // eslint-disable-next-line no-console
+
   console.log(JSON.stringify(rows))
   for (const [row, heights] of Object.entries(rows)) {
     expect(new Set(heights).size, `${row}: ${heights.join(', ')}`).toBe(1)

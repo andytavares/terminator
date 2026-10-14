@@ -2,6 +2,7 @@ import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 import { app } from 'electron'
 import type { AgentContext, Issue } from '../../shared/types/index.js'
+import { writeJsonAtomic } from '@terminator/extension-sdk/node'
 
 // What an agent session is told about the issue its project is for.
 //
@@ -17,6 +18,7 @@ import type { AgentContext, Issue } from '../../shared/types/index.js'
  * substitutes a preview and a path, which would silently turn the issue
  * context into a pointer nobody follows. So the budget is enforced here,
  * visibly, and the operator is shown the number (FR-022, FR-023).
+ * @internal
  */
 export const MAX_CONTEXT_CHARS = 10_000
 
@@ -59,16 +61,13 @@ function trimBlocks(text: string, limit: number): { text: string; truncated: boo
   return { text: out, truncated: true }
 }
 
-/**
- * The text a session receives, and the numbers the operator is shown.
- *
- * Pure: the drawer previews exactly what the file will contain because both
- * come from this function, not from two renderings of the same idea.
- */
-export function buildAgentContext(projectId: string, issue: Issue | null): AgentContext | null {
-  if (issue === null) return null
+interface ComposedContext {
+  markdown: string
+  truncated: boolean
+}
 
-  const header = [
+function issueHeader(issue: Issue): string {
+  return [
     `# Linked issue: ${issue.key}`,
     issue.title,
     `Tracker: ${TRACKER_LABELS[issue.tracker]} · State: ${issue.state.name} · Assignee: ${
@@ -77,11 +76,14 @@ export function buildAgentContext(projectId: string, issue: Issue | null): Agent
     ...(issue.labels.length > 0 ? [`Labels: ${issue.labels.join(', ')}`] : []),
     `URL: ${issue.url}`,
   ].join('\n')
+}
 
+/** Header, description and recent comments, each held to its own budget. */
+function composeSections(issue: Issue): ComposedContext {
   const description = trimBlocks(issue.description.trim(), MAX_DESCRIPTION_CHARS)
   const comments = issue.comments.slice(0, MAX_COMMENTS)
 
-  const sections = [header]
+  const sections = [issueHeader(issue)]
   if (description.text.length > 0) sections.push(`## Description\n\n${description.text}`)
   if (comments.length > 0) {
     sections.push(
@@ -89,19 +91,30 @@ export function buildAgentContext(projectId: string, issue: Issue | null): Agent
         comments.map((c) => `**${c.author}**: ${c.body}`).join('\n\n')
     )
   }
-
-  let markdown = sections.join('\n\n')
-  let truncated = description.truncated || issue.comments.length > comments.length
-
-  // Whatever the per-section budgets allowed, the whole must still fit — and
-  // the footer that admits the truncation has to fit inside it too.
-  const footer = `\n\n_— truncated; full issue at ${issue.url}_`
-  if (markdown.length > MAX_CONTEXT_CHARS) {
-    markdown = trimBlocks(markdown, MAX_CONTEXT_CHARS - footer.length).text
-    truncated = true
+  return {
+    markdown: sections.join('\n\n'),
+    truncated: description.truncated || issue.comments.length > comments.length,
   }
-  if (truncated) markdown += footer
+}
 
+/** Whatever the per-section budgets allowed, the whole must still fit — and the footer that
+ * admits the truncation has to fit inside it too. */
+function fitWithinBudget(composed: ComposedContext, url: string): ComposedContext {
+  const footer = `\n\n_— truncated; full issue at ${url}_`
+  const overBudget = composed.markdown.length > MAX_CONTEXT_CHARS
+  const markdown = overBudget
+    ? trimBlocks(composed.markdown, MAX_CONTEXT_CHARS - footer.length).text
+    : composed.markdown
+  const truncated = composed.truncated || overBudget
+  return { markdown: truncated ? markdown + footer : markdown, truncated }
+}
+
+/** The text a session receives, and the numbers the operator is shown. Pure: the drawer previews
+ * exactly what the file will contain because both come from this function, not from two
+ * renderings of the same idea. */
+export function buildAgentContext(projectId: string, issue: Issue | null): AgentContext | null {
+  if (issue === null) return null
+  const { markdown, truncated } = fitWithinBudget(composeSections(issue), issue.url)
   return {
     projectId,
     tracker: issue.tracker,
@@ -129,10 +142,7 @@ export function contextFilePath(projectId: string): string {
 
 export async function writeContextFile(context: AgentContext): Promise<void> {
   await fs.mkdir(contextDir(), { recursive: true })
-  const target = contextFilePath(context.projectId)
-  const tmp = `${target}.tmp`
-  await fs.writeFile(tmp, JSON.stringify(context, null, 2), 'utf8')
-  await fs.rename(tmp, target)
+  await writeJsonAtomic(contextFilePath(context.projectId), context)
 }
 
 /** What was last written, or null. Never throws — a missing file is an answer. */

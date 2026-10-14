@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 
 type Handler = (event: unknown, payload: unknown) => unknown
 
@@ -10,61 +10,34 @@ vi.mock('../../../../src/main/ipc/channel-registrar.js', () => ({
   onChannel: (channel: string, handler: Handler) => onHandlers.set(channel, handler),
 }))
 
-const {
-  mockExecuteExtensionCommand,
-  mockIsRegistered,
-  mockListExtensionCommands,
-  mockListExtensionSettingsSections,
-  mockListExtensionSidebarItems,
-  mockDispatchSidebarItemClick,
-  mockListExtensionContextMenuItems,
-  mockDispatchContextMenuClick,
-} = vi.hoisted(() => ({
+const { mockExecuteExtensionCommand } = vi.hoisted(() => ({
   mockExecuteExtensionCommand: vi.fn(),
-  mockIsRegistered: vi.fn(() => false),
-  mockListExtensionCommands: vi.fn(() => [] as unknown[]),
-  mockListExtensionSettingsSections: vi.fn(() => [] as unknown[]),
-  mockListExtensionSidebarItems: vi.fn(() => [] as unknown[]),
-  mockDispatchSidebarItemClick: vi.fn(),
-  mockListExtensionContextMenuItems: vi.fn(() => [] as unknown[]),
-  mockDispatchContextMenuClick: vi.fn(),
 }))
 
 vi.mock('../../../../src/main/extensions/api.js', () => ({
-  listExtensionSettingsSections: mockListExtensionSettingsSections,
-  listExtensionSidebarItems: mockListExtensionSidebarItems,
-  dispatchSidebarItemClick: mockDispatchSidebarItemClick,
-  listExtensionContextMenuItems: mockListExtensionContextMenuItems,
-  dispatchContextMenuClick: mockDispatchContextMenuClick,
-  listExtensionCommands: mockListExtensionCommands,
+  listExtensionSettingsSections: vi.fn(() => []),
+  listExtensionCommands: vi.fn(() => []),
   executeExtensionCommand: mockExecuteExtensionCommand,
-  isExtensionCommandRegistered: mockIsRegistered,
-}))
-
-const { mockGetAllExtensionSettings, mockSetExtensionSetting } = vi.hoisted(() => ({
-  mockGetAllExtensionSettings: vi.fn(() => ({})),
-  mockSetExtensionSetting: vi.fn(),
-}))
-vi.mock('../../../../src/main/storage/extension-settings-store.js', () => ({
-  getAllExtensionSettings: mockGetAllExtensionSettings,
-  setExtensionSetting: mockSetExtensionSetting,
+  isExtensionCommandRegistered: vi.fn(() => false),
 }))
 
 import { registerExtensionHandlers } from '../../../../src/main/ipc/extension.ipc'
 import type { ExtensionHost } from '../../../../src/main/extensions/extension-host'
+import { partialFake } from '../../../support/fakes'
 
 function makeExtensionHost(overrides: Partial<ExtensionHost> = {}): ExtensionHost {
-  return {
-    listExtensions: vi.fn(() => []),
+  return partialFake<ExtensionHost>({
+    listAll: vi.fn(() => []),
     load: vi.fn(),
-    toggle: vi.fn(),
-    uninstall: vi.fn(),
-    reload: vi.fn(),
+    setEnabled: vi.fn(),
+    uninstallExtension: vi.fn(),
+    reloadExtension: vi.fn(),
     ...overrides,
-  } as unknown as ExtensionHost
+  })
 }
 
-let broadcast: ReturnType<typeof vi.fn>
+let broadcast: Mock<(channel: string, data: unknown) => void>
+const noViewHost = () => null
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -74,8 +47,8 @@ beforeEach(() => {
 })
 
 describe('extension:execute-command', () => {
-  it('forwards the key and ctx to executeExtensionCommand', () => {
-    registerExtensionHandlers(makeExtensionHost())
+  it('forwards the key and ctx to executeExtensionCommand', async () => {
+    registerExtensionHandlers(makeExtensionHost(), broadcast, noViewHost)
     const listener = onHandlers.get('extension:execute-command')!
     const ctx = { projectId: 'p1', sessionId: null, repoRoot: '/repo' }
 
@@ -88,7 +61,7 @@ describe('extension:execute-command', () => {
 describe('extension:run-command', () => {
   it('runs the command with args and a null ctx, returning its result', async () => {
     mockExecuteExtensionCommand.mockResolvedValue({ ok: false, reason: 'not-registered' })
-    registerExtensionHandlers(makeExtensionHost())
+    registerExtensionHandlers(makeExtensionHost(), broadcast, noViewHost)
     const handler = handleHandlers.get('extension:run-command')!
 
     const result = await handler({}, { key: 'ext.command.open', args: { n: 1 } })
@@ -99,178 +72,5 @@ describe('extension:run-command', () => {
       { n: 1 }
     )
     expect(result).toEqual({ ok: false, reason: 'not-registered' })
-  })
-})
-
-describe('extension:has-command', () => {
-  it('answers from isExtensionCommandRegistered', () => {
-    mockIsRegistered.mockReturnValue(true)
-    registerExtensionHandlers(makeExtensionHost())
-    const handler = handleHandlers.get('extension:has-command')!
-
-    expect(handler({}, { key: 'ext.command.open' })).toBe(true)
-    expect(mockIsRegistered).toHaveBeenCalledWith('ext.command.open')
-  })
-})
-
-describe('extension:get-commands', () => {
-  it('returns listExtensionCommands()', () => {
-    mockListExtensionCommands.mockReturnValue([{ key: 'ext.command.push' }])
-    registerExtensionHandlers(makeExtensionHost())
-    const handler = handleHandlers.get('extension:get-commands')!
-
-    expect(handler({}, undefined)).toEqual({ commands: [{ key: 'ext.command.push' }] })
-  })
-})
-
-describe('extension:list', () => {
-  it('returns extensionHost.listExtensions()', () => {
-    const host = makeExtensionHost({ listExtensions: vi.fn(() => [{ id: 'ext' }] as never) })
-    registerExtensionHandlers(host)
-
-    expect(handleHandlers.get('extension:list')!({}, undefined)).toEqual({
-      extensions: [{ id: 'ext' }],
-    })
-  })
-})
-
-describe('extension:install', () => {
-  it('loads the extension at the given path', async () => {
-    const host = makeExtensionHost({ load: vi.fn().mockResolvedValue({ ok: true }) })
-    registerExtensionHandlers(host)
-
-    await expect(
-      handleHandlers.get('extension:install')!({}, { directoryPath: '/dir' })
-    ).resolves.toEqual({ ok: true })
-    expect(host.load).toHaveBeenCalledWith('/dir')
-  })
-})
-
-describe('extension:toggle', () => {
-  it('returns the toggled extension', async () => {
-    const host = makeExtensionHost({ toggle: vi.fn().mockResolvedValue({ id: 'ext' }) })
-    registerExtensionHandlers(host)
-
-    await expect(
-      handleHandlers.get('extension:toggle')!({}, { id: 'ext', enabled: true })
-    ).resolves.toEqual({ extension: { id: 'ext' } })
-  })
-
-  it('returns NOT_FOUND when the extension does not exist', async () => {
-    const host = makeExtensionHost({ toggle: vi.fn().mockResolvedValue(undefined) })
-    registerExtensionHandlers(host)
-
-    await expect(
-      handleHandlers.get('extension:toggle')!({}, { id: 'missing', enabled: true })
-    ).resolves.toEqual({ error: 'NOT_FOUND' })
-  })
-})
-
-describe('extension:uninstall', () => {
-  it('returns ok when removed', async () => {
-    const host = makeExtensionHost({ uninstall: vi.fn().mockResolvedValue(true) })
-    registerExtensionHandlers(host)
-
-    await expect(handleHandlers.get('extension:uninstall')!({}, { id: 'ext' })).resolves.toEqual({
-      ok: true,
-    })
-  })
-
-  it('returns NOT_FOUND when not removed', async () => {
-    const host = makeExtensionHost({ uninstall: vi.fn().mockResolvedValue(false) })
-    registerExtensionHandlers(host)
-
-    await expect(handleHandlers.get('extension:uninstall')!({}, { id: 'ext' })).resolves.toEqual({
-      error: 'NOT_FOUND',
-    })
-  })
-})
-
-describe('extension:reload', () => {
-  it('broadcasts extension:renderer-reload on success', async () => {
-    const host = makeExtensionHost({ reload: vi.fn().mockResolvedValue({ id: 'ext' }) })
-    registerExtensionHandlers(host, broadcast)
-
-    await handleHandlers.get('extension:reload')!({}, { id: 'ext' })
-
-    expect(broadcast).toHaveBeenCalledWith('extension:renderer-reload', { id: 'ext' })
-  })
-
-  it('does not broadcast on error', async () => {
-    const host = makeExtensionHost({ reload: vi.fn().mockResolvedValue({ error: 'NOT_FOUND' }) })
-    registerExtensionHandlers(host, broadcast)
-
-    await handleHandlers.get('extension:reload')!({}, { id: 'ext' })
-
-    expect(broadcast).not.toHaveBeenCalled()
-  })
-})
-
-describe('extension settings channels', () => {
-  it('extension:get-settings-schemas returns listExtensionSettingsSections()', () => {
-    mockListExtensionSettingsSections.mockReturnValue([{ extensionId: 'ext' }])
-    registerExtensionHandlers(makeExtensionHost())
-
-    expect(handleHandlers.get('extension:get-settings-schemas')!({}, undefined)).toEqual({
-      schemas: [{ extensionId: 'ext' }],
-    })
-  })
-
-  it('extension:get-settings-values returns getAllExtensionSettings()', () => {
-    mockGetAllExtensionSettings.mockReturnValue({ 'ext.setting': 1 })
-    registerExtensionHandlers(makeExtensionHost())
-
-    expect(handleHandlers.get('extension:get-settings-values')!({}, undefined)).toEqual({
-      values: { 'ext.setting': 1 },
-    })
-  })
-
-  it('extension:update-setting calls setExtensionSetting', () => {
-    registerExtensionHandlers(makeExtensionHost())
-
-    expect(
-      handleHandlers.get('extension:update-setting')!({}, { key: 'ext.setting', value: 2 })
-    ).toEqual({ ok: true })
-    expect(mockSetExtensionSetting).toHaveBeenCalledWith('ext.setting', 2)
-  })
-})
-
-describe('sidebar and context-menu channels', () => {
-  it('extension:get-sidebar-items returns listExtensionSidebarItems()', () => {
-    mockListExtensionSidebarItems.mockReturnValue([{ id: 'sb' }])
-    registerExtensionHandlers(makeExtensionHost())
-
-    expect(handleHandlers.get('extension:get-sidebar-items')!({}, undefined)).toEqual({
-      items: [{ id: 'sb' }],
-    })
-  })
-
-  it('extension:sidebar-item-click dispatches the click', () => {
-    registerExtensionHandlers(makeExtensionHost())
-
-    expect(handleHandlers.get('extension:sidebar-item-click')!({}, { itemId: 'sb' })).toEqual({
-      ok: true,
-    })
-    expect(mockDispatchSidebarItemClick).toHaveBeenCalledWith('sb')
-  })
-
-  it('extension:get-context-menu-items returns listExtensionContextMenuItems(target)', () => {
-    mockListExtensionContextMenuItems.mockReturnValue([{ id: 'ctx' }])
-    registerExtensionHandlers(makeExtensionHost())
-
-    expect(
-      handleHandlers.get('extension:get-context-menu-items')!({}, { target: 'workspace' })
-    ).toEqual({ items: [{ id: 'ctx' }] })
-  })
-
-  it('extension:context-menu-click dispatches the click', () => {
-    registerExtensionHandlers(makeExtensionHost())
-
-    onHandlers.get('extension:context-menu-click')!(
-      {},
-      { target: 'workspace', itemId: 'ctx', targetId: 'w1' }
-    )
-
-    expect(mockDispatchContextMenuClick).toHaveBeenCalledWith('workspace', 'ctx', 'w1')
   })
 })

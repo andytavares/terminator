@@ -25,11 +25,12 @@ interface ClaudeConfig {
   [key: string]: unknown
 }
 
+/** @internal */
 export function claudeConfigPath(home = os.homedir()): string {
   return path.join(home, '.claude.json')
 }
 
-function read(file: string): ClaudeConfig | null {
+function readClaudeConfig(file: string): ClaudeConfig | null {
   try {
     const parsed: unknown = JSON.parse(fs.readFileSync(file, 'utf8'))
     return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)
@@ -74,7 +75,7 @@ export type TrustResult =
 export function ensureTrusted(repoRoot: string, home = os.homedir()): TrustResult {
   if (repoRoot.trim() === '') return { changed: false, reason: 'no config to amend' }
   const file = claudeConfigPath(home)
-  const config = read(file)
+  const config = readClaudeConfig(file)
   if (config === null) return { changed: false, reason: 'no config to amend' }
 
   // Trust is keyed by the path as a string, and macOS hands out two for the
@@ -97,6 +98,11 @@ export function ensureTrusted(repoRoot: string, home = os.homedir()): TrustResul
     },
   }
 
+  return writeClaudeConfig(file, next)
+}
+
+/** The config, written through a temporary file and renamed into place. */
+function writeClaudeConfig(file: string, next: ClaudeConfig): TrustResult {
   const temporary = `${file}.foundry-${process.pid}.tmp`
   try {
     fs.writeFileSync(temporary, `${JSON.stringify(next, null, 2)}\n`, { mode: 0o600 })

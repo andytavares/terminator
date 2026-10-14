@@ -1,5 +1,12 @@
 # Core Extension API addition: issue state transitions
 
+> **Superseded. Kept as history.** This contract records what was decided when the feature was
+> specified, and is not edited. The code no longer has `issues.linkFor` / `onLinkChange` and its "no `createIssue`" boundary: `issues.create` and `supportsCreate` were added later. Do not build against it. The
+> current contract lives in:
+>
+> - `packages/extension-sdk/types/api.d.ts`: the `ExtensionAPI`, which the core implements in `src/main/extensions/api.ts` (`issues`)
+> - [ADR 061](../../../docs/adr/061-one-project-per-order.md)
+
 **Feature**: `037-foundry-software-factory` | **Date**: 2026-09-06 | **Target version**: ExtensionAPI v2.3.0 | **ADR**: 041
 
 This is the one change to core that this feature requires, and the only one. It is recorded in the plan's Complexity Tracking and needs an ADR because it supersedes a decision taken in feature 031.

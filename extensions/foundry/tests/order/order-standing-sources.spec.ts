@@ -4,6 +4,7 @@ import { draftOrder } from '../../src/order/draft.js'
 import type { LedgerEntry } from '../../src/ledger/append.js'
 import type { OrderStore } from '../../src/order/store.js'
 import type { WorkOrder } from '../../src/order/schema.js'
+import { partialFake } from '../../../../tests/support/fakes'
 
 // The standing inputs that come from the order and its ledger, built once so
 // the Forge's list, the Inbox and the tab badge read one answer.
@@ -21,7 +22,7 @@ function entry(over: Partial<LedgerEntry> & Pick<LedgerEntry, 'action'>): Ledger
 }
 
 function storeWith(entries: LedgerEntry[]): OrderStore {
-  return { entries: async () => entries } as unknown as OrderStore
+  return partialFake<OrderStore>({ entries: async () => entries })
 }
 
 function draft(): WorkOrder {

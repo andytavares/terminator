@@ -3,6 +3,8 @@
  * This is the renderer-side (webview / browser context) API surface.
  */
 
+import type { SettingsChange } from './api'
+
 export type NotificationTarget = 'system' | 'center' | 'toast'
 
 export interface SerializedNotification {
@@ -17,12 +19,19 @@ export interface SerializedNotification {
 }
 
 export interface ElectronAPI {
+  ui: {
+    /** How many dialogs the view has open, so the host's double-Escape exit stands down while
+     * one is. @terminator/extension-ui's Dialog reports it. */
+    setModalDepth(depth: number): void
+  }
   terminal: {
     create(payload: unknown): Promise<{ sessionId: string } | { error: string }>
     close(sessionId: string): Promise<{ success: boolean }>
     input(sessionId: string, data: string): void
+    listSessions(): Promise<
+      Array<{ sessionId: string; projectId: string; tabTitle: string; type: string }>
+    >
     resize(sessionId: string, cols: number, rows: number): void
-    onOutput(handler: (sessionId: string, data: string) => void): () => void
     closeAll(): Promise<{ terminatedCount: number }>
     cleanupOrphans(): Promise<{ cleanedCount: number }>
     onProcessExit(handler: (sessionId: string, exitCode: number) => void): () => void
@@ -33,6 +42,12 @@ export interface ElectronAPI {
     update(payload: unknown): Promise<{ workspace: unknown } | { error: string }>
     delete(id: string): Promise<{ success: boolean }>
     reorder(ids: string[]): Promise<{ success: boolean }>
+    /** What the operator has focused in the main window. */
+    getActive(): Promise<{
+      workspaceId: string | null
+      projectId: string | null
+      repoRoot: string | null
+    }>
   }
   project: {
     list(workspaceId: string): Promise<{ projects: Array<{ id: string; name: string }> }>
@@ -45,7 +60,9 @@ export interface ElectronAPI {
   git: {
     isRepo(path: string): Promise<{ isRepo: boolean; root?: string }>
     currentBranch(path: string): Promise<{ branch: string } | { error: string }>
-    listBranches(path: string): Promise<{ branches: Array<{ name: string }> }>
+    listBranches(
+      path: string
+    ): Promise<{ branches: Array<{ name: string; isCurrent: boolean; isRemote: boolean }> }>
     checkout(path: string, branch: string): Promise<{ success: true } | { error: string }>
     createBranch(path: string, branch: string): Promise<{ success: true } | { error: string }>
     suggestWorktreePath(
@@ -74,8 +91,14 @@ export interface ElectronAPI {
     openExternal(url: string): Promise<{ ok: true } | { error: string }>
   }
   fs: {
+    /** Adds a watch of `projectRoot` and what is under it, for this view only; it ends with
+     * `watchStop` or with the view. Read what you show after this resolves. The remote browser
+     * client answers `{ error: 'WATCH_UNAVAILABLE' }`. See EXTENSION-DEVELOPMENT.md. */
     watchStart(projectRoot: string): Promise<{ ok: true } | { error: string }>
+    /** Ends every watch this view started. Other views' watches are not touched. */
     watchStop(): Promise<{ ok: true }>
+    /** Called once per burst of changes under a root this view watches. `filename` is the one
+     * path that changed, from the root, or null when several did. */
     onChanged(
       handler: (event: { projectRoot: string; eventType: string; filename: string | null }) => void
     ): () => void
@@ -99,9 +122,10 @@ export interface ElectronAPI {
     getSettingsSchemas(): Promise<{ schemas: unknown[] }>
     getSettingsValues(): Promise<{ values: Record<string, unknown> }>
     updateSetting(key: string, value: unknown): Promise<{ ok: true }>
-    getSidebarItems(): Promise<{ items: Array<{ id: string; label: string; tooltip?: string }> }>
-    getContextMenuItems(target: string): Promise<{ items: Array<{ id: string; label: string }> }>
-    contextMenuClick(target: string, itemId: string, targetId: string): void
+    /** Called after any extension setting changes; re-read with `getSettingsValues`.
+     * `change.workspaceId` names the workspace whose own value changed, null for a global value
+     * (since 5.0.0). */
+    onSettingsChanged(handler: (change: SettingsChange) => void): () => void
     getCommands(): Promise<{
       commands: Array<{
         key: string
@@ -113,7 +137,6 @@ export interface ElectronAPI {
         extensionId: string
         mnemonic?: string
         requires?: 'repo' | 'session'
-        disabledReason?: string
       }>
     }>
     executeCommand(
@@ -124,27 +147,15 @@ export interface ElectronAPI {
      * Run another extension's command by its full id, with arguments the
      * command declared (v2.7.0, ADR-083). `reason` is 'not-registered' when the
      * command does not exist or its extension is disabled, so the caller can
-     * fall back; 'disabled', 'invalid-args: …' and 'failed: …' otherwise.
+     * fall back; 'invalid-args: …' and 'failed: …' otherwise.
      */
     runCommand(key: string, args?: unknown): Promise<{ ok: true } | { ok: false; reason: string }>
     /** Whether a command is registered, by full id: `<extensionId>.command.<id>`. */
     hasCommand(key: string): Promise<boolean>
-    updatePanelBounds(payload: {
-      extensionId: string
-      viewParam: string
-      bounds: { x: number; y: number; width: number; height: number }
-      visible: boolean
-      dpr: number
-    }): Promise<void>
   }
   extensionEvents: {
-    onToast(handler: (payload: { type: string; message: string }) => void): () => void
     onTogglePanel(handler: (panelId: string) => void): () => void
-    onSelectProjectTab(handler: (tabId: string) => void): () => void
     onMenuOpenSettings(handler: () => void): () => void
-    onMenuToggleSidebar(handler: () => void): () => void
-    onMenuCloseTab(handler: () => void): () => void
-    onMenuOpenAbout(handler: () => void): () => void
     notifyPanelState(panelId: string, open: boolean): void
     onExtensionPanelLoaded(handler: (id: string) => void): () => void
     onExtensionRendererReload(handler: (id: string) => void): () => void
@@ -159,14 +170,13 @@ export interface ElectronAPI {
       platform: string
     }>
   }
-  notification: {
-    show(title: string, body: string): void
-  }
   notifications: {
     create(payload: {
       type: 'info' | 'success' | 'warning' | 'error'
       title: string
       message?: string
+      source?: string
+      key: string
       targets?: NotificationTarget[]
     }): Promise<{ id: string } | { error: string }>
     list(): Promise<SerializedNotification[]>

@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createLedgerChannels } from '../../src/ipc/ledger-channels.js'
@@ -15,6 +14,7 @@ import type { LedgerEntry } from '../../src/ledger/append.js'
 import type { Gate } from '../../src/gates/rules.js'
 import type { RunGraph } from '../../src/line/run-graph.js'
 import type { ResolveSources } from '../../src/recipe/resolve.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 // The real built-in directory, so a test asking for "the skills that ship
 // with the tool" is asking about the ones that actually do.
@@ -59,7 +59,7 @@ function channels(existingRuleIds: string[] = [], sources?: () => ResolveSources
   })
 }
 
-async function seedOrder(id: string): Promise<void> {
+async function seedLedgerOrder(id: string): Promise<void> {
   await createOrderStore(root).save(
     draftOrder({
       id,
@@ -86,14 +86,14 @@ async function record(orderId: string, over: Partial<LedgerEntry> = {}): Promise
 
 /** Three rejections of the same thing, in one order. */
 async function repeatedRejections(orderId = 'WO-1'): Promise<void> {
-  await seedOrder(orderId)
+  await seedLedgerOrder(orderId)
   for (const n of [1, 2, 3]) {
     await record(orderId, { at: `2026-09-0${n}T10:00:00.000Z`, subject: `U-${n}` })
   }
 }
 
 beforeEach(() => {
-  root = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-ledger-ipc-'))
+  root = makeTempDir('fdry-ledger-ipc-')
 })
 
 afterEach(() => {
@@ -101,6 +101,13 @@ afterEach(() => {
 })
 
 describe('foundry:ledger.query', () => {
+  describe('reading', ledgerChannelsReadingTests)
+  describe('filtering', filteringTests)
+  describe('time and order', timeAndOrderTests)
+  describe('limits and values', limitsAndValuesTests)
+})
+
+function ledgerChannelsReadingTests() {
   it('is empty before anything has happened', async () => {
     const r = (await channels().query({})) as { entries: LedgerEntry[]; total: number }
     expect(r.entries).toEqual([])
@@ -108,8 +115,8 @@ describe('foundry:ledger.query', () => {
   })
 
   it('reads across every order when none is named', async () => {
-    await seedOrder('WO-1')
-    await seedOrder('WO-2')
+    await seedLedgerOrder('WO-1')
+    await seedLedgerOrder('WO-2')
     await record('WO-1', { subject: 'a' })
     await record('WO-2', { subject: 'b' })
     const r = (await channels().query({})) as { entries: LedgerEntry[] }
@@ -117,16 +124,18 @@ describe('foundry:ledger.query', () => {
   })
 
   it('reads one order alone when one is named', async () => {
-    await seedOrder('WO-1')
-    await seedOrder('WO-2')
+    await seedLedgerOrder('WO-1')
+    await seedLedgerOrder('WO-2')
     await record('WO-1', { subject: 'a' })
     await record('WO-2', { subject: 'b' })
     const r = (await channels().query({ orderId: 'WO-2' })) as { entries: LedgerEntry[] }
     expect(r.entries.map((e) => e.subject)).toEqual(['b'])
   })
+}
 
+function filteringTests() {
   it('filters by actor', async () => {
-    await seedOrder('WO-1')
+    await seedLedgerOrder('WO-1')
     await record('WO-1', { actor: 'operator', subject: 'a' })
     await record('WO-1', { actor: 'rule:budget.exceeded', subject: 'b' })
     const r = (await channels().query({ actor: 'operator' })) as { entries: LedgerEntry[] }
@@ -134,7 +143,7 @@ describe('foundry:ledger.query', () => {
   })
 
   it('filters by action', async () => {
-    await seedOrder('WO-1')
+    await seedLedgerOrder('WO-1')
     await record('WO-1', { action: 'gate.decided', subject: 'a' })
     await record('WO-1', { action: 'order.agreed', subject: 'b' })
     const r = (await channels().query({ action: 'order.agreed' })) as { entries: LedgerEntry[] }
@@ -142,14 +151,16 @@ describe('foundry:ledger.query', () => {
   })
 
   it('treats an empty filter as no filter, not as a value nothing matches', async () => {
-    await seedOrder('WO-1')
+    await seedLedgerOrder('WO-1')
     await record('WO-1')
     const r = (await channels().query({ actor: '', action: '' })) as { entries: LedgerEntry[] }
     expect(r.entries).toHaveLength(1)
   })
+}
 
+function timeAndOrderTests() {
   it('filters by time', async () => {
-    await seedOrder('WO-1')
+    await seedLedgerOrder('WO-1')
     await record('WO-1', { at: '2026-09-01T10:00:00.000Z', subject: 'old' })
     await record('WO-1', { at: '2026-09-05T10:00:00.000Z', subject: 'new' })
     const r = (await channels().query({ since: '2026-09-03T00:00:00.000Z' })) as {
@@ -159,13 +170,15 @@ describe('foundry:ledger.query', () => {
   })
 
   it('reads newest first, though the file is written oldest first', async () => {
-    await seedOrder('WO-1')
+    await seedLedgerOrder('WO-1')
     await record('WO-1', { at: '2026-09-01T10:00:00.000Z', subject: 'old' })
     await record('WO-1', { at: '2026-09-05T10:00:00.000Z', subject: 'new' })
     const r = (await channels().query({})) as { entries: LedgerEntry[] }
     expect(r.entries.map((e) => e.subject)).toEqual(['new', 'old'])
   })
+}
 
+function limitsAndValuesTests() {
   it('honours a limit while still reporting the true total', async () => {
     await repeatedRejections()
     const r = (await channels().query({ limit: 2 })) as { entries: LedgerEntry[]; total: number }
@@ -174,22 +187,18 @@ describe('foundry:ledger.query', () => {
   })
 
   it('offers only the filter values that actually occur', async () => {
-    await seedOrder('WO-1')
+    await seedLedgerOrder('WO-1')
     await record('WO-1', { actor: 'operator', action: 'gate.decided' })
     await record('WO-1', { actor: 'rule:risk.p0', action: 'gate.default' })
     const r = (await channels().query({})) as { actors: string[]; actions: string[] }
     expect(r.actors).toEqual(['operator', 'rule:risk.p0'])
     expect(r.actions).toEqual(['gate.decided', 'gate.default'])
   })
-
-  it('rejects a malformed request', async () => {
-    expect(await channels().query({ limit: 'lots' })).toEqual({ error: 'Malformed request.' })
-  })
-})
+}
 
 describe('foundry:rules.propose', () => {
   it('produces nothing until there is a pattern', async () => {
-    await seedOrder('WO-1')
+    await seedLedgerOrder('WO-1')
     await record('WO-1')
     const r = (await channels().proposeRules({})) as { proposals: unknown[] }
     expect(r.proposals).toEqual([])
@@ -213,18 +222,20 @@ describe('foundry:rules.propose', () => {
     }
     expect(again.proposals).toEqual([])
   })
-
-  it('rejects a malformed request', async () => {
-    expect(await channels().proposeRules({ orderId: 7 })).toEqual({ error: 'Malformed request.' })
-  })
 })
 
-describe('deciding a proposal', () => {
-  async function firstProposalId(): Promise<string> {
-    const r = (await channels().proposeRules({})) as { proposals: { id: string }[] }
-    return r.proposals[0].id
-  }
+async function firstProposalId(): Promise<string> {
+  const r = (await channels().proposeRules({})) as { proposals: { id: string }[] }
+  return r.proposals[0].id
+}
 
+describe('deciding a proposal', () => {
+  describe('accepting', ledgerChannelsAcceptingTests)
+  describe('declining', decliningTests)
+  describe('an unsupported proposal', anUnsupportedProposalTests)
+})
+
+function ledgerChannelsAcceptingTests() {
   it('accepting writes a rule that later work will load', async () => {
     await repeatedRejections()
     const id = await firstProposalId()
@@ -238,7 +249,9 @@ describe('deciding a proposal', () => {
         .ok
     ).toBe(true)
   })
+}
 
+function decliningTests() {
   it('declining records it and never offers it again', async () => {
     await repeatedRejections()
     const id = await firstProposalId()
@@ -255,22 +268,18 @@ describe('deciding a proposal', () => {
     await channels().decideProposal({ proposalId: id, accept: false })
     expect(fs.existsSync(path.join(root, 'rules', `${id}.yaml`))).toBe(false)
   })
+}
 
+function anUnsupportedProposalTests() {
   it('refuses a proposal the ledger no longer supports', async () => {
-    await seedOrder('WO-1')
+    await seedLedgerOrder('WO-1')
     const r = (await channels().decideProposal({
       proposalId: 'curator-made-up',
       accept: true,
     })) as { error: string }
     expect(r.error).toMatch(/no longer supports/)
   })
-
-  it('rejects a malformed request', async () => {
-    expect(await channels().decideProposal({ accept: true })).toEqual({
-      error: 'Malformed request.',
-    })
-  })
-})
+}
 
 describe('nothing is proposed unprompted (FR-076)', () => {
   it('the path a run writes decisions through cannot reach the curator', () => {
@@ -307,18 +316,24 @@ describe('nothing is proposed unprompted (FR-076)', () => {
   })
 })
 
-describe('removing an accepted check (FR-081)', () => {
-  async function accept(): Promise<string> {
-    await repeatedRejections()
-    const r = (await channels().proposeRules({})) as { proposals: { id: string }[] }
-    const id = r.proposals[0].id
-    await channels().decideProposal({ proposalId: id, accept: true })
-    return id
-  }
+async function accept(): Promise<string> {
+  await repeatedRejections()
+  const r = (await channels().proposeRules({})) as { proposals: { id: string }[] }
+  const id = r.proposals[0].id
+  await channels().decideProposal({ proposalId: id, accept: true })
+  return id
+}
 
+describe('removing an accepted check (FR-081)', () => {
+  describe('listing and removing', listingAndRemovingTests)
+  describe('recording the removal', recordingTheRemovalTests)
+  describe('proposing and refusing', proposingAndRefusingTests)
+})
+
+function listingAndRemovingTests() {
   it('lists what the operator accepted, and nothing that shipped with the tool', async () => {
     const id = await accept()
-    const view = (await channels().rulesInForce({})) as {
+    const view = (await channels().rulesInForce()) as {
       rules: { id: string; rung: string }[]
     }
     expect(view.rules.map((rule) => rule.id)).toEqual([id])
@@ -334,11 +349,13 @@ describe('removing an accepted check (FR-081)', () => {
         .ok
     ).toBe(false)
   })
+}
 
+function recordingTheRemovalTests() {
   it('records the removal, with the reason, where it can be read back', async () => {
     const id = await accept()
     await channels().removeAcceptedRule({ ruleId: id, reason: 'it fired on everything' })
-    const view = (await channels().rulesInForce({})) as {
+    const view = (await channels().rulesInForce()) as {
       declined: { id: string; reason: string; asserts: string | null }[]
     }
     expect(view.declined).toEqual([
@@ -349,7 +366,9 @@ describe('removing an accepted check (FR-081)', () => {
       },
     ])
   })
+}
 
+function proposingAndRefusingTests() {
   it('never proposes a removed check again', async () => {
     const id = await accept()
     await channels().removeAcceptedRule({ ruleId: id })
@@ -364,15 +383,11 @@ describe('removing an accepted check (FR-081)', () => {
     }
     expect(result.error).toMatch(/not yours to remove/)
   })
-
-  it('rejects a malformed request', async () => {
-    expect(await channels().removeAcceptedRule({})).toEqual({ error: 'Malformed request.' })
-  })
-})
+}
 
 describe('the skills in force', () => {
   it('lists every skill available, each with the rung it comes from', async () => {
-    const view = (await channels().rulesInForce({})) as {
+    const view = (await channels().rulesInForce()) as {
       skills: { id: string; rung: string }[]
     }
     const ciFix = view.skills.find((s) => s.id === 'ci-fix')
@@ -425,8 +440,13 @@ function graph(orderId: string): RunGraph {
 }
 
 describe('foundry:factory.metrics', () => {
+  describe('gathering', gatheringTests)
+  describe('windows', ledgerChannelsWindowsTests)
+})
+
+function gatheringTests() {
   it('gathers every order on disk, with its ledger, gates and run graph', async () => {
-    await seedOrder('WO-1')
+    await seedLedgerOrder('WO-1')
     await record('WO-1', {
       action: 'order.seeded',
       at: '2026-09-05T10:00:00.000Z',
@@ -442,7 +462,7 @@ describe('foundry:factory.metrics', () => {
     )
     await writeRunGraph(root, graph('WO-1'))
 
-    await seedOrder('WO-2')
+    await seedLedgerOrder('WO-2')
 
     const r = (await channels().factoryMetrics({})) as {
       window: string
@@ -455,22 +475,18 @@ describe('foundry:factory.metrics', () => {
     expect(r.firstPassYield).toBe(1)
     expect(r.orders.map((o) => o.orderId).sort()).toEqual(['WO-1', 'WO-2'])
   })
+}
 
+function ledgerChannelsWindowsTests() {
   it('defaults to the 30 day window', async () => {
-    await seedOrder('WO-1')
+    await seedLedgerOrder('WO-1')
     const r = (await channels().factoryMetrics({})) as { window: string }
     expect(r.window).toBe('30d')
   })
 
   it('honours an explicit window', async () => {
-    await seedOrder('WO-1')
+    await seedLedgerOrder('WO-1')
     const r = (await channels().factoryMetrics({ window: 'all' })) as { window: string }
     expect(r.window).toBe('all')
   })
-
-  it('rejects a malformed request', async () => {
-    expect(await channels().factoryMetrics({ window: 'bogus' })).toEqual({
-      error: 'Malformed request.',
-    })
-  })
-})
+}

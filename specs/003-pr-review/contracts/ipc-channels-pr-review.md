@@ -1,5 +1,12 @@
 # Contract: IPC Channels — PR Review Feature
 
+> **Superseded. Kept as history.** This contract records what was decided when the feature was
+> specified, and is not edited. The code no longer has `github:file-metrics`, `github:pr-comment-add` and `src/shared/schemas/pr-review.schema.ts`. Do not build against it. The
+> current contract lives in:
+>
+> - `extensions/git-integration/src/ipc/github.ipc.ts` and `extensions/git-integration/src/schemas/pr-review.schema.ts`: each channel is a `ChannelSpec` whose zod schema is its payload contract ([ADR 096](../../../docs/adr/096-every-ipc-channel-has-a-schema.md))
+> - `specs/072-code-review-revamp/contracts/ipc-channels.md` for the review channels added since
+
 **Version**: 1.0.0
 **Date**: 2026-05-07
 **Branch**: `003-pr-review`

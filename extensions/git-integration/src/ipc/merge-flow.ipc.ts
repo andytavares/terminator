@@ -1,404 +1,331 @@
 import { z } from 'zod'
-import { execFile as execFileCb } from 'child_process'
-import { promisify } from 'util'
-import { readFile, writeFile } from 'fs/promises'
-import Store from 'electron-store'
+import { readFile } from 'fs/promises'
+import { writeFileAtomic } from '../utils/write-atomic.js'
+import { isAbsolute } from 'path'
+import { namedStore } from '../storage-directory.js'
+import { defineChannel, type ChannelSpec } from '@terminator/extension-sdk'
 import {
   buildConflictSession,
   readConflictBlocks,
   listConflictedFiles,
 } from '../git/conflict-reader.js'
 import { ResolutionStrategySchema } from '../schemas/merge-flow.schema.js'
+import { runGit } from '../shell/run-git.js'
+import { RepoRoot } from './repo-root.js'
+import { VALIDATION_ERROR, errorEnvelope, type RegisterFn } from './register.js'
 
-const execFile = promisify(execFileCb)
-const store = new Store()
+/** A conflicted file of the checkout, read whole. */
+interface BlockFile {
+  fullPath: string
+  filePath: string
+  index: number
+  content: string
+}
+
+// electron-store's default name, kept so stored sessions survive the move.
+const configStore = () => namedStore('config')
 
 const GIT_TIMEOUT = 10_000
 
-type RegisterFn = (
-  channel: string,
-  handler: (payload: unknown) => Promise<unknown> | unknown
-) => void
-
-async function git(args: string[], cwd: string): Promise<string> {
-  const { stdout } = await execFile('git', args, {
-    cwd,
-    timeout: GIT_TIMEOUT,
-    env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
-  })
-  return stdout.trim()
+function git(args: string[], cwd: string): Promise<string> {
+  return runGit(cwd, args, { timeoutMs: GIT_TIMEOUT })
 }
 
 function sessionKey(repoRoot: string): string {
   return `mergeflow:session:${repoRoot}`
 }
 
+const RepoRootPayload = z.object({ repoRoot: RepoRoot })
+
+// "relative/path/file.ts#index". The path is joined onto repoRoot and written,
+// so it must stay inside the repository: relative, and no ".." segment.
+const BlockId = z
+  .string()
+  .regex(/^[^#]+#\d+$/, 'expected path#index')
+  .refine((id) => {
+    const path = id.slice(0, id.lastIndexOf('#'))
+    return !isAbsolute(path) && !path.split(/[\\/]/).includes('..')
+  }, 'the file must be inside the repository')
+
+const ResolvePayload = z.object({
+  repoRoot: RepoRoot,
+  blockId: BlockId,
+  resolvedText: z.string(),
+  strategy: ResolutionStrategySchema,
+  currentResolvedText: z.string().optional(),
+  originalConflictText: z.string().optional(),
+})
+
+const UndoPayload = z.object({
+  repoRoot: RepoRoot,
+  blockId: BlockId,
+  resolvedText: z.string(),
+  originalConflictText: z.string().min(1),
+})
+
+const PreparePayload = z.object({
+  repoRoot: RepoRoot,
+  worktreePath: z.string().min(1),
+  headRefName: z.string().min(1),
+  baseRefName: z.string().min(1),
+})
+
+/** Reads the file a block id names, `<path relative to the repo>#<block index>`. */
+async function readBlockFile(repoRoot: string, blockId: string): Promise<BlockFile> {
+  const hashIdx = blockId.lastIndexOf('#')
+  const filePath = blockId.slice(0, hashIdx)
+  const fullPath = `${repoRoot}/${filePath}`
+  const index = parseInt(blockId.slice(hashIdx + 1), 10)
+  return { fullPath, filePath, index, content: await readFile(fullPath, 'utf-8') }
+}
+
+/** The text a resolution replaces: the block's original conflict text (findable however many
+ *  blocks are resolved), else its previous resolution, else (sessions from before the text was
+ *  kept) the block at its index. Null when no markers remain for it. */
+function textToReplace(file: BlockFile, payload: z.infer<typeof ResolvePayload>): string | null {
+  const { originalConflictText, currentResolvedText } = payload
+  if (originalConflictText && file.content.includes(originalConflictText))
+    return originalConflictText
+  if (currentResolvedText && file.content.includes(currentResolvedText)) return currentResolvedText
+  const target = readConflictBlocks(file.filePath, file.content)[file.index]
+  return target?.originalConflictText ?? null
+}
+
+/** A block with no markers left was consumed by an earlier resolution; that still answers success,
+ *  so the session can finish navigating, and the file stays as it is. */
+async function resolveConflictBlock(payload: z.infer<typeof ResolvePayload>) {
+  const file = await readBlockFile(payload.repoRoot, payload.blockId)
+  const from = textToReplace(file, payload)
+  if (from !== null) {
+    await writeFileAtomic(file.fullPath, file.content.replace(from, payload.resolvedText))
+  }
+  return { success: true }
+}
+
+async function undoBlockResolve(payload: z.infer<typeof UndoPayload>) {
+  const file = await readBlockFile(payload.repoRoot, payload.blockId)
+  if (!file.content.includes(payload.resolvedText)) {
+    return { error: 'Resolved text not found in file — file may have changed since resolution.' }
+  }
+  const updated = file.content.replace(payload.resolvedText, payload.originalConflictText)
+  await writeFileAtomic(file.fullPath, updated)
+  return { success: true }
+}
+
+/** Pushes to the branch's upstream, named explicitly: the local branch (conflict-resolve/foo)
+ *  differs from the remote one (origin/foo). Best-effort: a local merge may have no upstream. */
+async function pushToUpstream(repoRoot: string): Promise<string | undefined> {
+  try {
+    const upstream = await git(
+      ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}'],
+      repoRoot
+    )
+    // "origin/test/conflict-theirs"
+    const slashIdx = upstream.indexOf('/')
+    const remoteName = slashIdx === -1 ? 'origin' : upstream.slice(0, slashIdx)
+    const remoteBranch = upstream.slice(slashIdx + 1)
+    await git(
+      ['push', '--force-with-lease', remoteName, `HEAD:refs/heads/${remoteBranch}`],
+      repoRoot
+    )
+    return undefined
+  } catch (pushErr) {
+    return String(pushErr)
+  }
+}
+
+async function commitResolvedMerge(
+  repoRoot: string,
+  resolvedFilePaths: string[],
+  commitMessage: string
+) {
+  await git(['add', '--', ...resolvedFilePaths], repoRoot)
+  const out = await git(['commit', '-m', commitMessage], repoRoot)
+  // "[main abc1234] message"
+  const commitHash = out.match(/\[[\w/]+\s+([a-f0-9]+)\]/)?.[1] ?? 'unknown'
+  return { commitHash, pushError: await pushToUpstream(repoRoot) }
+}
+
+/** The first of `refs` missing locally. Nothing is fetched: a fetch changes shared git state and can
+ *  collide with other work in the repo; the caller's status polling keeps the refs current. */
+async function missingRef(repoRoot: string, refs: string[]): Promise<string | undefined> {
+  const present = await Promise.all(
+    refs.map((ref) =>
+      git(['rev-parse', '--verify', ref], repoRoot)
+        .then(() => true)
+        .catch(() => false)
+    )
+  )
+  return refs.find((_, i) => !present[i])
+}
+
+/** Merges the base into the worktree; a failure with no conflict markers removes the worktree. */
+async function mergeBaseInto(payload: z.infer<typeof PreparePayload>, baseRemote: string) {
+  try {
+    await git(['merge', baseRemote], payload.worktreePath)
+    return { hasConflicts: false }
+  } catch {
+    const conflicted = await listConflictedFiles(payload.worktreePath).catch(() => [])
+    if (conflicted.length > 0) return { hasConflicts: true }
+    // Merge failed for a non-conflict reason (e.g. unrelated histories)
+    await removeMergeWorktree(payload)
+    return { error: 'Merge failed with no conflict markers — check the branch state.' }
+  }
+}
+
+function removeMergeWorktree(payload: z.infer<typeof PreparePayload>): Promise<unknown> {
+  const args = ['worktree', 'remove', '--force', payload.worktreePath]
+  return git(args, payload.repoRoot).catch(() => {})
+}
+
+/** A worktree of the PR's remote head on a fresh local branch, conflict-resolve/<head>, so it is
+ *  never "already checked out" elsewhere, then the base merged in to produce conflict markers. */
+async function prepareWorktreeForPr(payload: z.infer<typeof PreparePayload>) {
+  const headRemote = `origin/${payload.headRefName}`
+  const baseRemote = `origin/${payload.baseRefName}`
+  try {
+    const missing = await missingRef(payload.repoRoot, [headRemote, baseRemote])
+    if (missing) {
+      return {
+        error: `Remote ref '${missing}' not found locally. Run git fetch first, then try again.`,
+      }
+    }
+    const localBranch = `conflict-resolve/${payload.headRefName.replace(/\//g, '-')}`
+    const args = ['worktree', 'add', '-B', localBranch, payload.worktreePath, headRemote]
+    await git(args, payload.repoRoot)
+    return await mergeBaseInto(payload, baseRemote)
+  } catch (e) {
+    await removeMergeWorktree(payload)
+    return errorEnvelope(e)
+  }
+}
+
+/** The stored session, while conflicts remain and it has some; otherwise it is dropped. */
+async function restoreMergeSession(repoRoot: string) {
+  const sessions = await configStore()
+  const stored = sessions.get(sessionKey(repoRoot)) as { totalConflicts?: number } | undefined
+  if (!stored) return { session: null }
+  const conflicted = await listConflictedFiles(repoRoot).catch(() => [])
+  // An empty session is stale, e.g. from a broken Start Over.
+  if (conflicted.length === 0 || !stored.totalConflicts) {
+    sessions.delete(sessionKey(repoRoot))
+    return { session: null }
+  }
+  return { session: stored }
+}
+
+/** Restores every file's conflict markers and clears the persisted session. */
+async function resetMergeSession(repoRoot: string, files: Array<{ filePath: string }>) {
+  for (const file of files) {
+    // --conflict=merge re-creates the markers whether or not a block's resolvedText was saved.
+    await git(['checkout', '--conflict=merge', '--', file.filePath], repoRoot)
+  }
+  const sessions = await configStore()
+  sessions.delete(sessionKey(repoRoot))
+  return { success: true }
+}
+
+function resolutionChannels(): ChannelSpec[] {
+  return [
+    defineChannel({
+      channel: 'git:conflicts-list',
+      schema: RepoRootPayload,
+      invalid: VALIDATION_ERROR,
+      run: ({ repoRoot }) => buildConflictSession(repoRoot),
+      onError: errorEnvelope,
+    }),
+    defineChannel({
+      channel: 'git:resolve-conflict',
+      schema: ResolvePayload,
+      invalid: VALIDATION_ERROR,
+      run: resolveConflictBlock,
+      onError: errorEnvelope,
+    }),
+    defineChannel({
+      channel: 'git:undo-resolve',
+      schema: UndoPayload,
+      invalid: VALIDATION_ERROR,
+      run: undoBlockResolve,
+      onError: errorEnvelope,
+    }),
+  ]
+}
+
+function branchChannels(): ChannelSpec[] {
+  return [
+    defineChannel({
+      channel: 'git:merge-commit',
+      schema: z.object({
+        repoRoot: RepoRoot,
+        resolvedFilePaths: z.array(z.string().min(1)),
+        commitMessage: z.string().min(1),
+      }),
+      invalid: VALIDATION_ERROR,
+      run: (p) => commitResolvedMerge(p.repoRoot, p.resolvedFilePaths, p.commitMessage),
+      onError: errorEnvelope,
+    }),
+    defineChannel({
+      channel: 'git:prepare-pr-worktree',
+      schema: PreparePayload,
+      invalid: VALIDATION_ERROR,
+      run: prepareWorktreeForPr,
+    }),
+  ]
+}
+
+function mergeSessionChannels(): ChannelSpec[] {
+  return [
+    defineChannel({
+      channel: 'git:session-restore',
+      schema: RepoRootPayload,
+      invalid: VALIDATION_ERROR,
+      run: ({ repoRoot }) => restoreMergeSession(repoRoot),
+      onError: errorEnvelope,
+    }),
+    defineChannel({
+      channel: 'git:session-persist',
+      schema: z.object({ repoRoot: RepoRoot, session: z.unknown() }),
+      invalid: VALIDATION_ERROR,
+      run: async ({ repoRoot, session }) => {
+        const sessions = await configStore()
+        sessions.set(sessionKey(repoRoot), session)
+        return { success: true }
+      },
+      onError: errorEnvelope,
+    }),
+  ]
+}
+
+function sessionEndChannels(): ChannelSpec[] {
+  return [
+    // Never fails: clearing a session that cannot be cleared still answers success.
+    defineChannel({
+      channel: 'git:session-clear',
+      schema: RepoRootPayload,
+      invalid: { success: true },
+      run: async ({ repoRoot }) => {
+        const sessions = await configStore()
+        sessions.delete(sessionKey(repoRoot))
+        return { success: true }
+      },
+      onError: () => ({ success: true }),
+    }),
+    defineChannel({
+      channel: 'git:session-reset',
+      schema: z.object({ repoRoot: RepoRoot, files: z.array(z.object({ filePath: z.string() })) }),
+      invalid: VALIDATION_ERROR,
+      run: ({ repoRoot, files }) => resetMergeSession(repoRoot, files),
+      onError: errorEnvelope,
+    }),
+  ]
+}
+
 export function registerMergeFlowHandlers(register: RegisterFn): void {
-  // git:conflicts-list
-  register('git:conflicts-list', async (payload) => {
-    const schema = z.object({ repoRoot: z.string().min(1) })
-    const parsed = schema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    try {
-      return await buildConflictSession(parsed.data.repoRoot)
-    } catch (e) {
-      return { error: String(e) }
-    }
-  })
-
-  // git:conflict-blocks
-  register('git:conflict-blocks', async (payload) => {
-    const schema = z.object({
-      repoRoot: z.string().min(1),
-      filePath: z.string().min(1),
-    })
-    const parsed = schema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    try {
-      const { repoRoot, filePath } = parsed.data
-      const [baseContent, oursContent, theirsContent, workingTree] = await Promise.all([
-        git(['show', `:1:${filePath}`], repoRoot).catch(() => ''),
-        git(['show', `:2:${filePath}`], repoRoot).catch(() => ''),
-        git(['show', `:3:${filePath}`], repoRoot).catch(() => ''),
-        readFile(`${repoRoot}/${filePath}`, 'utf-8').catch(() => ''),
-      ])
-      const blocks = readConflictBlocks(
-        filePath,
-        workingTree,
-        baseContent,
-        oursContent,
-        theirsContent
-      )
-      return { blocks }
-    } catch (e) {
-      return { error: String(e) }
-    }
-  })
-
-  // git:resolve-conflict
-  register('git:resolve-conflict', async (payload) => {
-    const schema = z.object({
-      repoRoot: z.string().min(1),
-      blockId: z.string().min(1),
-      resolvedText: z.string(),
-      strategy: ResolutionStrategySchema,
-      currentResolvedText: z.string().optional(),
-      originalConflictText: z.string().optional(),
-    })
-    const parsed = schema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    try {
-      const { repoRoot, blockId, resolvedText, currentResolvedText, originalConflictText } =
-        parsed.data
-      // blockId format: "relative/path/file.ts#index"
-      const hashIdx = blockId.lastIndexOf('#')
-      const filePath = blockId.slice(0, hashIdx)
-      const fullPath = `${repoRoot}/${filePath}`
-      const content = await readFile(fullPath, 'utf-8')
-
-      // 1. Primary: match by original conflict text — stable regardless of how many
-      //    blocks have already been resolved (block indices shift as markers are removed)
-      if (originalConflictText && content.includes(originalConflictText)) {
-        const updated = content.replace(originalConflictText, resolvedText)
-        await writeFile(fullPath, updated, 'utf-8')
-        return { success: true }
-      }
-
-      // 2. Block already resolved — replace the previously written resolved text
-      if (currentResolvedText && content.includes(currentResolvedText)) {
-        const updated = content.replace(currentResolvedText, resolvedText)
-        await writeFile(fullPath, updated, 'utf-8')
-        return { success: true }
-      }
-
-      // 3. Fallback: index-based lookup (for sessions started before this fix)
-      const blocks = readConflictBlocks(filePath, content, '', '', '')
-      const blockIndex = parseInt(blockId.slice(hashIdx + 1), 10)
-      const target = blocks[blockIndex]
-      if (target) {
-        const updated = content.replace(target.originalConflictText, resolvedText)
-        await writeFile(fullPath, updated, 'utf-8')
-        return { success: true }
-      }
-
-      // 4. No conflict markers remain for this block — it was already consumed by a
-      //    previous resolution (possibly incorrect). Treat as a soft success so the
-      //    session can finish navigating. The file content stays as-is.
-      return { success: true }
-
-      return { error: `Block ${blockId} not found in file` }
-    } catch (e) {
-      return { error: String(e) }
-    }
-  })
-
-  // git:undo-resolve
-  register('git:undo-resolve', async (payload) => {
-    const schema = z.object({
-      repoRoot: z.string().min(1),
-      blockId: z.string().min(1),
-      resolvedText: z.string(),
-      originalConflictText: z.string().min(1),
-    })
-    const parsed = schema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    try {
-      const { repoRoot, blockId, resolvedText, originalConflictText } = parsed.data
-      const hashIdx = blockId.lastIndexOf('#')
-      const filePath = blockId.slice(0, hashIdx)
-      const fullPath = `${repoRoot}/${filePath}`
-      const content = await readFile(fullPath, 'utf-8')
-      if (!content.includes(resolvedText)) {
-        return {
-          error: 'Resolved text not found in file — file may have changed since resolution.',
-        }
-      }
-      const updated = content.replace(resolvedText, originalConflictText)
-      await writeFile(fullPath, updated, 'utf-8')
-      return { success: true }
-    } catch (e) {
-      return { error: String(e) }
-    }
-  })
-
-  // git:merge-commit
-  register('git:merge-commit', async (payload) => {
-    const schema = z.object({
-      repoRoot: z.string().min(1),
-      resolvedFilePaths: z.array(z.string().min(1)),
-      commitMessage: z.string().min(1),
-    })
-    const parsed = schema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    try {
-      const { repoRoot, resolvedFilePaths, commitMessage } = parsed.data
-      await git(['add', '--', ...resolvedFilePaths], repoRoot)
-      const out = await git(['commit', '-m', commitMessage], repoRoot)
-      // Extract commit hash from output like "[main abc1234] message"
-      const match = out.match(/\[[\w/]+\s+([a-f0-9]+)\]/)
-      const commitHash = match?.[1] ?? 'unknown'
-
-      // Push to the tracked upstream (set when the worktree was created from
-      // origin/<headRefName>). We resolve the upstream explicitly because the
-      // local branch name differs from the remote branch name (e.g., local is
-      // "conflict-resolve/foo" but upstream is "origin/foo"). Best-effort —
-      // local merge workflows may not have an upstream configured.
-      let pushError: string | undefined
-      try {
-        const upstreamFull = await git(
-          ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}'],
-          repoRoot
-        )
-        // upstreamFull is like "origin/test/conflict-theirs"
-        const slashIdx = upstreamFull.indexOf('/')
-        const remoteName = slashIdx === -1 ? 'origin' : upstreamFull.slice(0, slashIdx)
-        const remoteBranch = slashIdx === -1 ? upstreamFull : upstreamFull.slice(slashIdx + 1)
-        await git(
-          ['push', '--force-with-lease', remoteName, `HEAD:refs/heads/${remoteBranch}`],
-          repoRoot
-        )
-      } catch (pushErr) {
-        pushError = String(pushErr)
-      }
-
-      return { commitHash, pushError }
-    } catch (e) {
-      return { error: String(e) }
-    }
-  })
-
-  // git:prepare-pr-worktree
-  // Creates a git worktree for the PR branch (using the remote tracking ref so it
-  // matches what GitHub sees), runs git merge to produce conflict markers, then
-  // returns { hasConflicts: true } so the merge-flow view can open.
-  register('git:prepare-pr-worktree', async (payload) => {
-    const schema = z.object({
-      repoRoot: z.string().min(1),
-      worktreePath: z.string().min(1),
-      headRefName: z.string().min(1),
-      baseRefName: z.string().min(1),
-    })
-    const parsed = schema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    const { repoRoot, worktreePath, headRefName, baseRefName } = parsed.data
-    try {
-      // Deliberately do NOT run git fetch — it modifies shared git state and can
-      // collide with other tasks (terminal sessions, builds, other git operations)
-      // already running in this repo. The caller is expected to have up-to-date
-      // remote tracking refs (they come from the normal git status polling).
-
-      // Verify that origin/<head> and origin/<base> exist locally so we have
-      // something to build the worktree from.
-      const headRemote = `origin/${headRefName}`
-      const baseRemote = `origin/${baseRefName}`
-      const refsOk = await Promise.all([
-        git(['rev-parse', '--verify', headRemote], repoRoot)
-          .then(() => true)
-          .catch(() => false),
-        git(['rev-parse', '--verify', baseRemote], repoRoot)
-          .then(() => true)
-          .catch(() => false),
-      ])
-      if (!refsOk[0])
-        return {
-          error: `Remote ref '${headRemote}' not found locally. Run git fetch first, then try again.`,
-        }
-      if (!refsOk[1])
-        return {
-          error: `Remote ref '${baseRemote}' not found locally. Run git fetch first, then try again.`,
-        }
-
-      // Create a fresh local branch for the worktree, starting from origin/<head>.
-      // Using a unique branch name (conflict-resolve/…) means we never hit the
-      // "already checked out in another worktree" error, even if the user currently
-      // has the PR branch checked out. Only this worktree's working directory is
-      // affected — the main repo is untouched.
-      const localBranch = `conflict-resolve/${headRefName.replace(/\//g, '-')}`
-      await git(['worktree', 'add', '-B', localBranch, worktreePath, headRemote], repoRoot)
-
-      try {
-        await git(['merge', baseRemote], worktreePath)
-        // Merged cleanly — no conflicts
-        return { hasConflicts: false }
-      } catch {
-        const conflicted = await listConflictedFiles(worktreePath).catch(() => [])
-        if (conflicted.length > 0) return { hasConflicts: true }
-        // Merge failed for a non-conflict reason (e.g. unrelated histories)
-        await git(['worktree', 'remove', '--force', worktreePath], repoRoot).catch(() => {})
-        return { error: 'Merge failed with no conflict markers — check the branch state.' }
-      }
-    } catch (e) {
-      await git(['worktree', 'remove', '--force', worktreePath], repoRoot).catch(() => {})
-      return { error: String(e) }
-    }
-  })
-
-  // git:prepare-merge-for-pr
-  // Fetches the PR branch, checks it out, and runs git merge <base> to create
-  // local conflict state so the merge-flow view can detect and resolve them.
-  register('git:prepare-merge-for-pr', async (payload) => {
-    const schema = z.object({
-      repoRoot: z.string().min(1),
-      headRefName: z.string().min(1),
-      baseRefName: z.string().min(1),
-    })
-    const parsed = schema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    const { repoRoot, headRefName, baseRefName } = parsed.data
-    try {
-      await git(['fetch', 'origin'], repoRoot)
-      await git(['checkout', headRefName], repoRoot)
-      try {
-        await git(['merge', `origin/${baseRefName}`], repoRoot)
-        // Clean merge — no conflicts
-        return { hasConflicts: false }
-      } catch {
-        // git merge exits non-zero when conflicts exist — that is the expected path
-        const conflicted = await listConflictedFiles(repoRoot).catch(() => [])
-        if (conflicted.length > 0) return { hasConflicts: true }
-        // merge failed for a non-conflict reason (permissions, etc.)
-        return { error: 'Merge failed with no conflict markers — check git status.' }
-      }
-    } catch (e) {
-      return { error: String(e) }
-    }
-  })
-
-  // git:merge-ai-suggest (stub — Phase 3)
-  register('git:merge-ai-suggest', async (payload) => {
-    const schema = z.object({
-      repoRoot: z.string().min(1),
-      blockId: z.string().min(1),
-      baseText: z.string(),
-      oursText: z.string(),
-      theirsText: z.string(),
-      contextBefore: z.array(z.string()),
-      contextAfter: z.array(z.string()),
-    })
-    const parsed = schema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    return { error: 'NOT_IMPLEMENTED' }
-  })
-
-  // git:session-restore
-  register('git:session-restore', async (payload) => {
-    const schema = z.object({ repoRoot: z.string().min(1) })
-    const parsed = schema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    try {
-      const { repoRoot } = parsed.data
-      const stored = store.get(sessionKey(repoRoot)) as unknown
-      if (!stored) return { session: null }
-
-      // Validate that conflicts still exist in the working tree
-      const conflicted = await listConflictedFiles(repoRoot).catch(() => [])
-      if (conflicted.length === 0) {
-        store.delete(sessionKey(repoRoot))
-        return { session: null }
-      }
-
-      // Reject stale empty sessions (e.g., from a broken Start Over)
-      const sessionObj = stored as { totalConflicts?: number; files?: unknown[] }
-      if (!sessionObj.totalConflicts || sessionObj.totalConflicts === 0) {
-        store.delete(sessionKey(repoRoot))
-        return { session: null }
-      }
-
-      return { session: stored }
-    } catch (e) {
-      return { error: String(e) }
-    }
-  })
-
-  // git:session-persist
-  register('git:session-persist', async (payload) => {
-    const schema = z.object({
-      repoRoot: z.string().min(1),
-      session: z.unknown(),
-    })
-    const parsed = schema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    try {
-      store.set(sessionKey(parsed.data.repoRoot), parsed.data.session)
-      return { success: true }
-    } catch (e) {
-      return { error: String(e) }
-    }
-  })
-
-  // git:session-clear
-  register('git:session-clear', async (payload) => {
-    const schema = z.object({ repoRoot: z.string().min(1) })
-    const parsed = schema.safeParse(payload)
-    if (!parsed.success) return { success: true }
-    try {
-      store.delete(sessionKey(parsed.data.repoRoot))
-    } catch {
-      // session-clear never fails per contract
-    }
-    return { success: true }
-  })
-
-  // git:session-reset — restore all conflict markers and clear persisted session
-  register('git:session-reset', async (payload) => {
-    const fileSchema = z.object({ filePath: z.string() })
-    const schema = z.object({
-      repoRoot: z.string().min(1),
-      files: z.array(fileSchema),
-    })
-    const parsed = schema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    try {
-      const { repoRoot, files } = parsed.data
-      for (const file of files) {
-        // git checkout --conflict=merge re-introduces conflict markers reliably
-        // regardless of whether block.resolvedText is populated in persisted sessions
-        await git(['checkout', '--conflict=merge', '--', file.filePath], repoRoot)
-      }
-      store.delete(sessionKey(repoRoot))
-      return { success: true }
-    } catch (e) {
-      return { error: String(e) }
-    }
-  })
+  const channels = [
+    ...resolutionChannels(),
+    ...branchChannels(),
+    ...mergeSessionChannels(),
+    ...sessionEndChannels(),
+  ]
+  for (const spec of channels) register(spec)
 }

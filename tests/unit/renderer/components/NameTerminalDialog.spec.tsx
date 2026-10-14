@@ -1,26 +1,27 @@
 import React from 'react'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { NameTerminalDialog } from '../../../../src/renderer/components/NameTerminalDialog'
+import { pressOutside } from '../../../support/modal'
 
-vi.mock('../../../../src/renderer/components/sidebar/Dialog.css', () => ({}))
+const defaultName = 'Terminal 1'
+
+let onConfirm: Mock<(name: string) => void>
+
+let onCancel: Mock<() => void>
+
+function renderDialog() {
+  return render(
+    <NameTerminalDialog defaultName={defaultName} onConfirm={onConfirm} onCancel={onCancel} />
+  )
+}
+
+beforeEach(() => {
+  onConfirm = vi.fn()
+  onCancel = vi.fn()
+})
 
 describe('NameTerminalDialog', () => {
-  const defaultName = 'Terminal 1'
-  let onConfirm: ReturnType<typeof vi.fn>
-  let onCancel: ReturnType<typeof vi.fn>
-
-  beforeEach(() => {
-    onConfirm = vi.fn()
-    onCancel = vi.fn()
-  })
-
-  function renderDialog() {
-    return render(
-      <NameTerminalDialog defaultName={defaultName} onConfirm={onConfirm} onCancel={onCancel} />
-    )
-  }
-
   it('renders the dialog title', () => {
     renderDialog()
     expect(screen.getByText('Name this terminal')).toBeTruthy()
@@ -51,10 +52,12 @@ describe('NameTerminalDialog', () => {
     fireEvent.click(screen.getByText('Cancel'))
     expect(onCancel).toHaveBeenCalled()
   })
+})
 
+describe('NameTerminalDialog — calls onCancel when overlay is clicked', () => {
   it('calls onCancel when overlay is clicked', () => {
     renderDialog()
-    fireEvent.click(document.querySelector('.dialog-overlay')!)
+    pressOutside(screen.getByRole('dialog'))
     expect(onCancel).toHaveBeenCalled()
   })
 
@@ -80,7 +83,7 @@ describe('NameTerminalDialog', () => {
     renderDialog()
     const input = screen.getByRole('textbox')
     fireEvent.change(input, { target: { value: 'Build runner' } })
-    fireEvent.submit(screen.getByRole('dialog'))
+    fireEvent.submit(screen.getByRole('textbox'))
     expect(onConfirm).toHaveBeenCalledWith('Build runner')
   })
 })

@@ -1,4 +1,4 @@
-import { create } from 'zustand'
+import { create, type StoreApi } from 'zustand'
 import type { ComponentType, ReactNode } from 'react'
 import type { QuickActionGroup } from '../quick-actions/types'
 
@@ -28,7 +28,7 @@ export interface WorkspaceTabRegistration {
   view?: string
 }
 
-export interface SidebarPanelRegistration {
+interface SidebarPanelRegistration {
   id: string
   label: string
   component: ComponentType<{ repoRoot: string | null; onClose: () => void }>
@@ -45,14 +45,14 @@ export interface ProjectTabRegistration {
   view?: string
 }
 
-export interface KeyboardShortcutRegistration {
+interface KeyboardShortcutRegistration {
   /** Electron-style accelerator, e.g. "CmdOrCtrl+Shift+G" */
   accelerator: string
   action: () => void
   description?: string
 }
 
-export interface CommandRegistration {
+interface CommandRegistration {
   id: string
   label: string
   description?: string
@@ -62,21 +62,12 @@ export interface CommandRegistration {
   action(): void
 }
 
-export interface SidebarButtonRegistration {
-  id: string
-  label: string
-  icon?: ReactNode
-  /** Called when the user clicks the button in the ProjectsPanel */
-  action(): void
-}
-
 interface ExtensionRegistry {
   sidebarPanels: Map<string, SidebarPanelRegistration>
   projectTabs: Map<string, ProjectTabRegistration>
   globalTabs: Map<string, GlobalTabRegistration>
   workspaceTabs: Map<string, WorkspaceTabRegistration>
   windowViews: Map<string, ComponentType<{ repoRoot: string | null }>>
-  sidebarButtons: SidebarButtonRegistration[]
   activeGlobalTabId: string | null
   activeWorkspaceTabId: string | null
   keyboardShortcuts: KeyboardShortcutRegistration[]
@@ -97,7 +88,6 @@ interface ExtensionRegistry {
   registerOverlay(component: ComponentType): () => void
   registerKeyboardShortcut(shortcut: KeyboardShortcutRegistration): () => void
   registerCommand(command: CommandRegistration): () => void
-  registerSidebarButton(button: SidebarButtonRegistration): () => void
   updateCommand(id: string, patch: Partial<Omit<CommandRegistration, 'id' | 'action'>>): void
   updateGlobalTab(id: string, patch: Partial<Omit<GlobalTabRegistration, 'id' | 'component'>>): void
   togglePanel(panelId: string): void
@@ -110,31 +100,220 @@ interface ExtensionRegistry {
   clearPendingNavigation(extensionId: string): void
 }
 
-export type ExtensionRendererAPI = Pick<
-  ExtensionRegistry,
-  | 'registerGlobalTab'
-  | 'registerWorkspaceTab'
-  | 'registerSidebarPanel'
-  | 'registerProjectTab'
-  | 'registerWindowView'
-  | 'registerOverlay'
-  | 'registerKeyboardShortcut'
-  | 'registerCommand'
-  | 'updateGlobalTab'
-  | 'updateCommand'
->
-
 // Core-contributed surfaces use this id prefix (see the sort weight in App.tsx).
 // They are not extensions, so the Escape exit gesture leaves them alone.
 const CORE_SURFACE_PREFIX = 'core.'
 
+type SetRegistry = StoreApi<ExtensionRegistry>['setState']
+type GetRegistry = StoreApi<ExtensionRegistry>['getState']
+type Slice<Keys extends keyof ExtensionRegistry> = Pick<ExtensionRegistry, Keys>
+
+function withEntry<Value>(map: Map<string, Value>, id: string, value: Value): Map<string, Value> {
+  return new Map(map).set(id, value)
+}
+
+function withoutEntry<Value>(map: Map<string, Value>, id: string): Map<string, Value> {
+  const next = new Map(map)
+  next.delete(id)
+  return next
+}
+
+/** The active id, or null when it is the one going away. */
+const unlessGone = (active: string | null, id: string): string | null =>
+  active === id ? null : active
+
+function toggledIn(ids: Set<string>, id: string): Set<string> {
+  const next = new Set(ids)
+  if (next.has(id)) next.delete(id)
+  else next.add(id)
+  return next
+}
+
+function registerSidebarPanel(set: SetRegistry, panel: SidebarPanelRegistration): () => void {
+  set((s) => {
+    const open = new Set(s.openPanels)
+    if (panel.defaultOpen) open.add(panel.id)
+    return { sidebarPanels: withEntry(s.sidebarPanels, panel.id, panel), openPanels: open }
+  })
+  return () =>
+    set((s) => {
+      const open = new Set(s.openPanels)
+      open.delete(panel.id)
+      return { sidebarPanels: withoutEntry(s.sidebarPanels, panel.id), openPanels: open }
+    })
+}
+
+/** The project, global and workspace tabs; removing one that is showing shows the terminal. */
+function tabSlice(
+  set: SetRegistry
+): Slice<'registerProjectTab' | 'registerGlobalTab' | 'registerWorkspaceTab'> {
+  return {
+    registerProjectTab(tab) {
+      set((s) => ({ projectTabs: withEntry(s.projectTabs, tab.id, tab) }))
+      return () =>
+        set((s) => ({
+          projectTabs: withoutEntry(s.projectTabs, tab.id),
+          activeProjectTabId: unlessGone(s.activeProjectTabId, tab.id),
+        }))
+    },
+    registerGlobalTab(tab) {
+      set((s) => ({ globalTabs: withEntry(s.globalTabs, tab.id, tab) }))
+      return () =>
+        set((s) => ({
+          globalTabs: withoutEntry(s.globalTabs, tab.id),
+          activeGlobalTabId: unlessGone(s.activeGlobalTabId, tab.id),
+        }))
+    },
+    registerWorkspaceTab(tab) {
+      set((s) => ({ workspaceTabs: withEntry(s.workspaceTabs, tab.id, tab) }))
+      return () =>
+        set((s) => ({
+          workspaceTabs: withoutEntry(s.workspaceTabs, tab.id),
+          activeWorkspaceTabId: unlessGone(s.activeWorkspaceTabId, tab.id),
+        }))
+    },
+  }
+}
+
+/** Everything else an extension adds: panels, window views, overlays, shortcuts, commands. */
+function contributionSlice(
+  set: SetRegistry
+): Slice<
+  | 'registerSidebarPanel'
+  | 'registerWindowView'
+  | 'registerKeyboardShortcut'
+  | 'registerOverlay'
+  | 'registerCommand'
+> {
+  return {
+    registerSidebarPanel: (panel) => registerSidebarPanel(set, panel),
+    registerWindowView: (id, component) =>
+      set((s) => ({ windowViews: withEntry(s.windowViews, id, component) })),
+    registerKeyboardShortcut(shortcut) {
+      set((s) => ({ keyboardShortcuts: [...s.keyboardShortcuts, shortcut] }))
+      return () =>
+        set((s) => ({ keyboardShortcuts: s.keyboardShortcuts.filter((sc) => sc !== shortcut) }))
+    },
+    registerOverlay(component) {
+      set((s) => ({ overlays: [...s.overlays, component] }))
+      return () => set((s) => ({ overlays: s.overlays.filter((c) => c !== component) }))
+    },
+    registerCommand(command) {
+      set((s) => ({ commands: [...s.commands, command] }))
+      return () => set((s) => ({ commands: s.commands.filter((c) => c !== command) }))
+    },
+  }
+}
+
+function updateSlice(
+  set: SetRegistry
+): Slice<'setQuickActionGroups' | 'updateCommand' | 'updateGlobalTab' | 'togglePanel'> {
+  return {
+    setQuickActionGroups: (groups) => set({ quickActionGroups: groups }),
+    updateCommand: (id, patch) =>
+      set((s) => ({ commands: s.commands.map((c) => (c.id === id ? { ...c, ...patch } : c)) })),
+    updateGlobalTab: (id, patch) =>
+      set((s) => {
+        const existing = s.globalTabs.get(id)
+        if (!existing) return { globalTabs: new Map(s.globalTabs) }
+        return { globalTabs: withEntry(s.globalTabs, id, { ...existing, ...patch }) }
+      }),
+    togglePanel: (panelId) => set((s) => ({ openPanels: toggledIn(s.openPanels, panelId) })),
+  }
+}
+
+const isExitable = (id: string | null): boolean =>
+  id !== null && !id.startsWith(CORE_SURFACE_PREFIX)
+
+/** Leaves the extension surface for the terminal: closes the sidebar panel the exit came from, else
+ * clears all three tab slots, landing on TerminalPane and the session the user left. False when
+ * there was nothing to exit, so the caller skips re-focusing the terminal. */
+function exitExtensionToTerminal(
+  set: SetRegistry,
+  get: GetRegistry,
+  sidebarPanelId: string | undefined
+): boolean {
+  const s = get()
+  if (sidebarPanelId) {
+    if (!s.openPanels.has(sidebarPanelId)) return false
+    s.togglePanel(sidebarPanelId)
+    return true
+  }
+  const tabs = [s.activeGlobalTabId, s.activeWorkspaceTabId, s.activeProjectTabId]
+  if (!tabs.some(isExitable)) return false
+  const keepUnlessExitable = (id: string | null): string | null => (isExitable(id) ? null : id)
+  set((prev) => ({
+    activeGlobalTabId: keepUnlessExitable(prev.activeGlobalTabId),
+    activeWorkspaceTabId: keepUnlessExitable(prev.activeWorkspaceTabId),
+    activeProjectTabId: keepUnlessExitable(prev.activeProjectTabId),
+  }))
+  return true
+}
+
+/** Dismisses whatever is showing in place of the terminal, core screens such as Home and
+ * Overview included — the user has moved on to something else. Sidebar panels sit beside the
+ * terminal rather than over it, so they stay. */
+function dismissSurfaces(set: SetRegistry, get: GetRegistry): boolean {
+  const s = get()
+  if (!s.activeGlobalTabId && !s.activeWorkspaceTabId && !s.activeProjectTabId) return false
+  set({ activeGlobalTabId: null, activeWorkspaceTabId: null, activeProjectTabId: null })
+  return true
+}
+
+/** Which surface shows in place of the terminal, and leaving it. */
+function navigationSlice(
+  set: SetRegistry,
+  get: GetRegistry
+): Slice<
+  | 'exitExtensionToTerminal'
+  | 'dismissSurfaces'
+  | 'setActiveProjectTab'
+  | 'setActiveGlobalTab'
+  | 'setActiveWorkspaceTab'
+> {
+  return {
+    exitExtensionToTerminal: (sidebarPanelId) => exitExtensionToTerminal(set, get, sidebarPanelId),
+    dismissSurfaces: () => dismissSurfaces(set, get),
+    setActiveProjectTab: (tabId) => set({ activeProjectTabId: tabId }),
+    setActiveGlobalTab: (tabId) =>
+      set({
+        activeGlobalTabId: tabId,
+        activeWorkspaceTabId: null,
+        ...(tabId !== null ? { activeProjectTabId: null } : {}),
+      }),
+    setActiveWorkspaceTab: (tabId) =>
+      set({
+        activeWorkspaceTabId: tabId,
+        activeGlobalTabId: null,
+        ...(tabId !== null ? { activeProjectTabId: null } : {}),
+      }),
+  }
+}
+
+/** Data an extension's global tab reads once it shows, keyed by extension. */
+function pendingNavigationSlice(
+  set: SetRegistry
+): Slice<'setActiveGlobalTabWithNavigation' | 'clearPendingNavigation'> {
+  return {
+    setActiveGlobalTabWithNavigation: (tabId, navigationData) =>
+      set((s) => ({
+        activeGlobalTabId: tabId,
+        activeProjectTabId: null,
+        activeWorkspaceTabId: null,
+        pendingNavigations: withEntry(s.pendingNavigations, tabId, navigationData),
+      })),
+    clearPendingNavigation: (extensionId) =>
+      set((s) => ({ pendingNavigations: withoutEntry(s.pendingNavigations, extensionId) })),
+  }
+}
+
+// One store built from slices: https://zustand.docs.pmnd.rs/guides/slices-pattern
 export const useExtensionRegistry = create<ExtensionRegistry>((set, get) => ({
   sidebarPanels: new Map(),
   projectTabs: new Map(),
   globalTabs: new Map(),
   workspaceTabs: new Map(),
   windowViews: new Map(),
-  sidebarButtons: [],
   activeGlobalTabId: null,
   activeWorkspaceTabId: null,
   keyboardShortcuts: [],
@@ -144,221 +323,11 @@ export const useExtensionRegistry = create<ExtensionRegistry>((set, get) => ({
   activeProjectTabId: null,
   pendingNavigations: new Map(),
   quickActionGroups: [],
-
-  setQuickActionGroups(groups) {
-    set({ quickActionGroups: groups })
-  },
-
-  registerSidebarPanel(panel) {
-    set((s) => {
-      const panels = new Map(s.sidebarPanels)
-      panels.set(panel.id, panel)
-      const open = new Set(s.openPanels)
-      if (panel.defaultOpen) open.add(panel.id)
-      return { sidebarPanels: panels, openPanels: open }
-    })
-    return () =>
-      set((s) => {
-        const panels = new Map(s.sidebarPanels)
-        panels.delete(panel.id)
-        const open = new Set(s.openPanels)
-        open.delete(panel.id)
-        return { sidebarPanels: panels, openPanels: open }
-      })
-  },
-
-  registerProjectTab(tab) {
-    set((s) => {
-      const tabs = new Map(s.projectTabs)
-      tabs.set(tab.id, tab)
-      return { projectTabs: tabs }
-    })
-    return () =>
-      set((s) => {
-        const tabs = new Map(s.projectTabs)
-        tabs.delete(tab.id)
-        const next: Partial<ExtensionRegistry> = { projectTabs: tabs }
-        if (s.activeProjectTabId === tab.id) next.activeProjectTabId = null
-        return next
-      })
-  },
-
-  registerGlobalTab(tab) {
-    set((s) => {
-      const tabs = new Map(s.globalTabs)
-      tabs.set(tab.id, tab)
-      return { globalTabs: tabs }
-    })
-    return () =>
-      set((s) => {
-        const tabs = new Map(s.globalTabs)
-        tabs.delete(tab.id)
-        const next: Partial<ExtensionRegistry> = { globalTabs: tabs }
-        if (s.activeGlobalTabId === tab.id) next.activeGlobalTabId = null
-        return next
-      })
-  },
-
-  registerWorkspaceTab(tab) {
-    set((s) => {
-      const tabs = new Map(s.workspaceTabs)
-      tabs.set(tab.id, tab)
-      return { workspaceTabs: tabs }
-    })
-    return () =>
-      set((s) => {
-        const tabs = new Map(s.workspaceTabs)
-        tabs.delete(tab.id)
-        const next: Partial<ExtensionRegistry> = { workspaceTabs: tabs }
-        if (s.activeWorkspaceTabId === tab.id) next.activeWorkspaceTabId = null
-        return next
-      })
-  },
-
-  registerWindowView(id, component) {
-    set((s) => {
-      const views = new Map(s.windowViews)
-      views.set(id, component)
-      return { windowViews: views }
-    })
-  },
-
-  registerKeyboardShortcut(shortcut) {
-    set((s) => ({ keyboardShortcuts: [...s.keyboardShortcuts, shortcut] }))
-    return () =>
-      set((s) => ({ keyboardShortcuts: s.keyboardShortcuts.filter((sc) => sc !== shortcut) }))
-  },
-
-  registerOverlay(component) {
-    set((s) => ({ overlays: [...s.overlays, component] }))
-    return () => set((s) => ({ overlays: s.overlays.filter((c) => c !== component) }))
-  },
-
-  registerCommand(command) {
-    set((s) => ({ commands: [...s.commands, command] }))
-    return () => set((s) => ({ commands: s.commands.filter((c) => c !== command) }))
-  },
-
-  registerSidebarButton(button) {
-    set((s) => ({ sidebarButtons: [...s.sidebarButtons, button] }))
-    return () =>
-      set((s) => ({ sidebarButtons: s.sidebarButtons.filter((b) => b.id !== button.id) }))
-  },
-
-  updateCommand(id, patch) {
-    set((s) => ({
-      commands: s.commands.map((c) => (c.id === id ? { ...c, ...patch } : c)),
-    }))
-  },
-
-  updateGlobalTab(id, patch) {
-    set((s) => {
-      const tabs = new Map(s.globalTabs)
-      const existing = tabs.get(id)
-      if (existing) tabs.set(id, { ...existing, ...patch })
-      return { globalTabs: tabs }
-    })
-  },
-
-  togglePanel(panelId) {
-    set((s) => {
-      const open = new Set(s.openPanels)
-      if (open.has(panelId)) open.delete(panelId)
-      else open.add(panelId)
-      return { openPanels: open }
-    })
-  },
-
-  /**
-   * Dismisses the extension surface the user is in so the terminal shows again.
-   * `sidebarPanelId` is passed only when the exit came from a sidebar panel —
-   * those sit beside the terminal rather than replacing it, so closing the panel
-   * is the whole exit. Everything else is a full-screen surface: clearing all
-   * three tab slots at once lands on TerminalPane, which still holds the
-   * project's activeSessionId, i.e. the session the user left.
-   *
-   * Returns false when there was nothing to exit, so the caller can skip
-   * re-focusing the terminal.
-   */
-  exitExtensionToTerminal(sidebarPanelId) {
-    const s = get()
-
-    if (sidebarPanelId) {
-      if (!s.openPanels.has(sidebarPanelId)) return false
-      s.togglePanel(sidebarPanelId)
-      return true
-    }
-
-    const isExitable = (id: string | null): boolean =>
-      id !== null && !id.startsWith(CORE_SURFACE_PREFIX)
-    const exiting =
-      isExitable(s.activeGlobalTabId) ||
-      isExitable(s.activeWorkspaceTabId) ||
-      isExitable(s.activeProjectTabId)
-    if (!exiting) return false
-
-    set((prev) => ({
-      activeGlobalTabId: isExitable(prev.activeGlobalTabId) ? null : prev.activeGlobalTabId,
-      activeWorkspaceTabId: isExitable(prev.activeWorkspaceTabId)
-        ? null
-        : prev.activeWorkspaceTabId,
-      activeProjectTabId: isExitable(prev.activeProjectTabId) ? null : prev.activeProjectTabId,
-    }))
-    return true
-  },
-
-  /**
-   * Dismisses whatever is showing in place of the terminal, core screens such
-   * as Home and Overview included — the user has moved on to something else.
-   * Sidebar panels sit beside the terminal rather than over it, so they stay.
-   */
-  dismissSurfaces() {
-    const s = get()
-    if (!s.activeGlobalTabId && !s.activeWorkspaceTabId && !s.activeProjectTabId) return false
-    set({ activeGlobalTabId: null, activeWorkspaceTabId: null, activeProjectTabId: null })
-    return true
-  },
-
-  setActiveProjectTab(tabId) {
-    set({ activeProjectTabId: tabId })
-  },
-
-  setActiveGlobalTab(tabId) {
-    set({
-      activeGlobalTabId: tabId,
-      activeWorkspaceTabId: null,
-      ...(tabId !== null ? { activeProjectTabId: null } : {}),
-    })
-  },
-
-  setActiveWorkspaceTab(tabId) {
-    set({
-      activeWorkspaceTabId: tabId,
-      activeGlobalTabId: null,
-      ...(tabId !== null ? { activeProjectTabId: null } : {}),
-    })
-  },
-
-  setActiveGlobalTabWithNavigation(tabId, navigationData) {
-    set((s) => {
-      const pendingNavigations = new Map(s.pendingNavigations)
-      pendingNavigations.set(tabId, navigationData)
-      return {
-        activeGlobalTabId: tabId,
-        activeProjectTabId: null,
-        activeWorkspaceTabId: null,
-        pendingNavigations,
-      }
-    })
-  },
-
-  clearPendingNavigation(extensionId) {
-    set((s) => {
-      const pendingNavigations = new Map(s.pendingNavigations)
-      pendingNavigations.delete(extensionId)
-      return { pendingNavigations }
-    })
-  },
+  ...tabSlice(set),
+  ...contributionSlice(set),
+  ...updateSlice(set),
+  ...navigationSlice(set, get),
+  ...pendingNavigationSlice(set),
 }))
 
 // ── Accelerator parser ────────────────────────────────────────────────────────

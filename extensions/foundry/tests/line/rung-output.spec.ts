@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { builderUnit } from '../helpers/order-parts.js'
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import * as nodePath from 'node:path'
 import {
   COLLECTABLE,
@@ -15,6 +15,7 @@ import {
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import type { Role } from '../../src/recipe/parse.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 // A read-only rung has a product — context, findings, a plan it disagrees
 // with — and before this it had nowhere to put it. These are the tests for the
@@ -27,6 +28,7 @@ function role(over: Partial<Role> = {}): Role {
   return {
     schemaVersion: 1,
     id: 'scout',
+    skills: [],
     modelTier: 'fast',
     allowResume: false,
     reads: ['repo'],
@@ -73,9 +75,16 @@ describe('collectableWrites', () => {
   })
 })
 
-describe('a document hand-back', () => {
-  const AUTHOR = ['document'] as const
+const AUTHOR = ['document'] as const
 
+describe('a document hand-back', () => {
+  describe('declaring', declaringTests)
+  describe('accepting', rungOutputAcceptingTests)
+  describe('refusing', rungOutputRefusingTests)
+  describe('on the order', onTheOrderTests)
+})
+
+function declaringTests() {
   it('is collectable from a role that declared it', () => {
     expect(collectableWrites(role({ writes: ['docs', 'document'] }))).toEqual(['document'])
   })
@@ -89,7 +98,9 @@ describe('a document hand-back', () => {
     expect(text).toContain('"location"')
     expect(text).toContain('url')
   })
+}
 
+function rungOutputAcceptingTests() {
   it('takes a document with a location', () => {
     const parsed = parseRungOutput(
       { document: { path: '/o/answer.md', location: 'outputs' }, note: 'written' },
@@ -105,7 +116,9 @@ describe('a document hand-back', () => {
     )
     expect(parsed.document?.url).toBe('https://example.com/d/1')
   })
+}
 
+function rungOutputRefusingTests() {
   it('refuses a document with no location, or one in a fourth place', () => {
     expect(() => parseRungOutput({ document: { path: 'a.md' } }, [...AUTHOR])).toThrow(
       RungOutputRejected
@@ -120,7 +133,9 @@ describe('a document hand-back', () => {
       parseRungOutput({ document: { path: 'a.md', location: 'checkout' } }, ['context'])
     ).toThrow(RungOutputRejected)
   })
+}
 
+function onTheOrderTests() {
   it("puts the document on the order and reports it as this turn's", () => {
     const applied = applyRungOutput(order(), {
       role: 'author',
@@ -145,7 +160,7 @@ describe('a document hand-back', () => {
     expect(applied.document).toBeNull()
     expect(applied.order.document).toEqual(earlier)
   })
-})
+}
 
 describe('rungOutputPath', () => {
   it('puts a rung beside the order that asked for it', () => {
@@ -198,6 +213,12 @@ describe('rungOutputContract', () => {
 })
 
 describe('parseRungOutput', () => {
+  describe('keys', rungOutputKeysTests)
+  describe('findings', rungOutputFindingsTests)
+  describe('reopens', reopensTests)
+})
+
+function rungOutputKeysTests() {
   it('takes what the role was entitled to write', () => {
     const parsed = parseRungOutput(
       { findings: { entryPoints: ['src/a.ts'], conventions: ['tokens'] }, note: 'read it' },
@@ -218,7 +239,9 @@ describe('parseRungOutput', () => {
   it('refuses a key no role may ever write', () => {
     expect(() => parseRungOutput({ status: 'shipped' }, ['context', 'findings'])).toThrow(/status/)
   })
+}
 
+function rungOutputFindingsTests() {
   it('refuses a finding with no text', () => {
     expect(() =>
       parseRungOutput({ redTeam: [{ severity: 'high', category: 'unprovable', text: '' }] }, [
@@ -238,7 +261,9 @@ describe('parseRungOutput', () => {
       parseRungOutput({ redTeam: [{ category: 'nonsense', text: 'x' }] }, ['findings'])
     ).toThrow(RungOutputRejected)
   })
+}
 
+function reopensTests() {
   it('accepts a reopen with new evidence', () => {
     const parsed = parseRungOutput(
       {
@@ -256,9 +281,24 @@ describe('parseRungOutput', () => {
     expect(parsed.redTeam?.[0].reopens).toBe('RT-red-team-1')
     expect(parsed.redTeam?.[0].newEvidence).toBe('the fix regressed under load')
   })
-})
+}
 
 describe('applyRungOutput', () => {
+  describe('what the scout read', whatTheScoutReadTests)
+  describe('reports only', reportsOnlyTests)
+  describe('red team findings', rungOutputRedTeamFindingsTests)
+  describe('known findings', knownFindingsTests)
+  describe('numbering', numberingTests)
+  describe('non-blocking findings', nonBlockingFindingsTests)
+  describe('review rounds', reviewRoundsTests)
+  describe('reopening', rungOutputReopeningTests)
+  describe('reopens without evidence', reopensWithoutEvidenceTests)
+  describe('near-duplicates', nearDuplicatesTests)
+  describe('a disagreeing architect', aDisagreeingArchitectTests)
+  describe('an empty object', anEmptyObjectTests)
+})
+
+function whatTheScoutReadTests() {
   it('puts what the scout read into the order it was read for', () => {
     const before = order()
     expect(before.context.entryPoints).toEqual([])
@@ -279,7 +319,9 @@ describe('applyRungOutput', () => {
     expect(after.order.context.repos).toEqual(before.context.repos)
     expect(after.defect).toBeNull()
   })
+}
 
+function reportsOnlyTests() {
   it('leaves an order agreed when a rung only reports what it read', () => {
     // A scout's findings are not a disagreement, and sending an order back to
     // draft mid-run would stop the builders already working from it.
@@ -294,7 +336,9 @@ describe('applyRungOutput', () => {
     expect(after.order.status).toBe('agreed')
     expect(after.order.agreedAt).not.toBeNull()
   })
+}
 
+function rungOutputRedTeamFindingsTests() {
   it("puts the red team's findings where the structural ones go", () => {
     const after = applyRungOutput(order(), {
       role: 'red-team',
@@ -323,7 +367,9 @@ describe('applyRungOutput', () => {
     // that carried on building from it regardless.
     expect(after.defect).toContain('AC-2 cannot be falsified.')
   })
+}
 
+function knownFindingsTests() {
   it('raises nothing for a finding it had already made', () => {
     const once = applyRungOutput(order(), {
       role: 'red-team',
@@ -345,7 +391,9 @@ describe('applyRungOutput', () => {
     })
     expect(again.defect).toBeNull()
   })
+}
 
+function numberingTests() {
   it('numbers agent findings so a second turn does not duplicate the first', () => {
     const once = applyRungOutput(order(), {
       role: 'red-team',
@@ -367,7 +415,9 @@ describe('applyRungOutput', () => {
     })
     expect(twice.order.redTeam).toHaveLength(1)
   })
+}
 
+function nonBlockingFindingsTests() {
   it('appends a non-blocking finding without amending, and raises no defect', () => {
     const after = applyRungOutput(order(), {
       role: 'red-team',
@@ -396,7 +446,9 @@ describe('applyRungOutput', () => {
     })
     expect(after.note).toBe('1 non-blocking note')
   })
+}
 
+function reviewRoundsTests() {
   it('stamps the review round onto a fresh finding', () => {
     const after = applyRungOutput(order(), {
       role: 'red-team',
@@ -414,40 +466,39 @@ describe('applyRungOutput', () => {
     })
     expect(after.order.redTeam[0]?.round).toBe(2)
   })
+}
 
+/** A finding a previous round settled: the architect answered it with a command. */
+const SETTLED_FINDING: WorkOrder['redTeam'][number] = {
+  id: 'RT-red-team-1',
+  severity: 'high',
+  category: 'unprovable',
+  text: 'AC-2 cannot be falsified.',
+  status: 'resolved',
+  reason: 'the architect added a command',
+  round: 0,
+}
+
+/** The red team's rung writing `redTeam` as its findings onto `before`. */
+function redTeamWrote(before: WorkOrder, redTeam: unknown[]) {
+  return applyRungOutput(before, {
+    role: 'red-team',
+    output: parseRungOutput({ redTeam }, ['findings']),
+    writes: ['findings'],
+    at: AT,
+  })
+}
+
+function rungOutputReopeningTests() {
   it('reopens a settled finding when new evidence answers what settled it', () => {
-    const settled: WorkOrder = {
-      ...order(),
-      redTeam: [
-        {
-          id: 'RT-red-team-1',
-          severity: 'high',
-          category: 'unprovable',
-          text: 'AC-2 cannot be falsified.',
-          status: 'resolved',
-          reason: 'the architect added a command',
-          round: 0,
-        },
-      ],
-    }
-    const after = applyRungOutput(settled, {
-      role: 'red-team',
-      output: parseRungOutput(
-        {
-          redTeam: [
-            {
-              category: 'unprovable',
-              text: 'ignored',
-              reopens: 'RT-red-team-1',
-              newEvidence: 'the command the architect added does not run in CI',
-            },
-          ],
-        },
-        ['findings']
-      ),
-      writes: ['findings'],
-      at: AT,
-    })
+    const after = redTeamWrote({ ...order(), redTeam: [SETTLED_FINDING] }, [
+      {
+        category: 'unprovable',
+        text: 'ignored',
+        reopens: 'RT-red-team-1',
+        newEvidence: 'the command the architect added does not run in CI',
+      },
+    ])
     expect(after.order.redTeam).toHaveLength(1)
     expect(after.order.redTeam[0]?.status).toBe('open')
     expect(after.order.redTeam[0]?.text).toContain(
@@ -456,36 +507,20 @@ describe('applyRungOutput', () => {
     expect(after.order.status).toBe('draft')
     expect(after.defect).toContain('reopened')
   })
+}
 
+function reopensWithoutEvidenceTests() {
   it('drops a reopen with no new evidence, leaving the settled finding alone', () => {
-    const settled: WorkOrder = {
-      ...order(),
-      redTeam: [
-        {
-          id: 'RT-red-team-1',
-          severity: 'high',
-          category: 'unprovable',
-          text: 'AC-2 cannot be falsified.',
-          status: 'resolved',
-          reason: 'the architect added a command',
-          round: 0,
-        },
-      ],
-    }
-    const after = applyRungOutput(settled, {
-      role: 'red-team',
-      output: parseRungOutput(
-        { redTeam: [{ category: 'unprovable', text: 'ignored', reopens: 'RT-red-team-1' }] },
-        ['findings']
-      ),
-      writes: ['findings'],
-      at: AT,
-    })
+    const after = redTeamWrote({ ...order(), redTeam: [SETTLED_FINDING] }, [
+      { category: 'unprovable', text: 'ignored', reopens: 'RT-red-team-1' },
+    ])
     expect(after.order.redTeam[0]?.status).toBe('resolved')
     expect(after.order.status).toBe('agreed')
     expect(after.defect).toBeNull()
   })
+}
 
+function nearDuplicatesTests() {
   it('drops a fresh finding that is a near-duplicate of an existing one by headline', () => {
     const before: WorkOrder = {
       ...order(),
@@ -501,69 +536,38 @@ describe('applyRungOutput', () => {
         },
       ],
     }
-    const after = applyRungOutput(before, {
-      role: 'red-team',
-      output: parseRungOutput(
-        {
-          redTeam: [
-            {
-              severity: 'low',
-              category: 'process',
-              text: 'The empty state has no copy at all.\n\n- different evidence this time',
-            },
-          ],
-        },
-        ['findings']
-      ),
-      writes: ['findings'],
-      at: AT,
-    })
+    const after = redTeamWrote(before, [
+      {
+        severity: 'low',
+        category: 'process',
+        text: 'The empty state has no copy at all.\n\n- different evidence this time',
+      },
+    ])
     expect(after.order.redTeam).toHaveLength(1)
   })
+}
 
+/** A plan of one unit, `id`, touching `file` in the one lane. */
+function onePlan(id: string, title: string, file: string): WorkOrder['plan'] {
+  return {
+    units: [builderUnit(id, { title, touches: [file] })],
+    lanes: [{ ord: 1, repo: 'repo', branch: '', role: null, blocks: [], blockedBy: [] }],
+    sharedFiles: [],
+  }
+}
+
+function aDisagreeingArchitectTests() {
   it('reports a plan the architect disagrees with rather than applying it', () => {
     // The graph was compiled from the agreed plan before this rung ran, so
     // swapping the plan underneath running builders would orphan every node
     // already in flight. It becomes a question for the operator instead.
-    const before = order({
-      plan: {
-        units: [
-          {
-            id: 'U-1',
-            title: 'one',
-            role: 'builder',
-            lane: 1,
-            dependsOn: [],
-            satisfies: [],
-            touches: ['src/a.ts'],
-            verify: [],
-          },
-        ],
-        lanes: [{ ord: 1, repo: 'repo', branch: '', role: null, blocks: [], blockedBy: [] }],
-        sharedFiles: [],
-      },
-    })
+    const before = order({ plan: onePlan('U-1', 'one', 'src/a.ts') })
 
     const after = applyRungOutput(before, {
       role: 'architect',
       output: parseRungOutput(
         {
-          plan: {
-            units: [
-              {
-                id: 'U-9',
-                title: 'nine',
-                role: 'builder',
-                lane: 1,
-                dependsOn: [],
-                satisfies: [],
-                touches: ['src/b.ts'],
-                verify: [],
-              },
-            ],
-            lanes: [{ ord: 1, repo: 'repo', branch: '', role: null, blocks: [], blockedBy: [] }],
-            sharedFiles: [],
-          },
+          plan: onePlan('U-9', 'nine', 'src/b.ts'),
           note: 'three things in the order are wrong',
         },
         ['plan', 'acceptance']
@@ -579,7 +583,9 @@ describe('applyRungOutput', () => {
     // written in even if nobody answers the gate.
     expect(after.order.provenance.decisions.at(-1)).toContain('architect')
   })
+}
 
+function anEmptyObjectTests() {
   it('says nothing changed when the rung wrote an empty object', () => {
     const before = order()
     const after = applyRungOutput(before, {
@@ -592,7 +598,7 @@ describe('applyRungOutput', () => {
     expect(after.note).toBe('')
     expect(after.defect).toBeNull()
   })
-})
+}
 
 describe('anotherPass', () => {
   it('asks the red team whether its fixes need attacking again', () => {
@@ -628,12 +634,13 @@ describe('anotherPass', () => {
   })
 })
 
+let file: string
+
 describe('readRungOutput', () => {
   let dir: string
-  let file: string
 
   beforeEach(() => {
-    dir = fs.mkdtempSync(nodePath.join(os.tmpdir(), 'fdry-rung-'))
+    dir = makeTempDir('fdry-rung-')
     file = nodePath.join(dir, 'challenge.json')
   })
 
@@ -641,6 +648,14 @@ describe('readRungOutput', () => {
     fs.rmSync(dir, { recursive: true, force: true })
   })
 
+  describe('reading', rungOutputReadingTests)
+  describe('a passed-through round', aPassedThroughRoundTests)
+  describe('the default round', theDefaultRoundTests)
+  describe('clearing the file', clearingTheFileTests)
+  describe('nothing or not JSON', nothingOrNotJsonTests)
+})
+
+function rungOutputReadingTests() {
   it('reads what the rung wrote and puts it on the order', () => {
     fs.writeFileSync(
       file,
@@ -660,7 +675,9 @@ describe('readRungOutput', () => {
     if (result?.ok !== true) throw new Error('expected a reading')
     expect(result.order.redTeam[0]?.text).toBe('AC-2 cannot be falsified')
   })
+}
 
+function aPassedThroughRoundTests() {
   it('stamps a passed-through round onto a fresh finding', () => {
     fs.writeFileSync(
       file,
@@ -681,7 +698,9 @@ describe('readRungOutput', () => {
     if (result?.ok !== true) throw new Error('expected a reading')
     expect(result.order.redTeam[0]?.round).toBe(2)
   })
+}
 
+function theDefaultRoundTests() {
   it('defaults the round to 0 when none is passed', () => {
     fs.writeFileSync(
       file,
@@ -701,7 +720,9 @@ describe('readRungOutput', () => {
     if (result?.ok !== true) throw new Error('expected a reading')
     expect(result.order.redTeam[0]?.round).toBe(0)
   })
+}
 
+function clearingTheFileTests() {
   it('clears the file, so the next turn cannot read this one as its own', () => {
     fs.writeFileSync(file, JSON.stringify({ note: 'x' }))
     readRungOutput({ order: order(), role: 'scout', writes: ['context'], outputPath: file, at: AT })
@@ -720,7 +741,9 @@ describe('readRungOutput', () => {
     expect(result?.ok).toBe(false)
     expect(fs.existsSync(file)).toBe(false)
   })
+}
 
+function nothingOrNotJsonTests() {
   it('says the rung wrote nothing when there is no file', () => {
     expect(
       readRungOutput({
@@ -746,4 +769,4 @@ describe('readRungOutput', () => {
     if (result?.ok !== false) throw new Error('expected a refusal')
     expect(result.reason).toContain('not readable')
   })
-})
+}

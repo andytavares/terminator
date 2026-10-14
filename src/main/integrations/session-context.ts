@@ -5,6 +5,7 @@ import type { AgentContext } from '../../shared/types/index.js'
 import { buildAgentContext } from './agent-context.js'
 import type { IssueService } from './issue-service.js'
 import { listRecords } from '../sessions/session-record-store.js'
+import { writeJsonAtomic } from '@terminator/extension-sdk/node'
 
 // A session's own link, kept in step with what its agent is told.
 //
@@ -26,22 +27,10 @@ function sessionContextFilePath(sessionId: string): string {
   return path.join(sessionContextDir(), `${sessionId}.json`)
 }
 
+/** @internal */
 export async function writeSessionContext(sessionId: string, context: AgentContext): Promise<void> {
   await fs.mkdir(sessionContextDir(), { recursive: true })
-  const target = sessionContextFilePath(sessionId)
-  const tmp = `${target}.tmp`
-  await fs.writeFile(tmp, JSON.stringify(context, null, 2), 'utf8')
-  await fs.rename(tmp, target)
-}
-
-/** What was last written, or null. Never throws — a missing file is an answer. */
-export async function readSessionContext(sessionId: string): Promise<AgentContext | null> {
-  try {
-    const parsed: unknown = JSON.parse(await fs.readFile(sessionContextFilePath(sessionId), 'utf8'))
-    return typeof parsed === 'object' && parsed !== null ? (parsed as AgentContext) : null
-  } catch {
-    return null
-  }
+  await writeJsonAtomic(sessionContextFilePath(sessionId), context)
 }
 
 export async function deleteSessionContext(sessionId: string): Promise<void> {
@@ -60,15 +49,15 @@ export async function syncSessionContext(
   service: IssueService
 ): Promise<AgentContext | null> {
   const record = listRecords().find((r) => r.sessionId === sessionId)
-  const link = record?.link ?? null
 
-  if (link === null) {
+  if (!record?.link) {
     await deleteSessionContext(sessionId)
     return null
   }
 
+  const { link } = record
   const issue = await service.get(link.tracker, link.key).catch(() => null)
-  const context = buildAgentContext(record?.projectId ?? sessionId, issue)
+  const context = buildAgentContext(record.projectId, issue)
   if (context === null) return null
 
   await writeSessionContext(sessionId, context)

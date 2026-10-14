@@ -48,53 +48,65 @@ function parseJson<T>(stdout: string): T | null {
   }
 }
 
+function problem(text: string): CollectResult {
+  return { items: [], problem: text }
+}
+
+/** What to say when a `gh` listing fails, or prints something that is not its JSON. */
+interface ListingProblems {
+  readonly failed: string
+  readonly unreadable: string
+}
+
+/** Runs one `gh` listing and reads its JSON rows, or says why it could not. */
+async function ghRows<T>(
+  deps: CollectDeps,
+  args: string[],
+  problems: ListingProblems
+): Promise<{ rows: T[] } | { problem: string }> {
+  const result = await deps.exec({ command: 'gh', args, cwd: deps.cwd })
+  if (result.exitCode !== 0) return { problem: problems.failed }
+  const rows = parseJson<T[]>(result.stdout)
+  return rows === null ? { problem: problems.unreadable } : { rows }
+}
+
+/** The repository's default branch, or null when gh cannot say. */
+async function defaultBranch(deps: CollectDeps): Promise<string | null> {
+  const result = await deps.exec({
+    command: 'gh',
+    args: ['repo', 'view', '--json', 'defaultBranchRef', '--jq', '.defaultBranchRef.name'],
+    cwd: deps.cwd,
+  })
+  return result.exitCode === 0 ? result.stdout.trim() : null
+}
+
+interface FailedRun {
+  displayTitle: string
+  workflowName: string
+  createdAt: string
+  url: string
+}
+
 async function collectGithubRuns(
   source: Extract<SensorSource, { kind: 'github-runs' }>,
   deps: CollectDeps
 ): Promise<CollectResult> {
-  let branch = source.branch
-  if (branch === null) {
-    const branchResult = await deps.exec({
-      command: 'gh',
-      args: ['repo', 'view', '--json', 'defaultBranchRef', '--jq', '.defaultBranchRef.name'],
-      cwd: deps.cwd,
-    })
-    if (branchResult.exitCode !== 0) {
-      return { items: [], problem: 'gh repo view failed to read the default branch.' }
-    }
-    branch = branchResult.stdout.trim()
-  }
-
-  const args = [
-    'run',
-    'list',
-    '--branch',
-    branch,
-    '--status',
-    'failure',
-    '--limit',
-    String(source.limit),
-    '--json',
-    'databaseId,displayTitle,headSha,workflowName,createdAt,url',
-  ]
-  const result = await deps.exec({ command: 'gh', args, cwd: deps.cwd })
-  if (result.exitCode !== 0) {
-    return { items: [], problem: 'gh run list failed to list failing runs.' }
-  }
-
-  const runs = parseJson<
+  const branch = source.branch ?? (await defaultBranch(deps))
+  if (branch === null) return problem('gh repo view failed to read the default branch.')
+  const listed = await ghRows<FailedRun>(
+    deps,
+    [
+      ...['run', 'list', '--branch', branch, '--status', 'failure'],
+      ...['--limit', String(source.limit)],
+      ...['--json', 'databaseId,displayTitle,headSha,workflowName,createdAt,url'],
+    ],
     {
-      displayTitle: string
-      workflowName: string
-      createdAt: string
-      url: string
-    }[]
-  >(result.stdout)
-  if (runs === null) {
-    return { items: [], problem: 'gh run list returned output that could not be read.' }
-  }
-
-  const items: SensedItem[] = runs.map((run) => ({
+      failed: 'gh run list failed to list failing runs.',
+      unreadable: 'gh run list returned output that could not be read.',
+    }
+  )
+  if ('problem' in listed) return problem(listed.problem)
+  const items: SensedItem[] = listed.rows.map((run) => ({
     key: `workflow:${run.workflowName}`,
     title: `${run.workflowName} failing on ${branch}`,
     evidence: { kind: 'ci-run', title: run.displayTitle, url: run.url, at: run.createdAt },
@@ -106,29 +118,19 @@ async function collectGithubIssues(
   source: Extract<SensorSource, { kind: 'github-issues' }>,
   deps: CollectDeps
 ): Promise<CollectResult> {
-  const args = [
-    'issue',
-    'list',
-    '--label',
-    source.label,
-    '--state',
-    'open',
-    '--limit',
-    String(source.limit),
-    '--json',
-    'number,title,url,updatedAt',
-  ]
-  const result = await deps.exec({ command: 'gh', args, cwd: deps.cwd })
-  if (result.exitCode !== 0) {
-    return { items: [], problem: 'gh issue list failed to list open issues.' }
-  }
-
-  const issues = parseJson<{ title: string; url: string; updatedAt?: string }[]>(result.stdout)
-  if (issues === null) {
-    return { items: [], problem: 'gh issue list returned output that could not be read.' }
-  }
-
-  const items: SensedItem[] = issues.map((issue) => ({
+  const listed = await ghRows<{ title: string; url: string; updatedAt?: string }>(
+    deps,
+    [
+      ...['issue', 'list', '--label', source.label, '--state', 'open'],
+      ...['--limit', String(source.limit), '--json', 'number,title,url,updatedAt'],
+    ],
+    {
+      failed: 'gh issue list failed to list open issues.',
+      unreadable: 'gh issue list returned output that could not be read.',
+    }
+  )
+  if ('problem' in listed) return problem(listed.problem)
+  const items: SensedItem[] = listed.rows.map((issue) => ({
     key: `issue:${source.label}:${normalise(issue.title)}`,
     title: issue.title,
     evidence: {

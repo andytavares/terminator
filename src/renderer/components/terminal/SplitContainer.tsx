@@ -1,5 +1,5 @@
 import React, { useRef, useCallback } from 'react'
-import type { PaneSplitDirection } from '../../../../shared/types/index'
+import type { PaneSplitDirection } from '@shared/types/index'
 import './SplitContainer.css'
 
 interface Props {
@@ -10,6 +10,51 @@ interface Props {
   children: [React.ReactNode, React.ReactNode]
 }
 
+/** Where the pointer sits across the container, kept between a tenth and nine tenths. */
+function ratioAt(container: HTMLElement, ev: MouseEvent, isVertical: boolean): number {
+  const rect = container.getBoundingClientRect()
+  const pos = isVertical ? ev.clientX : ev.clientY
+  const start = isVertical ? rect.left : rect.top
+  const size = isVertical ? rect.width : rect.height
+  return Math.max(0.1, Math.min(0.9, (pos - start) / size))
+}
+
+/** Follows the pointer until the button comes up, reporting each new ratio. */
+function trackDividerDrag(
+  container: HTMLElement,
+  isVertical: boolean,
+  onRatio: (ratio: number) => void
+): void {
+  function onMouseMove(ev: MouseEvent): void {
+    onRatio(ratioAt(container, ev, isVertical))
+  }
+
+  function onMouseUp(): void {
+    document.removeEventListener('mousemove', onMouseMove)
+    document.removeEventListener('mouseup', onMouseUp)
+  }
+
+  document.addEventListener('mousemove', onMouseMove)
+  document.addEventListener('mouseup', onMouseUp)
+}
+
+/** Dragging the divider moves it, reporting the new ratio for this split. */
+function useDividerDrag(
+  containerRef: React.RefObject<HTMLDivElement>,
+  { splitId, direction, onRatioChange }: Pick<Props, 'splitId' | 'direction' | 'onRatioChange'>
+): (e: React.MouseEvent) => void {
+  const isVertical = direction === 'vertical'
+  return useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault()
+      const container = containerRef.current
+      if (!container) return
+      trackDividerDrag(container, isVertical, (newRatio) => onRatioChange(splitId, newRatio))
+    },
+    [containerRef, isVertical, splitId, onRatioChange]
+  )
+}
+
 export function SplitContainer({
   splitId,
   direction,
@@ -18,33 +63,7 @@ export function SplitContainer({
   children,
 }: Props): JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
-  const isVertical = direction === 'vertical'
-
-  const handleDividerMouseDown = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault()
-      const container = containerRef.current
-      if (!container) return
-
-      function onMouseMove(ev: MouseEvent): void {
-        const rect = container!.getBoundingClientRect()
-        const pos = isVertical ? ev.clientX : ev.clientY
-        const start = isVertical ? rect.left : rect.top
-        const size = isVertical ? rect.width : rect.height
-        const newRatio = Math.max(0.1, Math.min(0.9, (pos - start) / size))
-        onRatioChange(splitId, newRatio)
-      }
-
-      function onMouseUp(): void {
-        document.removeEventListener('mousemove', onMouseMove)
-        document.removeEventListener('mouseup', onMouseUp)
-      }
-
-      document.addEventListener('mousemove', onMouseMove)
-      document.addEventListener('mouseup', onMouseUp)
-    },
-    [isVertical, splitId, onRatioChange]
-  )
+  const handleDividerMouseDown = useDividerDrag(containerRef, { splitId, direction, onRatioChange })
 
   return (
     <div ref={containerRef} className={`split-container split-container--${direction}`}>

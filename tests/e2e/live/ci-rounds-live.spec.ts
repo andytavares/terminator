@@ -1,9 +1,10 @@
 import { test, expect } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
-import { launchApp, closeApp, createWorkspace, type AppHandle } from '../helpers'
+import { launchApp, closeApp, createWorkspace, type AppHandle, e2eTempDir } from '../helpers'
+import { writeLiveOrder } from './live-order'
+import { liveOrderDir, startLiveRun } from './live-run'
 
 // A red CI goes back to the builder, for real (ADR-064).
 //
@@ -55,12 +56,10 @@ async function foundry(channel: string, payload: unknown = {}): Promise<unknown>
 
 test.skip(REMOTE === '', 'set LIVE_REMOTE to run this')
 
-test.beforeAll(async () => {
-  test.setTimeout(300_000)
-  repo = mkdtempSync(join(tmpdir(), 'foundry-live-ci-'))
-  execFileSync('git', ['clone', REMOTE, repo])
-  git('config', 'user.email', 'live@example.com')
-  git('config', 'user.name', 'Live')
+/** A CI check the order does not mention: the house rule that a session TTL
+ * above 24 hours is clamped. Committed to the scratch repository, so the first
+ * draft goes red on it. */
+function commitMarkerWorkflow(): void {
   mkdirSync(join(repo, '.github', 'workflows'), { recursive: true })
   writeFileSync(
     join(repo, '.github', 'workflows', 'marker.yml'),
@@ -79,6 +78,15 @@ test.beforeAll(async () => {
   )
   git('add', '.github/workflows/marker.yml')
   git('commit', '-m', 'test: a CI check that clamps the session TTL to 24 hours')
+}
+
+test.beforeAll(async () => {
+  test.setTimeout(300_000)
+  repo = e2eTempDir('foundry-live-ci-')
+  execFileSync('git', ['clone', REMOTE, repo])
+  git('config', 'user.email', 'live@example.com')
+  git('config', 'user.name', 'Live')
+  commitMarkerWorkflow()
 
   handle = await launchApp()
   await createWorkspace(handle.page, 'live', repo)
@@ -115,151 +123,62 @@ test.afterAll(async () => {
  * own cover; what is under test here is an agent doing the work it describes.
  */
 function writeOrder(): void {
-  const dir = join(repo, '.foundry', 'orders', ORDER)
-  mkdirSync(dir, { recursive: true })
-  writeFileSync(
-    join(dir, 'order.json'),
-    JSON.stringify(
-      {
-        schemaVersion: 1,
-        id: ORDER,
-        title: 'Read the session TTL from the environment',
-        status: 'agreed',
-        source: { kind: 'typed', tracker: null, key: null, url: null },
-        writeBack: [],
-        stateMapping: { started: null, in_review: null, done: null },
-        recipe: 'direct',
-        recipeOverriddenBy: 'operator',
-        intent: {
-          problem: 'TTL_MS in src/session.js is a hardcoded literal.',
-          outcome:
-            'TTL_MS reads SESSION_TTL_MS from the environment, defaulting to the current value.',
-          nonGoals: ['Changing how expiry is computed'],
-        },
-        context: {
-          repos: [{ name: 'live', path: repo, lane: 1, baseBranch: 'main', headBranch: '' }],
-          toolchain: {
-            test: { command: 'npm test', source: 'package.json' },
-            lint: { command: 'npm run lint', source: 'package.json' },
-            format: null,
-            coverage: null,
-            e2e: null,
-            build: null,
-          },
-          entryPoints: ['src/session.js'],
-          priorArt: [],
-          conventions: [],
-          houseDocs: [],
-        },
-        acceptance: [
-          {
-            id: 'AC-1',
-            statement:
-              'TTL_MS takes its value from SESSION_TTL_MS when that is set, and the existing tests still pass.',
-            priority: 'P1',
-            verify: { kind: 'test', command: 'npm test', assert: 'exit_code == 0' },
-            unverifiable: null,
-          },
-        ],
-        // The test file as well as the source. The builder's role tells it to
-        // write the failing test first, so a unit that changes code in a tested
-        // repository touches two files — and one it writes that the order did
-        // not declare is a risk trigger. A live run was held for an operator on
-        // `outside_blast_radius` for exactly this, which was the order being
-        // wrong rather than the run.
-        risk: {
-          grade: 'P2',
-          triggers: [],
-          blastRadius: ['src/session.js', 'src/session.test.js'],
-          criticalPaths: [],
-        },
-        // Room for the whole pipeline plus the climb. At twenty minutes the
-        // budget was the thing under test: four agents and eight rungs is
-        // fifteen minutes on a good run, so a slow builder gated it rather
-        // than shipping. That the budget gate fires correctly is proven — a
-        // live run raised it, halted, left its agents in their terminals and
-        // wrote "not every node finished" — and it is not what this test is
-        // named after.
-        budgets: { agents: 1, wallClockMinutes: 45, tokens: null },
-        plan: {
-          units: [
-            {
-              id: 'U-1',
-              title: 'read TTL_MS from SESSION_TTL_MS, keeping the current value as the default',
-              role: 'builder',
-              lane: 1,
-              dependsOn: [],
-              satisfies: ['AC-1'],
-              touches: ['src/session.js', 'src/session.test.js'],
-              verify: [],
-            },
-          ],
-          lanes: [{ ord: 1, repo: 'live', branch: '', role: null, blocks: [], blockedBy: [] }],
-          sharedFiles: [],
-        },
-        assumptions: [],
-        openQuestions: [],
-        redTeam: [],
-        provenance: { forgeSession: null, decisions: [], amendments: [] },
-        createdAt: new Date().toISOString(),
-        agreedAt: new Date().toISOString(),
-      },
-      null,
-      2
-    )
-  )
+  writeLiveOrder({
+    repo,
+    id: ORDER,
+    title: 'Read the session TTL from the environment',
+    problem: 'TTL_MS in src/session.js is a hardcoded literal.',
+    outcome: 'TTL_MS reads SESSION_TTL_MS from the environment, defaulting to the current value.',
+    statement:
+      'TTL_MS takes its value from SESSION_TTL_MS when that is set, and the existing tests still pass.',
+    unitTitle: 'read TTL_MS from SESSION_TTL_MS, keeping the current value as the default',
+    lintCommand: 'npm run lint',
+    wallClockMinutes: 45,
+  })
 }
 
-test('a red CI goes back to the builder and the draft reaches the ready gate green', async () => {
-  test.setTimeout(3_600_000)
-  writeOrder()
+const readIfThere = (file: string): string => (existsSync(file) ? readFileSync(file, 'utf8') : '')
 
-  const started = (await foundry('foundry:run.start', { id: ORDER })) as {
-    error?: string
-    started?: boolean
-  }
-  expect(started.error, 'the run was refused').toBeUndefined()
-  expect(started.started, 'nothing was there to run it').toBe(true)
+/** The run is over when the ledger says how shipping ended. Null until then. */
+function shippingOver(): string | null {
+  const ledger = readIfThere(join(liveOrderDir(repo, ORDER), 'ledger.jsonl'))
+  if (ledger.includes('ship.ready_asked')) return 'the ready gate was raised'
+  if (ledger.includes('ship.ci_red')) return 'CI stayed red'
+  if (ledger.includes('ship.refused')) return 'shipping was refused'
+  if (ledger.includes('ship.ci_halted')) return 'a fix round halted'
+  return null
+}
 
-  const orderDir = join(repo, '.foundry', 'orders', ORDER)
-  const ledgerFile = join(orderDir, 'ledger.jsonl')
-  const gatesFile = join(orderDir, 'gates.json')
-  const ciFile = join(orderDir, 'ci.json')
-  const finished = (): string | null => {
-    const ledger = existsSync(ledgerFile) ? readFileSync(ledgerFile, 'utf8') : ''
-    if (ledger.includes('ship.ready_asked')) return 'the ready gate was raised'
-    if (ledger.includes('ship.ci_red')) return 'CI stayed red'
-    if (ledger.includes('ship.refused')) return 'shipping was refused'
-    if (ledger.includes('ship.ci_halted')) return 'a fix round halted'
-    return null
-  }
+/** Logs what ci.json says when it changes, and returns it. */
+function logCi(previous: string): string {
+  const ci = readIfThere(join(liveOrderDir(repo, ORDER), 'ci.json'))
+  const state = ci === '' ? 'no ci yet' : ci.replace(/\s+/g, ' ').slice(0, 300)
+  if (state !== previous) console.log(`[${new Date().toISOString().slice(11, 19)}] ${state}`)
+  return state
+}
 
+/** Polls the CI record until shipping is over, or the deadline passes. */
+async function waitForShipping(): Promise<void> {
   const deadline = Date.now() + 55 * 60_000
   let previous = ''
   while (Date.now() < deadline) {
-    const ci = existsSync(ciFile) ? readFileSync(ciFile, 'utf8') : ''
-    const state = ci === '' ? 'no ci yet' : ci.replace(/\s+/g, ' ').slice(0, 300)
-    if (state !== previous) {
-      // eslint-disable-next-line no-console
-      console.log(`[${new Date().toISOString().slice(11, 19)}] ${state}`)
-      previous = state
-    }
-    const over = finished()
+    previous = logCi(previous)
+    const over = shippingOver()
     if (over !== null) {
-      // eslint-disable-next-line no-console
       console.log(`[run over] ${over}`)
       break
     }
     await handle.page.waitForTimeout(15_000)
   }
+}
 
-  const ledger = existsSync(ledgerFile) ? readFileSync(ledgerFile, 'utf8') : ''
-  // eslint-disable-next-line no-console
-  console.log(`ledger:\n${ledger}`)
+/** One fix round, CI green, and the ready gate raised with the checks that passed. */
+function expectOneRoundToGreen(ledger: string): void {
+  const gatesFile = join(liveOrderDir(repo, ORDER), 'gates.json')
   const gates = existsSync(gatesFile)
     ? (JSON.parse(readFileSync(gatesFile, 'utf8')) as { rule: string; why: string }[])
     : []
-  // eslint-disable-next-line no-console
+
   console.log(`gates: ${JSON.stringify(gates.map((g) => g.rule))}`)
 
   expect(ledger).toContain('ship.draft_opened')
@@ -271,15 +190,31 @@ test('a red CI goes back to the builder and the draft reaches the ready gate gre
   expect(ledger).not.toContain('ci.exhausted')
   expect(gates.map((g) => g.rule)).toEqual(['ready-for-review'])
   expect(gates[0].why).toMatch(/CI passed: \d+ checks?\./)
+}
 
-  const worktree = join(orderDir, 'worktrees', 'live')
+/** GitHub agrees: every check on the lane's branch passed or was skipped. */
+function expectChecksGreenOnGitHub(): void {
+  const worktree = join(liveOrderDir(repo, ORDER), 'worktrees', 'live')
   const branch = execFileSync('git', ['branch', '--show-current'], { cwd: worktree })
     .toString()
     .trim()
   const checks = JSON.parse(
     execFileSync('gh', ['pr', 'checks', branch, '--json', 'name,bucket'], { cwd: repo }).toString()
   ) as { name: string; bucket: string }[]
-  // eslint-disable-next-line no-console
+
   console.log(`checks on ${branch}: ${JSON.stringify(checks)}`)
   expect(checks.every((c) => c.bucket === 'pass' || c.bucket === 'skipping')).toBe(true)
+}
+
+test('a red CI goes back to the builder and the draft reaches the ready gate green', async () => {
+  test.setTimeout(3_600_000)
+  writeOrder()
+  await startLiveRun(foundry, ORDER)
+  await waitForShipping()
+
+  const ledger = readIfThere(join(liveOrderDir(repo, ORDER), 'ledger.jsonl'))
+
+  console.log(`ledger:\n${ledger}`)
+  expectOneRoundToGreen(ledger)
+  expectChecksGreenOnGitHub()
 })

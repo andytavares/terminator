@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react'
+import { Button } from '@terminator/extension-ui'
 
 interface CommentAnchorData {
   noteId: string
@@ -15,48 +16,14 @@ interface CommentComposerProps {
   onCreated: (commentId: string) => void
 }
 
-export function CommentComposer({
-  anchor,
-  onClose,
-  onCreated,
-}: CommentComposerProps): React.JSX.Element {
-  const [body, setBody] = useState('')
-  const [submitting, setSubmitting] = useState(false)
+export function CommentComposer(props: CommentComposerProps): React.JSX.Element {
+  const { onClose } = props
+  const { body, setBody, submitting, handleSubmit } = useCommentDraft(props)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
     textareaRef.current?.focus()
   }, [])
-
-  const handleSubmit = useCallback(async () => {
-    if (!body.trim()) return
-    setSubmitting(true)
-    try {
-      const result = await window.electronAPI.extensionBridge.invoke(
-        'terminator.notepad:comments.create',
-        {
-          noteId: anchor.noteId,
-          body: body.trim(),
-          startOffset: anchor.from,
-          endOffset: anchor.to,
-          quote: anchor.quote,
-          prefix: anchor.prefix,
-          suffix: anchor.suffix,
-        }
-      )
-      const data = (result as { data?: { id: string } }).data
-      if (data?.id) onCreated(data.id)
-    } finally {
-      setSubmitting(false)
-    }
-  }, [body, anchor, onCreated])
-
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    },
-    [onClose]
-  )
 
   return (
     <div className="notepad-composer">
@@ -65,23 +32,71 @@ export function CommentComposer({
         className="notepad-composer__body"
         value={body}
         onChange={(e) => setBody(e.target.value)}
-        onKeyDown={handleKeyDown}
+        onKeyDown={(e) => e.key === 'Escape' && onClose()}
         placeholder="Add a comment…"
         rows={3}
       />
-      <div className="notepad-composer__actions">
-        <button className="notepad-composer__cancel" onClick={onClose} type="button">
-          Cancel
-        </button>
-        <button
-          className="notepad-composer__submit"
-          onClick={handleSubmit}
-          disabled={!body.trim() || submitting}
-          type="button"
-        >
-          Add comment
-        </button>
-      </div>
+      <AddCommentActions
+        onClose={onClose}
+        onSubmit={handleSubmit}
+        canSubmit={!!body.trim() && !submitting}
+      />
+    </div>
+  )
+}
+
+/** The comment being written, and submitting it on the anchored text. */
+function useCommentDraft({ anchor, onCreated }: CommentComposerProps) {
+  const [body, setBody] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+
+  const handleSubmit = useCallback(async () => {
+    if (!body.trim()) return
+    setSubmitting(true)
+    try {
+      const id = await createAnchoredComment(anchor, body.trim())
+      if (id) onCreated(id)
+    } finally {
+      setSubmitting(false)
+    }
+  }, [body, anchor, onCreated])
+
+  return { body, setBody, submitting, handleSubmit }
+}
+
+/** Creates a comment on the anchored text; resolves to its id, if one came back. */
+async function createAnchoredComment(anchor: CommentAnchorData, body: string) {
+  const result = await window.electronAPI.extensionBridge.invoke(
+    'terminator.notepad:comments.create',
+    {
+      noteId: anchor.noteId,
+      body,
+      startOffset: anchor.from,
+      endOffset: anchor.to,
+      quote: anchor.quote,
+      prefix: anchor.prefix,
+      suffix: anchor.suffix,
+    }
+  )
+  return (result as { data?: { id: string } }).data?.id
+}
+
+interface ComposerActionsProps {
+  onClose: () => void
+  onSubmit: () => void
+  canSubmit: boolean
+}
+
+function AddCommentActions(props: ComposerActionsProps): React.JSX.Element {
+  const { onClose, onSubmit, canSubmit } = props
+  return (
+    <div className="notepad-composer__actions">
+      <Button variant="ghost" size="sm" onClick={onClose}>
+        Cancel
+      </Button>
+      <Button variant="primary" size="sm" onClick={onSubmit} disabled={!canSubmit}>
+        Add comment
+      </Button>
     </div>
   )
 }

@@ -3,6 +3,8 @@ import * as path from 'node:path'
 import { orderDir } from '../data-root.js'
 import type { Gate } from './rules.js'
 import { BUDGET_KINDS } from '../line/scheduler.js'
+import type { FoundryIndex } from '../state/foundry-index.js'
+import { writeJsonAtomic } from '@terminator/extension-sdk/node'
 
 // Gates on disk, one file per order.
 //
@@ -31,7 +33,7 @@ function withoutRetiredBreach(gate: Gate): Gate {
   return { ...gate, breach: null }
 }
 
-async function read(root: string, orderId: string): Promise<Gate[]> {
+async function readGates(root: string, orderId: string): Promise<Gate[]> {
   try {
     const raw = await fs.promises.readFile(gatesPath(root, orderId), 'utf8')
     const parsed: unknown = JSON.parse(raw)
@@ -43,15 +45,20 @@ async function read(root: string, orderId: string): Promise<Gate[]> {
 }
 
 /** A gate store whose root is resolved on every call. See createLiveOrderStore. */
-export function createLiveGateStore(root: () => string): GateStore {
+export function createLiveGateStore(
+  root: () => string,
+  indexFor?: (root: string) => FoundryIndex
+): GateStore {
+  const gateStore = (): GateStore => createGateStore(root(), indexFor?.(root()))
   return {
-    save: (gate) => createGateStore(root()).save(gate),
-    list: () => createGateStore(root()).list(),
-    get: (id) => createGateStore(root()).get(id),
+    save: (gate) => gateStore().save(gate),
+    list: () => gateStore().list(),
+    get: (id) => gateStore().get(id),
   }
 }
 
-export function createGateStore(root: string): GateStore {
+/** With an index, `list` and `get` read memory and `save` tells the index. */
+export function createGateStore(root: string, index?: FoundryIndex): GateStore {
   async function orderIds(): Promise<string[]> {
     try {
       return await fs.promises.readdir(path.join(root, 'orders'))
@@ -62,21 +69,20 @@ export function createGateStore(root: string): GateStore {
 
   return {
     async save(gate) {
-      const existing = await read(root, gate.orderId)
+      const existing = await readGates(root, gate.orderId)
       const next = existing.some((g) => g.id === gate.id)
         ? existing.map((g) => (g.id === gate.id ? gate : g))
         : [...existing, gate]
       await fs.promises.mkdir(orderDir(root, gate.orderId), { recursive: true })
-      await fs.promises.writeFile(
-        gatesPath(root, gate.orderId),
-        `${JSON.stringify(next, null, 2)}\n`,
-        'utf8'
-      )
+      const json = JSON.stringify(next)
+      await writeJsonAtomic(gatesPath(root, gate.orderId), next)
+      index?.gatesWritten(gate.orderId, (JSON.parse(json) as Gate[]).map(withoutRetiredBreach))
     },
 
     async list() {
+      if (index !== undefined) return index.gates()
       const ids = await orderIds()
-      const perOrder = await Promise.all(ids.map((id) => read(root, id)))
+      const perOrder = await Promise.all(ids.map((id) => readGates(root, id)))
       return perOrder.flat()
     },
 

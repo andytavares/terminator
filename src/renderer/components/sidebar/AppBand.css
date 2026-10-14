@@ -19,8 +19,8 @@
   align-items: center;
   gap: 2px;
   padding: 7px 5px;
-  background: var(--bg-elevated);
-  border-right: 1px solid var(--border);
+  background: var(--tm-bg-elevated);
+  border-right: 1px solid var(--tm-border);
   overflow-y: auto;
   scrollbar-width: none;
 }
@@ -42,25 +42,25 @@
   position: relative;
   padding: 7px;
   border: 0;
-  border-radius: var(--radius-xs, 4px);
+  border-radius: var(--tm-radius-xs, 4px);
   background: transparent;
-  color: var(--text-secondary);
+  color: var(--tm-text-secondary);
   cursor: pointer;
 }
 
 .app-band__entry:hover {
-  color: var(--text-primary);
-  background: var(--bg-card-hover);
+  color: var(--tm-text-primary);
+  background: var(--tm-bg-card-hover);
 }
 
 .app-band__entry:focus-visible {
-  outline: 2px solid var(--text-primary);
+  outline: 2px solid var(--tm-text-primary);
   outline-offset: -2px;
 }
 
 .app-band__entry--active {
-  background: var(--bg-card-hover);
-  color: var(--text-primary);
+  background: var(--tm-bg-card-hover);
+  color: var(--tm-text-primary);
 }
 
 .app-band__icon {
@@ -84,8 +84,8 @@
   display: grid;
   place-items: center;
   border-radius: 6px;
-  background: var(--accent);
-  color: var(--on-accent);
-  font-family: var(--font-mono);
+  background: var(--tm-accent);
+  color: var(--tm-on-accent);
+  font-family: var(--tm-font-mono);
   font-size: 8px;
 }

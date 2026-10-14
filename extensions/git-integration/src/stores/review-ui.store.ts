@@ -1,11 +1,11 @@
-import { create } from 'zustand'
+import { create, type StoreApi } from 'zustand'
 import { SORT_MODES, type SortMode } from '../review/sort-prs'
 import type { AgentRun, AgentScope } from '../schemas/review-agent.schema'
 
-export type AgentRequest = 'review' | 'explain' | 'ask'
+type AgentRequest = 'review' | 'explain' | 'ask'
 
 export type CommentVisibility = 'all' | 'unresolved' | 'hidden'
-export type DiffRange = 'since' | 'whole'
+type DiffRange = 'since' | 'whole'
 export type DiffViewMode = 'unified' | 'split'
 
 /** A line range the reviewer has selected in the diff, for the float bar and the agent. */
@@ -62,30 +62,6 @@ const DEFAULT_PREFS: Prefs = {
   dashboardSort: 'newest',
 }
 
-function loadPrefs(): Prefs {
-  try {
-    const raw = typeof localStorage === 'undefined' ? null : localStorage.getItem(PREFS_KEY)
-    if (!raw) return DEFAULT_PREFS
-    const prefs = { ...DEFAULT_PREFS, ...(JSON.parse(raw) as Partial<Prefs>) }
-    const known = (mode: SortMode) => SORT_MODES.includes(mode)
-    return {
-      ...prefs,
-      queueSort: known(prefs.queueSort) ? prefs.queueSort : DEFAULT_PREFS.queueSort,
-      dashboardSort: known(prefs.dashboardSort) ? prefs.dashboardSort : DEFAULT_PREFS.dashboardSort,
-    }
-  } catch {
-    return DEFAULT_PREFS
-  }
-}
-
-function savePrefs(prefs: Prefs): void {
-  try {
-    localStorage.setItem(PREFS_KEY, JSON.stringify(prefs))
-  } catch {
-    // Preferences are a convenience; a blocked store keeps the defaults.
-  }
-}
-
 interface ReviewUiStore extends Prefs {
   selection: LineSelection | null
   composerRequest: ComposerRequest | null
@@ -118,66 +94,105 @@ interface ReviewUiStore extends Prefs {
   resetForPr(): void
 }
 
+function loadPrefs(): Prefs {
+  try {
+    const raw = typeof localStorage === 'undefined' ? null : localStorage.getItem(PREFS_KEY)
+    if (!raw) return DEFAULT_PREFS
+    const prefs = { ...DEFAULT_PREFS, ...(JSON.parse(raw) as Partial<Prefs>) }
+    const known = (mode: SortMode) => SORT_MODES.includes(mode)
+    return {
+      ...prefs,
+      queueSort: known(prefs.queueSort) ? prefs.queueSort : DEFAULT_PREFS.queueSort,
+      dashboardSort: known(prefs.dashboardSort) ? prefs.dashboardSort : DEFAULT_PREFS.dashboardSort,
+    }
+  } catch {
+    return DEFAULT_PREFS
+  }
+}
+
+function savePrefs(prefs: Prefs): void {
+  try {
+    localStorage.setItem(PREFS_KEY, JSON.stringify(prefs))
+  } catch {
+    // Preferences are a convenience; a blocked store keeps the defaults.
+  }
+}
+
 const CYCLE: CommentVisibility[] = ['all', 'unresolved', 'hidden']
 
-export const useReviewUiStore = create<ReviewUiStore>((set, get) => {
+type SetState = StoreApi<ReviewUiStore>['setState']
+type GetState = StoreApi<ReviewUiStore>['getState']
+
+/** The preference fields of the store, as savePrefs keeps them. */
+function prefsOf(state: ReviewUiStore): Prefs {
+  return {
+    commentVisibility: state.commentVisibility,
+    agentNotesOn: state.agentNotesOn,
+    diffRange: state.diffRange,
+    fileListHidden: state.fileListHidden,
+    diffViewMode: state.diffViewMode,
+    hideFormattingHunks: state.hideFormattingHunks,
+    queueSort: state.queueSort,
+    dashboardSort: state.dashboardSort,
+  }
+}
+
+/** Setters for the preferences, each saved as it changes. */
+function prefActions(set: SetState, get: GetState) {
   const persist = (patch: Partial<Prefs>) => {
     set(patch)
-    const s = get()
-    savePrefs({
-      commentVisibility: s.commentVisibility,
-      agentNotesOn: s.agentNotesOn,
-      diffRange: s.diffRange,
-      fileListHidden: s.fileListHidden,
-      diffViewMode: s.diffViewMode,
-      hideFormattingHunks: s.hideFormattingHunks,
-      queueSort: s.queueSort,
-      dashboardSort: s.dashboardSort,
-    })
+    savePrefs(prefsOf(get()))
   }
   return {
-    ...loadPrefs(),
-    selection: null,
-    composerRequest: null,
-    agentRuns: [],
-    agentPanelScope: null,
-    agentPanelRequest: 'review',
-    agentPanelAutoStart: false,
-    keyboardHelpOpen: false,
-    insightsOpen: false,
-
-    setCommentVisibility: (v) => persist({ commentVisibility: v }),
+    setCommentVisibility: (v: CommentVisibility) => persist({ commentVisibility: v }),
     cycleCommentVisibility: () => {
       const i = CYCLE.indexOf(get().commentVisibility)
       persist({ commentVisibility: CYCLE[(i + 1) % CYCLE.length] })
     },
-    setAgentNotesOn: (on) => persist({ agentNotesOn: on }),
-    setDiffRange: (r) => persist({ diffRange: r }),
+    setAgentNotesOn: (on: boolean) => persist({ agentNotesOn: on }),
+    setDiffRange: (r: DiffRange) => persist({ diffRange: r }),
     toggleFileList: () => persist({ fileListHidden: !get().fileListHidden }),
-    setDiffViewMode: (mode) => persist({ diffViewMode: mode }),
-    setHideFormattingHunks: (on) => persist({ hideFormattingHunks: on }),
-    setQueueSort: (mode) => persist({ queueSort: mode }),
-    setDashboardSort: (mode) => persist({ dashboardSort: mode }),
-    setSelection: (s) => set({ selection: s }),
-    requestComposer: (r) => set({ composerRequest: r }),
-    setAgentRuns: (runs) => set({ agentRuns: runs }),
-    upsertAgentRun: (run) =>
-      set((state) => {
-        const rest = state.agentRuns.filter((r) => r.id !== run.id)
-        return { agentRuns: [run, ...rest] }
-      }),
-    openAgentPanel: (scope, request = 'review', autoStart = false) =>
-      set({ agentPanelScope: scope, agentPanelRequest: request, agentPanelAutoStart: autoStart }),
-    setKeyboardHelpOpen: (open) => set({ keyboardHelpOpen: open }),
-    setInsightsOpen: (open) => set({ insightsOpen: open }),
-    resetForPr: () =>
-      set({
-        selection: null,
-        composerRequest: null,
-        agentRuns: [],
-        agentPanelScope: null,
-        keyboardHelpOpen: false,
-        insightsOpen: false,
-      }),
+    setDiffViewMode: (mode: DiffViewMode) => persist({ diffViewMode: mode }),
+    setHideFormattingHunks: (on: boolean) => persist({ hideFormattingHunks: on }),
+    setQueueSort: (mode: SortMode) => persist({ queueSort: mode }),
+    setDashboardSort: (mode: SortMode) => persist({ dashboardSort: mode }),
   }
-})
+}
+
+/** What resetForPr clears: everything about the PR that was open. */
+const NO_PR_STATE = {
+  selection: null,
+  composerRequest: null,
+  agentRuns: [],
+  agentPanelScope: null,
+  keyboardHelpOpen: false,
+  insightsOpen: false,
+}
+
+function uiSessionActions(set: SetState) {
+  return {
+    setSelection: (s: LineSelection | null) => set({ selection: s }),
+    requestComposer: (r: ComposerRequest | null) => set({ composerRequest: r }),
+    setAgentRuns: (runs: AgentRun[]) => set({ agentRuns: runs }),
+    upsertAgentRun: (run: AgentRun) =>
+      set((state) => ({ agentRuns: [run, ...state.agentRuns.filter((r) => r.id !== run.id)] })),
+    openAgentPanel: (
+      scope: AgentScope | null,
+      request: AgentRequest = 'review',
+      autoStart = false
+    ) =>
+      set({ agentPanelScope: scope, agentPanelRequest: request, agentPanelAutoStart: autoStart }),
+    setKeyboardHelpOpen: (open: boolean) => set({ keyboardHelpOpen: open }),
+    setInsightsOpen: (open: boolean) => set({ insightsOpen: open }),
+    resetForPr: () => set(NO_PR_STATE),
+  }
+}
+
+export const useReviewUiStore = create<ReviewUiStore>((set, get) => ({
+  ...loadPrefs(),
+  ...NO_PR_STATE,
+  agentPanelRequest: 'review',
+  agentPanelAutoStart: false,
+  ...prefActions(set, get),
+  ...uiSessionActions(set),
+}))

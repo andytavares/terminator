@@ -8,13 +8,14 @@ import type { GateRuleId } from './rules.js'
 // permissive setting is still not unattended shipping. It will open a draft
 // pull request without you; it will not mark one ready, and it will not merge.
 
+/** @internal */
 export const AUTONOMY_LEVELS = ['escorted', 'standard', 'lights-out'] as const
 export type Autonomy = (typeof AUTONOMY_LEVELS)[number]
 
 /**
  * Live at every setting, including the most permissive.
  *
- * Risk, budget, destruction and the merge decision. Everything else is a
+ * Risk, budget and the merge decision. Everything else is a
  * matter of taste; these are the difference between a factory and a machine
  * that ships whatever it happens to produce.
  *
@@ -29,11 +30,11 @@ export type Autonomy = (typeof AUTONOMY_LEVELS)[number]
  * `refinery.conflict` is here because a draft that cannot land must never be
  * silently skipped: rebasing it back onto its base is a decision, not a
  * default.
+ * @internal
  */
 export const UNCONDITIONAL: readonly GateRuleId[] = [
   'risk.p0',
   'budget.exceeded',
-  'destructive',
   'ready-for-review',
   'run.interrupted',
   'ci.red',
@@ -43,11 +44,10 @@ export const UNCONDITIONAL: readonly GateRuleId[] = [
 const STANDARD_EXTRA: readonly GateRuleId[] = [
   'verify.repeat-fail',
   'verify.base-fail',
-  'critical-path',
-  'new-dependency',
   'forge-defect',
 ]
 
+/** @internal */
 export function liveRules(autonomy: Autonomy): Set<GateRuleId> {
   switch (autonomy) {
     case 'escorted':

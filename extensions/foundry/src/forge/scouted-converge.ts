@@ -15,7 +15,7 @@ function isFirstDraft(order: WorkOrder): boolean {
 
 const runningScouts = new Map<string, Promise<void>>()
 
-/** How long the red team waits for a scout still reading the repository. */
+/** How long the red team waits for a scout still reading the repository. @internal */
 export const SCOUT_WAIT_MS = 30_000
 
 function trackScout(orderId: string, running: void | Promise<void>): void {

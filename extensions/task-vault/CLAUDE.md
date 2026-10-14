@@ -2,15 +2,7 @@
 
 ## Extension Isolation (MANDATORY)
 
-This is a **fully isolated extension**. The core application knows nothing about this extension until it is installed. Violations break the architecture.
-
-### What extensions MAY do
-
-- Import from `../../../../src/renderer/extensions/registry` (the extension registry API)
-- Import from `../../../../src/renderer/stores/` (shared core stores: session, workspace)
-- Call core IPC via `window.electronAPI.{terminal,workspace,project,git,shell,fs,settings,...}` for **core-owned channels only**
-- Call own IPC via `window.electronAPI.extensionBridge.invoke('task-vault:...')`
-- Register IPC handlers in `src/index.ts` via `api.ipc.registerHandler()`
+The rules every extension follows are in `extensions/CLAUDE.md`; this extension's channels are `task-vault:*`.
 
 ### Core git channels available (core-owned, safe to call directly)
 
@@ -28,10 +20,14 @@ await window.electronAPI.extensionBridge.invoke('task-vault:vault:list-areas', p
 ### What extensions MUST NOT do
 
 - **Never** modify `src/main/preload.ts` (core file)
-- **Never** modify `src/renderer/electron.d.ts` (core file)
+- **Never** modify `src/shared/electron-api/manifest.ts` (core file)
 - **Never** add extension-only npm deps to the **root** `package.json` — add to `extensions/task-vault/package.json`
-- **Never** import from other extensions (`extensions/git-integration/...`, `extensions/speckit-pilot/...`)
+- **Never** import from other extensions (`extensions/git-integration/...`, `extensions/foundry/...`)
 - **Never** hardcode the extension ID (`terminator.task-vault`) in core app files
+
+## The API task-vault offers other extensions
+
+`activate` returns a `TaskVaultAPI` (`open(destination?)`, `openCapture()`), declared in the SDK (`packages/extension-sdk/types/extensions.d.ts`) so a consumer types it without importing this extension (ADR 094). A consumer lists `terminator.task-vault` in its manifest's `extensionDependencies` and calls `api.extensions.get('terminator.task-vault')`. Change the SDK declaration and the return value together; keep it small: it is a public API.
 
 ## NPM Dependencies
 
@@ -39,4 +35,16 @@ Add deps to `extensions/task-vault/package.json` only. npm workspaces hoist them
 
 ## Terminal Linking
 
-When showing a terminal selector, use `window.electronAPI.extensionBridge` or read session/workspace stores directly. Never expose terminal-link logic through the core preload.
+When showing a terminal selector, list sessions with `window.electronAPI.terminal.listSessions()` in the view or `api.pty.listSessions()` in the backend. Never import the core's stores, and never expose terminal-link logic through the core preload.
+
+## Dates
+
+The backend (what `src/index.ts` imports and the view does not) computes dates with `Temporal`; the view (what `src/renderer/main.tsx` imports) must not use it, because it also runs in the phone's browser and iPhone Safari has no `Temporal` (ADR 108). `tsconfig.view.json` fails `npm run typecheck` on a use in any file the view reaches, so a module both sides import stays on `Date` or is split.
+
+- Read the clock through `src/vault/clock.ts` (`zonedNow()`, `today()`, `daysAgo()`): it reads `Date.now()`, which the specs' fake timers control; `Temporal.Now` they do not (Vitest 4.1.11).
+- `Temporal` is for sums and comparisons. Format what a person reads with `Intl`. Stored and sent values keep their format: `YYYY-MM-DD` dates, `toISOString()` instants.
+- Vitest runs on Node 24 with `--harmony-temporal`, an earlier draft than Electron's: no `Temporal.Now.timeZoneId()` and no `timeZoneId` property. Check a method on both before using it (the ADR lists what was measured).
+
+## End-to-end tests
+
+`tests/e2e/task-vault-*.spec.ts` drive every channel this extension registers in the real app, through its own view (`tests/e2e/task-vault-harness.ts`). A new channel gets a step there that does what a user does and reads back what was stored; a channel no view calls is driven as a remote client calls it (`task-vault-remote-api.spec.ts`).

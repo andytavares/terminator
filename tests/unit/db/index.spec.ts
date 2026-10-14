@@ -1,281 +1,212 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { DatabaseSync } from 'node:sqlite'
+import { rmSync } from 'node:fs'
+import type { ExtensionDB } from '@terminator/extension-sdk'
+import { wrapDb, initAppDb, getAppDb, closeAppDb, healthCheck } from '../../../src/main/db/index'
+import { makeTempDir } from '../../support/temp-dir'
 
-// Mock @electric-sql/pglite so tests don't need real WASM
-const mockQuery = vi.fn()
-const mockExec = vi.fn()
-const mockTransaction = vi.fn()
-const mockClose = vi.fn()
-const mockWaitReady = Promise.resolve()
+let db: ExtensionDB
 
-vi.mock('@electric-sql/pglite', () => ({
-  PGlite: vi.fn().mockImplementation(function () {
-    return {
-      query: mockQuery,
-      exec: mockExec,
-      transaction: mockTransaction,
-      close: mockClose,
-      waitReady: mockWaitReady,
-    }
-  }),
-}))
+async function openMemoryDb(): Promise<void> {
+  db = wrapDb(new DatabaseSync(':memory:'))
+  await db.exec(`
+    CREATE TABLE parents (id TEXT PRIMARY KEY);
+    CREATE TABLE children (
+      id TEXT PRIMARY KEY,
+      parent_id TEXT NOT NULL REFERENCES parents(id) ON DELETE CASCADE
+    );
+    CREATE TABLE items (id TEXT PRIMARY KEY, name TEXT, weight REAL);
+  `)
+}
 
-vi.mock('../../src/main/logger', () => ({
-  makeLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }),
-}))
+async function itemIds(): Promise<string[]> {
+  return (await db.query<{ id: string }>('SELECT id FROM items ORDER BY id')).map((r) => r.id)
+}
 
-const { mockExistsSync, mockUnlinkSync, mockRenameSync } = vi.hoisted(() => ({
-  mockExistsSync: vi.fn().mockReturnValue(false),
-  mockUnlinkSync: vi.fn(),
-  mockRenameSync: vi.fn(),
-}))
-vi.mock('node:fs', async (importOriginal) => {
-  const original = await importOriginal<typeof import('node:fs')>()
-  return {
-    ...original,
-    existsSync: mockExistsSync,
-    unlinkSync: mockUnlinkSync,
-    renameSync: mockRenameSync,
-  }
-})
+describe('ExtensionDB over node:sqlite', () => {
+  beforeEach(openMemoryDb)
 
-import { initAppDb, getAppDb, closeAppDb, healthCheck } from '../../../src/main/db/index'
-
-describe('AppDB', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-    mockExistsSync.mockReturnValue(false)
+  it('binds ? parameters and returns rows', async () => {
+    await db.run('INSERT INTO items (id, name, weight) VALUES (?, ?, ?)', ['a', 'Alice', 1.5])
+    await db.run('INSERT INTO items (id, name, weight) VALUES (?, ?, ?)', ['b', null, 2])
+    const rows = await db.query<{ id: string; name: string | null; weight: number }>(
+      'SELECT id, name, weight FROM items WHERE weight > ? ORDER BY id',
+      [1]
+    )
+    expect(rows.map((row) => ({ ...row }))).toEqual([
+      { id: 'a', name: 'Alice', weight: 1.5 },
+      { id: 'b', name: null, weight: 2 },
+    ])
   })
 
-  afterEach(async () => {
-    await closeAppDb()
+  it('get returns the first row, or undefined when nothing matches', async () => {
+    await db.run('INSERT INTO items (id, name) VALUES (?, ?)', ['a', 'Alice'])
+    expect((await db.get('SELECT name FROM items WHERE id = ?', ['a']))?.name).toBe('Alice')
+    expect(await db.get('SELECT name FROM items WHERE id = ?', ['missing'])).toBeUndefined()
+  })
+
+  it('run returns the number of rows changed', async () => {
+    await db.exec(`INSERT INTO items (id) VALUES ('a'), ('b'), ('c')`)
+    expect(await db.run('UPDATE items SET name = ? WHERE id != ?', ['x', 'a'])).toBe(2)
+    expect(await db.run('DELETE FROM items WHERE 1 = 0')).toBe(0)
+  })
+})
+
+describe('ExtensionDB over node:sqlite — errors and constraints', () => {
+  beforeEach(openMemoryDb)
+
+  it('rejects a statement that is not valid SQL', async () => {
+    await expect(db.query('SELECT FROM WHERE')).rejects.toThrow()
+  })
+
+  it('enforces foreign keys and cascades deletes', async () => {
+    await expect(
+      db.run('INSERT INTO children (id, parent_id) VALUES (?, ?)', ['c', 'x'])
+    ).rejects.toThrow(/FOREIGN KEY/)
+    await db.run('INSERT INTO parents (id) VALUES (?)', ['p'])
+    await db.run('INSERT INTO children (id, parent_id) VALUES (?, ?)', ['c', 'p'])
+    await db.run('DELETE FROM parents WHERE id = ?', ['p'])
+    expect(await db.query('SELECT id FROM children')).toEqual([])
+  })
+})
+
+describe('ExtensionDB transaction', () => {
+  beforeEach(openMemoryDb)
+
+  it('commits when the callback resolves and returns its value', async () => {
+    const result = await db.transaction(async (tx) => {
+      await tx.run('INSERT INTO items (id) VALUES (?)', ['a'])
+      return 'done'
+    })
+    expect(result).toBe('done')
+    expect(await db.query('SELECT id FROM items')).toHaveLength(1)
+  })
+
+  it('rolls everything back when the callback throws', async () => {
+    await expect(
+      db.transaction(async (tx) => {
+        await tx.run('INSERT INTO items (id) VALUES (?)', ['a'])
+        throw new Error('boom')
+      })
+    ).rejects.toThrow('boom')
+    expect(await db.query('SELECT id FROM items')).toEqual([])
+  })
+})
+
+describe('ExtensionDB transaction — deferred constraints', () => {
+  beforeEach(openMemoryDb)
+
+  it('rolls back when a deferred constraint fails at commit', async () => {
+    await expect(
+      db.transaction(async (tx) => {
+        await tx.exec('PRAGMA defer_foreign_keys = ON')
+        await tx.run('INSERT INTO children (id, parent_id) VALUES (?, ?)', ['c', 'missing'])
+      })
+    ).rejects.toThrow(/FOREIGN KEY/)
+    expect(await db.query('SELECT id FROM children')).toEqual([])
+    await db.transaction(async (tx) => {
+      await tx.run('INSERT INTO parents (id) VALUES (?)', ['p'])
+    })
+    expect(await db.query('SELECT id FROM parents')).toHaveLength(1)
+  })
+})
+
+describe('ExtensionDB nested transaction', () => {
+  beforeEach(openMemoryDb)
+
+  it('a nested transaction that throws undoes only its own writes', async () => {
+    await db.transaction(async (tx) => {
+      await tx.run('INSERT INTO items (id) VALUES (?)', ['outer'])
+      await tx
+        .transaction(async (inner) => {
+          await inner.run('INSERT INTO items (id) VALUES (?)', ['inner'])
+          throw new Error('inner failure')
+        })
+        .catch(() => undefined)
+      await tx.run('INSERT INTO items (id) VALUES (?)', ['after'])
+    })
+    expect(await itemIds()).toEqual(['after', 'outer'])
+  })
+
+  it('a nested transaction that succeeds is undone when the outer one fails', async () => {
+    await expect(
+      db.transaction(async (tx) => {
+        await tx.transaction(async (inner) => {
+          await inner.run('INSERT INTO items (id) VALUES (?)', ['inner'])
+        })
+        throw new Error('outer failure')
+      })
+    ).rejects.toThrow('outer failure')
+    expect(await db.query('SELECT id FROM items')).toEqual([])
+  })
+})
+
+describe('ExtensionDB ordering', () => {
+  beforeEach(openMemoryDb)
+
+  it('a statement issued while a transaction is open waits and is not rolled back with it', async () => {
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const failing = db
+      .transaction(async (tx) => {
+        await tx.run('INSERT INTO items (id) VALUES (?)', ['in-transaction'])
+        await gate
+        throw new Error('rolled back')
+      })
+      .catch(() => undefined)
+    const outside = db.run('INSERT INTO items (id) VALUES (?)', ['outside'])
+    release()
+    await Promise.all([failing, outside])
+    expect(await itemIds()).toEqual(['outside'])
+  })
+
+  it('runs overlapping transactions one after the other', async () => {
+    const order: string[] = []
+    const insertInTransaction = (label: string) =>
+      db.transaction(async (tx) => {
+        order.push(`${label}:start`)
+        await tx.run('INSERT INTO items (id) VALUES (?)', [label])
+        await new Promise((resolve) => setTimeout(resolve, 5))
+        order.push(`${label}:end`)
+      })
+    await Promise.all([insertInTransaction('a'), insertInTransaction('b')])
+    expect(order).toEqual(['a:start', 'a:end', 'b:start', 'b:end'])
+  })
+})
+
+describe('app database', () => {
+  let userData: string
+
+  beforeEach(() => {
+    userData = makeTempDir('app-db-')
+  })
+
+  afterEach(() => {
+    closeAppDb()
+    rmSync(userData, { recursive: true, force: true })
   })
 
   it('getAppDb throws before initAppDb', () => {
     expect(() => getAppDb()).toThrow('AppDB not initialized')
   })
 
-  it('initAppDb creates a PGlite instance and resolves', async () => {
-    mockQuery.mockResolvedValue({ rows: [{ '?column?': 1 }] })
-    await initAppDb('/tmp/test-db')
-    const db = getAppDb()
-    expect(db).toBeDefined()
-  })
-
-  it('db.query returns rows', async () => {
-    mockQuery.mockResolvedValue({ rows: [{ id: '1', name: 'Alice' }] })
-    await initAppDb('/tmp/test-db')
-    const db = getAppDb()
-    const rows = await db.query<{ id: string; name: string }>('SELECT * FROM foo')
-    expect(rows).toEqual([{ id: '1', name: 'Alice' }])
-  })
-
-  it('db.query converts ? to $1, $2 positional params', async () => {
-    mockQuery.mockResolvedValue({ rows: [] })
-    await initAppDb('/tmp/test-db')
-    const db = getAppDb()
-    await db.query('SELECT * FROM foo WHERE id = ? AND name = ?', ['1', 'Alice'])
-    expect(mockQuery).toHaveBeenCalledWith('SELECT * FROM foo WHERE id = $1 AND name = $2', [
-      '1',
-      'Alice',
-    ])
-  })
-
-  it('db.get returns first row or undefined', async () => {
-    mockQuery.mockResolvedValue({ rows: [{ id: '1' }] })
-    await initAppDb('/tmp/test-db')
-    const db = getAppDb()
-    const row = await db.get<{ id: string }>('SELECT * FROM foo WHERE id = ?', ['1'])
-    expect(row).toEqual({ id: '1' })
-  })
-
-  it('db.get returns undefined when no rows', async () => {
-    mockQuery.mockResolvedValue({ rows: [] })
-    await initAppDb('/tmp/test-db')
-    const db = getAppDb()
-    const row = await db.get('SELECT * FROM foo WHERE id = ?', ['missing'])
-    expect(row).toBeUndefined()
-  })
-
-  it('db.run executes and returns affectedRows', async () => {
-    mockQuery.mockResolvedValue({ rows: [], affectedRows: 2 })
-    await initAppDb('/tmp/test-db')
-    const db = getAppDb()
-    const count = await db.run('INSERT INTO foo (id) VALUES (?)', ['1'])
-    expect(mockQuery).toHaveBeenCalledWith('INSERT INTO foo (id) VALUES ($1)', ['1'])
-    expect(count).toBe(2)
-  })
-
-  it('db.run returns 0 when affectedRows is undefined', async () => {
-    mockQuery.mockResolvedValue({ rows: [] })
-    await initAppDb('/tmp/test-db')
-    const db = getAppDb()
-    const count = await db.run('DELETE FROM foo WHERE 1=0')
-    expect(count).toBe(0)
-  })
-
-  it('db.exec runs schema SQL', async () => {
-    mockExec.mockResolvedValue([])
-    await initAppDb('/tmp/test-db')
-    const db = getAppDb()
-    await db.exec('CREATE TABLE foo (id TEXT PRIMARY KEY)')
-    expect(mockExec).toHaveBeenCalledWith('CREATE TABLE foo (id TEXT PRIMARY KEY)')
-  })
-
-  it('db.transaction exposes exec, query, run, and get inside callback', async () => {
-    const fakeTxQuery = vi.fn().mockResolvedValue({ rows: [{ id: '1' }], affectedRows: 1 })
-    const fakeTxExec = vi.fn().mockResolvedValue([])
-    mockTransaction.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => {
-      return fn({ query: fakeTxQuery, exec: fakeTxExec })
-    })
-    await initAppDb('/tmp/test-db')
-    const db = getAppDb()
-    const result = await db.transaction(async (tx) => {
-      await tx.exec('CREATE TABLE IF NOT EXISTS foo (id TEXT)')
-      const rows = await tx.query<{ id: string }>('SELECT * FROM foo')
-      const row = await tx.get<{ id: string }>('SELECT * FROM foo WHERE id = ?', ['1'])
-      const count = await tx.run('INSERT INTO foo VALUES (?)', ['1'])
-      return { rows, row, count }
-    })
-    expect(fakeTxExec).toHaveBeenCalled()
-    expect(fakeTxQuery).toHaveBeenCalled()
-    expect((result as { count: number }).count).toBe(1)
-    expect(mockTransaction).toHaveBeenCalled()
-  })
-
-  it('db.transaction supports nested transactions via savepoints', async () => {
-    const fakeTxExec = vi.fn().mockResolvedValue([])
-    const fakeTxQuery = vi.fn().mockResolvedValue({ rows: [], affectedRows: 0 })
-    mockTransaction.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => {
-      return fn({ query: fakeTxQuery, exec: fakeTxExec })
-    })
-    await initAppDb('/tmp/test-db')
-    const db = getAppDb()
-    const result = await db.transaction(async (tx) => {
-      return tx.transaction(async (tx2) => {
-        await tx2.run('INSERT INTO foo VALUES (?)', ['nested'])
-        return 'nested-done'
-      })
-    })
-    expect(result).toBe('nested-done')
-    // SAVEPOINT + RELEASE should have been called via exec
-    const execCalls = fakeTxExec.mock.calls.map((c) => String(c[0]))
-    expect(execCalls.some((s) => s.startsWith('SAVEPOINT'))).toBe(true)
-    expect(execCalls.some((s) => s.startsWith('RELEASE SAVEPOINT'))).toBe(true)
-  })
-
-  it('db.transaction rolls back savepoint on nested error', async () => {
-    const fakeTxExec = vi.fn().mockResolvedValue([])
-    const fakeTxQuery = vi.fn().mockResolvedValue({ rows: [] })
-    mockTransaction.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => {
-      return fn({ query: fakeTxQuery, exec: fakeTxExec })
-    })
-    await initAppDb('/tmp/test-db')
-    const db = getAppDb()
-    await expect(
-      db.transaction(async (tx) => {
-        return tx.transaction(async () => {
-          throw new Error('inner failure')
-        })
-      })
-    ).rejects.toThrow('inner failure')
-    const execCalls = fakeTxExec.mock.calls.map((c) => String(c[0]))
-    expect(execCalls.some((s) => s.startsWith('ROLLBACK TO SAVEPOINT'))).toBe(true)
-  })
-
-  it('closeAppDb closes the pglite instance', async () => {
-    mockClose.mockResolvedValue(undefined)
-    await initAppDb('/tmp/test-db')
-    await closeAppDb()
-    expect(mockClose).toHaveBeenCalled()
+  it('keeps data in <userData>/app.sqlite across a close and reopen, in WAL mode', async () => {
+    initAppDb(userData)
+    expect((await getAppDb().get('PRAGMA journal_mode'))?.journal_mode).toBe('wal')
+    await getAppDb().exec("CREATE TABLE t (id TEXT); INSERT INTO t VALUES ('kept')")
+    closeAppDb()
     expect(() => getAppDb()).toThrow('AppDB not initialized')
+
+    initAppDb(userData)
+    expect((await getAppDb().get('SELECT id FROM t'))?.id).toBe('kept')
   })
 
-  it('closeAppDb resets _spCount so savepoints restart from sp_1 after re-init', async () => {
-    const fakeTxExec = vi.fn().mockResolvedValue([])
-    const fakeTxQuery = vi.fn().mockResolvedValue({ rows: [], affectedRows: 0 })
-    mockTransaction.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => {
-      return fn({ query: fakeTxQuery, exec: fakeTxExec })
+  it('healthCheck is ok when open and reports the reason when not initialized', async () => {
+    expect(await healthCheck()).toMatchObject({
+      ok: false,
+      message: expect.stringMatching(/not initialized/),
     })
-    mockClose.mockResolvedValue(undefined)
-    mockQuery.mockResolvedValue({ rows: [{ '?column?': 1 }] })
-
-    await initAppDb('/tmp/test-db')
-    const db1 = getAppDb()
-    await db1.transaction(async (tx) => {
-      await tx.transaction(async () => 'nested1')
-    })
-    await closeAppDb()
-
-    await initAppDb('/tmp/test-db')
-    const db2 = getAppDb()
-    fakeTxExec.mockClear()
-    await db2.transaction(async (tx) => {
-      await tx.transaction(async () => 'nested2')
-    })
-
-    const execCalls = fakeTxExec.mock.calls.map((c) => String(c[0]))
-    // After re-init, savepoint counter should restart from sp_1
-    expect(execCalls.some((s) => s.includes('sp_1'))).toBe(true)
-  })
-
-  it('healthCheck returns ok when query succeeds', async () => {
-    mockQuery.mockResolvedValue({ rows: [{ '?column?': 1 }] })
-    await initAppDb('/tmp/test-db')
-    const result = await healthCheck()
-    expect(result.ok).toBe(true)
-  })
-
-  it('healthCheck returns error when not initialized', async () => {
-    const result = await healthCheck()
-    expect(result.ok).toBe(false)
-    expect(result.message).toMatch(/not initialized/)
-  })
-
-  it('initAppDb retries with fresh db when catalog probe fails on first init', async () => {
-    // First call: catalog probe rejects (simulates pg_attribute corruption).
-    // Second call: succeeds on the fresh database.
-    mockQuery
-      .mockRejectedValueOnce(new Error('pg_attribute catalog is missing 4 attribute(s)'))
-      .mockResolvedValue({ rows: [] })
-    await initAppDb('/tmp/test-db-corrupt')
-    const db = getAppDb()
-    expect(db).toBeDefined()
-  })
-
-  it('initAppDb retries when a user-table probe fails after the initial catalog probe passes', async () => {
-    // Simulates: initial information_schema probe passes, pg_tables query returns
-    // a user table, then probing that table throws pg_attribute corruption.
-    // The retry path should back up and reinit successfully.
-    mockQuery
-      .mockResolvedValueOnce({ rows: [{ '?column?': 1 }] }) // information_schema probe
-      .mockResolvedValueOnce({ rows: [{ tablename: 'diagrams' }] }) // pg_tables list
-      .mockRejectedValueOnce(new Error('pg_attribute catalog is missing 4 attribute(s)')) // table probe
-      .mockResolvedValue({ rows: [] }) // fresh DB succeeds
-    await initAppDb('/tmp/test-db-user-table-corrupt')
-    expect(getAppDb()).toBeDefined()
-  })
-
-  it('initAppDb removes stale lock files when existsSync returns true', async () => {
-    mockExistsSync.mockReturnValue(true)
-    mockQuery.mockResolvedValue({ rows: [] })
-    await initAppDb('/tmp/test-db-lockfile')
-    expect(mockUnlinkSync).toHaveBeenCalled()
-  })
-
-  it('initAppDb backs up corrupt db dir before retrying when it exists', async () => {
-    // existsSync: return false for lockfiles, true for the db dir on backup check
-    mockExistsSync.mockImplementation((p: string) => p.includes('test-db-backup'))
-    mockQuery.mockRejectedValueOnce(new Error('corrupt')).mockResolvedValue({ rows: [] })
-    await initAppDb('/tmp/test-db-backup')
-    // renameSync is called to move the corrupt dir aside
-    expect(mockRenameSync).toHaveBeenCalled()
-  })
-
-  it('db.run returns affectedRows ?? 0 when affectedRows is undefined', async () => {
-    mockQuery.mockResolvedValue({ rows: [] })
-    await initAppDb('/tmp/test-db-run0')
-    const db = getAppDb()
-    const count = await db.run('DELETE FROM foo WHERE 1=0')
-    expect(count).toBe(0)
+    initAppDb(userData)
+    expect(await healthCheck()).toEqual({ ok: true })
   })
 })

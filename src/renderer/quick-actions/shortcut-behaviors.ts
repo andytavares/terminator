@@ -1,7 +1,9 @@
 import { useWorkspaceStore } from '../stores/workspace.store'
-import { useSessionStore } from '../stores/session.store'
+import { useSessionStore, type NewSessionRequest } from '../stores/session.store'
+import type { TerminalPlace } from '../terminal/session-controller'
 import { useExtensionRegistry } from '../extensions/registry'
 import { dispatchNotification } from '../lib/notifications'
+import { agentStateOf } from '../sidebar/agent-state'
 
 /** Leaves whatever global/workspace/project tab is showing, the way every
  * "go to session" path must (see navigate-to-session.ts's revealSession). */
@@ -56,7 +58,7 @@ export function jumpToNextAwaitingInput(
   deps: SessionNavDeps
 ): void {
   const waiting = [...useSessionStore.getState().sessions.values()].filter(
-    (s) => s.agentState === 'awaiting-input'
+    (s) => agentStateOf(s) === 'awaiting-input'
   )
   if (waiting.length === 0) return
   const currentId = effectiveProjectId ? deps.getActiveSessionForProject(effectiveProjectId) : null
@@ -120,13 +122,7 @@ export interface NewTabDeps {
   resolveSettings(workspaceId: string | null): { terminal: { scrollbackLimit: number } }
   resolveActiveCwd(): string
   activeWorkspaceId: string | null
-  createSession(
-    projectId: string,
-    type: 'human',
-    tabTitle: string,
-    cwd: string,
-    scrollbackLimit: number
-  ): Promise<unknown>
+  createSession(request: NewSessionRequest): Promise<unknown>
 }
 
 export function newTerminalTab(effectiveProjectId: string | null, deps: NewTabDeps): void {
@@ -134,7 +130,13 @@ export function newTerminalTab(effectiveProjectId: string | null, deps: NewTabDe
   const settings = deps.resolveSettings(deps.activeWorkspaceId)
   const cwd = deps.resolveActiveCwd()
   void deps
-    .createSession(effectiveProjectId, 'human', 'Terminal', cwd, settings.terminal.scrollbackLimit)
+    .createSession({
+      projectId: effectiveProjectId,
+      type: 'human',
+      title: 'Terminal',
+      cwd,
+      scrollbackLimit: settings.terminal.scrollbackLimit,
+    })
     .catch(() => {})
 }
 
@@ -145,8 +147,7 @@ export interface SplitDeps {
   splitSession(
     projectId: string,
     direction: 'vertical' | 'horizontal',
-    cwd: string,
-    scrollbackLimit: number
+    place: TerminalPlace
   ): Promise<unknown>
 }
 
@@ -159,7 +160,10 @@ export function splitPane(
   const settings = deps.resolveSettings(deps.activeWorkspaceId)
   const cwd = deps.resolveActiveCwd()
   deps
-    .splitSession(effectiveProjectId, direction, cwd, settings.terminal.scrollbackLimit)
+    .splitSession(effectiveProjectId, direction, {
+      cwd,
+      scrollbackLimit: settings.terminal.scrollbackLimit,
+    })
     .catch((error: unknown) =>
       dispatchNotification({
         type: 'error',

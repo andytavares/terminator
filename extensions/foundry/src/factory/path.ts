@@ -11,11 +11,27 @@ function key(tile: Tile): string {
   return `${tile.x},${tile.y}`
 }
 
+/** The four tiles a step can reach from `tile`. */
+function neighboursOf(tile: Tile): Tile[] {
+  return [
+    { x: tile.x + 1, y: tile.y },
+    { x: tile.x - 1, y: tile.y },
+    { x: tile.x, y: tile.y + 1 },
+    { x: tile.x, y: tile.y - 1 },
+  ]
+}
+
+/** Where a walk starts and where it ends. */
+export interface Trip {
+  readonly from: Tile
+  readonly to: Tile
+}
+
+/** Whether a step may land on `tile`: on the grid, and free — or the goal itself. */
 function passable(
   solid: HallMap['solid'],
   tile: Tile,
-  to: Tile,
-  blocked: ReadonlySet<string>
+  { to, blocked }: { to: Tile; blocked: ReadonlySet<string> }
 ): boolean {
   if (tile.y < 0 || tile.y >= solid.length) return false
   const row = solid[tile.y]
@@ -36,13 +52,7 @@ export function distancesFrom(grid: HallMap['solid'], from: Tile): Map<string, n
   for (let head = 0; head < queue.length; head++) {
     const current = queue[head]
     const currentDistance = distances.get(key(current)) as number
-    const neighbours: Tile[] = [
-      { x: current.x + 1, y: current.y },
-      { x: current.x - 1, y: current.y },
-      { x: current.x, y: current.y + 1 },
-      { x: current.x, y: current.y - 1 },
-    ]
-    for (const next of neighbours) {
+    for (const next of neighboursOf(current)) {
       const k = key(next)
       if (distances.has(k)) continue
       if (grid[next.y]?.[next.x] !== false) continue
@@ -60,41 +70,39 @@ export function distancesFrom(grid: HallMap['solid'], from: Tile): Map<string, n
  */
 export function findPath(
   solid: HallMap['solid'],
-  from: Tile,
-  to: Tile,
+  { from, to }: Trip,
   blocked: ReadonlySet<string> = new Set()
 ): Tile[] {
   if (from.x === to.x && from.y === to.y) return []
+  const cameFrom = searchToward(solid, { from, to }, blocked)
+  return cameFrom === null ? [] : pathBack(cameFrom, { from, to })
+}
 
+/** Each reached tile's predecessor, once the search reaches `to`; null when it never does. */
+function searchToward(
+  solid: HallMap['solid'],
+  { from, to }: Trip,
+  blocked: ReadonlySet<string>
+): Map<string, Tile> | null {
   const cameFrom = new Map<string, Tile>()
   const visited = new Set<string>([key(from)])
   const queue: Tile[] = [from]
-
-  let found = false
-  for (let head = 0; head < queue.length && !found; head++) {
+  for (let head = 0; head < queue.length; head++) {
     const current = queue[head]
-    const neighbours: Tile[] = [
-      { x: current.x + 1, y: current.y },
-      { x: current.x - 1, y: current.y },
-      { x: current.x, y: current.y + 1 },
-      { x: current.x, y: current.y - 1 },
-    ]
-    for (const next of neighbours) {
+    for (const next of neighboursOf(current)) {
       const k = key(next)
-      if (visited.has(k)) continue
-      if (!passable(solid, next, to, blocked)) continue
+      if (visited.has(k) || !passable(solid, next, { to, blocked })) continue
       visited.add(k)
       cameFrom.set(k, current)
-      if (next.x === to.x && next.y === to.y) {
-        found = true
-        break
-      }
+      if (next.x === to.x && next.y === to.y) return cameFrom
       queue.push(next)
     }
   }
+  return null
+}
 
-  if (!visited.has(key(to))) return []
-
+/** The path back from `to`, not counting `from`, in walking order. */
+function pathBack(cameFrom: ReadonlyMap<string, Tile>, { from, to }: Trip): Tile[] {
   const path: Tile[] = []
   let step: Tile | undefined = to
   while (step !== undefined && !(step.x === from.x && step.y === from.y)) {

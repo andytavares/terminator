@@ -3,14 +3,11 @@ import { collect } from '../../src/sensors/collect.js'
 import type { CollectDeps } from '../../src/sensors/collect.js'
 import type { ExecResult, ShellExec } from '../../src/line/integrate.js'
 import type { SensorSource } from '../../src/sensors/types.js'
+import { execSucceeded } from '../helpers/foundry-host.js'
 
 // Collectors turn one sensor source into sensed items, or a one-sentence
 // problem when the command they depend on fails. They never throw: a bad
 // `gh` call is a signal about the environment, not the sensor's own bug.
-
-function ok(stdout: string): ExecResult {
-  return { exitCode: 0, stdout, stderr: '', timedOut: false }
-}
 
 function fail(stderr: string): ExecResult {
   return { exitCode: 1, stdout: '', stderr, timedOut: false }
@@ -36,30 +33,54 @@ function deps(over: Partial<CollectDeps> = {}): CollectDeps {
   }
 }
 
-describe('collect: github-runs', () => {
-  const source: SensorSource = { kind: 'github-runs', branch: 'main', limit: 5 }
+const runsSource: SensorSource = { kind: 'github-runs', branch: 'main', limit: 5 }
 
+describe('collect: github-runs', () => {
+  describe('mapping runs', mappingRunsTests)
+  describe('the default branch', theDefaultBranchTests)
+  describe('problems', problemsTests)
+})
+
+const issuesSource: SensorSource = { kind: 'github-issues', label: 'bug', limit: 20 }
+
+/** Two failed runs on main, of two different workflows. */
+const FAILED_RUNS = [
+  {
+    databaseId: 1,
+    displayTitle: 'fix: flaky test',
+    headSha: 'abc123',
+    workflowName: 'CI',
+    createdAt: '2026-09-25T10:00:00.000Z',
+    url: 'https://github.com/o/r/actions/runs/1',
+  },
+  {
+    databaseId: 2,
+    displayTitle: 'chore: bump deps',
+    headSha: 'def456',
+    workflowName: 'Lint',
+    createdAt: '2026-09-25T11:00:00.000Z',
+    url: 'https://github.com/o/r/actions/runs/2',
+  },
+]
+
+/** How the runs sensor asks gh for main's last five failed runs. */
+const RUN_LIST_ARGS = [
+  'run',
+  'list',
+  '--branch',
+  'main',
+  '--status',
+  'failure',
+  '--limit',
+  '5',
+  '--json',
+  'databaseId,displayTitle,headSha,workflowName,createdAt,url',
+]
+
+function mappingRunsTests() {
   it('maps failed runs to one item each, keyed by workflow', async () => {
-    const runs = [
-      {
-        databaseId: 1,
-        displayTitle: 'fix: flaky test',
-        headSha: 'abc123',
-        workflowName: 'CI',
-        createdAt: '2026-09-25T10:00:00.000Z',
-        url: 'https://github.com/o/r/actions/runs/1',
-      },
-      {
-        databaseId: 2,
-        displayTitle: 'chore: bump deps',
-        headSha: 'def456',
-        workflowName: 'Lint',
-        createdAt: '2026-09-25T11:00:00.000Z',
-        url: 'https://github.com/o/r/actions/runs/2',
-      },
-    ]
-    const exec = queuedExec([ok(JSON.stringify(runs))])
-    const result = await collect(source, deps({ exec }))
+    const exec = queuedExec([execSucceeded(JSON.stringify(FAILED_RUNS))])
+    const result = await collect(runsSource, deps({ exec }))
 
     expect(result.problem).toBeNull()
     expect(result.items).toHaveLength(2)
@@ -76,27 +97,14 @@ describe('collect: github-runs', () => {
     expect(result.items[1].key).toBe('workflow:Lint')
 
     expect(exec).toHaveBeenCalledWith(
-      expect.objectContaining({
-        command: 'gh',
-        args: [
-          'run',
-          'list',
-          '--branch',
-          'main',
-          '--status',
-          'failure',
-          '--limit',
-          '5',
-          '--json',
-          'databaseId,displayTitle,headSha,workflowName,createdAt,url',
-        ],
-        cwd: '/repos/app',
-      })
+      expect.objectContaining({ command: 'gh', args: RUN_LIST_ARGS, cwd: '/repos/app' })
     )
   })
+}
 
+function theDefaultBranchTests() {
   it('resolves the default branch first when branch is null', async () => {
-    const exec = queuedExec([ok('main\n'), ok('[]')])
+    const exec = queuedExec([execSucceeded('main\n'), execSucceeded('[]')])
     const source: SensorSource = { kind: 'github-runs', branch: null, limit: 10 }
 
     const result = await collect(source, deps({ exec }))
@@ -117,11 +125,13 @@ describe('collect: github-runs', () => {
       })
     )
   })
+}
 
+function problemsTests() {
   it('reports a problem naming the command when gh fails, never throws', async () => {
     const exec = queuedExec([fail('gh: authentication required')])
 
-    const result = await collect(source, deps({ exec }))
+    const result = await collect(runsSource, deps({ exec }))
 
     expect(result.items).toEqual([])
     expect(result.problem).toMatch(/gh run list/)
@@ -139,36 +149,63 @@ describe('collect: github-runs', () => {
   })
 
   it('reports a problem when gh run list returns output that does not parse', async () => {
-    const exec = queuedExec([ok('not json')])
+    const exec = queuedExec([execSucceeded('not json')])
 
-    const result = await collect(source, deps({ exec }))
+    const result = await collect(runsSource, deps({ exec }))
 
     expect(result.items).toEqual([])
     expect(result.problem).toMatch(/could not be read/)
   })
-})
+}
 
 describe('collect: github-issues', () => {
-  const source: SensorSource = { kind: 'github-issues', label: 'bug', limit: 20 }
+  describe('normalising titles', normalisingTitlesTests)
+  describe('issue problems', issueProblemsTests)
+})
 
+const search = vi.fn()
+const listMine = vi.fn()
+function trackerDeps(over: Partial<CollectDeps> = {}): CollectDeps {
+  search.mockReset()
+  listMine.mockReset()
+  return deps({ issues: { search, listMine }, ...over })
+}
+
+/** Two open bugs whose titles differ only in a number inside a path. */
+const CRASHES = [
+  {
+    number: 42,
+    title: 'Crash in /api/42',
+    url: 'https://github.com/o/r/issues/42',
+    updatedAt: 't1',
+  },
+  {
+    number: 77,
+    title: 'Crash in /api/77',
+    url: 'https://github.com/o/r/issues/77',
+    updatedAt: 't2',
+  },
+]
+
+/** How the issues sensor asks gh for the twenty newest open bugs. */
+const ISSUE_LIST_ARGS = [
+  'issue',
+  'list',
+  '--label',
+  'bug',
+  '--state',
+  'open',
+  '--limit',
+  '20',
+  '--json',
+  'number,title,url,updatedAt',
+]
+
+function normalisingTitlesTests() {
   it('normalises titles with digits and paths into one shared key', async () => {
-    const issues = [
-      {
-        number: 42,
-        title: 'Crash in /api/42',
-        url: 'https://github.com/o/r/issues/42',
-        updatedAt: 't1',
-      },
-      {
-        number: 77,
-        title: 'Crash in /api/77',
-        url: 'https://github.com/o/r/issues/77',
-        updatedAt: 't2',
-      },
-    ]
-    const exec = queuedExec([ok(JSON.stringify(issues))])
+    const exec = queuedExec([execSucceeded(JSON.stringify(CRASHES))])
 
-    const result = await collect(source, deps({ exec }))
+    const result = await collect(issuesSource, deps({ exec }))
 
     expect(result.problem).toBeNull()
     expect(result.items).toHaveLength(2)
@@ -177,54 +214,46 @@ describe('collect: github-issues', () => {
     expect(result.items[0].evidence.kind).toBe('issue')
 
     expect(exec).toHaveBeenCalledWith(
-      expect.objectContaining({
-        command: 'gh',
-        args: [
-          'issue',
-          'list',
-          '--label',
-          'bug',
-          '--state',
-          'open',
-          '--limit',
-          '20',
-          '--json',
-          'number,title,url,updatedAt',
-        ],
-        cwd: '/repos/app',
-      })
+      expect.objectContaining({ command: 'gh', args: ISSUE_LIST_ARGS, cwd: '/repos/app' })
     )
   })
+}
 
+function issueProblemsTests() {
   it('reports a problem naming the command when gh fails, never throws', async () => {
     const exec = queuedExec([fail('gh: rate limited')])
 
-    const result = await collect(source, deps({ exec }))
+    const result = await collect(issuesSource, deps({ exec }))
 
     expect(result.items).toEqual([])
     expect(result.problem).toMatch(/gh issue list/)
   })
 
-  it('reports a problem when gh issue list returns output that does not parse', async () => {
-    const exec = queuedExec([ok('not json')])
+  it('dates an issue gh gave no update time by when it was sensed', async () => {
+    const [crash] = CRASHES
+    const exec = queuedExec([execSucceeded(JSON.stringify([{ ...crash, updatedAt: undefined }]))])
 
-    const result = await collect(source, deps({ exec }))
+    const result = await collect(issuesSource, deps({ exec }))
+
+    expect(result.items[0].evidence.at).toBe('2026-09-26T00:00:00.000Z')
+  })
+
+  it('reports a problem when gh issue list returns output that does not parse', async () => {
+    const exec = queuedExec([execSucceeded('not json')])
+
+    const result = await collect(issuesSource, deps({ exec }))
 
     expect(result.items).toEqual([])
     expect(result.problem).toMatch(/could not be read/)
   })
-})
+}
 
 describe('collect: tracker', () => {
-  const search = vi.fn()
-  const listMine = vi.fn()
+  describe('searching and listing', searchingAndListingTests)
+  describe('no tracker', noTrackerTests)
+})
 
-  function trackerDeps(over: Partial<CollectDeps> = {}): CollectDeps {
-    search.mockReset()
-    listMine.mockReset()
-    return deps({ issues: { search, listMine }, ...over })
-  }
-
+function searchingAndListingTests() {
   it('searches when a query is set', async () => {
     const built = trackerDeps()
     search.mockResolvedValue([
@@ -252,7 +281,9 @@ describe('collect: tracker', () => {
     expect(result.items).toEqual([])
     expect(result.problem).toBeNull()
   })
+}
 
+function noTrackerTests() {
   it('gives a problem, not a throw, when no tracker is connected', async () => {
     const source: SensorSource = { kind: 'tracker', query: 'flake', limit: 15 }
 
@@ -261,4 +292,4 @@ describe('collect: tracker', () => {
     expect(result.items).toEqual([])
     expect(result.problem).toBe('No tracker is connected.')
   })
-})
+}

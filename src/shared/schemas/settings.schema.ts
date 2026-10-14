@@ -1,11 +1,13 @@
 import { z } from 'zod'
+import { defaultGlobalSettings } from '../settings-defaults'
 
+/** @internal */
 export const ThemeSchema = z.enum(['dark', 'light'])
-export const NotificationTargetSchema = z.enum(['system', 'center', 'toast'])
-export const CustomActionKindSchema = z.enum(['shell', 'prompt'])
-export const CustomActionTargetSchema = z.enum(['focused', 'new-tab', 'agent'])
+const NotificationTargetSchema = z.enum(['system', 'center', 'toast'])
+const CustomActionKindSchema = z.enum(['shell', 'prompt'])
+const CustomActionTargetSchema = z.enum(['focused', 'new-tab', 'agent'])
 
-export const CustomActionSchema = z.object({
+const CustomActionSchema = z.object({
   id: z.string(),
   label: z.string(),
   mnemonic: z.string().max(1).optional(),
@@ -14,7 +16,7 @@ export const CustomActionSchema = z.object({
   body: z.string().min(1),
 })
 
-export const QuickActionsSettingsSchema = z
+const QuickActionsSettingsSchema = z
   .object({
     pins: z.array(z.string()).default([]),
     usage: z
@@ -38,10 +40,10 @@ export const GlobalSettingsSchema = z.object({
     worktreeBaseDir: z.string(),
     branchExcludePatterns: z.array(z.string()).default([]),
   }),
-  extensions: z.record(z.string(), z.record(z.string(), z.unknown())),
   ui: z
     .object({
       hasSeenWelcome: z.boolean(),
+      showMetricsBar: z.boolean().optional(),
       /**
        * Which editor "Open in editor" launches, by id. Empty means detect —
        * the common case, and why this is not a required choice buried in
@@ -108,28 +110,13 @@ export const WorkspaceSettingsSchema = z.object({
   extensions: z.record(z.string(), z.record(z.string(), z.unknown())).default({}),
 })
 
-export const DEFAULT_GLOBAL_SETTINGS = {
-  appearance: { theme: 'dark' as const },
-  terminal: {
-    scrollbackLimit: 10000,
-    defaultShell: process.env.SHELL || '/bin/zsh',
-    promptForName: false,
-  },
-  git: { worktreeBaseDir: '', branchExcludePatterns: [] },
-  extensions: {},
-  ui: { hasSeenWelcome: false, editor: '' },
-  sidebar: { staleAfterMs: 2 * 60 * 60 * 1000 },
-  notifications: {
-    defaultTargets: ['system', 'center', 'toast'] as ('system' | 'center' | 'toast')[],
-    overrides: {} as Record<string, ('system' | 'center' | 'toast')[]>,
-  },
-  quickActions: {
-    pins: [] as string[],
-    usage: [] as { id: string; count: number; lastUsedAt: number }[],
-    directUse: [] as { id: string; count: number }[],
-    custom: [] as z.infer<typeof CustomActionSchema>[],
-  },
-}
+export const DEFAULT_GLOBAL_SETTINGS = defaultGlobalSettings(process.env.SHELL || '/bin/zsh')
 
-export type GlobalSettingsData = z.infer<typeof GlobalSettingsSchema>
-export type WorkspaceSettingsData = z.infer<typeof WorkspaceSettingsSchema>
+export type GlobalSettings = z.infer<typeof GlobalSettingsSchema>
+export type WorkspaceSettings = z.infer<typeof WorkspaceSettingsSchema>
+export type QuickActionsSettings = GlobalSettings['quickActions']
+export type CustomAction = z.infer<typeof CustomActionSchema>
+export type CustomActionKind = z.infer<typeof CustomActionKindSchema>
+export type CustomActionTarget = z.infer<typeof CustomActionTargetSchema>
+export type ActionUsage = QuickActionsSettings['usage'][number]
+export type DirectUse = QuickActionsSettings['directUse'][number]

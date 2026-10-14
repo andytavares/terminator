@@ -3,8 +3,10 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import { useNotesStore } from '../stores/notes.store'
 import { NoteEditor } from '../editor/NoteEditor'
+import { noteTitle } from '../db/note-title'
 import type { DiagramListItem } from '../db/types'
-import { useDismissible } from '@terminator/extension-ui'
+import { Button, ModalShell, SegmentedControl } from '@terminator/extension-ui'
+import { tagEditing, withTag } from './tagEditing'
 
 function toFilenameSlug(title: string): string {
   return (
@@ -17,13 +19,9 @@ function toFilenameSlug(title: string): string {
   )
 }
 
-function deriveTitle(body: string): string {
-  const headingMatch = /^#{1,6}\s+(.+)/m.exec(body)
-  if (headingMatch) return headingMatch[1].trim()
-  const firstLine = body.split('\n').find((l) => l.trim().length > 0)
-  if (firstLine) return firstLine.trim().slice(0, 120)
-  return 'Untitled note'
-}
+type CreateKind = 'note' | 'diagram' | 'folder'
+
+type TitleRef = React.RefObject<HTMLInputElement>
 
 interface TagChipBarProps {
   tags: string[]
@@ -35,15 +33,23 @@ interface TagChipBarProps {
   onTagKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => void
 }
 
-function TagChipBar({
-  tags,
-  tagInput,
-  tagInputRef,
-  onTagInput,
-  onAddTag,
-  onRemoveTag,
-  onTagKeyDown,
-}: TagChipBarProps): React.JSX.Element {
+/** The overlay's draft and the controls that edit it. */
+type QuickCreateDraft = ReturnType<typeof useQuickCreateDraft>
+
+interface DraftProps {
+  draft: QuickCreateDraft
+}
+
+interface SaveProps extends DraftProps {
+  onSave: () => Promise<void>
+}
+
+interface TitleInputProps extends SaveProps {
+  titleRef: TitleRef
+}
+
+function TagChipBar(props: TagChipBarProps): React.JSX.Element {
+  const { tags, tagInput, tagInputRef, onAddTag, onRemoveTag, onTagInput, onTagKeyDown } = props
   return (
     <div className="notepad-quick-create__tags">
       {tags.map((tag) => (
@@ -66,26 +72,81 @@ function TagChipBar({
         value={tagInput}
         onChange={(e) => onTagInput(e.target.value)}
         onKeyDown={onTagKeyDown}
-        onBlur={() => {
-          if (tagInput.trim()) onAddTag(tagInput)
-        }}
+        onBlur={() => tagInput.trim() && onAddTag(tagInput)}
       />
     </div>
   )
 }
 
-export function QuickCreateOverlay(): React.JSX.Element | null {
-  const { showQuickCreate, setShowQuickCreate, setNotes, setDiagrams, setFolders } = useNotesStore()
-  const [type, setType] = useState<'note' | 'diagram' | 'folder'>('note')
+const CREATE_KINDS = [
+  { value: 'note', label: 'Note' },
+  { value: 'diagram', label: 'Diagram' },
+  { value: 'folder', label: 'Folder' },
+] as const
+
+/** Re-lists a collection into the store; resolves to the list, if one came back. */
+async function listInto<T>(channel: string, payload: object, store: (items: T[]) => void) {
+  const result = await window.electronAPI.extensionBridge.invoke(channel, payload)
+  const data = (result as { data?: T[] }).data
+  if (Array.isArray(data)) store(data)
+  return data
+}
+
+async function createFolderAndRelist(name: string): Promise<void> {
+  await window.electronAPI.extensionBridge.invoke('terminator.notepad:folders.create', { name })
+  await listInto('terminator.notepad:folders.list', {}, useNotesStore.getState().setFolders)
+}
+
+interface NewNote {
+  title: string
+  body: string
+  tags: string[]
+}
+
+async function createNoteAndRelist(note: NewNote): Promise<void> {
+  await window.electronAPI.extensionBridge.invoke('terminator.notepad:notes.create', note)
+  const { setNotes } = useNotesStore.getState()
+  await listInto('terminator.notepad:notes.list', { includeArchived: true }, setNotes)
+}
+
+async function createDiagramAndOpen(diagram: Omit<NewNote, 'body'>): Promise<void> {
+  const createResult = await window.electronAPI.extensionBridge.invoke(
+    'terminator.notepad:diagrams.create',
+    diagram
+  )
+  const created = (createResult as { data?: { id: string } }).data
+  const { setDiagrams, setSelectedDiagram } = useNotesStore.getState()
+  const data = await listInto<DiagramListItem>(
+    'terminator.notepad:diagrams.list',
+    { includeArchived: true },
+    setDiagrams
+  )
+  if (Array.isArray(data) && created?.id) setSelectedDiagram(created.id)
+}
+
+/** Creates the folder, diagram or note the draft describes. */
+async function saveQuickNote(draft: QuickCreateDraft): Promise<void> {
+  const { type, title, body } = draft
+  // Includes a tag still in the input: onBlur fires before onClick, but React 18
+  // batching means its setTags may not have applied yet.
+  const tags = withTag(draft.tags, draft.tagInput)
+  if (type === 'folder') {
+    await createFolderAndRelist(title.trim())
+  } else if (type === 'diagram') {
+    await createDiagramAndOpen({ title: title.trim() || 'Untitled diagram', tags })
+  } else {
+    await createNoteAndRelist({ title: title.trim() || noteTitle(body), body, tags })
+  }
+}
+
+function useQuickCreateDraft() {
+  const setShowQuickCreate = useNotesStore((s) => s.setShowQuickCreate)
+  const [type, setType] = useState<CreateKind>('note')
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [tags, setTags] = useState<string[]>([])
   const [tagInput, setTagInput] = useState('')
   const [saving, setSaving] = useState(false)
-  const titleRef = useRef<HTMLInputElement>(null)
-  const tagInputRef = useRef<HTMLInputElement>(null)
-
-  const exportFilename = toFilenameSlug(title)
 
   const close = useCallback(() => {
     setTitle('')
@@ -97,256 +158,165 @@ export function QuickCreateOverlay(): React.JSX.Element | null {
     setShowQuickCreate(false)
   }, [setShowQuickCreate])
 
-  const handleSaveFolder = useCallback(async () => {
-    if (saving) return
-    const folderName = title.trim()
-    if (!folderName) return
-    setSaving(true)
-    try {
-      await window.electronAPI.extensionBridge.invoke('terminator.notepad:folders.create', {
-        name: folderName,
-      })
-      const result = await window.electronAPI.extensionBridge.invoke(
-        'terminator.notepad:folders.list',
-        {}
-      )
-      const data = (result as { data?: unknown[] }).data
-      if (Array.isArray(data)) setFolders(data as Parameters<typeof setFolders>[0])
-      close()
-    } catch (err) {
-      console.error('[notepad] QuickCreateOverlay: save folder failed', err)
-      setSaving(false)
-    }
-  }, [title, saving, close, setFolders])
+  return {
+    ...{ type, setType, title, setTitle, body, setBody },
+    ...{ tags, setTags, tagInput, setTagInput, saving, setSaving, close },
+  }
+}
 
+/** Saves the draft and closes the overlay; a folder needs a name. */
+function saveHandler(draft: QuickCreateDraft) {
+  return async () => {
+    if (draft.saving) return
+    if (draft.type === 'folder' && !draft.title.trim()) return
+    draft.setSaving(true)
+    try {
+      await saveQuickNote(draft)
+      draft.close()
+    } catch (err) {
+      console.error(`[notepad] QuickCreateOverlay: save ${draft.type} failed`, err)
+      draft.setSaving(false)
+    }
+  }
+}
+
+function defaultTagsOf(values: Record<string, unknown>): string[] {
+  const raw = values['terminator.notepad.defaultTags']
+  if (typeof raw !== 'string' || !raw.trim()) return []
+  return raw
+    .split(',')
+    .map((t) => t.trim().toLowerCase())
+    .filter(Boolean)
+}
+
+/** Focuses the title on open, and starts with the configured default tags. */
+function useOpenDefaults(open: boolean, draft: QuickCreateDraft, titleRef: TitleRef) {
+  const { setTags } = draft
   useEffect(() => {
-    if (!showQuickCreate) return
+    if (!open) return
     const t = setTimeout(() => titleRef.current?.focus(), 50)
-    // Load default tags from settings (notes only)
     window.electronAPI.extension
       .getSettingsValues()
       .then((result) => {
-        const values = (result as { values: Record<string, unknown> }).values
-        const raw = values['terminator.notepad.defaultTags']
-        if (typeof raw === 'string' && raw.trim()) {
-          const defaults = raw
-            .split(',')
-            .map((t) => t.trim().toLowerCase())
-            .filter(Boolean)
-          if (defaults.length > 0) setTags(defaults)
-        }
+        const defaults = defaultTagsOf((result as { values: Record<string, unknown> }).values)
+        if (defaults.length > 0) setTags(defaults)
       })
       .catch(() => {
         /* ignore */
       })
     return () => clearTimeout(t)
-  }, [showQuickCreate])
+  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
+}
 
-  const handleSaveNote = useCallback(async () => {
-    if (saving) return
-    setSaving(true)
-    // Flush any uncommitted tag from the input field (onBlur fires before onClick
-    // but React 18 batching means the setTags update may not have applied yet)
-    const pendingTag = tagInput.trim().toLowerCase().replace(/\s+/g, '-')
-    const finalTags = pendingTag && !tags.includes(pendingTag) ? [...tags, pendingTag] : tags
-    const resolvedTitle = title.trim() || deriveTitle(body)
-    try {
-      await window.electronAPI.extensionBridge.invoke('terminator.notepad:notes.create', {
-        title: resolvedTitle,
-        body,
-        tags: finalTags,
-      })
-      const result = await window.electronAPI.extensionBridge.invoke(
-        'terminator.notepad:notes.list',
-        { includeArchived: true }
-      )
-      const data = (result as { data?: unknown[] }).data
-      if (Array.isArray(data)) setNotes(data as Parameters<typeof setNotes>[0])
-      close()
-    } catch (err) {
-      console.error('[notepad] QuickCreateOverlay: save note failed', err)
-      setSaving(false)
-    }
-  }, [title, body, tags, tagInput, saving, close, setNotes])
-
-  const handleSaveDiagram = useCallback(async () => {
-    if (saving) return
-    setSaving(true)
-    const pendingTag = tagInput.trim().toLowerCase().replace(/\s+/g, '-')
-    const finalTags = pendingTag && !tags.includes(pendingTag) ? [...tags, pendingTag] : tags
-    const resolvedTitle = title.trim() || 'Untitled diagram'
-    try {
-      const createResult = await window.electronAPI.extensionBridge.invoke(
-        'terminator.notepad:diagrams.create',
-        { title: resolvedTitle, tags: finalTags }
-      )
-      const created = (createResult as { data?: { id: string } }).data
-      const listResult = await window.electronAPI.extensionBridge.invoke(
-        'terminator.notepad:diagrams.list',
-        { includeArchived: true }
-      )
-      const data = (listResult as { data?: DiagramListItem[] }).data
-      if (Array.isArray(data)) {
-        setDiagrams(data)
-        if (created?.id) useNotesStore.getState().setSelectedDiagram(created.id)
-      }
-      close()
-    } catch (err) {
-      console.error('[notepad] QuickCreateOverlay: save diagram failed', err)
-      setSaving(false)
-    }
-  }, [title, tags, tagInput, saving, close, setDiagrams])
-
-  const handleSave = useCallback(() => {
-    if (type === 'diagram') return handleSaveDiagram()
-    if (type === 'folder') return handleSaveFolder()
-    return handleSaveNote()
-  }, [type, handleSaveNote, handleSaveDiagram, handleSaveFolder])
-
-  /**
-   * Escape, focus, and — the part this was missing — a place in the open-surface
-   * count that the double-Escape "leave the extension" gesture reads.
-   *
-   * Without it, the host saw no open modal here. Focus in the composer was
-   * saved by the text-field guard, but focus on any button in this overlay was
-   * not: two Escapes closed Notepad and took the draft with it. That is the
-   * defect this feature exists to fix, and this surface had been missed.
-   *
-   * `captureEscape` keeps the original reason for the capture-phase listener
-   * this replaces: CodeMirror stops propagation before the document sees it.
-   * The backdrop below owns the outside click.
-   */
-  const surfaceRef = useRef<HTMLDivElement>(null)
-
-  useDismissible({
-    ref: surfaceRef,
-    onDismiss: close,
-    closeOnOutsideClick: false,
-    captureEscape: true,
-    enabled: showQuickCreate,
-  })
-
-  function addTag(raw: string) {
-    const trimmed = raw.trim().toLowerCase().replace(/\s+/g, '-')
-    if (trimmed && !tags.includes(trimmed)) {
-      setTags((prev) => [...prev, trimmed])
-    }
-    setTagInput('')
-  }
-
+/** Adding, removing and keyboard-editing the draft's tags. */
+function useTagEditing(draft: QuickCreateDraft) {
+  const { tags, setTags, tagInput, setTagInput } = draft
   function removeTag(tag: string) {
     setTags((prev) => prev.filter((t) => t !== tag))
   }
+  return { ...tagEditing({ tags, updateTags: setTags, tagInput, setTagInput }), removeTag }
+}
 
-  function handleTagKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === 'Enter' || e.key === ',') {
-      e.preventDefault()
-      addTag(tagInput)
-    } else if (e.key === 'Backspace' && tagInput === '' && tags.length > 0) {
-      setTags((prev) => prev.slice(0, -1))
-    }
-  }
+/** The modal shell counts this overlay as an open surface, so double-Escape cannot close Notepad
+ *  with the draft in it, and its Escape is the dialog's own close request, which the editor
+ *  stopping the key's propagation does not prevent. */
+export function QuickCreateOverlay(): React.JSX.Element | null {
+  const showQuickCreate = useNotesStore((s) => s.showQuickCreate)
+  const draft = useQuickCreateDraft()
+  const handleSave = saveHandler(draft)
+  const titleRef = useRef<HTMLInputElement>(null)
+  useOpenDefaults(showQuickCreate, draft, titleRef)
 
   if (!showQuickCreate) return null
-
   return (
-    <div
-      className="notepad-overlay-backdrop"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) close()
-      }}
+    <ModalShell
+      label={draft.type === 'folder' ? 'New folder' : `New ${draft.type}`}
+      className="notepad-quick-create"
+      onDismiss={draft.close}
     >
-      <div
-        ref={surfaceRef}
-        data-tmui-surface=""
-        className="notepad-quick-create"
-        role="dialog"
-        aria-modal="true"
-        aria-label={type === 'folder' ? 'New folder' : `New ${type}`}
-      >
-        <div className="notepad-quick-create__header">
-          <div className="notepad-quick-create__type-tabs">
-            <button
-              className={`notepad-quick-create__type-tab${type === 'note' ? ' notepad-quick-create__type-tab--active' : ''}`}
-              onClick={() => setType('note')}
-            >
-              Note
-            </button>
-            <button
-              className={`notepad-quick-create__type-tab${type === 'diagram' ? ' notepad-quick-create__type-tab--active' : ''}`}
-              onClick={() => setType('diagram')}
-            >
-              Diagram
-            </button>
-            <button
-              className={`notepad-quick-create__type-tab${type === 'folder' ? ' notepad-quick-create__type-tab--active' : ''}`}
-              onClick={() => setType('folder')}
-            >
-              Folder
-            </button>
-          </div>
-          {type === 'note' && (
-            <span className="notepad-quick-create__vault-status">
-              saved · exports as <code>{exportFilename}</code>
-            </span>
-          )}
+      <QuickCreateHeader draft={draft} />
+      <div className="notepad-quick-create__divider" />
+      <TitleInput titleRef={titleRef} draft={draft} onSave={handleSave} />
+      <div className="notepad-quick-create__divider" />
+      {draft.type === 'note' && (
+        <div className="notepad-quick-create__body">
+          <NoteEditor key="open" initialDoc="" onChange={draft.setBody} />
         </div>
-        <div className="notepad-quick-create__divider" />
-        <input
-          ref={titleRef}
-          className="notepad-quick-create__title-input"
-          placeholder="Title"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault()
-              void handleSave()
-            }
-          }}
+      )}
+      <QuickCreateFooter draft={draft} onSave={handleSave} />
+    </ModalShell>
+  )
+}
+
+function QuickCreateHeader({ draft }: DraftProps): React.JSX.Element {
+  return (
+    <div className="notepad-quick-create__header">
+      <SegmentedControl
+        label="Create"
+        size="sm"
+        options={CREATE_KINDS}
+        value={draft.type}
+        onChange={draft.setType}
+      />
+      {draft.type === 'note' && (
+        <span className="notepad-quick-create__vault-status">
+          saved · exports as <code>{toFilenameSlug(draft.title)}</code>
+        </span>
+      )}
+    </div>
+  )
+}
+
+function TitleInput({ titleRef, draft, onSave }: TitleInputProps): React.JSX.Element {
+  return (
+    <input
+      ref={titleRef}
+      className="notepad-quick-create__title-input"
+      placeholder="Title"
+      value={draft.title}
+      onChange={(e) => draft.setTitle(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault()
+          void onSave()
+        }
+      }}
+    />
+  )
+}
+
+function QuickCreateFooter({ draft, onSave }: SaveProps): React.JSX.Element {
+  const tagInputRef = useRef<HTMLInputElement>(null)
+  const { addTag, removeTag, handleTagKeyDown } = useTagEditing(draft)
+  return (
+    <div className="notepad-quick-create__footer">
+      {draft.type !== 'folder' && (
+        <TagChipBar
+          tags={draft.tags}
+          tagInput={draft.tagInput}
+          tagInputRef={tagInputRef}
+          onTagInput={draft.setTagInput}
+          onAddTag={addTag}
+          onRemoveTag={removeTag}
+          onTagKeyDown={handleTagKeyDown}
         />
-        <div className="notepad-quick-create__divider" />
-        {type === 'note' && (
-          <div className="notepad-quick-create__body">
-            <NoteEditor
-              key={showQuickCreate ? 'open' : 'closed'}
-              initialDoc=""
-              onChange={setBody}
-            />
-          </div>
-        )}
-        <div className="notepad-quick-create__footer">
-          {type !== 'folder' && (
-            <TagChipBar
-              tags={tags}
-              tagInput={tagInput}
-              tagInputRef={tagInputRef}
-              onTagInput={setTagInput}
-              onAddTag={addTag}
-              onRemoveTag={removeTag}
-              onTagKeyDown={handleTagKeyDown}
-            />
-          )}
-          <div className="notepad-quick-create__footer-actions">
-            <button className="notepad-quick-create__cancel-link" onClick={close} disabled={saving}>
-              cancel <kbd className="notepad-kbd notepad-kbd--inline">Esc</kbd>
-            </button>
-            <button
-              className="notepad-btn-primary"
-              onClick={() => void handleSave()}
-              disabled={saving}
-            >
-              {saving ? (
-                'Saving…'
-              ) : (
-                <>
-                  Save <kbd className="notepad-kbd notepad-kbd--inline">↵</kbd>
-                </>
-              )}
-            </button>
-          </div>
-        </div>
+      )}
+      <div className="notepad-quick-create__footer-actions">
+        <Button variant="ghost" size="sm" onClick={draft.close} disabled={draft.saving}>
+          Cancel <kbd className="tmui-kbd">Esc</kbd>
+        </Button>
+        <Button variant="primary" size="sm" onClick={() => void onSave()} disabled={draft.saving}>
+          {draft.saving ? 'Saving…' : <SaveLabel />}
+        </Button>
       </div>
     </div>
+  )
+}
+
+function SaveLabel(): React.JSX.Element {
+  return (
+    <>
+      Save <kbd className="tmui-kbd">↵</kbd>
+    </>
   )
 }

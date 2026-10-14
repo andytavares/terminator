@@ -1,0 +1,16 @@
+{
+  "$schema": "./node_modules/syncpack/schema.json",
+  "semverGroups": [
+    {
+      "label": "Every version is exact (ADR 097)",
+      "range": ""
+    }
+  ],
+  "versionGroups": [
+    {
+      "label": "@xterm/xterm is the one terminal library (ADR 097)",
+      "dependencies": ["xterm", "xterm-addon-fit"],
+      "isBanned": true
+    }
+  ]
+}

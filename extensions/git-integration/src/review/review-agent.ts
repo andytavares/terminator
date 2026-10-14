@@ -1,5 +1,5 @@
-import { execFile as execFileCb, spawn as spawnCb } from 'child_process'
-import { promisify } from 'util'
+// child_process only for finding and running `claude`, which is not a command shell.exec runs.
+import { spawn as spawnCb, type ChildProcess } from 'child_process'
 import { randomUUID } from 'crypto'
 import {
   AgentOutputSchema,
@@ -9,29 +9,23 @@ import {
   type AgentRun,
   type AgentScope,
 } from '../schemas/review-agent.schema.js'
+import { runGit } from '../shell/run-git.js'
 
-const execFileAsync = promisify(execFileCb)
-
-const DIFF_TIMEOUT = 30_000
 const DIFF_CAP_BYTES = 200 * 1024
 const DEFAULT_TIMEOUT_MS = 5 * 60_000
 
+/** @internal */
 export type ExecFn = (
-  cmd: string,
+  cmd: 'git',
   args: string[],
-  opts: { cwd?: string }
+  opts: { cwd: string }
 ) => Promise<{ stdout: string; stderr?: string }>
 
-async function defaultExec(cmd: string, args: string[], opts: { cwd?: string }) {
-  return execFileAsync(cmd, args, {
-    cwd: opts.cwd,
-    timeout: DIFF_TIMEOUT,
-    maxBuffer: 20 * 1024 * 1024,
-    env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
-  })
-}
+const defaultExec: ExecFn = async (_cmd, args, opts) => ({
+  stdout: await runGit(opts.cwd, args, { raw: true, maxBuffer: 20 * 1024 * 1024 }),
+})
 
-/** Minimal shape a spawned `claude` child needs — real ChildProcess satisfies this. */
+/** Minimal shape a spawned `claude` child needs; a real ChildProcess satisfies it. @internal */
 export interface SpawnedProcess {
   stdin: { write(data: string): void; end(): void }
   stdout: { on(event: 'data', cb: (d: Buffer | string) => void): void }
@@ -41,21 +35,39 @@ export interface SpawnedProcess {
   kill(signal?: string): void
 }
 
-export type SpawnFn = (
+type SpawnFn = (
   cmd: string,
   args: string[],
   opts: { cwd: string; env: Record<string, string> }
 ) => SpawnedProcess
+
+/** claude leads its own process group and kill() signals the whole group, so a cancel also ends
+ *  what claude started (https://nodejs.org/api/child_process.html#optionsdetached). Not on Windows,
+ *  where `detached` gives the child a console of its own instead. */
+const OWN_PROCESS_GROUP = process.platform !== 'win32'
+
+/** Signals `child` and, on POSIX, every process in its group. */
+function killGroup(child: ChildProcess, signal?: NodeJS.Signals): void {
+  if (!OWN_PROCESS_GROUP || child.pid === undefined) return void child.kill(signal)
+  try {
+    process.kill(-child.pid, signal)
+  } catch {
+    // Already gone.
+  }
+}
 
 function defaultSpawn(
   cmd: string,
   args: string[],
   opts: { cwd: string; env: Record<string, string> }
 ): SpawnedProcess {
-  return spawnCb(cmd, args, { cwd: opts.cwd, env: opts.env }) as unknown as SpawnedProcess
+  const child = spawnCb(cmd, args, { cwd: opts.cwd, env: opts.env, detached: OWN_PROCESS_GROUP })
+  const killChild = (signal?: NodeJS.Signals): void => killGroup(child, signal)
+  return Object.assign(child, { kill: killChild })
 }
 
-/** The last absolute path in a shell's `command -v` output; rc files may print before it. */
+/** The last absolute path in a shell's `command -v` output; rc files may print before it.
+ *  @internal */
 export function claudeFromShellOutput(stdout: string): string | null {
   const paths = stdout
     .split('\n')
@@ -72,24 +84,39 @@ let resolvedClaude: string | undefined
  * terminal runs, where it is. Only a hit is cached, so installing claude later
  * needs no restart.
  */
-async function defaultResolveClaude(): Promise<string> {
+async function defaultResolveClaude(control: RunControl): Promise<string> {
   if (resolvedClaude) return resolvedClaude
-  try {
-    const { stdout } = await execFileAsync(
-      process.env.SHELL || '/bin/zsh',
-      ['-ilc', 'command -v claude'],
-      { timeout: 10_000 }
-    )
-    const found = claudeFromShellOutput(stdout)
-    if (found) resolvedClaude = found
-    return found ?? 'claude'
-  } catch {
-    return 'claude'
-  }
+  const found = claudeFromShellOutput(await askLoginShell(control))
+  if (found) resolvedClaude = found
+  return found ?? 'claude'
+}
+
+const LOGIN_SHELL_TIMEOUT_MS = 10_000
+
+/** `command -v claude` in the login shell, or '' when it fails. The shell leads its own process
+ *  group, which its timeout and a cancel stop whole: rc files can start processes of their own. */
+function askLoginShell(control: RunControl): Promise<string> {
+  return new Promise((resolve) => {
+    const shell = spawnCb(process.env.SHELL || '/bin/zsh', ['-ilc', 'command -v claude'], {
+      detached: OWN_PROCESS_GROUP,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    })
+    control.stopProbe = () => killGroup(shell, 'SIGKILL')
+    const timer = setTimeout(control.stopProbe, LOGIN_SHELL_TIMEOUT_MS)
+    let stdout = ''
+    shell.stdout?.on('data', (chunk: Buffer) => (stdout += chunk.toString()))
+    shell.once('error', () => resolve(''))
+    shell.once('close', (code) => {
+      clearTimeout(timer)
+      control.stopProbe = undefined
+      resolve(code === 0 ? stdout : '')
+    })
+  })
 }
 
 // ─── Prompt ────────────────────────────────────────────────────────────────
 
+/** @internal */
 export interface BuildAgentPromptInput {
   scope: AgentScope
   request: 'review' | 'explain' | 'ask'
@@ -99,12 +126,38 @@ export interface BuildAgentPromptInput {
   truncated?: boolean
 }
 
+const READ_ONLY_RULE =
+  'This is a READ-ONLY review. You must not modify any files, run any write or network ' +
+  'command, and you must not post anywhere — your output is a JSON object the caller ' +
+  'renders privately. You only have Read, Grep and Glob.'
+
+const CITATION_RULE =
+  `Cite every finding by its file path and the line number(s) on the new side of the diff ` +
+  `(the side after this change), unless the finding is specifically about a deleted line.`
+
+const EXPLAIN_NOTE =
+  'The requester wants an explanation, not a review: findings may be empty and the ' +
+  'explanation belongs in the summary.'
+
+const WALKTHROUGH_NOTE =
+  'Also produce a walkthrough: one entry per chapter (a logical grouping of the changed ' +
+  'files), each explaining what the change is, then its consequences.'
+
+const TRUNCATED_NOTE =
+  'The diff below was truncated to fit a size limit — note this in your summary if it ' +
+  'limits what you could review.'
+
+function lineRangeOf(scope: AgentScope): string {
+  return `${scope.startLine ?? '?'}-${scope.endLine ?? '?'}`
+}
+
 function describeScope(scope: AgentScope): string {
+  const file = scope.path ?? 'the file'
   switch (scope.kind) {
     case 'lines':
-      return `lines ${scope.startLine ?? '?'}-${scope.endLine ?? '?'} of ${scope.path ?? 'the file'}`
+      return `lines ${lineRangeOf(scope)} of ${file}`
     case 'hunk':
-      return `the hunk touching ${scope.path ?? 'the file'} around lines ${scope.startLine ?? '?'}-${scope.endLine ?? '?'}`
+      return `the hunk touching ${file} around lines ${lineRangeOf(scope)}`
     case 'file':
       return `the whole file ${scope.path ?? ''}`
     case 'chapter':
@@ -114,60 +167,75 @@ function describeScope(scope: AgentScope): string {
   }
 }
 
-export function buildAgentPrompt(input: BuildAgentPromptInput): string {
-  const severities = FINDING_SEVERITIES.join(', ')
-  const lines: string[] = []
-  lines.push(`You are reviewing pull request #${input.pr.number}: ${input.pr.title}`)
-  if (input.pr.body) {
-    lines.push('')
-    lines.push('PR description:')
-    lines.push(input.pr.body)
-  }
-  lines.push('')
-  lines.push(
-    'This is a READ-ONLY review. You must not modify any files, run any write or network ' +
-      'command, and you must not post anywhere — your output is a JSON object the caller ' +
-      'renders privately. You only have Read, Grep and Glob.'
-  )
-  lines.push('')
-  lines.push(
-    `Scope: ${describeScope(input.scope)}, at PR head ${input.pr.headSHA}, in a private worktree.`
-  )
-  lines.push(
-    `Cite every finding by its file path and the line number(s) on the new side of the diff ` +
-      `(the side after this change), unless the finding is specifically about a deleted line.`
-  )
-  lines.push(`Use these severities exactly, and only these: ${severities}.`)
+function promptIntro(input: BuildAgentPromptInput): string[] {
+  const lines = [`You are reviewing pull request #${input.pr.number}: ${input.pr.title}`]
+  if (input.pr.body) lines.push('', 'PR description:', input.pr.body)
+  return lines
+}
 
-  if (input.request === 'explain') {
-    lines.push(
-      'The requester wants an explanation, not a review: findings may be empty and the ' +
-        'explanation belongs in the summary.'
-    )
-  }
+function requestNotes(input: BuildAgentPromptInput): string[] {
+  const notes: string[] = []
+  if (input.request === 'explain') notes.push(EXPLAIN_NOTE)
   if (input.request === 'ask' && input.question) {
-    lines.push(`The requester asked: ${input.question}`)
+    notes.push(`The requester asked: ${input.question}`)
   }
-  if (input.scope.kind === 'pr') {
-    lines.push(
-      'Also produce a walkthrough: one entry per chapter (a logical grouping of the changed ' +
-        'files), each explaining what the change is, then its consequences.'
-    )
-  }
-  if (input.truncated) {
-    lines.push(
-      'The diff below was truncated to fit a size limit — note this in your summary if it ' +
-        'limits what you could review.'
-    )
-  }
-  lines.push('')
-  lines.push('Diff:')
-  lines.push(input.diffText)
-  return lines.join('\n')
+  if (input.scope.kind === 'pr') notes.push(WALKTHROUGH_NOTE)
+  if (input.truncated) notes.push(TRUNCATED_NOTE)
+  return notes
+}
+
+/** @internal */
+export function buildAgentPrompt(input: BuildAgentPromptInput): string {
+  const scopeLine = `Scope: ${describeScope(input.scope)}, at PR head ${input.pr.headSHA}, in a private worktree.`
+  const severities = `Use these severities exactly, and only these: ${FINDING_SEVERITIES.join(', ')}.`
+  return [
+    ...promptIntro(input),
+    '',
+    READ_ONLY_RULE,
+    '',
+    scopeLine,
+    CITATION_RULE,
+    severities,
+    ...requestNotes(input),
+    '',
+    'Diff:',
+    input.diffText,
+  ].join('\n')
 }
 
 // ─── JSON schema ───────────────────────────────────────────────────────────
 
+function findingJsonSchema(): Record<string, unknown> {
+  return {
+    type: 'object',
+    additionalProperties: false,
+    required: ['severity', 'path', 'startLine', 'endLine', 'title', 'body'],
+    properties: {
+      severity: { type: 'string', enum: [...FINDING_SEVERITIES] },
+      path: { type: 'string' },
+      startLine: { type: 'number' },
+      endLine: { type: 'number' },
+      side: { type: 'string', enum: ['LEFT', 'RIGHT'] },
+      title: { type: 'string' },
+      body: { type: 'string' },
+      suggestedCode: { type: ['string', 'null'] },
+    },
+  }
+}
+
+function walkthroughEntryJsonSchema(): Record<string, unknown> {
+  return {
+    type: 'object',
+    additionalProperties: false,
+    required: ['chapter', 'text'],
+    properties: {
+      chapter: { type: 'string' },
+      text: { type: 'string' },
+    },
+  }
+}
+
+/** @internal */
 export function buildAgentJsonSchema(): Record<string, unknown> {
   return {
     type: 'object',
@@ -175,42 +243,15 @@ export function buildAgentJsonSchema(): Record<string, unknown> {
     required: ['summary', 'findings'],
     properties: {
       summary: { type: 'string' },
-      findings: {
-        type: 'array',
-        items: {
-          type: 'object',
-          additionalProperties: false,
-          required: ['severity', 'path', 'startLine', 'endLine', 'title', 'body'],
-          properties: {
-            severity: { type: 'string', enum: [...FINDING_SEVERITIES] },
-            path: { type: 'string' },
-            startLine: { type: 'number' },
-            endLine: { type: 'number' },
-            side: { type: 'string', enum: ['LEFT', 'RIGHT'] },
-            title: { type: 'string' },
-            body: { type: 'string' },
-            suggestedCode: { type: ['string', 'null'] },
-          },
-        },
-      },
-      walkthrough: {
-        type: 'array',
-        items: {
-          type: 'object',
-          additionalProperties: false,
-          required: ['chapter', 'text'],
-          properties: {
-            chapter: { type: 'string' },
-            text: { type: 'string' },
-          },
-        },
-      },
+      findings: { type: 'array', items: findingJsonSchema() },
+      walkthrough: { type: 'array', items: walkthroughEntryJsonSchema() },
     },
   }
 }
 
 // ─── claude CLI args ───────────────────────────────────────────────────────
 
+/** @internal */
 export interface BuildClaudeArgsInput {
   sessionId: string
   model: string
@@ -218,6 +259,7 @@ export interface BuildClaudeArgsInput {
   schemaJson: string
 }
 
+/** @internal */
 export function buildClaudeArgs(input: BuildClaudeArgsInput): string[] {
   const args = [
     '-p',
@@ -238,81 +280,78 @@ export function buildClaudeArgs(input: BuildClaudeArgsInput): string[] {
 
 // ─── Diff text ─────────────────────────────────────────────────────────────
 
-/** Keeps only hunks whose new-side range overlaps [startLine, endLine]. */
-function filterHunksByRange(diffText: string, startLine: number, endLine: number): string {
-  const lines = diffText.split('\n')
-  const out: string[] = []
-  let inHeader = true
-  let currentHunk: string[] = []
-  let keepCurrent = false
-
-  const flush = () => {
-    if (currentHunk.length && keepCurrent) out.push(...currentHunk)
-    currentHunk = []
-  }
-
-  for (const line of lines) {
-    const m = line.match(/^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/)
-    if (m) {
-      flush()
-      const newStart = parseInt(m[1], 10)
-      const newCount = m[2] !== undefined ? parseInt(m[2], 10) : 1
-      const newEnd = newStart + Math.max(newCount, 1) - 1
-      keepCurrent = newEnd >= startLine && newStart <= endLine
-      currentHunk = [line]
-      inHeader = false
-      continue
-    }
-    if (inHeader) out.push(line)
-    else currentHunk.push(line)
-  }
-  flush()
-  return out.join('\n')
+/** Where to diff: the PR's worktree, its base branch and head, narrowed to `scope`. @internal */
+export interface DiffTarget {
+  worktreePath: string
+  baseRefName: string
+  headSHA: string
+  scope: AgentScope
 }
 
+const HUNK_RANGE_RE = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/
+
+/** The new-side line range a hunk header covers; null for a line that is not a hunk header. */
+function newSideRange(line: string): { start: number; end: number } | null {
+  const m = line.match(HUNK_RANGE_RE)
+  if (!m) return null
+  const start = parseInt(m[1], 10)
+  const count = m[2] !== undefined ? parseInt(m[2], 10) : 1
+  return { start, end: start + Math.max(count, 1) - 1 }
+}
+
+/** Keeps the file headers and only the hunks whose new-side range overlaps [startLine, endLine]. */
+function filterHunksByRange(diffText: string, startLine: number, endLine: number): string {
+  const kept: string[] = []
+  let keepingHunk = true
+  for (const line of diffText.split('\n')) {
+    const range = newSideRange(line)
+    if (range) keepingHunk = range.end >= startLine && range.start <= endLine
+    if (keepingHunk) kept.push(line)
+  }
+  return kept.join('\n')
+}
+
+function usesContext(scope: AgentScope): boolean {
+  return scope.kind === 'lines' || scope.kind === 'hunk'
+}
+
+function diffArgsFor(target: DiffTarget): string[] {
+  const { scope } = target
+  const args = ['diff']
+  if (usesContext(scope)) args.push('--unified=20')
+  args.push(`origin/${target.baseRefName}...${target.headSHA}`)
+  const narrowsToPath = scope.kind === 'file' || scope.kind === 'chapter' || usesContext(scope)
+  if (narrowsToPath && scope.path) args.push('--', scope.path)
+  return args
+}
+
+function cappedDiff(diffText: string): { diffText: string; truncated: boolean } {
+  if (Buffer.byteLength(diffText, 'utf8') <= DIFF_CAP_BYTES) return { diffText, truncated: false }
+  return { diffText: diffText.slice(0, DIFF_CAP_BYTES), truncated: true }
+}
+
+/** @internal */
 export async function buildDiffText(
-  worktreePath: string,
-  baseRefName: string,
-  headSHA: string,
-  scope: AgentScope,
+  target: DiffTarget,
   exec: ExecFn = defaultExec
 ): Promise<{ diffText: string; truncated: boolean }> {
-  await exec('git', ['fetch', 'origin', baseRefName], { cwd: worktreePath }).catch(() => {})
-  const range = `origin/${baseRefName}...${headSHA}`
-  const useContext = scope.kind === 'lines' || scope.kind === 'hunk'
-
-  const args = ['diff']
-  if (useContext) args.push('--unified=20')
-  args.push(range)
-  if ((scope.kind === 'file' || scope.kind === 'chapter' || useContext) && scope.path) {
-    args.push('--', scope.path)
+  const cwd = target.worktreePath
+  await exec('git', ['fetch', 'origin', target.baseRefName], { cwd }).catch(() => {})
+  const { stdout } = await exec('git', diffArgsFor(target), { cwd })
+  const { scope } = target
+  if (usesContext(scope) && scope.startLine != null && scope.endLine != null) {
+    return cappedDiff(filterHunksByRange(stdout, scope.startLine, scope.endLine))
   }
-
-  const { stdout } = await exec('git', args, { cwd: worktreePath })
-  let diffText = stdout
-  if (useContext && scope.startLine != null && scope.endLine != null) {
-    diffText = filterHunksByRange(diffText, scope.startLine, scope.endLine)
-  }
-
-  let truncated = false
-  if (Buffer.byteLength(diffText, 'utf8') > DIFF_CAP_BYTES) {
-    diffText = diffText.slice(0, DIFF_CAP_BYTES)
-    truncated = true
-  }
-  return { diffText, truncated }
+  return cappedDiff(stdout)
 }
 
 // ─── Run ───────────────────────────────────────────────────────────────────
 
-export interface RunAgentReviewInput {
+export interface RunAgentReviewInput extends DiffTarget {
   repoRoot: string
-  worktreePath: string
   prNumber: number
-  headSHA: string
-  baseRefName: string
   title: string
   body: string
-  scope: AgentScope
   request: 'review' | 'explain' | 'ask'
   question?: string | null
   sessionId: string
@@ -333,14 +372,35 @@ export interface RunAgentReviewResult {
   cancel: () => void
 }
 
-function baseFields(
-  input: RunAgentReviewInput,
-  runId: string,
-  startedAt: string,
+/** What every record of one run shares, whatever its outcome. */
+interface RunContext {
+  input: RunAgentReviewInput
+  runId: string
+  startedAt: string
   activity: string[]
-) {
+}
+
+/** Lets `cancel()` reach a run already under way. */
+interface RunControl {
+  cancelled: boolean
+  proc?: SpawnedProcess
+  /** Stops the login shell asked where claude is, while it runs. */
+  stopProbe?: () => void
+}
+
+/** A started `claude` invocation: what to run and what to send it. */
+interface ClaudeLaunch {
+  spawn: SpawnFn
+  claudePath: string
+  args: string[]
+  prompt: string
+  env: Record<string, string>
+}
+
+function baseFields(run: RunContext) {
+  const { input } = run
   return {
-    id: runId,
+    id: run.runId,
     repoRoot: input.repoRoot,
     prNumber: input.prNumber,
     headSHA: input.headSHA,
@@ -348,20 +408,14 @@ function baseFields(
     scope: input.scope,
     request: input.request,
     question: input.question ?? null,
-    startedAt,
-    activity,
+    startedAt: run.startedAt,
+    activity: run.activity,
   }
 }
 
-function failedRun(
-  input: RunAgentReviewInput,
-  runId: string,
-  startedAt: string,
-  activity: string[],
-  error: string
-): AgentRun {
+function failedRun(run: RunContext, error: string): AgentRun {
   return {
-    ...baseFields(input, runId, startedAt, activity),
+    ...baseFields(run),
     status: 'failed',
     finishedAt: new Date().toISOString(),
     summary: null,
@@ -371,14 +425,9 @@ function failedRun(
   }
 }
 
-function cancelledRun(
-  input: RunAgentReviewInput,
-  runId: string,
-  startedAt: string,
-  activity: string[]
-): AgentRun {
+function cancelledRun(run: RunContext): AgentRun {
   return {
-    ...baseFields(input, runId, startedAt, activity),
+    ...baseFields(run),
     status: 'cancelled',
     finishedAt: new Date().toISOString(),
     summary: null,
@@ -388,14 +437,8 @@ function cancelledRun(
   }
 }
 
-function doneRun(
-  input: RunAgentReviewInput,
-  runId: string,
-  startedAt: string,
-  activity: string[],
-  output: AgentOutput
-): AgentRun {
-  const findings: AgentFinding[] = output.findings.map((f) => ({
+function findingFrom(f: AgentOutput['findings'][number]): AgentFinding {
+  return {
     id: randomUUID(),
     severity: f.severity,
     path: f.path,
@@ -406,13 +449,16 @@ function doneRun(
     body: f.body,
     suggestedCode: f.suggestedCode ?? null,
     dismissed: false,
-  }))
+  }
+}
+
+function doneRun(run: RunContext, output: AgentOutput): AgentRun {
   return {
-    ...baseFields(input, runId, startedAt, activity),
+    ...baseFields(run),
     status: 'done',
     finishedAt: new Date().toISOString(),
     summary: output.summary,
-    findings,
+    findings: output.findings.map(findingFrom),
     walkthrough: output.walkthrough ?? [],
     error: null,
   }
@@ -436,130 +482,113 @@ function parseStructuredOutput(stdout: string): unknown {
   return parsed.result
 }
 
+/** The run a `claude` exit produces: its error output on failure, else its parsed findings. */
+function exitedRun(
+  run: RunContext,
+  code: number | null,
+  output: { stdout: string; stderr: string }
+) {
+  if (code !== 0) return failedRun(run, output.stderr.trim() || `claude exited with code ${code}`)
+  try {
+    return doneRun(run, AgentOutputSchema.parse(parseStructuredOutput(output.stdout)))
+  } catch (e) {
+    return failedRun(run, `Could not parse agent output: ${String(e)}`)
+  }
+}
+
+function sendPrompt(child: SpawnedProcess, prompt: string): void {
+  try {
+    child.stdin.write(prompt)
+    child.stdin.end()
+  } catch {
+    // handled by the 'error' listener runClaude adds
+  }
+}
+
+function collectChildOutput(child: SpawnedProcess): { stdout: string; stderr: string } {
+  const output = { stdout: '', stderr: '' }
+  child.stdout.on('data', (d) => {
+    output.stdout += d.toString()
+  })
+  child.stderr.on('data', (d) => {
+    output.stderr += d.toString()
+  })
+  return output
+}
+
+function runClaude(run: RunContext, launch: ClaudeLaunch, control: RunControl): Promise<AgentRun> {
+  return new Promise<AgentRun>((resolve) => {
+    const env = launch.env
+    const child = launch.spawn(launch.claudePath, launch.args, { cwd: run.input.worktreePath, env })
+    control.proc = child
+    const timer = setTimeout(() => {
+      child.kill('SIGKILL')
+      resolve(failedRun(run, 'Timed out after 5 min'))
+    }, run.input.timeoutMs ?? DEFAULT_TIMEOUT_MS)
+    sendPrompt(child, launch.prompt)
+    const output = collectChildOutput(child)
+    child.on('error', (e) => {
+      clearTimeout(timer)
+      resolve(failedRun(run, `Failed to start claude: ${String(e)}`))
+    })
+    child.on('exit', (code) => {
+      clearTimeout(timer)
+      resolve(control.cancelled ? cancelledRun(run) : exitedRun(run, code, output))
+    })
+  })
+}
+
+function agentReviewPrompt(
+  input: RunAgentReviewInput,
+  diff: { diffText: string; truncated: boolean }
+) {
+  return buildAgentPrompt({
+    scope: input.scope,
+    request: input.request,
+    question: input.question,
+    pr: { number: input.prNumber, title: input.title, body: input.body, headSHA: input.headSHA },
+    ...diff,
+  })
+}
+
+async function executeAgentRun(
+  run: RunContext,
+  deps: RunAgentReviewDeps,
+  control: RunControl
+): Promise<AgentRun> {
+  const { input } = run
+  let diff: { diffText: string; truncated: boolean }
+  try {
+    diff = await buildDiffText(input, deps.exec ?? defaultExec)
+  } catch (e) {
+    return failedRun(run, `Could not compute diff: ${String(e)}`)
+  }
+  if (control.cancelled) return cancelledRun(run)
+  const prompt = agentReviewPrompt(input, diff)
+  const schemaJson = JSON.stringify(buildAgentJsonSchema())
+  const { sessionId, model, effort } = input
+  const args = buildClaudeArgs({ sessionId, model, effort, schemaJson })
+  const env = scrubbedEnv()
+  const claudePath = await (deps.resolveClaude ?? (() => defaultResolveClaude(control)))()
+  if (control.cancelled) return cancelledRun(run)
+  const spawn = deps.spawn ?? defaultSpawn
+  return runClaude(run, { spawn, claudePath, args, prompt, env }, control)
+}
+
 export function runAgentReview(
   input: RunAgentReviewInput,
   deps: RunAgentReviewDeps = {}
 ): RunAgentReviewResult {
   const runId = randomUUID()
-  const exec = deps.exec ?? defaultExec
-  const spawnFn = deps.spawn ?? defaultSpawn
-  const startedAt = new Date().toISOString()
-  const activity: string[] = []
-  let cancelled = false
-  let proc: SpawnedProcess | undefined
-
-  const done = (async (): Promise<AgentRun> => {
-    let diffText = ''
-    let truncated = false
-    try {
-      const diff = await buildDiffText(
-        input.worktreePath,
-        input.baseRefName,
-        input.headSHA,
-        input.scope,
-        exec
-      )
-      diffText = diff.diffText
-      truncated = diff.truncated
-    } catch (e) {
-      return failedRun(input, runId, startedAt, activity, `Could not compute diff: ${String(e)}`)
-    }
-
-    if (cancelled) return cancelledRun(input, runId, startedAt, activity)
-
-    const prompt = buildAgentPrompt({
-      scope: input.scope,
-      request: input.request,
-      question: input.question,
-      pr: { number: input.prNumber, title: input.title, body: input.body, headSHA: input.headSHA },
-      diffText,
-      truncated,
-    })
-    const schemaJson = JSON.stringify(buildAgentJsonSchema())
-    const args = buildClaudeArgs({
-      sessionId: input.sessionId,
-      model: input.model,
-      effort: input.effort,
-      schemaJson,
-    })
-    const env = scrubbedEnv()
-    const claudePath = await (deps.resolveClaude ?? defaultResolveClaude)()
-    if (cancelled) return cancelledRun(input, runId, startedAt, activity)
-
-    return await new Promise<AgentRun>((resolve) => {
-      let stdout = ''
-      let stderr = ''
-      const timeoutMs = input.timeoutMs ?? DEFAULT_TIMEOUT_MS
-      const child = spawnFn(claudePath, args, { cwd: input.worktreePath, env })
-      proc = child
-
-      const timer = setTimeout(() => {
-        child.kill('SIGKILL')
-        resolve(failedRun(input, runId, startedAt, activity, 'Timed out after 5 min'))
-      }, timeoutMs)
-
-      try {
-        child.stdin.write(prompt)
-        child.stdin.end()
-      } catch {
-        // handled by the 'error' listener below
-      }
-
-      child.stdout.on('data', (d) => {
-        stdout += d.toString()
-      })
-      child.stderr.on('data', (d) => {
-        stderr += d.toString()
-      })
-      child.on('error', (e) => {
-        clearTimeout(timer)
-        resolve(
-          failedRun(input, runId, startedAt, activity, `Failed to start claude: ${String(e)}`)
-        )
-      })
-      child.on('exit', (code) => {
-        clearTimeout(timer)
-        if (cancelled) {
-          resolve(cancelledRun(input, runId, startedAt, activity))
-          return
-        }
-        if (code !== 0) {
-          resolve(
-            failedRun(
-              input,
-              runId,
-              startedAt,
-              activity,
-              stderr.trim() || `claude exited with code ${code}`
-            )
-          )
-          return
-        }
-        try {
-          const structured = parseStructuredOutput(stdout)
-          const output = AgentOutputSchema.parse(structured)
-          resolve(doneRun(input, runId, startedAt, activity, output))
-        } catch (e) {
-          resolve(
-            failedRun(
-              input,
-              runId,
-              startedAt,
-              activity,
-              `Could not parse agent output: ${String(e)}`
-            )
-          )
-        }
-      })
-    })
-  })()
-
+  const run: RunContext = { input, runId, startedAt: new Date().toISOString(), activity: [] }
+  const control: RunControl = { cancelled: false }
   return {
     runId,
-    done,
+    done: executeAgentRun(run, deps, control),
     cancel: () => {
-      cancelled = true
-      proc?.kill('SIGKILL')
+      control.cancelled = true
+      control.stopProbe?.()
+      control.proc?.kill('SIGKILL')
     },
   }
 }

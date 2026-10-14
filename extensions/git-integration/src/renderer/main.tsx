@@ -1,9 +1,10 @@
 import React from 'react'
-import { createRoot } from 'react-dom/client'
+import { mountExtension } from '@terminator/extension-sdk/renderer'
+import '@terminator/extension-ui/fonts'
+// Before App, so every view's own stylesheet comes after the rules they share.
+import '../components/shared-chrome.css'
 import { App } from './App'
 import '../components/syntax-theme.css'
 import '../components/git-integration.css'
 
-const el = document.getElementById('app')
-if (!el) throw new Error('No #app element')
-createRoot(el).render(<App />)
+mountExtension(<App />)

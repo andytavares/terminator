@@ -1,0 +1,14 @@
+{
+  // Type-checks the Playwright screenshot suite over the built Storybook
+  // (`npm run typecheck`). Playwright runs it without checking its types and
+  // tsconfig.json covers the sources and stories only, so this is the only
+  // place it is checked. It starts from tsconfig.json and adds Node, which the
+  // suite and its config read the built index and the environment through.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": false,
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "include": ["visual/**/*.ts", "playwright.visual.config.ts"]
+}

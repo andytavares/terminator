@@ -10,9 +10,9 @@
 
 .integrations__tracker {
   margin-top: 16px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--bg-card);
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-sm);
+  background: var(--tm-bg-card);
   overflow: hidden;
 }
 
@@ -21,7 +21,7 @@
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--tm-border);
 }
 
 /*
@@ -36,27 +36,27 @@
 }
 
 .integrations__dot--on {
-  background: var(--success);
+  background: var(--tm-success);
 }
 
 .integrations__dot--error {
-  background: var(--danger);
+  background: var(--tm-danger);
 }
 
 .integrations__dot--off {
-  background: var(--text-muted);
+  background: var(--tm-text-muted);
   opacity: 0.4;
 }
 
 .integrations__name {
   font-size: 12.5px;
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--tm-text-primary);
 }
 
 .integrations__status {
   font-size: 11.5px;
-  color: var(--text-muted);
+  color: var(--tm-text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -106,6 +106,6 @@
 
 .integrations__error {
   font-size: 11.5px;
-  color: var(--danger);
+  color: var(--tm-danger);
   margin-top: 6px;
 }

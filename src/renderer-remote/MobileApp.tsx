@@ -13,8 +13,55 @@ type Route = { view: 'list' } | { view: 'terminal'; sessionId: string; cwd: stri
 
 export function MobileApp() {
   const [route, setRoute] = useState<Route>({ view: 'list' })
+  const { workspaces, terminals, refreshTerminals } = useListings()
+
+  const handleCreateTerminal = async (_workspaceId: string, folderPath: string) => {
+    const sessionId = await createTerminalInFolder(folderPath)
+    if (sessionId !== null) setRoute({ view: 'terminal', sessionId, cwd: folderPath })
+  }
+
+  if (route.view === 'terminal') {
+    const handleBack = () => {
+      refreshTerminals()
+      setRoute({ view: 'list' })
+    }
+    return <MobileTerminalView sessionId={route.sessionId} cwd={route.cwd} onBack={handleBack} />
+  }
+
+  return (
+    <MobileTerminalList
+      workspaces={workspaces}
+      terminals={terminals}
+      onSelectTerminal={({ sessionId, cwd }) => setRoute({ view: 'terminal', sessionId, cwd })}
+      onCreateTerminal={handleCreateTerminal}
+      onAssignWorkspace={async (sessionId, workspaceId) => {
+        await assignTerminalWorkspace(sessionId, workspaceId).catch(() => undefined)
+        refreshTerminals()
+      }}
+    />
+  )
+}
+
+/** A new terminal in the folder, or null when the server would not make one. */
+async function createTerminalInFolder(folderPath: string): Promise<string | null> {
+  try {
+    const { sessionId } = await createTerminal({ cwd: folderPath, tabTitle: 'Remote' })
+    return sessionId
+  } catch {
+    // silently ignore — toast can be added later
+    return null
+  }
+}
+
+/** The workspaces and terminals the list shows, loaded once on mount. A failed read leaves them as they were. */
+function useListings() {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
   const [terminals, setTerminals] = useState<TerminalSession[]>([])
+  const refreshTerminals = () => {
+    listTerminals()
+      .then(setTerminals)
+      .catch(() => undefined)
+  }
 
   useEffect(() => {
     listWorkspaces()
@@ -24,49 +71,5 @@ export function MobileApp() {
       .then(setTerminals)
       .catch(() => undefined)
   }, [])
-
-  const handleSelectTerminal = ({ sessionId, cwd }: { sessionId: string; cwd: string }) => {
-    setRoute({ view: 'terminal', sessionId, cwd })
-  }
-
-  const handleCreateTerminal = async (workspaceId: string, folderPath: string) => {
-    try {
-      const { sessionId } = await createTerminal({
-        cwd: folderPath,
-        tabTitle: 'Remote',
-      })
-      setRoute({ view: 'terminal', sessionId, cwd: folderPath })
-    } catch {
-      // silently ignore — toast can be added later
-    }
-    void workspaceId
-  }
-
-  const handleAssignWorkspace = async (sessionId: string, workspaceId: string | null) => {
-    await assignTerminalWorkspace(sessionId, workspaceId).catch(() => undefined)
-    listTerminals()
-      .then(setTerminals)
-      .catch(() => undefined)
-  }
-
-  function handleBack() {
-    listTerminals()
-      .then(setTerminals)
-      .catch(() => undefined)
-    setRoute({ view: 'list' })
-  }
-
-  if (route.view === 'terminal') {
-    return <MobileTerminalView sessionId={route.sessionId} cwd={route.cwd} onBack={handleBack} />
-  }
-
-  return (
-    <MobileTerminalList
-      workspaces={workspaces}
-      terminals={terminals}
-      onSelectTerminal={handleSelectTerminal}
-      onCreateTerminal={handleCreateTerminal}
-      onAssignWorkspace={handleAssignWorkspace}
-    />
-  )
+  return { workspaces, terminals, refreshTerminals }
 }

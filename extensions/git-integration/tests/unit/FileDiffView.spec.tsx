@@ -1,6 +1,7 @@
 import React from 'react'
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, beforeAll, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
+import type { FileDiff } from '../../src/schemas/git.schema'
 
 vi.mock('../../src/utils/hljs', () => ({
   default: {
@@ -10,7 +11,7 @@ vi.mock('../../src/utils/hljs', () => ({
   },
 }))
 
-const makeDiff = (overrides: Record<string, unknown> = {}) => ({
+const makeDiff = (overrides: Partial<FileDiff> = {}): FileDiff => ({
   path: 'src/foo.ts',
   isBinary: false,
   truncated: false,
@@ -27,10 +28,18 @@ const makeDiff = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 })
 
-async function renderDiff(props: Record<string, unknown> = {}) {
+async function renderDiff(
+  props: { diff?: FileDiff; isStale?: boolean; onRefresh?: () => void } = {}
+) {
   const { FileDiffView } = await import('../../src/components/FileDiffView')
   return render(<FileDiffView diff={props.diff ?? makeDiff()} {...props} />)
 }
+
+// The first import compiles the component tree, which on a loaded machine takes longer
+// than one test's 5 s; load it once here so every test times only its own work.
+beforeAll(async () => {
+  await import('../../src/components/FileDiffView')
+}, 60_000)
 
 describe('FileDiffView', () => {
   it('shows empty state when diff is null', async () => {
@@ -59,7 +68,9 @@ describe('FileDiffView', () => {
     await renderDiff()
     expect(screen.getByText('@@ -1,3 +1,3 @@')).toBeTruthy()
   })
+})
 
+describe('FileDiffView — shows Unified and Split toggle buttons', () => {
   it('shows Unified and Split toggle buttons', async () => {
     await renderDiff()
     expect(screen.getByText('Unified')).toBeTruthy()
@@ -83,7 +94,9 @@ describe('FileDiffView', () => {
     await renderDiff({ isStale: true })
     expect(screen.getByText(/File changed while viewing/)).toBeTruthy()
   })
+})
 
+describe('FileDiffView — calls onRefresh when Refresh is clicked in stale banner', () => {
   it('calls onRefresh when Refresh is clicked in stale banner', async () => {
     const onRefresh = vi.fn()
     await renderDiff({ isStale: true, onRefresh })
@@ -107,7 +120,9 @@ describe('FileDiffView', () => {
     fireEvent.click(screen.getByText('Split'))
     expect(screen.getByText('@@ -1,3 +1,3 @@')).toBeTruthy()
   })
+})
 
+describe('FileDiffView — renders a diff with only removes correctly in split view', () => {
   it('renders a diff with only removes correctly in split view', async () => {
     const diff = makeDiff({
       hunks: [
@@ -123,7 +138,9 @@ describe('FileDiffView', () => {
     fireEvent.click(screen.getByText('Split'))
     expect(screen.getByText('@@ -1 +0,0 @@')).toBeTruthy()
   })
+})
 
+describe('FileDiffView — renders a diff with only adds correctly in split view', () => {
   it('renders a diff with only adds correctly in split view', async () => {
     const diff = makeDiff({
       hunks: [
@@ -148,7 +165,9 @@ describe('FileDiffView', () => {
     // drag state activated — fire mouseup to deactivate
     fireEvent.mouseUp(window)
   })
+})
 
+describe('FileDiffView — moves split position on mousemove while dragging', () => {
   it('moves split position on mousemove while dragging', async () => {
     const { container } = await renderDiff()
     fireEvent.click(screen.getByText('Split'))

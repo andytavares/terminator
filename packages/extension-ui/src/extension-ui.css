@@ -5,41 +5,57 @@
  * own. Stacking comes from the --tm-layer-* scale, never from a raw z-index.
  */
 
-/* ── Dialog ─────────────────────────────────────────────────────────────── */
+/* ── Modal shell ────────────────────────────────────────────────────────── */
 
-.tmui-dialog__scrim {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--tm-space-6, 24px);
-  /* Dims what is behind. It must never hide it: the content a dialog was opened
-     from stays visible, which is the whole reason dialogs render in the calling
-     view rather than in the host window (ADR 038). */
-  background: rgb(0 0 0 / 55%);
+/* The browser's own dialog box (border, padding, system colours) is taken off;
+   `:where` keeps this at no specificity, so the caller's class decides the look.
+   Content taller than the window scrolls inside the shell, which keeps a margin. */
+:where(.tmui-modal) {
+  box-sizing: border-box;
+  max-width: calc(100% - 2 * var(--tm-space-4, 16px));
+  max-height: calc(100% - 2 * var(--tm-space-4, 16px));
+  overflow: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
 }
+
+/* Every modal sits in the middle of the window, on both axes (ADR 110). These are
+   the browser's own values for a modal dialog, made unmovable: no caller's class,
+   offset or transform, animated or not, takes a modal off centre. */
+.tmui-modal {
+  position: fixed !important;
+  inset: 0 !important;
+  margin: auto !important;
+  transform: none !important;
+  translate: none !important;
+}
+
+/* Dims what is behind and never hides it (ADR 038). The fallback is for a browser
+   whose backdrop does not inherit custom properties (Safari before 17.4). */
+.tmui-modal::backdrop {
+  background: var(--tm-scrim, rgb(0 0 0 / 55%));
+}
+
+/* ── Dialog ─────────────────────────────────────────────────────────────── */
 
 /* Nothing a caller puts inside may make the panel wider than itself. A flex
    child defaults to min-width:auto and refuses to shrink below its content,
    which is how a 760px table of chips pushed a 518px dialog's title and close
    button off screen. */
-.tmui-dialog__panel > * {
+.tmui-dialog__panel > *,
+.tmui-dialog__form > * {
   min-width: 0;
   max-width: 100%;
 }
 
-.tmui-dialog__panel[data-size='wide'] {
-  width: min(860px, 100%);
-}
-
 .tmui-dialog__panel {
-  position: relative;
   display: flex;
   flex-direction: column;
   gap: var(--tm-space-4, 16px);
-  width: min(520px, 100%);
-  max-height: 100%;
+  width: min(520px, calc(100% - 2 * var(--tm-space-6, 24px)));
+  max-height: calc(100% - 2 * var(--tm-space-6, 24px));
   overflow: auto;
   /* The panel scrolls vertically; it never scrolls sideways, because its own
      header would be the first thing to leave. */
@@ -52,15 +68,20 @@
   font-family: var(--tm-font-ui);
 }
 
-.tmui-dialog__head {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--tm-space-3, 12px);
+.tmui-dialog__panel--wide {
+  width: min(860px, calc(100% - 2 * var(--tm-space-6, 24px)));
 }
 
+/* The form is the panel's content when an action submits; it draws no box. */
+.tmui-dialog__form {
+  display: contents;
+}
+
+/* Leaves the close control's corner free, and is as tall as that control. */
 .tmui-dialog__title {
-  flex: 1 1 auto;
+  min-height: 26px;
   margin: 0;
+  padding-right: calc(26px + var(--tm-space-3, 12px));
   font-size: 15px;
   font-weight: 600;
   line-height: 1.3;
@@ -84,8 +105,11 @@
   gap: var(--tm-space-2, 8px);
 }
 
+/* Last in the document, so focus opens on the content; drawn beside the title. */
 .tmui-dialog__close {
-  flex: 0 0 auto;
+  position: absolute;
+  top: var(--tm-space-5, 20px);
+  right: var(--tm-space-5, 20px);
 }
 
 /* ── Buttons ────────────────────────────────────────────────────────────── */
@@ -114,11 +138,44 @@
   cursor: default;
 }
 
+.tmui-button--sm {
+  padding: 3px 8px;
+  font-size: 12px;
+}
+
+.tmui-button--ghost {
+  border-color: transparent;
+  color: var(--tm-text-secondary);
+}
+
+.tmui-button--ghost:hover:not(:disabled) {
+  color: var(--tm-text-primary);
+}
+
+/* Principle XII: the icon is sized here, never by a size prop. */
+.tmui-button__icon {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+}
+
+.tmui-button--sm .tmui-button__icon {
+  width: 12px;
+  height: 12px;
+}
+
 .tmui-button--primary {
   background: var(--tm-accent);
   border-color: var(--tm-accent);
   color: var(--tm-on-accent);
   font-weight: 500;
+}
+
+/* Without this the base hover's card background won, leaving the light label
+   on a light grey in the light theme. Notepad's own primary had fixed the same. */
+.tmui-button--primary:hover:not(:disabled) {
+  background: var(--tm-accent-hover);
+  border-color: var(--tm-accent-hover);
 }
 
 .tmui-button--danger {
@@ -151,9 +208,25 @@
   cursor: pointer;
 }
 
-.tmui-icon-button:hover {
+.tmui-icon-button:hover:not(:disabled) {
   background: var(--tm-bg-card-hover);
   color: var(--tm-text-primary);
+}
+
+.tmui-icon-button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.tmui-icon-button--sm {
+  width: 20px;
+  height: 20px;
+  border-radius: var(--tm-radius-xs, 4px);
+}
+
+.tmui-icon-button.tmui-icon-button--sm svg {
+  width: 12px;
+  height: 12px;
 }
 
 .tmui-icon-button[aria-pressed='true'] {
@@ -168,6 +241,46 @@
 .tmui-empty__icon svg {
   width: 15px;
   height: 15px;
+}
+
+/* A single-line text field an extension draws itself. */
+.tmui-input {
+  background: var(--tm-bg-input);
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-sm, 6px);
+  color: var(--tm-text-primary);
+  font-size: 13px;
+  padding: 7px 10px;
+  outline: none;
+}
+
+.tmui-input:focus {
+  border-color: var(--tm-accent);
+}
+
+/* A list edited one item per line (ListInput): monospace, so globs line up. */
+.tmui-list-input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  background: var(--tm-bg-input);
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-sm, 6px);
+  color: var(--tm-text-primary);
+  font-family: var(--tm-font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  padding: 6px 9px;
+  resize: vertical;
+  outline: none;
+}
+
+.tmui-list-input:focus {
+  border-color: var(--tm-accent);
+}
+
+.tmui-list-input::placeholder {
+  color: var(--tm-text-muted);
 }
 
 .tmui-kbd {
@@ -247,18 +360,23 @@
   max-width: 380px;
 }
 
-.tmui-toast {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--tm-space-3, 12px);
-  padding: 10px 12px;
+/* A surface raised over the view: a toast, a popover. */
+.tmui-toast,
+.tmui-popover {
   border: 1px solid var(--tm-border-strong);
-  border-left-width: 2px;
   border-radius: var(--tm-radius-sm, 6px);
   background: var(--tm-bg-elevated);
   color: var(--tm-text-primary);
   font-family: var(--tm-font-ui);
   font-size: 13px;
+}
+
+.tmui-toast {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tm-space-3, 12px);
+  padding: 10px 12px;
+  border-left-width: 2px;
   line-height: 1.45;
 }
 
@@ -282,7 +400,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .tmui-dialog__scrim,
   .tmui-dialog__panel,
   .tmui-toast {
     animation: none !important;
@@ -296,12 +413,6 @@
   position: absolute;
   min-width: 200px;
   padding: var(--tm-space-2, 8px);
-  border: 1px solid var(--tm-border-strong);
-  border-radius: var(--tm-radius-sm, 6px);
-  background: var(--tm-bg-elevated);
-  color: var(--tm-text-primary);
-  font-family: var(--tm-font-ui);
-  font-size: 13px;
 }
 
 .tmui-toast__action {
@@ -323,4 +434,273 @@
 .tmui-toast__action:focus-visible {
   outline: 2px solid var(--tm-accent);
   outline-offset: 2px;
+}
+
+/* ── Tabs ───────────────────────────────────────────────────────────────── */
+
+.tmui-tabs__list {
+  display: flex;
+  gap: var(--tm-space-1, 4px);
+  border-bottom: 1px solid var(--tm-border);
+  font-family: var(--tm-font-ui);
+}
+
+.tmui-tabs__tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tm-space-1, 4px);
+  margin-bottom: -1px;
+  padding: 6px 12px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--tm-text-secondary);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+/* A count or badge inside a tab label. */
+.tmui-tabs__count {
+  color: var(--tm-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.tmui-tabs__list[aria-orientation='vertical'] {
+  flex-direction: column;
+  gap: 0;
+  border-bottom: 0;
+}
+
+.tmui-tabs__list[aria-orientation='vertical'] .tmui-tabs__tab {
+  margin-bottom: 0;
+  padding: 7px 10px;
+  border-bottom: 0;
+  border-left: 2px solid transparent;
+  text-align: left;
+}
+
+.tmui-tabs__list[aria-orientation='vertical'] .tmui-tabs__tab[aria-selected='true'] {
+  border-left-color: var(--tm-accent);
+  background: var(--tm-accent-dim);
+}
+
+.tmui-tabs__tab:hover:not(:disabled) {
+  color: var(--tm-text-primary);
+}
+
+.tmui-tabs__tab[aria-selected='true'] {
+  border-bottom-color: var(--tm-accent);
+  color: var(--tm-text-primary);
+  font-weight: 500;
+}
+
+.tmui-tabs__tab:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.tmui-tabs__tab:focus-visible,
+.tmui-tabs__panel:focus-visible {
+  outline: 2px solid var(--tm-accent);
+  outline-offset: -2px;
+}
+
+/* Only the assembled Tabs spaces its panel; a TabPanel placed by its caller is
+   spaced by that caller. */
+.tmui-tabs > .tmui-tabs__panel {
+  padding-top: var(--tm-space-3, 12px);
+}
+
+/* ── Segmented control ──────────────────────────────────────────────────── */
+
+.tmui-segmented {
+  display: inline-flex;
+  padding: 2px;
+  gap: 2px;
+  border: 1px solid var(--tm-border-strong);
+  border-radius: var(--tm-radius-sm, 6px);
+  background: var(--tm-bg-input);
+  font-family: var(--tm-font-ui);
+}
+
+.tmui-segmented__option {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tm-space-1, 4px);
+  padding: 3px 10px;
+  border: 0;
+  border-radius: var(--tm-radius-xs, 4px);
+  background: transparent;
+  color: var(--tm-text-secondary);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.3;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.tmui-segmented--sm .tmui-segmented__option {
+  padding: 2px 8px;
+  font-size: 12px;
+}
+
+.tmui-segmented__option svg {
+  width: 14px;
+  height: 14px;
+}
+
+.tmui-segmented__option:hover:not(:disabled) {
+  color: var(--tm-text-primary);
+}
+
+.tmui-segmented__option[aria-checked='true'] {
+  background: var(--tm-bg-card-hover);
+  color: var(--tm-text-primary);
+  font-weight: 500;
+}
+
+.tmui-segmented__option:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.tmui-segmented__option:focus-visible {
+  outline: 2px solid var(--tm-accent);
+  outline-offset: -2px;
+}
+
+/* ── Markdown ───────────────────────────────────────────────────────────── */
+
+/* Every selector is wrapped in :where() so the defaults weigh nothing: a caller
+   that styles its own class on the same elements always wins, whatever the
+   order the stylesheets load in. */
+
+:where(.tmui-markdown) {
+  color: var(--tm-text-primary);
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+:where(.tmui-markdown a) {
+  color: var(--tm-accent-text);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--tm-accent) 50%, transparent);
+  text-underline-offset: 2px;
+}
+
+:where(.tmui-markdown p) {
+  margin: 0 0 8px;
+}
+
+:where(.tmui-markdown p:last-child) {
+  margin-bottom: 0;
+}
+
+:where(.tmui-markdown code) {
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: var(--tm-overlay);
+  font-family: var(--tm-font-mono);
+  font-size: 12px;
+}
+
+:where(.tmui-markdown pre) {
+  margin: 8px 0;
+  border-radius: 6px;
+  overflow-x: auto;
+}
+
+:where(.tmui-markdown pre code) {
+  padding: 0;
+  background: none;
+}
+
+:where(.tmui-markdown ul, .tmui-markdown ol) {
+  margin: 4px 0 8px;
+  padding-left: 20px;
+}
+
+:where(.tmui-markdown li) {
+  margin-bottom: 3px;
+}
+
+:where(.tmui-markdown img) {
+  max-width: 100%;
+}
+
+:where(.tmui-markdown h1, .tmui-markdown h2, .tmui-markdown h3, .tmui-markdown h4) {
+  margin: 14px 0 6px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+:where(.tmui-markdown > :first-child) {
+  margin-top: 0;
+}
+
+:where(.tmui-markdown h1) {
+  font-size: 1.15em;
+}
+
+:where(.tmui-markdown h2) {
+  font-size: 1.05em;
+}
+
+:where(.tmui-markdown h3, .tmui-markdown h4, .tmui-markdown h5, .tmui-markdown h6) {
+  font-size: 1em;
+}
+
+/* A task list carries its own marker; the bullet as well is noise. */
+:where(.tmui-markdown li:has(> input[type='checkbox'])) {
+  list-style: none;
+  margin-left: -18px;
+}
+
+:where(.tmui-markdown li > input[type='checkbox']) {
+  margin: 0 6px 0 0;
+  vertical-align: -1px;
+}
+
+:where(.tmui-markdown blockquote) {
+  margin: 0 0 8px;
+  padding-left: 10px;
+  border-left: 2px solid var(--tm-border-strong);
+  color: var(--tm-text-muted);
+}
+
+/* A wide table or code block scrolls inside its own box, never widens the view. */
+:where(.tmui-markdown table) {
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  overflow-x: auto;
+  margin: 0 0 8px;
+  border-collapse: collapse;
+}
+
+:where(.tmui-markdown th, .tmui-markdown td) {
+  border: 1px solid var(--tm-border);
+  padding: 4px 8px;
+  text-align: left;
+}
+
+:where(.tmui-markdown th) {
+  background: var(--tm-bg-surface);
+  font-weight: 600;
+}
+
+:where(.tmui-markdown hr) {
+  border: none;
+  border-top: 1px solid var(--tm-border);
+  margin: 12px 0;
+}
+
+/* Inline text takes its size and colour from the button or label it sits in. */
+:where(.tmui-markdown--inline) {
+  color: inherit;
+  font-size: inherit;
+  line-height: inherit;
 }

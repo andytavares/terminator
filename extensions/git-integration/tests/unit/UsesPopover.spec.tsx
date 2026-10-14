@@ -4,7 +4,8 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { UsesPopover, type Use } from '../../src/components/pr-review/UsesPopover'
 
-vi.mock('@terminator/extension-ui', () => ({
+vi.mock('@terminator/extension-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@terminator/extension-ui')>()),
   Popover: ({
     label,
     children,
@@ -48,7 +49,9 @@ describe('UsesPopover', () => {
     render(<UsesPopover uses={allRead} onPeekDefinition={vi.fn()} />)
     expect(screen.getByRole('button', { name: 'Uses 2' })).toBeTruthy()
   })
+})
 
+describe('UsesPopover — lists each symbol with its step and read state', () => {
   it('lists each symbol with its step and read state', async () => {
     render(<UsesPopover uses={USES} onPeekDefinition={vi.fn()} />)
     await userEvent.click(screen.getByRole('button', { name: 'Uses 2 · 1 unread' }))

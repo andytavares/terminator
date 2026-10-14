@@ -5,6 +5,7 @@ import { createWorld } from '../../factory/sim.js'
 import type { World } from '../../factory/sim.js'
 import type { RunGraph } from '../../line/run-graph.js'
 import { HallScene } from './HallScene.js'
+import { invoke } from '@terminator/extension-sdk/renderer'
 
 // One still frame of an order's own hall, for its card in the Factory grid.
 //
@@ -27,8 +28,85 @@ export interface HallThumbnailProps {
 
 const PLACEHOLDER_TEXT = 'Not started yet — the floor appears when the work starts.'
 
-function invoke(channel: string, payload: unknown = {}): Promise<unknown> {
-  return window.electronAPI.extensionBridge.invoke(channel, payload)
+// Whether the element is within 200px of the screen, so an off-screen card never
+// fetches. With no `IntersectionObserver` (a test) it is visible at once.
+function useOnScreen(containerRef: React.MutableRefObject<HTMLDivElement | null>): boolean {
+  const canObserve = typeof IntersectionObserver !== 'undefined'
+  const [intersected, setIntersected] = useState(false)
+  useEffect(() => {
+    const el = containerRef.current
+    if (el === null) return
+    if (!canObserve) return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) setIntersected(true)
+      },
+      { rootMargin: '200px' }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [canObserve, containerRef])
+  return !canObserve || intersected
+}
+
+/** The order's run graph; undefined for an order that has not started. */
+async function readThumbnailGraph(orderId: string): Promise<RunGraph | undefined> {
+  const r = (await invoke('foundry:run.timeline', { id: orderId })) as {
+    graph?: RunGraph
+    error?: string
+  }
+  return r.graph
+}
+
+/** The world settled on `graph`, with nothing going on in it. */
+function stillWorld(map: HallMap, graph: RunGraph): World {
+  return createWorld(map, {
+    graph,
+    orphaned: [],
+    stranded: [],
+    waiting: [],
+    activity: {},
+    ci: null,
+    queue: null,
+  })
+}
+
+interface StillDeps {
+  readonly orderId: string
+  readonly refreshKey: string
+  readonly visible: boolean
+  readonly worldRef: React.MutableRefObject<World | null>
+}
+
+/** The hall laid out once per graph, fetched again on `refreshKey`; `draft` with no graph. */
+function useStillHall({ orderId, refreshKey, visible, worldRef }: StillDeps) {
+  const [map, setMap] = useState<HallMap | null>(null)
+  const [draft, setDraft] = useState(false)
+  const fetchedFor = useRef<string | null>(null)
+  useEffect(() => {
+    if (!visible) return
+    const key = `${orderId}:${refreshKey}`
+    if (fetchedFor.current === key) return
+    fetchedFor.current = key
+    let cancelled = false
+    void (async () => {
+      const graph = await readThumbnailGraph(orderId)
+      if (cancelled) return
+      if (graph === undefined) {
+        setDraft(true)
+        setMap(null)
+        return
+      }
+      const nextMap = layoutHall(graph, {}, false)
+      worldRef.current = stillWorld(nextMap, graph)
+      setDraft(false)
+      setMap(nextMap)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [visible, orderId, refreshKey, worldRef])
+  return { map, draft }
 }
 
 export function HallThumbnail({
@@ -37,86 +115,46 @@ export function HallThumbnail({
   refreshKey,
 }: HallThumbnailProps): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement | null>(null)
-  const [visible, setVisible] = useState(false)
-  const [map, setMap] = useState<HallMap | null>(null)
-  const [draft, setDraft] = useState(false)
   const worldRef = useRef<World | null>(null)
-  const fetchedFor = useRef<string | null>(null)
-
-  // Lazy: a card off-screen never fetches. Falls back to fetching right away
-  // when the test/runtime environment has no `IntersectionObserver` at all.
-  useEffect(() => {
-    const el = containerRef.current
-    if (el === null) return
-    if (typeof IntersectionObserver === 'undefined') {
-      setVisible(true)
-      return
-    }
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) setVisible(true)
-      },
-      { rootMargin: '200px' }
-    )
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [])
-
-  useEffect(() => {
-    if (!visible) return
-    const key = `${orderId}:${refreshKey}`
-    if (fetchedFor.current === key) return
-    fetchedFor.current = key
-    let cancelled = false
-    void (async () => {
-      const r = (await invoke('foundry:run.timeline', { id: orderId })) as {
-        graph?: RunGraph
-        error?: string
-      }
-      if (cancelled) return
-      if (r.graph === undefined) {
-        setDraft(true)
-        setMap(null)
-        return
-      }
-      const nextMap = layoutHall(r.graph, {}, false)
-      worldRef.current = createWorld(nextMap, {
-        graph: r.graph,
-        orphaned: [],
-        stranded: [],
-        waiting: [],
-        activity: {},
-        ci: null,
-        queue: null,
-      })
-      setDraft(false)
-      setMap(nextMap)
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [visible, orderId, refreshKey])
-
-  const label = `Factory floor for ${title}`
-
+  const visible = useOnScreen(containerRef)
+  const { map, draft } = useStillHall({ orderId, refreshKey, visible, worldRef })
   return (
     <div ref={containerRef} className="fdry-hall-card-pic">
-      {map !== null && worldRef.current !== null ? (
-        <div role="img" aria-label={label} className="fdry-hall-card-pic-frame">
-          <HallScene
-            map={map}
-            worldRef={worldRef as React.MutableRefObject<World>}
-            states={{}}
-            reducedMotion
-          />
-        </div>
-      ) : draft ? (
-        <p role="img" aria-label={label} className="fdry-hall-card-pic-empty">
-          {PLACEHOLDER_TEXT}
-        </p>
-      ) : (
-        <div className="fdry-hall-card-pic-frame" aria-hidden="true" />
-      )}
+      <StillPicture
+        map={map}
+        draft={draft}
+        label={`Factory floor for ${title}`}
+        worldRef={worldRef}
+      />
     </div>
+  )
+}
+
+interface StillPictureProps {
+  readonly map: HallMap | null
+  readonly draft: boolean
+  readonly label: string
+  readonly worldRef: React.MutableRefObject<World | null>
+}
+
+/** The hall's one frame, the words for an order not started yet, or an empty frame while it loads. */
+function StillPicture({ map, draft, label, worldRef }: StillPictureProps) {
+  if (map !== null) {
+    return (
+      <div role="img" aria-label={label} className="fdry-hall-card-pic-frame">
+        <HallScene
+          map={map}
+          worldRef={worldRef as React.MutableRefObject<World>}
+          states={{}}
+          reducedMotion
+        />
+      </div>
+    )
+  }
+  if (!draft) return <div className="fdry-hall-card-pic-frame" aria-hidden="true" />
+  return (
+    <p role="img" aria-label={label} className="fdry-hall-card-pic-empty">
+      {PLACEHOLDER_TEXT}
+    </p>
   )
 }

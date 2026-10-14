@@ -1,9 +1,11 @@
+import { createChangeBus } from '../../helpers/change-bus.js'
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import { FactorySite } from '../../../src/components/factory/FactorySite.js'
 import type { FactoryOrderRow } from '../../../src/components/factory/FactorySite.js'
 import type { Signal } from '../../../src/sensors/types.js'
+import { timesInvoked } from '../../helpers/bridge-calls.js'
 
 function dockSignal(over: Partial<Signal> = {}): Signal {
   return {
@@ -40,12 +42,15 @@ const METRICS = {
   forgeDecisionsStruckShare: 0.25,
 }
 
+let bus = createChangeBus()
+
 function mount(
   orders: FactoryOrderRow[],
   metrics: Record<string, unknown> = METRICS,
   extra: { signals?: Signal[]; sensors?: unknown[]; promote?: unknown } = {}
 ) {
   const onOpen = vi.fn()
+  bus = createChangeBus()
   const invoke = vi.fn(async (channel: string, payload?: unknown) => {
     if (channel === 'foundry:order.list') return { orders }
     if (channel === 'foundry:factory.metrics') return metrics
@@ -60,16 +65,44 @@ function mount(
     }
     return {}
   })
-  ;(window as unknown as Record<string, unknown>).electronAPI = {
-    extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
-  }
+  Object.assign(window, {
+    electronAPI: {
+      extensionBridge: { invoke, on: bus.on },
+    },
+  })
   render(<FactorySite repoRoot="/repo" onOpen={onOpen} />)
   return { onOpen, invoke }
 }
 
 beforeEach(() => vi.clearAllMocks())
 
+describe('FactorySite reading', () => {
+  it('reads the orders again when Foundry says one changed, and not for time passing', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const { invoke } = mount([])
+    await waitFor(() => expect(timesInvoked(invoke, 'foundry:order.list')).toBe(1))
+
+    await vi.advanceTimersByTimeAsync(60_000)
+    expect(timesInvoked(invoke, 'foundry:order.list')).toBe(1)
+    vi.useRealTimers()
+
+    bus.emit({ kind: 'order', orderId: 'WO-1' })
+    await waitFor(() => expect(timesInvoked(invoke, 'foundry:order.list')).toBe(2))
+  })
+})
+
 describe('FactorySite', () => {
+  describe('the cards', theCardsTests)
+  describe('completed orders', completedOrdersTests)
+  describe('no Completed section', noCompletedSectionTests)
+  describe('waiting shipped orders', waitingShippedOrdersTests)
+  describe('beacons', beaconsTests)
+  describe('CI', factorySiteCiTests)
+  describe('the refinery track', theRefineryTrackTests)
+  describe('opening', factorySiteOpeningTests)
+})
+
+function theCardsTests() {
   it('says there is nothing yet', async () => {
     mount([])
     await waitFor(() => expect(screen.getByText(/no orders yet/i)).toBeTruthy())
@@ -87,35 +120,42 @@ describe('FactorySite', () => {
       expect.stringContaining('Older'),
     ])
   })
+}
 
+/** A standing that says the order is finished. */
+const doneStanding = (label: string) => ({
+  kind: 'done' as const,
+  turn: 'foundry' as const,
+  label,
+  headline: '',
+  detail: '',
+  done: 1,
+  total: 1,
+  gateId: null,
+})
+
+/** Two shipped orders either side of one still building. */
+const SHIPPED_AROUND_BUILDING = [
+  {
+    id: 'WO-1',
+    title: 'Shipped early',
+    status: 'shipped',
+    standing: doneStanding('shipped'),
+    createdAt: '2026-10-01T00:00:00.000Z',
+  },
+  { id: 'WO-2', title: 'Building', status: 'running', createdAt: '2026-10-02T00:00:00.000Z' },
+  {
+    id: 'WO-3',
+    title: 'Shipped late',
+    status: 'shipped',
+    standing: doneStanding('shipped'),
+    createdAt: '2026-10-05T00:00:00.000Z',
+  },
+] as FactoryOrderRow[]
+
+function completedOrdersTests() {
   it('puts finished orders in their own section, marked done, newest first', async () => {
-    const done = (label: string) => ({
-      kind: 'done' as const,
-      turn: 'foundry' as const,
-      label,
-      headline: '',
-      detail: '',
-      done: 1,
-      total: 1,
-      gateId: null,
-    })
-    mount([
-      {
-        id: 'WO-1',
-        title: 'Shipped early',
-        status: 'shipped',
-        standing: done('shipped'),
-        createdAt: '2026-10-01T00:00:00.000Z',
-      },
-      { id: 'WO-2', title: 'Building', status: 'running', createdAt: '2026-10-02T00:00:00.000Z' },
-      {
-        id: 'WO-3',
-        title: 'Shipped late',
-        status: 'shipped',
-        standing: done('shipped'),
-        createdAt: '2026-10-05T00:00:00.000Z',
-      },
-    ])
+    mount(SHIPPED_AROUND_BUILDING)
     await waitFor(() => screen.getByText('Building'))
 
     const active = screen.getByRole('region', { name: 'Active' })
@@ -130,13 +170,17 @@ describe('FactorySite', () => {
     expect(finished.every((c) => c.classList.contains('is-done'))).toBe(true)
     expect(active.querySelector('.fdry-hall-card.is-done')).toBeNull()
   })
+}
 
+function noCompletedSectionTests() {
   it('shows no Completed section until an order finishes', async () => {
     mount([{ id: 'WO-1', title: 'Building', status: 'running' }])
     await waitFor(() => screen.getByText('Building'))
     expect(screen.queryByRole('region', { name: 'Completed' })).toBeNull()
   })
+}
 
+function waitingShippedOrdersTests() {
   // A shipped order still holding the ready-for-review gate is the operator's
   // move, so it stays with the active work.
   it('keeps a shipped order that is still waiting on you with the active ones', async () => {
@@ -161,7 +205,9 @@ describe('FactorySite', () => {
     expect(screen.getByRole('region', { name: 'Active' }).textContent).toContain('Awaiting review')
     expect(screen.queryByRole('region', { name: 'Completed' })).toBeNull()
   })
+}
 
+function beaconsTests() {
   it('beacons a card whose standing says the operator’s move', async () => {
     mount([
       {
@@ -185,7 +231,9 @@ describe('FactorySite', () => {
       screen.getByRole('button', { name: /Halted/ }).querySelector('.fdry-hall-card-beacon')
     ).not.toBeNull()
   })
+}
 
+function factorySiteCiTests() {
   it('shows the CI round and status in plain words, never a raw code', async () => {
     mount([
       { id: 'WO-1', title: 'Shipping', status: 'running', ci: { status: 'red', round: 2, max: 3 } },
@@ -199,7 +247,9 @@ describe('FactorySite', () => {
     await waitFor(() => screen.getByText('Fresh'))
     expect(screen.queryByText(/CI \d/)).toBeNull()
   })
+}
 
+function theRefineryTrackTests() {
   it('shows no refinery track when nothing is queued behind anything', async () => {
     mount([{ id: 'WO-1', title: 'Only one', status: 'running' }])
     await waitFor(() => screen.getByText('Only one'))
@@ -223,14 +273,16 @@ describe('FactorySite', () => {
     const track = screen.getByLabelText('Refinery').querySelector('.fdry-refinery-track')
     expect(track?.textContent).toBe('First2 shared filesSecond')
   })
+}
 
+function factorySiteOpeningTests() {
   it('opens the order it is given', async () => {
     const { onOpen } = mount([{ id: 'WO-1', title: 'Only one', status: 'running' }])
     await waitFor(() => screen.getByText('Only one'))
     fireEvent.click(screen.getByRole('button', { name: /Only one/ }))
     expect(onOpen).toHaveBeenCalledWith(expect.objectContaining({ id: 'WO-1', title: 'Only one' }))
   })
-})
+}
 
 describe('FactorySite status wall', () => {
   it('shows the 30-day numbers as tiles', async () => {
@@ -251,7 +303,7 @@ describe('FactorySite status wall', () => {
   it('refetches with the chosen window when the toggle is switched', async () => {
     const { invoke } = mount([])
     await waitFor(() => screen.getByText('Status wall'))
-    fireEvent.click(screen.getByRole('button', { name: 'All time' }))
+    fireEvent.click(screen.getByRole('radio', { name: 'All time' }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:factory.metrics', { window: 'all' })
     )
@@ -259,6 +311,11 @@ describe('FactorySite status wall', () => {
 })
 
 describe('the Dock', () => {
+  describe('crates', factorySiteCratesTests)
+  describe('promoting', factorySitePromotingTests)
+})
+
+function factorySiteCratesTests() {
   it('shows nothing when there are no open signals', async () => {
     mount([])
     await waitFor(() => screen.getByText(/no orders yet/i))
@@ -271,7 +328,9 @@ describe('the Dock', () => {
     expect(screen.getByText(/×4/)).toBeTruthy()
     expect(screen.getByText(/high/)).toBeTruthy()
   })
+}
 
+function factorySitePromotingTests() {
   it('promotes a crate the same way the Inbox does', async () => {
     const { invoke } = mount([], METRICS, {
       signals: [dockSignal()],
@@ -297,4 +356,4 @@ describe('the Dock', () => {
     )
     expect(await screen.findByText(/Draft WO-9 created — open it in the Forge/)).toBeTruthy()
   })
-})
+}

@@ -16,8 +16,9 @@ Object.defineProperty(globalThis, 'window', {
 })
 
 import { useSettingsStore } from '../../../../src/renderer/stores/settings.store'
+import type { GlobalSettings } from '../../../../src/shared/schemas/settings.schema'
 
-const DEFAULT_SETTINGS = {
+const DEFAULT_SETTINGS: GlobalSettings = {
   appearance: { theme: 'dark' },
   terminal: {
     scrollbackLimit: 10000,
@@ -25,8 +26,8 @@ const DEFAULT_SETTINGS = {
     promptForName: false,
   },
   git: { worktreeBaseDir: '', branchExcludePatterns: [] },
-  extensions: {},
-  ui: { hasSeenWelcome: false },
+  ui: { hasSeenWelcome: false, editor: '' },
+  sidebar: { staleAfterMs: 2 * 60 * 60 * 1000 },
   notifications: { defaultTargets: ['system', 'center', 'toast'], overrides: {} },
   quickActions: { pins: [], usage: [], directUse: [], custom: [] },
 }
@@ -39,49 +40,49 @@ function resetStore() {
   })
 }
 
-describe('useSettingsStore', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-    resetStore()
+beforeEach(() => {
+  vi.clearAllMocks()
+  resetStore()
+})
+
+describe('useSettingsStore — loadSettings', () => {
+  it('loads and stores global settings', async () => {
+    const globalSettings = { ...DEFAULT_SETTINGS, appearance: { theme: 'light' as const } }
+    mockElectronAPI.settings.getGlobal.mockResolvedValue({ settings: globalSettings })
+
+    await useSettingsStore.getState().loadSettings()
+    expect(useSettingsStore.getState().globalSettings).toEqual(globalSettings)
   })
 
-  describe('loadSettings', () => {
-    it('loads and stores global settings', async () => {
-      const globalSettings = { ...DEFAULT_SETTINGS, appearance: { theme: 'light' as const } }
-      mockElectronAPI.settings.getGlobal.mockResolvedValue({ settings: globalSettings })
+  it('falls back to DEFAULT_SETTINGS when global settings is null', async () => {
+    mockElectronAPI.settings.getGlobal.mockResolvedValue({ settings: null })
 
-      await useSettingsStore.getState().loadSettings()
-      expect(useSettingsStore.getState().globalSettings).toEqual(globalSettings)
-    })
-
-    it('falls back to DEFAULT_SETTINGS when global settings is null', async () => {
-      mockElectronAPI.settings.getGlobal.mockResolvedValue({ settings: null })
-
-      await useSettingsStore.getState().loadSettings()
-      expect(useSettingsStore.getState().globalSettings).toEqual(DEFAULT_SETTINGS)
-    })
-
-    it('loads workspace settings when workspaceId is provided', async () => {
-      mockElectronAPI.settings.getGlobal.mockResolvedValue({ settings: DEFAULT_SETTINGS })
-      const wsSettings = { overrides: { appearance: { theme: 'light' as const } } }
-      mockElectronAPI.settings.getWorkspace.mockResolvedValue({ settings: wsSettings })
-
-      await useSettingsStore.getState().loadSettings('ws-1')
-      const stored = useSettingsStore.getState().workspaceSettings.get('ws-1')
-      expect(stored).toEqual(wsSettings)
-    })
-
-    it('sets resolvedTheme based on merged settings', async () => {
-      const globalSettings = { ...DEFAULT_SETTINGS }
-      mockElectronAPI.settings.getGlobal.mockResolvedValue({ settings: globalSettings })
-      const wsSettings = { overrides: { appearance: { theme: 'light' as const } } }
-      mockElectronAPI.settings.getWorkspace.mockResolvedValue({ settings: wsSettings })
-
-      await useSettingsStore.getState().loadSettings('ws-1')
-      expect(useSettingsStore.getState().resolvedTheme).toBe('light')
-    })
+    await useSettingsStore.getState().loadSettings()
+    expect(useSettingsStore.getState().globalSettings).toEqual(DEFAULT_SETTINGS)
   })
 
+  it('loads workspace settings when workspaceId is provided', async () => {
+    mockElectronAPI.settings.getGlobal.mockResolvedValue({ settings: DEFAULT_SETTINGS })
+    const wsSettings = { overrides: { appearance: { theme: 'light' as const } } }
+    mockElectronAPI.settings.getWorkspace.mockResolvedValue({ settings: wsSettings })
+
+    await useSettingsStore.getState().loadSettings('ws-1')
+    const stored = useSettingsStore.getState().workspaceSettings.get('ws-1')
+    expect(stored).toEqual(wsSettings)
+  })
+
+  it('sets resolvedTheme based on merged settings', async () => {
+    const globalSettings = { ...DEFAULT_SETTINGS }
+    mockElectronAPI.settings.getGlobal.mockResolvedValue({ settings: globalSettings })
+    const wsSettings = { overrides: { appearance: { theme: 'light' as const } } }
+    mockElectronAPI.settings.getWorkspace.mockResolvedValue({ settings: wsSettings })
+
+    await useSettingsStore.getState().loadSettings('ws-1')
+    expect(useSettingsStore.getState().resolvedTheme).toBe('light')
+  })
+})
+
+describe('useSettingsStore — updateGlobalTheme', () => {
   describe('updateGlobalTheme', () => {
     it('calls updateGlobal and updates store', async () => {
       const updated = { ...DEFAULT_SETTINGS, appearance: { theme: 'light' as const } }
@@ -110,7 +111,9 @@ describe('useSettingsStore', () => {
       expect(useSettingsStore.getState().resolvedTheme).toBe('light')
     })
   })
+})
 
+describe('useSettingsStore — updateScrollbackLimit', () => {
   describe('updateScrollbackLimit', () => {
     it('calls updateGlobal with scrollbackLimit and updates store', async () => {
       const updated = {
@@ -136,67 +139,95 @@ describe('useSettingsStore', () => {
       expect(mockElectronAPI.settings.updateGlobal).toHaveBeenCalledWith({
         git: { worktreeBaseDir: '/my/worktrees' },
       })
+      expect(useSettingsStore.getState().globalSettings).toEqual(updated)
     })
   })
+})
 
-  describe('updateWorkspaceWorktreeBaseDir', () => {
-    it('calls updateWorkspace with git override when dir is provided', async () => {
-      const wsSettings = { overrides: { git: { worktreeBaseDir: '/ws/worktrees' } } }
-      mockElectronAPI.settings.updateWorkspace.mockResolvedValue({ settings: wsSettings })
+describe('useSettingsStore — updateWorkspaceWorktreeBaseDir', () => {
+  it('calls updateWorkspace with git override when dir is provided', async () => {
+    const wsSettings = { overrides: { git: { worktreeBaseDir: '/ws/worktrees' } } }
+    mockElectronAPI.settings.updateWorkspace.mockResolvedValue({ settings: wsSettings })
 
-      await useSettingsStore.getState().updateWorkspaceWorktreeBaseDir('ws-1', '/ws/worktrees')
-      expect(mockElectronAPI.settings.updateWorkspace).toHaveBeenCalledWith('ws-1', {
-        git: { worktreeBaseDir: '/ws/worktrees' },
-      })
+    await useSettingsStore.getState().updateWorkspaceWorktreeBaseDir('ws-1', '/ws/worktrees')
+    expect(mockElectronAPI.settings.updateWorkspace).toHaveBeenCalledWith('ws-1', {
+      git: { worktreeBaseDir: '/ws/worktrees' },
     })
-
-    it('calls updateWorkspace with undefined git override when dir is undefined', async () => {
-      const wsSettings = { overrides: undefined }
-      mockElectronAPI.settings.updateWorkspace.mockResolvedValue({ settings: wsSettings })
-
-      await useSettingsStore.getState().updateWorkspaceWorktreeBaseDir('ws-1', undefined)
-      expect(mockElectronAPI.settings.updateWorkspace).toHaveBeenCalledWith('ws-1', {
-        git: undefined,
-      })
-    })
+    expect(useSettingsStore.getState().workspaceSettings.get('ws-1')).toEqual(wsSettings)
   })
 
-  describe('resolveSettings', () => {
-    it('returns defaults merged with global settings when no workspace', () => {
-      useSettingsStore.setState({ globalSettings: DEFAULT_SETTINGS })
-      const resolved = useSettingsStore.getState().resolveSettings()
-      expect(resolved.appearance.theme).toBe('dark')
-    })
+  it('hands back only the worktree directory when dir is undefined', async () => {
+    const wsSettings = { overrides: undefined }
+    mockElectronAPI.settings.updateWorkspace.mockResolvedValue({ settings: wsSettings })
 
-    it('merges workspace overrides over global settings', () => {
-      useSettingsStore.setState({
-        globalSettings: DEFAULT_SETTINGS,
-        workspaceSettings: new Map([
-          ['ws-1', { overrides: { appearance: { theme: 'light' as const } } }],
-        ]),
-      })
-      const resolved = useSettingsStore.getState().resolveSettings('ws-1')
-      expect(resolved.appearance.theme).toBe('light')
-    })
-
-    it('uses defaults when globalSettings is null', () => {
-      useSettingsStore.setState({ globalSettings: null })
-      const resolved = useSettingsStore.getState().resolveSettings()
-      expect(resolved.terminal.scrollbackLimit).toBe(10000)
-    })
-
-    it('ignores workspace overrides when no workspace id provided', () => {
-      useSettingsStore.setState({
-        globalSettings: { ...DEFAULT_SETTINGS, appearance: { theme: 'dark' as const } },
-        workspaceSettings: new Map([
-          ['ws-1', { overrides: { appearance: { theme: 'light' as const } } }],
-        ]),
-      })
-      const resolved = useSettingsStore.getState().resolveSettings(null)
-      expect(resolved.appearance.theme).toBe('dark')
+    await useSettingsStore.getState().updateWorkspaceWorktreeBaseDir('ws-1', undefined)
+    expect(mockElectronAPI.settings.updateWorkspace).toHaveBeenCalledWith('ws-1', {
+      git: { worktreeBaseDir: undefined },
     })
   })
+})
 
+describe('useSettingsStore — updateWorkspaceDefaultShell', () => {
+  it("saves the workspace's own shell, and undefined hands it back", async () => {
+    const wsSettings = { overrides: { terminal: { defaultShell: '/bin/fish' } } }
+    mockElectronAPI.settings.updateWorkspace.mockResolvedValue({ settings: wsSettings })
+
+    await useSettingsStore.getState().updateWorkspaceDefaultShell('ws-1', '/bin/fish')
+    await useSettingsStore.getState().updateWorkspaceDefaultShell('ws-1', undefined)
+
+    expect(mockElectronAPI.settings.updateWorkspace.mock.calls).toEqual([
+      ['ws-1', { terminal: { defaultShell: '/bin/fish' } }],
+      ['ws-1', { terminal: { defaultShell: undefined } }],
+    ])
+    expect(useSettingsStore.getState().workspaceSettings.get('ws-1')).toEqual(wsSettings)
+  })
+})
+
+describe('useSettingsStore — resolveSettings', () => {
+  it('returns defaults merged with global settings when no workspace', () => {
+    useSettingsStore.setState({ globalSettings: DEFAULT_SETTINGS })
+    const resolved = useSettingsStore.getState().resolveSettings()
+    expect(resolved.appearance.theme).toBe('dark')
+  })
+
+  it('merges workspace overrides over global settings', () => {
+    useSettingsStore.setState({
+      globalSettings: DEFAULT_SETTINGS,
+      workspaceSettings: new Map([
+        [
+          'ws-1',
+          { workspaceId: 'ws-1', extensions: {}, overrides: { appearance: { theme: 'light' } } },
+        ],
+      ]),
+    })
+    const resolved = useSettingsStore.getState().resolveSettings('ws-1')
+    expect(resolved.appearance.theme).toBe('light')
+  })
+
+  it('uses defaults when globalSettings is null', () => {
+    useSettingsStore.setState({ globalSettings: null })
+    const resolved = useSettingsStore.getState().resolveSettings()
+    expect(resolved.terminal.scrollbackLimit).toBe(10000)
+  })
+})
+
+describe('useSettingsStore — resolveSettings — ignores workspace overrides when no workspace id provided', () => {
+  it('ignores workspace overrides when no workspace id provided', () => {
+    useSettingsStore.setState({
+      globalSettings: { ...DEFAULT_SETTINGS, appearance: { theme: 'dark' as const } },
+      workspaceSettings: new Map([
+        [
+          'ws-1',
+          { workspaceId: 'ws-1', extensions: {}, overrides: { appearance: { theme: 'light' } } },
+        ],
+      ]),
+    })
+    const resolved = useSettingsStore.getState().resolveSettings(null)
+    expect(resolved.appearance.theme).toBe('dark')
+  })
+})
+
+describe('useSettingsStore — markWelcomeSeen', () => {
   describe('markWelcomeSeen', () => {
     it('calls updateGlobal with hasSeenWelcome true', async () => {
       const updated = { ...DEFAULT_SETTINGS, ui: { hasSeenWelcome: true } }
@@ -223,143 +254,184 @@ describe('useSettingsStore', () => {
       expect(stored).toEqual(wsSettings)
     })
   })
+})
 
-  describe('updateShowMetricsBar', () => {
-    it('calls updateGlobal with showMetricsBar true and updates store', async () => {
-      const updated = { ...DEFAULT_SETTINGS, ui: { hasSeenWelcome: false, showMetricsBar: true } }
-      mockElectronAPI.settings.updateGlobal.mockResolvedValue({ settings: updated })
+describe('useSettingsStore — updateShowMetricsBar', () => {
+  it('calls updateGlobal with showMetricsBar true and updates store', async () => {
+    const updated = { ...DEFAULT_SETTINGS, ui: { hasSeenWelcome: false, showMetricsBar: true } }
+    mockElectronAPI.settings.updateGlobal.mockResolvedValue({ settings: updated })
 
-      await useSettingsStore.getState().updateShowMetricsBar(true)
-      expect(mockElectronAPI.settings.updateGlobal).toHaveBeenCalledWith({
-        ui: { showMetricsBar: true },
-      })
-      expect(useSettingsStore.getState().globalSettings?.ui?.showMetricsBar).toBe(true)
+    await useSettingsStore.getState().updateShowMetricsBar(true)
+    expect(mockElectronAPI.settings.updateGlobal).toHaveBeenCalledWith({
+      ui: { showMetricsBar: true },
     })
-
-    it('calls updateGlobal with showMetricsBar false', async () => {
-      const updated = { ...DEFAULT_SETTINGS, ui: { hasSeenWelcome: false, showMetricsBar: false } }
-      mockElectronAPI.settings.updateGlobal.mockResolvedValue({ settings: updated })
-
-      await useSettingsStore.getState().updateShowMetricsBar(false)
-      expect(mockElectronAPI.settings.updateGlobal).toHaveBeenCalledWith({
-        ui: { showMetricsBar: false },
-      })
-    })
+    expect(useSettingsStore.getState().globalSettings?.ui?.showMetricsBar).toBe(true)
   })
 
-  describe('updatePromptForName', () => {
-    it('calls updateGlobal with promptForName true and updates store', async () => {
-      const updated = {
-        ...DEFAULT_SETTINGS,
-        terminal: { ...DEFAULT_SETTINGS.terminal, promptForName: true },
-      }
-      mockElectronAPI.settings.updateGlobal.mockResolvedValue({ settings: updated })
+  it('calls updateGlobal with showMetricsBar false', async () => {
+    const updated = { ...DEFAULT_SETTINGS, ui: { hasSeenWelcome: false, showMetricsBar: false } }
+    mockElectronAPI.settings.updateGlobal.mockResolvedValue({ settings: updated })
 
-      await useSettingsStore.getState().updatePromptForName(true)
-      expect(mockElectronAPI.settings.updateGlobal).toHaveBeenCalledWith({
-        terminal: { promptForName: true },
-      })
-      expect(useSettingsStore.getState().globalSettings?.terminal?.promptForName).toBe(true)
-    })
-
-    it('calls updateGlobal with promptForName false', async () => {
-      const updated = {
-        ...DEFAULT_SETTINGS,
-        terminal: { ...DEFAULT_SETTINGS.terminal, promptForName: false },
-      }
-      mockElectronAPI.settings.updateGlobal.mockResolvedValue({ settings: updated })
-
-      await useSettingsStore.getState().updatePromptForName(false)
-      expect(mockElectronAPI.settings.updateGlobal).toHaveBeenCalledWith({
-        terminal: { promptForName: false },
-      })
+    await useSettingsStore.getState().updateShowMetricsBar(false)
+    expect(mockElectronAPI.settings.updateGlobal).toHaveBeenCalledWith({
+      ui: { showMetricsBar: false },
     })
   })
+})
 
-  describe('updateNotificationDefaultTargets', () => {
-    it('calls updateGlobal with the new default targets and updates store', async () => {
-      const updated = {
-        ...DEFAULT_SETTINGS,
-        notifications: { defaultTargets: ['toast'], overrides: {} },
-      }
-      mockElectronAPI.settings.updateGlobal.mockResolvedValue({ settings: updated })
+describe('useSettingsStore — updatePromptForName', () => {
+  it('calls updateGlobal with promptForName true and updates store', async () => {
+    const updated = {
+      ...DEFAULT_SETTINGS,
+      terminal: { ...DEFAULT_SETTINGS.terminal, promptForName: true },
+    }
+    mockElectronAPI.settings.updateGlobal.mockResolvedValue({ settings: updated })
 
-      await useSettingsStore.getState().updateNotificationDefaultTargets(['toast'])
-      expect(mockElectronAPI.settings.updateGlobal).toHaveBeenCalledWith({
-        notifications: { defaultTargets: ['toast'] },
-      })
-      expect(useSettingsStore.getState().globalSettings).toEqual(updated)
+    await useSettingsStore.getState().updatePromptForName(true)
+    expect(mockElectronAPI.settings.updateGlobal).toHaveBeenCalledWith({
+      terminal: { promptForName: true },
     })
+    expect(useSettingsStore.getState().globalSettings?.terminal?.promptForName).toBe(true)
   })
 
-  describe('updateNotificationOverride', () => {
-    it('calls updateGlobal with a single-key override patch and updates store', async () => {
-      const updated = {
-        ...DEFAULT_SETTINGS,
-        notifications: {
-          defaultTargets: ['system', 'center', 'toast'],
-          overrides: { terminalBell: ['system'] },
-        },
-      }
-      mockElectronAPI.settings.updateGlobal.mockResolvedValue({ settings: updated })
+  it('calls updateGlobal with promptForName false', async () => {
+    const updated = {
+      ...DEFAULT_SETTINGS,
+      terminal: { ...DEFAULT_SETTINGS.terminal, promptForName: false },
+    }
+    mockElectronAPI.settings.updateGlobal.mockResolvedValue({ settings: updated })
 
-      await useSettingsStore.getState().updateNotificationOverride('terminalBell', ['system'])
-      expect(mockElectronAPI.settings.updateGlobal).toHaveBeenCalledWith({
-        notifications: { overrides: { terminalBell: ['system'] } },
-      })
-      expect(useSettingsStore.getState().globalSettings).toEqual(updated)
-    })
-
-    it('reverts to default by sending an empty targets array', async () => {
-      const updated = {
-        ...DEFAULT_SETTINGS,
-        notifications: { defaultTargets: ['system', 'center', 'toast'], overrides: {} },
-      }
-      mockElectronAPI.settings.updateGlobal.mockResolvedValue({ settings: updated })
-
-      await useSettingsStore.getState().updateNotificationOverride('branchSwitchFailed', [])
-      expect(mockElectronAPI.settings.updateGlobal).toHaveBeenCalledWith({
-        notifications: { overrides: { branchSwitchFailed: [] } },
-      })
+    await useSettingsStore.getState().updatePromptForName(false)
+    expect(mockElectronAPI.settings.updateGlobal).toHaveBeenCalledWith({
+      terminal: { promptForName: false },
     })
   })
+})
 
-  describe('updateQuickActions', () => {
-    it('calls updateGlobal with the quickActions patch and updates store', async () => {
-      const updated = {
-        ...DEFAULT_SETTINGS,
-        quickActions: { pins: ['core.new-tab'], usage: [], directUse: [], custom: [] },
-      }
-      mockElectronAPI.settings.updateGlobal.mockResolvedValue({ settings: updated })
+describe('useSettingsStore — updateNotificationDefaultTargets', () => {
+  it('calls updateGlobal with the new default targets and updates store', async () => {
+    const updated = {
+      ...DEFAULT_SETTINGS,
+      notifications: { defaultTargets: ['toast'], overrides: {} },
+    }
+    mockElectronAPI.settings.updateGlobal.mockResolvedValue({ settings: updated })
 
-      await useSettingsStore.getState().updateQuickActions({ pins: ['core.new-tab'] })
-      expect(mockElectronAPI.settings.updateGlobal).toHaveBeenCalledWith({
-        quickActions: { pins: ['core.new-tab'] },
-      })
-      expect(useSettingsStore.getState().globalSettings).toEqual(updated)
+    await useSettingsStore.getState().updateNotificationDefaultTargets(['toast'])
+    expect(mockElectronAPI.settings.updateGlobal).toHaveBeenCalledWith({
+      notifications: { defaultTargets: ['toast'] },
     })
+    expect(useSettingsStore.getState().globalSettings).toEqual(updated)
+  })
+})
+
+describe('useSettingsStore — updateNotificationOverride', () => {
+  it('calls updateGlobal with a single-key override patch and updates store', async () => {
+    const updated = {
+      ...DEFAULT_SETTINGS,
+      notifications: {
+        defaultTargets: ['system', 'center', 'toast'],
+        overrides: { terminalBell: ['system'] },
+      },
+    }
+    mockElectronAPI.settings.updateGlobal.mockResolvedValue({ settings: updated })
+
+    await useSettingsStore.getState().updateNotificationOverride('terminalBell', ['system'])
+    expect(mockElectronAPI.settings.updateGlobal).toHaveBeenCalledWith({
+      notifications: { overrides: { terminalBell: ['system'] } },
+    })
+    expect(useSettingsStore.getState().globalSettings).toEqual(updated)
   })
 
-  describe('updateWorkspaceQuickActions', () => {
-    it('calls updateWorkspace with the custom action list and updates workspace settings', async () => {
-      const custom = [
-        {
-          id: 'custom-1',
-          label: 'Echo branch',
-          kind: 'shell' as const,
-          target: 'new-tab' as const,
-          body: 'echo {branch}',
-        },
-      ]
-      const wsSettings = { overrides: { quickActions: { custom } } }
-      mockElectronAPI.settings.updateWorkspace.mockResolvedValue({ settings: wsSettings })
+  it('reverts to default by sending an empty targets array', async () => {
+    const updated = {
+      ...DEFAULT_SETTINGS,
+      notifications: { defaultTargets: ['system', 'center', 'toast'], overrides: {} },
+    }
+    mockElectronAPI.settings.updateGlobal.mockResolvedValue({ settings: updated })
 
-      await useSettingsStore.getState().updateWorkspaceQuickActions('ws-1', custom)
-      expect(mockElectronAPI.settings.updateWorkspace).toHaveBeenCalledWith('ws-1', {
-        quickActions: { custom },
-      })
-      const stored = useSettingsStore.getState().workspaceSettings.get('ws-1')
-      expect(stored).toEqual(wsSettings)
+    await useSettingsStore.getState().updateNotificationOverride('branchSwitchFailed', [])
+    expect(mockElectronAPI.settings.updateGlobal).toHaveBeenCalledWith({
+      notifications: { overrides: { branchSwitchFailed: [] } },
     })
+  })
+})
+
+describe('useSettingsStore — updateQuickActions', () => {
+  it('calls updateGlobal with the quickActions patch and updates store', async () => {
+    const updated = {
+      ...DEFAULT_SETTINGS,
+      quickActions: { pins: ['core.new-tab'], usage: [], directUse: [], custom: [] },
+    }
+    mockElectronAPI.settings.updateGlobal.mockResolvedValue({ settings: updated })
+
+    await useSettingsStore.getState().updateQuickActions({ pins: ['core.new-tab'] })
+    expect(mockElectronAPI.settings.updateGlobal).toHaveBeenCalledWith({
+      quickActions: { pins: ['core.new-tab'] },
+    })
+    expect(useSettingsStore.getState().globalSettings).toEqual(updated)
+  })
+})
+
+describe('useSettingsStore — updateWorkspaceQuickActions', () => {
+  it('calls updateWorkspace with the custom action list and updates workspace settings', async () => {
+    const custom = [
+      {
+        id: 'custom-1',
+        label: 'Echo branch',
+        kind: 'shell' as const,
+        target: 'new-tab' as const,
+        body: 'echo {branch}',
+      },
+    ]
+    const wsSettings = { overrides: { quickActions: { custom } } }
+    mockElectronAPI.settings.updateWorkspace.mockResolvedValue({ settings: wsSettings })
+
+    await useSettingsStore.getState().updateWorkspaceQuickActions('ws-1', custom)
+    expect(mockElectronAPI.settings.updateWorkspace).toHaveBeenCalledWith('ws-1', {
+      quickActions: { custom },
+    })
+    const stored = useSettingsStore.getState().workspaceSettings.get('ws-1')
+    expect(stored).toEqual(wsSettings)
+  })
+})
+
+describe('useSettingsStore — branch exclude patterns', () => {
+  it('saves the global patterns and keeps what main returns', async () => {
+    const updated = {
+      ...DEFAULT_SETTINGS,
+      git: { ...DEFAULT_SETTINGS.git, branchExcludePatterns: ['wip/*'] },
+    }
+    mockElectronAPI.settings.updateGlobal.mockResolvedValue({ settings: updated })
+    await useSettingsStore.getState().updateBranchExcludePatterns(['wip/*'])
+    expect(mockElectronAPI.settings.updateGlobal).toHaveBeenCalledWith({
+      git: { branchExcludePatterns: ['wip/*'] },
+    })
+    expect(useSettingsStore.getState().globalSettings).toEqual(updated)
+  })
+
+  it("saves a repo's own patterns and keeps them for that repo", async () => {
+    const wsSettings = {
+      workspaceId: 'ws-1',
+      overrides: { git: { branchExcludePatterns: ['tmp/*'] } },
+      extensions: {},
+    }
+    mockElectronAPI.settings.updateWorkspace.mockResolvedValue({ settings: wsSettings })
+    await useSettingsStore.getState().updateWorkspaceBranchExcludePatterns('ws-1', ['tmp/*'])
+    expect(mockElectronAPI.settings.updateWorkspace).toHaveBeenCalledWith('ws-1', {
+      git: { branchExcludePatterns: ['tmp/*'] },
+    })
+    expect(useSettingsStore.getState().workspaceSettings.get('ws-1')).toEqual(wsSettings)
+  })
+})
+
+describe("useSettingsStore — branch exclude patterns — clears a repo's own patterns, so the global ones apply", () => {
+  it("clears a repo's own patterns, so the global ones apply", async () => {
+    const wsSettings = { workspaceId: 'ws-1', overrides: {}, extensions: {} }
+    mockElectronAPI.settings.updateWorkspace.mockResolvedValue({ settings: wsSettings })
+    await useSettingsStore.getState().updateWorkspaceBranchExcludePatterns('ws-1', undefined)
+    expect(mockElectronAPI.settings.updateWorkspace).toHaveBeenCalledWith('ws-1', {
+      git: { branchExcludePatterns: undefined },
+    })
+    expect(useSettingsStore.getState().workspaceSettings.get('ws-1')).toEqual(wsSettings)
   })
 })

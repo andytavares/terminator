@@ -13,9 +13,17 @@ function resetStore() {
   })
 }
 
-describe('useVaultNavStore', () => {
+describe('useVaultNavStore', useVaultNavStoreTests)
+
+function useVaultNavStoreTests() {
   beforeEach(resetStore)
 
+  describe('views and dates', useVaultNavStoreViewsDatesTests)
+  describe('navigation', useVaultNavStoreNavigationTests)
+  describe('visibility reset', useVaultNavStoreVisibilityResetTests)
+}
+
+function useVaultNavStoreViewsDatesTests() {
   it('setView updates activeView', () => {
     useVaultNavStore.getState().setView('inbox')
     expect(useVaultNavStore.getState().activeView).toBe('inbox')
@@ -38,7 +46,14 @@ describe('useVaultNavStore', () => {
     useVaultNavStore.getState().setViewingDate(null)
     expect(useVaultNavStore.getState().viewingDate).toBeNull()
   })
+}
 
+function useVaultNavStoreNavigationTests() {
+  describe('areas and projects', useVaultNavStoreNavigationAreasAndProjectsTests)
+  describe('tasks', useVaultNavStoreNavigationTasksTests)
+}
+
+function useVaultNavStoreNavigationAreasAndProjectsTests() {
   it('navToArea sets view to areas and stores area name', () => {
     useVaultNavStore.getState().navToArea('work')
     const state = useVaultNavStore.getState()
@@ -54,7 +69,9 @@ describe('useVaultNavStore', () => {
     expect(state.selectedProjectName).toBe('my-project')
     expect(state.selectedAreaName).toBeNull()
   })
+}
 
+function useVaultNavStoreNavigationTasksTests() {
   it('navigateToTask sets view to daily, pendingTaskId, and viewingDate', () => {
     useVaultNavStore.getState().navigateToTask('task-123', '2026-06-01')
     const state = useVaultNavStore.getState()
@@ -73,7 +90,9 @@ describe('useVaultNavStore', () => {
     useVaultNavStore.getState().clearPendingTask()
     expect(useVaultNavStore.getState().pendingTaskId).toBeNull()
   })
+}
 
+function useVaultNavStoreVisibilityResetTests() {
   it('skipNextVisibilityReset defaults to false', () => {
     expect(useVaultNavStore.getState().skipNextVisibilityReset).toBe(false)
   })
@@ -88,4 +107,4 @@ describe('useVaultNavStore', () => {
     useVaultNavStore.getState().setSkipNextVisibilityReset(false)
     expect(useVaultNavStore.getState().skipNextVisibilityReset).toBe(false)
   })
-})
+}

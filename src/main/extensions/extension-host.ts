@@ -1,17 +1,18 @@
+import { createRequire } from 'node:module'
 import { join } from 'path'
 import { readdirSync, existsSync } from 'fs'
 import { app } from 'electron'
-import Store from 'electron-store'
+import { CachedStore } from '../storage/cached-store.js'
+import type { z } from 'zod'
 import type { Extension } from '../../shared/types/index.js'
 import { ExtensionManifestSchema } from '../../shared/schemas/extension.schema.js'
-import {
-  createExtensionAPI,
-  getApiDisposables,
-  globalRegistry,
-  type Disposable,
-  type ExtensionAPIDeps,
-} from './api.js'
+import type { Disposable, ExtensionAPI } from '@terminator/extension-sdk'
+import { createExtensionAPI, getApiDisposables, type ExtensionAPIDeps } from './api.js'
 import { makeLogger } from '../logger.js'
+import type { BackendRecord } from './host/host-runtime.js'
+
+// Manifests are read with require(); main is an ES module.
+const loadCommonJs = createRequire(import.meta.url)
 
 const hostLogger = makeLogger('extension-host')
 
@@ -24,23 +25,144 @@ interface ExtensionStoreSchema {
   extensions: ExtensionRecord[]
 }
 
-const store = new Store<ExtensionStoreSchema>({
+const store = new CachedStore<ExtensionStoreSchema>({
   name: 'extensions',
   defaults: { extensions: [] },
 })
 
-interface LoadedExtension {
-  record: ExtensionRecord
-  disposables: Disposable[]
-  module: { activate?: unknown; deactivate?: () => void | Promise<void> }
+interface StartOptions {
+  bundledDirectory: string
+  /** Work extensions need before activating, such as the login-shell PATH. */
+  beforeActivation: Promise<void>
+  /** Work that needs every extension's tables to exist, such as the legacy database import. */
+  afterActivation?: () => Promise<void>
+}
+
+type RegisterResult =
+  | { record: ExtensionRecord }
+  | { error: 'INVALID_MANIFEST' | 'DUPLICATE_ID' | 'VERSION_INCOMPATIBLE'; message?: string }
+
+type ParsedManifest = z.infer<typeof ExtensionManifestSchema>
+
+function readManifest(
+  directoryPath: string
+): { data: ParsedManifest } | { error: 'INVALID_MANIFEST'; message: string } {
+  let manifest: Record<string, unknown>
+  try {
+    manifest = loadCommonJs(join(directoryPath, 'manifest.json'))
+  } catch {
+    hostLogger.warn(`INVALID_MANIFEST: cannot read manifest.json at ${directoryPath}`)
+    return { error: 'INVALID_MANIFEST', message: 'Cannot read manifest.json' }
+  }
+  const parsed = ExtensionManifestSchema.safeParse(manifest)
+  if (parsed.success) return { data: parsed.data }
+  hostLogger.warn(`INVALID_MANIFEST: ${parsed.error.message}`)
+  return { error: 'INVALID_MANIFEST', message: parsed.error.message }
+}
+
+function toRecord(manifest: ParsedManifest, directoryPath: string): ExtensionRecord {
+  const { id, name, version, description, main, renderer, contributes } = manifest
+  return {
+    id,
+    name,
+    version,
+    description,
+    entryPoint: join(directoryPath, main),
+    status: 'enabled',
+    installedAt: new Date().toISOString(),
+    directoryPath,
+    rendererRelPath: renderer,
+    rendererUrl: renderer ? `ext://${id}/${renderer}` : undefined,
+    contributes,
+  }
+}
+
+/** Read from the manifest, not the stored record: a bundled extension stays registered across
+ * updates, so its record can predate the field. */
+function declaredDependencies(record: ExtensionRecord): string[] {
+  const manifest = readManifest(record.directoryPath)
+  return 'data' in manifest ? (manifest.data.extensionDependencies ?? []) : []
+}
+
+/** The manifest's `contributes.shellRoots`, read like `extensionDependencies` (ADR 102). */
+function declaredShellRoots(record: ExtensionRecord): string[] {
+  const manifest = readManifest(record.directoryPath)
+  return 'data' in manifest ? (manifest.data.contributes?.shellRoots ?? []) : []
+}
+
+/** Where backends run: the extension host (ADR 094). */
+export interface BackendHost {
+  activate(record: BackendRecord): Promise<void>
+  deactivate(extensionId: string): Promise<void>
+}
+
+/** The dependency path from `id` back to itself, or null when `id` is in no cycle. */
+function cycleThrough(id: string, dependenciesOf: (id: string) => string[]): string[] | null {
+  const extendPath = (path: string[]): string[] | null => {
+    for (const dependency of dependenciesOf(path[path.length - 1])) {
+      if (dependency === id) return [...path, dependency]
+      if (path.includes(dependency)) continue
+      const cycle = extendPath([...path, dependency])
+      if (cycle) return cycle
+    }
+    return null
+  }
+  return extendPath([id])
+}
+
+function toExtension(record: ExtensionRecord): Extension {
+  const { directoryPath: _dp, ...extension } = record
+  return extension
 }
 
 export class ExtensionHost {
-  private loaded = new Map<string, LoadedExtension>()
+  /** Each active backend's registrations in main, by extension id. */
+  private loaded = new Map<string, Disposable[]>()
+  private activations = new Map<string, Promise<void>>()
+  private afterActivation: Promise<void> = Promise.resolve()
   private deps: ExtensionAPIDeps = {}
+  /** The main-side API of each backend in the extension host, which its calls run on. */
+  private readonly hostedApis = new Map<string, ExtensionAPI>()
+  private readonly hostFailures = new Map<string, string>()
+
+  /** Every backend runs in `backends`, the extension host process (ADR 094). */
+  constructor(private readonly backends: BackendHost) {}
 
   setDeps(deps: ExtensionAPIDeps): void {
     this.deps = deps
+  }
+
+  /** The API a backend in the extension host calls into, while it is active. */
+  apiOf(extensionId: string): ExtensionAPI | undefined {
+    return this.hostedApis.get(extensionId)
+  }
+
+  /** The extension host lost these backends for good: they show as failed, with why, until they
+   * activate again. Not stored, so the next launch retries them. */
+  failHostedBackends(extensionIds: string[], message: string): void {
+    const lost = extensionIds.flatMap((id) => {
+      const loaded = this.loaded.get(id)
+      return loaded ? [{ id, loaded }] : []
+    })
+    for (const { id, loaded } of lost) {
+      this.disposeAll(loaded)
+      this.loaded.delete(id)
+      this.hostedApis.delete(id)
+      this.hostFailures.set(id, message)
+      hostLogger.error(`Extension ${id} failed: ${message}`)
+    }
+    if (lost.length > 0) this.announceListChanged()
+  }
+
+  /** Tells the windows `listExtensions` changed: Settings -> Extensions re-reads it, since a
+   * backend can fail or come back while the panel is open. */
+  private announceListChanged(): void {
+    this.deps.broadcastToWindows?.('extension:list-changed', null)
+  }
+
+  private saveRecords(records: ExtensionRecord[]): void {
+    store.set('extensions', records)
+    this.announceListChanged()
   }
 
   async load(
@@ -49,72 +171,48 @@ export class ExtensionHost {
     | { extension: Extension }
     | { error: 'INVALID_MANIFEST' | 'DUPLICATE_ID' | 'VERSION_INCOMPATIBLE'; message?: string }
   > {
-    let manifest: Record<string, unknown>
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      manifest = require(join(directoryPath, 'manifest.json'))
-    } catch (e) {
-      hostLogger.warn(`INVALID_MANIFEST: cannot read manifest.json at ${directoryPath}`)
-      return { error: 'INVALID_MANIFEST', message: 'Cannot read manifest.json' }
+    const registration = this.registerDirectory(directoryPath)
+    if ('error' in registration) return registration
+
+    const { record } = registration
+    const loadResult = await this.activateBackend(record)
+    if ('error' in loadResult) {
+      hostLogger.error(`Extension ${record.id} activation failed: ${loadResult.message}`)
+      return { extension: toExtension(this.recordActivationFailure(record, loadResult.message)) }
     }
 
-    const parsed = ExtensionManifestSchema.safeParse(manifest)
-    if (!parsed.success) {
-      hostLogger.warn(`INVALID_MANIFEST: ${parsed.error.message}`)
-      return { error: 'INVALID_MANIFEST', message: parsed.error.message }
-    }
+    hostLogger.info(`Extension ${record.id} loaded successfully`)
+    return { extension: toExtension(record) }
+  }
 
-    const { id, name, version, description, main, renderer, contributes } = parsed.data
-    const existing = store.get('extensions').find((e) => e.id === id)
-    if (existing) {
+  /** Validates the manifest and persists the extension as enabled; does not activate it. */
+  private registerDirectory(directoryPath: string): RegisterResult {
+    const manifest = readManifest(directoryPath)
+    if ('error' in manifest) return manifest
+
+    const { id, version } = manifest.data
+    if (store.get('extensions').some((e) => e.id === id)) {
       hostLogger.warn(`DUPLICATE_ID: extension ${id} is already registered`)
       return { error: 'DUPLICATE_ID' }
     }
 
     const appVersion = app.getVersion()
-    if (!isVersionCompatible(parsed.data.minAppVersion, appVersion)) {
-      hostLogger.warn(
-        `VERSION_INCOMPATIBLE: ${id} requires >= ${parsed.data.minAppVersion}, got ${appVersion}`
-      )
-      return {
-        error: 'VERSION_INCOMPATIBLE',
-        message: `Requires app >= ${parsed.data.minAppVersion}, got ${appVersion}`,
-      }
+    if (!isVersionCompatible(manifest.data.minAppVersion, appVersion)) {
+      const message = `Requires app >= ${manifest.data.minAppVersion}, got ${appVersion}`
+      hostLogger.warn(`VERSION_INCOMPATIBLE: ${id} ${message}`)
+      return { error: 'VERSION_INCOMPATIBLE', message }
     }
 
     hostLogger.info(`Loading extension ${id} v${version} from ${directoryPath}`)
-    const entryPoint = join(directoryPath, main)
-    const record: ExtensionRecord = {
-      id,
-      name,
-      version,
-      description,
-      entryPoint,
-      status: 'enabled',
-      installedAt: new Date().toISOString(),
-      directoryPath,
-      rendererRelPath: renderer,
-      rendererUrl: renderer ? `ext://${id}/${renderer}` : undefined,
-      contributes,
-    }
+    const record = toRecord(manifest.data, directoryPath)
+    this.saveRecords([...store.get('extensions'), record])
+    return { record }
+  }
 
-    const loadResult = await this.activate(record)
-    if ('error' in loadResult) {
-      hostLogger.error(`Extension ${id} activation failed: ${loadResult.message}`)
-      const errorRecord: ExtensionRecord = {
-        ...record,
-        status: 'error',
-        errorMessage: loadResult.message,
-      }
-      store.set('extensions', [...store.get('extensions'), errorRecord])
-      const { directoryPath: _dp, ...ext } = errorRecord
-      return { extension: ext }
-    }
-
-    hostLogger.info(`Extension ${id} loaded successfully`)
-    store.set('extensions', [...store.get('extensions'), record])
-    const { directoryPath: _dp, ...ext } = record
-    return { extension: ext }
+  private recordActivationFailure(record: ExtensionRecord, message: string): ExtensionRecord {
+    const failed: ExtensionRecord = { ...record, status: 'error', errorMessage: message }
+    this.saveRecords(store.get('extensions').map((e) => (e.id === record.id ? failed : e)))
+    return failed
   }
 
   async unload(id: string): Promise<void> {
@@ -122,54 +220,51 @@ export class ExtensionHost {
     if (loaded) {
       hostLogger.info(`Unloading extension ${id}`)
       try {
-        await loaded.module.deactivate?.()
+        await this.backends.deactivate(id)
       } catch (e) {
         hostLogger.warn(
           `Extension ${id} deactivate error: ${e instanceof Error ? e.message : String(e)}`
         )
       }
-      for (const d of loaded.disposables) {
-        try {
-          d.dispose()
-        } catch {
-          /* ignore */
-        }
-      }
+      this.disposeAll(loaded)
       this.loaded.delete(id)
+      this.hostedApis.delete(id)
     }
   }
 
-  async uninstall(id: string): Promise<boolean> {
+  private disposeAll(disposables: Disposable[]): void {
+    for (const d of disposables) {
+      try {
+        d.dispose()
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+
+  async uninstallExtension(id: string): Promise<boolean> {
     await this.unload(id)
     const extensions = store.get('extensions')
     const filtered = extensions.filter((e) => e.id !== id)
     if (filtered.length === extensions.length) return false
-    store.set('extensions', filtered)
+    this.saveRecords(filtered)
     return true
   }
 
-  async reload(id: string): Promise<{ extension: Extension } | { error: string }> {
+  async reloadExtension(id: string): Promise<{ extension: Extension } | { error: string }> {
     const extensions = store.get('extensions')
     const record = extensions.find((e) => e.id === id)
     if (!record) return { error: 'NOT_FOUND' }
 
     await this.unload(id)
-
-    // Clear Node module cache so the updated code is re-evaluated
-    try {
-      delete require.cache[require.resolve(record.entryPoint)]
-    } catch {
-      // Module may not be in cache (e.g. was never successfully loaded); safe to skip
-    }
-
-    const result = await this.activate(record)
+    const result = await this.activateBackend(record)
     if ('error' in result) return { error: result.message }
 
     const { directoryPath: _dp, ...ext } = record
     return { extension: ext }
   }
 
-  async toggle(id: string, enabled: boolean): Promise<Extension | null> {
+  async setEnabled(id: string, enabled: boolean): Promise<Extension | null> {
     const extensions = store.get('extensions')
     const idx = extensions.findIndex((e) => e.id === id)
     if (idx === -1) return null
@@ -179,11 +274,11 @@ export class ExtensionHost {
       extensions[idx] = { ...extensions[idx], status: 'disabled' }
     } else {
       const record = extensions[idx]
-      await this.activate(record)
+      await this.activateBackend(record)
       extensions[idx] = { ...extensions[idx], status: 'enabled' }
     }
 
-    store.set('extensions', extensions)
+    this.saveRecords(extensions)
     const { directoryPath: _dp, ...ext } = extensions[idx]
     return ext
   }
@@ -194,13 +289,16 @@ export class ExtensionHost {
     }
   }
 
-  listExtensions(): Extension[] {
-    return store
-      .get('extensions')
-      .map(({ directoryPath: _dp, rendererRelPath: _rrp, ...ext }) => ext)
+  listAll(): Extension[] {
+    return store.get('extensions').map(({ directoryPath: _dp, rendererRelPath: _rrp, ...ext }) => {
+      const failure = this.hostFailures.get(ext.id)
+      return failure === undefined
+        ? ext
+        : { ...ext, status: 'error' as const, errorMessage: failure }
+    })
   }
 
-  getExtensionContributes(id: string) {
+  getExtensionContributes(id: string): Extension['contributes'] | null {
     const record = store.get('extensions').find((e) => e.id === id)
     return record?.contributes ?? null
   }
@@ -210,75 +308,131 @@ export class ExtensionHost {
     return record?.directoryPath ?? null
   }
 
-  async loadAll(): Promise<void> {
-    const extensions = store.get('extensions').filter((e) => e.status === 'enabled')
-    for (const record of extensions) {
-      const result = await this.activate(record)
-      if ('error' in result) {
-        hostLogger.error(`Extension ${record.id} failed to load: ${result.message}`)
-      }
+  /** Registers every extension, so `listAll` is complete when this call returns its
+   * promise, then activates them all at once after `beforeActivation`. One extension failing
+   * never stops another: `activate` reports failure as a value. Views wait on `whenActivated`. */
+  async startAll(options: StartOptions): Promise<void> {
+    const registered = [
+      ...store
+        .get('extensions')
+        .filter((e) => e.status === 'enabled')
+        .map((record) => ({ record, isNew: false })),
+      ...this.registerBundled(options.bundledDirectory).map((record) => ({ record, isNew: true })),
+    ]
+    const dependencies = new Map(
+      registered.map(({ record }) => [record.id, declaredDependencies(record)])
+    )
+    const dependenciesOf = (id: string) => dependencies.get(id) ?? []
+    for (const { record, isNew } of registered) {
+      const cycle = cycleThrough(record.id, dependenciesOf)
+      const activation = cycle
+        ? this.failAtStartup(record, isNew, `Extension dependency cycle: ${cycle.join(' -> ')}`)
+        : this.activateAtStartup(record, isNew, options.beforeActivation)
+      this.activations.set(record.id, activation)
     }
+    const allActivated = Promise.all(this.activations.values())
+    if (options.afterActivation) this.afterActivation = allActivated.then(options.afterActivation)
+    await Promise.all([allActivated, this.afterActivation])
   }
 
-  async loadBundledExtensions(bundledDir: string): Promise<void> {
-    if (!existsSync(bundledDir)) return
-    let entries: string[]
+  /** Resolves once the extension's backend is up and any startup data import is done. */
+  async whenActivated(id: string): Promise<void> {
+    await this.activations.get(id)
+    await this.afterActivation
+  }
+
+  private registerBundled(bundledDir: string): ExtensionRecord[] {
+    if (!existsSync(bundledDir)) return []
+    let names: string[]
     try {
-      entries = readdirSync(bundledDir, { withFileTypes: true })
+      names = readdirSync(bundledDir, { withFileTypes: true })
         .filter((d) => d.isDirectory())
         .map((d) => d.name)
     } catch {
-      return
+      return []
     }
-    for (const name of entries) {
-      const dirPath = join(bundledDir, name)
-      const manifestPath = join(dirPath, 'manifest.json')
-      if (!existsSync(manifestPath)) continue
-      // Peek at manifest to get the real extension ID (e.g. "terminator.git-integration")
-      // before checking this.loaded — directory name and ID differ.
-      let extensionId: string | undefined
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const manifest = require(manifestPath) as { id?: string }
-        extensionId = manifest.id
-      } catch {
-        // fall through and let load() report the invalid manifest
-      }
-      // Skip if already loaded or already registered in the store (avoids DUPLICATE_ID noise
-      // when an extension failed to activate during loadAll but is still persisted in the store).
-      if (
-        extensionId &&
-        (this.loaded.has(extensionId) || store.get('extensions').some((e) => e.id === extensionId))
-      )
-        continue
-      await this.load(dirPath)
+    const records: ExtensionRecord[] = []
+    for (const name of names) {
+      const directoryPath = join(bundledDir, name)
+      if (!existsSync(join(directoryPath, 'manifest.json'))) continue
+      // Already in the store (activated from there, or failed on an earlier run):
+      // registering again would only log DUPLICATE_ID.
+      if (this.isStored(directoryPath)) continue
+      const registration = this.registerDirectory(directoryPath)
+      if ('record' in registration) records.push(registration.record)
+    }
+    return records
+  }
+
+  private isStored(directoryPath: string): boolean {
+    try {
+      const { id } = loadCommonJs(join(directoryPath, 'manifest.json')) as { id?: string }
+      return store.get('extensions').some((e) => e.id === id)
+    } catch {
+      return false // registerDirectory() reports the unreadable manifest
     }
   }
 
-  private async activate(
+  private async activateAtStartup(
+    record: ExtensionRecord,
+    isNew: boolean,
+    beforeActivation: Promise<void>
+  ): Promise<void> {
+    await beforeActivation
+    // Every activation is in the map by now: startAll() fills it before anything awaits.
+    await Promise.all(declaredDependencies(record).map((id) => this.activations.get(id)))
+    const result = await this.activateBackend(record)
+    if ('error' in result) await this.failAtStartup(record, isNew, result.message)
+  }
+
+  private async failAtStartup(record: ExtensionRecord, isNew: boolean, message: string) {
+    hostLogger.error(`Extension ${record.id} failed to load: ${message}`)
+    // A stored extension stays enabled so the next start retries it.
+    if (isNew) this.recordActivationFailure(record, message)
+  }
+
+  /** Why a declared dependency is not active, or null when every one is. */
+  private inactiveDependency(record: ExtensionRecord): string | null {
+    for (const id of declaredDependencies(record)) {
+      if (this.loaded.has(id)) continue
+      const stored = store.get('extensions').find((e) => e.id === id)
+      if (!stored) return `Missing extension dependency "${id}"`
+      if (stored.status === 'disabled') return `Extension dependency "${id}" is disabled`
+      return `Extension dependency "${id}" failed to activate`
+    }
+    return null
+  }
+
+  private async activateBackend(
     record: ExtensionRecord
   ): Promise<{ ok: true } | { error: string; message: string }> {
+    const inactive = this.inactiveDependency(record)
+    if (inactive) return { error: 'DEPENDENCY_ERROR', message: inactive }
+    const deps = { ...this.deps, shellRootSettings: declaredShellRoots(record) }
+    const api = createExtensionAPI(record.id, deps, record.rendererUrl)
+    this.hostedApis.set(record.id, api)
     try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const mod = require(record.entryPoint) as {
-        activate?: (api: unknown) => void | Promise<void>
-        deactivate?: () => void | Promise<void>
-      }
-      const api = createExtensionAPI(record.id, app.getVersion(), this.deps, record.rendererUrl)
-      await mod.activate?.(api)
-      // The live array from the api: registrations made after activate() land in
-      // it too, so unload disposes everything the extension ever registered.
-      this.loaded.set(record.id, { record, disposables: getApiDisposables(api), module: mod })
-      return { ok: true }
+      const dependencies = declaredDependencies(record)
+      const { id, entryPoint, directoryPath: directory } = record
+      await this.backends.activate({ id, entryPoint, directory, dependencies })
     } catch (e) {
-      const message = e instanceof Error ? e.message : String(e)
-      return { error: 'ACTIVATE_ERROR', message }
+      this.hostedApis.delete(record.id)
+      this.disposeAll(getApiDisposables(api))
+      return { error: 'ACTIVATE_ERROR', message: e instanceof Error ? e.message : String(e) }
     }
+    // Every launch, not only an extension's first: scripts/smoke-start.mjs reads it.
+    hostLogger.info(`Extension ${record.id} activated`)
+    if (this.hostFailures.delete(record.id)) this.announceListChanged()
+    // The live array from the api: registrations made after activate() land in
+    // it too, so unload disposes everything the backend ever registered.
+    this.loaded.set(record.id, getApiDisposables(api))
+    return { ok: true }
   }
 }
 
-function isVersionCompatible(minVersion: string, appVersion: string): boolean {
-  const cleanMin = minVersion.replace(/^[>=^~]/, '')
+/** @internal */
+export function isVersionCompatible(minVersion: string, appVersion: string): boolean {
+  const cleanMin = minVersion.replace(/^[>=^~]+/, '')
   const min = cleanMin.split('.').map(Number)
   const cur = appVersion.split('.').map(Number)
   for (let i = 0; i < 3; i++) {
@@ -287,5 +441,3 @@ function isVersionCompatible(minVersion: string, appVersion: string): boolean {
   }
   return true
 }
-
-export { globalRegistry }

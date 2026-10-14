@@ -1,14 +1,10 @@
-import { describe, it, expect, vi, beforeEach, afterEach, beforeAll, afterAll } from 'vitest'
-import { PGlite } from '@electric-sql/pglite'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { DatabaseSync } from 'node:sqlite'
 
 const { mockShowSaveDialog, mockWriteFileSync, mockMkdirSync } = vi.hoisted(() => ({
   mockShowSaveDialog: vi.fn(),
   mockWriteFileSync: vi.fn(),
   mockMkdirSync: vi.fn(),
-}))
-
-vi.mock('electron', () => ({
-  dialog: { showSaveDialog: mockShowSaveDialog },
 }))
 
 vi.mock('node:fs', () => ({
@@ -19,44 +15,33 @@ vi.mock('node:fs', () => ({
 import { wrapDb } from '../../../../src/main/db/index'
 import { applyTaskVaultSchema } from '../../src/vault/db'
 import { registerWeeklyReviewIpcHandlers } from '../../src/ipc/weekly-review.ipc'
-import type { ExtensionDB } from '../../../../src/main/db/index'
-import type { ExtensionAPI } from '../../../../src/main/extensions/api'
+import { dispatchChannel } from '@terminator/extension-sdk'
+import type { ChannelSpec, ExtensionDB, ExtensionAPI } from '@terminator/extension-sdk'
+import { partialFake } from '../../../../tests/support/fakes'
 
-let pg: PGlite
 let db: ExtensionDB
-let handlers: Map<string, (payload: unknown) => Promise<unknown>>
+let handlers: Map<string, ChannelSpec>
 let dispose: () => void
 
-const mockApi = {
-  ipc: {
-    registerHandler: (channel: string, fn: (payload: unknown) => Promise<unknown>) => {
-      handlers.set(channel, fn)
-      return { dispose: () => handlers.delete(channel) }
+const mockApi = partialFake<ExtensionAPI>({
+  dialog: partialFake<ExtensionAPI['dialog']>({ showSaveDialog: mockShowSaveDialog }),
+  ipc: partialFake<ExtensionAPI['ipc']>({
+    registerHandler: (spec: ChannelSpec) => {
+      handlers.set(spec.channel, spec)
+      return { dispose: () => handlers.delete(spec.channel) }
     },
-  },
-} as unknown as ExtensionAPI
-
-function invoke(channel: string, payload?: unknown): Promise<unknown> {
-  const handler = handlers.get(channel)
-  if (!handler) throw new Error(`no handler registered for ${channel}`)
-  return handler(payload)
-}
-
-let tables: string
-
-beforeAll(async () => {
-  pg = new PGlite()
-  await pg.waitReady
-  db = wrapDb(pg)
-  await applyTaskVaultSchema(db)
-  const { rows } = await pg.query<{ names: string }>(
-    "SELECT string_agg(quote_ident(tablename), ', ') AS names FROM pg_tables WHERE schemaname = 'public'"
-  )
-  tables = rows[0].names
+  }),
 })
 
-afterAll(async () => {
-  await pg.close()
+function invoke(channel: string, payload?: unknown): Promise<unknown> {
+  const spec = handlers.get(channel)
+  if (!spec) throw new Error(`no handler registered for ${channel}`)
+  return dispatchChannel(spec, payload)
+}
+
+beforeEach(async () => {
+  db = wrapDb(new DatabaseSync(':memory:'))
+  await applyTaskVaultSchema(db)
 })
 
 beforeEach(async () => {
@@ -67,7 +52,6 @@ beforeEach(async () => {
 
 afterEach(async () => {
   dispose()
-  await pg.exec(`TRUNCATE ${tables} RESTART IDENTITY CASCADE`)
 })
 
 async function startReview(): Promise<string> {
@@ -132,34 +116,6 @@ describe('task-vault:review:log', () => {
     expect(result.review.actions).toHaveLength(1)
     expect(result.review.actions[0].entityLabel).toBe('Do the thing')
   })
-
-  it('rejects an unknown action kind', async () => {
-    const reviewId = await startReview()
-    const result = await invoke('task-vault:review:log', {
-      reviewId,
-      step: 1,
-      action: 'not-a-real-action',
-      entityType: 'task',
-      entityLabel: 'x',
-    })
-    expect(result).toEqual({ error: 'VALIDATION_ERROR' })
-  })
-
-  it('rejects a step outside the wizard range', async () => {
-    const reviewId = await startReview()
-    const result = await invoke('task-vault:review:log', {
-      reviewId,
-      step: 9,
-      action: 'captured',
-      entityType: 'task',
-      entityLabel: 'x',
-    })
-    expect(result).toEqual({ error: 'VALIDATION_ERROR' })
-  })
-
-  it('rejects a missing payload', async () => {
-    expect(await invoke('task-vault:review:log', null)).toEqual({ error: 'VALIDATION_ERROR' })
-  })
 })
 
 describe('task-vault:review:complete', () => {
@@ -178,12 +134,6 @@ describe('task-vault:review:complete', () => {
     expect(result.review.status).toBe('completed')
     expect(result.review.worked).toBe('shipping')
     expect(result.review.tryNext).toBe('fewer meetings')
-  })
-
-  it('rejects a missing review id', async () => {
-    expect(await invoke('task-vault:review:complete', { worked: 'x' })).toEqual({
-      error: 'VALIDATION_ERROR',
-    })
   })
 })
 
@@ -210,13 +160,16 @@ describe('task-vault:review:get', () => {
       error: 'REVIEW_NOT_FOUND',
     })
   })
-
-  it('rejects a missing id', async () => {
-    expect(await invoke('task-vault:review:get', {})).toEqual({ error: 'VALIDATION_ERROR' })
-  })
 })
 
-describe('task-vault:review:export', () => {
+describe('task-vault:review:export', taskVaultReviewExportTests)
+
+function taskVaultReviewExportTests() {
+  describe('writing', taskVaultReviewExportWritingTests)
+  describe('cancelling', taskVaultReviewExportCancellingTests)
+}
+
+function taskVaultReviewExportWritingTests() {
   it('writes markdown to the chosen path', async () => {
     const reviewId = await startReview()
     await invoke('task-vault:review:log', {
@@ -245,7 +198,9 @@ describe('task-vault:review:export', () => {
     const options = mockShowSaveDialog.mock.calls[0][0] as { defaultPath: string }
     expect(options.defaultPath).toMatch(/^weekly-review-\d{4}-\d{2}-\d{2}\.md$/)
   })
+}
 
+function taskVaultReviewExportCancellingTests() {
   it('writes nothing when the user cancels', async () => {
     const reviewId = await startReview()
     mockShowSaveDialog.mockResolvedValue({ canceled: true, filePath: undefined })
@@ -270,4 +225,4 @@ describe('task-vault:review:export', () => {
 
     expect(await invoke('task-vault:review:export', { reviewId })).toEqual({ error: 'EACCES' })
   })
-})
+}

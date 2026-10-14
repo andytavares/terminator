@@ -1,21 +1,10 @@
-import { resolve } from 'path'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { extensionViewConfig } from '@terminator/extension-sdk/vite'
 
-export default defineConfig({
-  root: resolve(__dirname),
-  base: './',
-  plugins: [react()],
-  build: {
-    // Loaded from disk by Electron, so Vite's 500 kB default (a download-size
-    // heuristic) is replaced by a budget on the largest chunk: the whole review
-    // UI, CodeMirror included, is 1,110 kB. A chunk past it warns, and CI fails
-    // the build on any warning.
-    chunkSizeWarningLimit: 1200,
-    outDir: resolve(__dirname, 'dist'),
-    emptyOutDir: false,
-    rollupOptions: {
-      input: resolve(__dirname, 'index.html'),
-    },
-  },
-})
+// Loaded from disk, so Vite's 500 kB download heuristic gives way to a budget on the largest chunk:
+// each view is its own chunk (src/renderer/App.tsx), the largest, shared code with CodeMirror and
+// highlight.js, is 771 kB. CI fails the build on any chunk warning.
+export default defineConfig(
+  extensionViewConfig(__dirname, { plugins: [react()], chunkSizeWarningLimit: 850 })
+)

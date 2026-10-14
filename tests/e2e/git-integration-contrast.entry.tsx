@@ -15,6 +15,7 @@ import { GitFullView } from '../../extensions/git-integration/src/components/Git
 import { MergeFlowView } from '../../extensions/git-integration/src/components/merge-flow/MergeFlowView'
 import { usePrReviewStore } from '../../extensions/git-integration/src/stores/pr-review.store'
 import { useGitStore } from '../../extensions/git-integration/src/stores/git.store'
+import { electronApiOf } from '../support/electron-api'
 
 const DAY = 86400000
 const ago = (days: number): string => new Date(Date.now() - days * DAY).toISOString()
@@ -22,13 +23,34 @@ const REPO = '/work/terminator'
 
 type Level = 'low' | 'medium' | 'high'
 
-function file(
-  path: string,
-  level: Level,
-  tier: 0 | 1 | 2 | 3,
-  additions: number,
+/** A file's risk score at `level`, driven by its change size. */
+function riskScore(level: Level) {
+  return {
+    level,
+    composite: level === 'high' ? 80 : level === 'medium' ? 50 : 10,
+    metrics: {
+      changeSize: null,
+      churn90d: null,
+      blastRadius: null,
+      testFilePresent: null,
+      complexityDelta: null,
+      patchCoverage: null,
+    },
+    dominantDriver: 'change size',
+    topImporters: [],
+    importerCount: 0,
+  }
+}
+
+/** How a file changed: its risk, its tier and its line counts. */
+interface FileChange {
+  level: Level
+  tier: 0 | 1 | 2 | 3
+  additions: number
   deletions: number
-) {
+}
+
+function contrastFile(path: string, { level, tier, additions, deletions }: FileChange) {
   return {
     path,
     changeType: 'modified' as const,
@@ -37,21 +59,7 @@ function file(
     isBinary: false,
     tier,
     whyHere: 'Changed in this pull request',
-    riskScore: {
-      level,
-      composite: level === 'high' ? 80 : level === 'medium' ? 50 : 10,
-      metrics: {
-        changeSize: null,
-        churn90d: null,
-        blastRadius: null,
-        testFilePresent: null,
-        complexityDelta: null,
-        patchCoverage: null,
-      },
-      dominantDriver: 'change size',
-      topImporters: [],
-      importerCount: 0,
-    },
+    riskScore: riskScore(level),
     estimatedMinutes: 4,
   }
 }
@@ -63,9 +71,24 @@ const chapters = [
     estimatedMinutes: 12,
     status: 'in-progress' as const,
     files: [
-      file('src/main/session/session-store.ts', 'high', 0, 120, 14),
-      file('src/main/session/session-records.ts', 'medium', 1, 44, 6),
-      file('src/main/session/session-types.ts', 'low', 2, 12, 0),
+      contrastFile('src/main/session/session-store.ts', {
+        level: 'high',
+        tier: 0,
+        additions: 120,
+        deletions: 14,
+      }),
+      contrastFile('src/main/session/session-records.ts', {
+        level: 'medium',
+        tier: 1,
+        additions: 44,
+        deletions: 6,
+      }),
+      contrastFile('src/main/session/session-types.ts', {
+        level: 'low',
+        tier: 2,
+        additions: 12,
+        deletions: 0,
+      }),
     ],
   },
   {
@@ -74,8 +97,18 @@ const chapters = [
     estimatedMinutes: 9,
     status: 'not-started' as const,
     files: [
-      file('src/renderer/home/Ledger.tsx', 'medium', 1, 80, 22),
-      file('src/renderer/home/Logbook.tsx', 'low', 2, 31, 3),
+      contrastFile('src/renderer/home/Ledger.tsx', {
+        level: 'medium',
+        tier: 1,
+        additions: 80,
+        deletions: 22,
+      }),
+      contrastFile('src/renderer/home/Logbook.tsx', {
+        level: 'low',
+        tier: 2,
+        additions: 31,
+        deletions: 3,
+      }),
     ],
   },
   {
@@ -83,7 +116,9 @@ const chapters = [
     name: 'Generated and lockfiles',
     estimatedMinutes: 1,
     status: 'complete' as const,
-    files: [file('package-lock.json', 'low', 3, 400, 380)],
+    files: [
+      contrastFile('package-lock.json', { level: 'low', tier: 3, additions: 400, deletions: 380 }),
+    ],
   },
 ]
 
@@ -146,8 +181,7 @@ const diff = {
 function dashboardPr(
   number: number,
   section: string,
-  riskLevel: Level,
-  extra: Record<string, unknown> = {}
+  { riskLevel, ...extra }: { riskLevel: Level } & Record<string, unknown>
 ) {
   return {
     repo: 'andytavares/terminator',
@@ -174,14 +208,18 @@ function dashboardPr(
 }
 
 const dashboardPrs = [
-  dashboardPr(201, 'requested', 'high', { ciStatus: 'failing' }),
-  dashboardPr(202, 'requested', 'medium'),
-  dashboardPr(203, 're-review', 'low', { commitsSinceMyReview: 3 }),
-  dashboardPr(204, 'team', 'medium', { ciStatus: 'pending' }),
-  dashboardPr(205, 'mine', 'low', { reviewDecision: 'changes-requested', unresolvedThreads: 2 }),
-  dashboardPr(206, 'mine', 'medium', { reviewDecision: 'approved' }),
-  dashboardPr(207, 'mine', 'high', { ciStatus: 'failing' }),
-  dashboardPr(208, 'involved', 'low'),
+  dashboardPr(201, 'requested', { riskLevel: 'high', ciStatus: 'failing' }),
+  dashboardPr(202, 'requested', { riskLevel: 'medium' }),
+  dashboardPr(203, 're-review', { riskLevel: 'low', commitsSinceMyReview: 3 }),
+  dashboardPr(204, 'team', { riskLevel: 'medium', ciStatus: 'pending' }),
+  dashboardPr(205, 'mine', {
+    riskLevel: 'low',
+    reviewDecision: 'changes-requested',
+    unresolvedThreads: 2,
+  }),
+  dashboardPr(206, 'mine', { riskLevel: 'medium', reviewDecision: 'approved' }),
+  dashboardPr(207, 'mine', { riskLevel: 'high', ciStatus: 'failing' }),
+  dashboardPr(208, 'involved', { riskLevel: 'low' }),
 ]
 
 function author(name: string) {
@@ -276,13 +314,25 @@ const channels: Record<string, unknown> = {
   },
 }
 
-;(window as unknown as { electronAPI: unknown }).electronAPI = {
+declare global {
+  interface Window {
+    /** Which surface this page renders; the spec sets it before loading the bundle. */
+    __SURFACE__?: string
+  }
+}
+
+window.electronAPI = electronApiOf({
   extensionBridge: {
     invoke: (channel: string) => Promise.resolve(channels[channel] ?? null),
     on: () => () => {},
   },
-  fs: { onChanged: () => () => {} },
-}
+  fs: {
+    onChanged: () => () => {},
+    watchStart: async () => ({ ok: true as const }),
+    watchStop: async () => ({ ok: true as const }),
+  },
+  extension: { onSettingsChanged: () => () => {} },
+})
 
 function PrRail(): JSX.Element {
   usePrReviewStore.setState({
@@ -325,35 +375,36 @@ function GitView(): JSX.Element {
   )
 }
 
+/** A queued pull request whose review was paused part-way. */
+function pausedPr(): never {
+  return {
+    number: 301,
+    title: 'Resume the session wall review',
+    author: 'octocat',
+    authorAvatarUrl: '',
+    openedAt: ago(1),
+    headRefName: 'feat/wall',
+    baseRefName: 'main',
+    isDraft: false,
+    ciStatus: 'passing',
+    fileCount: 9,
+    additions: 120,
+    deletions: 40,
+    estimatedMinutes: 18,
+    riskLevel: 'medium',
+    signalDots: {},
+    sessionStatus: 'paused',
+    viewedFileCount: 3,
+    approvalCount: 0,
+    approvedBy: [],
+    requestedReviewers: [],
+    assigneeLogins: [],
+    mergeStateStatus: 'clean',
+  } as never
+}
+
 function PausedQueue(): JSX.Element {
-  usePrReviewStore.setState({
-    prQueue: [
-      {
-        number: 301,
-        title: 'Resume the session wall review',
-        author: 'octocat',
-        authorAvatarUrl: '',
-        openedAt: ago(1),
-        headRefName: 'feat/wall',
-        baseRefName: 'main',
-        isDraft: false,
-        ciStatus: 'passing',
-        fileCount: 9,
-        additions: 120,
-        deletions: 40,
-        estimatedMinutes: 18,
-        riskLevel: 'medium',
-        signalDots: {},
-        sessionStatus: 'paused',
-        viewedFileCount: 3,
-        approvalCount: 0,
-        approvedBy: [],
-        requestedReviewers: [],
-        assigneeLogins: [],
-        mergeStateStatus: 'clean',
-      } as never,
-    ],
-  })
+  usePrReviewStore.setState({ prQueue: [pausedPr()] })
   return (
     <div style={{ height: 400, width: 1100, display: 'flex' }}>
       <ReviewQueue
@@ -377,6 +428,7 @@ const surfaces: Record<string, () => JSX.Element> = {
       onMarkViewed={() => {}}
       onFinishChapter={() => {}}
       onOpenSubmit={() => {}}
+      onOpenShortcuts={() => {}}
     />
   ),
   'review-queue': PausedQueue,
@@ -401,7 +453,7 @@ const surfaces: Record<string, () => JSX.Element> = {
   ),
 }
 
-const name = (window as unknown as { __SURFACE__: string }).__SURFACE__
+const name = window.__SURFACE__ ?? ''
 const Surface = surfaces[name]
 const el = document.getElementById('app')
 if (!Surface || !el) throw new Error(`No surface ${name}`)

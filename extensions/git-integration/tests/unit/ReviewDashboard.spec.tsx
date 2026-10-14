@@ -95,51 +95,52 @@ const pr213 = makePr({
   createdAt: new Date(Date.now() - 2 * 86400000).toISOString(),
 })
 
-function mockInvoke(
+interface InvokeOptions {
+  cloneFolder?: string
+  cloneResult?: unknown
+  cloneError?: Error
+  repos?: string[]
+}
+
+const ACCESSIBLE_REPOS = () => ({
+  repos: [
+    { fullName: 'acme/api', owner: 'acme', private: false, pushedAt: new Date().toISOString() },
+    { fullName: 'acme/web', owner: 'acme', private: true, pushedAt: new Date().toISOString() },
+  ],
+})
+
+function cloneAnswer(options: InvokeOptions): Promise<unknown> {
+  if (options.cloneError) return Promise.reject(options.cloneError)
+  return Promise.resolve(options.cloneResult ?? { repoRoot: '/cloned/terminator' })
+}
+
+/** The bridge's answer to each channel the dashboard calls. */
+function answerFor(
+  channel: string,
   dashboardResult: unknown,
-  options: {
-    cloneFolder?: string
-    cloneResult?: unknown
-    cloneError?: Error
-    repos?: string[]
-  } = {}
-) {
-  const invoke = vi.fn((channel: string) => {
-    if (channel === 'github:dashboard-search') return Promise.resolve(dashboardResult)
-    if (channel === 'github:review-settings')
-      return Promise.resolve({ cloneFolder: options.cloneFolder ?? '', repos: options.repos ?? [] })
-    if (channel === 'github:accessible-repos')
-      return Promise.resolve({
-        repos: [
-          {
-            fullName: 'acme/api',
-            owner: 'acme',
-            private: false,
-            pushedAt: new Date().toISOString(),
-          },
-          {
-            fullName: 'acme/web',
-            owner: 'acme',
-            private: true,
-            pushedAt: new Date().toISOString(),
-          },
-        ],
-      })
-    if (channel === 'github:clone-repo') {
-      if (options.cloneError) return Promise.reject(options.cloneError)
-      return Promise.resolve(options.cloneResult ?? { repoRoot: '/cloned/terminator' })
-    }
-    return Promise.resolve({})
+  options: InvokeOptions
+): Promise<unknown> {
+  if (channel === 'github:dashboard-search') return Promise.resolve(dashboardResult)
+  if (channel === 'github:review-settings')
+    return Promise.resolve({ cloneFolder: options.cloneFolder ?? '', repos: options.repos ?? [] })
+  if (channel === 'github:accessible-repos') return Promise.resolve(ACCESSIBLE_REPOS())
+  if (channel === 'github:clone-repo') return cloneAnswer(options)
+  return Promise.resolve({})
+}
+
+function mockInvoke(dashboardResult: unknown, options: InvokeOptions = {}) {
+  const invoke = vi.fn((channel: string) => answerFor(channel, dashboardResult, options))
+  Object.assign(window, {
+    electronAPI: {
+      extensionBridge: {
+        invoke,
+        on: vi.fn(() => () => {}),
+      },
+      shell: {
+        openExternal: vi.fn().mockResolvedValue(undefined),
+      },
+    },
   })
-  ;(window as unknown as Record<string, unknown>).electronAPI = {
-    extensionBridge: {
-      invoke,
-      on: vi.fn(() => () => {}),
-    },
-    shell: {
-      openExternal: vi.fn().mockResolvedValue(undefined),
-    },
-  }
 }
 
 beforeEach(() => {
@@ -173,7 +174,9 @@ describe('ReviewDashboard', () => {
     await screen.findByTestId('row-210')
     expect(container.querySelector('.rd-bar')!.textContent).not.toMatch(/need you/)
   })
+})
 
+describe('ReviewDashboard — reads no checks for a pull request without checks and never names CI twice', () => {
   it('reads "no checks" for a pull request without checks and never names CI twice', async () => {
     const noChecks = makePr({ number: 300, section: 'mine', ciStatus: 'none' })
     const failing = makePr({ number: 301, section: 'mine', ciStatus: 'failing' })
@@ -189,7 +192,9 @@ describe('ReviewDashboard', () => {
       expect(text.match(/CI/g)?.length ?? 0).toBeLessThanOrEqual(1)
     }
   })
+})
 
+describe('ReviewDashboard — shows 50+ on the tab and heading of a capped section', () => {
   it('shows 50+ on the tab and heading of a capped section', async () => {
     mockInvoke({
       prs: [pr210, pr212],
@@ -205,7 +210,9 @@ describe('ReviewDashboard', () => {
     const requested = screen.getByText('REQUESTED OF YOU').parentElement!
     expect(within(requested).queryByText('50+')).toBeNull()
   })
+})
 
+describe('ReviewDashboard — names the repository on the second line only when more than one repository shows', () => {
   it('names the repository on the second line only when more than one repository shows', async () => {
     const other = makePr({ repo: 'acme/api', number: 400, title: 'Other repo PR' })
     mockInvoke({ prs: [pr210, other], login: 'a', fetchedAt: new Date().toISOString() })
@@ -228,7 +235,9 @@ describe('ReviewDashboard', () => {
     expect(screen.getByTestId('row-210').textContent).toContain('High risk')
     expect(screen.getByTestId('row-410').textContent).not.toMatch(/risk/i)
   })
+})
 
+describe('ReviewDashboard — sorts each section with the chosen sort', () => {
   it('sorts each section with the chosen sort', async () => {
     const waiting = makePr({
       number: 501,
@@ -252,24 +261,20 @@ describe('ReviewDashboard', () => {
     expect(order()).toEqual(['row-502', 'row-501'])
     expect(screen.queryByText(/Sorted by closest/)).toBeNull()
   })
+})
 
+describe('ReviewDashboard — reloads when a review is submitted elsewhere', () => {
   it('reloads when a review is submitted elsewhere', async () => {
     mockInvoke({ prs: [pr210], login: 'andytavares', fetchedAt: new Date().toISOString() })
-    const bridge = (
-      window as unknown as {
-        electronAPI: {
-          extensionBridge: { invoke: ReturnType<typeof vi.fn>; on: ReturnType<typeof vi.fn> }
-        }
-      }
-    ).electronAPI.extensionBridge
-    const listeners: Record<string, () => void> = {}
-    bridge.on.mockImplementation((channel: string, cb: () => void) => {
+    const bridge = window.electronAPI.extensionBridge
+    const listeners: Record<string, (data?: unknown) => void> = {}
+    vi.mocked(bridge.on).mockImplementation((channel: string, cb: (data: unknown) => void) => {
       listeners[channel] = cb
       return () => {}
     })
     render(<ReviewDashboard />)
     await screen.findByText('REQUESTED OF YOU')
-    bridge.invoke.mockImplementation((channel: string) =>
+    vi.mocked(bridge.invoke).mockImplementation((channel: string) =>
       Promise.resolve(
         channel === 'github:dashboard-search'
           ? { prs: [], login: 'andytavares', fetchedAt: new Date().toISOString() }
@@ -279,7 +284,9 @@ describe('ReviewDashboard', () => {
     listeners['reviews:changed']()
     await screen.findByText('Nothing needs you')
   })
+})
 
+describe('ReviewDashboard — renders the three tabs with counts', () => {
   it('renders the three tabs with counts', async () => {
     mockInvoke({
       prs: [pr211, pr210, pr212, pr213],
@@ -296,7 +303,37 @@ describe('ReviewDashboard', () => {
     expect(screen.getByRole('tab', { name: /My PRs/ })).toBeTruthy()
     expect(screen.getByRole('tab', { name: /Involved/ })).toBeTruthy()
   })
+})
 
+describe('ReviewDashboard — names each tab with its count, read apart from the words', () => {
+  it('names each tab with its count, read apart from the words', async () => {
+    mockInvoke({
+      prs: [pr211, pr210, pr212, pr213],
+      login: 'andytavares',
+      fetchedAt: new Date().toISOString(),
+    })
+    render(<ReviewDashboard />)
+    expect(await screen.findByRole('tab', { name: 'Needs you, 3' })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: 'My PRs, 1' })).toBeTruthy()
+  })
+
+  it('moves between sections with the arrow keys and shows the selected one', async () => {
+    mockInvoke({ prs: [pr211, pr213], login: 'andytavares', fetchedAt: new Date().toISOString() })
+    render(<ReviewDashboard />)
+    await screen.findByText('RE-REVIEW · NEW COMMITS SINCE YOU REVIEWED')
+    const needs = screen.getByRole('tab', { name: /Needs you/ })
+    needs.focus()
+    fireEvent.keyDown(needs, { key: 'ArrowRight' })
+    const mine = screen.getByRole('tab', { name: /My PRs/ })
+    expect(document.activeElement).toBe(mine)
+    expect(mine.getAttribute('aria-selected')).toBe('true')
+    const panel = screen.getByRole('tabpanel')
+    expect(panel.getAttribute('aria-labelledby')).toBe(mine.id)
+    expect(within(panel).getByText('YOUR OPEN PRS')).toBeTruthy()
+  })
+})
+
+describe('ReviewDashboard — puts the reviews requested of you above every other group', () => {
   it('puts the reviews requested of you above every other group', async () => {
     mockInvoke({
       prs: [pr211, pr210, pr212],
@@ -317,7 +354,9 @@ describe('ReviewDashboard', () => {
     expect(screen.getAllByText('High risk').length).toBeGreaterThan(0)
     expect(screen.getByRole('button', { name: 'Re-review' })).toBeTruthy()
   })
+})
 
+describe('ReviewDashboard — omits an empty group', () => {
   it('omits an empty group', async () => {
     mockInvoke({ prs: [pr210], login: 'andytavares', fetchedAt: new Date().toISOString() })
     render(<ReviewDashboard />)
@@ -337,7 +376,9 @@ describe('ReviewDashboard', () => {
     )
     expect(screen.getByText('changes requested')).toBeTruthy()
   })
+})
 
+describe('ReviewDashboard — keeps the Open label and notes Not cloned when localRepoRoot is null', () => {
   it('keeps the "Open" label and notes "Not cloned" when localRepoRoot is null', async () => {
     mockInvoke({ prs: [pr213], login: 'andytavares', fetchedAt: new Date().toISOString() })
     render(<ReviewDashboard />)
@@ -358,7 +399,9 @@ describe('ReviewDashboard', () => {
       )
     })
   })
+})
 
+describe('ReviewDashboard — opens an uncloned row via the gh: pseudo repo root', () => {
   it('opens an uncloned row via the gh: pseudo repo root', async () => {
     mockInvoke({ prs: [pr213], login: 'andytavares', fetchedAt: new Date().toISOString() })
     render(<ReviewDashboard />)
@@ -372,7 +415,9 @@ describe('ReviewDashboard', () => {
       )
     })
   })
+})
 
+describe('ReviewDashboard — shows Clone and review only when a clone folder is configured, and clones then opens', () => {
   it('shows "Clone and review" only when a clone folder is configured, and clones then opens', async () => {
     mockInvoke(
       { prs: [pr213], login: 'andytavares', fetchedAt: new Date().toISOString() },
@@ -395,7 +440,9 @@ describe('ReviewDashboard', () => {
       )
     })
   })
+})
 
+describe('ReviewDashboard — does not show Clone and review when no clone folder is configured', () => {
   it('does not show "Clone and review" when no clone folder is configured', async () => {
     mockInvoke(
       { prs: [pr213], login: 'andytavares', fetchedAt: new Date().toISOString() },
@@ -413,6 +460,7 @@ describe('ReviewDashboard', () => {
     expect(await screen.findByText(/network down/)).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Retry' })).toBeTruthy()
   })
+
   it('labels the scope button from the saved selection', async () => {
     mockInvoke(
       { prs: [pr210], login: 'andytavares', fetchedAt: new Date().toISOString() },
@@ -421,7 +469,22 @@ describe('ReviewDashboard', () => {
     render(<ReviewDashboard />)
     expect(await screen.findByRole('button', { name: /3 repositories/ })).toBeTruthy()
   })
+})
 
+describe('ReviewDashboard — says "1 repository" for a selection of one', () => {
+  it('says "1 repository" for a selection of one', async () => {
+    mockInvoke(
+      { prs: [pr210], login: 'andytavares', fetchedAt: new Date().toISOString() },
+      { repos: ['acme/api'] }
+    )
+    render(<ReviewDashboard />)
+    expect(
+      await screen.findByRole('button', { name: '1 repository, choose repositories' })
+    ).toBeTruthy()
+  })
+})
+
+describe('ReviewDashboard — labels the scope button All repositories when nothing is selected', () => {
   it('labels the scope button All repositories when nothing is selected', async () => {
     mockInvoke({ prs: [pr210], login: 'andytavares', fetchedAt: new Date().toISOString() })
     render(<ReviewDashboard />)
@@ -438,7 +501,9 @@ describe('ReviewDashboard', () => {
     render(<ReviewDashboard />)
     expect(await screen.findByRole('button', { name: /12 repositories/ })).toBeTruthy()
   })
+})
 
+describe('ReviewDashboard — saving the picker sends the selection and reloads the dashboard', () => {
   it('saving the picker sends the selection and reloads the dashboard', async () => {
     mockInvoke({ prs: [pr210], login: 'andytavares', fetchedAt: new Date().toISOString() })
     render(<ReviewDashboard />)
@@ -454,7 +519,9 @@ describe('ReviewDashboard', () => {
     expect(invoke).toHaveBeenCalledWith('github:review-repos-set', { repos: ['acme/api'] })
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   })
+})
 
+describe('ReviewDashboard — names the sections that failed and keeps the ones that loaded', () => {
   it('names the sections that failed and keeps the ones that loaded', async () => {
     mockInvoke({
       prs: [pr210],
@@ -473,7 +540,9 @@ describe('ReviewDashboard', () => {
     expect(within(band).getByRole('button', { name: 'Choose repositories' })).toBeTruthy()
     expect(within(band).getByRole('button', { name: 'Retry' })).toBeTruthy()
   })
+})
 
+describe('ReviewDashboard — shows only the short message when every section failed', () => {
   it('shows only the short message when every section failed', async () => {
     const query = 'query { search(query: "is:open is:pr") { nodes { number } } }'
     const failed = ['re-review', 'requested', 'team', 'mine', 'involved'].map((section) => ({

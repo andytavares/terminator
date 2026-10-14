@@ -1,47 +1,54 @@
-import React from 'react'
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import React, { type ComponentProps } from 'react'
+import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { useWorkspaceStore } from '../../../src/renderer/stores/workspace.store'
 import { useSettingsStore } from '../../../src/renderer/stores/settings.store'
 import { useSessionStore } from '../../../src/renderer/stores/session.store'
 import { useToastStore } from '../../../src/renderer/stores/toast.store'
+import { useExtensionCommandsStore } from '../../../src/renderer/stores/extension-commands.store'
 import { useExtensionRegistry } from '../../../src/renderer/extensions/registry'
 import { useTerminalOpenErrorStore } from '../../../src/renderer/stores/terminal-open-error.store'
-import { useTerminalSession } from '../../../src/renderer/hooks/useTerminalSession'
 import { useIntegrationsStore } from '../../../src/renderer/stores/integrations.store'
 import { App } from '../../../src/renderer/App'
-import { SCRATCH_PROJECT_ID } from '../../../src/shared/types/index'
+import { installLogInterceptor } from '../../../src/renderer/logger'
+import { useLogStore } from '../../../src/renderer/stores/log.store'
+import { useNotificationStore } from '../../../src/renderer/stores/notification.store'
+import type { QuickAction } from '../../../src/renderer/quick-actions/types'
+import type { QuickActionsProps } from '../../../src/renderer/components/QuickActions'
+import type { useTerminalSession } from '../../../src/renderer/hooks/useTerminalSession'
+import type { useKeyboardShortcuts } from '../../../src/renderer/hooks/useKeyboardShortcuts'
+import type { UnifiedSidebar } from '../../../src/renderer/components/sidebar/UnifiedSidebar'
+import type { TerminalInstance } from '../../../src/renderer/components/terminal/TerminalSession'
+import {
+  SCRATCH_PROJECT_ID,
+  type GlobalSettings,
+  type Project,
+  type TerminalSession,
+  type Workspace,
+} from '../../../src/shared/types/index'
+import type { ElectronAPI } from '../../../src/shared/electron-api/api-type'
+import {
+  projectFixture,
+  resetStore,
+  terminalSessionOf,
+  workspaceFixture,
+} from '../../support/renderer-stores'
+import { bridgeEvents, installElectronApi, pushedEvent } from '../../support/electron-api'
+import { partialFake } from '../../support/fakes'
 
-// Mock all child components and hooks to focus on App logic
-vi.mock('../../../src/renderer/stores/workspace.store', () => ({
-  useWorkspaceStore: Object.assign(vi.fn(), { getState: vi.fn() }),
-}))
-vi.mock('../../../src/renderer/stores/settings.store', () => ({
-  useSettingsStore: Object.assign(vi.fn(), { getState: vi.fn() }),
-}))
-vi.mock('../../../src/renderer/stores/session.store', () => ({
-  useSessionStore: Object.assign(vi.fn(), { getState: vi.fn() }),
-}))
-vi.mock('../../../src/renderer/stores/toast.store', () => ({ useToastStore: vi.fn() }))
-vi.mock('../../../src/renderer/stores/log.store', () => ({ installLogInterceptor: vi.fn() }))
-vi.mock('../../../src/renderer/extensions/registry', () => {
-  const useExtensionRegistry = vi.fn()
-  ;(useExtensionRegistry as unknown as { getState: () => unknown }).getState = vi.fn(() => ({
-    registerGlobalTab: vi.fn(() => vi.fn()),
-    updateGlobalTab: vi.fn(),
-    setActiveGlobalTab: vi.fn(),
-    setActiveWorkspaceTab: vi.fn(),
-    setActiveProjectTab: vi.fn(),
-    sidebarPanels: new Map(),
-  }))
-  return { useExtensionRegistry }
-})
+// Settings are answered by the main process's own settings store, kept in memory.
+vi.mock('electron-store', async () =>
+  (await import('../../support/stores')).inMemoryElectronStore()
+)
+
+// The children are stand-ins: what is under test is the shell that wires them.
 vi.mock('../../../src/renderer/extensions/loader', () => ({}))
-const mockUseSessionFacts = vi.fn(() => [] as Array<{ sessionId: string; workItem: unknown }>)
-const mockUseIssue = vi.fn(() => null as { url: string } | null)
+const facts = vi.hoisted(() => ({
+  sessionFacts: [] as Array<{ sessionId: string; workItem: null }>,
+}))
 vi.mock('../../../src/renderer/components/session/useSessionFacts', () => ({
-  useSessionFacts: () => mockUseSessionFacts(),
-  useIssue: (ref: unknown) => mockUseIssue(ref),
+  useSessionFacts: () => facts.sessionFacts,
+  useIssue: () => null,
 }))
 vi.mock('../../../src/renderer/components/session/SessionLinkDialog', () => ({
   SessionLinkDialog: ({
@@ -57,49 +64,29 @@ vi.mock('../../../src/renderer/components/session/SessionLinkDialog', () => ({
     </div>
   ),
 }))
-type ShortcutCallbacks = {
-  onOpenSettings?: () => void
-  onToggleLog?: () => void
-  onOpenCommandPalette?: () => void
-  onToggleOverview?: () => void
-  onNewScratch?: () => void
-  onNewTab?: () => void
-  onEditSessionNote?: () => void
-}
-let capturedShortcutCallbacks: ShortcutCallbacks = {}
+
+type ShortcutOptions = NonNullable<Parameters<typeof useKeyboardShortcuts>[0]>
+const shortcuts = vi.hoisted(() => ({ callbacks: {} as ShortcutOptions }))
 vi.mock('../../../src/renderer/hooks/useKeyboardShortcuts', () => ({
-  useKeyboardShortcuts: vi.fn().mockImplementation((opts: ShortcutCallbacks = {}) => {
-    capturedShortcutCallbacks = opts
-  }),
+  useKeyboardShortcuts: (options: ShortcutOptions = {}) => {
+    shortcuts.callbacks = options
+  },
 }))
+
+// Opening a terminal builds an xterm, which jsdom cannot run; what is asserted
+// is the terminal asked for.
+type TerminalSessionApi = ReturnType<typeof useTerminalSession>
+const terminals = vi.hoisted(() => ({ createSession: vi.fn(), splitSession: vi.fn() }))
 vi.mock('../../../src/renderer/hooks/useTerminalSession', () => ({
-  useTerminalSession: vi.fn(() => ({
-    // Both resolve: the real hook hands back promises, and every call site
-    // attaches a rejection handler to them.
-    createSession: vi.fn().mockResolvedValue('ses-1'),
-    splitSession: vi.fn().mockResolvedValue(undefined),
-  })),
+  useTerminalSession: (): TerminalSessionApi => terminals,
 }))
-type QuickActionLike = { id: string; label: string; group: string; run: () => void }
-type QuickActionsProps = {
-  onClose: () => void
-  actions: QuickActionLike[]
-  groups?: unknown[]
-  pinned?: QuickActionLike[]
-  recent?: QuickActionLike[]
-  contextGroupId?: string | null
-  contextLabel?: string
-  onRun?: (a: QuickActionLike) => void
-  onTogglePin?: (id: string) => void
-}
-let capturedQuickActionsProps: QuickActionsProps | null = null
-// Back-compat aliases so the many pre-existing assertions below (written
-// against the old CommandPalette) keep reading from the same live data.
-let capturedPaletteCommands: QuickActionLike[] = []
+const createSession = vi.mocked<TerminalSessionApi['createSession']>(terminals.createSession)
+const splitSession = vi.mocked<TerminalSessionApi['splitSession']>(terminals.splitSession)
+
+const palette = vi.hoisted(() => ({ props: null as QuickActionsProps | null }))
 vi.mock('../../../src/renderer/components/QuickActions', () => ({
   QuickActions: (props: QuickActionsProps) => {
-    capturedQuickActionsProps = props
-    capturedPaletteCommands = props.actions
+    palette.props = props
     return (
       <div data-testid="quick-actions">
         <button onClick={props.onClose}>Close Palette</button>
@@ -108,23 +95,16 @@ vi.mock('../../../src/renderer/components/QuickActions', () => ({
   },
 }))
 
-let capturedOnSelectSession: ((sessionId: string) => void) | null = null
-let capturedOnSelectProject: (() => void) | null = null
-let capturedEditNoteSessionId: string | null = null
+type SidebarProps = ComponentProps<typeof UnifiedSidebar>
+const sidebar = vi.hoisted(() => ({ props: null as SidebarProps | null }))
 vi.mock('../../../src/renderer/components/sidebar/UnifiedSidebar', () => ({
-  UnifiedSidebar: ({
-    onSelectScratchSession,
-    onSelectProject,
-    visible,
-  }: {
-    onSelectScratchSession: (sessionId: string) => void
-    onSelectProject?: () => void
-    visible: boolean
-  }) => {
-    capturedOnSelectSession = onSelectScratchSession
-    capturedOnSelectProject = onSelectProject ?? null
+  UnifiedSidebar: (props: SidebarProps) => {
+    sidebar.props = props
     return (
-      <div data-testid="unified-sidebar" className={visible ? '' : 'unified-sidebar--hidden'} />
+      <div
+        data-testid="unified-sidebar"
+        className={props.visible ? '' : 'unified-sidebar--hidden'}
+      />
     )
   },
 }))
@@ -153,14 +133,27 @@ vi.mock('../../../src/renderer/components/NameTerminalDialog', () => ({
   ),
 }))
 vi.mock('../../../src/renderer/components/terminal/TerminalPane', () => ({
-  TerminalPane: () => <div data-testid="terminal-pane" />,
+  TerminalPane: ({ projectId }: { projectId: string }) => (
+    <div data-testid="terminal-pane">{projectId}</div>
+  ),
+}))
+const tabBar = vi.hoisted(() => ({
+  editNoteSessionId: null as string | null,
+  onScratchDeactivate: undefined as (() => void) | undefined,
 }))
 vi.mock('../../../src/renderer/components/terminal/TabBar', () => ({
-  TabBar: ({ editNoteSessionId }: { editNoteSessionId?: string | null }) => {
+  TabBar: ({
+    editNoteSessionId,
+    onScratchDeactivate,
+  }: {
+    editNoteSessionId?: string | null
+    onScratchDeactivate?: () => void
+  }) => {
     // App sets the id then clears it on a microtask, so pressing the shortcut
     // twice reopens the editor. The last render therefore always sees null —
     // what the test is asking is whether the tab bar was ever handed the id.
-    if (editNoteSessionId) capturedEditNoteSessionId = editNoteSessionId
+    if (editNoteSessionId) tabBar.editNoteSessionId = editNoteSessionId
+    tabBar.onScratchDeactivate = onScratchDeactivate
     return <div data-testid="tab-bar" />
   },
 }))
@@ -170,6 +163,12 @@ vi.mock('../../../src/renderer/components/settings/SettingsPanel', () => ({
       <button onClick={onClose}>Close Settings</button>
     </div>
   ),
+}))
+vi.mock('../../../src/renderer/components/home/HomeScreen', () => ({
+  HomeScreen: () => <div data-testid="home-screen" />,
+}))
+vi.mock('../../../src/renderer/components/overview/OverviewScreen', () => ({
+  OverviewScreen: () => <div data-testid="overview-screen" />,
 }))
 vi.mock('../../../src/renderer/components/ToastContainer', () => ({
   ToastContainer: () => <div data-testid="toast-container" />,
@@ -184,183 +183,243 @@ vi.mock('../../../src/renderer/components/LogWindow', () => ({
 vi.mock('../../../src/renderer/components/ErrorBoundary', () => ({
   ErrorBoundary: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }))
-type EmptyStateAction = { label: string; onClick: () => void }
-vi.mock('../../../src/renderer/components/EmptyState', () => ({
-  EmptyState: ({ title, actions }: { title: string; actions?: EmptyStateAction[] }) => (
-    <div data-testid="empty-state">
-      {title}
-      {actions?.map((a) => (
-        <button key={a.label} onClick={a.onClick}>
-          {a.label}
-        </button>
-      ))}
-    </div>
-  ),
-}))
 
-const mockLoadWorkspaces = vi.fn()
-const mockLoadSettings = vi.fn()
-const mockMarkWelcomeSeen = vi.fn()
-const mockHandleProcessExit = vi.fn()
-const mockAddToast = vi.fn()
+// ── The main process ─────────────────────────────────────────────────────────
 
-const defaultExtensionRegistry = {
-  sidebarPanels: new Map(),
-  projectTabs: new Map(),
-  globalTabs: new Map(),
-  workspaceTabs: new Map(),
-  openPanels: new Set<string>(),
-  activeProjectTabId: null,
-  activeGlobalTabId: null,
-  activeWorkspaceTabId: null,
-  togglePanel: vi.fn(),
-  setActiveProjectTab: vi.fn(),
-  setActiveGlobalTab: vi.fn(),
-  setActiveWorkspaceTab: vi.fn(),
-  keyboardShortcuts: [],
-  commands: [],
-  overlays: [],
-  // App draws the app band itself now, which reads the contributed items.
-  sidebarButtons: [],
-  quickActionGroups: [],
+type MainSettings = typeof import('../../../src/main/storage/settings-store')
+let mainSettings: MainSettings
+
+/** Settings as saved: the defaults, with `patch` written over them by main's own merge. */
+function settingsWith(patch: Record<string, unknown>): GlobalSettings {
+  return mainSettings.updateGlobalSettings(patch)
 }
 
-function setupMocks(
-  overrides: {
-    activeWorkspaceId?: string | null
-    activeProjectId?: string | null
-    globalSettings?: Record<string, unknown> | null
-    workspaces?: unknown[]
-    scratchActive?: boolean
-    sessions?: Map<string, unknown>
-    projectViews?: Map<string, unknown>
-    projectsByWorkspaceId?: Map<string, unknown>
-  } = {}
-) {
-  const {
-    activeWorkspaceId = null,
-    activeProjectId = null,
-    globalSettings = { appearance: { theme: 'dark' }, ui: { hasSeenWelcome: false } },
-    workspaces = [],
-    scratchActive: initialScratchActive = false,
-  } = overrides
-
-  const workspaceState = {
-    loadWorkspaces: mockLoadWorkspaces,
-    activeWorkspaceId,
-    activeProjectId,
-    workspaces,
-    projectsByWorkspaceId: overrides.projectsByWorkspaceId ?? new Map(),
-    setActiveWorkspace: vi.fn(),
-    setActiveProject: mockSetActiveProject,
-    resolveActiveCwd: vi.fn().mockReturnValue('~'),
-    scratchActive: initialScratchActive,
-    setScratchActive: vi.fn((value: boolean) => {
-      workspaceState.scratchActive = value
-      vi.mocked(useWorkspaceStore).mockReturnValue(
-        workspaceState as unknown as ReturnType<typeof useWorkspaceStore>
-      )
-    }),
+/** What main pushes to the window. */
+function mainEvents() {
+  return {
+    processExit: pushedEvent<[string, number | null]>(),
+    commandsChanged: pushedEvent<[]>(),
+    quickActionsOpen: pushedEvent<[]>(),
+    openSettings: pushedEvent<[]>(),
+    openAbout: pushedEvent<[]>(),
+    openHome: pushedEvent<[]>(),
+    toggleSidebar: pushedEvent<[]>(),
+    closeTab: pushedEvent<[]>(),
+    togglePanel: pushedEvent<[string]>(),
+    selectProjectTab: pushedEvent<[string]>(),
+    bridge: bridgeEvents(),
   }
-  vi.mocked(useWorkspaceStore).mockReturnValue(
-    workspaceState as unknown as ReturnType<typeof useWorkspaceStore>
-  )
-  // Plain reassignment, not vi.mocked(...).mockReturnValue: several tests below
-  // replace .getState outright with a bare function for a narrower fixture, and
-  // a mockReturnValue call on a getState that is no longer a mock throws.
-  ;(useWorkspaceStore as unknown as { getState: () => unknown }).getState = () => workspaceState
-  const settingsState = {
-    loadSettings: mockLoadSettings,
-    globalSettings,
-    markWelcomeSeen: mockMarkWelcomeSeen,
-    resolveSettings: vi.fn().mockReturnValue({ terminal: { scrollbackLimit: 5000 } }),
-    updateQuickActions: vi.fn().mockResolvedValue(undefined),
-    workspaceSettings: new Map(),
-  }
-  vi.mocked(useSettingsStore).mockReturnValue(
-    settingsState as unknown as ReturnType<typeof useWorkspaceStore>
-  )
-  vi.mocked(useSettingsStore.getState).mockReturnValue(
-    settingsState as unknown as ReturnType<typeof useSettingsStore.getState>
-  )
-  const sessionState = {
-    handleProcessExit: mockHandleProcessExit,
-    getSessionsForProject: vi.fn().mockReturnValue([]),
-    getActiveSessionForProject: vi.fn().mockReturnValue(null),
-    getFocusedSession: vi.fn().mockReturnValue(null),
-    getPaneLayout: vi.fn().mockReturnValue(null),
-    closeSplitLeaf: vi.fn(),
-    getTerminalInstance: vi.fn().mockReturnValue(undefined),
-    getScratchSessions: vi.fn().mockReturnValue([]),
-    sessions: overrides.sessions ?? new Map(),
-    setActiveSessionForProject: mockSetActiveSessionForProject,
-    closeSession: vi.fn().mockResolvedValue(undefined),
-    projectViews: overrides.projectViews ?? new Map(),
-    requestFocus: vi.fn(),
-  }
-  vi.mocked(useSessionStore).mockReturnValue(
-    sessionState as unknown as ReturnType<typeof useWorkspaceStore>
-  )
-  // Plain reassignment: several tests below replace .getState outright with a
-  // bare function, which would otherwise leave it not a mock for the rest of
-  // the file's tests.
-  ;(useSessionStore as unknown as { getState: () => unknown }).getState = () => sessionState
-  vi.mocked(useToastStore).mockReturnValue({
-    addToast: mockAddToast,
-  } as unknown as ReturnType<typeof useWorkspaceStore>)
-  vi.mocked(useExtensionRegistry).mockReturnValue(
-    defaultExtensionRegistry as unknown as ReturnType<typeof useExtensionRegistry>
-  )
 }
 
-const mockSetActiveProject = vi.fn()
-const mockSetActiveSessionForProject = vi.fn()
+type MainEvents = ReturnType<typeof mainEvents>
 
-let mockUnsubscribe: ReturnType<typeof vi.fn>
+/** What the window sends back to main, recorded. */
+function mainSent() {
+  return {
+    input: vi.fn<ElectronAPI['terminal']['input']>(),
+    notifyPanelState: vi.fn<ElectronAPI['extensionEvents']['notifyPanelState']>(),
+    getCommands: vi.fn<ElectronAPI['extension']['getCommands']>(async () => ({ commands: [] })),
+    updateGlobal: vi.fn<ElectronAPI['settings']['updateGlobal']>(async (patch) => ({
+      settings: mainSettings.updateGlobalSettings(patch),
+    })),
+  }
+}
 
-beforeEach(() => {
-  capturedEditNoteSessionId = null
+type MainSent = ReturnType<typeof mainSent>
+type MainData = { workspaces: Workspace[]; projects: Map<string, Project[]> }
 
-  vi.clearAllMocks()
-  mockUseSessionFacts.mockReturnValue([])
-  mockUseIssue.mockReturnValue(null)
-  capturedPaletteCommands = []
-  capturedOnSelectSession = null
-  capturedOnSelectProject = null
-  mockUnsubscribe = vi.fn()
-  ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
+/** Terminals, the workspace and project lists, and settings. */
+function coreParts(data: MainData, events: MainEvents, sent: MainSent) {
+  return {
     terminal: {
-      onProcessExit: vi.fn().mockReturnValue(mockUnsubscribe),
+      onProcessExit: events.processExit.addListener,
+      input: sent.input,
+      close: async () => ({ success: true }),
     },
-    extensionEvents: null,
-    notifications: {
-      list: vi.fn().mockResolvedValue([]),
-      dismiss: vi.fn().mockResolvedValue({ ok: true }),
-      onPush: vi.fn().mockReturnValue(mockUnsubscribe),
-    },
-    extensionBridge: {
-      on: vi.fn().mockReturnValue(mockUnsubscribe),
-      invoke: vi.fn().mockResolvedValue({}),
-    },
-    extension: {
-      setBottomInset: vi.fn(),
-      getCommands: vi.fn().mockResolvedValue({ commands: [] }),
-      list: vi.fn().mockResolvedValue({ extensions: [] }),
-      executeCommand: vi.fn(),
-    },
-    quickActions: {
-      onOpen: vi.fn().mockReturnValue(mockUnsubscribe),
+    workspace: { list: async () => ({ workspaces: data.workspaces }) },
+    project: { list: async (id: string) => ({ projects: data.projects.get(id) ?? [] }) },
+    settings: {
+      getGlobal: async () => ({ settings: mainSettings.getGlobalSettings() }),
+      getWorkspace: async (id: string) => ({ settings: mainSettings.getWorkspaceSettings(id) }),
+      updateGlobal: sent.updateGlobal,
     },
   }
-  setupMocks()
+}
+
+/** Menu accelerators, the extension bridge and extension commands. */
+function extensionParts(events: MainEvents, sent: MainSent) {
+  return {
+    extensionEvents: {
+      onMenuOpenSettings: events.openSettings.addListener,
+      onMenuOpenAbout: events.openAbout.addListener,
+      onMenuOpenHome: events.openHome.addListener,
+      onMenuToggleSidebar: events.toggleSidebar.addListener,
+      onMenuCloseTab: events.closeTab.addListener,
+      onTogglePanel: events.togglePanel.addListener,
+      onSelectProjectTab: events.selectProjectTab.addListener,
+      notifyPanelState: sent.notifyPanelState,
+    },
+    extensionBridge: { on: events.bridge.on, invoke: async () => ({}) },
+    extension: {
+      setBottomInset: () => {},
+      getCommands: sent.getCommands,
+      onCommandsChanged: events.commandsChanged.addListener,
+      list: async () => ({ extensions: [] }),
+      executeCommand: () => {},
+    },
+    quickActions: { onOpen: events.quickActionsOpen.addListener },
+  }
+}
+
+/** What the window only reads: notifications, session records, metrics and the branch. */
+function quietParts() {
+  const system = {
+    cpuPercent: 0,
+    memUsedBytes: 0,
+    memTotalBytes: 1,
+    netInBytesPerSec: 0,
+    netOutBytesPerSec: 0,
+  }
+  return {
+    notifications: {
+      list: async () => [],
+      onPush: () => () => {},
+      create: async () => ({ id: 'n1' }),
+    },
+    sessionRecords: { list: async () => ({ data: [] }), onChanged: () => () => {} },
+    metrics: {
+      getSystem: async () => ({ data: system }),
+      getProcesses: async () => ({ data: [] }),
+    },
+    git: { currentBranch: async () => ({ branch: 'main' }) },
+  }
+}
+
+/** What main pushes to the window, and what the window sends back to it. */
+function mainProcess(data: MainData) {
+  const events = mainEvents()
+  const sent = mainSent()
+  const parts = {
+    ...coreParts(data, events, sent),
+    ...extensionParts(events, sent),
+    ...quietParts(),
+  }
+  return { events, sent, parts }
+}
+
+let main: ReturnType<typeof mainProcess>
+
+const WS1 = workspaceFixture({ id: 'ws-1', name: 'One', folderPath: '/a' })
+const WS2 = workspaceFixture({ id: 'ws-2', name: 'Two', folderPath: '/b' })
+const PROJ1 = projectFixture({ id: 'proj-1', workspaceId: 'ws-1', name: 'API' })
+
+interface AppState {
+  activeWorkspaceId?: string | null
+  activeProjectId?: string | null
+  globalSettings?: GlobalSettings | null
+  workspaces?: Workspace[]
+  scratchActive?: boolean
+  sessions?: TerminalSession[]
+  projectsByWorkspaceId?: Map<string, Project[]>
+}
+
+/** The renderer's stores as the app would hold them, and a main process that
+ * answers with the same workspaces, projects and settings. */
+function setupApp(state: AppState = {}): void {
+  const workspaces = state.workspaces ?? []
+  const projects = state.projectsByWorkspaceId ?? new Map<string, Project[]>()
+  main = mainProcess({ workspaces, projects })
+  installElectronApi(main.parts)
+  resetStore(useWorkspaceStore, {
+    workspaces,
+    projectsByWorkspaceId: projects,
+    activeWorkspaceId: state.activeWorkspaceId ?? null,
+    activeProjectId: state.activeProjectId ?? null,
+    scratchActive: state.scratchActive ?? false,
+  })
+  resetStore(useSettingsStore, {
+    globalSettings: state.globalSettings === undefined ? settingsWith({}) : state.globalSettings,
+  })
+  resetStore(useSessionStore, {
+    sessions: new Map((state.sessions ?? []).map((s) => [s.id, s])),
+  })
+}
+
+/** Shows `sessionId` in its project, as a click on its tab does. */
+function showTab(projectId: string, sessionId: string): void {
+  useSessionStore.getState().setActiveSessionForProject(projectId, sessionId)
+}
+
+/** The operator leaves Home for the main area, as clicking Home in the band does. */
+function leaveHome(): void {
+  fireEvent.click(screen.getByRole('button', { name: /^Home/ }))
+}
+
+const registry = () => useExtensionRegistry.getState()
+const settings = () => useSettingsStore.getState().globalSettings
+const toasts = () => useToastStore.getState().toasts
+
+function openPalette(): void {
+  act(() => shortcuts.callbacks.onOpenCommandPalette?.())
+}
+
+/** Runs a Quick Actions entry by id, as a click on its row does. */
+function runAction(id: string): void {
+  act(() => {
+    void paletteAction(id)?.run()
+  })
+}
+
+function paletteAction(id: string): QuickAction | undefined {
+  return palette.props?.actions.find((a) => a.id === id)
+}
+
+beforeEach(async () => {
+  vi.clearAllMocks()
+  vi.resetModules()
+  mainSettings = await import('../../../src/main/storage/settings-store')
+  shortcuts.callbacks = {}
+  palette.props = null
+  sidebar.props = null
+  tabBar.editNoteSessionId = null
+  facts.sessionFacts = []
+  localStorage.clear()
+  createSession.mockResolvedValue('ses-1')
+  splitSession.mockResolvedValue(undefined)
+  resetStore(useExtensionRegistry)
+  resetStore(useToastStore)
+  resetStore(useExtensionCommandsStore)
+  resetStore(useTerminalOpenErrorStore)
+  resetStore(useIntegrationsStore)
+  setupApp()
 })
 
-afterEach(() => {
-  delete (globalThis as unknown as Record<string, unknown>).electronAPI
+// App opens these with React.lazy. Loading them first makes each lazy() resolve
+// from the module cache, so a surface mounts within its own test.
+beforeAll(async () => {
+  await Promise.all([
+    import('../../../src/renderer/components/settings/SettingsPanel'),
+    import('../../../src/renderer/components/overview/OverviewScreen'),
+  ])
 })
 
 describe('App', () => {
-  it('renders UnifiedSidebar', () => {
+  // An extension backend can activate after the app (and an open Quick Actions
+  // panel) is up; its commands must still show without reopening the panel.
+  it('reads the extension commands again when they change', async () => {
+    render(<App />)
+    await waitFor(() => expect(main.sent.getCommands).toHaveBeenCalled())
+    const command = { key: 'k1', extensionId: 'ext', id: 'go', label: 'Go' }
+    main.sent.getCommands.mockResolvedValue({ commands: [command] })
+    act(() => main.events.commandsChanged.deliver())
+    await waitFor(() => expect(useExtensionCommandsStore.getState().registered).toEqual([command]))
+  })
+
+  it('always shows the sidebar, with or without a workspace', () => {
+    const { unmount } = render(<App />)
+    expect(screen.getByTestId('unified-sidebar')).toBeTruthy()
+    unmount()
+    setupApp({ activeWorkspaceId: 'ws-1', workspaces: [WS1] })
     render(<App />)
     expect(screen.getByTestId('unified-sidebar')).toBeTruthy()
   })
@@ -369,171 +428,124 @@ describe('App', () => {
     render(<App />)
     expect(screen.getByTestId('toast-container')).toBeTruthy()
   })
+})
 
-  it('calls loadWorkspaces and loadSettings on mount', () => {
+describe('App — loads the workspaces and settings from main on mount', () => {
+  it('loads the workspaces and settings from main on mount', async () => {
+    setupApp({ workspaces: [WS1, WS2] })
+    useWorkspaceStore.setState({ workspaces: [] })
+    useSettingsStore.setState({ globalSettings: null })
     render(<App />)
-    expect(mockLoadWorkspaces).toHaveBeenCalled()
-    expect(mockLoadSettings).toHaveBeenCalled()
+    await waitFor(() => expect(useWorkspaceStore.getState().workspaces).toEqual([WS1, WS2]))
+    expect(settings()).toEqual(mainSettings.getGlobalSettings())
   })
 
-  it('shows UnifiedSidebar when activeWorkspaceId is set', () => {
-    setupMocks({
-      activeWorkspaceId: 'ws-1',
-      workspaces: [{ id: 'ws-1', name: 'Test', folderPath: '/test', color: '#fff', tags: [] }],
-    })
+  it("shows the project's terminal once the operator leaves Home", () => {
+    setupApp({ activeProjectId: 'proj-1', activeWorkspaceId: 'ws-1' })
     render(<App />)
-    expect(screen.getByTestId('unified-sidebar')).toBeTruthy()
-  })
-
-  it('shows UnifiedSidebar even when no activeWorkspaceId (sidebar is always present)', () => {
-    setupMocks({ activeWorkspaceId: null })
-    render(<App />)
-    expect(screen.getByTestId('unified-sidebar')).toBeTruthy()
-  })
-
-  it('shows TerminalPane when activeProjectId is set', () => {
-    setupMocks({ activeProjectId: 'proj-1', activeWorkspaceId: 'ws-1' })
-    render(<App />)
-    expect(screen.getByTestId('terminal-pane')).toBeTruthy()
+    expect(screen.getByTestId('home-screen')).toBeTruthy()
+    leaveHome()
+    expect(screen.getByTestId('terminal-pane').textContent).toBe('proj-1')
   })
 
   it('shows EmptyState with workspace prompt when activeWorkspaceId but no project and welcome seen', () => {
-    setupMocks({
+    setupApp({
       activeWorkspaceId: 'ws-1',
-      activeProjectId: null,
-      globalSettings: { ui: { hasSeenWelcome: true } },
+      globalSettings: settingsWith({ ui: { hasSeenWelcome: true } }),
     })
     render(<App />)
-    expect(screen.getByTestId('empty-state')).toBeTruthy()
-    expect(screen.getByText('Select or create a project')).toBeTruthy()
+    leaveHome()
+    expect(screen.getByRole('heading', { name: 'Select or create a project' })).toBeTruthy()
   })
+})
 
+describe('App — shows Welcome to Terminator EmptyState when no welcome seen', () => {
   it('shows Welcome to Terminator EmptyState when no welcome seen', () => {
-    setupMocks({
-      activeWorkspaceId: null,
-      activeProjectId: null,
-      globalSettings: { ui: { hasSeenWelcome: false } },
-    })
+    setupApp({ globalSettings: settingsWith({ ui: { hasSeenWelcome: false } }) })
     render(<App />)
-    expect(screen.getByTestId('empty-state')).toBeTruthy()
-    expect(screen.getByText('Welcome to Terminator')).toBeTruthy()
+    leaveHome()
+    expect(screen.getByRole('heading', { name: 'Welcome to Terminator' })).toBeTruthy()
   })
 
-  it('shows select workspace prompt when globalSettings is null', () => {
-    setupMocks({
-      activeWorkspaceId: null,
-      activeProjectId: null,
-      globalSettings: null,
+  it('asks for a workspace while the settings are still on their way', () => {
+    setupApp({ globalSettings: null })
+    installElectronApi({
+      ...main.parts,
+      settings: { ...main.parts.settings, getGlobal: () => new Promise(() => {}) },
     })
     render(<App />)
-    expect(screen.getByTestId('empty-state')).toBeTruthy()
-    expect(screen.getByText('Select a workspace to get started')).toBeTruthy()
-  })
-
-  it('does not show SettingsPanel by default', () => {
-    render(<App />)
-    expect(screen.queryByTestId('settings-panel')).toBeNull()
+    leaveHome()
+    expect(screen.getByRole('heading', { name: 'Select a workspace to get started' })).toBeTruthy()
   })
 
   it('opens SettingsPanel via menu:open-settings IPC event', async () => {
-    let openSettingsCb: (() => void) | null = null
-    ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
-      terminal: { onProcessExit: vi.fn().mockReturnValue(mockUnsubscribe) },
-      extensionEvents: {
-        onMenuOpenSettings: (cb: () => void) => {
-          openSettingsCb = cb
-          return vi.fn()
-        },
-        onMenuToggleSidebar: vi.fn().mockReturnValue(vi.fn()),
-        onMenuOpenPrReviewWindow: vi.fn().mockReturnValue(vi.fn()),
-        onTogglePanel: vi.fn().mockReturnValue(vi.fn()),
-        onSelectProjectTab: vi.fn().mockReturnValue(vi.fn()),
-      },
-      extensionBridge: {
-        on: vi.fn().mockReturnValue(mockUnsubscribe),
-        invoke: vi.fn().mockResolvedValue({}),
-      },
-    }
     render(<App />)
-    openSettingsCb?.()
+    expect(screen.queryByTestId('settings-panel')).toBeNull()
+    act(() => main.events.openSettings.deliver())
     await waitFor(() => expect(screen.getByTestId('settings-panel')).toBeTruthy())
   })
+})
 
+describe('App — closes SettingsPanel when onClose is called', () => {
   it('closes SettingsPanel when onClose is called', async () => {
-    let openSettingsCb: (() => void) | null = null
-    ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
-      terminal: { onProcessExit: vi.fn().mockReturnValue(mockUnsubscribe) },
-      extensionEvents: {
-        onMenuOpenSettings: (cb: () => void) => {
-          openSettingsCb = cb
-          return vi.fn()
-        },
-        onMenuToggleSidebar: vi.fn().mockReturnValue(vi.fn()),
-        onMenuOpenPrReviewWindow: vi.fn().mockReturnValue(vi.fn()),
-        onTogglePanel: vi.fn().mockReturnValue(vi.fn()),
-        onSelectProjectTab: vi.fn().mockReturnValue(vi.fn()),
-      },
-      extensionBridge: {
-        on: vi.fn().mockReturnValue(mockUnsubscribe),
-        invoke: vi.fn().mockResolvedValue({}),
-      },
-    }
     render(<App />)
-    openSettingsCb?.()
+    act(() => main.events.openSettings.deliver())
     await waitFor(() => screen.getByText('Close Settings'))
     fireEvent.click(screen.getByText('Close Settings'))
     await waitFor(() => expect(screen.queryByTestId('settings-panel')).toBeNull())
   })
 
-  it('does not show LogWindow by default', () => {
+  it("marks the session exited when main reports its process's exit", () => {
+    setupApp({ sessions: [terminalSessionOf({ id: 'sess-1', projectId: 'p1', tabTitle: 'zsh' })] })
     render(<App />)
-    expect(screen.queryByTestId('log-window')).toBeNull()
+    act(() => main.events.processExit.deliver('sess-1', 0))
+    expect(useSessionStore.getState().sessions.get('sess-1')).toMatchObject({
+      status: 'closed',
+      tabTitle: 'zsh [exited]',
+    })
   })
 
-  it('subscribes to terminal process exit events on mount', () => {
+  it("loads the active workspace's own settings", async () => {
+    setupApp({ activeWorkspaceId: 'ws-1', workspaces: [WS1] })
     render(<App />)
-    expect(
-      (globalThis as unknown as Record<string, unknown>).electronAPI as Record<string, unknown>
-    ).toBeTruthy()
-    expect(
-      (window.electronAPI as unknown as { terminal: { onProcessExit: ReturnType<typeof vi.fn> } })
-        .terminal.onProcessExit
-    ).toHaveBeenCalled()
+    await waitFor(() =>
+      expect(useSettingsStore.getState().workspaceSettings.get('ws-1')).toEqual(
+        mainSettings.getWorkspaceSettings('ws-1')
+      )
+    )
   })
+})
 
-  it('calls loadSettings with activeWorkspaceId when workspace changes', () => {
-    setupMocks({ activeWorkspaceId: 'ws-1' })
-    render(<App />)
-    expect(mockLoadSettings).toHaveBeenCalledWith('ws-1')
-  })
-
-  it('calls markWelcomeSeen when activeProjectId is set and welcome not seen', () => {
-    setupMocks({
+describe('App — records the welcome as seen once a project is opened', () => {
+  it('records the welcome as seen once a project is opened', async () => {
+    setupApp({
       activeProjectId: 'proj-1',
       activeWorkspaceId: 'ws-1',
-      globalSettings: { ui: { hasSeenWelcome: false } },
+      globalSettings: settingsWith({ ui: { hasSeenWelcome: false } }),
     })
     render(<App />)
-    expect(mockMarkWelcomeSeen).toHaveBeenCalled()
+    await waitFor(() => expect(settings()?.ui.hasSeenWelcome).toBe(true))
+    expect(mainSettings.getGlobalSettings().ui.hasSeenWelcome).toBe(true)
   })
 
   it('opens SettingsPanel via onOpenSettings keyboard shortcut callback', async () => {
     render(<App />)
-    expect(screen.queryByTestId('settings-panel')).toBeNull()
-    capturedShortcutCallbacks.onOpenSettings?.()
+    act(() => shortcuts.callbacks.onOpenSettings?.())
     await waitFor(() => expect(screen.getByTestId('settings-panel')).toBeTruthy())
   })
 
   it('opens LogWindow via onToggleLog keyboard shortcut callback', async () => {
     render(<App />)
     expect(screen.queryByTestId('log-window')).toBeNull()
-    capturedShortcutCallbacks.onToggleLog?.()
+    act(() => shortcuts.callbacks.onToggleLog?.())
     await waitFor(() => expect(screen.getByTestId('log-window')).toBeTruthy())
   })
+})
 
+describe('App — closes LogWindow when its onClose is called', () => {
   it('closes LogWindow when its onClose is called', async () => {
     render(<App />)
-    capturedShortcutCallbacks.onToggleLog?.()
+    act(() => shortcuts.callbacks.onToggleLog?.())
     await waitFor(() => screen.getByText('Close Log'))
     fireEvent.click(screen.getByText('Close Log'))
     await waitFor(() => expect(screen.queryByTestId('log-window')).toBeNull())
@@ -542,1209 +554,638 @@ describe('App', () => {
   it('opens CommandPalette via onOpenCommandPalette keyboard shortcut callback', async () => {
     render(<App />)
     expect(screen.queryByTestId('quick-actions')).toBeNull()
-    capturedShortcutCallbacks.onOpenCommandPalette?.()
+    openPalette()
     await waitFor(() => expect(screen.getByTestId('quick-actions')).toBeTruthy())
   })
 
   it('closes CommandPalette when its onClose is called', async () => {
     render(<App />)
-    capturedShortcutCallbacks.onOpenCommandPalette?.()
+    openPalette()
     await waitFor(() => screen.getByText('Close Palette'))
     fireEvent.click(screen.getByText('Close Palette'))
     await waitFor(() => expect(screen.queryByTestId('quick-actions')).toBeNull())
   })
 
-  it('onToggleOverview keyboard shortcut activates core.overview tab', () => {
-    const mockSetActiveGlobalTab = vi.fn()
-    vi.mocked(useExtensionRegistry).mockReturnValue({
-      ...defaultExtensionRegistry,
-      activeGlobalTabId: null,
-      setActiveGlobalTab: mockSetActiveGlobalTab,
-    } as unknown as ReturnType<typeof useExtensionRegistry>)
+  it('onToggleOverview keyboard shortcut opens Overview, and closes it when it is open', () => {
     render(<App />)
-    capturedShortcutCallbacks.onToggleOverview?.()
-    expect(mockSetActiveGlobalTab).toHaveBeenCalledWith('core.overview')
+    act(() => shortcuts.callbacks.onToggleOverview?.())
+    expect(registry().activeGlobalTabId).toBe('core.overview')
+    act(() => shortcuts.callbacks.onToggleOverview?.())
+    expect(registry().activeGlobalTabId).toBeNull()
   })
+})
 
-  it('onToggleOverview keyboard shortcut deactivates core.overview tab when already active', () => {
-    const mockSetActiveGlobalTab = vi.fn()
-    vi.mocked(useExtensionRegistry).mockReturnValue({
-      ...defaultExtensionRegistry,
-      activeGlobalTabId: 'core.overview',
-      setActiveGlobalTab: mockSetActiveGlobalTab,
-    } as unknown as ReturnType<typeof useExtensionRegistry>)
-    render(<App />)
-    capturedShortcutCallbacks.onToggleOverview?.()
-    expect(mockSetActiveGlobalTab).toHaveBeenCalledWith(null)
-  })
-
+describe('App — activates core.home when the menu:open-home event fires', () => {
   it('activates core.home when the menu:open-home event fires', () => {
-    const mockSetActiveGlobalTab = vi.fn()
-    vi.mocked(useExtensionRegistry).mockReturnValue({
-      ...defaultExtensionRegistry,
-      setActiveGlobalTab: mockSetActiveGlobalTab,
-    } as unknown as ReturnType<typeof useExtensionRegistry>)
-    let openHomeCb: (() => void) | null = null
-    ;(window.electronAPI as unknown as Record<string, unknown>).extensionEvents = {
-      onMenuOpenHome: (cb: () => void) => {
-        openHomeCb = cb
-        return vi.fn()
-      },
-    }
     render(<App />)
-    mockSetActiveGlobalTab.mockClear()
-    openHomeCb!()
-    expect(mockSetActiveGlobalTab).toHaveBeenCalledWith('core.home')
+    leaveHome()
+    act(() => main.events.openHome.deliver())
+    expect(registry().activeGlobalTabId).toBe('core.home')
   })
 
   it('renders overlay components from extension registry', () => {
-    const MockOverlay = () => <div data-testid="mock-overlay">Overlay</div>
-    vi.mocked(useExtensionRegistry).mockReturnValue({
-      ...defaultExtensionRegistry,
-      overlays: [MockOverlay],
-    } as unknown as ReturnType<typeof useExtensionRegistry>)
+    registry().registerOverlay(() => <div data-testid="mock-overlay">Overlay</div>)
     render(<App />)
     expect(screen.getByTestId('mock-overlay')).toBeTruthy()
   })
+})
 
-  it('renders extension sidebar panels when openPanels is non-empty', async () => {
-    const MockPanel = ({ onClose }: { onClose: () => void }) => (
-      <div data-testid="mock-panel">
-        <button onClick={onClose}>Close Panel</button>
-      </div>
-    )
-    vi.mocked(useExtensionRegistry).mockReturnValue({
-      ...defaultExtensionRegistry,
-      openPanels: new Set(['git-changes']),
-      sidebarPanels: new Map([
-        ['git-changes', { id: 'git-changes', label: 'Git', component: MockPanel }],
-      ]),
-    } as unknown as ReturnType<typeof useExtensionRegistry>)
+describe('App — renders an open extension sidebar panel, and closes it from the panel', () => {
+  it('renders an open extension sidebar panel, and closes it from the panel', () => {
+    registry().registerSidebarPanel({
+      id: 'git-changes',
+      label: 'Git',
+      defaultOpen: true,
+      component: ({ onClose }) => (
+        <div data-testid="mock-panel">
+          <button onClick={onClose}>Close Panel</button>
+        </div>
+      ),
+    })
     render(<App />)
-    expect(screen.getByTestId('mock-panel')).toBeTruthy()
+    leaveHome()
     fireEvent.click(screen.getByText('Close Panel'))
+    expect(screen.queryByTestId('mock-panel')).toBeNull()
+    expect(registry().openPanels.has('git-changes')).toBe(false)
   })
 
-  it('calls onMenuOpenSettings extensionEvent to open settings panel', async () => {
-    let openSettingsCallback: (() => void) | null = null
-    ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
-      terminal: { onProcessExit: vi.fn().mockReturnValue(mockUnsubscribe) },
-      extensionEvents: {
-        onMenuOpenSettings: (cb: () => void) => {
-          openSettingsCallback = cb
-          return vi.fn()
-        },
-        onMenuToggleSidebar: vi.fn().mockReturnValue(vi.fn()),
-        onMenuOpenPrReviewWindow: vi.fn().mockReturnValue(vi.fn()),
-        onTogglePanel: vi.fn().mockReturnValue(vi.fn()),
-        onSelectProjectTab: vi.fn().mockReturnValue(vi.fn()),
-      },
-      extensionBridge: {
-        on: vi.fn().mockReturnValue(mockUnsubscribe),
-        invoke: vi.fn().mockResolvedValue({}),
-      },
-    }
+  it('opens a panel when main asks to toggle it', () => {
     render(<App />)
-    openSettingsCallback?.()
-    await waitFor(() => expect(screen.getByTestId('settings-panel')).toBeTruthy())
+    act(() => main.events.togglePanel.deliver('git-changes'))
+    expect(registry().openPanels.has('git-changes')).toBe(true)
   })
+})
 
-  it('calls onTogglePanel extensionEvent to toggle a panel', () => {
-    const mockTogglePanel = vi.fn()
-    vi.mocked(useExtensionRegistry).mockReturnValue({
-      ...defaultExtensionRegistry,
-      togglePanel: mockTogglePanel,
-    } as unknown as ReturnType<typeof useWorkspaceStore>)
-    ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
-      terminal: { onProcessExit: vi.fn().mockReturnValue(mockUnsubscribe) },
-      extensionEvents: {
-        onMenuOpenSettings: vi.fn().mockReturnValue(vi.fn()),
-        onMenuToggleSidebar: vi.fn().mockReturnValue(vi.fn()),
-        onMenuOpenPrReviewWindow: vi.fn().mockReturnValue(vi.fn()),
-        onTogglePanel: (cb: (panelId: string) => void) => {
-          cb('git-changes')
-          return vi.fn()
-        },
-        onSelectProjectTab: vi.fn().mockReturnValue(vi.fn()),
-      },
-      extensionBridge: {
-        on: vi.fn().mockReturnValue(mockUnsubscribe),
-        invoke: vi.fn().mockResolvedValue({}),
-      },
-    }
+describe("App — shows an extension's project tab in place of the terminal once it is selected", () => {
+  it("shows an extension's project tab in place of the terminal once it is selected", () => {
+    setupApp({ activeProjectId: 'proj-1', activeWorkspaceId: 'ws-1' })
+    registry().registerProjectTab({
+      id: 'git',
+      label: 'Git',
+      component: ({ repoRoot }) => (
+        <div data-testid="project-tab-content">{repoRoot ?? 'no-root'}</div>
+      ),
+    })
     render(<App />)
-    expect(mockTogglePanel).toHaveBeenCalledWith('git-changes')
-  })
-
-  it('renders extension project tab component when activeProjectTabId matches projectTabs', () => {
-    const MockProjectTab = ({ repoRoot }: { repoRoot: string | null }) => (
-      <div data-testid="project-tab-content">{repoRoot ?? 'no-root'}</div>
-    )
-    setupMocks({ activeProjectId: 'proj-1', activeWorkspaceId: 'ws-1' })
-    vi.mocked(useExtensionRegistry).mockReturnValue({
-      ...defaultExtensionRegistry,
-      activeProjectTabId: 'git',
-      projectTabs: new Map([['git', { id: 'git', label: 'Git', component: MockProjectTab }]]),
-    } as unknown as ReturnType<typeof useExtensionRegistry>)
-    render(<App />)
+    leaveHome()
+    act(() => main.events.selectProjectTab.deliver('git'))
     expect(screen.getByTestId('project-tab-content')).toBeTruthy()
+    expect(screen.queryByTestId('terminal-pane')).toBeNull()
   })
 
   it('renders global tab component when activeGlobalTabId is set', () => {
-    const MockGlobalTab = () => <div data-testid="global-tab-content">Global Tab</div>
-    vi.mocked(useExtensionRegistry).mockReturnValue({
-      ...defaultExtensionRegistry,
-      globalTabs: new Map([
-        ['task-vault', { id: 'task-vault', label: 'Tasks', component: MockGlobalTab }],
-      ]),
-      activeGlobalTabId: 'task-vault',
-    } as unknown as ReturnType<typeof useExtensionRegistry>)
+    registry().registerGlobalTab({
+      id: 'task-vault',
+      label: 'Tasks',
+      component: () => <div data-testid="global-tab-content">Global Tab</div>,
+    })
     render(<App />)
+    act(() => registry().setActiveGlobalTab('task-vault'))
     expect(screen.getByTestId('global-tab-content')).toBeTruthy()
   })
+})
 
-  it('does not close open panels when workspace changes', async () => {
-    const mockTogglePanel = vi.fn()
-    vi.mocked(useExtensionRegistry).mockReturnValue({
-      ...defaultExtensionRegistry,
-      openPanels: new Set(['panel-a']),
-      togglePanel: mockTogglePanel,
-    } as unknown as ReturnType<typeof useExtensionRegistry>)
-    setupMocks({ activeWorkspaceId: 'ws-1' })
-    const { rerender } = render(<App />)
-    setupMocks({ activeWorkspaceId: 'ws-2' })
-    vi.mocked(useExtensionRegistry).mockReturnValue({
-      ...defaultExtensionRegistry,
-      openPanels: new Set(['panel-a']),
-      togglePanel: mockTogglePanel,
-    } as unknown as ReturnType<typeof useExtensionRegistry>)
-    rerender(<App />)
-    expect(mockTogglePanel).not.toHaveBeenCalledWith('panel-a')
+describe('App — does not close open panels when workspace changes', () => {
+  it('does not close open panels when workspace changes', () => {
+    setupApp({ activeWorkspaceId: 'ws-1', workspaces: [WS1, WS2] })
+    registry().togglePanel('panel-a')
+    render(<App />)
+    act(() => useWorkspaceStore.getState().setActiveWorkspace('ws-2'))
+    expect(registry().openPanels.has('panel-a')).toBe(true)
   })
 
-  it('calls onSelectProjectTab extensionEvent to set active tab', () => {
-    const mockSetActiveProjectTab = vi.fn()
-    vi.mocked(useExtensionRegistry).mockReturnValue({
-      ...defaultExtensionRegistry,
-      setActiveProjectTab: mockSetActiveProjectTab,
-    } as unknown as ReturnType<typeof useWorkspaceStore>)
-    ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
-      terminal: { onProcessExit: vi.fn().mockReturnValue(mockUnsubscribe) },
-      extensionEvents: {
-        onMenuOpenSettings: vi.fn().mockReturnValue(vi.fn()),
-        onMenuToggleSidebar: vi.fn().mockReturnValue(vi.fn()),
-        onMenuOpenPrReviewWindow: vi.fn().mockReturnValue(vi.fn()),
-        onTogglePanel: vi.fn().mockReturnValue(vi.fn()),
-        onSelectProjectTab: (cb: (tabId: string) => void) => {
-          cb('git')
-          return vi.fn()
-        },
-      },
-      extensionBridge: {
-        on: vi.fn().mockReturnValue(mockUnsubscribe),
-        invoke: vi.fn().mockResolvedValue({}),
-      },
-    }
+  it('selects the project tab main asks for', () => {
     render(<App />)
-    expect(mockSetActiveProjectTab).toHaveBeenCalledWith('git')
+    act(() => main.events.selectProjectTab.deliver('git'))
+    expect(registry().activeProjectTabId).toBe('git')
   })
 
   it('command core.open-settings action opens SettingsPanel', async () => {
     render(<App />)
-    capturedShortcutCallbacks.onOpenCommandPalette?.()
-    await waitFor(() => screen.getByTestId('quick-actions'))
-    const cmd = capturedPaletteCommands.find((c) => c.id === 'core.open-settings')
-    cmd?.run()
+    openPalette()
+    runAction('core.open-settings')
     await waitFor(() => expect(screen.getByTestId('settings-panel')).toBeTruthy())
   })
 
   it('command core.toggle-sidebar action adds hidden class to UnifiedSidebar', async () => {
-    setupMocks({ activeWorkspaceId: 'ws-1' })
+    setupApp({ activeWorkspaceId: 'ws-1' })
     render(<App />)
-    expect(screen.getByTestId('unified-sidebar')).toBeTruthy()
-    capturedShortcutCallbacks.onOpenCommandPalette?.()
-    await waitFor(() => screen.getByTestId('quick-actions'))
-    const cmd = capturedPaletteCommands.find((c) => c.id === 'core.toggle-sidebar')
-    cmd?.run()
+    openPalette()
+    runAction('core.toggle-sidebar')
     await waitFor(() =>
       expect(screen.getByTestId('unified-sidebar').className).toContain('unified-sidebar--hidden')
     )
   })
+})
 
+describe('App — command core.toggle-log action opens LogWindow', () => {
   it('command core.toggle-log action opens LogWindow', async () => {
     render(<App />)
-    capturedShortcutCallbacks.onOpenCommandPalette?.()
-    await waitFor(() => screen.getByTestId('quick-actions'))
-    const cmd = capturedPaletteCommands.find((c) => c.id === 'core.toggle-log')
-    cmd?.run()
+    openPalette()
+    runAction('core.toggle-log')
     await waitFor(() => expect(screen.getByTestId('log-window')).toBeTruthy())
   })
 
-  it('command core.switch-workspace-{id} action calls setActiveWorkspace', async () => {
-    const mockSetActiveWorkspace = vi.fn()
-    vi.mocked(useWorkspaceStore).mockReturnValue({
-      loadWorkspaces: mockLoadWorkspaces,
-      activeWorkspaceId: 'ws-1',
-      activeProjectId: null,
-      workspaces: [{ id: 'ws-1', name: 'Work', folderPath: '/', color: '#fff', tags: [] }],
-      projectsByWorkspaceId: new Map(),
-      setActiveWorkspace: mockSetActiveWorkspace,
-      resolveActiveCwd: vi.fn().mockReturnValue('~'),
-      scratchActive: false,
-      setScratchActive: vi.fn(),
-    } as unknown as ReturnType<typeof useWorkspaceStore>)
+  it('command core.switch-workspace-{id} action switches to that workspace', () => {
+    setupApp({ activeWorkspaceId: 'ws-2', workspaces: [WS1, WS2] })
     render(<App />)
-    capturedShortcutCallbacks.onOpenCommandPalette?.()
-    await waitFor(() => screen.getByTestId('quick-actions'))
-    const cmd = capturedPaletteCommands.find((c) => c.id === 'core.switch-workspace-ws-1')
-    cmd?.run()
-    expect(mockSetActiveWorkspace).toHaveBeenCalledWith('ws-1')
+    openPalette()
+    runAction('core.switch-workspace-ws-1')
+    expect(useWorkspaceStore.getState().activeWorkspaceId).toBe('ws-1')
   })
 
-  it('command core.split-vertical action calls splitSession with activeProjectId', async () => {
-    const mockSplitSession = vi.fn().mockResolvedValue(undefined)
-    vi.mocked(useTerminalSession).mockReturnValue({
-      createSession: vi.fn().mockResolvedValue('ses-1'),
-      splitSession: mockSplitSession,
+  it('command core.split-vertical action splits the active project', () => {
+    setupApp({ activeProjectId: 'proj-1', activeWorkspaceId: 'ws-1', workspaces: [WS1] })
+    render(<App />)
+    openPalette()
+    runAction('core.split-vertical')
+    expect(splitSession).toHaveBeenCalledWith('proj-1', 'vertical', {
+      cwd: '/a',
+      scrollbackLimit: 10000,
     })
-    setupMocks({ activeProjectId: 'proj-1', activeWorkspaceId: 'ws-1' })
-    render(<App />)
-    capturedShortcutCallbacks.onOpenCommandPalette?.()
-    await waitFor(() => screen.getByTestId('quick-actions'))
-    const cmd = capturedPaletteCommands.find((c) => c.id === 'core.split-vertical')
-    cmd?.run()
-    expect(mockSplitSession).toHaveBeenCalledWith(
-      'proj-1',
-      'vertical',
-      expect.any(String),
-      expect.any(Number)
-    )
   })
+})
 
-  it('command core.split-horizontal action calls splitSession with activeProjectId', async () => {
-    const mockSplitSession = vi.fn().mockResolvedValue(undefined)
-    vi.mocked(useTerminalSession).mockReturnValue({
-      createSession: vi.fn().mockResolvedValue('ses-1'),
-      splitSession: mockSplitSession,
+describe('App — command core.toggle-log action opens LogWindow — command core.split-horizontal action splits the active project', () => {
+  it('command core.split-horizontal action splits the active project', () => {
+    setupApp({ activeProjectId: 'proj-1', activeWorkspaceId: 'ws-1', workspaces: [WS1] })
+    render(<App />)
+    openPalette()
+    runAction('core.split-horizontal')
+    expect(splitSession).toHaveBeenCalledWith('proj-1', 'horizontal', {
+      cwd: '/a',
+      scrollbackLimit: 10000,
     })
-    setupMocks({ activeProjectId: 'proj-1', activeWorkspaceId: 'ws-1' })
-    render(<App />)
-    capturedShortcutCallbacks.onOpenCommandPalette?.()
-    await waitFor(() => screen.getByTestId('quick-actions'))
-    const cmd = capturedPaletteCommands.find((c) => c.id === 'core.split-horizontal')
-    cmd?.run()
-    expect(mockSplitSession).toHaveBeenCalledWith(
-      'proj-1',
-      'horizontal',
-      expect.any(String),
-      expect.any(Number)
-    )
   })
+})
 
-  it('onSelectGlobalTab toggles activeGlobalTab off when same id clicked', async () => {
-    const mockSetActiveGlobalTab = vi.fn()
-    vi.mocked(useExtensionRegistry).mockReturnValue({
-      ...defaultExtensionRegistry,
-      globalTabs: new Map([
-        ['task-vault', { id: 'task-vault', label: 'Tasks', component: () => null }],
-      ]),
-      activeGlobalTabId: 'task-vault',
-      setActiveGlobalTab: mockSetActiveGlobalTab,
-    } as unknown as ReturnType<typeof useExtensionRegistry>)
+describe('App — onSelectGlobalTab toggles activeGlobalTab off when same id clicked', () => {
+  it('onSelectGlobalTab toggles activeGlobalTab off when same id clicked', () => {
+    registry().registerGlobalTab({ id: 'task-vault', label: 'Tasks', component: () => null })
     render(<App />)
+    act(() => registry().setActiveGlobalTab('task-vault'))
     // Pressed on the app band itself, which is where these destinations live.
     fireEvent.click(screen.getByRole('button', { name: 'Tasks' }))
-    expect(mockSetActiveGlobalTab).toHaveBeenCalledWith(null)
+    expect(registry().activeGlobalTabId).toBeNull()
   })
 
   it('EmptyState Open Settings action opens SettingsPanel', async () => {
-    setupMocks({
-      activeWorkspaceId: null,
-      activeProjectId: null,
-      globalSettings: { ui: { hasSeenWelcome: false } },
-    })
+    setupApp({ globalSettings: settingsWith({ ui: { hasSeenWelcome: false } }) })
     render(<App />)
-    fireEvent.click(screen.getByText('Open Settings'))
+    leaveHome()
+    fireEvent.click(screen.getByRole('button', { name: /Open Settings/ }))
     await waitFor(() => expect(screen.getByTestId('settings-panel')).toBeTruthy())
   })
+})
 
-  describe('menu:close-tab (onMenuCloseTab)', () => {
-    it('calls closeSession with active session id when active project has an active session', async () => {
-      const mockCloseSession = vi.fn().mockResolvedValue(undefined)
-      vi.mocked(useSessionStore).mockReturnValue({
-        handleProcessExit: mockHandleProcessExit,
-        getSessionsForProject: vi.fn().mockReturnValue([]),
-        getScratchSessions: vi.fn().mockReturnValue([]),
-        sessions: new Map(),
-        setActiveSessionForProject: vi.fn(),
-        sessions: new Map(),
-        setActiveSessionForProject: vi.fn(),
-        closeSession: mockCloseSession,
-        projectViews: new Map([['proj-1', { terminalCounter: 0, activeSessionId: 'ses-active' }]]),
-        setActiveSessionForProject: vi.fn(),
-      } as unknown as ReturnType<typeof useSessionStore>)
-      setupMocks({ activeProjectId: 'proj-1', activeWorkspaceId: 'ws-1' })
-      vi.mocked(useSessionStore).mockReturnValue({
-        handleProcessExit: mockHandleProcessExit,
-        getSessionsForProject: vi.fn().mockReturnValue([]),
-        getScratchSessions: vi.fn().mockReturnValue([]),
-        sessions: new Map(),
-        setActiveSessionForProject: vi.fn(),
-        sessions: new Map(),
-        setActiveSessionForProject: vi.fn(),
-        closeSession: mockCloseSession,
-        projectViews: new Map([['proj-1', { terminalCounter: 0, activeSessionId: 'ses-active' }]]),
-        setActiveSessionForProject: vi.fn(),
-      } as unknown as ReturnType<typeof useSessionStore>)
+const tab = (id: string, projectId: string) => terminalSessionOf({ id, projectId })
 
-      let closeTabCallback: (() => void) | null = null
-      ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
-        terminal: { onProcessExit: vi.fn().mockReturnValue(mockUnsubscribe) },
-        extensionEvents: {
-          onMenuOpenSettings: vi.fn().mockReturnValue(vi.fn()),
-          onMenuToggleSidebar: vi.fn().mockReturnValue(vi.fn()),
-          onMenuOpenPrReviewWindow: vi.fn().mockReturnValue(vi.fn()),
-          onTogglePanel: vi.fn().mockReturnValue(vi.fn()),
-          onSelectProjectTab: vi.fn().mockReturnValue(vi.fn()),
-          onMenuCloseTab: (cb: () => void) => {
-            closeTabCallback = cb
-            return vi.fn()
-          },
-        },
-        notifications: {
-          list: vi.fn().mockResolvedValue([]),
-          dismiss: vi.fn().mockResolvedValue({ ok: true }),
-          onPush: vi.fn().mockReturnValue(mockUnsubscribe),
-        },
-        extensionBridge: {
-          on: vi.fn().mockReturnValue(mockUnsubscribe),
-          invoke: vi.fn().mockResolvedValue({}),
-        },
-      }
-      render(<App />)
-      closeTabCallback?.()
-      await waitFor(() => expect(mockCloseSession).toHaveBeenCalledWith('ses-active'))
+const has = (id: string) => useSessionStore.getState().sessions.has(id)
+
+describe('App — menu:close-tab (onMenuCloseTab)', () => {
+  it('closes the active session of the active project', async () => {
+    setupApp({
+      activeProjectId: 'proj-1',
+      activeWorkspaceId: 'ws-1',
+      sessions: [tab('ses-active', 'proj-1'), tab('ses-other', 'proj-1')],
     })
-
-    it('does not crash when onMenuCloseTab fires and there is no active project', async () => {
-      const mockCloseSession = vi.fn().mockResolvedValue(undefined)
-      setupMocks({ activeProjectId: null, activeWorkspaceId: null })
-      vi.mocked(useSessionStore).mockReturnValue({
-        handleProcessExit: mockHandleProcessExit,
-        getSessionsForProject: vi.fn().mockReturnValue([]),
-        getScratchSessions: vi.fn().mockReturnValue([]),
-        sessions: new Map(),
-        setActiveSessionForProject: vi.fn(),
-        sessions: new Map(),
-        setActiveSessionForProject: vi.fn(),
-        closeSession: mockCloseSession,
-        projectViews: new Map(),
-        setActiveSessionForProject: vi.fn(),
-      } as unknown as ReturnType<typeof useSessionStore>)
-
-      let closeTabCallback: (() => void) | null = null
-      ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
-        terminal: { onProcessExit: vi.fn().mockReturnValue(mockUnsubscribe) },
-        extensionEvents: {
-          onMenuOpenSettings: vi.fn().mockReturnValue(vi.fn()),
-          onMenuToggleSidebar: vi.fn().mockReturnValue(vi.fn()),
-          onMenuOpenPrReviewWindow: vi.fn().mockReturnValue(vi.fn()),
-          onTogglePanel: vi.fn().mockReturnValue(vi.fn()),
-          onSelectProjectTab: vi.fn().mockReturnValue(vi.fn()),
-          onMenuCloseTab: (cb: () => void) => {
-            closeTabCallback = cb
-            return vi.fn()
-          },
-        },
-        notifications: {
-          list: vi.fn().mockResolvedValue([]),
-          dismiss: vi.fn().mockResolvedValue({ ok: true }),
-          onPush: vi.fn().mockReturnValue(mockUnsubscribe),
-        },
-        extensionBridge: {
-          on: vi.fn().mockReturnValue(mockUnsubscribe),
-          invoke: vi.fn().mockResolvedValue({}),
-        },
-      }
-      render(<App />)
-      expect(() => closeTabCallback?.()).not.toThrow()
-      expect(mockCloseSession).not.toHaveBeenCalled()
-    })
-
-    it('closes scratch session when scratch is active and menu close fires', async () => {
-      const SCRATCH_PROJECT_ID = '00000000-0000-0000-0000-000000000000'
-      const mockCloseSession = vi.fn().mockResolvedValue(undefined)
-      const mockCreateSession = vi.fn().mockResolvedValue('ses-scratch')
-      vi.mocked(useTerminalSession).mockReturnValue({ createSession: mockCreateSession })
-      setupMocks({ activeProjectId: null, activeWorkspaceId: 'ws-1', scratchActive: true })
-      vi.mocked(useSessionStore).mockReturnValue({
-        handleProcessExit: mockHandleProcessExit,
-        getSessionsForProject: vi.fn().mockReturnValue([]),
-        getScratchSessions: vi.fn().mockReturnValue([]),
-        sessions: new Map(),
-        setActiveSessionForProject: vi.fn(),
-        sessions: new Map(),
-        setActiveSessionForProject: vi.fn(),
-        closeSession: mockCloseSession,
-        projectViews: new Map([
-          [SCRATCH_PROJECT_ID, { terminalCounter: 0, activeSessionId: 'ses-scratch' }],
-        ]),
-        setActiveSessionForProject: vi.fn(),
-      } as unknown as ReturnType<typeof useSessionStore>)
-
-      let closeTabCallback: (() => void) | null = null
-      ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
-        terminal: { onProcessExit: vi.fn().mockReturnValue(mockUnsubscribe) },
-        extensionEvents: {
-          onMenuOpenSettings: vi.fn().mockReturnValue(vi.fn()),
-          onMenuToggleSidebar: vi.fn().mockReturnValue(vi.fn()),
-          onMenuOpenPrReviewWindow: vi.fn().mockReturnValue(vi.fn()),
-          onTogglePanel: vi.fn().mockReturnValue(vi.fn()),
-          onSelectProjectTab: vi.fn().mockReturnValue(vi.fn()),
-          onMenuCloseTab: (cb: () => void) => {
-            closeTabCallback = cb
-            return vi.fn()
-          },
-        },
-        notifications: {
-          list: vi.fn().mockResolvedValue([]),
-          dismiss: vi.fn().mockResolvedValue({ ok: true }),
-          onPush: vi.fn().mockReturnValue(mockUnsubscribe),
-        },
-        extensionBridge: {
-          on: vi.fn().mockReturnValue(mockUnsubscribe),
-          invoke: vi.fn().mockResolvedValue({}),
-        },
-      }
-      render(<App />)
-      // Activate scratch mode
-      capturedShortcutCallbacks.onNewScratch?.()
-      await waitFor(() => expect(mockCreateSession).toHaveBeenCalled())
-      // Now fire the menu close — should target the scratch session
-      closeTabCallback?.()
-      await waitFor(() => expect(mockCloseSession).toHaveBeenCalledWith('ses-scratch'))
-    })
-
-    it('does not call closeSession when active project has no active session', async () => {
-      const mockCloseSession = vi.fn().mockResolvedValue(undefined)
-      setupMocks({ activeProjectId: 'proj-1', activeWorkspaceId: 'ws-1' })
-      vi.mocked(useSessionStore).mockReturnValue({
-        handleProcessExit: mockHandleProcessExit,
-        getSessionsForProject: vi.fn().mockReturnValue([]),
-        getScratchSessions: vi.fn().mockReturnValue([]),
-        sessions: new Map(),
-        setActiveSessionForProject: vi.fn(),
-        sessions: new Map(),
-        setActiveSessionForProject: vi.fn(),
-        closeSession: mockCloseSession,
-        // proj-1 has no active session mapped
-        projectViews: new Map(),
-        setActiveSessionForProject: vi.fn(),
-      } as unknown as ReturnType<typeof useSessionStore>)
-
-      let closeTabCallback: (() => void) | null = null
-      ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
-        terminal: { onProcessExit: vi.fn().mockReturnValue(mockUnsubscribe) },
-        extensionEvents: {
-          onMenuOpenSettings: vi.fn().mockReturnValue(vi.fn()),
-          onMenuToggleSidebar: vi.fn().mockReturnValue(vi.fn()),
-          onMenuOpenPrReviewWindow: vi.fn().mockReturnValue(vi.fn()),
-          onTogglePanel: vi.fn().mockReturnValue(vi.fn()),
-          onSelectProjectTab: vi.fn().mockReturnValue(vi.fn()),
-          onMenuCloseTab: (cb: () => void) => {
-            closeTabCallback = cb
-            return vi.fn()
-          },
-        },
-        notifications: {
-          list: vi.fn().mockResolvedValue([]),
-          dismiss: vi.fn().mockResolvedValue({ ok: true }),
-          onPush: vi.fn().mockReturnValue(mockUnsubscribe),
-        },
-        extensionBridge: {
-          on: vi.fn().mockReturnValue(mockUnsubscribe),
-          invoke: vi.fn().mockResolvedValue({}),
-        },
-      }
-      render(<App />)
-      closeTabCallback?.()
-      expect(mockCloseSession).not.toHaveBeenCalled()
-    })
+    showTab('proj-1', 'ses-active')
+    render(<App />)
+    act(() => main.events.closeTab.deliver())
+    await waitFor(() => expect(has('ses-active')).toBe(false))
+    expect(has('ses-other')).toBe(true)
   })
 
-  it('command core.toggle-overview action toggles overview tab on and off', async () => {
-    const mockSetActiveGlobalTab = vi.fn()
-    vi.mocked(useExtensionRegistry).mockReturnValue({
-      ...defaultExtensionRegistry,
-      activeGlobalTabId: null,
-      setActiveGlobalTab: mockSetActiveGlobalTab,
-    } as unknown as ReturnType<typeof useExtensionRegistry>)
+  it('closes nothing when there is no active project', async () => {
+    setupApp({ sessions: [tab('ses-active', 'proj-1')] })
+    showTab('proj-1', 'ses-active')
     render(<App />)
-    capturedShortcutCallbacks.onOpenCommandPalette?.()
-    await waitFor(() => screen.getByTestId('quick-actions'))
-    const cmd = capturedPaletteCommands.find((c) => c.id === 'core.toggle-overview')
-    cmd?.run()
-    expect(mockSetActiveGlobalTab).toHaveBeenCalledWith('core.overview')
+    act(() => main.events.closeTab.deliver())
+    await act(async () => {})
+    expect(has('ses-active')).toBe(true)
+  })
+})
+
+describe('App — menu:close-tab (onMenuCloseTab) — closes the scratch session once a new scratch terminal has made scratch active', () => {
+  it('closes the scratch session once a new scratch terminal has made scratch active', async () => {
+    setupApp({ activeWorkspaceId: 'ws-1', sessions: [tab('ses-scratch', SCRATCH_PROJECT_ID)] })
+    showTab(SCRATCH_PROJECT_ID, 'ses-scratch')
+    render(<App />)
+    act(() => shortcuts.callbacks.onNewScratch?.())
+    await waitFor(() => expect(useWorkspaceStore.getState().scratchActive).toBe(true))
+    act(() => main.events.closeTab.deliver())
+    await waitFor(() => expect(has('ses-scratch')).toBe(false))
   })
 
-  it('closes AboutDialog when onClose is called', async () => {
-    let openAboutCb: (() => void) | null = null
-    ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
-      terminal: { onProcessExit: vi.fn().mockReturnValue(mockUnsubscribe) },
-      extensionEvents: {
-        onMenuOpenSettings: vi.fn().mockReturnValue(vi.fn()),
-        onMenuOpenAbout: (cb: () => void) => {
-          openAboutCb = cb
-          return vi.fn()
-        },
-        onMenuToggleSidebar: vi.fn().mockReturnValue(vi.fn()),
-        onTogglePanel: vi.fn().mockReturnValue(vi.fn()),
-        onSelectProjectTab: vi.fn().mockReturnValue(vi.fn()),
-      },
-      notifications: {
-        list: vi.fn().mockResolvedValue([]),
-        onPush: vi.fn().mockReturnValue(mockUnsubscribe),
-      },
-      extensionBridge: {
-        on: vi.fn().mockReturnValue(mockUnsubscribe),
-        invoke: vi.fn().mockResolvedValue({}),
-      },
-    }
+  it('closes nothing when the active project has no active session', async () => {
+    setupApp({
+      activeProjectId: 'proj-1',
+      activeWorkspaceId: 'ws-1',
+      sessions: [tab('ses-1', 'proj-1')],
+    })
     render(<App />)
-    openAboutCb?.()
+    act(() => main.events.closeTab.deliver())
+    await act(async () => {})
+    expect(has('ses-1')).toBe(true)
+  })
+})
+
+describe('App — command core.toggle-overview action opens Overview', () => {
+  it('command core.toggle-overview action opens Overview', () => {
+    render(<App />)
+    openPalette()
+    runAction('core.toggle-overview')
+    expect(registry().activeGlobalTabId).toBe('core.overview')
+  })
+
+  it('opens AboutDialog when main asks, and closes it', async () => {
+    render(<App />)
+    expect(screen.queryByTestId('about-dialog')).toBeNull()
+    act(() => main.events.openAbout.deliver())
     await waitFor(() => screen.getByTestId('about-dialog'))
     fireEvent.click(screen.getByText('Close About'))
     await waitFor(() => expect(screen.queryByTestId('about-dialog')).toBeNull())
   })
 
-  it('renders scratch terminal after handleNewScratch resolves', async () => {
-    const mockCreateSession = vi.fn().mockResolvedValue('sess-scratch')
-    vi.mocked(useTerminalSession).mockReturnValue({ createSession: mockCreateSession })
-    setupMocks({ scratchActive: true })
+  it('opens a scratch terminal and switches to scratch once it is up', async () => {
+    setupApp({ activeWorkspaceId: 'ws-1', workspaces: [WS1] })
     render(<App />)
-    capturedShortcutCallbacks.onNewScratch?.()
-    await waitFor(() => {
-      expect(mockCreateSession).toHaveBeenCalled()
-      expect(screen.getByTestId('tab-bar')).toBeTruthy()
+    act(() => shortcuts.callbacks.onNewScratch?.())
+    expect(createSession).toHaveBeenCalledWith({
+      projectId: SCRATCH_PROJECT_ID,
+      type: 'human',
+      title: 'Scratch',
+      cwd: '/a',
+      scrollbackLimit: 10000,
     })
+    await waitFor(() => expect(useWorkspaceStore.getState().scratchActive).toBe(true))
   })
+})
 
+describe('App — renders MetricsBar when showMetricsBar is true', () => {
   it('renders MetricsBar when showMetricsBar is true', () => {
-    setupMocks({
-      globalSettings: { ui: { hasSeenWelcome: true, showMetricsBar: true } },
+    setupApp({
+      globalSettings: settingsWith({ ui: { hasSeenWelcome: true, showMetricsBar: true } }),
     })
     const { container } = render(<App />)
     expect(container.querySelector('.app-global-metrics')).toBeTruthy()
   })
 
-  it('UnifiedSidebar onSelectScratchSession activates scratch view for chosen session', async () => {
-    setupMocks({ activeWorkspaceId: 'ws-1' })
-    const mockSetActiveSessionForProject = vi.fn()
-    const mockSetScratchActive = vi.fn()
-    const mockRequestFocus = vi.fn()
-    ;(useSessionStore as unknown as { getState: () => unknown }).getState = () => ({
-      sessions: new Map([['sess-scratch', { projectId: SCRATCH_PROJECT_ID }]]),
-      setActiveSessionForProject: mockSetActiveSessionForProject,
-      requestFocus: mockRequestFocus,
-    })
-    ;(useWorkspaceStore as unknown as { getState: () => unknown }).getState = () => ({
-      setScratchActive: mockSetScratchActive,
+  it('UnifiedSidebar onSelectScratchSession activates scratch view for chosen session', () => {
+    setupApp({
+      activeWorkspaceId: 'ws-1',
+      sessions: [terminalSessionOf({ id: 'sess-scratch', projectId: SCRATCH_PROJECT_ID })],
     })
     render(<App />)
-    capturedOnSelectSession?.('sess-scratch')
-    await waitFor(() => {
-      expect(mockSetActiveSessionForProject).toHaveBeenCalledWith(
-        SCRATCH_PROJECT_ID,
-        'sess-scratch'
-      )
-      expect(mockSetScratchActive).toHaveBeenCalledWith(true)
-    })
+    act(() => sidebar.props?.onSelectScratchSession('sess-scratch'))
+    expect(useWorkspaceStore.getState().scratchActive).toBe(true)
+    expect(useSessionStore.getState().getActiveSessionForProject(SCRATCH_PROJECT_ID)).toBe(
+      'sess-scratch'
+    )
+    expect(registry().activeGlobalTabId).toBeNull()
   })
+})
 
-  it('triggers handleProcessExit when onProcessExit callback fires', () => {
-    let processExitCb: ((sessionId: string, exitCode: number) => void) | null = null
-    ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
-      terminal: {
-        onProcessExit: (cb: (sessionId: string, exitCode: number) => void) => {
-          processExitCb = cb
-          return mockUnsubscribe
-        },
-      },
-      extensionEvents: null,
-      notifications: {
-        list: vi.fn().mockResolvedValue([]),
-        onPush: vi.fn().mockReturnValue(mockUnsubscribe),
-      },
-      extensionBridge: {
-        on: vi.fn().mockReturnValue(mockUnsubscribe),
-        invoke: vi.fn().mockResolvedValue({}),
-      },
-    }
-    render(<App />)
-    processExitCb?.('sess-1', 0)
-    expect(mockHandleProcessExit).toHaveBeenCalledWith('sess-1', 0)
-  })
-
-  it('opens AboutDialog when onMenuOpenAbout event fires', async () => {
-    let openAboutCb: (() => void) | null = null
-    ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
-      terminal: { onProcessExit: vi.fn().mockReturnValue(mockUnsubscribe) },
-      extensionEvents: {
-        onMenuOpenSettings: vi.fn().mockReturnValue(vi.fn()),
-        onMenuOpenAbout: (cb: () => void) => {
-          openAboutCb = cb
-          return vi.fn()
-        },
-        onMenuToggleSidebar: vi.fn().mockReturnValue(vi.fn()),
-        onTogglePanel: vi.fn().mockReturnValue(vi.fn()),
-        onSelectProjectTab: vi.fn().mockReturnValue(vi.fn()),
-      },
-      notifications: {
-        list: vi.fn().mockResolvedValue([]),
-        onPush: vi.fn().mockReturnValue(mockUnsubscribe),
-      },
-      extensionBridge: {
-        on: vi.fn().mockReturnValue(mockUnsubscribe),
-        invoke: vi.fn().mockResolvedValue({}),
-      },
-    }
-    render(<App />)
-    expect(screen.queryByTestId('about-dialog')).toBeNull()
-    openAboutCb?.()
-    await waitFor(() => expect(screen.getByTestId('about-dialog')).toBeTruthy())
-  })
-
+describe('App — toggles sidebar when onMenuToggleSidebar event fires', () => {
   it('toggles sidebar when onMenuToggleSidebar event fires', async () => {
-    setupMocks({ activeWorkspaceId: 'ws-1' })
-    let toggleSidebarCb: (() => void) | null = null
-    ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
-      terminal: { onProcessExit: vi.fn().mockReturnValue(mockUnsubscribe) },
-      extensionEvents: {
-        onMenuOpenSettings: vi.fn().mockReturnValue(vi.fn()),
-        onMenuOpenAbout: vi.fn().mockReturnValue(vi.fn()),
-        onMenuToggleSidebar: (cb: () => void) => {
-          toggleSidebarCb = cb
-          return vi.fn()
-        },
-        onTogglePanel: vi.fn().mockReturnValue(vi.fn()),
-        onSelectProjectTab: vi.fn().mockReturnValue(vi.fn()),
-      },
-      notifications: {
-        list: vi.fn().mockResolvedValue([]),
-        onPush: vi.fn().mockReturnValue(mockUnsubscribe),
-      },
-      extensionBridge: {
-        on: vi.fn().mockReturnValue(mockUnsubscribe),
-        invoke: vi.fn().mockResolvedValue({}),
-      },
-    }
+    setupApp({ activeWorkspaceId: 'ws-1' })
     render(<App />)
-    expect(screen.getByTestId('unified-sidebar')).toBeTruthy()
-    toggleSidebarCb?.()
+    expect(screen.getByTestId('unified-sidebar').className).toBe('')
+    act(() => main.events.toggleSidebar.deliver())
     await waitFor(() =>
       expect(screen.getByTestId('unified-sidebar').className).toContain('unified-sidebar--hidden')
     )
   })
 
-  it('renders workspace tab component when activeWorkspaceTabId is set', () => {
-    const MockWorkspaceTab = () => <div data-testid="workspace-tab-content">Workspace Tab</div>
-    vi.mocked(useExtensionRegistry).mockReturnValue({
-      ...defaultExtensionRegistry,
-      workspaceTabs: new Map([
-        [
-          'code-reviews',
-          { id: 'code-reviews', label: 'Code Reviews', component: MockWorkspaceTab },
-        ],
-      ]),
-      activeWorkspaceTabId: 'code-reviews',
-    } as unknown as ReturnType<typeof useExtensionRegistry>)
+  it('opens a workspace tab chosen in the sidebar, in that workspace', () => {
+    setupApp({ workspaces: [WS1] })
+    registry().registerWorkspaceTab({
+      id: 'code-reviews',
+      label: 'Code Reviews',
+      component: () => <div data-testid="workspace-tab-content">Workspace Tab</div>,
+    })
     render(<App />)
+    act(() => sidebar.props?.onSelectWorkspaceTab('ws-1', 'code-reviews'))
     expect(screen.getByTestId('workspace-tab-content')).toBeTruthy()
-  })
-
-  it('onSelectProject clears active global, workspace, and project tabs', () => {
-    const mockSetActiveGlobalTab = vi.fn()
-    const mockSetActiveWorkspaceTab = vi.fn()
-    const mockSetActiveProjectTab = vi.fn()
-    vi.mocked(useExtensionRegistry).mockReturnValue({
-      ...defaultExtensionRegistry,
-      activeGlobalTabId: 'task-vault',
-      activeWorkspaceTabId: 'code-reviews',
-      activeProjectTabId: 'git',
-      setActiveGlobalTab: mockSetActiveGlobalTab,
-      setActiveWorkspaceTab: mockSetActiveWorkspaceTab,
-      setActiveProjectTab: mockSetActiveProjectTab,
-    } as unknown as ReturnType<typeof useExtensionRegistry>)
-    render(<App />)
-    capturedOnSelectProject?.()
-    expect(mockSetActiveGlobalTab).toHaveBeenCalledWith(null)
-    expect(mockSetActiveWorkspaceTab).toHaveBeenCalledWith(null)
-    expect(mockSetActiveProjectTab).toHaveBeenCalledWith(null)
-  })
-
-  it('calls notifyPanelState for each registered panel when openPanels changes', async () => {
-    const mockNotifyPanelState = vi.fn()
-    // setupMocks first so its electronAPI/registry setup happens before our overrides
-    setupMocks({ activeProjectId: 'proj-1' })
-    ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
-      terminal: { onProcessExit: vi.fn().mockReturnValue(mockUnsubscribe) },
-      extensionEvents: {
-        onMenuOpenSettings: vi.fn().mockReturnValue(vi.fn()),
-        onMenuToggleSidebar: vi.fn().mockReturnValue(vi.fn()),
-        onMenuOpenPrReviewWindow: vi.fn().mockReturnValue(vi.fn()),
-        onTogglePanel: vi.fn().mockReturnValue(vi.fn()),
-        onSelectProjectTab: vi.fn().mockReturnValue(vi.fn()),
-        notifyPanelState: mockNotifyPanelState,
-      },
-      extensionBridge: {
-        on: vi.fn().mockReturnValue(mockUnsubscribe),
-        invoke: vi.fn().mockResolvedValue({}),
-      },
-      notifications: {
-        list: vi.fn().mockResolvedValue([]),
-        dismiss: vi.fn().mockResolvedValue({ ok: true }),
-        onPush: vi.fn().mockReturnValue(mockUnsubscribe),
-      },
-    }
-    // Registry has a registered panel; getState returns a sidebarPanels map with one entry
-    ;(useExtensionRegistry as unknown as { getState: () => unknown }).getState = vi.fn(() => ({
-      registerGlobalTab: vi.fn(() => vi.fn()),
-      updateGlobalTab: vi.fn(),
-      setActiveGlobalTab: vi.fn(),
-      setActiveWorkspaceTab: vi.fn(),
-      setActiveProjectTab: vi.fn(),
-      sidebarPanels: new Map([['git-changes', {}]]),
-    }))
-    vi.mocked(useExtensionRegistry).mockReturnValue({
-      ...defaultExtensionRegistry,
-      openPanels: new Set(['git-changes']),
-    } as unknown as ReturnType<typeof useExtensionRegistry>)
-    const { rerender } = render(<App />)
-    await waitFor(() => {
-      expect(mockNotifyPanelState).toHaveBeenCalledWith('git-changes', true)
-    })
-    // After initial mount, panelsRestored.current = true. Change openPanels to trigger
-    // the effect again — this covers the localStorage.setItem branch (panelsRestored = true).
-    vi.mocked(useExtensionRegistry).mockReturnValue({
-      ...defaultExtensionRegistry,
-      openPanels: new Set<string>(),
-    } as unknown as ReturnType<typeof useExtensionRegistry>)
-    rerender(<App />)
-    await waitFor(() => {
-      expect(mockNotifyPanelState).toHaveBeenCalledWith('git-changes', false)
-    })
-    // Restore the default getState mock
-    ;(useExtensionRegistry as unknown as { getState: () => unknown }).getState = vi.fn(() => ({
-      registerGlobalTab: vi.fn(() => vi.fn()),
-      updateGlobalTab: vi.fn(),
-      setActiveGlobalTab: vi.fn(),
-      setActiveWorkspaceTab: vi.fn(),
-      setActiveProjectTab: vi.fn(),
-      sidebarPanels: new Map(),
-    }))
-  })
-
-  it('reopens saved panels from localStorage that are not yet open on mount', async () => {
-    // Covers line 343: `if (!openPanels.has(id)) togglePanel(id)` — true branch
-    const mockTogglePanel = vi.fn()
-    setupMocks({ activeProjectId: 'proj-1' })
-    localStorage.setItem('openPanels', JSON.stringify(['saved-panel']))
-    ;(useExtensionRegistry as unknown as { getState: () => unknown }).getState = vi.fn(() => ({
-      registerGlobalTab: vi.fn(() => vi.fn()),
-      updateGlobalTab: vi.fn(),
-      setActiveGlobalTab: vi.fn(),
-      setActiveWorkspaceTab: vi.fn(),
-      setActiveProjectTab: vi.fn(),
-      sidebarPanels: new Map(),
-      openPanels: new Set<string>(), // 'saved-panel' is NOT open → triggers togglePanel
-    }))
-    vi.mocked(useExtensionRegistry).mockReturnValue({
-      ...defaultExtensionRegistry,
-      togglePanel: mockTogglePanel,
-    } as unknown as ReturnType<typeof useExtensionRegistry>)
-    render(<App />)
-    await waitFor(() => {
-      expect(mockTogglePanel).toHaveBeenCalledWith('saved-panel')
-    })
-    localStorage.removeItem('openPanels')
-    ;(useExtensionRegistry as unknown as { getState: () => unknown }).getState = vi.fn(() => ({
-      registerGlobalTab: vi.fn(() => vi.fn()),
-      updateGlobalTab: vi.fn(),
-      setActiveGlobalTab: vi.fn(),
-      setActiveWorkspaceTab: vi.fn(),
-      setActiveProjectTab: vi.fn(),
-      sidebarPanels: new Map(),
-    }))
-  })
-
-  it('does not throw when extensionEvents is null and registered panels are open', async () => {
-    // extensionEvents: null + sidebarPanels has entries → covers the null branch of
-    // `extensionEvents?.notifyPanelState?.(...)` inside the for loop body
-    setupMocks({ activeProjectId: 'proj-1' })
-    // leave electronAPI.extensionEvents as null (set by setupMocks → beforeEach default)
-    ;(useExtensionRegistry as unknown as { getState: () => unknown }).getState = vi.fn(() => ({
-      registerGlobalTab: vi.fn(() => vi.fn()),
-      updateGlobalTab: vi.fn(),
-      setActiveGlobalTab: vi.fn(),
-      setActiveWorkspaceTab: vi.fn(),
-      setActiveProjectTab: vi.fn(),
-      sidebarPanels: new Map([['git-changes', {}]]),
-    }))
-    vi.mocked(useExtensionRegistry).mockReturnValue({
-      ...defaultExtensionRegistry,
-      openPanels: new Set(['git-changes']),
-    } as unknown as ReturnType<typeof useExtensionRegistry>)
-    expect(() => render(<App />)).not.toThrow()
-    ;(useExtensionRegistry as unknown as { getState: () => unknown }).getState = vi.fn(() => ({
-      registerGlobalTab: vi.fn(() => vi.fn()),
-      updateGlobalTab: vi.fn(),
-      setActiveGlobalTab: vi.fn(),
-      setActiveWorkspaceTab: vi.fn(),
-      setActiveProjectTab: vi.fn(),
-      sidebarPanels: new Map(),
-    }))
-  })
-
-  describe('Home', () => {
-    it('registers Home as a permanent core tab, ahead of Overview', () => {
-      const registered: string[] = []
-      ;(useExtensionRegistry as unknown as { getState: () => unknown }).getState = vi.fn(() => ({
-        registerGlobalTab: vi.fn((tab: { id: string; permanent?: boolean }) => {
-          registered.push(`${tab.id}:${tab.permanent}`)
-          return vi.fn()
-        }),
-        updateGlobalTab: vi.fn(),
-        setActiveGlobalTab: vi.fn(),
-        setActiveWorkspaceTab: vi.fn(),
-        setActiveProjectTab: vi.fn(),
-        sidebarPanels: new Map(),
-      }))
-      setupMocks({})
-      render(<App />)
-      expect(registered.indexOf('core.home:true')).toBeGreaterThanOrEqual(0)
-      expect(registered.indexOf('core.home:true')).toBeLessThan(
-        registered.indexOf('core.overview:true')
-      )
-    })
-
-    it('opens on Home at launch', () => {
-      setupMocks({})
-      render(<App />)
-      expect(defaultExtensionRegistry.setActiveGlobalTab).toHaveBeenCalledWith('core.home')
-    })
-
-    it('badges Home with the number of sessions waiting on the operator', () => {
-      const updateGlobalTab = vi.fn()
-      ;(useExtensionRegistry as unknown as { getState: () => unknown }).getState = vi.fn(() => ({
-        registerGlobalTab: vi.fn(() => vi.fn()),
-        updateGlobalTab,
-        setActiveGlobalTab: vi.fn(),
-        setActiveWorkspaceTab: vi.fn(),
-        setActiveProjectTab: vi.fn(),
-        sidebarPanels: new Map(),
-      }))
-      // State is derived, never read from the store: a bell or a visible choice
-      // makes a session wait on the operator; a closed one never does.
-      const session = (id: string, patch: Record<string, unknown>) => [
-        id,
-        { id, projectId: 'p', tabTitle: id, agentState: 'idle', status: 'active', ...patch },
-      ]
-      setupMocks({
-        sessions: new Map([
-          session('a', { bellCount: 1 }),
-          session('b', { choicePrompt: { question: 'Proceed?', options: [] } }),
-          session('c', { busy: true }),
-          session('d', { bellCount: 2, status: 'closed' }),
-        ] as never),
-      })
-      render(<App />)
-      expect(updateGlobalTab).toHaveBeenLastCalledWith('core.home', {
-        badge: 2,
-        badgeLabel: '2 need you',
-      })
-    })
-  })
-
-  describe('auto-open terminal failure', () => {
-    afterEach(() => useTerminalOpenErrorStore.setState({ errors: {}, retries: {} }))
-
-    it("keeps the reason a branch's first terminal failed to open", async () => {
-      const mockCreateSession = vi.fn().mockRejectedValue(new Error('spawn EBADF'))
-      vi.mocked(useTerminalSession).mockReturnValue({ createSession: mockCreateSession })
-      setupMocks({ activeProjectId: 'proj-1', activeWorkspaceId: 'ws-1' })
-      render(<App />)
-      await waitFor(() =>
-        expect(useTerminalOpenErrorStore.getState().errors['proj-1']).toBe('spawn EBADF')
-      )
-      expect(mockCreateSession).toHaveBeenCalledTimes(1)
-    })
-
-    it('opens again when Try again bumps the retry, and clears the error on success', async () => {
-      const mockCreateSession = vi
-        .fn()
-        .mockRejectedValueOnce(new Error('spawn EBADF'))
-        .mockResolvedValue('ses-1')
-      vi.mocked(useTerminalSession).mockReturnValue({ createSession: mockCreateSession })
-      setupMocks({ activeProjectId: 'proj-1', activeWorkspaceId: 'ws-1' })
-      render(<App />)
-      await waitFor(() =>
-        expect(useTerminalOpenErrorStore.getState().errors['proj-1']).toBeTruthy()
-      )
-      act(() => useTerminalOpenErrorStore.getState().retry('proj-1'))
-      await waitFor(() => expect(mockCreateSession).toHaveBeenCalledTimes(2))
-      expect(useTerminalOpenErrorStore.getState().errors['proj-1']).toBeUndefined()
-    })
-  })
-
-  describe('handleNewTab', () => {
-    it('does nothing when there is no active project and scratchActive is false', () => {
-      const mockCreateSession = vi.fn().mockResolvedValue('ses-1')
-      vi.mocked(useTerminalSession).mockReturnValue({ createSession: mockCreateSession })
-      setupMocks({ activeProjectId: null, scratchActive: false })
-      render(<App />)
-      capturedShortcutCallbacks.onNewTab?.()
-      expect(mockCreateSession).not.toHaveBeenCalled()
-    })
-
-    it('calls createSession when promptForName is false and a project is active', () => {
-      const mockCreateSession = vi.fn().mockResolvedValue('ses-1')
-      vi.mocked(useTerminalSession).mockReturnValue({ createSession: mockCreateSession })
-      setupMocks({ activeProjectId: 'proj-1', activeWorkspaceId: 'ws-1' })
-      // Default resolveSettings returns { terminal: { scrollbackLimit: 5000 } } — no promptForName
-      render(<App />)
-      capturedShortcutCallbacks.onNewTab?.()
-      expect(mockCreateSession).toHaveBeenCalledWith('proj-1', 'human', '', '~', 5000)
-    })
-
-    it('shows NameTerminalDialog when promptForName is true', async () => {
-      const mockCreateSession = vi.fn().mockResolvedValue('ses-1')
-      vi.mocked(useTerminalSession).mockReturnValue({ createSession: mockCreateSession })
-      setupMocks({ activeProjectId: 'proj-1', activeWorkspaceId: 'ws-1' })
-      vi.mocked(useSettingsStore).mockReturnValue({
-        loadSettings: mockLoadSettings,
-        globalSettings: { appearance: { theme: 'dark' }, ui: { hasSeenWelcome: true } },
-        markWelcomeSeen: mockMarkWelcomeSeen,
-        resolveSettings: vi
-          .fn()
-          .mockReturnValue({ terminal: { scrollbackLimit: 5000, promptForName: true } }),
-      } as unknown as ReturnType<typeof useSettingsStore>)
-      ;(useSessionStore as unknown as { getState: () => unknown }).getState = () => ({
-        projectViews: new Map([['proj-1', { terminalCounter: 2 }]]),
-        setActiveSessionForProject: vi.fn(),
-      })
-      render(<App />)
-      capturedShortcutCallbacks.onNewTab?.()
-      await waitFor(() => expect(screen.getByTestId('name-terminal-dialog')).toBeTruthy())
-      expect(screen.getByTestId('name-terminal-default').textContent).toBe('Terminal 3')
-    })
-
-    it('NameTerminalDialog onConfirm calls createSession and closes dialog', async () => {
-      const mockCreateSession = vi.fn().mockResolvedValue('ses-1')
-      vi.mocked(useTerminalSession).mockReturnValue({ createSession: mockCreateSession })
-      setupMocks({ activeProjectId: 'proj-1', activeWorkspaceId: 'ws-1' })
-      vi.mocked(useSettingsStore).mockReturnValue({
-        loadSettings: mockLoadSettings,
-        globalSettings: { appearance: { theme: 'dark' }, ui: { hasSeenWelcome: true } },
-        markWelcomeSeen: mockMarkWelcomeSeen,
-        resolveSettings: vi
-          .fn()
-          .mockReturnValue({ terminal: { scrollbackLimit: 5000, promptForName: true } }),
-      } as unknown as ReturnType<typeof useSettingsStore>)
-      ;(useSessionStore as unknown as { getState: () => unknown }).getState = () => ({
-        projectViews: new Map(),
-        setActiveSessionForProject: vi.fn(),
-      })
-      render(<App />)
-      capturedShortcutCallbacks.onNewTab?.()
-      await waitFor(() => screen.getByTestId('name-terminal-dialog'))
-      fireEvent.click(screen.getByText('Confirm'))
-      await waitFor(() => expect(screen.queryByTestId('name-terminal-dialog')).toBeNull())
-      expect(mockCreateSession).toHaveBeenCalledWith('proj-1', 'human', 'My Terminal', '~', 5000)
-    })
-
-    it('NameTerminalDialog onCancel closes dialog without creating a named session', async () => {
-      const mockCreateSession = vi.fn().mockResolvedValue('ses-1')
-      vi.mocked(useTerminalSession).mockReturnValue({ createSession: mockCreateSession })
-      setupMocks({ activeProjectId: 'proj-1', activeWorkspaceId: 'ws-1' })
-      vi.mocked(useSettingsStore).mockReturnValue({
-        loadSettings: mockLoadSettings,
-        globalSettings: { appearance: { theme: 'dark' }, ui: { hasSeenWelcome: true } },
-        markWelcomeSeen: mockMarkWelcomeSeen,
-        resolveSettings: vi
-          .fn()
-          .mockReturnValue({ terminal: { scrollbackLimit: 5000, promptForName: true } }),
-      } as unknown as ReturnType<typeof useSettingsStore>)
-      ;(useSessionStore as unknown as { getState: () => unknown }).getState = () => ({
-        projectViews: new Map(),
-        setActiveSessionForProject: vi.fn(),
-      })
-      render(<App />)
-      // clear auto-session-creation calls that fire on mount
-      mockCreateSession.mockClear()
-      capturedShortcutCallbacks.onNewTab?.()
-      await waitFor(() => screen.getByTestId('name-terminal-dialog'))
-      fireEvent.click(screen.getByText('Cancel Dialog'))
-      await waitFor(() => expect(screen.queryByTestId('name-terminal-dialog')).toBeNull())
-      // After cancel, no new session should be created
-      expect(mockCreateSession).not.toHaveBeenCalled()
-    })
-  })
-
-  it('reopens saved panels when switching back to Terminal tab', async () => {
-    const mockTogglePanel = vi.fn()
-    setupMocks({ activeProjectId: 'proj-1' })
-    vi.mocked(useExtensionRegistry).mockReturnValue({
-      ...defaultExtensionRegistry,
-      activeProjectTabId: 'git',
-      openPanels: new Set(['panel-a']),
-      togglePanel: mockTogglePanel,
-    } as unknown as ReturnType<typeof useExtensionRegistry>)
-    const { rerender } = render(<App />)
-    // Switch back to terminal (activeProjectTabId → null), with a saved panel
-    vi.mocked(useExtensionRegistry).mockReturnValue({
-      ...defaultExtensionRegistry,
-      activeProjectTabId: null,
-      openPanels: new Set<string>(),
-      togglePanel: mockTogglePanel,
-    } as unknown as ReturnType<typeof useExtensionRegistry>)
-    rerender(<App />)
-    // togglePanel called when entering extension tab AND when returning to terminal
-    expect(mockTogglePanel).toHaveBeenCalledWith('panel-a')
+    expect(useWorkspaceStore.getState().activeWorkspaceId).toBe('ws-1')
   })
 })
 
-describe('App — command palette sessions and note editing (US6)', () => {
-  const paletteSession = {
-    id: 's1',
-    projectId: 'proj-1',
-    tabTitle: 'api-shell',
-    status: 'active' as const,
-    type: 'agent' as const,
-    scrollbackLimit: 10000,
-    createdAt: '',
-    lastActivityAt: 0,
-    agentState: 'idle' as const,
-  }
-  const projects = new Map([
-    ['ws-1', [{ id: 'proj-1', workspaceId: 'ws-1', name: 'API', isWorktree: false }]],
-  ])
+describe('App — onSelectProject clears active global, workspace, and project tabs', () => {
+  it('onSelectProject clears active global, workspace, and project tabs', () => {
+    render(<App />)
+    act(() => {
+      registry().setActiveWorkspaceTab('code-reviews')
+      registry().setActiveProjectTab('git')
+    })
+    act(() => sidebar.props?.onSelectProject?.())
+    expect(registry()).toMatchObject({
+      activeGlobalTabId: null,
+      activeWorkspaceTabId: null,
+      activeProjectTabId: null,
+    })
+  })
+})
 
-  it('offers open sessions to the panel, one action per session named by project', () => {
-    setupMocks({
-      sessions: new Map([['s1', paletteSession]]),
-      projectsByWorkspaceId: projects,
+describe('App — tells main whether each registered panel is open, whenever that changes', () => {
+  it('tells main whether each registered panel is open, whenever that changes', async () => {
+    registry().registerSidebarPanel({
+      id: 'git-changes',
+      label: 'Git',
+      defaultOpen: true,
+      component: () => null,
     })
     render(<App />)
-    act(() => capturedShortcutCallbacks.onOpenCommandPalette?.())
-    const sessionAction = capturedPaletteCommands.find((a) => a.id === 'session:s1') as
-      | (QuickActionLike & { description?: string })
-      | undefined
-    expect(sessionAction).toMatchObject({ label: 'api-shell', description: 'API' })
+    await waitFor(() =>
+      expect(main.sent.notifyPanelState).toHaveBeenCalledWith('git-changes', true)
+    )
+    act(() => registry().togglePanel('git-changes'))
+    await waitFor(() =>
+      expect(main.sent.notifyPanelState).toHaveBeenLastCalledWith('git-changes', false)
+    )
+    expect(JSON.parse(localStorage.getItem('openPanels') ?? '')).toEqual([])
+  })
+
+  it('reopens saved panels from localStorage that are not yet open on mount', () => {
+    localStorage.setItem('openPanels', JSON.stringify(['saved-panel']))
+    render(<App />)
+    expect(registry().openPanels.has('saved-panel')).toBe(true)
+  })
+})
+
+describe('App — shows an open panel when the bridge has no extensionEvents (the remote window)', () => {
+  it('shows an open panel when the bridge has no extensionEvents (the remote window)', () => {
+    const { extensionEvents: _left, ...remote } = main.parts
+    installElectronApi(remote)
+    registry().registerSidebarPanel({
+      id: 'git-changes',
+      label: 'Git',
+      defaultOpen: true,
+      component: () => <div data-testid="mock-panel" />,
+    })
+    render(<App />)
+    leaveHome()
+    expect(screen.getByTestId('mock-panel')).toBeTruthy()
+  })
+})
+
+describe('App — Home', () => {
+  it('registers Home as a permanent core tab, ahead of Overview', () => {
+    render(<App />)
+    const tabs = [...registry().globalTabs.values()]
+    expect(tabs.map((t) => [t.id, t.permanent])).toEqual([
+      ['core.home', true],
+      ['core.overview', true],
+    ])
+  })
+
+  it('opens on Home at launch', () => {
+    render(<App />)
+    expect(registry().activeGlobalTabId).toBe('core.home')
+    expect(screen.getByTestId('home-screen')).toBeTruthy()
+  })
+})
+
+describe('App — Home — badges Home with the number of sessions waiting on the operator', () => {
+  it('badges Home with the number of sessions waiting on the operator', () => {
+    // State is derived, never read from the store: a bell or a visible choice
+    // makes a session wait on the operator; a closed one never does.
+    const session = (id: string, patch: Partial<TerminalSession>) =>
+      terminalSessionOf({ id, projectId: 'p', ...patch })
+    setupApp({
+      sessions: [
+        session('a', { bellCount: 1 }),
+        session('b', { choicePrompt: { question: 'Proceed?', options: [] } }),
+        session('c', { busy: true }),
+        session('d', { bellCount: 2, status: 'closed' }),
+      ],
+    })
+    render(<App />)
+    expect(registry().globalTabs.get('core.home')).toMatchObject({
+      badge: 2,
+      badgeLabel: '2 need you',
+    })
+    expect(screen.getByRole('button', { name: 'Home, 2 need you' })).toBeTruthy()
+  })
+})
+
+describe('App — auto-open terminal failure', () => {
+  it("keeps the reason a branch's first terminal failed to open", async () => {
+    createSession.mockRejectedValue(new Error('spawn EBADF'))
+    setupApp({ activeProjectId: 'proj-1', activeWorkspaceId: 'ws-1' })
+    render(<App />)
+    await waitFor(() =>
+      expect(useTerminalOpenErrorStore.getState().errors['proj-1']).toBe('spawn EBADF')
+    )
+    expect(createSession).toHaveBeenCalledTimes(1)
+  })
+
+  it('opens again when Try again bumps the retry, and clears the error on success', async () => {
+    createSession.mockRejectedValueOnce(new Error('spawn EBADF')).mockResolvedValue('ses-1')
+    setupApp({ activeProjectId: 'proj-1', activeWorkspaceId: 'ws-1' })
+    render(<App />)
+    await waitFor(() => expect(useTerminalOpenErrorStore.getState().errors['proj-1']).toBeTruthy())
+    act(() => useTerminalOpenErrorStore.getState().retry('proj-1'))
+    await waitFor(() => expect(createSession).toHaveBeenCalledTimes(2))
+    await waitFor(() =>
+      expect(useTerminalOpenErrorStore.getState().errors['proj-1']).toBeUndefined()
+    )
+  })
+})
+
+const promptForName = () => settingsWith({ terminal: { promptForName: true } })
+
+describe('App — handleNewTab', () => {
+  it('does nothing when there is no active project and scratchActive is false', () => {
+    render(<App />)
+    act(() => shortcuts.callbacks.onNewTab?.())
+    expect(createSession).not.toHaveBeenCalled()
+  })
+
+  it('opens a terminal straight away when promptForName is off', () => {
+    setupApp({
+      activeProjectId: 'proj-1',
+      activeWorkspaceId: 'ws-1',
+      workspaces: [WS1],
+      sessions: [terminalSessionOf({ id: 'existing', projectId: 'proj-1' })],
+    })
+    render(<App />)
+    act(() => shortcuts.callbacks.onNewTab?.())
+    expect(createSession).toHaveBeenCalledWith({
+      projectId: 'proj-1',
+      type: 'human',
+      title: '',
+      cwd: '/a',
+      scrollbackLimit: 10000,
+    })
+  })
+})
+
+describe('App — handleNewTab — shows NameTerminalDialog when promptForName is true', () => {
+  it('shows NameTerminalDialog when promptForName is true', async () => {
+    setupApp({
+      activeProjectId: 'proj-1',
+      activeWorkspaceId: 'ws-1',
+      globalSettings: promptForName(),
+      sessions: [terminalSessionOf({ id: 'existing', projectId: 'proj-1' })],
+    })
+    useSessionStore.setState({
+      projectViews: new Map([['proj-1', { terminalCounter: 2, activeSessionId: 'existing' }]]),
+    })
+    render(<App />)
+    leaveHome()
+    act(() => shortcuts.callbacks.onNewTab?.())
+    await waitFor(() => expect(screen.getByTestId('name-terminal-dialog')).toBeTruthy())
+    expect(screen.getByTestId('name-terminal-default').textContent).toBe('Terminal 3')
+  })
+})
+
+describe('App — handleNewTab — NameTerminalDialog onConfirm opens the named terminal and closes the dialog', () => {
+  it('NameTerminalDialog onConfirm opens the named terminal and closes the dialog', async () => {
+    setupApp({
+      activeProjectId: 'proj-1',
+      activeWorkspaceId: 'ws-1',
+      globalSettings: promptForName(),
+      sessions: [terminalSessionOf({ id: 'existing', projectId: 'proj-1' })],
+    })
+    render(<App />)
+    act(() => shortcuts.callbacks.onNewTab?.())
+    await waitFor(() => screen.getByTestId('name-terminal-dialog'))
+    fireEvent.click(screen.getByText('Confirm'))
+    await waitFor(() => expect(screen.queryByTestId('name-terminal-dialog')).toBeNull())
+    expect(createSession).toHaveBeenCalledWith({
+      projectId: 'proj-1',
+      type: 'human',
+      title: 'My Terminal',
+      cwd: '~',
+      scrollbackLimit: 10000,
+    })
+  })
+})
+
+describe('App — handleNewTab — NameTerminalDialog onCancel closes dialog without creating a named session', () => {
+  it('NameTerminalDialog onCancel closes dialog without creating a named session', async () => {
+    setupApp({
+      activeProjectId: 'proj-1',
+      activeWorkspaceId: 'ws-1',
+      globalSettings: promptForName(),
+      sessions: [terminalSessionOf({ id: 'existing', projectId: 'proj-1' })],
+    })
+    render(<App />)
+    act(() => shortcuts.callbacks.onNewTab?.())
+    await waitFor(() => screen.getByTestId('name-terminal-dialog'))
+    fireEvent.click(screen.getByText('Cancel Dialog'))
+    await waitFor(() => expect(screen.queryByTestId('name-terminal-dialog')).toBeNull())
+    expect(createSession).not.toHaveBeenCalled()
+  })
+})
+
+describe('App — reopens saved panels when switching back to Terminal tab', () => {
+  it('reopens saved panels when switching back to Terminal tab', () => {
+    setupApp({ activeProjectId: 'proj-1' })
+    registry().togglePanel('panel-a')
+    render(<App />)
+    act(() => registry().setActiveProjectTab('git'))
+    expect(registry().openPanels.has('panel-a')).toBe(false)
+    act(() => registry().setActiveProjectTab(null))
+    expect(registry().openPanels.has('panel-a')).toBe(true)
+  })
+})
+
+const paletteSession = terminalSessionOf({
+  id: 's1',
+  projectId: 'proj-1',
+  tabTitle: 'api-shell',
+  type: 'agent',
+})
+
+const projects = new Map([['ws-1', [PROJ1]]])
+
+describe('App — command palette sessions and note editing (US6)', () => {
+  it('offers open sessions to the panel, one action per session named by project', () => {
+    setupApp({ sessions: [paletteSession], projectsByWorkspaceId: projects })
+    render(<App />)
+    openPalette()
+    expect(paletteAction('session:s1')).toMatchObject({ label: 'api-shell', description: 'API' })
   })
 
   it('omits closed sessions from the panel', () => {
-    setupMocks({
-      sessions: new Map([['s1', { ...paletteSession, status: 'closed' as const }]]),
+    setupApp({
+      sessions: [{ ...paletteSession, status: 'closed' }],
       projectsByWorkspaceId: projects,
     })
     render(<App />)
-    act(() => capturedShortcutCallbacks.onOpenCommandPalette?.())
-    expect(capturedPaletteCommands.find((a) => a.id === 'session:s1')).toBeUndefined()
+    openPalette()
+    expect(paletteAction('session:s1')).toBeUndefined()
   })
 
   it('leaves the project name blank when the project is unknown', () => {
-    setupMocks({ sessions: new Map([['s1', paletteSession]]) })
+    setupApp({ sessions: [paletteSession] })
     render(<App />)
-    act(() => capturedShortcutCallbacks.onOpenCommandPalette?.())
-    const sessionAction = capturedPaletteCommands.find((a) => a.id === 'session:s1') as
-      | (QuickActionLike & { description?: string })
-      | undefined
-    expect(sessionAction?.description).toBe('')
+    openPalette()
+    expect(paletteAction('session:s1')?.description).toBe('')
   })
+})
 
+describe('App — command palette sessions and note editing (US6) — activates both the project and the session when one is chosen', () => {
   it('activates both the project and the session when one is chosen', () => {
-    setupMocks({
-      sessions: new Map([['s1', paletteSession]]),
-      projectsByWorkspaceId: projects,
-    })
+    setupApp({ sessions: [paletteSession], projectsByWorkspaceId: projects })
     render(<App />)
-    act(() => capturedShortcutCallbacks.onOpenCommandPalette?.())
-    const sessionAction = capturedPaletteCommands.find((a) => a.id === 'session:s1')
-    act(() => sessionAction?.run())
-    expect(mockSetActiveProject).toHaveBeenCalledWith('proj-1')
-    expect(mockSetActiveSessionForProject).toHaveBeenCalledWith('proj-1', 's1')
+    openPalette()
+    runAction('session:s1')
+    expect(useWorkspaceStore.getState().activeProjectId).toBe('proj-1')
+    expect(useSessionStore.getState().getActiveSessionForProject('proj-1')).toBe('s1')
   })
 
   it('asks the tab bar to edit the active terminal note on Cmd+I', () => {
-    setupMocks({
-      activeProjectId: 'proj-1',
-      sessions: new Map([['s1', paletteSession]]),
-      projectViews: new Map([['proj-1', { activeSessionId: 's1' }]]),
-    })
+    setupApp({ activeProjectId: 'proj-1', sessions: [paletteSession] })
+    showTab('proj-1', 's1')
     render(<App />)
-    act(() => capturedShortcutCallbacks.onEditSessionNote?.())
-    expect(capturedEditNoteSessionId).toBe('s1')
+    leaveHome()
+    act(() => shortcuts.callbacks.onEditSessionNote?.())
+    expect(tabBar.editNoteSessionId).toBe('s1')
   })
 
   it('asks for nothing when no project is active', () => {
-    setupMocks()
     render(<App />)
-    act(() => capturedShortcutCallbacks.onEditSessionNote?.())
-    expect(capturedEditNoteSessionId).toBeNull()
+    act(() => shortcuts.callbacks.onEditSessionNote?.())
+    expect(tabBar.editNoteSessionId).toBeNull()
   })
 })
 
 describe('App — Quick Actions integration (feature 057)', () => {
   it('opens the panel via the quickActions.onOpen bridge event', async () => {
-    let openCb: (() => void) | undefined
-    ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
-      ...(globalThis as unknown as { electronAPI: Record<string, unknown> }).electronAPI,
-      quickActions: {
-        onOpen: (cb: () => void) => {
-          openCb = cb
-          return vi.fn()
-        },
-      },
-    }
     render(<App />)
     expect(screen.queryByTestId('quick-actions')).toBeNull()
-    act(() => openCb?.())
+    act(() => main.events.quickActionsOpen.deliver())
     await waitFor(() => expect(screen.getByTestId('quick-actions')).toBeTruthy())
   })
 
   it('pressing Cmd+P again while open bumps the searchSignal prop', async () => {
     render(<App />)
-    act(() => capturedShortcutCallbacks.onOpenCommandPalette?.())
+    openPalette()
     await waitFor(() => screen.getByTestId('quick-actions'))
-    const firstSignal = capturedQuickActionsProps?.contextGroupId // sanity: props exist
-    expect(firstSignal).not.toBeUndefined()
-    const before = (capturedQuickActionsProps as unknown as { searchSignal?: number })?.searchSignal
-    act(() => capturedShortcutCallbacks.onOpenCommandPalette?.())
-    const after = (capturedQuickActionsProps as unknown as { searchSignal?: number })?.searchSignal
-    expect(after).toBe((before ?? 0) + 1)
+    const before = palette.props?.searchSignal ?? 0
+    openPalette()
+    expect(palette.props?.searchSignal).toBe(before + 1)
   })
 
-  it('running an action records usage through updateQuickActions', async () => {
+  it('running an action records its use in the saved settings', async () => {
     render(<App />)
-    act(() => capturedShortcutCallbacks.onOpenCommandPalette?.())
-    await waitFor(() => screen.getByTestId('quick-actions'))
-    const action = capturedPaletteCommands.find((a) => a.id === 'core.clear')
-    act(() => capturedQuickActionsProps?.onRun?.(action!))
-    const settingsState = useSettingsStore.getState()
-    expect(settingsState.updateQuickActions).toHaveBeenCalled()
-    const patch = vi.mocked(settingsState.updateQuickActions).mock.calls[0][0] as {
-      usage: { id: string }[]
-    }
-    expect(patch.usage.some((u) => u.id === 'core.clear')).toBe(true)
+    openPalette()
+    act(() => palette.props?.onRun(paletteAction('core.clear')!))
+    await waitFor(() =>
+      expect(settings()?.quickActions.usage.some((u) => u.id === 'core.clear')).toBe(true)
+    )
   })
+})
 
-  it('shows a "Next time" hint toast when a shortcut action with a fresh direct-use count runs', async () => {
+describe('App — Quick Actions integration (feature 057) — shows a "Next time" hint toast when a shortcut action with a fresh direct-use count runs', () => {
+  it('shows a "Next time" hint toast when a shortcut action with a fresh direct-use count runs', () => {
     render(<App />)
-    act(() => capturedShortcutCallbacks.onOpenCommandPalette?.())
-    await waitFor(() => screen.getByTestId('quick-actions'))
-    const action = capturedPaletteCommands.find((a) => a.id === 'core.clear')
-    act(() => capturedQuickActionsProps?.onRun?.(action!))
-    expect(mockAddToast).toHaveBeenCalledWith(
+    openPalette()
+    act(() => palette.props?.onRun(paletteAction('core.clear')!))
+    expect(toasts()).toContainEqual(
       expect.objectContaining({ type: 'info', message: expect.stringContaining('Next time') })
     )
   })
@@ -1755,449 +1196,266 @@ describe('App — Quick Actions integration (feature 057)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Quick actions (⌘P)' }))
     await waitFor(() => expect(screen.getByTestId('quick-actions')).toBeTruthy())
   })
+})
 
-  it('exercises the terminal, session, workspace and issue core action callbacks', async () => {
-    const mockSplitSession = vi.fn().mockResolvedValue(undefined)
-    const mockCloseSession = vi.fn().mockResolvedValue(undefined)
-    vi.mocked(useTerminalSession).mockReturnValue({
-      createSession: vi.fn().mockResolvedValue('ses-1'),
-      splitSession: mockSplitSession,
-    })
-    const mockSetActiveWorkspace = vi.fn()
-    vi.mocked(useWorkspaceStore).mockReturnValue({
-      loadWorkspaces: mockLoadWorkspaces,
+/** Two workspaces: s1 and s3 in the active branch with s1 showing, and s2,
+ * waiting for input, in the other workspace's branch. */
+function setupTwoWorkspaces(): void {
+  const s1 = terminalSessionOf({ id: 's1', projectId: 'proj-1' })
+  const s2 = terminalSessionOf({
+    id: 's2',
+    projectId: 'proj-2',
+    agentState: 'awaiting-input',
+    lastAttendedAt: 5,
+  })
+  const s3 = terminalSessionOf({ id: 's3', projectId: 'proj-1' })
+  setupApp({
+    activeWorkspaceId: 'ws-1',
+    activeProjectId: 'proj-1',
+    workspaces: [WS1, WS2],
+    projectsByWorkspaceId: new Map([
+      ['ws-1', [PROJ1]],
+      ['ws-2', [projectFixture({ id: 'proj-2', workspaceId: 'ws-2' })]],
+    ]),
+    sessions: [s1, s2, s3],
+  })
+  showTab('proj-1', 's1')
+}
+
+describe('App — Quick Actions integration (feature 057) — core actions', () => {
+  it('runs the terminal, session and workspace core actions against the stores', async () => {
+    setupTwoWorkspaces()
+    render(<App />)
+    openPalette()
+    const shown = (projectId: string) =>
+      useSessionStore.getState().getActiveSessionForProject(projectId)
+
+    runAction('core.cycle-recent-next')
+    expect(shown('proj-2')).toBe('s2')
+
+    runAction('core.next-waiting')
+    expect(shown('proj-2')).toBe('s2')
+
+    runAction('session:s1')
+    expect(useWorkspaceStore.getState()).toMatchObject({
       activeWorkspaceId: 'ws-1',
       activeProjectId: 'proj-1',
-      workspaces: [
-        { id: 'ws-1', name: 'One', folderPath: '/a', color: '#fff', tags: [] },
-        { id: 'ws-2', name: 'Two', folderPath: '/b', color: '#fff', tags: [] },
-      ],
-      projectsByWorkspaceId: new Map(),
-      setActiveWorkspace: mockSetActiveWorkspace,
-      setActiveProject: mockSetActiveProject,
-      resolveActiveCwd: vi.fn().mockReturnValue('~'),
-      scratchActive: false,
-      setScratchActive: vi.fn(),
-    } as unknown as ReturnType<typeof useWorkspaceStore>)
-    vi.mocked(useSessionStore).mockReturnValue({
-      handleProcessExit: mockHandleProcessExit,
-      getSessionsForProject: vi.fn().mockReturnValue([{ id: 's1' }, { id: 's2' }]),
-      getActiveSessionForProject: vi.fn().mockReturnValue('s1'),
-      getFocusedSession: vi.fn().mockReturnValue('s1'),
-      getPaneLayout: vi.fn().mockReturnValue({ type: 'split' }),
-      closeSplitLeaf: vi.fn(),
-      getTerminalInstance: vi.fn().mockReturnValue(undefined),
-      getScratchSessions: vi.fn().mockReturnValue([]),
-      sessions: new Map([
-        ['s1', { id: 's1', projectId: 'proj-1', status: 'active', agentState: 'idle' }],
-        [
-          's2',
-          {
-            id: 's2',
-            projectId: 'proj-2',
-            status: 'active',
-            agentState: 'awaiting-input',
-            lastAttendedAt: 5,
-          },
-        ],
-      ]),
-      setActiveSessionForProject: mockSetActiveSessionForProject,
-      closeSession: mockCloseSession,
-      projectViews: new Map(),
-    } as unknown as ReturnType<typeof useSessionStore>)
-    // revealSession (behind cycle-recent-next / next-waiting) reads sessions and
-    // project membership through getState, not the hook slice above.
-    ;(useSessionStore as unknown as { getState: () => unknown }).getState = () => ({
-      sessions: new Map([
-        ['s1', { id: 's1', projectId: 'proj-1', status: 'active', agentState: 'idle' }],
-        [
-          's2',
-          {
-            id: 's2',
-            projectId: 'proj-2',
-            status: 'active',
-            agentState: 'awaiting-input',
-            lastAttendedAt: 5,
-          },
-        ],
-      ]),
-      setActiveSessionForProject: mockSetActiveSessionForProject,
-      requestFocus: vi.fn(),
     })
-    ;(useWorkspaceStore as unknown as { getState: () => unknown }).getState = () => ({
-      activeWorkspaceId: 'ws-1',
-      projectsByWorkspaceId: new Map([
-        ['ws-1', [{ id: 'proj-1', workspaceId: 'ws-1' }]],
-        ['ws-2', [{ id: 'proj-2', workspaceId: 'ws-2' }]],
-      ]),
-      setActiveWorkspace: mockSetActiveWorkspace,
-      setActiveProject: mockSetActiveProject,
-      setScratchActive: vi.fn(),
-    })
-    render(<App />)
-    act(() => capturedShortcutCallbacks.onOpenCommandPalette?.())
-    await waitFor(() => screen.getByTestId('quick-actions'))
+    runAction('core.prev-tab')
+    expect(shown('proj-1')).toBe('s3')
 
-    const run = (id: string) => act(() => capturedPaletteCommands.find((a) => a.id === id)?.run())
+    runAction('core.close-tab')
+    await waitFor(() => expect(useSessionStore.getState().sessions.has('s3')).toBe(false))
 
-    run('core.close-tab')
-    expect(mockCloseSession).toHaveBeenCalled()
-
-    run('core.cycle-recent-next')
-    expect(mockSetActiveSessionForProject).toHaveBeenCalledWith('proj-2', 's2')
-
-    run('core.next-waiting')
-    expect(mockSetActiveSessionForProject).toHaveBeenCalledWith('proj-2', 's2')
-
-    run('core.prev-tab')
-    expect(mockSetActiveSessionForProject).toHaveBeenCalledWith('proj-1', 's2')
-
-    run('core.cycle-workspace-next')
-    expect(mockSetActiveWorkspace).toHaveBeenCalledWith('ws-2')
-
-    mockUseSessionFacts.mockReturnValue([{ sessionId: 's1', workItem: null }])
-    run('core.link-issue')
-    // Targets the focused terminal's own session, not the branch — the
-    // session dialog opens rather than the branch's LinkIssueDialog.
-    expect(screen.getByTestId('session-link-dialog').textContent).toContain('s1')
-
-    run('core.view-issue')
-    run('core.copy-issue-key')
-    run('core.open-issue')
-    run('core.resume')
-    expect(mockSetActiveWorkspace).toHaveBeenCalled()
-  })
-
-  it('"Link issue to branch" opens the branch dialog rather than the session one', async () => {
-    mockUseSessionFacts.mockReturnValue([{ sessionId: 's1', workItem: null }])
-    setupMocks({ activeProjectId: 'proj-1', activeWorkspaceId: 'ws-1' })
-    vi.mocked(useSessionStore).mockReturnValue({
-      getFocusedSession: vi.fn().mockReturnValue('s1'),
-      getActiveSessionForProject: vi.fn().mockReturnValue('s1'),
-      sessions: new Map([['s1', { id: 's1', projectId: 'proj-1', status: 'active' }]]),
-      getSessionsForProject: vi.fn().mockReturnValue([]),
-      getScratchSessions: vi.fn().mockReturnValue([]),
-      projectViews: new Map(),
-    } as unknown as ReturnType<typeof useSessionStore>)
-    render(<App />)
-    act(() => capturedShortcutCallbacks.onOpenCommandPalette?.())
-    await waitFor(() => screen.getByTestId('quick-actions'))
-
-    act(() => capturedPaletteCommands.find((a) => a.id === 'core.link-issue-branch')?.run())
-
-    expect(useIntegrationsStore.getState().linkDialogProjectId).toBe('proj-1')
-    expect(screen.queryByTestId('session-link-dialog')).toBeNull()
-  })
-
-  it('pinning an action via onTogglePin persists through updateQuickActions', async () => {
-    render(<App />)
-    act(() => capturedShortcutCallbacks.onOpenCommandPalette?.())
-    await waitFor(() => screen.getByTestId('quick-actions'))
-    act(() => capturedQuickActionsProps?.onTogglePin?.('core.clear'))
-    const settingsState = useSettingsStore.getState()
-    expect(settingsState.updateQuickActions).toHaveBeenCalledWith({ pins: ['core.clear'] })
-  })
-
-  it('unpinning an already-pinned action removes it from the persisted pins', async () => {
-    setupMocks({
-      globalSettings: {
-        appearance: { theme: 'dark' },
-        ui: { hasSeenWelcome: false },
-        quickActions: { pins: ['core.clear'], usage: [], directUse: [], custom: [] },
-      },
-    })
-    render(<App />)
-    act(() => capturedShortcutCallbacks.onOpenCommandPalette?.())
-    await waitFor(() => screen.getByTestId('quick-actions'))
-    act(() => capturedQuickActionsProps?.onTogglePin?.('core.clear'))
-    const settingsState = useSettingsStore.getState()
-    expect(settingsState.updateQuickActions).toHaveBeenCalledWith({ pins: [] })
+    runAction('core.cycle-workspace-next')
+    expect(useWorkspaceStore.getState().activeWorkspaceId).toBe('ws-2')
   })
 })
 
+describe('App — Quick Actions integration (feature 057) — "Link issue" opens the dialog for the focused terminal\'s own session', () => {
+  it('"Link issue" opens the dialog for the focused terminal\'s own session', async () => {
+    facts.sessionFacts = [{ sessionId: 's1', workItem: null }]
+    setupApp({
+      activeProjectId: 'proj-1',
+      activeWorkspaceId: 'ws-1',
+      sessions: [terminalSessionOf({ id: 's1', projectId: 'proj-1' })],
+    })
+    showTab('proj-1', 's1')
+    render(<App />)
+    openPalette()
+    runAction('core.link-issue')
+    expect(screen.getByTestId('session-link-dialog').textContent).toContain('s1')
+  })
+
+  it('"Link issue to branch" opens the branch dialog rather than the session one', () => {
+    facts.sessionFacts = [{ sessionId: 's1', workItem: null }]
+    setupApp({
+      activeProjectId: 'proj-1',
+      activeWorkspaceId: 'ws-1',
+      sessions: [terminalSessionOf({ id: 's1', projectId: 'proj-1' })],
+    })
+    showTab('proj-1', 's1')
+    render(<App />)
+    openPalette()
+    runAction('core.link-issue-branch')
+    expect(useIntegrationsStore.getState().linkDialogProjectId).toBe('proj-1')
+    expect(screen.queryByTestId('session-link-dialog')).toBeNull()
+  })
+})
+
+describe('App — Quick Actions integration (feature 057) — pinning an action saves it in the pins', () => {
+  it('pinning an action saves it in the pins', async () => {
+    render(<App />)
+    openPalette()
+    act(() => palette.props?.onTogglePin('core.clear'))
+    await waitFor(() => expect(settings()?.quickActions.pins).toEqual(['core.clear']))
+  })
+
+  it('unpinning an already-pinned action removes it from the saved pins', async () => {
+    setupApp({ globalSettings: settingsWith({ quickActions: { pins: ['core.clear'] } }) })
+    render(<App />)
+    openPalette()
+    act(() => palette.props?.onTogglePin('core.clear'))
+    await waitFor(() => expect(settings()?.quickActions.pins).toEqual([]))
+  })
+})
+
+const customAction = (id: string, body: string, target: 'new-tab' | 'focused') =>
+  settingsWith({
+    ui: { hasSeenWelcome: true },
+    quickActions: { custom: [{ id, label: id, kind: 'shell', target, body }] },
+  })
+
+const shell = terminalSessionOf({ id: 's1', projectId: 'proj-1', tabTitle: 'shell' })
+
 describe('App — Quick Actions branch coverage (context, surfaces, custom vars, errors)', () => {
-  afterEach(() => {
-    useIntegrationsStore.setState({ links: new Map(), issues: new Map() })
-  })
-
-  it('labels the context "in <group label>" when an extension surface is active', async () => {
-    vi.mocked(useExtensionRegistry).mockReturnValue({
-      ...defaultExtensionRegistry,
-      activeGlobalTabId: 'git-integration',
-      quickActionGroups: [
-        { id: 'ext:git-integration', mnemonic: 'g', label: 'Git', owner: 'git-integration' },
-      ],
-    } as unknown as ReturnType<typeof useExtensionRegistry>)
+  it('labels the context "in <group label>" when an extension surface is active', () => {
+    registry().setQuickActionGroups([
+      { id: 'ext:git-integration', mnemonic: 'g', label: 'Git', owner: 'git-integration' },
+    ])
     render(<App />)
-    act(() => capturedShortcutCallbacks.onOpenCommandPalette?.())
-    await waitFor(() => screen.getByTestId('quick-actions'))
-    expect(capturedQuickActionsProps?.contextGroupId).toBe('ext:git-integration')
-    expect(capturedQuickActionsProps?.contextLabel).toBe('in Git')
+    act(() => registry().setActiveGlobalTab('git-integration'))
+    openPalette()
+    expect(palette.props?.contextGroupId).toBe('ext:git-integration')
+    expect(palette.props?.contextLabel).toBe('in Git')
   })
 
-  it('labels the context "in terminal · <tab title>" when a terminal is focused and no surface is active', async () => {
-    setupMocks({
-      activeProjectId: 'proj-1',
-      sessions: new Map([
-        ['s1', { id: 's1', projectId: 'proj-1', tabTitle: 'api-shell', status: 'active' }],
-      ]),
-    })
-    vi.mocked(useSessionStore).mockReturnValue({
-      ...vi.mocked(useSessionStore)(),
-      getFocusedSession: vi.fn().mockReturnValue('s1'),
-      getActiveSessionForProject: vi.fn().mockReturnValue('s1'),
-      sessions: new Map([
-        ['s1', { id: 's1', projectId: 'proj-1', tabTitle: 'api-shell', status: 'active' }],
-      ]),
-    } as unknown as ReturnType<typeof useSessionStore>)
+  it('labels the context "in terminal · <tab title>" when a terminal is focused and no surface is active', () => {
+    setupApp({ activeProjectId: 'proj-1', sessions: [{ ...shell, tabTitle: 'api-shell' }] })
+    showTab('proj-1', 's1')
     render(<App />)
-    act(() => capturedShortcutCallbacks.onOpenCommandPalette?.())
-    await waitFor(() => screen.getByTestId('quick-actions'))
-    expect(capturedQuickActionsProps?.contextGroupId).toBeNull()
-    expect(capturedQuickActionsProps?.contextLabel).toBe('in terminal · api-shell')
+    openPalette()
+    expect(palette.props?.contextGroupId).toBeNull()
+    expect(palette.props?.contextLabel).toBe('in terminal · api-shell')
   })
 
-  it('shows no context label with no surface active and no terminal focused', async () => {
-    setupMocks()
+  it('shows no context label with no surface active and no terminal focused', () => {
     render(<App />)
-    act(() => capturedShortcutCallbacks.onOpenCommandPalette?.())
-    await waitFor(() => screen.getByTestId('quick-actions'))
-    expect(capturedQuickActionsProps?.contextGroupId).toBeNull()
-    expect(capturedQuickActionsProps?.contextLabel).toBeUndefined()
+    openPalette()
+    expect(palette.props?.contextGroupId).toBeNull()
+    expect(palette.props?.contextLabel).toBeUndefined()
   })
+})
 
+describe('App — Quick Actions branch coverage (context, surfaces, custom vars, errors) — extension:show-surface activates the registered surface matching the extension id and view', () => {
   it('extension:show-surface activates the registered surface matching the extension id and view', () => {
-    const mockSetActiveGlobalTab = vi.fn()
-    vi.mocked(useExtensionRegistry).mockReturnValue({
-      ...defaultExtensionRegistry,
-      globalTabs: new Map([
-        [
-          'git-integration',
-          { id: 'git-integration', label: 'Git', view: 'main', component: () => null },
-        ],
-      ]),
-      setActiveGlobalTab: mockSetActiveGlobalTab,
-    } as unknown as ReturnType<typeof useExtensionRegistry>)
-    const bridgeHandlers = new Map<string, (data: unknown) => void>()
-    ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
-      ...(globalThis as unknown as { electronAPI: Record<string, unknown> }).electronAPI,
-      extensionBridge: {
-        on: (channel: string, handler: (data: unknown) => void) => {
-          bridgeHandlers.set(channel, handler)
-          return vi.fn()
-        },
-        invoke: vi.fn().mockResolvedValue({}),
-      },
-    }
+    registry().registerGlobalTab({
+      id: 'git-integration',
+      label: 'Git',
+      view: 'main',
+      component: () => null,
+    })
     render(<App />)
-    mockSetActiveGlobalTab.mockClear()
-    bridgeHandlers.get('extension:show-surface')?.({ extensionId: 'git-integration', view: 'main' })
-    expect(mockSetActiveGlobalTab).toHaveBeenCalledWith('git-integration')
+    act(() =>
+      main.events.bridge.emit('extension:show-surface', {
+        extensionId: 'git-integration',
+        view: 'main',
+      })
+    )
+    expect(registry().activeGlobalTabId).toBe('git-integration')
   })
+})
 
+describe('App — Quick Actions branch coverage (context, surfaces, custom vars, errors) — extension:show-surface does nothing when no registered surface matches', () => {
   it('extension:show-surface does nothing when no registered surface matches', () => {
-    const mockSetActiveGlobalTab = vi.fn()
-    vi.mocked(useExtensionRegistry).mockReturnValue({
-      ...defaultExtensionRegistry,
-      globalTabs: new Map([
-        [
-          'git-integration',
-          { id: 'git-integration', label: 'Git', view: 'main', component: () => null },
-        ],
-      ]),
-      setActiveGlobalTab: mockSetActiveGlobalTab,
-    } as unknown as ReturnType<typeof useExtensionRegistry>)
-    const bridgeHandlers = new Map<string, (data: unknown) => void>()
-    ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
-      ...(globalThis as unknown as { electronAPI: Record<string, unknown> }).electronAPI,
-      extensionBridge: {
-        on: (channel: string, handler: (data: unknown) => void) => {
-          bridgeHandlers.set(channel, handler)
-          return vi.fn()
-        },
-        invoke: vi.fn().mockResolvedValue({}),
-      },
-    }
-    render(<App />)
-    mockSetActiveGlobalTab.mockClear()
-    bridgeHandlers.get('extension:show-surface')?.({ extensionId: 'not-registered', view: 'main' })
-    expect(mockSetActiveGlobalTab).not.toHaveBeenCalled()
-  })
-
-  it('disables a custom action referencing {issue} with "No linked issue" when nothing is linked', async () => {
-    setupMocks({
-      activeProjectId: 'proj-1',
-      activeWorkspaceId: 'ws-1',
-      globalSettings: {
-        appearance: { theme: 'dark' },
-        ui: { hasSeenWelcome: true },
-        quickActions: {
-          pins: [],
-          usage: [],
-          directUse: [],
-          custom: [
-            {
-              id: 'c1',
-              label: 'Open issue',
-              kind: 'shell',
-              target: 'new-tab',
-              body: 'echo {issue}',
-            },
-          ],
-        },
-      },
+    registry().registerGlobalTab({
+      id: 'git-integration',
+      label: 'Git',
+      view: 'main',
+      component: () => null,
     })
     render(<App />)
-    act(() => capturedShortcutCallbacks.onOpenCommandPalette?.())
-    await waitFor(() => screen.getByTestId('quick-actions'))
-    const action = capturedPaletteCommands.find((a) => a.id === 'custom:c1')
-    expect((action as unknown as { disabledReason?: string })?.disabledReason).toBe(
-      'No linked issue'
+    act(() =>
+      main.events.bridge.emit('extension:show-surface', {
+        extensionId: 'not-registered',
+        view: 'main',
+      })
     )
+    expect(registry().activeGlobalTabId).toBe('core.home')
   })
 
-  it('enables a custom action referencing {issue} once the project has a linked issue', async () => {
+  it('disables a custom action referencing {issue} with "No linked issue" when nothing is linked', () => {
+    setupApp({
+      activeProjectId: 'proj-1',
+      activeWorkspaceId: 'ws-1',
+      globalSettings: customAction('c1', 'echo {issue}', 'new-tab'),
+    })
+    render(<App />)
+    openPalette()
+    expect(paletteAction('custom:c1')?.disabledReason).toBe('No linked issue')
+  })
+})
+
+describe('App — Quick Actions branch coverage (context, surfaces, custom vars, errors) — enables a custom action referencing {issue} once the project has a linked issue', () => {
+  it('enables a custom action referencing {issue} once the project has a linked issue', () => {
+    setupApp({
+      activeProjectId: 'proj-1',
+      activeWorkspaceId: 'ws-1',
+      globalSettings: customAction('c1', 'echo {issue}', 'new-tab'),
+    })
     useIntegrationsStore.setState({
-      links: new Map([['proj-1', { key: 'ABC-1', tracker: 'linear' }]]),
-    })
-    setupMocks({
-      activeProjectId: 'proj-1',
-      activeWorkspaceId: 'ws-1',
-      globalSettings: {
-        appearance: { theme: 'dark' },
-        ui: { hasSeenWelcome: true },
-        quickActions: {
-          pins: [],
-          usage: [],
-          directUse: [],
-          custom: [
-            {
-              id: 'c1',
-              label: 'Open issue',
-              kind: 'shell',
-              target: 'new-tab',
-              body: 'echo {issue}',
-            },
-          ],
-        },
-      },
+      links: new Map([
+        [
+          'proj-1',
+          {
+            projectId: 'proj-1',
+            tracker: 'linear',
+            key: 'ABC-1',
+            injectContext: false,
+            linkedAt: '',
+          },
+        ],
+      ]),
     })
     render(<App />)
-    act(() => capturedShortcutCallbacks.onOpenCommandPalette?.())
-    await waitFor(() => screen.getByTestId('quick-actions'))
-    const action = capturedPaletteCommands.find((a) => a.id === 'custom:c1')
-    expect((action as unknown as { disabledReason?: string })?.disabledReason).toBeUndefined()
+    openPalette()
+    expect(paletteAction('custom:c1')?.disabledReason).toBeUndefined()
   })
+})
 
-  it('disables a custom action referencing {selection} with "No text selected" when nothing is selected', async () => {
-    setupMocks({
+describe('App — Quick Actions branch coverage (context, surfaces, custom vars, errors) — disables a custom action referencing {selection} with "No text selected" when nothing is selected', () => {
+  it('disables a custom action referencing {selection} with "No text selected" when nothing is selected', () => {
+    setupApp({
       activeProjectId: 'proj-1',
-      globalSettings: {
-        appearance: { theme: 'dark' },
-        ui: { hasSeenWelcome: true },
-        quickActions: {
-          pins: [],
-          usage: [],
-          directUse: [],
-          custom: [
-            {
-              id: 'c2',
-              label: 'Grep selection',
-              kind: 'shell',
-              target: 'focused',
-              body: 'echo {selection}',
-            },
-          ],
-        },
-      },
-      sessions: new Map([
-        [
-          's1',
-          { id: 's1', projectId: 'proj-1', tabTitle: 'shell', type: 'human', status: 'active' },
-        ],
-      ]),
+      globalSettings: customAction('c2', 'echo {selection}', 'focused'),
+      sessions: [shell],
     })
-    vi.mocked(useSessionStore).mockReturnValue({
-      ...vi.mocked(useSessionStore)(),
-      getFocusedSession: vi.fn().mockReturnValue('s1'),
-      getActiveSessionForProject: vi.fn().mockReturnValue('s1'),
-      getTerminalInstance: vi.fn().mockReturnValue(undefined),
-      sessions: new Map([
-        [
-          's1',
-          { id: 's1', projectId: 'proj-1', tabTitle: 'shell', type: 'human', status: 'active' },
-        ],
-      ]),
-    } as unknown as ReturnType<typeof useSessionStore>)
+    showTab('proj-1', 's1')
     render(<App />)
-    act(() => capturedShortcutCallbacks.onOpenCommandPalette?.())
-    await waitFor(() => screen.getByTestId('quick-actions'))
-    const action = capturedPaletteCommands.find((a) => a.id === 'custom:c2')
-    expect((action as unknown as { disabledReason?: string })?.disabledReason).toBe(
-      'No text selected'
-    )
+    openPalette()
+    expect(paletteAction('custom:c2')?.disabledReason).toBe('No text selected')
   })
+})
 
-  it('enables and runs a custom action referencing {selection} once there is a selection', async () => {
-    const mockInput = vi.fn()
-    ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
-      ...(globalThis as unknown as { electronAPI: Record<string, unknown> }).electronAPI,
-      terminal: { onProcessExit: vi.fn().mockReturnValue(vi.fn()), input: mockInput },
-    }
-    setupMocks({
+describe('App — Quick Actions branch coverage (context, surfaces, custom vars, errors) — enables and runs a custom action referencing {selection} once there is a selection', () => {
+  it('enables and runs a custom action referencing {selection} once there is a selection', () => {
+    setupApp({
       activeProjectId: 'proj-1',
-      globalSettings: {
-        appearance: { theme: 'dark' },
-        ui: { hasSeenWelcome: true },
-        quickActions: {
-          pins: [],
-          usage: [],
-          directUse: [],
-          custom: [
-            {
-              id: 'c2',
-              label: 'Grep selection',
-              kind: 'shell',
-              target: 'focused',
-              body: 'echo {selection}',
-            },
-          ],
-        },
-      },
-      sessions: new Map([
-        [
-          's1',
-          { id: 's1', projectId: 'proj-1', tabTitle: 'shell', type: 'human', status: 'active' },
-        ],
-      ]),
+      globalSettings: customAction('c2', 'echo {selection}', 'focused'),
+      sessions: [shell],
     })
-    vi.mocked(useSessionStore).mockReturnValue({
-      ...vi.mocked(useSessionStore)(),
-      getFocusedSession: vi.fn().mockReturnValue('s1'),
-      getActiveSessionForProject: vi.fn().mockReturnValue('s1'),
-      getTerminalInstance: vi.fn().mockReturnValue({ getSelection: () => 'picked-text' }),
-      sessions: new Map([
-        [
-          's1',
-          { id: 's1', projectId: 'proj-1', tabTitle: 'shell', type: 'human', status: 'active' },
-        ],
-      ]),
-    } as unknown as ReturnType<typeof useSessionStore>)
+    showTab('proj-1', 's1')
+    useSessionStore
+      .getState()
+      .setTerminalInstance(
+        's1',
+        partialFake<TerminalInstance>({ getSelection: () => 'picked-text' })
+      )
     render(<App />)
-    act(() => capturedShortcutCallbacks.onOpenCommandPalette?.())
-    await waitFor(() => screen.getByTestId('quick-actions'))
-    const action = capturedPaletteCommands.find((a) => a.id === 'custom:c2')
-    expect((action as unknown as { disabledReason?: string })?.disabledReason).toBeUndefined()
-    act(() => capturedQuickActionsProps?.onRun?.(action!))
-    expect(mockInput).toHaveBeenCalledWith('s1', expect.stringContaining('picked-text'))
+    openPalette()
+    const action = paletteAction('custom:c2')!
+    expect(action.disabledReason).toBeUndefined()
+    act(() => palette.props?.onRun(action))
+    expect(main.sent.input).toHaveBeenCalledWith('s1', expect.stringContaining('picked-text'))
   })
+})
 
+describe('App — Quick Actions branch coverage (context, surfaces, custom vars, errors) — shows an error toast with the thrown message when an action fails synchronously', () => {
   it('shows an error toast with the thrown message when an action fails synchronously', async () => {
     render(<App />)
-    act(() => capturedShortcutCallbacks.onOpenCommandPalette?.())
-    await waitFor(() => screen.getByTestId('quick-actions'))
+    openPalette()
     act(() =>
-      capturedQuickActionsProps?.onRun?.({
+      palette.props?.onRun({
         id: 'test.throws-error',
         label: 'Throws',
         group: 'top',
@@ -2207,16 +1465,17 @@ describe('App — Quick Actions branch coverage (context, surfaces, custom vars,
       })
     )
     await waitFor(() =>
-      expect(mockAddToast).toHaveBeenCalledWith({ type: 'error', message: 'boom' })
+      expect(toasts()).toContainEqual(expect.objectContaining({ type: 'error', message: 'boom' }))
     )
   })
+})
 
+describe('App — Quick Actions branch coverage (context, surfaces, custom vars, errors) — shows a generic "Action failed" error toast when a non-Error value is rejected', () => {
   it('shows a generic "Action failed" error toast when a non-Error value is rejected', async () => {
     render(<App />)
-    act(() => capturedShortcutCallbacks.onOpenCommandPalette?.())
-    await waitFor(() => screen.getByTestId('quick-actions'))
+    openPalette()
     act(() =>
-      capturedQuickActionsProps?.onRun?.({
+      palette.props?.onRun({
         id: 'test.rejects-string',
         label: 'Rejects',
         group: 'top',
@@ -2224,110 +1483,318 @@ describe('App — Quick Actions branch coverage (context, surfaces, custom vars,
       })
     )
     await waitFor(() =>
-      expect(mockAddToast).toHaveBeenCalledWith({ type: 'error', message: 'Action failed' })
+      expect(toasts()).toContainEqual(
+        expect.objectContaining({ type: 'error', message: 'Action failed' })
+      )
+    )
+  })
+})
+
+describe('App — Quick Actions branch coverage (context, surfaces, custom vars, errors) — suppresses the "Next time" hint once the shortcut has been used directly three times', () => {
+  it('suppresses the "Next time" hint once the shortcut has been used directly three times', () => {
+    setupApp({
+      globalSettings: settingsWith({
+        quickActions: { directUse: [{ id: 'core.clear', count: 3 }] },
+      }),
+    })
+    render(<App />)
+    openPalette()
+    act(() => palette.props?.onRun(paletteAction('core.clear')!))
+    expect(toasts()).not.toContainEqual(expect.objectContaining({ type: 'info' }))
+  })
+
+  it('records direct-use for Home, sidebar-toggle, settings and close-tab menu accelerators', async () => {
+    setupApp({ activeProjectId: 'proj-1' })
+    render(<App />)
+    const directUse = () => settings()?.quickActions.directUse.map((d) => d.id) ?? []
+
+    act(() => main.events.openHome.deliver())
+    await waitFor(() => expect(directUse()).toContain('core.open-home'))
+
+    act(() => main.events.toggleSidebar.deliver())
+    await waitFor(() => expect(directUse()).toContain('core.toggle-sidebar'))
+
+    act(() => main.events.openSettings.deliver())
+    await waitFor(() => expect(directUse()).toContain('core.open-settings'))
+
+    act(() => main.events.closeTab.deliver())
+    await waitFor(() => expect(directUse()).toContain('core.close-tab'))
+  })
+})
+
+describe('App — Quick Actions branch coverage (context, surfaces, custom vars, errors) — writes no settings for a shortcut whose hint has already stopped showing', () => {
+  it('writes no settings for a shortcut whose hint has already stopped showing', () => {
+    setupApp({
+      globalSettings: settingsWith({
+        quickActions: { directUse: [{ id: 'core.new-tab', count: 3 }] },
+      }),
+    })
+    render(<App />)
+    for (let press = 0; press < 5; press++) {
+      act(() => shortcuts.callbacks.onDirectShortcut?.('core.new-tab'))
+    }
+    expect(main.sent.updateGlobal).not.toHaveBeenCalled()
+  })
+})
+
+describe('App — Quick Actions branch coverage (context, surfaces, custom vars, errors) — leaves everything as it was for core actions with no project, no sessions and no workspaces', () => {
+  it('leaves everything as it was for core actions with no project, no sessions and no workspaces', () => {
+    render(<App />)
+    openPalette()
+    for (const id of [
+      'core.split-vertical',
+      'core.close-tab',
+      'core.clear',
+      'core.prev-tab',
+      'core.cycle-recent-next',
+      'core.next-waiting',
+      'core.cycle-workspace-next',
+      'core.copy-issue-key',
+      'core.open-issue',
+    ]) {
+      runAction(id)
+    }
+    expect(splitSession).not.toHaveBeenCalled()
+    expect(main.sent.input).not.toHaveBeenCalled()
+    expect(useWorkspaceStore.getState().activeWorkspaceId).toBeNull()
+    expect(toasts()).not.toContainEqual(expect.objectContaining({ type: 'error' }))
+  })
+})
+
+describe('App — console capture', () => {
+  it('records a console line in the log window once', () => {
+    const saved = { log: console.log, info: console.info, warn: console.warn, error: console.error }
+    try {
+      // What the renderer entry runs once App's module has loaded.
+      installLogInterceptor()
+      useLogStore.setState({ entries: [] })
+      console.log('captured once')
+      const lines = useLogStore
+        .getState()
+        .entries.filter((e) => e.message.includes('captured once'))
+      expect(lines.map((e) => e.message)).toEqual(['[renderer] captured once'])
+    } finally {
+      Object.assign(console, saved)
+    }
+  })
+})
+
+const showSurface = (extensionId: string, view: string): void =>
+  act(() => main.events.bridge.emit('extension:show-surface', { extensionId, view }))
+
+describe('App — surfaces an extension asks to show', () => {
+  it('shows a workspace tab and a project tab', () => {
+    registry().registerWorkspaceTab({ id: 'reviews', label: 'Reviews', component: () => null })
+    registry().registerProjectTab({ id: 'notes', label: 'Notes', component: () => null })
+    render(<App />)
+    showSurface('reviews', 'workspace')
+    showSurface('notes', 'project')
+    expect(registry()).toMatchObject({
+      activeWorkspaceTabId: 'reviews',
+      activeProjectTabId: 'notes',
+    })
+  })
+
+  it('opens a sidebar panel, and leaves it open when asked again', () => {
+    registry().registerSidebarPanel({ id: 'tasks', label: 'Tasks', component: () => null })
+    render(<App />)
+    showSurface('tasks', 'sidebar')
+    showSurface('tasks', 'sidebar')
+    expect(registry().openPanels.has('tasks')).toBe(true)
+  })
+
+  it('switches to the global tab an extension names, and ignores anything else', () => {
+    registry().registerGlobalTab({ id: 'git', label: 'Git', component: () => null })
+    render(<App />)
+    act(() => main.events.bridge.emit('extension:activate-global-tab', 42))
+    expect(registry().activeGlobalTabId).toBe('core.home')
+    act(() => main.events.bridge.emit('extension:activate-global-tab', 'git'))
+    expect(registry().activeGlobalTabId).toBe('git')
+  })
+})
+
+describe('App — terminals an extension opens, closes or reveals', () => {
+  it('adopts a terminal an extension opened, as a tab in its project', () => {
+    setupApp({ workspaces: [WS1], projectsByWorkspaceId: new Map([['ws-1', [PROJ1]]]) })
+    installElectronApi({
+      ...main.parts,
+      terminal: {
+        ...main.parts.terminal,
+        onOutput: () => () => {},
+        attach: async () => ({ released: true }),
+      },
+    })
+    render(<App />)
+    act(() =>
+      main.events.bridge.emit('terminal:adopt', {
+        sessionId: 'ext-1',
+        projectId: 'proj-1',
+        tabTitle: 'Review run',
+        scrollbackLimit: 1000,
+      })
+    )
+    expect(useSessionStore.getState().sessions.get('ext-1')).toMatchObject({
+      projectId: 'proj-1',
+      tabTitle: 'Review run',
+    })
+  })
+})
+
+describe('App — terminals an extension opens, closes or reveals — closes the tab an extension asks to close', () => {
+  it('closes the tab an extension asks to close', () => {
+    const closeSession = vi.fn(async () => {})
+    render(<App />)
+    useSessionStore.setState({ closeSession })
+    act(() => main.events.bridge.emit('terminal:close-tab', { sessionId: 's1' }))
+    expect(closeSession).toHaveBeenCalledWith('s1')
+  })
+
+  it('reveals the session an extension navigates to', () => {
+    setupApp({
+      workspaces: [WS1],
+      projectsByWorkspaceId: new Map([['ws-1', [PROJ1]]]),
+      sessions: [terminalSessionOf({ id: 's1', projectId: 'proj-1' })],
+    })
+    render(<App />)
+    act(() => main.events.bridge.emit('terminal:navigate-to-session', { sessionId: 's1' }))
+    expect(useWorkspaceStore.getState().activeProjectId).toBe('proj-1')
+    expect(useSessionStore.getState().projectViews.get('proj-1')?.activeSessionId).toBe('s1')
+  })
+})
+
+type Pushed = Parameters<Parameters<ElectronAPI['notifications']['onPush']>[0]>[0]
+
+const notice = (patch: Partial<Pushed>): Pushed => ({
+  id: crypto.randomUUID(),
+  type: 'info',
+  title: 'Built',
+  timestamp: 0,
+  targets: ['center'],
+  ...patch,
+})
+
+describe('App — notifications and log lines from main', () => {
+  it('fills the notification centre with only what was meant for it', async () => {
+    resetStore(useNotificationStore)
+    const list = async () => [
+      notice({ title: 'In the centre' }),
+      notice({ title: 'Toast only', targets: ['toast'] }),
+    ]
+    installElectronApi({ ...main.parts, notifications: { ...main.parts.notifications, list } })
+    render(<App />)
+    await waitFor(() =>
+      expect(useNotificationStore.getState().notifications.map((n) => n.title)).toEqual([
+        'In the centre',
+      ])
     )
   })
 
-  it('suppresses the "Next time" hint once the shortcut has been used directly three times', async () => {
-    setupMocks({
-      globalSettings: {
-        appearance: { theme: 'dark' },
-        ui: { hasSeenWelcome: false },
-        quickActions: {
-          pins: [],
-          usage: [],
-          directUse: [{ id: 'core.clear', count: 3 }],
-          custom: [],
-        },
-      },
+  it('puts a pushed notification in the centre, as a toast, or both', () => {
+    resetStore(useNotificationStore)
+    const push = pushedEvent<[Pushed]>()
+    installElectronApi({
+      ...main.parts,
+      notifications: { ...main.parts.notifications, onPush: push.addListener },
     })
     render(<App />)
-    act(() => capturedShortcutCallbacks.onOpenCommandPalette?.())
-    await waitFor(() => screen.getByTestId('quick-actions'))
-    const action = capturedPaletteCommands.find((a) => a.id === 'core.clear')
-    act(() => capturedQuickActionsProps?.onRun?.(action!))
-    expect(mockAddToast).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'info' }))
+    act(() => push.deliver(notice({ title: 'Saved', message: 'all of it', targets: ['toast'] })))
+    act(() => push.deliver(notice({ title: 'Done', targets: ['center', 'toast'] })))
+    expect(toasts().map((t) => t.message)).toEqual(['Saved: all of it', 'Done'])
+    expect(useNotificationStore.getState().notifications.map((n) => n.title)).toEqual(['Done'])
+  })
+})
+
+describe('App — notifications and log lines from main — records a log line an extension pushed, and reports a dropped tunnel', () => {
+  it('records a log line an extension pushed, and reports a dropped tunnel', () => {
+    const create = vi.fn(async () => ({ id: 'n1' }))
+    installElectronApi({ ...main.parts, notifications: { ...main.parts.notifications, create } })
+    render(<App />)
+    act(() => main.events.bridge.emit('log:push', { level: 'warn', message: 'slow disk' }))
+    act(() => main.events.bridge.emit('remote:tunnel-disconnected'))
+    expect(useLogStore.getState().entries.at(-1)).toMatchObject({
+      level: 'warn',
+      message: 'slow disk',
+    })
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({ key: 'remoteTunnelDisconnected' })
+    )
+  })
+})
+
+describe('App — the shell around the main area', () => {
+  it('opens Home from its shortcut, and runs without a Quick Actions bridge', () => {
+    const { quickActions: _quickActions, ...withoutQuickActions } = main.parts
+    installElectronApi(withoutQuickActions)
+    render(<App />)
+    act(() => registry().setActiveGlobalTab(null))
+    act(() => shortcuts.callbacks.onOpenHome?.())
+    expect(registry().activeGlobalTabId).toBe('core.home')
   })
 
-  it('records direct-use for Home, sidebar-toggle, settings and close-tab menu accelerators', () => {
-    let onMenuOpenHome: (() => void) | undefined
-    let onMenuToggleSidebar: (() => void) | undefined
-    let onMenuOpenSettings: (() => void) | undefined
-    let onMenuCloseTab: (() => void) | undefined
-    setupMocks({
+  it('puts a tab that asked for a place ahead of core', () => {
+    registry().registerGlobalTab({
+      id: 'first',
+      label: 'First',
+      sortOrder: -1,
+      component: () => null,
+    })
+    render(<App />)
+    const band = screen.getAllByRole('button').map((b) => b.getAttribute('aria-label'))
+    expect(band.indexOf('First')).toBeLessThan(band.indexOf('Home'))
+  })
+})
+
+describe('App — the shell around the main area — closes a workspace tab chosen again, and clears no tab when none is open', () => {
+  it('closes a workspace tab chosen again, and clears no tab when none is open', () => {
+    setupApp({ workspaces: [WS1] })
+    registry().registerWorkspaceTab({ id: 'reviews', label: 'Reviews', component: () => null })
+    render(<App />)
+    act(() => registry().setActiveGlobalTab(null))
+    act(() => sidebar.props?.onSelectWorkspaceTab('ws-1', 'reviews'))
+    act(() => sidebar.props?.onSelectWorkspaceTab('ws-1', 'reviews'))
+    expect(registry().activeWorkspaceTabId).toBeNull()
+    act(() => sidebar.props?.onSelectProject?.())
+    expect(registry()).toMatchObject({ activeGlobalTabId: null, activeProjectTabId: null })
+  })
+
+  it('leaves scratch when its tab bar asks to', () => {
+    setupApp({ scratchActive: true })
+    render(<App />)
+    leaveHome()
+    act(() => tabBar.onScratchDeactivate?.())
+    expect(useWorkspaceStore.getState().scratchActive).toBe(false)
+  })
+})
+
+describe('App — terminals that fail to start', () => {
+  it('opens a new tab in scratch while scratch is showing', () => {
+    setupApp({ scratchActive: true })
+    render(<App />)
+    act(() => shortcuts.callbacks.onNewTab?.())
+    expect(createSession).toHaveBeenCalledWith(
+      expect.objectContaining({ projectId: SCRATCH_PROJECT_ID })
+    )
+  })
+
+  it('stays out of scratch when its first terminal fails to start', async () => {
+    createSession.mockRejectedValue(new Error('pty'))
+    render(<App />)
+    act(() => shortcuts.callbacks.onNewScratch?.())
+    await waitFor(() => expect(createSession).toHaveBeenCalled())
+    expect(useWorkspaceStore.getState().scratchActive).toBe(false)
+  })
+
+  it('keeps a non-Error refusal of a branch’s first terminal as its text', async () => {
+    createSession.mockRejectedValue('no shell')
+    setupApp({
+      workspaces: [WS1],
+      projectsByWorkspaceId: new Map([['ws-1', [PROJ1]]]),
+      activeWorkspaceId: 'ws-1',
       activeProjectId: 'proj-1',
-      projectViews: new Map([['proj-1', { activeSessionId: 'ses-1' }]]),
     })
-    ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
-      ...(globalThis as unknown as { electronAPI: Record<string, unknown> }).electronAPI,
-      extensionEvents: {
-        onMenuOpenHome: (cb: () => void) => {
-          onMenuOpenHome = cb
-          return vi.fn()
-        },
-        onMenuToggleSidebar: (cb: () => void) => {
-          onMenuToggleSidebar = cb
-          return vi.fn()
-        },
-        onMenuOpenSettings: (cb: () => void) => {
-          onMenuOpenSettings = cb
-          return vi.fn()
-        },
-        onMenuCloseTab: (cb: () => void) => {
-          onMenuCloseTab = cb
-          return vi.fn()
-        },
-        onMenuOpenPrReviewWindow: vi.fn().mockReturnValue(vi.fn()),
-        onTogglePanel: vi.fn().mockReturnValue(vi.fn()),
-        onSelectProjectTab: vi.fn().mockReturnValue(vi.fn()),
-      },
-    }
     render(<App />)
-    const settingsState = useSettingsStore.getState()
-    const directUseIds = () =>
-      vi
-        .mocked(settingsState.updateQuickActions)
-        .mock.calls.map((c) => (c[0] as { directUse: { id: string }[] }).directUse.map((d) => d.id))
-        .flat()
-
-    act(() => onMenuOpenHome?.())
-    expect(directUseIds()).toContain('core.open-home')
-
-    act(() => onMenuToggleSidebar?.())
-    expect(directUseIds()).toContain('core.toggle-sidebar')
-
-    act(() => onMenuOpenSettings?.())
-    expect(directUseIds()).toContain('core.open-settings')
-
-    act(() => onMenuCloseTab?.())
-    expect(directUseIds()).toContain('core.close-tab')
-  })
-
-  it('exercises the remaining core-action edge branches with no project, no sessions and no workspaces', async () => {
-    const mockSplitSession = vi.fn().mockResolvedValue(undefined)
-    vi.mocked(useTerminalSession).mockReturnValue({
-      createSession: vi.fn().mockResolvedValue('ses-1'),
-      splitSession: mockSplitSession,
-    })
-    setupMocks({ activeProjectId: null, workspaces: [] })
-    const setActiveWorkspaceMock = vi.mocked(useWorkspaceStore)().setActiveWorkspace
-    render(<App />)
-    act(() => capturedShortcutCallbacks.onOpenCommandPalette?.())
-    await waitFor(() => screen.getByTestId('quick-actions'))
-    const run = (id: string) => act(() => capturedPaletteCommands.find((a) => a.id === id)?.run())
-
-    // None of these should throw with no project, no sessions and no workspaces.
-    run('core.split-vertical')
-    expect(mockSplitSession).not.toHaveBeenCalled()
-    run('core.close-tab')
-    run('core.clear')
-    run('core.prev-tab')
-    run('core.cycle-recent-next')
-    run('core.next-waiting')
-    run('core.cycle-workspace-next')
-    expect(setActiveWorkspaceMock).not.toHaveBeenCalled()
-    run('core.copy-issue-key')
-    run('core.open-issue')
-    expect(mockAddToast).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'error' }))
+    await waitFor(() =>
+      expect(useTerminalOpenErrorStore.getState().errors['proj-1']).toBe('no shell')
+    )
   })
 })

@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, rmSync } from 'fs'
-import { tmpdir } from 'os'
+import { rmSync } from 'fs'
 import { join } from 'path'
 import { createFeedLog } from '../../../src/runtime/feed/feed-log.js'
+import { makeTempDir } from '../../../../../tests/support/temp-dir'
 
 let dir: string
-beforeEach(() => (dir = mkdtempSync(join(tmpdir(), 'feed-'))))
+beforeEach(() => (dir = makeTempDir('feed-')))
 afterEach(() => rmSync(dir, { recursive: true, force: true }))
 
 const newLog = () => createFeedLog(join(dir, 'feed.jsonl'))
@@ -104,6 +104,11 @@ describe('mute rules (FR-029)', () => {
 // longer exists.
 
 describe('forgetting a session', () => {
+  describe('forgetting', forgettingTests)
+  describe('later and unknown sessions', laterAndUnknownSessionsTests)
+})
+
+function forgettingTests() {
   it('drops everything said about it', () => {
     const log = newLog()
     log.post({ at: 1_000, sessionId: 's1', author: 'agent', summary: 'did a thing' })
@@ -126,7 +131,9 @@ describe('forgetting a session', () => {
     log.forget('s1')
     expect(newLog().list()).toEqual([])
   })
+}
 
+function laterAndUnknownSessionsTests() {
   it('keeps anything said after it was forgotten', () => {
     const log = newLog()
     log.post({ at: 1_000, sessionId: 's1', author: 'agent', summary: 'before' })
@@ -141,7 +148,7 @@ describe('forgetting a session', () => {
     log.forget('ghost')
     expect(log.list()).toHaveLength(1)
   })
-})
+}
 
 describe('removing one entry', () => {
   it('takes it off the feed', () => {
@@ -204,5 +211,25 @@ describe('a feed that has been running for months', () => {
       log.post({ at: i, sessionId: 's1', author: 'agent', summary: `entry ${i}` })
     }
     expect(newLog().list().length).toBe(log.list().length)
+  })
+})
+
+describe('telling a window the feed moved', () => {
+  it('says so after a post, a forget and a dismissal, each once', () => {
+    let told = 0
+    const log = createFeedLog(join(dir, 'feed.jsonl'), () => told++)
+    const posted = log.post(agentEntry)
+    expect(told).toBe(1)
+    log.removeEntry(posted.id)
+    expect(told).toBe(2)
+    log.forget('s1')
+    expect(told).toBe(3)
+  })
+
+  it('says nothing for a read', () => {
+    let told = 0
+    const log = createFeedLog(join(dir, 'feed.jsonl'), () => told++)
+    log.list()
+    expect(told).toBe(0)
   })
 })

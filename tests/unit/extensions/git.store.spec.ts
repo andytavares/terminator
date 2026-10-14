@@ -28,75 +28,85 @@ const validDiff: FileDiff = {
   truncated: false,
 }
 
-describe('useGitStore', () => {
+function useFreshGitStore(): void {
   beforeEach(resetStore)
+}
 
-  describe('setStatus', () => {
-    it('stores the given status', () => {
-      useGitStore.getState().setStatus(validStatus)
-      expect(useGitStore.getState().status).toEqual(validStatus)
-    })
+describe('useGitStore — setStatus', () => {
+  useFreshGitStore()
 
-    it('clears status when set to null', () => {
-      useGitStore.setState({ status: validStatus })
-      useGitStore.getState().setStatus(null)
-      expect(useGitStore.getState().status).toBeNull()
-    })
+  it('stores the given status', () => {
+    useGitStore.getState().setStatus(validStatus)
+    expect(useGitStore.getState().status).toEqual(validStatus)
   })
 
-  describe('setSelectedFile', () => {
-    it('stores the selected file path', () => {
-      useGitStore.getState().setSelectedFile('src/app.ts')
-      expect(useGitStore.getState().selectedFile).toBe('src/app.ts')
-    })
+  it('clears status when set to null', () => {
+    useGitStore.setState({ status: validStatus })
+    useGitStore.getState().setStatus(null)
+    expect(useGitStore.getState().status).toBeNull()
+  })
+})
 
-    it('clears selected file when set to null', () => {
-      useGitStore.setState({ selectedFile: 'src/app.ts' })
-      useGitStore.getState().setSelectedFile(null)
-      expect(useGitStore.getState().selectedFile).toBeNull()
-    })
+describe('useGitStore — setSelectedFile', () => {
+  useFreshGitStore()
+
+  it('stores the selected file path', () => {
+    useGitStore.getState().setSelectedFile('src/app.ts')
+    expect(useGitStore.getState().selectedFile).toBe('src/app.ts')
   })
 
-  describe('setDiff', () => {
-    it('adds diff to cache by path', () => {
-      useGitStore.getState().setDiff('src/app.ts', validDiff)
-      expect(useGitStore.getState().diffCache.get('src/app.ts')).toEqual(validDiff)
-    })
+  it('clears selected file when set to null', () => {
+    useGitStore.setState({ selectedFile: 'src/app.ts' })
+    useGitStore.getState().setSelectedFile(null)
+    expect(useGitStore.getState().selectedFile).toBeNull()
+  })
+})
 
-    it('stores multiple diffs independently', () => {
-      const diff2: FileDiff = { ...validDiff, path: 'src/util.ts' }
-      useGitStore.getState().setDiff('src/app.ts', validDiff)
-      useGitStore.getState().setDiff('src/util.ts', diff2)
-      expect(useGitStore.getState().diffCache.size).toBe(2)
-    })
+describe('useGitStore — setDiff', () => {
+  useFreshGitStore()
 
-    it('overwrites existing diff for the same path', () => {
-      useGitStore.getState().setDiff('src/app.ts', validDiff)
-      const updated = { ...validDiff, isBinary: true }
-      useGitStore.getState().setDiff('src/app.ts', updated)
-      expect(useGitStore.getState().diffCache.get('src/app.ts')?.isBinary).toBe(true)
-    })
+  it('adds diff to cache by path', () => {
+    useGitStore.getState().setDiff('src/app.ts', validDiff)
+    expect(useGitStore.getState().diffCache.get('src/app.ts')).toEqual(validDiff)
   })
 
-  describe('setLoading', () => {
-    it('sets isLoading to true', () => {
-      useGitStore.getState().setLoading(true)
-      expect(useGitStore.getState().isLoading).toBe(true)
-    })
-
-    it('sets isLoading to false', () => {
-      useGitStore.setState({ isLoading: true })
-      useGitStore.getState().setLoading(false)
-      expect(useGitStore.getState().isLoading).toBe(false)
-    })
+  it('stores multiple diffs independently', () => {
+    const diff2: FileDiff = { ...validDiff, path: 'src/util.ts' }
+    useGitStore.getState().setDiff('src/app.ts', validDiff)
+    useGitStore.getState().setDiff('src/util.ts', diff2)
+    expect(useGitStore.getState().diffCache.size).toBe(2)
   })
 
-  describe('clearDiffCache', () => {
-    it('removes all cached diffs', () => {
-      useGitStore.getState().setDiff('src/a.ts', validDiff)
-      useGitStore.getState().setDiff('src/b.ts', validDiff)
-      useGitStore.getState().clearDiffCache()
-      expect(useGitStore.getState().diffCache.size).toBe(0)
-    })
+  it('overwrites existing diff for the same path', () => {
+    useGitStore.getState().setDiff('src/app.ts', validDiff)
+    const updated = { ...validDiff, isBinary: true }
+    useGitStore.getState().setDiff('src/app.ts', updated)
+    expect(useGitStore.getState().diffCache.get('src/app.ts')?.isBinary).toBe(true)
+  })
+})
+
+describe('useGitStore — setLoading', () => {
+  useFreshGitStore()
+
+  it('sets isLoading to true', () => {
+    useGitStore.getState().setLoading(true)
+    expect(useGitStore.getState().isLoading).toBe(true)
+  })
+
+  it('sets isLoading to false', () => {
+    useGitStore.setState({ isLoading: true })
+    useGitStore.getState().setLoading(false)
+    expect(useGitStore.getState().isLoading).toBe(false)
+  })
+})
+
+describe('useGitStore — clearDiffCache', () => {
+  useFreshGitStore()
+
+  it('removes all cached diffs', () => {
+    useGitStore.getState().setDiff('src/a.ts', validDiff)
+    useGitStore.getState().setDiff('src/b.ts', validDiff)
+    useGitStore.getState().clearDiffCache()
+    expect(useGitStore.getState().diffCache.size).toBe(0)
   })
 })

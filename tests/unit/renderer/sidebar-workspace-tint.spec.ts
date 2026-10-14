@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { WORKSPACE_PRESET_COLORS } from '../../../src/renderer/components/sidebar/workspace-colors'
 
 /**
  * The repo's colour used to wash every surface in the sidebar — 10% on a group
@@ -20,7 +19,7 @@ const read = (path: string) => readFileSync(fileURLToPath(new URL(path, import.m
 const ROW_CSS = read('../../../src/renderer/components/sidebar/BranchRow.css')
 const HEAD_CSS = read('../../../src/renderer/components/sidebar/RepoHeader.css')
 const HEAD_TSX = read('../../../src/renderer/components/sidebar/RepoHeader.tsx')
-const TOKENS = read('../../../src/renderer/styles.css')
+const TOKENS = read('../../../packages/extension-ui/src/tokens.css')
 
 const SIDEBAR_CSS = ROW_CSS + '\n' + HEAD_CSS
 
@@ -99,7 +98,7 @@ describe('hover and selection are neutral (FR-042)', () => {
     ['.repo-header:hover', HEAD_CSS],
   ])('%s uses a theme surface rather than the repo colour', (selector, css) => {
     const body = ruleBody(css, selector)
-    expect(body).toMatch(/background:\s*var\(--bg-[a-z-]+\)/)
+    expect(body).toMatch(/background:\s*var\(--tm-bg-[a-z-]+\)/)
     expect(body).not.toMatch(/--ws-color/)
   })
 })
@@ -107,7 +106,7 @@ describe('hover and selection are neutral (FR-042)', () => {
 describe('the repo name is text, not colour (FR-043)', () => {
   it('never paints the name in the repo colour', () => {
     expect(ruleBody(HEAD_CSS, '.repo-header__name')).not.toMatch(/color:/)
-    expect(ruleBody(HEAD_CSS, '.repo-header')).toMatch(/color:\s*var\(--text-primary\)/)
+    expect(ruleBody(HEAD_CSS, '.repo-header')).toMatch(/color:\s*var\(--tm-text-primary\)/)
   })
 
   it('gives the colour a swatch of its own instead', () => {
@@ -117,39 +116,26 @@ describe('the repo name is text, not colour (FR-043)', () => {
     )
   })
 
-  /**
-   * The defect this fixes. Painting a repo name in its own swatch put the text
-   * between 1.08:1 and 1.52:1 against the surface behind it in the light theme,
-   * measured in a browser — against the 4.5:1 AA asks for. Every preset failed;
-   * the fix is to stop using the swatch as a text colour at all.
-   */
-  it.each(['dark', 'light'] as const)(
-    'every preset repo colour would have failed AA as text in the %s theme',
-    (theme) => {
-      const surface = hex(token('--bg-base', theme))
-      const failing = WORKSPACE_PRESET_COLORS.filter((c) => contrast(hex(c), surface) < 4.5)
-      expect(failing.length).toBeGreaterThan(0)
-    }
-  )
-
+  // Painting a repo name in its own swatch put the text between 1.08:1 and
+  // 1.52:1 against the light surface; the name now uses a text token instead.
   it.each(['dark', 'light'] as const)('the name token clears AA in the %s theme', (theme) => {
-    const surface = hex(token('--bg-base', theme))
-    expect(contrast(hex(token('--text-primary', theme)), surface)).toBeGreaterThanOrEqual(4.5)
+    const surface = hex(token('--tm-bg-base', theme))
+    expect(contrast(hex(token('--tm-text-primary', theme)), surface)).toBeGreaterThanOrEqual(4.5)
   })
 
   it.each(['dark', 'light'] as const)(
     'the name still clears AA on the selected surface in the %s theme',
     (theme) => {
-      const surface = hex(token('--bg-card-hover', theme))
-      expect(contrast(hex(token('--text-primary', theme)), surface)).toBeGreaterThanOrEqual(4.5)
+      const surface = hex(token('--tm-bg-card-hover', theme))
+      expect(contrast(hex(token('--tm-text-primary', theme)), surface)).toBeGreaterThanOrEqual(4.5)
     }
   )
 
   it.each(['dark', 'light'] as const)(
     'the muted meta text clears AA on the hover surface in the %s theme',
     (theme) => {
-      const surface = hex(token('--bg-elevated', theme))
-      expect(contrast(hex(token('--text-muted', theme)), surface)).toBeGreaterThanOrEqual(4.5)
+      const surface = hex(token('--tm-bg-elevated', theme))
+      expect(contrast(hex(token('--tm-text-muted', theme)), surface)).toBeGreaterThanOrEqual(4.5)
     }
   )
 })

@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
 import { Popover } from '../../../../packages/extension-ui/src/Popover'
 import { MODAL_DEPTH_KEY } from '../../../../packages/extension-ui/src/modal-depth'
+import { layerValue } from '../../../../packages/extension-ui/src/layers'
 
 // A picker, a dropdown, a detail panel. The audit scored these against
 // aria-modal and a focus trap and called them failing; both would be defects
@@ -19,7 +20,7 @@ function renderPopover(onDismiss = vi.fn()) {
 }
 
 beforeEach(() => {
-  delete (window as unknown as Record<string, unknown>)[MODAL_DEPTH_KEY]
+  delete window[MODAL_DEPTH_KEY]
 })
 
 describe('Popover', () => {
@@ -53,7 +54,9 @@ describe('Popover', () => {
     fireEvent.mouseDown(screen.getByRole('button', { name: 'Today' }))
     expect(onDismiss).not.toHaveBeenCalled()
   })
+})
 
+describe('Popover — moves focus in, and returns it to the opener on close', () => {
   it('moves focus in, and returns it to the opener on close', () => {
     const opener = document.createElement('button')
     document.body.appendChild(opener)
@@ -89,18 +92,20 @@ describe('Popover', () => {
     expect(document.activeElement).toBe(buttons[buttons.length - 1])
     outside.remove()
   })
+})
 
+describe('Popover — counts toward the open-surface depth so the exit gesture stands down', () => {
   it('counts toward the open-surface depth so the exit gesture stands down', () => {
     const { unmount } = renderPopover()
-    expect((window as unknown as Record<string, number>)[MODAL_DEPTH_KEY]).toBe(1)
+    expect(window[MODAL_DEPTH_KEY]).toBe(1)
     unmount()
-    expect((window as unknown as Record<string, number>)[MODAL_DEPTH_KEY]).toBe(0)
+    expect(window[MODAL_DEPTH_KEY]).toBe(0)
   })
 
   it('stacks above a plain page, on the published overlay layer', () => {
     const { container } = renderPopover()
     const el = container.querySelector('.tmui-popover') as HTMLElement
-    expect(Number(el.style.zIndex)).toBeGreaterThan(0)
+    expect(Number(el.style.zIndex)).toBe(layerValue('overlay'))
   })
 })
 
@@ -112,29 +117,29 @@ describe('Popover', () => {
  * window with nothing to scroll. jsdom reports a zero rect, so the geometry is
  * stubbed: what is under test is the arithmetic and which way it nudges.
  */
-describe('Popover viewport clamping', () => {
-  function renderWithRect(rect: Partial<DOMRect>) {
-    const spy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      width: 200,
-      height: 100,
-      x: 0,
-      y: 0,
-      toJSON: () => ({}),
-      ...rect,
-    } as DOMRect)
-    const view = render(
-      <Popover label="Menu" onDismiss={vi.fn()}>
-        <button>Item</button>
-      </Popover>
-    )
-    spy.mockRestore()
-    return view.container.querySelector('[data-tmui-surface]') as HTMLElement
-  }
+function renderWithRect(rect: Partial<DOMRect>) {
+  const spy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: 200,
+    height: 100,
+    x: 0,
+    y: 0,
+    toJSON: () => ({}),
+    ...rect,
+  } as DOMRect)
+  const view = render(
+    <Popover label="Menu" onDismiss={vi.fn()}>
+      <button>Item</button>
+    </Popover>
+  )
+  spy.mockRestore()
+  return view.container.querySelector('[data-tmui-surface]') as HTMLElement
+}
 
+describe('Popover viewport clamping', () => {
   it('pulls back a surface overflowing the right edge', () => {
     const el = renderWithRect({ right: window.innerWidth + 40 })
     // 40 over, plus the 8px margin it keeps.

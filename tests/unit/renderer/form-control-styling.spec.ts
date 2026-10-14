@@ -10,6 +10,12 @@ import { EXTENSION_BASE_CSS } from '../../../src/main/extensions/extension-view-
 
 const read = (p: string) => readFileSync(fileURLToPath(new URL(p, import.meta.url)), 'utf8')
 const STYLES = read('../../../src/renderer/styles.css')
+// The controls are the design system's: the core imports this file and every
+// extension view gets it in the injected base sheet.
+const CONTROLS = read('../../../packages/extension-ui/src/controls.css')
+const INDEX = read('../../../src/renderer/index.tsx')
+const BOX = "input[type='checkbox'],\ninput[type='radio']"
+const TOKENS = read('../../../packages/extension-ui/src/tokens.css')
 
 function ruleBody(css: string, selector: string): string {
   const start = css.indexOf(`${selector} {`)
@@ -17,54 +23,63 @@ function ruleBody(css: string, selector: string): string {
   return css.slice(start, css.indexOf('}', start))
 }
 
-describe('core checkbox styling', () => {
+describe('checkbox styling', () => {
+  it('is loaded by the core renderer from the design system', () => {
+    expect(INDEX).toContain("import '@terminator/extension-ui/controls.css'")
+    expect(STYLES).not.toContain("input[type='checkbox']")
+  })
+
   it('replaces the native widget rather than tinting it', () => {
-    const base = ruleBody(STYLES, "input[type='checkbox']")
+    const base = ruleBody(CONTROLS, BOX)
     expect(base).toMatch(/appearance:\s*none/)
     expect(base).toMatch(/-webkit-appearance:\s*none/)
   })
 
   it('uses theme tokens for its surface and border, never a hard-coded colour', () => {
-    const base = ruleBody(STYLES, "input[type='checkbox']")
-    expect(base).toMatch(/background:\s*var\(--bg-input\)/)
-    expect(base).toMatch(/border:\s*1px solid var\(--border-strong\)/)
+    const base = ruleBody(CONTROLS, BOX)
+    expect(base).toMatch(/background:\s*var\(--tm-bg-input\)/)
+    expect(base).toMatch(/border:\s*1px solid var\(--tm-border-strong\)/)
   })
 
   it('fills with the accent when checked', () => {
-    expect(STYLES).toMatch(
-      /input\[type='checkbox'\]:checked,\s*\n?\s*input\[type='checkbox'\]:indeterminate \{[^}]*background:\s*var\(--accent\)/
+    expect(CONTROLS).toMatch(
+      /input\[type='checkbox'\]:checked,\s*\n?\s*input\[type='checkbox'\]:indeterminate,[^{]*\{[^}]*background:\s*var\(--tm-accent\)/
     )
   })
 
   it('draws the tick in CSS, never as a unicode glyph', () => {
-    const tick = ruleBody(STYLES, "input[type='checkbox']:checked::after")
-    expect(tick).toMatch(/border:\s*solid var\(--on-accent\)/)
+    const tick = ruleBody(CONTROLS, "input[type='checkbox']:checked::after")
+    expect(tick).toMatch(/border:\s*solid var\(--tm-on-accent\)/)
     expect(tick).toMatch(/transform:\s*rotate\(45deg\)/)
     for (const glyph of ['✓', '✔', '☑', '×']) {
-      expect(STYLES).not.toContain(glyph)
+      expect(CONTROLS).not.toContain(glyph)
     }
   })
+})
 
+describe('checkbox styling — has a visible keyboard focus ring', () => {
   it('has a visible keyboard focus ring', () => {
-    expect(ruleBody(STYLES, "input[type='checkbox']:focus-visible")).toMatch(/outline:\s*2px/)
+    expect(
+      ruleBody(CONTROLS, "input[type='checkbox']:focus-visible,\ninput[type='radio']:focus-visible")
+    ).toMatch(/outline:\s*2px/)
   })
 
   it('renders an indeterminate state as a bar, not an empty box', () => {
-    expect(ruleBody(STYLES, "input[type='checkbox']:indeterminate::after")).toMatch(
-      /background:\s*var\(--on-accent\)/
+    expect(ruleBody(CONTROLS, "input[type='checkbox']:indeterminate::after")).toMatch(
+      /background:\s*var\(--tm-on-accent\)/
     )
   })
 
-  it('defines --on-accent in both themes, since the accent fill is the same colour in each', () => {
-    const dark = STYLES.slice(STYLES.indexOf(':root'), STYLES.indexOf("[data-theme='light']"))
-    const light = STYLES.slice(STYLES.indexOf("[data-theme='light']"))
-    expect(dark).toMatch(/--on-accent:\s*#ffffff/)
-    expect(light).toMatch(/--on-accent:\s*#ffffff/)
+  it('defines --tm-on-accent in both themes, since the accent fill is the same colour in each', () => {
+    const dark = TOKENS.slice(TOKENS.indexOf(':root {'), TOKENS.indexOf("[data-theme='light'] {"))
+    const light = TOKENS.slice(TOKENS.indexOf("[data-theme='light'] {"))
+    expect(dark).toMatch(/--tm-on-accent:\s*#ffffff/)
+    expect(light).toMatch(/--tm-on-accent:\s*#ffffff/)
   })
 
   it('leaves no accent-color rule behind — it does nothing once appearance is none', () => {
     for (const file of [
-      '../../../src/renderer/components/sidebar/Dialog.css',
+      '../../../src/renderer/components/sidebar/dialog-fields.css',
       '../../../src/renderer/components/settings/SettingsPanel.css',
     ]) {
       expect(read(file)).not.toMatch(/accent-color/)
@@ -76,7 +91,9 @@ describe('extension checkbox styling', () => {
   // Extension UIs are isolated WebContentsViews and inherit none of the host's
   // CSS, so the same replacement has to travel with the injected base sheet.
   it('replaces the native widget inside extension views too', () => {
-    expect(EXTENSION_BASE_CSS).toMatch(/input\[type='checkbox'\] \{[^}]*appearance:\s*none/)
+    expect(EXTENSION_BASE_CSS).toMatch(
+      /input\[type='checkbox'\],\s*input\[type='radio'\] \{[^}]*appearance:\s*none/
+    )
   })
 
   it('uses the published --tm-* tokens, not the host variable names', () => {
@@ -97,34 +114,35 @@ describe('extension checkbox styling', () => {
   })
 })
 
-describe('core radio styling', () => {
+describe('radio styling', () => {
   it('replaces the native widget rather than tinting it', () => {
-    const base = ruleBody(STYLES, "input[type='radio']")
+    const base = ruleBody(CONTROLS, BOX)
     expect(base).toMatch(/appearance:\s*none/)
     expect(base).toMatch(/-webkit-appearance:\s*none/)
   })
 
   it('is the same box as the checkbox, but circular', () => {
-    const base = ruleBody(STYLES, "input[type='radio']")
-    expect(base).toMatch(/background:\s*var\(--bg-input\)/)
-    expect(base).toMatch(/border:\s*1px solid var\(--border-strong\)/)
-    expect(base).toMatch(/border-radius:\s*50%/)
+    expect(CONTROLS).toMatch(/\}\n\ninput\[type='radio'\] \{[^}]*border-radius:\s*50%/)
   })
 
   it('fills with the accent when checked', () => {
-    expect(ruleBody(STYLES, "input[type='radio']:checked")).toMatch(/background:\s*var\(--accent\)/)
+    expect(ruleBody(CONTROLS, "input[type='radio']:checked")).toMatch(
+      /background:\s*var\(--tm-accent\)/
+    )
   })
 
   it('marks the checked state with a dot, not a glyph', () => {
-    const dot = ruleBody(STYLES, "input[type='radio']:checked::after")
+    const dot = ruleBody(CONTROLS, "input[type='radio']:checked::after")
     expect(dot).toMatch(/content:\s*''/)
     expect(dot).toMatch(/border-radius:\s*50%/)
-    expect(dot).toMatch(/background:\s*var\(--on-accent\)/)
+    expect(dot).toMatch(/background:\s*var\(--tm-on-accent\)/)
   })
+})
 
+describe('radio styling — centres the dot — asserted arithmetically, so resizing the box cannot break it silently', () => {
   it('centres the dot — asserted arithmetically, so resizing the box cannot break it silently', () => {
-    const base = ruleBody(STYLES, "input[type='radio']")
-    const dot = ruleBody(STYLES, "input[type='radio']:checked::after")
+    const base = ruleBody(CONTROLS, BOX)
+    const dot = ruleBody(CONTROLS, "input[type='radio']:checked::after")
     const px = (body: string, prop: string) => {
       const m = new RegExp(`${prop}:\\s*(\\d+)px`).exec(body)
       if (!m) throw new Error(`${prop} not found`)
@@ -140,18 +158,12 @@ describe('core radio styling', () => {
   })
 
   it('has a visible keyboard focus ring and a disabled state', () => {
-    expect(ruleBody(STYLES, "input[type='radio']:focus-visible")).toMatch(/outline:\s*2px/)
-    expect(ruleBody(STYLES, "input[type='radio']:disabled")).toMatch(/opacity/)
+    expect(CONTROLS).toMatch(/input\[type='radio'\]:focus-visible \{[^}]*outline:\s*2px/)
+    expect(CONTROLS).toMatch(/input\[type='radio'\]:disabled \{[^}]*opacity/)
   })
 
   it('immunises both controls against a container form reset', () => {
-    for (const sel of ["input[type='checkbox']", "input[type='radio']"]) {
-      expect(ruleBody(STYLES, sel)).toMatch(/padding:\s*0/)
-    }
-  })
-
-  it('publishes --tm-on-accent, or an extension view resolves it to nothing', () => {
-    expect(STYLES).toMatch(/--tm-on-accent:\s*var\(--on-accent\)/)
+    expect(ruleBody(CONTROLS, BOX)).toMatch(/padding:\s*0/)
   })
 })
 
@@ -191,7 +203,7 @@ function filesUnder(roots: string[], exts: string[]): string[] {
     for (const entry of readdirSync(root, { recursive: true, withFileTypes: true })) {
       if (!entry.isFile()) continue
       if (!exts.some((e) => entry.name.endsWith(e))) continue
-      const dir = entry.parentPath ?? entry.path
+      const dir = entry.parentPath
       if (/(^|\/)(dist|node_modules|coverage)(\/|$)/.test(dir)) continue
       out.push(join(dir, entry.name))
     }
@@ -223,10 +235,11 @@ function rules(css: string): Array<[string, string]> {
   return out
 }
 
-describe('no form control may drift back to a native or half-styled widget', () => {
-  const cssFiles = filesUnder(sourceRoots(), ['.css'])
-  const tsFiles = filesUnder(sourceRoots(), ['.ts', '.tsx'])
+const cssFiles = filesUnder(sourceRoots(), ['.css'])
 
+const tsFiles = filesUnder(sourceRoots(), ['.ts', '.tsx'])
+
+describe('no form control may drift back to a native or half-styled widget', () => {
   it('finds stylesheets to check, so a broken glob cannot make these vacuous', () => {
     expect(cssFiles.length).toBeGreaterThan(10)
     expect(tsFiles.length).toBeGreaterThan(50)
@@ -247,7 +260,9 @@ describe('no form control may drift back to a native or half-styled widget', () 
     }
     expect(bad).toEqual([])
   })
+})
 
+describe('no form control may drift back to a native or half-styled widget — declares no box property on a control rule too weak to win', () => {
   it('declares no box property on a control rule too weak to win', () => {
     // A bare `.thing-checkbox { width: … }` loses to the (0,1,1) base rule, so
     // it is a lie in the source. Raise the selector or drop the declaration.

@@ -1,43 +1,30 @@
-import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll } from 'vitest'
-import { PGlite } from '@electric-sql/pglite'
+import { describe, it, expect, beforeEach } from 'vitest'
+import { DatabaseSync } from 'node:sqlite'
 import { wrapDb } from '../../../../src/main/db/index'
-import { applyTaskVaultSchema, applyTaskVaultMigrations, hasColumn } from '../../src/vault/db'
-import type { ExtensionDB } from '../../../../src/main/db/index'
+import { applyTaskVaultSchema } from '../../src/vault/db'
+import type { ExtensionDB } from '@terminator/extension-sdk'
 
-let pg: PGlite
 let db: ExtensionDB
 
-let template: PGlite
-
-beforeAll(async () => {
-  template = new PGlite()
-  await template.waitReady
-})
-
-afterAll(async () => {
-  await template.close()
-})
-
-beforeEach(async () => {
-  pg = await template.clone()
-  db = wrapDb(pg)
-})
-
-afterEach(async () => {
-  await pg.close()
+beforeEach(() => {
+  db = wrapDb(new DatabaseSync(':memory:'))
 })
 
 describe('applyTaskVaultSchema', () => {
   it('creates all required tables', async () => {
     await applyTaskVaultSchema(db)
-    const rows = await db.query<{ table_name: string }>(
-      `SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'`
+    const rows = await db.query<{ name: string }>(
+      `SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'`
     )
-    const tables = rows.map((r) => r.table_name)
-    expect(tables).toContain('settings')
-    expect(tables).toContain('areas')
-    expect(tables).toContain('projects')
-    expect(tables).toContain('tasks')
+    expect(rows.map((r) => r.name).sort()).toEqual([
+      'area_archive_changes',
+      'areas',
+      'projects',
+      'settings',
+      'tasks',
+      'weekly_review_actions',
+      'weekly_reviews',
+    ])
   })
 
   it('is idempotent — safe to call twice', async () => {
@@ -46,16 +33,19 @@ describe('applyTaskVaultSchema', () => {
   })
 })
 
-describe('settings composite PK (extension_id, key)', () => {
+describe('settings composite PK (extension_id, key)', settingsCompositePKExtensionIdTests)
+
+function settingsCompositePKExtensionIdTests() {
   beforeEach(async () => {
     await applyTaskVaultSchema(db)
-    await applyTaskVaultMigrations(db)
   })
 
-  it('settings table has extension_id column after migration', async () => {
-    expect(await hasColumn(db, 'settings', 'extension_id')).toBe(true)
-  })
+  describe('independent', settingsCompositePKExtensionIdIndependentTests)
+  describe('duplicates', settingsCompositePKExtensionIdDuplicatesTests)
+  describe('upserts', settingsCompositePKExtensionIdUpsertsTests)
+}
 
+function settingsCompositePKExtensionIdIndependentTests() {
   it('two different extension_ids can hold the same key independently', async () => {
     await db.run(`INSERT INTO settings (extension_id, key, value) VALUES (?, ?, ?)`, [
       'task-vault',
@@ -74,7 +64,9 @@ describe('settings composite PK (extension_id, key)', () => {
     expect(rows[0]).toMatchObject({ extension_id: 'other-ext' })
     expect(rows[1]).toMatchObject({ extension_id: 'task-vault' })
   })
+}
 
+function settingsCompositePKExtensionIdDuplicatesTests() {
   it('duplicate (extension_id, key) insert is rejected by PK constraint', async () => {
     await db.run(`INSERT INTO settings (extension_id, key, value) VALUES (?, ?, ?)`, [
       'task-vault',
@@ -89,7 +81,9 @@ describe('settings composite PK (extension_id, key)', () => {
       ])
     ).rejects.toThrow()
   })
+}
 
+function settingsCompositePKExtensionIdUpsertsTests() {
   it('ON CONFLICT (extension_id, key) upsert updates value correctly', async () => {
     await db.run(
       `INSERT INTO settings (extension_id, key, value) VALUES (?, ?, ?)
@@ -106,4 +100,4 @@ describe('settings composite PK (extension_id, key)', () => {
     )
     expect(row?.value).toBe('14')
   })
-})
+}

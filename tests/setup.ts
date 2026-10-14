@@ -1,10 +1,8 @@
 // Global test setup — runs before every test file regardless of environment.
 // CSS modules are not processed in tests; mock them to return an empty object.
-import { vi } from 'vitest'
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
-import { homedir, tmpdir } from 'node:os'
-import { randomUUID } from 'node:crypto'
-import { join } from 'node:path'
+import { afterAll, inject, vi } from 'vitest'
+import { installNativeDialog } from './support/native-dialog'
+import { removeTempDirs } from './support/temp-dir'
 
 // A git hook exports GIT_DIR and GIT_INDEX_FILE, and a spec's `git init` or
 // `git commit` in a temporary directory inherits them and writes into the real
@@ -29,30 +27,12 @@ for (const name of [
   delete process.env[name]
 }
 
-// `git commit` and `git fetch` start `git maintenance run --auto --detach`,
-// which keeps writing into a spec's temporary repository after the command
-// returns; the spec's cleanup then fails with ENOTEMPTY whenever the machine is
-// busy. Turned off through git's XDG config file rather than a GIT_* variable:
-// the local GIT_* variables are forbidden above, and specs scrub the rest before
-// running git. The operator's own XDG config is included so nothing else changes.
-const realXdgGitConfig = join(
-  process.env.XDG_CONFIG_HOME ?? join(homedir(), '.config'),
-  'git',
-  'config'
-)
-// One fixed file shared by every worker, rewritten only when it differs: a
-// worker truncating it while another's git reads it would switch maintenance
-// back on for that command.
-const xdgHome = join(tmpdir(), 'terminator-vitest-xdg')
-const xdgGitConfig = join(xdgHome, 'git', 'config')
-const wanted = `[include]\n\tpath = ${realXdgGitConfig}\n[maintenance]\n\tauto = false\n`
-if (!existsSync(xdgGitConfig) || readFileSync(xdgGitConfig, 'utf8') !== wanted) {
-  mkdirSync(join(xdgHome, 'git'), { recursive: true })
-  const staged = `${xdgGitConfig}.${randomUUID()}`
-  writeFileSync(staged, wanted)
-  renameSync(staged, xdgGitConfig)
-}
-process.env.XDG_CONFIG_HOME = xdgHome
+// git maintenance is off under this XDG config; tests/global-setup.ts says why.
+process.env.XDG_CONFIG_HOME = inject('xdgConfigHome')
+
+// Registered before the spec's own hooks so it runs after them (afterAll runs in reverse,
+// https://vitest.dev/config/sequence#sequence-hooks): they close what is inside first.
+afterAll(removeTempDirs)
 
 // A trace2 event target in the operator's global git config (git-ai's daemon)
 // answers every commit and fetch by writing notes and objects into `.git` for
@@ -79,3 +59,9 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
     disconnect() {}
   }
 }
+
+if (typeof window !== 'undefined') installNativeDialog(window)
+
+// jsdom parses its user-agent stylesheet (300+ ms) on a file's first getComputedStyle, which
+// every ByRole query calls; paid here, not by whichever test queries first.
+if (typeof window !== 'undefined') window.getComputedStyle(document.documentElement)

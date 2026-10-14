@@ -4,25 +4,17 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { useLogStore } from '../../../../src/renderer/stores/log.store'
 import { LogWindow } from '../../../../src/renderer/components/LogWindow'
 
-vi.mock('../../../../src/renderer/stores/log.store', () => ({
-  useLogStore: vi.fn(),
-}))
-
 // happy-dom doesn't implement scrollIntoView
 Element.prototype.scrollIntoView = vi.fn()
 
-const mockClear = vi.fn()
-
 beforeEach(() => {
-  vi.mocked(useLogStore).mockReturnValue({ entries: [], clear: mockClear } as unknown as ReturnType<
-    typeof useLogStore
-  >)
+  useLogStore.setState({ entries: [] })
 })
 
 describe('LogWindow', () => {
-  it('renders dialog with title', () => {
+  it('is a named region of the window, not a dialog: the app stays usable beside it', () => {
     render(<LogWindow onClose={vi.fn()} />)
-    expect(screen.getByRole('dialog')).toBeTruthy()
+    expect(screen.getByRole('region', { name: 'Application Logs' })).toBeTruthy()
     expect(screen.getByText('Application Logs')).toBeTruthy()
   })
 
@@ -32,24 +24,29 @@ describe('LogWindow', () => {
   })
 
   it('renders log entries with level and message', () => {
-    vi.mocked(useLogStore).mockReturnValue({
+    useLogStore.setState({
       entries: [
-        { id: '1', level: 'info', message: 'started up', timestamp: '12:00:00' },
-        { id: '2', level: 'error', message: 'something failed', timestamp: '12:00:01' },
+        { id: 1, level: 'info', message: 'started up', timestamp: '12:00:00' },
+        { id: 2, level: 'error', message: 'something failed', timestamp: '12:00:01' },
       ],
-      clear: mockClear,
-    } as unknown as ReturnType<typeof useLogStore>)
+    })
     render(<LogWindow onClose={vi.fn()} />)
     expect(screen.getByText('started up')).toBeTruthy()
     expect(screen.getByText('something failed')).toBeTruthy()
     expect(screen.getByText(/^INFO$/)).toBeTruthy()
     expect(screen.getByText(/^ERR/)).toBeTruthy()
   })
+})
 
-  it('calls clear when Clear button is clicked', () => {
+describe('LogWindow — empties the log when Clear is clicked', () => {
+  it('empties the log when Clear is clicked', () => {
+    useLogStore.setState({
+      entries: [{ id: 1, level: 'info', message: 'started up', timestamp: '12:00:00' }],
+    })
     render(<LogWindow onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Clear'))
-    expect(mockClear).toHaveBeenCalled()
+    expect(screen.queryByText('started up')).toBeNull()
+    expect(screen.getByText('No log entries yet.')).toBeTruthy()
   })
 
   it('calls onClose when close button is clicked', () => {
@@ -65,15 +62,16 @@ describe('LogWindow', () => {
     fireEvent.keyDown(window, { key: 'Escape' })
     expect(onClose).toHaveBeenCalled()
   })
+})
 
+describe('LogWindow — renders warn and log level labels', () => {
   it('renders warn and log level labels', () => {
-    vi.mocked(useLogStore).mockReturnValue({
+    useLogStore.setState({
       entries: [
-        { id: '1', level: 'warn', message: 'watch out', timestamp: '12:00:00' },
-        { id: '2', level: 'log', message: 'debug info', timestamp: '12:00:01' },
+        { id: 1, level: 'warn', message: 'watch out', timestamp: '12:00:00' },
+        { id: 2, level: 'log', message: 'debug info', timestamp: '12:00:01' },
       ],
-      clear: mockClear,
-    } as unknown as ReturnType<typeof useLogStore>)
+    })
     render(<LogWindow onClose={vi.fn()} />)
     expect(screen.getByText(/^WARN$/)).toBeTruthy()
     expect(screen.getByText(/^LOG/)).toBeTruthy()

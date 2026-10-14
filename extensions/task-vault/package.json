@@ -2,15 +2,14 @@
   "name": "@terminator/extension-task-vault",
   "version": "0.1.0",
   "private": true,
-  "description": "Task Vault: GTD+BuJo+PARA daily productivity system backed by SQLite",
+  "description": "Task Vault: GTD+BuJo+PARA daily productivity system backed by the shared SQLite database",
   "scripts": {
     "build:renderer": "vite build --config vite.renderer.config.ts"
   },
   "dependencies": {
-    "@terminator/extension-ui": "*",
-    "electron-store": "8.2.0",
-    "lucide-react": "^1.16.0",
-    "node-ical": "^0.26.1",
+    "@terminator/extension-sdk": "5.0.0",
+    "@terminator/extension-ui": "1.0.0",
+    "lucide-react": "1.21.0",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "zod": "3.23.8",

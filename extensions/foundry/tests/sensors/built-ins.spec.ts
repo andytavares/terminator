@@ -12,7 +12,7 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 const root = path.resolve(here, '../..')
 const sensorsDir = path.join(root, 'sensors')
 
-function read(file: string): string {
+function readSensorFile(file: string): string {
   return fs.readFileSync(path.join(sensorsDir, file), 'utf8')
 }
 
@@ -23,7 +23,7 @@ describe('built-in sensors', () => {
   })
 
   it('parses ci-main-red as a github-runs sensor on the base branch', () => {
-    const parsed = parseSensor(read('ci-main-red.yaml'), 'ci-main-red.yaml')
+    const parsed = parseSensor(readSensorFile('ci-main-red.yaml'), 'ci-main-red.yaml')
     expect(parsed.ok, parsed.ok ? '' : parsed.reason).toBe(true)
     if (parsed.ok) {
       expect(parsed.value.source).toEqual({ kind: 'github-runs', branch: null, limit: 20 })
@@ -33,7 +33,7 @@ describe('built-in sensors', () => {
   })
 
   it("parses tracker-query as a tracker sensor over the operator's own issues", () => {
-    const parsed = parseSensor(read('tracker-query.yaml'), 'tracker-query.yaml')
+    const parsed = parseSensor(readSensorFile('tracker-query.yaml'), 'tracker-query.yaml')
     expect(parsed.ok, parsed.ok ? '' : parsed.reason).toBe(true)
     if (parsed.ok) {
       expect(parsed.value.source).toEqual({ kind: 'tracker', query: null, limit: 25 })

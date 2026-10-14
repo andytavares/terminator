@@ -3,6 +3,7 @@ import * as path from 'node:path'
 import { app } from 'electron'
 import type { IssueLink, TrackerId } from '../../shared/types/index.js'
 import { onProjectDelete } from '../extensions/workspace-events.js'
+import { writeJsonAtomic } from '@terminator/extension-sdk/node'
 
 // A project's attachment to one issue.
 //
@@ -17,25 +18,14 @@ import { onProjectDelete } from '../extensions/workspace-events.js'
 
 const FILE_NAME = 'issue-links.json'
 
-type LinkChangeHandler = (projectId: string, link: IssueLink | null) => void
-
 const links = new Map<string, IssueLink>()
-const handlers = new Set<LinkChangeHandler>()
 
 function filePath(): string {
   return path.join(app.getPath('userData'), FILE_NAME)
 }
 
-function announce(projectId: string): void {
-  const link = links.get(projectId) ?? null
-  for (const handler of handlers) handler(projectId, link)
-}
-
 async function persist(): Promise<void> {
-  const target = filePath()
-  const tmp = `${target}.tmp`
-  await fs.writeFile(tmp, JSON.stringify([...links.values()], null, 2), 'utf8')
-  await fs.rename(tmp, target)
+  await writeJsonAtomic(filePath(), [...links.values()])
 }
 
 /** Read what was stored. Called once at startup; safe to call again. */
@@ -50,19 +40,25 @@ export async function loadLinks(): Promise<void> {
   }
   if (!Array.isArray(parsed)) return
   for (const entry of parsed) {
-    // The file is on disk and hand-editable. A null or a bare string in it
-    // used to throw here, which took out every *other* link the operator had.
-    if (typeof entry !== 'object' || entry === null) continue
-    const link = entry as Partial<IssueLink>
-    if (typeof link.projectId !== 'string' || typeof link.key !== 'string') continue
-    if (link.tracker !== 'linear' && link.tracker !== 'jira') continue
-    links.set(link.projectId, {
-      projectId: link.projectId,
-      tracker: link.tracker,
-      key: link.key,
-      injectContext: link.injectContext !== false,
-      linkedAt: typeof link.linkedAt === 'string' ? link.linkedAt : new Date().toISOString(),
-    })
+    const link = storedLink(entry)
+    if (link !== null) links.set(link.projectId, link)
+  }
+}
+
+/** One entry of the file as a link, or null when it is not one. The file is on disk and
+ * hand-editable. A null or a bare string in it used to throw, which took out every *other* link
+ * the operator had. */
+function storedLink(entry: unknown): IssueLink | null {
+  if (typeof entry !== 'object' || entry === null) return null
+  const link = entry as Partial<IssueLink>
+  if (typeof link.projectId !== 'string' || typeof link.key !== 'string') return null
+  if (link.tracker !== 'linear' && link.tracker !== 'jira') return null
+  return {
+    projectId: link.projectId,
+    tracker: link.tracker,
+    key: link.key,
+    injectContext: link.injectContext !== false,
+    linkedAt: typeof link.linkedAt === 'string' ? link.linkedAt : new Date().toISOString(),
   }
 }
 
@@ -91,7 +87,6 @@ export async function setLink(input: SetLinkInput): Promise<IssueLink> {
     linkedAt: new Date().toISOString(),
   }
   links.set(input.projectId, link)
-  announce(input.projectId)
   await persist()
   return link
 }
@@ -100,29 +95,16 @@ export function getLink(projectId: string): IssueLink | null {
   return links.get(projectId) ?? null
 }
 
-export function listLinks(): IssueLink[] {
-  return [...links.values()]
-}
-
 export async function setInjectContext(projectId: string, inject: boolean): Promise<void> {
   const existing = links.get(projectId)
   if (existing === undefined) return
   links.set(projectId, { ...existing, injectContext: inject })
-  announce(projectId)
   await persist()
 }
 
 export async function clearLink(projectId: string): Promise<void> {
   if (!links.delete(projectId)) return
-  announce(projectId)
   await persist()
-}
-
-export function onLinkChange(handler: LinkChangeHandler): () => void {
-  handlers.add(handler)
-  return () => {
-    handlers.delete(handler)
-  }
 }
 
 /**
@@ -135,7 +117,6 @@ export function registerLinkGarbageCollection(): () => void {
   return onProjectDelete((projectId) => {
     if (!links.has(projectId)) return
     links.delete(projectId)
-    announce(projectId)
     void persist()
   })
 }

@@ -7,72 +7,30 @@
  * cover that — but that the channel a surface calls reaches it. Every bug this
  * branch shipped was in exactly that gap.
  */
-import { tmpdir as tmpdirForUserData } from 'node:os'
+import { freshFoundryStorage } from '../helpers/foundry-host.js'
 
-// A real directory. The supervision runtime writes its feed, mutes and
-// per-session settings under userData, and a path that does not exist fails at
-// mkdir. `node:fs` is mocked in some of these specs, so nothing is created
-// here — the OS temp directory is already there.
-const USER_DATA = tmpdirForUserData()
+// A real userData, created before any spec mocks `node:fs`: the supervision
+// runtime writes its feed, mutes and per-session settings in Foundry's own
+// folder under it.
+const GLOBAL_STORAGE = freshFoundryStorage()
 
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest'
-import type { ExtensionAPI } from '../../../../src/main/extensions/api.js'
-import type { startSupervisionRuntime as startSupervisionRuntimeType } from '../../src/index.js'
+import { partialFake } from '../../../../tests/support/fakes'
+import { activate } from '../../src/index.ts'
+import { dispatchChannel, type ChannelSpec, type ExtensionAPI } from '@terminator/extension-sdk'
+import type { startSupervisionRuntime as startSupervisionRuntimeType } from '../../src/runtime/supervision-runtime.js'
+import { theRunner } from '../helpers/supervision-mocks.js'
 
-vi.mock('electron', () => ({
-  BrowserWindow: { getAllWindows: vi.fn().mockReturnValue([]) },
-  safeStorage: {
-    isEncryptionAvailable: vi.fn().mockReturnValue(false),
-    encryptString: vi.fn(),
-    decryptString: vi.fn(),
-  },
-  // A real directory: the supervision runtime writes its feed, mutes and
-  // per-session settings under userData, and a path that does not exist fails
-  // at mkdir.
-  app: { getPath: vi.fn().mockReturnValue(USER_DATA) },
-}))
-
-const runner = {
-  start: vi.fn(),
-  resolve: vi.fn(),
-  handBackToTerminal: vi.fn(),
-  interrupt: vi.fn(),
-  stop: vi.fn().mockReturnValue(true),
-  send: vi.fn().mockReturnValue(true),
-  terminalFor: vi.fn().mockReturnValue({ terminalSessionId: 'terminal-1', projectId: 'project-1' }),
-  watchable: vi.fn().mockReturnValue([]),
-  dispose: vi.fn(),
-}
-
-vi.mock('../../src/runtime/supervised-runner.js', () => ({
-  createSupervisedRunner: () => runner,
-}))
-
-// Captured so a test can raise a held tool call the way the runner does.
-let permissionSink: {
-  onPending: (ask: Record<string, unknown>) => void
-  onResolved: (requestId: string) => void
-} | null = null
+vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
+vi.mock('../../src/runtime/control-server.js', () => import('../helpers/supervision-mocks.js'))
 
 vi.mock('../../src/runner/agent-runner.js', async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>
   return {
     ...actual,
-    setPermissionSink: (sink: typeof permissionSink) => {
-      permissionSink = sink
-    },
+    setPermissionSink: () => undefined,
   }
 })
-
-vi.mock('../../src/runtime/control-server.js', () => ({
-  createControlServer: vi.fn().mockResolvedValue({
-    url: 'http://127.0.0.1:1/pretooluse',
-    eventUrl: 'http://127.0.0.1:1/event',
-    token: 'token',
-    register: vi.fn().mockReturnValue(() => {}),
-    close: vi.fn(),
-  }),
-}))
 
 // Reading a transcript is a file read; the run's path is fabricated here.
 vi.mock('../../src/runtime/transcript-excerpt.js', () => ({
@@ -105,69 +63,60 @@ function startRun(sessionId = 'session-1'): void {
     phase: 'implement',
     worktreePath: '/repo/.worktrees/thing',
     branch: 'feat/thing',
+    baseBranch: null,
     terminalSessionId: 'terminal-1',
     transcriptPath: '/t.jsonl',
     startedAt: 0,
   })
 }
 
-beforeAll(async () => {
-  const handlers = new Map<string, (payload: unknown) => Promise<unknown>>()
-  const commands = new Map<string, () => void>()
-  api = {
-    ipc: {
-      registerHandler: vi.fn((channel: string, handler: (payload: unknown) => Promise<unknown>) => {
-        handlers.set(channel, handler)
-        return { dispose: vi.fn() }
+type Handlers = Map<string, (payload: unknown) => Promise<unknown>>
+
+/** Commands registered into `commands` by id, so a spec can run one. */
+function keptCommands(commands: Map<string, () => void>): ExtensionAPI['commands'] {
+  return partialFake<ExtensionAPI['commands']>({
+    register: vi.fn((command: { id: string }, handler: () => void) => {
+      commands.set(command.id, handler)
+      return { dispose: vi.fn(() => commands.delete(command.id)) }
+    }),
+  })
+}
+
+/** A host that keeps every channel and command registered, so a spec can call them. */
+function actionsApi(handlers: Handlers, commands: Map<string, () => void>): ExtensionAPI {
+  const disposable = () => ({ dispose: vi.fn() })
+  return partialFake<ExtensionAPI>({
+    ipc: partialFake<ExtensionAPI['ipc']>({
+      registerHandler: vi.fn((spec: ChannelSpec) => {
+        handlers.set(spec.channel, (payload) => dispatchChannel(spec, payload))
+        return disposable()
       }),
-      invokeChannel: vi.fn(),
-      sendChannel: vi.fn(),
-      onWindowEvent: vi.fn().mockReturnValue(() => {}),
-      isRemoteAccessible: vi.fn().mockReturnValue(false),
-    },
-    window: { broadcast: vi.fn(), openAuxiliary: vi.fn(), focusSelf: vi.fn(), showSelf: vi.fn() },
-    commands: {
-      register: vi.fn((command: { id: string }, handler: () => void) => {
-        commands.set(command.id, handler)
-        return { dispose: vi.fn(() => commands.delete(command.id)) }
-      }),
-      setEnabled: vi.fn(),
-    },
-    shell: { exec },
-    notifications: { showToast, createNotification },
+    }),
+    window: partialFake<ExtensionAPI['window']>({
+      broadcast: vi.fn(),
+      openAuxiliary: vi.fn(),
+      focusSelf: vi.fn(),
+      showSelf: vi.fn(),
+    }),
+    commands: keptCommands(commands),
+    shell: partialFake<ExtensionAPI['shell']>({ exec }),
+    notifications: partialFake<ExtensionAPI['notifications']>({ showToast, createNotification }),
     log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
-    settings: {
-      register: vi.fn().mockReturnValue({ dispose: vi.fn() }),
+    paths: { app: '', globalStorage: GLOBAL_STORAGE },
+    settings: partialFake<ExtensionAPI['settings']>({
+      register: vi.fn(disposable),
       get: vi.fn(),
       set: vi.fn(),
-      resolveWorktreeBaseDir: vi.fn().mockReturnValue('/tmp/speckit-run-actions'),
-    },
-    terminal: {
-      onSessionCreate: vi.fn().mockReturnValue({ dispose: vi.fn() }),
-      onSessionClose: vi.fn().mockReturnValue({ dispose: vi.fn() }),
-    },
-    workspace: {
-      list: vi.fn().mockReturnValue([]),
-      listProjects: vi.fn().mockReturnValue([]),
-      createProject: vi.fn(),
-      deleteProject: vi.fn(),
-      onDelete: vi.fn().mockReturnValue({ dispose: vi.fn() }),
-      onProjectDelete: vi.fn().mockReturnValue({ dispose: vi.fn() }),
-    },
-    pty: {
-      spawn: vi.fn(),
-      write: vi.fn(),
-      resize: vi.fn(),
-      kill: vi.fn(),
-      listSessions: vi.fn().mockReturnValue([]),
-      attachOnData: vi.fn().mockReturnValue(null),
-      attachOnExit: vi.fn().mockReturnValue(null),
-      openTerminalTab: vi.fn(),
-    },
-    app: { version: '0.0.0-test' },
-  } as unknown as ExtensionAPI
+    }),
+    workspace: partialFake<ExtensionAPI['workspace']>({ list: () => [], listProjects: () => [] }),
+  })
+}
 
-  const { activate, startSupervisionRuntime } = await import('../../src/index.ts')
+beforeAll(async () => {
+  const handlers: Handlers = new Map()
+  const commands = new Map<string, () => void>()
+  api = actionsApi(handlers, commands)
+  const { startSupervisionRuntime } = await import('../../src/runtime/supervision-runtime.ts')
   activate(api)
   getHandler = (channel) => handlers.get(channel)
   getCommand = (id) => commands.get(id)
@@ -181,9 +130,9 @@ beforeAll(async () => {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  runner.stop.mockReturnValue(true)
-  runner.send.mockReturnValue(true)
-  runner.terminalFor.mockReturnValue({ terminalSessionId: 'terminal-1', projectId: 'project-1' })
+  theRunner.stop.mockReturnValue(true)
+  theRunner.send.mockReturnValue(true)
+  theRunner.terminalFor.mockReturnValue({ terminalSessionId: 'terminal-1', projectId: 'project-1' })
   exec.mockResolvedValue({ exitCode: 0, stdout: '', stderr: '', timedOut: false })
 })
 
@@ -221,7 +170,7 @@ describe('going to a run', () => {
   })
 
   it('says so rather than navigating nowhere once the run has ended', async () => {
-    runner.terminalFor.mockReturnValue(null)
+    theRunner.terminalFor.mockReturnValue(null)
     expect(await call('foundry:run-terminal', { sessionId: 'gone' })).toEqual({ ok: false })
     expect(vi.mocked(api.window.broadcast).mock.calls).not.toContainEqual([
       'terminal:navigate-to-session',
@@ -245,9 +194,14 @@ describe('reading what it was doing', () => {
 })
 
 describe('interrupting and redirecting', () => {
+  describe('interrupting', interruptingTests)
+  describe('refusing and recording', refusingAndRecordingTests)
+})
+
+function interruptingTests() {
   it('interrupts the session', async () => {
     expect(await call('foundry:run-interrupt', { sessionId: 'session-1' })).toEqual({ ok: true })
-    expect(runner.interrupt).toHaveBeenCalledWith('session-1')
+    expect(theRunner.interrupt).toHaveBeenCalledWith('session-1')
   })
 
   it('ends the turn before sending, or the redirect queues behind it', async () => {
@@ -255,10 +209,12 @@ describe('interrupting and redirecting', () => {
       sessionId: 'session-1',
       message: 'try the other approach',
     })
-    expect(runner.interrupt).toHaveBeenCalledWith('session-1')
-    expect(runner.send).toHaveBeenCalledWith('session-1', 'try the other approach')
+    expect(theRunner.interrupt).toHaveBeenCalledWith('session-1')
+    expect(theRunner.send).toHaveBeenCalledWith('session-1', 'try the other approach')
   })
+}
 
+function refusingAndRecordingTests() {
   it('refuses a payload with no message at all, rather than throwing', async () => {
     // A handler that throws on a missing field takes the channel down for
     // everyone rather than refusing one call. Found by driving the real app.
@@ -269,7 +225,7 @@ describe('interrupting and redirecting', () => {
     expect(await call('foundry:run-redirect', { sessionId: 'session-1', message: '   ' })).toEqual({
       ok: false,
     })
-    expect(runner.interrupt).not.toHaveBeenCalled()
+    expect(theRunner.interrupt).not.toHaveBeenCalled()
   })
 
   it('records the redirect, attributed to the pilot', async () => {
@@ -284,16 +240,16 @@ describe('interrupting and redirecting', () => {
       true
     )
   })
-})
+}
 
 describe('ending a run', () => {
   it('stops it with the reason, so the agent record carries it', async () => {
     await call('foundry:run-stop', { sessionId: 'session-1', reason: 'wrong branch' })
-    expect(runner.stop).toHaveBeenCalledWith('session-1', 'wrong branch')
+    expect(theRunner.stop).toHaveBeenCalledWith('session-1', 'wrong branch')
   })
 
   it('reports a stop that did not land', async () => {
-    runner.stop.mockReturnValue(false)
+    theRunner.stop.mockReturnValue(false)
     expect(await call('foundry:run-stop', { sessionId: 'gone' })).toEqual({ ok: false })
   })
 })

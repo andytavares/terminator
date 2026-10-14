@@ -39,10 +39,6 @@ export interface SeedDeps {
   readonly now: () => string
   readonly newId: () => string
   readonly readIssue?: (tracker: 'linear' | 'jira', key: string) => Promise<IssueLike | null>
-  readonly existingOrderFor?: (
-    tracker: 'linear' | 'jira',
-    key: string
-  ) => { id: string; title: string } | null
   /**
    * What was already decided about these files (FR-077).
    *
@@ -61,10 +57,7 @@ export type SeedInput =
   | { kind: 'tracker'; tracker: 'linear' | 'jira'; key: string; repoPaths: readonly string[] }
   | { kind: 'signal'; signalId: string; repoPaths: readonly string[] }
 
-export type SeedResult =
-  | { order: WorkOrder; unavailableChecks: CheckName[] }
-  | { existing: { id: string; title: string } }
-  | { error: string }
+export type SeedResult = { order: WorkOrder; unavailableChecks: CheckName[] } | { error: string }
 
 /**
  * File paths named in a sentence.
@@ -72,13 +65,14 @@ export type SeedResult =
  * Deliberately crude — something with a slash and an extension. An idea that
  * names no file gets no prior art, which is better than a fuzzy match that
  * dredges up decisions about something else and presents them as relevant.
+ * @internal
  */
 export function pathsNamedIn(text: string): string[] {
   const matches = text.match(/[A-Za-z0-9_.@/-]+\.[A-Za-z0-9]{1,6}\b/g) ?? []
   return [...new Set(matches.filter((token) => token.includes('/')))]
 }
 
-/** Whatever the repository says about itself. Absence is a normal answer. */
+/** Whatever the repository says about itself. Absence is a normal answer. @internal */
 export function houseDocsIn(repoPath: string): string[] {
   return HOUSE_DOCS.filter((rel) => fs.existsSync(path.join(repoPath, rel)))
 }
@@ -102,94 +96,125 @@ export function titleFrom(text: string): string {
   return firstSentence.length > 90 ? `${firstSentence.slice(0, 87)}…` : firstSentence
 }
 
+/** Where an order came from: what it is called, the problem it states, and its source. */
+interface Origin {
+  readonly title: string
+  readonly problem: string
+  readonly source: OrderSource
+  /** The tracker's own branch name for the work, where it has one. */
+  readonly branchName: string | null
+}
+
+type Read = { origin: Origin } | { error: string }
+
 export async function seedOrder(input: SeedInput, deps: SeedDeps): Promise<SeedResult> {
   if (input.repoPaths.length === 0) {
     return { error: 'An order needs at least one repository to be about.' }
   }
-
-  let title: string
-  let problem: string
-  let source: OrderSource
-  let branchName: string | null = null
-
-  if (input.kind === 'typed') {
-    if (input.text.trim() === '') {
-      return { error: 'An order needs an idea. Say what is wrong or what should exist.' }
-    }
-    title = titleFrom(input.text)
-    problem = input.text.trim()
-    source = { kind: 'typed', tracker: null, key: null, url: null }
-  } else if (input.kind === 'tracker') {
-    const existing = deps.existingOrderFor?.(input.tracker, input.key) ?? null
-    if (existing !== null) return { existing }
-
-    const issue = (await deps.readIssue?.(input.tracker, input.key)) ?? null
-    if (issue === null) {
-      return { error: `Could not read ${input.key} from ${input.tracker}.` }
-    }
-    title = issue.title
-    // A description is often absent and that is fine — the title is still a
-    // statement of the problem, and the rest becomes an assumption to strike.
-    problem = issue.description.trim() === '' ? issue.title : issue.description.trim()
-    source = { kind: 'tracker', tracker: input.tracker, key: issue.key, url: issue.url }
-    branchName = issue.branchName
-  } else {
-    const signal = (await deps.readSignal?.(input.signalId)) ?? null
-    if (signal === null) {
-      return { error: `Could not read signal ${input.signalId}.` }
-    }
-    title = signal.title
-    // One line per piece of evidence, so the order states what was seen and
-    // not only that something was — the same reason a ticket's description
-    // is preferred over its title alone.
-    problem = [signal.title, ...signal.evidence.map((e) => `- ${e.title} (${e.url})`)].join('\n')
-    source = {
-      kind: 'signal',
-      tracker: null,
-      key: signal.id,
-      url: signal.evidence[0]?.url ?? null,
-    }
-  }
-
+  const read = await readOrigin(input, deps)
+  if (!('origin' in read)) return read
+  const { origin } = read
   const order = draftOrder({
     id: deps.newId(),
-    title,
-    source,
+    title: origin.title,
+    source: origin.source,
     repoPaths: input.repoPaths,
     now: deps.now(),
   })
-
   // Scout's pack, before any question could be asked.
   const toolchain = probeToolchain(input.repoPaths[0])
   const houseDocs = input.repoPaths.flatMap((repoPath) => houseDocsIn(repoPath))
+  const priorArt = await priorArtForProblem(origin.problem, deps)
+  const seeded = seededFrom(order, { origin, context: { toolchain, houseDocs, priorArt } })
+  return { order: seeded, unavailableChecks: unavailableChecks(toolchain) }
+}
 
-  // What was already decided about the files this idea names. A failure to
-  // read the record is not a failure to seed an order: the draft is what the
-  // operator asked for, and prior art is a courtesy on top of it.
-  const named = pathsNamedIn(problem)
-  let priorArt: string[] = []
-  if (named.length > 0) {
-    try {
-      priorArt = [...((await deps.priorArtFor?.(named)) ?? [])]
-    } catch {
-      priorArt = []
-    }
+function readOrigin(input: SeedInput, deps: SeedDeps): Promise<Read> {
+  if (input.kind === 'typed') return Promise.resolve(typedOrigin(input.text))
+  if (input.kind === 'tracker') return trackerOrigin(input, deps)
+  return signalOrigin(input.signalId, deps)
+}
+
+function typedOrigin(text: string): Read {
+  if (text.trim() === '') {
+    return { error: 'An order needs an idea. Say what is wrong or what should exist.' }
   }
+  const source: OrderSource = { kind: 'typed', tracker: null, key: null, url: null }
+  return { origin: { title: titleFrom(text), problem: text.trim(), source, branchName: null } }
+}
 
-  // What the ticket already said done looks like. Not the architect's job
-  // done for it — coverage still runs both ways, so a criterion no unit
-  // satisfies fails the compile exactly as before. What this stops is an
-  // order seeded from a ticket with a heading called "Acceptance Criteria"
-  // opening with "No criteria yet", and its outcome with "Not stated yet".
+async function trackerOrigin(
+  { tracker, key }: Extract<SeedInput, { kind: 'tracker' }>,
+  deps: SeedDeps
+): Promise<Read> {
+  const issue = (await deps.readIssue?.(tracker, key)) ?? null
+  if (issue === null) return { error: `Could not read ${key} from ${tracker}.` }
+  // A description is often absent and that is fine — the title is still a
+  // statement of the problem, and the rest becomes an assumption to strike.
+  const description = issue.description.trim()
+  return {
+    origin: {
+      title: issue.title,
+      problem: description === '' ? issue.title : description,
+      source: { kind: 'tracker', tracker, key: issue.key, url: issue.url },
+      branchName: issue.branchName,
+    },
+  }
+}
+
+async function signalOrigin(signalId: string, deps: SeedDeps): Promise<Read> {
+  const signal = (await deps.readSignal?.(signalId)) ?? null
+  if (signal === null) return { error: `Could not read signal ${signalId}.` }
+  // One line per piece of evidence, so the order states what was seen and not
+  // only that something was — the same reason a ticket's description is
+  // preferred over its title alone.
+  const evidence = signal.evidence.map((e) => `- ${e.title} (${e.url})`)
+  return {
+    origin: {
+      title: signal.title,
+      problem: [signal.title, ...evidence].join('\n'),
+      source: {
+        kind: 'signal',
+        tracker: null,
+        key: signal.id,
+        url: signal.evidence[0]?.url ?? null,
+      },
+      branchName: null,
+    },
+  }
+}
+
+// What was already decided about the files this idea names. Failing to read the
+// record does not fail the seed: prior art is a courtesy on top of the draft.
+async function priorArtForProblem(problem: string, deps: SeedDeps): Promise<string[]> {
+  const named = pathsNamedIn(problem)
+  if (named.length === 0) return []
+  try {
+    return [...((await deps.priorArtFor?.(named)) ?? [])]
+  } catch {
+    return []
+  }
+}
+
+function seededFrom(
+  order: WorkOrder,
+  {
+    origin,
+    context,
+  }: { origin: Origin; context: Pick<WorkOrder['context'], 'toolchain' | 'houseDocs' | 'priorArt'> }
+): WorkOrder {
+  const { problem, branchName } = origin
+  // What the ticket already said done looks like, so an order seeded from a ticket
+  // with acceptance criteria does not open with "No criteria yet". Coverage still
+  // runs both ways: a criterion no unit satisfies fails the compile.
   const acceptance = acceptanceFromTicket(problem)
   const outcome = acceptance.map((criterion) => `- ${criterion.statement}`).join('\n')
-
-  const seeded: WorkOrder = {
+  return {
     ...order,
     source: branchName !== null ? { ...order.source, branch: branchName } : order.source,
     intent: { ...order.intent, problem, outcome },
     acceptance,
-    context: { ...order.context, toolchain, houseDocs, priorArt },
+    context: { ...order.context, ...context },
     plan: {
       ...order.plan,
       // The tracker's own branch name where there is one, rather than an
@@ -199,6 +224,4 @@ export async function seedOrder(input: SeedInput, deps: SeedDeps): Promise<SeedR
       ),
     },
   }
-
-  return { order: seeded, unavailableChecks: unavailableChecks(toolchain) }
 }

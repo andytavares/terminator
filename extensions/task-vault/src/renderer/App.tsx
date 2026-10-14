@@ -18,8 +18,8 @@ interface SerializedNotification {
   targets: string[]
 }
 
-export function App(): JSX.Element {
-  const view = new URLSearchParams(window.location.search).get('view')
+/** Opens the capture modal on a push from the main process, or one that fired before this view existed. */
+function useCaptureRequests(): void {
   const { setShowCaptureModal } = useVaultNavStore()
 
   useEffect(() => {
@@ -29,7 +29,6 @@ export function App(): JSX.Element {
     return off
   }, [setShowCaptureModal])
 
-  // On first mount, check whether the shortcut fired before this view existed.
   useEffect(() => {
     window.electronAPI.extensionBridge
       .invoke('task-vault:ui.consumePendingCapture')
@@ -38,8 +37,10 @@ export function App(): JSX.Element {
       })
       .catch(() => {})
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+}
 
-  // Show local toasts for scheduler notifications (due tasks, blocked tasks, etc.)
+/** Shows local toasts for scheduler notifications (due tasks, blocked tasks, etc.). */
+function usePushToasts(): void {
   useEffect(() => {
     if (!window.electronAPI.notifications?.onPush) return
     return window.electronAPI.notifications.onPush((raw: unknown) => {
@@ -50,23 +51,6 @@ export function App(): JSX.Element {
       addExtensionToast(n.type as ToastType, message)
     })
   }, [])
-
-  if (view === 'calendar') {
-    return (
-      <div className="vault-cal-panel" style={{ width: '100%', borderLeft: 'none' }}>
-        <CalendarDrawer />
-        <VaultToasts />
-      </div>
-    )
-  }
-
-  return (
-    <>
-      <TaskVaultView />
-      <CaptureModal />
-      <VaultToasts />
-    </>
-  )
 }
 
 /**
@@ -90,5 +74,28 @@ function VaultToasts(): React.JSX.Element {
       }))}
       onDismiss={removeToast}
     />
+  )
+}
+
+export function App(): JSX.Element {
+  const view = new URLSearchParams(window.location.search).get('view')
+  useCaptureRequests()
+  usePushToasts()
+
+  if (view === 'calendar') {
+    return (
+      <div className="vault-cal-panel" style={{ width: '100%', borderLeft: 'none' }}>
+        <CalendarDrawer />
+        <VaultToasts />
+      </div>
+    )
+  }
+
+  return (
+    <>
+      <TaskVaultView />
+      <CaptureModal />
+      <VaultToasts />
+    </>
   )
 }

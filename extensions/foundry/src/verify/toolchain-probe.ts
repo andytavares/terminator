@@ -15,9 +15,9 @@ import { CHECK_NAMES, type CheckName } from './check-names.js'
 // and a check that reports a pass it did not earn is the failure mode that
 // makes an unattended factory dangerous.
 
-export type ProbeSource = 'package.json' | 'config' | 'makefile' | 'ci'
+type ProbeSource = 'package.json' | 'config' | 'makefile' | 'ci'
 
-export interface ProbedCommand {
+interface ProbedCommand {
   readonly command: string
   readonly source: ProbeSource
 }
@@ -95,47 +95,53 @@ const ESLINT_CONFIGS = [
 const PRETTIER_CONFIGS = ['.prettierrc', '.prettierrc.json', '.prettierrc.js', 'prettier.config.js']
 const PLAYWRIGHT_CONFIGS = ['playwright.config.ts', 'playwright.config.js']
 
+/** A tool's presence in a repository, and the command that means it. */
+interface ConfigProbe {
+  readonly present: (repo: string) => boolean
+  readonly command: string
+}
+
+const anyOf =
+  (rels: readonly string[]) =>
+  (repo: string): boolean =>
+    existsAny(repo, rels)
+const CARGO = anyOf(['Cargo.toml'])
+const GO = anyOf(['go.mod'])
+const PYTEST = (repo: string): boolean =>
+  readText(repo, 'pyproject.toml')?.includes('pytest') ?? false
+
+/** In preference order: the first tool present names the check. */
+const CONFIG_PROBES: Record<CheckName, readonly ConfigProbe[]> = {
+  test: [
+    { present: anyOf(VITEST_CONFIGS), command: 'npx vitest run' },
+    { present: anyOf(JEST_CONFIGS), command: 'npx jest' },
+    { present: PYTEST, command: 'pytest' },
+    { present: CARGO, command: 'cargo test' },
+    { present: GO, command: 'go test ./...' },
+  ],
+  lint: [
+    { present: anyOf(ESLINT_CONFIGS), command: 'npx eslint .' },
+    { present: CARGO, command: 'cargo clippy' },
+  ],
+  format: [
+    { present: anyOf(PRETTIER_CONFIGS), command: 'npx prettier --check .' },
+    { present: CARGO, command: 'cargo fmt --check' },
+  ],
+  e2e: [{ present: anyOf(PLAYWRIGHT_CONFIGS), command: 'npx playwright test' }],
+  build: [
+    { present: CARGO, command: 'cargo build' },
+    { present: GO, command: 'go build ./...' },
+  ],
+  // Deliberately not inferred. A test runner's presence says nothing about
+  // whether this project measures coverage, and guessing a command here would
+  // produce a check that fails for a reason the project never chose.
+  coverage: [],
+}
+
 /** The tool's own presence, when no script named the check. */
 function fromConfig(repo: string, check: CheckName): ProbedCommand | null {
-  const cargo = exists(repo, 'Cargo.toml')
-  const go = exists(repo, 'go.mod')
-  const pyproject = readText(repo, 'pyproject.toml')
-
-  switch (check) {
-    case 'test':
-      if (existsAny(repo, VITEST_CONFIGS)) return { command: 'npx vitest run', source: 'config' }
-      if (existsAny(repo, JEST_CONFIGS)) return { command: 'npx jest', source: 'config' }
-      if (pyproject !== null && pyproject.includes('pytest')) {
-        return { command: 'pytest', source: 'config' }
-      }
-      if (cargo) return { command: 'cargo test', source: 'config' }
-      if (go) return { command: 'go test ./...', source: 'config' }
-      return null
-    case 'lint':
-      if (existsAny(repo, ESLINT_CONFIGS)) return { command: 'npx eslint .', source: 'config' }
-      if (cargo) return { command: 'cargo clippy', source: 'config' }
-      return null
-    case 'format':
-      if (existsAny(repo, PRETTIER_CONFIGS)) {
-        return { command: 'npx prettier --check .', source: 'config' }
-      }
-      if (cargo) return { command: 'cargo fmt --check', source: 'config' }
-      return null
-    case 'e2e':
-      if (existsAny(repo, PLAYWRIGHT_CONFIGS)) {
-        return { command: 'npx playwright test', source: 'config' }
-      }
-      return null
-    case 'build':
-      if (cargo) return { command: 'cargo build', source: 'config' }
-      if (go) return { command: 'go build ./...', source: 'config' }
-      return null
-    case 'coverage':
-      // Deliberately not inferred. A test runner's presence says nothing about
-      // whether this project measures coverage, and guessing a command here
-      // would produce a check that fails for a reason the project never chose.
-      return null
-  }
+  const probe = CONFIG_PROBES[check].find((candidate) => candidate.present(repo))
+  return probe === undefined ? null : { command: probe.command, source: 'config' }
 }
 
 /** A Makefile target whose name is the check. */

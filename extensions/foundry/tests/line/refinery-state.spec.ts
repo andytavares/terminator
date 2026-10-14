@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import * as path from 'node:path'
 import {
   readRefineryState,
@@ -10,11 +9,12 @@ import {
 } from '../../src/line/refinery-state.js'
 import { raiseGate } from '../../src/gates/rules.js'
 import type { Gate } from '../../src/gates/rules.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 let root: string
 
 beforeEach(() => {
-  root = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-refinery-state-'))
+  root = makeTempDir('fdry-refinery-state-')
 })
 
 afterEach(() => {
@@ -22,6 +22,13 @@ afterEach(() => {
 })
 
 describe('readRefineryState', () => {
+  describe('defaults', defaultsTests)
+  describe('round trips', roundTripsTests)
+  describe('malformed fields', malformedFieldsTests)
+  describe('a JSON array', aJsonArrayTests)
+})
+
+function defaultsTests() {
   it('defaults to never-merged when nothing was ever written', async () => {
     expect(await readRefineryState(root, 'WO-1')).toEqual({
       mergedAt: null,
@@ -38,7 +45,9 @@ describe('readRefineryState', () => {
       restackedFor: [],
     })
   })
+}
 
+function roundTripsTests() {
   it('reads back exactly what was written', async () => {
     await writeRefineryState(root, 'WO-1', {
       mergedAt: '2026-09-06T10:00:00.000Z',
@@ -60,7 +69,9 @@ describe('readRefineryState', () => {
       restackedFor: [],
     })
   })
+}
 
+function malformedFieldsTests() {
   it('defaults mergedAt when it is not a string, and drops non-string restackedFor entries', async () => {
     const dir = path.join(root, 'orders', 'WO-1')
     fs.mkdirSync(dir, { recursive: true })
@@ -83,7 +94,9 @@ describe('readRefineryState', () => {
       restackedFor: [],
     })
   })
+}
 
+function aJsonArrayTests() {
   it('defaults on a JSON array rather than an object', async () => {
     const dir = path.join(root, 'orders', 'WO-1')
     fs.mkdirSync(dir, { recursive: true })
@@ -93,7 +106,7 @@ describe('readRefineryState', () => {
       restackedFor: [],
     })
   })
-})
+}
 
 function gate(over: Partial<Parameters<typeof raiseGate>[0]> = {}, option?: string): Gate {
   const raised = raiseGate({

@@ -16,44 +16,35 @@ function leaf(sessionId: string): PaneNode {
 
 function split(
   id: string,
-  direction: 'horizontal' | 'vertical',
-  first: PaneNode,
-  second: PaneNode,
-  ratio = 0.5
+  [first, second]: [PaneNode, PaneNode],
+  { direction, ratio = 0.5 }: { direction: 'horizontal' | 'vertical'; ratio?: number }
 ): PaneNode {
   return { type: 'split', id, direction, ratio, first, second }
 }
 
 describe('splitLeaf', () => {
   it('replaces a matching leaf with a split', () => {
-    const result = splitLeaf(leaf('a'), 'a', 'b', 'vertical')
-    expect(result).toEqual(split('test-uuid', 'vertical', leaf('a'), leaf('b')))
+    const result = splitLeaf(leaf('a'), { targetId: 'a', newId: 'b', direction: 'vertical' })
+    expect(result).toEqual(split('test-uuid', [leaf('a'), leaf('b')], { direction: 'vertical' }))
   })
 
   it('does not change a non-matching leaf', () => {
-    const result = splitLeaf(leaf('x'), 'a', 'b', 'vertical')
+    const result = splitLeaf(leaf('x'), { targetId: 'a', newId: 'b', direction: 'vertical' })
     expect(result).toEqual(leaf('x'))
   })
 
   it('splits a leaf nested inside a split node', () => {
-    const tree = split('s1', 'vertical', leaf('a'), leaf('b'))
-    const result = splitLeaf(tree, 'b', 'c', 'horizontal')
+    const tree = split('s1', [leaf('a'), leaf('b')], { direction: 'vertical' })
+    const result = splitLeaf(tree, { targetId: 'b', newId: 'c', direction: 'horizontal' })
     expect(result).toEqual(
-      split('s1', 'vertical', leaf('a'), split('test-uuid', 'horizontal', leaf('b'), leaf('c')))
+      split(
+        's1',
+        [leaf('a'), split('test-uuid', [leaf('b'), leaf('c')], { direction: 'horizontal' })],
+        {
+          direction: 'vertical',
+        }
+      )
     )
-  })
-
-  it('sets ratio to 0.5 on the new split', () => {
-    const result = splitLeaf(leaf('a'), 'a', 'b', 'horizontal')
-    if (result.type !== 'split') throw new Error('expected split')
-    expect(result.ratio).toBe(0.5)
-  })
-
-  it('positions the new leaf as the second child', () => {
-    const result = splitLeaf(leaf('a'), 'a', 'new', 'vertical')
-    if (result.type !== 'split') throw new Error('expected split')
-    expect(result.first).toEqual(leaf('a'))
-    expect(result.second).toEqual(leaf('new'))
   })
 })
 
@@ -67,25 +58,39 @@ describe('removeLeaf', () => {
   })
 
   it('collapses the split when the first child is removed', () => {
-    const tree = split('s1', 'vertical', leaf('a'), leaf('b'))
+    const tree = split('s1', [leaf('a'), leaf('b')], { direction: 'vertical' })
     expect(removeLeaf(tree, 'a')).toEqual(leaf('b'))
   })
 
   it('collapses the split when the second child is removed', () => {
-    const tree = split('s1', 'vertical', leaf('a'), leaf('b'))
+    const tree = split('s1', [leaf('a'), leaf('b')], { direction: 'vertical' })
     expect(removeLeaf(tree, 'b')).toEqual(leaf('a'))
   })
+})
 
+describe('removeLeaf in nested trees', () => {
   it('removes a deeply nested leaf and collapses the parent', () => {
-    const tree = split('s1', 'vertical', leaf('a'), split('s2', 'horizontal', leaf('b'), leaf('c')))
+    const tree = split(
+      's1',
+      [leaf('a'), split('s2', [leaf('b'), leaf('c')], { direction: 'horizontal' })],
+      {
+        direction: 'vertical',
+      }
+    )
     const result = removeLeaf(tree, 'b')
-    expect(result).toEqual(split('s1', 'vertical', leaf('a'), leaf('c')))
+    expect(result).toEqual(split('s1', [leaf('a'), leaf('c')], { direction: 'vertical' }))
   })
 
   it('preserves structure when removing from a 3-leaf tree and 2 remain', () => {
-    const tree = split('s1', 'vertical', split('s2', 'horizontal', leaf('a'), leaf('b')), leaf('c'))
+    const tree = split(
+      's1',
+      [split('s2', [leaf('a'), leaf('b')], { direction: 'horizontal' }), leaf('c')],
+      {
+        direction: 'vertical',
+      }
+    )
     const result = removeLeaf(tree, 'a')
-    expect(result).toEqual(split('s1', 'vertical', leaf('b'), leaf('c')))
+    expect(result).toEqual(split('s1', [leaf('b'), leaf('c')], { direction: 'vertical' }))
   })
 })
 
@@ -95,12 +100,18 @@ describe('leafIds', () => {
   })
 
   it('returns all leaf ids in a split', () => {
-    const tree = split('s1', 'vertical', leaf('a'), leaf('b'))
+    const tree = split('s1', [leaf('a'), leaf('b')], { direction: 'vertical' })
     expect(leafIds(tree)).toEqual(['a', 'b'])
   })
 
   it('returns all ids for a deep tree in DFS order', () => {
-    const tree = split('s1', 'vertical', split('s2', 'horizontal', leaf('a'), leaf('b')), leaf('c'))
+    const tree = split(
+      's1',
+      [split('s2', [leaf('a'), leaf('b')], { direction: 'horizontal' }), leaf('c')],
+      {
+        direction: 'vertical',
+      }
+    )
     expect(leafIds(tree)).toEqual(['a', 'b', 'c'])
   })
 })
@@ -110,29 +121,20 @@ describe('updateSplitRatio', () => {
     expect(updateSplitRatio(leaf('a'), 'does-not-exist', 0.7)).toEqual(leaf('a'))
   })
 
-  it('updates the ratio of a matching split node', () => {
-    const tree = split('s1', 'vertical', leaf('a'), leaf('b'), 0.5)
-    const result = updateSplitRatio(tree, 's1', 0.7)
-    if (result.type !== 'split') throw new Error('expected split')
-    expect(result.ratio).toBe(0.7)
-  })
-
-  it('does not change other properties when updating ratio', () => {
-    const tree = split('s1', 'vertical', leaf('a'), leaf('b'), 0.5)
-    const result = updateSplitRatio(tree, 's1', 0.3)
-    if (result.type !== 'split') throw new Error('expected split')
-    expect(result.id).toBe('s1')
-    expect(result.direction).toBe('vertical')
-    expect(result.first).toEqual(leaf('a'))
-    expect(result.second).toEqual(leaf('b'))
+  it('updates the ratio of a matching split node and nothing else', () => {
+    const tree = split('s1', [leaf('a'), leaf('b')], { direction: 'vertical', ratio: 0.5 })
+    expect(updateSplitRatio(tree, 's1', 0.3)).toEqual(
+      split('s1', [leaf('a'), leaf('b')], { direction: 'vertical', ratio: 0.3 })
+    )
   })
 
   it('updates a nested split node', () => {
     const tree = split(
       's1',
-      'vertical',
-      leaf('a'),
-      split('s2', 'horizontal', leaf('b'), leaf('c'), 0.5)
+      [leaf('a'), split('s2', [leaf('b'), leaf('c')], { direction: 'horizontal', ratio: 0.5 })],
+      {
+        direction: 'vertical',
+      }
     )
     const result = updateSplitRatio(tree, 's2', 0.8)
     if (result.type !== 'split') throw new Error('expected split')
@@ -142,7 +144,7 @@ describe('updateSplitRatio', () => {
   })
 
   it('returns tree unchanged when splitId does not match', () => {
-    const tree = split('s1', 'vertical', leaf('a'), leaf('b'), 0.5)
+    const tree = split('s1', [leaf('a'), leaf('b')], { direction: 'vertical', ratio: 0.5 })
     const result = updateSplitRatio(tree, 'does-not-exist', 0.9)
     expect(result).toEqual(tree)
   })

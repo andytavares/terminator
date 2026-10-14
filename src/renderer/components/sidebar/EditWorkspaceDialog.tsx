@@ -1,9 +1,7 @@
-import React, { useState } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 import type { Workspace } from '../../../shared/types/index'
 import { useWorkspaceStore } from '../../stores/workspace.store'
-import { WORKSPACE_PRESET_COLORS as PRESET_COLORS } from './workspace-colors'
-import { useModalEffect } from '../../stores/modal.store'
-import './Dialog.css'
+import { WorkspaceDialog, showSaveError, useWorkspaceForm } from './workspace-form'
 
 interface Props {
   workspace: Workspace
@@ -11,130 +9,47 @@ interface Props {
 }
 
 export function EditWorkspaceDialog({ workspace, onClose }: Props): JSX.Element {
-  useModalEffect()
-  const [name, setName] = useState(workspace.name)
-  const [folderPath, setFolderPath] = useState(workspace.folderPath)
-  const [color, setColor] = useState(workspace.color)
-  const [tags, setTags] = useState(workspace.tags.join(', '))
-  const [nameError, setNameError] = useState('')
-  const [error, setError] = useState('')
-  const { updateWorkspace, workspaces } = useWorkspaceStore()
+  const { form, save } = useEditWorkspace(workspace, onClose)
+  return (
+    <WorkspaceDialog
+      title="Edit Workspace"
+      submitLabel="Save"
+      form={form}
+      onSubmit={save}
+      onClose={onClose}
+    />
+  )
+}
 
-  function validateName(value: string): string {
-    if (!value.trim()) return 'Name is required'
-    if (value.length > 100) return 'Name must be 100 characters or less'
-    if (
+/** The workspace's draft, and saving it unless its new name is another's. */
+function useEditWorkspace(workspace: Workspace, onClose: () => void) {
+  const { updateWorkspace, workspaces } = useWorkspaceStore(
+    useShallow((s) => ({ updateWorkspace: s.updateWorkspace, workspaces: s.workspaces }))
+  )
+  const form = useWorkspaceForm(
+    {
+      name: workspace.name,
+      folderPath: workspace.folderPath,
+      color: workspace.color,
+      tags: workspace.tags.join(', '),
+    },
+    (value) =>
       value.toLowerCase() !== workspace.name.toLowerCase() &&
       workspaces.some((w) => w.name.toLowerCase() === value.toLowerCase() && w.id !== workspace.id)
-    ) {
-      return 'A workspace with this name already exists'
-    }
-    return ''
-  }
+  )
 
-  async function handleBrowse(): Promise<void> {
-    const result = await window.electronAPI.dialog.openDirectory()
-    if ('filePath' in result) setFolderPath(result.filePath)
-  }
-
-  async function handleSubmit(e: React.FormEvent): Promise<void> {
-    e.preventDefault()
-    const nameErr = validateName(name)
-    if (nameErr) {
-      setNameError(nameErr)
-      return
-    }
-
-    const tagList = tags
-      .split(',')
-      .map((t) => t.trim())
-      .filter(Boolean)
+  async function submitWorkspaceEdit(): Promise<void> {
+    if (!form.nameIsValid()) return
+    const { name, folderPath, color } = form.draft
     const result = await updateWorkspace({
       id: workspace.id,
       name: name.trim(),
       folderPath,
       color,
-      tags: tagList,
+      tags: form.tagList(),
     })
-    if ('error' in result) {
-      if (result.error === 'DUPLICATE_NAME')
-        setNameError('A workspace with this name already exists')
-      else setError('Failed to update workspace')
-      return
-    }
-    onClose()
+    if (!showSaveError(form, result, 'Failed to update workspace')) onClose()
   }
 
-  return (
-    <div className="dialog-overlay" onClick={onClose}>
-      <div className="dialog" onClick={(e) => e.stopPropagation()}>
-        <h2 className="dialog__title">Edit Workspace</h2>
-        <form onSubmit={handleSubmit}>
-          <div className="dialog__field">
-            <label className="dialog__label">Name *</label>
-            <input
-              className={`dialog__input${nameError ? ' dialog__input--error' : ''}`}
-              value={name}
-              onChange={(e) => {
-                setName(e.target.value)
-                setNameError('')
-              }}
-              onBlur={() => setNameError(validateName(name))}
-              autoFocus
-            />
-            {nameError && <span className="dialog__error">{nameError}</span>}
-          </div>
-
-          <div className="dialog__field">
-            <label className="dialog__label">Folder</label>
-            <div className="dialog__row">
-              <input
-                className="dialog__input"
-                value={folderPath}
-                onChange={(e) => setFolderPath(e.target.value)}
-              />
-              <button type="button" className="dialog__btn-secondary" onClick={handleBrowse}>
-                Browse
-              </button>
-            </div>
-          </div>
-
-          <div className="dialog__field">
-            <label className="dialog__label">Color</label>
-            <div className="dialog__colors">
-              {PRESET_COLORS.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  className={`dialog__color-swatch${color === c ? ' dialog__color-swatch--selected' : ''}`}
-                  style={{ backgroundColor: c }}
-                  onClick={() => setColor(c)}
-                />
-              ))}
-            </div>
-          </div>
-
-          <div className="dialog__field">
-            <label className="dialog__label">Tags (comma-separated)</label>
-            <input
-              className="dialog__input"
-              value={tags}
-              onChange={(e) => setTags(e.target.value)}
-            />
-          </div>
-
-          {error && <p className="dialog__error">{error}</p>}
-
-          <div className="dialog__actions">
-            <button type="button" className="dialog__btn-secondary" onClick={onClose}>
-              Cancel
-            </button>
-            <button type="submit" className="dialog__btn-primary" disabled={!!nameError}>
-              Save
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  )
+  return { form, save: submitWorkspaceEdit }
 }

@@ -1,27 +1,13 @@
 import { test, expect, chromium, type Browser } from '@playwright/test'
-import { readFileSync, readdirSync, statSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { cssFiles, extensionBaseCss } from './extension-base-css'
 
 // Stacking and sizing gates for the git-integration review surfaces.
 // elementFromPoint and computed geometry need a rendered document.
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
-
-function baseCss(): string {
-  const src = readFileSync(join(ROOT, 'src/main/extensions/extension-view-host.ts'), 'utf8')
-  const m = src.match(/export const EXTENSION_BASE_CSS = `([\s\S]*?)\n`/)
-  if (!m) throw new Error('EXTENSION_BASE_CSS not found')
-  return m[1]
-}
-
-function cssFiles(dir: string): string[] {
-  return readdirSync(dir).flatMap((name) => {
-    const p = join(dir, name)
-    if (statSync(p).isDirectory()) return cssFiles(p)
-    return name.endsWith('.css') ? [p] : []
-  })
-}
 
 function allCss(): string {
   const files = [
@@ -46,7 +32,7 @@ async function render(body: string) {
   const page = await context.newPage()
   await page.setContent(
     `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>stacking</title>` +
-      `<style>${baseCss()}</style><style>${allCss()}</style></head><body>${body}</body></html>`
+      `<style>${extensionBaseCss(ROOT)}</style><style>${allCss()}</style></head><body>${body}</body></html>`
   )
   return { page, context }
 }
@@ -77,6 +63,30 @@ test('the review header menu is drawn above the file toolbar', async () => {
   }
 })
 
+/** Run in the page: scrolls the picker, then, for each row checkbox under the
+ * owner heading, whether the heading is what a click there would hit. */
+function probeUnderHeading(): { n: number; probes: boolean[]; box: number } {
+  const list = document.querySelector('.rp-list')!
+  list.scrollTop = 300
+  const checkbox = document.querySelector('.rp-group-label input')!
+  const box = checkbox.getBoundingClientRect()
+  const heading = document.querySelector('.rp-group-label')!.getBoundingClientRect()
+  // Probe every row checkbox that sits under the heading band.
+  const under = [...document.querySelectorAll('.rp-row input')].filter((c) => {
+    const r = c.getBoundingClientRect()
+    return r.top < heading.bottom && r.bottom > heading.top
+  })
+  const probes = under.map((c) => {
+    const r = c.getBoundingClientRect()
+    const el = document.elementFromPoint(
+      r.x + r.width / 2,
+      Math.max(r.y + r.height / 2, heading.top + 1)
+    )
+    return !!el?.closest('.rp-group-label')
+  })
+  return { n: under.length, probes, box: box.width }
+}
+
 test('the sticky owner heading in the repository picker stays above scrolled rows', async () => {
   const rows = Array.from(
     { length: 30 },
@@ -88,27 +98,7 @@ test('the sticky owner heading in the repository picker stays above scrolled row
      </div>`
   )
   try {
-    const hit = await page.evaluate(() => {
-      const list = document.querySelector('.rp-list')!
-      list.scrollTop = 300
-      const checkbox = document.querySelector('.rp-group-label input')!
-      const box = checkbox.getBoundingClientRect()
-      const heading = document.querySelector('.rp-group-label')!.getBoundingClientRect()
-      // Probe every row checkbox that sits under the heading band.
-      const under = [...document.querySelectorAll('.rp-row input')].filter((c) => {
-        const r = c.getBoundingClientRect()
-        return r.top < heading.bottom && r.bottom > heading.top
-      })
-      const probes = under.map((c) => {
-        const r = c.getBoundingClientRect()
-        const el = document.elementFromPoint(
-          r.x + r.width / 2,
-          Math.max(r.y + r.height / 2, heading.top + 1)
-        )
-        return !!el?.closest('.rp-group-label')
-      })
-      return { n: under.length, probes, box: box.width }
-    })
+    const hit = await page.evaluate(probeUnderHeading)
     expect(hit.n, 'a row checkbox is scrolled under the heading').toBeGreaterThan(0)
     expect(hit.probes.every(Boolean), 'heading is topmost over scrolled checkboxes').toBe(true)
   } finally {

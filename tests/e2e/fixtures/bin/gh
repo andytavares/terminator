@@ -1,0 +1,80 @@
+#!/usr/bin/env node
+// Stand-in for the gh CLI, beside the `claude` stub. When a spec has started a
+// stub GitHub (tests/e2e/github-stub.ts), the app's XDG_CONFIG_HOME, the folder
+// gh itself reads its config from, holds gh/e2e-stub-url: every call is sent
+// there and answered as gh would answer it. Otherwise this is the real gh, the
+// next one on PATH, so specs that start no stub run exactly as before.
+import { spawnSync } from 'node:child_process'
+import { accessSync, constants, readFileSync, realpathSync } from 'node:fs'
+import { delimiter, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+// The package is an ES module, so this extensionless script is one too.
+// PATH can name this folder as fixtures/zdotdir/../bin (fixtures/zdotdir/.zprofile)
+// or through a symlink, so a candidate is compared by its real path: one that
+// was this script ran itself until fork failed (macOS run 38380127678).
+const ownPath = realpathSync(fileURLToPath(import.meta.url))
+
+function stubUrl() {
+  const configHome = process.env.XDG_CONFIG_HOME
+  if (!configHome) return null
+  try {
+    return readFileSync(join(configHome, 'gh', 'e2e-stub-url'), 'utf8').trim()
+  } catch {
+    return null
+  }
+}
+
+function isOtherGh(candidate) {
+  try {
+    accessSync(candidate, constants.X_OK)
+    return realpathSync(candidate) !== ownPath
+  } catch {
+    return false
+  }
+}
+
+function realGh() {
+  for (const directory of (process.env.PATH || '').split(delimiter)) {
+    if (directory && isOtherGh(join(directory, 'gh'))) return join(directory, 'gh')
+  }
+  return null
+}
+
+function readStdin() {
+  try {
+    return readFileSync(0, 'utf8')
+  } catch {
+    return ''
+  }
+}
+
+async function forward(url) {
+  const call = {
+    args: process.argv.slice(2),
+    cwd: process.cwd(),
+    stdin: process.argv.includes('--input') ? readStdin() : '',
+    repository: process.env.GH_REPO || null,
+  }
+  const response = await fetch(url, { method: 'POST', body: JSON.stringify(call) })
+  const { stdout, stderr, exitCode } = await response.json()
+  process.stdout.write(stdout)
+  process.stderr.write(stderr)
+  process.exitCode = exitCode
+}
+
+const url = stubUrl()
+if (url) {
+  forward(url).catch((error) => {
+    process.stderr.write(`gh stub unreachable: ${String(error)}\n`)
+    process.exitCode = 1
+  })
+} else {
+  const gh = realGh()
+  if (!gh) {
+    process.stderr.write('gh: command not found\n')
+    process.exit(127)
+  }
+  const result = spawnSync(gh, process.argv.slice(2), { stdio: 'inherit' })
+  process.exit(result.status ?? 1)
+}

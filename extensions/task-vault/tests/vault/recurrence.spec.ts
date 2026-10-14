@@ -1,71 +1,21 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import {
-  localDate,
   computeNextDueDate,
   parseRecurrenceRule,
-  serializeRecurrenceRule,
   InvalidRecurrenceRuleError,
 } from '../../src/vault/recurrence'
 
-describe('localDate', () => {
-  it('formats a date as YYYY-MM-DD', () => {
-    expect(localDate(new Date(2024, 0, 5))).toBe('2024-01-05')
-  })
-
-  it('pads single-digit month and day', () => {
-    expect(localDate(new Date(2024, 2, 9))).toBe('2024-03-09')
-  })
-})
-
-describe('parseRecurrenceRule', () => {
-  it('parses daily', () => {
-    expect(parseRecurrenceRule('daily')).toEqual({ kind: 'daily' })
-  })
-
-  it('parses biweekly', () => {
-    expect(parseRecurrenceRule('biweekly')).toEqual({ kind: 'biweekly' })
-  })
-
-  it('parses monthly', () => {
-    expect(parseRecurrenceRule('monthly')).toEqual({ kind: 'monthly' })
-  })
-
-  it('parses plain weekly', () => {
-    expect(parseRecurrenceRule('weekly')).toEqual({ kind: 'weekly', days: [] })
-  })
-
-  it('parses weekly:1,3 with days', () => {
-    expect(parseRecurrenceRule('weekly:1,3')).toEqual({ kind: 'weekly', days: [1, 3] })
-  })
-
-  it('parses weekly with a single day', () => {
-    expect(parseRecurrenceRule('weekly:5')).toEqual({ kind: 'weekly', days: [5] })
-  })
-
-  it('throws InvalidRecurrenceRuleError on unknown input', () => {
-    expect(() => parseRecurrenceRule('unknown')).toThrow(InvalidRecurrenceRuleError)
-  })
-
-  it('throws on empty string', () => {
-    expect(() => parseRecurrenceRule('')).toThrow(InvalidRecurrenceRuleError)
-  })
-})
-
-describe('serializeRecurrenceRule', () => {
-  it('serialises daily', () => {
-    expect(serializeRecurrenceRule({ kind: 'daily' })).toBe('daily')
-  })
-
-  it('serialises weekly:1,3 (sorts days)', () => {
-    expect(serializeRecurrenceRule({ kind: 'weekly', days: [3, 1] })).toBe('weekly:1,3')
-  })
-
-  it('serialises plain weekly (no days)', () => {
-    expect(serializeRecurrenceRule({ kind: 'weekly', days: [] })).toBe('weekly')
-  })
-})
+describe('parseRecurrenceRule', parseRecurrenceRuleTests)
 
 describe('computeNextDueDate', () => {
+  describe('intervals', computeNextDueDateIntervalTests)
+  describe('month end', computeNextDueDateMonthEndTests)
+  describe('weekdays', computeNextDueDateWeekdayTests)
+})
+
+function computeNextDueDateIntervalTests() {
+  afterEach(() => vi.unstubAllEnvs())
+
   it('adds one day for daily', () => {
     expect(computeNextDueDate('2024-03-10', { kind: 'daily' })).toBe('2024-03-11')
   })
@@ -74,8 +24,48 @@ describe('computeNextDueDate', () => {
     expect(computeNextDueDate('2024-03-10', { kind: 'biweekly' })).toBe('2024-03-24')
   })
 
-  it('adds one month for monthly (overflow preserved)', () => {
-    expect(computeNextDueDate('2024-01-31', { kind: 'monthly' })).toBe('2024-03-02')
+  it('adds one month for monthly', () => {
+    expect(computeNextDueDate('2024-03-10', { kind: 'monthly' })).toBe('2024-04-10')
+    expect(computeNextDueDate('2025-12-15', { kind: 'monthly' })).toBe('2026-01-15')
+  })
+
+  it('has no next date after a due date that is not a calendar date', () => {
+    expect(computeNextDueDate('friday', { kind: 'daily' })).toBeNull()
+    expect(computeNextDueDate('2026-02-31', { kind: 'monthly' })).toBeNull()
+  })
+
+  it('counts days, not hours, across a clock change', () => {
+    vi.stubEnv('TZ', 'America/New_York')
+    expect(computeNextDueDate('2026-03-07', { kind: 'daily' })).toBe('2026-03-08')
+    expect(computeNextDueDate('2026-03-08', { kind: 'daily' })).toBe('2026-03-09')
+    expect(computeNextDueDate('2026-10-31', { kind: 'weekly', days: [0] })).toBe('2026-11-01')
+  })
+}
+
+function computeNextDueDateMonthEndTests() {
+  it('falls on the last day of a month too short for the day, and skips no month', () => {
+    expect(computeNextDueDate('2026-01-31', { kind: 'monthly' })).toBe('2026-02-28')
+    expect(computeNextDueDate('2024-01-31', { kind: 'monthly' })).toBe('2024-02-29')
+    expect(computeNextDueDate('2026-03-31', { kind: 'monthly' })).toBe('2026-04-30')
+  })
+
+  it('returns to the series day once a month is long enough for it', () => {
+    expect(computeNextDueDate('2026-02-28', { kind: 'monthly' }, '2026-01-31')).toBe('2026-03-31')
+    expect(computeNextDueDate('2026-04-30', { kind: 'monthly' }, '2026-01-31')).toBe('2026-05-31')
+    expect(computeNextDueDate('2026-02-28', { kind: 'monthly' }, '2026-01-30')).toBe('2026-03-30')
+  })
+
+  it('keeps the day it is on when the series start is not a calendar date', () => {
+    expect(computeNextDueDate('2026-02-28', { kind: 'monthly' }, 'friday')).toBe('2026-03-28')
+  })
+}
+
+function computeNextDueDateWeekdayTests() {
+  it('goes from Sunday to the next named day, and from Saturday round to Sunday', () => {
+    // 2024-03-10 is a Sunday, 2024-03-16 a Saturday.
+    expect(computeNextDueDate('2024-03-10', { kind: 'weekly', days: [0, 6] })).toBe('2024-03-16')
+    expect(computeNextDueDate('2024-03-16', { kind: 'weekly', days: [0, 6] })).toBe('2024-03-17')
+    expect(computeNextDueDate('2024-03-10', { kind: 'weekly', days: [0] })).toBe('2024-03-17')
   })
 
   it('adds 7 days for weekly with no days', () => {
@@ -91,4 +81,48 @@ describe('computeNextDueDate', () => {
     // 2024-03-15 is Friday (dow=5); days=[1,3] — wraps to next Monday
     expect(computeNextDueDate('2024-03-15', { kind: 'weekly', days: [1, 3] })).toBe('2024-03-18')
   })
-})
+}
+
+function parseRecurrenceRuleTests() {
+  describe('intervals', parseRecurrenceRuleIntervalsTests)
+  describe('weekdays', parseRecurrenceRuleWeekdaysTests)
+  describe('invalid rules', parseRecurrenceRuleInvalidRulesTests)
+}
+
+function parseRecurrenceRuleIntervalsTests() {
+  it('parses daily', () => {
+    expect(parseRecurrenceRule('daily')).toEqual({ kind: 'daily' })
+  })
+
+  it('parses biweekly', () => {
+    expect(parseRecurrenceRule('biweekly')).toEqual({ kind: 'biweekly' })
+  })
+
+  it('parses monthly', () => {
+    expect(parseRecurrenceRule('monthly')).toEqual({ kind: 'monthly' })
+  })
+
+  it('parses plain weekly', () => {
+    expect(parseRecurrenceRule('weekly')).toEqual({ kind: 'weekly', days: [] })
+  })
+}
+
+function parseRecurrenceRuleWeekdaysTests() {
+  it('parses weekly:1,3 with days', () => {
+    expect(parseRecurrenceRule('weekly:1,3')).toEqual({ kind: 'weekly', days: [1, 3] })
+  })
+
+  it('parses weekly with a single day', () => {
+    expect(parseRecurrenceRule('weekly:5')).toEqual({ kind: 'weekly', days: [5] })
+  })
+}
+
+function parseRecurrenceRuleInvalidRulesTests() {
+  it('throws InvalidRecurrenceRuleError on unknown input', () => {
+    expect(() => parseRecurrenceRule('unknown')).toThrow(InvalidRecurrenceRuleError)
+  })
+
+  it('throws on empty string', () => {
+    expect(() => parseRecurrenceRule('')).toThrow(InvalidRecurrenceRuleError)
+  })
+}

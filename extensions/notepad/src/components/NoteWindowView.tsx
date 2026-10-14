@@ -1,31 +1,29 @@
 import './notepad.css'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { MessageSquarePlus } from 'lucide-react'
+import { Button } from '@terminator/extension-ui'
+import type { EditorView } from '@codemirror/view'
 import { useEditorStore } from '../stores/editor.store'
 import { useCommentsStore } from '../stores/comments.store'
-import { CommentMargin } from './CommentMargin'
-import { CommentComposer } from './CommentComposer'
+import { useNotepadSettings, useNotepadSettingsStore } from '../stores/settings.store'
 import { NoteOutline } from './NoteOutline'
-import {
-  NoteEditor,
-  applyAnchors,
-  applyExternalDoc,
-  scrollToAnchor,
-  scrollToPosition,
-  setEditorHoverAnchor,
-  type SelectionAnchor,
-} from '../editor/NoteEditor'
+import { NoteEditor, applyExternalDoc, scrollToPosition } from '../editor/NoteEditor'
 import { ORIGIN_ID, onForeignNoteChange } from '../editor/noteSync'
-import { reanchorComment } from '../editor/reanchor'
-import { commentAnchorField } from '../editor/commentField'
-import type { EditorView } from '@codemirror/view'
+import { reanchorAfterSave, reanchorComments, schedulePersist } from './noteComments'
+import {
+  CommentColumn,
+  EditorCommentOverlays,
+  applyStoredAnchors,
+  hoveredAnchor,
+  useCommentCards,
+  useCommentAnchors,
+  useCommentHover,
+  useMarginScrollSync,
+  type ViewRef,
+} from './noteSurface'
 import type { Comment } from '../db/types'
+import { noteTitle } from '../db/note-title'
 
 const NOTE_ID = new URLSearchParams(window.location.search).get('noteId') ?? ''
-const AUTOSAVE_DELAY = 800
-const ANCHOR_DEBOUNCE = 2000
-const CARD_HEIGHT_EST = 110
-const CARD_GAP = 8
 
 interface NoteData {
   id: string
@@ -34,305 +32,17 @@ interface NoteData {
   tags: string[]
 }
 
-export function NoteWindowView(_props: { repoRoot: string | null }): React.JSX.Element {
-  const [note, setNote] = useState<NoteData | null>(null)
-  const [loadError, setLoadError] = useState<string | null>(null)
-  const [pendingAnchor, setPendingAnchor] = useState<SelectionAnchor | null>(null)
-  const [composingAnchor, setComposingAnchor] = useState<SelectionAnchor | null>(null)
-  const [anchorTops, setAnchorTops] = useState<Record<string, number>>({})
-  const [panelContentHeight, setPanelContentHeight] = useState(0)
-  const [activeCommentId, setActiveCommentId] = useState<string | null>(null)
-  const [commentHover, setCommentHover] = useState<{ id: string; top: number } | null>(null)
-  const [showOutline, setShowOutline] = useState(true)
-  const hoverHideTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+type SetNote = React.Dispatch<React.SetStateAction<NoteData | null>>
+type TimerRef = React.MutableRefObject<ReturnType<typeof setTimeout> | null>
 
-  const {
-    bodyDraft,
-    saveStatus,
-    previewMode,
-    setActiveNote,
-    markDirty,
-    markSaving,
-    markSaved,
-    togglePreviewMode,
-  } = useEditorStore()
-  const { comments, setComments } = useCommentsStore()
-  const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const anchorTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const editorViewRef = useRef<EditorView | null>(null)
-  const commentPanelRef = useRef<HTMLDivElement>(null)
-  const editorWrapRef = useRef<HTMLDivElement>(null)
+function setWindowTitle(title: string): void {
+  document.title = title || 'Note'
+}
 
-  // Load note + comments on mount
-  useEffect(() => {
-    if (!NOTE_ID) {
-      setLoadError('No note ID provided')
-      return
-    }
-    async function load() {
-      try {
-        const [noteResult, commentsResult] = await Promise.all([
-          window.electronAPI.extensionBridge.invoke('terminator.notepad:notes.get', {
-            id: NOTE_ID,
-          }),
-          window.electronAPI.extensionBridge.invoke('terminator.notepad:comments.list', {
-            noteId: NOTE_ID,
-            includeResolved: true,
-          }),
-        ])
-        const data = (noteResult as { data?: NoteData }).data
-        if (!data) {
-          setLoadError('Note not found')
-          return
-        }
-        setNote(data)
-        setActiveNote(data.id, data.body)
-        document.title = data.title || 'Note'
-
-        const allComments = (commentsResult as { data?: Comment[] }).data ?? []
-        const anchorUpdates: { id: string; newFrom: number; newTo: number }[] = []
-        const orphanIds: string[] = []
-        for (const c of allComments) {
-          if (c.parentId !== null || c.status === 'orphaned') continue
-          const result = reanchorComment(c, data.body)
-          if (result.status === 'orphaned') {
-            orphanIds.push(c.id)
-          } else if (result.newFrom !== undefined && result.newTo !== undefined) {
-            anchorUpdates.push({ id: c.id, newFrom: result.newFrom, newTo: result.newTo })
-          }
-        }
-        const updMap = new Map(anchorUpdates.map((u) => [u.id, u]))
-        const orphanSet = new Set(orphanIds)
-        setComments(
-          allComments.map((c) => {
-            if (orphanSet.has(c.id)) return { ...c, status: 'orphaned' as const }
-            const u = updMap.get(c.id)
-            return u ? { ...c, startOffset: u.newFrom, endOffset: u.newTo } : c
-          })
-        )
-        if (anchorUpdates.length > 0 || orphanIds.length > 0) {
-          if (anchorTimer.current) clearTimeout(anchorTimer.current)
-          anchorTimer.current = setTimeout(async () => {
-            await Promise.all([
-              ...anchorUpdates.map((u) =>
-                window.electronAPI.extensionBridge
-                  .invoke('terminator.notepad:comments.updateAnchor', {
-                    id: u.id,
-                    startOffset: u.newFrom,
-                    endOffset: u.newTo,
-                  })
-                  .catch(console.error)
-              ),
-              ...orphanIds.map((id) =>
-                window.electronAPI.extensionBridge
-                  .invoke('terminator.notepad:comments.markOrphaned', { id })
-                  .catch(console.error)
-              ),
-            ])
-          }, ANCHOR_DEBOUNCE)
-        }
-      } catch (err) {
-        setLoadError(String(err))
-      }
-    }
-    void load()
-  }, [setActiveNote, setComments])
-
-  // Re-layout comment cards when comments or editor changes
-  const computeAnchorTops = useCallback((view: EditorView, commentList: Comment[]) => {
-    requestAnimationFrame(() => {
-      const scrollTop = view.scrollDOM.scrollTop
-      const rect = view.scrollDOM.getBoundingClientRect()
-      const livePositions = new Map(view.state.field(commentAnchorField).map((a) => [a.id, a.from]))
-      const targets: { id: string; targetTop: number; createdAt: string }[] = []
-      for (const c of commentList) {
-        if (c.parentId === null && c.status !== 'orphaned') {
-          const livePos = livePositions.get(c.id)
-          const rawPos = livePos !== undefined ? livePos : c.startOffset
-          if (rawPos === null) continue
-          const pos = Math.min(rawPos, Math.max(0, view.state.doc.length - 1))
-          try {
-            const coords = view.coordsAtPos(pos)
-            if (coords)
-              targets.push({
-                id: c.id,
-                targetTop: coords.top - rect.top + scrollTop,
-                createdAt: c.createdAt,
-              })
-          } catch {
-            /* out of viewport */
-          }
-        }
-      }
-      targets.sort((a, b) => a.targetTop - b.targetTop || a.createdAt.localeCompare(b.createdAt))
-      const tops: Record<string, number> = {}
-      let prevBottom = 0
-      for (const t of targets) {
-        const top = Math.max(t.targetTop, prevBottom + CARD_GAP)
-        tops[t.id] = top
-        prevBottom = top + CARD_HEIGHT_EST
-      }
-      setAnchorTops(tops)
-      const lastTop = Object.values(tops).reduce((m, v) => Math.max(m, v), 0)
-      setPanelContentHeight(Math.max(view.scrollDOM.scrollHeight, lastTop + CARD_HEIGHT_EST + 20))
-      if (commentPanelRef.current) commentPanelRef.current.scrollTop = view.scrollDOM.scrollTop
-    })
-  }, [])
-
-  useEffect(() => {
-    const view = editorViewRef.current
-    if (!view) return
-    const validAnchors = comments
-      .filter((c) => c.parentId === null && c.status !== 'orphaned')
-      .map((c) => ({ id: c.id, from: c.startOffset ?? 0, to: c.endOffset ?? 0 }))
-      .filter((a) => a.from < a.to)
-    applyAnchors(view, validAnchors)
-    computeAnchorTops(view, comments)
-  }, [comments, computeAnchorTops])
-
-  useEffect(() => {
-    if (!note) return
-    let removeScroll: (() => void) | undefined
-    const t = setTimeout(() => {
-      const view = editorViewRef.current
-      const panel = commentPanelRef.current
-      if (!view || !panel) return
-      function onScroll() {
-        if (panel) panel.scrollTop = view.scrollDOM.scrollTop
-      }
-      view.scrollDOM.addEventListener('scroll', onScroll, { passive: true })
-      removeScroll = () => view.scrollDOM.removeEventListener('scroll', onScroll)
-    }, 100)
-    return () => {
-      clearTimeout(t)
-      removeScroll?.()
-    }
-  }, [note])
-
-  const scheduleAutosave = useCallback(
-    (newBody: string) => {
-      if (!note) return
-      if (autosaveTimer.current) clearTimeout(autosaveTimer.current)
-      autosaveTimer.current = setTimeout(async () => {
-        markSaving()
-        const headingMatch = /^#{1,6}\s+(.+)/m.exec(newBody)
-        const firstLine = newBody.split('\n').find((l) => l.trim().length > 0)
-        const title = headingMatch
-          ? headingMatch[1].trim()
-          : (firstLine?.trim().slice(0, 120) ?? 'Untitled note')
-        try {
-          await window.electronAPI.extensionBridge.invoke('terminator.notepad:notes.autosave', {
-            id: note.id,
-            title,
-            body: newBody,
-            tags: note.tags,
-            originId: ORIGIN_ID,
-          })
-          setNote((n) => (n ? { ...n, title } : n))
-          document.title = title || 'Note'
-          markSaved()
-
-          // Re-check anchors after save against the live editor body, not the
-          // stale newBody captured at debounce time.
-          const liveBody = editorViewRef.current?.state.doc.toString() ?? newBody
-          const currentComments = useCommentsStore.getState().comments
-          const orphanIds: string[] = []
-          const anchorUpdates: { id: string; newFrom: number; newTo: number }[] = []
-          for (const comment of currentComments) {
-            if (comment.parentId !== null || comment.status === 'orphaned') continue
-            const result = reanchorComment(comment, liveBody)
-            if (result.status === 'orphaned') {
-              orphanIds.push(comment.id)
-            } else if (result.newFrom !== undefined && result.newTo !== undefined) {
-              anchorUpdates.push({ id: comment.id, newFrom: result.newFrom, newTo: result.newTo })
-            }
-          }
-          if (orphanIds.length > 0 || anchorUpdates.length > 0) {
-            const updatedMap = new Map(anchorUpdates.map((u) => [u.id, u]))
-            useCommentsStore.getState().setComments(
-              currentComments.map((c) => {
-                if (orphanIds.includes(c.id)) return { ...c, status: 'orphaned' as const }
-                const upd = updatedMap.get(c.id)
-                return upd ? { ...c, startOffset: upd.newFrom, endOffset: upd.newTo } : c
-              })
-            )
-            await Promise.all([
-              ...orphanIds.map((id) =>
-                window.electronAPI.extensionBridge
-                  .invoke('terminator.notepad:comments.markOrphaned', { id })
-                  .catch((err) => console.error('[notepad] markOrphaned failed', err))
-              ),
-              ...anchorUpdates.map((u) =>
-                window.electronAPI.extensionBridge
-                  .invoke('terminator.notepad:comments.updateAnchor', {
-                    id: u.id,
-                    startOffset: u.newFrom,
-                    endOffset: u.newTo,
-                  })
-                  .catch((err) => console.error('[notepad] updateAnchor failed', err))
-              ),
-            ])
-          }
-        } catch {
-          /* silent — main window will retry */
-        }
-      }, AUTOSAVE_DELAY)
-    },
-    [note, markSaving, markSaved]
-  )
-
-  function handleEditorChange(newBody: string) {
-    // markDirty so an in-flight local edit outranks a foreign push (see the
-    // notes.changed subscription below) — the panel does the same.
-    markDirty(newBody)
-    scheduleAutosave(newBody)
-  }
-
-  // Adopt bodies saved by the docked panel so this window and the panel never
-  // hold different content for the same note.
-  useEffect(() => {
-    return onForeignNoteChange((event) => {
-      if (event.id !== NOTE_ID) return
-      if (useEditorStore.getState().isDirty) return
-      applyExternalDoc(editorViewRef.current, event.body)
-      setActiveNote(event.id, event.body)
-      setNote((n) => (n ? { ...n, title: event.title, tags: event.tags } : n))
-      document.title = event.title || 'Note'
-    })
-  }, [setActiveNote])
-
-  function handleEditorMouseOver(e: React.MouseEvent<HTMLDivElement>) {
-    const target = e.target as HTMLElement
-    const anchor = target.closest<HTMLElement>('[data-comment-id]')
-    if (anchor) {
-      const id = anchor.dataset.commentId
-      if (id) {
-        if (hoverHideTimer.current) clearTimeout(hoverHideTimer.current)
-        const top = anchorTops[id] ?? 0
-        setCommentHover({ id, top })
-      }
-    }
-  }
-
-  function scheduleHoverHide() {
-    if (hoverHideTimer.current) clearTimeout(hoverHideTimer.current)
-    hoverHideTimer.current = setTimeout(() => setCommentHover(null), 200)
-  }
-  function cancelHoverHide() {
-    if (hoverHideTimer.current) clearTimeout(hoverHideTimer.current)
-  }
-
-  function reloadComments() {
-    window.electronAPI.extensionBridge
-      .invoke('terminator.notepad:comments.list', { noteId: NOTE_ID })
-      .then((r) => {
-        const data = (r as { data?: Comment[] }).data
-        if (data) setComments(data)
-      })
-      .catch(console.error)
-  }
-
-  const statusLabel = saveStatus === 'saving' ? 'Saving…' : saveStatus === 'saved' ? 'Saved' : ''
+export function NoteWindowView(): React.JSX.Element {
+  const noteWindow = useNoteWindow()
+  useNotepadSettings()
+  const { note, loadError } = noteWindow
 
   if (loadError) {
     return <div className="notepad-window-loading">{loadError}</div>
@@ -343,134 +53,254 @@ export function NoteWindowView(_props: { repoRoot: string | null }): React.JSX.E
 
   return (
     <div className="notepad-window">
-      <div className="notepad-window__titlebar">
-        <span className="notepad-window__title">{note.title || 'Untitled'}</span>
-        <div className="notepad-window__titlebar-right">
-          <button
-            className="notepad-btn-ghost"
-            onClick={togglePreviewMode}
-            title={previewMode ? 'Show raw markdown source' : 'Show the rendered live preview'}
-          >
-            {previewMode ? 'Markdown' : 'Live'}
-          </button>
-          <button
-            className="notepad-btn-ghost"
-            onClick={() => setShowOutline((v) => !v)}
-            title={showOutline ? 'Hide the heading outline' : 'Show the heading outline'}
-          >
-            {showOutline ? 'Hide outline' : 'Outline'}
-          </button>
-          {note.tags.length > 0 && (
-            <div className="notepad-window__tags">
-              {note.tags.map((t) => (
-                <span key={t} className="notepad-window__tag">
-                  #{t}
-                </span>
-              ))}
-            </div>
-          )}
-          <span className={`notepad-window__status notepad-window__status--${saveStatus}`}>
-            {statusLabel}
-          </span>
-        </div>
-      </div>
+      <WindowTitlebar note={note} noteWindow={noteWindow} />
       <div className="notepad-window__body">
-        <div
-          ref={editorWrapRef}
-          className="notepad-view__editor-wrap"
-          onMouseOver={handleEditorMouseOver}
-          onMouseLeave={scheduleHoverHide}
-        >
-          <NoteEditor
-            key={note.id}
-            initialDoc={bodyDraft}
-            onChange={handleEditorChange}
-            onAnchorsReady={(getView) => {
-              const v = getView()
-              editorViewRef.current = v
-              // Apply anchors immediately so React Strict Mode's double-mount doesn't
-              // leave the second view without highlights (parent effect won't re-run
-              // if deps haven't changed, but editorViewRef now holds a fresh view).
-              if (v) {
-                const live = useCommentsStore.getState().comments
-                const validAnchors = live
-                  .filter((c) => c.parentId === null && c.status !== 'orphaned')
-                  .map((c) => ({ id: c.id, from: c.startOffset ?? 0, to: c.endOffset ?? 0 }))
-                  .filter((a) => a.from < a.to)
-                applyAnchors(v, validAnchors)
-              }
-            }}
-            onSelectionChange={(sel) => {
-              setPendingAnchor(sel)
-              if (!sel) setComposingAnchor(null)
-            }}
-            sourceMode={!previewMode}
-          />
-          {pendingAnchor && !composingAnchor && (
-            <button
-              className="notepad-add-comment-btn"
-              style={{ top: pendingAnchor.lineTop }}
-              title="Add comment"
-              onMouseDown={(e) => {
-                e.preventDefault()
-                setComposingAnchor(pendingAnchor)
-                setPendingAnchor(null)
-              }}
-            >
-              <MessageSquarePlus className="tm-icon" />
-            </button>
-          )}
-          {commentHover && (
-            <div
-              className="notepad-comment-hover-btn"
-              style={{ top: commentHover.top }}
-              onMouseEnter={cancelHoverHide}
-              onMouseLeave={scheduleHoverHide}
-              onMouseDown={(e) => {
-                e.preventDefault()
-                setActiveCommentId(commentHover.id)
-              }}
-            >
-              View comment
-            </div>
-          )}
-        </div>
-        <div className="notepad-view__rail">
-          {showOutline && (
-            <NoteOutline
-              onSelect={(pos) => scrollToPosition(editorViewRef.current, pos)}
-              onClose={() => setShowOutline(false)}
-            />
-          )}
-          <div className="notepad-view__comments" ref={commentPanelRef}>
-            {composingAnchor && (
-              <CommentComposer
-                anchor={{
-                  noteId: NOTE_ID,
-                  from: composingAnchor.from,
-                  to: composingAnchor.to,
-                  quote: composingAnchor.quote,
-                  prefix: composingAnchor.prefix,
-                  suffix: composingAnchor.suffix,
-                }}
-                onClose={() => setComposingAnchor(null)}
-                onCreated={() => {
-                  setComposingAnchor(null)
-                  reloadComments()
-                }}
-              />
-            )}
-            <CommentMargin
-              noteId={NOTE_ID}
-              anchorTops={anchorTops}
-              containerHeight={panelContentHeight}
-              activeCommentId={activeCommentId}
-              onCommentClick={(from, to) => scrollToAnchor(editorViewRef.current, from, to)}
-              onHoverComment={(id) => setEditorHoverAnchor(editorViewRef.current, id)}
-            />
-          </div>
-        </div>
+        <WindowEditorPane noteWindow={noteWindow} note={note} />
+        <WindowRail noteWindow={noteWindow} />
       </div>
+    </div>
+  )
+}
+
+function WindowRail({ noteWindow }: { noteWindow: NoteWindow }): React.JSX.Element {
+  const { showOutline, setShowOutline, editorViewRef, commentPanelRef, draft } = noteWindow
+  const { anchorTops, panelContentHeight, activeCommentId } = noteWindow
+  return (
+    <div className="notepad-view__rail">
+      {showOutline && (
+        <NoteOutline
+          onSelect={(pos) => scrollToPosition(editorViewRef.current, pos)}
+          onClose={() => setShowOutline(false)}
+        />
+      )}
+      <div className="notepad-view__comments" ref={commentPanelRef}>
+        <CommentColumn
+          noteId={NOTE_ID}
+          draft={draft}
+          viewRef={editorViewRef}
+          anchorTops={anchorTops}
+          containerHeight={panelContentHeight}
+          activeCommentId={activeCommentId}
+        />
+      </div>
+    </div>
+  )
+}
+
+/** The window's note, its comments and their layout, and saving. */
+function useNoteWindow() {
+  const [note, setNote] = useState<NoteData | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(NOTE_ID ? null : 'No note ID provided')
+  const [showOutline, setShowOutline] = useState(true)
+  const [activeCommentId, setActiveCommentId] = useState<string | null>(null)
+  const comments = useCommentsStore((s) => s.comments)
+  const editorViewRef: ViewRef = useRef<EditorView | null>(null)
+  const commentPanelRef = useRef<HTMLDivElement>(null)
+
+  useLoadWindowNote(setNote, setLoadError)
+  const cards = useCommentCards(editorViewRef, comments, {
+    noteId: NOTE_ID,
+    panelRef: commentPanelRef,
+  })
+  useMarginScrollSync(editorViewRef, commentPanelRef, note)
+  useAdoptPanelSaves(editorViewRef, setNote)
+  const scheduleAutosave = useWindowAutosave(note, setNote, editorViewRef)
+
+  return {
+    ...{ note, loadError, showOutline, setShowOutline, activeCommentId, setActiveCommentId },
+    ...{ editorViewRef, commentPanelRef, scheduleAutosave, ...cards },
+    ...{ draft: useCommentAnchors(), hover: useCommentHover() },
+  }
+}
+
+type NoteWindow = ReturnType<typeof useNoteWindow>
+
+/** Loads the note named in the URL with its comments, re-anchoring them to its body. */
+function useLoadWindowNote(setNote: SetNote, setLoadError: (error: string) => void) {
+  const anchorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => {
+    if (!NOTE_ID) return
+    loadWindowNote(anchorTimerRef)
+      .then((data) => (data ? setNote(data) : setLoadError('Note not found')))
+      .catch((err) => setLoadError(String(err)))
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+}
+
+async function loadWindowNote(anchorTimerRef: TimerRef): Promise<NoteData | null> {
+  const bridge = window.electronAPI.extensionBridge
+  const [noteResult, commentsResult] = await Promise.all([
+    bridge.invoke('terminator.notepad:notes.get', { id: NOTE_ID }),
+    bridge.invoke('terminator.notepad:comments.list', { noteId: NOTE_ID, includeResolved: true }),
+  ])
+  const data = (noteResult as { data?: NoteData }).data
+  if (!data) return null
+  useEditorStore.getState().setActiveNote(data.id, data.body)
+  setWindowTitle(data.title)
+
+  const reanchored = reanchorComments(
+    (commentsResult as { data?: Comment[] }).data ?? [],
+    data.body
+  )
+  useCommentsStore.getState().setComments(reanchored.comments)
+  schedulePersist(anchorTimerRef, reanchored)
+  return data
+}
+
+/** Adopts bodies the docked panel saved, so both surfaces hold one content per note. A local
+ *  edit still in flight outranks the push. */
+function useAdoptPanelSaves(editorViewRef: ViewRef, setNote: SetNote): void {
+  useEffect(() => {
+    return onForeignNoteChange((event) => {
+      if (event.id !== NOTE_ID) return
+      if (useEditorStore.getState().isDirty) return
+      applyExternalDoc(editorViewRef.current, event.body)
+      useEditorStore.getState().setActiveNote(event.id, event.body)
+      setNote((n) => (n ? { ...n, title: event.title, tags: event.tags } : n))
+      setWindowTitle(event.title)
+    })
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+}
+
+/** Saves an edit once typing pauses; a failure is left for the main window to retry. */
+function useWindowAutosave(note: NoteData | null, setNote: SetNote, editorViewRef: ViewRef) {
+  const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  return useCallback(
+    (newBody: string) => {
+      if (!note) return
+      if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current)
+      autosaveTimerRef.current = setTimeout(async () => {
+        const title = await saveWindowNote(note, newBody)
+        if (title === null) return
+        setNote((n) => (n ? { ...n, title } : n))
+        setWindowTitle(title)
+        useEditorStore.getState().markSaved()
+        await reanchorAfterSave(editorViewRef.current?.state.doc.toString() ?? newBody)
+      }, useNotepadSettingsStore.getState().autosaveMs)
+    },
+    [note] // eslint-disable-line react-hooks/exhaustive-deps
+  )
+}
+
+/** Resolves to the saved title, or null when the save failed. */
+async function saveWindowNote(note: NoteData, body: string): Promise<string | null> {
+  useEditorStore.getState().markSaving()
+  const title = noteTitle(body)
+  try {
+    const saved = await window.electronAPI.extensionBridge.invoke(
+      'terminator.notepad:notes.autosave',
+      { id: note.id, title, body, tags: note.tags, originId: ORIGIN_ID }
+    )
+    // A title set by hand is kept by the save, so the stored one is shown.
+    return (saved as { data?: { title?: string } }).data?.title ?? title
+  } catch {
+    return null
+  }
+}
+
+interface WindowTitlebarProps {
+  note: NoteData
+  noteWindow: NoteWindow
+}
+
+function WindowTitlebar({ note, noteWindow }: WindowTitlebarProps): React.JSX.Element {
+  const { saveStatus } = useEditorStore()
+  const statusLabel = { saving: 'Saving…', saved: 'Saved' }[saveStatus as string] ?? ''
+  return (
+    <div className="notepad-window__titlebar">
+      <span className="notepad-window__title">{note.title || 'Untitled'}</span>
+      <div className="notepad-window__titlebar-right">
+        <ViewModeButtons noteWindow={noteWindow} />
+        <NoteTags tags={note.tags} />
+        <span className={`notepad-window__status notepad-window__status--${saveStatus}`}>
+          {statusLabel}
+        </span>
+      </div>
+    </div>
+  )
+}
+
+function ViewModeButtons({ noteWindow }: { noteWindow: NoteWindow }): React.JSX.Element {
+  const { showOutline, setShowOutline } = noteWindow
+  const { previewMode, togglePreviewMode } = useEditorStore()
+  return (
+    <>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={togglePreviewMode}
+        title={previewMode ? 'Show raw markdown source' : 'Show the rendered live preview'}
+      >
+        {previewMode ? 'Markdown' : 'Live'}
+      </Button>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => setShowOutline((v) => !v)}
+        title={showOutline ? 'Hide the heading outline' : 'Show the heading outline'}
+      >
+        {showOutline ? 'Hide outline' : 'Outline'}
+      </Button>
+    </>
+  )
+}
+
+function NoteTags({ tags }: { tags: string[] }): React.JSX.Element | null {
+  if (tags.length === 0) return null
+  return (
+    <div className="notepad-window__tags">
+      {tags.map((t) => (
+        <span key={t} className="notepad-window__tag">
+          #{t}
+        </span>
+      ))}
+    </div>
+  )
+}
+
+/** A local edit marks the note unsaved, so it outranks a foreign push, and schedules its save. */
+function windowEditorCallbacks(noteWindow: NoteWindow) {
+  const { editorViewRef, scheduleAutosave } = noteWindow
+  return {
+    onChange: (newBody: string) => {
+      useEditorStore.getState().markDirty(newBody)
+      scheduleAutosave(newBody)
+    },
+    onAnchorsReady: (getView: () => EditorView | null) => {
+      editorViewRef.current = getView()
+      if (editorViewRef.current) applyStoredAnchors(editorViewRef.current)
+    },
+  }
+}
+
+/** The view-comment button is positioned from the card layout, level with its card. */
+function WindowEditorPane(props: { noteWindow: NoteWindow; note: NoteData }): React.JSX.Element {
+  const { noteWindow, note } = props
+  const { draft, hover, anchorTops, setActiveCommentId } = noteWindow
+  const { bodyDraft, previewMode } = useEditorStore()
+  const { onChange, onAnchorsReady } = windowEditorCallbacks(noteWindow)
+
+  function handleEditorMouseOver(e: React.MouseEvent<HTMLDivElement>) {
+    const hovered = hoveredAnchor(e)
+    if (!hovered) return
+    hover.cancelHoverHide()
+    hover.setCommentHover({ id: hovered.id, top: anchorTops[hovered.id] ?? 0 })
+  }
+
+  return (
+    <div
+      className="notepad-view__editor-wrap"
+      onMouseOver={handleEditorMouseOver}
+      onMouseLeave={hover.scheduleHoverHide}
+    >
+      <NoteEditor
+        key={note.id}
+        initialDoc={bodyDraft}
+        onChange={onChange}
+        onAnchorsReady={onAnchorsReady}
+        onSelectionChange={draft.onSelectionChange}
+        sourceMode={!previewMode}
+      />
+      <EditorCommentOverlays draft={draft} hover={hover} onGoToComment={setActiveCommentId} />
     </div>
   )
 }

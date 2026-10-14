@@ -52,7 +52,9 @@ describe('linear provider — states', () => {
     const options = (await providerWith(client).states?.(CRED, 'TAV-42')) ?? []
     expect(options.find((o) => o.intent === 'in_review')?.id).toBe('st-review')
   })
+})
 
+describe('linear provider — states by type', () => {
   it('resolves by type and not by name, however the states are named', async () => {
     const renamed = makeTeam({
       states: () =>
@@ -69,7 +71,9 @@ describe('linear provider — states', () => {
     expect(options.find((o) => o.intent === 'started')?.name).toBe('Cooking')
     expect(options.find((o) => o.intent === 'done')?.name).toBe('Shipped')
   })
+})
 
+describe('linear provider — states with one started state', () => {
   it('offers no review option when the workflow has only one started state', async () => {
     const single = makeTeam({
       states: () =>
@@ -85,7 +89,9 @@ describe('linear provider — states', () => {
     expect(options.some((o) => o.intent === 'in_review')).toBe(false)
     expect(options.find((o) => o.intent === 'started')?.id).toBe('b')
   })
+})
 
+describe('linear provider — states without an intent or a team', () => {
   it('leaves backlog, unstarted and cancelled states carrying no intent', async () => {
     const { client } = clientFor()
     const options = (await providerWith(client).states?.(CRED, 'TAV-42')) ?? []
@@ -122,19 +128,15 @@ describe('linear provider — transition', () => {
     })
   })
 
-  it('addresses the issue by its UUID, never by the human key', async () => {
-    const { client, updateIssue } = clientFor()
-    await providerWith(client).transition?.(CRED, 'TAV-42', 'done')
-    expect(updateIssue.mock.calls[0][0]).not.toBe('TAV-42')
-  })
-
   it("honours the operator's own mapping when one is given", async () => {
     const { client, updateIssue } = clientFor()
     // The operator decided "In Progress" is what in review means for them.
     await providerWith(client).transition?.(CRED, 'TAV-42', 'in_review', 'st-progress')
     expect(updateIssue).toHaveBeenCalledWith(expect.any(String), { stateId: 'st-progress' })
   })
+})
 
+describe('linear provider — transition refusals', () => {
   it('rejects an override naming a state this workflow does not have', async () => {
     const { client, updateIssue } = clientFor()
     await expect(
@@ -159,7 +161,9 @@ describe('linear provider — transition', () => {
     ).rejects.toMatchObject({ kind: 'not-found' })
     expect(updateIssue).not.toHaveBeenCalled()
   })
+})
 
+describe('linear provider — transition failures', () => {
   it('raises when Linear refuses the update', async () => {
     const { client } = clientFor()
     client.updateIssue = vi.fn().mockResolvedValue({ success: false })

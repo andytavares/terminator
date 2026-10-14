@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { orphanedNodes, reclaim, IN_FLIGHT } from '../../src/line/reclaim.js'
+import { orphanedNodes, reclaim } from '../../src/line/reclaim.js'
 import { buildRunGraph, withNode, nodeById } from '../../src/line/run-graph.js'
 import { parseRecipe } from '../../src/recipe/parse.js'
 import { draftOrder } from '../../src/order/draft.js'
@@ -61,12 +61,6 @@ describe('orphanedNodes', () => {
     expect(orphanedNodes(g, nothingLive).map((n) => n.id)).toEqual(['build:U-1'])
   })
 
-  it('covers verifying as well as running, because both occupy an agent', () => {
-    const g = withNode(graph(), 'build:U-1', { state: 'verifying', sessionId: 's1' })
-    expect(orphanedNodes(g, nothingLive).map((n) => n.id)).toEqual(['build:U-1'])
-    expect(IN_FLIGHT).toContain('verifying')
-  })
-
   it('leaves an in-flight node whose agent is still in its terminal alone', () => {
     const g = withNode(graph(), 'build:U-1', { state: 'running', sessionId: 's1' })
     expect(orphanedNodes(g, everythingLive)).toEqual([])
@@ -85,6 +79,12 @@ describe('orphanedNodes', () => {
 })
 
 describe('reclaim', () => {
+  describe('putting a node back', puttingANodeBackTests)
+  describe('end marks and blocked nodes', endMarksAndBlockedNodesTests)
+  describe('nothing to reclaim, or everything', nothingToReclaimOrEverythingTests)
+})
+
+function puttingANodeBackTests() {
   it('puts an orphaned node back where the scheduler can offer it again', () => {
     const g = withNode(graph(), 'build:U-1', { state: 'running', sessionId: 's1', attempts: 1 })
     const out = reclaim(g, nothingLive)
@@ -106,7 +106,9 @@ describe('reclaim', () => {
     const g = withNode(graph(), 'build:U-1', { state: 'running', sessionId: 's1' })
     expect(nodeById(reclaim(g, nothingLive).graph, 'build:U-1')?.sessionId).toBe('s1')
   })
+}
 
+function endMarksAndBlockedNodesTests() {
   it('clears the end mark, which a waiting node has not reached', () => {
     const g = withNode(graph(), 'build:U-1', {
       state: 'running',
@@ -121,7 +123,9 @@ describe('reclaim', () => {
     g = withNode(g, 'integrate', { state: 'blocked' })
     expect(nodeById(reclaim(g, nothingLive).graph, 'integrate')?.state).toBe('waiting')
   })
+}
 
+function nothingToReclaimOrEverythingTests() {
   it('changes nothing when every agent is still in its terminal', () => {
     const g = withNode(graph(), 'build:U-1', { state: 'running', sessionId: 's1' })
     const out = reclaim(g, everythingLive)
@@ -138,10 +142,10 @@ describe('reclaim', () => {
 
   it('reclaims every orphan at once, not one per pass', () => {
     let g = withNode(graph(), 'build:U-1', { state: 'running', sessionId: 's1' })
-    g = withNode(g, 'build:U-2', { state: 'verifying', sessionId: 's2' })
+    g = withNode(g, 'build:U-2', { state: 'running', sessionId: 's2' })
     expect(reclaim(g, nothingLive).reclaimed).toEqual(['build:U-1', 'build:U-2'])
   })
-})
+}
 
 describe('a running gate', () => {
   it('is the tail owed, not an agent that died', () => {

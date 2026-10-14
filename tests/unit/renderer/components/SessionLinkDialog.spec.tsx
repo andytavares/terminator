@@ -3,20 +3,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
 import type { IssueSummary } from '../../../../src/shared/types/index'
 
-const integrations = vi.hoisted(() => ({ connected: true }))
-const setLink = vi.hoisted(() => vi.fn().mockResolvedValue(true))
-const picked = vi.hoisted(() => ({
-  issue: { tracker: 'linear', key: 'NW-88', title: 'Rate limit per API key' } as IssueSummary,
-}))
+const picked = vi.hoisted(() => ({ key: 'NW-88', title: 'Rate limit per API key' }))
 
-vi.mock('../../../../src/renderer/stores/integrations.store', () => ({
-  useIntegrationsStore: (select: (s: unknown) => unknown) =>
-    select({ isAnyConnected: () => integrations.connected }),
-}))
-vi.mock('../../../../src/renderer/stores/session-records.store', () => ({
-  useSessionRecordsStore: (select: (s: unknown) => unknown) => select({ setLink }),
-}))
-vi.mock('../../../../src/renderer/stores/modal.store', () => ({ useModalEffect: () => {} }))
 // The picker searches the tracker and has its own spec; here it hands back one issue.
 vi.mock('../../../../src/renderer/components/integrations/IssuePicker', () => ({
   IssuePicker: ({
@@ -27,7 +15,7 @@ vi.mock('../../../../src/renderer/components/integrations/IssuePicker', () => ({
     onClear: () => void
   }) => (
     <>
-      <button type="button" onClick={() => onSelect(picked.issue)}>
+      <button type="button" onClick={() => onSelect(issueSummaryOf(picked))}>
         pick NW-88
       </button>
       <button type="button" onClick={onClear}>
@@ -39,12 +27,37 @@ vi.mock('../../../../src/renderer/components/integrations/IssuePicker', () => ({
 
 import { SessionLinkDialog } from '../../../../src/renderer/components/session/SessionLinkDialog'
 import { fact } from '../sidebar/fixtures/facts'
+import { useIntegrationsStore } from '../../../../src/renderer/stores/integrations.store'
+import { useSessionRecordsStore } from '../../../../src/renderer/stores/session-records.store'
+import { useModalStore } from '../../../../src/renderer/stores/modal.store'
+import {
+  issueSummaryOf,
+  sessionRecordOf,
+  trackerConnectionOf,
+} from '../../../support/renderer-stores'
+import { pressOutside } from '../../../support/modal'
 
 const onClose = vi.fn()
+// The main process's answer to a link write: the record with the link applied.
+const setLink = vi.fn<Window['electronAPI']['sessionRecords']['setLink']>(
+  async ({ session, link }) => ({ data: sessionRecordOf(session, { link }) })
+)
+const storedLinkOf = (sessionId: string) =>
+  useSessionRecordsStore.getState().records.get(sessionId)?.link
 
 beforeEach(() => {
   vi.clearAllMocks()
-  integrations.connected = true
+  Object.defineProperty(window, 'electronAPI', {
+    value: { sessionRecords: { setLink } },
+    writable: true,
+    configurable: true,
+  })
+  useIntegrationsStore.setState({
+    ...useIntegrationsStore.getInitialState(),
+    connections: [trackerConnectionOf()],
+  })
+  useSessionRecordsStore.setState(useSessionRecordsStore.getInitialState(), true)
+  useModalStore.setState(useModalStore.getInitialState(), true)
 })
 
 describe('SessionLinkDialog', () => {
@@ -58,29 +71,40 @@ describe('SessionLinkDialog', () => {
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Link NW-88' }))
     })
-    expect(setLink).toHaveBeenCalledWith(facts.snapshot, { tracker: 'linear', key: 'NW-88' })
+    expect(storedLinkOf(facts.sessionId)).toEqual({ tracker: 'linear', key: 'NW-88' })
     expect(onClose).toHaveBeenCalled()
   })
 
   it('stays open and says so when the link is refused', async () => {
-    setLink.mockResolvedValueOnce(false)
+    setLink.mockResolvedValueOnce({ error: 'write-failed', message: 'disk full' })
     render(<SessionLinkDialog facts={fact()} onClose={onClose} />)
     fireEvent.click(screen.getByRole('button', { name: 'pick NW-88' }))
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Link NW-88' }))
     })
     expect(screen.getByRole('alert').textContent).toMatch(/Could not link/)
+    expect(useSessionRecordsStore.getState().records.size).toBe(0)
     expect(onClose).not.toHaveBeenCalled()
   })
+})
 
+describe("SessionLinkDialog — removes the session's own link, which falls back to the branch's", () => {
   it("removes the session's own link, which falls back to the branch's", async () => {
     const own = fact({ workItem: { source: 'session', ref: { tracker: 'linear', key: 'NW-91' } } })
+    useSessionRecordsStore.setState({
+      records: new Map([
+        [
+          own.sessionId,
+          sessionRecordOf(own.snapshot, { link: { tracker: 'linear', key: 'NW-91' } }),
+        ],
+      ]),
+    })
     render(<SessionLinkDialog facts={own} onClose={onClose} />)
     expect(screen.getByText(/linked to NW-91/)).toBeTruthy()
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Remove session link' }))
     })
-    expect(setLink).toHaveBeenCalledWith(own.snapshot, null)
+    expect(storedLinkOf(own.sessionId)).toBeNull()
     expect(onClose).toHaveBeenCalled()
   })
 
@@ -91,9 +115,11 @@ describe('SessionLinkDialog', () => {
     render(<SessionLinkDialog facts={inherited} onClose={onClose} />)
     expect(screen.queryByRole('button', { name: 'Remove session link' })).toBeNull()
   })
+})
 
+describe('SessionLinkDialog — says where to connect a tracker when none is', () => {
   it('says where to connect a tracker when none is', () => {
-    integrations.connected = false
+    useIntegrationsStore.setState({ connections: [] })
     render(<SessionLinkDialog facts={fact()} onClose={onClose} />)
     expect(screen.getByRole('alert').textContent).toBe(
       'No issue tracker is connected. Connect Linear or Jira in Settings → Integrations.'
@@ -102,10 +128,10 @@ describe('SessionLinkDialog', () => {
   })
 
   it('closes on Cancel and on the backdrop, not on the dialog itself', () => {
-    const { container } = render(<SessionLinkDialog facts={fact()} onClose={onClose} />)
+    render(<SessionLinkDialog facts={fact()} onClose={onClose} />)
     fireEvent.click(screen.getByRole('dialog'))
     expect(onClose).not.toHaveBeenCalled()
-    fireEvent.click(container.querySelector('.dialog-overlay')!)
+    pressOutside(screen.getByRole('dialog'))
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(onClose).toHaveBeenCalledTimes(2)
   })
@@ -118,7 +144,9 @@ describe('SessionLinkDialog', () => {
       true
     )
   })
+})
 
+describe('SessionLinkDialog — keeps its keys from reaching the row or tile behind it', () => {
   it('keeps its keys from reaching the row or tile behind it', () => {
     const behind = vi.fn()
     render(
@@ -128,6 +156,13 @@ describe('SessionLinkDialog', () => {
     )
     fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Enter' })
     expect(behind).not.toHaveBeenCalled()
+  })
+
+  it('counts as an open modal until it closes', () => {
+    const { unmount } = render(<SessionLinkDialog facts={fact()} onClose={onClose} />)
+    expect(useModalStore.getState().depth).toBe(1)
+    unmount()
+    expect(useModalStore.getState().depth).toBe(0)
   })
 
   it('closes on Escape, wherever the focus is', () => {
@@ -142,7 +177,9 @@ describe('SessionLinkDialog', () => {
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(onClose).not.toHaveBeenCalled()
   })
+})
 
+describe('SessionLinkDialog — leaves other keys to the dialog, without reaching the row behind it', () => {
   it('leaves other keys to the dialog, without reaching the row behind it', () => {
     const behind = vi.fn()
     render(

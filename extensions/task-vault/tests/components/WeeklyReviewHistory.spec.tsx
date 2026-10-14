@@ -53,9 +53,11 @@ const DETAIL = {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  ;(window as unknown as { electronAPI: unknown }).electronAPI = {
-    extensionBridge: { invoke: mockInvoke, on: vi.fn(() => () => {}) },
-  }
+  Object.assign(window, {
+    electronAPI: {
+      extensionBridge: { invoke: mockInvoke, on: vi.fn(() => () => {}) },
+    },
+  })
   mockInvoke.mockImplementation((channel: string) => {
     if (channel === 'task-vault:review:list') return Promise.resolve({ reviews: [SUMMARY] })
     if (channel === 'task-vault:review:get') return Promise.resolve({ review: DETAIL })
@@ -65,19 +67,38 @@ beforeEach(() => {
 
 afterEach(cleanup)
 
-describe('groupActions', () => {
-  const action = (over: Partial<ReviewAction>): ReviewAction => ({
-    id: 'a',
-    step: 1,
-    action: 'captured',
-    entityType: 'task',
-    entityId: null,
-    entityLabel: 'x',
-    detail: null,
-    createdAt: '2026-01-05T09:00:00.000Z',
-    ...over,
+const action = (over: Partial<ReviewAction>): ReviewAction => ({
+  id: 'a',
+  step: 1,
+  action: 'captured',
+  entityType: 'task',
+  entityId: null,
+  entityLabel: 'x',
+  detail: null,
+  createdAt: '2026-01-05T09:00:00.000Z',
+  ...over,
+})
+
+describe('groupActions', groupActionsTests)
+
+describe('formatReviewDate', () => {
+  it('formats an ISO timestamp as a readable date', () => {
+    expect(formatReviewDate('2026-01-05T09:00:00.000Z')).toMatch(/2026/)
   })
 
+  it('passes through a value it cannot parse', () => {
+    expect(formatReviewDate('not a date')).toBe('not a date')
+  })
+})
+
+describe('WeeklyReviewHistory', weeklyReviewHistoryTests)
+
+function groupActionsTests() {
+  describe('grouping', groupActionsGroupingTests)
+  describe('ordering', groupActionsOrderingTests)
+}
+
+function groupActionsGroupingTests() {
   it('groups actions by kind', () => {
     const groups = groupActions([
       action({ id: '1', action: 'task-promoted' }),
@@ -97,7 +118,9 @@ describe('groupActions', () => {
   it('returns nothing for an empty action list', () => {
     expect(groupActions([])).toEqual([])
   })
+}
 
+function groupActionsOrderingTests() {
   it('orders groups by the flow of the review, not by input order', () => {
     const groups = groupActions([
       action({ id: '1', action: 'task-deleted' }),
@@ -105,19 +128,18 @@ describe('groupActions', () => {
     ])
     expect(groups.map((g) => g.kind)).toEqual(['captured', 'task-deleted'])
   })
-})
+}
 
-describe('formatReviewDate', () => {
-  it('formats an ISO timestamp as a readable date', () => {
-    expect(formatReviewDate('2026-01-05T09:00:00.000Z')).toMatch(/2026/)
-  })
+function weeklyReviewHistoryTests() {
+  describe('listing', weeklyReviewHistoryListingTests)
+  describe('status', weeklyReviewHistoryStatusTests)
+  describe('expanding', weeklyReviewHistoryExpandingTests)
+  describe('empty detail', weeklyReviewHistoryEmptyDetailTests)
+  describe('exporting', weeklyReviewHistoryExportingTests)
+  describe('export outcomes', weeklyReviewHistoryExportOutcomesTests)
+}
 
-  it('passes through a value it cannot parse', () => {
-    expect(formatReviewDate('not a date')).toBe('not a date')
-  })
-})
-
-describe('WeeklyReviewHistory', () => {
+function weeklyReviewHistoryListingTests() {
   it('lists past reviews with their action count', async () => {
     render(<WeeklyReviewHistory />)
     await waitFor(() => expect(screen.getByText('2 actions')).toBeTruthy())
@@ -138,7 +160,9 @@ describe('WeeklyReviewHistory', () => {
     render(<WeeklyReviewHistory />)
     await waitFor(() => expect(screen.getByText(/No reviews recorded yet/i)).toBeTruthy())
   })
+}
 
+function weeklyReviewHistoryStatusTests() {
   it('marks a review that was never finished', async () => {
     mockInvoke.mockImplementation((channel: string) => {
       if (channel === 'task-vault:review:list')
@@ -150,7 +174,14 @@ describe('WeeklyReviewHistory', () => {
     render(<WeeklyReviewHistory />)
     await waitFor(() => expect(screen.getByText('in progress')).toBeTruthy())
   })
+}
 
+function weeklyReviewHistoryExpandingTests() {
+  describe('opening', weeklyReviewHistoryExpandingOpeningTests)
+  describe('closing', weeklyReviewHistoryExpandingClosingTests)
+}
+
+function weeklyReviewHistoryExpandingOpeningTests() {
   it('shows what was done when a review is expanded', async () => {
     render(<WeeklyReviewHistory />)
     await waitFor(() => screen.getByText('2 actions'))
@@ -172,7 +203,9 @@ describe('WeeklyReviewHistory', () => {
     await waitFor(() => expect(screen.getByText('Reflection')).toBeTruthy())
     expect(screen.getByText('shipping small')).toBeTruthy()
   })
+}
 
+function weeklyReviewHistoryExpandingClosingTests() {
   it('collapses again on a second click', async () => {
     render(<WeeklyReviewHistory />)
     await waitFor(() => screen.getByText('2 actions'))
@@ -183,7 +216,9 @@ describe('WeeklyReviewHistory', () => {
 
     await waitFor(() => expect(screen.queryByText('Write the spec')).toBeNull())
   })
+}
 
+function weeklyReviewHistoryEmptyDetailTests() {
   it('says so when a review recorded nothing', async () => {
     mockInvoke.mockImplementation((channel: string) => {
       if (channel === 'task-vault:review:list')
@@ -198,7 +233,9 @@ describe('WeeklyReviewHistory', () => {
 
     await waitFor(() => expect(screen.getByText(/Nothing was recorded/i)).toBeTruthy())
   })
+}
 
+function weeklyReviewHistoryExportingTests() {
   it('exports a review and reports where it landed', async () => {
     mockInvoke.mockImplementation((channel: string) => {
       if (channel === 'task-vault:review:list') return Promise.resolve({ reviews: [SUMMARY] })
@@ -219,7 +256,14 @@ describe('WeeklyReviewHistory', () => {
       )
     )
   })
+}
 
+function weeklyReviewHistoryExportOutcomesTests() {
+  describe('cancelling', weeklyReviewHistoryExportOutcomesCancellingTests)
+  describe('failing', weeklyReviewHistoryExportOutcomesFailingTests)
+}
+
+function weeklyReviewHistoryExportOutcomesCancellingTests() {
   it('stays quiet when the user cancels the export dialog', async () => {
     mockInvoke.mockImplementation((channel: string) => {
       if (channel === 'task-vault:review:list') return Promise.resolve({ reviews: [SUMMARY] })
@@ -236,7 +280,9 @@ describe('WeeklyReviewHistory', () => {
     )
     expect(mockNotify).not.toHaveBeenCalled()
   })
+}
 
+function weeklyReviewHistoryExportOutcomesFailingTests() {
   it('surfaces an export failure', async () => {
     mockInvoke.mockImplementation((channel: string) => {
       if (channel === 'task-vault:review:list') return Promise.resolve({ reviews: [SUMMARY] })
@@ -256,4 +302,4 @@ describe('WeeklyReviewHistory', () => {
       )
     )
   })
-})
+}

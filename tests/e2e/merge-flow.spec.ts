@@ -1,9 +1,8 @@
 import { test, expect } from '@playwright/test'
 import { execSync } from 'node:child_process'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { AppHandle, launchApp, closeApp, createWorkspace } from './helpers'
+import { AppHandle, launchApp, closeApp, createWorkspace, e2eTempDir } from './helpers'
 import { CONTRAST_PROBE, type Probe } from './contrast-probe'
 
 /**
@@ -20,7 +19,7 @@ let repo: string
 
 /** A repository mid-merge, with one file genuinely conflicted. */
 function makeConflictedRepo(): string {
-  const dir = mkdtempSync(join(tmpdir(), 'terminator-e2e-conflict-'))
+  const dir = e2eTempDir('terminator-e2e-conflict-')
   const run = (c: string) => execSync(c, { cwd: dir })
   run('git init -b main')
   run('git config user.email "test@test.com"')
@@ -42,9 +41,10 @@ function makeConflictedRepo(): string {
   return dir
 }
 
-/** True once the git-integration view for `viewParam` has finished loading. */
-function gitViewReady(viewParam: string): Promise<boolean> {
-  return handle.app.evaluate(
+/** True once the git-integration view for `viewParam` has finished loading and
+ * drawn its view, a lazy chunk that renders after the load. */
+async function gitViewReady(viewParam: string): Promise<boolean> {
+  const loaded = await handle.app.evaluate(
     ({ webContents }, param) =>
       webContents
         .getAllWebContents()
@@ -57,6 +57,7 @@ function gitViewReady(viewParam: string): Promise<boolean> {
         ),
     viewParam
   )
+  return loaded && (await inGit<number>(viewParam, 'document.body.innerText.length')) > 0
 }
 
 /** Run a script inside the git-integration view matching `viewParam`. */
@@ -93,25 +94,8 @@ test.afterAll(async () => {
   if (repo) rmSync(repo, { recursive: true, force: true })
 })
 
-test('MergeFlow opens on a real conflict and reads in both themes', async () => {
-  // The Git project tab is where MergeFlow renders.
-  await handle.page
-    .locator('.tab-bar--primary .tab-bar__tab')
-    .filter({ hasText: 'Git' })
-    .first()
-    .click()
-  await expect(
-    handle.page.locator(
-      '[data-extension-panel="terminator.git-integration"][data-view-param="project"]'
-    )
-  ).toBeVisible({ timeout: 15000 })
-  await expect
-    .poll(() => gitViewReady('project'), {
-      timeout: 20000,
-      message: 'git project view never finished loading',
-    })
-    .toBe(true)
-
+/** Presses Resolve conflicts in the project view, and waits for ConflictHub. */
+async function openConflictHub(): Promise<void> {
   // Retries the click itself on every poll attempt, not just the read: the
   // button can exist before its handler is wired (or get replaced by a
   // re-render before the click lands), so a single click-then-poll can wait
@@ -135,6 +119,12 @@ test('MergeFlow opens on a real conflict and reads in both themes', async () => 
       }
     )
     .toMatch(/Files conflicted|Total conflicts|Needs your attention/)
+}
+
+test('MergeFlow opens on a real conflict and reads in both themes', async () => {
+  // The Git project tab is where MergeFlow renders.
+  await openGitProjectTab()
+  await openConflictHub()
 
   const text = await inGit<string>('project', 'document.body.innerText')
   // ConflictHub's own headings, in sentence case rather than the caps they were.

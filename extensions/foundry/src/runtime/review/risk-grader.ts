@@ -2,8 +2,8 @@
 // carries the safety property: P3 is checked LAST, so a lockfile change that
 // also touches authentication grades P0 rather than slipping into the only
 // lane that needs the least of your attention.
-
-export type RiskGrade = 'P0' | 'P1' | 'P2' | 'P3'
+import { matchesGlob } from 'node:path'
+import type { RiskGrade } from './risk-grade.js'
 
 export type CheckState = 'passing' | 'failing' | 'pending' | 'unavailable'
 
@@ -21,18 +21,6 @@ export interface GradedChange {
   readonly grade: RiskGrade
   /** The specific reason, shown on every queue item (FR-050). */
   readonly trigger: string
-}
-
-const GRADE_IN_WORDS: Record<RiskGrade, string> = {
-  P0: 'highest risk',
-  P1: 'elevated risk',
-  P2: 'ordinary risk',
-  P3: 'low risk',
-}
-
-/** A risk grade in words a person can read, never the bare code on its own. */
-export function gradeInWords(grade: RiskGrade): string {
-  return GRADE_IN_WORDS[grade]
 }
 
 const P0_PATTERNS: ReadonlyArray<{ label: string; pattern: RegExp }> = [
@@ -53,33 +41,20 @@ export function isLockfile(file: string): boolean {
   return /(^|\/)(package-lock\.json|pnpm-lock\.yaml|yarn\.lock)$/i.test(file)
 }
 
-/**
- * Minimal glob matching for the two forms an operator writes in a
- * critical-path list: `**` (any depth) and `*` (one segment). Deliberately not
- * a dependency — `minimatch` is only present in this tree by workspace
- * hoisting from an extension, and Constitution IV requires the standard
- * library be used where it fully satisfies the requirement.
- */
-export function matchesGlob(file: string, glob: string): boolean {
-  const pattern = glob
-    .split(/(\*\*\/|\*\*|\*|\?)/)
-    .map((part) => {
-      if (part === '**/') return '(?:.*/)?'
-      if (part === '**') return '.*'
-      if (part === '*') return '[^/]*'
-      if (part === '?') return '[^/]'
-      return part.replace(/[.+^${}()|[\]\\]/g, '\\$&')
-    })
-    .join('')
-  return new RegExp(`^${pattern}$`).test(file)
-}
-
 function matchesAnyGlob(file: string, globs: readonly string[]): boolean {
   return globs.some((glob) => matchesGlob(file, glob))
 }
 
 export function gradeRisk(change: ChangeSummary): GradedChange {
-  // ── P0 ────────────────────────────────────────────────────────────────────
+  return (
+    p0Of(change) ??
+    p1Of(change) ??
+    p3Of(change) ?? { grade: 'P2', trigger: 'ordinary feature work' }
+  )
+}
+
+// ── P0 ────────────────────────────────────────────────────────────────────
+function p0Of(change: ChangeSummary): GradedChange | null {
   for (const file of change.files) {
     for (const { label, pattern } of P0_PATTERNS) {
       if (pattern.test(file)) return { grade: 'P0', trigger: `touches ${label}: ${file}` }
@@ -88,8 +63,11 @@ export function gradeRisk(change: ChangeSummary): GradedChange {
       return { grade: 'P0', trigger: `on this repository's critical-path list: ${file}` }
     }
   }
+  return null
+}
 
-  // ── P1 ────────────────────────────────────────────────────────────────────
+// ── P1 ────────────────────────────────────────────────────────────────────
+function p1Of(change: ChangeSummary): GradedChange | null {
   for (const file of change.files) {
     if (SCHEMA_PATTERN.test(file)) return { grade: 'P1', trigger: `alters a schema: ${file}` }
     if (change.sharedContractFiles.includes(file)) {
@@ -99,12 +77,13 @@ export function gradeRisk(change: ChangeSummary): GradedChange {
   if (change.linesChanged > LARGE_CHANGE_LINES) {
     return { grade: 'P1', trigger: `${change.linesChanged} changed lines` }
   }
+  return null
+}
 
-  // ── P3 ────────────────────────────────────────────────────────────────────
-  // Last, and only when every file is trivial AND the checks actually passed.
-  // Anything other than `passing` — including an unreachable code host — must
-  // not produce a P3, because P3 is the only grade eligible for unattended
-  // merge (FR-057, FR-062).
+// ── P3 ── last, and only when every file is trivial and the checks passed: anything
+// else, an unreachable host too, must not grade P3, the one grade eligible for
+// unattended merge (FR-057, FR-062).
+function p3Of(change: ChangeSummary): GradedChange | null {
   if (
     change.files.length > 0 &&
     change.checkState === 'passing' &&
@@ -112,6 +91,5 @@ export function gradeRisk(change: ChangeSummary): GradedChange {
   ) {
     return { grade: 'P3', trigger: 'lockfile, formatting or dependency bump with green checks' }
   }
-
-  return { grade: 'P2', trigger: 'ordinary feature work' }
+  return null
 }

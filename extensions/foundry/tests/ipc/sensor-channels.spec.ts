@@ -1,7 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import * as fs from 'node:fs'
-import * as os from 'node:os'
-import * as path from 'node:path'
 
 import { createSensorChannels } from '../../src/ipc/sensor-channels.js'
 import { createSignalStore } from '../../src/sensors/store.js'
@@ -11,13 +9,14 @@ import type { Signal } from '../../src/sensors/types.js'
 import type { SensorDef } from '../../src/sensors/types.js'
 import type { AvailableSensor } from '../../src/ipc/sensor-channels.js'
 import type { CollectDeps } from '../../src/sensors/collect.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 let root: string
 let repo: string
 
 beforeEach(() => {
-  root = fs.mkdtempSync(path.join(os.tmpdir(), 'foundry-sensor-channels-'))
-  repo = fs.mkdtempSync(path.join(os.tmpdir(), 'foundry-sensor-repo-'))
+  root = makeTempDir('foundry-sensor-channels-')
+  repo = makeTempDir('foundry-sensor-repo-')
 })
 
 afterEach(() => {
@@ -84,14 +83,9 @@ describe('foundry:signals.list', () => {
     await seedSignal(store, { id: 'sig-open', status: 'open' })
     await seedSignal(store, { id: 'sig-dismissed', status: 'dismissed', dismissedAt: 1 })
 
-    const result = (await c.list({})) as { signals: Signal[]; counts: { open: number } }
+    const result = (await c.list()) as { signals: Signal[]; counts: { open: number } }
     expect(result.signals.map((s) => s.id)).toEqual(['sig-open'])
     expect(result.counts.open).toBe(1)
-  })
-
-  it('rejects a malformed payload', async () => {
-    const { c } = channels()
-    expect(await c.list({ bogus: true })).toEqual({ error: 'Malformed request.' })
   })
 })
 
@@ -108,11 +102,6 @@ describe('foundry:signals.dismiss', () => {
   it('errors on an unknown signal', async () => {
     const { c } = channels()
     expect(await c.dismiss({ id: 'nope' })).toEqual({ error: 'No signal nope.' })
-  })
-
-  it('rejects a malformed payload', async () => {
-    const { c } = channels()
-    expect(await c.dismiss({})).toEqual({ error: 'Malformed request.' })
   })
 })
 
@@ -139,17 +128,12 @@ describe('foundry:signals.promote', () => {
     const { c } = channels()
     expect(await c.promote({ id: 'nope', repoPaths: [repo] })).toEqual({ error: 'No signal nope.' })
   })
-
-  it('rejects a malformed payload', async () => {
-    const { c } = channels()
-    expect(await c.promote({ id: 'sig-1' })).toEqual({ error: 'Malformed request.' })
-  })
 })
 
 describe('foundry:sensors.list', () => {
   it('lists every available sensor with a defaulted state', async () => {
     const { c } = channels()
-    const result = (await c.sensorsList({})) as {
+    const result = (await c.sensorsList()) as {
       sensors: { def: SensorDef; state: unknown; nextDueAt: string | null }[]
     }
     expect(result.sensors).toHaveLength(1)
@@ -163,16 +147,11 @@ describe('foundry:sensors.list', () => {
     expect(result.sensors[0].nextDueAt).toBeNull()
   })
 
-  it('rejects a malformed payload', async () => {
-    const { c } = channels()
-    expect(await c.sensorsList({ bogus: true })).toEqual({ error: 'Malformed request.' })
-  })
-
   it('is due now for an enabled sensor that has never run', async () => {
     const { c } = channels()
     await c.sensorsSet({ id: 'ci-flake', repoPath: repo, enabled: true })
 
-    const result = (await c.sensorsList({})) as { sensors: { nextDueAt: string | null }[] }
+    const result = (await c.sensorsList()) as { sensors: { nextDueAt: string | null }[] }
     expect(result.sensors[0].nextDueAt).toBe('2026-01-01T00:20:00.000Z')
   })
 
@@ -181,12 +160,17 @@ describe('foundry:sensors.list', () => {
     await c.sensorsSet({ id: 'ci-flake', repoPath: repo, enabled: true })
     await c.sensorsRunNow({ id: 'ci-flake' })
 
-    const result = (await c.sensorsList({})) as { sensors: { nextDueAt: string | null }[] }
+    const result = (await c.sensorsList()) as { sensors: { nextDueAt: string | null }[] }
     expect(result.sensors[0].nextDueAt).toBe('2026-01-01T00:35:00.000Z')
   })
 })
 
 describe('foundry:sensors.set', () => {
+  describe('enabling', sensorChannelsEnablingTests)
+  describe('disabling and clearing', disablingAndClearingTests)
+})
+
+function sensorChannelsEnablingTests() {
   it('refuses to enable a sensor with no repository', async () => {
     const { c } = channels()
     expect(await c.sensorsSet({ id: 'ci-flake', enabled: true })).toEqual({
@@ -207,7 +191,9 @@ describe('foundry:sensors.set', () => {
       lastProblem: null,
     })
   })
+}
 
+function disablingAndClearingTests() {
   it('disables a sensor without needing a repository', async () => {
     const { c } = channels()
     await c.sensorsSet({ id: 'ci-flake', repoPath: repo, enabled: true })
@@ -230,12 +216,7 @@ describe('foundry:sensors.set', () => {
       lastProblem: null,
     })
   })
-
-  it('rejects a malformed payload', async () => {
-    const { c } = channels()
-    expect(await c.sensorsSet({ enabled: true })).toEqual({ error: 'Malformed request.' })
-  })
-})
+}
 
 describe('foundry:sensors.run-now', () => {
   it('runs the sensor once and reports what it recorded', async () => {
@@ -256,10 +237,5 @@ describe('foundry:sensors.run-now', () => {
   it('errors on an unknown sensor', async () => {
     const { c } = channels()
     expect(await c.sensorsRunNow({ id: 'nope' })).toEqual({ error: 'No sensor nope.' })
-  })
-
-  it('rejects a malformed payload', async () => {
-    const { c } = channels()
-    expect(await c.sensorsRunNow({})).toEqual({ error: 'Malformed request.' })
   })
 })

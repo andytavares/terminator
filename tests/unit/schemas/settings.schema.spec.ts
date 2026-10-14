@@ -10,9 +10,16 @@ const validGlobal = {
   appearance: { theme: 'dark' as const },
   terminal: { scrollbackLimit: 10000, defaultShell: '/bin/zsh' },
   git: { worktreeBaseDir: '' },
-  extensions: {},
   ui: { hasSeenWelcome: false },
 }
+
+const validWorkspace = {
+  workspaceId: '550e8400-e29b-41d4-a716-446655440000',
+  overrides: {},
+  extensions: {},
+}
+
+const staleBase = { ...DEFAULT_GLOBAL_SETTINGS }
 
 describe('ThemeSchema', () => {
   it('accepts dark', () => {
@@ -61,7 +68,9 @@ describe('GlobalSettingsSchema', () => {
     })
     expect(result.success).toBe(false)
   })
+})
 
+describe('GlobalSettingsSchema — scrollback bounds', () => {
   it('rejects scrollbackLimit above maximum (100000)', () => {
     const result = GlobalSettingsSchema.safeParse({
       ...validGlobal,
@@ -93,7 +102,9 @@ describe('GlobalSettingsSchema', () => {
     })
     expect(result.success).toBe(false)
   })
+})
 
+describe('GlobalSettingsSchema — shell, ui and extensions', () => {
   it('rejects empty defaultShell', () => {
     const result = GlobalSettingsSchema.safeParse({
       ...validGlobal,
@@ -110,20 +121,9 @@ describe('GlobalSettingsSchema', () => {
       expect(result.data.ui).toEqual({ hasSeenWelcome: false, editor: '' })
     }
   })
+})
 
-  it('accepts extensions as empty record', () => {
-    const result = GlobalSettingsSchema.safeParse({ ...validGlobal, extensions: {} })
-    expect(result.success).toBe(true)
-  })
-
-  it('accepts extensions with nested unknown values', () => {
-    const result = GlobalSettingsSchema.safeParse({
-      ...validGlobal,
-      extensions: { 'my-ext': { setting1: true, setting2: 42 } },
-    })
-    expect(result.success).toBe(true)
-  })
-
+describe('GlobalSettingsSchema — required fields and welcome flag', () => {
   it('rejects missing appearance field', () => {
     const { appearance: _a, ...without } = validGlobal
     const result = GlobalSettingsSchema.safeParse(without)
@@ -149,7 +149,9 @@ describe('GlobalSettingsSchema', () => {
     const result = GlobalSettingsSchema.safeParse({ ...validGlobal, ui: { hasSeenWelcome: 'yes' } })
     expect(result.success).toBe(false)
   })
+})
 
+describe('GlobalSettingsSchema — notifications', () => {
   it('applies default value for notifications field when omitted', () => {
     const result = GlobalSettingsSchema.safeParse(validGlobal)
     expect(result.success).toBe(true)
@@ -177,7 +179,9 @@ describe('GlobalSettingsSchema', () => {
       })
     }
   })
+})
 
+describe('GlobalSettingsSchema — unknown notification targets', () => {
   it('rejects an unknown notification target', () => {
     const result = GlobalSettingsSchema.safeParse({
       ...validGlobal,
@@ -219,12 +223,6 @@ describe('DEFAULT_GLOBAL_SETTINGS', () => {
 })
 
 describe('WorkspaceSettingsSchema', () => {
-  const validWorkspace = {
-    workspaceId: '550e8400-e29b-41d4-a716-446655440000',
-    overrides: {},
-    extensions: {},
-  }
-
   it('accepts a valid workspace settings object', () => {
     expect(WorkspaceSettingsSchema.safeParse(validWorkspace).success).toBe(true)
   })
@@ -245,7 +243,9 @@ describe('WorkspaceSettingsSchema', () => {
       expect(result.data.overrides).toEqual({})
     }
   })
+})
 
+describe('WorkspaceSettingsSchema — defaults and appearance overrides', () => {
   it('applies default empty record for extensions when omitted', () => {
     const { extensions: _e, ...without } = validWorkspace
     const result = WorkspaceSettingsSchema.safeParse(without)
@@ -270,7 +270,9 @@ describe('WorkspaceSettingsSchema', () => {
     })
     expect(result.success).toBe(false)
   })
+})
 
+describe('WorkspaceSettingsSchema — terminal overrides', () => {
   it('accepts overrides.terminal with partial fields', () => {
     const result = WorkspaceSettingsSchema.safeParse({
       ...validWorkspace,
@@ -302,7 +304,9 @@ describe('WorkspaceSettingsSchema', () => {
     })
     expect(result.success).toBe(false)
   })
+})
 
+describe('WorkspaceSettingsSchema — git overrides and invalid ids', () => {
   it('accepts overrides.git with worktreeBaseDir', () => {
     const result = WorkspaceSettingsSchema.safeParse({
       ...validWorkspace,
@@ -325,45 +329,46 @@ describe('WorkspaceSettingsSchema', () => {
 })
 
 describe('GlobalSettingsSchema — sidebar staleness (FR-020)', () => {
-  const base = { ...DEFAULT_GLOBAL_SETTINGS }
-
   it('defaults the threshold to two hours', () => {
-    const parsed = GlobalSettingsSchema.parse({ ...base, sidebar: undefined })
+    const parsed = GlobalSettingsSchema.parse({ ...staleBase, sidebar: undefined })
     expect(parsed.sidebar.staleAfterMs).toBe(7_200_000)
   })
 
   it('accepts a threshold inside the allowed range', () => {
-    const parsed = GlobalSettingsSchema.parse({ ...base, sidebar: { staleAfterMs: 900_000 } })
+    const parsed = GlobalSettingsSchema.parse({ ...staleBase, sidebar: { staleAfterMs: 900_000 } })
     expect(parsed.sidebar.staleAfterMs).toBe(900_000)
   })
 
   it('rejects zero, which would make every session stale', () => {
-    expect(GlobalSettingsSchema.safeParse({ ...base, sidebar: { staleAfterMs: 0 } }).success).toBe(
-      false
-    )
+    expect(
+      GlobalSettingsSchema.safeParse({ ...staleBase, sidebar: { staleAfterMs: 0 } }).success
+    ).toBe(false)
   })
 
   it('rejects anything under a minute', () => {
     expect(
-      GlobalSettingsSchema.safeParse({ ...base, sidebar: { staleAfterMs: 59_999 } }).success
+      GlobalSettingsSchema.safeParse({ ...staleBase, sidebar: { staleAfterMs: 59_999 } }).success
     ).toBe(false)
   })
 
   it('accepts exactly one minute', () => {
     expect(
-      GlobalSettingsSchema.safeParse({ ...base, sidebar: { staleAfterMs: 60_000 } }).success
+      GlobalSettingsSchema.safeParse({ ...staleBase, sidebar: { staleAfterMs: 60_000 } }).success
     ).toBe(true)
   })
+})
 
+describe('GlobalSettingsSchema — sidebar staleness upper bound (FR-020)', () => {
   it('rejects anything over thirty days, which would make the filter meaningless', () => {
     expect(
-      GlobalSettingsSchema.safeParse({ ...base, sidebar: { staleAfterMs: 2_592_000_001 } }).success
+      GlobalSettingsSchema.safeParse({ ...staleBase, sidebar: { staleAfterMs: 2_592_000_001 } })
+        .success
     ).toBe(false)
   })
 
   it('rejects a fractional millisecond count', () => {
     expect(
-      GlobalSettingsSchema.safeParse({ ...base, sidebar: { staleAfterMs: 60_000.5 } }).success
+      GlobalSettingsSchema.safeParse({ ...staleBase, sidebar: { staleAfterMs: 60_000.5 } }).success
     ).toBe(false)
   })
 
@@ -402,7 +407,9 @@ describe('GlobalSettingsSchema — quick actions (057)', () => {
     })
     expect(result.success).toBe(true)
   })
+})
 
+describe('GlobalSettingsSchema — quick action mnemonics (057)', () => {
   it('rejects a mnemonic longer than one character', () => {
     const result = GlobalSettingsSchema.safeParse({
       ...validGlobal,
@@ -424,7 +431,9 @@ describe('GlobalSettingsSchema — quick actions (057)', () => {
     })
     expect(result.success).toBe(false)
   })
+})
 
+describe('GlobalSettingsSchema — quick action bodies (057)', () => {
   it('rejects an empty body', () => {
     const result = GlobalSettingsSchema.safeParse({
       ...validGlobal,
@@ -439,7 +448,9 @@ describe('GlobalSettingsSchema — quick actions (057)', () => {
     })
     expect(result.success).toBe(false)
   })
+})
 
+describe('GlobalSettingsSchema — quick action kinds (057)', () => {
   it('rejects an unknown kind', () => {
     const result = GlobalSettingsSchema.safeParse({
       ...validGlobal,
@@ -460,7 +471,9 @@ describe('GlobalSettingsSchema — quick actions (057)', () => {
     })
     expect(result.success).toBe(false)
   })
+})
 
+describe('GlobalSettingsSchema — quick action targets and defaults (057)', () => {
   it('rejects an unknown target', () => {
     const result = GlobalSettingsSchema.safeParse({
       ...validGlobal,
@@ -493,12 +506,6 @@ describe('GlobalSettingsSchema — quick actions (057)', () => {
 })
 
 describe('WorkspaceSettingsSchema — quick actions custom overrides (057)', () => {
-  const validWorkspace = {
-    workspaceId: '550e8400-e29b-41d4-a716-446655440000',
-    overrides: {},
-    extensions: {},
-  }
-
   it('accepts overrides.quickActions with a custom action list', () => {
     const result = WorkspaceSettingsSchema.safeParse({
       ...validWorkspace,

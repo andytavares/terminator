@@ -7,13 +7,15 @@ const mockOn = vi.fn().mockReturnValue(() => {})
 beforeEach(() => {
   vi.clearAllMocks()
   mockInvoke.mockResolvedValue({})
-  ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
-    extensionBridge: { invoke: mockInvoke, on: mockOn },
-  }
+  Object.assign(globalThis, {
+    electronAPI: {
+      extensionBridge: { invoke: mockInvoke, on: mockOn },
+    },
+  })
 })
 
 afterEach(() => {
-  delete (globalThis as unknown as Record<string, unknown>).electronAPI
+  Reflect.deleteProperty(globalThis, 'electronAPI')
 })
 
 const scope = {
@@ -47,7 +49,9 @@ describe('reviewAgentAPI bridge', () => {
     await reviewAgentAPI.cancel('run-1')
     expect(mockInvoke).toHaveBeenCalledWith('review-agent:cancel', { runId: 'run-1' })
   })
+})
 
+describe('reviewAgentAPI bridge — list calls review-agent:list with repo/pr/sha', () => {
   it('list calls review-agent:list with repo/pr/sha', async () => {
     const { reviewAgentAPI } = await import('../../src/api/review-agent')
     await reviewAgentAPI.list('/repo', 1, 'sha1')
@@ -70,7 +74,9 @@ describe('reviewAgentAPI bridge', () => {
     await reviewAgentAPI.dismiss(payload)
     expect(mockInvoke).toHaveBeenCalledWith('review-agent:dismiss', payload)
   })
+})
 
+describe('reviewAgentAPI bridge — openTerminal calls review-agent:open-terminal with the runId', () => {
   it('openTerminal calls review-agent:open-terminal with the runId', async () => {
     const { reviewAgentAPI } = await import('../../src/api/review-agent')
     await reviewAgentAPI.openTerminal('run-1')

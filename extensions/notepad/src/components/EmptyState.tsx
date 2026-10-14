@@ -1,5 +1,6 @@
 import React from 'react'
 import { Pencil } from 'lucide-react'
+import { Button } from '@terminator/extension-ui'
 
 interface EmptyStateProps {
   onNewNote?: () => void
@@ -18,14 +19,10 @@ export function EmptyState({ onNewNote, onImport }: EmptyStateProps): React.JSX.
         this machine and export to plain markdown whenever you want.
       </p>
       <div className="notepad-empty-state__buttons">
-        <button className="notepad-btn-primary notepad-empty-state__new" onClick={onNewNote}>
-          New note <kbd className="notepad-kbd notepad-kbd--inline">⌘⇧N</kbd>
-        </button>
-        {onImport && (
-          <button className="notepad-btn-outline" onClick={onImport}>
-            Import a folder…
-          </button>
-        )}
+        <Button variant="primary" onClick={onNewNote}>
+          New note <kbd className="tmui-kbd">⌘⇧N</kbd>
+        </Button>
+        {onImport && <Button onClick={onImport}>Import a folder…</Button>}
       </div>
       <p className="notepad-empty-state__tip">
         Tip: press <kbd className="notepad-kbd">⌘⇧N</kbd> anytime — the overlay opens over your

@@ -10,14 +10,15 @@ import { fileURLToPath } from 'node:url'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const REPO_ROOT = join(__dirname, '..')
 
-// The four specs that exercise cross-cutting extension-host behaviour
-// (any extension can regress these), always pulled in alongside a
-// narrower rule match.
+// The specs that exercise cross-cutting extension-host behaviour (any
+// extension can regress these), always pulled in alongside a narrower rule
+// match. extension-settings writes every extension's settings.
 export const EXTENSION_TRIO = [
   'extension-smoke.spec.ts',
   'extension-keyboard.spec.ts',
   'extension-themes.spec.ts',
   'extension-escape.spec.ts',
+  'extension-settings.spec.ts',
 ]
 
 // Path glob -> spec glob rules. A changed path matching a rule's globs
@@ -28,7 +29,7 @@ export const EXTENSION_TRIO = [
 export const IMPACT_MAP = [
   {
     globs: ['extensions/foundry/**'],
-    specs: ['foundry*.spec.ts', ...EXTENSION_TRIO],
+    specs: ['foundry*.spec.ts', 'extension-commands.spec.ts', ...EXTENSION_TRIO],
   },
   {
     globs: ['extensions/git-integration/**', 'tests/e2e/git-integration-contrast.entry.tsx'],
@@ -38,13 +39,21 @@ export const IMPACT_MAP = [
       'git-integration-contrast.spec.ts',
       'git-integration-stacking.spec.ts',
       'merge-flow.spec.ts',
+      'merge-flow-resolve.spec.ts',
+      'git-commit-flow.spec.ts',
+      'git-settings.spec.ts',
+      'git-status-watch.spec.ts',
+      'workspace-extension-settings.spec.ts',
+      'pr-review-*.spec.ts',
+      'review-*.spec.ts',
+      'extension-commands.spec.ts',
       ...EXTENSION_TRIO,
     ],
   },
   {
     globs: ['extensions/notepad/**'],
     specs: [
-      'notepad-outline.spec.ts',
+      'notepad-*.spec.ts',
       'dismiss-surface-on-click.spec.ts',
       'extension-escape-exit.spec.ts',
       'quick-actions.spec.ts',
@@ -53,11 +62,11 @@ export const IMPACT_MAP = [
   },
   {
     globs: ['extensions/remote-control/**', 'src/renderer-remote/**'],
-    specs: ['remote-app.spec.ts', ...EXTENSION_TRIO],
+    specs: ['remote-app.spec.ts', 'remote-control.spec.ts', ...EXTENSION_TRIO],
   },
   {
     globs: ['extensions/task-vault/**'],
-    specs: [...EXTENSION_TRIO],
+    specs: ['task-vault-*.spec.ts', ...EXTENSION_TRIO],
   },
 ]
 
@@ -97,10 +106,17 @@ export const SMOKE_SPECS = ['extension-smoke.spec.ts', 'terminal.spec.ts', 'work
 // selects everything, so these run only then; the list exists so a new spec
 // has to be placed somewhere deliberately.
 export const CORE_SPECS = [
+  'app-menu.spec.ts',
   'branch-exclude-patterns.spec.ts',
   'branch-name.spec.ts',
   'close-session.spec.ts',
+  'core-ipc.spec.ts',
+  'core-quick-actions.spec.ts',
+  'extension-lifecycle.spec.ts',
   'extension.spec.ts',
+  'integrations.spec.ts',
+  'issue-trackers.spec.ts',
+  'modal-centre.spec.ts',
   'monitor-wall.spec.ts',
   'open-in-editor.spec.ts',
   'project.spec.ts',
@@ -155,78 +171,65 @@ function matchesAny(value, globs) {
  * @returns {{ mode: 'all' | 'none' | 'some', specs: string[] }}
  */
 export function select({ changed, specs, isMainPush }) {
+  if (isMainPush) return everySpec(specs)
+  if (changed.length === 0) return { mode: 'none', specs: [] }
+
+  const impact = specImpactOf(changed)
+  if (impact.forceAll) return everySpec(specs)
+  if (!impact.sawNonNonePath) return { mode: 'none', specs: [] }
+  return { mode: 'some', specs: selectedSpecs(impact, specs) }
+}
+
+function everySpec(specs) {
+  return { mode: 'all', specs: [...specs].sort() }
+}
+
+/** What the changed paths ask for: the whole suite, spec globs, or the spec files themselves. */
+function specImpactOf(changed) {
+  const impact = {
+    forceAll: false,
+    sawNonNonePath: false,
+    specGlobs: new Set(),
+    changedSpecFiles: new Set(),
+  }
+  for (const file of changed) addImpact(impact, file)
+  return impact
+}
+
+function addImpact(impact, file) {
+  const specFileMatch = SPEC_FILE_RE.exec(file)
+  if (specFileMatch) {
+    impact.changedSpecFiles.add(specFileMatch[1])
+    impact.sawNonNonePath = true
+    return
+  }
+  if (matchesAny(file, ALL_GLOBS)) {
+    impact.forceAll = true
+    impact.sawNonNonePath = true
+    return
+  }
+  if (matchesAny(file, NONE_GLOBS)) return
+
+  const rules = IMPACT_MAP.filter((rule) => matchesAny(file, rule.globs))
+  for (const rule of rules) for (const specGlob of rule.specs) impact.specGlobs.add(specGlob)
+  impact.sawNonNonePath = true
+  // Matched by no rule at all: fail safe to the full suite.
+  if (rules.length === 0) impact.forceAll = true
+}
+
+/** The specs the impact names, the changed spec files and the smoke set, among those that exist. */
+function selectedSpecs({ specGlobs, changedSpecFiles }, specs) {
   const specSet = new Set(specs)
-
-  if (isMainPush) {
-    return { mode: 'all', specs: [...specs].sort() }
-  }
-
-  if (changed.length === 0) {
-    return { mode: 'none', specs: [] }
-  }
-
-  let forceAll = false
-  let sawNonNonePath = false
-  const matchedSpecGlobs = new Set()
-  const changedSpecFiles = new Set()
-
-  for (const file of changed) {
-    const specFileMatch = SPEC_FILE_RE.exec(file)
-    if (specFileMatch) {
-      changedSpecFiles.add(specFileMatch[1])
-      sawNonNonePath = true
-      continue
-    }
-
-    if (matchesAny(file, ALL_GLOBS)) {
-      forceAll = true
-      sawNonNonePath = true
-      continue
-    }
-
-    if (matchesAny(file, NONE_GLOBS)) {
-      continue
-    }
-
-    let mapped = false
-    for (const rule of IMPACT_MAP) {
-      if (matchesAny(file, rule.globs)) {
-        mapped = true
-        for (const specGlob of rule.specs) matchedSpecGlobs.add(specGlob)
-      }
-    }
-
-    if (mapped) {
-      sawNonNonePath = true
-    } else {
-      // Matched by no rule at all: fail safe to the full suite.
-      forceAll = true
-      sawNonNonePath = true
-    }
-  }
-
-  if (forceAll) {
-    return { mode: 'all', specs: [...specs].sort() }
-  }
-
-  if (!sawNonNonePath) {
-    return { mode: 'none', specs: [] }
-  }
-
   const selected = new Set()
-  for (const specGlob of matchedSpecGlobs) {
+  for (const specGlob of specGlobs) {
     for (const spec of specs) {
       if (globToRegExp(specGlob).test(spec)) selected.add(spec)
     }
   }
-  for (const spec of changedSpecFiles) {
+  for (const spec of [...changedSpecFiles, ...SMOKE_SPECS]) {
     if (specSet.has(spec)) selected.add(spec)
   }
-  for (const spec of SMOKE_SPECS) {
-    if (specSet.has(spec)) selected.add(spec)
-  }
-
-  return { mode: 'some', specs: [...selected].sort() }
+  return [...selected].sort()
 }
 
 export function computeChanged(base) {

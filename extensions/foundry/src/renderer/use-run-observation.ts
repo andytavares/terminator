@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
+import { usePushed, ANY_RECORD } from './use-pushed.js'
 import type { RunGraph } from '../line/run-graph.js'
 import type { Standing } from '../order/standing.js'
 import type { Gate } from '../gates/rules.js'
 import type { CiState } from '../line/ci-state.js'
+import { invoke } from '@terminator/extension-sdk/renderer'
 
 /** One repository this order spans, and what it is waiting for. */
 interface LaneRow {
@@ -87,12 +89,9 @@ export interface PendingAsk {
   at: number
 }
 
-/** How often the live half is refetched. Slow enough to be cheap, fast
- *  enough that an agent is not left holding a tool call for a visible pause. */
-const LIVE_POLL_MS = 2000
-
-function invoke(channel: string, payload: unknown = {}): Promise<unknown> {
-  return window.electronAPI.extensionBridge.invoke(channel, payload)
+async function readPending(): Promise<PendingAsk[]> {
+  const asks = (await invoke('foundry:permissions-list')) as { pending?: PendingAsk[] }
+  return asks.pending ?? []
 }
 
 export interface UseRunObservation {
@@ -103,7 +102,8 @@ export interface UseRunObservation {
 }
 
 /**
- * The Floor's run observation, polled rather than fetched once.
+ * The Floor's run observation, read again whenever Foundry says this order's
+ * records or live state changed rather than fetched once.
  *
  * A single call on mount left every state chip a snapshot of whenever the
  * panel happened to open: a run that halted, failed or finished while you
@@ -115,34 +115,27 @@ export function useRunObservation(orderId: string): UseRunObservation {
   const [problem, setProblem] = useState<string | null>(null)
   const [pending, setPending] = useState<PendingAsk[]>([])
 
-  const refresh = useCallback(async () => {
-    const next = (await invoke('foundry:run.observe', { id: orderId })) as
-      | FloorView
-      | { error: string }
+  const readObservation = useCallback(
+    async () =>
+      (await invoke('foundry:run.observe', { id: orderId })) as FloorView | { error: string },
+    [orderId]
+  )
+  const showObservation = useCallback((next: FloorView | { error: string }): void => {
     if ('error' in next) {
       setProblem(next.error)
       return
     }
     setProblem(null)
     setView(next)
-  }, [orderId])
-
-  useEffect(() => {
-    void refresh()
-    const timer = setInterval(() => void refresh(), LIVE_POLL_MS)
-    return () => clearInterval(timer)
-  }, [refresh])
-
-  const pollPending = useCallback(async () => {
-    const asks = (await invoke('foundry:permissions-list')) as { pending?: PendingAsk[] }
-    setPending(asks.pending ?? [])
   }, [])
 
-  useEffect(() => {
-    void pollPending()
-    const timer = setInterval(() => void pollPending(), LIVE_POLL_MS)
-    return () => clearInterval(timer)
-  }, [pollPending])
+  const refresh = useCallback(
+    () => readObservation().then(showObservation),
+    [readObservation, showObservation]
+  )
+
+  usePushed(readObservation, showObservation, { kinds: ANY_RECORD, orderId })
+  usePushed(readPending, setPending, { kinds: ['live'] })
 
   return { view, problem, pending, refresh }
 }

@@ -15,6 +15,7 @@ import type { HallMap, HallProp } from '../../../src/factory/layout.js'
 import type { Check } from '../../../src/line/ci.js'
 import { createRecordingPaint } from './paint-fake.js'
 import type { PaintCall } from './paint-fake.js'
+import { partialFake } from '../../../../../tests/support/fakes'
 
 // Every sign the hall draws is read, so every sign has to stay on its own
 // fixture: a digit that spills past its board lands on the wall beside it.
@@ -49,7 +50,11 @@ function outside(calls: readonly PaintCall[], rect: Rect): Fill[] {
   )
 }
 
-function checks(pass: number, pending: number, fail: number): Record<string, Check['bucket']> {
+function checkBuckets(
+  pass: number,
+  pending: number,
+  fail: number
+): Record<string, Check['bucket']> {
   const all: Record<string, Check['bucket']> = {}
   for (let i = 0; i < pass; i++) all[`pass-${i}`] = 'pass'
   for (let i = 0; i < pending; i++) all[`pending-${i}`] = 'pending'
@@ -60,9 +65,15 @@ function checks(pass: number, pending: number, fail: number): Record<string, Che
 const setBits = (digits: string): number =>
   [...digits].reduce((n, d) => n + [...GLYPHS[d]].filter((b) => b === '1').length, 0)
 
-describe('the scoreboard', () => {
-  const board = fixture('statuswall', { x: 20, y: 2, w: 3 })
+const board = fixture('statuswall', { x: 20, y: 2, w: 3 })
 
+describe('the scoreboard', () => {
+  describe('bounds', boundsTests)
+  describe('tiles and figures', tilesAndFiguresTests)
+  describe('no progress bar', noProgressBarTests)
+})
+
+function boundsTests() {
   it.each([
     ['a fresh order', { leadTimeMs: 25 * 60_000, reworks: 0, ciRounds: 0 }],
     ['the widest figures', { leadTimeMs: 99 * 60_000, reworks: 99, ciRounds: 99 }],
@@ -70,19 +81,19 @@ describe('the scoreboard', () => {
     ['an order that has not shipped', { leadTimeMs: null, reworks: 3, ciRounds: 1 }],
   ])('keeps every pixel inside its three tiles for %s', (_name, metrics) => {
     const paint = createRecordingPaint()
-    drawProp(paint, board, context({ metrics }), 0)
+    drawProp(paint, board, { context: context({ metrics }), tMs: 0 })
     expect(fills(paint.calls).length).toBeGreaterThan(0)
     expect(outside(paint.calls, boardRect(board))).toEqual([])
   })
+}
 
+function tilesAndFiguresTests() {
   it('is three tiles wide and one cell per figure, each under its own icon colour', () => {
     const paint = createRecordingPaint()
-    drawProp(
-      paint,
-      board,
-      context({ metrics: { leadTimeMs: 25 * 60_000, reworks: 2, ciRounds: 3 } }),
-      0
-    )
+    drawProp(paint, board, {
+      context: context({ metrics: { leadTimeMs: 25 * 60_000, reworks: 2, ciRounds: 3 } }),
+      tMs: 0,
+    })
     const rect = boardRect(board)
     expect(rect.right - rect.left).toBe(3 * TILE_PX)
     const cell = (rect.right - rect.left) / 3
@@ -95,21 +106,21 @@ describe('the scoreboard', () => {
       }
     }
   })
+}
 
+function noProgressBarTests() {
   it("draws no progress bar: that is the heads-up display's job", () => {
     const paint = createRecordingPaint()
-    drawProp(
-      paint,
-      board,
-      context({
+    drawProp(paint, board, {
+      context: context({
         states: { a: 'passed', b: 'waiting' },
         metrics: { leadTimeMs: 0, reworks: 0, ciRounds: 0 },
       }),
-      0
-    )
+      tMs: 0,
+    })
     expect(fills(paint.calls).some((c) => c.style === HALL.green)).toBe(false)
   })
-})
+}
 
 describe('the queue plate', () => {
   const exit = { x: 30, y: 8 }
@@ -117,7 +128,7 @@ describe('the queue plate', () => {
   it.each([1, 12, 99, 100])('keeps position %i inside the plate, on whole pixels', (position) => {
     for (const tMs of [0, 250]) {
       const paint = createRecordingPaint()
-      drawQueuePlate(paint, exit, context({ queue: { position } }), tMs)
+      drawQueuePlate(paint, exit, { context: context({ queue: { position } }), tMs })
       const all = fills(paint.calls)
       expect(all.length).toBeGreaterThan(0)
       expect(outside(paint.calls, plateRect(exit))).toEqual([])
@@ -131,7 +142,7 @@ describe('the queue plate', () => {
     const rect = plateRect(exit)
     expect(rect.bottom - rect.top).toBe(16)
     const paint = createRecordingPaint()
-    drawQueuePlate(paint, exit, context({ queue: { position: 1 } }), 0)
+    drawQueuePlate(paint, exit, { context: context({ queue: { position: 1 } }), tMs: 0 })
     const ink = fills(paint.calls).filter((c) => c.style === '#1a1508')
     expect(ink.length).toBe(setBits('1'))
     expect(ink.every((c) => c.w === 1 && c.h === 1)).toBe(true)
@@ -139,19 +150,23 @@ describe('the queue plate', () => {
 
   it('draws nothing out of a queue', () => {
     const paint = createRecordingPaint()
-    drawQueuePlate(paint, exit, context(), 0)
+    drawQueuePlate(paint, exit, { context: context(), tMs: 0 })
     expect(paint.calls).toEqual([])
   })
 })
 
-describe('the CI tower', () => {
-  const tower = fixture('dispatch', { x: 38, y: 8 })
-  const lamps = (calls: readonly PaintCall[]): Fill[] =>
-    fills(calls).filter(
-      (c) =>
-        c.w === 3 && c.h === 3 && [HALL.green, HALL.amber, HALL.red].includes(c.style as string)
-    )
+const tower = fixture('dispatch', { x: 38, y: 8 })
+const LAMP_COLOURS: readonly string[] = [HALL.green, HALL.amber, HALL.red]
+const lamps = (calls: readonly PaintCall[]): Fill[] =>
+  fills(calls).filter((c) => c.w === 3 && c.h === 3 && LAMP_COLOURS.includes(c.style as string))
 
+describe('the CI tower', () => {
+  describe('tower bounds', towerBoundsTests)
+  describe('lamps', lampsTests)
+  describe('the beacon', theBeaconTests)
+})
+
+function towerBoundsTests() {
   it.each([
     [0, 0, 0],
     [1, 0, 0],
@@ -168,7 +183,8 @@ describe('the CI tower', () => {
         bottom: (tower.y + 1) * TILE_PX + 2,
       }
       const paint = createRecordingPaint()
-      drawProp(paint, tower, context({ ci: { checks: checks(p, w, f) } }), 0)
+      const ci = { checks: checkBuckets(p, w, f) }
+      drawProp(paint, tower, { context: context({ ci }), tMs: 0 })
       const strays = outside(paint.calls, towerRect(tower)).filter(
         (c) =>
           c.x < exitTile.left ||
@@ -179,10 +195,12 @@ describe('the CI tower', () => {
       expect(strays).toEqual([])
     }
   )
+}
 
+function lampsTests() {
   it('shows three lamps however many checks there are, each with its count in one-pixel digits', () => {
     const paint = createRecordingPaint()
-    drawProp(paint, tower, context({ ci: { checks: checks(12, 5, 2) } }), 0)
+    drawProp(paint, tower, { context: context({ ci: { checks: checkBuckets(12, 5, 2) } }), tMs: 0 })
     expect(
       lamps(paint.calls)
         .map((c) => c.style)
@@ -194,10 +212,12 @@ describe('the CI tower', () => {
 
   it('lights a lamp only for a bucket that has checks in it', () => {
     const paint = createRecordingPaint()
-    drawProp(paint, tower, context({ ci: { checks: checks(3, 0, 0) } }), 0)
+    drawProp(paint, tower, { context: context({ ci: { checks: checkBuckets(3, 0, 0) } }), tMs: 0 })
     expect(lamps(paint.calls).map((c) => c.style)).toEqual([HALL.green])
   })
+}
 
+function theBeaconTests() {
   it('blinks an amber beacon and parks a crate at the exit only while a check is pending', () => {
     const crate = '#b07a3c'
     const beacon = (calls: readonly PaintCall[], color: string): boolean =>
@@ -206,28 +226,36 @@ describe('the CI tower', () => {
       )
 
     const on = createRecordingPaint()
-    drawProp(on, tower, context({ ci: { checks: checks(1, 1, 0) } }), 0)
+    drawProp(on, tower, { context: context({ ci: { checks: checkBuckets(1, 1, 0) } }), tMs: 0 })
     expect(beacon(on.calls, HALL.amber)).toBe(true)
     expect(fills(on.calls).some((c) => c.style === crate)).toBe(true)
 
     const off = createRecordingPaint()
-    drawProp(off, tower, context({ ci: { checks: checks(1, 1, 0) } }), 400)
+    drawProp(off, tower, { context: context({ ci: { checks: checkBuckets(1, 1, 0) } }), tMs: 400 })
     expect(beacon(off.calls, HALL.amber)).toBe(false)
     expect(beacon(off.calls, HALL.amberDim)).toBe(true)
 
     const steady = createRecordingPaint()
-    drawProp(steady, tower, context({ steady: true, ci: { checks: checks(1, 1, 0) } }), 400)
+    drawProp(steady, tower, {
+      context: context({ steady: true, ci: { checks: checkBuckets(1, 1, 0) } }),
+      tMs: 400,
+    })
     expect(beacon(steady.calls, HALL.amber)).toBe(true)
 
     const quiet = createRecordingPaint()
-    drawProp(quiet, tower, context({ ci: { checks: checks(2, 0, 0) } }), 0)
+    drawProp(quiet, tower, { context: context({ ci: { checks: checkBuckets(2, 0, 0) } }), tMs: 0 })
     expect(beacon(quiet.calls, HALL.amber)).toBe(false)
     expect(beacon(quiet.calls, HALL.amberDim)).toBe(false)
     expect(fills(quiet.calls).some((c) => c.style === crate)).toBe(false)
   })
-})
+}
 
 describe('the vending decor', () => {
+  describe('wall fixtures', hallLabelsWallFixturesTests)
+  describe('baking', bakingTests)
+})
+
+function hallLabelsWallFixturesTests() {
   it('stands clear of every wall fixture', () => {
     const fixtures: HallProp[] = [
       fixture('shelves', { id: 'a', x: 8, y: 2 }),
@@ -235,19 +263,21 @@ describe('the vending decor', () => {
       fixture('statuswall', { id: 'c', x: 19, y: 2, w: 3 }),
       fixture('lockers', { id: 'd', x: 28, y: 2 }),
     ]
-    const x = vendingDecorX({ width: 40, props: fixtures } as unknown as HallMap)
+    const x = vendingDecorX(partialFake<HallMap>({ width: 40, props: fixtures }))
     for (const f of fixtures) {
       const left = f.x * TILE_PX
       const right = (f.x + f.w) * TILE_PX
       expect(x + 14 <= left || x >= right).toBe(true)
     }
   })
+}
 
+function bakingTests() {
   it('bakes into a hall without throwing', () => {
     const width = 40
     const height = 30
     const grid = Array.from({ length: height }, () => Array(width).fill(false))
-    const map = {
+    const map = partialFake<HallMap>({
       width,
       height,
       solid: grid,
@@ -267,10 +297,10 @@ describe('the vending decor', () => {
         wait: { x: 5, y: 5 },
       },
       lights: [],
-    } as unknown as HallMap
+    })
     expect(() => bakeHall(map, createRecordingPaint())).not.toThrow()
   })
-})
+}
 
 describe('the ship gate while its step runs through the final check and CI', () => {
   const gate = fixture('gate', { id: 'station-ship', nodeId: 'ship', x: 12, y: 6 })
@@ -279,18 +309,15 @@ describe('the ship gate while its step runs through the final check and CI', () 
     over: Partial<SceneContext> = {}
   ) => {
     const paint = createRecordingPaint()
-    drawProp(
-      paint,
-      gate,
-      context({ states: state === undefined ? {} : { ship: state }, ...over }),
-      0
-    )
+    drawProp(paint, gate, {
+      context: context({ states: state === undefined ? {} : { ship: state }, ...over }),
+      tMs: 0,
+    })
     return fills(paint.calls).find((c) => c.y === 6 * TILE_PX - 30 && c.h === 5)?.style
   }
 
   it('burns a steady cyan beacon, neither idle grey nor the open green', () => {
     expect(beacon('running')).toBe(HALL.cyan)
-    expect(beacon('verifying')).toBe(HALL.cyan)
     expect(beacon('waiting')).toBe('#3a414b')
     expect(beacon('passed')).toBe(HALL.green)
   })

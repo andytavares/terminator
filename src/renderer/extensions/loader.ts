@@ -23,13 +23,12 @@ function makePortalComponent(
   }
 }
 
-export function registerWebviewExtension(
-  ext: Extension,
-  registry: ReturnType<typeof useExtensionRegistry.getState>
-): void {
-  if (!ext.contributes) return
-  const { globalTab, workspaceTab, projectTab, sidebarPanel, windowViews } = ext.contributes
+type Registry = ReturnType<typeof useExtensionRegistry.getState>
+type Contributes = NonNullable<Extension['contributes']>
 
+/** The global and workspace tabs, which show the extension in place of the terminal. */
+function registerFullTabs(ext: Extension, contributes: Contributes, registry: Registry): void {
+  const { globalTab, workspaceTab } = contributes
   if (globalTab) {
     const viewParam = globalTab.view ?? 'main'
     registry.registerGlobalTab({
@@ -41,7 +40,6 @@ export function registerWebviewExtension(
       view: viewParam,
     })
   }
-
   if (workspaceTab) {
     const viewParam = workspaceTab.view ?? 'workspace'
     registry.registerWorkspaceTab({
@@ -52,73 +50,78 @@ export function registerWebviewExtension(
       view: viewParam,
     })
   }
+}
 
-  if (projectTab) {
-    const viewParam = projectTab.view ?? 'project'
-    registry.registerProjectTab({
-      id: ext.id,
-      label: projectTab.label,
-      component: makePortalComponent(ext.id, viewParam) as ComponentType<{
-        repoRoot: string | null
-      }>,
-      view: viewParam,
-    })
-  }
+/** The project tab, which shows the extension in place of a branch's terminal. */
+function registerContributedProjectTab(
+  ext: Extension,
+  contributes: Contributes,
+  registry: Registry
+): void {
+  const { projectTab } = contributes
+  if (!projectTab) return
+  const viewParam = projectTab.view ?? 'project'
+  registry.registerProjectTab({
+    id: ext.id,
+    label: projectTab.label,
+    component: makePortalComponent(ext.id, viewParam) as ComponentType<{
+      repoRoot: string | null
+    }>,
+    view: viewParam,
+  })
+}
 
-  if (sidebarPanel) {
-    const viewParam = sidebarPanel.view ?? 'sidebar'
-    registry.registerSidebarPanel({
-      id: ext.id,
-      label: sidebarPanel.label,
-      defaultOpen: sidebarPanel.defaultOpen,
-      view: viewParam,
-      component: makePortalComponent(ext.id, viewParam) as ComponentType<{
-        repoRoot: string | null
-        onClose: () => void
-      }>,
-    })
-  }
+/** The sidebar panel, which shows beside the terminal. */
+function registerContributedSidebarPanel(
+  ext: Extension,
+  contributes: Contributes,
+  registry: Registry
+): void {
+  const { sidebarPanel } = contributes
+  if (!sidebarPanel) return
+  const viewParam = sidebarPanel.view ?? 'sidebar'
+  registry.registerSidebarPanel({
+    id: ext.id,
+    label: sidebarPanel.label,
+    defaultOpen: sidebarPanel.defaultOpen,
+    view: viewParam,
+    component: makePortalComponent(ext.id, viewParam) as ComponentType<{
+      repoRoot: string | null
+      onClose: () => void
+    }>,
+  })
+}
 
-  for (const { id: viewId, view } of windowViews ?? []) {
+/** Window views, and the shortcuts that toggle the extension's sidebar panel. */
+function registerWindowsAndShortcuts(
+  ext: Extension,
+  contributes: Contributes,
+  registry: Registry
+): void {
+  for (const { id: viewId, view } of contributes.windowViews ?? []) {
     registry.registerWindowView(
       viewId,
       makePortalComponent(ext.id, view) as ComponentType<{ repoRoot: string | null }>
     )
   }
-
-  for (const cmd of ext.contributes.commands ?? []) {
+  if (!contributes.sidebarPanel) return
+  for (const cmd of contributes.commands ?? []) {
     if (!cmd.shortcut) continue
-    if (sidebarPanel) {
-      registry.registerKeyboardShortcut({
-        accelerator: cmd.shortcut,
-        action: () => useExtensionRegistry.getState().togglePanel(ext.id),
-        description: cmd.description,
-      })
-    }
+    registry.registerKeyboardShortcut({
+      accelerator: cmd.shortcut,
+      action: () => useExtensionRegistry.getState().togglePanel(ext.id),
+      description: cmd.description,
+    })
   }
 }
 
-/**
- * Brings main-process sidebar item contributions into the renderer registry.
- *
- * Extensions register these through `api.sidebar.registerItem`, which stores
- * them in the main process. Nothing in the renderer ever read them, so a
- * contributed item was stored and never drawn; this closes that gap. Clicks go
- * back over IPC because the item's handler is a closure in the extension's own
- * main-process code.
- */
-async function registerContributedSidebarItems(
-  registry: ReturnType<typeof useExtensionRegistry.getState>
-): Promise<void> {
-  const result = await window.electronAPI.extension.getSidebarItems?.()
-  for (const item of result?.items ?? []) {
-    registry.registerSidebarButton({
-      id: item.id,
-      label: item.label,
-      icon: item.icon ? iconFromName(item.icon) : undefined,
-      action: () => void window.electronAPI.extension.sidebarItemClick(item.id),
-    })
-  }
+/** @internal */
+export function registerWebviewExtension(ext: Extension, registry: Registry): void {
+  if (!ext.contributes) return
+  registerFullTabs(ext, ext.contributes, registry)
+  registerContributedProjectTab(ext, ext.contributes, registry)
+  registerContributedSidebarPanel(ext, ext.contributes, registry)
+  registerWindowsAndShortcuts(ext, ext.contributes, registry)
 }
 
 export async function initExtensions(): Promise<void> {
@@ -141,6 +144,4 @@ export async function initExtensions(): Promise<void> {
   )
   registry.setQuickActionGroups(groups)
   for (const warning of warnings) log.warn(warning)
-
-  await registerContributedSidebarItems(registry)
 }

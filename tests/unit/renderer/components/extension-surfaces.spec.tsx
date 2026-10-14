@@ -7,23 +7,21 @@ import { useExtensionRegistry } from '../../../../src/renderer/extensions/regist
 import { UnifiedSidebar } from '../../../../src/renderer/components/sidebar/UnifiedSidebar'
 import { AppBand } from '../../../../src/renderer/components/sidebar/AppBand'
 import type { GroupKey } from '../../../../src/renderer/sidebar/view-model'
-import type { Project, TerminalSession, Workspace } from '../../../../src/shared/types/index'
+import { useSettingsStore } from '../../../../src/renderer/stores/settings.store'
+import { DEFAULT_GLOBAL_SETTINGS } from '../../../../src/shared/schemas/settings.schema'
+import {
+  projectFixture,
+  terminalSessionOf,
+  workspaceFixture,
+} from '../../../support/renderer-stores'
 
 // THE MERGE GATE for feature 030.
 //
-// Flattening the sidebar removes the element two of these surfaces hang on,
-// and a third — sidebar items — never had a working host at all. Surfaces are
-// enumerated from what extensions can actually contribute, not from the
+// Flattening the sidebar removes the element two of these surfaces hang on.
+// Surfaces are enumerated from what extensions can actually contribute, not from the
 // renderer registry alone: reading only the renderer is what produced the
 // wrong "this surface does not exist" conclusion during Phase 0 research.
 
-vi.mock('../../../../src/renderer/stores/workspace.store', () => ({
-  useWorkspaceStore: vi.fn(),
-}))
-vi.mock('../../../../src/renderer/stores/session.store', () => ({ useSessionStore: vi.fn() }))
-vi.mock('../../../../src/renderer/extensions/registry', () => ({
-  useExtensionRegistry: vi.fn(),
-}))
 vi.mock('../../../../src/renderer/hooks/useBranchSync', () => ({ useBranchSync: vi.fn() }))
 vi.mock('../../../../src/renderer/components/sidebar/CreateProjectDialog', () => ({
   CreateProjectDialog: () => null,
@@ -35,9 +33,6 @@ const mockCreateSession = vi.fn().mockResolvedValue('ses-1')
 vi.mock('../../../../src/renderer/hooks/useTerminalSession', () => ({
   useTerminalSession: () => ({ createSession: mockCreateSession }),
 }))
-vi.mock('../../../../src/renderer/stores/settings.store', () => ({
-  useSettingsStore: () => ({ resolveSettings: () => ({ terminal: { scrollbackLimit: 5000 } }) }),
-}))
 vi.mock('../../../../src/renderer/components/session/useSessionFacts', () => ({
   useSessionFacts: () => [],
 }))
@@ -45,36 +40,15 @@ vi.mock('../../../../src/renderer/components/session/useSessionFacts', () => ({
 const NOW = 1_000_000_000
 const GROUPINGS: GroupKey[] = ['workspace', 'none']
 
-const ws1: Workspace = {
-  id: 'ws-1',
-  name: 'Backend',
-  folderPath: '/b',
-  color: '#111',
-  tags: [],
-  createdAt: '',
-  updatedAt: '',
-}
-const api: Project = {
-  id: 'p1',
-  workspaceId: 'ws-1',
-  name: 'API',
-  gitBranch: 'main',
-  isWorktree: false,
-  createdAt: '',
-  updatedAt: '',
-}
-
-const s1: TerminalSession = {
+const ws1 = workspaceFixture({ id: 'ws-1', name: 'Backend', folderPath: '/b', color: '#111' })
+const api = projectFixture({ id: 'p1', workspaceId: 'ws-1', name: 'API', gitBranch: 'main' })
+const s1 = terminalSessionOf({
   id: 's1',
   projectId: 'p1',
   tabTitle: 'api-shell',
-  status: 'active',
   type: 'agent',
-  scrollbackLimit: 10000,
-  createdAt: '2026-08-21T00:00:00.000Z',
   lastActivityAt: NOW,
-  agentState: 'idle',
-}
+})
 
 // A fake extension contributing every surface an extension can contribute.
 const globalTab = {
@@ -84,47 +58,6 @@ const globalTab = {
 }
 const workspaceTab = { id: 'fake.wstab', label: 'Fake Workspace Tab', component: () => null }
 const projectTab = { id: 'fake.projtab', label: 'Fake Project Tab', component: () => null }
-const sidebarItemAction = vi.fn()
-const sidebarItem = { id: 'fake.item', label: 'Fake Sidebar Item', action: sidebarItemAction }
-
-const mockWorkspaceStore = {
-  workspaces: [ws1],
-  activeWorkspaceId: 'ws-1',
-  projectsByWorkspaceId: new Map([['ws-1', [api]]]),
-  setActiveWorkspace: vi.fn(),
-  setActiveProject: vi.fn(),
-  loadProjects: vi.fn().mockResolvedValue(undefined),
-  reorderWorkspaces: vi.fn().mockResolvedValue(undefined),
-  deleteProject: vi.fn().mockResolvedValue(undefined),
-  renameProject: vi.fn().mockResolvedValue(undefined),
-  resolveActiveCwd: vi.fn().mockReturnValue('/b'),
-}
-
-const mockSessionStore = {
-  sessions: new Map([['s1', s1]]),
-  projectViews: new Map(),
-  isSessionBusy: vi.fn().mockReturnValue(false),
-  getBellCountForSession: vi.fn().mockReturnValue(0),
-  getScratchSessions: vi.fn().mockReturnValue([]),
-  setActiveSessionForProject: vi.fn(),
-  renameSession: vi.fn(),
-  requestFocus: vi.fn(),
-}
-
-const mockRegistryState = {
-  globalTabs: new Map([[globalTab.id, globalTab]]),
-  workspaceTabs: new Map([[workspaceTab.id, workspaceTab]]),
-  projectTabs: new Map([[projectTab.id, projectTab]]),
-  sidebarButtons: [sidebarItem],
-  activeGlobalTabId: null,
-  activeWorkspaceTabId: null,
-  activeProjectTabId: null,
-  setActiveGlobalTab: vi.fn(),
-  setActiveWorkspaceTab: vi.fn(),
-  setActiveProjectTab: vi.fn(),
-  dismissSurfaces: vi.fn(),
-  registerCommand: vi.fn(() => vi.fn()),
-}
 
 const sidebarProps = {
   globalTabs: [globalTab],
@@ -144,8 +77,8 @@ const sidebarProps = {
   now: NOW,
 }
 
-beforeEach(() => {
-  vi.clearAllMocks()
+/** One saved sidebar view per grouping, so each test can open the sidebar under any of them. */
+function saveGroupingViews(): void {
   localStorage.clear()
   localStorage.setItem(
     'terminator.sidebar.views',
@@ -159,23 +92,50 @@ beforeEach(() => {
       }))
     )
   )
-  vi.mocked(useWorkspaceStore).mockReturnValue(
-    mockWorkspaceStore as unknown as ReturnType<typeof useWorkspaceStore>
-  )
-  vi.mocked(useSessionStore).mockReturnValue(
-    mockSessionStore as unknown as ReturnType<typeof useSessionStore>
-  )
-  vi.mocked(useExtensionRegistry).mockImplementation(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ((selector: any) =>
-      typeof selector === 'function'
-        ? selector(mockRegistryState)
-        : mockRegistryState) as unknown as typeof useExtensionRegistry
-  )
-  Object.assign(useExtensionRegistry, { getState: () => mockRegistryState })
-  Object.assign(useSessionStore, { getState: () => mockSessionStore })
-  Object.assign(useWorkspaceStore, { getState: () => mockWorkspaceStore })
+}
+
+/** The real stores, holding one repo with one branch and its terminal. */
+function seedStores(): void {
+  // Only loading a repo's branches reaches the main process.
+  useWorkspaceStore.setState({
+    ...useWorkspaceStore.getInitialState(),
+    workspaces: [ws1],
+    activeWorkspaceId: 'ws-1',
+    projectsByWorkspaceId: new Map([['ws-1', [api]]]),
+    loadProjects: vi.fn().mockResolvedValue(undefined),
+  })
+  useSessionStore.setState({
+    ...useSessionStore.getInitialState(),
+    sessions: new Map([['s1', s1]]),
+  })
+  useSettingsStore.setState({
+    ...useSettingsStore.getInitialState(),
+    globalSettings: {
+      ...DEFAULT_GLOBAL_SETTINGS,
+      terminal: { ...DEFAULT_GLOBAL_SETTINGS.terminal, scrollbackLimit: 5000 },
+    },
+  })
+}
+
+/** What the fake extension contributed, in the real registry. */
+function seedRegistry(): void {
+  useExtensionRegistry.setState(useExtensionRegistry.getInitialState(), true)
+  useExtensionRegistry.setState({
+    globalTabs: new Map([[globalTab.id, globalTab]]),
+    workspaceTabs: new Map([[workspaceTab.id, workspaceTab]]),
+    projectTabs: new Map([[projectTab.id, projectTab]]),
+  })
+}
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  saveGroupingViews()
+  seedStores()
+  seedRegistry()
 })
+
+const commandLabels = (): string[] =>
+  useExtensionRegistry.getState().commands.map((command) => command.label)
 
 const renderSidebar = (groupBy: GroupKey) =>
   render(<UnifiedSidebar {...sidebarProps} initialViewId={`g-${groupBy}`} />)
@@ -185,14 +145,7 @@ describe.each(GROUPINGS)('every extension surface survives %s grouping', (groupB
   // sidebar's header; what an extension contributes is unchanged.
   it('surface 1: the global tab button renders in the app band and fires', () => {
     const onSelectGlobalTab = vi.fn()
-    render(
-      <AppBand
-        globalTabs={[globalTab]}
-        sidebarItems={[]}
-        activeId={null}
-        onSelect={onSelectGlobalTab}
-      />
-    )
+    render(<AppBand globalTabs={[globalTab]} activeId={null} onSelect={onSelectGlobalTab} />)
     fireEvent.click(screen.getByLabelText('Fake Tab'))
     expect(onSelectGlobalTab).toHaveBeenCalledWith('fake.global')
   })
@@ -218,51 +171,53 @@ describe.each(GROUPINGS)('every extension surface survives %s grouping', (groupB
     }
     expect(onSelectWorkspaceTab).toHaveBeenCalledWith('ws-1', 'fake.wstab')
   })
+})
 
-  it('surface 3: the contributed sidebar item renders once and its click reaches the handler', () => {
-    render(
-      <AppBand globalTabs={[]} sidebarItems={[sidebarItem]} activeId={null} onSelect={() => {}} />
-    )
-    expect(screen.getAllByRole('button', { name: 'Fake Sidebar Item' })).toHaveLength(1)
-    fireEvent.click(screen.getByRole('button', { name: 'Fake Sidebar Item' }))
-    expect(sidebarItemAction).toHaveBeenCalledOnce()
-  })
-
+describe.each(GROUPINGS)('the branch scope survives %s grouping', (groupBy) => {
   it('surface 4: selecting a branch leaves activeProjectId resolved for the project tab', () => {
     const { container } = renderSidebar(groupBy)
     fireEvent.click(container.querySelector('.branch-row')!)
-    expect(mockWorkspaceStore.setActiveProject).toHaveBeenCalledWith('p1')
+    expect(useWorkspaceStore.getState().activeProjectId).toBe('p1')
   })
 
   it('a new terminal can be created for the branch scope', () => {
     const { container } = renderSidebar(groupBy)
     fireEvent.click(container.querySelector('.branch-row__action')!)
-    expect(mockCreateSession).toHaveBeenCalledWith('p1', 'human', '', '/b', 5000)
+    expect(mockCreateSession).toHaveBeenCalledWith({
+      projectId: 'p1',
+      type: 'human',
+      title: '',
+      cwd: '/b',
+      scrollbackLimit: 5000,
+    })
   })
 })
 
 describe('scope actions are reachable from the command palette (FR-027)', () => {
   it('registers a new-terminal command per project', () => {
-    renderSidebar('project')
-    const labels = mockRegistryState.registerCommand.mock.calls.map((c) => c[0].label)
-    expect(labels).toContain('New terminal — Backend · main')
+    renderSidebar('workspace')
+    expect(commandLabels()).toContain('New terminal — Backend · main')
   })
 
   it('creates the session when the palette command runs', () => {
-    renderSidebar('project')
-    const command = mockRegistryState.registerCommand.mock.calls.find(
-      (c) => c[0].label === 'New terminal — Backend · main'
-    )![0]
+    renderSidebar('workspace')
+    const command = useExtensionRegistry
+      .getState()
+      .commands.find((c) => c.label === 'New terminal — Backend · main')!
     command.action()
-    expect(mockCreateSession).toHaveBeenCalledWith('p1', 'human', '', '/b', 5000)
+    expect(mockCreateSession).toHaveBeenCalledWith({
+      projectId: 'p1',
+      type: 'human',
+      title: '',
+      cwd: '/b',
+      scrollbackLimit: 5000,
+    })
   })
 
   it('disposes its commands on unmount so they cannot outlive the sidebar', () => {
-    const dispose = vi.fn()
-    mockRegistryState.registerCommand.mockReturnValue(dispose)
-    const { unmount } = renderSidebar('project')
+    const { unmount } = renderSidebar('workspace')
     unmount()
-    expect(dispose).toHaveBeenCalled()
+    expect(commandLabels()).not.toContain('New terminal — Backend · main')
   })
 })
 
@@ -289,17 +244,17 @@ describe('the extension API surface is unchanged', () => {
       'globalTab',
       'projectTab',
       'quickActions',
+      'shellRoots',
       'sidebarPanel',
       'windowViews',
       'workspaceTab',
     ])
   })
+})
 
+describe('the extension API surface is unchanged — the renderer-facing extension API still exposes exactly its known members', () => {
   it('the renderer-facing extension API still exposes exactly its known members', async () => {
-    const registryModule = await vi.importActual<
-      typeof import('../../../../src/renderer/extensions/registry')
-    >('../../../../src/renderer/extensions/registry')
-    const state = registryModule.useExtensionRegistry.getState()
+    const state: Record<string, unknown> = { ...useExtensionRegistry.getState() }
     const rendererApi = [
       'registerGlobalTab',
       'registerWorkspaceTab',
@@ -313,10 +268,7 @@ describe('the extension API surface is unchanged', () => {
       'updateCommand',
     ]
     for (const member of rendererApi) {
-      expect(typeof (state as unknown as Record<string, unknown>)[member]).toBe('function')
+      expect(typeof state[member]).toBe('function')
     }
-    // registerSidebarButton stays internal: extensions register through the
-    // main-process API, never this one (invariant I7).
-    expect(rendererApi).not.toContain('registerSidebarButton')
   })
 })

@@ -14,7 +14,7 @@ vi.mock('../../src/stores/vault.store', () => ({
       loadDate: typeof mockLoadDate
       loadToday: typeof mockLoadToday
       calendarRefreshKey: number
-      kanbanLanes: []
+      kanbanLanes: never[]
     }) => unknown
   ) => {
     const store = {
@@ -57,16 +57,45 @@ afterEach(() => {
   vi.clearAllMocks()
 })
 
+function todayString(): string {
+  const today = new Date()
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`
+}
+
+function dayTask(id: string, text: string) {
+  return { id, text, status: 'open', metadata: {}, terminatorLinks: [] }
+}
+
+/** Answers the month query with `days` and every daily query with `daily`. */
+function answerDays(days: unknown[], daily: unknown): void {
+  mockInvoke.mockImplementation((channel: string) => {
+    if (channel === 'task-vault:vault:get-calendar-month') return Promise.resolve({ days })
+    if (channel === 'task-vault:vault:get-daily') return Promise.resolve(daily)
+    return Promise.resolve({})
+  })
+}
+
 async function renderDrawer() {
   const { CalendarDrawer } = await import('../../src/components/CalendarDrawer')
   return render(<CalendarDrawer />)
 }
 
-describe('CalendarDrawer', () => {
+describe('CalendarDrawer', calendarDrawerTests)
+
+function calendarDrawerTests() {
   beforeEach(() => {
     mockInvoke.mockResolvedValue({ days: [] })
   })
 
+  describe('mounting', calendarDrawerMountingTests)
+  describe('today', calendarDrawerTodayTests)
+  describe('opening a task', calendarDrawerOpeningTaskTests)
+  describe('months', calendarDrawerMonthsTests)
+  describe('refreshing', calendarDrawerRefreshingTests)
+}
+
+function calendarDrawerMountingTests() {
   it('renders the calendar panel immediately (always open)', async () => {
     await renderDrawer()
     await waitFor(() => {
@@ -84,29 +113,19 @@ describe('CalendarDrawer', () => {
       )
     })
   })
+}
 
+function calendarDrawerTodayTests() {
   it('navigates to today and shows task list when today cell is clicked', async () => {
     const user = userEvent.setup()
-    const today = new Date()
-    const pad = (n: number) => String(n).padStart(2, '0')
-    const todayStr = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`
+    const todayStr = todayString()
 
-    mockInvoke.mockImplementation((channel: string) => {
-      if (channel === 'task-vault:vault:get-calendar-month') {
-        return Promise.resolve({ days: [{ date: todayStr, status: 'open', count: 1 }] })
-      }
-      if (channel === 'task-vault:vault:get-daily') {
-        return Promise.resolve({
-          date: todayStr,
-          tasks: [
-            { id: 't1', text: 'Test task', status: 'open', metadata: {}, terminatorLinks: [] },
-          ],
-          events: [],
-          notes: [],
-          exists: true,
-        })
-      }
-      return Promise.resolve({})
+    answerDays([{ date: todayStr, status: 'open', count: 1 }], {
+      date: todayStr,
+      tasks: [dayTask('t1', 'Test task')],
+      events: [],
+      notes: [],
+      exists: true,
     })
 
     await renderDrawer()
@@ -121,29 +140,19 @@ describe('CalendarDrawer', () => {
       expect(screen.getByText('Test task')).toBeTruthy()
     })
   })
+}
 
+function calendarDrawerOpeningTaskTests() {
   it('invokes task-vault:open-panel with taskId when a task in the day panel is clicked', async () => {
     const user = userEvent.setup()
-    const today = new Date()
-    const pad = (n: number) => String(n).padStart(2, '0')
-    const todayStr = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`
+    const todayStr = todayString()
 
-    mockInvoke.mockImplementation((channel: string) => {
-      if (channel === 'task-vault:vault:get-calendar-month') {
-        return Promise.resolve({ days: [{ date: todayStr, status: 'done', count: 1 }] })
-      }
-      if (channel === 'task-vault:vault:get-daily') {
-        return Promise.resolve({
-          date: todayStr,
-          tasks: [
-            { id: 'task-abc', text: 'My task', status: 'open', metadata: {}, terminatorLinks: [] },
-          ],
-          events: [],
-          notes: [],
-          exists: true,
-        })
-      }
-      return Promise.resolve({})
+    answerDays([{ date: todayStr, status: 'done', count: 1 }], {
+      date: todayStr,
+      tasks: [dayTask('task-abc', 'My task')],
+      events: [],
+      notes: [],
+      exists: true,
     })
 
     await renderDrawer()
@@ -155,7 +164,9 @@ describe('CalendarDrawer', () => {
       taskId: 'task-abc',
     })
   })
+}
 
+function calendarDrawerMonthsTests() {
   it('navigates to previous month on prev button click', async () => {
     const user = userEvent.setup()
     await renderDrawer()
@@ -175,37 +186,19 @@ describe('CalendarDrawer', () => {
     // 1: get-calendar-month on mount, 2: get-daily for today on mount, 3: get-calendar-month after next
     expect(mockInvoke).toHaveBeenCalledTimes(3)
   })
+}
 
+function calendarDrawerRefreshingTests() {
   it('refreshes task list when task-vault:push:index-updated fires', async () => {
-    const today = new Date()
-    const pad = (n: number) => String(n).padStart(2, '0')
-    const todayStr = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`
+    const todayStr = todayString()
 
-    mockInvoke.mockImplementation((channel: string) => {
-      if (channel === 'task-vault:vault:get-calendar-month') return Promise.resolve({ days: [] })
-      if (channel === 'task-vault:vault:get-daily')
-        return Promise.resolve({
-          tasks: [
-            { id: 't1', text: 'Updated task', status: 'open', metadata: {}, terminatorLinks: [] },
-          ],
-        })
-      return Promise.resolve({})
-    })
+    answerDays([], { tasks: [dayTask('t1', 'Updated task')] })
 
     await renderDrawer()
     await waitFor(() => screen.getByText('Updated task'))
 
     // Simulate a task update broadcast
-    mockInvoke.mockImplementation((channel: string) => {
-      if (channel === 'task-vault:vault:get-calendar-month') return Promise.resolve({ days: [] })
-      if (channel === 'task-vault:vault:get-daily')
-        return Promise.resolve({
-          tasks: [
-            { id: 't1', text: 'Reopened task', status: 'open', metadata: {}, terminatorLinks: [] },
-          ],
-        })
-      return Promise.resolve({})
-    })
+    answerDays([], { tasks: [dayTask('t1', 'Reopened task')] })
 
     await act(async () => {
       bridgeHandlers.get('task-vault:push:index-updated')?.({})
@@ -219,4 +212,4 @@ describe('CalendarDrawer', () => {
     // The cell's label says what the day is carrying now, not just its date.
     expect(screen.getByRole('button', { name: new RegExp(`^${todayStr}`) })).toBeTruthy()
   })
-})
+}

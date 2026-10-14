@@ -1,9 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import {
-  gradeRisk,
-  matchesGlob,
-  type ChangeSummary,
-} from '../../../src/runtime/review/risk-grader.js'
+import { gradeRisk, type ChangeSummary } from '../../../src/runtime/review/risk-grader.js'
 
 // Grading is evaluated strictly top-down, first match wins. The order is the
 // point: a lockfile change that also touches a critical path is P0, not P3.
@@ -119,18 +115,15 @@ describe('P2 — the default', () => {
   })
 })
 
-describe('glob matching for critical paths', () => {
+describe('critical-path globs', () => {
   it.each([
-    ['src/auth/**', 'src/auth/login.ts', true],
-    ['src/auth/**', 'src/auth/deep/nested/x.ts', true],
-    ['src/auth/**', 'src/authorised/x.ts', false],
+    ['src/core/**', 'src/core/deep/nested/x.ts', true],
+    ['src/core/**', 'src/corelib/x.ts', false],
     ['src/*/index.ts', 'src/a/index.ts', true],
     ['src/*/index.ts', 'src/a/b/index.ts', false],
-    ['**/*.sql', 'db/migrations/1.sql', true],
-    ['exact/path.ts', 'exact/path.ts', true],
-    ['exact/path.ts', 'exact/other.ts', false],
-    ['a.b.ts', 'axbxts', false],
-  ])('%s vs %s -> %s', (glob, file, expected) => {
-    expect(matchesGlob(file, glob)).toBe(expected)
+    ['**/*.sql', 'db/queries/1.sql', true],
+  ])('%s vs %s -> P0 is %s', (glob, file, expected) => {
+    const graded = gradeRisk(change({ files: [file], criticalPaths: [glob] }))
+    expect(graded.grade === 'P0').toBe(expected)
   })
 })

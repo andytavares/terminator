@@ -1,5 +1,12 @@
 # Contract: App Band
 
+> **Superseded. Kept as history.** This contract records what was decided when the feature was
+> specified, and is not edited. The code no longer has `api.sidebar.registerItem`, one of the two sources it reads. Do not build against it. The
+> current contract lives in:
+>
+> - `src/shared/schemas/extension.schema.ts` (`ExtensionManifestSchema`) and [The manifest](../../../docs/EXTENSION-DEVELOPMENT.md#the-manifest): the app band is fed by `contributes.globalTab` through `src/renderer/extensions/loader.ts`
+> - `packages/extension-sdk/types/api.d.ts`: the `ExtensionAPI`, which the core implements in `src/main/extensions/api.ts`
+
 **Feature**: `032-branch-first-sidebar`
 
 The sidebar's app-level surfaces move into one labelled band. **No extension-facing contract changes** — this is a core layout decision applied to registration data that already exists (FR-020, constitution II).

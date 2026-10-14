@@ -1,16 +1,70 @@
 // Bridge module so extension components don't access window.electronAPI.github directly.
 // All calls go through extensionBridge.invoke which routes via registered IPC handlers.
 
+import type { IssueComment } from '../schemas/pr-review.schema'
+import { invoke } from '@terminator/extension-sdk/renderer'
+import type { BridgeResult } from './bridge'
+
 const bridge = () => window.electronAPI.extensionBridge
+
+export interface RawFileMetrics {
+  churn90d: number
+  blastRadius: number
+  topImporters: string[]
+  importerCount: number
+  testFilePresent: boolean
+  patchCoverage?: number | null
+}
+
+export interface OpenPrsPage {
+  prs: unknown[]
+  hasMore: boolean
+  nextCursor?: string
+  totalCount?: number
+}
+
+export interface PrCompareResult {
+  rewritten: boolean
+  commits: number
+  files: Array<{ path: string; patch: string }>
+}
+
+export interface NewPullRequestInput {
+  repoRoot: string
+  title: string
+  body: string
+  base: string
+  head: string
+  draft: boolean
+}
+
+/** One file of a pull request. */
+interface PrFileRef {
+  repoRoot: string
+  prNumber: number
+  path: string
+}
+
+/** A viewed (or unviewed) mark for a pull request, with its node id when known. */
+interface ViewedMark {
+  repoRoot: string
+  prNumber: number
+  viewed: boolean
+  nodeId?: string
+}
 
 export const githubAPI = {
   currentUser: (repoRoot: string) => bridge().invoke('github:current-user', { repoRoot }),
 
+  /** Opens a pull request from `head`, which must already be pushed. */
+  prCreate: (input: NewPullRequestInput) =>
+    invoke<BridgeResult<{ number: number; url: string }>>('github:pr-create', input),
+
   listOpenPrs: (repoRoot: string, options?: { cursor?: string; search?: string }) =>
-    bridge().invoke('github:list-open-prs', { repoRoot, ...options }),
+    invoke<BridgeResult<OpenPrsPage>>('github:list-open-prs', { repoRoot, ...options }),
 
   prReviewDetail: (repoRoot: string, prNumber: number) =>
-    bridge().invoke('github:pr-review-detail', { repoRoot, prNumber }),
+    invoke<BridgeResult<{ pr: unknown }>>('github:pr-review-detail', { repoRoot, prNumber }),
 
   prMarkReady: (repoRoot: string, prNumber: number) =>
     bridge().invoke('github:pr-mark-ready', { repoRoot, prNumber }),
@@ -18,93 +72,76 @@ export const githubAPI = {
   prUpdateBranch: (repoRoot: string, prNumber: number) =>
     bridge().invoke('github:pr-update-branch', { repoRoot, prNumber }),
 
-  prFileDiff: (
-    repoRoot: string,
-    prNumber: number,
-    path: string,
-    known?: { baseRef?: string; headSHA?: string }
-  ) => bridge().invoke('github:pr-file-diff', { repoRoot, prNumber, path, ...known }),
+  /** A file's diff; `baseRef` and `headSHA`, when known, spare a lookup and a fetch. */
+  prFileDiff: (file: PrFileRef & { baseRef?: string; headSHA?: string }) =>
+    invoke<BridgeResult<{ diff: unknown }>>('github:pr-file-diff', file),
 
-  prFileContent: (repoRoot: string, prNumber: number, path: string, ref: string) =>
-    bridge().invoke('github:pr-file-content', { repoRoot, prNumber, path, ref }),
-
-  fileMetrics: (repoRoot: string, path: string) =>
-    bridge().invoke('github:file-metrics', { repoRoot, path }),
+  prFileContent: (file: PrFileRef & { ref: string }) =>
+    bridge().invoke('github:pr-file-content', file),
 
   filesMetrics: (repoRoot: string, paths: string[]) =>
-    bridge().invoke('github:files-metrics', { repoRoot, paths }),
+    invoke<BridgeResult<{ metrics: Record<string, RawFileMetrics> }>>('github:files-metrics', {
+      repoRoot,
+      paths,
+    }),
 
   prInlineComments: (repoRoot: string, prNumber: number) =>
-    bridge().invoke('github:pr-inline-comments', { repoRoot, prNumber }),
+    invoke<BridgeResult<{ comments: unknown[]; resolvedCommentIds?: number[] }>>(
+      'github:pr-inline-comments',
+      { repoRoot, prNumber }
+    ),
 
   prIssueComments: (repoRoot: string, prNumber: number) =>
-    bridge().invoke('github:pr-issue-comments', { repoRoot, prNumber }),
+    invoke<BridgeResult<{ comments: IssueComment[] }>>('github:pr-issue-comments', {
+      repoRoot,
+      prNumber,
+    }),
 
   prIssueCommentAdd: (payload: { repoRoot: string; prNumber: number; body: string }) =>
-    bridge().invoke('github:pr-issue-comment-add', payload),
+    invoke<BridgeResult<{ comment: unknown }>>('github:pr-issue-comment-add', payload),
 
-  prCommentAdd: (payload: unknown) => bridge().invoke('github:pr-comment-add', payload),
+  prCommentReply: (payload: unknown) =>
+    invoke<BridgeResult<{ comment: unknown }>>('github:pr-comment-reply', payload),
 
-  prCommentReply: (payload: unknown) => bridge().invoke('github:pr-comment-reply', payload),
+  prReviewSubmit: (payload: unknown) =>
+    invoke<BridgeResult<{ reviewId: number }>>('github:pr-review-submit', payload),
 
-  prReviewSubmit: (payload: unknown) => bridge().invoke('github:pr-review-submit', payload),
-
-  sessionGet: (key: string) => bridge().invoke('github:session-get', { key }),
+  sessionGet: (key: string) => invoke<{ session: unknown }>('github:session-get', { key }),
 
   sessionSet: (key: string, session: unknown) =>
     bridge().invoke('github:session-set', { key, session }),
 
-  sessionsForRepo: (repoRoot: string) => bridge().invoke('github:sessions-for-repo', { repoRoot }),
+  sessionsForRepo: (repoRoot: string) =>
+    invoke<{ sessions: unknown[] }>('github:sessions-for-repo', { repoRoot }),
 
   saveActiveReview: (repoRoot: string, pr: unknown) =>
     bridge().invoke('github:save-active-review', { repoRoot, pr }),
 
   activeReviewsForRepo: (repoRoot: string) =>
-    bridge().invoke('github:active-reviews-for-repo', { repoRoot }),
+    invoke<BridgeResult<{ prs: unknown[] }>>('github:active-reviews-for-repo', { repoRoot }),
 
   removeActiveReview: (repoRoot: string, prNumber: number) =>
     bridge().invoke('github:remove-active-review', { repoRoot, prNumber }),
 
   pruneActiveReviews: (repoRoot: string, prNumbers: number[]) =>
-    bridge().invoke('github:prune-active-reviews', { repoRoot, prNumbers }),
-
-  fileCoChange: (repoRoot: string, files: string[]) =>
-    bridge().invoke('github:file-cochange', { repoRoot, files }),
+    invoke<BridgeResult<{ openNumbers: number[] }>>('github:prune-active-reviews', {
+      repoRoot,
+      prNumbers,
+    }),
 
   dashboardSearch: () => bridge().invoke('github:dashboard-search', {}),
 
-  fileViewedSet: (
-    repoRoot: string,
-    prNumber: number,
-    path: string,
-    viewed: boolean,
-    nodeId?: string
-  ) =>
-    bridge().invoke('github:file-viewed-set', {
-      repoRoot,
-      prNumber,
-      path,
-      viewed,
-      ...(nodeId ? { nodeId } : {}),
-    }),
+  fileViewedSet: ({ nodeId, ...mark }: ViewedMark & { path: string }) =>
+    bridge().invoke('github:file-viewed-set', { ...mark, ...(nodeId ? { nodeId } : {}) }),
 
-  filesViewedSet: (
-    repoRoot: string,
-    prNumber: number,
-    nodeId: string | undefined,
-    paths: string[],
-    viewed: boolean
-  ) =>
+  filesViewedSet: ({ nodeId, ...mark }: ViewedMark & { paths: string[] }) =>
     bridge().invoke('github:files-viewed-set', {
-      repoRoot,
-      prNumber,
-      paths,
-      viewed,
+      ...mark,
       ...(nodeId ? { nodeId } : {}),
     }),
 
   prCompare: (repoRoot: string, fromSha: string, toSha: string) =>
-    bridge().invoke('github:pr-compare', { repoRoot, fromSha, toSha }),
+    invoke<BridgeResult<PrCompareResult>>('github:pr-compare', { repoRoot, fromSha, toSha }),
 
   testsForBlock: (input: {
     repoRoot: string

@@ -1,6 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   AppHandle,
@@ -9,6 +8,7 @@ import {
   createWorkspace,
   addAndSelectProject,
   selectProject,
+  e2eTempDir,
 } from './helpers'
 
 // Resume against the running app. A conversation is reported exactly as the
@@ -25,7 +25,7 @@ let folder: string
 let transcript: string
 
 test.beforeEach(() => {
-  folder = mkdtempSync(join(tmpdir(), 'resume-'))
+  folder = e2eTempDir('resume-')
   transcript = join(folder, 'conversation.jsonl')
   writeFileSync(transcript, '{}\n')
 })
@@ -49,17 +49,26 @@ async function openHome(page: Page): Promise<void> {
   await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible()
 }
 
+/** A conversation an agent reports: the terminal it ran in, its id and its transcript. */
+interface ConversationReport {
+  terminalSessionId: string
+  conversationId: string
+  transcriptPath: string
+}
+
 /** What the capture hook writes when an agent reports a conversation. */
 function reportConversation(
   profile: string,
-  terminalSessionId: string,
-  conversationId: string,
-  transcriptPath: string
+  { terminalSessionId, conversationId, transcriptPath }: ConversationReport
 ): void {
   const dir = join(profile, 'agent-sessions')
   mkdirSync(dir, { recursive: true })
+  const target = join(dir, `${terminalSessionId}.json`)
+  // Written aside and renamed into place, as the hook does
+  // (src/main/agents/agent-session-hook.ts): the watcher consumes a report as
+  // soon as its name appears, and one written in place could be read empty.
   writeFileSync(
-    join(dir, `${terminalSessionId}.json`),
+    `${target}.tmp`,
     JSON.stringify({
       terminal: terminalSessionId,
       provider: 'claude',
@@ -70,6 +79,7 @@ function reportConversation(
       at: new Date().toISOString(),
     })
   )
+  renameSync(`${target}.tmp`, target)
 }
 
 /**
@@ -116,7 +126,11 @@ test('a stopped session offers Resume once its conversation is known', async () 
   await expect(page.getByRole('button', { name: /^Resume/ })).toHaveCount(0)
 
   const terminalId = await openTerminalId(page, 'Repo One / feature-a')
-  reportConversation(handle.userDataDir, terminalId, 'conv-e2e-1', transcript)
+  reportConversation(handle.userDataDir, {
+    terminalSessionId: terminalId,
+    conversationId: 'conv-e2e-1',
+    transcriptPath: transcript,
+  })
   await awaitCaptured(page, terminalId)
 
   // A running session still offers nothing: there is nothing to bring back.
@@ -144,7 +158,11 @@ test('a conversation whose transcript has gone says so instead', async () => {
   await addAndSelectProject(page, 'Repo One', 'feature-a')
   await openHome(page)
   const terminalId = await openTerminalId(page, 'Repo One / feature-a')
-  reportConversation(handle.userDataDir, terminalId, 'conv-e2e-2', join(folder, 'missing.jsonl'))
+  reportConversation(handle.userDataDir, {
+    terminalSessionId: terminalId,
+    conversationId: 'conv-e2e-2',
+    transcriptPath: join(folder, 'missing.jsonl'),
+  })
   await awaitCaptured(page, terminalId)
 
   await goToTerminal(page)
@@ -173,7 +191,11 @@ test('a conversation that goes while the app is running stops being offered', as
   await addAndSelectProject(page, 'Repo One', 'feature-a')
   await openHome(page)
   const captured = await openTerminalId(page, 'Repo One / feature-a')
-  reportConversation(handle.userDataDir, captured, 'conv-e2e-4', transcript)
+  reportConversation(handle.userDataDir, {
+    terminalSessionId: captured,
+    conversationId: 'conv-e2e-4',
+    transcriptPath: transcript,
+  })
   await awaitCaptured(page, captured)
   await goToTerminal(page)
   await page.locator('.terminal-pane').click()
@@ -195,6 +217,20 @@ test('a conversation that goes while the app is running stops being offered', as
   await expect(page.getByRole('button', { name: /^Resume/ })).toHaveCount(0)
 })
 
+/** Resumes the closed conversation from the keyboard, with a focus ring to show
+ * where it is: this is the one control that brings work back, and it must not
+ * need a mouse. */
+async function resumeFromKeyboard(page: Page): Promise<void> {
+  const resume = page
+    .getByRole('rowgroup', { name: 'Closed' })
+    .getByRole('button', { name: /^Resume/ })
+  await resume.focus()
+  expect(
+    await resume.evaluate((el) => getComputedStyle(el, ':focus-visible').outlineWidth)
+  ).not.toBe('0px')
+  await page.keyboard.press('Enter')
+}
+
 test('a conversation from the last run is offered under Closed, and nothing restarted itself', async () => {
   handle = await launchApp()
   const profile = handle.userDataDir
@@ -203,7 +239,11 @@ test('a conversation from the last run is offered under Closed, and nothing rest
   await addAndSelectProject(page, 'Repo One', 'feature-a')
   await openHome(page)
   const before = await openTerminalId(page, 'Repo One / feature-a')
-  reportConversation(profile, before, 'conv-e2e-3', transcript)
+  reportConversation(profile, {
+    terminalSessionId: before,
+    conversationId: 'conv-e2e-3',
+    transcriptPath: transcript,
+  })
   await awaitCaptured(page, before)
 
   await closeApp(handle)
@@ -224,21 +264,38 @@ test('a conversation from the last run is offered under Closed, and nothing rest
   // Resuming it takes it out of the history: it is a live session again, not a
   // live session beside a ghost of itself.
   await openHome(restarted)
-  // Resumed from the keyboard, with a focus ring to show where it is: this is
-  // the one control that brings work back, and it must not need a mouse.
-  const resume = restarted
-    .getByRole('rowgroup', { name: 'Closed' })
-    .getByRole('button', { name: /^Resume/ })
-  await resume.focus()
-  expect(
-    await resume.evaluate((el) => getComputedStyle(el, ':focus-visible').outlineWidth)
-  ).not.toBe('0px')
-  await restarted.keyboard.press('Enter')
+  await resumeFromKeyboard(restarted)
   // The terminal that took the conversation over carries its description.
   await expect(restarted.locator('.tab-bar__tab--session[title="resume test"]')).toBeVisible()
   await openHome(restarted)
   await expect(restarted.getByRole('rowgroup', { name: 'Closed' })).toHaveCount(0)
 })
+
+/** Opens a second terminal on the branch, describes it, and returns its id. */
+async function secondTerminalId(page: Page, first: string): Promise<string> {
+  await goToTerminal(page)
+  await page.getByRole('button', { name: 'New terminal' }).click()
+  await openHome(page)
+  const box = page
+    .getByRole('rowgroup', { name: 'Repo One / feature-a' })
+    .getByRole('textbox', { name: 'What is this session doing?' })
+    .last()
+  await box.fill('the other one')
+  await box.press('Enter')
+  const ids = await page.evaluate(async () => {
+    const { data } = await window.electronAPI.sessionRecords.list()
+    return data.map((r) => r.sessionId)
+  })
+  return ids.find((id) => id !== first)!
+}
+
+/** The agent conversation a terminal's record holds, or null. */
+function conversationOf(page: Page, sessionId: string): Promise<string | null> {
+  return page.evaluate(async (id) => {
+    const { data } = await window.electronAPI.sessionRecords.list()
+    return data.find((r) => r.sessionId === id)?.agent?.sessionId ?? null
+  }, sessionId)
+}
 
 test('two conversations on one branch each come back to their own session', async () => {
   handle = await launchApp()
@@ -254,31 +311,20 @@ test('two conversations on one branch each come back to their own session', asyn
   // nothing here depends on how the agent was started.
   await openHome(page)
   const first = await openTerminalId(page, 'Repo One / feature-a')
-  reportConversation(profile, first, 'conv-first', transcript)
-  await goToTerminal(page)
-  await page.getByRole('button', { name: 'New terminal' }).click()
-  await openHome(page)
-  const box = page
-    .getByRole('rowgroup', { name: 'Repo One / feature-a' })
-    .getByRole('textbox', { name: 'What is this session doing?' })
-    .last()
-  await box.fill('the other one')
-  await box.press('Enter')
-  const ids = await page.evaluate(async () => {
-    const { data } = await window.electronAPI.sessionRecords.list()
-    return data.map((r) => r.sessionId)
+  reportConversation(profile, {
+    terminalSessionId: first,
+    conversationId: 'conv-first',
+    transcriptPath: transcript,
   })
-  const other = ids.find((id) => id !== first)!
-  reportConversation(profile, other, 'conv-second', second)
+  const other = await secondTerminalId(page, first)
+  reportConversation(profile, {
+    terminalSessionId: other,
+    conversationId: 'conv-second',
+    transcriptPath: second,
+  })
   await awaitCaptured(page, first)
   await awaitCaptured(page, other)
 
-  const conversationOf = async (sessionId: string): Promise<string | null> =>
-    page.evaluate(async (id) => {
-      const { data } = await window.electronAPI.sessionRecords.list()
-      return data.find((r) => r.sessionId === id)?.agent?.sessionId ?? null
-    }, sessionId)
-
-  expect(await conversationOf(first)).toBe('conv-first')
-  expect(await conversationOf(other)).toBe('conv-second')
+  expect(await conversationOf(page, first)).toBe('conv-first')
+  expect(await conversationOf(page, other)).toBe('conv-second')
 })

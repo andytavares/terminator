@@ -1,5 +1,5 @@
 import * as path from 'node:path'
-import type { ExtensionAPI } from '../../../../src/main/extensions/api.js'
+import type { ExtensionAPI } from '@terminator/extension-sdk'
 import {
   createRunRegistry,
   type Run,
@@ -48,77 +48,94 @@ export interface SupervisionOptions {
   run?: RunCommand
   /** The branch a card's work is measured against. */
   baseBranch?: string
+  /** Told whenever the feed gains or loses a line. */
+  onFeedChange?: () => void
+}
+
+/** What the supervision layer's parts share. */
+interface SupervisionContext {
+  readonly runs: RunRegistry
+  readonly feed: FeedLog
+  /** What the card was branched from; a fixed `main` measured two branches, not the run. */
+  readonly baseBranch: string
+  readonly runCommand: RunCommand
 }
 
 export function createSupervision(options: SupervisionOptions): Supervision {
-  const { api, stateDir } = options
-  // Whatever the card was actually branched from. Measuring against a fixed
-  // `main` reported the difference between two branches rather than the work
-  // this run did.
-  const baseBranch = options.baseBranch ?? 'main'
-  const runCommand: RunCommand =
-    options.run ??
-    (async (command, args, cwd) => {
-      const result = await api.shell.exec({ command: command as 'git', args, cwd })
-      return { ok: result.exitCode === 0, stdout: result.stdout }
-    })
-
   const runs = createRunRegistry()
-  const feed = createFeedLog(path.join(stateDir, 'feed.jsonl'))
-
-  async function measure(sessionId: string): Promise<void> {
-    const run = runs.get(sessionId)
-    if (run === null || run.worktreePath === '') return
-    runs.noteDiff(
-      sessionId,
-      await readDiffSummary(run.worktreePath, run.baseBranch ?? baseBranch, runCommand)
-    )
+  const context: SupervisionContext = {
+    runs,
+    feed: createFeedLog(path.join(options.stateDir, 'feed.jsonl'), options.onFeedChange),
+    baseBranch: options.baseBranch ?? 'main',
+    runCommand: options.run ?? shellRunCommand(options.api),
   }
 
   return {
     runs,
-    feed,
-    measure,
-
-    async finishTurn(sessionId, turns, at): Promise<void> {
-      const run = runs.get(sessionId)
-      if (run === null) return
-      runs.noteTurns(sessionId, turns)
-      await measure(sessionId)
-
-      const changed = runs.get(sessionId)?.diff ?? { files: 0, added: 0, removed: 0 }
-      if (changed.files === 0) {
-        // Nothing to look at, and nothing is over: in a terminal the session
-        // stays open and the next turn may well change something. Calling it
-        // `finished` retired a run that was still going, and took it off every
-        // surface that reads live runs.
-        runs.setState(sessionId, 'waiting', at)
-        return
-      }
-
-      runs.setState(sessionId, 'ready', at)
-
-      feed.post({
-        at,
-        sessionId,
-        author: 'agent',
-        summary: `${path.basename(run.featureDir)} is ready to review — ${changed.files} file${changed.files === 1 ? '' : 's'} +${changed.added} −${changed.removed}`,
-      })
-    },
-
-    finish(sessionId, at): void {
-      const run = runs.get(sessionId)
-      if (run === null) return
-      // Left on the register rather than removed: a finished run with a diff is
-      // still work somebody may open.
-      runs.setState(sessionId, run.diff.files > 0 ? 'ready' : 'finished', at)
-    },
-
-    snapshot() {
-      return {
-        runs: runs.list(),
-        history: runs.history(),
-      }
-    },
+    feed: context.feed,
+    measure: (sessionId) => measure(context, sessionId),
+    finishTurn: (sessionId, turns, at) => finishTurn(context, sessionId, { turns, at }),
+    finish: (sessionId, at) => finish(runs, sessionId, at),
+    snapshot: () => ({
+      runs: runs.list(),
+      history: runs.history(),
+    }),
   }
+}
+
+/** `git`, through the host's shell. */
+function shellRunCommand(api: ExtensionAPI): RunCommand {
+  return async (command, args, cwd) => {
+    const result = await api.shell.exec({ command: command as 'git', args, cwd })
+    return { ok: result.exitCode === 0, stdout: result.stdout }
+  }
+}
+
+async function measure(context: SupervisionContext, sessionId: string): Promise<void> {
+  const { runs } = context
+  const run = runs.get(sessionId)
+  if (run === null || run.worktreePath === '') return
+  runs.noteDiff(
+    sessionId,
+    await readDiffSummary(run.worktreePath, run.baseBranch ?? context.baseBranch, {
+      run: context.runCommand,
+    })
+  )
+}
+
+async function finishTurn(
+  context: SupervisionContext,
+  sessionId: string,
+  { turns, at }: { turns: number; at: number }
+): Promise<void> {
+  const { runs } = context
+  const run = runs.get(sessionId)
+  if (run === null) return
+  runs.noteTurns(sessionId, turns)
+  await measure(context, sessionId)
+
+  const changed = runs.get(sessionId)?.diff ?? { files: 0, added: 0, removed: 0 }
+  if (changed.files === 0) {
+    // Nothing to look at, and nothing over: the terminal session stays open for the
+    // next turn, so `finished` here would take a live run off every surface.
+    runs.setState(sessionId, 'waiting', at)
+    return
+  }
+
+  runs.setState(sessionId, 'ready', at)
+
+  context.feed.post({
+    at,
+    sessionId,
+    author: 'agent',
+    summary: `${path.basename(run.featureDir)} is ready to review — ${changed.files} file${changed.files === 1 ? '' : 's'} +${changed.added} −${changed.removed}`,
+  })
+}
+
+function finish(runs: RunRegistry, sessionId: string, at: number): void {
+  const run = runs.get(sessionId)
+  if (run === null) return
+  // Left on the register rather than removed: a finished run with a diff is
+  // still work somebody may open.
+  runs.setState(sessionId, run.diff.files > 0 ? 'ready' : 'finished', at)
 }

@@ -10,6 +10,12 @@ function git(state: { head: string; dirty: boolean }) {
 }
 
 describe('createPassCache', () => {
+  describe('remembering', passCacheRememberingTests)
+  describe('dirty trees', dirtyTreesTests)
+  describe('failures and unreadable checkouts', failuresAndUnreadableCheckoutsTests)
+})
+
+function passCacheRememberingTests() {
   it('remembers a command that passed on a clean commit', async () => {
     const cache = createPassCache(git({ head: 'abc', dirty: false }))
     await cache.record('/wt', 'npm run lint', 0)
@@ -23,7 +29,9 @@ describe('createPassCache', () => {
     state.head = 'def'
     expect(await cache.passed('/wt', 'npm run lint')).toBe(false)
   })
+}
 
+function dirtyTreesTests() {
   it('never trusts a pass while there are uncommitted changes', async () => {
     const state = { head: 'abc', dirty: true }
     const cache = createPassCache(git(state))
@@ -34,7 +42,9 @@ describe('createPassCache', () => {
     state.dirty = true
     expect(await cache.passed('/wt', 'npm run lint')).toBe(false)
   })
+}
 
+function failuresAndUnreadableCheckoutsTests() {
   it('does not remember a failure, or a different command', async () => {
     const cache = createPassCache(git({ head: 'abc', dirty: false }))
     await cache.record('/wt', 'npm test', 1)
@@ -48,4 +58,4 @@ describe('createPassCache', () => {
     await cache.record('/wt', 'npm run lint', 0)
     expect(await cache.passed('/wt', 'npm run lint')).toBe(false)
   })
-})
+}

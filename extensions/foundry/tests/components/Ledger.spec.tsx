@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import React from 'react'
 import { Ledger } from '../../src/components/Ledger.js'
+import { createChangeBus } from '../helpers/change-bus.js'
 
 // The record, read-only apart from one button. Proposals appear when the
 // operator presses it and at no other time.
@@ -72,45 +73,73 @@ const FACTORY_METRICS = {
 }
 
 let invoke: ReturnType<typeof vi.fn>
+let bus = createChangeBus()
+
+/** What each channel answers; `over` replaces the record's query fields and any answer. */
+function ledgerReplies(over: Record<string, unknown>): Record<string, () => unknown> {
+  return {
+    'foundry:ledger.query': () => ({
+      entries: ENTRIES,
+      total: 2,
+      actors: ['operator', 'rule:budget.exceeded'],
+      actions: ['gate.decided', 'gate.default'],
+      orders: ['WO-1', 'WO-2'],
+      ...over,
+    }),
+    'foundry:rules.propose': () => ({ proposals: over.proposals ?? [] }),
+    'foundry:rules.decide': () => over.decide ?? { ok: true, accepted: true },
+    'foundry:rules.inForce': () => over.inForce ?? { rules: [], declined: [] },
+    'foundry:rules.remove': () => over.remove ?? { ok: true, removed: true },
+    'foundry:factory.metrics': () => over.factoryMetrics ?? FACTORY_METRICS,
+  }
+}
 
 function mount(over: Record<string, unknown> = {}) {
-  invoke = vi.fn(async (channel: string) => {
-    if (channel === 'foundry:ledger.query') {
-      return {
-        entries: ENTRIES,
-        total: 2,
-        actors: ['operator', 'rule:budget.exceeded'],
-        actions: ['gate.decided', 'gate.default'],
-        orders: ['WO-1', 'WO-2'],
-        ...over,
-      }
-    }
-    if (channel === 'foundry:rules.propose') return { proposals: over.proposals ?? [] }
-    if (channel === 'foundry:rules.decide') return over.decide ?? { ok: true, accepted: true }
-    if (channel === 'foundry:rules.inForce') {
-      return over.inForce ?? { rules: [], declined: [] }
-    }
-    if (channel === 'foundry:rules.remove') return over.remove ?? { ok: true, removed: true }
-    if (channel === 'foundry:factory.metrics') return over.factoryMetrics ?? FACTORY_METRICS
-    return {}
+  bus = createChangeBus()
+  const replies = ledgerReplies(over)
+  invoke = vi.fn(async (channel: string) => (channel in replies ? replies[channel]() : {}))
+  Object.assign(window, {
+    electronAPI: {
+      extensionBridge: { invoke, on: bus.on },
+    },
   })
-  ;(window as unknown as Record<string, unknown>).electronAPI = {
-    extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
-  }
   render(<Ledger />)
 }
 
 beforeEach(() => vi.clearAllMocks())
 
-describe('reading the record', () => {
-  /** The rows, not the filter options, which carry the same words. */
-  function rowText(): string[] {
-    return screen
-      .getAllByRole('row')
-      .slice(1)
-      .map((row) => row.textContent ?? '')
-  }
+describe('the record while it is open', () => {
+  const queries = () => invoke.mock.calls.filter((c) => c[0] === 'foundry:ledger.query').length
 
+  it('is read again when an entry is appended, and not when only a gate changes', async () => {
+    mount()
+    await waitFor(() => expect(queries()).toBe(1))
+
+    bus.emit({ kind: 'gates', orderId: 'WO-1' })
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    expect(queries()).toBe(1)
+
+    bus.emit({ kind: 'ledger', orderId: 'WO-1' })
+    await waitFor(() => expect(queries()).toBe(2))
+  })
+})
+
+/** The rows, not the filter options, which carry the same words. */
+function rowText(): string[] {
+  return screen
+    .getAllByRole('row')
+    .slice(1)
+    .map((row) => row.textContent ?? '')
+}
+
+describe('reading the record', () => {
+  describe('who decided', whoDecidedTests)
+  describe('filters', filtersTests)
+  describe('filtering by who and what', filteringByWhoAndWhatTests)
+  describe('counts and empty', countsAndEmptyTests)
+})
+
+function whoDecidedTests() {
   it('shows who decided, what, about what and why', async () => {
     mount()
     await waitFor(() => expect(screen.getByText('G-1')).toBeTruthy())
@@ -126,7 +155,9 @@ describe('reading the record', () => {
     await waitFor(() => screen.getByText('G-1'))
     expect(rowText()[1]).toContain('rule:budget.exceeded')
   })
+}
 
+function filtersTests() {
   it('offers only the filter values that occur', async () => {
     mount()
     await waitFor(() => screen.getByText('G-1'))
@@ -145,7 +176,9 @@ describe('reading the record', () => {
       )
     )
   })
+}
 
+function filteringByWhoAndWhatTests() {
   it('filters by who decided', async () => {
     mount()
     await waitFor(() => screen.getByText('G-1'))
@@ -169,7 +202,9 @@ describe('reading the record', () => {
       )
     )
   })
+}
 
+function countsAndEmptyTests() {
   it('says how much of the record it is showing', async () => {
     mount()
     await waitFor(() => screen.getByText('G-1'))
@@ -180,9 +215,28 @@ describe('reading the record', () => {
     mount({ entries: [], total: 0, actors: [], actions: [], orders: [] })
     await waitFor(() => expect(screen.getByText('Nothing recorded yet.')).toBeTruthy())
   })
-})
+}
 
 describe('asking what it keeps rejecting (FR-076)', () => {
+  describe('asking', ledgerAskingTests)
+  describe('citations and threshold', citationsAndThresholdTests)
+  describe('accepting', ledgerAcceptingTests)
+  describe('declining and refusals', decliningAndRefusalsTests)
+})
+
+const IN_FORCE = {
+  rules: [
+    {
+      id: 'curator-hardcodes-the-timeout',
+      asserts: 'no unit hardcodes a timeout',
+      rung: 'data-root',
+      origin: 'curator:2026-09-01T10:00:00.000Z/U-1',
+    },
+  ],
+  declined: [],
+}
+
+function ledgerAskingTests() {
   it('proposes nothing until asked', async () => {
     mount({ proposals: [PROPOSAL] })
     await waitFor(() => screen.getByText('G-1'))
@@ -196,7 +250,9 @@ describe('asking what it keeps rejecting (FR-076)', () => {
     fireEvent.click(screen.getByRole('button', { name: /keep rejecting/ }))
     await waitFor(() => expect(screen.getByText('Proposed rules')).toBeTruthy())
   })
+}
 
+function citationsAndThresholdTests() {
   it('shows the citations the proposal derives from', async () => {
     mount({ proposals: [PROPOSAL] })
     await waitFor(() => screen.getByText('G-1'))
@@ -214,7 +270,9 @@ describe('asking what it keeps rejecting (FR-076)', () => {
     fireEvent.click(screen.getByRole('button', { name: /keep rejecting/ }))
     await waitFor(() => expect(screen.getByText(/three times/)).toBeTruthy())
   })
+}
 
+function ledgerAcceptingTests() {
   it('accepts one, and says what that means', async () => {
     mount({ proposals: [PROPOSAL] })
     await waitFor(() => screen.getByText('G-1'))
@@ -230,7 +288,9 @@ describe('asking what it keeps rejecting (FR-076)', () => {
     )
     expect(screen.getByText(/in force from the next run/)).toBeTruthy()
   })
+}
 
+function decliningAndRefusalsTests() {
   it('turns one down for good', async () => {
     mount({ proposals: [PROPOSAL] })
     await waitFor(() => screen.getByText('G-1'))
@@ -258,21 +318,17 @@ describe('asking what it keeps rejecting (FR-076)', () => {
     // Still listed, because it was not decided.
     expect(screen.getByText(PROPOSAL.asserts)).toBeTruthy()
   })
-})
+}
 
 describe('removing an accepted check (FR-081)', () => {
-  const IN_FORCE = {
-    rules: [
-      {
-        id: 'curator-hardcodes-the-timeout',
-        asserts: 'no unit hardcodes a timeout',
-        rung: 'data-root',
-        origin: 'curator:2026-09-01T10:00:00.000Z/U-1',
-      },
-    ],
-    declined: [],
-  }
+  describe('in force', inForceTests)
+  describe('removing', removingTests)
+  describe('what was turned down', whatWasTurnedDownTests)
+  describe('declined checks', declinedChecksTests)
+  describe('an empty panel', anEmptyPanelTests)
+})
 
+function inForceTests() {
   it('shows the checks the operator accepted, with what each asserts', async () => {
     mount({ inForce: IN_FORCE })
     await waitFor(() => expect(screen.getByText('Checks you accepted')).toBeTruthy())
@@ -289,7 +345,9 @@ describe('removing an accepted check (FR-081)', () => {
       })
     )
   })
+}
 
+function removingTests() {
   it('says it is gone and will not come back', async () => {
     mount({ inForce: IN_FORCE })
     await waitFor(() => screen.getByText('Checks you accepted'))
@@ -304,7 +362,9 @@ describe('removing an accepted check (FR-081)', () => {
     await waitFor(() => expect(screen.getByText(/not yours to remove/)).toBeTruthy())
     expect(screen.queryByText(/no longer in force/)).toBeNull()
   })
+}
 
+function whatWasTurnedDownTests() {
   it('shows what was turned down, and why, so the removal is readable back', async () => {
     mount({
       inForce: {
@@ -315,7 +375,9 @@ describe('removing an accepted check (FR-081)', () => {
     await waitFor(() => expect(screen.getByText('Checks you accepted')).toBeTruthy())
     expect(screen.getByText(/it fired on everything/)).toBeTruthy()
   })
+}
 
+function declinedChecksTests() {
   it('names a declined check by what it would have checked, never by its id', async () => {
     mount({
       inForce: {
@@ -335,13 +397,15 @@ describe('removing an accepted check (FR-081)', () => {
     expect(screen.getByText(/Skips the lint step/)).toBeTruthy()
     expect(document.body.textContent).not.toContain('curator-')
   })
+}
 
+function anEmptyPanelTests() {
   it('shows the panel not at all when there is nothing in force and nothing declined', async () => {
     mount()
     await waitFor(() => screen.getByText('G-1'))
     expect(screen.queryByText('Checks you accepted')).toBeNull()
   })
-})
+}
 
 describe('the skills in force', () => {
   it('lists a skill available across the rungs, with the rung it came from', async () => {
@@ -358,27 +422,33 @@ describe('the skills in force', () => {
   })
 })
 
+function tileValue(label: string): string | null {
+  const tiles = document.querySelectorAll('.fdry-metrics-tile')
+  for (const tile of Array.from(tiles)) {
+    if (within(tile as HTMLElement).queryByText(label) !== null) {
+      return tile.querySelector('.fdry-metrics-tile__value')?.textContent ?? null
+    }
+  }
+  return null
+}
+
 describe('the Factory view (FR: the factory’s numbers)', () => {
+  describe('switching', ledgerSwitchingTests)
+  describe('null numbers', nullNumbersTests)
+  describe('windows', ledgerWindowsTests)
+})
+
+function ledgerSwitchingTests() {
   it('stays on Record until asked', async () => {
     mount()
     await waitFor(() => screen.getByText('G-1'))
     expect(invoke.mock.calls.filter((c) => c[0] === 'foundry:factory.metrics')).toHaveLength(0)
   })
 
-  function tileValue(label: string): string | null {
-    const tiles = document.querySelectorAll('.fdry-metrics-tile')
-    for (const tile of Array.from(tiles)) {
-      if (within(tile as HTMLElement).queryByText(label) !== null) {
-        return tile.querySelector('.fdry-metrics-tile__value')?.textContent ?? null
-      }
-    }
-    return null
-  }
-
   it('shows the 30-day tiles and a per-order row when switched to Factory', async () => {
     mount()
     await waitFor(() => screen.getByText('G-1'))
-    fireEvent.click(screen.getByRole('button', { name: 'Factory' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Factory' }))
     await waitFor(() => screen.getByText('Ship the thing'))
 
     expect(tileValue('Shipped')).toBe('1')
@@ -389,7 +459,9 @@ describe('the Factory view (FR: the factory’s numbers)', () => {
     expect(row?.textContent).toContain('✓')
     expect(row?.textContent).toContain('1 h 20 min')
   })
+}
 
+function nullNumbersTests() {
   it('renders a null number as —, never 0', async () => {
     mount({
       factoryMetrics: {
@@ -400,7 +472,7 @@ describe('the Factory view (FR: the factory’s numbers)', () => {
       },
     })
     await waitFor(() => screen.getByText('G-1'))
-    fireEvent.click(screen.getByRole('button', { name: 'Factory' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Factory' }))
     await waitFor(() => screen.getByText('Ship the thing'))
 
     expect(tileValue('Median lead time')).toBe('—')
@@ -408,18 +480,20 @@ describe('the Factory view (FR: the factory’s numbers)', () => {
     const row = screen.getByText('Ship the thing').closest('tr')
     expect(row?.textContent).toContain('—')
   })
+}
 
+function ledgerWindowsTests() {
   it('refetches with the chosen window', async () => {
     mount()
     await waitFor(() => screen.getByText('G-1'))
-    fireEvent.click(screen.getByRole('button', { name: 'Factory' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Factory' }))
     await waitFor(() => screen.getByText('Ship the thing'))
-    fireEvent.click(screen.getByRole('button', { name: 'All time' }))
+    fireEvent.click(screen.getByRole('radio', { name: 'All time' }))
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith('foundry:factory.metrics', { window: 'all' })
     )
   })
-})
+}
 
 describe('the reasons in the record', () => {
   it('renders a reason as markdown — an architect note is written that way', async () => {

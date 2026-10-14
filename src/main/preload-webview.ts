@@ -58,20 +58,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.send('terminal:input', { sessionId, data }),
     resize: (sessionId: string, cols: number, rows: number) =>
       ipcRenderer.send('terminal:resize', { sessionId, cols, rows }),
-    onOutput: (handler: (sessionId: string, data: string) => void) => {
-      const listener = (
-        _event: Electron.IpcRendererEvent,
-        payload: { sessionId: string; data: string }
-      ) => handler(payload.sessionId, payload.data)
-      ipcRenderer.on('terminal:output', listener)
-      return () => ipcRenderer.removeListener('terminal:output', listener)
-    },
     closeAll: () => ipcRenderer.invoke('terminal:close-all'),
     cleanupOrphans: () => ipcRenderer.invoke('terminal:cleanup-orphans'),
-    onProcessExit: (handler: (sessionId: string, exitCode: number) => void) => {
+    onProcessExit: (handler: (sessionId: string, exitCode: number | null) => void) => {
       const listener = (
         _event: Electron.IpcRendererEvent,
-        payload: { sessionId: string; exitCode: number }
+        payload: { sessionId: string; exitCode: number | null }
       ) => handler(payload.sessionId, payload.exitCode)
       ipcRenderer.on('terminal:process-exit', listener)
       return () => ipcRenderer.removeListener('terminal:process-exit', listener)
@@ -132,11 +124,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getSettingsValues: () => ipcRenderer.invoke('extension:get-settings-values'),
     updateSetting: (key: string, value: unknown) =>
       ipcRenderer.invoke('extension:update-setting', { key, value }),
-    getSidebarItems: () => ipcRenderer.invoke('extension:get-sidebar-items'),
-    getContextMenuItems: (target: string) =>
-      ipcRenderer.invoke('extension:get-context-menu-items', { target }),
-    contextMenuClick: (target: string, itemId: string, targetId: string) =>
-      ipcRenderer.send('extension:context-menu-click', { target, itemId, targetId }),
+    onSettingsChanged: (handler: (change: unknown) => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, change: unknown) => handler(change)
+      ipcRenderer.on('extension:settings-changed', listener)
+      return () => ipcRenderer.removeListener('extension:settings-changed', listener)
+    },
     getCommands: () => ipcRenderer.invoke('extension:get-commands'),
     executeCommand: (
       key: string,

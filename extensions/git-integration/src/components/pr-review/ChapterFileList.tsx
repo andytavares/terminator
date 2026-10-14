@@ -1,7 +1,16 @@
 import React, { useRef, useState } from 'react'
-import { Check, Dot, Plus } from 'lucide-react'
+import { Check } from 'lucide-react'
 import { usePrReviewStore } from '../../stores/pr-review.store'
 import type { Chapter, PrChangedFile } from '../../schemas/pr-review.schema'
+import {
+  classNames,
+  currentAttr,
+  orderedFiles,
+  rowState,
+  RowStateLabel,
+  RowStateMark,
+  type SinceSets,
+} from './file-rows'
 
 interface Props {
   repoRoot: string
@@ -12,28 +21,123 @@ interface Props {
   onSelectFile: (path: string) => void
 }
 
-type RowState = 'viewed' | 'changed' | 'new' | 'default'
-
-function rowState(
-  file: PrChangedFile,
-  viewedFiles: Set<string>,
-  changedSince: Set<string>,
-  newSinceLook: Set<string>
-): RowState {
-  if (changedSince.has(file.path)) return 'changed'
-  if (newSinceLook.has(file.path)) return 'new'
-  if (viewedFiles.has(file.path)) return 'viewed'
-  return 'default'
+/** `paths` with the one at `from` moved to `to`. */
+function movedPath(paths: string[], from: number, to: number): string[] {
+  const next = [...paths]
+  const [moved] = next.splice(from, 1)
+  next.splice(to, 0, moved)
+  return next
 }
 
-export function ChapterFileList({
-  repoRoot,
-  prNumber,
-  headSHA,
-  chapter,
-  currentFilePath,
-  onSelectFile,
-}: Props) {
+type ReorderFiles = ReturnType<typeof usePrReviewStore.getState>['reorderFiles']
+
+interface DragTarget {
+  props: Props
+  files: PrChangedFile[]
+  reorderFiles: ReorderFiles
+}
+
+/** Stores the order with the dragged row moved onto the one it was dropped on. */
+function dropRow(target: DragTarget, from: number | null, to: number): void {
+  if (from == null || from === to) return
+  const { repoRoot, prNumber, headSHA, chapter } = target.props
+  const order = movedPath(
+    target.files.map((f) => f.path),
+    from,
+    to
+  )
+  target.reorderFiles({ repoRoot, prNumber, headSHA }, chapter.id, order)
+}
+
+/** Drag a row onto another to move it there; the new order is stored per chapter. */
+function useRowDrag(target: DragTarget) {
+  const dragIndexRef = useRef<number | null>(null)
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
+  const endFileDrag = () => {
+    dragIndexRef.current = null
+    setDragOverIndex(null)
+  }
+  const fileDragHandlers = (index: number) => ({
+    onDragStart: () => {
+      dragIndexRef.current = index
+    },
+    onDragOver: (e: React.DragEvent) => {
+      e.preventDefault()
+      setDragOverIndex(index)
+    },
+    onDrop: (e: React.DragEvent) => {
+      e.preventDefault()
+      dropRow(target, dragIndexRef.current, index)
+      endFileDrag()
+    },
+    onDragEnd: endFileDrag,
+  })
+  return { dragOverIndex, handlersFor: fileDragHandlers }
+}
+
+type RowDrag = ReturnType<typeof useRowDrag>
+
+interface FileRowProps {
+  file: PrChangedFile
+  index: number
+  sets: SinceSets
+  isActive: boolean
+  drag: RowDrag
+  onSelectFile: (path: string) => void
+}
+
+function FileRowBody({ file, isViewed }: { file: PrChangedFile; isViewed: boolean }) {
+  return (
+    <>
+      <span className={`chapter-file-risk-dot chapter-file-risk-dot--${file.riskScore.level}`} />
+      <span className="chapter-file-name" title={file.path}>
+        {file.path.split('/').pop()}
+      </span>
+      <span className="chapter-file-changes">
+        <span className="chapter-file-add">+{file.additions}</span>
+        <span className="chapter-file-del">−{file.deletions}</span>
+      </span>
+      {isViewed && (
+        <span className="chapter-file-viewed-check" aria-label="Viewed">
+          <Check aria-hidden="true" />
+        </span>
+      )}
+    </>
+  )
+}
+
+function ChapterFileRow(props: FileRowProps) {
+  const { file, index, isActive, onSelectFile } = props
+  const isViewed = props.sets.viewedFiles.has(file.path)
+  const state = rowState(file, props.sets)
+  const className = classNames('chapter-file-row', {
+    'chapter-file-row--active': isActive,
+    'chapter-file-row--viewed': isViewed,
+    'chapter-file-row--drag-over': props.drag.dragOverIndex === index,
+  })
+  return (
+    <div
+      aria-current={currentAttr(isActive)}
+      className={className}
+      draggable
+      {...props.drag.handlersFor(index)}
+      onClick={() => onSelectFile(file.path)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => e.key === 'Enter' && onSelectFile(file.path)}
+    >
+      <RowStateMark state={state} num={index + 1} numClass="chapter-file-num" />
+      <FileRowBody file={file} isViewed={isViewed} />
+      <RowStateLabel state={state} />
+      <span className="chapter-file-why" title={file.whyHere}>
+        {file.whyHere}
+      </span>
+    </div>
+  )
+}
+
+export function ChapterFileList(props: Props) {
+  const { chapter, currentFilePath } = props
   const {
     viewedFiles,
     fileOrderOverrides,
@@ -41,111 +145,22 @@ export function ChapterFileList({
     changedSince = new Set<string>(),
     newSinceLook = new Set<string>(),
   } = usePrReviewStore()
-  const overrideOrder = fileOrderOverrides[chapter.id]
-  const files = overrideOrder
-    ? overrideOrder
-        .map((p) => chapter.files.find((f) => f.path === p))
-        .filter((f): f is PrChangedFile => !!f)
-    : chapter.files
-
-  const dragIndexRef = useRef<number | null>(null)
-  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
-
-  const handleDragStart = (index: number) => {
-    dragIndexRef.current = index
-  }
-
-  const handleDragOver = (e: React.DragEvent, index: number) => {
-    e.preventDefault()
-    setDragOverIndex(index)
-  }
-
-  const handleDrop = (e: React.DragEvent, dropIndex: number) => {
-    e.preventDefault()
-    const fromIndex = dragIndexRef.current
-    if (fromIndex == null || fromIndex === dropIndex) {
-      dragIndexRef.current = null
-      setDragOverIndex(null)
-      return
-    }
-    const newOrder = [...files.map((f) => f.path)]
-    const [moved] = newOrder.splice(fromIndex, 1)
-    newOrder.splice(dropIndex, 0, moved)
-    reorderFiles(chapter.id, newOrder, repoRoot, prNumber, headSHA)
-    dragIndexRef.current = null
-    setDragOverIndex(null)
-  }
-
-  const handleDragEnd = () => {
-    dragIndexRef.current = null
-    setDragOverIndex(null)
-  }
-
+  const files = orderedFiles(chapter, fileOrderOverrides[chapter.id])
+  const drag = useRowDrag({ props, files, reorderFiles })
+  const sets = { viewedFiles, changedSince, newSinceLook }
   return (
     <div className="chapter-file-list">
-      {files.map((file, index) => {
-        const isActive = file.path === currentFilePath
-        const isViewed = viewedFiles.has(file.path)
-        const isDragOver = dragOverIndex === index
-        const state = rowState(file, viewedFiles, changedSince, newSinceLook)
-
-        return (
-          <div
-            key={file.path}
-            className={[
-              'chapter-file-row',
-              isActive ? 'chapter-file-row--active' : '',
-              isViewed ? 'chapter-file-row--viewed' : '',
-              isDragOver ? 'chapter-file-row--drag-over' : '',
-            ]
-              .filter(Boolean)
-              .join(' ')}
-            draggable
-            onDragStart={() => handleDragStart(index)}
-            onDragOver={(e) => handleDragOver(e, index)}
-            onDrop={(e) => handleDrop(e, index)}
-            onDragEnd={handleDragEnd}
-            onClick={() => onSelectFile(file.path)}
-            role="button"
-            aria-current={isActive ? 'true' : undefined}
-            tabIndex={0}
-            onKeyDown={(e) => e.key === 'Enter' && onSelectFile(file.path)}
-          >
-            {state === 'default' ? (
-              <span className="chapter-file-num">{index + 1}</span>
-            ) : (
-              <span className="rc-frow-state">
-                {state === 'viewed' && <Check aria-hidden="true" />}
-                {state === 'changed' && <Dot aria-hidden="true" />}
-                {state === 'new' && <Plus aria-hidden="true" />}
-              </span>
-            )}
-            <span
-              className={`chapter-file-risk-dot chapter-file-risk-dot--${file.riskScore.level}`}
-            />
-            <span className="chapter-file-name" title={file.path}>
-              {file.path.split('/').pop()}
-            </span>
-            <span className="chapter-file-changes">
-              <span className="chapter-file-add">+{file.additions}</span>
-              <span className="chapter-file-del">−{file.deletions}</span>
-            </span>
-            {isViewed && (
-              <span className="chapter-file-viewed-check" aria-label="Viewed">
-                <Check aria-hidden="true" />
-              </span>
-            )}
-            {state !== 'default' && (
-              <span className={`rc-frow-sub rc-frow-sub--${state}`}>
-                {state === 'viewed' ? 'viewed' : state === 'changed' ? 'changed' : 'new file'}
-              </span>
-            )}
-            <span className="chapter-file-why" title={file.whyHere}>
-              {file.whyHere}
-            </span>
-          </div>
-        )
-      })}
+      {files.map((file, index) => (
+        <ChapterFileRow
+          key={file.path}
+          file={file}
+          index={index}
+          sets={sets}
+          isActive={file.path === currentFilePath}
+          drag={drag}
+          onSelectFile={props.onSelectFile}
+        />
+      ))}
     </div>
   )
 }

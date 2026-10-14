@@ -1,167 +1,16 @@
-import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll } from 'vitest'
-import { PGlite } from '@electric-sql/pglite'
+import { describe, it, expect, beforeEach } from 'vitest'
+import { DatabaseSync } from 'node:sqlite'
 import { wrapDb } from '../../../../../src/main/db/index'
-import {
-  applyNotepadSchema,
-  applyNotepadMigrations,
-  hasColumn,
-  randomUUID,
-} from '../../../src/db/db'
-import type { ExtensionDB } from '../../../../../src/main/db/index'
+import { applyNotepadSchema, randomUUID } from '../../../src/db/db'
+import type { ExtensionDB } from '@terminator/extension-sdk'
 
-let pg: PGlite
 let db: ExtensionDB
 
-let template: PGlite
-
-beforeAll(async () => {
-  template = new PGlite()
-  await template.waitReady
+beforeEach(() => {
+  db = wrapDb(new DatabaseSync(':memory:'))
 })
 
-afterAll(async () => {
-  await template.close()
-})
-
-beforeEach(async () => {
-  pg = await template.clone()
-  db = wrapDb(pg)
-})
-
-afterEach(async () => {
-  await pg.close()
-})
-
-describe('applyNotepadSchema', () => {
-  it('creates all required tables', async () => {
-    await applyNotepadSchema(db)
-    const rows = await db.query<{ table_name: string }>(
-      `SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'`
-    )
-    const tables = rows.map((r) => r.table_name)
-    expect(tables).toContain('notes')
-    expect(tables).toContain('tags')
-    expect(tables).toContain('note_tags')
-    expect(tables).toContain('comments')
-    expect(tables).toContain('settings')
-    expect(tables).toContain('diagrams')
-    expect(tables).toContain('diagram_tags')
-    expect(tables).toContain('diagram_comments')
-  })
-
-  it('is idempotent — safe to call twice', async () => {
-    await applyNotepadSchema(db)
-    await expect(applyNotepadSchema(db)).resolves.not.toThrow()
-  })
-})
-
-describe('applyNotepadMigrations', () => {
-  it('is a no-op for new installs (diagram_tags already in schema)', async () => {
-    await applyNotepadSchema(db)
-    expect(await hasColumn(db, 'diagrams', 'tags')).toBe(false)
-    await expect(applyNotepadMigrations(db)).resolves.not.toThrow()
-    const tables = (
-      await db.query<{ table_name: string }>(
-        `SELECT table_name FROM information_schema.tables WHERE table_schema='public'`
-      )
-    ).map((r) => r.table_name)
-    expect(tables).toContain('diagram_tags')
-    expect(await hasColumn(db, 'diagrams', 'tags')).toBe(false)
-  })
-
-  it('is idempotent — safe to call twice', async () => {
-    await applyNotepadSchema(db)
-    await applyNotepadMigrations(db)
-    await expect(applyNotepadMigrations(db)).resolves.not.toThrow()
-  })
-
-  it('creates diagram_tags and does not add tags column when old schema had no tags column', async () => {
-    await db.exec(`
-      CREATE TABLE IF NOT EXISTS notes (id TEXT PRIMARY KEY, title TEXT NOT NULL DEFAULT 'Untitled note', body TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, updated_at TEXT NOT NULL, archived_at TEXT, sort_order REAL NOT NULL DEFAULT 0, folder_id TEXT);
-      CREATE TABLE IF NOT EXISTS tags (id TEXT PRIMARY KEY, name TEXT UNIQUE NOT NULL);
-      CREATE TABLE IF NOT EXISTS note_tags (note_id TEXT NOT NULL, tag_id TEXT NOT NULL, PRIMARY KEY (note_id, tag_id));
-      CREATE TABLE IF NOT EXISTS comments (id TEXT PRIMARY KEY, note_id TEXT NOT NULL, parent_id TEXT, body TEXT NOT NULL, author TEXT NOT NULL DEFAULT 'me', status TEXT NOT NULL DEFAULT 'open', start_offset INTEGER, end_offset INTEGER, quote TEXT, prefix TEXT, suffix TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
-      CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
-      CREATE TABLE IF NOT EXISTS diagrams (id TEXT PRIMARY KEY, title TEXT NOT NULL DEFAULT 'Untitled diagram', scene_json TEXT NOT NULL DEFAULT '{}', created_at TEXT NOT NULL, updated_at TEXT NOT NULL, archived_at TEXT, sort_order REAL NOT NULL DEFAULT 0, folder_id TEXT);
-    `)
-    expect(await hasColumn(db, 'diagrams', 'tags')).toBe(false)
-    await applyNotepadMigrations(db)
-    expect(await hasColumn(db, 'diagrams', 'tags')).toBe(false)
-    const tables = (
-      await db.query<{ table_name: string }>(
-        `SELECT table_name FROM information_schema.tables WHERE table_schema='public'`
-      )
-    ).map((r) => r.table_name)
-    expect(tables).toContain('diagram_tags')
-  })
-
-  it('migrates diagrams.tags JSON to diagram_tags rows and drops tags column', async () => {
-    await db.exec(`
-      CREATE TABLE IF NOT EXISTS notes (id TEXT PRIMARY KEY, title TEXT NOT NULL DEFAULT 'Untitled note', body TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, updated_at TEXT NOT NULL, archived_at TEXT, sort_order REAL NOT NULL DEFAULT 0, folder_id TEXT);
-      CREATE TABLE IF NOT EXISTS tags (id TEXT PRIMARY KEY, name TEXT UNIQUE NOT NULL);
-      CREATE TABLE IF NOT EXISTS note_tags (note_id TEXT NOT NULL, tag_id TEXT NOT NULL, PRIMARY KEY (note_id, tag_id));
-      CREATE TABLE IF NOT EXISTS comments (id TEXT PRIMARY KEY, note_id TEXT NOT NULL, parent_id TEXT, body TEXT NOT NULL, author TEXT NOT NULL DEFAULT 'me', status TEXT NOT NULL DEFAULT 'open', start_offset INTEGER, end_offset INTEGER, quote TEXT, prefix TEXT, suffix TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
-      CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
-      CREATE TABLE IF NOT EXISTS diagrams (id TEXT PRIMARY KEY, title TEXT NOT NULL DEFAULT 'Untitled diagram', tags TEXT NOT NULL DEFAULT '[]', scene_json TEXT NOT NULL DEFAULT '{}', created_at TEXT NOT NULL, updated_at TEXT NOT NULL, archived_at TEXT, sort_order REAL NOT NULL DEFAULT 0, folder_id TEXT);
-    `)
-    const now = new Date().toISOString()
-    await db.run(
-      `INSERT INTO diagrams (id, title, tags, scene_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`,
-      ['d1', 'Diag1', '["alpha","beta"]', '{}', now, now]
-    )
-    expect(await hasColumn(db, 'diagrams', 'tags')).toBe(true)
-    await applyNotepadMigrations(db)
-    expect(await hasColumn(db, 'diagrams', 'tags')).toBe(false)
-    const tagRows = await db.query<{ tag: string }>(
-      `SELECT tag FROM diagram_tags WHERE diagram_id=? ORDER BY tag`,
-      ['d1']
-    )
-    expect(tagRows.map((r) => r.tag)).toEqual(['alpha', 'beta'])
-  })
-
-  it('adds sort_order to notes when missing', async () => {
-    await db.exec(`
-      CREATE TABLE IF NOT EXISTS notes (id TEXT PRIMARY KEY, title TEXT NOT NULL DEFAULT 'Untitled note', body TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, updated_at TEXT NOT NULL, archived_at TEXT, folder_id TEXT);
-      CREATE TABLE IF NOT EXISTS tags (id TEXT PRIMARY KEY, name TEXT UNIQUE NOT NULL);
-      CREATE TABLE IF NOT EXISTS note_tags (note_id TEXT NOT NULL, tag_id TEXT NOT NULL, PRIMARY KEY (note_id, tag_id));
-      CREATE TABLE IF NOT EXISTS comments (id TEXT PRIMARY KEY, note_id TEXT NOT NULL, parent_id TEXT, body TEXT NOT NULL, author TEXT NOT NULL DEFAULT 'me', status TEXT NOT NULL DEFAULT 'open', start_offset INTEGER, end_offset INTEGER, quote TEXT, prefix TEXT, suffix TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
-      CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
-      CREATE TABLE IF NOT EXISTS diagrams (id TEXT PRIMARY KEY, title TEXT NOT NULL DEFAULT 'Untitled diagram', tags TEXT NOT NULL DEFAULT '[]', scene_json TEXT NOT NULL DEFAULT '{}', created_at TEXT NOT NULL, updated_at TEXT NOT NULL, archived_at TEXT, folder_id TEXT);
-    `)
-    expect(await hasColumn(db, 'notes', 'sort_order')).toBe(false)
-    await applyNotepadMigrations(db)
-    expect(await hasColumn(db, 'notes', 'sort_order')).toBe(true)
-    expect(await hasColumn(db, 'diagrams', 'sort_order')).toBe(true)
-  })
-
-  it('adds folder_id to notes and diagrams when missing', async () => {
-    await db.exec(`
-      CREATE TABLE IF NOT EXISTS notes (id TEXT PRIMARY KEY, title TEXT NOT NULL DEFAULT 'Untitled note', body TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, updated_at TEXT NOT NULL, archived_at TEXT, sort_order REAL NOT NULL DEFAULT 0);
-      CREATE TABLE IF NOT EXISTS tags (id TEXT PRIMARY KEY, name TEXT UNIQUE NOT NULL);
-      CREATE TABLE IF NOT EXISTS note_tags (note_id TEXT NOT NULL, tag_id TEXT NOT NULL, PRIMARY KEY (note_id, tag_id));
-      CREATE TABLE IF NOT EXISTS comments (id TEXT PRIMARY KEY, note_id TEXT NOT NULL, parent_id TEXT, body TEXT NOT NULL, author TEXT NOT NULL DEFAULT 'me', status TEXT NOT NULL DEFAULT 'open', start_offset INTEGER, end_offset INTEGER, quote TEXT, prefix TEXT, suffix TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
-      CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
-      CREATE TABLE IF NOT EXISTS diagrams (id TEXT PRIMARY KEY, title TEXT NOT NULL DEFAULT 'Untitled diagram', tags TEXT NOT NULL DEFAULT '[]', scene_json TEXT NOT NULL DEFAULT '{}', created_at TEXT NOT NULL, updated_at TEXT NOT NULL, archived_at TEXT, sort_order REAL NOT NULL DEFAULT 0);
-    `)
-    expect(await hasColumn(db, 'notes', 'folder_id')).toBe(false)
-    expect(await hasColumn(db, 'diagrams', 'folder_id')).toBe(false)
-    await applyNotepadMigrations(db)
-    expect(await hasColumn(db, 'notes', 'folder_id')).toBe(true)
-    expect(await hasColumn(db, 'diagrams', 'folder_id')).toBe(true)
-  })
-})
-
-describe('hasColumn', () => {
-  it('returns true for an existing column', async () => {
-    await applyNotepadSchema(db)
-    expect(await hasColumn(db, 'notes', 'title')).toBe(true)
-  })
-
-  it('returns false for a non-existent column', async () => {
-    await applyNotepadSchema(db)
-    expect(await hasColumn(db, 'notes', 'nonexistent_col')).toBe(false)
-  })
-})
+describe('applyNotepadSchema', applyNotepadSchemaTests)
 
 describe('randomUUID', () => {
   it('returns a valid UUID string', () => {
@@ -174,16 +23,78 @@ describe('randomUUID', () => {
   })
 })
 
-describe('settings composite PK (extension_id, key)', () => {
+describe('settings composite PK (extension_id, key)', notepadSettingsKeyTests)
+
+function applyNotepadSchemaTests() {
+  describe('tables', applyNotepadSchemaTablesTests)
+  describe('an earlier schema', applyNotepadSchemaEarlierSchemaTests)
+  describe('cascades', applyNotepadSchemaCascadesTests)
+}
+
+function applyNotepadSchemaTablesTests() {
+  it('creates all required tables', async () => {
+    await applyNotepadSchema(db)
+    const rows = await db.query<{ name: string }>(
+      `SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'`
+    )
+    expect(rows.map((r) => r.name).sort()).toEqual([
+      'comments',
+      'diagram_comments',
+      'diagram_tags',
+      'diagrams',
+      'folders',
+      'note_tags',
+      'notes',
+      'settings',
+      'tags',
+    ])
+  })
+
+  it('is idempotent — safe to call twice', async () => {
+    await applyNotepadSchema(db)
+    await expect(applyNotepadSchema(db)).resolves.not.toThrow()
+  })
+}
+
+function applyNotepadSchemaEarlierSchemaTests() {
+  it('gives notes from an earlier schema a title that still follows the body', async () => {
+    await db.exec(
+      `CREATE TABLE notes (id TEXT PRIMARY KEY, title TEXT NOT NULL DEFAULT 'Untitled note', body TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, updated_at TEXT NOT NULL, archived_at TEXT, sort_order REAL NOT NULL DEFAULT 0, folder_id TEXT);
+       INSERT INTO notes (id, created_at, updated_at) VALUES ('old', 't', 't');`
+    )
+    await applyNotepadSchema(db)
+    expect(await db.get('SELECT title_set_by_hand FROM notes WHERE id = ?', ['old'])).toEqual({
+      title_set_by_hand: 0,
+    })
+  })
+}
+
+function applyNotepadSchemaCascadesTests() {
+  it('deleting a note deletes its tag links and comments but keeps the tag', async () => {
+    await applyNotepadSchema(db)
+    await db.exec(`
+      INSERT INTO notes (id, created_at, updated_at) VALUES ('n', 't', 't');
+      INSERT INTO tags (id, name) VALUES ('g', 'work');
+      INSERT INTO note_tags (note_id, tag_id) VALUES ('n', 'g');
+      INSERT INTO comments (id, note_id, body, created_at, updated_at) VALUES ('c', 'n', 'hi', 't', 't');
+    `)
+    await db.run('DELETE FROM notes WHERE id = ?', ['n'])
+    expect(await db.query('SELECT * FROM note_tags')).toEqual([])
+    expect(await db.query('SELECT * FROM comments')).toEqual([])
+    expect(await db.query('SELECT * FROM tags')).toHaveLength(1)
+  })
+}
+
+function notepadSettingsKeyTests() {
   beforeEach(async () => {
     await applyNotepadSchema(db)
-    await applyNotepadMigrations(db)
   })
 
-  it('settings table has extension_id column after migration', async () => {
-    expect(await hasColumn(db, 'settings', 'extension_id')).toBe(true)
-  })
+  describe('independent extensions', settingsCompositePKExtensionIdIndependentExtensionsTests)
+  describe('duplicates', notepadSettingsDuplicateKeyTests)
+}
 
+function settingsCompositePKExtensionIdIndependentExtensionsTests() {
   it('two different extension_ids can hold the same key independently', async () => {
     await db.run(`INSERT INTO settings (extension_id, key, value) VALUES (?, ?, ?)`, [
       'notepad',
@@ -202,7 +113,9 @@ describe('settings composite PK (extension_id, key)', () => {
     expect(rows[0]).toMatchObject({ extension_id: 'notepad', value: 'dark' })
     expect(rows[1]).toMatchObject({ extension_id: 'other-ext', value: 'light' })
   })
+}
 
+function notepadSettingsDuplicateKeyTests() {
   it('duplicate (extension_id, key) insert is rejected by PK constraint', async () => {
     await db.run(`INSERT INTO settings (extension_id, key, value) VALUES (?, ?, ?)`, [
       'notepad',
@@ -217,11 +130,4 @@ describe('settings composite PK (extension_id, key)', () => {
       ])
     ).rejects.toThrow()
   })
-
-  it('existing settings rows are backfilled with extension_id after migration', async () => {
-    const rows = await db.query<{ extension_id: string }>(
-      `SELECT extension_id FROM settings WHERE extension_id IS NOT NULL`
-    )
-    expect(rows.length).toBeGreaterThanOrEqual(0)
-  })
-})
+}

@@ -1,5 +1,9 @@
 import type { WorkOrder } from '../order/schema.js'
+import type { OrderStore } from '../order/store.js'
 import type { QueueEntry } from './refinery.js'
+import { readObservedFiles } from './observed-files.js'
+import { readPulls } from './integrate.js'
+import { readRefineryState } from './refinery-state.js'
 
 // The queue's own data, assembled from live orders.
 //
@@ -12,6 +16,7 @@ import type { QueueEntry } from './refinery.js'
 // I/O stays behind `deps` so this is exercisable with fakes rather than a real
 // checkout and a real `gh`.
 
+/** @internal */
 export interface QueueEntriesDeps {
   /** The pulls this order has opened so far, if any. */
   readonly readPulls: (orderId: string) => Promise<readonly { readonly repo: string }[]>
@@ -28,6 +33,7 @@ export interface QueueEntriesDeps {
  * to the plan's own declared `touches` for that lane — an order that queued
  * behind another before its worktree existed still has something for
  * `advisory` and `laterOverlapping` to compare against.
+ * @internal
  */
 export async function queueEntries(
   orders: readonly WorkOrder[],
@@ -62,4 +68,24 @@ export async function queueEntries(
   }
 
   return entries
+}
+
+// Every in-flight order's entries in the refinery's file-overlap queue (the channels'
+// `queue` field and the agreement advisory), from records only: the files recorded
+// when a step settled (`observed-files.ts`), so no process starts.
+export async function computeQueueEntries(
+  root: string,
+  store: Pick<OrderStore, 'list'>
+): Promise<QueueEntry[]> {
+  const orders = await store.list()
+  const merged = new Set<string>()
+  for (const order of orders.filter((o) => o.status === 'running' || o.status === 'shipped')) {
+    if ((await readRefineryState(root, order.id)).mergedAt !== null) merged.add(order.id)
+  }
+  return queueEntries(orders, {
+    readPulls: (orderId) => readPulls(root, orderId),
+    changedFiles: (order) => readObservedFiles(root, order.id),
+    merged: (orderId) => merged.has(orderId),
+    agreedAt: (order) => order.agreedAt ?? '',
+  })
 }

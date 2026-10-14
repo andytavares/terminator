@@ -1,12 +1,19 @@
-import { Parser, type Node } from 'web-tree-sitter'
+import type { Node } from 'web-tree-sitter'
 import {
   classifyHunk,
   classifyTier,
   computeFileCyclomaticDelta,
-  parseDiff,
   COVERAGE_CHECK_NAMES,
 } from '../github/pr-review-service'
-import { analyseSnippet, loadLanguageFor } from './symbols'
+import {
+  analyseLines,
+  analyseSnippet,
+  withSyntaxTree,
+  type SnippetAnalysis,
+  type SnippetFunction,
+} from './symbols'
+import type { ParsedPrFile } from './parsed-file'
+import type { FileDiff } from '../schemas/git.schema'
 import type {
   Chapter,
   DryViolation,
@@ -14,14 +21,6 @@ import type {
   PrInsights,
   ReadingStep,
 } from '../schemas/pr-review.schema'
-
-interface RawPrFile {
-  filename?: string
-  path?: string
-  additions?: number
-  deletions?: number
-  patch?: string
-}
 
 interface StatusCheckLike {
   name: string
@@ -39,10 +38,6 @@ export interface ComputeInsightsOptions {
   findTestReferences?: (symbols: string[]) => Promise<Set<string>>
 }
 
-function pathOf(file: RawPrFile): string {
-  return file.path ?? file.filename ?? ''
-}
-
 function linesOf(
   hunkLines: Array<{ type: string; content: string }>,
   type: 'add' | 'remove'
@@ -56,68 +51,76 @@ function linesOf(
 // and prose (YAML, JSON, Markdown) have no branches worth counting.
 const UNPARSED_CODE_RE = /\.(kt|kts|swift|scala|c|m|mm|dart|lua|ex|exs|clj|hs|groovy|tf)$/
 
-async function computeComplexity(files: RawPrFile[]): Promise<PrInsights['complexity']> {
-  const functions: FunctionComplexity[] = []
-  let totalDelta = 0
-  let anyGrammar = false
-  let anyFallback = false
+interface FileComplexity {
+  delta: number
+  functions: FunctionComplexity[]
+  method: 'tree-sitter' | 'keywords'
+}
 
-  for (const file of files) {
-    const path = pathOf(file)
-    if (!file.patch || !path) continue
-    const diff = parseDiff(file.patch, path)
-    const headLines = diff.hunks.flatMap((h) =>
-      h.lines.filter((l) => l.type === 'add' || l.type === 'context')
-    )
-    const headText = headLines.map((l) => l.content).join('\n')
-    // Snippet rows are 1-based over the concatenated head lines; map back to the file.
-    const fileLineOf = (row: number) => headLines[row - 1]?.newLineNumber ?? null
-    const baseText = diff.hunks
-      .flatMap((h) => h.lines.filter((l) => l.type === 'remove' || l.type === 'context'))
-      .map((l) => l.content)
-      .join('\n')
-
-    const headAnalysis = headText ? await analyseSnippet(path, headText) : null
-    const baseAnalysis = baseText ? await analyseSnippet(path, baseText) : null
-
-    if (headAnalysis || baseAnalysis) {
-      anyGrammar = true
-      const baseByName = new Map((baseAnalysis?.functions ?? []).map((f) => [f.name, f.branches]))
-      const headFns = headAnalysis?.functions ?? []
-      const seen = new Set<string>()
-      for (const fn of headFns) {
-        seen.add(fn.name)
-        const delta = fn.branches - (baseByName.get(fn.name) ?? 0)
-        totalDelta += delta
-        if (delta > 0) {
-          functions.push({ path, name: fn.name, line: fileLineOf(fn.line), branchDelta: delta })
-        }
-      }
-      // A function whose branches only shrank still contributes to the total delta.
-      for (const [name, baseBranches] of baseByName) {
-        if (!seen.has(name)) totalDelta += -baseBranches
-      }
-    } else if (UNPARSED_CODE_RE.test(path)) {
-      anyFallback = true
-      const delta = computeFileCyclomaticDelta(diff)
-      totalDelta += delta
-      if (delta > 0) {
-        functions.push({
-          path,
-          name: path.split('/').pop() ?? path,
-          line: null,
-          branchDelta: delta,
-        })
-      }
-    }
+function branchDeltaByFunction(head: SnippetFunction[], base: SnippetFunction[]) {
+  const baseByName = new Map(base.map((f) => [f.name, f.branches]))
+  const headNames = new Set(head.map((f) => f.name))
+  let total = 0
+  const grown: Array<{ fn: SnippetFunction; delta: number }> = []
+  for (const fn of head) {
+    const delta = fn.branches - (baseByName.get(fn.name) ?? 0)
+    total += delta
+    if (delta > 0) grown.push({ fn, delta })
   }
+  // A function whose branches only shrank still contributes to the total delta.
+  for (const [name, baseBranches] of baseByName) {
+    if (!headNames.has(name)) total -= baseBranches
+  }
+  return { total, grown }
+}
 
+async function parsedComplexity({ path, diff }: ParsedPrFile): Promise<FileComplexity | null> {
+  const headLines = diff.hunks.flatMap((h) => h.lines.filter((l) => l.type !== 'remove'))
+  const baseLines = diff.hunks.flatMap((h) => h.lines.filter((l) => l.type !== 'add'))
+  const head = await analyseLines(path, headLines)
+  const base = await analyseLines(path, baseLines)
+  if (!head && !base) return null
+  // Snippet rows are 1-based over the concatenated head lines; map back to the file.
+  const fileLineOf = (row: number) => headLines[row - 1]?.newLineNumber ?? null
+  const { total, grown } = branchDeltaByFunction(head?.functions ?? [], base?.functions ?? [])
+  const functions = grown.map(({ fn, delta }) => ({
+    path,
+    name: fn.name,
+    line: fileLineOf(fn.line),
+    branchDelta: delta,
+  }))
+  return { delta: total, functions, method: 'tree-sitter' }
+}
+
+function keywordComplexity({ path, diff }: ParsedPrFile): FileComplexity {
+  const delta = computeFileCyclomaticDelta(diff)
+  const name = path.split('/').pop() ?? path
+  const functions = delta > 0 ? [{ path, name, line: null, branchDelta: delta }] : []
+  return { delta, functions, method: 'keywords' }
+}
+
+async function fileComplexity(file: ParsedPrFile): Promise<FileComplexity | null> {
+  if (!file.patch || !file.path) return null
+  const parsed = await parsedComplexity(file)
+  if (parsed) return parsed
+  if (!UNPARSED_CODE_RE.test(file.path)) return null
+  return keywordComplexity(file)
+}
+
+async function computeComplexity(files: ParsedPrFile[]): Promise<PrInsights['complexity']> {
+  const measured: FileComplexity[] = []
+  for (const file of files) {
+    const result = await fileComplexity(file)
+    if (result) measured.push(result)
+  }
+  const functions = measured.flatMap((m) => m.functions)
   functions.sort((a, b) => b.branchDelta - a.branchDelta)
-
+  const anyGrammar = measured.some((m) => m.method === 'tree-sitter')
+  const anyFallback = measured.some((m) => m.method === 'keywords')
   const source =
     anyGrammar || !anyFallback ? 'tree-sitter · hunk base vs head' : 'keyword count · approximate'
-
-  return { branchDelta: totalDelta, functions, source }
+  const branchDelta = measured.reduce((sum, m) => sum + m.delta, 0)
+  return { branchDelta, functions, source }
 }
 
 // ─── Coverage ───────────────────────────────────────────────────────────────────
@@ -132,76 +135,87 @@ function testStem(path: string): string {
   return (path.split('/').pop() ?? path).toLowerCase()
 }
 
-async function computeCoverage(
-  files: RawPrFile[],
-  opts: ComputeInsightsOptions
-): Promise<PrInsights['coverage']> {
-  const sourceFiles = files.filter((f) => SOURCE_FILE_RE.test(pathOf(f)) && !isTestPath(pathOf(f)))
-  const testFiles = files.filter((f) => isTestPath(pathOf(f)))
+function addedTextOf(file: ParsedPrFile): string {
+  return file.diff.hunks.flatMap((h) => linesOf(h.lines, 'add')).join('\n')
+}
 
-  const changedSourceFiles = sourceFiles.length
-  const changedSourceFilesWithTests = sourceFiles.filter((src) => {
-    const stem = testStem(src.path ?? src.filename ?? '').replace(/\.[^.]+$/, '')
-    return testFiles.some((t) => testStem(t.path ?? t.filename ?? '').includes(stem))
+/** Analyses the lines a file adds; null when it has no patch, no added text or no grammar. */
+async function analyseAddedText(file: ParsedPrFile): Promise<SnippetAnalysis | null> {
+  if (!file.patch) return null
+  const text = addedTextOf(file)
+  if (!text) return null
+  return analyseSnippet(file.path, text)
+}
+
+function countFilesWithTests(sourceFiles: ParsedPrFile[], testFiles: ParsedPrFile[]): number {
+  return sourceFiles.filter((src) => {
+    const stem = testStem(src.path).replace(/\.[^.]+$/, '')
+    return testFiles.some((t) => testStem(t.path).includes(stem))
   }).length
+}
 
-  // Names of every function changed in a (non-test) source file with a grammar.
-  const changedFunctionNames: string[] = []
+/** Names of every function changed in a (non-test) source file with a grammar. */
+async function changedFunctionNamesOf(sourceFiles: ParsedPrFile[]): Promise<string[]> {
+  const names: string[] = []
   for (const file of sourceFiles) {
-    const path = pathOf(file)
-    if (!file.patch) continue
-    const diff = parseDiff(file.patch, path)
-    const headText = diff.hunks.flatMap((h) => linesOf(h.lines, 'add')).join('\n')
-    if (!headText) continue
-    const analysis = await analyseSnippet(path, headText)
-    if (!analysis) continue
-    for (const fn of analysis.functions) changedFunctionNames.push(fn.name)
+    const analysis = await analyseAddedText(file)
+    for (const fn of analysis?.functions ?? []) names.push(fn.name)
   }
+  return [...new Set(names)]
+}
 
-  const referencedByPrTests = new Set<string>()
+async function referencedNamesOf(testFiles: ParsedPrFile[]): Promise<Set<string>> {
+  const referenced = new Set<string>()
   for (const file of testFiles) {
-    const path = pathOf(file)
-    if (!file.patch) continue
-    const diff = parseDiff(file.patch, path)
-    const addedText = diff.hunks.flatMap((h) => linesOf(h.lines, 'add')).join('\n')
-    if (!addedText) continue
-    const analysis = await analyseSnippet(path, addedText)
-    if (!analysis) continue
-    for (const ref of analysis.references) referencedByPrTests.add(ref)
+    const analysis = await analyseAddedText(file)
+    for (const ref of analysis?.references ?? []) referenced.add(ref)
   }
+  return referenced
+}
 
-  const uniqueChanged = [...new Set(changedFunctionNames)]
-  const missingFromPrTests = uniqueChanged.filter((name) => !referencedByPrTests.has(name))
+const PERCENT_RE = /(\d+(?:\.\d+)?)\s*%/
+
+function patchPercentFrom(opts: ComputeInsightsOptions): number | null {
+  for (const check of opts.statusChecks) {
+    const nameLower = check.name.toLowerCase()
+    if (!COVERAGE_CHECK_NAMES.some((n) => nameLower.includes(n))) continue
+    const match = check.description?.match(PERCENT_RE)
+    if (match) return Math.round(Number(match[1]))
+  }
+  if (opts.localCoverage == null) return null
+  return Math.round(opts.localCoverage)
+}
+
+async function untestedFunctionsOf(
+  changed: string[],
+  testFiles: ParsedPrFile[],
+  opts: ComputeInsightsOptions
+): Promise<string[]> {
+  const referencedByPrTests = await referencedNamesOf(testFiles)
+  const missingFromPrTests = changed.filter((name) => !referencedByPrTests.has(name))
   const fromRepo =
     missingFromPrTests.length > 0 && opts.findTestReferences
       ? await opts.findTestReferences(missingFromPrTests)
       : new Set<string>()
+  return missingFromPrTests.filter((name) => !fromRepo.has(name))
+}
 
-  const untestedFunctions = missingFromPrTests.filter((name) => !fromRepo.has(name))
-  const testedFunctions = uniqueChanged.length - untestedFunctions.length
-
-  let patchPercent: number | null = null
-  for (const check of opts.statusChecks) {
-    const nameLower = check.name.toLowerCase()
-    if (!COVERAGE_CHECK_NAMES.some((n) => nameLower.includes(n))) continue
-    const match = check.description?.match(/(\d+(?:\.\d+)?)\s*%/)
-    if (match) {
-      patchPercent = Math.round(Number(match[1]))
-      break
-    }
-  }
-  if (patchPercent === null && opts.localCoverage != null) {
-    patchPercent = Math.round(opts.localCoverage)
-  }
-
+async function computeCoverage(
+  files: ParsedPrFile[],
+  opts: ComputeInsightsOptions
+): Promise<PrInsights['coverage']> {
+  const sourceFiles = files.filter((f) => SOURCE_FILE_RE.test(f.path) && !isTestPath(f.path))
+  const testFiles = files.filter((f) => isTestPath(f.path))
+  const changed = await changedFunctionNamesOf(sourceFiles)
+  const untestedFunctions = await untestedFunctionsOf(changed, testFiles, opts)
   return {
-    changedFunctions: uniqueChanged.length,
-    testedFunctions,
+    changedFunctions: changed.length,
+    testedFunctions: changed.length - untestedFunctions.length,
     untestedFunctions,
-    patchPercent,
+    patchPercent: patchPercentFrom(opts),
     source: 'test files referencing each changed function',
-    changedSourceFiles,
-    changedSourceFilesWithTests,
+    changedSourceFiles: sourceFiles.length,
+    changedSourceFilesWithTests: countFilesWithTests(sourceFiles, testFiles),
   }
 }
 
@@ -242,112 +256,109 @@ interface HealthFlag {
   path: string
 }
 
+function flagsForFunction(node: Node, path: string): HealthFlag[] {
+  const flags: HealthFlag[] = []
+  const lineSpan = node.endPosition.row - node.startPosition.row + 1
+  if (lineSpan > 80) {
+    flags.push({ kind: 'long-function', label: `Function over 80 lines (${lineSpan})`, path })
+  }
+  const nesting = maxNestingDepth(node)
+  if (nesting > 4) flags.push({ kind: 'deep-nesting', label: `Nesting depth ${nesting}`, path })
+  const params = countParams(node)
+  if (params > 5) flags.push({ kind: 'many-params', label: `${params} parameters`, path })
+  return flags
+}
+
+function collectFunctionFlags(root: Node, path: string): HealthFlag[] {
+  const flags: HealthFlag[] = []
+  const visit = (n: Node): void => {
+    if (FUNCTION_NODE_TYPES.has(n.type)) flags.push(...flagsForFunction(n, path))
+    for (let i = 0; i < n.childCount; i++) visit(n.child(i)!)
+  }
+  visit(root)
+  return flags
+}
+
+interface AddedTextMarker {
+  kind: string
+  label: string
+  pattern: RegExp
+  /** Only files whose path matches carry this marker. */
+  paths?: RegExp
+}
+
+const ADDED_TEXT_MARKERS: AddedTextMarker[] = [
+  { kind: 'ts-ignore', label: 'New @ts-ignore', pattern: /@ts-ignore/ },
+  { kind: 'eslint-disable', label: 'New eslint-disable', pattern: /eslint-disable/ },
+  { kind: 'todo', label: 'New TODO/FIXME', pattern: /\b(TODO|FIXME)\b/ },
+  { kind: 'any', label: 'New `any` type', pattern: /:\s*any\b/, paths: /\.tsx?$/ },
+]
+
+function addedTextFlags(path: string, addedText: string): HealthFlag[] {
+  return ADDED_TEXT_MARKERS.filter(
+    (marker) => (!marker.paths || marker.paths.test(path)) && marker.pattern.test(addedText)
+  ).map(({ kind, label }) => ({ kind, label, path }))
+}
+
+function duplicateBlockFlags(dryViolations: DryViolation[]): HealthFlag[] {
+  return dryViolations.map((violation) => ({
+    kind: 'duplicate-block',
+    label: `${violation.lineCount} duplicated lines across ${violation.files.length} files`,
+    path: violation.files[0] ?? '',
+  }))
+}
+
 async function computeHealthFlags(
-  files: RawPrFile[],
+  files: ParsedPrFile[],
   dryViolations: DryViolation[]
 ): Promise<HealthFlag[]> {
   const flags: HealthFlag[] = []
-
   for (const file of files) {
-    const path = pathOf(file)
-    if (!file.patch) continue
-    const diff = parseDiff(file.patch, path)
-    const addedLines = diff.hunks.flatMap((h) => linesOf(h.lines, 'add'))
-    const addedText = addedLines.join('\n')
+    const { path } = file
+    const addedText = file.patch ? addedTextOf(file) : ''
     if (!addedText) continue
-
-    if (/@ts-ignore/.test(addedText)) {
-      flags.push({ kind: 'ts-ignore', label: 'New @ts-ignore', path })
-    }
-    if (/eslint-disable/.test(addedText)) {
-      flags.push({ kind: 'eslint-disable', label: 'New eslint-disable', path })
-    }
-    if (/\b(TODO|FIXME)\b/.test(addedText)) {
-      flags.push({ kind: 'todo', label: 'New TODO/FIXME', path })
-    }
-    if (/\.tsx?$/.test(path) && /:\s*any\b/.test(addedText)) {
-      flags.push({ kind: 'any', label: 'New `any` type', path })
-    }
-
-    const language = await loadLanguageFor(path)
-    if (!language) continue
-    const parser = new Parser()
-    parser.setLanguage(language)
-    const tree = parser.parse(addedText)
-    if (!tree) continue
-
-    const visit = (n: Node): void => {
-      if (FUNCTION_NODE_TYPES.has(n.type)) {
-        const lineSpan = n.endPosition.row - n.startPosition.row + 1
-        if (lineSpan > 80) {
-          flags.push({ kind: 'long-function', label: `Function over 80 lines (${lineSpan})`, path })
-        }
-        const nesting = maxNestingDepth(n)
-        if (nesting > 4) {
-          flags.push({ kind: 'deep-nesting', label: `Nesting depth ${nesting}`, path })
-        }
-        const params = countParams(n)
-        if (params > 5) {
-          flags.push({ kind: 'many-params', label: `${params} parameters`, path })
-        }
-      }
-      for (let i = 0; i < n.childCount; i++) visit(n.child(i)!)
-    }
-    visit(tree.rootNode)
+    flags.push(...addedTextFlags(path, addedText))
+    const functionFlags = await withSyntaxTree(path, addedText, (root) =>
+      collectFunctionFlags(root, path)
+    )
+    if (functionFlags) flags.push(...functionFlags)
   }
-
-  for (const violation of dryViolations) {
-    flags.push({
-      kind: 'duplicate-block',
-      label: `${violation.lineCount} duplicated lines across ${violation.files.length} files`,
-      path: violation.files[0] ?? '',
-    })
-  }
-
-  return flags
+  return [...flags, ...duplicateBlockFlags(dryViolations)]
 }
 
 // ─── Understandability ──────────────────────────────────────────────────────────
 
-async function computeUnderstandability(
-  files: RawPrFile[],
-  opts: ComputeInsightsOptions
-): Promise<PrInsights['understandability']> {
-  let linesToRead = 0
-  let newExports = 0
+function semanticLinesToRead(diff: FileDiff): number {
+  return diff.hunks
+    .filter((hunk) => classifyHunk(hunk) === 'semantic')
+    .reduce(
+      (sum, hunk) => sum + linesOf(hunk.lines, 'add').length + linesOf(hunk.lines, 'remove').length,
+      0
+    )
+}
 
-  for (const file of files) {
-    const path = pathOf(file)
-    if (!file.patch || classifyTier(path) === 3) continue
-    const diff = parseDiff(file.patch, path)
-    for (const hunk of diff.hunks) {
-      if (classifyHunk(hunk) !== 'semantic') continue
-      linesToRead += linesOf(hunk.lines, 'add').length + linesOf(hunk.lines, 'remove').length
-    }
-    const addedText = diff.hunks.flatMap((h) => linesOf(h.lines, 'add')).join('\n')
-    if (!addedText) continue
-    const analysis = await analyseSnippet(path, addedText)
-    if (analysis) newExports += analysis.definitions.length
-  }
-
+function longestDependencyChain(readingOrder: ReadingStep[]): number {
   const chainLength = new Map<number, number>()
-  let longestChain = 0
-  for (const step of opts.readingOrder) {
+  let longest = 0
+  for (const step of readingOrder) {
     let best = 1
     for (const use of step.uses) {
       if (use.definedInStep == null) continue
       best = Math.max(best, (chainLength.get(use.definedInStep) ?? 1) + 1)
     }
     chainLength.set(step.step, best)
-    longestChain = Math.max(longestChain, best)
+    longest = Math.max(longest, best)
   }
+  return longest
+}
 
+function countCrossChapterRefs(readingOrder: ReadingStep[], chapters: Chapter[]): number {
   const chapterOf = new Map<string, string>()
-  for (const chapter of opts.chapters) {
+  for (const chapter of chapters) {
     for (const f of chapter.files) chapterOf.set(f.path, chapter.id)
   }
   let crossChapterRefs = 0
-  for (const step of opts.readingOrder) {
+  for (const step of readingOrder) {
     const stepChapter = chapterOf.get(step.path)
     for (const use of step.uses) {
       if (!use.definedInPath) continue
@@ -355,20 +366,36 @@ async function computeUnderstandability(
       if (defChapter && stepChapter && defChapter !== stepChapter) crossChapterRefs++
     }
   }
+  return crossChapterRefs
+}
 
-  const level: PrInsights['understandability']['level'] =
-    linesToRead > 1000 || longestChain >= 6
-      ? 'hard'
-      : linesToRead < 300 && longestChain <= 2
-        ? 'easy'
-        : 'moderate'
+type UnderstandabilityLevel = PrInsights['understandability']['level']
 
+function understandabilityLevel(linesToRead: number, longestChain: number): UnderstandabilityLevel {
+  if (linesToRead > 1000 || longestChain >= 6) return 'hard'
+  if (linesToRead < 300 && longestChain <= 2) return 'easy'
+  return 'moderate'
+}
+
+async function computeUnderstandability(
+  files: ParsedPrFile[],
+  opts: ComputeInsightsOptions
+): Promise<PrInsights['understandability']> {
+  let linesToRead = 0
+  let newExports = 0
+  for (const file of files) {
+    if (!file.patch || classifyTier(file.path) === 3) continue
+    linesToRead += semanticLinesToRead(file.diff)
+    const analysis = await analyseAddedText(file)
+    if (analysis) newExports += analysis.definitions.length
+  }
+  const longestChain = longestDependencyChain(opts.readingOrder)
   return {
-    level,
+    level: understandabilityLevel(linesToRead, longestChain),
     linesToRead,
     newExports,
     longestChain,
-    crossChapterRefs,
+    crossChapterRefs: countCrossChapterRefs(opts.readingOrder, opts.chapters),
     source: 'reading-order graph',
   }
 }
@@ -378,14 +405,13 @@ async function computeUnderstandability(
  * understandability, each with the source that produced it.
  */
 export async function computeInsights(
-  files: unknown[],
+  files: ParsedPrFile[],
   opts: ComputeInsightsOptions
 ): Promise<PrInsights> {
-  const rawFiles = files as RawPrFile[]
-  const complexity = await computeComplexity(rawFiles)
-  const coverage = await computeCoverage(rawFiles, opts)
-  const flags = await computeHealthFlags(rawFiles, opts.dryViolations)
-  const understandability = await computeUnderstandability(rawFiles, opts)
+  const complexity = await computeComplexity(files)
+  const coverage = await computeCoverage(files, opts)
+  const flags = await computeHealthFlags(files, opts.dryViolations)
+  const understandability = await computeUnderstandability(files, opts)
 
   return {
     complexity,

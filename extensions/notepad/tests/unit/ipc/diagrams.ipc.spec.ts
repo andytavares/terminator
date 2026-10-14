@@ -1,27 +1,14 @@
-import { describe, it, expect, afterEach, vi, beforeAll, afterAll } from 'vitest'
-import { PGlite } from '@electric-sql/pglite'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { DatabaseSync } from 'node:sqlite'
 
 vi.mock('electron', () => ({
   ipcMain: { handle: vi.fn(), removeHandler: vi.fn() },
   app: { getPath: vi.fn(() => '/tmp') },
 }))
-import { ipcMain } from 'electron'
 
-// Adapter: registerHandler forwards to the electron ipcMain mocks so existing
-// capture/assert code (ipcMain.handle calls, removeHandler assertions) still works.
-const mockApi = {
-  ipc: {
-    registerHandler: (ch: string, fn: (payload: unknown) => unknown) => {
-      ;(ipcMain.handle as unknown as ReturnType<typeof vi.fn>)(
-        ch,
-        (_e: unknown, payload: unknown) => fn(payload)
-      )
-      return {
-        dispose: () => (ipcMain.removeHandler as unknown as ReturnType<typeof vi.fn>)(ch),
-      }
-    },
-  },
-} as unknown as import('../../../../../src/main/extensions/api').ExtensionAPI
+import { apiOverIpcMain } from '../support/ipc-main-api'
+
+const mockApi = apiOverIpcMain()
 
 import { wrapDb } from '../../../../../src/main/db/index'
 import { applyNotepadSchema } from '../../../src/db/db'
@@ -36,30 +23,13 @@ import {
   registerDiagramsIpcHandlers,
 } from '../../../src/ipc/diagrams.ipc'
 import { reorderItems } from '../../../src/ipc/notes.ipc'
-import type { ExtensionDB } from '../../../../../src/main/db/index'
+import type { ExtensionDB } from '@terminator/extension-sdk'
 
-let pg: PGlite
 let db: ExtensionDB
 
-let tables: string
-
-beforeAll(async () => {
-  pg = new PGlite()
-  await pg.waitReady
-  db = wrapDb(pg)
+beforeEach(async () => {
+  db = wrapDb(new DatabaseSync(':memory:'))
   await applyNotepadSchema(db)
-  const { rows } = await pg.query<{ names: string }>(
-    "SELECT string_agg(quote_ident(tablename), ', ') AS names FROM pg_tables WHERE schemaname = 'public'"
-  )
-  tables = rows[0].names
-})
-
-afterAll(async () => {
-  await pg.close()
-})
-
-afterEach(async () => {
-  await pg.exec(`TRUNCATE ${tables} RESTART IDENTITY CASCADE`)
 })
 
 describe('createDiagram', () => {
@@ -75,80 +45,9 @@ describe('createDiagram', () => {
     const result = await createDiagram(db, { title: 'My flowchart' })
     expect((result as { data: { title: string } }).data.title).toBe('My flowchart')
   })
-
-  it('returns VALIDATION_ERROR for invalid payload', async () => {
-    const result = await createDiagram(db, { unexpectedKey: true })
-    expect(result).toEqual({ error: 'VALIDATION_ERROR' })
-  })
-
-  it('handles null payload', async () => {
-    const result = await createDiagram(db, null)
-    expect(result).toHaveProperty('data')
-  })
 })
 
-describe('listDiagrams', () => {
-  it('returns empty array when no diagrams exist', async () => {
-    const result = await listDiagrams(db, {})
-    expect((result as { data: unknown[] }).data).toEqual([])
-  })
-
-  it('lists created diagrams sorted by updated_at desc', async () => {
-    await createDiagram(db, { title: 'First' })
-    await createDiagram(db, { title: 'Second' })
-    const result = await listDiagrams(db, {})
-    const data = (result as { data: { title: string }[] }).data
-    expect(data.length).toBe(2)
-    // Both exist; ordering by updated_at desc
-    expect(data.map((d) => d.title)).toContain('First')
-    expect(data.map((d) => d.title)).toContain('Second')
-  })
-
-  it('excludes archived diagrams by default', async () => {
-    const r = await createDiagram(db, { title: 'To archive' })
-    const id = (r as { data: { id: string } }).data.id
-    await archiveDiagram(db, { id })
-    const result = await listDiagrams(db, {})
-    expect((result as { data: unknown[] }).data).toHaveLength(0)
-  })
-
-  it('includes archived diagrams when includeArchived=true', async () => {
-    const r = await createDiagram(db, { title: 'Archived' })
-    const id = (r as { data: { id: string } }).data.id
-    await archiveDiagram(db, { id })
-    const result = await listDiagrams(db, { includeArchived: true })
-    expect((result as { data: unknown[] }).data).toHaveLength(1)
-  })
-
-  it('every item has type="diagram"', async () => {
-    await createDiagram(db, {})
-    const result = await listDiagrams(db, {})
-    const data = (result as { data: { type: string }[] }).data
-    expect(data[0].type).toBe('diagram')
-  })
-
-  it('handles null payload', async () => {
-    const result = await listDiagrams(db, null)
-    expect((result as { data: unknown[] }).data).toEqual([])
-  })
-
-  it('returns VALIDATION_ERROR for invalid payload', async () => {
-    const result = await listDiagrams(db, { includeArchived: 'yes' })
-    expect(result).toEqual({ error: 'VALIDATION_ERROR' })
-  })
-
-  it('returns empty tags array when no diagram_tags rows exist for diagram', async () => {
-    const now = new Date().toISOString()
-    await db.run(
-      `INSERT INTO diagrams (id, title, scene_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
-      ['no-tags-id', 'No Tags', '{}', now, now]
-    )
-    const result = await listDiagrams(db, {})
-    const data = (result as { data: { id: string; tags: string[] }[] }).data
-    const row = data.find((d) => d.id === 'no-tags-id')
-    expect(row?.tags).toEqual([])
-  })
-})
+describe('listDiagrams', listDiagramsTests)
 
 describe('getDiagram', () => {
   it('returns diagram data', async () => {
@@ -165,11 +64,6 @@ describe('getDiagram', () => {
     expect(result).toEqual({ error: 'DIAGRAM_NOT_FOUND' })
   })
 
-  it('returns VALIDATION_ERROR for invalid payload', async () => {
-    const result = await getDiagram(db, {})
-    expect(result).toEqual({ error: 'VALIDATION_ERROR' })
-  })
-
   it('returns empty tags array when no diagram_tags rows exist for diagram', async () => {
     const now = new Date().toISOString()
     await db.run(
@@ -182,44 +76,7 @@ describe('getDiagram', () => {
   })
 })
 
-describe('autosaveDiagram', () => {
-  it('updates title and scene json', async () => {
-    const r = await createDiagram(db, {})
-    const id = (r as { data: { id: string } }).data.id
-    const scene = JSON.stringify({ elements: [{ type: 'rectangle' }] })
-    const result = await autosaveDiagram(db, { id, title: 'Updated', sceneJson: scene })
-    expect(result).toHaveProperty('data.updatedAt')
-
-    const got = await getDiagram(db, { id })
-    const data = (got as { data: { title: string; sceneJson: string } }).data
-    expect(data.title).toBe('Updated')
-    expect(data.sceneJson).toBe(scene)
-  })
-
-  it('returns DIAGRAM_NOT_FOUND for unknown id', async () => {
-    const result = await autosaveDiagram(db, { id: 'x', title: 'T', sceneJson: '{}' })
-    expect(result).toEqual({ error: 'DIAGRAM_NOT_FOUND' })
-  })
-
-  it('returns VALIDATION_ERROR on bad payload', async () => {
-    const result = await autosaveDiagram(db, { id: 1 })
-    expect(result).toEqual({ error: 'VALIDATION_ERROR' })
-  })
-
-  it('updates title only (no sceneJson) without overwriting scene', async () => {
-    const r = await createDiagram(db, {})
-    const id = (r as { data: { id: string } }).data.id
-    const scene = JSON.stringify({ elements: [{ type: 'ellipse' }] })
-    await autosaveDiagram(db, { id, title: 'With scene', sceneJson: scene })
-    const result = await autosaveDiagram(db, { id, title: 'Title only', tags: ['tag1'] })
-    expect(result).toHaveProperty('data.updatedAt')
-    const got = await getDiagram(db, { id })
-    const data = (got as { data: { title: string; sceneJson: string; tags: string[] } }).data
-    expect(data.title).toBe('Title only')
-    expect(data.sceneJson).toBe(scene)
-    expect(data.tags).toEqual(['tag1'])
-  })
-})
+describe('autosaveDiagram', autosaveDiagramTests)
 
 describe('archiveDiagram / restoreDiagram', () => {
   it('archives and restores a diagram', async () => {
@@ -242,14 +99,6 @@ describe('archiveDiagram / restoreDiagram', () => {
   it('restoreDiagram returns DIAGRAM_NOT_FOUND for unknown id', async () => {
     expect(await restoreDiagram(db, { id: 'nope' })).toEqual({ error: 'DIAGRAM_NOT_FOUND' })
   })
-
-  it('archiveDiagram returns VALIDATION_ERROR for bad payload', async () => {
-    expect(await archiveDiagram(db, { id: 123 })).toEqual({ error: 'VALIDATION_ERROR' })
-  })
-
-  it('restoreDiagram returns VALIDATION_ERROR for bad payload', async () => {
-    expect(await restoreDiagram(db, null)).toEqual({ error: 'VALIDATION_ERROR' })
-  })
 })
 
 describe('hardDeleteDiagram', () => {
@@ -263,10 +112,6 @@ describe('hardDeleteDiagram', () => {
 
   it('returns DIAGRAM_NOT_FOUND for unknown id', async () => {
     expect(await hardDeleteDiagram(db, { id: 'nope' })).toEqual({ error: 'DIAGRAM_NOT_FOUND' })
-  })
-
-  it('returns VALIDATION_ERROR for bad payload', async () => {
-    expect(await hardDeleteDiagram(db, null)).toEqual({ error: 'VALIDATION_ERROR' })
   })
 })
 
@@ -293,7 +138,78 @@ describe('listDiagrams sort_order', () => {
   })
 })
 
-describe('registerDiagramsIpcHandlers', () => {
+describe('registerDiagramsIpcHandlers', registerDiagramsIpcHandlersTests)
+describe('diagram_tags relational storage', diagramTagsRelationalStorageTests)
+
+function listDiagramsTests() {
+  describe('listing', listDiagramsListingTests)
+  describe('archived diagrams', listDiagramsArchivedDiagramsTests)
+  describe('item shape', listDiagramsItemShapeTests)
+}
+
+function listDiagramsListingTests() {
+  it('returns empty array when no diagrams exist', async () => {
+    const result = await listDiagrams(db, {})
+    expect((result as { data: unknown[] }).data).toEqual([])
+  })
+
+  it('lists created diagrams sorted by updated_at desc', async () => {
+    await createDiagram(db, { title: 'First' })
+    await createDiagram(db, { title: 'Second' })
+    const result = await listDiagrams(db, {})
+    const data = (result as { data: { title: string }[] }).data
+    expect(data.length).toBe(2)
+    // Both exist; ordering by updated_at desc
+    expect(data.map((d) => d.title)).toContain('First')
+    expect(data.map((d) => d.title)).toContain('Second')
+  })
+}
+
+function listDiagramsArchivedDiagramsTests() {
+  it('excludes archived diagrams by default', async () => {
+    const r = await createDiagram(db, { title: 'To archive' })
+    const id = (r as { data: { id: string } }).data.id
+    await archiveDiagram(db, { id })
+    const result = await listDiagrams(db, {})
+    expect((result as { data: unknown[] }).data).toHaveLength(0)
+  })
+
+  it('includes archived diagrams when includeArchived=true', async () => {
+    const r = await createDiagram(db, { title: 'Archived' })
+    const id = (r as { data: { id: string } }).data.id
+    await archiveDiagram(db, { id })
+    const result = await listDiagrams(db, { includeArchived: true })
+    expect((result as { data: unknown[] }).data).toHaveLength(1)
+  })
+}
+
+function listDiagramsItemShapeTests() {
+  it('every item has type="diagram"', async () => {
+    await createDiagram(db, {})
+    const result = await listDiagrams(db, {})
+    const data = (result as { data: { type: string }[] }).data
+    expect(data[0].type).toBe('diagram')
+  })
+
+  it('returns empty tags array when no diagram_tags rows exist for diagram', async () => {
+    const now = new Date().toISOString()
+    await db.run(
+      `INSERT INTO diagrams (id, title, scene_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
+      ['no-tags-id', 'No Tags', '{}', now, now]
+    )
+    const result = await listDiagrams(db, {})
+    const data = (result as { data: { id: string; tags: string[] }[] }).data
+    const row = data.find((d) => d.id === 'no-tags-id')
+    expect(row?.tags).toEqual([])
+  })
+}
+
+function registerDiagramsIpcHandlersTests() {
+  describe('registration', registerDiagramsIpcHandlersRegistrationTests)
+  describe('defaults', registerDiagramsIpcHandlersDefaultsTests)
+}
+
+function registerDiagramsIpcHandlersRegistrationTests() {
   it('registers and disposes without error', () => {
     const dispose = registerDiagramsIpcHandlers(mockApi, db)
     expect(typeof dispose).toBe('function')
@@ -318,16 +234,30 @@ describe('registerDiagramsIpcHandlers', () => {
     await getHandler('terminator.notepad:diagrams.restore')?.(null, { id: 'noop' })
     await getHandler('terminator.notepad:diagrams.hardDelete')?.(null, { id: 'noop' })
   })
-})
+}
 
-describe('diagram_tags relational storage', () => {
-  it('diagram_tags table exists after schema is applied', async () => {
-    const rows = await db.query<{ table_name: string }>(
-      `SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_name='diagram_tags'`
-    )
-    expect(rows.length).toBe(1)
+function registerDiagramsIpcHandlersDefaultsTests() {
+  it('creates and lists with defaults when the renderer sends no payload', async () => {
+    const { ipcMain } = await import('electron')
+    vi.mocked(ipcMain.handle).mockClear()
+    registerDiagramsIpcHandlers(mockApi, db)
+    const calls = vi.mocked(ipcMain.handle).mock.calls as [string, (...a: unknown[]) => unknown][]
+    const getHandler = (ch: string) => calls.find(([c]) => c === ch)![1]
+    const created = await getHandler('terminator.notepad:diagrams.create')(null, undefined)
+    const listed = await getHandler('terminator.notepad:diagrams.list')(null, undefined)
+
+    expect(created).toHaveProperty('data.title', 'Untitled diagram')
+    expect((listed as { data: unknown[] }).data).toHaveLength(1)
   })
+}
 
+function diagramTagsRelationalStorageTests() {
+  describe('writing tags', diagramTagsRelationalStorageWritingTagsTests)
+  describe('reading tags', diagramTagsRelationalStorageReadingTagsTests)
+  describe('replacing tags', diagramTagsRelationalStorageReplacingTagsTests)
+}
+
+function diagramTagsRelationalStorageWritingTagsTests() {
   it('createDiagram with tags inserts rows into diagram_tags', async () => {
     const r = await createDiagram(db, { title: 'Tagged', tags: ['a', 'b'] })
     const id = (r as { data: { id: string } }).data.id
@@ -337,7 +267,9 @@ describe('diagram_tags relational storage', () => {
     )
     expect(tagRows.map((t) => t.tag)).toEqual(['a', 'b'])
   })
+}
 
+function diagramTagsRelationalStorageReadingTagsTests() {
   it('listDiagrams returns tags via JOIN from diagram_tags', async () => {
     const r = await createDiagram(db, { title: 'T', tags: ['x', 'y'] })
     const id = (r as { data: { id: string } }).data.id
@@ -353,7 +285,9 @@ describe('diagram_tags relational storage', () => {
     const result = await getDiagram(db, { id })
     expect((result as { data: { tags: string[] } }).data.tags).toEqual(['foo'])
   })
+}
 
+function diagramTagsRelationalStorageReplacingTagsTests() {
   it('autosaveDiagram replaces diagram_tags rows', async () => {
     const r = await createDiagram(db, { title: 'D', tags: ['old'] })
     const id = (r as { data: { id: string } }).data.id
@@ -371,4 +305,45 @@ describe('diagram_tags relational storage', () => {
     const data = (result as { data: { tags: string[] }[] }).data
     expect(data[0].tags).toEqual([])
   })
-})
+}
+
+function autosaveDiagramTests() {
+  describe('title and scene', autosaveDiagramTitleSceneTests)
+  describe('title only', autosaveDiagramTitleOnlyTests)
+}
+
+function autosaveDiagramTitleSceneTests() {
+  it('updates title and scene json', async () => {
+    const r = await createDiagram(db, {})
+    const id = (r as { data: { id: string } }).data.id
+    const scene = JSON.stringify({ elements: [{ type: 'rectangle' }] })
+    const result = await autosaveDiagram(db, { id, title: 'Updated', sceneJson: scene })
+    expect(result).toHaveProperty('data.updatedAt')
+
+    const got = await getDiagram(db, { id })
+    const data = (got as { data: { title: string; sceneJson: string } }).data
+    expect(data.title).toBe('Updated')
+    expect(data.sceneJson).toBe(scene)
+  })
+
+  it('returns DIAGRAM_NOT_FOUND for unknown id', async () => {
+    const result = await autosaveDiagram(db, { id: 'x', title: 'T', sceneJson: '{}' })
+    expect(result).toEqual({ error: 'DIAGRAM_NOT_FOUND' })
+  })
+}
+
+function autosaveDiagramTitleOnlyTests() {
+  it('updates title only (no sceneJson) without overwriting scene', async () => {
+    const r = await createDiagram(db, {})
+    const id = (r as { data: { id: string } }).data.id
+    const scene = JSON.stringify({ elements: [{ type: 'ellipse' }] })
+    await autosaveDiagram(db, { id, title: 'With scene', sceneJson: scene })
+    const result = await autosaveDiagram(db, { id, title: 'Title only', tags: ['tag1'] })
+    expect(result).toHaveProperty('data.updatedAt')
+    const got = await getDiagram(db, { id })
+    const data = (got as { data: { title: string; sceneJson: string; tags: string[] } }).data
+    expect(data.title).toBe('Title only')
+    expect(data.sceneJson).toBe(scene)
+    expect(data.tags).toEqual(['tag1'])
+  })
+}

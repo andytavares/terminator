@@ -22,6 +22,7 @@ const EMPTY: DiffSummary = { files: 0, added: 0, removed: 0 }
  * Parses `git diff --numstat` output: `<added>\t<removed>\t<path>` per file,
  * with `-` in both count columns for binary files. A file `weighLines` rejects
  * still counts as changed, but its lines do not.
+ * @internal
  */
 export function parseDiffStat(
   stdout: string,
@@ -32,29 +33,39 @@ export function parseDiffStat(
   let removed = 0
 
   for (const line of stdout.split('\n')) {
-    if (line.trim() === '') continue
-    const [addedRaw, removedRaw, ...rest] = line.split('\t')
-    // A well-formed row always has counts and a path; anything else is noise.
-    if (rest.length === 0 || addedRaw === undefined || removedRaw === undefined) continue
-
-    const addedCount = Number.parseInt(addedRaw, 10)
-    const removedCount = Number.parseInt(removedRaw, 10)
-    // Binary files report `-` for both counts. They changed, but there are no
-    // lines to attribute, and inventing some would distort the P1 threshold.
-    const isBinary = Number.isNaN(addedCount) && Number.isNaN(removedCount)
-    if (!isBinary && (Number.isNaN(addedCount) || Number.isNaN(removedCount))) continue
-
+    const row = numstatRow(line)
+    if (row === null) continue
     files += 1
-    if (!isBinary && weighLines(rest.join('\t'))) {
-      added += addedCount
-      removed += removedCount
+    if (row.lines !== null && weighLines(row.path)) {
+      added += row.lines.added
+      removed += row.lines.removed
     }
   }
 
   return { files, added, removed }
 }
 
-/** The paths a change touched. Risk grading is meaningless without them. */
+// One `--numstat` row: the file and its line counts (null for a binary file); null
+// for a line that is not a well-formed row.
+function numstatRow(
+  line: string
+): { path: string; lines: { added: number; removed: number } | null } | null {
+  if (line.trim() === '') return null
+  const [addedRaw, removedRaw, ...rest] = line.split('\t')
+  // A well-formed row always has counts and a path; anything else is noise.
+  if (rest.length === 0 || addedRaw === undefined || removedRaw === undefined) return null
+
+  const added = Number.parseInt(addedRaw, 10)
+  const removed = Number.parseInt(removedRaw, 10)
+  const path = rest.join('\t')
+  // Binary files report `-` for both counts. They changed, but there are no
+  // lines to attribute, and inventing some would distort the P1 threshold.
+  if (Number.isNaN(added) && Number.isNaN(removed)) return { path, lines: null }
+  if (Number.isNaN(added) || Number.isNaN(removed)) return null
+  return { path, lines: { added, removed } }
+}
+
+/** The paths a change touched; risk grading is meaningless without them. @internal */
 export function parseChangedFiles(stdout: string): string[] {
   const files: string[] = []
   for (const line of stdout.split('\n')) {
@@ -77,7 +88,7 @@ export function parseChangedFiles(stdout: string): string[] {
  * `--exclude-standard` honours .gitignore, which is what keeps node_modules and
  * build output out of it.
  */
-export async function readUntrackedFiles(worktreePath: string, run: RunCommand): Promise<string[]> {
+async function readUntrackedFiles(worktreePath: string, run: RunCommand): Promise<string[]> {
   try {
     const result = await run('git', ['ls-files', '--others', '--exclude-standard'], worktreePath)
     if (!result.ok) return []
@@ -132,6 +143,13 @@ export async function readChangedFiles(
   }
 }
 
+/** How a change summary is read: git, and which files' lines count. */
+export interface DiffReader {
+  readonly run: RunCommand
+  /** A file this rejects still counts as changed, but its lines do not. All count when absent. */
+  readonly weighLines?: (path: string) => boolean
+}
+
 /**
  * Reads the working copy's change summary against its base branch. Never
  * throws: a summary we cannot read reports as empty, which keeps the session
@@ -140,8 +158,7 @@ export async function readChangedFiles(
 export async function readDiffSummary(
   worktreePath: string,
   baseBranch: string,
-  run: RunCommand,
-  weighLines: (path: string) => boolean = () => true
+  { run, weighLines = () => true }: DiffReader
 ): Promise<DiffSummary> {
   try {
     // Against the base itself, not `base...HEAD`: the three-dot form sees only

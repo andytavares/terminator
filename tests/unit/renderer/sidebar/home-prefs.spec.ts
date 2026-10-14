@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import {
   DEFAULT_HOME_PREFS,
   HOME_PREFS_KEY,
@@ -16,6 +16,10 @@ beforeEach(() => {
   })
 })
 
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
+
 describe('loadHomePrefs', () => {
   it('opens on the Ledger, grouped by workspace and project, needs-you first', () => {
     expect(loadHomePrefs()).toEqual({
@@ -26,7 +30,6 @@ describe('loadHomePrefs', () => {
       previewSelected: true,
       hideExited: false,
     })
-    expect(DEFAULT_HOME_PREFS.layout).toBe('ledger')
   })
 
   it('reads back what was saved', () => {
@@ -46,7 +49,9 @@ describe('loadHomePrefs', () => {
       expect(loadHomePrefs()).toEqual(DEFAULT_HOME_PREFS)
     }
   )
+})
 
+describe('loadHomePrefs — keeps the valid fields and replaces only the invalid ones', () => {
   it('keeps the valid fields and replaces only the invalid ones', () => {
     storage.set(
       HOME_PREFS_KEY,
@@ -68,7 +73,9 @@ describe('loadHomePrefs', () => {
       hideExited: true,
     })
   })
+})
 
+describe('loadHomePrefs — falls back to defaults when storage throws', () => {
   it('falls back to defaults when storage throws', () => {
     vi.stubGlobal('localStorage', {
       getItem: () => {

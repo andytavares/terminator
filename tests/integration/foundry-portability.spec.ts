@@ -1,13 +1,15 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { execFileSync } from 'node:child_process'
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import * as path from 'node:path'
 import { createOrderStore } from '../../extensions/foundry/src/order/store.js'
 import { createForgeChannels } from '../../extensions/foundry/src/ipc/forge-channels.js'
+import { quietForgeSeams } from '../../extensions/foundry/tests/ipc/forge-deps.js'
+import { idleRunSeams } from '../../extensions/foundry/tests/ipc/run-deps.js'
 import { createRunChannels } from '../../extensions/foundry/src/ipc/run-channels.js'
 import { probeToolchain } from '../../extensions/foundry/src/verify/toolchain-probe.js'
 import type { WorkOrder } from '../../extensions/foundry/src/order/schema.js'
+import { makeTempDir } from '../support/temp-dir'
 
 // The portability claim, exercised against a repository that is not this one.
 //
@@ -32,20 +34,21 @@ let dataRoot: string
 
 function forge() {
   return createForgeChannels({
+    ...quietForgeSeams(() => dataRoot),
     store: createOrderStore(dataRoot),
     now: () => new Date().toISOString(),
   })
 }
 
 beforeEach(() => {
-  repo = fs.mkdtempSync(path.join(os.tmpdir(), 'foundry-portability-'))
+  repo = makeTempDir('foundry-portability-')
   git(repo, 'init', '--quiet')
   git(repo, 'config', 'user.email', 'test@example.com')
   git(repo, 'config', 'user.name', 'Test')
   fs.writeFileSync(path.join(repo, 'main.py'), 'def greet():\n    return "hi"\n')
   git(repo, 'add', '-A')
   git(repo, 'commit', '--quiet', '-m', 'init')
-  dataRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'foundry-portability-data-'))
+  dataRoot = makeTempDir('foundry-portability-data-')
 })
 
 afterEach(() => {
@@ -58,7 +61,7 @@ afterEach(() => {
   }
 })
 
-describe('Foundry in a repository it has never seen', () => {
+describe('Foundry in a repository it has never seen: seeding an order', () => {
   it('seeds an order with no setup step of any kind', async () => {
     const result = (await forge().create({
       source: { kind: 'typed', text: 'add a docstring to greet' },
@@ -89,7 +92,9 @@ describe('Foundry in a repository it has never seen', () => {
     })) as { order: WorkOrder }
     expect(result.order.context.houseDocs).toEqual([])
   })
+})
 
+describe('Foundry in a repository it has never seen: the recipes on offer', () => {
   it('does not offer the specification pipeline where the toolkit is absent', async () => {
     const store = createOrderStore(dataRoot)
     const seeded = (await forge().create({
@@ -102,6 +107,7 @@ describe('Foundry in a repository it has never seen', () => {
       dataRoot: () => dataRoot,
       sources: () => ({ dataRoot, repoPaths: [repo], builtInDir }),
       now: () => new Date().toISOString(),
+      ...idleRunSeams(),
     })
     const offered = (await runs.recipes({ id: seeded.order.id })) as {
       recipes: { name: string; available: boolean; unmet: string[] }[]
@@ -115,7 +121,9 @@ describe('Foundry in a repository it has never seen', () => {
     // is usable rather than merely refused.
     expect(offered.recipes.find((r) => r.name === 'direct')?.available).toBe(true)
   })
+})
 
+describe('Foundry in a repository it has never seen: the repository stays untouched', () => {
   it('leaves the repository exactly as it found it', async () => {
     await forge().create({ source: { kind: 'typed', text: 'x' }, repoPaths: [repo] })
     probeToolchain(repo)
@@ -130,6 +138,20 @@ describe('Foundry in a repository it has never seen', () => {
     expect(fs.existsSync(path.join(repo, '.gitignore'))).toBe(before)
   })
 
+  it('runs a complete intake without the repository ever being written to', async () => {
+    const head = git(repo, 'rev-parse', 'HEAD').trim()
+    const seeded = (await forge().create({
+      source: { kind: 'typed', text: 'add a docstring' },
+      repoPaths: [repo],
+    })) as { order: WorkOrder }
+    await forge().compile({ id: seeded.order.id, commit: false, automatic: false })
+
+    expect(git(repo, 'rev-parse', 'HEAD').trim()).toBe(head)
+    expect(git(repo, 'status', '--porcelain').trim()).toBe('')
+  })
+})
+
+describe('Foundry in a repository it has never seen: where the records go', () => {
   it('keeps every record under the configured location', async () => {
     const seeded = (await forge().create({
       source: { kind: 'typed', text: 'x' },
@@ -140,17 +162,5 @@ describe('Foundry in a repository it has never seen', () => {
     for (const file of ['order.json', 'order.md', 'ledger.jsonl']) {
       expect(fs.existsSync(path.join(orderPath, file)), file).toBe(true)
     }
-  })
-
-  it('runs a complete intake without the repository ever being written to', async () => {
-    const head = git(repo, 'rev-parse', 'HEAD').trim()
-    const seeded = (await forge().create({
-      source: { kind: 'typed', text: 'add a docstring' },
-      repoPaths: [repo],
-    })) as { order: WorkOrder }
-    await forge().compile({ id: seeded.order.id, commit: false })
-
-    expect(git(repo, 'rev-parse', 'HEAD').trim()).toBe(head)
-    expect(git(repo, 'status', '--porcelain').trim()).toBe('')
   })
 })

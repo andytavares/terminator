@@ -1,294 +1,24 @@
-import Fastify, { type FastifyInstance } from 'fastify'
+import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify'
 import websocketPlugin from '@fastify/websocket'
 import staticPlugin from '@fastify/static'
 import { join, resolve, dirname } from 'path'
 import { readFileSync, existsSync, readdirSync } from 'fs'
-import { app as electronApp } from 'electron'
-import type { PtyManagerAPI, WorkspaceSnapshot, ProjectSnapshot } from '../types.js'
+import type { PtyManagerAPI, WorkspaceSnapshot, ProjectSnapshot } from '@terminator/extension-sdk'
 import { registerHealthRoute } from './routes/health.route.js'
 import { registerTerminalRoutes } from './routes/terminal.routes.js'
 import { registerWorkspaceRoutes } from './routes/workspace.routes.js'
 import { registerAuthMiddleware } from './auth.middleware.js'
+import { registerLoginRoute } from './routes/login.route.js'
+import { AuthRateLimiter } from './auth-rate-limiter.js'
 import { registerBridgeRoute } from './routes/bridge.route.js'
 import { WsTicketStore } from './ws-ticket-store.js'
 import { SessionStore } from './session-store.js'
 import { WsSubscriberManager } from './ws-subscriber-manager.js'
 import { ConnectedDeviceRegistry } from './connected-devices.js'
+import { EXTENSION_BASE_CSS } from '@terminator/extension-ui/extension-base-css'
+import { PortInUseError } from './port-in-use-error.js'
 
-// CSS injected into every extension iframe so --tm-* variables and layout are defined.
-// Mirrors the EXTENSION_BASE_CSS in src/main/extensions/extension-view-host.ts —
-// keep in sync if the design tokens change.
-const EXTENSION_BASE_CSS = `
-:root {
-  --tm-control-height: 28px;
-  --tm-bg-base: #0c0c0f;
-  --tm-bg-surface: #111116;
-  --tm-bg-elevated: #18181f;
-  --tm-bg-card: #1c1c25;
-  --tm-bg-card-hover: #22222e;
-  --tm-bg-input: #16161c;
-  --tm-text-primary: #e2e2ee;
-  --tm-text-secondary: #9090c4;
-  --tm-text-muted: #8585b8;
-  --tm-border: rgba(255,255,255,0.06);
-  --tm-border-strong: rgba(255,255,255,0.12);
-  --tm-accent: #5c6bc0;
-  --tm-on-accent: #ffffff;
-  /* The accent as text or an icon, rather than as a fill. --tm-accent is dark
-     enough to carry white (4.86:1) and therefore too dark to read on the dark
-     surfaces (3.48:1 on --tm-bg-card); this is the same hue lifted until it
-     passes as text (6.24:1). In the light theme one value does both jobs. */
-  --tm-accent-text: #8b98e8;
-  /* Hover for a filled accent control. It darkens in both themes: lightening
-     the dark theme's accent drops white below AA (#6b79ce gives 4.00:1). */
-  --tm-accent-hover: #5361b5;
-  --tm-accent-dim: rgba(92,107,192,0.18);
-  --tm-accent-glow: rgba(92,107,192,0.35);
-  --tm-danger: #e46a6a;
-  --tm-success: #4ade80;
-  --tm-warning: #facc15;
-  /* Work an agent produced for the reader alone: private notes, findings. */
-  --tm-agent: #b39cf5;
-  --tm-agent-dim: rgba(179,156,245,0.10);
-  --tm-diff-added-bg: rgba(152,195,121,0.12);
-  --tm-diff-removed-bg: rgba(224,108,117,0.12);
-  --tm-syntax-comment: #8585b8;
-  --tm-syntax-keyword: #cf9ee8;
-  --tm-syntax-string: #4ade80;
-  --tm-syntax-tag: #e05c5c;
-  --tm-syntax-literal: #6cc9d9;
-  --tm-syntax-number: #e0a361;
-  --tm-syntax-title: #7fb8f0;
-  --tm-syntax-attribute: #e2c07e;
-  /* Translucent layers over whatever surface is beneath.
-     Extension stylesheets reached for rgba(255,255,255,alpha) ~350 times for
-     these — a hairline border, a faint hover fill, a raised strip. Every one
-     of them is invisible on a light ground, so the alpha itself has to flip
-     with the theme rather than the colour under it. */
-  --tm-overlay-subtle: rgba(255,255,255,0.04);
-  --tm-overlay-soft: rgba(255,255,255,0.06);
-  --tm-overlay: rgba(255,255,255,0.09);
-  --tm-overlay-strong: rgba(255,255,255,0.14);
-  --tm-scrim: rgba(0,0,0,0.55);
-  /* Text on a filled semantic control. The fills are bright in this theme, so
-     the text on them is dark; in the light theme the fills are deep and it
-     flips. */
-  --tm-on-success: #06210f;
-  --tm-on-warning: #241a00;
-  --tm-on-danger: #2a0b0b;
-  --tm-radius-xs: 4px;
-  --tm-radius-sm: 6px;
-  --tm-radius-md: 10px;
-  --tm-radius-lg: 16px;
-  --tm-space-1: 4px;
-  --tm-space-2: 8px;
-  --tm-space-3: 12px;
-  --tm-space-4: 16px;
-  --tm-space-5: 20px;
-  --tm-space-6: 24px;
-  --tm-space-8: 32px;
-  /* The stacking scale. Extension stylesheets reference these instead of raw
-     numbers; without them here every z-index in an extension view resolves to
-     nothing and the stacking order collapses. Must stay in step with
-     packages/extension-ui/src/layers.ts and the :root block in styles.css. */
-  --tm-layer-panel: 100;
-  --tm-layer-overlay: 200;
-  --tm-layer-modal: 300;
-  --tm-layer-toast: 400;
-  --tm-font-mono: 'IBM Plex Mono','JetBrains Mono','Fira Code','Courier New',monospace;
-  --tm-font-ui: 'IBM Plex Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
-}
-
-/* Icon sizes (Constitution Principle XII).
-   Icons are sized here, never with a size prop on the component. The
-   extensions had 139 such props across seven ad-hoc values in a 6px band —
-   10, 11, 12, 13, 14, 15, 16 — which is not seven decisions, it is one
-   decision made seven times. Three steps carry all of it. Injected rather
-   than exported so an extension gets them without importing anything, the
-   same way it gets the colour tokens. */
-.tm-icon-sm,
-.tm-icon,
-.tm-icon-lg {
-  flex: 0 0 auto;
-}
-.tm-icon-sm {
-  width: 12px;
-  height: 12px;
-}
-.tm-icon {
-  width: 14px;
-  height: 14px;
-}
-.tm-icon-lg {
-  width: 16px;
-  height: 16px;
-}
-
-/* No button renders the browser's native control.
-
-   Nothing in this product wants the UA button look, and relying on every
-   modifier to remember a background is how a caret beside "Commit & push"
-   shipped as a white pill on a dark panel. border:0 rather than a
-   transparent border, so a button that wants an edge states the full
-   shorthand — which every one of them already does. */
-/* One height for every single-line field and select, so controls that share a
-   row line up whatever padding and font size each class picks. :where() keeps
-   it at zero specificity: a class that sets its own height still wins. */
-:where(select:not([multiple], [size]), input:not([type='checkbox'], [type='radio'], [type='range'], [type='color'], [type='file'], [type='hidden'])) {
-  height: var(--tm-control-height);
-}
-
-button {
-  appearance: none;
-  -webkit-appearance: none;
-  background: transparent;
-  border: 0;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-}
-
-/* The default an icon gets when nothing else sizes it.
-
-   lucide renders width/height attributes of 24 when given no size, which is
-   never what a 12px label wants — an icon converted from a text glyph and left
-   without a rule comes out enormous. This makes the default "as tall as the
-   text beside it", which is what the glyph it replaced did. Anything wanting a
-   specific size says so with .tm-icon*, or its own rule; both are more
-   specific than this and win.
-
-   The :has() rule is the other half: a button that used to hold a character
-   laid it out as text, and an inline SVG in the same place sits on the
-   baseline instead of centred. */
-button > svg,
-a > svg,
-label > svg,
-summary > svg {
-  width: 1.08em;
-  height: 1.08em;
-  flex: 0 0 auto;
-}
-
-/* Vertical centring only. Forcing justify-content here re-centred every
-   left-aligned button that happens to contain an icon — a disclosure row,
-   a menu item — which is a layout decision that belongs to the caller. */
-button:has(> svg) {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-/* The light palette, mirroring [data-theme='light'] in src/renderer/styles.css.
-   Those values are WCAG AA verified against their surfaces (TAV-8) — including
-   the text-muted darkening and the semantic colours, which were chosen so they
-   hold up composited under the diff tints. Keep the two blocks in step. */
-:root[data-theme='light'] {
-  --tm-bg-base: #f0f0f5;
-  --tm-bg-surface: #e8e8f0;
-  --tm-bg-elevated: #ffffff;
-  --tm-bg-card: #f5f5fa;
-  --tm-bg-card-hover: #eaeaf5;
-  --tm-bg-input: #ffffff;
-  --tm-text-primary: #1a1a2e;
-  --tm-text-secondary: #555580;
-  --tm-text-muted: #5c5c94;
-  --tm-border: rgba(0,0,0,0.08);
-  --tm-border-strong: rgba(0,0,0,0.15);
-  --tm-accent: #4a57a8;
-  --tm-on-accent: #ffffff;
-  --tm-accent-text: #4a57a8;
-  --tm-accent-hover: #3d4890;
-  --tm-accent-dim: rgba(74,87,168,0.12);
-  --tm-accent-glow: rgba(74,87,168,0.28);
-  --tm-danger: #962d20;
-  --tm-success: #0f5c2a;
-  --tm-warning: #9c5400;
-  --tm-agent: #6b4fbf;
-  --tm-agent-dim: rgba(107,79,191,0.08);
-  --tm-diff-added-bg: rgba(15,92,42,0.10);
-  --tm-diff-removed-bg: rgba(150,45,32,0.10);
-  --tm-syntax-comment: #5c5c94;
-  --tm-syntax-keyword: #8a3fa8;
-  --tm-syntax-string: #0f5c2a;
-  --tm-syntax-tag: #962d20;
-  --tm-syntax-literal: #0e6e7a;
-  --tm-syntax-number: #8a5417;
-  --tm-syntax-title: #1d5fa8;
-  --tm-syntax-attribute: #7a5c12;
-  --tm-overlay-subtle: rgba(0,0,0,0.03);
-  --tm-overlay-soft: rgba(0,0,0,0.05);
-  --tm-overlay: rgba(0,0,0,0.07);
-  --tm-overlay-strong: rgba(0,0,0,0.12);
-  --tm-scrim: rgba(0,0,0,0.35);
-  --tm-on-success: #ffffff;
-  --tm-on-warning: #ffffff;
-  --tm-on-danger: #ffffff;
-}
-*, *::before, *::after { box-sizing: border-box; }
-html, body {
-  width: 100%; height: 100%; margin: 0; padding: 0;
-  background: var(--tm-bg-base);
-  color: var(--tm-text-primary);
-  font-family: var(--tm-font-ui);
-  /* The product's size, not the browser's.
-
-     This set a family, a colour and a background and no size, so anything that
-     forgot one landed on 16px beside a product drawn at 11-13px. Not a rare
-     mistake: an extension's every heading, every bold span inside a button,
-     every label whose rule happened to omit it. One view read as three type
-     scales at once, and every instance had to be found by eye.
-
-     A default that is right is the fix; a rule that wants larger still says
-     so. */
-  font-size: 13px;
-  line-height: 1.45;
-  -webkit-font-smoothing: antialiased;
-}
-#app { width: 100%; height: 100%; display: flex; flex-direction: column; }
-/* Checkboxes — extension views are isolated WebContentsViews and inherit none
-   of the host's CSS, so the same replacement the core applies is injected here.
-   Without it an extension's checkbox is a white OS widget on a dark panel. */
-input[type='checkbox'] {
-  appearance: none; -webkit-appearance: none; position: relative; flex-shrink: 0;
-  width: 14px; height: 14px; margin: 0; padding: 0;
-  border: 1px solid var(--tm-border-strong); border-radius: 3px;
-  background: var(--tm-bg-input); cursor: pointer;
-  transition: background-color 0.12s ease, border-color 0.12s ease;
-}
-input[type='checkbox']:hover:not(:disabled) { border-color: var(--tm-accent); }
-input[type='checkbox']:checked, input[type='checkbox']:indeterminate {
-  background: var(--tm-accent); border-color: var(--tm-accent);
-}
-input[type='checkbox']:checked::after {
-  content: ''; position: absolute; left: 4px; top: 1px; width: 4px; height: 8px;
-  border: solid var(--tm-on-accent); border-width: 0 2px 2px 0; transform: rotate(45deg);
-}
-input[type='checkbox']:indeterminate::after {
-  content: ''; position: absolute; left: 2px; top: 5px; width: 8px; height: 2px;
-  border-radius: 1px; background: var(--tm-on-accent);
-}
-input[type='checkbox']:focus-visible { outline: 2px solid var(--tm-accent-glow); outline-offset: 1px; }
-input[type='checkbox']:disabled { cursor: default; opacity: 0.4; }
-/* Radios: same box, circular, dot instead of a tick. left/top 3px centres a 6px
-   dot in the 12px padding box of a 14px border-box with a 1px border. */
-input[type='radio'] {
-  appearance: none; -webkit-appearance: none; position: relative; flex-shrink: 0;
-  width: 14px; height: 14px; margin: 0; padding: 0;
-  border: 1px solid var(--tm-border-strong); border-radius: 50%;
-  background: var(--tm-bg-input); cursor: pointer;
-  transition: background-color 0.12s ease, border-color 0.12s ease;
-}
-input[type='radio']:hover:not(:disabled) { border-color: var(--tm-accent); }
-input[type='radio']:checked { background: var(--tm-accent); border-color: var(--tm-accent); }
-input[type='radio']:checked::after {
-  content: ''; position: absolute; left: 3px; top: 3px; width: 6px; height: 6px;
-  border-radius: 50%; background: var(--tm-on-accent);
-}
-input[type='radio']:focus-visible { outline: 2px solid var(--tm-accent-glow); outline-offset: 1px; }
-input[type='radio']:disabled { cursor: default; opacity: 0.4; }
-`
-
-export interface RemoteServerDeps {
+interface RemoteServerDeps {
   getPasswordHash: () => string
   getMaxSubscribers: () => number
   listWorkspaces: () => WorkspaceSnapshot[]
@@ -296,12 +26,14 @@ export interface RemoteServerDeps {
   invokeChannel: (channel: string, payload: unknown) => Promise<unknown>
   sendChannel: (channel: string, payload: unknown) => void
   onWindowEvent: (channel: string, handler: (...args: unknown[]) => void) => () => void
-  isRemoteAccessible: (channel: string) => boolean
+  isRemoteAccessible: (channel: string) => Promise<boolean>
   onPortInUse: (port: number) => void
 }
 
-export interface RemoteServerOptions {
+interface RemoteServerOptions {
   port: number
+  /** `api.paths.app`: where the built renderers and extensions are found. */
+  appPath: string
   ptyManager: PtyManagerAPI
   deps: RemoteServerDeps
 }
@@ -316,192 +48,224 @@ export interface RemoteServerHandle {
   inject: FastifyInstance['inject']
 }
 
-export class PortInUseError extends Error {
-  constructor(port: number) {
-    super(`Port ${port} is already in use. Change the port in Settings.`)
-    this.name = 'PortInUseError'
-  }
+interface ExtensionRendererDir {
+  id: string
+  dir: string
+  rendererRelPath: string
 }
 
-function getRemoteRendererDir(): string {
+/** The session store of each browser surface. */
+interface SurfaceSessions {
+  app: SessionStore
+  mobile: SessionStore
+  /** Issued by POST /api/login; it authorises every /api request after the password check. */
+  login: SessionStore
+}
+
+/** What the server is built from, shared by the steps that build it. */
+interface RemoteServerParts {
+  fastify: FastifyInstance
+  options: RemoteServerOptions
+  sessions: SurfaceSessions
+  ticketStore: WsTicketStore
+  subscriberManager: WsSubscriberManager
+  deviceRegistry: ConnectedDeviceRegistry
+}
+
+/** What `stop` and `disconnectAllClients` tear down besides the session stores. */
+interface ServerConnections {
+  terminalCleanup: { cleanup: () => Promise<void> }
+  bridgeCleanup: { disconnectAll: () => void }
+}
+
+// One session store per browser surface; 8-hour cookie lifetime.
+const SESSION_TTL_MS = 8 * 60 * 60 * 1000
+const SHIM_TAG = '<script type="module" src="/remote-shim.js"></script>'
+
+function getRemoteRendererDir(appPath: string): string {
   const candidates = [
-    join(electronApp.getAppPath(), 'out', 'renderer-remote'),
+    join(appPath, 'out', 'renderer-remote'),
     resolve(__dirname, '..', '..', '..', '..', 'out', 'renderer-remote'),
   ]
   return candidates.find(existsSync) ?? candidates[0]
 }
 
-function getRendererDir(): string {
+function getRendererDir(appPath: string): string {
   const candidates = [
-    join(electronApp.getAppPath(), 'out', 'renderer'),
+    join(appPath, 'out', 'renderer'),
     resolve(__dirname, '..', '..', '..', '..', 'out', 'renderer'),
   ]
   return candidates.find(existsSync) ?? candidates[0]
 }
 
-function getExtensionRendererDirs(): Array<{ id: string; dir: string; rendererRelPath: string }> {
-  const results: Array<{ id: string; dir: string; rendererRelPath: string }> = []
+function getExtensionRendererDirs(appPath: string): ExtensionRendererDir[] {
   const candidates = [
-    join(electronApp.getAppPath(), 'extensions'),
+    join(appPath, 'extensions'),
     resolve(__dirname, '..', '..', '..', '..', 'extensions'),
   ]
   const extensionsRoot = candidates.find(existsSync)
-  if (!extensionsRoot) return results
+  if (!extensionsRoot) return []
 
   let entries: string[]
   try {
     entries = readdirSync(extensionsRoot)
   } catch {
-    return results
+    return []
   }
-
-  for (const name of entries) {
-    const manifestPath = join(extensionsRoot, name, 'manifest.json')
-    if (!existsSync(manifestPath)) continue
-    try {
-      const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
-        id?: string
-        renderer?: string
-      }
-      if (!manifest.id || !manifest.renderer) continue
-      const rendererDir = join(extensionsRoot, name, dirname(manifest.renderer))
-      if (existsSync(rendererDir)) {
-        results.push({ id: manifest.id, dir: rendererDir, rendererRelPath: manifest.renderer })
-      }
-    } catch {
-      // skip malformed manifests
-    }
-  }
-  return results
+  return entries.flatMap((name) => readExtensionRendererDir(join(extensionsRoot, name)))
 }
 
-export async function createRemoteServer(
-  options: RemoteServerOptions
-): Promise<RemoteServerHandle> {
-  const { port, ptyManager, deps } = options
-
-  const ticketStore = new WsTicketStore()
-  const subscriberManager = new WsSubscriberManager()
-  // Who is watching, so the Remote Control view can say so and disconnect one.
-  const deviceRegistry = new ConnectedDeviceRegistry()
-  // One session store per browser surface; 8-hour cookie lifetime.
-  const SESSION_TTL_MS = 8 * 60 * 60 * 1000
-  const appSessionStore = new SessionStore({
-    cookieName: 'app-session',
-    cookiePath: '/app',
-    ttlMs: SESSION_TTL_MS,
-  })
-  const mobileSessionStore = new SessionStore({
-    cookieName: 'mobile-session',
-    cookiePath: '/mobile',
-    ttlMs: SESSION_TTL_MS,
-  })
-  let sessionCleanupTimer: ReturnType<typeof setInterval> | null = null
-
-  // hasValidSession is the union of app + mobile sessions (used by auth middleware)
-  function hasValidSession(cookieHeader: string): boolean {
-    return (
-      appSessionStore.hasValidSession(cookieHeader) ||
-      mobileSessionStore.hasValidSession(cookieHeader)
-    )
+/** The renderer an installed extension declares, or none when it declares none. */
+function readExtensionRendererDir(extensionDir: string): ExtensionRendererDir[] {
+  const manifestPath = join(extensionDir, 'manifest.json')
+  if (!existsSync(manifestPath)) return []
+  try {
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
+      id?: string
+      renderer?: string
+    }
+    if (!manifest.id || !manifest.renderer) return []
+    const rendererDir = join(extensionDir, dirname(manifest.renderer))
+    if (!existsSync(rendererDir)) return []
+    return [{ id: manifest.id, dir: rendererDir, rendererRelPath: manifest.renderer }]
+  } catch {
+    // skip malformed manifests
+    return []
   }
+}
 
-  const fastify = Fastify({ logger: false })
+function createSurfaceSessions(): SurfaceSessions {
+  const surfaceStore = (cookieName: string, cookiePath: string) =>
+    new SessionStore({ cookieName, cookiePath, ttlMs: SESSION_TTL_MS })
+  return {
+    app: surfaceStore('app-session', '/app'),
+    mobile: surfaceStore('mobile-session', '/mobile'),
+    login: surfaceStore('remote-session', '/'),
+  }
+}
 
-  // Gate /app/* and /mobile/* static assets behind their respective session cookies
+function forEachSessionStore(sessions: SurfaceSessions, act: (store: SessionStore) => void) {
+  act(sessions.app)
+  act(sessions.mobile)
+  act(sessions.login)
+}
+
+/** True when a gated surface's asset is requested without that surface's session. */
+function lacksSurfaceSession(request: FastifyRequest, surface: string, store: SessionStore) {
+  const pathname = request.url.split('?')[0]
+  const prefix = `/${surface}/`
+  if (!pathname.startsWith(prefix) || pathname === prefix) return false
+  return !store.hasLiveSession(request.headers.cookie ?? '')
+}
+
+// Gate /app/* and /mobile/* static assets behind their respective session cookies.
+// /ext/* serves extension static assets (JS/HTML/CSS) without a cookie gate: the
+// extension bundle has no user data; auth happens via the bridge WebSocket.
+function gateSurfaceAssets(fastify: FastifyInstance, sessions: SurfaceSessions): void {
   fastify.addHook('onRequest', async (request, reply) => {
-    const pathname = request.url.split('?')[0]
-    if (pathname.startsWith('/app/') && pathname !== '/app/') {
-      if (!appSessionStore.hasValidSession(request.headers.cookie ?? '')) {
-        return reply.status(403).send({ error: 'FORBIDDEN' })
-      }
+    if (
+      lacksSurfaceSession(request, 'app', sessions.app) ||
+      lacksSurfaceSession(request, 'mobile', sessions.mobile)
+    ) {
+      return reply.status(403).send({ error: 'FORBIDDEN' })
     }
-    if (pathname.startsWith('/mobile/') && pathname !== '/mobile/') {
-      if (!mobileSessionStore.hasValidSession(request.headers.cookie ?? '')) {
-        return reply.status(403).send({ error: 'FORBIDDEN' })
-      }
-    }
-    // /ext/* serves extension static assets (JS/HTML/CSS). No cookie gate here —
-    // the extension bundle has no user data; auth happens via the bridge WebSocket.
   })
+}
 
-  await fastify.register(websocketPlugin)
-
-  const loginStaticDir = getRemoteRendererDir()
-  await fastify.register(staticPlugin, { root: loginStaticDir, prefix: '/', decorateReply: false })
-
-  const rendererDir = getRendererDir()
-  await fastify.register(staticPlugin, { root: rendererDir, prefix: '/app', decorateReply: false })
-
-  // Serve each installed extension's renderer under /ext/<extensionId>/
-  const extensionDirs = getExtensionRendererDirs()
-  for (const { id, dir } of extensionDirs) {
-    await fastify.register(staticPlugin, {
-      root: dir,
-      prefix: `/ext/${id}`,
-      decorateReply: false,
-    })
+// Serve each installed extension's renderer under /ext/<extensionId>/
+async function registerExtensionRenderers(fastify: FastifyInstance, appPath: string) {
+  for (const { id, dir } of getExtensionRendererDirs(appPath)) {
+    await fastify.register(staticPlugin, { root: dir, prefix: `/ext/${id}`, decorateReply: false })
     // Serve index.html with the shim + base CSS injected (provides --tm-* variables and #app height)
     fastify.get(`/ext/${id}/`, async (_request, reply) => {
-      const shimTag = '<script type="module" src="/remote-shim.js"></script>'
       const styleTag = `<style>${EXTENSION_BASE_CSS}</style>`
       try {
         let html = readFileSync(join(dir, 'index.html'), 'utf8')
-        html = html.replace(/<head[^>]*>/i, (m) => `${m}\n    ${shimTag}\n    ${styleTag}`)
+        html = html.replace(/<head[^>]*>/i, (m) => `${m}\n    ${SHIM_TAG}\n    ${styleTag}`)
         return reply.type('text/html').send(html)
       } catch {
         return reply.status(503).send(`Extension renderer not built for ${id}`)
       }
     })
   }
+}
+
+/** A request for a surface's entry page, and its reply. */
+interface SurfaceExchange {
+  request: FastifyRequest<{ Querystring: { t?: string } }>
+  reply: FastifyReply
+}
+
+/** A valid session cookie is accepted, so a refresh needs no new login; otherwise a one-use
+ *  ticket issues one. False when the request has neither. */
+function admitToSurface(
+  parts: RemoteServerParts,
+  surface: 'app' | 'mobile',
+  exchange: SurfaceExchange
+): boolean {
+  const { request, reply } = exchange
+  const store = parts.sessions[surface]
+  if (store.hasLiveSession(request.headers.cookie ?? '')) return true
+  const t = request.query.t ?? ''
+  if (!t || !parts.ticketStore.consumeTicket(t, surface)) return false
+  reply.header('Set-Cookie', store.issueSession().setCookie)
+  return true
+}
+
+async function sendAppPage(
+  parts: RemoteServerParts,
+  rendererDir: string,
+  exchange: SurfaceExchange
+) {
+  const { reply } = exchange
+  if (!admitToSurface(parts, 'app', exchange)) return reply.redirect('/')
+  try {
+    let html = readFileSync(join(rendererDir, 'index.html'), 'utf8')
+    html = html.replace(/<head[^>]*>/i, (m) => `${m}\n    ${SHIM_TAG}`)
+    return reply.type('text/html').send(html)
+  } catch {
+    return reply.status(503).send('Renderer not built. Run: npm run build')
+  }
+}
+
+async function sendMobilePage(
+  parts: RemoteServerParts,
+  loginStaticDir: string,
+  exchange: SurfaceExchange
+) {
+  const { reply } = exchange
+  if (!admitToSurface(parts, 'mobile', exchange)) return reply.redirect('/')
+  try {
+    const html = readFileSync(join(loginStaticDir, 'mobile.html'), 'utf8')
+    return reply.type('text/html').send(html)
+  } catch {
+    return reply.status(503).send('Mobile renderer not built. Run: npm run build:remote')
+  }
+}
+
+async function registerSurfaces(parts: RemoteServerParts): Promise<void> {
+  const { fastify, options } = parts
+  const loginStaticDir = getRemoteRendererDir(options.appPath)
+  await fastify.register(staticPlugin, { root: loginStaticDir, prefix: '/', decorateReply: false })
+
+  const rendererDir = getRendererDir(options.appPath)
+  await fastify.register(staticPlugin, { root: rendererDir, prefix: '/app', decorateReply: false })
+
+  await registerExtensionRenderers(fastify, options.appPath)
 
   // Mobile static assets share the same renderer-remote output directory
-  await fastify.register(staticPlugin, {
-    root: loginStaticDir,
-    prefix: '/mobile',
-    decorateReply: false,
-  })
+  const mobileStatic = { root: loginStaticDir, prefix: '/mobile', decorateReply: false }
+  await fastify.register(staticPlugin, mobileStatic)
 
-  fastify.get<{ Querystring: { t?: string } }>('/app/', async (request, reply) => {
-    // Accept an existing valid session cookie (allows page refresh without re-auth)
-    const hasSession = appSessionStore.hasValidSession(request.headers.cookie ?? '')
+  fastify.get<{ Querystring: { t?: string } }>('/app/', async (request, reply) =>
+    sendAppPage(parts, rendererDir, { request, reply })
+  )
+  fastify.get<{ Querystring: { t?: string } }>('/mobile/', async (request, reply) =>
+    sendMobilePage(parts, loginStaticDir, { request, reply })
+  )
+}
 
-    if (!hasSession) {
-      const t = request.query.t ?? ''
-      if (!t || !ticketStore.consumeTicket(t, 'app')) {
-        return reply.redirect('/')
-      }
-      reply.header('Set-Cookie', appSessionStore.issueSession().setCookie)
-    }
-
-    const shimTag = '<script type="module" src="/remote-shim.js"></script>'
-    try {
-      let html = readFileSync(join(rendererDir, 'index.html'), 'utf8')
-      html = html.replace(/<head[^>]*>/i, (m) => `${m}\n    ${shimTag}`)
-      return reply.type('text/html').send(html)
-    } catch {
-      return reply.status(503).send('Renderer not built. Run: npm run build')
-    }
-  })
-
-  fastify.get<{ Querystring: { t?: string } }>('/mobile/', async (request, reply) => {
-    const hasSession = mobileSessionStore.hasValidSession(request.headers.cookie ?? '')
-
-    if (!hasSession) {
-      const t = request.query.t ?? ''
-      if (!t || !ticketStore.consumeTicket(t, 'mobile')) {
-        return reply.redirect('/')
-      }
-      reply.header('Set-Cookie', mobileSessionStore.issueSession().setCookie)
-    }
-    try {
-      const html = readFileSync(join(loginStaticDir, 'mobile.html'), 'utf8')
-      return reply.type('text/html').send(html)
-    } catch {
-      return reply.status(503).send('Mobile renderer not built. Run: npm run build:remote')
-    }
-  })
-
+function registerSurfaceTickets(fastify: FastifyInstance, ticketStore: WsTicketStore): void {
   fastify.post('/api/app-ticket', async (_request, reply) => {
     const ticket = ticketStore.createTicket('__app__', 'app')
     return reply.status(201).send({ ticket })
@@ -511,22 +275,33 @@ export async function createRemoteServer(
     const ticket = ticketStore.createTicket('__mobile__', 'mobile')
     return reply.status(201).send({ ticket })
   })
+}
 
+async function registerLogin(parts: RemoteServerParts): Promise<void> {
+  const { fastify, sessions } = parts
   await registerAuthMiddleware(fastify, {
-    getPasswordHash: deps.getPasswordHash,
-    hasValidSession,
+    hasValidSession: (cookieHeader) => sessions.login.hasLiveSession(cookieHeader),
   })
+  await registerLoginRoute(fastify, {
+    getPasswordHash: parts.options.deps.getPasswordHash,
+    sessionStore: sessions.login,
+    rateLimiter: new AuthRateLimiter(),
+  })
+}
 
+async function registerApi(parts: RemoteServerParts): Promise<ServerConnections> {
+  const { fastify, options, ticketStore } = parts
+  const { deps } = options
   await registerHealthRoute(fastify)
   await registerWorkspaceRoutes(fastify, {
     listWorkspaces: deps.listWorkspaces,
     listProjects: deps.listProjects,
   })
   const terminalCleanup = await registerTerminalRoutes(fastify, {
-    ptyManager,
+    ptyManager: options.ptyManager,
     ticketStore,
-    subscriberManager,
-    deviceRegistry,
+    subscriberManager: parts.subscriberManager,
+    deviceRegistry: parts.deviceRegistry,
     getMaxSubscribers: deps.getMaxSubscribers,
   })
   const bridgeCleanup = await registerBridgeRoute(fastify, {
@@ -536,66 +311,95 @@ export async function createRemoteServer(
     onWindowEvent: deps.onWindowEvent,
     isRemoteAccessible: deps.isRemoteAccessible,
   })
+  return { terminalCleanup, bridgeCleanup }
+}
 
-  let listening = false
+export async function createRemoteServer(
+  options: RemoteServerOptions
+): Promise<RemoteServerHandle> {
+  const parts: RemoteServerParts = {
+    fastify: Fastify({ logger: false }),
+    options,
+    sessions: createSurfaceSessions(),
+    ticketStore: new WsTicketStore(),
+    subscriberManager: new WsSubscriberManager(),
+    // Who is watching, so the Remote Control view can say so and disconnect one.
+    deviceRegistry: new ConnectedDeviceRegistry(),
+  }
+  gateSurfaceAssets(parts.fastify, parts.sessions)
+  await parts.fastify.register(websocketPlugin)
+  await registerSurfaces(parts)
+  registerSurfaceTickets(parts.fastify, parts.ticketStore)
+  await registerLogin(parts)
+  const connections = await registerApi(parts)
+  return new RemoteServer(parts, connections).toHandle()
+}
 
-  return {
-    async start() {
-      try {
-        await fastify.listen({ port, host: '0.0.0.0' })
-        ticketStore.startCleanup()
-        // Purge expired app-session tokens once per hour
-        sessionCleanupTimer = setInterval(
-          () => {
-            appSessionStore.sweep()
-            mobileSessionStore.sweep()
-          },
-          60 * 60 * 1000
-        )
-        listening = true
-      } catch (err) {
-        await fastify.close().catch(() => {})
-        const code = (err as NodeJS.ErrnoException).code
-        if (code === 'EADDRINUSE') {
-          deps.onPortInUse(port)
-          throw new PortInUseError(port)
-        }
-        throw err
+/** The running state of a built server: whether it listens, and its sweep timer. */
+class RemoteServer {
+  private listening = false
+  private sessionCleanupTimer: ReturnType<typeof setInterval> | null = null
+
+  constructor(
+    private parts: RemoteServerParts,
+    private connections: ServerConnections
+  ) {}
+
+  toHandle(): RemoteServerHandle {
+    const { fastify, deviceRegistry } = this.parts
+    return {
+      start: () => this.start(),
+      stop: () => this.stop(),
+      disconnectAllClients: () => this.disconnectAllClients(),
+      isListening: () => this.listening,
+      /** The live device list, and a subscription to changes. */
+      devices: deviceRegistry,
+      inject: fastify.inject.bind(fastify),
+    }
+  }
+
+  private async start(): Promise<void> {
+    const { fastify, options, ticketStore, sessions } = this.parts
+    try {
+      await fastify.listen({ port: options.port, host: '0.0.0.0' })
+      ticketStore.startCleanup()
+      // Purge expired session tokens once per hour
+      this.sessionCleanupTimer = setInterval(
+        () => forEachSessionStore(sessions, (store) => store.sweep()),
+        60 * 60 * 1000
+      )
+      this.listening = true
+    } catch (err) {
+      await fastify.close().catch(() => {})
+      const code = (err as NodeJS.ErrnoException).code
+      if (code === 'EADDRINUSE') {
+        options.deps.onPortInUse(options.port)
+        throw new PortInUseError(options.port)
       }
-    },
+      throw err
+    }
+  }
 
-    async stop() {
-      if (!listening) return
-      ticketStore.stopCleanup()
-      if (sessionCleanupTimer) {
-        clearInterval(sessionCleanupTimer)
-        sessionCleanupTimer = null
-      }
-      appSessionStore.clear()
-      mobileSessionStore.clear()
-      terminalCleanup.cleanup()
-      bridgeCleanup.disconnectAll()
-      subscriberManager.destroyAll()
-      await fastify.close()
-      listening = false
-    },
+  private async stop(): Promise<void> {
+    if (!this.listening) return
+    this.parts.ticketStore.stopCleanup()
+    if (this.sessionCleanupTimer) {
+      clearInterval(this.sessionCleanupTimer)
+      this.sessionCleanupTimer = null
+    }
+    forEachSessionStore(this.parts.sessions, (store) => store.revokeAll())
+    await this.connections.terminalCleanup.cleanup()
+    this.connections.bridgeCleanup.disconnectAll()
+    this.parts.subscriberManager.destroyAll()
+    await this.parts.fastify.close()
+    this.listening = false
+  }
 
-    disconnectAllClients() {
-      appSessionStore.clear()
-      mobileSessionStore.clear()
-      // Kill all remote PTYs — password rotation invalidates existing sessions
-      terminalCleanup.cleanup()
-      bridgeCleanup.disconnectAll()
-      subscriberManager.destroyAll()
-    },
-
-    isListening() {
-      return listening
-    },
-
-    /** The live device list, and a subscription to changes. */
-    devices: deviceRegistry,
-
-    inject: fastify.inject.bind(fastify),
+  private disconnectAllClients(): void {
+    forEachSessionStore(this.parts.sessions, (store) => store.revokeAll())
+    // Kill all remote PTYs — password rotation invalidates existing sessions
+    void this.connections.terminalCleanup.cleanup()
+    this.connections.bridgeCleanup.disconnectAll()
+    this.parts.subscriberManager.destroyAll()
   }
 }

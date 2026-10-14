@@ -6,16 +6,8 @@ import type { SessionFacts } from '../../../../src/renderer/sidebar/session-fact
 
 const state = vi.hoisted(() => ({ facts: [] as SessionFacts[] }))
 const navigate = vi.hoisted(() => vi.fn())
-const setDescription = vi.hoisted(() => vi.fn().mockResolvedValue(true))
-const setActiveGlobalTab = vi.hoisted(() => vi.fn())
 const startScratch = vi.hoisted(() => vi.fn())
 const closeFromFacts = vi.hoisted(() => vi.fn())
-const forgetRecord = vi.hoisted(() => vi.fn())
-const metrics = vi.hoisted(() => ({
-  processesBySessionId: new Map(),
-  startPolling: vi.fn(),
-  stopPolling: vi.fn(),
-}))
 
 vi.mock('../../../../src/renderer/components/session/useSessionFacts', () => ({
   useSessionFacts: () => state.facts,
@@ -27,15 +19,8 @@ vi.mock('../../../../src/renderer/components/session/LivePreview', () => ({
     <div data-testid={`preview-${sessionId}`} />
   ),
 }))
-vi.mock('../../../../src/renderer/stores/metrics.store', () => ({
-  useMetricsStore: () => metrics,
-}))
-vi.mock('../../../../src/renderer/stores/session-records.store', () => ({
-  useSessionRecordsStore: (select: (s: unknown) => unknown) =>
-    select({ setDescription, forget: forgetRecord }),
-}))
 vi.mock('../../../../src/renderer/terminal/navigate-to-session', () => ({
-  navigateToSession: navigate,
+  revealSession: navigate,
 }))
 vi.mock('../../../../src/renderer/terminal/start-session', () => ({
   resumeSession: vi.fn(),
@@ -44,9 +29,6 @@ vi.mock('../../../../src/renderer/terminal/start-session', () => ({
 }))
 vi.mock('../../../../src/renderer/terminal/close-session', () => ({
   closeSessionFromFacts: closeFromFacts,
-}))
-vi.mock('../../../../src/renderer/extensions/registry', () => ({
-  useExtensionRegistry: { getState: () => ({ setActiveGlobalTab }) },
 }))
 
 vi.mock('../../../../src/renderer/components/session/SessionLinkDialog', () => ({
@@ -60,14 +42,36 @@ vi.mock('../../../../src/renderer/components/session/SessionLinkDialog', () => (
 }))
 
 import { OverviewScreen } from '../../../../src/renderer/components/overview/OverviewScreen'
+import { useSessionRecordsStore } from '../../../../src/renderer/stores/session-records.store'
+import { useMetricsStore } from '../../../../src/renderer/stores/metrics.store'
+import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
+import { seedStore, type SeededStore } from '../../../support/renderer-stores'
 
-const getPids = vi.fn()
+// The real metrics store polls these; the wall shows what it holds.
+const metricsApi = {
+  getPids: vi.fn(),
+  getSystem: vi.fn(),
+  getProcesses: vi.fn(),
+}
+let records: SeededStore<typeof useSessionRecordsStore>
 
 beforeEach(() => {
   vi.clearAllMocks()
   localStorage.clear()
-  getPids.mockResolvedValue({ data: [{ sessionId: 'b', pid: 42 }] })
-  ;(window as unknown as { electronAPI: unknown }).electronAPI = { metrics: { getPids } }
+  metricsApi.getPids.mockResolvedValue({ data: [{ sessionId: 'b', pid: 42 }] })
+  metricsApi.getSystem.mockResolvedValue({ error: 'not measured' })
+  metricsApi.getProcesses.mockResolvedValue({
+    data: [{ pid: 42, cpuPercent: 12.5, rssBytes: 1_048_576 }],
+  })
+  Object.defineProperty(window, 'electronAPI', {
+    value: { metrics: metricsApi },
+    writable: true,
+    configurable: true,
+  })
+  records = seedStore(useSessionRecordsStore)
+  records.setDescription.mockResolvedValue(true)
+  useMetricsStore.setState(useMetricsStore.getInitialState(), true)
+  useExtensionRegistry.setState(useExtensionRegistry.getInitialState(), true)
   state.facts = [
     fact({ sessionId: 'a', name: 'claude', state: 'awaiting-input', lastActivityAt: 2 }),
     fact({ sessionId: 'b', name: 'vitest', state: 'working', lastActivityAt: 5 }),
@@ -83,6 +87,9 @@ beforeEach(() => {
 })
 
 const tiles = () => screen.getAllByRole('article')
+
+const overviewTileOf = (name: string) =>
+  tiles().find((t) => t.getAttribute('aria-label')?.endsWith(name))!
 
 describe('OverviewScreen — the Monitor wall', () => {
   it('draws every open session as a tile, and no closed history', () => {
@@ -109,7 +116,9 @@ describe('OverviewScreen — the Monitor wall', () => {
     expect(screen.queryByRole('heading', { name: 'Needs you' })).toBeNull()
     expect(screen.queryByRole('heading', { name: 'Everything else' })).toBeNull()
   })
+})
 
+describe('OverviewScreen — the Monitor wall — keeps every tile in one grid, so a state change moves a tile without remounting it', () => {
   it('keeps every tile in one grid, so a state change moves a tile without remounting it', () => {
     const { rerender, container } = render(<OverviewScreen />)
     const grid = container.querySelector('.wall__grid')!
@@ -132,7 +141,9 @@ describe('OverviewScreen — the Monitor wall', () => {
     expect(screen.queryByRole('heading', { name: 'Needs you' })).toBeNull()
     expect(JSON.parse(localStorage.getItem('terminator.wall.prefs')!).pinNeeds).toBe(false)
   })
+})
 
+describe('OverviewScreen — the Monitor wall — changes tile size and remembers it', () => {
   it('changes tile size and remembers it', () => {
     const { container } = render(<OverviewScreen />)
     const sizes = screen.getByRole('radiogroup', { name: 'Tile size' })
@@ -161,7 +172,9 @@ describe('OverviewScreen — the Monitor wall', () => {
     expect(container.querySelector('.wall__grid')!.getAttribute('data-size')).toBe('s')
     expect(screen.queryByRole('heading', { name: 'Needs you' })).toBeNull()
   })
+})
 
+describe('OverviewScreen — the Monitor wall — filters tiles by what is typed', () => {
   it('filters tiles by what is typed', () => {
     render(<OverviewScreen />)
     fireEvent.change(screen.getByRole('searchbox', { name: 'Filter sessions' }), {
@@ -185,46 +198,70 @@ describe('OverviewScreen — the Monitor wall', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Open zsh' }))
     expect(navigate).toHaveBeenCalledWith('c')
   })
+})
 
+describe('OverviewScreen — the Monitor wall — saves a description typed on a tile', () => {
   it('saves a description typed on a tile', () => {
     render(<OverviewScreen />)
     const tile = tiles().find((t) => t.getAttribute('aria-label')?.endsWith('claude'))!
     const box = within(tile).getByRole('textbox', { name: 'What is this session doing?' })
     fireEvent.change(box, { target: { value: 'Session home view' } })
     fireEvent.keyDown(box, { key: 'Enter' })
-    expect(setDescription).toHaveBeenCalledWith(state.facts[0].snapshot, 'Session home view')
+    expect(records.setDescription).toHaveBeenCalledWith(
+      state.facts[0].snapshot,
+      'Session home view'
+    )
   })
 
-  it('polls process load for the sessions on the wall', async () => {
+  it('shows the process load of each session on the wall', async () => {
     render(<OverviewScreen />)
     await act(async () => {})
-    expect(getPids).toHaveBeenCalledWith(['a', 'b', 'c'])
-    expect(metrics.startPolling).toHaveBeenCalledWith([{ sessionId: 'b', pid: 42 }])
+    expect(metricsApi.getPids).toHaveBeenCalledWith(['a', 'b', 'c'])
+    expect(overviewTileOf('vitest').textContent).toContain('12.5%')
+    expect(useMetricsStore.getState().processesBySessionId.has('a')).toBe(false)
   })
 
-  it('polls nothing when the pid lookup fails', async () => {
-    getPids.mockRejectedValue(new Error('gone'))
+  it('shows no load when the pid lookup fails', async () => {
+    metricsApi.getPids.mockRejectedValue(new Error('gone'))
     render(<OverviewScreen />)
     await act(async () => {})
-    expect(metrics.startPolling).toHaveBeenCalledWith([])
+    expect(useMetricsStore.getState().pollingActive).toBe(true)
+    expect(metricsApi.getProcesses).not.toHaveBeenCalled()
+    expect(overviewTileOf('vitest').textContent).not.toContain('%')
   })
+})
 
-  it('polls nothing when the pid lookup reports an error', async () => {
-    getPids.mockResolvedValue({ error: 'nope' })
+describe('OverviewScreen — the Monitor wall — shows no load when the pid lookup reports an error', () => {
+  it('shows no load when the pid lookup reports an error', async () => {
+    metricsApi.getPids.mockResolvedValue({ error: 'nope' })
     render(<OverviewScreen />)
     await act(async () => {})
-    expect(metrics.startPolling).toHaveBeenCalledWith([])
+    expect(useMetricsStore.getState().pollingActive).toBe(true)
+    expect(metricsApi.getProcesses).not.toHaveBeenCalled()
+    expect(overviewTileOf('vitest').textContent).not.toContain('%')
   })
 
-  it('says no terminals are open, and offers the way to them', () => {
+  it('stops polling when the wall closes', async () => {
+    const { unmount } = render(<OverviewScreen />)
+    await act(async () => {})
+    unmount()
+    expect(useMetricsStore.getState().pollingActive).toBe(false)
+    expect(useMetricsStore.getState().processesBySessionId.size).toBe(0)
+  })
+
+  it('says no terminals are open, and offers the way to them', async () => {
     state.facts = []
+    useExtensionRegistry.getState().setActiveGlobalTab('core.overview')
     render(<OverviewScreen />)
+    await act(async () => {})
     expect(screen.getByText('No terminals are open')).toBeTruthy()
-    expect(metrics.startPolling).toHaveBeenCalledWith([])
+    expect(metricsApi.getPids).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: 'Go to terminals' }))
-    expect(setActiveGlobalTab).toHaveBeenCalledWith(null)
+    expect(useExtensionRegistry.getState().activeGlobalTabId).toBeNull()
   })
+})
 
+describe('OverviewScreen — the Monitor wall — opens the link dialog for a session, and closes it', () => {
   it('opens the link dialog for a session, and closes it', () => {
     render(<OverviewScreen />)
     const host = tiles().find((t) => t.getAttribute('aria-label')?.endsWith('claude'))!
@@ -247,5 +284,48 @@ describe('OverviewScreen — the Monitor wall', () => {
     render(<OverviewScreen />)
     fireEvent.click(screen.getAllByRole('button', { name: /^Close / })[0])
     expect(closeFromFacts).toHaveBeenCalled()
+  })
+})
+
+describe('OverviewScreen — starting and resuming from the wall', () => {
+  it('starts a terminal in a branch from its bar', async () => {
+    const { useWorkspaceStore } = await import('../../../../src/renderer/stores/workspace.store')
+    const { startSessionInBranch } = await import('../../../../src/renderer/terminal/start-session')
+    const { workspaceFixture: workspaceOf, projectFixture: projectOf } = await import(
+      '../../../support/renderer-stores'
+    )
+    useWorkspaceStore.setState({
+      workspaces: [workspaceOf({ id: 'w1', name: 'repo' })],
+      projectsByWorkspaceId: new Map([
+        ['w1', [projectOf({ id: 'p1', workspaceId: 'w1', name: 'main' })]],
+      ]),
+    })
+    render(<OverviewScreen />)
+    fireEvent.click(screen.getByRole('button', { name: 'New terminal' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'New terminal in repo / main' }))
+    expect(startSessionInBranch).toHaveBeenCalledWith('p1')
+  })
+})
+
+describe('OverviewScreen — starting and resuming from the wall — resumes a stopped session whose conversation is still there', () => {
+  it('resumes a stopped session whose conversation is still there', async () => {
+    const { resumeSession } = await import('../../../../src/renderer/terminal/start-session')
+    const stopped = fact({
+      sessionId: 'r',
+      name: 'claude',
+      state: 'exited',
+      agent: {
+        provider: 'claude',
+        sessionId: 'conv-1',
+        transcriptPath: '/t/c.jsonl',
+        cwd: '/code/repo',
+        capturedAt: '2026-09-15T18:00:00.000Z',
+      },
+      resumable: true,
+    })
+    state.facts = [stopped]
+    render(<OverviewScreen />)
+    fireEvent.click(screen.getByRole('button', { name: 'Resume claude' }))
+    expect(resumeSession).toHaveBeenCalledWith(stopped)
   })
 })

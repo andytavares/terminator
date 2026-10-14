@@ -1,6 +1,6 @@
 import type { BrowserWindow } from 'electron'
-import { registerInvokeTable, invokeSpec } from './invoke-table.js'
-import { handleChannel } from './channel-registrar.js'
+import { defineChannel, type ChannelSpec } from '@terminator/extension-sdk'
+import { registerInvokeTable, noPayload } from './invoke-table.js'
 import { sendToWindow } from '../safe-send.js'
 import * as fs from 'node:fs'
 import {
@@ -58,57 +58,63 @@ function byCloseTime(a: { closedAt?: string }, b: { closedAt?: string }): number
   return Date.parse(b.closedAt) - Date.parse(a.closedAt)
 }
 
-export function registerSessionRecordsHandlers(
-  getWindow: () => BrowserWindow | null = () => null
-): void {
-  handleChannel('session-records:list', () => ({
-    data: pruneRecords(listRecords(), Date.now())
-      .sort(byCloseTime)
-      .map((record) => listing(record)!),
-  }))
+const recordReadChannels: ChannelSpec[] = [
+  defineChannel({
+    channel: 'session-records:list',
+    schema: noPayload,
+    invalid,
+    run: () => ({
+      data: pruneRecords(listRecords(), Date.now())
+        .sort(byCloseTime)
+        .map((record) => listing(record)!),
+    }),
+  }),
+]
 
-  registerInvokeTable([
-    invokeSpec({
-      channel: 'session-records:set-description',
-      schema: SetDescriptionInputSchema,
-      invalid,
-      run: async ({ session, description }) => ({
-        data: listing(await setDescription(session, description)),
-      }),
-      onError: fail,
+const recordWriteChannels: ChannelSpec[] = [
+  defineChannel({
+    channel: 'session-records:set-description',
+    schema: SetDescriptionInputSchema,
+    invalid,
+    run: async ({ session, description }) => ({
+      data: listing(await setDescription(session, description)),
     }),
-    invokeSpec({
-      channel: 'session-records:set-link',
-      schema: SetLinkInputSchema,
-      invalid,
-      run: async ({ session, link }) => {
-        const record = await setLink(session, link)
-        // The session's own link feeds its agent's SessionStart context and
-        // wins over the project's. Best-effort: a tracker outage keeps
-        // whatever context was there rather than costing the operator the
-        // link (syncSessionContext handles that itself).
-        await syncSessionContext(session.sessionId, getIssueService())
-        return { data: listing(record) }
-      },
-      onError: fail,
+    onError: fail,
+  }),
+  defineChannel({
+    channel: 'session-records:set-link',
+    schema: SetLinkInputSchema,
+    invalid,
+    run: async ({ session, link }) => {
+      const record = await setLink(session, link)
+      // The session's own link feeds its agent's SessionStart context and wins over the project's.
+      // Best-effort: a tracker outage keeps whatever context was there rather than costing the
+      // operator the link (syncSessionContext handles that itself).
+      await syncSessionContext(session.sessionId, getIssueService())
+      return { data: listing(record) }
+    },
+    onError: fail,
+  }),
+  defineChannel({
+    channel: 'session-records:forget',
+    schema: ForgetInputSchema,
+    invalid,
+    run: async ({ sessionId }) => ({ data: await forget(sessionId) }),
+    onError: fail,
+  }),
+  defineChannel({
+    channel: 'session-records:transfer',
+    schema: TransferInputSchema,
+    invalid,
+    run: async ({ fromSessionId, session }) => ({
+      data: listing(await transfer(fromSessionId, session)),
     }),
-    invokeSpec({
-      channel: 'session-records:forget',
-      schema: ForgetInputSchema,
-      invalid,
-      run: async ({ sessionId }) => ({ data: await forget(sessionId) }),
-      onError: fail,
-    }),
-    invokeSpec({
-      channel: 'session-records:transfer',
-      schema: TransferInputSchema,
-      invalid,
-      run: async ({ fromSessionId, session }) => ({
-        data: listing(await transfer(fromSessionId, session)),
-      }),
-      onError: fail,
-    }),
-  ])
+    onError: fail,
+  }),
+]
+
+export function registerSessionRecordsHandlers(getWindow: () => BrowserWindow | null): void {
+  registerInvokeTable([...recordReadChannels, ...recordWriteChannels])
 
   onRecordChange((sessionId, record) => {
     sendToWindow(getWindow(), 'session-records:changed', { sessionId, record: listing(record) })

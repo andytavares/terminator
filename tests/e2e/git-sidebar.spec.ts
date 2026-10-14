@@ -1,9 +1,8 @@
 import { test, expect } from '@playwright/test'
 import { execSync } from 'node:child_process'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { AppHandle, launchApp, closeApp, createWorkspace } from './helpers'
+import { AppHandle, launchApp, closeApp, createWorkspace, e2eTempDir } from './helpers'
 
 // Exercises the git-integration extension against a REAL temporary repo:
 // the Git project tab and the extension's settings section. PR-creation flows are intentionally not covered — they
@@ -14,7 +13,7 @@ let gitRepoDir: string
 const WS = 'Git Test Workspace'
 
 test.beforeAll(async () => {
-  gitRepoDir = mkdtempSync(join(tmpdir(), 'terminator-e2e-git-'))
+  gitRepoDir = e2eTempDir('terminator-e2e-git-')
   const run = (cmd: string) => execSync(cmd, { cwd: gitRepoDir })
   run('git init -b main')
   run('git config user.email "test@test.com"')

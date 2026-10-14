@@ -1,4 +1,5 @@
 import React from 'react'
+import { SegmentedControl } from '@terminator/extension-ui'
 import type { FactoryMetrics } from '../factory/metrics.js'
 import { formatDuration } from '../factory/format.js'
 
@@ -18,7 +19,7 @@ function fmtShare(value: number | null): string {
   return value === null ? '—' : `${Math.round(value * 100)}%`
 }
 
-export function metricsTiles(metrics: FactoryMetrics): readonly [string, string][] {
+function metricsTiles(metrics: FactoryMetrics): readonly [string, string][] {
   return [
     ['Shipped', String(metrics.shipped)],
     ['Median lead time', fmtDuration(metrics.medianLeadTimeMs)],
@@ -54,16 +55,21 @@ export interface WindowToggleProps {
   readonly onChange: (value: 'all' | '30d') => void
 }
 
+const WINDOW_OPTIONS = [
+  { value: '30d', label: '30 days' },
+  { value: 'all', label: 'All time' },
+] as const
+
 /** The 30 days / all time switch, shared wherever a `FactoryMetrics` window is chosen. */
 export function WindowToggle({ value, onChange }: WindowToggleProps): JSX.Element {
   return (
-    <div className="fdry-window-toggle" role="group" aria-label="Time window">
-      <button type="button" aria-pressed={value === '30d'} onClick={() => onChange('30d')}>
-        30 days
-      </button>
-      <button type="button" aria-pressed={value === 'all'} onClick={() => onChange('all')}>
-        All time
-      </button>
-    </div>
+    <SegmentedControl
+      label="Time window"
+      size="sm"
+      className="fdry-window-toggle"
+      options={WINDOW_OPTIONS}
+      value={value}
+      onChange={onChange}
+    />
   )
 }

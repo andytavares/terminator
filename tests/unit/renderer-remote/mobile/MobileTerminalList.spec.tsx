@@ -20,20 +20,24 @@ beforeEach(() => {
   vi.clearAllMocks()
 })
 
+async function renderList(workspaces: Workspace[], terminals: TerminalSession[]) {
+  const { MobileTerminalList } = await import(
+    '../../../../src/renderer-remote/components/MobileTerminalList'
+  )
+  return render(
+    <MobileTerminalList
+      workspaces={workspaces}
+      terminals={terminals}
+      onSelectTerminal={mockOnSelectTerminal}
+      onCreateTerminal={mockOnCreateTerminal}
+      onAssignWorkspace={mockOnAssignWorkspace}
+    />
+  )
+}
+
 describe('MobileTerminalList', () => {
   it('renders workspace names', async () => {
-    const { MobileTerminalList } = await import(
-      '../../../../src/renderer-remote/components/MobileTerminalList'
-    )
-    render(
-      <MobileTerminalList
-        workspaces={[workspace]}
-        terminals={[]}
-        onSelectTerminal={mockOnSelectTerminal}
-        onCreateTerminal={mockOnCreateTerminal}
-        onAssignWorkspace={mockOnAssignWorkspace}
-      />
-    )
+    await renderList([workspace], [])
     expect(screen.getByText('My Workspace')).toBeTruthy()
   })
 
@@ -43,18 +47,7 @@ describe('MobileTerminalList', () => {
       cwd: '/Users/me/projects/myapp',
       createdAt: '2026-06-19T10:00:00.000Z',
     }
-    const { MobileTerminalList } = await import(
-      '../../../../src/renderer-remote/components/MobileTerminalList'
-    )
-    render(
-      <MobileTerminalList
-        workspaces={[workspace]}
-        terminals={[terminal]}
-        onSelectTerminal={mockOnSelectTerminal}
-        onCreateTerminal={mockOnCreateTerminal}
-        onAssignWorkspace={mockOnAssignWorkspace}
-      />
-    )
+    await renderList([workspace], [terminal])
     expect(screen.getByText('myapp')).toBeTruthy()
   })
 
@@ -64,69 +57,22 @@ describe('MobileTerminalList', () => {
       cwd: '/tmp/myapp',
       createdAt: '2026-06-19T10:00:00.000Z',
     }
-    const { MobileTerminalList } = await import(
-      '../../../../src/renderer-remote/components/MobileTerminalList'
-    )
-    render(
-      <MobileTerminalList
-        workspaces={[workspace]}
-        terminals={[terminal]}
-        onSelectTerminal={mockOnSelectTerminal}
-        onCreateTerminal={mockOnCreateTerminal}
-        onAssignWorkspace={mockOnAssignWorkspace}
-      />
-    )
+    await renderList([workspace], [terminal])
     fireEvent.click(screen.getByText('Scratch 1 · myapp'))
     expect(mockOnSelectTerminal).toHaveBeenCalledWith({ sessionId: 's1', cwd: '/tmp/myapp' })
   })
 
   it('shows "New Terminal" button per workspace', async () => {
-    const { MobileTerminalList } = await import(
-      '../../../../src/renderer-remote/components/MobileTerminalList'
-    )
-    render(
-      <MobileTerminalList
-        workspaces={[workspace]}
-        terminals={[]}
-        onSelectTerminal={mockOnSelectTerminal}
-        onCreateTerminal={mockOnCreateTerminal}
-        onAssignWorkspace={mockOnAssignWorkspace}
-      />
-    )
+    await renderList([workspace], [])
     expect(screen.getByRole('button', { name: /new terminal/i })).toBeTruthy()
   })
+})
 
+describe('MobileTerminalList — calls onCreateTerminal with workspaceId and folderPath when "New Terminal" is clicked', () => {
   it('calls onCreateTerminal with workspaceId and folderPath when "New Terminal" is clicked', async () => {
-    const { MobileTerminalList } = await import(
-      '../../../../src/renderer-remote/components/MobileTerminalList'
-    )
-    render(
-      <MobileTerminalList
-        workspaces={[workspace]}
-        terminals={[]}
-        onSelectTerminal={mockOnSelectTerminal}
-        onCreateTerminal={mockOnCreateTerminal}
-        onAssignWorkspace={mockOnAssignWorkspace}
-      />
-    )
+    await renderList([workspace], [])
     fireEvent.click(screen.getByRole('button', { name: /new terminal/i }))
     expect(mockOnCreateTerminal).toHaveBeenCalledWith('w1', '/Users/me/projects')
-  })
-
-  it('renders gracefully with empty terminals list', async () => {
-    const { MobileTerminalList } = await import(
-      '../../../../src/renderer-remote/components/MobileTerminalList'
-    )
-    const { container } = render(
-      <MobileTerminalList
-        workspaces={[workspace]}
-        terminals={[]}
-        onSelectTerminal={mockOnSelectTerminal}
-        onCreateTerminal={mockOnCreateTerminal}
-        onAssignWorkspace={mockOnAssignWorkspace}
-      />
-    )
-    expect(container).toBeTruthy()
   })
 
   it('shows terminal under matching workspace by cwd prefix', async () => {
@@ -135,18 +81,7 @@ describe('MobileTerminalList', () => {
       cwd: '/Users/me/projects/myapp',
       createdAt: '2026-06-19T10:00:00.000Z',
     }
-    const { MobileTerminalList } = await import(
-      '../../../../src/renderer-remote/components/MobileTerminalList'
-    )
-    render(
-      <MobileTerminalList
-        workspaces={[workspace]}
-        terminals={[terminal]}
-        onSelectTerminal={mockOnSelectTerminal}
-        onCreateTerminal={mockOnCreateTerminal}
-        onAssignWorkspace={mockOnAssignWorkspace}
-      />
-    )
+    await renderList([workspace], [terminal])
     // appears exactly once (under the workspace, not duplicated)
     expect(screen.getAllByText('myapp')).toHaveLength(1)
   })
@@ -159,24 +94,15 @@ describe('MobileTerminalList', () => {
       cwd: '/Users/me/projects-extra/thing',
       createdAt: '2026-06-19T10:00:00.000Z',
     }
-    const { MobileTerminalList } = await import(
-      '../../../../src/renderer-remote/components/MobileTerminalList'
-    )
-    render(
-      <MobileTerminalList
-        workspaces={[workspace]}
-        terminals={[terminal]}
-        onSelectTerminal={mockOnSelectTerminal}
-        onCreateTerminal={mockOnCreateTerminal}
-        onAssignWorkspace={mockOnAssignWorkspace}
-      />
-    )
+    await renderList([workspace], [terminal])
     // Should appear in the fallback section, not under the workspace
     expect(screen.getByText('Scratch 1 · thing')).toBeTruthy()
     // Only one occurrence — not duplicated
     expect(screen.getAllByText('Scratch 1 · thing')).toHaveLength(1)
   })
+})
 
+describe('MobileTerminalList — labels unassigned terminals with "Scratch N · {basename}" prefix', () => {
   it('labels unassigned terminals with "Scratch N · {basename}" prefix', async () => {
     const unmatched: TerminalSession = {
       sessionId: 's-scratch-label',
@@ -188,43 +114,23 @@ describe('MobileTerminalList', () => {
       cwd: '/Users/me/projects/myapp',
       createdAt: '2026-06-20T10:00:00.000Z',
     }
-    const { MobileTerminalList } = await import(
-      '../../../../src/renderer-remote/components/MobileTerminalList'
-    )
-    render(
-      <MobileTerminalList
-        workspaces={[workspace]}
-        terminals={[unmatched, assigned]}
-        onSelectTerminal={mockOnSelectTerminal}
-        onCreateTerminal={mockOnCreateTerminal}
-        onAssignWorkspace={mockOnAssignWorkspace}
-      />
-    )
+    await renderList([workspace], [unmatched, assigned])
     // Unassigned terminal gets "Scratch N ·" prefix
     expect(screen.getByText('Scratch 1 · my-session')).toBeTruthy()
     // Workspace-assigned terminal does NOT get the prefix
     expect(screen.getByText('myapp')).toBeTruthy()
     expect(screen.queryByText('Scratch 1 · myapp')).toBeNull()
   })
+})
 
+describe('MobileTerminalList — shows unmatched terminal in fallback section outside any workspace', () => {
   it('shows unmatched terminal in fallback section outside any workspace', async () => {
     const unmatched: TerminalSession = {
       sessionId: 's-global',
       cwd: '/tmp/scratch',
       createdAt: '2026-06-19T10:00:00.000Z',
     }
-    const { MobileTerminalList } = await import(
-      '../../../../src/renderer-remote/components/MobileTerminalList'
-    )
-    render(
-      <MobileTerminalList
-        workspaces={[workspace]}
-        terminals={[unmatched]}
-        onSelectTerminal={mockOnSelectTerminal}
-        onCreateTerminal={mockOnCreateTerminal}
-        onAssignWorkspace={mockOnAssignWorkspace}
-      />
-    )
+    await renderList([workspace], [unmatched])
     expect(screen.getByText('Scratch 1 · scratch')).toBeTruthy()
     fireEvent.click(screen.getByText('Scratch 1 · scratch'))
     expect(mockOnSelectTerminal).toHaveBeenCalledWith({
@@ -239,43 +145,23 @@ describe('MobileTerminalList', () => {
       cwd: '/Users/me/projects/myapp',
       createdAt: '2026-06-19T10:00:00.000Z',
     }
-    const { MobileTerminalList } = await import(
-      '../../../../src/renderer-remote/components/MobileTerminalList'
-    )
-    render(
-      <MobileTerminalList
-        workspaces={[workspace]}
-        terminals={[terminal]}
-        onSelectTerminal={mockOnSelectTerminal}
-        onCreateTerminal={mockOnCreateTerminal}
-        onAssignWorkspace={mockOnAssignWorkspace}
-      />
-    )
+    await renderList([workspace], [terminal])
     fireEvent.keyDown(screen.getByText('myapp'), { key: 'Enter' })
     expect(mockOnSelectTerminal).toHaveBeenCalledWith({
       sessionId: 's-enter-ws',
       cwd: '/Users/me/projects/myapp',
     })
   })
+})
 
+describe('MobileTerminalList — triggers onSelectTerminal via Enter key on fallback terminal', () => {
   it('triggers onSelectTerminal via Enter key on fallback terminal', async () => {
     const unmatched: TerminalSession = {
       sessionId: 's-enter-global',
       cwd: '/tmp/enter-scratch',
       createdAt: '2026-06-19T10:00:00.000Z',
     }
-    const { MobileTerminalList } = await import(
-      '../../../../src/renderer-remote/components/MobileTerminalList'
-    )
-    render(
-      <MobileTerminalList
-        workspaces={[workspace]}
-        terminals={[unmatched]}
-        onSelectTerminal={mockOnSelectTerminal}
-        onCreateTerminal={mockOnCreateTerminal}
-        onAssignWorkspace={mockOnAssignWorkspace}
-      />
-    )
+    await renderList([workspace], [unmatched])
     fireEvent.keyDown(screen.getByText('Scratch 1 · enter-scratch'), { key: 'Enter' })
     expect(mockOnSelectTerminal).toHaveBeenCalledWith({
       sessionId: 's-enter-global',
@@ -290,41 +176,21 @@ describe('MobileTerminalList', () => {
       createdAt: '2026-06-19T10:00:00.000Z',
       workspaceId: 'w1',
     }
-    const { MobileTerminalList } = await import(
-      '../../../../src/renderer-remote/components/MobileTerminalList'
-    )
-    render(
-      <MobileTerminalList
-        workspaces={[workspace]}
-        terminals={[terminal]}
-        onSelectTerminal={mockOnSelectTerminal}
-        onCreateTerminal={mockOnCreateTerminal}
-        onAssignWorkspace={mockOnAssignWorkspace}
-      />
-    )
+    await renderList([workspace], [terminal])
     // Should appear under the workspace (not in fallback)
     expect(screen.getByText('random')).toBeTruthy()
     expect(screen.getAllByText('random')).toHaveLength(1)
   })
+})
 
+describe('MobileTerminalList — shows context menu with workspace options on right-click of fallback terminal', () => {
   it('shows context menu with workspace options on right-click of fallback terminal', async () => {
     const unmatched: TerminalSession = {
       sessionId: 's-ctx',
       cwd: '/tmp/ctx-scratch',
       createdAt: '2026-06-19T10:00:00.000Z',
     }
-    const { MobileTerminalList } = await import(
-      '../../../../src/renderer-remote/components/MobileTerminalList'
-    )
-    render(
-      <MobileTerminalList
-        workspaces={[workspace]}
-        terminals={[unmatched]}
-        onSelectTerminal={mockOnSelectTerminal}
-        onCreateTerminal={mockOnCreateTerminal}
-        onAssignWorkspace={mockOnAssignWorkspace}
-      />
-    )
+    await renderList([workspace], [unmatched])
     fireEvent.contextMenu(screen.getByText('Scratch 1 · ctx-scratch'))
     expect(screen.getAllByText('My Workspace').length).toBeGreaterThanOrEqual(1)
     expect(screen.getByText('Move to workspace')).toBeTruthy()
@@ -337,18 +203,7 @@ describe('MobileTerminalList', () => {
       cwd: '/tmp/longpress',
       createdAt: '2026-06-20T10:00:00.000Z',
     }
-    const { MobileTerminalList } = await import(
-      '../../../../src/renderer-remote/components/MobileTerminalList'
-    )
-    render(
-      <MobileTerminalList
-        workspaces={[workspace]}
-        terminals={[unmatched]}
-        onSelectTerminal={mockOnSelectTerminal}
-        onCreateTerminal={mockOnCreateTerminal}
-        onAssignWorkspace={mockOnAssignWorkspace}
-      />
-    )
+    await renderList([workspace], [unmatched])
     const btn = screen.getByText('Scratch 1 · longpress').closest('button')!
     fireEvent.touchStart(btn, { touches: [{ clientX: 50, clientY: 100 }] })
     await act(async () => {
@@ -357,7 +212,9 @@ describe('MobileTerminalList', () => {
     expect(screen.getByText('Move to workspace')).toBeTruthy()
     vi.useRealTimers()
   })
+})
 
+describe('MobileTerminalList — touchEnd before 500ms cancels long-press and no context menu appears', () => {
   it('touchEnd before 500ms cancels long-press and no context menu appears', async () => {
     vi.useFakeTimers()
     const unmatched: TerminalSession = {
@@ -365,18 +222,7 @@ describe('MobileTerminalList', () => {
       cwd: '/tmp/touchend',
       createdAt: '2026-06-20T10:00:00.000Z',
     }
-    const { MobileTerminalList } = await import(
-      '../../../../src/renderer-remote/components/MobileTerminalList'
-    )
-    render(
-      <MobileTerminalList
-        workspaces={[workspace]}
-        terminals={[unmatched]}
-        onSelectTerminal={mockOnSelectTerminal}
-        onCreateTerminal={mockOnCreateTerminal}
-        onAssignWorkspace={mockOnAssignWorkspace}
-      />
-    )
+    await renderList([workspace], [unmatched])
     const btn = screen.getByText('Scratch 1 · touchend').closest('button')!
     fireEvent.touchStart(btn, { touches: [{ clientX: 50, clientY: 100 }] })
     fireEvent.touchEnd(btn)
@@ -386,7 +232,9 @@ describe('MobileTerminalList', () => {
     expect(screen.queryByText('Move to workspace')).toBeNull()
     vi.useRealTimers()
   })
+})
 
+describe('MobileTerminalList — touchMove before 500ms cancels long-press and no context menu appears', () => {
   it('touchMove before 500ms cancels long-press and no context menu appears', async () => {
     vi.useFakeTimers()
     const unmatched: TerminalSession = {
@@ -394,18 +242,7 @@ describe('MobileTerminalList', () => {
       cwd: '/tmp/touchmove',
       createdAt: '2026-06-20T10:00:00.000Z',
     }
-    const { MobileTerminalList } = await import(
-      '../../../../src/renderer-remote/components/MobileTerminalList'
-    )
-    render(
-      <MobileTerminalList
-        workspaces={[workspace]}
-        terminals={[unmatched]}
-        onSelectTerminal={mockOnSelectTerminal}
-        onCreateTerminal={mockOnCreateTerminal}
-        onAssignWorkspace={mockOnAssignWorkspace}
-      />
-    )
+    await renderList([workspace], [unmatched])
     const btn = screen.getByText('Scratch 1 · touchmove').closest('button')!
     fireEvent.touchStart(btn, { touches: [{ clientX: 50, clientY: 100 }] })
     fireEvent.touchMove(btn)
@@ -422,47 +259,29 @@ describe('MobileTerminalList', () => {
       cwd: '/tmp/noworkspace',
       createdAt: '2026-06-19T10:00:00.000Z',
     }
-    const { MobileTerminalList } = await import(
-      '../../../../src/renderer-remote/components/MobileTerminalList'
-    )
-    render(
-      <MobileTerminalList
-        workspaces={[]}
-        terminals={[unmatched]}
-        onSelectTerminal={mockOnSelectTerminal}
-        onCreateTerminal={mockOnCreateTerminal}
-        onAssignWorkspace={mockOnAssignWorkspace}
-      />
-    )
+    await renderList([], [unmatched])
     fireEvent.contextMenu(screen.getByText('Scratch 1 · noworkspace'))
     expect(screen.getByText('No workspaces')).toBeTruthy()
   })
+})
 
+describe('MobileTerminalList — calls onAssignWorkspace when a workspace is chosen from context menu', () => {
   it('calls onAssignWorkspace when a workspace is chosen from context menu', async () => {
     const unmatched: TerminalSession = {
       sessionId: 's-assign',
       cwd: '/tmp/assign-scratch',
       createdAt: '2026-06-19T10:00:00.000Z',
     }
-    const { MobileTerminalList } = await import(
-      '../../../../src/renderer-remote/components/MobileTerminalList'
-    )
-    render(
-      <MobileTerminalList
-        workspaces={[workspace]}
-        terminals={[unmatched]}
-        onSelectTerminal={mockOnSelectTerminal}
-        onCreateTerminal={mockOnCreateTerminal}
-        onAssignWorkspace={mockOnAssignWorkspace}
-      />
-    )
+    await renderList([workspace], [unmatched])
     fireEvent.contextMenu(screen.getByText('Scratch 1 · assign-scratch'))
     // Click the workspace option in the context menu
     const menuItems = screen.getAllByText('My Workspace')
     fireEvent.click(menuItems[menuItems.length - 1])
     expect(mockOnAssignWorkspace).toHaveBeenCalledWith('s-assign', 'w1')
   })
+})
 
+describe('MobileTerminalList — second touchStart on a different terminal cancels first long-press timer', () => {
   it('second touchStart on a different terminal cancels first long-press timer', async () => {
     vi.useFakeTimers()
     const termA: TerminalSession = {
@@ -475,18 +294,7 @@ describe('MobileTerminalList', () => {
       cwd: '/tmp/timer-b',
       createdAt: '2026-06-20T10:00:00.000Z',
     }
-    const { MobileTerminalList } = await import(
-      '../../../../src/renderer-remote/components/MobileTerminalList'
-    )
-    render(
-      <MobileTerminalList
-        workspaces={[]}
-        terminals={[termA, termB]}
-        onSelectTerminal={mockOnSelectTerminal}
-        onCreateTerminal={mockOnCreateTerminal}
-        onAssignWorkspace={mockOnAssignWorkspace}
-      />
-    )
+    await renderList([], [termA, termB])
     const btnA = screen.getByText('Scratch 1 · timer-a').closest('button')!
     const btnB = screen.getByText('Scratch 2 · timer-b').closest('button')!
     // Start long-press on A, then immediately start one on B
@@ -500,7 +308,9 @@ describe('MobileTerminalList', () => {
     expect(menus).toHaveLength(1)
     vi.useRealTimers()
   })
+})
 
+describe('MobileTerminalList — resets longPressFired after blocking a click, so subsequent taps on any terminal work', () => {
   it('resets longPressFired after blocking a click, so subsequent taps on any terminal work', async () => {
     vi.useFakeTimers()
     const wsTerm: TerminalSession = {
@@ -513,18 +323,7 @@ describe('MobileTerminalList', () => {
       cwd: '/tmp/scratch',
       createdAt: '2026-06-19T10:00:00.000Z',
     }
-    const { MobileTerminalList } = await import(
-      '../../../../src/renderer-remote/components/MobileTerminalList'
-    )
-    render(
-      <MobileTerminalList
-        workspaces={[workspace]}
-        terminals={[wsTerm, unassigned]}
-        onSelectTerminal={mockOnSelectTerminal}
-        onCreateTerminal={mockOnCreateTerminal}
-        onAssignWorkspace={mockOnAssignWorkspace}
-      />
-    )
+    await renderList([workspace], [wsTerm, unassigned])
     // Long-press the unassigned terminal to set longPressFired = true
     fireEvent.touchStart(screen.getByText('Scratch 1 · scratch'), {
       touches: [{ clientX: 10, clientY: 10 }],
@@ -543,25 +342,16 @@ describe('MobileTerminalList', () => {
     })
     vi.useRealTimers()
   })
+})
 
+describe('MobileTerminalList — backdrop touchStart does not close context menu before menu item click fires', () => {
   it('backdrop touchStart does not close context menu before menu item click fires', async () => {
     const unmatched: TerminalSession = {
       sessionId: 's-backdrop-touch',
       cwd: '/tmp/backdrop',
       createdAt: '2026-06-20T10:00:00.000Z',
     }
-    const { MobileTerminalList } = await import(
-      '../../../../src/renderer-remote/components/MobileTerminalList'
-    )
-    render(
-      <MobileTerminalList
-        workspaces={[workspace]}
-        terminals={[unmatched]}
-        onSelectTerminal={mockOnSelectTerminal}
-        onCreateTerminal={mockOnCreateTerminal}
-        onAssignWorkspace={mockOnAssignWorkspace}
-      />
-    )
+    await renderList([workspace], [unmatched])
     // Open context menu
     fireEvent.contextMenu(screen.getByText('Scratch 1 · backdrop'))
     expect(screen.getByText('Move to workspace')).toBeTruthy()

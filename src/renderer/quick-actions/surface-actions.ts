@@ -1,6 +1,6 @@
 import type { QuickAction, QuickActionGroup } from './types'
 
-export type SurfaceKind = 'global' | 'workspace' | 'project' | 'sidebar'
+type SurfaceKind = 'global' | 'workspace' | 'project' | 'sidebar'
 
 export interface SurfaceRegistration {
   extensionId: string
@@ -16,6 +16,17 @@ function firstFreeLetter(label: string, used: Set<string>): string | undefined {
   return undefined
 }
 
+/** The mnemonics `taken` already holds, by group. */
+function mnemonicsByGroup(taken: QuickAction[]): Map<string, Set<string>> {
+  const mnemonicsUsed = new Map<string, Set<string>>()
+  for (const action of taken) {
+    if (!action.mnemonic) continue
+    const used = mnemonicsUsed.get(action.group) ?? new Set<string>()
+    mnemonicsUsed.set(action.group, used.add(action.mnemonic))
+  }
+  return mnemonicsUsed
+}
+
 /**
  * "Open <label>" actions for every non-core surface a registry holds: global
  * tabs, workspace tabs, project tabs and sidebar panels. Core never names an
@@ -24,17 +35,11 @@ function firstFreeLetter(label: string, used: Set<string>): string | undefined {
  */
 export function buildSurfaceActions(
   surfaces: SurfaceRegistration[],
-  groups: QuickActionGroup[],
   activate: (surface: SurfaceRegistration) => void,
-  taken: QuickAction[] = []
+  { groups, taken = [] }: { groups: QuickActionGroup[]; taken?: QuickAction[] }
 ): QuickAction[] {
   const groupIdByOwner = new Map(groups.filter((g) => g.owner).map((g) => [g.owner!, g.id]))
-  const mnemonicsUsed = new Map<string, Set<string>>()
-  for (const action of taken) {
-    if (!action.mnemonic) continue
-    const used = mnemonicsUsed.get(action.group) ?? new Set<string>()
-    mnemonicsUsed.set(action.group, used.add(action.mnemonic))
-  }
+  const mnemonicsUsed = mnemonicsByGroup(taken)
 
   return surfaces.map((surface) => {
     const group = groupIdByOwner.get(surface.extensionId) ?? 'top'

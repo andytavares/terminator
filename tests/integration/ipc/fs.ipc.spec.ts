@@ -1,123 +1,213 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { ipcMain } from 'electron'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { EventEmitter } from 'node:events'
+import * as fs from 'node:fs'
+import * as path from 'node:path'
+import type { WebContents } from 'electron'
+import { makeTempDir } from '../../support/temp-dir'
+import { nextLoopTurn, openWatches } from '../../support/watches'
+import { partialFake } from '../../support/fakes'
+
+type Handler = (event: unknown, payload?: unknown) => unknown
+const handlers = vi.hoisted(() => new Map<string, Handler>())
 
 vi.mock('electron', () => ({
-  ipcMain: { handle: vi.fn() },
+  ipcMain: { handle: (channel: string, handler: Handler) => handlers.set(channel, handler) },
 }))
 
-vi.mock('../../../src/main/fs/fs-watcher', () => ({
-  fsWatcherService: {
-    addHandler: vi.fn(),
-    watchStart: vi.fn(),
-    watchStop: vi.fn(),
-  },
-}))
-
-vi.mock('node:fs/promises', () => ({
-  default: {
-    readFile: vi.fn(),
-  },
-}))
-
-import fs from 'node:fs/promises'
-import { fsWatcherService } from '../../../src/main/fs/fs-watcher'
 import { registerFsHandlers } from '../../../src/main/ipc/fs.ipc'
 
-function captureHandler(channel: string): (event: unknown, payload?: unknown) => unknown {
-  const calls = vi.mocked(ipcMain.handle).mock.calls
-  const match = calls.find(([ch]) => ch === channel)
-  if (!match) throw new Error(`No handler registered for: ${channel}`)
-  return match[1] as (event: unknown, payload?: unknown) => unknown
+registerFsHandlers()
+
+interface ChangeEvent {
+  projectRoot: string
+  eventType: string
+  filename: string | null
 }
 
-describe('fs IPC handlers', () => {
-  const mockGetMainWindow = vi.fn(() => ({
-    webContents: { send: vi.fn() },
-  }))
+/** A view as the handlers know one: what it was sent, and the ways it can go away. */
+function fakeView() {
+  const received: ChangeEvent[] = []
+  let destroyed = false
+  const events = new EventEmitter()
+  type Listener = (...args: never[]) => void
+  const calling = (listener: Listener) => (details: unknown) => listener(details as never)
+  const sender: WebContents = partialFake<WebContents>({
+    send: (_channel: string, event: ChangeEvent) => void received.push(event),
+    isDestroyed: () => destroyed,
+    once: (name: string, listener: Listener) => (events.once(name, calling(listener)), sender),
+    on: (name: string, listener: Listener) => (events.on(name, calling(listener)), sender),
+  })
+  const destroy = () => {
+    destroyed = true
+    events.emit('destroyed')
+  }
+  const navigate = (navigation: { isMainFrame: boolean; isSameDocument: boolean }) =>
+    events.emit('did-start-navigation', navigation)
+  return { sender, received, destroy, navigate }
+}
 
-  beforeEach(() => {
-    vi.clearAllMocks()
-    registerFsHandlers(mockGetMainWindow)
+type View = ReturnType<typeof fakeView>
+
+function invoke<T>(channel: string, view: View, payload?: unknown): Promise<T> {
+  return Promise.resolve(handlers.get(channel)!({ sender: view.sender }, payload)) as Promise<T>
+}
+
+const startWatch = (view: View, projectRoot: string) =>
+  invoke('fs:watch-start', view, { projectRoot })
+
+/** Looks less often than a burst takes to settle, or each look's write would keep it open. */
+const LOOKS = { interval: 250, timeout: 10_000 }
+
+/** Writes the file again on each look: macOS arms a watch a moment after `fs.watch` returns, and a
+ * change made before that has no event. Resolves once `view` has been told about `root`. */
+async function changeUntilTold(root: string, view: View): Promise<void> {
+  await vi.waitFor(() => {
+    const told = view.received.some((event) => event.projectRoot === root)
+    if (!told) fs.writeFileSync(path.join(root, 'a.ts'), String(Math.random()))
+    expect(told).toBe(true)
+  }, LOOKS)
+}
+
+const views: View[] = []
+function openView(): View {
+  views.push(fakeView())
+  return views.at(-1)!
+}
+
+let projectRoot: string
+let otherRoot: string
+
+beforeEach(() => {
+  projectRoot = makeTempDir('fs-ipc-')
+  otherRoot = makeTempDir('fs-ipc-other-')
+})
+
+afterEach(() => {
+  for (const view of views.splice(0)) view.destroy()
+})
+
+describe('fs:watch-start', () => {
+  it('tells the view that asked which file changed in its root', async () => {
+    const view = openView()
+    expect(await startWatch(view, projectRoot)).toEqual({ ok: true })
+    await changeUntilTold(projectRoot, view)
+    // A new watch can also report the making of its own directory, so the file is changed alone.
+    view.received.length = 0
+    await changeUntilTold(projectRoot, view)
+    expect(view.received.map((event) => event.filename)).toContain('a.ts')
   })
 
-  describe('fs:watch-start', () => {
-    it('calls watchStart and returns ok for valid payload', () => {
-      const handler = captureHandler('fs:watch-start')
-      const result = handler({}, { projectRoot: '/my/project' }) as { ok: boolean }
-      expect(fsWatcherService.watchStart).toHaveBeenCalledWith('/my/project')
-      expect(result.ok).toBe(true)
-    })
+  it('tells a view about its own root only', async () => {
+    const [first, second] = [openView(), openView()]
+    await startWatch(first, projectRoot)
+    await startWatch(second, otherRoot)
+    await changeUntilTold(projectRoot, first)
+    await changeUntilTold(otherRoot, second)
+    expect(new Set(first.received.map((event) => event.projectRoot))).toEqual(
+      new Set([projectRoot])
+    )
+    expect(new Set(second.received.map((event) => event.projectRoot))).toEqual(new Set([otherRoot]))
+  })
+})
 
-    it('returns VALIDATION_ERROR when projectRoot is missing', () => {
-      const handler = captureHandler('fs:watch-start')
-      const result = handler({}, {}) as { error: string }
-      expect(result.error).toBe('VALIDATION_ERROR')
-      expect(fsWatcherService.watchStart).not.toHaveBeenCalled()
-    })
+describe('fs:watch-start — shared roots and several roots', () => {
+  it('tells every view watching the same root', async () => {
+    const [first, second] = [openView(), openView()]
+    await startWatch(first, projectRoot)
+    await startWatch(second, projectRoot)
+    await changeUntilTold(projectRoot, first)
+    await changeUntilTold(projectRoot, second)
+  })
 
-    it('returns VALIDATION_ERROR when projectRoot is an empty string', () => {
-      const handler = captureHandler('fs:watch-start')
-      const result = handler({}, { projectRoot: '' }) as { error: string }
-      expect(result.error).toBe('VALIDATION_ERROR')
+  it('lets one view watch several roots', async () => {
+    const view = openView()
+    await startWatch(view, projectRoot)
+    await startWatch(view, otherRoot)
+    await changeUntilTold(projectRoot, view)
+    await changeUntilTold(otherRoot, view)
+  })
+
+  it('rejects a payload without a root', async () => {
+    expect(await invoke('fs:watch-start', openView(), {})).toEqual({ error: 'VALIDATION_ERROR' })
+  })
+})
+
+describe('fs:watch-stop', () => {
+  it('stops the watches of the view that asked, and nobody else’s', async () => {
+    const [stopping, staying] = [openView(), openView()]
+    await startWatch(stopping, projectRoot)
+    await startWatch(staying, projectRoot)
+    expect(await invoke('fs:watch-stop', stopping)).toEqual({ ok: true })
+    await changeUntilTold(projectRoot, staying)
+    expect(stopping.received).toEqual([])
+  })
+
+  it('closes a watch no view is left on', async () => {
+    await nextLoopTurn()
+    const before = openWatches()
+    const view = openView()
+    await startWatch(view, projectRoot)
+    expect(openWatches()).toBeGreaterThan(before)
+    await invoke('fs:watch-stop', view)
+    await nextLoopTurn()
+    expect(openWatches()).toBe(before)
+  })
+})
+
+describe('a view that goes away', () => {
+  async function watchesLeftAfter(leave: (view: View) => void): Promise<number> {
+    await nextLoopTurn()
+    const before = openWatches()
+    const view = openView()
+    await startWatch(view, projectRoot)
+    leave(view)
+    await nextLoopTurn()
+    return openWatches() - before
+  }
+
+  it('gives up its watches when it is destroyed', async () => {
+    expect(await watchesLeftAfter((view) => view.destroy())).toBe(0)
+  })
+
+  it('gives up its watches when it loads another page, as a reload does', async () => {
+    const reload = { isMainFrame: true, isSameDocument: false }
+    expect(await watchesLeftAfter((view) => view.navigate(reload))).toBe(0)
+  })
+})
+
+describe('a view that stays', () => {
+  it('can watch again from the page it loaded', async () => {
+    const view = openView()
+    await startWatch(view, projectRoot)
+    view.navigate({ isMainFrame: true, isSameDocument: false })
+    await startWatch(view, projectRoot)
+    await changeUntilTold(projectRoot, view)
+  })
+
+  it.each([
+    ['moves within its page', { isMainFrame: true, isSameDocument: true }],
+    ['navigates a frame inside it', { isMainFrame: false, isSameDocument: false }],
+  ])('keeps its watches when it %s', async (_how, navigation) => {
+    const view = openView()
+    await startWatch(view, projectRoot)
+    view.navigate(navigation)
+    await changeUntilTold(projectRoot, view)
+  })
+})
+
+describe('fs:read-file', () => {
+  it('returns the file’s content', async () => {
+    const filePath = path.join(projectRoot, 'file.ts')
+    fs.writeFileSync(filePath, 'file contents')
+    expect(await invoke('fs:read-file', openView(), { filePath })).toEqual({
+      content: 'file contents',
     })
   })
 
-  describe('fs:watch-stop', () => {
-    it('calls watchStop and returns ok', () => {
-      const handler = captureHandler('fs:watch-stop')
-      const result = handler({}) as { ok: boolean }
-      expect(fsWatcherService.watchStop).toHaveBeenCalled()
-      expect(result.ok).toBe(true)
-    })
-  })
-
-  describe('fs:read-file', () => {
-    it('reads file and returns content', async () => {
-      vi.mocked(fs.readFile).mockResolvedValue('file contents' as unknown as Buffer)
-      const handler = captureHandler('fs:read-file')
-      const result = (await handler({}, { filePath: '/my/file.ts' })) as { content: string }
-      expect(result.content).toBe('file contents')
-    })
-
-    it('returns VALIDATION_ERROR when filePath is missing', async () => {
-      const handler = captureHandler('fs:read-file')
-      const result = (await handler({}, {})) as { error: string }
-      expect(result.error).toBe('VALIDATION_ERROR')
-    })
-
-    it('returns VALIDATION_ERROR when filePath is empty string', async () => {
-      const handler = captureHandler('fs:read-file')
-      const result = (await handler({}, { filePath: '' })) as { error: string }
-      expect(result.error).toBe('VALIDATION_ERROR')
-    })
-
-    it('returns FILE_NOT_FOUND when readFile rejects', async () => {
-      vi.mocked(fs.readFile).mockRejectedValue(new Error('ENOENT'))
-      const handler = captureHandler('fs:read-file')
-      const result = (await handler({}, { filePath: '/no/such/file.ts' })) as { error: string }
-      expect(result.error).toBe('FILE_NOT_FOUND')
-    })
-  })
-
-  describe('fs watcher event forwarding', () => {
-    it('registers a watcher handler that sends fs:changed events to the window', () => {
-      const handlerCapture = vi.mocked(fsWatcherService.addHandler).mock.calls[0][0]
-      const mockSend = vi.fn()
-      mockGetMainWindow.mockReturnValueOnce({
-        webContents: { send: mockSend },
-        isDestroyed: vi.fn().mockReturnValue(false),
-      })
-      const event = { type: 'change', path: '/my/file.ts' }
-      handlerCapture(event as Parameters<typeof handlerCapture>[0])
-      expect(mockSend).toHaveBeenCalledWith('fs:changed', event)
-    })
-
-    it('does not crash when main window is null', () => {
-      const handlerCapture = vi.mocked(fsWatcherService.addHandler).mock.calls[0][0]
-      mockGetMainWindow.mockReturnValueOnce(null)
-      expect(() =>
-        handlerCapture({ type: 'change', path: '/file.ts' } as Parameters<typeof handlerCapture>[0])
-      ).not.toThrow()
+  it('returns FILE_NOT_FOUND for a file that is not there', async () => {
+    const filePath = path.join(projectRoot, 'missing.ts')
+    expect(await invoke('fs:read-file', openView(), { filePath })).toEqual({
+      error: 'FILE_NOT_FOUND',
     })
   })
 })

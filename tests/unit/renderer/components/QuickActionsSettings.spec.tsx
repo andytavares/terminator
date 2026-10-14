@@ -4,23 +4,28 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { useSettingsStore } from '../../../../src/renderer/stores/settings.store'
 import { QuickActionsSettings } from '../../../../src/renderer/components/settings/QuickActionsSettings'
 import type { CustomAction } from '../../../../src/shared/types'
+import { DEFAULT_GLOBAL_SETTINGS } from '../../../../src/shared/schemas/settings.schema'
+import { seedStore, type SeededStore } from '../../../support/renderer-stores'
 
-vi.mock('../../../../src/renderer/stores/settings.store', () => ({
-  useSettingsStore: vi.fn(),
-}))
-
-const mockUpdateQuickActions = vi.fn()
-const mockUpdateWorkspaceQuickActions = vi.fn()
+let settings: SeededStore<typeof useSettingsStore>
 
 function mockStore(custom: CustomAction[], workspaceCustom: CustomAction[] = []) {
-  vi.mocked(useSettingsStore).mockReturnValue({
-    globalSettings: { quickActions: { pins: [], usage: [], directUse: [], custom } },
+  settings = seedStore(useSettingsStore, {
+    globalSettings: {
+      ...DEFAULT_GLOBAL_SETTINGS,
+      quickActions: { ...DEFAULT_GLOBAL_SETTINGS.quickActions, custom },
+    },
     workspaceSettings: new Map([
-      ['ws-1', { workspaceId: 'ws-1', overrides: { quickActions: { custom: workspaceCustom } } }],
+      [
+        'ws-1',
+        {
+          workspaceId: 'ws-1',
+          overrides: { quickActions: { custom: workspaceCustom } },
+          extensions: {},
+        },
+      ],
     ]),
-    updateQuickActions: mockUpdateQuickActions,
-    updateWorkspaceQuickActions: mockUpdateWorkspaceQuickActions,
-  } as unknown as ReturnType<typeof useSettingsStore>)
+  })
 }
 
 beforeEach(() => {
@@ -54,7 +59,9 @@ describe('QuickActionsSettings — global scope', () => {
     expect(screen.getByText('shell')).toBeTruthy()
     expect(screen.getByText('New tab on branch')).toBeTruthy()
   })
+})
 
+describe('QuickActionsSettings — global scope — adds a new action and saves it via updateQuickActions', () => {
   it('adds a new action and saves it via updateQuickActions', () => {
     mockStore([])
     render(<QuickActionsSettings scope="global" />)
@@ -65,7 +72,7 @@ describe('QuickActionsSettings — global scope', () => {
     fireEvent.change(screen.getByLabelText('Body'), { target: { value: 'npx vitest run' } })
     fireEvent.click(screen.getByText('Save'))
 
-    expect(mockUpdateQuickActions).toHaveBeenCalledWith({
+    expect(settings.updateQuickActions).toHaveBeenCalledWith({
       custom: [
         {
           id: 'new-uuid',
@@ -78,7 +85,9 @@ describe('QuickActionsSettings — global scope', () => {
       ],
     })
   })
+})
 
+describe('QuickActionsSettings — global scope — edits an existing action in place', () => {
   it('edits an existing action in place', () => {
     mockStore([
       {
@@ -95,7 +104,7 @@ describe('QuickActionsSettings — global scope', () => {
     fireEvent.change(screen.getByLabelText('Label'), { target: { value: 'Run all tests' } })
     fireEvent.click(screen.getByText('Save'))
 
-    expect(mockUpdateQuickActions).toHaveBeenCalledWith({
+    expect(settings.updateQuickActions).toHaveBeenCalledWith({
       custom: [
         {
           id: 'a1',
@@ -108,7 +117,9 @@ describe('QuickActionsSettings — global scope', () => {
       ],
     })
   })
+})
 
+describe('QuickActionsSettings — global scope — deletes an action', () => {
   it('deletes an action', () => {
     mockStore([
       {
@@ -122,7 +133,7 @@ describe('QuickActionsSettings — global scope', () => {
     ])
     render(<QuickActionsSettings scope="global" />)
     fireEvent.click(screen.getByText('Delete'))
-    expect(mockUpdateQuickActions).toHaveBeenCalledWith({ custom: [] })
+    expect(settings.updateQuickActions).toHaveBeenCalledWith({ custom: [] })
   })
 
   it('requires a label', () => {
@@ -132,9 +143,11 @@ describe('QuickActionsSettings — global scope', () => {
     fireEvent.change(screen.getByLabelText('Body'), { target: { value: 'echo hi' } })
     fireEvent.click(screen.getByText('Save'))
     expect(screen.getByText('Label is required')).toBeTruthy()
-    expect(mockUpdateQuickActions).not.toHaveBeenCalled()
+    expect(settings.updateQuickActions).not.toHaveBeenCalled()
   })
+})
 
+describe('QuickActionsSettings — global scope — requires a body', () => {
   it('requires a body', () => {
     mockStore([])
     render(<QuickActionsSettings scope="global" />)
@@ -142,7 +155,7 @@ describe('QuickActionsSettings — global scope', () => {
     fireEvent.change(screen.getByLabelText('Label'), { target: { value: 'Run tests' } })
     fireEvent.click(screen.getByText('Save'))
     expect(screen.getByText('Body is required')).toBeTruthy()
-    expect(mockUpdateQuickActions).not.toHaveBeenCalled()
+    expect(settings.updateQuickActions).not.toHaveBeenCalled()
   })
 
   it('keeps only the first character typed into Key', () => {
@@ -153,7 +166,9 @@ describe('QuickActionsSettings — global scope', () => {
     fireEvent.change(keyInput, { target: { value: 'ab' } })
     expect(keyInput.value).toBe('a')
   })
+})
 
+describe('QuickActionsSettings — global scope — rejects a key already used by another action', () => {
   it('rejects a key already used by another action', () => {
     mockStore([
       {
@@ -172,9 +187,11 @@ describe('QuickActionsSettings — global scope', () => {
     fireEvent.change(screen.getByLabelText('Body'), { target: { value: 'echo new' } })
     fireEvent.click(screen.getByText('Save'))
     expect(screen.getByText('Key already used by Existing')).toBeTruthy()
-    expect(mockUpdateQuickActions).not.toHaveBeenCalled()
+    expect(settings.updateQuickActions).not.toHaveBeenCalled()
   })
+})
 
+describe('QuickActionsSettings — global scope — resets target to the first valid option when kind changes', () => {
   it('resets target to the first valid option when kind changes', () => {
     mockStore([])
     render(<QuickActionsSettings scope="global" />)
@@ -191,7 +208,7 @@ describe('QuickActionsSettings — global scope', () => {
     fireEvent.change(screen.getByLabelText('Label'), { target: { value: 'Draft' } })
     fireEvent.click(screen.getByText('Cancel'))
     expect(screen.queryByLabelText('Label')).toBeNull()
-    expect(mockUpdateQuickActions).not.toHaveBeenCalled()
+    expect(settings.updateQuickActions).not.toHaveBeenCalled()
   })
 })
 
@@ -205,7 +222,47 @@ describe('QuickActionsSettings — workspace scope', () => {
     expect(screen.getByText('Workspace action')).toBeTruthy()
 
     fireEvent.click(screen.getByText('Delete'))
-    expect(mockUpdateWorkspaceQuickActions).toHaveBeenCalledWith('ws-1', [])
-    expect(mockUpdateQuickActions).not.toHaveBeenCalled()
+    expect(settings.updateWorkspaceQuickActions).toHaveBeenCalledWith('ws-1', [])
+    expect(settings.updateQuickActions).not.toHaveBeenCalled()
+  })
+})
+
+const askClaude: CustomAction = {
+  id: 'a2',
+  label: 'Ask Claude',
+  kind: 'prompt',
+  target: 'agent',
+  body: 'review this',
+}
+
+describe('QuickActionsSettings — actions without a key, and scopes with nothing yet', () => {
+  it('lists a prompt action against the focused Claude session, with no key', () => {
+    mockStore([askClaude])
+    render(<QuickActionsSettings scope="global" />)
+    expect(screen.getByText('Focused Claude session')).toBeTruthy()
+    expect(document.querySelector('.qa-settings-list__key')!.textContent).toBe('')
+  })
+
+  it('edits a keyless action with an empty Key field, and keeps it keyless', () => {
+    mockStore([askClaude])
+    render(<QuickActionsSettings scope="global" />)
+    fireEvent.click(screen.getByText('Edit'))
+    expect((screen.getByLabelText('Key') as HTMLInputElement).value).toBe('')
+    fireEvent.click(screen.getByText('Save'))
+    expect(settings.updateQuickActions).toHaveBeenCalledWith({
+      custom: [{ ...askClaude, mnemonic: undefined }],
+    })
+  })
+
+  it('shows no actions while global settings have not loaded', () => {
+    seedStore(useSettingsStore, { globalSettings: null, workspaceSettings: new Map() })
+    render(<QuickActionsSettings scope="global" />)
+    expect(screen.getByText('No custom actions yet.')).toBeTruthy()
+  })
+
+  it('shows no actions for a workspace with no settings of its own', () => {
+    mockStore([])
+    render(<QuickActionsSettings scope="workspace" workspaceId="ws-unknown" />)
+    expect(screen.getByText('No custom actions yet.')).toBeTruthy()
   })
 })

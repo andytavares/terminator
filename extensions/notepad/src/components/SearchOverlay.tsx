@@ -1,72 +1,111 @@
 import './notepad.css'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useDismissible } from '@terminator/extension-ui'
+import { ModalShell, RelativeTime } from '@terminator/extension-ui'
 import { Search, X } from 'lucide-react'
 import type { SearchResult } from '../db/types'
 import { useNotesStore } from '../stores/notes.store'
-
-function highlightTitle(title: string, query: string): React.JSX.Element {
-  if (!query.trim()) return <>{title}</>
-  const words = query
-    .replace(/[*"]/g, '')
-    .split(/\s+/)
-    .filter((w) => w.length > 1)
-  if (words.length === 0) return <>{title}</>
-  const pattern = new RegExp(
-    `(${words.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`,
-    'i'
-  )
-  const parts = title.split(pattern)
-  return (
-    <>
-      {parts.map((part, i) =>
-        pattern.test(part) ? <mark key={i}>{part}</mark> : <span key={i}>{part}</span>
-      )}
-    </>
-  )
-}
-
-function relativeTime(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime()
-  const mins = Math.floor(diff / 60000)
-  if (mins < 1) return 'just now'
-  if (mins < 60) return `${mins}m ago`
-  const hrs = Math.floor(mins / 60)
-  if (hrs < 24) return `${hrs}h ago`
-  const days = Math.floor(hrs / 24)
-  if (days < 7) return `${days}d ago`
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-}
 
 interface SearchOverlayProps {
   onClose: () => void
 }
 
+/** The search's results for the current query and tag filter, and the selected row. */
+type NoteSearch = ReturnType<typeof useNoteSearch>
+
+interface TagFilterProps {
+  tagCounts: [string, number][]
+  activeTagFilter: string | null
+  setActiveTagFilter: (tag: string | null) => void
+}
+
+interface SearchResultsProps {
+  search: NoteSearch
+  query: string
+  openResult: (result: SearchResult) => void
+}
+
+interface SearchResultRowProps {
+  result: SearchResult
+  query: string
+  selected: boolean
+  onHover: () => void
+  onOpen: () => void
+}
+
+function highlightTitle(title: string, query: string): React.JSX.Element {
+  const pattern = titleHighlightPattern(query)
+  if (!pattern) return <>{title}</>
+  const parts = title.split(pattern)
+  return (
+    <>
+      {parts.map((part, i) => (
+        <TitlePart key={i} part={part} highlighted={pattern.test(part)} />
+      ))}
+    </>
+  )
+}
+
+/** Matches any query word longer than one character, or null when there is none. */
+function titleHighlightPattern(query: string): RegExp | null {
+  if (!query.trim()) return null
+  const words = query
+    .replace(/[*"]/g, '')
+    .split(/\s+/)
+    .filter((w) => w.length > 1)
+  if (words.length === 0) return null
+  const escaped = words.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+  return new RegExp(`(${escaped.join('|')})`, 'i')
+}
+
+function TitlePart(props: { part: string; highlighted: boolean }): React.JSX.Element {
+  if (props.highlighted) return <mark>{props.part}</mark>
+  return <span>{props.part}</span>
+}
+
+/** Opening a result selects its note and closes the search. */
+function useOpenResult(onClose: () => void) {
+  const setSelected = useNotesStore((s) => s.setSelected)
+  return useCallback(
+    (result: SearchResult) => {
+      setSelected(result.id)
+      onClose()
+    },
+    [setSelected, onClose]
+  )
+}
+
+/** The modal shell counts this palette as an open surface: without that, two Escapes with focus
+ *  off the input closed Notepad instead of the search. */
 export function SearchOverlay({ onClose }: SearchOverlayProps): React.JSX.Element {
-  const surfaceRef = useRef<HTMLDivElement>(null)
   const [query, setQuery] = useState('')
-  const [results, setResults] = useState<SearchResult[]>([])
   const [activeTagFilter, setActiveTagFilter] = useState<string | null>(null)
+  const search = useNoteSearch(query, activeTagFilter)
+  const openResult = useOpenResult(onClose)
+
+  useResultKeyboard(search, openResult)
+
+  return (
+    <ModalShell label="Search notes" className="notepad-search-overlay" onDismiss={onClose}>
+      <SearchInputRow query={query} setQuery={setQuery} search={search} />
+      <TagFilters
+        tagCounts={search.tagCounts}
+        activeTagFilter={activeTagFilter}
+        setActiveTagFilter={setActiveTagFilter}
+      />
+      <SearchResults search={search} query={query} openResult={openResult} />
+    </ModalShell>
+  )
+}
+
+function useNoteSearch(query: string, tagFilter: string | null) {
+  const [results, setResults] = useState<SearchResult[]>([])
   const [selectedIdx, setSelectedIdx] = useState(0)
   const [isSearching, setIsSearching] = useState(false)
-  const inputRef = useRef<HTMLInputElement>(null)
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const { setSelected } = useNotesStore()
 
-  useEffect(() => {
-    inputRef.current?.focus()
-  }, [])
-
-  const runSearch = useCallback(async (q: string, tagFilter: string | null) => {
-    const fullQuery = tagFilter ? `${q.trim()} tag:${tagFilter}`.trim() : q
+  const runSearch = useCallback(async (q: string, filter: string | null) => {
     setIsSearching(true)
     try {
-      const result = await window.electronAPI.extensionBridge.invoke(
-        'terminator.notepad:search.query',
-        { query: fullQuery, includeArchived: false }
-      )
-      const data = (result as { data?: SearchResult[] }).data ?? []
-      setResults(data)
+      setResults(await queryNotes(q, filter))
       setSelectedIdx(0)
     } catch (err) {
       console.error('[notepad] search failed', err)
@@ -77,40 +116,39 @@ export function SearchOverlay({ onClose }: SearchOverlayProps): React.JSX.Elemen
   }, [])
 
   useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(() => {
-      void runSearch(query, activeTagFilter)
-    }, 200)
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current)
-    }
-  }, [query, activeTagFilter, runSearch])
+    const timer = setTimeout(() => void runSearch(query, tagFilter), 200)
+    return () => clearTimeout(timer)
+  }, [query, tagFilter, runSearch])
 
-  const tagCounts = useMemo(() => {
-    const map = new Map<string, number>()
-    for (const r of results) {
-      for (const t of r.tags) {
-        map.set(t, (map.get(t) ?? 0) + 1)
-      }
-    }
-    return Array.from(map.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 6)
-  }, [results])
+  const tagCounts = useMemo(() => topTagCounts(results), [results])
+  return { results, selectedIdx, setSelectedIdx, isSearching, tagCounts }
+}
 
-  function openResult(result: SearchResult) {
-    setSelected(result.id)
-    onClose()
+async function queryNotes(q: string, tagFilter: string | null): Promise<SearchResult[]> {
+  const fullQuery = tagFilter ? `${q.trim()} tag:${tagFilter}`.trim() : q
+  const result = await window.electronAPI.extensionBridge.invoke(
+    'terminator.notepad:search.query',
+    { query: fullQuery, includeArchived: false }
+  )
+  return (result as { data?: SearchResult[] }).data ?? []
+}
+
+/** The six tags the results carry most, with how many results carry each. */
+function topTagCounts(results: SearchResult[]): [string, number][] {
+  const map = new Map<string, number>()
+  for (const r of results) {
+    for (const t of r.tags) {
+      map.set(t, (map.get(t) ?? 0) + 1)
+    }
   }
+  return Array.from(map.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6)
+}
 
-  /**
-   * Escape, focus, and a place in the open-surface count the double-Escape
-   * "leave the extension" gesture reads — which this palette was missing, so
-   * two Escapes with focus off the input closed Notepad instead of the search.
-   * The backdrop below owns the outside click.
-   */
-  useDismissible({ ref: surfaceRef, onDismiss: onClose, closeOnOutsideClick: false })
-
+/** Arrow keys move the selection; Enter opens the selected result. */
+function useResultKeyboard(search: NoteSearch, openResult: (result: SearchResult) => void) {
+  const { results, selectedIdx, setSelectedIdx } = search
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === 'ArrowDown') {
@@ -128,104 +166,125 @@ export function SearchOverlay({ onClose }: SearchOverlayProps): React.JSX.Elemen
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [results, selectedIdx, onClose]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [results, selectedIdx, setSelectedIdx, openResult])
+}
 
-  const isRanked = query.trim().length > 0
-  const resultLabel = isSearching
-    ? 'searching…'
-    : results.length > 0
-      ? `${results.length} result${results.length === 1 ? '' : 's'}${isRanked ? ' · ranked' : ''}`
-      : query
-        ? 'no results'
-        : ''
+function resultCountLabel(search: NoteSearch, query: string): string {
+  const count = search.results.length
+  if (search.isSearching) return 'searching…'
+  if (count === 0 && query) return 'no results'
+  if (count === 0) return ''
+  let label = count === 1 ? '1 result' : `${count} results`
+  if (query.trim().length > 0) label += ' · ranked'
+  return label
+}
+
+function SearchInputRow(props: {
+  query: string
+  setQuery: (query: string) => void
+  search: NoteSearch
+}): React.JSX.Element {
+  const { query, setQuery, search } = props
+  const inputRef = useRef<HTMLInputElement>(null)
+  const resultLabel = resultCountLabel(search, query)
+
+  useEffect(() => {
+    inputRef.current?.focus()
+  }, [])
 
   return (
+    <div className="notepad-search-overlay__input-row">
+      <Search className="notepad-search-overlay__icon tm-icon-lg" />
+      <input
+        ref={inputRef}
+        className="notepad-search-overlay__input"
+        placeholder="Search across all notes"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        spellCheck={false}
+      />
+      {resultLabel && <span className="notepad-search-overlay__count">{resultLabel}</span>}
+    </div>
+  )
+}
+
+function TagFilters(props: TagFilterProps): React.JSX.Element | null {
+  const { tagCounts, activeTagFilter, setActiveTagFilter } = props
+  if (tagCounts.length === 0) return null
+  return (
+    <div className="notepad-search-overlay__filters">
+      <span className="notepad-search-overlay__filter-label">Filter:</span>
+      {activeTagFilter && (
+        <button
+          className="notepad-search-overlay__filter-chip notepad-search-overlay__filter-chip--active"
+          onClick={() => setActiveTagFilter(null)}
+        >
+          {activeTagFilter} <X className="tm-icon-sm" />
+        </button>
+      )}
+      {tagCounts
+        .filter(([tag]) => tag !== activeTagFilter)
+        .map(([tag, count]) => (
+          <button
+            key={tag}
+            className="notepad-search-overlay__filter-chip"
+            onClick={() => setActiveTagFilter(tag)}
+          >
+            # {tag} {count}
+          </button>
+        ))}
+    </div>
+  )
+}
+
+function SearchResults({ search, query, openResult }: SearchResultsProps): React.JSX.Element {
+  const { results, isSearching, selectedIdx, setSelectedIdx } = search
+  return (
+    <div className="notepad-search-overlay__results">
+      {results.length === 0 && !isSearching && query && (
+        <div className="notepad-search-overlay__empty">
+          No notes found for &ldquo;{query}&rdquo;
+        </div>
+      )}
+      {results.length === 0 && !query && (
+        <div className="notepad-search-overlay__empty">
+          Type to search. Use <code>tag:name</code> to filter by tag.
+        </div>
+      )}
+      {results.map((r, idx) => (
+        <SearchResultRow
+          key={r.id}
+          result={r}
+          query={query}
+          selected={idx === selectedIdx}
+          onHover={() => setSelectedIdx(idx)}
+          onOpen={() => openResult(r)}
+        />
+      ))}
+    </div>
+  )
+}
+
+function SearchResultRow(props: SearchResultRowProps): React.JSX.Element {
+  const { result: r, query, selected } = props
+  return (
     <div
-      className="notepad-overlay-backdrop"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose()
-      }}
+      className={`notepad-search-overlay__result${selected ? ' notepad-search-overlay__result--selected' : ''}`}
+      onMouseEnter={props.onHover}
+      onClick={props.onOpen}
     >
+      <div className="notepad-search-overlay__result-title">{highlightTitle(r.title, query)}</div>
       <div
-        ref={surfaceRef}
-        data-tmui-surface=""
-        className="notepad-search-overlay"
-        role="dialog"
-        aria-label="Search notes"
-        aria-modal="true"
-      >
-        <div className="notepad-search-overlay__input-row">
-          <Search className="notepad-search-overlay__icon tm-icon-lg" />
-          <input
-            ref={inputRef}
-            className="notepad-search-overlay__input"
-            placeholder="Search across all notes"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            spellCheck={false}
-          />
-          {resultLabel && <span className="notepad-search-overlay__count">{resultLabel}</span>}
-        </div>
-        {tagCounts.length > 0 && (
-          <div className="notepad-search-overlay__filters">
-            <span className="notepad-search-overlay__filter-label">Filter:</span>
-            {activeTagFilter && (
-              <button
-                className="notepad-search-overlay__filter-chip notepad-search-overlay__filter-chip--active"
-                onClick={() => setActiveTagFilter(null)}
-              >
-                {activeTagFilter} <X className="tm-icon-sm" />
-              </button>
-            )}
-            {tagCounts
-              .filter(([tag]) => tag !== activeTagFilter)
-              .map(([tag, count]) => (
-                <button
-                  key={tag}
-                  className="notepad-search-overlay__filter-chip"
-                  onClick={() => setActiveTagFilter(tag)}
-                >
-                  # {tag} {count}
-                </button>
-              ))}
-          </div>
-        )}
-        <div className="notepad-search-overlay__results">
-          {results.length === 0 && !isSearching && query && (
-            <div className="notepad-search-overlay__empty">
-              No notes found for &ldquo;{query}&rdquo;
-            </div>
-          )}
-          {results.length === 0 && !query && (
-            <div className="notepad-search-overlay__empty">
-              Type to search. Use <code>tag:name</code> to filter by tag.
-            </div>
-          )}
-          {results.map((r, idx) => (
-            <div
-              key={r.id}
-              className={`notepad-search-overlay__result${idx === selectedIdx ? ' notepad-search-overlay__result--selected' : ''}`}
-              onMouseEnter={() => setSelectedIdx(idx)}
-              onClick={() => openResult(r)}
-            >
-              <div className="notepad-search-overlay__result-title">
-                {highlightTitle(r.title, query)}
-              </div>
-              <div
-                className="notepad-search-overlay__result-snippet"
-                dangerouslySetInnerHTML={{ __html: r.snippet }}
-              />
-              <div className="notepad-search-overlay__result-meta">
-                <span className="notepad-search-overlay__result-tags">
-                  {r.tags.map((t) => `#${t}`).join(' ')}
-                </span>
-                <span className="notepad-search-overlay__result-time">
-                  {relativeTime(r.updatedAt)}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
+        className="notepad-search-overlay__result-snippet"
+        dangerouslySetInnerHTML={{ __html: r.snippet }}
+      />
+      <div className="notepad-search-overlay__result-meta">
+        <span className="notepad-search-overlay__result-tags">
+          {r.tags.map((t) => `#${t}`).join(' ')}
+        </span>
+        <span className="notepad-search-overlay__result-time">
+          <RelativeTime value={r.updatedAt} />
+        </span>
       </div>
     </div>
   )

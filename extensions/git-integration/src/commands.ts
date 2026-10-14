@@ -1,4 +1,4 @@
-import type { ExtensionAPI, Disposable, CommandContext } from '../../../src/main/extensions/api.js'
+import type { ExtensionAPI, Disposable, CommandContext } from '@terminator/extension-sdk'
 import { pushBranch, pullFastForward } from './git/git-service.js'
 
 const PUSH_ERROR_MESSAGES: Record<string, string> = {
@@ -6,68 +6,95 @@ const PUSH_ERROR_MESSAGES: Record<string, string> = {
   REJECTED: 'Push rejected — pull changes first.',
 }
 
+/** What a command asked the Git view to do, kept for a view that does not exist yet. */
+export interface ViewRequest {
+  kind: 'commit' | 'pull-request'
+  repoRoot: string
+}
+
+const VIEW_REQUEST_CHANNEL: Record<ViewRequest['kind'], string> = {
+  commit: 'git:focus-commit-message',
+  'pull-request': 'git:open-pr-dialog',
+}
+const PENDING_REQUEST_MS = 5000
+let pendingRequest: ViewRequest | null = null
+let pendingTimer: ReturnType<typeof setTimeout> | null = null
+
+/** Brings the Git tab forward and asks its view to act. An open view hears the broadcast; one the
+ *  tab is only now creating collects it on mount (consumePendingViewRequest), within five seconds,
+ *  as Notepad and Foundry do for the same race. */
+function requestOfView(api: ExtensionAPI, request: ViewRequest): void {
+  api.window.showSelf('project')
+  api.window.broadcast(VIEW_REQUEST_CHANNEL[request.kind], { repoRoot: request.repoRoot })
+  pendingRequest = request
+  if (pendingTimer !== null) clearTimeout(pendingTimer)
+  pendingTimer = setTimeout(() => {
+    pendingRequest = null
+    pendingTimer = null
+  }, PENDING_REQUEST_MS)
+}
+
+/** The request a command left for the Git view, once. */
+export function consumePendingViewRequest(): ViewRequest | null {
+  const request = pendingRequest
+  pendingRequest = null
+  return request
+}
+
+/** Asks the Git view to act on the command's repository. */
+function viewCommand(api: ExtensionAPI, kind: ViewRequest['kind']) {
+  return (ctx: CommandContext) => {
+    if (ctx.repoRoot) requestOfView(api, { kind, repoRoot: ctx.repoRoot })
+  }
+}
+
+function pushCommand(api: ExtensionAPI) {
+  return async (ctx: CommandContext) => {
+    if (!ctx.repoRoot) return
+    const result = await pushBranch(ctx.repoRoot)
+    if ('error' in result) {
+      const message = PUSH_ERROR_MESSAGES[result.error] ?? `Push failed: ${result.error}`
+      api.notifications.showToast('error', message, 'pushFailed')
+      return
+    }
+    const message = `Pushed ${result.branch} to ${result.remote}`
+    api.notifications.showToast('success', message, 'pushSucceeded')
+  }
+}
+
+function pullCommand(api: ExtensionAPI) {
+  return async (ctx: CommandContext) => {
+    if (!ctx.repoRoot) return
+    const result = await pullFastForward(ctx.repoRoot)
+    if ('error' in result) {
+      api.notifications.showToast('error', `Pull failed: ${result.error}`, 'pullFailed')
+      return
+    }
+    api.notifications.showToast('success', `Pulled ${result.branch}`, 'pullSucceeded')
+  }
+}
+
+const GIT_COMMAND = { requires: 'repo', category: 'Git' } as const
+
 export function registerQuickActionCommands(api: ExtensionAPI): Disposable[] {
-  const disposables: Disposable[] = []
-
-  disposables.push(
-    api.commands.register(
-      { id: 'commit', label: 'Commit…', mnemonic: 'c', requires: 'repo', category: 'Git' },
-      (ctx: CommandContext) => {
-        if (!ctx.repoRoot) return
-        api.window.showSelf('project')
-        api.window.broadcast('git:focus-commit-message', { repoRoot: ctx.repoRoot })
-      }
-    )
-  )
-
-  disposables.push(
-    api.commands.register(
-      { id: 'push', label: 'Push', mnemonic: 'p', requires: 'repo', category: 'Git' },
-      async (ctx: CommandContext) => {
-        if (!ctx.repoRoot) return
-        const result = await pushBranch(ctx.repoRoot)
-        if ('error' in result) {
-          api.notifications.showToast(
-            'error',
-            PUSH_ERROR_MESSAGES[result.error] ?? `Push failed: ${result.error}`,
-            'pushFailed'
-          )
-          return
-        }
-        api.notifications.showToast(
-          'success',
-          `Pushed ${result.branch} to ${result.remote}`,
-          'pushSucceeded'
-        )
-      }
-    )
-  )
-
-  disposables.push(
-    api.commands.register(
-      { id: 'pull', label: 'Pull', mnemonic: 'l', requires: 'repo', category: 'Git' },
-      async (ctx: CommandContext) => {
-        if (!ctx.repoRoot) return
-        const result = await pullFastForward(ctx.repoRoot)
-        if ('error' in result) {
-          api.notifications.showToast('error', `Pull failed: ${result.error}`, 'pullFailed')
-          return
-        }
-        api.notifications.showToast('success', `Pulled ${result.branch}`, 'pullSucceeded')
-      }
-    )
-  )
-
-  disposables.push(
-    api.commands.register(
-      { id: 'create-pr', label: 'Create PR…', mnemonic: 'r', requires: 'repo', category: 'Git' },
-      (ctx: CommandContext) => {
-        if (!ctx.repoRoot) return
-        api.window.showSelf('project')
-        api.window.broadcast('git:open-pr-dialog', { repoRoot: ctx.repoRoot })
-      }
-    )
-  )
-
-  return disposables
+  const registerGitCommand: ExtensionAPI['commands']['register'] = (spec, handler) =>
+    api.commands.register(spec, handler)
+  return [
+    registerGitCommand(
+      { id: 'commit', label: 'Commit…', mnemonic: 'c', ...GIT_COMMAND },
+      viewCommand(api, 'commit')
+    ),
+    registerGitCommand(
+      { id: 'push', label: 'Push', mnemonic: 'p', ...GIT_COMMAND },
+      pushCommand(api)
+    ),
+    registerGitCommand(
+      { id: 'pull', label: 'Pull', mnemonic: 'l', ...GIT_COMMAND },
+      pullCommand(api)
+    ),
+    registerGitCommand(
+      { id: 'create-pr', label: 'Create PR…', mnemonic: 'r', ...GIT_COMMAND },
+      viewCommand(api, 'pull-request')
+    ),
+  ]
 }

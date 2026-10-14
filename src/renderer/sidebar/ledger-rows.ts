@@ -1,6 +1,6 @@
 import { matchesFilter, type IssueTitles } from './session-filter'
 import type { HomePrefs } from './home-prefs'
-import type { SessionFacts } from './session-facts'
+import { byRecentlyOpened, byStarted, type SessionFacts } from './session-facts'
 import { standingRank } from './view-model'
 
 export interface LedgerGroup {
@@ -9,12 +9,11 @@ export interface LedgerGroup {
   facts: SessionFacts[]
 }
 
+/** @internal */
 export interface LedgerFilters {
   needsYou: boolean
   text: string
 }
-
-export const NO_FILTERS: LedgerFilters = { needsYou: false, text: '' }
 
 const NO_BRANCH = 'No branch'
 const ALL_SESSIONS = 'All sessions'
@@ -28,17 +27,6 @@ function groupLabel(facts: SessionFacts, groupBy: HomePrefs['groupBy']): string 
   return `${facts.workspaceName ?? NO_BRANCH} / ${facts.projectName}`
 }
 
-const byStarted = (a: SessionFacts, b: SessionFacts): number =>
-  Date.parse(a.startedAt) - Date.parse(b.startedAt)
-
-/** Most recently opened first, a session that has never been attended sorting last. */
-const byRecentlyOpened = (a: SessionFacts, b: SessionFacts): number => {
-  if (a.lastAttendedAt === null && b.lastAttendedAt === null) return byStarted(a, b)
-  if (a.lastAttendedAt === null) return 1
-  if (b.lastAttendedAt === null) return -1
-  return b.lastAttendedAt - a.lastAttendedAt || byStarted(a, b)
-}
-
 function compare(sort: HomePrefs['sort']) {
   return (a: SessionFacts, b: SessionFacts): number => {
     if (sort === 'recent') return byRecentlyOpened(a, b)
@@ -46,56 +34,58 @@ function compare(sort: HomePrefs['sort']) {
   }
 }
 
-/**
- * The Ledger's rows, grouped and ordered.
- *
- * Filters apply first, so a group that loses every row to them is not drawn.
- * Closed sessions are always their own last group, newest first: they are
- * history, and ordering them by state would put every one of them last anyway.
- */
-export function buildLedger(
-  facts: readonly SessionFacts[],
-  prefs: HomePrefs,
-  filters: LedgerFilters,
+/** The filters, and the issue titles the text filter also searches. */
+export interface LedgerQuery extends LedgerFilters {
   titles: IssueTitles
-): LedgerGroup[] {
-  const visible = facts.filter(
-    (f) =>
-      !(prefs.hideExited && !f.isClosed && f.state === 'exited') &&
-      !(filters.needsYou && f.state !== 'awaiting-input') &&
-      matchesFilter(f, filters.text, titles)
-  )
+}
 
-  const openVisible = visible.filter((f) => !f.isClosed)
-  const liftNeedsYou = prefs.sort === 'needs-you'
-  const needsYou = liftNeedsYou ? openVisible.filter((f) => f.state === 'awaiting-input') : []
-  const rest = liftNeedsYou ? openVisible.filter((f) => f.state !== 'awaiting-input') : openVisible
+function isVisible(f: SessionFacts, prefs: HomePrefs, query: LedgerQuery): boolean {
+  if (prefs.hideExited && !f.isClosed && f.state === 'exited') return false
+  if (query.needsYou && f.state !== 'awaiting-input') return false
+  return matchesFilter(f, query.text, query.titles)
+}
 
+/** Open sessions under their branch label, labels in order with "No branch" last. */
+function openGroups(open: SessionFacts[], prefs: HomePrefs): LedgerGroup[] {
   const byLabel = new Map<string, SessionFacts[]>()
-  for (const f of rest) {
+  for (const f of open) {
     const label = groupLabel(f, prefs.groupBy)
     byLabel.set(label, [...(byLabel.get(label) ?? []), f])
   }
-
-  const open = [...byLabel.entries()]
+  return [...byLabel.entries()]
     .sort(([a], [b]) => {
       if (a === NO_BRANCH) return 1
       if (b === NO_BRANCH) return -1
       return a.localeCompare(b)
     })
     .map(([label, rows]) => ({ key: label, label, facts: rows.sort(compare(prefs.sort)) }))
+}
 
-  const needsYouGroup: LedgerGroup[] =
-    needsYou.length === 0
-      ? []
-      : [{ key: NEEDS_YOU, label: 'Needs you', facts: needsYou.sort(compare(prefs.sort)) }]
+/** A group of its own, or none when it would be empty. */
+function ledgerGroupOf(key: string, label: string, facts: SessionFacts[]): LedgerGroup[] {
+  return facts.length === 0 ? [] : [{ key, label, facts }]
+}
 
+/** The Ledger's rows, grouped and ordered. Filters apply first, so a group that loses every row
+ * to them is not drawn. Closed sessions are always their own last group, newest first: they are
+ * history, and ordering them by state would put every one of them last anyway. */
+export function buildLedger(
+  facts: readonly SessionFacts[],
+  prefs: HomePrefs,
+  query: LedgerQuery
+): LedgerGroup[] {
+  const visible = facts.filter((f) => isVisible(f, prefs, query))
+  const openVisible = visible.filter((f) => !f.isClosed)
+  const liftNeedsYou = prefs.sort === 'needs-you'
+  const needsYou = liftNeedsYou ? openVisible.filter((f) => f.state === 'awaiting-input') : []
+  const rest = liftNeedsYou ? openVisible.filter((f) => f.state !== 'awaiting-input') : openVisible
   const closed = visible
     .filter((f) => f.isClosed)
     .sort((a, b) => Date.parse(b.closedAt ?? '') - Date.parse(a.closedAt ?? ''))
 
-  const closedGroup: LedgerGroup[] =
-    closed.length === 0 ? [] : [{ key: CLOSED, label: CLOSED, facts: closed }]
-
-  return [...needsYouGroup, ...open, ...closedGroup]
+  return [
+    ...ledgerGroupOf(NEEDS_YOU, 'Needs you', needsYou.sort(compare(prefs.sort))),
+    ...openGroups(rest, prefs),
+    ...ledgerGroupOf(CLOSED, CLOSED, closed),
+  ]
 }

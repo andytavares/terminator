@@ -3,11 +3,14 @@ import type { GitStatus, FileDiff } from '../schemas/git.schema'
 
 interface GitStore {
   status: GitStatus | null
+  /** The repository's workspace switched "Enable Git Integration" off (git:status said GIT_DISABLED). */
+  disabled: boolean
   selectedFile: string | null
   diffCache: Map<string, FileDiff>
   isLoading: boolean
   view: 'default' | 'merge-flow'
   setStatus(status: GitStatus | null): void
+  setDisabled(disabled: boolean): void
   setSelectedFile(path: string | null): void
   setDiff(path: string, diff: FileDiff): void
   setLoading(loading: boolean): void
@@ -22,6 +25,7 @@ export function diffCacheKey(path: string, staged: boolean): string {
 /** Cached diffs (see diffCacheKey) are dropped whenever the status changes. */
 export const useGitStore = create<GitStore>((set) => ({
   status: null,
+  disabled: false,
   selectedFile: null,
   diffCache: new Map(),
   isLoading: false,
@@ -31,6 +35,7 @@ export const useGitStore = create<GitStore>((set) => ({
       if (JSON.stringify(state.status) === JSON.stringify(status)) return state
       return { status, diffCache: new Map() }
     }),
+  setDisabled: (disabled) => set({ disabled }),
   setSelectedFile: (selectedFile) => set({ selectedFile }),
   setDiff: (path, diff) =>
     set((state) => {

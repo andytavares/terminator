@@ -28,116 +28,130 @@ describe('ELECTRON_API_MANIFEST', () => {
   })
 })
 
-describe('remoteAccessibleCoreChannels()', () => {
-  // The complete expected remote surface for core channels. Deliberately spelled
-  // out: widening or shrinking what a browser client can reach must show up as a
-  // diff in this test, even though the runtime set is derived from the manifest.
-  const EXPECTED = [
-    'app:get-info',
-    'terminal:create',
-    'terminal:attach',
-    'terminal:close',
-    'terminal:close-all',
-    'terminal:cleanup-orphans',
-    'terminal:input',
-    'terminal:resize',
-    'terminal:output',
-    'terminal:process-exit',
-    'workspace:list',
-    'workspace:create',
-    'workspace:update',
-    'workspace:delete',
-    'workspace:reorder',
-    'project:list',
-    'project:create',
-    'project:delete',
-    'project:rename',
-    'project:reorder',
-    'project:update-branch',
-    'settings:get-global',
-    'settings:get-workspace',
-    'settings:update-global',
-    'settings:update-workspace',
-    'git:is-repo',
-    'git:current-branch',
-    'git:list-branches',
-    'git:fetch',
-    'git:change-stats',
-    'git:checkout',
-    'git:create-branch',
-    'git:create-worktree',
-    'git:list-worktrees',
-    'git:remove-worktree',
-    'git:suggest-worktree-path',
-    'extension:list',
-    'extension:install',
-    'extension:uninstall',
-    'extension:toggle',
-    'extension:reload',
-    'extension:update-setting',
-    'extension:get-commands',
-    'extension:get-context-menu-items',
-    'extension:get-settings-schemas',
-    'extension:get-settings-values',
-    'extension:get-sidebar-items',
-    'extension:sidebar-item-click',
-    'extension:context-menu-click',
-    'extension:execute-command',
-    'metrics:system',
-    'metrics:processes',
-    'metrics:pids',
-    'notifications:list',
-    'notifications:create',
-    'notifications:dismiss',
-    'notifications:trigger-action',
-    'fs:read-file',
-    'fs:watch-start',
-    'fs:watch-stop',
-    'shell:exec',
-    'shell:open-path',
-    'log:write',
-    // Push-event channels the /app/ shim subscribes to. These were silently
-    // rejected before the manifest existed (the old hand-written allowlist
-    // missed them), so remote /app/ never received these pushes.
-    'fs:changed',
-    'notifications:push',
-    'extension:toggle-panel',
-    'extension:select-project-tab',
-    'menu:open-settings',
-    'menu:open-home',
-    'menu:toggle-sidebar',
-    'menu:close-tab',
-    'menu:open-about',
-    // Issue-tracker integrations. Everything the remote surface needs to read
-    // and attach issues — but note connect/disconnect are deliberately absent
-    // below, and asserted absent in their own test.
-    'integrations:status',
-    'integrations:set-mine',
-    'integrations:issue-list-mine',
-    'integrations:issue-search',
-    'integrations:issue-get',
-    'integrations:issue-comment',
-    'integrations:link-set',
-    'integrations:link-get',
-    'integrations:link-clear',
-    'integrations:context-preview',
-    'integrations:set-inject-context',
-    'integrations:status-changed',
-    'integrations:link-changed',
-    'integrations:context-injected',
-    // Session descriptions and session-level work items. The remote /app/ runs
-    // the same Home and Overview, so it reads and writes the same records.
-    'session-records:list',
-    'session-records:set-description',
-    'session-records:set-link',
-    'session-records:transfer',
-    'session-records:forget',
-    'session-records:changed',
-  ]
+// The complete expected remote surface for core channels. Deliberately spelled
+// out: widening or shrinking what a browser client can reach must show up as a
+// diff in this test, even though the runtime set is derived from the manifest.
+const EXPECTED_REMOTE_CHANNELS = [
+  'app:get-info',
+  'terminal:create',
+  'terminal:attach',
+  'terminal:close',
+  'terminal:close-all',
+  'terminal:cleanup-orphans',
+  'terminal:input',
+  'terminal:resize',
+  'terminal:output',
+  'terminal:process-exit',
+  'workspace:list',
+  'workspace:create',
+  'workspace:update',
+  'workspace:delete',
+  'workspace:reorder',
+  'project:list',
+  'project:create',
+  'project:delete',
+  'project:rename',
+  'project:reorder',
+  'project:update-branch',
+  'settings:get-global',
+  'settings:get-workspace',
+  'settings:update-global',
+  'settings:update-workspace',
+  'git:is-repo',
+  'git:current-branch',
+  'git:list-branches',
+  'git:fetch',
+  'git:change-stats',
+  'git:checkout',
+  'git:create-branch',
+  'git:create-worktree',
+  'git:list-worktrees',
+  'git:remove-worktree',
+  'git:suggest-worktree-path',
+  'extension:list',
+  'extension:list-changed',
+  'extension:install',
+  'extension:uninstall',
+  'extension:toggle',
+  'extension:reload',
+  'extension:update-setting',
+  'extension:update-workspace-setting',
+  'extension:get-commands',
+  'extension:get-settings-schemas',
+  'extension:get-settings-values',
+  'extension:execute-command',
+  'metrics:system',
+  'metrics:processes',
+  'metrics:pids',
+  'notifications:list',
+  'notifications:create',
+  'notifications:dismiss',
+  'notifications:trigger-action',
+  'fs:read-file',
+  'shell:exec',
+  'shell:open-path',
+  'log:write',
+  // Push-event channels the /app/ shim subscribes to. These were silently
+  // rejected before the manifest existed (the old hand-written allowlist
+  // missed them), so remote /app/ never received these pushes.
+  'notifications:push',
+  'extension:toggle-panel',
+  'extension:select-project-tab',
+  'menu:open-settings',
+  'menu:open-home',
+  'menu:toggle-sidebar',
+  'menu:close-tab',
+  'menu:open-about',
+  // Issue-tracker integrations. Everything the remote surface needs to read
+  // and attach issues — but note connect/disconnect are deliberately absent
+  // below, and asserted absent in their own test.
+  'integrations:status',
+  'integrations:set-mine',
+  'integrations:issue-list-mine',
+  'integrations:issue-search',
+  'integrations:issue-get',
+  'integrations:issue-comment',
+  'integrations:link-set',
+  'integrations:link-get',
+  'integrations:link-clear',
+  'integrations:context-preview',
+  'integrations:set-inject-context',
+  'integrations:status-changed',
+  'integrations:link-changed',
+  'integrations:context-injected',
+  // Session descriptions and session-level work items. The remote /app/ runs
+  // the same Home and Overview, so it reads and writes the same records.
+  'session-records:list',
+  'session-records:set-description',
+  'session-records:set-link',
+  'session-records:transfer',
+  'session-records:forget',
+  'session-records:changed',
+]
 
+const INTERNAL_ONLY_CHANNELS = [
+  // A file watch reports to the desktop view that asked for it (ADR 109).
+  'fs:watch-start',
+  'fs:watch-stop',
+  'fs:changed',
+  'dialog:open-directory',
+  'shell:open-external',
+  'extension:update-panel-bounds',
+  'extension:set-bottom-inset',
+  'workspace:get-active',
+  'workspace:active-changed',
+  'db:health',
+  'menu:set-panel-checked',
+  'workspace:project-added',
+  'workspace:project-removed',
+  'extension:panel-loaded',
+  'extension:renderer-reload',
+]
+
+describe('remoteAccessibleCoreChannels()', () => {
   it('derives exactly the expected remote surface', () => {
     const derived = remoteAccessibleCoreChannels()
-    expect([...derived].sort()).toEqual([...EXPECTED].sort())
+    expect([...derived].sort()).toEqual([...EXPECTED_REMOTE_CHANNELS].sort())
   })
 
   it('never exposes credential writes to the remote bridge', () => {
@@ -150,19 +164,7 @@ describe('remoteAccessibleCoreChannels()', () => {
 
   it('keeps internal-only channels unreachable (default-deny holds)', () => {
     const derived = remoteAccessibleCoreChannels()
-    for (const internal of [
-      'dialog:open-directory',
-      'shell:open-external',
-      'extension:update-panel-bounds',
-      'extension:set-bottom-inset',
-      'workspace:get-active',
-      'db:health',
-      'menu:set-panel-checked',
-      'workspace:project-added',
-      'workspace:project-removed',
-      'extension:panel-loaded',
-      'extension:renderer-reload',
-    ]) {
+    for (const internal of INTERNAL_ONLY_CHANNELS) {
       expect(derived.has(internal), `${internal} must not be remote-accessible`).toBe(false)
     }
   })

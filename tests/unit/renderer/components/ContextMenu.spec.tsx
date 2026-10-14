@@ -1,9 +1,9 @@
 import React from 'react'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
 import { ContextMenu, closeAllContextMenus } from '../../../../src/renderer/components/ContextMenu'
 
-let onDismiss: ReturnType<typeof vi.fn>
+let onDismiss: Mock<() => void>
 
 const items = [
   { label: 'Rename', onSelect: vi.fn() },
@@ -44,7 +44,9 @@ describe('ContextMenu', () => {
     const { container } = render(<ContextMenu x={0} y={0} items={items} onDismiss={onDismiss} />)
     expect(container.querySelectorAll('.ctx-menu__separator')).toHaveLength(1)
   })
+})
 
+describe('ContextMenu — dismisses on an outside click', () => {
   it('dismisses on an outside click', () => {
     render(<ContextMenu x={0} y={0} items={items} onDismiss={onDismiss} />)
     fireEvent.click(window)
@@ -70,7 +72,9 @@ describe('ContextMenu', () => {
     act(() => closeAllContextMenus())
     expect(onDismiss).not.toHaveBeenCalled()
   })
+})
 
+describe('ContextMenu — closeAllContextMenus dispatches the coordination event', () => {
   it('closeAllContextMenus dispatches the coordination event', () => {
     const handler = vi.fn()
     window.addEventListener('close-context-menus', handler)

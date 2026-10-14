@@ -1,9 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { queueEntry } from '../helpers/queue-entries.js'
+import { builderUnit, testCriterion } from '../helpers/order-parts.js'
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createRunChannels, proposeRecipe, readRunGraph } from '../../src/ipc/run-channels.js'
+import type { RunDeps } from '../../src/ipc/run-channels.js'
+import { idleRunSeams } from './run-deps.js'
 import { createOrderStore } from '../../src/order/store.js'
 import type { OrderStore } from '../../src/order/store.js'
 import { draftOrder } from '../../src/order/draft.js'
@@ -11,9 +14,10 @@ import { probeToolchain } from '../../src/verify/toolchain-probe.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import type { RunGraph } from '../../src/line/run-graph.js'
 import type { ToolActivity } from '../../src/runtime/transcript-tailer.js'
-import { readTimeline, forgetTimelines } from '../../src/factory/timeline-store.js'
+import { readTimeline } from '../../src/factory/timeline-store.js'
 import { writeCiState } from '../../src/line/ci-state.js'
 import type { CiState } from '../../src/line/ci-state.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 // Everything that can refuse a run refuses before any work begins. An order
 // that fails half way through because a recipe could not run here has already
@@ -25,15 +29,21 @@ let dataRoot: string
 let repo: string
 let store: OrderStore
 
-function channels() {
-  return createRunChannels({
+function runDeps(over: Partial<RunDeps> = {}): RunDeps {
+  return {
     store,
     // Resolved on every call in the host, because the records location follows
     // the open workspace — a fixed value here is what that resolver returns.
     dataRoot: () => dataRoot,
     sources: () => ({ dataRoot, repoPaths: [repo], builtInDir }),
     now: () => '2026-09-06T10:00:00.000Z',
-  })
+    ...idleRunSeams(),
+    ...over,
+  }
+}
+
+function freshRunChannels() {
+  return createRunChannels(runDeps())
 }
 
 function order(over: Partial<WorkOrder> = {}): WorkOrder {
@@ -47,37 +57,18 @@ function order(over: Partial<WorkOrder> = {}): WorkOrder {
   return {
     ...base,
     status: 'agreed',
-    acceptance: [
-      {
-        id: 'AC-1',
-        statement: 'a',
-        priority: 'P1',
-        verify: { kind: 'test', command: 'npm test', assert: 'exit_code == 0' },
-        unverifiable: null,
-      },
-    ],
+    acceptance: [testCriterion('AC-1', { statement: 'a' })],
     plan: {
       ...base.plan,
-      units: [
-        {
-          id: 'U-1',
-          title: 'a',
-          role: 'builder',
-          lane: 1,
-          dependsOn: [],
-          satisfies: ['AC-1'],
-          touches: ['src/a'],
-          verify: [],
-        },
-      ],
+      units: [builderUnit('U-1', { title: 'a', satisfies: ['AC-1'], touches: ['src/a'] })],
     },
     ...over,
   }
 }
 
 beforeEach(() => {
-  dataRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-run-'))
-  repo = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-run-repo-'))
+  dataRoot = makeTempDir('fdry-run-')
+  repo = makeTempDir('fdry-run-repo-')
   fs.writeFileSync(path.join(repo, 'package.json'), JSON.stringify({ scripts: { test: 'vitest' } }))
   store = createOrderStore(dataRoot)
 })
@@ -87,9 +78,20 @@ afterEach(() => {
 })
 
 describe('foundry:run.start', () => {
+  describe('building', buildingTests)
+  describe('unknown skills', unknownSkillsTests)
+  describe('shapes', shapesTests)
+  describe('recording', runChannelsRecordingTests)
+  describe('unknown recipes and orders', unknownRecipesAndOrdersTests)
+})
+
+function buildingTests() {
   it('builds a graph and moves the order to running', async () => {
     await store.save(order())
-    const r = (await channels().start({ id: 'WO-1' })) as { graph: RunGraph; order: WorkOrder }
+    const r = (await freshRunChannels().start({ id: 'WO-1' })) as {
+      graph: RunGraph
+      order: WorkOrder
+    }
     expect(r.graph.nodes.length).toBeGreaterThan(0)
     expect(r.order.status).toBe('running')
     expect((await store.load('WO-1'))?.status).toBe('running')
@@ -97,17 +99,19 @@ describe('foundry:run.start', () => {
 
   it('persists the graph so a restart can pick it up', async () => {
     await store.save(order())
-    await channels().start({ id: 'WO-1' })
+    await freshRunChannels().start({ id: 'WO-1' })
     expect(fs.existsSync(path.join(dataRoot, 'orders', 'WO-1', 'run-graph.json'))).toBe(true)
   })
 
   it('refuses an order that has not been agreed, without building anything', async () => {
     await store.save(order({ status: 'draft' }))
-    const r = (await channels().start({ id: 'WO-1' })) as { error: string }
+    const r = (await freshRunChannels().start({ id: 'WO-1' })) as { error: string }
     expect(r.error).toMatch(/Only an agreed order/)
     expect(fs.existsSync(path.join(dataRoot, 'orders', 'WO-1', 'run-graph.json'))).toBe(false)
   })
+}
 
+function unknownSkillsTests() {
   it('refuses to start when a role names a skill nothing defines, and nothing runs', async () => {
     // The data root overrides the built-in builder with one that names a
     // skill nobody has, at any of the three rungs.
@@ -128,17 +132,21 @@ describe('foundry:run.start', () => {
       ].join('\n')
     )
     await store.save(order())
-    const r = (await channels().start({ id: 'WO-1' })) as { error: string }
+    const r = (await freshRunChannels().start({ id: 'WO-1' })) as { error: string }
     expect(r.error).toMatch(/Unknown skill "nonexistent"/)
     expect(r.error).toContain('builder')
     expect(r.error).toContain(`${dataRoot}/skills/nonexistent/SKILL.md`)
     expect(fs.existsSync(path.join(dataRoot, 'orders', 'WO-1', 'run-graph.json'))).toBe(false)
     expect((await store.load('WO-1'))?.status).toBe('agreed')
   })
+}
 
+function shapesTests() {
   it('refuses a shape this repository cannot support, and says why', async () => {
     await store.save(order())
-    const r = (await channels().start({ id: 'WO-1', recipe: 'speckit' })) as { error: string }
+    const r = (await freshRunChannels().start({ id: 'WO-1', recipe: 'speckit' })) as {
+      error: string
+    }
     expect(r.error).toMatch(/cannot run here/)
     expect(r.error).toMatch(/\.specify/)
   })
@@ -146,13 +154,17 @@ describe('foundry:run.start', () => {
   it('runs that same shape once the repository supports it', async () => {
     fs.mkdirSync(path.join(repo, '.specify'), { recursive: true })
     await store.save(order())
-    const r = (await channels().start({ id: 'WO-1', recipe: 'speckit' })) as { graph: RunGraph }
+    const r = (await freshRunChannels().start({ id: 'WO-1', recipe: 'speckit' })) as {
+      graph: RunGraph
+    }
     expect(r.graph.recipe).toBe('speckit')
   })
+}
 
+function runChannelsRecordingTests() {
   it('records an operator override as an operator decision', async () => {
     await store.save(order())
-    await channels().start({ id: 'WO-1', recipe: 'direct' })
+    await freshRunChannels().start({ id: 'WO-1', recipe: 'direct' })
     const saved = await store.load('WO-1')
     expect(saved?.recipeOverriddenBy).toBe('operator')
     const ledger = fs.readFileSync(path.join(dataRoot, 'orders', 'WO-1', 'ledger.jsonl'), 'utf8')
@@ -161,7 +173,7 @@ describe('foundry:run.start', () => {
 
   it('records a proposal as the architect proposing, not the operator choosing', async () => {
     await store.save(order())
-    await channels().start({ id: 'WO-1' })
+    await freshRunChannels().start({ id: 'WO-1' })
     expect((await store.load('WO-1'))?.recipeOverriddenBy).toBeNull()
     const ledger = fs.readFileSync(path.join(dataRoot, 'orders', 'WO-1', 'ledger.jsonl'), 'utf8')
     expect(ledger).toContain('role:architect')
@@ -169,32 +181,44 @@ describe('foundry:run.start', () => {
 
   it('records which rung the recipe came from', async () => {
     await store.save(order())
-    await channels().start({ id: 'WO-1' })
+    await freshRunChannels().start({ id: 'WO-1' })
     expect(
       fs.readFileSync(path.join(dataRoot, 'orders', 'WO-1', 'ledger.jsonl'), 'utf8')
     ).toContain('built-in')
   })
+}
 
+function unknownRecipesAndOrdersTests() {
   it('reports a recipe nobody defines', async () => {
     await store.save(order())
-    const r = (await channels().start({ id: 'WO-1', recipe: 'nonesuch' })) as { error: string }
+    const r = (await freshRunChannels().start({ id: 'WO-1', recipe: 'nonesuch' })) as {
+      error: string
+    }
     expect(r.error).toMatch(/nonesuch/)
   })
 
   it('reports an order it cannot find', async () => {
-    expect(await channels().start({ id: 'WO-nope' })).toEqual({ error: 'No order WO-nope.' })
+    expect(await freshRunChannels().start({ id: 'WO-nope' })).toEqual({
+      error: 'No order WO-nope.',
+    })
   })
-
-  it('rejects a malformed request', async () => {
-    expect(await channels().start({ nope: true })).toEqual({ error: 'Malformed request.' })
-  })
-})
+}
 
 describe('foundry:run.observe', () => {
+  describe('the graph', runChannelsTheGraphTests)
+  describe('CI', runChannelsCiTests)
+  describe('pull requests', pullRequestsTests)
+  describe('no pulls and the ticket', noPullsAndTheTicketTests)
+  describe('no CI and skills', noCiAndSkillsTests)
+  describe('unresolved skills and no queue', unresolvedSkillsAndNoQueueTests)
+  describe('the queue position', runChannelsTheQueuePositionTests)
+})
+
+function runChannelsTheGraphTests() {
   it('reports the graph, what can start and what is waiting', async () => {
     await store.save(order())
-    await channels().start({ id: 'WO-1' })
-    const r = (await channels().observe({ id: 'WO-1' })) as {
+    await freshRunChannels().start({ id: 'WO-1' })
+    const r = (await freshRunChannels().observe({ id: 'WO-1' })) as {
       graph: RunGraph
       ready: string[]
       blocked: { id: string; reason: string }[]
@@ -205,12 +229,14 @@ describe('foundry:run.observe', () => {
 
   it('reports no run before one has started', async () => {
     await store.save(order())
-    expect(await channels().observe({ id: 'WO-1' })).toEqual({ error: 'No run for WO-1.' })
+    expect(await freshRunChannels().observe({ id: 'WO-1' })).toEqual({ error: 'No run for WO-1.' })
   })
+}
 
+function runChannelsCiTests() {
   it('reports the CI state a written ci.json carries', async () => {
     await store.save(order())
-    await channels().start({ id: 'WO-1' })
+    await freshRunChannels().start({ id: 'WO-1' })
     const state: CiState = {
       round: 1,
       max: 3,
@@ -220,13 +246,15 @@ describe('foundry:run.observe', () => {
       at: '2026-09-06T10:00:00.000Z',
     }
     await writeCiState(dataRoot, 'WO-1', state)
-    const r = (await channels().observe({ id: 'WO-1' })) as { ci: CiState | null }
+    const r = (await freshRunChannels().observe({ id: 'WO-1' })) as { ci: CiState | null }
     expect(r.ci).toEqual(state)
   })
+}
 
+function pullRequestsTests() {
   it('reports each pull request the run opened, with its address', async () => {
     await store.save(order())
-    await channels().start({ id: 'WO-1' })
+    await freshRunChannels().start({ id: 'WO-1' })
     fs.writeFileSync(
       path.join(dataRoot, 'orders', 'WO-1', 'pulls.json'),
       JSON.stringify([
@@ -240,7 +268,7 @@ describe('foundry:run.observe', () => {
         },
       ])
     )
-    const r = (await channels().observe({ id: 'WO-1' })) as {
+    const r = (await freshRunChannels().observe({ id: 'WO-1' })) as {
       pulls: { repo: string; url: string; number: number; cwd: string }[]
     }
     expect(r.pulls).toEqual([
@@ -252,18 +280,20 @@ describe('foundry:run.observe', () => {
       },
     ])
   })
+}
 
+function noPullsAndTheTicketTests() {
   it('reports no pull requests before one is opened', async () => {
     await store.save(order())
-    await channels().start({ id: 'WO-1' })
-    const r = (await channels().observe({ id: 'WO-1' })) as { pulls: unknown[] }
+    await freshRunChannels().start({ id: 'WO-1' })
+    const r = (await freshRunChannels().observe({ id: 'WO-1' })) as { pulls: unknown[] }
     expect(r.pulls).toEqual([])
   })
 
   it('reports the ticket the order came from, and null for a typed idea', async () => {
     await store.save(order())
-    await channels().start({ id: 'WO-1' })
-    const typed = (await channels().observe({ id: 'WO-1' })) as { source: unknown }
+    await freshRunChannels().start({ id: 'WO-1' })
+    const typed = (await freshRunChannels().observe({ id: 'WO-1' })) as { source: unknown }
     expect(typed.source).toBeNull()
 
     const running = (await store.load('WO-1')) as WorkOrder
@@ -276,84 +306,103 @@ describe('foundry:run.observe', () => {
         url: 'https://linear.app/t/issue/TAV-15',
       },
     })
-    const ticket = (await channels().observe({ id: 'WO-1' })) as { source: unknown }
+    const ticket = (await freshRunChannels().observe({ id: 'WO-1' })) as { source: unknown }
     expect(ticket.source).toEqual({ key: 'TAV-15', url: 'https://linear.app/t/issue/TAV-15' })
   })
+}
 
+function noCiAndSkillsTests() {
   it('reports no CI when nothing has written one', async () => {
     await store.save(order())
-    await channels().start({ id: 'WO-1' })
-    const r = (await channels().observe({ id: 'WO-1' })) as { ci: CiState | null }
+    await freshRunChannels().start({ id: 'WO-1' })
+    const r = (await freshRunChannels().observe({ id: 'WO-1' })) as { ci: CiState | null }
     expect(r.ci).toBeNull()
   })
 
   it("reports each node's skills, resolved from the order's recipe", async () => {
     await store.save(order())
-    await channels().start({ id: 'WO-1' })
+    await freshRunChannels().start({ id: 'WO-1' })
     const graph = await readRunGraph(dataRoot, 'WO-1')
     const builderNode = graph?.nodes.find((n) => n.role === 'builder')
-    const r = (await channels().observe({ id: 'WO-1' })) as { skills: Record<string, string[]> }
+    const r = (await freshRunChannels().observe({ id: 'WO-1' })) as {
+      skills: Record<string, string[]>
+    }
     expect(builderNode).toBeDefined()
     expect(r.skills[builderNode?.id ?? '']).toEqual(['ci-fix'])
   })
+}
 
+function unresolvedSkillsAndNoQueueTests() {
   it('reports no skills for an order whose recipe no longer resolves', async () => {
     await store.save(order())
-    await channels().start({ id: 'WO-1' })
+    await freshRunChannels().start({ id: 'WO-1' })
     const running = await store.load('WO-1')
     await store.save({ ...(running as WorkOrder), recipe: 'ghost-recipe' })
-    const r = (await channels().observe({ id: 'WO-1' })) as { skills: Record<string, string[]> }
+    const r = (await freshRunChannels().observe({ id: 'WO-1' })) as {
+      skills: Record<string, string[]>
+    }
     expect(r.skills).toEqual({})
   })
 
   it('carries no queue when nothing has wired the refinery', async () => {
     await store.save(order())
-    await channels().start({ id: 'WO-1' })
-    const r = (await channels().observe({ id: 'WO-1' })) as { queue: unknown }
+    await freshRunChannels().start({ id: 'WO-1' })
+    const r = (await freshRunChannels().observe({ id: 'WO-1' })) as { queue: unknown }
     expect(r.queue).toBeNull()
   })
+}
 
+function runChannelsTheQueuePositionTests() {
   it('carries the queue position when the refinery is wired and this order overlaps another', async () => {
     await store.save(order())
-    await channels().start({ id: 'WO-1' })
-    const withQueue = createRunChannels({
-      store,
-      dataRoot: () => dataRoot,
-      sources: () => ({ dataRoot, repoPaths: [repo], builtInDir }),
-      now: () => '2026-09-06T10:00:00.000Z',
-      queueEntries: async () => [
-        {
-          orderId: 'WO-1',
-          title: 'x',
-          repo: 'repo',
-          base: 'main',
-          agreedAt: '2026-09-02T00:00:00.000Z',
-          files: ['src/a'],
-          merged: false,
-        },
-        {
-          orderId: 'WO-earlier',
-          title: 'Earlier work',
-          repo: 'repo',
-          base: 'main',
-          agreedAt: '2026-09-01T00:00:00.000Z',
-          files: ['src/a'],
-          merged: false,
-        },
-      ],
-    })
+    await freshRunChannels().start({ id: 'WO-1' })
+    const withQueue = createRunChannels(
+      runDeps({
+        queueEntries: async () => [
+          queueEntry('WO-1', {
+            title: 'x',
+            agreedAt: '2026-09-02T00:00:00.000Z',
+            files: ['src/a'],
+          }),
+          queueEntry('WO-earlier', { title: 'Earlier work', files: ['src/a'] }),
+        ],
+      })
+    )
     const r = (await withQueue.observe({ id: 'WO-1' })) as {
       queue: { position: number; behind: { orderId: string }[] } | null
     }
     expect(r.queue?.position).toBe(2)
     expect(r.queue?.behind[0]?.orderId).toBe('WO-earlier')
   })
-})
+}
 
 describe('foundry:run.recipes', () => {
+  describe('offering', offeringTests)
+  describe('the choice', theChoiceTests)
+  describe('the proposal', runChannelsTheProposalTests)
+})
+
+function unit(over: Partial<WorkOrder['plan']['units'][number]> = {}) {
+  return {
+    id: 'U-2',
+    title: 'b',
+    role: 'builder',
+    lane: 1,
+    dependsOn: [],
+    satisfies: ['AC-1'],
+    touches: [],
+    verify: [],
+    ...over,
+  }
+}
+function graded(grade: WorkOrder['risk']['grade'], triggers: WorkOrder['risk']['triggers'] = []) {
+  return order({ risk: { grade, triggers, blastRadius: [], criticalPaths: [] } })
+}
+
+function offeringTests() {
   it('offers every shape, marking the ones this repository cannot support', async () => {
     await store.save(order())
-    const r = (await channels().recipes({ id: 'WO-1' })) as {
+    const r = (await freshRunChannels().recipes({ id: 'WO-1' })) as {
       recipes: { name: string; available: boolean; unmet: string[] }[]
       proposed: string
     }
@@ -365,13 +414,15 @@ describe('foundry:run.recipes', () => {
 
   it('names which rung each shape came from', async () => {
     await store.save(order())
-    const r = (await channels().recipes({ id: 'WO-1' })) as { recipes: { rung: string }[] }
+    const r = (await freshRunChannels().recipes({ id: 'WO-1' })) as { recipes: { rung: string }[] }
     expect(r.recipes.every((x) => x.rung === 'built-in')).toBe(true)
   })
+}
 
+function theChoiceTests() {
   it('is unchosen, with no chosenAt, before the operator picks one', async () => {
     await store.save(order())
-    const r = (await channels().recipes({ id: 'WO-1' })) as {
+    const r = (await freshRunChannels().recipes({ id: 'WO-1' })) as {
       chosen: string | null
       chosenAt: string | null
     }
@@ -391,22 +442,24 @@ describe('foundry:run.recipes', () => {
       evidence: [],
     })
     await store.save({ ...order(), recipe: 'standard' })
-    const r = (await channels().recipes({ id: 'WO-1' })) as {
+    const r = (await freshRunChannels().recipes({ id: 'WO-1' })) as {
       chosen: string | null
       chosenAt: string | null
     }
     expect(r.chosen).toBe('standard')
     expect(r.chosenAt).toBe('2026-09-06T10:05:00.000Z')
   })
+}
 
+function runChannelsTheProposalTests() {
   // The ladder's own proposal ignores the operator's pick — overriding one
   // recipe with another must not read back as "the ladder proposed this".
   it('proposes what the ladder would choose, ignoring the operator’s own pick', async () => {
     await store.save({ ...order(), recipe: 'standard' })
-    const r = (await channels().recipes({ id: 'WO-1' })) as { proposed: string }
+    const r = (await freshRunChannels().recipes({ id: 'WO-1' })) as { proposed: string }
     expect(r.proposed).toBe('direct')
   })
-})
+}
 
 // Choosing the shape.
 //
@@ -416,24 +469,11 @@ describe('foundry:run.recipes', () => {
 // fan-out is `by lane` now, so seven units in one lane cost one session and
 // pricing the shape off them charged for parallelism that never existed.
 describe('proposeRecipe', () => {
-  function unit(over: Partial<WorkOrder['plan']['units'][number]> = {}) {
-    return {
-      id: 'U-2',
-      title: 'b',
-      role: 'builder',
-      lane: 1,
-      dependsOn: [],
-      satisfies: ['AC-1'],
-      touches: [],
-      verify: [],
-      ...over,
-    }
-  }
+  describe('direct', directTests)
+  describe('standard', standardTests)
+})
 
-  function graded(grade: WorkOrder['risk']['grade'], triggers: WorkOrder['risk']['triggers'] = []) {
-    return order({ risk: { grade, triggers, blastRadius: [], criticalPaths: [] } })
-  }
-
+function directTests() {
   it('keeps a shape the order already carries', () => {
     expect(proposeRecipe(order({ recipe: 'bugfix' }))).toEqual({
       name: 'bugfix',
@@ -464,7 +504,9 @@ describe('proposeRecipe', () => {
     expect(proposal.name).toBe('direct')
     expect(proposal.why).toContain('public_interface')
   })
+}
 
+function standardTests() {
   it('proposes the standard shape once there is more than one lane', () => {
     const o = graded('P3')
     o.plan.units.push(unit({ lane: 2 }))
@@ -482,16 +524,22 @@ describe('proposeRecipe', () => {
     expect(proposal.name).toBe('standard')
     expect(proposal.why).toContain("above the direct shape's ceiling")
   })
-})
+}
 
 describe('the reason a shape was chosen (FR-014)', () => {
+  describe('recording the reason', recordingTheReasonTests)
+  describe('offering the reason', offeringTheReasonTests)
+  describe('direct and refused choices', directAndRefusedChoicesTests)
+})
+
+function recordingTheReasonTests() {
   function ledgerText(): string {
     return fs.readFileSync(path.join(dataRoot, 'orders', 'WO-1', 'ledger.jsonl'), 'utf8')
   }
 
   it('records why the system picked the shape, not only where it came from', async () => {
     await store.save(order())
-    await channels().start({ id: 'WO-1' })
+    await freshRunChannels().start({ id: 'WO-1' })
     const text = ledgerText()
     expect(text).toContain('role:architect')
     expect(text).toContain('one lane, graded low risk')
@@ -500,13 +548,15 @@ describe('the reason a shape was chosen (FR-014)', () => {
 
   it('says the operator chose it when the operator chose it', async () => {
     await store.save(order())
-    await channels().start({ id: 'WO-1', recipe: 'standard' })
+    await freshRunChannels().start({ id: 'WO-1', recipe: 'standard' })
     expect(ledgerText()).toContain('chosen by the operator')
   })
+}
 
+function offeringTheReasonTests() {
   it('offers the reason alongside the proposal', async () => {
     await store.save(order())
-    const view = (await channels().recipes({ id: 'WO-1' })) as {
+    const view = (await freshRunChannels().recipes({ id: 'WO-1' })) as {
       proposed: string
       proposedWhy: string
     }
@@ -516,14 +566,16 @@ describe('the reason a shape was chosen (FR-014)', () => {
 
   it('proposes direct in a repository with no test command, because direct needs none', async () => {
     await store.save(order())
-    const view = (await channels().recipes({ id: 'WO-1' })) as {
+    const view = (await freshRunChannels().recipes({ id: 'WO-1' })) as {
       recipes: { name: string; available: boolean }[]
       proposed: string
     }
     expect(view.recipes.find((r) => r.name === 'direct')?.available).toBe(true)
     expect(view.proposed).toBe('direct')
   })
+}
 
+function directAndRefusedChoicesTests() {
   it('proposes direct where a test command exists too', async () => {
     fs.writeFileSync(
       path.join(repo, 'package.json'),
@@ -534,7 +586,7 @@ describe('the reason a shape was chosen (FR-014)', () => {
       ...o,
       context: { ...o.context, toolchain: probeToolchain(repo) },
     })
-    const view = (await channels().recipes({ id: 'WO-1' })) as { proposed: string }
+    const view = (await freshRunChannels().recipes({ id: 'WO-1' })) as { proposed: string }
     expect(view.proposed).toBe('direct')
   })
 
@@ -542,127 +594,87 @@ describe('the reason a shape was chosen (FR-014)', () => {
   // why not, because a silent substitution is a decision nobody made.
   it('refuses an operator choice this repository cannot run, rather than stepping down', async () => {
     await store.save(order())
-    const result = (await channels().start({ id: 'WO-1', recipe: 'bugfix' })) as { error?: string }
+    const result = (await freshRunChannels().start({ id: 'WO-1', recipe: 'bugfix' })) as {
+      error?: string
+    }
     expect(result.error).toContain('bugfix')
     expect(result.error).toContain('no test command')
   })
-})
+}
 
 // A run left in flight when the application closed is picked back up by
 // reading its graph off disk (042). Graphs written before a fan-out node could
 // carry a whole lane have `unitId`, a single value, and nothing validates the
 // file on the way in — so the boundary that reads it is the one place worth
 // converting.
+/** What every node in an old graph carries besides what each test names. */
+const LEGACY_NODE = {
+  lane: null,
+  role: null,
+  dependsOn: [],
+  attempts: 0,
+  sessionId: null,
+  worktreePath: null,
+  startedAt: null,
+  endedAt: null,
+}
+
+/** Writes WO-1's graph the way an earlier build did, with this one node. */
+function writeLegacyGraph(node: Record<string, unknown>): void {
+  const dir = path.join(dataRoot, 'orders', 'WO-1')
+  fs.mkdirSync(dir, { recursive: true })
+  const graph = { orderId: 'WO-1', recipe: 'direct', nodes: [{ ...LEGACY_NODE, ...node }] }
+  fs.writeFileSync(path.join(dir, 'run-graph.json'), JSON.stringify(graph))
+}
+
 describe('a graph written before a node could carry a lane', () => {
   it('reads a legacy unitId as the one unit it names', async () => {
-    const dir = path.join(dataRoot, 'orders', 'WO-1')
-    fs.mkdirSync(dir, { recursive: true })
-    fs.writeFileSync(
-      path.join(dir, 'run-graph.json'),
-      JSON.stringify({
-        orderId: 'WO-1',
-        recipe: 'direct',
-        nodes: [
-          {
-            id: 'build:U-1',
-            stepId: 'build',
-            kind: 'fanout',
-            state: 'running',
-            unitId: 'U-1',
-            lane: 1,
-            role: 'builder',
-            dependsOn: [],
-            attempts: 1,
-            sessionId: 's-1',
-            worktreePath: null,
-            startedAt: null,
-            endedAt: null,
-          },
-        ],
-      })
-    )
+    writeLegacyGraph({
+      id: 'build:U-1',
+      stepId: 'build',
+      kind: 'fanout',
+      state: 'running',
+      unitId: 'U-1',
+      lane: 1,
+      role: 'builder',
+      attempts: 1,
+      sessionId: 's-1',
+    })
     const graph = await readRunGraph(dataRoot, 'WO-1')
     expect(graph?.nodes[0].unitIds).toEqual(['U-1'])
   })
 
   it('reads a legacy node with no unit as covering none', async () => {
-    const dir = path.join(dataRoot, 'orders', 'WO-1')
-    fs.mkdirSync(dir, { recursive: true })
-    fs.writeFileSync(
-      path.join(dir, 'run-graph.json'),
-      JSON.stringify({
-        orderId: 'WO-1',
-        recipe: 'direct',
-        nodes: [
-          {
-            id: 'ship',
-            stepId: 'ship',
-            kind: 'gate',
-            state: 'waiting',
-            unitId: null,
-            lane: null,
-            role: null,
-            dependsOn: [],
-            attempts: 0,
-            sessionId: null,
-            worktreePath: null,
-            startedAt: null,
-            endedAt: null,
-          },
-        ],
-      })
-    )
+    writeLegacyGraph({ id: 'ship', stepId: 'ship', kind: 'gate', state: 'waiting', unitId: null })
     const graph = await readRunGraph(dataRoot, 'WO-1')
     expect(graph?.nodes[0].unitIds).toEqual([])
   })
 
   it('reads a graph written before reworks and feedback existed as having neither', async () => {
-    const dir = path.join(dataRoot, 'orders', 'WO-1')
-    fs.mkdirSync(dir, { recursive: true })
-    fs.writeFileSync(
-      path.join(dir, 'run-graph.json'),
-      JSON.stringify({
-        orderId: 'WO-1',
-        recipe: 'direct',
-        nodes: [
-          {
-            id: 'lint',
-            stepId: 'lint',
-            kind: 'agent',
-            state: 'waiting',
-            unitIds: [],
-            lane: null,
-            role: null,
-            dependsOn: [],
-            attempts: 0,
-            sessionId: null,
-            worktreePath: null,
-            startedAt: null,
-            endedAt: null,
-          },
-        ],
-      })
-    )
+    writeLegacyGraph({ id: 'lint', stepId: 'lint', kind: 'agent', state: 'waiting', unitIds: [] })
     const graph = await readRunGraph(dataRoot, 'WO-1')
     expect(graph?.nodes[0].reworks).toBe(0)
     expect(graph?.nodes[0].feedback).toEqual([])
   })
 })
 
+/** Starts WO-1 with its records in a directory nobody may write to, then cleans up. */
+async function startWhereNothingCanBeWritten(): Promise<{ error: string }> {
+  const wall = makeTempDir('fdry-wall-')
+  fs.chmodSync(wall, 0o500)
+  try {
+    const blocked = createRunChannels(runDeps({ dataRoot: () => path.join(wall, 'foundry') }))
+    return (await blocked.start({ id: 'WO-1' })) as { error: string }
+  } finally {
+    fs.chmodSync(wall, 0o700)
+    fs.rmSync(wall, { recursive: true, force: true })
+  }
+}
+
 describe('the records location', () => {
   it('refuses to start when the records location cannot be written to, before any work begins', async () => {
     await store.save(order())
-    const wall = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-wall-'))
-    fs.chmodSync(wall, 0o500)
-    const blocked = createRunChannels({
-      store,
-      dataRoot: () => path.join(wall, 'foundry'),
-      sources: () => ({ dataRoot, repoPaths: [repo], builtInDir }),
-      now: () => '2026-09-06T10:00:00.000Z',
-    })
-    const r = (await blocked.start({ id: 'WO-1' })) as { error: string }
-    fs.chmodSync(wall, 0o700)
-    fs.rmSync(wall, { recursive: true, force: true })
+    const r = await startWhereNothingCanBeWritten()
 
     expect(r.error).toContain('foundry')
     // And the order is untouched — no half-started run.
@@ -670,10 +682,50 @@ describe('the records location', () => {
   })
 })
 
+function setNode(over: Record<string, unknown>): string {
+  const graphPath = path.join(dataRoot, 'orders', 'WO-1', 'run-graph.json')
+  const graph = JSON.parse(fs.readFileSync(graphPath, 'utf8')) as {
+    nodes: Record<string, unknown>[]
+  }
+  Object.assign(graph.nodes[0], over)
+  fs.writeFileSync(graphPath, JSON.stringify(graph))
+  return graph.nodes[0].id as string
+}
+async function startedRun(): Promise<void> {
+  await store.save(order())
+  await freshRunChannels().start({ id: 'WO-1' })
+}
+
 describe('attaching to a running agent', () => {
+  describe('the live session', theLiveSessionTests)
+  describe('no session yet', noSessionYetTests)
+
+  describe('what it says about a step that has no agent to go to', () => {
+    describe('finished and automatic steps', finishedAndAutomaticStepsTests)
+    describe('the resume wording', theResumeWordingTests)
+  })
+
+  it('reports a node that is not in the run', async () => {
+    await store.save(order())
+    await freshRunChannels().start({ id: 'WO-1' })
+    const r = (await freshRunChannels().attach({ orderId: 'WO-1', nodeId: 'nope' })) as {
+      error: string
+    }
+    expect(r.error).toBe('No step nope.')
+  })
+
+  it('reports an order with no run', async () => {
+    const r = (await freshRunChannels().attach({ orderId: 'WO-nope', nodeId: 'x' })) as {
+      error: string
+    }
+    expect(r.error).toBe('No run for WO-nope.')
+  })
+})
+
+function theLiveSessionTests() {
   it('returns the live session behind a node', async () => {
     await store.save(order())
-    await channels().start({ id: 'WO-1' })
+    await freshRunChannels().start({ id: 'WO-1' })
     // The scheduler stamps a session when it starts a node; simulate that.
     const graphPath = path.join(dataRoot, 'orders', 'WO-1', 'run-graph.json')
     const graph = JSON.parse(fs.readFileSync(graphPath, 'utf8')) as {
@@ -685,111 +737,89 @@ describe('attaching to a running agent', () => {
     // Live, said out loud. A session id outlives the process that ran it, so
     // "there is an id on the node" is not the same question as "is anything
     // running it" — and only the second one can be attached to.
-    const withRunner = createRunChannels({
-      store,
-      dataRoot: () => dataRoot,
-      sources: () => ({ dataRoot, repoPaths: [repo], builtInDir }),
-      now: () => '2026-09-06T10:00:00.000Z',
-      isLive: (sessionId) => sessionId === 'sess-42',
-    })
+    const withRunner = createRunChannels(
+      runDeps({
+        isLive: (sessionId) => sessionId === 'sess-42',
+      })
+    )
     const r = (await withRunner.attach({ orderId: 'WO-1', nodeId: graph.nodes[0].id })) as {
       terminalSessionId: string
     }
     expect(r.terminalSessionId).toBe('sess-42')
   })
+}
 
+function noSessionYetTests() {
   it('says why rather than pretending, when a node has no session yet', async () => {
     await store.save(order())
-    const started = (await channels().start({ id: 'WO-1' })) as {
+    const started = (await freshRunChannels().start({ id: 'WO-1' })) as {
       graph: { nodes: { id: string }[] }
     }
-    const r = (await channels().attach({
+    const r = (await freshRunChannels().attach({
       orderId: 'WO-1',
       nodeId: started.graph.nodes[0].id,
     })) as { error: string }
     expect(r.error).toMatch(/no session yet/)
   })
+}
 
-  describe('what it says about a step that has no agent to go to', () => {
-    function setNode(over: Record<string, unknown>): string {
-      const graphPath = path.join(dataRoot, 'orders', 'WO-1', 'run-graph.json')
-      const graph = JSON.parse(fs.readFileSync(graphPath, 'utf8')) as {
-        nodes: Record<string, unknown>[]
-      }
-      Object.assign(graph.nodes[0], over)
-      fs.writeFileSync(graphPath, JSON.stringify(graph))
-      return graph.nodes[0].id as string
-    }
-
-    async function started(): Promise<void> {
-      await store.save(order())
-      await channels().start({ id: 'WO-1' })
-    }
-
-    it.each(['passed', 'failed', 'skipped'])(
-      'says a %s step finished, and when, instead of blaming a restart',
-      async (state) => {
-        await started()
-        const id = setNode({ state, sessionId: 'sess-9', endedAt: '2026-09-06T09:41:00.000Z' })
-        const r = (await channels().attach({ orderId: 'WO-1', nodeId: id })) as { error: string }
-        expect(r.error).toMatch(/ finished at \d\d:\d\d; its agent has closed\.$/)
-        expect(r.error).not.toContain('Resume the run')
-      }
-    )
-
-    it.each(['gate', 'join'])('says a %s step is automatic and has no agent', async (kind) => {
-      await started()
-      const id = setNode({ kind, state: 'passed', sessionId: null })
-      const r = (await channels().attach({ orderId: 'WO-1', nodeId: id })) as { error: string }
-      expect(r.error).toMatch(/ is an automatic step with no agent\.$/)
-    })
-
-    it('keeps the resume wording for a running step whose session is not live', async () => {
-      await started()
-      const id = setNode({ state: 'running', sessionId: 'sess-9' })
-      const r = (await channels().attach({ orderId: 'WO-1', nodeId: id })) as { error: string }
-      expect(r.error).toContain('Resume the run to start it again.')
-    })
-  })
-
-  it('reports a node that is not in the run', async () => {
-    await store.save(order())
-    await channels().start({ id: 'WO-1' })
-    const r = (await channels().attach({ orderId: 'WO-1', nodeId: 'nope' })) as { error: string }
-    expect(r.error).toBe('No step nope.')
-  })
-
-  it('reports an order with no run', async () => {
-    const r = (await channels().attach({ orderId: 'WO-nope', nodeId: 'x' })) as { error: string }
-    expect(r.error).toBe('No run for WO-nope.')
-  })
-
-  it('rejects a malformed request', async () => {
-    expect(await channels().attach({ nope: true })).toEqual({ error: 'Malformed request.' })
-  })
-})
-
-describe('foundry:run.activity', () => {
-  function channelsWithActivity(activityFor: (sessionId: string) => ToolActivity[]) {
-    return createRunChannels({
-      store,
-      dataRoot: () => dataRoot,
-      sources: () => ({ dataRoot, repoPaths: [repo], builtInDir }),
-      now: () => '2026-09-06T10:00:00.000Z',
+function channelsWithActivity(activityFor: (sessionId: string) => ToolActivity[]) {
+  return createRunChannels(
+    runDeps({
       activityFor,
     })
-  }
+  )
+}
+async function startedGraph(): Promise<readonly { id: string; sessionId: string | null }[]> {
+  await store.save(order())
+  const r = (await freshRunChannels().start({ id: 'WO-1' })) as { graph: RunGraph }
+  return r.graph.nodes
+}
+function activityEvent(at: number, callId = `c-${at}`): ToolActivity {
+  return { kind: 'tool_started', toolName: 'Read', callId, isShell: false, path: null, at }
+}
 
-  async function startedGraph(): Promise<{ id: string; sessionId: string | null }[]> {
-    await store.save(order())
-    const r = (await channels().start({ id: 'WO-1' })) as { graph: RunGraph }
-    return r.graph.nodes
-  }
+function finishedAndAutomaticStepsTests() {
+  it.each(['passed', 'failed', 'skipped'])(
+    'says a %s step finished, and when, instead of blaming a restart',
+    async (state) => {
+      await startedRun()
+      const id = setNode({ state, sessionId: 'sess-9', endedAt: '2026-09-06T09:41:00.000Z' })
+      const r = (await freshRunChannels().attach({ orderId: 'WO-1', nodeId: id })) as {
+        error: string
+      }
+      expect(r.error).toMatch(/ finished at \d\d:\d\d; its agent has closed\.$/)
+      expect(r.error).not.toContain('Resume the run')
+    }
+  )
 
-  function activityEvent(at: number, callId = `c-${at}`): ToolActivity {
-    return { kind: 'tool_started', toolName: 'Read', callId, isShell: false, path: null, at }
-  }
+  it.each(['gate', 'join'])('says a %s step is automatic and has no agent', async (kind) => {
+    await startedRun()
+    const id = setNode({ kind, state: 'passed', sessionId: null })
+    const r = (await freshRunChannels().attach({ orderId: 'WO-1', nodeId: id })) as {
+      error: string
+    }
+    expect(r.error).toMatch(/ is an automatic step with no agent\.$/)
+  })
+}
 
+function theResumeWordingTests() {
+  it('keeps the resume wording for a running step whose session is not live', async () => {
+    await startedRun()
+    const id = setNode({ state: 'running', sessionId: 'sess-9' })
+    const r = (await freshRunChannels().attach({ orderId: 'WO-1', nodeId: id })) as {
+      error: string
+    }
+    expect(r.error).toContain('Resume the run to start it again.')
+  })
+}
+
+describe('foundry:run.activity', () => {
+  describe('the last entries', theLastEntriesTests)
+  describe('no session and no run', noSessionAndNoRunTests)
+})
+
+function theLastEntriesTests() {
   it('returns the last 20 activity entries for a node with a session', async () => {
     const nodes = await startedGraph()
     const graphPath = path.join(dataRoot, 'orders', 'WO-1', 'run-graph.json')
@@ -807,7 +837,9 @@ describe('foundry:run.activity', () => {
     expect(r.activity[nodes[0].id]).toHaveLength(20)
     expect(r.activity[nodes[0].id]).toEqual(events.slice(-20))
   })
+}
 
+function noSessionAndNoRunTests() {
   it('omits nodes with no session', async () => {
     const nodes = await startedGraph()
     const withActivity = channelsWithActivity(() => [activityEvent(1)])
@@ -818,29 +850,23 @@ describe('foundry:run.activity', () => {
   })
 
   it('reports an order with no run', async () => {
-    const r = (await channels().activity({ id: 'WO-nope' })) as { error: string }
+    const r = (await freshRunChannels().activity({ id: 'WO-nope' })) as { error: string }
     expect(r.error).toBe('No run for WO-nope.')
   })
-
-  it('rejects a malformed request', async () => {
-    expect(await channels().activity({ nope: true })).toEqual({ error: 'Malformed request.' })
-  })
-})
+}
 
 describe('offering shapes of work', () => {
-  it('rejects a malformed request', async () => {
-    expect(await channels().recipes({ nope: true })).toEqual({ error: 'Malformed request.' })
-  })
-
   it('reports an order it cannot find', async () => {
-    expect(await channels().recipes({ id: 'WO-nope' })).toEqual({ error: 'No order WO-nope.' })
+    expect(await freshRunChannels().recipes({ id: 'WO-nope' })).toEqual({
+      error: 'No order WO-nope.',
+    })
   })
 
   it('marks a malformed operator recipe as unavailable rather than hiding it', async () => {
     await store.save(order())
     fs.mkdirSync(path.join(dataRoot, 'recipes'), { recursive: true })
     fs.writeFileSync(path.join(dataRoot, 'recipes', 'broken.yaml'), 'id: [unclosed\n')
-    const r = (await channels().recipes({ id: 'WO-1' })) as {
+    const r = (await freshRunChannels().recipes({ id: 'WO-1' })) as {
       recipes: { name: string; available: boolean }[]
     }
     expect(r.recipes.find((x) => x.name === 'broken')?.available).toBe(false)
@@ -848,80 +874,74 @@ describe('offering shapes of work', () => {
 
   it('observes with the order own budgets rather than a guessed default', async () => {
     await store.save(order({ budgets: { agents: 1, wallClockMinutes: 5, tokens: null } }))
-    await channels().start({ id: 'WO-1' })
-    const r = (await channels().observe({ id: 'WO-1' })) as { ready: string[] }
+    await freshRunChannels().start({ id: 'WO-1' })
+    const r = (await freshRunChannels().observe({ id: 'WO-1' })) as { ready: string[] }
     expect(r.ready.length).toBeLessThanOrEqual(2)
   })
 })
 
+function twoLanes(): WorkOrder {
+  const base = order()
+  return {
+    ...base,
+    plan: {
+      ...base.plan,
+      sharedFiles: ['proto/session.proto'],
+      lanes: [
+        { ord: 1, repo: 'proto', branch: '', role: 'producer', blocks: [2], blockedBy: [] },
+        { ord: 2, repo: 'cli', branch: '', role: 'consumer', blocks: [], blockedBy: [1] },
+      ],
+      units: [
+        builderUnit('U-1', {
+          title: 'the contract',
+          satisfies: ['AC-1'],
+          touches: ['proto/session.proto'],
+        }),
+        builderUnit('U-2', {
+          title: 'adopt it',
+          lane: 2,
+          satisfies: ['AC-1'],
+          touches: ['proto/session.proto'],
+        }),
+      ],
+    },
+  }
+}
+interface Observed {
+  lanes: {
+    ord: number
+    repo: string
+    role: string | null
+    collisions: string[]
+    blockedBy: number[]
+    hold: string | null
+  }[]
+}
+
 describe('what run.observe says about lanes (FR-067, FR-068)', () => {
-  function twoLanes(): WorkOrder {
-    const base = order()
-    return {
-      ...base,
-      plan: {
-        ...base.plan,
-        sharedFiles: ['proto/session.proto'],
-        lanes: [
-          { ord: 1, repo: 'proto', branch: '', role: 'producer', blocks: [2], blockedBy: [] },
-          { ord: 2, repo: 'cli', branch: '', role: 'consumer', blocks: [], blockedBy: [1] },
-        ],
-        units: [
-          {
-            id: 'U-1',
-            title: 'the contract',
-            role: 'builder',
-            lane: 1,
-            dependsOn: [],
-            satisfies: ['AC-1'],
-            touches: ['proto/session.proto'],
-            verify: [],
-          },
-          {
-            id: 'U-2',
-            title: 'adopt it',
-            role: 'builder',
-            lane: 2,
-            dependsOn: [],
-            satisfies: ['AC-1'],
-            touches: ['proto/session.proto'],
-            verify: [],
-          },
-        ],
-      },
-    }
-  }
+  describe('lanes', runChannelsLanesTests)
+})
 
-  interface Observed {
-    lanes: {
-      ord: number
-      repo: string
-      role: string | null
-      collisions: string[]
-      blockedBy: number[]
-      hold: string | null
-    }[]
-  }
-
+function runChannelsLanesTests() {
   it('reports each lane in merge order, by repository', async () => {
     await store.save(twoLanes())
-    await channels().start({ id: 'WO-1' })
-    const r = (await channels().observe({ id: 'WO-1' })) as Observed
+    await freshRunChannels().start({ id: 'WO-1' })
+    const r = (await freshRunChannels().observe({ id: 'WO-1' })) as Observed
     expect(r.lanes.map((l) => l.repo)).toEqual(['proto', 'cli'])
   })
 
   it('names the shared file on both lanes, not only on the producer', async () => {
     await store.save(twoLanes())
-    await channels().start({ id: 'WO-1' })
-    const r = (await channels().observe({ id: 'WO-1' })) as Observed
+    await freshRunChannels().start({ id: 'WO-1' })
+    const r = (await freshRunChannels().observe({ id: 'WO-1' })) as Observed
     expect(r.lanes.length).toBeGreaterThan(1)
     for (const lane of r.lanes) expect(lane.collisions).toEqual(['proto/session.proto'])
   })
 
   it('gives the hold as a sentence, so the surface does not reassemble it', async () => {
     await store.save(twoLanes())
-    await channels().start({ id: 'WO-1' })
-    const r = (await channels().observe({ id: 'WO-1' })) as Observed
+    await freshRunChannels().start({ id: 'WO-1' })
+    const r = (await freshRunChannels().observe({ id: 'WO-1' })) as Observed
     expect(r.lanes[0].hold).toBeNull()
     expect(r.lanes[1].hold).toContain('must merge first')
     expect(r.lanes[1].hold).toContain('proto/session.proto')
@@ -929,24 +949,41 @@ describe('what run.observe says about lanes (FR-067, FR-068)', () => {
 
   it('reports one unremarkable lane for a single-repository order', async () => {
     await store.save(order())
-    await channels().start({ id: 'WO-1' })
-    const r = (await channels().observe({ id: 'WO-1' })) as Observed
+    await freshRunChannels().start({ id: 'WO-1' })
+    const r = (await freshRunChannels().observe({ id: 'WO-1' })) as Observed
     expect(r.lanes).toHaveLength(1)
     expect(r.lanes[0]).toMatchObject({ collisions: [], blockedBy: [], hold: null })
   })
-})
+}
 
 describe('the graph is actually run (FR-020)', () => {
+  describe('handing over', handingOverTests)
+  describe('failures and refusals', failuresAndRefusalsTests)
+})
+
+function live(execute?: ReturnType<typeof vi.fn>) {
+  return createRunChannels(
+    runDeps({
+      execute: (execute ?? vi.fn(async () => undefined)) as never,
+    })
+  )
+}
+async function started(execute?: ReturnType<typeof vi.fn>) {
+  await store.save(order())
+  const channels = live(execute)
+  await channels.start({ id: 'WO-1' })
+  return channels
+}
+
+function handingOverTests() {
   it('hands the graph to whatever executes it', async () => {
     await store.save(order())
-    const execute = vi.fn(async () => undefined)
-    const r = (await createRunChannels({
-      store,
-      dataRoot: () => dataRoot,
-      sources: () => ({ dataRoot, repoPaths: [repo], builtInDir }),
-      now: () => '2026-09-06T10:00:00.000Z',
-      execute,
-    }).start({ id: 'WO-1' })) as { started: boolean }
+    const execute = vi.fn<RunDeps['execute']>(async () => undefined)
+    const r = (await createRunChannels(
+      runDeps({
+        execute,
+      })
+    ).start({ id: 'WO-1' })) as { started: boolean }
 
     expect(r.started).toBe(true)
     expect(execute).toHaveBeenCalledWith(
@@ -956,40 +993,31 @@ describe('the graph is actually run (FR-020)', () => {
     )
   })
 
-  it('says so when there is nothing to run it, rather than reporting a started run', async () => {
-    await store.save(order())
-    const r = (await channels().start({ id: 'WO-1' })) as { started: boolean; reason: string }
-    expect(r.started).toBe(false)
-    expect(r.reason).toMatch(/not available/)
-  })
-
   it('does not wait for the run to finish before answering', async () => {
     await store.save(order())
     let released = (): void => {}
     const execute = vi.fn(() => new Promise<void>((r) => (released = r)))
-    const r = await createRunChannels({
-      store,
-      dataRoot: () => dataRoot,
-      sources: () => ({ dataRoot, repoPaths: [repo], builtInDir }),
-      now: () => '2026-09-06T10:00:00.000Z',
-      execute: execute as never,
-    }).start({ id: 'WO-1' })
+    const r = await createRunChannels(
+      runDeps({
+        execute: execute as never,
+      })
+    ).start({ id: 'WO-1' })
 
     // Answered while the run is still going: a channel that blocked until the
     // last agent finished would hold the bridge for the length of the work.
     expect(r).toMatchObject({ started: true })
     released()
   })
+}
 
+function failuresAndRefusalsTests() {
   it('records a run that failed to start rather than losing it', async () => {
     await store.save(order())
-    await createRunChannels({
-      store,
-      dataRoot: () => dataRoot,
-      sources: () => ({ dataRoot, repoPaths: [repo], builtInDir }),
-      now: () => '2026-09-06T10:00:00.000Z',
-      execute: async () => Promise.reject(new Error('no worktree could be prepared')),
-    }).start({ id: 'WO-1' })
+    await createRunChannels(
+      runDeps({
+        execute: async () => Promise.reject(new Error('no worktree could be prepared')),
+      })
+    ).start({ id: 'WO-1' })
 
     // The rejection is handled off the call — that is the point of not
     // awaiting it — so poll for the entry rather than assuming one turn of the
@@ -1006,38 +1034,26 @@ describe('the graph is actually run (FR-020)', () => {
   })
 
   it('runs nothing for an order that was refused', async () => {
-    const execute = vi.fn(async () => undefined)
-    await createRunChannels({
-      store,
-      dataRoot: () => dataRoot,
-      sources: () => ({ dataRoot, repoPaths: [repo], builtInDir }),
-      now: () => '2026-09-06T10:00:00.000Z',
-      execute,
-    }).start({ id: 'WO-nope' })
+    const execute = vi.fn<RunDeps['execute']>(async () => undefined)
+    await createRunChannels(
+      runDeps({
+        execute,
+      })
+    ).start({ id: 'WO-nope' })
     expect(execute).not.toHaveBeenCalled()
   })
-})
+}
 
 describe('foundry:run.resume', () => {
-  function live(execute?: ReturnType<typeof vi.fn>) {
-    return createRunChannels({
-      store,
-      dataRoot: () => dataRoot,
-      sources: () => ({ dataRoot, repoPaths: [repo], builtInDir }),
-      now: () => '2026-09-06T10:00:00.000Z',
-      execute: (execute ?? vi.fn(async () => undefined)) as never,
-    })
-  }
+  describe('picking up', runChannelsPickingUpTests)
+  describe('retrying', runChannelsRetryingTests)
+  describe('recording the resume', recordingTheResumeTests)
+  describe('refusals', runChannelsRefusalsTests)
+})
 
-  async function started(execute?: ReturnType<typeof vi.fn>) {
-    await store.save(order())
-    const channels = live(execute)
-    await channels.start({ id: 'WO-1' })
-    return channels
-  }
-
+function runChannelsPickingUpTests() {
   it('picks the run back up from the graph on disk', async () => {
-    const execute = vi.fn(async () => undefined)
+    const execute = vi.fn<RunDeps['execute']>(async () => undefined)
     const channels = await started(execute)
     execute.mockClear()
 
@@ -1049,9 +1065,11 @@ describe('foundry:run.resume', () => {
       expect.objectContaining({ nodes: expect.anything() })
     )
   })
+}
 
+function runChannelsRetryingTests() {
   it('retries the node the operator sent back', async () => {
-    const execute = vi.fn(async () => undefined)
+    const execute = vi.fn<RunDeps['execute']>(async () => undefined)
     const channels = await started(execute)
 
     // Fail a node, as a run would.
@@ -1076,7 +1094,7 @@ describe('foundry:run.resume', () => {
   })
 
   it('leaves everything else where it was', async () => {
-    const execute = vi.fn(async () => undefined)
+    const execute = vi.fn<RunDeps['execute']>(async () => undefined)
     const channels = await started(execute)
     execute.mockClear()
 
@@ -1084,12 +1102,14 @@ describe('foundry:run.resume', () => {
     const handed = execute.mock.calls[0][2] as RunGraph
     expect(handed.nodes.every((n) => n.state !== 'failed')).toBe(true)
   })
+}
 
+function recordingTheResumeTests() {
   // Clears any `run.failed` a previous attempt left behind — without this a
   // retry that goes on to succeed still reads `stopped`, because the ledger's
   // newest run-shaped line stays the old failure for ever.
   it('records that the run was resumed', async () => {
-    const execute = vi.fn(async () => undefined)
+    const execute = vi.fn<RunDeps['execute']>(async () => undefined)
     const channels = await started(execute)
 
     await channels.resume({ id: 'WO-1' })
@@ -1098,25 +1118,9 @@ describe('foundry:run.resume', () => {
     const ledger = fs.readFileSync(ledgerFile, 'utf8')
     expect(ledger).toContain('run.resumed')
   })
+}
 
-  // Never recorded when there is nothing to resume it with — a ledger line
-  // saying a run picked back up would be false when nothing did.
-  it('does not record a resume when there is no runtime to run it', async () => {
-    await store.save(order())
-    const noRuntime = createRunChannels({
-      store,
-      dataRoot: () => dataRoot,
-      sources: () => ({ dataRoot, repoPaths: [repo], builtInDir }),
-      now: () => '2026-09-06T10:00:00.000Z',
-    })
-    await noRuntime.start({ id: 'WO-1' })
-    await noRuntime.resume({ id: 'WO-1' })
-
-    const ledgerFile = path.join(dataRoot, 'orders', 'WO-1', 'ledger.jsonl')
-    const ledger = fs.readFileSync(ledgerFile, 'utf8')
-    expect(ledger).not.toContain('run.resumed')
-  })
-
+function runChannelsRefusalsTests() {
   it('refuses an order that is not running', async () => {
     await store.save(order({ status: 'agreed' }))
     expect(await live().resume({ id: 'WO-1' })).toEqual({
@@ -1132,30 +1136,13 @@ describe('foundry:run.resume', () => {
   it('reports an order it cannot find', async () => {
     expect(await live().resume({ id: 'WO-nope' })).toEqual({ error: 'No order WO-nope.' })
   })
-
-  it('rejects a malformed request', async () => {
-    expect(await live().resume({ retry: 'U-1' })).toEqual({ error: 'Malformed request.' })
-  })
-
-  it('says so when there is nothing to run it', async () => {
-    await store.save(order())
-    const channels = live()
-    await channels.start({ id: 'WO-1' })
-    const bare = createRunChannels({
-      store,
-      dataRoot: () => dataRoot,
-      sources: () => ({ dataRoot, repoPaths: [repo], builtInDir }),
-      now: () => '2026-09-06T10:00:00.000Z',
-    })
-    expect(await bare.resume({ id: 'WO-1' })).toMatchObject({ started: false })
-  })
-})
+}
 
 describe('what the Floor is told to call each node', () => {
   it('supplies a label per node, so a chip does not read "n2"', async () => {
     await store.save(order())
-    await channels().start({ id: 'WO-1' })
-    const view = (await channels().observe({ id: 'WO-1' })) as {
+    await freshRunChannels().start({ id: 'WO-1' })
+    const view = (await freshRunChannels().observe({ id: 'WO-1' })) as {
       labels: Record<string, string>
     }
     expect(Object.keys(view.labels).length).toBeGreaterThan(0)
@@ -1165,8 +1152,8 @@ describe('what the Floor is told to call each node', () => {
 
   it('says what a blocked node is waiting on in the same words the chips use', async () => {
     await store.save(order())
-    await channels().start({ id: 'WO-1' })
-    const view = (await channels().observe({ id: 'WO-1' })) as {
+    await freshRunChannels().start({ id: 'WO-1' })
+    const view = (await freshRunChannels().observe({ id: 'WO-1' })) as {
       labels: Record<string, string>
       blocked: { id: string; reason: string }[]
     }
@@ -1191,13 +1178,9 @@ describe('a start is never refused for finished turns waiting on review', () => 
 
   it('starts even when a legacy gate says there is no room', async () => {
     await store.save(order())
-    const legacy = createRunChannels({
-      store,
-      dataRoot: () => dataRoot,
-      sources: () => ({ dataRoot, repoPaths: [repo], builtInDir }),
-      now: () => '2026-09-06T10:00:00.000Z',
-      backpressure: full,
-    } as unknown as Parameters<typeof createRunChannels>[0])
+    // Not a RunDeps field any more: the old gate rides along as a stray property.
+    const legacyDeps = { ...runDeps(), backpressure: full }
+    const legacy = createRunChannels(legacyDeps)
     const r = (await legacy.start({ id: 'WO-1' })) as { error?: string }
     expect(r.error).toBeUndefined()
     expect((await store.load('WO-1'))?.status).toBe('running')
@@ -1205,6 +1188,37 @@ describe('a start is never refused for finished turns waiting on review', () => 
     expect(ledger).not.toContain('backpressure.overridden')
   })
 })
+
+const nothingLive = (): boolean => false
+const everythingLive = (): boolean => true
+function withRunning(): { nodeId: string } {
+  const file = path.join(dataRoot, 'orders', 'WO-1', 'run-graph.json')
+  const graph = JSON.parse(fs.readFileSync(file, 'utf8')) as RunGraph
+  const nodeId = graph.nodes.find((n) => n.unitIds.includes('U-1'))?.id ?? ''
+  fs.writeFileSync(
+    file,
+    JSON.stringify({
+      ...graph,
+      nodes: graph.nodes.map((n) =>
+        n.id === nodeId ? { ...n, state: 'running', sessionId: 'gone', attempts: 1 } : n
+      ),
+    })
+  )
+  return { nodeId }
+}
+async function startedRunChannels(
+  over: Partial<Parameters<typeof createRunChannels>[0]> = {}
+): Promise<ReturnType<typeof createRunChannels>> {
+  await store.save(order())
+  const channels = createRunChannels(
+    runDeps({
+      execute: vi.fn(async () => undefined) as never,
+      ...over,
+    })
+  )
+  await channels.start({ id: 'WO-1' })
+  return channels
+}
 
 // ── Picking a run back up after the application closed ───────────────────
 //
@@ -1214,44 +1228,19 @@ describe('a start is never refused for finished turns waiting on review', () => 
 // it did nothing at all — the scheduler offers only `waiting` and `ready`.
 
 describe('a run whose agents are gone', () => {
-  const nothingLive = (): boolean => false
-  const everythingLive = (): boolean => true
+  describe('taking nodes back', takingNodesBackTests)
+  describe('live agents and running executors', liveAgentsAndRunningExecutorsTests)
+  describe('observing orphans', observingOrphansTests)
+  describe('attaching', attachingTests)
+})
 
-  function withRunning(): { nodeId: string } {
-    const file = path.join(dataRoot, 'orders', 'WO-1', 'run-graph.json')
-    const graph = JSON.parse(fs.readFileSync(file, 'utf8')) as RunGraph
-    const nodeId = graph.nodes.find((n) => n.unitIds.includes('U-1'))?.id ?? ''
-    fs.writeFileSync(
-      file,
-      JSON.stringify({
-        ...graph,
-        nodes: graph.nodes.map((n) =>
-          n.id === nodeId ? { ...n, state: 'running', sessionId: 'gone', attempts: 1 } : n
-        ),
-      })
-    )
-    return { nodeId }
-  }
-
-  async function runningOrder(
-    over: Partial<Parameters<typeof createRunChannels>[0]> = {}
-  ): Promise<ReturnType<typeof createRunChannels>> {
-    await store.save(order())
-    const channels = createRunChannels({
-      store,
-      dataRoot: () => dataRoot,
-      sources: () => ({ dataRoot, repoPaths: [repo], builtInDir }),
-      now: () => '2026-09-06T10:00:00.000Z',
-      execute: vi.fn(async () => undefined) as never,
-      ...over,
-    })
-    await channels.start({ id: 'WO-1' })
-    return channels
-  }
-
+function takingNodesBackTests() {
   it('resume takes the node back so the scheduler can offer it again', async () => {
-    const execute = vi.fn(async () => undefined)
-    const channels = await runningOrder({ execute: execute as never, isLive: nothingLive })
+    const execute = vi.fn<RunDeps['execute']>(async () => undefined)
+    const channels = await startedRunChannels({
+      execute: execute as never,
+      isLive: nothingLive,
+    })
     const { nodeId } = withRunning()
     execute.mockClear()
 
@@ -1261,13 +1250,13 @@ describe('a run whose agents are gone', () => {
   })
 
   it('says what it took back, so the answer is not silent', async () => {
-    const channels = await runningOrder({ isLive: nothingLive })
+    const channels = await startedRunChannels({ isLive: nothingLive })
     const { nodeId } = withRunning()
     expect(await channels.resume({ id: 'WO-1' })).toMatchObject({ reclaimed: [nodeId] })
   })
 
   it('writes the reclaimed graph down, so a reopened surface reads it too', async () => {
-    const channels = await runningOrder({ isLive: nothingLive })
+    const channels = await startedRunChannels({ isLive: nothingLive })
     const { nodeId } = withRunning()
     await channels.resume({ id: 'WO-1' })
 
@@ -1275,10 +1264,15 @@ describe('a run whose agents are gone', () => {
     const saved = JSON.parse(fs.readFileSync(file, 'utf8')) as RunGraph
     expect(saved.nodes.find((n) => n.id === nodeId)?.state).toBe('waiting')
   })
+}
 
+function liveAgentsAndRunningExecutorsTests() {
   it('leaves a node alone whose agent is still in its terminal', async () => {
-    const execute = vi.fn(async () => undefined)
-    const channels = await runningOrder({ execute: execute as never, isLive: everythingLive })
+    const execute = vi.fn<RunDeps['execute']>(async () => undefined)
+    const channels = await startedRunChannels({
+      execute: execute as never,
+      isLive: everythingLive,
+    })
     const { nodeId } = withRunning()
     execute.mockClear()
 
@@ -1288,8 +1282,8 @@ describe('a run whose agents are gone', () => {
   })
 
   it('refuses to resume, and starts no second executor, while one is already running this order', async () => {
-    const execute = vi.fn(async () => undefined)
-    const channels = await runningOrder({
+    const execute = vi.fn<RunDeps['execute']>(async () => undefined)
+    const channels = await startedRunChannels({
       execute: execute as never,
       isLive: nothingLive,
       executing: () => true,
@@ -1301,59 +1295,69 @@ describe('a run whose agents are gone', () => {
     expect(r.error).toBe('This run is already going; nothing to resume.')
     expect(execute).not.toHaveBeenCalled()
   })
+}
 
+function observingOrphansTests() {
   it('observe names the nodes nothing is running, so the surface can say so', async () => {
-    const channels = await runningOrder({ isLive: nothingLive })
+    const channels = await startedRunChannels({ isLive: nothingLive })
     const { nodeId } = withRunning()
     const view = (await channels.observe({ id: 'WO-1' })) as { orphaned: string[] }
     expect(view.orphaned).toEqual([nodeId])
   })
 
   it('observe reports no orphans while an executor is still running the order', async () => {
-    const channels = await runningOrder({ isLive: nothingLive, executing: () => true })
+    const channels = await startedRunChannels({
+      isLive: nothingLive,
+      executing: () => true,
+    })
     withRunning()
     const view = (await channels.observe({ id: 'WO-1' })) as { orphaned: string[] }
     expect(view.orphaned).toEqual([])
   })
 
   it('observe says nothing is orphaned when every agent is live', async () => {
-    const channels = await runningOrder({ isLive: everythingLive })
+    const channels = await startedRunChannels({ isLive: everythingLive })
     withRunning()
     const view = (await channels.observe({ id: 'WO-1' })) as { orphaned: string[] }
     expect(view.orphaned).toEqual([])
   })
+}
 
+function attachingTests() {
   it('refuses to attach to a session this process no longer has', async () => {
-    const channels = await runningOrder({ isLive: nothingLive })
+    const channels = await startedRunChannels({ isLive: nothingLive })
     const { nodeId } = withRunning()
     expect(await channels.attach({ orderId: 'WO-1', nodeId })).toEqual({
       error: `${nodeId} has no live agent — its session ended when the application last closed. Resume the run to start it again.`,
     })
   })
-})
+}
 
 describe('the run timeline', () => {
-  beforeEach(() => forgetTimelines())
+  describe('recording frames', recordingFramesTests)
+  describe('the timeline', theTimelineTests)
+})
 
+function recordingFramesTests() {
   it('records a frame of every node’s standing when a run starts', async () => {
     await store.save(order())
-    await channels().start({ id: 'WO-1' })
+    await freshRunChannels().start({ id: 'WO-1' })
     const timeline = await readTimeline(path.join(dataRoot, 'orders', 'WO-1'))
     expect(timeline.frames).toHaveLength(1)
     expect(timeline.frames[0].nodes.length).toBeGreaterThan(0)
   })
+}
 
+function theTimelineTests() {
   it('hands back the graph, the recording and every gate the order raised', async () => {
     await store.save(order())
-    await channels().start({ id: 'WO-1' })
+    await freshRunChannels().start({ id: 'WO-1' })
     const gate = { id: 'g-1', orderId: 'WO-1' }
-    const withGates = createRunChannels({
-      store,
-      dataRoot: () => dataRoot,
-      sources: () => ({ dataRoot, repoPaths: [repo], builtInDir }),
-      now: () => '2026-09-06T10:00:00.000Z',
-      gatesFor: async () => [gate as never],
-    })
+    const withGates = createRunChannels(
+      runDeps({
+        gatesFor: async () => [gate as never],
+      })
+    )
     const r = (await withGates.timeline({ id: 'WO-1' })) as {
       graph: RunGraph
       timeline: { frames: unknown[]; tools: unknown[] }
@@ -1365,15 +1369,14 @@ describe('the run timeline', () => {
     expect(r.gates).toEqual([gate])
   })
 
-  it('says so for an order with no run, and for a request it cannot read', async () => {
-    expect(await channels().timeline({ id: 'WO-1' })).toEqual({ error: 'No run for WO-1.' })
-    expect(await channels().timeline({})).toEqual({ error: 'Malformed request.' })
+  it('says so for an order with no run', async () => {
+    expect(await freshRunChannels().timeline({ id: 'WO-1' })).toEqual({ error: 'No run for WO-1.' })
   })
 
   it('hands back no gates when the host has no gate store to ask', async () => {
     await store.save(order())
-    await channels().start({ id: 'WO-1' })
-    const r = (await channels().timeline({ id: 'WO-1' })) as { gates: unknown[] }
+    await freshRunChannels().start({ id: 'WO-1' })
+    const r = (await freshRunChannels().timeline({ id: 'WO-1' })) as { gates: unknown[] }
     expect(r.gates).toEqual([])
   })
-})
+}

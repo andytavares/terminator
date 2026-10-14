@@ -12,7 +12,7 @@ export interface ExtensionExitDeps {
   send(channel: 'extension:exit-to-terminal', payload: ExtensionExitPayload): void
 }
 
-export interface ExtensionExitPayload {
+interface ExtensionExitPayload {
   extensionId: string
   /**
    * Set when the exit came from a sidebar panel. Those sit beside the terminal

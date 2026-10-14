@@ -2,8 +2,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { act, render, screen, fireEvent, waitFor } from '@testing-library/react'
 import React from 'react'
 import { Inbox, SIGNAL_POLL_MS } from '../../src/components/Inbox.js'
+import { createChangeBus } from '../helpers/change-bus.js'
 import { raiseGate, GATE_RULES, ruleInWords } from '../../src/gates/rules.js'
 import type { Signal } from '../../src/sensors/types.js'
+import { timesInvoked } from '../helpers/bridge-calls.js'
 
 // The one surface the operator is required to visit. Every row names the rule
 // that raised it, says what it looked at, and says what happens if it is
@@ -11,7 +13,8 @@ import type { Signal } from '../../src/sensors/types.js'
 // click through without reading.
 
 let invoke: ReturnType<typeof vi.fn>
-const openExternal = vi.fn()
+let bus = createChangeBus()
+const openExternal = vi.fn(async () => ({ ok: true as const }))
 
 function gate(over: Partial<Parameters<typeof raiseGate>[0]> = {}) {
   return raiseGate({
@@ -52,46 +55,56 @@ function signal(over: Partial<Signal> = {}): Signal {
   }
 }
 
-function mount(over: Record<string, unknown> = {}) {
-  // Mutable so a dismiss during the test is reflected the next time the
-  // component re-polls the list, the way the real channel would behave.
+/** What `foundry:inbox.list` answers: `over` names what is waiting. */
+function inboxList(over: Record<string, unknown>) {
+  return {
+    gates: over.gates ?? [],
+    waiting: over.waiting ?? [],
+    autonomy: over.autonomy ?? 'standard',
+    silenced: over.silenced ?? [],
+    summary: {
+      waiting: 0,
+      orders: 0,
+      automatic: 0,
+      building: 0,
+      converging: 0,
+      ...(over.summary as object satisfies object | undefined),
+    },
+  }
+}
+
+// What each channel answers. The signals are a live list, so a dismiss shows on the
+// component's next poll, the way the real channel behaves.
+function inboxReplies(
+  over: Record<string, unknown>
+): Record<string, (payload: unknown) => unknown> {
   let liveSignals = [...((over.signals as Signal[] | undefined) ?? [])]
-  invoke = vi.fn(async (channel: string, payload?: unknown) => {
-    if (channel === 'foundry:inbox.list') {
-      return {
-        gates: over.gates ?? [],
-        waiting: over.waiting ?? [],
-        autonomy: over.autonomy ?? 'standard',
-        silenced: over.silenced ?? [],
-        summary: {
-          waiting: 0,
-          orders: 0,
-          automatic: 0,
-          building: 0,
-          converging: 0,
-          ...(over.summary as object satisfies object | undefined),
-        },
-      }
-    }
-    if (channel === 'foundry:inbox.decide') return over.decide ?? { ok: true }
-    if (channel === 'foundry:signals.list') {
-      return { signals: liveSignals, counts: { open: liveSignals.length } }
-    }
-    if (channel === 'foundry:sensors.list') {
-      return { sensors: over.sensors ?? [] }
-    }
-    if (channel === 'foundry:signals.dismiss') {
+  return {
+    'foundry:inbox.list': () => inboxList(over),
+    'foundry:inbox.decide': () => over.decide ?? { ok: true },
+    'foundry:signals.list': () => ({ signals: liveSignals, counts: { open: liveSignals.length } }),
+    'foundry:sensors.list': () => ({ sensors: over.sensors ?? [] }),
+    'foundry:signals.dismiss': (payload) => {
       const { id } = payload as { id: string }
       liveSignals = liveSignals.filter((s) => s.id !== id)
       return over.dismiss ?? { signal: null }
-    }
-    if (channel === 'foundry:signals.promote') return over.promote ?? { order: { id: 'WO-9' } }
-    return { ok: true }
-  })
-  ;(window as unknown as Record<string, unknown>).electronAPI = {
-    extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
-    shell: { openExternal },
+    },
+    'foundry:signals.promote': () => over.promote ?? { order: { id: 'WO-9' } },
   }
+}
+
+function mount(over: Record<string, unknown> = {}) {
+  bus = createChangeBus()
+  const replies = inboxReplies(over)
+  invoke = vi.fn(async (channel: string, payload?: unknown) =>
+    channel in replies ? replies[channel](payload) : { ok: true }
+  )
+  Object.assign(window, {
+    electronAPI: {
+      extensionBridge: { invoke, on: bus.on },
+      shell: { openExternal },
+    },
+  })
   return render(<Inbox onOpenOrder={over.onOpenOrder as ((id: string) => void) | undefined} />)
 }
 
@@ -130,6 +143,21 @@ beforeEach(() => {
 })
 
 describe('a row the operator can act on', () => {
+  describe('the rule and the evidence', theRuleAndTheEvidenceTests)
+  describe('links', inboxLinksTests)
+  describe('options', optionsTests)
+  describe('deciding', inboxDecidingTests)
+})
+
+const budgetGate = () =>
+  gate({
+    rule: 'budget.exceeded',
+    summary: 'x has gone past its wall clock budget',
+    why: 'The order budgets 45 and this run is at 46.',
+    breach: { kind: 'wall_clock', limit: 45, actual: 45.6 },
+  })
+
+function theRuleAndTheEvidenceTests() {
   it('names the rule, the reason and what happens if it is ignored', async () => {
     mount({ gates: [gate()] })
     await waitFor(() => expect(screen.getByText(ruleInWords('risk.p0'))).toBeTruthy())
@@ -149,7 +177,9 @@ describe('a row the operator can act on', () => {
     fireEvent.click(screen.getByText('U-4 rewrites session token refresh'))
     expect((document.querySelector('details') as HTMLDetailsElement).open).toBe(false)
   })
+}
 
+function inboxLinksTests() {
   it('links the order\u2019s pull request and ticket from the gate', async () => {
     const pullUrl = 'https://github.com/andytavares/terminator/pull/233'
     const ticketUrl = 'https://linear.app/team/issue/TAV-15'
@@ -168,7 +198,9 @@ describe('a row the operator can act on', () => {
     expect(openExternal).toHaveBeenCalledWith(pullUrl)
     expect(openExternal).toHaveBeenCalledWith(ticketUrl)
   })
+}
 
+function optionsTests() {
   it('says how much work the decision unblocks', async () => {
     mount({ gates: [gate()] })
     await waitFor(() => screen.getByText(ruleInWords('risk.p0')))
@@ -181,7 +213,9 @@ describe('a row the operator can act on', () => {
     const approve = screen.getByRole('button', { name: 'Approve' })
     expect(approve.getAttribute('title')).toContain('proceeds')
   })
+}
 
+function inboxDecidingTests() {
   it('sends the decision, and asks again afterwards', async () => {
     mount({ gates: [gate()] })
     await waitFor(() => screen.getByText(ruleInWords('risk.p0')))
@@ -200,17 +234,14 @@ describe('a row the operator can act on', () => {
     await waitFor(() => screen.getByText(ruleInWords('risk.p0')))
     expect(screen.getByText(/\(it waits for you\)/)).toBeTruthy()
   })
-})
+}
 
 describe('raising a budget from the inbox', () => {
-  const budgetGate = () =>
-    gate({
-      rule: 'budget.exceeded',
-      summary: 'x has gone past its wall clock budget',
-      why: 'The order budgets 45 and this run is at 46.',
-      breach: { kind: 'wall_clock', limit: 45, actual: 45.6 },
-    })
+  describe('the new limit', inboxTheNewLimitTests)
+  describe('no recorded budget', noRecordedBudgetTests)
+})
 
+function inboxTheNewLimitTests() {
   it('asks for the new limit, then sends it with the decision', async () => {
     mount({ gates: [budgetGate()] })
     await waitFor(() => screen.getByText(ruleInWords('budget.exceeded')))
@@ -229,7 +260,9 @@ describe('raising a budget from the inbox', () => {
       })
     )
   })
+}
 
+function noRecordedBudgetTests() {
   it('decides straight away for a gate that never recorded its budget', async () => {
     mount({ gates: [gate({ rule: 'budget.exceeded' })] })
     await waitFor(() => screen.getByText(ruleInWords('budget.exceeded')))
@@ -241,18 +274,25 @@ describe('raising a budget from the inbox', () => {
       })
     )
   })
-})
+}
 
 // The queue sits above the Forge, so with nothing in it there is nothing to
 // show: an empty page was where the operator landed between runs.
 describe('nothing waiting', () => {
+  describe('nothing at all', nothingAtAllTests)
+  describe('a promotion note', aPromotionNoteTests)
+})
+
+function nothingAtAllTests() {
   it('renders nothing at all', async () => {
     const { container } = mount()
     await waitFor(() => expect(invoke).toHaveBeenCalledWith('foundry:signals.list', {}))
     await waitFor(() => expect(invoke).toHaveBeenCalledWith('foundry:inbox.list', {}))
     expect(container.innerHTML).toBe('')
   })
+}
 
+function aPromotionNoteTests() {
   it('keeps a promotion note up after the last signal goes', async () => {
     mount({ signals: [signal()] })
     await waitFor(() => screen.getByText('test-foo flakes on main'))
@@ -276,7 +316,7 @@ describe('nothing waiting', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Confirm promote' }))
     expect(await screen.findByText(/Draft WO-9 created/)).toBeTruthy()
   })
-})
+}
 
 // The decision is the whole point of the surface. A refusal that showed
 // nothing looked exactly like a decision that was taken: the reply was thrown
@@ -370,25 +410,34 @@ describe('refinery.conflict', () => {
   })
 })
 
+const highSignal = () =>
+  signal({ id: 'SIG-1', title: 'test-foo flakes on main', occurrences: 4, severity: 'high' })
+const lowSignal = () =>
+  signal({
+    id: 'SIG-2',
+    sensorId: 'issue-churn',
+    title: 'many issues opened against auth',
+    occurrences: 2,
+    severity: 'low',
+    evidence: [
+      { kind: 'issue', title: 'Issue #9', url: 'https://tracker/9', at: '2026-09-19T00:00:00Z' },
+    ],
+  })
+
 // From the factory's sensors: an open signal never starts anything by
 // itself. The two moves the operator has over one live here, below the
 // gates band, because gates are the surface's whole point and a heuristic's
 // hunch is not the same class of interruption as a gate that blocks work.
 describe("from the factory's sensors", () => {
-  const highSignal = () =>
-    signal({ id: 'SIG-1', title: 'test-foo flakes on main', occurrences: 4, severity: 'high' })
-  const lowSignal = () =>
-    signal({
-      id: 'SIG-2',
-      sensorId: 'issue-churn',
-      title: 'many issues opened against auth',
-      occurrences: 2,
-      severity: 'low',
-      evidence: [
-        { kind: 'issue', title: 'Issue #9', url: 'https://tracker/9', at: '2026-09-19T00:00:00Z' },
-      ],
-    })
+  describe('listing', inboxListingTests)
+  describe('several signals and arrivals', severalSignalsAndArrivalsTests)
+  describe('refreshing and empty', refreshingAndEmptyTests)
+  describe('promoting', inboxPromotingTests)
+  describe('changing the repository', changingTheRepositoryTests)
+  describe('dismissing and the badge', dismissingAndTheBadgeTests)
+})
 
+function inboxListingTests() {
   it('lists open signals, each with its count, severity, sensor and evidence link', async () => {
     mount({
       signals: [highSignal()],
@@ -410,7 +459,9 @@ describe("from the factory's sensors", () => {
       'https://ci.example/42'
     )
   })
+}
 
+function severalSignalsAndArrivalsTests() {
   it('renders more than one signal, in the order the channel ranked them', async () => {
     mount({ signals: [highSignal(), lowSignal()] })
     await waitFor(() => screen.getByText('test-foo flakes on main'))
@@ -441,6 +492,17 @@ describe("from the factory's sensors", () => {
       vi.useRealTimers()
     }
   })
+}
+
+function refreshingAndEmptyTests() {
+  it('reads the inbox again when Foundry says a gate changed, not before', async () => {
+    mount({})
+    await waitFor(() => expect(timesInvoked(invoke, 'foundry:inbox.list')).toBeGreaterThan(0))
+    const before = timesInvoked(invoke, 'foundry:inbox.list')
+
+    bus.emit({ kind: 'gates', orderId: 'WO-1' })
+    await waitFor(() => expect(timesInvoked(invoke, 'foundry:inbox.list')).toBe(before + 1))
+  })
 
   it('does not show the section when there are no open signals', async () => {
     mount({
@@ -450,7 +512,9 @@ describe("from the factory's sensors", () => {
     await waitFor(() => screen.getByText('Ready to hand off'))
     expect(screen.queryByText("From the factory's sensors")).toBeNull()
   })
+}
 
+function inboxPromotingTests() {
   it('promotes with the repository, defaulting to the sensor’s own', async () => {
     mount({
       signals: [highSignal()],
@@ -476,7 +540,9 @@ describe("from the factory's sensors", () => {
     )
     expect(await screen.findByText(/Draft WO-9 created — open it in the Forge/)).toBeTruthy()
   })
+}
 
+function changingTheRepositoryTests() {
   it('lets the repository be changed before promoting', async () => {
     mount({ signals: [highSignal()] })
     await waitFor(() => screen.getByText('test-foo flakes on main'))
@@ -492,7 +558,9 @@ describe("from the factory's sensors", () => {
       })
     )
   })
+}
 
+function dismissingAndTheBadgeTests() {
   it('dismisses a signal and removes it from the list', async () => {
     mount({ signals: [highSignal()] })
     await waitFor(() => screen.getByText('test-foo flakes on main'))
@@ -508,4 +576,4 @@ describe("from the factory's sensors", () => {
     await waitFor(() => screen.getByText('test-foo flakes on main'))
     expect(invoke).not.toHaveBeenCalledWith('foundry:attention', expect.anything())
   })
-})
+}

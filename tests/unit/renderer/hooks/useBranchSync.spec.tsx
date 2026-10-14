@@ -2,13 +2,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { useBranchSync, type BranchSyncTarget } from '../../../../src/renderer/hooks/useBranchSync'
-
-vi.mock('../../../../src/renderer/stores/workspace.store', () => ({
-  useWorkspaceStore: vi.fn(),
-}))
+import { seedStore } from '../../../support/renderer-stores'
+import { installElectronApi } from '../../../support/electron-api'
+import type { ElectronAPI } from '../../../../src/shared/electron-api/api-type'
 
 const mockUpdateProjectBranch = vi.fn()
-const mockCurrentBranch = vi.fn()
+const mockCurrentBranch = vi.fn<ElectronAPI['git']['currentBranch']>()
 
 const target = (over: Partial<BranchSyncTarget> = {}): BranchSyncTarget => ({
   id: 'proj-1',
@@ -29,19 +28,16 @@ async function settle(): Promise<void> {
 beforeEach(() => {
   vi.clearAllMocks()
   vi.useFakeTimers({ shouldAdvanceTime: true })
-  ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
-    git: { currentBranch: mockCurrentBranch },
-  }
-  vi.mocked(useWorkspaceStore).mockReturnValue({
+  installElectronApi({ git: { currentBranch: mockCurrentBranch } })
+  seedStore(useWorkspaceStore, {
     updateProjectBranch: mockUpdateProjectBranch,
-  } as unknown as ReturnType<typeof useWorkspaceStore>)
+  })
   mockCurrentBranch.mockResolvedValue({ branch: 'main' })
   mockUpdateProjectBranch.mockResolvedValue({})
 })
 
 afterEach(() => {
   vi.useRealTimers()
-  delete (globalThis as unknown as Record<string, unknown>).electronAPI
 })
 
 describe('useBranchSync — the name on the card is the branch in the tree', () => {
@@ -70,7 +66,9 @@ describe('useBranchSync — the name on the card is the branch in the tree', () 
     await settle()
     expect(mockUpdateProjectBranch).toHaveBeenCalledWith('proj-1', 'feature/new')
   })
+})
 
+describe('useBranchSync — the name on the card is the branch in the tree — moves every card that shares the folder, without one telling the other', () => {
   it('moves every card that shares the folder, without one telling the other', async () => {
     // Two plain cards on one repo: each is checked against its own tree, so
     // both land on the branch that tree is on.
@@ -95,7 +93,9 @@ describe('useBranchSync — the name on the card is the branch in the tree', () 
     expect(mockCurrentBranch).toHaveBeenCalledWith('/workspace')
     expect(mockUpdateProjectBranch).toHaveBeenCalledWith('proj-1', 'develop')
   })
+})
 
+describe('useBranchSync — the name on the card is the branch in the tree — does not ask while the window is hidden', () => {
   it('does not ask while the window is hidden', async () => {
     const spy = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden')
     renderHook(() => useBranchSync([target()]))
@@ -123,10 +123,12 @@ describe('useBranchSync — the name on the card is the branch in the tree', () 
     await settle()
     expect(mockCurrentBranch.mock.calls.length).toBe(callsAfterMount)
   })
+})
 
+describe('useBranchSync — the name on the card is the branch in the tree — ignores a folder that is not a repository', () => {
   it('ignores a folder that is not a repository', async () => {
     mockCurrentBranch.mockRejectedValue(new Error('not a git repo'))
-    expect(() => renderHook(() => useBranchSync([target()]))).not.toThrow()
+    renderHook(() => useBranchSync([target()]))
     await settle()
     expect(mockUpdateProjectBranch).not.toHaveBeenCalled()
   })

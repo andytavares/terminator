@@ -1,3 +1,4 @@
+import { useShallow } from 'zustand/react/shallow'
 import React, { useEffect, useState } from 'react'
 import { Check, Link2, RefreshCw, X } from 'lucide-react'
 import { useIntegrationsStore } from '../../stores/integrations.store'
@@ -30,75 +31,142 @@ function StatusDot({ connection }: { connection: TrackerConnection | undefined }
   return <span className={`integrations__dot integrations__dot--${state}`} aria-hidden="true" />
 }
 
-function LinearForm(): JSX.Element {
-  const { connect, connectError, clearConnectError } = useIntegrationsStore()
+type ConnectInput = Parameters<ReturnType<typeof useIntegrationsStore.getState>['connect']>[0]
+
+/** Sending a credential for `tracker`: busy while main verifies it, and the error it gave back,
+ * cleared as soon as the operator types again. */
+function useConnect(tracker: TrackerId) {
+  const error = useIntegrationsStore((s) => s.connectError[tracker])
+  const [busy, setBusy] = useState(false)
+  async function connectTracker(input: ConnectInput): Promise<boolean> {
+    setBusy(true)
+    const ok = await useIntegrationsStore.getState().connect(input)
+    setBusy(false)
+    return ok
+  }
+  const clearError = (): void => useIntegrationsStore.getState().clearConnectError(tracker)
+  return { busy, error, connect: connectTracker, clearError }
+}
+
+interface FieldProps {
+  id: string
+  label: string
+  value: string
+  onChange: (value: string) => void
+  placeholder?: string
+  /** Masked, and kept out of autofill history. */
+  secret?: boolean
+}
+
+function CredentialField({ id, label, value, onChange, placeholder, secret = false }: FieldProps) {
+  return (
+    <>
+      <label className="settings-section__label" htmlFor={id}>
+        {label}
+      </label>
+      <input
+        id={id}
+        className="settings-section__input"
+        type={secret ? 'password' : undefined}
+        autoComplete={secret ? 'off' : undefined}
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </>
+  )
+}
+
+function ConnectError({ error }: { error: string | undefined }) {
+  if (error === undefined) return null
+  return (
+    <p className="integrations__error" role="alert">
+      {error}
+    </p>
+  )
+}
+
+interface ConnectButtonProps {
+  label: string
+  busy: boolean
+  ready: boolean
+  onConnect: () => Promise<void>
+}
+
+function ConnectButton({ label, busy, ready, onConnect }: ConnectButtonProps): JSX.Element {
+  return (
+    <button className="ext-btn" disabled={busy || !ready} onClick={() => void onConnect()}>
+      {busy ? 'Verifying…' : label}
+    </button>
+  )
+}
+
+/** The Linear key and optional lookup email; the key is cleared after every attempt. */
+function useLinearForm() {
+  const { connect, clearError, ...state } = useConnect('linear')
   const [apiKey, setApiKey] = useState('')
   const [email, setEmail] = useState('')
-  const [busy, setBusy] = useState(false)
-
   async function submit(): Promise<void> {
-    setBusy(true)
     const ok = await connect({ tracker: 'linear', apiKey, email: email.trim() || null })
-    setBusy(false)
     // Cleared whatever happened — a key that was rejected should not sit in a
     // form field waiting to be screenshotted.
     setApiKey('')
     if (ok) setEmail('')
   }
+  const typeKey = (value: string): void => {
+    setApiKey(value)
+    clearError()
+  }
+  return { ...state, apiKey, typeKey, email, setEmail, submit }
+}
 
+function LinearForm(): JSX.Element {
+  const form = useLinearForm()
   return (
     <div className="integrations__form">
-      <label className="settings-section__label" htmlFor="linear-api-key">
-        API key
-      </label>
-      <input
+      <CredentialField
         id="linear-api-key"
-        className="settings-section__input"
-        type="password"
-        autoComplete="off"
-        value={apiKey}
+        label="API key"
+        secret
+        value={form.apiKey}
         placeholder="lin_api_…"
-        onChange={(e) => {
-          setApiKey(e.target.value)
-          clearConnectError('linear')
-        }}
+        onChange={form.typeKey}
       />
-      <label className="settings-section__label" htmlFor="linear-email">
-        Assigned-issue lookup (optional)
-      </label>
-      <input
+      <CredentialField
         id="linear-email"
-        className="settings-section__input"
-        value={email}
+        label="Assigned-issue lookup (optional)"
+        value={form.email}
         placeholder="Leave blank to use the key's own account"
-        onChange={(e) => setEmail(e.target.value)}
+        onChange={form.setEmail}
       />
-      {connectError.linear !== undefined && (
-        <p className="integrations__error" role="alert">
-          {connectError.linear}
-        </p>
-      )}
-      <button
-        className="ext-btn"
-        disabled={busy || apiKey.trim().length === 0}
-        onClick={() => void submit()}
-      >
-        {busy ? 'Verifying…' : 'Connect Linear'}
-      </button>
+      <ConnectError error={form.error} />
+      <ConnectButton
+        label="Connect Linear"
+        busy={form.busy}
+        ready={form.apiKey.trim().length > 0}
+        onConnect={form.submit}
+      />
     </div>
   )
 }
 
-function JiraForm(): JSX.Element {
-  const { connect, connectError, clearConnectError } = useIntegrationsStore()
-  const [site, setSite] = useState('')
-  const [email, setEmail] = useState('')
-  const [apiToken, setApiToken] = useState('')
-  const [jql, setJql] = useState('assignee = currentUser() AND resolution = Unresolved')
-  const [busy, setBusy] = useState(false)
+const DEFAULT_JQL = 'assignee = currentUser() AND resolution = Unresolved'
 
+type JiraDraft = { site: string; email: string; apiToken: string; jql: string }
+
+/** The Jira form's fields and sending them. The token is cleared after every attempt, the site
+ * and email only once connected. */
+function useJiraForm() {
+  const { connect, clearError, ...state } = useConnect('jira')
+  const [draft, setDraft] = useState<JiraDraft>({
+    site: '',
+    email: '',
+    apiToken: '',
+    jql: DEFAULT_JQL,
+  })
+  const updateDraft = (patch: Partial<JiraDraft>): void => setDraft((d) => ({ ...d, ...patch }))
   async function submit(): Promise<void> {
-    setBusy(true)
+    const { site, email, apiToken, jql } = draft
     const ok = await connect({
       tracker: 'jira',
       site: site.trim(),
@@ -106,93 +174,78 @@ function JiraForm(): JSX.Element {
       apiToken,
       jql,
     })
-    setBusy(false)
-    setApiToken('')
-    if (ok) {
-      setSite('')
-      setEmail('')
-    }
+    updateDraft(ok ? { apiToken: '', site: '', email: '' } : { apiToken: '' })
   }
+  const editDraft = (patch: Partial<JiraDraft>): void => {
+    updateDraft(patch)
+    clearError()
+  }
+  const ready =
+    draft.site.trim().length > 0 && draft.email.trim().length > 0 && draft.apiToken.length > 0
+  return { ...state, draft, update: updateDraft, edit: editDraft, ready, submit }
+}
 
-  const ready = site.trim().length > 0 && email.trim().length > 0 && apiToken.length > 0
-
+function JiraForm(): JSX.Element {
+  const form = useJiraForm()
+  const { draft, update } = form
   return (
     <div className="integrations__form">
-      <label className="settings-section__label" htmlFor="jira-site">
-        Site
-      </label>
-      <input
-        id="jira-site"
-        className="settings-section__input"
-        value={site}
-        placeholder="your-team.atlassian.net"
-        onChange={(e) => {
-          setSite(e.target.value)
-          clearConnectError('jira')
-        }}
-      />
-      <label className="settings-section__label" htmlFor="jira-email">
-        Account email
-      </label>
-      <input
-        id="jira-email"
-        className="settings-section__input"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-      />
-      <label className="settings-section__label" htmlFor="jira-token">
-        API token
-      </label>
-      <input
-        id="jira-token"
-        className="settings-section__input"
-        type="password"
-        autoComplete="off"
-        value={apiToken}
-        onChange={(e) => {
-          setApiToken(e.target.value)
-          clearConnectError('jira')
-        }}
-      />
-      <label className="settings-section__label" htmlFor="jira-jql">
-        My issues (JQL)
-      </label>
-      <input
+      <JiraCredentialFields form={form} />
+      <CredentialField
         id="jira-jql"
-        className="settings-section__input"
-        value={jql}
-        onChange={(e) => setJql(e.target.value)}
+        label="My issues (JQL)"
+        value={draft.jql}
+        onChange={(jql) => update({ jql })}
       />
-      {connectError.jira !== undefined && (
-        <p className="integrations__error" role="alert">
-          {connectError.jira}
-        </p>
-      )}
-      <button className="ext-btn" disabled={busy || !ready} onClick={() => void submit()}>
-        {busy ? 'Verifying…' : 'Connect Jira'}
-      </button>
+      <ConnectError error={form.error} />
+      <ConnectButton
+        label="Connect Jira"
+        busy={form.busy}
+        ready={form.ready}
+        onConnect={form.submit}
+      />
     </div>
   )
 }
 
+/** Site, account email and API token; editing the site or token clears a rejection. */
+function JiraCredentialFields({ form }: { form: ReturnType<typeof useJiraForm> }) {
+  const { draft, update, edit } = form
+  return (
+    <>
+      <CredentialField
+        id="jira-site"
+        label="Site"
+        value={draft.site}
+        placeholder="your-team.atlassian.net"
+        onChange={(site) => edit({ site })}
+      />
+      <CredentialField
+        id="jira-email"
+        label="Account email"
+        value={draft.email}
+        onChange={(email) => update({ email })}
+      />
+      <CredentialField
+        id="jira-token"
+        label="API token"
+        secret
+        value={draft.apiToken}
+        onChange={(apiToken) => edit({ apiToken })}
+      />
+    </>
+  )
+}
+
+/** What "my issues" means for a connection: an assignee email, or a JQL query. */
+function mineText(connection: TrackerConnection | undefined): string {
+  if (connection?.mine.kind === 'assignee') return connection.mine.email ?? ''
+  return connection?.mine.kind === 'query' ? connection.mine.jql : ''
+}
+
 function ConnectedPanel({ tracker }: { tracker: TrackerId }): JSX.Element {
-  const { connectionFor, disconnect, setMine, loadConnections } = useIntegrationsStore()
-  const connection = connectionFor(tracker)
-  const [mineValue, setMineValue] = useState(() => {
-    if (connection?.mine.kind === 'assignee') return connection.mine.email ?? ''
-    return connection?.mine.kind === 'query' ? connection.mine.jql : ''
-  })
-
-  function commitMine(): void {
-    if (connection === undefined) return
-    void setMine(
-      tracker,
-      connection.mine.kind === 'assignee'
-        ? { kind: 'assignee', email: mineValue.trim() || null }
-        : { kind: 'query', jql: mineValue.trim() }
-    )
-  }
-
+  const connection = useIntegrationsStore((s) => s.connectionFor(tracker))
+  const [mineValue, setMineValue] = useState(() => mineText(connection))
   const isAssignee = connection?.mine.kind === 'assignee'
 
   return (
@@ -206,18 +259,38 @@ function ConnectedPanel({ tracker }: { tracker: TrackerId }): JSX.Element {
         value={mineValue}
         placeholder={isAssignee ? "Blank uses the key's own account" : ''}
         onChange={(e) => setMineValue(e.target.value)}
-        onBlur={commitMine}
+        onBlur={() => saveMine(tracker, connection, mineValue)}
       />
-      <div className="integrations__actions">
-        <button className="ext-btn" onClick={() => void loadConnections()} title="Re-check">
-          <RefreshCw />
-          <span>Test</span>
-        </button>
-        <button className="ext-btn ext-btn--danger" onClick={() => void disconnect(tracker)}>
-          <X />
-          <span>Disconnect</span>
-        </button>
-      </div>
+      <ConnectedActions tracker={tracker} />
+    </div>
+  )
+}
+
+/** Stores the edited lookup: a blank assignee email means the key's own account. */
+function saveMine(tracker: TrackerId, connection: TrackerConnection | undefined, text: string) {
+  if (connection === undefined) return
+  void useIntegrationsStore
+    .getState()
+    .setMine(
+      tracker,
+      connection.mine.kind === 'assignee'
+        ? { kind: 'assignee', email: text.trim() || null }
+        : { kind: 'query', jql: text.trim() }
+    )
+}
+
+function ConnectedActions({ tracker }: { tracker: TrackerId }): JSX.Element {
+  const store = useIntegrationsStore.getState
+  return (
+    <div className="integrations__actions">
+      <button className="ext-btn" onClick={() => void store().loadConnections()} title="Re-check">
+        <RefreshCw />
+        <span>Test</span>
+      </button>
+      <button className="ext-btn ext-btn--danger" onClick={() => void store().disconnect(tracker)}>
+        <X />
+        <span>Disconnect</span>
+      </button>
     </div>
   )
 }
@@ -246,7 +319,9 @@ function TrackerRow({ tracker }: { tracker: TrackerId }): JSX.Element {
 }
 
 export function IntegrationsSettings(): JSX.Element {
-  const { loadConnections, subscribe } = useIntegrationsStore()
+  const { loadConnections, subscribe } = useIntegrationsStore(
+    useShallow((s) => ({ loadConnections: s.loadConnections, subscribe: s.subscribe }))
+  )
 
   useEffect(() => {
     void loadConnections()

@@ -8,26 +8,25 @@ const mockOpenPath = vi.fn()
 
 beforeEach(() => {
   vi.clearAllMocks()
-  ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
-    shell: { openPath: mockOpenPath },
-  }
+  Object.assign(globalThis, {
+    electronAPI: {
+      shell: { openPath: mockOpenPath },
+    },
+  })
 })
 
 afterEach(() => {
-  delete (globalThis as unknown as Record<string, unknown>).electronAPI
+  Reflect.deleteProperty(globalThis, 'electronAPI')
 })
 
 function makeRiskScore(overrides: Partial<RiskScore> = {}): RiskScore {
   return {
-    score: 60,
     level: 'medium',
     composite: 60,
     dominantDriver: 'High churn rate',
     topImporters: [],
     importerCount: 0,
     metrics: {
-      linesChanged: 50,
-      filesChanged: 1,
       testFilePresent: true,
       complexityDelta: 2,
       churn90d: 10,
@@ -65,7 +64,9 @@ describe('RiskBreakdownPanel', () => {
     expect(container.querySelector('.risk-composite-score')?.textContent).toBe('60')
     expect(container.querySelector('.risk-composite-max')?.textContent).toBe(' / 100')
   })
+})
 
+describe('RiskBreakdownPanel — does not render composite score when null', () => {
   it('does not render composite score when null', () => {
     render(
       <RiskBreakdownPanel
@@ -88,7 +89,9 @@ describe('RiskBreakdownPanel', () => {
     expect(screen.getByText('Patch coverage')).toBeTruthy()
     expect(screen.getByText('Test file')).toBeTruthy()
   })
+})
 
+describe('RiskBreakdownPanel — shows ? for unknown metric values', () => {
   it('shows "?" for unknown metric values', () => {
     const riskScore = makeRiskScore()
     riskScore.metrics.churn90d = null
@@ -114,7 +117,9 @@ describe('RiskBreakdownPanel', () => {
     expect(screen.getByText('bar.ts')).toBeTruthy()
     expect(screen.getByText('baz.ts')).toBeTruthy()
   })
+})
 
+describe('RiskBreakdownPanel — calls openPath when importer is clicked', () => {
   it('calls openPath when importer is clicked', () => {
     const riskScore = makeRiskScore({ topImporters: ['src/bar.ts'], importerCount: 1 })
     render(<RiskBreakdownPanel filePath="src/foo.ts" riskScore={riskScore} repoRoot="/repo" />)
@@ -137,7 +142,9 @@ describe('RiskBreakdownPanel', () => {
     expect(screen.getByText('f.ts')).toBeTruthy()
     expect(screen.getByText('Collapse')).toBeTruthy()
   })
+})
 
+describe('RiskBreakdownPanel — shows test file as present when testFilePresent is true', () => {
   it('shows test file as present when testFilePresent is true', () => {
     render(
       <RiskBreakdownPanel filePath="src/foo.ts" riskScore={makeRiskScore()} repoRoot="/repo" />

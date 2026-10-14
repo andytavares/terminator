@@ -6,6 +6,7 @@ import { queueRiskLevel } from './pr-review-service'
 // `search does not reliably accept @me` for team-review-requested-user, so LOGIN
 // is substituted with the viewer's login before the query is sent.
 
+/** @internal */
 export const DASHBOARD_QUERIES: Record<DashboardSection, string> = {
   're-review': 'is:pr is:open archived:false reviewed-by:@me -author:@me sort:created-desc',
   requested: 'is:pr is:open archived:false user-review-requested:@me sort:created-desc',
@@ -115,6 +116,13 @@ interface RawSearchResult {
   nodes?: unknown[]
 }
 
+/** Who is looking, and where their checkouts of each repository are. */
+export interface DashboardViewer {
+  login: string
+  /** owner/name -> local checkout path */
+  localRoots: Map<string, string>
+}
+
 interface RawDashboardResponse {
   data?: {
     reReview?: RawSearchResult
@@ -125,32 +133,26 @@ interface RawDashboardResponse {
   }
 }
 
+const CI_STATUSES = new Map<string, DashboardPR['ciStatus']>([
+  ['SUCCESS', 'passing'],
+  ['FAILURE', 'failing'],
+  ['ERROR', 'failing'],
+  ['PENDING', 'pending'],
+  ['EXPECTED', 'pending'],
+])
+
+const REVIEW_DECISIONS = new Map<string, DashboardPR['reviewDecision']>([
+  ['APPROVED', 'approved'],
+  ['CHANGES_REQUESTED', 'changes-requested'],
+  ['REVIEW_REQUIRED', 'review-required'],
+])
+
 function mapCiStatus(state: string | null | undefined): DashboardPR['ciStatus'] {
-  switch (state) {
-    case 'SUCCESS':
-      return 'passing'
-    case 'FAILURE':
-    case 'ERROR':
-      return 'failing'
-    case 'PENDING':
-    case 'EXPECTED':
-      return 'pending'
-    default:
-      return 'none'
-  }
+  return CI_STATUSES.get(state ?? '') ?? 'none'
 }
 
 function mapReviewDecision(decision: string | null | undefined): DashboardPR['reviewDecision'] {
-  switch (decision) {
-    case 'APPROVED':
-      return 'approved'
-    case 'CHANGES_REQUESTED':
-      return 'changes-requested'
-    case 'REVIEW_REQUIRED':
-      return 'review-required'
-    default:
-      return 'none'
-  }
+  return REVIEW_DECISIONS.get(decision ?? '') ?? 'none'
 }
 
 function computeCommitsSinceMyReview(node: RawPrNode, login: string): number {
@@ -163,18 +165,29 @@ function computeCommitsSinceMyReview(node: RawPrNode, login: string): number {
   return node.commits.nodes.filter((c) => c.commit.committedDate > latestReviewAt).length
 }
 
-function mapNode(
-  node: RawPrNode,
-  section: DashboardSection,
-  login: string,
-  localRoots: Map<string, string>
-): DashboardPR {
-  const additions = node.additions
-  const deletions = node.deletions
+function reviewerCountOf(node: RawPrNode): number {
+  const reviewers = new Set(node.latestReviews.nodes.map((r) => r.author?.login).filter(Boolean))
+  return node.reviewRequests.totalCount + reviewers.size
+}
+
+/** Where review of the PR stands for the viewer: CI, decision, threads, new commits. */
+function reviewProgressOf(node: RawPrNode, login: string) {
   const latestCommit = node.commits.nodes[node.commits.nodes.length - 1]
   return {
-    repo: node.repository.nameWithOwner,
-    localRepoRoot: localRoots.get(node.repository.nameWithOwner) ?? null,
+    ciStatus: mapCiStatus(latestCommit?.commit.statusCheckRollup?.state),
+    reviewDecision: mapReviewDecision(node.reviewDecision),
+    unresolvedThreads: node.reviewThreads.nodes.filter((t) => !t.isResolved).length,
+    commitsSinceMyReview: computeCommitsSinceMyReview(node, login),
+    reviewerCount: reviewerCountOf(node),
+  }
+}
+
+function mapNode(node: RawPrNode, section: DashboardSection, viewer: DashboardViewer): DashboardPR {
+  const { additions, deletions } = node
+  const repo = node.repository.nameWithOwner
+  return {
+    repo,
+    localRepoRoot: viewer.localRoots.get(repo) ?? null,
     section,
     number: node.number,
     title: node.title,
@@ -187,13 +200,7 @@ function mapNode(
     fileCount: node.changedFiles,
     riskLevel: queueRiskLevel(additions + deletions),
     estimatedMinutes: Math.max(1, Math.ceil((additions + deletions) / 60)),
-    ciStatus: mapCiStatus(latestCommit?.commit.statusCheckRollup?.state),
-    reviewDecision: mapReviewDecision(node.reviewDecision),
-    unresolvedThreads: node.reviewThreads.nodes.filter((t) => !t.isResolved).length,
-    commitsSinceMyReview: computeCommitsSinceMyReview(node, login),
-    reviewerCount:
-      node.reviewRequests.totalCount +
-      new Set(node.latestReviews.nodes.map((r) => r.author?.login).filter(Boolean)).size,
+    ...reviewProgressOf(node, viewer.login),
     sessionStatus: 'not-started',
     viewedFileCount: 0,
   }
@@ -205,49 +212,78 @@ function mapNode(
  */
 export type BranchExcluded = (branch: string, repoPath?: string) => boolean
 
-/**
- * Pure: turns the raw GraphQL response into deduped, section-tagged rows,
- * leaving out pull requests opened from an excluded branch.
- */
-export function parseDashboard(
-  raw: unknown,
-  login: string,
-  localRoots: Map<string, string>,
-  isBranchExcluded: BranchExcluded = () => false
-): DashboardPR[] {
-  const response = raw as RawDashboardResponse
-  const data = response.data ?? {}
+/** The core's answer for one branch, which crosses the extension host's port (SDK 4.0.0). */
+export type BranchExclusionQuery = (branch: string, repoPath?: string) => Promise<boolean>
 
+/**
+ * Asks about each distinct candidate once, then answers from the replies, so a
+ * pure filter such as `parseDashboard` stays synchronous.
+ */
+export async function resolveBranchExclusions(
+  query: BranchExclusionQuery,
+  candidates: ReadonlyArray<{ branch: string; repoPath?: string }>
+): Promise<BranchExcluded> {
+  const keyOf = (branch: string, repoPath?: string) => `${repoPath ?? ''}\0${branch}`
+  const distinct = new Map(candidates.map((c) => [keyOf(c.branch, c.repoPath), c]))
+  const answers = await Promise.all(
+    [...distinct].map(async ([key, c]) => [key, await query(c.branch, c.repoPath)] as const)
+  )
+  const excluded = new Set(answers.filter(([, isExcluded]) => isExcluded).map(([key]) => key))
+  return (branch, repoPath) => excluded.has(keyOf(branch, repoPath))
+}
+
+/** Each pull request's branch and local checkout in the raw response, for `resolveBranchExclusions`. */
+export function dashboardBranches(
+  raw: unknown,
+  localRoots: Map<string, string>
+): Array<{ branch: string; repoPath?: string }> {
+  const data = (raw as RawDashboardResponse).data ?? {}
+  return [data.reReview, data.requested, data.team, data.mine, data.involved]
+    .flatMap((result) => (result?.nodes ?? []).filter((n): n is RawPrNode => n != null))
+    .map((n) => ({
+      branch: n.headRefName ?? '',
+      repoPath: localRoots.get(n.repository.nameWithOwner),
+    }))
+}
+
+/** Each section's pull requests, leaving out those opened from an excluded branch. */
+function nodesBySection(
+  raw: unknown,
+  localRoots: Map<string, string>,
+  isBranchExcluded: BranchExcluded
+): Record<DashboardSection, RawPrNode[]> {
+  const data = (raw as RawDashboardResponse).data ?? {}
   const nodesFor = (result: RawSearchResult | undefined): RawPrNode[] =>
     ((result?.nodes ?? []).filter((n): n is RawPrNode => n != null) as RawPrNode[]).filter(
       (n) => !isBranchExcluded(n.headRefName ?? '', localRoots.get(n.repository.nameWithOwner))
     )
-
-  const bySection: Record<DashboardSection, RawPrNode[]> = {
+  return {
     're-review': nodesFor(data.reReview),
     requested: nodesFor(data.requested),
     team: nodesFor(data.team),
     mine: nodesFor(data.mine),
     involved: nodesFor(data.involved),
   }
+}
 
+/** Pure: turns the raw GraphQL response into deduped, section-tagged rows, leaving out pull requests
+ *  opened from an excluded branch. */
+export function parseDashboard(
+  raw: unknown,
+  viewer: DashboardViewer,
+  isBranchExcluded: BranchExcluded = () => false
+): DashboardPR[] {
+  const bySection = nodesBySection(raw, viewer.localRoots, isBranchExcluded)
   const results: DashboardPR[] = []
   const seen = new Set<string>() // "owner/name#number"
-
   for (const section of DEDUPE_ORDER) {
     for (const node of bySection[section]) {
       const key = `${node.repository.nameWithOwner}#${node.number}`
       if (seen.has(key)) continue
       seen.add(key)
-      const pr = mapNode(node, section, login, localRoots)
-      if (section === 're-review' && pr.commitsSinceMyReview <= 0) continue
-      results.push(pr)
+      const pr = mapNode(node, section, viewer)
+      if (section !== 're-review' || pr.commitsSinceMyReview > 0) results.push(pr)
     }
   }
-
-  for (const node of bySection.mine) {
-    results.push(mapNode(node, 'mine', login, localRoots))
-  }
-
-  return results
+  return [...results, ...bySection.mine.map((node) => mapNode(node, 'mine', viewer))]
 }

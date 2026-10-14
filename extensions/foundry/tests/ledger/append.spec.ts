@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import * as path from 'node:path'
-import { appendEntry, readEntries, queryEntries } from '../../src/ledger/append.js'
+import { appendEntry, readEntries } from '../../src/ledger/append.js'
 import type { LedgerEntry } from '../../src/ledger/append.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 // The ledger is the record of every decision, by whom or by what rule, and why
 // (FR-078). It is append-only: a reversal is a new entry, never a rewritten
@@ -27,7 +27,7 @@ function entry(over: Partial<LedgerEntry> = {}): LedgerEntry {
 }
 
 beforeEach(() => {
-  dir = fs.mkdtempSync(path.join(os.tmpdir(), 'foundry-ledger-'))
+  dir = makeTempDir('foundry-ledger-')
   file = path.join(dir, 'ledger.jsonl')
 })
 
@@ -36,6 +36,11 @@ afterEach(() => {
 })
 
 describe('appendEntry', () => {
+  describe('writing lines', writingLinesTests)
+  describe('concurrent and invalid entries', concurrentAndInvalidEntriesTests)
+})
+
+function writingLinesTests() {
   it('creates the file and its parent directory on first write', async () => {
     const nested = path.join(dir, 'orders', 'WO-1', 'ledger.jsonl')
     await appendEntry(nested, entry())
@@ -63,7 +68,9 @@ describe('appendEntry', () => {
     const entries = await readEntries(file)
     expect(entries.map((e) => e.action)).toEqual(['gate.decided', 'gate.reversed'])
   })
+}
 
+function concurrentAndInvalidEntriesTests() {
   it('lands every entry when many writers append at once', async () => {
     await Promise.all(
       Array.from({ length: 40 }, (_, i) => appendEntry(file, entry({ subject: `S-${i}` })))
@@ -80,7 +87,7 @@ describe('appendEntry', () => {
   it('rejects an entry with no action', async () => {
     await expect(appendEntry(file, entry({ action: '' }))).rejects.toThrow()
   })
-})
+}
 
 describe('readEntries', () => {
   it('returns nothing for a ledger that does not exist yet', async () => {
@@ -96,44 +103,12 @@ describe('readEntries', () => {
   })
 })
 
-describe('queryEntries', () => {
-  beforeEach(async () => {
-    await appendEntry(file, entry({ actor: 'operator', action: 'gate.decided', subject: 'G-1' }))
-    await appendEntry(file, entry({ actor: 'rule:risk.p0', action: 'gate.raised', subject: 'G-2' }))
-    await appendEntry(
-      file,
-      entry({
-        actor: 'role:verifier',
-        action: 'verdict',
-        subject: 'U-1',
-        at: '2026-09-07T10:00:00.000Z',
-      })
-    )
-  })
-
-  it('filters by actor', async () => {
-    const r = await queryEntries(file, { actor: 'operator' })
-    expect(r.map((e) => e.subject)).toEqual(['G-1'])
-  })
-
-  it('filters by action', async () => {
-    const r = await queryEntries(file, { action: 'gate.raised' })
-    expect(r.map((e) => e.subject)).toEqual(['G-2'])
-  })
-
-  it('filters by time', async () => {
-    const r = await queryEntries(file, { since: '2026-09-07T00:00:00.000Z' })
-    expect(r.map((e) => e.subject)).toEqual(['U-1'])
-  })
-
-  it('honours a limit, keeping the most recent', async () => {
-    const r = await queryEntries(file, { limit: 1 })
-    expect(r).toHaveLength(1)
-    expect(r[0].subject).toBe('U-1')
-  })
+describe('every decision is attributable (FR-078)', () => {
+  describe('who, what and why', whoWhatAndWhyTests)
+  describe('evidence, gaps and order', evidenceGapsAndOrderTests)
 })
 
-describe('every decision is attributable (FR-078)', () => {
+function whoWhatAndWhyTests() {
   it('keeps all four of who, what, about what and why', async () => {
     await appendEntry(
       file,
@@ -161,7 +136,9 @@ describe('every decision is attributable (FR-078)', () => {
     const actors = (await readEntries(file)).map((e) => e.actor)
     expect(actors).toEqual(['operator', 'rule:budget.exceeded', 'role:verifier'])
   })
+}
 
+function evidenceGapsAndOrderTests() {
   it('carries the evidence a decision was taken on', async () => {
     await appendEntry(
       file,
@@ -187,6 +164,7 @@ describe('every decision is attributable (FR-078)', () => {
   it('keeps the order every entry belongs to, so one order can be read alone', async () => {
     await appendEntry(file, entry({ orderId: 'WO-1', subject: 'a' }))
     await appendEntry(file, entry({ orderId: 'WO-2', subject: 'b' }))
-    expect((await queryEntries(file, { orderId: 'WO-2' })).map((e) => e.subject)).toEqual(['b'])
+    const own = (await readEntries(file)).filter((e) => e.orderId === 'WO-2')
+    expect(own.map((e) => e.subject)).toEqual(['b'])
   })
-})
+}

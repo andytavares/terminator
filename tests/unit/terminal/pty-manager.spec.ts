@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import type { PtyManager } from '../../../src/main/terminal/pty-manager'
 
 const mockPty = {
   pid: 12345,
@@ -7,6 +8,8 @@ const mockPty = {
   write: vi.fn(),
   resize: vi.fn(),
   kill: vi.fn(),
+  pause: vi.fn(),
+  resume: vi.fn(),
 }
 
 vi.mock('node-pty', () => ({
@@ -22,7 +25,7 @@ vi.mock('electron', () => ({
 
 const fsMock = vi.hoisted(() => ({
   // Every cwd is a real directory unless a test says otherwise.
-  statSync: vi.fn(() => ({ isDirectory: () => true })),
+  statSync: vi.fn((): { isDirectory: () => boolean } => ({ isDirectory: () => true })),
 }))
 
 vi.mock('fs', () => ({
@@ -32,7 +35,12 @@ vi.mock('fs', () => ({
   statSync: fsMock.statSync,
 }))
 
-describe('PtyManager', () => {
+async function makeManager() {
+  const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
+  return new PtyManager()
+}
+
+function usePtyMocks(): void {
   beforeEach(() => {
     vi.resetModules()
     vi.clearAllMocks()
@@ -40,110 +48,149 @@ describe('PtyManager', () => {
     mockPty.onData.mockImplementation((_cb: unknown) => {})
     mockPty.onExit.mockImplementation((_cb: unknown) => {})
   })
+}
 
-  describe('a cwd that is not there', () => {
-    // node-pty does not fail this spawn — the child forks, cannot chdir, and
-    // exits 1 with no output, which reaches the operator as a tab that opens
-    // and instantly dies showing nothing. Refusing up front is the only point
-    // at which the reason still exists.
-    it('refuses to spawn, and names the folder', async () => {
-      const { PtyManager, MissingCwdError } = await import('../../../src/main/terminal/pty-manager')
-      const pty = await import('node-pty')
-      fsMock.statSync.mockImplementation(() => {
-        throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
-      })
-      const mgr = new PtyManager()
+describe('PtyManager — a cwd that is not there', () => {
+  usePtyMocks()
 
-      expect(() =>
-        mgr.spawnSession({
-          sessionId: 'gone',
-          cwd: '/repo/.worktrees/removed',
-          shell: '/bin/zsh',
-          type: 'human',
-          origin: 'app',
-        })
-      ).toThrow(MissingCwdError)
-      expect(() =>
-        mgr.spawnSession({
-          sessionId: 'gone',
-          cwd: '/repo/.worktrees/removed',
-          shell: '/bin/zsh',
-          type: 'human',
-          origin: 'app',
-        })
-      ).toThrow('/repo/.worktrees/removed')
-      expect(pty.spawn).not.toHaveBeenCalled()
-      expect(mgr.getSessionIds()).toHaveLength(0)
+  // node-pty's child cannot chdir and exits 1 with no output, a tab that dies showing
+  // nothing; only up front does the reason still exist.
+  it('refuses to spawn, and names the folder', async () => {
+    const { PtyManager, MissingCwdError } = await import('../../../src/main/terminal/pty-manager')
+    const pty = await import('node-pty')
+    fsMock.statSync.mockImplementation(() => {
+      throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
     })
-
-    it('refuses a cwd that exists but is a file', async () => {
-      const { PtyManager, MissingCwdError } = await import('../../../src/main/terminal/pty-manager')
-      const pty = await import('node-pty')
-      fsMock.statSync.mockImplementation(() => ({ isDirectory: () => false }))
-      const mgr = new PtyManager()
-
-      expect(() =>
-        mgr.spawnSession({
-          sessionId: 'file',
-          cwd: '/repo/README.md',
-          shell: '/bin/zsh',
-          type: 'human',
-          origin: 'app',
-        })
-      ).toThrow(MissingCwdError)
-      expect(pty.spawn).not.toHaveBeenCalled()
-    })
-  })
-
-  it('spawn creates a PTY and returns sessionId', async () => {
-    const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
     const mgr = new PtyManager()
+    const cwd = '/repo/.worktrees/removed'
+    const spawn = () =>
+      mgr.spawnSession({ sessionId: 'gone', cwd, shell: '/bin/zsh', type: 'human', origin: 'app' })
+
+    expect(spawn).toThrow(MissingCwdError)
+    expect(spawn).toThrow(cwd)
+    expect(pty.spawn).not.toHaveBeenCalled()
+    expect(mgr.getSessionIds()).toHaveLength(0)
+  })
+})
+
+describe('PtyManager — a cwd that is a file', () => {
+  usePtyMocks()
+
+  it('refuses a cwd that exists but is a file', async () => {
+    const { PtyManager, MissingCwdError } = await import('../../../src/main/terminal/pty-manager')
+    const pty = await import('node-pty')
+    fsMock.statSync.mockImplementation(() => ({ isDirectory: () => false }))
+    const mgr = new PtyManager()
+
+    expect(() =>
+      mgr.spawnSession({
+        sessionId: 'file',
+        cwd: '/repo/README.md',
+        shell: '/bin/zsh',
+        type: 'human',
+        origin: 'app',
+      })
+    ).toThrow(MissingCwdError)
+    expect(pty.spawn).not.toHaveBeenCalled()
+  })
+})
+
+describe('PtyManager', () => {
+  usePtyMocks()
+
+  it('spawnSession creates a PTY and returns the session info', async () => {
+    const mgr = await makeManager()
     const sessionId = 'test-session-1'
-    const result = mgr.spawn(sessionId, '/home', '/bin/bash', 'human', vi.fn(), vi.fn())
-    expect(result).toBe(sessionId)
+    const result = mgr.spawnSession({
+      sessionId,
+      cwd: '/home',
+      shell: '/bin/bash',
+      type: 'human',
+      origin: 'app',
+    })
+    expect(result.sessionId).toBe(sessionId)
     expect(mgr.getSessionIds()).toContain(sessionId)
   })
 
   it('resize calls pty.resize', async () => {
-    const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
-    const mgr = new PtyManager()
+    const mgr = await makeManager()
     const id = 'resize-session'
-    mgr.spawn(id, '/', '/bin/bash', 'human', vi.fn(), vi.fn())
+    mgr.spawnSession({ sessionId: id, cwd: '/', shell: '/bin/bash', type: 'human', origin: 'app' })
     mgr.resize(id, 120, 40)
     expect(mockPty.resize).toHaveBeenCalledWith(120, 40)
   })
+})
+
+describe('PtyManager — flow control and writing', () => {
+  usePtyMocks()
+
+  it('pause and resume stop and restart reading from the PTY', async () => {
+    const mgr = await makeManager()
+    const id = 'flow-session'
+    mgr.spawnSession({ sessionId: id, cwd: '/', shell: '/bin/bash', type: 'human', origin: 'app' })
+    mgr.pause(id)
+    expect(mockPty.pause).toHaveBeenCalledTimes(1)
+    expect(mockPty.resume).not.toHaveBeenCalled()
+    mgr.resume(id)
+    expect(mockPty.resume).toHaveBeenCalledTimes(1)
+  })
+
+  it('pause and resume are no-ops for unknown sessionId', async () => {
+    const mgr = await makeManager()
+    expect(() => {
+      mgr.pause('no-such')
+      mgr.resume('no-such')
+    }).not.toThrow()
+    expect(mockPty.pause).not.toHaveBeenCalled()
+  })
 
   it('write sends data to PTY', async () => {
-    const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
-    const mgr = new PtyManager()
+    const mgr = await makeManager()
     const id = 'write-session'
-    mgr.spawn(id, '/', '/bin/bash', 'human', vi.fn(), vi.fn())
+    mgr.spawnSession({ sessionId: id, cwd: '/', shell: '/bin/bash', type: 'human', origin: 'app' })
     mgr.write(id, 'ls\n')
     expect(mockPty.write).toHaveBeenCalledWith('ls\n')
   })
+})
+
+describe('PtyManager — kill', () => {
+  usePtyMocks()
 
   it('kill terminates process', async () => {
-    const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
-    const mgr = new PtyManager()
+    const mgr = await makeManager()
     const id = 'kill-session'
-    mgr.spawn(id, '/', '/bin/bash', 'human', vi.fn(), vi.fn())
+    mgr.spawnSession({ sessionId: id, cwd: '/', shell: '/bin/bash', type: 'human', origin: 'app' })
     mgr.kill(id)
     expect(mockPty.kill).toHaveBeenCalled()
     expect(mgr.getSessionIds()).not.toContain(id)
   })
 
   it('killAll terminates all tracked PTY processes', async () => {
-    const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
-    const mgr = new PtyManager()
-    mgr.spawn('s1', '/', '/bin/bash', 'human', vi.fn(), vi.fn())
-    mgr.spawn('s2', '/', '/bin/bash', 'agent', vi.fn(), vi.fn())
+    const mgr = await makeManager()
+    mgr.spawnSession({
+      sessionId: 's1',
+      cwd: '/',
+      shell: '/bin/bash',
+      type: 'human',
+      origin: 'app',
+    })
+    mgr.spawnSession({
+      sessionId: 's2',
+      cwd: '/',
+      shell: '/bin/bash',
+      type: 'agent',
+      origin: 'app',
+    })
     await mgr.killAll()
     expect(mgr.getSessionIds()).toHaveLength(0)
   })
+})
+
+describe('PtyManager — kill when nothing is there', () => {
+  usePtyMocks()
 
   it('kill is a no-op for unknown sessionId', async () => {
-    const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
-    const mgr = new PtyManager()
+    const mgr = await makeManager()
     // Should not throw
     expect(() => mgr.kill('nonexistent-session')).not.toThrow()
     expect(mockPty.kill).not.toHaveBeenCalled()
@@ -153,13 +200,16 @@ describe('PtyManager', () => {
     mockPty.kill.mockImplementationOnce(() => {
       throw new Error('already dead')
     })
-    const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
-    const mgr = new PtyManager()
+    const mgr = await makeManager()
     const id = 'kill-err'
-    mgr.spawn(id, '/', '/bin/bash', 'human', vi.fn(), vi.fn())
+    mgr.spawnSession({ sessionId: id, cwd: '/', shell: '/bin/bash', type: 'human', origin: 'app' })
     expect(() => mgr.kill(id)).not.toThrow()
     expect(mgr.getSessionIds()).not.toContain(id)
   })
+})
+
+describe('PtyManager — exit and missing registries', () => {
+  usePtyMocks()
 
   it('onExit callback removes session and calls user onExit', async () => {
     let capturedOnExit: ((args: { exitCode: number }) => void) | undefined
@@ -167,24 +217,27 @@ describe('PtyManager', () => {
       capturedOnExit = cb
     })
 
-    const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
-    const mgr = new PtyManager()
+    const mgr = await makeManager()
     const onExit = vi.fn()
     const id = 'exit-session'
-    mgr.spawn(id, '/', '/bin/bash', 'human', vi.fn(), onExit)
+    mgr.spawnSession({ sessionId: id, cwd: '/', shell: '/bin/bash', type: 'human', origin: 'app' })
+    mgr.onExit(id, onExit)
 
     expect(mgr.getSessionIds()).toContain(id)
     capturedOnExit?.({ exitCode: 0 })
     expect(onExit).toHaveBeenCalledWith(0)
     expect(mgr.getSessionIds()).not.toContain(id)
   })
+})
+
+describe('PtyManager — missing registries', () => {
+  usePtyMocks()
 
   it('cleanupOrphans returns 0 when registry file does not exist', async () => {
     const fs = await import('fs')
     vi.mocked(fs.existsSync).mockReturnValue(false)
 
-    const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
-    const mgr = new PtyManager()
+    const mgr = await makeManager()
     const result = mgr.cleanupOrphans()
     expect(result).toEqual({ cleanedCount: 0 })
   })
@@ -192,13 +245,16 @@ describe('PtyManager', () => {
   it('cleanupOrphans returns 0 when registry JSON is malformed', async () => {
     const fs = await import('fs')
     vi.mocked(fs.existsSync).mockReturnValue(true)
-    vi.mocked(fs.readFileSync).mockReturnValue('NOT_JSON' as unknown as Buffer)
+    vi.mocked(fs.readFileSync).mockReturnValue('NOT_JSON')
 
-    const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
-    const mgr = new PtyManager()
+    const mgr = await makeManager()
     const result = mgr.cleanupOrphans()
     expect(result).toEqual({ cleanedCount: 0 })
   })
+})
+
+describe('PtyManager — orphans', () => {
+  usePtyMocks()
 
   it('cleanupOrphans sends SIGTERM to running orphan processes', async () => {
     const fs = await import('fs')
@@ -206,9 +262,7 @@ describe('PtyManager', () => {
     // Provide a registry with one orphan PID
     const orphanPid = 99999
     vi.mocked(fs.readFileSync).mockReturnValue(
-      JSON.stringify([
-        { sessionId: 'orphan', pid: orphanPid, cwd: '/', shell: '/bin/sh' },
-      ]) as unknown as Buffer
+      JSON.stringify([{ sessionId: 'orphan', pid: orphanPid, cwd: '/', shell: '/bin/sh' }])
     )
 
     // Spy on process.kill — first call (signal 0) returns true (process running),
@@ -218,23 +272,24 @@ describe('PtyManager', () => {
       return true // SIGTERM
     })
 
-    const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
-    const mgr = new PtyManager()
+    const mgr = await makeManager()
     const result = mgr.cleanupOrphans()
 
     expect(result.cleanedCount).toBe(1)
     expect(killSpy).toHaveBeenCalledWith(orphanPid, 'SIGTERM')
     killSpy.mockRestore()
   })
+})
+
+describe('PtyManager — orphans that cannot be signalled', () => {
+  usePtyMocks()
 
   it('cleanupOrphans handles SIGTERM failure gracefully', async () => {
     const fs = await import('fs')
     vi.mocked(fs.existsSync).mockReturnValue(true)
     const orphanPid = 88888
     vi.mocked(fs.readFileSync).mockReturnValue(
-      JSON.stringify([
-        { sessionId: 'zombie', pid: orphanPid, cwd: '/', shell: '/bin/sh' },
-      ]) as unknown as Buffer
+      JSON.stringify([{ sessionId: 'zombie', pid: orphanPid, cwd: '/', shell: '/bin/sh' }])
     )
 
     // isProcessRunning returns true, SIGTERM throws
@@ -243,20 +298,21 @@ describe('PtyManager', () => {
       throw new Error('EPERM')
     })
 
-    const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
-    const mgr = new PtyManager()
-    // Should not throw
-    expect(() => mgr.cleanupOrphans()).not.toThrow()
+    const mgr = await makeManager()
+    // The process went between the check and the signal: nothing was cleaned.
+    expect(mgr.cleanupOrphans()).toEqual({ cleanedCount: 0 })
     killSpy.mockRestore()
   })
+})
+
+describe('PtyManager — orphans that are not running, and unknown sessions', () => {
+  usePtyMocks()
 
   it('cleanupOrphans skips non-running PIDs', async () => {
     const fs = await import('fs')
     vi.mocked(fs.existsSync).mockReturnValue(true)
     vi.mocked(fs.readFileSync).mockReturnValue(
-      JSON.stringify([
-        { sessionId: 'dead', pid: 77777, cwd: '/', shell: '/bin/sh' },
-      ]) as unknown as Buffer
+      JSON.stringify([{ sessionId: 'dead', pid: 77777, cwd: '/', shell: '/bin/sh' }])
     )
 
     // isProcessRunning signal 0 throws → process not running
@@ -264,45 +320,59 @@ describe('PtyManager', () => {
       throw new Error('ESRCH')
     })
 
-    const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
-    const mgr = new PtyManager()
+    const mgr = await makeManager()
     const result = mgr.cleanupOrphans()
     expect(result.cleanedCount).toBe(0)
     killSpy.mockRestore()
   })
 
   it('resize is a no-op for unknown sessionId', async () => {
-    const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
-    const mgr = new PtyManager()
+    const mgr = await makeManager()
     expect(() => mgr.resize('no-such', 80, 24)).not.toThrow()
     expect(mockPty.resize).not.toHaveBeenCalled()
   })
 
   it('write is a no-op for unknown sessionId', async () => {
-    const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
-    const mgr = new PtyManager()
+    const mgr = await makeManager()
     expect(() => mgr.write('no-such', 'data')).not.toThrow()
     expect(mockPty.write).not.toHaveBeenCalled()
   })
+})
+
+describe('PtyManager — pids and listing', () => {
+  usePtyMocks()
 
   it('getPid returns the PID of a live session', async () => {
-    const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
-    const mgr = new PtyManager()
-    mgr.spawn('s1', '/', '/bin/sh', 'human', vi.fn(), vi.fn())
+    const mgr = await makeManager()
+    mgr.spawnSession({ sessionId: 's1', cwd: '/', shell: '/bin/sh', type: 'human', origin: 'app' })
     expect(mgr.getPid('s1')).toBe(12345)
   })
 
   it('getPid returns undefined for unknown sessionId', async () => {
-    const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
-    const mgr = new PtyManager()
+    const mgr = await makeManager()
     expect(mgr.getPid('nope')).toBeUndefined()
   })
+})
+
+describe('PtyManager — listing', () => {
+  usePtyMocks()
 
   it('listSessions returns all active sessions with cwd', async () => {
-    const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
-    const mgr = new PtyManager()
-    mgr.spawn('s1', '/home/user', '/bin/sh', 'human', vi.fn(), vi.fn())
-    mgr.spawn('s2', '/tmp', '/bin/sh', 'agent', vi.fn(), vi.fn())
+    const mgr = await makeManager()
+    mgr.spawnSession({
+      sessionId: 's1',
+      cwd: '/home/user',
+      shell: '/bin/sh',
+      type: 'human',
+      origin: 'app',
+    })
+    mgr.spawnSession({
+      sessionId: 's2',
+      cwd: '/tmp',
+      shell: '/bin/sh',
+      type: 'agent',
+      origin: 'app',
+    })
     const result = mgr.listSessions()
     expect(result).toHaveLength(2)
     expect(result).toEqual(
@@ -312,42 +382,21 @@ describe('PtyManager', () => {
       ])
     )
   })
+})
+
+describe('PtyManager — listing nothing', () => {
+  usePtyMocks()
 
   it('listSessions returns empty array when no sessions exist', async () => {
-    const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
-    const mgr = new PtyManager()
+    const mgr = await makeManager()
     expect(mgr.listSessions()).toEqual([])
-  })
-
-  it('attachOnData returns a dispose function that detaches the listener', async () => {
-    const onDataCb = vi.fn()
-    let capturedDataCb: ((data: string) => void) | null = null
-    mockPty.onData.mockImplementation((cb: (data: string) => void) => {
-      capturedDataCb = cb
-      return { dispose: vi.fn() }
-    })
-
-    const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
-    const mgr = new PtyManager()
-    mgr.spawn('s1', '/tmp', '/bin/sh', 'human', vi.fn(), vi.fn())
-
-    const dispose = mgr.attachOnData('s1', onDataCb)
-    expect(dispose).toBeTypeOf('function')
-    expect(capturedDataCb).not.toBeNull()
-  })
-
-  it('attachOnData returns null for unknown sessionId', async () => {
-    const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
-    const mgr = new PtyManager()
-    const result = mgr.attachOnData('no-such', vi.fn())
-    expect(result).toBeNull()
   })
 })
 
-describe('PtyManager session authority (spawnSession)', () => {
-  let capturedDataCb: ((data: string) => void) | null
-  let capturedExitCb: ((args: { exitCode: number }) => void) | null
+let capturedDataCb: ((data: string) => void) | null
+let capturedExitCb: ((args: { exitCode: number }) => void) | null
 
+function useCapturedCallbacks(): void {
   beforeEach(() => {
     vi.resetModules()
     vi.clearAllMocks()
@@ -362,11 +411,10 @@ describe('PtyManager session authority (spawnSession)', () => {
       return { dispose: vi.fn() }
     })
   })
+}
 
-  async function makeManager() {
-    const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
-    return new PtyManager()
-  }
+describe('PtyManager session authority (spawnSession)', () => {
+  useCapturedCallbacks()
 
   it('spawnSession records metadata and returns the session info', async () => {
     const mgr = await makeManager()
@@ -391,6 +439,10 @@ describe('PtyManager session authority (spawnSession)', () => {
     expect(info.createdAt).toBeTruthy()
     expect(mgr.getSession('s-app')).toMatchObject({ sessionId: 's-app', origin: 'app' })
   })
+})
+
+describe('PtyManager session authority — fan-out', () => {
+  useCapturedCallbacks()
 
   it('fans data out to every onData subscriber and disposes independently', async () => {
     const mgr = await makeManager()
@@ -407,6 +459,10 @@ describe('PtyManager session authority (spawnSession)', () => {
     expect(a).toHaveBeenCalledTimes(1)
     expect(b).toHaveBeenCalledTimes(2)
   })
+})
+
+describe('PtyManager session authority — exit fan-out', () => {
+  useCapturedCallbacks()
 
   it('fans exit out to every onExit subscriber and removes the session first', async () => {
     const mgr = await makeManager()
@@ -426,6 +482,10 @@ describe('PtyManager session authority (spawnSession)', () => {
     expect(seenDuringExit).toEqual([false])
     expect(mgr.getSession('s2')).toBeUndefined()
   })
+})
+
+describe('PtyManager session authority — unknown sessions and workspaces', () => {
+  useCapturedCallbacks()
 
   it('onData and onExit return null for unknown sessions', async () => {
     const mgr = await makeManager()
@@ -448,6 +508,10 @@ describe('PtyManager session authority (spawnSession)', () => {
     expect(mgr.getSession('s3')?.workspaceId).toBeUndefined()
     expect(mgr.setWorkspace('unknown', 'ws-9')).toBe(false)
   })
+})
+
+describe('PtyManager session authority — listing', () => {
+  useCapturedCallbacks()
 
   it('listSessions exposes the full session info', async () => {
     const mgr = await makeManager()
@@ -465,54 +529,54 @@ describe('PtyManager session authority (spawnSession)', () => {
       ['sr', 'remote'],
     ])
   })
-
-  it('legacy spawn() delegates to spawnSession with app origin and wires callbacks', async () => {
-    const mgr = await makeManager()
-    const onData = vi.fn()
-    const onExit = vi.fn()
-    mgr.spawn('legacy', '/l', '/bin/sh', 'human', onData, onExit)
-    expect(mgr.getSession('legacy')?.origin).toBe('app')
-    capturedDataCb!('out')
-    expect(onData).toHaveBeenCalledWith('out')
-    capturedExitCb!({ exitCode: 0 })
-    expect(onExit).toHaveBeenCalledWith(0)
-  })
 })
+
+/** A manager whose PTY output and exit the test drives: `emit` writes output,
+ * `exit` ends the process with `defaultExitCode` unless told otherwise. */
+async function controlledManager(defaultExitCode: number) {
+  const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
+  let emit: (data: string) => void = () => {}
+  let exit: (e: { exitCode: number }) => void = () => {}
+  mockPty.onData.mockImplementation((cb: (data: string) => void) => {
+    emit = cb
+  })
+  mockPty.onExit.mockImplementation((cb: (e: { exitCode: number }) => void) => {
+    exit = cb
+  })
+  return {
+    mgr: new PtyManager(),
+    emit: (data: string) => emit(data),
+    exit: (exitCode = defaultExitCode) => exit({ exitCode }),
+  }
+}
+
+const spawn = (mgr: PtyManager, holdOutput: boolean) =>
+  mgr.spawnSession({
+    sessionId: 's1',
+    cwd: '/repo',
+    shell: '/bin/zsh',
+    type: 'agent',
+    origin: 'app',
+    holdOutput,
+  })
+
+const spawnHeld = (mgr: PtyManager) =>
+  mgr.spawnSession({
+    sessionId: 'dead',
+    cwd: '/repo',
+    shell: '/bin/zsh',
+    type: 'agent',
+    origin: 'app',
+    holdOutput: true,
+  })
 
 describe('holding output until something is on screen to show it', () => {
   // A terminal the application opened starts producing output while the tab
   // that will show it does not exist yet. Delivered live, everything in that
   // window is dropped — for a supervised agent that means the launch command
   // and its first output are simply missing from the terminal you open.
-  async function manager() {
-    const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
-    let emit: (data: string) => void = () => {}
-    let exit: (e: { exitCode: number }) => void = () => {}
-    mockPty.onData.mockImplementation((cb: (data: string) => void) => {
-      emit = cb
-    })
-    mockPty.onExit.mockImplementation((cb: (e: { exitCode: number }) => void) => {
-      exit = cb
-    })
-    return {
-      mgr: new PtyManager(),
-      emit: (data: string) => emit(data),
-      exit: (exitCode = 0) => exit({ exitCode }),
-    }
-  }
-
-  const spawn = (mgr: { spawnSession: (o: unknown) => unknown }, holdOutput: boolean) =>
-    mgr.spawnSession({
-      sessionId: 's1',
-      cwd: '/repo',
-      shell: '/bin/zsh',
-      type: 'agent',
-      origin: 'app',
-      holdOutput,
-    })
-
   it('delivers nothing while it is held', async () => {
-    const { mgr, emit } = await manager()
+    const { mgr, emit } = await controlledManager(0)
     spawn(mgr, true)
     const seen: string[] = []
     mgr.onData('s1', (data) => seen.push(data))
@@ -521,7 +585,7 @@ describe('holding output until something is on screen to show it', () => {
   })
 
   it('delivers everything held the moment something attaches', async () => {
-    const { mgr, emit } = await manager()
+    const { mgr, emit } = await controlledManager(0)
     spawn(mgr, true)
     const seen: string[] = []
     mgr.onData('s1', (data) => seen.push(data))
@@ -532,7 +596,7 @@ describe('holding output until something is on screen to show it', () => {
   })
 
   it('delivers live once released', async () => {
-    const { mgr, emit } = await manager()
+    const { mgr, emit } = await controlledManager(0)
     spawn(mgr, true)
     const seen: string[] = []
     mgr.onData('s1', (data) => seen.push(data))
@@ -540,9 +604,11 @@ describe('holding output until something is on screen to show it', () => {
     emit('later output')
     expect(seen).toEqual(['later output'])
   })
+})
 
+describe('holding output — terminals that never hold', () => {
   it('holds nothing for a terminal the operator opened themselves', async () => {
-    const { mgr, emit } = await manager()
+    const { mgr, emit } = await controlledManager(0)
     spawn(mgr, false)
     const seen: string[] = []
     mgr.onData('s1', (data) => seen.push(data))
@@ -551,18 +617,20 @@ describe('holding output until something is on screen to show it', () => {
   })
 
   it('reports that a session which was never holding had nothing to release', async () => {
-    const { mgr } = await manager()
+    const { mgr } = await controlledManager(0)
     spawn(mgr, false)
     expect(mgr.releaseOutput('s1')).toBe(false)
   })
 
   it('reports nothing to release for a session it does not have', async () => {
-    const { mgr } = await manager()
+    const { mgr } = await controlledManager(0)
     expect(mgr.releaseOutput('nobody')).toBe(false)
   })
+})
 
+describe('holding output — releasing once and bounding', () => {
   it('releases only once, so a second attach does not replay the whole session', async () => {
-    const { mgr, emit } = await manager()
+    const { mgr, emit } = await controlledManager(0)
     spawn(mgr, true)
     emit('once')
     mgr.releaseOutput('s1')
@@ -570,7 +638,7 @@ describe('holding output until something is on screen to show it', () => {
   })
 
   it('drops the oldest output rather than growing without limit', async () => {
-    const { mgr, emit } = await manager()
+    const { mgr, emit } = await controlledManager(0)
     spawn(mgr, true)
     const seen: string[] = []
     mgr.onData('s1', (data) => seen.push(data))
@@ -588,35 +656,8 @@ describe('a process that dies before anything is on screen', () => {
   // output went with it, leaving exactly the blank terminal the operator then
   // reports as "nothing ever shows up".
 
-  async function manager() {
-    const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
-    let emit: (data: string) => void = () => {}
-    let exit: (e: { exitCode: number }) => void = () => {}
-    mockPty.onData.mockImplementation((cb: (data: string) => void) => {
-      emit = cb
-    })
-    mockPty.onExit.mockImplementation((cb: (e: { exitCode: number }) => void) => {
-      exit = cb
-    })
-    return {
-      mgr: new PtyManager(),
-      emit: (data: string) => emit(data),
-      exit: (exitCode = 1) => exit({ exitCode }),
-    }
-  }
-
-  const spawnHeld = (mgr: { spawnSession: (o: unknown) => unknown }) =>
-    mgr.spawnSession({
-      sessionId: 'dead',
-      cwd: '/repo',
-      shell: '/bin/zsh',
-      type: 'agent',
-      origin: 'app',
-      holdOutput: true,
-    })
-
   it('still shows what it said to a tab that mounts afterwards', async () => {
-    const { mgr, emit, exit } = await manager()
+    const { mgr, emit, exit } = await controlledManager(1)
     spawnHeld(mgr)
     emit('Error: Settings file not found\r\n')
     exit(1)
@@ -628,7 +669,7 @@ describe('a process that dies before anything is on screen', () => {
   })
 
   it('delivers it immediately when something was already listening', async () => {
-    const { mgr, emit, exit } = await manager()
+    const { mgr, emit, exit } = await controlledManager(1)
     spawnHeld(mgr)
     const seen: string[] = []
     mgr.onData('dead', (data) => seen.push(data))
@@ -636,15 +677,17 @@ describe('a process that dies before anything is on screen', () => {
     exit(1)
     expect(seen.join('')).toContain('Settings file not found')
   })
+})
 
+describe('a process that dies — unknown and repeated attaches', () => {
   it('reports nothing for a session it never knew', async () => {
-    const { mgr } = await manager()
+    const { mgr } = await controlledManager(1)
     expect(mgr.releaseOutput('never-existed')).toBe(false)
     expect(mgr.onData('never-existed', () => {})).toBeNull()
   })
 
   it('hands it over once, not to every later attach', async () => {
-    const { mgr, emit, exit } = await manager()
+    const { mgr, emit, exit } = await controlledManager(1)
     spawnHeld(mgr)
     emit('gone\r\n')
     exit(1)
@@ -663,8 +706,7 @@ async function lastSpawnEnv(): Promise<Record<string, string | undefined>> {
 
 describe('pty-manager — linked issue environment (FR-020 support)', () => {
   it('adds the issue variables on top of the inherited environment', async () => {
-    const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
-    const manager = new PtyManager()
+    const manager = await makeManager()
     manager.spawnSession({
       sessionId: 'env-1',
       cwd: '/tmp',
@@ -681,10 +723,11 @@ describe('pty-manager — linked issue environment (FR-020 support)', () => {
     expect(spawned.PATH).toBe(process.env.PATH)
     manager.kill('env-1')
   })
+})
 
+describe('pty-manager — no linked issue', () => {
   it('adds nothing for a session with no linked issue', async () => {
-    const { PtyManager } = await import('../../../src/main/terminal/pty-manager')
-    const manager = new PtyManager()
+    const manager = await makeManager()
     manager.spawnSession({
       sessionId: 'env-2',
       cwd: '/tmp',

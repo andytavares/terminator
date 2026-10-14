@@ -1,9 +1,11 @@
 import { describe, it, expect, beforeEach } from 'vitest'
+import { builderUnit, testCriterion } from '../helpers/order-parts.js'
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createRunChannels } from '../../src/ipc/run-channels.js'
+import type { RunDeps } from '../../src/ipc/run-channels.js'
+import { idleRunSeams } from './run-deps.js'
 import { createOrderStore } from '../../src/order/store.js'
 import { draftOrder } from '../../src/order/draft.js'
 import { raiseGate } from '../../src/gates/rules.js'
@@ -11,6 +13,7 @@ import type { OrderStore } from '../../src/order/store.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import type { Standing } from '../../src/order/standing.js'
 import type { Gate } from '../../src/gates/rules.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 // What `run.observe` has to hand a surface before that surface can say what to
 // do next. Before this it returned the graph and nothing else, so the Floor
@@ -27,16 +30,25 @@ interface Observed {
   waiting: Gate[]
 }
 
-function channels(over: { gates?: Gate[]; asks?: number; stalls?: number } = {}) {
-  return createRunChannels({
+function runDeps(over: Partial<RunDeps> = {}): RunDeps {
+  return {
     store,
     dataRoot: () => dataRoot,
     sources: () => ({ dataRoot, repoPaths: [repo], builtInDir }),
     now: () => '2026-09-06T10:00:00.000Z',
-    gatesFor: async () => over.gates ?? [],
-    asksFor: () => over.asks ?? 0,
-    stallsFor: () => over.stalls ?? 0,
-  })
+    ...idleRunSeams(),
+    ...over,
+  }
+}
+
+function channels(over: { gates?: Gate[]; asks?: number; stalls?: number } = {}) {
+  return createRunChannels(
+    runDeps({
+      gatesFor: async () => over.gates ?? [],
+      asksFor: () => over.asks ?? 0,
+      stallsFor: () => over.stalls ?? 0,
+    })
+  )
 }
 
 async function markAllPassed(orderId: string): Promise<void> {
@@ -63,29 +75,10 @@ function order(over: Partial<WorkOrder> = {}): WorkOrder {
   return {
     ...base,
     status: 'agreed',
-    acceptance: [
-      {
-        id: 'AC-1',
-        statement: 'a',
-        priority: 'P1',
-        verify: { kind: 'test', command: 'npm test', assert: 'exit_code == 0' },
-        unverifiable: null,
-      },
-    ],
+    acceptance: [testCriterion('AC-1', { statement: 'a' })],
     plan: {
       ...base.plan,
-      units: [
-        {
-          id: 'U-1',
-          title: 'a',
-          role: 'builder',
-          lane: 1,
-          dependsOn: [],
-          satisfies: ['AC-1'],
-          touches: ['src/a'],
-          verify: [],
-        },
-      ],
+      units: [builderUnit('U-1', { title: 'a', satisfies: ['AC-1'], touches: ['src/a'] })],
     },
     ...over,
   }
@@ -104,13 +97,20 @@ function gate(over: Partial<Parameters<typeof raiseGate>[0]> = {}): Gate {
 }
 
 beforeEach(() => {
-  dataRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-standing-'))
-  repo = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-standing-repo-'))
+  dataRoot = makeTempDir('fdry-standing-')
+  repo = makeTempDir('fdry-standing-repo-')
   fs.writeFileSync(path.join(repo, 'package.json'), JSON.stringify({ scripts: { test: 'vitest' } }))
   store = createOrderStore(dataRoot)
 })
 
 describe('what run.observe says about where an order stands', () => {
+  describe('halted', runStandingHaltedTests)
+  describe('asking and stalled', askingAndStalledTests)
+  describe('stopped', runStandingStoppedTests)
+  describe('resumed', resumedTests)
+})
+
+function runStandingHaltedTests() {
   it('carries a standing with the graph', async () => {
     await store.save(order())
     await channels().start({ id: 'WO-1' })
@@ -142,7 +142,9 @@ describe('what run.observe says about where an order stands', () => {
     expect(view.standing.kind).not.toBe('halted')
     expect(view.waiting).toEqual([])
   })
+}
 
+function askingAndStalledTests() {
   it('is asking when an agent is holding a tool call', async () => {
     await store.save(order())
     await channels().start({ id: 'WO-1' })
@@ -156,23 +158,9 @@ describe('what run.observe says about where an order stands', () => {
     const view = (await channels({ stalls: 1 }).observe({ id: 'WO-1' })) as Observed
     expect(view.standing.kind).toBe('stalled')
   })
+}
 
-  // A host with no supervision runtime supplies none of these. It still has to
-  // get a standing back rather than a crash or a blank band.
-  it('still stands somewhere with no runtime to ask', async () => {
-    await store.save(order())
-    const bare = createRunChannels({
-      store,
-      dataRoot: () => dataRoot,
-      sources: () => ({ dataRoot, repoPaths: [repo], builtInDir }),
-      now: () => '2026-09-06T10:00:00.000Z',
-    })
-    await bare.start({ id: 'WO-1' })
-    const view = (await bare.observe({ id: 'WO-1' })) as Observed
-    expect(view.standing.label.trim()).not.toBe('')
-    expect(view.waiting).toEqual([])
-  })
-
+function runStandingStoppedTests() {
   // The WO-0913-0bd shape: every node in the graph finished, but the ledger's
   // tail says the run went on to fail — here, opening the pull request.
   // Before `runFailureFor` was wired in, this read `working`/"Between steps.
@@ -206,7 +194,9 @@ describe('what run.observe says about where an order stands', () => {
     expect(view.standing.label).toBe('not shipped')
     expect(view.standing.detail).toContain('Opening the pull request')
   })
+}
 
+function resumedTests() {
   // Resuming records `run.resumed`, so a run that failed once and is retried
   // stops reading `stopped` while the retry is in flight.
   it('clears a stopped standing once the run is resumed', async () => {
@@ -225,15 +215,14 @@ describe('what run.observe says about where an order stands', () => {
     let view = (await channels().observe({ id: 'WO-1' })) as Observed
     expect(view.standing.kind).toBe('stopped')
 
-    const withExecute = createRunChannels({
-      store,
-      dataRoot: () => dataRoot,
-      sources: () => ({ dataRoot, repoPaths: [repo], builtInDir }),
-      now: () => '2026-09-13T10:10:00.000Z',
-      execute: async () => undefined,
-    })
+    const withExecute = createRunChannels(
+      runDeps({
+        now: () => '2026-09-13T10:10:00.000Z',
+        execute: async () => undefined,
+      })
+    )
     await withExecute.resume({ id: 'WO-1' })
     view = (await channels().observe({ id: 'WO-1' })) as Observed
     expect(view.standing.kind).not.toBe('stopped')
   })
-})
+}

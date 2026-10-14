@@ -7,39 +7,19 @@
  * that what reaches `api.commands.register` carries the group's category and
  * mnemonic rule, and that the static command actually brings Foundry forward.
  */
-import { tmpdir as tmpdirForUserData } from 'node:os'
+import { freshFoundryStorage } from '../helpers/foundry-host.js'
 
-const USER_DATA = tmpdirForUserData()
+const GLOBAL_STORAGE = freshFoundryStorage()
 
 import { describe, it, expect, vi, beforeAll, afterEach } from 'vitest'
-import type { ExtensionAPI, CommandContribution } from '../../../../src/main/extensions/api.js'
-import type { startSupervisionRuntime as startSupervisionRuntimeType } from '../../src/index.js'
+import { partialFake } from '../../../../tests/support/fakes'
+import { activate } from '../../src/index.ts'
+import type { ExtensionAPI, CommandContribution } from '@terminator/extension-sdk'
+import type { startSupervisionRuntime as startSupervisionRuntimeType } from '../../src/runtime/supervision-runtime.js'
+import { disposableStub } from '../helpers/foundry-host.js'
 
-vi.mock('electron', () => ({
-  BrowserWindow: { getAllWindows: vi.fn().mockReturnValue([]) },
-  safeStorage: {
-    isEncryptionAvailable: vi.fn().mockReturnValue(false),
-    encryptString: vi.fn(),
-    decryptString: vi.fn(),
-  },
-  app: { getPath: vi.fn().mockReturnValue(USER_DATA) },
-}))
-
-const runner = {
-  start: vi.fn(),
-  resolve: vi.fn(),
-  handBackToTerminal: vi.fn(),
-  interrupt: vi.fn(),
-  stop: vi.fn().mockReturnValue(true),
-  send: vi.fn().mockReturnValue(true),
-  terminalFor: vi.fn().mockReturnValue(null),
-  watchable: vi.fn().mockReturnValue([]),
-  dispose: vi.fn(),
-}
-
-vi.mock('../../src/runtime/supervised-runner.js', () => ({
-  createSupervisedRunner: () => runner,
-}))
+vi.mock('../../src/runtime/supervised-runner.js', () => import('../helpers/supervision-mocks.js'))
+vi.mock('../../src/runtime/control-server.js', () => import('../helpers/supervision-mocks.js'))
 
 vi.mock('../../src/runner/agent-runner.js', async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>
@@ -48,16 +28,6 @@ vi.mock('../../src/runner/agent-runner.js', async (importOriginal) => {
     setPermissionSink: () => {},
   }
 })
-
-vi.mock('../../src/runtime/control-server.js', () => ({
-  createControlServer: vi.fn().mockResolvedValue({
-    url: 'http://127.0.0.1:1/pretooluse',
-    eventUrl: 'http://127.0.0.1:1/event',
-    token: 'token',
-    register: vi.fn().mockReturnValue(() => {}),
-    close: vi.fn(),
-  }),
-}))
 
 vi.mock('../../src/runtime/transcript-excerpt.js', () => ({
   readTranscriptTail: vi.fn().mockReturnValue([]),
@@ -96,69 +66,49 @@ async function addRunAndWaitForPalette(
   await vi.advanceTimersByTimeAsync(5100)
 }
 
-beforeAll(async () => {
-  vi.useFakeTimers()
-  api = {
-    ipc: {
-      registerHandler: vi.fn().mockReturnValue({ dispose: vi.fn() }),
-      invokeChannel: vi.fn(),
-      sendChannel: vi.fn(),
-      onWindowEvent: vi.fn().mockReturnValue(() => {}),
-      isRemoteAccessible: vi.fn().mockReturnValue(false),
-    },
-    window: {
+/** Commands kept in `registered` with what they were registered with. */
+function registeringCommands(): ExtensionAPI['commands'] {
+  return partialFake<ExtensionAPI['commands']>({
+    register: vi.fn((command: CommandContribution, handler: () => void) => {
+      registered.set(command.id, { command, handler })
+      return { dispose: vi.fn(() => registered.delete(command.id)) }
+    }),
+  })
+}
+
+/** A host that keeps every command registered, so a spec can read it and run it. */
+function paletteApi(): ExtensionAPI {
+  return partialFake<ExtensionAPI>({
+    ipc: partialFake<ExtensionAPI['ipc']>({ registerHandler: vi.fn(disposableStub) }),
+    window: partialFake<ExtensionAPI['window']>({
       broadcast: vi.fn(),
       openAuxiliary: vi.fn(),
       focusSelf: vi.fn(),
       showSelf: vi.fn(),
-    },
-    commands: {
-      register: vi.fn((command: CommandContribution, handler: () => void) => {
-        registered.set(command.id, { command, handler })
-        return { dispose: vi.fn(() => registered.delete(command.id)) }
-      }),
-      setEnabled: vi.fn(),
-    },
-    shell: {
-      exec: vi.fn().mockResolvedValue({ exitCode: 0, stdout: '', stderr: '', timedOut: false }),
-    },
-    notifications: {
+    }),
+    commands: registeringCommands(),
+    notifications: partialFake<ExtensionAPI['notifications']>({
       showToast: vi.fn(),
-      createNotification: vi.fn().mockReturnValue({ dispose: vi.fn() }),
-    },
+      createNotification: vi.fn(disposableStub),
+    }),
     log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
-    settings: {
-      register: vi.fn().mockReturnValue({ dispose: vi.fn() }),
+    paths: { app: '', globalStorage: GLOBAL_STORAGE },
+    settings: partialFake<ExtensionAPI['settings']>({
+      register: vi.fn(disposableStub),
       get: vi.fn(),
       set: vi.fn(),
-      resolveWorktreeBaseDir: vi.fn().mockReturnValue('/tmp/speckit-quick-actions'),
-    },
-    terminal: {
-      onSessionCreate: vi.fn().mockReturnValue({ dispose: vi.fn() }),
-      onSessionClose: vi.fn().mockReturnValue({ dispose: vi.fn() }),
-    },
-    workspace: {
-      list: vi.fn().mockReturnValue([]),
-      listProjects: vi.fn().mockReturnValue([]),
-      createProject: vi.fn(),
-      deleteProject: vi.fn(),
-      onDelete: vi.fn().mockReturnValue({ dispose: vi.fn() }),
-      onProjectDelete: vi.fn().mockReturnValue({ dispose: vi.fn() }),
-    },
-    pty: {
-      spawn: vi.fn(),
-      write: vi.fn(),
-      resize: vi.fn(),
-      kill: vi.fn(),
-      listSessions: vi.fn().mockReturnValue([]),
-      attachOnData: vi.fn().mockReturnValue(null),
-      attachOnExit: vi.fn().mockReturnValue(null),
-      openTerminalTab: vi.fn(),
-    },
-    app: { version: '0.0.0-test' },
-  } as unknown as ExtensionAPI
+    }),
+    shell: partialFake<ExtensionAPI['shell']>({
+      exec: vi.fn().mockResolvedValue({ exitCode: 0, stdout: '', stderr: '', timedOut: false }),
+    }),
+    workspace: partialFake<ExtensionAPI['workspace']>({ list: () => [], listProjects: () => [] }),
+  })
+}
 
-  const { activate, startSupervisionRuntime } = await import('../../src/index.ts')
+beforeAll(async () => {
+  vi.useFakeTimers()
+  api = paletteApi()
+  const { startSupervisionRuntime } = await import('../../src/runtime/supervision-runtime.ts')
   activate(api)
   const started = await startSupervisionRuntime(api)
   if (started === null) throw new Error('the supervision runtime did not start')
@@ -172,6 +122,12 @@ afterEach(() => {
 })
 
 describe('the go-to-run entries', () => {
+  describe('registering', registeringTests)
+  describe('labels', labelsTests)
+  describe('stable ids', stableIdsTests)
+})
+
+function registeringTests() {
   it('register under the Foundry category', async () => {
     await addRunAndWaitForPalette({ sessionId: 'a', branch: 'feat/a', state: 'working' })
     expect(goToRunEntries().some((c) => c.id === 'run.a')).toBe(true)
@@ -196,7 +152,9 @@ describe('the go-to-run entries', () => {
     expect(withMnemonic).toHaveLength(1)
     expect(withMnemonic[0].mnemonic).toBe('w')
   })
+}
 
+function labelsTests() {
   it('labels the most urgent entry as the run waiting on you, when it is waiting', async () => {
     await addRunAndWaitForPalette({ sessionId: 'a', branch: 'feat/a', state: 'waiting' })
     const entry = registered.get('run.a')!.command
@@ -215,7 +173,9 @@ describe('the go-to-run entries', () => {
     expect(entry.label).toBe('Go to 021-thing')
     expect(entry.mnemonic).toBe('w')
   })
+}
 
+function stableIdsTests() {
   it('keeps ids stable across a refresh', async () => {
     await addRunAndWaitForPalette({ sessionId: 'a', branch: 'feat/a', state: 'working' })
     expect(registered.has('run.a')).toBe(true)
@@ -223,7 +183,7 @@ describe('the go-to-run entries', () => {
     await vi.advanceTimersByTimeAsync(5100)
     expect(registered.has('run.a')).toBe(true)
   })
-})
+}
 
 describe('the new work order command', () => {
   it('is registered under Foundry with mnemonic n', () => {

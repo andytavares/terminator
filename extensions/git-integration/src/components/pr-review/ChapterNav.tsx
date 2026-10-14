@@ -1,5 +1,6 @@
-import React, { useRef } from 'react'
+import React from 'react'
 import { Check } from 'lucide-react'
+import { Tab, TabList, TabsRoot } from '@terminator/extension-ui'
 import type { Chapter } from '../../schemas/pr-review.schema'
 import { usePrReviewStore } from '../../stores/pr-review.store'
 import { chapterRiskLevel } from '../../github/pr-review-service'
@@ -9,92 +10,64 @@ interface Props {
   onSelectChapter?: (id: string) => void
 }
 
+type ChapterStatus = 'not-started' | 'in-progress' | 'complete'
+
+function fileCount(chapter: Chapter): string {
+  const count = chapter.files.length
+  if (count === 1) return '1 file'
+  return `${count} files`
+}
+
+function chapterName(chapter: Chapter, status: ChapterStatus): string {
+  const name = `${chapter.name}, ${fileCount(chapter)}`
+  if (status === 'complete') return `${name}, viewed`
+  return name
+}
+
+function chapterStatusOf(chapter: Chapter, viewedFiles: Set<string>): ChapterStatus {
+  const viewed = chapter.files.filter((f) => viewedFiles.has(f.path)).length
+  if (viewed === 0) return 'not-started'
+  if (viewed === chapter.files.length) return 'complete'
+  return 'in-progress'
+}
+
+function chapterTab(chapter: Chapter, status: ChapterStatus) {
+  return (
+    <Tab
+      key={chapter.id}
+      id={chapter.id}
+      accessibleName={chapterName(chapter, status)}
+      className={`chapter-nav-tab chapter-nav-tab--${status}`}
+    >
+      <span className={`chapter-nav-risk-dot chapter-nav-risk-dot--${chapterRiskLevel(chapter)}`} />
+      <span className="chapter-nav-name">{chapter.name}</span>
+      <span className="chapter-nav-meta">
+        {fileCount(chapter)} · {chapter.estimatedMinutes}m
+      </span>
+      {status === 'complete' && (
+        <span className="chapter-nav-check" aria-label="complete">
+          <Check aria-hidden="true" />
+        </span>
+      )}
+    </Tab>
+  )
+}
+
 export function ChapterNav({ chapters, onSelectChapter }: Props) {
   const currentChapterId = usePrReviewStore((s) => s.currentChapterId)
   const setCurrentChapter = usePrReviewStore((s) => s.setCurrentChapter)
   const viewedFiles = usePrReviewStore((s) => s.viewedFiles)
-  const tabRefs = useRef<Array<HTMLButtonElement | null>>([])
-
   function selectChapter(id: string) {
     setCurrentChapter(id)
     onSelectChapter?.(id)
   }
-
-  function handleKeyDown(e: React.KeyboardEvent, index: number) {
-    const last = chapters.length - 1
-    let target: number
-    switch (e.key) {
-      case 'ArrowDown':
-        target = index === last ? 0 : index + 1
-        break
-      case 'ArrowUp':
-        target = index === 0 ? last : index - 1
-        break
-      case 'Home':
-        target = 0
-        break
-      case 'End':
-        target = last
-        break
-      default:
-        return
-    }
-    e.preventDefault()
-    tabRefs.current[target]?.focus()
-    selectChapter(chapters[target].id)
-  }
-
-  function chapterStatus(chapter: Chapter): 'not-started' | 'in-progress' | 'complete' {
-    const viewed = chapter.files.filter((f) => viewedFiles.has(f.path)).length
-    if (viewed === 0) return 'not-started'
-    if (viewed === chapter.files.length) return 'complete'
-    return 'in-progress'
-  }
-
   if (chapters.length <= 1) return null
-
-  const activeId = chapters.some((c) => c.id === currentChapterId)
-    ? currentChapterId
-    : chapters[0].id
-
+  const activeId = chapters.find((c) => c.id === currentChapterId)?.id ?? chapters[0].id
   return (
-    <div
-      className="chapter-nav"
-      role="tablist"
-      aria-label="PR chapters"
-      aria-orientation="vertical"
-    >
-      {chapters.map((ch, index) => {
-        const status = chapterStatus(ch)
-        const isActive = ch.id === activeId
-        return (
-          <button
-            key={ch.id}
-            ref={(el) => {
-              tabRefs.current[index] = el
-            }}
-            role="tab"
-            aria-selected={isActive}
-            tabIndex={isActive ? 0 : -1}
-            className={`chapter-nav-tab chapter-nav-tab--${status}${isActive ? ' chapter-nav-tab--active' : ''}`}
-            onClick={() => selectChapter(ch.id)}
-            onKeyDown={(e) => handleKeyDown(e, index)}
-          >
-            <span
-              className={`chapter-nav-risk-dot chapter-nav-risk-dot--${chapterRiskLevel(ch)}`}
-            />
-            <span className="chapter-nav-name">{ch.name}</span>
-            <span className="chapter-nav-meta">
-              {ch.files.length} {ch.files.length === 1 ? 'file' : 'files'} · {ch.estimatedMinutes}m
-            </span>
-            {status === 'complete' && (
-              <span className="chapter-nav-check" aria-label="complete">
-                <Check aria-hidden="true" />
-              </span>
-            )}
-          </button>
-        )
-      })}
-    </div>
+    <TabsRoot selectedId={activeId} onSelect={selectChapter}>
+      <TabList label="PR chapters" orientation="vertical" className="chapter-nav">
+        {chapters.map((ch) => chapterTab(ch, chapterStatusOf(ch, viewedFiles)))}
+      </TabList>
+    </TabsRoot>
   )
 }

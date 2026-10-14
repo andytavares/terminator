@@ -4,7 +4,7 @@ import type { AgentState, TerminalSession } from '../../shared/types/index'
  * Where a session's AgentState comes from. One implementation exists today;
  * the seam is here so a better signal can replace it without the UI changing.
  */
-export interface AgentStateSource {
+interface AgentStateSource {
   derive(session: TerminalSession): AgentState
 }
 
@@ -27,4 +27,11 @@ export class BellAndBusySource implements AgentStateSource {
     if (session.busy) return 'working'
     return 'idle'
   }
+}
+
+const signals = new BellAndBusySource()
+
+/** A session's state, from its signals: the `agentState` a session is stored with never changes. */
+export function agentStateOf(session: TerminalSession): AgentState {
+  return signals.derive(session)
 }

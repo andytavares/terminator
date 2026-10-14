@@ -1,8 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { queueEntry } from '../helpers/queue-entries.js'
+import { builderUnit, testCriterion } from '../helpers/order-parts.js'
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import * as path from 'node:path'
-import { createForgeChannels } from '../../src/ipc/forge-channels.js'
+import { dispatchChannel } from '@terminator/extension-sdk'
+import { createForgeChannels, forgeChannelSpecs } from '../../src/ipc/forge-channels.js'
+import type { ForgeDeps } from '../../src/ipc/forge-channels.js'
+import { quietForgeSeams } from './forge-deps.js'
 import { createOrderStore } from '../../src/order/store.js'
 import { raiseGate } from '../../src/gates/rules.js'
 import { writeCiState } from '../../src/line/ci-state.js'
@@ -10,6 +14,7 @@ import type { Standing } from '../../src/order/standing.js'
 import type { OrderStore } from '../../src/order/store.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import type { CompileResult } from '../../src/order/compile.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 let root: string
 let repo: string
@@ -22,17 +27,27 @@ interface OrderView {
   unavailableChecks?: string[]
 }
 
+function forgeDeps(over: Partial<ForgeDeps> = {}): ForgeDeps {
+  return { store, now: () => NOW, ...quietForgeSeams(() => root), ...over }
+}
+
+/** A compile payload as the channel's schema leaves it: one the operator asked for. */
+const compiling = (id: string, commit: boolean) => ({ id, commit, automatic: false })
+
 function channels(readIssue?: ReturnType<typeof vi.fn>) {
-  return createForgeChannels({
-    store,
-    now: () => '2026-09-06T10:00:00.000Z',
-    readIssue: readIssue as never,
-  })
+  return createForgeChannels(forgeDeps({ readIssue: readIssue as never }))
+}
+
+/** Through the channel's own schema, as the renderer's request arrives. */
+function sendThroughSchema(channel: string, payload: unknown): Promise<unknown> {
+  const spec = forgeChannelSpecs(channels()).find((row) => row.channel === channel)
+  if (spec === undefined) throw new Error(`no channel ${channel}`)
+  return Promise.resolve(dispatchChannel(spec, payload))
 }
 
 beforeEach(() => {
-  root = fs.mkdtempSync(path.join(os.tmpdir(), 'foundry-ipc-'))
-  repo = fs.mkdtempSync(path.join(os.tmpdir(), 'foundry-ipc-repo-'))
+  root = makeTempDir('foundry-ipc-')
+  repo = makeTempDir('foundry-ipc-repo-')
   fs.writeFileSync(
     path.join(repo, 'package.json'),
     JSON.stringify({ scripts: { test: 'vitest run' } })
@@ -46,6 +61,36 @@ afterEach(() => {
 })
 
 describe('foundry:order.create', () => {
+  describe('the draft', theDraftTests)
+  describe('the ledger and the same issue', theLedgerAndTheSameIssueTests)
+})
+
+async function seeded(): Promise<WorkOrder> {
+  const r = (await channels().create({
+    source: { kind: 'typed', text: 'x' },
+    repoPaths: [repo],
+  })) as OrderView
+  const withExtras: WorkOrder = {
+    ...r.order,
+    assumptions: [{ id: 'A-1', text: 'single repo', struck: false, affects: ['U-1'] }],
+    openQuestions: [
+      {
+        id: 'Q-1',
+        text: 'does it?',
+        why: '',
+        options: ['No', 'Yes'],
+        recommended: 0,
+        answer: null,
+        rank: 1,
+        confidence: null,
+      },
+    ],
+  }
+  await store.save(withExtras)
+  return withExtras
+}
+
+function theDraftTests() {
   it('returns a saved draft with its checks already evaluated', async () => {
     const r = (await channels().create({
       source: { kind: 'typed', text: 'rows are clipped at the right edge' },
@@ -71,7 +116,9 @@ describe('foundry:order.create', () => {
     })) as OrderView
     expect(r.order.redTeam.length).toBeGreaterThan(0)
   })
+}
 
+function theLedgerAndTheSameIssueTests() {
   it('records the seeding in the ledger', async () => {
     const r = (await channels().create({
       source: { kind: 'typed', text: 'x' },
@@ -100,38 +147,15 @@ describe('foundry:order.create', () => {
     })) as { existing: { id: string } }
     expect(second.existing.id).toBe(first.order.id)
   })
-
-  it('rejects a malformed request without touching the store', async () => {
-    expect(await channels().create({ nonsense: true })).toEqual({ error: 'Malformed request.' })
-    expect(await store.list()).toEqual([])
-  })
-})
+}
 
 describe('foundry:order.turn', () => {
-  async function seeded(): Promise<WorkOrder> {
-    const r = (await channels().create({
-      source: { kind: 'typed', text: 'x' },
-      repoPaths: [repo],
-    })) as OrderView
-    const withExtras: WorkOrder = {
-      ...r.order,
-      assumptions: [{ id: 'A-1', text: 'single repo', struck: false, affects: ['U-1'] }],
-      openQuestions: [
-        {
-          id: 'Q-1',
-          text: 'does it?',
-          why: '',
-          options: ['No', 'Yes'],
-          recommended: 0,
-          answer: null,
-          rank: 1,
-        },
-      ],
-    }
-    await store.save(withExtras)
-    return withExtras
-  }
+  describe('strikes and answers', strikesAndAnswersTests)
+  describe('persisting and recording', persistingAndRecordingTests)
+  describe('free text and unknown orders', freeTextAndUnknownOrdersTests)
+})
 
+function strikesAndAnswersTests() {
   it('strikes an assumption and says exactly what has to be redrawn', async () => {
     const order = await seeded()
     const r = (await channels().turn({ id: order.id, strike: 'A-1' })) as OrderView
@@ -147,7 +171,9 @@ describe('foundry:order.turn', () => {
     })) as OrderView
     expect(r.order.openQuestions[0].answer).toBe('Yes')
   })
+}
 
+function persistingAndRecordingTests() {
   it('persists the turn rather than only returning it', async () => {
     const order = await seeded()
     await channels().turn({ id: order.id, strike: 'A-1' })
@@ -160,11 +186,29 @@ describe('foundry:order.turn', () => {
     const ledger = fs.readFileSync(path.join(root, 'orders', order.id, 'ledger.jsonl'), 'utf8')
     expect(ledger).toContain('question.answered')
   })
+}
 
-  it('returns the order unchanged for free text, which goes to the session instead', async () => {
+function freeTextAndUnknownOrdersTests() {
+  it('hands free text to the architect and leaves the order unchanged', async () => {
     const order = await seeded()
-    const r = (await channels().turn({ id: order.id, message: 'what about resize?' })) as OrderView
+    const converge = vi.fn(async () => ({ ok: true as const, sessionId: 'sess-arch' }))
+    const c = createForgeChannels(forgeDeps({ converge }))
+    const before = await store.load(order.id)
+
+    const r = (await c.turn({ id: order.id, message: 'what about resize?' })) as OrderView & {
+      converging: string
+      error?: string
+    }
+
+    expect(converge).toHaveBeenCalledWith(
+      expect.objectContaining({ id: order.id }),
+      'what about resize?',
+      expect.any(Function)
+    )
+    expect(r.error).toBeUndefined()
+    expect(r.converging).toBe('sess-arch')
     expect(r.changed).toEqual([])
+    expect(await store.load(order.id)).toEqual(before)
   })
 
   it('reports an order it cannot find', async () => {
@@ -172,58 +216,26 @@ describe('foundry:order.turn', () => {
       error: 'No order WO-nope.',
     })
   })
-})
+}
 
 describe('foundry:order.compile', () => {
-  async function completeOrder(): Promise<WorkOrder> {
-    const r = (await channels().create({
-      source: { kind: 'typed', text: 'x' },
-      repoPaths: [repo],
-    })) as OrderView
-    const done: WorkOrder = {
-      ...r.order,
-      intent: { problem: 'p', outcome: 'rows render fully', nonGoals: ['scrollbars'] },
-      risk: { grade: 'P2', triggers: [], blastRadius: ['src/'], criticalPaths: [] },
-      acceptance: [
-        {
-          id: 'AC-1',
-          statement: 'a full-width row renders its final glyph',
-          priority: 'P1',
-          verify: { kind: 'test', command: 'npm test', assert: 'exit_code == 0' },
-          unverifiable: null,
-        },
-      ],
-      plan: {
-        ...r.order.plan,
-        units: [
-          {
-            id: 'U-1',
-            title: 'widen',
-            role: 'builder',
-            lane: 1,
-            dependsOn: [],
-            satisfies: ['AC-1'],
-            touches: ['src/a.ts'],
-            verify: [],
-          },
-        ],
-      },
-      redTeam: r.order.redTeam.map((f) => ({ ...f, status: 'resolved' as const })),
-    }
-    await store.save(done)
-    return done
-  }
+  describe('previewing and agreeing', previewingAndAgreeingTests)
+  describe('the ledger', forgeChannelsTheLedgerTests)
+  describe('unknown orders and no refinery', unknownOrdersAndNoRefineryTests)
+  describe('the refinery advisory', forgeChannelsTheRefineryAdvisoryTests)
+})
 
+function previewingAndAgreeingTests() {
   it('previews the checks without committing when asked not to', async () => {
     const order = await completeOrder()
-    const r = (await channels().compile({ id: order.id, commit: false })) as OrderView
+    const r = (await channels().compile(compiling(order.id, false))) as OrderView
     expect(r.compile.ok).toBe(true)
     expect((await store.load(order.id))?.status).toBe('draft')
   })
 
   it('agrees a complete order and stamps when', async () => {
     const order = await completeOrder()
-    const r = (await channels().compile({ id: order.id, commit: true })) as OrderView
+    const r = (await channels().compile(compiling(order.id, true))) as OrderView
     expect(r.order.status).toBe('agreed')
     expect((await store.load(order.id))?.agreedAt).toBe('2026-09-06T10:00:00.000Z')
   })
@@ -233,15 +245,17 @@ describe('foundry:order.compile', () => {
       source: { kind: 'typed', text: 'x' },
       repoPaths: [repo],
     })) as OrderView
-    const out = (await channels().compile({ id: r.order.id, commit: true })) as OrderView
+    const out = (await channels().compile(compiling(r.order.id, true))) as OrderView
     expect(out.compile.ok).toBe(false)
     expect(out.order.status).toBe('draft')
     expect(out.compile.failures.map((f) => f.check)).toContain('coverage')
   })
+}
 
+function forgeChannelsTheLedgerTests() {
   it('records the agreement in the ledger', async () => {
     const order = await completeOrder()
-    await channels().compile({ id: order.id, commit: true })
+    await channels().compile(compiling(order.id, true))
     expect(fs.readFileSync(path.join(root, 'orders', order.id, 'ledger.jsonl'), 'utf8')).toContain(
       'order.agreed'
     )
@@ -261,46 +275,63 @@ describe('foundry:order.compile', () => {
     expect(agreed?.actor).toBe('rule:forge')
     expect(agreed?.reason).toMatch(/released/)
   })
+}
 
+function unknownOrdersAndNoRefineryTests() {
   it('reports an order it cannot find', async () => {
-    expect(await channels().compile({ id: 'WO-nope', commit: true })).toEqual({
+    expect(await channels().compile(compiling('WO-nope', true))).toEqual({
       error: 'No order WO-nope.',
     })
   })
 
   it('carries no advisory when nothing has wired the refinery', async () => {
     const order = await completeOrder()
-    const r = (await channels().compile({ id: order.id, commit: true })) as OrderView & {
+    const r = (await channels().compile(compiling(order.id, true))) as OrderView & {
       advisory: string | null
     }
     expect(r.advisory).toBeNull()
   })
+}
 
+function forgeChannelsTheRefineryAdvisoryTests() {
   it('advises when the newly agreed order overlaps an in-flight one', async () => {
     const order = await completeOrder()
-    const c = createForgeChannels({
-      store,
-      now: () => '2026-09-06T10:00:00.000Z',
-      queueEntries: async () => [
-        {
-          orderId: 'WO-earlier',
-          title: 'Earlier work',
-          repo: order.context.repos[0]?.name ?? '',
-          base: order.context.repos[0]?.baseBranch ?? 'main',
-          agreedAt: '2026-09-01T00:00:00.000Z',
-          files: ['src/a.ts'],
-          merged: false,
-        },
-      ],
-    })
-    const r = (await c.compile({ id: order.id, commit: true })) as OrderView & {
+    const c = createForgeChannels(
+      forgeDeps({
+        queueEntries: async () => [
+          {
+            orderId: 'WO-earlier',
+            title: 'Earlier work',
+            repo: order.context.repos[0]?.name ?? '',
+            base: order.context.repos[0]?.baseBranch ?? 'main',
+            agreedAt: '2026-09-01T00:00:00.000Z',
+            files: ['src/a.ts'],
+            merged: false,
+          },
+        ],
+      })
+    )
+    const r = (await c.compile(compiling(order.id, true))) as OrderView & {
       advisory: string | null
     }
     expect(r.advisory).toContain('WO-earlier')
   })
-})
+}
 
 describe('foundry:order.list', () => {
+  describe('nothing and no queue', nothingAndNoQueueTests)
+  describe('the queue position', forgeChannelsTheQueuePositionTests)
+  describe('checks and running orders', checksAndRunningOrdersTests)
+  describe('halted orders', haltedOrdersTests)
+  describe('open questions', forgeChannelsOpenQuestionsTests)
+  describe('when it was made', whenItWasMadeTests)
+  describe('finished checks and pulls', finishedChecksAndPullsTests)
+  describe('the open gate', theOpenGateTests)
+  describe('no CI yet', noCiYetTests)
+  describe('the CI round', theCiRoundTests)
+})
+
+function nothingAndNoQueueTests() {
   it('lists nothing before any order is seeded', async () => {
     expect(await channels().list()).toEqual({ orders: [] })
   })
@@ -310,41 +341,32 @@ describe('foundry:order.list', () => {
     const r = (await channels().list()) as { orders: { queue: unknown }[] }
     expect(r.orders[0]?.queue).toBeNull()
   })
+}
 
+function forgeChannelsTheQueuePositionTests() {
   it('carries the queue position when the refinery is wired and this order overlaps another', async () => {
     const seeded = (await channels().create({
       source: { kind: 'typed', text: 'first idea' },
       repoPaths: [repo],
     })) as OrderView
-    const c = createForgeChannels({
-      store,
-      now: () => '2026-09-06T10:00:00.000Z',
-      queueEntries: async () => [
-        {
-          orderId: seeded.order.id,
-          title: seeded.order.title,
-          repo: 'repo',
-          base: 'main',
-          agreedAt: '2026-09-02T00:00:00.000Z',
-          files: ['src/a.ts'],
-          merged: false,
-        },
-        {
-          orderId: 'WO-earlier',
-          title: 'Earlier work',
-          repo: 'repo',
-          base: 'main',
-          agreedAt: '2026-09-01T00:00:00.000Z',
-          files: ['src/a.ts'],
-          merged: false,
-        },
-      ],
-    })
+    const c = createForgeChannels(
+      forgeDeps({
+        queueEntries: async () => [
+          queueEntry(seeded.order.id, {
+            title: seeded.order.title,
+            agreedAt: '2026-09-02T00:00:00.000Z',
+          }),
+          queueEntry('WO-earlier', { title: 'Earlier work' }),
+        ],
+      })
+    )
     const r = (await c.list()) as { orders: { id: string; queue: { position: number } | null }[] }
     const row = r.orders.find((o) => o.id === seeded.order.id)
     expect(row?.queue?.position).toBe(2)
   })
+}
 
+function checksAndRunningOrdersTests() {
   it('lists each order with where its checks stand', async () => {
     const c = channels()
     await c.create({ source: { kind: 'typed', text: 'first idea' }, repoPaths: [repo] })
@@ -375,7 +397,9 @@ describe('foundry:order.list', () => {
     expect(r.orders[0].standing.label).not.toContain('hand off')
     expect(r.orders[0].standing.kind).not.toBe('done')
   })
+}
 
+function haltedOrdersTests() {
   it('says a halted order is halted, and whose move it is', async () => {
     const held = raiseGate({
       id: 'G-1',
@@ -385,11 +409,7 @@ describe('foundry:order.list', () => {
       why: 'the order budgets 90 and this run is at 90',
       at: '2026-09-06T11:30:00.000Z',
     })
-    const c = createForgeChannels({
-      store,
-      now: () => '2026-09-06T10:00:00.000Z',
-      standingSources: { gatesFor: async () => [held] },
-    })
+    const c = createForgeChannels(forgeDeps({ standingSources: { gatesFor: async () => [held] } }))
     const seeded = (await c.create({
       source: { kind: 'typed', text: 'first idea' },
       repoPaths: [repo],
@@ -404,7 +424,9 @@ describe('foundry:order.list', () => {
     expect(r.orders[0].standing.turn).toBe('you')
     expect(r.orders[0].standing.gateId).toBe('G-1')
   })
+}
 
+function forgeChannelsOpenQuestionsTests() {
   // A draft's standing is the questions it is asking, which is the count the
   // tab badge sends the operator here to find.
   it('counts the questions a draft is still asking', async () => {
@@ -426,6 +448,7 @@ describe('foundry:order.list', () => {
           recommended: 0,
           answer: null,
           rank: 1,
+          confidence: null,
         },
       ],
     })
@@ -435,46 +458,56 @@ describe('foundry:order.list', () => {
     expect(r.orders[0].standing.turn).toBe('you')
     expect(r.orders[0].openQuestions).toBe(1)
   })
+}
 
+function whenItWasMadeTests() {
   // The Factory sorts its cards newest first, and only the row reaches it.
   it('carries when each order was made', async () => {
-    const c = createForgeChannels({ store, now: () => NOW })
+    const c = createForgeChannels(forgeDeps())
     await c.create({ source: { kind: 'typed', text: 'first idea' }, repoPaths: [repo] })
 
     const r = (await c.list()) as { orders: { createdAt: string }[] }
     expect(r.orders[0].createdAt).toBe(NOW)
   })
+}
 
+/** CI watching one pull request: one check passed, one pending, one failed. */
+function watchingThreeChecks(url: string) {
+  const checks = [
+    { name: 'lint', bucket: 'pass', link: '', workflow: 'ci' },
+    { name: 'test', bucket: 'pending', link: '', workflow: 'ci' },
+    { name: 'build', bucket: 'fail', link: '', workflow: 'ci' },
+  ] as const
+  return {
+    round: 0,
+    max: 2,
+    status: 'watching' as const,
+    pulls: [{ url, checks: [...checks] }],
+    reason: '',
+    at: NOW,
+  }
+}
+
+/** Puts the order in a run that opened the pull request at `url`. */
+async function runningWithPull(orderId: string, url: string): Promise<void> {
+  const loaded = await store.load(orderId)
+  if (loaded === null) throw new Error('the order this test needs was not saved')
+  await store.save({ ...loaded, status: 'running' })
+  const dir = path.join(root, 'orders', orderId)
+  fs.mkdirSync(dir, { recursive: true })
+  fs.writeFileSync(path.join(dir, 'pulls.json'), JSON.stringify([{ url, repo: 'r', cwd: '/c' }]))
+}
+
+function finishedChecksAndPullsTests() {
   it('counts the checks that have finished, and links the pull requests', async () => {
-    const c = createForgeChannels({ store, now: () => NOW, dataRoot: () => root })
+    const c = createForgeChannels(forgeDeps({ dataRoot: () => root }))
     const seeded = (await c.create({
       source: { kind: 'typed', text: 'first idea' },
       repoPaths: [repo],
     })) as OrderView
     const url = 'https://github.com/andytavares/terminator/pull/233'
-    await writeCiState(root, seeded.order.id, {
-      round: 0,
-      max: 2,
-      status: 'watching',
-      pulls: [
-        {
-          url,
-          checks: [
-            { name: 'lint', bucket: 'pass', link: '', workflow: 'ci' },
-            { name: 'test', bucket: 'pending', link: '', workflow: 'ci' },
-            { name: 'build', bucket: 'fail', link: '', workflow: 'ci' },
-          ],
-        },
-      ],
-      reason: '',
-      at: NOW,
-    })
-    const loaded = await store.load(seeded.order.id)
-    if (loaded === null) throw new Error('the order this test needs was not saved')
-    await store.save({ ...loaded, status: 'running' })
-    const dir = path.join(root, 'orders', seeded.order.id)
-    fs.mkdirSync(dir, { recursive: true })
-    fs.writeFileSync(path.join(dir, 'pulls.json'), JSON.stringify([{ url, repo: 'r', cwd: '/c' }]))
+    await writeCiState(root, seeded.order.id, watchingThreeChecks(url))
+    await runningWithPull(seeded.order.id, url)
 
     const r = (await c.list()) as {
       orders: {
@@ -485,7 +518,9 @@ describe('foundry:order.list', () => {
     expect(r.orders[0].ci.checks).toEqual({ done: 2, total: 3 })
     expect(r.orders[0].pulls).toEqual([{ number: 233, url }])
   })
+}
 
+function theOpenGateTests() {
   it('hands the row the open gate whose move is yours, and nothing for another', async () => {
     const held = raiseGate({
       id: 'G-1',
@@ -495,11 +530,7 @@ describe('foundry:order.list', () => {
       why: 'the work shipped as drafts',
       at: '2026-09-06T11:30:00.000Z',
     })
-    const c = createForgeChannels({
-      store,
-      now: () => '2026-09-06T10:00:00.000Z',
-      standingSources: { gatesFor: async () => [held] },
-    })
+    const c = createForgeChannels(forgeDeps({ standingSources: { gatesFor: async () => [held] } }))
     const seeded = (await c.create({
       source: { kind: 'typed', text: 'first idea' },
       repoPaths: [repo],
@@ -515,21 +546,15 @@ describe('foundry:order.list', () => {
     expect(r.orders[0].gate?.options[0].id).toBe('mark_ready')
 
     await store.save({ ...loaded, status: 'running' })
-    const none = createForgeChannels({ store, now: () => NOW })
+    const none = createForgeChannels(forgeDeps())
     const again = (await none.list()) as { orders: { gate: unknown }[] }
     expect(again.orders[0].gate).toBeNull()
   })
+}
 
-  it('carries no ci field when this host has no records location wired', async () => {
-    const c = channels()
-    await c.create({ source: { kind: 'typed', text: 'first idea' }, repoPaths: [repo] })
-    const r = (await c.list()) as { orders: Record<string, unknown>[] }
-    expect(r.orders[0].ci).toBeUndefined()
-    expect('ci' in r.orders[0]).toBe(false)
-  })
-
+function noCiYetTests() {
   it('says an order has no CI yet when nothing has shipped', async () => {
-    const c = createForgeChannels({ store, now: () => NOW, dataRoot: () => root })
+    const c = createForgeChannels(forgeDeps({ dataRoot: () => root }))
     const seeded = (await c.create({
       source: { kind: 'typed', text: 'first idea' },
       repoPaths: [repo],
@@ -537,9 +562,11 @@ describe('foundry:order.list', () => {
     const r = (await c.list()) as { orders: { id: string; ci: unknown }[] }
     expect(r.orders.find((o) => o.id === seeded.order.id)?.ci).toBeNull()
   })
+}
 
+function theCiRoundTests() {
   it("reports a shipped order's CI round and status", async () => {
-    const c = createForgeChannels({ store, now: () => NOW, dataRoot: () => root })
+    const c = createForgeChannels(forgeDeps({ dataRoot: () => root }))
     const seeded = (await c.create({
       source: { kind: 'typed', text: 'first idea' },
       repoPaths: [repo],
@@ -564,9 +591,15 @@ describe('foundry:order.list', () => {
       checks: { done: 0, total: 0 },
     })
   })
-})
+}
 
 describe('channel edge cases', () => {
+  describe('tracker issues and repositories', trackerIssuesAndRepositoriesTests)
+  describe('compile flags and agreed orders', compileFlagsAndAgreedOrdersTests)
+  describe('unknown questions and no tracker', unknownQuestionsAndNoTrackerTests)
+})
+
+function trackerIssuesAndRepositoriesTests() {
   it('reports an issue the tracker cannot return', async () => {
     const c = channels(vi.fn(async () => null))
     expect(
@@ -594,21 +627,18 @@ describe('channel edge cases', () => {
     })
     expect(readIssue).toHaveBeenCalledWith('linear', 'TAV-1')
   })
+}
 
-  it('rejects a malformed turn', async () => {
-    expect(await channels().turn({ nope: true })).toEqual({ error: 'Malformed request.' })
-  })
-
-  it('rejects a malformed compile request', async () => {
-    expect(await channels().compile({ nope: true })).toEqual({ error: 'Malformed request.' })
-  })
-
+function compileFlagsAndAgreedOrdersTests() {
   it('treats a compile with no commit flag as a preview', async () => {
     const seeded = (await channels().create({
       source: { kind: 'typed', text: 'x' },
       repoPaths: [repo],
     })) as OrderView
-    const r = (await channels().compile({ id: seeded.order.id })) as OrderView
+    // Through the channel's schema, which is what supplies the missing flag.
+    const r = (await sendThroughSchema('foundry:order.compile', {
+      id: seeded.order.id,
+    })) as OrderView
     expect(r.order.status).toBe('draft')
   })
 
@@ -618,10 +648,12 @@ describe('channel edge cases', () => {
       repoPaths: [repo],
     })) as OrderView
     await store.save({ ...seeded.order, status: 'running' })
-    const r = (await channels().compile({ id: seeded.order.id, commit: true })) as OrderView
+    const r = (await channels().compile(compiling(seeded.order.id, true))) as OrderView
     expect(r.compile.ok).toBe(false)
   })
+}
 
+function unknownQuestionsAndNoTrackerTests() {
   it('ignores an answer to a question that does not exist', async () => {
     const seeded = (await channels().create({
       source: { kind: 'typed', text: 'x' },
@@ -635,14 +667,14 @@ describe('channel edge cases', () => {
   })
 
   it('seeds without a tracker reader at all', async () => {
-    const c = createForgeChannels({ store, now: () => '2026-09-06T10:00:00.000Z' })
+    const c = createForgeChannels(forgeDeps())
     const r = (await c.create({
       source: { kind: 'typed', text: 'no tracker here' },
       repoPaths: [repo],
     })) as OrderView
     expect(r.order.id).toBeTruthy()
   })
-})
+}
 
 // The write-back seams. Everything below builds its own channel set, because
 // what is being asserted is what the seams are handed and when.
@@ -668,29 +700,10 @@ async function agreeable(): Promise<WorkOrder> {
     },
     intent: { problem: 'p', outcome: 'rows render fully', nonGoals: ['scrollbars'] },
     risk: { grade: 'P2', triggers: [], blastRadius: ['src/'], criticalPaths: [] },
-    acceptance: [
-      {
-        id: 'AC-1',
-        statement: 'a full-width row renders its final glyph',
-        priority: 'P1',
-        verify: { kind: 'test', command: 'npm test', assert: 'exit_code == 0' },
-        unverifiable: null,
-      },
-    ],
+    acceptance: [testCriterion('AC-1', { statement: 'a full-width row renders its final glyph' })],
     plan: {
       ...seed.order.plan,
-      units: [
-        {
-          id: 'U-1',
-          title: 'widen',
-          role: 'builder',
-          lane: 1,
-          dependsOn: [],
-          satisfies: ['AC-1'],
-          touches: ['src/a.ts'],
-          verify: [],
-        },
-      ],
+      units: [builderUnit('U-1', { title: 'widen', satisfies: ['AC-1'], touches: ['src/a.ts'] })],
     },
     redTeam: seed.order.redTeam.map((f) => ({ ...f, status: 'resolved' as const })),
   }
@@ -698,6 +711,13 @@ async function agreeable(): Promise<WorkOrder> {
 }
 
 describe('the capability check at agreement (FR-059a)', () => {
+  describe('asking at agreement', askingAtAgreementTests)
+  describe('tracker failures', forgeChannelsTrackerFailuresTests)
+  describe('agreeing twice', agreeingTwiceTests)
+  describe('writing back', writingBackTests)
+})
+
+function askingAtAgreementTests() {
   it('asks what the tracker can do when the order is agreed, not when a write is due', async () => {
     const capability = vi.fn(async () => ({
       transitions: 'unsupported' as const,
@@ -706,9 +726,9 @@ describe('the capability check at agreement (FR-059a)', () => {
     }))
     const store = createOrderStore(root)
     await store.save(await agreeable())
-    const channels = createForgeChannels({ store, now: () => NOW, capability })
+    const channels = createForgeChannels(forgeDeps({ capability }))
 
-    const result = (await channels.compile({ id: 'WO-1', commit: true })) as {
+    const result = (await channels.compile(compiling('WO-1', true))) as {
       capability?: { transitions: string }
     }
     expect(capability).toHaveBeenCalled()
@@ -723,66 +743,93 @@ describe('the capability check at agreement (FR-059a)', () => {
     }))
     const store = createOrderStore(root)
     await store.save(await agreeable())
-    const channels = createForgeChannels({ store, now: () => NOW, capability })
+    const channels = createForgeChannels(forgeDeps({ capability }))
 
-    await channels.compile({ id: 'WO-1', commit: false })
+    await channels.compile(compiling('WO-1', false))
     expect(capability).not.toHaveBeenCalled()
   })
+}
 
+function forgeChannelsTrackerFailuresTests() {
   it('agrees the order even when the tracker cannot be reached', async () => {
     const store = createOrderStore(root)
     await store.save(await agreeable())
-    const channels = createForgeChannels({
-      store,
-      now: () => NOW,
-      capability: async () => Promise.reject(new Error('offline')),
-    })
+    const channels = createForgeChannels(
+      forgeDeps({ capability: async () => Promise.reject(new Error('offline')) })
+    )
 
-    const result = (await channels.compile({ id: 'WO-1', commit: true })) as { order: WorkOrder }
+    const result = (await channels.compile(compiling('WO-1', true))) as {
+      order: WorkOrder
+    }
     expect(result.order.status).toBe('agreed')
   })
 
   it('agrees the order even when the summary comment fails', async () => {
     const store = createOrderStore(root)
     await store.save(await agreeable())
-    const channels = createForgeChannels({
-      store,
-      now: () => NOW,
-      onAgreed: async () => Promise.reject(new Error('rate limited')),
-    })
+    const channels = createForgeChannels(
+      forgeDeps({ onAgreed: async () => Promise.reject(new Error('rate limited')) })
+    )
 
-    const result = (await channels.compile({ id: 'WO-1', commit: true })) as { order: WorkOrder }
+    const result = (await channels.compile(compiling('WO-1', true))) as {
+      order: WorkOrder
+    }
     expect(result.order.status).toBe('agreed')
     expect((await store.load('WO-1'))?.status).toBe('agreed')
   })
+}
 
+function agreeingTwiceTests() {
+  it('does not agree an order a second time, and says why', async () => {
+    const onAgreed = vi.fn(async () => undefined)
+    const store = createOrderStore(root)
+    await store.save(await agreeable())
+    const channels = createForgeChannels(forgeDeps({ onAgreed }))
+    await channels.compile(compiling('WO-1', true))
+
+    const again = (await channels.compile(compiling('WO-1', true))) as {
+      compile: { ok: boolean; failures: { detail: string }[] }
+    }
+    expect(again.compile.ok).toBe(false)
+    expect(again.compile.failures[0].detail).toBe(
+      'Only a draft can be agreed; this order is agreed.'
+    )
+    expect(onAgreed).toHaveBeenCalledTimes(1)
+  })
+}
+
+function writingBackTests() {
   it('writes the agreed order back to the issue', async () => {
     const onAgreed = vi.fn(async () => undefined)
     const store = createOrderStore(root)
     await store.save(await agreeable())
-    await createForgeChannels({ store, now: () => NOW, onAgreed }).compile({
-      id: 'WO-1',
-      commit: true,
-    })
+    await createForgeChannels(forgeDeps({ onAgreed })).compile(compiling('WO-1', true))
     expect(onAgreed).toHaveBeenCalledWith(expect.objectContaining({ status: 'agreed' }))
   })
-})
+}
 
 describe('the intent-to-state mapping (FR-060)', () => {
+  describe('the states', theStatesTests)
+  describe('no tracker or a failing one', noTrackerOrAFailingOneTests)
+  describe('overrides', forgeChannelsOverridesTests)
+  describe('refusals', forgeChannelsRefusalsTests)
+})
+
+function theStatesTests() {
   it('offers the tracker states and the mapping as it stands', async () => {
     const store = createOrderStore(root)
     await store.save(await agreeable())
-    const channels = createForgeChannels({
-      store,
-      now: () => NOW,
-      capability: async () => ({
-        transitions: 'supported' as const,
-        states: [
-          { id: 'st-review', name: 'In Review', intent: 'in_review' as const, available: true },
-        ],
-        unreachable: [],
-      }),
-    })
+    const channels = createForgeChannels(
+      forgeDeps({
+        capability: async () => ({
+          transitions: 'supported' as const,
+          states: [
+            { id: 'st-review', name: 'In Review', intent: 'in_review' as const, available: true },
+          ],
+          unreachable: [],
+        }),
+      })
+    )
 
     const result = (await channels.states({ id: 'WO-1' })) as {
       capability: { states: { id: string }[] }
@@ -791,11 +838,13 @@ describe('the intent-to-state mapping (FR-060)', () => {
     expect(result.capability.states[0].id).toBe('st-review')
     expect(result.mapping.in_review).toBeNull()
   })
+}
 
+function noTrackerOrAFailingOneTests() {
   it('reports no issue when the host has no tracker connection at all', async () => {
     const store = createOrderStore(root)
     await store.save(await agreeable())
-    const result = (await createForgeChannels({ store, now: () => NOW }).states({
+    const result = (await createForgeChannels(forgeDeps()).states({
       id: 'WO-1',
     })) as { capability: { transitions: string } }
     expect(result.capability.transitions).toBe('no_issue')
@@ -804,18 +853,18 @@ describe('the intent-to-state mapping (FR-060)', () => {
   it('reports the tracker own failure rather than pretending it has no states', async () => {
     const store = createOrderStore(root)
     await store.save(await agreeable())
-    const result = (await createForgeChannels({
-      store,
-      now: () => NOW,
-      capability: async () => Promise.reject(new Error('offline')),
-    }).states({ id: 'WO-1' })) as { error: string }
+    const result = (await createForgeChannels(
+      forgeDeps({ capability: async () => Promise.reject(new Error('offline')) })
+    ).states({ id: 'WO-1' })) as { error: string }
     expect(result.error).toBe('offline')
   })
+}
 
+function forgeChannelsOverridesTests() {
   it('stores the operator override and keeps it', async () => {
     const store = createOrderStore(root)
     await store.save(await agreeable())
-    const channels = createForgeChannels({ store, now: () => NOW })
+    const channels = createForgeChannels(forgeDeps())
 
     await channels.mapState({ id: 'WO-1', intent: 'in_review', optionId: 'st-progress' })
     expect((await store.load('WO-1'))?.stateMapping.in_review).toBe('st-progress')
@@ -824,18 +873,19 @@ describe('the intent-to-state mapping (FR-060)', () => {
   it('puts an intent back to whatever the tracker resolves', async () => {
     const store = createOrderStore(root)
     await store.save(await agreeable())
-    const channels = createForgeChannels({ store, now: () => NOW })
+    const channels = createForgeChannels(forgeDeps())
 
     await channels.mapState({ id: 'WO-1', intent: 'done', optionId: 'st-done' })
     await channels.mapState({ id: 'WO-1', intent: 'done', optionId: null })
     expect((await store.load('WO-1'))?.stateMapping.done).toBeNull()
   })
+}
 
+function forgeChannelsRefusalsTests() {
   it('refuses an intent that is not one of the three', async () => {
-    const store = createOrderStore(root)
-    await store.save(await agreeable())
+    await createOrderStore(root).save(await agreeable())
     expect(
-      await createForgeChannels({ store, now: () => NOW }).mapState({
+      await sendThroughSchema('foundry:order.mapState', {
         id: 'WO-1',
         intent: 'shipped',
         optionId: 'x',
@@ -844,30 +894,85 @@ describe('the intent-to-state mapping (FR-060)', () => {
   })
 
   it('reports an order it cannot find', async () => {
-    const channels = createForgeChannels({ store: createOrderStore(root), now: () => NOW })
+    const channels = createForgeChannels(forgeDeps({ store: createOrderStore(root) }))
     expect(await channels.mapState({ id: 'WO-nope', intent: 'done', optionId: null })).toEqual({
       error: 'No order WO-nope.',
     })
     expect(await channels.states({ id: 'WO-nope' })).toEqual({ error: 'No order WO-nope.' })
   })
-
-  it('rejects a malformed states request', async () => {
-    const channels = createForgeChannels({ store: createOrderStore(root), now: () => NOW })
-    expect(await channels.states({ nope: true })).toEqual({ error: 'Malformed request.' })
-  })
-})
+}
 
 describe('foundry:order.converge — the half that was missing', () => {
-  function drafted() {
-    return channels().create({
-      source: { kind: 'typed', text: 'expired tokens are accepted' },
-      repoPaths: [repo],
-    }) as Promise<OrderView>
-  }
+  describe('starting', startingTests)
+  describe('recording', forgeChannelsRecordingTests)
+  describe('refused proposals', refusedProposalsTests)
+  describe('the last turn', theLastTurnTests)
+  describe('a running turn', forgeChannelsARunningTurnTests)
+  describe('a refused draft in the list', aRefusedDraftInTheListTests)
+  describe('non-drafts and unknown orders', nonDraftsAndUnknownOrdersTests)
+})
+
+/** Two open questions and two blocking findings: everything one settle can decide. */
+const UNSETTLED: Pick<WorkOrder, 'openQuestions' | 'redTeam'> = {
+  openQuestions: [
+    {
+      id: 'Q-1',
+      text: 'which token?',
+      why: '',
+      options: ['a', 'b'],
+      recommended: 0,
+      answer: null,
+      rank: 1,
+      confidence: null,
+    },
+    {
+      id: 'Q-2',
+      text: 'which clock?',
+      why: '',
+      options: ['server', 'client'],
+      recommended: 0,
+      answer: null,
+      rank: 1,
+      confidence: null,
+    },
+  ],
+  redTeam: [
+    {
+      id: 'RT-1',
+      severity: 'high',
+      category: 'wrong-outcome',
+      text: 'finding one is wrong',
+      status: 'open',
+      reason: '',
+      round: 0,
+    },
+    {
+      id: 'RT-2',
+      severity: 'high',
+      category: 'regression',
+      text: 'finding two breaks something',
+      status: 'open',
+      reason: '',
+      round: 0,
+    },
+  ],
+}
+
+async function withQuestionsAndFindings(): Promise<WorkOrder> {
+  const seed = (await channels().create({
+    source: { kind: 'typed', text: 'x' },
+    repoPaths: [repo],
+  })) as OrderView
+  const withExtras: WorkOrder = { ...seed.order, ...UNSETTLED }
+  await store.save(withExtras)
+  return withExtras
+}
+
+function startingTests() {
   it('starts the architect and answers straight away, rather than holding the bridge', async () => {
     const seed = await drafted()
     const converge = vi.fn(async () => ({ ok: true as const, sessionId: 'sess-arch' }))
-    const c = createForgeChannels({ store, now: () => NOW, converge })
+    const c = createForgeChannels(forgeDeps({ converge }))
 
     const r = (await c.converge({ id: seed.order.id })) as OrderView & { converging: string }
     expect(converge).toHaveBeenCalled()
@@ -880,35 +985,35 @@ describe('foundry:order.converge — the half that was missing', () => {
 
   it('names the session, so the surface can take the operator to it', async () => {
     const seed = await drafted()
-    const c = createForgeChannels({
-      store,
-      now: () => NOW,
-      converge: async () => ({ ok: true, sessionId: 'sess-arch' }),
-    })
+    const c = createForgeChannels(
+      forgeDeps({ converge: async () => ({ ok: true, sessionId: 'sess-arch' }) })
+    )
     const r = (await c.converge({ id: seed.order.id })) as { converging: string }
     expect(r.converging).toBe('sess-arch')
   })
+}
 
+function forgeChannelsRecordingTests() {
   it('records that it started, and what it was asked', async () => {
     const seed = await drafted()
-    const c = createForgeChannels({
-      store,
-      now: () => NOW,
-      converge: async () => ({ ok: true, sessionId: 'sess-arch' }),
-    })
+    const c = createForgeChannels(
+      forgeDeps({ converge: async () => ({ ok: true, sessionId: 'sess-arch' }) })
+    )
     await c.converge({ id: seed.order.id, message: 'tighten AC-2' })
     const ledger = fs.readFileSync(path.join(root, 'orders', seed.order.id, 'ledger.jsonl'), 'utf8')
     expect(ledger).toContain('converge.started')
     expect(ledger).toContain('tighten AC-2')
   })
+}
 
+function refusedProposalsTests() {
   it('returns the order untouched, and why, when the proposal was refused', async () => {
     const seed = await drafted()
-    const c = createForgeChannels({
-      store,
-      now: () => NOW,
-      converge: async () => ({ ok: false, reason: 'the architect could not be started' }),
-    })
+    const c = createForgeChannels(
+      forgeDeps({
+        converge: async () => ({ ok: false, reason: 'the architect could not be started' }),
+      })
+    )
     const r = (await c.converge({ id: seed.order.id })) as OrderView & { error: string }
     expect(r.error).toBe('the architect could not be started')
     expect(r.order.acceptance).toEqual([])
@@ -916,43 +1021,43 @@ describe('foundry:order.converge — the half that was missing', () => {
 
   it('records a refusal, so a run of bad proposals is visible afterwards', async () => {
     const seed = await drafted()
-    const c = createForgeChannels({
-      store,
-      now: () => NOW,
-      converge: async () => ({ ok: false, reason: 'no runtime' }),
-    })
+    const c = createForgeChannels(
+      forgeDeps({ converge: async () => ({ ok: false, reason: 'no runtime' }) })
+    )
     await c.converge({ id: seed.order.id })
     const ledger = fs.readFileSync(path.join(root, 'orders', seed.order.id, 'ledger.jsonl'), 'utf8')
     expect(ledger).toContain('converge.refused')
   })
+}
 
+function theLastTurnTests() {
   // The half that was missing after that. A refusal was recorded and read by
   // nothing: the Forge polls `order.compile`, which handed back the document
   // and the checks, and a refusal changes neither — so the surface went on
   // saying the architect was working over a turn that had ended.
   it('carries how the last turn ended on the read the Forge polls', async () => {
     const seed = await drafted()
-    const c = createForgeChannels({
-      store,
-      now: () => NOW,
-      converge: async () => ({ ok: false, reason: 'acceptance.5: Invalid enum value.' }),
-    })
+    const c = createForgeChannels(
+      forgeDeps({
+        converge: async () => ({ ok: false, reason: 'acceptance.5: Invalid enum value.' }),
+      })
+    )
     await c.converge({ id: seed.order.id })
 
-    const r = (await c.compile({ id: seed.order.id, commit: false })) as {
+    const r = (await c.compile(compiling(seed.order.id, false))) as {
       intake: { kind: string; reason?: string }
     }
     expect(r.intake.kind).toBe('refused')
     expect(r.intake.reason).toBe('acceptance.5: Invalid enum value.')
   })
+}
 
+function forgeChannelsARunningTurnTests() {
   it('says a turn is running the moment it starts one', async () => {
     const seed = await drafted()
-    const c = createForgeChannels({
-      store,
-      now: () => NOW,
-      converge: async () => ({ ok: true, sessionId: 'sess-arch' }),
-    })
+    const c = createForgeChannels(
+      forgeDeps({ converge: async () => ({ ok: true, sessionId: 'sess-arch' }) })
+    )
     // On this call and not only on the next poll: the surface reads whether a
     // turn is in flight from here, and would otherwise sit idle.
     const started = (await c.converge({ id: seed.order.id, message: 'close the gap' })) as {
@@ -970,22 +1075,24 @@ describe('foundry:order.converge — the half that was missing', () => {
       autoTurn: null,
     })
 
-    const polled = (await c.compile({ id: seed.order.id, commit: false })) as {
+    const polled = (await c.compile(compiling(seed.order.id, false))) as {
       intake: { kind: string }
     }
     expect(polled.intake.kind).toBe('running')
   })
+}
 
+function aRefusedDraftInTheListTests() {
   // The order list said "Foundry is still shaping this" about an order nothing
   // had touched for an hour, because a draft's standing had no idea intake had
   // ever run.
   it('hands a refused draft back to the operator in the list', async () => {
     const seed = await drafted()
-    const c = createForgeChannels({
-      store,
-      now: () => NOW,
-      converge: async () => ({ ok: false, reason: 'acceptance.5: Invalid enum value.' }),
-    })
+    const c = createForgeChannels(
+      forgeDeps({
+        converge: async () => ({ ok: false, reason: 'acceptance.5: Invalid enum value.' }),
+      })
+    )
     await c.converge({ id: seed.order.id })
 
     const listed = (await c.list()) as {
@@ -995,96 +1102,42 @@ describe('foundry:order.converge — the half that was missing', () => {
     expect(row?.standing.turn).toBe('you')
     expect(row?.standing.headline).toMatch(/refused/i)
   })
+}
 
-  it('says so when there is no runtime to run an architect', async () => {
-    const seed = await drafted()
-    const r = (await channels().converge({ id: seed.order.id })) as { error: string }
-    expect(r.error).toMatch(/no architect can draft the plan/)
-  })
-
+function nonDraftsAndUnknownOrdersTests() {
   it('refuses to converge an order that is no longer a draft', async () => {
     const done = await agreeable()
     await store.save({ ...done, status: 'running' })
-    const c = createForgeChannels({
-      store,
-      now: () => NOW,
-      converge: async () => ({ ok: true, sessionId: 's' }),
-    })
+    const c = createForgeChannels(
+      forgeDeps({ converge: async () => ({ ok: true, sessionId: 's' }) })
+    )
     expect(await c.converge({ id: 'WO-1' })).toEqual({
       error: 'Only a draft can be converged; this order is running.',
     })
   })
 
   it('reports an order it cannot find', async () => {
-    const c = createForgeChannels({
-      store,
-      now: () => NOW,
-      converge: async () => ({ ok: true, sessionId: 's' }),
-    })
+    const c = createForgeChannels(
+      forgeDeps({ converge: async () => ({ ok: true, sessionId: 's' }) })
+    )
     expect(await c.converge({ id: 'WO-nope' })).toEqual({ error: 'No order WO-nope.' })
   })
-})
+}
 
 // The batch that replaces seven serial turns: an answer and an accept change
 // the order directly and need no turn; a fix or an ask is folded into the one
 // turn `converge` starts once, naming every finding it carries.
 describe('foundry:order.converge — settling everything in one submit', () => {
-  async function withQuestionsAndFindings(): Promise<WorkOrder> {
-    const seed = (await channels().create({
-      source: { kind: 'typed', text: 'x' },
-      repoPaths: [repo],
-    })) as OrderView
-    const withExtras: WorkOrder = {
-      ...seed.order,
-      openQuestions: [
-        {
-          id: 'Q-1',
-          text: 'which token?',
-          why: '',
-          options: ['a', 'b'],
-          recommended: 0,
-          answer: null,
-          rank: 1,
-        },
-        {
-          id: 'Q-2',
-          text: 'which clock?',
-          why: '',
-          options: ['server', 'client'],
-          recommended: 0,
-          answer: null,
-          rank: 1,
-        },
-      ],
-      redTeam: [
-        {
-          id: 'RT-1',
-          severity: 'high',
-          category: 'wrong-outcome',
-          text: 'finding one is wrong',
-          status: 'open',
-          reason: '',
-          round: 0,
-        },
-        {
-          id: 'RT-2',
-          severity: 'high',
-          category: 'regression',
-          text: 'finding two breaks something',
-          status: 'open',
-          reason: '',
-          round: 0,
-        },
-      ],
-    }
-    await store.save(withExtras)
-    return withExtras
-  }
+  describe('answers and accepts', answersAndAcceptsTests)
+  describe('fixes and asks', fixesAndAsksTests)
+  describe('a blank reason', aBlankReasonTests)
+})
 
+function answersAndAcceptsTests() {
   it('applies every answer and every accept, with no architect turn', async () => {
     const order = await withQuestionsAndFindings()
     const converge = vi.fn(async () => ({ ok: true as const, sessionId: 's' }))
-    const c = createForgeChannels({ store, now: () => NOW, converge })
+    const c = createForgeChannels(forgeDeps({ converge }))
 
     const r = (await c.converge({
       id: order.id,
@@ -1113,11 +1166,16 @@ describe('foundry:order.converge — settling everything in one submit', () => {
     expect(ledger).toContain('question.answered')
     expect(ledger).toContain('finding.accepted')
   })
+}
 
+function fixesAndAsksTests() {
   it('folds every fix and ask into exactly one converge call naming every finding', async () => {
     const order = await withQuestionsAndFindings()
-    const converge = vi.fn(async () => ({ ok: true as const, sessionId: 'sess-arch' }))
-    const c = createForgeChannels({ store, now: () => NOW, converge })
+    const converge = vi.fn<ForgeDeps['converge']>(async () => ({
+      ok: true as const,
+      sessionId: 'sess-arch',
+    }))
+    const c = createForgeChannels(forgeDeps({ converge }))
 
     await c.converge({
       id: order.id,
@@ -1128,7 +1186,7 @@ describe('foundry:order.converge — settling everything in one submit', () => {
     })
 
     expect(converge).toHaveBeenCalledTimes(1)
-    const [, message] = converge.mock.calls[0] as [WorkOrder, string]
+    const [, message] = converge.mock.calls[0]
     expect(message).toContain('RT-1')
     expect(message).toContain('finding one is wrong')
     expect(message).toContain('RT-2')
@@ -1136,11 +1194,13 @@ describe('foundry:order.converge — settling everything in one submit', () => {
     expect(message).toContain('do it this way')
     expect(message).toContain('resolveFindings')
   })
+}
 
+function aBlankReasonTests() {
   it('refuses the whole settle on a blank accept reason, applying nothing', async () => {
     const order = await withQuestionsAndFindings()
     const converge = vi.fn(async () => ({ ok: true as const, sessionId: 's' }))
-    const c = createForgeChannels({ store, now: () => NOW, converge })
+    const c = createForgeChannels(forgeDeps({ converge }))
 
     const r = (await c.converge({
       id: order.id,
@@ -1157,28 +1217,48 @@ describe('foundry:order.converge — settling everything in one submit', () => {
     expect(saved?.openQuestions[0].answer).toBeNull()
     expect(saved?.redTeam.find((f) => f.id === 'RT-2')?.status).toBe('open')
   })
-})
+}
 
 describe('free text reaches the architect', () => {
+  describe('intake', intakeTests)
+  describe('other turns and empty text', otherTurnsAndEmptyTextTests)
+})
+
+async function withFinding() {
+  const seed = (await channels().create({
+    source: { kind: 'typed', text: 'x' },
+    repoPaths: [repo],
+  })) as OrderView
+  expect(seed.order.redTeam.length).toBeGreaterThan(0)
+  return seed.order
+}
+
+function intakeTests() {
   it('goes to intake rather than nowhere', async () => {
     const seed = (await channels().create({
       source: { kind: 'typed', text: 'x' },
       repoPaths: [repo],
     })) as OrderView
     const converge = vi.fn(async () => ({ ok: true as const, sessionId: 's' }))
-    const c = createForgeChannels({ store, now: () => NOW, converge })
+    const c = createForgeChannels(forgeDeps({ converge }))
 
     await c.turn({ id: seed.order.id, message: 'the second unit is not needed' })
-    expect(converge).toHaveBeenCalledWith(expect.anything(), 'the second unit is not needed')
+    expect(converge).toHaveBeenCalledWith(
+      expect.anything(),
+      'the second unit is not needed',
+      expect.any(Function)
+    )
   })
+}
 
+function otherTurnsAndEmptyTextTests() {
   it('leaves striking an assumption and answering a question alone', async () => {
     const seed = (await channels().create({
       source: { kind: 'typed', text: 'x' },
       repoPaths: [repo],
     })) as OrderView
     const converge = vi.fn(async () => ({ ok: true as const, sessionId: 's' }))
-    const c = createForgeChannels({ store, now: () => NOW, converge })
+    const c = createForgeChannels(forgeDeps({ converge }))
 
     await c.turn({ id: seed.order.id, strike: seed.order.assumptions[0]?.id ?? 'A-1' })
     expect(converge).not.toHaveBeenCalled()
@@ -1190,28 +1270,48 @@ describe('free text reaches the architect', () => {
       repoPaths: [repo],
     })) as OrderView
     const converge = vi.fn(async () => ({ ok: true as const, sessionId: 's' }))
-    const c = createForgeChannels({ store, now: () => NOW, converge })
+    const c = createForgeChannels(forgeDeps({ converge }))
 
     await c.turn({ id: seed.order.id, message: '   ' })
     expect(converge).not.toHaveBeenCalled()
   })
-})
+}
 
 describe('clearing an adversarial finding — the other thing that blocked the gate', () => {
-  async function withFinding() {
-    const seed = (await channels().create({
-      source: { kind: 'typed', text: 'x' },
-      repoPaths: [repo],
-    })) as OrderView
-    expect(seed.order.redTeam.length).toBeGreaterThan(0)
-    return seed.order
-  }
+  describe('fixing by decree and accepting', fixingByDecreeAndAcceptingTests)
+  describe('reasons and records', reasonsAndRecordsTests)
+  describe('unblocking compile', unblockingCompileTests)
+})
 
+/** A draft with one criterion whose proof is a command that does not exist. */
+async function withCriterion() {
+  const seed = (await channels().create({
+    source: { kind: 'typed', text: 'x' },
+    repoPaths: [repo],
+  })) as OrderView
+  const order = seed.order
+  const withAc: WorkOrder = {
+    ...order,
+    acceptance: [
+      {
+        id: 'AC-1',
+        statement: 'the row does not clip its last glyph',
+        priority: 'P0',
+        verify: { kind: 'screenshot', target: 'the terminal row' },
+        unverifiable: null,
+      },
+    ],
+  }
+  await store.save(withAc)
+  return withAc
+}
+
+function fixingByDecreeAndAcceptingTests() {
   // Fixing one is the architect's, told how: an operator "Fixed" with nothing
   // behind it cleared the gate without changing the order.
   it('refuses to mark one fixed by decree', async () => {
     const o = await withFinding()
-    const r = (await channels().turn({
+    const r = (await sendThroughSchema('foundry:order.turn', {
       id: o.id,
       finding: { id: o.redTeam[0].id, decision: 'resolved' },
     })) as { error?: string }
@@ -1230,7 +1330,9 @@ describe('clearing an adversarial finding — the other thing that blocked the g
       reason: 'the risk is priced in',
     })
   })
+}
 
+function reasonsAndRecordsTests() {
   it('refuses to accept one without a reason — a shrug is not a decision', async () => {
     const o = await withFinding()
     const r = (await channels().turn({
@@ -1251,7 +1353,9 @@ describe('clearing an adversarial finding — the other thing that blocked the g
     expect(ledger).toContain('finding.accepted')
     expect(ledger).toContain('priced in')
   })
+}
 
+function unblockingCompileTests() {
   it('unblocks the compile check once every finding is cleared', async () => {
     const o = await withFinding()
     for (const finding of o.redTeam) {
@@ -1262,37 +1366,21 @@ describe('clearing an adversarial finding — the other thing that blocked the g
     }
     // The one check this used to fail for ever, because nothing could clear a
     // finding.
-    const compiled = (await channels().compile({ id: o.id, commit: false })) as {
+    const compiled = (await channels().compile(compiling(o.id, false))) as {
       compile: { failures: { check: string }[] }
     }
     expect(compiled.compile.failures.map((f) => f.check)).not.toContain('redTeam')
   })
-})
+}
 
 describe('accepting a criterion as unverifiable — the escape nothing could reach', () => {
-  /** A draft with one criterion whose proof is a command that does not exist. */
-  async function withCriterion() {
-    const seed = (await channels().create({
-      source: { kind: 'typed', text: 'x' },
-      repoPaths: [repo],
-    })) as OrderView
-    const order = seed.order
-    const withAc: WorkOrder = {
-      ...order,
-      acceptance: [
-        {
-          id: 'AC-1',
-          statement: 'the row does not clip its last glyph',
-          priority: 'P0',
-          verify: { kind: 'screenshot', target: 'the terminal row' },
-          unverifiable: null,
-        },
-      ],
-    }
-    await store.save(withAc)
-    return withAc
-  }
+  describe('recording the acceptance', recordingTheAcceptanceTests)
+  describe('refused acceptances', refusedAcceptancesTests)
+  describe('who accepted', whoAcceptedTests)
+  describe('the falsifiable check', theFalsifiableCheckTests)
+})
 
+function recordingTheAcceptanceTests() {
   it('records the acceptance on the criterion, with the reason', async () => {
     const o = await withCriterion()
     const r = (await channels().turn({
@@ -1314,7 +1402,9 @@ describe('accepting a criterion as unverifiable — the escape nothing could rea
     })) as OrderView
     expect(r.changed).toContain('acceptance')
   })
+}
 
+function refusedAcceptancesTests() {
   it('refuses one without a reason — the same shrug the finding refuses', async () => {
     const o = await withCriterion()
     const r = (await channels().turn({
@@ -1333,7 +1423,9 @@ describe('accepting a criterion as unverifiable — the escape nothing could rea
     })) as OrderView & { error: string }
     expect(r.error).toMatch(/No criterion AC-9/)
   })
+}
 
+function whoAcceptedTests() {
   it('records who accepted it and why', async () => {
     const o = await withCriterion()
     await channels().turn({
@@ -1344,37 +1436,31 @@ describe('accepting a criterion as unverifiable — the escape nothing could rea
     expect(ledger).toContain('criterion.unverifiable')
     expect(ledger).toContain('no display in this environment')
   })
+}
 
+/** The failure an operator meets: a unit changes a file a person looks at, and no criterion asks
+ * for a picture of it. The other half of this check — a criterion with no proof at all —
+ * cannot survive the schema, so this is the one the escape has to answer. */
+function blockedOnAPicture(o: WorkOrder): WorkOrder {
+  const proof = { kind: 'command' as const, command: 'npm test', assert: 'ok' }
+  const unit = builderUnit('U-1', {
+    title: 'redraw the row',
+    satisfies: ['AC-1'],
+    touches: ['src/components/Row.tsx'],
+  })
+  return {
+    ...o,
+    acceptance: [{ ...o.acceptance[0], verify: proof }],
+    plan: { ...o.plan, units: [unit] },
+  }
+}
+
+function theFalsifiableCheckTests() {
   it('clears the falsifiable check, which is the whole point of the escape', async () => {
     const o = await withCriterion()
-    // The failure an operator actually meets: a unit changes a file a person
-    // looks at, and no criterion asks for a picture of it. The other half of
-    // this check — a criterion with no proof at all — cannot survive the
-    // schema, so this is the one the escape has to answer.
-    const blocked: WorkOrder = {
-      ...o,
-      acceptance: [
-        { ...o.acceptance[0], verify: { kind: 'command', command: 'npm test', assert: 'ok' } },
-      ],
-      plan: {
-        ...o.plan,
-        units: [
-          {
-            id: 'U-1',
-            title: 'redraw the row',
-            role: 'builder',
-            lane: 1,
-            dependsOn: [],
-            satisfies: ['AC-1'],
-            touches: ['src/components/Row.tsx'],
-            verify: [],
-          },
-        ],
-      },
-    }
-    await store.save(blocked)
+    await store.save(blockedOnAPicture(o))
 
-    const before = (await channels().compile({ id: o.id, commit: false })) as {
+    const before = (await channels().compile(compiling(o.id, false))) as {
       compile: { failures: { check: string }[] }
     }
     expect(before.compile.failures.map((f) => f.check)).toContain('verifiable')
@@ -1384,14 +1470,26 @@ describe('accepting a criterion as unverifiable — the escape nothing could rea
       unverifiable: { criterionId: 'AC-1', reason: 'there is no display in this environment' },
     })
 
-    const after = (await channels().compile({ id: o.id, commit: false })) as {
+    const after = (await channels().compile(compiling(o.id, false))) as {
       compile: { failures: { check: string }[] }
     }
     expect(after.compile.failures.map((f) => f.check)).not.toContain('verifiable')
   })
-})
+}
 
 describe('turning a write-back off for one order (FR-062)', () => {
+  describe('choosing', forgeChannelsChoosingTests)
+  describe('recording, refusing and unknown orders', recordingRefusingAndUnknownOrdersTests)
+})
+
+async function seed(): Promise<OrderView> {
+  return (await channels().create({
+    source: { kind: 'typed', text: 'x' },
+    repoPaths: [repo],
+  })) as OrderView
+}
+
+function forgeChannelsChoosingTests() {
   it('keeps what the operator chose', async () => {
     const seed = (await channels().create({
       source: { kind: 'typed', text: 'x' },
@@ -1414,7 +1512,9 @@ describe('turning a write-back off for one order (FR-062)', () => {
     const r = (await channels().setWriteBack({ id: seed.order.id, writeBack: [] })) as OrderView
     expect(r.order.writeBack).toEqual([])
   })
+}
 
+function recordingRefusingAndUnknownOrdersTests() {
   it('records the choice, and says what it means when it is nothing', async () => {
     const seed = (await channels().create({
       source: { kind: 'typed', text: 'x' },
@@ -1431,9 +1531,12 @@ describe('turning a write-back off for one order (FR-062)', () => {
       source: { kind: 'typed', text: 'x' },
       repoPaths: [repo],
     })) as OrderView
-    expect(await channels().setWriteBack({ id: seed.order.id, writeBack: ['everything'] })).toEqual(
-      { error: 'Malformed request.' }
-    )
+    expect(
+      await sendThroughSchema('foundry:order.writeBack', {
+        id: seed.order.id,
+        writeBack: ['everything'],
+      })
+    ).toEqual({ error: 'Malformed request.' })
   })
 
   it('reports an order it cannot find', async () => {
@@ -1441,18 +1544,25 @@ describe('turning a write-back off for one order (FR-062)', () => {
       error: 'No order WO-nope.',
     })
   })
-})
+}
 
 // The configured budgets were a default the operator could not see or change
 // on any one order, and the architect could replace them. They are set here.
 describe('setting one order’s budgets', () => {
-  async function seed(): Promise<OrderView> {
-    return (await channels().create({
-      source: { kind: 'typed', text: 'x' },
-      repoPaths: [repo],
-    })) as OrderView
-  }
+  describe('keeping the choice', keepingTheChoiceTests)
+  describe('recording and zero limits', recordingAndZeroLimitsTests)
+  describe('non-drafts and unknown budget orders', nonDraftsAndUnknownBudgetOrdersTests)
+})
 
+async function seededWith(deps: Partial<Parameters<typeof createForgeChannels>[0]>) {
+  const c = createForgeChannels(forgeDeps({ ...deps }))
+  return (await c.create({
+    source: { kind: 'typed', text: 'change the session refresh' },
+    repoPaths: [repo],
+  })) as OrderView
+}
+
+function keepingTheChoiceTests() {
   it('keeps what the operator chose, including no limit, and leaves tokens alone', async () => {
     const { order } = await seed()
     const r = (await channels().setBudgets({
@@ -1468,13 +1578,15 @@ describe('setting one order’s budgets', () => {
   it('refuses a files budget', async () => {
     const { order } = await seed()
     expect(
-      await channels().setBudgets({
+      await sendThroughSchema('foundry:order.budgets', {
         id: order.id,
         budgets: { agents: 3, wallClockMinutes: 45, filesTouched: 25 },
       })
     ).toEqual({ error: 'Malformed request.' })
   })
+}
 
+function recordingAndZeroLimitsTests() {
   it('records the choice in words', async () => {
     const { order } = await seed()
     await channels().setBudgets({
@@ -1489,13 +1601,15 @@ describe('setting one order’s budgets', () => {
   it('refuses a limit of zero', async () => {
     const { order } = await seed()
     expect(
-      await channels().setBudgets({
+      await sendThroughSchema('foundry:order.budgets', {
         id: order.id,
         budgets: { agents: 0, wallClockMinutes: 45 },
       })
     ).toEqual({ error: 'Malformed request.' })
   })
+}
 
+function nonDraftsAndUnknownBudgetOrdersTests() {
   // A running order's budgets change at its budget gate, where the run is
   // resumed against them; changed here, nothing would read them until then.
   it('refuses an order that is no longer a draft', async () => {
@@ -1516,7 +1630,7 @@ describe('setting one order’s budgets', () => {
       })
     ).toEqual({ error: 'No order WO-nope.' })
   })
-})
+}
 
 // A setting that reaches nothing is a control the operator can move while the
 // factory ignores it. Both of these were registered and read by nobody: every
@@ -1524,40 +1638,55 @@ describe('setting one order’s budgets', () => {
 // the operator declared never made it onto an order's risk.
 
 describe('what configuration a new order starts with', () => {
-  async function seeded(deps: Partial<Parameters<typeof createForgeChannels>[0]>) {
-    const c = createForgeChannels({ store, now: () => NOW, ...deps })
-    return (await c.create({
-      source: { kind: 'typed', text: 'change the session refresh' },
-      repoPaths: [repo],
-    })) as OrderView
-  }
+  describe('configured budgets', configuredBudgetsTests)
+  describe('reading every order', readingEveryOrderTests)
+  describe('critical paths', criticalPathsTests)
+})
 
+const DESCRIPTION = [
+  '# Summary',
+  'Make all text in the application red',
+  '',
+  '# Acceptance Criteria',
+  '- [ ] All text in the application is red',
+  '- [ ] The heading is red too',
+].join('\n')
+const issue = () =>
+  vi.fn(async () => ({
+    key: 'TAV-14',
+    title: 'Make all text in the application red',
+    description: DESCRIPTION,
+    url: 'https://linear.app/x/TAV-14',
+    branchName: null,
+  }))
+
+function configuredBudgetsTests() {
   it('takes the budgets the operator configured (FR-030)', async () => {
-    const r = await seeded({
+    const r = await seededWith({
       budgetDefaults: () => ({ agents: 1, wallClockMinutes: 10 }),
     })
     expect(r.order.budgets).toMatchObject({ agents: 1, wallClockMinutes: 10 })
   })
 
   it('takes a configured budget of no limit', async () => {
-    const r = await seeded({
+    const r = await seededWith({
       budgetDefaults: () => ({ agents: null, wallClockMinutes: 10 }),
     })
     expect(r.order.budgets).toMatchObject({ agents: null, wallClockMinutes: 10 })
   })
 
   it('falls back to the schema defaults when nothing is configured', async () => {
-    const r = await seeded({})
+    const r = await seededWith({})
     expect(r.order.budgets).toMatchObject({ agents: 3, wallClockMinutes: 45 })
   })
+}
 
+function readingEveryOrderTests() {
   it('reads the budgets on every order, not once when the extension started', async () => {
     let agents = 1
-    const c = createForgeChannels({
-      store,
-      now: () => NOW,
-      budgetDefaults: () => ({ agents, wallClockMinutes: 45 }),
-    })
+    const c = createForgeChannels(
+      forgeDeps({ budgetDefaults: () => ({ agents, wallClockMinutes: 45 }) })
+    )
     const first = (await c.create({
       source: { kind: 'typed', text: 'first' },
       repoPaths: [repo],
@@ -1570,17 +1699,27 @@ describe('what configuration a new order starts with', () => {
     expect(first.order.budgets.agents).toBe(1)
     expect(second.order.budgets.agents).toBe(5)
   })
+}
 
+function criticalPathsTests() {
   it("carries the operator's declared critical paths onto the order's risk (FR-043)", async () => {
-    const r = await seeded({ criticalPaths: () => ['src/main/auth/**', 'src/main/billing/**'] })
+    const r = await seededWith({ criticalPaths: () => ['src/main/auth/**', 'src/main/billing/**'] })
     expect(r.order.risk.criticalPaths).toEqual(['src/main/auth/**', 'src/main/billing/**'])
   })
 
+  it("reads the critical paths of the order's repositories, a workspace-scoped list", async () => {
+    const byRepository: Record<string, string[]> = { [repo]: ['src/main/auth/**'] }
+    const r = await seededWith({
+      criticalPaths: (repoPaths) => repoPaths.flatMap((path) => byRepository[path] ?? []),
+    })
+    expect(r.order.risk.criticalPaths).toEqual(['src/main/auth/**'])
+  })
+
   it('declares none when the operator declared none — never inferred', async () => {
-    const r = await seeded({})
+    const r = await seededWith({})
     expect(r.order.risk.criticalPaths).toEqual([])
   })
-})
+}
 
 // A ticket that states its acceptance criteria, taken at its word. The
 // description arrived whole in `intent.problem` and nothing read it, so an
@@ -1588,24 +1727,11 @@ describe('what configuration a new order starts with', () => {
 // Criteria" opened saying "No criteria yet" to the person who had just
 // written them.
 describe('an order seeded from a ticket that states its criteria', () => {
-  const DESCRIPTION = [
-    '# Summary',
-    'Make all text in the application red',
-    '',
-    '# Acceptance Criteria',
-    '- [ ] All text in the application is red',
-    '- [ ] The heading is red too',
-  ].join('\n')
+  describe('stated criteria', statedCriteriaTests)
+  describe('nothing stated', forgeChannelsNothingStatedTests)
+})
 
-  const issue = () =>
-    vi.fn(async () => ({
-      key: 'TAV-14',
-      title: 'Make all text in the application red',
-      description: DESCRIPTION,
-      url: 'https://linear.app/x/TAV-14',
-      branchName: null,
-    }))
-
+function statedCriteriaTests() {
   it('starts from the criteria the ticket already stated', async () => {
     const r = (await channels(issue()).create({
       source: { kind: 'tracker', tracker: 'linear', key: 'TAV-14' },
@@ -1637,7 +1763,9 @@ describe('an order seeded from a ticket that states its criteria', () => {
     expect(r.order.intent.problem).toContain('# Dev Hints'.slice(0, 1))
     expect(r.order.intent.problem).toContain('# Summary')
   })
+}
 
+function forgeChannelsNothingStatedTests() {
   it('takes nothing from a ticket that states nothing', async () => {
     const bare = vi.fn(async () => ({
       key: 'TAV-15',
@@ -1652,7 +1780,7 @@ describe('an order seeded from a ticket that states its criteria', () => {
     })) as OrderView
     expect(r.order.acceptance).toEqual([])
   })
-})
+}
 
 async function drafted() {
   return channels().create({
@@ -1670,29 +1798,10 @@ async function completeOrder(): Promise<WorkOrder> {
     ...r.order,
     intent: { problem: 'p', outcome: 'rows render fully', nonGoals: ['scrollbars'] },
     risk: { grade: 'P2', triggers: [], blastRadius: ['src/'], criticalPaths: [] },
-    acceptance: [
-      {
-        id: 'AC-1',
-        statement: 'a full-width row renders its final glyph',
-        priority: 'P1',
-        verify: { kind: 'test', command: 'npm test', assert: 'exit_code == 0' },
-        unverifiable: null,
-      },
-    ],
+    acceptance: [testCriterion('AC-1', { statement: 'a full-width row renders its final glyph' })],
     plan: {
       ...r.order.plan,
-      units: [
-        {
-          id: 'U-1',
-          title: 'widen',
-          role: 'builder',
-          lane: 1,
-          dependsOn: [],
-          satisfies: ['AC-1'],
-          touches: ['src/a.ts'],
-          verify: [],
-        },
-      ],
+      units: [builderUnit('U-1', { title: 'widen', satisfies: ['AC-1'], touches: ['src/a.ts'] })],
     },
     redTeam: r.order.redTeam.map((f) => ({ ...f, status: 'resolved' as const })),
   }
@@ -1701,9 +1810,14 @@ async function completeOrder(): Promise<WorkOrder> {
 }
 
 describe('the backend facts every Forge response carries', () => {
+  describe('compile and converge', compileAndConvergeTests)
+  describe('who agreed', whoAgreedTests)
+})
+
+function compileAndConvergeTests() {
   it('carries loop, agreed and turnEndedAt on compile, alongside intake', async () => {
     const seed = await drafted()
-    const r = (await channels().compile({ id: seed.order.id, commit: false })) as OrderView & {
+    const r = (await channels().compile(compiling(seed.order.id, false))) as OrderView & {
       loop: { rounds: unknown[]; heldAt: null; exhausted: boolean }
       agreed: unknown
       turnEndedAt: string | null
@@ -1715,11 +1829,9 @@ describe('the backend facts every Forge response carries', () => {
 
   it('carries them on a running converge answer too', async () => {
     const seed = await drafted()
-    const c = createForgeChannels({
-      store,
-      now: () => NOW,
-      converge: async () => ({ ok: true as const, sessionId: 'sess-arch' }),
-    })
+    const c = createForgeChannels(
+      forgeDeps({ converge: async () => ({ ok: true as const, sessionId: 'sess-arch' }) })
+    )
     const r = (await c.converge({ id: seed.order.id, message: 'go' })) as OrderView & {
       loop: unknown
       agreed: unknown
@@ -1729,21 +1841,23 @@ describe('the backend facts every Forge response carries', () => {
     expect(r.agreed).toBeNull()
     expect(r.turnEndedAt).toBeNull()
   })
+}
 
+function whoAgreedTests() {
   it('says who agreed the order once it is agreed', async () => {
     const order = await completeOrder()
-    const r = (await channels().compile({ id: order.id, commit: true })) as OrderView & {
+    const r = (await channels().compile(compiling(order.id, true))) as OrderView & {
       agreed: { at: string; by: string } | null
     }
     expect(r.compile.ok).toBe(true)
     expect(r.agreed).toEqual({ at: NOW, by: 'you' })
   })
-})
+}
 
 describe('foundry:order.compile — who agrees', () => {
   it('records the operator even when a caller names the rule, since only a person hands off', async () => {
     const order = await completeOrder()
-    const r = (await channels().compile({
+    const r = (await sendThroughSchema('foundry:order.compile', {
       id: order.id,
       commit: true,
       actor: 'rule:forge',
@@ -1758,7 +1872,7 @@ describe('foundry:order.compile — who agrees', () => {
 
   it('defaults to the operator, with the plain reason', async () => {
     const order = await completeOrder()
-    await channels().compile({ id: order.id, commit: true })
+    await channels().compile(compiling(order.id, true))
 
     const entries = await store.entries(order.id)
     const agreedEntry = entries.find((e) => e.action === 'order.agreed')
@@ -1768,6 +1882,11 @@ describe('foundry:order.compile — who agrees', () => {
 })
 
 describe('foundry:order.recipe', () => {
+  describe('choosing', choosingARecipeTests)
+  describe('refusals', recipeRefusalsTests)
+})
+
+function choosingARecipeTests() {
   it('sets the recipe and records who chose it', async () => {
     const seed = await drafted()
     const c = channels()
@@ -1790,7 +1909,9 @@ describe('foundry:order.recipe', () => {
     const last = entries[entries.length - 1]
     expect(last.reason).toBe('the proposal')
   })
+}
 
+function recipeRefusalsTests() {
   it('refuses on anything but a draft', async () => {
     const seed = await drafted()
     const c = channels()
@@ -1798,13 +1919,19 @@ describe('foundry:order.recipe', () => {
     const r = (await c.recipe({ id: seed.order.id, recipe: 'direct' })) as { error?: string }
     expect(r.error).toBe('Only a draft can have its shape chosen; this order is agreed.')
   })
-})
+
+  it('refuses an order it has no record of', async () => {
+    expect(await channels().recipe({ id: 'WO-nope', recipe: 'direct' })).toEqual({
+      error: 'No order WO-nope.',
+    })
+  })
+}
 
 describe('foundry:order.hold', () => {
   it('records a hold and releases it, calling onReleased only on release', async () => {
     const seed = await drafted()
     const onReleased = vi.fn()
-    const c = createForgeChannels({ store, now: () => NOW, onReleased })
+    const c = createForgeChannels(forgeDeps({ onReleased }))
 
     await c.hold({ id: seed.order.id, held: true })
     expect(onReleased).not.toHaveBeenCalled()
@@ -1823,3 +1950,69 @@ describe('foundry:order.hold', () => {
     expect(r.error).toBe('No order WO-nope.')
   })
 })
+
+// An order made by mistake used to stay on the list for good. Discarding marks
+// it rather than deleting it, and refuses one whose agents are still working.
+describe('foundry:order.cancel', () => {
+  describe('discarding a draft', discardingADraftTests)
+  describe('an order already cancelled', alreadyCancelledTests)
+  describe('what it refuses', whatCancelRefusesTests)
+})
+
+function discardingADraftTests() {
+  it('marks the order cancelled, records why, and takes it off the list', async () => {
+    const seed = await drafted()
+    const r = (await sendThroughSchema('foundry:order.cancel', {
+      id: seed.order.id,
+      reason: 'made by mistake',
+    })) as OrderView
+    expect(r.order.status).toBe('cancelled')
+    expect((await store.load(seed.order.id))?.status).toBe('cancelled')
+    const last = (await store.entries(seed.order.id)).at(-1)
+    expect(last).toMatchObject({
+      actor: 'operator',
+      action: 'order.cancelled',
+      reason: 'made by mistake',
+    })
+    const listed = (await channels().list()) as { orders: { id: string }[] }
+    expect(listed.orders.map((row) => row.id)).not.toContain(seed.order.id)
+  })
+
+  it('says the operator discarded it when no reason is given', async () => {
+    const seed = await drafted()
+    await sendThroughSchema('foundry:order.cancel', { id: seed.order.id })
+    const last = (await store.entries(seed.order.id)).at(-1)
+    expect(last?.reason).toBe('Discarded by the operator.')
+  })
+}
+
+function alreadyCancelledTests() {
+  it('leaves an order already cancelled as it is, recording nothing more', async () => {
+    const seed = await drafted()
+    await sendThroughSchema('foundry:order.cancel', { id: seed.order.id })
+    const before = (await store.entries(seed.order.id)).length
+    const r = (await sendThroughSchema('foundry:order.cancel', { id: seed.order.id })) as OrderView
+    expect(r.order.status).toBe('cancelled')
+    expect(await store.entries(seed.order.id)).toHaveLength(before)
+  })
+}
+
+function whatCancelRefusesTests() {
+  it('refuses a running order, sending the operator to its gate', async () => {
+    const seed = await drafted()
+    await store.save({ ...seed.order, status: 'running' })
+    const r = (await sendThroughSchema('foundry:order.cancel', { id: seed.order.id })) as {
+      error: string
+    }
+    expect(r.error).toBe(
+      `${seed.order.id} is running. Stop it at its gate before discarding it — its agents still have work in their worktrees.`
+    )
+    expect((await store.load(seed.order.id))?.status).toBe('running')
+  })
+
+  it('reports an order it cannot find', async () => {
+    expect(await sendThroughSchema('foundry:order.cancel', { id: 'WO-nope' })).toEqual({
+      error: 'No order WO-nope.',
+    })
+  })
+}

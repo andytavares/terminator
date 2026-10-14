@@ -1,39 +1,18 @@
-import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll } from 'vitest'
-import { PGlite } from '@electric-sql/pglite'
+import { describe, it, expect, beforeEach } from 'vitest'
+import { DatabaseSync } from 'node:sqlite'
 import { wrapDb } from '../../../../src/main/db/index'
-import { applyTaskVaultSchema, applyTaskVaultMigrations } from '../../src/vault/db'
+import { applyTaskVaultSchema } from '../../src/vault/db'
 import {
   ensureNextOccurrence,
   backfillRecurringTasks,
 } from '../../src/vault/ensure-next-occurrence'
-import type { ExtensionDB } from '../../../../src/main/extensions/api'
+import type { ExtensionDB } from '@terminator/extension-sdk'
 
-let pg: PGlite
 let db: ExtensionDB
 
-let tables: string
-
-beforeAll(async () => {
-  pg = new PGlite()
-  await pg.waitReady
-  db = wrapDb(pg)
-  await applyTaskVaultSchema(db)
-  const { rows } = await pg.query<{ names: string }>(
-    "SELECT string_agg(quote_ident(tablename), ', ') AS names FROM pg_tables WHERE schemaname = 'public'"
-  )
-  tables = rows[0].names
-})
-
-afterAll(async () => {
-  await pg.close()
-})
-
 beforeEach(async () => {
-  await applyTaskVaultMigrations(db)
-})
-
-afterEach(async () => {
-  await pg.exec(`TRUNCATE ${tables} RESTART IDENTITY CASCADE`)
+  db = wrapDb(new DatabaseSync(':memory:'))
+  await applyTaskVaultSchema(db)
 })
 
 let _taskCounter = 0
@@ -62,44 +41,60 @@ interface TaskInput {
   recurrence_completed_count?: number | null
 }
 
+/** Column defaults for a seeded task; created_at and updated_at are set at insert time. */
+const TASK_DEFAULTS: Record<string, unknown> = {
+  text: 'Test task',
+  status: 'open',
+  project_id: null,
+  context: null,
+  area_id: null,
+  due_date: null,
+  source: 'daily',
+  source_ref: null,
+  recurrence_rule: null,
+  recurrence_template_id: null,
+  recurrence_notify_at: null,
+  metadata: '{}',
+  terminator_links: '[]',
+  recurrence_end_type: null,
+  recurrence_end_date: null,
+  recurrence_end_count: null,
+  recurrence_completed_count: null,
+}
+
 async function insertTask(input: TaskInput = {}): Promise<string> {
   const id = input.id ?? makeId()
   const now = new Date().toISOString()
+  const given = Object.entries(input).filter(([, value]) => value != null)
+  const row = {
+    ...TASK_DEFAULTS,
+    ...Object.fromEntries(given),
+    id,
+    created_at: now,
+    updated_at: now,
+  }
+  const columns = Object.keys(row)
   await db.run(
-    `INSERT INTO tasks
-       (id, text, status, project_id, context, area_id, due_date,
-        source, source_ref, recurrence_rule, recurrence_template_id,
-        recurrence_notify_at, metadata, terminator_links, created_at, updated_at,
-        recurrence_end_type, recurrence_end_date, recurrence_end_count,
-        recurrence_completed_count)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-    [
-      id,
-      input.text ?? 'Test task',
-      input.status ?? 'open',
-      input.project_id ?? null,
-      input.context ?? null,
-      input.area_id ?? null,
-      input.due_date ?? null,
-      input.source ?? 'daily',
-      input.source_ref ?? null,
-      input.recurrence_rule ?? null,
-      input.recurrence_template_id ?? null,
-      input.recurrence_notify_at ?? null,
-      input.metadata ?? '{}',
-      input.terminator_links ?? '[]',
-      now,
-      now,
-      input.recurrence_end_type ?? null,
-      input.recurrence_end_date ?? null,
-      input.recurrence_end_count ?? null,
-      input.recurrence_completed_count ?? null,
-    ]
+    `INSERT INTO tasks (${columns.join(', ')}) VALUES (${columns.map(() => '?').join(',')})`,
+    Object.values(row)
   )
   return id
 }
 
-describe('ensureNextOccurrence', () => {
+describe('ensureNextOccurrence', ensureNextOccurrenceTests)
+describe('backfillRecurringTasks', backfillRecurringTasksTests)
+
+function ensureNextOccurrenceTests() {
+  describe('not recurring', ensureNextOccurrenceNotRecurringTests)
+  describe('spawning', ensureNextOccurrenceSpawningTests)
+  describe('month end', ensureNextOccurrenceMonthEndTests)
+  describe('sources', ensureNextOccurrenceSourcesTests)
+  describe('idempotence and templates', ensureNextOccurrenceIdempotenceTemplatesTests)
+  describe('count limits', ensureNextOccurrenceCountLimitsTests)
+  describe('date limits', ensureNextOccurrenceDateLimitsTests)
+}
+
+function ensureNextOccurrenceNotRecurringTests() {
   it('returns null for a non-recurring task', async () => {
     const id = await insertTask({ due_date: '2026-01-01' })
     expect(await ensureNextOccurrence(db, id)).toBeNull()
@@ -110,6 +105,14 @@ describe('ensureNextOccurrence', () => {
     expect(await ensureNextOccurrence(db, id)).toBeNull()
   })
 
+  it('adds no task after a due date typed as a word', async () => {
+    const id = await insertTask({ recurrence_rule: 'daily', due_date: 'friday' })
+    expect(await ensureNextOccurrence(db, id)).toBeNull()
+    expect(await db.query(`SELECT id FROM tasks WHERE id != ?`, [id])).toEqual([])
+  })
+}
+
+function ensureNextOccurrenceSpawningTests() {
   it('creates a future instance for a daily recurring task', async () => {
     const id = await insertTask({ recurrence_rule: 'daily', due_date: '2099-03-10' })
     const newId = await ensureNextOccurrence(db, id)
@@ -123,7 +126,31 @@ describe('ensureNextOccurrence', () => {
     expect(newRow?.recurrence_template_id).toBe(id)
     expect(newRow?.recurrence_rule).toBe('daily')
   })
+}
 
+function ensureNextOccurrenceMonthEndTests() {
+  it('a series started on the 31st is due on the 31st again after February', async () => {
+    const templateId = await insertTask({ recurrence_rule: 'monthly', due_date: '2099-01-31' })
+    const february = await insertTask({
+      recurrence_rule: 'monthly',
+      due_date: '2099-02-28',
+      recurrence_template_id: templateId,
+      status: 'done',
+    })
+    const marchId = await ensureNextOccurrence(db, february)
+    const march = await db.get<{ due_date: string }>(`SELECT due_date FROM tasks WHERE id=?`, [
+      marchId!,
+    ])
+    expect(march?.due_date).toBe('2099-03-31')
+  })
+}
+
+function ensureNextOccurrenceSourcesTests() {
+  describe('other sources', ensureNextOccurrenceSourcesOtherSourcesTests)
+  describe('daily source', ensureNextOccurrenceSourcesDailySourceTests)
+}
+
+function ensureNextOccurrenceSourcesOtherSourcesTests() {
   it('inherits source and source_ref from the template task for non-daily sources', async () => {
     const id = await insertTask({
       recurrence_rule: 'daily',
@@ -140,7 +167,9 @@ describe('ensureNextOccurrence', () => {
     expect(newRow?.source).toBe('project')
     expect(newRow?.source_ref).toBe('my-project')
   })
+}
 
+function ensureNextOccurrenceSourcesDailySourceTests() {
   it('sets source_ref to nextDue for daily-source tasks', async () => {
     const id = await insertTask({
       recurrence_rule: 'daily',
@@ -158,7 +187,9 @@ describe('ensureNextOccurrence', () => {
     expect(newRow?.source).toBe('daily')
     expect(newRow?.source_ref).toBe('2099-03-11')
   })
+}
 
+function ensureNextOccurrenceIdempotenceTemplatesTests() {
   it('is idempotent — second call creates no additional instance', async () => {
     const id = await insertTask({ recurrence_rule: 'daily', due_date: '2099-03-10' })
     await ensureNextOccurrence(db, id)
@@ -184,7 +215,9 @@ describe('ensureNextOccurrence', () => {
     )
     expect(newRow?.recurrence_template_id).toBe(templateId)
   })
+}
 
+function ensureNextOccurrenceCountLimitsTests() {
   it('does not spawn when after_count limit is exhausted (column-based)', async () => {
     const id = await insertTask({
       recurrence_rule: 'daily',
@@ -208,7 +241,14 @@ describe('ensureNextOccurrence', () => {
     })
     expect(await ensureNextOccurrence(db, id)).toBeNull()
   })
+}
 
+function ensureNextOccurrenceDateLimitsTests() {
+  describe('passed dates', ensureNextOccurrenceDateLimitsPassedDatesTests)
+  describe('counts not reached', ensureNextOccurrenceDateLimitsCountsNotReachedTests)
+}
+
+function ensureNextOccurrenceDateLimitsPassedDatesTests() {
   it('does not spawn when on_date end condition has passed (column-based)', async () => {
     const id = await insertTask({
       recurrence_rule: 'daily',
@@ -230,7 +270,9 @@ describe('ensureNextOccurrence', () => {
     })
     expect(await ensureNextOccurrence(db, id)).toBeNull()
   })
+}
 
+function ensureNextOccurrenceDateLimitsCountsNotReachedTests() {
   it('still spawns when after_count limit is not yet reached', async () => {
     const id = await insertTask({
       recurrence_rule: 'daily',
@@ -241,9 +283,14 @@ describe('ensureNextOccurrence', () => {
     })
     expect(await ensureNextOccurrence(db, id)).toBeTruthy()
   })
-})
+}
 
-describe('backfillRecurringTasks', () => {
+function backfillRecurringTasksTests() {
+  describe('spawning', backfillRecurringTasksSpawningTests)
+  describe('existing instances', backfillRecurringTasksExistingInstancesTests)
+}
+
+function backfillRecurringTasksSpawningTests() {
   it('creates a future instance for a stale recurring task', async () => {
     const id = await insertTask({ recurrence_rule: 'daily', due_date: '2020-01-01' })
     await backfillRecurringTasks(db)
@@ -259,7 +306,9 @@ describe('backfillRecurringTasks', () => {
     ).length
     expect(countAfterFirst).toBeGreaterThan(0)
   })
+}
 
+function backfillRecurringTasksExistingInstancesTests() {
   it('does not spawn when a future open instance already exists', async () => {
     const id = await insertTask({ recurrence_rule: 'daily', due_date: '2020-01-01' })
     const futureId = await insertTask({
@@ -275,4 +324,4 @@ describe('backfillRecurringTasks', () => {
     )
     expect(instances).toHaveLength(0)
   })
-})
+}

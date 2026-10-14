@@ -1,6 +1,11 @@
-import * as path from 'node:path'
-import { load } from 'js-yaml'
 import { z } from 'zod'
+import {
+  checkVersion,
+  yamlFailure,
+  idMatchesFile,
+  loadYaml,
+  type ParseResult,
+} from '../recipe/yaml-file.js'
 import type { SensorDef, SensorSource } from './types.js'
 
 // Sensors are YAML, resolved on the same three rungs as a recipe, role or
@@ -10,31 +15,8 @@ import type { SensorDef, SensorSource } from './types.js'
 // Nothing here throws. A malformed file is reported by path and excluded, the
 // same contract parseRecipe/parseRole/parseRule already keep.
 
+/** @internal */
 export const SENSOR_SCHEMA_VERSION = 1
-
-export type ParseResult<T> = { ok: true; value: T } | { ok: false; reason: string }
-
-function fail(file: string, message: string): { ok: false; reason: string } {
-  return { ok: false, reason: `${file}: ${message}` }
-}
-
-function idMatchesFile(id: string, file: string): boolean {
-  return id === path.basename(file).replace(/\.ya?ml$/, '')
-}
-
-function checkVersion(value: unknown, file: string): { ok: false; reason: string } | null {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-    return fail(file, 'is not a mapping')
-  }
-  const declared = (value as { schemaVersion?: unknown }).schemaVersion
-  if (typeof declared === 'number' && declared > SENSOR_SCHEMA_VERSION) {
-    return fail(
-      file,
-      `declares schema version ${declared}; this build knows version ${SENSOR_SCHEMA_VERSION}`
-    )
-  }
-  return null
-}
 
 const EVERY_PATTERN = /^([1-9][0-9]*)(m|h)$/
 
@@ -85,21 +67,18 @@ const SensorSchema = z.object({
 })
 
 export function parseSensor(text: string, file: string): ParseResult<SensorDef> {
-  let loaded: unknown
-  try {
-    loaded = load(text)
-  } catch (error) {
-    return fail(file, `could not be read as YAML — ${(error as Error).message}`)
-  }
-  const versionProblem = checkVersion(loaded, file)
+  const loaded = loadYaml(text, file)
+  if (!loaded.ok) return loaded
+  const versionProblem = checkVersion(loaded.value, file, SENSOR_SCHEMA_VERSION)
   if (versionProblem !== null) return versionProblem
 
-  const parsed = SensorSchema.safeParse(loaded)
-  if (!parsed.success) return fail(file, parsed.error.issues.map((i) => i.message).join('; '))
+  const parsed = SensorSchema.safeParse(loaded.value)
+  if (!parsed.success)
+    return yamlFailure(file, parsed.error.issues.map((i) => i.message).join('; '))
   const sensor = parsed.data
 
   if (!idMatchesFile(sensor.id, file)) {
-    return fail(file, `declares id "${sensor.id}", which does not match the filename`)
+    return yamlFailure(file, `declares id "${sensor.id}", which does not match the filename`)
   }
 
   return {

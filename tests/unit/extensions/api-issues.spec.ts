@@ -17,8 +17,6 @@ const service = vi.hoisted(() => ({
 }))
 const store = vi.hoisted(() => ({
   listConnections: vi.fn(),
-  getLink: vi.fn(),
-  onLinkChange: vi.fn(() => () => {}),
   setLink: vi.fn(),
 }))
 
@@ -27,8 +25,6 @@ vi.mock('../../../src/main/integrations/tracker-store', () => ({
   listConnections: store.listConnections,
 }))
 vi.mock('../../../src/main/integrations/issue-link-store', () => ({
-  getLink: store.getLink,
-  onLinkChange: store.onLinkChange,
   setLink: store.setLink,
 }))
 vi.mock('electron', () => ({
@@ -53,7 +49,6 @@ async function makeApi() {
 beforeEach(() => {
   vi.clearAllMocks()
   store.setLink.mockResolvedValue(LINK)
-  store.onLinkChange.mockReturnValue(() => {})
 })
 
 describe('api.issues — delegation', () => {
@@ -68,15 +63,17 @@ describe('api.issues — delegation', () => {
     expect(result[0]).toMatchObject({ tracker: 'linear', connected: true })
   })
 
-  it('delegates listMine, search and get to the one service', async () => {
-    service.listMine.mockResolvedValue({ issues: [], failures: [] })
-    service.search.mockResolvedValue({ issues: [], failures: [] })
+  it('answers listMine, search and get with what the one service answered', async () => {
+    const mine = { issues: [], failures: [{ tracker: 'jira', error: 'not-connected' }] }
+    const found = { issues: [], failures: [] }
+    service.listMine.mockResolvedValue(mine)
+    service.search.mockResolvedValue(found)
     service.get.mockResolvedValue(null)
     const api = await makeApi()
 
-    await api.issues.listMine({ tracker: 'linear' })
-    await api.issues.search('sidebar', { limit: 5 })
-    await api.issues.get('jira', 'TAV-7', { refresh: true })
+    await expect(api.issues.listMine({ tracker: 'linear' })).resolves.toBe(mine)
+    await expect(api.issues.search('sidebar', { limit: 5 })).resolves.toBe(found)
+    await expect(api.issues.get('jira', 'TAV-7', { refresh: true })).resolves.toBeNull()
 
     expect(service.listMine).toHaveBeenCalledWith({ tracker: 'linear' })
     expect(service.search).toHaveBeenCalledWith('sidebar', { limit: 5 })
@@ -87,22 +84,6 @@ describe('api.issues — delegation', () => {
     service.comment.mockRejectedValue(new Error('no permission'))
     const api = await makeApi()
     await expect(api.issues.comment('linear', 'TAV-42', 'hi')).rejects.toThrow('no permission')
-  })
-
-  it('reads a project link synchronously', async () => {
-    store.getLink.mockReturnValue(LINK)
-    const api = await makeApi()
-    expect(api.issues.linkFor('p1')).toMatchObject({ key: 'TAV-42' })
-  })
-
-  it('subscribes to link changes and disposes cleanly', async () => {
-    const unsub = vi.fn()
-    store.onLinkChange.mockReturnValue(unsub)
-    const api = await makeApi()
-
-    const subscription = api.issues.onLinkChange(() => {})
-    subscription.dispose()
-    expect(unsub).toHaveBeenCalled()
   })
 })
 
@@ -181,9 +162,7 @@ describe('api.issues — the surface itself (FR-034)', () => {
         'connections',
         'create',
         'get',
-        'linkFor',
         'listMine',
-        'onLinkChange',
         'search',
         'states',
         'supportsCreate',
@@ -205,7 +184,7 @@ describe('api.issues — the surface itself (FR-034)', () => {
   })
 })
 
-describe('api.workspace.createProject — attaching an issue (v2.2.0)', () => {
+describe('api.workspace.addProject — attaching an issue (v2.2.0)', () => {
   it('attaches the issue the caller said the project is for', async () => {
     const workspaceStore = await import('../../../src/main/storage/workspace-store')
     vi.spyOn(workspaceStore, 'listProjects').mockReturnValue([])
@@ -214,7 +193,7 @@ describe('api.workspace.createProject — attaching an issue (v2.2.0)', () => {
     } as never)
 
     const api = await makeApi()
-    api.workspace.createProject({
+    await api.workspace.addProject({
       workspaceId: 'w1',
       name: 'n',
       worktreePath: '/wt/a',
@@ -227,7 +206,9 @@ describe('api.workspace.createProject — attaching an issue (v2.2.0)', () => {
       key: 'TAV-42',
     })
   })
+})
 
+describe('api.workspace.addProject — attaching to an existing project', () => {
   it('attaches to the existing project when one already covers that path', async () => {
     const workspaceStore = await import('../../../src/main/storage/workspace-store')
     vi.spyOn(workspaceStore, 'listProjects').mockReturnValue([
@@ -235,7 +216,7 @@ describe('api.workspace.createProject — attaching an issue (v2.2.0)', () => {
     ] as never)
 
     const api = await makeApi()
-    const result = api.workspace.createProject({
+    const result = await api.workspace.addProject({
       workspaceId: 'w1',
       name: 'n',
       worktreePath: '/wt/a',
@@ -249,7 +230,9 @@ describe('api.workspace.createProject — attaching an issue (v2.2.0)', () => {
       key: 'TAV-7',
     })
   })
+})
 
+describe('api.workspace.addProject — no issue, or a link that fails', () => {
   it('attaches nothing when no issue was named', async () => {
     const workspaceStore = await import('../../../src/main/storage/workspace-store')
     vi.spyOn(workspaceStore, 'listProjects').mockReturnValue([])
@@ -258,7 +241,7 @@ describe('api.workspace.createProject — attaching an issue (v2.2.0)', () => {
     } as never)
 
     const api = await makeApi()
-    api.workspace.createProject({ workspaceId: 'w1', name: 'n', worktreePath: '/wt/b' })
+    await api.workspace.addProject({ workspaceId: 'w1', name: 'n', worktreePath: '/wt/b' })
     expect(store.setLink).not.toHaveBeenCalled()
   })
 
@@ -271,7 +254,7 @@ describe('api.workspace.createProject — attaching an issue (v2.2.0)', () => {
     store.setLink.mockRejectedValue(new Error('read-only'))
 
     const api = await makeApi()
-    const result = api.workspace.createProject({
+    const result = await api.workspace.addProject({
       workspaceId: 'w1',
       name: 'n',
       worktreePath: '/wt/c',

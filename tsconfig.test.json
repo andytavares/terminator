@@ -1,0 +1,29 @@
+{
+  // Type-checks the core's specs, unit, integration and end-to-end
+  // (`npm run typecheck`). Playwright runs the e2e specs without checking their
+  // types, so this is the only place they are checked. The specs import from
+  // main, renderer and shared alike, so this starts from the renderer config
+  // (DOM, JSX, `@shared/*`) and adds Node and Vitest's globals. Extensions and
+  // packages type-check their own sources.
+  "extends": "./tsconfig.renderer.json",
+  "compilerOptions": {
+    "composite": false,
+    "target": "ES2022",
+    // Temporal: two unit specs import Task Vault's backend, which uses it (ADR
+    // 108). Vitest has it behind a flag; Playwright does not, so not in tests/e2e.
+    "lib": ["ES2022", "ESNext.Temporal", "DOM", "DOM.Iterable"],
+    "esModuleInterop": true,
+    // The scripts specs import .mjs; their types are inferred, not checked.
+    "allowJs": true,
+    "types": ["node", "vite/client", "vitest/globals"]
+  },
+  "include": [
+    "tests/unit/**/*",
+    "tests/integration/**/*",
+    "tests/e2e/**/*",
+    "tests/support/**/*",
+    "tests/setup.ts",
+    "tests/global-setup.ts",
+    "src/renderer/electron-api.d.ts"
+  ]
+}

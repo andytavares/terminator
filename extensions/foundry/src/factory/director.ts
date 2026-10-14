@@ -85,7 +85,6 @@ function sendToRest(world: World, nodeId: string): World {
       .map((c) => c.restSeat as number)
   )
   const seat = nearestRestSeat(world.map, tileOf(crew.x, crew.y), taken)
-  /* v8 ignore next -- a hall always has at least (crewed + 2) rest seats */
   if (seat === null) return world
   return withCrew(world, nodeId, (c) => ({
     ...c,
@@ -195,9 +194,7 @@ function applyNodeState(world: World, event: Extract<FactoryEvent, { kind: 'node
   const cleared = withVerdict(clearOpenCalls(world, event.nodeId), event)
   const fed = hasStarted(event.to) ? consumeQueued(cleared, event.nodeId) : cleared
   switch (event.to) {
-    case 'ready':
     case 'running':
-    case 'verifying':
       return withCrew(fed, event.nodeId, (crew) => {
         const seat = seatOf(world.map, event.nodeId)
         return seat === null ? crew : sendTo(crew, seat, workAnimFor(world.map, event.nodeId))
@@ -212,7 +209,6 @@ function applyNodeState(world: World, event: Extract<FactoryEvent, { kind: 'node
     case 'skipped':
     case 'blocked':
       return sendToRest(fed, event.nodeId)
-    /* v8 ignore next 3 -- exhaustive union, unreachable */
     default: {
       const never: never = event.to
       throw new Error(`unhandled node state: ${String(never)}`)
@@ -296,28 +292,8 @@ function applyRework(world: World, event: Extract<FactoryEvent, { kind: 'rework'
   const walker = sender ?? target
   if (walker === undefined) return world
 
-  const from = tileOf(walker.x, walker.y)
-  const homeStop: ErrandStop = {
-    tile: walker.goal ?? from,
-    act: 'home',
-    then: walker.then,
-    settle: walker.settle,
-  }
-  let stops: ErrandStop[]
-  if (sender !== undefined) {
-    const drop = besideSeat(world.map, event.toNodeId, from)
-    if (drop === null) return world
-    stops = [{ tile: drop, act: 'drop', nodeId: event.toNodeId }, homeStop]
-  } else {
-    const pickup = besideSeat(world.map, event.fromNodeId, from)
-    const drop = pickup === null ? null : besideSeat(world.map, event.toNodeId, pickup)
-    if (pickup === null || drop === null) return world
-    stops = [
-      { tile: pickup, act: 'pickup' },
-      { tile: drop, act: 'drop', nodeId: event.toNodeId },
-      homeStop,
-    ]
-  }
+  const stops = reworkStops(world.map, event, { walker, carried: sender !== undefined })
+  if (stops === null) return world
   return withCrew(world, walker.nodeId, (c) => ({
     ...c,
     goal: stops[0].tile,
@@ -331,25 +307,41 @@ function applyRework(world: World, event: Extract<FactoryEvent, { kind: 'rework'
   }))
 }
 
+// Where the box goes: straight to the node when it is the sender's own, else via the
+// check's station first, then home. Null when either station has nowhere to stand.
+function reworkStops(
+  map: World['map'],
+  event: Extract<FactoryEvent, { kind: 'rework' }>,
+  { walker, carried }: { walker: Crew; carried: boolean }
+): ErrandStop[] | null {
+  const from = tileOf(walker.x, walker.y)
+  const homeStop: ErrandStop = {
+    tile: walker.goal ?? from,
+    act: 'home',
+    then: walker.then,
+    settle: walker.settle,
+  }
+  if (carried) {
+    const drop = besideSeat(map, event.toNodeId, from)
+    return drop === null ? null : [{ tile: drop, act: 'drop', nodeId: event.toNodeId }, homeStop]
+  }
+  const pickup = besideSeat(map, event.fromNodeId, from)
+  const drop = pickup === null ? null : besideSeat(map, event.toNodeId, pickup)
+  if (pickup === null || drop === null) return null
+  return [
+    { tile: pickup, act: 'pickup' },
+    { tile: drop, act: 'drop', nodeId: event.toNodeId },
+    homeStop,
+  ]
+}
+
 function applyGate(world: World, event: Extract<FactoryEvent, { kind: 'gate' }>): World {
   const gatesWaiting = event.waiting
     ? world.gatesWaiting.includes(event.nodeId)
       ? world.gatesWaiting
       : [...world.gatesWaiting, event.nodeId]
     : world.gatesWaiting.filter((id) => id !== event.nodeId)
-
-  const foreman = world.crew.find((c) => c.role === 'foreman')
-  let world2 = { ...world, gatesWaiting }
-  if (foreman !== undefined) {
-    if (event.waiting) {
-      const seat = seatOf(world.map, event.nodeId)
-      if (seat !== null) world2 = withCrew(world2, foreman.nodeId, (c) => sendTo(c, seat, 'wave'))
-    } else {
-      const seat = seatOf(world.map, foreman.nodeId)
-      if (seat !== null) world2 = withCrew(world2, foreman.nodeId, (c) => sendTo(c, seat, 'idle'))
-    }
-  }
-  return world2
+  return { ...world, gatesWaiting }
 }
 
 /** A run's round advancing: the dispatch tower's own count moves on. */
@@ -368,47 +360,33 @@ function applyQueued(world: World, event: Extract<FactoryEvent, { kind: 'queued'
   return { ...world, queue: { position: event.position, behind: event.behind } }
 }
 
+/** What one kind of event does to the world. */
+type Applier<K extends FactoryEvent['kind']> = (
+  world: World,
+  event: Extract<FactoryEvent, { kind: K }>
+) => World
+
+/** Each kind of event's effect — a kind this lacks is a compile error. */
+const APPLY: { readonly [K in FactoryEvent['kind']]: Applier<K> } = {
+  'node-state': applyNodeState,
+  orphaned: applyOrphaned,
+  stranded: applyStranded,
+  tool: applyTool,
+  handoff: applyHandoff,
+  gate: applyGate,
+  rework: applyRework,
+  'ci-round': applyCiRound,
+  'ci-check': applyCiCheck,
+  queued: applyQueued,
+}
+
+function applyEvent(world: World, event: FactoryEvent): World {
+  const apply = APPLY[event.kind] as (world: World, event: FactoryEvent) => World
+  return apply(world, event)
+}
+
 export function direct(world: World, events: readonly FactoryEvent[], nowMs: number): World {
-  let next = world
-  for (const event of events) {
-    switch (event.kind) {
-      case 'node-state':
-        next = applyNodeState(next, event)
-        break
-      case 'orphaned':
-        next = applyOrphaned(next, event)
-        break
-      case 'stranded':
-        next = applyStranded(next, event)
-        break
-      case 'tool':
-        next = applyTool(next, event)
-        break
-      case 'handoff':
-        next = applyHandoff(next, event)
-        break
-      case 'gate':
-        next = applyGate(next, event)
-        break
-      case 'rework':
-        next = applyRework(next, event)
-        break
-      case 'ci-round':
-        next = applyCiRound(next, event)
-        break
-      case 'ci-check':
-        next = applyCiCheck(next, event)
-        break
-      case 'queued':
-        next = applyQueued(next, event)
-        break
-      /* v8 ignore next 3 -- exhaustive union, unreachable */
-      default: {
-        const never: never = event
-        throw new Error(`unhandled factory event: ${String(never)}`)
-      }
-    }
-  }
+  const next = events.reduce(applyEvent, world)
   // A call remembered from an earlier poll can cross the ≥1500ms threshold
   // with no new event at all — this is what makes that case reachable.
   return applyOpenCallWalks(next, nowMs)

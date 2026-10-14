@@ -1,8 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { rmSync } from 'node:fs'
 import { createSupervision, type Supervision } from '../../src/runtime/supervision.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 // What is running, what it changed, what needs looking at, and what must not
 // start yet. Assembled as one thing here because the closed branch's worst bugs
@@ -38,6 +37,7 @@ function addRun(
     phase: 'implement',
     worktreePath: '/wt/a',
     branch: 'feat/a',
+    baseBranch: null,
     terminalSessionId: 'terminal-1',
     transcriptPath: '/t.jsonl',
     startedAt: 0,
@@ -45,7 +45,7 @@ function addRun(
 }
 
 beforeEach(() => {
-  dir = mkdtempSync(join(tmpdir(), 'supervision-'))
+  dir = makeTempDir('supervision-')
   diff = { files: 1, added: 10, removed: 2 }
   changedFiles = ['src/a.ts']
 })
@@ -175,6 +175,13 @@ describe('the snapshot a surface reads', () => {
 })
 
 describe('how it reaches git', () => {
+  describe('the extension shell', theExtensionShellTests)
+  describe('the branch', supervisionTheBranchTests)
+  describe('no working copy', noWorkingCopyTests)
+  describe('runs it does not have', runsItDoesNotHaveTests)
+})
+
+function theExtensionShellTests() {
   it('goes through the extension shell when nothing else is injected', async () => {
     // `api.shell.exec` is restricted to git and gh, which is exactly the reach
     // this needs and no more.
@@ -194,7 +201,9 @@ describe('how it reaches git', () => {
     await s.measure('session-1')
     expect(calls[0]).toMatchObject({ command: 'git' })
   })
+}
 
+function supervisionTheBranchTests() {
   it('measures against the branch it was told to', async () => {
     const calls: string[][] = []
     const s = build({
@@ -208,7 +217,9 @@ describe('how it reaches git', () => {
     await s.measure('session-1')
     expect(calls[0]).toContain('develop')
   })
+}
 
+function noWorkingCopyTests() {
   it('measures nothing for a run with no working copy', async () => {
     const calls: string[][] = []
     const s = build({
@@ -223,6 +234,7 @@ describe('how it reaches git', () => {
       phase: 'implement',
       worktreePath: '',
       branch: 'feat/a',
+      baseBranch: null,
       terminalSessionId: 't',
       transcriptPath: '/t.jsonl',
       startedAt: 0,
@@ -230,7 +242,9 @@ describe('how it reaches git', () => {
     await s.measure('no-copy')
     expect(calls).toEqual([])
   })
+}
 
+function runsItDoesNotHaveTests() {
   it('ignores a measurement for a run it does not have', async () => {
     await expect(build().measure('nobody')).resolves.toBeUndefined()
   })
@@ -242,4 +256,4 @@ describe('how it reaches git', () => {
   it('does nothing for a run ending that it does not have', () => {
     expect(() => build().finish('nobody', 2_000)).not.toThrow()
   })
-})
+}

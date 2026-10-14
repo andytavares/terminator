@@ -1,8 +1,8 @@
 import { expect } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { launchApp, closeApp, workspaceRow, e2eTempDir } from './helpers'
 import type { AppHandle } from './helpers'
 
 // Shared helpers for every `tests/e2e/foundry-*.spec.ts` file. Each spec keeps
@@ -13,19 +13,20 @@ import type { AppHandle } from './helpers'
 // grow shared state of its own by accident.
 
 /** Runs `git` against the fixture repo, with any inherited GIT_* stripped so a
- *  git hook running this suite does not point every command at itself. */
-export function git(repo: string, ...args: string[]): void {
+ *  git hook running this suite does not point every command at itself, and
+ *  returns its trimmed output. */
+export function git(repo: string, ...args: string[]): string {
   const env = { ...process.env }
   delete env.GIT_DIR
   delete env.GIT_INDEX_FILE
   delete env.GIT_WORK_TREE
-  execFileSync('git', args, { cwd: repo, env })
+  return execFileSync('git', args, { cwd: repo, env, encoding: 'utf8' }).trim()
 }
 
 /** A minimal git repository with a real toolchain, exactly what every foundry
  *  spec seeds before launching the app. */
 export function makeFixtureRepo(prefix: string): string {
-  const repo = mkdtempSync(join(tmpdir(), prefix))
+  const repo = e2eTempDir(prefix)
   git(repo, 'init', '-b', 'main')
   git(repo, 'config', 'user.email', 'e2e@example.com')
   git(repo, 'config', 'user.name', 'E2E')
@@ -46,12 +47,7 @@ export function foundryChannel(
   payload: unknown = {}
 ): Promise<unknown> {
   return handle.page.evaluate(
-    ([ch, body]) =>
-      (
-        window as unknown as {
-          electronAPI: { extensionBridge: { invoke(c: string, p: unknown): Promise<unknown> } }
-        }
-      ).electronAPI.extensionBridge.invoke(ch as string, body),
+    ([ch, body]) => window.electronAPI.extensionBridge.invoke(ch as string, body),
     [channel, payload] as [string, unknown]
   )
 }
@@ -166,6 +162,18 @@ export function hasStation(handle: AppHandle, prefix: string): Promise<boolean> 
   )
 }
 
+/** Closes the app and opens it again on the same profile, with Foundry showing. Foundry
+ * reads its records from disk once, so a spec that writes them by hand restarts after,
+ * as an operator who edited them would. */
+export async function restartFoundry(handle: AppHandle, workspaceName: string): Promise<AppHandle> {
+  const userDataDir = handle.userDataDir
+  await closeApp(handle)
+  const next = await launchApp(userDataDir)
+  await expect(workspaceRow(next.page, workspaceName)).toBeVisible({ timeout: 30_000 })
+  await openFoundry(next)
+  return next
+}
+
 /** Opens the Foundry panel and waits until its view has actually rendered
  *  something — polled rather than slept, so this never races the extension's
  *  lazy activation. */
@@ -216,6 +224,50 @@ export async function openForge(handle: AppHandle): Promise<void> {
     .toMatch(/New order|Steps|All orders|STATUS WALL/)
 }
 
+/** Run in Foundry's view: whether some button's text contains `id`. */
+function orderRowListed(id: string): string {
+  return `(function () {
+        var all = document.querySelectorAll('button')
+        for (var i = 0; i < all.length; i++) {
+          if ((all[i].textContent || '').indexOf(${JSON.stringify(id)}) !== -1) return true
+        }
+        return false
+      })()`
+}
+
+/** Run in Foundry's view: clicks the first button whose text contains `id`, and says whether one did. */
+function clickOrderRow(id: string): string {
+  return `(function () {
+    var all = document.querySelectorAll('button')
+    for (var i = 0; i < all.length; i++) {
+      if ((all[i].textContent || '').indexOf(${JSON.stringify(id)}) !== -1) {
+        all[i].click()
+        return true
+      }
+    }
+    return false
+  })()`
+}
+
+/** Shows every order in the Forge, and waits until the row for `id` is among them. */
+export async function listOrdersInForge(handle: AppHandle, id: string): Promise<void> {
+  expect(await clickByName(handle, 'button', 'Forge')).toBe(true)
+  await expect
+    .poll(() => bodyText(handle), { timeout: 15_000 })
+    .toMatch(/New order|Steps|All orders/)
+  // An earlier order may already be open; get back to the list first.
+  await clickByName(handle, 'button', 'All orders')
+  await expect
+    .poll(() => inFoundry<boolean>(handle, orderRowListed(id)), { timeout: 15_000 })
+    .toBe(true)
+}
+
+/** Clicks the listed Forge row whose visible text contains `id`, opening it. */
+export async function openListedOrder(handle: AppHandle, id: string): Promise<void> {
+  const opened = await inFoundry<boolean>(handle, clickOrderRow(id))
+  expect(opened, `no row for ${id} in the Forge`).toBe(true)
+}
+
 /**
  * The launch script the terminal was told to run, and what is in it.
  *
@@ -225,7 +277,8 @@ export async function openForge(handle: AppHandle): Promise<void> {
  * scraping a screen an agent's own output may since have scrolled past.
  */
 export function launchScript(handle: AppHandle): string {
-  const dir = join(handle.userDataDir, 'foundry-runtime', 'launch')
+  // Foundry's own folder (ADR 103): <userData>/extensions/<id>/runtime.
+  const dir = join(handle.userDataDir, 'extensions', 'terminator.foundry', 'runtime', 'launch')
   const scripts = readdirSync(dir)
     .filter((name) => name.endsWith('.sh'))
     .map((name) => join(dir, name))
@@ -258,4 +311,18 @@ export async function captureFoundry(handle: AppHandle, name: string): Promise<v
     return image.toPNG().toString('base64')
   })
   writeFileSync(join(outDir, name), Buffer.from(pngBase64, 'base64'))
+}
+
+/** Creates a typed order on `repo` and returns its id; `missing` is the failure's message. */
+export async function createTypedOrder(
+  handle: AppHandle,
+  order: { repo: string; text: string; missing: string }
+): Promise<string> {
+  const created = (await foundryChannel(handle, 'foundry:order.create', {
+    source: { kind: 'typed', text: order.text },
+    repoPaths: [order.repo],
+  })) as { order?: { id: string } }
+  const id = created.order?.id as string
+  expect(id, order.missing).toBeTruthy()
+  return id
 }

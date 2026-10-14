@@ -1,6 +1,9 @@
 import React from 'react'
-import { ArrowLeft, ChevronLeft, ChevronRight, RotateCcw, X } from 'lucide-react'
+import { ArrowLeft, ChevronLeft, ChevronRight, RotateCcw, Undo2, X } from 'lucide-react'
+import { Button, IconButton } from '@terminator/extension-ui'
 import { useMergeFlowStore } from '../../stores/merge-flow.store'
+import type { ConflictFile } from '../../schemas/merge-flow.schema'
+import { choose, splitPath } from '../text'
 
 interface Props {
   onBack: () => void
@@ -14,120 +17,118 @@ interface Props {
   onExit?: () => void
 }
 
-export function ConflictHeader({
-  onBack,
-  onPrev,
-  onNext,
-  onUndo,
-  canUndo,
-  canPrev,
-  canNext,
-  onStartOver,
-  onExit,
-}: Props) {
+type MergeFile = ConflictFile
+
+/** The active conflict's number across every file, and how many conflicts there are. */
+function conflictPosition(files: MergeFile[], activeFile: number, activeBlock: number) {
+  const blocksIn = (list: MergeFile[]) => list.reduce((n, f) => n + f.blocks.length, 0)
+  const before = blocksIn(files.filter((_, i) => i < activeFile))
+  const inActive = files[activeFile]?.blocks.length ?? 0
+  const number = before + Math.min(Math.max(activeBlock, 0), inActive) + 1
+  return { number, total: blocksIn(files) }
+}
+
+function Breadcrumb(props: { filePath: string; onBack: () => void }) {
+  const { dir, name } = splitPath(props.filePath)
+  return (
+    <div className="conflict-header__breadcrumb">
+      <Button
+        variant="ghost"
+        size="sm"
+        icon={ArrowLeft}
+        onClick={props.onBack}
+        aria-label="Back to file list"
+      >
+        All files
+      </Button>
+      <span className="conflict-header__sep">/</span>
+      <span className="conflict-header__filepath">
+        <span className="conflict-header__file-dir">{dir}</span>
+        <span className="conflict-header__file-name">{name}</span>
+      </span>
+    </div>
+  )
+}
+
+function dotClass(resolved: boolean, active: boolean): string {
+  const r = choose(resolved, ' conflict-header__dot--resolved', '')
+  return `conflict-header__dot${r}${choose(active, ' conflict-header__dot--active', '')}`
+}
+
+function BlockDots(props: { file: MergeFile | undefined; activeBlock: number }) {
+  return (
+    <div className="conflict-header__dots">
+      {props.file?.blocks.map((block, i) => (
+        <span key={block.blockId} className={dotClass(block.isResolved, i === props.activeBlock)} />
+      ))}
+    </div>
+  )
+}
+
+function ConflictNav({ nav }: { nav: Props }) {
+  return (
+    <div className="conflict-header__nav">
+      <Button
+        size="sm"
+        icon={ChevronLeft}
+        onClick={nav.onPrev}
+        disabled={!nav.canPrev}
+        aria-label="Previous conflict"
+      >
+        Prev
+      </Button>
+      <Button size="sm" onClick={nav.onNext} disabled={!nav.canNext} aria-label="Next conflict">
+        Next <ChevronRight aria-hidden="true" className="tmui-button__icon" />
+      </Button>
+    </div>
+  )
+}
+
+function HeaderActions({ nav }: { nav: Props }) {
+  return (
+    <>
+      <Button
+        variant="ghost"
+        size="sm"
+        icon={Undo2}
+        onClick={nav.onUndo}
+        disabled={!nav.canUndo}
+        aria-label="Undo last decision"
+      >
+        Undo last
+      </Button>
+      {nav.onStartOver && (
+        <Button
+          variant="ghost"
+          size="sm"
+          icon={RotateCcw}
+          onClick={nav.onStartOver}
+          title="Reset all resolutions and start from scratch"
+        >
+          Start over
+        </Button>
+      )}
+      {nav.onExit && <IconButton icon={X} label="Exit merge flow" onClick={nav.onExit} />}
+    </>
+  )
+}
+
+export function ConflictHeader(props: Props) {
   const session = useMergeFlowStore((s) => s.session)
   const activeFileIndex = useMergeFlowStore((s) => s.activeFileIndex)
   const activeBlockIndex = useMergeFlowStore((s) => s.activeBlockIndex)
-
   if (!session) return null
-
   const activeFile = session.files[activeFileIndex]
-  // Compute global conflict number across all files
-  let globalNum = 1
-  let globalTotal = 0
-  for (let fi = 0; fi < session.files.length; fi++) {
-    const f = session.files[fi]
-    for (let bi = 0; bi < f.blocks.length; bi++) {
-      globalTotal++
-      if (fi < activeFileIndex || (fi === activeFileIndex && bi < activeBlockIndex)) {
-        globalNum++
-      }
-    }
-  }
-
-  const filePath = activeFile?.filePath ?? ''
-  const slashIdx = filePath.lastIndexOf('/')
-  const fileDir = slashIdx === -1 ? '' : filePath.slice(0, slashIdx + 1)
-  const fileName = slashIdx === -1 ? filePath : filePath.slice(slashIdx + 1)
-
+  const position = conflictPosition(session.files, activeFileIndex, activeBlockIndex)
   return (
     <div className="conflict-header">
-      {/* Breadcrumb */}
-      <div className="conflict-header__breadcrumb">
-        <button className="conflict-header__back" onClick={onBack} aria-label="Back to file list">
-          <ArrowLeft aria-hidden="true" /> All files
-        </button>
-        <span className="conflict-header__sep">/</span>
-        <span className="conflict-header__filepath">
-          <span className="conflict-header__file-dir">{fileDir}</span>
-          <span className="conflict-header__file-name">{fileName}</span>
-        </span>
-      </div>
-
-      {/* Dots */}
-      <div className="conflict-header__dots">
-        {activeFile?.blocks.map((block, i) => (
-          <span
-            key={block.blockId}
-            className={`conflict-header__dot${block.isResolved ? ' conflict-header__dot--resolved' : ''}${i === activeBlockIndex ? ' conflict-header__dot--active' : ''}`}
-          />
-        ))}
-      </div>
-
-      {/* Counter + navigation */}
+      <Breadcrumb filePath={activeFile?.filePath ?? ''} onBack={props.onBack} />
+      <BlockDots file={activeFile} activeBlock={activeBlockIndex} />
       <span className="conflict-header__counter">
-        Conflict {globalNum} of {globalTotal}
+        Conflict {position.number} of {position.total}
       </span>
-
-      <div className="conflict-header__nav">
-        <button
-          className="conflict-header__nav-btn"
-          onClick={onPrev}
-          disabled={!canPrev}
-          aria-label="Previous conflict"
-        >
-          <ChevronLeft aria-hidden="true" /> Prev
-        </button>
-        <button
-          className="conflict-header__nav-btn"
-          onClick={onNext}
-          disabled={!canNext}
-          aria-label="Next conflict"
-        >
-          Next <ChevronRight aria-hidden="true" />
-        </button>
-      </div>
-
-      <button
-        className="conflict-header__undo"
-        onClick={onUndo}
-        disabled={!canUndo}
-        aria-label="Undo last decision"
-      >
-        ↩ Undo last
-      </button>
-
-      {onStartOver && (
-        <button
-          className="conflict-header__start-over"
-          onClick={onStartOver}
-          aria-label="Start over"
-          title="Reset all resolutions and start from scratch"
-        >
-          <RotateCcw aria-hidden="true" /> Start over
-        </button>
-      )}
-
-      {onExit && (
-        <button
-          className="conflict-header__exit"
-          onClick={onExit}
-          aria-label="Exit merge flow"
-          title="Exit merge flow"
-        >
-          <X aria-hidden="true" />
-        </button>
-      )}
+      <ConflictNav nav={props} />
+      <HeaderActions nav={props} />
     </div>
   )
 }

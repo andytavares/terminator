@@ -1,12 +1,12 @@
 import React from 'react'
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, within } from '@testing-library/react'
 import { useSettingsStore } from '../../../../src/renderer/stores/settings.store'
 import { GlobalSettings } from '../../../../src/renderer/components/settings/GlobalSettings'
-
-vi.mock('../../../../src/renderer/stores/settings.store', () => ({
-  useSettingsStore: vi.fn(),
-}))
+import { seedStore } from '../../../support/renderer-stores'
+import { DEFAULT_GLOBAL_SETTINGS } from '../../../../src/shared/schemas/settings.schema'
+import type { GlobalSettings as GlobalSettingsValue } from '../../../../src/shared/types'
+import { installElectronApi } from '../../../support/electron-api'
 
 const mockUpdateTheme = vi.fn()
 const mockUpdateScrollback = vi.fn()
@@ -18,21 +18,16 @@ const mockUpdatePromptForName = vi.fn()
 const mockUpdateNotificationDefaultTargets = vi.fn()
 const mockUpdateNotificationOverride = vi.fn()
 
-const globalSettings = {
-  appearance: { theme: 'dark' as const },
+const globalSettings: GlobalSettingsValue = {
+  ...DEFAULT_GLOBAL_SETTINGS,
+  appearance: { theme: 'dark' },
   terminal: {
+    ...DEFAULT_GLOBAL_SETTINGS.terminal,
     scrollbackLimit: 5000,
     defaultShell: '/bin/zsh',
   },
-  git: { worktreeBaseDir: '' },
-  extensions: {},
-  ui: { hasSeenWelcome: false, showMetricsBar: false },
+  ui: { hasSeenWelcome: false, editor: '', showMetricsBar: false },
   sidebar: { staleAfterMs: 7_200_000 },
-  notifications: {
-    defaultTargets: ['system', 'center', 'toast'] as const,
-    overrides: {},
-  },
-  quickActions: { pins: [], usage: [], directUse: [], custom: [] },
 }
 
 const mockUpdateQuickActions = vi.fn()
@@ -40,7 +35,7 @@ const mockUpdateQuickActions = vi.fn()
 beforeEach(() => {
   vi.clearAllMocks()
   mockUpdateGlobal.mockResolvedValue(undefined)
-  vi.mocked(useSettingsStore).mockReturnValue({
+  seedStore(useSettingsStore, {
     globalSettings,
     updateGlobalTheme: mockUpdateTheme,
     updateScrollbackLimit: mockUpdateScrollback,
@@ -52,21 +47,15 @@ beforeEach(() => {
     updateNotificationOverride: mockUpdateNotificationOverride,
     updateQuickActions: mockUpdateQuickActions,
     workspaceSettings: new Map(),
-  } as unknown as ReturnType<typeof useSettingsStore>)
-  ;(globalThis as unknown as Record<string, unknown>).electronAPI = {
+  })
+  installElectronApi({
     settings: { updateGlobal: mockUpdateGlobal },
-  }
-})
-
-afterEach(() => {
-  delete (globalThis as unknown as Record<string, unknown>).electronAPI
+  })
 })
 
 describe('GlobalSettings', () => {
   it('shows loading when globalSettings is null', () => {
-    vi.mocked(useSettingsStore).mockReturnValue({ globalSettings: null } as unknown as ReturnType<
-      typeof useSettingsStore
-    >)
+    seedStore(useSettingsStore, { globalSettings: null })
     render(<GlobalSettings />)
     expect(screen.getByText('Loading...')).toBeTruthy()
   })
@@ -96,7 +85,9 @@ describe('GlobalSettings', () => {
     fireEvent.change(input, { target: { value: '8000' } })
     expect(mockUpdateScrollback).toHaveBeenCalledWith(8000)
   })
+})
 
+describe('GlobalSettings — does not call updateScrollbackLimit for below-minimum value', () => {
   it('does not call updateScrollbackLimit for below-minimum value', () => {
     render(<GlobalSettings />)
     const input = screen.getByDisplayValue('5000')
@@ -127,7 +118,9 @@ describe('GlobalSettings', () => {
     fireEvent.blur(shellInput)
     expect(mockUpdateGlobal).toHaveBeenCalledWith({ terminal: { defaultShell: '/bin/bash' } })
   })
+})
 
+describe('GlobalSettings — calls updateShowMetricsBar when metrics bar checkbox is toggled', () => {
   it('calls updateShowMetricsBar when metrics bar checkbox is toggled', () => {
     render(<GlobalSettings />)
     const checkbox = screen.getByRole('checkbox', { name: /show cpu/i })
@@ -154,62 +147,68 @@ describe('GlobalSettings', () => {
     fireEvent.click(checkbox)
     expect(mockUpdatePromptForName).toHaveBeenCalledWith(true)
   })
+})
 
-  describe('Notifications', () => {
-    it('renders the default target checkboxes, all checked by default', () => {
-      render(<GlobalSettings />)
-      expect(screen.getAllByRole('checkbox', { name: 'System' })[0]).toHaveProperty('checked', true)
-      expect(screen.getAllByRole('checkbox', { name: 'In-App' })[0]).toHaveProperty('checked', true)
-      expect(screen.getAllByRole('checkbox', { name: 'Toast' })[0]).toHaveProperty('checked', true)
-    })
-
-    it('unchecking a default target removes it from the array', () => {
-      render(<GlobalSettings />)
-      fireEvent.click(screen.getAllByRole('checkbox', { name: 'System' })[0])
-      expect(mockUpdateNotificationDefaultTargets).toHaveBeenCalledWith(['center', 'toast'])
-    })
-
-    it('checking an absent default target adds it back', () => {
-      vi.mocked(useSettingsStore).mockReturnValue({
-        globalSettings: {
-          ...globalSettings,
-          notifications: { defaultTargets: ['toast'], overrides: {} },
-        },
-        updateGlobalTheme: mockUpdateTheme,
-        updateScrollbackLimit: mockUpdateScrollback,
-        updateWorktreeBaseDir: mockUpdateWorktreeBaseDir,
-        updateShowMetricsBar: mockUpdateShowMetrics,
-        updateBranchExcludePatterns: mockUpdateBranchExclude,
-        updatePromptForName: mockUpdatePromptForName,
-        updateNotificationDefaultTargets: mockUpdateNotificationDefaultTargets,
-        updateNotificationOverride: mockUpdateNotificationOverride,
-      } as unknown as ReturnType<typeof useSettingsStore>)
-      render(<GlobalSettings />)
-      fireEvent.click(screen.getAllByRole('checkbox', { name: 'System' })[0])
-      expect(mockUpdateNotificationDefaultTargets).toHaveBeenCalledWith(['toast', 'system'])
-    })
-
-    it('renders a per-notification override row for each core notification kind', () => {
-      render(<GlobalSettings />)
-      expect(screen.getByText('Terminal bell (session needs attention)')).toBeTruthy()
-      expect(screen.getByText('Branch switch failed')).toBeTruthy()
-      expect(screen.getByText('Extension install failed')).toBeTruthy()
-    })
-
-    it('checking a target on a core notification override row calls updateNotificationOverride', () => {
-      render(<GlobalSettings />)
-      const row = screen.getByText('Terminal bell (session needs attention)').closest('div')!
-      const systemCheckbox = within(row.parentElement as HTMLElement).getAllByRole('checkbox')[0]
-      fireEvent.click(systemCheckbox)
-      expect(mockUpdateNotificationOverride).toHaveBeenCalledWith('terminalBell', ['system'])
-    })
-
-    it('does not show a per-extension table (extensions configure their own notifications)', () => {
-      render(<GlobalSettings />)
-      expect(screen.queryByText('Per-Extension Overrides')).toBeNull()
-    })
+describe('GlobalSettings — Notifications', () => {
+  it('renders the default target checkboxes, all checked by default', () => {
+    render(<GlobalSettings />)
+    expect(screen.getAllByRole('checkbox', { name: 'System' })[0]).toHaveProperty('checked', true)
+    expect(screen.getAllByRole('checkbox', { name: 'In-App' })[0]).toHaveProperty('checked', true)
+    expect(screen.getAllByRole('checkbox', { name: 'Toast' })[0]).toHaveProperty('checked', true)
   })
 
+  it('unchecking a default target removes it from the array', () => {
+    render(<GlobalSettings />)
+    fireEvent.click(screen.getAllByRole('checkbox', { name: 'System' })[0])
+    expect(mockUpdateNotificationDefaultTargets).toHaveBeenCalledWith(['center', 'toast'])
+  })
+})
+
+describe('GlobalSettings — Notifications — checking an absent default target adds it back', () => {
+  it('checking an absent default target adds it back', () => {
+    seedStore(useSettingsStore, {
+      globalSettings: {
+        ...globalSettings,
+        notifications: { defaultTargets: ['toast'], overrides: {} },
+      },
+      updateGlobalTheme: mockUpdateTheme,
+      updateScrollbackLimit: mockUpdateScrollback,
+      updateWorktreeBaseDir: mockUpdateWorktreeBaseDir,
+      updateShowMetricsBar: mockUpdateShowMetrics,
+      updateBranchExcludePatterns: mockUpdateBranchExclude,
+      updatePromptForName: mockUpdatePromptForName,
+      updateNotificationDefaultTargets: mockUpdateNotificationDefaultTargets,
+      updateNotificationOverride: mockUpdateNotificationOverride,
+    })
+    render(<GlobalSettings />)
+    fireEvent.click(screen.getAllByRole('checkbox', { name: 'System' })[0])
+    expect(mockUpdateNotificationDefaultTargets).toHaveBeenCalledWith(['toast', 'system'])
+  })
+
+  it('renders a per-notification override row for each core notification kind', () => {
+    render(<GlobalSettings />)
+    expect(screen.getByText('Terminal bell (session needs attention)')).toBeTruthy()
+    expect(screen.getByText('Branch switch failed')).toBeTruthy()
+    expect(screen.getByText('Extension install failed')).toBeTruthy()
+  })
+})
+
+describe('GlobalSettings — Notifications — checking a target on a core notification override row calls updateNotificationOverride', () => {
+  it('checking a target on a core notification override row calls updateNotificationOverride', () => {
+    render(<GlobalSettings />)
+    const row = screen.getByText('Terminal bell (session needs attention)').closest('div')!
+    const systemCheckbox = within(row.parentElement as HTMLElement).getAllByRole('checkbox')[0]
+    fireEvent.click(systemCheckbox)
+    expect(mockUpdateNotificationOverride).toHaveBeenCalledWith('terminalBell', ['system'])
+  })
+
+  it('does not show a per-extension table (extensions configure their own notifications)', () => {
+    render(<GlobalSettings />)
+    expect(screen.queryByText('Per-Extension Overrides')).toBeNull()
+  })
+})
+
+describe('GlobalSettings — mounts the Quick actions section', () => {
   it('mounts the Quick actions section', () => {
     render(<GlobalSettings />)
     expect(screen.getByText('Quick actions')).toBeTruthy()
@@ -217,9 +216,9 @@ describe('GlobalSettings', () => {
   })
 })
 
-describe('GlobalSettings — staleness threshold (FR-020)', () => {
-  const field = () => screen.getByLabelText('Mark sessions stale after (minutes)')
+const field = () => screen.getByLabelText('Mark sessions stale after (minutes)')
 
+describe('GlobalSettings — staleness threshold (FR-020)', () => {
   it('shows the current threshold in minutes', () => {
     render(<GlobalSettings />)
     expect((field() as HTMLInputElement).value).toBe('120')
@@ -248,7 +247,9 @@ describe('GlobalSettings — staleness threshold (FR-020)', () => {
     fireEvent.blur(field(), { target: { value: '43201' } })
     expect(mockUpdateGlobal).not.toHaveBeenCalled()
   })
+})
 
+describe('GlobalSettings — staleness threshold (FR-020) — rejects a non-numeric entry', () => {
   it('rejects a non-numeric entry', () => {
     render(<GlobalSettings />)
     fireEvent.blur(field(), { target: { value: '' } })
@@ -260,13 +261,14 @@ describe('GlobalSettings — staleness threshold (FR-020)', () => {
     fireEvent.blur(field(), { target: { value: '2.6' } })
     expect(mockUpdateGlobal).toHaveBeenCalledWith({ sidebar: { staleAfterMs: 180_000 } })
   })
+})
 
-  it('falls back to two hours when the setting is absent', () => {
-    vi.mocked(useSettingsStore).mockReturnValue({
-      globalSettings: { ...globalSettings, sidebar: undefined },
-      updateGlobalTheme: mockUpdateTheme,
-    } as unknown as ReturnType<typeof useSettingsStore>)
+describe('GlobalSettings — values left unset', () => {
+  it('keeps the default shell when the field is cleared', () => {
     render(<GlobalSettings />)
-    expect((field() as HTMLInputElement).value).toBe('120')
+    const shellInput = screen.getAllByRole('textbox')[0]
+    fireEvent.change(shellInput, { target: { value: '   ' } })
+    fireEvent.blur(shellInput)
+    expect(mockUpdateGlobal).not.toHaveBeenCalled()
   })
 })

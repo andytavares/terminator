@@ -8,6 +8,11 @@ import { forgeDefectAnswer } from '../../src/gates/act-decision.js'
 // order first, and only resume when there's a run left to resume.
 
 describe('forgeDefectAnswer', () => {
+  describe('sent back to draft', sentBackToDraftTests)
+  describe('resuming', actDecisionResumingTests)
+})
+
+function sentBackToDraftTests() {
   it('converges with every open finding when the order was sent back to draft', () => {
     const result = forgeDefectAnswer({
       order: { status: 'draft' },
@@ -29,7 +34,9 @@ describe('forgeDefectAnswer', () => {
     expect(result.kind).toBe('converge')
     expect(result.kind === 'converge' && result.message).toContain('forge-defect')
   })
+}
 
+function actDecisionResumingTests() {
   it('resumes when the order is still running', () => {
     expect(
       forgeDefectAnswer({
@@ -45,4 +52,4 @@ describe('forgeDefectAnswer', () => {
       kind: 'resume',
     })
   })
-})
+}

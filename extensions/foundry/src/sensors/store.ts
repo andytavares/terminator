@@ -1,8 +1,8 @@
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import * as path from 'node:path'
 
 import type { Signal } from './types'
+import { writeJsonAtomic } from '@terminator/extension-sdk/node'
 
 // Everything a sensor produces or remembers lives under
 // `<dataRoot>/signals/`, never inside a repository (ADR-066): the data root is
@@ -97,9 +97,38 @@ async function readState(file: string): Promise<Record<string, SensorState>> {
 
 async function writeState(file: string, state: Record<string, SensorState>): Promise<void> {
   await fs.promises.mkdir(path.dirname(file), { recursive: true })
-  const tmp = path.join(os.tmpdir(), `foundry-sensor-state-${process.pid}-${Date.now()}.tmp`)
-  await fs.promises.writeFile(tmp, JSON.stringify(state, null, 2))
-  await fs.promises.rename(tmp, file)
+  await writeJsonAtomic(file, state)
+}
+
+/** Appends a line for each signal that is new or differs from its latest line. */
+async function appendChanged(dataRoot: string, signals: readonly Signal[]): Promise<void> {
+  if (signals.length === 0) return
+  const jsonlFile = signalsPath(dataRoot)
+  const latest = latestById(await readSignalLines(jsonlFile))
+  const toAppend = signals.filter((signal) => {
+    const current = latest.get(signal.id)
+    return current === undefined || JSON.stringify(current) !== JSON.stringify(signal)
+  })
+  if (toAppend.length === 0) return
+
+  await fs.promises.mkdir(signalsDir(dataRoot), { recursive: true })
+  const text = toAppend.map((signal) => JSON.stringify(signal) + '\n').join('')
+  await fs.promises.appendFile(jsonlFile, text, 'utf-8')
+}
+
+/** Merges one sensor's patch into its stored state, and returns every sensor's. */
+async function patchState(
+  file: string,
+  id: string,
+  patch: Partial<SensorState>
+): Promise<Record<string, SensorState>> {
+  const current = await readState(file)
+  const next: Record<string, SensorState> = {
+    ...current,
+    [id]: { ...current[id], ...patch } as SensorState,
+  }
+  await writeState(file, next)
+  return next
 }
 
 export function createSignalStore(dataRoot: string): SignalStore {
@@ -112,20 +141,7 @@ export function createSignalStore(dataRoot: string): SignalStore {
       return Array.from(latestById(lines).values())
     },
 
-    async save(signals: readonly Signal[]): Promise<void> {
-      if (signals.length === 0) return
-      const lines = await readSignalLines(jsonlFile)
-      const latest = latestById(lines)
-      const toAppend = signals.filter((signal) => {
-        const current = latest.get(signal.id)
-        return current === undefined || JSON.stringify(current) !== JSON.stringify(signal)
-      })
-      if (toAppend.length === 0) return
-
-      await fs.promises.mkdir(signalsDir(dataRoot), { recursive: true })
-      const text = toAppend.map((signal) => JSON.stringify(signal) + '\n').join('')
-      await fs.promises.appendFile(jsonlFile, text, 'utf-8')
-    },
+    save: (signals) => appendChanged(dataRoot, signals),
 
     async get(id: string): Promise<Signal | null> {
       const lines = await readSignalLines(jsonlFile)
@@ -136,17 +152,6 @@ export function createSignalStore(dataRoot: string): SignalStore {
       return readState(stateFile)
     },
 
-    async setSensorState(
-      id: string,
-      patch: Partial<SensorState>
-    ): Promise<Record<string, SensorState>> {
-      const current = await readState(stateFile)
-      const next: Record<string, SensorState> = {
-        ...current,
-        [id]: { ...current[id], ...patch } as SensorState,
-      }
-      await writeState(stateFile, next)
-      return next
-    },
+    setSensorState: (id, patch) => patchState(stateFile, id, patch),
   }
 }

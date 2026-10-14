@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, fireEvent, screen, cleanup, act } from '@testing-library/react'
+import { pressOutside } from '../../../../tests/support/modal'
 
 const mockInvoke = vi.fn().mockResolvedValue({ data: [] })
 const mockOn = vi.fn().mockReturnValue(vi.fn())
@@ -22,7 +23,15 @@ afterEach(() => {
   vi.clearAllTimers()
 })
 
-describe('SearchOverlay', () => {
+describe('SearchOverlay', searchOverlayTests)
+
+function searchOverlayTests() {
+  describe('closing', searchOverlayClosingTests)
+  describe('results', searchOverlayResultsTests)
+  describe('opening a result', searchOverlayOpeningResultTests)
+}
+
+function searchOverlayClosingTests() {
   it('renders search input', () => {
     render(<SearchOverlay onClose={vi.fn()} />)
     expect(screen.getByPlaceholderText(/search across all notes/i)).toBeTruthy()
@@ -37,12 +46,13 @@ describe('SearchOverlay', () => {
 
   it('calls onClose when backdrop clicked', () => {
     const onClose = vi.fn()
-    const { container } = render(<SearchOverlay onClose={onClose} />)
-    const backdrop = container.querySelector('.notepad-overlay-backdrop')!
-    fireEvent.click(backdrop)
+    render(<SearchOverlay onClose={onClose} />)
+    pressOutside(screen.getByRole('dialog', { name: 'Search notes' }))
     expect(onClose).toHaveBeenCalled()
   })
+}
 
+function searchOverlayResultsTests() {
   it('shows result count label when results exist', async () => {
     mockInvoke.mockResolvedValueOnce({
       data: [
@@ -68,7 +78,9 @@ describe('SearchOverlay', () => {
     vi.useRealTimers()
     expect(screen.getByText(/1 result/)).toBeTruthy()
   })
+}
 
+function searchOverlayOpeningResultTests() {
   it('selects note and closes on Enter', async () => {
     const result = {
       id: 'note-x',
@@ -94,4 +106,4 @@ describe('SearchOverlay', () => {
     expect(useNotesStore.getState().selectedNoteId).toBe('note-x')
     expect(onClose).toHaveBeenCalled()
   })
-})
+}

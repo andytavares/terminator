@@ -21,6 +21,79 @@ function isEditableTarget(target: EventTarget | null): boolean {
   return target.isContentEditable
 }
 
+type ReviewUi = ReturnType<typeof useReviewUiStore.getState>
+type KeyAction = (handlers: ReviewKeyHandlers, ui: ReviewUi) => void
+
+const G_D_WINDOW_MS = 1000
+
+/** Raises a key event the diff pane performs, since only it knows its hunks and selection. */
+function emitKeyEvent(event: string): KeyAction {
+  return () => window.dispatchEvent(new CustomEvent(event))
+}
+
+const KEY_ACTIONS: Record<string, KeyAction> = {
+  k: emitKeyEvent(REVIEW_KEY_EVENTS.nextHunk),
+  j: emitKeyEvent(REVIEW_KEY_EVENTS.prevHunk),
+  ']': (h) => h.nextFile(),
+  '[': (h) => h.prevFile(),
+  '}': (h) => h.nextChapter(),
+  '{': (h) => h.prevChapter(),
+  n: (h) => h.nextUnviewedFile(),
+  v: (h) => h.markViewed(),
+  s: (_h, ui) => ui.setDiffRange(ui.diffRange === 'since' ? 'whole' : 'since'),
+  c: (_h, ui) => ui.cycleCommentVisibility(),
+  C: (_h, ui) => ui.setAgentNotesOn(!ui.agentNotesOn),
+  a: emitKeyEvent(REVIEW_KEY_EVENTS.askAgent),
+  e: emitKeyEvent(REVIEW_KEY_EVENTS.explain),
+  r: emitKeyEvent(REVIEW_KEY_EVENTS.comment),
+  m: emitKeyEvent(REVIEW_KEY_EVENTS.note),
+  t: (h, ui) => (h.toggleFileList ? h.toggleFileList() : ui.toggleFileList()),
+  i: (h) => h.toggleInsights(),
+  '?': (_h, ui) => ui.setKeyboardHelpOpen(!ui.keyboardHelpOpen),
+}
+
+/** The `g d` chord (peek definition): `g` starts it, `d` within a second ends it. True when the key
+ *  was part of the chord; any other key cancels a started one. */
+function chordKey(key: string, gPressedAtRef: { current: number | null }): boolean {
+  if (key === 'g') {
+    gPressedAtRef.current = Date.now()
+    return true
+  }
+  const started = gPressedAtRef.current
+  gPressedAtRef.current = null
+  if (key !== 'd' || !started || Date.now() - started > G_D_WINDOW_MS) return false
+  window.dispatchEvent(new CustomEvent(REVIEW_KEY_EVENTS.peekDefinition))
+  return true
+}
+
+/** Cmd+Enter (Ctrl+Enter off macOS) opens the submit panel. */
+function isSubmitShortcut(e: KeyboardEvent): boolean {
+  return (e.metaKey || e.ctrlKey) && e.key === 'Enter'
+}
+
+function hasCommandModifier(e: KeyboardEvent): boolean {
+  return e.metaKey || e.ctrlKey || e.altKey
+}
+
+function keyDownHandler(
+  handlersRef: { current: ReviewKeyHandlers },
+  gPressedAtRef: { current: number | null }
+) {
+  return (e: KeyboardEvent) => {
+    if (e.key === 'Escape' || isEditableTarget(e.target)) return
+    if (isSubmitShortcut(e)) {
+      e.preventDefault()
+      handlersRef.current.openSubmit()
+      return
+    }
+    // Every other binding is a bare key or shift+key — reject any other
+    // modifier so OS/app shortcuts (Cmd+R, Ctrl+Tab, ...) pass through.
+    if (hasCommandModifier(e)) return
+    if (chordKey(e.key, gPressedAtRef)) return
+    KEY_ACTIONS[e.key]?.(handlersRef.current, useReviewUiStore.getState())
+  }
+}
+
 /**
  * Single-key bindings for the review surface (S3). Bound on window keydown
  * so it works no matter which pane has focus, but ignored while typing in an
@@ -33,100 +106,8 @@ export function useReviewKeys(handlers: ReviewKeyHandlers): void {
   useEffect(() => {
     handlersRef.current = handlers
   })
-
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') return
-      if (isEditableTarget(e.target)) return
-
-      const isCmdEnter = (e.metaKey || e.ctrlKey) && e.key === 'Enter'
-      if (isCmdEnter) {
-        e.preventDefault()
-        handlersRef.current.openSubmit()
-        return
-      }
-
-      // Every other binding is a bare key or shift+key — reject any other
-      // modifier so OS/app shortcuts (Cmd+R, Ctrl+Tab, ...) pass through.
-      if (e.metaKey || e.ctrlKey || e.altKey) return
-
-      const key = e.key
-
-      if (key === 'g') {
-        gPressedAtRef.current = Date.now()
-        return
-      }
-      if (key === 'd' && gPressedAtRef.current && Date.now() - gPressedAtRef.current <= 1000) {
-        gPressedAtRef.current = null
-        window.dispatchEvent(new CustomEvent(REVIEW_KEY_EVENTS.peekDefinition))
-        return
-      }
-      gPressedAtRef.current = null
-
-      const ui = useReviewUiStore.getState()
-      const handlers = handlersRef.current
-
-      switch (key) {
-        case 'k':
-          window.dispatchEvent(new CustomEvent(REVIEW_KEY_EVENTS.nextHunk))
-          return
-        case 'j':
-          window.dispatchEvent(new CustomEvent(REVIEW_KEY_EVENTS.prevHunk))
-          return
-        case ']':
-          handlers.nextFile()
-          return
-        case '[':
-          handlers.prevFile()
-          return
-        case '}':
-          handlers.nextChapter()
-          return
-        case '{':
-          handlers.prevChapter()
-          return
-        case 'n':
-          handlers.nextUnviewedFile()
-          return
-        case 'v':
-          handlers.markViewed()
-          return
-        case 's':
-          ui.setDiffRange(ui.diffRange === 'since' ? 'whole' : 'since')
-          return
-        case 'c':
-          ui.cycleCommentVisibility()
-          return
-        case 'C':
-          ui.setAgentNotesOn(!ui.agentNotesOn)
-          return
-        case 'a':
-          window.dispatchEvent(new CustomEvent(REVIEW_KEY_EVENTS.askAgent))
-          return
-        case 'e':
-          window.dispatchEvent(new CustomEvent(REVIEW_KEY_EVENTS.explain))
-          return
-        case 'r':
-          window.dispatchEvent(new CustomEvent(REVIEW_KEY_EVENTS.comment))
-          return
-        case 'm':
-          window.dispatchEvent(new CustomEvent(REVIEW_KEY_EVENTS.note))
-          return
-        case 't':
-          if (handlers.toggleFileList) handlers.toggleFileList()
-          else ui.toggleFileList()
-          return
-        case 'i':
-          handlers.toggleInsights()
-          return
-        case '?':
-          ui.setKeyboardHelpOpen(!ui.keyboardHelpOpen)
-          return
-        default:
-          return
-      }
-    }
-
+    const handleKeyDown = keyDownHandler(handlersRef, gPressedAtRef)
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])

@@ -73,24 +73,30 @@ function mean(values: readonly number[]): number | null {
   return values.reduce((sum, v) => sum + v, 0) / values.length
 }
 
-export function orderMetrics(records: OrderRecords): OrderMetrics {
-  const { order, ledger, gates, graph } = records
-
-  const shipped = ledger.some((e) => e.action === 'ship.draft_opened')
+/** How long the order took to ship, its run took to build, and the operator spent deciding. */
+function timesOf({
+  ledger,
+  gates,
+}: OrderRecords): Pick<OrderMetrics, 'leadTimeMs' | 'buildTimeMs' | 'yourTimeMs'> {
   const seeded = firstAt(ledger, 'order.seeded')
   const shippedAt = firstAt(ledger, 'ship.draft_opened')
   const started = firstAt(ledger, 'run.started')
+  const between = (from: string | null, to: string | null): number | null =>
+    from !== null && to !== null ? Date.parse(to) - Date.parse(from) : null
+  return {
+    leadTimeMs: between(seeded, shippedAt),
+    buildTimeMs: between(started, shippedAt),
+    yourTimeMs: gates.reduce((sum, gate) => {
+      if (gate.decision === null || gate.decision.by !== 'operator') return sum
+      return sum + (Date.parse(gate.decision.at) - Date.parse(gate.raisedAt))
+    }, 0),
+  }
+}
 
-  const leadTimeMs =
-    seeded !== null && shippedAt !== null ? Date.parse(shippedAt) - Date.parse(seeded) : null
-  const buildTimeMs =
-    started !== null && shippedAt !== null ? Date.parse(shippedAt) - Date.parse(started) : null
-
-  const yourTimeMs = gates.reduce((sum, gate) => {
-    if (gate.decision === null || gate.decision.by !== 'operator') return sum
-    return sum + (Date.parse(gate.decision.at) - Date.parse(gate.raisedAt))
-  }, 0)
-
+/** @internal */
+export function orderMetrics(records: OrderRecords): OrderMetrics {
+  const { order, ledger, gates, graph } = records
+  const shipped = ledger.some((e) => e.action === 'ship.draft_opened')
   const reworks = countOf(ledger, 'rework.started')
   const ciRounds = countOf(ledger, 'ci.round')
   const sentBack = gates.filter((g) => g.decision?.option === 'send_back').length
@@ -99,21 +105,18 @@ export function orderMetrics(records: OrderRecords): OrderMetrics {
         .filter((n) => n.kind === 'agent' || n.kind === 'fanout')
         .reduce((sum, n) => sum + n.attempts, 0)
     : 0
-  const forgeFollowUps = countOf(ledger, 'converge.followed_up')
   const decisions = order.assumptions.filter((a) => a.id.startsWith('A-Q-'))
 
   return {
     orderId: order.id,
     title: order.title,
     shipped,
-    leadTimeMs,
-    buildTimeMs,
-    yourTimeMs,
+    ...timesOf(records),
     reworks,
     ciRounds,
     sentBack,
     sessions,
-    forgeFollowUps,
+    forgeFollowUps: countOf(ledger, 'converge.followed_up'),
     forgeDecisions: decisions.length,
     forgeDecisionsStruck: decisions.filter((a) => a.struck).length,
     firstPass: shipped && reworks === 0 && ciRounds === 0 && sentBack === 0,

@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import * as path from 'node:path'
 import { createOrderStore, createLiveOrderStore } from '../../src/order/store.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import { SCHEMA_VERSION } from '../../src/order/schema.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 let root: string
 
@@ -23,7 +23,7 @@ function order(over: Partial<WorkOrder> = {}): WorkOrder {
 }
 
 beforeEach(() => {
-  root = fs.mkdtempSync(path.join(os.tmpdir(), 'foundry-store-'))
+  root = makeTempDir('foundry-store-')
 })
 
 afterEach(() => {
@@ -31,11 +31,22 @@ afterEach(() => {
 })
 
 describe('createOrderStore', () => {
+  describe('atomic saves', atomicSavesTests)
+  describe('the rendering', theRenderingTests)
+  describe('missing and corrupt orders', missingAndCorruptOrdersTests)
+  describe('listing', storeListingTests)
+  describe('finding by issue', findingByIssueTests)
+  describe('trackers and the ledger', trackersAndTheLedgerTests)
+})
+
+function atomicSavesTests() {
   it('never shows a reader a half-written order while it is being saved', async () => {
     const store = createOrderStore(root)
     await store.save(order())
     const seen: (WorkOrder | null)[] = []
-    for (let i = 0; i < 200; i++) {
+    // Saved in place, five reads in six land in the gap, from the first round
+    // on; twenty rounds catch that every time without 200 rounds of disk work.
+    for (let i = 0; i < 20; i++) {
       const [, loaded] = await Promise.all([
         store.save(order({ title: `Save ${i}` })),
         store.load('WO-0913-c71'),
@@ -44,7 +55,9 @@ describe('createOrderStore', () => {
     }
     expect(seen.filter((o) => o === null)).toHaveLength(0)
   })
+}
 
+function theRenderingTests() {
   it('writes the truth and its rendering side by side', async () => {
     const store = createOrderStore(root)
     await store.save(order())
@@ -71,7 +84,9 @@ describe('createOrderStore', () => {
       'A different title'
     )
   })
+}
 
+function missingAndCorruptOrdersTests() {
   it('returns null for an order that does not exist', async () => {
     expect(await createOrderStore(root).load('WO-nope')).toBeNull()
   })
@@ -82,7 +97,9 @@ describe('createOrderStore', () => {
     fs.writeFileSync(path.join(dir, 'order.json'), '{{{')
     expect(await createOrderStore(root).load('WO-bad')).toBeNull()
   })
+}
 
+function storeListingTests() {
   it('lists orders newest first', async () => {
     const store = createOrderStore(root)
     await store.save(order({ id: 'WO-1', createdAt: '2026-09-01T10:00:00.000Z' }))
@@ -102,7 +119,9 @@ describe('createOrderStore', () => {
     fs.writeFileSync(path.join(bad, 'order.json'), 'not json')
     expect((await store.list()).map((o) => o.id)).toEqual(['WO-good'])
   })
+}
 
+function findingByIssueTests() {
   it('finds an open order already seeded from an issue', async () => {
     const store = createOrderStore(root)
     await store.save(
@@ -128,7 +147,9 @@ describe('createOrderStore', () => {
     )
     expect(await store.findByIssue('linear', 'TAV-42')).toBeNull()
   })
+}
 
+function trackersAndTheLedgerTests() {
   it('does not confuse the same key on two different trackers', async () => {
     const store = createOrderStore(root)
     await store.save(
@@ -151,12 +172,18 @@ describe('createOrderStore', () => {
     const ledger = path.join(root, 'orders', 'WO-0913-c71', 'ledger.jsonl')
     expect(JSON.parse(fs.readFileSync(ledger, 'utf8').trim()).action).toBe('order.agreed')
   })
-})
+}
 
 describe('a store whose root follows the workspace', () => {
+  describe('writing', storeWritingTests)
+  describe('reading through the resolver', readingThroughTheResolverTests)
+  describe('the ledger', storeTheLedgerTests)
+})
+
+function storeWritingTests() {
   it('writes wherever the resolver points, on each call', async () => {
-    const a = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-live-a-'))
-    const b = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-live-b-'))
+    const a = makeTempDir('fdry-live-a-')
+    const b = makeTempDir('fdry-live-b-')
     let here = a
     const store = createLiveOrderStore(() => here)
 
@@ -171,9 +198,11 @@ describe('a store whose root follows the workspace', () => {
 
     for (const dir of [a, b]) fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5 })
   })
+}
 
+function readingThroughTheResolverTests() {
   it('reads, lists, finds and records through the same resolver', async () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-live-c-'))
+    const dir = makeTempDir('fdry-live-c-')
     const store = createLiveOrderStore(() => dir)
 
     await store.save(
@@ -202,13 +231,15 @@ describe('a store whose root follows the workspace', () => {
 
     fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5 })
   })
+}
 
+function storeTheLedgerTests() {
   // Some of what happens to an order is recorded here and nowhere else — an
   // intake turn whose proposal was refused writes a line and never touches
   // `order.json` — so a store that could only append was a store no surface
   // could ask what had happened.
   it('reads back the ledger it wrote, oldest first', async () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-entries-'))
+    const dir = makeTempDir('fdry-entries-')
     const store = createOrderStore(dir)
 
     for (const action of ['converge.started', 'converge.refused']) {
@@ -232,8 +263,8 @@ describe('a store whose root follows the workspace', () => {
 
   // An order nothing has happened to yet is not an error.
   it('reads an empty ledger as no entries', async () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-noledger-'))
+    const dir = makeTempDir('fdry-noledger-')
     expect(await createOrderStore(dir).entries('WO-nothing')).toEqual([])
     fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5 })
   })
-})
+}

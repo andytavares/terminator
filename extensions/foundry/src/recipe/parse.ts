@@ -1,6 +1,13 @@
-import * as path from 'node:path'
-import { load } from 'js-yaml'
 import { z } from 'zod'
+import {
+  checkVersion,
+  yamlFailure,
+  idMatchesFile,
+  loadYaml,
+  type ParseResult,
+} from './yaml-file.js'
+
+export type { ParseResult } from './yaml-file.js'
 
 // Recipes, roles and rules: the extension point.
 //
@@ -13,42 +20,8 @@ import { z } from 'zod'
 // Nothing here throws. A malformed file is reported by path and excluded, so
 // one bad file in the operator's directory cannot take the whole surface down.
 
+/** @internal */
 export const RECIPE_SCHEMA_VERSION = 1
-
-export type ParseResult<T> = { ok: true; value: T } | { ok: false; reason: string }
-
-function fail(file: string, message: string): { ok: false; reason: string } {
-  return { ok: false, reason: `${file}: ${message}` }
-}
-
-function loadYaml(text: string, file: string): ParseResult<unknown> {
-  try {
-    return { ok: true, value: load(text) }
-  } catch (error) {
-    return fail(file, `could not be read as YAML — ${(error as Error).message}`)
-  }
-}
-
-function checkVersion(value: unknown, file: string): { ok: false; reason: string } | null {
-  // Arrays are objects, and a YAML list is a common hand-authoring slip. Say
-  // what is wrong with the file rather than letting zod report a type mismatch
-  // several levels down.
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-    return fail(file, 'is not a mapping')
-  }
-  const declared = (value as { schemaVersion?: unknown }).schemaVersion
-  if (typeof declared === 'number' && declared > RECIPE_SCHEMA_VERSION) {
-    return fail(
-      file,
-      `declares schema version ${declared}; this build knows version ${RECIPE_SCHEMA_VERSION}`
-    )
-  }
-  return null
-}
-
-function idMatchesFile(id: string, file: string): boolean {
-  return id === path.basename(file).replace(/\.ya?ml$/, '')
-}
 
 // A skill id becomes a directory name — `<dir>/skills/<id>/SKILL.md` — so it
 // is held to the shape a directory name can take, not the looser rule for a
@@ -61,15 +34,10 @@ function badSkillIds(ids: readonly string[]): string[] {
 
 // ── recipes ──────────────────────────────────────────────────────────────
 
-/**
- * Six step kinds, and there is no seventh.
- *
- * They exist because six concrete recipes need them, not in anticipation: fan
- * out over units, a barrier for lane merge order, a human decision, an agent
- * role, a shell command and a rubric judgement. A recipe that wants arbitrary
- * logic wants a role — a prompt and an output schema — not code in a data file.
- */
-export const STEP_KINDS = ['agent', 'run', 'judge', 'gate', 'fanout', 'join'] as const
+// Five step kinds, each one recipes need (fan-out, lane barrier, human decision, agent,
+// shell command); arbitrary logic belongs in a role, not in a data file.
+/** @internal */
+export const STEP_KINDS = ['agent', 'run', 'gate', 'fanout', 'join'] as const
 export type StepKind = (typeof STEP_KINDS)[number]
 
 /**
@@ -80,8 +48,42 @@ export type StepKind = (typeof STEP_KINDS)[number]
  * chooses a default: a recipe that declares none launches at whatever the
  * operator's own runtime configuration says.
  */
-export const EFFORT_LEVELS = ['low', 'medium', 'high', 'xhigh', 'max'] as const
+const EFFORT_LEVELS = ['low', 'medium', 'high', 'xhigh', 'max'] as const
 export type EffortLevel = (typeof EFFORT_LEVELS)[number]
+
+/** The fields a step must declare for its kind. */
+interface StepFields {
+  readonly kind: string
+  readonly role?: unknown
+  readonly command?: unknown
+  readonly over?: unknown
+  readonly step?: unknown
+  readonly rule?: unknown
+  readonly defaultIfIgnored?: unknown
+}
+
+/** What a step of its kind needs and does not declare, in words. */
+function missingFor(step: StepFields): string[] {
+  switch (step.kind) {
+    case 'agent':
+      return step.role === undefined ? ['a role'] : []
+    case 'run':
+      return step.command === undefined ? ['a command'] : []
+    case 'fanout':
+      return step.over === undefined || step.step === undefined ? ['both `over` and `step`'] : []
+    case 'gate':
+      return missingForGate(step)
+    default:
+      return []
+  }
+}
+
+function missingForGate(step: StepFields): string[] {
+  const missing = step.rule === undefined ? ['a rule'] : []
+  // A gate with no stated default is a gate that stops the line for ever when
+  // nobody answers it. Saying what silence means is the contract.
+  return step.defaultIfIgnored === undefined ? [...missing, 'a defaultIfIgnored'] : missing
+}
 
 const StepSchema = z
   .object({
@@ -91,7 +93,6 @@ const StepSchema = z
     when: z.string().optional(),
     role: z.string().optional(),
     command: z.string().optional(),
-    rubric: z.string().optional(),
     rule: z.string().optional(),
     options: z.array(z.string()).optional(),
     defaultIfIgnored: z.string().optional(),
@@ -101,7 +102,6 @@ const StepSchema = z
     order: z.string().optional(),
     expect: z.record(z.string(), z.unknown()).optional(),
     context: z.enum(['fresh', 'resume']).optional(),
-    evidence: z.array(z.string()).optional(),
     effort: z.enum(EFFORT_LEVELS).optional(),
     // Mounted for this step's agent the way Claude Code loads a skill: a
     // directory per id, passed with `--add-dir`. Optional, because most steps
@@ -115,20 +115,8 @@ const StepSchema = z
       .optional(),
   })
   .superRefine((step, ctx) => {
-    const need = (field: string): void => {
+    for (const field of missingFor(step)) {
       ctx.addIssue({ code: 'custom', message: `step "${step.id}" (${step.kind}) needs ${field}` })
-    }
-    if (step.kind === 'agent' && step.role === undefined) need('a role')
-    if (step.kind === 'run' && step.command === undefined) need('a command')
-    if (step.kind === 'judge' && step.rubric === undefined) need('a rubric')
-    if (step.kind === 'fanout' && (step.over === undefined || step.step === undefined)) {
-      need('both `over` and `step`')
-    }
-    if (step.kind === 'gate') {
-      if (step.rule === undefined) need('a rule')
-      // A gate with no stated default is a gate that stops the line for ever
-      // when nobody answers it. Saying what silence means is the contract.
-      if (step.defaultIfIgnored === undefined) need('a defaultIfIgnored')
     }
   })
 
@@ -184,56 +172,76 @@ function findCycle(steps: readonly Step[]): string | null {
 export function parseRecipe(text: string, file: string): ParseResult<Recipe> {
   const loaded = loadYaml(text, file)
   if (!loaded.ok) return loaded
-  const versionProblem = checkVersion(loaded.value, file)
+  const versionProblem = checkVersion(loaded.value, file, RECIPE_SCHEMA_VERSION)
   if (versionProblem !== null) return versionProblem
 
   const parsed = RecipeSchema.safeParse(loaded.value)
-  if (!parsed.success) return fail(file, parsed.error.issues.map((i) => i.message).join('; '))
+  if (!parsed.success)
+    return yamlFailure(file, parsed.error.issues.map((i) => i.message).join('; '))
   const recipe = parsed.data
 
   // A name has to resolve to what it says it is, because resolution is by name
   // across three directories and a mismatch would silently shadow a built-in.
   if (!idMatchesFile(recipe.id, file)) {
-    return fail(file, `declares id "${recipe.id}", which does not match the filename`)
+    return yamlFailure(file, `declares id "${recipe.id}", which does not match the filename`)
   }
 
-  const seen = new Set<string>()
-  for (const step of recipe.steps) {
-    if (seen.has(step.id)) return fail(file, `has more than one step called "${step.id}"`)
-    seen.add(step.id)
-  }
-  for (const step of recipe.steps) {
-    for (const after of step.after) {
-      if (!seen.has(after)) {
-        return fail(file, `step "${step.id}" waits on "${after}", which does not exist`)
-      }
-    }
-  }
-  for (const step of recipe.steps) {
-    const bad = badSkillIds(step.skills ?? [])
-    if (bad.length > 0) {
-      return fail(file, `step "${step.id}" names skill "${bad[0]}", which is not a valid skill id`)
-    }
-  }
-  const cycle = findCycle(recipe.steps)
-  if (cycle !== null) return fail(file, `has a cycle in its step graph, through "${cycle}"`)
-
+  const problem = stepGraphProblem(recipe.steps)
+  if (problem !== null) return yamlFailure(file, problem)
   const onFailProblem = checkOnFail(recipe.steps, file)
   if (onFailProblem !== null) return onFailProblem
+  const ci = ciProblem(recipe)
+  return ci === null ? { ok: true, value: recipe } : yamlFailure(file, ci)
+}
 
-  if (recipe.ci !== undefined) {
-    const hasReadyForReviewGate = recipe.steps.some(
-      (step) => step.kind === 'gate' && step.rule === 'ready-for-review'
-    )
-    if (!hasReadyForReviewGate) {
-      return fail(
-        file,
-        'declares ci, but opens no ready-for-review gate — there is no draft for CI to watch'
-      )
+/** The first thing wrong with how the steps name and wait on each other, in words. */
+function stepGraphProblem(steps: readonly Step[]): string | null {
+  return duplicateStep(steps) ?? unknownWait(steps) ?? badSkill(steps) ?? cycleIn(steps)
+}
+
+function duplicateStep(steps: readonly Step[]): string | null {
+  const seen = new Set<string>()
+  for (const step of steps) {
+    if (seen.has(step.id)) return `has more than one step called "${step.id}"`
+    seen.add(step.id)
+  }
+  return null
+}
+
+function unknownWait(steps: readonly Step[]): string | null {
+  const ids = new Set(steps.map((step) => step.id))
+  for (const step of steps) {
+    const missing = step.after.find((after) => !ids.has(after))
+    if (missing !== undefined) {
+      return `step "${step.id}" waits on "${missing}", which does not exist`
     }
   }
+  return null
+}
 
-  return { ok: true, value: recipe }
+function badSkill(steps: readonly Step[]): string | null {
+  for (const step of steps) {
+    const bad = badSkillIds(step.skills ?? [])
+    if (bad.length > 0)
+      return `step "${step.id}" names skill "${bad[0]}", which is not a valid skill id`
+  }
+  return null
+}
+
+function cycleIn(steps: readonly Step[]): string | null {
+  const cycle = findCycle(steps)
+  return cycle === null ? null : `has a cycle in its step graph, through "${cycle}"`
+}
+
+/** A recipe that declares ci needs a ready-for-review gate to open the draft CI watches. */
+function ciProblem(recipe: Recipe): string | null {
+  if (recipe.ci === undefined) return null
+  const opensADraft = recipe.steps.some(
+    (step) => step.kind === 'gate' && step.rule === 'ready-for-review'
+  )
+  return opensADraft
+    ? null
+    : 'declares ci, but opens no ready-for-review gate — there is no draft for CI to watch'
 }
 
 /** Every id reachable by walking `after`, transitively — a step's upstream. */
@@ -255,7 +263,7 @@ function checkOnFail(steps: readonly Step[], file: string): { ok: false; reason:
   for (const step of steps) {
     if (step.onFail === undefined) continue
     if (step.kind !== 'run') {
-      return fail(
+      return yamlFailure(
         file,
         `step "${step.id}" has onFail, but only a command step can fail on its own today`
       )
@@ -263,13 +271,13 @@ function checkOnFail(steps: readonly Step[], file: string): { ok: false; reason:
     const target = byId.get(step.onFail.rework)
     const upstream = upstreamOf(step.id, byId)
     if (target === undefined || !upstream.has(target.id)) {
-      return fail(
+      return yamlFailure(
         file,
         `step "${step.id}" has onFail.rework "${step.onFail.rework}", which is not upstream of it`
       )
     }
     if (target.kind !== 'agent' && target.kind !== 'fanout') {
-      return fail(
+      return yamlFailure(
         file,
         `step "${step.id}" has onFail.rework "${target.id}", but only an agent or fanout step can rework`
       )
@@ -300,30 +308,44 @@ const RoleSchema = z.object({
 export type Role = z.infer<typeof RoleSchema>
 
 export function parseRole(text: string, file: string): ParseResult<Role> {
+  const parsed = parseNamedFile(RoleSchema, text, file)
+  if (!parsed.ok) return parsed
+  const bad = badSkillIds(parsed.value.skills)
+  if (bad.length > 0) {
+    return yamlFailure(
+      file,
+      `role "${parsed.value.id}" names skill "${bad[0]}", which is not a valid skill id`
+    )
+  }
+  return parsed
+}
+
+/** A schema for a file named by its `id`. */
+type NamedSchema = z.ZodType<{ id: string }, z.ZodTypeDef, unknown>
+
+/** A role or rule file: YAML at a known version, valid for `schema`, named by its id. */
+function parseNamedFile<S extends NamedSchema>(
+  schema: S,
+  text: string,
+  file: string
+): ParseResult<z.output<S>> {
   const loaded = loadYaml(text, file)
   if (!loaded.ok) return loaded
-  const versionProblem = checkVersion(loaded.value, file)
+  const versionProblem = checkVersion(loaded.value, file, RECIPE_SCHEMA_VERSION)
   if (versionProblem !== null) return versionProblem
-
-  const parsed = RoleSchema.safeParse(loaded.value)
-  if (!parsed.success) return fail(file, parsed.error.issues.map((i) => i.message).join('; '))
-  if (!idMatchesFile(parsed.data.id, file)) {
-    return fail(file, `declares id "${parsed.data.id}", which does not match the filename`)
+  const parsed = schema.safeParse(loaded.value)
+  if (!parsed.success) {
+    return yamlFailure(file, parsed.error.issues.map((i) => i.message).join('; '))
   }
-  const bad = badSkillIds(parsed.data.skills)
-  if (bad.length > 0) {
-    return fail(
-      file,
-      `role "${parsed.data.id}" names skill "${bad[0]}", which is not a valid skill id`
-    )
+  if (!idMatchesFile(parsed.data.id, file)) {
+    return yamlFailure(file, `declares id "${parsed.data.id}", which does not match the filename`)
   }
   return { ok: true, value: parsed.data }
 }
 
 // ── rules ────────────────────────────────────────────────────────────────
 
-export const RUNGS = ['L0', 'L1', 'L2', 'L3', 'L4', 'L5', 'L6'] as const
-export type Rung = (typeof RUNGS)[number]
+const RUNGS = ['L0', 'L1', 'L2', 'L3', 'L4', 'L5', 'L6'] as const
 
 const RuleSchema = z.object({
   schemaVersion: z.number().int().default(RECIPE_SCHEMA_VERSION),
@@ -342,15 +364,5 @@ const RuleSchema = z.object({
 export type Rule = z.infer<typeof RuleSchema>
 
 export function parseRule(text: string, file: string): ParseResult<Rule> {
-  const loaded = loadYaml(text, file)
-  if (!loaded.ok) return loaded
-  const versionProblem = checkVersion(loaded.value, file)
-  if (versionProblem !== null) return versionProblem
-
-  const parsed = RuleSchema.safeParse(loaded.value)
-  if (!parsed.success) return fail(file, parsed.error.issues.map((i) => i.message).join('; '))
-  if (!idMatchesFile(parsed.data.id, file)) {
-    return fail(file, `declares id "${parsed.data.id}", which does not match the filename`)
-  }
-  return { ok: true, value: parsed.data }
+  return parseNamedFile(RuleSchema, text, file)
 }

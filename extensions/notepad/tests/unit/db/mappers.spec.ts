@@ -1,7 +1,17 @@
 import { describe, it, expect } from 'vitest'
-import { rowToNote, rowToTag, rowToComment, rowToSearchResult } from '../../../src/db/mappers'
+import { rowToNote, rowToComment } from '../../../src/db/mappers'
 
-describe('rowToNote', () => {
+describe('rowToNote', rowToNoteTests)
+
+describe('rowToComment', rowToCommentTests)
+
+function rowToNoteTests() {
+  describe('mapping', rowToNoteMappingTests)
+  describe('tags column', rowToNoteTagsColumnTests)
+  describe('archived notes', rowToNoteArchivedNotesTests)
+}
+
+function rowToNoteMappingTests() {
   it('maps a DB row to a Note domain object', () => {
     const row = {
       id: 'abc',
@@ -21,7 +31,9 @@ describe('rowToNote', () => {
     expect(note.createdAt).toBe('2026-01-01T00:00:00Z')
     expect(note.updatedAt).toBe('2026-01-02T00:00:00Z')
   })
+}
 
+function rowToNoteTagsColumnTests() {
   it('returns empty tags array when tags column is empty string', () => {
     const row = {
       id: 'x',
@@ -43,11 +55,13 @@ describe('rowToNote', () => {
       created_at: '2026-01-01T00:00:00Z',
       updated_at: '2026-01-01T00:00:00Z',
       archived_at: null,
-      tags: null as unknown as string,
+      tags: null,
     }
     expect(rowToNote(row).tags).toEqual([])
   })
+}
 
+function rowToNoteArchivedNotesTests() {
   it('preserves archived_at when set', () => {
     const row = {
       id: 'x',
@@ -60,24 +74,14 @@ describe('rowToNote', () => {
     }
     expect(rowToNote(row).archivedAt).toBe('2026-02-01T00:00:00Z')
   })
-})
+}
 
-describe('rowToTag', () => {
-  it('maps a DB row to a Tag domain object', () => {
-    const row = { id: 't1', name: 'infra', note_count: 3 }
-    const tag = rowToTag(row)
-    expect(tag.id).toBe('t1')
-    expect(tag.name).toBe('infra')
-    expect(tag.noteCount).toBe(3)
-  })
+function rowToCommentTests() {
+  describe('top-level comments', rowToCommentTopLevelCommentsTests)
+  describe('replies', rowToCommentRepliesTests)
+}
 
-  it('handles zero note count', () => {
-    const row = { id: 't2', name: 'empty', note_count: 0 }
-    expect(rowToTag(row).noteCount).toBe(0)
-  })
-})
-
-describe('rowToComment', () => {
+function rowToCommentTopLevelCommentsTests() {
   it('maps a DB row to a Comment domain object', () => {
     const row = {
       id: 'c1',
@@ -103,7 +107,9 @@ describe('rowToComment', () => {
     expect(comment.quote).toBe('nice text')
     expect(comment.replies).toEqual([])
   })
+}
 
+function rowToCommentRepliesTests() {
   it('handles reply comment with null anchor data', () => {
     const row = {
       id: 'c2',
@@ -125,34 +131,4 @@ describe('rowToComment', () => {
     expect(comment.startOffset).toBeNull()
     expect(comment.replies).toEqual([])
   })
-})
-
-describe('rowToSearchResult', () => {
-  it('maps a DB row to a SearchResult', () => {
-    const row = {
-      id: 'n1',
-      title: 'Auth Notes',
-      snippet: '…<mark>auth</mark>…',
-      tags: 'infra',
-      updated_at: '2026-01-01T00:00:00Z',
-      archived_at: null,
-    }
-    const result = rowToSearchResult(row)
-    expect(result.id).toBe('n1')
-    expect(result.snippet).toContain('<mark>auth</mark>')
-    expect(result.tags).toEqual(['infra'])
-    expect(result.archivedAt).toBeNull()
-  })
-
-  it('handles multiple tags in search result', () => {
-    const row = {
-      id: 'n2',
-      title: 'Multi',
-      snippet: 'foo',
-      tags: 'a,b,c',
-      updated_at: '2026-01-01T00:00:00Z',
-      archived_at: null,
-    }
-    expect(rowToSearchResult(row).tags).toEqual(['a', 'b', 'c'])
-  })
-})
+}

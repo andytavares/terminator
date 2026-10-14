@@ -1,11 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, rmSync, readFileSync, mkdirSync, writeFileSync, existsSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync, readFileSync, mkdirSync, writeFileSync, existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { spawnSync } from 'node:child_process'
+import { spawn as ptySpawn } from 'node-pty'
 import { createSupervisedRunner } from '../../src/runtime/supervised-runner.js'
 import { createControlServer, type ControlServer } from '../../src/runtime/control-server.js'
 import type { PendingPermission } from '../../src/runtime/permission-bridge.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
+import { partialFake } from '../../../../tests/support/fakes'
+import type { ExtensionAPI } from '@terminator/extension-sdk'
 
 // This replaces spawning `claude --print --permission-mode bypassPermissions`
 // as a hidden child process — a run nobody could see, approving every tool call
@@ -21,26 +24,46 @@ let opened: Array<Record<string, unknown>>
 let written: Array<{ terminal: string; data: string }>
 let terminalId: string | null
 let projectId: string | null
-let exitListener: ((exitCode: number) => void) | null
+let exitListener: ((exitCode: number | null) => void) | null
 let exitDetached: boolean
 let closed: string[]
+let ran: Array<{ file: string; args: string[] } & Record<string, unknown>>
+/** How the next `runInTerminal` ends; never, unless a test says. */
+let nextExit: { exitCode: number | null } | null
 
-function api() {
+function exitWith(exit: { exitCode: number | null }): void {
+  nextExit = exit
+}
+
+/** The script a command's terminal was asked to run: the last path its `-c` execs. */
+function scriptOf(input: { args: string[] }): string {
+  const match = /'([^']+)'$/.exec(input.args[input.args.length - 1])
+  if (match === null) throw new Error(`no script in ${input.args.join(' ')}`)
+  return match[1]
+}
+
+function runnerCoreApi() {
   return {
     workspace: {
-      createProject: (input: Record<string, unknown>) => {
+      addProject: async (input: Record<string, unknown>) => {
         created.push(input)
         return projectId === null ? null : { id: projectId, workspaceId: 'ws-1', name: 'p' }
       },
     },
     pty: {
-      openTerminalTab: (input: Record<string, unknown>) => {
+      openTerminal: async (input: Record<string, unknown>) => {
         opened.push(input)
         return terminalId
       },
       write: (terminal: string, data: string) => written.push({ terminal, data }),
       closeTerminalTab: (terminal: string) => closed.push(terminal),
-      onExit: (_sessionId: string, listener: (exitCode: number) => void) => {
+      runInTerminal: (input: { file: string; args: string[] } & Record<string, unknown>) => {
+        ran.push(input)
+        if (terminalId === null) return Promise.resolve(null)
+        if (nextExit === null) return new Promise(() => {})
+        return Promise.resolve({ sessionId: terminalId, ...nextExit })
+      },
+      onExit: (_sessionId: string, listener: (exitCode: number | null) => void) => {
         exitListener = listener
         return () => {
           exitDetached = true
@@ -50,9 +73,12 @@ function api() {
   } as never
 }
 
+/** Lets the runner's awaits on the core (addProject, openTerminal) finish. */
+const coreCallsSettled = () => new Promise((resolve) => setImmediate(resolve))
+
 function runner(now: () => number = () => 1_000) {
   return createSupervisedRunner({
-    api: api(),
+    api: runnerCoreApi(),
     control,
     stateDir: join(dir, 'state'),
     now,
@@ -108,7 +134,7 @@ const start = {
 }
 
 beforeEach(async () => {
-  dir = mkdtempSync(join(tmpdir(), 'supervised-runner-'))
+  dir = makeTempDir('supervised-runner-')
   control = await createControlServer()
   created = []
   opened = []
@@ -118,6 +144,8 @@ beforeEach(async () => {
   exitListener = null
   exitDetached = false
   closed = []
+  ran = []
+  nextExit = null
 })
 
 afterEach(async () => {
@@ -126,6 +154,24 @@ afterEach(async () => {
 })
 
 describe('starting a supervised run', () => {
+  describe('the project', theProjectTests)
+  describe('the terminal and session', theTerminalAndSessionTests)
+  describe('skills and transcripts', skillsAndTranscriptsTests)
+  describe('resuming', supervisedRunnerResumingTests)
+  describe('nothing started', nothingStartedTests)
+})
+
+function ask(sessionId: string): Promise<unknown> {
+  const pending = fetch(control.url, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${control.token}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ sessionId, toolName: 'Bash', input: { command: 'rm -rf /' } }),
+  }).then((r) => r.json())
+  pending.catch(() => {})
+  return pending
+}
+
+function theProjectTests() {
   it('registers the worktree as a project, so the run has somewhere to live', async () => {
     await runner().start(start)
     expect(created[0]).toMatchObject({
@@ -140,7 +186,9 @@ describe('starting a supervised run', () => {
     await runner().start({ ...start, issue: { tracker: 'linear', key: 'TAV-15' } })
     expect(created[0]).toMatchObject({ issue: { tracker: 'linear', key: 'TAV-15' } })
   })
+}
 
+function theTerminalAndSessionTests() {
   it('opens a terminal in that project rather than a hidden child process', async () => {
     await runner().start(start)
     expect(opened[0]).toMatchObject({
@@ -163,7 +211,9 @@ describe('starting a supervised run', () => {
     expect(written.map((w) => w.data).join('')).not.toContain('bypassPermissions')
     expect(launchScriptBody()).not.toContain('bypassPermissions')
   })
+}
 
+function skillsAndTranscriptsTests() {
   it('points the skills at the card, so they work whatever the branch is called', async () => {
     await runner().start(start)
     // Quoted: it goes into the operator's shell, and a slug is not guaranteed
@@ -187,7 +237,9 @@ describe('starting a supervised run', () => {
       terminalSessionId: 'terminal-1',
     })
   })
+}
 
+function supervisedRunnerResumingTests() {
   it('resumes an existing conversation rather than starting a second one', async () => {
     const run = await runner().start({ ...start, resumeSessionId: 'earlier-session' })
     expect(run?.sessionId).toBe('earlier-session')
@@ -208,7 +260,9 @@ describe('starting a supervised run', () => {
     const second = await r.start({ ...start, resumeSessionId: first?.sessionId })
     expect(second?.transcriptFrom).toBe(512)
   })
+}
 
+function nothingStartedTests() {
   it('starts nothing when the worktree cannot be made a project', async () => {
     projectId = null
     expect(await runner().start(start)).toBeNull()
@@ -220,19 +274,23 @@ describe('starting a supervised run', () => {
     expect(await runner().start(start)).toBeNull()
     expect(written).toEqual([])
   })
-})
+}
 
 describe('a tool call the agent may not make on its own', () => {
-  function ask(sessionId: string): Promise<unknown> {
-    const pending = fetch(control.url, {
-      method: 'POST',
-      headers: { authorization: `Bearer ${control.token}`, 'content-type': 'application/json' },
-      body: JSON.stringify({ sessionId, toolName: 'Bash', input: { command: 'rm -rf /' } }),
-    }).then((r) => r.json())
-    pending.catch(() => {})
-    return pending
-  }
+  describe('reaching the operator', reachingTheOperatorTests)
+  describe('the answer', theAnswerTests)
+  describe('the ladder', theLadderTests)
+})
 
+async function report(sessionId: string, kind: string): Promise<void> {
+  await fetch(control.eventUrl, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${control.token}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ sessionId, kind }),
+  })
+}
+
+function reachingTheOperatorTests() {
   it('reaches the operator instead of being approved for them', async () => {
     const call = held()
     const r = runner()
@@ -252,7 +310,9 @@ describe('a tool call the agent may not make on its own', () => {
     await call.arrived
     expect(settled).toBe(false)
   })
+}
 
+function theAnswerTests() {
   it('proceeds once the operator allows it', async () => {
     const call = held()
     const r = runner()
@@ -278,7 +338,9 @@ describe('a tool call the agent may not make on its own', () => {
       reason: 'use the staging host',
     })
   })
+}
 
+function theLadderTests() {
   it('is settled by the autonomy ladder without troubling the operator', async () => {
     const seen: PendingPermission[] = []
     const r = runner()
@@ -290,17 +352,17 @@ describe('a tool call the agent may not make on its own', () => {
     expect(await ask(run?.sessionId ?? '')).toMatchObject({ permissionDecision: 'allow' })
     expect(seen).toEqual([])
   })
-})
+}
 
 describe('taking a run over, or ending it', () => {
-  async function report(sessionId: string, kind: string): Promise<void> {
-    await fetch(control.eventUrl, {
-      method: 'POST',
-      headers: { authorization: `Bearer ${control.token}`, 'content-type': 'application/json' },
-      body: JSON.stringify({ sessionId, kind }),
-    })
-  }
+  describe('typing and interrupting', typingAndInterruptingTests)
+  describe('stopping and ending', stoppingAndEndingTests)
+  describe('turn and conversation ends', turnAndConversationEndsTests)
+  describe('closing the tab', closingTheTabTests)
+  describe('disposing', disposingTests)
+})
 
+function typingAndInterruptingTests() {
   it('sends a message by typing it, exactly as the operator would', async () => {
     const r = runner()
     const run = await r.start(start)
@@ -317,7 +379,9 @@ describe('taking a run over, or ending it', () => {
     r.send(run?.sessionId ?? '', 'do it differently')
     expect(written.map((w) => w.data)).toEqual([ESC, 'do it differently\r'])
   })
+}
 
+function stoppingAndEndingTests() {
   it('stops the turn first, so the reason is not queued behind it', async () => {
     const r = runner()
     const run = await r.start(start)
@@ -338,7 +402,9 @@ describe('taking a run over, or ending it', () => {
     expect(runner().stop('nobody')).toBe(false)
     expect(runner().send('nobody', 'hi')).toBe(false)
   })
+}
 
+function turnAndConversationEndsTests() {
   it('reports the end of a turn without calling the run over', async () => {
     const turns: number[] = []
     const ends: number[] = []
@@ -361,14 +427,18 @@ describe('taking a run over, or ending it', () => {
     expect(ends).toEqual([1])
     expect(r.terminalFor(run?.sessionId ?? '')).toBeNull()
   })
+}
 
+function closingTheTabTests() {
   it('closes the tab once the conversation has ended, rather than leaving a shell behind', async () => {
     const r = runner()
     const run = await r.start(start)
     await report(run?.sessionId ?? '', 'session_end')
     expect(closed).toEqual(['terminal-1'])
   })
+}
 
+function disposingTests() {
   it('stops answering the agent once disposed, rather than holding a call open', async () => {
     const call = held()
     const r = runner()
@@ -383,7 +453,7 @@ describe('taking a run over, or ending it', () => {
     r.dispose()
     expect(await pending).toMatchObject({ permissionDecision: 'deny' })
   })
-})
+}
 
 describe('the environment the agent runs in', () => {
   it('forces session persistence, or there is no transcript to read', async () => {
@@ -398,12 +468,18 @@ describe('the environment the agent runs in', () => {
 })
 
 describe('when the terminal itself goes', () => {
+  describe('ending the run', endingTheRunTests)
+  describe('a host that cannot close tabs', aHostThatCannotCloseTabsTests)
+  describe('killed and failed runs', killedAndFailedRunsTests)
+})
+
+function endingTheRunTests() {
   // Supervised runs ended on the runtime's `session_end` hook. Closing the tab
   // fires no hook, so the phase stayed running with no completion ever
   // delivered.
 
   it('ends the run, carrying the terminal’s exit code', async () => {
-    const ends: number[] = []
+    const ends: Array<number | null> = []
     const r = runner()
     await r.start({ ...start, onEnd: (code) => ends.push(code) })
     exitListener?.(137)
@@ -422,9 +498,11 @@ describe('when the terminal itself goes', () => {
     exitListener?.(0)
     expect(closed).toEqual(['terminal-1'])
   })
+}
 
+function aHostThatCannotCloseTabsTests() {
   it('still stops answering the agent on a host that cannot close the tab', async () => {
-    const host = api() as { pty: { closeTerminalTab?: unknown } }
+    const host = runnerCoreApi() as { pty: { closeTerminalTab?: unknown } }
     delete host.pty.closeTerminalTab
     const r = createSupervisedRunner({
       api: host as never,
@@ -444,6 +522,18 @@ describe('when the terminal itself goes', () => {
     expect(() => exitListener?.(0)).not.toThrow()
     expect(await pending).toMatchObject({ permissionDecision: 'deny' })
   })
+}
+
+function killedAndFailedRunsTests() {
+  // Closing the tab kills the shell with SIGHUP. The core reports that as no
+  // exit status; it used to arrive as 0, and the phase was recorded as ended.
+  it('ends a run whose terminal was killed with no exit status, never a clean 0', async () => {
+    const ends: Array<number | null> = []
+    await runner().start({ ...start, onEnd: (code) => ends.push(code) })
+    exitListener?.(null)
+    expect(ends).toEqual([null])
+    expect(closed).toEqual([])
+  })
 
   it('keeps the tab of a run that failed, so the operator can read why', async () => {
     await runner().start(start)
@@ -458,7 +548,7 @@ describe('when the terminal itself goes', () => {
     exitListener?.(0)
     expect(exitDetached).toBe(true)
   })
-})
+}
 
 // Awaiting the response is enough: the control server runs an event's
 // handler synchronously in the tick it answers, before the answer can be read.
@@ -480,6 +570,14 @@ function askPermission(sessionId: string): void {
 }
 
 describe('running the next phase in the conversation that is already open', () => {
+  describe('no second terminal', noSecondTerminalTests)
+  describe('keeping the session', keepingTheSessionTests)
+  describe('gone sessions and turn ends', goneSessionsAndTurnEndsTests)
+  describe('permission asks', permissionAsksTests)
+  describe('the waiting flag', theWaitingFlagTests)
+})
+
+function noSecondTerminalTests() {
   it('opens no second terminal, which is where the tab-per-phase sprawl came from', async () => {
     const supervised = runner()
     const run = await supervised.start(start)
@@ -506,7 +604,9 @@ describe('running the next phase in the conversation that is already open', () =
     })
     expect(written).toEqual([{ terminal: 'terminal-1', data: '/speckit-plan\r' }])
   })
+}
 
+function keepingTheSessionTests() {
   it('keeps the session and its transcript, which is the point of reusing it', async () => {
     const supervised = runner()
     const run = await supervised.start(start)
@@ -531,7 +631,9 @@ describe('running the next phase in the conversation that is already open', () =
     })
     expect(written[0].data).toBe('do this and that\r')
   })
+}
 
+function goneSessionsAndTurnEndsTests() {
   it('reports nothing for a session that is gone, rather than typing into thin air', () => {
     // The tab was closed, or the console restarted. The caller's signal to open
     // a fresh conversation instead of silently dropping the phase.
@@ -559,7 +661,9 @@ describe('running the next phase in the conversation that is already open', () =
     await reportEvent(run!.sessionId, 'stop')
     expect(seen).toEqual(['plan'])
   })
+}
 
+function permissionAsksTests() {
   it('reports the new phase’s permission asks, not the one that just finished', async () => {
     const supervised = runner()
     const seen: string[] = []
@@ -581,7 +685,9 @@ describe('running the next phase in the conversation that is already open', () =
     await plan.arrived
     expect(seen).toEqual(['plan'])
   })
+}
 
+function theWaitingFlagTests() {
   it('clears the waiting flag, so the new phase is not born already blocked', async () => {
     const supervised = runner()
     const run = await supervised.start(start)
@@ -595,7 +701,7 @@ describe('running the next phase in the conversation that is already open', () =
     })
     expect(supervised.watchable()[0].isWaiting).toBe(false)
   })
-})
+}
 
 describe('an agent sitting at its prompt', () => {
   it('counts as blocked on a person, not as having stopped making progress', async () => {
@@ -622,7 +728,7 @@ describe('acting on a session that is not there', () => {
   // Every one of these is reachable from the panel: it polls every five
   // seconds, so a row can be clicked after the run behind it has ended.
   it('refuses to answer a tool call for it, rather than reporting success', () => {
-    expect(runner().resolve('gone', 'request-1', { permissionDecision: 'allow' })).toBe(false)
+    expect(runner().resolve('gone', 'request-1', { allow: true })).toBe(false)
   })
 
   it('shrugs off handing one back to a terminal that is not there', () => {
@@ -658,6 +764,14 @@ describe('acting on a session that is not there', () => {
   })
 })
 
+const longPrompt = [
+  'Turn intent and context into criteria and a plan.',
+  '',
+  '# Read the session TTL from the environment',
+  '',
+  'x'.repeat(4000),
+].join('\n')
+
 // A terminal in canonical mode silently mangles anything past `MAX_CANON` on
 // one line — 1024 bytes on macOS. A brief is a role prompt plus a whole work
 // order, which is always longer, and it was typed at the shell prompt. A live
@@ -665,16 +779,24 @@ describe('acting on a session that is not there', () => {
 // the rest cut off mid-word, and nothing could see it: the terminal shows the
 // first line correctly, the agent starts, and it does the wrong work or none.
 describe('launching with a brief longer than a terminal line', () => {
+  describe('line length', lineLengthTests)
+  describe('what still shows', whatStillShowsTests)
+  describe('the heredoc', theHeredocTests)
+})
+
+const IDENTITY = [
+  'CLAUDE_CODE_BRIDGE_SESSION_ID',
+  'CLAUDE_CODE_MESSAGING_SOCKET',
+  'CLAUDE_CODE_MESSAGING_TOKEN',
+  'CLAUDE_CODE_SESSION_ID',
+  'CLAUDE_CODE_CHILD_SESSION',
+  'CLAUDE_PID',
+  'CLAUDECODE',
+]
+
+function lineLengthTests() {
   /** The canonical-mode line limit this is all about. */
   const MAX_CANON = 1024
-
-  const longPrompt = [
-    'Turn intent and context into criteria and a plan.',
-    '',
-    '# Read the session TTL from the environment',
-    '',
-    'x'.repeat(4000),
-  ].join('\n')
 
   it('never types a line the terminal cannot carry', async () => {
     await runner().start({ ...start, prompt: longPrompt })
@@ -694,7 +816,9 @@ describe('launching with a brief longer than a terminal line', () => {
     // Intact, not truncated: the tail of the brief is there too.
     expect(body).toContain('x'.repeat(4000))
   })
+}
 
+function whatStillShowsTests() {
   it('still shows the whole command in the terminal, which is the point of a terminal', async () => {
     await runner().start({ ...start, prompt: longPrompt })
     const body = launchScriptBody()
@@ -710,7 +834,9 @@ describe('launching with a brief longer than a terminal line', () => {
     expect(body).toContain('SPECIFY_FEATURE=')
     expect(body).toContain('CLAUDE_CODE_FORCE_SESSION_PERSISTENCE=1')
   })
+}
 
+function theHeredocTests() {
   it('never lets the brief out of the quoted heredoc, so nothing in it is run', async () => {
     await runner().start({ ...start, prompt: 'plan it\nTERMINATOR_LAUNCH\nrm -rf /' })
     const body = launchScriptBody()
@@ -721,7 +847,7 @@ describe('launching with a brief longer than a terminal line', () => {
     expect(firstEnd).toBeGreaterThan(0)
     expect(afterHeredoc.slice(firstEnd)).toContain('exec ')
   })
-})
+}
 
 // A fresh agent must not inherit another session's identity.
 //
@@ -732,16 +858,11 @@ describe('launching with a brief longer than a terminal line', () => {
 // all, and from the console it looked exactly like an agent thinking. Four
 // live runs died on it.
 describe('the parent session it must not inherit', () => {
-  const IDENTITY = [
-    'CLAUDE_CODE_BRIDGE_SESSION_ID',
-    'CLAUDE_CODE_MESSAGING_SOCKET',
-    'CLAUDE_CODE_MESSAGING_TOKEN',
-    'CLAUDE_CODE_SESSION_ID',
-    'CLAUDE_CODE_CHILD_SESSION',
-    'CLAUDE_PID',
-    'CLAUDECODE',
-  ]
+  describe('unsetting', unsettingTests)
+  describe('what it keeps', supervisedRunnerWhatItKeepsTests)
+})
 
+function unsettingTests() {
   it.each(IDENTITY)('unsets %s before the agent starts', async (name) => {
     await runner().start(start)
     const body = launchScriptBody()
@@ -756,7 +877,9 @@ describe('the parent session it must not inherit', () => {
     expect(body.indexOf('unset ')).toBeLessThan(body.indexOf('exec '))
     expect(body.indexOf('unset ')).toBeLessThan(body.indexOf('SPECIFY_FEATURE='))
   })
+}
 
+function supervisedRunnerWhatItKeepsTests() {
   it('still forces session persistence, which is the other half of the same problem', async () => {
     await runner().start(start)
     expect(launchScriptBody()).toContain('CLAUDE_CODE_FORCE_SESSION_PERSISTENCE=1')
@@ -766,7 +889,7 @@ describe('the parent session it must not inherit', () => {
     const run = await runner().start(start)
     expect(launchScriptBody()).toContain(`--session-id ${run?.sessionId}`)
   })
-})
+}
 
 // The other half of the stall the detector could not have seen through. A
 // session's `startedAt` was written once, at registration, and the stall
@@ -803,26 +926,31 @@ describe('when a session is given something new to do', () => {
   })
 })
 
-describe('running one command in a terminal, with no agent', () => {
-  const command = {
-    worktreePath: '/wt/feat-thing',
-    workspaceId: 'ws-1',
-    branch: 'feat/thing',
-    title: 'Lint',
-    command: 'npm run lint',
-  }
+const command = {
+  worktreePath: '/wt/feat-thing',
+  workspaceId: 'ws-1',
+  branch: 'feat/thing',
+  title: 'Lint',
+  command: 'npm run lint',
+}
 
+describe('running one command in a terminal, with no agent', () => {
+  describe('opening the tab', openingTheTabTests)
+  describe('exit statuses', supervisedRunnerExitStatusesTests)
+})
+
+function openingTheTabTests() {
   it("links the order's ticket to the project a command opens, too", async () => {
     void runner().runCommand({ ...command, issue: { tracker: 'linear', key: 'TAV-15' } })
-    await Promise.resolve()
+    await coreCallsSettled()
     expect(created[0]).toMatchObject({ issue: { tracker: 'linear', key: 'TAV-15' } })
   })
 
   it('opens a plain terminal tab in the worktree project', async () => {
     void runner().runCommand(command)
-    await Promise.resolve()
+    await coreCallsSettled()
     expect(created[0]).toMatchObject({ worktreePath: '/wt/feat-thing', gitBranch: 'feat/thing' })
-    expect(opened[0]).toMatchObject({
+    expect(ran[0]).toMatchObject({
       projectId: 'project-1',
       cwd: '/wt/feat-thing',
       tabTitle: 'Lint',
@@ -830,52 +958,39 @@ describe('running one command in a terminal, with no agent', () => {
     })
   })
 
-  it('runs the command from a script and exits the shell with its status', async () => {
+  // Typed into an interactive shell, the verdict was that shell's exit, and closing the tab
+  // read as exit 0 (extensions/foundry/CLAUDE.md, "Verification commands").
+  it("runs the command's script as the terminal's process, typing nothing", async () => {
     void runner().runCommand(command)
-    await Promise.resolve()
-    expect(launchScriptBody()).toContain('npm run lint')
-    expect(written.map((w) => w.data).join('')).toMatch(/; exit \$\?\r$/)
-    expect(launchScriptBody()).not.toContain('claude')
+    await coreCallsSettled()
+    expect(written).toEqual([])
+    const shell = process.env.SHELL ?? '/bin/sh'
+    expect(ran[0].file).toBe(shell)
+    // An interactive login shell reads the startup files, then execs the script.
+    expect(ran[0].args).toEqual(['-i', '-l', '-c', `exec '${shell}' '${scriptOf(ran[0])}'`])
+    expect(readFileSync(scriptOf(ran[0]), 'utf8')).toContain('npm run lint')
   })
+}
 
-  it('closes the tab of a command that passed', async () => {
-    const pending = runner().runCommand(command)
-    await Promise.resolve()
-    exitListener!(0)
-    await pending
+function supervisedRunnerExitStatusesTests() {
+  it('resolves 0 for a command that exited 0, and closes its tab', async () => {
+    exitWith({ exitCode: 0 })
+    await expect(runner().runCommand(command)).resolves.toBe(0)
     expect(closed).toEqual(['terminal-1'])
   })
 
-  // The extension loads from the checkout; the host is whatever app is
-  // installed. A host built before `closeTerminalTab` existed threw from the
-  // exit listener, the pass never resolved, and the run sat at lint for ever.
-  it('still resolves a pass on a host that cannot close the tab', async () => {
-    const host = api() as { pty: { closeTerminalTab?: unknown } }
-    delete host.pty.closeTerminalTab
-    const pending = createSupervisedRunner({
-      api: host as never,
-      control,
-      stateDir: join(dir, 'state'),
-      now: () => 1_000,
-    }).runCommand(command)
-    await Promise.resolve()
-    expect(() => exitListener!(0)).not.toThrow()
-    await expect(pending).resolves.toBe(0)
-  })
-
-  it('keeps the tab of a command that failed, with its output on screen', async () => {
-    const pending = runner().runCommand(command)
-    await Promise.resolve()
-    exitListener!(1)
-    await pending
+  it('resolves the status of a command that failed, and keeps its tab on screen', async () => {
+    exitWith({ exitCode: 2 })
+    await expect(runner().runCommand(command)).resolves.toBe(2)
     expect(closed).toEqual([])
   })
 
-  it("resolves with the terminal's exit status, a failure as much as a pass", async () => {
-    const pending = runner().runCommand(command)
-    await Promise.resolve()
-    exitListener!(2)
-    await expect(pending).resolves.toBe(2)
+  // Killed by a signal, or its tab closed before it finished: the core has no
+  // exit status to give, and "not measured" is the only honest verdict.
+  it('resolves null, never 0, for a command that ended without an exit status', async () => {
+    exitWith({ exitCode: null })
+    await expect(runner().runCommand(command)).resolves.toBeNull()
+    expect(closed).toEqual([])
   })
 
   it('resolves null when no project or terminal could be opened', async () => {
@@ -885,75 +1000,210 @@ describe('running one command in a terminal, with no agent', () => {
     terminalId = null
     await expect(runner().runCommand(command)).resolves.toBeNull()
   })
-})
+}
 
 // A command step's output used to vanish the moment the tab scrolled past it.
-// logPath tees stdout+stderr to a file while keeping the tab's own exit code
-// as the verdict — the command's status, never tee's.
+// logPath tees stdout+stderr to a file while keeping the script's own exit
+// status as the verdict — the command's status, never tee's.
+const LOG_SHELLS = ['/bin/sh', ...(existsSync('/bin/zsh') ? ['/bin/zsh'] : [])]
+
+let logDir: string
+
+/** The script the runner hands the terminal for `commandLine`, teeing to `logPath` if given. */
+async function scriptFor(commandLine: string, logPath?: string): Promise<string> {
+  void runner().runCommand({
+    worktreePath: '/wt/feat-thing',
+    workspaceId: 'ws-1',
+    branch: 'feat/thing',
+    title: 'Check',
+    command: commandLine,
+    logPath,
+  })
+  await coreCallsSettled()
+  return scriptOf(ran[ran.length - 1])
+}
+
 describe('running a command with a log file', () => {
-  const shells = ['/bin/sh', ...(existsSync('/bin/zsh') ? ['/bin/zsh'] : [])]
-
-  let logDir: string
-
   beforeEach(() => {
-    logDir = mkdtempSync(join(tmpdir(), 'supervised-runner-log-'))
+    logDir = makeTempDir('supervised-runner-log-')
   })
 
   afterEach(() => {
     rmSync(logDir, { recursive: true, force: true, maxRetries: 5 })
   })
 
-  function scriptPath(): string {
-    const typed = written.map((w) => w.data).join('')
-    const match = /([^'\s]*\/launch\/[\w-]+\.sh)/.exec(typed)
-    if (match === null) throw new Error(`no command script was typed: ${typed}`)
-    return match[1]
-  }
-
-  for (const shell of shells) {
-    it(`(${shell}) exits with the command's status, not tee's, and writes the log`, async () => {
-      const logPath = join(logDir, 'false.log')
-      void runner().runCommand({
-        worktreePath: '/wt/feat-thing',
-        workspaceId: 'ws-1',
-        branch: 'feat/thing',
-        title: 'Check',
-        command: 'false',
-        logPath,
-      })
-      await Promise.resolve()
-      const result = spawnSync(shell, [scriptPath()])
-      expect(result.status).toBe(1)
-      expect(existsSync(logPath)).toBe(true)
-    })
-
-    it(`(${shell}) captures the command's exit code and its combined output in the log`, async () => {
-      written = []
-      const logPath = join(logDir, 'echo.log')
-      void runner().runCommand({
-        worktreePath: '/wt/feat-thing',
-        workspaceId: 'ws-1',
-        branch: 'feat/thing',
-        title: 'Check',
-        command: 'echo hello; exit 3',
-        logPath,
-      })
-      await Promise.resolve()
-      const result = spawnSync(shell, [scriptPath()])
-      expect(result.status).toBe(3)
-      expect(readFileSync(logPath, 'utf8')).toContain('hello')
-    })
-  }
+  for (const shell of LOG_SHELLS) loggedCommandTests(shell)
 
   it('has no tee when logPath is absent', async () => {
-    void runner().runCommand({
-      worktreePath: '/wt/feat-thing',
-      workspaceId: 'ws-1',
-      branch: 'feat/thing',
-      title: 'Check',
-      command: 'npm run lint',
-    })
-    await Promise.resolve()
-    expect(readFileSync(scriptPath(), 'utf8')).not.toContain('tee')
+    expect(readFileSync(await scriptFor('npm run lint'), 'utf8')).not.toContain('tee')
   })
 })
+
+function loggedCommandTests(shell: string) {
+  it(`(${shell}) exits with the command's status, not tee's, and writes the log`, async () => {
+    const logPath = join(logDir, 'false.log')
+    const result = spawnSync(shell, [await scriptFor('false', logPath)])
+    expect(result.status).toBe(1)
+    expect(existsSync(logPath)).toBe(true)
+  })
+
+  it(`(${shell}) captures the command's exit code and its combined output in the log`, async () => {
+    const logPath = join(logDir, 'echo.log')
+    const result = spawnSync(shell, [await scriptFor('echo hello; exit 3', logPath)])
+    expect(result.status).toBe(3)
+    expect(readFileSync(logPath, 'utf8')).toContain('hello')
+  })
+}
+
+// The app adopts only PATH from the login shell, so a bare `$SHELL script` lost what startup
+// files export (extensions/foundry/CLAUDE.md, "Verification commands"). A real PTY and a
+// temporary HOME whose startup file is the only place a variable is set; the check must see it.
+interface StartupShell {
+  shell: string
+  files: Record<string, string>
+}
+
+/** Each shell there is, and the startup files where it reads the one variable a check needs. */
+const EVERY_STARTUP_SHELL: StartupShell[] = [
+  // An interactive login bash reads ~/.bash_profile, which is where the
+  // usual setup sources ~/.bashrc from.
+  {
+    shell: '/bin/bash',
+    files: {
+      '.bash_profile': '[ -f ~/.bashrc ] && . ~/.bashrc\n',
+      '.bashrc': 'export FOUNDRY_RC_ONLY=from-rc\n',
+    },
+  },
+  {
+    shell: '/bin/zsh',
+    files: {
+      // Debian and Ubuntu's /etc/zsh/zshrc runs compinit, which stops to ask
+      // about group-writable system directories on CI's runner; that file's
+      // own documented opt-out is this line in ~/.zshenv.
+      '.zshenv': 'skip_global_compinit=1\n',
+      '.zshrc': 'export FOUNDRY_RC_ONLY=from-rc\n',
+    },
+  },
+]
+
+const STARTUP_SHELLS = EVERY_STARTUP_SHELL.filter(({ shell }) => existsSync(shell))
+
+let home: string
+const savedEnv = { HOME: process.env.HOME, SHELL: process.env.SHELL }
+/** What the tab printed, so a check that never ends says what the shell is waiting on. */
+let printed = ''
+
+/** Runs `input` in a real node-pty, ending it the way the core does when its tab closes. */
+function runInRealPty(input: { file: string; args: string[]; cwd: string }) {
+  return new Promise((resolve) => {
+    const proc = ptySpawn(input.file, input.args, {
+      cwd: input.cwd,
+      env: process.env as Record<string, string>,
+    })
+    proc.onData((data) => {
+      printed += data
+      // Closing the tab: the core sends the process SIGHUP.
+      if (data.includes('hang-up-now')) proc.kill('SIGHUP')
+    })
+    // As PtyManager reports it: null when a signal ended the process.
+    proc.onExit(({ exitCode, signal }) =>
+      resolve({ sessionId: 'terminal-1', exitCode: signal ? null : exitCode })
+    )
+  })
+}
+
+/** The core's runInTerminal, over a real node-pty and nothing else. */
+function realPtyApi(): ExtensionAPI {
+  const project = { id: 'project-1', workspaceId: 'ws-1', name: 'p' }
+  return partialFake<ExtensionAPI>({
+    workspace: partialFake<ExtensionAPI['workspace']>({ addProject: async () => project }),
+    pty: partialFake<ExtensionAPI['pty']>({
+      write: () => {},
+      closeTerminalTab: () => {},
+      runInTerminal: runInRealPty as ExtensionAPI['pty']['runInTerminal'],
+    }),
+  })
+}
+
+function runCheck(commandLine: string, logPath?: string): Promise<number | null> {
+  return createSupervisedRunner({
+    api: realPtyApi(),
+    control,
+    stateDir: join(dir, 'state'),
+    now: () => 1_000,
+  }).runCommand({
+    worktreePath: dir,
+    workspaceId: 'ws-1',
+    branch: 'feat/thing',
+    title: 'Check',
+    command: commandLine,
+    logPath,
+  })
+}
+
+async function checkOrTimeOut(commandLine: string, logPath?: string): Promise<number | null> {
+  const ended = runCheck(commandLine, logPath)
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const stuck = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`the check never ended; it printed:\n${printed}`)),
+      4_000
+    )
+  })
+  try {
+    return await Promise.race([ended, stuck])
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+/** Makes `startup.shell` the user's shell, in a HOME holding only its startup files. */
+function withStartupShell(startup: StartupShell): void {
+  for (const [name, body] of Object.entries(startup.files)) writeFileSync(join(home, name), body)
+  process.env.HOME = home
+  process.env.SHELL = startup.shell
+}
+
+describe('a check sees what the user’s shell startup files export', () => {
+  beforeEach(() => {
+    printed = ''
+    home = makeTempDir('supervised-runner-home-')
+    delete process.env.FOUNDRY_RC_ONLY
+  })
+
+  afterEach(() => {
+    process.env.HOME = savedEnv.HOME
+    process.env.SHELL = savedEnv.SHELL
+    rmSync(home, { recursive: true, force: true, maxRetries: 5 })
+  })
+
+  for (const startup of STARTUP_SHELLS) startupFileTests(startup)
+})
+
+function startupFileTests(startup: StartupShell) {
+  const { shell } = startup
+
+  it(`(${shell}) passes a check that needs a variable only a startup file exports`, async () => {
+    withStartupShell(startup)
+    await expect(checkOrTimeOut('test "$FOUNDRY_RC_ONLY" = from-rc')).resolves.toBe(0)
+  })
+
+  it(`(${shell}) still resolves the command's own exit code, not the shell's`, async () => {
+    withStartupShell(startup)
+    await expect(checkOrTimeOut('echo "$FOUNDRY_RC_ONLY"; exit 3')).resolves.toBe(3)
+  })
+
+  // bash ends by the signal (null, "not measured"); zsh catches SIGHUP and
+  // exits 1. Either way a check nobody let finish is never a pass.
+  it(`(${shell}) never passes a check whose tab was closed while it ran`, async () => {
+    withStartupShell(startup)
+    await expect(checkOrTimeOut('echo hang-up-"now"; sleep 30')).resolves.not.toBe(0)
+  })
+
+  it(`(${shell}) keeps both through the log file`, async () => {
+    withStartupShell(startup)
+    const logPath = join(home, 'logs', 'check.log')
+    await expect(checkOrTimeOut('echo "$FOUNDRY_RC_ONLY"; exit 3', logPath)).resolves.toBe(3)
+    expect(readFileSync(logPath, 'utf8')).toContain('from-rc')
+  })
+}

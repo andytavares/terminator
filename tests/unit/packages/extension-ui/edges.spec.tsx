@@ -5,11 +5,6 @@ import { FileText } from 'lucide-react'
 import { IconButton } from '../../../../packages/extension-ui/src/IconButton'
 import { Popover } from '../../../../packages/extension-ui/src/Popover'
 import { Toast } from '../../../../packages/extension-ui/src/Toast'
-import {
-  captureFocus,
-  focusableWithin,
-  trapTab,
-} from '../../../../packages/extension-ui/src/focus-trap'
 
 // The paths the happy-path specs do not reach: empty surfaces, absent optional
 // props, timers that do and do not fire, and an opener that is gone by the time
@@ -30,6 +25,23 @@ describe('IconButton edges', () => {
     expect(screen.getByRole('button', { name: 'Close' }).hasAttribute('aria-pressed')).toBe(false)
   })
 
+  it('keeps the label as the name and shows a longer description as the tooltip', () => {
+    render(
+      <IconButton
+        icon={FileText}
+        label="Mute run-1"
+        description="Stop this run interrupting, without hiding what it does"
+        onClick={() => {}}
+      />
+    )
+    const button = screen.getByRole('button', { name: 'Mute run-1' })
+    expect(button.getAttribute('title')).toBe(
+      'Stop this run interrupting, without hiding what it does'
+    )
+  })
+})
+
+describe('IconButton edges — reports the unpressed state of a toggle', () => {
   it('reports the unpressed state of a toggle', () => {
     render(<IconButton icon={FileText} label="List view" pressed={false} onClick={() => {}} />)
     expect(screen.getByRole('button', { name: 'List view' }).getAttribute('aria-pressed')).toBe(
@@ -59,7 +71,9 @@ describe('Popover edges', () => {
     fireEvent.keyDown(document, { key: 'Enter' })
     expect(onDismiss).not.toHaveBeenCalled()
   })
+})
 
+describe('Popover edges — leaves the outer surface alone when Escape reaches a nested one', () => {
   it('leaves the outer surface alone when Escape reaches a nested one', () => {
     const onOuter = vi.fn()
     const onInner = vi.fn()
@@ -102,7 +116,9 @@ describe('Toast edges', () => {
     expect(onDismiss).not.toHaveBeenCalled()
     vi.useRealTimers()
   })
+})
 
+describe('Toast edges — treats a zero duration as sticky', () => {
   it('treats a zero duration as sticky', () => {
     vi.useFakeTimers()
     const onDismiss = vi.fn()
@@ -117,86 +133,5 @@ describe('Toast edges', () => {
   it('defaults to info when no tone is given', () => {
     render(<Toast message="Saved" onDismiss={() => {}} />)
     expect(screen.getByRole('status').getAttribute('data-tone')).toBe('info')
-  })
-})
-
-describe('focus-trap edges', () => {
-  function container(html: string): HTMLElement {
-    const el = document.createElement('div')
-    el.setAttribute('data-tmui-panel', '')
-    el.innerHTML = html
-    document.body.appendChild(el)
-    return el
-  }
-
-  it('finds nothing focusable in an empty surface', () => {
-    const el = container('<p>nothing here</p>')
-    expect(focusableWithin(el)).toHaveLength(0)
-    el.remove()
-  })
-
-  it('does not claim the key when there is nothing to move focus to', () => {
-    const el = container('<p>nothing here</p>')
-    expect(trapTab(el, false)).toBe(false)
-    el.remove()
-  })
-
-  it('skips disabled controls, which cannot take focus', () => {
-    const el = container('<button disabled>no</button><button>yes</button>')
-    expect(focusableWithin(el)).toHaveLength(1)
-    el.remove()
-  })
-
-  it('skips tabindex="-1", which is not in the tab order', () => {
-    const el = container('<div tabindex="-1">no</div><button>yes</button>')
-    expect(focusableWithin(el)).toHaveLength(1)
-    el.remove()
-  })
-
-  it('leaves Tab alone in the middle of the order', () => {
-    const el = container('<button>a</button><button>b</button><button>c</button>')
-    const buttons = el.querySelectorAll('button')
-    ;(buttons[1] as HTMLElement).focus()
-    expect(trapTab(el, false)).toBe(false)
-    el.remove()
-  })
-
-  it('leaves Shift+Tab alone in the middle of the order', () => {
-    const el = container('<button>a</button><button>b</button><button>c</button>')
-    const buttons = el.querySelectorAll('button')
-    ;(buttons[1] as HTMLElement).focus()
-    expect(trapTab(el, true)).toBe(false)
-    el.remove()
-  })
-
-  it('pulls stray focus back in on Tab', () => {
-    const outside = document.createElement('button')
-    document.body.appendChild(outside)
-    outside.focus()
-    const el = container('<button>a</button><button>b</button>')
-    expect(trapTab(el, false)).toBe(true)
-    expect(el.contains(document.activeElement)).toBe(true)
-    el.remove()
-    outside.remove()
-  })
-
-  it('focuses the surface itself when it holds nothing focusable', () => {
-    const el = container('<p>nothing</p>')
-    el.tabIndex = -1
-    captureFocus(el)
-    expect(document.activeElement).toBe(el)
-    el.remove()
-  })
-
-  // The obvious case: a row deleted by the very dialog that confirmed deleting it.
-  it('does not throw when the opener has left the document', () => {
-    const opener = document.createElement('button')
-    document.body.appendChild(opener)
-    opener.focus()
-    const el = container('<button>a</button>')
-    const restore = captureFocus(el)
-    opener.remove()
-    expect(() => restore()).not.toThrow()
-    el.remove()
   })
 })

@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Search, X } from 'lucide-react'
-import { useIntegrationsStore } from '../../stores/integrations.store'
-import type { IssueListResult, IssueSummary, TrackerId } from '../../../shared/types/index'
+import { ERROR_TEXT, TRACKER_LABELS, useIssueSearch } from './use-issue-search'
+import type { IssueSummary } from '../../../shared/types/index'
+import './issue-search.css'
 import './IssuePicker.css'
 
 // Choosing an issue, inline.
@@ -10,17 +11,6 @@ import './IssuePicker.css'
 // owning a modal — the new-project dialog cannot open a second dialog over
 // itself just to pick one row.
 
-const TRACKER_LABELS: Record<TrackerId, string> = { linear: 'Linear', jira: 'Jira' }
-const SEARCH_DEBOUNCE_MS = 250
-
-const ERROR_TEXT: Record<string, string> = {
-  'auth-failed': 'credential rejected',
-  'rate-limited': 'rate limited',
-  unavailable: 'unreachable',
-  'not-found': 'not found',
-  failed: 'failed',
-}
-
 export interface IssuePickerProps {
   selected: IssueSummary | null
   onSelect: (issue: IssueSummary) => void
@@ -28,74 +18,10 @@ export interface IssuePickerProps {
 }
 
 export function IssuePicker({ selected, onSelect, onClear }: IssuePickerProps): JSX.Element {
-  const { listMine, searchIssues } = useIntegrationsStore()
-  const [term, setTerm] = useState('')
-  const [open, setOpen] = useState(false)
-  const [result, setResult] = useState<IssueListResult>({ issues: [], failures: [] })
-  const [loading, setLoading] = useState(false)
-  // Guards against a slow earlier request replacing a faster later one.
-  const requestId = useRef(0)
-  const rootRef = useRef<HTMLDivElement>(null)
+  const { term, open, setOpen, rootRef, clear, search, pick } = useIssuePicker(onSelect, onClear)
+  const { result, loading } = useIssueSearch(term, open, { limit: 25 })
 
-  useEffect(() => {
-    if (!open) return
-    const id = ++requestId.current
-    const trimmed = term.trim()
-    setLoading(true)
-
-    const run = async (): Promise<void> => {
-      const next =
-        trimmed.length === 0 ? await listMine({ limit: 25 }) : await searchIssues(trimmed)
-      if (id !== requestId.current) return
-      setResult(next)
-      setLoading(false)
-    }
-
-    if (trimmed.length === 0) {
-      void run()
-      return
-    }
-    const timer = setTimeout(() => void run(), SEARCH_DEBOUNCE_MS)
-    return () => clearTimeout(timer)
-  }, [term, open, listMine, searchIssues])
-
-  // The list is a dropdown, so it goes away the way one does: Escape, or a
-  // pointer anywhere else. Without this it stayed open over whatever it was
-  // opened from, and only picking an issue closed it.
-  useEffect(() => {
-    if (!open) return
-    const dismiss = (event: PointerEvent): void => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false)
-    }
-    document.addEventListener('pointerdown', dismiss)
-    return () => document.removeEventListener('pointerdown', dismiss)
-  }, [open])
-
-  // A tracker the operator never connected is not a failure worth warning
-  // about — it is just absent. Only real failures are named.
-  const reportable = result.failures.filter((f) => f.error !== 'not-connected')
-
-  if (selected !== null) {
-    return (
-      <div className="issue-picker__chosen">
-        <span className="issue-picker__key">{selected.key}</span>
-        <span className="issue-picker__title">{selected.title}</span>
-        <span className="issue-picker__tracker">{TRACKER_LABELS[selected.tracker]}</span>
-        <button
-          type="button"
-          className="issue-picker__clear"
-          title="Choose a different issue"
-          onClick={() => {
-            onClear()
-            setOpen(false)
-            setTerm('')
-          }}
-        >
-          <X />
-        </button>
-      </div>
-    )
-  }
+  if (selected !== null) return <ChosenIssue issue={selected} onClear={clear} />
 
   return (
     <div
@@ -104,57 +30,140 @@ export function IssuePicker({ selected, onSelect, onClear }: IssuePickerProps): 
       onKeyDown={(e) => {
         // Only while the list is showing: with it closed, Escape belongs to
         // whatever the picker sits in, which is usually a dialog to close.
-        if (e.key === 'Escape' && open) {
-          e.stopPropagation()
-          setOpen(false)
-        }
+        if (e.key !== 'Escape' || !open) return
+        e.stopPropagation()
+        setOpen(false)
       }}
     >
-      <div className="issue-picker__search">
-        <Search />
-        <input
-          className="issue-picker__input"
-          value={term}
-          placeholder="Search, or type an issue key"
-          onFocus={() => setOpen(true)}
-          onChange={(e) => {
-            setTerm(e.target.value)
-            setOpen(true)
-          }}
-        />
-      </div>
+      <IssueSearchBox term={term} onFocus={() => setOpen(true)} onChange={search} />
+      {open && <PickerList result={result} loading={loading} onPick={pick} />}
+    </div>
+  )
+}
 
-      {open && (
-        <div className="issue-picker__list">
-          {reportable.length > 0 && (
-            <p className="issue-picker__failures" role="status">
-              {reportable
-                .map((f) => `${TRACKER_LABELS[f.tracker]} ${ERROR_TEXT[f.error]}`)
-                .join(' · ')}
-            </p>
-          )}
-          {loading && <div className="issue-picker__row issue-picker__row--muted">Loading…</div>}
-          {!loading && result.issues.length === 0 && (
-            <div className="issue-picker__row issue-picker__row--muted">No issues found.</div>
-          )}
-          {!loading &&
-            result.issues.map((candidate) => (
-              <button
-                key={`${candidate.tracker}:${candidate.key}`}
-                type="button"
-                className="issue-picker__row"
-                onClick={() => {
-                  onSelect(candidate)
-                  setOpen(false)
-                }}
-              >
-                <span className="issue-picker__key">{candidate.key}</span>
-                <span className="issue-picker__title">{candidate.title}</span>
-                <span className="issue-picker__tracker">{TRACKER_LABELS[candidate.tracker]}</span>
-              </button>
-            ))}
-        </div>
+/** The search text and the list, and what clearing, typing and picking do to them. */
+function useIssuePicker(onSelect: (issue: IssueSummary) => void, onClear: () => void) {
+  const [term, setTerm] = useState('')
+  const { open, setOpen, rootRef } = useDropdown()
+  return {
+    term,
+    open,
+    setOpen,
+    rootRef,
+    clear: (): void => {
+      onClear()
+      setOpen(false)
+      setTerm('')
+    },
+    search: (next: string): void => {
+      setTerm(next)
+      setOpen(true)
+    },
+    pick: (issue: IssueSummary): void => {
+      onSelect(issue)
+      setOpen(false)
+    },
+  }
+}
+
+/** Whether the list is open. The list is a dropdown, so it goes away the way one does: Escape,
+ * or a pointer anywhere else. Without this it stayed open over whatever it was opened from, and
+ * only picking an issue closed it. */
+function useDropdown() {
+  const [open, setOpen] = useState(false)
+  const rootRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!open) return
+    const dismiss = (event: PointerEvent): void => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false)
+    }
+    document.addEventListener('pointerdown', dismiss)
+    return () => document.removeEventListener('pointerdown', dismiss)
+  }, [open])
+  return { open, setOpen, rootRef }
+}
+
+/** An issue's key, title and tracker, as the chosen chip and every row draw them. */
+function IssueCells({ issue }: { issue: IssueSummary }): JSX.Element {
+  return (
+    <>
+      <span className="issue-picker__key">{issue.key}</span>
+      <span className="issue-picker__title">{issue.title}</span>
+      <span className="issue-picker__tracker">{TRACKER_LABELS[issue.tracker]}</span>
+    </>
+  )
+}
+
+function ChosenIssue({ issue, onClear }: { issue: IssueSummary; onClear: () => void }) {
+  return (
+    <div className="issue-picker__chosen">
+      <IssueCells issue={issue} />
+      <button
+        type="button"
+        className="issue-picker__clear"
+        title="Choose a different issue"
+        onClick={onClear}
+      >
+        <X />
+      </button>
+    </div>
+  )
+}
+
+interface SearchBoxProps {
+  term: string
+  onFocus: () => void
+  onChange: (term: string) => void
+}
+
+function IssueSearchBox({ term, onFocus, onChange }: SearchBoxProps): JSX.Element {
+  return (
+    <div className="issue-picker__search">
+      <Search />
+      <input
+        className="issue-picker__input"
+        value={term}
+        placeholder="Search, or type an issue key"
+        onFocus={onFocus}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </div>
+  )
+}
+
+interface PickerListProps {
+  result: ReturnType<typeof useIssueSearch>['result']
+  loading: boolean
+  onPick: (issue: IssueSummary) => void
+}
+
+/** What failed, then the issues (or why there are none). */
+function PickerList({ result, loading, onPick }: PickerListProps): JSX.Element {
+  // A tracker the operator never connected is not a failure worth warning
+  // about — it is just absent. Only real failures are named.
+  const reportable = result.failures.filter((f) => f.error !== 'not-connected')
+  return (
+    <div className="issue-picker__list">
+      {reportable.length > 0 && (
+        <p className="issue-picker__failures" role="status">
+          {reportable.map((f) => `${TRACKER_LABELS[f.tracker]} ${ERROR_TEXT[f.error]}`).join(' · ')}
+        </p>
       )}
+      {loading && <div className="issue-picker__row issue-picker__row--muted">Loading…</div>}
+      {!loading && result.issues.length === 0 && (
+        <div className="issue-picker__row issue-picker__row--muted">No issues found.</div>
+      )}
+      {!loading &&
+        result.issues.map((candidate) => (
+          <button
+            key={`${candidate.tracker}:${candidate.key}`}
+            type="button"
+            className="issue-picker__row"
+            onClick={() => onPick(candidate)}
+          >
+            <IssueCells issue={candidate} />
+          </button>
+        ))}
     </div>
   )
 }

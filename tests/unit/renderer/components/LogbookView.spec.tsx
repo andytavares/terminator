@@ -1,41 +1,20 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, within, waitFor } from '@testing-library/react'
-import type { IssueSummary } from '../../../../src/shared/types/index'
-
-const integrations = vi.hoisted(() => ({
-  connected: true,
-  listMine: vi.fn(),
-  issueFor: vi.fn(),
-}))
-
 vi.mock('../../../../src/renderer/components/session/LivePreview', () => ({
   LivePreview: ({ sessionId }: { sessionId: string }) => (
     <div data-testid={`preview-${sessionId}`} />
   ),
 }))
-vi.mock('../../../../src/renderer/stores/integrations.store', () => ({
-  useIntegrationsStore: (select: (s: unknown) => unknown) =>
-    select({
-      isAnyConnected: () => integrations.connected,
-      listMine: integrations.listMine,
-      issueFor: integrations.issueFor,
-    }),
-}))
-
 import { LogbookView } from '../../../../src/renderer/components/home/LogbookView'
 import { buildLogbook } from '../../../../src/renderer/sidebar/logbook-groups'
 import { fact } from '../sidebar/fixtures/facts'
+import { useIntegrationsStore } from '../../../../src/renderer/stores/integrations.store'
+import { issueFixture, issueSummaryOf, trackerConnectionOf } from '../../../support/renderer-stores'
 
 const NOW = Date.parse('2026-09-15T12:00:00.000Z')
 const titles = new Map([['linear:NW-88', 'Rate limit per API key']])
-const issue = (key: string, title: string): IssueSummary =>
-  ({
-    tracker: 'linear',
-    key,
-    title,
-    state: { name: 'In Progress', type: 'started' },
-  }) as IssueSummary
+const listMine = vi.fn()
 
 const undescribed = fact({
   sessionId: 'u',
@@ -68,12 +47,17 @@ let props: React.ComponentProps<typeof LogbookView>
 
 beforeEach(() => {
   vi.clearAllMocks()
-  integrations.connected = true
-  integrations.listMine.mockResolvedValue({
-    issues: [issue('NW-84', '429s under light load')],
+  listMine.mockResolvedValue({
+    issues: [issueSummaryOf({ key: 'NW-84', title: '429s under light load' })],
     failures: [],
   })
-  integrations.issueFor.mockReturnValue(null)
+  // The real getters (isAnyConnected, issueFor) read this state; only the
+  // tracker call is replaced.
+  useIntegrationsStore.setState({
+    ...useIntegrationsStore.getInitialState(),
+    connections: [trackerConnectionOf()],
+    listMine,
+  })
   props = {
     groups: buildLogbook(facts, '', titles),
     selected: null,
@@ -148,7 +132,9 @@ describe('LogbookView — the detail of an open session', () => {
       'Reproducing the staging 429s'
     )
   })
+})
 
+describe('LogbookView — the detail of an open session — saves with Cmd+Enter, and clears with an empty box', () => {
   it('saves with Cmd+Enter, and clears with an empty box', () => {
     render(<LogbookView {...props} selected={{ ...undescribed, description: 'old' }} />)
     const box = screen.getByRole('textbox', { name: 'What is this session doing?' })
@@ -167,7 +153,9 @@ describe('LogbookView — the detail of an open session', () => {
     expect(within(detail).getByText('NW-88')).toBeTruthy()
     expect(within(detail).getByText("From the branch's link")).toBeTruthy()
   })
+})
 
+describe('LogbookView — the detail of an open session — suggests tickets and links one in a click', () => {
   it('suggests tickets and links one in a click', async () => {
     render(<LogbookView {...props} selected={undescribed} />)
     const suggestions = await screen.findByRole('list', { name: 'Suggested work items' })
@@ -181,7 +169,9 @@ describe('LogbookView — the detail of an open session', () => {
   })
 
   it("offers the branch's own ticket first when the session is linked elsewhere", async () => {
-    integrations.issueFor.mockReturnValue(issue('P-1', 'Project ticket'))
+    useIntegrationsStore.setState({
+      issues: new Map([['p1', issueFixture({ key: 'P-1', title: 'Project ticket' })]]),
+    })
     const own = {
       ...undescribed,
       projectId: 'p1',
@@ -193,11 +183,13 @@ describe('LogbookView — the detail of an open session', () => {
       'P-1 Project ticket'
     )
   })
+})
 
+describe('LogbookView — the detail of an open session — suggests nothing when no tracker is connected', () => {
   it('suggests nothing when no tracker is connected', async () => {
-    integrations.connected = false
+    useIntegrationsStore.setState({ connections: [trackerConnectionOf({ connected: false })] })
     render(<LogbookView {...props} selected={undescribed} />)
-    await waitFor(() => expect(integrations.listMine).not.toHaveBeenCalled())
+    await waitFor(() => expect(listMine).not.toHaveBeenCalled())
     expect(screen.queryByRole('list', { name: 'Suggested work items' })).toBeNull()
   })
 
@@ -249,7 +241,9 @@ describe('LogbookView — the detail of a closed session', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Resume zsh' }))
     expect(onResume).toHaveBeenCalledWith(stopped)
   })
+})
 
+describe('LogbookView — the detail of a closed session — ends the selected session', () => {
   it('ends the selected session', () => {
     const onCloseSession = vi.fn()
     render(<LogbookView {...props} selected={undescribed} onCloseSession={onCloseSession} />)
@@ -277,5 +271,65 @@ describe('LogbookView — the detail of a closed session', () => {
       />
     )
     expect(screen.getByText('Conversation no longer available')).toBeTruthy()
+  })
+})
+
+const scratch = fact({
+  sessionId: 's',
+  name: 'scratch-shell',
+  projectId: null,
+  workspaceName: null,
+  workspaceColor: null,
+  projectName: null,
+  branch: null,
+})
+
+describe('LogbookView — a session that belongs to no branch', () => {
+  it('lists it by its name, and says it has no branch', () => {
+    render(
+      <LogbookView {...props} groups={buildLogbook([scratch], '', titles)} selected={scratch} />
+    )
+    const option = screen.getByRole('option')
+    expect(within(option).getByText('scratch-shell')).toBeTruthy()
+    expect(option.style.getPropertyValue('--rail')).toBe('')
+    const detail = screen.getByRole('region', { name: 'Session details' })
+    expect(within(detail).getByText('No branch')).toBeTruthy()
+  })
+
+  it('still suggests the operator’s own tickets for it', async () => {
+    render(<LogbookView {...props} selected={scratch} />)
+    expect(await screen.findByRole('button', { name: 'NW-84 429s under light load' })).toBeTruthy()
+  })
+})
+
+describe('LogbookView — keys and facts it leaves alone', () => {
+  it('selects only on Enter or Space', () => {
+    render(<LogbookView {...props} />)
+    fireEvent.keyDown(screen.getByRole('option', { name: /Bundle size/ }), { key: 'a' })
+    expect(props.onSelect).not.toHaveBeenCalled()
+  })
+
+  it('saves only on Cmd or Ctrl with Enter', () => {
+    render(<LogbookView {...props} selected={undescribed} />)
+    const box = screen.getByRole('textbox', { name: 'What is this session doing?' })
+    fireEvent.change(box, { target: { value: 'typing' } })
+    fireEvent.keyDown(box, { key: 'Enter' })
+    expect(props.onSaveDescription).not.toHaveBeenCalled()
+    fireEvent.keyDown(box, { key: 'Enter', ctrlKey: true })
+    expect(props.onSaveDescription).toHaveBeenCalledWith(undescribed, 'typing')
+  })
+
+  it('names the git branch only when it differs from the branch', () => {
+    render(<LogbookView {...props} selected={{ ...undescribed, branch: 'northwind-api' }} />)
+    expect(screen.queryByText('Git branch')).toBeNull()
+  })
+
+  it('dates a closed session by its start when its close was not recorded', () => {
+    render(<LogbookView {...props} selected={{ ...closed, closedAt: null }} />)
+    const started = new Date(closed.startedAt).toLocaleString(undefined, {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    })
+    expect(screen.getByText(`Closed ${started}`)).toBeTruthy()
   })
 })

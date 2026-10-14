@@ -5,17 +5,12 @@
  * (and, through it, the private stripAnsi helper).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { EventEmitter } from 'events'
+import type { ExtensionAPI, ShellExecResult } from '@terminator/extension-sdk'
+import { bindShell } from '../../src/shell/run-git'
+import { bindShellToStub, stubFails, stubPrints } from './support/shell'
 
-const { mockExecFile, mockSpawn } = vi.hoisted(() => ({
-  mockExecFile: vi.fn(),
-  mockSpawn: vi.fn(),
-}))
-
-vi.mock('child_process', () => ({
-  execFile: mockExecFile,
-  spawn: mockSpawn,
-}))
+const mockExecFile = vi.fn()
+bindShellToStub(mockExecFile)
 
 import {
   getStatus,
@@ -25,29 +20,12 @@ import {
   commitChanges,
 } from '../../src/git/git-service'
 
-type ExecCallback = (
-  err: (Error & { stdout?: string }) | null,
-  result?: { stdout: string; stderr: string }
-) => void
-
 function mockExecSuccess(stdout = '') {
-  mockExecFile.mockImplementationOnce(
-    (_cmd: string, _args: string[], _opts: unknown, cb: ExecCallback) =>
-      cb(null, { stdout, stderr: '' })
-  )
+  mockExecFile.mockImplementationOnce(stubPrints(stdout))
 }
 
 function mockExecError(message: string, extra: Record<string, unknown> = {}) {
-  mockExecFile.mockImplementationOnce(
-    (_cmd: string, _args: string[], _opts: unknown, cb: ExecCallback) =>
-      cb(Object.assign(new Error(message), extra))
-  )
-}
-
-class FakeChildProcess extends EventEmitter {
-  stdout = new EventEmitter()
-  stderr = new EventEmitter()
-  kill = vi.fn()
+  mockExecFile.mockImplementationOnce(stubFails(Object.assign(new Error(message), extra)))
 }
 
 beforeEach(() => {
@@ -75,7 +53,9 @@ describe('getStatus', () => {
     ])
     expect(result.hasConflicts).toBe(false)
   })
+})
 
+describe('getStatus — falls back to HEAD when the branch cannot be read (e.g. detached HEAD)', () => {
   it('falls back to HEAD when the branch cannot be read (e.g. detached HEAD)', async () => {
     mockExecSuccess('') // no changes
     mockExecError('fatal: ref HEAD is not a symbolic ref') // git branch --show-current fails
@@ -85,7 +65,9 @@ describe('getStatus', () => {
     expect(result.branch).toBe('HEAD')
     expect(result.files).toEqual([])
   })
+})
 
+describe('getStatus — limits', () => {
   it('caps the file list at maxFiles and reports truncation', async () => {
     const entries = ['M  a.ts', 'M  b.ts', 'M  c.ts'].join('\0') + '\0'
     mockExecSuccess(entries)
@@ -102,7 +84,7 @@ describe('getDiff', () => {
   it('requests a staged diff with --cached when staged is true', async () => {
     mockExecSuccess('@@ -1,1 +1,2 @@\n line1\n+line2\n')
 
-    const result = await getDiff('/repo', 'src/foo.ts', true)
+    const result = await getDiff('/repo', 'src/foo.ts', { staged: true })
 
     expect(mockExecFile).toHaveBeenCalledWith(
       'git',
@@ -117,11 +99,13 @@ describe('getDiff', () => {
       { type: 'add', content: 'line2', oldLineNumber: null, newLineNumber: 2 },
     ])
   })
+})
 
+describe('getDiff — requests an unstaged diff without --cached when staged is false', () => {
   it('requests an unstaged diff without --cached when staged is false', async () => {
     mockExecSuccess('@@ -1,1 +1,1 @@\n-old\n+new\n')
 
-    await getDiff('/repo', 'src/foo.ts', false)
+    await getDiff('/repo', 'src/foo.ts', { staged: false })
 
     expect(mockExecFile).toHaveBeenCalledWith(
       'git',
@@ -130,12 +114,14 @@ describe('getDiff', () => {
       expect.any(Function)
     )
   })
+})
 
+describe('getDiff — untracked files', () => {
   it('falls back to --no-index for an untracked file with no plain diff output', async () => {
     mockExecSuccess('') // plain `git diff` produces nothing for an untracked file
     mockExecSuccess('@@ -0,0 +1,1 @@\n+brand new line\n') // --no-index succeeds
 
-    const result = await getDiff('/repo', 'src/new.ts', false, true)
+    const result = await getDiff('/repo', 'src/new.ts', { staged: false, isUntracked: true })
 
     expect(mockExecFile).toHaveBeenNthCalledWith(
       2,
@@ -148,12 +134,14 @@ describe('getDiff', () => {
       { type: 'add', content: 'brand new line', oldLineNumber: null, newLineNumber: 1 },
     ])
   })
+})
 
+describe('getDiff — untracked files whose diff git reports as a failure', () => {
   it('reads the diff from the error object when --no-index exits non-zero', async () => {
     mockExecSuccess('') // plain diff empty
     mockExecError('Command failed', { stdout: '@@ -0,0 +1,1 @@\n+content\n' }) // --no-index "fails" (exit 1) but carries the diff
 
-    const result = await getDiff('/repo', 'src/new.ts', false, true)
+    const result = await getDiff('/repo', 'src/new.ts', { staged: false, isUntracked: true })
 
     expect(result.hunks[0].lines).toEqual([
       { type: 'add', content: 'content', oldLineNumber: null, newLineNumber: 1 },
@@ -163,14 +151,14 @@ describe('getDiff', () => {
   it('does not fall back to --no-index for a tracked file with an empty diff', async () => {
     mockExecSuccess('')
 
-    const result = await getDiff('/repo', 'src/unchanged.ts', false, false)
+    const result = await getDiff('/repo', 'src/unchanged.ts', { staged: false, isUntracked: false })
 
     expect(mockExecFile).toHaveBeenCalledTimes(1)
     expect(result.hunks).toEqual([])
   })
 })
 
-describe('stageFiles / unstageFiles', () => {
+describe('stageFiles', () => {
   it('stageFiles runs git add -- <paths>', async () => {
     mockExecSuccess('')
     await stageFiles('/repo', ['a.ts', 'b.ts'])
@@ -188,7 +176,9 @@ describe('stageFiles / unstageFiles', () => {
       'pathspec did not match any files'
     )
   })
+})
 
+describe('unstageFiles', () => {
   it('unstageFiles runs git restore --staged -- <paths>', async () => {
     mockExecSuccess('')
     await unstageFiles('/repo', ['a.ts'])
@@ -206,86 +196,102 @@ describe('stageFiles / unstageFiles', () => {
   })
 })
 
-describe('commitChanges', () => {
-  let proc: FakeChildProcess
+type ExecOptions = Parameters<ExtensionAPI['shell']['exec']>[0]
+let calls: ExecOptions[]
 
-  beforeEach(() => {
-    proc = new FakeChildProcess()
-    mockSpawn.mockReturnValue(proc)
-  })
+/** The core's shell.exec stand-in: streams `chunks` to onOutput, then resolves `result`. */
+function commitRuns(chunks: string[], result: Partial<ShellExecResult> = {}): void {
+  calls = []
+  const execRecording = async (options: ExecOptions): Promise<ShellExecResult> => {
+    calls.push(options)
+    for (const chunk of chunks) options.onOutput?.(chunk)
+    const exitCode = result.exitCode ?? 0
+    const stdout = exitCode === 0 ? chunks.join('') : ''
+    return { exitCode, stdout, stderr: '', timedOut: false, exceededMaxBuffer: false, ...result }
+  }
+  bindShell({ exec: execRecording as ExtensionAPI['shell']['exec'] })
+}
 
-  afterEach(() => {
-    vi.useRealTimers()
-  })
+afterEach(() => {
+  bindShellToStub(mockExecFile)
+})
 
+describe('commitChanges — arguments', () => {
   it('passes --signoff and --no-verify only when requested', async () => {
-    const pending = commitChanges('/repo', 'msg', true, true)
-    proc.stdout.emit('data', Buffer.from('[main abc1234] msg\n'))
-    proc.emit('close', 0)
-    await pending
+    commitRuns(['[main abc1234] msg\n'])
+    await commitChanges('/repo', 'msg', { signOff: true, noVerify: true })
 
-    expect(mockSpawn).toHaveBeenCalledWith(
-      'git',
-      ['commit', '-m', 'msg', '--signoff', '--no-verify'],
-      expect.objectContaining({ cwd: '/repo' })
-    )
+    expect(calls[0]).toMatchObject({
+      command: 'git',
+      args: ['commit', '-m', 'msg', '--signoff', '--no-verify'],
+      cwd: '/repo',
+    })
   })
 
   it('omits --signoff and --no-verify by default', async () => {
-    const pending = commitChanges('/repo', 'msg')
-    proc.emit('close', 0)
-    await pending
+    commitRuns([])
+    await commitChanges('/repo', 'msg')
 
-    expect(mockSpawn).toHaveBeenCalledWith(
-      'git',
-      ['commit', '-m', 'msg'],
-      expect.objectContaining({ cwd: '/repo' })
-    )
+    expect(calls[0].args).toEqual(['commit', '-m', 'msg'])
   })
+})
 
+describe('commitChanges — the commit hash', () => {
   it('resolves the commit hash parsed from stdout on success', async () => {
-    const pending = commitChanges('/repo', 'feat: add x')
-    proc.stdout.emit('data', Buffer.from('[main a1b2c3d] feat: add x\n'))
-    proc.emit('close', 0)
+    commitRuns(['[main a1b2c3d] feat: add x\n'])
 
-    await expect(pending).resolves.toEqual({ commitHash: 'a1b2c3d' })
+    await expect(commitChanges('/repo', 'feat: add x')).resolves.toEqual({ commitHash: 'a1b2c3d' })
   })
 
+  it.each([
+    ['feature/add-login', '[feature/add-login a1b2c3d] feat: add login'],
+    ['release-1.2', '[release-1.2 a1b2c3d] chore: release'],
+    ['user.name/fix_x', '[user.name/fix_x a1b2c3d] fix: x'],
+    ['the first commit', '[main (root-commit) a1b2c3d] chore: init'],
+    ['a detached HEAD', '[detached HEAD a1b2c3d] wip'],
+  ])('resolves the commit hash for %s', async (_case, summaryLine) => {
+    commitRuns([`${summaryLine}\n 1 file changed, 1 insertion(+)\n`])
+
+    await expect(commitChanges('/repo', 'msg')).resolves.toEqual({ commitHash: 'a1b2c3d' })
+  })
+
+  it('resolves an empty commit hash when git prints no summary line', async () => {
+    commitRuns(['done\n'])
+
+    await expect(commitChanges('/repo', 'msg')).resolves.toEqual({ commitHash: '' })
+  })
+})
+
+describe('commitChanges — streamed output', () => {
   it('strips ANSI escapes from streamed output before handing it to onOutput', async () => {
+    commitRuns(['\x1b[32mrunning hook\x1b[0m\n'])
     const onOutput = vi.fn()
-    const pending = commitChanges('/repo', 'msg', false, false, onOutput)
-    proc.stdout.emit('data', Buffer.from('\x1b[32mrunning hook\x1b[0m\n'))
-    proc.emit('close', 0)
-    await pending
+    await commitChanges('/repo', 'msg', { onOutput })
 
     expect(onOutput).toHaveBeenCalledWith('running hook')
   })
 
   it('does not call onOutput for blank lines', async () => {
+    commitRuns(['\n   \n[main abc] msg\n'])
     const onOutput = vi.fn()
-    const pending = commitChanges('/repo', 'msg', false, false, onOutput)
-    proc.stdout.emit('data', Buffer.from('\n   \n[main abc] msg\n'))
-    proc.emit('close', 0)
-    await pending
+    await commitChanges('/repo', 'msg', { onOutput })
 
     expect(onOutput).toHaveBeenCalledTimes(1)
     expect(onOutput).toHaveBeenCalledWith('[main abc] msg')
   })
+})
 
+describe('commitChanges — failures', () => {
   it('resolves NOTHING_TO_COMMIT when git reports nothing staged', async () => {
-    const pending = commitChanges('/repo', 'msg')
-    proc.stdout.emit('data', Buffer.from('nothing to commit, working tree clean\n'))
-    proc.emit('close', 1)
+    commitRuns([], { exitCode: 1, stdout: 'nothing to commit, working tree clean\n' })
 
-    await expect(pending).resolves.toEqual({ error: 'NOTHING_TO_COMMIT' })
+    await expect(commitChanges('/repo', 'msg')).resolves.toEqual({ error: 'NOTHING_TO_COMMIT' })
   })
 
   it('detects a pre-commit hook failure and reports the hook output', async () => {
-    const pending = commitChanges('/repo', 'msg')
-    proc.stderr.emit('data', Buffer.from('husky - pre-commit hook exited with code 1\n'))
-    proc.emit('close', 1)
+    commitRuns([], { exitCode: 1, stderr: 'husky - pre-commit hook exited with code 1\n' })
 
-    const result = (await pending) as {
+    const result = (await commitChanges('/repo', 'msg')) as {
       error: string
       hookOutput?: string
       isHookFailure?: boolean
@@ -294,31 +300,34 @@ describe('commitChanges', () => {
     expect(result.isHookFailure).toBe(true)
     expect(result.hookOutput).toContain('husky - pre-commit hook exited with code 1')
   })
+})
 
+describe('commitChanges — failures — reports a generic failure with the combined output when no hook pattern matches', () => {
   it('reports a generic failure with the combined output when no hook pattern matches', async () => {
-    const pending = commitChanges('/repo', 'msg')
-    proc.stderr.emit('data', Buffer.from('fatal: unable to auto-detect email address\n'))
-    proc.emit('close', 1)
+    commitRuns([], { exitCode: 128, stderr: 'fatal: unable to auto-detect email address\n' })
 
-    const result = (await pending) as { error: string; isHookFailure?: boolean }
+    const result = (await commitChanges('/repo', 'msg')) as {
+      error: string
+      isHookFailure?: boolean
+    }
     expect(result.error).toContain('unable to auto-detect email address')
     expect(result.isHookFailure).toBe(false)
   })
+})
 
-  it('resolves TIMEOUT and kills the process when it runs past the hook timeout', async () => {
-    vi.useFakeTimers()
-    const pending = commitChanges('/repo', 'msg')
-    await vi.advanceTimersByTimeAsync(120_000)
-    expect(proc.kill).toHaveBeenCalled()
-    proc.emit('close', null)
+describe('commitChanges — timeouts and spawn failures', () => {
+  it('gives hooks two minutes, and resolves TIMEOUT past them', async () => {
+    commitRuns([], { exitCode: 124, timedOut: true })
 
-    await expect(pending).resolves.toEqual({ error: 'TIMEOUT' })
+    await expect(commitChanges('/repo', 'msg')).resolves.toEqual({ error: 'TIMEOUT' })
+    expect(calls[0].timeoutMs).toBe(120_000)
   })
 
-  it('resolves with the error message when the process itself fails to spawn', async () => {
-    const pending = commitChanges('/repo', 'msg')
-    proc.emit('error', new Error('ENOENT'))
+  it('reports why git could not run at all', async () => {
+    commitRuns([], { exitCode: 1, stderr: 'spawn git ENOENT' })
 
-    await expect(pending).resolves.toEqual({ error: 'Error: ENOENT' })
+    await expect(commitChanges('/repo', 'msg')).resolves.toMatchObject({
+      error: 'spawn git ENOENT',
+    })
   })
 })

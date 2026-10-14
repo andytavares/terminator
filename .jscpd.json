@@ -1,0 +1,9 @@
+{
+  "path": ["src", "packages", "extensions"],
+  "minLines": 6,
+  "minTokens": 60,
+  "ignore": ["**/*.spec.*", "**/tests/**", "**/stories/**"],
+  "threshold": 0,
+  "exitCode": 1,
+  "reporters": ["console"]
+}

@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import { execFileSync, spawnSync } from 'node:child_process'
-import { mkdtempSync, realpathSync, rmSync } from 'node:fs'
+import { realpathSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { makeTempDir } from '../../support/temp-dir'
 
 // Specs run real git in a temporary directory. Run from inside a git hook, the
 // hook's GIT_DIR and GIT_INDEX_FILE were inherited by every one of them, so
@@ -21,7 +22,7 @@ describe('the environment a spec runs git in', () => {
   })
 
   it('initialises a fixture in the fixture, not in a repository outside it', () => {
-    const fixture = mkdtempSync(join(tmpdir(), 'git-env-fixture-'))
+    const fixture = makeTempDir('git-env-fixture-')
     try {
       execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: fixture })
       const gitDir = spawnSync('git', ['rev-parse', '--absolute-git-dir'], { cwd: fixture })

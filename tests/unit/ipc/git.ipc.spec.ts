@@ -22,22 +22,12 @@ const gitService = vi.hoisted(() => ({
 }))
 vi.mock('../../../src/main/git/git-service.js', () => gitService)
 
-const stores = vi.hoisted(() => ({
-  getGlobalSettings: vi.fn(),
-  getWorkspaceSettings: vi.fn(),
-  listWorkspaces: vi.fn(),
-  listProjects: vi.fn(),
-}))
-vi.mock('../../../src/main/storage/settings-store.js', () => ({
-  getGlobalSettings: stores.getGlobalSettings,
-  getWorkspaceSettings: stores.getWorkspaceSettings,
-}))
-vi.mock('../../../src/main/storage/workspace-store.js', () => ({
-  listWorkspaces: stores.listWorkspaces,
-  listProjects: stores.listProjects,
-}))
+vi.mock('electron-store', async () =>
+  (await import('../../support/stores')).inMemoryElectronStore()
+)
 
-import { registerGitHandlers } from '../../../src/main/ipc/git.ipc.js'
+let workspaceStore: typeof import('../../../src/main/storage/workspace-store.js')
+let settingsStore: typeof import('../../../src/main/storage/settings-store.js')
 
 function handler(channel: string) {
   return mockHandle.mock.calls.find(([ch]) => ch === channel)![1] as (
@@ -46,12 +36,27 @@ function handler(channel: string) {
   ) => Promise<unknown>
 }
 
-beforeEach(() => {
+/** A workspace at `folderPath`, with its own exclusion patterns when given. */
+function workspaceAt(folderPath: string, branchExcludePatterns?: string[]): string {
+  const created = workspaceStore.createWorkspace({
+    name: folderPath,
+    folderPath,
+    color: '#4A90E2',
+    tags: [],
+  })
+  if (!('workspace' in created)) throw new Error(`could not create ${folderPath}`)
+  if (branchExcludePatterns) {
+    settingsStore.updateWorkspaceSettings(created.workspace.id, { git: { branchExcludePatterns } })
+  }
+  return created.workspace.id
+}
+
+beforeEach(async () => {
   vi.clearAllMocks()
-  stores.getGlobalSettings.mockReturnValue({ git: { branchExcludePatterns: [] } })
-  stores.getWorkspaceSettings.mockReturnValue({})
-  stores.listWorkspaces.mockReturnValue([])
-  stores.listProjects.mockReturnValue([])
+  vi.resetModules()
+  workspaceStore = await import('../../../src/main/storage/workspace-store.js')
+  settingsStore = await import('../../../src/main/storage/settings-store.js')
+  const { registerGitHandlers } = await import('../../../src/main/ipc/git.ipc.js')
   registerGitHandlers()
 })
 
@@ -65,10 +70,9 @@ describe('git:is-repo', () => {
     })
   })
 
-  it('returns isRepo false for non-repos, invalid payloads, and thrown errors', async () => {
+  it('returns isRepo false for non-repos and thrown errors', async () => {
     gitService.isGitRepo.mockResolvedValue(false)
     await expect(handler('git:is-repo')({}, { path: '/x' })).resolves.toEqual({ isRepo: false })
-    await expect(handler('git:is-repo')({}, {})).resolves.toEqual({ isRepo: false })
     gitService.isGitRepo.mockRejectedValue(new Error('io'))
     await expect(handler('git:is-repo')({}, { path: '/x' })).resolves.toEqual({ isRepo: false })
   })
@@ -82,8 +86,7 @@ describe('git:current-branch', () => {
     })
   })
 
-  it('maps invalid payloads and errors to error envelopes', async () => {
-    await expect(handler('git:current-branch')({}, {})).resolves.toEqual({ error: 'INVALID_PATH' })
+  it('maps errors to an error envelope', async () => {
     gitService.getCurrentBranch.mockRejectedValue(new Error('detached'))
     await expect(handler('git:current-branch')({}, { path: '/r' })).resolves.toEqual({
       error: 'Error: detached',
@@ -91,24 +94,26 @@ describe('git:current-branch', () => {
   })
 })
 
+const b = (name: string) => ({ name, isCurrent: false, isRemote: true })
+const all = [b('main'), b('gh-readonly-queue/main/pr-248-3f1a'), b('trunk-merge/pr-9'), b('dev')]
+
 describe('git:list-branches', () => {
-  it('returns branches, and an empty list on invalid payload or error', async () => {
+  it('returns branches, and an empty list on error', async () => {
     gitService.listBranches.mockResolvedValue(['main', 'dev'])
     await expect(handler('git:list-branches')({}, { path: '/r' })).resolves.toEqual({
       branches: ['main', 'dev'],
     })
-    await expect(handler('git:list-branches')({}, {})).resolves.toEqual({ branches: [] })
     gitService.listBranches.mockRejectedValue(new Error('io'))
     await expect(handler('git:list-branches')({}, { path: '/r' })).resolves.toEqual({
       branches: [],
     })
   })
-  const b = (name: string) => ({ name, isCurrent: false, isRemote: true })
-  const all = [b('main'), b('gh-readonly-queue/main/pr-248-3f1a'), b('trunk-merge/pr-9'), b('dev')]
+})
 
+describe('git:list-branches — exclusion patterns', () => {
   it('hides branches matching the global exclusion patterns', async () => {
     gitService.listBranches.mockResolvedValue(all)
-    stores.getGlobalSettings.mockReturnValue({
+    settingsStore.updateGlobalSettings({
       git: { branchExcludePatterns: ['gh-readonly-queue/*', 'trunk-merge/*'] },
     })
     const r = (await handler('git:list-branches')({}, { path: '/r' })) as {
@@ -119,27 +124,26 @@ describe('git:list-branches', () => {
 
   it("uses the owning workspace's own patterns over the global ones", async () => {
     gitService.listBranches.mockResolvedValue(all)
-    stores.getGlobalSettings.mockReturnValue({ git: { branchExcludePatterns: ['trunk-merge/*'] } })
-    stores.listWorkspaces.mockReturnValue([
-      { id: 'other', folderPath: '/elsewhere' },
-      { id: 'ws', folderPath: '/repos/app' },
-    ])
-    stores.getWorkspaceSettings.mockImplementation((id: string) =>
-      id === 'ws' ? { overrides: { git: { branchExcludePatterns: ['gh-readonly-queue/*'] } } } : {}
-    )
+    settingsStore.updateGlobalSettings({ git: { branchExcludePatterns: ['trunk-merge/*'] } })
+    workspaceAt('/elsewhere', ['dev'])
+    workspaceAt('/repos/app', ['gh-readonly-queue/*'])
     // A worktree inside the workspace's folder belongs to it.
     const r = (await handler('git:list-branches')({}, { path: '/repos/app/.worktrees/feat' })) as {
       branches: { name: string }[]
     }
     expect(r.branches.map((x) => x.name)).toEqual(['main', 'trunk-merge/pr-9', 'dev'])
   })
+})
 
+describe("git:list-branches — which workspace's patterns", () => {
   it("finds the workspace through a project's worktree outside its folder", async () => {
     gitService.listBranches.mockResolvedValue(all)
-    stores.listWorkspaces.mockReturnValue([{ id: 'ws', folderPath: '/repos/app' }])
-    stores.listProjects.mockReturnValue([{ id: 'p', worktreePath: '/wt/app-feat' }])
-    stores.getWorkspaceSettings.mockReturnValue({
-      overrides: { git: { branchExcludePatterns: ['trunk-merge/*'] } },
+    const workspaceId = workspaceAt('/repos/app', ['trunk-merge/*'])
+    workspaceStore.createProject({
+      workspaceId,
+      name: 'feat',
+      worktreePath: '/wt/app-feat',
+      isWorktree: true,
     })
     const r = (await handler('git:list-branches')({}, { path: '/wt/app-feat' })) as {
       branches: { name: string }[]
@@ -153,10 +157,7 @@ describe('git:list-branches', () => {
 
   it('does not take a sibling folder with the same prefix for the workspace', async () => {
     gitService.listBranches.mockResolvedValue(all)
-    stores.listWorkspaces.mockReturnValue([{ id: 'ws', folderPath: '/repos/app' }])
-    stores.getWorkspaceSettings.mockReturnValue({
-      overrides: { git: { branchExcludePatterns: ['trunk-merge/*'] } },
-    })
+    workspaceAt('/repos/app', ['trunk-merge/*'])
     const r = (await handler('git:list-branches')({}, { path: '/repos/app-two' })) as {
       branches: { name: string }[]
     }
@@ -169,7 +170,6 @@ describe('git:fetch', () => {
     gitService.fetchRemotes.mockResolvedValue(undefined)
     await expect(handler('git:fetch')({}, { path: '/r' })).resolves.toEqual({ success: true })
     expect(gitService.fetchRemotes).toHaveBeenCalledWith('/r')
-    await expect(handler('git:fetch')({}, {})).resolves.toEqual({ error: 'VALIDATION_ERROR' })
     gitService.fetchRemotes.mockRejectedValue(new Error('Could not resolve host'))
     await expect(handler('git:fetch')({}, { path: '/r' })).resolves.toEqual({
       error: 'Error: Could not resolve host',
@@ -191,16 +191,10 @@ describe('git:checkout and git:create-branch', () => {
     expect(gitService.createBranch).toHaveBeenCalledWith('/r', 'new')
   })
 
-  it('maps invalid payloads and errors to error envelopes', async () => {
-    await expect(handler('git:checkout')({}, { path: '/r' })).resolves.toEqual({
-      error: 'VALIDATION_ERROR',
-    })
+  it('maps errors to error envelopes', async () => {
     gitService.checkoutBranch.mockRejectedValue(new Error('conflict'))
     await expect(handler('git:checkout')({}, { path: '/r', branch: 'dev' })).resolves.toEqual({
       error: 'Error: conflict',
-    })
-    await expect(handler('git:create-branch')({}, {})).resolves.toEqual({
-      error: 'VALIDATION_ERROR',
     })
     gitService.createBranch.mockRejectedValue(new Error('exists'))
     await expect(handler('git:create-branch')({}, { path: '/r', branch: 'x' })).resolves.toEqual({
@@ -210,14 +204,11 @@ describe('git:checkout and git:create-branch', () => {
 })
 
 describe('git:suggest-worktree-path', () => {
-  it('returns the suggested path, or an empty path on invalid payload', async () => {
+  it('returns the suggested path', async () => {
     gitService.suggestWorktreePath.mockReturnValue('/wt/dev')
     await expect(
       handler('git:suggest-worktree-path')({}, { repoRoot: '/r', branch: 'dev' })
     ).resolves.toEqual({ path: '/wt/dev' })
-    await expect(handler('git:suggest-worktree-path')({}, { repoRoot: '/r' })).resolves.toEqual({
-      path: '',
-    })
   })
 })
 
@@ -230,23 +221,22 @@ describe('git:create-worktree and git:remove-worktree', () => {
     await expect(handler('git:create-worktree')({}, createPayload)).resolves.toEqual({
       success: true,
     })
-    expect(gitService.createWorktree).toHaveBeenCalledWith('/r', '/wt', 'dev', true)
+    expect(gitService.createWorktree).toHaveBeenCalledWith({
+      repoRoot: '/r',
+      worktreePath: '/wt',
+      branch: 'dev',
+      isNewBranch: true,
+    })
     await expect(
       handler('git:remove-worktree')({}, { repoRoot: '/r', worktreePath: '/wt' })
     ).resolves.toEqual({ success: true })
     expect(gitService.removeWorktree).toHaveBeenCalledWith('/r', '/wt')
   })
 
-  it('maps invalid payloads and errors to error envelopes', async () => {
-    await expect(handler('git:create-worktree')({}, {})).resolves.toEqual({
-      error: 'VALIDATION_ERROR',
-    })
+  it('maps errors to error envelopes', async () => {
     gitService.createWorktree.mockRejectedValue(new Error('dirty'))
     await expect(handler('git:create-worktree')({}, createPayload)).resolves.toEqual({
       error: 'Error: dirty',
-    })
-    await expect(handler('git:remove-worktree')({}, {})).resolves.toEqual({
-      error: 'VALIDATION_ERROR',
     })
     gitService.removeWorktree.mockRejectedValue(new Error('locked'))
     await expect(
@@ -256,12 +246,11 @@ describe('git:create-worktree and git:remove-worktree', () => {
 })
 
 describe('git:list-worktrees', () => {
-  it('returns worktrees, and an empty list on invalid payload or error', async () => {
+  it('returns worktrees, and an empty list on error', async () => {
     gitService.listWorktrees.mockResolvedValue([{ path: '/wt' }])
     await expect(handler('git:list-worktrees')({}, { path: '/r' })).resolves.toEqual({
       worktrees: [{ path: '/wt' }],
     })
-    await expect(handler('git:list-worktrees')({}, {})).resolves.toEqual({ worktrees: [] })
     gitService.listWorktrees.mockRejectedValue(new Error('io'))
     await expect(handler('git:list-worktrees')({}, { path: '/r' })).resolves.toEqual({
       worktrees: [],
@@ -278,12 +267,6 @@ describe('git:change-stats', () => {
       files: 2,
     })
     expect(gitService.getChangeStats).toHaveBeenCalledWith('/repo')
-  })
-
-  it('maps an invalid payload to an error envelope', async () => {
-    await expect(handler('git:change-stats')({}, {})).resolves.toEqual({
-      error: 'VALIDATION_ERROR',
-    })
   })
 
   it('resolves with an error envelope rather than rejecting across the boundary', async () => {

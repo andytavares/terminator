@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { builderUnit, testCriterion } from '../helpers/order-parts.js'
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
@@ -13,6 +13,8 @@ import { EVIDENCE_KINDS, LANE_ROLES, RISK_TRIGGERS } from '../../src/order/schem
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import { orderDir } from '../../src/data-root.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
+import { writeProposalFor } from '../helpers/forge-turns.js'
 
 // Converging an order.
 //
@@ -44,8 +46,8 @@ function order(over: Partial<WorkOrder> = {}): WorkOrder {
 }
 
 beforeEach(() => {
-  root = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-converge-'))
-  repo = fs.mkdtempSync(path.join(os.tmpdir(), 'fdry-converge-repo-'))
+  root = makeTempDir('fdry-converge-')
+  repo = makeTempDir('fdry-converge-repo-')
 })
 
 afterEach(() => {
@@ -55,6 +57,31 @@ afterEach(() => {
 })
 
 describe('what the architect is told', () => {
+  describe('lane branches', laneBranchesTests)
+  describe('deciding and dismissing', decidingAndDismissingTests)
+  describe('open findings', convergeOpenFindingsTests)
+  describe('the prompt and the file', thePromptAndTheFileTests)
+  describe('triggers and evidence', triggersAndEvidenceTests)
+  describe('lane roles and closed sets', laneRolesAndClosedSetsTests)
+  describe('units, budgets and refusing checks', unitsBudgetsAndRefusingChecksTests)
+  describe('nothing wrong', nothingWrongTests)
+  describe('agreeing its own work and the operator', agreeingItsOwnWorkAndTheOperatorTests)
+  describe('where it runs', whereItRunsTests)
+})
+
+type Finding = WorkOrder['redTeam'][number]
+
+/** A red-team finding as the order schema fills one in: open, with no reason yet. */
+function finding(over: Partial<Finding> & Pick<Finding, 'id' | 'severity' | 'text'>): Finding {
+  return { status: 'open', reason: '', category: 'wrong-outcome', round: 0, ...over }
+}
+
+const CRITERION = testCriterion('AC-1', {
+  statement: 'an expired token is refused',
+  priority: 'P0',
+})
+
+function laneBranchesTests() {
   it('shows a lane branch the ticket fixed, and says to keep it', () => {
     const base = order()
     const fixed: WorkOrder = {
@@ -74,7 +101,9 @@ describe('what the architect is told', () => {
     expect(plan.prompt).toContain('"branch": ""')
     expect(plan.prompt).not.toContain('fixed by the ticket')
   })
+}
 
+function decidingAndDismissingTests() {
   it('tells the architect to decide what it is 90% sure of rather than ask', () => {
     const plan = convergeBrief({ order: order(), root, sources: sources(), rules: [] })
     expect(plan.prompt).toContain('90%')
@@ -88,19 +117,15 @@ describe('what the architect is told', () => {
     expect(plan.prompt).toContain('wrong-outcome')
     expect(plan.prompt).not.toContain('a high one is')
   })
+}
 
+function convergeOpenFindingsTests() {
   it('names each open finding, so the architect can close it rather than the operator', () => {
     const plan = convergeBrief({
       order: order({
         redTeam: [
-          {
-            id: 'RT-no-non-goals',
-            severity: 'low',
-            text: 'The order excludes nothing.',
-            status: 'open',
-            reason: '',
-          },
-          { id: 'RT-done', severity: 'low', text: 'Settled.', status: 'resolved', reason: '' },
+          finding({ id: 'RT-no-non-goals', severity: 'low', text: 'The order excludes nothing.' }),
+          finding({ id: 'RT-done', severity: 'low', text: 'Settled.', status: 'resolved' }),
         ],
       }),
       root,
@@ -113,7 +138,9 @@ describe('what the architect is told', () => {
     // being asked to close.
     expect(plan.prompt).not.toContain('## Open red-team findings\n\n- RT-done')
   })
+}
 
+function thePromptAndTheFileTests() {
   it("leads with the architect's own prompt and the order", () => {
     const plan = convergeBrief({ order: order(), root, sources: sources(), rules: [] })
     expect(plan.prompt).toContain('Turn intent and context into criteria and a plan')
@@ -126,7 +153,9 @@ describe('what the architect is told', () => {
     expect(plan.prompt).toContain(plan.proposalPath)
     expect(plan.prompt).toContain('Nothing else you do counts')
   })
+}
 
+function triggersAndEvidenceTests() {
   // Measured on WO-0907-3c1: the contract spelled out the legal values for
   // `risk.grade` and not for `risk.triggers`, so the architect wrote a
   // sentence into a closed enum and nine minutes of deep-tier work was refused
@@ -156,7 +185,9 @@ describe('what the architect is told', () => {
     expect(plan.prompt).toContain('closed set too')
     expect(plan.prompt).toContain('kinds of artifact, not paths')
   })
+}
 
+function laneRolesAndClosedSetsTests() {
   // The third one, found by sweeping rather than by losing another turn: a
   // lane's `role` was shown as `null` and named neither value, three lines
   // under a *unit's* `role`, which is a free string whose example reads
@@ -191,7 +222,9 @@ describe('what the architect is told', () => {
       }
     }
   })
+}
 
+function unitsBudgetsAndRefusingChecksTests() {
   // The contract showed a budget of 12 files as an example, the architect
   // wrote a budget of 10, and a run was halted at a limit the operator had
   // configured as 25. Budgets are the operator's now; the architect fits them.
@@ -224,40 +257,25 @@ describe('what the architect is told', () => {
     // point — it is being asked to fix exactly this.
     expect(plan.prompt).toContain('**coverage**')
   })
+}
 
+function nothingWrongTests() {
   it('says nothing is wrong when nothing is', () => {
     const complete = order({
       intent: { problem: 'p', outcome: 'o', nonGoals: [] },
       risk: { grade: 'P2', triggers: [], blastRadius: ['src/'], criticalPaths: [] },
-      acceptance: [
-        {
-          id: 'AC-1',
-          statement: 'a',
-          priority: 'P1',
-          verify: { kind: 'test', command: 'npm test', assert: 'exit_code == 0' },
-          unverifiable: null,
-        },
-      ],
+      acceptance: [testCriterion('AC-1', { statement: 'a' })],
       plan: {
         ...order().plan,
-        units: [
-          {
-            id: 'U-1',
-            title: 'a',
-            role: 'builder',
-            lane: 1,
-            dependsOn: [],
-            satisfies: ['AC-1'],
-            touches: ['src/a.ts'],
-            verify: [],
-          },
-        ],
+        units: [builderUnit('U-1', { title: 'a', satisfies: ['AC-1'], touches: ['src/a.ts'] })],
       },
     })
     const plan = convergeBrief({ order: complete, root, sources: sources(), rules: [] })
     expect(plan.prompt).toContain('Nothing, as it stands')
   })
+}
 
+function agreeingItsOwnWorkAndTheOperatorTests() {
   it('refuses to let the agent agree its own work', () => {
     const plan = convergeBrief({ order: order(), root, sources: sources(), rules: [] })
     expect(plan.prompt).toContain('you\ndo not agree your own work')
@@ -279,7 +297,9 @@ describe('what the architect is told', () => {
     const plan = convergeBrief({ order: order(), root, sources: sources(), rules: [] })
     expect(plan.prompt).not.toContain('What the operator just said')
   })
+}
 
+function whereItRunsTests() {
   it('runs in the repository, not in a worktree cut for a plan that may never be agreed', () => {
     expect(convergeBrief({ order: order(), root, sources: sources(), rules: [] }).cwd).toBe(repo)
   })
@@ -294,26 +314,21 @@ describe('what the architect is told', () => {
       })
     ).toThrow(NoArchitectError)
   })
-})
+}
 
 describe('reading back what it wrote', () => {
-  function write(value: unknown): string {
-    const file = path.join(orderDir(root, 'WO-1'), 'proposal.json')
-    fs.mkdirSync(path.dirname(file), { recursive: true })
-    fs.writeFileSync(file, typeof value === 'string' ? value : JSON.stringify(value))
-    return file
-  }
+  describe('merging and deciding', mergingAndDecidingTests)
+  describe('dismissed findings', dismissedFindingsTests)
+  describe('nothing, bad or stale files', nothingBadOrStaleFilesTests)
+  describe('cleared findings', clearedFindingsTests)
+  describe('reviewer findings', reviewerFindingsTests)
+  describe('accepted findings', convergeAcceptedFindingsTests)
+  describe('refusals and drafts', refusalsAndDraftsTests)
+})
 
-  const CRITERION = {
-    id: 'AC-1',
-    statement: 'an expired token is refused',
-    priority: 'P0',
-    verify: { kind: 'test', command: 'npm test', assert: 'exit_code == 0' },
-    unverifiable: null,
-  }
-
+function mergingAndDecidingTests() {
   it('merges a proposal into the order', () => {
-    const file = write({ acceptance: [CRITERION], note: 'first draft' })
+    const file = writeProposalFor(root, 'WO-1', { acceptance: [CRITERION], note: 'first draft' })
     const result = readProposal(order(), file, '2026-09-06T12:00:00.000Z')
     expect(result.ok).toBe(true)
     expect(result.ok && result.order.acceptance).toHaveLength(1)
@@ -323,7 +338,7 @@ describe('reading back what it wrote', () => {
   // Spec 062: the Forge stops the operator only for what the architect
   // cannot settle.
   it('decides a question the architect is at least 90% sure of, instead of asking', () => {
-    const file = write({
+    const file = writeProposalFor(root, 'WO-1', {
       openQuestions: [
         {
           id: 'Q-1',
@@ -338,9 +353,11 @@ describe('reading back what it wrote', () => {
     expect(result.ok && result.order.openQuestions[0].answer).toBe('Hide')
     expect(result.ok && result.order.assumptions.map((a) => a.id)).toContain('A-Q-1')
   })
+}
 
+function dismissedFindingsTests() {
   it('applies the findings the architect dismissed with confidence, whatever their severity', () => {
-    const file = write({
+    const file = writeProposalFor(root, 'WO-1', {
       dismissFindings: [
         { id: 'RT-no-non-goals', reason: 'nothing to exclude', confidence: 0.95 },
         {
@@ -352,78 +369,76 @@ describe('reading back what it wrote', () => {
     })
     const before = order({
       redTeam: [
-        { id: 'RT-no-non-goals', severity: 'low', text: 't', status: 'open', reason: '' },
-        { id: 'RT-no-runnable-check', severity: 'high', text: 't', status: 'open', reason: '' },
+        finding({ id: 'RT-no-non-goals', severity: 'low', text: 't' }),
+        finding({ id: 'RT-no-runnable-check', severity: 'high', text: 't' }),
       ],
     })
     const result = readProposal(before, file, 'now')
     expect(result.ok && result.order.redTeam.map((f) => f.status)).toEqual(['accepted', 'accepted'])
   })
+}
 
+function nothingBadOrStaleFilesTests() {
   it('says so when the architect wrote nothing', () => {
     const result = readProposal(order(), path.join(root, 'nothing.json'), 'now')
     expect(result).toEqual({ ok: false, reason: 'the architect wrote no proposal' })
   })
 
   it('refuses one that is not readable JSON, rather than half-applying it', () => {
-    const file = write('{{{')
+    const file = writeProposalFor(root, 'WO-1', '{{{')
     const result = readProposal(order(), file, 'now')
     expect(result.ok).toBe(false)
     expect(!result.ok && result.reason).toMatch(/not readable/)
   })
 
   it('refuses one that reaches for a field it may not have', () => {
-    const file = write({ status: 'agreed' })
+    const file = writeProposalFor(root, 'WO-1', { status: 'agreed' })
     const result = readProposal(order(), file, 'now')
     expect(result.ok).toBe(false)
     expect(!result.ok && result.reason).toMatch(/refused/)
   })
 
   it('clears the file whatever happened, so a stale one is never read as this turn', () => {
-    const file = write({ note: 'x' })
+    const file = writeProposalFor(root, 'WO-1', { note: 'x' })
     readProposal(order(), file, 'now')
     expect(fs.existsSync(file)).toBe(false)
 
-    const bad = write('{{{')
+    const bad = writeProposalFor(root, 'WO-1', '{{{')
     readProposal(order(), bad, 'now')
     expect(fs.existsSync(bad)).toBe(false)
   })
+}
 
+function clearedFindingsTests() {
   it('closes a finding the redraft cleared, so asking for it is enough', () => {
-    const file = write({
+    const file = writeProposalFor(root, 'WO-1', {
       intent: { problem: 'p', outcome: 'o', nonGoals: ['the settings screen'] },
     })
     const before = order({
       redTeam: [
-        {
-          id: 'RT-no-non-goals',
-          severity: 'low',
-          text: 'The order excludes nothing.',
-          status: 'open',
-          reason: '',
-        },
+        finding({ id: 'RT-no-non-goals', severity: 'low', text: 'The order excludes nothing.' }),
       ],
     })
     const result = readProposal(before, file, 'now')
     expect(result.ok && result.order.redTeam[0].status).toBe('resolved')
   })
+}
 
+function reviewerFindingsTests() {
   // Reported: "Ask the architect seems to not do anything." The architect
   // redrafted, but a reviewer's finding is not re-derivable, and it had no
   // field to say it was cleared — so the finding sat open and unchanged.
   it('closes a reviewer finding the architect says it cleared, with how', () => {
-    const file = write({
+    const file = writeProposalFor(root, 'WO-1', {
       resolveFindings: [{ id: 'RT-red-team-1', how: 'AC-1 now pages past 50 tickets' }],
     })
     const before = order({
       redTeam: [
-        {
+        finding({
           id: 'RT-red-team-1',
           severity: 'high',
           text: 'The handler filters after a fixed limit: 50 fetch.',
-          status: 'open',
-          reason: '',
-        },
+        }),
       ],
     })
     const result = readProposal(before, file, 'now')
@@ -432,9 +447,13 @@ describe('reading back what it wrote', () => {
       reason: 'architect: AC-1 now pages past 50 tickets',
     })
   })
+}
 
+function convergeAcceptedFindingsTests() {
   it('does not reopen or rewrite a finding the operator already accepted', () => {
-    const file = write({ resolveFindings: [{ id: 'RT-red-team-1', how: 'changed it' }] })
+    const file = writeProposalFor(root, 'WO-1', {
+      resolveFindings: [{ id: 'RT-red-team-1', how: 'changed it' }],
+    })
     const accepted = {
       id: 'RT-red-team-1',
       severity: 'low' as const,
@@ -447,28 +466,25 @@ describe('reading back what it wrote', () => {
     const result = readProposal(order({ redTeam: [accepted] }), file, 'now')
     expect(result.ok && result.order.redTeam[0]).toEqual(accepted)
   })
+}
 
+function refusalsAndDraftsTests() {
   it('refuses a resolution that does not say how', () => {
-    const file = write({ resolveFindings: [{ id: 'RT-red-team-1', how: '' }] })
+    const file = writeProposalFor(root, 'WO-1', {
+      resolveFindings: [{ id: 'RT-red-team-1', how: '' }],
+    })
     const result = readProposal(order(), file, 'now')
     expect(result.ok).toBe(false)
   })
 
   it('leaves the order a draft — converging is not agreeing', () => {
-    const file = write({ acceptance: [CRITERION] })
+    const file = writeProposalFor(root, 'WO-1', { acceptance: [CRITERION] })
     const result = readProposal(order(), file, 'now')
     expect(result.ok && result.order.status).toBe('draft')
   })
-})
+}
 
 describe('when the proposal is read', () => {
-  function write(value: unknown): string {
-    const file = path.join(orderDir(root, 'WO-1'), 'proposal.json')
-    fs.mkdirSync(path.dirname(file), { recursive: true })
-    fs.writeFileSync(file, typeof value === 'string' ? value : JSON.stringify(value))
-    return file
-  }
-
   it('is not read while the file is not there — a turn ending is not the architect finishing', () => {
     // It thinks, replies, asks something, and may write on a later turn.
     // Reading at the first turn end reported "wrote no proposal" while it was
@@ -478,11 +494,44 @@ describe('when the proposal is read', () => {
   })
 
   it('is read once it is there, whatever turn wrote it', () => {
-    const file = write({ note: 'on the third turn' })
+    const file = writeProposalFor(root, 'WO-1', { note: 'on the third turn' })
     const result = readProposal(order(), file, 'now')
     expect(result.ok && result.note).toBe('on the third turn')
   })
 })
+
+function drafted(over: Partial<WorkOrder> = {}): WorkOrder {
+  const base = order()
+  return {
+    ...base,
+    acceptance: [
+      testCriterion('AC-1', { statement: 'an expired token is refused', priority: 'P0' }),
+    ],
+    plan: {
+      ...base.plan,
+      units: [
+        builderUnit('U-1', {
+          title: 'check the expiry on the refresh path',
+          touches: ['src/auth.ts'],
+        }),
+      ],
+    },
+    provenance: {
+      ...base.provenance,
+      decisions: ['2026-09-06T11:00:00.000Z architect: first plan'],
+    },
+    ...over,
+  }
+}
+function prompt(target: WorkOrder, message?: string): string {
+  return convergeBrief({
+    order: target,
+    root,
+    sources: sources(),
+    rules: [],
+    ...(message === undefined ? {} : { message }),
+  }).prompt
+}
 
 // Amending an order, rather than drafting one again.
 //
@@ -497,52 +546,13 @@ describe('when the proposal is read', () => {
 // applies it, and its second was to reconstruct the order from `order.json`
 // and the ledger by hand.
 describe('amending an order the architect has already written', () => {
-  function drafted(over: Partial<WorkOrder> = {}): WorkOrder {
-    const base = order()
-    return {
-      ...base,
-      acceptance: [
-        {
-          id: 'AC-1',
-          statement: 'an expired token is refused',
-          priority: 'P0',
-          verify: { kind: 'test', command: 'npm test', assert: 'exit_code == 0' },
-          unverifiable: null,
-        },
-      ],
-      plan: {
-        ...base.plan,
-        units: [
-          {
-            id: 'U-1',
-            title: 'check the expiry on the refresh path',
-            role: 'builder',
-            lane: 1,
-            dependsOn: [],
-            satisfies: [],
-            touches: ['src/auth.ts'],
-            verify: [],
-          },
-        ],
-      },
-      provenance: {
-        ...base.provenance,
-        decisions: ['2026-09-06T11:00:00.000Z architect: first plan'],
-      },
-      ...over,
-    }
-  }
+  describe('what it hands over', whatItHandsOverTests)
+  describe('the amending framing', theAmendingFramingTests)
+  describe('first drafts', firstDraftsTests)
+  describe('what counts as a draft', whatCountsAsADraftTests)
+})
 
-  function prompt(target: WorkOrder, message?: string): string {
-    return convergeBrief({
-      order: target,
-      root,
-      sources: sources(),
-      rules: [],
-      ...(message === undefined ? {} : { message }),
-    }).prompt
-  }
-
+function whatItHandsOverTests() {
   it('hands over the criteria and the plan it is being told are wrong', () => {
     const text = prompt(drafted())
     expect(text).toContain('AC-1')
@@ -554,7 +564,9 @@ describe('amending an order the architect has already written', () => {
   it('plots which criteria the plan does not build, which is the check that fails', () => {
     expect(prompt(drafted())).toContain('| AC-1 |')
   })
+}
 
+function theAmendingFramingTests() {
   it('says the turn amends the order rather than drafting it again', () => {
     expect(prompt(drafted())).toContain('This turn amends the order above')
   })
@@ -578,13 +590,17 @@ describe('amending an order the architect has already written', () => {
     expect(said, 'the operator’s instruction is missing').toBeGreaterThan(-1)
     expect(framing).toBeLessThan(said)
   })
+}
 
+function firstDraftsTests() {
   it('says none of it on a first draft, which has nothing to amend', () => {
     const text = prompt(order())
     expect(text).not.toContain('This turn amends the order above')
     expect(text).not.toContain('Send only the keys you changed')
   })
+}
 
+function whatCountsAsADraftTests() {
   // A ticket that states its own criteria is taken at its word, so an order
   // can carry acceptance before any architect has seen it. Telling that
   // architect it wrote them is a lie, and "change only what is wrong" is the
@@ -609,7 +625,7 @@ describe('amending an order the architect has already written', () => {
     })
     expect(prompt(refused)).not.toContain('This turn amends the order above')
   })
-})
+}
 
 // Answering an ask is a narrow change to a plan that already exists; the
 // operator's model drafts it, and the ask model amends it.

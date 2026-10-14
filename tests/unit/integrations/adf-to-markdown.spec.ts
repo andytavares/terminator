@@ -11,6 +11,12 @@ function text(value: string, marks?: unknown[]): unknown {
 function para(...content: unknown[]): unknown {
   return { type: 'paragraph', content }
 }
+function adfList(type: 'bulletList' | 'orderedList', ...items: unknown[]): unknown {
+  return { type, content: items }
+}
+function adfListItem(...content: unknown[]): unknown {
+  return { type: 'listItem', content }
+}
 
 describe('adfToMarkdown — block nodes', () => {
   it('renders headings at their level', () => {
@@ -27,54 +33,31 @@ describe('adfToMarkdown — block nodes', () => {
   it('separates paragraphs with a blank line', () => {
     expect(adfToMarkdown(doc(para(text('first')), para(text('second'))))).toBe('first\n\nsecond')
   })
+})
 
+describe('adfToMarkdown — lists', () => {
   it('renders a bullet list', () => {
     const out = adfToMarkdown(
-      doc({
-        type: 'bulletList',
-        content: [
-          { type: 'listItem', content: [para(text('alpha'))] },
-          { type: 'listItem', content: [para(text('beta'))] },
-        ],
-      })
+      doc(adfList('bulletList', adfListItem(para(text('alpha'))), adfListItem(para(text('beta')))))
     )
     expect(out).toBe('- alpha\n- beta')
   })
 
   it('renders an ordered list with ascending numbers', () => {
     const out = adfToMarkdown(
-      doc({
-        type: 'orderedList',
-        content: [
-          { type: 'listItem', content: [para(text('one'))] },
-          { type: 'listItem', content: [para(text('two'))] },
-        ],
-      })
+      doc(adfList('orderedList', adfListItem(para(text('one'))), adfListItem(para(text('two')))))
     )
     expect(out).toBe('1. one\n2. two')
   })
 
   it('nests a list inside a list item', () => {
-    const out = adfToMarkdown(
-      doc({
-        type: 'bulletList',
-        content: [
-          {
-            type: 'listItem',
-            content: [
-              para(text('outer')),
-              {
-                type: 'bulletList',
-                content: [{ type: 'listItem', content: [para(text('inner'))] }],
-              },
-            ],
-          },
-        ],
-      })
-    )
+    const inner = adfList('bulletList', adfListItem(para(text('inner'))))
+    const out = adfToMarkdown(doc(adfList('bulletList', adfListItem(para(text('outer')), inner))))
     expect(out).toBe('- outer\n  - inner')
   })
+})
 
+describe('adfToMarkdown — task lists', () => {
   it('renders a task list as checkboxes, honouring state', () => {
     const out = adfToMarkdown(
       doc({
@@ -87,7 +70,9 @@ describe('adfToMarkdown — block nodes', () => {
     )
     expect(out).toBe('- [x] done thing\n- [ ] todo thing')
   })
+})
 
+describe('adfToMarkdown — tables, quotes and code', () => {
   it('renders a table with a header separator', () => {
     const cell = (t: string, type: 'tableHeader' | 'tableCell'): unknown => ({
       type,
@@ -107,7 +92,9 @@ describe('adfToMarkdown — block nodes', () => {
     )
     expect(out).toBe('| Name | Value |\n| --- | --- |\n| a | 1 |')
   })
+})
 
+describe('adfToMarkdown — quotes and code', () => {
   it('renders a blockquote with a marker on every line', () => {
     const out = adfToMarkdown(
       doc({ type: 'blockquote', content: [para(text('line one')), para(text('line two'))] })
@@ -126,7 +113,9 @@ describe('adfToMarkdown — block nodes', () => {
     const out = adfToMarkdown(doc({ type: 'codeBlock', content: [text('plain')] }))
     expect(out).toBe('```\nplain\n```')
   })
+})
 
+describe('adfToMarkdown — rules and breaks', () => {
   it('renders a rule', () => {
     expect(adfToMarkdown(doc(para(text('a')), { type: 'rule' }, para(text('b'))))).toBe(
       'a\n\n---\n\nb'
@@ -184,7 +173,6 @@ describe('adfToMarkdown — degradation', () => {
   })
 
   it('renders an unmapped leaf node with no text as nothing, without throwing', () => {
-    expect(() => adfToMarkdown(doc({ type: 'mediaSingle', attrs: { width: 100 } }))).not.toThrow()
     expect(adfToMarkdown(doc({ type: 'mediaSingle', attrs: { width: 100 } }))).toBe('')
   })
 
@@ -192,11 +180,12 @@ describe('adfToMarkdown — degradation', () => {
     const out = adfToMarkdown(doc(para({ type: 'mention', attrs: { text: '@andrew' } })))
     expect(out).toBe('@andrew')
   })
+})
 
+describe('adfToMarkdown — malformed input', () => {
   it('does not throw on a malformed document', () => {
     for (const bad of [null, undefined, {}, { type: 'doc' }, { type: 'doc', content: null }, 42]) {
-      expect(() => adfToMarkdown(bad)).not.toThrow()
-      expect(typeof adfToMarkdown(bad)).toBe('string')
+      expect(adfToMarkdown(bad)).toBe('')
     }
   })
 
@@ -225,6 +214,23 @@ describe('adfToMarkdown — further degradation', () => {
     expect(adfToMarkdown(doc(para(text('x', [{ type: 'link', attrs: {} }]))))).toBe('x')
   })
 
+  it('skips a mark that is not an object or has no type', () => {
+    expect(adfToMarkdown(doc(para(text('x', [null, 'bold', {}, { type: 'strong' }]))))).toBe(
+      '**x**'
+    )
+  })
+})
+
+describe('adfToMarkdown — unknown inline and list content', () => {
+  it('renders an unknown inline node as its text content', () => {
+    expect(adfToMarkdown(doc(para({ type: 'status', content: [text('Done')] })))).toBe('Done')
+  })
+
+  it('separates a block with no type from the one before it in a list item', () => {
+    const item = { type: 'listItem', content: [para(text('a')), { content: [para(text('b'))] }] }
+    expect(adfToMarkdown(doc({ type: 'bulletList', content: [item] }))).toBe('- a\n\nb')
+  })
+
   it('renders an inline card as its url', () => {
     expect(
       adfToMarkdown(doc(para({ type: 'inlineCard', attrs: { url: 'https://example.com/a' } })))
@@ -234,7 +240,9 @@ describe('adfToMarkdown — further degradation', () => {
   it('renders an inline card with no url as nothing', () => {
     expect(adfToMarkdown(doc(para({ type: 'inlineCard', attrs: {} })))).toBe('')
   })
+})
 
+describe('adfToMarkdown — empty inline nodes and headings', () => {
   it('renders an emoji as its text', () => {
     expect(adfToMarkdown(doc(para({ type: 'emoji', attrs: { text: '🎉' } })))).toBe('🎉')
   })
@@ -259,7 +267,9 @@ describe('adfToMarkdown — further degradation', () => {
       '# x'
     )
   })
+})
 
+describe('adfToMarkdown — degraded tables, code and lists', () => {
   it('renders a table with no header row and no separator', () => {
     const out = adfToMarkdown(
       doc({
@@ -281,7 +291,9 @@ describe('adfToMarkdown — further degradation', () => {
   it('renders an empty table as nothing', () => {
     expect(adfToMarkdown(doc({ type: 'table', content: [] }))).toBe('')
   })
+})
 
+describe('adfToMarkdown — degraded code and lists', () => {
   it('ignores a non-string code block language', () => {
     expect(
       adfToMarkdown(doc({ type: 'codeBlock', attrs: { language: 7 }, content: [text('x')] }))

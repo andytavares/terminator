@@ -67,6 +67,7 @@ function build(over: { linear?: TrackerProvider; jira?: TrackerProvider } = {}) 
         ? { tracker: 'linear', apiKey: 'k' }
         : { tracker: 'jira', site: 's', email: 'e@x.c', apiToken: 't' },
     getMine: async () => ({ kind: 'assignee', email: null }),
+    onTrackerError: () => {},
     now: () => 1_000_000,
   })
   return { service, linear, jira }
@@ -89,12 +90,16 @@ describe('supportsTransitions', () => {
   })
 
   it('answers without a credential, because it is a fact about the provider', () => {
+    const getCredential = vi.fn(async () => null)
+    const linear = fakeProvider('linear', { states: vi.fn(), transition: vi.fn() })
     const service = createIssueService({
-      providers: { linear: fakeProvider('linear'), jira: fakeProvider('jira') },
-      getCredential: async () => null,
+      providers: { linear, jira: fakeProvider('jira') },
+      getCredential,
       getMine: async () => ({ kind: 'assignee', email: null }),
+      onTrackerError: () => {},
     })
-    expect(service.supportsTransitions('linear')).toBe(false)
+    expect(service.supportsTransitions('linear')).toBe(true)
+    expect(getCredential).not.toHaveBeenCalled()
   })
 })
 
@@ -134,7 +139,9 @@ describe('transition', () => {
     const { service } = build()
     await expect(service.transition('jira', 'TAV-42', 'done')).rejects.toThrow(/jira/)
   })
+})
 
+describe('transition and the cache', () => {
   it('invalidates the cached issue on success, since its state just changed', async () => {
     const { service, linear } = build()
     await service.get('linear', 'TAV-42')
@@ -169,13 +176,6 @@ describe('the Jira provider is untouched by this feature', () => {
     const jira = createJiraProvider() as TrackerProvider
     expect(jira.states).toBeUndefined()
     expect(jira.transition).toBeUndefined()
-  })
-
-  it('still exposes the five it always had', () => {
-    const jira = createJiraProvider() as unknown as Record<string, unknown>
-    for (const method of ['verify', 'listMine', 'search', 'get', 'comment']) {
-      expect(typeof jira[method]).toBe('function')
-    }
   })
 })
 

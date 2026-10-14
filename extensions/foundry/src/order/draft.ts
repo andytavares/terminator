@@ -16,23 +16,41 @@ export interface DraftOrderInput {
   readonly baseBranch?: string
 }
 
-/**
- * A valid, empty draft.
- *
- * The Forge always has a real document to show, from the first turn — never a
- * progress bar over nothing (FR-003). One lane per repository from the start,
- * because a two-repository order has to be expressible before anyone plans it.
- */
-export function draftOrder(input: DraftOrderInput): WorkOrder {
+type DraftRepo = WorkOrder['context']['repos'][number]
+
+/** One repository per path, each in its own lane, in the order given. */
+function reposOf(input: DraftOrderInput): DraftRepo[] {
   const base = input.baseBranch ?? 'main'
-  const repos = input.repoPaths.map((repoPath, index) => ({
+  return input.repoPaths.map((repoPath, index) => ({
     name: path.basename(repoPath),
     path: repoPath,
     lane: index + 1,
     baseBranch: base,
     headBranch: '',
   }))
+}
 
+/** What is known about the repositories before Scout reads them: where they are, nothing else. */
+function emptyContext(repos: readonly DraftRepo[]) {
+  return {
+    repos,
+    toolchain: Object.fromEntries(CHECK_NAMES.map((name) => [name, null])),
+    entryPoints: [],
+    priorArt: [],
+    conventions: [],
+    houseDocs: [],
+  }
+}
+
+/** The repository's lane, unplanned: no branch, no role, nothing blocking it. */
+function laneFor(repo: DraftRepo) {
+  return { ord: repo.lane, repo: repo.name, branch: '', role: null, blocks: [], blockedBy: [] }
+}
+
+// A valid, empty draft, so the Forge shows a real document from the first turn
+// (FR-003); one lane per repository, so two repositories are expressible at once.
+export function draftOrder(input: DraftOrderInput): WorkOrder {
+  const repos = reposOf(input)
   return WorkOrderSchema.parse({
     schemaVersion: SCHEMA_VERSION,
     id: input.id,
@@ -44,29 +62,11 @@ export function draftOrder(input: DraftOrderInput): WorkOrder {
     recipe: null,
     recipeOverriddenBy: null,
     intent: { problem: '', outcome: '', nonGoals: [] },
-    context: {
-      repos,
-      toolchain: Object.fromEntries(CHECK_NAMES.map((name) => [name, null])),
-      entryPoints: [],
-      priorArt: [],
-      conventions: [],
-      houseDocs: [],
-    },
+    context: emptyContext(repos),
     acceptance: [],
     risk: { grade: 'P3', triggers: [], blastRadius: [], criticalPaths: [] },
     budgets: { agents: 3, wallClockMinutes: 45, tokens: null },
-    plan: {
-      units: [],
-      lanes: repos.map((repo) => ({
-        ord: repo.lane,
-        repo: repo.name,
-        branch: '',
-        role: null,
-        blocks: [],
-        blockedBy: [],
-      })),
-      sharedFiles: [],
-    },
+    plan: { units: [], lanes: repos.map(laneFor), sharedFiles: [] },
     assumptions: [],
     openQuestions: [],
     redTeam: [],

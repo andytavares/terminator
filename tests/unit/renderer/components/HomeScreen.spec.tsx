@@ -5,10 +5,7 @@ import { fact } from '../sidebar/fixtures/facts'
 import type { SessionFacts } from '../../../../src/renderer/sidebar/session-facts'
 
 const state = vi.hoisted(() => ({ facts: [] as SessionFacts[] }))
-const setDescription = vi.hoisted(() => vi.fn().mockResolvedValue(true))
-const setLink = vi.hoisted(() => vi.fn().mockResolvedValue(true))
 const navigate = vi.hoisted(() => vi.fn())
-const setActiveGlobalTab = vi.hoisted(() => vi.fn())
 
 vi.mock('../../../../src/renderer/components/session/useSessionFacts', () => ({
   useSessionFacts: () => state.facts,
@@ -18,45 +15,18 @@ vi.mock('../../../../src/renderer/components/session/useSessionFacts', () => ({
 vi.mock('../../../../src/renderer/components/session/LivePreview', () => ({
   LivePreview: () => <div />,
 }))
-vi.mock('../../../../src/renderer/stores/session-records.store', () => ({
-  useSessionRecordsStore: (select: (s: unknown) => unknown) =>
-    select({ forget, setDescription, setLink }),
-}))
 vi.mock('../../../../src/renderer/terminal/close-session', () => ({
   closeSessionFromFacts: closeSession,
 }))
-// One object for every render, as a real store's actions are: a fresh function
-// per render would re-run every effect that depends on one, for ever.
-const integrations = vi.hoisted(() => ({
-  isAnyConnected: () => true,
-  listMine: async () => ({
-    issues: [{ tracker: 'linear', key: 'NW-84', title: '429s', state: { name: 'Todo' } }],
-    failures: [],
-  }),
-  issueFor: () => null,
-}))
-vi.mock('../../../../src/renderer/stores/integrations.store', () => ({
-  useIntegrationsStore: (select: (s: unknown) => unknown) => select(integrations),
-}))
-const started = vi.hoisted(() => ({ inBranch: vi.fn(), scratch: vi.fn() }))
-const forget = vi.hoisted(() => vi.fn())
+const started = vi.hoisted(() => ({ inBranch: vi.fn(), scratch: vi.fn(), resume: vi.fn() }))
 const closeSession = vi.hoisted(() => vi.fn())
 vi.mock('../../../../src/renderer/terminal/start-session', () => ({
   startSessionInBranch: started.inBranch,
   startScratchSession: started.scratch,
-}))
-vi.mock('../../../../src/renderer/stores/workspace.store', () => ({
-  useWorkspaceStore: (select: (s: unknown) => unknown) =>
-    select({
-      workspaces: [{ id: 'w1', name: 'terminator' }],
-      projectsByWorkspaceId: new Map([['w1', [{ id: 'p1', workspaceId: 'w1', name: 'main' }]]]),
-    }),
+  resumeSession: started.resume,
 }))
 vi.mock('../../../../src/renderer/terminal/navigate-to-session', () => ({
-  navigateToSession: navigate,
-}))
-vi.mock('../../../../src/renderer/extensions/registry', () => ({
-  useExtensionRegistry: { getState: () => ({ setActiveGlobalTab }) },
+  revealSession: navigate,
 }))
 
 vi.mock('../../../../src/renderer/components/session/SessionLinkDialog', () => ({
@@ -70,10 +40,47 @@ vi.mock('../../../../src/renderer/components/session/SessionLinkDialog', () => (
 }))
 
 import { HomeScreen } from '../../../../src/renderer/components/home/HomeScreen'
+import { useSessionRecordsStore } from '../../../../src/renderer/stores/session-records.store'
+import { useIntegrationsStore } from '../../../../src/renderer/stores/integrations.store'
+import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
+import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
+import {
+  issueSummaryOf,
+  projectFixture,
+  seedStore,
+  trackerConnectionOf,
+  workspaceFixture,
+  type SeededStore,
+} from '../../../support/renderer-stores'
+
+let records: SeededStore<typeof useSessionRecordsStore>
 
 beforeEach(() => {
   vi.clearAllMocks()
   localStorage.clear()
+  records = seedStore(useSessionRecordsStore)
+  records.setDescription.mockResolvedValue(true)
+  records.setLink.mockResolvedValue(true)
+  // The real getters (isAnyConnected, issueFor) read this state; only the
+  // tracker call is replaced. One function for every render, as a real
+  // store's actions are: a fresh one per render would re-run its effects.
+  useIntegrationsStore.setState({
+    ...useIntegrationsStore.getInitialState(),
+    connections: [trackerConnectionOf()],
+    listMine: vi.fn().mockResolvedValue({
+      issues: [
+        issueSummaryOf({ key: 'NW-84', title: '429s', state: { name: 'Todo', type: 'unstarted' } }),
+      ],
+      failures: [],
+    }),
+  })
+  seedStore(useWorkspaceStore, {
+    workspaces: [workspaceFixture({ id: 'w1', name: 'terminator' })],
+    projectsByWorkspaceId: new Map([
+      ['w1', [projectFixture({ id: 'p1', workspaceId: 'w1', name: 'main' })]],
+    ]),
+  })
+  useExtensionRegistry.setState(useExtensionRegistry.getInitialState(), true)
   state.facts = [
     fact({ sessionId: 'a', name: 'claude', state: 'awaiting-input' }),
     fact({ sessionId: 'b', name: 'zsh', description: 'Checking bundle size' }),
@@ -107,7 +114,9 @@ describe('HomeScreen', () => {
     fireEvent.keyDown(screen.getByRole('row', { name: 'claude' }), { key: 'Enter' })
     expect(navigate).toHaveBeenCalledWith('a')
   })
+})
 
+describe('HomeScreen — writes a description to the session record', () => {
   it('writes a description to the session record', async () => {
     render(<HomeScreen />)
     const box = within(screen.getByRole('row', { name: 'claude' })).getByRole('textbox', {
@@ -117,7 +126,10 @@ describe('HomeScreen', () => {
     await act(async () => {
       fireEvent.keyDown(box, { key: 'Enter' })
     })
-    expect(setDescription).toHaveBeenCalledWith(state.facts[0].snapshot, 'Session home view')
+    expect(records.setDescription).toHaveBeenCalledWith(
+      state.facts[0].snapshot,
+      'Session home view'
+    )
   })
 
   it('narrows the list as the filter is typed', () => {
@@ -128,7 +140,9 @@ describe('HomeScreen', () => {
     expect(screen.queryByRole('row', { name: 'claude' })).toBeNull()
     expect(screen.getByRole('row', { name: 'zsh' })).toBeTruthy()
   })
+})
 
+describe('HomeScreen — says when nothing matches and clears the filter on request', () => {
   it('says when nothing matches and clears the filter on request', () => {
     render(<HomeScreen />)
     const search = screen.getByRole('searchbox', { name: 'Filter sessions' }) as HTMLInputElement
@@ -141,10 +155,11 @@ describe('HomeScreen', () => {
 
   it('says no terminals are open, and offers the way to them', () => {
     state.facts = []
+    useExtensionRegistry.getState().setActiveGlobalTab('core.home')
     render(<HomeScreen />)
     expect(screen.getByText('No terminals are open')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Go to terminals' }))
-    expect(setActiveGlobalTab).toHaveBeenCalledWith(null)
+    expect(useExtensionRegistry.getState().activeGlobalTabId).toBeNull()
   })
 
   // Both ends of a session's life are on the row it is drawn on.
@@ -153,7 +168,9 @@ describe('HomeScreen', () => {
     fireEvent.click(screen.getAllByRole('button', { name: /^Close / })[0])
     expect(closeSession).toHaveBeenCalled()
   })
+})
 
+describe('HomeScreen — removes a closed session from the list', () => {
   it('removes a closed session from the list', () => {
     state.facts = [
       fact({
@@ -166,9 +183,11 @@ describe('HomeScreen', () => {
     ]
     render(<HomeScreen />)
     fireEvent.click(screen.getByRole('button', { name: 'Remove old from the list' }))
-    expect(forget).toHaveBeenCalledWith('c')
+    expect(records.forget).toHaveBeenCalledWith('c')
   })
+})
 
+describe('HomeScreen — still shows closed history when no terminal is open', () => {
   it('still shows closed history when no terminal is open', () => {
     state.facts = [
       fact({
@@ -196,7 +215,9 @@ describe('HomeScreen', () => {
     render(<HomeScreen />)
     expect(screen.getByRole('listbox', { name: 'Sessions' })).toBeTruthy()
   })
+})
 
+describe('HomeScreen — keeps the selection when switching layout', () => {
   it('keeps the selection when switching layout', () => {
     render(<HomeScreen />)
     fireEvent.click(screen.getByRole('row', { name: 'zsh' }))
@@ -213,12 +234,14 @@ describe('HomeScreen', () => {
     render(<HomeScreen />)
     fireEvent.click(screen.getByRole('option', { name: /Checking bundle size/ }))
     fireEvent.click(await screen.findByRole('button', { name: 'NW-84 429s' }))
-    expect(setLink).toHaveBeenCalledWith(state.facts[1].snapshot, {
+    expect(records.setLink).toHaveBeenCalledWith(state.facts[1].snapshot, {
       tracker: 'linear',
       key: 'NW-84',
     })
   })
+})
 
+describe('HomeScreen — says when nothing matches in the Logbook too', () => {
   it('says when nothing matches in the Logbook too', () => {
     localStorage.setItem('terminator.home.prefs', JSON.stringify({ layout: 'logbook' }))
     render(<HomeScreen />)
@@ -248,7 +271,9 @@ describe('HomeScreen', () => {
     fireEvent.click(screen.getByRole('radio', { name: 'Logbook' }))
     expect(screen.queryByRole('option', { name: /Checking bundle size/ })).toBeNull()
   })
+})
 
+describe('HomeScreen — does not remember the Needs you filter', () => {
   it('does not remember the Needs you filter', () => {
     const { unmount } = render(<HomeScreen />)
     fireEvent.click(screen.getByRole('button', { name: /Needs you/ }))
@@ -266,7 +291,9 @@ describe('HomeScreen', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }))
     expect(screen.getByRole('row', { name: 'zsh' })).toBeTruthy()
   })
+})
 
+describe('HomeScreen — arranges the Ledger from the Display menu, and remembers it', () => {
   it('arranges the Ledger from the Display menu, and remembers it', () => {
     const { unmount } = render(<HomeScreen />)
     fireEvent.click(screen.getByRole('button', { name: 'Display' }))
@@ -293,7 +320,9 @@ describe('HomeScreen', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: 'New terminal in terminator / main' }))
     expect(started.inBranch).toHaveBeenCalledWith('p1')
   })
+})
 
+describe('HomeScreen — starts a scratch terminal from Home', () => {
   it('starts a scratch terminal from Home', () => {
     render(<HomeScreen />)
     fireEvent.click(screen.getByRole('button', { name: 'New terminal' }))
@@ -320,5 +349,78 @@ describe('HomeScreen', () => {
     render(<HomeScreen onOpenQuickActions={onOpenQuickActions} />)
     fireEvent.click(screen.getByRole('button', { name: 'Quick actions (⌘P)' }))
     expect(onOpenQuickActions).toHaveBeenCalledOnce()
+  })
+})
+
+/** A stopped session whose conversation can be picked up again. */
+const resumable = (): SessionFacts =>
+  fact({
+    sessionId: 'r',
+    name: 'claude',
+    state: 'exited',
+    agent: {
+      provider: 'claude',
+      sessionId: 'conv-1',
+      transcriptPath: '/t/c.jsonl',
+      cwd: '/code/repo',
+      capturedAt: '2026-09-15T18:00:00.000Z',
+    },
+    resumable: true,
+  })
+
+const closedOld = (): SessionFacts =>
+  fact({
+    sessionId: 'c',
+    name: 'old',
+    isClosed: true,
+    state: 'exited',
+    closedAt: '2026-09-15T00:00:00.000Z',
+  })
+
+const inLogbook = (): void =>
+  localStorage.setItem('terminator.home.prefs', JSON.stringify({ layout: 'logbook' }))
+
+describe('HomeScreen — starting and resuming', () => {
+  it('starts a terminal on a branch from the empty state', () => {
+    state.facts = []
+    render(<HomeScreen />)
+    fireEvent.click(screen.getAllByRole('button', { name: 'New terminal' })[1])
+    fireEvent.click(screen.getByRole('menuitem', { name: 'New terminal in terminator / main' }))
+    expect(started.inBranch).toHaveBeenCalledWith('p1')
+  })
+
+  it('resumes a stopped session from its Ledger row', () => {
+    state.facts = [resumable()]
+    render(<HomeScreen />)
+    fireEvent.click(screen.getByRole('button', { name: 'Resume claude' }))
+    expect(started.resume).toHaveBeenCalledWith(state.facts[0])
+  })
+})
+
+describe('HomeScreen — a session’s life from the Logbook', () => {
+  it('resumes a stopped session', () => {
+    inLogbook()
+    state.facts = [resumable()]
+    render(<HomeScreen />)
+    fireEvent.click(screen.getByRole('option'))
+    fireEvent.click(screen.getByRole('button', { name: 'Resume claude' }))
+    expect(started.resume).toHaveBeenCalledWith(state.facts[0])
+  })
+
+  it('ends a running session', () => {
+    inLogbook()
+    render(<HomeScreen />)
+    fireEvent.click(screen.getByRole('option', { name: /Checking bundle size/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Close zsh' }))
+    expect(closeSession).toHaveBeenCalledWith(state.facts[1])
+  })
+
+  it('removes a closed session from the list', () => {
+    inLogbook()
+    state.facts = [closedOld()]
+    render(<HomeScreen />)
+    fireEvent.click(screen.getByRole('option'))
+    fireEvent.click(screen.getByRole('button', { name: 'Remove old from the list' }))
+    expect(records.forget).toHaveBeenCalledWith('c')
   })
 })

@@ -1,6 +1,10 @@
 import React from 'react'
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, act } from '@testing-library/react'
+// Imported with the file, not inside each test: App reads the URL when it
+// renders, so nothing needs a fresh module. Each view is lazy, so a test
+// awaits it with findBy.
+import { App } from '../../../src/renderer/App'
 
 vi.mock('../../../src/components/GitFullView', () => ({
   GitFullView: ({ repoRoot }: { repoRoot: string | null }) => (
@@ -35,50 +39,46 @@ beforeEach(() => {
   })
 })
 
-afterEach(() => {
-  vi.resetModules()
-})
-
 describe('git-integration renderer App', () => {
   it('passes repoRoot from URL to GitFullView', async () => {
     setSearch({ view: 'project', repoRoot: '/my/repo' })
-    const { App } = await import('../../../src/renderer/App')
     render(<App />)
-    expect(screen.getByTestId('git-full-view').getAttribute('data-repo-root')).toBe('/my/repo')
+    expect((await screen.findByTestId('git-full-view')).getAttribute('data-repo-root')).toBe(
+      '/my/repo'
+    )
   })
 
   it('renders GitFullView for ?view=project', async () => {
     setSearch({ view: 'project', repoRoot: '/my/repo' })
-    const { App } = await import('../../../src/renderer/App')
     render(<App />)
-    expect(screen.getByTestId('git-full-view')).toBeDefined()
+    expect(await screen.findByTestId('git-full-view')).toBeDefined()
   })
 
   it('renders PrReviewTab for ?view=code-reviews', async () => {
     setSearch({ view: 'code-reviews', repoRoot: '' })
-    const { App } = await import('../../../src/renderer/App')
     render(<App />)
-    expect(screen.getByTestId('pr-review-tab')).toBeDefined()
+    expect(await screen.findByTestId('pr-review-tab')).toBeDefined()
   })
+})
 
+describe('git-integration renderer App — renders PrReviewTab for ?view=pr-review', () => {
   it('renders PrReviewTab for ?view=pr-review', async () => {
     setSearch({ view: 'pr-review', repoRoot: '/my/repo' })
-    const { App } = await import('../../../src/renderer/App')
     render(<App />)
-    expect(screen.getByTestId('pr-review-tab')).toBeDefined()
+    expect(await screen.findByTestId('pr-review-tab')).toBeDefined()
   })
 
   it('subscribes to workspace:changed for live repoRoot updates', async () => {
     setSearch({ view: 'project', repoRoot: '/my/repo' })
-    const { App } = await import('../../../src/renderer/App')
     render(<App />)
+    await screen.findByTestId('git-full-view')
     expect(mockBridgeOn).toHaveBeenCalledWith('workspace:changed', expect.any(Function))
   })
 
   it('updates repoRoot when workspace:changed fires', async () => {
     setSearch({ view: 'project', repoRoot: '/initial/repo' })
-    const { App } = await import('../../../src/renderer/App')
     render(<App />)
+    await screen.findByTestId('git-full-view')
     const handler = mockBridgeOn.mock.calls.find(([ch]) => ch === 'workspace:changed')?.[1]
     act(() => {
       handler?.({ repoRoot: '/new/repo' })

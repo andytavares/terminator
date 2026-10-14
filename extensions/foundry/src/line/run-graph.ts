@@ -9,15 +9,7 @@ import type { PlanUnit, WorkOrder } from '../order/schema.js'
 // order stay immutable while work runs. An order that changed while its own
 // work was running would mean the agreement moved under the work.
 
-export type NodeState =
-  | 'waiting'
-  | 'ready'
-  | 'running'
-  | 'verifying'
-  | 'passed'
-  | 'failed'
-  | 'blocked'
-  | 'skipped'
+export type NodeState = 'waiting' | 'running' | 'passed' | 'failed' | 'blocked' | 'skipped'
 
 /** A failed check's own words, handed to the node sent back to answer it. */
 export interface Feedback {
@@ -96,73 +88,80 @@ function nodesOfStep(nodes: readonly RunNode[], stepId: string): string[] {
 
 export function buildRunGraph(order: WorkOrder, recipe: Recipe): RunGraph {
   const nodes: RunNode[] = []
-
   for (const step of recipe.steps) {
     // A condition that is false skips the step rather than removing it: the
     // record has to show that the inspector did not run, and why (FR-044).
     const applies = evaluateWhen(step.when, order)
-    const skipReason = applies ? null : whenSkipReason(step.when ?? '', order)
-
-    if (step.kind === 'fanout') {
-      const targets = fanoutTargets(step.over ?? '', order)
-      const inner = (step.step ?? {}) as { role?: string }
-      // Which node ended up carrying each unit, so a dependency on a unit
-      // resolves to the node doing it — the same id under a plain fan-out,
-      // and the lane's node under `by lane`.
-      const nodeOfUnit = new Map<string, string>()
-      for (const target of targets) {
-        for (const unit of target.units) nodeOfUnit.set(unit.id, `${step.id}:${target.id}`)
-      }
-
-      for (const target of targets) {
-        const id = `${step.id}:${target.id}`
-        const outside = target.units
-          .flatMap((unit) => unit.dependsOn)
-          .map((unitId) => nodeOfUnit.get(unitId))
-          // A dependency this node already carries is its own internal order,
-          // not something to wait for; a node that waited on itself would
-          // never become ready.
-          .filter(
-            (dependency): dependency is string => dependency !== undefined && dependency !== id
-          )
-
-        nodes.push(
-          node({
-            id,
-            stepId: step.id,
-            kind: 'fanout',
-            state: applies ? 'waiting' : 'skipped',
-            skipReason,
-            unitIds: target.units.map((unit) => unit.id),
-            lane: target.lane,
-            role: inner.role ?? target.units[0]?.role ?? null,
-            // A fan-out child waits on the steps its parent waits on, and on
-            // whatever carries its units' dependencies. That second half is
-            // what makes `depends_on` in the plan mean anything.
-            dependsOn: [
-              ...step.after.flatMap((after) => nodesOfStep(nodes, after)),
-              ...new Set(outside),
-            ],
-          })
-        )
-      }
-      continue
+    const placed: Placement = {
+      state: applies ? 'waiting' : 'skipped',
+      skipReason: applies ? null : whenSkipReason(step.when ?? '', order),
+      after: step.after.flatMap((after) => nodesOfStep(nodes, after)),
     }
-
-    nodes.push(
-      node({
-        id: step.id,
-        stepId: step.id,
-        kind: step.kind,
-        state: applies ? 'waiting' : 'skipped',
-        skipReason,
-        role: step.role ?? null,
-        dependsOn: step.after.flatMap((after) => nodesOfStep(nodes, after)),
-      })
-    )
+    if (step.kind === 'fanout') nodes.push(...fanoutNodes(step, order, placed))
+    else nodes.push(stepNode(step, placed))
   }
-
   return { orderId: order.id, recipe: recipe.id, nodes }
+}
+
+/** Where a step's nodes start: run or skipped, and the nodes they wait on. */
+interface Placement {
+  readonly state: 'waiting' | 'skipped'
+  readonly skipReason: string | null
+  readonly after: readonly string[]
+}
+
+function stepNode(step: Step, placed: Placement): RunNode {
+  return node({
+    id: step.id,
+    stepId: step.id,
+    kind: step.kind,
+    state: placed.state,
+    skipReason: placed.skipReason,
+    role: step.role ?? null,
+    dependsOn: [...placed.after],
+  })
+}
+
+function fanoutNodes(step: Step, order: WorkOrder, placed: Placement): RunNode[] {
+  const targets = fanoutTargets(step.over ?? '', order)
+  const inner = (step.step ?? {}) as { role?: string }
+  // Which node ended up carrying each unit, so a dependency on a unit
+  // resolves to the node doing it — the same id under a plain fan-out,
+  // and the lane's node under `by lane`.
+  const nodeOfUnit = new Map<string, string>()
+  for (const target of targets) {
+    for (const unit of target.units) nodeOfUnit.set(unit.id, `${step.id}:${target.id}`)
+  }
+  return targets.map((target) => {
+    const id = `${step.id}:${target.id}`
+    return node({
+      id,
+      stepId: step.id,
+      kind: 'fanout',
+      state: placed.state,
+      skipReason: placed.skipReason,
+      unitIds: target.units.map((unit) => unit.id),
+      lane: target.lane,
+      role: inner.role ?? target.units[0]?.role ?? null,
+      // A fan-out child waits on the steps its parent waits on, and on
+      // whatever carries its units' dependencies. That second half is
+      // what makes `depends_on` in the plan mean anything.
+      dependsOn: [...placed.after, ...new Set(outsideDependencies(target.units, nodeOfUnit, id))],
+    })
+  })
+}
+
+// The nodes carrying what these units depend on. A dependency this node carries
+// itself is internal order, not a wait: waiting on itself, it would never be ready.
+function outsideDependencies(
+  units: readonly { dependsOn: readonly string[] }[],
+  nodeOfUnit: ReadonlyMap<string, string>,
+  id: string
+): string[] {
+  return units
+    .flatMap((unit) => unit.dependsOn)
+    .map((unitId) => nodeOfUnit.get(unitId))
+    .filter((dependency): dependency is string => dependency !== undefined && dependency !== id)
 }
 
 /** The step a node came from, for anything that needs the recipe's own words. */

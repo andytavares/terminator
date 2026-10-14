@@ -26,7 +26,9 @@ describe('ExtensionContributesSchema', () => {
     })
     expect(result.success).toBe(false)
   })
+})
 
+describe('ExtensionContributesSchema — workspace, project and sidebar tabs', () => {
   it('accepts a valid workspaceTab contribution', () => {
     const result = ExtensionContributesSchema.safeParse({
       workspaceTab: { label: 'Reviews', icon: 'git-pull-request', view: 'reviews' },
@@ -57,7 +59,9 @@ describe('ExtensionContributesSchema', () => {
       expect(result.data.sidebarPanel?.defaultOpen).toBeUndefined()
     }
   })
+})
 
+describe('ExtensionContributesSchema — window views and commands', () => {
   it('accepts windowViews array', () => {
     const result = ExtensionContributesSchema.safeParse({
       windowViews: [{ id: 'my-view', view: 'detail' }],
@@ -85,7 +89,9 @@ describe('ExtensionContributesSchema', () => {
     })
     expect(result.success).toBe(true)
   })
+})
 
+describe('ExtensionContributesSchema — unknown keys and combined contributions', () => {
   it('silently ignores unknown keys', () => {
     const result = ExtensionContributesSchema.safeParse({
       unknownFutureContribution: { label: 'something' },
@@ -107,5 +113,19 @@ describe('ExtensionContributesSchema', () => {
       commands: [{ id: 'my-tool:open', label: 'Open', shortcut: 'CmdOrCtrl+M' }],
     }
     expect(ExtensionContributesSchema.safeParse(full).success).toBe(true)
+  })
+})
+
+describe('ExtensionContributesSchema — shellRoots', () => {
+  it('keeps the setting keys an extension declares as directories its commands may run in', () => {
+    const result = ExtensionContributesSchema.safeParse({
+      shellRoots: ['com.example.tool.cloneFolder'],
+    })
+    expect(result.success && result.data.shellRoots).toEqual(['com.example.tool.cloneFolder'])
+  })
+
+  it('rejects a shell root that is not a setting key', () => {
+    expect(ExtensionContributesSchema.safeParse({ shellRoots: [''] }).success).toBe(false)
+    expect(ExtensionContributesSchema.safeParse({ shellRoots: '/tmp' }).success).toBe(false)
   })
 })

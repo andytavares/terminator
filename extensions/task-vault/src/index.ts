@@ -1,17 +1,34 @@
-import { BrowserWindow } from 'electron'
-import type { ExtensionAPI, ExtensionDB, Disposable } from '../../../src/main/extensions/api'
+import { z } from 'zod'
+import { createIpcRegistrar, noPayload } from '@terminator/extension-sdk'
+import type {
+  ExtensionAPI,
+  ExtensionDB,
+  Disposable,
+  SettingDefinition,
+  TaskVaultAPI,
+} from '@terminator/extension-sdk'
 import { DEFAULT_CAPTURE_HOTKEY } from './constants.js'
 import { registerVaultIpcHandlers } from './ipc/vault.ipc.js'
 import { registerProjectsIpcHandlers } from './ipc/projects.ipc.js'
 import { registerLinksIpcHandlers } from './ipc/links.ipc.js'
 import { registerKanbanIpcHandlers } from './ipc/kanban.ipc.js'
+import { errorResult } from './ipc/register.js'
 import { registerAdminIpcHandlers } from './ipc/admin.ipc.js'
 import { registerWeeklyReviewIpcHandlers } from './ipc/weekly-review.ipc.js'
-import { applyTaskVaultSchema, applyTaskVaultMigrations } from './vault/db.js'
+import { applyTaskVaultSchema } from './vault/db.js'
+import {
+  migrateStoredStaleThreshold,
+  STALE_THRESHOLD,
+  STALE_THRESHOLD_KEY,
+} from './stale-threshold.js'
 import { backfillRecurringTasks } from './vault/ensure-next-occurrence.js'
-import { startTaskScheduler, setSchedulerTick } from './notifications/task-scheduler.js'
+import {
+  bindBroadcast,
+  startTaskScheduler,
+  setSchedulerTick,
+} from './notifications/task-scheduler.js'
 import { openInVault, popPendingNavigation } from './navigation.js'
-import type { SettingDefinition } from '../../../src/main/extensions/api'
+import { zonedNow } from './vault/clock.js'
 
 // Every notification kind task-vault ever raises, so the user can independently
 // choose its delivery target(s) (system/in-app/toast) in this extension's own
@@ -61,6 +78,64 @@ function buildNotificationSettingProperties(): Record<string, SettingDefinition>
   return properties
 }
 
+/** The extension's own settings, before the per-notification delivery toggles. */
+const BASE_SETTINGS: Record<string, SettingDefinition> = {
+  [STALE_THRESHOLD_KEY]: {
+    type: 'number',
+    label: 'Stale Task Threshold (days)',
+    description:
+      'Days a task can roll over on Today before it is marked stale and listed in the weekly review',
+    default: STALE_THRESHOLD.default,
+    min: STALE_THRESHOLD.min,
+    max: STALE_THRESHOLD.max,
+  },
+  'terminator.task-vault.weeklyReviewDay': {
+    type: 'string',
+    label: 'Weekly Review Day',
+    description: 'Day of the week for weekly review reminder (0=Sun, 6=Sat)',
+    default: '0',
+  },
+  'terminator.task-vault.contexts': {
+    type: 'string',
+    label: 'Contexts',
+    description:
+      'Comma-separated list of contexts shown in the + picker (e.g. home,work,computer,phone,errands)',
+    default: 'home,work,computer,phone,errands',
+  },
+  'terminator.task-vault.dueDateAlertTime': {
+    type: 'string',
+    label: 'Due Date Alert Time',
+    description: 'Time of day to send due-date notifications (24-hour HH:MM format, e.g. 09:00)',
+    default: '09:00',
+  },
+  'terminator.task-vault.db.reinit': {
+    type: 'action',
+    label: 'Re-initialize',
+    description: 'Re-run schema checks and startup gap-fill. Use if tasks stop loading.',
+    channel: 'task-vault:db.reinit',
+    default: null,
+  },
+  'terminator.task-vault.db.reset': {
+    type: 'action',
+    label: 'Reset (delete all data)',
+    description: 'Permanently delete all tasks and projects. This cannot be undone.',
+    channel: 'task-vault:db.reset',
+    danger: true,
+    confirmMessage:
+      'This will permanently delete ALL your tasks and projects. This cannot be undone. Continue?',
+    default: null,
+  },
+}
+
+/** The terminal a task links to, for jumping to its tab. */
+const TerminalTarget = z.object({ sessionId: z.string().min(1), projectId: z.string().min(1) })
+/** The day or task the vault panel opens on. */
+const VaultTarget = z
+  .object({ date: z.string().optional(), taskId: z.string().optional() })
+  .default({})
+
+type OwnIpc = ReturnType<typeof createIpcRegistrar>
+
 const disposables: Disposable[] = []
 let _api: ExtensionAPI | null = null
 let _schedulerStarted = false
@@ -79,115 +154,48 @@ function maybeStartScheduler(db: ExtensionDB): void {
   }
 }
 
-export async function activate(api: ExtensionAPI): Promise<void> {
-  _api = api
-  const db: ExtensionDB = api.db
-
-  disposables.push(
-    api.settings.register({
-      label: 'Task Vault',
-      properties: {
-        'terminator.task-vault.staleThresholdDays': {
-          type: 'number',
-          label: 'Stale Project Threshold (days)',
-          description: 'Days without modification before a project is considered stale',
-          default: 14,
-          min: 1,
-          max: 365,
-        },
-        'terminator.task-vault.weeklyReviewDay': {
-          type: 'string',
-          label: 'Weekly Review Day',
-          description: 'Day of the week for weekly review reminder (0=Sun, 6=Sat)',
-          default: '0',
-        },
-        'terminator.task-vault.contexts': {
-          type: 'string',
-          label: 'Contexts',
-          description:
-            'Comma-separated list of contexts shown in the + picker (e.g. home,work,computer,phone,errands)',
-          default: 'home,work,computer,phone,errands',
-        },
-        'terminator.task-vault.dueDateAlertTime': {
-          type: 'string',
-          label: 'Due Date Alert Time',
-          description:
-            'Time of day to send due-date notifications (24-hour HH:MM format, e.g. 09:00)',
-          default: '09:00',
-        },
-        'terminator.task-vault.db.reinit': {
-          type: 'action',
-          label: 'Re-initialize',
-          description: 'Re-run schema checks and startup gap-fill. Use if tasks stop loading.',
-          channel: 'task-vault:db.reinit',
-          default: null,
-        },
-        'terminator.task-vault.db.reset': {
-          type: 'action',
-          label: 'Reset (delete all data)',
-          description: 'Permanently delete all tasks and projects. This cannot be undone.',
-          channel: 'task-vault:db.reset',
-          danger: true,
-          confirmMessage:
-            'This will permanently delete ALL your tasks and projects. This cannot be undone. Continue?',
-          default: null,
-        },
-        ...buildNotificationSettingProperties(),
-      },
-    })
-  )
-
-  const disposeDbReinit = api.ipc.registerHandler('task-vault:db.reinit', async () => {
-    try {
-      await applyTaskVaultSchema(db)
-      await applyTaskVaultMigrations(db)
-      await backfillRecurringTasks(db)
-      maybeStartScheduler(db)
-      return { data: { ok: true } }
-    } catch (err) {
-      return { error: err instanceof Error ? err.message : String(err) }
-    }
+/** The settings page's Re-initialize and Reset actions. */
+function registerDbActions(ownIpc: OwnIpc, db: ExtensionDB): void {
+  ownIpc.handle('task-vault:db.reinit', noPayload, async () => {
+    await applyTaskVaultSchema(db)
+    await backfillRecurringTasks(db)
+    maybeStartScheduler(db)
+    return { data: { ok: true } }
   })
-  const disposeDbReset = api.ipc.registerHandler(
-    'task-vault:db.reset',
-    async () => {
-      try {
-        // Delete rows in FK-safe order; do not drop tables — the settings table is
-        // shared with other extensions in the unified PGlite database.
-        await db.exec(`
+  ownIpc.handle('task-vault:db.reset', noPayload, async () => {
+    // Delete rows in FK-safe order; do not drop tables — the settings table is
+    // shared with other extensions in the unified app database, so only this
+    // extension's own rows go.
+    await db.exec(`
+        DELETE FROM area_archive_changes;
         DELETE FROM tasks;
         DELETE FROM projects;
         DELETE FROM areas;
-        DELETE FROM settings;
+        DELETE FROM settings WHERE extension_id = 'task-vault';
       `)
-        await applyTaskVaultSchema(db)
-        await applyTaskVaultMigrations(db)
-        maybeStartScheduler(db)
-        return { data: { ok: true } }
-      } catch (err) {
-        return { error: err instanceof Error ? err.message : String(err) }
-      }
-    },
-    { remoteAccessible: false }
-  )
-  disposables.push(disposeDbReinit, disposeDbReset)
+    await applyTaskVaultSchema(db)
+    maybeStartScheduler(db)
+    return { data: { ok: true } }
+  })
+}
 
-  const disposeIpc = registerVaultIpcHandlers(api, db)
-  disposables.push({ dispose: disposeIpc })
-  const disposeProjectsIpc = registerProjectsIpcHandlers(api, db)
-  disposables.push({ dispose: disposeProjectsIpc })
-  const disposeLinksIpc = registerLinksIpcHandlers(api, db)
-  disposables.push({ dispose: disposeLinksIpc })
-  const disposeKanbanIpc = registerKanbanIpcHandlers(api, db)
-  disposables.push({ dispose: disposeKanbanIpc })
-  const disposeAdminIpc = registerAdminIpcHandlers(api, db)
-  disposables.push({ dispose: disposeAdminIpc })
-  const disposeWeeklyReviewIpc = registerWeeklyReviewIpcHandlers(api, db)
-  disposables.push({ dispose: disposeWeeklyReviewIpc })
+const FEATURE_IPC = [
+  registerVaultIpcHandlers,
+  registerProjectsIpcHandlers,
+  registerLinksIpcHandlers,
+  registerKanbanIpcHandlers,
+  registerAdminIpcHandlers,
+  registerWeeklyReviewIpcHandlers,
+]
 
+function registerFeatureIpc(api: ExtensionAPI, db: ExtensionDB): void {
+  for (const register of FEATURE_IPC) disposables.push({ dispose: register(api, db) })
+}
+
+async function initializeSchema(api: ExtensionAPI, db: ExtensionDB): Promise<void> {
   try {
     await applyTaskVaultSchema(db)
-    await applyTaskVaultMigrations(db)
+    await migrateStoredStaleThreshold(api, db)
     await backfillRecurringTasks(db)
     maybeStartScheduler(db)
   } catch (err) {
@@ -198,33 +206,23 @@ export async function activate(api: ExtensionAPI): Promise<void> {
       'schemaInitFailed'
     )
   }
+}
 
-  disposables.push(
-    api.ipc.registerHandler('task-vault:navigate-to-terminal', (data) => {
-      const { sessionId, projectId } = (data ?? {}) as {
-        sessionId?: string
-        projectId?: string
-      }
-      if (!sessionId || !projectId) return { ok: false, error: 'missing sessionId or projectId' }
-      api.window.broadcast('terminal:navigate-to-session', { sessionId, projectId })
-      return { ok: true }
-    })
-  )
-
-  disposables.push(
-    api.ipc.registerHandler('task-vault:open-panel', (data) => {
-      const { date, taskId } = (data ?? {}) as { date?: string; taskId?: string }
-      openInVault(api, { date, taskId })
-      return { ok: true }
-    })
-  )
-
+function registerNavigation(ownIpc: OwnIpc, api: ExtensionAPI): void {
+  ownIpc.handle('task-vault:navigate-to-terminal', TerminalTarget, ({ sessionId, projectId }) => {
+    api.window.broadcast('terminal:navigate-to-session', { sessionId, projectId })
+    return { ok: true }
+  })
+  ownIpc.handle('task-vault:open-panel', VaultTarget, ({ date, taskId }) => {
+    openInVault(api, { date, taskId })
+    return { ok: true }
+  })
   // Consumed by TaskVaultView on cold-start mount, when the broadcast above
   // was sent before its WebContentsView existed to hear it.
-  disposables.push(
-    api.ipc.registerHandler('task-vault:pop-pending-navigation', () => popPendingNavigation())
-  )
+  ownIpc.handle('task-vault:pop-pending-navigation', noPayload, () => popPendingNavigation())
+}
 
+function addCalendarMenuItem(api: ExtensionAPI): void {
   disposables.push(
     api.nativeMenu.addViewMenuItem({
       id: 'vault-calendar-toggle',
@@ -236,28 +234,27 @@ export async function activate(api: ExtensionAPI): Promise<void> {
       },
     })
   )
+}
 
-  const reviewDay = parseInt(
-    api.settings.get<string>('terminator.task-vault.weeklyReviewDay') ?? '0',
-    10
-  )
-  scheduleWeeklyReviewNudge(api, reviewDay)
+function clearPendingCaptureTimer(): void {
+  if (_pendingCaptureTimer === null) return
+  clearTimeout(_pendingCaptureTimer)
+  _pendingCaptureTimer = null
+}
 
-  // Renderer calls this on mount to pick up a capture triggered before the view existed.
-  disposables.push(
-    api.ipc.registerHandler('task-vault:ui.consumePendingCapture', () => {
-      const pending = _pendingCapture
-      _pendingCapture = false
-      if (_pendingCaptureTimer !== null) {
-        clearTimeout(_pendingCaptureTimer)
-        _pendingCaptureTimer = null
-      }
-      return { data: { pending } }
-    })
-  )
+/** Renderer calls this on mount to pick up a capture triggered before the view existed. */
+function registerPendingCapture(ownIpc: OwnIpc): void {
+  ownIpc.handle('task-vault:ui.consumePendingCapture', noPayload, () => {
+    const pending = _pendingCapture
+    _pendingCapture = false
+    clearPendingCaptureTimer()
+    return { data: { pending } }
+  })
+}
 
+async function registerCaptureShortcut(api: ExtensionAPI): Promise<void> {
   try {
-    const hotkeyDisposable = api.globalShortcut.register(DEFAULT_CAPTURE_HOTKEY, () => {
+    const hotkeyDisposable = await api.globalShortcut.register(DEFAULT_CAPTURE_HOTKEY, () => {
       openCaptureOverlay(api)
     })
     disposables.push(hotkeyDisposable)
@@ -273,9 +270,11 @@ export async function activate(api: ExtensionAPI): Promise<void> {
       'globalShortcutTaken'
     )
   }
+}
 
-  // Registered unconditionally: the quick-actions command must not depend on
-  // the global hotkey above having claimed its accelerator.
+/** Registered unconditionally: the quick-actions command must not depend on the global hotkey
+ *  having claimed its accelerator. */
+function registerCaptureCommand(api: ExtensionAPI): void {
   disposables.push(
     api.commands.register(
       {
@@ -289,45 +288,73 @@ export async function activate(api: ExtensionAPI): Promise<void> {
   )
 }
 
-let reviewNudgeInterval: ReturnType<typeof setInterval> | null = null
+function weeklyReviewDay(api: ExtensionAPI): number {
+  return parseInt(api.settings.get<string>('terminator.task-vault.weeklyReviewDay') ?? '0', 10)
+}
 
-function scheduleWeeklyReviewNudge(api: ExtensionAPI, reviewDay: number): void {
-  if (reviewNudgeInterval !== null) {
-    clearInterval(reviewNudgeInterval)
-    reviewNudgeInterval = null
-  }
-  function checkAndNudge() {
-    const now = new Date()
-    if (now.getDay() !== reviewDay) return
-    // A notification rather than a toast: a toast is transient and has nothing
-    // to click, so "open Task Vault to start" was an instruction to go and do
-    // the navigation yourself. This one is the link.
-    api.notifications.createNotification({
-      type: 'info',
-      title: 'Weekly review is ready',
-      key: 'weeklyReviewReady',
-      onClick: () => openInVault(api, { view: 'review' }),
+/** Activates task-vault; returns what other extensions may use, through extensionDependencies (ADR 094). */
+export async function activate(api: ExtensionAPI): Promise<TaskVaultAPI> {
+  _api = api
+  bindBroadcast((channel, data) => api.window.broadcast(channel, data))
+  const db: ExtensionDB = api.db
+  disposables.push(
+    api.settings.register({
+      label: 'Task Vault',
+      properties: { ...BASE_SETTINGS, ...buildNotificationSettingProperties() },
     })
-  }
-
-  checkAndNudge()
-  reviewNudgeInterval = setInterval(
-    () => {
-      checkAndNudge()
-    },
-    24 * 60 * 60 * 1000
   )
+  const ownIpc = createIpcRegistrar(api, { onError: errorResult })
+  disposables.push({ dispose: ownIpc.cleanup })
+  registerDbActions(ownIpc, db)
+  registerFeatureIpc(api, db)
+  await initializeSchema(api, db)
+  registerNavigation(ownIpc, api)
+  addCalendarMenuItem(api)
+  scheduleWeeklyReviewNudge(api)
+  registerPendingCapture(ownIpc)
+  await registerCaptureShortcut(api)
+  registerCaptureCommand(api)
+  return {
+    open: (destination) => openInVault(api, destination),
+    openCapture: () => openCaptureOverlay(api),
+  }
+}
+
+let reviewNudgeTimer: ReturnType<typeof setTimeout> | null = null
+
+function clearReviewNudgeTimer(): void {
+  if (reviewNudgeTimer === null) return
+  clearTimeout(reviewNudgeTimer)
+  reviewNudgeTimer = null
+}
+
+function nudgeWeeklyReview(api: ExtensionAPI): void {
+  // A notification rather than a toast: a toast is transient and has nothing
+  // to click, so "open Task Vault to start" was an instruction to go and do
+  // the navigation yourself. This one is the link.
+  api.notifications.createNotification({
+    type: 'info',
+    title: 'Weekly review is ready',
+    key: 'weeklyReviewReady',
+    onClick: () => openInVault(api, { view: 'review' }),
+  })
+}
+
+/** Checks daily whether today is the review day; the setting is read at each check, so a change applies. */
+function scheduleWeeklyReviewNudge(api: ExtensionAPI): void {
+  clearReviewNudgeTimer()
+  const now = zonedNow()
+  // Temporal counts Sunday as 7; the setting counts it as 0.
+  if (now.dayOfWeek % 7 === weeklyReviewDay(api)) nudgeWeeklyReview(api)
+  // The same time tomorrow, not 24 hours on: when the clocks change, 24 hours can step over a date.
+  const untilTomorrow = now.add({ days: 1 }).epochMilliseconds - now.epochMilliseconds
+  reviewNudgeTimer = setTimeout(() => scheduleWeeklyReviewNudge(api), untilTomorrow)
 }
 
 function openCaptureOverlay(api: ExtensionAPI): void {
-  // Broadcast to any already-running extension view immediately.
-  for (const win of BrowserWindow.getAllWindows()) {
-    if (win.isDestroyed()) continue
-    if (win.isMinimized()) win.restore()
-    win.show()
-    win.focus()
-    win.webContents.send('task-vault:push:open-capture')
-  }
+  // Bring the app forward and tell any already-running extension view immediately.
+  api.window.raise()
+  api.window.broadcast('task-vault:push:open-capture', undefined)
   // Activate the global tab — this creates the WebContentsView if it doesn't exist yet.
   api.window.broadcast('extension:activate-global-tab', 'terminator.task-vault')
   // Transfer keyboard focus to the task-vault WebContentsView so Escape works immediately.
@@ -346,14 +373,8 @@ export async function deactivate(): Promise<void> {
   _api = null
   _schedulerStarted = false
   _pendingCapture = false
-  if (_pendingCaptureTimer !== null) {
-    clearTimeout(_pendingCaptureTimer)
-    _pendingCaptureTimer = null
-  }
-  if (reviewNudgeInterval !== null) {
-    clearInterval(reviewNudgeInterval)
-    reviewNudgeInterval = null
-  }
+  clearPendingCaptureTimer()
+  clearReviewNudgeTimer()
   for (const d of disposables) {
     d.dispose()
   }

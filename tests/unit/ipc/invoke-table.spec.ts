@@ -7,7 +7,8 @@ vi.mock('electron', () => ({
   ipcMain: { handle: mockHandle, on: vi.fn(), removeHandler: vi.fn() },
 }))
 
-import { registerInvokeTable, invokeSpec } from '../../../src/main/ipc/invoke-table.js'
+import { defineChannel } from '@terminator/extension-sdk'
+import { registerInvokeTable, noPayload } from '../../../src/main/ipc/invoke-table.js'
 
 function capturedHandler(channel: string) {
   return mockHandle.mock.calls.find(([ch]) => ch === channel)![1] as (
@@ -23,8 +24,8 @@ describe('registerInvokeTable', () => {
 
   it('registers one channel per row', () => {
     registerInvokeTable([
-      invokeSpec({ channel: 'a:one', schema: z.object({}), invalid: null, run: () => 'one' }),
-      invokeSpec({ channel: 'a:two', schema: z.object({}), invalid: null, run: () => 'two' }),
+      defineChannel({ channel: 'a:one', schema: z.object({}), invalid: null, run: () => 'one' }),
+      defineChannel({ channel: 'a:two', schema: z.object({}), invalid: null, run: () => 'two' }),
     ])
     expect(mockHandle).toHaveBeenCalledWith('a:one', expect.any(Function))
     expect(mockHandle).toHaveBeenCalledWith('a:two', expect.any(Function))
@@ -32,7 +33,7 @@ describe('registerInvokeTable', () => {
 
   it('dispatches valid payloads to run() and returns its response', async () => {
     registerInvokeTable([
-      invokeSpec({
+      defineChannel({
         channel: 'a:echo',
         schema: z.object({ name: z.string() }),
         invalid: { error: 'VALIDATION_ERROR' },
@@ -41,10 +42,16 @@ describe('registerInvokeTable', () => {
     ])
     await expect(capturedHandler('a:echo')({}, { name: 'x' })).resolves.toEqual({ hello: 'x' })
   })
+})
+
+describe('registerInvokeTable — invalid payloads', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
   it('returns the static invalid response when validation fails', async () => {
     registerInvokeTable([
-      invokeSpec({
+      defineChannel({
         channel: 'a:strict',
         schema: z.object({ id: z.string().min(1) }),
         invalid: { error: 'VALIDATION_ERROR' },
@@ -55,24 +62,38 @@ describe('registerInvokeTable', () => {
       error: 'VALIDATION_ERROR',
     })
   })
+})
+
+describe('registerInvokeTable — functional invalid responses', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
   it('passes the zod error to a functional invalid response', async () => {
     registerInvokeTable([
-      invokeSpec({
+      defineChannel({
         channel: 'a:detail',
         schema: z.object({ id: z.string() }),
-        invalid: (err) => ({ error: 'VALIDATION_ERROR', message: err.message }),
+        invalid: (err: z.ZodError) => ({ error: 'VALIDATION_ERROR', message: err.message }),
         run: () => ({ ok: true }),
       }),
     ])
-    const result = (await capturedHandler('a:detail')({}, {})) as { error: string; message: string }
-    expect(result.error).toBe('VALIDATION_ERROR')
-    expect(result.message).toBeTruthy()
+    const { error } = z.object({ id: z.string() }).safeParse({})
+    expect(await capturedHandler('a:detail')({}, {})).toEqual({
+      error: 'VALIDATION_ERROR',
+      message: error!.message,
+    })
+  })
+})
+
+describe('registerInvokeTable — errors', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
   })
 
   it('maps thrown errors through onError', async () => {
     registerInvokeTable([
-      invokeSpec({
+      defineChannel({
         channel: 'a:boom',
         schema: z.object({}),
         invalid: null,
@@ -86,10 +107,16 @@ describe('registerInvokeTable', () => {
       error: 'Error: kaput',
     })
   })
+})
+
+describe('registerInvokeTable — errors without onError', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
   it('lets errors propagate when no onError is declared', async () => {
     registerInvokeTable([
-      invokeSpec({
+      defineChannel({
         channel: 'a:throws',
         schema: z.object({}),
         invalid: null,
@@ -99,5 +126,12 @@ describe('registerInvokeTable', () => {
       }),
     ])
     await expect(capturedHandler('a:throws')({}, {})).rejects.toThrow('unhandled')
+  })
+})
+
+describe('noPayload', () => {
+  it('accepts what the desktop renderer sends (nothing) and what the bridge sends ({})', () => {
+    expect(noPayload.safeParse(undefined).success).toBe(true)
+    expect(noPayload.safeParse({}).success).toBe(true)
   })
 })

@@ -14,6 +14,7 @@ import { CHECK_NAMES } from '../verify/check-names.js'
 
 export const SCHEMA_VERSION = 1
 
+/** @internal */
 export class SchemaVersionTooNewError extends Error {
   readonly code = 'ORDER_SCHEMA_TOO_NEW'
   constructor(found: number, known: number) {
@@ -239,7 +240,7 @@ export const RED_TEAM_CATEGORIES = [
 
 export type RedTeamCategory = (typeof RED_TEAM_CATEGORIES)[number]
 
-/** The categories that stop a hand-off. Everything else is a note. */
+/** The categories that stop a hand-off; everything else is a note. @internal */
 export const BLOCKING_CATEGORIES: readonly RedTeamCategory[] = RED_TEAM_CATEGORIES.slice(0, 3)
 
 /**
@@ -338,13 +339,11 @@ export type OrderStatus = WorkOrder['status']
 export type AcceptanceCriterion = z.infer<typeof AcceptanceSchema>
 export type PlanUnit = z.infer<typeof UnitSchema>
 export type Lane = z.infer<typeof LaneSchema>
-export type Verify = z.infer<typeof VerifySchema>
 export type OrderSource = z.infer<typeof SourceSchema>
 export type Budgets = z.infer<typeof BudgetsSchema>
 export type RiskAssessment = z.infer<typeof RiskSchema>
 export type Assumption = z.infer<typeof AssumptionSchema>
 export type OpenQuestion = z.infer<typeof OpenQuestionSchema>
-export type RedTeamFinding = z.infer<typeof RedTeamFindingSchema>
 export type WriteBack = z.infer<typeof WriteBackSchema>
 export type StateMapping = z.infer<typeof StateMappingSchema>
 export type TransitionIntent = z.infer<typeof TransitionIntentSchema>

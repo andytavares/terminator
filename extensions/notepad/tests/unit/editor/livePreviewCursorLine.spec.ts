@@ -1,16 +1,16 @@
 import { describe, it, expect } from 'vitest'
-import { EditorState } from '@codemirror/state'
 import { markdown } from '@codemirror/lang-markdown'
 import { GFM } from '@lezer/markdown'
 import type { Decoration } from '@codemirror/view'
 import { buildDecorations } from '../../../src/editor/livePreview'
+import { parsedState } from '../support/parsed-state'
 
 // Live preview reveals the raw markdown of whatever line the caret is on, so
 // the construct stays editable. These cover that reveal for every construct
 // that implements it — the counterpart to the "rendered" assertions elsewhere.
 
 function makeState(doc: string) {
-  return EditorState.create({ doc, extensions: [markdown({ extensions: [GFM] })] })
+  return parsedState({ doc, extensions: [markdown({ extensions: [GFM] })] })
 }
 
 function countDecorations(doc: string, cursor: number): number {
@@ -54,11 +54,18 @@ describe('buildDecorations — raw reveal on the caret line', () => {
   })
 })
 
-describe('buildDecorations — degenerate constructs', () => {
-  // Caret parked at the very end, off the construct's line, so the renderer
-  // takes its decorating path rather than the raw-reveal one.
-  const atEnd = (doc: string) => countDecorations(doc, doc.length)
+// Caret parked at the very end, off the construct's line, so the renderer
+// takes its decorating path rather than the raw-reveal one.
+const atEnd = (doc: string) => countDecorations(doc, doc.length)
 
+describe('buildDecorations — degenerate constructs', buildDecorationsDegenerateConstructsTests)
+
+function buildDecorationsDegenerateConstructsTests() {
+  describe('empty markers', buildDecorationsDegenerateConstructsEmptyMarkersTests)
+  describe('fences', buildDecorationsDegenerateConstructsFencesTests)
+}
+
+function buildDecorationsDegenerateConstructsEmptyMarkersTests() {
   it('leaves a bare heading marker with no text alone', () => {
     expect(() => atEnd('#\nsecond line')).not.toThrow()
   })
@@ -70,7 +77,9 @@ describe('buildDecorations — degenerate constructs', () => {
   it('handles an image with no URL', () => {
     expect(() => atEnd('![alt]()\nsecond line')).not.toThrow()
   })
+}
 
+function buildDecorationsDegenerateConstructsFencesTests() {
   it('handles a fenced code block with no content', () => {
     expect(() => atEnd('```\n```\nsecond line')).not.toThrow()
   })
@@ -91,4 +100,4 @@ describe('buildDecorations — degenerate constructs', () => {
     const doc = '```js\nconst a = 1\n```\nsecond line'
     expect(countDecorations(doc, doc.length)).toBeGreaterThan(0)
   })
-})
+}

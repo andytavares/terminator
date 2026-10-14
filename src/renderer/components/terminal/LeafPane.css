@@ -29,9 +29,9 @@
   height: 16px;
   padding: 0;
   border: 0;
-  border-radius: var(--radius-sm, 4px);
+  border-radius: var(--tm-radius-sm, 4px);
   background: transparent;
-  color: var(--text-muted);
+  color: var(--tm-text-muted);
   cursor: pointer;
   opacity: 0.55;
   transition:
@@ -48,8 +48,8 @@
 .leaf-pane__close:hover,
 .leaf-pane__close:focus-visible {
   opacity: 1;
-  background: var(--bg-card-hover);
-  color: var(--text-primary);
+  background: var(--tm-bg-card-hover);
+  color: var(--tm-text-primary);
 }
 
 .leaf-pane--focused .leaf-pane__titlebar {
@@ -85,8 +85,4 @@
 .leaf-pane__container .xterm {
   height: 100%;
   padding: 6px 12px;
-}
-
-.leaf-pane__container .xterm-viewport {
-  border-radius: 0;
 }

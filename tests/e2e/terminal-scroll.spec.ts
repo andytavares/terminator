@@ -25,12 +25,17 @@ test.afterAll(async () => {
   await closeApp(handle)
 })
 
-/** True when the live terminal viewport is scrolled to (or within a line of) the bottom. */
+/** True when the live terminal is scrolled to (or within a line of) the bottom.
+ * xterm 6 scrolls virtually (the `.xterm-viewport` element has no scroll offset), so this
+ * reads the vertical scrollbar slider: its bottom edge sits at the track's bottom edge. */
 function viewportAtBottom(): Promise<boolean> {
   return handle.page.evaluate(() => {
-    const vp = document.querySelector('.terminal-pane .xterm-viewport') as HTMLElement | null
-    if (!vp) return false
-    return vp.scrollHeight - vp.scrollTop - vp.clientHeight < 5
+    const track = document.querySelector(
+      '.terminal-pane .xterm-scrollable-element > .scrollbar.vertical'
+    ) as HTMLElement | null
+    const slider = track?.querySelector('.slider') as HTMLElement | null
+    if (!track || !slider) return false
+    return track.getBoundingClientRect().bottom - slider.getBoundingClientRect().bottom < 5
   })
 }
 

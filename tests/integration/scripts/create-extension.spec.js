@@ -1,9 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { spawnSync } from 'child_process'
-import { existsSync, readFileSync, rmSync, mkdirSync } from 'fs'
+import { existsSync, readFileSync, mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { tmpdir } from 'os'
-import { randomBytes } from 'crypto'
+import { runInNewContext } from 'vm'
+import { makeTempDir } from '../../support/temp-dir'
 
 const SCRIPT = join(process.cwd(), 'scripts', 'create-extension.cjs')
 
@@ -18,12 +18,7 @@ function run(args, opts = {}) {
 let tempDir
 
 beforeEach(() => {
-  tempDir = join(tmpdir(), `terminator-test-${randomBytes(4).toString('hex')}`)
-  mkdirSync(tempDir, { recursive: true })
-})
-
-afterEach(() => {
-  if (existsSync(tempDir)) rmSync(tempDir, { recursive: true, force: true })
+  tempDir = makeTempDir('terminator-test-')
 })
 
 describe('create-extension.js CLI', () => {
@@ -47,7 +42,9 @@ describe('create-extension.js CLI', () => {
     const manifest = JSON.parse(readFileSync(join(tempDir, 'my-tool', 'manifest.json'), 'utf8'))
     expect(manifest.id).toBe('com.acme.my-tool')
   })
+})
 
+describe('create-extension.js CLI — collisions, bad names and the guide', () => {
   it('exits 2 on directory collision', () => {
     const dir = join(tempDir, 'existing-ext')
     mkdirSync(dir, { recursive: true })
@@ -60,18 +57,77 @@ describe('create-extension.js CLI', () => {
     expect(result.status).toBe(1)
   })
 
+  it('points at the guide for a view, not at the removed renderer.tsx model', () => {
+    const result = run(['view-ext', '--dir', join(tempDir, 'view-ext')])
+    expect(result.status).toBe(0)
+    expect(result.stdout).toContain('docs/EXTENSION-DEVELOPMENT.md')
+    expect(result.stdout).not.toContain('renderer.tsx')
+    expect(result.stdout).not.toContain('useExtensionRegistry')
+    expect(result.stdout).not.toMatch(/v1\.\d\.\d/)
+  })
+})
+
+describe('create-extension.js CLI — help and a runnable entry', () => {
   it('exits 0 with --help', () => {
     const result = run(['--help'])
     expect(result.status).toBe(0)
     expect(result.stdout).toContain('Usage')
   })
 
-  it('generated src/index.js is valid JavaScript with activate/deactivate', () => {
+  it('writes a src/index.js that runs and exports activate and deactivate', () => {
     run(['hello-world', '--dir', join(tempDir, 'hello-world')])
     const index = readFileSync(join(tempDir, 'hello-world', 'src', 'index.js'), 'utf8')
-    // Should not have syntax errors — we check by verifying key exports exist
-    expect(index).toContain('activate')
-    expect(index).toContain('deactivate')
-    expect(index).toContain('module.exports')
+    // Evaluated as CommonJS, with the SDK it requires standing in empty.
+    const module = { exports: {} }
+    runInNewContext(index, { module, exports: module.exports, require: () => ({}), console })
+    expect(module.exports).toEqual({
+      activate: expect.any(Function),
+      deactivate: expect.any(Function),
+    })
+  })
+})
+
+describe('create-extension.js CLI — refusals', () => {
+  it('exits 1 with the usage when no name is given', () => {
+    const result = run([])
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain('Error: Extension name is required.')
+    expect(result.stdout).toContain('Usage: npm run create-extension -- <name> [options]')
+  })
+
+  it('exits 1 for an invalid --id', () => {
+    const result = run(['my-ext', '--id', 'Bad', '--dir', join(tempDir, 'my-ext')])
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain('Error: Invalid ID "Bad".')
+    expect(existsSync(join(tempDir, 'my-ext'))).toBe(false)
+  })
+
+  it('exits 3 when the files cannot be written', () => {
+    writeFileSync(join(tempDir, 'blocker'), '')
+    const result = run(['my-ext', '--dir', join(tempDir, 'blocker', 'my-ext')])
+    expect(result.status).toBe(3)
+    expect(result.stderr).toContain('Error writing extension files:')
+  })
+})
+
+describe('create-extension.js CLI — defaults and report', () => {
+  it('writes to extensions/<name> under the working directory, as com.example.<name>', () => {
+    const result = run(['my-ext'], { cwd: tempDir })
+    const outDir = join(tempDir, 'extensions', 'my-ext')
+    const manifest = JSON.parse(readFileSync(join(outDir, 'manifest.json'), 'utf8'))
+    expect(manifest.id).toBe('com.example.my-ext')
+    expect(result.stdout).toBe(
+      [
+        `✓ Created extension "my-ext" at ${outDir}`,
+        '  package.json  — workspace package (add npm deps here)',
+        '  manifest.json — id: com.example.my-ext',
+        '  src/index.js  — backend entry, run in the extension host, with commented API stubs',
+        '',
+        'To contribute UI (a tab, a sidebar panel), add a view: a "renderer" in manifest.json',
+        'and its "contributes" surfaces (see "The view" in docs/EXTENSION-DEVELOPMENT.md).',
+        '\nRun "npm install" then "npm run dev" to load the extension automatically.',
+        '',
+      ].join('\n')
+    )
   })
 })

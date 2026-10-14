@@ -1,4 +1,5 @@
-import { gradeRisk, matchesGlob } from '../runtime/review/risk-grader.js'
+import { matchesGlob } from 'node:path'
+import { gradeRisk } from '../runtime/review/risk-grader.js'
 import type { CheckState } from '../runtime/review/risk-grader.js'
 import type { RiskAssessment, WorkOrder } from '../order/schema.js'
 import { isDocumentationRelative } from './documentation-path.js'
@@ -52,6 +53,34 @@ export interface Inspection {
  * explicitly (FR-044). Security theatre on every change is how people learn to
  * skim security findings.
  */
+type Trigger = RiskAssessment['triggers'][number]
+
+/** The triggers the grader does not speak to, read off the changed files. */
+function whatTheChangeTripped(order: WorkOrder, files: readonly string[]): Trigger[] {
+  const tripped: Trigger[] = []
+  // About what the change brings in rather than where it lands.
+  if (files.some((f) => DEPENDENCY_MANIFEST.test(f))) tripped.push('new_dependency')
+  if (files.some((f) => NETWORK.test(f))) tripped.push('network_egress')
+  const { criticalPaths } = order.risk
+  if (files.some((file) => criticalPaths.some((glob) => matchesGlob(file, glob)))) {
+    tripped.push('critical_path')
+  }
+  if (outsideBlastRadius(order, files)) tripped.push('outside_blast_radius')
+  return tripped
+}
+
+// Writing outside what the order declared is a trigger: the plan grew past what was
+// assessed. Documentation is not growth: the scribe writes the README and CHANGELOG.
+function outsideBlastRadius(order: WorkOrder, files: readonly string[]): boolean {
+  const { blastRadius } = order.risk
+  if (blastRadius.length === 0) return false
+  return files.some(
+    (file) =>
+      !isDocumentationRelative(file) &&
+      !blastRadius.some((prefix) => file === prefix || file.startsWith(prefix))
+  )
+}
+
 export function inspectionFor(order: WorkOrder, input: InspectionInput): Inspection {
   const graded = gradeRisk({
     files: input.changedFiles,
@@ -61,36 +90,10 @@ export function inspectionFor(order: WorkOrder, input: InspectionInput): Inspect
     criticalPaths: order.risk.criticalPaths,
   })
 
-  const triggers = new Set<RiskAssessment['triggers'][number]>()
-
-  for (const { match, trigger } of TRIGGER_FROM_GRADER) {
-    if (match.test(graded.trigger)) triggers.add(trigger)
-  }
-
-  // Three the grader does not speak to, because they are about what the change
-  // brings in rather than where it lands.
-  if (input.changedFiles.some((f) => DEPENDENCY_MANIFEST.test(f))) triggers.add('new_dependency')
-  if (input.changedFiles.some((f) => NETWORK.test(f))) triggers.add('network_egress')
-
-  if (order.risk.criticalPaths.length > 0) {
-    const entered = input.changedFiles.some((file) =>
-      order.risk.criticalPaths.some((glob) => matchesGlob(file, glob))
-    )
-    if (entered) triggers.add('critical_path')
-  }
-
-  // Writing outside what the order declared is itself a trigger: a plan that
-  // has quietly grown past what was assessed is the case worth catching.
-  // Documentation is not growth: the scribe writes the README and CHANGELOG
-  // every order owes, wherever the plan's code lives.
-  if (order.risk.blastRadius.length > 0) {
-    const outside = input.changedFiles.some(
-      (file) =>
-        !isDocumentationRelative(file) &&
-        !order.risk.blastRadius.some((prefix) => file === prefix || file.startsWith(prefix))
-    )
-    if (outside) triggers.add('outside_blast_radius')
-  }
+  const triggers = new Set<Trigger>(
+    TRIGGER_FROM_GRADER.filter(({ match }) => match.test(graded.trigger)).map((t) => t.trigger)
+  )
+  for (const trigger of whatTheChangeTripped(order, input.changedFiles)) triggers.add(trigger)
 
   return {
     grade: graded.grade,

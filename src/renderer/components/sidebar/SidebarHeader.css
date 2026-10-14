@@ -4,7 +4,7 @@
   flex-direction: column;
   gap: 4px;
   padding: 8px 9px 6px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--tm-border);
 }
 
 .sidebar-header__add svg {
@@ -22,15 +22,15 @@
   background: transparent;
   border: none;
   outline: none;
-  border-radius: var(--radius-xs);
-  color: var(--text-muted);
+  border-radius: var(--tm-radius-xs);
+  color: var(--tm-text-muted);
   font-size: 16px;
   cursor: pointer;
 }
 
 .sidebar-header__add:hover {
-  background: var(--bg-card-hover);
-  color: var(--text-primary);
+  background: var(--tm-bg-card-hover);
+  color: var(--tm-text-primary);
 }
 
 /* Search plus the two controls that act on the list beneath it. */

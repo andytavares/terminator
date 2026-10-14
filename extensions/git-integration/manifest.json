@@ -24,6 +24,7 @@
     "windowViews": [{ "id": "pr-review", "view": "pr-review" }],
     "quickActions": {
       "group": { "mnemonic": "g", "label": "Git" }
-    }
+    },
+    "shellRoots": ["terminator.git-integration.review.cloneFolder"]
   }
 }

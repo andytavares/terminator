@@ -1,8 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React from 'react'
 import { ListFilter } from 'lucide-react'
 import type { SessionView } from '../../sidebar/view-model'
-import { closeAllContextMenus } from '../ContextMenu'
-import { useMenuPlacement } from '../use-menu-placement'
+import { DropdownMenu, MenuChoice } from './menu'
 import './SidebarMenu.css'
 
 export interface FilterMenuProps {
@@ -29,110 +28,99 @@ export interface FilterMenuProps {
  * caused the filtering says the same thing without a band of chrome, and puts
  * the way out in the same place as the way in.
  */
-export function FilterMenu({
+export function FilterMenu(props: FilterMenuProps): JSX.Element {
+  const hidden = Math.max(0, props.total - props.shown)
+  return (
+    <DropdownMenu
+      label="Filter"
+      icon={<ListFilter aria-hidden="true" />}
+      ariaLabel={hidden > 0 ? `Filter — ${hidden} hidden` : 'Filter'}
+      on={hidden > 0}
+      badge={hidden > 0 && <span className="sidebar-menu__badge">{hidden}</span>}
+    >
+      {(close) => (
+        <>
+          <ViewChoices {...props} close={close} />
+          <div className="sidebar-menu__separator" />
+          <HideStaleItem {...props} />
+          {hidden > 0 && <ShowAllItem {...props} close={close} />}
+        </>
+      )}
+    </DropdownMenu>
+  )
+}
+
+type Closing = { close: () => void }
+
+/** The saved views, each with how many branches it would show. */
+function ViewChoices({
   views,
   activeViewId,
   onSelectView,
   counts,
+  close,
+}: FilterMenuProps & Closing): JSX.Element {
+  return (
+    <>
+      {views.map((view) => (
+        <MenuChoice
+          key={view.id}
+          checked={view.id === activeViewId}
+          onSelect={() => {
+            onSelectView(view.id)
+            close()
+          }}
+        >
+          <span>{view.name}</span>
+          {counts?.[view.id] ? (
+            <span className="sidebar-menu__count">{counts[view.id]}</span>
+          ) : null}
+        </MenuChoice>
+      ))}
+    </>
+  )
+}
+
+/** Toggles the active view's stale filter, keeping its other filters. */
+function HideStaleItem({
+  views,
+  activeViewId,
   onChangeView,
   hideStaleUnavailable,
-  shown,
-  total,
-  onShowAll,
 }: FilterMenuProps): JSX.Element {
-  const [open, setOpen] = useState(false)
-  const buttonRef = useRef<HTMLButtonElement>(null)
-  const panelRef = useRef<HTMLDivElement>(null)
-  const placement = useMenuPlacement(open, buttonRef, panelRef)
   const active = views.find((v) => v.id === activeViewId) ?? views[0]
-  const hidden = Math.max(0, total - shown)
-
-  useEffect(() => {
-    if (!open) return
-    const close = (): void => setOpen(false)
-    window.addEventListener('click', close)
-    window.addEventListener('close-context-menus', close)
-    return () => {
-      window.removeEventListener('click', close)
-      window.removeEventListener('close-context-menus', close)
-    }
-  }, [open])
-
+  const on = active?.filters.hideStale === true
   return (
-    <div className="sidebar-menu" onClick={(e) => e.stopPropagation()}>
+    <button
+      type="button"
+      role="menuitemcheckbox"
+      aria-checked={on}
+      className="sidebar-menu__item"
+      disabled={hideStaleUnavailable}
+      onClick={() => onChangeView({ filters: { ...active.filters, hideStale: !on } })}
+    >
+      <span>Hide stale</span>
+      {on && <span className="sidebar-menu__tick">✓</span>}
+    </button>
+  )
+}
+
+/** The way out of the filtering, saying how much it hides. */
+function ShowAllItem({ shown, total, onShowAll, close }: FilterMenuProps & Closing): JSX.Element {
+  return (
+    <>
+      <div className="sidebar-menu__separator" />
       <button
-        ref={buttonRef}
         type="button"
-        className={`sidebar-menu__button${hidden > 0 ? ' sidebar-menu__button--on' : ''}`}
-        aria-expanded={open}
-        aria-label={hidden > 0 ? `Filter — ${hidden} hidden` : 'Filter'}
+        role="menuitem"
+        className="sidebar-menu__item sidebar-menu__item--note"
         onClick={() => {
-          closeAllContextMenus()
-          setOpen((v) => !v)
+          onShowAll()
+          close()
         }}
       >
-        <ListFilter aria-hidden="true" />
-        <span className="sidebar-menu__label">Filter</span>
-        {hidden > 0 && <span className="sidebar-menu__badge">{hidden}</span>}
+        Showing {shown} of {total} — show all
       </button>
-
-      {open && (
-        <div ref={panelRef} className="sidebar-menu__panel" role="menu" style={placement}>
-          {views.map((view) => (
-            <button
-              key={view.id}
-              type="button"
-              role="menuitemradio"
-              aria-checked={view.id === activeViewId}
-              className={`sidebar-menu__item${view.id === activeViewId ? ' sidebar-menu__item--on' : ''}`}
-              onClick={() => {
-                onSelectView(view.id)
-                setOpen(false)
-              }}
-            >
-              <span>{view.name}</span>
-              {counts?.[view.id] ? (
-                <span className="sidebar-menu__count">{counts[view.id]}</span>
-              ) : null}
-            </button>
-          ))}
-
-          <div className="sidebar-menu__separator" />
-
-          <button
-            type="button"
-            role="menuitemcheckbox"
-            aria-checked={active?.filters.hideStale === true}
-            className="sidebar-menu__item"
-            disabled={hideStaleUnavailable}
-            onClick={() =>
-              onChangeView({
-                filters: { ...active.filters, hideStale: active.filters.hideStale !== true },
-              })
-            }
-          >
-            <span>Hide stale</span>
-            {active?.filters.hideStale === true && <span className="sidebar-menu__tick">✓</span>}
-          </button>
-
-          {hidden > 0 && (
-            <>
-              <div className="sidebar-menu__separator" />
-              <button
-                type="button"
-                role="menuitem"
-                className="sidebar-menu__item sidebar-menu__item--note"
-                onClick={() => {
-                  onShowAll()
-                  setOpen(false)
-                }}
-              >
-                Showing {shown} of {total} — show all
-              </button>
-            </>
-          )}
-        </div>
-      )}
-    </div>
+    </>
   )
 }

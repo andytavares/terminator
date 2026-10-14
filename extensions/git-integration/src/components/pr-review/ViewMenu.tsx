@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 import { ChevronDown } from 'lucide-react'
-import { Popover } from '@terminator/extension-ui'
+import { Button, Popover, SegmentedControl } from '@terminator/extension-ui'
 import { useReviewUiStore } from '../../stores/review-ui.store'
 import './view-menu.css'
 
@@ -9,130 +10,161 @@ export interface ViewMenuProps {
   sinceNote?: string | null
 }
 
+const COMMENT_OPTIONS = [
+  { value: 'all', label: 'All' },
+  { value: 'unresolved', label: 'Unresolved' },
+  { value: 'hidden', label: 'Hidden' },
+] as const
+
+const AGENT_NOTE_OPTIONS = [
+  { value: 'on', label: 'On' },
+  { value: 'off', label: 'Off' },
+] as const
+
+const LAYOUT_OPTIONS = [
+  { value: 'unified', label: 'Unified' },
+  { value: 'split', label: 'Split' },
+] as const
+
+/** The view settings the menu edits, with their setters. */
+function useViewSettings() {
+  return useReviewUiStore(
+    useShallow((s) => ({
+      commentVisibility: s.commentVisibility,
+      setCommentVisibility: s.setCommentVisibility,
+      agentNotesOn: s.agentNotesOn,
+      setAgentNotesOn: s.setAgentNotesOn,
+      diffViewMode: s.diffViewMode,
+      setDiffViewMode: s.setDiffViewMode,
+      hideFormattingHunks: s.hideFormattingHunks,
+      setHideFormattingHunks: s.setHideFormattingHunks,
+    }))
+  )
+}
+
+type ViewSettings = ReturnType<typeof useViewSettings>
+
+/** True when any setting differs from its default. */
+function settingsChanged(v: ViewSettings): boolean {
+  if (v.commentVisibility !== 'all' || !v.agentNotesOn) return true
+  return v.diffViewMode !== 'unified' || !v.hideFormattingHunks
+}
+
+function menuLabel(v: ViewSettings): string {
+  if (v.commentVisibility === 'hidden') return 'View · comments hidden'
+  if (settingsChanged(v)) return 'View (changed)'
+  return 'View'
+}
+
+function agentNotesValue(on: boolean): 'on' | 'off' {
+  if (on) return 'on'
+  return 'off'
+}
+
+function MenuGroup(props: { label: string; kbd?: string; children: React.ReactNode }) {
+  return (
+    <div className="vm-group">
+      <div className="vm-group-label">
+        {props.label}
+        {props.kbd && <span className="vm-kbd">{props.kbd}</span>}
+      </div>
+      {props.children}
+    </div>
+  )
+}
+
+function FormattingSwitch({ v }: { v: ViewSettings }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={v.hideFormattingHunks}
+      className="vm-switch-row"
+      onClick={() => v.setHideFormattingHunks(!v.hideFormattingHunks)}
+    >
+      <span className="vm-switch" aria-hidden="true" />
+      Hide formatting-only hunks
+    </button>
+  )
+}
+
+function CommentsGroup({ v }: { v: ViewSettings }) {
+  return (
+    <MenuGroup label="Comments" kbd="c">
+      <SegmentedControl
+        label="Comment visibility"
+        size="sm"
+        options={[...COMMENT_OPTIONS]}
+        value={v.commentVisibility}
+        onChange={v.setCommentVisibility}
+      />
+    </MenuGroup>
+  )
+}
+
+function AgentNotesGroup({ v }: { v: ViewSettings }) {
+  return (
+    <MenuGroup label="Agent notes" kbd="⇧C">
+      <SegmentedControl
+        label="Agent notes"
+        size="sm"
+        options={[...AGENT_NOTE_OPTIONS]}
+        value={agentNotesValue(v.agentNotesOn)}
+        onChange={(value) => v.setAgentNotesOn(value === 'on')}
+      />
+    </MenuGroup>
+  )
+}
+
+function LayoutGroup({ v }: { v: ViewSettings }) {
+  return (
+    <MenuGroup label="Layout">
+      <SegmentedControl
+        label="Diff view mode"
+        size="sm"
+        options={[...LAYOUT_OPTIONS]}
+        value={v.diffViewMode}
+        onChange={v.setDiffViewMode}
+      />
+    </MenuGroup>
+  )
+}
+
+function ViewMenuGroups({ v }: { v: ViewSettings }) {
+  return (
+    <>
+      <CommentsGroup v={v} />
+      <AgentNotesGroup v={v} />
+      <LayoutGroup v={v} />
+    </>
+  )
+}
+
 /** File-header menu: comments, agent notes, diff layout and the formatting filter. */
 export function ViewMenu({ sinceNote }: ViewMenuProps) {
   const [open, setOpen] = useState(false)
-  const commentVisibility = useReviewUiStore((s) => s.commentVisibility)
-  const setCommentVisibility = useReviewUiStore((s) => s.setCommentVisibility)
-  const agentNotesOn = useReviewUiStore((s) => s.agentNotesOn)
-  const setAgentNotesOn = useReviewUiStore((s) => s.setAgentNotesOn)
-  const diffViewMode = useReviewUiStore((s) => s.diffViewMode)
-  const setDiffViewMode = useReviewUiStore((s) => s.setDiffViewMode)
-  const hideFormattingHunks = useReviewUiStore((s) => s.hideFormattingHunks)
-  const setHideFormattingHunks = useReviewUiStore((s) => s.setHideFormattingHunks)
-
-  const changed =
-    commentVisibility !== 'all' ||
-    !agentNotesOn ||
-    diffViewMode !== 'unified' ||
-    !hideFormattingHunks
-
-  const label =
-    commentVisibility === 'hidden' ? 'View · comments hidden' : changed ? 'View (changed)' : 'View'
-
+  const v = useViewSettings()
+  const label = menuLabel(v)
+  const hidden = v.commentVisibility === 'hidden'
   return (
     <div className="vm">
-      <button
-        type="button"
-        className="vm-btn"
+      <Button
+        variant="ghost"
+        size="sm"
         aria-haspopup="true"
         aria-expanded={open}
         aria-label={label}
-        title={commentVisibility === 'hidden' ? label : undefined}
-        onClick={() => setOpen((v) => !v)}
+        title={(hidden && label) || undefined}
+        onClick={() => setOpen((o) => !o)}
       >
         View
-        {(changed || commentVisibility === 'hidden') && (
-          <span className="vm-dot" aria-hidden="true" />
-        )}
+        {settingsChanged(v) && <span className="vm-dot" aria-hidden="true" />}
         <ChevronDown aria-hidden="true" className="tm-icon-sm" />
-      </button>
+      </Button>
       {open && (
         <Popover label="View" onDismiss={() => setOpen(false)} className="vm-popover">
-          <div className="vm-group">
-            <div className="vm-group-label">
-              Comments
-              <span className="vm-kbd">c</span>
-            </div>
-            <div className="vm-seg" role="group" aria-label="Comment visibility">
-              <button
-                type="button"
-                aria-pressed={commentVisibility === 'all'}
-                onClick={() => setCommentVisibility('all')}
-              >
-                All
-              </button>
-              <button
-                type="button"
-                aria-pressed={commentVisibility === 'unresolved'}
-                onClick={() => setCommentVisibility('unresolved')}
-              >
-                Unresolved
-              </button>
-              <button
-                type="button"
-                aria-pressed={commentVisibility === 'hidden'}
-                onClick={() => setCommentVisibility('hidden')}
-              >
-                Hidden
-              </button>
-            </div>
-          </div>
-
-          <div className="vm-group">
-            <div className="vm-group-label">
-              Agent notes
-              <span className="vm-kbd">⇧C</span>
-            </div>
-            <div className="vm-seg" role="group" aria-label="Agent notes">
-              <button
-                type="button"
-                aria-pressed={agentNotesOn}
-                onClick={() => setAgentNotesOn(true)}
-              >
-                On
-              </button>
-              <button
-                type="button"
-                aria-pressed={!agentNotesOn}
-                onClick={() => setAgentNotesOn(false)}
-              >
-                Off
-              </button>
-            </div>
-          </div>
-
-          <div className="vm-group">
-            <div className="vm-group-label">Layout</div>
-            <div className="vm-seg" role="group" aria-label="Diff view mode">
-              <button
-                type="button"
-                aria-pressed={diffViewMode === 'unified'}
-                onClick={() => setDiffViewMode('unified')}
-              >
-                Unified
-              </button>
-              <button
-                type="button"
-                aria-pressed={diffViewMode === 'split'}
-                onClick={() => setDiffViewMode('split')}
-              >
-                Split
-              </button>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            role="switch"
-            aria-checked={hideFormattingHunks}
-            className="vm-switch-row"
-            onClick={() => setHideFormattingHunks(!hideFormattingHunks)}
-          >
-            <span className="vm-switch" aria-hidden="true" />
-            Hide formatting-only hunks
-          </button>
-
+          <ViewMenuGroups v={v} />
+          <FormattingSwitch v={v} />
           {sinceNote && <div className="vm-since">{sinceNote}</div>}
         </Popover>
       )}

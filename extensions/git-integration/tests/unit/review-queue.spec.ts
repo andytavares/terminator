@@ -44,7 +44,9 @@ describe('parseReviewQueuePR()', () => {
     // (120 + 15) / 60 = 2.25 → ceil = 3
     expect(pr.estimatedMinutes).toBe(3)
   })
+})
 
+describe('parseReviewQueuePR() — sets estimatedMinutes to at least 1 for tiny PRs', () => {
   it('sets estimatedMinutes to at least 1 for tiny PRs', () => {
     const pr = parseReviewQueuePR(
       makeRawPr({
@@ -66,7 +68,9 @@ describe('parseReviewQueuePR()', () => {
     expect(pr.deletions).toBe(0)
     expect(pr.estimatedMinutes).toBeGreaterThanOrEqual(1)
   })
+})
 
+describe('parseReviewQueuePR() — defaults approvalCount to 0 when no reviews present', () => {
   it('defaults approvalCount to 0 when no reviews present', () => {
     const pr = parseReviewQueuePR(makeRawPr())
     expect(pr.approvalCount).toBe(0)
@@ -89,7 +93,9 @@ describe('parseReviewQueuePR()', () => {
     expect(pr.approvalCount).toBe(1)
     expect(pr.approvedBy).toEqual(['bob'])
   })
+})
 
+describe('parseReviewQueuePR() — extracts approvals from GraphQL latestReviews field', () => {
   it('extracts approvals from GraphQL latestReviews field', () => {
     const pr = parseReviewQueuePR(
       makeRawPr({
@@ -113,7 +119,9 @@ describe('parseReviewQueuePR()', () => {
     expect(pr.approvedBy).toContain('alice')
     expect(pr.approvedBy).toContain('dave')
   })
+})
 
+describe('parseReviewQueuePR() — deduplicates approvals from the same author', () => {
   it('deduplicates approvals from the same author', () => {
     const pr = parseReviewQueuePR(
       makeRawPr({

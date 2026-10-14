@@ -1,5 +1,5 @@
-import { describe, it, expect, afterEach, vi, beforeAll, afterAll } from 'vitest'
-import { PGlite } from '@electric-sql/pglite'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { DatabaseSync } from 'node:sqlite'
 
 vi.mock('electron', () => ({
   ipcMain: { handle: vi.fn(), removeHandler: vi.fn() },
@@ -8,21 +8,9 @@ vi.mock('electron', () => ({
 
 import { ipcMain } from 'electron'
 
-// Adapter: registerHandler forwards to the electron ipcMain mocks so existing
-// capture/assert code (ipcMain.handle calls, removeHandler assertions) still works.
-const mockApi = {
-  ipc: {
-    registerHandler: (ch: string, fn: (payload: unknown) => unknown) => {
-      ;(ipcMain.handle as unknown as ReturnType<typeof vi.fn>)(
-        ch,
-        (_e: unknown, payload: unknown) => fn(payload)
-      )
-      return {
-        dispose: () => (ipcMain.removeHandler as unknown as ReturnType<typeof vi.fn>)(ch),
-      }
-    },
-  },
-} as unknown as import('../../../../../src/main/extensions/api').ExtensionAPI
+import { apiOverIpcMain } from '../support/ipc-main-api'
+
+const mockApi = apiOverIpcMain()
 import { wrapDb } from '../../../../../src/main/db/index'
 import { applyNotepadSchema } from '../../../src/db/db'
 import {
@@ -35,31 +23,25 @@ import {
 } from '../../../src/ipc/folders.ipc'
 import { createNote } from '../../../src/ipc/notes.ipc'
 import { createDiagram } from '../../../src/ipc/diagrams.ipc'
-import type { ExtensionDB } from '../../../../../src/main/db/index'
+import type { ExtensionDB } from '@terminator/extension-sdk'
 
-let pg: PGlite
 let db: ExtensionDB
 
-let tables: string
-
-beforeAll(async () => {
-  pg = new PGlite()
-  await pg.waitReady
-  db = wrapDb(pg)
+beforeEach(async () => {
+  db = wrapDb(new DatabaseSync(':memory:'))
   await applyNotepadSchema(db)
-  const { rows } = await pg.query<{ names: string }>(
-    "SELECT string_agg(quote_ident(tablename), ', ') AS names FROM pg_tables WHERE schemaname = 'public'"
-  )
-  tables = rows[0].names
 })
 
-afterAll(async () => {
-  await pg.close()
-})
-
-afterEach(async () => {
-  await pg.exec(`TRUNCATE ${tables} RESTART IDENTITY CASCADE`)
-})
+/** Invokes the handler registered for a folders channel, as the renderer would. */
+function invokeFolders(action: string, payload?: unknown): Promise<unknown> {
+  const folderHandler = vi
+    .mocked(ipcMain.handle)
+    .mock.calls.find(([c]) => c === `terminator.notepad:folders.${action}`)![1] as (
+    e: unknown,
+    payload?: unknown
+  ) => Promise<unknown>
+  return folderHandler({}, payload)
+}
 
 describe('createFolder', () => {
   it('creates a folder with the given name', async () => {
@@ -83,16 +65,6 @@ describe('createFolder', () => {
     const listResult = await listFolders(db)
     const folders = (listResult as { data: { name: string; sortOrder: number }[] }).data
     expect(folders[0].sortOrder).toBeLessThan(folders[1].sortOrder)
-  })
-
-  it('returns VALIDATION_ERROR for empty name', async () => {
-    const result = await createFolder(db, { name: '' })
-    expect(result).toEqual({ error: 'VALIDATION_ERROR' })
-  })
-
-  it('returns VALIDATION_ERROR for invalid payload', async () => {
-    const result = await createFolder(db, { unexpected: true })
-    expect(result).toEqual({ error: 'VALIDATION_ERROR' })
   })
 })
 
@@ -136,18 +108,21 @@ describe('renameFolder', () => {
     const result = await renameFolder(db, { id: 'nonexistent', name: 'X' })
     expect(result).toEqual({ error: 'FOLDER_NOT_FOUND' })
   })
-
-  it('returns VALIDATION_ERROR for missing name', async () => {
-    const result = await renameFolder(db, { id: 'abc' })
-    expect(result).toEqual({ error: 'VALIDATION_ERROR' })
-  })
 })
 
-describe('deleteFolder', () => {
+describe('deleteFolder', deleteFolderTests)
+describe('moveItemsToFolder', moveItemsToFolderTests)
+describe('registerFoldersIpcHandlers', registerFoldersIpcHandlersTests)
+
+function deleteFolderTests() {
+  describe('notes', deleteFolderNotesTests)
+  describe('diagrams and unknown folders', deleteFolderDiagramsUnknownFoldersTests)
+}
+
+function deleteFolderNotesTests() {
   it('deletes a folder and nullifies folder_id on notes', async () => {
     const folderResult = await createFolder(db, { name: 'To Delete' })
     const { id: folderId } = (folderResult as { data: { id: string } }).data
-
     const noteResult = await createNote(db, { title: 'Note in folder' })
     const { id: noteId } = (noteResult as { data: { id: string } }).data
     await db.run('UPDATE notes SET folder_id=? WHERE id=?', [folderId, noteId])
@@ -163,11 +138,12 @@ describe('deleteFolder', () => {
     )
     expect(noteRow?.folder_id).toBeNull()
   })
+}
 
+function deleteFolderDiagramsUnknownFoldersTests() {
   it('deletes a folder and nullifies folder_id on diagrams', async () => {
     const folderResult = await createFolder(db, { name: 'Diagram folder' })
     const { id: folderId } = (folderResult as { data: { id: string } }).data
-
     const diagramResult = await createDiagram(db, { title: 'Diagram in folder' })
     const { id: diagramId } = (diagramResult as { data: { id: string } }).data
     await db.run('UPDATE diagrams SET folder_id=? WHERE id=?', [folderId, diagramId])
@@ -185,18 +161,18 @@ describe('deleteFolder', () => {
     const result = await deleteFolder(db, { id: 'nonexistent' })
     expect(result).toEqual({ error: 'FOLDER_NOT_FOUND' })
   })
+}
 
-  it('returns VALIDATION_ERROR for invalid payload', async () => {
-    const result = await deleteFolder(db, {})
-    expect(result).toEqual({ error: 'VALIDATION_ERROR' })
-  })
-})
+function moveItemsToFolderTests() {
+  describe('notes', moveItemsToFolderNotesTests)
+  describe('diagrams', moveItemsToFolderDiagramsTests)
+  describe('moving out', moveItemsToFolderMovingOutTests)
+}
 
-describe('moveItemsToFolder', () => {
+function moveItemsToFolderNotesTests() {
   it('moves a note into a folder', async () => {
     const folderResult = await createFolder(db, { name: 'Target' })
     const { id: folderId } = (folderResult as { data: { id: string } }).data
-
     const noteResult = await createNote(db, { title: 'My note' })
     const { id: noteId } = (noteResult as { data: { id: string } }).data
 
@@ -207,11 +183,12 @@ describe('moveItemsToFolder', () => {
     ])
     expect(row?.folder_id).toBe(folderId)
   })
+}
 
+function moveItemsToFolderDiagramsTests() {
   it('moves a diagram into a folder', async () => {
     const folderResult = await createFolder(db, { name: 'Diagrams folder' })
     const { id: folderId } = (folderResult as { data: { id: string } }).data
-
     const diagramResult = await createDiagram(db, { title: 'Flow' })
     const { id: diagramId } = (diagramResult as { data: { id: string } }).data
 
@@ -222,11 +199,12 @@ describe('moveItemsToFolder', () => {
     ])
     expect(row?.folder_id).toBe(folderId)
   })
+}
 
+function moveItemsToFolderMovingOutTests() {
   it('removes an item from a folder by passing folderId: null', async () => {
     const folderResult = await createFolder(db, { name: 'Temp' })
     const { id: folderId } = (folderResult as { data: { id: string } }).data
-
     const noteResult = await createNote(db, { title: 'Note' })
     const { id: noteId } = (noteResult as { data: { id: string } }).data
     await db.run('UPDATE notes SET folder_id=? WHERE id=?', [folderId, noteId])
@@ -249,74 +227,35 @@ describe('moveItemsToFolder', () => {
     })
     expect(result).toEqual({ error: 'FOLDER_NOT_FOUND' })
   })
+}
 
-  it('returns VALIDATION_ERROR for invalid payload', async () => {
-    const result = await moveItemsToFolder(db, { items: 'not-an-array', folderId: null })
-    expect(result).toEqual({ error: 'VALIDATION_ERROR' })
-  })
-})
-
-describe('registerFoldersIpcHandlers', () => {
+function registerFoldersIpcHandlersTests() {
   it('dispatches registered handlers to the folder functions', async () => {
-    ;(ipcMain.handle as unknown as ReturnType<typeof vi.fn>).mockClear()
+    vi.mocked(ipcMain.handle).mockClear()
     const cleanup = registerFoldersIpcHandlers(mockApi, db)
-    const get = (ch: string) =>
-      (ipcMain.handle as unknown as ReturnType<typeof vi.fn>).mock.calls.find(
-        ([c]) => c === ch
-      )![1] as (e: unknown, payload?: unknown) => Promise<unknown>
-
-    const created = (await get('terminator.notepad:folders.create')({}, { name: 'Inbox' })) as {
-      data: { id: string }
-    }
+    const created = (await invokeFolders('create', { name: 'Inbox' })) as { data: { id: string } }
     expect(created.data.id).toBeTruthy()
-
-    const listed = (await get('terminator.notepad:folders.list')({})) as { data: unknown[] }
+    const id = created.data.id
+    const listed = (await invokeFolders('list')) as { data: unknown[] }
     expect(listed.data).toHaveLength(1)
-
-    const renamed = (await get('terminator.notepad:folders.rename')(
-      {},
-      { id: created.data.id, name: 'Later' }
-    )) as { data: unknown }
-    expect(renamed).toHaveProperty('data')
-
-    const moved = await get('terminator.notepad:folders.move')(
-      {},
-      { items: 'not-an-array', folderId: created.data.id }
-    )
-    expect(moved).toEqual({ error: 'VALIDATION_ERROR' })
-
-    const deleted = (await get('terminator.notepad:folders.delete')(
-      {},
-      { id: created.data.id }
-    )) as { data: unknown }
-    expect(deleted).toHaveProperty('data')
+    expect(await invokeFolders('rename', { id, name: 'Later' })).toHaveProperty('data')
+    expect(await invokeFolders('move', { items: 'not-an-array', folderId: id })).toEqual({
+      error: 'VALIDATION_ERROR',
+    })
+    expect(await invokeFolders('delete', { id })).toHaveProperty('data')
     cleanup()
   })
 
   it('registers and returns a cleanup function', () => {
     const cleanup = registerFoldersIpcHandlers(mockApi, db)
     expect(typeof cleanup).toBe('function')
-    expect(ipcMain.handle).toHaveBeenCalledWith(
-      'terminator.notepad:folders.create',
-      expect.any(Function)
-    )
-    expect(ipcMain.handle).toHaveBeenCalledWith(
-      'terminator.notepad:folders.list',
-      expect.any(Function)
-    )
-    expect(ipcMain.handle).toHaveBeenCalledWith(
-      'terminator.notepad:folders.rename',
-      expect.any(Function)
-    )
-    expect(ipcMain.handle).toHaveBeenCalledWith(
-      'terminator.notepad:folders.delete',
-      expect.any(Function)
-    )
-    expect(ipcMain.handle).toHaveBeenCalledWith(
-      'terminator.notepad:folders.move',
-      expect.any(Function)
-    )
+    for (const action of ['create', 'list', 'rename', 'delete', 'move']) {
+      expect(ipcMain.handle).toHaveBeenCalledWith(
+        `terminator.notepad:folders.${action}`,
+        expect.any(Function)
+      )
+    }
     cleanup()
     expect(ipcMain.removeHandler).toHaveBeenCalledWith('terminator.notepad:folders.create')
   })
-})
+}

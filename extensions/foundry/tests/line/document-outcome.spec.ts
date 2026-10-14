@@ -18,6 +18,11 @@ function recipe(role: string): Recipe {
 }
 
 describe('documentOutcome', () => {
+  describe('shapes without a document', shapesWithoutADocumentTests)
+  describe('where the document is', whereTheDocumentIsTests)
+})
+
+function shapesWithoutADocumentTests() {
   it('leaves a shape with no author alone, whatever the order holds', () => {
     expect(documentOutcome(recipe('builder'), null)).toEqual({ kind: 'not-a-document-shape' })
     expect(documentOutcome(recipe('builder'), { path: 'a.md', location: 'outputs' })).toEqual({
@@ -31,7 +36,9 @@ describe('documentOutcome', () => {
       reason: 'the author handed back no document',
     })
   })
+}
 
+function whereTheDocumentIsTests() {
   it('ends on the document when it is outside the checkout', () => {
     expect(
       documentOutcome(recipe('author'), { path: '/o/answer.md', location: 'outputs' })
@@ -50,7 +57,7 @@ describe('documentOutcome', () => {
       documentOutcome(recipe('author'), { path: 'docs/answer.md', location: 'checkout' })
     ).toEqual({ kind: 'ships' })
   })
-})
+}
 
 describe('describeDocument', () => {
   it('says where, then what, then the link when there is one', () => {

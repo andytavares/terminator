@@ -1,7 +1,7 @@
 # ADR-006: Sandboxed Shell Execution for Extension IPC Bridge
 
 **Date**: 2026-05-07
-**Status**: Accepted
+**Status**: Accepted (rule 2, the cwd pin, superseded by [ADR-102](102-shell-exec-runs-in-declared-roots.md))
 **Branch**: `002-git-github-integration`
 
 ## Decision

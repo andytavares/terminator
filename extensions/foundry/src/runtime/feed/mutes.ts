@@ -25,56 +25,61 @@ function key(rule: MuteRule): string {
 }
 
 export function createMuteStore(filePath: string): MuteStore {
-  function read(): MuteRule[] {
-    try {
-      const parsed: unknown = JSON.parse(fs.readFileSync(filePath, 'utf8'))
-      if (!Array.isArray(parsed)) return []
-      // Filtered on read rather than trusted: the file is small, hand-editable,
-      // and a malformed rule would silently mute everything or nothing.
-      return parsed.filter((rule): rule is MuteRule => {
-        if (typeof rule !== 'object' || rule === null) return false
-        const candidate = rule as MuteRule
-        const namesSession = typeof candidate.sessionId === 'string'
-        const namesAuthor = candidate.author === 'agent' || candidate.author === 'console'
-        // At least one, or the rule matches every entry: `shouldNotify` treats
-        // an empty rule as "mute everything", which is the opposite of what a
-        // filter over hand-editable JSON should let through.
-        if (!namesSession && !namesAuthor) return false
-        return (
-          (candidate.author === undefined || namesAuthor) &&
-          (candidate.sessionId === undefined || namesSession)
-        )
-      })
-    } catch {
-      return []
-    }
-  }
-
-  function write(rules: readonly MuteRule[]): void {
-    try {
-      fs.mkdirSync(path.dirname(filePath), { recursive: true })
-      fs.writeFileSync(filePath, JSON.stringify(rules), 'utf8')
-    } catch {
-      // A mute that could not be saved still applies for this session; failing
-      // the click over it would be worse than losing it on restart.
-    }
-  }
-
   return {
-    list: read,
+    list: () => readMuteRules(filePath),
 
     add(rule): void {
-      const rules = read()
+      const rules = readMuteRules(filePath)
       if (rules.some((existing) => key(existing) === key(rule))) return
-      write([...rules, rule])
+      writeRules(filePath, [...rules, rule])
     },
 
     remove(rule): void {
-      write(read().filter((existing) => key(existing) !== key(rule)))
+      writeRules(
+        filePath,
+        readMuteRules(filePath).filter((existing) => key(existing) !== key(rule))
+      )
     },
 
     clear(): void {
-      write([])
+      writeRules(filePath, [])
     },
+  }
+}
+
+function readMuteRules(filePath: string): MuteRule[] {
+  try {
+    const parsed: unknown = JSON.parse(fs.readFileSync(filePath, 'utf8'))
+    if (!Array.isArray(parsed)) return []
+    // Filtered on read rather than trusted: the file is small, hand-editable,
+    // and a malformed rule would silently mute everything or nothing.
+    return parsed.filter(isMuteRule)
+  } catch {
+    return []
+  }
+}
+
+function isMuteRule(rule: unknown): rule is MuteRule {
+  if (typeof rule !== 'object' || rule === null) return false
+  const candidate = rule as MuteRule
+  const namesSession = typeof candidate.sessionId === 'string'
+  const namesAuthor = candidate.author === 'agent' || candidate.author === 'console'
+  // At least one, or the rule matches every entry: `shouldNotify` treats
+  // an empty rule as "mute everything", which is the opposite of what a
+  // filter over hand-editable JSON should let through.
+  if (!namesSession && !namesAuthor) return false
+  return (
+    (candidate.author === undefined || namesAuthor) &&
+    (candidate.sessionId === undefined || namesSession)
+  )
+}
+
+function writeRules(filePath: string, rules: readonly MuteRule[]): void {
+  try {
+    fs.mkdirSync(path.dirname(filePath), { recursive: true })
+    fs.writeFileSync(filePath, JSON.stringify(rules), 'utf8')
+  } catch {
+    // A mute that could not be saved still applies for this session; failing
+    // the click over it would be worse than losing it on restart.
   }
 }

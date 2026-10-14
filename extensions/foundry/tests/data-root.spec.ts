@@ -1,22 +1,25 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import * as path from 'node:path'
 import {
   resolveDataRoot,
   RelativeDataDirError,
   OrderIdEscapesRootError,
   orderDir,
-  unitDir,
-  laneDir,
   ensureWritable,
 } from '../src/data-root.js'
+import { makeTempDir } from '../../../tests/support/temp-dir'
 
 // Where Foundry writes is one setting with two behaviours (FR-074), and it is
 // resolved once so that two writers can never disagree about it — a real hazard
 // once an order spans repositories and "the working directory" is ambiguous.
 
 describe('resolveDataRoot', () => {
+  describe('the default location', theDefaultLocationTests)
+  describe('a configured path', aConfiguredPathTests)
+})
+
+function theDefaultLocationTests() {
   it('defaults to a .foundry directory beside the working directory', () => {
     const r = resolveDataRoot('', '/repos/terminator')
     expect(r.root).toBe(path.join('/repos/terminator', '.foundry'))
@@ -28,7 +31,9 @@ describe('resolveDataRoot', () => {
       resolveDataRoot('', '/repos/terminator').root
     )
   })
+}
 
+function aConfiguredPathTests() {
   it('uses a configured absolute path for every repository', () => {
     const a = resolveDataRoot('/var/foundry', '/repos/terminator')
     const b = resolveDataRoot('/var/foundry', '/repos/other')
@@ -54,7 +59,7 @@ describe('resolveDataRoot', () => {
     expect(resolveDataRoot('  /var/foundry  ', '/repos/x').root).toBe('/var/foundry')
     expect(resolveDataRoot('   ', '/repos/x').usingDefault).toBe(true)
   })
-})
+}
 
 describe('paths under the root', () => {
   const root = '/var/foundry'
@@ -62,29 +67,24 @@ describe('paths under the root', () => {
   it('puts an order in its own directory', () => {
     expect(orderDir(root, 'WO-0913-c71')).toBe('/var/foundry/orders/WO-0913-c71')
   })
-
-  it('puts a unit under its order', () => {
-    expect(unitDir(root, 'WO-0913-c71', 'U-2')).toBe('/var/foundry/orders/WO-0913-c71/units/U-2')
-  })
-
-  it('names a lane directory by merge order and repository, so it sorts', () => {
-    expect(laneDir(root, 'WO-0913-c71', 1, 'api-contracts')).toBe(
-      '/var/foundry/orders/WO-0913-c71/lanes/1-api-contracts'
-    )
-  })
 })
 
-describe('ensureWritable', () => {
-  let tmp: string
+let tmp: string
 
+describe('ensureWritable', () => {
   beforeEach(() => {
-    tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'foundry-root-'))
+    tmp = makeTempDir('foundry-root-')
   })
 
   afterEach(() => {
     fs.rmSync(tmp, { recursive: true, force: true })
   })
 
+  describe('a root that can be written', aRootThatCanBeWrittenTests)
+  describe('a root that cannot be written', aRootThatCannotBeWrittenTests)
+})
+
+function aRootThatCanBeWrittenTests() {
   it('creates the root when it does not exist yet', async () => {
     const root = path.join(tmp, 'nested', 'foundry')
     const r = await ensureWritable(root)
@@ -95,13 +95,14 @@ describe('ensureWritable', () => {
   it('accepts a root that already exists', async () => {
     expect((await ensureWritable(tmp)).ok).toBe(true)
   })
+}
 
+function aRootThatCannotBeWrittenTests() {
   it('reports a root it cannot create, naming the path', async () => {
+    // A file where the parent directory should be: no one can create under it.
     const wall = path.join(tmp, 'wall')
-    fs.mkdirSync(wall)
-    fs.chmodSync(wall, 0o500)
+    fs.writeFileSync(wall, '')
     const r = await ensureWritable(path.join(wall, 'foundry'))
-    fs.chmodSync(wall, 0o700)
     expect(r.ok).toBe(false)
     if (!r.ok) expect(r.reason).toContain(path.join(wall, 'foundry'))
   })
@@ -113,7 +114,7 @@ describe('ensureWritable', () => {
     expect(r.ok).toBe(false)
     if (!r.ok) expect(r.reason).toMatch(/not a directory/i)
   })
-})
+}
 
 // This took whatever it was given and built the directories to match. A live
 // run filed its `ship.draft_opened` entry by the entry's *subject* — a pull

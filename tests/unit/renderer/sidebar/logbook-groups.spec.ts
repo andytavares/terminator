@@ -9,28 +9,30 @@ import type { IssueSummary } from '../../../../src/shared/types/index'
 
 const titles = new Map([['linear:NW-88', 'Rate limit per API key']])
 
-describe('buildLogbook', () => {
-  const T1 = '2026-09-15T10:00:00.000Z'
-  const T2 = '2026-09-15T10:01:00.000Z'
-  const facts = [
-    fact({ sessionId: 'idle-old', state: 'idle', startedAt: T1 }),
-    fact({
-      sessionId: 'closed-old',
-      isClosed: true,
-      state: 'exited',
-      closedAt: '2026-09-14T00:00:00.000Z',
-    }),
-    fact({ sessionId: 'needs', state: 'awaiting-input' }),
-    fact({ sessionId: 'idle-new', state: 'idle', startedAt: T2 }),
-    fact({
-      sessionId: 'closed-new',
-      isClosed: true,
-      state: 'exited',
-      closedAt: '2026-09-15T00:00:00.000Z',
-    }),
-    fact({ sessionId: 'exited', state: 'exited' }),
-  ]
+const T1 = '2026-09-15T10:00:00.000Z'
 
+const T2 = '2026-09-15T10:01:00.000Z'
+
+const facts = [
+  fact({ sessionId: 'idle-old', state: 'idle', startedAt: T1 }),
+  fact({
+    sessionId: 'closed-old',
+    isClosed: true,
+    state: 'exited',
+    closedAt: '2026-09-14T00:00:00.000Z',
+  }),
+  fact({ sessionId: 'needs', state: 'awaiting-input' }),
+  fact({ sessionId: 'idle-new', state: 'idle', startedAt: T2 }),
+  fact({
+    sessionId: 'closed-new',
+    isClosed: true,
+    state: 'exited',
+    closedAt: '2026-09-15T00:00:00.000Z',
+  }),
+  fact({ sessionId: 'exited', state: 'exited' }),
+]
+
+describe('buildLogbook', () => {
   it('groups needs you, running, and exited, oldest first within a group', () => {
     expect(
       buildLogbook(facts, '', titles).map((g) => [g.label, g.facts.map((f) => f.sessionId)])
@@ -55,7 +57,9 @@ describe('buildLogbook', () => {
     const after = buildLogbook(flipped, '', titles)[0].facts.map((f) => f.sessionId)
     expect(after).toEqual(before)
   })
+})
 
+describe('buildLogbook — leaves out a group with nothing in it', () => {
   it('leaves out a group with nothing in it', () => {
     expect(buildLogbook([fact({ state: 'working' })], '', titles).map((g) => g.label)).toEqual([
       'Running',
@@ -98,11 +102,12 @@ describe('headlineOf', () => {
   })
 })
 
-describe('suggestWorkItems', () => {
-  const issue = (key: string): IssueSummary =>
-    ({ tracker: 'linear', key, title: key }) as IssueSummary
-  const mine = [issue('A-1'), issue('A-2'), issue('A-3'), issue('A-4')]
+const issue = (key: string): IssueSummary =>
+  ({ tracker: 'linear', key, title: key }) as IssueSummary
 
+const mine = [issue('A-1'), issue('A-2'), issue('A-3'), issue('A-4')]
+
+describe('suggestWorkItems', () => {
   it("offers the user's own tickets, three at most", () => {
     expect(suggestWorkItems(fact(), null, mine).map((i) => i.key)).toEqual(['A-1', 'A-2', 'A-3'])
   })
@@ -132,7 +137,9 @@ describe('suggestWorkItems', () => {
       'A-3',
     ])
   })
+})
 
+describe('suggestWorkItems — tells the same key in two trackers apart', () => {
   it('tells the same key in two trackers apart', () => {
     const jira = { ...issue('A-1'), tracker: 'jira' } as IssueSummary
     expect(suggestWorkItems(fact(), null, [issue('A-1'), jira]).map((i) => i.tracker)).toEqual([

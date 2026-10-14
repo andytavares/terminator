@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from 'vitest'
 
 const execFile = vi.fn()
 const access = vi.fn()
@@ -29,8 +29,13 @@ afterAll(() => {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  process.env.PATH = '/usr/local/bin:/usr/bin'
+  // Stubbed, so the worker's own PATH is back for the next spec file.
+  vi.stubEnv('PATH', '/usr/local/bin:/usr/bin')
   execFile.mockImplementation((_c: string, _a: string[], cb: (e: Error | null) => void) => cb(null))
+})
+
+afterEach(() => {
+  vi.unstubAllEnvs()
 })
 
 describe('detectEditor', () => {
@@ -48,7 +53,9 @@ describe('detectEditor', () => {
     present()
     expect(await detectEditor()).toBeNull()
   })
+})
 
+describe('detectEditor — a configured editor and PATH', () => {
   it('honours a configured editor over the one it would have picked', async () => {
     present('/usr/local/bin/cursor', '/usr/local/bin/subl')
     expect((await detectEditor('sublime'))?.id).toBe('sublime')
@@ -65,7 +72,7 @@ describe('detectEditor', () => {
   })
 
   it('survives an empty PATH', async () => {
-    process.env.PATH = ''
+    vi.stubEnv('PATH', '')
     present('/Applications/Cursor.app')
     expect((await detectEditor())?.id).toBe('cursor')
   })
@@ -95,7 +102,9 @@ describe('openInEditor', () => {
       expect.any(Function)
     )
   })
+})
 
+describe('openInEditor — paths', () => {
   // The path is an argument, never part of a shell string, so a directory name
   // cannot become a second command.
   it('passes a hostile path through as one argument', async () => {
@@ -117,7 +126,9 @@ describe('openInEditor', () => {
     expect(await openInEditor('/gone')).toEqual({ error: 'FOLDER_NOT_FOUND' })
     expect(execFile).not.toHaveBeenCalled()
   })
+})
 
+describe('openInEditor — failures and a configured editor', () => {
   it('says so when the machine has no editor it recognises', async () => {
     present('/repos/app')
     expect(await openInEditor('/repos/app')).toEqual({ error: 'NO_EDITOR_FOUND' })

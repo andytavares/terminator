@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { readFileSync, rmSync } from 'node:fs'
+import { readdirSync, readFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { launchApp, closeApp, createWorkspace, type AppHandle } from './helpers'
 import {
@@ -116,11 +116,15 @@ test('every registered channel answers rather than rejecting', async () => {
   // Read from the source rather than listed here. The list was seven of
   // forty-three while the test's own name said "every", which is the shape of
   // a green nobody should have trusted.
-  const source = readFileSync(
-    join(process.cwd(), 'extensions', 'foundry', 'src', 'index.ts'),
-    'utf8'
-  )
-  const channels = [...source.matchAll(/reg\(api,\s*'(foundry:[^']+)'/g)].map((m) => m[1])
+  const src = join(process.cwd(), 'extensions', 'foundry', 'src')
+  const source = [
+    join(src, 'index.ts'),
+    ...readdirSync(join(src, 'ipc')).map((file) => join(src, 'ipc', file)),
+  ]
+    .map((file) => readFileSync(file, 'utf8'))
+    .join('\n')
+  const declared = /(?:(?:foundry|session)Channel\(\s*|channel: )'(foundry:[^']+)'/g
+  const channels = [...source.matchAll(declared)].map((m) => m[1])
   expect(channels.length).toBeGreaterThan(30)
 
   // Every one is called with an empty payload. A channel that needs arguments

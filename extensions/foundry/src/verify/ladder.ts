@@ -18,7 +18,7 @@ import { isDocumentationRelative } from './documentation-path.js'
 export const RUNGS = ['L0', 'L1', 'L2', 'L3', 'L4', 'L5', 'L6'] as const
 export type Rung = (typeof RUNGS)[number]
 
-export type RungStatus = 'runnable' | 'unavailable' | 'not_triggered' | 'elsewhere'
+type RungStatus = 'runnable' | 'unavailable' | 'not_triggered' | 'elsewhere'
 
 const RUNG_LEVEL_IN_WORDS: Record<Rung, string> = {
   L0: 'formatting and lint',
@@ -47,19 +47,20 @@ export interface LadderStep {
   readonly check: CheckName | null
 }
 
-function step(
-  rung: Rung,
-  name: string,
-  found: { command: string } | null,
-  check: CheckName | null
+/** A rung run by the command the probe found for `check`, or unavailable when it found none. */
+function probedStep(
+  toolchain: Toolchain,
+  check: CheckName,
+  { rung, name }: Pick<LadderStep, 'rung' | 'name'>
 ): LadderStep {
+  const found = toolchain[check]
   return found === null
     ? {
         rung,
         name,
         command: null,
         status: 'unavailable',
-        reason: `this repository has no ${check ?? name} command`,
+        reason: `this repository has no ${check} command`,
         check,
       }
     : { rung, name, command: found.command, status: 'runnable', reason: '', check }
@@ -78,6 +79,50 @@ export interface LadderInput {
   readonly changedFiles?: readonly string[]
 }
 
+// Not a command and not a gap: the verifier runs as its own node on every unit and its
+// exit status is in the criteria table. "Not measured" here taught skimming.
+const INDEPENDENT_VERIFICATION: LadderStep = {
+  rung: 'L3',
+  name: 'Independent verification',
+  command: null,
+  status: 'elsewhere',
+  reason: 'by the verifier on each unit — see the criteria table',
+  check: null,
+}
+
+const HUMAN_DECISION: LadderStep = {
+  rung: 'L6',
+  name: 'Human decision',
+  command: null,
+  status: 'elsewhere',
+  reason: 'only what a rule raised — see the decision below',
+  check: null,
+}
+
+function inspectionStep(risk: RiskAssessment): LadderStep {
+  const triggered = risk.triggers.length > 0
+  return {
+    rung: 'L4',
+    name: 'Security inspection',
+    command: null,
+    status: triggered ? 'elsewhere' : 'not_triggered',
+    reason: triggered
+      ? `triggered by ${risk.triggers.join(', ')} — see the findings`
+      : 'this change touches nothing that warrants one',
+    check: null,
+  }
+}
+
+/** End-to-end tests run against the built application, so a step builds it first. */
+function integrationSteps(toolchain: Toolchain, touchesUi: boolean): LadderStep[] {
+  const build =
+    toolchain.e2e !== null && toolchain.build !== null
+      ? [probedStep(toolchain, 'build', { rung: 'L5', name: 'Build the application' })]
+      : []
+  const name = touchesUi ? 'Integration and a picture of the running application' : 'Integration'
+  return [...build, probedStep(toolchain, 'e2e', { rung: 'L5', name })]
+}
+
 /**
  * The rungs for this repository and this change.
  *
@@ -87,62 +132,15 @@ export interface LadderInput {
  */
 export function ladderFor(input: LadderInput): LadderStep[] {
   const { toolchain, risk, touchesUi, changedFiles = [] } = input
-
-  const inspection: LadderStep =
-    risk.triggers.length > 0
-      ? {
-          rung: 'L4',
-          name: 'Security inspection',
-          command: null,
-          status: 'elsewhere',
-          reason: `triggered by ${risk.triggers.join(', ')} — see the findings`,
-          check: null,
-        }
-      : {
-          rung: 'L4',
-          name: 'Security inspection',
-          command: null,
-          status: 'not_triggered',
-          reason: 'this change touches nothing that warrants one',
-          check: null,
-        }
-
-  const integration: LadderStep = touchesUi
-    ? step('L5', 'Integration and a picture of the running application', toolchain.e2e, 'e2e')
-    : step('L5', 'Integration', toolchain.e2e, 'e2e')
-
   const rungs: LadderStep[] = [
-    step('L0', 'Format', toolchain.format, 'format'),
-    step('L0', 'Lint', toolchain.lint, 'lint'),
-    step('L1', "The unit's own tests", toolchain.test, 'test'),
-    step('L2', 'Repository gate', toolchain.coverage, 'coverage'),
-    {
-      rung: 'L3',
-      name: 'Independent verification',
-      command: null,
-      // Not a command, and not a gap: the verifier runs as its own node on
-      // every unit, and its exit status is in the criteria table. Calling this
-      // "not measured" put three phantom gaps in every pull request body and
-      // taught the operator to skim the one signal that matters.
-      status: 'elsewhere',
-      reason: 'by the verifier on each unit — see the criteria table',
-      check: null,
-    },
-    inspection,
-    // End-to-end tests run against the built application; a checkout that was
-    // never built fails every one of them whatever the change was.
-    ...(toolchain.e2e !== null && toolchain.build !== null
-      ? [step('L5', 'Build the application', toolchain.build, 'build')]
-      : []),
-    integration,
-    {
-      rung: 'L6',
-      name: 'Human decision',
-      command: null,
-      status: 'elsewhere',
-      reason: 'only what a rule raised — see the decision below',
-      check: null,
-    },
+    probedStep(toolchain, 'format', { rung: 'L0', name: 'Format' }),
+    probedStep(toolchain, 'lint', { rung: 'L0', name: 'Lint' }),
+    probedStep(toolchain, 'test', { rung: 'L1', name: "The unit's own tests" }),
+    probedStep(toolchain, 'coverage', { rung: 'L2', name: 'Repository gate' }),
+    INDEPENDENT_VERIFICATION,
+    inspectionStep(risk),
+    ...integrationSteps(toolchain, touchesUi),
+    HUMAN_DECISION,
   ]
 
   // Words cannot break a build or a test, so a change that only touches them
@@ -181,6 +179,15 @@ export interface LadderOutcome {
 
 export type RunStep = (step: LadderStep) => Promise<number | null>
 
+// What a step not run here records. `unavailable` is not a failure (the climb goes on)
+// but never a pass, carried out so nothing reads it as green; `elsewhere` is decided,
+// neither a pass this climb can claim nor a gap to report.
+const NOT_RUN: Record<Exclude<RungStatus, 'runnable'>, StepOutcome['result']> = {
+  not_triggered: 'not_triggered',
+  elsewhere: 'elsewhere',
+  unavailable: 'not_measured',
+}
+
 /**
  * Climb, stopping at the first failure.
  *
@@ -198,87 +205,12 @@ export async function climb(steps: readonly LadderStep[], run: RunStep): Promise
   const passed = new Map<string, string>()
 
   for (const step of steps) {
-    if (stoppedAt !== null) break
-
-    if (step.status === 'not_triggered') {
-      outcomes.push({
-        rung: step.rung,
-        name: step.name,
-        result: 'not_triggered',
-        reason: step.reason,
-        exitCode: null,
-        command: step.command,
-      })
-      continue
+    const outcome = await rungOutcomeOf(step, run, passed)
+    outcomes.push(outcome)
+    if (outcome.result === 'fail') {
+      stoppedAt = step.rung
+      break
     }
-
-    if (step.status === 'elsewhere') {
-      // Decided, but not here. Neither a pass this climb can claim nor a gap
-      // it should report.
-      outcomes.push({
-        rung: step.rung,
-        name: step.name,
-        result: 'elsewhere',
-        reason: step.reason,
-        exitCode: null,
-        command: step.command,
-      })
-      continue
-    }
-
-    if (step.status === 'unavailable') {
-      // Not a failure — the climb continues. But it is never a pass either,
-      // and it is carried all the way out so nothing downstream can read the
-      // absence as a green.
-      outcomes.push({
-        rung: step.rung,
-        name: step.name,
-        result: 'not_measured',
-        reason: step.reason,
-        exitCode: null,
-        command: step.command,
-      })
-      continue
-    }
-
-    const earlier = step.command === null ? undefined : passed.get(step.command)
-    if (earlier !== undefined) {
-      outcomes.push({
-        rung: step.rung,
-        name: step.name,
-        result: 'pass',
-        reason: `same command as ${earlier}; its result was reused, not run again`,
-        exitCode: 0,
-        command: step.command,
-        reusedFrom: earlier,
-      })
-      continue
-    }
-
-    const exitCode = await run(step)
-    if (exitCode === null) {
-      outcomes.push({
-        rung: step.rung,
-        name: step.name,
-        result: 'not_measured',
-        reason: 'the step did not run',
-        exitCode: null,
-        command: step.command,
-      })
-      continue
-    }
-
-    const succeeded = exitCode === 0
-    if (succeeded && step.command !== null) passed.set(step.command, step.name)
-    outcomes.push({
-      rung: step.rung,
-      name: step.name,
-      result: succeeded ? 'pass' : 'fail',
-      reason: succeeded ? '' : `exited ${exitCode}`,
-      exitCode,
-      command: step.command,
-    })
-    if (!succeeded) stoppedAt = step.rung
   }
 
   return {
@@ -286,5 +218,47 @@ export async function climb(steps: readonly LadderStep[], run: RunStep): Promise
     stoppedAt,
     unmeasured: outcomes.filter((o) => o.result === 'not_measured').map((o) => o.name),
     ok: stoppedAt === null && outcomes.every((o) => o.result !== 'fail'),
+  }
+}
+
+async function rungOutcomeOf(
+  step: LadderStep,
+  run: RunStep,
+  passed: Map<string, string>
+): Promise<StepOutcome> {
+  const { rung, name, command } = step
+  if (step.status !== 'runnable') {
+    return {
+      rung,
+      name,
+      result: NOT_RUN[step.status],
+      reason: step.reason,
+      exitCode: null,
+      command,
+    }
+  }
+  const earlier = command === null ? undefined : passed.get(command)
+  if (earlier !== undefined) {
+    const reason = `same command as ${earlier}; its result was reused, not run again`
+    return { rung, name, result: 'pass', reason, exitCode: 0, command, reusedFrom: earlier }
+  }
+  const outcome = ranOutcome(step, await run(step))
+  if (outcome.result === 'pass' && command !== null) passed.set(command, name)
+  return outcome
+}
+
+/** What a step's exit status says: a pass, a failure, or nothing when it did not run. */
+function ranOutcome({ rung, name, command }: LadderStep, exitCode: number | null): StepOutcome {
+  if (exitCode === null) {
+    return { rung, name, result: 'not_measured', reason: 'the step did not run', exitCode, command }
+  }
+  const succeeded = exitCode === 0
+  return {
+    rung,
+    name,
+    result: succeeded ? 'pass' : 'fail',
+    reason: succeeded ? '' : `exited ${exitCode}`,
+    exitCode,
+    command,
   }
 }

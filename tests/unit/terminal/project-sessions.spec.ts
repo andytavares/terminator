@@ -44,7 +44,9 @@ describe('closeSessionsOfDeletedProjects', () => {
     expect(markClosed).toHaveBeenCalledWith('s3', at)
     expect(markClosed).toHaveBeenCalledTimes(2)
   })
+})
 
+describe('closeSessionsOfDeletedProjects — clock and disposal', () => {
   it('stamps the close with the current time when no clock is given', () => {
     const markClosed = vi.fn().mockResolvedValue(undefined)
     stop = closeSessionsOfDeletedProjects({

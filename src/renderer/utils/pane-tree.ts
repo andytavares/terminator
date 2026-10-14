@@ -1,26 +1,28 @@
 import type { PaneNode, PaneSplitDirection } from '../../shared/types/index'
 
-export function splitLeaf(
-  node: PaneNode,
-  targetId: string,
-  newId: string,
+/** One split: the pane `targetId` divides, and `newId` opens beside it. */
+export interface PaneSplit {
+  targetId: string
+  newId: string
   direction: PaneSplitDirection
-): PaneNode {
+}
+
+export function splitLeaf(node: PaneNode, split: PaneSplit): PaneNode {
   if (node.type === 'leaf') {
-    if (node.sessionId !== targetId) return node
+    if (node.sessionId !== split.targetId) return node
     return {
       type: 'split',
       id: crypto.randomUUID(),
-      direction,
+      direction: split.direction,
       ratio: 0.5,
       first: node,
-      second: { type: 'leaf', sessionId: newId },
+      second: { type: 'leaf', sessionId: split.newId },
     }
   }
   return {
     ...node,
-    first: splitLeaf(node.first, targetId, newId, direction),
-    second: splitLeaf(node.second, targetId, newId, direction),
+    first: splitLeaf(node.first, split),
+    second: splitLeaf(node.second, split),
   }
 }
 

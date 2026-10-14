@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, rmSync, writeFileSync, appendFileSync, readFileSync } from 'fs'
-import { tmpdir } from 'os'
+import { rmSync, writeFileSync, appendFileSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { direct } from '../../src/factory/director.js'
 import { createWorld, seatOf, tick, VERDICT_MS } from '../../src/factory/sim.js'
@@ -10,10 +9,11 @@ import { buildRunGraph, withNode } from '../../src/line/run-graph.js'
 import { parseRecipe } from '../../src/recipe/parse.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
-import type { RunGraph } from '../../src/line/run-graph.js'
+import type { NodeState, RunGraph } from '../../src/line/run-graph.js'
 import { diffObservation } from '../../src/factory/events.js'
 import type { Observation, FactoryEvent } from '../../src/factory/events.js'
 import { readTranscript } from '../../src/runtime/transcript-tailer.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 // direct() turns a batch of FactoryEvents into a new World: it never moves
 // anyone for a reason that is not one of those events, and coalescing is
@@ -24,9 +24,6 @@ const RECIPE = `
 schemaVersion: 1
 id: standard
 steps:
-  - id: foreman
-    kind: agent
-    role: foreman
   - id: a
     kind: agent
     role: builder
@@ -104,7 +101,17 @@ function ghostCrew(nodeId: string, role: string | null = null): Crew {
 }
 
 describe('direct: node-state', () => {
-  it('sends a node to its seat, to type, on ready/running', () => {
+  describe('running and passed', runningAndPassedTests)
+  describe('failed and resting', failedAndRestingTests)
+  describe('no crew', noCrewTests)
+  describe('run and agent kinds', runAndAgentKindsTests)
+  describe('skipped', skippedTests)
+  describe('idle without crew', idleWithoutCrewTests)
+  describe('no station', noStationTests)
+})
+
+function runningAndPassedTests() {
+  it('sends a node to its seat, to type, on running', () => {
     const g = graph()
     const world = worldFor(g)
     const events: FactoryEvent[] = [
@@ -130,7 +137,9 @@ describe('direct: node-state', () => {
     expect(crew.restSeat).not.toBe(null)
     expect(crew.settle).not.toBe(null)
   })
+}
 
+function failedAndRestingTests() {
   it('slumps a failed node at its seat', () => {
     const g = graph()
     const world = worldFor(g)
@@ -149,25 +158,29 @@ describe('direct: node-state', () => {
     const world = worldFor(g)
     const next = direct(
       world,
-      [{ kind: 'node-state', nodeId: 'a', from: 'ready', to: 'blocked' }],
+      [{ kind: 'node-state', nodeId: 'a', from: 'running', to: 'blocked' }],
       0
     )
     const crew = next.crew.find((c) => c.nodeId === 'a')!
     expect(crew.then).toBe('couch')
     expect(crew.restSeat).not.toBe(null)
   })
+}
 
+function noCrewTests() {
   it('has no effect on a node with no crew of its own', () => {
     const g = graph()
     const world = worldFor(g)
     const next = direct(
       world,
-      [{ kind: 'node-state', nodeId: 'g', from: 'waiting', to: 'ready' }],
+      [{ kind: 'node-state', nodeId: 'g', from: 'waiting', to: 'running' }],
       0
     )
     expect(next).toEqual(world)
   })
+}
 
+function runAndAgentKindsTests() {
   it('sends a run-kind node to its seat scanning, not typing', () => {
     const g = graph()
     const world = worldFor(g)
@@ -180,15 +193,19 @@ describe('direct: node-state', () => {
     expect(crew.then).toBe('scan')
   })
 
-  it('sends a node to its seat on ready, and on verifying, same as running', () => {
+  it('sends an agent node to its seat typing when it starts running', () => {
     const g = graph()
     const world = worldFor(g)
-    for (const to of ['ready', 'verifying'] as const) {
-      const next = direct(world, [{ kind: 'node-state', nodeId: 'a', from: 'waiting', to }], 0)
-      expect(next.crew.find((c) => c.nodeId === 'a')!.then).toBe('type')
-    }
+    const next = direct(
+      world,
+      [{ kind: 'node-state', nodeId: 'a', from: 'waiting', to: 'running' }],
+      0
+    )
+    expect(next.crew.find((c) => c.nodeId === 'a')!.then).toBe('type')
   })
+}
 
+function skippedTests() {
   it('sends a skipped node to a rest seat too', () => {
     const g = graph()
     const world = worldFor(g)
@@ -201,7 +218,9 @@ describe('direct: node-state', () => {
     expect(crew.then).toBe('couch')
     expect(crew.restSeat).not.toBe(null)
   })
+}
 
+function idleWithoutCrewTests() {
   it('has no effect on an idle transition for a node with no crew of its own', () => {
     const g = graph()
     const world = worldFor(g)
@@ -212,8 +231,10 @@ describe('direct: node-state', () => {
     )
     expect(next).toEqual(world)
   })
+}
 
-  it('leaves a crew member with no station untouched on ready/running/verifying', () => {
+function noStationTests() {
+  it('leaves a crew member with no station untouched on running', () => {
     const g = graph()
     const world: World = { ...worldFor(g), crew: [...worldFor(g).crew, ghostCrew('ghost')] }
     const next = direct(
@@ -234,9 +255,14 @@ describe('direct: node-state', () => {
     )
     expect(next.crew.find((c) => c.nodeId === 'ghost')).toEqual(ghostCrew('ghost'))
   })
-})
+}
 
 describe('direct: orphaned / stranded', () => {
+  describe('orphans and strands', directorOrphansAndStrandsTests)
+  describe('clearing a strand', clearingAStrandTests)
+})
+
+function directorOrphansAndStrandsTests() {
   it('marks an orphaned node not present', () => {
     const g = withNode(graph(), 'a', { state: 'running' })
     const world = worldFor(g)
@@ -253,7 +279,9 @@ describe('direct: orphaned / stranded', () => {
     expect(crew.goal).toEqual(world.map.anchors.wait)
     expect(crew.then).toBe('wave')
   })
+}
 
+function clearingAStrandTests() {
   it('sends a node back to its seat, working, once it is no longer stranded', () => {
     const world = worldFor(runningGraph())
     const off: FactoryEvent = { kind: 'stranded', nodeId: 'a', on: false }
@@ -278,7 +306,7 @@ describe('direct: orphaned / stranded', () => {
     const next = direct(world, [{ kind: 'stranded', nodeId: 'ghost', on: false }], 0)
     expect(next.crew.find((c) => c.nodeId === 'ghost')).toEqual(ghostCrew('ghost'))
   })
-})
+}
 
 // In production `direct` is called on every ~2s poll with only the *new*
 // events since the last one: a long Read emits `tool_started` exactly once,
@@ -288,6 +316,26 @@ describe('direct: orphaned / stranded', () => {
 // poll that carries no new event for it at all. `World.openCalls` is what
 // lets `direct` judge that with nothing but `nowMs` to go on.
 describe('direct: tool coalescing', () => {
+  describe('an instant call', anInstantCallTests)
+  describe('the reported defect', theReportedDefectTests)
+  describe('quick calls', quickCallsTests)
+  describe('bursts', burstsTests)
+  describe('desk props', deskPropsTests)
+  describe('returning to the seat', returningToTheSeatTests)
+  describe('resting and slumped', restingAndSlumpedTests)
+  describe('stale calls', staleCallsTests)
+  describe('another call open', anotherCallOpenTests)
+  describe('seen calls and no station', seenCallsAndNoStationTests)
+})
+
+const finish = (to: 'passed' | 'failed', from: 'running' | 'passed' = 'running'): FactoryEvent => ({
+  kind: 'node-state',
+  nodeId: 'a',
+  from,
+  to,
+})
+
+function anInstantCallTests() {
   it('does not walk the instant a call opens', () => {
     const g = graph()
     const world = worldFor(g)
@@ -299,7 +347,9 @@ describe('direct: tool coalescing', () => {
     expect(crew.goal).toBe(null)
     expect(next.openCalls).toEqual([{ nodeId: 'a', prop: 'archive', callId: 'c1', at: 0 }])
   })
+}
 
+function theReportedDefectTests() {
   it('reproduces the reported defect: a call open ≥1500ms is walked to on a later poll with no new events', () => {
     const g = graph()
     let world = worldFor(g)
@@ -324,7 +374,9 @@ describe('direct: tool coalescing', () => {
     const afterCrew = ticked.crew.find((c) => c.nodeId === 'a')!
     expect(afterCrew.x === seat.x && afterCrew.y === seat.y).toBe(false)
   })
+}
 
+function quickCallsTests() {
   it('a call that closes at 1000ms never causes a walk', () => {
     const g = runningGraph()
     let world = worldFor(g)
@@ -347,7 +399,9 @@ describe('direct: tool coalescing', () => {
     const later = direct(world, [], 100_000)
     expect(later.crew.find((c) => c.nodeId === 'a')!.goal).toEqual(seatOf(world.map, 'a'))
   })
+}
 
+function burstsTests() {
   it('walks to the rack on a burst of 3 same-prop calls, all still open, in one poll', () => {
     const g = graph()
     const world = worldFor(g)
@@ -371,7 +425,9 @@ describe('direct: tool coalescing', () => {
     const next = direct(world, events, 300)
     expect(next.crew.find((c) => c.nodeId === 'a')!.goal).toBe(null)
   })
+}
 
+function deskPropsTests() {
   it('a desk-prop tool call is remembered but never moves anyone, and its close retires it', () => {
     const world = worldFor(runningGraph())
     const open: FactoryEvent = {
@@ -389,7 +445,9 @@ describe('direct: tool coalescing', () => {
     const closed = direct(opened, [{ ...open, open: false }], 100_001)
     expect(closed.openCalls).toEqual([])
   })
+}
 
+function returningToTheSeatTests() {
   it('returns to the seat, working, on close when no other call is open', () => {
     const world = worldFor(runningGraph())
     const close = (nodeId: string): FactoryEvent => ({
@@ -407,7 +465,9 @@ describe('direct: tool coalescing', () => {
     expect(rig.goal).toEqual(seatOf(world.map, 'r'))
     expect(rig.then).toBe('scan')
   })
+}
 
+function restingAndSlumpedTests() {
   it('leaves a resting crew member resting when a call closes late', () => {
     const world = worldFor(graph())
     const before = world.crew.find((c) => c.nodeId === 'a')!
@@ -431,7 +491,9 @@ describe('direct: tool coalescing', () => {
     )
     expect(next.crew.find((c) => c.nodeId === 'a')).toEqual(before)
   })
+}
 
+function staleCallsTests() {
   it('a stale dropped call returns its crew member to work', () => {
     let world = worldFor(runningGraph())
     world = direct(
@@ -445,7 +507,9 @@ describe('direct: tool coalescing', () => {
     expect(crew.goal).toEqual(seatOf(world.map, 'a'))
     expect(crew.then).toBe('type')
   })
+}
 
+function anotherCallOpenTests() {
   it('stays put on close while another call of that prop is still open', () => {
     const g = graph()
     let world = worldFor(g)
@@ -464,7 +528,9 @@ describe('direct: tool coalescing', () => {
     expect(crew.goal).not.toEqual(seatOf(world.map, 'a'))
     expect(next.openCalls).toEqual([{ nodeId: 'a', prop: 'archive', callId: 'c2', at: 100 }])
   })
+}
 
+function seenCallsAndNoStationTests() {
   it('does not re-remember a call it has already seen open', () => {
     const g = graph()
     let world = worldFor(g)
@@ -490,19 +556,14 @@ describe('direct: tool coalescing', () => {
     const next = direct(world, events, 0)
     expect(next.crew.find((c) => c.nodeId === 'ghost')).toEqual(ghostCrew('ghost'))
   })
-})
+}
 
 describe('direct: verdicts', () => {
-  const finish = (
-    to: 'passed' | 'failed',
-    from: 'running' | 'passed' = 'running'
-  ): FactoryEvent => ({
-    kind: 'node-state',
-    nodeId: 'a',
-    from,
-    to,
-  })
+  describe('recording', directorRecordingTests)
+  describe('nothing and expiry', nothingAndExpiryTests)
+})
 
+function directorRecordingTests() {
   it('records a pass at the world clock when a step passes', () => {
     const world = { ...worldFor(runningGraph()), clockMs: 4200 }
     expect(direct(world, [finish('passed')], 0).verdicts).toEqual([
@@ -523,7 +584,9 @@ describe('direct: verdicts', () => {
     const passed = direct({ ...failed, clockMs: 500 }, [finish('passed')], 0)
     expect(passed.verdicts).toEqual([{ nodeId: 'a', pass: true, at: 500 }])
   })
+}
 
+function nothingAndExpiryTests() {
   it('records nothing for a same-state event', () => {
     const world = worldFor(runningGraph())
     expect(direct(world, [finish('passed', 'passed')], 0).verdicts).toEqual([])
@@ -540,9 +603,17 @@ describe('direct: verdicts', () => {
     expect(tick(world, VERDICT_MS - 1).verdicts).toHaveLength(1)
     expect(tick(world, VERDICT_MS).verdicts).toEqual([])
   })
-})
+}
 
 describe('direct: handoff', () => {
+  describe('crates', directorCratesTests)
+  describe('taking in and no belt', takingInAndNoBeltTests)
+})
+
+const realGraph = (): RunGraph =>
+  JSON.parse(readFileSync(join(__dirname, 'fixtures', 'run-graph-real.json'), 'utf-8')) as RunGraph
+
+function directorCratesTests() {
   it('adds a crate on the matching belt, at progress 0', () => {
     const g = graph()
     const world = worldFor(g)
@@ -567,7 +638,9 @@ describe('direct: handoff', () => {
     )
     expect(next.crates[0].parks).toBe(false)
   })
+}
 
+function takingInAndNoBeltTests() {
   it('a step starting takes in the work parked at it', () => {
     const world = {
       ...worldFor(graph()),
@@ -575,7 +648,7 @@ describe('direct: handoff', () => {
     }
     const next = direct(
       world,
-      [{ kind: 'node-state', nodeId: 'b', from: 'ready', to: 'running' }],
+      [{ kind: 'node-state', nodeId: 'b', from: 'waiting', to: 'running' }],
       0
     )
     expect(next.crates).toEqual([{ id: 'q', beltId: 'a->b', progress: 1, parks: false }])
@@ -591,25 +664,28 @@ describe('direct: handoff', () => {
     )
     expect(next.crates).toEqual([])
   })
-})
+}
 
 describe('direct: rework', () => {
-  const realGraph = (): RunGraph =>
-    JSON.parse(
-      readFileSync(join(__dirname, 'fixtures', 'run-graph-real.json'), 'utf-8')
-    ) as RunGraph
-  const realWorld = (): World => worldFor(realGraph())
-  const crewOf = (world: World, id: string): Crew => world.crew.find((c) => c.nodeId === id)!
-  const adjacent = (a: { x: number; y: number }, b: { x: number; y: number }): boolean =>
-    Math.abs(a.x - b.x) + Math.abs(a.y - b.y) === 1
+  describe('carrying the box', directorCarryingTheBoxTests)
+  describe('neither side crewed', neitherSideCrewedTests)
+})
 
+const realWorld = (): World => worldFor(realGraph())
+
+const crewOf = (world: World, id: string): Crew => world.crew.find((c) => c.nodeId === id)!
+
+const adjacent = (a: { x: number; y: number }, b: { x: number; y: number }): boolean =>
+  Math.abs(a.x - b.x) + Math.abs(a.y - b.y) === 1
+
+/** The world after `fromNodeId` sends its work back to `toNodeId`, in round 1. */
+const reworked = (world: World, fromNodeId: string, toNodeId: string): World =>
+  direct(world, [{ kind: 'rework', fromNodeId, toNodeId, round: 1 }], 0)
+
+function directorCarryingTheBoxTests() {
   it('has the check carry the box to the node it sent back, with no crate on a belt', () => {
     const world = realWorld()
-    const next = direct(
-      world,
-      [{ kind: 'rework', fromNodeId: 'verify', toNodeId: 'build:lane-1', round: 1 }],
-      0
-    )
+    const next = reworked(world, 'verify', 'build:lane-1')
     const verifier = crewOf(next, 'verify')
     expect(verifier.carrying).toBe(true)
     expect(adjacent(verifier.goal!, seatOf(world.map, 'build:lane-1')!)).toBe(true)
@@ -619,18 +695,16 @@ describe('direct: rework', () => {
 
   it('has the target walk to a check with no crew and bring the box back', () => {
     const world = realWorld()
-    const next = direct(
-      world,
-      [{ kind: 'rework', fromNodeId: 'ship', toNodeId: 'inspect', round: 1 }],
-      0
-    )
+    const next = reworked(world, 'ship', 'inspect')
     const inspector = crewOf(next, 'inspect')
     expect(inspector.carrying).toBeFalsy()
     expect(adjacent(inspector.goal!, seatOf(world.map, 'ship')!)).toBe(true)
     expect(inspector.errand!.map((s) => s.act)).toEqual(['pickup', 'drop', 'home'])
     expect(next.crates).toEqual(world.crates)
   })
+}
 
+function neitherSideCrewedTests() {
   it('draws nothing when neither side has crew', () => {
     const g = graph()
     const world = worldFor(g)
@@ -641,17 +715,13 @@ describe('direct: rework', () => {
     )
     expect(next).toEqual(world)
   })
-})
+}
 
 describe('direct: gate', () => {
-  it('adds the node to gatesWaiting and sends the foreman to wave at its seat', () => {
-    const g = graph()
-    const world = worldFor(g)
+  it('adds the node to gatesWaiting', () => {
+    const world = worldFor(graph())
     const next = direct(world, [{ kind: 'gate', nodeId: 'g', waiting: true }], 0)
     expect(next.gatesWaiting).toEqual(['g'])
-    const foreman = next.crew.find((c) => c.role === 'foreman')!
-    expect(foreman.then).toBe('wave')
-    expect(foreman.goal).toEqual(seatOf(world.map, 'g'))
   })
 
   it('does not duplicate an already-waiting gate', () => {
@@ -661,44 +731,11 @@ describe('direct: gate', () => {
     expect(next.gatesWaiting).toEqual(['g'])
   })
 
-  it('removes the node from gatesWaiting and sends the foreman back on clear', () => {
+  it('removes the node from gatesWaiting on clear', () => {
     const g = graph()
     const world: World = { ...worldFor(g), gatesWaiting: ['g'] }
     const next = direct(world, [{ kind: 'gate', nodeId: 'g', waiting: false }], 0)
     expect(next.gatesWaiting).toEqual([])
-    const foreman = next.crew.find((c) => c.role === 'foreman')!
-    expect(foreman.then).toBe('idle')
-  })
-
-  it('adds gatesWaiting without moving the foreman when the gate node has no station', () => {
-    const g = graph()
-    const world = worldFor(g)
-    const next = direct(world, [{ kind: 'gate', nodeId: 'ghost', waiting: true }], 0)
-    expect(next.gatesWaiting).toEqual(['ghost'])
-    const foreman = next.crew.find((c) => c.role === 'foreman')!
-    expect(foreman.goal).toBe(null)
-  })
-
-  it('clears gatesWaiting without moving a foreman that has no station', () => {
-    const g = graph()
-    const base = worldFor(g)
-    const world: World = {
-      ...base,
-      gatesWaiting: ['g'],
-      crew: [...base.crew.filter((c) => c.role !== 'foreman'), ghostCrew('foreman-x', 'foreman')],
-    }
-    const next = direct(world, [{ kind: 'gate', nodeId: 'g', waiting: false }], 0)
-    expect(next.gatesWaiting).toEqual([])
-    expect(next.crew.find((c) => c.role === 'foreman')).toEqual(ghostCrew('foreman-x', 'foreman'))
-  })
-
-  it('does nothing at all when there is no foreman crew', () => {
-    const g = graph()
-    const base = worldFor(g)
-    const world: World = { ...base, crew: base.crew.filter((c) => c.role !== 'foreman') }
-    const next = direct(world, [{ kind: 'gate', nodeId: 'g', waiting: true }], 0)
-    expect(next.gatesWaiting).toEqual(['g'])
-    expect(next.crew).toEqual(world.crew)
   })
 })
 
@@ -750,6 +787,42 @@ describe('direct: CI', () => {
   })
 })
 
+let transcript: string
+function toolUseLine(id: string, name: string, at: string): string {
+  return JSON.stringify({
+    type: 'assistant',
+    timestamp: at,
+    message: { content: [{ type: 'tool_use', id, name }] },
+  })
+}
+function toolResultLine(id: string, at: string): string {
+  return JSON.stringify({
+    type: 'user',
+    timestamp: at,
+    message: { content: [{ type: 'tool_result', tool_use_id: id }] },
+  })
+}
+/** Runs one call from open through close over the real pipeline, and returns the crew member. */
+function runCall(toolName: string): Crew {
+  writeFileSync(transcript, toolUseLine('c1', toolName, '2026-09-27T10:00:00.000Z') + '\n')
+
+  const g = runningGraph()
+  const map = layoutHall(g)
+  const emptyObs = obs(g, { activity: {} })
+  let world = createWorld(map, emptyObs)
+
+  const started = readTranscript(transcript)
+  const afterStart = obs(g, { activity: { a: started } })
+  world = direct(world, diffObservation(emptyObs, afterStart), 0)
+
+  appendFileSync(transcript, toolResultLine('c1', '2026-09-27T10:00:05.000Z') + '\n')
+  const finished = readTranscript(transcript)
+  const afterFinish = obs(g, { activity: { a: finished } })
+  world = direct(world, diffObservation(afterStart, afterFinish), 5000)
+
+  return world.crew.find((c) => c.nodeId === 'a')!
+}
+
 // The real bug: a worker walked to the bookshelf or the server rack and never
 // walked back. It was never in `direct`'s own unit tests — those fed it
 // close events shaped the way production ought to produce them, which is not
@@ -760,52 +833,19 @@ describe('direct: CI', () => {
 // archive tool (Read) and a rack tool (Bash), and fail on the old code.
 describe('direct: the real pipeline never strands a worker at the shelf or the rack', () => {
   let dir: string
-  let transcript: string
 
   beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), 'director-pipeline-'))
+    dir = makeTempDir('director-pipeline-')
     transcript = join(dir, 's1.jsonl')
   })
 
   afterEach(() => rmSync(dir, { recursive: true, force: true }))
 
-  function toolUseLine(id: string, name: string, at: string): string {
-    return JSON.stringify({
-      type: 'assistant',
-      timestamp: at,
-      message: { content: [{ type: 'tool_use', id, name }] },
-    })
-  }
+  describe('walking and returning', walkingAndReturningTests)
+  describe('the world after', theWorldAfterTests)
+})
 
-  function toolResultLine(id: string, at: string): string {
-    return JSON.stringify({
-      type: 'user',
-      timestamp: at,
-      message: { content: [{ type: 'tool_result', tool_use_id: id }] },
-    })
-  }
-
-  /** Runs one call from open through close over the real pipeline, and returns the crew member. */
-  function runCall(toolName: string): Crew {
-    writeFileSync(transcript, toolUseLine('c1', toolName, '2026-09-27T10:00:00.000Z') + '\n')
-
-    const g = runningGraph()
-    const map = layoutHall(g)
-    const emptyObs = obs(g, { activity: {} })
-    let world = createWorld(map, emptyObs)
-
-    const started = readTranscript(transcript)
-    const afterStart = obs(g, { activity: { a: started } })
-    world = direct(world, diffObservation(emptyObs, afterStart), 0)
-
-    appendFileSync(transcript, toolResultLine('c1', '2026-09-27T10:00:05.000Z') + '\n')
-    const finished = readTranscript(transcript)
-    const afterFinish = obs(g, { activity: { a: finished } })
-    world = direct(world, diffObservation(afterStart, afterFinish), 5000)
-
-    return world.crew.find((c) => c.nodeId === 'a')!
-  }
-
+function walkingAndReturningTests() {
   it('walks a Read call to the bookshelf and back to the seat when it closes', () => {
     const crew = runCall('Read')
     const seat = seatOf(layoutHall(graph()), 'a')
@@ -819,7 +859,9 @@ describe('direct: the real pipeline never strands a worker at the shelf or the r
     expect(crew.goal).toEqual(seatOf(layoutHall(graph()), 'a'))
     expect(crew.then).toBe('type')
   })
+}
 
+function theWorldAfterTests() {
   it('the world after the close no longer remembers the call as open', () => {
     writeFileSync(transcript, toolUseLine('c1', 'Read', '2026-09-27T10:00:00.000Z') + '\n')
     const g = graph()
@@ -838,7 +880,7 @@ describe('direct: the real pipeline never strands a worker at the shelf or the r
     world = direct(world, diffObservation(afterStart, afterFinish), 5000)
     expect(world.openCalls).toEqual([])
   })
-})
+}
 
 describe('direct: queue', () => {
   it('records the position and who it is behind on a queued event', () => {
@@ -854,5 +896,28 @@ describe('direct: queue', () => {
     const first = direct(world, [{ kind: 'queued', position: 2, behind: ['Other order'] }], 0)
     const second = direct(first, [{ kind: 'queued', position: 1, behind: ['Other order'] }], 0)
     expect(second.queue).toEqual({ position: 1, behind: ['Other order'] })
+  })
+})
+
+describe('direct: a hall that cannot seat everyone, and a corrupted state', () => {
+  it('leaves a resting crew member where it is when no rest seat is free', () => {
+    const g = graph()
+    const world = createWorld({ ...layoutHall(g), restSeats: [] }, obs(g))
+    const next = direct(
+      world,
+      [{ kind: 'node-state', nodeId: 'a', from: 'running', to: 'passed' }],
+      0
+    )
+    expect(next.crew.find((c) => c.nodeId === 'a')).toEqual(
+      world.crew.find((c) => c.nodeId === 'a')
+    )
+  })
+
+  it('throws on a state a corrupted run graph file holds', () => {
+    const to: NodeState = JSON.parse('"rebuilding"')
+    const world = worldFor(graph())
+    expect(() =>
+      direct(world, [{ kind: 'node-state', nodeId: 'a', from: 'running', to }], 0)
+    ).toThrow('unhandled node state: rebuilding')
   })
 })

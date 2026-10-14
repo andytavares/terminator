@@ -1,84 +1,59 @@
 import type { ConflictSession, ResolutionStrategy } from '../schemas/merge-flow.schema'
+import { invoke } from '@terminator/extension-sdk/renderer'
 
-const bridge = () => window.electronAPI.extensionBridge
+/** A conflict block of a checkout, and the text it was resolved to. */
+interface BlockText {
+  repoRoot: string
+  blockId: string
+  resolvedText: string
+}
 
 export const mergeFlowAPI = {
   listConflicts: (repoRoot: string): Promise<ConflictSession | { error: string }> =>
-    bridge().invoke('git:conflicts-list', { repoRoot }),
-
-  getConflictBlocks: (
-    repoRoot: string,
-    filePath: string
-  ): Promise<{ blocks: unknown[] } | { error: string }> =>
-    bridge().invoke('git:conflict-blocks', { repoRoot, filePath }),
+    invoke('git:conflicts-list', { repoRoot }),
 
   resolveConflict: (
-    repoRoot: string,
-    blockId: string,
-    resolvedText: string,
-    strategy: ResolutionStrategy,
-    currentResolvedText?: string,
-    originalConflictText?: string
-  ): Promise<{ success: true } | { error: string }> =>
-    bridge().invoke('git:resolve-conflict', {
-      repoRoot,
-      blockId,
-      resolvedText,
-      strategy,
-      currentResolvedText,
-      originalConflictText,
-    }),
+    resolution: BlockText & {
+      strategy: ResolutionStrategy
+      currentResolvedText?: string
+      originalConflictText?: string
+    }
+  ): Promise<{ success: true } | { error: string }> => invoke('git:resolve-conflict', resolution),
 
   undoResolve: (
-    repoRoot: string,
-    blockId: string,
-    resolvedText: string,
-    originalConflictText: string
-  ): Promise<{ success: true } | { error: string }> =>
-    bridge().invoke('git:undo-resolve', { repoRoot, blockId, resolvedText, originalConflictText }),
+    undo: BlockText & { originalConflictText: string }
+  ): Promise<{ success: true } | { error: string }> => invoke('git:undo-resolve', undo),
 
   mergeCommit: (
     repoRoot: string,
     resolvedFilePaths: string[],
     commitMessage: string
   ): Promise<{ commitHash: string; pushError?: string } | { error: string }> =>
-    bridge().invoke('git:merge-commit', { repoRoot, resolvedFilePaths, commitMessage }),
+    invoke('git:merge-commit', { repoRoot, resolvedFilePaths, commitMessage }),
 
   restoreSession: (repoRoot: string): Promise<{ session: ConflictSession | null }> =>
-    bridge().invoke('git:session-restore', { repoRoot }),
+    invoke('git:session-restore', { repoRoot }),
 
   persistSession: (
     repoRoot: string,
     session: ConflictSession
   ): Promise<{ success: true } | { error: string }> =>
-    bridge().invoke('git:session-persist', { repoRoot, session }),
+    invoke('git:session-persist', { repoRoot, session }),
 
   clearSession: (repoRoot: string): Promise<{ success: true }> =>
-    bridge().invoke('git:session-clear', { repoRoot }),
+    invoke('git:session-clear', { repoRoot }),
 
   resetSession: (
     repoRoot: string,
     files: Array<{ filePath: string }>
   ): Promise<{ success: true } | { error: string }> =>
-    bridge().invoke('git:session-reset', { repoRoot, files }),
+    invoke('git:session-reset', { repoRoot, files }),
 
-  prepareMergeForPr: (
-    repoRoot: string,
-    headRefName: string,
+  preparePrWorktree: (worktree: {
+    repoRoot: string
+    worktreePath: string
+    headRefName: string
     baseRefName: string
-  ): Promise<{ hasConflicts: boolean } | { error: string }> =>
-    bridge().invoke('git:prepare-merge-for-pr', { repoRoot, headRefName, baseRefName }),
-
-  preparePrWorktree: (
-    repoRoot: string,
-    worktreePath: string,
-    headRefName: string,
-    baseRefName: string
-  ): Promise<{ hasConflicts: boolean } | { error: string }> =>
-    bridge().invoke('git:prepare-pr-worktree', {
-      repoRoot,
-      worktreePath,
-      headRefName,
-      baseRefName,
-    }),
+  }): Promise<{ hasConflicts: boolean } | { error: string }> =>
+    invoke('git:prepare-pr-worktree', worktree),
 }

@@ -33,6 +33,11 @@ function amendedOrder(): WorkOrder {
 }
 
 describe('convergeMaybeScouted', () => {
+  describe('the architect', theArchitectTests)
+  describe('amending drafts', amendingDraftsTests)
+})
+
+function theArchitectTests() {
   it('starts the architect with the order as given while the scout is still running', async () => {
     const startScout = vi.fn() // never finishes
     const startArchitect = vi.fn().mockResolvedValue({ ok: true, sessionId: 'architect-1' })
@@ -55,7 +60,9 @@ describe('convergeMaybeScouted', () => {
     expect(result).toEqual({ ok: false, reason: 'refused' })
     expect(startArchitect).toHaveBeenCalledTimes(1)
   })
+}
 
+function amendingDraftsTests() {
   it('skips the scout for an amending draft', async () => {
     const startScout = vi.fn()
     const startArchitect = vi.fn().mockResolvedValue({ ok: true, sessionId: 'architect-1' })
@@ -70,7 +77,7 @@ describe('convergeMaybeScouted', () => {
     expect(startScout).not.toHaveBeenCalled()
     expect(startArchitect).toHaveBeenCalledWith(amendedOrder(), 'amend it')
   })
-})
+}
 
 describe('withScoutContext', () => {
   const scouted = order({
@@ -107,6 +114,11 @@ describe('withScoutContext', () => {
 })
 
 describe('waitForScout', () => {
+  describe('waiting', scoutedConvergeWaitingTests)
+  describe('giving up', givingUpTests)
+})
+
+function scoutedConvergeWaitingTests() {
   it('returns at once when no scout is running for the order', async () => {
     await expect(waitForScout('WO-none')).resolves.toBe('none')
   })
@@ -127,7 +139,9 @@ describe('waitForScout', () => {
     expect(settled).toBe('finished')
     await expect(waitForScout('WO-w')).resolves.toBe('none')
   })
+}
 
+function givingUpTests() {
   it('gives up after the time box and lets the red team start with what is stored', async () => {
     vi.useFakeTimers()
     try {
@@ -149,4 +163,4 @@ describe('waitForScout', () => {
     await convergeMaybeScouted({ startScout, startArchitect }, order({ id: 'WO-x' }), 'draft')
     await expect(waitForScout('WO-x')).resolves.toMatch(/^(finished|none)$/)
   })
-})
+}

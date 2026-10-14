@@ -2,16 +2,16 @@ import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { AboutDialog } from '../../../../src/renderer/components/AboutDialog'
+import type { ElectronAPI } from '../../../../src/shared/electron-api/api-type'
+import { installElectronApi } from '../../../support/electron-api'
+import { pressOutside } from '../../../support/modal'
 
-const mockGetInfo = vi.fn()
-const mockDbHealth = vi.fn()
+const mockGetInfo = vi.fn<ElectronAPI['app']['getInfo']>()
+const mockDbHealth = vi.fn<ElectronAPI['db']['health']>()
 
 beforeEach(() => {
   vi.clearAllMocks()
-  window.electronAPI = {
-    app: { getInfo: mockGetInfo },
-    db: { health: mockDbHealth },
-  } as unknown as typeof window.electronAPI
+  installElectronApi({ app: { getInfo: mockGetInfo }, db: { health: mockDbHealth } })
 
   mockDbHealth.mockResolvedValue({ ok: true })
   mockGetInfo.mockResolvedValue({
@@ -21,14 +21,16 @@ beforeEach(() => {
     nodeVersion: '20.0.0',
     chromeVersion: '124.0.0',
     platform: 'darwin',
+    homeDir: '/Users/me',
   })
 })
 
 describe('AboutDialog', () => {
   it('renders the dialog with app name and version after loading', async () => {
     render(<AboutDialog onClose={vi.fn()} />)
-    await waitFor(() => expect(screen.getByText('Terminator')).toBeTruthy())
-    expect(screen.getByText('v1.2.3')).toBeTruthy()
+    // The title is drawn at once; the version arrives with the app info.
+    expect(await screen.findByText('v1.2.3')).toBeTruthy()
+    expect(screen.getByText('Terminator')).toBeTruthy()
   })
 
   it('renders version info rows', async () => {
@@ -51,10 +53,12 @@ describe('AboutDialog', () => {
     const onClose = vi.fn()
     render(<AboutDialog onClose={onClose} />)
     await waitFor(() => expect(screen.getByRole('dialog')).toBeTruthy())
-    fireEvent.click(document.querySelector('.dialog-overlay')!)
+    pressOutside(screen.getByRole('dialog'))
     expect(onClose).toHaveBeenCalled()
   })
+})
 
+describe('AboutDialog — does not call onClose when dialog body is clicked', () => {
   it('does not call onClose when dialog body is clicked', async () => {
     const onClose = vi.fn()
     render(<AboutDialog onClose={onClose} />)
@@ -78,17 +82,16 @@ describe('AboutDialog', () => {
     expect(dashes.length).toBeGreaterThan(0)
     dashes.forEach((dd) => expect(dd.textContent).toBe('—'))
   })
+})
 
-  it('calls app.getInfo on mount', async () => {
-    render(<AboutDialog onClose={vi.fn()} />)
-    expect(mockGetInfo).toHaveBeenCalledTimes(1)
-    await waitFor(() => screen.getByText('Terminator'))
-  })
-
-  it('swallows getInfo rejection silently', async () => {
+describe('AboutDialog — keeps the placeholders when the app info cannot be read', () => {
+  it('keeps the placeholders when the app info cannot be read', async () => {
     mockGetInfo.mockRejectedValue(new Error('IPC gone'))
-    expect(() => render(<AboutDialog onClose={vi.fn()} />)).not.toThrow()
-    await new Promise((r) => setTimeout(r, 0))
+    render(<AboutDialog onClose={vi.fn()} />)
+    // The database row settles from its own call; by then the rejection has too.
+    await screen.findByText('OK')
+    expect(screen.getByText('v—')).toBeTruthy()
+    expect(screen.getByText('Electron').nextElementSibling!.textContent).toBe('—')
   })
 
   it('shows DB error with message when health returns ok:false', async () => {
@@ -108,7 +111,9 @@ describe('AboutDialog', () => {
     render(<AboutDialog onClose={vi.fn()} />)
     await waitFor(() => expect(screen.getByText('Error — IPC error')).toBeTruthy())
   })
+})
 
+describe('AboutDialog — does not close when non-Escape key is pressed', () => {
   it('does not close when non-Escape key is pressed', async () => {
     const onClose = vi.fn()
     render(<AboutDialog onClose={onClose} />)

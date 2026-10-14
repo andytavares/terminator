@@ -7,9 +7,17 @@ import {
   buildDiffText,
   runAgentReview,
   claudeFromShellOutput,
+  type RunAgentReviewInput,
   type SpawnedProcess,
+  type ExecFn,
+  type RunAgentReviewDeps,
 } from '../../src/review/review-agent.js'
+import type { AgentScope } from '../../src/schemas/review-agent.schema.js'
 import { FINDING_SEVERITIES } from '../../src/schemas/review-agent.schema.js'
+
+type SpawnFn = NonNullable<RunAgentReviewDeps['spawn']>
+/** What an EventEmitter calls back with; SpawnedProcess.on takes one per event. */
+type Listener = Parameters<EventEmitter['on']>[1]
 
 const pr = {
   number: 42,
@@ -18,17 +26,15 @@ const pr = {
   headSHA: 'abc1234',
 }
 
-describe('buildAgentPrompt', () => {
+/** A scope of `kind` with every optional field empty, overridden by `fields`. */
+function scopeOf(kind: AgentScope['kind'], fields: Partial<AgentScope> = {}): AgentScope {
+  return { kind, path: null, startLine: null, endLine: null, side: null, chapter: null, ...fields }
+}
+
+describe('buildAgentPrompt — rules every prompt states', () => {
   it('renders every severity from the shared constant and marks the run read-only', () => {
     const prompt = buildAgentPrompt({
-      scope: {
-        kind: 'file',
-        path: 'src/foo.ts',
-        startLine: null,
-        endLine: null,
-        side: null,
-        chapter: null,
-      },
+      scope: scopeOf('file', { path: 'src/foo.ts' }),
       request: 'review',
       pr,
       diffText: 'diff --git a/src/foo.ts b/src/foo.ts',
@@ -40,10 +46,29 @@ describe('buildAgentPrompt', () => {
     expect(prompt).toMatch(/must not post/i)
     expect(prompt).toMatch(/new side/i)
   })
+})
 
+describe('buildAgentPrompt — rules every prompt states (continued)', () => {
+  it.each([
+    [scopeOf('lines', { path: 'a.ts', startLine: 1, endLine: 2 }), 'lines 1-2 of a.ts'],
+    [scopeOf('lines'), 'lines ?-? of the file'],
+    [
+      scopeOf('hunk', { path: 'a.ts', startLine: 3, endLine: 9 }),
+      'the hunk touching a.ts around lines 3-9',
+    ],
+    [scopeOf('file', { path: 'src/foo.ts' }), 'the whole file src/foo.ts'],
+    [scopeOf('chapter', { chapter: 'Data model' }), 'the chapter "Data model"'],
+    [scopeOf('pr'), 'the whole pull request'],
+  ])('describes the %o scope as "%s"', (scope, described) => {
+    const prompt = buildAgentPrompt({ scope, request: 'review', pr, diffText: 'diff' })
+    expect(prompt).toContain(`Scope: ${described}, at PR head abc1234, in a private worktree.`)
+  })
+})
+
+describe('buildAgentPrompt — notes for the scope and diff', () => {
   it('asks for a walkthrough with one entry per chapter when scope is pr', () => {
     const prompt = buildAgentPrompt({
-      scope: { kind: 'pr', path: null, startLine: null, endLine: null, side: null, chapter: null },
+      scope: scopeOf('pr'),
       request: 'review',
       pr,
       diffText: 'diff',
@@ -53,16 +78,17 @@ describe('buildAgentPrompt', () => {
     expect(prompt).toMatch(/what the change is, then its consequences/i)
   })
 
+  it('says the diff was truncated only when it was', () => {
+    const input = { scope: scopeOf('pr'), request: 'review' as const, pr, diffText: 'diff' }
+    expect(buildAgentPrompt({ ...input, truncated: true })).toMatch(/diff below was truncated/i)
+    expect(buildAgentPrompt(input)).not.toMatch(/truncated/i)
+  })
+})
+
+describe('buildAgentPrompt — notes for an explain or ask request', () => {
   it('lets findings be empty for an explain request', () => {
     const prompt = buildAgentPrompt({
-      scope: {
-        kind: 'lines',
-        path: 'a.ts',
-        startLine: 1,
-        endLine: 2,
-        side: 'RIGHT',
-        chapter: null,
-      },
+      scope: scopeOf('lines', { path: 'a.ts', startLine: 1, endLine: 2, side: 'RIGHT' }),
       request: 'explain',
       pr,
       diffText: 'diff',
@@ -72,7 +98,7 @@ describe('buildAgentPrompt', () => {
 
   it('includes the question for an ask request', () => {
     const prompt = buildAgentPrompt({
-      scope: { kind: 'hunk', path: 'a.ts', startLine: 1, endLine: 2, side: 'RIGHT', chapter: null },
+      scope: scopeOf('hunk', { path: 'a.ts', startLine: 1, endLine: 2, side: 'RIGHT' }),
       request: 'ask',
       question: 'why does this skip validation?',
       pr,
@@ -84,10 +110,11 @@ describe('buildAgentPrompt', () => {
 
 describe('buildAgentJsonSchema', () => {
   it('derives the severity enum from the shared constant', () => {
-    const schema = buildAgentJsonSchema() as any
-    expect(schema.properties.findings.items.properties.severity.enum).toEqual([
-      ...FINDING_SEVERITIES,
-    ])
+    expect(buildAgentJsonSchema()).toMatchObject({
+      properties: {
+        findings: { items: { properties: { severity: { enum: [...FINDING_SEVERITIES] } } } },
+      },
+    })
   })
 })
 
@@ -122,84 +149,73 @@ describe('buildClaudeArgs', () => {
   })
 })
 
+/** Runs buildDiffText for `scope` against a git that prints `stdout`; returns the result and the diff args. */
+async function diffFor(scope: AgentScope, stdout: string) {
+  const exec = vi.fn<ExecFn>(async () => ({ stdout }))
+  const result = await buildDiffText(
+    { worktreePath: '/wt', baseRefName: 'main', headSHA: 'abc1234', scope },
+    exec
+  )
+  const diffArgs = exec.mock.calls.find((c) => c[1][0] === 'diff')?.[1]
+  return { ...result, diffArgs }
+}
+
+const TWO_HUNK_DIFF = [
+  'diff --git a/a.ts b/a.ts',
+  '--- a/a.ts',
+  '+++ b/a.ts',
+  '@@ -1,2 +1,2 @@',
+  '-old1',
+  '+new1',
+  '@@ -50,2 +50,2 @@',
+  '-old50',
+  '+new50',
+].join('\n')
+
 describe('buildDiffText', () => {
   it('diffs the whole PR range for pr scope', async () => {
-    const exec = vi.fn(async () => ({ stdout: 'diff --git a/x b/x\n@@ -1,1 +1,1 @@\n-a\n+b\n' }))
-    await buildDiffText(
-      '/wt',
-      'main',
-      'abc1234',
-      { kind: 'pr', path: null, startLine: null, endLine: null, side: null, chapter: null },
-      exec
+    const { diffArgs } = await diffFor(
+      scopeOf('pr'),
+      'diff --git a/x b/x\n@@ -1,1 +1,1 @@\n-a\n+b\n'
     )
-    const diffCall = exec.mock.calls.find((c) => c[1][0] === 'diff')
-    expect(diffCall?.[1]).toEqual(['diff', 'origin/main...abc1234'])
+    expect(diffArgs).toEqual(['diff', 'origin/main...abc1234'])
   })
 
   it('scopes to a single file for file scope', async () => {
-    const exec = vi.fn(async () => ({ stdout: 'diff' }))
-    await buildDiffText(
-      '/wt',
-      'main',
-      'abc1234',
-      { kind: 'file', path: 'src/a.ts', startLine: null, endLine: null, side: null, chapter: null },
-      exec
-    )
-    const diffCall = exec.mock.calls.find((c) => c[1][0] === 'diff')
-    expect(diffCall?.[1]).toEqual(['diff', 'origin/main...abc1234', '--', 'src/a.ts'])
+    const { diffArgs } = await diffFor(scopeOf('file', { path: 'src/a.ts' }), 'diff')
+    expect(diffArgs).toEqual(['diff', 'origin/main...abc1234', '--', 'src/a.ts'])
   })
 
   it('uses wide context and filters hunks outside the line range for lines scope', async () => {
-    const diff = [
-      'diff --git a/a.ts b/a.ts',
-      '--- a/a.ts',
-      '+++ b/a.ts',
-      '@@ -1,2 +1,2 @@',
-      '-old1',
-      '+new1',
-      '@@ -50,2 +50,2 @@',
-      '-old50',
-      '+new50',
-    ].join('\n')
-    const exec = vi.fn(async () => ({ stdout: diff }))
-    const { diffText } = await buildDiffText(
-      '/wt',
-      'main',
-      'abc1234',
-      { kind: 'lines', path: 'a.ts', startLine: 1, endLine: 2, side: 'RIGHT', chapter: null },
-      exec
-    )
-    const diffCall = exec.mock.calls.find((c) => c[1][0] === 'diff')
-    expect(diffCall?.[1]).toEqual(['diff', '--unified=20', 'origin/main...abc1234', '--', 'a.ts'])
+    const scope = scopeOf('lines', { path: 'a.ts', startLine: 1, endLine: 2, side: 'RIGHT' })
+    const { diffArgs, diffText } = await diffFor(scope, TWO_HUNK_DIFF)
+    expect(diffArgs).toEqual(['diff', '--unified=20', 'origin/main...abc1234', '--', 'a.ts'])
     expect(diffText).toContain('new1')
     expect(diffText).not.toContain('new50')
   })
 
   it('caps the diff at 200KB and reports truncation', async () => {
-    const big = 'x'.repeat(250 * 1024)
-    const exec = vi.fn(async () => ({ stdout: big }))
-    const { diffText, truncated } = await buildDiffText(
-      '/wt',
-      'main',
-      'abc1234',
-      { kind: 'pr', path: null, startLine: null, endLine: null, side: null, chapter: null },
-      exec
-    )
+    const { diffText, truncated } = await diffFor(scopeOf('pr'), 'x'.repeat(250 * 1024))
     expect(truncated).toBe(true)
     expect(Buffer.byteLength(diffText, 'utf8')).toBeLessThanOrEqual(200 * 1024)
   })
 })
 
-function makeFakeProcess(): SpawnedProcess & {
+type FakeProcess = SpawnedProcess & {
   emitExit: (code: number) => void
   emitError: (e: Error) => void
   writtenStdin: string
-} {
+  stdoutEmitter: EventEmitter
+  stderrEmitter: EventEmitter
+  kill: ReturnType<typeof vi.fn>
+}
+
+function makeFakeProcess(): FakeProcess {
   const stdoutEmitter = new EventEmitter()
   const stderrEmitter = new EventEmitter()
   const procEmitter = new EventEmitter()
   let writtenStdin = ''
-  const fake: any = {
+  return {
     stdin: {
       write: (d: string) => {
         writtenStdin += d
@@ -208,56 +224,64 @@ function makeFakeProcess(): SpawnedProcess & {
     },
     stdout: { on: (ev: string, cb: (d: Buffer | string) => void) => stdoutEmitter.on(ev, cb) },
     stderr: { on: (ev: string, cb: (d: Buffer | string) => void) => stderrEmitter.on(ev, cb) },
-    on: (ev: string, cb: (...args: any[]) => void) => procEmitter.on(ev, cb),
+    on: (ev: string, cb: Listener) => procEmitter.on(ev, cb),
     kill: vi.fn(),
-    _stdoutEmitter: stdoutEmitter,
     emitExit: (code: number) => procEmitter.emit('exit', code),
     emitError: (e: Error) => procEmitter.emit('error', e),
     get writtenStdin() {
       return writtenStdin
     },
-  }
-  fake.stdoutEmitter = stdoutEmitter
-  return fake
+    stdoutEmitter,
+    stderrEmitter,
+  } as FakeProcess
 }
 
-describe('runAgentReview', () => {
-  const resolveClaude = async () => '/Users/me/.local/bin/claude'
-  const baseInput = {
-    repoRoot: '/repo',
-    worktreePath: '/wt',
-    prNumber: 42,
-    headSHA: 'abc1234',
-    baseRefName: 'main',
-    title: 'Add review agent',
-    body: 'body',
-    scope: {
-      kind: 'file',
-      path: 'a.ts',
-      startLine: null,
-      endLine: null,
-      side: null,
-      chapter: null,
-    } as const,
-    request: 'review' as const,
-    sessionId: 'sess-1',
-    model: 'opus',
-  }
+const resolveClaude = async () => '/Users/me/.local/bin/claude'
 
+const baseInput: RunAgentReviewInput = {
+  repoRoot: '/repo',
+  worktreePath: '/wt',
+  prNumber: 42,
+  headSHA: 'abc1234',
+  baseRefName: 'main',
+  title: 'Add review agent',
+  body: 'body',
+  scope: scopeOf('file', { path: 'a.ts' }),
+  request: 'review',
+  sessionId: 'sess-1',
+  model: 'opus',
+}
+
+/** Starts a run against a fake claude process and waits for the diff and prompt to settle. */
+async function startFakeRun(input: RunAgentReviewInput = baseInput) {
+  const exec = vi.fn(async () => ({ stdout: 'diff' }))
+  const fake = makeFakeProcess()
+  const spawn = vi.fn((..._args: Parameters<SpawnFn>) => fake)
+  const { done, cancel } = runAgentReview(input, { exec, spawn, resolveClaude })
+  // let the diff/prompt build settle before the process "runs"
+  await new Promise((r) => setTimeout(r, 10))
+  return { fake, spawn, done, cancel }
+}
+
+/** Has the fake claude print `output` as its JSON result and exit 0. */
+function printAndExit(fake: FakeProcess, output: unknown) {
+  fake.stdoutEmitter.emit('data', JSON.stringify(output))
+  fake.emitExit(0)
+}
+
+const NIT_WITHOUT_SIDE = {
+  severity: 'nit',
+  path: 'a.ts',
+  startLine: 1,
+  endLine: 1,
+  title: 't',
+  body: 'b',
+}
+
+describe('runAgentReview — a run that completes', () => {
   it('spawns claude with read-only tools only, on the worktree cwd, and parses structured_output', async () => {
-    const exec = vi.fn(async () => ({ stdout: 'diff' }))
-    const fake = makeFakeProcess()
-    const spawn = vi.fn(() => fake)
-
-    const { done } = runAgentReview(baseInput, { exec, spawn, resolveClaude })
-
-    // let the diff/prompt build settle before the process "runs"
-    await new Promise((r) => setTimeout(r, 10))
-    fake.stdoutEmitter.emit(
-      'data',
-      JSON.stringify({ structured_output: { summary: 'looks fine', findings: [] } })
-    )
-    fake.emitExit(0)
+    const { fake, spawn, done } = await startFakeRun()
+    printAndExit(fake, { structured_output: { summary: 'looks fine', findings: [] } })
 
     const run = await done
     expect(run.status).toBe('done')
@@ -273,24 +297,8 @@ describe('runAgentReview', () => {
   })
 
   it('assigns an id to each finding and defaults side to RIGHT', async () => {
-    const exec = vi.fn(async () => ({ stdout: 'diff' }))
-    const fake = makeFakeProcess()
-    const spawn = vi.fn(() => fake)
-
-    const { done } = runAgentReview(baseInput, { exec, spawn, resolveClaude })
-    await new Promise((r) => setTimeout(r, 10))
-    fake.stdoutEmitter.emit(
-      'data',
-      JSON.stringify({
-        structured_output: {
-          summary: 's',
-          findings: [
-            { severity: 'nit', path: 'a.ts', startLine: 1, endLine: 1, title: 't', body: 'b' },
-          ],
-        },
-      })
-    )
-    fake.emitExit(0)
+    const { fake, done } = await startFakeRun()
+    printAndExit(fake, { structured_output: { summary: 's', findings: [NIT_WITHOUT_SIDE] } })
 
     const run = await done
     expect(run.findings).toHaveLength(1)
@@ -298,75 +306,90 @@ describe('runAgentReview', () => {
     expect(run.findings[0].id.length).toBeGreaterThan(0)
     expect(run.findings[0].side).toBe('RIGHT')
   })
+})
 
+describe('runAgentReview — reading the result', () => {
   it('falls back to parsing .result as JSON when structured_output is absent', async () => {
-    const exec = vi.fn(async () => ({ stdout: 'diff' }))
-    const fake = makeFakeProcess()
-    const spawn = vi.fn(() => fake)
-
-    const { done } = runAgentReview(baseInput, { exec, spawn, resolveClaude })
-    await new Promise((r) => setTimeout(r, 10))
-    fake.stdoutEmitter.emit(
-      'data',
-      JSON.stringify({ result: JSON.stringify({ summary: 'via result', findings: [] }) })
-    )
-    fake.emitExit(0)
+    const { fake, done } = await startFakeRun()
+    printAndExit(fake, { result: JSON.stringify({ summary: 'via result', findings: [] }) })
 
     const run = await done
     expect(run.status).toBe('done')
     expect(run.summary).toBe('via result')
   })
 
-  it('fails with a readable error and no partial findings when output does not validate', async () => {
-    const exec = vi.fn(async () => ({ stdout: 'diff' }))
-    const fake = makeFakeProcess()
-    const spawn = vi.fn(() => fake)
+  it('takes .result as it is when it is already an object', async () => {
+    const { fake, done } = await startFakeRun()
+    printAndExit(fake, { result: { summary: 'object result', findings: [] } })
 
-    const { done } = runAgentReview(baseInput, { exec, spawn, resolveClaude })
-    await new Promise((r) => setTimeout(r, 10))
-    fake.stdoutEmitter.emit('data', JSON.stringify({ structured_output: { summary: 'x' } }))
-    fake.emitExit(0)
+    const run = await done
+    expect(run.status).toBe('done')
+    expect(run.summary).toBe('object result')
+  })
+
+  it('fails with a readable error and no partial findings when output does not validate', async () => {
+    const { fake, done } = await startFakeRun()
+    printAndExit(fake, { structured_output: { summary: 'x' } })
 
     const run = await done
     expect(run.status).toBe('failed')
     expect(run.findings).toEqual([])
     expect(run.error).toBeTruthy()
   })
+})
 
+describe('runAgentReview — a run that fails', () => {
   it('fails on non-zero exit', async () => {
-    const exec = vi.fn(async () => ({ stdout: 'diff' }))
-    const fake = makeFakeProcess()
-    const spawn = vi.fn(() => fake)
-
-    const { done } = runAgentReview(baseInput, { exec, spawn, resolveClaude })
-    await new Promise((r) => setTimeout(r, 10))
-    fake.stderr.on
-    ;(fake as any)._stdoutEmitter // no-op reference
-    ;(fake as any).emitExit(1)
+    const { fake, done } = await startFakeRun()
+    fake.emitExit(1)
 
     const run = await done
     expect(run.status).toBe('failed')
   })
 
-  it('times out after the given timeoutMs and kills the process', async () => {
-    const exec = vi.fn(async () => ({ stdout: 'diff' }))
-    const fake = makeFakeProcess()
-    const spawn = vi.fn(() => fake)
+  it("reports claude's stderr as the error when it exits non-zero", async () => {
+    const { fake, done } = await startFakeRun()
+    fake.stderrEmitter.emit('data', '  model not available\n')
+    fake.emitExit(2)
 
-    const { done } = runAgentReview({ ...baseInput, timeoutMs: 5 }, { exec, spawn, resolveClaude })
+    expect((await done).error).toBe('model not available')
+  })
+})
+
+describe('runAgentReview — a run that never gets an answer', () => {
+  it('fails when claude cannot start', async () => {
+    const { fake, done } = await startFakeRun()
+    fake.emitError(new Error('ENOENT'))
+
+    const run = await done
+    expect(run.status).toBe('failed')
+    expect(run.error).toBe('Failed to start claude: Error: ENOENT')
+  })
+
+  it('fails without spawning when the diff cannot be computed', async () => {
+    const spawn = vi.fn()
+    const exec = vi.fn(async (_cmd: 'git', args: string[]) => {
+      if (args[0] === 'diff') throw new Error('bad revision')
+      return { stdout: '' }
+    })
+    const run = await runAgentReview(baseInput, { exec, spawn, resolveClaude }).done
+    expect(run.status).toBe('failed')
+    expect(run.error).toBe('Could not compute diff: Error: bad revision')
+    expect(spawn).not.toHaveBeenCalled()
+  })
+
+  it('times out after the given timeoutMs and kills the process', async () => {
+    const { fake, done } = await startFakeRun({ ...baseInput, timeoutMs: 5 })
     const run = await done
     expect(run.status).toBe('failed')
     expect(run.error).toMatch(/Timed out/)
     expect(fake.kill).toHaveBeenCalled()
   })
+})
 
+describe('runAgentReview — cancelling', () => {
   it('cancel() marks the run cancelled and kills the process', async () => {
-    const exec = vi.fn(async () => ({ stdout: 'diff' }))
-    const fake = makeFakeProcess()
-    const spawn = vi.fn(() => fake)
-
-    const { done, cancel } = runAgentReview(baseInput, { exec, spawn, resolveClaude })
-    await new Promise((r) => setTimeout(r, 10))
+    const { fake, done, cancel } = await startFakeRun()
     cancel()
     fake.emitExit(137)
 
@@ -375,34 +398,52 @@ describe('runAgentReview', () => {
     expect(fake.kill).toHaveBeenCalled()
   })
 
-  it('scrubs CLAUDE_CODE_* and CLAUDECODE from the child env', async () => {
-    const exec = vi.fn(async () => ({ stdout: 'diff' }))
-    const fake = makeFakeProcess()
-    const spawn = vi.fn(() => fake)
-    const prevBridge = process.env.CLAUDE_CODE_BRIDGE_SESSION_ID
-    const prevCode = process.env.CLAUDECODE
-    process.env.CLAUDE_CODE_BRIDGE_SESSION_ID = 'parent-session'
-    process.env.CLAUDECODE = '1'
+  it('never spawns when cancelled while the diff is computed', async () => {
+    let diffPrinted: (out: { stdout: string }) => void = () => {}
+    const exec = vi.fn((_cmd: 'git', args: string[]) =>
+      args[0] === 'diff'
+        ? new Promise<{ stdout: string }>((r) => (diffPrinted = r))
+        : Promise.resolve({ stdout: '' })
+    )
+    const spawn = vi.fn()
+    const { done, cancel } = runAgentReview(baseInput, { exec, spawn, resolveClaude })
+    await new Promise((r) => setTimeout(r, 0))
+    cancel()
+    diffPrinted({ stdout: 'diff' })
 
-    try {
-      const { done } = runAgentReview(baseInput, { exec, spawn, resolveClaude })
-      await new Promise((r) => setTimeout(r, 10))
-      fake.stdoutEmitter.emit(
-        'data',
-        JSON.stringify({ structured_output: { summary: 's', findings: [] } })
-      )
-      fake.emitExit(0)
-      await done
+    expect((await done).status).toBe('cancelled')
+    expect(spawn).not.toHaveBeenCalled()
+  })
+})
 
-      const [, , opts] = spawn.mock.calls[0]
-      expect(opts.env.CLAUDE_CODE_BRIDGE_SESSION_ID).toBeUndefined()
-      expect(opts.env.CLAUDECODE).toBeUndefined()
-    } finally {
-      if (prevBridge === undefined) delete process.env.CLAUDE_CODE_BRIDGE_SESSION_ID
-      else process.env.CLAUDE_CODE_BRIDGE_SESSION_ID = prevBridge
-      if (prevCode === undefined) delete process.env.CLAUDECODE
-      else process.env.CLAUDECODE = prevCode
+/** Sets environment variables for one callback, restoring the previous values after. */
+async function withEnv(vars: Record<string, string>, body: () => Promise<void>) {
+  const previous = Object.fromEntries(Object.keys(vars).map((k) => [k, process.env[k]]))
+  Object.assign(process.env, vars)
+  try {
+    await body()
+  } finally {
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) delete process.env[key]
+      else process.env[key] = value
     }
+  }
+}
+
+describe('runAgentReview — child environment', () => {
+  it('scrubs CLAUDE_CODE_* and CLAUDECODE from the child env', async () => {
+    await withEnv(
+      { CLAUDE_CODE_BRIDGE_SESSION_ID: 'parent-session', CLAUDECODE: '1' },
+      async () => {
+        const { fake, spawn, done } = await startFakeRun()
+        printAndExit(fake, { structured_output: { summary: 's', findings: [] } })
+        await done
+
+        const [, , opts] = spawn.mock.calls[0]
+        expect(opts.env.CLAUDE_CODE_BRIDGE_SESSION_ID).toBeUndefined()
+        expect(opts.env.CLAUDECODE).toBeUndefined()
+      }
+    )
   })
 })
 

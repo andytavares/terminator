@@ -1,5 +1,7 @@
-import type { ExtensionAPI, Disposable } from '../../../src/main/extensions/api'
-import { applyNotepadSchema, applyNotepadMigrations } from './db/db'
+import { z } from 'zod'
+import { defineChannel, noPayload } from '@terminator/extension-sdk'
+import type { ExtensionAPI, Disposable, SettingDefinition } from '@terminator/extension-sdk'
+import { applyNotepadSchema } from './db/db'
 import { registerNotesIpcHandlers, registerTagsIpcHandlers } from './ipc/notes.ipc'
 import { registerCommentsIpcHandlers } from './ipc/comments.ipc'
 import { registerSearchIpcHandlers } from './ipc/search.ipc'
@@ -7,7 +9,11 @@ import { registerExportIpcHandlers } from './ipc/export.ipc'
 import { registerDiagramsIpcHandlers } from './ipc/diagrams.ipc'
 import { registerDiagramCommentsIpcHandlers } from './ipc/diagram-comments.ipc'
 import { registerFoldersIpcHandlers } from './ipc/folders.ipc'
-import type { SettingDefinition } from '../../../src/main/extensions/api'
+import { VALIDATION_ERROR } from './ipc/register'
+import { NOTEPAD_SETTING_BOUNDS } from './notepad-settings'
+
+/** The note or diagram a dedicated window opens on. */
+const WindowTarget = z.object({ id: z.string().min(1) })
 
 // Every notification kind this extension ever raises, so the user can
 // independently choose its delivery target(s) (system/in-app/toast) in this
@@ -42,10 +48,81 @@ const disposables: Disposable[] = []
 let _pendingQuickCreate = false
 let _pendingQuickCreateTimer: ReturnType<typeof setTimeout> | null = null
 
+// Each registers one group of IPC handlers and returns its cleanup.
+const IPC_GROUPS = [
+  registerNotesIpcHandlers,
+  registerCommentsIpcHandlers,
+  registerTagsIpcHandlers,
+  registerSearchIpcHandlers,
+  registerExportIpcHandlers,
+  registerDiagramsIpcHandlers,
+  registerDiagramCommentsIpcHandlers,
+  registerFoldersIpcHandlers,
+]
+
+const NOTEPAD_SETTINGS: Record<string, SettingDefinition> = {
+  'terminator.notepad.exportPath': {
+    type: 'folder',
+    label: 'Export folder',
+    description: 'Where "Export" writes .md files',
+    default: '~/Documents/Terminator Notes',
+  },
+  'terminator.notepad.commentExportFormat': {
+    type: 'enum',
+    label: 'Export comments as',
+    description: 'Format for comment export',
+    default: 'sidecar',
+    options: ['sidecar', 'inline', 'both'],
+  },
+  'terminator.notepad.autosaveMs': {
+    type: 'number',
+    label: 'Autosave debounce',
+    description: 'How long typing must pause before a note is saved (ms)',
+    default: NOTEPAD_SETTING_BOUNDS.autosaveMs.default,
+    min: NOTEPAD_SETTING_BOUNDS.autosaveMs.min,
+    max: NOTEPAD_SETTING_BOUNDS.autosaveMs.max,
+  },
+  'terminator.notepad.defaultTags': {
+    type: 'string',
+    label: 'Default tags for new notes',
+    description: 'Applied on quick-create',
+    default: '',
+  },
+  'terminator.notepad.editorFontSize': {
+    type: 'number',
+    label: 'Editor font size',
+    description: 'Font size in pixels',
+    default: NOTEPAD_SETTING_BOUNDS.editorFontSize.default,
+    min: NOTEPAD_SETTING_BOUNDS.editorFontSize.min,
+    max: NOTEPAD_SETTING_BOUNDS.editorFontSize.max,
+  },
+  'terminator.notepad.db.reinit': {
+    type: 'action',
+    label: 'Re-initialise database',
+    description: 'Re-apply schema and migrations without deleting data',
+    channel: 'terminator.notepad:db.reinit',
+    default: null,
+  },
+}
+
 export async function activate(api: ExtensionAPI): Promise<void> {
+  await applySchemaOrWarn(api)
+  for (const register of IPC_GROUPS) disposables.push({ dispose: register(api, api.db) })
+  disposables.push(...windowChannels(api), dbReinitChannel(api))
+  disposables.push(
+    api.settings.register({
+      label: 'Notepad',
+      description: 'Markdown notes with live preview, comments, and export.',
+      properties: { ...NOTEPAD_SETTINGS, ...buildNotificationSettingProperties() },
+    })
+  )
+  disposables.push(api.ipc.registerHandler(pendingQuickCreateChannel()))
+  disposables.push(...quickCreateEntryPoints(api))
+}
+
+async function applySchemaOrWarn(api: ExtensionAPI): Promise<void> {
   try {
     await applyNotepadSchema(api.db)
-    await applyNotepadMigrations(api.db)
   } catch (err) {
     console.error('[notepad] Failed to initialize schema:', err)
     api.notifications.showToast(
@@ -54,158 +131,93 @@ export async function activate(api: ExtensionAPI): Promise<void> {
       'schemaInitFailed'
     )
   }
+}
 
-  const disposeNotes = registerNotesIpcHandlers(api, api.db)
-  disposables.push({ dispose: disposeNotes })
-
-  const disposeComments = registerCommentsIpcHandlers(api, api.db)
-  disposables.push({ dispose: disposeComments })
-
-  const disposeTags = registerTagsIpcHandlers(api, api.db)
-  disposables.push({ dispose: disposeTags })
-
-  const disposeSearch = registerSearchIpcHandlers(api, api.db)
-  disposables.push({ dispose: disposeSearch })
-
-  const disposeExport = registerExportIpcHandlers(api, api.db)
-  disposables.push({ dispose: disposeExport })
-
-  const disposeDiagrams = registerDiagramsIpcHandlers(api, api.db)
-  disposables.push({ dispose: disposeDiagrams })
-
-  // Open note/diagram in a dedicated auxiliary window using the extension's own renderer.
-  // Using api.window.openAuxiliary ensures the extension renderer URL (ext://terminator.notepad/…)
-  // is loaded rather than the main app URL — which would trigger ExtensionPanelPortal and
-  // wrongly attach the WebContentsView to the main window.
-  disposables.push(
-    api.ipc.registerHandler('terminator.notepad:notes.openWindow', (payload) => {
-      const { id } = (payload ?? {}) as { id?: string }
-      if (!id) return { error: 'VALIDATION_ERROR' }
+// Open note/diagram in a dedicated auxiliary window using the extension's own renderer.
+// api.window.openAuxiliary loads ext://terminator.notepad/…, not the main app URL, which
+// would trigger ExtensionPanelPortal and attach the WebContentsView to the main window.
+function windowChannels(api: ExtensionAPI): Disposable[] {
+  const openNote = defineChannel({
+    channel: 'terminator.notepad:notes.openWindow',
+    schema: WindowTarget,
+    invalid: VALIDATION_ERROR,
+    run: ({ id }) => {
       // Unique key per note so each note gets its own window; passing view:'note' in params
       // overrides the view key that openAuxiliary would derive from the first argument.
       api.window.openAuxiliary(`notepad-note-${id}`, { view: 'note', noteId: id })
       return { data: { ok: true } }
-    })
-  )
-
-  disposables.push(
-    api.ipc.registerHandler('terminator.notepad:diagrams.openWindow', (payload) => {
-      const { id } = (payload ?? {}) as { id?: string }
-      if (!id) return { error: 'VALIDATION_ERROR' }
+    },
+  })
+  const openDiagram = defineChannel({
+    channel: 'terminator.notepad:diagrams.openWindow',
+    schema: WindowTarget,
+    invalid: VALIDATION_ERROR,
+    run: ({ id }) => {
       api.window.openAuxiliary(`notepad-diagram-${id}`, { view: 'diagram', diagramId: id })
       return { data: { ok: true } }
-    })
-  )
-
-  const disposeDiagramComments = registerDiagramCommentsIpcHandlers(api, api.db)
-  disposables.push({ dispose: disposeDiagramComments })
-
-  const disposeFolders = registerFoldersIpcHandlers(api, api.db)
-  disposables.push({ dispose: disposeFolders })
-
-  const disposeDbReinit = api.ipc.registerHandler('terminator.notepad:db.reinit', async () => {
-    try {
-      await applyNotepadSchema(api.db)
-      await applyNotepadMigrations(api.db)
-      return { data: { ok: true } }
-    } catch (err) {
-      return { error: err instanceof Error ? err.message : String(err) }
-    }
+    },
   })
-  disposables.push(disposeDbReinit)
+  return [api.ipc.registerHandler(openNote), api.ipc.registerHandler(openDiagram)]
+}
 
-  disposables.push(
-    api.settings.register({
-      label: 'Notepad',
-      description: 'Markdown notes with live preview, comments, and export.',
-      properties: {
-        'terminator.notepad.exportPath': {
-          type: 'folder',
-          label: 'Export folder',
-          description: 'Where "Export" writes .md files',
-          default: '~/Documents/Terminator Notes',
-        },
-        'terminator.notepad.commentExportFormat': {
-          type: 'enum',
-          label: 'Export comments as',
-          description: 'Format for comment export',
-          default: 'sidecar',
-          options: ['sidecar', 'inline', 'both'],
-        },
-        'terminator.notepad.autosaveMs': {
-          type: 'number',
-          label: 'Autosave debounce',
-          description: 'Idle delay before write (ms)',
-          default: 800,
-        },
-        'terminator.notepad.defaultTags': {
-          type: 'string',
-          label: 'Default tags for new notes',
-          description: 'Applied on quick-create',
-          default: '',
-        },
-        'terminator.notepad.editorFontSize': {
-          type: 'number',
-          label: 'Editor font size',
-          description: 'Font size in pixels',
-          default: 14,
-        },
-        'terminator.notepad.db.reinit': {
-          type: 'action',
-          label: 'Re-initialise database',
-          description: 'Re-apply schema and migrations without deleting data',
-          channel: 'terminator.notepad:db.reinit',
-        },
-        'terminator.notepad.mcpSidecar': {
-          type: 'boolean',
-          label: 'Enable MCP sidecar',
-          description: 'Let agents read/search notes',
-          default: false,
-        },
-        ...buildNotificationSettingProperties(),
+function dbReinitChannel(api: ExtensionAPI): Disposable {
+  return api.ipc.registerHandler(
+    defineChannel({
+      channel: 'terminator.notepad:db.reinit',
+      schema: noPayload,
+      invalid: VALIDATION_ERROR,
+      run: async () => {
+        await applyNotepadSchema(api.db)
+        return { data: { ok: true } }
       },
+      onError: (err) => ({ error: err instanceof Error ? err.message : String(err) }),
     })
   )
+}
 
-  // Renderer calls this on mount to pick up a quick-create triggered before the view existed.
-  disposables.push(
-    api.ipc.registerHandler('terminator.notepad:ui.consumePendingQuickCreate', () => {
+// Renderer calls this on mount to pick up a quick-create triggered before the view existed.
+function pendingQuickCreateChannel() {
+  return defineChannel({
+    channel: 'terminator.notepad:ui.consumePendingQuickCreate',
+    schema: noPayload,
+    invalid: VALIDATION_ERROR,
+    run: () => {
       const pending = _pendingQuickCreate
       _pendingQuickCreate = false
-      if (_pendingQuickCreateTimer !== null) {
-        clearTimeout(_pendingQuickCreateTimer)
-        _pendingQuickCreateTimer = null
-      }
+      clearPendingQuickCreateTimer()
       return { data: { pending } }
-    })
-  )
+    },
+  })
+}
 
-  // Cmd+Shift+N lives on the View menu, not globalShortcut: menu accelerators fire only
-  // while Terminator is focused, whereas a global registration would take the combo away
-  // from every other app on the system (it collides with New Incognito Window / New Folder).
-  disposables.push(
-    api.nativeMenu.addViewMenuItem({
-      id: 'notepad-new-note',
-      label: 'New Note',
-      accelerator: 'CmdOrCtrl+Shift+N',
-      onClick: () => newNote(api),
-    })
+// On the View menu, not globalShortcut: a menu accelerator fires only while Terminator is
+// focused, and a global one would take Cmd+Shift+N (New Incognito Window, New Folder) from every
+// other app. The quick-actions panel (⌘P) reaches the same path.
+function quickCreateEntryPoints(api: ExtensionAPI): Disposable[] {
+  const menuItem = api.nativeMenu.addViewMenuItem({
+    id: 'notepad-new-note',
+    label: 'New Note',
+    accelerator: 'CmdOrCtrl+Shift+N',
+    onClick: () => newNote(api),
+  })
+  const command = api.commands.register(
+    {
+      id: 'notepad:quick-create',
+      label: 'New note',
+      mnemonic: 'n',
+      shortcut: '⌘⇧N',
+      category: 'Notes',
+      description: 'Open quick-create overlay',
+    },
+    () => newNote(api)
   )
+  return [menuItem, command]
+}
 
-  // Same path as the View-menu item, reachable from the quick-actions panel (⌘P).
-  disposables.push(
-    api.commands.register(
-      {
-        id: 'notepad:quick-create',
-        label: 'New note',
-        mnemonic: 'n',
-        shortcut: '⌘⇧N',
-        category: 'Notes',
-        description: 'Open quick-create overlay',
-      },
-      () => newNote(api)
-    )
-  )
+function clearPendingQuickCreateTimer(): void {
+  if (_pendingQuickCreateTimer === null) return
+  clearTimeout(_pendingQuickCreateTimer)
+  _pendingQuickCreateTimer = null
 }
 
 function newNote(api: ExtensionAPI): void {
@@ -227,8 +239,5 @@ export function deactivate(): void {
   for (const d of disposables) d.dispose()
   disposables.length = 0
   _pendingQuickCreate = false
-  if (_pendingQuickCreateTimer !== null) {
-    clearTimeout(_pendingQuickCreateTimer)
-    _pendingQuickCreateTimer = null
-  }
+  clearPendingQuickCreateTimer()
 }

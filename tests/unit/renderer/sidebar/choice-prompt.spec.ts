@@ -48,7 +48,9 @@ describe('parseChoicePrompt — shapes it accepts', () => {
       'Playwright, for the checkout flow end to end, which needs a browser installed'
     )
   })
+})
 
+describe('parseChoicePrompt — shapes it accepts — strips box-drawing edges from a boxed prompt', () => {
   it('strips box-drawing edges from a boxed prompt', () => {
     expect(
       parseChoicePrompt(
@@ -93,7 +95,9 @@ describe('parseChoicePrompt — shapes it refuses', () => {
   it('needs at least two options', () => {
     expect(parseChoicePrompt(screen(' Proceed?', ' ❯ 1. Yes'))).toBeNull()
   })
+})
 
+describe('parseChoicePrompt — shapes it refuses — needs the options numbered 1 to n without gaps', () => {
   it('needs the options numbered 1 to n without gaps', () => {
     expect(
       parseChoicePrompt(screen(' Proceed?', ' ❯ 1. Yes', '   2. Maybe', '   4. No'))

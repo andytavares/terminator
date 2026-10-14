@@ -11,9 +11,9 @@ class names, database columns and type names are **not** in scope — they keep
 whatever name they have.
 
 Enforcement: the three vocabulary rules below are `no-restricted-syntax`
-selectors in `.eslintrc.json`, scoped to `extensions/*/src/**/*.tsx` and
+selectors in `eslint.config.mjs`, scoped to `extensions/*/src/**/*.tsx` and
 `packages/extension-ui/src/**/*.tsx`. Their fixture spec is
-`tests/unit/lint/extension-vocabulary.spec.ts`. Everything else here is a
+`tests/unit/lint/extension-rules.spec.ts`. Everything else here is a
 convention a reviewer applies.
 
 ---
@@ -155,8 +155,10 @@ sits **between two named things in a sentence** (typography).
 
 ## 8. Colour
 
-Every colour comes from the published `--tm-*` tokens. An extension view does
-not load the core stylesheet, so a raw hex is a value that cannot follow the
+Every colour comes from the published `--tm-*` tokens, and
+`packages/extension-ui/src/tokens.css` is the only place one is defined — for
+the core, for every extension view and for the remote client. An extension view
+does not load the core stylesheet, so a raw hex is a value that cannot follow the
 theme, and `rgba(255,255,255,0.08)` is a light-theme bug waiting for someone to
 switch themes. State is never carried by hue alone — pair it with a word, a
 shape or a position.
@@ -164,7 +166,7 @@ shape or a position.
 ## 9. Layering
 
 Stacking comes from the published scale in `@terminator/extension-ui`:
-`layerValue()` / `nestedLayerValue()` in TypeScript, `var(--tm-layer-*)` in CSS.
+`layerValue()` in TypeScript, `var(--tm-layer-*)` in CSS. A modal surface is a `ModalShell`, which the browser stacks itself (ADR 110).
 A raw `z-index` number is how 38 unmanaged values ended up deciding order by
 whoever picked the biggest.
 
@@ -177,3 +179,38 @@ whatever padding or font size each class picks. Do not size a control with
 padding. A field drawn borderless inside a container that is the visible box (the
 sidebar search, the Quick Actions search), or an inline rename in a dense row (a
 tab, a branch row), opts out with `height: auto` on its own selector.
+
+## 11. Use the components
+
+If `@terminator/extension-ui` has the control, use it; do not write another. A
+missing one is added there first (ADR 098). Storybook shows each in both themes:
+`npm run storybook`.
+
+| Need                           | Use                                                                                                 |
+| ------------------------------ | --------------------------------------------------------------------------------------------------- |
+| A button                       | `Button` (primary, secondary, ghost, danger; sm, md)                                                |
+| An icon-only button            | `IconButton`, which requires its accessible name; `size="sm"` in a dense row                        |
+| Switching between views        | `Tabs`, the WAI-ARIA tabs pattern; its parts when the list shares a row or the panel sits elsewhere |
+| One short choice out of a few  | `SegmentedControl`, the WAI-ARIA radio group: a time window, what kind of thing to create           |
+| Markdown from a person/agent   | `Markdown`, never `dangerouslySetInnerHTML`; `inline` in a label, `fetchesNothing` for tracker text |
+| "5 minutes ago"                | `RelativeTime` / `formatRelativeTime`, never hand-made                                              |
+| Re-reading something on a tick | `usePolling`                                                                                        |
+| A dropdown or menu that closes | `useDismissible` (Escape, a click outside, the open-surface count), never a document listener       |
+
+A button's icon is the `icon` prop, sized by the stylesheet, not by `size`.
+
+Fonts ship with the app. Each view's entry imports `@terminator/extension-ui/fonts`
+once (the core renderer does the same); do not add a `<link>` to a font service or
+an `@import url(https://…)`; the UI must draw offline.
+
+A form in a dialog is a `Dialog` whose primary action has `submit: true`, so Enter
+submits; do not draw your own overlay, title or action row.
+
+Every story is screenshot by `npm run test:visual` (Playwright, over the built
+Storybook, both themes). A change that moves a component's pixels updates its
+baseline in the same commit, generated on Linux with the Playwright version the
+repository pins. Baselines live under `__screenshots__/linux/` in
+`packages/extension-ui/visual/` (the `snapshotPathTemplate` in
+`packages/extension-ui/playwright.visual.config.ts`). A story without one gets it
+from the Story baselines workflow (`update-story-baselines` label, see
+`packages/extension-ui/README.md`).

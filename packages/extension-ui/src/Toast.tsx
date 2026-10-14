@@ -1,6 +1,8 @@
 import React, { useEffect, useRef } from 'react'
 import { X } from 'lucide-react'
+import { createPortal } from 'react-dom'
 import { layerValue } from './layers'
+import { useTopModal } from './modal-stack'
 import './extension-ui.css'
 
 /** Matches the core's existing ToastType, so migrating its store is not an API change. */
@@ -42,16 +44,7 @@ export function Toast({
   action,
   onDismiss,
 }: ToastProps): JSX.Element {
-  const dismissRef = useRef(onDismiss)
-  dismissRef.current = onDismiss
-
-  useEffect(() => {
-    const ms = duration ?? (tone === 'error' ? 0 : DEFAULT_DURATION_MS)
-    if (ms <= 0) return
-    const timer = setTimeout(() => dismissRef.current(), ms)
-    return () => clearTimeout(timer)
-  }, [duration, tone])
-
+  useAutoDismiss(onDismiss, duration, tone)
   return (
     <div className="tmui-toast" data-tone={tone} role="status">
       <span className="tmui-toast__message">{message}</span>
@@ -73,14 +66,41 @@ export function Toast({
   )
 }
 
+/** Dismisses after the toast's duration; zero leaves it to the reader. */
+function useAutoDismiss(
+  onDismiss: () => void,
+  duration: number | undefined,
+  tone: ToastTone
+): void {
+  const dismissRef = useRef(onDismiss)
+  useEffect(() => {
+    dismissRef.current = onDismiss
+  })
+
+  useEffect(() => {
+    const ms = duration ?? (tone === 'error' ? 0 : DEFAULT_DURATION_MS)
+    if (ms <= 0) return
+    const timer = setTimeout(() => dismissRef.current(), ms)
+    return () => clearTimeout(timer)
+  }, [duration, tone])
+}
+
 export interface ToastRegionProps {
   toasts: readonly ToastItem[]
   onDismiss: (id: string) => void
 }
 
-/** Mount once per view. Sits above every other layer, including modals. */
+/** Mount once per view. Sits above every other layer. While a modal shell is open the region
+ * renders inside the one on top: outside it, a toast would be inert and painted over. Its toasts
+ * mount afresh on that move, so each one's time on screen starts again. */
 export function ToastRegion({ toasts, onDismiss }: ToastRegionProps): JSX.Element | null {
+  const modal = useTopModal()
   if (toasts.length === 0) return null
+  const region = <ToastList toasts={toasts} onDismiss={onDismiss} />
+  return modal ? createPortal(region, modal) : region
+}
+
+function ToastList({ toasts, onDismiss }: ToastRegionProps): JSX.Element {
   return (
     <div className="tmui-toast-region" style={{ zIndex: layerValue('toast') }}>
       {toasts.map((toast) => (

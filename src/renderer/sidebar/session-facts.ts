@@ -49,6 +49,16 @@ export interface SessionFacts {
   snapshot: SessionSnapshot
 }
 
+/** What a Home row or a wall tile can do to the session it shows. */
+export interface SessionActions {
+  onOpen: (sessionId: string) => void
+  onSaveDescription: (facts: SessionFacts, description: string | null) => void
+  onLink?: (facts: SessionFacts) => void
+  onResume?: (facts: SessionFacts) => void
+  onCloseSession?: (facts: SessionFacts) => void
+  onForgetSession?: (facts: SessionFacts) => void
+}
+
 export interface SessionFactsInput {
   sessions: readonly TerminalSession[]
   records: readonly SessionRecordListing[]
@@ -62,6 +72,60 @@ const AGENT_TAG = 'agent'
 /** agentState is never stored; every surface derives it from the same signals. */
 const stateSource = new BellAndBusySource()
 
+/** What an open session's record adds: its description and the agent that ran in it. */
+function recordFacts(record: SessionRecordListing | undefined) {
+  return {
+    description: record?.description ?? null,
+    agent: record?.agent ?? null,
+    resumable: record?.resumable === true,
+  }
+}
+
+/** Where the session runs, as its record keeps it. */
+function openSnapshot(
+  session: TerminalSession,
+  project: Project | undefined,
+  workspace: Workspace | undefined
+): SessionSnapshot {
+  return {
+    sessionId: session.id,
+    projectId: session.projectId,
+    workspaceName: workspace?.name ?? null,
+    projectName: project?.name ?? null,
+    // A project with no git branch has no branch to show; its name is already the project's.
+    branch: project?.gitBranch ?? null,
+    tabTitle: session.tabTitle,
+    shell: session.shell ?? null,
+    startedAt: session.createdAt,
+  }
+}
+
+/** What the running terminal itself says: when it was last used and what it last printed. */
+function liveFacts(session: TerminalSession) {
+  return {
+    state: stateSource.derive(session),
+    lastActivityAt: session.lastActivityAt,
+    lastAttendedAt: session.lastAttendedAt ?? null,
+    latestLine: session.latestLine ?? '',
+    choicePrompt: session.choicePrompt ?? null,
+  }
+}
+
+/** The repo's tags, and "agent" for a terminal an agent runs in. */
+function tagsOf(session: TerminalSession, workspace: Workspace | undefined): string[] {
+  return [...(workspace?.tags ?? []), ...(session.type === 'agent' ? [AGENT_TAG] : [])]
+}
+
+/** The session's own link, or else its project's. */
+function workItemOf(
+  record: SessionRecordListing | undefined,
+  project: Project | undefined,
+  projectLinks: SessionFactsInput['projectLinks']
+): WorkItem | null {
+  const projectLink = project ? (projectLinks.get(project.id) ?? null) : null
+  return resolveWorkItem(record?.link ?? null, projectLink)
+}
+
 function openFacts(
   session: TerminalSession,
   input: SessionFactsInput,
@@ -69,46 +133,37 @@ function openFacts(
 ): SessionFacts {
   const project = input.projects.find((p) => p.id === session.projectId)
   const workspace = project && input.workspaces.find((w) => w.id === project.workspaceId)
-  // A project with no git branch has no branch to show; its name is already the project's.
-  const branch = project?.gitBranch ?? null
-  const snapshot: SessionSnapshot = {
-    sessionId: session.id,
-    projectId: session.projectId,
-    workspaceName: workspace?.name ?? null,
-    projectName: project?.name ?? null,
-    branch,
-    tabTitle: session.tabTitle,
-    shell: session.shell ?? null,
-    startedAt: session.createdAt,
-  }
+  const snapshot = openSnapshot(session, project, workspace)
   return {
+    ...liveFacts(session),
+    ...recordFacts(record),
     sessionId: session.id,
     name: session.tabTitle,
-    state: stateSource.derive(session),
     isClosed: false,
     projectId: project?.id ?? null,
     workspaceName: snapshot.workspaceName,
     workspaceColor: workspace?.color ?? null,
     projectName: snapshot.projectName,
-    branch,
+    branch: snapshot.branch,
     shell: snapshot.shell,
-    tags: [...(workspace?.tags ?? []), ...(session.type === 'agent' ? [AGENT_TAG] : [])],
-    workItem: resolveWorkItem(
-      record?.link ?? null,
-      project ? (input.projectLinks.get(project.id) ?? null) : null
-    ),
-    description: record?.description ?? null,
-    lastActivityAt: session.lastActivityAt,
-    lastAttendedAt: session.lastAttendedAt ?? null,
+    tags: tagsOf(session, workspace),
+    workItem: workItemOf(record, project, input.projectLinks),
     startedAt: session.createdAt,
     closedAt: null,
-    latestLine: session.latestLine ?? '',
-    choicePrompt: session.choicePrompt ?? null,
-    agent: record?.agent ?? null,
-    resumable: record?.resumable === true,
     snapshot,
   }
 }
+
+/** What a closed session no longer has: a live state, a project, a screen. */
+const CLOSED = {
+  state: 'exited',
+  isClosed: true,
+  projectId: null,
+  workspaceColor: null,
+  lastAttendedAt: null,
+  latestLine: '',
+  choicePrompt: null,
+} as const
 
 function closedFacts(record: SessionRecordListing & { closedAt: string }): SessionFacts {
   const {
@@ -121,25 +176,19 @@ function closedFacts(record: SessionRecordListing & { closedAt: string }): Sessi
     ...snapshot
   } = record
   return {
+    ...CLOSED,
+    tags: [],
     sessionId: record.sessionId,
     name: record.tabTitle,
-    state: 'exited',
-    isClosed: true,
-    projectId: null,
     workspaceName: record.workspaceName,
-    workspaceColor: null,
     projectName: record.projectName,
     branch: record.branch,
     shell: record.shell,
-    tags: [],
     workItem: resolveWorkItem(link, null),
     description,
     lastActivityAt: Date.parse(closedAt),
-    lastAttendedAt: null,
     startedAt: record.startedAt,
     closedAt,
-    latestLine: '',
-    choicePrompt: null,
     agent,
     resumable,
     snapshot,
@@ -161,4 +210,16 @@ export function buildSessionFacts(input: SessionFactsInput): SessionFacts[] {
     .filter((r) => !openIds.has(r.sessionId))
     .map(closedFacts)
   return [...open, ...closed]
+}
+
+/** Oldest first. */
+export const byStarted = (a: SessionFacts, b: SessionFacts): number =>
+  Date.parse(a.startedAt) - Date.parse(b.startedAt)
+
+/** Most recently opened first, a session that has never been attended sorting last. */
+export const byRecentlyOpened = (a: SessionFacts, b: SessionFacts): number => {
+  if (a.lastAttendedAt === null && b.lastAttendedAt === null) return byStarted(a, b)
+  if (a.lastAttendedAt === null) return 1
+  if (b.lastAttendedAt === null) return -1
+  return b.lastAttendedAt - a.lastAttendedAt || byStarted(a, b)
 }

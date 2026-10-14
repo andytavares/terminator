@@ -1,5 +1,14 @@
 import { test, expect, Page } from '@playwright/test'
-import { AppHandle, launchApp, closeApp, createWorkspace, addAndSelectProject } from './helpers'
+import {
+  AppHandle,
+  launchApp,
+  closeApp,
+  createWorkspace,
+  addAndSelectProject,
+  readTerminalRows,
+} from './helpers'
+import { openExtensionSettings } from './extension-settings-page'
+import { expectCentredInWindow } from './modal-centre'
 
 let handle: AppHandle
 
@@ -33,6 +42,7 @@ test('US5-1: opening global settings shows configuration categories', async () =
   const { page } = handle
   await openSettings(page)
   await expect(page.locator('.settings-panel')).toBeVisible()
+  await expectCentredInWindow(page.getByRole('dialog', { name: 'Settings' }), 'Settings')
   await expect(
     page.locator('.settings-panel__nav-item').filter({ hasText: 'Appearance & Terminal' })
   ).toBeVisible()
@@ -119,4 +129,43 @@ test('settings panel closes on Escape', async () => {
   await expect(page.locator('.settings-panel')).toBeVisible()
   await page.keyboard.press('Escape')
   await expect(page.locator('.settings-panel')).toHaveCount(0)
+})
+
+test("a list setting is edited one item per line and stored as a list (Foundry's critical paths)", async () => {
+  const { page } = handle
+  const label = 'Critical paths, one glob per line'
+  const foundry = await openExtensionSettings(page, 'Foundry')
+  const box = foundry.getByRole('textbox', { name: label })
+  await expect(box).toHaveJSProperty('tagName', 'TEXTAREA')
+  await box.fill('src/auth/**\n\n  migrations/** ')
+  await closeSettings(page)
+
+  const storedGlobalSettings = () =>
+    page.evaluate(async (key) => {
+      const { values } = await window.electronAPI.extension.getSettingsValues()
+      return values[key]
+    }, 'terminator.foundry.criticalPaths')
+  await expect.poll(storedGlobalSettings).toEqual(['src/auth/**', 'migrations/**'])
+
+  const reopened = await openExtensionSettings(page, 'Foundry')
+  await expect(reopened.getByRole('textbox', { name: label })).toHaveValue(
+    'src/auth/**\nmigrations/**'
+  )
+  await closeSettings(page)
+})
+
+test("a workspace's own Default Shell is the shell its new terminals open in", async () => {
+  const { page } = handle
+  await openSettings(page)
+  await page.locator('.settings-panel__nav-item').filter({ hasText: 'Workspace Settings' }).click()
+  const shell = page.getByRole('textbox', { name: 'Default Shell' })
+  await shell.fill('/bin/bash')
+  await shell.blur()
+  await closeSettings(page)
+
+  await page.keyboard.press('Meta+t')
+  await page.keyboard.type('echo "shell:$0"\n')
+  await expect
+    .poll(async () => (await readTerminalRows(page)).join('\n'), { timeout: 15_000 })
+    .toContain('shell:/bin/bash')
 })

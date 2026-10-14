@@ -108,6 +108,22 @@ describe('IssueDrawer — the issue', () => {
     })
     expect(document.querySelector('.issue-drawer__comment code')?.textContent).toBe('npm test')
   })
+})
+
+describe('IssueDrawer — the issue — fetches nothing a description names, and opens its links in the browser', () => {
+  // Anyone who can comment on a ticket writes this text: a remote image in it
+  // is a tracking pixel aimed at whoever opens the drawer.
+  it('fetches nothing a description names, and opens its links in the browser', async () => {
+    const { container } = await setupSettled({
+      issue: issue({
+        description: '![pixel](https://evil.example/p.png) <b>raw</b> [docs](https://e.example/d)',
+      }),
+    })
+    const body = container.querySelector('.issue-markdown') as Element
+    expect(body.querySelector('img, [src], b')).toBeNull()
+    fireEvent.click(screen.getByRole('link', { name: 'docs' }))
+    expect(openExternal).toHaveBeenCalledWith('https://e.example/d')
+  })
 
   it('says so when there is no description', async () => {
     await setupSettled({ issue: issue({ description: '' }) })
@@ -125,7 +141,9 @@ describe('IssueDrawer — the issue', () => {
     expect(screen.getByText(/could not be read/)).toBeTruthy()
     expect(screen.getByText(/still\s+attached/)).toBeTruthy()
   })
+})
 
+describe('IssueDrawer — the issue — renders nothing for a project with no link', () => {
   it('renders nothing for a project with no link', async () => {
     const { container } = await setupSettled({ link: null })
     expect(container.querySelector('.issue-drawer')).toBeNull()
@@ -151,7 +169,9 @@ describe('IssueDrawer — actions', () => {
     )
     await waitFor(() => expect(loadLink).toHaveBeenCalledWith(P))
   })
+})
 
+describe('IssueDrawer — actions — posts a comment and clears the box', () => {
   it('posts a comment and clears the box', async () => {
     await setupSettled()
     const box = screen.getByPlaceholderText(/Add a comment/)
@@ -185,7 +205,9 @@ describe('IssueDrawer — actions', () => {
     // possible response to a failed write.
     expect((box as HTMLTextAreaElement).value).toBe('important note')
   })
+})
 
+describe('IssueDrawer — actions — unlinks and closes', () => {
   it('unlinks and closes', async () => {
     const onClose = vi.fn()
     useIntegrationsStore.setState({
@@ -235,7 +257,9 @@ describe('IssueDrawer — agent context (FR-023)', () => {
     setup()
     expect(await screen.findByText(/Shortened to fit/)).toBeTruthy()
   })
+})
 
+describe('IssueDrawer — agent context (FR-023) — says plainly when nothing is fed', () => {
   it('says plainly when nothing is fed', async () => {
     api.contextPreview.mockResolvedValue({ context: null })
     setup()
@@ -266,5 +290,37 @@ describe('IssueDrawer — agent context (FR-023)', () => {
   it('reflects injection being off', async () => {
     await setupSettled({ link: link({ injectContext: false }) })
     expect((screen.getByRole('checkbox') as HTMLInputElement).checked).toBe(false)
+  })
+})
+
+describe('IssueDrawer — failures that say nothing of their own', () => {
+  it('reports a failed comment in its own words when the tracker gives none', async () => {
+    api.comment.mockResolvedValue({ error: 'failed' })
+    await setupSettled()
+    fireEvent.change(screen.getByPlaceholderText(/Add a comment/), { target: { value: 'note' } })
+    fireEvent.click(screen.getByText('Post comment'))
+    await waitFor(() =>
+      expect(screen.getByRole('alert').textContent).toBe('Could not post that comment.')
+    )
+  })
+
+  it('reports a failed toggle in its own words when main gives none', async () => {
+    api.setInjectContext.mockResolvedValue({ error: 'failed' })
+    await setupSettled()
+    fireEvent.click(screen.getByRole('checkbox'))
+    await waitFor(() =>
+      expect(screen.getByRole('alert').textContent).toBe('Could not change that setting.')
+    )
+  })
+
+  it('survives a preview that rejects outright', async () => {
+    api.contextPreview.mockRejectedValue(new Error('gone'))
+    setup()
+    expect(await screen.findByText(/Nothing is fed to agent sessions/)).toBeTruthy()
+  })
+
+  it('says nothing of when an issue was updated if the tracker did not say', async () => {
+    await setupSettled({ issue: issue({ updatedAt: '' }) })
+    expect(screen.queryByText(/updated/)).toBeNull()
   })
 })

@@ -1,7 +1,10 @@
 import React from 'react'
 import { ArrowRight, Check, Info, RotateCcw, X } from 'lucide-react'
+import { Button, IconButton } from '@terminator/extension-ui'
 import { useMergeFlowStore } from '../../stores/merge-flow.store'
-import type { ConflictFile } from '../../schemas/merge-flow.schema'
+import type { ConflictFile, ConflictSession } from '../../schemas/merge-flow.schema'
+import { plural } from '@terminator/extension-sdk'
+import { choose, splitPath } from '../text'
 
 interface Props {
   onSelectFile: (fileIndex: number) => void
@@ -15,32 +18,37 @@ interface LangBadge {
   text: string
 }
 
+function badge(label: string, bg: string): LangBadge {
+  return { label, bg, text: '#fff' }
+}
+
+const LANG_BADGES = new Map<string, LangBadge>([
+  ['ts', badge('TS', '#2563eb')],
+  ['tsx', badge('TS', '#2563eb')],
+  ['js', badge('JS', '#a16207')],
+  ['jsx', badge('JS', '#a16207')],
+  ['mjs', badge('JS', '#a16207')],
+  ['py', badge('PY', '#1d4ed8')],
+  ['rb', badge('RB', '#dc2626')],
+  ['go', badge('GO', '#155e75')],
+  ['rs', badge('RS', '#c2410c')],
+  ['java', badge('JV', '#b45309')],
+  ['json', badge('{ }', '#0e7490')],
+  ['css', badge('CSS', '#db2777')],
+  ['scss', badge('CSS', '#db2777')],
+  ['md', badge('MD', '#6b7280')],
+  ['yaml', badge('YML', '#7c3aed')],
+  ['yml', badge('YML', '#7c3aed')],
+  ['sh', badge('SH', '#374151')],
+  ['sql', badge('SQL', '#0f766e')],
+  ['html', badge('HTML', '#9a3412')],
+])
+
 function getLangBadge(filePath: string): LangBadge {
   const name = filePath.split('/').pop()?.toLowerCase() ?? ''
-  if (name === 'dockerfile') return { label: 'DO', bg: '#0369a1', text: '#fff' }
+  if (name === 'dockerfile') return badge('DO', '#0369a1')
   const ext = name.split('.').pop() ?? ''
-  const map: Record<string, LangBadge> = {
-    ts: { label: 'TS', bg: '#2563eb', text: '#fff' },
-    tsx: { label: 'TS', bg: '#2563eb', text: '#fff' },
-    js: { label: 'JS', bg: '#a16207', text: '#fff' },
-    jsx: { label: 'JS', bg: '#a16207', text: '#fff' },
-    mjs: { label: 'JS', bg: '#a16207', text: '#fff' },
-    py: { label: 'PY', bg: '#1d4ed8', text: '#fff' },
-    rb: { label: 'RB', bg: '#dc2626', text: '#fff' },
-    go: { label: 'GO', bg: '#155e75', text: '#fff' },
-    rs: { label: 'RS', bg: '#c2410c', text: '#fff' },
-    java: { label: 'JV', bg: '#b45309', text: '#fff' },
-    json: { label: '{ }', bg: '#0e7490', text: '#fff' },
-    css: { label: 'CSS', bg: '#db2777', text: '#fff' },
-    scss: { label: 'CSS', bg: '#db2777', text: '#fff' },
-    md: { label: 'MD', bg: '#6b7280', text: '#fff' },
-    yaml: { label: 'YML', bg: '#7c3aed', text: '#fff' },
-    yml: { label: 'YML', bg: '#7c3aed', text: '#fff' },
-    sh: { label: 'SH', bg: '#374151', text: '#fff' },
-    sql: { label: 'SQL', bg: '#0f766e', text: '#fff' },
-    html: { label: 'HTML', bg: '#9a3412', text: '#fff' },
-  }
-  return map[ext] ?? { label: ext.slice(0, 3).toUpperCase() || '?', bg: '#4b5563', text: '#fff' }
+  return LANG_BADGES.get(ext) ?? badge(ext.slice(0, 3).toUpperCase() || '?', '#4b5563')
 }
 
 function getDotColor(file: ConflictFile): string {
@@ -50,22 +58,7 @@ function getDotColor(file: ConflictFile): string {
   return '#6b7280'
 }
 
-function formatFilePath(filePath: string): { dir: string; name: string } {
-  const idx = filePath.lastIndexOf('/')
-  return idx === -1
-    ? { dir: '', name: filePath }
-    : { dir: filePath.slice(0, idx + 1), name: filePath.slice(idx + 1) }
-}
-
-function FileCard({
-  file,
-  index,
-  isFirst,
-  isResolved,
-  oursBranch,
-  theirsBranch,
-  onSelectFile,
-}: {
+interface FileCardProps {
   file: ConflictFile
   index: number
   isFirst: boolean
@@ -73,211 +66,252 @@ function FileCard({
   oursBranch?: string
   theirsBranch?: string
   onSelectFile: (i: number) => void
-}) {
-  const badge = getLangBadge(file.filePath)
-  const { dir, name } = formatFilePath(file.filePath)
-  const remaining = file.conflictCount - file.resolvedCount
-  const dotColor = getDotColor(file)
+}
 
-  const oursLabel = oursBranch ? `${file.oursAuthor.name} (${oursBranch})` : file.oursAuthor.name
-  const theirsLabel = theirsBranch
-    ? `${file.theirsAuthor.name} (${theirsBranch})`
-    : file.theirsAuthor.name
+/** "Ana (main)", or just the name when the branch is unknown. */
+function authorLabel(name: string, branch: string | undefined): string {
+  if (!branch) return name
+  return `${name} (${branch})`
+}
 
+function cardClass(card: FileCardProps): string {
+  const highlighted = choose(
+    card.isFirst && !card.isResolved,
+    ' conflict-hub__file-card--highlighted',
+    ''
+  )
+  const resolved = choose(card.isResolved, ' conflict-hub__file-card--resolved', '')
+  return `conflict-hub__file-card${highlighted}${resolved}`
+}
+
+function conflictBadgeClass(conflictCount: number): string {
+  if (conflictCount >= 4) return 'conflict-hub__conflict-badge conflict-hub__conflict-badge--high'
+  if (conflictCount >= 2) return 'conflict-hub__conflict-badge conflict-hub__conflict-badge--med'
+  return 'conflict-hub__conflict-badge'
+}
+
+function CountTag({ file, isResolved }: { file: ConflictFile; isResolved: boolean }) {
+  const count = file.conflictCount
+  if (isResolved) {
+    return (
+      <span className="conflict-hub__resolved-tag">
+        {count} {plural(count, 'conflict')} · resolved
+      </span>
+    )
+  }
+  const remaining = count - file.resolvedCount
   return (
-    <div
-      className={`conflict-hub__file-card${isFirst && !isResolved ? ' conflict-hub__file-card--highlighted' : ''}${isResolved ? ' conflict-hub__file-card--resolved' : ''}`}
-      data-testid="conflict-file-row"
-      role="button"
-      tabIndex={0}
-      onClick={() => onSelectFile(index)}
-      onKeyDown={(e) => e.key === 'Enter' && onSelectFile(index)}
-    >
-      <span
-        className="conflict-hub__file-dot"
-        style={{ background: isResolved ? 'var(--tm-success)' : dotColor }}
-      >
-        {isResolved && <Check aria-hidden="true" />}
+    <span className={conflictBadgeClass(count)}>
+      {remaining} {plural(remaining, 'conflict')}
+    </span>
+  )
+}
+
+function FileInfo({ card }: { card: FileCardProps }) {
+  const { file } = card
+  const { dir, name } = splitPath(file.filePath)
+  const ours = authorLabel(file.oursAuthor.name, card.oursBranch)
+  const theirs = authorLabel(file.theirsAuthor.name, card.theirsBranch)
+  return (
+    <div className="conflict-hub__file-info">
+      <span className="conflict-hub__file-path">
+        <span className="conflict-hub__file-dir">{dir}</span>
+        <span className="conflict-hub__file-name">{name}</span>
       </span>
-
-      <span
-        className="conflict-hub__lang-badge"
-        style={{ background: badge.bg, color: badge.text }}
-      >
-        {badge.label}
+      <span className="conflict-hub__file-authors">
+        Modified by {ours} · {theirs}
       </span>
-
-      <div className="conflict-hub__file-info">
-        <span className="conflict-hub__file-path">
-          <span className="conflict-hub__file-dir">{dir}</span>
-          <span className="conflict-hub__file-name">{name}</span>
-        </span>
-        <span className="conflict-hub__file-authors">
-          Modified by {oursLabel} · {theirsLabel}
-        </span>
-        {file.conflictDescription && (
-          <span className="conflict-hub__file-desc">{file.conflictDescription}</span>
-        )}
-      </div>
-
-      {isResolved ? (
-        <span className="conflict-hub__resolved-tag">
-          {file.conflictCount} conflict{file.conflictCount !== 1 ? 's' : ''} · resolved
-        </span>
-      ) : (
-        <span
-          className={`conflict-hub__conflict-badge${file.conflictCount >= 4 ? ' conflict-hub__conflict-badge--high' : file.conflictCount >= 2 ? ' conflict-hub__conflict-badge--med' : ''}`}
-        >
-          {remaining} conflict{remaining !== 1 ? 's' : ''}
-        </span>
+      {file.conflictDescription && (
+        <span className="conflict-hub__file-desc">{file.conflictDescription}</span>
       )}
     </div>
   )
 }
 
-export function ConflictHub({ onSelectFile, onStartOver, onExit }: Props) {
-  const session = useMergeFlowStore((s) => s.session)
+function FileCard(props: FileCardProps) {
+  const { file, index, isResolved, onSelectFile } = props
+  const langBadge = getLangBadge(file.filePath)
+  const dotColor = choose(isResolved, 'var(--tm-success)', getDotColor(file))
+  return (
+    <div
+      data-testid="conflict-file-row"
+      className={cardClass(props)}
+      role="button"
+      tabIndex={0}
+      onClick={() => onSelectFile(index)}
+      onKeyDown={(e) => e.key === 'Enter' && onSelectFile(index)}
+    >
+      <span className="conflict-hub__file-dot" style={{ background: dotColor }}>
+        {isResolved && <Check aria-hidden="true" />}
+      </span>
+      <span
+        className="conflict-hub__lang-badge"
+        style={{ background: langBadge.bg, color: langBadge.text }}
+      >
+        {langBadge.label}
+      </span>
+      <FileInfo card={props} />
+      <CountTag file={file} isResolved={isResolved} />
+    </div>
+  )
+}
 
-  if (!session) return null
+function sessionBranchNames(session: ConflictSession): { ours: string; theirs: string } {
+  const fallback = choose(session.isRebase, 'upstream', 'incoming')
+  return { ours: session.oursBranch ?? 'HEAD', theirs: session.theirsBranch ?? fallback }
+}
 
-  const totalRemaining = session.totalConflicts - session.totalResolved
-  const progressPct =
-    session.totalConflicts > 0
-      ? Math.round((session.totalResolved / session.totalConflicts) * 100)
-      : 0
+function HubTopBar({ session, hub }: { session: ConflictSession; hub: Props }) {
+  const branches = sessionBranchNames(session)
+  return (
+    <div className="conflict-hub__topbar">
+      <div className="conflict-hub__brand">
+        <span className="conflict-hub__brand-name">Conflict Solver</span>
+      </div>
+      <div className="conflict-hub__branch-crumb">
+        <span className="conflict-hub__branch">{branches.ours}</span>
+        <ArrowRight aria-hidden="true" className="conflict-hub__branch-arrow" />
+        <span className="conflict-hub__branch">{branches.theirs}</span>
+      </div>
+      {session.isRebase && <span className="conflict-hub__rebase-badge">rebase</span>}
+      {hub.onStartOver && session.totalResolved > 0 && (
+        <Button
+          variant="ghost"
+          size="sm"
+          icon={RotateCcw}
+          onClick={hub.onStartOver}
+          title="Reset all resolutions and start over"
+        >
+          Start over
+        </Button>
+      )}
+      {hub.onExit && <IconButton icon={X} label="Exit merge flow" onClick={hub.onExit} />}
+    </div>
+  )
+}
+
+function Stat(props: { value: React.ReactNode; label: string; tone?: string }) {
+  const tone = choose(props.tone, ` conflict-hub__stat-value--${props.tone}`, '')
+  return (
+    <div className="conflict-hub__stat">
+      <span className={`conflict-hub__stat-value${tone}`}>{props.value}</span>
+      <span className="conflict-hub__stat-label">{props.label}</span>
+    </div>
+  )
+}
+
+function resolvedPercent(session: ConflictSession): number {
+  if (session.totalConflicts <= 0) return 0
+  return Math.round((session.totalResolved / session.totalConflicts) * 100)
+}
+
+function Progress({ session }: { session: ConflictSession }) {
+  return (
+    <div className="conflict-hub__progress">
+      <span className="conflict-hub__progress-label">Progress</span>
+      <div className="conflict-hub__progress-bar">
+        <div
+          className="conflict-hub__progress-fill"
+          style={{ width: `${resolvedPercent(session)}%` }}
+        />
+      </div>
+      <span className="conflict-hub__progress-count">
+        {session.totalResolved} of {session.totalConflicts} resolved
+      </span>
+    </div>
+  )
+}
+
+function Hero({ session }: { session: ConflictSession }) {
+  const branches = sessionBranchNames(session)
   const estimatedMin = Math.max(1, Math.ceil(session.totalConflicts * 0.75))
+  return (
+    <div className="conflict-hub__hero">
+      <h2 className="conflict-hub__hero-title">Merge conflicts need resolving</h2>
+      <p className="conflict-hub__hero-subtitle">
+        {branches.theirs} cannot be merged into {branches.ours} until these are resolved
+      </p>
+      <div className="conflict-hub__stats">
+        <Stat value={session.files.length} label="Files conflicted" />
+        <Stat value={session.totalConflicts} label="Total conflicts" tone="accent" />
+        <Stat value={`~${estimatedMin} min`} label="Estimated time" tone="muted" />
+      </div>
+      <Progress session={session} />
+    </div>
+  )
+}
 
-  const unresolvedFiles = session.files.filter((f) => f.resolvedCount < f.conflictCount)
-  const resolvedFiles = session.files.filter((f) => f.resolvedCount >= f.conflictCount)
+function Hint() {
+  return (
+    <div className="conflict-hub__hint">
+      <Info aria-hidden="true" className="conflict-hub__hint-icon" />
+      <span>
+        <strong>Start with the highlighted file.</strong> MergeFlow orders by complexity — hardest
+        first while you&apos;re fresh. You can jump to any file at any time.
+      </span>
+    </div>
+  )
+}
 
-  const theirsBranchDisplay = session.theirsBranch ?? (session.isRebase ? 'upstream' : 'incoming')
-  const oursBranchDisplay = session.oursBranch ?? 'HEAD'
+interface FileSectionProps {
+  label: string
+  files: ConflictFile[]
+  resolved: boolean
+  session: ConflictSession
+  onSelectFile: Props['onSelectFile']
+}
 
+function FileSection({ section }: { section: FileSectionProps }) {
+  const { files, session } = section
+  return (
+    <div className="conflict-hub__section">
+      <div className="conflict-hub__section-label">{section.label}</div>
+      {files.map((file) => (
+        <FileCard
+          key={file.filePath}
+          file={file}
+          index={session.files.indexOf(file)}
+          isFirst={!section.resolved && file === files[0]}
+          isResolved={section.resolved}
+          oursBranch={session.oursBranch}
+          theirsBranch={session.theirsBranch}
+          onSelectFile={section.onSelectFile}
+        />
+      ))}
+    </div>
+  )
+}
+
+function FileSections({ session, hub }: { session: ConflictSession; hub: Props }) {
+  const isFileResolved = (f: ConflictFile) => f.resolvedCount >= f.conflictCount
+  const unresolved = session.files.filter((f) => !isFileResolved(f))
+  const resolved = session.files.filter(isFileResolved)
+  const common = { session, onSelectFile: hub.onSelectFile }
+  return (
+    <>
+      {unresolved.length > 0 && <Hint />}
+      {unresolved.length > 0 && (
+        <FileSection
+          section={{ ...common, label: 'Needs your attention', files: unresolved, resolved: false }}
+        />
+      )}
+      {resolved.length > 0 && (
+        <FileSection section={{ ...common, label: 'Resolved', files: resolved, resolved: true }} />
+      )}
+    </>
+  )
+}
+
+export function ConflictHub(props: Props) {
+  const session = useMergeFlowStore((s) => s.session)
+  if (!session) return null
+  const allDone = session.totalConflicts - session.totalResolved === 0 && session.totalConflicts > 0
   return (
     <div className="conflict-hub">
-      {/* Header */}
-      <div className="conflict-hub__topbar">
-        <div className="conflict-hub__brand">
-          <span className="conflict-hub__brand-name">Conflict Solver</span>
-        </div>
-        <div className="conflict-hub__branch-crumb">
-          <span className="conflict-hub__branch">{oursBranchDisplay}</span>
-          <ArrowRight aria-hidden="true" className="conflict-hub__branch-arrow" />
-          <span className="conflict-hub__branch">{theirsBranchDisplay}</span>
-        </div>
-        {session.isRebase && <span className="conflict-hub__rebase-badge">rebase</span>}
-        {onStartOver && session.totalResolved > 0 && (
-          <button
-            className="conflict-hub__start-over"
-            onClick={onStartOver}
-            title="Reset all resolutions and start over"
-          >
-            <RotateCcw aria-hidden="true" /> Start over
-          </button>
-        )}
-        {onExit && (
-          <button
-            className="conflict-hub__exit"
-            onClick={onExit}
-            aria-label="Exit merge flow"
-            title="Exit merge flow"
-          >
-            <X aria-hidden="true" />
-          </button>
-        )}
-      </div>
-
-      {/* Stats hero card */}
-      <div className="conflict-hub__hero">
-        <h2 className="conflict-hub__hero-title">Merge conflicts need resolving</h2>
-        <p className="conflict-hub__hero-subtitle">
-          {theirsBranchDisplay} cannot be merged into {oursBranchDisplay} until these are resolved
-        </p>
-        <div className="conflict-hub__stats">
-          <div className="conflict-hub__stat">
-            <span className="conflict-hub__stat-value">{session.files.length}</span>
-            <span className="conflict-hub__stat-label">Files conflicted</span>
-          </div>
-          <div className="conflict-hub__stat">
-            <span className="conflict-hub__stat-value conflict-hub__stat-value--accent">
-              {session.totalConflicts}
-            </span>
-            <span className="conflict-hub__stat-label">Total conflicts</span>
-          </div>
-          <div className="conflict-hub__stat">
-            <span className="conflict-hub__stat-value conflict-hub__stat-value--muted">
-              ~{estimatedMin} min
-            </span>
-            <span className="conflict-hub__stat-label">Estimated time</span>
-          </div>
-        </div>
-        <div className="conflict-hub__progress">
-          <span className="conflict-hub__progress-label">Progress</span>
-          <div className="conflict-hub__progress-bar">
-            <div className="conflict-hub__progress-fill" style={{ width: `${progressPct}%` }} />
-          </div>
-          <span className="conflict-hub__progress-count">
-            {session.totalResolved} of {session.totalConflicts} resolved
-          </span>
-        </div>
-      </div>
-
-      {/* Hint */}
-      {unresolvedFiles.length > 0 && (
-        <div className="conflict-hub__hint">
-          <Info aria-hidden="true" className="conflict-hub__hint-icon" />
-          <span>
-            <strong>Start with the highlighted file.</strong> MergeFlow orders by complexity —
-            hardest first while you&apos;re fresh. You can jump to any file at any time.
-          </span>
-        </div>
-      )}
-
-      {/* Unresolved files */}
-      {unresolvedFiles.length > 0 && (
-        <div className="conflict-hub__section">
-          <div className="conflict-hub__section-label">Needs your attention</div>
-          {unresolvedFiles.map((file) => {
-            const idx = session.files.indexOf(file)
-            return (
-              <FileCard
-                key={file.filePath}
-                file={file}
-                index={idx}
-                isFirst={file === unresolvedFiles[0]}
-                isResolved={false}
-                oursBranch={session.oursBranch}
-                theirsBranch={session.theirsBranch}
-                onSelectFile={onSelectFile}
-              />
-            )
-          })}
-        </div>
-      )}
-
-      {/* Resolved files */}
-      {resolvedFiles.length > 0 && (
-        <div className="conflict-hub__section">
-          <div className="conflict-hub__section-label">Resolved</div>
-          {resolvedFiles.map((file) => {
-            const idx = session.files.indexOf(file)
-            return (
-              <FileCard
-                key={file.filePath}
-                file={file}
-                index={idx}
-                isFirst={false}
-                isResolved={true}
-                oursBranch={session.oursBranch}
-                theirsBranch={session.theirsBranch}
-                onSelectFile={onSelectFile}
-              />
-            )
-          })}
-        </div>
-      )}
-
-      {totalRemaining === 0 && session.totalConflicts > 0 && (
+      <HubTopBar session={session} hub={props} />
+      <Hero session={session} />
+      <FileSections session={session} hub={props} />
+      {allDone && (
         <div className="conflict-hub__all-done">All conflicts resolved — ready to commit.</div>
       )}
     </div>

@@ -5,6 +5,7 @@ import type { ResolveSources } from '../recipe/resolve.js'
 import type { Rule } from '../recipe/parse.js'
 import type { Proposal } from '../ledger/curator.js'
 import type { Rung } from './ladder.js'
+import { writeJsonAtomic } from '@terminator/extension-sdk/node'
 
 // Which checks apply here.
 //
@@ -152,6 +153,12 @@ async function readDeclined(root: string): Promise<Record<string, DeclinedRecord
   }
 }
 
+/** Why the operator turned a rule down, and what the rule said. */
+export interface Decline {
+  readonly reason: string
+  readonly asserts?: string | null
+}
+
 /**
  * Turn a proposal down, permanently.
  *
@@ -162,15 +169,14 @@ async function readDeclined(root: string): Promise<Record<string, DeclinedRecord
 export async function declineProposal(
   root: string,
   proposalId: string,
-  reason: string,
-  asserts: string | null = null
+  { reason, asserts = null }: Decline
 ): Promise<void> {
   await fs.promises.mkdir(rulesDir(root), { recursive: true })
   const declined = {
     ...(await readDeclined(root)),
     [proposalId]: { reason, asserts: asserts?.trim() || null },
   }
-  await fs.promises.writeFile(declinedFile(root), JSON.stringify(declined, null, 2), 'utf8')
+  await writeJsonAtomic(declinedFile(root), declined)
 }
 
 /** Proposals the operator has already turned down. */
@@ -200,12 +206,7 @@ export async function declinedWithReasons(
  * against, so proposing it again next time the ledger is read would be the
  * factory arguing with them.
  */
-export async function removeRule(
-  root: string,
-  ruleId: string,
-  reason: string,
-  asserts: string | null = null
-): Promise<boolean> {
+export async function removeRule(root: string, ruleId: string, decline: Decline): Promise<boolean> {
   let removed = false
   for (const extension of ['.yaml', '.yml']) {
     try {
@@ -215,6 +216,6 @@ export async function removeRule(
       // Not under that extension. The other one, or not there at all.
     }
   }
-  await declineProposal(root, ruleId, reason, asserts)
+  await declineProposal(root, ruleId, decline)
   return removed
 }

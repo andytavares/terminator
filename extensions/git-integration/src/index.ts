@@ -1,15 +1,38 @@
-import type { ExtensionAPI, Disposable, SettingDefinition } from '../../../src/main/extensions/api'
+import { z } from 'zod'
+import { defineChannel, noPayload } from '@terminator/extension-sdk'
+import type {
+  ChannelSpec,
+  ExtensionAPI,
+  Disposable,
+  SettingDefinition,
+} from '@terminator/extension-sdk'
 import { registerGitExtensionHandlers } from './ipc/git.ipc.js'
-import { registerGithubHandlers } from './ipc/github.ipc.js'
-import { registerReviewAgentHandlers } from './ipc/review-agent.ipc.js'
-import { registerQuickActionCommands } from './commands.js'
+import { gitEnabled, gitEnabledAnywhere, gitSettings, MAX_DISPLAYED_FILES } from './git-settings.js'
+import { gatedByWorkspace } from './ipc/workspace-switch.js'
+import { bindWorkspaceRoots } from './ipc/repo-root.js'
+import { projectForCheckout } from './review/terminal-project.js'
+import { VALIDATION_ERROR, type RegisterFn } from './ipc/register.js'
+import { registerGithubHandlers, type GithubHandlerOptions } from './ipc/github.ipc.js'
+import { registerReviewAgentHandlers, type OpenTerminalInput } from './ipc/review-agent.ipc.js'
+import { consumePendingViewRequest, registerQuickActionCommands } from './commands.js'
+import { remoteAccessFor } from './remote-access.js'
+import { bindShell } from './shell/run-git.js'
+import { openStorageDirectory } from './storage-directory.js'
 import {
   openPrReviewWindow,
   registerReviewPullRequestCommand,
   registerReviewSubmittedRelay,
   registerReviewSettings,
-  type PrReviewWindowParams,
+  PrReviewWindowParams,
 } from './review-command.js'
+
+/** A notification the isolated view asks the shared dispatcher to raise. */
+const NotifyPayload = z.object({
+  type: z.enum(['info', 'success', 'warning', 'error']),
+  title: z.string().min(1),
+  key: z.string().min(1),
+  message: z.string().optional(),
+})
 
 // Every notification kind this extension ever raises, so the user can
 // independently choose its delivery target(s) (system/in-app/toast) in this
@@ -31,6 +54,7 @@ const NOTIFICATION_KEYS: { key: string; label: string }[] = [
   { key: 'pushFailed', label: 'Push failed' },
   { key: 'pullSucceeded', label: 'Pull succeeded' },
   { key: 'pullFailed', label: 'Pull failed' },
+  { key: 'prCreated', label: 'Pull request opened' },
 ]
 
 function buildNotificationSettingProperties(): Record<string, SettingDefinition> {
@@ -55,203 +79,209 @@ function buildNotificationSettingProperties(): Record<string, SettingDefinition>
   return properties
 }
 
+const SETTING = 'terminator.git-integration'
+
+const SETTINGS: Record<string, SettingDefinition> = {
+  'terminator.git-integration.git.enabled': {
+    type: 'boolean',
+    label: 'Enable Git Integration',
+    default: true,
+    workspaceScoped: true,
+  },
+  'terminator.git-integration.git.githubToken': {
+    type: 'string',
+    label: 'GitHub token',
+    description:
+      'Personal access token or fine-grained token with repo scope. Used as GH_TOKEN when running gh commands.',
+    default: '',
+    secret: true,
+  },
+  'terminator.git-integration.git.commit.signOff': {
+    type: 'boolean',
+    label: 'Add sign-off to commits',
+    description: 'Commits from the Git view end with a Signed-off-by line (git commit --signoff).',
+    default: false,
+    workspaceScoped: true,
+  },
+  'terminator.git-integration.git.maxDisplayedFiles': {
+    type: 'number',
+    label: 'Max displayed changed files',
+    description:
+      'The Git view lists this many changed files at most, and says when there are more.',
+    default: MAX_DISPLAYED_FILES.default,
+    min: MAX_DISPLAYED_FILES.min,
+    max: MAX_DISPLAYED_FILES.max,
+  },
+  'terminator.git-integration.review.agentModel': {
+    type: 'enum',
+    label: 'Review agent model',
+    options: ['opus', 'sonnet'],
+    default: 'sonnet',
+  },
+  'terminator.git-integration.review.agentEffort': {
+    type: 'enum',
+    label: 'Review agent effort',
+    options: ['default', 'low', 'medium', 'high'],
+    default: 'default',
+  },
+  'terminator.git-integration.review.cloneFolder': {
+    type: 'folder',
+    label: 'Clone folder for reviews',
+    description:
+      'Where "Clone and review" puts repositories you have not cloned. Empty keeps reviews diff-only.',
+    default: '',
+  },
+  'terminator.git-integration.review.agentTimeoutMinutes': {
+    type: 'number',
+    label: 'Review agent timeout (minutes)',
+    default: 5,
+    min: 1,
+    max: 30,
+  },
+  ...buildNotificationSettingProperties(),
+}
+
 const disposables: Disposable[] = []
 
-export function activate(api: ExtensionAPI): void {
-  const enabled = api.settings.get<boolean>('terminator.git-integration.git.enabled') ?? true
-  if (!enabled) return
+/** Each workspace project's checkout, or its workspace folder. */
+function projectRootsOf(api: ExtensionAPI): () => string[] {
+  return () =>
+    api.workspace
+      .list()
+      .flatMap((w) => api.workspace.listProjects(w.id).map((p) => p.worktreePath ?? w.folderPath))
+}
 
-  const registerFn = (
-    channel: string,
-    handler: (payload: unknown) => Promise<unknown> | unknown
-  ) => {
-    disposables.push(api.ipc.registerHandler(channel, handler))
+/** The roots a channel may run git or gh in: workspace folders, projects and the clone folder. */
+function bindRoots(api: ExtensionAPI, projectRoots: () => string[]): void {
+  bindWorkspaceRoots(() => [
+    ...api.workspace.list().map((w) => w.folderPath),
+    ...projectRoots(),
+    api.settings.get<string>(`${SETTING}.review.cloneFolder`) ?? '',
+  ])
+}
+
+/** Opens an agent terminal in the project the repo belongs to and types the command into it. */
+async function openReviewAgentTerminal(api: ExtensionAPI, input: OpenTerminalInput): Promise<void> {
+  const projectId = projectForCheckout(api.workspace, input.repoRoot)
+  if (!projectId) return
+  const sessionId = await api.pty.openTerminal({
+    projectId,
+    cwd: input.cwd,
+    tabTitle: input.title,
+    type: 'agent',
+  })
+  if (sessionId) api.pty.write(sessionId, `${input.command}\r`)
+}
+
+/** The workspace's project roots, and the extension's own folder, where a gh call that needs no checkout runs. */
+interface ChannelRoots {
+  projectRoots: () => string[]
+  storage: string
+}
+
+function registerGithub(api: ExtensionAPI, registerFn: RegisterFn, roots: ChannelRoots) {
+  const access = {
+    github: api.github,
+    getToken: () => api.settings.get<string>(`${SETTING}.git.githubToken`) ?? '',
+    noCheckoutCwd: roots.storage,
   }
-  registerGitExtensionHandlers(registerFn)
-  disposables.push(...registerQuickActionCommands(api))
-  disposables.push(registerReviewPullRequestCommand(api))
-  disposables.push(registerReviewSubmittedRelay(api))
-  registerGithubHandlers(
-    registerFn,
-    {
-      getGhPath: () => api.settings.get<string>('terminator.git-integration.git.ghCliPath') ?? '',
-      getToken: () => api.settings.get<string>('terminator.git-integration.git.githubToken') ?? '',
-    },
+  const options: GithubHandlerOptions = {
     // Optional: an older host has no issues namespace, and the review view
     // then renders references exactly as it does today.
-    api.issues,
-    () =>
-      api.workspace
-        .list()
-        .flatMap((w) =>
-          api.workspace.listProjects(w.id).map((p) => p.worktreePath ?? w.folderPath)
-        ),
-    () => api.settings.get<string[]>('terminator.git-integration.review.repos') ?? [],
+    issues: api.issues,
+    listProjectRoots: roots.projectRoots,
+    getReviewRepos: () => api.settings.get<string[]>(`${SETTING}.review.repos`) ?? [],
     // Settings → Git → Branch Exclude Patterns, matched by the core.
-    (branch, repoPath) => api.settings.isBranchExcluded(branch, repoPath)
-  )
+    isBranchExcluded: (branch, repoPath) => api.settings.isBranchExcluded(branch, repoPath),
+  }
+  registerGithubHandlers(registerFn, access, options)
+}
 
+/** Every channel this extension answers, each with its remote-access rule. */
+function registerChannels(api: ExtensionAPI, roots: ChannelRoots): void {
+  // A repository whose workspace switched the extension off is answered GIT_DISABLED.
+  const isEnabled = (repoPath?: string) => gitEnabled(api, repoPath)
+  const registerFn = (spec: ChannelSpec) => {
+    const gated = gatedByWorkspace(spec, isEnabled)
+    disposables.push(api.ipc.registerHandler(gated, remoteAccessFor(spec.channel)))
+  }
+  registerGitExtensionHandlers(registerFn, gitSettings(api))
+  registerFn(pendingRequestChannel())
+  registerGithub(api, registerFn, roots)
   // Read-only review agent: headless `claude -p` in a detached PR-head worktree.
-  registerReviewAgentHandlers(registerFn, {
+  const reviewAgent = registerReviewAgentHandlers(registerFn, {
     getSetting: (key) => api.settings.get(key),
     broadcast: (channel, data) => api.window.broadcast(channel, data),
-    openTerminal: ({ repoRoot, cwd, title, command }) => {
-      let projectId: string | undefined
-      for (const ws of api.workspace.list()) {
-        const match = api.workspace.listProjects(ws.id).find((p) => p.worktreePath === repoRoot)
-        if (match) {
-          projectId = match.id
-          break
-        }
-      }
-      if (!projectId) return
-      const sessionId = api.pty.openTerminalTab({
-        projectId,
-        cwd,
-        tabTitle: title,
-        type: 'agent',
-      })
-      if (sessionId) api.pty.write(sessionId, `${command}\r`)
+    openTerminal: (input) => openReviewAgentTerminal(api, input),
+  })
+  disposables.push(reviewAgent)
+}
+
+/** Bridges this extension's renderer (an isolated webview, with no api.notifications) to the shared
+ *  notification dispatcher. */
+function notifyChannel(api: ExtensionAPI): ChannelSpec {
+  return defineChannel({
+    channel: 'git:notify',
+    schema: NotifyPayload,
+    invalid: VALIDATION_ERROR,
+    run: (notification) => {
+      api.notifications.createNotification(notification)
+      return { ok: true }
     },
   })
+}
 
-  // Cross-iframe broadcast: any extension view can invoke this to open the
-  // merge-flow view in the GitFullView iframe (which lives in a separate iframe context).
-  disposables.push(
-    api.ipc.registerHandler('git:request-merge-flow', (payload) => {
-      const { repoRoot } = (payload ?? {}) as { repoRoot?: string }
-      api.window.broadcast('git:merge-flow-open', { repoRoot: repoRoot ?? '' })
+/** Hands the Git view the Commit… or Create PR… request a command left before the view existed. */
+function pendingRequestChannel(): ChannelSpec {
+  return defineChannel({
+    channel: 'git:ui.consume-pending-request',
+    schema: noPayload,
+    invalid: VALIDATION_ERROR,
+    run: () => ({ request: consumePendingViewRequest() }),
+  })
+}
+
+function openReviewWindowChannel(api: ExtensionAPI): ChannelSpec {
+  return defineChannel({
+    channel: 'window:open-pr-review',
+    schema: PrReviewWindowParams,
+    invalid: VALIDATION_ERROR,
+    run: (params) => {
+      openPrReviewWindow(api, params ?? {})
       return { ok: true }
-    })
-  )
+    },
+  })
+}
 
-  // Same bridge shape, for bringing the Git project tab forward when a file is
-  // picked in the sidebar panel. The panel used to do this by importing the
-  // core renderer's registry and calling setActiveProjectTab — but the panel is
-  // an isolated webview, so that import bundled a second copy of the store and
-  // the call moved nothing. `extension:select-project-tab` is the channel the
-  // host actually listens on.
-  disposables.push(
-    api.ipc.registerHandler('git:focus-project-tab', (payload) => {
-      const { tabId } = (payload ?? {}) as { tabId?: string }
-      api.window.broadcast('extension:select-project-tab', { tabId: tabId ?? 'git' })
-      return { ok: true }
-    })
-  )
-
-  disposables.push(...registerReviewSettings(api))
-
-  // Bridges this extension's renderer (an isolated webview, no direct access to
-  // api.notifications) to the shared notification dispatcher.
-  disposables.push(
-    api.ipc.registerHandler('git:notify', (payload) => {
-      const { type, title, key, message } = (payload ?? {}) as {
-        type?: 'info' | 'success' | 'warning' | 'error'
-        title?: string
-        key?: string
-        message?: string
-      }
-      if (!type || !title || !key) return { error: 'VALIDATION_ERROR' }
-      api.notifications.createNotification({ type, title, key, message })
-      return { ok: true }
-    })
-  )
-
-  disposables.push(
-    api.settings.register({
-      label: 'Git Integration',
-      properties: {
-        'terminator.git-integration.git.enabled': {
-          type: 'boolean',
-          label: 'Enable Git Integration',
-          default: true,
-          workspaceScoped: true,
-        },
-        'terminator.git-integration.git.ghCliPath': {
-          type: 'string',
-          label: 'gh CLI path',
-          description: 'Path to the gh binary. Leave empty to auto-detect.',
-          default: '',
-        },
-        'terminator.git-integration.git.githubToken': {
-          type: 'string',
-          label: 'GitHub token',
-          description:
-            'Personal access token or fine-grained token with repo scope. Used as GH_TOKEN when running gh commands.',
-          default: '',
-          secret: true,
-        },
-        'terminator.git-integration.git.commit.signOff': {
-          type: 'boolean',
-          label: 'Add sign-off to commits',
-          default: false,
-          workspaceScoped: true,
-        },
-        'terminator.git-integration.git.maxDisplayedFiles': {
-          type: 'number',
-          label: 'Max displayed changed files',
-          default: 500,
-          min: 10,
-          max: 5000,
-        },
-        'terminator.git-integration.review.agentModel': {
-          type: 'enum',
-          label: 'Review agent model',
-          options: ['opus', 'sonnet'],
-          default: 'sonnet',
-        },
-        'terminator.git-integration.review.agentEffort': {
-          type: 'enum',
-          label: 'Review agent effort',
-          options: ['default', 'low', 'medium', 'high'],
-          default: 'default',
-        },
-        'terminator.git-integration.review.cloneFolder': {
-          type: 'folder',
-          label: 'Clone folder for reviews',
-          description:
-            'Where "Clone and review" puts repositories you have not cloned. Empty keeps reviews diff-only.',
-          default: '',
-        },
-        'terminator.git-integration.review.agentTimeoutMinutes': {
-          type: 'number',
-          label: 'Review agent timeout (minutes)',
-          default: 5,
-          min: 1,
-          max: 30,
-        },
-        ...buildNotificationSettingProperties(),
-      },
-    })
-  )
-
-  disposables.push(
+/** Commands, the view menu item and the two window channels. */
+function contributions(api: ExtensionAPI): Disposable[] {
+  return [
+    ...registerQuickActionCommands(api),
+    registerReviewPullRequestCommand(api),
+    registerReviewSubmittedRelay(api),
+    ...registerReviewSettings(api),
+    api.ipc.registerHandler(notifyChannel(api)),
     api.nativeMenu.addViewMenuItem({
       id: 'open-pr-review',
       label: 'Code Reviews in New Window',
-      onClick: () => {
-        api.window.openAuxiliary('pr-review', {})
-      },
-    })
-  )
+      onClick: () => api.window.openAuxiliary('pr-review', {}),
+    }),
+    api.ipc.registerHandler(openReviewWindowChannel(api)),
+  ]
+}
 
-  disposables.push(
-    api.ipc.registerHandler('window:open-pr-review', (payload) => {
-      openPrReviewWindow(api, (payload ?? {}) as PrReviewWindowParams)
-      return { ok: true }
-    })
-  )
-
-  disposables.push(
-    api.topBar.registerMenuItem({
-      id: 'git-view',
-      label: 'Git',
-      tooltip: 'Open Git view',
-      onClick: () => {
-        api.notifications.showToast('info', 'Git view', 'gitViewOpened')
-      },
-    })
-  )
+export function activate(api: ExtensionAPI): void {
+  // Registered before the enabled check: switched off globally and in every
+  // workspace, the extension registers nothing else, and the settings page is
+  // the only way back on.
+  disposables.push(api.settings.register({ label: 'Git Integration', properties: SETTINGS }))
+  if (!gitEnabledAnywhere(api)) return
+  bindShell(api.shell)
+  const storage = openStorageDirectory(api)
+  const projectRoots = projectRootsOf(api)
+  bindRoots(api, projectRoots)
+  registerChannels(api, { projectRoots, storage })
+  disposables.push(...contributions(api))
 }
 
 export function deactivate(): void {

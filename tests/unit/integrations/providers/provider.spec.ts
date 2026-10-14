@@ -1,9 +1,4 @@
 import { describe, it, expect } from 'vitest'
-import {
-  PROVIDER_OPERATIONS,
-  PROVIDER_OPTIONAL_OPERATIONS,
-  PROVIDER_WRITE_OPERATIONS,
-} from '../../../../src/main/integrations/providers/provider'
 import { createLinearProvider } from '../../../../src/main/integrations/providers/linear.provider'
 import { createJiraProvider } from '../../../../src/main/integrations/providers/jira.provider'
 
@@ -18,6 +13,27 @@ import { createJiraProvider } from '../../../../src/main/integrations/providers/
 // 037 widened the sanctioned set by exactly one operation, and widening it is
 // supposed to be conspicuous: it takes an edit to this file, which is the
 // point.
+
+/** The complete set of operations a provider may expose. */
+const PROVIDER_OPERATIONS = [
+  'verify',
+  'listMine',
+  'search',
+  'get',
+  'comment',
+  'states',
+  'transition',
+  'teams',
+  'create',
+] as const
+
+/** The operations permitted to write to a tracker. `transition` moves an issue
+ * along its own workflow and can do nothing else; `create` files a new issue the
+ * operator asked for (ADR-061); neither can set a field of an existing one. */
+const PROVIDER_WRITE_OPERATIONS = ['comment', 'transition', 'create'] as const
+
+/** What a provider may expose but need not: callers ask the issue service first. */
+const PROVIDER_OPTIONAL_OPERATIONS = ['states', 'transition', 'teams', 'create'] as const
 
 const providers = [
   ['linear', createLinearProvider(() => ({}) as never)],
@@ -70,8 +86,11 @@ describe('TrackerProvider surface', () => {
       expect(methodsOf(linear)).toContain(operation)
     }
   })
+})
 
-  it('jira omits every optional operation, and reports that rather than throwing when asked', () => {
+describe('TrackerProvider optional operations and writes', () => {
+  // Asked about one, the issue service answers "unsupported" (issue-service-transition.spec).
+  it('jira omits every optional operation', () => {
     const [, jira] = providers[1]
     for (const operation of PROVIDER_OPTIONAL_OPERATIONS) {
       expect(methodsOf(jira)).not.toContain(operation)
@@ -88,12 +107,6 @@ describe('TrackerProvider surface', () => {
         ).toBe(false)
       }
     }
-  })
-
-  // 061 widened it by one more: creating an issue, at the operator's word
-  // (ADR-061). Still no field-level write, and still no way to delete one.
-  it('sanctions exactly three write operations, and no field-level write among them', () => {
-    expect(PROVIDER_WRITE_OPERATIONS).toEqual(['comment', 'transition', 'create'])
   })
 
   it('sanctions no way to delete or archive an issue', () => {

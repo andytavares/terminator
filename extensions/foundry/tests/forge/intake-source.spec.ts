@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import * as path from 'node:path'
 import { seedOrder, houseDocsIn, newOrderId, pathsNamedIn } from '../../src/forge/intake-source.js'
 import { applyProposal, parseProposal } from '../../src/order/proposal.js'
 import { branchFor } from '../../src/line/worktree.js'
 import type { SeedDeps } from '../../src/forge/intake-source.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 // Scout runs before the operator is asked anything (FR-002). By the time a
 // question could be put to them, the repository has already been read, the
@@ -25,13 +25,12 @@ function deps(over: Partial<SeedDeps> = {}): SeedDeps {
     now: () => '2026-09-06T10:00:00.000Z',
     newId: () => 'WO-0906-abc',
     readIssue: vi.fn(async () => null),
-    existingOrderFor: () => null,
     ...over,
   }
 }
 
 beforeEach(() => {
-  repo = fs.mkdtempSync(path.join(os.tmpdir(), 'foundry-intake-'))
+  repo = makeTempDir('foundry-intake-')
   write('package.json', JSON.stringify({ scripts: { test: 'vitest run', lint: 'eslint .' } }))
 })
 
@@ -40,6 +39,20 @@ afterEach(() => {
 })
 
 describe('seedOrder from a typed idea', () => {
+  describe('a complete draft', aCompleteDraftTests)
+  describe('what the repository says', whatTheRepositorySaysTests)
+  describe('lanes and issues', lanesAndIssuesTests)
+})
+
+const issue = {
+  key: 'TAV-42',
+  title: 'Terminal clips the last glyph of every row',
+  description: 'The row div overflow slices the final glyph.',
+  url: 'https://linear.app/x/TAV-42',
+  branchName: 'andrew/tav-42-row-clipping',
+}
+
+function aCompleteDraftTests() {
   it('produces a complete draft without asking anything first', async () => {
     const r = await seedOrder(
       { kind: 'typed', text: 'the greeting should say hello, not hi', repoPaths: [repo] },
@@ -62,7 +75,9 @@ describe('seedOrder from a typed idea', () => {
     })
     expect(r.order.context.toolchain.coverage).toBeNull()
   })
+}
 
+function whatTheRepositorySaysTests() {
   it('records the checks this repository cannot run, so the gap is known up front', async () => {
     const r = await seedOrder({ kind: 'typed', text: 'x', repoPaths: [repo] }, deps())
     if (!('order' in r)) throw new Error('expected an order')
@@ -80,16 +95,18 @@ describe('seedOrder from a typed idea', () => {
   })
 
   it('completes in a repository that says nothing about itself', async () => {
-    const bare = fs.mkdtempSync(path.join(os.tmpdir(), 'foundry-bare-'))
+    const bare = makeTempDir('foundry-bare-')
     const r = await seedOrder({ kind: 'typed', text: 'x', repoPaths: [bare] }, deps())
     fs.rmSync(bare, { recursive: true, force: true })
     if (!('order' in r)) throw new Error('expected an order')
     expect(r.order.context.houseDocs).toEqual([])
     expect(r.unavailableChecks).toHaveLength(6)
   })
+}
 
+function lanesAndIssuesTests() {
   it('opens one lane per repository', async () => {
-    const second = fs.mkdtempSync(path.join(os.tmpdir(), 'foundry-second-'))
+    const second = makeTempDir('foundry-second-')
     const r = await seedOrder({ kind: 'typed', text: 'x', repoPaths: [repo, second] }, deps())
     fs.rmSync(second, { recursive: true, force: true })
     if (!('order' in r)) throw new Error('expected an order')
@@ -101,17 +118,35 @@ describe('seedOrder from a typed idea', () => {
     await seedOrder({ kind: 'typed', text: 'x', repoPaths: [repo] }, deps({ readIssue }))
     expect(readIssue).not.toHaveBeenCalled()
   })
-})
+}
 
 describe('seedOrder from a tracker issue', () => {
-  const issue = {
-    key: 'TAV-42',
-    title: 'Terminal clips the last glyph of every row',
-    description: 'The row div overflow slices the final glyph.',
-    url: 'https://linear.app/x/TAV-42',
-    branchName: 'andrew/tav-42-row-clipping',
-  }
+  describe('the ticket branch', theTicketBranchTests)
+  describe('what is seeded', whatIsSeededTests)
+  describe('unreadable issues', unreadableIssuesTests)
+  describe('the stated outcome', theStatedOutcomeTests)
+  describe('no heading and a bare title', noHeadingAndABareTitleTests)
+})
 
+const signal = {
+  id: 'sig-1',
+  sensorId: 'ci-flake',
+  key: 'workflow:ci',
+  title: 'CI is flaky on main',
+  evidence: [
+    { kind: 'ci-run' as const, title: 'run 1', url: 'https://x/1', at: '2026-01-01T00:00:00Z' },
+    { kind: 'ci-run' as const, title: 'run 2', url: 'https://x/2', at: '2026-01-02T00:00:00Z' },
+  ],
+  occurrences: 2,
+  severity: 'medium' as const,
+  firstSeen: '2026-01-01T00:00:00Z',
+  lastSeen: '2026-01-02T00:00:00Z',
+  status: 'open' as const,
+  dismissedAt: null,
+  orderId: null,
+}
+
+function theTicketBranchTests() {
   it("still pushes to the ticket's branch after an architect blanks the lane branch", async () => {
     const r = await seedOrder(
       { kind: 'tracker', tracker: 'linear', key: 'TAV-42', repoPaths: [repo] },
@@ -123,7 +158,9 @@ describe('seedOrder from a tracker issue', () => {
     const converged = applyProposal(r.order, proposal, '2026-09-06T12:00:00.000Z')
     expect(branchFor(converged, lane.ord)).toBe('andrew/tav-42-row-clipping')
   })
+}
 
+function whatIsSeededTests() {
   it('seeds title, intent and provenance from the issue', async () => {
     const r = await seedOrder(
       { kind: 'tracker', tracker: 'linear', key: 'TAV-42', repoPaths: [repo] },
@@ -149,16 +186,9 @@ describe('seedOrder from a tracker issue', () => {
     if (!('order' in r)) throw new Error('expected an order')
     expect(r.order.plan.lanes[0].branch).toBe('andrew/tav-42-row-clipping')
   })
+}
 
-  it('offers the existing order when the same issue is seeded twice', async () => {
-    const r = await seedOrder(
-      { kind: 'tracker', tracker: 'linear', key: 'TAV-42', repoPaths: [repo] },
-      deps({ existingOrderFor: () => ({ id: 'WO-0905-zzz', title: 'already seeded' }) })
-    )
-    expect('existing' in r).toBe(true)
-    if ('existing' in r) expect(r.existing.id).toBe('WO-0905-zzz')
-  })
-
+function unreadableIssuesTests() {
   it('reports an issue it cannot read rather than seeding an empty order', async () => {
     const r = await seedOrder(
       { kind: 'tracker', tracker: 'linear', key: 'TAV-99', repoPaths: [repo] },
@@ -167,7 +197,9 @@ describe('seedOrder from a tracker issue', () => {
     expect('error' in r).toBe(true)
     if ('error' in r) expect(r.error).toContain('TAV-99')
   })
+}
 
+function theStatedOutcomeTests() {
   it('states the outcome the ticket already gives under its acceptance heading', async () => {
     const r = await seedOrder(
       { kind: 'tracker', tracker: 'linear', key: 'TAV-15', repoPaths: [repo] },
@@ -191,7 +223,9 @@ describe('seedOrder from a tracker issue', () => {
       '- Filters only list tickets in an open state\n- A text search matches tickets in any state'
     )
   })
+}
 
+function noHeadingAndABareTitleTests() {
   it('leaves the outcome unstated when the ticket gives no acceptance heading', async () => {
     const r = await seedOrder(
       { kind: 'tracker', tracker: 'linear', key: 'TAV-42', repoPaths: [repo] },
@@ -218,27 +252,15 @@ describe('seedOrder from a tracker issue', () => {
     expect(r.order.title).toBe('Just a title')
     expect(r.order.intent.problem).toBe('Just a title')
   })
-})
+}
 
 describe('seedOrder from a signal (ADR-066)', () => {
-  const signal = {
-    id: 'sig-1',
-    sensorId: 'ci-flake',
-    key: 'workflow:ci',
-    title: 'CI is flaky on main',
-    evidence: [
-      { kind: 'ci-run' as const, title: 'run 1', url: 'https://x/1', at: '2026-01-01T00:00:00Z' },
-      { kind: 'ci-run' as const, title: 'run 2', url: 'https://x/2', at: '2026-01-02T00:00:00Z' },
-    ],
-    occurrences: 2,
-    severity: 'medium' as const,
-    firstSeen: '2026-01-01T00:00:00Z',
-    lastSeen: '2026-01-02T00:00:00Z',
-    status: 'open' as const,
-    dismissedAt: null,
-    orderId: null,
-  }
+  describe('seeding from the signal', seedingFromTheSignalTests)
+  describe('an unreadable signal', anUnreadableSignalTests)
+  describe('a signal with no evidence', aSignalWithNoEvidenceTests)
+})
 
+function seedingFromTheSignalTests() {
   it('seeds title and one problem line per piece of evidence', async () => {
     const r = await seedOrder(
       { kind: 'signal', signalId: 'sig-1', repoPaths: [repo] },
@@ -263,7 +285,21 @@ describe('seedOrder from a signal (ADR-066)', () => {
       url: 'https://x/1',
     })
   })
+}
 
+function aSignalWithNoEvidenceTests() {
+  it('seeds a signal that carries no evidence, with no url to point at', async () => {
+    const r = await seedOrder(
+      { kind: 'signal', signalId: 'sig-1', repoPaths: [repo] },
+      deps({ readSignal: vi.fn(async () => ({ ...signal, evidence: [] })) })
+    )
+    if (!('order' in r)) throw new Error('expected an order')
+    expect(r.order.intent.problem).toBe('CI is flaky on main')
+    expect(r.order.source.url).toBeNull()
+  })
+}
+
+function anUnreadableSignalTests() {
   it('reports a signal it cannot read rather than seeding an empty order', async () => {
     const r = await seedOrder(
       { kind: 'signal', signalId: 'sig-missing', repoPaths: [repo] },
@@ -272,7 +308,7 @@ describe('seedOrder from a signal (ADR-066)', () => {
     expect('error' in r).toBe(true)
     if ('error' in r) expect(r.error).toContain('sig-missing')
   })
-})
+}
 
 describe('seedOrder validation', () => {
   it('refuses to seed with no repository', async () => {
@@ -307,6 +343,12 @@ describe('newOrderId', () => {
 const NOW = '2026-09-06T10:00:00.000Z'
 
 describe('prior art (FR-077)', () => {
+  describe('naming files', namingFilesTests)
+  describe('asking the record', askingTheRecordTests)
+  describe('unreadable and absent prior art', unreadableAndAbsentPriorArtTests)
+})
+
+function namingFilesTests() {
   it('names the files an idea mentions', () => {
     expect(pathsNamedIn('the timeout in src/auth/session.ts is hardcoded')).toEqual([
       'src/auth/session.ts',
@@ -320,7 +362,9 @@ describe('prior art (FR-077)', () => {
   it('ignores a bare word with a dot but no path', () => {
     expect(pathsNamedIn('it fails on node.js')).toEqual([])
   })
+}
 
+function askingTheRecordTests() {
   it('asks the record about those files, before any question could be asked', async () => {
     const priorArtFor = vi.fn(async () => ['2026-08-01 operator: review.rejected — no'])
     const result = await seedOrder(
@@ -341,7 +385,9 @@ describe('prior art (FR-077)', () => {
     )
     expect(priorArtFor).not.toHaveBeenCalled()
   })
+}
 
+function unreadableAndAbsentPriorArtTests() {
   it('seeds the order anyway when the record cannot be read', async () => {
     const result = await seedOrder(
       { kind: 'typed', text: 'src/a.ts is wrong', repoPaths: [repo] },
@@ -362,4 +408,4 @@ describe('prior art (FR-077)', () => {
     )
     expect('order' in result && result.order.context.priorArt).toEqual([])
   })
-})
+}

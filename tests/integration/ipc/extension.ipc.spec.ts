@@ -2,8 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ipcMain } from 'electron'
 
 // The handlers delegate to the real api.ts registry query functions, so this
-// spec uses the real api module and seeds the real globalRegistry. Electron
-// and the storage stores are mocked the same way api.spec.ts mocks them.
+// spec uses the real api module and seeds the real globalRegistry, and the
+// real stores over an in-memory electron-store.
 vi.mock('electron', () => ({
   ipcMain: {
     handle: vi.fn(),
@@ -32,38 +32,25 @@ vi.mock('../../../src/main/shell/shell-executor', () => ({
   CwdOutOfScopeError: class extends Error {},
 }))
 
-vi.mock('../../../src/main/storage/settings-store', () => ({
-  getGlobalSettings: vi.fn(() => ({})),
-  getWorkspaceSettings: vi.fn(() => ({})),
-}))
-
-vi.mock('../../../src/main/storage/workspace-store', () => ({
-  listWorkspaces: vi.fn(() => []),
-  listProjects: vi.fn(() => []),
-  deleteProject: vi.fn(),
-}))
-
-vi.mock('../../../src/main/storage/extension-settings-store', () => {
-  const store: Record<string, unknown> = {}
-  return {
-    getExtensionSetting: (key: string) => store[key],
-    getAllExtensionSettings: () => ({ ...store }),
-    setExtensionSetting: (key: string, value: unknown) => {
-      store[key] = value
-    },
-  }
-})
+vi.mock('electron-store', async () =>
+  (await import('../../support/stores')).inMemoryElectronStore()
+)
 
 import { globalRegistry } from '../../../src/main/extensions/api'
 import { registerExtensionHandlers } from '../../../src/main/ipc/extension.ipc'
+import type { ExtensionHost } from '../../../src/main/extensions/extension-host'
+import type { ExtensionViewHost } from '../../../src/main/extensions/extension-view-host'
+import { partialFake } from '../../support/fakes'
 
 const mockExtensionHost = {
-  listExtensions: vi.fn(),
+  listAll: vi.fn(),
   load: vi.fn(),
-  toggle: vi.fn(),
-  uninstall: vi.fn(),
-  reload: vi.fn(),
+  setEnabled: vi.fn(),
+  uninstallExtension: vi.fn(),
+  reloadExtension: vi.fn(),
+  whenActivated: vi.fn().mockResolvedValue(undefined),
 }
+const extensionHost = partialFake<ExtensionHost>(mockExtensionHost)
 
 function captureHandle(channel: string): (event: unknown, payload?: unknown) => unknown {
   const calls = vi.mocked(ipcMain.handle).mock.calls
@@ -72,234 +59,289 @@ function captureHandle(channel: string): (event: unknown, payload?: unknown) => 
   return match[1] as (event: unknown, payload?: unknown) => unknown
 }
 
-function captureOn(channel: string): (event: unknown, payload?: unknown) => unknown {
-  const calls = vi.mocked(ipcMain.on).mock.calls
-  const match = calls.find(([ch]) => ch === channel)
-  if (!match) throw new Error(`No listener registered for: ${channel}`)
-  return match[1] as (event: unknown, payload?: unknown) => unknown
-}
-
-describe('extension IPC handlers', () => {
+function useExtensionHandlers(): void {
   beforeEach(() => {
     vi.clearAllMocks()
-    ;(globalRegistry.sidebarItems as Map<string, unknown>).clear()
-    ;(globalRegistry.contextMenuItems as Map<string, unknown>).clear()
     ;(globalRegistry.settingsSections as Map<string, unknown>).clear()
-    registerExtensionHandlers(mockExtensionHost as Parameters<typeof registerExtensionHandlers>[0])
+    registerExtensionHandlers(extensionHost, vi.fn(), () => null)
+  })
+}
+
+describe('extension IPC handlers — extension:list', () => {
+  useExtensionHandlers()
+
+  it('returns extensions from host', async () => {
+    const extensions = [{ id: 'com.test', name: 'Test' }]
+    mockExtensionHost.listAll.mockReturnValue(extensions)
+    const handler = captureHandle('extension:list')
+    const result = (await handler({})) as { extensions: unknown[] }
+    expect(result.extensions).toEqual(extensions)
+  })
+})
+
+describe('extension IPC handlers — extension:install', () => {
+  useExtensionHandlers()
+
+  it('calls load with directoryPath and returns result', async () => {
+    const ext = { extension: { id: 'com.new', name: 'New' } }
+    mockExtensionHost.load.mockResolvedValue(ext)
+    const handler = captureHandle('extension:install')
+    const result = await handler({}, { directoryPath: '/extensions/new' })
+    expect(mockExtensionHost.load).toHaveBeenCalledWith('/extensions/new')
+    expect(result).toEqual(ext)
+  })
+})
+
+describe('extension IPC handlers — extension:toggle', () => {
+  useExtensionHandlers()
+
+  it('returns extension on successful toggle', async () => {
+    const ext = { id: 'com.test', status: 'disabled' }
+    mockExtensionHost.setEnabled.mockResolvedValue(ext)
+    const handler = captureHandle('extension:toggle')
+    const result = (await handler({}, { id: 'com.test', enabled: false })) as {
+      extension: unknown
+    }
+    expect(mockExtensionHost.setEnabled).toHaveBeenCalledWith('com.test', false)
+    expect(result.extension).toEqual(ext)
   })
 
-  describe('extension:list', () => {
-    it('returns extensions from host', () => {
-      const extensions = [{ id: 'com.test', name: 'Test' }]
-      mockExtensionHost.listExtensions.mockReturnValue(extensions)
-      const handler = captureHandle('extension:list')
-      const result = handler({}) as { extensions: unknown[] }
-      expect(result.extensions).toEqual(extensions)
+  it('returns NOT_FOUND error when toggle returns null', async () => {
+    mockExtensionHost.setEnabled.mockResolvedValue(null)
+    const handler = captureHandle('extension:toggle')
+    const result = (await handler({}, { id: 'missing', enabled: true })) as { error: string }
+    expect(result.error).toBe('NOT_FOUND')
+  })
+})
+
+describe('extension IPC handlers — extension:uninstall', () => {
+  useExtensionHandlers()
+
+  it('returns ok when extension is removed', async () => {
+    mockExtensionHost.uninstallExtension.mockResolvedValue(true)
+    const handler = captureHandle('extension:uninstall')
+    const result = (await handler({}, { id: 'com.test' })) as { ok: boolean }
+    expect(mockExtensionHost.uninstallExtension).toHaveBeenCalledWith('com.test')
+    expect(result.ok).toBe(true)
+  })
+
+  it('returns NOT_FOUND when extension does not exist', async () => {
+    mockExtensionHost.uninstallExtension.mockResolvedValue(false)
+    const handler = captureHandle('extension:uninstall')
+    const result = (await handler({}, { id: 'missing' })) as { error: string }
+    expect(result.error).toBe('NOT_FOUND')
+  })
+})
+
+describe('extension IPC handlers — extension:reload', () => {
+  useExtensionHandlers()
+
+  it('returns extension on successful reload', async () => {
+    const ext = { id: 'com.test', status: 'enabled' }
+    mockExtensionHost.reloadExtension.mockResolvedValue({ extension: ext })
+    const handler = captureHandle('extension:reload')
+    const result = (await handler({}, { id: 'com.test' })) as { extension: unknown }
+    expect(mockExtensionHost.reloadExtension).toHaveBeenCalledWith('com.test')
+    expect(result.extension).toEqual(ext)
+  })
+
+  it('returns error when extension not found', async () => {
+    mockExtensionHost.reloadExtension.mockResolvedValue({ error: 'NOT_FOUND' })
+    const handler = captureHandle('extension:reload')
+    const result = (await handler({}, { id: 'missing' })) as { error: string }
+    expect(result.error).toBe('NOT_FOUND')
+  })
+})
+
+describe('extension IPC handlers — extension:reload broadcasts', () => {
+  useExtensionHandlers()
+
+  it('calls broadcast with extension:renderer-reload on successful reload', async () => {
+    const broadcast = vi.fn()
+    vi.clearAllMocks()
+    registerExtensionHandlers(extensionHost, broadcast, () => null)
+    const ext = { id: 'com.test', status: 'enabled' }
+    mockExtensionHost.reloadExtension.mockResolvedValue({ extension: ext })
+    const handler = captureHandle('extension:reload')
+    await handler({}, { id: 'com.test' })
+    expect(broadcast).toHaveBeenCalledWith('extension:renderer-reload', { id: 'com.test' })
+  })
+
+  it('does not call broadcast when reload fails', async () => {
+    const broadcast = vi.fn()
+    vi.clearAllMocks()
+    registerExtensionHandlers(extensionHost, broadcast, () => null)
+    mockExtensionHost.reloadExtension.mockResolvedValue({ error: 'NOT_FOUND' })
+    const handler = captureHandle('extension:reload')
+    await handler({}, { id: 'missing' })
+    expect(broadcast).not.toHaveBeenCalled()
+  })
+})
+
+describe('extension IPC handlers — extension:update-panel-bounds', () => {
+  useExtensionHandlers()
+
+  it("places the extension's view where the renderer's placeholder is", async () => {
+    const updatePanelBounds = vi.fn().mockResolvedValue(undefined)
+    vi.clearAllMocks()
+    registerExtensionHandlers(extensionHost, vi.fn(), () =>
+      partialFake<ExtensionViewHost>({ updatePanelBounds })
+    )
+    const ext = { id: 'com.test', name: 'Test' }
+    mockExtensionHost.listAll.mockReturnValue([ext])
+    const bounds = { x: 10, y: 20, width: 300, height: 400 }
+    await captureHandle('extension:update-panel-bounds')(
+      {},
+      { extensionId: 'com.test', viewParam: 'main', bounds, visible: true, repoRoot: '/repo' }
+    )
+    const [findExtension, placement] = updatePanelBounds.mock.calls[0]
+    expect(placement).toEqual({
+      extensionId: 'com.test',
+      viewParam: 'main',
+      bounds,
+      visible: true,
+      repoRoot: '/repo',
     })
+    expect(findExtension()).toBe(ext)
   })
+})
 
-  describe('extension:install', () => {
-    it('calls load with directoryPath and returns result', async () => {
-      const ext = { extension: { id: 'com.new', name: 'New' } }
-      mockExtensionHost.load.mockResolvedValue(ext)
-      const handler = captureHandle('extension:install')
-      const result = await handler({}, { directoryPath: '/extensions/new' })
-      expect(mockExtensionHost.load).toHaveBeenCalledWith('/extensions/new')
-      expect(result).toEqual(ext)
-    })
+describe('extension IPC handlers — extension:update-panel-bounds before activation', () => {
+  useExtensionHandlers()
+
+  it("does not create the extension's view until that extension has been activated", async () => {
+    const updatePanelBounds = vi.fn().mockResolvedValue(undefined)
+    vi.clearAllMocks()
+    let finishActivation = () => {}
+    mockExtensionHost.whenActivated.mockReturnValueOnce(
+      new Promise<void>((resolve) => (finishActivation = resolve))
+    )
+    registerExtensionHandlers(extensionHost, vi.fn(), () =>
+      partialFake<ExtensionViewHost>({ updatePanelBounds })
+    )
+    const bounds = { x: 0, y: 0, width: 1, height: 1 }
+    const pending = captureHandle('extension:update-panel-bounds')(
+      {},
+      { extensionId: 'com.slow', viewParam: 'main', bounds, visible: true }
+    )
+
+    await Promise.resolve()
+    expect(mockExtensionHost.whenActivated).toHaveBeenCalledWith('com.slow')
+    expect(updatePanelBounds).not.toHaveBeenCalled()
+
+    finishActivation()
+    await pending
+    expect(updatePanelBounds).toHaveBeenCalledTimes(1)
   })
+})
 
-  describe('extension:toggle', () => {
-    it('returns extension on successful toggle', async () => {
-      const ext = { id: 'com.test', status: 'disabled' }
-      mockExtensionHost.toggle.mockResolvedValue(ext)
-      const handler = captureHandle('extension:toggle')
-      const result = (await handler({}, { id: 'com.test', enabled: false })) as {
-        extension: unknown
+describe('extension IPC handlers — extension:update-panel-bounds without a view host', () => {
+  useExtensionHandlers()
+
+  it('does nothing before the view host exists', async () => {
+    const handler = captureHandle('extension:update-panel-bounds')
+    const result = await handler(
+      {},
+      {
+        extensionId: 'com.test',
+        viewParam: 'main',
+        bounds: { x: 0, y: 0, width: 1, height: 1 },
+        visible: false,
       }
-      expect(mockExtensionHost.toggle).toHaveBeenCalledWith('com.test', false)
-      expect(result.extension).toEqual(ext)
-    })
+    )
+    expect(result).toBeUndefined()
+  })
+})
 
-    it('returns NOT_FOUND error when toggle returns null', async () => {
-      mockExtensionHost.toggle.mockResolvedValue(null)
-      const handler = captureHandle('extension:toggle')
-      const result = (await handler({}, { id: 'missing', enabled: true })) as { error: string }
-      expect(result.error).toBe('NOT_FOUND')
-    })
+describe('extension IPC handlers — extension:get-settings-schemas', () => {
+  useExtensionHandlers()
+
+  it('returns empty schemas when none registered', async () => {
+    const handler = captureHandle('extension:get-settings-schemas')
+    const result = (await handler({})) as { schemas: unknown[] }
+    expect(result.schemas).toEqual([])
   })
 
-  describe('extension:get-sidebar-items', () => {
-    it('returns empty items when registry has none', () => {
-      const handler = captureHandle('extension:get-sidebar-items')
-      const result = handler({}) as { items: unknown[] }
-      expect(result.items).toEqual([])
+  it('returns registered schemas with extensionId derived from key', async () => {
+    ;(globalRegistry.settingsSections as Map<string, unknown>).set('com.test.settings', {
+      label: 'Test Extension',
+      properties: { 'com.test.key': { type: 'string', label: 'Key', default: '' } },
     })
+    const handler = captureHandle('extension:get-settings-schemas')
+    const result = (await handler({})) as {
+      schemas: Array<{ extensionId: string; label: string }>
+    }
+    expect(result.schemas).toHaveLength(1)
+    expect(result.schemas[0].extensionId).toBe('com.test')
+    expect(result.schemas[0].label).toBe('Test Extension')
+  })
+})
 
-    it('returns mapped sidebar items from registry', () => {
-      ;(globalRegistry.sidebarItems as Map<string, unknown>).set('item1', {
-        id: 'sidebar-1',
-        label: 'Git',
-        tooltip: 'Git panel',
+describe('extension IPC handlers — extension settings values', () => {
+  useExtensionHandlers()
+
+  it('answers what extension:update-setting stored', async () => {
+    const update = captureHandle('extension:update-setting')
+    const values = captureHandle('extension:get-settings-values')
+
+    expect(await values({})).toEqual({ values: {} })
+    expect(await update({}, { key: 'com.test.token', value: 'abc123' })).toEqual({ ok: true })
+    expect(await values({})).toEqual({ values: { 'com.test.token': 'abc123' } })
+  })
+})
+
+// Workspace Settings sets a `workspaceScoped` setting for one workspace; the
+// value lives in that workspace's settings, under the extension that declared it.
+const WORKSPACE_ID = '7f1d2c3b-4a5e-4f60-8a7b-9c0d1e2f3a4b'
+
+function registerSignOff(): void {
+  ;(globalRegistry.settingsSections as Map<string, unknown>).set('com.test.settings', {
+    label: 'Test Extension',
+    properties: {
+      'com.test.signOff': {
+        type: 'boolean',
+        label: 'Sign off',
+        default: false,
+        workspaceScoped: true,
+      },
+      'com.test.token': { type: 'string', label: 'Token', default: '' },
+    },
+  })
+}
+
+describe('extension IPC handlers — a workspace value', () => {
+  useExtensionHandlers()
+
+  it('stores it under the extension that declared the key, and "Use global default" removes it', async () => {
+    registerSignOff()
+    const update = captureHandle('extension:update-workspace-setting')
+
+    const set = (await update(
+      {},
+      { workspaceId: WORKSPACE_ID, key: 'com.test.signOff', value: true }
+    )) as {
+      settings: { extensions: unknown }
+    }
+    expect(set.settings.extensions).toEqual({ 'com.test': { 'com.test.signOff': true } })
+
+    const cleared = (await update({}, { workspaceId: WORKSPACE_ID, key: 'com.test.signOff' })) as {
+      settings: { extensions: unknown }
+    }
+    expect(cleared.settings.extensions).toEqual({ 'com.test': {} })
+  })
+})
+
+describe('extension IPC handlers — a workspace value for another key', () => {
+  useExtensionHandlers()
+
+  it('refuses a key no extension declared workspaceScoped', async () => {
+    registerSignOff()
+    const update = captureHandle('extension:update-workspace-setting')
+
+    for (const key of ['com.test.token', 'com.other.unknown']) {
+      expect(await update({}, { workspaceId: WORKSPACE_ID, key, value: 'x' })).toEqual({
+        error: 'NOT_WORKSPACE_SCOPED',
       })
-      const handler = captureHandle('extension:get-sidebar-items')
-      const result = handler({}) as { items: { id: string; label: string; tooltip?: string }[] }
-      expect(result.items).toHaveLength(1)
-      expect(result.items[0]).toEqual({ id: 'sidebar-1', label: 'Git', tooltip: 'Git panel' })
-    })
-  })
-
-  describe('extension:get-context-menu-items', () => {
-    it('returns empty items when no items match target', () => {
-      const handler = captureHandle('extension:get-context-menu-items')
-      const result = handler({}, { target: 'project' }) as { items: unknown[] }
-      expect(result.items).toEqual([])
-    })
-
-    it('returns only items matching the given target', () => {
-      ;(globalRegistry.contextMenuItems as Map<string, unknown>).set('ext1.open', {
-        target: 'file',
-        item: { id: 'open', label: 'Open in editor' },
-      })
-      ;(globalRegistry.contextMenuItems as Map<string, unknown>).set('ext1.delete', {
-        target: 'project',
-        item: { id: 'delete', label: 'Delete project' },
-      })
-      const handler = captureHandle('extension:get-context-menu-items')
-      const result = handler({}, { target: 'file' }) as { items: { id: string; label: string }[] }
-      expect(result.items).toHaveLength(1)
-      expect(result.items[0]).toEqual({ id: 'open', label: 'Open in editor' })
-    })
-  })
-
-  describe('extension:context-menu-click', () => {
-    it('calls onClick for the matching context menu item', () => {
-      const onClick = vi.fn()
-      ;(globalRegistry.contextMenuItems as Map<string, unknown>).set('ext1.open', {
-        target: 'file',
-        item: { id: 'open', label: 'Open', onClick },
-      })
-      const listener = captureOn('extension:context-menu-click')
-      listener({}, { target: 'file', itemId: 'open', targetId: 'file-123' })
-      expect(onClick).toHaveBeenCalledWith('file-123')
-    })
-
-    it('does not call onClick when target does not match', () => {
-      const onClick = vi.fn()
-      ;(globalRegistry.contextMenuItems as Map<string, unknown>).set('ext1.open', {
-        target: 'file',
-        item: { id: 'open', label: 'Open', onClick },
-      })
-      const listener = captureOn('extension:context-menu-click')
-      listener({}, { target: 'project', itemId: 'open', targetId: 'proj-1' })
-      expect(onClick).not.toHaveBeenCalled()
-    })
-
-    it('does not crash when no matching item exists', () => {
-      const listener = captureOn('extension:context-menu-click')
-      expect(() =>
-        listener({}, { target: 'file', itemId: 'nonexistent', targetId: 'file-1' })
-      ).not.toThrow()
-    })
-  })
-
-  describe('extension:uninstall', () => {
-    it('returns ok when extension is removed', async () => {
-      mockExtensionHost.uninstall.mockResolvedValue(true)
-      const handler = captureHandle('extension:uninstall')
-      const result = (await handler({}, { id: 'com.test' })) as { ok: boolean }
-      expect(mockExtensionHost.uninstall).toHaveBeenCalledWith('com.test')
-      expect(result.ok).toBe(true)
-    })
-
-    it('returns NOT_FOUND when extension does not exist', async () => {
-      mockExtensionHost.uninstall.mockResolvedValue(false)
-      const handler = captureHandle('extension:uninstall')
-      const result = (await handler({}, { id: 'missing' })) as { error: string }
-      expect(result.error).toBe('NOT_FOUND')
-    })
-  })
-
-  describe('extension:reload', () => {
-    it('returns extension on successful reload', async () => {
-      const ext = { id: 'com.test', status: 'enabled' }
-      mockExtensionHost.reload.mockResolvedValue({ extension: ext })
-      const handler = captureHandle('extension:reload')
-      const result = (await handler({}, { id: 'com.test' })) as { extension: unknown }
-      expect(mockExtensionHost.reload).toHaveBeenCalledWith('com.test')
-      expect(result.extension).toEqual(ext)
-    })
-
-    it('returns error when extension not found', async () => {
-      mockExtensionHost.reload.mockResolvedValue({ error: 'NOT_FOUND' })
-      const handler = captureHandle('extension:reload')
-      const result = (await handler({}, { id: 'missing' })) as { error: string }
-      expect(result.error).toBe('NOT_FOUND')
-    })
-
-    it('calls broadcast with extension:renderer-reload on successful reload', async () => {
-      const broadcast = vi.fn()
-      vi.clearAllMocks()
-      registerExtensionHandlers(
-        mockExtensionHost as Parameters<typeof registerExtensionHandlers>[0],
-        broadcast
-      )
-      const ext = { id: 'com.test', status: 'enabled' }
-      mockExtensionHost.reload.mockResolvedValue({ extension: ext })
-      const handler = captureHandle('extension:reload')
-      await handler({}, { id: 'com.test' })
-      expect(broadcast).toHaveBeenCalledWith('extension:renderer-reload', { id: 'com.test' })
-    })
-
-    it('does not call broadcast when reload fails', async () => {
-      const broadcast = vi.fn()
-      vi.clearAllMocks()
-      registerExtensionHandlers(
-        mockExtensionHost as Parameters<typeof registerExtensionHandlers>[0],
-        broadcast
-      )
-      mockExtensionHost.reload.mockResolvedValue({ error: 'NOT_FOUND' })
-      const handler = captureHandle('extension:reload')
-      await handler({}, { id: 'missing' })
-      expect(broadcast).not.toHaveBeenCalled()
-    })
-  })
-
-  describe('extension:get-settings-schemas', () => {
-    it('returns empty schemas when none registered', () => {
-      const handler = captureHandle('extension:get-settings-schemas')
-      const result = handler({}) as { schemas: unknown[] }
-      expect(result.schemas).toEqual([])
-    })
-
-    it('returns registered schemas with extensionId derived from key', () => {
-      ;(globalRegistry.settingsSections as Map<string, unknown>).set('com.test.settings', {
-        label: 'Test Extension',
-        properties: { 'com.test.key': { type: 'string', label: 'Key', default: '' } },
-      })
-      const handler = captureHandle('extension:get-settings-schemas')
-      const result = handler({}) as {
-        schemas: Array<{ extensionId: string; label: string }>
-      }
-      expect(result.schemas).toHaveLength(1)
-      expect(result.schemas[0].extensionId).toBe('com.test')
-      expect(result.schemas[0].label).toBe('Test Extension')
-    })
-  })
-
-  describe('extension:get-settings-values', () => {
-    it('returns values from the extension settings store', () => {
-      const handler = captureHandle('extension:get-settings-values')
-      const result = handler({}) as { values: Record<string, unknown> }
-      expect(typeof result.values).toBe('object')
-    })
-  })
-
-  describe('extension:update-setting', () => {
-    it('writes value to the extension settings store and returns ok', () => {
-      const handler = captureHandle('extension:update-setting')
-      const result = handler({}, { key: 'com.test.token', value: 'abc123' }) as { ok: boolean }
-      expect(result.ok).toBe(true)
-    })
+    }
   })
 })

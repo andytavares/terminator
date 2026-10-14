@@ -26,40 +26,9 @@ export const CaptureRequestSchema = z.object({
   hintProject: z.string().optional(),
 })
 
-export const CaptureResponseSchema = z.union([
-  z.object({ taskId: z.string() }),
-  z.object({ error: z.string() }),
-])
-
 // ── vault:get-today / get-daily ──────────────────────────────────────────────
 
 export const GetDailyRequestSchema = z.object({ date: DateSchema })
-
-const EventSchema = z.object({ time: z.string().optional(), text: z.string() })
-const NoteSchema = z.object({ text: z.string() })
-const IndexedTaskSchema = z.object({
-  id: z.string(),
-  filePath: z.string(),
-  line: z.number(),
-  status: TaskStatusSchema,
-  text: z.string(),
-  project: z.string().optional(),
-  context: z.string().optional(),
-  area: z.string().optional(),
-  dueDate: z.string().optional(),
-  terminatorLinks: z.array(z.string()),
-})
-
-export const DailyLogResponseSchema = z.union([
-  z.object({
-    date: z.string(),
-    tasks: z.array(IndexedTaskSchema),
-    events: z.array(EventSchema),
-    notes: z.array(NoteSchema),
-    exists: z.boolean(),
-  }),
-  z.object({ error: z.string() }),
-])
 
 // ── vault:add-task ───────────────────────────────────────────────────────────
 
@@ -81,22 +50,12 @@ export const AddTaskRequestSchema = z.object({
 
 export const CompleteTaskRequestSchema = z.object({ taskId: TaskIdSchema })
 
-export const CompleteTaskResponseSchema = z.union([
-  z.object({ success: z.literal(true) }),
-  z.object({ error: z.union([z.literal('STALE_ID'), z.string()]) }),
-])
-
 // ── vault:migrate-task ───────────────────────────────────────────────────────
 
 export const MigrateTaskRequestSchema = z.object({
   taskId: TaskIdSchema,
   targetDate: DateSchema,
 })
-
-export const MigrateTaskResponseSchema = z.union([
-  z.object({ newTaskId: z.string() }),
-  z.object({ error: z.union([z.literal('STALE_ID'), z.string()]) }),
-])
 
 // ── vault:query ──────────────────────────────────────────────────────────────
 
@@ -108,11 +67,6 @@ export const QueryRequestSchema = z.object({
   dueBefore: DateSchema.optional(),
   filePattern: z.string().optional(),
 })
-
-export const QueryResponseSchema = z.union([
-  z.object({ tasks: z.array(IndexedTaskSchema) }),
-  z.object({ error: z.string() }),
-])
 
 // ── vault:edit-task ──────────────────────────────────────────────────────────
 
@@ -142,10 +96,46 @@ export const CreateAreaRequestSchema = z.object({ name: z.string().min(1) })
 export const DeleteAreaRequestSchema = z.object({ areaFilePath: z.string().min(1) })
 export const ArchiveAreaRequestSchema = z.object({ areaName: z.string().min(1) })
 
+// ── projects:update-area / projects:update-deadline / projects:rename ───────
+
+export const UpdateProjectAreaRequestSchema = z.object({
+  projectFilePath: z.string().min(1),
+  area: z.string().nullish(),
+})
+export const UpdateProjectDeadlineRequestSchema = z.object({
+  projectFilePath: z.string().min(1),
+  deadline: z.string().nullish(),
+})
+export const RenameProjectRequestSchema = z.object({
+  projectFilePath: z.string().min(1),
+  newName: z.string().trim().min(1),
+})
+
+// ── vault:rename-area / vault:list-areas ─────────────────────────────────────
+
+export const RenameAreaRequestSchema = z.object({
+  areaFilePath: z.string().min(1),
+  newName: z.string().trim().min(1),
+})
+export const ListAreasRequestSchema = z.object({ status: z.string().optional() }).default({})
+
+// ── projects:get-tasks / vault:add-subtask ───────────────────────────────────
+
+export const GetProjectTasksRequestSchema = z.object({ projectName: z.string() })
+export const AddSubtaskRequestSchema = z.object({ taskId: TaskIdSchema, text: z.string().min(1) })
+
+// ── vault:get-calendar-month / settings:set-stale-threshold ──────────────────
+
+export const CalendarMonthRequestSchema = z.object({
+  year: z.number().int(),
+  month: z.number().int().min(1).max(12),
+})
+export const StaleThresholdRequestSchema = z.object({ days: z.number().min(1) })
+
 // ── vault:list-archive ───────────────────────────────────────────────────────
 
 export const ListArchiveRequestSchema = z.object({
-  days: z.number().optional(), // how many days back to look for done tasks
+  days: z.number().int().optional(), // how many days back to look for done tasks
 })
 
 // ── projects:create ──────────────────────────────────────────────────────────
@@ -172,11 +162,6 @@ export const ProcessInboxRequestSchema = z.object({
   newProjectName: z.string().optional(),
 })
 
-export const ProcessInboxResponseSchema = z.union([
-  z.object({ success: z.literal(true), newTaskId: z.string().optional() }),
-  z.object({ error: z.string() }),
-])
-
 // ── vault:update-project-status ──────────────────────────────────────────────
 
 export const UpdateProjectStatusRequestSchema = z.object({
@@ -189,24 +174,6 @@ export const UpdateProjectStatusRequestSchema = z.object({
 export const ListProjectsRequestSchema = z.object({
   status: z.union([ProjectStatusSchema, z.array(ProjectStatusSchema)]).optional(),
 })
-
-const IndexedProjectSchema = z.object({
-  id: z.string(),
-  filePath: z.string(),
-  name: z.string(),
-  status: ProjectStatusSchema,
-  deadline: z.string().optional(),
-  area: z.string().optional(),
-  isStale: z.boolean(),
-  nextActionCount: z.number(),
-  lastModified: z.string(),
-  terminatorLinks: z.array(z.string()),
-})
-
-export const ListProjectsResponseSchema = z.union([
-  z.object({ projects: z.array(IndexedProjectSchema) }),
-  z.object({ error: z.string() }),
-])
 
 // ── links:create / remove ────────────────────────────────────────────────────
 
@@ -223,22 +190,6 @@ export const LinksRemoveRequestSchema = z.object({
 })
 
 export const LinksGetForTargetRequestSchema = z.object({ targetId: z.string().uuid() })
-
-// ── ics:get-events ───────────────────────────────────────────────────────────
-
-export const GetEventsRequestSchema = z.object({ windowDays: z.number().optional() })
-
-// ── settings ─────────────────────────────────────────────────────────────────
-
-export const McpAutoExecuteSchema = z.object({
-  capture: z.boolean().default(false),
-  add_task: z.boolean().default(false),
-  complete_task: z.boolean().default(false),
-  migrate_task: z.boolean().default(false),
-  process_inbox_item: z.boolean().default(false),
-})
-
-export type McpAutoExecute = z.infer<typeof McpAutoExecuteSchema>
 
 // ── vault:get-task-detail / save-task-detail ──────────────────────────────────
 
@@ -284,7 +235,7 @@ export const ReorderTasksRequestSchema = z.object({
 
 // ── vault:set-recurrence ──────────────────────────────────────────────────────
 
-export const RecurrenceIntervalSchema = z.enum(['daily', 'weekly', 'biweekly', 'monthly'])
+const RecurrenceIntervalSchema = z.enum(['daily', 'weekly', 'biweekly', 'monthly'])
 
 export const SetRecurrenceRequestSchema = z.object({
   taskId: TaskIdSchema,

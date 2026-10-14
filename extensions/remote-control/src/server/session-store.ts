@@ -1,11 +1,17 @@
 import { randomBytes } from 'crypto'
 
-export interface SessionStoreOptions {
+interface SessionStoreOptions {
   /** Cookie carrying the session token, e.g. 'app-session'. */
   cookieName: string
   /** Path scope for the issued cookie, e.g. '/app'. */
   cookiePath: string
   ttlMs: number
+}
+
+/** A minted token and the Set-Cookie header value that carries it. */
+interface IssuedSession {
+  token: string
+  setCookie: string
 }
 
 /**
@@ -23,7 +29,7 @@ export class SessionStore {
   }
 
   /** Mints a token and returns it with the Set-Cookie header value. */
-  issueSession(): { token: string; setCookie: string } {
+  issueSession(): IssuedSession {
     const token = randomBytes(32).toString('hex')
     this.sessions.set(token, Date.now() + this.opts.ttlMs)
     const maxAge = Math.floor(this.opts.ttlMs / 1000)
@@ -34,7 +40,7 @@ export class SessionStore {
   }
 
   /** True when the cookie header carries a live token; expired tokens are forgotten. */
-  hasValidSession(cookieHeader: string): boolean {
+  hasLiveSession(cookieHeader: string): boolean {
     const token = this.parseToken(cookieHeader)
     if (!token) return false
     const expiresAt = this.sessions.get(token)
@@ -54,7 +60,7 @@ export class SessionStore {
     }
   }
 
-  clear(): void {
+  revokeAll(): void {
     this.sessions.clear()
   }
 

@@ -6,10 +6,13 @@ import {
   bodyText,
   captureFoundry,
   clickByName,
-  foundryChannel,
   inFoundry,
+  listOrdersInForge,
   makeFixtureRepo,
   openFoundry,
+  openListedOrder,
+  restartFoundry,
+  createTypedOrder,
 } from './foundry-harness'
 
 // The Floor's live CI band and the Ledger's Factory metrics: numbers read
@@ -37,63 +40,18 @@ test.afterAll(async () => {
 })
 
 async function openOrderRow(id: string, listShot?: string): Promise<string> {
-  expect(await clickByName(handle, 'button', 'Forge')).toBe(true)
-  await expect
-    .poll(() => bodyText(handle), { timeout: 15_000 })
-    .toMatch(/New order|Steps|All orders/)
-  await clickByName(handle, 'button', 'All orders')
-  await expect
-    .poll(
-      () =>
-        inFoundry<boolean>(
-          handle,
-          `(function () {
-        var all = document.querySelectorAll('button')
-        for (var i = 0; i < all.length; i++) {
-          if ((all[i].textContent || '').indexOf(${JSON.stringify(id)}) !== -1) return true
-        }
-        return false
-      })()`
-        ),
-      { timeout: 15_000 }
-    )
-    .toBe(true)
+  await listOrdersInForge(handle, id)
   if (listShot !== undefined) await captureFoundry(handle, listShot)
   const list = await bodyText(handle)
-  const opened = await inFoundry<boolean>(
-    handle,
-    `(function () {
-    var all = document.querySelectorAll('button')
-    for (var i = 0; i < all.length; i++) {
-      if ((all[i].textContent || '').indexOf(${JSON.stringify(id)}) !== -1) {
-        all[i].click()
-        return true
-      }
-    }
-    return false
-  })()`
-  )
-  expect(opened, `no row for ${id} in the Forge`).toBe(true)
+  await openListedOrder(handle, id)
   return list
 }
 
-test('a draft’s CI is on the Floor while it is watched', async () => {
-  const created = (await foundryChannel(handle, 'foundry:order.create', {
-    source: { kind: 'typed', text: 'a draft whose CI is being watched' },
-    repoPaths: [repo],
-  })) as { order?: { id: string } }
-  const id = created.order?.id as string
-  expect(id, 'no order was created').toBeTruthy()
-
-  const dir = join(repo, '.foundry', 'orders', id)
-  const file = join(dir, 'order.json')
-  writeFileSync(
-    file,
-    JSON.stringify({ ...JSON.parse(readFileSync(file, 'utf8')), status: 'running' })
-  )
-  const node = (nodeId: string, kind: string, role: string | null, lane: number | null) => ({
-    id: nodeId,
-    stepId: nodeId.split(':')[0],
+/** One node of a run graph that has passed. */
+function passedNode({ id, kind, role, lane }: NodeShape) {
+  return {
+    id,
+    stepId: id.split(':')[0],
     kind,
     state: 'passed',
     unitIds: [],
@@ -107,16 +65,35 @@ test('a draft’s CI is on the Floor while it is watched', async () => {
     worktreePath: null,
     startedAt: null,
     endedAt: null,
-  })
+  }
+}
+
+interface NodeShape {
+  id: string
+  kind: string
+  role: string | null
+  lane: number | null
+}
+
+/** Marks the order running, with a passed lane build and a passed ship gate. */
+function writeRunningOrder(dir: string, id: string): void {
+  const file = join(dir, 'order.json')
+  writeFileSync(
+    file,
+    JSON.stringify({ ...JSON.parse(readFileSync(file, 'utf8')), status: 'running' })
+  )
+  const nodes = [
+    passedNode({ id: 'build:lane-1', kind: 'fanout', role: 'builder', lane: 1 }),
+    passedNode({ id: 'ship', kind: 'gate', role: null, lane: null }),
+  ]
   writeFileSync(
     join(dir, 'run-graph.json'),
-    JSON.stringify({
-      orderId: id,
-      recipe: 'direct',
-      nodes: [node('build:lane-1', 'fanout', 'builder', 1), node('ship', 'gate', null, null)],
-    })
+    JSON.stringify({ orderId: id, recipe: 'direct', nodes })
   )
-  // The draft this run opened, as shipping records it.
+}
+
+/** The draft this run opened, as shipping records it. */
+function writeDraftPull(dir: string): void {
   writeFileSync(
     join(dir, 'pulls.json'),
     JSON.stringify([
@@ -130,6 +107,10 @@ test('a draft’s CI is on the Floor while it is watched', async () => {
       },
     ])
   )
+}
+
+/** CI being watched on that draft: round 1 of 2, one check failing and one pending. */
+function writeWatchedCi(dir: string): void {
   const link = (run: number) => `https://github.com/o/r/actions/runs/${run}/job/1`
   writeFileSync(
     join(dir, 'ci.json'),
@@ -151,6 +132,31 @@ test('a draft’s CI is on the Floor while it is watched', async () => {
       at: new Date().toISOString(),
     })
   )
+}
+
+/** The text of the Floor's CI band. */
+function ciBand(): Promise<string> {
+  return inFoundry<string>(
+    handle,
+    `(function () {
+    var h = document.getElementById('fdry-ci-h')
+    return h && h.closest('section') ? h.closest('section').innerText : ''
+  })()`
+  )
+}
+
+test('a draft’s CI is on the Floor while it is watched', async () => {
+  const id = await createTypedOrder(handle, {
+    repo,
+    text: 'a draft whose CI is being watched',
+    missing: 'no order was created',
+  })
+  const dir = join(repo, '.foundry', 'orders', id)
+  writeRunningOrder(dir, id)
+  writeDraftPull(dir)
+  writeWatchedCi(dir)
+
+  handle = await restartFoundry(handle, 'Foundry Floor')
 
   // The order's row says the same as its Floor before it is opened: the pull
   // request, and the CI round with a spinner while the checks run.
@@ -158,30 +164,15 @@ test('a draft’s CI is on the Floor while it is watched', async () => {
   expect(list).toContain('#7')
   expect(list).toContain('Fix 1 of 2')
 
-  const band = () =>
-    inFoundry<string>(
-      handle,
-      `(function () {
-    var h = document.getElementById('fdry-ci-h')
-    return h && h.closest('section') ? h.closest('section').innerText : ''
-  })()`
-    )
-  await expect.poll(band, { timeout: 15_000 }).toContain('Fix 1 of 2')
-  expect(await band()).toContain('Test')
+  await expect.poll(ciBand, { timeout: 15_000 }).toContain('Fix 1 of 2')
+  expect(await ciBand()).toContain('Test')
 
   await captureFoundry(handle, 'floor-ci.png')
 })
 
-test('the Ledger’s Factory tab reads the numbers off what was recorded', async () => {
-  const created = (await foundryChannel(handle, 'foundry:order.create', {
-    source: { kind: 'typed', text: 'a shipped order to measure' },
-    repoPaths: [repo],
-  })) as { order?: { id: string } }
-  const id = created.order?.id as string
-  expect(id, 'no order was created to measure').toBeTruthy()
-
-  // What a run that shipped first time leaves behind: started, then a draft
-  // thirty minutes after the order was seeded, with nothing sent back.
+/** What a run that shipped first time leaves behind: started, then a draft
+ * thirty minutes after the order was seeded, with nothing sent back. */
+function writeShippedFirstTime(id: string): void {
   const seededAt = Date.now()
   const entry = (minutes: number, action: string): string =>
     JSON.stringify({
@@ -197,15 +188,13 @@ test('the Ledger’s Factory tab reads the numbers off what was recorded', async
     join(repo, '.foundry', 'orders', id, 'ledger.jsonl'),
     [entry(10, 'run.started'), entry(30, 'ship.draft_opened')].map((line) => `${line}\n`).join('')
   )
+}
 
-  await openFoundry(handle)
-  expect(await clickByName(handle, 'button', 'Ledger')).toBe(true)
-  await expect.poll(() => clickByName(handle, 'button', 'Factory'), { timeout: 15_000 }).toBe(true)
-
-  const tiles = () =>
-    inFoundry<Record<string, string>>(
-      handle,
-      `(function () {
+/** The Factory tab's metric tiles, by label. */
+function metricTiles(): Promise<Record<string, string>> {
+  return inFoundry<Record<string, string>>(
+    handle,
+    `(function () {
     var out = {}
     document.querySelectorAll('.fdry-metrics-tile').forEach(function (tile) {
       var label = tile.querySelector('.fdry-metrics-tile__label')
@@ -213,16 +202,11 @@ test('the Ledger’s Factory tab reads the numbers off what was recorded', async
     })
     return out
   })()`
-    )
-  await expect.poll(async () => (await tiles()).Shipped, { timeout: 15_000 }).toBe('1')
-  const finalTiles = await tiles()
-  expect(finalTiles['First-pass yield']).toBe('100%')
-  expect(finalTiles['Median lead time']).toBe('30 min')
-  expect(await bodyText(handle)).toContain('a shipped order to measure')
+  )
+}
 
-  await captureFoundry(handle, 'ledger-factory.png')
-
-  // And on the factory site's status wall.
+/** The factory site's status wall shows the same metrics. */
+async function expectStatusWall(): Promise<void> {
   expect(await clickByName(handle, 'button', 'Forge')).toBe(true)
   expect(await clickByName(handle, 'button', 'Factory view')).toBe(true)
   const wall = () =>
@@ -235,6 +219,32 @@ test('the Ledger’s Factory tab reads the numbers off what was recorded', async
     )
   await expect.poll(wall, { timeout: 15_000 }).toContain('First-pass yield')
   await captureFoundry(handle, 'site-status-wall.png')
+}
+
+test('the Ledger’s Factory tab reads the numbers off what was recorded', async () => {
+  const id = await createTypedOrder(handle, {
+    repo,
+    text: 'a shipped order to measure',
+    missing: 'no order was created to measure',
+  })
+  writeShippedFirstTime(id)
+  // Foundry keeps each ledger in memory from its first read and never sees a
+  // hand edit; an open panel may already have read this order's after create.
+  handle = await restartFoundry(handle, 'Foundry Floor')
+
+  expect(await clickByName(handle, 'button', 'Ledger')).toBe(true)
+  await expect.poll(() => clickByName(handle, 'button', 'Factory'), { timeout: 15_000 }).toBe(true)
+
+  await expect.poll(async () => (await metricTiles()).Shipped, { timeout: 15_000 }).toBe('1')
+  const finalTiles = await metricTiles()
+  expect(finalTiles['First-pass yield']).toBe('100%')
+  expect(finalTiles['Median lead time']).toBe('30 min')
+  expect(await bodyText(handle)).toContain('a shipped order to measure')
+
+  await captureFoundry(handle, 'ledger-factory.png')
+
+  // And on the factory site's status wall.
+  await expectStatusWall()
   // Back to the list, tidying up after itself.
   expect(await clickByName(handle, 'button', 'List view')).toBe(true)
 })

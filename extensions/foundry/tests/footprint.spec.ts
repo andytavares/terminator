@@ -2,14 +2,7 @@ import { describe, it, expect } from 'vitest'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import {
-  resolveDataRoot,
-  untrackedNotice,
-  orderDir,
-  unitDir,
-  laneDir,
-  ledgerPath,
-} from '../src/data-root.js'
+import { resolveDataRoot, untrackedNotice, orderDir, ledgerPath } from '../src/data-root.js'
 
 // The footprint promise, held by a test rather than by good intentions.
 //
@@ -31,6 +24,11 @@ function sourceFiles(dir: string): string[] {
 const files = sourceFiles(srcDir)
 
 describe('the repository footprint', () => {
+  describe('dotfiles', dotfilesTests)
+  describe('the data root', theDataRootTests)
+})
+
+function dotfilesTests() {
   // Naming .gitignore in prose is fine — several comments explain precisely
   // that Foundry will not touch one. What must not exist is a write whose
   // target is an ignore file, so that is what this looks for.
@@ -63,14 +61,11 @@ describe('the repository footprint', () => {
     }
     expect(offenders).toEqual([])
   })
+}
 
+function theDataRootTests() {
   it('routes every record path through the data root', () => {
-    for (const helper of [
-      orderDir('/root', 'WO-1'),
-      unitDir('/root', 'WO-1', 'U-1'),
-      laneDir('/root', 'WO-1', 1, 'repo'),
-      ledgerPath('/root', 'WO-1'),
-    ]) {
+    for (const helper of [orderDir('/root', 'WO-1'), ledgerPath('/root', 'WO-1')]) {
       expect(helper.startsWith('/root/')).toBe(true)
     }
   })
@@ -79,7 +74,7 @@ describe('the repository footprint', () => {
     const resolved = resolveDataRoot('/var/foundry', '/repos/terminator')
     expect(orderDir(resolved.root, 'WO-1').startsWith('/repos/terminator')).toBe(false)
   })
-})
+}
 
 describe('untrackedNotice', () => {
   it('warns once when the default location is used', () => {

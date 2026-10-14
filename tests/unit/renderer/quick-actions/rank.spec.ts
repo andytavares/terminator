@@ -39,10 +39,11 @@ describe('frecencyScore', () => {
   })
 })
 
-describe('rankFirstScreen', () => {
-  const now = 1_000_000_000_000
-  const actions = [action('a'), action('b'), action('c'), action('d'), action('e')]
+const now = 1_000_000_000_000
 
+const actions = [action('a'), action('b'), action('c'), action('d'), action('e')]
+
+describe('rankFirstScreen', () => {
   it('follows pin order regardless of usage', () => {
     const { pinned } = rankFirstScreen(actions, { pins: ['c', 'a'], usage: [], now })
     expect(pinned.map((a) => a.id)).toEqual(['c', 'a'])
@@ -60,16 +61,17 @@ describe('rankFirstScreen', () => {
       { id: 'c', count: 5, lastUsedAt: now },
     ]
     const { recent } = rankFirstScreen(actions, { pins: ['a'], usage, now })
-    expect(recent[0].id).toBe('c')
-    expect(recent.map((a) => a.id)).not.toContain('a')
+    expect(recent.map((a) => a.id)).toEqual(['c', 'b'])
   })
 
   it('drops stale usage ids that are no longer live actions', () => {
     const usage: ActionUsage[] = [{ id: 'ghost', count: 100, lastUsedAt: now }]
     const { recent } = rankFirstScreen(actions, { pins: [], usage, now })
-    expect(recent.map((a) => a.id)).not.toContain('ghost')
+    expect(recent).toEqual([])
   })
+})
 
+describe('rankFirstScreen — limits the recent row to the given limit, defaulting to 4', () => {
   it('limits the recent row to the given limit, defaulting to 4', () => {
     const usage: ActionUsage[] = actions.map((a) => ({ id: a.id, count: 1, lastUsedAt: now }))
     const { recent } = rankFirstScreen(actions, { pins: [], usage, now })

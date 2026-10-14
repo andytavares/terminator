@@ -6,28 +6,19 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-const { mockExecFile } = vi.hoisted(() => ({ mockExecFile: vi.fn() }))
+import { bindShellToStub, stubFails, stubPrints } from './support/shell'
 
-vi.mock('child_process', () => ({
-  execFile: mockExecFile,
-  spawn: vi.fn(),
-}))
+const mockExecFile = vi.fn()
+bindShellToStub(mockExecFile)
 
 import { pushBranch, pullFastForward } from '../../src/git/git-service'
 
-type ExecCallback = (err: Error | null, result?: { stdout: string; stderr: string }) => void
-
 function mockExecSuccess(stdout = '') {
-  mockExecFile.mockImplementationOnce(
-    (_cmd: string, _args: string[], _opts: unknown, cb: ExecCallback) =>
-      cb(null, { stdout, stderr: '' })
-  )
+  mockExecFile.mockImplementationOnce(stubPrints(stdout))
 }
 
 function mockExecError(message: string) {
-  mockExecFile.mockImplementationOnce(
-    (_cmd: string, _args: string[], _opts: unknown, cb: ExecCallback) => cb(new Error(message))
-  )
+  mockExecFile.mockImplementationOnce(stubFails(new Error(message)))
 }
 
 beforeEach(() => {
@@ -61,7 +52,9 @@ describe('pushBranch', () => {
 
     expect(result).toEqual({ success: true, branch: 'feature', remote: 'origin' })
   })
+})
 
+describe('pushBranch — failures', () => {
   it('returns NO_UPSTREAM when the branch has no upstream', async () => {
     mockExecError('error: The current branch has no upstream branch')
     const result = await pushBranch('/repo')

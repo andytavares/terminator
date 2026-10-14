@@ -1,5 +1,6 @@
 import { z } from 'zod'
-import { handleChannel } from './channel-registrar.js'
+import { defineChannel } from '@terminator/extension-sdk'
+import { registerInvokeTable, noPayload } from './invoke-table.js'
 import { detectEditor, openInEditor } from '../editor/open-in-editor.js'
 import { getGlobalSettings } from '../storage/settings-store.js'
 
@@ -11,16 +12,23 @@ import { getGlobalSettings } from '../storage/settings-store.js'
  * took a command from the renderer would be a way to run anything.
  */
 export function registerEditorHandlers(): void {
-  handleChannel('editor:detect', async () => {
-    const editor = await detectEditor(configuredEditorId())
-    return editor === null ? { editor: null } : { editor: { id: editor.id, name: editor.name } }
-  })
-
-  handleChannel('editor:open', async (_event, payload) => {
-    const parsed = z.object({ folderPath: z.string().min(1) }).safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    return openInEditor(parsed.data.folderPath, configuredEditorId())
-  })
+  registerInvokeTable([
+    defineChannel({
+      channel: 'editor:detect',
+      schema: noPayload,
+      invalid: { editor: null },
+      run: async () => {
+        const editor = await detectEditor(configuredEditorId())
+        return editor === null ? { editor: null } : { editor: { id: editor.id, name: editor.name } }
+      },
+    }),
+    defineChannel({
+      channel: 'editor:open',
+      schema: z.object({ folderPath: z.string().min(1) }),
+      invalid: { error: 'VALIDATION_ERROR' },
+      run: ({ folderPath }) => openInEditor(folderPath, configuredEditorId()),
+    }),
+  ])
 }
 
 /** The user's choice, when they have made one. Absent means "detect". */

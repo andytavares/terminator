@@ -23,7 +23,9 @@ describe('MetricsBar', () => {
     )
     expect(screen.getByText(/42%/)).toBeTruthy()
   })
+})
 
+describe('MetricsBar — renders memory in GB format', () => {
   it('renders memory in GB format', () => {
     render(
       <MetricsBar
@@ -38,7 +40,9 @@ describe('MetricsBar', () => {
     )
     expect(screen.getByText(/2\.0 \/ 8\.0 GB/)).toBeTruthy()
   })
+})
 
+describe('MetricsBar — renders network rates', () => {
   it('renders network rates', () => {
     render(
       <MetricsBar
@@ -53,7 +57,9 @@ describe('MetricsBar', () => {
     )
     expect(screen.getByText(/1 KB\/s/)).toBeTruthy()
   })
+})
 
+describe('MetricsBar — renders network rates in MB/s for large values', () => {
   it('renders network rates in MB/s for large values', () => {
     render(
       <MetricsBar
@@ -68,7 +74,9 @@ describe('MetricsBar', () => {
     )
     expect(screen.getByText(/MB\/s/)).toBeTruthy()
   })
+})
 
+describe('MetricsBar — renders network rates in B/s for tiny values', () => {
   it('renders network rates in B/s for tiny values', () => {
     render(
       <MetricsBar
@@ -83,7 +91,9 @@ describe('MetricsBar', () => {
     )
     expect(screen.getByText(/200 B\/s/)).toBeTruthy()
   })
+})
 
+describe('MetricsBar — applies red color at 90%+ CPU', () => {
   it('applies red color at 90%+ CPU', () => {
     const { container } = render(
       <MetricsBar
@@ -100,7 +110,9 @@ describe('MetricsBar', () => {
     // Browser normalises #e03131 to rgb(224, 49, 49)
     expect(fill.style.background).toMatch(/e03131|224.*49.*49/)
   })
+})
 
+describe('MetricsBar — applies orange color at 70–89% CPU', () => {
   it('applies orange color at 70–89% CPU', () => {
     const { container } = render(
       <MetricsBar

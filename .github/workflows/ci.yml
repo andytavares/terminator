@@ -19,28 +19,35 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version-file: .nvmrc
           cache: 'npm'
 
       - name: Install dependencies
         run: npm ci
 
-      # Gates on what actually ships. Production dependencies must carry no
-      # high or critical advisory — that is enforceable and currently clean.
-      - name: Security audit (production dependencies)
-        run: npm audit --omit=dev --audit-level=high
+      # Every dependency, shipped or tooling, must carry no high or critical
+      # advisory (Constitution IV). Overrides used to reach patched versions are
+      # listed with their advisories in docs/CONTRIBUTING.md.
+      - name: Security audit
+        run: npm audit --audit-level=high
 
-      # Development tooling is reported but does not fail the build, because it
-      # cannot currently be made clean: `eslint-plugin-react` and
-      # `electron-winstaller` both still depend on minimatch 3, whose
-      # brace-expansion is covered by an advisory that only 5.0.8 satisfies, and
-      # 5.x changed its CommonJS export so forcing it breaks them at runtime.
-      # Nothing here is shipped to a user. Revisit when those release.
-      - name: Security audit (all dependencies, informational)
-        run: npm audit --audit-level=high || true
+      - name: Dependency versions
+        run: npm run lint:deps
+
+      # Unused files, exports and dependencies (knip.jsonc, ADR 104).
+      - name: Unused code
+        run: npm run lint:unused
+
+      # Code that only tests reach: knip's production mode (knip.jsonc, ADR 107).
+      - name: Unused production code
+        run: npm run lint:unused:production
+
+      # Copy-pasted code in src, packages and extensions (.jscpd.json, ADR 105).
+      - name: Duplicate code
+        run: npm run lint:duplicates
 
       - name: Lint
-        run: npx eslint . --ext .ts,.tsx
+        run: npm run lint
 
   typecheck:
     name: Typecheck
@@ -51,20 +58,17 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version-file: .nvmrc
           cache: 'npm'
 
       - name: Install dependencies
         run: npm ci
 
+      # `tsc --noEmit` on the root tsconfig checks nothing: it is `files: []`
+      # plus references, which only `tsc --build` follows. This checks each
+      # project by name.
       - name: Typecheck
-        run: npx tsc --noEmit
-
-      # The root typecheck references only main, renderer and shared, so
-      # extension code was never checked at all and type errors in it reached
-      # a green build.
-      - name: Typecheck extensions
-        run: npm run typecheck:extensions
+        run: npm run typecheck
 
   format:
     name: Format
@@ -75,7 +79,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version-file: .nvmrc
           cache: 'npm'
 
       - name: Install dependencies
@@ -83,6 +87,53 @@ jobs:
 
       - name: Check formatting
         run: npm run format:check
+
+  # Every story is a test (ADR 098): it renders in Chromium and runs its play
+  # function, in the light and the dark theme. The build proves the Storybook
+  # site itself still compiles.
+  stories:
+    name: Stories
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Test stories
+        run: npm run test:stories
+        timeout-minutes: 5
+
+      - name: Build Storybook
+        run: npm run build-storybook
+
+      # Screenshots of every story against the Linux baselines in
+      # packages/extension-ui/visual/__screenshots__/linux (ADR 098). Baselines
+      # are per platform, so this job compares on Linux only; a macOS run would
+      # look for .../darwin and is not made. A story with no baseline fails and
+      # gets one written here (--update-snapshots=missing); the step below
+      # uploads them so they can be reviewed and committed.
+      - name: Compare story screenshots
+        run: npm run test:visual -w @terminator/extension-ui -- --update-snapshots=missing
+        timeout-minutes: 5
+
+      - name: Upload new baselines
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: story-baselines-linux
+          path: packages/extension-ui/visual/__screenshots__/linux/
+          if-no-files-found: ignore
+          retention-days: 14
 
   # On Linux: GitHub allows five macOS jobs at once, and those go to the build
   # and E2E, which drive the real app. Tests of macOS behaviour pin
@@ -101,7 +152,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version-file: .nvmrc
           cache: 'npm'
 
       - name: Install dependencies
@@ -111,8 +162,12 @@ jobs:
       - name: Install zsh
         run: command -v zsh || (sudo apt-get update -qq && sudo apt-get install -y -qq zsh)
 
+      # TMPDIR is an empty directory for the run, and the step fails if a spec
+      # leaves anything in it (scripts/check-temp-leaks.mjs): specs that never
+      # removed their temporary directories once filled a disk with ~22,000.
       - name: Test
         run: >-
+          node scripts/check-temp-leaks.mjs
           npx vitest run --coverage --shard=${{ matrix.shard }}/4 --reporter=blob --reporter=dot
           --coverage.thresholds.lines=0 --coverage.thresholds.functions=0
           --coverage.thresholds.branches=0 --coverage.thresholds.statements=0
@@ -127,6 +182,28 @@ jobs:
           include-hidden-files: true
           retention-days: 1
 
+  # The wall-clock budgets (`*.perf.spec.ts`), one file at a time in a job of
+  # their own: in the unit shards they share the CPU with every other spec and
+  # measure the load rather than the code.
+  perf:
+    name: Perf budgets
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Perf budgets
+        run: npm run test:perf
+        timeout-minutes: 5
+
   # The required "Test" check. Same OS as the shards, because the blobs carry
   # their absolute source paths and coverage is remapped against them.
   test:
@@ -140,7 +217,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version-file: .nvmrc
           cache: 'npm'
 
       - name: Install dependencies
@@ -152,7 +229,7 @@ jobs:
           path: .vitest-reports
           merge-multiple: true
 
-      - name: Merge reports and enforce coverage
+      - name: Merge reports and write coverage
         run: >-
           npx vitest run --merge-reports --coverage --reporter=dot --reporter=junit
           --outputFile.junit=test-report.junit.xml
@@ -195,7 +272,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version-file: .nvmrc
           cache: 'npm'
 
       - name: Install dependencies
@@ -210,6 +287,85 @@ jobs:
             echo "::error::npm run build printed the warnings above"
             exit 1
           fi
+
+  # The app started the way a developer starts it, from a clean checkout with no
+  # npm cache: `npm run dev`, and `npm run preview` after `npm run build`. A
+  # fresh install once could not start at all ("Error: Electron uninstall")
+  # while every other job passed, because none of them ran these scripts.
+  # scripts/smoke-start.mjs checks for App ready, every extension activated, and
+  # no error or uncaught exception, then quits the app.
+  start:
+    name: Start (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, ubuntu-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Electron needs a display on Linux; macOS has one.
+      - name: npm run dev
+        run: ${{ runner.os == 'Linux' && 'xvfb-run -a ' || '' }}node scripts/smoke-start.mjs dev
+        timeout-minutes: 8
+
+      - name: npm run build
+        run: npm run build
+
+      - name: npm run preview
+        run: ${{ runner.os == 'Linux' && 'xvfb-run -a ' || '' }}node scripts/smoke-start.mjs preview
+        timeout-minutes: 8
+
+      # The packaged app, unsigned, from the same electron-builder.cjs the
+      # release uses. It once started with no extensions at all: they were not
+      # in app.asar. Linux only: macOS packaging signs and notarizes.
+      - name: Packaged app
+        if: runner.os == 'Linux'
+        run: |
+          npx electron-builder --linux dir --publish never
+          xvfb-run -a node scripts/smoke-start.mjs exec "$PWD/dist/linux-unpacked/@andytavaresterminator"
+        timeout-minutes: 15
+
+  # The specs that press keys at the X server (tests/e2e/x11-keys.ts), such as
+  # Task Vault's global capture shortcut. The E2E job runs on macOS, where they
+  # skip: synthesising a system-wide key there needs Accessibility consent for
+  # the runner. Chromium's sandbox needs a setuid helper or user namespaces this
+  # runner does not grant, so the app starts with --no-sandbox, as Start does.
+  e2e-x11:
+    name: E2E (Linux, X11)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # The e2e harness runs terminals under zsh; XTEST presses the keys.
+      - name: Install zsh and the X test extension
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq zsh libxtst6
+
+      - name: Build
+        run: npm run build
+
+      - name: Run X11 specs
+        env:
+          E2E_ELECTRON_ARGS: --no-sandbox
+        run: xvfb-run -a npx playwright test tests/e2e/task-vault-capture.spec.ts --reporter=dot
+        timeout-minutes: 10
 
   e2e-select:
     name: E2E select
@@ -226,7 +382,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version-file: .nvmrc
 
       # Which specs this diff can affect: scripts/e2e-select.mjs. A push to main
       # runs everything, and any path the map does not know runs everything.
@@ -258,7 +414,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version-file: .nvmrc
           cache: 'npm'
 
       - name: Install dependencies
@@ -276,6 +432,11 @@ jobs:
           node node_modules/electron/install.js
           codesign --force --deep --sign - node_modules/electron/dist/Electron.app
 
+      # This user's processes against the per-user limit, before and after each
+      # E2E step: what a step leaves running is still there in the next one.
+      - name: Process census (before the suite)
+        run: scripts/process-census.sh "before the suite"
+
       # No retries: a test that fails once fails the build. Shards are split by
       # recorded duration (scripts/e2e-shard.mjs), not Playwright's test count.
       - name: Run E2E suite
@@ -287,12 +448,16 @@ jobs:
           if [ "$MODE" = all ]; then SPECS=""; fi
           ARGS=$(node scripts/e2e-shard.mjs ${{ matrix.shard }} 5 $SPECS)
           if [ -z "$ARGS" ]; then echo "Nothing selected for this shard."; exit 0; fi
-          # remote-app.spec.ts drives the browser remote renderer in Chromium, and
+          # remote-app.spec.ts and remote-control.spec.ts drive the browser remote renderer in Chromium, and
           # git-integration-contrast.spec.ts and git-integration-stacking.spec.ts
           # render the extension views in it.
-          case "$ARGS" in *remote-app.spec.ts* | *git-integration-contrast.spec.ts* | *git-integration-stacking.spec.ts*) npx playwright install chromium ;; esac
+          case "$ARGS" in *remote-app.spec.ts* | *remote-control.spec.ts* | *git-integration-contrast.spec.ts* | *git-integration-stacking.spec.ts*) npx playwright install chromium ;; esac
           npx playwright test $ARGS --reporter=blob,dot
         timeout-minutes: 10
+
+      - name: Process census (after the suite)
+        if: ${{ !cancelled() }}
+        run: scripts/process-census.sh "after the suite"
 
       # A new or edited spec must pass three times before it merges: once in the
       # suite above and twice here, split across the shards the same way.
@@ -301,9 +466,13 @@ jobs:
         run: |
           ARGS=$(node scripts/e2e-shard.mjs ${{ matrix.shard }} 5 ${{ needs.e2e-select.outputs.changed }})
           if [ -z "$ARGS" ]; then echo "Nothing changed on this shard."; exit 0; fi
-          case "$ARGS" in *remote-app.spec.ts* | *git-integration-contrast.spec.ts* | *git-integration-stacking.spec.ts*) npx playwright install chromium ;; esac
+          case "$ARGS" in *remote-app.spec.ts* | *remote-control.spec.ts* | *git-integration-contrast.spec.ts* | *git-integration-stacking.spec.ts*) npx playwright install chromium ;; esac
           npx playwright test $ARGS --repeat-each=2 --reporter=dot
         timeout-minutes: 10
+
+      - name: Process census (after the burn-in)
+        if: ${{ !cancelled() && needs.e2e-select.outputs.changed != '' }}
+        run: scripts/process-census.sh "after the burn-in"
 
       - name: Upload blob report
         if: ${{ !cancelled() }}
@@ -348,7 +517,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version-file: .nvmrc
           cache: 'npm'
 
       - name: Install dependencies

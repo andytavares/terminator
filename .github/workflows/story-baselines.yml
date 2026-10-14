@@ -1,0 +1,76 @@
+name: Story baselines
+
+# Writes the Linux screenshot baselines for stories that have none and commits
+# them to the pull request's branch (ADR 098). Baselines are per platform, so
+# they are made on the platform that compares them
+# (https://playwright.dev/docs/test-snapshots). Runs only when a maintainer adds
+# the `update-story-baselines` label to a pull request from this repository; the
+# label is removed when the job ends. A push made with GITHUB_TOKEN starts no
+# other workflow
+# (https://docs.github.com/en/actions/using-workflows/triggering-a-workflow#triggering-a-workflow-from-a-workflow),
+# so the Stories check compares against the new baselines on the next push.
+
+on:
+  pull_request:
+    types: [labeled]
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  baselines:
+    name: Write story baselines
+    if: >-
+      github.event.label.name == 'update-story-baselines' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      # test:visual serves the built Storybook (playwright.visual.config.ts).
+      - name: Build Storybook
+        run: npm run build-storybook
+
+      # Writes a baseline only for a story that has none; an existing baseline
+      # is never overwritten here. Playwright reports each baseline it writes as
+      # a failure, so the step may fail and the commit still runs; the Stories
+      # check in ci.yml is the comparison that gates the pull request.
+      - name: Write missing baselines
+        run: npm run test:visual -w @terminator/extension-ui -- --update-snapshots=missing
+        timeout-minutes: 5
+        continue-on-error: true
+
+      - name: Commit the baselines
+        run: |
+          git add packages/extension-ui/visual/__screenshots__/linux
+          if git diff --cached --quiet; then
+            echo "Every story already has a baseline."
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'test(extension-ui): Linux baselines for the stories that had none'
+          git push
+
+      - name: Remove the label
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh pr edit ${{ github.event.pull_request.number }} --repo ${{ github.repository }} --remove-label update-story-baselines

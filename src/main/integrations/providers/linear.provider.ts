@@ -1,4 +1,4 @@
-import { LinearClient } from '@linear/sdk'
+import { LinearClient, PaginationOrderBy, type LinearDocument } from '@linear/sdk'
 import type {
   Issue,
   IssueComment,
@@ -7,6 +7,7 @@ import type {
   IssueSummary,
   MineSelector,
   TrackerAccount,
+  TrackerErrorKind,
 } from '../../../shared/types/index.js'
 import { TrackerError, toErrorMessage } from '../tracker-error.js'
 import type {
@@ -30,29 +31,19 @@ import type {
 const MAX_COMMENTS = 5
 
 /** Filter to exclude completed and canceled issues from listMine results. */
-const OPEN_STATES_FILTER = {
+const OPEN_STATES_FILTER: LinearDocument.IssueFilter = {
   state: { type: { nin: ['completed', 'canceled'] } },
-} as const
-
-interface LinearLike {
-  viewer: Promise<{
-    name: string
-    email: string
-    assignedIssues?: (vars?: unknown) => unknown
-    teams?: (vars?: unknown) => unknown
-  }>
-  issues(vars?: unknown): unknown
-  searchIssues(vars?: unknown): unknown
-  issue(id: string): unknown
-  createComment(input: { issueId: string; body: string }): unknown
-  updateIssue(id: string, input: { stateId: string }): unknown
-  createIssue(input: NewIssueInput): unknown
 }
+
+/** The part of the SDK client the provider calls; specs pass a fake of it. */
+type LinearLike = Pick<
+  LinearClient,
+  'viewer' | 'issues' | 'searchIssues' | 'issue' | 'createComment' | 'updateIssue' | 'createIssue'
+>
 
 export type LinearClientFactory = (apiKey: string) => LinearLike
 
-const defaultFactory: LinearClientFactory = (apiKey) =>
-  new LinearClient({ apiKey }) as unknown as LinearLike
+const defaultFactory: LinearClientFactory = (apiKey) => new LinearClient({ apiKey })
 
 function assertLinear(
   cred: StoredCredential
@@ -95,26 +86,31 @@ function toAccount(
  * Linear itself asked for, and guessing instead is how an integration gets
  * itself blocked for longer.
  */
+// Matched in order, by the SDK's error type or, failing that, its message.
+const ERROR_KINDS: ReadonlyArray<{ type: string; message: RegExp; kind: TrackerErrorKind }> = [
+  {
+    type: 'AuthenticationError',
+    message: /authenticat|unauthor|invalid api key/i,
+    kind: 'auth-failed',
+  },
+  { type: 'FeatureNotAccessible', message: /not found|entity not found/i, kind: 'not-found' },
+  { type: 'NetworkError', message: /fetch failed|network/i, kind: 'unavailable' },
+]
+
 function asTrackerError(error: unknown): TrackerError {
   if (error instanceof TrackerError) return error
   const message = toErrorMessage(error)
   const type = (error as { type?: unknown } | null)?.type
-  const retryAfter = (error as { retryAfter?: unknown } | null)?.retryAfter
   if (type === 'Ratelimited' || /rate.?limit/i.test(message)) {
+    const retryAfter = (error as { retryAfter?: unknown } | null)?.retryAfter
     return new TrackerError('rate-limited', message, {
       retryAfterMs: typeof retryAfter === 'number' ? retryAfter * 1000 : undefined,
     })
   }
-  if (type === 'AuthenticationError' || /authenticat|unauthor|invalid api key/i.test(message)) {
-    return new TrackerError('auth-failed', message)
-  }
-  if (type === 'FeatureNotAccessible' || /not found|entity not found/i.test(message)) {
-    return new TrackerError('not-found', message)
-  }
-  if (type === 'NetworkError' || /fetch failed|network/i.test(message)) {
-    return new TrackerError('unavailable', message)
-  }
-  return new TrackerError('failed', message, { cause: error })
+  const known = ERROR_KINDS.find((entry) => type === entry.type || entry.message.test(message))
+  return known === undefined
+    ? new TrackerError('failed', message, { cause: error })
+    : new TrackerError(known.kind, message)
 }
 
 async function run<T>(work: () => Promise<T>): Promise<T> {
@@ -266,6 +262,176 @@ function toRawStates(nodes: readonly unknown[]): RawState[] {
   })
 }
 
+/** The issue behind `key`, or a not-found TrackerError. */
+async function issueOrThrow(client: LinearLike, key: string): Promise<RawIssue> {
+  const raw = (await client.issue(key)) as RawIssue | null
+  if (raw === null || raw === undefined) {
+    throw new TrackerError('not-found', `Issue ${key} not found`)
+  }
+  return raw
+}
+
+/** The workflow states of the issue's team, each with the intent it satisfies. */
+async function stateOptionsOf(raw: RawIssue): Promise<TrackerStateOption[]> {
+  const team = (await Promise.resolve(raw.team)) as { states?: () => unknown } | null
+  if (team === null || team === undefined || typeof team.states !== 'function') return []
+  const connection = (await team.states()) as { nodes?: unknown[] } | null
+  return withIntents(toRawStates(connection?.nodes ?? []))
+}
+
+function verify(client: LinearLike): Promise<VerifiedAccount> {
+  return run(async () => {
+    const viewer = await client.viewer
+    return { name: viewer.name, email: viewer.email }
+  })
+}
+
+/** The issues assigned to the configured email, or to the key's own viewer when there is none. */
+async function assignedIssues(client: LinearLike, email: string | null, limit: number) {
+  if (email === null) {
+    // No email configured: the key's own viewer is the answer, and it is one
+    // fewer round trip than looking the user up first.
+    const viewer = await client.viewer
+    return viewer.assignedIssues?.({ filter: OPEN_STATES_FILTER, first: limit }) ?? { nodes: [] }
+  }
+  return client.issues({
+    filter: { ...OPEN_STATES_FILTER, assignee: { email: { eq: email } } },
+    first: limit,
+    orderBy: PaginationOrderBy.UpdatedAt,
+  })
+}
+
+function listMine(client: LinearLike, mine: MineSelector, limit: number): Promise<IssueSummary[]> {
+  return run(async () => {
+    const email = mine.kind === 'assignee' ? mine.email : null
+    const connection = (await assignedIssues(client, email, limit)) as {
+      nodes?: RawIssue[]
+    } | null
+    return Promise.all((connection?.nodes ?? []).map(toSummary))
+  })
+}
+
+function search(client: LinearLike, term: string, limit: number): Promise<IssueSummary[]> {
+  return run(async () => {
+    const connection = (await client.searchIssues(term, { first: limit })) as {
+      nodes?: RawIssue[]
+    } | null
+    return Promise.all((connection?.nodes ?? []).map(toSummary))
+  })
+}
+
+async function linearIssueByKey(client: LinearLike, key: string): Promise<Issue | null> {
+  try {
+    const raw = (await client.issue(key)) as RawIssue | null
+    if (raw === null || raw === undefined) return null
+    return await toIssue(raw)
+  } catch (error) {
+    const tracked = asTrackerError(error)
+    // "Gone" is an answer, not a failure — the badge renders unavailable
+    // and the operator can unlink or relink.
+    if (tracked.kind === 'not-found') return null
+    throw tracked
+  }
+}
+
+function comment(client: LinearLike, key: string, body: string): Promise<void> {
+  return run(async () => {
+    // Linear issues are addressed by UUID, always — not by the human key, even where Linear would
+    // accept one. One addressing mechanism means one thing to be right about, and the UUID is the
+    // one Linear documents as working for every operation including this one.
+    const raw = await issueOrThrow(client, key)
+    const result = (await client.createComment({ issueId: raw.id, body })) as {
+      success?: boolean
+    } | null
+    if (result?.success !== true) {
+      throw new TrackerError('failed', `Linear refused the comment on ${key}`)
+    }
+  })
+}
+
+function states(client: LinearLike, key: string): Promise<TrackerStateOption[]> {
+  return run(async () => stateOptionsOf(await issueOrThrow(client, key)))
+}
+
+interface MoveTarget {
+  intent: TransitionIntent
+  optionId?: string
+}
+
+/** The state a move goes to: the operator's own mapping wins over the type rule. An override
+ * naming a state this workflow lacks is refused, not fallen back on: moving somewhere they did
+ * not choose is worse than not moving. */
+function chosenState(
+  options: TrackerStateOption[],
+  key: string,
+  { intent, optionId }: MoveTarget
+): TrackerStateOption {
+  const chosen =
+    optionId === undefined
+      ? options.find((option) => option.intent === intent && option.available)
+      : options.find((option) => option.id === optionId && option.available)
+  if (chosen === undefined) {
+    throw new TrackerError(
+      'not-found',
+      optionId === undefined
+        ? `No available Linear state on ${key} satisfies "${intent}"`
+        : `Linear state ${optionId} is not available on ${key}`
+    )
+  }
+  return chosen
+}
+
+function transition(client: LinearLike, key: string, target: MoveTarget): Promise<void> {
+  return run(async () => {
+    const raw = await issueOrThrow(client, key)
+    const chosen = chosenState(await stateOptionsOf(raw), key, target)
+    const result = (await client.updateIssue(raw.id, { stateId: chosen.id })) as {
+      success?: boolean
+    } | null
+    if (result?.success !== true) {
+      throw new TrackerError('failed', `Linear refused the move of ${key} to ${chosen.name}`)
+    }
+  })
+}
+
+function toTeam(node: unknown): TrackerTeam[] {
+  const raw = node as { id?: unknown; key?: unknown; name?: unknown }
+  if (typeof raw.id !== 'string') return []
+  return [
+    {
+      id: raw.id,
+      key: typeof raw.key === 'string' ? raw.key : '',
+      name: typeof raw.name === 'string' ? raw.name : raw.id,
+    },
+  ]
+}
+
+function teams(client: LinearLike): Promise<TrackerTeam[]> {
+  return run(async () => {
+    const viewer = await client.viewer
+    const connection = (await viewer.teams?.()) as { nodes?: unknown[] } | null | undefined
+    return (connection?.nodes ?? []).flatMap(toTeam)
+  })
+}
+
+function create(client: LinearLike, input: NewIssueInput): Promise<Issue> {
+  return run(async () => {
+    const payload = (await client.createIssue({
+      teamId: input.teamId,
+      title: input.title,
+      description: input.description,
+    })) as { success?: boolean; issue?: unknown } | null
+    if (payload?.success !== true) {
+      throw new TrackerError('failed', `Linear refused to create "${input.title}"`)
+    }
+    const raw = (await Promise.resolve(payload.issue)) as RawIssue | null | undefined
+    if (raw === null || raw === undefined) {
+      throw new TrackerError('failed', `Linear created "${input.title}" but returned no issue`)
+    }
+    return toIssue(raw)
+  })
+}
+
 export function createLinearProvider(
   makeClient: LinearClientFactory = defaultFactory
 ): TrackerProvider {
@@ -274,175 +440,19 @@ export function createLinearProvider(
     return makeClient(cred.apiKey)
   }
 
+  // Async throughout, so a credential for another tracker rejects rather than throws.
   return {
     id: 'linear',
-
-    async verify(cred): Promise<VerifiedAccount> {
-      const client = clientFor(cred)
-      return run(async () => {
-        const viewer = await client.viewer
-        return { name: viewer.name, email: viewer.email }
-      })
-    },
-
-    async listMine(cred, mine: MineSelector, limit): Promise<IssueSummary[]> {
-      const client = clientFor(cred)
-      return run(async () => {
-        const email = mine.kind === 'assignee' ? mine.email : null
-        const connection = (await (email === null
-          ? // No email configured: the key's own viewer is the answer, and it
-            // is one fewer round trip than looking the user up first.
-            ((await client.viewer).assignedIssues?.({
-              filter: OPEN_STATES_FILTER,
-              first: limit,
-            }) ?? { nodes: [] })
-          : client.issues({
-              filter: { ...OPEN_STATES_FILTER, assignee: { email: { eq: email } } },
-              first: limit,
-              orderBy: 'updatedAt',
-            }))) as { nodes?: RawIssue[] } | null
-        return Promise.all((connection?.nodes ?? []).map(toSummary))
-      })
-    },
-
-    async search(cred, term, limit): Promise<IssueSummary[]> {
-      const client = clientFor(cred)
-      return run(async () => {
-        const connection = (await client.searchIssues({ term, first: limit })) as {
-          nodes?: RawIssue[]
-        } | null
-        return Promise.all((connection?.nodes ?? []).map(toSummary))
-      })
-    },
-
-    async get(cred, key): Promise<Issue | null> {
-      const client = clientFor(cred)
-      try {
-        const raw = (await client.issue(key)) as RawIssue | null
-        if (raw === null || raw === undefined) return null
-        return await toIssue(raw)
-      } catch (error) {
-        const tracked = asTrackerError(error)
-        // "Gone" is an answer, not a failure — the badge renders unavailable
-        // and the operator can unlink or relink.
-        if (tracked.kind === 'not-found') return null
-        throw tracked
-      }
-    },
-
-    async comment(cred, key, body): Promise<void> {
-      const client = clientFor(cred)
-      return run(async () => {
-        // Linear issues are addressed by UUID, always — not by the human key,
-        // even where Linear would accept one. One addressing mechanism means
-        // one thing to be right about, and the UUID is the one Linear
-        // documents as working for every operation including this one.
-        const raw = (await client.issue(key)) as RawIssue | null
-        if (raw === null || raw === undefined) {
-          throw new TrackerError('not-found', `Issue ${key} not found`)
-        }
-        const result = (await client.createComment({ issueId: raw.id, body })) as {
-          success?: boolean
-        } | null
-        if (result?.success !== true) {
-          throw new TrackerError('failed', `Linear refused the comment on ${key}`)
-        }
-      })
-    },
-
-    async states(cred, key): Promise<TrackerStateOption[]> {
-      const client = clientFor(cred)
-      return run(async () => {
-        const raw = (await client.issue(key)) as RawIssue | null
-        if (raw === null || raw === undefined) {
-          throw new TrackerError('not-found', `Issue ${key} not found`)
-        }
-        const team = (await Promise.resolve(raw.team)) as {
-          states?: () => unknown
-        } | null
-        if (team === null || team === undefined || typeof team.states !== 'function') return []
-        const connection = (await team.states()) as { nodes?: unknown[] } | null
-        return withIntents(toRawStates(connection?.nodes ?? []))
-      })
-    },
-
-    async transition(cred, key, intent, optionId): Promise<void> {
-      const client = clientFor(cred)
-      return run(async () => {
-        const raw = (await client.issue(key)) as RawIssue | null
-        if (raw === null || raw === undefined) {
-          throw new TrackerError('not-found', `Issue ${key} not found`)
-        }
-        const team = (await Promise.resolve(raw.team)) as { states?: () => unknown } | null
-        const connection =
-          team !== null && team !== undefined && typeof team.states === 'function'
-            ? ((await team.states()) as { nodes?: unknown[] } | null)
-            : null
-        const options = withIntents(toRawStates(connection?.nodes ?? []))
-
-        // The operator's own mapping wins over the type rule, which is the
-        // whole point of presenting it to them. An override naming a state
-        // this workflow does not have is refused rather than fallen back on:
-        // moving somewhere they did not choose is worse than not moving.
-        const chosen =
-          optionId === undefined
-            ? options.find((option) => option.intent === intent && option.available)
-            : options.find((option) => option.id === optionId && option.available)
-
-        if (chosen === undefined) {
-          throw new TrackerError(
-            'not-found',
-            optionId === undefined
-              ? `No available Linear state on ${key} satisfies "${intent}"`
-              : `Linear state ${optionId} is not available on ${key}`
-          )
-        }
-
-        const result = (await client.updateIssue(raw.id, { stateId: chosen.id })) as {
-          success?: boolean
-        } | null
-        if (result?.success !== true) {
-          throw new TrackerError('failed', `Linear refused the move of ${key} to ${chosen.name}`)
-        }
-      })
-    },
-
-    async teams(cred): Promise<TrackerTeam[]> {
-      const client = clientFor(cred)
-      return run(async () => {
-        const viewer = await client.viewer
-        const connection = (await viewer.teams?.()) as { nodes?: unknown[] } | null | undefined
-        return (connection?.nodes ?? []).flatMap((node) => {
-          const raw = node as { id?: unknown; key?: unknown; name?: unknown }
-          if (typeof raw.id !== 'string') return []
-          return [
-            {
-              id: raw.id,
-              key: typeof raw.key === 'string' ? raw.key : '',
-              name: typeof raw.name === 'string' ? raw.name : raw.id,
-            },
-          ]
-        })
-      })
-    },
-
-    async create(cred, input): Promise<Issue> {
-      const client = clientFor(cred)
-      return run(async () => {
-        const payload = (await client.createIssue({
-          teamId: input.teamId,
-          title: input.title,
-          description: input.description,
-        })) as { success?: boolean; issue?: unknown } | null
-        if (payload?.success !== true) {
-          throw new TrackerError('failed', `Linear refused to create "${input.title}"`)
-        }
-        const raw = (await Promise.resolve(payload.issue)) as RawIssue | null | undefined
-        if (raw === null || raw === undefined) {
-          throw new TrackerError('failed', `Linear created "${input.title}" but returned no issue`)
-        }
-        return toIssue(raw)
-      })
-    },
+    verify: async (cred) => verify(clientFor(cred)),
+    listMine: async (cred, mine, limit) => listMine(clientFor(cred), mine, limit),
+    search: async (cred, term, limit) => search(clientFor(cred), term, limit),
+    get: async (cred, key) => linearIssueByKey(clientFor(cred), key),
+    comment: async (cred, key, body) => comment(clientFor(cred), key, body),
+    states: async (cred, key) => states(clientFor(cred), key),
+    // The provider interface's (intent, optionId) pair, carried as one target.
+    transition: async (cred, key, ...[intent, optionId]) =>
+      transition(clientFor(cred), key, { intent, optionId }),
+    teams: async (cred) => teams(clientFor(cred)),
+    create: async (cred, input) => create(clientFor(cred), input),
   }
 }

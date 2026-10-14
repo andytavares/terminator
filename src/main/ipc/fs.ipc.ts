@@ -1,38 +1,65 @@
-import { handleChannel } from './channel-registrar.js'
-import type { BrowserWindow } from 'electron'
+import type { WebContents } from 'electron'
 import { z } from 'zod'
 import fs from 'node:fs/promises'
-import { fsWatcherService } from '../fs/fs-watcher.js'
+import { defineChannel } from '@terminator/extension-sdk'
+import { registerInvokeTable, noPayload, defineViewChannel } from './invoke-table.js'
+import { fsWatcherService, type FsChangeBatch, type FsChangeListener } from '../fs/fs-watcher.js'
 
-const WatchStartSchema = z.object({ projectRoot: z.string().min(1) })
-const ReadFileSchema = z.object({ filePath: z.string().min(1) })
+// A view's file watches (ADR 109). The view that asks is the one that is told, and it is named
+// by `event.sender` (https://www.electronjs.org/docs/latest/api/structures/ipc-main-invoke-event).
 
-export function registerFsHandlers(getMainWindow: () => BrowserWindow | null): void {
-  fsWatcherService.addHandler((event) => {
-    const win = getMainWindow()
-    if (win && !win.isDestroyed()) win.webContents.send('fs:changed', event)
+const listeners = new WeakMap<WebContents, FsChangeListener>()
+
+/** The event a view receives: the one file a burst changed, or null when it changed several. */
+function changeEventOf(batch: FsChangeBatch) {
+  const filename = batch.filenames.length === 1 ? batch.filenames[0] : null
+  return { projectRoot: batch.projectRoot, eventType: batch.eventType, filename }
+}
+
+/** The listener every watch of `view` reports to. Made once: it also ends the view's watches
+ * when the view is destroyed, or leaves the page that asked for them (a reload). */
+function listenerOf(view: WebContents): FsChangeListener {
+  const existing = listeners.get(view)
+  if (existing) return existing
+  const listener: FsChangeListener = (batch) => {
+    if (!view.isDestroyed()) view.send('fs:changed', changeEventOf(batch))
+  }
+  listeners.set(view, listener)
+  view.once('destroyed', () => fsWatcherService.unwatch(listener))
+  view.on('did-start-navigation', (navigation) => {
+    if (navigation.isMainFrame && !navigation.isSameDocument) fsWatcherService.unwatch(listener)
   })
+  return listener
+}
 
-  handleChannel('fs:watch-start', (_event, payload) => {
-    const parsed = WatchStartSchema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    fsWatcherService.watchStart(parsed.data.projectRoot)
-    return { ok: true }
-  })
+const fsChannels = [
+  defineViewChannel({
+    channel: 'fs:watch-start',
+    schema: z.object({ projectRoot: z.string().min(1) }),
+    invalid: { error: 'VALIDATION_ERROR' },
+    run: ({ projectRoot }, view) => {
+      fsWatcherService.watch(projectRoot, listenerOf(view))
+      return { ok: true }
+    },
+  }),
+  defineViewChannel({
+    channel: 'fs:watch-stop',
+    schema: noPayload,
+    invalid: { error: 'VALIDATION_ERROR' },
+    run: (_nothing, view) => {
+      fsWatcherService.unwatch(listenerOf(view))
+      return { ok: true }
+    },
+  }),
+  defineChannel({
+    channel: 'fs:read-file',
+    schema: z.object({ filePath: z.string().min(1) }),
+    invalid: { error: 'VALIDATION_ERROR' },
+    run: async ({ filePath }) => ({ content: await fs.readFile(filePath, 'utf-8') }),
+    onError: () => ({ error: 'FILE_NOT_FOUND' }),
+  }),
+]
 
-  handleChannel('fs:watch-stop', () => {
-    fsWatcherService.watchStop()
-    return { ok: true }
-  })
-
-  handleChannel('fs:read-file', async (_event, payload) => {
-    const parsed = ReadFileSchema.safeParse(payload)
-    if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-    try {
-      const content = await fs.readFile(parsed.data.filePath, 'utf-8')
-      return { content }
-    } catch {
-      return { error: 'FILE_NOT_FOUND' }
-    }
-  })
+export function registerFsHandlers(): void {
+  registerInvokeTable(fsChannels)
 }

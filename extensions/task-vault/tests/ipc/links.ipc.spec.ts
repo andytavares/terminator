@@ -1,256 +1,203 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import type { ExtensionDB } from '../../../../src/main/extensions/api'
+import { describe, it, expect, beforeEach } from 'vitest'
+import { DatabaseSync } from 'node:sqlite'
+import { wrapDb } from '../../../../src/main/db/index'
+import type { ExtensionDB } from '@terminator/extension-sdk'
+import { registerLinksIpcHandlers } from '../../src/ipc/links.ipc.js'
+import {
+  createIpcHarness,
+  createVaultDb,
+  seedArea,
+  seedProject,
+  seedTask,
+  selectTaskRow,
+} from '../support/vault-db'
 
-const { mockHandle, mockRemoveHandler } = vi.hoisted(() => ({
-  mockHandle: vi.fn(),
-  mockRemoveHandler: vi.fn(),
-}))
-vi.mock('electron', () => ({
-  ipcMain: { handle: mockHandle, removeHandler: mockRemoveHandler },
-}))
+const TARGET = '11111111-1111-4111-8111-111111111111'
+const OTHER = '22222222-2222-4222-8222-222222222222'
 
-// Adapter: registerHandler forwards to the electron ipcMain mocks so existing
-// capture/assert code (mockHandle.mock.calls, removeHandler assertions) still works.
-const mockApiIpc = {
-  registerHandler: (ch: string, fn: (payload: unknown) => unknown) => {
-    mockHandle(ch, (_e: unknown, payload: unknown) => fn(payload))
-    return { dispose: () => mockRemoveHandler(ch) }
-  },
-}
-const mockApi = {
-  ipc: mockApiIpc,
-} as unknown as import('../../../../src/main/extensions/api').ExtensionAPI
+let db: ExtensionDB
+let harness: ReturnType<typeof createIpcHarness>
 
-import { registerLinksIpcHandlers } from '../../src/ipc/links.ipc'
-
-const UUID = '550e8400-e29b-41d4-a716-446655440000'
-const TASK_ID = 'task-uuid-1'
-const PROJECT_NAME = 'alpha'
-
-function createMockDb() {
-  const mockQuery = vi.fn().mockResolvedValue([])
-  const mockGet = vi.fn().mockResolvedValue(undefined)
-  const mockRun = vi.fn().mockResolvedValue(undefined)
-  const db: ExtensionDB = {
-    query: mockQuery,
-    get: mockGet,
-    run: mockRun,
-    exec: vi.fn().mockResolvedValue(undefined),
-    transaction: vi
-      .fn()
-      .mockImplementation(async (fn: (tx: ExtensionDB) => Promise<unknown>) => fn(db)),
-  }
-  return Object.assign(db, { mockQuery, mockGet, mockRun })
-}
-
-type MockDb = ReturnType<typeof createMockDb>
-let db: MockDb
-
-function getHandler(channel: string): (event: unknown, payload: unknown) => Promise<unknown> {
-  let handler: ((event: unknown, payload: unknown) => Promise<unknown>) | undefined
-  vi.mocked(mockHandle).mockImplementation((ch, fn) => {
-    if (ch === channel) handler = fn as typeof handler
-  })
-  registerLinksIpcHandlers(mockApi, db)
-  if (!handler) throw new Error(`Handler for ${channel} not registered`)
-  return handler
-}
-
-beforeEach(() => {
-  vi.clearAllMocks()
-  db = createMockDb()
+beforeEach(async () => {
+  db = await createVaultDb()
+  harness = createIpcHarness()
+  registerLinksIpcHandlers(harness.api, db)
 })
 
+async function linksOf(table: 'tasks' | 'projects', key: string): Promise<string[]> {
+  const column = table === 'tasks' ? 'id' : 'name'
+  const row = await db.get<{ terminator_links: string }>(
+    `SELECT terminator_links FROM ${table} WHERE ${column} = ?`,
+    [key]
+  )
+  return JSON.parse(row?.terminator_links ?? '[]') as string[]
+}
+
 describe('task-vault:links:create', () => {
-  it('replaces all existing terminator links with the new one for taskId', async () => {
-    const OLD_UUID = 'aaaaaaaa-0000-0000-0000-000000000000'
-    db.mockGet.mockResolvedValue({ terminator_links: JSON.stringify([OLD_UUID]) })
-    const handler = getHandler('task-vault:links:create')
-    const result = await handler({}, { taskId: TASK_ID, targetId: UUID })
-    expect(result).toMatchObject({ success: true })
-    const writtenLinks = db.mockRun.mock.calls[0][1][0] as string
-    expect(JSON.parse(writtenLinks)).toEqual([UUID])
-    expect(writtenLinks).not.toContain(OLD_UUID)
+  it('replaces all existing links of a task with the new one', async () => {
+    await seedTask(db, { id: 't1', terminatorLinks: JSON.stringify([OTHER]) })
+
+    expect(
+      await harness.invoke('task-vault:links:create', { taskId: 't1', targetId: TARGET })
+    ).toEqual({
+      success: true,
+    })
+    expect(await linksOf('tasks', 't1')).toEqual([TARGET])
   })
 
-  it('appends terminator link via projectFilePath', async () => {
-    db.mockGet.mockResolvedValue({ terminator_links: '[]' })
-    const handler = getHandler('task-vault:links:create')
-    const result = await handler({}, { projectFilePath: PROJECT_NAME, targetId: UUID })
-    expect(result).toMatchObject({ success: true })
+  it('appends a link to a project once, however often it is created', async () => {
+    await seedProject(db, 'p1', 'alpha')
+
+    await harness.invoke('task-vault:links:create', { projectFilePath: 'alpha', targetId: OTHER })
+    await harness.invoke('task-vault:links:create', { projectFilePath: 'alpha', targetId: TARGET })
+    await harness.invoke('task-vault:links:create', { projectFilePath: 'alpha', targetId: TARGET })
+
+    expect(await linksOf('projects', 'alpha')).toEqual([OTHER, TARGET])
   })
 
-  it('returns NOT_FOUND when task does not exist', async () => {
-    const handler = getHandler('task-vault:links:create')
-    const result = await handler({}, { taskId: 'nonexistent', targetId: UUID })
-    expect(result).toMatchObject({ error: 'NOT_FOUND' })
-  })
-
-  it('returns NOT_FOUND when project does not exist', async () => {
-    const handler = getHandler('task-vault:links:create')
-    const result = await handler({}, { projectFilePath: 'nonexistent', targetId: UUID })
-    expect(result).toMatchObject({ error: 'NOT_FOUND' })
-  })
-
-  it('returns VALIDATION_ERROR for missing targetId', async () => {
-    const handler = getHandler('task-vault:links:create')
-    const result = await handler({}, { taskId: TASK_ID })
-    expect(result).toMatchObject({ error: 'VALIDATION_ERROR' })
+  it('returns NOT_FOUND for an unknown task or project', async () => {
+    expect(
+      await harness.invoke('task-vault:links:create', { taskId: 'x', targetId: TARGET })
+    ).toEqual({
+      error: 'NOT_FOUND',
+    })
+    expect(
+      await harness.invoke('task-vault:links:create', { projectFilePath: 'nope', targetId: TARGET })
+    ).toEqual({ error: 'NOT_FOUND' })
   })
 })
 
 describe('task-vault:links:remove', () => {
-  it('removes terminator link from task', async () => {
-    db.mockGet.mockResolvedValue({ terminator_links: JSON.stringify([UUID]) })
-    const handler = getHandler('task-vault:links:remove')
-    const result = await handler({}, { taskId: TASK_ID, targetId: UUID })
-    expect(result).toMatchObject({ success: true })
-    expect(db.mockRun).toHaveBeenCalled()
-    // The updated links JSON (first param array item) should not contain UUID
-    const writtenLinks = db.mockRun.mock.calls[0][1][0] as string
-    expect(writtenLinks).not.toContain(UUID)
+  it('removes only the given link from a task', async () => {
+    await seedTask(db, { id: 't1', terminatorLinks: JSON.stringify([TARGET, OTHER]) })
+
+    expect(
+      await harness.invoke('task-vault:links:remove', { taskId: 't1', targetId: TARGET })
+    ).toEqual({
+      success: true,
+    })
+    expect(await linksOf('tasks', 't1')).toEqual([OTHER])
   })
 
-  it('removes terminator link from project via projectFilePath', async () => {
-    db.mockGet.mockResolvedValue({ terminator_links: JSON.stringify([UUID]) })
-    const handler = getHandler('task-vault:links:remove')
-    const result = await handler({}, { projectFilePath: PROJECT_NAME, targetId: UUID })
-    expect(result).toMatchObject({ success: true })
-    expect(db.mockRun).toHaveBeenCalled()
+  it('removes the given link from a project', async () => {
+    await seedProject(db, 'p1', 'alpha')
+    await db.run(`UPDATE projects SET terminator_links = ? WHERE id = 'p1'`, [
+      JSON.stringify([TARGET, OTHER]),
+    ])
+
+    await harness.invoke('task-vault:links:remove', { projectFilePath: 'alpha', targetId: OTHER })
+
+    expect(await linksOf('projects', 'alpha')).toEqual([TARGET])
   })
 
-  it('returns NOT_FOUND when project does not exist during remove', async () => {
-    const handler = getHandler('task-vault:links:remove')
-    const result = await handler({}, { projectFilePath: 'nonexistent-proj', targetId: UUID })
-    expect(result).toMatchObject({ error: 'NOT_FOUND' })
-  })
-
-  it('returns NOT_FOUND when task does not exist', async () => {
-    const handler = getHandler('task-vault:links:remove')
-    const result = await handler({}, { taskId: 'nonexistent', targetId: UUID })
-    expect(result).toMatchObject({ error: 'NOT_FOUND' })
-  })
-
-  it('returns VALIDATION_ERROR for missing targetId', async () => {
-    const handler = getHandler('task-vault:links:remove')
-    const result = await handler({}, { taskId: TASK_ID })
-    expect(result).toMatchObject({ error: 'VALIDATION_ERROR' })
+  it('returns NOT_FOUND for an unknown task or project', async () => {
+    expect(
+      await harness.invoke('task-vault:links:remove', { taskId: 'x', targetId: TARGET })
+    ).toEqual({
+      error: 'NOT_FOUND',
+    })
+    expect(
+      await harness.invoke('task-vault:links:remove', { projectFilePath: 'nope', targetId: TARGET })
+    ).toEqual({ error: 'NOT_FOUND' })
   })
 })
 
-describe('task-vault:links:get-for-terminator-target', () => {
-  const taskRow = {
-    id: TASK_ID,
-    source: 'inbox',
-    source_ref: null,
-    text: 'Task',
-    status: 'open',
-    project: null,
-    context: null,
-    area: null,
-    due_date: null,
-    terminator_links: JSON.stringify([UUID]),
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    parent_id: null,
-    sort_order: 0,
-    completed_date: null,
-    migrated_to: null,
-  }
+describe('task-vault:links:get-for-terminator-target', taskVaultLinksGetTerminatorTests)
 
-  it('returns linked tasks and projects for targetId', async () => {
-    db.mockQuery.mockResolvedValueOnce([taskRow]).mockResolvedValueOnce([])
-    const handler = getHandler('task-vault:links:get-for-terminator-target')
-    const result = (await handler({}, { targetId: UUID })) as {
-      tasks: unknown[]
-      projects: unknown[]
+describe('database errors', () => {
+  let closed: ExtensionDB
+  let closedHarness: ReturnType<typeof createIpcHarness>
+
+  beforeEach(() => {
+    const database = new DatabaseSync(':memory:')
+    closed = wrapDb(database)
+    database.close()
+    closedHarness = createIpcHarness()
+    registerLinksIpcHandlers(closedHarness.api, closed)
+  })
+
+  it.each(['task-vault:links:create', 'task-vault:links:remove'])(
+    '%s returns the error instead of throwing',
+    async (channel) => {
+      const result = await closedHarness.invoke(channel, { taskId: 't1', targetId: TARGET })
+      expect(result).toMatchObject({ error: expect.stringMatching(/not open/) })
     }
-    expect(result.tasks).toHaveLength(1)
-    expect(result.projects).toHaveLength(0)
-  })
+  )
 
-  it('returns empty when targetId has no links', async () => {
-    db.mockQuery.mockResolvedValue([])
-    const handler = getHandler('task-vault:links:get-for-terminator-target')
-    const result = (await handler({}, { targetId: '00000000-0000-0000-0000-000000000000' })) as {
-      tasks: unknown[]
-      projects: unknown[]
-    }
-    expect(result.tasks).toHaveLength(0)
-    expect(result.projects).toHaveLength(0)
-  })
-
-  it('returns VALIDATION_ERROR for missing targetId', async () => {
-    const handler = getHandler('task-vault:links:get-for-terminator-target')
-    const result = await handler({}, {})
-    expect(result).toMatchObject({ error: 'VALIDATION_ERROR' })
-  })
-
-  it('returns linked projects for targetId', async () => {
-    const projectRow = {
-      id: 'proj-uuid-1',
-      name: PROJECT_NAME,
-      status: 'active',
-      area: null,
-      deadline: null,
-      terminator_links: JSON.stringify([UUID]),
-      updated_at: new Date().toISOString(),
-    }
-    db.mockQuery.mockResolvedValueOnce([]).mockResolvedValueOnce([projectRow])
-    const handler = getHandler('task-vault:links:get-for-terminator-target')
-    const result = (await handler({}, { targetId: UUID })) as {
-      tasks: unknown[]
-      projects: { name: string }[]
-    }
-    expect(result.projects).toHaveLength(1)
-    expect(result.projects[0].name).toBe(PROJECT_NAME)
+  it('get-for-terminator-target returns the error instead of throwing', async () => {
+    const result = await closedHarness.invoke('task-vault:links:get-for-terminator-target', {
+      targetId: TARGET,
+    })
+    expect(result).toMatchObject({ error: expect.stringMatching(/not open/) })
   })
 })
 
-describe('task-vault:links:create error handling', () => {
-  it('returns error string when db throws during task update', async () => {
-    db.mockGet.mockResolvedValue({ terminator_links: '[]' })
-    db.mockRun.mockRejectedValueOnce(new Error('db write error'))
-    const handler = getHandler('task-vault:links:create')
-    const result = await handler({}, { taskId: TASK_ID, targetId: UUID })
-    expect(result).toMatchObject({ error: expect.stringContaining('db write error') })
-  })
-
-  it('returns String(err) when db throws a non-Error value', async () => {
-    db.mockGet.mockResolvedValue({ terminator_links: '[]' })
-    db.mockRun.mockRejectedValueOnce('raw string error')
-    const handler = getHandler('task-vault:links:create')
-    const result = await handler({}, { taskId: TASK_ID, targetId: UUID })
-    expect(result).toMatchObject({ error: 'raw string error' })
-  })
-})
-
-describe('task-vault:links:remove error handling', () => {
-  it('returns error string when db throws during task remove', async () => {
-    db.mockGet.mockResolvedValue({ terminator_links: JSON.stringify([UUID]) })
-    db.mockRun.mockRejectedValueOnce(new Error('db remove error'))
-    const handler = getHandler('task-vault:links:remove')
-    const result = await handler({}, { taskId: TASK_ID, targetId: UUID })
-    expect(result).toMatchObject({ error: expect.stringContaining('db remove error') })
-  })
-})
-
-describe('task-vault:links:get-for-terminator-target error handling', () => {
-  it('returns String(err) via outer handle catch when db.query throws a non-Error value', async () => {
-    db.mockQuery.mockRejectedValueOnce('db gone')
-    const handler = getHandler('task-vault:links:get-for-terminator-target')
-    const result = await handler({}, { targetId: UUID })
-    expect(result).toMatchObject({ error: 'db gone' })
-  })
-})
-
-describe('registerLinksIpcHandlers dispose', () => {
-  it('calls ipcMain.removeHandler for all registered channels', () => {
-    const dispose = registerLinksIpcHandlers(mockApi, db)
+describe('registerLinksIpcHandlers', () => {
+  it('dispose removes every registered channel', () => {
+    const own = createIpcHarness()
+    const dispose = registerLinksIpcHandlers(own.api, db)
+    expect(own.channels().sort()).toEqual([
+      'task-vault:links:create',
+      'task-vault:links:get-for-terminator-target',
+      'task-vault:links:remove',
+    ])
     dispose()
-    const removedChannels = vi.mocked(mockRemoveHandler).mock.calls.map((c) => c[0])
-    expect(removedChannels).toContain('task-vault:links:create')
-    expect(removedChannels).toContain('task-vault:links:remove')
-    expect(removedChannels).toContain('task-vault:links:get-for-terminator-target')
+    expect(own.channels()).toEqual([])
+  })
+
+  it('leaves unrelated tasks untouched by a link change', async () => {
+    await seedTask(db, { id: 't1' })
+    await seedTask(db, { id: 't2' })
+    await harness.invoke('task-vault:links:create', { taskId: 't1', targetId: TARGET })
+    expect(await selectTaskRow(db, 't2')).toMatchObject({ terminator_links: '[]' })
   })
 })
+
+function taskVaultLinksGetTerminatorTests() {
+  describe('linked', taskVaultLinksGetTerminatorLinkedTests)
+  describe('areas and nothing', taskVaultLinksGetTerminatorAreasNothingTests)
+}
+
+function taskVaultLinksGetTerminatorLinkedTests() {
+  it('returns the tasks and projects linked to the target and no others', async () => {
+    await seedTask(db, { id: 'linked', terminatorLinks: JSON.stringify([TARGET]) })
+    await seedTask(db, { id: 'other', terminatorLinks: JSON.stringify([OTHER]) })
+    await seedTask(db, { id: 'none' })
+    await seedProject(db, 'p1', 'alpha')
+    await seedProject(db, 'p2', 'beta')
+    await db.run(`UPDATE projects SET terminator_links = ? WHERE id = 'p1'`, [
+      JSON.stringify([TARGET]),
+    ])
+
+    const result = (await harness.invoke('task-vault:links:get-for-terminator-target', {
+      targetId: TARGET,
+    })) as { tasks: { id: string }[]; projects: { name: string }[] }
+
+    expect(result.tasks.map((task) => task.id)).toEqual(['linked'])
+    expect(result.projects.map((project) => project.name)).toEqual(['alpha'])
+  })
+}
+
+function taskVaultLinksGetTerminatorAreasNothingTests() {
+  it('names the area of a linked project', async () => {
+    await seedArea(db, 'a1', 'Work')
+    await seedProject(db, 'p1', { name: 'alpha', areaId: 'a1' })
+    await db.run(`UPDATE projects SET terminator_links = ? WHERE id = 'p1'`, [
+      JSON.stringify([TARGET]),
+    ])
+
+    const result = (await harness.invoke('task-vault:links:get-for-terminator-target', {
+      targetId: TARGET,
+    })) as { projects: { name: string; area?: string }[] }
+
+    expect(result.projects).toMatchObject([{ name: 'alpha', area: 'Work' }])
+  })
+
+  it('returns empty lists when nothing links to the target', async () => {
+    await seedTask(db, { id: 'other', terminatorLinks: JSON.stringify([OTHER]) })
+
+    expect(
+      await harness.invoke('task-vault:links:get-for-terminator-target', { targetId: TARGET })
+    ).toEqual({ tasks: [], projects: [] })
+  })
+}

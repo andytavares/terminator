@@ -1,5 +1,24 @@
-export type { NotificationTarget, NotificationType } from '../notifications/resolve-targets'
-import type { NotificationTarget } from '../notifications/resolve-targets'
+export type { NotificationTarget } from '../notifications/resolve-targets'
+import type { NotificationTarget, NotificationType } from '../notifications/resolve-targets'
+
+export interface NotificationAction {
+  id: string
+  label: string
+}
+
+/** A notification as the main process sends it to the renderer. */
+export interface SerializedNotification {
+  id: string
+  type: NotificationType
+  title: string
+  message?: string
+  timestamp: number
+  source?: string
+  actions?: NotificationAction[]
+  /** Whether clicking the row goes anywhere. False for a bare report. */
+  clickable?: boolean
+  targets: NotificationTarget[]
+}
 
 export interface Workspace {
   id: string
@@ -38,8 +57,8 @@ export interface WorktreeInfo {
   head: string
 }
 
-export type SessionStatus = 'active' | 'backgrounded' | 'closed'
-export type SessionType = 'human' | 'agent'
+type SessionStatus = 'active' | 'backgrounded' | 'closed'
+type SessionType = 'human' | 'agent'
 
 /**
  * What a session appears to be doing. Derived on read from the bell, byte-flow
@@ -93,16 +112,16 @@ export interface ChoicePrompt {
   options: ChoiceOption[]
 }
 
-export type ExtensionStatus = 'enabled' | 'disabled' | 'error'
+type ExtensionStatus = 'enabled' | 'disabled' | 'error'
 
-export interface ExtensionSurfaceContribution {
+interface ExtensionSurfaceContribution {
   label: string
   icon?: string
   view?: string
   defaultOpen?: boolean
 }
 
-export interface ExtensionContributes {
+interface ExtensionContributes {
   globalTab?: ExtensionSurfaceContribution
   workspaceTab?: ExtensionSurfaceContribution
   projectTab?: ExtensionSurfaceContribution
@@ -117,6 +136,8 @@ export interface ExtensionContributes {
     requires?: 'repo' | 'session'
   }>
   quickActions?: { group?: { mnemonic?: string; label: string } }
+  /** Keys of the extension's own folder settings whose directories its git and gh may run in. */
+  shellRoots?: string[]
 }
 
 export interface Extension {
@@ -134,92 +155,16 @@ export interface Extension {
   contributes?: ExtensionContributes
 }
 
-export interface ExtensionManifest {
-  id: string
-  name: string
-  version: string
-  description: string
-  main: string
-  renderer?: string
-  minAppVersion: string
-}
-
-export type CustomActionKind = 'shell' | 'prompt'
-export type CustomActionTarget = 'focused' | 'new-tab' | 'agent'
-
-export interface CustomAction {
-  id: string
-  label: string
-  mnemonic?: string
-  kind: CustomActionKind
-  target: CustomActionTarget
-  body: string
-}
-
-export interface ActionUsage {
-  id: string
-  count: number
-  lastUsedAt: number
-}
-
-export interface DirectUse {
-  id: string
-  count: number
-}
-
-export interface QuickActionsSettings {
-  pins: string[]
-  usage: ActionUsage[]
-  directUse: DirectUse[]
-  custom: CustomAction[]
-}
-
-export interface GlobalSettings {
-  appearance: {
-    theme: 'dark' | 'light'
-  }
-  terminal: {
-    scrollbackLimit: number
-    defaultShell: string
-    promptForName: boolean
-  }
-  git: {
-    /** Base directory for new worktrees. Empty string means <repoRoot>/.worktrees. */
-    worktreeBaseDir: string
-    branchExcludePatterns: string[]
-  }
-  extensions: {
-    [extensionId: string]: Record<string, unknown>
-  }
-  ui: {
-    hasSeenWelcome: boolean
-    showMetricsBar?: boolean
-  }
-  sidebar?: {
-    /** How long a quiet session waits before the sidebar treats it as stale. */
-    staleAfterMs: number
-  }
-  notifications: {
-    defaultTargets: NotificationTarget[]
-    overrides: {
-      [notificationKey: string]: NotificationTarget[]
-    }
-  }
-  quickActions: QuickActionsSettings
-}
-
-export interface WorkspaceSettings {
-  workspaceId: string
-  overrides: Partial<Omit<GlobalSettings, 'extensions' | 'quickActions'>> & {
-    /** A workspace override carries only its own custom actions, never usage or pins. */
-    quickActions?: { custom: CustomAction[] }
-  }
-  extensions: {
-    [extensionId: string]: Record<string, unknown>
-  }
-}
-
-export type SettingsScope = 'global' | 'workspace'
+export type {
+  ActionUsage,
+  CustomAction,
+  CustomActionKind,
+  CustomActionTarget,
+  DirectUse,
+  GlobalSettings,
+  QuickActionsSettings,
+  WorkspaceSettings,
+} from '../schemas/settings.schema'
 
 export interface SystemMetrics {
   cpuPercent: number
@@ -257,113 +202,23 @@ export const SCRATCH_PROJECT_ID = '00000000-0000-0000-0000-000000000000'
 // except where the operator needs to be told, which is why `tracker` is on
 // every issue, link and connection.
 
-export type TrackerId = 'linear' | 'jira'
+import type { TrackerId } from '@terminator/extension-sdk'
 
-/**
- * Two trackers can issue the same key (`TAV-42` in both), so nothing in this
- * feature is identified by key alone. This pair is the identity.
- */
-export interface IssueRef {
-  tracker: TrackerId
-  key: string
-}
-
-export type TrackerErrorKind =
-  | 'not-connected'
-  | 'auth-failed'
-  | 'rate-limited'
-  | 'unavailable'
-  | 'not-found'
-  | 'failed'
-  /**
-   * The tracker cannot be asked to do this at all — not today, not on retry.
-   * Distinct from 'failed' because a caller retries a failure and records an
-   * unsupported capability once (037 FR-063).
-   */
-  | 'unsupported'
-
-/**
- * How "my issues" is defined, per tracker. Tracker-shaped rather than
- * flattened: Linear identifies an assignee directly, Jira expresses it as a
- * saved query, and pretending those are the same loses information.
- */
-export type MineSelector =
-  | { kind: 'assignee'; email: string | null }
-  | { kind: 'query'; jql: string }
-
-export interface TrackerAccount {
-  name: string
-  email: string
-}
-
-/** What the renderer is told about a tracker. Never carries the secret. */
-export interface TrackerConnection {
-  tracker: TrackerId
-  connected: boolean
-  /** Proof the credential was verified — absent means it never was. */
-  account: TrackerAccount | null
-  /** Jira only: the site domain. Always null for Linear. */
-  site: string | null
-  mine: MineSelector
-  /** Set when a credential that worked starts failing. */
-  lastError: TrackerErrorKind | null
-}
-
-export type IssueStateType = 'backlog' | 'unstarted' | 'started' | 'completed' | 'canceled'
-
-export interface IssueState {
-  /** The tracker's own label, displayed as-is. */
-  name: string
-  /** What the UI reasons about — never the colour. */
-  type: IssueStateType
-}
-
-export interface IssueComment {
-  author: string
-  /** Markdown, normalised the same way as a description. */
-  body: string
-  createdAt: string
-}
-
-/** The subset lists and pickers need. No description, no comments. */
-export interface IssueSummary {
-  tracker: TrackerId
-  /** The tracker's own stable id — a UUID for Linear, a numeric string for Jira. */
-  id: string
-  key: string
-  title: string
-  url: string
-  state: IssueState
-  assignee: TrackerAccount | null
-  /**
-   * The tracker's suggested VCS branch. Always null for Jira.
-   *
-   * On the summary rather than only the full issue because the new-project
-   * dialog prefills a branch straight from a picked row, and Linear returns
-   * this on the same query the list already makes — fetching the whole issue
-   * again just to read one string would be a request for nothing.
-   */
-  branchName: string | null
-}
-
-export interface Issue extends IssueSummary {
-  /** Always markdown. Jira's ADF is converted before it reaches this type. */
-  description: string
-  labels: string[]
-  completed: boolean
-  updatedAt: string
-  /** Most recent first, bounded — a long thread is read in the tracker. */
-  comments: IssueComment[]
-}
-
-/** A project's attachment to exactly one issue. */
-export interface IssueLink {
-  projectId: string
-  tracker: TrackerId
-  key: string
-  injectContext: boolean
-  linkedAt: string
-}
+export type {
+  TrackerId,
+  TrackerErrorKind,
+  MineSelector,
+  TrackerAccount,
+  TrackerConnection,
+  IssueStateType,
+  IssueState,
+  IssueComment,
+  IssueSummary,
+  Issue,
+  IssueLink,
+  TrackerFailure,
+  IssueListResult,
+} from '@terminator/extension-sdk'
 
 /** Derived, never authored. Rebuilt when the link, issue, or toggle changes. */
 export interface AgentContext {
@@ -375,20 +230,6 @@ export interface AgentContext {
   chars: number
   truncated: boolean
   builtAt: string
-}
-
-export interface TrackerFailure {
-  tracker: TrackerId
-  error: TrackerErrorKind
-}
-
-/**
- * A tracker that fails does not fail the call. Callers show what arrived and
- * say what is missing, rather than presenting a partial list as complete.
- */
-export interface IssueListResult {
-  issues: IssueSummary[]
-  failures: TrackerFailure[]
 }
 
 /** A ticket in a connected tracker, by key alone. */

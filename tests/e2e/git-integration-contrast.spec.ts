@@ -1,9 +1,10 @@
 import { test, expect, chromium, type Browser, type Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 import { build } from 'esbuild'
-import { readFileSync, readdirSync, mkdirSync, statSync } from 'node:fs'
+import { mkdirSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { cssFiles, extensionBaseCss } from './extension-base-css'
 
 // WCAG 2.1 AA contrast gate for the git-integration surfaces, in both themes.
 // It renders the real components with fixture data in plain Chromium (no
@@ -15,21 +16,6 @@ import { fileURLToPath } from 'node:url'
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 const COMPONENTS = join(ROOT, 'extensions/git-integration/src/components')
 const SHOTS = join(ROOT, 'test-results/git-integration-contrast')
-
-function baseCss(): string {
-  const src = readFileSync(join(ROOT, 'src/main/extensions/extension-view-host.ts'), 'utf8')
-  const m = src.match(/export const EXTENSION_BASE_CSS = `([\s\S]*?)\n`/)
-  if (!m) throw new Error('EXTENSION_BASE_CSS not found')
-  return m[1]
-}
-
-function cssFiles(dir: string): string[] {
-  return readdirSync(dir).flatMap((name) => {
-    const p = join(dir, name)
-    if (statSync(p).isDirectory()) return cssFiles(p)
-    return name.endsWith('.css') ? [p] : []
-  })
-}
 
 // Computed in the page: composite every translucent layer from `el` up onto the
 // first opaque one. Chromium reports color-mix() as color(srgb r g b / a).
@@ -111,8 +97,8 @@ const SURFACES: Surface[] = [
     ready: '[data-testid="conflict-file-row"]',
   },
   { name: 'reviews', ready: '.rd-row' },
-  { name: 'review-footer', ready: '.rf-btn.rf-pri' },
-  { name: 'review-queue', ready: '.rd-btn.rd-pri' },
+  { name: 'review-footer', ready: '.tmui-button--primary' },
+  { name: 'review-queue', ready: '.tmui-button--primary' },
   { name: 'repo-picker', ready: '.rp-row' },
   {
     name: 'reviews-mine',
@@ -159,28 +145,47 @@ test.afterAll(async () => {
   await browser?.close()
 })
 
+/** Renders one surface of the bundle in a theme, settled and ready to measure. */
+async function renderSurface(page: Page, surface: Surface, theme: 'dark' | 'light'): Promise<void> {
+  const themeAttr = theme === 'light' ? ' data-theme="light"' : ''
+  await page.setContent(
+    `<!doctype html><html lang="en"${themeAttr}><head><meta charset="utf-8"><title>${surface.name}</title>` +
+      `<style>${extensionBaseCss(ROOT)}</style><style>${bundleCss}</style></head><body><div id="app"></div></body></html>`
+  )
+  await page.evaluate(
+    (n) => {
+      window.__SURFACE__ = n
+    },
+    surface.name.replace('-mine', '')
+  )
+  await page.addScriptTag({ content: bundleJs })
+  await page.waitForSelector(surface.ready)
+  await surface.act?.(page)
+  await page.evaluate(() => document.fonts.ready)
+}
+
+/** A selected row stands out from its panel by 3:1 at least (WCAG 1.4.11). */
+async function expectSelectedRowContrast(
+  page: Page,
+  selected: string,
+  surface: Surface
+): Promise<void> {
+  const measured = (await page.evaluate(
+    `(${MEASURE})(${JSON.stringify(selected)}, ${JSON.stringify(surface.indicator ?? 'background')})`
+  )) as { ratio: number } | null
+  expect(measured, `${selected} is rendered`).not.toBeNull()
+  expect(measured!.ratio, `selected row vs its panel (1.4.11), ${selected}`).toBeGreaterThanOrEqual(
+    3
+  )
+}
+
 for (const theme of ['dark', 'light'] as const) {
   for (const surface of SURFACES) {
     test(`${surface.name} meets WCAG 2.1 AA contrast in the ${theme} theme`, async () => {
       const context = await browser.newContext({ viewport: { width: 1200, height: 700 } })
       const page = await context.newPage()
       try {
-        const themeAttr = theme === 'light' ? ' data-theme="light"' : ''
-        await page.setContent(
-          `<!doctype html><html lang="en"${themeAttr}><head><meta charset="utf-8"><title>${surface.name}</title>` +
-            `<style>${baseCss()}</style><style>${bundleCss}</style></head><body><div id="app"></div></body></html>`
-        )
-        await page.evaluate(
-          (n) => {
-            ;(window as unknown as { __SURFACE__: string }).__SURFACE__ = n
-          },
-          surface.name.replace('-mine', '')
-        )
-        await page.addScriptTag({ content: bundleJs })
-        await page.waitForSelector(surface.ready)
-        await surface.act?.(page)
-        await page.evaluate(() => document.fonts.ready)
-
+        await renderSurface(page, surface, theme)
         await page.screenshot({ path: join(SHOTS, `${surface.name}-${theme}.png`) })
 
         const axe = await new AxeBuilder({ page }).withRules(['color-contrast']).analyze()
@@ -189,16 +194,7 @@ for (const theme of ['dark', 'light'] as const) {
         )
         expect(failures, 'axe color-contrast violations').toEqual([])
 
-        if (surface.selected) {
-          const measured = (await page.evaluate(
-            `(${MEASURE})(${JSON.stringify(surface.selected)}, ${JSON.stringify(surface.indicator ?? 'background')})`
-          )) as { ratio: number } | null
-          expect(measured, `${surface.selected} is rendered`).not.toBeNull()
-          expect(
-            measured!.ratio,
-            `selected row vs its panel (1.4.11), ${surface.selected}`
-          ).toBeGreaterThanOrEqual(3)
-        }
+        if (surface.selected) await expectSelectedRowContrast(page, surface.selected, surface)
       } finally {
         await context.close()
       }

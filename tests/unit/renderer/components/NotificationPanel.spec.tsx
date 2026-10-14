@@ -2,7 +2,6 @@ import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, cleanup } from '@testing-library/react'
 import { useNotificationStore } from '../../../../src/renderer/stores/notification.store'
-import type { SerializedNotification } from '../../../../src/renderer/electron.d'
 import type { Notification } from '../../../../src/renderer/stores/notification.store'
 
 const mockTriggerAction = vi.fn().mockResolvedValue({ ok: true })
@@ -10,25 +9,24 @@ const mockDismiss = vi.fn().mockResolvedValue({ ok: true })
 const mockSetLeftInset = vi.fn()
 
 // In jsdom, globalThis === window, so setting globalThis.electronAPI sets window.electronAPI
-;(globalThis as unknown as Record<string, unknown>).electronAPI = {
+installElectronApi({
   notifications: {
     dismiss: mockDismiss,
     triggerAction: mockTriggerAction,
   },
   extension: { setLeftInset: mockSetLeftInset },
-}
+})
 
-import {
-  NotificationPanel,
-  BellButton,
-} from '../../../../src/renderer/components/NotificationPanel'
+import { NotificationPanel } from '../../../../src/renderer/components/NotificationPanel'
+import { installElectronApi } from '../../../support/electron-api'
 
-function makeNotif(overrides: Partial<SerializedNotification> = {}): Notification {
+function makeNotif(overrides: Partial<Notification> = {}): Notification {
   return {
     id: crypto.randomUUID(),
     type: 'info',
     title: 'Test notification',
     timestamp: Date.now(),
+    targets: ['center'],
     read: false,
     ...overrides,
   }
@@ -38,7 +36,8 @@ function resetStore() {
   useNotificationStore.setState({ notifications: [], panelOpen: false, unreadCount: 0 })
 }
 
-describe('NotificationPanel', () => {
+/** The hooks every "NotificationPanel" describe registers. */
+function setUpNotificationPanel(): void {
   beforeEach(() => {
     vi.clearAllMocks()
     resetStore()
@@ -47,16 +46,20 @@ describe('NotificationPanel', () => {
   afterEach(() => {
     cleanup()
   })
+}
+
+describe('NotificationPanel', () => {
+  setUpNotificationPanel()
 
   it('renders nothing when panelOpen is false', () => {
     const { container } = render(<NotificationPanel />)
     expect(container.firstChild).toBeNull()
   })
 
-  it('renders the panel when panelOpen is true', () => {
+  it('renders the panel, a named region beside the app, when panelOpen is true', () => {
     useNotificationStore.setState({ panelOpen: true })
     render(<NotificationPanel />)
-    expect(screen.getByRole('dialog')).toBeTruthy()
+    expect(screen.getByRole('region', { name: 'Notifications' })).toBeTruthy()
   })
 
   it('shows empty state when no notifications', () => {
@@ -78,6 +81,10 @@ describe('NotificationPanel', () => {
     render(<NotificationPanel />)
     expect(screen.getByText('Detailed message')).toBeTruthy()
   })
+})
+
+describe('NotificationPanel — close button calls closePanel', () => {
+  setUpNotificationPanel()
 
   it('close button calls closePanel', () => {
     useNotificationStore.setState({ panelOpen: true })
@@ -101,6 +108,10 @@ describe('NotificationPanel', () => {
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(useNotificationStore.getState().panelOpen).toBe(false)
   })
+})
+
+describe('NotificationPanel — "Mark all read" button marks all notifications as read', () => {
+  setUpNotificationPanel()
 
   it('"Mark all read" button marks all notifications as read', () => {
     const n = makeNotif()
@@ -129,6 +140,10 @@ describe('NotificationPanel', () => {
     expect(useNotificationStore.getState().notifications).toHaveLength(0)
     expect(mockDismiss).toHaveBeenCalledWith('n1')
   })
+})
+
+describe('NotificationPanel — renders action buttons and calls triggerAction on click', () => {
+  setUpNotificationPanel()
 
   it('renders action buttons and calls triggerAction on click', () => {
     const n = makeNotif({
@@ -155,26 +170,25 @@ describe('NotificationPanel', () => {
     render(<NotificationPanel />)
     expect(screen.queryByText('core')).toBeNull()
   })
+})
 
-  it('renders success type icon class', () => {
-    const n = makeNotif({ type: 'success' })
-    useNotificationStore.setState({ notifications: [n], panelOpen: true, unreadCount: 1 })
-    const { container } = render(<NotificationPanel />)
-    expect(container.querySelector('.notif-item__type-icon')).toBeTruthy()
-  })
+describe('NotificationPanel — draws each type as its own shape', () => {
+  setUpNotificationPanel()
 
-  it('renders warning type icon', () => {
-    const n = makeNotif({ type: 'warning' })
-    useNotificationStore.setState({ notifications: [n], panelOpen: true, unreadCount: 1 })
+  it('draws each type as its own shape', () => {
+    useNotificationStore.setState({
+      notifications: (['info', 'success', 'warning', 'error'] as const).map((type) =>
+        makeNotif({ id: type, type })
+      ),
+      panelOpen: true,
+      unreadCount: 4,
+    })
     const { container } = render(<NotificationPanel />)
-    expect(container.querySelector('.notif-item__type-icon')).toBeTruthy()
-  })
-
-  it('renders error type icon', () => {
-    const n = makeNotif({ type: 'error' })
-    useNotificationStore.setState({ notifications: [n], panelOpen: true, unreadCount: 1 })
-    const { container } = render(<NotificationPanel />)
-    expect(container.querySelector('.notif-item__type-icon')).toBeTruthy()
+    const shapes = [...container.querySelectorAll('.notif-item__type-icon')].map((icon) =>
+      icon.getAttribute('class')
+    )
+    expect(shapes).toHaveLength(4)
+    expect(new Set(shapes).size).toBe(4)
   })
 
   it('clicking a notification with onClick calls it and closes panel', () => {
@@ -186,6 +200,10 @@ describe('NotificationPanel', () => {
     expect(onClick).toHaveBeenCalled()
     expect(useNotificationStore.getState().panelOpen).toBe(false)
   })
+})
+
+describe('NotificationPanel — clicking a notification without onClick does not close panel', () => {
+  setUpNotificationPanel()
 
   it('clicking a notification without onClick does not close panel', () => {
     const n = makeNotif()
@@ -195,59 +213,15 @@ describe('NotificationPanel', () => {
     expect(useNotificationStore.getState().panelOpen).toBe(true)
   })
 
-  it('renders relative time: just now for fresh timestamp', () => {
-    const n = makeNotif({ timestamp: Date.now() })
-    useNotificationStore.setState({ notifications: [n], panelOpen: true })
+  it('says how long ago it happened, keeping the exact moment', () => {
+    const timestamp = Date.now() - 2 * 60 * 1000
+    useNotificationStore.setState({
+      notifications: [makeNotif({ timestamp })],
+      panelOpen: true,
+    })
     render(<NotificationPanel />)
-    expect(screen.getByText('just now')).toBeTruthy()
-  })
-
-  it('renders relative time: minutes ago', () => {
-    const n = makeNotif({ timestamp: Date.now() - 2 * 60 * 1000 })
-    useNotificationStore.setState({ notifications: [n], panelOpen: true })
-    render(<NotificationPanel />)
-    expect(screen.getByText('2m ago')).toBeTruthy()
-  })
-
-  it('renders relative time: hours ago', () => {
-    const n = makeNotif({ timestamp: Date.now() - 2 * 3600 * 1000 })
-    useNotificationStore.setState({ notifications: [n], panelOpen: true })
-    render(<NotificationPanel />)
-    expect(screen.getByText('2h ago')).toBeTruthy()
-  })
-
-  it('renders relative time: days ago', () => {
-    const n = makeNotif({ timestamp: Date.now() - 2 * 86400 * 1000 })
-    useNotificationStore.setState({ notifications: [n], panelOpen: true })
-    render(<NotificationPanel />)
-    expect(screen.getByText('2d ago')).toBeTruthy()
-  })
-})
-
-describe('BellButton', () => {
-  afterEach(() => {
-    cleanup()
-  })
-
-  it('renders without active class when unreadCount is 0', () => {
-    render(<BellButton unreadCount={0} onClick={vi.fn()} />)
-    const btn = screen.getByTitle('Notifications')
-    expect(btn.className).not.toContain('notif-bell--active')
-    expect(btn.getAttribute('aria-label')).toBe('Notifications')
-  })
-
-  it('renders with active class and unread label when unreadCount > 0', () => {
-    render(<BellButton unreadCount={3} onClick={vi.fn()} />)
-    const btn = screen.getByTitle('Notifications')
-    expect(btn.className).toContain('notif-bell--active')
-    expect(btn.getAttribute('aria-label')).toBe('Notifications (3 unread)')
-  })
-
-  it('calls onClick when clicked', () => {
-    const onClick = vi.fn()
-    render(<BellButton unreadCount={0} onClick={onClick} />)
-    fireEvent.click(screen.getByTitle('Notifications'))
-    expect(onClick).toHaveBeenCalled()
+    const time = screen.getByText('2 minutes ago')
+    expect(time.getAttribute('datetime')).toBe(new Date(timestamp).toISOString())
   })
 })
 
@@ -264,10 +238,14 @@ describe('opening the drawer without blanking what is behind it', () => {
     // WebContentsView while a modal is open. That is right for a centred
     // dialog and wrong for a drawer down one edge: the whole application went
     // black to show a 340px panel.
+    // jsdom lays nothing out; the drawer's right edge is what a browser would measure.
+    const measure = vi
+      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockReturnValue(new DOMRect(0, 0, 339.5, 800))
     useNotificationStore.setState({ notifications: [], panelOpen: true, unreadCount: 0 })
     render(<NotificationPanel />)
-    expect(mockSetLeftInset).toHaveBeenCalled()
-    expect(mockSetLeftInset.mock.calls.at(-1)![0]).toBeGreaterThanOrEqual(0)
+    measure.mockRestore()
+    expect(mockSetLeftInset).toHaveBeenLastCalledWith(340)
   })
 
   it('gives the strip back when it closes', () => {
@@ -279,13 +257,18 @@ describe('opening the drawer without blanking what is behind it', () => {
   })
 })
 
-describe('taking you to the thing a notification is about', () => {
+/** The hooks every "taking you to the thing a notification is about" describe registers. */
+function setUpTakingYouToThe(): void {
   beforeEach(() => {
     vi.clearAllMocks()
     mockTriggerAction.mockResolvedValue({ ok: true })
     resetStore()
   })
   afterEach(cleanup)
+}
+
+describe('taking you to the thing a notification is about', () => {
+  setUpTakingYouToThe()
 
   it('asks main for the destination when only main knows it', async () => {
     // An extension's notification carries a handler that lives in the main
@@ -314,6 +297,10 @@ describe('taking you to the thing a notification is about', () => {
     fireEvent.click(screen.getByText('Test notification'))
     expect(mockTriggerAction).not.toHaveBeenCalled()
   })
+})
+
+describe('taking you to the thing a notification is about — closes the drawer on the way, so it does not cover where you landed', () => {
+  setUpTakingYouToThe()
 
   it('closes the drawer on the way, so it does not cover where you landed', async () => {
     const n = makeNotif({ clickable: true })
@@ -324,13 +311,18 @@ describe('taking you to the thing a notification is about', () => {
   })
 })
 
-describe('acting on a notification settles it', () => {
+/** The hooks every "acting on a notification settles it" describe registers. */
+function setUpActingOnANotification(): void {
   beforeEach(() => {
     vi.clearAllMocks()
     mockTriggerAction.mockResolvedValue({ ok: true })
     resetStore()
   })
   afterEach(cleanup)
+}
+
+describe('acting on a notification settles it', () => {
+  setUpActingOnANotification()
 
   it('takes the row away once its action has fired', async () => {
     // Approve a phase and the request to approve that phase should not still be

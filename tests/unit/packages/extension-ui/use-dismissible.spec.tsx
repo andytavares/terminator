@@ -60,7 +60,9 @@ describe('useDismissible', () => {
     fireEvent.mouseDown(screen.getByRole('button', { name: 'Inside' }))
     expect(onDismiss).not.toHaveBeenCalled()
   })
+})
 
+describe('useDismissible — leaves the outside click alone when the surface owns its own', () => {
   it('leaves the outside click alone when the surface owns its own', async () => {
     const onDismiss = vi.fn()
     render(<Panel onDismiss={onDismiss} closeOnOutsideClick={false} />)
@@ -88,13 +90,34 @@ describe('useDismissible', () => {
     expect(document.activeElement).toBe(opener)
     opener.remove()
   })
+})
 
+function EmptyPanel(): JSX.Element {
+  const ref = useRef<HTMLDivElement>(null)
+  useDismissible({ ref, onDismiss: () => {} })
+  return <div ref={ref} data-tmui-surface="" tabIndex={-1} aria-label="Legend" role="group" />
+}
+
+describe('useDismissible — where focus goes', () => {
+  it('focuses the surface itself when it holds nothing focusable', () => {
+    render(<EmptyPanel />)
+    expect(document.activeElement).toBe(screen.getByRole('group', { name: 'Legend' }))
+  })
+
+  // Inside a modal shell the key's default asks the dialog to close as well.
+  it('prevents the default of the Escape it answers', () => {
+    render(<Panel onDismiss={() => {}} />)
+    expect(fireEvent.keyDown(document.body, { key: 'Escape' })).toBe(false)
+  })
+})
+
+describe('useDismissible — counts toward the open-surface depth', () => {
   it('counts toward the open-surface depth', () => {
-    delete (window as unknown as Record<string, unknown>)[MODAL_DEPTH_KEY]
+    delete window[MODAL_DEPTH_KEY]
     const { unmount } = render(<Panel onDismiss={() => {}} />)
-    expect((window as unknown as Record<string, number>)[MODAL_DEPTH_KEY]).toBe(1)
+    expect(window[MODAL_DEPTH_KEY]).toBe(1)
     unmount()
-    expect((window as unknown as Record<string, number>)[MODAL_DEPTH_KEY]).toBe(0)
+    expect(window[MODAL_DEPTH_KEY]).toBe(0)
   })
 
   // A picker opened inside a dialog must not take the dialog down with it.
@@ -115,23 +138,50 @@ describe('useDismissible', () => {
 
 // An anchored popover has to treat its own trigger as inside, or clicking the
 // trigger to close it dismisses and immediately reopens.
-describe('alsoInside', () => {
-  function Anchored({ onDismiss }: { onDismiss: () => void }): JSX.Element {
-    const trigger = useRef<HTMLButtonElement>(null)
-    const surface = useRef<HTMLDivElement>(null)
-    useDismissible({ ref: surface, onDismiss, alsoInside: [trigger] })
-    return (
-      <>
-        <button type="button" ref={trigger}>
-          Open
-        </button>
-        <div ref={surface} data-tmui-surface="">
-          <button type="button">Inside</button>
-        </div>
-      </>
-    )
-  }
+describe('a re-rendered onDismiss', () => {
+  it('is the one called on Escape and on an outside click', async () => {
+    const first = vi.fn()
+    const latest = vi.fn()
+    const view = render(<Panel onDismiss={first} />)
+    await settle()
+    view.rerender(<Panel onDismiss={latest} />)
 
+    fireEvent.keyDown(document, { key: 'Escape' })
+    fireEvent.mouseDown(document.body)
+
+    expect(latest).toHaveBeenCalledTimes(2)
+    expect(first).not.toHaveBeenCalled()
+  })
+
+  it('does not rebind the document listeners when only the callback changes', async () => {
+    const add = vi.spyOn(document, 'addEventListener')
+    const view = render(<Panel onDismiss={vi.fn()} />)
+    await settle()
+    const bound = add.mock.calls.length
+    view.rerender(<Panel onDismiss={vi.fn()} />)
+    await settle()
+    expect(add.mock.calls.length).toBe(bound)
+    add.mockRestore()
+  })
+})
+
+function Anchored({ onDismiss }: { onDismiss: () => void }): JSX.Element {
+  const trigger = useRef<HTMLButtonElement>(null)
+  const surface = useRef<HTMLDivElement>(null)
+  useDismissible({ ref: surface, onDismiss, alsoInside: [trigger] })
+  return (
+    <>
+      <button type="button" ref={trigger}>
+        Open
+      </button>
+      <div ref={surface} data-tmui-surface="">
+        <button type="button">Inside</button>
+      </div>
+    </>
+  )
+}
+
+describe('alsoInside', () => {
   it('treats a click on the trigger as inside', async () => {
     const onDismiss = vi.fn()
     render(<Anchored onDismiss={onDismiss} />)
@@ -151,7 +201,7 @@ describe('alsoInside', () => {
 
 describe('enabled', () => {
   it('binds nothing while the surface is closed', () => {
-    delete (window as unknown as Record<string, unknown>)[MODAL_DEPTH_KEY]
+    delete window[MODAL_DEPTH_KEY]
     const onDismiss = vi.fn()
     function Closed(): JSX.Element {
       const ref = useRef<HTMLDivElement>(null)
@@ -161,6 +211,6 @@ describe('enabled', () => {
     render(<Closed />)
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(onDismiss).not.toHaveBeenCalled()
-    expect((window as unknown as Record<string, number>)[MODAL_DEPTH_KEY] ?? 0).toBe(0)
+    expect(window[MODAL_DEPTH_KEY] ?? 0).toBe(0)
   })
 })

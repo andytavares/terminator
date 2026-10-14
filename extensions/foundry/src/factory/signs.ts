@@ -61,9 +61,12 @@ function towerText(ci: NonNullable<SignInput['ci']>): string | null {
 
 /** The signs for everything the hall draws that carries a value or a destination. */
 export function hallSigns(map: HallMap, input: SignInput): HallSign[] {
-  const signs: HallSign[] = []
-  const nameOf = (nodeId: string): string => input.labels[nodeId] ?? nodeId
+  return [...fixtureSigns(map, input), ...junctionSigns(map, input.labels)]
+}
 
+/** The scoreboard, the queue plate and the dispatch tower, each when it has something to say. */
+function fixtureSigns(map: HallMap, input: SignInput): HallSign[] {
+  const signs: HallSign[] = []
   const board = map.props.find((p) => p.kind === 'statuswall')
   if (board !== undefined) {
     signs.push({ id: 'scoreboard', text: scoreboardText(input.metrics), rect: boardRect(board) })
@@ -82,7 +85,13 @@ export function hallSigns(map: HallMap, input: SignInput): HallSign[] {
   if (tower !== undefined && waiting !== null) {
     signs.push({ id: 'tower', text: waiting, rect: towerRect(tower) })
   }
+  return signs
+}
 
+/** Each split and merge, naming the steps its belts lead into. */
+function junctionSigns(map: HallMap, labels: SignInput['labels']): HallSign[] {
+  const signs: HallSign[] = []
+  const nameOf = (nodeId: string): string => labels[nodeId] ?? nodeId
   for (const tile of map.beltTiles) {
     if (tile.kind !== 'split' && tile.kind !== 'merge') continue
     const leads = new Set<string>()

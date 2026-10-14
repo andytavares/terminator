@@ -1,56 +1,53 @@
-import type { ExtensionAPI, ExtensionDB } from '../../../../src/main/extensions/api'
-import { createIpcRegistrar } from './register'
+import { z } from 'zod'
+import { noPayload, type ExtensionAPI, type ExtensionDB } from '@terminator/extension-sdk'
+import { localRoute, registerRoutes, type IpcContext } from './register'
+import { orErrorString } from './vault-shared'
 
 const BLOCKED_DDL = /^\s*(drop|create|alter)\s/i
 
+const RunQueryRequestSchema = z.object({ sql: z.string() })
+
+async function tableNames(db: ExtensionDB): Promise<string[]> {
+  const rows = await db.query<{ table_name: string }>(
+    `SELECT name AS table_name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name`
+  )
+  return rows.map((r) => r.table_name)
+}
+
+function tableStats({ db }: IpcContext) {
+  return orErrorString(async () => {
+    const stats: Record<string, number> = {}
+    for (const t of await tableNames(db)) {
+      const row = await db.get<{ n: number }>(`SELECT COUNT(*) AS n FROM "${t}"`)
+      stats[t] = row?.n ?? 0
+    }
+    return { stats }
+  })
+}
+
+function runQuery({ db }: IpcContext, args: z.infer<typeof RunQueryRequestSchema>) {
+  const { sql } = args
+  return orErrorString(async () => {
+    if (!sql.trim()) return { error: 'Empty query' }
+    if (BLOCKED_DDL.test(sql.trim())) {
+      return { error: 'DDL statements (DROP, CREATE, ALTER) are not permitted' }
+    }
+    const isSelect = /^\s*(select|explain|with\b)/i.test(sql.trim())
+    if (isSelect) {
+      const rows = await db.query(sql)
+      return { rows, changes: 0 }
+    }
+    const changes = await db.run(sql)
+    return { rows: [], changes: changes ?? 0 }
+  })
+}
+
+/** The database console: desktop-only, since it reads and writes any table. */
+const ADMIN_ROUTES = [
+  localRoute('task-vault:admin:table-stats', noPayload, tableStats),
+  localRoute('task-vault:admin:run-query', RunQueryRequestSchema, runQuery),
+]
+
 export function registerAdminIpcHandlers(api: ExtensionAPI, db: ExtensionDB): () => void {
-  const { handle, cleanup } = createIpcRegistrar(api)
-  handle('task-vault:admin:list-tables', async () => {
-    try {
-      const rows = await db.query<{ table_name: string }>(
-        `SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE' ORDER BY table_name`
-      )
-      return { tables: rows.map((r) => r.table_name) }
-    } catch (err) {
-      return { error: String(err) }
-    }
-  })
-
-  handle('task-vault:admin:table-stats', async () => {
-    try {
-      const tableRows = await db.query<{ table_name: string }>(
-        `SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE' ORDER BY table_name`
-      )
-      const tables = tableRows.map((r) => r.table_name)
-      const stats: Record<string, number> = {}
-      for (const t of tables) {
-        const row = await db.get<{ n: string }>(`SELECT COUNT(*) AS n FROM "${t}"`)
-        stats[t] = parseInt(row?.n ?? '0', 10)
-      }
-      return { stats }
-    } catch (err) {
-      return { error: String(err) }
-    }
-  })
-
-  handle('task-vault:admin:run-query', async (payload: unknown) => {
-    try {
-      const { sql } = payload as { sql: string }
-      if (!sql?.trim()) return { error: 'Empty query' }
-      if (BLOCKED_DDL.test(sql.trim())) {
-        return { error: 'DDL statements (DROP, CREATE, ALTER) are not permitted' }
-      }
-      const isSelect = /^\s*(select|explain|with\b)/i.test(sql.trim())
-      if (isSelect) {
-        const rows = await db.query(sql)
-        return { rows, changes: 0 }
-      }
-      const changes = await db.run(sql)
-      return { rows: [], changes: changes ?? 0 }
-    } catch (err) {
-      return { error: String(err) }
-    }
-  })
-
-  return cleanup
+  return registerRoutes({ api, db }, ADMIN_ROUTES)
 }

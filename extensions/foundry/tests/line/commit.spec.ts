@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { commitWorktree, committedSince } from '../../src/line/commit.js'
 import type { ShellExec } from '../../src/line/integrate.js'
+import { partialFake } from '../../../../tests/support/fakes'
 
 // A format step that writes leaves the checkout ahead of what CI will see, and
 // the push that follows is only honest when a commit was actually made.
@@ -17,10 +18,15 @@ function exec(responses: Record<string, { exitCode: number; stdout?: string; std
       timedOut: false,
     }
   })
-  return { run: run as unknown as ShellExec, calls }
+  return { run: partialFake<ShellExec>(run), calls }
 }
 
 describe('commitWorktree', () => {
+  describe('commits', commitsTests)
+  describe('refusals', commitRefusalsTests)
+})
+
+function commitsTests() {
   it('commits what is dirty and says so', async () => {
     const { run, calls } = exec({ status: { exitCode: 0, stdout: ' M src/a.ts\n' } })
     expect(await commitWorktree('/work', 'final check: format', run)).toEqual({ kind: 'committed' })
@@ -36,7 +42,9 @@ describe('commitWorktree', () => {
     expect(await commitWorktree('/work', 'm', run)).toEqual({ kind: 'clean' })
     expect(calls).toHaveLength(1)
   })
+}
 
+function commitRefusalsTests() {
   it('reports a refusal when git could not stage or commit, so nothing is pushed as if it had', async () => {
     const staged = exec({ status: { exitCode: 0, stdout: 'M a' }, add: { exitCode: 1 } })
     expect((await commitWorktree('/work', 'm', staged.run)).kind).toBe('refused')
@@ -60,6 +68,23 @@ describe('commitWorktree', () => {
       exitCode: 1,
       output: '[STARTED] vitest related --run\n✖ 2 tests failed',
     })
+  })
+}
+
+describe('commitWorktree when the commit does not finish', () => {
+  it('waits long enough for the commit hooks, and refuses a commit that timed out', async () => {
+    const run = vi.fn(async (options: { args: string[]; timeoutMs?: number }) => ({
+      exitCode: 0,
+      stdout: options.args[0] === 'status' ? 'M a' : '',
+      stderr: '',
+      timedOut: options.args[0] === 'commit',
+    }))
+    const outcome = await commitWorktree('/work', 'm', partialFake<ShellExec>(run))
+
+    expect(outcome).toMatchObject({ kind: 'refused', command: 'git commit' })
+    expect((outcome as { output: string }).output).toMatch(/timed out after 300 seconds/)
+    const commitCall = run.mock.calls.find((call) => call[0].args[0] === 'commit')
+    expect(commitCall?.[0].timeoutMs).toBe(300_000)
   })
 })
 

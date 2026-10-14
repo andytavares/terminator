@@ -33,6 +33,26 @@ async function post(
 const ask = { sessionId: 's1', toolName: 'Bash', input: { command: 'rm -rf /' } }
 
 describe('createControlServer', () => {
+  describe('listening and tokens', listeningAndTokensTests)
+  describe('delivering', deliveringTests)
+  describe('holding the connection', holdingTheConnectionTests)
+  describe('the token and unknown sessions', theTokenAndUnknownSessionsTests)
+  describe('a throwing decider', aThrowingDeciderTests)
+  describe('bad requests', badRequestsTests)
+  describe('other endpoints', otherEndpointsTests)
+  describe('two sessions and closing', twoSessionsAndClosingTests)
+})
+
+async function postEvent(target: ControlServer, body: unknown): Promise<{ status: number }> {
+  const response = await fetch(target.eventUrl, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${target.token}`, 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  return { status: response.status }
+}
+
+function listeningAndTokensTests() {
   it('listens on loopback only', async () => {
     server = await createControlServer()
     expect(server.url).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/pretooluse$/)
@@ -49,7 +69,9 @@ describe('createControlServer', () => {
     expect(second.token).not.toBe(server.token)
     await second.close()
   })
+}
 
+function deliveringTests() {
   it('delivers the tool call to the session that owns it', async () => {
     server = await createControlServer()
     let seen: unknown = null
@@ -74,12 +96,17 @@ describe('createControlServer', () => {
     const { decision } = await post(server, ask)
     expect(decision).toEqual({ permissionDecision: 'deny', reason: 'not on production' })
   })
+}
 
+function holdingTheConnectionTests() {
   it('holds the connection open until the operator answers', async () => {
     server = await createControlServer()
-    let answer: ((decision: HookDecision) => void) | null = null
+    // Resolves once the request has reached the operator, however long the
+    // loopback round trip takes on a loaded machine.
+    const { promise: asked, resolve: deliverAnswer } =
+      Promise.withResolvers<(decision: HookDecision) => void>()
     server.register('s1', {
-      decide: () => new Promise<HookDecision>((resolve) => (answer = resolve)),
+      decide: () => new Promise<HookDecision>((resolve) => deliverAnswer(resolve)),
     })
 
     let settled = false
@@ -91,12 +118,17 @@ describe('createControlServer', () => {
     // rejection there would be reported as a suite error.
     pending.catch(() => {})
 
+    const answer = await asked
+    // A window for a premature reply to arrive in; nothing can settle it but
+    // the answer below, so a slow machine only makes the check stricter.
     await new Promise((resolve) => setTimeout(resolve, 50))
     expect(settled).toBe(false)
-    ;(answer as unknown as (decision: HookDecision) => void)({ permissionDecision: 'allow' })
+    answer({ permissionDecision: 'allow' })
     expect((await pending).decision.permissionDecision).toBe('allow')
   })
+}
 
+function theTokenAndUnknownSessionsTests() {
   it('refuses a caller without the token, so nothing else on the machine can approve', async () => {
     server = await createControlServer()
     server.register('s1', { decide: async () => ({ permissionDecision: 'allow' }) })
@@ -119,7 +151,9 @@ describe('createControlServer', () => {
     forget()
     expect((await post(server, ask)).decision.permissionDecision).toBe('ask')
   })
+}
 
+function aThrowingDeciderTests() {
   it('falls back to the terminal prompt when the decider throws', async () => {
     server = await createControlServer()
     server.register('s1', {
@@ -129,7 +163,9 @@ describe('createControlServer', () => {
     })
     expect((await post(server, ask)).decision.permissionDecision).toBe('ask')
   })
+}
 
+function badRequestsTests() {
   it('rejects a body that is not a hook request', async () => {
     server = await createControlServer()
     const response = await fetch(server.url, {
@@ -152,7 +188,9 @@ describe('createControlServer', () => {
     const { status } = await post(server, { sessionId: 's1' })
     expect(status).toBe(400)
   })
+}
 
+function otherEndpointsTests() {
   it('serves nothing but the hook endpoint', async () => {
     server = await createControlServer()
     const response = await fetch(server.url.replace('/pretooluse', '/'), {
@@ -170,7 +208,9 @@ describe('createControlServer', () => {
     })
     expect(response.status).toBe(404)
   })
+}
 
+function twoSessionsAndClosingTests() {
   it('keeps two sessions apart', async () => {
     server = await createControlServer()
     server.register('s1', { decide: async () => ({ permissionDecision: 'allow' }) })
@@ -189,18 +229,15 @@ describe('createControlServer', () => {
       fetch(url, { method: 'POST', headers: { authorization: `Bearer ${token}` }, body: '{}' })
     ).rejects.toThrow()
   })
-})
+}
 
 describe('the lifecycle endpoint', () => {
-  async function postEvent(target: ControlServer, body: unknown): Promise<{ status: number }> {
-    const response = await fetch(target.eventUrl, {
-      method: 'POST',
-      headers: { authorization: `Bearer ${target.token}`, 'content-type': 'application/json' },
-      body: JSON.stringify(body),
-    })
-    return { status: response.status }
-  }
+  describe('turns and sessions ending', turnsAndSessionsEndingTests)
+  describe('answering at once', answeringAtOnceTests)
+  describe('rejections', rejectionsTests)
+})
 
+function turnsAndSessionsEndingTests() {
   it('shares the listener and the token with the tool-call endpoint', async () => {
     server = await createControlServer()
     expect(server.eventUrl).toBe(server.url.replace('/pretooluse', '/event'))
@@ -227,7 +264,9 @@ describe('the lifecycle endpoint', () => {
     await postEvent(server, { sessionId: 's1', kind: 'session_end' })
     expect(seen).toEqual(['session_end'])
   })
+}
 
+function answeringAtOnceTests() {
   it('answers immediately rather than holding the agent up', async () => {
     server = await createControlServer()
     server.register('s1', {
@@ -250,7 +289,9 @@ describe('the lifecycle endpoint', () => {
     server = await createControlServer()
     expect((await postEvent(server, { sessionId: 'gone', kind: 'stop' })).status).toBe(200)
   })
+}
 
+function rejectionsTests() {
   it('rejects a kind it does not recognise, rather than inventing a state change', async () => {
     server = await createControlServer()
     expect((await postEvent(server, { sessionId: 's1', kind: 'exploded' })).status).toBe(400)
@@ -270,4 +311,4 @@ describe('the lifecycle endpoint', () => {
     })
     expect(response.status).toBe(401)
   })
-})
+}

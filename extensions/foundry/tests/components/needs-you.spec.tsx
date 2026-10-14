@@ -4,6 +4,7 @@ import React from 'react'
 import { Forge } from '../../src/components/Forge.js'
 import { Floor } from '../../src/components/Floor.js'
 import { App } from '../../src/renderer/App.js'
+import '../helpers/app-views.js'
 import { draftOrder } from '../../src/order/draft.js'
 import { compileOrder } from '../../src/order/compile.js'
 import type { OpenQuestion, WorkOrder } from '../../src/order/schema.js'
@@ -31,6 +32,7 @@ const QUESTIONS: OpenQuestion[] = [
     recommended: 0,
     answer: null,
     rank: 9,
+    confidence: null,
   },
   {
     id: 'q-2',
@@ -40,6 +42,7 @@ const QUESTIONS: OpenQuestion[] = [
     recommended: 0,
     answer: null,
     rank: 4,
+    confidence: null,
   },
 ]
 
@@ -70,9 +73,11 @@ function mountForge(questions: OpenQuestion[]) {
     }
     return {}
   })
-  ;(window as unknown as Record<string, unknown>).electronAPI = {
-    extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
-  }
+  Object.assign(window, {
+    electronAPI: {
+      extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+    },
+  })
   return render(<Forge orderId="WO-1" />)
 }
 
@@ -137,13 +142,20 @@ function mountForgeWithOrder(over: Partial<WorkOrder>) {
     }
     return {}
   })
-  ;(window as unknown as Record<string, unknown>).electronAPI = {
-    extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
-  }
+  Object.assign(window, {
+    electronAPI: {
+      extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+    },
+  })
   return render(<Forge orderId="WO-1" />)
 }
 
 describe('the Red team step holds open findings, but only the ones that block need a decision', () => {
+  describe('blocking findings', needsYouBlockingFindingsTests)
+  describe('notes', needsYouNotesTests)
+})
+
+function needsYouBlockingFindingsTests() {
   it('puts a blocking finding in the "Needs your decision" group, with a way to decide it', async () => {
     mountForgeWithOrder({
       redTeam: [
@@ -164,7 +176,9 @@ describe('the Red team step holds open findings, but only the ones that block ne
     expect(within(group).getByText('the change would leave the outcome false')).toBeTruthy()
     expect(within(group).getByRole('button', { name: 'Ask the architect' })).toBeTruthy()
   })
+}
 
+function needsYouNotesTests() {
   it('puts a non-blocking finding in the neutral "Notes" group instead', async () => {
     mountForgeWithOrder({
       redTeam: [
@@ -183,7 +197,7 @@ describe('the Red team step holds open findings, but only the ones that block ne
     await waitFor(() => screen.getByText('Notes, nothing to do'))
     expect(screen.queryByText('Needs your decision')).toBeNull()
   })
-})
+}
 
 // The Floor's half of the same problem.
 
@@ -223,14 +237,15 @@ function mountFloor(pending: unknown[]) {
       }
     }
     if (channel === 'foundry:permissions-list') return { pending }
-    if (channel === 'foundry:supervision-snapshot') return { review: [] }
     if (channel === 'foundry:stalls-list') return { firings: [], shadowMode: true }
     if (channel === 'foundry:feed-list') return { entries: [], mutes: [] }
     return { ok: true }
   })
-  ;(window as unknown as Record<string, unknown>).electronAPI = {
-    extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
-  }
+  Object.assign(window, {
+    electronAPI: {
+      extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+    },
+  })
   return render(<Floor orderId="WO-1" />)
 }
 
@@ -247,9 +262,9 @@ describe('the Floor puts a held tool call above the run graph', () => {
     const band = container.querySelector('.fdry-needs-you')
     const lane = container.querySelector('.fdry-lane')
     expect(lane, 'no lane rendered, so the ordering assertion proves nothing').not.toBeNull()
-    expect(band?.compareDocumentPosition(lane as Node) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
-      Node.DOCUMENT_POSITION_FOLLOWING
-    )
+    expect(
+      (band?.compareDocumentPosition(lane as Node) ?? 0) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
   })
 
   it('is absent when nothing is held', async () => {
@@ -274,11 +289,13 @@ function mountApp(attention: { inbox: number; forge: number }) {
     if (channel === 'foundry:order.list') return { orders: [] }
     return {}
   })
-  ;(window as unknown as Record<string, unknown>).electronAPI = {
-    extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
-    workspace: { list: vi.fn().mockResolvedValue({ workspaces: [] }) },
-    project: { create: vi.fn() },
-  }
+  Object.assign(window, {
+    electronAPI: {
+      extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+      workspace: { list: vi.fn().mockResolvedValue({ workspaces: [] }) },
+      project: { create: vi.fn() },
+    },
+  })
   window.history.replaceState({}, '', '/?repoRoot=/repo')
   return render(<App />)
 }

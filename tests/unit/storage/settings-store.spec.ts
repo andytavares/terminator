@@ -4,6 +4,9 @@ vi.mock('electron-store', () => {
   const stores: Record<string, Record<string, unknown>> = {}
   return {
     default: class MockStore {
+      onDidAnyChange() {
+        return () => {}
+      }
       private name: string
       private data: Record<string, unknown>
       constructor({ name, defaults }: { name: string; defaults: Record<string, unknown> }) {
@@ -23,10 +26,14 @@ vi.mock('electron-store', () => {
 
 vi.mock('electron', () => ({ app: { getPath: () => '/tmp' } }))
 
-describe('settings-store', () => {
+function useEmptyStores(): void {
   beforeEach(() => {
     vi.resetModules()
   })
+}
+
+describe('settings-store', () => {
+  useEmptyStores()
 
   it('getGlobalSettings returns defaults', async () => {
     const { getGlobalSettings } = await import('../../../src/main/storage/settings-store')
@@ -48,6 +55,10 @@ describe('settings-store', () => {
     expect(settings.notifications.defaultTargets).toEqual(['toast'])
     expect(settings.notifications.overrides).toEqual({})
   })
+})
+
+describe('settings-store — notification overrides and merging', () => {
+  useEmptyStores()
 
   it('updateGlobalSettings patches a single core notification override without clobbering others', async () => {
     const { getGlobalSettings, updateGlobalSettings } = await import(
@@ -74,6 +85,31 @@ describe('settings-store', () => {
     const settings = getGlobalSettings()
     expect(settings.appearance.theme).toBe('light')
   })
+})
+
+describe('settings-store — refused values', () => {
+  useEmptyStores()
+
+  it('updateGlobalSettings refuses a value the settings schema rejects and keeps what was stored', async () => {
+    const { getGlobalSettings, updateGlobalSettings } = await import(
+      '../../../src/main/storage/settings-store'
+    )
+    const before = getGlobalSettings().terminal.scrollbackLimit
+    expect(() => updateGlobalSettings({ terminal: { scrollbackLimit: 5 } })).toThrow()
+    expect(getGlobalSettings().terminal.scrollbackLimit).toBe(before)
+  })
+
+  it('updateWorkspaceSettings refuses an override the settings schema rejects', async () => {
+    const { getWorkspaceSettings, updateWorkspaceSettings } = await import(
+      '../../../src/main/storage/settings-store'
+    )
+    expect(() => updateWorkspaceSettings('ws-bad', { appearance: { theme: 'purple' } })).toThrow()
+    expect(getWorkspaceSettings('ws-bad').overrides).toEqual({})
+  })
+})
+
+describe('settings-store — workspace overrides', () => {
+  useEmptyStores()
 
   it('getWorkspaceSettings returns global defaults when no override', async () => {
     const { getWorkspaceSettings } = await import('../../../src/main/storage/settings-store')
@@ -90,22 +126,48 @@ describe('settings-store', () => {
     const ws = getWorkspaceSettings('ws-1')
     expect(ws.overrides?.appearance?.theme).toBe('light')
   })
+})
 
-  it('workspace override takes precedence — test via resolveSettings logic', async () => {
-    const {
-      updateGlobalSettings,
-      updateWorkspaceSettings,
-      getGlobalSettings,
-      getWorkspaceSettings,
-    } = await import('../../../src/main/storage/settings-store')
-    updateGlobalSettings({ appearance: { theme: 'dark' } })
-    updateWorkspaceSettings('ws-override', { appearance: { theme: 'light' } })
-    const global = getGlobalSettings()
-    const ws = getWorkspaceSettings('ws-override')
-    const resolved = {
-      ...global,
-      appearance: { ...global.appearance, ...ws.overrides?.appearance },
-    }
-    expect(resolved.appearance.theme).toBe('light')
+describe('settings-store — handing a workspace override back', () => {
+  useEmptyStores()
+
+  it('"Use global default" drops the override it names, and keeps the others', async () => {
+    const { updateWorkspaceSettings, getWorkspaceSettings } = await import(
+      '../../../src/main/storage/settings-store'
+    )
+    updateWorkspaceSettings('ws-reset', {
+      appearance: { theme: 'light' },
+      terminal: { scrollbackLimit: 2000, defaultShell: '/bin/fish' },
+    })
+    updateWorkspaceSettings('ws-reset', { appearance: undefined })
+    updateWorkspaceSettings('ws-reset', { terminal: { scrollbackLimit: undefined } })
+
+    expect(getWorkspaceSettings('ws-reset').overrides).toEqual({
+      terminal: { defaultShell: '/bin/fish' },
+    })
+  })
+})
+
+// `extensions` was a global settings field nothing read or wrote; a file
+// written before it was removed still carries it.
+describe('settings-store — a settings file that still has the removed `extensions` field', () => {
+  useEmptyStores()
+
+  it('loads, and the next write leaves the field out of the file', async () => {
+    const Store = (await import('electron-store')).default
+    const file = new Store<Record<string, unknown>>({ name: 'settings', defaults: {} })
+    const { DEFAULT_GLOBAL_SETTINGS, GlobalSettingsSchema } = await import(
+      '../../../src/shared/schemas/settings.schema'
+    )
+    file.set('global', { ...DEFAULT_GLOBAL_SETTINGS, extensions: { 'com.old': { on: true } } })
+    const { getGlobalSettings, updateGlobalSettings } = await import(
+      '../../../src/main/storage/settings-store'
+    )
+
+    expect(GlobalSettingsSchema.safeParse(getGlobalSettings()).success).toBe(true)
+    updateGlobalSettings({ appearance: { theme: 'light' } })
+
+    expect(file.get('global')).not.toHaveProperty('extensions')
+    expect(getGlobalSettings().appearance.theme).toBe('light')
   })
 })

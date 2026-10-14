@@ -1,7 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { rmSync } from 'node:fs'
 import {
   AppHandle,
   launchApp,
@@ -9,7 +7,9 @@ import {
   createWorkspace,
   addAndSelectProject,
   selectProject,
+  e2eTempDir,
 } from './helpers'
+import { expectCentredInWindow } from './modal-centre'
 
 // Home against the running app: it is the launch view, it lists every terminal
 // where it lives, and what the operator writes about a session is still there
@@ -23,7 +23,7 @@ let handle: AppHandle | undefined
 let folder: string
 
 test.beforeEach(() => {
-  folder = mkdtempSync(join(tmpdir(), 'home-'))
+  folder = e2eTempDir('home-')
 })
 
 test.afterEach(async () => {
@@ -129,6 +129,7 @@ test('linking a session says where to connect a tracker when none is', async () 
     .getByRole('button', { name: 'Link a work item' })
     .click()
   const dialog = page.getByRole('dialog', { name: 'Link a work item' })
+  await expectCentredInWindow(dialog, 'Link a work item')
   await expect(dialog.getByRole('alert')).toHaveText(
     'No issue tracker is connected. Connect Linear or Jira in Settings → Integrations.'
   )

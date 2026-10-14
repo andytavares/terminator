@@ -1,8 +1,13 @@
 import { test, expect, type Page } from '@playwright/test'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { AppHandle, launchApp, closeApp, createWorkspace, addAndSelectProject } from './helpers'
+import { rmSync } from 'node:fs'
+import {
+  AppHandle,
+  launchApp,
+  closeApp,
+  createWorkspace,
+  addAndSelectProject,
+  e2eTempDir,
+} from './helpers'
 
 // A regression suite for feature 058: output arriving in a background terminal
 // must never reorder Home or the wall, and every way of opening a session must
@@ -19,7 +24,7 @@ let handle: AppHandle | undefined
 let folder: string
 
 test.beforeEach(() => {
-  folder = mkdtempSync(join(tmpdir(), 'surfaces-'))
+  folder = e2eTempDir('surfaces-')
 })
 
 test.afterEach(async () => {
@@ -86,6 +91,22 @@ async function expectTerminalFocused(page: Page): Promise<void> {
     .toBe(true)
 }
 
+/** The Ledger's rows, top to bottom. */
+function ledgerOrder(page: Page): Promise<string> {
+  return page.evaluate(() =>
+    [...document.querySelectorAll('[role="row"][aria-label]')]
+      .map((el) => el.getAttribute('aria-label'))
+      .join('|')
+  )
+}
+
+/** The wall's tiles, by the order each is drawn in. */
+function wallOrder(page: Page): Promise<string> {
+  return page.evaluate(() =>
+    [...document.querySelectorAll('.wall-tile')].map((el) => getComputedStyle(el).order).join('|')
+  )
+}
+
 test('output never reorders sessions, on Home or the wall', async () => {
   test.setTimeout(120_000)
   handle = await launchApp()
@@ -99,29 +120,57 @@ test('output never reorders sessions, on Home or the wall', async () => {
   await runInTab(page, 1, 'while true; do echo tick; sleep 0.4; done')
 
   await openHome(page)
-  const homeOrders = await sampleDistinct(
-    () =>
-      page.evaluate(() =>
-        [...document.querySelectorAll('[role="row"][aria-label]')]
-          .map((el) => el.getAttribute('aria-label'))
-          .join('|')
-      ),
-    40
-  )
+  const homeOrders = await sampleDistinct(() => ledgerOrder(page), 40)
   expect(homeOrders.size).toBe(1)
 
   await openOverview(page)
-  const wallOrders = await sampleDistinct(
-    () =>
-      page.evaluate(() =>
-        [...document.querySelectorAll('.wall-tile')]
-          .map((el) => getComputedStyle(el).order)
-          .join('|')
-      ),
-    40
-  )
+  const wallOrders = await sampleDistinct(() => wallOrder(page), 40)
   expect(wallOrders.size).toBe(1)
 })
+
+/** 1. Enter on a Ledger row. 2. The "Open <name>" button on a wall tile. */
+async function openFromHomeAndWall(page: Page): Promise<void> {
+  await openHome(page)
+  const row = page.getByRole('row', { name: 'Terminal 1' })
+  await row.locator('.ledger__name').click()
+  await page.keyboard.press('Enter')
+  await expectTerminalFocused(page)
+  await expect(page.getByRole('heading', { name: 'Home' })).toBeHidden()
+
+  await openOverview(page)
+  await page
+    .getByRole('article', { name: /Terminal 2/ })
+    .getByRole('button', { name: 'Open Terminal 2' })
+    .click()
+  await expectTerminalFocused(page)
+}
+
+/** 3. A sidebar terminal row, for a different session. 4. The sidebar row of
+ * the already-active session, clicked again. 5. A session tab in the tab bar. */
+async function openFromSidebarAndTabs(page: Page): Promise<void> {
+  await page.locator('.branch-row__disclosure[aria-label^="Show terminals in"]').click()
+  await sidebarTerminalRow(page, 'Terminal 3').click()
+  await expectTerminalFocused(page)
+
+  await sidebarTerminalRow(page, 'Terminal 3').click()
+  await expectTerminalFocused(page)
+
+  await page.locator('.tab-bar__tab--session').nth(0).click()
+  await expectTerminalFocused(page)
+}
+
+/** 6. Quick Actions, opened over Home. */
+async function openFromQuickActions(page: Page): Promise<void> {
+  await openHome(page)
+  await page.keyboard.press('Meta+p')
+  await page.keyboard.press('/')
+  const search = page.getByRole('combobox', { name: 'Search quick actions' })
+  await expect(search).toBeVisible()
+  await search.fill('Terminal 2')
+  await page.keyboard.press('Enter')
+  await expectTerminalFocused(page)
+  await expect(page.getByRole('heading', { name: 'Home' })).toBeHidden()
+}
 
 test('opening a session always focuses its terminal', async () => {
   test.setTimeout(60_000)
@@ -132,46 +181,34 @@ test('opening a session always focuses its terminal', async () => {
   await addTwoMoreTabs(page)
   // Default titles, in creation order: Terminal 1, Terminal 2, Terminal 3.
 
-  // 1. Enter on a Ledger row.
-  await openHome(page)
-  const row = page.getByRole('row', { name: 'Terminal 1' })
-  await row.locator('.ledger__name').click()
-  await page.keyboard.press('Enter')
-  await expectTerminalFocused(page)
-  await expect(page.getByRole('heading', { name: 'Home' })).toBeHidden()
-
-  // 2. The "Open <name>" button on a wall tile.
-  await openOverview(page)
-  await page
-    .getByRole('article', { name: /Terminal 2/ })
-    .getByRole('button', { name: 'Open Terminal 2' })
-    .click()
-  await expectTerminalFocused(page)
-
-  // 3. A sidebar terminal row, for a different session.
-  await page.locator('.branch-row__disclosure[aria-label^="Show terminals in"]').click()
-  await sidebarTerminalRow(page, 'Terminal 3').click()
-  await expectTerminalFocused(page)
-
-  // 4. The sidebar row of the already-active session, clicked again.
-  await sidebarTerminalRow(page, 'Terminal 3').click()
-  await expectTerminalFocused(page)
-
-  // 5. A session tab in the tab bar.
-  await page.locator('.tab-bar__tab--session').nth(0).click()
-  await expectTerminalFocused(page)
-
-  // 6. Quick Actions, opened over Home.
-  await openHome(page)
-  await page.keyboard.press('Meta+p')
-  await page.keyboard.press('/')
-  const search = page.getByRole('combobox', { name: 'Search quick actions' })
-  await expect(search).toBeVisible()
-  await search.fill('Terminal 2')
-  await page.keyboard.press('Enter')
-  await expectTerminalFocused(page)
-  await expect(page.getByRole('heading', { name: 'Home' })).toBeHidden()
+  await openFromHomeAndWall(page)
+  await openFromSidebarAndTabs(page)
+  await openFromQuickActions(page)
 })
+
+/** Run in the page: links Terminal 1's record to ENG-123 through the preload API. */
+async function linkTerminalOneToEng123(): Promise<void> {
+  const { data } = await window.electronAPI.sessionRecords.list()
+  const record = data.find((r) => r.tabTitle === 'Terminal 1')
+  if (!record) throw new Error('no record for Terminal 1')
+  const { sessionId, projectId, workspaceName, projectName, branch, tabTitle, shell, startedAt } =
+    record
+  const session = {
+    sessionId,
+    projectId,
+    workspaceName,
+    projectName,
+    branch,
+    tabTitle,
+    shell,
+    startedAt,
+  }
+  const result = await window.electronAPI.sessionRecords.setLink({
+    session,
+    link: { tracker: 'linear', key: 'ENG-123' },
+  })
+  if ('error' in result) throw new Error(result.message)
+}
 
 test('a session link made from Home shows on the sidebar terminal row and the session tab', async () => {
   handle = await launchApp()
@@ -192,28 +229,7 @@ test('a session link made from Home shows on the sidebar terminal row and the se
   await box.press('Enter')
   await expect(page.getByText('Wiring up the link')).toBeVisible()
 
-  await page.evaluate(async () => {
-    const { data } = await window.electronAPI.sessionRecords.list()
-    const record = data.find((r) => r.tabTitle === 'Terminal 1')
-    if (!record) throw new Error('no record for Terminal 1')
-    const { sessionId, projectId, workspaceName, projectName, branch, tabTitle, shell, startedAt } =
-      record
-    const session = {
-      sessionId,
-      projectId,
-      workspaceName,
-      projectName,
-      branch,
-      tabTitle,
-      shell,
-      startedAt,
-    }
-    const result = await window.electronAPI.sessionRecords.setLink({
-      session,
-      link: { tracker: 'linear', key: 'ENG-123' },
-    })
-    if ('error' in result) throw new Error(result.message)
-  })
+  await page.evaluate(linkTerminalOneToEng123)
 
   // Branches start collapsed, so the branch row itself must carry the key.
   await expect(page.getByRole('button', { name: /^ticket/ }).getByText('ENG-123')).toBeVisible()

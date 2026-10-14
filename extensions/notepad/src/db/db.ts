@@ -1,18 +1,10 @@
 import { randomUUID } from 'node:crypto'
-import type { ExtensionDB } from '../../../../src/main/db/index'
+import type { ExtensionDB } from '@terminator/extension-sdk'
 
 export { randomUUID }
 
-export async function hasColumn(db: ExtensionDB, table: string, column: string): Promise<boolean> {
-  const rows = await db.query<{ column_name: string }>(
-    `SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name = ? AND column_name = ?`,
-    [table, column]
-  )
-  return rows.length > 0
-}
-
-export async function applyNotepadSchema(db: ExtensionDB): Promise<void> {
-  await db.exec(`
+// Folders, notes and their tags.
+const NOTE_SCHEMA = `
     CREATE TABLE IF NOT EXISTS folders (
       id         TEXT PRIMARY KEY,
       name       TEXT NOT NULL,
@@ -40,9 +32,10 @@ export async function applyNotepadSchema(db: ExtensionDB): Promise<void> {
       note_id TEXT NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
       tag_id  TEXT NOT NULL REFERENCES tags(id)  ON DELETE CASCADE,
       PRIMARY KEY (note_id, tag_id)
-    );
+    );`
 
-    CREATE TABLE IF NOT EXISTS comments (
+// Note comments, and the extension's settings.
+const COMMENT_SCHEMA = `    CREATE TABLE IF NOT EXISTS comments (
       id           TEXT PRIMARY KEY,
       note_id      TEXT NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
       parent_id    TEXT REFERENCES comments(id) ON DELETE CASCADE,
@@ -64,9 +57,10 @@ export async function applyNotepadSchema(db: ExtensionDB): Promise<void> {
       key          TEXT NOT NULL,
       value        TEXT NOT NULL,
       PRIMARY KEY (extension_id, key)
-    );
+    );`
 
-    CREATE TABLE IF NOT EXISTS diagrams (
+// Diagrams, their tags and their comments.
+const DIAGRAM_SCHEMA = `    CREATE TABLE IF NOT EXISTS diagrams (
       id          TEXT PRIMARY KEY,
       title       TEXT NOT NULL DEFAULT 'Untitled diagram',
       scene_json  TEXT NOT NULL DEFAULT '{}',
@@ -96,77 +90,27 @@ export async function applyNotepadSchema(db: ExtensionDB): Promise<void> {
       updated_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_diagram_comments_diagram ON diagram_comments(diagram_id, status);
-  `)
+`
+
+export async function applyNotepadSchema(db: ExtensionDB): Promise<void> {
+  await db.exec(NOTE_SCHEMA + '\n\n' + COMMENT_SCHEMA + '\n\n' + DIAGRAM_SCHEMA)
+  await addColumnIfMissing(db, {
+    table: 'notes',
+    column: 'title_set_by_hand',
+    definition: 'INTEGER NOT NULL DEFAULT 0',
+  })
 }
 
-export async function applyNotepadMigrations(db: ExtensionDB): Promise<void> {
-  const hasTags = await hasColumn(db, 'diagrams', 'tags')
-  if (!hasTags) {
-    await db.exec(`ALTER TABLE diagrams ADD COLUMN tags TEXT NOT NULL DEFAULT '[]'`)
-  }
-  const hasSortOrderNotes = await hasColumn(db, 'notes', 'sort_order')
-  if (!hasSortOrderNotes) {
-    await db.exec(`ALTER TABLE notes ADD COLUMN sort_order REAL NOT NULL DEFAULT 0`)
-  }
-  const hasSortOrderDiagrams = await hasColumn(db, 'diagrams', 'sort_order')
-  if (!hasSortOrderDiagrams) {
-    await db.exec(`ALTER TABLE diagrams ADD COLUMN sort_order REAL NOT NULL DEFAULT 0`)
-  }
-  await db.exec(`CREATE TABLE IF NOT EXISTS folders (
-    id         TEXT PRIMARY KEY,
-    name       TEXT NOT NULL,
-    sort_order REAL NOT NULL DEFAULT 0,
-    created_at TEXT NOT NULL
-  )`)
-  const hasFolderIdNotes = await hasColumn(db, 'notes', 'folder_id')
-  if (!hasFolderIdNotes) {
-    await db.exec(`ALTER TABLE notes ADD COLUMN folder_id TEXT`)
-  }
-  const hasFolderIdDiagrams = await hasColumn(db, 'diagrams', 'folder_id')
-  if (!hasFolderIdDiagrams) {
-    await db.exec(`ALTER TABLE diagrams ADD COLUMN folder_id TEXT`)
-  }
-  if (!(await hasColumn(db, 'settings', 'extension_id'))) {
-    await db.transaction(async (tx) => {
-      await tx.exec(`
-        CREATE TABLE settings_new (
-          extension_id TEXT NOT NULL DEFAULT 'notepad',
-          key          TEXT NOT NULL,
-          value        TEXT NOT NULL,
-          PRIMARY KEY (extension_id, key)
-        );
-        INSERT INTO settings_new (extension_id, key, value)
-          SELECT 'notepad', key, value FROM settings;
-        DROP TABLE settings;
-        ALTER TABLE settings_new RENAME TO settings;
-      `)
-    })
-  }
-  await db.exec(`
-    CREATE TABLE IF NOT EXISTS diagram_tags (
-      diagram_id TEXT NOT NULL REFERENCES diagrams(id) ON DELETE CASCADE,
-      tag        TEXT NOT NULL,
-      PRIMARY KEY (diagram_id, tag)
-    )
-  `)
-  if (await hasColumn(db, 'diagrams', 'tags')) {
-    await db.transaction(async (tx) => {
-      const rows = await tx.query<{ id: string; tags: string }>(`SELECT id, tags FROM diagrams`)
-      for (const row of rows) {
-        let parsed: string[] = []
-        try {
-          parsed = JSON.parse(row.tags ?? '[]') as string[]
-        } catch {
-          parsed = []
-        }
-        for (const tag of parsed) {
-          await tx.run(
-            `INSERT INTO diagram_tags (diagram_id, tag) VALUES (?, ?) ON CONFLICT DO NOTHING`,
-            [row.id, tag]
-          )
-        }
-      }
-      await tx.exec(`ALTER TABLE diagrams DROP COLUMN tags`)
-    })
-  }
+/** A column a table created by an earlier version of this schema may lack. */
+interface ColumnSpec {
+  table: string
+  column: string
+  definition: string
+}
+
+/** Adds a column to a table created by an earlier version of this schema. */
+async function addColumnIfMissing(db: ExtensionDB, spec: ColumnSpec): Promise<void> {
+  const { table, column, definition } = spec
+  const present = await db.get('SELECT 1 FROM pragma_table_info(?) WHERE name = ?', [table, column])
+  if (!present) await db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`)
 }

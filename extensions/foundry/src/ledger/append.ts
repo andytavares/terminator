@@ -9,7 +9,7 @@ import * as path from 'node:path'
 // a read-modify-write — and it is what makes the curator's citations mean
 // something later, since the entry it cites cannot have changed underneath it.
 
-export interface LedgerEvidence {
+interface LedgerEvidence {
   readonly kind: string
   readonly path?: string
   readonly excerpt?: string
@@ -27,15 +27,7 @@ export interface LedgerEntry {
   readonly evidence: readonly LedgerEvidence[]
 }
 
-export interface LedgerQuery {
-  readonly orderId?: string
-  readonly actor?: string
-  readonly action?: string
-  readonly since?: string
-  readonly limit?: number
-}
-
-export class UnattributedEntryError extends Error {
+class UnattributedEntryError extends Error {
   readonly code = 'UNATTRIBUTED_LEDGER_ENTRY'
   constructor(missing: 'actor' | 'action') {
     super(
@@ -90,17 +82,4 @@ export async function readEntries(file: string): Promise<LedgerEntry[]> {
     }
   }
   return out
-}
-
-/** Filtered, oldest first; `limit` keeps the most recent. */
-export async function queryEntries(file: string, query: LedgerQuery = {}): Promise<LedgerEntry[]> {
-  const all = await readEntries(file)
-  const matched = all.filter((entry) => {
-    if (query.orderId !== undefined && entry.orderId !== query.orderId) return false
-    if (query.actor !== undefined && entry.actor !== query.actor) return false
-    if (query.action !== undefined && entry.action !== query.action) return false
-    if (query.since !== undefined && entry.at < query.since) return false
-    return true
-  })
-  return query.limit === undefined ? matched : matched.slice(-query.limit)
 }

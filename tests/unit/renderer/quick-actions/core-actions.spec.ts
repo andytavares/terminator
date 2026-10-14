@@ -1,10 +1,11 @@
 import { describe, it, expect, vi } from 'vitest'
 import {
   buildCoreActions,
-  CORE_SHORTCUTS,
   type CoreActionDeps,
 } from '../../../../src/renderer/quick-actions/core-actions'
-import { CORE_GROUPS, findMnemonicConflicts } from '../../../../src/renderer/quick-actions/groups'
+import { CORE_GROUPS } from '../../../../src/renderer/quick-actions/groups'
+import { CORE_SHORTCUTS, findMnemonicConflicts } from '../../../support/quick-actions'
+import type { QuickAction } from '../../../../src/renderer/quick-actions/types'
 
 function makeDeps(overrides: Partial<CoreActionDeps> = {}): CoreActionDeps {
   return {
@@ -15,6 +16,14 @@ function makeDeps(overrides: Partial<CoreActionDeps> = {}): CoreActionDeps {
     sessions: [{ id: 's1', projectId: 'p1', tabTitle: 'Terminal 1', projectName: 'main' }],
     issueLink: { key: 'ABC-1', tracker: 'linear' },
     issue: { url: 'https://example.com' },
+    ...coreActionHandlers(),
+    ...overrides,
+  }
+}
+
+/** A fake for every handler an action can run. */
+function coreActionHandlers() {
+  return {
     onNewTab: vi.fn(),
     onSplit: vi.fn(),
     onClosePane: vi.fn(),
@@ -38,8 +47,12 @@ function makeDeps(overrides: Partial<CoreActionDeps> = {}): CoreActionDeps {
     onToggleSidebar: vi.fn(),
     onOpenSettings: vi.fn(),
     onToggleLog: vi.fn(),
-    ...overrides,
   }
+}
+
+/** The label of the action with `id`. */
+function actionLabelOf(actions: QuickAction[], id: string): string {
+  return actions.find((action) => action.id === id)!.label
 }
 
 describe('buildCoreActions', () => {
@@ -68,7 +81,9 @@ describe('buildCoreActions', () => {
     const clear = actions.find((a) => a.id === 'core.clear')!
     expect(clear.disabledReason).toBe('No terminal focused')
   })
+})
 
+describe('buildCoreActions — disables New tab with "No project focused" when no project is focused', () => {
   it('disables New tab with "No project focused" when no project is focused', () => {
     const actions = buildCoreActions(makeDeps({ hasProjectFocused: false }))
     const newTab = actions.find((a) => a.id === 'core.new-tab')!
@@ -91,42 +106,46 @@ describe('buildCoreActions', () => {
     expect(actions.find((a) => a.id === 'core.close-tab')).toBeDefined()
     expect(actions.find((a) => a.id === 'core.link-issue')).toBeDefined()
   })
+})
 
-  describe('linking issues to a session vs a branch', () => {
-    it('targets the focused terminal, disabled by "No terminal focused" rather than project', () => {
-      const actions = buildCoreActions(
-        makeDeps({ hasTerminalFocused: false, hasProjectFocused: true })
-      )
-      expect(actions.find((a) => a.id === 'core.link-issue')!.disabledReason).toBe(
-        'No terminal focused'
-      )
-    })
-
-    it('runs onLinkIssue, not onLinkIssueBranch', () => {
-      const deps = makeDeps()
-      buildCoreActions(deps)
-        .find((a) => a.id === 'core.link-issue')!
-        .run()
-      expect(deps.onLinkIssue).toHaveBeenCalledOnce()
-      expect(deps.onLinkIssueBranch).not.toHaveBeenCalled()
-    })
-
-    it('offers a separate "Link issue to branch" action, disabled by "No project focused"', () => {
-      const actions = buildCoreActions(makeDeps({ hasProjectFocused: false }))
-      const branch = actions.find((a) => a.id === 'core.link-issue-branch')!
-      expect(branch.label).toBe('Link issue to branch')
-      expect(branch.disabledReason).toBe('No project focused')
-    })
-
-    it('runs onLinkIssueBranch for the branch action', () => {
-      const deps = makeDeps()
-      buildCoreActions(deps)
-        .find((a) => a.id === 'core.link-issue-branch')!
-        .run()
-      expect(deps.onLinkIssueBranch).toHaveBeenCalledOnce()
-    })
+describe('buildCoreActions — linking issues to a session vs a branch', () => {
+  it('targets the focused terminal, disabled by "No terminal focused" rather than project', () => {
+    const actions = buildCoreActions(
+      makeDeps({ hasTerminalFocused: false, hasProjectFocused: true })
+    )
+    expect(actions.find((a) => a.id === 'core.link-issue')!.disabledReason).toBe(
+      'No terminal focused'
+    )
   })
 
+  it('runs onLinkIssue, not onLinkIssueBranch', () => {
+    const deps = makeDeps()
+    buildCoreActions(deps)
+      .find((a) => a.id === 'core.link-issue')!
+      .run()
+    expect(deps.onLinkIssue).toHaveBeenCalledOnce()
+    expect(deps.onLinkIssueBranch).not.toHaveBeenCalled()
+  })
+
+  it('offers a separate "Link issue to branch" action, disabled by "No project focused"', () => {
+    const actions = buildCoreActions(makeDeps({ hasProjectFocused: false }))
+    const branch = actions.find((a) => a.id === 'core.link-issue-branch')!
+    expect(branch.label).toBe('Link issue to branch')
+    expect(branch.disabledReason).toBe('No project focused')
+  })
+})
+
+describe('buildCoreActions — linking issues to a session vs a branch — runs onLinkIssueBranch for the branch action', () => {
+  it('runs onLinkIssueBranch for the branch action', () => {
+    const deps = makeDeps()
+    buildCoreActions(deps)
+      .find((a) => a.id === 'core.link-issue-branch')!
+      .run()
+    expect(deps.onLinkIssueBranch).toHaveBeenCalledOnce()
+  })
+})
+
+describe('buildCoreActions — runs the matching dep callback', () => {
   it('runs the matching dep callback', () => {
     const deps = makeDeps()
     const actions = buildCoreActions(deps)
@@ -175,10 +194,65 @@ describe('CORE_SHORTCUTS', () => {
   it('matches the KeyboardEvent shape it documents', () => {
     const entry = CORE_SHORTCUTS.find((s) => s.actionId === 'core.clear')!
     expect(
-      entry.match({ key: 'k', metaKey: true, ctrlKey: false, shiftKey: false, altKey: false })
+      entry.firedBy({ key: 'k', metaKey: true, ctrlKey: false, shiftKey: false, altKey: false })
     ).toBe(true)
     expect(
-      entry.match({ key: 'k', metaKey: false, ctrlKey: false, shiftKey: false, altKey: false })
+      entry.firedBy({ key: 'k', metaKey: false, ctrlKey: false, shiftKey: false, altKey: false })
     ).toBe(false)
+  })
+})
+
+const HANDLED_BY: [string, keyof CoreActionDeps, unknown[]][] = [
+  ['core.new-tab', 'onNewTab', []],
+  ['core.split-horizontal', 'onSplit', ['horizontal']],
+  ['core.close-tab', 'onClosePane', []],
+  ['core.new-scratch', 'onNewScratch', []],
+  ['core.edit-note', 'onEditNote', []],
+  ['core.prev-tab', 'onCycleTab', [-1]],
+  ['core.next-tab', 'onCycleTab', [1]],
+  ['core.cycle-recent-prev', 'onCycleRecentSession', [-1]],
+  ['core.cycle-recent-next', 'onCycleRecentSession', [1]],
+  ['core.next-waiting', 'onNextWaiting', []],
+  ['session:s1', 'onSelectSession', [expect.objectContaining({ id: 's1', projectId: 'p1' })]],
+  ['core.resume', 'onResume', []],
+  ['core.switch-workspace-ws-1', 'onSwitchWorkspace', ['ws-1']],
+  ['core.cycle-workspace-next', 'onCycleWorkspace', [1]],
+  ['core.cycle-workspace-prev', 'onCycleWorkspace', [-1]],
+  ['core.view-issue', 'onViewIssue', []],
+  ['core.copy-issue-key', 'onCopyIssueKey', []],
+  ['core.open-issue', 'onOpenIssue', []],
+  ['core.open-home', 'onHome', []],
+  ['core.toggle-overview', 'onOverview', []],
+  ['core.next-waiting-top', 'onNextWaiting', []],
+  ['core.toggle-sidebar', 'onToggleSidebar', []],
+  ['core.open-settings', 'onOpenSettings', []],
+  ['core.toggle-log', 'onToggleLog', []],
+]
+
+describe('buildCoreActions — every action runs its own handler', () => {
+  it.each(HANDLED_BY)('%s runs %s', (id, handler, args) => {
+    const deps = makeDeps()
+    buildCoreActions(deps)
+      .find((a) => a.id === id)!
+      .run()
+    expect(deps[handler]).toHaveBeenCalledWith(...args)
+  })
+})
+
+describe('buildCoreActions — issue labels name the linked issue', () => {
+  it('names a Jira issue and its tracker', () => {
+    const actions = buildCoreActions(makeDeps({ issueLink: { key: 'J-7', tracker: 'jira' } }))
+    expect(actionLabelOf(actions, 'core.link-issue')).toBe('Change linked issue')
+    expect(actionLabelOf(actions, 'core.view-issue')).toBe('View J-7')
+    expect(actionLabelOf(actions, 'core.copy-issue-key')).toBe('Copy issue key (J-7)')
+    expect(actionLabelOf(actions, 'core.open-issue')).toBe('Open J-7 in Jira')
+  })
+
+  it('says what it would do when nothing is linked', () => {
+    const actions = buildCoreActions(makeDeps({ issueLink: null }))
+    expect(actionLabelOf(actions, 'core.link-issue')).toBe('Link issue')
+    expect(actionLabelOf(actions, 'core.view-issue')).toBe('View linked issue')
+    expect(actionLabelOf(actions, 'core.copy-issue-key')).toBe('Copy issue key')
+    expect(actionLabelOf(actions, 'core.open-issue')).toBe('Open issue in tracker')
   })
 })

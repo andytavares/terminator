@@ -20,38 +20,7 @@ function makeEvent(overrides: Partial<NoteChangedEvent> = {}): NoteChangedEvent 
   }
 }
 
-describe('parseNoteChangedEvent', () => {
-  it('parses a well-formed payload', () => {
-    expect(parseNoteChangedEvent(makeEvent())).toEqual(makeEvent())
-  })
-
-  it('rejects non-objects', () => {
-    expect(parseNoteChangedEvent(null)).toBeNull()
-    expect(parseNoteChangedEvent('nope')).toBeNull()
-    expect(parseNoteChangedEvent(undefined)).toBeNull()
-  })
-
-  it('rejects payloads without an id or body', () => {
-    expect(parseNoteChangedEvent({ body: 'b' })).toBeNull()
-    expect(parseNoteChangedEvent({ id: 'note-1' })).toBeNull()
-  })
-
-  it('defaults the optional fields rather than dropping the event', () => {
-    const parsed = parseNoteChangedEvent({ id: 'note-1', body: 'b' })
-    expect(parsed).toEqual({
-      id: 'note-1',
-      title: '',
-      body: 'b',
-      tags: [],
-      updatedAt: '',
-      originId: null,
-    })
-  })
-
-  it('keeps an empty body, which is a legitimate note state', () => {
-    expect(parseNoteChangedEvent({ id: 'note-1', body: '' })?.body).toBe('')
-  })
-})
+describe('parseNoteChangedEvent', parseNoteChangedEventTests)
 
 describe('isForeignChange', () => {
   it('is false for this surface own write', () => {
@@ -67,30 +36,40 @@ describe('isForeignChange', () => {
   })
 })
 
-describe('onForeignNoteChange', () => {
-  const off = vi.fn()
-  let handlers: Array<(data: unknown) => void>
+const off = vi.fn()
 
+let handlers: Array<(data: unknown) => void>
+
+describe('onForeignNoteChange', onForeignNoteChangeTests)
+
+function onForeignNoteChangeTests() {
   beforeEach(() => {
     handlers = []
     off.mockClear()
-    ;(globalThis as unknown as { window: unknown }).window = {
-      electronAPI: {
-        extensionBridge: {
-          on: vi.fn((channel: string, handler: (data: unknown) => void) => {
-            expect(channel).toBe(NOTES_CHANGED_CHANNEL)
-            handlers.push(handler)
-            return off
-          }),
+    Object.assign(globalThis, {
+      window: {
+        electronAPI: {
+          extensionBridge: {
+            on: vi.fn((channel: string, handler: (data: unknown) => void) => {
+              expect(channel).toBe(NOTES_CHANGED_CHANNEL)
+              handlers.push(handler)
+              return off
+            }),
+          },
         },
       },
-    }
+    })
   })
 
   afterEach(() => {
-    delete (globalThis as unknown as { window?: unknown }).window
+    Reflect.deleteProperty(globalThis, 'window')
   })
 
+  describe('delivering', onForeignNoteChangeDeliveringTests)
+  describe('ignoring and unsubscribing', onForeignNoteChangeIgnoringUnsubscribingTests)
+}
+
+function onForeignNoteChangeDeliveringTests() {
   it('delivers changes written by another surface', () => {
     const handler = vi.fn()
     onForeignNoteChange(handler)
@@ -104,7 +83,9 @@ describe('onForeignNoteChange', () => {
     handlers[0](makeEvent({ originId: ORIGIN_ID }))
     expect(handler).not.toHaveBeenCalled()
   })
+}
 
+function onForeignNoteChangeIgnoringUnsubscribingTests() {
   it('ignores malformed payloads', () => {
     const handler = vi.fn()
     onForeignNoteChange(handler)
@@ -115,4 +96,44 @@ describe('onForeignNoteChange', () => {
   it('returns the unsubscribe function from the bridge', () => {
     expect(onForeignNoteChange(vi.fn())).toBe(off)
   })
-})
+}
+
+function parseNoteChangedEventTests() {
+  describe('parsing', parseNoteChangedEventParsingTests)
+  describe('defaults', parseNoteChangedEventDefaultsTests)
+}
+
+function parseNoteChangedEventParsingTests() {
+  it('parses a well-formed payload', () => {
+    expect(parseNoteChangedEvent(makeEvent())).toEqual(makeEvent())
+  })
+
+  it('rejects non-objects', () => {
+    expect(parseNoteChangedEvent(null)).toBeNull()
+    expect(parseNoteChangedEvent('nope')).toBeNull()
+    expect(parseNoteChangedEvent(undefined)).toBeNull()
+  })
+
+  it('rejects payloads without an id or body', () => {
+    expect(parseNoteChangedEvent({ body: 'b' })).toBeNull()
+    expect(parseNoteChangedEvent({ id: 'note-1' })).toBeNull()
+  })
+}
+
+function parseNoteChangedEventDefaultsTests() {
+  it('defaults the optional fields rather than dropping the event', () => {
+    const parsed = parseNoteChangedEvent({ id: 'note-1', body: 'b' })
+    expect(parsed).toEqual({
+      id: 'note-1',
+      title: '',
+      body: 'b',
+      tags: [],
+      updatedAt: '',
+      originId: null,
+    })
+  })
+
+  it('keeps an empty body, which is a legitimate note state', () => {
+    expect(parseNoteChangedEvent({ id: 'note-1', body: '' })?.body).toBe('')
+  })
+}

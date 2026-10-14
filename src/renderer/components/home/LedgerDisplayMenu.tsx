@@ -1,7 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React from 'react'
 import { SlidersHorizontal } from 'lucide-react'
-import { closeAllContextMenus } from '../ContextMenu'
-import { useMenuPlacement } from '../use-menu-placement'
+import { DropdownMenu, MenuChoice, RadioChoices } from '../sidebar/menu'
 import type { HomePrefs, LedgerColumns, LedgerGroupBy, LedgerSort } from '../../sidebar/home-prefs'
 import '../sidebar/SidebarMenu.css'
 
@@ -31,95 +30,62 @@ interface Props {
 
 /** How the Ledger is arranged, behind one control, in the shape of the sidebar's Display menu. */
 export function LedgerDisplayMenu({ prefs, onChange }: Props): JSX.Element {
-  const [open, setOpen] = useState(false)
-  const buttonRef = useRef<HTMLButtonElement>(null)
-  const panelRef = useRef<HTMLDivElement>(null)
-  const placement = useMenuPlacement(open, buttonRef, panelRef)
-
-  useEffect(() => {
-    if (!open) return
-    const close = (): void => setOpen(false)
-    window.addEventListener('click', close)
-    window.addEventListener('close-context-menus', close)
-    return () => {
-      window.removeEventListener('click', close)
-      window.removeEventListener('close-context-menus', close)
-    }
-  }, [open])
-
-  const radio = (checked: boolean, label: string, patch: Partial<HomePrefs>): JSX.Element => (
-    <button
-      key={label}
-      type="button"
-      role="menuitemradio"
-      aria-checked={checked}
-      className={`sidebar-menu__item${checked ? ' sidebar-menu__item--on' : ''}`}
-      onClick={() => {
-        onChange(patch)
-        setOpen(false)
-      }}
-    >
-      {label}
-    </button>
-  )
-
-  const check = (checked: boolean, label: string, patch: Partial<HomePrefs>): JSX.Element => (
-    <button
-      key={label}
-      type="button"
-      role="menuitemcheckbox"
-      aria-checked={checked}
-      className={`sidebar-menu__item${checked ? ' sidebar-menu__item--on' : ''}`}
-      onClick={() => onChange(patch)}
-    >
-      {label}
-    </button>
-  )
-
   return (
-    <div className="sidebar-menu home-menu" onClick={(e) => e.stopPropagation()}>
-      <button
-        ref={buttonRef}
-        type="button"
-        className={`sidebar-menu__button${open ? ' sidebar-menu__button--on' : ''}`}
-        aria-expanded={open}
-        aria-label="Display"
-        onClick={() => {
-          closeAllContextMenus()
-          setOpen((v) => !v)
-        }}
-      >
-        <SlidersHorizontal aria-hidden="true" />
-        <span className="sidebar-menu__label">Display</span>
-      </button>
+    <DropdownMenu
+      label="Display"
+      icon={<SlidersHorizontal aria-hidden="true" />}
+      on="when-open"
+      variant="home-menu"
+      panelLabel="Display options"
+    >
+      {(close) => <LedgerOptions prefs={prefs} onChange={onChange} close={close} />}
+    </DropdownMenu>
+  )
+}
 
-      {open && (
-        <div
-          ref={panelRef}
-          className="sidebar-menu__panel home-menu__panel"
-          role="menu"
-          aria-label="Display options"
-          style={placement}
-        >
-          <div className="sidebar-menu__heading">Group by</div>
-          {GROUPS.map(([key, label]) => radio(prefs.groupBy === key, label, { groupBy: key }))}
-          <div className="sidebar-menu__separator" />
-          <div className="sidebar-menu__heading">Sort</div>
-          {SORTS.map(([key, label]) => radio(prefs.sort === key, label, { sort: key }))}
-          <div className="sidebar-menu__separator" />
-          <div className="sidebar-menu__heading">Columns</div>
-          {COLUMNS.map(([key, label]) =>
-            check(prefs.columns[key], label, {
-              columns: { ...prefs.columns, [key]: !prefs.columns[key] },
-            })
-          )}
-          <div className="sidebar-menu__separator" />
-          {check(prefs.previewSelected, 'Preview the selected row', {
-            previewSelected: !prefs.previewSelected,
-          })}
-          {check(prefs.hideExited, 'Hide exited sessions', { hideExited: !prefs.hideExited })}
-        </div>
+/** Grouping and sort, which close the menu once picked, then the toggles. */
+function LedgerOptions({ prefs, onChange, close }: Props & { close: () => void }): JSX.Element {
+  const pickDisplay = (patch: Partial<HomePrefs>): void => {
+    onChange(patch)
+    close()
+  }
+  return (
+    <>
+      <div className="sidebar-menu__heading">Group by</div>
+      <RadioChoices
+        choices={GROUPS}
+        current={prefs.groupBy}
+        onPick={(groupBy) => pickDisplay({ groupBy })}
+      />
+      <div className="sidebar-menu__separator" />
+      <div className="sidebar-menu__heading">Sort</div>
+      <RadioChoices choices={SORTS} current={prefs.sort} onPick={(sort) => pickDisplay({ sort })} />
+      <div className="sidebar-menu__separator" />
+      <LedgerToggles prefs={prefs} onChange={onChange} />
+    </>
+  )
+}
+
+/** The column checkboxes and the two row toggles; these leave the menu open. */
+function LedgerToggles({ prefs, onChange }: Props): JSX.Element {
+  const check = (checked: boolean, label: string, patch: Partial<HomePrefs>): JSX.Element => (
+    <MenuChoice key={label} kind="checkbox" checked={checked} onSelect={() => onChange(patch)}>
+      {label}
+    </MenuChoice>
+  )
+  return (
+    <>
+      <div className="sidebar-menu__heading">Columns</div>
+      {COLUMNS.map(([key, label]) =>
+        check(prefs.columns[key], label, {
+          columns: { ...prefs.columns, [key]: !prefs.columns[key] },
+        })
       )}
-    </div>
+      <div className="sidebar-menu__separator" />
+      {check(prefs.previewSelected, 'Preview the selected row', {
+        previewSelected: !prefs.previewSelected,
+      })}
+      {check(prefs.hideExited, 'Hide exited sessions', { hideExited: !prefs.hideExited })}
+    </>
   )
 }

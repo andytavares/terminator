@@ -1,8 +1,17 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { EventEmitter } from 'events'
+import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs'
+import { tmpdir } from 'os'
+import { join } from 'path'
+import type { RunAgentReviewDeps } from '../../src/review/review-agent.js'
 
-const execFile = vi.fn()
-vi.mock('child_process', () => ({ execFile, spawn: vi.fn() }))
+type SpawnFn = NonNullable<RunAgentReviewDeps['spawn']>
+/** What an EventEmitter calls back with; SpawnedProcess.on takes one per event. */
+type Listener = Parameters<EventEmitter['on']>[1]
+
+// Without an injected resolver the review agent asks the person's interactive
+// login shell where claude is. SHELL is a stand-in here that records each call
+// and its arguments, and prints what a test gives it.
 
 const input = {
   repoRoot: '/repo',
@@ -25,13 +34,16 @@ const input = {
   model: 'sonnet',
 }
 
+let scratch: string
+let callsFile: string
+
 function exitingProcess() {
   const proc = new EventEmitter()
   return {
     stdin: { write: () => {}, end: () => {} },
     stdout: { on: () => {} },
     stderr: { on: () => {} },
-    on: (ev: string, cb: (...a: unknown[]) => void) => {
+    on: (ev: string, cb: Listener) => {
       proc.on(ev, cb)
       if (ev === 'exit') setTimeout(() => proc.emit('exit', 1), 0)
     },
@@ -39,24 +51,37 @@ function exitingProcess() {
   }
 }
 
-type ExecCb = (err: Error | null, out?: { stdout: string }) => void
-function shellPrints(stdout: string | Error) {
-  execFile.mockImplementation((_cmd: string, _args: string[], _opts: unknown, cb: ExecCb) =>
-    stdout instanceof Error ? cb(stdout) : cb(null, { stdout })
-  )
+/** A login shell that records its arguments, prints `stdout` and exits with `status`. */
+function shellPrints(stdout: string, status = 0): void {
+  const shell = join(scratch, 'shell')
+  const printed = join(scratch, 'printed')
+  writeFileSync(printed, stdout)
+  writeFileSync(shell, `#!/bin/sh\necho "$*" >> "${callsFile}"\ncat "${printed}"\nexit ${status}\n`)
+  chmodSync(shell, 0o755)
+  vi.stubEnv('SHELL', shell)
+}
+
+function shellCalls(): string[] {
+  return existsSync(callsFile) ? readFileSync(callsFile, 'utf8').trim().split('\n') : []
 }
 
 async function spawnedCommands(runs: number) {
   const { runAgentReview } = await import('../../src/review/review-agent.js')
   const exec = vi.fn(async () => ({ stdout: 'diff' }))
-  const spawn = vi.fn(() => exitingProcess())
+  const spawn = vi.fn<SpawnFn>(() => exitingProcess())
   for (let i = 0; i < runs; i++) await runAgentReview(input, { exec, spawn }).done
   return spawn.mock.calls.map((c) => c[0])
 }
 
 beforeEach(() => {
   vi.resetModules()
-  execFile.mockReset()
+  scratch = mkdtempSync(join(tmpdir(), 'claude-path-'))
+  callsFile = join(scratch, 'calls')
+})
+
+afterEach(() => {
+  vi.unstubAllEnvs()
+  rmSync(scratch, { recursive: true, force: true })
 })
 
 describe('runAgentReview without an injected claude resolver', () => {
@@ -64,7 +89,7 @@ describe('runAgentReview without an injected claude resolver', () => {
     shellPrints('rc noise\n/Users/me/.local/bin/claude\n')
 
     expect(await spawnedCommands(1)).toEqual(['/Users/me/.local/bin/claude'])
-    expect(execFile.mock.calls[0][1]).toEqual(['-ilc', 'command -v claude'])
+    expect(shellCalls()).toEqual(['-ilc command -v claude'])
   })
 
   it('asks the shell once and reuses the path it found', async () => {
@@ -74,18 +99,20 @@ describe('runAgentReview without an injected claude resolver', () => {
       '/Users/me/.local/bin/claude',
       '/Users/me/.local/bin/claude',
     ])
-    expect(execFile).toHaveBeenCalledTimes(1)
+    expect(shellCalls()).toHaveLength(1)
   })
 
   it('falls back to a bare claude, and asks again next run, when the shell finds none', async () => {
     shellPrints('')
 
     expect(await spawnedCommands(2)).toEqual(['claude', 'claude'])
-    expect(execFile).toHaveBeenCalledTimes(2)
+    expect(shellCalls()).toHaveLength(2)
   })
+})
 
+describe('runAgentReview without an injected claude resolver — falls back to a bare claude when the shell itself fails', () => {
   it('falls back to a bare claude when the shell itself fails', async () => {
-    shellPrints(new Error('zsh: timeout'))
+    shellPrints('/Users/me/.local/bin/claude\n', 1)
 
     expect(await spawnedCommands(1)).toEqual(['claude'])
   })

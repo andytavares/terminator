@@ -1,96 +1,86 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-
-const session = vi.hoisted(() => ({
-  sessions: new Map<string, { projectId: string }>(),
-  setActiveSessionForProject: vi.fn(),
-  requestFocus: vi.fn(),
-}))
-const workspace = vi.hoisted(() => ({
-  activeWorkspaceId: 'w1',
-  projectsByWorkspaceId: new Map<string, Array<{ id: string; workspaceId: string }>>(),
-  setActiveWorkspace: vi.fn(),
-  setActiveProject: vi.fn(),
-  setScratchActive: vi.fn(),
-}))
-const registry = vi.hoisted(() => ({
-  setActiveGlobalTab: vi.fn(),
-  setActiveWorkspaceTab: vi.fn(),
-  setActiveProjectTab: vi.fn(),
-}))
-
-vi.mock('../../../../src/renderer/stores/session.store', () => ({
-  useSessionStore: { getState: () => session },
-}))
-vi.mock('../../../../src/renderer/stores/workspace.store', () => ({
-  useWorkspaceStore: { getState: () => workspace },
-}))
-vi.mock('../../../../src/renderer/extensions/registry', () => ({
-  useExtensionRegistry: { getState: () => registry },
-}))
-
-import {
-  revealSession,
-  navigateToSession,
-} from '../../../../src/renderer/terminal/navigate-to-session'
+// @vitest-environment jsdom
+import { describe, it, expect, beforeEach } from 'vitest'
+import { revealSession } from '../../../../src/renderer/terminal/navigate-to-session'
 import { SCRATCH_PROJECT_ID } from '../../../../src/shared/types/index'
+import { useSessionStore } from '../../../../src/renderer/stores/session.store'
+import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
+import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
+import { projectFixture, resetStore, terminalSessionOf } from '../../../support/renderer-stores'
+import { installElectronApi } from '../../../support/electron-api'
+import { registryState, sessionState, workspaceState } from '../../../support/store-state'
+
+const P1 = projectFixture({ id: 'p1', workspaceId: 'w1' })
+const P2 = projectFixture({ id: 'p2', workspaceId: 'w2' })
+const projectsByWorkspaceId = new Map([
+  ['w1', [P1]],
+  ['w2', [P2]],
+])
+
+function seedSessions(...list: ReturnType<typeof terminalSessionOf>[]): void {
+  useSessionStore.setState({ sessions: new Map(list.map((s) => [s.id, s])) })
+}
 
 beforeEach(() => {
-  vi.clearAllMocks()
-  session.sessions = new Map()
-  workspace.activeWorkspaceId = 'w1'
-  workspace.projectsByWorkspaceId = new Map([
-    ['w1', [{ id: 'p1', workspaceId: 'w1' }]],
-    ['w2', [{ id: 'p2', workspaceId: 'w2' }]],
-  ])
+  resetStore(useSessionStore)
+  resetStore(useWorkspaceStore, { activeWorkspaceId: 'w1', projectsByWorkspaceId })
+  resetStore(useExtensionRegistry, {
+    activeGlobalTabId: 'core.home',
+    activeWorkspaceTabId: 'reviews',
+    activeProjectTabId: 'git',
+  })
+  // Switching workspace reloads its projects from main.
+  installElectronApi({
+    project: { list: async (id: string) => ({ projects: projectsByWorkspaceId.get(id) ?? [] }) },
+  })
 })
 
 describe('revealSession', () => {
   it('leaves the global, workspace and project tabs and shows the session in its project', () => {
-    session.sessions.set('s1', { projectId: 'p1' })
+    seedSessions(terminalSessionOf({ id: 's1', projectId: 'p1' }))
     revealSession('s1')
-    expect(registry.setActiveGlobalTab).toHaveBeenCalledWith(null)
-    expect(registry.setActiveWorkspaceTab).toHaveBeenCalledWith(null)
-    expect(registry.setActiveProjectTab).toHaveBeenCalledWith(null)
-    expect(workspace.setActiveWorkspace).not.toHaveBeenCalled()
-    expect(workspace.setActiveProject).toHaveBeenCalledWith('p1')
-    expect(session.setActiveSessionForProject).toHaveBeenCalledWith('p1', 's1')
+    expect(registryState()).toMatchObject({
+      activeGlobalTabId: null,
+      activeWorkspaceTabId: null,
+      activeProjectTabId: null,
+    })
+    expect(workspaceState()).toMatchObject({ activeWorkspaceId: 'w1', activeProjectId: 'p1' })
+    expect(sessionState().getActiveSessionForProject('p1')).toBe('s1')
   })
 
   it('switches workspace when the session lives in another one', () => {
-    session.sessions.set('s2', { projectId: 'p2' })
+    seedSessions(terminalSessionOf({ id: 's2', projectId: 'p2' }))
     revealSession('s2')
-    expect(workspace.setActiveWorkspace).toHaveBeenCalledWith('w2')
+    expect(workspaceState()).toMatchObject({ activeWorkspaceId: 'w2', activeProjectId: 'p2' })
+    expect(sessionState().getActiveSessionForProject('p2')).toBe('s2')
   })
 
   it('opens a scratch terminal in the scratch view', () => {
-    session.sessions.set('s3', { projectId: SCRATCH_PROJECT_ID })
+    seedSessions(terminalSessionOf({ id: 's3', projectId: SCRATCH_PROJECT_ID }))
     revealSession('s3')
-    expect(session.setActiveSessionForProject).toHaveBeenCalledWith(SCRATCH_PROJECT_ID, 's3')
-    expect(workspace.setScratchActive).toHaveBeenCalledWith(true)
-    expect(workspace.setActiveProject).not.toHaveBeenCalled()
-    expect(session.requestFocus).toHaveBeenCalledWith('s3')
+    expect(sessionState().getActiveSessionForProject(SCRATCH_PROJECT_ID)).toBe('s3')
+    expect(workspaceState()).toMatchObject({ scratchActive: true, activeProjectId: null })
+    expect(sessionState().focusRequest?.sessionId).toBe('s3')
   })
+})
 
+describe('revealSession — does nothing for a session that has gone', () => {
   it('does nothing for a session that has gone', () => {
     revealSession('nobody')
-    expect(registry.setActiveGlobalTab).not.toHaveBeenCalled()
+    expect(registryState().activeGlobalTabId).toBe('core.home')
   })
 
   it('stays put when the project has gone', () => {
-    session.sessions.set('s4', { projectId: 'deleted' })
+    seedSessions(terminalSessionOf({ id: 's4', projectId: 'deleted' }))
     revealSession('s4')
-    expect(workspace.setActiveProject).not.toHaveBeenCalled()
+    expect(workspaceState().activeProjectId).toBeNull()
+    expect(sessionState().focusRequest).toBeNull()
   })
 
   it('bumps the focus request even when the session is already the active one', () => {
-    session.sessions.set('s1', { projectId: 'p1' })
+    seedSessions(terminalSessionOf({ id: 's1', projectId: 'p1' }))
     revealSession('s1')
-    expect(session.requestFocus).toHaveBeenCalledWith('s1')
+    const first = sessionState().focusRequest
     revealSession('s1')
-    expect(session.requestFocus).toHaveBeenCalledTimes(2)
-  })
-
-  it('exposes navigateToSession as an alias', () => {
-    expect(navigateToSession).toBe(revealSession)
+    expect(sessionState().focusRequest).toEqual({ sessionId: 's1', nonce: first!.nonce + 1 })
   })
 })

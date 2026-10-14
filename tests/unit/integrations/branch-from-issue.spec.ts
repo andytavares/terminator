@@ -51,7 +51,9 @@ describe('branchFromIssue — deriving one when the tracker offers none', () => 
       expect(branch).not.toContain(bad)
     }
   })
+})
 
+describe('branchFromIssue — separators and suffixes git refuses', () => {
   it('collapses runs of separators rather than leaving a row of hyphens', () => {
     expect(branchFromIssue(summary({ branchName: null, key: 'ENG-3', title: 'a   ///   b' }))).toBe(
       'eng-3-a-b'
@@ -62,16 +64,17 @@ describe('branchFromIssue — deriving one when the tracker offers none', () => 
     const branch = branchFromIssue(
       summary({ branchName: null, key: 'ENG-4', title: '...leading and trailing...' })
     )
-    expect(branch).not.toMatch(/^[-.]/)
-    expect(branch).not.toMatch(/[-.]$/)
+    expect(branch).toBe('eng-4-leading-and-trailing')
   })
 
   it('never produces a name git rejects for ending in .lock', () => {
-    expect(
-      branchFromIssue(summary({ branchName: null, key: 'ENG-5', title: 'file.lock' }))
-    ).not.toMatch(/\.lock$/)
+    expect(branchFromIssue(summary({ branchName: null, key: 'ENG-5', title: 'file.lock' }))).toBe(
+      'eng-5-file-lock'
+    )
   })
+})
 
+describe('branchFromIssue — length and empty titles', () => {
   it('bounds the length so a rambling title does not become a 300-character branch', () => {
     const branch = branchFromIssue(
       summary({ branchName: null, key: 'ENG-6', title: 'word '.repeat(80) })

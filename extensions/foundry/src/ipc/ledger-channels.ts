@@ -1,8 +1,6 @@
 import { z } from 'zod'
-import { queryEntries } from '../ledger/append.js'
 import type { LedgerEntry } from '../ledger/append.js'
 import { propose } from '../ledger/curator.js'
-import { ledgerPath } from '../data-root.js'
 import {
   acceptProposal,
   declineProposal,
@@ -12,11 +10,14 @@ import {
 } from '../verify/rules.js'
 import type { OrderStore } from '../order/store.js'
 import { createGateStore } from '../gates/store.js'
+import type { FoundryIndex } from '../state/foundry-index.js'
 import { readRunGraph } from './run-channels.js'
 import { factoryMetrics as computeFactoryMetrics } from '../factory/metrics.js'
 import type { OrderRecords } from '../factory/metrics.js'
 import { availableSkills } from '../recipe/resolve.js'
 import type { ResolveSources } from '../recipe/resolve.js'
+import { noPayload, type ChannelSpec } from '@terminator/extension-sdk'
+import { foundryChannel } from './channel.js'
 
 // The record, and what the operator can ask it for.
 //
@@ -45,7 +46,7 @@ const DecidePayload = z.object({
 const RemovePayload = z.object({ ruleId: z.string(), reason: z.string().optional() })
 
 /** A check the operator accepted, as the surface that can remove it needs it. */
-export interface AcceptedRule {
+interface AcceptedRule {
   readonly id: string
   readonly asserts: string
   readonly rung: string
@@ -72,176 +73,171 @@ export interface LedgerDeps {
    */
   readonly sources: () => ResolveSources
   readonly now: () => string
+  /** The in-memory index over this root's records; absent, every read parses the files. */
+  readonly index?: (root: string) => FoundryIndex
 }
 
 export interface LedgerChannels {
-  query(payload: unknown): Promise<unknown>
-  proposeRules(payload: unknown): Promise<unknown>
-  decideProposal(payload: unknown): Promise<unknown>
-  rulesInForce(payload: unknown): Promise<unknown>
-  removeAcceptedRule(payload: unknown): Promise<unknown>
-  factoryMetrics(payload: unknown): Promise<unknown>
+  query(payload: z.infer<typeof QueryPayload>): Promise<unknown>
+  proposeRules(payload: z.infer<typeof ProposePayload>): Promise<unknown>
+  decideProposal(payload: z.infer<typeof DecidePayload>): Promise<unknown>
+  rulesInForce(): Promise<unknown>
+  removeAcceptedRule(payload: z.infer<typeof RemovePayload>): Promise<unknown>
+  factoryMetrics(payload: z.infer<typeof FactoryMetricsPayload>): Promise<unknown>
 }
 
 export function createLedgerChannels(deps: LedgerDeps): LedgerChannels {
-  /**
-   * Every entry across every order, or one order's own.
-   *
-   * Read per order because that is how the ledger is stored — one file each,
-   * which is what makes concurrent appends safe. Reading them all is a fan-out
-   * rather than one big file, and a corrupt line in one order costs that order
-   * rather than the record.
-   */
-  async function entriesFor(orderId: string | undefined): Promise<LedgerEntry[]> {
-    const ids =
-      orderId === undefined ? (await deps.store.list()).map((order) => order.id) : [orderId]
-    const perOrder = await Promise.all(
-      ids.map((id) => queryEntries(ledgerPath(deps.dataRoot(), id)))
-    )
-    return perOrder.flat().sort((a, b) => a.at.localeCompare(b.at))
+  return {
+    query: (payload) => query(deps, payload),
+    proposeRules: (payload) => proposeRules(deps, payload),
+    decideProposal: (payload) => decideProposal(deps, payload),
+    rulesInForce: () => rulesInForce(deps),
+    removeAcceptedRule: (payload) => removeAcceptedRule(deps, payload),
+    factoryMetrics: (payload) => factoryMetrics(deps, payload),
   }
+}
 
-  async function query(raw: unknown): Promise<unknown> {
-    const parsed = QueryPayload.safeParse(raw)
-    if (!parsed.success) return { error: 'Malformed request.' }
-    const { orderId, actor, action, since, limit } = parsed.data
+// Every entry across every order, or one order's. Read per order as stored, one file
+// each so appends are safe concurrently, and a corrupt line costs one order only.
+async function entriesFor(deps: LedgerDeps, orderId: string | undefined): Promise<LedgerEntry[]> {
+  const ids = orderId === undefined ? (await deps.store.list()).map((order) => order.id) : [orderId]
+  const perOrder = await Promise.all(ids.map((id) => deps.store.entries(id)))
+  return perOrder.flat().sort((a, b) => a.at.localeCompare(b.at))
+}
 
-    const all = await entriesFor(orderId)
-    const matched = all.filter((entry) => {
-      if (actor !== undefined && actor !== '' && entry.actor !== actor) return false
-      if (action !== undefined && action !== '' && entry.action !== action) return false
-      if (since !== undefined && since !== '' && entry.at < since) return false
-      return true
-    })
+async function query(deps: LedgerDeps, payload: z.infer<typeof QueryPayload>): Promise<unknown> {
+  const { orderId, actor, action, since, limit } = payload
 
-    return {
-      // Newest first: the record is read from the top, unlike the file, which
-      // is written from the bottom.
-      entries: [...(limit === undefined ? matched : matched.slice(-limit))].reverse(),
-      total: matched.length,
-      // The values that actually occur, so a filter never offers a choice that
-      // matches nothing.
-      actors: [...new Set(all.map((entry) => entry.actor))].sort(),
-      actions: [...new Set(all.map((entry) => entry.action))].sort(),
-      orders: [...new Set(all.map((entry) => entry.orderId))].sort(),
-    }
-  }
-
-  async function proposeRules(raw: unknown): Promise<unknown> {
-    const parsed = ProposePayload.safeParse(raw)
-    if (!parsed.success) return { error: 'Malformed request.' }
-
-    const proposals = propose({
-      entries: await entriesFor(parsed.data.orderId),
-      existingRuleIds: deps.existingRuleIds(),
-      rejectedIds: await declinedProposals(deps.dataRoot()),
-    })
-    return { proposals }
-  }
-
-  async function decideProposal(raw: unknown): Promise<unknown> {
-    const parsed = DecidePayload.safeParse(raw)
-    if (!parsed.success) return { error: 'Malformed request.' }
-    const { proposalId, accept, reason } = parsed.data
-
-    // Re-derived rather than carried in from the surface: a proposal the
-    // renderer held onto could name citations the ledger no longer supports,
-    // and a rule accepted on stale evidence is one nobody can justify.
-    const found = propose({
-      entries: await entriesFor(undefined),
-      rejectedIds: accept ? await declinedProposals(deps.dataRoot()) : [],
-    }).find((candidate) => candidate.id === proposalId)
-
-    if (found === undefined) {
-      return { error: 'The ledger no longer supports that suggestion. Ask again for suggestions.' }
-    }
-
-    if (!accept) {
-      await declineProposal(
-        deps.dataRoot(),
-        proposalId,
-        reason ?? 'declined by the operator',
-        found.asserts
-      )
-      return { ok: true, accepted: false }
-    }
-
-    const file = await acceptProposal(deps.dataRoot(), found)
-    return { ok: true, accepted: true, file, rule: found.id }
-  }
-
-  /**
-   * The checks in force that the operator put there, and the ones they turned
-   * down — the two halves of the record FR-081 asks for.
-   */
-  async function rulesInForce(): Promise<unknown> {
-    return {
-      rules: deps.acceptedRules(),
-      declined: await declinedWithReasons(deps.dataRoot()),
-      skills: availableSkills(deps.sources()),
-    }
-  }
-
-  /**
-   * Remove an accepted check.
-   *
-   * Refused for anything the operator did not accept: deleting a built-in
-   * would leave the tool quietly weaker than the one it ships as, and a
-   * removal that silently did nothing is worse than a refusal that says why.
-   */
-  async function removeAcceptedRule(raw: unknown): Promise<unknown> {
-    const parsed = RemovePayload.safeParse(raw)
-    if (!parsed.success) return { error: 'Malformed request.' }
-    const { ruleId } = parsed.data
-
-    const accepted = deps.acceptedRules().find((rule) => rule.id === ruleId)
-    if (accepted === undefined) {
-      return {
-        error: 'That check is not one you accepted, so it is not yours to remove.',
-      }
-    }
-
-    const reason = parsed.data.reason ?? 'removed by the operator'
-    const removed = await removeRule(deps.dataRoot(), ruleId, reason, accepted.asserts)
-    return { ok: true, removed, reason, at: deps.now() }
-  }
-
-  /**
-   * The factory's own dashboard: every order's ledger, gates and run graph,
-   * reduced by `factoryMetrics`. Nothing here is stored — it is recomputed on
-   * every call from the same records the order screens already read.
-   */
-  async function factoryMetrics(raw: unknown): Promise<unknown> {
-    const parsed = FactoryMetricsPayload.safeParse(raw)
-    if (!parsed.success) return { error: 'Malformed request.' }
-    const window = parsed.data.window ?? '30d'
-
-    const orders = await deps.store.list()
-    const allGates = await createGateStore(deps.dataRoot()).list()
-    const records: OrderRecords[] = await Promise.all(
-      orders.map(async (order) => {
-        const [ledger, graph] = await Promise.all([
-          queryEntries(ledgerPath(deps.dataRoot(), order.id)),
-          readRunGraph(deps.dataRoot(), order.id),
-        ])
-        return {
-          order,
-          ledger,
-          gates: allGates.filter((g) => g.orderId === order.id),
-          graph,
-        }
-      })
-    )
-
-    return computeFactoryMetrics(records, window, deps.now())
-  }
+  const all = await entriesFor(deps, orderId)
+  const matched = all.filter((entry) => {
+    if (actor !== undefined && actor !== '' && entry.actor !== actor) return false
+    if (action !== undefined && action !== '' && entry.action !== action) return false
+    if (since !== undefined && since !== '' && entry.at < since) return false
+    return true
+  })
 
   return {
-    query,
-    proposeRules,
-    decideProposal,
-    rulesInForce,
-    removeAcceptedRule,
-    factoryMetrics,
+    // Newest first: the record is read from the top, unlike the file, which
+    // is written from the bottom.
+    entries: [...(limit === undefined ? matched : matched.slice(-limit))].reverse(),
+    total: matched.length,
+    // The values that actually occur, so a filter never offers a choice that
+    // matches nothing.
+    actors: [...new Set(all.map((entry) => entry.actor))].sort(),
+    actions: [...new Set(all.map((entry) => entry.action))].sort(),
+    orders: [...new Set(all.map((entry) => entry.orderId))].sort(),
   }
+}
+
+async function proposeRules(
+  deps: LedgerDeps,
+  payload: z.infer<typeof ProposePayload>
+): Promise<unknown> {
+  const proposals = propose({
+    entries: await entriesFor(deps, payload.orderId),
+    existingRuleIds: deps.existingRuleIds(),
+    rejectedIds: await declinedProposals(deps.dataRoot()),
+  })
+  return { proposals }
+}
+
+async function decideProposal(
+  deps: LedgerDeps,
+  payload: z.infer<typeof DecidePayload>
+): Promise<unknown> {
+  const { proposalId, accept, reason } = payload
+
+  // Re-derived rather than carried in from the surface: a proposal the
+  // renderer held onto could name citations the ledger no longer supports,
+  // and a rule accepted on stale evidence is one nobody can justify.
+  const found = propose({
+    entries: await entriesFor(deps, undefined),
+    rejectedIds: accept ? await declinedProposals(deps.dataRoot()) : [],
+  }).find((candidate) => candidate.id === proposalId)
+
+  if (found === undefined) {
+    return { error: 'The ledger no longer supports that suggestion. Ask again for suggestions.' }
+  }
+
+  if (!accept) {
+    await declineProposal(deps.dataRoot(), proposalId, {
+      reason: reason ?? 'declined by the operator',
+      asserts: found.asserts,
+    })
+    return { ok: true, accepted: false }
+  }
+
+  const file = await acceptProposal(deps.dataRoot(), found)
+  return { ok: true, accepted: true, file, rule: found.id }
+}
+
+/** The checks the operator put in force and the ones they turned down (FR-081). */
+async function rulesInForce(deps: LedgerDeps): Promise<unknown> {
+  return {
+    rules: deps.acceptedRules(),
+    declined: await declinedWithReasons(deps.dataRoot()),
+    skills: availableSkills(deps.sources()),
+  }
+}
+
+// Remove an accepted check. Anything the operator did not accept is refused, with
+// why: deleting a built-in would leave the tool quietly weaker than it ships.
+async function removeAcceptedRule(
+  deps: LedgerDeps,
+  payload: z.infer<typeof RemovePayload>
+): Promise<unknown> {
+  const { ruleId } = payload
+
+  const accepted = deps.acceptedRules().find((rule) => rule.id === ruleId)
+  if (accepted === undefined) {
+    return {
+      error: 'That check is not one you accepted, so it is not yours to remove.',
+    }
+  }
+
+  const reason = payload.reason ?? 'removed by the operator'
+  const removed = await removeRule(deps.dataRoot(), ruleId, { reason, asserts: accepted.asserts })
+  return { ok: true, removed, reason, at: deps.now() }
+}
+
+// The factory's dashboard: every order's ledger, gates and run graph reduced by
+// `factoryMetrics`, recomputed per call from the records, never stored.
+async function factoryMetrics(
+  deps: LedgerDeps,
+  payload: z.infer<typeof FactoryMetricsPayload>
+): Promise<unknown> {
+  const window = payload.window ?? '30d'
+
+  const orders = await deps.store.list()
+  const root = deps.dataRoot()
+  const index = deps.index?.(root)
+  const allGates = await createGateStore(root, index).list()
+  const records: OrderRecords[] = await Promise.all(
+    orders.map(async (order) => {
+      const [ledger, graph] = await Promise.all([
+        deps.store.entries(order.id),
+        readRunGraph(root, order.id, index),
+      ])
+      return {
+        order,
+        ledger,
+        gates: allGates.filter((g) => g.orderId === order.id),
+        graph,
+      }
+    })
+  )
+
+  return computeFactoryMetrics(records, window, deps.now())
+}
+
+/** The record's channels, each with the schema its payload is parsed with (ADR 096). */
+export function ledgerChannelSpecs(ledger: LedgerChannels): ChannelSpec[] {
+  return [
+    foundryChannel('foundry:ledger.query', QueryPayload, ledger.query),
+    foundryChannel('foundry:factory.metrics', FactoryMetricsPayload, ledger.factoryMetrics),
+    foundryChannel('foundry:rules.propose', ProposePayload, ledger.proposeRules),
+    foundryChannel('foundry:rules.decide', DecidePayload, ledger.decideProposal),
+    foundryChannel('foundry:rules.inForce', noPayload, ledger.rulesInForce),
+    foundryChannel('foundry:rules.remove', RemovePayload, ledger.removeAcceptedRule),
+  ]
 }

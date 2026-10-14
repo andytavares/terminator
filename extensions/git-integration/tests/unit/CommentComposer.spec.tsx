@@ -9,12 +9,10 @@ vi.mock('../../src/components/pr-review/RichContent', () => ({
   ),
 }))
 
-const mockPrCommentAdd = vi.fn()
 const mockPrCommentReply = vi.fn()
 
 vi.mock('../../src/api/github', () => ({
   githubAPI: {
-    prCommentAdd: (...args: unknown[]) => mockPrCommentAdd(...args),
     prCommentReply: (...args: unknown[]) => mockPrCommentReply(...args),
   },
 }))
@@ -73,7 +71,9 @@ describe('CommentComposer (new comment)', () => {
     fireEvent.click(screen.getByText('Preview'))
     expect(screen.getByTestId('rich-content')).toBeTruthy()
   })
+})
 
+describe('CommentComposer (new comment) — calls onCancel when Cancel is clicked', () => {
   it('calls onCancel when Cancel is clicked', () => {
     const onCancel = vi.fn()
     render(<CommentComposer {...newCommentProps} onCancel={onCancel} />)
@@ -98,17 +98,17 @@ describe('CommentComposer (new comment)', () => {
     render(<CommentComposer {...newCommentProps} />)
     expect(screen.getByText('Sent when you submit your review')).toBeTruthy()
   })
+})
 
-  it('calls addDraft, not prCommentAdd, on submit', async () => {
+describe('CommentComposer (new comment) — adds the comment to the pending review on submit', () => {
+  it('adds the comment to the pending review on submit', async () => {
     const onSubmitted = vi.fn()
     render(<CommentComposer {...newCommentProps} onSubmitted={onSubmitted} />)
     fireEvent.change(screen.getByPlaceholderText(/Leave a comment/), { target: { value: 'Nice!' } })
     fireEvent.click(screen.getByText('Add to pending review'))
     await waitFor(() => expect(mockAddDraft).toHaveBeenCalled())
     expect(mockAddDraft).toHaveBeenCalledWith(
-      '/repo',
-      42,
-      'abc123',
+      { repoRoot: '/repo', prNumber: 42, headSHA: 'abc123' },
       expect.objectContaining({
         path: 'src/foo.ts',
         line: 10,
@@ -118,10 +118,11 @@ describe('CommentComposer (new comment)', () => {
         fromFindingId: null,
       })
     )
-    expect(mockPrCommentAdd).not.toHaveBeenCalled()
     expect(onSubmitted).toHaveBeenCalled()
   })
+})
 
+describe('CommentComposer (new comment) — shows New comment · line N header, and edited from agent finding when fromFindingId is set', () => {
   it('shows "New comment · line N" header, and "edited from agent finding" when fromFindingId is set', () => {
     render(<CommentComposer {...newCommentProps} fromFindingId="finding-1" />)
     expect(screen.getByText(/New comment · line 10/)).toBeTruthy()
@@ -161,7 +162,9 @@ describe('CommentComposer (reply)', () => {
     expect(mockAddDraft).not.toHaveBeenCalled()
     expect(onSubmitted).toHaveBeenCalled()
   })
+})
 
+describe('CommentComposer (reply) — shows error when reply submission returns error field', () => {
   it('shows error when reply submission returns error field', async () => {
     mockPrCommentReply.mockResolvedValue({ error: 'FORBIDDEN' })
     render(<CommentComposer {...replyProps} />)

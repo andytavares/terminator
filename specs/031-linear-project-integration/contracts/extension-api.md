@@ -1,5 +1,11 @@
 # Contract: Extension API v2.2.0 — `api.issues`
 
+> **Superseded. Kept as history.** This contract records what was decided when the feature was
+> specified, and is not edited. The code no longer has `api.workspace.createProject` (now `addProject`), `issues.linkFor` / `onLinkChange`, and the `speckit:*` channels it migrates. Do not build against it. The
+> current contract lives in:
+>
+> - `packages/extension-sdk/types/api.d.ts`: the `ExtensionAPI`, which the core implements in `src/main/extensions/api.ts` (`issues`, `workspace`)
+
 **Feature**: 031-linear-project-integration
 
 Additive release. Nothing existing changes shape. The version follows the documented series in

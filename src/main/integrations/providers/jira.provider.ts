@@ -27,9 +27,9 @@ import type { StoredCredential, TrackerProvider, VerifiedAccount } from './provi
 const MAX_COMMENTS = 5
 const MAX_PAGES = 10
 
-function assertJira(
-  cred: StoredCredential
-): asserts cred is Extract<StoredCredential, { tracker: 'jira' }> {
+type JiraCredential = Extract<StoredCredential, { tracker: 'jira' }>
+
+function assertJira(cred: StoredCredential): asserts cred is JiraCredential {
   if (cred.tracker !== 'jira') {
     throw new TrackerError('failed', `Expected a Jira credential, got ${cred.tracker}`)
   }
@@ -60,7 +60,7 @@ function messageFrom(body: unknown, fallback: string): string {
 }
 
 async function request(
-  cred: Extract<StoredCredential, { tracker: 'jira' }>,
+  cred: JiraCredential,
   path: string,
   init: RequestInit = {}
 ): Promise<unknown> {
@@ -159,127 +159,154 @@ function adfParagraph(text: string): unknown {
   }
 }
 
+interface SearchPage {
+  issues?: JiraIssue[]
+  nextPageToken?: unknown
+  isLast?: unknown
+}
+
+async function fetchSearchPage(
+  cred: JiraCredential,
+  jql: string,
+  page: { maxResults: number; token: string | undefined }
+): Promise<SearchPage | null> {
+  const params = new URLSearchParams({
+    jql,
+    maxResults: String(page.maxResults),
+    fields: 'summary,status,assignee,labels,updated,resolutiondate',
+  })
+  if (page.token !== undefined) params.set('nextPageToken', page.token)
+  return (await request(cred, `/search/jql?${params.toString()}`)) as SearchPage | null
+}
+
+/** The token for the page after this one, or undefined when this one is the last. */
+function nextPageToken(body: SearchPage | null): string | undefined {
+  const next = body?.nextPageToken
+  if (body?.isLast === true || typeof next !== 'string' || next.length === 0) return undefined
+  return next
+}
+
 async function searchJql(
-  cred: Extract<StoredCredential, { tracker: 'jira' }>,
+  cred: JiraCredential,
   jql: string,
   limit: number
 ): Promise<IssueSummary[]> {
   const collected: IssueSummary[] = []
   let token: string | undefined
   for (let page = 0; page < MAX_PAGES; page++) {
-    const params = new URLSearchParams({
-      jql,
-      maxResults: String(Math.min(limit - collected.length, 100)),
-      fields: 'summary,status,assignee,labels,updated,resolutiondate',
-    })
-    if (token !== undefined) params.set('nextPageToken', token)
-
-    const body = (await request(cred, `/search/jql?${params.toString()}`)) as {
-      issues?: JiraIssue[]
-      nextPageToken?: unknown
-      isLast?: unknown
-    } | null
-
+    const maxResults = Math.min(limit - collected.length, 100)
+    const body = await fetchSearchPage(cred, jql, { maxResults, token })
     for (const raw of body?.issues ?? []) collected.push(toSummary(cred.site, raw))
     if (collected.length >= limit) return collected.slice(0, limit)
-
-    const next = body?.nextPageToken
-    if (body?.isLast === true || typeof next !== 'string' || next.length === 0) break
-    token = next
+    token = nextPageToken(body)
+    if (token === undefined) break
   }
   return collected.slice(0, limit)
 }
 
-export function createJiraProvider(): TrackerProvider {
-  return {
-    id: 'jira',
-
-    async verify(cred): Promise<VerifiedAccount> {
-      assertJira(cred)
-      const me = (await request(cred, '/myself')) as {
-        displayName?: unknown
-        emailAddress?: unknown
-      } | null
-      return {
-        name: typeof me?.displayName === 'string' ? me.displayName : '',
-        email: typeof me?.emailAddress === 'string' ? me.emailAddress : cred.email,
-        site: cred.site,
-      }
-    },
-
-    async listMine(cred, mine: MineSelector, limit): Promise<IssueSummary[]> {
-      assertJira(cred)
-      // Jira expresses "mine" as a saved query; there is no assignee field to
-      // read it from, which is why MineSelector is tracker-shaped.
-      const jql =
-        mine.kind === 'query' ? mine.jql : 'assignee = currentUser() ORDER BY updated DESC'
-      return searchJql(cred, jql, limit)
-    },
-
-    async search(cred, term, limit): Promise<IssueSummary[]> {
-      assertJira(cred)
-      return searchJql(cred, `text ~ "${quoteJql(term)}" ORDER BY updated DESC`, limit)
-    },
-
-    async get(cred, key): Promise<Issue | null> {
-      assertJira(cred)
-      try {
-        const raw = (await request(
-          cred,
-          `/issue/${encodeURIComponent(key)}?fields=summary,description,status,assignee,labels,updated,resolutiondate`
-        )) as JiraIssue | null
-        if (raw === null) return null
-
-        const commentBody = (await request(
-          cred,
-          `/issue/${encodeURIComponent(key)}/comment?maxResults=${MAX_COMMENTS}&orderBy=-created`
-        ).catch(() => null)) as { comments?: unknown[] } | null
-
-        const comments: IssueComment[] = (commentBody?.comments ?? [])
-          .map((entry) => {
-            const comment = entry as {
-              author?: { displayName?: unknown }
-              created?: unknown
-              body?: unknown
-            }
-            return {
-              author:
-                typeof comment.author?.displayName === 'string'
-                  ? comment.author.displayName
-                  : 'Unknown',
-              body: adfToMarkdown(comment.body),
-              createdAt: String(comment.created ?? ''),
-            }
-          })
-          .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-          .slice(0, MAX_COMMENTS)
-
-        const summary = toSummary(cred.site, raw)
-        const labels = Array.isArray(raw.fields?.labels)
-          ? raw.fields.labels.filter((l): l is string => typeof l === 'string')
-          : []
-
-        return {
-          ...summary,
-          description: adfToMarkdown(raw.fields?.description),
-          labels,
-          completed: summary.state.type === 'completed',
-          updatedAt: String(raw.fields?.updated ?? ''),
-          comments,
-        }
-      } catch (error) {
-        if (error instanceof TrackerError && error.kind === 'not-found') return null
-        throw error
-      }
-    },
-
-    async comment(cred, key, body): Promise<void> {
-      assertJira(cred)
-      // The key is accepted in the path — unlike Linear, no id resolution.
-      await request(cred, `/issue/${encodeURIComponent(key)}/comment`, {
-        method: 'POST',
-        body: JSON.stringify({ body: adfParagraph(body) }),
-      })
-    },
+function toComment(entry: unknown): IssueComment {
+  const comment = entry as {
+    author?: { displayName?: unknown }
+    created?: unknown
+    body?: unknown
   }
+  return {
+    author:
+      typeof comment.author?.displayName === 'string' ? comment.author.displayName : 'Unknown',
+    body: adfToMarkdown(comment.body),
+    createdAt: String(comment.created ?? ''),
+  }
+}
+
+/** The newest comments first. A failed comment request costs the comments, not the issue. */
+async function fetchComments(cred: JiraCredential, key: string): Promise<IssueComment[]> {
+  const commentBody = (await request(
+    cred,
+    `/issue/${encodeURIComponent(key)}/comment?maxResults=${MAX_COMMENTS}&orderBy=-created`
+  ).catch(() => null)) as { comments?: unknown[] } | null
+  return (commentBody?.comments ?? [])
+    .map(toComment)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .slice(0, MAX_COMMENTS)
+}
+
+function toIssue(site: string, raw: JiraIssue, comments: IssueComment[]): Issue {
+  const summary = toSummary(site, raw)
+  const labels = Array.isArray(raw.fields?.labels)
+    ? raw.fields.labels.filter((l): l is string => typeof l === 'string')
+    : []
+  return {
+    ...summary,
+    description: adfToMarkdown(raw.fields?.description),
+    labels,
+    completed: summary.state.type === 'completed',
+    updatedAt: String(raw.fields?.updated ?? ''),
+    comments,
+  }
+}
+
+async function fetchIssue(cred: JiraCredential, key: string): Promise<Issue | null> {
+  const raw = (await request(
+    cred,
+    `/issue/${encodeURIComponent(key)}?fields=summary,description,status,assignee,labels,updated,resolutiondate`
+  )) as JiraIssue | null
+  if (raw === null) return null
+  return toIssue(cred.site, raw, await fetchComments(cred, key))
+}
+
+async function verify(cred: StoredCredential): Promise<VerifiedAccount> {
+  assertJira(cred)
+  const me = (await request(cred, '/myself')) as {
+    displayName?: unknown
+    emailAddress?: unknown
+  } | null
+  return {
+    name: typeof me?.displayName === 'string' ? me.displayName : '',
+    email: typeof me?.emailAddress === 'string' ? me.emailAddress : cred.email,
+    site: cred.site,
+  }
+}
+
+async function listMine(
+  cred: StoredCredential,
+  mine: MineSelector,
+  limit: number
+): Promise<IssueSummary[]> {
+  assertJira(cred)
+  // Jira expresses "mine" as a saved query; there is no assignee field to
+  // read it from, which is why MineSelector is tracker-shaped.
+  const jql = mine.kind === 'query' ? mine.jql : 'assignee = currentUser() ORDER BY updated DESC'
+  return searchJql(cred, jql, limit)
+}
+
+async function search(
+  cred: StoredCredential,
+  term: string,
+  limit: number
+): Promise<IssueSummary[]> {
+  assertJira(cred)
+  return searchJql(cred, `text ~ "${quoteJql(term)}" ORDER BY updated DESC`, limit)
+}
+
+async function jiraIssueByKey(cred: StoredCredential, key: string): Promise<Issue | null> {
+  assertJira(cred)
+  try {
+    return await fetchIssue(cred, key)
+  } catch (error) {
+    if (error instanceof TrackerError && error.kind === 'not-found') return null
+    throw error
+  }
+}
+
+async function comment(cred: StoredCredential, key: string, body: string): Promise<void> {
+  assertJira(cred)
+  // The key is accepted in the path — unlike Linear, no id resolution.
+  await request(cred, `/issue/${encodeURIComponent(key)}/comment`, {
+    method: 'POST',
+    body: JSON.stringify({ body: adfParagraph(body) }),
+  })
+}
+
+export function createJiraProvider(): TrackerProvider {
+  return { id: 'jira', verify, listMine, search, get: jiraIssueByKey, comment }
 }

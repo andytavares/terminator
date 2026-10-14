@@ -1,0 +1,19 @@
+{
+  // Every extension's tsconfig.json extends this. `noEmit`: the bundles are
+  // built by esbuild and vite, never by tsc; this only typechecks.
+  // `types` loads the SDK's renderer declaration, which declares the
+  // `window.electronAPI` an extension view receives (Constitution II).
+  "compilerOptions": {
+    "strict": true,
+    "noEmit": true,
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "types": ["node", "vite/client", "@terminator/extension-sdk/types/renderer"]
+  }
+}

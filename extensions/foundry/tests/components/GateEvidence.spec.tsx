@@ -4,6 +4,11 @@ import { render, screen } from '@testing-library/react'
 import { GateEvidence } from '../../src/components/GateEvidence'
 
 describe('GateEvidence', () => {
+  describe('the failed step', gateEvidenceTheFailedStepTests)
+  describe('other evidence', otherEvidenceTests)
+})
+
+function gateEvidenceTheFailedStepTests() {
   it('shows the failed step’s last lines, labelled in words', () => {
     render(
       <GateEvidence
@@ -22,7 +27,9 @@ describe('GateEvidence', () => {
     expect(screen.getByText(/final-integration\.1\.log/)).toBeTruthy()
     expect(document.body.textContent).not.toMatch(/\bstdout\b/)
   })
+}
 
+function otherEvidenceTests() {
   it('names evidence without an excerpt in words, never by its kind code', () => {
     render(
       <GateEvidence evidence={[{ kind: 'exit_code', exitCode: 2 }, { kind: 'report_file' }]} />
@@ -36,7 +43,7 @@ describe('GateEvidence', () => {
     const { container } = render(<GateEvidence evidence={[]} />)
     expect(container.textContent).toBe('')
   })
-})
+}
 
 describe('GateEvidence, until it is asked for', () => {
   it('starts closed, so the output is a click away rather than a wall', () => {

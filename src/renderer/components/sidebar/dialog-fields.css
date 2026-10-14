@@ -1,0 +1,154 @@
+/* Fields inside the core's dialogs. The dialog itself is the design system's. */
+
+.dialog__field {
+  margin-bottom: 14px;
+}
+
+.dialog__label {
+  display: block;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--tm-text-muted);
+  margin-bottom: 5px;
+}
+
+/* A dialog's text input, and a branch picker's trigger drawn as one. */
+.dialog__input,
+.branch-select__trigger {
+  width: 100%;
+  background: var(--tm-bg-input);
+  border: 1px solid var(--tm-border-strong);
+  border-radius: var(--tm-radius-sm);
+  padding: 7px 10px;
+  font-size: 12px;
+  font-family: var(--tm-font-ui);
+  color: var(--tm-text-primary);
+  transition: border-color 0.15s;
+}
+
+.dialog__input {
+  outline: none;
+}
+
+.dialog__input:focus {
+  border-color: var(--tm-accent);
+}
+
+.dialog__input--error {
+  border-color: var(--tm-danger);
+}
+
+.dialog__error {
+  display: block;
+  font-size: 10px;
+  color: var(--tm-danger);
+  margin-top: 4px;
+  letter-spacing: 0.01em;
+}
+
+.dialog__row {
+  display: flex;
+  gap: 8px;
+}
+
+.dialog__row .dialog__input {
+  flex: 1;
+}
+
+/* ── Color swatches ──────────────────────────────────────────── */
+.dialog__colors {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.dialog__color-swatch {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+  transition:
+    transform 0.12s,
+    border-color 0.12s;
+}
+
+.dialog__color-swatch:hover {
+  transform: scale(1.15);
+}
+
+.dialog__color-swatch--selected {
+  border-color: rgba(255, 255, 255, 0.7);
+  transform: scale(1.1);
+}
+
+/* ── Toggle label (checkbox) ─────────────────────────────────── */
+.dialog__label--toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-transform: none;
+  letter-spacing: normal;
+  font-size: 12px;
+  color: var(--tm-text-secondary);
+  cursor: pointer;
+  margin-bottom: 0;
+}
+
+/* ── Segmented control ───────────────────────────────────────── */
+.dialog__segment {
+  display: flex;
+  border: 1px solid var(--tm-border-strong);
+  border-radius: var(--tm-radius-sm);
+  overflow: hidden;
+}
+
+.dialog__segment-btn {
+  flex: 1;
+  background: none;
+  border: none;
+  border-right: 1px solid var(--tm-border-strong);
+  padding: 6px 10px;
+  font-size: 11px;
+  font-family: var(--tm-font-ui);
+  color: var(--tm-text-secondary);
+  cursor: pointer;
+  transition:
+    background 0.12s,
+    color 0.12s;
+}
+
+.dialog__segment-btn:last-child {
+  border-right: none;
+}
+
+.dialog__segment-btn:hover:not(.dialog__segment-btn--active) {
+  background: var(--tm-bg-card-hover);
+  color: var(--tm-text-primary);
+}
+
+.dialog__segment-btn--active {
+  background: var(--tm-accent);
+  color: white;
+}
+
+.dialog__segment-btn--disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+
+.dialog__segment-btn--disabled:hover {
+  background: none;
+  color: var(--tm-text-secondary);
+}
+
+/* ── Hint text ───────────────────────────────────────────────── */
+.dialog__hint {
+  display: block;
+  font-size: 10px;
+  color: var(--tm-text-muted);
+  margin-top: 4px;
+  letter-spacing: 0.01em;
+}

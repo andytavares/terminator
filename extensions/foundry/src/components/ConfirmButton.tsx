@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { TriangleAlert } from 'lucide-react'
+import { Button } from '@terminator/extension-ui'
 
 // A control that destroys something, and says what, before it does it.
 //
@@ -32,40 +33,54 @@ export function ConfirmButton({
 
   if (!armed) {
     return (
-      <button
-        type="button"
+      <Button
+        variant="ghost"
+        size="sm"
         className="fdry-discard"
         disabled={disabled}
         onClick={() => setArmed(true)}
       >
         {label}
-      </button>
+      </Button>
     )
   }
 
+  return (
+    <ArmedConfirm
+      {...{ label, confirmLabel, warning, disabled, onConfirm }}
+      onDisarm={() => setArmed(false)}
+    />
+  )
+}
+
+/** The armed control: the sentence saying what goes, the verb that does it, and a way back. */
+function ArmedConfirm({
+  label,
+  confirmLabel,
+  warning,
+  disabled,
+  onConfirm,
+  onDisarm,
+}: Required<ConfirmButtonProps> & { readonly onDisarm: () => void }) {
+  // Disarmed before the work, not after: the second run of a
+  // destructive action is a second decision, and leaving it armed
+  // through a slow teardown invites a double click into being one.
+  const disarmThenConfirm = (): void => {
+    onDisarm()
+    onConfirm()
+  }
   return (
     <div className="fdry-confirm" role="group" aria-label={label}>
       <p className="fdry-note">
         <TriangleAlert aria-hidden="true" /> {warning}
       </p>
       <div className="fdry-ask-actions">
-        <button
-          type="button"
-          className="fdry-discard"
-          disabled={disabled}
-          onClick={() => {
-            // Disarmed before the work, not after: the second run of a
-            // destructive action is a second decision, and leaving it armed
-            // through a slow teardown invites a double click into being one.
-            setArmed(false)
-            onConfirm()
-          }}
-        >
+        <Button variant="danger" size="sm" disabled={disabled} onClick={disarmThenConfirm}>
           {confirmLabel}
-        </button>
-        <button type="button" disabled={disabled} onClick={() => setArmed(false)}>
+        </Button>
+        <Button size="sm" disabled={disabled} onClick={onDisarm}>
           Cancel
-        </button>
+        </Button>
       </div>
     </div>
   )

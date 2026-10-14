@@ -9,7 +9,6 @@ import {
   sendBack,
   isComplete,
   hasStalled,
-  blockedNodes,
   blockedReason,
   stalledWhy,
   inFlight,
@@ -78,6 +77,12 @@ function graph(units = [unit('U-1'), unit('U-2'), unit('U-3')]): RunGraph {
 }
 
 describe('readyNodes', () => {
+  describe('readiness and the budget', readinessAndTheBudgetTests)
+  describe('dependencies', schedulerDependenciesTests)
+  describe('gates', schedulerGatesTests)
+})
+
+function readinessAndTheBudgetTests() {
   it('offers only what has nothing left to wait for', () => {
     expect(readyNodes(graph(), BUDGETS).map((n) => n.id)).toEqual(['build:U-1', 'build:U-2'])
   })
@@ -91,14 +96,9 @@ describe('readyNodes', () => {
     const g = withNode(graph(), 'build:U-1', { state: 'running' })
     expect(readyNodes(g, BUDGETS).filter((n) => n.kind !== 'gate')).toHaveLength(1)
   })
+}
 
-  it('counts verifying against the budget too, since it occupies an agent', () => {
-    const g = withNode(withNode(graph(), 'build:U-1', { state: 'verifying' }), 'build:U-2', {
-      state: 'running',
-    })
-    expect(readyNodes(g, BUDGETS).filter((n) => n.kind !== 'gate')).toEqual([])
-  })
-
+function schedulerDependenciesTests() {
   it('does not offer a node whose dependency has not passed', () => {
     expect(readyNodes(graph(), BUDGETS).map((n) => n.id)).not.toContain('integrate')
   })
@@ -119,7 +119,9 @@ describe('readyNodes', () => {
     const g = graph([unit('U-1'), unit('U-2', ['U-1'])])
     expect(readyNodes(g, BUDGETS).map((n) => n.id)).toEqual(['build:U-1'])
   })
+}
 
+function schedulerGatesTests() {
   it('never counts a gate against the budget — it waits on a person, not an agent', () => {
     let g = graph([unit('U-1')])
     g = markPassed(g, 'build:U-1', 'now')
@@ -127,7 +129,7 @@ describe('readyNodes', () => {
     g = withNode(g, 'build:U-1', { state: 'running' })
     expect(readyNodes(g, { ...BUDGETS, agents: 1 }).map((n) => n.id)).toContain('ship')
   })
-})
+}
 
 describe('startReady', () => {
   it('moves what can start into running and stamps when', () => {
@@ -144,7 +146,7 @@ describe('startReady', () => {
 
   it('keeps the original start time across a retry', () => {
     let g = startReady(graph(), BUDGETS, 'first').graph
-    g = markFailed(g, 'build:U-1', 'then').graph
+    g = markFailed(g, 'build:U-1', { at: 'then' }).graph
     g = retry(g, 'build:U-1')
     g = startReady(g, BUDGETS, 'second').graph
     expect(nodeById(g, 'build:U-1')?.startedAt).toBe('first')
@@ -155,21 +157,21 @@ describe('startReady', () => {
 describe('markFailed', () => {
   it('blocks everything downstream rather than leaving it waiting for ever', () => {
     const g = graph([unit('U-1')])
-    const { graph: after } = markFailed(g, 'build:U-1', 'at')
+    const { graph: after } = markFailed(g, 'build:U-1', { at: 'at' })
     expect(nodeById(after, 'integrate')?.state).toBe('blocked')
   })
 
   it('does not ask for a decision on the first failure', () => {
     const g = startReady(graph(), BUDGETS, 'at').graph
-    expect(markFailed(g, 'build:U-1', 'at').needsDecision).toBe(false)
+    expect(markFailed(g, 'build:U-1', { at: 'at' }).needsDecision).toBe(false)
   })
 
   it('asks for a decision once the retries are used up', () => {
     let g = startReady(graph(), BUDGETS, 'at').graph
-    g = markFailed(g, 'build:U-1', 'at').graph
+    g = markFailed(g, 'build:U-1', { at: 'at' }).graph
     g = retry(g, 'build:U-1')
     g = startReady(g, BUDGETS, 'at').graph
-    expect(markFailed(g, 'build:U-1', 'at').needsDecision).toBe(true)
+    expect(markFailed(g, 'build:U-1', { at: 'at' }).needsDecision).toBe(true)
   })
 
   it('allows exactly two attempts before the third becomes a decision', () => {
@@ -178,14 +180,14 @@ describe('markFailed', () => {
 
   it('ignores a node that is not in the graph', () => {
     const g = graph()
-    expect(markFailed(g, 'nope', 'at').graph).toEqual(g)
+    expect(markFailed(g, 'nope', { at: 'at' }).graph).toEqual(g)
   })
 })
 
 describe('retry', () => {
   it('puts a failed node back in the queue and unblocks what it stopped', () => {
     let g = graph([unit('U-1')])
-    g = markFailed(g, 'build:U-1', 'at').graph
+    g = markFailed(g, 'build:U-1', { at: 'at' }).graph
     g = retry(g, 'build:U-1')
     expect(nodeById(g, 'build:U-1')?.state).toBe('waiting')
     expect(nodeById(g, 'integrate')?.state).toBe('waiting')
@@ -193,20 +195,20 @@ describe('retry', () => {
 
   it('forgets why the node failed', () => {
     let g = graph([unit('U-1')])
-    g = markFailed(g, 'build:U-1', 'at', 'exited 1').graph
+    g = markFailed(g, 'build:U-1', { at: 'at', reason: 'exited 1' }).graph
     expect(nodeById(g, 'build:U-1')?.failReason).toBe('exited 1')
     g = retry(g, 'build:U-1')
     expect(nodeById(g, 'build:U-1')?.failReason).toBeNull()
   })
 })
 
-describe('blockedNodes and blockedReason', () => {
+describe('blockedReason', () => {
   it('names what a node is waiting on', () => {
     expect(blockedReason(graph(), 'integrate')).toMatch(/waiting on build:U-1/)
   })
 
   it('names what failed, in preference to what it is waiting on', () => {
-    const g = markFailed(graph([unit('U-1')]), 'build:U-1', 'at').graph
+    const g = markFailed(graph([unit('U-1')]), 'build:U-1', { at: 'at' }).graph
     expect(blockedReason(g, 'integrate')).toBe('build:U-1 failed')
   })
 
@@ -218,40 +220,44 @@ describe('blockedNodes and blockedReason', () => {
   it('has no reason for a node that is not there', () => {
     expect(blockedReason(graph(), 'nope')).toBeNull()
   })
-
-  it('lists everything a failure has stopped', () => {
-    const g = markFailed(graph([unit('U-1')]), 'build:U-1', 'at').graph
-    expect(blockedNodes(g).map((n) => n.id)).toContain('integrate')
-  })
 })
 
 describe('stalledWhy', () => {
+  describe('the failed step', schedulerTheFailedStepTests)
+  describe('several or last failures', severalOrLastFailuresTests)
+  describe('nothing failed', nothingFailedTests)
+})
+
+function schedulerTheFailedStepTests() {
   it('names the failed step, why it failed, and everything held up behind it', () => {
-    const g = markFailed(
-      graph([unit('U-1')]),
-      'build:U-1',
-      'at',
-      'exited 1 running `npm test`'
-    ).graph
+    const g = markFailed(graph([unit('U-1')]), 'build:U-1', {
+      at: 'at',
+      reason: 'exited 1 running `npm test`',
+    }).graph
     expect(stalledWhy(g)).toBe(
       'build:U-1 failed: exited 1 running `npm test`.\n\nHeld up behind it: integrate, ship.'
     )
   })
 
   it('uses the names the surface uses', () => {
-    const g = markFailed(graph([unit('U-1')]), 'build:U-1', 'at', 'made no change').graph
+    const g = markFailed(graph([unit('U-1')]), 'build:U-1', {
+      at: 'at',
+      reason: 'made no change',
+    }).graph
     expect(stalledWhy(g, (id) => `<${id}>`)).toMatch(/^<build:U-1> failed: made no change\./)
   })
 
   it('says only that a step failed when no reason was recorded', () => {
-    const g = markFailed(graph([unit('U-1')]), 'build:U-1', 'at').graph
+    const g = markFailed(graph([unit('U-1')]), 'build:U-1', { at: 'at' }).graph
     expect(stalledWhy(g)).toMatch(/^build:U-1 failed\.\n/)
   })
+}
 
+function severalOrLastFailuresTests() {
   it('lists every failed step when more than one failed', () => {
     let g = graph([unit('U-1'), unit('U-2')])
-    g = markFailed(g, 'build:U-1', 'at', 'exited 1').graph
-    g = markFailed(g, 'build:U-2', 'at', 'exited 2').graph
+    g = markFailed(g, 'build:U-1', { at: 'at', reason: 'exited 1' }).graph
+    g = markFailed(g, 'build:U-2', { at: 'at', reason: 'exited 2' }).graph
     expect(stalledWhy(g)).toBe(
       '- build:U-1 failed: exited 1.\n- build:U-2 failed: exited 2.\n\nHeld up behind them: integrate, ship.'
     )
@@ -260,10 +266,12 @@ describe('stalledWhy', () => {
   it('names nothing held up when the failed step was the last one', () => {
     let g = graph([unit('U-1')])
     for (const id of ['build:U-1', 'integrate']) g = markPassed(g, id, 'at')
-    g = markFailed(g, 'ship', 'at', 'exited 1').graph
+    g = markFailed(g, 'ship', { at: 'at', reason: 'exited 1' }).graph
     expect(stalledWhy(g)).toBe('ship failed: exited 1.')
   })
+}
 
+function nothingFailedTests() {
   it('says what each step waits on when nothing failed', () => {
     let g = graph([unit('U-1')])
     g = withNode(g, 'build:U-1', { dependsOn: ['ship'] })
@@ -272,7 +280,7 @@ describe('stalledWhy', () => {
         '- build:U-1 is waiting on ship\n- integrate is waiting on build:U-1\n- ship is waiting on integrate'
     )
   })
-})
+}
 
 describe('isComplete and hasStalled', () => {
   it('is not complete while anything is outstanding', () => {
@@ -291,7 +299,7 @@ describe('isComplete and hasStalled', () => {
   })
 
   it('has stalled when nothing is running and nothing can start', () => {
-    const g = markFailed(graph([unit('U-1')]), 'build:U-1', 'at').graph
+    const g = markFailed(graph([unit('U-1')]), 'build:U-1', { at: 'at' }).graph
     expect(hasStalled(g, BUDGETS)).toBe(true)
   })
 
@@ -380,43 +388,76 @@ describe('raisedLimitProblem', () => {
   })
 })
 
+const mkNode = (over: Partial<RunNode> & Pick<RunNode, 'id' | 'stepId'>): RunNode => ({
+  kind: 'agent',
+  state: 'passed',
+  unitIds: [],
+  lane: null,
+  role: null,
+  dependsOn: [],
+  attempts: 1,
+  reworks: 0,
+  feedback: [],
+  sessionId: null,
+  worktreePath: null,
+  startedAt: null,
+  endedAt: 'ended',
+  ...over,
+})
+const rg = (nodes: RunNode[]): RunGraph => ({ orderId: 'WO-1', recipe: 'r', nodes })
+const fb = (over: Partial<Feedback> = {}): Feedback => ({
+  from: 'lint',
+  attempt: 1,
+  source: 'check',
+  command: 'npm run lint',
+  exitCode: 1,
+  excerpt: 'error',
+  logPath: null,
+  ...over,
+})
+
 describe('rework', () => {
-  const mkNode = (over: Partial<RunNode> & Pick<RunNode, 'id' | 'stepId'>): RunNode => ({
-    kind: 'agent',
-    state: 'passed',
-    unitIds: [],
-    lane: null,
-    role: null,
-    dependsOn: [],
-    attempts: 1,
-    reworks: 0,
-    feedback: [],
-    sessionId: null,
-    worktreePath: null,
-    startedAt: null,
-    endedAt: 'ended',
-    ...over,
-  })
+  describe('the target and between', theTargetAndBetweenTests)
+  describe('downstream nodes', downstreamNodesTests)
+  describe('two lanes', twoLanesTests)
+  describe('every target', everyTargetTests)
+  describe('unchanged graphs', unchangedGraphsTests)
+  describe('attempts', attemptsTests)
+})
 
-  const rg = (nodes: RunNode[]): RunGraph => ({ orderId: 'WO-1', recipe: 'r', nodes })
+const mk = (over: Partial<RunNode> & Pick<RunNode, 'id' | 'stepId'>): RunNode => ({
+  kind: 'agent',
+  state: 'passed',
+  unitIds: [],
+  lane: 1,
+  role: null,
+  dependsOn: [],
+  attempts: 1,
+  reworks: 0,
+  feedback: [],
+  sessionId: 's',
+  worktreePath: null,
+  startedAt: 'started',
+  endedAt: 'ended',
+  ...over,
+})
+const failure: Feedback = {
+  from: 'final check',
+  attempt: 1,
+  source: 'check',
+  command: 'npm run test:e2e',
+  exitCode: 1,
+  excerpt: 'Error: Process failed to launch!',
+  logPath: '/data/runs/final-integration.1.log',
+}
 
-  const fb = (over: Partial<Feedback> = {}): Feedback => ({
-    from: 'lint',
-    attempt: 1,
-    source: 'check',
-    command: 'npm run lint',
-    exitCode: 1,
-    excerpt: 'error',
-    logPath: null,
-    ...over,
-  })
-
+function theTargetAndBetweenTests() {
   it('sends a one-lane build back with the failure attached', () => {
     const graph = rg([
       mkNode({ id: 'build', stepId: 'build', lane: 1, state: 'passed' }),
       mkNode({ id: 'lint', stepId: 'lint', dependsOn: ['build'], state: 'failed' }),
     ])
-    const after = rework(graph, 'lint', 'build', fb())
+    const after = rework(graph, 'lint', { to: 'build', feedback: fb() })
     expect(nodeById(after, 'build')?.state).toBe('waiting')
     expect(nodeById(after, 'build')?.endedAt).toBeNull()
     expect(nodeById(after, 'build')?.feedback).toEqual([fb()])
@@ -431,19 +472,21 @@ describe('rework', () => {
       mkNode({ id: 'fmt', stepId: 'fmt', dependsOn: ['build'], state: 'passed' }),
       mkNode({ id: 'lint', stepId: 'lint', dependsOn: ['fmt'], state: 'failed' }),
     ])
-    const after = rework(graph, 'lint', 'build', fb())
+    const after = rework(graph, 'lint', { to: 'build', feedback: fb() })
     expect(nodeById(after, 'fmt')?.state).toBe('waiting')
     expect(nodeById(after, 'fmt')?.endedAt).toBeNull()
     expect(nodeById(after, 'fmt')?.feedback).toEqual([])
   })
+}
 
+function downstreamNodesTests() {
   it('leaves a node downstream of the failure alone unless it was blocked', () => {
     const graph = rg([
       mkNode({ id: 'build', stepId: 'build', lane: 1, state: 'passed' }),
       mkNode({ id: 'lint', stepId: 'lint', dependsOn: ['build'], state: 'failed' }),
       mkNode({ id: 'verify', stepId: 'verify', dependsOn: ['lint'], state: 'blocked' }),
     ])
-    const after = rework(graph, 'lint', 'build', fb())
+    const after = rework(graph, 'lint', { to: 'build', feedback: fb() })
     expect(nodeById(after, 'verify')?.state).toBe('waiting')
   })
 
@@ -453,11 +496,13 @@ describe('rework', () => {
       mkNode({ id: 'lint', stepId: 'lint', dependsOn: ['build'], state: 'failed' }),
       mkNode({ id: 'verify', stepId: 'verify', dependsOn: ['lint'], state: 'waiting' }),
     ])
-    const after = rework(graph, 'lint', 'build', fb())
+    const after = rework(graph, 'lint', { to: 'build', feedback: fb() })
     expect(nodeById(after, 'verify')?.state).toBe('waiting')
     expect(nodeById(after, 'verify')?.feedback).toEqual([])
   })
+}
 
+function twoLanesTests() {
   it('resets only the lane the failed node belongs to, in a two-lane build', () => {
     const graph = rg([
       mkNode({ id: 'build:lane1', stepId: 'build', lane: 1, state: 'passed' }),
@@ -470,13 +515,15 @@ describe('rework', () => {
         state: 'failed',
       }),
     ])
-    const after = rework(graph, 'lint', 'build', fb())
+    const after = rework(graph, 'lint', { to: 'build', feedback: fb() })
     expect(nodeById(after, 'build:lane1')?.state).toBe('waiting')
     expect(nodeById(after, 'build:lane1')?.feedback).toEqual([fb()])
     expect(nodeById(after, 'build:lane2')?.state).toBe('passed')
     expect(nodeById(after, 'build:lane2')?.feedback).toEqual([])
   })
+}
 
+function everyTargetTests() {
   it('uses every target when none of them share the failed node lowest lane', () => {
     const graph = rg([
       mkNode({ id: 'build:lane1', stepId: 'build', lane: 1, state: 'passed' }),
@@ -489,17 +536,19 @@ describe('rework', () => {
         state: 'failed',
       }),
     ])
-    const after = rework(graph, 'lint', 'build', fb())
+    const after = rework(graph, 'lint', { to: 'build', feedback: fb() })
     expect(nodeById(after, 'build:lane1')?.state).toBe('waiting')
     expect(nodeById(after, 'build:lane2')?.state).toBe('waiting')
   })
+}
 
+function unchangedGraphsTests() {
   it('leaves the graph unchanged for an unknown failed node', () => {
     const graph = rg([
       mkNode({ id: 'build', stepId: 'build', lane: 1, state: 'passed' }),
       mkNode({ id: 'lint', stepId: 'lint', dependsOn: ['build'], state: 'failed' }),
     ])
-    expect(rework(graph, 'nope', 'build', fb())).toEqual(graph)
+    expect(rework(graph, 'nope', { to: 'build', feedback: fb() })).toEqual(graph)
   })
 
   it('leaves the graph unchanged when no node matches the target step', () => {
@@ -507,47 +556,27 @@ describe('rework', () => {
       mkNode({ id: 'build', stepId: 'build', lane: 1, state: 'passed' }),
       mkNode({ id: 'lint', stepId: 'lint', dependsOn: ['build'], state: 'failed' }),
     ])
-    expect(rework(graph, 'lint', 'nope', fb())).toEqual(graph)
+    expect(rework(graph, 'lint', { to: 'nope', feedback: fb() })).toEqual(graph)
   })
+}
 
+function attemptsTests() {
   it('does not touch attempts — the next start counts that', () => {
     const graph = rg([
       mkNode({ id: 'build', stepId: 'build', lane: 1, state: 'passed', attempts: 1 }),
       mkNode({ id: 'lint', stepId: 'lint', dependsOn: ['build'], state: 'failed', attempts: 2 }),
     ])
-    const after = rework(graph, 'lint', 'build', fb())
+    const after = rework(graph, 'lint', { to: 'build', feedback: fb() })
     expect(nodeById(after, 'build')?.attempts).toBe(1)
     expect(nodeById(after, 'lint')?.attempts).toBe(2)
   })
-})
+}
 
 describe('sendBack after the final check failed', () => {
-  const mk = (over: Partial<RunNode> & Pick<RunNode, 'id' | 'stepId'>): RunNode => ({
-    kind: 'agent',
-    state: 'passed',
-    unitIds: [],
-    lane: 1,
-    role: null,
-    dependsOn: [],
-    attempts: 1,
-    reworks: 0,
-    feedback: [],
-    sessionId: 's',
-    worktreePath: null,
-    startedAt: 'started',
-    endedAt: 'ended',
-    ...over,
-  })
-  const failure: Feedback = {
-    from: 'final check',
-    attempt: 1,
-    source: 'check',
-    command: 'npm run test:e2e',
-    exitCode: 1,
-    excerpt: 'Error: Process failed to launch!',
-    logPath: '/data/runs/final-integration.1.log',
-  }
+  describe('the builder reopened', theBuilderReopenedTests)
+})
 
+function theBuilderReopenedTests() {
   it('reopens the builder with the failure, and everything after it', () => {
     const g: RunGraph = {
       orderId: 'WO-1',
@@ -569,4 +598,4 @@ describe('sendBack after the final check failed', () => {
     expect(byId('unrelated').state).toBe('passed')
     expect(isComplete(next)).toBe(false)
   })
-})
+}

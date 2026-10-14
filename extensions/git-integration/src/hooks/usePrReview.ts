@@ -1,219 +1,145 @@
 import { useCallback, useRef } from 'react'
-import { githubAPI } from '../api/github'
-import { usePrReviewStore } from '../stores/pr-review.store'
+import { useShallow } from 'zustand/react/shallow'
+import { githubAPI, type RawFileMetrics } from '../api/github'
+import { usePrReviewStore, type PrReviewStore } from '../stores/pr-review.store'
+import { PrReviewDetailSchema } from '../schemas/pr-review.schema'
+import type { PrReviewDetail, IssueComment } from '../schemas/pr-review.schema'
 import {
-  ReviewQueuePRSchema,
-  PrReviewDetailSchema,
-  ReviewSessionSchema,
-} from '../schemas/pr-review.schema'
-import type {
-  PrReviewDetail,
-  RiskScore,
-  FileMetrics,
-  IssueComment,
-  SignalDots,
-  ReviewQueuePR,
-} from '../schemas/pr-review.schema'
-import { computeRiskScore, queueRiskLevel } from '../github/pr-review-service'
+  measuredFiles,
+  prRiskLevel,
+  riskScores,
+  scoredFiles,
+  signalDots,
+} from '../review/pr-signals'
+import { mergeSessionStatuses, parsePrList } from './queue-sessions'
 
 // ─── Queue loading ────────────────────────────────────────────────────────────
 
-function parsePrList(raw: unknown[]): ReturnType<typeof ReviewQueuePRSchema.safeParse>['data'][] {
-  return raw
-    .map((p) => ReviewQueuePRSchema.safeParse(p))
-    .filter((r) => r.success)
-    .map((r) => r.data!)
+type Store = PrReviewStore
+
+/** The store actions loading the queue drives. */
+type QueueActions = Pick<
+  Store,
+  | 'setQueue'
+  | 'appendQueue'
+  | 'setQueueLoading'
+  | 'setLoadingMorePrs'
+  | 'setQueueError'
+  | 'setRateLimitState'
+  | 'setHasMorePrs'
+  | 'setNextPrCursor'
+  | 'setTotalPrCount'
+  | 'setCurrentUserLogin'
+>
+
+interface QueueRequest {
+  repoRoot: string
+  cursor?: string
+  search?: string
+  append: boolean
+  /** True once a later request has started: this one's results must be dropped. */
+  isStale: () => boolean
 }
 
-async function mergeSessionStatuses(
-  repoRoot: string,
-  prs: ReviewQueuePR[],
-  isAppend: boolean = false
-): Promise<ReviewQueuePR[]> {
-  try {
-    const result = await githubAPI.sessionsForRepo(repoRoot)
-    const sessions = (result.sessions as unknown[])
-      .map((s) => ReviewSessionSchema.safeParse(s))
-      .filter((r) => r.success)
-      .map((r) => r.data!)
+interface QueuePage {
+  prs: unknown[]
+  hasMore: boolean
+  nextCursor?: string
+  totalCount?: number
+}
 
-    // Keep the most-recently-accessed session per PR number
-    const latestByPr = new Map<number, (typeof sessions)[0]>()
-    for (const session of sessions) {
-      const existing = latestByPr.get(session.prNumber)
-      if (!existing || session.lastAccessedAt > existing.lastAccessedAt) {
-        latestByPr.set(session.prNumber, session)
-      }
-    }
+const NOT_AUTHENTICATED =
+  'Not authenticated. Add a GitHub token in Settings → Git Integration, or run: gh auth login'
 
-    const merged = prs.map((pr) => {
-      if (!pr) return pr
-      const session = latestByPr.get(pr.number)
-      if (!session) return pr
-      const sessionStatus: ReviewQueuePR['sessionStatus'] = session.pausedAt
-        ? 'paused'
-        : 'in-progress'
-      return { ...pr, sessionStatus, viewedFileCount: session.viewedFiles.length }
+function setLoading(actions: QueueActions, append: boolean, loading: boolean): void {
+  if (append) actions.setLoadingMorePrs(loading)
+  else actions.setQueueLoading(loading)
+}
+
+/** The signed-in login, best-effort and in parallel with the list. */
+function loadCurrentUser(actions: QueueActions, request: QueueRequest): void {
+  githubAPI
+    .currentUser(request.repoRoot)
+    .then((res) => {
+      if (!request.isStale()) actions.setCurrentUserLogin((res as { login?: string }).login ?? null)
     })
+    .catch(() => {
+      /* non-critical */
+    })
+}
 
-    // Load persisted active-review snapshots and prepend any not already in the
-    // current page — guarantees in-progress PRs appear regardless of pagination.
-    // Skip orphan logic on append loads (orphans were already prepended on the first page).
-    if (isAppend) return merged
-
-    const activeResult = await githubAPI.activeReviewsForRepo(repoRoot)
-    if ('error' in activeResult) return merged
-
-    const queueNumbers = new Set(prs.map((p) => p.number))
-    const activePrs = parsePrList((activeResult as { prs: unknown[] }).prs)
-    const candidateOrphans = activePrs.filter(
-      (pr): pr is ReviewQueuePR => pr != null && !queueNumbers.has(pr.number)
-    )
-
-    // Verify each orphan's current state against GitHub. Any PR that is now CLOSED
-    // or MERGED is removed from the store and excluded from the queue.
-    let openOrphanNumbers = new Set(candidateOrphans.map((p) => p.number))
-    if (candidateOrphans.length > 0) {
-      try {
-        const pruneResult = await githubAPI.pruneActiveReviews(
-          repoRoot,
-          candidateOrphans.map((p) => p.number)
-        )
-        if (!('error' in pruneResult)) {
-          openOrphanNumbers = new Set((pruneResult as { openNumbers: number[] }).openNumbers)
-        }
-      } catch {
-        // If the prune check fails (e.g. no network), keep all orphans visible.
-      }
-    }
-
-    const orphans = candidateOrphans
-      .filter((pr) => openOrphanNumbers.has(pr.number))
-      .map((pr) => {
-        const session = latestByPr.get(pr.number)
-        const sessionStatus: ReviewQueuePR['sessionStatus'] = session
-          ? session.pausedAt
-            ? 'paused'
-            : 'in-progress'
-          : 'in-progress'
-        const viewedFileCount = session?.viewedFiles.length ?? 0
-        return { ...pr, sessionStatus, viewedFileCount }
-      })
-
-    return [...orphans, ...merged]
-  } catch {
-    return prs
+/** A failed list: a rate limit waits it out, missing auth says how to sign in. */
+function showQueueError(actions: QueueActions, result: { error: string; resetAt?: number }): void {
+  if (result.error === 'RATE_LIMITED') {
+    actions.setRateLimitState({ resetAt: result.resetAt ?? Date.now() + 60_000 })
+  } else if (result.error === 'NOT_AUTHENTICATED') {
+    actions.setQueueError(NOT_AUTHENTICATED)
+  } else {
+    actions.setQueueError(result.error)
   }
 }
 
+async function applyQueuePage(actions: QueueActions, request: QueueRequest, page: QueuePage) {
+  const prs = await mergeSessionStatuses(request.repoRoot, parsePrList(page.prs), request.append)
+  if (request.isStale()) return
+  if (request.append) actions.appendQueue(prs)
+  else actions.setQueue(prs)
+  actions.setHasMorePrs(page.hasMore)
+  actions.setNextPrCursor(page.nextCursor)
+  actions.setTotalPrCount(page.totalCount ?? null)
+}
+
+async function loadQueue(actions: QueueActions, request: QueueRequest): Promise<void> {
+  setLoading(actions, request.append, true)
+  if (!request.append) {
+    actions.setQueueError(null)
+    loadCurrentUser(actions, request)
+  }
+  try {
+    const { repoRoot, cursor, search } = request
+    const result = await githubAPI.listOpenPrs(repoRoot, { cursor, search })
+    if (request.isStale()) return
+    if ('error' in result)
+      return showQueueError(actions, result as { error: string; resetAt?: number })
+    await applyQueuePage(actions, request, result as QueuePage)
+  } catch (e) {
+    if (!request.isStale()) actions.setQueueError(String(e))
+  } finally {
+    if (!request.isStale()) setLoading(actions, request.append, false)
+  }
+}
+
+/** The queue actions, as one object that changes only when an action does. */
+function useQueueActions(): QueueActions {
+  return usePrReviewStore(
+    useShallow((s) => ({
+      setQueue: s.setQueue,
+      appendQueue: s.appendQueue,
+      setQueueLoading: s.setQueueLoading,
+      setLoadingMorePrs: s.setLoadingMorePrs,
+      setQueueError: s.setQueueError,
+      setRateLimitState: s.setRateLimitState,
+      setHasMorePrs: s.setHasMorePrs,
+      setNextPrCursor: s.setNextPrCursor,
+      setTotalPrCount: s.setTotalPrCount,
+      setCurrentUserLogin: s.setCurrentUserLogin,
+    }))
+  )
+}
+
 export function useLoadPrQueue(repoRoot: string | null) {
-  const {
-    setQueue,
-    appendQueue,
-    setQueueLoading,
-    setLoadingMorePrs,
-    setQueueError,
-    setRateLimitState,
-    setHasMorePrs,
-    setNextPrCursor,
-    setTotalPrCount,
-    setCurrentUserLogin,
-  } = usePrReviewStore()
-
-  // Monotonic request id: guards against an earlier, slower request (e.g. a
-  // stale search query) resolving after a later one and overwriting its
-  // results (TAV-7). Any response whose id no longer matches the latest
-  // issued request is discarded instead of being applied to the store.
+  const actions = useQueueActions()
+  // Monotonic request id: a slower earlier request (e.g. a stale search) must not overwrite a
+  // later one's results (TAV-7); a response whose id is no longer the latest is dropped.
   const latestRequestIdRef = useRef(0)
-
   return useCallback(
     async (options?: { cursor?: string; search?: string; append?: boolean }) => {
       if (!repoRoot) return
-      const isAppend = Boolean(options?.append)
       const requestId = ++latestRequestIdRef.current
       const isStale = () => requestId !== latestRequestIdRef.current
-      if (isAppend) {
-        setLoadingMorePrs(true)
-      } else {
-        setQueueLoading(true)
-        setQueueError(null)
-      }
-      // Fetch current user in parallel with PR list (best-effort)
-      if (!isAppend) {
-        githubAPI
-          .currentUser(repoRoot)
-          .then((res) => {
-            if (isStale()) return
-            const login = (res as { login?: string }).login ?? null
-            setCurrentUserLogin(login)
-          })
-          .catch(() => {
-            /* non-critical */
-          })
-      }
-      try {
-        const result = await githubAPI.listOpenPrs(repoRoot, {
-          cursor: options?.cursor,
-          search: options?.search,
-        })
-        if (isStale()) return
-        if ('error' in result) {
-          const err = (result as { error: string }).error
-          if (err === 'RATE_LIMITED') {
-            setRateLimitState({
-              resetAt: (result as { resetAt?: number }).resetAt ?? Date.now() + 60_000,
-            })
-          } else if (err === 'NOT_AUTHENTICATED') {
-            setQueueError(
-              'Not authenticated. Add a GitHub token in Settings → Git Integration, or run: gh auth login'
-            )
-          } else {
-            setQueueError(err)
-          }
-          return
-        }
-        const res = result as {
-          prs: unknown[]
-          hasMore: boolean
-          nextCursor?: string
-          totalCount?: number
-        }
-        const prs = parsePrList(res.prs)
-        const prsWithStatus = await mergeSessionStatuses(repoRoot, prs, isAppend)
-        if (isStale()) return
-        if (isAppend) {
-          appendQueue(prsWithStatus)
-        } else {
-          setQueue(prsWithStatus)
-        }
-        setHasMorePrs(res.hasMore)
-        setNextPrCursor(res.nextCursor)
-        setTotalPrCount(res.totalCount ?? null)
-      } catch (e) {
-        if (!isStale()) setQueueError(String(e))
-      } finally {
-        if (!isStale()) {
-          if (isAppend) {
-            setLoadingMorePrs(false)
-          } else {
-            setQueueLoading(false)
-          }
-        }
-      }
+      await loadQueue(actions, { repoRoot, ...options, append: Boolean(options?.append), isStale })
     },
-    [
-      repoRoot,
-      appendQueue,
-      setQueue,
-      setQueueLoading,
-      setLoadingMorePrs,
-      setQueueError,
-      setRateLimitState,
-      setHasMorePrs,
-      setNextPrCursor,
-      setTotalPrCount,
-      setCurrentUserLogin,
-    ]
+    [repoRoot, actions]
   )
 }
 
@@ -251,129 +177,36 @@ export function useLoadPrDetail(repoRoot: string | null) {
 
 // ─── File metrics loading ─────────────────────────────────────────────────────
 
-interface RawFileMetrics {
-  churn90d: number
-  blastRadius: number
-  topImporters: string[]
-  importerCount: number
-  testFilePresent: boolean
-  patchCoverage?: number | null
+/** Scores each file from its metrics, then the PR's risk and signal dots in the queue. */
+async function scorePr(
+  repoRoot: string,
+  pr: PrReviewDetail,
+  actions: Pick<Store, 'updateFileRiskScores' | 'updateQueuePrRisk'>
+) {
+  const files = scoredFiles(pr)
+  if (files.length === 0) return
+  const response = await githubAPI.filesMetrics(
+    repoRoot,
+    files.map((f) => f.path)
+  )
+  if ('error' in response) return
+  const measured = measuredFiles(
+    files,
+    (response as { metrics: Record<string, RawFileMetrics> }).metrics
+  )
+  if (measured.length === 0) return
+  const scores = riskScores(measured)
+  actions.updateFileRiskScores(scores)
+  actions.updateQueuePrRisk(pr.number, prRiskLevel(measured, scores), signalDots(measured, pr))
 }
 
 export function useFetchFileMetrics(repoRoot: string | null) {
   const { activePr, updateFileRiskScores, updateQueuePrRisk } = usePrReviewStore()
-
   return useCallback(
     async (prDetail?: PrReviewDetail) => {
       const pr = prDetail ?? activePr
       if (!repoRoot || !pr) return
-      // Exclude lock files / generated files (tier 3) from risk scoring entirely
-      const allFiles = pr.chapters.flatMap((c) => c.files).filter((f) => f.tier !== 3)
-
-      if (allFiles.length === 0) return
-      const response = await githubAPI.filesMetrics(
-        repoRoot,
-        allFiles.map((f) => f.path)
-      )
-      if ('error' in response) return
-      const byPath = (response as { metrics: Record<string, RawFileMetrics> }).metrics
-
-      const results = allFiles.map((file) => {
-        const raw = byPath[file.path]
-        if (!raw) return null
-        const metrics: FileMetrics = {
-          path: file.path,
-          additions: file.additions,
-          deletions: file.deletions,
-          churn90d: raw.churn90d ?? null,
-          blastRadius: raw.blastRadius ?? null,
-          testFilePresent: raw.testFilePresent ?? false,
-          complexityDelta: null,
-          patchCoverage: raw.patchCoverage ?? null,
-          topImporters: raw.topImporters ?? [],
-          importerCount: raw.importerCount ?? 0,
-        }
-        return { file, metrics }
-      })
-
-      const collected: Array<{ file: (typeof allFiles)[0]; metrics: FileMetrics }> = []
-      for (const r of results) {
-        if (r != null) collected.push(r)
-      }
-
-      if (collected.length === 0) return
-
-      const allMetrics = collected.map((c) => c.metrics)
-
-      const scores: Record<string, RiskScore> = {}
-      for (const { file, metrics } of collected) {
-        scores[file.path] = computeRiskScore(metrics, allMetrics)
-      }
-      updateFileRiskScores(scores)
-
-      // Weighted PR-level risk: high files always push to HIGH; medium files block LOW
-      const riskLevels = collected.map((c) => scores[c.file.path].level)
-      const highCount = riskLevels.filter((l) => l === 'high').length
-      const medCount = riskLevels.filter((l) => l === 'medium').length
-      const n = riskLevels.length
-      const fileRiskLevel: 'low' | 'medium' | 'high' =
-        highCount > 0
-          ? 'high'
-          : medCount >= 3 || (n > 0 && medCount / n >= 0.3)
-            ? 'high'
-            : medCount > 0
-              ? 'medium'
-              : 'low'
-
-      // Keep the size-based floor from the queue so a large-but-mechanically-simple PR
-      // isn't silently downgraded out of the High-risk filter once it's opened.
-      const totalChangeSize = collected.reduce(
-        (s, c) => s + c.metrics.additions + c.metrics.deletions,
-        0
-      )
-      const rank = { low: 0, medium: 1, high: 2 } as const
-      const sizeFloor = queueRiskLevel(totalChangeSize)
-      const prRiskLevel = rank[sizeFloor] >= rank[fileRiskLevel] ? sizeFloor : fileRiskLevel
-
-      const anyMissingTest = collected.some((c) => !c.metrics.testFilePresent)
-      const maxChurn = Math.max(...collected.map((c) => c.metrics.churn90d ?? 0))
-      const maxBlast = Math.max(...collected.map((c) => c.metrics.blastRadius ?? 0))
-      const covValues = collected
-        .map((c) => c.metrics.patchCoverage)
-        .filter((v): v is number => v != null)
-      const avgCoverage =
-        covValues.length > 0 ? covValues.reduce((a, b) => a + b, 0) / covValues.length : null
-
-      const ciDot: SignalDots['ci'] =
-        pr.ciStatus === 'passing'
-          ? 'pass'
-          : pr.ciStatus === 'failing'
-            ? 'fail'
-            : pr.ciStatus === 'pending'
-              ? 'warn'
-              : 'unknown'
-
-      // For coverage: prefer local patch coverage (file-level) when available;
-      // fall back to the API-reported codecov/coveralls check so it doesn't show ? when CI passed.
-      const coverageDot: SignalDots['coverage'] =
-        avgCoverage != null
-          ? avgCoverage >= 80
-            ? 'pass'
-            : avgCoverage >= 50
-              ? 'warn'
-              : 'fail'
-          : (pr.coverageStatus ?? 'unknown')
-
-      const signalDots: SignalDots = {
-        tests: anyMissingTest ? 'fail' : 'pass',
-        coverage: coverageDot,
-        ci: ciDot,
-        lint: pr.lintStatus ?? 'unknown',
-        churn: maxChurn > 50 ? 'fail' : maxChurn > 20 ? 'warn' : 'pass',
-        blast: maxBlast > 20 ? 'fail' : maxBlast > 10 ? 'warn' : 'pass',
-      }
-
-      updateQueuePrRisk(pr.number, prRiskLevel, signalDots)
+      await scorePr(repoRoot, pr, { updateFileRiskScores, updateQueuePrRisk })
     },
     [repoRoot, activePr, updateFileRiskScores, updateQueuePrRisk]
   )
@@ -404,6 +237,18 @@ export function useLoadIssueComments(repoRoot: string | null) {
 
 // ─── Inline comments loading ──────────────────────────────────────────────────
 
+/** Each path's threads, those GitHub marks resolved flagged as such. */
+async function threadsByPath(result: { comments: unknown[]; resolvedCommentIds?: number[] }) {
+  const { buildThreads } = await import('../github/pr-review-service-renderer')
+  const resolved = new Set(result.resolvedCommentIds ?? [])
+  const threads = buildThreads(result.comments as Parameters<typeof buildThreads>[0]).map(
+    (thread) => (resolved.has(thread.comments[0]?.id) ? { ...thread, resolved: true } : thread)
+  )
+  const byPath: Record<string, typeof threads> = {}
+  for (const thread of threads) (byPath[thread.path] ??= []).push(thread)
+  return byPath
+}
+
 export function useLoadInlineComments(repoRoot: string | null) {
   const { activePr, setThreads } = usePrReviewStore()
   // Depend on the number, not the object: every file open patches activePr.
@@ -415,23 +260,10 @@ export function useLoadInlineComments(repoRoot: string | null) {
     try {
       const result = await githubAPI.prInlineComments(repoRoot, current.number)
       if ('error' in result) return
-      const { buildThreads } = await import('../github/pr-review-service-renderer')
-      const comments = (result as { comments: unknown[]; resolvedCommentIds?: number[] }).comments
-      const resolvedCommentIds = new Set(
-        (result as { resolvedCommentIds?: number[] }).resolvedCommentIds ?? []
+      const byPath = await threadsByPath(
+        result as { comments: unknown[]; resolvedCommentIds?: number[] }
       )
-      const threads = buildThreads(comments as Parameters<typeof buildThreads>[0]).map((thread) =>
-        resolvedCommentIds.has(thread.comments[0]?.id) ? { ...thread, resolved: true } : thread
-      )
-      // Group threads by file path
-      const byPath: Record<string, typeof threads> = {}
-      for (const thread of threads) {
-        if (!byPath[thread.path]) byPath[thread.path] = []
-        byPath[thread.path].push(thread)
-      }
-      for (const [path, pathThreads] of Object.entries(byPath)) {
-        setThreads(path, pathThreads)
-      }
+      for (const [path, pathThreads] of Object.entries(byPath)) setThreads(path, pathThreads)
     } catch (e) {
       console.error('Failed to load inline comments', e)
     }

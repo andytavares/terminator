@@ -1,7 +1,7 @@
 # ADR-017: Embedded HTTP Server for Remote Browser Access
 
 **Date**: 2026-06-11 (revised 2026-06-22)
-**Status**: Accepted
+**Status**: Accepted (credential handling superseded by [ADR-100](100-remote-control-credentials.md))
 
 > **Revision history**
 >

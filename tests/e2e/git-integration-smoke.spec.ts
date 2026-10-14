@@ -1,9 +1,8 @@
 import { test, expect } from '@playwright/test'
 import { execSync } from 'node:child_process'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { AppHandle, launchApp, closeApp, createWorkspace } from './helpers'
+import { AppHandle, launchApp, closeApp, createWorkspace, e2eTempDir } from './helpers'
 
 /**
  * The whole-class checks `extension-smoke.spec.ts` runs, for the extension it
@@ -48,7 +47,7 @@ const PROBE = `(() => {
     }
   }
   const sideScrollers = []
-  for (const el of document.querySelectorAll('.tmui-dialog__panel, [role=dialog]')) {
+  for (const el of document.querySelectorAll('dialog, [role=dialog]')) {
     if (el.scrollWidth - el.clientWidth > 1) {
       sideScrollers.push((el.className || 'dialog') + ' +' + (el.scrollWidth - el.clientWidth) + 'px')
     }
@@ -89,7 +88,7 @@ function inGit(viewParam: string, script: string): Promise<Report> {
 }
 
 test.beforeAll(async () => {
-  repo = mkdtempSync(join(tmpdir(), 'terminator-e2e-gitsmoke-'))
+  repo = e2eTempDir('terminator-e2e-gitsmoke-')
   const run = (c: string) => execSync(c, { cwd: repo })
   run('git init -b main')
   run('git config user.email "test@test.com"')
@@ -133,6 +132,21 @@ function assertClean(view: string, report: Report): void {
   ).toHaveLength(0)
 }
 
+/** Whether git-integration's project view has finished loading. */
+function projectViewLoaded(): Promise<boolean> {
+  return handle.app.evaluate(({ webContents }) =>
+    webContents
+      .getAllWebContents()
+      .some(
+        (wc) =>
+          !wc.isDestroyed() &&
+          wc.getURL().includes('git-integration') &&
+          wc.getURL().includes('view=project') &&
+          !wc.isLoading()
+      )
+  )
+}
+
 test('the git project view renders, and everything on it is styled', async () => {
   await handle.page
     .locator('.tab-bar--primary .tab-bar__tab')
@@ -143,21 +157,14 @@ test('the git project view renders, and everything on it is styled', async () =>
     timeout: 15000,
   })
   await expect
-    .poll(
-      () =>
-        handle.app.evaluate(({ webContents }) =>
-          webContents
-            .getAllWebContents()
-            .some(
-              (wc) =>
-                !wc.isDestroyed() &&
-                wc.getURL().includes('git-integration') &&
-                wc.getURL().includes('view=project') &&
-                !wc.isLoading()
-            )
-        ),
-      { timeout: 20000, message: 'git-integration project view never finished loading' }
-    )
+    .poll(projectViewLoaded, {
+      timeout: 20000,
+      message: 'git-integration project view never finished loading',
+    })
     .toBe(true)
+  // The view is its own chunk (React.lazy), so it renders after the load event.
+  await expect
+    .poll(async () => (await inGit('project', PROBE)).bodyLength, { timeout: 10000 })
+    .toBeGreaterThan(20)
   assertClean('project', await inGit('project', PROBE))
 })

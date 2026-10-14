@@ -8,13 +8,14 @@
  * every transition is testable without a server.
  */
 
-export type FailureReason =
+type FailureReason =
   | 'port-in-use'
+  | 'password-required'
   | 'credential-rejected'
   | 'tunnel-dropped'
   | 'tunnel-unreachable'
 
-export interface RemoteFailure {
+interface RemoteFailure {
   reason: FailureReason
   /** What happened, in the reader's language. */
   message: string
@@ -40,7 +41,7 @@ export type RemoteStatus =
   | { kind: 'failed'; port: number; failure: RemoteFailure }
 
 /** The shape `remote:status` arrives in. Every field is optional by history. */
-export interface StatusBroadcast {
+interface StatusBroadcast {
   enabled?: boolean
   port?: number
   lanUrl?: string | null
@@ -66,53 +67,77 @@ export function reduceStatus(previous: RemoteStatus, message: StatusBroadcast): 
   const port = message.port ?? portOf(previous) ?? DEFAULT_PORT
 
   // A hard error arrives on its own, without the enabled/url fields.
-  if (message.error === 'PORT_IN_USE') {
-    return {
-      kind: 'failed',
-      port,
-      failure: {
-        reason: 'port-in-use',
-        message: `Port ${port} is already in use.`,
-        resolution:
-          'Another program is listening on it. Pick a different port, or quit that program.',
-      },
-    }
-  }
+  const hardError = hardErrorStatus(message, port)
+  if (hardError) return hardError
 
   if (message.enabled === false) return OFF
 
   if (message.enabled !== true) return previous
 
-  const localUrl = message.lanUrl ?? localUrlOf(previous) ?? ''
-  const publicUrl = message.publicUrl ?? null
+  if (stillDropped(previous, message)) return previous
 
-  if (message.ngrokError) {
-    // Missing credential is not a failure: the local address still works, and
-    // saying "failed" would be wrong about what the user can currently do.
-    if (isMissingCredential(message.ngrokError)) {
-      return { kind: 'on', port, localUrl, publicUrl: null, reach: 'local-only' }
-    }
-    return {
-      kind: 'failed',
-      port,
-      failure: {
-        reason: 'tunnel-unreachable',
-        message: 'The public address could not be created.',
-        resolution: message.ngrokError,
-      },
-    }
+  return enabledStatus(previous, message, port)
+}
+
+/** A dropped tunnel is followed at once by a broadcast of the local address alone, which says
+ *  nothing new, so the drop stands until a public address or a new tunnel error arrives. */
+function stillDropped(previous: RemoteStatus, message: StatusBroadcast): boolean {
+  if (previous.kind !== 'failed' || previous.failure.reason !== 'tunnel-dropped') return false
+  return !message.publicUrl && !message.ngrokError
+}
+
+function hardErrorStatus(message: StatusBroadcast, port: number): RemoteStatus | null {
+  if (message.error === 'PORT_IN_USE') {
+    return failedStatus(port, {
+      reason: 'port-in-use',
+      message: `Port ${port} is already in use.`,
+      resolution:
+        'Another program is listening on it. Pick a different port, or quit that program.',
+    })
   }
+  if (message.error === 'PASSWORD_REQUIRED') {
+    return failedStatus(port, {
+      reason: 'password-required',
+      message: message.message ?? 'Remote Control needs a password before it can start.',
+      resolution: 'Open Settings below and set a password, or generate one.',
+    })
+  }
+  return null
+}
 
+/** The status of an enabled server, from the addresses and tunnel error it reports. */
+function enabledStatus(
+  previous: RemoteStatus,
+  message: StatusBroadcast,
+  port: number
+): RemoteStatus {
+  const localUrl = message.lanUrl ?? localUrlOf(previous) ?? ''
+  if (message.ngrokError) return tunnelErrorStatus(message.ngrokError, port, localUrl)
+  return listeningStatus(port, localUrl, message.publicUrl ?? null)
+}
+
+function listeningStatus(port: number, localUrl: string, publicUrl: string | null): RemoteStatus {
   // Enabled, no address yet: still coming up.
   if (!localUrl && !publicUrl) return { kind: 'starting', port }
+  const reach = publicUrl ? 'public' : 'local-only'
+  return { kind: 'on', port, localUrl, publicUrl, reach }
+}
 
-  return {
-    kind: 'on',
-    port,
-    localUrl,
-    publicUrl,
-    reach: publicUrl ? 'public' : 'local-only',
+function tunnelErrorStatus(ngrokError: string, port: number, localUrl: string): RemoteStatus {
+  // Missing credential is not a failure: the local address still works, and
+  // saying "failed" would be wrong about what the user can currently do.
+  if (isMissingCredential(ngrokError)) {
+    return { kind: 'on', port, localUrl, publicUrl: null, reach: 'local-only' }
   }
+  return failedStatus(port, {
+    reason: 'tunnel-unreachable',
+    message: 'The public address could not be created.',
+    resolution: ngrokError,
+  })
+}
+
+function failedStatus(port: number, failure: RemoteFailure): RemoteStatus {
+  return { kind: 'failed', port, failure }
 }
 
 /** The tunnel dropped while devices were connected. */
@@ -124,15 +149,9 @@ export function tunnelDropped(previous: RemoteStatus): RemoteStatus {
     failure: {
       reason: 'tunnel-dropped',
       message: 'The public address stopped working.',
-      resolution:
-        'Anyone connected through it has been disconnected. Turn it off and on to get a new one.',
+      resolution: 'Anyone connected through it has been disconnected. Reconnect to get a new one.',
     },
   }
-}
-
-/** True when this status can serve a browser at all. */
-export function isReachable(status: RemoteStatus): boolean {
-  return status.kind === 'on'
 }
 
 function portOf(status: RemoteStatus): number | null {

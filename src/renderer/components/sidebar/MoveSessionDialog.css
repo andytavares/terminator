@@ -1,6 +1,4 @@
 .move-session-dialog {
-  min-width: 320px;
-  max-width: 420px;
   max-height: 70vh;
   display: flex;
   flex-direction: column;
@@ -25,7 +23,7 @@
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: var(--tm-text-muted);
   padding: 4px 6px 2px;
 }
 
@@ -44,16 +42,16 @@
   background: none;
   border: none;
   padding: 7px 10px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--tm-radius-sm);
   text-align: left;
   font-size: 12px;
-  color: var(--text-primary);
+  color: var(--tm-text-primary);
   transition: background 0.1s;
   cursor: pointer;
 }
 
 .move-session-dialog__project:hover:not(:disabled) {
-  background: var(--bg-card-hover);
+  background: var(--tm-bg-card-hover);
 }
 
 .move-session-dialog__project--current {
@@ -63,7 +61,7 @@
 
 .move-session-dialog__current-label {
   font-size: 10px;
-  color: var(--text-muted);
+  color: var(--tm-text-muted);
   font-style: italic;
 }
 
@@ -73,10 +71,10 @@
   background: none;
   border: none;
   padding: 6px 10px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--tm-radius-sm);
   text-align: left;
   font-size: 11px;
-  color: var(--text-muted);
+  color: var(--tm-text-muted);
   transition:
     background 0.1s,
     color 0.1s;
@@ -84,22 +82,22 @@
 }
 
 .move-session-dialog__new-btn:hover {
-  background: var(--bg-elevated);
-  color: var(--text-secondary);
+  background: var(--tm-bg-elevated);
+  color: var(--tm-text-secondary);
 }
 
 .move-session-dialog__footer {
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--tm-border);
   padding-top: 10px;
   margin-top: 8px;
 }
 
 .move-session-dialog__new-workspace-btn {
-  color: var(--accent, #7c6af7);
+  color: var(--tm-accent, #7c6af7);
 }
 
 .move-session-dialog__new-workspace-btn:hover {
-  color: var(--accent, #7c6af7);
+  color: var(--tm-accent, #7c6af7);
 }
 
 .move-session-dialog__new-project {

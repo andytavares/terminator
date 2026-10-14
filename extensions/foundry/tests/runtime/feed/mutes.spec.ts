@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { createMuteStore } from '../../../src/runtime/feed/mutes.js'
+import { makeTempDir } from '../../../../../tests/support/temp-dir'
 
 // Which runs are allowed to interrupt you. A mute you have to set again after
 // every restart is one you stop bothering with, and then notifications get
@@ -12,13 +12,18 @@ let dir: string
 let file: string
 
 beforeEach(() => {
-  dir = mkdtempSync(join(tmpdir(), 'mutes-'))
+  dir = makeTempDir('mutes-')
   file = join(dir, 'mutes.json')
 })
 
 afterEach(() => rmSync(dir, { recursive: true, force: true, maxRetries: 5 }))
 
 describe('muting', () => {
+  describe('muting', mutingTests)
+  describe('unmuting', unmutingTests)
+})
+
+function mutingTests() {
   it('starts with nothing muted', () => {
     expect(createMuteStore(file).list()).toEqual([])
   })
@@ -41,7 +46,9 @@ describe('muting', () => {
     store.add({ author: 'console' })
     expect(store.list()).toHaveLength(2)
   })
+}
 
+function unmutingTests() {
   it('unmutes one without touching the others', () => {
     const store = createMuteStore(file)
     store.add({ sessionId: 'session-1' })
@@ -56,7 +63,7 @@ describe('muting', () => {
     store.clear()
     expect(store.list()).toEqual([])
   })
-})
+}
 
 describe('a file that is not what was written', () => {
   it('reads nothing rather than throwing on nonsense', () => {

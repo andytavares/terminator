@@ -1,6 +1,6 @@
 import React from 'react'
 import { GitPullRequest, Ticket } from 'lucide-react'
-import { ExternalLink } from './Markdown.js'
+import { ExternalLink } from './ExternalLink.js'
 
 // Where an order's pull requests and its ticket are, as links that open outside
 // the application. One component because the gate card, the order list and the

@@ -2,6 +2,7 @@ import { coverageMatrix } from './coverage-matrix.js'
 import { compileOrder } from './compile.js'
 import { isBlocking } from './schema.js'
 import type { Budgets, OrderStatus, WorkOrder } from './schema.js'
+import { findingHeadline } from './finding-headline.js'
 
 // The order, rendered for a person.
 //
@@ -29,22 +30,6 @@ function verifyLine(order: WorkOrder, criterionId: string): string {
     case 'screenshot':
       return `screenshot · ${v.target}`
   }
-}
-
-/**
- * The claim in a finding's text, without its evidence.
- *
- * Mirrors `findingParts` in `Forge.tsx` exactly: a first line if the text has
- * one, otherwise its first sentence. Duplicated rather than imported because
- * that module is a React component; this one runs wherever an order is
- * rendered, including outside the application.
- */
-function findingHeadline(text: string): string {
-  const trimmed = text.trim()
-  const newline = trimmed.indexOf('\n')
-  if (newline !== -1) return trimmed.slice(0, newline).trim()
-  const sentence = /^(.+?[.!?])\s+(?=[A-Z`'"(])/s.exec(trimmed)
-  return sentence === null ? trimmed : sentence[1]
 }
 
 /** The two enforced budgets, e.g. "3 agents · 45 minutes". */
@@ -86,114 +71,120 @@ function coverageTable(order: WorkOrder): string[] {
  * one that survives all three.
  */
 export function renderOrder(order: WorkOrder): string {
-  const result = compileOrder(order)
-  const lines: string[] = []
+  return [
+    ...headLines(order),
+    ...intentLines(order),
+    ...doneMeansLines(order),
+    ...planLines(order),
+    '## Coverage',
+    '',
+    ...coverageTable(order),
+    '',
+    ...listedSection('Assumptions', liveAssumptions(order)),
+    ...listedSection('Open questions', openQuestionTexts(order)),
+    ...redTeamLines(order),
+    '## Budgets',
+    '',
+    `${budgetsInWords(order.budgets)} · tokens ${order.budgets.tokens ?? 'uncapped'}`,
+    '',
+    ...convergenceLines(order),
+  ].join('\n')
+}
 
-  lines.push(`# ${order.title}`, '')
-  lines.push(
-    `**${order.id}** · ${order.status} · risk ${order.risk.grade} · recipe ${order.recipe ?? 'not chosen'}`
-  )
-  if (order.source.kind === 'tracker' && order.source.key !== null) {
-    lines.push(`Source: ${order.source.tracker} ${order.source.key}`)
-  }
-  lines.push('')
+/** A heading over one bullet per item, or nothing at all when there are none. */
+function listedSection(heading: string, items: readonly string[]): string[] {
+  if (items.length === 0) return []
+  return [`## ${heading}`, '', ...items.map((item) => `- ${item}`), '']
+}
 
-  lines.push('## Intent', '')
-  lines.push(`**Problem.** ${order.intent.problem || '_not stated_'}`, '')
-  lines.push(`**Outcome.** ${order.intent.outcome || '_not stated_'}`, '')
-  if (order.intent.nonGoals.length > 0) {
-    lines.push('**Deliberately not doing:**', '')
-    for (const goal of order.intent.nonGoals) lines.push(`- ${goal}`)
-    lines.push('')
-  }
+function headLines(order: WorkOrder): string[] {
+  const source =
+    order.source.kind === 'tracker' && order.source.key !== null
+      ? [`Source: ${order.source.tracker} ${order.source.key}`]
+      : []
+  return [
+    `# ${order.title}`,
+    '',
+    `**${order.id}** · ${order.status} · risk ${order.risk.grade} · recipe ${order.recipe ?? 'not chosen'}`,
+    ...source,
+    '',
+  ]
+}
 
-  lines.push('## Done means', '')
-  if (order.acceptance.length === 0) {
-    lines.push('_No criteria yet._', '')
-  } else {
-    for (const criterion of order.acceptance) {
-      lines.push(`- **${criterion.id}** (${criterion.priority}) ${criterion.statement}`)
-      lines.push(`  - ${verifyLine(order, criterion.id)}`)
-    }
-    lines.push('')
-  }
+function intentLines(order: WorkOrder): string[] {
+  const nonGoals = order.intent.nonGoals
+  const deliberately =
+    nonGoals.length > 0
+      ? ['**Deliberately not doing:**', '', ...nonGoals.map((goal) => `- ${goal}`), '']
+      : []
+  return [
+    '## Intent',
+    '',
+    `**Problem.** ${order.intent.problem || '_not stated_'}`,
+    '',
+    `**Outcome.** ${order.intent.outcome || '_not stated_'}`,
+    '',
+    ...deliberately,
+  ]
+}
 
-  lines.push('## Plan', '')
-  if (order.plan.units.length === 0) {
-    lines.push('_No units yet._', '')
-  } else {
-    for (const unit of order.plan.units) {
-      const waits = unit.dependsOn.length > 0 ? ` · after ${unit.dependsOn.join(', ')}` : ''
-      lines.push(
-        `- **${unit.id}** ${unit.title} — ${unit.role}, lane ${unit.lane}${waits} · satisfies ${unit.satisfies.join(', ') || '_nothing_'}`
-      )
-      if (unit.touches.length > 0) lines.push(`  - touches: ${unit.touches.join(', ')}`)
-    }
-    lines.push('')
-  }
+function doneMeansLines(order: WorkOrder): string[] {
+  if (order.acceptance.length === 0) return ['## Done means', '', '_No criteria yet._', '']
+  const criteria = order.acceptance.flatMap((criterion) => [
+    `- **${criterion.id}** (${criterion.priority}) ${criterion.statement}`,
+    `  - ${verifyLine(order, criterion.id)}`,
+  ])
+  return ['## Done means', '', ...criteria, '']
+}
 
-  lines.push('## Coverage', '')
-  lines.push(...coverageTable(order), '')
+function planLines(order: WorkOrder): string[] {
+  if (order.plan.units.length === 0) return ['## Plan', '', '_No units yet._', '']
+  return ['## Plan', '', ...order.plan.units.flatMap(unitLines), '']
+}
 
-  const live = order.assumptions.filter((a) => !a.struck)
-  if (live.length > 0) {
-    lines.push('## Assumptions', '')
-    for (const assumption of live) lines.push(`- ${assumption.text}`)
-    lines.push('')
-  }
+function unitLines(unit: WorkOrder['plan']['units'][number]): string[] {
+  const waits = unit.dependsOn.length > 0 ? ` · after ${unit.dependsOn.join(', ')}` : ''
+  const touches = unit.touches.length > 0 ? [`  - touches: ${unit.touches.join(', ')}`] : []
+  return [
+    `- **${unit.id}** ${unit.title} — ${unit.role}, lane ${unit.lane}${waits} · satisfies ${unit.satisfies.join(', ') || '_nothing_'}`,
+    ...touches,
+  ]
+}
 
-  const open = order.openQuestions.filter((q) => q.answer === null)
-  if (open.length > 0) {
-    lines.push('## Open questions', '')
-    for (const question of open) lines.push(`- ${question.text}`)
-    lines.push('')
-  }
+function liveAssumptions(order: WorkOrder): string[] {
+  return order.assumptions.filter((a) => !a.struck).map((a) => a.text)
+}
 
-  const blocking = order.redTeam.filter((f) => f.status === 'open' && isBlocking(f))
-  if (blocking.length > 0) {
-    lines.push('## Red team — blocking', '')
-    for (const finding of blocking) {
-      lines.push(
-        `- **${finding.id}** (${finding.category}, ${finding.severity}) ${findingHeadline(finding.text)}`
-      )
-    }
-    lines.push('')
-  }
+function openQuestionTexts(order: WorkOrder): string[] {
+  return order.openQuestions.filter((q) => q.answer === null).map((q) => q.text)
+}
 
-  const notes = order.redTeam.filter((f) => f.status === 'open' && !isBlocking(f))
-  if (notes.length > 0) {
-    lines.push('## Red team — notes', '')
-    for (const finding of notes) {
-      lines.push(
-        `- **${finding.id}** (${finding.category}, ${finding.severity}) ${findingHeadline(finding.text)}`
-      )
-    }
-    lines.push('')
-  }
+type Finding = WorkOrder['redTeam'][number]
 
+/** Open findings, blocking then not, and then the ones already settled. */
+function redTeamLines(order: WorkOrder): string[] {
+  const open = order.redTeam.filter((f) => f.status === 'open')
   const settled = order.redTeam.filter((f) => f.status !== 'open')
-  if (settled.length > 0) {
-    lines.push('## Red team — settled', '')
-    for (const finding of settled) {
-      lines.push(
-        `- **${finding.id}** (${finding.status}: ${finding.reason || 'no reason given'}) ${findingHeadline(finding.text)}`
-      )
-    }
-    lines.push('')
-  }
+  return [
+    ...listedSection('Red team — blocking', open.filter((f) => isBlocking(f)).map(openFinding)),
+    ...listedSection('Red team — notes', open.filter((f) => !isBlocking(f)).map(openFinding)),
+    ...listedSection('Red team — settled', settled.map(settledFinding)),
+  ]
+}
 
-  lines.push('## Budgets', '')
-  lines.push(`${budgetsInWords(order.budgets)} · tokens ${order.budgets.tokens ?? 'uncapped'}`, '')
+function openFinding(finding: Finding): string {
+  return `**${finding.id}** (${finding.category}, ${finding.severity}) ${findingHeadline(finding.text)}`
+}
 
-  lines.push('## Convergence', '')
+function settledFinding(finding: Finding): string {
+  return `**${finding.id}** (${finding.status}: ${finding.reason || 'no reason given'}) ${findingHeadline(finding.text)}`
+}
+
+function convergenceLines(order: WorkOrder): string[] {
+  const result = compileOrder(order)
   if (result.ok) {
-    lines.push('All checks pass. This order can be handed off.', '')
-  } else {
-    for (const failure of result.failures) {
-      lines.push(`- **${failure.check}** — ${failure.detail}`)
-    }
-    lines.push('')
+    return ['## Convergence', '', 'All checks pass. This order can be handed off.', '']
   }
-
-  return lines.join('\n')
+  const failures = result.failures.map((failure) => `- **${failure.check}** — ${failure.detail}`)
+  return ['## Convergence', '', ...failures, '']
 }

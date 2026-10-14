@@ -2,8 +2,9 @@
 
 const { build } = require('esbuild')
 const { resolve } = require('path')
-const { readdirSync, existsSync } = require('fs')
+const { readdirSync, existsSync, readFileSync } = require('fs')
 const { spawn } = require('child_process')
+const { EXTENSION_EXTERNALS } = require('./extension-externals.cjs')
 
 const root = resolve(__dirname, '..')
 const extensionsDir = resolve(root, 'extensions')
@@ -16,6 +17,21 @@ function run(command, args, cwd) {
       code === 0 ? done() : fail(new Error(`${command} ${args.join(' ')} exited ${code} in ${cwd}`))
     )
   })
+}
+
+// esbuild has no `?raw` import; the design system reads its stylesheets that way.
+const rawTextImports = {
+  name: 'raw-text-imports',
+  setup(build) {
+    build.onResolve({ filter: /\?raw$/ }, (args) => ({
+      path: resolve(args.resolveDir, args.path.slice(0, -'?raw'.length)),
+      namespace: 'raw-text',
+    }))
+    build.onLoad({ filter: /.*/, namespace: 'raw-text' }, (args) => ({
+      contents: readFileSync(args.path, 'utf8'),
+      loader: 'text',
+    }))
+  },
 }
 
 async function buildExtension(name) {
@@ -35,27 +51,8 @@ async function buildExtension(name) {
     target: 'node20',
     format: 'cjs',
     outfile,
-    external: [
-      'electron',
-      'electron-store',
-      'zod',
-      'node-pty',
-      'chokidar',
-      'fsevents',
-      'gray-matter',
-      'node-ical',
-      '@modelcontextprotocol/sdk',
-      // Remote Control's server. Root dependencies, resolved from node_modules
-      // at runtime; bundled, they made a 2.1 MB main-process file.
-      'fastify',
-      '@fastify/static',
-      '@fastify/websocket',
-      'bcryptjs',
-      // Git Integration's parser. Loads its .wasm files relative to its own
-      // module path, which a bundle would move.
-      'web-tree-sitter',
-      '@vscode/tree-sitter-wasm',
-    ],
+    plugins: [rawTextImports],
+    external: EXTENSION_EXTERNALS,
     logLevel: 'info',
   })
 

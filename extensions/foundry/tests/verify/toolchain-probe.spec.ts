@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import * as fs from 'node:fs'
-import * as os from 'node:os'
 import * as path from 'node:path'
 import { probeToolchain, installCommandFor } from '../../src/verify/toolchain-probe.js'
 import { CHECK_NAMES } from '../../src/verify/check-names.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 // The probe is what makes "works in any repository, with nothing installed"
 // true rather than a claim. It reads manifests and never executes them: FR-070
@@ -22,7 +22,7 @@ function write(rel: string, body: string): void {
 }
 
 beforeEach(() => {
-  repo = fs.mkdtempSync(path.join(os.tmpdir(), 'foundry-probe-'))
+  repo = makeTempDir('foundry-probe-')
 })
 
 afterEach(() => {
@@ -30,6 +30,18 @@ afterEach(() => {
 })
 
 describe('probeToolchain', () => {
+  describe('empty repositories', emptyRepositoriesTests)
+  describe('package.json', packageJsonTests)
+  describe('coverage and configs', coverageAndConfigsTests)
+  describe('other languages', otherLanguagesTests)
+  describe('tool configs', toolConfigsTests)
+  describe('go', goTests)
+  describe('makefiles and CI', makefilesAndCiTests)
+  describe('precedence and e2e', precedenceAndE2eTests)
+  describe('nothing executed or written', nothingExecutedOrWrittenTests)
+})
+
+function emptyRepositoriesTests() {
   it('reports every check as null in a repository with nothing in it', () => {
     const t = probeToolchain(repo)
     for (const name of CHECK_NAMES) expect(t[name]).toBeNull()
@@ -39,7 +51,9 @@ describe('probeToolchain', () => {
     const t = probeToolchain(repo)
     expect(Object.values(t).every((v) => v === null)).toBe(true)
   })
+}
 
+function packageJsonTests() {
   it('reads package.json scripts', () => {
     write(
       'package.json',
@@ -57,7 +71,9 @@ describe('probeToolchain', () => {
     expect(() => probeToolchain(repo)).not.toThrow()
     expect(probeToolchain(repo).test).toBeNull()
   })
+}
 
+function coverageAndConfigsTests() {
   it('recognises a coverage script separately from the test script', () => {
     write(
       'package.json',
@@ -74,7 +90,9 @@ describe('probeToolchain', () => {
     write('vitest.config.ts', 'export default {}')
     expect(probeToolchain(repo).test).toEqual({ command: 'npx vitest run', source: 'config' })
   })
+}
 
+function otherLanguagesTests() {
   it('recognises a python project with no package.json at all', () => {
     write('pyproject.toml', '[tool.pytest.ini_options]\ntestpaths = ["tests"]\n')
     expect(probeToolchain(repo).test).toEqual({ command: 'pytest', source: 'config' })
@@ -86,7 +104,61 @@ describe('probeToolchain', () => {
     expect(t.test).toEqual({ command: 'cargo test', source: 'config' })
     expect(t.build).toEqual({ command: 'cargo build', source: 'config' })
   })
+}
 
+function toolConfigsTests() {
+  it('falls back to jest, eslint, prettier and playwright by their configs', () => {
+    write('jest.config.js', 'module.exports = {}')
+    write('eslint.config.mjs', 'export default []')
+    write('.prettierrc', '{}')
+    write('playwright.config.ts', 'export default {}')
+    const t = probeToolchain(repo)
+    expect(t.test).toEqual({ command: 'npx jest', source: 'config' })
+    expect(t.lint).toEqual({ command: 'npx eslint .', source: 'config' })
+    expect(t.format).toEqual({ command: 'npx prettier --check .', source: 'config' })
+    expect(t.e2e).toEqual({ command: 'npx playwright test', source: 'config' })
+  })
+
+  it('prefers vitest to jest when a repository has both configs', () => {
+    write('jest.config.js', 'module.exports = {}')
+    write('vitest.config.ts', 'export default {}')
+    expect(probeToolchain(repo).test?.command).toBe('npx vitest run')
+  })
+
+  it('does not read a pyproject that names no pytest as a test command', () => {
+    write('pyproject.toml', '[project]\nname = "x"\n')
+    expect(probeToolchain(repo).test).toBeNull()
+  })
+
+  it('never infers a coverage command from a tool being present', () => {
+    write('vitest.config.ts', 'export default {}')
+    write('Cargo.toml', '[package]\nname = "x"\n')
+    expect(probeToolchain(repo).coverage).toBeNull()
+  })
+}
+
+function goTests() {
+  it('recognises a go module, and nothing for the checks go has no stock tool for', () => {
+    write('go.mod', 'module example.com/x\n')
+    const t = probeToolchain(repo)
+    expect(t.test).toEqual({ command: 'go test ./...', source: 'config' })
+    expect(t.build).toEqual({ command: 'go build ./...', source: 'config' })
+    expect(t.lint).toBeNull()
+    expect(t.format).toBeNull()
+  })
+
+  it('takes cargo over go in a repository with both manifests', () => {
+    write('go.mod', 'module example.com/x\n')
+    write('Cargo.toml', '[package]\nname = "x"\n')
+    const t = probeToolchain(repo)
+    expect(t.test?.command).toBe('cargo test')
+    expect(t.build?.command).toBe('cargo build')
+    expect(t.lint?.command).toBe('cargo clippy')
+    expect(t.format?.command).toBe('cargo fmt --check')
+  })
+}
+
+function makefilesAndCiTests() {
   it('reads a Makefile target when nothing else supplies the check', () => {
     write('Makefile', 'test:\n\tgo test ./...\n\nlint:\n\tgolangci-lint run\n')
     const t = probeToolchain(repo)
@@ -98,7 +170,9 @@ describe('probeToolchain', () => {
     write('.github/workflows/ci.yml', 'jobs:\n  a:\n    steps:\n      - run: bun test\n')
     expect(probeToolchain(repo).test).toEqual({ command: 'bun test', source: 'ci' })
   })
+}
 
+function precedenceAndE2eTests() {
   it('prefers package.json over a tool config over CI', () => {
     write('package.json', JSON.stringify({ scripts: { test: 'vitest run' } }))
     write('vitest.config.ts', 'export default {}')
@@ -115,7 +189,9 @@ describe('probeToolchain', () => {
     expect(t.test?.command).toBe('npm run test')
     expect(t.e2e).toEqual({ command: 'npm run test:e2e', source: 'package.json' })
   })
+}
 
+function nothingExecutedOrWrittenTests() {
   it('does not execute anything it finds', () => {
     // A script that would leave a trace if it were ever run.
     write('package.json', JSON.stringify({ scripts: { test: `touch ${repo}/EXECUTED` } }))
@@ -129,7 +205,7 @@ describe('probeToolchain', () => {
     probeToolchain(repo)
     expect(fs.readdirSync(repo).sort()).toEqual(before)
   })
-})
+}
 
 // Read from the lockfile, like every other command here: a reinstall that
 // ignores the lockfile installs something other than what the project pinned.

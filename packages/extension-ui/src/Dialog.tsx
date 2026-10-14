@@ -1,8 +1,7 @@
-import React, { createContext, useContext, useEffect, useId, useRef } from 'react'
+import React, { useId } from 'react'
 import { X } from 'lucide-react'
-import { captureFocus, trapTab } from './focus-trap'
-import { nestedLayerValue } from './layers'
-import { createModalDepthRegistry } from './modal-depth'
+import { Button } from './Button'
+import { ModalShell } from './ModalShell'
 import './extension-ui.css'
 
 export interface DialogAction {
@@ -20,6 +19,9 @@ export interface DialogAction {
   disabled?: boolean
   /** Display-only hint, e.g. "⌘↵". */
   shortcut?: string
+  /** The dialog's form submission: Enter in a field runs it, as in any form. At most one action
+   * submits; the content sits in a `<form>` when one does. */
+  submit?: boolean
 }
 
 export interface DialogProps {
@@ -45,151 +47,92 @@ export interface DialogProps {
   onDismiss: () => void
 }
 
-/**
- * The resolved stacking value of the surface a component sits inside, so a
- * dialog or picker opened from within one renders above it rather than behind.
- */
-const LayerContext = createContext<number | null>(null)
-
-export function useContainingLayer(): number | null {
-  return useContext(LayerContext)
+const PANEL_CLASS = {
+  default: 'tmui-dialog__panel',
+  wide: 'tmui-dialog__panel tmui-dialog__panel--wide',
 }
 
-/**
- * One dialog, for the whole product.
- *
- * Everything a caller would otherwise have written by hand — Escape, focus
- * trapping and restoration, `role`, `aria-modal`, a scrim, outside-click, and
- * registering the modal depth the exit gesture reads — happens here. Measured
- * before this existed: of 19 hand-written surfaces, 6 closed on Escape, 5 set a
- * dialog role, 3 set aria-modal, 7 managed focus and 4 dismissed on an outside
- * click. No two agreed.
- *
- * It renders inside the caller's own React tree (ADR 038), which is what keeps
- * the content it was opened from visible and dimmed behind the scrim rather
- * than hidden.
- */
-export function Dialog({
-  title,
-  children,
-  actions,
-  dismissible = true,
-  size = 'default',
-  onDismiss,
-}: DialogProps): JSX.Element {
-  const panelRef = useRef<HTMLDivElement>(null)
+/** One dialog for the whole product: the modal shell with a title, a body and one to three
+ * actions. It renders in the caller's own React tree (ADR 038), over the view it was opened from. */
+export function Dialog(props: DialogProps): JSX.Element {
+  const { dismissible = true, size = 'default', actions, onDismiss } = props
   const titleId = useId()
-  const parentLayer = useContainingLayer()
-  const zIndex = nestedLayerValue('modal', parentLayer ?? null)
-
-  // Read through a ref so the listeners below never need re-binding when the
-  // caller passes a fresh closure on every render.
-  const dismissRef = useRef(onDismiss)
-  dismissRef.current = onDismiss
-  const dismissibleRef = useRef(dismissible)
-  dismissibleRef.current = dismissible
-
-  useEffect(() => {
-    const registry = createModalDepthRegistry(window as unknown as Record<string, unknown>)
-    const release = registry.release()
-    const restoreFocus = panelRef.current ? captureFocus(panelRef.current) : () => {}
-
-    function onKeyDown(e: KeyboardEvent): void {
-      if (e.key !== 'Escape') return
-      // Only the innermost open surface answers Escape. Without this a nested
-      // picker and the dialog containing it would both close on one press.
-      if (!isInnermost(panelRef.current)) return
-      if (!dismissibleRef.current) return
-      e.stopPropagation()
-      dismissRef.current()
-    }
-
-    document.addEventListener('keydown', onKeyDown)
-    return () => {
-      document.removeEventListener('keydown', onKeyDown)
-      restoreFocus()
-      release()
-    }
-  }, [])
-
   return (
-    <LayerContext.Provider value={zIndex}>
-      <div
-        className="tmui-dialog__scrim"
-        style={{ zIndex }}
-        onClick={() => {
-          if (dismissibleRef.current) onDismiss()
-        }}
-      >
-        <div
-          ref={panelRef}
-          data-tmui-panel=""
-          className="tmui-dialog__panel"
-          data-size={size}
-          style={{ zIndex }}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby={titleId}
-          onClick={(e) => e.stopPropagation()}
-          onKeyDown={(e) => {
-            if (e.key === 'Tab' && panelRef.current && trapTab(panelRef.current, e.shiftKey)) {
-              e.preventDefault()
-            }
-          }}
-        >
-          <div className="tmui-dialog__head">
-            <h2 id={titleId} className="tmui-dialog__title">
-              {title}
-            </h2>
-            <button
-              type="button"
-              className="tmui-icon-button tmui-dialog__close"
-              data-tmui-close=""
-              aria-label="Close"
-              title="Close"
-              onClick={onDismiss}
-            >
-              <X aria-hidden="true" />
-            </button>
-          </div>
-
-          {children !== undefined && <div className="tmui-dialog__body">{children}</div>}
-
-          <div className="tmui-dialog__actions">
-            {actions.map((action) => (
-              <DialogActionButton key={action.label} action={action} />
-            ))}
-          </div>
-        </div>
-      </div>
-    </LayerContext.Provider>
+    <ModalShell
+      className={PANEL_CLASS[size]}
+      labelledBy={titleId}
+      dismissible={dismissible}
+      onDismiss={onDismiss}
+    >
+      <DialogForm submitting={actions.find((action) => action.submit === true)}>
+        <DialogContent {...props} titleId={titleId} />
+      </DialogForm>
+    </ModalShell>
   )
 }
+
+interface DialogFormProps {
+  submitting: DialogAction | undefined
+  children: React.ReactNode
+}
+
+/** A `<form>` when one action submits, so Enter in a field runs it; else the content as it is. */
+function DialogForm({ submitting, children }: DialogFormProps): JSX.Element {
+  if (!submitting) return <>{children}</>
+  return (
+    <form
+      className="tmui-dialog__form"
+      onSubmit={(e) => {
+        e.preventDefault()
+        if (submitting.disabled !== true) void submitting.onSelect()
+      }}
+    >
+      {children}
+    </form>
+  )
+}
+
+/** The close control comes last, so the dialog opens on its first field or, with none, on its
+ * first action: the safe one, never the close. */
+function DialogContent(props: DialogProps & { titleId: string }): JSX.Element {
+  const { children, onDismiss } = props
+  return (
+    <>
+      <h2 id={props.titleId} className="tmui-dialog__title">
+        {props.title}
+      </h2>
+      {children !== undefined && <div className="tmui-dialog__body">{children}</div>}
+      <div className="tmui-dialog__actions">
+        {props.actions.map((action) => (
+          <DialogActionButton key={action.label} action={action} />
+        ))}
+      </div>
+      <button
+        type="button"
+        className="tmui-icon-button tmui-dialog__close"
+        aria-label="Close"
+        title="Close"
+        onClick={onDismiss}
+      >
+        <X aria-hidden="true" />
+      </button>
+    </>
+  )
+}
+
+const TONE_VARIANT = { default: 'secondary', primary: 'primary', danger: 'danger' } as const
 
 export function DialogActionButton({ action }: { action: DialogAction }): JSX.Element {
   return (
-    <button
-      type="button"
-      className={`tmui-button tmui-button--${action.tone ?? 'default'}`}
+    <Button
+      variant={TONE_VARIANT[action.tone ?? 'default']}
       disabled={action.disabled === true}
-      onClick={() => void action.onSelect()}
+      type={action.submit === true ? 'submit' : 'button'}
+      // A submitting action runs through the form's submit event, once.
+      onClick={action.submit === true ? undefined : () => void action.onSelect()}
     >
       {action.label}
       {action.shortcut !== undefined && <kbd className="tmui-kbd">{action.shortcut}</kbd>}
-    </button>
+    </Button>
   )
-}
-
-/**
- * Whether this panel is the last one opened.
- *
- * Nested surfaces all listen on the document, so without this every one of them
- * would answer a single Escape and the whole stack would collapse at once.
- */
-function isInnermost(panel: HTMLElement | null): boolean {
-  if (!panel) return false
-  // Dialogs and popovers share one ordering: whichever surface opened last owns
-  // Escape, whatever kind it is.
-  const surfaces = Array.from(document.querySelectorAll('[data-tmui-panel],[data-tmui-surface]'))
-  return surfaces[surfaces.length - 1] === panel
 }

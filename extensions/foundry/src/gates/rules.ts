@@ -11,12 +11,9 @@ import type { BudgetBreach } from '../line/scheduler.js'
 export const GATE_RULES = [
   'risk.p0',
   'budget.exceeded',
-  'destructive',
   'ready-for-review',
   'verify.repeat-fail',
   'verify.base-fail',
-  'critical-path',
-  'new-dependency',
   'forge-defect',
   'unit.boundary',
   'run.interrupted',
@@ -36,13 +33,10 @@ export type GateRuleId = (typeof GATE_RULES)[number]
  */
 const RULE_IN_WORDS: Record<GateRuleId, string> = {
   'risk.p0': 'changes that turn out to be riskier than planned',
-  'budget.exceeded': 'a run going past its time, files or agent budget',
-  destructive: 'anything that destroys work rather than changing it',
+  'budget.exceeded': 'a run going past its time or agent budget',
   'ready-for-review': 'whether a draft is ready for review',
   'verify.repeat-fail': 'work that keeps failing its checks',
   'verify.base-fail': 'a check that already fails on the base branch',
-  'critical-path': 'edits to a path you marked critical',
-  'new-dependency': 'a new third-party dependency',
   'forge-defect': 'an order that contradicts itself',
   'unit.boundary': 'each unit of work as it finishes',
   'run.interrupted': 'a run whose agents are gone, so nothing is moving it',
@@ -63,7 +57,7 @@ export interface GateOption {
   readonly consequence: string
 }
 
-export interface GateDecision {
+interface GateDecision {
   readonly option: string
   readonly by: 'operator' | 'default'
   readonly note: string
@@ -123,14 +117,6 @@ const RULE_SHAPE: Record<GateRuleId, { options: GateOption[]; defaultIfIgnored: 
     ],
     defaultIfIgnored: 'hold',
   },
-  destructive: {
-    options: [
-      { id: 'approve', label: 'Approve', consequence: 'The destructive step runs.' },
-      { id: 'skip', label: 'Skip it', consequence: 'The step is skipped and recorded as skipped.' },
-      HOLD,
-    ],
-    defaultIfIgnored: 'hold',
-  },
   'ready-for-review': {
     options: [
       { id: 'mark_ready', label: 'Mark ready', consequence: 'The draft becomes a review request.' },
@@ -170,26 +156,6 @@ const RULE_SHAPE: Record<GateRuleId, { options: GateOption[]; defaultIfIgnored: 
         label: 'Accept the debt',
         consequence: 'The criterion is accepted unmet, in writing.',
       },
-      HOLD,
-    ],
-    defaultIfIgnored: 'hold',
-  },
-  'critical-path': {
-    options: [
-      {
-        id: 'approve',
-        label: 'Approve',
-        consequence: 'The change proceeds into the critical path.',
-      },
-      { id: 'send_back', label: 'Send back', consequence: 'The unit is reopened.' },
-      HOLD,
-    ],
-    defaultIfIgnored: 'hold',
-  },
-  'new-dependency': {
-    options: [
-      { id: 'approve', label: 'Approve', consequence: 'The dependency stays.' },
-      { id: 'send_back', label: 'Send back', consequence: 'The unit is reopened without it.' },
       HOLD,
     ],
     defaultIfIgnored: 'hold',
@@ -272,6 +238,7 @@ export interface RaiseInput {
   readonly omitOptions?: readonly string[]
 }
 
+/** @internal */
 export class UnattributedGateError extends Error {
   readonly code = 'UNATTRIBUTED_GATE'
   constructor() {
@@ -292,23 +259,8 @@ export class UnattributedGateError extends Error {
 export function raiseGate(input: RaiseInput): Gate {
   if (input.why.trim() === '') throw new UnattributedGateError()
   const shape = RULE_SHAPE[input.rule]
-
-  // A default naming an option the gate does not offer would produce a
-  // decision nobody could have made. Caught here rather than at the moment a
-  // deadline passes, unattended, which is the worst possible time to find out.
-  if (!shape.options.some((option) => option.id === shape.defaultIfIgnored)) {
-    throw new Error(
-      `The "${input.rule}" rule defaults to "${shape.defaultIfIgnored}", which is not one of the options it offers.`
-    )
-  }
-
   const omitted = input.omitOptions ?? []
-  if (omitted.includes(shape.defaultIfIgnored)) {
-    throw new Error(
-      `The "${input.rule}" rule defaults to "${shape.defaultIfIgnored}", so that option cannot be omitted.`
-    )
-  }
-
+  assertDefaultOffered(input.rule, omitted)
   return {
     id: input.id,
     rule: input.rule,
@@ -328,6 +280,19 @@ export function raiseGate(input: RaiseInput): Gate {
   }
 }
 
+// A default the gate does not offer would be a decision nobody could make, found
+// unattended when a deadline passes; so it is caught when the gate is raised. Every
+// `RULE_SHAPE` offers its own default, so only a caller omitting it can lose it.
+function assertDefaultOffered(rule: GateRuleId, omitted: readonly string[]): void {
+  const shape = RULE_SHAPE[rule]
+  if (omitted.includes(shape.defaultIfIgnored)) {
+    throw new Error(
+      `The "${rule}" rule defaults to "${shape.defaultIfIgnored}", so that option cannot be omitted.`
+    )
+  }
+}
+
+/** @internal */
 export class AlreadyDecidedError extends Error {
   readonly code = 'GATE_ALREADY_DECIDED'
   constructor(id: string) {
@@ -336,11 +301,19 @@ export class AlreadyDecidedError extends Error {
   }
 }
 
-export function decide(gate: Gate, option: string, note: string, at: string): Gate {
+/** What the operator answered: the option they took, what they said, and when. */
+export interface Answer {
+  readonly option: string
+  readonly note: string
+  readonly at: string
+}
+
+export function decide(gate: Gate, answer: Answer): Gate {
   if (gate.decision !== null) throw new AlreadyDecidedError(gate.id)
-  if (!gate.options.some((o) => o.id === option)) {
-    throw new Error(`"${option}" is not one of the options on gate ${gate.id}.`)
+  if (!gate.options.some((o) => o.id === answer.option)) {
+    throw new Error(`"${answer.option}" is not one of the options on gate ${gate.id}.`)
   }
+  const { option, note, at } = answer
   return { ...gate, decision: { option, by: 'operator', note, at } }
 }
 

@@ -21,13 +21,15 @@ const block = {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  ;(globalThis as unknown as { electronAPI: unknown }).electronAPI = {
-    shell: { openPath: mockOpenPath },
-  }
+  Object.assign(globalThis, {
+    electronAPI: {
+      shell: { openPath: mockOpenPath },
+    },
+  })
 })
 
 afterEach(() => {
-  delete (globalThis as unknown as { electronAPI?: unknown }).electronAPI
+  Reflect.deleteProperty(globalThis, 'electronAPI')
 })
 
 function renderPopover(prPaths: string[] = ['src/utils.spec.ts']) {
@@ -64,7 +66,9 @@ describe('TestsPopover', () => {
     expect(screen.getByText('it("sorts")')).toBeTruthy()
     expect(screen.getByText('tests/e2e/batch.spec.ts:4')).toBeTruthy()
   })
+})
 
+describe('TestsPopover — opens a test that is part of the PR in the review, at its line', () => {
   it('opens a test that is part of the PR in the review, at its line', async () => {
     mockTestsForBlock.mockResolvedValue({
       symbols: ['sortByPriority'],
@@ -89,7 +93,9 @@ describe('TestsPopover', () => {
     expect(mockOpenPath).toHaveBeenCalledWith('/repo/tests/old.spec.ts')
     expect(onOpenInReview).not.toHaveBeenCalled()
   })
+})
 
+describe('TestsPopover — says which names it looked for when no test mentions them', () => {
   it('says which names it looked for when no test mentions them', async () => {
     mockTestsForBlock.mockResolvedValue({
       symbols: ['sortByPriority', 'filterItems'],

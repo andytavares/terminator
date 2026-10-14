@@ -1,0 +1,10 @@
+{
+  // The whole extension, with the Temporal types its backend uses (ADR 108):
+  // TypeScript declares them in the `esnext.temporal` library. The view may not
+  // use Temporal; tsconfig.view.json checks it without that library.
+  "extends": "../../tsconfig.extension.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "ESNext.Temporal", "DOM", "DOM.Iterable"]
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx"]
+}

@@ -1,42 +1,44 @@
+import type { IpcMainInvokeEvent, WebContents } from 'electron'
 import type { z } from 'zod'
+import { dispatchChannel, type ChannelSpec } from '@terminator/extension-sdk'
 import { handleChannel } from './channel-registrar.js'
 
 // Schema-driven registration for validated invoke channels. Each row declares
 // the channel, its payload schema, the response for invalid payloads, and how
 // to produce the success (and optionally failure) response. The
-// parse → dispatch → error-envelope skeleton lives here, once.
+// parse → dispatch → error-envelope skeleton is the SDK's dispatchChannel,
+// shared with extension channels.
 
-export interface InvokeSpec<S extends z.ZodType = z.ZodType> {
-  channel: string
-  schema: S
-  /** Response returned when the payload fails validation. */
-  invalid: unknown | ((error: z.ZodError) => unknown)
-  /** Produces the success response from the validated payload. */
-  run: (args: z.infer<S>) => Promise<unknown> | unknown
-  /** Response when run() throws. Omit to let the error propagate. */
-  onError?: (e: unknown) => unknown
+export { noPayload } from '@terminator/extension-sdk'
+
+/** A row whose answer depends on which view asked. The remote bridge has no view to name, so
+ * such a channel must not be one the bridge can reach. */
+export interface ViewChannelSpec extends Omit<ChannelSpec, 'run'> {
+  fromView: true
+  run: (args: never, sender: WebContents) => Promise<unknown> | unknown
 }
 
-/** Identity helper so each table row infers its own schema's payload type. */
-export function invokeSpec<S extends z.ZodType>(spec: InvokeSpec<S>): InvokeSpec {
-  return spec as unknown as InvokeSpec
+/** Declares a row that is also given the view that asked (`event.sender`). */
+export function defineViewChannel<S extends z.ZodType>(
+  spec: Omit<ChannelSpec<S>, 'run'> & {
+    run: (args: z.infer<S>, sender: WebContents) => Promise<unknown> | unknown
+  }
+): ViewChannelSpec {
+  return { ...spec, fromView: true, run: (args, sender) => spec.run(args, sender) }
 }
 
-export function registerInvokeTable(specs: ReadonlyArray<InvokeSpec>): void {
+type InvokeRow = ChannelSpec | ViewChannelSpec
+
+/** The row as the dispatcher runs it. The bridge's invoke has no event, and no view row. */
+function asDispatched(spec: InvokeRow, event: IpcMainInvokeEvent): ChannelSpec {
+  if (!('fromView' in spec)) return spec
+  return { ...spec, run: (args) => spec.run(args as never, event.sender) }
+}
+
+export function registerInvokeTable(specs: ReadonlyArray<InvokeRow>): void {
   for (const spec of specs) {
-    handleChannel(spec.channel, async (_event, payload) => {
-      const parsed = spec.schema.safeParse(payload)
-      if (!parsed.success) {
-        return typeof spec.invalid === 'function'
-          ? (spec.invalid as (error: z.ZodError) => unknown)(parsed.error)
-          : spec.invalid
-      }
-      try {
-        return await spec.run(parsed.data)
-      } catch (e) {
-        if (spec.onError) return spec.onError(e)
-        throw e
-      }
-    })
+    handleChannel(spec.channel, (event, payload) =>
+      dispatchChannel(asDispatched(spec, event), payload)
+    )
   }
 }

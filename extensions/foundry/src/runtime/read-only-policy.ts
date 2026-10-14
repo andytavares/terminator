@@ -162,6 +162,11 @@ const WRITING_FLAGS: ReadonlyArray<RegExp> = [
   /^-fprintf$/,
 ]
 
+const NO_COMMAND: PolicyDecision = {
+  allow: false,
+  reason: 'a Bash call with no command cannot be checked',
+}
+
 export function decideReadOnly(toolName: string, input: unknown): PolicyDecision {
   if (READ_ONLY_TOOLS.has(toolName)) {
     return { allow: true, reason: `${toolName} cannot change anything` }
@@ -174,14 +179,20 @@ export function decideReadOnly(toolName: string, input: unknown): PolicyDecision
     return { allow: false, reason: `${toolName} can change things; a review may only read` }
   }
 
+  const command = bashCommand(input)
+  return command === null ? NO_COMMAND : decideCommand(command)
+}
+
+/** A Bash call's command, or null when it has none worth reading. */
+function bashCommand(input: unknown): string | null {
   const command =
     typeof input === 'object' && input !== null
       ? (input as { command?: unknown }).command
       : undefined
-  if (typeof command !== 'string' || command.trim() === '') {
-    return { allow: false, reason: 'a Bash call with no command cannot be checked' }
-  }
+  return typeof command !== 'string' || command.trim() === '' ? null : command
+}
 
+function decideCommand(command: string): PolicyDecision {
   // Discarding output is not writing. `2>/dev/null` is the first thing any
   // reader reaches for, and refusing it cost four live runs before this: the
   // architect's opening command every time was `… 2>/dev/null`. Only
@@ -206,15 +217,12 @@ export function decideReadOnly(toolName: string, input: unknown): PolicyDecision
       reason: 'a review may not run a command this cannot read to the end',
     }
   }
+  return reading.segments.length === 0 ? NO_COMMAND : decideSegments(reading.segments)
+}
 
-  // Every segment, not the first one. Each has to read on its own, so the whole
-  // reads — and a joined command whose second half writes is refused by the
-  // half that writes rather than being missed because the first half was fine.
-  const segments = reading.segments
-  if (segments.length === 0) {
-    return { allow: false, reason: 'a Bash call with no command cannot be checked' }
-  }
-
+// Every segment must read on its own, so a joined command whose second half writes is
+// refused by that half, not passed because the first was fine.
+function decideSegments(segments: readonly string[]): PolicyDecision {
   let last: PolicyDecision | null = null
   for (const segment of segments) {
     const decision = decideSegment(segment)
@@ -315,12 +323,7 @@ const ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/
 
 /** One command, with no joiners left in it. */
 function decideSegment(segment: string): PolicyDecision {
-  const words = segment.split(/\s+/).filter((word, index, all) => {
-    if (!ASSIGNMENT.test(word)) return true
-    // Only a *leading* run of them: a `KEY=value` argument in the middle
-    // belongs to the command and is none of this function's business.
-    return all.slice(0, index).some((earlier) => !ASSIGNMENT.test(earlier))
-  })
+  const words = withoutLeadingAssignments(segment.split(/\s+/))
   if (words.length === 0) {
     return { allow: true, reason: 'setting a variable changes nothing' }
   }
@@ -335,23 +338,35 @@ function decideSegment(segment: string): PolicyDecision {
     }
   }
 
-  if (binary === 'git') {
-    const at = gitSubcommandAt(words)
-    const subcommand = words[at] ?? ''
-    if (subcommand === 'branch') {
-      return branchOnlyLists(words.slice(at + 1))
-        ? { allow: true, reason: 'git branch is only listing here' }
-        : {
-            allow: false,
-            reason: 'git branch writes a ref unless every argument is a listing flag',
-          }
-    }
-    return READ_ONLY_GIT.has(subcommand)
-      ? { allow: true, reason: `git ${subcommand} only reads` }
-      : { allow: false, reason: `git ${subcommand || '(none)'} is not a read-only git command` }
-  }
+  if (binary === 'git') return decideGit(words)
 
   return READ_ONLY_BINARIES.has(binary)
     ? { allow: true, reason: `${binary} only reads` }
     : { allow: false, reason: `${binary} is not on the review's read-only list` }
+}
+
+// The words without their leading `KEY=value` assignments; one mid-command belongs to
+// the command and is not this policy's business.
+function withoutLeadingAssignments(words: readonly string[]): string[] {
+  return words.filter((word, index, all) => {
+    if (!ASSIGNMENT.test(word)) return true
+    return all.slice(0, index).some((earlier) => !ASSIGNMENT.test(earlier))
+  })
+}
+
+/** A `git` command, by the subcommand after git's own options. */
+function decideGit(words: readonly string[]): PolicyDecision {
+  const at = gitSubcommandAt(words)
+  const subcommand = words[at] ?? ''
+  if (subcommand === 'branch') {
+    return branchOnlyLists(words.slice(at + 1))
+      ? { allow: true, reason: 'git branch is only listing here' }
+      : {
+          allow: false,
+          reason: 'git branch writes a ref unless every argument is a listing flag',
+        }
+  }
+  return READ_ONLY_GIT.has(subcommand)
+    ? { allow: true, reason: `git ${subcommand} only reads` }
+    : { allow: false, reason: `git ${subcommand || '(none)'} is not a read-only git command` }
 }

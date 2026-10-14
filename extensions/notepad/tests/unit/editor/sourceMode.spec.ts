@@ -4,11 +4,12 @@ import { markdown } from '@codemirror/lang-markdown'
 import { GFM } from '@lezer/markdown'
 import type { Decoration } from '@codemirror/view'
 import { buildDecorations, livePreviewPlugin } from '../../../src/editor/livePreview'
+import { parsedState } from '../support/parsed-state'
 
 const TABLE = ['| Name | Count |', '| --- | --- |', '| apples | 3 |'].join('\n')
 
 function makeState(doc: string, cursor: number, extensions: unknown[] = []) {
-  return EditorState.create({
+  return parsedState({
     doc,
     selection: { anchor: cursor },
     extensions: [markdown({ extensions: [GFM] }), ...(extensions as never[])],
@@ -53,7 +54,14 @@ describe('source mode', () => {
   })
 })
 
-describe('table stays editable', () => {
+describe('table stays editable', tableStaysEditableTests)
+
+function tableStaysEditableTests() {
+  describe('rendering', tableStaysEditableRenderingTests)
+  describe('editing', tableStaysEditableEditingTests)
+}
+
+function tableStaysEditableRenderingTests() {
   it('renders the table when the caret is outside it', () => {
     const doc = `${TABLE}\n\nafter`
     const state = makeState(doc, doc.length)
@@ -67,7 +75,9 @@ describe('table stays editable', () => {
     })
     expect(hasTable).toBe(true)
   })
+}
 
+function tableStaysEditableEditingTests() {
   it('yields to raw markdown as soon as the caret lands in a cell', () => {
     // This is the round trip a click performs: dispatch a selection inside the
     // table, and the rendering gives way so the text can be edited.
@@ -93,4 +103,4 @@ describe('table stays editable', () => {
     const countOutside = decorationCount(state, doc.length)
     expect(countOutside).toBeGreaterThan(countInside)
   })
-})
+}

@@ -1,4 +1,4 @@
-import { create } from 'zustand'
+import { create, type StoreApi } from 'zustand'
 import type {
   Issue,
   IssueLink,
@@ -14,13 +14,13 @@ import type {
 // whether a tracker is connected and which account proved it, and that is all
 // any surface here needs to render.
 
-export interface ConnectLinearInput {
+interface ConnectLinearInput {
   tracker: 'linear'
   apiKey: string
   email?: string | null
 }
 
-export interface ConnectJiraInput {
+interface ConnectJiraInput {
   tracker: 'jira'
   site: string
   email: string
@@ -62,12 +62,8 @@ interface IntegrationsState {
   loadIssue: (tracker: TrackerId, key: string) => Promise<void>
   /** undefined until read, null when it could not be. */
   issueByKey: (tracker: TrackerId, key: string) => Issue | null | undefined
-  linkIssue: (
-    projectId: string,
-    tracker: TrackerId,
-    key: string,
-    injectContext?: boolean
-  ) => Promise<boolean>
+  /** Links the project to the issue; false when the link could not be made. */
+  linkIssue: (projectId: string, issue: { tracker: TrackerId; key: string }) => Promise<boolean>
   unlinkIssue: (projectId: string) => Promise<void>
   listMine: (opts?: { limit?: number }) => Promise<IssueListResult>
   searchIssues: (term: string) => Promise<IssueListResult>
@@ -139,6 +135,160 @@ const issueKey = (tracker: TrackerId, key: string): string => `${tracker}:${key}
 /** Reads in flight, so ten surfaces showing one ticket make one request. */
 const pendingIssues = new Map<string, Promise<void>>()
 
+type SetIntegrations = StoreApi<IntegrationsState>['setState']
+type GetIntegrations = StoreApi<IntegrationsState>['getState']
+type Slice<Keys extends keyof IntegrationsState> = Pick<IntegrationsState, Keys>
+
+async function loadConnections(set: SetIntegrations): Promise<void> {
+  set({ loading: true })
+  const result = ok(await api().status?.({}))
+  set({ loading: false })
+  if (result === null) return
+  set({ connections: result.connections })
+}
+
+async function submitCredential(
+  set: SetIntegrations,
+  get: GetIntegrations,
+  input: ConnectLinearInput | ConnectJiraInput
+): Promise<boolean> {
+  const result = await api().connect?.(input)
+  if (result === undefined || isError(result)) {
+    // Shown against the field the operator just filled in, rather than as a
+    // toast they have to go and find.
+    const message = (result as ErrorEnvelope | undefined)?.message ?? 'Could not connect'
+    set((state) => ({ connectError: { ...state.connectError, [input.tracker]: message } }))
+    return false
+  }
+  set((state) => ({ connectError: { ...state.connectError, [input.tracker]: undefined } }))
+  await get().loadConnections()
+  return true
+}
+
+/** Reads an issue by key once; a read already in flight is shared. */
+function loadIssue(
+  set: SetIntegrations,
+  get: GetIntegrations,
+  ref: { tracker: TrackerId; key: string }
+) {
+  const id = issueKey(ref.tracker, ref.key)
+  if (get().issuesByKey.has(id)) return Promise.resolve()
+  const pending = pendingIssues.get(id)
+  if (pending !== undefined) return pending
+  const request = (async () => {
+    const result = ok(await api().getIssue?.(ref))
+    set((state) => ({ issuesByKey: new Map(state.issuesByKey).set(id, result?.issue ?? null) }))
+    pendingIssues.delete(id)
+  })()
+  pendingIssues.set(id, request)
+  return request
+}
+
+async function loadLink(set: SetIntegrations, projectId: string): Promise<void> {
+  const result = ok(await api().linkGet?.({ projectId }))
+  if (result === null) return
+  set((state) => ({
+    links: new Map(state.links).set(projectId, result.link),
+    issues: new Map(state.issues).set(projectId, result.issue),
+  }))
+}
+
+function subscribeToIntegrations(set: SetIntegrations, get: GetIntegrations): () => void {
+  const offStatus = subscribeTo('onStatusChanged', (payload) => {
+    const connections = (payload as { connections?: TrackerConnection[] } | undefined)?.connections
+    if (Array.isArray(connections)) set({ connections })
+  })
+  const offLink = subscribeTo('onLinkChanged', (payload) => {
+    const event = payload as { projectId?: string; link?: IssueLink | null } | undefined
+    if (typeof event?.projectId !== 'string') return
+    set((state) => ({ links: new Map(state.links).set(event.projectId!, event.link ?? null) }))
+    // A link that changed elsewhere needs its issue re-read for the badge.
+    if (event.link != null) void get().loadLink(event.projectId)
+  })
+  return () => {
+    offStatus()
+    offLink()
+  }
+}
+
+/** The trackers: their connections, credentials and whose issues count as mine. */
+function connectionSlice(
+  set: SetIntegrations,
+  get: GetIntegrations
+): Slice<
+  'loadConnections' | 'connect' | 'disconnect' | 'setMine' | 'clearConnectError' | 'subscribe'
+> {
+  return {
+    loadConnections: () => loadConnections(set),
+    connect: (input) => submitCredential(set, get, input),
+    disconnect: async (tracker) => {
+      await api().disconnect?.({ tracker })
+      await get().loadConnections()
+    },
+    setMine: async (tracker, mine) => {
+      await api().setMine?.({ tracker, mine })
+      await get().loadConnections()
+    },
+    clearConnectError: (tracker) =>
+      set((state) => ({ connectError: { ...state.connectError, [tracker]: undefined } })),
+    subscribe: () => subscribeToIntegrations(set, get),
+  }
+}
+
+/** Each project's linked issue, and issues read by key. */
+function linkSlice(
+  set: SetIntegrations,
+  get: GetIntegrations
+): Slice<'loadLink' | 'loadIssue' | 'linkIssue' | 'unlinkIssue' | 'listMine' | 'searchIssues'> {
+  return {
+    loadLink: (projectId) => loadLink(set, projectId),
+    loadIssue: (tracker, key) => loadIssue(set, get, { tracker, key }),
+    linkIssue: async (projectId, { tracker, key }) => {
+      const result = ok(await api().linkSet?.({ projectId, tracker, key }))
+      if (result === null) return false
+      // Read back rather than trusting the write: the badge needs the issue's
+      // state, which only the read returns.
+      await get().loadLink(projectId)
+      return true
+    },
+    unlinkIssue: async (projectId) => {
+      await api().linkClear?.({ projectId })
+      set((state) => ({
+        links: new Map(state.links).set(projectId, null),
+        issues: new Map(state.issues).set(projectId, null),
+      }))
+    },
+    listMine: async (opts = {}) =>
+      ok(await api().listMine?.({ limit: opts.limit })) ?? EMPTY_RESULT,
+    searchIssues: async (term) => ok(await api().search?.({ term })) ?? EMPTY_RESULT,
+  }
+}
+
+/** Which project's link picker and issue drawer are open. */
+function surfaceSlice(
+  set: SetIntegrations
+): Slice<'openLinkDialog' | 'closeLinkDialog' | 'openDrawer' | 'closeDrawer'> {
+  return {
+    openLinkDialog: (projectId) => set({ linkDialogProjectId: projectId }),
+    closeLinkDialog: () => set({ linkDialogProjectId: null }),
+    openDrawer: (projectId) => set({ drawerProjectId: projectId }),
+    closeDrawer: () => set({ drawerProjectId: null }),
+  }
+}
+
+function issueQuerySlice(
+  get: GetIntegrations
+): Slice<'issueByKey' | 'connectionFor' | 'linkFor' | 'issueFor' | 'isAnyConnected'> {
+  return {
+    issueByKey: (tracker, key) => get().issuesByKey.get(issueKey(tracker, key)),
+    connectionFor: (tracker) => get().connections.find((c) => c.tracker === tracker),
+    linkFor: (projectId) => get().links.get(projectId) ?? null,
+    issueFor: (projectId) => get().issues.get(projectId) ?? null,
+    isAnyConnected: () => get().connections.some((c) => c.connected),
+  }
+}
+
+// One store built from slices: https://zustand.docs.pmnd.rs/guides/slices-pattern
 export const useIntegrationsStore = create<IntegrationsState>((set, get) => ({
   connections: [],
   links: new Map(),
@@ -148,129 +298,8 @@ export const useIntegrationsStore = create<IntegrationsState>((set, get) => ({
   linkDialogProjectId: null,
   drawerProjectId: null,
   connectError: {},
-
-  loadConnections: async () => {
-    set({ loading: true })
-    const result = ok(await api().status?.({}))
-    set({ loading: false })
-    if (result === null) return
-    set({ connections: result.connections })
-  },
-
-  connect: async (input) => {
-    const result = await api().connect?.(input)
-    if (result === undefined || isError(result)) {
-      // Shown against the field the operator just filled in, rather than as a
-      // toast they have to go and find.
-      set((state) => ({
-        connectError: {
-          ...state.connectError,
-          [input.tracker]: (result as ErrorEnvelope | undefined)?.message ?? 'Could not connect',
-        },
-      }))
-      return false
-    }
-    set((state) => ({ connectError: { ...state.connectError, [input.tracker]: undefined } }))
-    await get().loadConnections()
-    return true
-  },
-
-  loadLink: async (projectId) => {
-    const result = ok(await api().linkGet?.({ projectId }))
-    if (result === null) return
-    set((state) => ({
-      links: new Map(state.links).set(projectId, result.link),
-      issues: new Map(state.issues).set(projectId, result.issue),
-    }))
-  },
-
-  loadIssue: (tracker, key) => {
-    const id = issueKey(tracker, key)
-    if (get().issuesByKey.has(id)) return Promise.resolve()
-    const pending = pendingIssues.get(id)
-    if (pending !== undefined) return pending
-    const request = (async () => {
-      const result = ok(await api().getIssue?.({ tracker, key }))
-      set((state) => ({ issuesByKey: new Map(state.issuesByKey).set(id, result?.issue ?? null) }))
-      pendingIssues.delete(id)
-    })()
-    pendingIssues.set(id, request)
-    return request
-  },
-
-  issueByKey: (tracker, key) => get().issuesByKey.get(issueKey(tracker, key)),
-
-  linkIssue: async (projectId, tracker, key, injectContext) => {
-    const result = ok(await api().linkSet?.({ projectId, tracker, key, injectContext }))
-    if (result === null) return false
-    // Read back rather than trusting the write: the badge needs the issue's
-    // state, which only the read returns.
-    await get().loadLink(projectId)
-    return true
-  },
-
-  unlinkIssue: async (projectId) => {
-    await api().linkClear?.({ projectId })
-    set((state) => ({
-      links: new Map(state.links).set(projectId, null),
-      issues: new Map(state.issues).set(projectId, null),
-    }))
-  },
-
-  listMine: async (opts = {}) => {
-    return ok(await api().listMine?.({ limit: opts.limit })) ?? EMPTY_RESULT
-  },
-
-  searchIssues: async (term) => {
-    return ok(await api().search?.({ term })) ?? EMPTY_RESULT
-  },
-
-  disconnect: async (tracker) => {
-    await api().disconnect?.({ tracker })
-    await get().loadConnections()
-  },
-
-  setMine: async (tracker, mine) => {
-    await api().setMine?.({ tracker, mine })
-    await get().loadConnections()
-  },
-
-  openLinkDialog: (projectId) => set({ linkDialogProjectId: projectId }),
-
-  closeLinkDialog: () => set({ linkDialogProjectId: null }),
-
-  openDrawer: (projectId) => set({ drawerProjectId: projectId }),
-
-  closeDrawer: () => set({ drawerProjectId: null }),
-
-  clearConnectError: (tracker) => {
-    set((state) => ({ connectError: { ...state.connectError, [tracker]: undefined } }))
-  },
-
-  subscribe: () => {
-    const offStatus = subscribeTo('onStatusChanged', (payload) => {
-      const connections = (payload as { connections?: TrackerConnection[] } | undefined)
-        ?.connections
-      if (Array.isArray(connections)) set({ connections })
-    })
-    const offLink = subscribeTo('onLinkChanged', (payload) => {
-      const event = payload as { projectId?: string; link?: IssueLink | null } | undefined
-      if (typeof event?.projectId !== 'string') return
-      set((state) => ({ links: new Map(state.links).set(event.projectId!, event.link ?? null) }))
-      // A link that changed elsewhere needs its issue re-read for the badge.
-      if (event.link != null) void get().loadLink(event.projectId)
-    })
-    return () => {
-      offStatus()
-      offLink()
-    }
-  },
-
-  connectionFor: (tracker) => get().connections.find((c) => c.tracker === tracker),
-
-  linkFor: (projectId) => get().links.get(projectId) ?? null,
-
-  issueFor: (projectId) => get().issues.get(projectId) ?? null,
-
-  isAnyConnected: () => get().connections.some((c) => c.connected),
+  ...connectionSlice(set, get),
+  ...linkSlice(set, get),
+  ...surfaceSlice(set),
+  ...issueQuerySlice(get),
 }))

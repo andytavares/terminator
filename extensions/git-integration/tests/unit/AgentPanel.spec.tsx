@@ -5,6 +5,9 @@ import { AgentPanel } from '../../src/components/pr-review/AgentPanel'
 import { useReviewUiStore } from '../../src/stores/review-ui.store'
 import type { PrReviewDetail } from '../../src/schemas/pr-review.schema'
 import type { AgentRun, AgentScope } from '../../src/schemas/review-agent.schema'
+import { partialFake } from '../../../../tests/support/fakes'
+
+type ReviewUiState = ReturnType<typeof useReviewUiStore.getState>
 
 vi.mock('../../src/stores/review-ui.store', () => ({ useReviewUiStore: vi.fn() }))
 
@@ -100,8 +103,8 @@ function setStoreState(overrides: Record<string, unknown>) {
     requestComposer: mockRequestComposer,
     ...overrides,
   }
-  ;(useReviewUiStore as unknown as ReturnType<typeof vi.fn>).mockImplementation(
-    (selector: (s: typeof state) => unknown) => selector(state)
+  vi.mocked(useReviewUiStore).mockImplementation((selector: (s: ReviewUiState) => unknown) =>
+    selector(partialFake<ReviewUiState>(state))
   )
 }
 
@@ -164,7 +167,9 @@ describe('AgentPanel', () => {
       expect(mockStart).toHaveBeenCalledWith(expect.objectContaining({ request: 'explain' }))
     })
   })
+})
 
+describe('AgentPanel — shows the running state and cancels the run', () => {
   it('shows the running state and cancels the run', () => {
     const run = makeRun({ status: 'running', activity: [] })
     setStoreState({ agentPanelScope: linesScope, agentRuns: [run] })
@@ -185,7 +190,9 @@ describe('AgentPanel', () => {
     expect(screen.getByText('Risk scored twice per file')).toBeTruthy()
     expect(screen.getByText('usePrReview.ts:317')).toBeTruthy()
   })
+})
 
+describe('AgentPanel — renders a finding body as markdown, so code reads as code', () => {
   it('renders a finding body as markdown, so code reads as code', () => {
     const run = makeRun({
       status: 'done',
@@ -197,7 +204,9 @@ describe('AgentPanel', () => {
     expect(code?.textContent).toBe('computeRiskScore')
     expect(container.querySelector('.ap-fnd-body')?.textContent).not.toContain('`')
   })
+})
 
+describe('AgentPanel — posts a finding as a comment with fromFindingId and the finding line', () => {
   it('posts a finding as a comment with fromFindingId and the finding line', () => {
     const run = makeRun({ status: 'done', findings: [finding1, finding2] })
     setStoreState({ agentPanelScope: linesScope, agentRuns: [run] })
@@ -214,7 +223,9 @@ describe('AgentPanel', () => {
       })
     )
   })
+})
 
+describe('AgentPanel — dismisses a finding and hides its card', () => {
   it('dismisses a finding and hides its card', () => {
     const run = makeRun({ status: 'done', findings: [finding1, finding2] })
     setStoreState({ agentPanelScope: linesScope, agentRuns: [run] })

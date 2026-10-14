@@ -3,13 +3,13 @@
   align-items: center;
   justify-content: center;
   height: 100%;
-  background: var(--bg-base);
+  background: var(--tm-bg-base);
 }
 
 .login__card {
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-lg);
+  background: var(--tm-bg-elevated);
+  border: 1px solid var(--tm-border-strong);
+  border-radius: var(--tm-radius-lg);
   padding: 32px 28px 28px;
   width: 320px;
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.7);
@@ -33,7 +33,7 @@
 .login__title {
   font-size: 15px;
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--tm-text-primary);
   text-align: center;
   letter-spacing: -0.01em;
   margin-bottom: 4px;
@@ -41,37 +41,37 @@
 
 .login__input {
   width: 100%;
-  background: var(--bg-input);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm);
+  background: var(--tm-bg-input);
+  border: 1px solid var(--tm-border-strong);
+  border-radius: var(--tm-radius-sm);
   padding: 9px 12px;
   font-size: 13px;
-  font-family: var(--font-ui);
-  color: var(--text-primary);
+  font-family: var(--tm-font-ui);
+  color: var(--tm-text-primary);
   outline: none;
   transition: border-color 0.15s;
 }
 
 .login__input:focus {
-  border-color: var(--accent);
+  border-color: var(--tm-accent);
 }
 
 .login__error {
   font-size: 12px;
-  color: var(--danger);
+  color: var(--tm-danger);
   text-align: center;
   min-height: 16px;
 }
 
 .login__btn {
   width: 100%;
-  background: var(--accent);
+  background: var(--tm-accent);
   color: #fff;
   border: none;
-  border-radius: var(--radius-sm);
+  border-radius: var(--tm-radius-sm);
   padding: 9px;
   font-size: 13px;
-  font-family: var(--font-ui);
+  font-family: var(--tm-font-ui);
   font-weight: 500;
   cursor: pointer;
   transition: opacity 0.15s;

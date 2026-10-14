@@ -13,7 +13,7 @@ test.beforeAll(async () => {
   await handle.page.locator('.repo-header').first().hover()
   await handle.page.locator('.repo-header__action[aria-label^="New branch in"]').first().click()
   await handle.page.getByPlaceholder('My branch').fill('demo-branch')
-  await handle.page.click('.dialog__btn-primary')
+  await handle.page.click('.tmui-dialog__actions .tmui-button--primary')
   await expect(handle.page.locator('.branch-row').first()).toBeVisible()
 })
 
@@ -57,9 +57,6 @@ test('a folder that is not there is refused rather than launching anything', asy
 // to launch, from a fixed list. A channel that took a command would be a way to
 // run anything.
 test('the channel takes a folder, never a command', async () => {
-  const result = await handle.page.evaluate(() =>
-    // @ts-expect-error deliberately wrong shape
-    window.electronAPI.editor.open('')
-  )
+  const result = await handle.page.evaluate(() => window.electronAPI.editor.open(''))
   expect(result).toEqual({ error: 'VALIDATION_ERROR' })
 })

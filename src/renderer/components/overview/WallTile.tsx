@@ -7,22 +7,16 @@ import { ResumeButton } from '../session/ResumeButton'
 import { CloseSessionButton } from '../session/CloseSessionButton'
 import { useIssue } from '../session/useSessionFacts'
 import { formatRelativeTime } from '../../sidebar/relative-time'
-import type { SessionFacts } from '../../sidebar/session-facts'
+import type { SessionActions, SessionFacts } from '../../sidebar/session-facts'
 import type { WallPlacement } from '../../sidebar/wall-order'
 import type { ProcessMetrics } from '../../../shared/types/index'
 import './WallTile.css'
 
-interface Props {
+interface Props extends SessionActions {
   facts: SessionFacts
   placement: WallPlacement
   metrics: ProcessMetrics | null
   now: number
-  onOpen: (sessionId: string) => void
-  onSaveDescription: (facts: SessionFacts, description: string | null) => void
-  onLink?: (facts: SessionFacts) => void
-  onResume?: (facts: SessionFacts) => void
-  onCloseSession?: (facts: SessionFacts) => void
-  onForgetSession?: (facts: SessionFacts) => void
   /** Buttons answering a waiting prompt, drawn in the footer. */
   answers?: React.ReactNode
 }
@@ -47,22 +41,9 @@ function locationOf(facts: SessionFacts): string {
  * re-parents a tile, because the live preview inside it is the session's one
  * xterm element and would be torn out.
  */
-export function WallTile({
-  facts,
-  placement,
-  metrics,
-  now,
-  onOpen,
-  onSaveDescription,
-  onLink,
-  onResume,
-  onCloseSession,
-  onForgetSession,
-  answers,
-}: Props): JSX.Element {
-  const issue = useIssue(facts.workItem?.ref)
+export function WallTile(props: Props): JSX.Element {
+  const { facts, placement, onOpen } = props
   const location = locationOf(facts)
-
   return (
     <article
       className={`wall-tile${facts.state === 'awaiting-input' ? ' wall-tile--needs' : ''}`}
@@ -79,45 +60,71 @@ export function WallTile({
         if (e.key === 'Enter' && e.target === e.currentTarget) onOpen(facts.sessionId)
       }}
     >
-      <div className="wall-tile__cap">
-        <StateChip state={facts.state} />
-        <span className="wall-tile__where">{location}</span>
-        <span className="wall-tile__name">{facts.name}</span>
-        <span className="wall-tile__age">{formatRelativeTime(facts.lastActivityAt, now)}</span>
-        <button
-          type="button"
-          className="wall-tile__open"
-          aria-label={`Open ${facts.name}`}
-          onClick={(e) => {
-            e.stopPropagation()
-            onOpen(facts.sessionId)
-          }}
-        >
-          <SquareArrowOutUpRight aria-hidden="true" />
-        </button>
-        {onCloseSession && (
-          <CloseSessionButton facts={facts} onClose={onCloseSession} onForget={onForgetSession} />
-        )}
-      </div>
-
+      <TileCap {...props} location={location} />
       <LivePreview sessionId={facts.sessionId} className="wall-tile__preview" />
-
-      <div className="wall-tile__foot" onClick={(e) => e.stopPropagation()}>
-        <WorkItemCell
-          workItem={facts.workItem}
-          issue={issue}
-          description={facts.description}
-          onSaveDescription={(text) => onSaveDescription(facts, text)}
-          onLink={onLink ? () => onLink(facts) : undefined}
-        />
-        {onResume && <ResumeButton facts={facts} onResume={onResume} />}
-        {answers}
-        {metrics && (
-          <span className="wall-tile__metrics">
-            {metrics.cpuPercent.toFixed(1)}% {formatRss(metrics.rssBytes)}
-          </span>
-        )}
-      </div>
+      <TileFoot {...props} />
     </article>
+  )
+}
+
+/** State, where the session lives, its name and age, then Open and Close. */
+function TileCap({
+  facts,
+  now,
+  onOpen,
+  onCloseSession,
+  onForgetSession,
+  location,
+}: Props & { location: string }) {
+  return (
+    <div className="wall-tile__cap">
+      <StateChip state={facts.state} />
+      <span className="wall-tile__where">{location}</span>
+      <span className="wall-tile__name">{facts.name}</span>
+      <span className="wall-tile__age">{formatRelativeTime(facts.lastActivityAt, now)}</span>
+      <OpenButton name={facts.name} onOpen={() => onOpen(facts.sessionId)} />
+      {onCloseSession && (
+        <CloseSessionButton facts={facts} onClose={onCloseSession} onForget={onForgetSession} />
+      )}
+    </div>
+  )
+}
+
+function OpenButton({ name, onOpen }: { name: string; onOpen: () => void }): JSX.Element {
+  return (
+    <button
+      type="button"
+      className="wall-tile__open"
+      aria-label={`Open ${name}`}
+      onClick={(e) => {
+        e.stopPropagation()
+        onOpen()
+      }}
+    >
+      <SquareArrowOutUpRight aria-hidden="true" />
+    </button>
+  )
+}
+
+/** What the session is for, Resume, any answers, and its process load; clicks stay here. */
+function TileFoot({ facts, metrics, onSaveDescription, onLink, onResume, answers }: Props) {
+  const issue = useIssue(facts.workItem?.ref)
+  return (
+    <div className="wall-tile__foot" onClick={(e) => e.stopPropagation()}>
+      <WorkItemCell
+        workItem={facts.workItem}
+        issue={issue}
+        description={facts.description}
+        onSaveDescription={(text) => onSaveDescription(facts, text)}
+        onLink={onLink ? () => onLink(facts) : undefined}
+      />
+      {onResume && <ResumeButton facts={facts} onResume={onResume} />}
+      {answers}
+      {metrics && (
+        <span className="wall-tile__metrics">
+          {metrics.cpuPercent.toFixed(1)}% {formatRss(metrics.rssBytes)}
+        </span>
+      )}
+    </div>
   )
 }

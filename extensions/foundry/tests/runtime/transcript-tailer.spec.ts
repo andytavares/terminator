@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, rmSync, writeFileSync, appendFileSync } from 'fs'
-import { tmpdir } from 'os'
+import { rmSync, writeFileSync, appendFileSync } from 'fs'
 import { join } from 'path'
 import { readTranscript, countTurns } from '../../src/runtime/transcript-tailer.js'
+import { makeTempDir } from '../../../../tests/support/temp-dir'
 
 // The tailer opens the path the runtime handed us (research.md R3) and never
 // computes one. The per-line JSONL schema is NOT a published contract, so it
@@ -12,7 +12,7 @@ let dir: string
 let transcript: string
 
 beforeEach(() => {
-  dir = mkdtempSync(join(tmpdir(), 'transcript-'))
+  dir = makeTempDir('transcript-')
   transcript = join(dir, 's1.jsonl')
 })
 
@@ -23,6 +23,12 @@ function write(lines: unknown[]): void {
 }
 
 describe('reading a transcript', () => {
+  describe('tool activity', toolActivityTests)
+  describe('completion and timestamps', completionAndTimestampsTests)
+  describe('several tool uses', severalToolUsesTests)
+})
+
+function toolActivityTests() {
   it('returns nothing for a transcript that does not exist yet', () => {
     expect(readTranscript(join(dir, 'missing.jsonl'))).toEqual([])
   })
@@ -50,7 +56,9 @@ describe('reading a transcript', () => {
     ])
     expect(readTranscript(transcript)[0]).toMatchObject({ isShell: true })
   })
+}
 
+function completionAndTimestampsTests() {
   it('derives tool completion from user tool_result entries', () => {
     write([
       {
@@ -75,7 +83,9 @@ describe('reading a transcript', () => {
     ])
     expect(readTranscript(transcript)[0].at).toBe(Date.parse('2026-07-26T10:00:00.000Z'))
   })
+}
 
+function severalToolUsesTests() {
   it('reads several tool uses from one assistant entry', () => {
     write([
       {
@@ -94,9 +104,21 @@ describe('reading a transcript', () => {
       'c2',
     ])
   })
-})
+}
 
 describe('defensive parsing (the line schema is not a contract)', () => {
+  describe('unparseable lines', unparseableLinesTests)
+  describe('torn lines and unknown shapes', tornLinesAndUnknownShapesTests)
+  describe('unpairable and untimed entries', unpairableAndUntimedEntriesTests)
+  describe('directories', directoriesTests)
+})
+
+function events(lines: unknown[]): ReturnType<typeof readTranscript> {
+  writeFileSync(transcript, lines.map((line) => JSON.stringify(line)).join('\n'))
+  return readTranscript(transcript)
+}
+
+function unparseableLinesTests() {
   it('skips an unparseable line and keeps reading', () => {
     write([
       {
@@ -116,7 +138,9 @@ describe('defensive parsing (the line schema is not a contract)', () => {
     )
     expect(readTranscript(transcript)).toHaveLength(2)
   })
+}
 
+function tornLinesAndUnknownShapesTests() {
   it('tolerates a torn final line', () => {
     write([
       {
@@ -137,7 +161,9 @@ describe('defensive parsing (the line schema is not a contract)', () => {
     ])
     expect(readTranscript(transcript)).toEqual([])
   })
+}
 
+function unpairableAndUntimedEntriesTests() {
   it('ignores a tool_use with no id, which cannot be paired', () => {
     write([
       {
@@ -159,23 +185,26 @@ describe('defensive parsing (the line schema is not a contract)', () => {
     ])
     expect(readTranscript(transcript)).toEqual([])
   })
+}
 
+function directoriesTests() {
   it('never throws on a directory handed to it in place of a file', () => {
     expect(() => readTranscript(dir)).not.toThrow()
     expect(readTranscript(dir)).toEqual([])
   })
-})
+}
 
 // The JSONL schema is not a published contract, so every field the tailer reads
 // must be allowed to be missing or the wrong type without taking state
 // reporting down (SC-007).
 
 describe('reading a transcript whose lines are not the shape we expect', () => {
-  function events(lines: unknown[]): ReturnType<typeof readTranscript> {
-    writeFileSync(transcript, lines.map((line) => JSON.stringify(line)).join('\n'))
-    return readTranscript(transcript)
-  }
+  describe('malformed entries', malformedEntriesTests)
+  describe('unnamed calls and unpaired results', unnamedCallsAndUnpairedResultsTests)
+  describe('unknown blocks', unknownBlocksTests)
+})
 
+function malformedEntriesTests() {
   it('ignores an entry with no message at all', () => {
     expect(events([{ timestamp: '2026-07-27T14:00:00Z' }])).toEqual([])
   })
@@ -193,7 +222,9 @@ describe('reading a transcript whose lines are not the shape we expect', () => {
   it('ignores a line that parses to something other than an object', () => {
     expect(events([42])).toEqual([])
   })
+}
 
+function unnamedCallsAndUnpairedResultsTests() {
   it('names an unnamed tool call rather than dropping it', () => {
     const [event] = events([
       {
@@ -214,7 +245,9 @@ describe('reading a transcript whose lines are not the shape we expect', () => {
       ])
     ).toEqual([])
   })
+}
 
+function unknownBlocksTests() {
   it('ignores a content block of an unrecognised type', () => {
     expect(
       events([
@@ -225,9 +258,14 @@ describe('reading a transcript whose lines are not the shape we expect', () => {
       ])
     ).toEqual([])
   })
-})
+}
 
 describe('counting turns', () => {
+  describe('counting', transcriptTailerCountingTests)
+  describe('subagents and torn lines', subagentsAndTornLinesTests)
+})
+
+function transcriptTailerCountingTests() {
   // Turns used to arrive in the runtime's own result message. A terminal
   // produces no such message, so they are counted from the record instead.
   it('counts nothing for a transcript that does not exist yet', () => {
@@ -251,7 +289,9 @@ describe('counting turns', () => {
     ])
     expect(countTurns(transcript)).toBe(0)
   })
+}
 
+function subagentsAndTornLinesTests() {
   it('does not count a subagent’s turns as this session’s', () => {
     write([
       { type: 'assistant', timestamp: '2026-07-27T10:00:01.000Z' },
@@ -271,7 +311,7 @@ describe('counting turns', () => {
   it('counts nothing for a path that is a directory', () => {
     expect(countTurns(dir)).toBe(0)
   })
-})
+}
 
 describe('a transcript too big to read whole', () => {
   it('reads the tail rather than the file, and still finds recent calls', () => {

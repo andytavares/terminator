@@ -12,7 +12,7 @@ import type { DiffSummary } from './review/diff-summary.js'
 // that no longer exist — which is exactly the "session stuck working forever"
 // state the old console kept getting into.
 
-export type RunState =
+type RunState =
   | 'working'
   /** Held on a tool call the operator has to decide. */
   | 'waiting'
@@ -49,7 +49,7 @@ export interface Run {
 }
 
 /** How a phase of work stopped being live. */
-export type RunOutcome = 'approved' | 'stopped' | 'discarded' | 'ended'
+type RunOutcome = 'approved' | 'stopped' | 'discarded' | 'ended'
 
 /**
  * A phase of work that is over, kept so it can be looked back at.
@@ -117,90 +117,93 @@ export interface RunRegistry {
 const LIVE: ReadonlySet<RunState> = new Set<RunState>(['working', 'waiting', 'stalled'])
 
 export function createRunRegistry(): RunRegistry {
-  const runs = new Map<string, Run>()
-  const past: RunHistoryEntry[] = []
+  return new MemoryRunRegistry()
+}
 
-  return {
-    archive(sessionId, outcome, at): RunHistoryEntry | null {
-      const run = runs.get(sessionId)
-      if (run === undefined) return null
-      const entry: RunHistoryEntry = {
-        sessionId: run.sessionId,
-        featureDir: run.featureDir,
-        phase: run.phase,
-        branch: run.branch,
-        outcome,
-        startedAt: run.stateSince,
-        endedAt: at,
-        turns: run.turns,
-        diff: { ...run.diff },
-        asked: run.asked,
-      }
-      // Newest first, matching how it is read: the last thing that happened is
-      // the thing you are looking for.
-      past.unshift(entry)
-      if (past.length > HISTORY_LIMIT) past.length = HISTORY_LIMIT
-      run.state = 'finished'
-      run.stateSince = at
-      return entry
-    },
+/** The runs of this process, live and past, held in memory. */
+class MemoryRunRegistry implements RunRegistry {
+  private readonly runs = new Map<string, Run>()
+  private readonly past: RunHistoryEntry[] = []
 
-    history(): RunHistoryEntry[] {
-      return [...past]
-    },
+  archive(sessionId: string, outcome: RunOutcome, at: number): RunHistoryEntry | null {
+    const run = this.runs.get(sessionId)
+    if (run === undefined) return null
+    const entry: RunHistoryEntry = {
+      sessionId: run.sessionId,
+      featureDir: run.featureDir,
+      phase: run.phase,
+      branch: run.branch,
+      outcome,
+      startedAt: run.stateSince,
+      endedAt: at,
+      turns: run.turns,
+      diff: { ...run.diff },
+      asked: run.asked,
+    }
+    // Newest first, matching how it is read: the last thing that happened is
+    // the thing you are looking for.
+    this.past.unshift(entry)
+    if (this.past.length > HISTORY_LIMIT) this.past.length = HISTORY_LIMIT
+    run.state = 'finished'
+    run.stateSince = at
+    return entry
+  }
 
-    add(input): Run {
-      const run: Run = {
-        ...input,
-        state: 'working',
-        stateSince: input.startedAt,
-        turns: 0,
-        diff: { files: 0, added: 0, removed: 0 },
-        asked: 0,
-      }
-      runs.set(run.sessionId, run)
-      return run
-    },
+  history(): RunHistoryEntry[] {
+    return [...this.past]
+  }
 
-    get(sessionId): Run | null {
-      return runs.get(sessionId) ?? null
-    },
+  add(input: Omit<Run, 'state' | 'stateSince' | 'turns' | 'diff' | 'asked'>): Run {
+    const run: Run = {
+      ...input,
+      state: 'working',
+      stateSince: input.startedAt,
+      turns: 0,
+      diff: { files: 0, added: 0, removed: 0 },
+      asked: 0,
+    }
+    this.runs.set(run.sessionId, run)
+    return run
+  }
 
-    list(): Run[] {
-      return [...runs.values()]
-    },
+  get(sessionId: string): Run | null {
+    return this.runs.get(sessionId) ?? null
+  }
 
-    live(): Run[] {
-      return [...runs.values()].filter((run) => LIVE.has(run.state))
-    },
+  list(): Run[] {
+    return [...this.runs.values()]
+  }
 
-    setState(sessionId, state, at): void {
-      const run = runs.get(sessionId)
-      // Recorded only on a change: `stateSince` is how long it has been like
-      // this, and rewriting it every tick would make everything look new.
-      if (run === undefined || run.state === state) return
-      run.state = state
-      run.stateSince = at
-    },
+  live(): Run[] {
+    return [...this.runs.values()].filter((run) => LIVE.has(run.state))
+  }
 
-    noteTurns(sessionId, turns): void {
-      const run = runs.get(sessionId)
-      if (run !== undefined) run.turns = turns
-    },
+  setState(sessionId: string, state: RunState, at: number): void {
+    const run = this.runs.get(sessionId)
+    // Recorded only on a change: `stateSince` is how long it has been like
+    // this, and rewriting it every tick would make everything look new.
+    if (run === undefined || run.state === state) return
+    run.state = state
+    run.stateSince = at
+  }
 
-    noteDiff(sessionId, diff): void {
-      const run = runs.get(sessionId)
-      if (run !== undefined) run.diff = diff
-    },
+  noteTurns(sessionId: string, turns: number): void {
+    const run = this.runs.get(sessionId)
+    if (run !== undefined) run.turns = turns
+  }
 
-    forget(sessionId): void {
-      runs.delete(sessionId)
-    },
+  noteDiff(sessionId: string, diff: DiffSummary): void {
+    const run = this.runs.get(sessionId)
+    if (run !== undefined) run.diff = diff
+  }
 
-    forgetCard(featureDir): void {
-      for (const [sessionId, run] of runs) {
-        if (run.featureDir === featureDir) runs.delete(sessionId)
-      }
-    },
+  forget(sessionId: string): void {
+    this.runs.delete(sessionId)
+  }
+
+  forgetCard(featureDir: string): void {
+    for (const [sessionId, run] of this.runs) {
+      if (run.featureDir === featureDir) this.runs.delete(sessionId)
+    }
   }
 }

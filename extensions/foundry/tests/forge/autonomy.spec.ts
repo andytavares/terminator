@@ -6,11 +6,11 @@ import {
   dismissConfidentFindings,
   followUpFor,
   retryForRefusal,
-  MAX_AUTO_TURNS,
 } from '../../src/forge/autonomy.js'
 import { draftOrder } from '../../src/order/draft.js'
-import type { WorkOrder } from '../../src/order/schema.js'
+import type { OpenQuestion, WorkOrder } from '../../src/order/schema.js'
 import type { CompileFailure } from '../../src/order/compile.js'
+import { openQuestion } from '../helpers/order-parts.js'
 
 // The Forge stops the operator only for what the architect cannot settle
 // (spec 062): a choice it is less than 90% sure of, or a high-severity finding.
@@ -31,31 +31,62 @@ function order(over: Partial<WorkOrder> = {}): WorkOrder {
   }
 }
 
-function question(over: Record<string, unknown> = {}) {
-  return {
-    id: 'Q-1',
+/** Q-1, which recommends hiding done tickets over greying them out. */
+function hideOrGreyQuestion(over: Partial<OpenQuestion> = {}): OpenQuestion {
+  return openQuestion('Q-1', {
     text: 'Hide done tickets or grey them out?',
-    why: '',
     options: ['Hide them', 'Grey them out'],
     recommended: 0,
-    answer: null,
-    rank: 1,
-    confidence: null,
     ...over,
-  }
+  })
 }
 
 describe('decideConfidentQuestions', () => {
+  describe('deciding', autonomyDecidingTests)
+  describe('leaving it to the operator', leavingItToTheOperatorTests)
+})
+
+const findings = [
+  {
+    id: 'RT-no-non-goals',
+    severity: 'low' as const,
+    text: 't',
+    status: 'open' as const,
+    reason: '',
+    category: 'wrong-outcome' as const,
+    round: 0,
+  },
+  {
+    id: 'RT-fully-serial-plan',
+    severity: 'medium' as const,
+    text: 't',
+    status: 'open' as const,
+    reason: '',
+    category: 'wrong-outcome' as const,
+    round: 0,
+  },
+  {
+    id: 'RT-no-runnable-check',
+    severity: 'high' as const,
+    text: 't',
+    status: 'open' as const,
+    reason: '',
+    category: 'wrong-outcome' as const,
+    round: 0,
+  },
+]
+
+function autonomyDecidingTests() {
   it('takes the recommended option when the architect is at least 90% sure', () => {
     const next = decideConfidentQuestions(
-      order({ openQuestions: [question({ confidence: 0.92 })] })
+      order({ openQuestions: [hideOrGreyQuestion({ confidence: 0.92 })] })
     )
     expect(next.openQuestions[0].answer).toBe('Hide them')
   })
 
   it('says what it decided as an assumption the operator can strike', () => {
     const next = decideConfidentQuestions(
-      order({ openQuestions: [question({ confidence: 0.95 })] })
+      order({ openQuestions: [hideOrGreyQuestion({ confidence: 0.95 })] })
     )
     expect(next.assumptions).toContainEqual(
       expect.objectContaining({
@@ -68,14 +99,16 @@ describe('decideConfidentQuestions', () => {
 
   it('decides at exactly the bar', () => {
     const next = decideConfidentQuestions(
-      order({ openQuestions: [question({ confidence: CONFIDENCE_BAR })] })
+      order({ openQuestions: [hideOrGreyQuestion({ confidence: CONFIDENCE_BAR })] })
     )
     expect(next.openQuestions[0].answer).toBe('Hide them')
   })
+}
 
+function leavingItToTheOperatorTests() {
   it('leaves a question below the bar for the operator', () => {
     const next = decideConfidentQuestions(
-      order({ openQuestions: [question({ confidence: 0.89 })] })
+      order({ openQuestions: [hideOrGreyQuestion({ confidence: 0.89 })] })
     )
     expect(next.openQuestions[0].answer).toBeNull()
     expect(next.assumptions).toHaveLength(0)
@@ -85,9 +118,9 @@ describe('decideConfidentQuestions', () => {
     const next = decideConfidentQuestions(
       order({
         openQuestions: [
-          question({ id: 'Q-1', confidence: null }),
-          question({ id: 'Q-2', confidence: 0.99, recommended: null }),
-          question({ id: 'Q-3', confidence: 0.99, recommended: 7 }),
+          hideOrGreyQuestion({ id: 'Q-1', confidence: null }),
+          hideOrGreyQuestion({ id: 'Q-2', confidence: 0.99, recommended: null }),
+          hideOrGreyQuestion({ id: 'Q-3', confidence: 0.99, recommended: 7 }),
         ],
       })
     )
@@ -96,38 +129,19 @@ describe('decideConfidentQuestions', () => {
 
   it('never overrides an answer the operator already gave', () => {
     const next = decideConfidentQuestions(
-      order({ openQuestions: [question({ confidence: 0.99, answer: 'Grey them out' })] })
+      order({ openQuestions: [hideOrGreyQuestion({ confidence: 0.99, answer: 'Grey them out' })] })
     )
     expect(next.openQuestions[0].answer).toBe('Grey them out')
     expect(next.assumptions).toHaveLength(0)
   })
-})
+}
 
 describe('dismissConfidentFindings', () => {
-  const findings = [
-    {
-      id: 'RT-no-non-goals',
-      severity: 'low' as const,
-      text: 't',
-      status: 'open' as const,
-      reason: '',
-    },
-    {
-      id: 'RT-fully-serial-plan',
-      severity: 'medium' as const,
-      text: 't',
-      status: 'open' as const,
-      reason: '',
-    },
-    {
-      id: 'RT-no-runnable-check',
-      severity: 'high' as const,
-      text: 't',
-      status: 'open' as const,
-      reason: '',
-    },
-  ]
+  describe('dismissing', dismissingTests)
+  describe('leaving open', leavingOpenTests)
+})
 
+function dismissingTests() {
   it('accepts a low or medium finding the architect is at least 90% sure does not apply', () => {
     const next = dismissConfidentFindings(order({ redTeam: findings }), [
       { id: 'RT-no-non-goals', reason: 'a one-line fix has no scope to exclude', confidence: 0.93 },
@@ -151,7 +165,9 @@ describe('dismissConfidentFindings', () => {
       reason: 'architect, 99% confident: this repo has no toolchain by design',
     })
   })
+}
 
+function leavingOpenTests() {
   it('leaves one dismissed below the bar, or with no reason, open', () => {
     const next = dismissConfidentFindings(order({ redTeam: findings }), [
       { id: 'RT-no-non-goals', reason: 'r', confidence: 0.5 },
@@ -159,7 +175,7 @@ describe('dismissConfidentFindings', () => {
     ])
     expect(next.redTeam.slice(0, 2).every((f) => f.status === 'open')).toBe(true)
   })
-})
+}
 
 describe('followUpFor', () => {
   const failure = (check: CompileFailure['check'], detail = 'd'): CompileFailure => ({

@@ -18,25 +18,30 @@ function jqlOf(url: unknown): string {
   return new URL(String(url)).searchParams.get('jql') ?? ''
 }
 
+/** A real Response carrying `body` as JSON, as Jira's REST API answers. */
+function jiraAnswer(body: unknown, status = 200, headers?: HeadersInit): Response {
+  return new Response(JSON.stringify(body), { status, headers })
+}
+
+/** `fetch` as the provider calls it: the URL, then the request. */
+type Fetch = (input: string | URL, init?: RequestInit) => Promise<Response>
+
+/** Installs `answer` as the global fetch and returns it, so a case can read its calls. */
+function stubFetch(answer: Fetch) {
+  const calls = vi.fn<Fetch>(answer)
+  vi.stubGlobal('fetch', calls)
+  return calls
+}
+
 /** Route by URL so a test states which endpoints it expects to be hit. */
-function routeFetch(routes: Array<[RegExp, unknown, number?]>): ReturnType<typeof vi.fn> {
-  const calls = vi.fn(async (input: string | URL) => {
+function routeFetch(routes: Array<[RegExp, unknown, number?]>) {
+  return stubFetch(async (input) => {
     const url = String(input)
     for (const [pattern, body, status] of routes) {
-      if (pattern.test(url)) {
-        return {
-          ok: (status ?? 200) < 400,
-          status: status ?? 200,
-          headers: new Headers(),
-          json: async () => body,
-          text: async () => JSON.stringify(body),
-        } as unknown as Response
-      }
+      if (pattern.test(url)) return jiraAnswer(body, status)
     }
     throw new Error(`unexpected fetch: ${url}`)
   })
-  vi.stubGlobal('fetch', calls)
-  return calls as unknown as ReturnType<typeof vi.fn>
 }
 
 beforeEach(() => vi.unstubAllGlobals())
@@ -55,8 +60,8 @@ describe('jira provider — verify', () => {
   it('sends Basic auth built from the email and token', async () => {
     const fetchMock = routeFetch([[/\/myself/, MYSELF]])
     await provider.verify(CREDENTIAL)
-    const init = fetchMock.mock.calls[0][1] as RequestInit
-    const auth = (init.headers as Record<string, string>).Authorization
+    const init = fetchMock.mock.calls[0][1]
+    const auth = (init?.headers as Record<string, string>).Authorization
     expect(auth).toBe(
       `Basic ${Buffer.from('andrew.tavares87@gmail.com:token-abc').toString('base64')}`
     )
@@ -81,17 +86,10 @@ describe('jira provider — listMine', () => {
 
   it('follows nextPageToken until the last page', async () => {
     let call = 0
-    const fetchMock = vi.fn(async () => {
+    const fetchMock = stubFetch(async () => {
       call += 1
-      const body = call === 1 ? SEARCH_PAGE_1 : SEARCH_PAGE_2
-      return {
-        ok: true,
-        status: 200,
-        headers: new Headers(),
-        json: async () => body,
-      } as unknown as Response
+      return jiraAnswer(call === 1 ? SEARCH_PAGE_1 : SEARCH_PAGE_2)
     })
-    vi.stubGlobal('fetch', fetchMock)
 
     const result = await provider.listMine(CREDENTIAL, { kind: 'query', jql: 'x = y' }, 50)
 
@@ -101,21 +99,14 @@ describe('jira provider — listMine', () => {
   })
 
   it('stops at the requested limit even when more pages exist', async () => {
-    const fetchMock = vi.fn(
-      async () =>
-        ({
-          ok: true,
-          status: 200,
-          headers: new Headers(),
-          json: async () => SEARCH_PAGE_1,
-        }) as unknown as Response
-    )
-    vi.stubGlobal('fetch', fetchMock)
+    const fetchMock = stubFetch(async () => jiraAnswer(SEARCH_PAGE_1))
     const result = await provider.listMine(CREDENTIAL, { kind: 'query', jql: 'x = y' }, 1)
     expect(result).toHaveLength(1)
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
+})
 
+describe('jira provider — listMine summaries and limits', () => {
   it('reports a null branch name on summaries — Jira has no equivalent', async () => {
     routeFetch([[/\/search\/jql/, { issues: [ISSUE_TAV_7], isLast: true }]])
     const [issue] = await provider.listMine(CREDENTIAL, { kind: 'query', jql: 'x = y' }, 25)
@@ -130,16 +121,9 @@ describe('jira provider — listMine', () => {
   })
 
   it('surfaces 429 as rate-limited carrying Retry-After', async () => {
-    const fetchMock = vi.fn(
-      async () =>
-        ({
-          ok: false,
-          status: 429,
-          headers: new Headers({ 'Retry-After': '30' }),
-          json: async () => ({ errorMessages: ['Rate limited'] }),
-        }) as unknown as Response
+    stubFetch(async () =>
+      jiraAnswer({ errorMessages: ['Rate limited'] }, 429, { 'Retry-After': '30' })
     )
-    vi.stubGlobal('fetch', fetchMock)
     await expect(
       provider.listMine(CREDENTIAL, { kind: 'query', jql: 'x = y' }, 25)
     ).rejects.toMatchObject({ kind: 'rate-limited', retryAfterMs: 30_000 })
@@ -188,7 +172,9 @@ describe('jira provider — get', () => {
       createdAt: '2026-08-22T10:15:00.000+0000',
     })
   })
+})
 
+describe('jira provider — get fields', () => {
   it('always reports branchName as null — Jira has no equivalent', async () => {
     routeFetch([
       [/\/issue\/TAV-7\/comment/, COMMENTS],
@@ -214,15 +200,52 @@ describe('jira provider — get', () => {
   })
 })
 
+describe('jira provider — get edge cases', () => {
+  it('returns null when Jira answers the issue request with no body', async () => {
+    stubFetch(async () => new Response('', { status: 200 }))
+    await expect(provider.get(CREDENTIAL, 'TAV-7')).resolves.toBeNull()
+  })
+
+  it('rejects a failure other than not-found rather than reading it as no issue', async () => {
+    routeFetch([[/\/issue\//, {}, 500]])
+    await expect(provider.get(CREDENTIAL, 'TAV-7')).rejects.toMatchObject({ kind: 'unavailable' })
+  })
+})
+
+describe('jira provider — get comments and account', () => {
+  it('orders comments newest first, with an undated one last', async () => {
+    const comments = [
+      { created: '2026-01-01', body: 'old' },
+      { body: 'undated' },
+      { created: '2026-02-01', body: 'new' },
+    ]
+    routeFetch([
+      [/\/comment/, { comments }],
+      [/\/issue\//, ISSUE_TAV_7],
+    ])
+    const issue = await provider.get(CREDENTIAL, 'TAV-7')
+    expect(issue?.comments.map((c) => [c.body, c.createdAt])).toEqual([
+      ['new', '2026-02-01'],
+      ['old', '2026-01-01'],
+      ['undated', ''],
+    ])
+  })
+
+  it('names no one when /myself omits a display name', async () => {
+    routeFetch([[/\/myself/, { emailAddress: 'a@b.c' }]])
+    await expect(provider.verify(CREDENTIAL)).resolves.toMatchObject({ name: '', email: 'a@b.c' })
+  })
+})
+
 describe('jira provider — comment', () => {
   it('posts an ADF body to the issue key path', async () => {
     const fetchMock = routeFetch([[/\/issue\/TAV-7\/comment/, { id: '1' }, 201]])
     await provider.comment(CREDENTIAL, 'TAV-7', 'PR opened')
 
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
-    expect(url).toContain('/rest/api/3/issue/TAV-7/comment')
-    expect(init.method).toBe('POST')
-    expect(JSON.parse(String(init.body))).toEqual({
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(String(url)).toContain('/rest/api/3/issue/TAV-7/comment')
+    expect(init?.method).toBe('POST')
+    expect(JSON.parse(String(init?.body))).toEqual({
       body: {
         type: 'doc',
         version: 1,
@@ -261,7 +284,9 @@ describe('jira provider — hostile and incomplete responses', () => {
       assignee: null,
     })
   })
+})
 
+describe('jira provider — unknown categories and failed comment requests', () => {
   it('falls back to backlog for a status category Jira adds later', async () => {
     routeFetch([
       [/\/comment/, { comments: [] }],
@@ -280,19 +305,15 @@ describe('jira provider — hostile and incomplete responses', () => {
   })
 
   it('still returns the issue when the comment request fails', async () => {
-    const fetchMock = vi.fn(async (input: string | URL) => {
+    stubFetch(async (input) => {
       if (String(input).includes('/comment')) throw new Error('comment endpoint down')
-      return {
-        ok: true,
-        status: 200,
-        headers: new Headers(),
-        json: async () => ISSUE_TAV_7,
-      } as unknown as Response
+      return jiraAnswer(ISSUE_TAV_7)
     })
-    vi.stubGlobal('fetch', fetchMock)
     await expect(provider.get(CREDENTIAL, 'TAV-7')).resolves.toMatchObject({ comments: [] })
   })
+})
 
+describe('jira provider — incomplete comments and search pages', () => {
   it('names an author Jira did not supply', async () => {
     routeFetch([
       [/\/comment/, { comments: [{ created: '2026-01-01', body: 'x' }] }],
@@ -310,16 +331,7 @@ describe('jira provider — hostile and incomplete responses', () => {
   })
 
   it('stops paging when a page returns no token and does not claim to be last', async () => {
-    const fetchMock = vi.fn(
-      async () =>
-        ({
-          ok: true,
-          status: 200,
-          headers: new Headers(),
-          json: async () => ({ issues: [ISSUE_TAV_7] }),
-        }) as unknown as Response
-    )
-    vi.stubGlobal('fetch', fetchMock)
+    const fetchMock = stubFetch(async () => jiraAnswer({ issues: [ISSUE_TAV_7] }))
     await provider.listMine(CREDENTIAL, { kind: 'query', jql: 'x = y' }, 50)
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
@@ -331,7 +343,9 @@ describe('jira provider — hostile and incomplete responses', () => {
     await provider.listMine(CREDENTIAL, { kind: 'assignee', email: null }, 10)
     expect(jqlOf(fetchMock.mock.calls[0][0])).toContain('currentUser()')
   })
+})
 
+describe('jira provider — failed requests', () => {
   it('maps a dead network to unavailable, not to a bad credential', async () => {
     vi.stubGlobal(
       'fetch',
@@ -355,7 +369,9 @@ describe('jira provider — hostile and incomplete responses', () => {
       provider.listMine(CREDENTIAL, { kind: 'query', jql: 'x = y' }, 10)
     ).rejects.toMatchObject({ kind: 'unavailable', message: 'Jira request failed' })
   })
+})
 
+describe('jira provider — incomplete accounts and foreign credentials', () => {
   it('falls back to the configured email when /myself omits one', async () => {
     routeFetch([[/\/myself/, { displayName: 'Andrew' }]])
     await expect(provider.verify(CREDENTIAL)).resolves.toMatchObject({

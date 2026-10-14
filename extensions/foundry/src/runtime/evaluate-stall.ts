@@ -45,7 +45,7 @@ export interface SessionFacts {
  * needs a per-edit history of the working copy, and nothing records one. It was
  * removed rather than left as a threshold no input could ever cross.
  */
-export type StallSignal = 'silence' | 'loop'
+type StallSignal = 'silence' | 'loop'
 
 export interface StallFiring {
   readonly sessionId: string
@@ -71,31 +71,7 @@ export function evaluateStall(
   // earns the reputation that gets it turned off.
   if (!facts.canStall) return null
 
-  const shellInFlight = facts.openShellStartedAt !== null
-  // An agent that has never called a tool has been quiet since it started, and
-  // one that has never changed a line has changed nothing since it started.
-  //
-  // The later of the two, not the tool call alone. A session spans turns — the
-  // architect's intake conversation is one session the operator comes back to
-  // — and the transcript keeps every turn's tool calls, so a session given a
-  // new turn after a long gap carried the *previous* turn's last call as its
-  // most recent activity. Measured on a live run: a run twenty-three seconds
-  // old was reported silent for twenty-one minutes and `run.stalled` was on
-  // the order before the builder's third command. Silence belongs to the state
-  // the session is in now, and `stateSince` is when that state began.
-  const since = (at: number | null): number => Math.max(at ?? facts.stateSince, facts.stateSince)
-  const toolSilenceMs = now - since(facts.lastToolActivityAt)
-  const diffSilenceMs = now - since(facts.lastNetChangeAt)
-  const distinctFiles = new Set(facts.recentToolPaths).size
-
-  const inputs = {
-    toolSilenceMs,
-    diffSilenceMs,
-    distinctFiles,
-    netChange: facts.recentNetChange,
-    shellInFlight,
-  }
-
+  const inputs = stallInputs(facts, now)
   const fire = (signal: StallSignal): StallFiring => ({
     sessionId: facts.sessionId,
     signal,
@@ -107,8 +83,8 @@ export function evaluateStall(
   // evaluated while a command is in flight — a loop is a different failure
   // from silence, and the command being slow does not excuse it.
   if (
-    diffSilenceMs > thresholds.noProgressMs &&
-    distinctFiles === 1 &&
+    inputs.diffSilenceMs > thresholds.noProgressMs &&
+    inputs.distinctFiles === 1 &&
     facts.recentNetChange === 0
   ) {
     return fire('loop')
@@ -118,9 +94,24 @@ export function evaluateStall(
   // working, not stuck: its silence is the command's, not the agent's. Without
   // this, every test suite longer than the threshold reads as a stall — the
   // spec's named "obvious first bug", and the gate on shipping this at all.
-  if (shellInFlight) return null
+  if (inputs.shellInFlight) return null
 
-  if (toolSilenceMs > thresholds.silenceMs) return fire('silence')
+  if (inputs.toolSilenceMs > thresholds.silenceMs) return fire('silence')
 
   return null
+}
+
+/** The values a firing is judged on, at `now`. */
+function stallInputs(facts: SessionFacts, now: number): StallFiring['inputs'] {
+  // Silence counts from the later of the last activity and `stateSince`: a session
+  // spans turns, and a new turn carried the previous turn's last call, reporting a
+  // 23-second-old run silent for 21 minutes (SUPERVISION.md, "Incidents behind the code").
+  const since = (at: number | null): number => Math.max(at ?? facts.stateSince, facts.stateSince)
+  return {
+    toolSilenceMs: now - since(facts.lastToolActivityAt),
+    diffSilenceMs: now - since(facts.lastNetChangeAt),
+    distinctFiles: new Set(facts.recentToolPaths).size,
+    netChange: facts.recentNetChange,
+    shellInFlight: facts.openShellStartedAt !== null,
+  }
 }

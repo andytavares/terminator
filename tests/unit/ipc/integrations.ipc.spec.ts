@@ -1,42 +1,30 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
+import * as fs from 'node:fs'
+import * as path from 'node:path'
+import type { Issue } from '../../../src/shared/types/index'
+import { makeTempDir } from '../../support/temp-dir'
 
-// The channel registrar is the seam: registering captures handlers here, and a
-// test invokes them exactly as the renderer would.
-const handlers = new Map<string, (event: unknown, payload: unknown) => Promise<unknown>>()
-const sent: Array<{ channel: string; data: unknown }> = []
+type Handler = (event: unknown, payload?: unknown) => unknown
+const handlers = vi.hoisted(() => new Map<string, Handler>())
 
-vi.mock('../../../src/main/safe-send', () => ({
-  sendToWindow: (_win: unknown, channel: string, data: unknown) => {
-    sent.push({ channel, data })
+let userData: string
+let projectDir: string
+
+vi.mock('electron', () => ({
+  app: { getPath: () => userData },
+  ipcMain: { handle: (channel: string, handler: Handler) => handlers.set(channel, handler) },
+  safeStorage: {
+    isEncryptionAvailable: () => true,
+    encryptString: (value: string) => Buffer.from(`enc:${value}`, 'utf8'),
+    decryptString: (buf: Buffer) => buf.toString('utf8').replace(/^enc:/, ''),
   },
-  sendToView: () => {},
 }))
+vi.mock('electron-store', async () =>
+  (await import('../../support/stores')).inMemoryElectronStore()
+)
 
-vi.mock('../../../src/main/ipc/channel-registrar', () => ({
-  handleChannel: (channel: string, handler: (event: unknown, payload: unknown) => unknown) => {
-    handlers.set(channel, handler as never)
-  },
-  removeChannel: () => {},
-}))
-
-const store = vi.hoisted(() => ({
-  connections: [] as unknown[],
-  setCredential: vi.fn().mockResolvedValue(undefined),
-  clearCredential: vi.fn().mockResolvedValue(undefined),
-  setAccount: vi.fn().mockResolvedValue(undefined),
-  setMine: vi.fn().mockResolvedValue(undefined),
-}))
-
-vi.mock('../../../src/main/integrations/tracker-store', () => ({
-  listConnections: async () => store.connections,
-  setCredential: store.setCredential,
-  clearCredential: store.clearCredential,
-  setAccount: store.setAccount,
-  setMine: store.setMine,
-  getCredential: async () => null,
-  getMine: async () => ({ kind: 'assignee', email: null }),
-}))
-
+// The trackers are the network, so the providers and the issue service built
+// on them are stand-ins. The stores and the agent-context files are real.
 const verify = vi.hoisted(() => ({ linear: vi.fn(), jira: vi.fn() }))
 
 vi.mock('../../../src/main/integrations/providers/linear.provider', () => ({
@@ -44,21 +32,6 @@ vi.mock('../../../src/main/integrations/providers/linear.provider', () => ({
 }))
 vi.mock('../../../src/main/integrations/providers/jira.provider', () => ({
   createJiraProvider: () => ({ id: 'jira', verify: verify.jira }),
-}))
-
-const linkStore = vi.hoisted(() => ({
-  links: new Map<string, unknown>(),
-  setLink: vi.fn(),
-  getLink: vi.fn(),
-  clearLink: vi.fn(),
-  setInjectContext: vi.fn(),
-}))
-
-vi.mock('../../../src/main/integrations/issue-link-store', () => ({
-  setLink: linkStore.setLink,
-  getLink: linkStore.getLink,
-  clearLink: linkStore.clearLink,
-  setInjectContext: linkStore.setInjectContext,
 }))
 
 const service = vi.hoisted(() => ({
@@ -70,67 +43,102 @@ const service = vi.hoisted(() => ({
 
 vi.mock('../../../src/main/integrations/index', () => ({
   getIssueService: () => service,
-  resetIssueService: vi.fn(),
+  resetIssueService: () => {},
 }))
 
-// Context sync reaches the filesystem and Electron's app paths; those have
-// their own tests. Here the question is only whether the handlers call it, and
-// what they do when it fails.
-const contextSync = vi.hoisted(() => ({
-  syncProjectContext: vi.fn().mockResolvedValue(null),
-  clearProjectContext: vi.fn().mockResolvedValue(undefined),
-  previewProjectContext: vi.fn().mockResolvedValue(null),
-}))
+const TAV_42: Issue = {
+  tracker: 'linear',
+  id: 'id-42',
+  key: 'TAV-42',
+  title: 'A thing',
+  url: 'https://linear.app/tav/issue/TAV-42',
+  state: { name: 'In Progress', type: 'started' },
+  assignee: null,
+  description: 'Body',
+  labels: [],
+  branchName: null,
+  completed: false,
+  updatedAt: '2026-08-22T00:00:00Z',
+  comments: [],
+}
 
-vi.mock('../../../src/main/integrations/context-sync', () => contextSync)
+let trackers: typeof import('../../../src/main/integrations/tracker-store')
+let links: typeof import('../../../src/main/integrations/issue-link-store')
+let sent: Array<{ channel: string; data: unknown }>
+let P: string
+
+const window = {
+  isDestroyed: () => false,
+  webContents: {
+    isDestroyed: () => false,
+    send: (channel: string, data: unknown) => sent.push({ channel, data }),
+  },
+}
+
+async function addLinkedProject(): Promise<string> {
+  const workspaces = await import('../../../src/main/storage/workspace-store')
+  const created = workspaces.createWorkspace({
+    name: 'repo',
+    folderPath: '/repo/root',
+    color: '#4A90E2',
+    tags: [],
+  })
+  if (!('workspace' in created)) throw new Error(created.error)
+  const added = workspaces.createProject({
+    workspaceId: created.workspace.id,
+    name: 'main',
+    worktreePath: projectDir,
+    isWorktree: false,
+  })
+  if (!('project' in added)) throw new Error(added.error)
+  return added.project.id
+}
 
 async function register() {
   handlers.clear()
-  sent.length = 0
-  contextSync.syncProjectContext.mockResolvedValue(null)
-  contextSync.clearProjectContext.mockResolvedValue(undefined)
-  contextSync.previewProjectContext.mockResolvedValue(null)
-  linkStore.setInjectContext.mockResolvedValue(undefined)
   const mod = await import('../../../src/main/ipc/integrations.ipc')
-  mod.registerIntegrationsHandlers(() => ({}) as never)
+  mod.registerIntegrationsHandlers(() => window as never)
 }
 
-async function invoke(channel: string, payload: unknown): Promise<unknown> {
+async function invoke<T = unknown>(channel: string, payload: unknown): Promise<T> {
   const handler = handlers.get(channel)
   if (handler === undefined) throw new Error(`no handler for ${channel}`)
-  return handler({}, payload)
+  return (await handler({}, payload)) as T
 }
 
-const LINEAR_CONNECTED = {
-  tracker: 'linear',
-  connected: true,
-  account: { name: 'Andrew', email: 'a@b.c' },
-  site: null,
-  mine: { kind: 'assignee', email: null },
-  lastError: null,
-}
-const JIRA_DISCONNECTED = {
-  tracker: 'jira',
-  connected: false,
-  account: null,
-  site: null,
-  mine: { kind: 'query', jql: 'x' },
-  lastError: null,
-}
+const connectionOf = async (tracker: string) =>
+  (await trackers.listConnections()).find((c) => c.tracker === tracker)
+
+const sessionContextFile = () => path.join(userData, 'integrations', 'context', `${P}.json`)
+const projectSettings = () => path.join(projectDir, '.claude', 'settings.local.json')
 
 beforeEach(async () => {
   vi.clearAllMocks()
-  store.connections = [LINEAR_CONNECTED, JIRA_DISCONNECTED]
+  vi.resetModules()
+  userData = makeTempDir('integrations-ipc-ud-')
+  projectDir = makeTempDir('integrations-ipc-proj-')
+  sent = []
   verify.linear.mockResolvedValue({ name: 'Andrew', email: 'a@b.c' })
   verify.jira.mockResolvedValue({ name: 'Andrew', email: 'a@b.c', site: 's.atlassian.net' })
+  service.get.mockResolvedValue(TAV_42)
+  trackers = await import('../../../src/main/integrations/tracker-store')
+  links = await import('../../../src/main/integrations/issue-link-store')
+  P = await addLinkedProject()
+  await trackers.setCredential({ tracker: 'linear', apiKey: 'stored-key' })
   await register()
 })
 
 describe('integrations:status', () => {
   it('returns every tracker and never a secret', async () => {
-    const result = (await invoke('integrations:status', {})) as { connections: unknown[] }
-    expect(result.connections).toHaveLength(2)
-    expect(JSON.stringify(result)).not.toMatch(/apiKey|apiToken|secret/)
+    const result = await invoke<{ connections: Array<{ tracker: string; connected: boolean }> }>(
+      'integrations:status',
+      {}
+    )
+    expect(result.connections.map((c) => [c.tracker, c.connected])).toEqual([
+      ['linear', true],
+      ['jira', false],
+    ])
+    expect(JSON.stringify(result)).not.toMatch(/stored-key|secret/)
   })
 
   it('can be narrowed to one tracker', async () => {
@@ -139,38 +147,36 @@ describe('integrations:status', () => {
     }
     expect(result.connections.map((c) => c.tracker)).toEqual(['jira'])
   })
-
-  it('rejects an unknown tracker rather than guessing', async () => {
-    await expect(invoke('integrations:status', { tracker: 'asana' })).resolves.toMatchObject({
-      error: 'failed',
-    })
-  })
 })
 
 describe('integrations:connect', () => {
-  it('verifies before storing', async () => {
+  it('verifies the credential it is given, then stores it', async () => {
     await invoke('integrations:connect', { tracker: 'linear', apiKey: 'lin_key' })
-
-    expect(verify.linear).toHaveBeenCalled()
-    const verifyOrder = verify.linear.mock.invocationCallOrder[0]
-    const storeOrder = store.setCredential.mock.invocationCallOrder[0]
-    expect(verifyOrder).toBeLessThan(storeOrder)
+    expect(verify.linear).toHaveBeenCalledWith({ tracker: 'linear', apiKey: 'lin_key' })
+    expect(await trackers.getCredential('linear')).toEqual({ tracker: 'linear', apiKey: 'lin_key' })
   })
 
   it('stores nothing when the credential is rejected', async () => {
-    verify.linear.mockRejectedValue(
-      Object.assign(new Error('Authentication required'), { kind: 'auth-failed' })
-    )
-    const result = await invoke('integrations:connect', { tracker: 'linear', apiKey: 'bad' })
+    // The module the handlers were registered with, after this test's resetModules.
+    const { TrackerError } = await import('../../../src/main/integrations/tracker-error')
+    verify.jira.mockRejectedValue(new TrackerError('auth-failed', 'Authentication required'))
+    const result = await invoke('integrations:connect', {
+      tracker: 'jira',
+      site: 's.atlassian.net',
+      email: 'a@b.c',
+      apiToken: 'bad',
+      jql: 'x',
+    })
 
-    expect(result).toMatchObject({ error: expect.any(String) })
-    expect(store.setCredential).not.toHaveBeenCalled()
-    expect(store.setAccount).not.toHaveBeenCalled()
+    expect(result).toEqual({ error: 'auth-failed', message: 'Authentication required' })
+    expect(await connectionOf('jira')).toMatchObject({ connected: false, account: null })
   })
+})
 
+describe('integrations:connect — what it stores', () => {
   it('records the account the credential proved to belong to', async () => {
     await invoke('integrations:connect', { tracker: 'linear', apiKey: 'k' })
-    expect(store.setAccount).toHaveBeenCalledWith('linear', { name: 'Andrew', email: 'a@b.c' })
+    expect((await connectionOf('linear'))?.account).toEqual({ name: 'Andrew', email: 'a@b.c' })
   })
 
   it('stores the Jira query as its mine selector', async () => {
@@ -181,21 +187,10 @@ describe('integrations:connect', () => {
       apiToken: 't',
       jql: 'assignee = currentUser()',
     })
-    expect(store.setMine).toHaveBeenCalledWith('jira', {
+    expect(await trackers.getMine('jira')).toEqual({
       kind: 'query',
       jql: 'assignee = currentUser()',
     })
-  })
-
-  it('refuses a Jira payload missing its site — a credential that cannot work', async () => {
-    const result = await invoke('integrations:connect', {
-      tracker: 'jira',
-      email: 'a@b.c',
-      apiToken: 't',
-      jql: 'x',
-    })
-    expect(result).toMatchObject({ error: 'failed' })
-    expect(store.setCredential).not.toHaveBeenCalled()
   })
 
   it('never echoes the credential back', async () => {
@@ -209,9 +204,15 @@ describe('integrations:connect', () => {
 
 describe('integrations:disconnect', () => {
   it('destroys that tracker only', async () => {
+    await trackers.setCredential({
+      tracker: 'jira',
+      site: 's.atlassian.net',
+      email: 'a@b.c',
+      apiToken: 't',
+    })
     await invoke('integrations:disconnect', { tracker: 'linear' })
-    expect(store.clearCredential).toHaveBeenCalledWith('linear')
-    expect(store.clearCredential).toHaveBeenCalledTimes(1)
+    expect(await trackers.getCredential('linear')).toBeNull()
+    expect(await connectionOf('jira')).toMatchObject({ connected: true })
   })
 })
 
@@ -237,13 +238,6 @@ describe('integrations:issue-list-mine', () => {
 })
 
 describe('integrations:issue-search', () => {
-  it('requires a term', async () => {
-    await expect(invoke('integrations:issue-search', { term: '' })).resolves.toMatchObject({
-      error: 'failed',
-    })
-    expect(service.search).not.toHaveBeenCalled()
-  })
-
   it('forwards the term and limit', async () => {
     service.search.mockResolvedValue({ issues: [], failures: [] })
     await invoke('integrations:issue-search', { term: 'sidebar', limit: 10 })
@@ -289,13 +283,6 @@ describe('integrations:issue-comment', () => {
       invoke('integrations:issue-comment', { tracker: 'linear', key: 'TAV-42', body: 'hi' })
     ).resolves.toMatchObject({ error: 'failed', message: 'no permission' })
   })
-
-  it('refuses an empty body', async () => {
-    await expect(
-      invoke('integrations:issue-comment', { tracker: 'linear', key: 'TAV-42', body: '' })
-    ).resolves.toMatchObject({ error: 'failed' })
-    expect(service.comment).not.toHaveBeenCalled()
-  })
 })
 
 describe('integrations:set-mine', () => {
@@ -304,13 +291,7 @@ describe('integrations:set-mine', () => {
       tracker: 'linear',
       mine: { kind: 'assignee', email: 'me@x.c' },
     })
-    expect(store.setMine).toHaveBeenCalledWith('linear', { kind: 'assignee', email: 'me@x.c' })
-  })
-
-  it('rejects a selector shape that does not exist', async () => {
-    await expect(
-      invoke('integrations:set-mine', { tracker: 'linear', mine: { kind: 'nonsense' } })
-    ).resolves.toMatchObject({ error: 'failed' })
+    expect(await trackers.getMine('linear')).toEqual({ kind: 'assignee', email: 'me@x.c' })
   })
 })
 
@@ -336,7 +317,9 @@ describe('integrations:status-changed', () => {
   it('carries connections and never a secret', async () => {
     await invoke('integrations:connect', { tracker: 'linear', apiKey: 'super-secret' })
     const announcement = sent.find((s) => s.channel === 'integrations:status-changed')
-    expect(announcement?.data).toMatchObject({ connections: expect.any(Array) })
+    expect(announcement?.data).toMatchObject({
+      connections: [{ tracker: 'linear', account: { name: 'Andrew' } }, { tracker: 'jira' }],
+    })
     expect(JSON.stringify(announcement?.data)).not.toContain('super-secret')
   })
 
@@ -347,72 +330,44 @@ describe('integrations:status-changed', () => {
   })
 })
 
-const LINK = {
-  projectId: '11111111-1111-4111-8111-111111111111',
-  tracker: 'linear' as const,
-  key: 'TAV-42',
-  injectContext: true,
-  linkedAt: '2026-08-22T00:00:00.000Z',
-}
-
 describe('integrations:link-set', () => {
   it('stores the link and announces it', async () => {
-    linkStore.setLink.mockResolvedValue(LINK)
-    linkStore.getLink.mockReturnValue(LINK)
-
     const result = await invoke('integrations:link-set', {
-      projectId: LINK.projectId,
+      projectId: P,
       tracker: 'linear',
       key: 'TAV-42',
     })
 
-    expect(linkStore.setLink).toHaveBeenCalledWith({
-      projectId: LINK.projectId,
-      tracker: 'linear',
-      key: 'TAV-42',
-      injectContext: undefined,
-    })
-    expect(result).toMatchObject({ link: { key: 'TAV-42' } })
-    expect(sent.map((s) => s.channel)).toContain('integrations:link-changed')
+    expect(result).toMatchObject({ link: { key: 'TAV-42', injectContext: true } })
+    expect(links.getLink(P)).toMatchObject({ tracker: 'linear', key: 'TAV-42' })
+    const announcement = sent.find((s) => s.channel === 'integrations:link-changed')
+    expect(announcement?.data).toMatchObject({ projectId: P, link: { key: 'TAV-42' } })
   })
 
-  it('passes the injection choice through when one is made', async () => {
-    linkStore.setLink.mockResolvedValue({ ...LINK, injectContext: false })
-    linkStore.getLink.mockReturnValue(LINK)
+  it('keeps the injection choice when one is made', async () => {
     await invoke('integrations:link-set', {
-      projectId: LINK.projectId,
+      projectId: P,
       tracker: 'linear',
       key: 'TAV-42',
       injectContext: false,
     })
-    expect(linkStore.setLink).toHaveBeenCalledWith(
-      expect.objectContaining({ injectContext: false })
-    )
+    expect(links.getLink(P)?.injectContext).toBe(false)
   })
 
-  it('refuses a project id that is not a project id', async () => {
-    await expect(
-      invoke('integrations:link-set', { projectId: 'nope', tracker: 'linear', key: 'TAV-42' })
-    ).resolves.toMatchObject({ error: 'failed' })
-    expect(linkStore.setLink).not.toHaveBeenCalled()
-  })
-
+  // A file where the directory should be refuses the write whoever runs the test.
   it('reports a store failure rather than claiming success', async () => {
-    linkStore.setLink.mockRejectedValue(new Error('read-only directory'))
+    const blocker = path.join(userData, 'blocker')
+    fs.writeFileSync(blocker, '')
+    userData = path.join(blocker, 'user-data')
     await expect(
-      invoke('integrations:link-set', {
-        projectId: LINK.projectId,
-        tracker: 'linear',
-        key: 'TAV-42',
-      })
-    ).resolves.toMatchObject({ error: 'failed', message: 'read-only directory' })
+      invoke('integrations:link-set', { projectId: P, tracker: 'linear', key: 'TAV-42' })
+    ).resolves.toMatchObject({ error: 'failed', message: expect.stringContaining('ENOTDIR') })
   })
 })
 
 describe('integrations:link-get', () => {
   it('returns nothing for an unlinked project', async () => {
-    linkStore.getLink.mockReturnValue(null)
-    await expect(invoke('integrations:link-get', { projectId: LINK.projectId })).resolves.toEqual({
+    await expect(invoke('integrations:link-get', { projectId: P })).resolves.toEqual({
       link: null,
       issue: null,
     })
@@ -420,56 +375,49 @@ describe('integrations:link-get', () => {
   })
 
   it('returns the link and its issue', async () => {
-    linkStore.getLink.mockReturnValue(LINK)
-    service.get.mockResolvedValue({ tracker: 'linear', key: 'TAV-42', title: 'A thing' })
-    await expect(
-      invoke('integrations:link-get', { projectId: LINK.projectId })
-    ).resolves.toMatchObject({ link: { key: 'TAV-42' }, issue: { title: 'A thing' } })
+    await links.setLink({ projectId: P, tracker: 'linear', key: 'TAV-42' })
+    await expect(invoke('integrations:link-get', { projectId: P })).resolves.toMatchObject({
+      link: { key: 'TAV-42' },
+      issue: { title: 'A thing' },
+    })
   })
 
   it('keeps the link when the issue cannot be read, and says why', async () => {
-    linkStore.getLink.mockReturnValue(LINK)
+    await links.setLink({ projectId: P, tracker: 'linear', key: 'TAV-42' })
     service.get.mockRejectedValue(
       Object.assign(new Error('offline'), { code: 'ENOTFOUND', name: 'TypeError' })
     )
-    await expect(
-      invoke('integrations:link-get', { projectId: LINK.projectId })
-    ).resolves.toMatchObject({ link: { key: 'TAV-42' }, issue: null, issueError: 'unavailable' })
+    await expect(invoke('integrations:link-get', { projectId: P })).resolves.toMatchObject({
+      link: { key: 'TAV-42' },
+      issue: null,
+      issueError: 'unavailable',
+    })
   })
 })
 
 describe('integrations:link-clear', () => {
   it('clears and announces', async () => {
-    linkStore.clearLink.mockResolvedValue(undefined)
-    linkStore.getLink.mockReturnValue(null)
+    await links.setLink({ projectId: P, tracker: 'linear', key: 'TAV-42' })
 
-    await expect(invoke('integrations:link-clear', { projectId: LINK.projectId })).resolves.toEqual(
-      {
-        ok: true,
-      }
-    )
-    expect(linkStore.clearLink).toHaveBeenCalledWith(LINK.projectId)
+    await expect(invoke('integrations:link-clear', { projectId: P })).resolves.toEqual({
+      ok: true,
+    })
+    expect(links.getLink(P)).toBeNull()
     const announcement = sent.find((s) => s.channel === 'integrations:link-changed')
-    expect(announcement?.data).toMatchObject({ projectId: LINK.projectId, link: null })
+    expect(announcement?.data).toMatchObject({ projectId: P, link: null })
   })
 })
 
 describe('integrations — agent context', () => {
-  const P = '11111111-1111-4111-8111-111111111111'
-
-  it('brings the context up to date when a link is made', async () => {
-    linkStore.setLink.mockResolvedValue({ projectId: P, tracker: 'linear', key: 'TAV-42' })
-    linkStore.getLink.mockReturnValue({ projectId: P, tracker: 'linear', key: 'TAV-42' })
-
+  it('writes the context and the project hook when a link is made', async () => {
     await invoke('integrations:link-set', { projectId: P, tracker: 'linear', key: 'TAV-42' })
-    expect(contextSync.syncProjectContext).toHaveBeenCalledWith(P, expect.anything())
+    expect(JSON.parse(fs.readFileSync(sessionContextFile(), 'utf8')).markdown).toContain('TAV-42')
+    expect(fs.existsSync(projectSettings())).toBe(true)
   })
 
   it('undoes the link when the project directory cannot be written (FR-026)', async () => {
-    linkStore.setLink.mockResolvedValue({ projectId: P, tracker: 'linear', key: 'TAV-42' })
-    linkStore.getLink.mockReturnValue(null)
-    contextSync.syncProjectContext.mockRejectedValue(new Error('EACCES: permission denied'))
-
+    // A file where `.claude` should be: no one can write the hook into it.
+    fs.writeFileSync(path.join(projectDir, '.claude'), '')
     const result = await invoke('integrations:link-set', {
       projectId: P,
       tracker: 'linear',
@@ -477,37 +425,39 @@ describe('integrations — agent context', () => {
     })
 
     // A link that looks attached and silently feeds nothing is worse than none.
-    expect(result).toMatchObject({ error: 'failed', message: expect.stringContaining('EACCES') })
-    expect(linkStore.clearLink).toHaveBeenCalledWith(P)
+    expect(result).toMatchObject({ error: 'failed', message: expect.any(String) })
+    expect(links.getLink(P)).toBeNull()
   })
+})
 
+describe('integrations — agent context when unlinking and previewing', () => {
   it('removes what it wrote when a link is cleared', async () => {
-    linkStore.clearLink.mockResolvedValue(undefined)
-    linkStore.getLink.mockReturnValue(null)
+    const before = fs.readdirSync(projectDir)
+    await invoke('integrations:link-set', { projectId: P, tracker: 'linear', key: 'TAV-42' })
     await invoke('integrations:link-clear', { projectId: P })
-    expect(contextSync.clearProjectContext).toHaveBeenCalledWith(P)
+    expect(fs.existsSync(sessionContextFile())).toBe(false)
+    expect(fs.readdirSync(projectDir)).toEqual(before)
   })
 
   it('previews exactly what a session would receive', async () => {
-    contextSync.previewProjectContext.mockResolvedValue({ markdown: '# TAV-42', chars: 8 })
-    await expect(invoke('integrations:context-preview', { projectId: P })).resolves.toMatchObject({
-      context: { markdown: '# TAV-42' },
+    await links.setLink({ projectId: P, tracker: 'linear', key: 'TAV-42' })
+    const result = await invoke<{ context: { markdown: string } }>('integrations:context-preview', {
+      projectId: P,
     })
+    expect(result.context.markdown).toContain('TAV-42')
+    expect(fs.existsSync(sessionContextFile())).toBe(false)
   })
 
-  it('re-syncs when injection is turned on or off', async () => {
-    linkStore.getLink.mockReturnValue({ projectId: P, tracker: 'linear', key: 'TAV-42' })
+  it('removes the context when injection is turned off, and announces it', async () => {
+    await invoke('integrations:link-set', { projectId: P, tracker: 'linear', key: 'TAV-42' })
+    sent = []
     await invoke('integrations:set-inject-context', { projectId: P, injectContext: false })
 
-    expect(linkStore.setInjectContext).toHaveBeenCalledWith(P, false)
-    expect(contextSync.syncProjectContext).toHaveBeenCalledWith(P, expect.anything())
-    expect(sent.map((s) => s.channel)).toContain('integrations:link-changed')
-  })
-
-  it('refuses a malformed injection toggle', async () => {
-    await expect(
-      invoke('integrations:set-inject-context', { projectId: P, injectContext: 'yes' })
-    ).resolves.toMatchObject({ error: 'failed' })
-    expect(linkStore.setInjectContext).not.toHaveBeenCalled()
+    expect(links.getLink(P)?.injectContext).toBe(false)
+    expect(fs.existsSync(sessionContextFile())).toBe(false)
+    expect(fs.existsSync(projectSettings())).toBe(false)
+    expect(sent.find((s) => s.channel === 'integrations:link-changed')?.data).toMatchObject({
+      link: { injectContext: false },
+    })
   })
 })

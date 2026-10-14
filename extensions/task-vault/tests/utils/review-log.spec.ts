@@ -6,16 +6,25 @@ const mockInvoke = vi.fn()
 beforeEach(() => {
   vi.clearAllMocks()
   mockInvoke.mockResolvedValue({})
-  ;(globalThis as unknown as { window: unknown }).window = {
-    electronAPI: { extensionBridge: { invoke: mockInvoke } },
-  }
+  Object.assign(globalThis, {
+    window: {
+      electronAPI: { extensionBridge: { invoke: mockInvoke } },
+    },
+  })
 })
 
 afterEach(() => {
-  delete (globalThis as unknown as { window?: unknown }).window
+  Reflect.deleteProperty(globalThis, 'window')
 })
 
-describe('logReviewAction', () => {
+describe('logReviewAction', reviewLogActionTests)
+
+function reviewLogActionTests() {
+  describe('logging', logReviewActionLoggingTests)
+  describe('outside reviews and failures', logReviewActionOutsideReviewsFailuresTests)
+}
+
+function logReviewActionLoggingTests() {
   it('sends the action against the review', () => {
     logReviewAction('r1', {
       step: 5,
@@ -34,7 +43,9 @@ describe('logReviewAction', () => {
       entityLabel: 'Ship it',
     })
   })
+}
 
+function logReviewActionOutsideReviewsFailuresTests() {
   it('does nothing outside a review, so the shared inbox processor is unaffected', () => {
     logReviewAction(null, {
       step: 2,
@@ -61,4 +72,4 @@ describe('logReviewAction', () => {
     await vi.waitFor(() => expect(consoleError).toHaveBeenCalled())
     consoleError.mockRestore()
   })
-})
+}

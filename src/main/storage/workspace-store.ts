@@ -1,7 +1,8 @@
-import Store from 'electron-store'
+import { CachedStore } from './cached-store.js'
 import { randomUUID } from 'crypto'
+import type { z } from 'zod'
 import type { Workspace, Project } from '../../shared/types/index.js'
-import {
+import type {
   CreateWorkspaceInputSchema,
   UpdateWorkspaceInputSchema,
   CreateProjectInputSchema,
@@ -11,12 +12,15 @@ import {
   ReorderProjectsSchema,
 } from '../../shared/schemas/workspace.schema.js'
 
+// Every write below is reached only through its IPC channel, which has already
+// parsed the payload with the schema named in its parameter type (ADR 096).
+
 interface StoreSchema {
   workspaces: Workspace[]
   projects: Project[]
 }
 
-const store = new Store<StoreSchema>({
+const store = new CachedStore<StoreSchema>({
   name: 'workspaces',
   defaults: {
     workspaces: [],
@@ -28,18 +32,18 @@ function now(): string {
   return new Date().toISOString()
 }
 
+export function onWorkspacesChanged(listener: () => void): () => void {
+  return store.onAnyChange(listener)
+}
+
 export function listWorkspaces(): Workspace[] {
   return store.get('workspaces')
 }
 
 export function createWorkspace(
-  input: unknown
-): { workspace: Workspace } | { error: 'DUPLICATE_NAME' | 'VALIDATION_ERROR'; message?: string } {
-  const parsed = CreateWorkspaceInputSchema.safeParse(input)
-  if (!parsed.success) {
-    return { error: 'VALIDATION_ERROR', message: parsed.error.message }
-  }
-  const { name, folderPath, color, tags } = parsed.data
+  input: z.infer<typeof CreateWorkspaceInputSchema>
+): { workspace: Workspace } | { error: 'DUPLICATE_NAME' } {
+  const { name, folderPath, color, tags } = input
   const workspaces = store.get('workspaces')
   if (workspaces.some((w) => w.name.toLowerCase() === name.toLowerCase())) {
     return { error: 'DUPLICATE_NAME' }
@@ -58,15 +62,9 @@ export function createWorkspace(
 }
 
 export function updateWorkspace(
-  input: unknown
-):
-  | { workspace: Workspace }
-  | { error: 'DUPLICATE_NAME' | 'NOT_FOUND' | 'VALIDATION_ERROR'; message?: string } {
-  const parsed = UpdateWorkspaceInputSchema.safeParse(input)
-  if (!parsed.success) {
-    return { error: 'VALIDATION_ERROR', message: parsed.error.message }
-  }
-  const { id, name, ...rest } = parsed.data
+  input: z.infer<typeof UpdateWorkspaceInputSchema>
+): { workspace: Workspace } | { error: 'DUPLICATE_NAME' | 'NOT_FOUND' } {
+  const { id, name, ...rest } = input
   const workspaces = store.get('workspaces')
   const idx = workspaces.findIndex((w) => w.id === id)
   if (idx === -1) return { error: 'NOT_FOUND' }
@@ -101,15 +99,9 @@ export function listProjects(workspaceId: string): Project[] {
 }
 
 export function createProject(
-  input: unknown
-):
-  | { project: Project }
-  | { error: 'DUPLICATE_NAME' | 'WORKSPACE_NOT_FOUND' | 'VALIDATION_ERROR'; message?: string } {
-  const parsed = CreateProjectInputSchema.safeParse(input)
-  if (!parsed.success) {
-    return { error: 'VALIDATION_ERROR', message: parsed.error.message }
-  }
-  const { workspaceId, name, gitBranch, worktreePath, isWorktree } = parsed.data
+  input: z.infer<typeof CreateProjectInputSchema>
+): { project: Project } | { error: 'DUPLICATE_NAME' | 'WORKSPACE_NOT_FOUND' } {
+  const { workspaceId, name, gitBranch, worktreePath, isWorktree } = input
   const workspaces = store.get('workspaces')
   if (!workspaces.some((w) => w.id === workspaceId)) {
     return { error: 'WORKSPACE_NOT_FOUND' }
@@ -128,7 +120,7 @@ export function createProject(
     name,
     gitBranch,
     worktreePath,
-    isWorktree: isWorktree ?? false,
+    isWorktree,
     createdAt: now(),
     updatedAt: now(),
   }
@@ -137,14 +129,12 @@ export function createProject(
 }
 
 export function updateProjectBranch(
-  input: unknown
-): { project: Project } | { error: 'NOT_FOUND' | 'VALIDATION_ERROR' } {
-  const parsed = UpdateProjectBranchSchema.safeParse(input)
-  if (!parsed.success) return { error: 'VALIDATION_ERROR' }
+  input: z.infer<typeof UpdateProjectBranchSchema>
+): { project: Project } | { error: 'NOT_FOUND' } {
   const projects = store.get('projects')
-  const idx = projects.findIndex((p) => p.id === parsed.data.id)
+  const idx = projects.findIndex((p) => p.id === input.id)
   if (idx === -1) return { error: 'NOT_FOUND' }
-  const updated = { ...projects[idx], gitBranch: parsed.data.gitBranch, updatedAt: now() }
+  const updated = { ...projects[idx], gitBranch: input.gitBranch, updatedAt: now() }
   const next = [...projects]
   next[idx] = updated
   store.set('projects', next)
@@ -162,11 +152,9 @@ export function deleteProject(id: string): { success: boolean } {
 }
 
 export function renameProject(
-  input: unknown
-): { project: Project } | { error: 'NOT_FOUND' | 'DUPLICATE_NAME' | 'VALIDATION_ERROR' } {
-  const parsed = RenameProjectSchema.safeParse(input)
-  if (!parsed.success) return { error: 'VALIDATION_ERROR' }
-  const { id, name } = parsed.data
+  input: z.infer<typeof RenameProjectSchema>
+): { project: Project } | { error: 'NOT_FOUND' | 'DUPLICATE_NAME' } {
+  const { id, name } = input
   const projects = store.get('projects')
   const idx = projects.findIndex((p) => p.id === id)
   if (idx === -1) return { error: 'NOT_FOUND' }
@@ -186,10 +174,9 @@ export function renameProject(
   return { project: updated }
 }
 
-export function reorderWorkspaces(input: unknown): { success: boolean } {
-  const parsed = ReorderWorkspacesSchema.safeParse(input)
-  if (!parsed.success) return { success: false }
-  const { ids } = parsed.data
+export function reorderWorkspaces({ ids }: z.infer<typeof ReorderWorkspacesSchema>): {
+  success: boolean
+} {
   const workspaces = store.get('workspaces')
   const map = new Map(workspaces.map((w) => [w.id, w]))
   const reordered = ids.flatMap((id) => (map.get(id) ? [map.get(id)!] : []))
@@ -198,10 +185,9 @@ export function reorderWorkspaces(input: unknown): { success: boolean } {
   return { success: true }
 }
 
-export function reorderProjects(input: unknown): { success: boolean } {
-  const parsed = ReorderProjectsSchema.safeParse(input)
-  if (!parsed.success) return { success: false }
-  const { workspaceId, ids } = parsed.data
+export function reorderProjects({ workspaceId, ids }: z.infer<typeof ReorderProjectsSchema>): {
+  success: boolean
+} {
   const projects = store.get('projects')
   const forWs = projects.filter((p) => p.workspaceId === workspaceId)
   const other = projects.filter((p) => p.workspaceId !== workspaceId)

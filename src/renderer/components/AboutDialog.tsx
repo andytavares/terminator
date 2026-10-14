@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
+import { Dialog } from '@terminator/extension-ui'
 import { useModalEffect } from '../stores/modal.store'
-import './sidebar/Dialog.css'
 import './AboutDialog.css'
 
 interface AppInfo {
@@ -16,16 +16,12 @@ interface Props {
   onClose: () => void
 }
 
-export function AboutDialog({ onClose }: Props) {
-  useModalEffect()
+type DbStatus = { ok: boolean; message?: string }
+
+/** The app's versions and the database's health, as main reports them. */
+function useAppInfo(): { info: AppInfo | null; dbStatus: DbStatus | null } {
   const [info, setInfo] = useState<AppInfo | null>(null)
-  const [dbStatus, setDbStatus] = useState<{ ok: boolean; message?: string } | null>(null)
-  const closeRef = useRef<HTMLButtonElement>(null)
-
-  useEffect(() => {
-    closeRef.current?.focus()
-  }, [])
-
+  const [dbStatus, setDbStatus] = useState<DbStatus | null>(null)
   useEffect(() => {
     window.electronAPI.app
       .getInfo()
@@ -36,24 +32,34 @@ export function AboutDialog({ onClose }: Props) {
       .then(setDbStatus)
       .catch(() => setDbStatus({ ok: false, message: 'IPC error' }))
   }, [])
+  return { info, dbStatus }
+}
 
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', handler)
-    return () => document.removeEventListener('keydown', handler)
-  }, [onClose])
+function dbStatusText(dbStatus: DbStatus | null): string {
+  if (dbStatus === null) return '—'
+  return dbStatus.ok ? 'OK' : `Error — ${dbStatus.message ?? 'unknown'}`
+}
+
+function InfoRow({ label, value }: { label: string; value: string | undefined }) {
+  return (
+    <div className="about-dialog__row">
+      <dt>{label}</dt>
+      <dd>{value ?? '—'}</dd>
+    </div>
+  )
+}
+
+export function AboutDialog({ onClose }: Props) {
+  useModalEffect()
+  const { info, dbStatus } = useAppInfo()
 
   return (
-    <div className="dialog-overlay" onClick={onClose}>
-      <div
-        className="dialog about-dialog"
-        onClick={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-modal="true"
-        aria-label="About"
-      >
+    <Dialog
+      title="About"
+      onDismiss={onClose}
+      actions={[{ label: 'Close', tone: 'primary', onSelect: onClose }]}
+    >
+      <div className="about-dialog">
         <div className="about-dialog__header">
           <div className="about-dialog__logo">⬛</div>
           <div className="about-dialog__name">{info?.appName ?? 'Terminator'}</div>
@@ -61,40 +67,13 @@ export function AboutDialog({ onClose }: Props) {
         </div>
 
         <dl className="about-dialog__info">
-          <div className="about-dialog__row">
-            <dt>Electron</dt>
-            <dd>{info?.electronVersion ?? '—'}</dd>
-          </div>
-          <div className="about-dialog__row">
-            <dt>Node</dt>
-            <dd>{info?.nodeVersion ?? '—'}</dd>
-          </div>
-          <div className="about-dialog__row">
-            <dt>Chrome</dt>
-            <dd>{info?.chromeVersion ?? '—'}</dd>
-          </div>
-          <div className="about-dialog__row">
-            <dt>Platform</dt>
-            <dd>{info?.platform ?? '—'}</dd>
-          </div>
-          <div className="about-dialog__row">
-            <dt>DB</dt>
-            <dd>
-              {dbStatus === null
-                ? '—'
-                : dbStatus.ok
-                  ? 'OK'
-                  : `Error — ${dbStatus.message ?? 'unknown'}`}
-            </dd>
-          </div>
+          <InfoRow label="Electron" value={info?.electronVersion} />
+          <InfoRow label="Node" value={info?.nodeVersion} />
+          <InfoRow label="Chrome" value={info?.chromeVersion} />
+          <InfoRow label="Platform" value={info?.platform} />
+          <InfoRow label="DB" value={dbStatusText(dbStatus)} />
         </dl>
-
-        <div className="dialog__actions">
-          <button ref={closeRef} className="dialog__btn-primary" onClick={onClose}>
-            Close
-          </button>
-        </div>
       </div>
-    </div>
+    </Dialog>
   )
 }

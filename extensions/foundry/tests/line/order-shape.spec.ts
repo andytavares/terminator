@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { builderUnit } from '../helpers/order-parts.js'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -62,16 +63,9 @@ function allTextRed(): WorkOrder {
     },
     plan: {
       ...base.plan,
-      units: UNITS.map(({ id, dependsOn }) => ({
-        id,
-        title: id,
-        role: 'builder',
-        lane: 1,
-        dependsOn,
-        satisfies: ['AC-1'],
-        touches: ['src/renderer/styles.css'],
-        verify: [],
-      })),
+      units: UNITS.map(({ id, dependsOn }) =>
+        builderUnit(id, { dependsOn, satisfies: ['AC-1'], touches: ['src/renderer/styles.css'] })
+      ),
       lanes: [{ ord: 1, repo: 'terminator', branch: 'red', role: null, blocks: [], blockedBy: [] }],
     },
   }
@@ -85,6 +79,13 @@ function agents(order: WorkOrder, name: string): string[] {
 }
 
 describe('the shape WO-0907-3c1 would get now', () => {
+  describe('the proposed shape and its cost', theProposedShapeAndItsCostTests)
+  describe('what it keeps', orderShapeWhatItKeepsTests)
+  describe('nodes', orderShapeNodesTests)
+  describe('the standard shape and the architect', theStandardShapeAndTheArchitectTests)
+})
+
+function theProposedShapeAndItsCostTests() {
   it('is proposed the direct shape, because one lane graded P2 is not the heaviest work there is', () => {
     const proposal = proposeRecipe(allTextRed())
     expect(proposal.name).toBe('direct')
@@ -107,7 +108,9 @@ describe('the shape WO-0907-3c1 would get now', () => {
     expect(build).toHaveLength(1)
     expect(build[0].unitIds).toHaveLength(UNITS.length)
   })
+}
 
+function orderShapeWhatItKeepsTests() {
   it('keeps every unit, because the plan is still what the builder is told to do', () => {
     const build = buildRunGraph(allTextRed(), recipe('direct')).nodes.find(
       (node) => node.stepId === 'build'
@@ -121,7 +124,9 @@ describe('the shape WO-0907-3c1 would get now', () => {
     )
     expect(inspect?.state).toBe('waiting')
   })
+}
 
+function orderShapeNodesTests() {
   it('is eight nodes end to end, where it was twenty-one', () => {
     const graph = buildRunGraph(allTextRed(), recipe('direct'))
     expect(graph.nodes.length).toBeLessThanOrEqual(8)
@@ -137,7 +142,9 @@ describe('the shape WO-0907-3c1 would get now', () => {
     expect(lint?.kind).toBe('run')
     expect(lint?.state).toBe('skipped')
   })
+}
 
+function theStandardShapeAndTheArchitectTests() {
   // The heavy shape still exists and is still heavy — what changed is that a
   // one-lane order is no longer sent to it, and that it no longer spends a
   // session per unit twice over when it is.
@@ -156,4 +163,4 @@ describe('the shape WO-0907-3c1 would get now', () => {
       expect(agents(allTextRed(), name)).not.toContain('plan')
     }
   })
-})
+}

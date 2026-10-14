@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
-import type { ExtensionAPI } from '../../../../src/main/extensions/api.js'
-import { buildLaunchSpec, shellQuote } from './claude-launch.js'
+import type { ExtensionAPI } from '@terminator/extension-sdk'
+import { shellQuote } from '@terminator/extension-sdk/node'
+import { buildLaunchSpec } from './claude-launch.js'
 import { installHookScript } from './hook-script.js'
 import type { ControlServer } from './control-server.js'
 import {
@@ -20,7 +21,7 @@ import type { WatchedRun } from './stall-watcher.js'
  * It was one of ten fixed phase names. It is a string now because the shape of
  * work is chosen per order, so the set of steps is not knowable here.
  */
-export type StepLabel = string
+type StepLabel = string
 
 // Running a phase where the operator can see it.
 //
@@ -100,11 +101,12 @@ export interface StartSupervisedRunOptions {
    * The conversation is over, with the terminal's exit code when there is one.
    *
    * Zero when the runtime reported a clean `SessionEnd`; whatever the shell
-   * exited with when the tab was closed or the process died. A phase that
+   * exited with when the process died, and null when closing the tab or a
+   * signal ended it. A phase that
    * crashed must not land in `awaiting_review`, which is an approval gate over
    * nothing.
    */
-  onEnd?: (exitCode: number) => void
+  onEnd?: (exitCode: number | null) => void
 }
 
 /**
@@ -114,13 +116,13 @@ export interface StartSupervisedRunOptions {
  * the same conversation: the terminal, the session id and the transcript are
  * the card's, but "which phase finished" is not.
  */
-export interface PhaseCallbacks {
+interface PhaseCallbacks {
   onPending: (pending: PendingPermission) => void
   onResolved: (requestId: string, decision: PermissionOutcome) => void
   /** The ladder refused something without asking. Only refusals are reported. */
   onAutoDenied?: (toolName: string, reason: string) => void
   onTurnEnd?: (turns: number) => void
-  onEnd?: (exitCode: number) => void
+  onEnd?: (exitCode: number | null) => void
 }
 
 export interface RunCommandOptions {
@@ -160,7 +162,9 @@ export interface SupervisedRunner {
    * verdict is the exit status, so a model in between adds cost and a
    * transcript to read back, and nothing else.
    *
-   * Null when no project or tab could be opened — "not measured", never a pass.
+   * Null when no project or tab could be opened, or when the command ended
+   * without an exit status (a signal, or its tab closed first) — "not
+   * measured", never a pass.
    */
   runCommand(options: RunCommandOptions): Promise<number | null>
   /** The card's open conversation, if it still has one. */ /**
@@ -204,6 +208,13 @@ export interface SupervisedRunner {
  */
 function oneLine(text: string): string {
   return text.replace(/\r?\n/g, ' ').trim()
+}
+
+// The shell's arguments for a check: `-i -l -c` reads the startup files a typed command
+// got (https://zsh.sourceforge.io/Doc/Release/Files.html, https://www.gnu.org/software/bash/manual/html_node/Bash-Startup-Files.html),
+// then `exec` makes the single-quoted script the process whose exit code is reported.
+function startupFilesThen(shell: string, script: string): string[] {
+  return ['-i', '-l', '-c', `exec ${shellQuote(shell)} ${shellQuote(script)}`]
 }
 
 /** Escape. Ends the turn and keeps the session, which is what makes a redirect land. */
@@ -262,423 +273,463 @@ const INHERITED_SESSION_VARS = [
   'CLAUDECODE',
 ] as const
 
+/** What every part of one runner shares: the host, the control server, and the live runs. */
+interface RunnerContext {
+  readonly api: ExtensionAPI
+  readonly control: ControlServer
+  /** Where per-session settings and the hook script are written. */
+  readonly stateDir: string
+  readonly now: () => number
+  readonly hookScriptPath: string
+  readonly running: Map<string, Running>
+}
+
+function runnerContext(options: SupervisedRunnerOptions): RunnerContext {
+  return {
+    api: options.api,
+    control: options.control,
+    stateDir: options.stateDir,
+    now: options.now ?? Date.now,
+    hookScriptPath: installHookScript(options.stateDir),
+    running: new Map<string, Running>(),
+  }
+}
+
 export function createSupervisedRunner(options: SupervisedRunnerOptions): SupervisedRunner {
-  const { api, control, stateDir } = options
-  const now = options.now ?? Date.now
-  const hookScriptPath = installHookScript(stateDir)
-  const running = new Map<string, Running>()
-
-  /**
-   * The launch, as a file the terminal runs rather than a line it is typed.
-   *
-   * `MAX_CANON` is the reason: a terminal in canonical mode silently mangles
-   * anything past 1024 bytes on one line, and a brief — a role prompt plus a
-   * whole work order — is always longer. The `cat` echo is deliberate: the
-   * whole command still appears in the terminal, so what an agent was told is
-   * readable there, which is the point of running it in a terminal at all.
-   */
-  function writeLaunchScript(
-    sessionId: string,
-    parts: { exports: string; command: string }
-  ): string {
-    const dir = path.join(stateDir, 'launch')
-    fs.mkdirSync(dir, { recursive: true })
-    const file = path.join(dir, `${sessionId}.sh`)
-    fs.writeFileSync(
-      file,
-      [
-        '#!/bin/sh',
-        '# Written by Terminator. One per session; overwritten on every start.',
-        // A fresh agent must not inherit another session's identity.
-        //
-        // Terminator launched from a Claude Code terminal passes its whole
-        // environment down — Electron inherits the shell, the pty inherits
-        // Electron, `claude` inherits the pty — so the agent came up carrying
-        // the *parent's* bridge session, messaging socket and session id. It
-        // joined that bridge, sat at `lastSequenceNum: 0` waiting for
-        // instructions only the parent could send, and produced no turn at
-        // all. From the console it looked exactly like an agent thinking.
-        //
-        // `CLAUDE_CODE_CHILD_SESSION` was already known about and worked
-        // around with FORCE_SESSION_PERSISTENCE below; these are the rest of
-        // the same family.
-        `unset ${INHERITED_SESSION_VARS.join(' ')}`,
-        parts.exports,
-        // A quoted heredoc: nothing in the brief is expanded or run.
-        "cat <<'TERMINATOR_LAUNCH'",
-        parts.command,
-        'TERMINATOR_LAUNCH',
-        `exec ${parts.command}`,
-        '',
-      ].join('\n'),
-      { mode: 0o700 }
-    )
-    return file
+  const context = runnerContext(options)
+  const { running } = context
+  return {
+    start: (start) => startSupervisedRun(context, start),
+    runCommand: (command) => runCommandInTab(context, command),
+    continueRun: (sessionId, next) => continueRun(context, sessionId, next),
+    resolve: (sessionId, requestId, decision) =>
+      running.get(sessionId)?.bridge.resolve(requestId, decision) ?? false,
+    handBackToTerminal: (sessionId, requestId) =>
+      running.get(sessionId)?.bridge.handBackToTerminal(requestId),
+    interrupt: (sessionId) => interruptRun(context, sessionId),
+    stop: (sessionId, reason) => stopSupervisedRun(context, sessionId, reason),
+    send: (sessionId, message) => sendToSession(context, sessionId, message),
+    terminalFor: (sessionId) => terminalOf(running.get(sessionId)),
+    watchable: () => watchableRuns(running),
+    dispose: () => {
+      for (const sessionId of [...running.keys()]) end(context, sessionId, false)
+    },
   }
+}
 
-  /**
-   * A script that shows the command, then runs it and exits with its status.
-   *
-   * A file for the same reason the agent launch is one: a typed line past
-   * `MAX_CANON` is mangled. Run by the shell rather than `exec`ed, so a
-   * command with `&&` in it still works.
-   */
-  function writeCommandScript(id: string, command: string, logPath?: string): string {
-    const dir = path.join(stateDir, 'launch')
-    fs.mkdirSync(dir, { recursive: true })
-    const file = path.join(dir, `${id}.sh`)
-    // Not `set -o pipefail`: the script is run by the user's own $SHELL, which
-    // may not support it. A status file survives the pipe into tee instead.
-    const runLine =
-      logPath === undefined
-        ? command
-        : (() => {
-            fs.mkdirSync(path.dirname(logPath), { recursive: true })
-            const statusFile = `${file}.status`
-            // A subshell, not a brace group: the command may itself call
-            // `exit` (as a test runner does on failure), which would end the
-            // whole script before the status file is written if it shared
-            // the script's own shell.
-            return `{ ( ${command} ); echo $? > ${shellQuote(statusFile)}; } 2>&1 | tee ${shellQuote(logPath)}; exit "$(cat ${shellQuote(statusFile)})"`
-          })()
-    fs.writeFileSync(
-      file,
-      [
-        '#!/bin/sh',
-        '# Written by Terminator. One per command; overwritten on every run.',
-        "cat <<'TERMINATOR_LAUNCH'",
-        command,
-        'TERMINATOR_LAUNCH',
-        runLine,
-        '',
-      ].join('\n'),
-      { mode: 0o700 }
-    )
-    return file
-  }
+// The launch as a file the terminal runs, not a typed line: canonical mode mangles a
+// line past `MAX_CANON`, and a brief is longer. The `cat` echo keeps the whole command
+// readable in the terminal (SUPERVISION.md, "The launch is a file, not a typed line").
+function writeLaunchScript(
+  stateDir: string,
+  sessionId: string,
+  parts: { exports: string; command: string }
+): string {
+  const dir = path.join(stateDir, 'launch')
+  fs.mkdirSync(dir, { recursive: true })
+  const file = path.join(dir, `${sessionId}.sh`)
+  fs.writeFileSync(
+    file,
+    [
+      '#!/bin/sh',
+      '# Written by Terminator. One per session; overwritten on every start.',
+      // A fresh agent must not inherit the parent Claude Code session's identity from
+      // the environment (SUPERVISION.md, "A fresh agent, not the parent's session").
+      `unset ${INHERITED_SESSION_VARS.join(' ')}`,
+      parts.exports,
+      // A quoted heredoc: nothing in the brief is expanded or run.
+      "cat <<'TERMINATOR_LAUNCH'",
+      parts.command,
+      'TERMINATOR_LAUNCH',
+      `exec ${parts.command}`,
+      '',
+    ].join('\n'),
+    { mode: 0o700 }
+  )
+  return file
+}
 
-  /**
-   * `clean` closes the tab: a finished agent's terminal is a shell nobody
-   * needs. A failed one stays open so the operator can read why.
-   */
-  function end(sessionId: string, clean: boolean): void {
-    const run = running.get(sessionId)
-    if (run === undefined) return
-    running.delete(sessionId)
-    run.detachExit?.()
-    // Anything still waiting can no longer be answered from here, and an
-    // unresolved promise holds the agent's tool call open forever.
-    run.bridge.rejectAll('This run has ended')
-    run.release()
-    // Last and optional: an installed host older than `closeTerminalTab`
-    // threw here and skipped everything after it.
-    if (clean) api.pty.closeTerminalTab?.(run.terminalSessionId)
+/** One check's command, the id its script is named by, and where its output is kept. */
+interface CommandScript {
+  readonly id: string
+  readonly command: string
+  readonly logPath?: string
+}
+
+// A script that shows the command, runs it and exits with its status, which is the
+// tab's. Run by the shell, not `exec`ed, so `&&` in a command still works.
+function writeCommandScript(stateDir: string, { id, command, logPath }: CommandScript): string {
+  const dir = path.join(stateDir, 'launch')
+  fs.mkdirSync(dir, { recursive: true })
+  const file = path.join(dir, `${id}.sh`)
+  fs.writeFileSync(
+    file,
+    [
+      '#!/bin/sh',
+      '# Written by Terminator. One per command; overwritten on every run.',
+      "cat <<'TERMINATOR_LAUNCH'",
+      command,
+      'TERMINATOR_LAUNCH',
+      logPath === undefined ? command : teedRunLine(file, command, logPath),
+      '',
+    ].join('\n'),
+    { mode: 0o700 }
+  )
+  return file
+}
+
+// The line that runs the command, output kept in `logPath`, status the script's. No
+// `pipefail` (the user's $SHELL may lack it): a status file survives the pipe to tee.
+function teedRunLine(file: string, command: string, logPath: string): string {
+  fs.mkdirSync(path.dirname(logPath), { recursive: true })
+  const statusFile = `${file}.status`
+  // A subshell, not a brace group: a command that calls `exit` would otherwise end the
+  // script before the status file is written.
+  return `{ ( ${command} ); echo $? > ${shellQuote(statusFile)}; } 2>&1 | tee ${shellQuote(logPath)}; exit "$(cat ${shellQuote(statusFile)})"`
+}
+
+/** `clean` closes a finished agent's tab; a failed one stays open to read why. */
+function end(context: RunnerContext, sessionId: string, clean: boolean): void {
+  const run = context.running.get(sessionId)
+  if (run === undefined) return
+  context.running.delete(sessionId)
+  run.detachExit?.()
+  // Anything still waiting can no longer be answered from here, and an
+  // unresolved promise holds the agent's tool call open forever.
+  run.bridge.rejectAll('This run has ended')
+  run.release()
+  // Last and optional: an installed host older than `closeTerminalTab`
+  // threw here and skipped everything after it.
+  if (clean) context.api.pty.closeTerminalTab?.(run.terminalSessionId)
+}
+
+async function startSupervisedRun(
+  context: RunnerContext,
+  start: StartSupervisedRunOptions
+): Promise<SupervisedRun | null> {
+  // Ours, not the runtime's. Choosing it means the transcript path is known
+  // before the process exists and a hook callback needs no correlation.
+  const sessionId = start.resumeSessionId ?? randomUUID()
+
+  // A box shared with the record, so `continueRun` can move a hook to another phase
+  // without a new session; the closures exist before the record does.
+  const phase: Running['phase'] = { current: { id: start.phase, ...start } }
+
+  const bridge = permissionBridgeFor(context, sessionId, { phase, autoDecide: start.autoDecide })
+  const spec = launchSpecFor(context, sessionId, start)
+  const release = registerControl(context, sessionId, { bridge, phase, spec })
+
+  const opened = await openSupervisedTerminal(context, start)
+  if (opened === null) {
+    release()
+    return null
   }
+  const { projectId, terminalSessionId } = opened
+  const { transcriptPath } = spec
+  const featureDir = start.featureDir
+  const run = trackRun(context, sessionId, {
+    bridge,
+    release,
+    phase,
+    projectId,
+    terminalSessionId,
+    transcriptPath,
+    featureDir,
+  })
+
+  // Registered before a single keystroke reaches the terminal: the launch
+  // command is written below, and a hook or turn-end arriving before the
+  // caller had added the run would hit an empty registry and be dropped.
+  start.onRegistered?.({ ...run })
+  typeLaunch(context, run, { featureDir, command: spec.command })
+  return run
+}
+
+/** What a run's permission bridge reports to: the phase it belongs to now. */
+interface BridgeSeams {
+  readonly phase: Running['phase']
+  readonly autoDecide: StartSupervisedRunOptions['autoDecide']
+}
+
+function permissionBridgeFor(
+  context: RunnerContext,
+  sessionId: string,
+  { phase, autoDecide }: BridgeSeams
+): Running['bridge'] {
+  const { running, now } = context
+  return createPermissionBridge({
+    sessionId,
+    now,
+    autoDecide,
+    onAutoDenied: (toolName, reason) => phase.current.onAutoDenied?.(toolName, reason),
+    onPending: (pending) => {
+      // Held on a person, so the detector must not call it stuck.
+      const run = running.get(sessionId)
+      if (run !== undefined) run.isWaiting = true
+      phase.current.onPending(pending)
+    },
+    onResolved: (requestId, decision) => {
+      const run = running.get(sessionId)
+      if (run !== undefined) {
+        run.isWaiting = false
+        // However long the operator took is not the agent's silence.
+        run.startedAt = now()
+      }
+      phase.current.onResolved(requestId, decision)
+    },
+  })
+}
+
+function launchSpecFor(
+  context: RunnerContext,
+  sessionId: string,
+  start: StartSupervisedRunOptions
+): ReturnType<typeof buildLaunchSpec> {
+  const { control } = context
+  return buildLaunchSpec({
+    sessionId,
+    resume: start.resumeSessionId !== undefined,
+    cwd: start.worktreePath,
+    prompt: start.prompt,
+    model: start.model,
+    effort: start.effort,
+    addDirs: start.addDirs,
+    settingsDirectory: path.join(context.stateDir, 'settings'),
+    hookScriptPath: context.hookScriptPath,
+    controlUrl: control.url,
+    controlEventUrl: control.eventUrl,
+    controlToken: control.token,
+  })
+}
+
+/** What the control server's hooks for one session reach. */
+interface ControlSeams {
+  readonly bridge: Running['bridge']
+  readonly phase: Running['phase']
+  readonly spec: { readonly transcriptPath: string }
+}
+
+/** The session's hooks on the control server; returns what releases them. */
+function registerControl(
+  context: RunnerContext,
+  sessionId: string,
+  { bridge, phase, spec }: ControlSeams
+): () => void {
+  return context.control.register(sessionId, {
+    decide: (request) => bridge.canUseTool(request.toolName, request.input),
+    onEvent: (kind) => {
+      const run = context.running.get(sessionId)
+      if (kind === 'stop') {
+        // Finished responding and sitting at the prompt is blocked on a person, like a
+        // held call, so the stall detector must not read a finished phase as stuck.
+        if (run !== undefined) run.isWaiting = true
+        phase.current.onTurnEnd?.(countTurns(spec.transcriptPath))
+        return
+      }
+      phase.current.onEnd?.(0)
+      end(context, sessionId, true)
+    },
+  })
+}
+
+/** Where a run lives: its worktree's project, and the terminal tab in it. */
+async function openSupervisedTerminal(
+  { api }: RunnerContext,
+  start: StartSupervisedRunOptions
+): Promise<{ projectId: string; terminalSessionId: string } | null> {
+  // The worktree becomes a project, so the terminal has somewhere to live
+  // and the operator can find it in the sidebar rather than only in a card.
+  const project = await api.workspace.addProject({
+    workspaceId: start.workspaceId,
+    name: start.branch,
+    worktreePath: start.worktreePath,
+    gitBranch: start.branch,
+    issue: start.issue,
+  })
+  if (project === null) return null
+
+  const terminalSessionId = await api.pty.openTerminal({
+    projectId: project.id,
+    cwd: start.worktreePath,
+    tabTitle: start.title,
+    type: 'agent',
+  })
+  // No terminal, no run. Said out loud rather than starting an agent
+  // nobody can see, which is the thing this replaced.
+  if (terminalSessionId === null) return null
+  return { projectId: project.id, terminalSessionId }
+}
+
+/** The record of a run, from the moment its terminal exists; returns how a caller finds it. */
+function trackRun(
+  context: RunnerContext,
+  sessionId: string,
+  run: Omit<Running, 'detachExit' | 'startedAt' | 'isWaiting'>
+): SupervisedRun {
+  // The terminal dying is the other way a run ends: `session_end` fires only when the
+  // runtime exits cleanly, so a closed tab would leave the phase `running`.
+  const detachExit =
+    context.api.pty.onExit?.(run.terminalSessionId, (exitCode: number | null) => {
+      run.phase.current.onEnd?.(exitCode)
+      end(context, sessionId, exitCode === 0)
+    }) ?? null
+
+  context.running.set(sessionId, {
+    ...run,
+    detachExit,
+    startedAt: context.now(),
+    isWaiting: false,
+  })
+
+  // Before a keystroke reaches the terminal: everything already in this
+  // file belongs to the nodes that came before this one in the lane's
+  // conversation, and reading past it attributes their work to this node.
+  const { terminalSessionId, transcriptPath } = run
+  return {
+    sessionId,
+    terminalSessionId,
+    transcriptPath,
+    transcriptFrom: transcriptSize(transcriptPath),
+  }
+}
+
+// The launch, run through its script with the card's paths exported for the skills.
+// CLAUDE_CODE_FORCE_SESSION_PERSISTENCE keeps a nested session's transcript, which
+// all of this reads (SUPERVISION.md, "Two things the runtime does to a supervised run").
+function typeLaunch(
+  context: RunnerContext,
+  { sessionId, terminalSessionId }: SupervisedRun,
+  { featureDir, command }: { featureDir: string; command: string }
+): void {
+  const featureSlug = path.basename(featureDir)
+  const launchScript = writeLaunchScript(context.stateDir, sessionId, {
+    exports: `export SPECIFY_FEATURE=${shellQuote(featureSlug)} SPECIFY_FEATURE_DIRECTORY=${shellQuote(path.join('specs', featureSlug))} CLAUDE_CODE_FORCE_SESSION_PERSISTENCE=1`,
+    command,
+  })
+  context.api.pty.write(
+    terminalSessionId,
+    `${shellQuote(process.env.SHELL ?? '/bin/sh')} ${shellQuote(launchScript)}\r`
+  )
+}
+
+async function runCommandInTab(
+  { api, stateDir }: RunnerContext,
+  options: RunCommandOptions
+): Promise<number | null> {
+  const project = await api.workspace.addProject({
+    workspaceId: options.workspaceId,
+    name: options.branch,
+    worktreePath: options.worktreePath,
+    gitBranch: options.branch,
+    issue: options.issue,
+  })
+  if (project === null) return null
+
+  // The script is the tab's own process, so the exit the core reports is
+  // the command's, and null when a signal or a closed tab ended it first.
+  const script = writeCommandScript(stateDir, {
+    id: randomUUID(),
+    command: options.command,
+    logPath: options.logPath,
+  })
+  const shell = process.env.SHELL ?? '/bin/sh'
+  const exit = await api.pty.runInTerminal({
+    projectId: project.id,
+    cwd: options.worktreePath,
+    tabTitle: options.title,
+    type: 'human',
+    file: shell,
+    args: startupFilesThen(shell, script),
+  })
+  if (exit === null) return null
+  // A failure stays open, exited, as the record of what ran; a pass
+  // closes, and its output is in the log.
+  if (exit.exitCode === 0) api.pty.closeTerminalTab(exit.sessionId)
+  return exit.exitCode
+}
+
+function continueRun(
+  context: RunnerContext,
+  sessionId: string,
+  next: { prompt: string; phase: StepLabel } & PhaseCallbacks
+): SupervisedRun | null {
+  const run = context.running.get(sessionId)
+  // Gone: the tab was closed, the agent exited, or the console restarted.
+  // Saying so lets the caller open a fresh one rather than typing a
+  // `/speckit-plan` into a terminal that is not there.
+  if (run === undefined) return null
+
+  // Swapped before a keystroke reaches the terminal, or the first thing the
+  // new phase does is reported against the phase that just finished.
+  run.phase.current = { id: next.phase, ...next }
+  // A phase that begins on a held tool call is a phase that begins blocked,
+  // not stalled — but the previous phase left this true if it ended while
+  // something was waiting, and nothing else clears it.
+  run.isWaiting = false
+  // A new turn is a new state, and silence counts from when the state began, so a
+  // conversation resumed after a gap is not judged against a stale start.
+  run.startedAt = context.now()
+
+  // Typed as a person would type it. The agent is sitting at its prompt
+  // with the whole card's conversation behind it: the spec it wrote, the
+  // plan it derived from it, and every decision made in between.
+  context.api.pty.write(run.terminalSessionId, `${oneLine(next.prompt)}\r`)
 
   return {
-    async start(start: StartSupervisedRunOptions): Promise<SupervisedRun | null> {
-      // Ours, not the runtime's. Choosing it means the transcript path is known
-      // before the process exists and a hook callback needs no correlation.
-      const resuming = start.resumeSessionId !== undefined
-      const sessionId = start.resumeSessionId ?? randomUUID()
-
-      // Shared with the record below rather than closed over by value, so
-      // `continueRun` can swap which phase a hook belongs to without tearing
-      // the session down and building a new one. A box, because these closures
-      // are installed before the record exists.
-      const phase: Running['phase'] = { current: { id: start.phase, ...start } }
-
-      const bridge = createPermissionBridge({
-        sessionId,
-        now,
-        autoDecide: start.autoDecide,
-        onAutoDenied: (toolName, reason) => phase.current.onAutoDenied?.(toolName, reason),
-        onPending: (pending) => {
-          // Held on a person, so the detector must not call it stuck.
-          const run = running.get(sessionId)
-          if (run !== undefined) run.isWaiting = true
-          phase.current.onPending(pending)
-        },
-        onResolved: (requestId, decision) => {
-          const run = running.get(sessionId)
-          if (run !== undefined) {
-            run.isWaiting = false
-            // However long the operator took is not the agent's silence.
-            run.startedAt = now()
-          }
-          phase.current.onResolved(requestId, decision)
-        },
-      })
-
-      const spec = buildLaunchSpec({
-        sessionId,
-        resume: resuming,
-        cwd: start.worktreePath,
-        prompt: start.prompt,
-        model: start.model,
-        effort: start.effort,
-        addDirs: start.addDirs,
-        settingsDirectory: path.join(stateDir, 'settings'),
-        hookScriptPath,
-        controlUrl: control.url,
-        controlEventUrl: control.eventUrl,
-        controlToken: control.token,
-      })
-
-      const release = control.register(sessionId, {
-        decide: (request) => bridge.canUseTool(request.toolName, request.input),
-        onEvent: (kind) => {
-          const run = running.get(sessionId)
-          if (kind === 'stop') {
-            // The agent has finished responding and is sitting at its prompt.
-            // That is blocked on a person — the same state as a held tool call
-            // — and the stall detector must not read it as stuck. It used to:
-            // a phase that finished cleanly and was waiting to be approved
-            // went quiet, fired a stall eight minutes later, and stayed in the
-            // Stalls tab offering to interrupt work that was already done.
-            if (run !== undefined) run.isWaiting = true
-            phase.current.onTurnEnd?.(countTurns(spec.transcriptPath))
-            return
-          }
-          phase.current.onEnd?.(0)
-          end(sessionId, true)
-        },
-      })
-
-      // The worktree becomes a project, so the terminal has somewhere to live
-      // and the operator can find it in the sidebar rather than only in a card.
-      const project = api.workspace.createProject({
-        workspaceId: start.workspaceId,
-        name: start.branch,
-        worktreePath: start.worktreePath,
-        gitBranch: start.branch,
-        issue: start.issue,
-      })
-      if (project === null) {
-        release()
-        return null
-      }
-
-      const terminalSessionId = api.pty.openTerminalTab({
-        projectId: project.id,
-        cwd: start.worktreePath,
-        tabTitle: start.title,
-        type: 'agent',
-      })
-      if (terminalSessionId === null) {
-        // No terminal, no run. Said out loud rather than starting an agent
-        // nobody can see, which is the thing this replaced.
-        release()
-        return null
-      }
-
-      // The terminal dying is the other way a run ends. Without this, closing
-      // the tab left the phase `running` with no completion ever delivered:
-      // `session_end` only arrives when the runtime exits cleanly enough to
-      // fire its hook.
-      const detachExit =
-        api.pty.onExit?.(terminalSessionId, (exitCode: number) => {
-          phase.current.onEnd?.(exitCode)
-          end(sessionId, exitCode === 0)
-        }) ?? null
-
-      running.set(sessionId, {
-        detachExit,
-        bridge,
-        terminalSessionId,
-        projectId: project.id,
-        transcriptPath: spec.transcriptPath,
-        featureDir: start.featureDir,
-        startedAt: now(),
-        isWaiting: false,
-        release,
-        phase,
-      })
-
-      // Before a keystroke reaches the terminal: everything already in this
-      // file belongs to the nodes that came before this one in the lane's
-      // conversation, and reading past it attributes their work to this node.
-      const transcriptFrom = transcriptSize(spec.transcriptPath)
-
-      // Registered before a single keystroke reaches the terminal: the launch
-      // command is written below, and a hook or turn-end arriving before the
-      // caller had added the run would hit an empty registry and be dropped.
-      start.onRegistered?.({
-        sessionId,
-        terminalSessionId,
-        transcriptPath: spec.transcriptPath,
-        transcriptFrom,
-      })
-
-      // Typed, exactly as a person would. The skills read these to find the
-      // card's spec, plan and tasks regardless of the branch name.
-      const featureSlug = path.basename(start.featureDir)
-      // CLAUDE_CODE_FORCE_SESSION_PERSISTENCE, because everything this runtime
-      // knows it reads from the transcript. The runtime sets
-      // CLAUDE_CODE_CHILD_SESSION=1 in every process it spawns, and a nested
-      // interactive session carrying that marker is excluded from history —
-      // "Transcript saving is off" — so when the console itself was started
-      // from a Claude Code session, its agents write no transcript and the
-      // stall detector, the turn count and the card's console all read empty
-      // forever. Documented as the override for exactly this case.
-      //
-      // Through a file, not typed. A terminal in canonical mode drops or
-      // corrupts anything past `MAX_CANON` on one line — 1024 bytes on macOS —
-      // and a brief is a role prompt plus a whole work order, which is always
-      // more than that. Typing it produced a command line with a fragment of
-      // the order repeated fifteen times and the rest cut off mid-word, so
-      // every agent this runtime has ever launched was handed a mangled brief.
-      // Nothing could see it: the terminal shows the first line correctly, the
-      // agent starts, and it simply does the wrong work or none at all.
-      //
-      // The script echoes itself first, so the terminal still shows the whole
-      // command — the operator can read exactly what is running, which is the
-      // point of running it in a terminal at all.
-      const launchScript = writeLaunchScript(sessionId, {
-        exports: `export SPECIFY_FEATURE=${shellQuote(featureSlug)} SPECIFY_FEATURE_DIRECTORY=${shellQuote(path.join('specs', featureSlug))} CLAUDE_CODE_FORCE_SESSION_PERSISTENCE=1`,
-        command: spec.command,
-      })
-      api.pty.write(
-        terminalSessionId,
-        `${shellQuote(process.env.SHELL ?? '/bin/sh')} ${shellQuote(launchScript)}\r`
-      )
-
-      return {
-        sessionId,
-        terminalSessionId,
-        transcriptPath: spec.transcriptPath,
-        transcriptFrom,
-      }
-    },
-
-    runCommand(options: RunCommandOptions): Promise<number | null> {
-      const project = api.workspace.createProject({
-        workspaceId: options.workspaceId,
-        name: options.branch,
-        worktreePath: options.worktreePath,
-        gitBranch: options.branch,
-        issue: options.issue,
-      })
-      if (project === null) return Promise.resolve(null)
-
-      const terminalSessionId = api.pty.openTerminalTab({
-        projectId: project.id,
-        cwd: options.worktreePath,
-        tabTitle: options.title,
-        type: 'human',
-      })
-      if (terminalSessionId === null) return Promise.resolve(null)
-
-      return new Promise((resolve) => {
-        // The shell exits with the command's status, so the tab's own exit is
-        // the verdict. A failure stays open, exited, as the record of what
-        // ran; a pass closes, and its output is in the log. The verdict goes
-        // first and the close is optional: an installed host older than
-        // `closeTerminalTab` threw here, and the pass never reached the run.
-        api.pty.onExit?.(terminalSessionId, (exitCode: number) => {
-          resolve(exitCode)
-          if (exitCode === 0) api.pty.closeTerminalTab?.(terminalSessionId)
-        })
-        const script = writeCommandScript(randomUUID(), options.command, options.logPath)
-        api.pty.write(
-          terminalSessionId,
-          `${shellQuote(process.env.SHELL ?? '/bin/sh')} ${shellQuote(script)}; exit $?\r`
-        )
-      })
-    },
-
-    continueRun(sessionId, next): SupervisedRun | null {
-      const run = running.get(sessionId)
-      // Gone: the tab was closed, the agent exited, or the console restarted.
-      // Saying so lets the caller open a fresh one rather than typing a
-      // `/speckit-plan` into a terminal that is not there.
-      if (run === undefined) return null
-
-      // Swapped before a keystroke reaches the terminal, or the first thing the
-      // new phase does is reported against the phase that just finished.
-      run.phase.current = { id: next.phase, ...next }
-      // A phase that begins on a held tool call is a phase that begins blocked,
-      // not stalled — but the previous phase left this true if it ended while
-      // something was waiting, and nothing else clears it.
-      run.isWaiting = false
-      // A new turn is a new state, and the stall detector measures silence
-      // from when the state began. Left at registration, a conversation the
-      // operator came back to twenty minutes later was judged against a start
-      // twenty minutes stale and fired the moment it was given work again.
-      run.startedAt = now()
-
-      // Typed as a person would type it. The agent is sitting at its prompt
-      // with the whole card's conversation behind it: the spec it wrote, the
-      // plan it derived from it, and every decision made in between.
-      api.pty.write(run.terminalSessionId, `${oneLine(next.prompt)}\r`)
-
-      return {
-        sessionId,
-        terminalSessionId: run.terminalSessionId,
-        transcriptPath: run.transcriptPath,
-        transcriptFrom: transcriptSize(run.transcriptPath),
-      }
-    },
-
-    resolve(sessionId, requestId, decision): boolean {
-      return running.get(sessionId)?.bridge.resolve(requestId, decision) ?? false
-    },
-
-    handBackToTerminal(sessionId, requestId): void {
-      running.get(sessionId)?.bridge.handBackToTerminal(requestId)
-    },
-
-    interrupt(sessionId): void {
-      const run = running.get(sessionId)
-      if (run === undefined) return
-      api.pty.write(run.terminalSessionId, INTERRUPT)
-    },
-
-    stop(sessionId, reason): boolean {
-      const run = running.get(sessionId)
-      if (run === undefined) return false
-      // The turn first, or the reason queues behind whatever it is part-way
-      // through and the run outlives the instruction to end.
-      api.pty.write(run.terminalSessionId, INTERRUPT)
-      if (reason !== undefined && reason.trim() !== '') {
-        api.pty.write(run.terminalSessionId, `${oneLine(reason)}\r`)
-      }
-      api.pty.write(run.terminalSessionId, EXIT)
-      return true
-    },
-
-    send(sessionId, message): boolean {
-      const run = running.get(sessionId)
-      if (run === undefined) return false
-      // It has been given something to do, so it is no longer waiting on us,
-      // and the silence the detector measures starts again here.
-      run.isWaiting = false
-      run.startedAt = now()
-      // Claude Code queues input arriving mid-turn, so a redirect does not
-      // require the agent to be idle first.
-      api.pty.write(run.terminalSessionId, `${oneLine(message)}\r`)
-      return true
-    },
-
-    terminalFor(sessionId): { terminalSessionId: string; projectId: string } | null {
-      const run = running.get(sessionId)
-      return run === undefined
-        ? null
-        : { terminalSessionId: run.terminalSessionId, projectId: run.projectId }
-    },
-
-    watchable(): WatchedRun[] {
-      return [...running].map(([sessionId, run]) => ({
-        sessionId,
-        featureDir: run.featureDir,
-        transcriptPath: run.transcriptPath,
-        startedAt: run.startedAt,
-        isWaiting: run.isWaiting,
-      }))
-    },
-
-    dispose(): void {
-      for (const sessionId of [...running.keys()]) end(sessionId, false)
-    },
+    sessionId,
+    terminalSessionId: run.terminalSessionId,
+    transcriptPath: run.transcriptPath,
+    transcriptFrom: transcriptSize(run.transcriptPath),
   }
+}
+
+/** Ends the current turn, leaving the session open so a redirect lands. */
+function interruptRun(context: RunnerContext, sessionId: string): void {
+  const run = context.running.get(sessionId)
+  if (run !== undefined) context.api.pty.write(run.terminalSessionId, INTERRUPT)
+}
+
+function stopSupervisedRun(context: RunnerContext, sessionId: string, reason?: string): boolean {
+  const run = context.running.get(sessionId)
+  if (run === undefined) return false
+  const { pty } = context.api
+  // The turn first, or the reason queues behind whatever it is part-way
+  // through and the run outlives the instruction to end.
+  pty.write(run.terminalSessionId, INTERRUPT)
+  if (reason !== undefined && reason.trim() !== '') {
+    pty.write(run.terminalSessionId, `${oneLine(reason)}\r`)
+  }
+  pty.write(run.terminalSessionId, EXIT)
+  return true
+}
+
+function sendToSession(context: RunnerContext, sessionId: string, message: string): boolean {
+  const run = context.running.get(sessionId)
+  if (run === undefined) return false
+  // It has been given something to do, so it is no longer waiting on us,
+  // and the silence the detector measures starts again here.
+  run.isWaiting = false
+  run.startedAt = context.now()
+  // Claude Code queues input arriving mid-turn, so a redirect does not
+  // require the agent to be idle first.
+  context.api.pty.write(run.terminalSessionId, `${oneLine(message)}\r`)
+  return true
+}
+
+function terminalOf(
+  run: Running | undefined
+): { terminalSessionId: string; projectId: string } | null {
+  return run === undefined
+    ? null
+    : { terminalSessionId: run.terminalSessionId, projectId: run.projectId }
+}
+
+function watchableRuns(running: ReadonlyMap<string, Running>): WatchedRun[] {
+  return [...running].map(([sessionId, run]) => ({
+    sessionId,
+    featureDir: run.featureDir,
+    transcriptPath: run.transcriptPath,
+    startedAt: run.startedAt,
+    isWaiting: run.isWaiting,
+  }))
 }

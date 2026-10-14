@@ -1,7 +1,34 @@
 import { describe, it, expect } from 'vitest'
 import React from 'react'
 import { isValidElement } from 'react'
-import { iconFromName, CURATED_ICON_NAMES } from '../../../src/renderer/extensions/icon-from-name'
+import { iconFromName } from '../../../src/renderer/extensions/icon-from-name'
+
+/** The names an extension manifest may give its icon (docs/EXTENSION-DEVELOPMENT.md). */
+const CURATED_ICON_NAMES = [
+  'puzzle',
+  'wrench',
+  'terminal',
+  'git-branch',
+  'git-pull-request',
+  'database',
+  'code',
+  'layers',
+  'settings',
+  'file',
+  'search',
+  'box',
+  'star',
+  'zap',
+  'globe',
+  'cpu',
+  'flask',
+  'chart-bar',
+  'list',
+  'calendar',
+  'wifi',
+  'check',
+  'brain',
+]
 
 describe('iconFromName', () => {
   it('returns a React element for known icon names', () => {
@@ -25,20 +52,8 @@ describe('iconFromName', () => {
   })
 
   it('maps all curated icon names to distinct elements', () => {
-    for (const name of CURATED_ICON_NAMES) {
-      const el = iconFromName(name)
-      expect(isValidElement(el), `${name} should return a React element`).toBe(true)
-    }
-  })
-
-  it('includes wifi in the curated set', () => {
-    expect(CURATED_ICON_NAMES).toContain('wifi')
-    expect(isValidElement(iconFromName('wifi'))).toBe(true)
-  })
-
-  it('includes check in the curated set', () => {
-    expect(CURATED_ICON_NAMES).toContain('check')
-    expect(isValidElement(iconFromName('check'))).toBe(true)
+    const types = CURATED_ICON_NAMES.map((name) => iconFromName(name).type)
+    expect(new Set(types).size).toBe(CURATED_ICON_NAMES.length)
   })
 
   it('is case-sensitive — uppercase is treated as unknown', () => {

@@ -23,7 +23,8 @@ interface TerminalButtonProps {
   t: TerminalSession
   label?: string
   showContextMenu?: boolean
-  longPressFired: React.MutableRefObject<boolean>
+  /** Returns true, and clears the flag, when a long press just opened the menu. */
+  consumeLongPress: () => boolean
   onSelectTerminal: (t: { sessionId: string; cwd: string }) => void
   onContextMenu?: (e: React.MouseEvent) => void
   onTouchStart?: (e: React.TouchEvent) => void
@@ -34,7 +35,7 @@ interface TerminalButtonProps {
 function TerminalButton({
   t,
   label,
-  longPressFired,
+  consumeLongPress,
   onSelectTerminal,
   onContextMenu,
   onTouchStart,
@@ -46,10 +47,7 @@ function TerminalButton({
       className="mobile-list__terminal"
       type="button"
       onClick={() => {
-        if (longPressFired.current) {
-          longPressFired.current = false
-          return
-        }
+        if (consumeLongPress()) return
         onSelectTerminal({ sessionId: t.sessionId, cwd: t.cwd })
       }}
       onKeyDown={(e) => {
@@ -65,125 +63,192 @@ function TerminalButton({
   )
 }
 
-export function MobileTerminalList({
-  workspaces,
-  terminals,
-  onSelectTerminal,
-  onCreateTerminal,
-  onAssignWorkspace,
-}: Props) {
-  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
+const LONG_PRESS_MS = 500
+
+type OpenMenu = (sessionId: string, x: number, y: number) => void
+
+/** Touching a terminal for half a second opens its menu; lifting or moving first does not. */
+function useLongPress(openMenu: OpenMenu) {
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const longPressFired = useRef(false)
 
-  const openContextMenu = (sessionId: string, x: number, y: number) => {
-    setContextMenu({ sessionId, x, y })
-  }
-
-  const handleContextMenu = (e: React.MouseEvent, sessionId: string) => {
-    e.preventDefault()
-    openContextMenu(sessionId, e.clientX, e.clientY)
-  }
-
-  const handleTouchStart = (e: React.TouchEvent, sessionId: string) => {
+  const cancelLongPress = () => {
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current)
       longPressTimer.current = null
     }
+  }
+  const startLongPress = (e: React.TouchEvent, sessionId: string) => {
+    cancelLongPress()
     longPressFired.current = false
     const touch = e.touches[0]
     longPressTimer.current = setTimeout(() => {
       longPressFired.current = true
-      openContextMenu(sessionId, touch.clientX, touch.clientY)
-    }, 500)
+      openMenu(sessionId, touch.clientX, touch.clientY)
+    }, LONG_PRESS_MS)
   }
-
-  const handleTouchEnd = () => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current)
-      longPressTimer.current = null
-    }
+  const consumeLongPress = () => {
+    const fired = longPressFired.current
+    longPressFired.current = false
+    return fired
   }
+  return { start: startLongPress, cancel: cancelLongPress, consumeLongPress }
+}
 
-  const handleTouchMove = () => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current)
-      longPressTimer.current = null
-    }
-  }
+/** A terminal belongs to the workspace it was assigned to, or else to the folder it runs in. */
+function belongsTo(ws: Workspace, t: TerminalSession): boolean {
+  if (t.workspaceId === ws.id) return true
+  return !t.workspaceId && (t.cwd === ws.folderPath || t.cwd.startsWith(ws.folderPath + '/'))
+}
 
-  const assignedSessionIds = new Set<string>()
+/** Each workspace with its terminals, and the terminals in none of them. */
+function groupTerminals(workspaces: Workspace[], terminals: TerminalSession[]) {
+  const groups = workspaces.map((ws) => ({
+    ws,
+    terminals: terminals.filter((t) => belongsTo(ws, t)),
+  }))
+  const assigned = new Set(groups.flatMap((group) => group.terminals.map((t) => t.sessionId)))
+  return { groups, scratch: terminals.filter((t) => !assigned.has(t.sessionId)) }
+}
+
+export function MobileTerminalList({ workspaces, terminals, ...handlers }: Props) {
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
+  const openTerminalMenu: OpenMenu = (sessionId, x, y) => setContextMenu({ sessionId, x, y })
+  const longPress = useLongPress(openTerminalMenu)
+  const { groups, scratch } = groupTerminals(workspaces, terminals)
 
   return (
     <div className="mobile-list">
-      {workspaces.map((ws) => {
-        const wsTerminals = terminals.filter(
-          (t) =>
-            t.workspaceId === ws.id ||
-            (!t.workspaceId && (t.cwd === ws.folderPath || t.cwd.startsWith(ws.folderPath + '/')))
-        )
-        wsTerminals.forEach((t) => assignedSessionIds.add(t.sessionId))
-        return (
-          <div key={ws.id} className="mobile-list__workspace">
-            <p className="mobile-list__workspace-name">{ws.name}</p>
-            {wsTerminals.map((t) => (
-              <TerminalButton
-                key={t.sessionId}
-                t={t}
-                longPressFired={longPressFired}
-                onSelectTerminal={onSelectTerminal}
-              />
-            ))}
-            <button
-              className="mobile-list__new-terminal-btn"
-              type="button"
-              onClick={() => onCreateTerminal(ws.id, ws.folderPath)}
-            >
-              + New Terminal
-            </button>
-          </div>
-        )
-      })}
-      {terminals
-        .filter((t) => !assignedSessionIds.has(t.sessionId))
-        .map((t, i) => (
-          <TerminalButton
-            key={t.sessionId}
-            t={t}
-            label={`Scratch ${i + 1} · ${basename(t.cwd)}`}
-            showContextMenu
-            longPressFired={longPressFired}
-            onSelectTerminal={onSelectTerminal}
-            onContextMenu={(e) => handleContextMenu(e, t.sessionId)}
-            onTouchStart={(e) => handleTouchStart(e, t.sessionId)}
-            onTouchEnd={handleTouchEnd}
-            onTouchMove={handleTouchMove}
+      {groups.map((group) => (
+        <WorkspaceGroup
+          key={group.ws.id}
+          {...group}
+          {...handlers}
+          consumeLongPress={longPress.consumeLongPress}
+        />
+      ))}
+      <ScratchTerminals
+        terminals={scratch}
+        longPress={longPress}
+        onSelectTerminal={handlers.onSelectTerminal}
+        openMenu={openTerminalMenu}
+      />
+      <MoveToWorkspaceMenu
+        menu={contextMenu}
+        workspaces={workspaces}
+        onAssignWorkspace={handlers.onAssignWorkspace}
+        onClose={() => setContextMenu(null)}
+      />
+    </div>
+  )
+}
+
+interface WorkspaceGroupProps extends Pick<Props, 'onSelectTerminal' | 'onCreateTerminal'> {
+  ws: Workspace
+  terminals: TerminalSession[]
+  consumeLongPress: () => boolean
+}
+
+function WorkspaceGroup({
+  ws,
+  terminals,
+  consumeLongPress,
+  onSelectTerminal,
+  onCreateTerminal,
+}: WorkspaceGroupProps) {
+  return (
+    <div className="mobile-list__workspace">
+      <p className="mobile-list__workspace-name">{ws.name}</p>
+      {terminals.map((t) => (
+        <TerminalButton
+          key={t.sessionId}
+          t={t}
+          consumeLongPress={consumeLongPress}
+          onSelectTerminal={onSelectTerminal}
+        />
+      ))}
+      <button
+        className="mobile-list__new-terminal-btn"
+        type="button"
+        onClick={() => onCreateTerminal(ws.id, ws.folderPath)}
+      >
+        + New Terminal
+      </button>
+    </div>
+  )
+}
+
+interface ScratchTerminalsProps extends Pick<Props, 'onSelectTerminal'> {
+  terminals: TerminalSession[]
+  longPress: ReturnType<typeof useLongPress>
+  openMenu: OpenMenu
+}
+
+/** Terminals in no workspace, which a right-click or a long press can move into one. */
+function ScratchTerminals({
+  terminals,
+  longPress,
+  onSelectTerminal,
+  openMenu,
+}: ScratchTerminalsProps) {
+  return terminals.map((t, i) => (
+    <TerminalButton
+      key={t.sessionId}
+      t={t}
+      label={`Scratch ${i + 1} · ${basename(t.cwd)}`}
+      showContextMenu
+      consumeLongPress={longPress.consumeLongPress}
+      onSelectTerminal={onSelectTerminal}
+      onContextMenu={(e) => {
+        e.preventDefault()
+        openMenu(t.sessionId, e.clientX, e.clientY)
+      }}
+      onTouchStart={(e) => longPress.start(e, t.sessionId)}
+      onTouchEnd={longPress.cancel}
+      onTouchMove={longPress.cancel}
+    />
+  ))
+}
+
+interface MoveToWorkspaceMenuProps extends Pick<Props, 'workspaces' | 'onAssignWorkspace'> {
+  menu: ContextMenuState | null
+  onClose: () => void
+}
+
+function MoveToWorkspaceMenu({
+  menu,
+  workspaces,
+  onAssignWorkspace,
+  onClose,
+}: MoveToWorkspaceMenuProps) {
+  if (!menu) return null
+  return (
+    <>
+      <div className="mobile-context-menu-backdrop" onClick={onClose} />
+      <div className="mobile-context-menu" style={{ top: menu.y, left: menu.x }}>
+        <p className="mobile-context-menu__label">Move to workspace</p>
+        {workspaces.map((ws) => (
+          <MenuItem
+            key={ws.id}
+            label={ws.name}
+            onSelect={() => {
+              onAssignWorkspace(menu.sessionId, ws.id)
+              onClose()
+            }}
           />
         ))}
-      {contextMenu && (
-        <>
-          <div className="mobile-context-menu-backdrop" onClick={() => setContextMenu(null)} />
-          <div className="mobile-context-menu" style={{ top: contextMenu.y, left: contextMenu.x }}>
-            <p className="mobile-context-menu__label">Move to workspace</p>
-            {workspaces.map((ws) => (
-              <button
-                key={ws.id}
-                type="button"
-                className="mobile-context-menu__item"
-                onClick={() => {
-                  onAssignWorkspace(contextMenu.sessionId, ws.id)
-                  setContextMenu(null)
-                }}
-              >
-                {ws.name}
-              </button>
-            ))}
-            {workspaces.length === 0 && (
-              <span className="mobile-context-menu__empty">No workspaces</span>
-            )}
-          </div>
-        </>
-      )}
-    </div>
+        {workspaces.length === 0 && (
+          <span className="mobile-context-menu__empty">No workspaces</span>
+        )}
+      </div>
+    </>
+  )
+}
+
+function MenuItem({ label, onSelect }: { label: string; onSelect: () => void }) {
+  return (
+    <button type="button" className="mobile-context-menu__item" onClick={onSelect}>
+      {label}
+    </button>
   )
 }

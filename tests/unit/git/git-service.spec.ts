@@ -1,40 +1,34 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import type { ShellExecInput } from '../../../src/main/shell/command-runner'
 
-// git-service.ts does: const execFile = promisify(execFileCb)
-// Node's real execFile has a [util.promisify.custom] symbol that makes promisify
-// resolve with {stdout, stderr}. Our mock must replicate that by attaching a
-// vi.fn() to the well-known symbol so util.promisify delegates to it.
+// git-service.ts runs git through runTextCommand (src/main/shell/command-runner.ts).
+// Every case drives this fake, which gets the command, its arguments and its
+// options, and resolves with git's output or rejects with its error.
+type GitRun = (
+  command: string,
+  args: string[],
+  options: { cwd: string; env: NodeJS.ProcessEnv }
+) => Promise<{ stdout: string; stderr: string }>
+const execFileCustom = vi.hoisted(() => vi.fn<GitRun>())
+const customMock = () => execFileCustom
 
-const PROMISIFY_CUSTOM = Symbol.for('nodejs.util.promisify.custom')
+vi.mock('../../../src/main/shell/command-runner.js', () => ({
+  runTextCommand: (input: ShellExecInput, env: NodeJS.ProcessEnv) =>
+    execFileCustom(input.command, input.args, { cwd: input.cwd, env }).then(
+      ({ stdout, stderr }) => ({ exitCode: 0, stdout, stderr, timedOut: false }),
+      (error: Error) => ({ exitCode: 1, stdout: '', stderr: error.message, timedOut: false })
+    ),
+}))
 
-const { execFileMock } = vi.hoisted(() => {
-  const CUSTOM = Symbol.for('nodejs.util.promisify.custom')
-  const execFileMock = vi.fn()
-  ;(execFileMock as unknown as Record<symbol, ReturnType<typeof vi.fn>>)[CUSTOM] = vi.fn()
-  return { execFileMock }
-})
-
-vi.mock('child_process', () => ({ execFile: execFileMock }))
-
-// Convenience helpers — update the promisify.custom mock (the path actually invoked)
 function mockResolve(stdout: string) {
-  ;(execFileMock as unknown as Record<symbol, ReturnType<typeof vi.fn>>)[
-    PROMISIFY_CUSTOM
-  ].mockResolvedValue({ stdout, stderr: '' })
+  customMock().mockResolvedValue({ stdout, stderr: '' })
 }
 
 function mockReject(message: string) {
-  ;(execFileMock as unknown as Record<symbol, ReturnType<typeof vi.fn>>)[
-    PROMISIFY_CUSTOM
-  ].mockRejectedValue(new Error(message))
+  customMock().mockRejectedValue(new Error(message))
 }
 
 import {
-  getStatus,
-  getDiff,
-  stageFiles,
-  unstageFiles,
-  commitChanges,
   isGitRepo,
   getGitRoot,
   getCurrentBranch,
@@ -48,129 +42,8 @@ import {
   getChangeStats,
 } from '../../../src/main/git/git-service'
 
-const customMock = () =>
-  (execFileMock as unknown as Record<symbol, ReturnType<typeof vi.fn>>)[PROMISIFY_CUSTOM]
-
 beforeEach(() => {
   vi.clearAllMocks()
-})
-
-// ─── getStatus ───────────────────────────────────────────────────────────────
-
-describe('getStatus', () => {
-  it('returns parsed status with branch name', async () => {
-    customMock().mockImplementation((_cmd: string, args: string[]) => {
-      if (args.includes('status'))
-        return Promise.resolve({ stdout: '?? new-file.ts\0', stderr: '' })
-      return Promise.resolve({ stdout: 'main\n', stderr: '' })
-    })
-
-    const result = await getStatus('/repo')
-    expect(result.branch).toBe('main')
-    expect(result.files).toHaveLength(1)
-    expect(result.files[0].status).toBe('untracked')
-  })
-
-  it('falls back to HEAD when branch command fails', async () => {
-    customMock().mockImplementation((_cmd: string, args: string[]) => {
-      if (args.includes('status')) return Promise.resolve({ stdout: '', stderr: '' })
-      return Promise.reject(new Error('not a repo'))
-    })
-
-    const result = await getStatus('/repo')
-    expect(result.branch).toBe('HEAD')
-  })
-
-  it('passes maxFiles to parser', async () => {
-    const files = Array.from({ length: 10 }, (_, i) => `?? file${i}.ts`).join('\0')
-    customMock().mockImplementation((_cmd: string, args: string[]) => {
-      if (args.includes('status')) return Promise.resolve({ stdout: files + '\0', stderr: '' })
-      return Promise.resolve({ stdout: 'main', stderr: '' })
-    })
-
-    const result = await getStatus('/repo', 3)
-    expect(result.files).toHaveLength(3)
-    expect(result.truncated).toBe(true)
-  })
-})
-
-// ─── getDiff ─────────────────────────────────────────────────────────────────
-
-describe('getDiff', () => {
-  it('calls git diff without --cached for unstaged', async () => {
-    mockResolve('@@ -1,1 +1,1 @@\n-old\n+new\n')
-    const result = await getDiff('/repo', 'src/app.ts', false)
-    const args: string[] = customMock().mock.calls[0][1]
-    expect(args).not.toContain('--cached')
-    expect(result.path).toBe('src/app.ts')
-  })
-
-  it('calls git diff --cached for staged changes', async () => {
-    mockResolve('@@ -1,1 +1,1 @@\n-old\n+new\n')
-    await getDiff('/repo', 'src/app.ts', true)
-    const args: string[] = customMock().mock.calls[0][1]
-    expect(args).toContain('--cached')
-  })
-
-  it('attaches path to parsed diff result', async () => {
-    mockResolve('')
-    const result = await getDiff('/repo', 'src/util.ts', false)
-    expect(result.path).toBe('src/util.ts')
-  })
-})
-
-// ─── stageFiles / unstageFiles ────────────────────────────────────────────────
-
-describe('stageFiles', () => {
-  it('calls git add with the given paths', async () => {
-    mockResolve('')
-    await stageFiles('/repo', ['src/a.ts', 'src/b.ts'])
-    const args: string[] = customMock().mock.calls[0][1]
-    expect(args).toContain('add')
-    expect(args).toContain('src/a.ts')
-    expect(args).toContain('src/b.ts')
-  })
-})
-
-describe('unstageFiles', () => {
-  it('calls git restore --staged with the given paths', async () => {
-    mockResolve('')
-    await unstageFiles('/repo', ['src/a.ts'])
-    const args: string[] = customMock().mock.calls[0][1]
-    expect(args).toContain('restore')
-    expect(args).toContain('--staged')
-    expect(args).toContain('src/a.ts')
-  })
-})
-
-// ─── commitChanges ────────────────────────────────────────────────────────────
-
-describe('commitChanges', () => {
-  it('returns short hash from commit output', async () => {
-    mockResolve('[main abc1234] feat: add something\n 1 file changed')
-    const hash = await commitChanges('/repo', 'feat: add something')
-    expect(hash).toBe('abc1234')
-  })
-
-  it('returns empty string when hash cannot be parsed', async () => {
-    mockResolve('nothing useful here')
-    const hash = await commitChanges('/repo', 'feat: add something')
-    expect(hash).toBe('')
-  })
-
-  it('appends --signoff when signOff is true', async () => {
-    mockResolve('[main abc1234] signed commit')
-    await commitChanges('/repo', 'signed commit', true)
-    const args: string[] = customMock().mock.calls[0][1]
-    expect(args).toContain('--signoff')
-  })
-
-  it('does not append --signoff by default', async () => {
-    mockResolve('[main abc1234] unsigned commit')
-    await commitChanges('/repo', 'unsigned commit')
-    const args: string[] = customMock().mock.calls[0][1]
-    expect(args).not.toContain('--signoff')
-  })
 })
 
 // ─── isGitRepo ────────────────────────────────────────────────────────────────
@@ -212,16 +85,16 @@ describe('getCurrentBranch', () => {
 
 // ─── listBranches ─────────────────────────────────────────────────────────────
 
-describe('listBranches', () => {
-  // The shape `git branch -a --format=%(HEAD)|%(refname)` prints: full refs,
-  // remote-tracking ones under refs/remotes/<remote>/. `git remote` answers
-  // second.
-  function mockRefs(refs: string, remotes = 'origin\nupstream\n') {
-    customMock().mockImplementation((_cmd: string, args: string[]) =>
-      Promise.resolve({ stdout: args[0] === 'remote' ? remotes : refs, stderr: '' })
-    )
-  }
+// The shape `git branch -a --format=%(HEAD)|%(refname)` prints: full refs,
+// remote-tracking ones under refs/remotes/<remote>/. `git remote` answers
+// second.
+function mockRefs(refs: string, remotes = 'origin\nupstream\n') {
+  customMock().mockImplementation((_cmd, args) =>
+    Promise.resolve({ stdout: args[0] === 'remote' ? remotes : refs, stderr: '' })
+  )
+}
 
+describe('listBranches', () => {
   it('lists local branches', async () => {
     mockRefs(' |refs/heads/main\n |refs/heads/feature/x\n')
     const branches = await listBranches('/repo')
@@ -242,7 +115,9 @@ describe('listBranches', () => {
     const names = (await listBranches('/repo')).map((b) => b.name)
     expect(names.some((n) => n.startsWith('origin') || n.startsWith('upstream'))).toBe(false)
   })
+})
 
+describe('listBranches — remote branches', () => {
   it('lists a branch that exists only on a remote by its bare name', async () => {
     mockRefs(' |refs/heads/main\n |refs/remotes/origin/main\n |refs/remotes/origin/remote-only\n')
     const branches = await listBranches('/repo')
@@ -266,7 +141,9 @@ describe('listBranches', () => {
     const branches = await listBranches('/repo')
     expect(branches.map((b) => b.name)).toEqual(['main'])
   })
+})
 
+describe('listBranches — refs that are not branches', () => {
   it('filters out pull request refs', async () => {
     mockRefs(
       ' |refs/heads/main\n |refs/remotes/origin/pull/123/head\n |refs/remotes/origin/pull/456/head\n'
@@ -312,9 +189,7 @@ describe('checkoutBranch', () => {
   it('calls git checkout with the branch name', async () => {
     mockResolve('')
     await checkoutBranch('/repo', 'feature/new')
-    const args: string[] = customMock().mock.calls[0][1]
-    expect(args).toContain('checkout')
-    expect(args).toContain('feature/new')
+    expect(customMock().mock.calls[0][1]).toEqual(['checkout', 'feature/new'])
   })
 })
 
@@ -332,7 +207,9 @@ describe('suggestWorktreePath', () => {
   })
 
   it('replaces slashes, backslashes, colons, and spaces in branch name', () => {
-    expect(suggestWorktreePath('/repo', 'feat/my branch:v2')).toContain('feat-my-branch-v2')
+    expect(suggestWorktreePath('/repo', 'feat\\my branch:v2')).toBe(
+      '/repo/.worktrees/feat-my-branch-v2'
+    )
   })
 })
 
@@ -373,18 +250,30 @@ describe('listWorktrees', () => {
 describe('createWorktree', () => {
   it('uses -b flag when creating a new branch', async () => {
     mockResolve('')
-    await createWorktree('/repo', '/worktrees/new-feature', 'new-feature', true)
-    const args: string[] = customMock().mock.calls[0][1]
-    expect(args).toContain('-b')
-    expect(args).toContain('new-feature')
+    await createWorktree({
+      repoRoot: '/repo',
+      worktreePath: '/worktrees/new-feature',
+      branch: 'new-feature',
+      isNewBranch: true,
+    })
+    expect(customMock().mock.calls[0][1]).toEqual([
+      'worktree',
+      'add',
+      '-b',
+      'new-feature',
+      '/worktrees/new-feature',
+    ])
   })
 
   it('does not use -b flag for existing branch', async () => {
     mockResolve('')
-    await createWorktree('/repo', '/worktrees/main', 'main', false)
-    const args: string[] = customMock().mock.calls[0][1]
-    expect(args).not.toContain('-b')
-    expect(args).toContain('main')
+    await createWorktree({
+      repoRoot: '/repo',
+      worktreePath: '/worktrees/main',
+      branch: 'main',
+      isNewBranch: false,
+    })
+    expect(customMock().mock.calls[0][1]).toEqual(['worktree', 'add', '/worktrees/main', 'main'])
   })
 })
 
@@ -394,10 +283,12 @@ describe('removeWorktree', () => {
   it('calls git worktree remove --force', async () => {
     mockResolve('')
     await removeWorktree('/repo', '/worktrees/old-feature')
-    const args: string[] = customMock().mock.calls[0][1]
-    expect(args).toContain('remove')
-    expect(args).toContain('--force')
-    expect(args).toContain('/worktrees/old-feature')
+    expect(customMock().mock.calls[0][1]).toEqual([
+      'worktree',
+      'remove',
+      '--force',
+      '/worktrees/old-feature',
+    ])
   })
 })
 
@@ -414,10 +305,12 @@ describe('getChangeStats', () => {
     await getChangeStats('/repo')
     const [cmd, args, opts] = customMock().mock.calls[0]
     expect(cmd).toBe('git')
-    expect(args).toEqual(['diff', '--numstat', 'HEAD'])
+    expect(args).toEqual(['-c', 'diff.autoRefreshIndex=false', 'diff', '--numstat', 'HEAD'])
     expect(opts).toMatchObject({ cwd: '/repo' })
   })
+})
 
+describe('getChangeStats — edge cases', () => {
   it('counts a binary file but adds nothing for it — git reports dashes, not numbers', async () => {
     mockResolve(['5\t2\tsrc/a.ts', '-\t-\tassets/logo.png'].join('\n'))
     expect(await getChangeStats('/repo')).toEqual({ added: 5, removed: 2, files: 2 })

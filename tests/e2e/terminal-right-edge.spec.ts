@@ -1,31 +1,20 @@
-import { test, expect } from '@playwright/test'
-import { AppHandle, launchApp, closeApp, createWorkspace, addAndSelectProject } from './helpers'
+import { test, expect, type Page } from '@playwright/test'
+import {
+  AppHandle,
+  launchApp,
+  closeApp,
+  createWorkspace,
+  addAndSelectProject,
+  readTerminalRowsIn,
+} from './helpers'
 
-// Regression guard for right-edge text clipping.
-//
-// THE ACTUAL BUG: xterm's DOM renderer gives each row div `overflow: hidden` and a width
-// of exactly cols x cellWidth, but lays text out using the font's natural advance width.
-// The per-column difference accumulates across the line, so the final glyph's ink
-// overhangs the row box and gets sliced. The fix widens the row's clip box (TerminalPane
-// .css). `last-column glyph is not clipped` below is the test that actually catches it.
-//
-// IMPORTANT: not every geometry assertion can see this. An earlier revision of this file
-// asserted inter-element POSITIONS (screenRight <= viewportContentRight etc.) and passed
-// cleanly the entire time the bug was live — comparing where boxes sit relative to each
-// other says nothing about whether a box's own content overflows it. The guard below
-// instead compares a row's content extent (scrollWidth) against its clip box
-// (clientWidth), which is the overflow being clipped.
-//
-// Any change to that test must be re-validated by negative control: revert the
-// .xterm-rows rule in TerminalPane.css, REBUILD (the suite runs against out/, so skipping
-// the rebuild silently tests the old bundle), and confirm the test goes red.
-//
-// The scrollbar-width tests below guard a separate, real property: that terminal geometry
-// does not depend on the user's macOS overlay-scrollbar setting. They were mistakenly
-// believed to fix the clipping bug. They do not, and never did.
+// Regression guard for right-edge text clipping, per renderer, and for geometry that ignores
+// macOS overlay scrollbars: docs/ARCHITECTURE.md, "Renderer choice". Positions alone cannot
+// see a clipped glyph, hence the ink and overflow checks. Runs against out/: rebuild first.
 
-// Must match the ::-webkit-scrollbar width in TerminalPane.css.
-const SCROLLBAR_WIDTH_PX = 10
+// xterm's default scrollbar width (ITerminalOptions.overviewRuler.width falls back to 14);
+// FitAddon subtracts the same value from the columns it proposes.
+const SCROLLBAR_WIDTH_PX = 14
 
 let handle: AppHandle
 
@@ -53,60 +42,130 @@ interface Geometry {
   scrollbarPx: number
   screenRight: number
   viewportContentRight: number
-  maxRowRight: number
+  renderedRight: number
 }
 
+// WebGL draws into canvases and has no `.xterm-rows`; the DOM renderer has rows and no canvas.
 async function measure(selector: string): Promise<Geometry> {
   return handle.page.evaluate((sel) => {
     const scope = document.querySelector(sel) as HTMLElement
-    const vp = scope.querySelector('.xterm-viewport') as HTMLElement
+    const bar = scope.querySelector(
+      '.xterm-scrollable-element > .scrollbar.vertical'
+    ) as HTMLElement
     const sc = scope.querySelector('.xterm-screen') as HTMLElement
-    const rows = scope.querySelector('.xterm-rows') as HTMLElement
-    const scrollbarPx = vp.offsetWidth - vp.clientWidth
-    let maxRowRight = 0
-    rows.querySelectorAll('div').forEach((d) => {
+    const drawn = scope.querySelectorAll('.xterm-rows div, .xterm-screen canvas')
+    let renderedRight = 0
+    drawn.forEach((d) => {
       const b = (d as HTMLElement).getBoundingClientRect()
-      if (b.right > maxRowRight) maxRowRight = b.right
+      if (b.width > 0 && b.right > renderedRight) renderedRight = b.right
     })
     return {
-      scrollbarPx,
+      scrollbarPx: bar.offsetWidth,
       screenRight: sc.getBoundingClientRect().right,
-      viewportContentRight: vp.getBoundingClientRect().right - scrollbarPx,
-      maxRowRight,
+      viewportContentRight: bar.getBoundingClientRect().left,
+      renderedRight,
     }
   }, selector)
 }
 
-test('the terminal viewport reserves real layout width for its scrollbar', async () => {
+// The single pane's terminal, the one these tests type into until the split test.
+const PANE_SCREEN = '.terminal-pane__container .xterm-screen'
+
+// The WebGL add-on draws into canvases inside the screen; xterm 6's DOM renderer has none.
+async function usesWebgl(): Promise<boolean> {
+  return (await handle.page.locator(`${PANE_SCREEN} canvas`).count()) > 0
+}
+
+test('the terminal reserves real layout width for its scrollbar', async () => {
   const g = await measure('.terminal-pane__container')
   // A zero-width scrollbar means we are back on OS overlay scrollbars, which is exactly
   // the condition that lets glyphs render underneath the scrollbar.
-  // Exact, not just non-zero: the width is pinned by our ::-webkit-scrollbar rule. Any
-  // other value means the scroller fell back to the OS scrollbar (0 with macOS overlay
-  // scrollbars, ~4-15 with classic ones) and the geometry is environment-dependent again.
+  // Exact, not just non-zero: xterm's own scrollbar has a fixed width that FitAddon
+  // reserves. Any other value means geometry and the reserved width have drifted apart.
   expect(g.scrollbarPx).toBe(SCROLLBAR_WIDTH_PX)
 })
 
 test('single-pane: rendered text never extends under the scrollbar', async () => {
   const g = await measure('.terminal-pane__container')
   expect(g.screenRight).toBeLessThanOrEqual(g.viewportContentRight)
-  expect(g.maxRowRight).toBeLessThanOrEqual(g.viewportContentRight)
+  expect(g.renderedRight).toBeLessThanOrEqual(g.viewportContentRight)
 })
 
-// The real guard for the clipping bug.
-//
-// The row div's content (the sum of the font's natural per-character advances) is wider
-// than the row's own clip box (cols x xterm's rounded cellWidth). scrollWidth reports the
-// content width, clientWidth the clip box — so content overflowing its clip box is exactly
-// the condition that slices the last glyph, and it is what this asserts.
-//
-// This is NOT the same class of check as the three tests above. Those compare element
-// POSITIONS against each other and cannot see inside a box; they passed for the entire
-// time the bug was live. This compares a box's content extent against the box itself.
-// Verified by negative control: with the .xterm-rows rule in TerminalPane.css reverted,
-// a full-width row measures scrollWidth 986 vs clientWidth 984 and this fails; with the
-// fix it is 990 vs 990. Re-run that control before ever relaxing this test.
-//
+// The canvas's rightmost 4px, inside the last cell, must be blank before the ruler and inked
+// after, or the last column was clipped or never drawn. A screenshot is the only read-back:
+// WebGL clears its buffer after compositing.
+const STRIP_WIDTH_PX = 4
+
+async function lastColumnInk(): Promise<number> {
+  const { page } = handle
+  // The add-on's text canvas; its link layer is a second canvas of the same size.
+  const canvas = page.locator(`${PANE_SCREEN} canvas:not(.xterm-link-layer)`)
+  const box = (await canvas.boundingBox())!
+  const right = box.x + box.width
+  const png = await page.screenshot({
+    clip: {
+      x: right - STRIP_WIDTH_PX,
+      y: box.y,
+      width: STRIP_WIDTH_PX,
+      height: box.height,
+    },
+  })
+  return page.evaluate(async (base64) => {
+    const blob = await (await fetch(`data:image/png;base64,${base64}`)).blob()
+    const bitmap = await createImageBitmap(blob)
+    const canvas = document.createElement('canvas')
+    canvas.width = bitmap.width
+    canvas.height = bitmap.height
+    const ctx = canvas.getContext('2d') as CanvasRenderingContext2D
+    ctx.drawImage(bitmap, 0, 0)
+    const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height)
+    let ink = 0
+    for (let i = 4; i < data.length; i += 4) {
+      if (data[i] !== data[0] || data[i + 1] !== data[1] || data[i + 2] !== data[2]) ink++
+    }
+    return ink
+  }, png.toString('base64'))
+}
+
+// Exactly `tput cols` '#'s, so the advance drift accumulates across the full width; awk is on
+// every runner. No trailing newline, so the row holds nothing but the ruler.
+const RULER_COMMAND =
+  'clear; C=$(tput cols); awk -v c=$C \'BEGIN{s="";for(i=0;i<c;i++)s=s"#";printf "%s",s}\'\n'
+
+/** WebGL draws to a canvas, so the ruler's last column is read as ink in the pixels. */
+async function expectRulerInkInLastColumn(page: Page): Promise<void> {
+  await page.keyboard.type('clear\n')
+  await expect.poll(lastColumnInk, { timeout: 15000 }).toBe(0)
+  await page.keyboard.type(RULER_COMMAND)
+  await expect
+    .poll(lastColumnInk, {
+      message: 'the last column of the full-width ruler line was not drawn',
+      timeout: 30000,
+    })
+    .toBeGreaterThan(0)
+}
+
+/** The ruler row's columns, and its content width against its clip box. */
+async function measureRulerRow(
+  page: Page
+): Promise<{ cols: number; scrollW: number; clientW: number }> {
+  // Found by content, not at row 0: on CI the shell may print a notice first.
+  const screen = page.locator(PANE_SCREEN)
+  const rulerRow = async () =>
+    (await readTerminalRowsIn(screen)).findIndex((row) => /^#+$/.test(row) && row.length >= 40)
+  await expect.poll(rulerRow, { timeout: 30000 }).toBeGreaterThanOrEqual(0)
+  // The DOM renderer draws the screen's rows in order, one div each; its clip box is the
+  // thing under test, so this measures the DOM on purpose.
+  return screen.evaluate(
+    (element, index) => {
+      const el = element.querySelector('.xterm-rows')!.children[index] as HTMLElement
+      const text = (el.textContent ?? '').replace(/\u00a0/g, ' ').trimEnd()
+      return { cols: text.length, scrollW: el.scrollWidth, clientW: el.clientWidth }
+    },
+    await rulerRow()
+  )
+}
+
 // Must run on a FULL-WIDTH single pane, hence its position before the split test below:
 // the overhang is cols x per-column drift, so a half-width pane roughly halves it and
 // can round away to nothing.
@@ -114,35 +173,13 @@ test('last-column glyph is not clipped', async () => {
   const { page } = handle
   test.setTimeout(120000)
 
-  // A line of exactly `tput cols` identical characters, so the per-column advance drift
-  // accumulates across the full width. awk rather than python3: it is guaranteed present
-  // on both macOS and Linux runners. No trailing newline, so the prompt wraps to the next
-  // row and this row stays nothing but the ruler.
-  await page.keyboard.type(
-    'clear; C=$(tput cols); awk -v c=$C \'BEGIN{s="";for(i=0;i<c;i++)s=s"#";printf "%s",s}\'\n'
-  )
+  if (await usesWebgl()) {
+    await expectRulerInkInLastColumn(page)
+    return
+  }
 
-  // Poll for the ruler row by content rather than waiting a fixed interval and assuming
-  // row 0 — on CI the shell prints a "default interactive shell is now zsh" notice first,
-  // so the ruler does not reliably land on any particular row.
-  const row = await page.waitForFunction(
-    () => {
-      const rows =
-        document.querySelector('.xterm-rows.xterm-focus') ?? document.querySelector('.xterm-rows')
-      if (!rows) return null
-      for (const el of Array.from(rows.children) as HTMLElement[]) {
-        const text = (el.textContent ?? '').replace(/\u00a0/g, ' ').trimEnd()
-        // Strictly the ruler: nothing but '#', and long enough to be a real full-width line.
-        if (/^#+$/.test(text) && text.length >= 40) {
-          return { cols: text.length, scrollW: el.scrollWidth, clientW: el.clientWidth }
-        }
-      }
-      return null
-    },
-    undefined,
-    { timeout: 30000 }
-  )
-  const m = (await row.jsonValue()) as { cols: number; scrollW: number; clientW: number }
+  await page.keyboard.type(RULER_COMMAND)
+  const m = await measureRulerRow(page)
 
   // Guard the guard: too few columns and the accumulated overhang rounds to zero, which
   // would make the assertion below vacuously true.
@@ -166,10 +203,22 @@ test('split-pane: rendered text never extends under the scrollbar', async () => 
     .toBe(SCROLLBAR_WIDTH_PX)
 
   const g = await measure('.leaf-pane__container')
-  // Exact, not just non-zero: the width is pinned by our ::-webkit-scrollbar rule. Any
-  // other value means the scroller fell back to the OS scrollbar (0 with macOS overlay
-  // scrollbars, ~4-15 with classic ones) and the geometry is environment-dependent again.
+  // Exact, not just non-zero: xterm's own scrollbar has a fixed width that FitAddon
+  // reserves. Any other value means geometry and the reserved width have drifted apart.
   expect(g.scrollbarPx).toBe(SCROLLBAR_WIDTH_PX)
   expect(g.screenRight).toBeLessThanOrEqual(g.viewportContentRight)
-  expect(g.maxRowRight).toBeLessThanOrEqual(g.viewportContentRight)
+  expect(g.renderedRight).toBeLessThanOrEqual(g.viewportContentRight)
+})
+
+test("the padding around the terminal is the terminal's own colour, so no edge shows", async () => {
+  const { page } = handle
+  const colours = await page.evaluate(() => {
+    const xterm = document.querySelector('.xterm')!
+    return {
+      surround: getComputedStyle(xterm.parentElement!).backgroundColor,
+      padding: getComputedStyle(xterm.querySelector('.xterm-viewport')!).backgroundColor,
+    }
+  })
+  // XTERM_THEMES.dark.background behind a clear viewport: the padding shows the cells' colour.
+  expect(colours).toEqual({ surround: 'rgb(30, 30, 30)', padding: 'rgba(0, 0, 0, 0)' })
 })

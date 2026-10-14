@@ -1,6 +1,7 @@
-import { create } from 'zustand'
+import { create, type StoreApi } from 'zustand'
 import type { DailyLog, IndexedTask, KanbanLane } from '../vault/types'
 import { useVaultNavStore } from './vault-nav.store'
+import { localDate } from '../utils/local-date'
 
 interface VaultDataStore {
   todayLog: DailyLog | null
@@ -21,6 +22,76 @@ interface VaultDataStore {
   loadSomeday: () => Promise<void>
 }
 
+type SetState = StoreApi<VaultDataStore>['setState']
+
+/** The error a vault channel answered with, if it answered with one. */
+function errorOf(result: unknown): string | null {
+  if (result && typeof result === 'object' && 'error' in result) {
+    return (result as { error: string }).error
+  }
+  return null
+}
+
+type TodayResult = DailyLog & {
+  rolledOver?: number
+  rolledOverIds?: string[]
+  staleDaysThreshold?: number
+}
+
+async function fetchTodayInto(set: SetState): Promise<void> {
+  set({ isLoading: true, error: null })
+  try {
+    const result = await window.electronAPI.extensionBridge.invoke('task-vault:vault:get-today')
+    const error = errorOf(result)
+    if (error !== null) return set({ error, isLoading: false })
+    const res = result as TodayResult
+    useVaultNavStore.getState().setViewingDate(localDate())
+    set((s) => ({
+      todayLog: res,
+      isLoading: false,
+      lastRolledOver: res.rolledOver ?? 0,
+      rolledOverTaskIds: res.rolledOverIds ?? [],
+      staleDaysThreshold: res.staleDaysThreshold ?? s.staleDaysThreshold,
+      calendarRefreshKey: s.calendarRefreshKey + 1,
+    }))
+  } catch (err) {
+    set({ error: String(err), isLoading: false })
+  }
+}
+
+async function loadDate(set: SetState, date: string): Promise<void> {
+  set({ isLoading: true, error: null })
+  try {
+    const result = await window.electronAPI.extensionBridge.invoke('task-vault:vault:get-daily', {
+      date,
+    })
+    const error = errorOf(result)
+    if (error !== null) return set({ error, isLoading: false })
+    useVaultNavStore.getState().setViewingDate(date)
+    set((s) => ({
+      todayLog: result as DailyLog,
+      isLoading: false,
+      rolledOverTaskIds: [],
+      calendarRefreshKey: s.calendarRefreshKey + 1,
+    }))
+  } catch (err) {
+    set({ error: String(err), isLoading: false })
+  }
+}
+
+/** The tasks a list channel answered with; null when it answered anything else. */
+async function listedTasks<T>(channel: string): Promise<T[] | null> {
+  try {
+    const result = await window.electronAPI.extensionBridge.invoke(channel)
+    if (result && typeof result === 'object' && 'tasks' in result) {
+      return (result as { tasks: T[] }).tasks
+    }
+  } catch {
+    // non-critical
+  }
+  return null
+}
+
 export const useVaultDataStore = create<VaultDataStore>((set) => ({
   todayLog: null,
   inboxCount: 0,
@@ -34,81 +105,14 @@ export const useVaultDataStore = create<VaultDataStore>((set) => ({
   lastRolledOver: 0,
   rolledOverTaskIds: [],
   staleDaysThreshold: 7,
-
-  loadToday: async () => {
-    set({ isLoading: true, error: null })
-    try {
-      const result = await window.electronAPI.extensionBridge.invoke('task-vault:vault:get-today')
-      if (result && typeof result === 'object' && 'error' in result) {
-        set({ error: (result as { error: string }).error, isLoading: false })
-        return
-      }
-      const res = result as DailyLog & {
-        rolledOver?: number
-        rolledOverIds?: string[]
-        staleDaysThreshold?: number
-      }
-      const d = new Date()
-      const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-      useVaultNavStore.getState().setViewingDate(today)
-      set((s) => ({
-        todayLog: res,
-        isLoading: false,
-        lastRolledOver: res.rolledOver ?? 0,
-        rolledOverTaskIds: res.rolledOverIds ?? [],
-        staleDaysThreshold: res.staleDaysThreshold ?? s.staleDaysThreshold,
-        calendarRefreshKey: s.calendarRefreshKey + 1,
-      }))
-    } catch (err) {
-      set({ error: String(err), isLoading: false })
-    }
-  },
-
-  loadDate: async (date: string) => {
-    set({ isLoading: true, error: null })
-    try {
-      const result = await window.electronAPI.extensionBridge.invoke('task-vault:vault:get-daily', {
-        date,
-      })
-      if (result && typeof result === 'object' && 'error' in result) {
-        set({ error: (result as { error: string }).error, isLoading: false })
-        return
-      }
-      const res = result as DailyLog
-      useVaultNavStore.getState().setViewingDate(date)
-      set((s) => ({
-        todayLog: res,
-        isLoading: false,
-        rolledOverTaskIds: [],
-        calendarRefreshKey: s.calendarRefreshKey + 1,
-      }))
-    } catch (err) {
-      set({ error: String(err), isLoading: false })
-    }
-  },
-
+  loadToday: () => fetchTodayInto(set),
+  loadDate: (date: string) => loadDate(set, date),
   refreshInboxCount: async () => {
-    try {
-      const result = await window.electronAPI.extensionBridge.invoke('task-vault:vault:get-inbox')
-      if (result && typeof result === 'object' && 'tasks' in result) {
-        const { tasks } = result as { tasks: { status: string }[] }
-        set({ inboxCount: tasks.length })
-      }
-    } catch {
-      // non-critical
-    }
+    const tasks = await listedTasks<{ status: string }>('task-vault:vault:get-inbox')
+    if (tasks) set({ inboxCount: tasks.length })
   },
-
   loadSomeday: async () => {
-    try {
-      const result = await window.electronAPI.extensionBridge.invoke(
-        'task-vault:vault:list-someday'
-      )
-      if (result && typeof result === 'object' && 'tasks' in result) {
-        set({ somedayTasks: (result as { tasks: IndexedTask[] }).tasks })
-      }
-    } catch {
-      // non-critical
-    }
+    const tasks = await listedTasks<IndexedTask>('task-vault:vault:list-someday')
+    if (tasks) set({ somedayTasks: tasks })
   },
 }))

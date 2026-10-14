@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor, cleanup } from '@testing-library/react'
 import { HallThumbnail } from '../../../src/components/factory/HallThumbnail.js'
 import type { RunGraph } from '../../../src/line/run-graph.js'
+import { partialFake } from '../../../../../tests/support/fakes'
 
 // The Factory's front door shows a picture, not just text — one still frame
 // of the order's own hall, fetched once it is actually on screen.
@@ -45,7 +46,7 @@ function stubIntersectionObserver() {
     unobserve = vi.fn()
     disconnect = vi.fn()
   }
-  vi.stubGlobal('IntersectionObserver', FakeIO as unknown as typeof IntersectionObserver)
+  vi.stubGlobal('IntersectionObserver', FakeIO)
   return {
     fire: () => {
       for (const inst of instances) {
@@ -59,21 +60,22 @@ function stubIntersectionObserver() {
 }
 
 function mockBridge(invoke: ReturnType<typeof vi.fn>) {
-  ;(window as unknown as Record<string, unknown>).electronAPI = {
-    extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
-  }
+  Object.assign(window, {
+    electronAPI: {
+      extensionBridge: { invoke, on: vi.fn(() => vi.fn()) },
+    },
+  })
 }
 
 beforeEach(() => {
-  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(
-    () =>
-      ({
-        fillStyle: '#000',
-        globalCompositeOperation: 'source-over',
-        fillRect: vi.fn(),
-        drawImage: vi.fn(),
-        createRadialGradient: vi.fn(() => ({ addColorStop: vi.fn() })),
-      }) as unknown as RenderingContext
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() =>
+    partialFake<RenderingContext>({
+      fillStyle: '#000',
+      globalCompositeOperation: 'source-over',
+      fillRect: vi.fn(),
+      drawImage: vi.fn(),
+      createRadialGradient: vi.fn(() => ({ addColorStop: vi.fn() })),
+    })
   )
 })
 
@@ -84,6 +86,12 @@ afterEach(() => {
 })
 
 describe('components/factory/HallThumbnail', () => {
+  describe('the picture', thePictureTests)
+  describe('fetching', fetchingTests)
+  describe('visibility', visibilityTests)
+})
+
+function thePictureTests() {
   it('renders a picture region labelled for the order once its graph arrives', async () => {
     const invoke = vi.fn(async () => ({ graph: GRAPH }))
     mockBridge(invoke)
@@ -103,7 +111,9 @@ describe('components/factory/HallThumbnail', () => {
       ).toBeTruthy()
     )
   })
+}
 
+function fetchingTests() {
   it('fetches the graph only once per order', async () => {
     const invoke = vi.fn(async () => ({ graph: GRAPH }))
     mockBridge(invoke)
@@ -126,7 +136,9 @@ describe('components/factory/HallThumbnail', () => {
     rerender(<HallThumbnail orderId="WO-1" title="Build the thing" refreshKey="halted" />)
     await waitFor(() => expect(invoke).toHaveBeenCalledTimes(2))
   })
+}
 
+function visibilityTests() {
   it('fetches nothing until the card is actually visible', async () => {
     const io = stubIntersectionObserver()
     const invoke = vi.fn(async () => ({ graph: GRAPH }))
@@ -144,4 +156,4 @@ describe('components/factory/HallThumbnail', () => {
     render(<HallThumbnail orderId="WO-1" title="Build the thing" refreshKey="running" />)
     await waitFor(() => expect(invoke).toHaveBeenCalledTimes(1))
   })
-})
+}

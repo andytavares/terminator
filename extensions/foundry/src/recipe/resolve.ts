@@ -16,9 +16,10 @@ import type { SensorDef } from '../sensors/types.js'
 export type Kind = 'recipes' | 'roles' | 'rules' | 'sensors'
 
 export type { Rung } from './rung.js'
-export { rungInWords } from './rung.js'
+
 import type { Rung } from './rung.js'
 
+/** @internal */
 export interface ResolvedFile {
   readonly name: string
   readonly rung: Rung
@@ -64,6 +65,7 @@ function candidates(kind: Kind, name: string, sources: ResolveSources): [Rung, s
  * The rung is returned rather than discarded because "which recipe ran" is not
  * the whole answer — "and which of the three it came from" is what makes a
  * surprising run explicable, and it is recorded in the ledger for that reason.
+ * @internal
  */
 export function resolveFile(
   kind: Kind,
@@ -101,11 +103,16 @@ export interface Resolved<T> {
   readonly file: string
 }
 
+/** A kind of definition, and how to read one. */
+interface Definition<T> {
+  readonly kind: Kind
+  readonly parse: (text: string, file: string) => ParseResult<T>
+}
+
 function resolveParsed<T>(
-  kind: Kind,
+  { kind, parse }: Definition<T>,
   name: string,
-  sources: ResolveSources,
-  parse: (text: string, file: string) => ParseResult<T>
+  sources: ResolveSources
 ): { ok: true; resolved: Resolved<T> } | { ok: false; reason: string } {
   const found = resolveFile(kind, name, sources)
   if (found === null) return { ok: false, reason: `No ${kind.slice(0, -1)} called "${name}".` }
@@ -115,19 +122,20 @@ function resolveParsed<T>(
 }
 
 export function resolveRecipe(name: string, sources: ResolveSources) {
-  return resolveParsed<Recipe>('recipes', name, sources, parseRecipe)
+  return resolveParsed<Recipe>({ kind: 'recipes', parse: parseRecipe }, name, sources)
 }
 
 export function resolveRole(name: string, sources: ResolveSources) {
-  return resolveParsed<Role>('roles', name, sources, parseRole)
+  return resolveParsed<Role>({ kind: 'roles', parse: parseRole }, name, sources)
 }
 
 export function resolveRule(name: string, sources: ResolveSources) {
-  return resolveParsed<Rule>('rules', name, sources, parseRule)
+  return resolveParsed<Rule>({ kind: 'rules', parse: parseRule }, name, sources)
 }
 
+/** @internal */
 export function resolveSensor(name: string, sources: ResolveSources) {
-  return resolveParsed<SensorDef>('sensors', name, sources, parseSensor)
+  return resolveParsed<SensorDef>({ kind: 'sensors', parse: parseSensor }, name, sources)
 }
 
 /**
@@ -187,6 +195,7 @@ function skillCandidates(id: string, sources: ResolveSources): [Rung, string][] 
   ]
 }
 
+/** @internal */
 export function resolveSkill(id: string, sources: ResolveSources): ResolvedSkill | null {
   for (const [rung, dir] of skillCandidates(id, sources)) {
     if (fs.existsSync(path.join(dir, 'SKILL.md'))) return { id, rung, dir }

@@ -1,19 +1,20 @@
-import { execFile as execFileCb, spawn } from 'child_process'
-import { promisify } from 'util'
+import { access, constants } from 'fs/promises'
+import { resolve } from 'path'
+import { stripVTControlCharacters } from 'util'
 import type { GitStatus, FileDiff } from '../schemas/git.schema.js'
 import { parseStatus, parseDiff } from './git-parser.js'
-
-const execFile = promisify(execFileCb)
+import { GitCommandError, runGit } from '../shell/run-git.js'
+import { canonical, isInside } from '../ipc/repo-root.js'
 
 const GIT_TIMEOUT = 10_000
 const HOOK_TIMEOUT = 120_000
 const DIFF_MAX_BYTES = 500 * 1024
 
-export interface CommitSuccess {
+interface CommitSuccess {
   commitHash: string
 }
 
-export interface CommitError {
+interface CommitError {
   error: string
   hookOutput?: string
   isHookFailure?: boolean
@@ -21,81 +22,86 @@ export interface CommitError {
 
 export type CommitResult = CommitSuccess | CommitError
 
-function stripAnsi(str: string): string {
-  // eslint-disable-next-line no-control-regex
-  return str.replace(/\x1b\[[0-9;]*m/g, '').replace(/\x1b\[\??\d+[hl]/g, '')
+export interface CommitOptions {
+  signOff?: boolean
+  noVerify?: boolean
+  /** Receives each line the commit (and its hooks) print, as they print it. */
+  onOutput?: (line: string) => void
 }
 
-async function git(args: string[], cwd: string): Promise<string> {
-  const { stdout } = await execFile('git', args, {
-    cwd,
-    timeout: GIT_TIMEOUT,
-    env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
-  })
-  return stdout.trim()
+/** Which version of a file to diff: the staged one or the working tree, and whether git tracks it. */
+export interface DiffSide {
+  staged: boolean
+  isUntracked?: boolean
+}
+
+function gitInRepo(args: string[], cwd: string, options: { raw?: boolean } = {}): Promise<string> {
+  return runGit(cwd, args, { timeoutMs: GIT_TIMEOUT, ...options })
 }
 
 export async function getStatus(repoRoot: string, maxFiles: number = 500): Promise<GitStatus> {
   const [statusOut, branch] = await Promise.all([
-    execFile('git', ['status', '--porcelain=v1', '-z'], {
-      cwd: repoRoot,
-      timeout: GIT_TIMEOUT,
-      env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
-    }).then(({ stdout }) => stdout),
-    git(['branch', '--show-current'], repoRoot).catch(() => 'HEAD'),
+    gitInRepo(['status', '--porcelain=v1', '-z'], repoRoot, { raw: true }),
+    gitInRepo(['branch', '--show-current'], repoRoot).catch(() => 'HEAD'),
   ])
   const partial = parseStatus(statusOut, maxFiles)
   return { ...partial, branch: branch || 'HEAD' }
 }
 
+/** The directories whose changes can change `repoRoot`'s status: `repoRoot`, and the repository's
+ * git directory when it is outside it. A linked worktree keeps its index and HEAD there
+ * (https://git-scm.com/docs/git-worktree#_details), so a `git add` in one changes nothing in it. */
+export async function statusWatchRoots(repoRoot: string): Promise<string[]> {
+  const gitDirectory = await gitInRepo(
+    ['rev-parse', '--path-format=absolute', '--git-common-dir'],
+    repoRoot
+  )
+  const isWithinRoot = isInside(canonical(repoRoot), canonical(gitDirectory))
+  return isWithinRoot ? [repoRoot] : [repoRoot, gitDirectory]
+}
+
+function runDiff(args: string[], repoRoot: string): Promise<string> {
+  return runGit(repoRoot, args, {
+    timeoutMs: GIT_TIMEOUT,
+    maxBuffer: DIFF_MAX_BYTES + 1024,
+    raw: true,
+  })
+}
+
+/** An untracked file against /dev/null; git exits 1 when they differ, with the diff on stdout. */
+async function untrackedFileDiff(repoRoot: string, filePath: string): Promise<string | null> {
+  try {
+    return await runDiff(
+      ['diff', '--no-index', '--unified=3', '--', '/dev/null', filePath],
+      repoRoot
+    )
+  } catch (e: unknown) {
+    if (e instanceof GitCommandError && e.stdout) return e.stdout
+    return null
+  }
+}
+
 export async function getDiff(
   repoRoot: string,
   filePath: string,
-  staged: boolean,
-  isUntracked = false
+  side: DiffSide
 ): Promise<FileDiff> {
-  const args = staged
+  const args = side.staged
     ? ['diff', '--cached', '--unified=3', '--', filePath]
     : ['diff', '--unified=3', '--', filePath]
-
-  const { stdout } = await execFile('git', args, {
-    cwd: repoRoot,
-    timeout: GIT_TIMEOUT,
-    maxBuffer: DIFF_MAX_BYTES + 1024,
-    env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
-  })
-
-  // Untracked files produce no output from `git diff` because git has no index entry.
-  // Use --no-index to compare /dev/null against the file, showing all lines as additions.
-  // git diff --no-index exits with code 1 when files differ (normal), so stdout is in the error.
-  if (!staged && isUntracked && !stdout.trim()) {
-    try {
-      const { stdout: noIndexOut } = await execFile(
-        'git',
-        ['diff', '--no-index', '--unified=3', '--', '/dev/null', filePath],
-        {
-          cwd: repoRoot,
-          timeout: GIT_TIMEOUT,
-          maxBuffer: DIFF_MAX_BYTES + 1024,
-          env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
-        }
-      )
-      return { ...parseDiff(noIndexOut, DIFF_MAX_BYTES), path: filePath }
-    } catch (e: unknown) {
-      const err = e as { stdout?: string }
-      if (err.stdout) return { ...parseDiff(err.stdout, DIFF_MAX_BYTES), path: filePath }
-    }
-  }
-
-  return { ...parseDiff(stdout, DIFF_MAX_BYTES), path: filePath }
+  const stdout = await runDiff(args, repoRoot)
+  // `git diff` prints nothing for an untracked file: git has no index entry to compare.
+  const untracked = !side.staged && side.isUntracked && !stdout.trim()
+  const output = (untracked ? await untrackedFileDiff(repoRoot, filePath) : null) ?? stdout
+  return { ...parseDiff(output, DIFF_MAX_BYTES), path: filePath }
 }
 
 export async function stageFiles(repoRoot: string, paths: string[]): Promise<void> {
-  await git(['add', '--', ...paths], repoRoot)
+  await gitInRepo(['add', '--', ...paths], repoRoot)
 }
 
 export async function unstageFiles(repoRoot: string, paths: string[]): Promise<void> {
-  await git(['restore', '--staged', '--', ...paths], repoRoot)
+  await gitInRepo(['restore', '--staged', '--', ...paths], repoRoot)
 }
 
 export interface PushSuccess {
@@ -112,21 +118,17 @@ export interface PushError {
 // (main-process-triggered push), so the git CLI invocation lives once.
 export async function pushBranch(repoRoot: string): Promise<PushSuccess | PushError> {
   try {
-    await execFile('git', ['push'], {
-      cwd: repoRoot,
-      timeout: GIT_TIMEOUT,
-      env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
-    })
+    await gitInRepo(['push'], repoRoot)
   } catch (e) {
     const msg = String(e)
     if (msg.includes('has no upstream')) return { error: 'NO_UPSTREAM' }
     if (msg.includes('rejected')) return { error: 'REJECTED' }
     return { error: msg }
   }
-  const branch = await git(['branch', '--show-current'], repoRoot).catch(() => '')
+  const branch = await gitInRepo(['branch', '--show-current'], repoRoot).catch(() => '')
   let remote = 'origin'
   try {
-    const upstream = await git(
+    const upstream = await gitInRepo(
       ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}'],
       repoRoot
     )
@@ -141,97 +143,88 @@ export async function pullFastForward(
   repoRoot: string
 ): Promise<{ success: true; branch: string } | { error: string }> {
   try {
-    await execFile('git', ['pull', '--ff-only'], {
-      cwd: repoRoot,
-      timeout: GIT_TIMEOUT,
-      env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
-    })
+    await gitInRepo(['pull', '--ff-only'], repoRoot)
   } catch (e) {
     return { error: String(e) }
   }
-  const branch = await git(['branch', '--show-current'], repoRoot).catch(() => '')
+  const branch = await gitInRepo(['branch', '--show-current'], repoRoot).catch(() => '')
   return { success: true, branch }
 }
 
-export function commitChanges(
+/** Hands each non-blank line of a chunk to `onOutput`, without terminal escapes. */
+function lineEmitter(onOutput?: (line: string) => void): ((chunk: string) => void) | undefined {
+  if (!onOutput) return undefined
+  return (chunk) => {
+    for (const line of stripVTControlCharacters(chunk).split('\n')) {
+      if (line.trim()) onOutput(line.trimEnd())
+    }
+  }
+}
+
+function isHookFailure(stderr: string): boolean {
+  // git reports "hook failed" / "hook exited with code", or a hook runner
+  // (husky, lefthook) writes output before failing.
+  return ['hook failed', 'hook exited with code', 'husky -', 'lefthook'].some((marker) =>
+    stderr.includes(marker)
+  )
+}
+
+/** The hooks `git commit` runs and `--no-verify` skips (https://git-scm.com/docs/git-commit#Documentation/git-commit.txt---no-verify). */
+const VERIFY_HOOKS = ['pre-commit', 'commit-msg']
+
+/** True when one of the commit's verify hooks is installed, where core.hooksPath puts it. */
+async function hasVerifyHook(repoRoot: string): Promise<boolean> {
+  const installed = await Promise.all(
+    VERIFY_HOOKS.map(async (name) => {
+      const path = await gitInRepo(['rev-parse', '--git-path', `hooks/${name}`], repoRoot)
+      return access(resolve(repoRoot, path), constants.X_OK).then(
+        () => true,
+        () => false
+      )
+    })
+  )
+  return installed.includes(true)
+}
+
+/** A hook exiting non-zero aborts the commit and git prints nothing beside the hook's output
+ *  (https://git-scm.com/docs/githooks#_pre_commit); git's own failures say `fatal:` or `error:`. */
+async function plainHookFailed(repoRoot: string, output: string): Promise<boolean> {
+  if (/^(fatal|error):/m.test(output)) return false
+  return hasVerifyHook(repoRoot).catch(() => false)
+}
+
+async function commitFailure(error: GitCommandError, repoRoot: string): Promise<CommitError> {
+  const combined = stripVTControlCharacters(
+    [error.stdout, error.stderr].filter(Boolean).join('\n').trim()
+  )
+  if (combined.includes('nothing to commit')) return { error: 'NOTHING_TO_COMMIT' }
+  const hookFailed = isHookFailure(error.stderr) || (await plainHookFailed(repoRoot, combined))
+  return {
+    error: hookFailed ? 'HOOK_FAILED' : combined || 'Commit failed',
+    hookOutput: combined || undefined,
+    isHookFailure: hookFailed,
+  }
+}
+
+export async function commitChanges(
   repoRoot: string,
   message: string,
-  signOff = false,
-  noVerify = false,
-  onOutput?: (line: string) => void
+  options: CommitOptions = {}
 ): Promise<CommitResult> {
   const args = ['commit', '-m', message]
-  if (signOff) args.push('--signoff')
-  if (noVerify) args.push('--no-verify')
-
-  return new Promise((resolve) => {
-    const proc = spawn('git', args, {
-      cwd: repoRoot,
-      env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
+  if (options.signOff) args.push('--signoff')
+  if (options.noVerify) args.push('--no-verify')
+  try {
+    const stdout = await runGit(repoRoot, args, {
+      timeoutMs: HOOK_TIMEOUT,
+      raw: true,
+      onOutput: lineEmitter(options.onOutput),
     })
-
-    let stdout = ''
-    let stderr = ''
-    let timedOut = false
-
-    const killTimer = setTimeout(() => {
-      timedOut = true
-      proc.kill()
-    }, HOOK_TIMEOUT)
-
-    const emit = (chunk: Buffer) => {
-      const text = stripAnsi(chunk.toString())
-      if (onOutput) {
-        for (const line of text.split('\n')) {
-          if (line.trim()) onOutput(line.trimEnd())
-        }
-      }
-    }
-
-    proc.stdout.on('data', (chunk: Buffer) => {
-      stdout += chunk.toString()
-      emit(chunk)
-    })
-    proc.stderr.on('data', (chunk: Buffer) => {
-      stderr += chunk.toString()
-      emit(chunk)
-    })
-
-    proc.on('close', (code) => {
-      clearTimeout(killTimer)
-      if (timedOut) {
-        resolve({ error: 'TIMEOUT' })
-        return
-      }
-      if (code === 0) {
-        const match = stdout.trim().match(/\[[\w/]+ ([a-f0-9]+)\]/)
-        resolve({ commitHash: match?.[1] ?? '' })
-        return
-      }
-      const combined = stripAnsi([stdout, stderr].filter(Boolean).join('\n').trim())
-      if (combined.includes('nothing to commit')) {
-        resolve({ error: 'NOTHING_TO_COMMIT' })
-        return
-      }
-      // Detect hook failures: git reports "hook failed" / "hook exited with code" in stderr,
-      // or a hook runner (husky, lefthook) writes output before failing.
-      const isHookFailure = !!(
-        stderr &&
-        (stderr.includes('hook failed') ||
-          stderr.includes('hook exited with code') ||
-          stderr.includes('husky -') ||
-          stderr.includes('lefthook'))
-      )
-      resolve({
-        error: isHookFailure ? 'HOOK_FAILED' : combined || 'Commit failed',
-        hookOutput: combined || undefined,
-        isHookFailure,
-      })
-    })
-
-    proc.on('error', (err) => {
-      clearTimeout(killTimer)
-      resolve({ error: String(err) })
-    })
-  })
+    const match = stdout.match(/^\[.+? ([a-f0-9]+)\]/m)
+    return { commitHash: match?.[1] ?? '' }
+  } catch (e) {
+    if (!(e instanceof GitCommandError)) return { error: String(e) }
+    if (e.timedOut) return { error: 'TIMEOUT' }
+    return commitFailure(e, repoRoot)
+  }
 }

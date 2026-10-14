@@ -9,6 +9,7 @@ import type {
   TrackerId,
 } from '../../shared/types/index.js'
 import type { StoredCredential } from './providers/provider.js'
+import { writeJsonAtomic } from '@terminator/extension-sdk/node'
 
 // Where tracker credentials live now that they are the application's rather
 // than one extension's.
@@ -67,9 +68,9 @@ function decrypt(encoded: string): string | null {
   }
 }
 
-async function read(): Promise<StoreFile> {
+async function readStoreFile(file: string): Promise<StoreFile> {
   try {
-    const raw = await fs.readFile(filePath(), 'utf8')
+    const raw = await fs.readFile(file, 'utf8')
     const parsed: unknown = JSON.parse(raw)
     return typeof parsed === 'object' && parsed !== null ? (parsed as StoreFile) : {}
   } catch {
@@ -78,17 +79,34 @@ async function read(): Promise<StoreFile> {
   }
 }
 
-async function write(data: StoreFile): Promise<void> {
-  const target = filePath()
-  const tmp = `${target}.tmp`
-  await fs.writeFile(tmp, JSON.stringify(data, null, 2), 'utf8')
-  await fs.rename(tmp, target)
+async function write(file: string, data: StoreFile): Promise<void> {
+  await writeJsonAtomic(file, data)
 }
 
-async function update(tracker: TrackerId, patch: Partial<StoredTracker>): Promise<void> {
-  const data = await read()
-  data[tracker] = { ...data[tracker], ...patch }
-  await write(data)
+// Each change rewrites the whole file, so two at once (two trackers answering one listMine) would
+// overwrite each other, and a read could miss one under way. Every access waits for those asked for
+// before it, and takes the file's path when it is asked for.
+let queue: Promise<unknown> = Promise.resolve()
+
+function serialized<T>(op: (file: string) => Promise<T>): Promise<T> {
+  const file = filePath()
+  const run = queue.then(() => op(file))
+  queue = run.catch(() => undefined)
+  return run
+}
+
+function editStoreFile(edit: (data: StoreFile) => void): Promise<void> {
+  return serialized(async (file) => {
+    const data = await readStoreFile(file)
+    edit(data)
+    await write(file, data)
+  })
+}
+
+function update(tracker: TrackerId, patch: Partial<StoredTracker>): Promise<void> {
+  return editStoreFile((data) => {
+    data[tracker] = { ...data[tracker], ...patch }
+  })
 }
 
 function defaultMine(tracker: TrackerId): MineSelector {
@@ -108,7 +126,7 @@ export async function setCredential(cred: StoredCredential): Promise<void> {
 }
 
 export async function getCredential(tracker: TrackerId): Promise<StoredCredential | null> {
-  const entry = (await read())[tracker]
+  const entry = (await serialized(readStoreFile))[tracker]
   if (entry?.secret === undefined) return null
   const secret = decrypt(entry.secret)
   if (secret === null) return null
@@ -118,14 +136,14 @@ export async function getCredential(tracker: TrackerId): Promise<StoredCredentia
   return { tracker: 'jira', site: entry.site, email: entry.email, apiToken: secret }
 }
 
-export async function clearCredential(tracker: TrackerId): Promise<void> {
-  const data = await read()
-  // The mine selector survives a disconnect: it is the operator's
-  // configuration, not the credential's, and retyping a JQL query because a
-  // token expired is a small insult that adds up.
-  const kept = data[tracker]?.mine
-  data[tracker] = kept === undefined ? {} : { mine: kept }
-  await write(data)
+export function clearCredential(tracker: TrackerId): Promise<void> {
+  return editStoreFile((data) => {
+    // The mine selector survives a disconnect: it is the operator's
+    // configuration, not the credential's, and retyping a JQL query because a
+    // token expired is a small insult that adds up.
+    const kept = data[tracker]?.mine
+    data[tracker] = kept === undefined ? {} : { mine: kept }
+  })
 }
 
 export async function setAccount(tracker: TrackerId, account: TrackerAccount): Promise<void> {
@@ -144,7 +162,7 @@ export async function setMine(tracker: TrackerId, mine: MineSelector): Promise<v
 }
 
 export async function getMine(tracker: TrackerId): Promise<MineSelector> {
-  return (await read())[tracker]?.mine ?? defaultMine(tracker)
+  return (await serialized(readStoreFile))[tracker]?.mine ?? defaultMine(tracker)
 }
 
 /**
@@ -152,7 +170,7 @@ export async function getMine(tracker: TrackerId): Promise<MineSelector> {
  * exists and which account it proved to belong to.
  */
 export async function listConnections(): Promise<TrackerConnection[]> {
-  const data = await read()
+  const data = await serialized(readStoreFile)
   return TRACKERS.map((tracker) => {
     const entry = data[tracker] ?? {}
     return {
@@ -191,37 +209,41 @@ export async function migrateLegacyCredentials(): Promise<void> {
   }
 
   try {
-    const data = await read()
-
-    if (legacy.linearKey !== undefined && data.linear?.secret === undefined) {
-      const key = decrypt(legacy.linearKey)
-      if (key !== null) {
-        data.linear = {
-          ...data.linear,
-          secret: encrypt(key),
-          mine: { kind: 'assignee', email: legacy.linearEmail ?? null },
-        }
-      }
-    }
-
-    const jira = legacy.jiraCreds
-    if (jira?.apiToken !== undefined && data.jira?.secret === undefined) {
-      const token = decrypt(jira.apiToken)
-      if (token !== null && jira.domain !== undefined && jira.email !== undefined) {
-        data.jira = {
-          ...data.jira,
-          secret: encrypt(token),
-          site: jira.domain,
-          email: jira.email,
-          mine: { kind: 'query', jql: jira.jql ?? DEFAULT_JIRA_JQL },
-        }
-      }
-    }
-
-    await write(data)
+    await editStoreFile((data) => adoptLegacy(data, legacy))
     await fs.rename(legacyPath(), `${legacyPath()}.bak`)
   } catch {
     // A migration that cannot finish leaves the legacy file in place so it can
     // be retried, and the operator can still connect by hand.
+  }
+}
+
+/** The legacy file's credentials, for any tracker that has none yet. */
+function adoptLegacy(data: StoreFile, legacy: LegacyFile): void {
+  adoptLegacyLinear(data, legacy)
+  adoptLegacyJira(data, legacy)
+}
+
+function adoptLegacyLinear(data: StoreFile, legacy: LegacyFile): void {
+  if (legacy.linearKey === undefined || data.linear?.secret !== undefined) return
+  const key = decrypt(legacy.linearKey)
+  if (key === null) return
+  data.linear = {
+    ...data.linear,
+    secret: encrypt(key),
+    mine: { kind: 'assignee', email: legacy.linearEmail ?? null },
+  }
+}
+
+function adoptLegacyJira(data: StoreFile, legacy: LegacyFile): void {
+  const jira = legacy.jiraCreds
+  if (jira?.apiToken === undefined || data.jira?.secret !== undefined) return
+  const token = decrypt(jira.apiToken)
+  if (token === null || jira.domain === undefined || jira.email === undefined) return
+  data.jira = {
+    ...data.jira,
+    secret: encrypt(token),
+    site: jira.domain,
+    email: jira.email,
+    mine: { kind: 'query', jql: jira.jql ?? DEFAULT_JIRA_JQL },
   }
 }

@@ -1,4 +1,5 @@
 import * as fs from 'node:fs'
+import { writeJsonAtomic } from '@terminator/extension-sdk/node'
 import * as path from 'node:path'
 import { orderDir } from '../data-root.js'
 import type { Check } from './ci.js'
@@ -25,11 +26,7 @@ function ciStatePath(root: string, orderId: string): string {
 
 export async function writeCiState(root: string, orderId: string, state: CiState): Promise<void> {
   await fs.promises.mkdir(orderDir(root, orderId), { recursive: true })
-  await fs.promises.writeFile(
-    ciStatePath(root, orderId),
-    `${JSON.stringify(state, null, 2)}\n`,
-    'utf8'
-  )
+  await writeJsonAtomic(ciStatePath(root, orderId), state)
   // The replay's record of CI. Best effort, as the graph's frame is: the file
   // just written is the truth, and a timeline that cannot be appended to must
   // not undo it.

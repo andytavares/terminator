@@ -6,6 +6,7 @@ import { ConfirmDialog } from '../../../../packages/extension-ui/src/ConfirmDial
 import { Popover } from '../../../../packages/extension-ui/src/Popover'
 import { useDismissible } from '../../../../packages/extension-ui/src/useDismissible'
 import { getModalDepth } from '../../../../packages/extension-ui/src/modal-depth'
+import { pressOutside } from '../../../support/modal'
 
 /**
  * SC-002, as a measurement rather than an inference.
@@ -30,93 +31,92 @@ const CHECKS = [
   'dismissible from outside',
 ]
 
-describe('behaviour matrix: Dialog', () => {
-  const open = (onDismiss = vi.fn()) => {
-    render(
-      <Dialog title="Rename" onDismiss={onDismiss} actions={[{ label: 'Go', onSelect: vi.fn() }]}>
-        <input aria-label="name" />
-      </Dialog>
-    )
-    return onDismiss
-  }
+// A native dialog opened as a modal is announced as one and holds focus without being told to.
+// A test DOM does neither, so what is asserted here is that the dialog is that element, opened.
+const BY_THE_BROWSER = `${CHECKS[2]} and ${CHECKS[3]}, by the browser`
 
+function expectOpenNativeDialog(): void {
+  const dialog = screen.getByRole('dialog')
+  expect(dialog.tagName).toBe('DIALOG')
+  expect(dialog.hasAttribute('open')).toBe(true)
+}
+
+const openRenameDialog = (onDismiss = vi.fn()) => {
+  render(
+    <Dialog title="Rename" onDismiss={onDismiss} actions={[{ label: 'Go', onSelect: vi.fn() }]}>
+      <input aria-label="name" />
+    </Dialog>
+  )
+  return onDismiss
+}
+
+describe('behaviour matrix: Dialog', () => {
   it(CHECKS[0], () => {
-    const onDismiss = open()
+    const onDismiss = openRenameDialog()
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(onDismiss).toHaveBeenCalled()
   })
 
   it(CHECKS[1], () => {
-    open()
+    openRenameDialog()
     expect(screen.getByRole('dialog')).toBeTruthy()
   })
 
-  it(CHECKS[2], () => {
-    open()
-    expect(screen.getByRole('dialog').getAttribute('aria-modal')).toBe('true')
-  })
-
-  it(CHECKS[3], () => {
-    open()
-    // Focus moved into the surface rather than being left behind it.
-    expect(screen.getByRole('dialog').contains(document.activeElement)).toBe(true)
+  it(BY_THE_BROWSER, () => {
+    openRenameDialog()
+    expectOpenNativeDialog()
   })
 
   it(CHECKS[4], () => {
-    const onDismiss = open()
-    fireEvent.mouseDown(document.querySelector('.tmui-dialog__scrim') as Element)
-    fireEvent.click(document.querySelector('.tmui-dialog__scrim') as Element)
+    const onDismiss = openRenameDialog()
+    pressOutside(screen.getByRole('dialog'))
     expect(onDismiss).toHaveBeenCalled()
   })
+})
 
+describe('behaviour matrix: Dialog — counts toward the modal depth the exit gesture reads', () => {
   it('counts toward the modal depth the exit gesture reads', () => {
-    expect(getModalDepth(window as unknown as Record<string, unknown>)).toBe(0)
+    expect(getModalDepth(window)).toBe(0)
     const { unmount } = render(
       <Dialog title="X" onDismiss={vi.fn()} actions={[]}>
         <p>body</p>
       </Dialog>
     )
-    expect(getModalDepth(window as unknown as Record<string, unknown>)).toBe(1)
+    expect(getModalDepth(window)).toBe(1)
     unmount()
-    expect(getModalDepth(window as unknown as Record<string, unknown>)).toBe(0)
+    expect(getModalDepth(window)).toBe(0)
   })
 })
 
-describe('behaviour matrix: ConfirmDialog', () => {
-  const open = (onDismiss = vi.fn()) => {
-    render(
-      <ConfirmDialog
-        title="Delete this note?"
-        description="It cannot be recovered."
-        onConfirm={vi.fn()}
-        onClose={onDismiss}
-      />
-    )
-    return onDismiss
-  }
+const openConfirmDialog = (onDismiss = vi.fn()) => {
+  render(
+    <ConfirmDialog
+      title="Delete this note?"
+      description="It cannot be recovered."
+      onConfirm={vi.fn()}
+      onClose={onDismiss}
+    />
+  )
+  return onDismiss
+}
 
+describe('behaviour matrix: ConfirmDialog', () => {
   it(CHECKS[0], () => {
-    const onDismiss = open()
+    const onDismiss = openConfirmDialog()
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(onDismiss).toHaveBeenCalled()
   })
   it(CHECKS[1], () => {
-    open()
+    openConfirmDialog()
     expect(screen.getByRole('dialog')).toBeTruthy()
   })
-  it(CHECKS[2], () => {
-    open()
-    expect(screen.getByRole('dialog').getAttribute('aria-modal')).toBe('true')
-  })
-  it(CHECKS[3], () => {
-    open()
-    expect(screen.getByRole('dialog').contains(document.activeElement)).toBe(true)
+  it(BY_THE_BROWSER, () => {
+    openConfirmDialog()
+    expectOpenNativeDialog()
   })
   it(CHECKS[4], () => {
-    const onDismiss = open()
-    const scrim = document.querySelector('.tmui-dialog__scrim') as Element
-    fireEvent.mouseDown(scrim)
-    fireEvent.click(scrim)
+    const onDismiss = openConfirmDialog()
+    pressOutside(screen.getByRole('dialog'))
     expect(onDismiss).toHaveBeenCalled()
   })
 })
@@ -186,8 +186,8 @@ describe('behaviour matrix: useDismissible', () => {
   it('counts toward modal depth — the guard the three Notepad surfaces lacked', () => {
     const onDismiss = vi.fn()
     const { unmount } = render(<Custom onDismiss={onDismiss} />)
-    expect(getModalDepth(window as unknown as Record<string, unknown>)).toBe(1)
+    expect(getModalDepth(window)).toBe(1)
     unmount()
-    expect(getModalDepth(window as unknown as Record<string, unknown>)).toBe(0)
+    expect(getModalDepth(window)).toBe(0)
   })
 })
