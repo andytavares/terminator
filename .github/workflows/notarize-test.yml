@@ -42,7 +42,9 @@ jobs:
         run: |
           APP="$GITHUB_WORKSPACE/$(find dist -maxdepth 2 -name Terminator.app | head -1)"
           cd "$RUNNER_TEMP" && codesign -d --extract-certificates=chain "$APP"
-          openssl x509 -inform DER -in chain0 -noout -issuer | grep -q 'OU=G2' || {
+          openssl version
+          openssl x509 -inform DER -in chain0 -noout -subject -issuer -enddate -fingerprint -sha1 | tee signing-certificate.txt
+          grep -Eq 'OU ?= ?G2' signing-certificate.txt || {
             echo "::error::Signed by the Developer ID authority that expires 2027-02-01. Create a G2 Developer ID Application certificate and replace APPLE_CERTIFICATE."
             exit 1
           }
