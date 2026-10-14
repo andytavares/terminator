@@ -214,10 +214,15 @@ test("a task's detail panel saves its description", async () => {
 
 test('a backlog item is picked up for today, another is deleted', async () => {
   await rowAction('Send the invites', 'Send to backlog')
-  await rowAction('Draft the agenda', 'Send to backlog')
   const backlogRow = (text: string) =>
     vault.locator('.daily-log__backlog-list > *').filter({ hasText: text })
+  // The row appears after the refresh, which follows the dispatcher's answer and so its push.
   await expect(backlogRow('Send the invites')).toBeVisible()
+  const toast = vault
+    .locator('.tmui-toast')
+    .filter({ hasText: 'Moved to backlog: Send the invites' })
+  await expect(toast, 'one move, one toast').toHaveCount(1)
+  await rowAction('Draft the agenda', 'Send to backlog')
   await expect(backlogRow('Draft the agenda')).toBeVisible()
 
   await backlogRow('Send the invites').hover()
