@@ -38,7 +38,7 @@
     "create-extension": "node scripts/create-extension.cjs",
     "package": "npm run build:extensions && npm run build:remote && electron-vite build && electron-builder --mac --arm64 --publish never",
     "prepare": "husky",
-    "typecheck:extensions": "tsc -p extensions/foundry/tsconfig.json && tsc -p extensions/foundry/tsconfig.test.json && tsc -p extensions/git-integration/tsconfig.json && tsc -p extensions/git-integration/tsconfig.test.json && tsc -p extensions/notepad/tsconfig.json && tsc -p extensions/notepad/tsconfig.test.json && tsc -p extensions/task-vault/tsconfig.json && tsc -p extensions/task-vault/tsconfig.test.json && tsc -p extensions/remote-control/tsconfig.json && tsc -p extensions/remote-control/tsconfig.test.json",
+    "typecheck:extensions": "tsc -p extensions/foundry/tsconfig.json && tsc -p extensions/foundry/tsconfig.test.json && tsc -p extensions/git-integration/tsconfig.json && tsc -p extensions/git-integration/tsconfig.test.json && tsc -p extensions/notepad/tsconfig.json && tsc -p extensions/notepad/tsconfig.test.json && tsc -p extensions/task-vault/tsconfig.json && tsc -p extensions/task-vault/tsconfig.view.json &&tsc -p extensions/task-vault/tsconfig.test.json && tsc -p extensions/remote-control/tsconfig.json && tsc -p extensions/remote-control/tsconfig.test.json",
     "storybook": "npm run storybook -w @terminator/extension-ui",
     "build-storybook": "npm run build-storybook -w @terminator/extension-ui",
     "test:stories": "npm run test:stories -w @terminator/extension-ui",

@@ -40,6 +40,7 @@ task-vault/
 ├── package.json             its own npm dependencies and the build:renderer script
 ├── tsconfig.json            extends ../../tsconfig.extension.json (typecheck only)
 ├── tsconfig.test.json       extends tsconfig.json and adds tests/ (typecheck only)
+├── tsconfig.view.json       the view alone, without the Temporal types (ADR 108)
 ├── src/
 │   ├── index.ts             backend: activate(api) / deactivate()
 │   ├── index.js             esbuild output of index.ts (gitignored, never edited)
