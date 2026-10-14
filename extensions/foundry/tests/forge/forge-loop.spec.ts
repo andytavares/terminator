@@ -258,6 +258,24 @@ function askingArchitect(answered: (resolve: (requestId: string) => void) => voi
   }
 }
 
+describe('a turn that has started', () => {
+  it("tells the surfaces about a turn's conversation once, though its start is reported twice", async () => {
+    theRunner.start.mockImplementation(askingArchitect(() => undefined) as never)
+    await createOrderStore(dataDir).save(readyDraft(repo))
+    host.broadcast.mockClear()
+    await host.call('foundry:order.converge', { id: 'WO-1', message: 'go' })
+    await vi.waitFor(async () =>
+      expect((await createOrderStore(dataDir).load('WO-1'))?.provenance.forgeSession).toBe(
+        'architect-1'
+      )
+    )
+    const announced = host.broadcast.mock.calls.filter(
+      ([, change]) => change.kind === 'live' && change.orderId === 'WO-1'
+    )
+    expect(announced).toHaveLength(1)
+  })
+})
+
 describe('a question the architect asks', () => {
   it('waits on the console for the operator, and is gone once answered', async () => {
     let answer: (requestId: string) => void = () => undefined

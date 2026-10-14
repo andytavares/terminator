@@ -129,7 +129,11 @@ interface SessionMemory {
 // put the old plan back, with the answered finding open again.
 function rememberSessions(root: string, orderId: string): SessionMemory {
   let remembering: Promise<void> = Promise.resolve()
+  let remembered: string | null = null
   const remember = (sessionId: string): void => {
+    // A turn's start reports its session twice: as it registers, and when the start returns.
+    if (sessionId === remembered) return
+    remembered = sessionId
     intakeSessions.set(orderId, sessionId)
     announceLive(orderId)
     remembering = remembering
