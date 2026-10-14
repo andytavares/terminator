@@ -44,6 +44,9 @@ export default defineConfig({
     env: {
       ELECTRON_OVERRIDE_DIST_PATH: resolve(__dirname, 'node_modules/electron/dist'),
     },
+    // Task Vault's backend uses Temporal (ADR 108). Electron 44 has it; Node 24
+    // only behind this flag. Remove it when .nvmrc reaches Node 26, which ships it.
+    execArgv: ['--harmony-temporal'],
     projects: [
       {
         extends: true,
