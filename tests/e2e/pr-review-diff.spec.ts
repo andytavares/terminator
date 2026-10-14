@@ -10,6 +10,7 @@ import {
   writeFile,
 } from './git-harness'
 import { startGithubStub, type GithubStub } from './github-stub'
+import { expectCentredInWindow } from './modal-centre'
 
 /** A pull request's diff in Code Reviews against the stub GitHub: context, risk, covering
  * tests, threads and pending comments, files marked viewed, and what changed since the last look. */
@@ -144,6 +145,7 @@ test('a pending comment goes out with the review, and finishing marks the rest v
   await fileInList(view, 'tests/math.spec.ts').click()
   await view.getByRole('button', { name: 'Submit review…' }).click()
   const dialog = view.getByRole('dialog', { name: 'Submit review' })
+  await expectCentredInWindow(dialog, 'Git: Submit review')
   await dialog.getByLabel('Request changes').check()
   await dialog.getByPlaceholder('Leave a summary comment (optional)…').fill('One naming nit.')
   await dialog.getByRole('button', { name: 'Submit review' }).click()
