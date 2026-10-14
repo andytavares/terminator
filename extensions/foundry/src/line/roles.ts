@@ -77,7 +77,7 @@ const TOOL_CLASS: Record<string, string | undefined> = {
 export function createRoleRegistry(sources: ResolveSources): RoleRegistry {
   const cache = new Map<string, Role | null>()
 
-  function get(id: string): Role | null {
+  function roleById(id: string): Role | null {
     const cached = cache.get(id)
     if (cached !== undefined) return cached
     const result = resolveRole(id, sources)
@@ -87,21 +87,21 @@ export function createRoleRegistry(sources: ResolveSources): RoleRegistry {
   }
 
   return {
-    get,
+    get: roleById,
     assertResumable(id, resumeSessionId) {
       if (resumeSessionId === undefined) return
       // An unknown role is treated as non-resumable. Defaulting the other way
       // would mean a typo in a recipe silently produced a verifier that could
       // read the builder's reasoning.
-      if (get(id)?.allowResume !== true) throw new ResumeForbiddenError(id)
+      if (roleById(id)?.allowResume !== true) throw new ResumeForbiddenError(id)
     },
     // Unknown is non-resumable, for the same reason `assertResumable` treats
     // it that way: a typo in a recipe must not produce a verifier that can
     // read the builder's reasoning.
-    mayResume: (id) => get(id)?.allowResume === true,
-    mayUseTool: (id, tool) => mayUseTool(get(id), tool),
-    writesOnlyDocs: (id) => writesOnlyDocs(get(id)),
-    mayWrite: (id) => mayWrite(get(id)),
+    mayResume: (id) => roleById(id)?.allowResume === true,
+    mayUseTool: (id, tool) => mayUseTool(roleById(id), tool),
+    writesOnlyDocs: (id) => writesOnlyDocs(roleById(id)),
+    mayWrite: (id) => mayWrite(roleById(id)),
   }
 }
 

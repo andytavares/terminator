@@ -33,7 +33,7 @@ function withoutRetiredBreach(gate: Gate): Gate {
   return { ...gate, breach: null }
 }
 
-async function read(root: string, orderId: string): Promise<Gate[]> {
+async function readGates(root: string, orderId: string): Promise<Gate[]> {
   try {
     const raw = await fs.promises.readFile(gatesPath(root, orderId), 'utf8')
     const parsed: unknown = JSON.parse(raw)
@@ -69,7 +69,7 @@ export function createGateStore(root: string, index?: FoundryIndex): GateStore {
 
   return {
     async save(gate) {
-      const existing = await read(root, gate.orderId)
+      const existing = await readGates(root, gate.orderId)
       const next = existing.some((g) => g.id === gate.id)
         ? existing.map((g) => (g.id === gate.id ? gate : g))
         : [...existing, gate]
@@ -82,7 +82,7 @@ export function createGateStore(root: string, index?: FoundryIndex): GateStore {
     async list() {
       if (index !== undefined) return index.gates()
       const ids = await orderIds()
-      const perOrder = await Promise.all(ids.map((id) => read(root, id)))
+      const perOrder = await Promise.all(ids.map((id) => readGates(root, id)))
       return perOrder.flat()
     },
 

@@ -68,7 +68,7 @@ function decrypt(encoded: string): string | null {
   }
 }
 
-async function read(file: string): Promise<StoreFile> {
+async function readStoreFile(file: string): Promise<StoreFile> {
   try {
     const raw = await fs.readFile(file, 'utf8')
     const parsed: unknown = JSON.parse(raw)
@@ -97,7 +97,7 @@ function serialized<T>(op: (file: string) => Promise<T>): Promise<T> {
 
 function editStoreFile(edit: (data: StoreFile) => void): Promise<void> {
   return serialized(async (file) => {
-    const data = await read(file)
+    const data = await readStoreFile(file)
     edit(data)
     await write(file, data)
   })
@@ -126,7 +126,7 @@ export async function setCredential(cred: StoredCredential): Promise<void> {
 }
 
 export async function getCredential(tracker: TrackerId): Promise<StoredCredential | null> {
-  const entry = (await serialized(read))[tracker]
+  const entry = (await serialized(readStoreFile))[tracker]
   if (entry?.secret === undefined) return null
   const secret = decrypt(entry.secret)
   if (secret === null) return null
@@ -162,7 +162,7 @@ export async function setMine(tracker: TrackerId, mine: MineSelector): Promise<v
 }
 
 export async function getMine(tracker: TrackerId): Promise<MineSelector> {
-  return (await serialized(read))[tracker]?.mine ?? defaultMine(tracker)
+  return (await serialized(readStoreFile))[tracker]?.mine ?? defaultMine(tracker)
 }
 
 /**
@@ -170,7 +170,7 @@ export async function getMine(tracker: TrackerId): Promise<MineSelector> {
  * exists and which account it proved to belong to.
  */
 export async function listConnections(): Promise<TrackerConnection[]> {
-  const data = await serialized(read)
+  const data = await serialized(readStoreFile)
   return TRACKERS.map((tracker) => {
     const entry = data[tracker] ?? {}
     return {

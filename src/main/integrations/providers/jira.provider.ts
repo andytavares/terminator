@@ -288,7 +288,7 @@ async function search(
   return searchJql(cred, `text ~ "${quoteJql(term)}" ORDER BY updated DESC`, limit)
 }
 
-async function get(cred: StoredCredential, key: string): Promise<Issue | null> {
+async function jiraIssueByKey(cred: StoredCredential, key: string): Promise<Issue | null> {
   assertJira(cred)
   try {
     return await fetchIssue(cred, key)
@@ -308,5 +308,5 @@ async function comment(cred: StoredCredential, key: string, body: string): Promi
 }
 
 export function createJiraProvider(): TrackerProvider {
-  return { id: 'jira', verify, listMine, search, get, comment }
+  return { id: 'jira', verify, listMine, search, get: jiraIssueByKey, comment }
 }

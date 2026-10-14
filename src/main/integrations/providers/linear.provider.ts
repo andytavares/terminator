@@ -320,7 +320,7 @@ function search(client: LinearLike, term: string, limit: number): Promise<IssueS
   })
 }
 
-async function get(client: LinearLike, key: string): Promise<Issue | null> {
+async function linearIssueByKey(client: LinearLike, key: string): Promise<Issue | null> {
   try {
     const raw = (await client.issue(key)) as RawIssue | null
     if (raw === null || raw === undefined) return null
@@ -446,7 +446,7 @@ export function createLinearProvider(
     verify: async (cred) => verify(clientFor(cred)),
     listMine: async (cred, mine, limit) => listMine(clientFor(cred), mine, limit),
     search: async (cred, term, limit) => search(clientFor(cred), term, limit),
-    get: async (cred, key) => get(clientFor(cred), key),
+    get: async (cred, key) => linearIssueByKey(clientFor(cred), key),
     comment: async (cred, key, body) => comment(clientFor(cred), key, body),
     states: async (cred, key) => states(clientFor(cred), key),
     // The provider interface's (intent, optionId) pair, carried as one target.

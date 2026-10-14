@@ -61,7 +61,7 @@ function bridgeOf(host: Host): DepthBridge | null {
   return api?.ui ?? null
 }
 
-function read(host: Host): number {
+function openDepthOf(host: Host): number {
   const raw = host[MODAL_DEPTH_KEY]
   return typeof raw === 'number' && Number.isFinite(raw) && raw > 0 ? raw : 0
 }
@@ -85,9 +85,9 @@ export function createModalDepthRegistry(host: Host): ModalDepthRegistry {
   }
 
   const registry: ModalDepthRegistry = {
-    push: () => write(read(host) + 1),
-    pop: () => write(read(host) - 1),
-    current: () => read(host),
+    push: () => write(openDepthOf(host) + 1),
+    pop: () => write(openDepthOf(host) - 1),
+    current: () => openDepthOf(host),
     release() {
       registry.push()
       let released = false
@@ -110,5 +110,5 @@ export function createModalDepthRegistry(host: Host): ModalDepthRegistry {
  */
 export function getModalDepth(host: Host | undefined | null): number {
   if (!host) return 0
-  return read(host)
+  return openDepthOf(host)
 }

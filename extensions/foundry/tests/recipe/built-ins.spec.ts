@@ -22,7 +22,7 @@ const root = path.resolve(here, '../..')
 const recipesDir = path.join(root, 'recipes')
 const rolesDir = path.join(root, 'roles')
 
-function read(dir: string, file: string): string {
+function readRecipeFile(dir: string, file: string): string {
   return fs.readFileSync(path.join(dir, file), 'utf8')
 }
 
@@ -30,7 +30,7 @@ const recipeFiles = fs.readdirSync(recipesDir).filter((f) => f.endsWith('.yaml')
 const roleFiles = fs.readdirSync(rolesDir).filter((f) => f.endsWith('.yaml'))
 
 function recipe(file: string): Recipe {
-  const parsed = parseRecipe(read(recipesDir, file), file)
+  const parsed = parseRecipe(readRecipeFile(recipesDir, file), file)
   if (!parsed.ok) throw new Error(parsed.reason)
   return parsed.value
 }
@@ -60,7 +60,7 @@ function sixShapesTests() {
   })
 
   it.each(recipeFiles)('%s parses', (file) => {
-    const parsed = parseRecipe(read(recipesDir, file), file)
+    const parsed = parseRecipe(readRecipeFile(recipesDir, file), file)
     expect(parsed.ok, parsed.ok ? '' : parsed.reason).toBe(true)
   })
 }
@@ -358,7 +358,7 @@ function theJoinTests() {
 }
 
 describe('the author role', () => {
-  const author = parseRole(read(rolesDir, 'author.yaml'), 'author.yaml')
+  const author = parseRole(readRecipeFile(rolesDir, 'author.yaml'), 'author.yaml')
 
   it('hands back where the document is, beside writing documentation', () => {
     expect(author.ok && author.value.writes).toEqual(['docs', 'document'])
@@ -396,20 +396,20 @@ function theRolesTests() {
   })
 
   it.each(roleFiles)('%s parses', (file) => {
-    const parsed = parseRole(read(rolesDir, file), file)
+    const parsed = parseRole(readRecipeFile(rolesDir, file), file)
     expect(parsed.ok, parsed.ok ? '' : parsed.reason).toBe(true)
   })
 }
 
 function builtInsResumingTests() {
   it('forbids the verifier from resuming a conversation', () => {
-    const parsed = parseRole(read(rolesDir, 'verifier.yaml'), 'verifier.yaml')
+    const parsed = parseRole(readRecipeFile(rolesDir, 'verifier.yaml'), 'verifier.yaml')
     expect(parsed.ok && parsed.value.allowResume).toBe(false)
   })
 
   it('forbids the red team and the inspector from resuming either', () => {
     for (const file of ['red-team.yaml', 'inspector.yaml']) {
-      const parsed = parseRole(read(rolesDir, file), file)
+      const parsed = parseRole(readRecipeFile(rolesDir, file), file)
       expect(parsed.ok && parsed.value.allowResume).toBe(false)
     }
   })
@@ -422,7 +422,7 @@ function builtInsWritingTests() {
     const CHECKOUT = ['worktree', 'integration_branch', 'docs']
     const allowed = new Set(['builder', 'scribe', 'author'])
     for (const file of roleFiles) {
-      const parsed = parseRole(read(rolesDir, file), file)
+      const parsed = parseRole(readRecipeFile(rolesDir, file), file)
       if (!parsed.ok) throw new Error(parsed.reason)
       const touchesCheckout = parsed.value.writes.some((w) => CHECKOUT.includes(w))
       expect(touchesCheckout, `${parsed.value.id} writes ${parsed.value.writes.join(', ')}`).toBe(
@@ -441,12 +441,12 @@ function handBacksTests() {
   // touch a checkout, which is the property this pair is really about and
   // which the test above enforces for every role.
   it('gives the verifier nothing to hand back, because its verdict is an exit status', () => {
-    const parsed = parseRole(read(rolesDir, 'verifier.yaml'), 'verifier.yaml')
+    const parsed = parseRole(readRecipeFile(rolesDir, 'verifier.yaml'), 'verifier.yaml')
     expect(parsed.ok && parsed.value.writes).toEqual([])
   })
 
   it('lets the inspector hand back the findings its prompt asks it for', () => {
-    const parsed = parseRole(read(rolesDir, 'inspector.yaml'), 'inspector.yaml')
+    const parsed = parseRole(readRecipeFile(rolesDir, 'inspector.yaml'), 'inspector.yaml')
     expect(parsed.ok && parsed.value.writes).toEqual(['findings'])
     expect(parsed.ok && parsed.value.tools).not.toContain('edit')
   })
@@ -455,7 +455,7 @@ function handBacksTests() {
 function toolsAndPromptsTests() {
   it('gives no role an editing tool unless it may write to a checkout', () => {
     for (const file of roleFiles) {
-      const parsed = parseRole(read(rolesDir, file), file)
+      const parsed = parseRole(readRecipeFile(rolesDir, file), file)
       if (!parsed.ok) throw new Error(parsed.reason)
       if (parsed.value.tools.includes('edit')) {
         expect(
@@ -467,7 +467,7 @@ function toolsAndPromptsTests() {
   })
 
   it.each(roleFiles)('%s carries a prompt that says what it is for', (file) => {
-    const parsed = parseRole(read(rolesDir, file), file)
+    const parsed = parseRole(readRecipeFile(rolesDir, file), file)
     expect(parsed.ok && parsed.value.prompt.trim().length).toBeGreaterThan(40)
   })
 }
@@ -537,7 +537,7 @@ describe('the architect and the builder, about the same files', () => {
 // honestly instead of quietly ignoring what the role declared.
 describe('what the architect may read', () => {
   it('may read the order it is writing', () => {
-    const parsed = parseRole(read(rolesDir, 'architect.yaml'), 'architect.yaml')
+    const parsed = parseRole(readRecipeFile(rolesDir, 'architect.yaml'), 'architect.yaml')
     expect(parsed.ok).toBe(true)
     expect(parsed.ok && parsed.value.reads).toContain('order')
   })
@@ -676,7 +676,7 @@ describe('ci rounds on every shape that ships code', () => {
 // has to actually be there for that to mean anything.
 describe('the built-in ci-fix skill', () => {
   it('is declared by the builder role', () => {
-    const parsed = parseRole(read(rolesDir, 'builder.yaml'), 'builder.yaml')
+    const parsed = parseRole(readRecipeFile(rolesDir, 'builder.yaml'), 'builder.yaml')
     expect(parsed.ok && parsed.value.skills).toEqual(['ci-fix'])
   })
 
