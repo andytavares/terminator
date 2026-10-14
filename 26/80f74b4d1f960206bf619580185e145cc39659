@@ -1,0 +1,48 @@
+tests/e2e/design-system-fields.spec.ts
+  s_dc878271adf24d::t_a9af5a2c5d721d 38-42
+  s_dc878271adf24d::t_79f5aa14884528 1-37,43-65
+extensions/notepad/src/components/notepad.css
+  s_dc878271adf24d::t_f475707944dce9 254,1898
+src/renderer/components/QuickActions.css
+  s_dc878271adf24d::t_f475707944dce9 84
+src/renderer/components/screen-chrome.css
+  s_dc878271adf24d::t_f475707944dce9 83
+CHANGELOG.md
+  s_dc878271adf24d::t_f8a4bb38c549fa 87
+tests/e2e/modal-centre.spec.ts
+  s_dc878271adf24d::t_d41d538c0d589c 10,74
+  s_dc878271adf24d::t_4c7a4d28574ab2 50,53,55,67-73,75-77,81-82
+  s_dc878271adf24d::t_b9ccc7b25f49f9 51-52,54,56-66,78-80
+src/renderer/styles.css
+  s_dc878271adf24d::t_51bf38b7e3c6a3 69-70
+.github/workflows/ci.yml
+  s_dc878271adf24d::t_6663d114c3b96d 453-454,469
+src/renderer/components/sidebar/SidebarSearch.css
+  s_dc878271adf24d::t_f475707944dce9 17-21,33
+extensions/task-vault/src/components/task-vault.css
+  s_dc878271adf24d::t_f475707944dce9 2014
+src/renderer/components/integrations/issue-search.css
+  s_dc878271adf24d::t_f475707944dce9 21
+packages/extension-ui/README.md
+  s_dc878271adf24d::t_f8a4bb38c549fa 42-43
+packages/extension-ui/src/controls.css
+  s_dc878271adf24d::t_2e59fa20e945c6 29,36-54,56-59,62-65,80-81,83-84,97-100
+  s_dc878271adf24d::t_24ede72f63c4f1 30-35,55,60-61,72-77,82,85-96
+  s_dc878271adf24d::t_51bf38b7e3c6a3 66-71,78-79
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2680f74b4d1f960206bf619580185e145cc39659",
+  "prompts": {},
+  "sessions": {
+    "s_dc878271adf24d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "45251aad-8da0-4892-86db-9ec0654f5a1f",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
