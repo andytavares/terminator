@@ -4,7 +4,8 @@ import { route, type IpcContext } from './register'
 import { ensureNextOccurrence } from '../vault/ensure-next-occurrence'
 import { broadcast } from '../notifications/task-scheduler.js'
 import { ClearRecurrenceRequestSchema, SetRecurrenceRequestSchema } from '../schemas/vault.schema'
-import { indexUpdated, nowIso, parseMetaLenient, readTaskMetaLenient, today } from './vault-shared'
+import { indexUpdated, nowIso, parseMetaLenient, readTaskMetaLenient } from './vault-shared'
+import { today } from '../vault/clock'
 
 type SetArgs = z.infer<typeof SetRecurrenceRequestSchema>
 type Meta = Record<string, unknown>

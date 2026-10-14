@@ -1,11 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import type { ExtensionDB } from '@terminator/extension-sdk'
-import {
-  localDate,
-  computeNextDueDate,
-  parseRecurrenceRule,
-  readRecurrenceEndState,
-} from './recurrence'
+import { computeNextDueDate, parseRecurrenceRule, readRecurrenceEndState } from './recurrence'
+import { today } from './clock'
 import { insertTask } from './task-repository'
 
 type TaskRow = {
@@ -53,7 +49,7 @@ async function loadTask(db: ExtensionDB, taskId: string): Promise<TaskRow | unde
 async function hasUpcomingOccurrence(db: ExtensionDB, templateId: string): Promise<boolean> {
   const existing = await db.get<{ id: string }>(
     `SELECT id FROM tasks WHERE recurrence_template_id=? AND status='open' AND due_date >= ?`,
-    [templateId, localDate()]
+    [templateId, today()]
   )
   return Boolean(existing)
 }
@@ -104,7 +100,7 @@ export async function ensureNextOccurrence(
   if (await hasUpcomingOccurrence(db, templateId)) return null
   const nextDue = computeNextDueDate(task.due_date, parseRecurrenceRule(task.recurrence_rule))
   const end = readRecurrenceEndState(task)
-  if (seriesEnded(end, nextDue)) return null
+  if (!nextDue || seriesEnded(end, nextDue)) return null
   return spawnOccurrence(db, task, { templateId, nextDue, end })
 }
 
@@ -120,7 +116,7 @@ async function ensureEach(db: ExtensionDB, rows: { id: string }[]): Promise<void
 }
 
 export async function backfillRecurringTasks(db: ExtensionDB): Promise<void> {
-  const today = localDate()
+  const todayDate = today()
   const templates = await db.query<{ id: string }>(
     `SELECT t.id FROM tasks t
      WHERE t.recurrence_rule IS NOT NULL
@@ -131,7 +127,7 @@ export async function backfillRecurringTasks(db: ExtensionDB): Promise<void> {
            AND i.status = 'open'
            AND i.due_date >= ?
        )`,
-    [today]
+    [todayDate]
   )
   await ensureEach(db, templates)
   const selfContained = await db.query<{ id: string }>(
@@ -141,7 +137,7 @@ export async function backfillRecurringTasks(db: ExtensionDB): Promise<void> {
        AND due_date IS NOT NULL
        AND due_date < ?
        AND status = 'open'`,
-    [today]
+    [todayDate]
   )
   await ensureEach(db, selfContained)
 }

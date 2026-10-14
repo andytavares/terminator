@@ -26,6 +26,7 @@ import {
   TASK_JOINS,
 } from '../vault/mappers'
 import { findOrCreateArea, indexUpdated, nowIso } from './vault-shared'
+import { daysAgo, storedInstant, zonedNow } from '../vault/clock'
 
 type Row = Record<string, unknown>
 
@@ -55,17 +56,6 @@ async function queryProjects({ db }: IpcContext, args: z.infer<typeof ListProjec
   return { projects: await Promise.all(rows.map((p) => withNextActions(db, p))) }
 }
 
-/** The local date `days` days ago, as YYYY-MM-DD. */
-function localDateDaysAgo(days: number): string {
-  const staleDate = new Date()
-  staleDate.setDate(staleDate.getDate() - days)
-  return [
-    staleDate.getFullYear(),
-    String(staleDate.getMonth() + 1).padStart(2, '0'),
-    String(staleDate.getDate()).padStart(2, '0'),
-  ].join('-')
-}
-
 /** Daily tasks that have sat on the log since the threshold date or earlier. */
 async function staleTasks(db: ExtensionDB, thresholdDays: number) {
   const rows = await db.query<Row>(
@@ -73,7 +63,7 @@ async function staleTasks(db: ExtensionDB, thresholdDays: number) {
        WHERE t.source='daily' AND t.parent_id IS NULL
          AND t.status IN ('open','in-progress','blocked')
          AND t.today_since IS NOT NULL AND t.today_since <= ?`,
-    [localDateDaysAgo(thresholdDays)]
+    [daysAgo(thresholdDays)]
   )
   return rows.map(rowToTask)
 }
@@ -96,7 +86,7 @@ async function reviewProjects(db: ExtensionDB) {
 async function reviewTasks(db: ExtensionDB) {
   const tasks = async (sql: string, params?: unknown[]) =>
     (await db.query<Row>(sql, params)).map(rowToTask)
-  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+  const sevenDaysAgo = storedInstant(zonedNow().subtract({ days: 7 }))
   return {
     inboxItems: await tasks(`SELECT * FROM tasks WHERE source='inbox' AND status='open'`),
     somedayTasks: await tasks(

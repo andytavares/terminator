@@ -24,8 +24,8 @@ import {
   orErrorString,
   readTaskMeta,
   taskExists,
-  today,
 } from './vault-shared'
+import { today } from '../vault/clock'
 
 type Meta = Record<string, unknown>
 

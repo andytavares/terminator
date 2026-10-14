@@ -19,14 +19,8 @@ import {
   PROJECT_COLS,
   PROJECT_JOINS,
 } from '../vault/mappers'
-import {
-  dailyTasks,
-  indexUpdated,
-  nowIso,
-  orErrorString,
-  tasksWithSubtasks,
-  today,
-} from './vault-shared'
+import { dailyTasks, indexUpdated, nowIso, orErrorString, tasksWithSubtasks } from './vault-shared'
+import { today } from '../vault/clock'
 
 type Row = Record<string, unknown>
 type Tx = Pick<ExtensionDB, 'run'>

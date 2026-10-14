@@ -893,7 +893,8 @@ The task-vault extension (`extensions/task-vault/`) implements a GTD+BuJo+PARA p
 #### Vault Layer (`src/vault/`)
 
 - **db.ts** — Defines the `settings`, `tasks`, `projects`, `areas`, and `links` schema via `applyTaskVaultSchema()`, which creates the final schema in one idempotent step (`CREATE TABLE IF NOT EXISTS`; no column-by-column migrations, because every SQLite database is created from it). All IPC handlers receive the extension's `api.db` and access data exclusively through it. Runs `backfillRecurringTasks` on startup to gap-fill any missing future occurrences. The `settings` table is shared with other extensions and keyed `PRIMARY KEY (extension_id, key)`; Task Vault reads, writes and resets only rows with `extension_id = 'task-vault'`.
-- **recurrence.ts** — `RecurrenceRule` discriminated union, `parseRecurrenceRule` (throws `InvalidRecurrenceRuleError` on unknown input), and `computeNextDueDate` (strict mode: next date = previous + interval, never completion date). Also exports `localDate()` helper.
+- **recurrence.ts** — `RecurrenceRule` discriminated union, `parseRecurrenceRule` (throws `InvalidRecurrenceRuleError` on unknown input), and `computeNextDueDate` (strict mode: next date = previous + interval, never completion date).
+- **clock.ts** — the backend's clock: `zonedNow()` (a `Temporal.ZonedDateTime` in the machine's time zone), `today()` and `daysAgo(days)` (`YYYY-MM-DD`). The backend computes dates with `Temporal`; the view, which also runs in the phone's browser, stays on `Date` (`src/utils/local-date.ts`) and is type-checked without the `Temporal` types ([ADR 108](adr/108-temporal-in-extension-backends-not-in-views.md)).
 - **ensure-next-occurrence.ts** — `ensureNextOccurrence(db, taskId)`: idempotent function that checks whether a future `status='open'` instance already exists and inserts one if not. `backfillRecurringTasks(db)`: called at extension startup to handle days the app was closed.
 - **tags.ts** — Utilities for extracting and normalising `@context`, `+project`, `#area`, and `due:` inline tags from task text.
 - **types.ts** — `TaskStatus`, `IndexedTask`, `IndexedProject`, `KanbanConfig`, and other shared TypeScript types used by both the IPC layer and renderer components.
@@ -928,7 +929,7 @@ End conditions (`recurrence_end_type`, `recurrence_end_date`, `recurrence_end_co
 
 **The notification scheduler (`task-scheduler.ts`) is notification-only.** It reads the `recurrence_notify_at` column to determine per-task alert times but never inserts task rows.
 
-**Strict recurrence mode:** next `due_date` is always `previous_due_date + interval`, regardless of completion date (e.g., a weekly Monday task completed on Wednesday still recurs next Monday).
+**Strict recurrence mode:** next `due_date` is always `previous_due_date + interval`, regardless of completion date (e.g., a weekly Monday task completed on Wednesday still recurs next Monday). The sum is on `Temporal.PlainDate`: a monthly task due on a day the next month lacks falls on that month's last day (January 31 is followed by February 28, not March 3), and a task whose due date is not a calendar date (a `due:` tag stores whatever was typed) has no next occurrence.
 
 A `UNIQUE INDEX` on `(recurrence_template_id, due_date)` enforces the invariant at the database level, preventing duplicate instances even under concurrent writes.
 

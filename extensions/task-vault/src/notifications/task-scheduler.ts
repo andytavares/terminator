@@ -1,6 +1,6 @@
 import type { ExtensionAPI, ExtensionDB, Disposable } from '@terminator/extension-sdk'
 import { openInVault } from '../navigation.js'
-import { localDate } from '../vault/recurrence'
+import { today, zonedAt, zonedNow } from '../vault/clock'
 
 let _tick: (() => void) | null = null
 
@@ -12,26 +12,20 @@ export function triggerSchedulerTick(): void {
   _tick?.()
 }
 
-const UNIT_MS: Record<string, number> = {
-  min: 60_000,
-  hour: 3_600_000,
-  day: 86_400_000,
-  week: 7 * 86_400_000,
-  month: 30 * 86_400_000,
-}
+const DURATION_UNIT = {
+  min: 'minutes',
+  hour: 'hours',
+  day: 'days',
+  week: 'weeks',
+  month: 'months',
+} as const
 
-function parseIntervalMs(value: string): number {
-  const m = value.match(/^(\d+)-(min|hour|day|week|month)s?$/)
-  if (!m) return Infinity
-  const unit = UNIT_MS[m[2]]
-  return unit !== undefined ? parseInt(m[1]) * unit : Infinity
-}
-
-function getTargetTimestamp(value: string, blockedAt: number): number {
-  const intervalMs = parseIntervalMs(value)
-  if (intervalMs !== Infinity) return blockedAt + intervalMs
-  const ts = new Date(value).getTime()
-  return isNaN(ts) ? Infinity : ts
+/** The interval a check-in such as "2-day" names, or null when it is a custom date. */
+function parseInterval(value: string): Temporal.Duration | null {
+  const match = /^(\d+)-(min|hour|day|week|month)s?$/.exec(value)
+  if (!match) return null
+  const unit = DURATION_UNIT[match[2] as keyof typeof DURATION_UNIT]
+  return Temporal.Duration.from({ [unit]: parseInt(match[1]) })
 }
 
 let _broadcast: ((channel: string, data: unknown) => void) | null = null
@@ -60,8 +54,7 @@ interface Tick {
   api: ExtensionAPI
   db: ExtensionDB
   state: SchedulerState
-  now: number
-  nowDate: Date
+  now: Temporal.ZonedDateTime
   today: string
   wasStartup: boolean
 }
@@ -93,11 +86,10 @@ function minutesOf(time: string): number {
 }
 
 /** A new day forgets which tasks were already announced as due. */
-function rollDay(state: SchedulerState): void {
-  const currentDay = new Date().toDateString()
-  if (currentDay === state.lastDay) return
+function rollDay(state: SchedulerState, today: string): void {
+  if (today === state.lastDay) return
   state.notifiedDueIds.clear()
-  state.lastDay = currentDay
+  state.lastDay = today
 }
 
 /** Dismisses tracked notifications whose task now matches `condition`; returns their ids. */
@@ -137,7 +129,7 @@ function dueAlertReached(tick: Tick, task: DueRow): boolean {
   const globalAlertTime =
     tick.api.settings.get<string>('terminator.task-vault.dueDateAlertTime') ?? '09:00'
   const alertMinutes = minutesOf(task.recurrence_notify_at ?? globalAlertTime)
-  const currentMinutes = tick.nowDate.getHours() * 60 + tick.nowDate.getMinutes()
+  const currentMinutes = tick.now.hour * 60 + tick.now.minute
   return currentMinutes >= alertMinutes
 }
 
@@ -180,23 +172,25 @@ function parseMeta(metadata: string): Record<string, string> | null {
   }
 }
 
-/** A blocked task is due a check-in once its interval (or custom date) has passed and, for a
- *  repeating interval, a full interval has passed since the last check-in. */
+/** A blocked task is due a check-in a full interval after it was blocked or last checked in, or
+ *  once, when its custom date has passed. Days, weeks and months are the calendar's: a day later
+ *  is the same time tomorrow, whatever the clocks did. */
 function checkInDue(tick: Tick, task: BlockedRow, interval: string): boolean {
-  const blockedAt = new Date(task.updated_at).getTime()
-  const targetTs = getTargetTimestamp(interval, blockedAt)
-  if (!isFinite(targetTs) || tick.now < targetTs) return false
-  const intervalMs = parseIntervalMs(interval)
+  // Date.parse reads what an import or an older version stored; not a date is never due.
+  const blockedAt = Date.parse(task.updated_at)
+  if (Number.isNaN(blockedAt)) return false
   const lastNotified = tick.state.lastNotifiedBlocked.get(task.id) ?? blockedAt
-  if (intervalMs === Infinity) return lastNotified < targetTs
-  return tick.now - lastNotified >= intervalMs
+  const every = parseInterval(interval)
+  if (every) return Temporal.ZonedDateTime.compare(tick.now, zonedAt(lastNotified).add(every)) >= 0
+  const customDate = Date.parse(interval)
+  return customDate <= tick.now.epochMilliseconds && lastNotified < customDate
 }
 
 function announceCheckIn(tick: Tick, task: BlockedRow, reason: string | undefined): void {
   const { api, state } = tick
   const taskId = task.id
   const date = task.source_ref ?? undefined
-  state.lastNotifiedBlocked.set(taskId, tick.now)
+  state.lastNotifiedBlocked.set(taskId, tick.now.epochMilliseconds)
   state.blockedTaskNotifs.get(taskId)?.dispose()
   const notif = api.notifications.createNotification({
     type: 'info',
@@ -224,9 +218,9 @@ async function notifyBlockedTasks(tick: Tick): Promise<void> {
 async function runTick(api: ExtensionAPI, db: ExtensionDB, state: SchedulerState): Promise<void> {
   const wasStartup = state.isStartup
   try {
-    const nowDate = new Date()
-    const tick = { api, db, state, now: Date.now(), nowDate, today: localDate(nowDate), wasStartup }
-    rollDay(state)
+    const now = zonedNow()
+    const tick = { api, db, state, now, today: now.toPlainDate().toString(), wasStartup }
+    rollDay(state, tick.today)
     await dismissFinished(tick)
     await notifyDueTasks(tick)
     await notifyBlockedTasks(tick)
@@ -249,7 +243,7 @@ export function startTaskScheduler(
     dueTaskNotifs: new Map(),
     lastNotifiedBlocked: new Map(),
     blockedTaskNotifs: new Map(),
-    lastDay: new Date().toDateString(),
+    lastDay: today(),
     isStartup: true,
   }
   const tickAsync = (): Promise<void> => runTick(api, db, state)

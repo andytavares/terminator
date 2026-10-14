@@ -135,7 +135,7 @@ export const StaleThresholdRequestSchema = z.object({ days: z.number().min(1) })
 // ── vault:list-archive ───────────────────────────────────────────────────────
 
 export const ListArchiveRequestSchema = z.object({
-  days: z.number().optional(), // how many days back to look for done tasks
+  days: z.number().int().optional(), // how many days back to look for done tasks
 })
 
 // ── projects:create ──────────────────────────────────────────────────────────

@@ -103,6 +103,12 @@ function ensureNextOccurrenceNotRecurringTests() {
     const id = await insertTask({ recurrence_rule: 'daily' })
     expect(await ensureNextOccurrence(db, id)).toBeNull()
   })
+
+  it('adds no task after a due date typed as a word', async () => {
+    const id = await insertTask({ recurrence_rule: 'daily', due_date: 'friday' })
+    expect(await ensureNextOccurrence(db, id)).toBeNull()
+    expect(await db.query(`SELECT id FROM tasks WHERE id != ?`, [id])).toEqual([])
+  })
 }
 
 function ensureNextOccurrenceSpawningTests() {

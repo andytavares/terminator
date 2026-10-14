@@ -31,7 +31,7 @@ import { KanbanBoard } from './KanbanBoard'
 import { TaskDetailPanel } from './TaskDetailPanel'
 import { DatabaseAdmin } from './DatabaseAdmin'
 import { invokeVault, makeTaskNavHandler } from './daily-log-format'
-import { localDate } from '../vault/recurrence'
+import { localDate } from '../utils/local-date'
 
 interface NavigationTarget {
   date?: string

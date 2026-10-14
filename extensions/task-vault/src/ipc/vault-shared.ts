@@ -1,17 +1,11 @@
 import type { ExtensionDB } from '@terminator/extension-sdk'
 import { randomUUID } from '../vault/db'
 import { toDisplayName } from '../vault/tags'
-import { localDate } from '../vault/recurrence'
 import { broadcast } from '../notifications/task-scheduler.js'
 import { rowToTask, TASK_COLS, TASK_JOINS } from '../vault/mappers'
 import type { IndexedTask } from '../vault/types'
 
 type Row = Record<string, unknown>
-
-/** Today's date in local time, as the daily log names it. */
-export function today(): string {
-  return localDate()
-}
 
 /** The current instant, as stored in created_at / updated_at. */
 export function nowIso(): string {

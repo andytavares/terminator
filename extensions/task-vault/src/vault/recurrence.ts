@@ -1,7 +1,3 @@
-export function localDate(d: Date = new Date()): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-
 export type RecurrenceRule =
   | { kind: 'daily' }
   | { kind: 'biweekly' }
@@ -35,18 +31,24 @@ export function parseRecurrenceRule(raw: string): RecurrenceRule {
   throw new InvalidRecurrenceRuleError(raw)
 }
 
-/** Compute the next due date after fromDate using strict recurrence (next occurrence
- *  is always based on fromDate + interval, never on completion date). */
-export function computeNextDueDate(fromDate: string, rule: RecurrenceRule): string {
-  // Use noon to avoid DST edge cases
-  const d = new Date(`${fromDate}T12:00:00`)
-  if (rule.kind === 'monthly') {
-    // Intentional overflow: Jan 31 + 1 month = Mar 2 (documented accepted behaviour)
-    d.setMonth(d.getMonth() + 1)
-  } else {
-    d.setDate(d.getDate() + daysToNext(rule, d.getDay()))
+/** The calendar date a stored due date names, or null: a `due:` tag stores whatever was typed. */
+function calendarDate(dueDate: string): Temporal.PlainDate | null {
+  try {
+    return Temporal.PlainDate.from(dueDate)
+  } catch {
+    return null
   }
-  return localDate(d)
+}
+
+/** The next due date after fromDate under strict recurrence (fromDate + interval, never the
+ *  completion date), or null when fromDate is not a calendar date. */
+export function computeNextDueDate(fromDate: string, rule: RecurrenceRule): string | null {
+  const from = calendarDate(fromDate)
+  if (!from) return null
+  // A day the next month lacks becomes its last day: Jan 31 is followed by Feb 28.
+  if (rule.kind === 'monthly') return from.add({ months: 1 }).toString()
+  // Temporal counts Monday as 1 and Sunday as 7; a rule's days count Sunday as 0.
+  return from.add({ days: daysToNext(rule, from.dayOfWeek % 7) }).toString()
 }
 
 /** Days from a date on weekday `dow` to the rule's next occurrence (monthly aside). */

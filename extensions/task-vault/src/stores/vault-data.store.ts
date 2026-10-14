@@ -1,7 +1,7 @@
 import { create, type StoreApi } from 'zustand'
 import type { DailyLog, IndexedTask, KanbanLane } from '../vault/types'
 import { useVaultNavStore } from './vault-nav.store'
-import { localDate } from '../vault/recurrence'
+import { localDate } from '../utils/local-date'
 
 interface VaultDataStore {
   todayLog: DailyLog | null
