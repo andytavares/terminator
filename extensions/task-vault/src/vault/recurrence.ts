@@ -41,14 +41,24 @@ function calendarDate(dueDate: string): Temporal.PlainDate | null {
 }
 
 /** The next due date after fromDate under strict recurrence (fromDate + interval, never the
- *  completion date), or null when fromDate is not a calendar date. */
-export function computeNextDueDate(fromDate: string, rule: RecurrenceRule): string | null {
+ *  completion date), or null when fromDate is not a calendar date. A monthly series falls on
+ *  seriesStart's day of the month, the series' first due date. */
+export function computeNextDueDate(
+  fromDate: string,
+  rule: RecurrenceRule,
+  seriesStart: string = fromDate
+): string | null {
   const from = calendarDate(fromDate)
   if (!from) return null
-  // A day the next month lacks becomes its last day: Jan 31 is followed by Feb 28.
-  if (rule.kind === 'monthly') return from.add({ months: 1 }).toString()
+  if (rule.kind === 'monthly') return nextMonthly(from, calendarDate(seriesStart) ?? from)
   // Temporal counts Monday as 1 and Sunday as 7; a rule's days count Sunday as 0.
   return from.add({ days: daysToNext(rule, from.dayOfWeek % 7) }).toString()
+}
+
+/** The month after `from`, on `start`'s day. A day the month lacks becomes its last day: a
+ *  series from Jan 31 is due Feb 28, then Mar 31. */
+function nextMonthly(from: Temporal.PlainDate, start: Temporal.PlainDate): string {
+  return from.add({ months: 1 }).with({ day: start.day }, { overflow: 'constrain' }).toString()
 }
 
 /** Days from a date on weekday `dow` to the rule's next occurrence (monthly aside). */

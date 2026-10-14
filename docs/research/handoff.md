@@ -185,8 +185,9 @@ Each entry: what was decided, why, and how to undo it.
 
 - Task Vault stays, as a core extension. Foundry stays an extension. Remote Control over the LAN
   without TLS is accepted.
-- A monthly task due on the 31st repeats on the last day of a shorter month (Jan 31, then Feb 28).
-  It used to skip that month.
+- A monthly task due on the 31st repeats on the last day of a shorter month (Jan 31, then Feb 28),
+  and on the 31st again after it (Mar 31): the day comes from the series' first due date. It used
+  to skip that month.
 - The notification drawer is not a modal: the app stays usable beside it.
 - `@terminator/extension-sdk` is 5.0.0, for the change in who owns a view's file watch.
 - The clean gate skips the names in `.clean-gate.json`.

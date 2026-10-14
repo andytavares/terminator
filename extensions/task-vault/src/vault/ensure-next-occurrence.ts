@@ -54,6 +54,16 @@ async function hasUpcomingOccurrence(db: ExtensionDB, templateId: string): Promi
   return Boolean(existing)
 }
 
+/** The due date of the series' template: the task itself, or the row its occurrences copy. */
+async function seriesStartDate(db: ExtensionDB, task: TaskRow): Promise<string | null> {
+  if (!task.recurrence_template_id) return task.due_date
+  const template = await db.get<{ due_date: string | null }>(
+    `SELECT due_date FROM tasks WHERE id=?`,
+    [task.recurrence_template_id]
+  )
+  return template?.due_date ?? null
+}
+
 interface Occurrence {
   templateId: string
   nextDue: string
@@ -98,7 +108,9 @@ export async function ensureNextOccurrence(
   if (!task || !task.recurrence_rule || !task.due_date) return null
   const templateId = task.recurrence_template_id ?? task.id
   if (await hasUpcomingOccurrence(db, templateId)) return null
-  const nextDue = computeNextDueDate(task.due_date, parseRecurrenceRule(task.recurrence_rule))
+  const seriesStart = (await seriesStartDate(db, task)) ?? task.due_date
+  const rule = parseRecurrenceRule(task.recurrence_rule)
+  const nextDue = computeNextDueDate(task.due_date, rule, seriesStart)
   const end = readRecurrenceEndState(task)
   if (!nextDue || seriesEnded(end, nextDue)) return null
   return spawnOccurrence(db, task, { templateId, nextDue, end })

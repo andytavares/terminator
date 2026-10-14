@@ -87,6 +87,7 @@ describe('backfillRecurringTasks', backfillRecurringTasksTests)
 function ensureNextOccurrenceTests() {
   describe('not recurring', ensureNextOccurrenceNotRecurringTests)
   describe('spawning', ensureNextOccurrenceSpawningTests)
+  describe('month end', ensureNextOccurrenceMonthEndTests)
   describe('sources', ensureNextOccurrenceSourcesTests)
   describe('idempotence and templates', ensureNextOccurrenceIdempotenceTemplatesTests)
   describe('count limits', ensureNextOccurrenceCountLimitsTests)
@@ -124,6 +125,23 @@ function ensureNextOccurrenceSpawningTests() {
     expect(newRow?.due_date).toBe('2099-03-11')
     expect(newRow?.recurrence_template_id).toBe(id)
     expect(newRow?.recurrence_rule).toBe('daily')
+  })
+}
+
+function ensureNextOccurrenceMonthEndTests() {
+  it('a series started on the 31st is due on the 31st again after February', async () => {
+    const templateId = await insertTask({ recurrence_rule: 'monthly', due_date: '2099-01-31' })
+    const february = await insertTask({
+      recurrence_rule: 'monthly',
+      due_date: '2099-02-28',
+      recurrence_template_id: templateId,
+      status: 'done',
+    })
+    const marchId = await ensureNextOccurrence(db, february)
+    const march = await db.get<{ due_date: string }>(`SELECT due_date FROM tasks WHERE id=?`, [
+      marchId!,
+    ])
+    expect(march?.due_date).toBe('2099-03-31')
   })
 }
 

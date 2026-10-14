@@ -9,6 +9,7 @@ describe('parseRecurrenceRule', parseRecurrenceRuleTests)
 
 describe('computeNextDueDate', () => {
   describe('intervals', computeNextDueDateIntervalTests)
+  describe('month end', computeNextDueDateMonthEndTests)
   describe('weekdays', computeNextDueDateWeekdayTests)
 })
 
@@ -28,12 +29,6 @@ function computeNextDueDateIntervalTests() {
     expect(computeNextDueDate('2025-12-15', { kind: 'monthly' })).toBe('2026-01-15')
   })
 
-  it('falls on the last day of a month too short for the day, and skips no month', () => {
-    expect(computeNextDueDate('2026-01-31', { kind: 'monthly' })).toBe('2026-02-28')
-    expect(computeNextDueDate('2024-01-31', { kind: 'monthly' })).toBe('2024-02-29')
-    expect(computeNextDueDate('2026-03-31', { kind: 'monthly' })).toBe('2026-04-30')
-  })
-
   it('has no next date after a due date that is not a calendar date', () => {
     expect(computeNextDueDate('friday', { kind: 'daily' })).toBeNull()
     expect(computeNextDueDate('2026-02-31', { kind: 'monthly' })).toBeNull()
@@ -44,6 +39,24 @@ function computeNextDueDateIntervalTests() {
     expect(computeNextDueDate('2026-03-07', { kind: 'daily' })).toBe('2026-03-08')
     expect(computeNextDueDate('2026-03-08', { kind: 'daily' })).toBe('2026-03-09')
     expect(computeNextDueDate('2026-10-31', { kind: 'weekly', days: [0] })).toBe('2026-11-01')
+  })
+}
+
+function computeNextDueDateMonthEndTests() {
+  it('falls on the last day of a month too short for the day, and skips no month', () => {
+    expect(computeNextDueDate('2026-01-31', { kind: 'monthly' })).toBe('2026-02-28')
+    expect(computeNextDueDate('2024-01-31', { kind: 'monthly' })).toBe('2024-02-29')
+    expect(computeNextDueDate('2026-03-31', { kind: 'monthly' })).toBe('2026-04-30')
+  })
+
+  it('returns to the series day once a month is long enough for it', () => {
+    expect(computeNextDueDate('2026-02-28', { kind: 'monthly' }, '2026-01-31')).toBe('2026-03-31')
+    expect(computeNextDueDate('2026-04-30', { kind: 'monthly' }, '2026-01-31')).toBe('2026-05-31')
+    expect(computeNextDueDate('2026-02-28', { kind: 'monthly' }, '2026-01-30')).toBe('2026-03-30')
+  })
+
+  it('keeps the day it is on when the series start is not a calendar date', () => {
+    expect(computeNextDueDate('2026-02-28', { kind: 'monthly' }, 'friday')).toBe('2026-03-28')
   })
 }
 
