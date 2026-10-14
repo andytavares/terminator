@@ -116,6 +116,7 @@ export const CORE_SPECS = [
   'extension.spec.ts',
   'integrations.spec.ts',
   'issue-trackers.spec.ts',
+  'modal-centre.spec.ts',
   'monitor-wall.spec.ts',
   'open-in-editor.spec.ts',
   'project.spec.ts',
