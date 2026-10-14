@@ -1,6 +1,7 @@
 import './notepad.css'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { Button } from '@terminator/extension-ui'
+import { ListTree, MessageSquare } from 'lucide-react'
+import { IconButton, SegmentedControl, type SegmentedOption } from '@terminator/extension-ui'
 import { loadLibrary, useNotesStore } from '../stores/notes.store'
 import { useEditorStore } from '../stores/editor.store'
 import { useCommentsStore } from '../stores/comments.store'
@@ -396,62 +397,61 @@ function saveStatusLabel(isDirty: boolean, saveStatus: string): string {
   return ''
 }
 
-interface ToggleButtonProps {
-  on: boolean
-  onClick: () => void
-  labels: [on: string, off: string]
-  titles: [on: string, off: string]
-}
+type ViewMode = 'live' | 'source' | 'read'
 
-function ToggleButton(props: ToggleButtonProps): React.JSX.Element {
-  const { on, onClick, labels, titles } = props
-  return (
-    <Button variant="ghost" size="sm" onClick={onClick} title={on ? titles[0] : titles[1]}>
-      {on ? labels[0] : labels[1]}
-    </Button>
-  )
+const VIEW_MODES: readonly SegmentedOption<ViewMode>[] = [
+  { value: 'live', label: 'Live', title: 'Edit the rendered note' },
+  { value: 'source', label: 'Source', title: 'Edit the raw markdown' },
+  { value: 'read', label: 'Read', title: 'Read the rendered note without editing' },
+]
+
+/** Reading always renders the note; raw markdown is only ever shown to edit it. */
+function useViewMode(toggles: PanelToggles): [ViewMode, (mode: ViewMode) => void] {
+  const { previewMode, setPreviewMode } = useEditorStore()
+  const mode: ViewMode = toggles.readingMode ? 'read' : previewMode ? 'live' : 'source'
+  const choose = (next: ViewMode) => {
+    toggles.setReadingMode(next === 'read')
+    setPreviewMode(next !== 'source')
+  }
+  return [mode, choose]
 }
 
 function NotepadToolbar({ toggles }: { toggles: PanelToggles }): React.JSX.Element {
-  const { isDirty, saveStatus, previewMode, togglePreviewMode } = useEditorStore()
+  const { isDirty, saveStatus } = useEditorStore()
+  const [mode, setMode] = useViewMode(toggles)
   return (
     <div className="notepad-view__toolbar">
       <span className="notepad-view__save-status">{saveStatusLabel(isDirty, saveStatus)}</span>
-      <ToggleButton
-        on={previewMode}
-        onClick={togglePreviewMode}
-        labels={['Markdown', 'Live']}
-        titles={['Show raw markdown source', 'Show the rendered live preview']}
+      <SegmentedControl
+        label="View"
+        size="sm"
+        options={VIEW_MODES}
+        value={mode}
+        onChange={setMode}
       />
+      <span className="notepad-view__toolbar-divider" aria-hidden="true" />
       <PanelToggleButtons toggles={toggles} />
-      <Button variant="ghost" size="sm" onClick={() => toggles.setShowExport(true)}>
-        Export
-      </Button>
     </div>
   )
 }
 
 function PanelToggleButtons({ toggles }: { toggles: PanelToggles }): React.JSX.Element {
-  const { readingMode, showOutline, showComments } = toggles
+  const { showOutline, showComments } = toggles
   return (
     <>
-      <ToggleButton
-        on={readingMode}
-        onClick={() => toggles.setReadingMode((v) => !v)}
-        labels={['Edit', 'Read']}
-        titles={['Switch to edit mode', 'Switch to reading mode']}
-      />
-      <ToggleButton
-        on={showOutline}
+      <IconButton
+        icon={ListTree}
+        label="Outline"
+        description={showOutline ? 'Hide the heading outline' : 'Show the heading outline'}
+        pressed={showOutline}
         onClick={() => toggles.setShowOutline((v) => !v)}
-        labels={['Hide outline', 'Outline']}
-        titles={['Hide the heading outline', 'Show the heading outline']}
       />
-      <ToggleButton
-        on={showComments}
+      <IconButton
+        icon={MessageSquare}
+        label="Comments"
+        description={showComments ? 'Hide comments' : 'Show comments'}
+        pressed={showComments}
         onClick={() => toggles.setShowComments((v) => !v)}
-        labels={['Hide comments', 'Show comments']}
-        titles={['Hide comments', 'Show comments']}
       />
     </>
   )

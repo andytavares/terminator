@@ -13,7 +13,7 @@ interface EditorState {
   markSaving: () => void
   markSaved: () => void
   markError: () => void
-  togglePreviewMode: () => void
+  setPreviewMode: (previewMode: boolean) => void
 }
 
 export const useEditorStore = create<EditorState>((set) => ({
@@ -28,5 +28,5 @@ export const useEditorStore = create<EditorState>((set) => ({
   markSaving: () => set({ saveStatus: 'saving' }),
   markSaved: () => set({ saveStatus: 'saved', isDirty: false }),
   markError: () => set({ saveStatus: 'error' }),
-  togglePreviewMode: () => set((s) => ({ previewMode: !s.previewMode })),
+  setPreviewMode: (previewMode) => set({ previewMode }),
 }))
