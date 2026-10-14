@@ -1,0 +1,29 @@
+src/main/git/git-env.ts
+  s_c9dd89ad1f6c54::t_3a9f7be07abbe6 1-4
+  s_c9dd89ad1f6c54::t_7f3fe4078986ea 5-6
+src/main/git/git-service.ts
+  s_c9dd89ad1f6c54::t_697de136eb1dc8 33-35
+tests/unit/git/git-service.spec.ts
+  s_c9dd89ad1f6c54::t_452604a385c5ba 308
+src/main/shell/shell-executor.ts
+  s_c9dd89ad1f6c54::t_2065d5525bee0e 65
+  s_c9dd89ad1f6c54::t_af9edc55f33551 4
+tests/integration/fs/watch-and-git.spec.ts
+  s_c9dd89ad1f6c54::t_83b77ea5cf5430 1-104
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "7da58c6a2eb44ef503c265683c63505fa26c53ed",
+  "prompts": {},
+  "sessions": {
+    "s_c9dd89ad1f6c54": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ee6b7f82-c708-43d8-8c1f-eefe55f692a9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
