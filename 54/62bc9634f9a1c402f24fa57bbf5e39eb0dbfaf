@@ -1,0 +1,21 @@
+tests/unit/config/temporal-runtime.spec.ts
+  s_c9dd89ad1f6c54::t_98c2a5b43b2cb5 1-10
+vitest.config.ts
+  s_c9dd89ad1f6c54::t_227d65de70a4b6 47-49
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "5462bc9634f9a1c402f24fa57bbf5e39eb0dbfaf",
+  "prompts": {},
+  "sessions": {
+    "s_c9dd89ad1f6c54": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ee6b7f82-c708-43d8-8c1f-eefe55f692a9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
