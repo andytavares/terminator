@@ -10,7 +10,10 @@
  * segmented control, Markdown, relative time and polling.
  */
 
-export { Dialog, DialogActionButton, useContainingLayer } from './Dialog'
+export { ModalShell } from './ModalShell'
+export type { ModalShellProps } from './ModalShell'
+
+export { Dialog, DialogActionButton } from './Dialog'
 export type { DialogAction, DialogProps } from './Dialog'
 
 export { Button } from './Button'
@@ -60,14 +63,7 @@ export type { EmptyStateProps } from './EmptyState'
 export { IconButton } from './IconButton'
 export type { IconButtonProps, IconButtonSize } from './IconButton'
 
-export {
-  LAYERS,
-  LAYER_NAMES,
-  layerCssDeclarations,
-  layerCssVar,
-  layerValue,
-  nestedLayerValue,
-} from './layers'
+export { LAYERS, LAYER_NAMES, layerCssDeclarations, layerCssVar, layerValue } from './layers'
 export type { LayerName } from './layers'
 
 export { createModalDepthRegistry, getModalDepth, MODAL_DEPTH_KEY } from './modal-depth'
@@ -75,5 +71,3 @@ export type { ModalDepthHost, ModalDepthRegistry } from './modal-depth'
 
 export { useDismissible } from './useDismissible'
 export type { DismissibleOptions } from './useDismissible'
-
-export { captureFocus, focusableWithin, trapTab } from './focus-trap'

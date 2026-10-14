@@ -738,18 +738,8 @@
 }
 
 /* ── Quick-create overlay ───────────────────────────────────────── */
-.notepad-overlay-backdrop {
-  position: fixed;
-  inset: 0;
-  background: var(--tm-scrim);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: var(--tm-layer-modal);
-}
-
+/* A modal shell (a native dialog): it centres this and draws the backdrop. */
 .notepad-quick-create {
-  position: relative;
   width: 520px;
   max-width: calc(100vw - 40px);
   background: var(--tm-bg-elevated);
@@ -759,7 +749,6 @@
   display: flex;
   flex-direction: column;
   gap: 0;
-  z-index: var(--tm-layer-modal);
   overflow: hidden;
 }
 
@@ -1885,8 +1874,6 @@ input[type='checkbox'].notepad-task-checkbox {
   flex-direction: column;
   overflow: hidden;
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7);
-  margin-top: 60px;
-  align-self: flex-start;
 }
 
 .notepad-search-overlay__input-row {

@@ -1,6 +1,5 @@
 import React, { useEffect, useRef } from 'react'
-import { nestedLayerValue } from './layers'
-import { useContainingLayer } from './Dialog'
+import { layerValue } from './layers'
 import { useDismissible } from './useDismissible'
 import './extension-ui.css'
 
@@ -29,8 +28,8 @@ export interface PopoverProps {
  */
 export function Popover({ label, children, onDismiss, className }: PopoverProps): JSX.Element {
   const ref = useRef<HTMLDivElement>(null)
-  const parentLayer = useContainingLayer()
-  const zIndex = nestedLayerValue('overlay', parentLayer)
+  // Inside a modal shell it is in the dialog's own stacking context, so this is enough there too.
+  const zIndex = layerValue('overlay')
 
   // Escape, an outside click, the open-surface depth and focus moving in. Focus
   // is not trapped: Tab may leave, which is correct for a surface the rest of

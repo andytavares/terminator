@@ -15,6 +15,7 @@ import {
 } from './helpers'
 import { connectJira, startJiraStub, type JiraStub } from './jira-stub'
 import { allowCredentialsWithoutKeychain } from './main-stubs'
+import { expectCentredInWindow } from './modal-centre'
 
 // The issue-tracker integration against a local Jira (jira-stub.ts), from connect to
 // disconnect, each step done as an operator does it and each assertion on what the app shows
@@ -61,6 +62,7 @@ async function myIssuesQueryReachesTracker(): Promise<void> {
   await closeSettingsPanel(page)
   await runQuickActionFromPanel(page, 'Link issue to branch')
   const dialog = page.getByRole('dialog', { name: 'Link an issue' })
+  await expectCentredInWindow(dialog, 'Link an issue')
   await expect(dialog.locator('.link-issue__group')).toHaveText('Assigned to you')
   await expect(dialog.locator('.link-issue__row', { hasText: 'OPS-8' })).toBeVisible()
   const mineQuery = new URLSearchParams({ jql: 'project = OPS ORDER BY updated DESC' }).toString()

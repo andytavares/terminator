@@ -4,6 +4,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { AboutDialog } from '../../../../src/renderer/components/AboutDialog'
 import type { ElectronAPI } from '../../../../src/shared/electron-api/api-type'
 import { installElectronApi } from '../../../support/electron-api'
+import { pressOutside } from '../../../support/modal'
 
 const mockGetInfo = vi.fn<ElectronAPI['app']['getInfo']>()
 const mockDbHealth = vi.fn<ElectronAPI['db']['health']>()
@@ -52,7 +53,7 @@ describe('AboutDialog', () => {
     const onClose = vi.fn()
     render(<AboutDialog onClose={onClose} />)
     await waitFor(() => expect(screen.getByRole('dialog')).toBeTruthy())
-    fireEvent.click(document.querySelector('.tmui-dialog__scrim')!)
+    pressOutside(screen.getByRole('dialog'))
     expect(onClose).toHaveBeenCalled()
   })
 })

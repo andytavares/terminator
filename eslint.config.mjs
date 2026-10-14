@@ -172,7 +172,7 @@ export default defineConfig([
           selector:
             "JSXAttribute[name.name='style'] Property[key.name='zIndex'] > Literal[value=/^[0-9]+$/]",
           message:
-            'Stacking comes from the published layer scale. Use layerValue()/nestedLayerValue() from @terminator/extension-ui, or var(--tm-layer-*) in CSS — a raw number is how 14 unmanaged values ended up deciding order by whoever picked the biggest.',
+            'Stacking comes from the published layer scale. Use layerValue() from @terminator/extension-ui, or var(--tm-layer-*) in CSS — a raw number is how 14 unmanaged values ended up deciding order by whoever picked the biggest.',
         },
         {
           selector:

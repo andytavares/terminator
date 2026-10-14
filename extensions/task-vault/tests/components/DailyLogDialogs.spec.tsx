@@ -7,6 +7,7 @@ vi.mock('../../src/utils/notify', () => ({ notify: vi.fn() }))
 vi.mock('../../src/components/DateTimePicker', () => import('./helpers/input-stubs'))
 
 import { notify } from '../../src/utils/notify'
+import { pressOutside } from '../../../../tests/support/modal'
 
 vi.setConfig({ testTimeout: 30_000 })
 
@@ -61,7 +62,7 @@ function blockTestsPart2() {
     fireEvent.click(buttonNamed('Mark as blocked'))
     fireEvent.click(modal())
     expect(modal()).toBeTruthy()
-    fireEvent.click(document.querySelector('.daily-log__block-modal-backdrop')!)
+    pressOutside(modal())
     expect(modal()).toBeNull()
     expect(bridge.calls('task-vault:vault:block-task')).toEqual([])
   })
@@ -150,7 +151,7 @@ function recurrenceTestsPart2() {
     fireEvent.click(within(modal()).getByRole('button', { name: 'Close' }))
     fireEvent.click(buttonNamed('Set recurrence'))
     fireEvent.click(modal())
-    fireEvent.click(document.querySelector('.daily-log__block-modal-backdrop')!)
+    pressOutside(modal())
     expect(modal()).toBeNull()
   })
 }

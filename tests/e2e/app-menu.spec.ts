@@ -12,6 +12,7 @@ import {
   runQuickActionFromPanel,
 } from './helpers'
 import { recordShellOpens, shellOpens } from './main-stubs'
+import { expectCentredInWindow } from './modal-centre'
 
 // Playwright cannot open a native menu, so each test clicks the MenuItem the menu bar
 // would call (https://www.electronjs.org/docs/latest/api/menu-item#menuitemclick).
@@ -95,6 +96,7 @@ test('Help → About shows the versions and that the database is healthy', async
   await clickMenuItem(app, ['Help', 'About'])
   const about = page.getByRole('dialog', { name: 'About' })
   await expect(about).toBeVisible()
+  await expectCentredInWindow(about, 'About')
   const dbRow = about.locator('.about-dialog__row', { hasText: 'DB' })
   await expect(dbRow.locator('dd')).toHaveText('OK')
   await about.locator('.tmui-button--primary', { hasText: 'Close' }).click()

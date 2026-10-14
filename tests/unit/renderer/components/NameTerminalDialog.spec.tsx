@@ -2,6 +2,7 @@ import React from 'react'
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { NameTerminalDialog } from '../../../../src/renderer/components/NameTerminalDialog'
+import { pressOutside } from '../../../support/modal'
 
 const defaultName = 'Terminal 1'
 
@@ -56,7 +57,7 @@ describe('NameTerminalDialog', () => {
 describe('NameTerminalDialog — calls onCancel when overlay is clicked', () => {
   it('calls onCancel when overlay is clicked', () => {
     renderDialog()
-    fireEvent.click(document.querySelector('.tmui-dialog__scrim')!)
+    pressOutside(screen.getByRole('dialog'))
     expect(onCancel).toHaveBeenCalled()
   })
 
@@ -82,7 +83,7 @@ describe('NameTerminalDialog — calls onCancel when overlay is clicked', () => 
     renderDialog()
     const input = screen.getByRole('textbox')
     fireEvent.change(input, { target: { value: 'Build runner' } })
-    fireEvent.submit(screen.getByRole('dialog'))
+    fireEvent.submit(screen.getByRole('textbox'))
     expect(onConfirm).toHaveBeenCalledWith('Build runner')
   })
 })

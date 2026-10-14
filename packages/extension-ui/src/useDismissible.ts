@@ -1,5 +1,4 @@
 import { useEffect, useRef, type MutableRefObject, type RefObject } from 'react'
-import { captureFocus } from './focus-trap'
 import { createModalDepthRegistry } from './modal-depth'
 
 export interface DismissibleOptions {
@@ -17,16 +16,6 @@ export interface DismissibleOptions {
    * close it dismisses and immediately reopens.
    */
   alsoInside?: ReadonlyArray<RefObject<HTMLElement | null>>
-  /**
-   * Listen for Escape in the capture phase.
-   *
-   * A surface hosting an editor — CodeMirror, xterm — may have its keydown
-   * stopped before it reaches the document, so the surface never learns the
-   * key was pressed and cannot close. Capture phase sees it first. Off by
-   * default: capturing is the wrong default for a surface with nothing that
-   * swallows keys, because it reaches Escape ahead of anything nested.
-   */
-  captureEscape?: boolean
   /**
    * False while the surface is closed.
    *
@@ -53,7 +42,6 @@ export function useDismissible({
   manageFocus = true,
   closeOnOutsideClick = true,
   alsoInside,
-  captureEscape = false,
   enabled = true,
 }: DismissibleOptions): void {
   // Read through refs so a caller passing a fresh closure each render does not
@@ -67,16 +55,9 @@ export function useDismissible({
 
   useEffect(() => {
     if (!enabled) return
-    return bindDismissal({
-      ref,
-      dismissRef,
-      alsoInsideRef,
-      manageFocus,
-      closeOnOutsideClick,
-      captureEscape,
-    })
+    return bindDismissal({ ref, dismissRef, alsoInsideRef, manageFocus, closeOnOutsideClick })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, captureEscape])
+  }, [enabled])
 }
 
 interface Dismissal {
@@ -85,18 +66,17 @@ interface Dismissal {
   alsoInsideRef: MutableRefObject<DismissibleOptions['alsoInside']>
   manageFocus: boolean
   closeOnOutsideClick: boolean
-  captureEscape: boolean
 }
 
 /** Registers the surface's depth, moves focus in and listens; returns the undo. */
 function bindDismissal(dismissal: Dismissal): () => void {
-  const { ref, manageFocus, closeOnOutsideClick, captureEscape } = dismissal
+  const { ref, manageFocus, closeOnOutsideClick } = dismissal
   const release = createModalDepthRegistry(window).release()
-  const restoreFocus = manageFocus && ref.current ? captureFocus(ref.current) : () => {}
+  const restoreFocus = manageFocus && ref.current ? moveFocusIn(ref.current) : () => {}
   const onKeyDown = escapeListener(dismissal)
   const onPointerDown = outsideClickListener(dismissal)
 
-  document.addEventListener('keydown', onKeyDown, captureEscape)
+  document.addEventListener('keydown', onKeyDown)
   // Deferred a tick: the click that opened this surface is still propagating.
   const timer = closeOnOutsideClick
     ? setTimeout(() => document.addEventListener('mousedown', onPointerDown), 0)
@@ -104,10 +84,30 @@ function bindDismissal(dismissal: Dismissal): () => void {
 
   return () => {
     if (timer !== undefined) clearTimeout(timer)
-    document.removeEventListener('keydown', onKeyDown, captureEscape)
+    document.removeEventListener('keydown', onKeyDown)
     document.removeEventListener('mousedown', onPointerDown)
     restoreFocus()
     release()
+  }
+}
+
+/** What Tab reaches. `[tabindex="-1"]` takes focus from code only, so it is no place to start. */
+const FOCUSABLE = [
+  'a[href]',
+  'button:not([disabled])',
+  'input:not([disabled]):not([type="hidden"])',
+  'select:not([disabled])',
+  'textarea:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])',
+].join(',')
+
+/** Moves focus into the surface, unless a field inside took it on mount, and returns the way back
+ * to whatever had it. An opener that has left the document ignores the call. */
+function moveFocusIn(surface: HTMLElement): () => void {
+  const opener = document.activeElement
+  if (!surface.contains(opener)) (surface.querySelector<HTMLElement>(FOCUSABLE) ?? surface).focus()
+  return () => {
+    if (opener instanceof HTMLElement) opener.focus()
   }
 }
 
@@ -118,6 +118,8 @@ function escapeListener({ ref, dismissRef }: Dismissal): (e: KeyboardEvent) => v
     // would take the dialog down with it.
     if (!isInnermost(ref.current)) return
     e.stopPropagation()
+    // Inside a modal shell the key's default is a close request to the dialog around this.
+    e.preventDefault()
     dismissRef.current()
   }
 }

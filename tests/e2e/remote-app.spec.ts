@@ -1,5 +1,12 @@
-import { test, expect, type APIRequestContext, type PlaywrightWorkerArgs } from '@playwright/test'
+import {
+  test,
+  expect,
+  type APIRequestContext,
+  type Page,
+  type PlaywrightWorkerArgs,
+} from '@playwright/test'
 import { AppHandle, launchApp, closeApp } from './helpers'
+import { expectCentredInWindow } from './modal-centre'
 
 // End-to-end guard for the browser `/app/` remote surface — the feature that
 // silently broke when the bridge default-deny enforcement shipped without an
@@ -99,7 +106,17 @@ async function expectRemoteWorkspace(
   await expect(remotePage.locator('.repo-header__name').filter({ hasText: WS_NAME })).toBeVisible({
     timeout: 20000,
   })
+  await expectRemoteModalCentred(remotePage)
   await browser.close()
+}
+
+/** A modal in the remote client sits in the middle of the browser's window, as in the app. */
+async function expectRemoteModalCentred(remotePage: Page): Promise<void> {
+  await remotePage.click('.sidebar-header__add')
+  const dialog = remotePage.getByRole('dialog', { name: 'Create Workspace' })
+  await expectCentredInWindow(dialog, 'Remote client: Create Workspace')
+  await dialog.getByRole('button', { name: 'Cancel' }).click()
+  await expect(dialog).toHaveCount(0)
 }
 
 test('/app/ browser remote renderer loads and the IPC bridge serves workspace:list', async ({

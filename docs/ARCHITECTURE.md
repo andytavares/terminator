@@ -437,7 +437,7 @@ A click in the sidebar dismisses the same way, and there core surfaces go too: `
 
 The core and every extension are built from one design system, `packages/extension-ui` (`@terminator/extension-ui`), published outward: the core consumes it the way an extension does ([ADR 098](adr/098-one-design-system-documented-in-storybook.md), extending [ADR-039](adr/039-one-ui-layer-published-outward.md); Constitution XIII). It is a source-only workspace package: `main`, `module` and `types` point at `src/index.ts`, and `react`, `react-dom` and `lucide-react` are peer dependencies, so there is no build step and no second copy of React.
 
-**Components.** `src/index.ts` exports `Dialog`, `ConfirmDialog`, `Popover`, `ToastRegion` / `Toast`, `EmptyState`, `Button`, `IconButton`, `Tabs`, `SegmentedControl`, `Markdown`, `RelativeTime`, `usePolling`, `useDismissible`, the layer scale and the modal-depth registry. The core's own dialogs, toast region and empty states use them (`src/renderer/components/ConfirmDialog.tsx` wraps the shared `ConfirmDialog`).
+**Components.** `src/index.ts` exports `ModalShell`, `Dialog`, `ConfirmDialog`, `Popover`, `ToastRegion` / `Toast`, `EmptyState`, `Button`, `IconButton`, `Tabs`, `SegmentedControl`, `Markdown`, `RelativeTime`, `usePolling`, `useDismissible`, the layer scale and the modal-depth registry. The core's own dialogs, toast region and empty states use them (`src/renderer/components/ConfirmDialog.tsx` wraps the shared `ConfirmDialog`).
 
 **Storybook.** `packages/extension-ui/stories/` documents each component in both themes (`npm run storybook`). The stories run as tests through the Vitest add-on (`npm run test:stories`), and Playwright screenshot tests guard them (`npm run test:visual`, `packages/extension-ui/playwright.visual.config.ts`).
 
@@ -453,16 +453,18 @@ A `--tm-*` name referenced but not defined makes its declaration invalid, and th
 
 **Stacking** comes from a named scale (`src/layers.ts`), not from whoever picked the biggest number:
 
-| Layer     | Value | For                               |
-| --------- | ----- | --------------------------------- |
-| `panel`   | 100   | In-flow raised surfaces           |
-| `overlay` | 200   | Popovers, dropdowns, pickers      |
-| `modal`   | 300   | Dialogs and their scrims          |
-| `toast`   | 400   | Above everything, modals included |
+| Layer     | Value | For                                             |
+| --------- | ----- | ----------------------------------------------- |
+| `panel`   | 100   | In-flow raised surfaces                         |
+| `overlay` | 200   | Popovers, dropdowns, pickers                    |
+| `modal`   | 300   | A surface over a view that is not a modal shell |
+| `toast`   | 400   | Above everything on the scale                   |
 
-`nestedLayerValue(name, containerValue)` places a surface inside another without leaving its band. A raw `z-index` number in an extension is a lint error.
+A raw `z-index` number in an extension is a lint error.
 
-**Modal depth is per document.** `contextIsolation: true` gives an extension page and its preload different `window` objects, so `Dialog` reports its depth across the bridge with `electronAPI.ui.setModalDepth`; that is how the double-Escape exit stands down while a dialog is open. Within one document, Escape is answered by the innermost surface only (`isInnermost` in `Dialog.tsx`).
+**Modal surfaces** are not on that scale. Each is a `ModalShell` (`src/ModalShell.tsx`, [ADR 110](adr/110-modal-surfaces-use-the-native-dialog-element.md)): a native `<dialog>` opened with `showModal()` while it is mounted, so the browser keeps focus inside, makes the page behind inert, paints the shell above every z-index and returns focus on close. Every modal is centred in its window on both axes; the shell states the placement `!important`, so no caller moves one, and `expectCentredInWindow` (`tests/e2e/modal-centre.ts`) measures it in each spec that opens a modal. `Dialog` is the shell with a title, body and actions. Settings and Quick Actions in the core, Notepad's search and quick create, and Task Vault's block, recurrence and query-confirmation dialogs are the shell with their own content. The shell dismisses on the dialog's `cancel` event (Escape, a phone's back gesture) and on a press on the backdrop. `ToastRegion` renders inside the shell opened last (`src/modal-stack.ts`), because everything outside an open modal dialog is inert. The top layer belongs to one document, so a core modal still hides the extension views (`useModalEffect`, `src/renderer/stores/modal.store.ts`), which are separate native views painted over the page.
+
+**Modal depth is per document.** `contextIsolation: true` gives an extension page and its preload different `window` objects, so `ModalShell` reports its depth across the bridge with `electronAPI.ui.setModalDepth`; that is how the double-Escape exit stands down while a dialog is open. Among surfaces that are not modal (`Popover`, `useDismissible`), Escape is answered by the one opened last (`isInnermost` in `useDismissible.ts`), which prevents the key's default so a shell around it stays open.
 
 **Contrast** is verified by rendering, not by reading the stylesheet: `tests/e2e/extension-themes.spec.ts` walks every visible text node in each extension view, in both themes, resolves the real composited backdrop through the translucent layers above it, and asserts WCAG AA. `color-mix` and layered alpha only resolve in a browser.
 

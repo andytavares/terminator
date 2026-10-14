@@ -9,6 +9,7 @@ import {
   selectProject,
   e2eTempDir,
 } from './helpers'
+import { expectCentredInWindow } from './modal-centre'
 
 // Home against the running app: it is the launch view, it lists every terminal
 // where it lives, and what the operator writes about a session is still there
@@ -128,6 +129,7 @@ test('linking a session says where to connect a tracker when none is', async () 
     .getByRole('button', { name: 'Link a work item' })
     .click()
   const dialog = page.getByRole('dialog', { name: 'Link a work item' })
+  await expectCentredInWindow(dialog, 'Link a work item')
   await expect(dialog.getByRole('alert')).toHaveText(
     'No issue tracker is connected. Connect Linear or Jira in Settings → Integrations.'
   )

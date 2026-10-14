@@ -56,10 +56,10 @@ describe('NotificationPanel', () => {
     expect(container.firstChild).toBeNull()
   })
 
-  it('renders the panel when panelOpen is true', () => {
+  it('renders the panel, a named region beside the app, when panelOpen is true', () => {
     useNotificationStore.setState({ panelOpen: true })
     render(<NotificationPanel />)
-    expect(screen.getByRole('dialog')).toBeTruthy()
+    expect(screen.getByRole('region', { name: 'Notifications' })).toBeTruthy()
   })
 
   it('shows empty state when no notifications', () => {

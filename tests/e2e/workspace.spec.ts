@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { AppHandle, launchApp, closeApp, createWorkspace, workspaceRow } from './helpers'
+import { expectCentredInWindow } from './modal-centre'
 
 let handle: AppHandle
 
@@ -15,6 +16,10 @@ test('US1-1: clicking New workspace opens a dialog with name, folder, and color 
   const { page } = handle
   await page.click('.sidebar-header__add')
   await expect(page.locator('.tmui-dialog__title')).toContainText('Create Workspace')
+  await expectCentredInWindow(
+    page.getByRole('dialog', { name: 'Create Workspace' }),
+    'Create Workspace'
+  )
   await expect(page.getByPlaceholder('My Workspace')).toBeVisible()
   await expect(page.getByPlaceholder('/path/to/folder')).toBeVisible()
   await expect(page.locator('.dialog__colors')).toBeVisible()
@@ -49,6 +54,10 @@ async function renameShowsImmediately(): Promise<void> {
   await workspaceRow(page, 'My Test Workspace').click({ button: 'right' })
   await page.locator('.ctx-menu__item').filter({ hasText: 'Edit workspace' }).click()
   await expect(page.locator('.tmui-dialog__title')).toContainText('Edit Workspace')
+  await expectCentredInWindow(
+    page.getByRole('dialog', { name: 'Edit Workspace' }),
+    'Edit Workspace'
+  )
   const nameInput = page.locator('.dialog__input').first()
   await nameInput.fill('Renamed Workspace')
   await page.click('.tmui-dialog__actions .tmui-button--primary')
@@ -68,6 +77,7 @@ async function removeTakesWorkspaceAway(): Promise<void> {
   // nothing a user sees does not break it.
   const confirm = page.getByRole('dialog')
   await expect(confirm).toContainText('Remove workspace')
+  await expectCentredInWindow(confirm, 'Confirm: Remove workspace')
   await confirm.getByRole('button', { name: 'Remove', exact: true }).click()
 
   await expect(page.locator('.repo-header')).toHaveCount(before - 1)

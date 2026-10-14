@@ -7,6 +7,7 @@ import {
   workspaceRow,
   projectGroup,
 } from './helpers'
+import { expectCentredInWindow } from './modal-centre'
 
 let handle: AppHandle
 const WS = 'Project Test Workspace'
@@ -24,6 +25,7 @@ async function addBranchOpensCreateDialog(): Promise<void> {
   const { page } = handle
   await workspaceRow(page, WS).locator('.repo-header__action[aria-label^="New branch in"]').click()
   await expect(page.locator('.tmui-dialog__title')).toContainText('Create Branch')
+  await expectCentredInWindow(page.getByRole('dialog', { name: 'Create Branch' }), 'Create Branch')
   await page.getByRole('button', { name: 'Cancel' }).click()
   await expect(page.locator('.tmui-dialog__title')).toHaveCount(0)
 }

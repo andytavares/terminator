@@ -3,6 +3,7 @@ import { AppHandle, launchApp, closeApp } from './helpers'
 import { invokeChannel } from './extension-page'
 import { goToSection, openVault, storedTask, type StoredTask } from './task-vault-harness'
 import { canPressGlobalKeys, pressGlobalChord } from './x11-keys'
+import { expectCentredInWindow } from './modal-centre'
 
 // Capturing into the Task Vault inbox and clarifying what was captured, the
 // GTD loop the inbox exists for. Each test drives the view the way a user does
@@ -137,6 +138,7 @@ test('Capture to inbox from Quick Actions saves what was typed', async () => {
 
   const dialog = vault.getByRole('dialog', { name: 'Capture to Inbox' })
   await expect(dialog).toBeVisible({ timeout: 15_000 })
+  await expectCentredInWindow(dialog, 'Task Vault: Capture to Inbox')
   await dialog.getByRole('textbox').fill('Buy stamps')
   await dialog.getByRole('textbox').press('Enter')
 

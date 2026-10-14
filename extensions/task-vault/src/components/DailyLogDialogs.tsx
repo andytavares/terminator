@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Button, IconButton } from '@terminator/extension-ui'
+import { Button, IconButton, ModalShell } from '@terminator/extension-ui'
 import { OctagonAlert, Repeat, X } from 'lucide-react'
 import { DateTimePicker } from './DateTimePicker'
 import {
@@ -52,19 +52,17 @@ const END_TYPES: { value: EndType; label: string }[] = [
   { value: 'after_count', label: 'After' },
 ]
 
-/** The dialog chrome both task dialogs share: backdrop, card and header. */
+/** The chrome both task dialogs share: the modal shell, the card and its header. */
 function ModalFrame(props: FrameProps): React.JSX.Element {
   return (
-    <div className="daily-log__block-modal-backdrop" onClick={props.onClose}>
-      <div className="daily-log__block-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="daily-log__block-modal-header">
-          {props.icon}
-          <span>{props.title}</span>
-          <IconButton icon={X} label="Close" size="sm" onClick={props.onClose} />
-        </div>
-        {props.children}
+    <ModalShell label={props.title} className="daily-log__block-modal" onDismiss={props.onClose}>
+      <div className="daily-log__block-modal-header">
+        {props.icon}
+        <span>{props.title}</span>
+        <IconButton icon={X} label="Close" size="sm" onClick={props.onClose} />
       </div>
-    </div>
+      {props.children}
+    </ModalShell>
   )
 }
 

@@ -10,6 +10,7 @@ import {
   CreateWorkspaceInputSchema,
 } from '../../../../src/shared/schemas/workspace.schema'
 import { installElectronApi } from '../../../support/electron-api'
+import { pressOutside } from '../../../support/modal'
 
 // The main process's side of the two writes the real store makes, each payload
 // read by the schema main reads it with.
@@ -171,7 +172,7 @@ describe('CreateWorkspaceDialog — clears nameError when name input changes', (
   it('calls onClose when overlay is clicked', () => {
     const onClose = vi.fn()
     render(<CreateWorkspaceDialog onClose={onClose} />)
-    fireEvent.click(screen.getByText('Create Workspace').closest('.tmui-dialog__scrim')!)
+    pressOutside(screen.getByRole('dialog'))
     expect(onClose).toHaveBeenCalled()
   })
 })

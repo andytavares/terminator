@@ -2,6 +2,7 @@ import { test, expect, type Page } from '@playwright/test'
 import { AppHandle, launchApp, closeApp } from './helpers'
 import { invokeChannel } from './extension-page'
 import { openVault, storedTask, localDate } from './task-vault-harness'
+import { expectCentredInWindow } from './modal-centre'
 
 // The board view and the calendar beside the log: moving cards between lanes,
 // grouping and editing lanes, and jumping from a day in the calendar to a task.
@@ -81,6 +82,7 @@ test('grouping the board by project draws a swimlane per project and is remember
 test('a lane renamed and given a dot colour keeps both after saving', async () => {
   await vault.getByTitle('Edit lanes').click()
   const editor = vault.getByRole('dialog', { name: 'Edit Kanban Lanes' })
+  await expectCentredInWindow(editor, 'Task Vault: Edit Kanban Lanes')
   const todoRow = editor.locator('.tv-lane-editor__row').first()
   await todoRow.getByPlaceholder('Lane name').fill('Up next')
   await todoRow.locator('input[type="color"]').fill('#ff8800')

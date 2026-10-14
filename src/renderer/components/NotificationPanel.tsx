@@ -172,7 +172,7 @@ function NotificationPanelInner(): JSX.Element {
   return (
     <>
       <div className="notif-backdrop" onClick={closePanel} />
-      <div className="notif-panel" ref={panelRef} role="dialog" aria-label="Notifications">
+      <div className="notif-panel" ref={panelRef} role="region" aria-label="Notifications">
         <div className="notif-panel__header">
           <span className="notif-panel__title">Notifications</span>
           {notifications.length > 0 && (

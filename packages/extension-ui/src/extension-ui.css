@@ -5,41 +5,57 @@
  * own. Stacking comes from the --tm-layer-* scale, never from a raw z-index.
  */
 
-/* ── Dialog ─────────────────────────────────────────────────────────────── */
+/* ── Modal shell ────────────────────────────────────────────────────────── */
 
-.tmui-dialog__scrim {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--tm-space-6, 24px);
-  /* Dims what is behind. It must never hide it: the content a dialog was opened
-     from stays visible, which is the whole reason dialogs render in the calling
-     view rather than in the host window (ADR 038). */
-  background: rgb(0 0 0 / 55%);
+/* The browser's own dialog box (border, padding, system colours) is taken off;
+   `:where` keeps this at no specificity, so the caller's class decides the look.
+   Content taller than the window scrolls inside the shell, which keeps a margin. */
+:where(.tmui-modal) {
+  box-sizing: border-box;
+  max-width: calc(100% - 2 * var(--tm-space-4, 16px));
+  max-height: calc(100% - 2 * var(--tm-space-4, 16px));
+  overflow: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
 }
+
+/* Every modal sits in the middle of the window, on both axes (ADR 110). These are
+   the browser's own values for a modal dialog, made unmovable: no caller's class,
+   offset or transform, animated or not, takes a modal off centre. */
+.tmui-modal {
+  position: fixed !important;
+  inset: 0 !important;
+  margin: auto !important;
+  transform: none !important;
+  translate: none !important;
+}
+
+/* Dims what is behind and never hides it (ADR 038). The fallback is for a browser
+   whose backdrop does not inherit custom properties (Safari before 17.4). */
+.tmui-modal::backdrop {
+  background: var(--tm-scrim, rgb(0 0 0 / 55%));
+}
+
+/* ── Dialog ─────────────────────────────────────────────────────────────── */
 
 /* Nothing a caller puts inside may make the panel wider than itself. A flex
    child defaults to min-width:auto and refuses to shrink below its content,
    which is how a 760px table of chips pushed a 518px dialog's title and close
    button off screen. */
-.tmui-dialog__panel > * {
+.tmui-dialog__panel > *,
+.tmui-dialog__form > * {
   min-width: 0;
   max-width: 100%;
 }
 
-.tmui-dialog__panel[data-size='wide'] {
-  width: min(860px, 100%);
-}
-
 .tmui-dialog__panel {
-  position: relative;
   display: flex;
   flex-direction: column;
   gap: var(--tm-space-4, 16px);
-  width: min(520px, 100%);
-  max-height: 100%;
+  width: min(520px, calc(100% - 2 * var(--tm-space-6, 24px)));
+  max-height: calc(100% - 2 * var(--tm-space-6, 24px));
   overflow: auto;
   /* The panel scrolls vertically; it never scrolls sideways, because its own
      header would be the first thing to leave. */
@@ -52,15 +68,20 @@
   font-family: var(--tm-font-ui);
 }
 
-.tmui-dialog__head {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--tm-space-3, 12px);
+.tmui-dialog__panel--wide {
+  width: min(860px, calc(100% - 2 * var(--tm-space-6, 24px)));
 }
 
+/* The form is the panel's content when an action submits; it draws no box. */
+.tmui-dialog__form {
+  display: contents;
+}
+
+/* Leaves the close control's corner free, and is as tall as that control. */
 .tmui-dialog__title {
-  flex: 1 1 auto;
+  min-height: 26px;
   margin: 0;
+  padding-right: calc(26px + var(--tm-space-3, 12px));
   font-size: 15px;
   font-weight: 600;
   line-height: 1.3;
@@ -84,8 +105,11 @@
   gap: var(--tm-space-2, 8px);
 }
 
+/* Last in the document, so focus opens on the content; drawn beside the title. */
 .tmui-dialog__close {
-  flex: 0 0 auto;
+  position: absolute;
+  top: var(--tm-space-5, 20px);
+  right: var(--tm-space-5, 20px);
 }
 
 /* ── Buttons ────────────────────────────────────────────────────────────── */
@@ -376,7 +400,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .tmui-dialog__scrim,
   .tmui-dialog__panel,
   .tmui-toast {
     animation: none !important;

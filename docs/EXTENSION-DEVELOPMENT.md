@@ -370,7 +370,7 @@ await window.electronAPI.fs.watchStop()
 ### Keys the core handles in your view
 
 - **`⌘P` / `Ctrl+P`** opens the core's Quick Actions panel even while focus is in your view: the host watches `before-input-event` on every view (`isQuickActionsOpenShortcut`).
-- **`Esc` twice within 500 ms** leaves your extension and returns the operator to their terminal ([ADR 026](adr/026-double-escape-extension-exit.md)). The listener in the webview preload is passive and bubble-phase, so your own single-`Esc` handlers run as normal. It stands down inside a text field and while a dialog is open; `Dialog` from the design system reports open dialogs over `electronAPI.ui.setModalDepth`, and a modal you write yourself must call it too. Do not stop `Esc` propagation at the window level, or the gesture stops working in your view.
+- **`Esc` twice within 500 ms** leaves your extension and returns the operator to their terminal ([ADR 026](adr/026-double-escape-extension-exit.md)). The listener in the webview preload is passive and bubble-phase, so your own single-`Esc` handlers run as normal. It stands down inside a text field and while a dialog is open; the design system's `ModalShell` (and so `Dialog`) reports open dialogs over `electronAPI.ui.setModalDepth`. Do not write a modal of your own: give `ModalShell` your content. Do not stop `Esc` propagation at the window level, or the gesture stops working in your view.
 
 ### Testing your view end to end
 
@@ -415,6 +415,7 @@ An action with `submit: true` makes the dialog a form: Enter in a field runs tha
 
 | Export                                           | Use it for                                                       |
 | ------------------------------------------------ | ---------------------------------------------------------------- |
+| `ModalShell`                                     | Any other modal surface: the modal behaviour around your content |
 | `Dialog`, `ConfirmDialog`                        | A modal question or form; yes/no with the consequence stated     |
 | `Popover`                                        | A dropdown or picker: dismissible, not modal                     |
 | `ToastRegion`, `Toast`                           | Transient messages, `role="status"`; mount the region once       |
@@ -426,15 +427,16 @@ An action with `submit: true` makes the dialog a form: Enter in a field runs tha
 | `RelativeTime`, `formatRelativeTime`             | "5 minutes ago"; nothing for a time that does not parse          |
 | `usePolling`, `everyWhileVisible`                | Read now and on an interval; tick only while the view is visible |
 | `useDismissible`                                 | Outside-click, Escape and focus restore for your own surface     |
-| `LAYERS`, `layerValue`, `nestedLayerValue`       | Stacking by name                                                 |
+| `LAYERS`, `layerValue`                           | Stacking by name                                                 |
 
 `packages/extension-ui/src/index.ts` is the complete export list.
 
 What the package handles that is easy to get wrong alone:
 
-- **Escape closes only the innermost surface.** Several dialogs in one document would otherwise all close on one keystroke.
+- **A modal is the browser's own.** `ModalShell` is a native `<dialog>` opened with `showModal()` ([ADR 110](adr/110-modal-surfaces-use-the-native-dialog-element.md)): focus stays inside, the view behind is inert, it paints above every `z-index`, and Escape closes only the one opened last. The remote client runs your view in a phone's browser, where the back gesture dismisses it too.
+- **What you open from a modal must be inside it.** Everything outside an open modal dialog is inert. `Popover` and `ToastRegion` handle this; a surface you portal to `document.body` must portal to `trigger.closest('dialog') ?? document.body`.
 - **A dialog renders in your view, never in the core.** The core cannot draw over a `WebContentsView` ([ADR 038](adr/038-dialogs-render-in-the-extension-view.md)).
-- **Stacking comes from a named scale** (`panel` 100, `overlay` 200, `modal` 300, `toast` 400). A raw `z-index` number in an extension is a lint error.
+- **Stacking of everything else comes from a named scale** (`panel` 100, `overlay` 200, `modal` 300, `toast` 400). A raw `z-index` number in an extension is a lint error.
 
 ### Styling
 

@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { Play, RefreshCw, Trash2 } from 'lucide-react'
 import { invoke } from '@terminator/extension-sdk/renderer'
-import { Button, IconButton } from '@terminator/extension-ui'
+import { Button, IconButton, ModalShell } from '@terminator/extension-ui'
 import { countLabel } from '../utils/count-label'
 
 interface TableStats {
@@ -413,21 +413,20 @@ function QueryConfirmDialog({ admin }: AdminProps): React.JSX.Element | null {
     closeConfirm()
     admin.show(pending.sql)
   }
+  // Cancel comes first: a modal opens with focus on its first control, and Enter presses it.
   return (
-    <div className="db-admin__confirm-backdrop" onClick={closeConfirm}>
-      <div className="db-admin__confirm" onClick={(e) => e.stopPropagation()}>
-        <p className="db-admin__confirm-title">{pending.title}</p>
-        <p className="db-admin__confirm-sql">{pending.sql}</p>
-        <div className="db-admin__confirm-actions">
-          <Button variant="danger" onClick={confirmPendingQuery}>
-            Run
-          </Button>
-          <Button variant="ghost" onClick={closeConfirm}>
-            Cancel
-          </Button>
-        </div>
+    <ModalShell label={pending.title} className="db-admin__confirm" onDismiss={closeConfirm}>
+      <p className="db-admin__confirm-title">{pending.title}</p>
+      <p className="db-admin__confirm-sql">{pending.sql}</p>
+      <div className="db-admin__confirm-actions">
+        <Button variant="ghost" onClick={closeConfirm}>
+          Cancel
+        </Button>
+        <Button variant="danger" onClick={confirmPendingQuery}>
+          Run
+        </Button>
       </div>
-    </div>
+    </ModalShell>
   )
 }
 

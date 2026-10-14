@@ -14,6 +14,7 @@ import type { IssueSummary } from '../../../../src/shared/types/index'
 import { DEFAULT_GLOBAL_SETTINGS } from '../../../../src/shared/schemas/settings.schema'
 import type { ElectronAPI } from '../../../../src/shared/electron-api/api-type'
 import { installElectronApi } from '../../../support/electron-api'
+import { pressOutside } from '../../../support/modal'
 
 const mockCreateProject = vi.fn()
 
@@ -138,7 +139,7 @@ describe('CreateProjectDialog — shows duplicate project name error on blur', (
   it('calls onClose when overlay is clicked', () => {
     const onClose = vi.fn()
     render(<CreateProjectDialog workspaceId="ws-1" onClose={onClose} />)
-    fireEvent.click(screen.getByText('Create Branch').closest('.tmui-dialog__scrim')!)
+    pressOutside(screen.getByRole('dialog'))
     expect(onClose).toHaveBeenCalled()
   })
 
@@ -702,7 +703,7 @@ describe('CreateProjectDialog — from an issue — while it is working', () => 
     await screen.findByRole('button', { name: 'Creating…' })
 
     fireEvent.click(screen.getByText('Cancel'))
-    fireEvent.click(document.querySelector('.tmui-dialog__scrim')!)
+    pressOutside(screen.getByRole('dialog'))
     expect(onClose).not.toHaveBeenCalled()
     gate.finish()
   })

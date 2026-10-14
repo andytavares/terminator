@@ -100,7 +100,7 @@ async function showPanel({ id, label, part }: Surface): Promise<void> {
 
 /** Run in a view: whether focus is inside its open surface. */
 const FOCUS_IN_SURFACE = `(() => {
-      const s = document.querySelector('[data-tmui-surface]')
+      const s = document.querySelector('dialog[open]')
       return !!s && s.contains(document.activeElement)
     })()`
 
@@ -128,7 +128,7 @@ async function openNotesComposer(): Promise<void> {
     )
     .toBe(true)
   await expect
-    .poll(() => inView<boolean>('notepad', `!!document.querySelector('[data-tmui-surface]')`), {
+    .poll(() => inView<boolean>('notepad', `!!document.querySelector('dialog[open]')`), {
       timeout: 10000,
       message: 'the composer surface never opened',
     })
@@ -149,7 +149,7 @@ async function dialogTrapsFocusAndClosesOnEscape(): Promise<void> {
 
   // Escape closes the surface — and only the surface.
   await key('notepad', 'Escape')
-  const closed = await inView<boolean>('notepad', `!document.querySelector('[data-tmui-surface]')`)
+  const closed = await inView<boolean>('notepad', `!document.querySelector('dialog[open]')`)
   expect(closed, 'Escape should close the surface').toBe(true)
 
   const stillOpen = await activeExtensionPanel()

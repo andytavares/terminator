@@ -12,9 +12,9 @@ beforeEach(() => {
 })
 
 describe('LogWindow', () => {
-  it('renders dialog with title', () => {
+  it('is a named region of the window, not a dialog: the app stays usable beside it', () => {
     render(<LogWindow onClose={vi.fn()} />)
-    expect(screen.getByRole('dialog')).toBeTruthy()
+    expect(screen.getByRole('region', { name: 'Application Logs' })).toBeTruthy()
     expect(screen.getByText('Application Logs')).toBeTruthy()
   })
 

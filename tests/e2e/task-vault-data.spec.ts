@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { AppHandle, launchApp, closeApp } from './helpers'
 import { invokeChannel } from './extension-page'
 import { allTasks, openVault, todayTasks } from './task-vault-harness'
+import { expectCentredInWindow } from './modal-centre'
 
 // Task Vault's data tools and its database actions in Settings: the SQL
 // console, export to JSON, reset, re-initialise, and import of the export.
@@ -39,6 +40,7 @@ async function openVaultDataTools(tab: 'Export & import' | 'Database'): Promise<
     await vault.getByRole('button', { name: 'Data tools (export / import)' }).click()
   }
   await dataTools().getByRole('tab', { name: tab }).click()
+  await expectCentredInWindow(dataTools(), `Task Vault: Data tools, ${tab}`)
 }
 
 /** Saves the vault view's next download to `filePath`, where the save dialog

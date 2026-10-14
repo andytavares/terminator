@@ -10,6 +10,7 @@ import {
   addAndSelectProject,
   e2eTempDir,
 } from './helpers'
+import { expectCentredInWindow } from './modal-centre'
 
 /**
  * Feature 057 — Quick Actions.
@@ -39,7 +40,8 @@ async function openPanel(page: Page): Promise<void> {
   const d = dialog(page)
   await expect(d).toBeVisible({ timeout: 10000 })
   // Keys sent before the panel owns focus land in the terminal underneath.
-  await expect(d).toBeFocused()
+  await expect(d.locator(':focus')).toHaveCount(1)
+  await expectCentredInWindow(d, 'Quick actions')
 }
 
 /** Waits for a CSS animation/transition on `selector` to finish, not a fixed delay. */
@@ -179,7 +181,7 @@ async function leaderNNOpensNotepadQuickCreate(handle: AppHandle): Promise<void>
         inView<boolean>(
           handle,
           'notepad',
-          `!!document.querySelector('[role="dialog"][data-tmui-surface]')`
+          `!!document.querySelector('dialog[open][aria-label="New note"]')`
         ).catch(() => false),
       { timeout: 15000, message: 'Notepad quick-create overlay never appeared' }
     )
@@ -233,7 +235,7 @@ async function leaderInsideNotesOpensPanel(handle: AppHandle): Promise<void> {
   await expect(dialog(page)).toBeVisible({ timeout: 10000 })
   // Escape closes the panel from inside it; pressed before focus has moved
   // there from the extension's view, it closes nothing (as core-ipc found).
-  await expect(dialog(page)).toBeFocused()
+  await expect(dialog(page).locator(':focus')).toHaveCount(1)
 
   // A single Escape closes only the panel — Notes stays the active surface.
   await page.keyboard.press('Escape')

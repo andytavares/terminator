@@ -21,7 +21,7 @@ const meta = {
   decorators: [
     (Story) => (
       <div>
-        <p>The screen the dialog was opened from stays visible behind the scrim.</p>
+        <p>The screen the dialog was opened from stays visible behind the backdrop.</p>
         <Story />
       </div>
     ),
@@ -63,18 +63,30 @@ export const WithShortcutHint: Story = {
   },
 }
 
+// A play function's keys are scripted events, which a browser does not answer with a close
+// request; requestClose() is one. The real Escape is pressed in visual/modal-keys.visual.ts.
+const requestClose = (canvasElement: HTMLElement): void =>
+  within(canvasElement).getByRole<HTMLDialogElement>('dialog').requestClose()
+
 export const NotDismissible: Story = {
   args: { dismissible: false },
-  play: async ({ args }) => {
-    await userEvent.keyboard('{Escape}')
+  play: async ({ canvasElement, args }) => {
+    requestClose(canvasElement)
     await expect(args.onDismiss).not.toHaveBeenCalled()
   },
 }
 
-export const EscapeDismisses: Story = {
-  play: async ({ args }) => {
-    await userEvent.keyboard('{Escape}')
+export const CloseRequestDismisses: Story = {
+  play: async ({ canvasElement, args }) => {
+    requestClose(canvasElement)
     await expect(args.onDismiss).toHaveBeenCalledTimes(1)
+  },
+}
+
+/** Focus opens on the first action, the safe one, and never on the close control. */
+export const FocusOpensOnTheFirstAction: Story = {
+  play: async ({ canvasElement }) => {
+    await expect(within(canvasElement).getByRole('button', { name: 'Cancel' })).toHaveFocus()
   },
 }
 
@@ -103,5 +115,5 @@ export const DefaultLight = inLight(Default)
 export const WideLight = inLight(Wide)
 export const DangerActionLight = inLight(DangerAction)
 export const DisabledActionLight = inLight(DisabledAction)
-export const EscapeDismissesLight = inLight(EscapeDismisses)
+export const CloseRequestDismissesLight = inLight(CloseRequestDismisses)
 export const FormSubmitsOnEnterLight = inLight(FormSubmitsOnEnter)

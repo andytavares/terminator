@@ -1,6 +1,7 @@
 // Global test setup — runs before every test file regardless of environment.
 // CSS modules are not processed in tests; mock them to return an empty object.
 import { afterAll, inject, vi } from 'vitest'
+import { installNativeDialog } from './support/native-dialog'
 import { removeTempDirs } from './support/temp-dir'
 
 // A git hook exports GIT_DIR and GIT_INDEX_FILE, and a spec's `git init` or
@@ -58,6 +59,8 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
     disconnect() {}
   }
 }
+
+if (typeof window !== 'undefined') installNativeDialog(window)
 
 // jsdom parses its user-agent stylesheet (300+ ms) on a file's first getComputedStyle, which
 // every ByRole query calls; paid here, not by whichever test queries first.
