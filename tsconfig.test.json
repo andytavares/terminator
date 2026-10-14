@@ -9,7 +9,9 @@
   "compilerOptions": {
     "composite": false,
     "target": "ES2022",
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    // Temporal: two unit specs import Task Vault's backend, which uses it (ADR
+    // 108). Vitest has it behind a flag; Playwright does not, so not in tests/e2e.
+    "lib": ["ES2022", "ESNext.Temporal", "DOM", "DOM.Iterable"],
     "esModuleInterop": true,
     // The scripts specs import .mjs; their types are inferred, not checked.
     "allowJs": true,

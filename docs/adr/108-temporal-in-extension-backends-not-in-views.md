@@ -18,7 +18,7 @@ Four rules follow:
 
 1. **The view check has no `Temporal` type.** `extensions/task-vault/tsconfig.view.json` type-checks the view from its entry, through everything it imports, without TypeScript's `esnext.temporal` library, so a use of `Temporal` in any file the view reaches is `TS2304: Cannot find name 'Temporal'`. `tsconfig.json` and `tsconfig.test.json` add the library ([TypeScript 6.0, "New Types for Temporal"](https://www.typescriptlang.org/docs/handbook/release-notes/typescript-6-0.html)). `npm run typecheck` runs all three. `tests/unit/lint/temporal-boundary.spec.ts` holds the three configs to this.
 2. **Arithmetic and comparison only.** Anything shown to a person is formatted with `Intl`, as before. What is stored or sent over a channel keeps its format: `YYYY-MM-DD` dates and `Date.prototype.toISOString()` instants.
-3. **The clock is read with `Date.now()`** and turned into a `Temporal.ZonedDateTime` in one place (`src/vault/clock.ts`). Vitest's fake timers replace `Date`, not `Temporal.Now`.
+3. **The clock is read with `Date.now()`** and turned into a `Temporal.ZonedDateTime` in one place (`src/vault/clock.ts`). The fake timers of the installed Vitest (4.1.11) replace `Date` and leave `Temporal.Now` alone: under `vi.setSystemTime(new Date('2001-01-01'))`, `new Date()` read 2001 and `Temporal.Now.instant()` read today. Vitest's current documentation says a later version fakes `Temporal` when it is on the global object ([`fakeTimers`](https://vitest.dev/config/faketimers)); the clock can read `Temporal.Now` once the installed version does.
 4. **Vitest's workers start with `--harmony-temporal`** (`execArgv` in `vitest.config.ts`). `tests/unit/config/temporal-runtime.spec.ts` fails without it. The flag is removed when `.nvmrc` reaches Node 26.
 
 Another extension that wants `Temporal` in its backend adds the same two libraries and the same view config.
@@ -35,7 +35,7 @@ Measured on 2026-10-13:
 
 MDN's compatibility table lists Node from 26.0.0, and no Safari on iOS ([browser-compat-data](https://github.com/mdn/browser-compat-data/blob/main/javascript/builtins/Temporal.json): `safari_ios: false`). Task Vault's view is served to the phone's browser by Remote Control, so the view has to run there.
 
-Node 24's flagged implementation (V8 13.6) is an earlier draft than Electron's. The same script run on both gave the same results for every sum and comparison the backend uses (`add`, `subtract`, `compare`, `dayOfWeek`, `toZonedDateTimeISO`, `Duration.total`). It differed in two places, and the backend uses neither:
+Node 24's flagged implementation (V8 13.6) is an earlier draft than Electron's. The same script run on both gave the same results for every sum and comparison the backend uses (`PlainDate.from`, including what it rejects, `add` and `subtract` on `PlainDate` and `ZonedDateTime` with days, weeks, months, hours and minutes, `startOfDay`, `compare`, `dayOfWeek`, `hour`, `minute`, `epochMilliseconds`, `Instant.toZonedDateTimeISO`, and `Instant.toString({ fractionalSecondDigits: 3 })`). It differed in two places, and the backend uses neither:
 
 - `Temporal.Now.timeZoneId()` and `ZonedDateTime.prototype.timeZoneId` do not exist on Node 24. The system time zone is read with `Intl.DateTimeFormat().resolvedOptions().timeZone`.
 - `PlainDate.prototype.toLocaleString('en-US', { month: 'short', day: 'numeric' })` gives "Jan 31, 2026" on Node 24 and "Jan 31" on Electron 44. Hence rule 2.

@@ -13,7 +13,7 @@ export function zonedAt(epochMilliseconds: number): Temporal.ZonedDateTime {
 
 /** Now, on the wall clock of the machine's time zone. */
 export function zonedNow(): Temporal.ZonedDateTime {
-  // Date.now(), not Temporal.Now: the specs' fake timers replace Date only.
+  // Date.now(), not Temporal.Now: vitest 4.1's fake timers replace Date only.
   return zonedAt(Date.now())
 }
 
