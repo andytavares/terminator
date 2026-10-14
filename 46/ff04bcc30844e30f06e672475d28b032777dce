@@ -1,0 +1,57 @@
+packages/extension-ui/README.md
+  s_dc878271adf24d::t_2803a22a019e14 25-39
+src/renderer/index.tsx
+  s_dc878271adf24d::t_fc55bc144ffcbc 13,17
+extensions/notepad/src/renderer/main.tsx
+  s_dc878271adf24d::t_fc55bc144ffcbc 3,8
+extensions/foundry/src/renderer/main.tsx
+  s_dc878271adf24d::t_fc55bc144ffcbc 3,8
+tests/unit/packages/extension-ui/icon-tooltips.spec.tsx
+  s_dc878271adf24d::t_27c15f5c4f641c 97-105
+  s_dc878271adf24d::t_d7a831fb4fff8f 1-42,44-60,62,64-96,113-118
+  s_dc878271adf24d::t_e7ad191e2b4418 106-112
+  s_dc878271adf24d::t_e90d02693e1d57 43,61,63
+extensions/task-vault/src/renderer/main.tsx
+  s_dc878271adf24d::t_fc55bc144ffcbc 3,8
+packages/extension-ui/src/index.ts
+  s_dc878271adf24d::t_fc55bc144ffcbc 56
+extensions/git-integration/src/renderer/main.tsx
+  s_dc878271adf24d::t_fc55bc144ffcbc 3,11
+extensions/remote-control/src/renderer/main.tsx
+  s_dc878271adf24d::t_fc55bc144ffcbc 3,8
+tests/e2e/task-vault-today.spec.ts
+  s_dc878271adf24d::t_3f0f3a47fd3420 255-263
+CHANGELOG.md
+  s_dc878271adf24d::t_2803a22a019e14 11,87-90
+packages/extension-ui/src/extension-ui.css
+  s_dc878271adf24d::t_fc55bc144ffcbc 363,365-366,708-722
+  s_dc878271adf24d::t_e2731a26ba2f40 723
+tests/e2e/monitor-wall.spec.ts
+  s_dc878271adf24d::t_3f0f3a47fd3420 123,125,128-130
+  s_dc878271adf24d::t_3b7192b57aec01 124,126-127
+packages/extension-ui/src/icon-tooltips.ts
+  s_dc878271adf24d::t_f9b18eabf814e1 99,115
+  s_dc878271adf24d::t_e9167906e6b2e5 9-10,14-16
+  s_dc878271adf24d::t_48c19f6af2a457 97-98,101,107,111-113
+  s_dc878271adf24d::t_6d57c0e79d901b 122-123
+  s_dc878271adf24d::t_54ad84d118927c 76-80,89-96,106,110,117-118,126
+  s_dc878271adf24d::t_20bebaa785b9b5 1-8,11-13,17-75,81-88,100,102,108-109,119,127-133
+  s_dc878271adf24d::t_e90d02693e1d57 114,120-121,124-125
+  s_dc878271adf24d::t_99261b0e879e2c 103-105,116
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "46ff04bcc30844e30f06e672475d28b032777dce",
+  "prompts": {},
+  "sessions": {
+    "s_dc878271adf24d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "45251aad-8da0-4892-86db-9ec0654f5a1f",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
