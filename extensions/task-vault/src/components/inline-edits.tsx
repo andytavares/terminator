@@ -104,7 +104,7 @@ export function RenameRow(props: { rename: RenameDraft; scope?: string }): React
     <div className={scopedClass('rename-row')}>
       <input
         autoFocus
-        className={scopedClass('rename-input')}
+        className={`tmui-inline-edit ${scopedClass('rename-input')}`}
         value={rename.renameText}
         onChange={(e) => rename.setRenameText(e.target.value)}
         onKeyDown={(e) => {

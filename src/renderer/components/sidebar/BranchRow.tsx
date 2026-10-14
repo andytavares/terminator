@@ -201,7 +201,7 @@ type Rename = ReturnType<typeof useRename>
 function RenameInput({ rename }: { rename: Rename }): JSX.Element {
   return (
     <input
-      className="branch-row__rename"
+      className="tmui-inline-edit branch-row__rename"
       value={rename.draft}
       autoFocus
       onChange={(e) => rename.setDraft(e.target.value)}

@@ -113,3 +113,14 @@ input[type='radio']:disabled {
   cursor: default;
   opacity: 0.4;
 }
+
+/* A name or note edited in place, where the text it replaces was: the field takes the row's
+   remaining width and shows the accent edge of a field in use. */
+.tmui-inline-edit {
+  flex: 1;
+  min-width: 0;
+  background: var(--tm-bg-input);
+  border: 1px solid var(--tm-accent);
+  border-radius: var(--tm-radius-xs);
+  color: var(--tm-text-primary);
+}

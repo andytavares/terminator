@@ -132,16 +132,10 @@
 
 .branch-row__rename {
   height: auto;
-  flex: 1;
-  min-width: 0;
+  padding: 0 4px;
   margin-left: 4px;
   font-family: var(--tm-font-mono);
   font-size: 11.5px;
-  background: var(--tm-bg-input);
-  border: 1px solid var(--tm-accent);
-  border-radius: var(--tm-radius-xs, 4px);
-  color: var(--tm-text-primary);
-  padding: 0 4px;
 }
 
 .branch-row__meta {

@@ -234,17 +234,16 @@ do not declare.
    ([Playwright docs](https://playwright.dev/docs/test-snapshots)). Compare on CI only; refresh
    baselines with the `update-story-baselines` label (decision 1).
 
-7. **Two file-watching specs fail now and then on macOS, not on Linux.**
-   `tests/unit/agents/agent-session-watcher.spec.ts` and `tests/integration/ipc/fs.ipc.spec.ts`
-   write a file right after `fs.watch` starts. On macOS the watch is not armed yet when `fs.watch`
-   returns: with six processes churning files in the temp directory, 3 of 60 writes made at once
-   were never reported, and 0 of 60 made 50 ms later (`node watchrace.mjs 0` and `50`, a loop of
-   `fs.watch` then `writeFileSync`). Node has no event for "armed"
-   ([fs.watch caveats](https://nodejs.org/api/fs.html#caveats)). It fails about one full local run
-   in two and the commit hook now and then; CI's unit jobs run on Linux. The product has the same
-   gap: a report written in the first moments after the app starts watching is not seen until the
-   next one. Any fix is a workaround (read the directory again shortly after arming), so it waits
-   for the user's decision.
+7. Resolved: two file-watching specs failed now and then on macOS, where `fs.watch` is armed a
+   moment after it returns ([fs.watch caveats](https://nodejs.org/api/fs.html#caveats)). The agent
+   session watcher now proves its watch is armed with a probe file and reads its directory once
+   more then (`src/main/agents/agent-session-watcher.ts`); the `fs:watch-start` test changes its
+   file on every look. The loaded batch that failed 2 runs in 4 passed 6 in 6.
+8. **`fs.watchStart` has no caller in the app.** `fs:watch-start`, `fs:watch-stop` and the
+   `fs:changed` event are in the view API, git-integration's `useGitStatus` listens for
+   `fs:changed`, and nothing starts a watch, so the event never fires and git status is polled
+   every 3 s. Either a view starts the watch for its project, or the three members are removed
+   from the API (a breaking SDK change). Waits for the user's decision.
 
 ## How to continue
 

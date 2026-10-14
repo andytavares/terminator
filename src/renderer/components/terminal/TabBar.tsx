@@ -327,7 +327,7 @@ function TabLabel({ session, editing, factsById }: SessionTabProps): JSX.Element
 function NoteInput({ sessionId, note }: { sessionId: string; note: TabEditing['note'] }) {
   return (
     <input
-      className="tab-bar__note-input"
+      className="tmui-inline-edit tab-bar__note-input"
       value={note.value}
       maxLength={DESCRIPTION_MAX_LENGTH}
       placeholder="What is this session doing?"

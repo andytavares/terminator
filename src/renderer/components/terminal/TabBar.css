@@ -259,12 +259,6 @@
 /* The note is edited in place on the tab, the way it used to be on the row. */
 .tab-bar__note-input {
   height: auto;
-  flex: 1;
-  min-width: 0;
-  font: inherit;
-  background: var(--tm-bg-input);
-  border: 1px solid var(--tm-accent);
-  border-radius: var(--tm-radius-xs, 4px);
-  color: var(--tm-text-primary);
   padding: 0 4px;
+  font: inherit;
 }
