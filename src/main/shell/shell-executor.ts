@@ -1,6 +1,7 @@
 import { runProcess, type ShellExecInput, type ShellExecOutput } from './command-runner.js'
 import { loginShellPathReady } from './login-shell-path.js'
 import { isPathWithin } from '../fs/path-within.js'
+import { BACKGROUND_GIT } from '../git/git-env.js'
 import { realpath } from 'fs/promises'
 import { basename, dirname, isAbsolute, join } from 'path'
 
@@ -61,8 +62,8 @@ function baseEnvironment(): NodeJS.ProcessEnv {
     LOGNAME: process.env.LOGNAME,
     SHELL: process.env.SHELL,
     TMPDIR: process.env.TMPDIR,
+    ...BACKGROUND_GIT,
     // git credentials
-    GIT_TERMINAL_PROMPT: '0',
     GIT_ASKPASS: process.env.GIT_ASKPASS,
     SSH_AUTH_SOCK: process.env.SSH_AUTH_SOCK,
     // gh CLI auth — token takes precedence over config dir auth

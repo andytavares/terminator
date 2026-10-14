@@ -37,6 +37,9 @@ const REMOTE_LOCALS = {
   'shell.openExternal': vi.fn(),
   'extension.updatePanelBounds': () => {},
   'terminal.acknowledge': () => {},
+  'fs.watchStart': () => Promise.resolve({ error: 'WATCH_UNAVAILABLE' }),
+  'fs.watchStop': () => Promise.resolve({ ok: true }),
+  'fs.onChanged': () => () => {},
   'extensionBridge.invoke': vi.fn(),
   'extensionBridge.on': vi.fn(),
 }

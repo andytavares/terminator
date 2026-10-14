@@ -239,11 +239,22 @@ do not declare.
    session watcher now proves its watch is armed with a probe file and reads its directory once
    more then (`src/main/agents/agent-session-watcher.ts`); the `fs:watch-start` test changes its
    file on every look. The loaded batch that failed 2 runs in 4 passed 6 in 6.
-8. **`fs.watchStart` has no caller in the app.** `fs:watch-start`, `fs:watch-stop` and the
-   `fs:changed` event are in the view API, git-integration's `useGitStatus` listens for
-   `fs:changed`, and nothing starts a watch, so the event never fires and git status is polled
-   every 3 s. Either a view starts the watch for its project, or the three members are removed
-   from the API (a breaking SDK change). Waits for the user's decision.
+8. Resolved: `fs.watchStart` had no caller, so `fs:changed` never fired and the Git tab polled
+   git status every 3 s. The Git tab now starts a watch for its repository and reads status when
+   a change is reported ([ADR 109](../adr/109-a-file-watch-belongs-to-the-view-that-asked.md)).
+   A watch belongs to the view that asked for it; the remote browser client has none and still
+   polls. Git processes started in one idle minute with the Git tab open went from 54 to 14
+   (the Git tab's own, 40 to 0); the method is in the ADR. Three things are left as they were:
+   - The 14 are the core sidebar's polls: `useBranchSync` (`git branch --show-current` every
+     5 s per card) and the change count. The view API watches trees and the branch is one file,
+     so a watch per card would cost more than the poll.
+   - The SDK changelog records the watch's new behaviour under 4.1.0 "Changed". It is a break
+     for a view that relied on another view's watch, or used the watch from the remote client;
+     no extension here did. Whether that makes the release 5.0.0 is the user's call.
+   - `tests/e2e/git-commit-flow.spec.ts` fails about one run in two on a machine whose global
+     git config sends trace2 to a daemon (`rmSync` of the spec's own clone, `ENOTEMPTY`). It
+     passes with `GIT_TRACE2_EVENT=0`, which `tests/setup.ts` sets for vitest and nothing sets
+     for Playwright.
 
 ## How to continue
 

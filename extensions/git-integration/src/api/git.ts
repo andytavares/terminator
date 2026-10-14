@@ -12,6 +12,10 @@ const bridge = () => window.electronAPI.extensionBridge
 export const gitAPI = {
   status: (path: string) => bridge().invoke('git:status', { path }),
 
+  /** The directories to watch for changes to `repoRoot`'s status. */
+  watchRoots: (repoRoot: string) =>
+    invoke<{ roots: string[] } | { error: string }>('git:watch-roots', { repoRoot }),
+
   diffFile: (payload: { repoRoot: string; path: string; staged: boolean; isUntracked?: boolean }) =>
     bridge().invoke('git:diff-file', payload),
 

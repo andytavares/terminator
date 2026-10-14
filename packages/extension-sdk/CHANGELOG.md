@@ -2,7 +2,8 @@
 
 ## Unreleased
 
-Minor: 4.1.0. Every addition is optional, so an extension built for 4.0.0 runs unchanged.
+Minor: 4.1.0. Every addition is optional, so an extension built for 4.0.0 runs unchanged, with
+one exception: a view that used `fs.watchStart` (see Changed). No extension in this repository did.
 
 ### Added
 
@@ -37,9 +38,30 @@ Minor: 4.1.0. Every addition is optional, so an extension built for 4.0.0 runs u
 - `defineChannel` returns a new spec whose `run` calls the given one, instead of the same object
   under a cast. A channel answers as before; code that compared the returned spec to its
   argument by identity would not.
+- A view's `fs.watchStart(projectRoot)` watch belongs to that view (ADR 109). The signatures are
+  unchanged; the behaviour is not, and a view that relied on the old one must change:
+  - Only the view that called `watchStart` receives `fs.onChanged` for that folder. Before, the
+    event went to the main window and every extension view.
+  - A view may watch several folders: each `watchStart` adds one, where it used to replace the
+    one folder the whole app watched. `watchStop` ends this view's watches and nobody else's.
+    They also end when the view closes or reloads.
+  - A burst of changes is one event: after 100 ms of quiet, or 1 s into a burst that has not
+    ended. `filename` is `null` when more than one path changed.
+  - `node_modules` and `.git/objects` are not watched.
+  - The remote browser client has no watch: `watchStart` answers
+    `{ error: 'WATCH_UNAVAILABLE' }` and `onChanged` never fires, so a view polls there.
+    `fs:watch-start`, `fs:watch-stop` and `fs:changed` are no longer reachable over the bridge.
+- `shell.exec` runs git with `GIT_OPTIONAL_LOCKS=0`: `git status` no longer rewrites
+  `.git/index`, which a file watch would report and which could lock the index against the
+  person's own git command.
 
 ### Fixed
 
+- `fs.onChanged` never fired in the app: nothing called `fs.watchStart`. The Git tab now does,
+  and reads status on a change instead of every three seconds.
+- On Linux a watch missed every `git add` after the first: Node builds a recursive watch there
+  from one watch per file, and git replaces its index by a rename. The core now watches each
+  directory.
 - `workspace.getActive()` in a view answered `{ workspaceId: null, projectId: null, repoRoot:
 null }` whatever was on screen: nothing told the core what the main window showed. The app
   renderer now reports it (`workspace.setActive`, internal to the app), and views also receive it

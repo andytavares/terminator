@@ -345,6 +345,28 @@ await window.electronAPI.extension.hasCommand(key) // boolean
 
 `runCommand` resolves `{ ok: true }` or `{ ok: false, reason }`; `reason` is `'not-registered'`, `'invalid-args: …'` or `'failed: …'`. It is not reachable over the remote bridge.
 
+### Watching a folder for changes
+
+A view is told when files change under a folder it asks to watch ([ADR 109](adr/109-a-file-watch-belongs-to-the-view-that-asked.md)):
+
+```typescript
+const stopListening = window.electronAPI.fs.onChanged(({ projectRoot, filename }) => reload())
+const started = await window.electronAPI.fs.watchStart(repoRoot)
+await reload() // after the watch has started, never before
+if ('error' in started) pollInstead() // the remote browser client: WATCH_UNAVAILABLE
+// when the view is done:
+stopListening()
+await window.electronAPI.fs.watchStop()
+```
+
+- The watch is yours alone: only the view that called `watchStart` receives `fs:changed` for that folder. Another view watching the same folder is not affected by your `watchStop`.
+- Each `watchStart` adds a folder; `watchStop` ends all of this view's watches. They also end when the view closes or reloads.
+- Everything under the folder is watched except `node_modules` and `.git/objects`.
+- A burst is reported once: after 100 ms of quiet, or 1 s into a burst that has not ended. `filename` is the path that changed, from the folder, or `null` when several did.
+- Read what you show after `watchStart` resolves. A change made before it has no event.
+- A git command you run through `api.shell.exec` has `GIT_OPTIONAL_LOCKS=0`, so `git status` does not rewrite `.git/index` and report a change of its own. `git diff` against the working tree can still refresh the index once after a file is saved unchanged; pass `-c diff.autoRefreshIndex=false` where that matters and the output does not list file names.
+- A linked worktree keeps its index outside its folder. Watch the repository's git directory too (`git rev-parse --path-format=absolute --git-common-dir`) if you follow `git add` and `git commit` there; the Git tab does (`git:watch-roots`).
+
 ### Keys the core handles in your view
 
 - **`⌘P` / `Ctrl+P`** opens the core's Quick Actions panel even while focus is in your view: the host watches `before-input-event` on every view (`isQuickActionsOpenShortcut`).

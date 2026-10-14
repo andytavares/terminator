@@ -229,6 +229,7 @@ The built-in extensions in `extensions/` are the working examples, and `tests/fi
 | Unused code is a CI gate (knip)                       | [ADR-104](docs/adr/104-unused-code-is-a-ci-gate.md)                         |
 | Duplicate code is a CI gate (jscpd)                   | [ADR-105](docs/adr/105-duplicate-code-is-a-ci-gate.md)                      |
 | TypeScript 6.0.3 until typescript-eslint supports 7   | [ADR-106](docs/adr/106-typescript-6-until-the-lint-toolchain-supports-7.md) |
+| A file watch belongs to the view that asked           | [ADR-109](docs/adr/109-a-file-watch-belongs-to-the-view-that-asked.md)      |
 
 ## Contributing
 

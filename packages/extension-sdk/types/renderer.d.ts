@@ -91,8 +91,14 @@ export interface ElectronAPI {
     openExternal(url: string): Promise<{ ok: true } | { error: string }>
   }
   fs: {
+    /** Adds a watch of `projectRoot` and what is under it, for this view only; it ends with
+     * `watchStop` or with the view. Read what you show after this resolves. The remote browser
+     * client answers `{ error: 'WATCH_UNAVAILABLE' }`. See EXTENSION-DEVELOPMENT.md. */
     watchStart(projectRoot: string): Promise<{ ok: true } | { error: string }>
+    /** Ends every watch this view started. Other views' watches are not touched. */
     watchStop(): Promise<{ ok: true }>
+    /** Called once per burst of changes under a root this view watches. `filename` is the one
+     * path that changed, from the root, or null when several did. */
     onChanged(
       handler: (event: { projectRoot: string; eventType: string; filename: string | null }) => void
     ): () => void

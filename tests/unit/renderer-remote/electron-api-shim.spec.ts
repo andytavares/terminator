@@ -314,15 +314,23 @@ describe('electron-api-shim: what reaches a handler, and the local stand-ins', (
   })
 })
 
-describe('electron-api-shim: what reaches a handler, and the local stand-ins — fs.onChanged dispatches first arg when event fires', () => {
-  it('fs.onChanged dispatches first arg when event fires', async () => {
+describe('electron-api-shim: what reaches a handler, and the local stand-ins — a browser client has no file watch', () => {
+  it('fs.watchStart says so, so the caller can poll, and asks the desktop for nothing', async () => {
+    const { api, ws } = await loadShim()
+    await expect(api.fs.watchStart('/repo')).resolves.toEqual({ error: 'WATCH_UNAVAILABLE' })
+    await expect(api.fs.watchStop()).resolves.toEqual({ ok: true })
+    expect(ws.sentMessages).toEqual([])
+  })
+  it('fs.onChanged subscribes to nothing, and a pushed fs:changed reaches no handler', async () => {
     const { api, ws } = await loadShim()
     const handler = vi.fn()
-    api.fs.onChanged(handler)
+    const unsubscribe = api.fs.onChanged(handler)
     ws.onmessage?.({
       data: JSON.stringify({ type: 'event', channel: 'fs:changed', args: [{ path: '/foo' }] }),
     })
-    expect(handler).toHaveBeenCalledWith({ path: '/foo' })
+    unsubscribe()
+    expect(ws.sentMessages).toEqual([])
+    expect(handler).not.toHaveBeenCalled()
   })
   it('extensionBridge.invoke calls invoke with channel', async () => {
     const { api, ws } = await loadShim()

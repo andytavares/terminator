@@ -12,7 +12,11 @@ function answerStatusWith(answer: unknown) {
   const invoke = vi.fn(async (channel: string) => (channel === 'git:status' ? answer : {}))
   installElectronApi({
     extensionBridge: { invoke, on: () => () => {} },
-    fs: { onChanged: () => () => {} },
+    fs: {
+      onChanged: () => () => {},
+      watchStart: async () => ({ ok: true as const }),
+      watchStop: async () => ({ ok: true as const }),
+    },
   })
 }
 

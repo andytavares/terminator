@@ -21,6 +21,7 @@ These IPC handlers are registered by **this extension** (not the core). Always c
 ```typescript
 import { gitAPI } from '../api/git'
 await gitAPI.status(repoRoot)       // NOT window.electronAPI.git.status(...)
+await gitAPI.watchRoots(repoRoot)   // the folders useGitStatus watches (ADR 109)
 await gitAPI.diffFile(...)          // NOT window.electronAPI.git.diffFile(...)
 await gitAPI.stage(...) / gitAPI.unstage(...)
 await gitAPI.commit(...)
@@ -28,6 +29,10 @@ await gitAPI.commitOutputPoll(...)
 await gitAPI.prStatus(...)
 await gitAPI.push(...)
 ```
+
+### Status refresh
+
+`useGitStatus` (`src/hooks/useGitStatus.ts`) starts the core's file watch on the folders `git:watch-roots` names, then reads status, and reads it again when the watch reports a change (ADR 109). It has no timer, except in the remote browser client, which has no watch. Do not add a poll to the Git tab: a change the watch misses is a defect in the watch. `tests/e2e/git-status-watch.spec.ts` drives it with changes made outside the app, in a checkout and in a linked worktree.
 
 ### Extension-owned GitHub channels — use `githubAPI` bridge
 

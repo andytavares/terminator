@@ -112,6 +112,8 @@ function relayPushes(win: BrowserWindow): void {
   const _origSend = win.webContents.send.bind(win.webContents)
   win.webContents.send = (channel: string, ...args: unknown[]) => {
     _origSend(channel, ...args)
+    // A file watch reports to the one view that asked for it (ADR 109), this window included.
+    if (channel === 'fs:changed') return
     bridgeEventBus.emit(channel, ...args)
     // Relay to extension WebContentsViews so extension renderers receive push events
     // (terminal: is high-frequency; workspace:changed is relayed separately below)
@@ -434,7 +436,7 @@ function startIntegrationsAndRecords(): void {
 function registerToolHandlers(): void {
   registerShellHandlers()
   registerEditorHandlers()
-  registerFsHandlers(() => mainWindow)
+  registerFsHandlers()
   registerLogHandlers()
   registerNotificationHandlers()
   registerMetricsHandlers(ptyManager)

@@ -169,6 +169,10 @@ forgetLegacyToken()
         },
         // Flow control is between the desktop renderer and its own main process.
         'terminal.acknowledge': () => {},
+        // A file watch reports to one desktop view (ADR 109); a caller told this polls instead.
+        'fs.watchStart': () => Promise.resolve({ error: 'WATCH_UNAVAILABLE' }),
+        'fs.watchStop': () => Promise.resolve({ ok: true }),
+        'fs.onChanged': () => () => {},
         // No-op in remote mode: WebContentsView positioning is an Electron-only concept.
         'extension.updatePanelBounds': () => {},
         // Dynamic passthrough for extension-owned channels.

@@ -30,7 +30,9 @@ async function git(args: string[], cwd: string, timeoutMs = GIT_TIMEOUT): Promis
 export async function getChangeStats(cwd: string): Promise<ChangeStats> {
   let out: string
   try {
-    out = await git(['diff', '--numstat', 'HEAD'], cwd)
+    // Without the refresh, a diff after a file is saved unchanged rewrites `.git/index`, which
+    // the file watch reports (https://git-scm.com/docs/diff-config). The counts are the same.
+    out = await git(['-c', 'diff.autoRefreshIndex=false', 'diff', '--numstat', 'HEAD'], cwd)
   } catch (err) {
     // A repository with no commits has no HEAD to diff against. That is an
     // empty tree, not a failure — every other error still propagates.

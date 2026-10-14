@@ -7,6 +7,7 @@ import {
   unstageFiles,
   commitChanges,
   pushBranch,
+  statusWatchRoots,
 } from '../git/git-service.js'
 import { registerMergeFlowHandlers } from './merge-flow.ipc.js'
 import { RepoRoot } from './repo-root.js'
@@ -107,6 +108,13 @@ const GIT_CHANNELS: ChannelSpec[] = [
       await unstageFiles(repoRoot, paths)
       return { success: true as const }
     },
+    onError: errorEnvelope,
+  }),
+  defineChannel({
+    channel: 'git:watch-roots',
+    schema: RepoRootPayload,
+    invalid: VALIDATION_ERROR,
+    run: async ({ repoRoot }) => ({ roots: await statusWatchRoots(repoRoot) }),
     onError: errorEnvelope,
   }),
   defineChannel({

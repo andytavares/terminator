@@ -129,7 +129,7 @@ These are the channels the core registers or pushes (`src/shared/electron-api/ma
 | `integrations:*`                                        | Issue trackers: connection, issue list, search, get, comment, project links, agent context                                           |
 | `git:*`                                                 | Branches, worktrees, fetch and change statistics the core sidebar needs                                                              |
 | `shell:*`                                               | `shell:exec` (git and gh only; `cwd` confined to `workspaceRoot`, after `realpath`, when one is given), `open-path`, `open-external` |
-| `fs:*`                                                  | File watch start and stop, `fs:read-file`, `fs:changed` pushes                                                                       |
+| `fs:*`                                                  | File watch start and stop for the view that asks, `fs:read-file`, `fs:changed` pushed to that view alone (desktop only)              |
 | `extension:*`                                           | Install, toggle, reload, list, settings, commands, view bounds, insets, theme, exit gesture                                          |
 | `notifications:*`                                       | Create, list, dismiss, trigger an action, push                                                                                       |
 | `metrics:*`                                             | System and per-process metrics                                                                                                       |
@@ -382,7 +382,20 @@ Commands resolve against `process.env.PATH`. On macOS an app started from the Do
 
 ### File system watch
 
-`FsWatcherService` (`src/main/fs/fs-watcher.ts`) wraps `fs.watch` with a polling fallback and pushes `fs:changed` to the renderer ([ADR-005](adr/005-native-fswatcher-over-chokidar.md)).
+A view asks for a watch with `fs:watch-start` and is the only one told about it ([ADR 109](adr/109-a-file-watch-belongs-to-the-view-that-asked.md)):
+
+```
+view ── fs:watch-start ──▶ src/main/ipc/fs.ipc.ts ──▶ FsWatcherService ──▶ src/main/fs/tree-watch.ts
+ ◀── fs:changed, to event.sender only ◀── one batch per burst ◀───────────────┘
+```
+
+- `src/main/ipc/fs.ipc.ts` keeps one listener per `WebContents` (`event.sender`) and sends `fs:changed` to it alone; the main window's relay of pushes to the extension views and the remote bridge leaves `fs:changed` out. The listener ends its watches when the `WebContents` is destroyed or its main frame loads another document.
+- `FsWatcherService` (`src/main/fs/fs-watcher.ts`) watches each root once for all its listeners, gathers a burst of changes into one batch (100 ms of quiet, 1 s at most), and reports a tree it cannot watch as changed every three seconds ([ADR-005](adr/005-native-fswatcher-over-chokidar.md)).
+- `src/main/fs/tree-watch.ts` is `fs.watch` with `recursive` on macOS and Windows and one `fs.watch` per directory on Linux, where Node's own `recursive` misses a file replaced by a rename. `node_modules` and `.git/objects` are not watched.
+- Every git the app runs has `GIT_OPTIONAL_LOCKS=0` (`src/main/git/git-env.ts`), so a status read does not rewrite `.git/index` and report itself.
+- The remote browser client has no watch: its `fs.watchStart` answers `WATCH_UNAVAILABLE` and the Git tab polls there.
+
+The Git tab is the caller: `extensions/git-integration/src/hooks/useGitStatus.ts` watches its repository, and the repository's git directory when that is outside the folder, as a linked worktree's is.
 
 ### Keyboard shortcuts
 
