@@ -1,0 +1,33 @@
+extensions/task-vault/src/vault/recurrence.ts
+  s_c9dd89ad1f6c54::t_c60e99124b2706 44-50,53,58-61
+  s_c9dd89ad1f6c54::t_6d88d8ef6de73b 62-63
+docs/research/handoff.md
+  s_c9dd89ad1f6c54::t_0e28c428c23cbd 188-190
+extensions/task-vault/src/vault/ensure-next-occurrence.ts
+  s_c9dd89ad1f6c54::t_c60e99124b2706 57-66,111-113
+docs/adr/108-temporal-in-extension-backends-not-in-views.md
+  s_c9dd89ad1f6c54::t_0e28c428c23cbd 38
+extensions/task-vault/tests/vault/ensure-next-occurrence.spec.ts
+  s_c9dd89ad1f6c54::t_7c94a011265c0e 90,131-144
+  s_c9dd89ad1f6c54::t_10c1b1073ca7f1 145-147
+extensions/task-vault/tests/vault/recurrence.spec.ts
+  s_c9dd89ad1f6c54::t_7c94a011265c0e 50,52-60
+  s_c9dd89ad1f6c54::t_76ecd38bb66f9a 12,45
+  s_c9dd89ad1f6c54::t_68356d184600c7 46-49,51,61-62
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "047a9a79ee0246c08df5063ffafa226be6e57db4",
+  "prompts": {},
+  "sessions": {
+    "s_c9dd89ad1f6c54": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ee6b7f82-c708-43d8-8c1f-eefe55f692a9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
