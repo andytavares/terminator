@@ -79,35 +79,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-.wall-tile__open {
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: 22px;
-  height: 22px;
-  padding: 0;
-  border: 0;
-  border-radius: var(--tm-radius-xs);
-  background: transparent;
-  color: var(--tm-text-secondary);
-  cursor: pointer;
-}
-
-.wall-tile__open:hover {
-  background: var(--tm-bg-elevated);
-  color: var(--tm-text-primary);
-}
-
-.wall-tile__open:focus-visible {
-  outline: 2px solid var(--tm-accent);
-  outline-offset: 0;
-}
-
-.wall-tile__open svg {
-  width: 12px;
-  height: 12px;
-}
-
 .wall-tile__preview {
   height: var(--tile-preview-h, 160px);
   border-block: 1px solid var(--tm-border);

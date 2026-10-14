@@ -41,16 +41,6 @@ function isLeader(e: KeyboardEvent): boolean {
   return isQuickActionsLeader(press, navigator.platform.startsWith('Mac'))
 }
 
-function measureCharWidth(fontSize: number): number {
-  const canvas = document.createElement('canvas')
-  const ctx = canvas.getContext('2d')
-  if (ctx) {
-    ctx.font = `${fontSize}px Menlo, Monaco, "Courier New", monospace`
-    return ctx.measureText('M').width || 8
-  }
-  return 8
-}
-
 const currentTheme = () =>
   document.documentElement.dataset.theme === 'light' ? XTERM_THEMES.light : XTERM_THEMES.dark
 
@@ -105,16 +95,17 @@ function handleCustomKey(terminal: Terminal, e: KeyboardEvent): boolean {
   return true
 }
 
-const PREVIEW_FONT_SIZE = 13
-
-/** The terminal's size in pixels at its own font, before a preview scales it. */
-function naturalSize(cols: number, rows: number) {
-  const lineHeight = Math.ceil(PREVIEW_FONT_SIZE * 1.2)
-  const charW = measureCharWidth(PREVIEW_FONT_SIZE)
+/**
+ * The terminal's size as xterm drew it, before a preview scales it; null until xterm has drawn.
+ * Measured, not derived from the font: Menlo's 13px rows are 18px tall, not 13 × 1.2.
+ */
+function naturalSize(element: HTMLElement, rows: number) {
+  const screen = element.querySelector<HTMLElement>('.xterm-screen')
+  if (!screen?.offsetHeight) return null
   return {
-    lineHeight,
-    naturalW: Math.ceil(cols * charW + 12),
-    naturalH: rows * lineHeight + 8,
+    lineHeight: screen.offsetHeight / rows,
+    naturalW: screen.offsetWidth + 12,
+    naturalH: screen.offsetHeight + 8,
   }
 }
 
@@ -277,36 +268,43 @@ export class TerminalInstance {
     if (!this.opened) return null
     const { cols, rows } = this.terminal
     if (!cols || !rows) return null
-    const size = naturalSize(cols, rows)
 
-    const place = (): void => {
-      const { scale, translateY } = previewWindow({
-        rows,
-        cursorY: this.terminal.buffer.active.cursorY,
-        ...size,
-        containerW: container.offsetWidth || 220,
-        containerH: container.offsetHeight || 150,
-      })
-      this.element.style.transform = `translateY(${translateY}px) scale(${scale})`
-    }
+    const place = (): void => this.placeInPreview(container, rows)
 
     // A tile is a scaled thumbnail of a live terminal; it never takes a GPU context.
     this.disableWebgl()
-    this.styleAsPreview(size)
-    place()
+    this.styleAsPreview()
     container.appendChild(this.element)
-    // The cursor moves as output arrives; the window follows it on each render.
+    place()
+    // The cursor moves as output arrives, and a tile or row changes size; the window follows both.
     const following = this.terminal.onRender(place)
+    const resizing = new ResizeObserver(place)
+    resizing.observe(container)
 
     return () => {
       following.dispose()
+      resizing.disconnect()
       this.restoreFromPreview()
     }
   }
 
-  private styleAsPreview({ naturalW, naturalH }: { naturalW: number; naturalH: number }): void {
-    this.element.style.width = `${naturalW}px`
-    this.element.style.height = `${naturalH}px`
+  /** Scales the screen to the box's width and moves the window to the cursor's row. */
+  private placeInPreview(container: HTMLElement, rows: number): void {
+    const size = naturalSize(this.element, rows)
+    if (!size) return
+    this.element.style.width = `${size.naturalW}px`
+    this.element.style.height = `${size.naturalH}px`
+    const { scale, translateY } = previewWindow({
+      rows,
+      cursorY: this.terminal.buffer.active.cursorY,
+      ...size,
+      containerW: container.offsetWidth || 220,
+      containerH: container.offsetHeight || 150,
+    })
+    this.element.style.transform = `translateY(${translateY}px) scale(${scale})`
+  }
+
+  private styleAsPreview(): void {
     this.element.style.transformOrigin = 'top left'
     this.element.style.pointerEvents = 'none'
     // A preview is for reading. Its xterm input stays out of the tab order, or

@@ -3,7 +3,7 @@
 # case something sources .zshrc without .zprofile having run first, and a
 # minimal prompt so nothing here has to load the developer's real prompt
 # framework (oh-my-zsh, starship, etc.) from the real HOME.
-export PATH="${ZDOTDIR}/../bin:${PATH}"
+export PATH="${E2E_PATH_FIRST:+${E2E_PATH_FIRST}:}${ZDOTDIR}/../bin:${PATH}"
 export PS1='e2e$ '
 # Never write a history file into this fixture directory.
 unset HISTFILE

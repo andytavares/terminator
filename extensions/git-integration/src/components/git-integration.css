@@ -347,12 +347,7 @@
   color: var(--tm-accent-text);
   font-size: 11px;
   padding: 2px 8px;
-  display: block;
   border-top: 1px solid var(--tm-border);
-}
-
-.diff-line {
-  display: flex;
 }
 
 .diff-line--add {

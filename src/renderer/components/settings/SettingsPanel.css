@@ -265,7 +265,11 @@
   color: var(--tm-text-secondary);
   font-size: 10px;
   font-family: var(--tm-font-ui);
-  padding: 3px 10px;
+  box-sizing: border-box;
+  height: var(--tm-control-height-sm);
+  display: inline-flex;
+  align-items: center;
+  padding: 0 10px;
   cursor: pointer;
   white-space: nowrap;
   transition:
@@ -291,7 +295,7 @@
 }
 
 .ext-btn--settings {
-  padding: 3px 7px;
+  padding: 0 7px;
   font-size: 12px;
 }
 

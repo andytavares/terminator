@@ -3,6 +3,8 @@ import { execFileSync } from 'node:child_process'
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { launchApp, closeApp, createWorkspace, type AppHandle } from './helpers'
+import { misalignedOn } from './control-alignment'
+import { extensionPage } from './extension-page'
 import {
   bodyText,
   captureFoundry,
@@ -296,6 +298,9 @@ test('an open order is a frame, and the controls that end it never scroll away',
     await inFoundry(handle, SCROLL_EVERYTHING)
     await expectEndControlsOnScreen(10_000, 'scrolled off the screen')
     await expectStepWithinFrame()
+    expect(
+      await misalignedOn(await extensionPage(handle, 'terminator.foundry'), 'Forge order')
+    ).toEqual([])
   })
 })
 

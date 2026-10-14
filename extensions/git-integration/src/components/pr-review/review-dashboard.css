@@ -94,11 +94,11 @@
 
 /* Rows share one set of columns (subgrid), so a column is as wide as its
    fixed, so sections that are separate grids still line up. Left: title over its
-   attention line. Right: size over reading time, then the action. A second
-   button (Clone and review) overflows leftwards over the size on hover. */
+   attention line. Right: size over reading time, then the actions, wide
+   enough for the row's own button beside Clone and review. */
 .rd-rows {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 10.5rem 10rem;
+  grid-template-columns: minmax(0, 1fr) 10.5rem 14.5rem;
   column-gap: 12px;
 }
 
@@ -176,6 +176,7 @@
 
 .rd-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
   gap: 6px;
@@ -261,14 +262,11 @@
   align-items: center;
 }
 
+/* The design system's field (controls.css), sized for the picker's header. */
 .rp-search {
   flex: 1 1 200px;
   min-width: 0;
   padding: 5px 9px;
-  background: var(--tm-bg-input);
-  border: 1px solid var(--tm-border-strong);
-  border-radius: var(--tm-radius-sm);
-  color: var(--tm-text-primary);
   font: inherit;
 }
 

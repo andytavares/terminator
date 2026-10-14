@@ -1,5 +1,8 @@
 import { spawn, execSync, type ChildProcess } from 'child_process'
-import { networkInterfaces } from 'os'
+import { writeFileSync } from 'fs'
+import { createServer } from 'net'
+import { networkInterfaces, tmpdir } from 'os'
+import { join } from 'path'
 
 // Packaged Electron apps launch without the user's shell, so Homebrew paths are absent.
 // They come after the person's own PATH, so an ngrok they put first is the one that runs.
@@ -31,6 +34,38 @@ export function generateCaddyfile(port: number): string {
 `
 }
 
+/** A port nothing listens on now, from the OS. */
+function freePort(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const server = createServer()
+    server.on('error', reject)
+    server.listen(0, '127.0.0.1', () => {
+      const { port } = server.address() as { port: number }
+      server.close(() => resolve(port))
+    })
+  })
+}
+
+/** The person's own ngrok config file, which holds their authtoken; null when they have none. */
+function userConfigPath(): string | null {
+  try {
+    const answer = execSync('ngrok config check', { env: EXTENDED_ENV, encoding: 'utf8' })
+    return /configuration file at (.+)$/m.exec(answer)?.[1].trim() ?? null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * `--config` for an agent whose API is on `apiPort` rather than the default 4040, which another
+ * ngrok the person runs may hold. Later files win when ngrok merges them, so theirs comes first.
+ */
+function agentConfigArgs(apiPort: number): string[] {
+  const own = join(tmpdir(), `terminator-ngrok-${process.pid}.yml`)
+  writeFileSync(own, `version: "3"\nagent:\n  web_addr: 127.0.0.1:${apiPort}\n`)
+  return ['--config', [userConfigPath(), own].filter(Boolean).join(',')]
+}
+
 export class NgrokManager {
   private process: ChildProcess | null = null
   private onCrashCallback: (() => void) | null = null
@@ -49,9 +84,10 @@ export class NgrokManager {
     this.onCrashCallback = cb
   }
 
-  start(port: number, authToken?: string): Promise<string> {
+  async start(port: number, authToken?: string): Promise<string> {
     this.stopped = false
-    const args = ['http', String(port)]
+    const apiPort = await freePort()
+    const args = ['http', String(port), ...agentConfigArgs(apiPort)]
     if (authToken) args.push('--authtoken', authToken)
     this.process = spawn('ngrok', args, { detached: false, env: EXTENDED_ENV })
 
@@ -70,7 +106,7 @@ export class NgrokManager {
       }
     })
 
-    return this.pollForUrl(port).catch((err: Error) => {
+    return this.pollForUrl(port, apiPort).catch((err: Error) => {
       const detail = outputLines.slice(-5).join(' | ')
       throw new Error(detail ? `${err.message}: ${detail}` : err.message)
     })
@@ -85,13 +121,13 @@ export class NgrokManager {
     }
   }
 
-  private async pollForUrl(port: number): Promise<string> {
+  private async pollForUrl(port: number, apiPort: number): Promise<string> {
     for (let i = 0; i < MAX_POLLS; i++) {
       if (this.stopped) throw new Error('ngrok stopped')
       await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS))
       if (this.stopped) throw new Error('ngrok stopped')
       try {
-        const res = await fetch('http://localhost:4040/api/tunnels')
+        const res = await fetch(`http://127.0.0.1:${apiPort}/api/tunnels`)
         if (res.ok) {
           const data = (await res.json()) as {
             tunnels: Array<{ public_url: string; config?: { addr?: string } }>

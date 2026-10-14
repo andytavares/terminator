@@ -3,7 +3,16 @@ import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync } from 'node:f
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { closeApp, launchApp, type AppHandle } from './helpers'
-import { git, makeRepoWithRemote, openGitTab, openRepo, projectTab, writeFile } from './git-harness'
+import { misalignedOn } from './control-alignment'
+import {
+  git,
+  gitView,
+  makeRepoWithRemote,
+  openGitTab,
+  openRepo,
+  projectTab,
+  writeFile,
+} from './git-harness'
 import { startGithubStub, type GithubStub } from './github-stub'
 import { expectCentredInWindow } from './modal-centre'
 
@@ -62,6 +71,7 @@ test('selecting a changed file shows its diff', async () => {
   await fileRow(view, 'src/math.ts').click()
   await expect(view.locator('.diff-line--add')).toContainText('return b + a')
   await expect(view.locator('.diff-line--remove')).toContainText('return a + b')
+  expect(await misalignedOn(view, 'Git tab')).toEqual([])
 })
 
 test('checking a file stages it, unchecking unstages it, and the index agrees', async () => {
@@ -126,8 +136,9 @@ test('Open PR pushes the branch and opens a pull request on GitHub', async () =>
   await dialog.getByRole('button', { name: 'Create Draft PR' }).click()
   await expect(dialog).toBeHidden({ timeout: 15000 })
   await expect(view.getByRole('status').getByRole('link')).toHaveText('#1 Greet in either order')
+  // The Git view draws its own toast: the core's would sit under the view.
   await expect(
-    handle.page.locator('.tmui-toast__message', { hasText: 'Opened #1 Greet in either order' })
+    view.locator('.tmui-toast__message', { hasText: 'Opened #1 Greet in either order' })
   ).toBeVisible()
 
   expect(stub.pullRequests).toHaveLength(1)
@@ -189,7 +200,9 @@ test('the Pull Quick Action fast-forwards the branch to what a teammate pushed',
   rmSync(teammate, { recursive: true, force: true })
 
   await runGitQuickAction('l')
-  await expect(handle.page.locator('.tmui-toast__message', { hasText: 'Pulled' })).toContainText(
+  // The Git tab is still on screen, so its view draws the toast: the core's would sit under it.
+  const view = await gitView(handle, 'project')
+  await expect(view.locator('.tmui-toast__message', { hasText: 'Pulled' })).toContainText(
     `Pulled ${BRANCH}`,
     { timeout: 15000 }
   )

@@ -575,20 +575,34 @@ describe('TerminalInstance — mountPreview() — appends element to the preview
   })
 })
 
+/** A terminal mounted once, at 80 by 24, whose screen xterm drew 640 by 432: 18px rows. */
+function previewableInstance(): TerminalInstance {
+  const instance = new TerminalInstance('ses-1', 1000)
+  instance.mount(document.createElement('div'))
+  instance.unmount()
+  Object.defineProperty(instance.terminal, 'cols', { value: 80, configurable: true })
+  Object.defineProperty(instance.terminal, 'rows', { value: 24, configurable: true })
+  const screen = document.createElement('div')
+  screen.className = 'xterm-screen'
+  Object.defineProperty(screen, 'offsetWidth', { value: 640 })
+  Object.defineProperty(screen, 'offsetHeight', { value: 432 })
+  instance.element.appendChild(screen)
+  return instance
+}
+
+/** A preview box whose size the test can change, as a resized tile would. */
+function sizedBox(width: number, height: number): HTMLDivElement {
+  const box = document.createElement('div')
+  Object.defineProperty(box, 'offsetWidth', { value: width, configurable: true })
+  Object.defineProperty(box, 'offsetHeight', { value: height, configurable: true })
+  return box
+}
+
 describe('TerminalInstance — mountPreview() — follows the cursor on every render, and stops when the preview goes', () => {
   it('follows the cursor on every render, and stops when the preview goes', () => {
-    const instance = new TerminalInstance('ses-1', 1000)
-    const mountContainer = document.createElement('div')
-    document.body.appendChild(mountContainer)
-    instance.mount(mountContainer)
-    instance.unmount()
-    Object.defineProperty(instance.terminal, 'cols', { value: 80, configurable: true })
-    Object.defineProperty(instance.terminal, 'rows', { value: 24, configurable: true })
-
-    const previewContainer = document.createElement('div')
+    const instance = previewableInstance()
     // A short box, so a full screen is taller than it and the window has to move.
-    Object.defineProperty(previewContainer, 'offsetWidth', { value: 220 })
-    Object.defineProperty(previewContainer, 'offsetHeight', { value: 60 })
+    const previewContainer = sizedBox(220, 60)
     Object.assign(instance.terminal.buffer.active, { cursorY: 0 })
     const cleanup = instance.mountPreview(previewContainer)!
     const onRender = vi.mocked(instance.terminal.onRender)
@@ -601,7 +615,32 @@ describe('TerminalInstance — mountPreview() — follows the cursor on every re
 
     cleanup()
     expect(mockRenderDispose).toHaveBeenCalled()
-    document.body.removeChild(mountContainer)
+  })
+})
+
+describe('TerminalInstance — mountPreview() — sizes the window from the rows xterm drew', () => {
+  it('ends the window on the cursor row at the drawn row height', () => {
+    const instance = previewableInstance()
+    Object.assign(instance.terminal.buffer.active, { cursorY: 23 })
+    // 220 / (640 + 12) scales the screen; 9 rows of 18px fit the box, so the window starts at row 15.
+    const scale = 220 / 652
+    instance.mountPreview(sizedBox(220, 60))
+    const [, translateY, shownScale] = instance.element.style.transform.match(
+      /translateY\((.+)px\) scale\((.+)\)/
+    )!
+    expect(Number(shownScale)).toBeCloseTo(scale, 5)
+    expect(Number(translateY)).toBeCloseTo(-15 * 18 * scale, 3)
+  })
+
+  it('places the screen again when the box is resized', () => {
+    const instance = previewableInstance()
+    Object.assign(instance.terminal.buffer.active, { cursorY: 0 })
+    const box = sizedBox(220, 60)
+    instance.mountPreview(box)
+    Object.defineProperty(box, 'offsetWidth', { value: 652 })
+    const observer = mockResizeObserver.mock.calls.at(-1)![0] as () => void
+    observer()
+    expect(instance.element.style.transform).toBe('translateY(0px) scale(1)')
   })
 })
 
@@ -653,24 +692,10 @@ describe('TerminalInstance — mountPreview() — cleanup removes element and re
 
 describe('TerminalInstance — mountPreview() — sets pointer-events none and transform on the element', () => {
   it('sets pointer-events none and transform on the element', () => {
-    const instance = new TerminalInstance('ses-1', 1000)
-    const mountContainer = document.createElement('div')
-    document.body.appendChild(mountContainer)
-    instance.mount(mountContainer)
-    instance.unmount()
-
-    Object.defineProperty(instance.terminal, 'cols', { value: 80, configurable: true })
-    Object.defineProperty(instance.terminal, 'rows', { value: 24, configurable: true })
-
-    const previewContainer = document.createElement('div')
-    document.body.appendChild(previewContainer)
-
-    instance.mountPreview(previewContainer)
+    const instance = previewableInstance()
+    instance.mountPreview(sizedBox(220, 150))
     expect(instance.element.style.pointerEvents).toBe('none')
     expect(instance.element.style.transform).toContain('scale(')
-
-    document.body.removeChild(mountContainer)
-    document.body.removeChild(previewContainer)
   })
 })
 

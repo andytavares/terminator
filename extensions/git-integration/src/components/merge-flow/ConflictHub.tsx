@@ -177,7 +177,6 @@ function HubTopBar({ session, hub }: { session: ConflictSession; hub: Props }) {
       {hub.onStartOver && session.totalResolved > 0 && (
         <Button
           variant="ghost"
-          size="sm"
           icon={RotateCcw}
           onClick={hub.onStartOver}
           title="Reset all resolutions and start over"

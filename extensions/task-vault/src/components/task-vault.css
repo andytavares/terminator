@@ -450,7 +450,8 @@
   margin-left: auto;
   opacity: 0;
 }
-.projects-browser__card-header:hover .projects-browser__deadline-add-btn {
+.projects-browser__card-header:hover .projects-browser__deadline-add-btn,
+.projects-browser__card-header:focus-within .projects-browser__deadline-add-btn {
   opacity: 1;
 }
 .projects-browser__deadline-add-btn:hover {
@@ -2011,6 +2012,7 @@
   flex: 1;
   background: none;
   border: none;
+  padding: 0;
   color: var(--tm-text-primary);
   font-size: 13px;
   outline: none;
@@ -2313,7 +2315,8 @@
   opacity: 0;
 }
 
-.daily-log__subtask:hover .daily-log__subtask-actions {
+.daily-log__subtask:hover .daily-log__subtask-actions,
+.daily-log__subtask:focus-within .daily-log__subtask-actions {
   opacity: 1;
 }
 
@@ -2467,7 +2470,8 @@
   pointer-events: none;
 }
 
-.daily-log__task:hover .daily-log__task-actions {
+.daily-log__task:hover .daily-log__task-actions,
+.daily-log__task:focus-within .daily-log__task-actions {
   opacity: 1;
   pointer-events: auto;
 }
@@ -2478,7 +2482,8 @@
   transition: opacity 120ms ease-out;
 }
 
-.daily-log__subtask:hover .daily-log__subtask-actions {
+.daily-log__subtask:hover .daily-log__subtask-actions,
+.daily-log__subtask:focus-within .daily-log__subtask-actions {
   opacity: 1;
 }
 
@@ -3256,7 +3261,8 @@ h2.daily-log__date {
   transition: opacity 120ms;
 }
 
-.area-detail__task:hover .area-detail__task-actions {
+.area-detail__task:hover .area-detail__task-actions,
+.area-detail__task:focus-within .area-detail__task-actions {
   opacity: 1;
 }
 
@@ -3341,7 +3347,8 @@ h2.daily-log__date {
   transition: opacity 120ms;
 }
 
-.archive-task:hover .archive-task__actions {
+.archive-task:hover .archive-task__actions,
+.archive-task:focus-within .archive-task__actions {
   opacity: 1;
 }
 
@@ -3763,15 +3770,20 @@ h2.daily-log__date {
 }
 
 .projects-browser__task-actions {
-  display: none;
+  /* Hidden but focusable: a keyboard user tabbing along the row reveals it (display: none could not). */
+  display: flex;
+  opacity: 0;
+  pointer-events: none;
   align-items: center;
   gap: 2px;
   margin-left: auto;
   flex-shrink: 0;
 }
 
-.projects-browser__task-row:hover .projects-browser__task-actions {
-  display: flex;
+.projects-browser__task-row:hover .projects-browser__task-actions,
+.projects-browser__task-row:focus-within .projects-browser__task-actions {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .projects-browser__task-edit {
@@ -4688,11 +4700,14 @@ h2.daily-log__date {
 }
 
 .db-admin__stat-chip-wrap .db-admin__stat-clear {
-  display: none;
+  opacity: 0;
+  pointer-events: none;
 }
 
-.db-admin__stat-chip-wrap:hover .db-admin__stat-clear {
-  display: inline-flex;
+.db-admin__stat-chip-wrap:hover .db-admin__stat-clear,
+.db-admin__stat-chip-wrap:focus-within .db-admin__stat-clear {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .db-admin__stat-chip {
@@ -4836,11 +4851,14 @@ h2.daily-log__date {
 }
 
 .db-admin__row-delete {
-  display: none;
+  opacity: 0;
+  pointer-events: none;
 }
 
-.db-admin__data-row:hover .db-admin__row-delete {
-  display: inline-flex;
+.db-admin__data-row:hover .db-admin__row-delete,
+.db-admin__data-row:focus-within .db-admin__row-delete {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .db-admin__result-hint {
@@ -5030,7 +5048,8 @@ h2.daily-log__date {
   transition: opacity 120ms ease-out;
 }
 
-.daily-log__backlog-task:hover .daily-log__backlog-actions {
+.daily-log__backlog-task:hover .daily-log__backlog-actions,
+.daily-log__backlog-task:focus-within .daily-log__backlog-actions {
   opacity: 1;
 }
 
@@ -5943,7 +5962,8 @@ h2.daily-log__date {
   transition: opacity 150ms;
 }
 
-.projects-browser__name-wrap:hover .area-detail__rename-btn {
+.projects-browser__name-wrap:hover .area-detail__rename-btn,
+.projects-browser__name-wrap:focus-within .area-detail__rename-btn {
   opacity: 1;
 }
 

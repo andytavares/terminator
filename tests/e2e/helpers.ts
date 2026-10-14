@@ -70,8 +70,14 @@ const CLAUDE_STUB_ZDOTDIR = join(dirname(fileURLToPath(import.meta.url)), 'fixtu
 /** The app's PATH: `firstDirs`, then the `claude` stub, then the runner's own.
  * A spec that stands in for another program passes its folder as `env.PATH`
  * through this, so the `claude` stub stays ahead of any real one. */
-export function e2ePath(...firstDirs: string[]): string {
+function e2ePath(...firstDirs: string[]): string {
   return [...firstDirs, CLAUDE_STUB_DIR, process.env.PATH ?? ''].join(delimiter)
+}
+
+/** The env that puts stub folders first on the app's PATH. The app adopts the login shell's PATH
+ * ahead of the one it was launched with, so the fixture's .zprofile re-adds them as E2E_PATH_FIRST. */
+export function stubsFirst(...dirs: string[]): Record<string, string> {
+  return { PATH: e2ePath(...dirs), E2E_PATH_FIRST: dirs.join(delimiter) }
 }
 
 /** The environment every e2e-launched Electron process gets. */
@@ -175,6 +181,29 @@ async function launchFailure(
   )
 }
 
+/**
+ * Moves each window of the app, now and later, beside the real cursor rather than under it.
+ * Chromium sends a window a pointer move to where the cursor rests whenever a view's layout
+ * changes; with several apps open at once that ended hovers and drags mid-test.
+ */
+async function keepWindowsClearOfTheCursor(app: ElectronApplication): Promise<void> {
+  await app.evaluate(({ app: electronApp, BrowserWindow, screen }) => {
+    const clear = (window: Electron.BrowserWindow): void => {
+      const cursor = screen.getCursorScreenPoint()
+      const { x, y, width, height } = window.getBounds()
+      const under = cursor.x >= x && cursor.x < x + width && cursor.y >= y && cursor.y < y + height
+      if (!under) return
+      const display = screen.getDisplayNearestPoint(cursor).workArea
+      const rightOfCursor = cursor.x - display.x < display.width / 2
+      window.setPosition(rightOfCursor ? cursor.x + 1 : cursor.x - width, y)
+    }
+    for (const window of BrowserWindow.getAllWindows()) clear(window)
+    electronApp.on('browser-window-created', (_event, window) =>
+      window.once('show', () => clear(window))
+    )
+  })
+}
+
 export async function launchApp(
   userDataDir: string = e2eProfileDir(),
   env: Record<string, string> = {}
@@ -186,6 +215,7 @@ export async function launchApp(
   const output = keepOutput(app)
   try {
     const page = await firstReadyWindow(app, remaining)
+    await keepWindowsClearOfTheCursor(app)
     return { app, page, userDataDir, launchId: marker.launchId }
   } catch (error) {
     throw await launchFailure(app, output, error)

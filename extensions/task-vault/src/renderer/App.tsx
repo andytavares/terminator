@@ -3,20 +3,8 @@ import { TaskVaultView, CaptureModal } from '../components/TaskVaultView'
 import { CalendarDrawer } from '../components/CalendarDrawer'
 import { ToastRegion } from '@terminator/extension-ui'
 import { useVaultNavStore } from '../stores/vault-nav.store'
-import {
-  addExtensionToast,
-  useExtensionToastStore,
-  type ToastType,
-} from '../stores/extension-toast.store'
-
-interface SerializedNotification {
-  id: string
-  type: string
-  title: string
-  message?: string
-  source?: string
-  targets: string[]
-}
+import { useExtensionToastStore } from '../stores/extension-toast.store'
+import { toastPushed, type PushedNotification } from '../utils/notify'
 
 /** Opens the capture modal on a push from the main process, or one that fired before this view existed. */
 function useCaptureRequests(): void {
@@ -39,17 +27,13 @@ function useCaptureRequests(): void {
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 }
 
-/** Shows local toasts for scheduler notifications (due tasks, blocked tasks, etc.). */
+/** Shows the vault's notifications, the scheduler's and the view's own, as toasts. */
 function usePushToasts(): void {
   useEffect(() => {
     if (!window.electronAPI.notifications?.onPush) return
-    return window.electronAPI.notifications.onPush((raw: unknown) => {
-      const n = raw as SerializedNotification
-      if (n.source !== 'terminator.task-vault') return
-      if (!n.targets.includes('toast')) return
-      const message = n.message ? `${n.title}: ${n.message}` : n.title
-      addExtensionToast(n.type as ToastType, message)
-    })
+    return window.electronAPI.notifications.onPush((raw: unknown) =>
+      toastPushed(raw as PushedNotification)
+    )
   }, [])
 }
 

@@ -28,7 +28,7 @@ function draftsLabelOf(drafts: DraftComment[]): string | null {
 
 function SubmitButton({ onClick }: { onClick: () => void }) {
   return (
-    <Button variant="primary" size="sm" onClick={onClick} aria-label="Submit review…">
+    <Button variant="primary" onClick={onClick} aria-label="Submit review…">
       Submit review…{' '}
       <kbd className="tmui-kbd" aria-hidden="true">
         ⌘↵
@@ -39,7 +39,7 @@ function SubmitButton({ onClick }: { onClick: () => void }) {
 
 function NextFileButton({ onClick }: { onClick: () => void }) {
   return (
-    <Button variant="primary" size="sm" onClick={onClick} aria-label="Mark viewed, next file">
+    <Button variant="primary" onClick={onClick} aria-label="Mark viewed, next file">
       <span className="rf-long">Mark viewed, next file</span>
       <span className="rf-short">Next</span>
     </Button>
@@ -51,7 +51,7 @@ function ForwardButton(props: ReviewFooterProps) {
   if (!props.isLastFile) return <NextFileButton onClick={props.onMarkViewed} />
   if (props.isLastChapter) return <SubmitButton onClick={props.onFinishChapter} />
   return (
-    <Button variant="primary" size="sm" onClick={props.onFinishChapter}>
+    <Button variant="primary" onClick={props.onFinishChapter}>
       Finish chapter <kbd className="tmui-kbd">↵</kbd>
     </Button>
   )
@@ -61,15 +61,11 @@ export function ReviewFooter(props: ReviewFooterProps) {
   const draftsLabel = draftsLabelOf(props.drafts)
   return (
     <div className="rf-bar">
-      <Button size="sm" onClick={props.onPause}>
-        Pause review
-      </Button>
+      <Button onClick={props.onPause}>Pause review</Button>
       {draftsLabel ? (
-        <Button size="sm" onClick={props.onOpenSubmit}>
-          {draftsLabel}
-        </Button>
+        <Button onClick={props.onOpenSubmit}>{draftsLabel}</Button>
       ) : (
-        <Button variant="ghost" size="sm" onClick={props.onOpenShortcuts}>
+        <Button variant="ghost" onClick={props.onOpenShortcuts}>
           <kbd className="tmui-kbd">?</kbd>
           <span>Shortcuts</span>
         </Button>

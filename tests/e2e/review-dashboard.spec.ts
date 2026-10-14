@@ -3,6 +3,7 @@ import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { closeApp, launchApp, type AppHandle } from './helpers'
+import { misalignedOn } from './control-alignment'
 import { git, gitView, makeRepoWithRemote, pushBranchToOrigin } from './git-harness'
 import { startGithubStub, type GithubStub } from './github-stub'
 
@@ -50,8 +51,12 @@ async function openDashboard(): Promise<Page> {
 
 test('choosing repositories narrows what the dashboard asks GitHub for', async () => {
   const view = await openDashboard()
+  await expect(view.getByRole('button', { name: 'Refresh' })).toBeVisible()
+  const misaligned = await misalignedOn(view, 'Reviews')
   await view.getByRole('button', { name: 'All repositories, choose repositories' }).click()
   const picker = view.getByRole('dialog', { name: 'Repositories for Reviews' })
+  misaligned.push(...(await misalignedOn(view, 'Reviews: repository picker')))
+  expect(misaligned).toEqual([])
   await picker.getByRole('checkbox', { name: 'acme/widgets' }).check()
   await expect(picker.getByRole('checkbox', { name: 'acme/gadgets' })).not.toBeChecked()
   await picker.getByRole('button', { name: 'Save' }).click()

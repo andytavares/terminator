@@ -23,7 +23,8 @@ export interface IconButtonProps
   description?: string
   onClick: (event: React.MouseEvent<HTMLButtonElement>) => void
   pressed?: boolean
-  /** `sm` for a dense row or inside a chip; `md` (26px) everywhere else. */
+  /** `sm` for a dense row or inside a chip; `md` everywhere else. Each is its size's control height,
+   *  so it lines up with a field or a Button of the same size. */
   size?: IconButtonSize
   className?: string
 }

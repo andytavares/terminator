@@ -4,6 +4,10 @@ const mockSpawn = vi.fn()
 const mockExecSync = vi.fn()
 const mockFetch = vi.fn()
 const mockNetworkInterfaces = vi.fn()
+const mockWriteFileSync = vi.fn()
+/** The port the OS hands out for the agent API. */
+const AGENT_API_PORT = 51234
+const USER_CONFIG = '/Users/me/Library/Application Support/ngrok/ngrok.yml'
 
 vi.mock('child_process', () => ({
   spawn: mockSpawn,
@@ -12,6 +16,21 @@ vi.mock('child_process', () => ({
 
 vi.mock('os', () => ({
   networkInterfaces: mockNetworkInterfaces,
+  tmpdir: () => '/tmp',
+}))
+
+vi.mock('fs', () => ({ writeFileSync: mockWriteFileSync }))
+
+vi.mock('net', () => ({
+  createServer: () => {
+    const server = {
+      listen: (_port: number, _host: string, ready: () => void) => ready(),
+      address: () => ({ port: AGENT_API_PORT }),
+      close: (closed: () => void) => closed(),
+      on: () => server,
+    }
+    return server
+  },
 }))
 
 global.fetch = mockFetch as never
@@ -29,6 +48,21 @@ function mockTunnelUrl(publicUrl: string): void {
         tunnels: [{ public_url: publicUrl, config: { addr: 'http://localhost:7681' } }],
       }),
   })
+}
+
+/** `ngrok config check` naming the person's own config file, as ngrok 3 prints it. */
+function mockUserConfig(path: string | null): void {
+  mockExecSync.mockImplementation((command: string) => {
+    if (command !== 'ngrok config check') return ''
+    if (path === null) throw new Error('ERROR: no configuration file')
+    return `Valid configuration file at ${path}\n`
+  })
+}
+
+/** The --config value ngrok was started with. */
+function configArg(): string {
+  const args = mockSpawn.mock.calls.at(-1)![1] as string[]
+  return args[args.indexOf('--config') + 1]
 }
 
 async function startManagerTunnel(): Promise<void> {
@@ -171,6 +205,7 @@ function ngrokIsInstalledTests() {
 
 function ngrokStartTests() {
   describe('resolving the public URL', ngrokStartResolveTests)
+  describe('its own agent API', ngrokStartAgentApiTests)
   describe('giving up after polling', ngrokStartGiveUpTests)
   describe('reporting ngrok output', ngrokStartOutputTests)
   describe('an auth token', ngrokStartAuthTokenTests)
@@ -184,8 +219,28 @@ function ngrokStartResolveTests() {
     await vi.runAllTimersAsync()
     const url = await urlPromise
 
-    expect(mockSpawn).toHaveBeenCalledWith('ngrok', ['http', '7681'], expect.anything())
+    expect(mockSpawn.mock.calls[0][1].slice(0, 2)).toEqual(['http', '7681'])
     expect(url).toBe('https://abc.ngrok.io')
+  })
+}
+
+function ngrokStartAgentApiTests() {
+  it("reads its tunnel from an agent API on a port of its own, not another ngrok's 4040", async () => {
+    mockUserConfig(USER_CONFIG)
+    mockTunnelUrl('https://own.ngrok.io')
+    await startManagerTunnel()
+    expect(mockFetch).toHaveBeenCalledWith(`http://127.0.0.1:${AGENT_API_PORT}/api/tunnels`)
+    const [ownPath, contents] = mockWriteFileSync.mock.calls.at(-1)!
+    expect(contents).toContain(`web_addr: 127.0.0.1:${AGENT_API_PORT}`)
+    // The person's own file first, so its authtoken still applies; this one wins on web_addr.
+    expect(configArg()).toBe(`${USER_CONFIG},${ownPath}`)
+  })
+
+  it('passes only its own file when the person has none', async () => {
+    mockUserConfig(null)
+    mockTunnelUrl('https://own.ngrok.io')
+    await startManagerTunnel()
+    expect(configArg()).toBe(mockWriteFileSync.mock.calls.at(-1)![0])
   })
 }
 
@@ -218,9 +273,10 @@ function ngrokStartOutputTests() {
     const urlPromise = manager.start(7681)
     urlPromise.catch(() => {})
 
-    // Trigger output before polls exhaust
-    stdoutHandler?.(Buffer.from('ERR_NGROK_105'))
-    stderrHandler?.(Buffer.from('authentication failed'))
+    // Trigger output before polls exhaust, once ngrok has been started.
+    await vi.waitFor(() => expect(stdoutHandler && stderrHandler).toBeTruthy())
+    stdoutHandler!(Buffer.from('ERR_NGROK_105'))
+    stderrHandler!(Buffer.from('authentication failed'))
 
     await runPastAllPolls()
     await expect(urlPromise).rejects.toThrow(/authentication failed|ERR_NGROK/)
@@ -235,11 +291,8 @@ function ngrokStartAuthTokenTests() {
     await vi.runAllTimersAsync()
     await urlPromise
 
-    expect(mockSpawn).toHaveBeenCalledWith(
-      'ngrok',
-      ['http', '7681', '--authtoken', 'my-token'],
-      expect.anything()
-    )
+    const args = mockSpawn.mock.calls.at(-1)![1] as string[]
+    expect(args.slice(-2)).toEqual(['--authtoken', 'my-token'])
   })
 }
 

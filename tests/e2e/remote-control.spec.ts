@@ -1,4 +1,5 @@
 import { test, expect, type Browser, type Page } from '@playwright/test'
+import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
@@ -6,7 +7,8 @@ import {
   addAndSelectProject,
   closeApp,
   createWorkspace,
-  e2ePath,
+  stubsFirst,
+  e2eTempDir,
   launchApp,
 } from './helpers'
 import { openFromAppBand } from './extension-page'
@@ -43,9 +45,15 @@ let view: Page
 let browser: Browser
 /** A phone watching the desktop app's terminal. */
 let phone: Page
+/** Where the stand-in ngrok writes its agent API's address once it listens. */
+let ngrokApiFile: string
 
 test.beforeAll(async ({ playwright }) => {
-  handle = await launchApp(undefined, { PATH: e2ePath(NGROK_STUB_DIR) })
+  ngrokApiFile = join(e2eTempDir('ngrok-'), 'api')
+  handle = await launchApp(undefined, {
+    ...stubsFirst(NGROK_STUB_DIR),
+    E2E_NGROK_API_FILE: ngrokApiFile,
+  })
   await createWorkspace(handle.page, 'Remote-WS', handle.userDataDir)
   await addAndSelectProject(handle.page, 'Remote-WS', 'phone-branch')
   view = await openFromAppBand(handle, 'Remote Control', 'remote-control')
@@ -103,7 +111,7 @@ async function tokenOpensThePublicAddress(): Promise<void> {
 async function reconnectKeepsThePhone(): Promise<void> {
   phone = await openPhone()
   await expect(view.locator('.rc-device')).toHaveCount(1)
-  await fetch('http://127.0.0.1:4040/e2e/crash')
+  await fetch(`${readFileSync(ngrokApiFile, 'utf8')}/e2e/crash`)
   await expect(heading('The public address stopped working.')).toBeVisible()
   await view.getByRole('button', { name: 'Reconnect' }).click()
   await expect(heading(PUBLIC_HEADING)).toBeVisible({ timeout: 20_000 })

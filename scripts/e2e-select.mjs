@@ -12,8 +12,10 @@ const REPO_ROOT = join(__dirname, '..')
 
 // The specs that exercise cross-cutting extension-host behaviour (any
 // extension can regress these), always pulled in alongside a narrower rule
-// match. extension-settings writes every extension's settings.
+// match. extension-settings writes every extension's settings; control-alignment
+// checks that side-by-side controls line up on every extension's screens.
 export const EXTENSION_TRIO = [
+  'control-alignment.spec.ts',
   'extension-smoke.spec.ts',
   'extension-keyboard.spec.ts',
   'extension-themes.spec.ts',
@@ -112,6 +114,7 @@ export const CORE_SPECS = [
   'close-session.spec.ts',
   'core-ipc.spec.ts',
   'core-quick-actions.spec.ts',
+  'design-system-fields.spec.ts',
   'extension-lifecycle.spec.ts',
   'extension.spec.ts',
   'integrations.spec.ts',

@@ -1,5 +1,6 @@
 import React from 'react'
 import { SquareArrowOutUpRight } from 'lucide-react'
+import { IconButton } from '@terminator/extension-ui'
 import { StateChip } from '../session/StateChip'
 import { LivePreview } from '../session/LivePreview'
 import { WorkItemCell } from '../session/WorkItemCell'
@@ -92,17 +93,15 @@ function TileCap({
 
 function OpenButton({ name, onOpen }: { name: string; onOpen: () => void }): JSX.Element {
   return (
-    <button
-      type="button"
-      className="wall-tile__open"
-      aria-label={`Open ${name}`}
+    <IconButton
+      icon={SquareArrowOutUpRight}
+      size="sm"
+      label={`Open ${name}`}
       onClick={(e) => {
         e.stopPropagation()
         onOpen()
       }}
-    >
-      <SquareArrowOutUpRight aria-hidden="true" />
-    </button>
+    />
   )
 }
 

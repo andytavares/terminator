@@ -26,6 +26,78 @@
   height: var(--tm-control-height);
 }
 
+/* Every text field, textarea and select is the themed field, whatever class it carries or lacks:
+   a field whose class lives in a sheet not loaded yet (Settings' fields) was the white OS widget.
+   One element's weight: above the core's `*` reset, below any class a view adds. */
+textarea,
+select,
+input:where(
+    :not(
+        [type='checkbox'],
+        [type='radio'],
+        [type='range'],
+        [type='color'],
+        [type='file'],
+        [type='hidden']
+      )
+  ) {
+  box-sizing: border-box;
+  padding: 0 8px;
+  background: var(--tm-bg-input);
+  border: 1px solid var(--tm-border-strong);
+  border-radius: var(--tm-radius-sm);
+  color: var(--tm-text-primary);
+  font: inherit;
+  font-size: 12px;
+  transition: border-color 0.15s;
+}
+
+textarea {
+  padding: 6px 8px;
+  line-height: 1.5;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--tm-text-muted);
+  opacity: 1;
+}
+
+/* A field in use: the accent edge and its soft ring. Zero weight, so a field drawn inside a
+   wrapper that shows its own focus (a search box with an icon) keeps its `outline: none`. */
+:where(
+    textarea:focus,
+    select:focus,
+    input:not(
+        [type='checkbox'],
+        [type='radio'],
+        [type='range'],
+        [type='color'],
+        [type='file'],
+        [type='hidden']
+      ):focus
+  ) {
+  border-color: var(--tm-accent);
+  outline: 2px solid var(--tm-accent-glow);
+  outline-offset: 0;
+}
+
+textarea:disabled,
+select:disabled,
+input:where(
+    :not(
+        [type='checkbox'],
+        [type='radio'],
+        [type='range'],
+        [type='color'],
+        [type='file'],
+        [type='hidden']
+      )
+  ):disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
 /* One 14px box for both; padding 0 so a container's form reset cannot grow it. */
 input[type='checkbox'],
 input[type='radio'] {

@@ -17,7 +17,7 @@ Object.defineProperty(globalThis, 'window', {
   configurable: true,
 })
 
-import { notify } from '../../src/utils/notify'
+import { notify, toastPushed } from '../../src/utils/notify'
 import { addExtensionToast } from '../../src/stores/extension-toast.store'
 
 const mockAddToast = vi.mocked(addExtensionToast)
@@ -34,31 +34,54 @@ describe('notify', notifyTests)
 
 function notifyTests() {
   describe('local toasts', notifyLocalToastsTests)
+  describe('pushes the vault leaves alone', ignoredPushTests)
   describe('dispatcher', notifyDispatcherTests)
 }
 
+/** The push the dispatcher sends back for a task-vault notification that reaches a toast. */
+function pushed(title: string, targets: string[] = ['toast']) {
+  return { title, type: 'info' as const, source: 'terminator.task-vault', targets }
+}
+
 function notifyLocalToastsTests() {
-  it('adds a local toast with the correct type and message', () => {
+  it('draws no toast of its own: the push it causes draws the one toast', () => {
     notify('success', 'Task done', 'taskCompleted')
-    expect(mockAddToast).toHaveBeenCalledWith('success', 'Task done', { onClick: undefined })
+    expect(mockAddToast).not.toHaveBeenCalled()
+    toastPushed(pushed('Task done'))
+    expect(mockAddToast).toHaveBeenCalledTimes(1)
+    expect(mockAddToast).toHaveBeenCalledWith('info', 'Task done', { onClick: undefined })
   })
 
-  it('forwards all toast types to the local store', () => {
-    const types = ['success', 'error', 'warning', 'info'] as const
-    types.forEach((type) => notify(type, type, 'testKey'))
-    types.forEach((type, i) => {
-      expect(mockAddToast.mock.calls[i][0]).toBe(type)
-    })
-  })
-
-  it('passes onClick through to the toast store', () => {
+  it('gives the pushed toast the click handler notify was given', () => {
     const onClick = vi.fn()
-    notify('info', 'Hello', { key: 'testKey', onClick })
-    expect(mockAddToast).toHaveBeenCalledWith('info', 'Hello', { onClick })
+    notify('info', 'Moved to backlog: test', { key: 'taskMovedToBacklog', onClick })
+    toastPushed(pushed('Moved to backlog: test'))
+    expect(mockAddToast).toHaveBeenCalledWith('info', 'Moved to backlog: test', { onClick })
+  })
+
+  it('forgets the click handler once the dispatcher has answered', async () => {
+    const onClick = vi.fn()
+    notify('info', 'Archived: test', { key: 'taskArchived', onClick })
+    await mockCreate.mock.results[0].value
+    await Promise.resolve()
+    toastPushed(pushed('Archived: test'))
+    expect(mockAddToast).toHaveBeenCalledWith('info', 'Archived: test', { onClick: undefined })
   })
 
   it('does not throw when called without options', () => {
     expect(() => notify('error', 'Oops', 'testKey')).not.toThrow()
+  })
+}
+
+function ignoredPushTests() {
+  it("draws nothing for a push the user's settings keep out of toasts", () => {
+    toastPushed(pushed('Task done', ['center']))
+    expect(mockAddToast).not.toHaveBeenCalled()
+  })
+
+  it("draws nothing for another extension's push", () => {
+    toastPushed({ ...pushed('Build finished'), source: 'terminator.git-integration' })
+    expect(mockAddToast).not.toHaveBeenCalled()
   })
 }
 

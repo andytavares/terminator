@@ -1,6 +1,7 @@
 import { test, expect, type Page } from '@playwright/test'
 import { rmSync } from 'node:fs'
 import { closeApp, launchApp, type AppHandle } from './helpers'
+import { misalignedOn } from './control-alignment'
 import {
   git,
   makeRepoWithRemote,
@@ -90,6 +91,7 @@ test('the diff shows the change, and the context below it on request', async () 
   await fileInList(view, 'src/math.ts').click()
   await expect(view.getByRole('main')).toContainText('return a - b')
   await expect(view.getByRole('main')).not.toContainText('export const step20 = 20')
+  expect(await misalignedOn(view, 'Review screen')).toEqual([])
 
   await view.getByRole('button', { name: 'Show 20 lines below' }).click()
   await expect(view.getByRole('main')).toContainText('export const step20 = 20')

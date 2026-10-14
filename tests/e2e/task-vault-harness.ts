@@ -1,4 +1,4 @@
-import { expect, type Page } from '@playwright/test'
+import { expect, type Locator, type Page } from '@playwright/test'
 import type { AppHandle } from './helpers'
 import { invokeChannel, openFromAppBand } from './extension-page'
 
@@ -61,4 +61,12 @@ export async function todayTasks(vault: Page): Promise<StoredTask[]> {
 /** A task row of the open daily log, found by its exact text. */
 export function dailyLogTaskRow(vault: Page, text: string) {
   return vault.locator('.daily-log__task').filter({ has: vault.getByText(text, { exact: true }) })
+}
+
+/** Presses an action a row shows on hover or keyboard focus. Focus, not hover: with several apps
+ * open at once, Chromium sends each a pointer move to where the real cursor rests whenever a
+ * view's layout changes, which ended a hover between Playwright's hover and its click. */
+export async function pressRowAction(action: Locator): Promise<void> {
+  await action.focus()
+  await action.click()
 }

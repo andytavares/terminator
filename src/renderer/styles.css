@@ -66,7 +66,8 @@ button {
 }
 
 /* ── Focus ───────────────────────────────────────────────────── */
-*:focus-visible {
+/* Not on a text field: the design system's field draws its own focus (controls.css). */
+*:focus-visible:where(:not(textarea, select, input)) {
   outline: 2px solid rgba(255, 255, 255, 0.85);
   outline-offset: 2px;
   border-radius: var(--tm-radius-sm);

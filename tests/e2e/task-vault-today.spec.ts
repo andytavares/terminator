@@ -8,6 +8,7 @@ import {
   todayTasks,
   type StoredTask,
   localDate,
+  pressRowAction,
 } from './task-vault-harness'
 import { expectCentredInWindow } from './modal-centre'
 
@@ -37,8 +38,9 @@ async function addTaskToToday(text: string): Promise<void> {
 }
 
 async function rowAction(text: string, label: string): Promise<void> {
-  await dailyLogTaskRow(vault, text).hover()
-  await dailyLogTaskRow(vault, text).getByRole('button', { name: label, exact: true }).click()
+  await pressRowAction(
+    dailyLogTaskRow(vault, text).getByRole('button', { name: label, exact: true })
+  )
 }
 
 async function storedTaskNamed(text: string): Promise<StoredTask> {
@@ -214,19 +216,27 @@ test("a task's detail panel saves its description", async () => {
 
 test('a backlog item is picked up for today, another is deleted', async () => {
   await rowAction('Send the invites', 'Send to backlog')
-  await rowAction('Draft the agenda', 'Send to backlog')
   const backlogRow = (text: string) =>
     vault.locator('.daily-log__backlog-list > *').filter({ hasText: text })
+  // The row appears after the refresh, which follows the dispatcher's answer and so its push.
   await expect(backlogRow('Send the invites')).toBeVisible()
+  const toast = vault
+    .locator('.tmui-toast')
+    .filter({ hasText: 'Moved to backlog: Send the invites' })
+  await expect(toast, 'one move, one toast').toHaveCount(1)
+  // The core leaves it to the vault, whose view covers the core's toast region.
+  const coreCopy = handle.page.locator('.tmui-toast').filter({ hasText: 'Moved to backlog' })
+  await expect(coreCopy).toHaveCount(0)
+  await rowAction('Draft the agenda', 'Send to backlog')
   await expect(backlogRow('Draft the agenda')).toBeVisible()
 
-  await backlogRow('Send the invites').hover()
-  await backlogRow('Send the invites').getByRole('button', { name: 'Pick up today' }).click()
+  await pressRowAction(
+    backlogRow('Send the invites').getByRole('button', { name: 'Pick up today' })
+  )
   await expect(dailyLogTaskRow(vault, 'Send the invites')).toBeVisible()
   expect((await todayTasks(vault)).map((task) => task.text)).toContain('Send the invites')
 
-  await backlogRow('Draft the agenda').hover()
-  await backlogRow('Draft the agenda').getByRole('button', { name: 'Delete' }).click()
+  await pressRowAction(backlogRow('Draft the agenda').getByRole('button', { name: 'Delete' }))
   await expect(backlogRow('Draft the agenda')).toHaveCount(0)
   expect(await storedTask(vault, 'Draft the agenda')).toBeUndefined()
 })
@@ -246,4 +256,27 @@ test('a task rolled over from last week is marked stale until kept', async () =>
   await expect(row.locator('.daily-log__stale-badge')).toHaveCount(0)
   const kept = (await todayTasks(vault)).find((task) => task.text === 'Renew the domain')
   expect(kept).toMatchObject({ todaySince: localDate() })
+})
+
+test("keyboard focus on a row's icon names it, inside the vault's own view", async () => {
+  await addTaskToToday('Book the room')
+  // Focus, not hover: see pressRowAction. The pointer path is covered by icon-tooltips.spec.tsx.
+  await dailyLogTaskRow(vault, 'Book the room')
+    .getByRole('button', { name: 'Mark as blocked', exact: true })
+    .focus()
+  await expect(vault.locator('.tmui-tooltip')).toHaveText('Mark as blocked')
+  await expect(vault.locator('.tmui-tooltip')).toBeVisible()
+})
+
+test("a row's actions show for keyboard focus, not only for the pointer", async () => {
+  await addTaskToToday('Order the badges')
+  const archive = dailyLogTaskRow(vault, 'Order the badges').getByRole('button', {
+    name: 'Archive task',
+    exact: true,
+  })
+  await archive.focus()
+  // The actions fade in; the assertion waits for where the fade ends.
+  const actions = dailyLogTaskRow(vault, 'Order the badges').locator('.daily-log__task-actions')
+  await expect(actions).toHaveCSS('opacity', '1')
+  await expect(actions).toHaveCSS('pointer-events', 'auto')
 })

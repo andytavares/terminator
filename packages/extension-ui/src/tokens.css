@@ -10,7 +10,9 @@
  * the diff tints.
  */
 :root {
+  /* Every control of a size is one height: fields, selects, buttons and icon buttons. */
   --tm-control-height: 28px;
+  --tm-control-height-sm: 22px;
   --tm-bg-base: #0c0c0f;
   --tm-bg-surface: #111116;
   --tm-bg-elevated: #18181f;

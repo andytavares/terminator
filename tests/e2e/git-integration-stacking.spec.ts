@@ -122,3 +122,83 @@ test('a text field and a select beside it are the same height', async () => {
     await context.close()
   }
 })
+
+/** A unified review table as the diff pane renders it: a hunk header, then a line. */
+function unifiedReviewTables(): string {
+  const cols =
+    '<colgroup><col style="width:49px"><col style="width:49px"><col style="width:48px">' +
+    '<col class="diff-col--prefix"><col></colgroup>'
+  const table = (row: string) =>
+    `<table class="diff-table diff-table--review diff-table--row">${cols}<tbody>${row}</tbody></table>`
+  return `<div class="review-diff-scroll" style="width:1000px">
+    ${table(`<tr><td colspan="5" class="diff-hunk-header rs-hunk-anchor"><div class="rs-hunk-bar">
+      <span class="rs-hunk-bar__text">@@ -55,5 +55,5 @@ def load_settings()</span>
+      <button class="rs-hunk-tests">Tests</button></div></td></tr>`)}
+    ${table(`<tr class="diff-line diff-line--add"><td class="diff-line__old-num">58</td>
+      <td class="diff-line__new-num">58</td><td class="rs-gut"></td><td class="diff-line__prefix">+</td>
+      <td class="diff-line__content"><pre>audio_device=env.get("EFFECTS_AUDIO_DEVICE", "auto"),</pre></td></tr>`)}
+  </div>`
+}
+
+test('a unified review diff spans the pane, hunk header and code alike', async () => {
+  const { page, context } = await render(unifiedReviewTables())
+  try {
+    const widths = await page.evaluate(() => ({
+      pane: document.querySelector('.review-diff-scroll')!.getBoundingClientRect().width,
+      hunk: document.querySelector('.diff-hunk-header')!.getBoundingClientRect().width,
+      codeRight: document.querySelector('.diff-line__content')!.getBoundingClientRect().right,
+    }))
+    expect(widths.hunk, 'the hunk header spans every column').toBe(widths.pane)
+    expect(widths.codeRight, 'the code column reaches the pane edge').toBe(widths.pane)
+  } finally {
+    await context.close()
+  }
+})
+
+test('a Git tab diff row lays out as a table row', async () => {
+  const { page, context } = await render(`<div class="file-diff-view" style="width:800px">
+    <table class="diff-table"><tbody>
+      <tr><td colspan="4" class="diff-hunk-header">@@ -1,2 +1,2 @@</td></tr>
+      <tr class="diff-line diff-line--add"><td class="diff-line__old-num"></td>
+        <td class="diff-line__new-num">1</td><td class="diff-line__prefix">+</td>
+        <td class="diff-line__content">const answer = 42</td></tr>
+    </tbody></table></div>`)
+  try {
+    const shown = await page.evaluate(() => ({
+      row: getComputedStyle(document.querySelector('tr.diff-line')!).display,
+      header: getComputedStyle(document.querySelector('.diff-hunk-header')!).display,
+    }))
+    expect(shown).toEqual({ row: 'table-row', header: 'table-cell' })
+  } finally {
+    await context.close()
+  }
+})
+
+test('a review row with two actions keeps them clear of the size column', async () => {
+  const { page, context } = await render(`<div class="rd-rows" style="width:1100px">
+    <div class="rd-row rd-row--clickable">
+      <span class="rd-ti"><span class="rd-t1"><span class="rd-no">#11</span>
+        <span>NO/NC switches, per-pin debounce, and show-night reliability</span></span></span>
+      <span class="rd-side"><span class="rd-num">+3,068 −201 · 63 files</span>
+        <span class="rd-num">~55 min</span></span>
+      <span class="rd-actions">
+        <button class="tmui-button tmui-button--secondary tmui-button--sm rd-row-action">Open</button>
+        <button class="tmui-button tmui-button--secondary tmui-button--sm rd-row-action">Clone and review</button>
+      </span>
+    </div></div>`)
+  try {
+    const edges = await page.evaluate(() => ({
+      sizeRight: document.querySelector('.rd-side')!.getBoundingClientRect().right,
+      actionsLeft: Math.min(
+        ...[...document.querySelectorAll('.rd-row-action')].map(
+          (b) => b.getBoundingClientRect().left
+        )
+      ),
+    }))
+    expect(edges.actionsLeft, 'the first action starts after the size column').toBeGreaterThan(
+      edges.sizeRight
+    )
+  } finally {
+    await context.close()
+  }
+})
