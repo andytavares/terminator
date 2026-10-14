@@ -59,7 +59,7 @@ function channels(existingRuleIds: string[] = [], sources?: () => ResolveSources
   })
 }
 
-async function seedOrder(id: string): Promise<void> {
+async function seedLedgerOrder(id: string): Promise<void> {
   await createOrderStore(root).save(
     draftOrder({
       id,
@@ -86,7 +86,7 @@ async function record(orderId: string, over: Partial<LedgerEntry> = {}): Promise
 
 /** Three rejections of the same thing, in one order. */
 async function repeatedRejections(orderId = 'WO-1'): Promise<void> {
-  await seedOrder(orderId)
+  await seedLedgerOrder(orderId)
   for (const n of [1, 2, 3]) {
     await record(orderId, { at: `2026-09-0${n}T10:00:00.000Z`, subject: `U-${n}` })
   }
@@ -115,8 +115,8 @@ function ledgerChannelsReadingTests() {
   })
 
   it('reads across every order when none is named', async () => {
-    await seedOrder('WO-1')
-    await seedOrder('WO-2')
+    await seedLedgerOrder('WO-1')
+    await seedLedgerOrder('WO-2')
     await record('WO-1', { subject: 'a' })
     await record('WO-2', { subject: 'b' })
     const r = (await channels().query({})) as { entries: LedgerEntry[] }
@@ -124,8 +124,8 @@ function ledgerChannelsReadingTests() {
   })
 
   it('reads one order alone when one is named', async () => {
-    await seedOrder('WO-1')
-    await seedOrder('WO-2')
+    await seedLedgerOrder('WO-1')
+    await seedLedgerOrder('WO-2')
     await record('WO-1', { subject: 'a' })
     await record('WO-2', { subject: 'b' })
     const r = (await channels().query({ orderId: 'WO-2' })) as { entries: LedgerEntry[] }
@@ -135,7 +135,7 @@ function ledgerChannelsReadingTests() {
 
 function filteringTests() {
   it('filters by actor', async () => {
-    await seedOrder('WO-1')
+    await seedLedgerOrder('WO-1')
     await record('WO-1', { actor: 'operator', subject: 'a' })
     await record('WO-1', { actor: 'rule:budget.exceeded', subject: 'b' })
     const r = (await channels().query({ actor: 'operator' })) as { entries: LedgerEntry[] }
@@ -143,7 +143,7 @@ function filteringTests() {
   })
 
   it('filters by action', async () => {
-    await seedOrder('WO-1')
+    await seedLedgerOrder('WO-1')
     await record('WO-1', { action: 'gate.decided', subject: 'a' })
     await record('WO-1', { action: 'order.agreed', subject: 'b' })
     const r = (await channels().query({ action: 'order.agreed' })) as { entries: LedgerEntry[] }
@@ -151,7 +151,7 @@ function filteringTests() {
   })
 
   it('treats an empty filter as no filter, not as a value nothing matches', async () => {
-    await seedOrder('WO-1')
+    await seedLedgerOrder('WO-1')
     await record('WO-1')
     const r = (await channels().query({ actor: '', action: '' })) as { entries: LedgerEntry[] }
     expect(r.entries).toHaveLength(1)
@@ -160,7 +160,7 @@ function filteringTests() {
 
 function timeAndOrderTests() {
   it('filters by time', async () => {
-    await seedOrder('WO-1')
+    await seedLedgerOrder('WO-1')
     await record('WO-1', { at: '2026-09-01T10:00:00.000Z', subject: 'old' })
     await record('WO-1', { at: '2026-09-05T10:00:00.000Z', subject: 'new' })
     const r = (await channels().query({ since: '2026-09-03T00:00:00.000Z' })) as {
@@ -170,7 +170,7 @@ function timeAndOrderTests() {
   })
 
   it('reads newest first, though the file is written oldest first', async () => {
-    await seedOrder('WO-1')
+    await seedLedgerOrder('WO-1')
     await record('WO-1', { at: '2026-09-01T10:00:00.000Z', subject: 'old' })
     await record('WO-1', { at: '2026-09-05T10:00:00.000Z', subject: 'new' })
     const r = (await channels().query({})) as { entries: LedgerEntry[] }
@@ -187,7 +187,7 @@ function limitsAndValuesTests() {
   })
 
   it('offers only the filter values that actually occur', async () => {
-    await seedOrder('WO-1')
+    await seedLedgerOrder('WO-1')
     await record('WO-1', { actor: 'operator', action: 'gate.decided' })
     await record('WO-1', { actor: 'rule:risk.p0', action: 'gate.default' })
     const r = (await channels().query({})) as { actors: string[]; actions: string[] }
@@ -198,7 +198,7 @@ function limitsAndValuesTests() {
 
 describe('foundry:rules.propose', () => {
   it('produces nothing until there is a pattern', async () => {
-    await seedOrder('WO-1')
+    await seedLedgerOrder('WO-1')
     await record('WO-1')
     const r = (await channels().proposeRules({})) as { proposals: unknown[] }
     expect(r.proposals).toEqual([])
@@ -272,7 +272,7 @@ function decliningTests() {
 
 function anUnsupportedProposalTests() {
   it('refuses a proposal the ledger no longer supports', async () => {
-    await seedOrder('WO-1')
+    await seedLedgerOrder('WO-1')
     const r = (await channels().decideProposal({
       proposalId: 'curator-made-up',
       accept: true,
@@ -446,7 +446,7 @@ describe('foundry:factory.metrics', () => {
 
 function gatheringTests() {
   it('gathers every order on disk, with its ledger, gates and run graph', async () => {
-    await seedOrder('WO-1')
+    await seedLedgerOrder('WO-1')
     await record('WO-1', {
       action: 'order.seeded',
       at: '2026-09-05T10:00:00.000Z',
@@ -462,7 +462,7 @@ function gatheringTests() {
     )
     await writeRunGraph(root, graph('WO-1'))
 
-    await seedOrder('WO-2')
+    await seedLedgerOrder('WO-2')
 
     const r = (await channels().factoryMetrics({})) as {
       window: string
@@ -479,13 +479,13 @@ function gatheringTests() {
 
 function ledgerChannelsWindowsTests() {
   it('defaults to the 30 day window', async () => {
-    await seedOrder('WO-1')
+    await seedLedgerOrder('WO-1')
     const r = (await channels().factoryMetrics({})) as { window: string }
     expect(r.window).toBe('30d')
   })
 
   it('honours an explicit window', async () => {
-    await seedOrder('WO-1')
+    await seedLedgerOrder('WO-1')
     const r = (await channels().factoryMetrics({ window: 'all' })) as { window: string }
     expect(r.window).toBe('all')
   })

@@ -158,7 +158,7 @@ function useOverviewActions(props: Props, loadIssueComments: (prNumber: number) 
 type OverviewActions = ReturnType<typeof useOverviewActions>
 
 /** Posts the comment to the PR's conversation, then reloads it; throws what GitHub refused. */
-async function postIssueComment(props: Props, body: string): Promise<void> {
+async function postPullRequestComment(props: Props, body: string): Promise<void> {
   const result = await githubAPI.prIssueCommentAdd({
     repoRoot: props.repoRoot,
     prNumber: props.pr.number,
@@ -176,7 +176,7 @@ function useIssueComment(props: Props, loadIssueComments: (prNumber: number) => 
   const handleCommentSubmit = async () => {
     if (!commentBody.trim()) return
     await send.run(async () => {
-      await postIssueComment(props, commentBody)
+      await postPullRequestComment(props, commentBody)
       setCommentBody('')
       await loadIssueComments(props.pr.number)
       return null

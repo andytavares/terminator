@@ -86,7 +86,7 @@ function statusFromSettings(previous: RemoteStatus, s: StoredSettings): RemoteSt
 function useRemoteSettings() {
   const [status, setStatus] = useState<RemoteStatus>({})
   const [form, setForm] = useState<SettingsForm>(DEFAULT_FORM)
-  const updateForm: FormUpdate = (patch) => setForm((previous) => ({ ...previous, ...patch }))
+  const updateRemoteForm: FormUpdate = (patch) => setForm((previous) => ({ ...previous, ...patch }))
 
   useEffect(() => {
     const unsub = window.electronAPI.extensionBridge.on('remote:status', (data) => {
@@ -104,7 +104,7 @@ function useRemoteSettings() {
     return unsub
   }, [])
 
-  return { status, form, updateForm }
+  return { status, form, updateRemoteForm }
 }
 
 interface RemoteControlSettingsProps {
@@ -115,7 +115,7 @@ interface RemoteControlSettingsProps {
 export function RemoteControlSettings({
   onViewersSaved,
 }: RemoteControlSettingsProps): React.JSX.Element {
-  const { status, form, updateForm } = useRemoteSettings()
+  const { status, form, updateRemoteForm } = useRemoteSettings()
   return (
     <div className="settings-section">
       {/* No heading and no on/off control here: the status band above owns both.
@@ -123,12 +123,12 @@ export function RemoteControlSettings({
 
       {/* Required before optional (FR-018). Without an account token there is no
           public address at all, which is the whole point. */}
-      <AccountTokenField form={form} updateForm={updateForm} />
-      <PortField form={form} updateForm={updateForm} />
-      <ViewersField form={form} updateForm={updateForm} onSaved={onViewersSaved} />
+      <AccountTokenField form={form} updateRemoteForm={updateRemoteForm} />
+      <PortField form={form} updateRemoteForm={updateRemoteForm} />
+      <ViewersField form={form} updateRemoteForm={updateRemoteForm} onSaved={onViewersSaved} />
       <PasswordField
         hasPassword={form.hasPassword}
-        onChanged={() => updateForm({ hasPassword: true })}
+        onChanged={() => updateRemoteForm({ hasPassword: true })}
       />
       {status.enabled && <Addresses status={status} port={form.port} />}
     </div>
@@ -148,10 +148,10 @@ function FieldLabel(props: { htmlFor: string; children: React.ReactNode }): Reac
 
 interface FieldProps {
   form: SettingsForm
-  updateForm: FormUpdate
+  updateRemoteForm: FormUpdate
 }
 
-function AccountTokenField({ form, updateForm }: FieldProps): React.JSX.Element {
+function AccountTokenField({ form, updateRemoteForm }: FieldProps): React.JSX.Element {
   const saveToken = () => {
     void window.electronAPI.extensionBridge.invoke('remote:update-ngrok-token', {
       ngrokAuthToken: form.ngrokTokenInput.trim(),
@@ -171,7 +171,7 @@ function AccountTokenField({ form, updateForm }: FieldProps): React.JSX.Element 
           type="password"
           className="settings-section__input"
           value={form.ngrokTokenInput}
-          onChange={(e) => updateForm({ ngrokTokenInput: e.target.value })}
+          onChange={(e) => updateRemoteForm({ ngrokTokenInput: e.target.value })}
           onBlur={saveToken}
           placeholder="Paste your account token"
           style={{ flex: 1 }}
@@ -181,7 +181,7 @@ function AccountTokenField({ form, updateForm }: FieldProps): React.JSX.Element 
   )
 }
 
-function PortField({ form, updateForm }: FieldProps): React.JSX.Element {
+function PortField({ form, updateRemoteForm }: FieldProps): React.JSX.Element {
   const savePort = (e: React.FocusEvent<HTMLInputElement>) => {
     const val = parseInt(e.target.value, 10)
     if (val >= 1024 && val <= 65535) {
@@ -200,7 +200,7 @@ function PortField({ form, updateForm }: FieldProps): React.JSX.Element {
         value={form.port}
         min={1024}
         max={65535}
-        onChange={(e) => updateForm({ port: parseInt(e.target.value, 10) || 7681 })}
+        onChange={(e) => updateRemoteForm({ port: parseInt(e.target.value, 10) || 7681 })}
         onBlur={savePort}
       />
       <span className="settings-section__hint">
@@ -221,11 +221,11 @@ function saveViewerLimit(text: string): number | null {
 }
 
 function ViewersField(props: FieldProps & { onSaved: (max: number) => void }): React.JSX.Element {
-  const { form, updateForm, onSaved } = props
+  const { form, updateRemoteForm, onSaved } = props
   const saveViewers = (e: React.FocusEvent<HTMLInputElement>) => {
     const saved = saveViewerLimit(e.target.value)
     if (saved === null) return
-    updateForm({ maxSubscribers: saved })
+    updateRemoteForm({ maxSubscribers: saved })
     onSaved(saved)
   }
   const id = useId()
@@ -240,7 +240,7 @@ function ViewersField(props: FieldProps & { onSaved: (max: number) => void }): R
         value={form.maxSubscribers}
         min={1}
         max={20}
-        onChange={(e) => updateForm({ maxSubscribers: parseInt(e.target.value, 10) || 1 })}
+        onChange={(e) => updateRemoteForm({ maxSubscribers: parseInt(e.target.value, 10) || 1 })}
         onBlur={saveViewers}
       />
       <span className="settings-section__hint">

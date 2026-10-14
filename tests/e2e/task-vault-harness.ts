@@ -25,8 +25,8 @@ const VAULT_URL = 'terminator.task-vault/dist/index.html?view=main'
 export function localDate(offsetDays = 0): string {
   const date = new Date()
   date.setDate(date.getDate() + offsetDays)
-  const twoDigits = (n: number) => String(n).padStart(2, '0')
-  return `${date.getFullYear()}-${twoDigits(date.getMonth() + 1)}-${twoDigits(date.getDate())}`
+  const zeroPadded = (n: number) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${zeroPadded(date.getMonth() + 1)}-${zeroPadded(date.getDate())}`
 }
 
 /** Opens Task Vault from the app band and waits for its navigation. */

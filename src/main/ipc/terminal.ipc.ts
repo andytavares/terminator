@@ -115,7 +115,7 @@ function createChannel(context: TerminalContext): ChannelSpec {
     channel: 'terminal:create',
     schema: CreateTerminalSchema,
     invalid: validationError,
-    run: (input) => createTerminalSession(context, input),
+    run: (input) => createPtySession(context, input),
     // Reported rather than thrown, so the renderer can say which folder is
     // gone. A branch whose worktree was deleted outside the app otherwise
     // produced a tab that died instantly with nothing written in it.
@@ -232,7 +232,7 @@ export function registerTerminalHandlers(
   registerStreamHandlers(context)
 }
 
-function createTerminalSession(
+function createPtySession(
   { ptyManager, getWindow, relay }: TerminalContext,
   input: z.infer<typeof CreateTerminalSchema>
 ): { sessionId: string; shell: string } {

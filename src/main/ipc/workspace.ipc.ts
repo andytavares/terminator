@@ -129,7 +129,7 @@ const projectChannels: ChannelSpec[] = [
     channel: 'project:delete',
     schema: IdSchema,
     invalid: failed,
-    run: ({ id }) => removeProject(id),
+    run: ({ id }) => removeProjectAndItsLinks(id),
   }),
 ]
 
@@ -137,7 +137,7 @@ export function registerWorkspaceHandlers(): void {
   registerInvokeTable([...workspaceChannels, ...projectChannels])
 }
 
-async function removeProject(id: string): Promise<{ success: boolean }> {
+async function removeProjectAndItsLinks(id: string): Promise<{ success: boolean }> {
   const project = getProjectById(id)
   if (project?.isWorktree && project.worktreePath) {
     const workspace = listWorkspaces().find((w) => w.id === project.workspaceId)

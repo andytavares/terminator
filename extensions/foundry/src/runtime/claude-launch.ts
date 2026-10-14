@@ -163,7 +163,7 @@ export function buildSettings(options: HookCommandOptions): unknown {
           hooks: [
             {
               type: 'command',
-              command: hookCommand(options, options.controlUrl),
+              command: toolHookCommand(options, options.controlUrl),
               timeout: HOOK_TIMEOUT_SECONDS,
             },
           ],
@@ -179,7 +179,7 @@ export function buildSettings(options: HookCommandOptions): unknown {
 }
 
 /** The hook script run against one of the console's URLs, for one session. */
-function hookCommand(options: HookCommandOptions, url: string, kind?: string): string {
+function toolHookCommand(options: HookCommandOptions, url: string, kind?: string): string {
   return [
     // Electron refuses to be a node unless told; without this the hook script
     // would launch a second copy of the application.
@@ -202,7 +202,7 @@ function notifyHook(options: HookCommandOptions, kind: string): unknown {
     hooks: [
       {
         type: 'command',
-        command: hookCommand(options, options.controlEventUrl, kind),
+        command: toolHookCommand(options, options.controlEventUrl, kind),
         timeout: 10,
       },
     ],

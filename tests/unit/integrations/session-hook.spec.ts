@@ -25,7 +25,7 @@ function settingsPath(): string {
   return path.join(projectDir, '.claude', 'settings.local.json')
 }
 
-function readSettings(): Record<string, unknown> {
+function readClaudeSettingsFile(): Record<string, unknown> {
   return JSON.parse(fs.readFileSync(settingsPath(), 'utf8'))
 }
 
@@ -184,7 +184,7 @@ describe('installProjectHook', () => {
     const mod = await load()
     await mod.installProjectHook(projectDir, HOOK_OPTIONS)
 
-    const settings = readSettings() as { hooks: { SessionStart: unknown[] } }
+    const settings = readClaudeSettingsFile() as { hooks: { SessionStart: unknown[] } }
     expect(settings.hooks.SessionStart).toHaveLength(1)
     expect(JSON.stringify(settings)).toContain('/tmp/hook.cjs')
   })
@@ -203,7 +203,7 @@ describe('installProjectHook', () => {
     const mod = await load()
     await mod.installProjectHook(projectDir, HOOK_OPTIONS)
 
-    const settings = readSettings() as { hooks: { SessionStart: unknown[] } }
+    const settings = readClaudeSettingsFile() as { hooks: { SessionStart: unknown[] } }
     expect(settings.hooks.SessionStart).toHaveLength(2)
     expect(JSON.stringify(settings)).toContain('echo mine')
   })
@@ -223,7 +223,10 @@ describe('installProjectHook — other settings and repeats', () => {
     const mod = await load()
     await mod.installProjectHook(projectDir, HOOK_OPTIONS)
 
-    const settings = readSettings() as { permissions: unknown; hooks: { PostToolUse: unknown } }
+    const settings = readClaudeSettingsFile() as {
+      permissions: unknown
+      hooks: { PostToolUse: unknown }
+    }
     expect(settings.permissions).toEqual({ allow: ['Bash(npm test *)'] })
     expect(settings.hooks.PostToolUse).toEqual([{ matcher: 'Edit' }])
   })
@@ -234,7 +237,7 @@ describe('installProjectHook — other settings and repeats', () => {
     await mod.installProjectHook(projectDir, HOOK_OPTIONS)
     await mod.installProjectHook(projectDir, HOOK_OPTIONS)
 
-    const settings = readSettings() as { hooks: { SessionStart: unknown[] } }
+    const settings = readClaudeSettingsFile() as { hooks: { SessionStart: unknown[] } }
     expect(settings.hooks.SessionStart).toHaveLength(1)
   })
 })
@@ -289,7 +292,7 @@ describe('removeProjectHook', () => {
     await mod.installProjectHook(projectDir, HOOK_OPTIONS)
     await mod.removeProjectHook(projectDir, HOOK_OPTIONS.hookScriptPath)
 
-    expect(readSettings()).toEqual(original)
+    expect(readClaudeSettingsFile()).toEqual(original)
   })
 })
 
@@ -309,7 +312,7 @@ describe('removeProjectHook — other tools and directories', () => {
     await mod.installProjectHook(projectDir, HOOK_OPTIONS)
     await mod.removeProjectHook(projectDir, HOOK_OPTIONS.hookScriptPath)
 
-    const settings = readSettings() as { hooks: { SessionStart: unknown[] } }
+    const settings = readClaudeSettingsFile() as { hooks: { SessionStart: unknown[] } }
     expect(settings.hooks.SessionStart).toHaveLength(1)
     expect(JSON.stringify(settings)).toContain('echo mine')
   })

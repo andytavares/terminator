@@ -34,7 +34,7 @@ type SubtaskDraft = ReturnType<typeof useSubtaskDraft>
 function useSubtaskActions(subtask: IndexedTask, onRefresh: () => Promise<void>) {
   const [editing, setEditing] = useState(false)
   const [editText, setEditText] = useState(subtask.text)
-  async function saveEdit() {
+  async function saveSubtaskEdit() {
     if (!editText.trim()) return
     await invokeVault('task-vault:vault:edit-task', { taskId: subtask.id, text: editText.trim() })
     setEditing(false)
@@ -53,7 +53,7 @@ function useSubtaskActions(subtask: IndexedTask, onRefresh: () => Promise<void>)
     await invokeVault('task-vault:vault:delete-task', { taskId: subtask.id })
     await onRefresh()
   }
-  return { editing, setEditing, editText, setEditText, saveEdit, complete, remove }
+  return { editing, setEditing, editText, setEditText, saveSubtaskEdit, complete, remove }
 }
 
 function SubtaskEditor({ edit }: SubtaskEditProps): React.JSX.Element {
@@ -63,10 +63,10 @@ function SubtaskEditor({ edit }: SubtaskEditProps): React.JSX.Element {
         autoFocus
         value={edit.editText}
         onChange={edit.setEditText}
-        onSubmit={() => void edit.saveEdit()}
+        onSubmit={() => void edit.saveSubtaskEdit()}
         onCancel={() => edit.setEditing(false)}
       />
-      <Button variant="primary" onClick={() => void edit.saveEdit()}>
+      <Button variant="primary" onClick={() => void edit.saveSubtaskEdit()}>
         Save
       </Button>
       <IconButton icon={X} label="Cancel edit" size="sm" onClick={() => edit.setEditing(false)} />

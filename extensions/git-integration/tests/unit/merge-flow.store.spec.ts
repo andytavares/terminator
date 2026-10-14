@@ -32,7 +32,7 @@ function storeFile(
   return { filePath, conflictCount: blocks.length, resolvedCount: 0, blocks, ...authors }
 }
 
-function storeSession(overrides: Partial<ConflictSession> = {}): ConflictSession {
+function conflictSessionWith(overrides: Partial<ConflictSession> = {}): ConflictSession {
   const foo = 'src/foo.ts'
   const blocks = [0, 1].map((i) =>
     storeBlock(foo, i, {
@@ -69,7 +69,7 @@ describe('session lifecycle', () => {
   })
 
   it('startSession sets session and resets indices', () => {
-    const session = storeSession()
+    const session = conflictSessionWith()
     act(() => {
       useMergeFlowStore.getState().startSession(session)
     })
@@ -81,7 +81,7 @@ describe('session lifecycle', () => {
 
   it('clearSession resets all state', () => {
     act(() => {
-      useMergeFlowStore.getState().startSession(storeSession())
+      useMergeFlowStore.getState().startSession(conflictSessionWith())
       useMergeFlowStore.getState().clearSession()
     })
     const state = useMergeFlowStore.getState()
@@ -93,7 +93,7 @@ describe('session lifecycle', () => {
 describe('navigation', () => {
   it('setActiveFile updates activeFileIndex', () => {
     act(() => {
-      useMergeFlowStore.getState().startSession(storeSession())
+      useMergeFlowStore.getState().startSession(conflictSessionWith())
       useMergeFlowStore.getState().setActiveFile(0)
     })
     expect(useMergeFlowStore.getState().activeFileIndex).toBe(0)
@@ -101,7 +101,7 @@ describe('navigation', () => {
 
   it('setActiveBlock updates activeBlockIndex', () => {
     act(() => {
-      useMergeFlowStore.getState().startSession(storeSession())
+      useMergeFlowStore.getState().startSession(conflictSessionWith())
       useMergeFlowStore.getState().setActiveBlock(1)
     })
     expect(useMergeFlowStore.getState().activeBlockIndex).toBe(1)
@@ -109,7 +109,7 @@ describe('navigation', () => {
 
   it('goToNextBlock advances to next block', () => {
     act(() => {
-      useMergeFlowStore.getState().startSession(storeSession())
+      useMergeFlowStore.getState().startSession(conflictSessionWith())
       useMergeFlowStore.getState().goToNextBlock()
     })
     expect(useMergeFlowStore.getState().activeBlockIndex).toBe(1)
@@ -119,7 +119,7 @@ describe('navigation', () => {
 describe('navigation — goToNextBlock clamps at last block of last file', () => {
   it('goToNextBlock clamps at last block of last file', () => {
     act(() => {
-      useMergeFlowStore.getState().startSession(storeSession())
+      useMergeFlowStore.getState().startSession(conflictSessionWith())
       useMergeFlowStore.getState().setActiveBlock(1)
       useMergeFlowStore.getState().goToNextBlock()
     })
@@ -129,7 +129,7 @@ describe('navigation — goToNextBlock clamps at last block of last file', () =>
 
   it('goToPrevBlock moves back', () => {
     act(() => {
-      useMergeFlowStore.getState().startSession(storeSession())
+      useMergeFlowStore.getState().startSession(conflictSessionWith())
       useMergeFlowStore.getState().setActiveBlock(1)
       useMergeFlowStore.getState().goToPrevBlock()
     })
@@ -138,7 +138,7 @@ describe('navigation — goToNextBlock clamps at last block of last file', () =>
 
   it('goToPrevBlock clamps at first block', () => {
     act(() => {
-      useMergeFlowStore.getState().startSession(storeSession())
+      useMergeFlowStore.getState().startSession(conflictSessionWith())
       useMergeFlowStore.getState().goToPrevBlock()
     })
     expect(useMergeFlowStore.getState().activeBlockIndex).toBe(0)
@@ -147,7 +147,7 @@ describe('navigation — goToNextBlock clamps at last block of last file', () =>
 
 describe('confirmDecision', () => {
   it('marks block as resolved and pushes to undo stack', () => {
-    const session = storeSession()
+    const session = conflictSessionWith()
     act(() => {
       useMergeFlowStore.getState().startSession(session)
     })
@@ -170,7 +170,7 @@ describe('confirmDecision', () => {
 describe('undoLastDecision', () => {
   it('returns null when undo stack is empty', () => {
     act(() => {
-      useMergeFlowStore.getState().startSession(storeSession())
+      useMergeFlowStore.getState().startSession(conflictSessionWith())
     })
     const decision = useMergeFlowStore.getState().undoLastDecision()
     expect(decision).toBeNull()
@@ -179,7 +179,7 @@ describe('undoLastDecision', () => {
 
 describe('undoLastDecision — pops the last decision from undo stack and navigates back to that block', () => {
   it('pops the last decision from undo stack and navigates back to that block', () => {
-    const session = storeSession()
+    const session = conflictSessionWith()
     act(() => {
       useMergeFlowStore.getState().startSession(session)
       // Resolve block 0, which advances to block 1
@@ -225,7 +225,7 @@ describe('UI modals', () => {
 
 describe('isComplete selector', () => {
   it('returns true when all conflicts resolved', () => {
-    const session = storeSession({ totalConflicts: 0, totalResolved: 0 })
+    const session = conflictSessionWith({ totalConflicts: 0, totalResolved: 0 })
     act(() => {
       useMergeFlowStore.getState().startSession({ ...session, totalConflicts: 2, totalResolved: 2 })
     })

@@ -109,7 +109,7 @@ function PrivateNote(props: { ctx: PaneContext; note: ReviewNote }) {
   )
 }
 
-function editDraft(ctx: PaneContext, draft: DraftComment): void {
+function editDraftComment(ctx: PaneContext, draft: DraftComment): void {
   const next = prompt('Edit draft', draft.body)
   if (next != null) ctx.actions.updateDraft(ctx.head, draft.id, next)
 }
@@ -123,7 +123,7 @@ function PendingDraft(props: { ctx: PaneContext; draft: DraftComment }) {
         <RichContent>{draft.body}</RichContent>
       </div>
       <div className="rs-thread-actions">
-        <button type="button" className="rs-btn" onClick={() => editDraft(ctx, draft)}>
+        <button type="button" className="rs-btn" onClick={() => editDraftComment(ctx, draft)}>
           Edit
         </button>
         <button

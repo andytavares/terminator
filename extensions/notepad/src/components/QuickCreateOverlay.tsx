@@ -125,7 +125,7 @@ async function createDiagramAndOpen(diagram: Omit<NewNote, 'body'>): Promise<voi
 }
 
 /** Creates the folder, diagram or note the draft describes. */
-async function saveDraft(draft: QuickCreateDraft): Promise<void> {
+async function saveQuickNote(draft: QuickCreateDraft): Promise<void> {
   const { type, title, body } = draft
   // Includes a tag still in the input: onBlur fires before onClick, but React 18
   // batching means its setTags may not have applied yet.
@@ -171,7 +171,7 @@ function saveHandler(draft: QuickCreateDraft) {
     if (draft.type === 'folder' && !draft.title.trim()) return
     draft.setSaving(true)
     try {
-      await saveDraft(draft)
+      await saveQuickNote(draft)
       draft.close()
     } catch (err) {
       console.error(`[notepad] QuickCreateOverlay: save ${draft.type} failed`, err)

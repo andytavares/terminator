@@ -50,7 +50,7 @@ export function SidebarDialogs({ dialog, close, factsBySessionId }: SidebarDialo
     case 'edit-workspace':
       return <EditWorkspaceDialog workspace={dialog.workspace} onClose={close} />
     case 'remove-workspace':
-      return <ConfirmRemoval {...removeWorkspace(dialog.workspace)} close={close} />
+      return <ConfirmRemoval {...workspaceRemoval(dialog.workspace)} close={close} />
     case 'create-branch':
       return <CreateProjectDialog workspaceId={dialog.workspaceId} onClose={close} />
     case 'remove-branch':
@@ -65,7 +65,7 @@ interface Removal {
   remove: () => void
 }
 
-function removeWorkspace(workspace: Workspace): Removal {
+function workspaceRemoval(workspace: Workspace): Removal {
   return {
     title: `Remove workspace "${workspace.name}"?`,
     remove: () => void useWorkspaceStore.getState().deleteWorkspace(workspace.id),

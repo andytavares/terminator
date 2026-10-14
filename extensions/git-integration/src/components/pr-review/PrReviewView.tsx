@@ -189,7 +189,7 @@ function inspectorFile(pr: PrReviewDetail, repoRoot: string, file: PrChangedFile
   }
 }
 
-function isStaleSession(lastAccessedAt: string | null | undefined): boolean {
+function isStaleReviewSession(lastAccessedAt: string | null | undefined): boolean {
   if (!lastAccessedAt) return false
   return Date.now() - new Date(lastAccessedAt).getTime() > RESUME_CARD_STALE_MS
 }
@@ -210,7 +210,7 @@ function useUiState() {
 
 /** The view's own toggles and panels. */
 function useViewState(store: ReviewStore) {
-  const [showResume, setShowResume] = useState(() => isStaleSession(store.lastAccessedAt))
+  const [showResume, setShowResume] = useState(() => isStaleReviewSession(store.lastAccessedAt))
   const [showSubmit, setShowSubmit] = useState(false)
   const [showRiskFor, setShowRiskFor] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'guided' | 'full'>('full')

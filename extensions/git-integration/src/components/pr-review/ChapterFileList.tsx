@@ -53,7 +53,7 @@ function dropRow(target: DragTarget, from: number | null, to: number): void {
 function useRowDrag(target: DragTarget) {
   const dragIndexRef = useRef<number | null>(null)
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
-  const endDrag = () => {
+  const endFileDrag = () => {
     dragIndexRef.current = null
     setDragOverIndex(null)
   }
@@ -68,9 +68,9 @@ function useRowDrag(target: DragTarget) {
     onDrop: (e: React.DragEvent) => {
       e.preventDefault()
       dropRow(target, dragIndexRef.current, index)
-      endDrag()
+      endFileDrag()
     },
-    onDragEnd: endDrag,
+    onDragEnd: endFileDrag,
   })
   return { dragOverIndex, handlersFor: fileDragHandlers }
 }

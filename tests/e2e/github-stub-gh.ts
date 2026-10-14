@@ -377,7 +377,11 @@ const REST_ROUTES: Array<[string, RegExp, RestHandler]> = [
   ['GET', /^user\/repos$/, (context) => accessibleRepositories(context)],
   ['GET', new RegExp(`^${REPO}/pulls/(\\d+)/files$`), (c, _r, m) => prFiles(c, m)],
   ['GET', new RegExp(`^${REPO}/pulls/(\\d+)/reviews$`), (c, _r, m) => pr(c, m).reviews],
-  ['POST', new RegExp(`^${REPO}/pulls/(\\d+)/reviews$`), (c, r, m) => submitPrReview(c, r, m)],
+  [
+    'POST',
+    new RegExp(`^${REPO}/pulls/(\\d+)/reviews$`),
+    (c, r, m) => answerSubmittedReview(c, r, m),
+  ],
   ['GET', new RegExp(`^${REPO}/pulls/(\\d+)/requested_reviewers$`), () => noReviewers()],
   ['GET', new RegExp(`^${REPO}/pulls/(\\d+)/comments$`), (c, _r, m) => pr(c, m).reviewComments],
   [
@@ -460,7 +464,7 @@ const REVIEW_STATES = {
 } as const
 
 /** POST .../reviews, with its draft comments in the same request, as GitHub takes them. */
-function submitPrReview(context: StubContext, request: ApiRequest, match: RegExpMatchArray) {
+function answerSubmittedReview(context: StubContext, request: ApiRequest, match: RegExpMatchArray) {
   const pullRequest = pr(context, match)
   const input = { ...request.body, ...request.fields } as {
     event: keyof typeof REVIEW_STATES
@@ -531,7 +535,7 @@ function graphql(context: StubContext, request: ApiRequest): unknown {
   const { query } = request.fields
   if (query.includes('pullRequests(first:')) return openPullRequestPage(context)
   if (query.includes('reviewThreads(first:100)')) return reviewThreads(context, request)
-  if (query.includes('pullRequest(number:$n){id}')) return nodeIdOfPullRequest(request)
+  if (query.includes('pullRequest(number:$n){id}')) return stubPullRequestNodeId(request)
   if (query.includes('markFileAsViewed')) return markPathViewed(context, request)
   if (query.includes('search(query:')) return searchDashboard(context, query)
   throw new GhFailure(1, `stub GitHub cannot answer this query: ${query.slice(0, 80)}`)
@@ -569,7 +573,7 @@ function reviewThreads(context: StubContext, request: ApiRequest) {
   return { data: { repository: { pullRequest: { reviewThreads: { nodes } } } } }
 }
 
-function nodeIdOfPullRequest(request: ApiRequest) {
+function stubPullRequestNodeId(request: ApiRequest) {
   return { data: { repository: { pullRequest: { id: `PR_node_${request.fields.n}` } } } }
 }
 

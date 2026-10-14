@@ -117,7 +117,11 @@ function differs(stored: unknown, written: unknown): boolean {
 }
 
 /** Runs an action setting's button, confirming when it asks. */
-async function runAction(handle: AppHandle, panel: Locator, def: SettingDef): Promise<void> {
+async function pressActionSetting(
+  handle: AppHandle,
+  panel: Locator,
+  def: SettingDef
+): Promise<void> {
   if (def.confirmMessage) handle.page.once('dialog', (dialog) => void dialog.accept())
   await panel.getByRole('button', { name: def.label, exact: true }).click()
   await expect
@@ -178,7 +182,7 @@ async function writesEverySetting(extension: string): Promise<void> {
   const folder = mkdtempSync(join(tmpdir(), 'terminator-e2e-setting-folder-'))
   for (const [key, def] of Object.entries(schema.properties)) {
     if (def.type === 'action') {
-      await runAction(handle, panel, def)
+      await pressActionSetting(handle, panel, def)
       continue
     }
     const value = NOTIFY.test(key) ? false : chosenValue(key, def, folder)
