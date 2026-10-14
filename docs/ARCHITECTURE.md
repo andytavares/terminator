@@ -929,7 +929,7 @@ End conditions (`recurrence_end_type`, `recurrence_end_date`, `recurrence_end_co
 
 **The notification scheduler (`task-scheduler.ts`) is notification-only.** It reads the `recurrence_notify_at` column to determine per-task alert times but never inserts task rows.
 
-**Strict recurrence mode:** next `due_date` is always `previous_due_date + interval`, regardless of completion date (e.g., a weekly Monday task completed on Wednesday still recurs next Monday).
+**Strict recurrence mode:** next `due_date` is always `previous_due_date + interval`, regardless of completion date (e.g., a weekly Monday task completed on Wednesday still recurs next Monday). The sum is on `Temporal.PlainDate`: a monthly task due on a day the next month lacks falls on that month's last day (January 31 is followed by February 28, not March 3), and a task whose due date is not a calendar date (a `due:` tag stores whatever was typed) has no next occurrence.
 
 A `UNIQUE INDEX` on `(recurrence_template_id, due_date)` enforces the invariant at the database level, preventing duplicate instances even under concurrent writes.
 

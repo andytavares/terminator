@@ -100,7 +100,7 @@ export async function ensureNextOccurrence(
   if (await hasUpcomingOccurrence(db, templateId)) return null
   const nextDue = computeNextDueDate(task.due_date, parseRecurrenceRule(task.recurrence_rule))
   const end = readRecurrenceEndState(task)
-  if (seriesEnded(end, nextDue)) return null
+  if (!nextDue || seriesEnded(end, nextDue)) return null
   return spawnOccurrence(db, task, { templateId, nextDue, end })
 }
 
