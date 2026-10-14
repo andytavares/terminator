@@ -1,0 +1,21 @@
+packages/extension-sdk/CHANGELOG.md
+  s_c9dd89ad1f6c54::t_08eafd569a0c6b 35-40
+packages/extension-sdk/src/index.ts
+  s_c9dd89ad1f6c54::t_dbee951fd25af7 31-32,34
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "51248b1be4386ac9c66be489da6e30a45714afc4",
+  "prompts": {},
+  "sessions": {
+    "s_c9dd89ad1f6c54": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ee6b7f82-c708-43d8-8c1f-eefe55f692a9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
