@@ -1,0 +1,205 @@
+packages/extension-ui/src/Toast.tsx
+  s_c9dd89ad1f6c54::t_429f9858936ba7 3,5,93-95,97,99-103
+tests/unit/packages/extension-ui/dialog.spec.tsx
+  s_c9dd89ad1f6c54::t_429f9858936ba7 3,7,41-42,44-45,61-63,67,69,90-92,103-104,106,108-110,238-239,241,245-259,261-268,358,360
+tests/unit/renderer/components/CreateWorkspaceDialog.spec.tsx
+  s_c9dd89ad1f6c54::t_429f9858936ba7 13,175
+src/renderer/components/QuickActions.tsx
+  s_c9dd89ad1f6c54::t_429f9858936ba7 3,56-57,62,156-158
+extensions/task-vault/tests/components/DailyLogDialogs.spec.tsx
+  s_c9dd89ad1f6c54::t_429f9858936ba7 10,65,154
+tests/e2e/notepad-search.spec.ts
+  s_c9dd89ad1f6c54::t_429f9858936ba7 8,83
+tests/unit/packages/extension-ui/modal-shell.spec.tsx
+  s_c9dd89ad1f6c54::t_429f9858936ba7 1-178
+tests/e2e/modal-centre.ts
+  s_c9dd89ad1f6c54::t_429f9858936ba7 1-23,25-36
+  s_c9dd89ad1f6c54::t_d6846d42e2f319 24
+tests/unit/renderer/components/SettingsPanel.spec.tsx
+  s_c9dd89ad1f6c54::t_429f9858936ba7 8,57-58,60,112
+extensions/notepad/src/components/notepad.css
+  s_c9dd89ad1f6c54::t_429f9858936ba7 741
+tests/e2e/core-ipc.spec.ts
+  s_c9dd89ad1f6c54::t_429f9858936ba7 264
+eslint.config.mjs
+  s_c9dd89ad1f6c54::t_429f9858936ba7 175
+CHANGELOG.md
+  s_c9dd89ad1f6c54::t_d6846d42e2f319 11
+packages/extension-ui/src/Dialog.tsx
+  s_c9dd89ad1f6c54::t_429f9858936ba7 1,4,23,50-52,55-56,58-59,61-70,74-76,79-81,83-88,90-91,95-98,101-103,106,119
+tests/unit/renderer/components/MoveSessionDialog.spec.tsx
+  s_c9dd89ad1f6c54::t_429f9858936ba7 13,102
+src/renderer/components/QuickActions.css
+  s_c9dd89ad1f6c54::t_429f9858936ba7 1,15-23
+packages/extension-ui/README.md
+  s_c9dd89ad1f6c54::t_d6846d42e2f319 45
+  s_c9dd89ad1f6c54::t_429f9858936ba7 32-33,35,40-44,46-83,91-92
+src/renderer/components/LogWindow.tsx
+  s_c9dd89ad1f6c54::t_429f9858936ba7 33
+tests/unit/renderer/components/LinkIssueDialog.spec.tsx
+  s_c9dd89ad1f6c54::t_429f9858936ba7 8,238,241,244
+tests/e2e/notepad-harness.ts
+  s_c9dd89ad1f6c54::t_429f9858936ba7 4,36
+tests/e2e/app-menu.spec.ts
+  s_c9dd89ad1f6c54::t_429f9858936ba7 15,99
+extensions/notepad/tests/components/NoteList.spec.tsx
+  s_c9dd89ad1f6c54::t_429f9858936ba7 288
+tests/e2e/project.spec.ts
+  s_c9dd89ad1f6c54::t_429f9858936ba7 10,28
+tests/e2e/task-vault-today.spec.ts
+  s_c9dd89ad1f6c54::t_429f9858936ba7 12,102,122
+tests/e2e/workspace.spec.ts
+  s_c9dd89ad1f6c54::t_429f9858936ba7 3,19-22,57-60,80
+packages/extension-ui/stories/Dialog.stories.tsx
+  s_c9dd89ad1f6c54::t_429f9858936ba7 24,66-70,73-74,79-81,86-92,118
+tests/e2e/quick-actions.spec.ts
+  s_c9dd89ad1f6c54::t_429f9858936ba7 13,43-44,184,238
+docs/ARCHITECTURE.md
+  s_c9dd89ad1f6c54::t_429f9858936ba7 440,456-461,463,466-467
+  s_c9dd89ad1f6c54::t_d6846d42e2f319 465
+docs/EXTENSION-DEVELOPMENT.md
+  s_c9dd89ad1f6c54::t_d6846d42e2f319 436
+  s_c9dd89ad1f6c54::t_429f9858936ba7 373,418,430,437,439
+tests/e2e/git-commit-flow.spec.ts
+  s_c9dd89ad1f6c54::t_429f9858936ba7 8,121,158
+tests/e2e/notepad-notes.spec.ts
+  s_c9dd89ad1f6c54::t_429f9858936ba7 5,74
+tests/unit/renderer/components/AboutDialog.spec.tsx
+  s_c9dd89ad1f6c54::t_429f9858936ba7 7,56
+src/renderer/components/settings/SettingsPanel.css
+  s_c9dd89ad1f6c54::t_429f9858936ba7 2
+src/renderer/components/NotificationPanel.tsx
+  s_c9dd89ad1f6c54::t_429f9858936ba7 175
+tests/e2e/extension-smoke.spec.ts
+  s_c9dd89ad1f6c54::t_429f9858936ba7 178
+tests/unit/renderer/components/EditWorkspaceDialog.spec.tsx
+  s_c9dd89ad1f6c54::t_429f9858936ba7 10,140
+tests/unit/renderer/components/NotificationPanel.spec.tsx
+  s_c9dd89ad1f6c54::t_429f9858936ba7 59,62
+packages/extension-ui/src/useDismissible.ts
+  s_c9dd89ad1f6c54::t_429f9858936ba7 58,60,73,75,79,87,94-113,121-122
+tests/e2e/remote-app.spec.ts
+  s_c9dd89ad1f6c54::t_429f9858936ba7 1-7,9,109,113-119
+  s_c9dd89ad1f6c54::t_75698d61cae0f8 120-121
+packages/extension-ui/src/extension-ui.css
+  s_c9dd89ad1f6c54::t_d6846d42e2f319 24
+  s_c9dd89ad1f6c54::t_429f9858936ba7 8,10-22,25-38,41-42,47-48,57-58,71-72,75-80,82,84,108,110-112
+  s_c9dd89ad1f6c54::t_2340389b4bcc7c 23
+tests/setup.ts
+  s_c9dd89ad1f6c54::t_429f9858936ba7 4,63
+  s_c9dd89ad1f6c54::t_33270f324c2dee 64
+packages/extension-ui/src/Popover.tsx
+  s_c9dd89ad1f6c54::t_429f9858936ba7 2,31-32
+tests/e2e/task-vault-data.spec.ts
+  s_c9dd89ad1f6c54::t_429f9858936ba7 8,43
+extensions/notepad/tests/components/SearchOverlay.spec.tsx
+  s_c9dd89ad1f6c54::t_429f9858936ba7 4,49-50
+tests/support/native-dialog.ts
+  s_c9dd89ad1f6c54::t_429f9858936ba7 1-43
+extensions/notepad/src/components/QuickCreateOverlay.tsx
+  s_c9dd89ad1f6c54::t_429f9858936ba7 8,220-222,232-236,247
+packages/extension-ui/src/modal-stack.ts
+  s_c9dd89ad1f6c54::t_429f9858936ba7 1-18
+packages/extension-ui/src/index.ts
+  s_c9dd89ad1f6c54::t_429f9858936ba7 13-16,66
+packages/extension-ui/src/layers.ts
+  s_c9dd89ad1f6c54::t_d6846d42e2f319 11
+  s_c9dd89ad1f6c54::t_429f9858936ba7 9-10,21,23
+packages/extension-ui/stories/ModalShell.stories.tsx
+  s_c9dd89ad1f6c54::t_429f9858936ba7 1-256
+src/renderer/components/settings/SettingsPanel.tsx
+  s_c9dd89ad1f6c54::t_429f9858936ba7 1-2,24-27,29-35
+tests/e2e/modal-centre.spec.ts
+  s_c9dd89ad1f6c54::t_d6846d42e2f319 14
+  s_c9dd89ad1f6c54::t_429f9858936ba7 1-13,15-48
+docs/adr/110-modal-surfaces-use-the-native-dialog-element.md
+  s_c9dd89ad1f6c54::t_d6846d42e2f319 1-72
+tests/e2e/integrations.spec.ts
+  s_c9dd89ad1f6c54::t_429f9858936ba7 18,65
+tests/e2e/task-vault-capture.spec.ts
+  s_c9dd89ad1f6c54::t_429f9858936ba7 6,141
+tests/e2e/session-home.spec.ts
+  s_c9dd89ad1f6c54::t_429f9858936ba7 12,132
+docs/adr/038-dialogs-render-in-the-extension-view.md
+  s_c9dd89ad1f6c54::t_d6846d42e2f319 3
+extensions/notepad/src/components/SearchOverlay.tsx
+  s_c9dd89ad1f6c54::t_429f9858936ba7 3,77-78,88,96
+tests/e2e/helpers.ts
+  s_c9dd89ad1f6c54::t_429f9858936ba7 384
+tests/e2e/task-vault-board.spec.ts
+  s_c9dd89ad1f6c54::t_429f9858936ba7 5,85
+tests/unit/packages/extension-ui/use-dismissible.spec.tsx
+  s_c9dd89ad1f6c54::t_429f9858936ba7 95-113
+packages/extension-ui/visual/modal-keys.visual.ts
+  s_c9dd89ad1f6c54::t_429f9858936ba7 1-57
+extensions/task-vault/src/components/DateTimePicker.tsx
+  s_c9dd89ad1f6c54::t_429f9858936ba7 285-292,297,308-311,603
+docs/EXTENSION-STYLE.md
+  s_c9dd89ad1f6c54::t_d6846d42e2f319 169
+tests/e2e/core-quick-actions.spec.ts
+  s_c9dd89ad1f6c54::t_429f9858936ba7 148
+tests/e2e/extension-keyboard.spec.ts
+  s_c9dd89ad1f6c54::t_429f9858936ba7 103,131,152
+tests/unit/ConfirmDialog.spec.tsx
+  s_c9dd89ad1f6c54::t_429f9858936ba7 58,60,71,87
+tests/unit/renderer/components/QuickActions.spec.tsx
+  s_c9dd89ad1f6c54::t_429f9858936ba7 6,254-261
+tests/unit/renderer/components/CreateProjectDialog.spec.tsx
+  s_c9dd89ad1f6c54::t_429f9858936ba7 17,142,706
+tests/unit/renderer/components/LogWindow.spec.tsx
+  s_c9dd89ad1f6c54::t_429f9858936ba7 15,17
+extensions/notepad/README.md
+  s_c9dd89ad1f6c54::t_d6846d42e2f319 28
+packages/extension-ui/src/ModalShell.tsx
+  s_c9dd89ad1f6c54::t_429f9858936ba7 1-21,23-101
+  s_c9dd89ad1f6c54::t_d6846d42e2f319 22
+tests/support/modal.ts
+  s_c9dd89ad1f6c54::t_429f9858936ba7 1-7
+tests/e2e/pr-review-diff.spec.ts
+  s_c9dd89ad1f6c54::t_429f9858936ba7 13,148
+tests/unit/packages/extension-ui/toast.spec.tsx
+  s_c9dd89ad1f6c54::t_429f9858936ba7 4,88,96-130
+  s_c9dd89ad1f6c54::t_a6dc3587a64626 131
+tests/unit/renderer/components/NameTerminalDialog.spec.tsx
+  s_c9dd89ad1f6c54::t_429f9858936ba7 5,60,86
+tests/e2e/git-integration-smoke.spec.ts
+  s_c9dd89ad1f6c54::t_429f9858936ba7 50
+tests/unit/extensions/PrDialog.spec.tsx
+  s_c9dd89ad1f6c54::t_429f9858936ba7 8,61
+extensions/task-vault/tests/components/DatabaseAdmin.spec.tsx
+  s_c9dd89ad1f6c54::t_429f9858936ba7 6,137
+tests/e2e/notepad-export.spec.ts
+  s_c9dd89ad1f6c54::t_429f9858936ba7 8,64
+tests/e2e/extension-lifecycle.spec.ts
+  s_c9dd89ad1f6c54::t_429f9858936ba7 72
+tests/unit/renderer/components/SessionLinkDialog.spec.tsx
+  s_c9dd89ad1f6c54::t_429f9858936ba7 38,131,134
+extensions/task-vault/src/components/DatabaseAdmin.tsx
+  s_c9dd89ad1f6c54::t_429f9858936ba7 4,416,418-427,429
+extensions/task-vault/src/components/DailyLogDialogs.tsx
+  s_c9dd89ad1f6c54::t_429f9858936ba7 2,55,58-62,64-65
+extensions/task-vault/src/components/task-vault.css
+  s_c9dd89ad1f6c54::t_429f9858936ba7 4851,5038
+tests/e2e/settings.spec.ts
+  s_c9dd89ad1f6c54::t_429f9858936ba7 11,45
+tests/unit/packages/extension-ui/behaviour-matrix.spec.tsx
+  s_c9dd89ad1f6c54::t_429f9858936ba7 9,34-43,65,67,72,113,115,119
+README.md
+  s_c9dd89ad1f6c54::t_51a5532705b8b4 232,234
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2f23e21bfb52cf9318a09b7ebf0053cd05a4986d",
+  "prompts": {},
+  "sessions": {
+    "s_c9dd89ad1f6c54": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ee6b7f82-c708-43d8-8c1f-eefe55f692a9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
