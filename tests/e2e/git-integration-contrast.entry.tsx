@@ -331,6 +331,7 @@ window.electronAPI = electronApiOf({
     watchStart: async () => ({ ok: true as const }),
     watchStop: async () => ({ ok: true as const }),
   },
+  extension: { onSettingsChanged: () => () => {} },
 })
 
 function PrRail(): JSX.Element {

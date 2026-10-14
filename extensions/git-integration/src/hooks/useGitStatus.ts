@@ -72,12 +72,14 @@ async function startWatching(repoRoot: string, isCancelled: () => boolean): Prom
 
 type Refresh = () => Promise<void>
 
-/** Reads status now and on every change the watch reports; returns the way to stop. */
+/** Reads status now, on every change the watch reports, and when a setting changes (the file
+ * limit decides what status holds); returns the way to stop. */
 function followChanges(repoRoot: string, refresh: Refresh, isCancelled: () => boolean): () => void {
   const readIfVisible = () => {
     if (document.visibilityState !== 'hidden') void refresh()
   }
   const unsubscribe = window.electronAPI.fs.onChanged(readIfVisible)
+  const unsubscribeSettings = window.electronAPI.extension.onSettingsChanged(readIfVisible)
   document.addEventListener('visibilitychange', readIfVisible)
   let unwatchedRead: ReturnType<typeof setInterval> | undefined
   // The first read comes after the watch has started: a change made before the read is in it,
@@ -90,6 +92,7 @@ function followChanges(repoRoot: string, refresh: Refresh, isCancelled: () => bo
   })
   return () => {
     unsubscribe()
+    unsubscribeSettings()
     document.removeEventListener('visibilitychange', readIfVisible)
     clearInterval(unwatchedRead)
     void window.electronAPI.fs.watchStop()

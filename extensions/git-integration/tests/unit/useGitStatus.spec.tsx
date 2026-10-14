@@ -20,6 +20,7 @@ class FakeDesktop {
     watchStart: { ok: true },
   }
   private readonly changeHandlers = new Set<() => void>()
+  private readonly settingHandlers = new Set<() => void>()
 
   readonly electronAPI = {
     extensionBridge: {
@@ -36,6 +37,12 @@ class FakeDesktop {
         return () => this.changeHandlers.delete(handler)
       },
     },
+    extension: {
+      onSettingsChanged: (handler: () => void) => {
+        this.settingHandlers.add(handler)
+        return () => this.settingHandlers.delete(handler)
+      },
+    },
   }
 
   statusReads(): number {
@@ -44,6 +51,10 @@ class FakeDesktop {
 
   reportChange(): void {
     this.changeHandlers.forEach((handler) => handler())
+  }
+
+  changeSetting(): void {
+    this.settingHandlers.forEach((handler) => handler())
   }
 
   private answer(name: string): Promise<unknown> {
@@ -168,6 +179,27 @@ describe('useGitStatus — a reported change', () => {
     renderHook(() => useGitStatus('/repo'))
     await settle()
     await act(() => vi.advanceTimersByTimeAsync(60_000))
+    expect(desktop.statusReads()).toBe(1)
+  })
+})
+
+describe('useGitStatus — a changed setting', () => {
+  it('reads status again, since a setting decides what status shows', async () => {
+    desktop.answers['git:status'] = statusOn('twelve-files')
+    renderHook(() => useGitStatus('/repo'))
+    await settle()
+    desktop.answers['git:status'] = statusOn('first-ten-files')
+    act(() => desktop.changeSetting())
+    await settle()
+    expect(useGitStore.getState().status?.branch).toBe('first-ten-files')
+  })
+
+  it('hears of no setting once the view has gone', async () => {
+    const { unmount } = renderHook(() => useGitStatus('/repo'))
+    await settle()
+    unmount()
+    desktop.changeSetting()
+    await settle()
     expect(desktop.statusReads()).toBe(1)
   })
 })

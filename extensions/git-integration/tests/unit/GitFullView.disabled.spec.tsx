@@ -17,6 +17,7 @@ function answerStatusWith(answer: unknown) {
       watchStart: async () => ({ ok: true as const }),
       watchStop: async () => ({ ok: true as const }),
     },
+    extension: { onSettingsChanged: () => () => {} },
   })
 }
 
