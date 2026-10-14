@@ -172,11 +172,10 @@ test('the rail splits evenly between the outline and the comments', async () => 
 test('one panel takes the whole rail when the other is closed', async () => {
   const height = await inNotepad<{ comments: number; rail: number }>(
     `(async () => {
-       const byLabel = (text) =>
-         [...document.querySelectorAll('.notepad-view__toolbar button')]
-           .find((b) => b.textContent === text)
+       const byLabel = (name) =>
+         document.querySelector('.notepad-view__toolbar [aria-label="' + name + '"]')
        const rect = (sel) => document.querySelector(sel).getBoundingClientRect().height
-       byLabel('Hide outline').click()
+       byLabel('Outline').click()
        let out = { comments: rect('.notepad-view__comments'), rail: rect('.notepad-view__rail') }
        for (let i = 0; i < 30; i++) {
          await new Promise((r) => requestAnimationFrame(r))
@@ -204,8 +203,7 @@ test('the outline closes from the panel and comes back from the toolbar', async 
        for (let i = 0; i < 30 && count() !== 0; i++) await new Promise((r) => requestAnimationFrame(r))
        const closed = count()
 
-       const toolbarBtn = [...document.querySelectorAll('.notepad-view__toolbar button')]
-         .find((b) => b.textContent === 'Outline')
+       const toolbarBtn = document.querySelector('.notepad-view__toolbar [aria-label="Outline"]')
        toolbarBtn.click()
        for (let i = 0; i < 30 && count() === 0; i++) await new Promise((r) => requestAnimationFrame(r))
        return { open, closed, reopened: count() }
@@ -218,12 +216,11 @@ test('closing both rail panels gives the width back to the editor', async () => 
   const widths = await inNotepad<{ withRail: number; withoutRail: number }>(
     `(async () => {
        const editor = document.querySelector('.notepad-view__editor')
-       const byLabel = (text) =>
-         [...document.querySelectorAll('.notepad-view__toolbar button')]
-           .find((b) => b.textContent === text)
+       const byLabel = (name) =>
+         document.querySelector('.notepad-view__toolbar [aria-label="' + name + '"]')
        const withRail = editor.getBoundingClientRect().width
-       byLabel('Hide outline').click()
-       byLabel('Hide comments').click()
+       byLabel('Outline').click()
+       byLabel('Comments').click()
        let withoutRail = editor.getBoundingClientRect().width
        for (let i = 0; i < 30 && withoutRail <= withRail + 200; i++) {
          await new Promise((r) => requestAnimationFrame(r))
@@ -231,7 +228,7 @@ test('closing both rail panels gives the width back to the editor', async () => 
        }
        // Put it back for whatever runs next.
        byLabel('Outline').click()
-       byLabel('Show comments').click()
+       byLabel('Comments').click()
        for (let i = 0; i < 30; i++) {
          await new Promise((r) => requestAnimationFrame(r))
          if (document.querySelectorAll('.notepad-outline__item').length > 0) break

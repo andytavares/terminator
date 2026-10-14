@@ -1,6 +1,7 @@
 import './notepad.css'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { Button } from '@terminator/extension-ui'
+import { ListTree } from 'lucide-react'
+import { IconButton, SegmentedControl, type SegmentedOption } from '@terminator/extension-ui'
 import type { EditorView } from '@codemirror/view'
 import { useEditorStore } from '../stores/editor.store'
 import { useCommentsStore } from '../stores/comments.store'
@@ -219,27 +220,30 @@ function WindowTitlebar({ note, noteWindow }: WindowTitlebarProps): React.JSX.El
   )
 }
 
+const PREVIEW_MODES: readonly SegmentedOption<'live' | 'source'>[] = [
+  { value: 'live', label: 'Live', title: 'Edit the rendered note' },
+  { value: 'source', label: 'Source', title: 'Edit the raw markdown' },
+]
+
 function ViewModeButtons({ noteWindow }: { noteWindow: NoteWindow }): React.JSX.Element {
   const { showOutline, setShowOutline } = noteWindow
-  const { previewMode, togglePreviewMode } = useEditorStore()
+  const { previewMode, setPreviewMode } = useEditorStore()
   return (
     <>
-      <Button
-        variant="ghost"
+      <SegmentedControl
+        label="View"
         size="sm"
-        onClick={togglePreviewMode}
-        title={previewMode ? 'Show raw markdown source' : 'Show the rendered live preview'}
-      >
-        {previewMode ? 'Markdown' : 'Live'}
-      </Button>
-      <Button
-        variant="ghost"
-        size="sm"
+        options={PREVIEW_MODES}
+        value={previewMode ? 'live' : 'source'}
+        onChange={(mode) => setPreviewMode(mode === 'live')}
+      />
+      <IconButton
+        icon={ListTree}
+        label="Outline"
+        description={showOutline ? 'Hide the heading outline' : 'Show the heading outline'}
+        pressed={showOutline}
         onClick={() => setShowOutline((v) => !v)}
-        title={showOutline ? 'Hide the heading outline' : 'Show the heading outline'}
-      >
-        {showOutline ? 'Hide outline' : 'Outline'}
-      </Button>
+      />
     </>
   )
 }

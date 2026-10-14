@@ -34,7 +34,7 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 4px;
   padding: 6px 12px;
   border-bottom: 1px solid var(--tm-border);
   height: 36px;
@@ -42,8 +42,16 @@
 }
 
 .notepad-view__save-status {
+  margin-right: auto;
   font-size: 11px;
   color: var(--tm-text-muted);
+}
+
+.notepad-view__toolbar-divider {
+  width: 1px;
+  height: 16px;
+  margin: 0 6px;
+  background: var(--tm-border);
 }
 
 .notepad-view__editor-wrap {

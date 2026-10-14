@@ -207,3 +207,53 @@ describe('NotepadView with Notepad settings changed', () => {
     )
   })
 })
+
+const viewMode = (name: string) => screen.getByRole('radio', { name })
+const editor = () => mountedEditorView()
+
+describe('NotepadView toolbar view modes', () => {
+  it('offers Live, Source and Read as one choice, starting on Live', async () => {
+    await openNote()
+    expect(viewMode('Live').getAttribute('aria-checked')).toBe('true')
+    expect(viewMode('Source').getAttribute('aria-checked')).toBe('false')
+    expect(viewMode('Read').getAttribute('aria-checked')).toBe('false')
+    expect(editor().state.readOnly).toBe(false)
+  })
+
+  it('Read makes the rendered note read-only; Source shows editable markdown', async () => {
+    await openNote()
+    fireEvent.click(viewMode('Read'))
+    await eventually(() => expect(editor().state.readOnly).toBe(true))
+    expect(useEditorStore.getState().previewMode).toBe(true)
+
+    fireEvent.click(viewMode('Source'))
+    await eventually(() => expect(editor().state.readOnly).toBe(false))
+    expect(useEditorStore.getState().previewMode).toBe(false)
+    expect(viewMode('Source').getAttribute('aria-checked')).toBe('true')
+  })
+
+  it('Read from Source renders the note rather than reading raw markdown', async () => {
+    useEditorStore.setState({ previewMode: false })
+    await openNote()
+    fireEvent.click(viewMode('Read'))
+    await eventually(() => expect(editor().state.readOnly).toBe(true))
+    expect(useEditorStore.getState().previewMode).toBe(true)
+  })
+})
+
+describe('NotepadView toolbar panel buttons', () => {
+  it('outline and comments are pressed toggles that hide and show their panels', async () => {
+    await openNote()
+    const outline = screen.getByRole('button', { name: 'Outline' })
+    const comments = screen.getByRole('button', { name: 'Comments' })
+    expect(outline.getAttribute('aria-pressed')).toBe('true')
+    expect(comments.getAttribute('aria-pressed')).toBe('true')
+
+    fireEvent.click(outline)
+    fireEvent.click(comments)
+    expect(outline.getAttribute('aria-pressed')).toBe('false')
+    expect(comments.getAttribute('aria-pressed')).toBe('false')
+    expect(document.querySelector('.notepad-outline')).toBeNull()
+    expect(document.querySelector<HTMLElement>('.notepad-view__comments')?.hidden).toBe(true)
+  })
+})

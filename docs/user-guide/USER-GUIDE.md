@@ -1012,7 +1012,8 @@ The **new item dialog** offers three types:
 ### Note features
 
 - **Live preview** — toggle between edit and rendered Markdown view.
-- **Outline** — the open note's headings, in the right rail above the comments, nested by heading level. Click one to jump the editor to that heading. With the comments open the two split the rail evenly — half each, whatever either one holds; with one closed the other takes the whole rail. Close the outline from the button in its header and bring it back with **Outline** in the toolbar; closing both gives the whole width to the editor. The same panel is in a popped-out note window. Headings inside fenced code blocks are not listed, and depth is measured from the note's own top heading, so a note that starts at `##` is not indented for it.
+- **Outline** — the open note's headings, in the right rail above the comments, nested by heading level. Click one to jump the editor to that heading. With the comments open the two split the rail evenly — half each, whatever either one holds; with one closed the other takes the whole rail. Close the outline from the button in its header and bring it back with the **Outline** icon in the toolbar; closing both gives the whole width to the editor. The same panel is in a popped-out note window. Headings inside fenced code blocks are not listed, and depth is measured from the note's own top heading, so a note that starts at `##` is not indented for it.
+- **View modes** — the toolbar's **Live / Source / Read** control: edit the rendered note, edit its raw markdown, or read it without editing.
 - **Margin comments** — pin comments at any position in the note body.
 - **Full-text search** — type in the search bar to filter notes by content.
 - **Multi-tag filter** — click the Tags button in the sidebar to open a multiselect dropdown and filter by one or more tags simultaneously.

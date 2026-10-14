@@ -58,11 +58,13 @@ function editorStoreSaveStatusTests() {
 }
 
 function editorStorePreviewModeTests() {
-  it('togglePreviewMode flips previewMode', () => {
+  it('setPreviewMode sets previewMode to the value given, whatever it was', () => {
     expect(useEditorStore.getState().previewMode).toBe(true)
-    useEditorStore.getState().togglePreviewMode()
+    useEditorStore.getState().setPreviewMode(false)
     expect(useEditorStore.getState().previewMode).toBe(false)
-    useEditorStore.getState().togglePreviewMode()
+    useEditorStore.getState().setPreviewMode(false)
+    expect(useEditorStore.getState().previewMode).toBe(false)
+    useEditorStore.getState().setPreviewMode(true)
     expect(useEditorStore.getState().previewMode).toBe(true)
   })
 }
