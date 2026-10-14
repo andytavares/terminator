@@ -1,9 +1,9 @@
 import { describe, it, expect, afterAll, vi } from 'vitest'
-import { execFileSync } from 'node:child_process'
 import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { runAgentReview, type RunAgentReviewInput } from '../../src/review/review-agent'
+import { isProcessAlive } from '../../../../tests/support/processes'
 
 // A real `claude` starts processes of its own (tools' shells, MCP servers); cancelling a review,
 // as deactivation does for every run, must end those too. This stand-in claude starts a `sleep`
@@ -29,16 +29,6 @@ const input: RunAgentReviewInput = {
   request: 'review',
   sessionId: 'sess-1',
   model: 'opus',
-}
-
-/** Running, and not a zombie waiting for its new parent to reap it. */
-function isProcessAlive(pid: number): boolean {
-  try {
-    const state = execFileSync('ps', ['-o', 'stat=', '-p', String(pid)], { encoding: 'utf8' })
-    return !state.startsWith('Z')
-  } catch {
-    return false
-  }
 }
 
 describe('runAgentReview — cancelling a running claude', () => {
