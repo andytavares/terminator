@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Button, IconButton, useDismissible } from '@terminator/extension-ui'
+import { invoke } from '@terminator/extension-sdk/renderer'
 import { DateTimePicker } from './DateTimePicker'
 import {
   Zap,
@@ -115,10 +116,6 @@ type Combo = ReturnType<typeof useCombobox>
 type CreateForm = ReturnType<typeof useCreateProject>
 
 type AreaEdit = ReturnType<typeof useAreaEdit>
-
-function invoke(channel: string, payload?: unknown): Promise<unknown> {
-  return window.electronAPI.extensionBridge.invoke(channel, payload)
-}
 
 function errorOf(result: unknown): string | null {
   if (result && typeof result === 'object' && 'error' in result) {
