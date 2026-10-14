@@ -1,7 +1,7 @@
 import type { z } from 'zod'
 import type { ExtensionDB } from '@terminator/extension-sdk'
 import { route, type IpcContext } from './register'
-import { localDate } from '../utils/local-date'
+import { storedInstant, zonedNow } from '../vault/clock'
 import {
   GetProjectTasksRequestSchema,
   ListArchiveRequestSchema,
@@ -122,7 +122,7 @@ async function projectTasks(
 function listArchive({ db }: IpcContext, args: z.infer<typeof ListArchiveRequestSchema>) {
   const days = args.days ?? 30
   return orErrorString(async () => {
-    const cutoff = localDate(new Date(Date.now() - days * 86400000))
+    const cutoff = storedInstant(zonedNow().subtract({ days }).startOfDay())
     const taskRows = await db.query<Row>(
       `SELECT ${TASK_COLS} FROM tasks t ${TASK_JOINS}
          WHERE t.status IN ('done','cancelled','migrated') AND t.updated_at >= ? ORDER BY t.updated_at DESC`,

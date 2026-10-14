@@ -20,3 +20,8 @@ export function today(): string {
 export function daysAgo(days: number): string {
   return zonedNow().toPlainDate().subtract({ days }).toString()
 }
+
+/** An instant as created_at and updated_at hold it: what Date.toISOString() writes. */
+export function storedInstant(at: Temporal.ZonedDateTime): string {
+  return at.toInstant().toString({ fractionalSecondDigits: 3 })
+}

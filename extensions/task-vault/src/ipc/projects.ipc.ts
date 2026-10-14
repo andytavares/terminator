@@ -26,7 +26,7 @@ import {
   TASK_JOINS,
 } from '../vault/mappers'
 import { findOrCreateArea, indexUpdated, nowIso } from './vault-shared'
-import { daysAgo } from '../vault/clock'
+import { daysAgo, storedInstant, zonedNow } from '../vault/clock'
 
 type Row = Record<string, unknown>
 
@@ -86,7 +86,7 @@ async function reviewProjects(db: ExtensionDB) {
 async function reviewTasks(db: ExtensionDB) {
   const tasks = async (sql: string, params?: unknown[]) =>
     (await db.query<Row>(sql, params)).map(rowToTask)
-  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+  const sevenDaysAgo = storedInstant(zonedNow().subtract({ days: 7 }))
   return {
     inboxItems: await tasks(`SELECT * FROM tasks WHERE source='inbox' AND status='open'`),
     somedayTasks: await tasks(

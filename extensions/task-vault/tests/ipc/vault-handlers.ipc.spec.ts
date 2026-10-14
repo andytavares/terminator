@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import type { ExtensionDB } from '@terminator/extension-sdk'
 import { localDate } from '../../src/utils/local-date'
 import {
@@ -10,6 +10,7 @@ import {
   selectTaskRow,
   taskMetadata,
 } from '../support/vault-db'
+import { restoreLocalClock, setLocalClock } from '../support/clock'
 
 vi.mock('../../src/notifications/task-scheduler.js', () => ({
   triggerSchedulerTick: vi.fn(),
@@ -852,6 +853,7 @@ function taskVaultVaultTaskDetailSavingMissingTasksTests() {
 
 function taskVaultVaultListArchiveTests() {
   describe('listing', taskVaultVaultListArchiveListingTests)
+  describe('the window', taskVaultVaultListArchiveWindowTests)
   describe('areas and errors', taskVaultVaultListArchiveAreasErrorsTests)
 }
 
@@ -876,6 +878,53 @@ function taskVaultVaultListArchiveListingTests() {
     expect(result.tasks.map((task) => task.id).sort()).toEqual(['recent-cancelled', 'recent-done'])
     expect(result.projects.map((project) => project.name)).toEqual(['Old Project'])
     expect(result.areas).toEqual([{ id: 'a-old', name: 'Old Area', updatedAt: expect.any(String) }])
+  })
+}
+
+/** The ids of the tasks finished within the last `days` days. */
+async function archivedTaskIds(days: number): Promise<string[]> {
+  const result = (await harness.invoke('task-vault:vault:list-archive', { days })) as {
+    tasks: { id: string }[]
+  }
+  return result.tasks.map((task) => task.id).sort()
+}
+
+function taskVaultVaultListArchiveWindowTests() {
+  afterEach(restoreLocalClock)
+
+  it('starts at local midnight west of UTC, the night the clocks went forward', async () => {
+    // Monday 00:30 in New York. One day back is Sunday, which began at 05:00 UTC.
+    setLocalClock('America/New_York', '2026-03-09T04:30:00.000Z')
+    await seedTask(db, {
+      id: 'saturday-2345',
+      status: 'done',
+      updatedAt: '2026-03-08T04:45:00.000Z',
+    })
+    await seedTask(db, { id: 'sunday-0010', status: 'done', updatedAt: '2026-03-08T05:10:00.000Z' })
+
+    expect(await archivedTaskIds(1)).toEqual(['sunday-0010'])
+  })
+
+  it('starts at local midnight east of UTC', async () => {
+    // Wednesday 01:00 in Auckland. One day back is Tuesday, which began at 12:00 UTC on Monday.
+    setLocalClock('Pacific/Auckland', '2026-06-30T13:00:00.000Z')
+    await seedTask(db, { id: 'monday-2330', status: 'done', updatedAt: '2026-06-29T11:30:00.000Z' })
+    await seedTask(db, {
+      id: 'tuesday-0900',
+      status: 'done',
+      updatedAt: '2026-06-29T21:00:00.000Z',
+    })
+
+    expect(await archivedTaskIds(1)).toEqual(['tuesday-0900'])
+  })
+
+  it('takes whole days only', async () => {
+    await seedTask(db, { id: 'done', status: 'done', updatedAt: new Date().toISOString() })
+
+    const answer = await harness.invoke('task-vault:vault:list-archive', { days: 1.5 })
+
+    expect(answer).not.toHaveProperty('tasks')
+    expect(answer).not.toMatchObject({ error: expect.stringContaining('RangeError') })
   })
 }
 

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import type { ExtensionDB } from '@terminator/extension-sdk'
 import { localDate } from '../../src/utils/local-date'
 import {
@@ -9,6 +9,7 @@ import {
   seedTask,
   selectTaskRow,
 } from '../support/vault-db'
+import { restoreLocalClock, setLocalClock } from '../support/clock'
 
 vi.mock('../../src/notifications/task-scheduler.js', () => ({
   broadcast: vi.fn(),
@@ -250,6 +251,19 @@ function taskVaultProjectsWeeklyReviewSomedayCompletedTests() {
     await seedTask(db, { id: 'open', updatedAt: recent })
 
     expect(sortedIds((await weeklyReviewVia()).completedLastWeek)).toEqual(['recent'])
+  })
+
+  describe('in a week the clocks changed', () => {
+    afterEach(restoreLocalClock)
+
+    it('goes back seven days on the wall clock, not 168 hours', async () => {
+      // Tuesday 10:00 in New York, two days after the clocks went forward.
+      setLocalClock('America/New_York', '2026-03-10T14:00:00.000Z')
+      await seedTask(db, { id: 'at-0930', status: 'done', updatedAt: '2026-03-03T14:30:00.000Z' })
+      await seedTask(db, { id: 'at-1030', status: 'done', updatedAt: '2026-03-03T15:30:00.000Z' })
+
+      expect(sortedIds((await weeklyReviewVia()).completedLastWeek)).toEqual(['at-1030'])
+    })
   })
 }
 

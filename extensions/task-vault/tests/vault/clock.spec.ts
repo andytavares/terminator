@@ -1,20 +1,8 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { daysAgo, today, zonedNow } from '../../src/vault/clock'
+import { describe, it, expect, afterEach } from 'vitest'
+import { daysAgo, storedInstant, today, zonedNow } from '../../src/vault/clock'
+import { restoreLocalClock, setLocalClock as setClock } from '../support/clock'
 
-/** Sets the machine's time zone and the instant it reads as now. */
-function setClock(timeZone: string, instant: string): void {
-  vi.stubEnv('TZ', timeZone)
-  vi.setSystemTime(new Date(instant))
-}
-
-beforeEach(() => {
-  vi.useFakeTimers()
-})
-
-afterEach(() => {
-  vi.useRealTimers()
-  vi.unstubAllEnvs()
-})
+afterEach(restoreLocalClock)
 
 describe('today', () => {
   it('is the date on the wall, not the UTC date', () => {
@@ -56,5 +44,17 @@ describe('zonedNow', () => {
   it('is the instant the system clock reads', () => {
     setClock('Asia/Tokyo', '2026-03-10T02:30:00.000Z')
     expect(zonedNow().epochMilliseconds).toBe(Date.parse('2026-03-10T02:30:00.000Z'))
+  })
+})
+
+describe('storedInstant', () => {
+  it('writes an instant as created_at and updated_at hold it', () => {
+    setClock('Asia/Tokyo', '2026-03-10T02:30:00.000Z')
+    expect(storedInstant(zonedNow())).toBe(new Date().toISOString())
+  })
+
+  it('keeps three decimals when the milliseconds are not zero', () => {
+    setClock('America/New_York', '2026-03-10T02:30:00.120Z')
+    expect(storedInstant(zonedNow())).toBe('2026-03-10T02:30:00.120Z')
   })
 })
