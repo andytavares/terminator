@@ -1,0 +1,23 @@
+tests/e2e/control-alignment.ts
+  s_dc878271adf24d::t_c44741d89a11a3 6
+tests/e2e/helpers.ts
+  s_dc878271adf24d::t_c44741d89a11a3 73
+packages/extension-ui/src/icon-tooltips.ts
+  s_dc878271adf24d::t_c44741d89a11a3 3-4
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "cdcd3336b3bd9a47e461fa3901a582f04e298895",
+  "prompts": {},
+  "sessions": {
+    "s_dc878271adf24d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "45251aad-8da0-4892-86db-9ec0654f5a1f",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
