@@ -1,0 +1,24 @@
+extensions/task-vault/src/index.ts
+  s_c9dd89ad1f6c54::t_1958246100a7ed 31,323-341,345-351,377
+CHANGELOG.md
+  s_c9dd89ad1f6c54::t_32f81d457e4fd2 85
+extensions/task-vault/tests/index.spec.ts
+  s_c9dd89ad1f6c54::t_61fdc47ee971d1 174,179-202
+  s_c9dd89ad1f6c54::t_f5c3a098203c34 175-178
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "405dae2b81113cbf5725eccd1f44f35f5092fea1",
+  "prompts": {},
+  "sessions": {
+    "s_c9dd89ad1f6c54": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ee6b7f82-c708-43d8-8c1f-eefe55f692a9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
