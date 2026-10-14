@@ -1,0 +1,19 @@
+tests/e2e/git-integration-stacking.spec.ts
+  s_dc878271adf24d::t_7a2408437ae245 125-175
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "0cb5c2ba55ed71b9b444e576c9898a6b8c6dc958",
+  "prompts": {},
+  "sessions": {
+    "s_dc878271adf24d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "45251aad-8da0-4892-86db-9ec0654f5a1f",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
