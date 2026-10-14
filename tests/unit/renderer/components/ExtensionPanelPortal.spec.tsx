@@ -23,6 +23,8 @@ vi.stubGlobal(
 
 import { ExtensionPanelPortal } from '../../../../src/renderer/components/ExtensionPanelPortal.js'
 import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
+import { useShownExtensionViews } from '../../../../src/renderer/stores/shown-extension-views.store'
+import { useModalStore } from '../../../../src/renderer/stores/modal.store'
 
 const mockExitExtensionToTerminal = vi.fn()
 
@@ -197,6 +199,15 @@ describe('ExtensionPanelPortal — remote/browser mode (onExtensionPanelLoaded a
     expect(iframe.src).toContain('/ext/com.test.ext/')
     expect(iframe.src).toContain('viewParam=pr-review')
   })
+
+  it('marks the extension shown while its frame is active, as the frame draws its own toasts', () => {
+    const { unmount } = render(
+      <ExtensionPanelPortal extensionId="com.test.ext" viewParam="main" isActive={true} />
+    )
+    expect([...useShownExtensionViews.getState().shown.values()]).toEqual(['com.test.ext'])
+    unmount()
+    expect([...useShownExtensionViews.getState().shown.values()]).toEqual([])
+  })
 })
 
 describe('ExtensionPanelPortal — remote/browser mode (onExtensionPanelLoaded absent) — iframe includes repoRoot in query params when provided', () => {
@@ -305,5 +316,29 @@ describe('ExtensionPanelPortal — remote/browser mode (onExtensionPanelLoaded a
       win?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
     })
     expect(mockExitExtensionToTerminal).not.toHaveBeenCalled()
+  })
+})
+
+describe('ExtensionPanelPortal — tells the core which extension covers the toast region', () => {
+  const shownIds = () => [...useShownExtensionViews.getState().shown.values()]
+
+  it('marks the extension shown while its panel is active, and not after', () => {
+    const { rerender, unmount } = render(
+      <ExtensionPanelPortal extensionId="com.test.ext" viewParam="main" isActive={true} />
+    )
+    expect(shownIds()).toEqual(['com.test.ext'])
+    rerender(<ExtensionPanelPortal extensionId="com.test.ext" viewParam="main" isActive={false} />)
+    expect(shownIds()).toEqual([])
+    rerender(<ExtensionPanelPortal extensionId="com.test.ext" viewParam="main" isActive={true} />)
+    unmount()
+    expect(shownIds()).toEqual([])
+  })
+
+  it('does not mark it while a modal hides the view', () => {
+    act(() => useModalStore.getState().push())
+    render(<ExtensionPanelPortal extensionId="com.test.ext" viewParam="main" isActive={true} />)
+    expect(shownIds()).toEqual([])
+    act(() => useModalStore.getState().pop())
+    expect(shownIds()).toEqual(['com.test.ext'])
   })
 })

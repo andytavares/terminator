@@ -154,8 +154,9 @@ test('resolving every conflict commits the merge, and the failed push is reporte
   await expect(view.getByText('All conflicts resolved')).toBeVisible()
   await view.getByRole('button', { name: 'Commit merge' }).click()
 
+  // The Git view draws its own toast: the core's would sit under the view.
   await expect(
-    handle.page.locator('.tmui-toast__message', { hasText: 'Committed but push failed' })
+    view.locator('.tmui-toast__message', { hasText: 'Committed but push failed' })
   ).toBeVisible({ timeout: 15000 })
   expect(git(repo, 'rev-list', '--parents', '-n', '1', 'HEAD').split(' ')).toHaveLength(3)
   expect(git(repo, 'status', '--porcelain')).toBe('')

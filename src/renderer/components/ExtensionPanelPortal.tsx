@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useModalStore } from '../stores/modal.store'
+import { useShownExtensionViews } from '../stores/shown-extension-views.store'
 import { useExtensionRegistry } from '../extensions/registry'
 import { createDoubleEscapeDetector } from '../../shared/double-escape'
 import { focusActiveTerminal } from '../lib/focus-terminal'
@@ -56,34 +57,45 @@ function frameSrc({ extensionId, viewParam, repoRoot }: Props): string {
   return `/ext/${extensionId}/?${params.toString()}`
 }
 
-function RemoteIframe(props: Props): JSX.Element {
-  const { extensionId, viewParam, isActive } = props
-  const iframeRef = useRef<HTMLIFrameElement>(null)
-  const src = frameSrc(props)
+/** Marks the extension's view on screen while it is, so the core leaves its toasts to it. */
+function useShownWhileVisible({ extensionId, viewParam }: Surface, visible: boolean): void {
+  useEffect(() => {
+    if (!visible) return
+    const viewKey = `${extensionId}:${viewParam}`
+    const { show, hide } = useShownExtensionViews.getState()
+    show(viewKey, extensionId)
+    return () => hide(viewKey)
+  }, [extensionId, viewParam, visible])
+}
 
-  // Native panels get the double-Escape exit from the webview preload; browser
-  // clients have no preload, so the host page listens on the same-origin frame.
+/** Native panels get the double-Escape exit from the webview preload; browser
+ * clients have no preload, so the host page listens on the same-origin frame. */
+function useDoubleEscapeInFrame(
+  iframeRef: React.RefObject<HTMLIFrameElement>,
+  { extensionId, viewParam }: Surface
+): void {
   useEffect(() => {
     const iframe = iframeRef.current
     if (!iframe) return
     return listenInFrame(iframe, doubleEscapeListener({ extensionId, viewParam }))
-  }, [extensionId, viewParam])
+  }, [iframeRef, extensionId, viewParam])
+}
 
+function RemoteIframe(props: Props): JSX.Element {
+  const { extensionId, viewParam, isActive } = props
+  const iframeRef = useRef<HTMLIFrameElement>(null)
+  useShownWhileVisible({ extensionId, viewParam }, isActive)
+  useDoubleEscapeInFrame(iframeRef, { extensionId, viewParam })
+  const display = isActive ? 'flex' : 'none'
   return (
     <div
       data-extension-panel={extensionId}
       data-view-param={viewParam}
-      style={{
-        flex: 1,
-        minHeight: 0,
-        minWidth: 0,
-        display: isActive ? 'flex' : 'none',
-        flexDirection: 'column',
-      }}
+      style={{ flex: 1, minHeight: 0, minWidth: 0, display, flexDirection: 'column' }}
     >
       <iframe
         ref={iframeRef}
-        src={src}
+        src={frameSrc(props)}
         style={{ flex: 1, border: 'none', width: '100%', minHeight: 0 }}
         allow="clipboard-read; clipboard-write"
       />
@@ -116,6 +128,7 @@ function usePanelBounds(
   { extensionId, viewParam, isActive, repoRoot = null }: Props
 ): void {
   const modalOpen = useModalStore((s) => s.depth > 0)
+  useShownWhileVisible({ extensionId, viewParam }, isActive && !modalOpen)
   useEffect(() => {
     const el = containerRef.current
     if (!el) return

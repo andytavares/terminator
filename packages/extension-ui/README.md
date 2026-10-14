@@ -35,6 +35,7 @@ should define a colour.
 | `ToastRegion`, `Toast`                           | transient messages; shown inside the modal shell on top while one is open                                                     |
 | `EmptyState`                                     | heading, one line of why, and the control that fills it                                                                       |
 | `installIconTooltips`                            | call once per document: names every icon-only control on hover (after 500 ms) or keyboard focus, from its title or aria-label |
+| `PushedToasts`                                   | draws the extension's own pushed notifications that go to a toast; mount one per view (`source`, `subscribe`)                 |
 | `Markdown`                                       | react-markdown with GFM and sanitised raw HTML (ADR 091); `inline`, `fetchesNothing`                                          |
 | `RelativeTime`, `formatRelativeTime`             | "5 minutes ago" through `Intl.RelativeTimeFormat`                                                                             |
 

@@ -222,6 +222,9 @@ test('a backlog item is picked up for today, another is deleted', async () => {
     .locator('.tmui-toast')
     .filter({ hasText: 'Moved to backlog: Send the invites' })
   await expect(toast, 'one move, one toast').toHaveCount(1)
+  // The core leaves it to the vault, whose view covers the core's toast region.
+  const coreCopy = handle.page.locator('.tmui-toast').filter({ hasText: 'Moved to backlog' })
+  await expect(coreCopy).toHaveCount(0)
   await rowAction('Draft the agenda', 'Send to backlog')
   await expect(backlogRow('Draft the agenda')).toBeVisible()
 

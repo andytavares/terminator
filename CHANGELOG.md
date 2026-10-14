@@ -84,6 +84,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- Extension toasts no longer sit under the extension's view. While an extension's view is on screen (or its frame, in the browser), the core leaves that extension's toasts to the view; every bundled extension view now draws its own (`PushedToasts` in the design system, Task Vault's own region). Elsewhere the core draws them as before
 - Reviews: a row's Open and Clone and review buttons no longer cover its size and reading time on hover
 - Review screen: the unified diff spans the pane again. The Git tab's stylesheet made every diff row a flex box, squeezing the code column to 200px and hiding the hunk header
 - Home and Overview: a terminal preview shows the line being written instead of a blank box. The preview guessed 16px rows where xterm draws 18px, so it followed the cursor to the empty middle of a fullscreen program such as Claude Code; it also re-fits when its box resizes

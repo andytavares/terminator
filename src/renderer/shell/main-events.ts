@@ -7,6 +7,7 @@ import { useSettingsStore } from '../stores/settings.store'
 import { useLogStore } from '../stores/log.store'
 import { useNotificationStore } from '../stores/notification.store'
 import { useToastStore } from '../stores/toast.store'
+import { isExtensionViewShown } from '../stores/shown-extension-views.store'
 import { dispatchNotification } from '../lib/notifications'
 import { recordDirectUse } from '../quick-actions/usage'
 import { findSurface, type SurfaceRegistration } from '../quick-actions/surface-actions'
@@ -96,7 +97,8 @@ export function useNotificationFeed(): void {
     })
     return window.electronAPI.notifications?.onPush((n) => {
       if (n.targets.includes('center')) addNotification(n)
-      if (n.targets.includes('toast')) {
+      // An extension whose view is on screen draws its own: the core's would sit under the view.
+      if (n.targets.includes('toast') && !isExtensionViewShown(n.source)) {
         const message = n.message ? `${n.title}: ${n.message}` : n.title
         useToastStore.getState().addToast({ type: n.type, message })
       }

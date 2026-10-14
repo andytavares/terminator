@@ -13,6 +13,7 @@ import {
   runQuickActionFromPanel,
 } from './helpers'
 import { git, makeFixtureRepo } from './foundry-harness'
+import { gitView } from './git-harness'
 
 // The bundled extensions' commands no other spec runs, run from Quick
 // Actions like any operator would, each asserted by what it brings up.
@@ -80,11 +81,11 @@ test('Git → Pull fast-forwards to a commit pushed elsewhere', async () => {
   git(other, 'commit', '-m', 'pushed elsewhere')
   git(other, 'push', 'origin', 'main')
   await runQuickActionFromPanel(handle.page, 'Pull')
-  await expect(handle.page.locator('.tmui-toast__message', { hasText: 'Pulled main' })).toBeVisible(
-    {
-      timeout: 15000,
-    }
-  )
+  // The Git tab is on screen, so its view draws the toast: the core's would sit under it.
+  const view = await gitView(handle, 'project')
+  await expect(view.locator('.tmui-toast__message', { hasText: 'Pulled main' })).toBeVisible({
+    timeout: 15000,
+  })
   const head = execFileSync('git', ['log', '-1', '--format=%s'], { cwd: repo }).toString().trim()
   expect(head).toBe('pushed elsewhere')
 })
