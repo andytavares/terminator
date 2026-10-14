@@ -46,13 +46,6 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Install the Developer ID G2 intermediate
-        # codesign builds the signing chain from the keychains, and the runner
-        # ships only the authority that expires 2027-02-01.
-        run: |
-          curl -sSfo "$RUNNER_TEMP/DeveloperIDG2CA.cer" https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer
-          sudo security add-certificates -k /Library/Keychains/System.keychain "$RUNNER_TEMP/DeveloperIDG2CA.cer"
-
       - name: Package
         env:
           CSC_LINK: ${{ secrets.APPLE_CERTIFICATE }}
