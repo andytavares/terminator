@@ -39,10 +39,9 @@ const NOTIFY = /^(.+)\.notify\.([^.]+)\.(system|center|toast)$/
 /** Values chosen so their effect can be checked below; the rest only differ from the default. */
 const CHOSEN: Record<string, unknown> = {
   'terminator.git-integration.git.enabled': false,
-  // Foundry sets this itself when it shows its notice, already true by now. Its
-  // records folder is set first (dataDir), after which it never shows it again,
-  // so false is written and stays.
-  'terminator.foundry.untrackedNoticeSeen': false,
+  // Foundry sets this itself when it shows its notice, which it has not yet: the app started
+  // with no workspace, so no records sit beside one. Written here, it stays.
+  'terminator.foundry.untrackedNoticeSeen': true,
   'terminator.foundry.budgets.agents': 7,
   'terminator.foundry.budgets.wallClockMinutes': 50,
   'terminator.foundry.criticalPaths': ['src/auth/**'],
