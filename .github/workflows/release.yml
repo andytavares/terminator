@@ -55,6 +55,24 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: npm run package
 
+      - name: Check the signature
+        run: |
+          APP="$GITHUB_WORKSPACE/$(find dist -maxdepth 2 -name Terminator.app | head -1)"
+          cd "$RUNNER_TEMP" && codesign -d --extract-certificates=chain "$APP"
+          openssl version
+          openssl x509 -inform DER -in chain0 -noout -subject -issuer -enddate -fingerprint -sha1 | tee signing-certificate.txt
+          grep -Eq 'OU ?= ?G2' signing-certificate.txt || {
+            echo "::error::Signed by the Developer ID authority that expires 2027-02-01. Create a G2 Developer ID Application certificate and replace APPLE_CERTIFICATE."
+            exit 1
+          }
+          openssl x509 -inform DER -in chain0 -noout -checkend $((30 * 86400)) ||
+            echo "::warning::The signing certificate expires within 30 days. Renew it and replace APPLE_CERTIFICATE."
+          codesign -dvv "$APP" 2>&1 | grep -q '^Timestamp=' || {
+            echo "::error::The app has no secure timestamp."
+            exit 1
+          }
+          xcrun stapler validate "$APP"
+
       - name: Get version
         id: version
         run: echo "value=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
