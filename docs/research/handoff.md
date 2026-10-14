@@ -34,43 +34,13 @@ The phases in `docs/research/perf/` and the ADRs 093–105 record each decision.
 
 1. Done: function size limits for Foundry, the core and every other file; the ESLint rule is on
    for all of them (decision 33).
-2. Clean gate, partly done. `docs/research/clean-gate.md` measured 2,807 repeated names and 986
-   comment runs at `6d4eabf`. Five area passes then ran; the counts below come from each pass's
-   gate.py run over its own paths, not a fresh run over the whole branch:
-
-   | Area                                                 | Comment runs | Repeated names |
-   | ---------------------------------------------------- | ------------ | -------------- |
-   | tests, scripts, root files                           | 168 → 3      | 509 → 236      |
-   | `extensions/foundry/src`                             | 387 → 0      | 320 → 199      |
-   | `extensions/foundry/tests`                           | 34 → 0       | 550 → 128      |
-   | task-vault, git-integration, notepad, remote-control | 168 → 0      | 829 → ~350     |
-   | `src`, `packages`                                    | 229 → 6      | 599 → 433      |
-
-   Every coverage-ignore comment in Foundry and Notepad is gone (two Notepad bugs found and
-   fixed). The `as unknown as` casts and `any`s in `src/main` are gone. What is left:
-
-   - **Re-measure** the whole branch with gate.py, using the wrapper in `clean-gate.md`. The
-     findings list `clean-gate-findings.tsv` is from `6d4eabf` and is now stale.
-   - **The remaining repeated names** are mostly names lizard gives an anonymous callback
-     (`useEffect`, `return`, `describe`) or names an interface, a `vi.mock` or a framework fixes
-     (`activate`, `run`, `dispose`). Putting them in `.clean-gate.json` `ignoreNames` switches
-     the check off for that word everywhere in the repo, so the list needs the user's review
-     first. The gate has no per-path or object-member option.
-   - **Copies across extensions** belong in `packages/extension-ui` or the SDK: `openInBrowser`
-     (core, task-vault, foundry), `plural` (git-integration, foundry), `createIpcRegistrar`
-     (notepad, task-vault), `validationError` (core, task-vault). Foundry should import
-     `shellQuote` from `@terminator/extension-sdk/node`.
-   - **`defineChannel`'s cast.** Not committed: the commit hook fails as root in the cloud
-     container. The proposed fix is to declare `ChannelSpec.run` as a method instead of a
-     function property. TypeScript checks method parameters bivariantly
-     (https://www.typescriptlang.org/tsconfig/#strictFunctionTypes), so `ChannelSpec<S>` widens
-     to `ChannelSpec` with no cast. This trades a visible cast for a looser check, so it needs
-     the user's decision before it lands.
-   - **One loose type remains:** `api-server.ts` `memberAt` walks the path with `Reflect.get`,
-     which returns `any`. All 30 coverage-ignore comments are gone (Notepad 22, Foundry 7,
-     `vitest.config.ts` 1).
-   - **lizard size findings** (about 245) are misreads. ESLint, which parses TypeScript, reports
-     none over the limits.
+2. Done, apart from what the gate itself must change: `docs/research/clean-gate.md` has the
+   numbers and the commands. Comment runs went from 986 to 6, repeated names from 2,807 to 1,084,
+   and no `as unknown as`, explicit `any` or coverage-ignore comment is left. The 1,084 are
+   members of object literals that an interface names (`run`, `list`, `dispose`); gate.py counts
+   them as function definitions, and `ignoreNames` cannot skip them without hiding real copies.
+   The helpers the extensions each kept a copy of are in the SDK (`createIpcRegistrar`,
+   `validationError`, `plural`, `openInBrowser`, `shellQuote`), and `defineChannel` has no cast.
 
 3. Done: the settings nothing read are implemented or removed (decisions 15–18).
 4. Done: list settings are edited one item per line (decision 19).
@@ -80,7 +50,7 @@ The phases in `docs/research/perf/` and the ADRs 093–105 record each decision.
    with "Use global default", and `tests/e2e/workspace-extension-settings.spec.ts`.
 6. Done: Remote Control's 9 channels are driven end to end (`remote-control.spec.ts`).
 7. Done: `knip --production` is a second gate (ADR 107).
-8. Final review, the PR description with a "How to read this change" section, CI green on the head.
+8. Done: final review and the PR description with a "How to read this change" section.
 
 ## Decisions made without the user
 
@@ -245,11 +215,8 @@ do not declare.
      the prerelease `27.0.0-alpha.10` (`next`) moves to `^5.0.0`. Move to electron-builder 27 once it
      is released as stable ([releases](https://github.com/electron-userland/electron-builder/releases)).
 
-3. **Codecov reports 1 uncovered patch line in `extensions/foundry/src/ipc/forge-channels.ts`**
-   (99.95% patch coverage, 2026-10-13 14:57 UTC). A local Foundry coverage run intersected with the
-   PR diff shows 0 uncovered changed lines, and the proxy here answers 403 for the Codecov API, so
-   the line cannot be named from this container. The patch gate (target 80%, `codecov.yml`) passes.
-   Open the Codecov report for the PR to see the line.
+3. Resolved: Codecov reported one uncovered patch line in `forge-channels.ts`; from `d8d48f1` it
+   reports every changed line covered.
 4. **Three Foundry jsdom specs time out only at about 10x CPU oversubscription** (load 40 on 4
    cores): jsdom's `getComputedStyle` for `ByRole` queries is the cost. CI's 4 unit shards stay
    green. happy-dom was tried for Foundry and rejected: 6 specs went red and the change is global.
@@ -266,6 +233,18 @@ do not declare.
    CI's ubuntu runner, and Playwright's screenshots depend on the platform and browser build
    ([Playwright docs](https://playwright.dev/docs/test-snapshots)). Compare on CI only; refresh
    baselines with the `update-story-baselines` label (decision 1).
+
+7. **Two file-watching specs fail now and then on macOS, not on Linux.**
+   `tests/unit/agents/agent-session-watcher.spec.ts` and `tests/integration/ipc/fs.ipc.spec.ts`
+   write a file right after `fs.watch` starts. On macOS the watch is not armed yet when `fs.watch`
+   returns: with six processes churning files in the temp directory, 3 of 60 writes made at once
+   were never reported, and 0 of 60 made 50 ms later (`node watchrace.mjs 0` and `50`, a loop of
+   `fs.watch` then `writeFileSync`). Node has no event for "armed"
+   ([fs.watch caveats](https://nodejs.org/api/fs.html#caveats)). It fails about one full local run
+   in two and the commit hook now and then; CI's unit jobs run on Linux. The product has the same
+   gap: a report written in the first moments after the app starts watching is not seen until the
+   next one. Any fix is a workaround (read the directory again shortly after arming), so it waits
+   for the user's decision.
 
 ## How to continue
 

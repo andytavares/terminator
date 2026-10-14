@@ -10,7 +10,43 @@ Two tools measure them, and they disagree, so both are reported:
 - **gate.py** (`/home/user/andytavares/claude/at/hooks/clean-gate/gate.py`, lizard 1.24.1) for the
   handoff's two open items, repeated names and comment runs.
 
-## Result
+## Where it stands
+
+Measured 2026-10-14 at `ab990397`, after the clean-up passes. This section replaces the numbers in
+the sections below, which record the first measurement.
+
+| Rule                                                  | First measurement | Now   | Command                                                                              |
+| ----------------------------------------------------- | ----------------- | ----- | ------------------------------------------------------------------------------------ |
+| Functions over the limits (ESLint, every file)        | 1                 | 0     | `npm run lint`                                                                       |
+| Explicit `any`, counting ones behind `eslint-disable` | 25                | 0     | `npx eslint . --no-inline-config --rule '@typescript-eslint/no-explicit-any: error'` |
+| `as unknown as` lines                                 | 256               | 0     | `git grep -n 'as unknown as' -- '*.ts' '*.tsx' '*.mts' '*.js' '*.mjs' '*.cjs'`       |
+| Coverage-ignore comments                              | 30                | 0     | `git grep -niE '(istanbul\|v8\|c8) ignore' -- '*.ts' '*.tsx'`                        |
+| Comment runs over 3 lines (gate.py)                   | 986               | 6     | `uv run --script findings.py origin/main..HEAD` (the script below)                   |
+| Repeated names (gate.py)                              | 2,807             | 1,084 | same                                                                                 |
+| Size and ratchet (gate.py, lizard)                    | 277               | 276   | same; ESLint reports 0                                                               |
+
+The gate reads `.clean-gate.json`: it skips PNGs, which it could not decode, and 20 names that are
+never a function someone defined twice. lizard gives an anonymous callback the name of the call or
+keyword before it (`return`, `describe`, `useEffect`); Storybook requires `render` and `play`; the
+extension host calls `activate` and `deactivate`.
+
+What is left, all listed in [clean-gate-findings.tsv](clean-gate-findings.tsv):
+
+- **6 comment runs.** Three are lines of the template `scripts/create-extension.cjs` writes into a
+  new extension, not comments of that file. Three are file headers (`types/api.d.ts`,
+  `electron-api/manifest.ts`), which the rule allows; the gate reports them because line 1 itself
+  did not change.
+- **1,084 repeated names across 395 names.** They are members of object literals that an
+  interface names: `run` (139, the `run` of each `ChannelSpec`), `list` (25), `dispose` (16),
+  `register` (15), and spec fakes of those interfaces. Renaming a member means renaming the
+  interface, which moves the repeat. `ignoreNames` is by name for the whole repository, so adding
+  `run` or `list` would also hide a real copy. The fix belongs in gate.py: do not count an object
+  literal's members as function definitions.
+- **276 size and ratchet findings.** lizard counts each field of a destructured parameter and loses
+  the end of a function after some generics and template literals. ESLint parses TypeScript and
+  reports none over the limits.
+
+## First measurement: result
 
 | Rule                                                                    | At `da1fe0b` | Now | Command                                                                                                                                                                                                |
 | ----------------------------------------------------------------------- | ------------ | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -37,23 +73,7 @@ limits, and `@typescript-eslint/no-explicit-any` is an error (`eslint.config.mjs
 - The one function over the limits, `tests/integration/foundry-portability.spec.ts:64`, split into
   four describes (`16439dd`).
 
-## What is left, and why
-
-| Where                                                                                               | What                                                | Why it stays                                                                                                                                                                                                                                                 |
-| --------------------------------------------------------------------------------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `extensions/foundry/src/components/factory/canvas.ts:7`, `:10`                                      | `as unknown as string` on `fillStyle`               | The art kit's `PaintGradient` stands for a `CanvasGradient` that `createRadialGradient` made; TypeScript cannot prove that, and an `instanceof CanvasGradient` check throws in jsdom, which has no canvas. Fix: make the kit generic over the gradient type. |
-| `packages/extension-sdk/src/index.ts:32`                                                            | `spec as unknown as ChannelSpec` in `defineChannel` | Widens `ChannelSpec<S>` to the registry's `ChannelSpec`; `run` takes the parsed payload, so the generic is not assignable. Removing it changes the SDK's public types (a major version).                                                                     |
-| `src/main/extensions/host/api-server.ts:79`                                                         | `api as unknown as Record<string, unknown>`         | `memberAt` walks a dotted path the extension host sends at run time.                                                                                                                                                                                         |
-| `src/main/integrations/providers/linear.provider.ts:56`                                             | `new LinearClient(...) as unknown as LinearLike`    | `LinearLike` is the narrow interface the provider and its specs use. Without the cast, `npx tsc --noEmit -p tsconfig.main.json` fails with TS2322: `viewer` is `LinearFetch<User>`, whose `assignedIssues` takes typed variables, not `unknown`.             |
-| `src/main/ipc/channel-registrar.ts:26`, `:36`                                                       | 3 `any`                                             | The handler signature mirrors Electron's `ipcMain.handle` listener, which is `(...args: any[]) => any` ([Electron docs](https://www.electronjs.org/docs/latest/api/ipc-main#ipcmainhandlechannel-listener)); `unknown[]` rejects every typed handler.        |
-| `src/main/storage/cached-store.ts:13`                                                               | 1 `any`                                             | electron-store 8 constrains its schema type to `Record<string, any>`; the schemas are interfaces, which `Record<string, unknown>` does not accept.                                                                                                           |
-| `extensions/notepad/src/editor/{NoteEditor.tsx,livePreview.ts,commentField.ts}`, `NoteList.tsx:134` | 22 `v8 ignore`                                      | CodeMirror view code (widgets, decorations, DOM measuring) that jsdom cannot lay out; the e2e suite drives it.                                                                                                                                               |
-| `extensions/foundry/src/factory/{callouts.ts:349,director.ts:213,sim.ts:251}`                       | `v8 ignore` on an exhaustive `switch` default       | Unreachable while the union is exhaustive; dropping the default removes the throw for a state read from a corrupted file.                                                                                                                                    |
-| `extensions/foundry/src/factory/{director.ts:88,sim.ts:240,layout.ts:165}`                          | `v8 ignore` on an invariant guard                   | A hall always has the rest seats and floor these guard; no input reaches them.                                                                                                                                                                               |
-| `extensions/foundry/src/trackers/write-back.ts:201`                                                 | `c8 ignore` on the return after the retry loop      | Every loop iteration returns; restructuring the loop is a behaviour change to the tracker write-back.                                                                                                                                                        |
-| `vitest.config.ts:1`                                                                                | `v8 ignore file`                                    | The config itself is not code under test.                                                                                                                                                                                                                    |
-
-## The handoff's two open items: repeated names and comment runs
+## First measurement: repeated names and comment runs
 
 The handoff's 929 and 255 came from gate.py's report mode over the branch, run in the main checkout:
 `uv run --script /home/user/andytavares/claude/at/hooks/clean-gate/gate.py report origin/main..HEAD`
@@ -81,7 +101,7 @@ cut -f1 findings.tsv | sort | uniq -c   # 986 comment, 26 ratchet, 2807 repeat, 
 import sys
 from pathlib import Path
 
-sys.path.insert(0, "/home/user/andytavares/claude/at/hooks/clean-gate")
+sys.path.insert(0, str(Path.home() / ".claude/skills/at/hooks/clean-gate"))
 import gate  # noqa: E402
 
 # Same results, faster: each file is parsed by lizard once, not once per name.
@@ -112,8 +132,6 @@ for f in gate.report_findings(root, sys.argv[1], config):
 | Comment runs over 3 lines                                   | 255        | 986 (782 in source, 204 in specs)       |
 | Functions over a limit (lizard)                             | 121        | 251                                     |
 | Ratchet breaches (lizard)                                   | 142        | 26                                      |
-
-Every finding, with its `file:line`, is in [clean-gate-findings.tsv](clean-gate-findings.tsv).
 
 The counts grew because the span did: the branch added 134,509 more lines since the first count. None
 of the four is a small mechanical fix, so all are left:
