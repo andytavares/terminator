@@ -1,0 +1,212 @@
+tests/e2e/notepad-notes.spec.ts
+  s_c9dd89ad1f6c54::t_fe9e8f153a4718 5,74
+packages/extension-ui/src/index.ts
+  s_c9dd89ad1f6c54::t_dc896bb22cf602 13-16
+  s_c9dd89ad1f6c54::t_18eb85ca42bfb5 66
+tests/e2e/notepad-search.spec.ts
+  s_c9dd89ad1f6c54::t_fe9e8f153a4718 8,83
+tests/unit/ConfirmDialog.spec.tsx
+  s_c9dd89ad1f6c54::t_957094954792f0 58,60
+  s_c9dd89ad1f6c54::t_943b92136b9eca 71,87
+tests/unit/packages/extension-ui/dialog.spec.tsx
+  s_c9dd89ad1f6c54::t_2d50ce50413669 238-239,241
+  s_c9dd89ad1f6c54::t_599bf94af4aa12 90-92
+  s_c9dd89ad1f6c54::t_6cf306b1e894e0 41-42,44-45
+  s_c9dd89ad1f6c54::t_c0cb5fccfd104f 358,360
+  s_c9dd89ad1f6c54::t_aa3c632c10708e 61-63,67,69
+  s_c9dd89ad1f6c54::t_85afd818014012 3
+  s_c9dd89ad1f6c54::t_6ab0ed0d7640a1 245-259,261-268
+  s_c9dd89ad1f6c54::t_7023523edaf2d0 7
+  s_c9dd89ad1f6c54::t_63e01aa527e195 103-104,106,108-110
+packages/extension-ui/src/layers.ts
+  s_c9dd89ad1f6c54::t_a31323501ad20f 9-10,21,23
+  s_c9dd89ad1f6c54::t_2e3aec048feebe 11
+tests/unit/packages/extension-ui/behaviour-matrix.spec.tsx
+  s_c9dd89ad1f6c54::t_b7ee6f2175b32b 9
+  s_c9dd89ad1f6c54::t_627b96caf0f045 34-43
+  s_c9dd89ad1f6c54::t_4ddabad35f0a15 113,115,119
+  s_c9dd89ad1f6c54::t_30bfa5d75584e9 65,67,72
+tests/unit/renderer/components/AboutDialog.spec.tsx
+  s_c9dd89ad1f6c54::t_ac48d859ad8764 7,56
+packages/extension-ui/stories/ModalShell.stories.tsx
+  s_c9dd89ad1f6c54::t_10b278e0949c20 3
+  s_c9dd89ad1f6c54::t_59ba7b83fb0fe8 207
+  s_c9dd89ad1f6c54::t_32bd1c07b2dc61 1-2,4-206,208-211,254-256
+  s_c9dd89ad1f6c54::t_ae0b93325487d4 212-253
+packages/extension-ui/visual/modal-keys.visual.ts
+  s_c9dd89ad1f6c54::t_d06eb7664a4bdd 1-17,21-29,32-57
+  s_c9dd89ad1f6c54::t_a475ed6fde948a 18-20
+  s_c9dd89ad1f6c54::t_8bff79c5beec58 30-31
+extensions/notepad/tests/components/NoteList.spec.tsx
+  s_c9dd89ad1f6c54::t_957094954792f0 288
+extensions/task-vault/src/components/DatabaseAdmin.tsx
+  s_c9dd89ad1f6c54::t_d4fcd1c723668a 416,418-427,429
+  s_c9dd89ad1f6c54::t_605c9a5dc09258 4
+extensions/notepad/README.md
+  s_c9dd89ad1f6c54::t_683c3f5e0560a5 28
+packages/extension-ui/src/ModalShell.tsx
+  s_c9dd89ad1f6c54::t_2e3aec048feebe 22
+  s_c9dd89ad1f6c54::t_c647c5a702015f 24-25,30-32,35
+  s_c9dd89ad1f6c54::t_07c6a735905871 23,34,40-44,47,58
+  s_c9dd89ad1f6c54::t_98e60e421ad064 1-13,16-20,26-29,33,36-39,45-46,48-57,59-77,79-87,89-92,94-101
+  s_c9dd89ad1f6c54::t_8b267885ccad5a 14-15,21,78,88,93
+docs/adr/038-dialogs-render-in-the-extension-view.md
+  s_c9dd89ad1f6c54::t_2344f847d19760 3
+extensions/task-vault/tests/components/DatabaseAdmin.spec.tsx
+  s_c9dd89ad1f6c54::t_5a2d129c147c93 6
+  s_c9dd89ad1f6c54::t_605c9a5dc09258 137
+packages/extension-ui/src/modal-stack.ts
+  s_c9dd89ad1f6c54::t_80431ee67d72cd 1,4-5,9,11,17
+  s_c9dd89ad1f6c54::t_9a4e5769a9d2eb 2-3,6-8,10,12-16,18
+tests/unit/packages/extension-ui/toast.spec.tsx
+  s_c9dd89ad1f6c54::t_19458b54f36467 4
+  s_c9dd89ad1f6c54::t_d53aa3d4c4b093 88,96-130
+  s_c9dd89ad1f6c54::t_46da27e8aa83f5 131
+docs/EXTENSION-STYLE.md
+  s_c9dd89ad1f6c54::t_a72770676b854e 169
+packages/extension-ui/src/useDismissible.ts
+  s_c9dd89ad1f6c54::t_85a4701e40c6e6 75
+  s_c9dd89ad1f6c54::t_3dc0e8fca41fe3 121-122
+  s_c9dd89ad1f6c54::t_45666be5db95e8 73
+  s_c9dd89ad1f6c54::t_e862856e00a21a 79
+  s_c9dd89ad1f6c54::t_d3da9e7243f1ee 87
+  s_c9dd89ad1f6c54::t_4a7afc4e0ebdac 94-113
+  s_c9dd89ad1f6c54::t_344c6accdb68cf 58,60
+tests/unit/extensions/PrDialog.spec.tsx
+  s_c9dd89ad1f6c54::t_ac48d859ad8764 8,61
+tests/e2e/modal-centre.ts
+  s_c9dd89ad1f6c54::t_b684410c167179 1-36
+eslint.config.mjs
+  s_c9dd89ad1f6c54::t_a72770676b854e 175
+tests/e2e/task-vault-today.spec.ts
+  s_c9dd89ad1f6c54::t_2bb1521a161aeb 12,102,122
+tests/unit/renderer/components/NameTerminalDialog.spec.tsx
+  s_c9dd89ad1f6c54::t_943b92136b9eca 86
+  s_c9dd89ad1f6c54::t_ac48d859ad8764 5,60
+tests/unit/renderer/components/SessionLinkDialog.spec.tsx
+  s_c9dd89ad1f6c54::t_ac48d859ad8764 38,131,134
+tests/e2e/task-vault-capture.spec.ts
+  s_c9dd89ad1f6c54::t_fe9e8f153a4718 6
+  s_c9dd89ad1f6c54::t_5c12c53fbc0cd6 141
+extensions/task-vault/src/components/DateTimePicker.tsx
+  s_c9dd89ad1f6c54::t_078de4f210d408 308-311
+  s_c9dd89ad1f6c54::t_753aba37ddc26e 285-292
+  s_c9dd89ad1f6c54::t_4f2e27b7057d24 297
+  s_c9dd89ad1f6c54::t_c15bdbbcdb00a4 603
+tests/e2e/extension-smoke.spec.ts
+  s_c9dd89ad1f6c54::t_d595dc36b3084f 178
+extensions/notepad/src/components/notepad.css
+  s_c9dd89ad1f6c54::t_6ffeac2f3683d8 741
+tests/setup.ts
+  s_c9dd89ad1f6c54::t_32c1b65021d359 63-64
+  s_c9dd89ad1f6c54::t_cbeb9adc6f4745 4
+tests/unit/packages/extension-ui/use-dismissible.spec.tsx
+  s_c9dd89ad1f6c54::t_6af1b273333d39 95-113
+docs/adr/108-modal-surfaces-use-the-native-dialog-element.md
+  s_c9dd89ad1f6c54::t_7039b2d7dd7378 12
+  s_c9dd89ad1f6c54::t_2b963c473663e9 68
+  s_c9dd89ad1f6c54::t_659c4bc97361fc 1-11,13-28,31-53,55-67,69-72
+  s_c9dd89ad1f6c54::t_bbe8f042d96a63 54
+  s_c9dd89ad1f6c54::t_7287fbb13cee1d 29-30
+CHANGELOG.md
+  s_c9dd89ad1f6c54::t_2b963c473663e9 11
+tests/e2e/notepad-export.spec.ts
+  s_c9dd89ad1f6c54::t_fe9e8f153a4718 8,64
+tests/unit/packages/extension-ui/modal-shell.spec.tsx
+  s_c9dd89ad1f6c54::t_599c70812393b9 128,142,151
+  s_c9dd89ad1f6c54::t_467c8e66e1b0c1 1-127,129-141,143-150,152-178
+tests/unit/renderer/components/CreateProjectDialog.spec.tsx
+  s_c9dd89ad1f6c54::t_ac48d859ad8764 17,142,706
+tests/e2e/task-vault-data.spec.ts
+  s_c9dd89ad1f6c54::t_fe9e8f153a4718 8,43
+extensions/task-vault/src/components/task-vault.css
+  s_c9dd89ad1f6c54::t_016e097f9c3ce0 5038
+  s_c9dd89ad1f6c54::t_8eed5136456ee4 4851
+tests/unit/renderer/components/EditWorkspaceDialog.spec.tsx
+  s_c9dd89ad1f6c54::t_ac48d859ad8764 10,140
+extensions/notepad/src/components/SearchOverlay.tsx
+  s_c9dd89ad1f6c54::t_3891c3c09e3a38 3
+  s_c9dd89ad1f6c54::t_cc724879acd8bd 77-78,88,96
+extensions/notepad/tests/components/SearchOverlay.spec.tsx
+  s_c9dd89ad1f6c54::t_0658f71a88ab23 49-50
+  s_c9dd89ad1f6c54::t_e003e8a5510626 4
+tests/unit/renderer/components/CreateWorkspaceDialog.spec.tsx
+  s_c9dd89ad1f6c54::t_ac48d859ad8764 13,175
+packages/extension-ui/src/Toast.tsx
+  s_c9dd89ad1f6c54::t_de87b216f78f8f 3,5
+  s_c9dd89ad1f6c54::t_2a47766f1d7d0d 93-95,97,99-103
+packages/extension-ui/src/extension-ui.css
+  s_c9dd89ad1f6c54::t_b1733ba279accb 8,13,18-21,34-38,41-42,47-48,57-58,71-72,75-77,84,108,110-112
+  s_c9dd89ad1f6c54::t_65cacfddbe13df 10-12,14-17,22-33,78
+  s_c9dd89ad1f6c54::t_ac9b32b3c6b73e 80,82
+  s_c9dd89ad1f6c54::t_5e925c2f1cd935 79
+extensions/notepad/src/components/QuickCreateOverlay.tsx
+  s_c9dd89ad1f6c54::t_fc3aea03ae454e 220-222,232-236,247
+  s_c9dd89ad1f6c54::t_e9bdbdae467569 8
+docs/EXTENSION-DEVELOPMENT.md
+  s_c9dd89ad1f6c54::t_735cb00d7a501a 407,413-414,416
+  s_c9dd89ad1f6c54::t_69a83ef4b4c3cd 395
+  s_c9dd89ad1f6c54::t_9ecaf24030a3fe 350
+tests/support/native-dialog.ts
+  s_c9dd89ad1f6c54::t_08f89e762b304e 1-2,4-5,9,39-41
+  s_c9dd89ad1f6c54::t_76940af372618b 6-8,10-14,18-19,21-22,37-38,43
+  s_c9dd89ad1f6c54::t_6bb409a72d9a5c 23-25,27-32,34
+  s_c9dd89ad1f6c54::t_f4dfdfdcc3ac5e 3,15-17,20,26,33,35-36,42
+docs/ARCHITECTURE.md
+  s_c9dd89ad1f6c54::t_2b963c473663e9 452
+  s_c9dd89ad1f6c54::t_f01b81c61037f2 427
+  s_c9dd89ad1f6c54::t_a0a751623f3de6 447-448,450,453-454
+  s_c9dd89ad1f6c54::t_ef066ecbcd2f9b 443-446
+tests/support/modal.ts
+  s_c9dd89ad1f6c54::t_db363b5772aac7 1-7
+tests/e2e/task-vault-board.spec.ts
+  s_c9dd89ad1f6c54::t_fe9e8f153a4718 5,85
+tests/e2e/git-integration-smoke.spec.ts
+  s_c9dd89ad1f6c54::t_d595dc36b3084f 50
+packages/extension-ui/src/Dialog.tsx
+  s_c9dd89ad1f6c54::t_2a5196a8d71fc3 1,4,23,55-56,58-59,61-70,74-76,79-81,83-88,90-91,95-96,103,119
+  s_c9dd89ad1f6c54::t_18eb85ca42bfb5 50-52
+  s_c9dd89ad1f6c54::t_9e458df3301dd3 97-98,101-102,106
+packages/extension-ui/stories/Dialog.stories.tsx
+  s_c9dd89ad1f6c54::t_2c5283e474f12c 66-70,73-74,80-81,86-89
+  s_c9dd89ad1f6c54::t_d5f862f2b8f341 24,79,118
+  s_c9dd89ad1f6c54::t_096318e09db920 90-92
+tests/e2e/extension-keyboard.spec.ts
+  s_c9dd89ad1f6c54::t_76b63e2c192b75 103,131,152
+extensions/task-vault/src/components/DailyLogDialogs.tsx
+  s_c9dd89ad1f6c54::t_519be29b73bfb1 2
+  s_c9dd89ad1f6c54::t_5956869170d3d0 55,58-62,64-65
+extensions/task-vault/tests/components/DailyLogDialogs.spec.tsx
+  s_c9dd89ad1f6c54::t_5a2d129c147c93 10,65,154
+tests/e2e/notepad-harness.ts
+  s_c9dd89ad1f6c54::t_2bb1521a161aeb 4,36
+tests/unit/renderer/components/LinkIssueDialog.spec.tsx
+  s_c9dd89ad1f6c54::t_ac48d859ad8764 8,238,241,244
+packages/extension-ui/src/Popover.tsx
+  s_c9dd89ad1f6c54::t_d4ac8595b4acb5 2
+  s_c9dd89ad1f6c54::t_bc07dcd3998966 31-32
+tests/unit/renderer/components/MoveSessionDialog.spec.tsx
+  s_c9dd89ad1f6c54::t_ac48d859ad8764 13,102
+packages/extension-ui/README.md
+  s_c9dd89ad1f6c54::t_d7a47d840546c9 48-52
+  s_c9dd89ad1f6c54::t_96860283ac26d6 32-33,35
+  s_c9dd89ad1f6c54::t_de6c819b000b41 91-92
+  s_c9dd89ad1f6c54::t_313136d223cefb 40-47,53-71,76-83
+  s_c9dd89ad1f6c54::t_3db93ea41a4794 72-75
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "9c6dedc220f34057fd0cb5b3789763af0b436b31",
+  "prompts": {},
+  "sessions": {
+    "s_c9dd89ad1f6c54": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ee6b7f82-c708-43d8-8c1f-eefe55f692a9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
