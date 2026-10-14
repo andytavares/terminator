@@ -305,7 +305,7 @@ describe('getChangeStats', () => {
     await getChangeStats('/repo')
     const [cmd, args, opts] = customMock().mock.calls[0]
     expect(cmd).toBe('git')
-    expect(args).toEqual(['diff', '--numstat', 'HEAD'])
+    expect(args).toEqual(['-c', 'diff.autoRefreshIndex=false', 'diff', '--numstat', 'HEAD'])
     expect(opts).toMatchObject({ cwd: '/repo' })
   })
 })
