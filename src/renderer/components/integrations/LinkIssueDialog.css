@@ -7,10 +7,10 @@
   height: 30px;
   padding: 0 9px;
   margin-top: 12px;
-  background: var(--bg-input);
-  border: 1px solid var(--accent);
-  border-radius: var(--radius-sm);
-  box-shadow: 0 0 0 3px var(--accent-dim);
+  background: var(--tm-bg-input);
+  border: 1px solid var(--tm-accent);
+  border-radius: var(--tm-radius-sm);
+  box-shadow: 0 0 0 3px var(--tm-accent-dim);
 }
 
 /*
@@ -21,25 +21,25 @@
 .link-issue__failures {
   margin-top: 8px;
   font-size: 11px;
-  color: var(--warning);
+  color: var(--tm-warning);
 }
 
 .link-issue__list {
   margin-top: 8px;
   max-height: 260px;
   overflow-y: auto;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-sm);
 }
 
 .link-issue__group {
   padding: 7px 10px 5px;
-  background: var(--bg-surface);
+  background: var(--tm-bg-surface);
   font-size: 9.5px;
   font-weight: 600;
   letter-spacing: 0.09em;
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: var(--tm-text-muted);
   position: sticky;
   top: 0;
 }
@@ -49,24 +49,24 @@
 }
 
 .link-issue__row:hover {
-  background: var(--bg-card-hover);
+  background: var(--tm-bg-card-hover);
 }
 
 .link-issue__row--selected {
-  background: var(--accent-dim);
+  background: var(--tm-accent-dim);
 }
 
 .link-issue__row--muted {
-  color: var(--text-muted);
+  color: var(--tm-text-muted);
   cursor: default;
 }
 
 .link-issue__key {
   width: 64px;
   flex-shrink: 0;
-  font-family: var(--font-mono);
+  font-family: var(--tm-font-mono);
   font-size: 11px;
-  color: var(--text-secondary);
+  color: var(--tm-text-secondary);
 }
 
 .link-issue__title {
@@ -82,27 +82,27 @@
 .link-issue__state {
   flex-shrink: 0;
   font-size: 10px;
-  color: var(--text-muted);
+  color: var(--tm-text-muted);
 }
 
 .link-issue__warning {
   margin-top: 10px;
   font-size: 11.5px;
-  color: var(--warning);
+  color: var(--tm-warning);
 }
 
 .link-issue__empty {
   margin-top: 16px;
   padding: 20px 12px;
-  border: 1px dashed var(--border-strong);
-  border-radius: var(--radius-sm);
+  border: 1px dashed var(--tm-border-strong);
+  border-radius: var(--tm-radius-sm);
   text-align: center;
   font-size: 12.5px;
-  color: var(--text-secondary);
+  color: var(--tm-text-secondary);
 }
 
 .link-issue__hint {
   margin-top: 6px;
   font-size: 11.5px;
-  color: var(--text-muted);
+  color: var(--tm-text-muted);
 }

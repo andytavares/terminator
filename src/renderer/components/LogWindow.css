@@ -10,7 +10,7 @@
   flex-direction: column;
   z-index: 9998;
   animation: log-slide-up 0.18s cubic-bezier(0.22, 1, 0.36, 1);
-  font-family: var(--font-mono);
+  font-family: var(--tm-font-mono);
 }
 
 @keyframes log-slide-up {
@@ -35,7 +35,7 @@
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: var(--text-muted);
+  color: var(--tm-text-muted);
 }
 
 .log-window__actions {
@@ -47,9 +47,9 @@
   background: none;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 4px;
-  color: var(--text-muted);
+  color: var(--tm-text-muted);
   font-size: 10px;
-  font-family: var(--font-mono);
+  font-family: var(--tm-font-mono);
   padding: 2px 8px;
   cursor: pointer;
   transition:
@@ -59,7 +59,7 @@
 
 .log-window__btn:hover {
   background: rgba(255, 255, 255, 0.06);
-  color: var(--text-primary);
+  color: var(--tm-text-primary);
 }
 
 .log-window__btn--close {
@@ -75,7 +75,7 @@
 .log-window__empty {
   padding: 20px 12px;
   font-size: 11px;
-  color: var(--text-muted);
+  color: var(--tm-text-muted);
   text-align: center;
 }
 
@@ -103,7 +103,7 @@
 }
 
 .log-entry__ts {
-  color: var(--text-muted);
+  color: var(--tm-text-muted);
   flex-shrink: 0;
   user-select: none;
 }
@@ -129,7 +129,7 @@
 }
 
 .log-entry__msg {
-  color: var(--text-secondary);
+  color: var(--tm-text-secondary);
   white-space: pre-wrap;
   word-break: break-all;
   flex: 1;

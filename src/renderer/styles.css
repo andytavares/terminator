@@ -1,38 +1,9 @@
 /* ── Tokens ────────────────────────────────────────────────────
-   Every value is defined once, in the design system's tokens.css, under the
-   published --tm-* names, and index.tsx imports that file before this one. The
-   names below are aliases the core's own rules still use; they carry no value of
-   their own, so the theme switch needs nothing here. */
+   Every design token is defined once, in the design system's tokens.css, under
+   the published --tm-* names; index.tsx imports that file before this one.
+   What follows is the core's own: values no other surface uses. */
 
 :root {
-  --font-mono: var(--tm-font-mono);
-  --font-ui: var(--tm-font-ui);
-  --control-height: var(--tm-control-height);
-
-  /* surfaces */
-  --bg-base: var(--tm-bg-base);
-  --bg-surface: var(--tm-bg-surface);
-  --bg-elevated: var(--tm-bg-elevated);
-  --bg-card: var(--tm-bg-card);
-  --bg-card-hover: var(--tm-bg-card-hover);
-  --bg-input: var(--tm-bg-input);
-
-  --text-primary: var(--tm-text-primary);
-  --text-secondary: var(--tm-text-secondary);
-  --text-muted: var(--tm-text-muted);
-
-  --border: var(--tm-border);
-  --border-strong: var(--tm-border-strong);
-
-  /* accent — overridden per-workspace via inline style vars */
-  --accent: var(--tm-accent);
-  --on-accent: var(--tm-on-accent);
-  --accent-dim: var(--tm-accent-dim);
-  --accent-glow: var(--tm-accent-glow);
-
-  --danger: var(--tm-danger);
-  --success: var(--tm-success);
-  --warning: var(--tm-warning);
   /* The core's own violet. It is not --tm-agent (#b39cf5), which the core's agent
      chrome has never used. */
   --agent-clr: #8b5cf6;
@@ -51,22 +22,10 @@
   /* Colour on fills and edges only — never on the glyph or as text (XII). Two
      hues, spent on the two states that ask something of the operator: amber
      for needs-you, green for working. Idle and exited stay neutral. */
-  --state-needs: var(--warning);
-  --state-working: var(--success);
-  --state-needs-fill: color-mix(in srgb, var(--warning) 14%, transparent);
-  --state-working-fill: color-mix(in srgb, var(--success) 14%, transparent);
-
-  --diff-added-bg: var(--tm-diff-added-bg);
-  --diff-removed-bg: var(--tm-diff-removed-bg);
-
-  --syntax-comment: var(--tm-syntax-comment);
-  --syntax-keyword: var(--tm-syntax-keyword);
-  --syntax-string: var(--tm-syntax-string);
-  --syntax-tag: var(--tm-syntax-tag);
-  --syntax-literal: var(--tm-syntax-literal);
-  --syntax-number: var(--tm-syntax-number);
-  --syntax-title: var(--tm-syntax-title);
-  --syntax-attribute: var(--tm-syntax-attribute);
+  --state-needs: var(--tm-warning);
+  --state-working: var(--tm-success);
+  --state-needs-fill: color-mix(in srgb, var(--tm-warning) 14%, transparent);
+  --state-working-fill: color-mix(in srgb, var(--tm-success) 14%, transparent);
 
   /* core layout measures — not design tokens */
   --sidebar-w: 300px;
@@ -77,21 +36,6 @@
   --session-row-h: 28px;
   --project-row-h: 30px;
   --ws-card-gap: 6px;
-
-  --radius-xs: var(--tm-radius-xs);
-  --radius-sm: var(--tm-radius-sm);
-  --radius-md: var(--tm-radius-md);
-  --radius-lg: var(--tm-radius-lg);
-
-  --space-1: var(--tm-space-1);
-  --space-2: var(--tm-space-2);
-  --space-3: var(--tm-space-3);
-  --space-4: var(--tm-space-4);
-  --space-5: var(--tm-space-5);
-  --space-6: var(--tm-space-6);
-  --space-8: var(--tm-space-8);
-  --space-10: var(--tm-space-10);
-  --space-12: var(--tm-space-12);
 }
 
 /* ── Reset ───────────────────────────────────────────────────── */
@@ -109,10 +53,10 @@ body,
   height: 100%;
   width: 100%;
   overflow: hidden;
-  font-family: var(--font-ui);
+  font-family: var(--tm-font-ui);
   font-size: 13px;
-  background: var(--bg-base);
-  color: var(--text-primary);
+  background: var(--tm-bg-base);
+  color: var(--tm-text-primary);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -125,7 +69,7 @@ button {
 *:focus-visible {
   outline: 2px solid rgba(255, 255, 255, 0.85);
   outline-offset: 2px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--tm-radius-sm);
 }
 
 /* ── Layout ──────────────────────────────────────────────────── */
@@ -147,7 +91,7 @@ button {
 
 .app-global-metrics {
   flex-shrink: 0;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--tm-border);
 }
 
 .app-global-metrics .metrics-bar {
@@ -168,7 +112,7 @@ button {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: var(--bg-base);
+  background: var(--tm-bg-base);
   min-width: 0;
 }
 
@@ -213,7 +157,7 @@ button {
   );
   background-size: 200% 100%;
   animation: skeleton-shimmer 1.4s ease-in-out infinite;
-  border-radius: var(--radius-sm);
+  border-radius: var(--tm-radius-sm);
 }
 
 .skeleton--row {
@@ -246,9 +190,9 @@ button {
   position: fixed;
   z-index: 9999;
   min-width: 160px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm);
+  background: var(--tm-bg-elevated);
+  border: 1px solid var(--tm-border-strong);
+  border-radius: var(--tm-radius-sm);
   box-shadow:
     0 8px 24px rgba(0, 0, 0, 0.5),
     0 2px 8px rgba(0, 0, 0, 0.4);
@@ -263,32 +207,32 @@ button {
   padding: 6px 10px;
   background: transparent;
   border: none;
-  border-radius: var(--radius-xs);
-  color: var(--text-primary);
+  border-radius: var(--tm-radius-xs);
+  color: var(--tm-text-primary);
   font-size: 12px;
-  font-family: var(--font-ui);
+  font-family: var(--tm-font-ui);
   text-align: left;
   cursor: pointer;
   white-space: nowrap;
 }
 
 .ctx-menu__item:hover {
-  background: var(--bg-card-hover);
-  color: var(--text-primary);
+  background: var(--tm-bg-card-hover);
+  color: var(--tm-text-primary);
 }
 
 .ctx-menu__item--danger {
-  color: var(--danger);
+  color: var(--tm-danger);
 }
 
 .ctx-menu__item--danger:hover {
   background: rgba(224, 92, 92, 0.12);
-  color: var(--danger);
+  color: var(--tm-danger);
 }
 
 .ctx-menu__separator {
   height: 1px;
-  background: var(--border);
+  background: var(--tm-border);
   margin: 4px 0;
 }
 
@@ -301,9 +245,9 @@ button {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--text-muted);
+  background: var(--tm-text-muted);
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--text-secondary);
+  background: var(--tm-text-secondary);
 }

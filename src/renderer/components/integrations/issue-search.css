@@ -19,14 +19,14 @@
   background: transparent;
   border: none;
   outline: none;
-  color: var(--text-primary);
-  font-family: var(--font-ui);
+  color: var(--tm-text-primary);
+  font-family: var(--tm-font-ui);
   font-size: 12px;
 }
 
 .issue-picker__input::placeholder,
 .link-issue__input::placeholder {
-  color: var(--text-muted);
+  color: var(--tm-text-muted);
 }
 
 .issue-picker__row,
@@ -36,10 +36,10 @@
   gap: 9px;
   width: 100%;
   border: none;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--tm-border);
   background: transparent;
-  color: var(--text-primary);
-  font-family: var(--font-ui);
+  color: var(--tm-text-primary);
+  font-family: var(--tm-font-ui);
   font-size: 12px;
   text-align: left;
   cursor: pointer;

@@ -5,9 +5,9 @@
   display: grid;
   grid-template-rows: auto 1fr auto;
   min-width: 0;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  background: var(--tm-bg-card);
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-sm);
   overflow: hidden;
   cursor: pointer;
   outline: none;
@@ -34,11 +34,11 @@
 }
 
 .wall-tile:hover {
-  background: var(--bg-card-hover);
+  background: var(--tm-bg-card-hover);
 }
 
 .wall-tile:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--tm-accent);
   outline-offset: -2px;
 }
 
@@ -49,7 +49,7 @@
 .wall-tile__cap {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--tm-space-2);
   min-width: 0;
   padding: 6px 6px 6px 12px;
   font-size: 12px;
@@ -58,7 +58,7 @@
 .wall-tile__where {
   flex: 1;
   min-width: 0;
-  color: var(--text-secondary);
+  color: var(--tm-text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -75,7 +75,7 @@
 
 .wall-tile__age {
   flex: none;
-  color: var(--text-muted);
+  color: var(--tm-text-muted);
   font-variant-numeric: tabular-nums;
 }
 
@@ -87,19 +87,19 @@
   height: 22px;
   padding: 0;
   border: 0;
-  border-radius: var(--radius-xs);
+  border-radius: var(--tm-radius-xs);
   background: transparent;
-  color: var(--text-secondary);
+  color: var(--tm-text-secondary);
   cursor: pointer;
 }
 
 .wall-tile__open:hover {
-  background: var(--bg-elevated);
-  color: var(--text-primary);
+  background: var(--tm-bg-elevated);
+  color: var(--tm-text-primary);
 }
 
 .wall-tile__open:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--tm-accent);
   outline-offset: 0;
 }
 
@@ -110,7 +110,7 @@
 
 .wall-tile__preview {
   height: var(--tile-preview-h, 160px);
-  border-block: 1px solid var(--border);
+  border-block: 1px solid var(--tm-border);
 }
 
 .wall-tile[data-band='needs'] .wall-tile__preview {
@@ -120,7 +120,7 @@
 .wall-tile__foot {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--tm-space-2);
   min-width: 0;
   padding: 6px 10px 7px 12px;
   cursor: default;
@@ -132,9 +132,9 @@
 
 .wall-tile__metrics {
   flex: none;
-  font-family: var(--font-mono);
+  font-family: var(--tm-font-mono);
   font-size: 10.5px;
-  color: var(--text-muted);
+  color: var(--tm-text-muted);
   font-variant-numeric: tabular-nums;
 }
 

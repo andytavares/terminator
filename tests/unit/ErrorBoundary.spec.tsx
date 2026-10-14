@@ -42,7 +42,7 @@ describe('ErrorBoundary — fallback container uses CSS variable for background,
     )
     console.error = originalError
     const fallback = container.firstElementChild as HTMLElement
-    expect(fallback?.style.background).toContain('var(--bg-base)')
+    expect(fallback?.style.background).toContain('var(--tm-bg-base)')
     expect(fallback?.style.background).not.toContain('#0c0c0f')
   })
 
@@ -56,7 +56,7 @@ describe('ErrorBoundary — fallback container uses CSS variable for background,
     )
     console.error = originalError
     const fallback = container.firstElementChild as HTMLElement
-    expect(fallback?.style.color).toContain('var(--danger)')
+    expect(fallback?.style.color).toContain('var(--tm-danger)')
     expect(fallback?.style.color).not.toContain('#f87171')
   })
 })

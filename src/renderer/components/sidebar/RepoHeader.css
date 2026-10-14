@@ -26,22 +26,22 @@
   align-items: center;
   gap: 7px;
   padding: 0 10px 0 8px;
-  font-family: var(--font-ui);
+  font-family: var(--tm-font-ui);
   font-size: 11.5px;
   font-weight: 600;
   letter-spacing: -0.005em;
-  color: var(--text-primary);
+  color: var(--tm-text-primary);
   user-select: none;
   cursor: pointer;
   outline: none;
 }
 
 .repo-header:hover {
-  background: var(--bg-card-hover);
+  background: var(--tm-bg-card-hover);
 }
 
 .repo-header:focus-visible {
-  outline: 2px solid var(--text-primary);
+  outline: 2px solid var(--tm-text-primary);
   outline-offset: -2px;
 }
 
@@ -53,7 +53,7 @@
   place-items: center;
   flex: 0 0 auto;
   width: 12px;
-  color: var(--text-muted);
+  color: var(--tm-text-muted);
 }
 
 .repo-header__swatch {
@@ -89,10 +89,10 @@
   flex: 0 0 var(--sidebar-count-w);
   width: var(--sidebar-count-w);
   text-align: right;
-  font-family: var(--font-mono);
+  font-family: var(--tm-font-mono);
   font-size: 10px;
   font-weight: 400;
-  color: var(--text-muted);
+  color: var(--tm-text-muted);
   font-variant-numeric: tabular-nums;
   flex: 0 0 auto;
 }
@@ -152,5 +152,5 @@
 /* Drop feedback for reordering repos. The old wrapper set a class that had no
    rule at all, so dragging gave no indication of where it would land. */
 .repo-header--dnd-over {
-  box-shadow: inset 0 2px 0 var(--accent);
+  box-shadow: inset 0 2px 0 var(--tm-accent);
 }

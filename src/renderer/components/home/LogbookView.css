@@ -8,41 +8,41 @@
 }
 
 .logbook__list {
-  border-right: 1px solid var(--border);
+  border-right: 1px solid var(--tm-border);
   overflow-y: auto;
-  padding-bottom: var(--space-3);
+  padding-bottom: var(--tm-space-3);
   outline: none;
 }
 
 .logbook__group-label {
   display: flex;
   gap: 6px;
-  padding: 14px var(--space-4) var(--space-1);
+  padding: 14px var(--tm-space-4) var(--tm-space-1);
   font-size: 11.5px;
-  color: var(--text-muted);
+  color: var(--tm-text-muted);
 }
 
 .logbook__item {
   display: grid;
   grid-template-columns: 16px minmax(0, 1fr);
   gap: 2px 10px;
-  padding: 8px var(--space-4) 9px 14px;
-  border-bottom: 1px solid var(--border);
+  padding: 8px var(--tm-space-4) 9px 14px;
+  border-bottom: 1px solid var(--tm-border);
   box-shadow: inset 2px 0 0 var(--rail, transparent);
   cursor: pointer;
   outline: none;
 }
 
 .logbook__item:hover {
-  background: var(--bg-card-hover);
+  background: var(--tm-bg-card-hover);
 }
 
 .logbook__item--selected {
-  background: var(--accent-dim);
+  background: var(--tm-accent-dim);
 }
 
 .logbook__item:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--tm-accent);
   outline-offset: -2px;
 }
 
@@ -64,28 +64,28 @@
 
 .logbook__headline--blank {
   font-weight: 400;
-  color: var(--text-secondary);
+  color: var(--tm-text-secondary);
 }
 
 .logbook__meta {
   grid-column: 2;
   display: flex;
   align-items: baseline;
-  gap: var(--space-2);
+  gap: var(--tm-space-2);
   min-width: 0;
   font-size: 12px;
 }
 
 .logbook__key {
   flex: none;
-  font-family: var(--font-mono);
+  font-family: var(--tm-font-mono);
   font-size: 11.5px;
-  color: var(--text-secondary);
+  color: var(--tm-text-secondary);
 }
 
 .logbook__where {
   min-width: 0;
-  color: var(--text-secondary);
+  color: var(--tm-text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -94,21 +94,21 @@
 .logbook__age {
   margin-left: auto;
   flex: none;
-  color: var(--text-muted);
+  color: var(--tm-text-muted);
   font-variant-numeric: tabular-nums;
 }
 
 .logbook__placeholder {
   margin: 0;
-  padding: var(--space-6);
-  color: var(--text-secondary);
+  padding: var(--tm-space-6);
+  color: var(--tm-text-secondary);
 }
 
 .logbook__detail {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 220px;
   grid-template-rows: auto 1fr;
-  gap: var(--space-4) 28px;
+  gap: var(--tm-space-4) 28px;
   align-content: start;
   padding: 20px 28px;
   overflow-y: auto;
@@ -129,21 +129,21 @@
 .logbook__main {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--tm-space-4);
   min-width: 0;
 }
 
 .logbook__work {
   display: flex;
   align-items: baseline;
-  gap: var(--space-2);
+  gap: var(--tm-space-2);
 }
 
 .logbook__source,
 .logbook__muted {
   margin: 0;
   font-size: 12px;
-  color: var(--text-muted);
+  color: var(--tm-text-muted);
 }
 
 .logbook__closed-text {
@@ -156,12 +156,12 @@
 .logbook__edit {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--tm-space-2);
 }
 
 .logbook__edit label {
   font-size: 12px;
-  color: var(--text-secondary);
+  color: var(--tm-text-secondary);
 }
 
 .logbook__textarea {
@@ -169,10 +169,10 @@
   min-height: 76px;
   resize: vertical;
   padding: 10px 12px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-strong);
-  background: var(--bg-input);
-  color: var(--text-primary);
+  border-radius: var(--tm-radius-md);
+  border: 1px solid var(--tm-border-strong);
+  background: var(--tm-bg-input);
+  color: var(--tm-text-primary);
   font: inherit;
   font-size: 16px;
   font-weight: 500;
@@ -181,15 +181,15 @@
 
 .logbook__textarea:focus-visible {
   outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-dim);
+  border-color: var(--tm-accent);
+  box-shadow: 0 0 0 3px var(--tm-accent-dim);
 }
 
 .logbook__actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--tm-space-2);
 }
 
 .logbook__button {
@@ -200,14 +200,14 @@
 }
 
 .logbook__button--primary {
-  background: var(--accent);
+  background: var(--tm-accent);
   border-color: transparent;
-  color: var(--on-accent);
+  color: var(--tm-on-accent);
 }
 
 .logbook__button:focus-visible,
 .logbook__suggest button:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--tm-accent);
   outline-offset: 1px;
 }
 
@@ -220,7 +220,7 @@
   margin: 0 0 6px;
   font-size: 12px;
   font-weight: 500;
-  color: var(--text-secondary);
+  color: var(--tm-text-secondary);
 }
 
 .logbook__suggest ul {
@@ -238,10 +238,10 @@
   gap: 10px;
   width: 100%;
   padding: 8px 10px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: var(--bg-card);
-  color: var(--text-primary);
+  border-radius: var(--tm-radius-sm);
+  border: 1px solid var(--tm-border);
+  background: var(--tm-bg-card);
+  color: var(--tm-text-primary);
   font: inherit;
   font-size: 12.5px;
   text-align: left;
@@ -249,7 +249,7 @@
 }
 
 .logbook__suggest button:hover {
-  background: var(--bg-card-hover);
+  background: var(--tm-bg-card-hover);
 }
 
 .logbook__title {
@@ -262,8 +262,8 @@
 
 .logbook__preview {
   height: 280px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border);
+  border-radius: var(--tm-radius-md);
+  border: 1px solid var(--tm-border);
 }
 
 .logbook__facts dl {
@@ -275,7 +275,7 @@
 }
 
 .logbook__facts dt {
-  color: var(--text-muted);
+  color: var(--tm-text-muted);
 }
 
 .logbook__facts dd {
@@ -289,5 +289,5 @@
 .logbook__tags {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-1);
+  gap: var(--tm-space-1);
 }

@@ -19,39 +19,39 @@
 .about-dialog__name {
   font-size: 16px;
   font-weight: 700;
-  color: var(--text-primary);
+  color: var(--tm-text-primary);
   letter-spacing: -0.02em;
 }
 
 .about-dialog__version {
   font-size: 11px;
-  color: var(--text-muted);
-  font-family: var(--font-mono);
+  color: var(--tm-text-muted);
+  font-family: var(--tm-font-mono);
 }
 
 .about-dialog__info {
   margin: 0 0 4px;
   padding: 0;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--tm-border);
 }
 
 .about-dialog__row {
   display: flex;
   justify-content: space-between;
   padding: 8px 0;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--tm-border);
 }
 
 .about-dialog__row dt {
   font-size: 11px;
-  color: var(--text-muted);
+  color: var(--tm-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
 
 .about-dialog__row dd {
   font-size: 11px;
-  color: var(--text-secondary);
-  font-family: var(--font-mono);
+  color: var(--tm-text-secondary);
+  font-family: var(--tm-font-mono);
   margin: 0;
 }

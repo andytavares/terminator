@@ -9,8 +9,8 @@
 .tab-bar {
   display: flex;
   align-items: stretch;
-  background: var(--bg-surface);
-  border-bottom: 1px solid var(--border);
+  background: var(--tm-bg-surface);
+  border-bottom: 1px solid var(--tm-border);
   overflow-x: auto;
   overflow-y: hidden;
   flex-shrink: 0;
@@ -27,8 +27,8 @@
 /* ── Session sub-tab bar ──────────────────────────────────────── */
 .tab-bar--sessions {
   height: 30px;
-  background: var(--bg-base);
-  border-bottom: 1px solid var(--border);
+  background: var(--tm-bg-base);
+  border-bottom: 1px solid var(--tm-border);
 }
 
 /* ── Individual tab ──────────────────────────────────────────── */
@@ -40,9 +40,9 @@
   min-width: 90px;
   max-width: 200px;
   cursor: pointer;
-  border-right: 1px solid var(--border);
+  border-right: 1px solid var(--tm-border);
   background: transparent;
-  color: var(--text-secondary);
+  color: var(--tm-text-secondary);
   font-size: 11px;
   letter-spacing: 0.01em;
   white-space: nowrap;
@@ -68,13 +68,13 @@
 }
 
 .tab-bar__tab:hover {
-  background: var(--bg-elevated);
-  color: var(--text-primary);
+  background: var(--tm-bg-elevated);
+  color: var(--tm-text-primary);
 }
 
 .tab-bar__tab--active {
-  background: var(--bg-base);
-  color: var(--text-primary);
+  background: var(--tm-bg-base);
+  color: var(--tm-text-primary);
 }
 
 /* Active indicator: top accent on primary tabs */
@@ -85,7 +85,7 @@
   left: 0;
   right: 0;
   height: 2px;
-  background: var(--ws-color, var(--accent));
+  background: var(--ws-color, var(--tm-accent));
 }
 
 /* Active indicator: bottom accent on session sub-tabs */
@@ -96,7 +96,7 @@
   left: 0;
   right: 0;
   height: 2px;
-  background: var(--ws-color, var(--accent));
+  background: var(--ws-color, var(--tm-accent));
 }
 
 .tab-bar__title {
@@ -109,9 +109,9 @@
    is the whole fact. */
 .tab-bar__key {
   flex: 0 0 auto;
-  font-family: var(--font-mono);
+  font-family: var(--tm-font-mono);
   font-size: 9.5px;
-  color: var(--text-muted);
+  color: var(--tm-text-muted);
   margin-left: 4px;
   white-space: nowrap;
 }
@@ -133,7 +133,7 @@
 .tab-bar__close {
   background: none;
   border: none;
-  color: var(--text-muted);
+  color: var(--tm-text-muted);
   font-size: 13px;
   line-height: 1;
   padding: 1px 3px;
@@ -153,16 +153,16 @@
 
 .tab-bar__close:hover {
   opacity: 1 !important;
-  background: var(--bg-card-hover);
-  color: var(--danger);
+  background: var(--tm-bg-card-hover);
+  color: var(--tm-danger);
 }
 
 /* ── New tab button ──────────────────────────────────────────── */
 .tab-bar__new-tab {
   background: none;
   border: none;
-  border-right: 1px solid var(--border);
-  color: var(--text-muted);
+  border-right: 1px solid var(--tm-border);
+  color: var(--tm-text-muted);
   font-size: 18px;
   padding: 0 10px;
   height: 100%;
@@ -174,23 +174,23 @@
 }
 
 .tab-bar__new-tab:hover {
-  color: var(--text-primary);
-  background: var(--bg-elevated);
+  color: var(--tm-text-primary);
+  background: var(--tm-bg-elevated);
 }
 
 /* ── Drag-over indicator on session tabs ─────────────────────── */
 .tab-bar__tab--dnd-over {
-  border-left: 2px solid var(--ws-color, var(--accent));
+  border-left: 2px solid var(--ws-color, var(--tm-accent));
 }
 
 /* ── Inline rename input ─────────────────────────────────────── */
 .tab-bar__rename-input {
   height: auto;
   flex: 1;
-  background: var(--bg-base);
-  border: 1px solid var(--ws-color, var(--accent));
+  background: var(--tm-bg-base);
+  border: 1px solid var(--ws-color, var(--tm-accent));
   border-radius: 3px;
-  color: var(--text-primary);
+  color: var(--tm-text-primary);
   font-size: 11px;
   font-family: inherit;
   padding: 1px 4px;
@@ -207,8 +207,8 @@
   padding: 0 10px 0 12px;
   font-size: 10px;
   letter-spacing: 0.04em;
-  color: var(--text-muted);
-  border-right: 1px solid var(--border);
+  color: var(--tm-text-muted);
+  border-right: 1px solid var(--tm-border);
   max-width: 30%;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -262,9 +262,9 @@
   flex: 1;
   min-width: 0;
   font: inherit;
-  background: var(--bg-input);
-  border: 1px solid var(--accent);
-  border-radius: var(--radius-xs, 4px);
-  color: var(--text-primary);
+  background: var(--tm-bg-input);
+  border: 1px solid var(--tm-accent);
+  border-radius: var(--tm-radius-xs, 4px);
+  color: var(--tm-text-primary);
   padding: 0 4px;
 }

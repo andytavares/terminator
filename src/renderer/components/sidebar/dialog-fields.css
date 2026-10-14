@@ -9,7 +9,7 @@
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--text-muted);
+  color: var(--tm-text-muted);
   margin-bottom: 5px;
 }
 
@@ -17,13 +17,13 @@
 .dialog__input,
 .branch-select__trigger {
   width: 100%;
-  background: var(--bg-input);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm);
+  background: var(--tm-bg-input);
+  border: 1px solid var(--tm-border-strong);
+  border-radius: var(--tm-radius-sm);
   padding: 7px 10px;
   font-size: 12px;
-  font-family: var(--font-ui);
-  color: var(--text-primary);
+  font-family: var(--tm-font-ui);
+  color: var(--tm-text-primary);
   transition: border-color 0.15s;
 }
 
@@ -32,17 +32,17 @@
 }
 
 .dialog__input:focus {
-  border-color: var(--accent);
+  border-color: var(--tm-accent);
 }
 
 .dialog__input--error {
-  border-color: var(--danger);
+  border-color: var(--tm-danger);
 }
 
 .dialog__error {
   display: block;
   font-size: 10px;
-  color: var(--danger);
+  color: var(--tm-danger);
   margin-top: 4px;
   letter-spacing: 0.01em;
 }
@@ -92,7 +92,7 @@
   text-transform: none;
   letter-spacing: normal;
   font-size: 12px;
-  color: var(--text-secondary);
+  color: var(--tm-text-secondary);
   cursor: pointer;
   margin-bottom: 0;
 }
@@ -100,8 +100,8 @@
 /* ── Segmented control ───────────────────────────────────────── */
 .dialog__segment {
   display: flex;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm);
+  border: 1px solid var(--tm-border-strong);
+  border-radius: var(--tm-radius-sm);
   overflow: hidden;
 }
 
@@ -109,11 +109,11 @@
   flex: 1;
   background: none;
   border: none;
-  border-right: 1px solid var(--border-strong);
+  border-right: 1px solid var(--tm-border-strong);
   padding: 6px 10px;
   font-size: 11px;
-  font-family: var(--font-ui);
-  color: var(--text-secondary);
+  font-family: var(--tm-font-ui);
+  color: var(--tm-text-secondary);
   cursor: pointer;
   transition:
     background 0.12s,
@@ -125,12 +125,12 @@
 }
 
 .dialog__segment-btn:hover:not(.dialog__segment-btn--active) {
-  background: var(--bg-card-hover);
-  color: var(--text-primary);
+  background: var(--tm-bg-card-hover);
+  color: var(--tm-text-primary);
 }
 
 .dialog__segment-btn--active {
-  background: var(--accent);
+  background: var(--tm-accent);
   color: white;
 }
 
@@ -141,14 +141,14 @@
 
 .dialog__segment-btn--disabled:hover {
   background: none;
-  color: var(--text-secondary);
+  color: var(--tm-text-secondary);
 }
 
 /* ── Hint text ───────────────────────────────────────────────── */
 .dialog__hint {
   display: block;
   font-size: 10px;
-  color: var(--text-muted);
+  color: var(--tm-text-muted);
   margin-top: 4px;
   letter-spacing: 0.01em;
 }

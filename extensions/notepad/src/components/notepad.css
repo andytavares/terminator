@@ -7,7 +7,7 @@
   overflow: hidden;
   background: var(--tm-bg-base);
   color: var(--tm-text-primary);
-  font-family: var(--font-ui, system-ui, sans-serif);
+  font-family: var(--tm-font-ui, system-ui, sans-serif);
   font-size: 13px;
 }
 
@@ -650,7 +650,7 @@
 }
 
 .notepad-kbd {
-  font-family: var(--font-mono, monospace);
+  font-family: var(--tm-font-mono, monospace);
   font-size: 11px;
   background: var(--tm-bg-input);
   border: 1px solid var(--tm-border);
@@ -716,7 +716,7 @@
 
 .notepad-textarea {
   font-size: 13px;
-  font-family: var(--font-mono, monospace);
+  font-family: var(--tm-font-mono, monospace);
   padding: 8px 10px;
   resize: vertical;
   transition: border-color 100ms ease;
@@ -782,7 +782,7 @@
 }
 
 .notepad-quick-create__vault-status code {
-  font-family: var(--font-mono, monospace);
+  font-family: var(--tm-font-mono, monospace);
   background: var(--tm-overlay-soft);
   padding: 0 3px;
   border-radius: 3px;
@@ -969,7 +969,7 @@
 }
 
 .notepad-editor-cm .cm-scroller {
-  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-family: var(--tm-font-mono, 'JetBrains Mono', monospace);
   /* Set by NoteEditor from the "Editor font size" setting. */
   font-size: var(--notepad-editor-font-size, 14px);
   line-height: 1.65;
@@ -1170,7 +1170,7 @@
 
 .notepad-export-dialog__folder-input {
   flex: 1;
-  font-family: var(--font-mono, monospace);
+  font-family: var(--tm-font-mono, monospace);
   transition: border-color 100ms ease;
 }
 
@@ -1208,7 +1208,7 @@
 
 .notepad-export-dialog__preview-line {
   font-size: 12px;
-  font-family: var(--font-mono, monospace);
+  font-family: var(--tm-font-mono, monospace);
   color: var(--tm-text-muted);
   line-height: 1.7;
 }

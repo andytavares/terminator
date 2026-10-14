@@ -98,7 +98,7 @@ describe('hover and selection are neutral (FR-042)', () => {
     ['.repo-header:hover', HEAD_CSS],
   ])('%s uses a theme surface rather than the repo colour', (selector, css) => {
     const body = ruleBody(css, selector)
-    expect(body).toMatch(/background:\s*var\(--bg-[a-z-]+\)/)
+    expect(body).toMatch(/background:\s*var\(--tm-bg-[a-z-]+\)/)
     expect(body).not.toMatch(/--ws-color/)
   })
 })
@@ -106,7 +106,7 @@ describe('hover and selection are neutral (FR-042)', () => {
 describe('the repo name is text, not colour (FR-043)', () => {
   it('never paints the name in the repo colour', () => {
     expect(ruleBody(HEAD_CSS, '.repo-header__name')).not.toMatch(/color:/)
-    expect(ruleBody(HEAD_CSS, '.repo-header')).toMatch(/color:\s*var\(--text-primary\)/)
+    expect(ruleBody(HEAD_CSS, '.repo-header')).toMatch(/color:\s*var\(--tm-text-primary\)/)
   })
 
   it('gives the colour a swatch of its own instead', () => {

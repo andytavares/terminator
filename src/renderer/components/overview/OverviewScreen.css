@@ -3,31 +3,31 @@
   padding: 0 8px;
   border: 0;
   background: transparent;
-  color: var(--text-secondary);
+  color: var(--tm-text-secondary);
   font: inherit;
   font-size: 12px;
   cursor: pointer;
 }
 
 .wall__size + .wall__size {
-  border-left: 1px solid var(--border-strong);
+  border-left: 1px solid var(--tm-border-strong);
 }
 
 .wall__size[aria-checked='true'] {
-  background: var(--accent-dim);
-  color: var(--text-primary);
+  background: var(--tm-accent-dim);
+  color: var(--tm-text-primary);
 }
 
 .wall__toggle {
   padding: 0 10px;
-  color: var(--text-secondary);
+  color: var(--tm-text-secondary);
   cursor: pointer;
 }
 
 .wall__toggle[aria-checked='true'] {
-  background: var(--accent-dim);
+  background: var(--tm-accent-dim);
   border-color: transparent;
-  color: var(--text-primary);
+  color: var(--tm-text-primary);
 }
 
 .wall__select {
@@ -35,12 +35,12 @@
   align-items: center;
   gap: 6px;
   font-size: 12px;
-  color: var(--text-muted);
+  color: var(--tm-text-muted);
 }
 
 .wall__select select {
   padding: 0 6px;
-  color: var(--text-primary);
+  color: var(--tm-text-primary);
 }
 
 .wall__search {
@@ -51,7 +51,7 @@
 .wall__toggle:focus-visible,
 .wall__select select:focus-visible,
 .wall__empty-action:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--tm-accent);
   outline-offset: 1px;
 }
 
@@ -71,7 +71,7 @@
   /* min() keeps a single column narrower than a tile from overflowing. */
   grid-template-columns: repeat(auto-fill, minmax(min(var(--tile-min), 100%), 1fr));
   gap: 10px;
-  padding: var(--space-3) var(--space-4) var(--space-5);
+  padding: var(--tm-space-3) var(--tm-space-4) var(--tm-space-5);
   align-content: start;
 }
 
@@ -92,5 +92,5 @@
   margin: 4px 0 -2px;
   font-size: 12px;
   font-weight: 600;
-  color: var(--text-secondary);
+  color: var(--tm-text-secondary);
 }

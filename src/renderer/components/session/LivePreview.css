@@ -2,7 +2,7 @@
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background: var(--bg-base);
+  background: var(--tm-bg-base);
   /* Fades rather than slicing a line of terminal output in half. */
   -webkit-mask-image: linear-gradient(to bottom, #000 70%, transparent 100%);
   mask-image: linear-gradient(to bottom, #000 70%, transparent 100%);

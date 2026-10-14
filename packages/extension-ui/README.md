@@ -12,8 +12,8 @@ and layer tokens for both themes, under the published `--tm-*` names. `:root` is
 the dark default; `[data-theme='light']` replaces what differs. No other file
 should define a colour.
 
-- The core renderer imports `@terminator/extension-ui/tokens.css`. Its older
-  `--bg-*`, `--text-*` and `--space-*` names are aliases of the `--tm-*` tokens.
+- The core renderer imports `@terminator/extension-ui/tokens.css` and uses the `--tm-*` names
+  directly; a token has no second name.
 - Extension views are separate documents, so the host injects
   `EXTENSION_BASE_CSS` (`@terminator/extension-ui/extension-base-css`): the tokens
   plus `src/extension-base.css`, the icon scale (`tm-icon-sm`, `tm-icon`,

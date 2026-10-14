@@ -13,19 +13,19 @@
   height: 20px;
   padding: 0;
   border: 0;
-  border-radius: var(--radius-xs);
+  border-radius: var(--tm-radius-xs);
   background: transparent;
-  color: var(--text-muted);
+  color: var(--tm-text-muted);
   cursor: pointer;
 }
 
 .close-session:hover {
-  background: var(--bg-card-hover);
-  color: var(--text-primary);
+  background: var(--tm-bg-card-hover);
+  color: var(--tm-text-primary);
 }
 
 .close-session:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--tm-accent);
   outline-offset: 1px;
 }
 

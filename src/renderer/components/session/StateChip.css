@@ -11,7 +11,7 @@
   height: 22px;
   padding: 0 9px 0 7px;
   border-radius: 999px;
-  color: var(--text-primary);
+  color: var(--tm-text-primary);
   white-space: nowrap;
 }
 
@@ -28,7 +28,7 @@
 .state-chip--idle,
 .state-chip--exited {
   background: transparent;
-  color: var(--text-secondary);
+  color: var(--tm-text-secondary);
 }
 
 .state-chip__icon {

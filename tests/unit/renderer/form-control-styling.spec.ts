@@ -70,12 +70,11 @@ describe('checkbox styling — has a visible keyboard focus ring', () => {
     )
   })
 
-  it('defines --on-accent in both themes, since the accent fill is the same colour in each', () => {
+  it('defines --tm-on-accent in both themes, since the accent fill is the same colour in each', () => {
     const dark = TOKENS.slice(TOKENS.indexOf(':root {'), TOKENS.indexOf("[data-theme='light'] {"))
     const light = TOKENS.slice(TOKENS.indexOf("[data-theme='light'] {"))
     expect(dark).toMatch(/--tm-on-accent:\s*#ffffff/)
     expect(light).toMatch(/--tm-on-accent:\s*#ffffff/)
-    expect(STYLES).toMatch(/--on-accent:\s*var\(--tm-on-accent\)/)
   })
 
   it('leaves no accent-color rule behind — it does nothing once appearance is none', () => {
@@ -165,10 +164,6 @@ describe('radio styling — centres the dot — asserted arithmetically, so resi
 
   it('immunises both controls against a container form reset', () => {
     expect(ruleBody(CONTROLS, BOX)).toMatch(/padding:\s*0/)
-  })
-
-  it('draws the dot with the core alias of the published --tm-on-accent', () => {
-    expect(STYLES).toMatch(/--on-accent:\s*var\(--tm-on-accent\)/)
   })
 })
 

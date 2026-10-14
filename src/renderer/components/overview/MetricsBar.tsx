@@ -25,7 +25,7 @@ export function MetricsBar({ system }: Props): JSX.Element {
       <BarMetric label="CPU" percent={cpuPct} colour={cpuColour(cpuPct)}>
         {cpuPct}%
       </BarMetric>
-      <BarMetric label="MEM" percent={memPct} colour="var(--accent)">
+      <BarMetric label="MEM" percent={memPct} colour="var(--tm-accent)">
         {formatGiB(system.memUsedBytes)} / {formatGiB(system.memTotalBytes)} GB
       </BarMetric>
       <div className="metrics-bar__item">
@@ -42,7 +42,7 @@ export function MetricsBar({ system }: Props): JSX.Element {
 /** Amber from 70%, red from 90%. */
 function cpuColour(percent: number): string {
   if (percent >= 90) return '#e03131'
-  return percent >= 70 ? '#f08c00' : 'var(--accent)'
+  return percent >= 70 ? '#f08c00' : 'var(--tm-accent)'
 }
 
 /** Each metric's label over a skeleton, until the first sample arrives. */

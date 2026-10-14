@@ -14,7 +14,7 @@
      left of the repo's own. */
   padding: 0 10px 0 14px;
   box-shadow: inset 2px 0 0 var(--ws-color, transparent);
-  color: var(--text-secondary);
+  color: var(--tm-text-secondary);
   user-select: none;
   cursor: pointer;
   outline: none;
@@ -32,7 +32,7 @@
   padding: 0;
   border: 0;
   background: transparent;
-  color: var(--text-muted);
+  color: var(--tm-text-muted);
   cursor: pointer;
 }
 
@@ -43,7 +43,7 @@
 }
 
 .branch-row__disclosure:hover {
-  color: var(--text-primary);
+  color: var(--tm-text-primary);
 }
 
 .branch-row__disclosure--empty {
@@ -51,15 +51,15 @@
 }
 
 .branch-row:hover {
-  background: var(--bg-elevated);
+  background: var(--tm-bg-elevated);
 }
 
 .branch-row--selected {
-  background: var(--bg-card-hover);
+  background: var(--tm-bg-card-hover);
 }
 
 .branch-row--selected .branch-row__name {
-  color: var(--text-primary);
+  color: var(--tm-text-primary);
 }
 
 /* The drop line, drawn alongside the colour rail rather than replacing it —
@@ -67,11 +67,11 @@
 .branch-row--dnd-over {
   box-shadow:
     inset 2px 0 0 var(--ws-color, transparent),
-    inset 0 2px 0 var(--accent);
+    inset 0 2px 0 var(--tm-accent);
 }
 
 .branch-row:focus-visible {
-  outline: 2px solid var(--text-primary);
+  outline: 2px solid var(--tm-text-primary);
   outline-offset: -2px;
 }
 
@@ -108,7 +108,7 @@
   flex: 0 0 auto;
   display: grid;
   place-items: center;
-  color: var(--text-muted);
+  color: var(--tm-text-muted);
   opacity: 0.6;
 }
 
@@ -120,9 +120,9 @@
 
 /* A machine fact: the name you would have to type exactly. */
 .branch-row__name {
-  font-family: var(--font-mono);
+  font-family: var(--tm-font-mono);
   font-size: 11.5px;
-  color: var(--text-primary);
+  color: var(--tm-text-primary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -135,12 +135,12 @@
   flex: 1;
   min-width: 0;
   margin-left: 4px;
-  font-family: var(--font-mono);
+  font-family: var(--tm-font-mono);
   font-size: 11.5px;
-  background: var(--bg-input);
-  border: 1px solid var(--accent);
-  border-radius: var(--radius-xs, 4px);
-  color: var(--text-primary);
+  background: var(--tm-bg-input);
+  border: 1px solid var(--tm-accent);
+  border-radius: var(--tm-radius-xs, 4px);
+  color: var(--tm-text-primary);
   padding: 0 4px;
 }
 
@@ -151,9 +151,9 @@
   gap: 9px;
   flex: 0 0 auto;
   padding-left: 8px;
-  font-family: var(--font-mono);
+  font-family: var(--tm-font-mono);
   font-size: 10px;
-  color: var(--text-muted);
+  color: var(--tm-text-muted);
   font-variant-numeric: tabular-nums;
 }
 
@@ -164,12 +164,12 @@
 }
 
 .branch-row__stats b {
-  color: var(--success);
+  color: var(--tm-success);
   font-weight: 400;
 }
 
 .branch-row__stats i {
-  color: var(--danger);
+  color: var(--tm-danger);
   font-style: normal;
 }
 
@@ -188,18 +188,18 @@
   width: var(--sidebar-count-w);
   text-align: right;
   white-space: nowrap;
-  font-family: var(--font-mono);
+  font-family: var(--tm-font-mono);
   font-size: 10px;
   font-weight: 400;
   font-variant-numeric: tabular-nums;
 }
 
 .branch-row__age {
-  color: var(--text-muted);
+  color: var(--tm-text-muted);
 }
 
 .branch-row__count {
-  color: var(--text-secondary);
+  color: var(--tm-text-secondary);
 }
 
 /* Sits to the left of the count and takes the slack, so revealing it cannot
@@ -233,7 +233,7 @@
   height: 14px;
   background: transparent;
   border: 0;
-  color: var(--text-muted);
+  color: var(--tm-text-muted);
 }
 
 .branch-row__action svg {

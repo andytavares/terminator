@@ -430,7 +430,7 @@ The core and every extension are built from one design system, `packages/extensi
 
 **Tokens.** `packages/extension-ui/src/tokens.css` is the one definition of every token: colour, spacing, radius, fonts and the `--tm-layer-*` scale, under the `--tm-*` names, for both themes (a dark `:root` and a light `[data-theme='light']`). Tokens reach each document differently:
 
-- The core renderer imports the file in `src/renderer/index.tsx`. `src/renderer/styles.css` defines the core's older names (`--bg-*`, `--text-*`, `--border-*`, `--accent`, `--font-*`) as aliases of `--tm-*`; they hold no value of their own.
+- The core renderer imports the file in `src/renderer/index.tsx` and uses the `--tm-*` names directly. `src/renderer/styles.css` defines only the core's own values (layout measures, the agent-state scale).
 - An extension view is a separate document, so CSS has to be injected into it. `EXTENSION_BASE_CSS` (`src/extension-base-css.ts`: `tokens.css`, `extension-base.css` with the icon scale and element resets, and `controls.css` with the one field height and the themed checkboxes and radios) is read at build time with Vite's `?raw` import, so nothing is looked up on disk at run time. `ExtensionViewHost` inserts it into every view on load, and `extensions/remote-control/src/server/remote-server.ts` serves the same constant to the remote client. The e2e specs that render extension stylesheets in plain Chromium rebuild it with `tests/e2e/extension-base-css.ts`, which reads the builder's own `?raw` imports, and `tests/unit/renderer/extension-base-css.spec.ts` checks the two are identical.
 - An extension document never sees the main renderer's `data-theme`, so `ExtensionViewHost.setTheme` stamps it on every open view and remembers it for views created later, driven by the renderer over `extension:set-theme`.
 
@@ -706,7 +706,7 @@ A terminal dies with the app; the conversation that ran in it does not. Claude C
 
 ### Colour propagation
 
-A repo's `color` appears in exactly two places: a 2px rail on its rows (`box-shadow: inset 2px 0 0 var(--ws-color, transparent)`) and a 7px swatch beside its name. No background tint at rest, on hover, or when selected; hover and selection are neutral theme surfaces identical for every repo; the repo name is `--text-primary`.
+A repo's `color` appears in exactly two places: a 2px rail on its rows (`box-shadow: inset 2px 0 0 var(--ws-color, transparent)`) and a 7px swatch beside its name. No background tint at rest, on hover, or when selected; hover and selection are neutral theme surfaces identical for every repo; the repo name is `--tm-text-primary`.
 
 Every mix spells its fallback as `var(--ws-color, transparent)`: an unresolved custom property makes the _whole_ declaration invalid at computed-value time rather than just that term, which would leave the surface unpainted. `tests/unit/renderer/sidebar-workspace-tint.spec.ts` asserts the washes are gone, that the colour is used only as a rail and a swatch, and that the text tokens clear AA on the flat surfaces they now sit on, in both themes. See ADR 037.
 

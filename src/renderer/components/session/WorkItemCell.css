@@ -1,21 +1,21 @@
 .work-item {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--tm-space-2);
   min-width: 0;
   font-size: 12px;
 }
 
 .work-item__key {
-  font-family: var(--font-mono);
+  font-family: var(--tm-font-mono);
   font-size: 11.5px;
-  color: var(--text-secondary);
+  color: var(--tm-text-secondary);
   flex: none;
 }
 
 .work-item__title,
 .work-item__description {
-  color: var(--text-primary);
+  color: var(--tm-text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -23,40 +23,40 @@
 }
 
 .work-item__muted {
-  color: var(--text-muted);
+  color: var(--tm-text-muted);
 }
 
 .work-item__icon-button,
 .work-item__link {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-1);
+  gap: var(--tm-space-1);
   flex: none;
   height: 22px;
   padding: 0 6px;
-  border-radius: var(--radius-xs);
+  border-radius: var(--tm-radius-xs);
   border: 1px solid transparent;
   background: transparent;
-  color: var(--text-secondary);
+  color: var(--tm-text-secondary);
   font: inherit;
   font-size: 11.5px;
   cursor: pointer;
 }
 
 .work-item__link {
-  border-color: var(--border-strong);
+  border-color: var(--tm-border-strong);
 }
 
 .work-item__icon-button:hover,
 .work-item__link:hover {
-  background: var(--bg-card-hover);
-  color: var(--text-primary);
+  background: var(--tm-bg-card-hover);
+  color: var(--tm-text-primary);
 }
 
 .work-item__icon-button:focus-visible,
 .work-item__link:focus-visible,
 .work-item__input:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--tm-accent);
   outline-offset: 1px;
 }
 
@@ -71,14 +71,14 @@
   min-width: 0;
   height: 24px;
   padding: 0 8px;
-  border: 1px dashed var(--border-strong);
-  border-radius: var(--radius-xs);
+  border: 1px dashed var(--tm-border-strong);
+  border-radius: var(--tm-radius-xs);
   background: transparent;
-  color: var(--text-primary);
+  color: var(--tm-text-primary);
   font: inherit;
   font-size: 12px;
 }
 
 .work-item__input::placeholder {
-  color: var(--text-secondary);
+  color: var(--tm-text-secondary);
 }

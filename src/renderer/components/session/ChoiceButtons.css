@@ -1,7 +1,7 @@
 .choice-buttons {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-1);
+  gap: var(--tm-space-1);
   min-width: 0;
 }
 
@@ -11,9 +11,9 @@
 
 /* The option the agent's own cursor starts on is the one a person usually wants. */
 .choice-buttons__option--first {
-  background: var(--accent);
+  background: var(--tm-accent);
   border-color: transparent;
-  color: var(--on-accent);
+  color: var(--tm-on-accent);
 }
 
 .choice-buttons__option:hover {
@@ -21,12 +21,12 @@
 }
 
 .choice-buttons__option:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--tm-accent);
   outline-offset: 1px;
 }
 
 .choice-buttons__number {
-  font-family: var(--font-mono);
+  font-family: var(--tm-font-mono);
   opacity: 0.75;
 }
 

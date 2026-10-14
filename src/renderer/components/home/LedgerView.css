@@ -4,7 +4,7 @@
 .ledger {
   display: flex;
   flex-direction: column;
-  padding-bottom: var(--space-4);
+  padding-bottom: var(--tm-space-4);
   min-width: 0;
   /* The list fits its surface: no column may push the row sideways. */
   overflow-x: hidden;
@@ -15,8 +15,8 @@
   display: grid;
   grid-template-columns: var(--ledger-columns);
   align-items: center;
-  column-gap: var(--space-3);
-  padding: 0 var(--space-4) 0 var(--space-4);
+  column-gap: var(--tm-space-3);
+  padding: 0 var(--tm-space-4) 0 var(--tm-space-4);
 }
 
 .ledger__head {
@@ -25,19 +25,19 @@
   z-index: 1;
   height: 30px;
   font-size: 11.5px;
-  color: var(--text-muted);
-  background: var(--bg-base);
-  border-bottom: 1px solid var(--border);
+  color: var(--tm-text-muted);
+  background: var(--tm-bg-base);
+  border-bottom: 1px solid var(--tm-border);
 }
 
 .ledger__group-label {
   display: flex;
   align-items: baseline;
-  gap: var(--space-2);
-  padding: var(--space-4) var(--space-4) 6px;
+  gap: var(--tm-space-2);
+  padding: var(--tm-space-4) var(--tm-space-4) 6px;
   font-size: 12.5px;
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--tm-text-primary);
 }
 
 /* The Needs-you group reads as a band at the top of Home: the same fill the
@@ -45,8 +45,8 @@
 .ledger__group-label--needs {
   background: var(--state-needs-fill);
   margin: 0 0 6px;
-  padding-top: var(--space-3);
-  padding-bottom: var(--space-3);
+  padding-top: var(--tm-space-3);
+  padding-bottom: var(--tm-space-3);
 }
 
 /* A decorative swatch, not text: answers "what is what" in the workspace's
@@ -60,13 +60,13 @@
 
 .ledger__group-count {
   font-weight: 400;
-  color: var(--text-muted);
+  color: var(--tm-text-muted);
   font-variant-numeric: tabular-nums;
 }
 
 .ledger__row {
   height: 36px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--tm-border);
   /* The workspace's colour is this edge and nothing else. */
   box-shadow: inset 3px 0 0 var(--rail, transparent);
   cursor: pointer;
@@ -74,11 +74,11 @@
 }
 
 .ledger__row:hover {
-  background: var(--bg-card-hover);
+  background: var(--tm-bg-card-hover);
 }
 
 .ledger__row--selected {
-  background: var(--bg-card);
+  background: var(--tm-bg-card);
 }
 
 .ledger__row--needs {
@@ -90,7 +90,7 @@
 }
 
 .ledger__row:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--tm-accent);
   outline-offset: -2px;
 }
 
@@ -112,7 +112,7 @@
   gap: 6px;
   min-width: 0;
   font-size: 12px;
-  color: var(--text-secondary);
+  color: var(--tm-text-secondary);
 }
 
 .ledger__branch span {
@@ -135,7 +135,7 @@
 
 .ledger__tags {
   display: flex;
-  gap: var(--space-1);
+  gap: var(--tm-space-1);
   overflow: hidden;
 }
 
@@ -144,9 +144,9 @@
 }
 
 .ledger__latest {
-  font-family: var(--font-mono);
+  font-family: var(--tm-font-mono);
   font-size: 11px;
-  color: var(--text-secondary);
+  color: var(--tm-text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -154,7 +154,7 @@
 
 .ledger__age {
   font-size: 12px;
-  color: var(--text-muted);
+  color: var(--tm-text-muted);
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
@@ -177,21 +177,21 @@
 
 .ledger__expand {
   display: block;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-card);
+  border-bottom: 1px solid var(--tm-border);
+  background: var(--tm-bg-card);
 }
 
 .ledger__expand-inner {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 260px;
-  gap: var(--space-4);
-  padding: var(--space-3) var(--space-4) 14px 44px;
+  gap: var(--tm-space-4);
+  padding: var(--tm-space-3) var(--tm-space-4) 14px 44px;
 }
 
 .ledger__preview {
   height: 180px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
+  border-radius: var(--tm-radius-sm);
+  border: 1px solid var(--tm-border);
 }
 
 .ledger__actions {
@@ -208,7 +208,7 @@
 }
 
 .ledger__open:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--tm-accent);
   outline-offset: 1px;
 }
 

@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
-// Guards the design system against contrast regressions: the dark `--text-secondary`
-// token previously sat at 4.20:1 (below WCAG AA) and was dimmer than `--text-muted`
+// Guards the design system against contrast regressions: the dark `--tm-text-secondary`
+// token previously sat at 4.20:1 (below WCAG AA) and was dimmer than `--tm-text-muted`
 // (an inverted hierarchy). This test reads the real token values from styles.css and
 // asserts every text token clears AA for normal text on its theme background, and
 // that the primary > secondary > muted prominence order holds.
@@ -46,7 +46,7 @@ describe('design token contrast (WCAG AA)', () => {
     const bg = token(block, '--tm-bg-base')
     const primary = token(block, '--tm-text-primary')
 
-    it(`${themeName}: all text tokens meet AA on --bg-base`, () => {
+    it(`${themeName}: all text tokens meet AA on --tm-bg-base`, () => {
       for (const name of ['--tm-text-primary', '--tm-text-secondary', '--tm-text-muted']) {
         const value = token(block, name)
         expect(

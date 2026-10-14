@@ -17,8 +17,8 @@
   max-height: 70vh;
   display: flex;
   flex-direction: column;
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
+  background: var(--tm-bg-surface);
+  border: 1px solid var(--tm-border);
   border-left: none;
   border-top-left-radius: 0;
   border-top-right-radius: 6px;
@@ -35,7 +35,7 @@
   align-items: center;
   gap: 8px;
   padding: 10px 14px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--tm-border);
   flex-shrink: 0;
 }
 
@@ -43,13 +43,13 @@
   flex: 1;
   font-size: 12px;
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--tm-text-primary);
 }
 
 .notif-panel__action-btn {
   background: none;
   border: none;
-  color: var(--text-muted);
+  color: var(--tm-text-muted);
   font-size: 11px;
   padding: 2px 6px;
   border-radius: 3px;
@@ -60,14 +60,14 @@
 }
 
 .notif-panel__action-btn:hover {
-  color: var(--text-primary);
-  background: var(--bg-elevated);
+  color: var(--tm-text-primary);
+  background: var(--tm-bg-elevated);
 }
 
 .notif-panel__close {
   background: none;
   border: none;
-  color: var(--text-muted);
+  color: var(--tm-text-muted);
   font-size: 16px;
   line-height: 1;
   padding: 2px 4px;
@@ -79,8 +79,8 @@
 }
 
 .notif-panel__close:hover {
-  color: var(--text-primary);
-  background: var(--bg-elevated);
+  color: var(--tm-text-primary);
+  background: var(--tm-bg-elevated);
 }
 
 /* ── Scrollable list ───────────────────────────────────────────── */
@@ -97,13 +97,13 @@
   justify-content: center;
   gap: 8px;
   padding: 40px 20px;
-  color: var(--text-muted);
+  color: var(--tm-text-muted);
   font-size: 12px;
 }
 
 .notif-panel__empty-icon {
   opacity: 0.35;
-  color: var(--text-muted);
+  color: var(--tm-text-muted);
 }
 
 /* ── Notification item ─────────────────────────────────────────── */
@@ -111,7 +111,7 @@
   display: flex;
   gap: 10px;
   padding: 10px 14px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--tm-border);
   transition: background 0.1s;
   position: relative;
 }
@@ -121,11 +121,11 @@
 }
 
 .notif-item--unread {
-  background: var(--bg-elevated);
+  background: var(--tm-bg-elevated);
 }
 
 .notif-item:hover {
-  background: var(--bg-card-hover);
+  background: var(--tm-bg-card-hover);
 }
 
 .notif-item--clickable {
@@ -135,7 +135,7 @@
 .notif-item__type-icon {
   flex-shrink: 0;
   margin-top: 2px;
-  color: var(--text-muted);
+  color: var(--tm-text-muted);
 }
 
 .notif-item__body {
@@ -145,7 +145,7 @@
 
 .notif-item__title {
   font-size: 12px;
-  color: var(--text-primary);
+  color: var(--tm-text-primary);
   font-weight: 500;
   word-break: break-word;
   line-height: 1.4;
@@ -153,7 +153,7 @@
 
 .notif-item__message {
   font-size: 11px;
-  color: var(--text-secondary);
+  color: var(--tm-text-secondary);
   margin-top: 2px;
   word-break: break-word;
   line-height: 1.4;
@@ -168,13 +168,13 @@
 
 .notif-item__time {
   font-size: 10px;
-  color: var(--text-muted);
+  color: var(--tm-text-muted);
 }
 
 .notif-item__source {
   font-size: 10px;
-  color: var(--text-muted);
-  background: var(--bg-elevated);
+  color: var(--tm-text-muted);
+  background: var(--tm-bg-elevated);
   border-radius: 3px;
   padding: 1px 4px;
 }
@@ -190,9 +190,9 @@
   font-size: 11px;
   padding: 2px 8px;
   border-radius: 4px;
-  border: 1px solid var(--border);
-  background: var(--bg-elevated);
-  color: var(--text-primary);
+  border: 1px solid var(--tm-border);
+  background: var(--tm-bg-elevated);
+  color: var(--tm-text-primary);
   cursor: pointer;
   transition:
     background 0.1s,
@@ -200,8 +200,8 @@
 }
 
 .notif-item__action-btn:hover {
-  background: var(--accent);
-  border-color: var(--accent);
+  background: var(--tm-accent);
+  border-color: var(--tm-accent);
   color: #fff;
 }
 
@@ -211,7 +211,7 @@
   right: 8px;
   background: none;
   border: none;
-  color: var(--text-muted);
+  color: var(--tm-text-muted);
   font-size: 14px;
   line-height: 1;
   padding: 2px 4px;
@@ -230,6 +230,6 @@
 
 .notif-item__dismiss:hover {
   opacity: 1 !important;
-  background: var(--bg-card-hover);
-  color: var(--danger);
+  background: var(--tm-bg-card-hover);
+  color: var(--tm-danger);
 }
