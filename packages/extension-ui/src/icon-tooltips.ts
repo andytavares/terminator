@@ -1,6 +1,7 @@
 import './extension-ui.css'
 
-/** How long the pointer rests on a control before its name shows. */
+/** How long the pointer rests on a control before its name shows.
+ * @internal */
 export const TOOLTIP_DELAY_MS = 500
 
 const CONTROL = 'button, a[href], [role="button"]'

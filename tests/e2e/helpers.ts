@@ -70,7 +70,7 @@ const CLAUDE_STUB_ZDOTDIR = join(dirname(fileURLToPath(import.meta.url)), 'fixtu
 /** The app's PATH: `firstDirs`, then the `claude` stub, then the runner's own.
  * A spec that stands in for another program passes its folder as `env.PATH`
  * through this, so the `claude` stub stays ahead of any real one. */
-export function e2ePath(...firstDirs: string[]): string {
+function e2ePath(...firstDirs: string[]): string {
   return [...firstDirs, CLAUDE_STUB_DIR, process.env.PATH ?? ''].join(delimiter)
 }
 

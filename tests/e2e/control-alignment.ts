@@ -3,7 +3,7 @@ import type { Page } from '@playwright/test'
 // Each function below runs in the page, so each uses only the DOM and the functions sent with it.
 
 /** Two controls that sit side by side and do not line up. */
-export interface Misalignment {
+interface Misalignment {
   first: string
   second: string
   heights: [number, number]
