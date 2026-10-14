@@ -1,0 +1,31 @@
+extensions/foundry/src/line/ci-state.ts
+  s_c9dd89ad1f6c54::t_86fa3db2e83d83 2,29
+extensions/foundry/src/line/refinery-state.ts
+  s_c9dd89ad1f6c54::t_86fa3db2e83d83 5,50
+extensions/foundry/src/line/observed-files.ts
+  s_c9dd89ad1f6c54::t_86fa3db2e83d83 2,19
+extensions/foundry/tests/ipc/run-graph-atomic.spec.ts
+  s_c9dd89ad1f6c54::t_86fa3db2e83d83 1-34
+extensions/foundry/src/gates/store.ts
+  s_c9dd89ad1f6c54::t_86fa3db2e83d83 7,77-78
+extensions/foundry/src/ipc/run-channels.ts
+  s_c9dd89ad1f6c54::t_86fa3db2e83d83 33,180,182
+extensions/foundry/src/verify/rules.ts
+  s_c9dd89ad1f6c54::t_86fa3db2e83d83 8,179
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f6be002665dd9ce2d0ea0a29e33b30c9bc5e1317",
+  "prompts": {},
+  "sessions": {
+    "s_c9dd89ad1f6c54": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ee6b7f82-c708-43d8-8c1f-eefe55f692a9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
