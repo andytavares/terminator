@@ -1,0 +1,22 @@
+extensions/foundry/src/forge/intake-outcome.ts
+  s_b1c4d88360506f::t_5370d2cb702421 51-54,182,188-199
+  s_b1c4d88360506f::t_a0db187574082f 200-201
+extensions/foundry/tests/forge/intake-outcome.spec.ts
+  s_b1c4d88360506f::t_92a11aa28172ad 299-355
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "ffa374f1831257b94d77ad66eb1f5ce964e7cfa1",
+  "prompts": {},
+  "sessions": {
+    "s_b1c4d88360506f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1ef90e9e-5d40-41e3-9550-9077984cef40",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
