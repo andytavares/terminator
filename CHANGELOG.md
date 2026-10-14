@@ -84,6 +84,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- Controls side by side line up everywhere: every control of a size is one height (`--tm-control-height` 28px, `--tm-control-height-sm` 22px) for fields, selects, `Button` and `IconButton`, which were sized by padding (31px and 23.6px) or fixed 26px and 20px. Rows that mixed sizes (review header and footer, merge flow, Task Vault edit and blocked rows) use one, and the core's work-item field, session buttons, extension buttons and the diff's line expanders take the tokens. An e2e audit (`control-alignment`) checks every main screen
+- Remote Control goes public while another ngrok runs: it gives its own agent an API port instead of reading 4040
+- Task Vault: a row's actions show for keyboard focus, not only for the pointer
 - Every text field, textarea and select is the design system's field (`controls.css`): themed background, border, padding, placeholder, and an accent edge with a soft ring on focus. A field whose class lived in a sheet not loaded yet was the white OS widget; the terminal-name dialog showed one until Settings had been opened once. Fields inside a box that draws its own edge (searches with an icon) keep their look, and the sidebar search box now shows focus
 - Extension toasts no longer sit under the extension's view. While an extension's view is on screen (or its frame, in the browser), the core leaves that extension's toasts to the view; every bundled extension view now draws its own (`PushedToasts` in the design system, Task Vault's own region). Elsewhere the core draws them as before
 - Reviews: a row's Open and Clone and review buttons no longer cover its size and reading time on hover

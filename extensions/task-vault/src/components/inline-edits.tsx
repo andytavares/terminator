@@ -82,7 +82,7 @@ export function TaskTextEditor({ draft, className, saveSize }: TaskTextEditorPro
       <Button variant="primary" size={saveSize} onClick={save}>
         Save
       </Button>
-      <IconButton icon={X} label="Cancel edit" size="sm" onClick={draft.cancel} />
+      <IconButton icon={X} label="Cancel edit" size={saveSize} onClick={draft.cancel} />
     </span>
   )
 }

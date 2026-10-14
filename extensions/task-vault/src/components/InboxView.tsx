@@ -304,7 +304,7 @@ function ItemEditor(props: EditProps): React.JSX.Element {
       <Button variant="primary" onClick={saveEdit}>
         Save
       </Button>
-      <IconButton icon={X} label="Cancel edit" size="sm" onClick={onDone} />
+      <IconButton icon={X} label="Cancel edit" onClick={onDone} />
     </div>
   )
 }

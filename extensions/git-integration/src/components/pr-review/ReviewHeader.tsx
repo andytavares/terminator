@@ -239,7 +239,6 @@ export function ReviewHeader(props: ReviewHeaderProps): JSX.Element {
       <Button
         aria-label="Ask agent about this PR"
         variant="ghost"
-        size="sm"
         icon={Sparkles}
         onClick={props.onAskAgent}
       >

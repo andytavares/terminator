@@ -1,7 +1,7 @@
 import React from 'react'
 import { X } from 'lucide-react'
+import { IconButton } from '@terminator/extension-ui'
 import type { SessionFacts } from '../../sidebar/session-facts'
-import './CloseSessionButton.css'
 
 interface Props {
   facts: SessionFacts
@@ -24,19 +24,17 @@ export function CloseSessionButton({ facts, onClose, onForget }: Props): JSX.Ele
   if (forgetting && onForget === undefined) return null
   const label = forgetting ? `Remove ${facts.name} from the list` : `Close ${facts.name}`
   return (
-    <button
-      type="button"
+    <IconButton
+      icon={X}
+      size="sm"
       className="close-session"
-      aria-label={label}
-      title={label}
+      label={label}
       onClick={(e) => {
         e.stopPropagation()
         if (forgetting) onForget!(facts)
         else onClose(facts)
       }}
       onKeyDown={(e) => e.stopPropagation()}
-    >
-      <X aria-hidden="true" />
-    </button>
+    />
   )
 }

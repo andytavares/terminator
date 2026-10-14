@@ -406,7 +406,7 @@ function BlockedActions({ row }: RowProps): React.JSX.Element {
   return (
     <span className="daily-log__task-actions">
       <AddSubtaskButton row={row} />
-      <Button size="sm" onClick={() => void row.commands.unblock()} title="Unblock task">
+      <Button onClick={() => void row.commands.unblock()} title="Unblock task">
         Unblock
       </Button>
       <ArchiveButton row={row} />
@@ -526,7 +526,7 @@ function MigratePicker({ row }: RowProps): React.JSX.Element {
       <Button variant="primary" onClick={() => void migrate.migrate()} disabled={!migrate.date}>
         Move
       </Button>
-      <IconButton icon={X} label="Cancel move" size="sm" onClick={() => migrate.setOpen(false)} />
+      <IconButton icon={X} label="Cancel move" onClick={() => migrate.setOpen(false)} />
     </span>
   )
 }

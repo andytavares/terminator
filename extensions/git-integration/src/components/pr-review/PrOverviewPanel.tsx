@@ -237,7 +237,6 @@ function TopBarActions(bar: TopBarProps) {
       {props.onPopOut && (
         <Button
           variant="ghost"
-          size="sm"
           icon={ExternalLink}
           onClick={props.onPopOut}
           title="Open in focused window"

@@ -3,6 +3,7 @@ import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync } from 'node:f
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { closeApp, launchApp, type AppHandle } from './helpers'
+import { misalignedOn } from './control-alignment'
 import {
   git,
   gitView,
@@ -70,6 +71,7 @@ test('selecting a changed file shows its diff', async () => {
   await fileRow(view, 'src/math.ts').click()
   await expect(view.locator('.diff-line--add')).toContainText('return b + a')
   await expect(view.locator('.diff-line--remove')).toContainText('return a + b')
+  expect(await misalignedOn(view, 'Git tab')).toEqual([])
 })
 
 test('checking a file stages it, unchecking unstages it, and the index agrees', async () => {

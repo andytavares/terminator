@@ -3,6 +3,7 @@ import { mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { closeApp, launchApp, type AppHandle } from './helpers'
+import { misalignedOn } from './control-alignment'
 import { git, openGitTab, openRepo, writeFile } from './git-harness'
 
 /** The Conflict Solver on a real conflicted repository: each choice written to disk, undo,
@@ -104,7 +105,11 @@ test.afterAll(async () => {
 test('a decision is written to the file, and undo puts the conflict back', async () => {
   const view = await openSolver()
   await expect(view.locator('.conflict-hub__hero')).toContainText('3')
+  const misaligned = await misalignedOn(view, 'Conflict hub')
   await view.getByTestId('conflict-file-row').filter({ hasText: 'app.ts' }).click()
+  await expect(view.getByRole('button', { name: 'Keep mine' }).first()).toBeVisible()
+  misaligned.push(...(await misalignedOn(view, 'Conflict in app.ts')))
+  expect(misaligned).toEqual([])
 
   const inode = statSync(join(repo, 'app.ts')).ino
   const reads = watchReads('app.ts')

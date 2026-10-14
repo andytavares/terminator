@@ -32,7 +32,8 @@
   align-items: center;
   gap: var(--tm-space-1);
   flex: none;
-  height: 22px;
+  box-sizing: border-box;
+  height: var(--tm-control-height-sm);
   padding: 0 6px;
   border-radius: var(--tm-radius-xs);
   border: 1px solid transparent;
@@ -69,7 +70,7 @@
 .work-item__input {
   flex: 1;
   min-width: 0;
-  height: 24px;
+  height: var(--tm-control-height-sm);
   padding: 0 8px;
   border: 1px dashed var(--tm-border-strong);
   border-radius: var(--tm-radius-xs);

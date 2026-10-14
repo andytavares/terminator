@@ -89,7 +89,6 @@ function HeaderActions({ nav }: { nav: Props }) {
     <>
       <Button
         variant="ghost"
-        size="sm"
         icon={Undo2}
         onClick={nav.onUndo}
         disabled={!nav.canUndo}
@@ -100,7 +99,6 @@ function HeaderActions({ nav }: { nav: Props }) {
       {nav.onStartOver && (
         <Button
           variant="ghost"
-          size="sm"
           icon={RotateCcw}
           onClick={nav.onStartOver}
           title="Reset all resolutions and start from scratch"

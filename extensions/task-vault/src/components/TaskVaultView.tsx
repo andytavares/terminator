@@ -628,7 +628,6 @@ function VaultToolbar(props: ToolbarProps): React.JSX.Element {
           <IconButton
             icon={Settings}
             label="Data tools (export / import)"
-            size="sm"
             className="task-vault-view__tools-btn"
             onClick={props.onDataTools}
           />

@@ -69,7 +69,7 @@ function SubtaskEditor({ edit }: SubtaskEditProps): React.JSX.Element {
       <Button variant="primary" onClick={() => void edit.saveSubtaskEdit()}>
         Save
       </Button>
-      <IconButton icon={X} label="Cancel edit" size="sm" onClick={() => edit.setEditing(false)} />
+      <IconButton icon={X} label="Cancel edit" onClick={() => edit.setEditing(false)} />
     </span>
   )
 }
