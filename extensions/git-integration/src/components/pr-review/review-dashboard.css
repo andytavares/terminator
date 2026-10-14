@@ -262,14 +262,11 @@
   align-items: center;
 }
 
+/* The design system's field (controls.css), sized for the picker's header. */
 .rp-search {
   flex: 1 1 200px;
   min-width: 0;
   padding: 5px 9px;
-  background: var(--tm-bg-input);
-  border: 1px solid var(--tm-border-strong);
-  border-radius: var(--tm-radius-sm);
-  color: var(--tm-text-primary);
   font: inherit;
 }
 
