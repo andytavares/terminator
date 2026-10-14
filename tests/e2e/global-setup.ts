@@ -15,4 +15,7 @@ export default function globalSetup(_config: FullConfig): void {
   const root = join(tmpdir(), `terminator-e2e-run-${process.pid}`)
   mkdirSync(root, { recursive: true })
   process.env.TERMINATOR_E2E_RUN_ROOT = root
+  // As tests/setup.ts does for Vitest: git-ai's trace2 target writes into a spec's temporary
+  // repository for seconds after git returns, so deleting it fails with ENOTEMPTY.
+  process.env.GIT_TRACE2_EVENT = '0'
 }
