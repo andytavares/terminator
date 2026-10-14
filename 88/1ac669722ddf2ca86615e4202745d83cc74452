@@ -1,0 +1,36 @@
+docs/adr/108-temporal-in-extension-backends-not-in-views.md
+  s_c9dd89ad1f6c54::t_82aa604e9df08b 11-15,30-34,45-51
+  s_c9dd89ad1f6c54::t_940f74b6e1234e 1-10,16-29,35-44,52-57
+docs/CONTRIBUTING.md
+  s_c9dd89ad1f6c54::t_82aa604e9df08b 119
+docs/EXTENSION-DEVELOPMENT.md
+  s_c9dd89ad1f6c54::t_82aa604e9df08b 43
+extensions/task-vault/CLAUDE.md
+  s_c9dd89ad1f6c54::t_82aa604e9df08b 40-47
+extensions/task-vault/tsconfig.json
+  s_c9dd89ad1f6c54::t_21c7f8e74c3d1e 2-4,6-8
+package.json
+  s_c9dd89ad1f6c54::t_9513b9bf619068 41
+tests/unit/lint/temporal-boundary.spec.ts
+  s_c9dd89ad1f6c54::t_9bb4c2b2d57176 1-62
+extensions/task-vault/tsconfig.test.json
+  s_c9dd89ad1f6c54::t_b12c004455f722 11-13
+extensions/task-vault/tsconfig.view.json
+  s_c9dd89ad1f6c54::t_4785071aa380fe 1-8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "881ac669722ddf2ca86615e4202745d83cc74452",
+  "prompts": {},
+  "sessions": {
+    "s_c9dd89ad1f6c54": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ee6b7f82-c708-43d8-8c1f-eefe55f692a9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
