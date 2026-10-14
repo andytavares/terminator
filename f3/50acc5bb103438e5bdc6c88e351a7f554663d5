@@ -1,0 +1,51 @@
+scripts/e2e-select.mjs
+  s_c9dd89ad1f6c54::t_1b3a6cc1396b27 45
+tests/e2e/git-status-watch.spec.ts
+  s_c9dd89ad1f6c54::t_131397ac06ad93 1-22,28,46,59,72,81-83
+  s_c9dd89ad1f6c54::t_d61e1f02fa6caf 23,27,29,31-45,47-58,60-71,73-80,84-97
+  s_c9dd89ad1f6c54::t_55d715e6204dff 24-26,30
+extensions/git-integration/src/ipc/git.ipc.ts
+  s_c9dd89ad1f6c54::t_524b8793826687 114-117
+  s_c9dd89ad1f6c54::t_89d8488a0bffd0 10
+  s_c9dd89ad1f6c54::t_1cadbad1128765 113,118-119
+extensions/git-integration/tests/unit/GitFullView.disabled.spec.tsx
+  s_c9dd89ad1f6c54::t_2241894a5da8b9 15-19
+extensions/git-integration/src/git/git-service.ts
+  s_c9dd89ad1f6c54::t_b8cde0312c3784 7
+  s_c9dd89ad1f6c54::t_d0562d52984dd2 51-60
+  s_c9dd89ad1f6c54::t_b6e83a45c86b71 61-62
+extensions/git-integration/tests/unit/status-watch-roots.spec.ts
+  s_c9dd89ad1f6c54::t_8d3061b3908338 1-45
+extensions/git-integration/src/api/git.ts
+  s_c9dd89ad1f6c54::t_94a7aa63712a21 15-18
+extensions/git-integration/src/hooks/useGitStatus.ts
+  s_c9dd89ad1f6c54::t_be0ce35204c5eb 14-16,23-35,37-38,40-43,45-50,54-77,80-90,92-95,99,109-110,112,115,117
+tests/e2e/git-integration-contrast.entry.tsx
+  s_c9dd89ad1f6c54::t_2241894a5da8b9 329-333
+extensions/git-integration/src/ipc/repo-root.ts
+  s_c9dd89ad1f6c54::t_a0007f72ac446e 32-33
+extensions/git-integration/tests/unit/useGitStatus.spec.tsx
+  s_c9dd89ad1f6c54::t_b4d666cc7e1af9 18-21,25-26,29-31,34,37-38,59-60,64-70,75-76,82,87-89,91-93,96,98-100,103,105-107,112-116,119-123,125-127,131-134,136-137,140-141,143-144,147-152,156-159,161-163,167-171,176-184,186-188,190-191,193-201,203-204,208-211,213-225,228,230,232-233,235,237-238,240,242-251,253-258,263-271
+  s_c9dd89ad1f6c54::t_2bbaec5851746f 111,175,262
+  s_c9dd89ad1f6c54::t_47cd5adaa0fdd9 74
+  s_c9dd89ad1f6c54::t_1d8c23bece266b 10,12-17,22,24,27-28,32-33,35-36,39-58,62
+  s_c9dd89ad1f6c54::t_db7882f4c89ffb 2,80-81
+  s_c9dd89ad1f6c54::t_ebadfef6550bbd 5,7-9,160,164,185,189
+  s_c9dd89ad1f6c54::t_f848474b884d1c 61,63
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f350acc5bb103438e5bdc6c88e351a7f554663d5",
+  "prompts": {},
+  "sessions": {
+    "s_c9dd89ad1f6c54": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ee6b7f82-c708-43d8-8c1f-eefe55f692a9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
