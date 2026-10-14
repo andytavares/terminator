@@ -3,7 +3,7 @@
 The Extension API every Terminator extension is written against, and the helpers they share.
 `types/api.d.ts` declares the API; the core implements it in `src/main/extensions/api.ts` and the
 compiler checks the two agree ([ADR 094](../../docs/adr/094-extensions-follow-the-vs-code-model.md)).
-The version is `4.0.0`; `CHANGELOG.md` lists each version's changes and how to migrate.
+The version is `5.0.0`; `CHANGELOG.md` lists each version's changes and how to migrate.
 
 This README is a map of the package. How to write an extension (the manifest, the backend, the
 view, the build and every API namespace) is in the

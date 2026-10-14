@@ -1,9 +1,10 @@
 # Changelog — @terminator/extension-sdk
 
-## Unreleased
+## 5.0.0
 
-Minor: 4.1.0. Every addition is optional, so an extension built for 4.0.0 runs unchanged, with
-one exception: a view that used `fs.watchStart` (see Changed). No extension in this repository did.
+Major, because a view's file watch changed owner (see Changed (breaking)): a view that relied on
+another view's watch, or used the watch from the remote browser client, must change. Everything
+under Added is optional, so an extension that did neither runs unchanged.
 
 ### Added
 
@@ -33,7 +34,7 @@ one exception: a view that used `fs.watchStart` (see Changed). No extension in t
   whoever changed it, so a view re-reads `getSettingsValues()` and applies the change at once.
   Returns the unsubscribe. A pop-out window (`api.window.openAuxiliary`) has it too.
 
-### Changed
+### Changed (breaking)
 
 - `defineChannel` returns a new spec whose `run` calls the given one, instead of the same object
   under a cast. A channel answers as before; code that compared the returned spec to its

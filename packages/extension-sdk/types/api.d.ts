@@ -60,7 +60,7 @@ export interface ExtensionSettingsSchema {
 }
 
 export interface SettingDefinition {
-  /** `list` holds a `string[]`, edited in Settings one item per line (since 4.1.0). */
+  /** `list` holds a `string[]`, edited in Settings one item per line (since 5.0.0). */
   type: 'string' | 'number' | 'boolean' | 'enum' | 'folder' | 'action' | 'list'
   label: string
   description?: string
@@ -77,14 +77,14 @@ export interface SettingDefinition {
   danger?: boolean
 }
 
-/** Where `settings.get` reads a `workspaceScoped` setting. Since 4.1.0. */
+/** Where `settings.get` reads a `workspaceScoped` setting. Since 5.0.0. */
 export interface SettingScope {
   /** A path in a workspace: its folder, a project's worktree, or anything below one. The setting
    * resolves to that workspace's own value, else the global one. */
   repoPath?: string
 }
 
-/** Which value of an extension setting changed: one workspace's own, or (null) the global one. Since 4.1.0. */
+/** Which value of an extension setting changed: one workspace's own, or (null) the global one. Since 5.0.0. */
 export interface SettingsChange {
   workspaceId: string | null
 }
@@ -321,7 +321,7 @@ export interface ExtensionAPI {
   settings: {
     register(schema: ExtensionSettingsSchema): Disposable
     /** Synchronous: a snapshot the core pushes on every change, which `set` updates at once. With
-     * `scope.repoPath` (4.1.0) a `workspaceScoped` setting is that workspace's own value, else the
+     * `scope.repoPath` (5.0.0) a `workspaceScoped` setting is that workspace's own value, else the
      * global value, else the schema's default; without a scope, the global value. */
     get<T>(key: string, scope?: SettingScope): T | undefined
     set(key: string, value: unknown): void

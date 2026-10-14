@@ -124,7 +124,7 @@ export interface ElectronAPI {
     updateSetting(key: string, value: unknown): Promise<{ ok: true }>
     /** Called after any extension setting changes; re-read with `getSettingsValues`.
      * `change.workspaceId` names the workspace whose own value changed, null for a global value
-     * (since 4.1.0). */
+     * (since 5.0.0). */
     onSettingsChanged(handler: (change: SettingsChange) => void): () => void
     getCommands(): Promise<{
       commands: Array<{
