@@ -493,6 +493,15 @@ function endingTheRunTests() {
     expect(r.watchable().map((w) => w.sessionId)).not.toContain(run?.sessionId)
   })
 
+  it('ends the run once when the hook arrives after the terminal has gone', async () => {
+    // The typed `; exit` closes the shell as the agent leaves, so the exit can beat the hook.
+    const ends: Array<number | null> = []
+    const run = await runner().start({ ...start, onEnd: (code) => ends.push(code) })
+    exitListener?.(0)
+    await report(run?.sessionId ?? '', 'session_end')
+    expect(ends).toEqual([0])
+  })
+
   it('closes the tab of a run that ended cleanly, so finished agents do not pile up', async () => {
     await runner().start(start)
     exitListener?.(0)
@@ -1054,6 +1063,56 @@ function loggedCommandTests(shell: string) {
     expect(readFileSync(logPath, 'utf8')).toContain('hello')
   })
 }
+
+/** A `claude` on PATH that records FOUNDRY_RUN and exits with `status`. */
+function stubClaude(stubDir: string, status: number): { env: NodeJS.ProcessEnv; marker: string } {
+  const marker = join(stubDir, 'foundry-run.txt')
+  const stub = join(stubDir, 'claude')
+  writeFileSync(stub, `#!/bin/sh\nprintf '%s' "$FOUNDRY_RUN" > '${marker}'\nexit ${status}\n`, {
+    mode: 0o700,
+  })
+  return { env: { ...process.env, PATH: `${stubDir}:${process.env.PATH ?? ''}` }, marker }
+}
+
+/** The line typed into the tab, without its carriage return. */
+async function typedLine(): Promise<string> {
+  await runner().start(start)
+  const typed = written.map((w) => w.data).join('')
+  expect(typed.endsWith('; exit\r')).toBe(true)
+  return typed.slice(0, -1)
+}
+
+// The agent is `exec`ed by its launch script, so nothing before the binary name may be a
+// `VAR=1` assignment (`exec VAR=1 claude` is "command not found", exit 127).
+describe('the agent launch under a real shell', () => {
+  let stubDir: string
+
+  beforeEach(() => {
+    stubDir = makeTempDir('supervised-runner-stub-')
+  })
+
+  afterEach(() => {
+    rmSync(stubDir, { recursive: true, force: true, maxRetries: 5 })
+  })
+
+  for (const shell of LOG_SHELLS) {
+    it(`(${shell}) starts the agent with FOUNDRY_RUN=1 set`, async () => {
+      const { env, marker } = stubClaude(stubDir, 0)
+      await runner().start(start)
+      const script = /([^'\s]*\/launch\/[\w-]+\.sh)/.exec(written.map((w) => w.data).join(''))?.[1]
+      if (script === undefined) throw new Error('no launch script was typed')
+      const result = spawnSync(shell, [script], { env })
+      expect(result.status).toBe(0)
+      expect(readFileSync(marker, 'utf8')).toBe('1')
+    })
+
+    it(`(${shell}) ends the tab's shell with the agent's exit status`, async () => {
+      const { env } = stubClaude(stubDir, 127)
+      const result = spawnSync(shell, ['-c', await typedLine()], { env })
+      expect(result.status).toBe(127)
+    })
+  }
+})
 
 // The app adopts only PATH from the login shell, so a bare `$SHELL script` lost what startup
 // files export (extensions/foundry/CLAUDE.md, "Verification commands"). A real PTY and a

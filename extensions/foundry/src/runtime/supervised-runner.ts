@@ -593,9 +593,9 @@ function trackRun(
   }
 }
 
-// The launch, run through its script with the card's paths exported for the skills.
-// CLAUDE_CODE_FORCE_SESSION_PERSISTENCE keeps a nested session's transcript, which
-// all of this reads (SUPERVISION.md, "Two things the runtime does to a supervised run").
+// The launch, run through its script with the card's paths exported for the skills, and
+// `; exit` so the tab ends with the script's status (SUPERVISION.md, "Two things the runtime
+// does to a supervised run" and "The launch is a file, not a typed line").
 function typeLaunch(
   context: RunnerContext,
   { sessionId, terminalSessionId }: SupervisedRun,
@@ -603,12 +603,12 @@ function typeLaunch(
 ): void {
   const featureSlug = path.basename(featureDir)
   const launchScript = writeLaunchScript(context.stateDir, sessionId, {
-    exports: `export SPECIFY_FEATURE=${shellQuote(featureSlug)} SPECIFY_FEATURE_DIRECTORY=${shellQuote(path.join('specs', featureSlug))} CLAUDE_CODE_FORCE_SESSION_PERSISTENCE=1`,
+    exports: `export SPECIFY_FEATURE=${shellQuote(featureSlug)} SPECIFY_FEATURE_DIRECTORY=${shellQuote(path.join('specs', featureSlug))} CLAUDE_CODE_FORCE_SESSION_PERSISTENCE=1 FOUNDRY_RUN=1`,
     command,
   })
   context.api.pty.write(
     terminalSessionId,
-    `${shellQuote(process.env.SHELL ?? '/bin/sh')} ${shellQuote(launchScript)}\r`
+    `${shellQuote(process.env.SHELL ?? '/bin/sh')} ${shellQuote(launchScript)}; exit\r`
   )
 }
 

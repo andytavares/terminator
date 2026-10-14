@@ -118,9 +118,10 @@ describe('an architect turn that ends before its proposal is written', () => {
   })
 })
 
-/** An architect that registers, and whose session then ends with `exitCode`, having written nothing. */
-function architectEndsWith(exitCode: number | null) {
+/** An architect that registers, and whose session then ends with `exitCode`, having written `proposal` if given. */
+function architectEndsWith(exitCode: number | null, proposal?: unknown) {
   return (async (input: TurnInput) => {
+    if (proposal !== undefined) writeFileWithDirs(proposalPath(), proposal)
     input.onRegistered({ sessionId: 'architect-1', transcriptFrom: 0 })
     setTimeout(() => input.onEnd(exitCode), 0)
     return startedTurn('architect-1')
@@ -144,6 +145,23 @@ describe('an architect session that ends having written nothing', () => {
       'The architect could not be started.'
     )
     await untilRefusalIsSaid()
+  })
+})
+
+describe('an architect session that exits with a failure code', () => {
+  it('is refused with the exit code when it wrote no proposal', async () => {
+    theRunner.start.mockImplementation(architectEndsWith(127))
+    await convergeOrder(host, dataDir, readyDraft(repo))
+    expect((await untilLedgerHas(dataDir, 'converge.refused')).reason).toBe(
+      "The architect's terminal exited with code 127 before it wrote a plan. Its tab is still open."
+    )
+    await untilRefusalIsSaid()
+  })
+
+  it('has the proposal it wrote read all the same', async () => {
+    theRunner.start.mockImplementation(architectEndsWith(127, { note: 'wrote it, then died' }))
+    await convergeOrder(host, dataDir, readyDraft(repo))
+    expect((await untilLedgerHas(dataDir, 'order.redrafted')).reason).toBe('wrote it, then died')
   })
 })
 
