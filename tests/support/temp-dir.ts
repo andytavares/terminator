@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, realpathSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -6,9 +6,10 @@ import { join } from 'node:path'
 // Each spec file has its own copy of this module, so it never removes another's.
 const made: string[] = []
 
-/** A new directory `<os temp dir>/<prefix>XXXXXX`, removed after the spec file ends. */
+/** A new directory `<os temp dir>/<prefix>XXXXXX`, removed after the spec file ends. Named by its
+ * real path: macOS's temp directory is a symlink, and a child process reports the target. */
 export function makeTempDir(prefix: string): string {
-  const dir = mkdtempSync(join(tmpdir(), prefix))
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), prefix)))
   made.push(dir)
   return dir
 }

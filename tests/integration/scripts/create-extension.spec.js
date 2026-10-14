@@ -1,10 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { spawnSync } from 'child_process'
-import { existsSync, readFileSync, rmSync, mkdirSync, writeFileSync } from 'fs'
+import { existsSync, readFileSync, mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { tmpdir } from 'os'
-import { randomBytes } from 'crypto'
 import { runInNewContext } from 'vm'
+import { makeTempDir } from '../../support/temp-dir'
 
 const SCRIPT = join(process.cwd(), 'scripts', 'create-extension.cjs')
 
@@ -19,12 +18,7 @@ function run(args, opts = {}) {
 let tempDir
 
 beforeEach(() => {
-  tempDir = join(tmpdir(), `terminator-test-${randomBytes(4).toString('hex')}`)
-  mkdirSync(tempDir, { recursive: true })
-})
-
-afterEach(() => {
-  if (existsSync(tempDir)) rmSync(tempDir, { recursive: true, force: true })
+  tempDir = makeTempDir('terminator-test-')
 })
 
 describe('create-extension.js CLI', () => {
