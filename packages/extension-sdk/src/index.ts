@@ -28,9 +28,10 @@ export interface ChannelSpec<S extends z.ZodType = z.ZodType> {
  */
 export const noPayload = z.union([z.undefined(), z.object({})])
 
-/** Identity helper so each channel infers its own schema's payload type. */
+/** Declares one channel so `run` gets its own schema's payload type. The registry holds channels
+ * of every schema, so the returned spec takes the payload `dispatchChannel` parsed with it. */
 export function defineChannel<S extends z.ZodType>(spec: ChannelSpec<S>): ChannelSpec {
-  return spec as unknown as ChannelSpec
+  return { ...spec, run: (args) => spec.run(args) }
 }
 
 /**

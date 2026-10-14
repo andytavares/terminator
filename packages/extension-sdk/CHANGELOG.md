@@ -32,6 +32,12 @@ Minor: 4.1.0. Every addition is optional, so an extension built for 4.0.0 runs u
   whoever changed it, so a view re-reads `getSettingsValues()` and applies the change at once.
   Returns the unsubscribe. A pop-out window (`api.window.openAuxiliary`) has it too.
 
+### Changed
+
+- `defineChannel` returns a new spec whose `run` calls the given one, instead of the same object
+  under a cast. A channel answers as before; code that compared the returned spec to its
+  argument by identity would not.
+
 ### Fixed
 
 - `workspace.getActive()` in a view answered `{ workspaceId: null, projectId: null, repoRoot:
