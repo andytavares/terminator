@@ -47,6 +47,16 @@ Starts the app on a fresh profile and passes when the main log says `App ready`,
 
 `asarUnpack` lists only `postgres.wasm` and `postgres.data` of `@electric-sql/pglite`, which the one-time import (`src/main/db/legacy-pglite-import.ts`, ADR 099) reads with `readFileSync`; Electron's asar fs interception redirects those reads to `app.asar.unpacked`. Unpacking all of the package breaks Electron's ESM dynamic import handler: from `app.asar.unpacked`, pglite's `import("./fs/nodefs.js")` fails to resolve through the asar virtual path, the NodeFS adapter never loads, and `pg_initdb` aborts. The entries go when PGlite is removed, one release after the import ships.
 
+#### Signing certificate
+
+`release.yml` signs with the Developer ID Application certificate in the `APPLE_CERTIFICATE` secret (a base64 `.p12`, password in `APPLE_CERTIFICATE_PASSWORD`). It must come from Apple's Developer ID G2 authority: the original authority expires on February 1, 2027, and the `Check the signature` step fails any build signed from it. G2 certificates last one year; the same step warns 30 days before expiry. To renew:
+
+1. In Certificates, Identifiers & Profiles, add a **Developer ID Application** certificate and choose the **G2 Sub-CA** intermediary.
+2. Confirm it: `openssl x509 -inform DER -in developerID_application.cer -noout -issuer` must show `OU=G2`.
+3. Install it and [`DeveloperIDG2CA.cer`](https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer) in the login keychain, then export the new identity from Keychain Access as a `.p12`.
+4. `base64 -i terminator-g2.p12 | gh secret set APPLE_CERTIFICATE`, then `gh secret set APPLE_CERTIFICATE_PASSWORD`, and delete the `.p12`.
+5. Run the `Test Notarization` workflow and confirm it passes.
+
 ### Run tests
 
 ```bash

@@ -40,13 +40,7 @@ Terminator is a developer-focused terminal emulator that organises work into a t
 
 1. Download the `.dmg` from the [latest release](https://github.com/andytavares/terminator/releases/latest).
 2. Mount the `.dmg` and drag **Terminator** to your Applications folder.
-3. Because the app is not notarized, run the following once before opening:
-
-```bash
-xattr -cr /Applications/Terminator.app
-```
-
-4. Open Terminator normally from your Applications folder.
+3. Open Terminator from your Applications folder. The app is signed and notarized, so macOS opens it without a warning.
 
 ### From source
 
