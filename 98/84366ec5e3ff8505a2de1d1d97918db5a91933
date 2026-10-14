@@ -1,0 +1,153 @@
+src/renderer/components/session/ResumeButton.css
+  s_c9dd89ad1f6c54::t_fda6c612eba4a6 9
+  s_c9dd89ad1f6c54::t_77e73f8c43e3b6 10-12,23,27,39
+tests/unit/packages/extension-ui/tokens.spec.ts
+  s_c9dd89ad1f6c54::t_ddc43240e3e6d8 2-4,9-15,26,28-30,33-36,38-39
+src/renderer/components/sidebar/SidebarMenu.css
+  s_c9dd89ad1f6c54::t_77e73f8c43e3b6 17,19-20,25,29-30,47-49,61-62,69,73,85-86,92-93,101,105,112,114,121
+  s_c9dd89ad1f6c54::t_fda6c612eba4a6 18,63,84
+src/renderer/components/sidebar/UnifiedSidebar.css
+  s_c9dd89ad1f6c54::t_77e73f8c43e3b6 11-12,57,63,73-74,89,148,152
+src/renderer/components/home/LedgerView.css
+  s_c9dd89ad1f6c54::t_77e73f8c43e3b6 28-30,40,63,69,77,81,93,115,147,149,157,180-181,194,211
+  s_c9dd89ad1f6c54::t_fda6c612eba4a6 7,18-19,36-37,48-49,138,187-188,193
+src/renderer/components/home/HomeScreen.css
+  s_c9dd89ad1f6c54::t_fda6c612eba4a6 113
+  s_c9dd89ad1f6c54::t_77e73f8c43e3b6 5,12,16-17,26,33,43-44,47,51,65,75,77,85,91,96,117
+src/renderer/components/NotificationPanel.css
+  s_c9dd89ad1f6c54::t_77e73f8c43e3b6 20-21,38,46,52,63-64,70,82-83,100,106,114,124,128,138,148,156,171,176-177,193-195,203-204,214,233-234
+src/renderer/components/overview/MetricsBar.css
+  s_c9dd89ad1f6c54::t_77e73f8c43e3b6 3-4,11,21,29
+src/renderer/components/sidebar/SidebarHeader.css
+  s_c9dd89ad1f6c54::t_77e73f8c43e3b6 7,26,32-33
+  s_c9dd89ad1f6c54::t_fda6c612eba4a6 25
+src/renderer-remote/Login.css
+  s_c9dd89ad1f6c54::t_fda6c612eba4a6 12,46,71
+  s_c9dd89ad1f6c54::t_77e73f8c43e3b6 6,10-11,36,44-45,49-50,56,61,68,74
+src/renderer/components/sidebar/SidebarSearch.css
+  s_c9dd89ad1f6c54::t_77e73f8c43e3b6 5-6,14,18,29,36,43,53
+packages/extension-ui/README.md
+  s_c9dd89ad1f6c54::t_2f2366eca064b7 15-16
+src/renderer/components/settings/SettingsPanel.css
+  s_c9dd89ad1f6c54::t_77e73f8c43e3b6 23-24,34-35,45,65-66,73-74,78-79,97,107-108,130,134-135,139-140,149-150,159,164,170,173,179,186,199-200,226,234,257-259,264,277-278,280,282,293-295,299,305,314-316,321-322,351,357,363-364,366,368,376,382,401,404,415,452,462,469,471-472,474,488-489,493,501,503
+  s_c9dd89ad1f6c54::t_fda6c612eba4a6 25,61,100,136,198,204,279,324,365,463
+src/renderer/components/home/LogbookView.css
+  s_c9dd89ad1f6c54::t_77e73f8c43e3b6 11,22,30,37,41,45,67,81,83,88,97,104,146,164,173-175,184-185,203,205,210,223,242-244,252,266,278
+  s_c9dd89ad1f6c54::t_fda6c612eba4a6 13,20,29,74,103,111,132,139,159,172,192,241,265,292
+src/renderer/components/sidebar/TerminalRow.css
+  s_c9dd89ad1f6c54::t_77e73f8c43e3b6 16-17,30,34-35,39,72,74,80,82,98,117
+  s_c9dd89ad1f6c54::t_fda6c612eba4a6 96
+src/renderer/components/integrations/IssueDrawer.css
+  s_c9dd89ad1f6c54::t_fda6c612eba4a6 55,102,171,201
+  s_c9dd89ad1f6c54::t_77e73f8c43e3b6 10-11,16,26,28,34-35,54,60-61,79,91-92,101,104,109,120,127,136,147,152,157,159,169-170,172,175,182,191,199-200,202-203,217,222
+src/renderer/components/settings/QuickActionsSettings.css
+  s_c9dd89ad1f6c54::t_77e73f8c43e3b6 15,22,33,41,48,67,75
+src/renderer/components/ErrorBoundary.tsx
+  s_c9dd89ad1f6c54::t_77e73f8c43e3b6 49-50,56,65-66,68
+src/renderer/components/session/CloseSessionButton.css
+  s_c9dd89ad1f6c54::t_77e73f8c43e3b6 18,23-24,28
+  s_c9dd89ad1f6c54::t_fda6c612eba4a6 16
+src/renderer/components/terminal/LeafPane.css
+  s_c9dd89ad1f6c54::t_fda6c612eba4a6 32
+  s_c9dd89ad1f6c54::t_77e73f8c43e3b6 34,51-52
+tests/unit/renderer/sidebar-workspace-tint.spec.ts
+  s_c9dd89ad1f6c54::t_77e73f8c43e3b6 109
+  s_c9dd89ad1f6c54::t_6c8ba9ae0bee4d 101
+src/renderer/components/screen-chrome.css
+  s_c9dd89ad1f6c54::t_fda6c612eba4a6 23,47,58,95-96,120,142,154
+  s_c9dd89ad1f6c54::t_77e73f8c43e3b6 9-10,24,38,46,59-61,66,85,97,121-123,133,143-144,155-157
+src/renderer/components/session/ChoiceButtons.css
+  s_c9dd89ad1f6c54::t_77e73f8c43e3b6 14,16,24,29
+  s_c9dd89ad1f6c54::t_fda6c612eba4a6 4
+src/renderer/components/integrations/IssuePicker.css
+  s_c9dd89ad1f6c54::t_77e73f8c43e3b6 13-14,19-20,36-37,47,51,58-59,68-69,75,77,92,104,110-111
+  s_c9dd89ad1f6c54::t_fda6c612eba4a6 15,38,70,105
+src/renderer/components/LogWindow.css
+  s_c9dd89ad1f6c54::t_77e73f8c43e3b6 13,38,50,52,62,78,106,132
+src/renderer/components/overview/OverviewScreen.css
+  s_c9dd89ad1f6c54::t_77e73f8c43e3b6 6,13,17-18,23,28,30,38,43,54,95
+  s_c9dd89ad1f6c54::t_fda6c612eba4a6 74
+src/renderer/components/sidebar/BranchRow.css
+  s_c9dd89ad1f6c54::t_fda6c612eba4a6 142
+  s_c9dd89ad1f6c54::t_77e73f8c43e3b6 17,35,46,54,58,62,70,74,111,123,125,138,140-141,143,154,156,167,172,191,198,202,236
+src/renderer/components/sidebar/BranchSelect.css
+  s_c9dd89ad1f6c54::t_fda6c612eba4a6 18,86
+  s_c9dd89ad1f6c54::t_77e73f8c43e3b6 16-17,26,60,73,84-85,107,109,112-113,118,136-137,146-147,151,155-156,161,176
+src/renderer-remote/mobile.css
+  s_c9dd89ad1f6c54::t_77e73f8c43e3b6 15-17,33-34,42,51,61,66-67,77,86,88,90,102-103,120-121,128,137-138,159-161,166,172,191-192,203,216,218,224,231,240-241,251-252,254,256,265
+tests/unit/ErrorBoundary.spec.tsx
+  s_c9dd89ad1f6c54::t_77e73f8c43e3b6 45,59
+extensions/task-vault/src/components/task-vault.css
+  s_c9dd89ad1f6c54::t_2f2366eca064b7 3,17
+  s_c9dd89ad1f6c54::t_fda6c612eba4a6 29-30,78,169-171,184,194,196-197,396-397,412,414,432,505,542,664,873,998,1003,1012,1015,1030,1129,1197-1198,1212,1474,1600,1631,1646,1652,1784,1807-1809,2535-2536,2547,3070-3071,3113,3118,3122,3154,4111-4112,4780,4876,4914,5174-5175,5181,5204-5205,5211,5251,5515,5925,5937
+  s_c9dd89ad1f6c54::t_77e73f8c43e3b6 52,357,831,1425,1516,1734,1819,1841,2100,4069,4722,4755,4775,4785,4800,4882
+src/renderer/components/sidebar/MoveSessionDialog.css
+  s_c9dd89ad1f6c54::t_77e73f8c43e3b6 26,48,54,64,77,85-86,90,96,100
+  s_c9dd89ad1f6c54::t_fda6c612eba4a6 45,74
+src/renderer/components/session/StateChip.css
+  s_c9dd89ad1f6c54::t_77e73f8c43e3b6 14,31
+src/renderer/components/session/WorkItemCell.css
+  s_c9dd89ad1f6c54::t_77e73f8c43e3b6 10,12,18,26,40,47,52-53,59,74,77,83
+  s_c9dd89ad1f6c54::t_fda6c612eba4a6 4,33,37,75
+src/renderer/components/terminal/TabBar.css
+  s_c9dd89ad1f6c54::t_77e73f8c43e3b6 12-13,30-31,43,45,71-72,76-77,88,99,112,114,136,156-157,164-165,177-178,183,190-191,193,210-211,265-266,268
+  s_c9dd89ad1f6c54::t_fda6c612eba4a6 267
+src/renderer/styles.css
+  s_c9dd89ad1f6c54::t_fda6c612eba4a6 72,160,195,210
+  s_c9dd89ad1f6c54::t_2caba30044db5a 2-4
+  s_c9dd89ad1f6c54::t_77e73f8c43e3b6 25-28,56,58-59,94,115,193-194,211,213,220-221,225,230,235,248,252
+src/renderer/components/settings/IntegrationsSettings.css
+  s_c9dd89ad1f6c54::t_77e73f8c43e3b6 13,15,24,39,43,47,54,59,109
+  s_c9dd89ad1f6c54::t_fda6c612eba4a6 14
+tests/unit/renderer/design-tokens-contrast.spec.ts
+  s_c9dd89ad1f6c54::t_77e73f8c43e3b6 5-6,49
+extensions/notepad/src/components/notepad.css
+  s_c9dd89ad1f6c54::t_77e73f8c43e3b6 10,653,719,785,972,1173,1211
+src/renderer/components/overview/WallTile.css
+  s_c9dd89ad1f6c54::t_77e73f8c43e3b6 8-9,37,41,61,78,92,97-98,102,113,135,137
+  s_c9dd89ad1f6c54::t_fda6c612eba4a6 10,52,90,123
+src/renderer/components/sidebar/AppBand.css
+  s_c9dd89ad1f6c54::t_77e73f8c43e3b6 22-23,47,52-53,57,62-63,87-89
+  s_c9dd89ad1f6c54::t_fda6c612eba4a6 45
+src/renderer/components/session/LivePreview.css
+  s_c9dd89ad1f6c54::t_77e73f8c43e3b6 5
+src/renderer/components/AboutDialog.css
+  s_c9dd89ad1f6c54::t_77e73f8c43e3b6 22,28-29,35,42,47,54-55
+src/renderer/components/integrations/issue-search.css
+  s_c9dd89ad1f6c54::t_77e73f8c43e3b6 22-23,29,39,41-42
+src/renderer/components/overview/MetricsBar.tsx
+  s_c9dd89ad1f6c54::t_77e73f8c43e3b6 28,45
+src/renderer/components/sidebar/dialog-fields.css
+  s_c9dd89ad1f6c54::t_fda6c612eba4a6 22,104
+  s_c9dd89ad1f6c54::t_77e73f8c43e3b6 12,20-21,25-26,35,39,45,95,103,112,115-116,128-129,133,144,151
+src/renderer/components/sidebar/RepoHeader.css
+  s_c9dd89ad1f6c54::t_77e73f8c43e3b6 29,33,40,44,56,92,95,155
+src/renderer/components/terminal/TerminalPane.css
+  s_c9dd89ad1f6c54::t_77e73f8c43e3b6 17
+src/renderer/components/QuickActions.css
+  s_c9dd89ad1f6c54::t_77e73f8c43e3b6 25-26,53,61,67,71,76,80-81,98,100,112,119,152,159,163,167,183,194,205,216,219,221-222,227,240,252,270-271,277,285-287,304,308,313,319,322-323,328
+src/renderer/components/integrations/LinkIssueDialog.css
+  s_c9dd89ad1f6c54::t_77e73f8c43e3b6 10-11,13,24,31,37,42,52,56,60,67,69,85,91,97,101,107
+  s_c9dd89ad1f6c54::t_fda6c612eba4a6 12,32,98
+tests/unit/renderer/form-control-styling.spec.ts
+  s_c9dd89ad1f6c54::t_77e73f8c43e3b6 73
+docs/ARCHITECTURE.md
+  s_c9dd89ad1f6c54::t_2f2366eca064b7 433
+  s_c9dd89ad1f6c54::t_77e73f8c43e3b6 709
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "9884366ec5e3ff8505a2de1d1d97918db5a91933",
+  "prompts": {},
+  "sessions": {
+    "s_c9dd89ad1f6c54": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ee6b7f82-c708-43d8-8c1f-eefe55f692a9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
