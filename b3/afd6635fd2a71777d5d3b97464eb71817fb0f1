@@ -1,0 +1,26 @@
+tests/unit/agents/agent-session-watcher-arming.spec.ts
+  s_c9dd89ad1f6c54::t_4f0950cd1764d8 1-32,36-79
+  s_c9dd89ad1f6c54::t_d2702dbfe6df5f 33-35
+tests/unit/agents/agent-session-watcher.spec.ts
+  s_c9dd89ad1f6c54::t_b8f52d4ce9f74f 183,206,211
+tests/integration/ipc/fs.ipc.spec.ts
+  s_c9dd89ad1f6c54::t_74918cace48c09 44-47,52
+src/main/agents/agent-session-watcher.ts
+  s_c9dd89ad1f6c54::t_154d9d110f8f93 68-92,96-97,100-104,111-115
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b3afd6635fd2a71777d5d3b97464eb71817fb0f1",
+  "prompts": {},
+  "sessions": {
+    "s_c9dd89ad1f6c54": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ee6b7f82-c708-43d8-8c1f-eefe55f692a9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
