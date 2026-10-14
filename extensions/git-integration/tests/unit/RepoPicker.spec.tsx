@@ -149,7 +149,7 @@ describe('RepoPicker — shows the error with Retry that reloads', () => {
     const s = setup()
     render(<RepoPicker initial={[]} onClose={s.onClose} onSaved={s.onSaved} />)
     await screen.findByText('acme/api')
-    expect(document.activeElement).toBe(screen.getByRole('searchbox'))
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('searchbox')))
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(s.onClose).toHaveBeenCalled()
   })
