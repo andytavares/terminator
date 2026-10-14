@@ -5,10 +5,16 @@ function systemTimeZone(): string {
   return Intl.DateTimeFormat().resolvedOptions().timeZone
 }
 
+/** An instant, given in epoch milliseconds, on the wall clock of the machine's time zone. */
+export function zonedAt(epochMilliseconds: number): Temporal.ZonedDateTime {
+  const instant = Temporal.Instant.fromEpochMilliseconds(epochMilliseconds)
+  return instant.toZonedDateTimeISO(systemTimeZone())
+}
+
 /** Now, on the wall clock of the machine's time zone. */
 export function zonedNow(): Temporal.ZonedDateTime {
   // Date.now(), not Temporal.Now: the specs' fake timers replace Date only.
-  return Temporal.Instant.fromEpochMilliseconds(Date.now()).toZonedDateTimeISO(systemTimeZone())
+  return zonedAt(Date.now())
 }
 
 /** Today's local date as YYYY-MM-DD: how a daily log is named and every date is stored. */

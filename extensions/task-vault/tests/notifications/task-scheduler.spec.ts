@@ -811,3 +811,63 @@ function startTaskSchedulerAutoDismissUnblockedTasksTests() {
     expect(disposeMock).toHaveBeenCalledTimes(1)
   })
 }
+
+/** How many check-ins one startup pass raises for a task blocked at `blockedAt`, looked at `now`. */
+async function checkInsRaised(interval: string, blockedAt: string, now: string): Promise<number> {
+  vi.setSystemTime(new Date(now))
+  const api = makeApi('09:00')
+  mock.mockBlockedAll.mockResolvedValue([
+    blockedRow({
+      updated_at: new Date(blockedAt).toISOString(),
+      metadata: JSON.stringify({ blocked_check_interval: interval }),
+    }),
+  ])
+  const scheduler = startTaskScheduler(api, mock.db)
+  await scheduler.startupPromise
+  scheduler.dispose()
+  return vi.mocked(api.notifications.createNotification).mock.calls.length
+}
+
+describe('a blocked task checked in after days, weeks or months', () => {
+  afterEach(() => vi.unstubAllEnvs())
+
+  it('comes due at the same time of day when the clocks went forward in between', async () => {
+    vi.stubEnv('TZ', 'America/New_York')
+    // Blocked Saturday 10:00; the clocks go forward on Sunday at 02:00.
+    expect(await checkInsRaised('1-day', '2026-03-07T10:00:00', '2026-03-08T09:59:00')).toBe(0)
+    expect(await checkInsRaised('1-day', '2026-03-07T10:00:00', '2026-03-08T10:01:00')).toBe(1)
+  })
+
+  it('comes due at the same time of day when the clocks went back in between', async () => {
+    vi.stubEnv('TZ', 'America/New_York')
+    // Blocked Saturday 10:00; the clocks go back on Sunday at 02:00.
+    expect(await checkInsRaised('1-week', '2026-10-31T10:00:00', '2026-11-07T09:30:00')).toBe(0)
+    expect(await checkInsRaised('1-week', '2026-10-31T10:00:00', '2026-11-07T10:01:00')).toBe(1)
+  })
+
+  it('counts a month as the calendar counts it, not as 30 days', async () => {
+    expect(await checkInsRaised('1-month', '2026-02-10T12:00:00', '2026-03-10T11:59:00')).toBe(0)
+    expect(await checkInsRaised('1-month', '2026-02-10T12:00:00', '2026-03-10T12:01:00')).toBe(1)
+    expect(await checkInsRaised('1-month', '2026-07-10T12:00:00', '2026-08-09T12:01:00')).toBe(0)
+  })
+
+  it('still counts hours as hours across a clock change', async () => {
+    vi.stubEnv('TZ', 'America/New_York')
+    // 01:30 EST plus four hours is 06:30 EDT: the hour from 02:00 to 03:00 does not exist.
+    expect(await checkInsRaised('4-hour', '2026-03-08T01:30:00', '2026-03-08T06:29:00')).toBe(0)
+    expect(await checkInsRaised('4-hour', '2026-03-08T01:30:00', '2026-03-08T06:31:00')).toBe(1)
+  })
+})
+
+describe('a blocked task whose blocked time is not a date', () => {
+  it('raises nothing, and the other blocked tasks are still checked', async () => {
+    vi.setSystemTime(new Date('2026-05-26T10:00:00'))
+    const api = makeApi('09:00')
+    mock.mockBlockedAll.mockResolvedValue([blockedRow({ updated_at: 'yesterday' }), blockedRow()])
+    const scheduler = startTaskScheduler(api, mock.db)
+    await scheduler.startupPromise
+    scheduler.dispose()
+
+    expect(vi.mocked(api.notifications.createNotification)).toHaveBeenCalledTimes(1)
+  })
+})
