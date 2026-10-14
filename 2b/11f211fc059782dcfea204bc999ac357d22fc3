@@ -1,0 +1,58 @@
+tests/unit/integrations/session-hook.spec.ts
+  s_c9dd89ad1f6c54::t_35e3786ecb8eca 226-229
+  s_c9dd89ad1f6c54::t_9c85aa128c80b7 28,187,206,240,295,315
+extensions/notepad/tests/unit/ipc/export.ipc.spec.ts
+  s_c9dd89ad1f6c54::t_9c85aa128c80b7 76,350
+src/renderer/components/sidebar/SidebarDialogs.tsx
+  s_c9dd89ad1f6c54::t_9c85aa128c80b7 53,68
+extensions/git-integration/src/components/pr-review/PrReviewView.tsx
+  s_c9dd89ad1f6c54::t_9c85aa128c80b7 192,213
+extensions/foundry/tests/ipc/ledger-channels.spec.ts
+  s_c9dd89ad1f6c54::t_9c85aa128c80b7 62,89,118-119,127-128,138,146,154,163,173,190,201,275,449,465,482,488
+tests/e2e/task-vault-harness.ts
+  s_c9dd89ad1f6c54::t_9c85aa128c80b7 28-29
+tests/e2e/extension-settings.spec.ts
+  s_c9dd89ad1f6c54::t_35e3786ecb8eca 120-124
+  s_c9dd89ad1f6c54::t_9c85aa128c80b7 185
+extensions/notepad/src/components/QuickCreateOverlay.tsx
+  s_c9dd89ad1f6c54::t_9c85aa128c80b7 128,174
+extensions/remote-control/src/components/RemoteControlSettings.tsx
+  s_c9dd89ad1f6c54::t_9c85aa128c80b7 89,107,118,126-128,131,151,154,174,184,203,224,228,243
+src/main/ipc/workspace.ipc.ts
+  s_c9dd89ad1f6c54::t_9c85aa128c80b7 132,140
+src/renderer/components/sidebar/EditWorkspaceDialog.tsx
+  s_c9dd89ad1f6c54::t_9c85aa128c80b7 41,54
+extensions/git-integration/src/components/pr-review/ChapterFileList.tsx
+  s_c9dd89ad1f6c54::t_9c85aa128c80b7 56,71,73
+extensions/git-integration/src/components/pr-review/diff-pane/annotations.tsx
+  s_c9dd89ad1f6c54::t_9c85aa128c80b7 112,126
+tests/e2e/github-stub-gh.ts
+  s_c9dd89ad1f6c54::t_9c85aa128c80b7 467,538,576
+  s_c9dd89ad1f6c54::t_35e3786ecb8eca 380-384
+extensions/task-vault/src/components/DailyLogSubtasks.tsx
+  s_c9dd89ad1f6c54::t_9c85aa128c80b7 37,56,66,69
+extensions/git-integration/tests/unit/merge-flow.store.spec.ts
+  s_c9dd89ad1f6c54::t_9c85aa128c80b7 35,72,84,96,104,112,122,132,141,150,173,182,228
+src/main/ipc/terminal.ipc.ts
+  s_c9dd89ad1f6c54::t_35e3786ecb8eca 118,235
+extensions/foundry/src/runtime/claude-launch.ts
+  s_c9dd89ad1f6c54::t_9c85aa128c80b7 166,182,205
+extensions/git-integration/src/components/pr-review/PrOverviewPanel.tsx
+  s_c9dd89ad1f6c54::t_9c85aa128c80b7 161,179
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2b11f211fc059782dcfea204bc999ac357d22fc3",
+  "prompts": {},
+  "sessions": {
+    "s_c9dd89ad1f6c54": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ee6b7f82-c708-43d8-8c1f-eefe55f692a9",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
