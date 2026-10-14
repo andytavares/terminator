@@ -2,6 +2,7 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { orderDir } from '../data-root.js'
 import type { Gate } from '../gates/rules.js'
+import { writeJsonAtomic } from '@terminator/extension-sdk/node'
 
 // Whether an order's merge has already been acted on.
 //
@@ -46,7 +47,7 @@ export async function writeRefineryState(
 ): Promise<void> {
   const file = statePath(root, orderId)
   await fs.promises.mkdir(path.dirname(file), { recursive: true })
-  await fs.promises.writeFile(file, JSON.stringify(state, null, 2), 'utf8')
+  await writeJsonAtomic(file, state)
 }
 
 /**

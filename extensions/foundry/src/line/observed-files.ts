@@ -1,4 +1,5 @@
 import * as fs from 'node:fs'
+import { writeJsonAtomic } from '@terminator/extension-sdk/node'
 import * as path from 'node:path'
 import { orderDir } from '../data-root.js'
 
@@ -15,7 +16,7 @@ export async function writeObservedFiles(
   files: readonly string[]
 ): Promise<void> {
   await fs.promises.mkdir(orderDir(root, orderId), { recursive: true })
-  await fs.promises.writeFile(observedPath(root, orderId), JSON.stringify([...new Set(files)]))
+  await writeJsonAtomic(observedPath(root, orderId), [...new Set(files)])
 }
 
 /** Nothing recorded, or an unreadable record, is no files: the plan's own `touches` stand in. */

@@ -5,6 +5,7 @@ import type { ResolveSources } from '../recipe/resolve.js'
 import type { Rule } from '../recipe/parse.js'
 import type { Proposal } from '../ledger/curator.js'
 import type { Rung } from './ladder.js'
+import { writeJsonAtomic } from '@terminator/extension-sdk/node'
 
 // Which checks apply here.
 //
@@ -175,7 +176,7 @@ export async function declineProposal(
     ...(await readDeclined(root)),
     [proposalId]: { reason, asserts: asserts?.trim() || null },
   }
-  await fs.promises.writeFile(declinedFile(root), JSON.stringify(declined, null, 2), 'utf8')
+  await writeJsonAtomic(declinedFile(root), declined)
 }
 
 /** Proposals the operator has already turned down. */

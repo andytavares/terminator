@@ -30,6 +30,7 @@ import { pullNumber } from '../line/pull-number.js'
 import type { FoundryIndex } from '../state/foundry-index.js'
 import type { ChannelSpec } from '@terminator/extension-sdk'
 import { foundryChannel } from './channel.js'
+import { writeJsonAtomic } from '@terminator/extension-sdk/node'
 
 // Starting a run.
 //
@@ -176,9 +177,9 @@ export async function writeRunGraph(
   graph: RunGraph,
   index?: FoundryIndex
 ): Promise<void> {
-  const json = `${JSON.stringify(graph, null, 2)}\n`
+  const json = JSON.stringify(graph)
   await fs.promises.mkdir(orderDir(dataRoot, graph.orderId), { recursive: true })
-  await fs.promises.writeFile(graphPath(dataRoot, graph.orderId), json, 'utf8')
+  await writeJsonAtomic(graphPath(dataRoot, graph.orderId), graph)
   index?.graphSaved(withUnitIdsOnNodes(JSON.parse(json) as RunGraph))
   // The replay's record of the run. Best effort: the graph just written is
   // the truth, and a timeline that cannot be appended to must not undo it.

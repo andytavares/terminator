@@ -4,6 +4,7 @@ import { orderDir } from '../data-root.js'
 import type { Gate } from './rules.js'
 import { BUDGET_KINDS } from '../line/scheduler.js'
 import type { FoundryIndex } from '../state/foundry-index.js'
+import { writeJsonAtomic } from '@terminator/extension-sdk/node'
 
 // Gates on disk, one file per order.
 //
@@ -73,8 +74,8 @@ export function createGateStore(root: string, index?: FoundryIndex): GateStore {
         ? existing.map((g) => (g.id === gate.id ? gate : g))
         : [...existing, gate]
       await fs.promises.mkdir(orderDir(root, gate.orderId), { recursive: true })
-      const json = `${JSON.stringify(next, null, 2)}\n`
-      await fs.promises.writeFile(gatesPath(root, gate.orderId), json, 'utf8')
+      const json = JSON.stringify(next)
+      await writeJsonAtomic(gatesPath(root, gate.orderId), next)
       index?.gatesWritten(gate.orderId, (JSON.parse(json) as Gate[]).map(withoutRetiredBreach))
     },
 
