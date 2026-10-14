@@ -175,6 +175,29 @@ async function launchFailure(
   )
 }
 
+/**
+ * Moves each window of the app, now and later, beside the real cursor rather than under it.
+ * Chromium sends a window a pointer move to where the cursor rests whenever a view's layout
+ * changes; with several apps open at once that ended hovers and drags mid-test.
+ */
+async function keepWindowsClearOfTheCursor(app: ElectronApplication): Promise<void> {
+  await app.evaluate(({ app: electronApp, BrowserWindow, screen }) => {
+    const clear = (window: Electron.BrowserWindow): void => {
+      const cursor = screen.getCursorScreenPoint()
+      const { x, y, width, height } = window.getBounds()
+      const under = cursor.x >= x && cursor.x < x + width && cursor.y >= y && cursor.y < y + height
+      if (!under) return
+      const display = screen.getDisplayNearestPoint(cursor).workArea
+      const rightOfCursor = cursor.x - display.x < display.width / 2
+      window.setPosition(rightOfCursor ? cursor.x + 1 : cursor.x - width, y)
+    }
+    for (const window of BrowserWindow.getAllWindows()) clear(window)
+    electronApp.on('browser-window-created', (_event, window) =>
+      window.once('show', () => clear(window))
+    )
+  })
+}
+
 export async function launchApp(
   userDataDir: string = e2eProfileDir(),
   env: Record<string, string> = {}
@@ -186,6 +209,7 @@ export async function launchApp(
   const output = keepOutput(app)
   try {
     const page = await firstReadyWindow(app, remaining)
+    await keepWindowsClearOfTheCursor(app)
     return { app, page, userDataDir, launchId: marker.launchId }
   } catch (error) {
     throw await launchFailure(app, output, error)

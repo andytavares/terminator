@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test'
 import { AppHandle, launchApp, closeApp } from './helpers'
 import { invokeChannel } from './extension-page'
-import { goToSection, openVault, storedTask } from './task-vault-harness'
+import { goToSection, openVault, pressRowAction, storedTask } from './task-vault-harness'
 
 // Projects, areas and the history of what was archived: creating, renaming,
 // filing tasks under them, archiving, restoring and deleting, each through the
@@ -113,8 +113,7 @@ test("a project's tasks are added, edited, completed and reopened from its card"
   expect(await storedTask(vault, 'Write the hero copy')).toMatchObject({ status: 'done' })
 
   await card.locator('.projects-browser__done-tasks summary').click()
-  await card.locator('.projects-browser__task-row--done').hover()
-  await card.getByTitle("Reopen on today's log").click()
+  await pressRowAction(card.getByTitle("Reopen on today's log"))
   await expect(card.locator('.projects-browser__done-tasks')).toHaveCount(0)
   expect(await storedTask(vault, 'Write the hero copy')).toMatchObject({ status: 'open' })
 })
