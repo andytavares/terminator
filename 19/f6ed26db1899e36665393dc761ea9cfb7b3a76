@@ -1,0 +1,34 @@
+extensions/git-integration/src/components/pr-review/UsesPopover.tsx
+  s_e708cca5bdf352::t_4532ca04eb138f 3,40-45,50-51
+extensions/git-integration/src/components/pr-review/diff-pane/FileHeader.tsx
+  s_e708cca5bdf352::t_656d98933802f7 129
+  s_e708cca5bdf352::t_a0996804e5322c 134
+  s_e708cca5bdf352::t_4532ca04eb138f 2-3,8,29-35,40-54,57-58,66,73-75,90-105,107-111,120-128,130
+  s_e708cca5bdf352::t_36cbede67bdf62 131-133
+extensions/git-integration/tests/unit/FileHeader.spec.tsx
+  s_e708cca5bdf352::t_8783894a53d686 91,93
+  s_e708cca5bdf352::t_3e186a5147ae4b 90
+  s_e708cca5bdf352::t_bde1031ff71057 4-7,92
+  s_e708cca5bdf352::t_4532ca04eb138f 1-3,8-70,88-89,94-113
+extensions/git-integration/tests/unit/UsesPopover.spec.tsx
+  s_e708cca5bdf352::t_bde1031ff71057 20-21,26-27,33-38,45-47,57-59
+  s_e708cca5bdf352::t_6df96468610d64 62
+extensions/git-integration/src/components/pr-review/diff-pane/file-header.css
+  s_e708cca5bdf352::t_226f8b4a84000c 1-107,124-131
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "19f6ed26db1899e36665393dc761ea9cfb7b3a76",
+  "prompts": {},
+  "sessions": {
+    "s_e708cca5bdf352": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5d7c9815-e79e-402d-b85d-cf8028e700ad",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
