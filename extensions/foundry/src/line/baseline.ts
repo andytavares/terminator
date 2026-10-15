@@ -16,7 +16,6 @@ import { lastLines, safeFilename } from './execution-parts.js'
 import type { ShellExec } from './integrate.js'
 import { issueOf } from './order-project.js'
 import { failedStepSentence } from './baseline-steps.js'
-export { failedStepSentence, isTestStep } from './baseline-steps.js'
 import {
   ensureBaselineCheckout,
   removeBaseCheckout,
@@ -53,6 +52,7 @@ export interface BaselineDeps {
 
 const EXCERPT_LINES = 20
 
+/** @internal */
 export function baselineSteps(toolchain: Toolchain): LadderStep[] {
   return [
     probedStep(toolchain, 'format', { rung: 'L0', name: 'Format' }),
@@ -75,6 +75,7 @@ export async function readBaseline(root: string, orderId: string): Promise<Basel
   }
 }
 
+/** @internal */
 export async function writeBaseline(
   root: string,
   orderId: string,

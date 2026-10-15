@@ -4,15 +4,14 @@ import * as path from 'node:path'
 
 import {
   baselineSteps,
-  failedStepSentence,
   isProving,
-  isTestStep,
   proveEnvironment,
   readBaseline,
   recordedOnBase,
   writeBaseline,
 } from '../../src/line/baseline.js'
 import type { Baseline, BaselineDeps } from '../../src/line/baseline.js'
+import { failedStepSentence, isTestStep } from '../../src/line/baseline-steps.js'
 import { checkoutPath } from '../../src/line/worktree.js'
 import { runStepOnBaseCheckout } from '../../src/line/lane-commands.js'
 import type { RunContext } from '../../src/line/run-context.js'

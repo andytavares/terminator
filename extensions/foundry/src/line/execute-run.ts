@@ -5,7 +5,8 @@ import { RUNGS, rungLevelInWords } from '../verify/ladder.js'
 import { askOnce, createLiveGateStore } from '../gates/store.js'
 import type { GateStore } from '../gates/store.js'
 import { shipOrder } from './integrate.js'
-import { isTestStep, readBaseline } from './baseline.js'
+import { readBaseline } from './baseline.js'
+import { isTestStep } from './baseline-steps.js'
 import { baseBranchCommit } from './lane-commands.js'
 import { afterFinalCheck, ciRounds, settledOnce } from './ship-tail.js'
 import { createEarlyShip } from './early-ship.js'
@@ -113,6 +114,7 @@ async function prepareRun(api: ExtensionAPI, run: OrderRun): Promise<RunTail> {
 // The checks that failed on the base branch before the change. A baseline taken
 // on an older base commit says nothing about this one, and a bugfix's failing
 // tests are the bug, not something left for the reader.
+/** @internal */
 export async function failingOnBaseOf(run: {
   root: string
   order: WorkOrder

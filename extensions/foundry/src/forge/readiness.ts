@@ -716,7 +716,7 @@ function environmentRowOf(
   return checkedRow(baseline, proving, shapeName)
 }
 
-/** Whether the base branch check lets an order be handed off: the row is passed exactly then. */
+/** Whether the base branch check lets an order be handed off: the row is passed exactly then. @internal */
 export function environmentPasses(
   environment: EnvironmentFacts,
   shapeName: string | null
