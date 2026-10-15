@@ -1,0 +1,81 @@
+docs/adr/113-a-file-is-high-risk-by-fixed-thresholds.md
+  s_e708cca5bdf352::t_f16007fd638e57 25
+extensions/git-integration/src/components/pr-review/review-layout.css
+  s_e708cca5bdf352::t_84613aebd5d789 25-34
+extensions/git-integration/tests/unit/ReviewHeader.spec.tsx
+  s_e708cca5bdf352::t_1aeeaef37ca47d 157,159-161,167,226,234-235
+extensions/git-integration/tests/unit/WhyThisFile.spec.tsx
+  s_e708cca5bdf352::t_ad1b9518c9e95f 128
+  s_e708cca5bdf352::t_b14870b4b2afa7 60-78,121-127,129-132
+extensions/git-integration/tests/unit/word-diff.spec.ts
+  s_e708cca5bdf352::t_c2e12b30c37bca 106-122
+docs/user-guide/USER-GUIDE.md
+  s_e708cca5bdf352::t_2be7f26efe200f 565,568
+extensions/git-integration/src/review/reading-order.ts
+  s_e708cca5bdf352::t_2be7f26efe200f 2-3
+extensions/git-integration/src/components/pr-review/diff-pane/FileHeader.tsx
+  s_e708cca5bdf352::t_1aeeaef37ca47d 80-89,106
+extensions/git-integration/src/components/pr-review/review-footer.css
+  s_e708cca5bdf352::t_84613aebd5d789 32,43
+extensions/git-integration/tests/unit/PrReviewView.spec.tsx
+  s_e708cca5bdf352::t_6b5ec2fb4be4bf 277,295,316
+  s_e708cca5bdf352::t_b14870b4b2afa7 503-505
+  s_e708cca5bdf352::t_9012b65525c320 480,501,532
+extensions/git-integration/src/components/pr-review/pr-review.css
+  s_e708cca5bdf352::t_d5c01c30ec1cbc 1023,1029
+extensions/git-integration/src/review/pr-signals.ts
+  s_e708cca5bdf352::t_f16007fd638e57 114-117
+extensions/git-integration/src/components/pr-review/file-tree.css
+  s_e708cca5bdf352::t_84613aebd5d789 159-163
+extensions/git-integration/src/components/pr-review/review-inspector.css
+  s_e708cca5bdf352::t_f16007fd638e57 142,146,150
+extensions/git-integration/CLAUDE.md
+  s_e708cca5bdf352::t_2be7f26efe200f 66
+extensions/git-integration/src/components/pr-review/ReviewFooter.tsx
+  s_e708cca5bdf352::t_99ef74cee27d5f 27-28,30,39-41,56
+  s_e708cca5bdf352::t_1aeeaef37ca47d 5
+  s_e708cca5bdf352::t_84613aebd5d789 29
+extensions/git-integration/tests/unit/FileHeader.spec.tsx
+  s_e708cca5bdf352::t_b14870b4b2afa7 72-80
+  s_e708cca5bdf352::t_1aeeaef37ca47d 71,81-87
+extensions/git-integration/src/components/pr-review/diff-pane/word-diff.ts
+  s_e708cca5bdf352::t_c2e12b30c37bca 11,100,113,118-120
+  s_e708cca5bdf352::t_3dbbccc708a39d 121-122
+extensions/git-integration/src/components/pr-review/WhyThisFile.tsx
+  s_e708cca5bdf352::t_f16007fd638e57 22,42-44,58,66,70,72,78,81,100,106,108,113,118-120,126,137,140,153,176,195
+  s_e708cca5bdf352::t_b14870b4b2afa7 155
+extensions/git-integration/src/components/pr-review/diff-pane/file-header.css
+  s_e708cca5bdf352::t_1aeeaef37ca47d 108-123
+extensions/git-integration/tests/unit/pr-signals.spec.ts
+  s_e708cca5bdf352::t_f16007fd638e57 1-33
+extensions/git-integration/tests/unit/FullFileList.spec.tsx
+  s_e708cca5bdf352::t_6b5ec2fb4be4bf 253
+  s_e708cca5bdf352::t_69d4cdb9973179 242-252,254-255
+extensions/git-integration/src/review/test-locations.ts
+  s_e708cca5bdf352::t_2be7f26efe200f 1-2
+extensions/git-integration/tests/unit/ReviewFooter.spec.tsx
+  s_e708cca5bdf352::t_99ef74cee27d5f 44,50,56,63-65,77-88
+  s_e708cca5bdf352::t_ae37ac0d62664d 89-90
+extensions/git-integration/src/components/pr-review/ReviewHeader.tsx
+  s_e708cca5bdf352::t_b14870b4b2afa7 166-167
+  s_e708cca5bdf352::t_1aeeaef37ca47d 8,126-130,132-139,180-181,189-190,207-212,275
+extensions/git-integration/src/components/pr-review/file-rows.tsx
+  s_e708cca5bdf352::t_9012b65525c320 4,92
+  s_e708cca5bdf352::t_1aeeaef37ca47d 7
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "5aaebd11f9247f6d9f3cfa8af514369ad6b03671",
+  "prompts": {},
+  "sessions": {
+    "s_e708cca5bdf352": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5d7c9815-e79e-402d-b85d-cf8028e700ad",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
