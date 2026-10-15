@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { PrOverviewPanel } from '../../src/components/pr-review/PrOverviewPanel'
 import { usePrReviewStore } from '../../src/stores/pr-review.store'
 import type { PrReviewDetail } from '../../src/schemas/pr-review.schema'
@@ -48,6 +48,10 @@ vi.mock('../../../../src/renderer/stores/workspace.store', () => ({
 
 vi.mock('../../../../src/renderer/stores/toast.store', () => ({
   useToastStore: () => ({ addToast: vi.fn() }),
+}))
+
+vi.mock('../../src/api/review-agent', () => ({
+  reviewAgentAPI: { summarize: vi.fn().mockResolvedValue({ summary: 'A summary.' }) },
 }))
 
 vi.mock('../../src/components/pr-review/RichContent', () => ({
@@ -163,6 +167,86 @@ function renderPanel(overrides: Partial<PrReviewDetail> = {}, props = {}) {
   )
 }
 
+/** The "At a glance" aside, where status, people and linked issues sit. */
+function atAGlance(): HTMLElement {
+  return screen.getByRole('complementary', { name: 'At a glance' })
+}
+
+/** Renders the panel and opens one of its tabs. */
+function renderOnTab(tab: RegExp, overrides: Partial<PrReviewDetail> = {}) {
+  const view = renderPanel(overrides)
+  fireEvent.click(screen.getByRole('tab', { name: tab }))
+  return view
+}
+
+const bobsComment = {
+  id: 1,
+  author: 'bob',
+  authorAvatarUrl: '',
+  body: 'Looks off',
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+}
+
+describe('PrOverviewPanel — the At a glance aside', () => {
+  it('labels a row for each fact about the pull request', () => {
+    renderPanel()
+    const aside = within(atAGlance())
+    for (const label of ['Checks', 'Reviewers', 'Author', 'Branch', 'Opened', 'Merge state']) {
+      expect(aside.getByText(label)).toBeTruthy()
+    }
+    expect(aside.getByText('alice')).toBeTruthy()
+    expect(aside.getByText('feature/x → main')).toBeTruthy()
+    expect(aside.queryByText('Linked issues')).toBeNull()
+  })
+
+  it('lists linked issues only when the pull request has some', () => {
+    renderPanel({ issueRefs: [{ ref: '#7', type: 'github', title: 'Crash on save' }] })
+    const aside = within(atAGlance())
+    expect(aside.getByText('Linked issues')).toBeTruthy()
+    expect(aside.getByText('#7')).toBeTruthy()
+    expect(aside.getByText('Crash on save')).toBeTruthy()
+  })
+
+  it('says so when there are no checks and no reviewers', () => {
+    renderPanel({ statusChecks: [] })
+    const aside = within(atAGlance())
+    expect(aside.getByText('No checks')).toBeTruthy()
+    expect(aside.getByText('None requested')).toBeTruthy()
+    expect(aside.getByText('No conflicts')).toBeTruthy()
+  })
+})
+
+describe('PrOverviewPanel — the tabs beside it', () => {
+  it('offers Description, Discussion with its count, and Insights, Description first', () => {
+    renderPanel()
+    const tabs = screen.getAllByRole('tab', { name: /^(Description|Discussion · 0|Insights)$/ })
+    expect(tabs.map((t) => t.textContent)).toEqual(['Description', 'Discussion · 0', 'Insights'])
+    expect(tabs[0].getAttribute('aria-selected')).toBe('true')
+  })
+
+  it("keeps only the selected tab's panel in the document", () => {
+    renderPanel()
+    expect(screen.getAllByRole('tabpanel')).toHaveLength(1)
+    expect(screen.getByText('This PR adds feature X.')).toBeTruthy()
+    expect(screen.queryByText('What to look at')).toBeNull()
+    fireEvent.click(screen.getByRole('tab', { name: 'Insights' }))
+    expect(screen.getAllByRole('tabpanel')).toHaveLength(1)
+    expect(screen.getByText('What to look at')).toBeTruthy()
+    expect(screen.queryByText('This PR adds feature X.')).toBeNull()
+  })
+
+  it('offers Summarize on the description and keeps the summary across tab switches', async () => {
+    renderPanel()
+    fireEvent.click(screen.getByRole('button', { name: 'Summarize' }))
+    expect(await screen.findByText('A summary.')).toBeTruthy()
+    fireEvent.click(screen.getByRole('tab', { name: 'Insights' }))
+    expect(screen.queryByText('A summary.')).toBeNull()
+    fireEvent.click(screen.getByRole('tab', { name: 'Description' }))
+    expect(screen.getByText('A summary.')).toBeTruthy()
+  })
+})
+
 describe('PrOverviewPanel', () => {
   it('renders PR title and number', () => {
     const onStartReview = vi.fn()
@@ -198,7 +282,7 @@ describe('PrOverviewPanel — renders author and branch info', () => {
 
   it('summarises passing checks and keeps the list collapsed', () => {
     renderPanel()
-    expect(screen.getByText('1 check passing')).toBeTruthy()
+    expect(within(atAGlance()).getByText('1 check passing')).toBeTruthy()
     expect(screen.queryByRole('list')).toBeNull()
   })
 })
@@ -213,7 +297,7 @@ describe('PrOverviewPanel — names the failing checks in the summary and expand
         { name: 'lint', state: 'pass' },
       ],
     })
-    const summary = screen.getByRole('button', {
+    const summary = within(atAGlance()).getByRole('button', {
       name: /2 of 4 checks failing · Format, codecov\/patch/,
     })
     expect(screen.queryByRole('list')).toBeNull()
@@ -231,7 +315,7 @@ describe('PrOverviewPanel — says how many checks are pending', () => {
         { name: 'b', state: 'pass' },
       ],
     })
-    expect(screen.getByText('1 of 2 checks pending')).toBeTruthy()
+    expect(within(atAGlance()).getByText('1 of 2 checks pending')).toBeTruthy()
   })
 
   it('shows Start Review for not-started PRs', () => {
@@ -341,7 +425,7 @@ describe('PrOverviewPanel — renders PR description via RichContent', () => {
 
 describe('PrOverviewPanel — folds hotspot files into the risk row, leaving out low risk files', () => {
   it('folds hotspot files into the risk row, leaving out low risk files', () => {
-    renderPanel()
+    renderOnTab(/Insights/)
     const risk = screen.getByText('Risk').closest('.ib-score') as HTMLElement
     expect(screen.getByTitle('src/high.ts')).toBeTruthy()
     expect(screen.getByTitle('src/medium.ts')).toBeTruthy()
@@ -351,7 +435,7 @@ describe('PrOverviewPanel — folds hotspot files into the risk row, leaving out
   })
 
   it('puts risk, time and size on one header line', () => {
-    renderPanel()
+    renderOnTab(/Insights/)
     expect(screen.getByText('What to look at')).toBeTruthy()
     expect(screen.getByText('High risk')).toBeTruthy()
     expect(screen.getByText(/about 15 min · 3 files, \+85 −32/)).toBeTruthy()
@@ -360,7 +444,7 @@ describe('PrOverviewPanel — folds hotspot files into the risk row, leaving out
 
 describe('PrOverviewPanel — has no metric tiles and no high/med/low chips', () => {
   it('has no metric tiles and no high/med/low chips', () => {
-    renderPanel()
+    renderOnTab(/Insights/)
     for (const label of ['Additions', 'Deletions', 'Est. time', 'Files', 'CI']) {
       expect(screen.queryByText(label)).toBeNull()
     }
@@ -374,7 +458,7 @@ describe('PrOverviewPanel — has no metric tiles and no high/med/low chips', ()
 
 describe('PrOverviewPanel — shows analysis provenance as a tooltip, not as text', () => {
   it('shows analysis provenance as a tooltip, not as text', () => {
-    renderPanel({
+    renderOnTab(/Insights/, {
       insights: {
         complexity: { branchDelta: 3, functions: [], source: 'tree-sitter · hunk base vs head' },
         coverage: {
@@ -471,7 +555,7 @@ describe('PrOverviewPanel — shows approvals bar when PR has approvals', () => 
         onClose={vi.fn()}
       />
     )
-    expect(screen.getByText('Approved by bob, carol')).toBeTruthy()
+    expect(within(atAGlance()).getByText('Approved by bob, carol')).toBeTruthy()
   })
 })
 
@@ -486,7 +570,7 @@ describe('PrOverviewPanel — does not show approvals bar when PR has no approva
         onClose={vi.fn()}
       />
     )
-    expect(screen.queryByText(/Approved by/)).toBeNull()
+    expect(within(atAGlance()).queryByText(/Approved by/)).toBeNull()
   })
 
   it('does not render pop out button when onPopOut is absent', () => {
@@ -503,52 +587,47 @@ describe('PrOverviewPanel — does not show approvals bar when PR has no approva
   })
 })
 
-describe('PrOverviewPanel — collapses the discussion behind a count, composer hidden', () => {
-  it('collapses the discussion behind a count, composer hidden', () => {
+describe('PrOverviewPanel — keeps the discussion behind its tab', () => {
+  it('shows no composer until the Discussion tab is selected', () => {
     renderPanel()
-    const toggle = screen.getByRole('button', { name: /Discussion · 0/ })
-    expect(toggle.getAttribute('aria-expanded')).toBe('false')
     expect(screen.queryByPlaceholderText('Leave a comment…')).toBeNull()
     expect(screen.queryByText('Write')).toBeNull()
+    fireEvent.click(screen.getByRole('tab', { name: /Discussion · 0/ }))
+    expect(screen.getByPlaceholderText('Leave a comment…')).toBeTruthy()
   })
-})
 
-describe('PrOverviewPanel — keeps comments collapsed and shows their count', () => {
-  it('keeps comments collapsed and shows their count', () => {
+  it('counts the comments on the tab and lists them once it is selected', () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
       viewedFiles: new Set(),
-      issueComments: [
-        {
-          id: 1,
-          author: 'bob',
-          authorAvatarUrl: '',
-          body: 'Looks off',
-          createdAt: new Date().toISOString(),
-        },
-      ],
+      issueComments: [bobsComment],
       currentUserLogin: null,
     })
     renderPanel()
-    expect(screen.getByRole('button', { name: /Discussion · 1/ })).toBeTruthy()
     expect(screen.queryByText('Looks off')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: /Discussion · 1/ }))
+    fireEvent.click(screen.getByRole('tab', { name: /Discussion · 1/ }))
     expect(screen.getByText('Looks off')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Summarize' })).toBeTruthy()
+  })
+
+  it('offers no Summarize on a discussion with no comments', () => {
+    renderOnTab(/Discussion · 0/)
+    expect(screen.queryByRole('button', { name: 'Summarize' })).toBeNull()
   })
 })
 
-describe('PrOverviewPanel — renders write/preview tabs in the discussion composer once expanded', () => {
-  it('renders write/preview tabs in the discussion composer once expanded', () => {
+describe('PrOverviewPanel — renders write/preview tabs in the discussion composer once its tab is selected', () => {
+  it('renders write/preview tabs in the discussion composer once its tab is selected', () => {
     renderPanel()
-    fireEvent.click(screen.getByRole('button', { name: /Discussion/ }))
+    fireEvent.click(screen.getByRole('tab', { name: /Discussion/ }))
     expect(screen.getByText('Write')).toBeTruthy()
     expect(screen.getByText('Preview')).toBeTruthy()
     expect(screen.getByPlaceholderText('Leave a comment…')).toBeTruthy()
   })
 
-  it('posts a comment from the expanded composer', async () => {
+  it('posts a comment from the discussion composer', async () => {
     const { githubAPI } = await import('../../src/api/github')
     renderPanel()
-    fireEvent.click(screen.getByRole('button', { name: /Discussion/ }))
+    fireEvent.click(screen.getByRole('tab', { name: /Discussion/ }))
     fireEvent.change(screen.getByPlaceholderText('Leave a comment…'), {
       target: { value: 'Ship it' },
     })
@@ -566,7 +645,7 @@ describe('PrOverviewPanel — renders write/preview tabs in the discussion compo
 describe('PrOverviewPanel — shows preview pane when Preview tab is clicked', () => {
   it('shows preview pane when Preview tab is clicked', () => {
     renderPanel()
-    fireEvent.click(screen.getByRole('button', { name: /Discussion/ }))
+    fireEvent.click(screen.getByRole('tab', { name: /Discussion/ }))
     fireEvent.click(screen.getByText('Preview'))
     expect(screen.getByText('Nothing to preview.')).toBeTruthy()
     expect(screen.queryByPlaceholderText('Leave a comment…')).toBeNull()
@@ -759,7 +838,7 @@ describe('PrOverviewPanel — shows requested reviewers as pending when no appro
         onClose={vi.fn()}
       />
     )
-    expect(screen.getByText('Review requested from dave, eve')).toBeTruthy()
+    expect(within(atAGlance()).getByText('Review requested from dave, eve')).toBeTruthy()
   })
 })
 
@@ -780,8 +859,8 @@ describe('PrOverviewPanel — shows Awaiting label for pending reviewers when ap
         onClose={vi.fn()}
       />
     )
-    expect(screen.getByText('Approved by bob')).toBeTruthy()
-    expect(screen.getByText('Awaiting dave')).toBeTruthy()
+    expect(within(atAGlance()).getByText('Approved by bob')).toBeTruthy()
+    expect(within(atAGlance()).getByText('Awaiting dave')).toBeTruthy()
   })
 })
 
@@ -796,8 +875,8 @@ describe('PrOverviewPanel — does not show reviewer bar when no approvals and n
         onClose={vi.fn()}
       />
     )
-    expect(screen.queryByText(/Approved by/)).toBeNull()
-    expect(screen.queryByText(/Review requested from/)).toBeNull()
+    expect(within(atAGlance()).queryByText(/Approved by/)).toBeNull()
+    expect(within(atAGlance()).queryByText(/Review requested from/)).toBeNull()
   })
 })
 
@@ -817,7 +896,7 @@ describe('PrOverviewPanel — shows Your review requested badge when current use
         onClose={vi.fn()}
       />
     )
-    expect(screen.getByText('Your review requested')).toBeTruthy()
+    expect(within(atAGlance()).getByText('Your review requested')).toBeTruthy()
   })
 })
 
@@ -837,7 +916,7 @@ describe('PrOverviewPanel — shows Your review requested badge when current use
         onClose={vi.fn()}
       />
     )
-    expect(screen.getByText('Your review requested')).toBeTruthy()
+    expect(within(atAGlance()).getByText('Your review requested')).toBeTruthy()
   })
 })
 
@@ -857,6 +936,6 @@ describe('PrOverviewPanel — does not show Your review requested badge when cur
         onClose={vi.fn()}
       />
     )
-    expect(screen.queryByText('Your review requested')).toBeNull()
+    expect(within(atAGlance()).queryByText('Your review requested')).toBeNull()
   })
 })

@@ -1484,32 +1484,13 @@
   flex-direction: column;
   height: 100%;
   overflow: hidden;
+  container: pr-overview / inline-size;
 }
 
 .pr-overview-pr-num {
   color: var(--tm-text-muted);
   font-weight: 400;
   margin-right: 4px;
-}
-
-.pr-overview-meta {
-  display: flex;
-  align-items: center;
-  gap: 4px 10px;
-  margin-top: 6px;
-  font-size: 11px;
-  color: var(--tm-text-muted);
-  flex-wrap: wrap;
-}
-
-.pr-overview-meta-author {
-  color: var(--tm-text-secondary);
-  font-weight: 500;
-}
-
-.pr-overview-meta-branch {
-  font-family: var(--tm-font-mono);
-  font-size: 10px;
 }
 
 .pr-overview-approvals-label {
@@ -1520,53 +1501,113 @@
   color: var(--tm-warning);
 }
 
-/* Each of the four blocks: Status, What to look at, Description, Discussion */
+/* Under the top bar: the At a glance aside beside the tabs, each scrolling on its own. Below
+   640px of pane the aside stacks above the tabs. */
 
-.pr-overview-block {
+.pr-overview-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(200px, 260px) minmax(0, 1fr);
+}
+
+@container pr-overview (max-width: 640px) {
+  .pr-overview-body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .pr-glance {
+    max-height: 40vh;
+    border-right: 0;
+    border-bottom: 1px solid var(--tm-border);
+  }
+}
+
+.pr-glance {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px 16px;
+  border-right: 1px solid var(--tm-border);
+}
+
+.pr-glance-list {
+  margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding-top: 14px;
-  border-top: 1px solid var(--tm-border);
+  gap: 12px;
 }
 
-.pr-overview-block:first-child {
-  padding-top: 0;
-  border-top: 0;
+.pr-glance-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
 }
 
-.pr-overview-status .pr-checks-bar {
+.pr-glance-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--tm-text-muted);
+}
+
+.pr-glance-value {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--tm-text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.pr-glance-none {
+  color: var(--tm-text-muted);
+}
+
+.pr-glance .pr-checks-bar {
+  width: 100%;
   border-bottom: 0;
 }
 
-.pr-overview-status .pr-checks-summary {
+.pr-glance .pr-checks-summary {
   padding: 0;
-  font-size: 13px;
+  font-size: 12px;
+  text-align: left;
 }
 
-.pr-overview-status .pr-checks-list {
+.pr-glance .pr-checks-list {
   max-height: 200px;
   overflow-y: auto;
 }
 
-.pr-overview-discussion-toggle {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+.pr-glance .pr-overview-issue-refs {
   width: 100%;
-  padding: 0;
-  background: none;
-  border: 0;
-  cursor: pointer;
-  text-align: left;
 }
 
-.pr-overview-discussion-toggle:hover {
-  color: var(--tm-text-secondary);
+.pr-glance .pr-overview-issue-ref {
+  flex-wrap: wrap;
 }
 
-.pr-overview-body-scroll {
+.pr-overview-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.pr-overview-tabs {
+  flex-shrink: 0;
+  padding: 0 12px;
+}
+
+.pr-overview-tab-panel {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 14px 16px;
   display: flex;
@@ -1574,32 +1615,33 @@
   gap: 14px;
 }
 
-/* Sections */
+/* Summarize, above the description or the discussion it summarizes */
 
-.pr-overview-section-title {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--tm-text-muted);
-  margin: 0;
-}
-
-.pr-overview-section-title--collapsible {
-  cursor: pointer;
+.pr-overview-summary {
   display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.pr-overview-summary-text {
+  align-self: stretch;
+  padding: 10px 12px;
+  border-left: 2px solid var(--tm-accent);
+  border-radius: 4px;
+  background: var(--tm-overlay-subtle);
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--tm-text-primary);
+}
+
+.pr-overview-summary-error {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  user-select: none;
-}
-
-.pr-overview-section-title--collapsible:hover {
-  color: var(--tm-text-secondary);
-}
-
-.pr-overview-section-toggle {
-  font-size: 10px;
-  color: var(--tm-text-muted);
+  gap: 8px;
+  font-size: 12px;
+  color: var(--tm-danger);
 }
 
 /* Issue refs */
@@ -1681,8 +1723,6 @@
   font-size: 13px;
   line-height: 1.6;
   color: var(--tm-text-primary);
-  max-height: 400px;
-  overflow-y: auto;
 }
 
 /* Merge state badges */
@@ -1844,7 +1884,6 @@
 .pr-checks-summary-icon svg,
 .review-diff-viewed-badge svg,
 .pr-merge-state-badge svg,
-.pr-overview-section-toggle svg,
 .chapter-nav__done svg,
 .chapter-file-list__done svg {
   width: 12px;

@@ -90,7 +90,7 @@ test('the queue lists the open pull requests, and search narrows it', async () =
 
 test('a comment in the discussion is posted to the pull request', async () => {
   const view = await openPrOverview('Add subtract')
-  await view.getByRole('button', { name: /^Discussion · 1/ }).click()
+  await view.getByRole('tab', { name: /^Discussion · 1/ }).click()
   await expect(view.locator('.pr-issue-comment-list')).toContainText('once CI is green')
   await view.getByPlaceholder('Leave a comment…').fill('Looking now.')
   await view.getByRole('button', { name: 'Comment', exact: true }).click()

@@ -1,6 +1,12 @@
 // Bridge module so extension components don't access window.electronAPI.extensionBridge
 // directly. All calls go through extensionBridge.invoke via registered IPC handlers.
-import type { AgentRun, AgentScope } from '../schemas/review-agent.schema'
+import type {
+  AgentRun,
+  AgentScope,
+  SummaryKind,
+  SummaryResult,
+} from '../schemas/review-agent.schema'
+import { invoke } from '@terminator/extension-sdk/renderer'
 
 const bridge = () => window.electronAPI.extensionBridge
 
@@ -15,6 +21,13 @@ export interface StartReviewAgentInput {
   request: 'review' | 'explain' | 'ask'
   question?: string | null
   model?: 'opus' | 'sonnet'
+}
+
+export interface SummarizeInput {
+  repoRoot: string
+  prNumber: number
+  kind: SummaryKind
+  text: string
 }
 
 export const reviewAgentAPI = {
@@ -36,6 +49,8 @@ export const reviewAgentAPI = {
   openTerminal: (runId: string) => bridge().invoke('review-agent:open-terminal', { runId }),
 
   settings: () => bridge().invoke('review-agent:settings', {}),
+
+  summarize: (input: SummarizeInput) => invoke<SummaryResult>('review-agent:summarize', input),
 
   onEvent: (cb: (payload: { run: AgentRun }) => void) =>
     bridge().on('review-agent:event', (data: unknown) => cb(data as { run: AgentRun })),

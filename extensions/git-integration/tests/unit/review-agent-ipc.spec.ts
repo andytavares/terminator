@@ -27,6 +27,7 @@ import { bindWorkspaceRoots } from '../../src/ipc/repo-root'
 import type { AgentRun } from '../../src/schemas/review-agent.schema'
 
 type RunReview = NonNullable<ReviewAgentDeps['runReview']>
+type RunSummary = NonNullable<ReviewAgentDeps['runSummary']>
 
 type Handler = (payload: unknown) => Promise<unknown>
 
@@ -39,6 +40,7 @@ function captureAgentHandlers(deps: Partial<ReviewAgentDeps>) {
     getSetting: <T>(key: string) => settings[key] as T | undefined,
     broadcast,
     openTerminal,
+    storagePath: '/storage/git-integration',
     ...deps,
   }
   bindWorkspaceRoots(() => ['/repo'])
@@ -353,5 +355,72 @@ describe('review-agent IPC — review-agent:open-terminal opens claude --resume 
     const { handlers } = captureAgentHandlers({})
     const result = await handlers['review-agent:open-terminal']({ runId: 'nope' })
     expect(result).toEqual({ error: 'NOT_FOUND' })
+  })
+})
+
+/** A summarize request for PR 1's description, overridden by `overrides`. */
+function summarizePayload(overrides: Record<string, unknown> = {}) {
+  return { repoRoot: '/repo', prNumber: 1, kind: 'description', text: 'Adds X', ...overrides }
+}
+
+describe('review-agent IPC — review-agent:summarize', () => {
+  it('rejects whitespace-only text without starting claude', async () => {
+    const runSummary = vi.fn<RunSummary>()
+    const { handlers } = captureAgentHandlers({ runSummary })
+    const result = await handlers['review-agent:summarize'](summarizePayload({ text: '  \n ' }))
+    expect(result).toEqual({ error: 'VALIDATION_ERROR' })
+    expect(runSummary).not.toHaveBeenCalled()
+  })
+
+  it('runs the summary in the storage folder with the configured model and timeout', async () => {
+    const runSummary = vi.fn<RunSummary>(() => ({
+      done: Promise.resolve({ summary: 'Adds X.' }),
+      cancel: vi.fn(),
+    }))
+    const { handlers, settings } = captureAgentHandlers({ runSummary })
+    settings['terminator.git-integration.review.agentModel'] = 'opus'
+    settings['terminator.git-integration.review.agentTimeoutMinutes'] = 12
+
+    const result = await handlers['review-agent:summarize'](summarizePayload())
+
+    expect(result).toEqual({ summary: 'Adds X.' })
+    expect(runSummary.mock.calls[0][0]).toMatchObject({
+      prNumber: 1,
+      kind: 'description',
+      text: 'Adds X',
+      cwd: '/storage/git-integration',
+      model: 'opus',
+      timeoutMs: 12 * 60_000,
+    })
+  })
+})
+
+describe('review-agent IPC — review-agent:summarize ends with the extension', () => {
+  it('disposing the handlers kills a summary still running', async () => {
+    const cancel = vi.fn()
+    const runSummary = vi.fn<RunSummary>(() => ({ done: new Promise(() => {}), cancel }))
+    const { handlers, registration } = captureAgentHandlers({ runSummary })
+    void handlers['review-agent:summarize'](summarizePayload())
+    await vi.waitFor(() => expect(runSummary).toHaveBeenCalled())
+
+    registration.dispose()
+
+    expect(cancel).toHaveBeenCalledTimes(1)
+  })
+
+  it('forgets a finished summary, so disposing cancels nothing', async () => {
+    const cancel = vi.fn()
+    const runSummary = vi.fn<RunSummary>(() => ({
+      done: Promise.resolve({ error: 'Timed out after 5 min' }),
+      cancel,
+    }))
+    const { handlers, registration } = captureAgentHandlers({ runSummary })
+    expect(await handlers['review-agent:summarize'](summarizePayload())).toEqual({
+      error: 'Timed out after 5 min',
+    })
+
+    registration.dispose()
+
+    expect(cancel).not.toHaveBeenCalled()
   })
 })

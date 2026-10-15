@@ -99,3 +99,14 @@ describe('reviewAgentAPI bridge — openTerminal calls review-agent:open-termina
     expect(cb).toHaveBeenCalledWith({ run: { id: 'run-1' } })
   })
 })
+
+describe('reviewAgentAPI bridge — summarize', () => {
+  it('summarize calls review-agent:summarize with the repo, PR, kind and text', async () => {
+    const { reviewAgentAPI } = await import('../../src/api/review-agent')
+    mockInvoke.mockResolvedValue({ summary: 'Adds X.' })
+    const payload = { repoRoot: '/repo', prNumber: 1, kind: 'description' as const, text: 'Adds X' }
+
+    expect(await reviewAgentAPI.summarize(payload)).toEqual({ summary: 'Adds X.' })
+    expect(mockInvoke).toHaveBeenCalledWith('review-agent:summarize', payload)
+  })
+})

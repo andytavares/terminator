@@ -78,3 +78,14 @@ export interface AgentRun {
 }
 
 export type AgentOutput = z.infer<typeof AgentOutputSchema>
+
+/** What Summarize can summarize on the PR overview. */
+export const SUMMARY_KINDS = ['description', 'discussion'] as const
+
+export type SummaryKind = (typeof SUMMARY_KINDS)[number]
+
+/** What the agent returns for a summary. */
+export const SummaryOutputSchema = z.object({ summary: z.string() })
+
+/** review-agent:summarize's answer: the summary, or why there is none, in plain words. */
+export type SummaryResult = { summary: string } | { error: string }
