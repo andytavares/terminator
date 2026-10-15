@@ -1,0 +1,33 @@
+extensions/git-integration/tests/unit/overview-signals.spec.ts
+  s_e708cca5bdf352::t_b84a77f5d50b11 8-14
+extensions/git-integration/src/components/pr-review/IssueRefs.tsx
+  s_e708cca5bdf352::t_354edd6201c1a3 1-46
+extensions/git-integration/tests/unit/PropertiesRail.spec.tsx
+  s_e708cca5bdf352::t_d19eda3b0680a1 1-4,7-10,14-19,21-24,26-41,48-64,66-68,70-71
+  s_e708cca5bdf352::t_ea0a9269f43160 5
+  s_e708cca5bdf352::t_0487f1297b963d 6,11-13,20,25,42-47,65,69
+extensions/git-integration/tests/unit/overview-fixtures.ts
+  s_e708cca5bdf352::t_ea0a9269f43160 1-142
+extensions/git-integration/src/components/pr-review/properties-rail.css
+  s_e708cca5bdf352::t_354edd6201c1a3 1-148
+extensions/git-integration/src/components/pr-review/PropertiesRail.tsx
+  s_e708cca5bdf352::t_37bb9dbc9c5d4b 85-114,122-123
+  s_e708cca5bdf352::t_103433847f5e4c 79,81-84,115,130
+  s_e708cca5bdf352::t_354edd6201c1a3 1-78,80,116-121,124-129,131-144
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "556ad28261940f0c36a068d04002fa8e1348252f",
+  "prompts": {},
+  "sessions": {
+    "s_e708cca5bdf352": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5d7c9815-e79e-402d-b85d-cf8028e700ad",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
