@@ -1,0 +1,23 @@
+extensions/git-integration/tests/unit/PrReviewTab.spec.tsx
+  s_e708cca5bdf352::t_48f49c3f0d0697 86,90-91,104,115,213-235
+  s_e708cca5bdf352::t_daa5cb97b893fc 236-237
+extensions/git-integration/tests/unit/PropertiesRail.spec.tsx
+  s_e708cca5bdf352::t_4e9e8c97b44d39 57-66
+  s_e708cca5bdf352::t_82879bf005d036 54-56
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "5e7e3cc4729db5f46e69d8b1b3dab4209c3e8e84",
+  "prompts": {},
+  "sessions": {
+    "s_e708cca5bdf352": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5d7c9815-e79e-402d-b85d-cf8028e700ad",
+        "model": "unknown"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
