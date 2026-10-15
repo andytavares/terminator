@@ -347,12 +347,23 @@ function leftForYouLines(order: WorkOrder, shipment: Shipment): string[] {
     ...failingOnBaseItems(order, shipment.failingOnBase ?? []),
     ...pendingDecisionItems(order),
   ]
+  const bullets = items.length === 0 ? [] : ['', ...items]
+  return [
+    '',
+    "### What's left for you",
+    '',
+    summaryOf(order, failing.length, items.length),
+    ...bullets,
+  ]
+}
+
+function summaryOf(order: WorkOrder, failingCount: number, itemCount: number): string {
+  if (itemCount === 0) return 'Nothing. Every criterion passed and nothing is pending.'
   const total = order.acceptance.length
-  const summary =
-    failing.length === 0 && items.length === 0
-      ? 'Nothing. Every criterion passed and nothing is pending.'
-      : `**${total - failing.length} of ${total}** criteria pass. ${failing.length} need you.`
-  return ['', "### What's left for you", '', summary, ...items]
+  const passing = `**${total - failingCount} of ${total}** criteria pass.`
+  return failingCount === 0
+    ? `${passing} These still need you:`
+    : `${passing} ${failingCount} need you.`
 }
 
 function criterionItem(

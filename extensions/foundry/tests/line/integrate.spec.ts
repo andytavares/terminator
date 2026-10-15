@@ -1637,9 +1637,11 @@ function leftForYou(body: string): string[] {
   const lines = body.split('\n')
   const start = lines.indexOf(LEFT_HEADER)
   if (start === -1) return []
-  const rest = lines.slice(start + 1)
+  const rest = lines.slice(start + 2)
   const next = rest.findIndex((line) => line.startsWith('### '))
-  return (next === -1 ? rest : rest.slice(0, next)).filter((line) => line !== '')
+  const section = next === -1 ? rest : rest.slice(0, next)
+  while (section.at(-1) === '') section.pop()
+  return section
 }
 
 function ladderWith(steps: LadderOutcome['steps']): LadderOutcome {
@@ -1711,12 +1713,12 @@ function leftShipment(): Parameters<typeof prBody>[1] {
 function leftForYouTests() {
   it('counts criteria by their worst verdict, and a criterion with no verdict as not passing', () => {
     const section = leftForYou(prBody(leftOrder(), leftShipment()))
-    expect(section[0]).toBe('**1 of 4** criteria pass. 3 need you.')
+    expect(section.slice(0, 2)).toEqual(['**1 of 4** criteria pass. 3 need you.', ''])
   })
 
   it('lists every item in order: criteria, unmeasured steps, base failures, accepted findings, assumptions, questions', () => {
     const section = leftForYou(prBody(leftOrder(), leftShipment()))
-    expect(section.slice(1)).toEqual([
+    expect(section.slice(2)).toEqual([
       '- **AC-2** A valid token is kept: failed. kept token was refused',
       '- **AC-3** The refusal is logged: not measured. no log harness',
       '- **AC-4** The refusal is documented: not measured. nothing ran',
@@ -1738,6 +1740,13 @@ function leftForYouTests() {
 }
 
 function leftForYouEdgeTests() {
+  it('says what still needs you, not a count of zero, when criteria pass but items remain', () => {
+    const shipment = { ...leftShipment(), verdicts: [verdict()] }
+    const section = leftForYou(prBody(refreshTokenOrder(), shipment))
+    expect(section.slice(0, 2)).toEqual(['**1 of 1** criteria pass. These still need you:', ''])
+    expect(section.join('\n')).not.toContain('0 need you')
+  })
+
   it('names the base branch of the first repository', () => {
     const order = leftOrder()
     const moved = {

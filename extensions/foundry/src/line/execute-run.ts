@@ -5,7 +5,8 @@ import { RUNGS, rungLevelInWords } from '../verify/ladder.js'
 import { askOnce, createLiveGateStore } from '../gates/store.js'
 import type { GateStore } from '../gates/store.js'
 import { shipOrder } from './integrate.js'
-import { readBaseline } from './baseline.js'
+import { isTestStep, readBaseline } from './baseline.js'
+import { baseBranchCommit } from './lane-commands.js'
 import { afterFinalCheck, ciRounds, settledOnce } from './ship-tail.js'
 import { createEarlyShip } from './early-ship.js'
 import { executePlan } from './executor.js'
@@ -105,14 +106,25 @@ async function prepareRun(api: ExtensionAPI, run: OrderRun): Promise<RunTail> {
     graphRef: { current: graph },
     shippedOrderRef: { current: order },
     finalCheck: settledOnce<boolean>(),
-    failingOnBase: await failingOnBaseOf(root, order.id),
+    failingOnBase: await failingOnBaseOf({ root, order, recipe, exec: built.exec }),
   }
 }
 
-async function failingOnBaseOf(root: string, orderId: string): Promise<string[]> {
-  const baseline = await readBaseline(root, orderId)
-  if (baseline?.state !== 'failing') return []
-  return baseline.steps.filter((step) => step.result === 'fail').map((step) => step.name)
+// The checks that failed on the base branch before the change. A baseline taken
+// on an older base commit says nothing about this one, and a bugfix's failing
+// tests are the bug, not something left for the reader.
+export async function failingOnBaseOf(run: {
+  root: string
+  order: WorkOrder
+  recipe: Recipe
+  exec: ShellExec
+}): Promise<string[]> {
+  const baseline = await readBaseline(run.root, run.order.id)
+  const repo = run.order.context.repos[0]
+  if (baseline?.state !== 'failing' || repo === undefined) return []
+  if (baseline.commit !== (await baseBranchCommit(run.exec, repo))) return []
+  const leftOut = run.recipe.id === 'bugfix' ? isTestStep : () => false
+  return baseline.steps.filter((s) => s.result === 'fail' && !leftOut(s)).map((s) => s.name)
 }
 
 function shipmentFor(tail: RunTail, found: Found): Shipment {

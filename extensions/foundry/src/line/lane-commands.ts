@@ -11,6 +11,7 @@ import { readBaseline, recordedOnBase } from './baseline.js'
 import { issueOf } from './order-project.js'
 import { ensureBaseCheckout, removeBaseCheckout, unlinkBorrowedDependencies } from './worktree.js'
 import type { Checkout } from './worktree.js'
+import type { ShellExec } from './integrate.js'
 import { firstLane, workspaceOf } from './run-context.js'
 import type { RunContext } from './run-context.js'
 
@@ -95,6 +96,15 @@ export async function runStepOnBaseCheckout(
   )
 }
 
+/** The commit the repository's base branch is at now, or null when git cannot say. */
+export async function baseBranchCommit(
+  exec: ShellExec,
+  repo: { readonly baseBranch: string; readonly path: string }
+): Promise<string | null> {
+  const head = await exec({ command: 'git', args: ['rev-parse', repo.baseBranch], cwd: repo.path })
+  return head.exitCode === 0 ? head.stdout.trim() : null
+}
+
 // What the order's baseline already found for this command on the unmoved base branch.
 async function recordedBaseExitCode(
   context: RunContext,
@@ -102,12 +112,7 @@ async function recordedBaseExitCode(
 ): Promise<number | null> {
   const repo = context.order.context.repos.find((r) => r.lane === lane)
   if (repo === undefined) return null
-  const head = await context.exec({
-    command: 'git',
-    args: ['rev-parse', repo.baseBranch],
-    cwd: repo.path,
-  })
-  const commit = head.exitCode === 0 ? head.stdout.trim() : null
+  const commit = await baseBranchCommit(context.exec, repo)
   const baseline = await readBaseline(context.root, context.order.id)
   const exitCode = recordedOnBase(baseline, command, commit)
   if (exitCode === null || commit === null) return null
