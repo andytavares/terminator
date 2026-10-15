@@ -848,6 +848,7 @@ describe('github:pr-file-diff', () => {
   it('fetches PR ref with --force so stale local refs do not block the diff', async () => {
     mockGitSuccess('') // git fetch
     mockGitSuccess('{"baseRefName":"main"}') // gh pr view (also goes through execFile)
+    mockGitSuccess('') // git fetch of the base branch
     mockGitSuccess('abc123\n') // git merge-base
     mockGitSuccess('') // git diff
 
@@ -885,6 +886,7 @@ describe('github:pr-file-diff — parses a diff with binary file indicator', () 
   it('parses a diff with binary file indicator', async () => {
     mockGitSuccess('') // git fetch
     mockGitSuccess('{"baseRefName":"main"}') // gh pr view
+    mockGitSuccess('') // git fetch of the base branch
     mockGitSuccess('abc123\n') // git merge-base
     mockGitSuccess('Binary files a/image.png and b/image.png differ\n') // git diff
 
@@ -914,6 +916,7 @@ describe('github:pr-file-diff — parses a diff with actual hunks', () => {
 `
     mockGitSuccess('') // git fetch
     mockGitSuccess('{"baseRefName":"main"}') // gh pr view
+    mockGitSuccess('') // git fetch of the base branch
     mockGitSuccess('abc123\n') // git merge-base
     mockGitSuccess(diffContent) // git diff
 
@@ -2977,6 +2980,17 @@ describe('github:pr-file-diff caching — fetches again when the head commit cha
     await handlers['github:pr-file-diff']({ ...payload, headSHA: 'h2' })
 
     expect(spawns.some((s) => s.args[0] === 'fetch')).toBe(true)
+  })
+
+  it('fetches the base branch before taking the merge base, so a stacked PR resolves', async () => {
+    const spawns = routeExec(gitRoute)
+
+    await handlers['github:pr-file-diff']({ ...payload, baseRef: 'develop', headSHA: 'h1' })
+
+    const order = spawns.map((s) => s.args.join(' '))
+    const baseFetch = order.findIndex((a) => a.startsWith('fetch') && a.includes('develop'))
+    expect(baseFetch).toBeGreaterThan(-1)
+    expect(baseFetch).toBeLessThan(order.findIndex((a) => a.startsWith('merge-base')))
   })
 
   it('does not ask gh for the base branch when the caller supplies it', async () => {
