@@ -7,6 +7,7 @@ import { agentTitle } from '../runtime/agent-title.js'
 import { runtime } from '../runtime/runtime-state.js'
 import type { RunCommandOptions } from '../runtime/supervised-runner.js'
 import type { ExecutorDeps } from './executor.js'
+import { readBaseline, recordedOnBase } from './baseline.js'
 import { issueOf } from './order-project.js'
 import { ensureBaseCheckout, removeBaseCheckout, unlinkBorrowedDependencies } from './worktree.js'
 import type { Checkout } from './worktree.js'
@@ -77,6 +78,8 @@ export async function runStepOnBaseCheckout(
   if (runner === null) return null
   const { order, exec, root, base } = context
   const lane = firstLane(context.checkouts)
+  const recorded = await recordedBaseExitCode(context, { command: step.command, lane, logPath })
+  if (recorded !== null) return recorded
   try {
     base.current ??= await ensureBaseCheckout(order, lane, { exec, root })
   } catch {
@@ -90,6 +93,30 @@ export async function runStepOnBaseCheckout(
       logPath,
     })
   )
+}
+
+// What the order's baseline already found for this command on the unmoved base branch.
+async function recordedBaseExitCode(
+  context: RunContext,
+  { command, lane, logPath }: { command: string; lane: number; logPath: string }
+): Promise<number | null> {
+  const repo = context.order.context.repos.find((r) => r.lane === lane)
+  if (repo === undefined) return null
+  const head = await context.exec({
+    command: 'git',
+    args: ['rev-parse', repo.baseBranch],
+    cwd: repo.path,
+  })
+  const commit = head.exitCode === 0 ? head.stdout.trim() : null
+  const baseline = await readBaseline(context.root, context.order.id)
+  const exitCode = recordedOnBase(baseline, command, commit)
+  if (exitCode === null || commit === null) return null
+  await fs.promises.mkdir(path.dirname(logPath), { recursive: true })
+  await fs.promises.writeFile(
+    logPath,
+    `\`${command}\` already ran on ${repo.baseBranch} at ${commit.slice(0, 7)} while the order was shaped (exit ${exitCode}); not run again.\n`
+  )
+  return exitCode
 }
 
 // A broken install, mended in place. The borrowed links go first, so the

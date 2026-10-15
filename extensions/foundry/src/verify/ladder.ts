@@ -48,7 +48,7 @@ export interface LadderStep {
 }
 
 /** A rung run by the command the probe found for `check`, or unavailable when it found none. */
-function probedStep(
+export function probedStep(
   toolchain: Toolchain,
   check: CheckName,
   { rung, name }: Pick<LadderStep, 'rung' | 'name'>
