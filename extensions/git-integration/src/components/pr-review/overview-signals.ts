@@ -125,7 +125,7 @@ function coverageTone(coverage: Coverage): Signal['tone'] {
   return choose(coverage.untestedFunctions.length > 0, 'warning', 'success')
 }
 
-function testsSignal(insights: Insights): Signal {
+function testCoverageSignal(insights: Insights): Signal {
   const { coverage } = insights
   return {
     kind: 'tests',
@@ -176,7 +176,7 @@ export function overviewSignals(pr: PrReviewDetail): Signal[] {
   if (pr.insights === null) return [risk]
   return [
     risk,
-    testsSignal(pr.insights),
+    testCoverageSignal(pr.insights),
     complexitySignal(pr.insights),
     readingSignal(pr.insights),
     ...healthSignals(pr.insights),
