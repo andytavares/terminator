@@ -625,7 +625,13 @@ function InspectorPane({ r }: { r: ReviewState }) {
         onClose={closeAgentPanel}
         agentAvailable={!!ui.agentPanelScope}
         agentFindingCount={openFindingCount(run)}
-        agent={<AgentPanel repoRoot={repoRoot} pr={pr} />}
+        agent={
+          <AgentPanel
+            repoRoot={repoRoot}
+            pr={pr}
+            currentFilePath={r.position.activeFile?.path ?? null}
+          />
+        }
         file={inspectorFile(repoRoot, r.position.activeFile)}
       />
     </aside>

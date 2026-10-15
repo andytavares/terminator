@@ -145,13 +145,15 @@ beforeEach(() => {
 describe('AgentPanel', () => {
   it('renders null when there is no scope', () => {
     setStoreState({ agentPanelScope: null })
-    const { container } = render(<AgentPanel repoRoot="/repo" pr={makePr()} />)
+    const { container } = render(
+      <AgentPanel repoRoot="/repo" pr={makePr()} currentFilePath={null} />
+    )
     expect(container.firstChild).toBeNull()
   })
 
   it('shows the ask state for the scope label', () => {
     setStoreState({ agentPanelScope: linesScope })
-    render(<AgentPanel repoRoot="/repo" pr={makePr()} />)
+    render(<AgentPanel repoRoot="/repo" pr={makePr()} currentFilePath={null} />)
     expect(screen.getByText('Ask about lines 309–317')).toBeTruthy()
   })
 
@@ -161,7 +163,7 @@ describe('AgentPanel', () => {
       agentPanelRequest: 'explain',
       agentPanelAutoStart: true,
     })
-    render(<AgentPanel repoRoot="/repo" pr={makePr()} />)
+    render(<AgentPanel repoRoot="/repo" pr={makePr()} currentFilePath={null} />)
 
     await waitFor(() => {
       expect(mockStart).toHaveBeenCalledWith(expect.objectContaining({ request: 'explain' }))
@@ -173,7 +175,7 @@ describe('AgentPanel — shows the running state and cancels the run', () => {
   it('shows the running state and cancels the run', () => {
     const run = makeRun({ status: 'running', activity: [] })
     setStoreState({ agentPanelScope: linesScope, agentRuns: [run] })
-    render(<AgentPanel repoRoot="/repo" pr={makePr()} />)
+    render(<AgentPanel repoRoot="/repo" pr={makePr()} currentFilePath={null} />)
 
     expect(screen.getByText(/Reviewing lines 309–317/)).toBeTruthy()
     fireEvent.click(screen.getByText('Cancel'))
@@ -183,7 +185,7 @@ describe('AgentPanel — shows the running state and cancels the run', () => {
   it('shows the findings state with severity tags and file:line notes', () => {
     const run = makeRun({ status: 'done', findings: [finding1, finding2] })
     setStoreState({ agentPanelScope: linesScope, agentRuns: [run] })
-    render(<AgentPanel repoRoot="/repo" pr={makePr()} />)
+    render(<AgentPanel repoRoot="/repo" pr={makePr()} currentFilePath={null} />)
 
     expect(screen.getByText('2 findings · lines 309–317')).toBeTruthy()
     expect(screen.getByText('suggestion')).toBeTruthy()
@@ -199,7 +201,9 @@ describe('AgentPanel — renders a finding body as markdown, so code reads as co
       findings: [{ ...finding1, body: '`computeRiskScore` runs twice per file.' }],
     })
     setStoreState({ agentPanelScope: linesScope, agentRuns: [run] })
-    const { container } = render(<AgentPanel repoRoot="/repo" pr={makePr()} />)
+    const { container } = render(
+      <AgentPanel repoRoot="/repo" pr={makePr()} currentFilePath={null} />
+    )
     const code = container.querySelector('.ap-fnd-body code')
     expect(code?.textContent).toBe('computeRiskScore')
     expect(container.querySelector('.ap-fnd-body')?.textContent).not.toContain('`')
@@ -210,7 +214,7 @@ describe('AgentPanel — posts a finding as a comment with fromFindingId and the
   it('posts a finding as a comment with fromFindingId and the finding line', () => {
     const run = makeRun({ status: 'done', findings: [finding1, finding2] })
     setStoreState({ agentPanelScope: linesScope, agentRuns: [run] })
-    render(<AgentPanel repoRoot="/repo" pr={makePr()} />)
+    render(<AgentPanel repoRoot="/repo" pr={makePr()} currentFilePath={null} />)
 
     const postButtons = screen.getAllByText('Post as comment')
     fireEvent.click(postButtons[0])
@@ -229,7 +233,7 @@ describe('AgentPanel — dismisses a finding and hides its card', () => {
   it('dismisses a finding and hides its card', () => {
     const run = makeRun({ status: 'done', findings: [finding1, finding2] })
     setStoreState({ agentPanelScope: linesScope, agentRuns: [run] })
-    render(<AgentPanel repoRoot="/repo" pr={makePr()} />)
+    render(<AgentPanel repoRoot="/repo" pr={makePr()} currentFilePath={null} />)
 
     expect(screen.getByText('Risk scored twice per file')).toBeTruthy()
     const dismissButtons = screen.getAllByText('Dismiss')
@@ -243,8 +247,57 @@ describe('AgentPanel — dismisses a finding and hides its card', () => {
 
   it('closes the panel', () => {
     setStoreState({ agentPanelScope: linesScope })
-    render(<AgentPanel repoRoot="/repo" pr={makePr()} />)
+    render(<AgentPanel repoRoot="/repo" pr={makePr()} currentFilePath={null} />)
     fireEvent.click(screen.getByLabelText('Close agent panel'))
     expect(mockOpenAgentPanel).toHaveBeenCalledWith(null)
+  })
+})
+
+const prScope: AgentScope = {
+  kind: 'pr',
+  path: null,
+  startLine: null,
+  endLine: null,
+  side: null,
+  chapter: null,
+}
+
+const CURRENT_FILE = 'extensions/git-integration/src/hooks/usePrReview.ts'
+
+describe('AgentPanel — choosing between the current file and the whole PR', () => {
+  it('points the panel at the current file, keeping the request', () => {
+    setStoreState({ agentPanelScope: prScope, agentPanelRequest: 'explain' })
+    render(<AgentPanel repoRoot="/repo" pr={makePr()} currentFilePath={CURRENT_FILE} />)
+
+    fireEvent.click(screen.getByRole('radio', { name: 'This file' }))
+
+    expect(mockOpenAgentPanel).toHaveBeenCalledWith(
+      { ...prScope, kind: 'file', path: CURRENT_FILE },
+      'explain'
+    )
+  })
+
+  it('points a file-scoped panel back at the whole PR', () => {
+    const fileScope = { ...prScope, kind: 'file' as const, path: CURRENT_FILE }
+    setStoreState({ agentPanelScope: fileScope })
+    render(<AgentPanel repoRoot="/repo" pr={makePr()} currentFilePath={CURRENT_FILE} />)
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Whole PR' }))
+
+    expect(mockOpenAgentPanel).toHaveBeenCalledWith(prScope, 'review')
+  })
+
+  it('offers no choice for a selection of lines', () => {
+    setStoreState({ agentPanelScope: linesScope })
+    render(<AgentPanel repoRoot="/repo" pr={makePr()} currentFilePath={CURRENT_FILE} />)
+
+    expect(screen.queryByRole('radio', { name: 'This file' })).toBeNull()
+  })
+
+  it('offers no file choice when no file is open', () => {
+    setStoreState({ agentPanelScope: prScope })
+    render(<AgentPanel repoRoot="/repo" pr={makePr()} currentFilePath={null} />)
+
+    expect(screen.queryByRole('radio', { name: 'This file' })).toBeNull()
   })
 })
