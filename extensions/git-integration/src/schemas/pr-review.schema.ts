@@ -223,6 +223,8 @@ export const PrReviewDetailSchema = z.object({
   readingOrder: z.array(ReadingStepSchema).default([]),
   movedBlocks: z.array(MovedBlockSchema).default([]),
   insights: PrInsightsSchema.nullable().default(null),
+  /** Changed files the viewer owns, by base-branch CODEOWNERS, directly or through a team. */
+  ownedPaths: z.array(z.string()).default([]),
 })
 
 // ─── Review queue PR (lightweight summary) ────────────────────────────────────

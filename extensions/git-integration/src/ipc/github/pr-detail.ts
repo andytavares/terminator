@@ -18,6 +18,7 @@ import { runGit } from '../../shell/run-git.js'
 import { analysePr } from '../../review/analyse.js'
 import { applyReadingOrder } from '../../review/apply-reading-order.js'
 import { findTestReferencesInRepo } from '../../review/test-references.js'
+import { ownedFilesOf } from './owned-files.js'
 import { VALIDATION_ERROR } from '../register.js'
 import { catchError, PullRequestPayload, type GithubContext } from './context.js'
 import { assigneeLoginsOf, asText } from '../../github/pr-review-service.js'
@@ -192,6 +193,16 @@ function reviewersOf(sources: PrSources) {
   }
 }
 
+/** What the owned-files lookup needs: the base branch whose CODEOWNERS counts and the changed paths. */
+function ownerLookupOf(at: PrAt, repoPath: string, sources: PrSources) {
+  return {
+    repoRoot: at.repoRoot,
+    repoPath,
+    baseRefName: asText(sources.meta.baseRefName),
+    paths: sources.files.map(filePathOf),
+  }
+}
+
 async function prDetail(ctx: GithubContext, at: PrAt): Promise<{ pr: PrReviewDetail }> {
   const { owner, repo } = await ctx.ownerAndName(at.repoRoot)
   const repoPath = `repos/${owner}/${repo}`
@@ -216,6 +227,7 @@ async function prDetail(ctx: GithubContext, at: PrAt): Promise<{ pr: PrReviewDet
     readingOrder: analysis.readingOrder,
     movedBlocks: analysis.movedBlocks,
     insights: analysis.insights,
+    ownedPaths: await ownedFilesOf(ctx, ownerLookupOf(at, repoPath, sources)),
   }
   return { pr }
 }

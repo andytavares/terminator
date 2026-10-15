@@ -23,7 +23,7 @@ import { useResizePanel } from '../../hooks/useResizePanel'
 import type { PrReviewDetail, PrChangedFile, Chapter } from '../../schemas/pr-review.schema'
 import type { AgentRun, AgentScope } from '../../schemas/review-agent.schema'
 import { orderedFiles as orderedFilesOf, startAtChapter } from './file-rows'
-import { choose } from '../text'
+import { visiblePr, type PrFilters } from '../../review/visible-pr'
 import './review-chrome.css'
 import './review-layout.css'
 
@@ -63,16 +63,6 @@ const LIST_MODE_OPTIONS = [
 
 type ReviewStore = ReturnType<typeof usePrReviewStore.getState>
 type FileOrder = ReviewStore['fileOrderOverrides']
-
-/** In focus mode each chapter keeps only its medium and high risk files and an all-low chapter is
- *  dropped; if that would drop every chapter (the whole PR is low risk) all are shown. */
-function focusedPr(pr: PrReviewDetail, focusMode: boolean): PrReviewDetail {
-  if (!focusMode) return pr
-  const filteredChapters = pr.chapters
-    .map((c) => ({ ...c, files: c.files.filter((f) => f.riskScore.level !== 'low') }))
-    .filter((c) => c.files.length > 0)
-  return { ...pr, chapters: choose(filteredChapters.length > 0, filteredChapters, pr.chapters) }
-}
 
 /** The PR's changed lines and a reading estimate of 25 minutes per hundred lines. */
 function largePrInfo(pr: PrReviewDetail, dismissed: boolean) {
@@ -207,6 +197,7 @@ function useViewState(store: ReviewStore) {
   const [viewMode, setViewMode] = useState<'guided' | 'full'>('full')
   const [refreshing, setRefreshing] = useState(false)
   const [focusMode, setFocusMode] = useState(false)
+  const [ownedOnly, setOwnedOnly] = useState(false)
   const [largePrDismissed, setLargePrDismissed] = useState(false)
   return {
     showResume,
@@ -221,6 +212,8 @@ function useViewState(store: ReviewStore) {
     setRefreshing,
     focusMode,
     setFocusMode,
+    ownedOnly,
+    setOwnedOnly,
     largePrDismissed,
     setLargePrDismissed,
   }
@@ -243,8 +236,12 @@ function useLayout() {
 }
 
 /** The PR as displayed and the reader's position in it. */
-function usePosition(pr: PrReviewDetail, store: ReviewStore, focusMode: boolean) {
-  const displayPr = useMemo(() => focusedPr(pr, focusMode), [pr, focusMode])
+function usePosition(pr: PrReviewDetail, store: ReviewStore, filters: PrFilters) {
+  const { focusMode, ownedOnly } = filters
+  const displayPr = useMemo(
+    () => visiblePr(pr, { focusMode, ownedOnly }),
+    [pr, focusMode, ownedOnly]
+  )
   const activeChapter = activeChapterOf(displayPr, store.currentChapterId)
   const { fileOrderOverrides } = store
   const orderedFiles = useMemo(() => {
@@ -271,7 +268,7 @@ function useReviewState(props: Props) {
   const view = useViewState(store)
   const inspector = useInspectorTab(ui.agentPanelScope)
   const layout = useLayout()
-  const { displayPr, position, displayedPaths } = usePosition(pr, store, view.focusMode)
+  const { displayPr, position, displayedPaths } = usePosition(pr, store, view)
   const loadInlineComments = useLoadInlineComments(repoRoot)
   useEffect(() => {
     loadInlineComments()
@@ -460,6 +457,9 @@ function Header({ r, h }: { r: ReviewState; h: Handlers }) {
       onDismissLargePr={() => view.setLargePrDismissed(true)}
       focusMode={view.focusMode}
       onToggleFocusMode={() => view.setFocusMode((v) => !v)}
+      ownedCount={pr.ownedPaths.length}
+      ownedOnly={view.ownedOnly}
+      onToggleOwnedOnly={() => view.setOwnedOnly((v) => !v)}
       onAskAgent={() => ui.openAgentPanel(PR_SCOPE, 'review')}
       onShowOverview={r.props.onShowOverview}
       onPopOut={r.props.onPopOut}
