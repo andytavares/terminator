@@ -98,23 +98,29 @@
   flex-shrink: 0;
 }
 
-.rh-progress-meter {
-  width: 60px;
-  height: 4px;
-  border-radius: 2px;
-  background: var(--tm-overlay);
-  overflow: hidden;
+.rh-segments {
+  display: flex;
+  gap: 3px;
+  width: 140px;
 }
 
-.rh-progress-fill {
-  height: 100%;
-  background: var(--tm-accent);
-  transition: width 0.3s ease;
+.rh-segments i {
+  display: block;
+  flex-basis: 0;
+  min-width: 6px;
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(
+    90deg,
+    var(--tm-success) var(--filled),
+    var(--tm-overlay-strong) var(--filled)
+  );
 }
 
 .rh-progress-text {
-  font-size: 11px;
-  color: var(--tm-text-muted);
+  font-size: 12px;
+  color: var(--tm-text-secondary);
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
@@ -182,4 +188,13 @@
 .rh-menu-hint {
   font-size: 10px;
   color: var(--tm-text-muted);
+}
+
+.rh-count {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  background: color-mix(in srgb, var(--tm-on-accent) 22%, transparent);
+  padding: 0 6px;
+  border-radius: 999px;
+  line-height: 17px;
 }

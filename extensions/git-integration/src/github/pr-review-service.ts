@@ -10,6 +10,15 @@ import type {
 } from '../schemas/pr-review.schema.js'
 import type { StatusCheck, IssueComment, InlineComment } from '../schemas/pr-review.schema.js'
 import type { FileDiff } from '../schemas/git.schema.js'
+import { plural } from '@terminator/extension-sdk'
+import {
+  BLAST_HIGH_IMPORTERS,
+  BLAST_MEDIUM_IMPORTERS,
+  CHANGE_HIGH_LINES,
+  CHANGE_MEDIUM_LINES,
+  CHURN_HIGH_COMMITS,
+  CHURN_MEDIUM_COMMITS,
+} from '../review/risk-thresholds.js'
 import { FileDiffSchema } from '../schemas/git.schema.js'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -44,6 +53,8 @@ interface NormalisedMetrics {
 interface RiskContribution {
   label: string
   value: number
+  /** False when the metric is under its medium floor: it is shown but is not a risk signal. */
+  overFloor: boolean
 }
 
 /** Totals for a queue row, from its file list when GitHub sent one, else from its counters. */
@@ -191,16 +202,39 @@ function compositeScore(norm: NormalisedMetrics, testFilePresent: boolean | null
   return Math.min(100, Math.round((weighted / totalWeight) * 80 + penalty))
 }
 
+function churnLabel(commits: number): string {
+  const count = `${commits} ${plural(commits, 'commit')} in 90 days`
+  return commits >= CHURN_MEDIUM_COMMITS ? `Changes often — ${count}` : count
+}
+
+function blastLabel(importers: number): string {
+  const count = `Used by ${importers} ${plural(importers, 'file')}`
+  return importers >= BLAST_MEDIUM_IMPORTERS ? `${count} — wide reach` : count
+}
+
+function sizeLabel(lines: number): string {
+  const count = `${lines} ${plural(lines, 'line')}`
+  return lines >= CHANGE_HIGH_LINES ? `Large change — ${count}` : `${count} changed`
+}
+
 /** Churn and blast radius: how often the file changes and how many files import it. */
 function historyContributions(norm: NormalisedMetrics, metrics: FileMetrics): RiskContribution[] {
   const out: RiskContribution[] = []
   if (norm.churn != null && metrics.churn90d != null) {
-    const label = `High churn — ${metrics.churn90d} commits/90d`
-    out.push({ label, value: norm.churn * RISK_WEIGHTS.churn })
+    const overFloor = metrics.churn90d >= CHURN_MEDIUM_COMMITS
+    out.push({
+      label: churnLabel(metrics.churn90d),
+      value: norm.churn * RISK_WEIGHTS.churn,
+      overFloor,
+    })
   }
   if (norm.blast != null && metrics.blastRadius != null) {
-    const label = `Wide blast radius — ${metrics.blastRadius} importers`
-    out.push({ label, value: norm.blast * RISK_WEIGHTS.blast })
+    const overFloor = metrics.blastRadius >= BLAST_MEDIUM_IMPORTERS
+    out.push({
+      label: blastLabel(metrics.blastRadius),
+      value: norm.blast * RISK_WEIGHTS.blast,
+      overFloor,
+    })
   }
   return out
 }
@@ -209,15 +243,16 @@ function historyContributions(norm: NormalisedMetrics, metrics: FileMetrics): Ri
 function changeContributions(norm: NormalisedMetrics, metrics: FileMetrics): RiskContribution[] {
   const out: RiskContribution[] = []
   if (norm.size != null) {
-    const label = `Large change — ${changeSizeOf(metrics)} lines`
-    out.push({ label, value: norm.size * RISK_WEIGHTS.size })
+    const lines = changeSizeOf(metrics)
+    const overFloor = lines >= CHANGE_MEDIUM_LINES
+    out.push({ label: sizeLabel(lines), value: norm.size * RISK_WEIGHTS.size, overFloor })
   }
   if (norm.complexity != null && (metrics.complexityDelta ?? 0) > 0) {
     const label = `Complexity increase — +${metrics.complexityDelta} decision points`
-    out.push({ label, value: norm.complexity * RISK_WEIGHTS.complexity })
+    out.push({ label, value: norm.complexity * RISK_WEIGHTS.complexity, overFloor: true })
   }
   if (!metrics.testFilePresent) {
-    out.push({ label: 'Missing test file', value: MISSING_TEST_PENALTY / 100 })
+    out.push({ label: 'Missing test file', value: MISSING_TEST_PENALTY / 100, overFloor: true })
   }
   return out
 }
@@ -227,10 +262,34 @@ function riskContributions(norm: NormalisedMetrics, metrics: FileMetrics): RiskC
   return all.sort((a, b) => b.value - a.value)
 }
 
-function riskLevelOf(composite: number | null): RiskScore['level'] {
-  if (composite == null || composite < 34) return 'low'
-  if (composite >= 67) return 'high'
-  return 'medium'
+/** True when any of churn, blast radius or change size reaches its floor. */
+function reachesFloor(
+  metrics: FileMetrics,
+  floor: { churn: number; blast: number; lines: number }
+) {
+  return (
+    (metrics.churn90d ?? 0) >= floor.churn ||
+    (metrics.blastRadius ?? 0) >= floor.blast ||
+    changeSizeOf(metrics) >= floor.lines
+  )
+}
+
+const HIGH_FLOOR = {
+  churn: CHURN_HIGH_COMMITS,
+  blast: BLAST_HIGH_IMPORTERS,
+  lines: CHANGE_HIGH_LINES,
+}
+const MEDIUM_FLOOR = {
+  churn: CHURN_MEDIUM_COMMITS,
+  blast: BLAST_MEDIUM_IMPORTERS,
+  lines: CHANGE_MEDIUM_LINES,
+}
+
+/** Level from absolute floors; the relative composite only orders files. */
+function riskLevelOf(metrics: FileMetrics): RiskScore['level'] {
+  if (reachesFloor(metrics, HIGH_FLOOR)) return 'high'
+  if (reachesFloor(metrics, MEDIUM_FLOOR)) return 'medium'
+  return 'low'
 }
 
 function riskMetricsOf(metrics: FileMetrics): RiskScore['metrics'] {
@@ -240,8 +299,8 @@ function riskMetricsOf(metrics: FileMetrics): RiskScore['metrics'] {
 }
 
 function dominantDriverOf(contributions: RiskContribution[]): string {
-  if (contributions.length === 0) return 'No dominant risk signal'
-  return contributions[0].label
+  const top = contributions.find((c) => c.overFloor)
+  return top ? top.label : 'No risk signal over its threshold'
 }
 
 export function computeRiskScore(metrics: FileMetrics, allFilesMetrics: FileMetrics[]): RiskScore {
@@ -249,7 +308,7 @@ export function computeRiskScore(metrics: FileMetrics, allFilesMetrics: FileMetr
   const composite = compositeScore(norm, metrics.testFilePresent)
   const dominantDriver = dominantDriverOf(riskContributions(norm, metrics))
   return {
-    level: riskLevelOf(composite),
+    level: riskLevelOf(metrics),
     composite,
     metrics: riskMetricsOf(metrics),
     dominantDriver,
@@ -267,9 +326,9 @@ export function computeRiskScore(metrics: FileMetrics, allFilesMetrics: FileMetr
 // pass refines it via `updateQueuePrRisk`. Thresholds are the total of additions +
 // deletions across the PR. PrReviewView reuses QUEUE_RISK_HIGH_LINES for its
 // "large PR" cognitive-load banner, so the two stay in lockstep.
-export const QUEUE_RISK_HIGH_LINES = 400
+export const QUEUE_RISK_HIGH_LINES = CHANGE_HIGH_LINES
 /** @internal */
-export const QUEUE_RISK_MEDIUM_LINES = 150
+export const QUEUE_RISK_MEDIUM_LINES = CHANGE_MEDIUM_LINES
 
 export function queueRiskLevel(changeSize: number): 'low' | 'medium' | 'high' {
   if (changeSize >= QUEUE_RISK_HIGH_LINES) return 'high'
@@ -887,11 +946,15 @@ export function parseReviewQueuePR(raw: unknown): ReviewQueuePR {
 
 // ─── Chapter risk ─────────────────────────────────────────────────────────────
 
-export function chapterRiskLevel(chapter: Chapter): 'low' | 'medium' | 'high' {
-  const scoreable = chapter.files.filter((f) => f.tier !== 3)
+export function filesRiskLevel(files: PrChangedFile[]): 'low' | 'medium' | 'high' {
+  const scoreable = files.filter((f) => f.tier !== 3)
   if (scoreable.some((f) => f.riskScore.level === 'high')) return 'high'
   if (scoreable.some((f) => f.riskScore.level === 'medium')) return 'medium'
   return 'low'
+}
+
+export function chapterRiskLevel(chapter: Chapter): 'low' | 'medium' | 'high' {
+  return filesRiskLevel(chapter.files)
 }
 
 // ─── Hunk classification (formatting vs semantic) ─────────────────────────────

@@ -11,10 +11,10 @@ import {
   clickByName,
   fillByName,
   foundryChannel,
-  hasLaunchScript,
+  hasAgentLaunchScript,
   inFoundry,
   listOrdersInForge,
-  launchScript,
+  agentLaunchScript,
   makeFixtureRepo,
   openFoundry,
   openListedOrder,
@@ -142,8 +142,8 @@ async function startForgeRun(id: string): Promise<void> {
 /** The agent's launch: supervised, with its settings and its whole brief, on its own. */
 async function expectSupervisedLaunch(): Promise<void> {
   const screen = handle.page.locator('.xterm-screen')
-  await expect.poll(() => hasLaunchScript(handle), { timeout: 60_000 }).toBe(true)
-  const launched = launchScript(handle)
+  await expect.poll(() => hasAgentLaunchScript(handle), { timeout: 60_000 }).toBe(true)
+  const launched = agentLaunchScript(handle)
   expect(launched).toContain('claude --session-id')
 
   // Never the thing this replaced: an invisible agent approving its own tool

@@ -1,9 +1,11 @@
-import React, { useState } from 'react'
+import React, { useId, useState } from 'react'
+import { CircleCheck, CircleX, MessageSquare, type LucideIcon } from 'lucide-react'
 import { Button } from '@terminator/extension-ui'
 import { githubAPI } from '../../api/github'
 import { usePrReviewStore } from '../../stores/pr-review.store'
 import type { DraftComment } from '../../schemas/pr-review.schema'
 import { choose } from '../text'
+import './review-submit.css'
 
 interface Props {
   repoRoot: string
@@ -12,15 +14,44 @@ interface Props {
   isOwnPr?: boolean
   onClose: () => void
   onApproved?: () => void
+  /** Shown as a warning when files remain unviewed; omit to leave the warning out. */
+  viewedCount?: number
+  totalFiles?: number
 }
 
 type ReviewEvent = 'APPROVE' | 'REQUEST_CHANGES' | 'COMMENT'
 
-const OUTCOMES = [
-  ['APPROVE', 'Approve'],
-  ['REQUEST_CHANGES', 'Request changes'],
-  ['COMMENT', 'Comment'],
-] as const
+interface Outcome {
+  event: ReviewEvent
+  label: string
+  description: string
+  submitLabel: string
+  icon: LucideIcon
+}
+
+const OUTCOMES: Outcome[] = [
+  {
+    event: 'COMMENT',
+    label: 'Comment',
+    description: 'No verdict',
+    submitLabel: 'Submit comment',
+    icon: MessageSquare,
+  },
+  {
+    event: 'APPROVE',
+    label: 'Approve',
+    description: 'Ready to merge',
+    submitLabel: 'Submit approval',
+    icon: CircleCheck,
+  },
+  {
+    event: 'REQUEST_CHANGES',
+    label: 'Request changes',
+    description: 'Blocks merge',
+    submitLabel: 'Submit changes request',
+    icon: CircleX,
+  },
+]
 
 interface Submission {
   repoRoot: string
@@ -85,31 +116,75 @@ function useReviewSubmit(props: Props) {
 
 type SubmitState = ReturnType<typeof useReviewSubmit>
 
-function optionClass(val: ReviewEvent, selected: boolean, blocked: boolean): string {
-  const base = `review-submit-option review-submit-option--${val.toLowerCase().replace('_', '-')}`
-  const sel = choose(selected, ' review-submit-option--selected', '')
-  return base + sel + choose(blocked, ' review-submit-option--disabled', '')
+function verdictClass(outcome: Outcome, selected: boolean, blocked: boolean): string {
+  const base = `rs-verdict rs-verdict--${outcome.event.toLowerCase().replace('_', '-')}`
+  return (
+    base + choose(selected, ' rs-verdict--on', '') + choose(blocked, ' rs-verdict--blocked', '')
+  )
+}
+
+function VerdictCard(props: {
+  outcome: Outcome
+  selected: boolean
+  blocked: boolean
+  onSelect: () => void
+}) {
+  const { outcome, selected, blocked } = props
+  const titleId = useId()
+  const descriptionId = useId()
+  const Icon = outcome.icon
+  return (
+    <label className={verdictClass(outcome, selected, blocked)}>
+      <input
+        type="radio"
+        name="review-event"
+        value={outcome.event}
+        checked={selected}
+        disabled={blocked}
+        aria-labelledby={titleId}
+        aria-describedby={descriptionId}
+        onChange={props.onSelect}
+      />
+      <b id={titleId}>
+        <Icon aria-hidden="true" className="rs-verdict-icon" />
+        {outcome.label}
+      </b>
+      <small id={descriptionId}>{outcome.description}</small>
+    </label>
+  )
 }
 
 function OutcomeOptions({ state, isOwnPr }: { state: SubmitState; isOwnPr?: boolean }) {
   return (
-    <div className="review-submit-options" role="radiogroup" aria-label="Review outcome">
-      {OUTCOMES.map(([val, label]) => {
-        const blocked = Boolean(isOwnPr) && val !== 'COMMENT'
-        return (
-          <label key={val} className={optionClass(val, state.event === val, blocked)}>
-            <input
-              type="radio"
-              name="review-event"
-              value={val}
-              checked={state.event === val}
-              disabled={blocked}
-              onChange={() => !blocked && state.setEvent(val)}
-            />
-            {label}
-          </label>
-        )
-      })}
+    <div className="rs-verdicts" role="radiogroup" aria-label="Review outcome">
+      {OUTCOMES.map((outcome) => (
+        <VerdictCard
+          key={outcome.event}
+          outcome={outcome}
+          selected={state.event === outcome.event}
+          blocked={Boolean(isOwnPr) && outcome.event !== 'COMMENT'}
+          onSelect={() => state.setEvent(outcome.event)}
+        />
+      ))}
+    </div>
+  )
+}
+
+function firstLineOf(text: string): string {
+  return text.split('\n')[0]
+}
+
+function PendingDrafts({ drafts }: { drafts: DraftComment[] }) {
+  if (drafts.length === 0) return null
+  return (
+    <div className="rs-pending">
+      <div className="rs-label">Pending · {drafts.length}</div>
+      {drafts.map((draft) => (
+        <div key={draft.id} className="rs-draft">
+          <span className="rs-draft-ref">{`${draft.path}:${draft.line}`}</span>
+          <p>{firstLineOf(draft.body)}</p>
+        </div>
+      ))}
     </div>
   )
 }
@@ -117,7 +192,7 @@ function OutcomeOptions({ state, isOwnPr }: { state: SubmitState; isOwnPr?: bool
 function SummaryBody({ state }: { state: SubmitState }) {
   return (
     <textarea
-      className="review-submit-body"
+      className="rs-summary"
       value={state.body}
       onChange={(e) => state.setBody(e.target.value)}
       placeholder="Leave a summary comment (optional)…"
@@ -127,41 +202,59 @@ function SummaryBody({ state }: { state: SubmitState }) {
   )
 }
 
-function SubmitActions({ state, onClose }: { state: SubmitState; onClose: () => void }) {
+/** "You have viewed 4 of 23 files", or null when everything is viewed or the counts are unknown. */
+function viewedWarning(viewedCount?: number, totalFiles?: number): string | null {
+  if (viewedCount === undefined || totalFiles === undefined || viewedCount >= totalFiles)
+    return null
+  return `You have viewed ${viewedCount} of ${totalFiles} files`
+}
+
+function SubmitActions(props: { state: SubmitState; onClose: () => void; warning: string | null }) {
+  const { state } = props
+  const outcome = OUTCOMES.find((o) => o.event === state.event) ?? OUTCOMES[0]
   return (
-    <div className="review-submit-actions">
-      <Button onClick={onClose} disabled={state.submitting}>
+    <div className="rs-actions">
+      <span className="rs-hint">{props.warning}</span>
+      <Button onClick={props.onClose} disabled={state.submitting}>
         Cancel
       </Button>
       <Button variant="primary" onClick={state.handleSubmit} disabled={state.submitting}>
-        {choose(state.submitting, 'Submitting…', 'Submit review')}
+        {choose(state.submitting, 'Submitting…', outcome.submitLabel)}
       </Button>
+    </div>
+  )
+}
+
+function SubmittedNotice({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="rs-success">
+      <p>Review submitted successfully.</p>
+      <Button onClick={onClose}>Close</Button>
     </div>
   )
 }
 
 export function ReviewSubmitPanel(props: Props) {
   const state = useReviewSubmit(props)
-  if (state.submitted) {
-    return (
-      <div className="review-submit-success">
-        <p>Review submitted successfully.</p>
-        <Button onClick={props.onClose}>Close</Button>
-      </div>
-    )
-  }
+  const drafts = usePrReviewStore((s) => s.drafts)
+  if (state.submitted) return <SubmittedNotice onClose={props.onClose} />
   return (
-    <div className="review-submit-panel">
-      <h2 className="review-submit-heading">Submit review</h2>
+    <div className="rs-panel">
+      <h2 className="rs-heading">Submit review</h2>
       {props.isOwnPr && (
-        <p className="review-submit-own-pr-notice">
+        <p className="rs-own-pr-notice">
           You cannot approve or request changes on your own pull request.
         </p>
       )}
-      <OutcomeOptions state={state} isOwnPr={props.isOwnPr} />
+      <PendingDrafts drafts={drafts} />
       <SummaryBody state={state} />
-      {state.error && <p className="review-submit-error">{state.error}</p>}
-      <SubmitActions state={state} onClose={props.onClose} />
+      <OutcomeOptions state={state} isOwnPr={props.isOwnPr} />
+      {state.error && <p className="rs-error">{state.error}</p>}
+      <SubmitActions
+        state={state}
+        onClose={props.onClose}
+        warning={viewedWarning(props.viewedCount, props.totalFiles)}
+      />
     </div>
   )
 }

@@ -1,0 +1,79 @@
+/* The thread renders inside the monospace diff table, so it sets its own UI font. */
+.inline-comment-thread {
+  margin: var(--tm-space-2) 20px var(--tm-space-2) var(--diff-code-offset, 88px);
+  max-width: 760px;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--tm-border-strong);
+  border-radius: var(--tm-radius-md);
+  background: var(--tm-bg-elevated);
+  font-family: var(--tm-font-ui);
+  font-size: 13px;
+}
+.inline-comment-thread--outdated {
+  border-style: dashed;
+}
+.inline-comment-outdated-label {
+  display: block;
+  padding: 2px 14px;
+  background: var(--tm-overlay-soft);
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--tm-text-muted);
+}
+.inline-comment {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 10px;
+  padding: 10px 14px;
+}
+.inline-comment + .inline-comment {
+  border-top: 1px solid var(--tm-border);
+}
+.inline-comment .inline-comment-avatar {
+  width: 22px;
+  height: 22px;
+}
+.inline-comment-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--tm-text-muted);
+}
+.inline-comment-thread .inline-comment-author {
+  font-size: 12.5px;
+}
+.inline-comment-resolved-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--tm-success);
+}
+.inline-comment-body {
+  margin-top: 3px;
+  max-width: 72ch;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--tm-text-primary);
+  overflow-wrap: break-word;
+}
+.inline-comment-reply {
+  display: flex;
+  padding: 8px 14px;
+  border-top: 1px solid var(--tm-border);
+}
+.inline-comment-reply-field {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  height: var(--tm-control-height);
+  padding: 0 10px;
+  border: 1px solid var(--tm-border-strong);
+  border-radius: var(--tm-radius-md);
+  background: var(--tm-bg-base);
+  color: var(--tm-text-muted);
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  cursor: text;
+}

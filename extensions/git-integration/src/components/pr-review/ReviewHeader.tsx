@@ -1,10 +1,18 @@
 import React, { useState } from 'react'
-import { Sparkles, TriangleAlert, MoreHorizontal, X } from 'lucide-react'
+import { ArrowLeft, Sparkles, TriangleAlert, MoreHorizontal, X } from 'lucide-react'
 import { Button, IconButton, Popover } from '@terminator/extension-ui'
 import { StatusChecksBar } from './StatusChecksBar'
 import type { StatusCheck } from '../../schemas/pr-review.schema'
 import { plural } from '@terminator/extension-sdk'
 import './review-header.css'
+import './review-layout.css'
+
+/** One chapter's slice of the progress bar. */
+export interface ChapterProgress {
+  id: string
+  fileCount: number
+  viewedCount: number
+}
 
 export interface ReviewHeaderProps {
   prNumber: number
@@ -13,7 +21,11 @@ export interface ReviewHeaderProps {
   checks: StatusCheck[]
   viewedCount: number
   totalFiles: number
-  estimatedMinutes: number
+  chapters: ChapterProgress[]
+  minutesLeft: number
+  draftCount: number
+  onSubmit: () => void
+  onPause: () => void
   largePr: { loc: number; minutes: number } | null
   onDismissLargePr: () => void
   focusMode: boolean
@@ -105,34 +117,57 @@ function LargePrPill(props: { largePr: { loc: number; minutes: number }; onDismi
   )
 }
 
-function progressPercent(viewed: number, total: number): number {
-  if (total <= 0) return 0
-  return (viewed / total) * 100
+function filledPercent(chapter: ChapterProgress): number {
+  if (chapter.fileCount <= 0) return 0
+  return (chapter.viewedCount / chapter.fileCount) * 100
 }
 
-function ReviewProgress(props: {
+/** One segment per chapter, as wide as the chapter has files. */
+function ChapterSegments(props: {
+  chapters: ChapterProgress[]
   viewedCount: number
   totalFiles: number
-  estimatedMinutes: number
 }) {
+  return (
+    <div
+      role="progressbar"
+      aria-label="Files viewed"
+      aria-valuemin={0}
+      aria-valuemax={props.totalFiles}
+      aria-valuenow={props.viewedCount}
+      className="rh-segments"
+    >
+      {props.chapters.map((chapter) => (
+        <i
+          key={chapter.id}
+          style={
+            {
+              flexGrow: chapter.fileCount,
+              '--filled': `${filledPercent(chapter)}%`,
+            } as React.CSSProperties
+          }
+        />
+      ))}
+    </div>
+  )
+}
+
+function progressText(viewedCount: number, totalFiles: number, minutesLeft: number): string {
+  const viewed = `${viewedCount} of ${totalFiles} viewed`
+  return minutesLeft > 0 ? `${viewed} · about ${minutesLeft} min left` : viewed
+}
+
+function ReviewProgress(props: ReviewHeaderProps) {
   const { viewedCount, totalFiles } = props
   return (
     <div className="rh-progress">
-      <div
-        aria-valuenow={viewedCount}
-        aria-valuemin={0}
-        aria-valuemax={totalFiles}
-        aria-label={`${viewedCount} of ${totalFiles} files viewed`}
-        className="rh-progress-meter"
-        role="progressbar"
-      >
-        <div
-          className="rh-progress-fill"
-          style={{ width: `${progressPercent(viewedCount, totalFiles)}%` }}
-        />
-      </div>
+      <ChapterSegments
+        chapters={props.chapters}
+        viewedCount={viewedCount}
+        totalFiles={totalFiles}
+      />
       <span className="rh-progress-text">
-        {viewedCount}/{totalFiles} viewed · ~{props.estimatedMinutes}m
+        {progressText(viewedCount, totalFiles, props.minutesLeft)}
       </span>
     </div>
   )
@@ -142,6 +177,8 @@ interface MenuItemProps {
   label: string
   hint?: React.ReactNode
   disabled?: boolean
+  /** Set on a toggle: the item is then a checkbox menu item. */
+  checked?: boolean
   onSelect: () => void
 }
 
@@ -149,7 +186,8 @@ function HeaderMenuItem(props: MenuItemProps & { close: () => void }) {
   return (
     <button
       type="button"
-      role="menuitem"
+      role={props.checked === undefined ? 'menuitem' : 'menuitemcheckbox'}
+      aria-checked={props.checked}
       className="rh-menu-item"
       disabled={props.disabled}
       onClick={() => {
@@ -166,9 +204,15 @@ function HeaderMenuItem(props: MenuItemProps & { close: () => void }) {
 /** The "more" menu's items, in order; an item whose handler is absent is left out. */
 function menuItems(props: ReviewHeaderProps): MenuItemProps[] {
   const items: (MenuItemProps | false)[] = [
-    { label: 'Focus mode', hint: props.focusMode && 'On', onSelect: props.onToggleFocusMode },
+    {
+      label: 'Focus mode',
+      hint: props.focusMode && 'On',
+      checked: props.focusMode,
+      onSelect: props.onToggleFocusMode,
+    },
     !!props.onShowOverview && { label: 'Overview', hint: 'i', onSelect: props.onShowOverview },
     { label: 'Hide file list', hint: 't', onSelect: props.onToggleFileList },
+    { label: 'Pause review', onSelect: props.onPause },
     { label: 'Refresh PR', disabled: props.refreshing, onSelect: props.onRefresh },
     !!props.onPopOut && { label: 'Pop out', onSelect: props.onPopOut },
     { label: 'Keyboard shortcuts', hint: '?', onSelect: props.onOpenKeyboardHelp },
@@ -221,21 +265,34 @@ function HeaderPills({ header }: { header: ReviewHeaderProps }) {
   )
 }
 
+function SubmitButton(props: { draftCount: number; onSubmit: () => void }) {
+  return (
+    <Button variant="primary" onClick={props.onSubmit}>
+      Submit review
+      {props.draftCount > 0 && (
+        <span className="rh-count">
+          {props.draftCount}
+          <span className="pr-visually-hidden"> {plural(props.draftCount, 'pending comment')}</span>
+        </span>
+      )}
+    </Button>
+  )
+}
+
 /** One 44px row holding everything that is not the diff, in place of the old top bar, checks band,
  *  progress track and large-PR banner (design: docs/research/review-screen-declutter.md). */
 export function ReviewHeader(props: ReviewHeaderProps): JSX.Element {
   return (
     <div className="rh-row">
+      {props.onShowOverview && (
+        <IconButton icon={ArrowLeft} label="Back to overview" onClick={props.onShowOverview} />
+      )}
       <span className="rh-num">#{props.prNumber}</span>
       {props.isDraft && <span className="rh-draft-badge">Draft</span>}
       <span className="rh-title">{props.title}</span>
       <HeaderPills header={props} />
       <div className="rh-spacer" />
-      <ReviewProgress
-        viewedCount={props.viewedCount}
-        totalFiles={props.totalFiles}
-        estimatedMinutes={props.estimatedMinutes}
-      />
+      <ReviewProgress {...props} />
       <Button
         aria-label="Ask agent about this PR"
         variant="ghost"
@@ -244,6 +301,7 @@ export function ReviewHeader(props: ReviewHeaderProps): JSX.Element {
       >
         Ask agent
       </Button>
+      <SubmitButton draftCount={props.draftCount} onSubmit={props.onSubmit} />
       <MoreMenu header={props} />
       <IconButton icon={X} label="Close review" onClick={props.onClose} />
     </div>

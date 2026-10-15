@@ -1,5 +1,4 @@
 import React, { useRef, useState } from 'react'
-import { Check } from 'lucide-react'
 import { usePrReviewStore } from '../../stores/pr-review.store'
 import type { Chapter, PrChangedFile } from '../../schemas/pr-review.schema'
 import {
@@ -7,8 +6,7 @@ import {
   currentAttr,
   orderedFiles,
   rowState,
-  RowStateLabel,
-  RowStateMark,
+  FileRowContent,
   type SinceSets,
 } from './file-rows'
 
@@ -81,36 +79,17 @@ interface FileRowProps {
   file: PrChangedFile
   index: number
   sets: SinceSets
+  threadCount: number
   isActive: boolean
   drag: RowDrag
   onSelectFile: (path: string) => void
-}
-
-function FileRowBody({ file, isViewed }: { file: PrChangedFile; isViewed: boolean }) {
-  return (
-    <>
-      <span className={`chapter-file-risk-dot chapter-file-risk-dot--${file.riskScore.level}`} />
-      <span className="chapter-file-name" title={file.path}>
-        {file.path.split('/').pop()}
-      </span>
-      <span className="chapter-file-changes">
-        <span className="chapter-file-add">+{file.additions}</span>
-        <span className="chapter-file-del">−{file.deletions}</span>
-      </span>
-      {isViewed && (
-        <span className="chapter-file-viewed-check" aria-label="Viewed">
-          <Check aria-hidden="true" />
-        </span>
-      )}
-    </>
-  )
 }
 
 function ChapterFileRow(props: FileRowProps) {
   const { file, index, isActive, onSelectFile } = props
   const isViewed = props.sets.viewedFiles.has(file.path)
   const state = rowState(file, props.sets)
-  const className = classNames('chapter-file-row', {
+  const className = classNames('chapter-file-row file-tree-row', {
     'chapter-file-row--active': isActive,
     'chapter-file-row--viewed': isViewed,
     'chapter-file-row--drag-over': props.drag.dragOverIndex === index,
@@ -123,15 +102,16 @@ function ChapterFileRow(props: FileRowProps) {
       {...props.drag.handlersFor(index)}
       onClick={() => onSelectFile(file.path)}
       role="button"
+      title={file.path}
       tabIndex={0}
       onKeyDown={(e) => e.key === 'Enter' && onSelectFile(file.path)}
     >
-      <RowStateMark state={state} num={index + 1} numClass="chapter-file-num" />
-      <FileRowBody file={file} isViewed={isViewed} />
-      <RowStateLabel state={state} />
-      <span className="chapter-file-why" title={file.whyHere}>
-        {file.whyHere}
-      </span>
+      <FileRowContent
+        file={file}
+        state={state}
+        isViewed={isViewed}
+        threadCount={props.threadCount}
+      />
     </div>
   )
 }
@@ -142,6 +122,7 @@ export function ChapterFileList(props: Props) {
     viewedFiles,
     fileOrderOverrides,
     reorderFiles,
+    threads = {},
     changedSince = new Set<string>(),
     newSinceLook = new Set<string>(),
   } = usePrReviewStore()
@@ -149,13 +130,14 @@ export function ChapterFileList(props: Props) {
   const drag = useRowDrag({ props, files, reorderFiles })
   const sets = { viewedFiles, changedSince, newSinceLook }
   return (
-    <div className="chapter-file-list">
+    <div className="chapter-file-list file-tree">
       {files.map((file, index) => (
         <ChapterFileRow
           key={file.path}
           file={file}
           index={index}
           sets={sets}
+          threadCount={threads[file.path]?.length ?? 0}
           isActive={file.path === currentFilePath}
           drag={drag}
           onSelectFile={props.onSelectFile}

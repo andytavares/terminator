@@ -234,3 +234,73 @@ describe('computeFileCyclomaticDelta()', () => {
     expect(computeFileCyclomaticDelta(diff)).toBe(3)
   })
 })
+
+// ─── Absolute risk levels ─────────────────────────────────────────────────────
+
+const small = baseMetrics({
+  additions: 3,
+  deletions: 0,
+  churn90d: 2,
+  blastRadius: 1,
+  complexityDelta: 0,
+})
+const smaller = baseMetrics({
+  additions: 1,
+  deletions: 0,
+  churn90d: 1,
+  blastRadius: 0,
+  complexityDelta: 0,
+})
+
+describe('computeRiskScore() — level comes from fixed thresholds, not from the neighbours', () => {
+  it('rates both files of a tiny two-file change low, with no "High" label', () => {
+    for (const file of [small, smaller]) {
+      const score = computeRiskScore(file, [small, smaller])
+      expect(score.level).toBe('low')
+      expect(score.dominantDriver).not.toMatch(/^(High|Wide|Large)/)
+    }
+  })
+
+  it('says no signal crossed its threshold when nothing is over a floor', () => {
+    const score = computeRiskScore(small, [small, smaller])
+    expect(score.dominantDriver).toBe('No risk signal over its threshold')
+  })
+
+  it('rates 31 commits in 90 days medium whatever the neighbours are', () => {
+    const busy = baseMetrics({ ...small, churn90d: 31 })
+    const extreme = baseMetrics({ churn90d: 500, blastRadius: 900, additions: 9000 })
+    expect(computeRiskScore(busy, [busy]).level).toBe('medium')
+    expect(computeRiskScore(busy, [busy, extreme]).level).toBe('medium')
+  })
+
+  it('rates 55 commits in 90 days high and names the churn', () => {
+    const score = computeRiskScore(baseMetrics({ ...small, churn90d: 55 }), [small])
+    expect(score.level).toBe('high')
+    expect(score.dominantDriver).toBe('Changes often — 55 commits in 90 days')
+  })
+})
+
+describe('computeRiskScore() — absolute floors and wording', () => {
+  it('rates the blast radius and change size floors', () => {
+    expect(computeRiskScore(baseMetrics({ ...small, blastRadius: 10 }), [small]).level).toBe(
+      'medium'
+    )
+    expect(computeRiskScore(baseMetrics({ ...small, blastRadius: 20 }), [small]).level).toBe('high')
+    expect(computeRiskScore(baseMetrics({ ...small, additions: 150 }), [small]).level).toBe(
+      'medium'
+    )
+    expect(computeRiskScore(baseMetrics({ ...small, additions: 400 }), [small]).level).toBe('high')
+  })
+
+  it('words a single commit and a single importer in the singular', () => {
+    const score = computeRiskScore(smaller, [smaller, small])
+    expect(JSON.stringify(score)).not.toContain('1 commits')
+    const lone = baseMetrics({ ...small, churn90d: 1, testFilePresent: false })
+    expect(computeRiskScore(lone, [lone, small]).dominantDriver).toBe('Missing test file')
+  })
+
+  it('labels a large change by its line count', () => {
+    const big = baseMetrics({ ...small, additions: 412, deletions: 0 })
+    expect(computeRiskScore(big, [big]).dominantDriver).toBe('Large change — 412 lines')
+  })
+})

@@ -1,7 +1,7 @@
 import React from 'react'
 import { describe, it, expect } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
-import { StatusChecksBar } from '../../src/components/pr-review/StatusChecksBar'
+import { GroupedCheckList, StatusChecksBar } from '../../src/components/pr-review/StatusChecksBar'
 import type { StatusCheck } from '../../src/schemas/pr-review.schema'
 
 const passing: StatusCheck[] = [
@@ -148,5 +148,41 @@ describe('StatusChecksBar (continued) — detailed summary', () => {
   it('says all checks are passing', () => {
     render(<StatusChecksBar checks={passing} detailed />)
     expect(screen.getByText('2 checks passing')).toBeTruthy()
+  })
+})
+
+const mixedChecks: StatusCheck[] = [
+  { name: 'b2', state: 'pass' },
+  { name: 'lint', state: 'fail' },
+  { name: 'b10', state: 'pass' },
+  { name: 'e2e', state: 'pending' },
+  { name: 'format', state: 'fail' },
+  { name: 'preview', state: 'skipped', url: 'https://example.com/run/9' },
+]
+
+function namesIn(group: string): string[] {
+  const heading = screen.getByRole('heading', { name: group })
+  const list = heading.parentElement!.querySelector('ul')!
+  return Array.from(list.querySelectorAll('li')).map((item) => item.textContent ?? '')
+}
+
+describe('GroupedCheckList', () => {
+  it('orders groups failing, pending, passing, skipped and leaves out empty ones', () => {
+    render(<GroupedCheckList checks={mixedChecks} />)
+    const headings = screen.getAllByRole('heading').map((heading) => heading.textContent)
+    expect(headings).toEqual(['Failing · 2', 'Pending · 1', 'Passing · 2', 'Skipped · 1'])
+  })
+
+  it('sorts names in natural order inside a group', () => {
+    render(<GroupedCheckList checks={mixedChecks} />)
+    expect(namesIn('Failing · 2')).toEqual(['format', 'lint'])
+    expect(namesIn('Passing · 2')).toEqual(['b2', 'b10'])
+  })
+
+  it('links a check that has a url', () => {
+    render(<GroupedCheckList checks={mixedChecks} />)
+    const links = screen.getAllByRole('link', { name: 'Open check details' })
+    expect(links).toHaveLength(1)
+    expect(links[0].getAttribute('href')).toBe('https://example.com/run/9')
   })
 })

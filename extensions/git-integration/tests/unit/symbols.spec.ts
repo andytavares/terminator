@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { Tree } from 'web-tree-sitter'
-import { loadLanguageFor, analyseSnippet, symbolFromHunkHeader } from '../../src/review/symbols'
+import { loadLanguageFor, analyseSnippet } from '../../src/review/symbols'
 
 describe('loadLanguageFor()', () => {
   it('loads the typescript grammar for a .ts path', async () => {
@@ -238,24 +238,5 @@ export class Registry {
     expect(result).not.toBeNull()
     expect(result!.definitions).toContain('Registry')
     expect(result!.definitions).toContain('register')
-  })
-})
-
-describe('symbolFromHunkHeader()', () => {
-  it('pulls the trailing symbol name out of a hunk header', () => {
-    expect(symbolFromHunkHeader('@@ -56,10 +56,12 @@ export function HealthChips')).toBe(
-      'HealthChips'
-    )
-  })
-
-  it('skips export/class/const keywords to find the name', () => {
-    expect(symbolFromHunkHeader('@@ -1,2 +1,2 @@ export class RiskEngine')).toBe('RiskEngine')
-    expect(symbolFromHunkHeader('@@ -1,2 +1,2 @@ export const computeRiskScore = (')).toBe(
-      'computeRiskScore'
-    )
-  })
-
-  it('returns null when the header has no trailing context', () => {
-    expect(symbolFromHunkHeader('@@ -1,2 +1,2 @@')).toBeNull()
   })
 })

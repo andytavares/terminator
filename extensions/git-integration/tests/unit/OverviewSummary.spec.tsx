@@ -3,9 +3,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import {
   OverviewSummary,
+  summaryShown,
   useSummary,
+  type Summary,
   type SummarySubject,
 } from '../../src/components/pr-review/OverviewSummary'
+import { partialFake } from '../../../../tests/support/fakes'
 import type { IssueComment } from '../../src/schemas/pr-review.schema'
 import type { SummaryResult } from '../../src/schemas/review-agent.schema'
 
@@ -47,14 +50,22 @@ beforeEach(() => {
 })
 
 describe('OverviewSummary — summarizing a description', () => {
-  it('sends the body, shows it is busy, then shows the summary', async () => {
+  it('offers the agent in one quiet row before it has run', () => {
+    renderDescription('Adds feature X.')
+    expect(screen.getByText('Summarize the description with the review agent')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Summarize' })).toBeTruthy()
+    expect(screen.queryByText('Brief')).toBeNull()
+  })
+
+  it('sends the body, shows the Brief as busy, then shows the summary with Regenerate', async () => {
     const settle = pendingSummary()
     renderDescription('Adds feature X.')
 
     fireEvent.click(screen.getByRole('button', { name: 'Summarize' }))
 
-    const busy = screen.getByRole('button', { name: 'Summarizing…' }) as HTMLButtonElement
-    expect(busy.disabled).toBe(true)
+    expect(screen.getByText('Brief')).toBeTruthy()
+    expect(screen.getByText('reading the description…')).toBeTruthy()
+    expect(screen.getByText('Summarizing').closest('[aria-busy="true"]')).toBeTruthy()
     expect(mockSummarize).toHaveBeenCalledWith({
       repoRoot: '/repo',
       prNumber: 42,
@@ -63,9 +74,13 @@ describe('OverviewSummary — summarizing a description', () => {
     })
     settle({ summary: 'Adds X behind a flag.' })
     expect((await screen.findByTestId('rich-content')).textContent).toBe('Adds X behind a flag.')
-    expect(screen.queryByRole('button', { name: 'Summarizing…' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Regenerate' })).toBeTruthy()
+    expect(screen.getByText(/review agent · from the description ·/)).toBeTruthy()
+    expect(screen.queryByText('Summarizing')).toBeNull()
   })
+})
 
+describe('OverviewSummary — a description with nothing to summarize', () => {
   it('offers no Summarize for an empty description', () => {
     renderDescription('')
     expect(screen.queryByRole('button', { name: 'Summarize' })).toBeNull()
@@ -77,6 +92,17 @@ describe('OverviewSummary — summarizing a description', () => {
   })
 })
 
+describe('summaryShown', () => {
+  const state = (summary: string | null, error: string | null) =>
+    partialFake<Summary>({ summary, error })
+
+  it('is true only with summary text and no error', () => {
+    expect(summaryShown(state('Adds X.', null))).toBe(true)
+    expect(summaryShown(state(null, null))).toBe(false)
+    expect(summaryShown(state('Adds X.', 'Timed out'))).toBe(false)
+  })
+})
+
 describe('OverviewSummary — summarizing a discussion', () => {
   it('sends each comment as **author**: body', () => {
     mockSummarize.mockResolvedValue({ summary: 's' })
@@ -85,6 +111,7 @@ describe('OverviewSummary — summarizing a discussion', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Summarize' }))
 
+    expect(screen.getByText('reading the discussion…')).toBeTruthy()
     expect(mockSummarize).toHaveBeenCalledWith({
       repoRoot: '/repo',
       prNumber: 42,
@@ -106,8 +133,10 @@ describe('OverviewSummary — when the agent cannot summarize', () => {
     renderDescription('Adds feature X.')
 
     fireEvent.click(screen.getByRole('button', { name: 'Summarize' }))
-    expect((await screen.findByRole('alert')).textContent).toContain('Timed out after 5 min')
-    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    expect((await screen.findByRole('alert')).textContent).toBe(
+      'The review agent could not summarize this: Timed out after 5 min.Try again'
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
 
     expect((await screen.findByTestId('rich-content')).textContent).toBe('Adds X.')
     expect(mockSummarize).toHaveBeenCalledTimes(2)
@@ -123,6 +152,6 @@ describe('OverviewSummary — when the agent cannot summarize', () => {
     expect((await screen.findByRole('alert')).textContent).toContain(
       'No handler for review-agent:summarize'
     )
-    expect(screen.getByRole('button', { name: 'Retry' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy()
   })
 })

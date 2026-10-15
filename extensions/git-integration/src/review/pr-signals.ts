@@ -6,6 +6,12 @@ import type {
   SignalDots,
 } from '../schemas/pr-review.schema'
 import type { RawFileMetrics } from '../api/github'
+import {
+  BLAST_HIGH_IMPORTERS,
+  BLAST_MEDIUM_IMPORTERS,
+  CHURN_HIGH_COMMITS,
+  CHURN_MEDIUM_COMMITS,
+} from './risk-thresholds'
 import { computeRiskScore, queueRiskLevel } from '../github/pr-review-service'
 
 type RiskLevel = RiskScore['level']
@@ -105,10 +111,10 @@ function coverageDot(measured: MeasuredFile[], pr: PrReviewDetail): SignalDots['
   return 'fail'
 }
 
-/** 'fail' above `failOver`, 'warn' above `warnOver`, else 'pass'. */
-function thresholdDot(value: number, warnOver: number, failOver: number): SignalDots['churn'] {
-  if (value > failOver) return 'fail'
-  if (value > warnOver) return 'warn'
+/** 'fail' at or over `failFloor`, 'warn' at or over `warnFloor`, else 'pass'; the file level's floors. */
+function thresholdDot(value: number, warnFloor: number, failFloor: number): SignalDots['churn'] {
+  if (value >= failFloor) return 'fail'
+  if (value >= warnFloor) return 'warn'
   return 'pass'
 }
 
@@ -121,7 +127,7 @@ export function signalDots(measured: MeasuredFile[], pr: PrReviewDetail): Signal
     coverage: coverageDot(measured, pr),
     ci: CI_DOTS[pr.ciStatus] ?? 'unknown',
     lint: pr.lintStatus ?? 'unknown',
-    churn: thresholdDot(maxChurn, 20, 50),
-    blast: thresholdDot(maxBlast, 10, 20),
+    churn: thresholdDot(maxChurn, CHURN_MEDIUM_COMMITS, CHURN_HIGH_COMMITS),
+    blast: thresholdDot(maxBlast, BLAST_MEDIUM_IMPORTERS, BLAST_HIGH_IMPORTERS),
   }
 }

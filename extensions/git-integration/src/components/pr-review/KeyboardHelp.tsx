@@ -20,7 +20,7 @@ const ROWS: Array<{ keys: string[]; label: string }> = [
   { keys: ['m'], label: 'Private note' },
   { keys: ['g', 'd'], label: 'Peek definition' },
   { keys: ['t'], label: 'Hide file list' },
-  { keys: ['i'], label: 'Insights panel' },
+  { keys: ['i'], label: 'Overview' },
   { keys: ['⌘↵'], label: 'Submit review' },
 ]
 

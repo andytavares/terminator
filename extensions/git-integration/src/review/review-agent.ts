@@ -665,7 +665,8 @@ const SUMMARY_SUBJECT: Record<SummaryKind, string> = {
 function buildSummaryPrompt(input: Pick<RunSummaryInput, 'prNumber' | 'kind' | 'text'>) {
   return [
     `Summarize the ${SUMMARY_SUBJECT[input.kind]} of pull request #${input.prNumber} for a ` +
-      'reviewer, in a few short Markdown sentences or bullets.',
+      'reviewer as Markdown: at most four bullet points, each under 25 words. Add a final ' +
+      'bullet starting "Not done:" only when the text says something was left undone.',
     '',
     READ_ONLY_RULE,
     UNTRUSTED_TEXT_RULE,

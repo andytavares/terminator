@@ -1,0 +1,173 @@
+/* The file list: chapter groups of 30px rows (design mock .ch, .fr, .st). */
+
+.file-tree {
+  overflow-y: auto;
+  flex: 1;
+}
+
+.file-tree-chapter-header {
+  display: flex;
+  align-items: baseline;
+  gap: var(--tm-space-2);
+  width: 100%;
+  padding: 10px 12px 4px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  text-align: left;
+  color: var(--tm-text-muted);
+}
+.file-tree-chapter-header b {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  color: var(--tm-text-primary);
+}
+.file-tree-chapter-header span {
+  margin-left: auto;
+  white-space: nowrap;
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.file-tree-row {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  gap: var(--tm-space-2);
+  align-items: center;
+  width: 100%;
+  height: 30px;
+  padding: 0 12px 0 14px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--tm-radius-sm);
+  cursor: pointer;
+  font-size: 12.5px;
+  text-align: left;
+  color: var(--tm-text-secondary);
+}
+.file-tree-row:hover {
+  background: var(--tm-overlay-subtle);
+}
+.chapter-file-row--drag-over {
+  box-shadow: inset 0 2px 0 var(--tm-accent);
+}
+.full-file-row--active,
+.full-file-row--active:hover,
+.chapter-file-row--active,
+.chapter-file-row--active:hover {
+  background: var(--tm-overlay);
+  /* The outline carries WCAG 1.4.11's 3:1 against the panel; a fill that strong would shout. */
+  border-color: var(--tm-accent-text);
+  color: var(--tm-text-primary);
+}
+.full-file-row--active .file-tree-name b,
+.chapter-file-row--active .file-tree-name b {
+  font-weight: 600;
+}
+
+.file-tree-glyph {
+  display: grid;
+  place-items: center;
+}
+.file-tree-glyph svg {
+  width: 14px;
+  height: 14px;
+}
+.file-tree-glyph--done {
+  color: var(--tm-success);
+}
+.file-tree-glyph--todo {
+  color: var(--tm-text-muted);
+}
+.file-tree-glyph--risk {
+  color: var(--tm-danger);
+}
+
+.file-tree-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.file-tree-name b {
+  font-weight: 500;
+  color: var(--tm-text-primary);
+}
+.file-tree-name small {
+  margin-left: 4px;
+  font-size: 11.5px;
+  color: var(--tm-text-muted);
+}
+
+.file-tree-end {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+}
+.file-tree-comments {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--tm-text-muted);
+}
+.file-tree-comments svg {
+  width: 12px;
+  height: 12px;
+}
+.file-tree-add {
+  color: var(--tm-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.file-tree-since--changed {
+  color: var(--tm-warning);
+}
+.file-tree-since--new {
+  color: var(--tm-accent-text);
+}
+
+/* Narrow review: a 44px rail of state glyphs. The file name stays in the DOM, visually hidden. */
+@container pr-review (max-width: 1100px) {
+  .file-tree {
+    width: 44px;
+  }
+  .file-tree-chapter {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 6px 0;
+    border-top: 1px solid var(--tm-border-strong);
+  }
+  .file-tree-chapter:first-child {
+    border-top: none;
+  }
+  .file-tree-row {
+    display: grid;
+    grid-template-columns: 1fr;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border-radius: var(--tm-radius-md);
+  }
+}
+
+@container pr-review (max-width: 1100px) {
+  /* The rail shows no chapter heading; display:none keeps focus off an invisible control. */
+  .file-tree-chapter-header {
+    display: none;
+  }
+
+  .file-tree-name,
+  .file-tree-end {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+}

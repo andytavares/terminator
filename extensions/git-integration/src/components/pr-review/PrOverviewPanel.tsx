@@ -8,15 +8,19 @@ import {
   TabPanel,
   TabsRoot,
 } from '@terminator/extension-ui'
-import { ArrowDown, ArrowRight, ExternalLink, Eye, RefreshCw, TriangleAlert, X } from 'lucide-react'
+import { ExternalLink, RefreshCw, X } from 'lucide-react'
+import { plural } from '@terminator/extension-sdk'
 import { usePrReviewStore } from '../../stores/pr-review.store'
 import { useLoadIssueComments } from '../../hooks/usePrReview'
 import { githubAPI } from '../../api/github'
 import { mergeFlowAPI } from '../../api/merge-flow'
-import { StatusChecksBar } from './StatusChecksBar'
 import { RichContent } from './RichContent'
-import { InsightsPanel } from './InsightsPanel'
-import { OverviewSummary, useSummary, type Summary } from './OverviewSummary'
+import { OverviewSummary, summaryShown, useSummary, type Summary } from './OverviewSummary'
+import { ReadinessStrip, type ReadinessBranch } from './ReadinessStrip'
+import { ReviewPlan } from './ReviewPlan'
+import { PropertiesRail } from './PropertiesRail'
+import { overviewTotals } from './overview-signals'
+import './pr-overview.css'
 import type { PrReviewDetail, IssueComment } from '../../schemas/pr-review.schema'
 import { choose } from '../text'
 
@@ -24,7 +28,7 @@ interface Props {
   repoRoot: string
   pr: PrReviewDetail
   sessionStatus: 'not-started' | 'in-progress' | 'paused'
-  onStartReview: () => void
+  onStartReview: (chapterId?: string) => void
   onClose: () => void
   onRefresh?: () => Promise<void>
   onPopOut?: () => void
@@ -32,15 +36,14 @@ interface Props {
 }
 
 type SessionStatus = Props['sessionStatus']
-type IssueRef = NonNullable<PrReviewDetail['issueRefs']>[number]
 
 const START_LABEL: Record<SessionStatus, string> = {
-  'not-started': 'Start Review',
-  'in-progress': 'Continue Review',
-  paused: 'Resume Review',
+  'not-started': 'Start review',
+  'in-progress': 'Continue review',
+  paused: 'Resume review',
 }
 
-/** "Start Review", or "Resume Review · 3 of 9 viewed" for a review already under way. */
+/** "Start review", or "Resume review · 3 of 9 viewed" for a review already under way. */
 function startLabel(status: SessionStatus, viewedCount: number, totalFiles: number): string {
   const base = START_LABEL[status]
   if (status === 'not-started' || totalFiles === 0) return base
@@ -92,8 +95,6 @@ function useBusyAction() {
   }
   return { busy, error, run: runReportingError }
 }
-
-type BusyFlag = ReturnType<typeof useBusyFlag>
 
 async function updateBranchFromBase(props: Props): Promise<string | null> {
   const result = await githubAPI.prUpdateBranch(props.repoRoot, props.pr.number)
@@ -198,210 +199,6 @@ function focusAtEnd(box: HTMLTextAreaElement | null): void {
   const len = box?.value.length ?? 0
   box?.setSelectionRange(len, len)
 }
-
-interface TopBarProps {
-  props: Props
-  refresh: BusyFlag
-  onRefresh: () => void
-}
-
-function TopBarActions(bar: TopBarProps) {
-  const { props, refresh } = bar
-  return (
-    <div className="pr-review-topbar-actions">
-      <IconButton
-        icon={RefreshCw}
-        className={choose(refresh.busy, 'pr-refresh-btn--spinning', undefined)}
-        onClick={bar.onRefresh}
-        disabled={refresh.busy}
-        label="Reload pull request"
-      />
-      {props.onPopOut && (
-        <Button
-          variant="ghost"
-          icon={ExternalLink}
-          onClick={props.onPopOut}
-          title="Open in focused window"
-        >
-          Pop out
-        </Button>
-      )}
-      <IconButton icon={X} label="Close" onClick={props.onClose} />
-    </div>
-  )
-}
-
-function OverviewTopBar(bar: TopBarProps) {
-  const { pr } = bar.props
-  return (
-    <div className="pr-review-topbar">
-      <span className="pr-review-topbar-title">
-        <span className="pr-overview-pr-num">#{pr.number}</span>
-        {pr.isDraft && <span className="pr-draft-badge">Draft</span>} {pr.title}
-      </span>
-      <TopBarActions props={bar.props} refresh={bar.refresh} onRefresh={bar.onRefresh} />
-    </div>
-  )
-}
-
-function Reviewers({ pr, youAreRequested }: { pr: PrReviewDetail; youAreRequested: boolean }) {
-  const approved = (pr.approvals?.length ?? 0) > 0
-  const requested = pr.requestedReviewers ?? []
-  return (
-    <>
-      {approved && (
-        <span className="pr-overview-approvals-label">
-          Approved by {(pr.approvals ?? []).map((a) => a.author).join(', ')}
-        </span>
-      )}
-      {requested.length > 0 && (
-        <span className="pr-overview-approvals-label pr-overview-approvals-label--pending">
-          {choose(approved, 'Awaiting', 'Review requested from')} {requested.join(', ')}
-        </span>
-      )}
-      {youAreRequested && (
-        <span
-          className="pr-overview-your-review-badge"
-          title="You have been requested to review this PR"
-        >
-          <Eye aria-hidden="true" />
-          Your review requested
-        </span>
-      )}
-    </>
-  )
-}
-
-/** Approvals, pending requests and your own request, or that nobody was asked. */
-function ReviewersRow({ pr, youAreRequested }: { pr: PrReviewDetail; youAreRequested: boolean }) {
-  const anyone =
-    (pr.approvals?.length ?? 0) > 0 || (pr.requestedReviewers?.length ?? 0) > 0 || youAreRequested
-  if (!anyone) return <span className="pr-glance-none">None requested</span>
-  return <Reviewers pr={pr} youAreRequested={youAreRequested} />
-}
-
-const SETTLED_MERGE_STATE: Record<'clean' | 'unknown', string> = {
-  clean: 'No conflicts',
-  unknown: 'Not reported',
-}
-
-function MergeStateBadge({ pr }: { pr: PrReviewDetail }) {
-  if (pr.mergeStateStatus === 'behind') {
-    return (
-      <span className="pr-merge-state-badge pr-merge-state-badge--behind">
-        <ArrowDown aria-hidden="true" /> Behind {pr.baseRefName}
-      </span>
-    )
-  }
-  if (pr.mergeStateStatus !== 'dirty') {
-    return <span className="pr-glance-none">{SETTLED_MERGE_STATE[pr.mergeStateStatus]}</span>
-  }
-  return (
-    <span className="pr-merge-state-badge pr-merge-state-badge--dirty">
-      <TriangleAlert aria-hidden="true" /> Conflicts
-    </span>
-  )
-}
-
-function GlanceRow({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="pr-glance-row">
-      <dt className="pr-glance-label">{label}</dt>
-      <dd className="pr-glance-value">{children}</dd>
-    </div>
-  )
-}
-
-function ChecksRow({ pr }: { pr: PrReviewDetail }) {
-  const checks = pr.statusChecks ?? []
-  if (checks.length === 0) return <span className="pr-glance-none">No checks</span>
-  return <StatusChecksBar detailed checks={checks} />
-}
-
-/** The facts a reviewer checks before reading: status, people, branch and linked issues. */
-function AtAGlance({ pr, youAreRequested }: { pr: PrReviewDetail; youAreRequested: boolean }) {
-  const issueRefs = pr.issueRefs ?? []
-  return (
-    <aside className="pr-glance" aria-label="At a glance">
-      <dl className="pr-glance-list">
-        <GlanceRow label="Checks">
-          <ChecksRow pr={pr} />
-        </GlanceRow>
-        <GlanceRow label="Reviewers">
-          <ReviewersRow pr={pr} youAreRequested={youAreRequested} />
-        </GlanceRow>
-        <GlanceRow label="Author">{pr.author}</GlanceRow>
-        <GlanceRow label="Branch">
-          {pr.headRefName} → {pr.baseRefName}
-        </GlanceRow>
-        <GlanceRow label="Opened">
-          <RelativeTime value={pr.openedAt} />
-        </GlanceRow>
-        <GlanceRow label="Merge state">
-          <MergeStateBadge pr={pr} />
-        </GlanceRow>
-        {issueRefs.length > 0 && <LinkedIssuesRow issueRefs={issueRefs} />}
-      </dl>
-    </aside>
-  )
-}
-
-function IssueRefName({ issueRef }: { issueRef: IssueRef }) {
-  const { url } = issueRef
-  if (!url) return <span className="pr-overview-issue-ref-label">{issueRef.ref}</span>
-  return (
-    <a
-      href={url}
-      onClick={(e) => {
-        e.preventDefault()
-        window.electronAPI.shell.openExternal(url).catch(() => {})
-      }}
-      className="pr-overview-issue-ref-link"
-    >
-      {issueRef.ref}
-    </a>
-  )
-}
-
-function IssueRefItem({ issueRef }: { issueRef: IssueRef }) {
-  return (
-    <li className="pr-overview-issue-ref">
-      <IssueRefName issueRef={issueRef} />
-      {issueRef.title !== undefined && (
-        <span className="pr-overview-issue-ref-title">{issueRef.title}</span>
-      )}
-      {issueRef.state !== undefined && (
-        <span className="pr-overview-issue-ref-state">{issueRef.state}</span>
-      )}
-      <span className="pr-overview-issue-ref-type">{issueRef.type}</span>
-    </li>
-  )
-}
-
-function LinkedIssuesRow({ issueRefs }: { issueRefs: IssueRef[] }) {
-  return (
-    <GlanceRow label="Linked issues">
-      <ul className="pr-overview-issue-refs">
-        {issueRefs.map((ref, i) => (
-          <IssueRefItem key={i} issueRef={ref} />
-        ))}
-      </ul>
-    </GlanceRow>
-  )
-}
-
-function DescriptionPanel({ pr, summary }: { pr: PrReviewDetail; summary: Summary }) {
-  if (!pr.body) return <p className="pr-overview-no-desc">No description provided.</p>
-  return (
-    <>
-      <OverviewSummary subject={{ kind: 'description', body: pr.body }} summary={summary} />
-      <div className="pr-overview-description">
-        <RichContent>{pr.body}</RichContent>
-      </div>
-    </>
-  )
-}
-
 function WriteBox({ box, composerRef }: { box: IssueCommentBox; composerRef: ComposerRef }) {
   return (
     <textarea
@@ -472,77 +269,145 @@ function DiscussionComposer({
   )
 }
 
-interface DiscussionProps {
-  comments: IssueComment[]
-  box: IssueCommentBox
-  composerRef: ComposerRef
-  summary: Summary
-}
-
-function DiscussionPanel({ comments, box, composerRef, summary }: DiscussionProps) {
-  return (
-    <>
-      <OverviewSummary subject={{ kind: 'discussion', comments }} summary={summary} />
-      {comments.length > 0 && (
-        <div className="pr-issue-comment-list">
-          {comments.map((comment) => (
-            <IssueCommentItem key={comment.id} comment={comment} onReply={box.handleReply} />
-          ))}
-        </div>
-      )}
-      <DiscussionComposer box={box} composerRef={composerRef} />
-    </>
-  )
-}
-
-function BranchButtons({ pr, actions }: { pr: PrReviewDetail; actions: OverviewActions }) {
-  const { update, merge } = actions
-  return (
-    <>
-      {pr.mergeStateStatus === 'behind' && (
-        <Button
-          icon={choose(update.busy, undefined, ArrowDown)}
-          onClick={actions.handleUpdateBranch}
-          disabled={update.busy}
-        >
-          {choose(update.busy, 'Updating…', `Update from ${pr.baseRefName}`)}
-        </Button>
-      )}
-      {pr.mergeStateStatus === 'dirty' && (
-        <Button
-          variant="danger"
-          icon={choose(merge.busy, undefined, ArrowRight)}
-          onClick={actions.handleResolveConflicts}
-          disabled={merge.busy}
-        >
-          {choose(merge.busy, 'Preparing merge…', 'Resolve conflicts')}
-        </Button>
-      )}
-    </>
-  )
-}
-
-function CtaBar(props: {
-  pr: PrReviewDetail
+interface HeaderProps {
+  props: Props
   actions: OverviewActions
-  startLabel: string
-  onStartReview: () => void
-}) {
-  const { pr, actions } = props
+  label: string
+}
+
+function HeaderTitle({ pr }: { pr: PrReviewDetail }) {
   return (
-    <div className="pr-overview-cta">
-      {actions.update.error && <p className="pr-update-branch-error">{actions.update.error}</p>}
-      {actions.merge.error && <p className="pr-update-branch-error">{actions.merge.error}</p>}
-      <BranchButtons pr={pr} actions={actions} />
-      {pr.isDraft && (
+    <h1 className="pr-overview-title">
+      <span
+        className={`pr-overview-state pr-overview-state--${choose(pr.isDraft, 'draft', 'open')}`}
+      >
+        {choose(pr.isDraft, 'Draft', 'Open')}
+      </span>
+      {pr.title} <span className="pr-overview-number">#{pr.number}</span>
+    </h1>
+  )
+}
+
+function HeaderMeta({ pr }: { pr: PrReviewDetail }) {
+  const { fileCount, additions, deletions, minutes } = overviewTotals(pr)
+  return (
+    <div className="pr-overview-meta" role="group" aria-label="Pull request summary">
+      <strong>{pr.author}</strong>
+      <span>
+        <code className="pr-overview-ref">{pr.headRefName}</code> →{' '}
+        <code className="pr-overview-ref">{pr.baseRefName}</code>
+      </span>
+      <span>
+        opened <RelativeTime value={pr.openedAt} />
+      </span>
+      <span>
+        {fileCount} {plural(fileCount, 'file')}
+      </span>
+      <span>
+        <b className="pr-overview-added">+{additions}</b>{' '}
+        <b className="pr-overview-removed">−{deletions}</b>
+      </span>
+      <span>about {minutes} min</span>
+    </div>
+  )
+}
+
+function ReviewActions({ props, actions, label }: HeaderProps) {
+  return (
+    <>
+      {props.pr.isDraft && (
         <Button onClick={actions.handleMarkReady} disabled={actions.markReady.busy}>
-          {choose(actions.markReady.busy, 'Marking ready…', 'Mark as Ready')}
+          {choose(actions.markReady.busy, 'Marking ready…', 'Mark as ready')}
         </Button>
       )}
-      <Button variant="primary" onClick={props.onStartReview}>
-        {props.startLabel}
+      <Button variant="primary" onClick={() => props.onStartReview()}>
+        {label}
       </Button>
-    </div>
+    </>
+  )
+}
+
+function IconActions({ props, actions }: Omit<HeaderProps, 'label'>) {
+  const { refresh } = actions
+  return (
+    <>
+      <IconButton
+        icon={RefreshCw}
+        className={choose(refresh.busy, 'pr-refresh-btn--spinning', undefined)}
+        onClick={actions.handleRefresh}
+        disabled={refresh.busy}
+        label="Reload pull request"
+      />
+      {props.onPopOut && (
+        <IconButton icon={ExternalLink} label="Open in focused window" onClick={props.onPopOut} />
+      )}
+      <IconButton icon={X} label="Close" onClick={props.onClose} />
+    </>
+  )
+}
+
+function OverviewHeader(header: HeaderProps) {
+  return (
+    <header className="pr-overview-header">
+      <div className="pr-overview-heading">
+        <HeaderTitle pr={header.props.pr} />
+        <HeaderMeta pr={header.props.pr} />
+      </div>
+      <div className="pr-overview-actions" role="group" aria-label="Pull request actions">
+        <IconActions props={header.props} actions={header.actions} />
+        <span className="pr-overview-review-actions">
+          <ReviewActions {...header} />
+        </span>
+      </div>
+    </header>
+  )
+}
+
+/** Narrow panes move the review actions here (see pr-overview.css); the header hides its copy. */
+function OverviewFooter(footer: HeaderProps) {
+  return (
+    <footer className="pr-overview-footer" role="group" aria-label="Review actions">
+      <ReviewActions {...footer} />
+    </footer>
+  )
+}
+
+function Reading({ pr, clamped }: { pr: PrReviewDetail; clamped: boolean }) {
+  const [expanded, setExpanded] = useState(false)
+  const [overflows, setOverflows] = useState(false)
+  const readingRef = useRef<HTMLDivElement>(null)
+  const clamp = clamped && !expanded
+  useEffect(() => {
+    const element = readingRef.current
+    if (clamp && element) setOverflows(element.scrollHeight > element.clientHeight)
+  }, [clamp, pr.body])
+  return (
+    <>
+      <div
+        ref={readingRef}
+        className={`pr-overview-reading${clamp ? ' pr-overview-reading--clamped' : ''}`}
+      >
+        <RichContent>{pr.body}</RichContent>
+      </div>
+      {clamped && (expanded || overflows) && (
+        <Button variant="ghost" size="sm" onClick={() => setExpanded(!expanded)}>
+          {choose(expanded, 'Show less', 'Show full description')}
+        </Button>
+      )}
+    </>
+  )
+}
+
+function DescriptionSection({ pr, clamped }: { pr: PrReviewDetail; clamped: boolean }) {
+  return (
+    <section className="pr-overview-section">
+      <div className="pr-overview-section-head">
+        <h2>Description</h2>
+        {pr.body && <span className="pr-overview-byline">{pr.author} wrote</span>}
+      </div>
+      {!pr.body && <p className="pr-overview-no-desc">No description provided.</p>}
+      {pr.body && <Reading pr={pr} clamped={clamped} />}
+    </section>
   )
 }
 
@@ -552,46 +417,119 @@ interface OverviewBodyProps {
   comments: IssueComment[]
   box: IssueCommentBox
   composerRef: ComposerRef
-  youAreRequested: boolean
+  onStartReview: Props['onStartReview']
 }
 
-type OverviewTab = 'description' | 'discussion' | 'insights'
+function OverviewTabContent(props: OverviewBodyProps & { summary: Summary }) {
+  const { pr, summary } = props
+  return (
+    <div className="pr-overview-layout">
+      <div className="pr-overview-column">
+        <OverviewSummary subject={{ kind: 'description', body: pr.body }} summary={summary} />
+        <ReviewPlan chapters={pr.chapters} onStartAt={props.onStartReview} />
+        <DescriptionSection pr={pr} clamped={summaryShown(summary)} />
+      </div>
+      <PropertiesRail pr={pr} />
+    </div>
+  )
+}
 
-/** Description, Discussion and Insights, one at a time. Each summary lives here, so it outlasts a
- *  tab switch and goes with the overview. */
+type CommentProps = { comment: IssueComment; onReply: (comment: IssueComment) => void }
+
+function IssueCommentHeader({ comment, onReply }: CommentProps) {
+  return (
+    <div className="pr-issue-comment-header">
+      <strong className="inline-comment-author">{comment.author}</strong>
+      <time className="inline-comment-time" dateTime={comment.createdAt}>
+        <RelativeTime value={comment.createdAt} />
+      </time>
+      <Button variant="ghost" size="sm" onClick={() => onReply(comment)}>
+        Reply
+      </Button>
+    </div>
+  )
+}
+
+function IssueCommentItem(props: CommentProps) {
+  const { comment } = props
+  return (
+    <div className="pr-issue-comment">
+      <img
+        src={comment.authorAvatarUrl}
+        alt={comment.author}
+        className="pr-issue-comment-avatar"
+        width={26}
+        height={26}
+      />
+      <div>
+        <IssueCommentHeader {...props} />
+        <div className="pr-issue-comment-body">
+          <RichContent>{comment.body}</RichContent>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** The discussion as a timeline. Its Brief sits above it, compact, so it never hides the thread. */
+function DiscussionContent(props: OverviewBodyProps & { summary: Summary }) {
+  const { comments, box } = props
+  return (
+    <div className="pr-overview-layout pr-overview-layout--single">
+      <div className="pr-overview-column">
+        <OverviewSummary subject={{ kind: 'discussion', comments }} summary={props.summary} />
+        {comments.length > 0 && (
+          <div className="pr-issue-comment-list">
+            {comments.map((comment) => (
+              <IssueCommentItem key={comment.id} comment={comment} onReply={box.handleReply} />
+            ))}
+          </div>
+        )}
+        <DiscussionComposer box={box} composerRef={props.composerRef} />
+      </div>
+    </div>
+  )
+}
+
+/** Overview and Discussion, one at a time. Each summary lives here, so it outlasts a tab switch
+ *  and goes with the overview. */
 function OverviewTabs(props: OverviewBodyProps) {
-  const [tab, setTab] = useState<OverviewTab>('description')
+  const [tab, setTab] = useState<'overview' | 'discussion'>('overview')
   const descriptionSummary = useSummary(props.repoRoot, props.pr.number)
   const discussionSummary = useSummary(props.repoRoot, props.pr.number)
   return (
     <div className="pr-overview-main">
       <TabsRoot selectedId={tab} onSelect={setTab}>
         <TabList label="Pull request sections" className="pr-overview-tabs">
-          <Tab id="description">Description</Tab>
+          <Tab id="overview">Overview</Tab>
           <Tab id="discussion">Discussion · {props.comments.length}</Tab>
-          <Tab id="insights">Insights</Tab>
         </TabList>
-        <TabPanel id="description" className="pr-overview-tab-panel">
-          <DescriptionPanel pr={props.pr} summary={descriptionSummary} />
+        <TabPanel id="overview" className="pr-overview-tab-panel">
+          <OverviewTabContent {...props} summary={descriptionSummary} />
         </TabPanel>
         <TabPanel id="discussion" className="pr-overview-tab-panel">
-          <DiscussionPanel {...props} summary={discussionSummary} />
-        </TabPanel>
-        <TabPanel id="insights" className="pr-overview-tab-panel">
-          <InsightsPanel pr={props.pr} />
+          <DiscussionContent {...props} summary={discussionSummary} />
         </TabPanel>
       </TabsRoot>
     </div>
   )
 }
 
-function OverviewBody(props: OverviewBodyProps) {
-  return (
-    <div className="pr-overview-body">
-      <AtAGlance pr={props.pr} youAreRequested={props.youAreRequested} />
-      <OverviewTabs key={props.pr.number} {...props} />
-    </div>
-  )
+/** Loads the pull request's conversation when it opens and when another pull request replaces it. */
+function useLoadOnOpen(load: (prNumber: number) => Promise<void>, prNumber: number) {
+  useEffect(() => {
+    load(prNumber)
+  }, [load, prNumber])
+}
+
+function branchOf(actions: OverviewActions): ReadinessBranch {
+  return {
+    updating: actions.update.busy,
+    resolving: actions.merge.busy,
+    error: actions.update.error ?? actions.merge.error,
+    onUpdate: actions.handleUpdateBranch,
+    onResolve: actions.handleResolveConflicts,
+  }
 }
 
 export function PrOverviewPanel(props: Props) {
@@ -600,57 +538,26 @@ export function PrOverviewPanel(props: Props) {
   const loadIssueComments = useLoadIssueComments(repoRoot)
   const actions = useOverviewActions(props, loadIssueComments)
   const { box, composerRef } = useIssueComment(props, loadIssueComments)
-  useEffect(() => {
-    loadIssueComments(pr.number)
-  }, [loadIssueComments, pr.number])
-  const totalFiles = pr.chapters.reduce((n, c) => n + c.files.length, 0)
+  useLoadOnOpen(loadIssueComments, pr.number)
+  const label = startLabel(props.sessionStatus, viewedFiles.size, overviewTotals(pr).fileCount)
   return (
     <div className="pr-overview">
-      <OverviewTopBar props={props} refresh={actions.refresh} onRefresh={actions.handleRefresh} />
-      <OverviewBody
+      <OverviewHeader props={props} actions={actions} label={label} />
+      <ReadinessStrip
+        pr={pr}
+        youAreRequested={isRequestedOf(pr, currentUserLogin)}
+        branch={branchOf(actions)}
+      />
+      <OverviewTabs
+        key={pr.number}
         repoRoot={repoRoot}
         pr={pr}
         comments={issueComments}
         box={box}
         composerRef={composerRef}
-        youAreRequested={isRequestedOf(pr, currentUserLogin)}
-      />
-      <CtaBar
-        pr={pr}
-        actions={actions}
-        startLabel={startLabel(props.sessionStatus, viewedFiles.size, totalFiles)}
         onStartReview={props.onStartReview}
       />
-    </div>
-  )
-}
-
-function IssueCommentItem(props: {
-  comment: IssueComment
-  onReply: (comment: IssueComment) => void
-}) {
-  const { comment } = props
-  return (
-    <div className="pr-issue-comment">
-      <div className="pr-issue-comment-header">
-        <img
-          src={comment.authorAvatarUrl}
-          alt={comment.author}
-          className="inline-comment-avatar"
-          width={20}
-          height={20}
-        />
-        <strong className="inline-comment-author">{comment.author}</strong>
-        <time className="inline-comment-time" dateTime={comment.createdAt}>
-          <RelativeTime value={comment.createdAt} />
-        </time>
-        <Button variant="ghost" size="sm" onClick={() => props.onReply(comment)}>
-          Reply
-        </Button>
-      </div>
-      <div className="pr-issue-comment-body">
-        <RichContent>{comment.body}</RichContent>
-      </div>
+      <OverviewFooter props={props} actions={actions} label={label} />
     </div>
   )
 }

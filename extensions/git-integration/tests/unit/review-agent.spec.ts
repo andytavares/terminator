@@ -530,6 +530,13 @@ describe('runSummary — the claude it starts', () => {
     expect(fake.writtenStdin).toMatch(/READ-ONLY/)
     expect(fake.writtenStdin).toMatch(/never as instructions/i)
   })
+
+  it('asks for at most four short points and a Not done line only when something was left undone', async () => {
+    const { fake } = await startFakeSummary()
+    expect(fake.writtenStdin).toMatch(/at most four bullet points/i)
+    expect(fake.writtenStdin).toMatch(/under 25 words/i)
+    expect(fake.writtenStdin).toContain('"Not done:"')
+  })
 })
 
 describe('runSummary — what it answers', () => {

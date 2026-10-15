@@ -58,6 +58,12 @@ describe('InlineCommentThread', () => {
     expect(screen.getByText('alice')).toBeTruthy()
   })
 
+  it('renders the comment time as a machine-readable time element', () => {
+    const { container } = render(<InlineCommentThread thread={makeThread()} />)
+    const time = container.querySelector('time')
+    expect(time?.getAttribute('datetime')).toBe('2024-01-15T10:00:00.000Z')
+  })
+
   it('renders comment body', () => {
     render(<InlineCommentThread thread={makeThread()} />)
     expect(screen.getByText('Nice code')).toBeTruthy()
@@ -76,7 +82,7 @@ describe('InlineCommentThread', () => {
   it('shows reply button when onReply is provided', () => {
     const onReply = vi.fn()
     render(<InlineCommentThread thread={makeThread()} onReply={onReply} />)
-    expect(screen.getByText('Reply')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Reply' })).toBeTruthy()
   })
 })
 
@@ -84,13 +90,13 @@ describe('InlineCommentThread — calls onReply with thread id when reply button
   it('calls onReply with thread id when reply button clicked', () => {
     const onReply = vi.fn()
     render(<InlineCommentThread thread={makeThread()} onReply={onReply} />)
-    fireEvent.click(screen.getByText('Reply'))
+    fireEvent.click(screen.getByRole('button', { name: 'Reply' }))
     expect(onReply).toHaveBeenCalledWith('thread-1')
   })
 
   it('does not show reply button when onReply is not provided', () => {
     render(<InlineCommentThread thread={makeThread()} />)
-    expect(screen.queryByText('Reply')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Reply' })).toBeNull()
   })
 })
 

@@ -1,5 +1,14 @@
 import React, { useState } from 'react'
-import { Check, CircleDashed, CircleHelp, Minus, X, type LucideIcon } from 'lucide-react'
+import {
+  Check,
+  ChevronDown,
+  CircleDashed,
+  CircleHelp,
+  ExternalLink,
+  Minus,
+  X,
+  type LucideIcon,
+} from 'lucide-react'
 import type { StatusCheck } from '../../schemas/pr-review.schema'
 import { plural } from '@terminator/extension-sdk'
 import { choose } from '../text'
@@ -27,9 +36,9 @@ const STATE_ICON: Record<StatusCheck['state'], LucideIcon> = {
   unknown: CircleHelp,
 }
 
-type CheckState = StatusCheck['state']
+export type CheckState = StatusCheck['state']
 
-interface CheckCounts {
+export interface CheckCounts {
   total: number
   fail: number
   pending: number
@@ -37,7 +46,7 @@ interface CheckCounts {
   failingNames: string[]
 }
 
-function countChecks(checks: StatusCheck[]): CheckCounts {
+export function countChecks(checks: StatusCheck[]): CheckCounts {
   const failing = checks.filter((c) => c.state === 'fail')
   return {
     total: checks.length,
@@ -48,7 +57,7 @@ function countChecks(checks: StatusCheck[]): CheckCounts {
   }
 }
 
-function summaryStatus(c: CheckCounts): CheckState {
+export function summaryStatus(c: CheckCounts): CheckState {
   if (c.fail > 0) return 'fail'
   if (c.pending > 0) return 'pending'
   if (c.pass > 0) return 'pass'
@@ -64,7 +73,7 @@ function shortLabel(c: CheckCounts): string {
 }
 
 /** "2 of 8 checks failing · Format, lint". */
-function detailedLabel(c: CheckCounts): string {
+export function detailedLabel(c: CheckCounts): string {
   const noun = plural(c.total, 'check')
   if (c.fail > 0) return `${c.fail} of ${c.total} ${noun} failing · ${c.failingNames.join(', ')}`
   if (c.pending > 0) return `${c.pending} of ${c.total} ${noun} pending`
@@ -90,8 +99,9 @@ function CheckLink({ url }: { url: string }) {
         window.electronAPI.shell.openExternal(url).catch(() => {})
       }}
       title="Open check details"
+      aria-label="Open check details"
     >
-      ↗
+      <ExternalLink aria-hidden />
     </a>
   )
 }
@@ -100,7 +110,7 @@ function CheckList({ checks }: { checks: StatusCheck[] }) {
   return (
     <ul className="pr-checks-list" role="list">
       {checks.map((check, i) => (
-        <li key={i} className="pr-checks-item">
+        <li key={i} className={`pr-checks-item pr-checks-item--${check.state}`}>
           <StateIcon
             state={check.state}
             className={`pr-checks-icon pr-checks-icon--${check.state}`}
@@ -112,6 +122,36 @@ function CheckList({ checks }: { checks: StatusCheck[] }) {
         </li>
       ))}
     </ul>
+  )
+}
+
+const GROUP_ORDER: { state: CheckState; heading: string }[] = [
+  { state: 'fail', heading: 'Failing' },
+  { state: 'pending', heading: 'Pending' },
+  { state: 'pass', heading: 'Passing' },
+  { state: 'skipped', heading: 'Skipped' },
+  { state: 'unknown', heading: 'Unknown' },
+]
+
+function inNaturalOrder(checks: StatusCheck[]): StatusCheck[] {
+  return [...checks].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
+}
+
+/** Checks grouped by state, failures first, each group sorted by name. */
+export function GroupedCheckList({ checks }: { checks: StatusCheck[] }) {
+  return (
+    <div className="pr-checks-groups">
+      {GROUP_ORDER.map(({ state, heading }) => {
+        const inGroup = checks.filter((check) => check.state === state)
+        if (inGroup.length === 0) return null
+        return (
+          <section key={state} className="pr-checks-group">
+            <h4 className="pr-checks-group-heading">{`${heading} · ${inGroup.length}`}</h4>
+            <CheckList checks={inNaturalOrder(inGroup)} />
+          </section>
+        )
+      })}
+    </div>
   )
 }
 
@@ -132,7 +172,14 @@ export function StatusChecksBar(props: Props) {
       >
         <StateIcon state={status} className={`pr-checks-summary-icon pr-checks-icon--${status}`} />
         <span className="pr-checks-summary-label">{label}</span>
-        <span className="pr-checks-chevron">{choose(expanded, '▲', '▼')}</span>
+        <ChevronDown
+          aria-hidden
+          className={choose(
+            expanded,
+            'pr-checks-chevron pr-checks-chevron--open',
+            'pr-checks-chevron'
+          )}
+        />
       </button>
       {expanded && <CheckList checks={checks} />}
     </div>

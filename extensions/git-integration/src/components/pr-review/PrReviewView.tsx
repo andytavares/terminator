@@ -12,7 +12,7 @@ import { AgentPanel } from './AgentPanel'
 import { SinceBanner } from './SinceBanner'
 import { ResumeCard } from './ResumeCard'
 import { KeyboardHelp } from './KeyboardHelp'
-import { ReviewHeader } from './ReviewHeader'
+import { ReviewHeader, type ChapterProgress } from './ReviewHeader'
 import { ReviewFooter } from './ReviewFooter'
 import { ReviewInspector, type InspectorTab } from './ReviewInspector'
 import { useLoadInlineComments } from '../../hooks/usePrReview'
@@ -22,9 +22,10 @@ import { QUEUE_RISK_HIGH_LINES } from '../../github/pr-review-service'
 import { useResizePanel } from '../../hooks/useResizePanel'
 import type { PrReviewDetail, PrChangedFile, Chapter } from '../../schemas/pr-review.schema'
 import type { AgentRun, AgentScope } from '../../schemas/review-agent.schema'
-import { orderedFiles as orderedFilesOf } from './file-rows'
+import { orderedFiles as orderedFilesOf, startAtChapter } from './file-rows'
 import { choose } from '../text'
 import './review-chrome.css'
+import './review-layout.css'
 
 /** S1 banner info, computed by PrReviewTab from a prCompare against the stored session's head. */
 export interface SinceInfo {
@@ -170,22 +171,12 @@ function openFindingCount(run: AgentRun | undefined): number {
   return run.findings.filter((f) => !f.dismissed).length
 }
 
-/** How many duplicated blocks touch the file; unknown when the PR has no duplication data. */
-function dryCountFor(pr: PrReviewDetail, file: PrChangedFile | null): number | undefined {
-  if (!file || !pr.dryViolations?.length) return undefined
-  return pr.dryViolations.filter((v) => v.files.includes(file.path)).length
-}
-
-function inspectorFile(pr: PrReviewDetail, repoRoot: string, file: PrChangedFile | null) {
+function inspectorFile(repoRoot: string, file: PrChangedFile | null) {
   if (!file) return null
   return {
     path: file.path,
     riskScore: file.riskScore,
     repoRoot,
-    ciStatus: pr.ciStatus,
-    lintStatus: pr.lintStatus,
-    coverageStatus: pr.coverageStatus,
-    dryViolationCount: dryCountFor(pr, file),
   }
 }
 
@@ -248,8 +239,7 @@ function useInspectorTab(agentPanelScope: AgentScope | null) {
 
 function useLayout() {
   const left = useResizePanel(240, { min: 120, max: 500 }, 1)
-  const right = useResizePanel(280, { min: 160, max: 600 }, -1)
-  return { left, right }
+  return { left }
 }
 
 /** The PR as displayed and the reader's position in it. */
@@ -303,13 +293,7 @@ function goToFile(r: ReviewState, target: FileEntry): void {
 }
 
 function selectChapterIn(r: ReviewState, id: string): void {
-  r.store.setCurrentChapter(id)
-  const chapter = r.displayPr.chapters.find((c) => c.id === id)
-  if (chapter) {
-    r.store.setCurrentFile(
-      orderedFilesOf(chapter, r.store.fileOrderOverrides[chapter.id])[0]?.path ?? null
-    )
-  }
+  startAtChapter(r.store, r.displayPr.chapters, id)
 }
 
 function stepChapter(r: ReviewState, delta: 1 | -1): void {
@@ -417,6 +401,49 @@ function totalFilesOf(displayPr: PrReviewDetail): number {
   return displayPr.chapters.flatMap((c) => c.files).length
 }
 
+function chapterProgressOf(displayPr: PrReviewDetail, viewed: Set<string>): ChapterProgress[] {
+  return displayPr.chapters.map((c) => ({
+    id: c.id,
+    fileCount: c.files.length,
+    viewedCount: c.files.filter((f) => viewed.has(f.path)).length,
+  }))
+}
+
+/** Reading time still ahead: the estimate of every displayed file not yet viewed. */
+function minutesLeftOf(displayPr: PrReviewDetail, viewed: Set<string>): number {
+  return displayPr.chapters
+    .flatMap((c) => c.files)
+    .filter((f) => !viewed.has(f.path))
+    .reduce((sum, f) => sum + f.estimatedMinutes, 0)
+}
+
+function baseName(path: string | undefined): string | null {
+  return path?.split('/').pop() ?? null
+}
+
+/** The base names of the files either side of the open one, in review order across chapters. */
+function neighbourNames(r: ReviewState) {
+  const all = reviewSequence(r.displayPr, r.store.fileOrderOverrides)
+  const { activeChapterId, activeFile } = r.position
+  const at = all.findIndex((e) => e.chapterId === activeChapterId && e.path === activeFile?.path)
+  if (at < 0) return { previousFileName: null, nextFileName: null }
+  return {
+    previousFileName: baseName(all[at - 1]?.path),
+    nextFileName: baseName(all[at + 1]?.path),
+  }
+}
+
+function progressOf(r: ReviewState) {
+  const { displayPr, store } = r
+  return {
+    viewedCount: reviewedCount(r),
+    totalFiles: totalFilesOf(displayPr),
+    chapters: chapterProgressOf(displayPr, store.viewedFiles),
+    minutesLeft: minutesLeftOf(displayPr, store.viewedFiles),
+    draftCount: store.drafts.length,
+  }
+}
+
 function Header({ r, h }: { r: ReviewState; h: Handlers }) {
   const { pr } = r.props
   const { view, ui } = r
@@ -426,9 +453,9 @@ function Header({ r, h }: { r: ReviewState; h: Handlers }) {
       title={pr.title}
       isDraft={!!pr.isDraft}
       checks={pr.statusChecks ?? []}
-      viewedCount={reviewedCount(r)}
-      totalFiles={totalFilesOf(r.displayPr)}
-      estimatedMinutes={r.displayPr.chapters.reduce((n, c) => n + c.estimatedMinutes, 0)}
+      {...progressOf(r)}
+      onSubmit={() => view.setShowSubmit(true)}
+      onPause={h.pause}
       largePr={largePrInfo(pr, view.largePrDismissed)}
       onDismissLargePr={() => view.setLargePrDismissed(true)}
       focusMode={view.focusMode}
@@ -499,7 +526,10 @@ function LeftPanel({ r, h }: { r: ReviewState; h: Handlers }) {
   const { activeChapter } = r.position
   const guided = r.view.viewMode === 'guided' && activeChapter
   return (
-    <aside className="pr-review-panel pr-review-panel--left" style={{ width: r.layout.left.size }}>
+    <aside
+      className="pr-review-panel pr-review-panel--left"
+      style={{ '--pr-left-width': `${r.layout.left.size}px` } as React.CSSProperties}
+    >
       <ListHeader r={r} />
       {guided && <GuidedList r={r} h={h} chapter={activeChapter} />}
       {!guided && (
@@ -567,14 +597,12 @@ function CentrePane({ r, h }: { r: ReviewState; h: Handlers }) {
       <DiffArea r={r} h={h} />
       {view.showResume && <Resume r={r} />}
       <ReviewFooter
-        drafts={r.store.drafts}
+        {...neighbourNames(r)}
         isLastFile={position.resolvedIndex === position.orderedFiles.length - 1}
         isLastChapter={position.activeChapterIndex === r.displayPr.chapters.length - 1}
-        onPause={h.pause}
         onPrevFile={h.prevFile}
         onMarkViewed={h.markViewed}
         onFinishChapter={h.finishChapter}
-        onOpenSubmit={() => view.setShowSubmit(true)}
         onOpenShortcuts={() => r.ui.setKeyboardHelpOpen(true)}
       />
     </main>
@@ -590,23 +618,17 @@ function InspectorPane({ r }: { r: ReviewState }) {
     r.view.setShowRiskFor(null)
   }
   return (
-    <>
-      <div className="pr-resize-handle" onMouseDown={r.layout.right.handleMouseDown} />
-      <aside
-        className="pr-review-panel pr-review-panel--right"
-        style={{ width: r.layout.right.size }}
-      >
-        <ReviewInspector
-          tab={r.inspector.inspectorTab}
-          onTabChange={r.inspector.setInspectorTab}
-          onClose={closeAgentPanel}
-          agentAvailable={!!ui.agentPanelScope}
-          agentFindingCount={openFindingCount(run)}
-          agent={<AgentPanel repoRoot={repoRoot} pr={pr} />}
-          file={inspectorFile(pr, repoRoot, r.position.activeFile)}
-        />
-      </aside>
-    </>
+    <aside className="ri-drawer">
+      <ReviewInspector
+        tab={r.inspector.inspectorTab}
+        onTabChange={r.inspector.setInspectorTab}
+        onClose={closeAgentPanel}
+        agentAvailable={!!ui.agentPanelScope}
+        agentFindingCount={openFindingCount(run)}
+        agent={<AgentPanel repoRoot={repoRoot} pr={pr} />}
+        file={inspectorFile(repoRoot, r.position.activeFile)}
+      />
+    </aside>
   )
 }
 
@@ -641,6 +663,8 @@ function SubmitDialog({ r }: { r: ReviewState }) {
         prNumber={pr.number}
         headSHA={pr.headSHA}
         isOwnPr={!!currentUserLogin && currentUserLogin === pr.author}
+        viewedCount={reviewedCount(r)}
+        totalFiles={totalFilesOf(r.displayPr)}
         onClose={closeSubmit}
         onApproved={onApproved}
       />

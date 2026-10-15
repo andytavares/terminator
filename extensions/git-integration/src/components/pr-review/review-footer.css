@@ -21,8 +21,16 @@
   display: none;
 }
 
-/* The buttons never wrap; the shortcuts hint gives way first, then the long label. */
-@container (max-width: 520px) {
+.rf-name {
+  display: inline-block;
+  max-width: 24ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+}
+
+/* Under 640px the primary shortens to "Next" and the previous file keeps only its arrow (its name stays in `.pr-visually-hidden`). */
+@container (max-width: 640px) {
   .rf-long {
     display: none;
   }
@@ -30,7 +38,12 @@
   .rf-short {
     display: inline;
   }
+
+  .rf-collapsible {
+    display: none;
+  }
 }
+
 .rf-sp {
   flex: 1;
 }

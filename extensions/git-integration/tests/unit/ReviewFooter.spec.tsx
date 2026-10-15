@@ -3,75 +3,66 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ReviewFooter } from '../../src/components/pr-review/ReviewFooter'
-import type { DraftComment } from '../../src/schemas/pr-review.schema'
-
-function makeDraft(overrides: Partial<DraftComment> = {}): DraftComment {
-  return {
-    id: 'd1',
-    path: 'src/foo.ts',
-    line: 10,
-    startLine: null,
-    side: 'RIGHT',
-    body: 'fix this',
-    fromFindingId: null,
-    ...overrides,
-  }
-}
 
 function renderFooter(props: Partial<React.ComponentProps<typeof ReviewFooter>> = {}) {
   const handlers = {
-    onPause: vi.fn(),
     onPrevFile: vi.fn(),
     onMarkViewed: vi.fn(),
     onFinishChapter: vi.fn(),
-    onOpenSubmit: vi.fn(),
     onOpenShortcuts: vi.fn(),
   }
   render(
-    <ReviewFooter drafts={[]} isLastFile={false} isLastChapter={false} {...handlers} {...props} />
+    <ReviewFooter
+      previousFileName="store.py"
+      nextFileName="api.py"
+      isLastFile={false}
+      isLastChapter={false}
+      {...handlers}
+      {...props}
+    />
   )
   return handlers
 }
 
-describe('ReviewFooter', () => {
-  it('fires onPause when Pause review is clicked', async () => {
+describe('ReviewFooter — previous file', () => {
+  it('names the previous file and goes back to it', async () => {
     const handlers = renderFooter()
-    await userEvent.click(screen.getByRole('button', { name: 'Pause review' }))
-    expect(handlers.onPause).toHaveBeenCalledTimes(1)
-  })
-
-  it('fires onPrevFile from the Previous file button', async () => {
-    const handlers = renderFooter()
-    await userEvent.click(screen.getByRole('button', { name: 'Previous file' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Previous file: store.py' }))
     expect(handlers.onPrevFile).toHaveBeenCalledTimes(1)
   })
 
-  it('fires onMarkViewed from "Mark viewed, next file" when not on the last file', async () => {
-    const handlers = renderFooter({ isLastFile: false })
-    await userEvent.click(screen.getByRole('button', { name: 'Mark viewed, next file' }))
+  it('is disabled on the first file', () => {
+    renderFooter({ previousFileName: null })
+    const previous = screen.getByRole('button', { name: /^Previous file/ })
+    expect(previous.hasAttribute('disabled')).toBe(true)
+  })
+})
+
+describe('ReviewFooter — forward action', () => {
+  it('names the next file and marks the open one viewed', async () => {
+    const handlers = renderFooter()
+    await userEvent.click(screen.getByRole('button', { name: /^Viewed, next: api.py/ }))
     expect(handlers.onMarkViewed).toHaveBeenCalledTimes(1)
   })
 
-  it('fires onFinishChapter with "Finish chapter" label when last file but not last chapter', async () => {
-    const handlers = renderFooter({ isLastFile: true, isLastChapter: false })
-    await userEvent.click(screen.getByRole('button', { name: 'Finish chapter ↵' }))
+  it('says "next chapter" on the last file of a chapter', async () => {
+    const handlers = renderFooter({ isLastFile: true, nextFileName: 'models.py' })
+    await userEvent.click(screen.getByRole('button', { name: /^Viewed, next chapter/ }))
+    expect(handlers.onFinishChapter).toHaveBeenCalledTimes(1)
+  })
+
+  it('says "submit review" on the last file overall and finishes, which opens the submit panel', async () => {
+    const handlers = renderFooter({ isLastFile: true, isLastChapter: true, nextFileName: null })
+    await userEvent.click(screen.getByRole('button', { name: /^Viewed, submit review/ }))
     expect(handlers.onFinishChapter).toHaveBeenCalledTimes(1)
   })
 })
 
-describe('ReviewFooter — labels the primary action Submit review… on the last file of the last chapter and finishes', () => {
-  it('labels the primary action "Submit review…" on the last file of the last chapter and finishes', async () => {
-    const handlers = renderFooter({ isLastFile: true, isLastChapter: true })
-    await userEvent.click(screen.getByRole('button', { name: 'Submit review…' }))
-    expect(handlers.onFinishChapter).toHaveBeenCalledTimes(1)
-    expect(handlers.onOpenSubmit).not.toHaveBeenCalled()
-    expect(screen.getByText('⌘↵')).toBeTruthy()
-  })
-
+describe('ReviewFooter — one primary action', () => {
   it.each([
-    [false, false, 'Mark viewed, next file'],
-    [true, true, 'Submit review…'],
-    [true, false, 'Finish chapter ↵'],
+    [false, false, /^Viewed, next: api.py/],
+    [true, false, /^Viewed, next chapter/],
+    [true, true, /^Viewed, submit review/],
   ])(
     'renders exactly one primary button (last file %s, last chapter %s)',
     (isLastFile, isLastChapter, name) => {
@@ -81,70 +72,40 @@ describe('ReviewFooter — labels the primary action Submit review… on the las
       expect(screen.getByRole('button', { name })).toBe(primary[0])
     }
   )
+})
 
-  it('has no separate "Submit review" button mid-review', () => {
-    renderFooter({ isLastFile: false })
-    expect(screen.queryByRole('button', { name: /^Submit review/ })).toBeNull()
+describe('ReviewFooter — narrow width', () => {
+  it('keeps the short label readable to assistive technology, since the long one is display:none there', () => {
+    renderFooter()
+    const short = document.querySelector('.rf-short')
+    expect(short?.hasAttribute('aria-hidden')).toBe(false)
+    expect(screen.getByRole('button', { name: /Next/ })).toBeTruthy()
+  })
+
+  it('reads "Viewed, next file" without an empty name when the open file is outside the sequence', () => {
+    renderFooter({ nextFileName: null })
+    expect(screen.getByRole('button', { name: /^Viewed, next file/ })).toBeTruthy()
   })
 })
 
-describe('ReviewFooter — opens the keyboard help from the ? Shortcuts hint', () => {
+describe('ReviewFooter — hints', () => {
+  it('shows the Enter hint on the forward action', () => {
+    renderFooter()
+    expect(screen.getByRole('button', { name: /^Viewed, next/ }).textContent).toContain('↵')
+  })
+})
+
+describe('ReviewFooter — what it no longer holds', () => {
+  it('has no Pause review or drafts button, both moved to the header', () => {
+    renderFooter()
+    expect(screen.queryByRole('button', { name: 'Pause review' })).toBeNull()
+    expect(screen.queryByRole('button', { name: /drafts? on/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /^Submit review/ })).toBeNull()
+  })
+
   it('opens the keyboard help from the "? Shortcuts" hint', async () => {
     const handlers = renderFooter()
     await userEvent.click(screen.getByRole('button', { name: /Shortcuts/ }))
     expect(handlers.onOpenShortcuts).toHaveBeenCalledTimes(1)
-    expect(screen.queryByText('all keys')).toBeNull()
-  })
-
-  it('hides the shortcuts hint when there are drafts', () => {
-    renderFooter({ drafts: [makeDraft()] })
-    expect(screen.queryByRole('button', { name: /Shortcuts/ })).toBeNull()
-  })
-
-  it('shows singular draft/file label for one draft on one file', () => {
-    renderFooter({ drafts: [makeDraft({ path: 'src/foo.ts' })] })
-    expect(screen.getByRole('button', { name: '1 draft on 1 file' })).toBeTruthy()
-  })
-})
-
-describe('ReviewFooter — shows plural draft/file label and counts distinct files with duplicates', () => {
-  it('shows plural draft/file label and counts distinct files with duplicates', () => {
-    renderFooter({
-      drafts: [
-        makeDraft({ id: 'd1', path: 'src/foo.ts' }),
-        makeDraft({ id: 'd2', path: 'src/foo.ts' }),
-        makeDraft({ id: 'd3', path: 'src/bar.ts' }),
-      ],
-    })
-    expect(screen.getByRole('button', { name: '3 drafts on 2 files' })).toBeTruthy()
-  })
-
-  it('appends the agent-finding suffix only when drafts have a fromFindingId', () => {
-    renderFooter({
-      drafts: [
-        makeDraft({ id: 'd1', path: 'src/foo.ts', fromFindingId: 'f1' }),
-        makeDraft({ id: 'd2', path: 'src/bar.ts', fromFindingId: null }),
-      ],
-    })
-    expect(
-      screen.getByRole('button', { name: '2 drafts on 2 files · 1 from an agent finding' })
-    ).toBeTruthy()
-  })
-})
-
-describe('ReviewFooter — omits the agent-finding suffix when no drafts came from a finding', () => {
-  it('omits the agent-finding suffix when no drafts came from a finding', () => {
-    renderFooter({
-      drafts: [makeDraft({ id: 'd1', path: 'src/foo.ts', fromFindingId: null })],
-    })
-    expect(screen.getByRole('button', { name: '1 draft on 1 file' })).toBeTruthy()
-  })
-
-  it('opens the submit panel when the drafts summary button is clicked', async () => {
-    const handlers = renderFooter({
-      drafts: [makeDraft({ id: 'd1', path: 'src/foo.ts' })],
-    })
-    await userEvent.click(screen.getByRole('button', { name: '1 draft on 1 file' }))
-    expect(handlers.onOpenSubmit).toHaveBeenCalledTimes(1)
   })
 })

@@ -1,0 +1,176 @@
+/* Each unified entry is its own table; fixed columns keep them aligned. */
+.diff-table--row {
+  table-layout: fixed;
+}
+.diff-col--prefix {
+  width: 16px;
+}
+
+.diff-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.diff-table--review {
+  font-family: var(--tm-font-mono);
+  font-size: 12.5px;
+}
+
+/* Split view */
+.diff-split-header {
+  background: var(--tm-bg-surface);
+  color: var(--tm-text-muted);
+  padding: 4px 10px;
+  font-size: 12px;
+  font-family: var(--tm-font-ui);
+}
+.diff-table--split {
+  flex: 0 1 auto;
+  min-width: 0;
+  table-layout: fixed;
+  font-family: var(--tm-font-mono);
+  font-size: 12.5px;
+  border-collapse: collapse;
+}
+
+/* Hunk row: names the enclosing symbol in the UI face; the ranges stay out of it. */
+.diff-hunk-header {
+  background: var(--tm-bg-surface);
+  border-block: 1px solid var(--tm-border);
+  color: var(--tm-text-muted);
+  padding: 4px 8px;
+  font-family: var(--tm-font-ui);
+  font-size: 12px;
+}
+.diff-hunk-header code {
+  font-family: var(--tm-font-mono);
+  font-size: 11.5px;
+  background: none;
+  padding: 0;
+  color: var(--tm-text-primary);
+}
+
+.diff-line {
+  height: 20px;
+  line-height: 20px;
+}
+.diff-line--add {
+  background: var(--tm-diff-added-bg);
+}
+.diff-line--remove {
+  background: var(--tm-diff-removed-bg);
+}
+.diff-line--selecting,
+.diff-line--selecting td {
+  background: color-mix(in srgb, var(--tm-accent) 18%, transparent) !important;
+}
+.diff-line--selecting .diff-gutter-btn {
+  opacity: 1;
+}
+
+.diff-word--add {
+  background: var(--tm-diff-added-word-bg);
+  border-radius: 2px;
+}
+.diff-word--remove {
+  background: var(--tm-diff-removed-word-bg);
+  border-radius: 2px;
+}
+
+.diff-line__old-num,
+.diff-line__new-num {
+  width: 1%;
+  white-space: nowrap;
+  text-align: right;
+  padding: 0 8px 0 0;
+  color: var(--tm-text-muted);
+  user-select: none;
+  vertical-align: top;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.diff-line__num-gutter {
+  position: relative;
+  cursor: pointer;
+}
+
+.diff-table--review .rs-gut--none {
+  padding: 0;
+  min-width: 0;
+}
+
+.diff-line__prefix {
+  width: 16px;
+  min-width: 16px;
+  padding: 0;
+  text-align: center;
+  color: var(--tm-text-muted);
+  user-select: none;
+  vertical-align: top;
+}
+.diff-line--add .diff-line__prefix {
+  color: var(--tm-success);
+}
+.diff-line--remove .diff-line__prefix {
+  color: var(--tm-danger);
+}
+
+.diff-line__content {
+  padding: 0 20px 0 0;
+  width: 100%;
+  min-width: 200px;
+  vertical-align: top;
+}
+.diff-line__content pre {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  font-family: inherit;
+  font-size: inherit;
+  color: var(--tm-text-primary);
+}
+
+/* The add-comment button is drawn over the number cell on row hover. */
+.diff-gutter-btn {
+  position: absolute;
+  left: 4px;
+  top: 2px;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--tm-accent);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--tm-on-accent);
+  opacity: 0;
+  transition: opacity 0.1s;
+  padding: 0;
+}
+.diff-gutter-btn svg {
+  width: 12px;
+  height: 12px;
+}
+.diff-line:hover .diff-gutter-btn {
+  opacity: 1;
+}
+.diff-line--commented td:first-child {
+  position: relative;
+}
+.diff-line--commented td:first-child::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: color-mix(in srgb, var(--tm-accent) 80%, transparent);
+  pointer-events: none;
+  z-index: var(--tm-layer-panel);
+}
+
+.diff-gap-count {
+  margin-right: 6px;
+  font-family: var(--tm-font-ui);
+}
