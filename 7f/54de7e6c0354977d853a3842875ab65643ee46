@@ -1,0 +1,25 @@
+extensions/git-integration/src/components/pr-review/StatusChecksBar.tsx
+  s_e708cca5bdf352::t_5cd58f125ab3a7 2-11,102,104,113,128-157,175-176,182
+  s_e708cca5bdf352::t_af1698d5c28d57 177-181
+extensions/git-integration/tests/unit/StatusChecksBar.spec.tsx
+  s_e708cca5bdf352::t_c6e0db3a1996be 4,153-187
+  s_e708cca5bdf352::t_58a167bbacb187 188
+extensions/git-integration/src/components/pr-review/pr-review.css
+  s_e708cca5bdf352::t_5cd58f125ab3a7 239-240,243-259,316,1904
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "7f54de7e6c0354977d853a3842875ab65643ee46",
+  "prompts": {},
+  "sessions": {
+    "s_e708cca5bdf352": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5d7c9815-e79e-402d-b85d-cf8028e700ad",
+        "model": "unknown"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
