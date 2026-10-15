@@ -1,0 +1,20 @@
+tests/e2e/git-status-watch.spec.ts
+  s_6a258b7ed88259::t_c2266997d870c6 50-55
+  s_6a258b7ed88259::t_3ecf1284b0bec6 63
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "5e8e864c8fc7156b46c183efa703aa9fad843021",
+  "prompts": {},
+  "sessions": {
+    "s_6a258b7ed88259": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e5aab6d9-7637-4d40-a99a-133997956276",
+        "model": "unknown"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
