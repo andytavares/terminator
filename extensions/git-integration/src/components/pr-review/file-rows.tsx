@@ -1,8 +1,10 @@
 import React from 'react'
-import { Check, Dot, Plus } from 'lucide-react'
+import { Circle, CircleCheck, MessageSquare } from 'lucide-react'
 import type { Chapter, PrChangedFile } from '../../schemas/pr-review.schema'
+import { choose, splitPath } from '../text'
+import './file-tree.css'
 
-/** What a file row shows beside its name: viewed, changed since the last look, new, or nothing. */
+/** Whether a file is viewed, changed since the last look, new, or nothing of those. */
 export type RowState = 'viewed' | 'changed' | 'new' | 'default'
 
 /** The files the reviewer has viewed, and those that changed or appeared since they last looked. */
@@ -35,29 +37,62 @@ export function classNames(base: string, flags: Record<string, boolean>): string
   return [base, ...Object.keys(flags).filter((name) => flags[name])].join(' ')
 }
 
-const STATE_ICON = { viewed: Check, changed: Dot, new: Plus } as const
+const STATE_LABEL = { changed: 'changed', new: 'new file' } as const
 
-const STATE_LABEL: Record<Exclude<RowState, 'default'>, string> = {
-  viewed: 'viewed',
-  changed: 'changed',
-  new: 'new file',
-}
-
-/** The row's number, or its state's icon once it has one. */
-export function RowStateMark(props: { state: RowState; num: number; numClass: string }) {
-  const { state } = props
-  if (state === 'default') return <span className={props.numClass}>{props.num}</span>
-  const Icon = STATE_ICON[state]
+/** The row's viewed / unviewed / high-risk glyph; its label is the state for assistive tech. */
+function RowGlyph(props: { isViewed: boolean; isHighRisk: boolean }) {
+  if (props.isViewed) {
+    return (
+      <span className="file-tree-glyph file-tree-glyph--done" role="img" aria-label="Viewed">
+        <CircleCheck aria-hidden="true" />
+      </span>
+    )
+  }
+  const label = choose(props.isHighRisk, 'High risk, not viewed', 'Not viewed')
+  const tone = choose(props.isHighRisk, 'risk', 'todo')
   return (
-    <span className="rc-frow-state">
-      <Icon aria-hidden="true" />
+    <span className={`file-tree-glyph file-tree-glyph--${tone}`} role="img" aria-label={label}>
+      <Circle aria-hidden="true" />
     </span>
   )
 }
 
-export function RowStateLabel({ state }: { state: RowState }) {
-  if (state === 'default') return null
-  return <span className={`rc-frow-sub rc-frow-sub--${state}`}>{STATE_LABEL[state]}</span>
+function RowSinceLabel({ state }: { state: RowState }) {
+  if (state !== 'changed' && state !== 'new') return null
+  return <span className={`file-tree-since file-tree-since--${state}`}>{STATE_LABEL[state]}</span>
+}
+
+interface FileRowContentProps {
+  file: PrChangedFile
+  state: RowState
+  isViewed: boolean
+  threadCount: number
+}
+
+/** What every file row shows: state glyph, name and folder, since-label, comment count, additions. */
+export function FileRowContent(props: FileRowContentProps) {
+  const { file, threadCount } = props
+  const { dir, name } = splitPath(file.path)
+  const isHighRisk = file.riskScore.level === 'high'
+  return (
+    <>
+      <RowGlyph isViewed={props.isViewed} isHighRisk={isHighRisk} />
+      <span className="file-tree-name">
+        <b>{name}</b>
+        {dir && <small>{dir}</small>}
+      </span>
+      <span className="file-tree-end">
+        <RowSinceLabel state={props.state} />
+        {threadCount > 0 && (
+          <span className="file-tree-comments">
+            <MessageSquare aria-hidden="true" />
+            {threadCount}
+          </span>
+        )}
+        <span className="file-tree-add">+{file.additions}</span>
+      </span>
+    </>
+  )
 }
 
 /** "true" for the row being shown, so assistive tech announces it as current. */

@@ -3,32 +3,15 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { ChapterFileList } from '../../src/components/pr-review/ChapterFileList'
 import { usePrReviewStore } from '../../src/stores/pr-review.store'
-import type { Chapter, RiskScore } from '../../src/schemas/pr-review.schema'
+import type { Chapter } from '../../src/schemas/pr-review.schema'
 import { changedFile } from './support/pr-review-file'
+import { makeRiskScore } from './risk-score-fixtures'
 
 vi.mock('../../src/stores/pr-review.store', () => ({
   usePrReviewStore: vi.fn(),
 }))
 
 const mockReorderFiles = vi.fn()
-
-function makeRiskScore(): RiskScore {
-  return {
-    level: 'low',
-    composite: 10,
-    dominantDriver: '',
-    topImporters: [],
-    importerCount: 0,
-    metrics: {
-      changeSize: 5,
-      testFilePresent: true,
-      complexityDelta: 0,
-      churn90d: 1,
-      blastRadius: 1,
-      patchCoverage: 90,
-    },
-  }
-}
 
 function makeChapter(): Chapter {
   return {
@@ -110,7 +93,7 @@ describe('ChapterFileList — marks active file with active class', () => {
       reorderFiles: mockReorderFiles,
     })
     render(<ChapterFileList {...defaultProps} />)
-    expect(screen.getByLabelText('Viewed')).toBeTruthy()
+    expect(screen.getByRole('img', { name: 'Viewed' })).toBeTruthy()
   })
 
   it('shows file additions and deletions', () => {
@@ -118,9 +101,10 @@ describe('ChapterFileList — marks active file with active class', () => {
     expect(screen.getAllByText('+3').length).toBeGreaterThan(0)
   })
 
-  it('shows why-here text', () => {
+  it('does not show why-here text on the row', () => {
     render(<ChapterFileList {...defaultProps} />)
-    expect(screen.getByTitle('Core logic')).toBeTruthy()
+    expect(screen.queryByText('Core logic')).toBeNull()
+    expect(screen.queryByTitle('Core logic')).toBeNull()
   })
 })
 
@@ -135,12 +119,6 @@ describe('ChapterFileList — respects fileOrderOverrides for file order', () =>
     const rows = screen.getAllByRole('button')
     expect(rows[0].textContent).toContain('bar.ts')
     expect(rows[1].textContent).toContain('foo.ts')
-  })
-
-  it('renders row numbers', () => {
-    render(<ChapterFileList {...defaultProps} />)
-    expect(screen.getByText('1')).toBeTruthy()
-    expect(screen.getByText('2')).toBeTruthy()
   })
 })
 
