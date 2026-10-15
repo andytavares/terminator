@@ -111,9 +111,8 @@ async function prepareRun(api: ExtensionAPI, run: OrderRun): Promise<RunTail> {
   }
 }
 
-// The checks that failed on the base branch before the change. A baseline taken
-// on an older base commit says nothing about this one, and a bugfix's failing
-// tests are the bug, not something left for the reader.
+// A baseline on an older base commit says nothing about this one, and a bug
+// fix's failing tests are the bug, not something left for the reader.
 /** @internal */
 export async function failingOnBaseOf(run: {
   root: string

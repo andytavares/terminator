@@ -306,11 +306,7 @@ export async function ensureBaseCheckout(
   return detachedBaseCheckout({ order, lane, suffix: '@base', fresh: false }, deps)
 }
 
-/**
- * The base branch checked out for the shaping-time proof: its own directory,
- * never the line's `@base`, and always new, so a leftover from a crash cannot
- * stand at an older commit.
- */
+/** Never the line's `@base`, and always new: a crash's leftover stands at an older commit. */
 export async function ensureBaselineCheckout(
   order: WorkOrder,
   lane: number,

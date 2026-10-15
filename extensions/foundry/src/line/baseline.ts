@@ -161,7 +161,7 @@ function failedIn(pass: Pass): StepOutcome[] {
   return pass.steps.filter((step) => step.result === 'fail')
 }
 
-async function installFaultIn(pass: Pass): Promise<boolean> {
+async function logsShowBrokenInstall(pass: Pass): Promise<boolean> {
   for (const step of failedIn(pass)) {
     const log = await fs.promises.readFile(pass.logs[step.name] ?? '', 'utf8').catch(() => '')
     if (brokenInstall(log) !== null) return true
@@ -188,7 +188,7 @@ interface Finding {
 async function checkAndMend(proof: Proof, checkout: Checkout): Promise<Finding> {
   const steps = baselineSteps(probeToolchain(checkout.path))
   const first = await runSteps(proof, checkout, steps)
-  if (!(await installFaultIn(first))) return { pass: first, mended: false }
+  if (!(await logsShowBrokenInstall(first))) return { pass: first, mended: false }
   await reinstall(proof, checkout)
   return { pass: await runSteps(proof, checkout, steps), mended: true }
 }
@@ -250,7 +250,7 @@ function isProven(pass: Pass): boolean {
   return failedIn(pass).length === 0 && pass.steps.some((step) => step.result === 'pass')
 }
 
-async function settle(proof: Proof, commit: string | null, found: Finding): Promise<void> {
+async function recordOutcome(proof: Proof, commit: string | null, found: Finding): Promise<void> {
   const state = isProven(found.pass) ? 'proven' : 'failing'
   await writeBaseline(
     proof.deps.root,
@@ -278,7 +278,7 @@ async function proveOnCheckout(proof: Proof, lane: number): Promise<void> {
   const checkout = await ensureBaselineCheckout(proof.order, lane, proof.deps)
   try {
     const commit = await readCommit(proof, checkout)
-    await settle(proof, commit, await checkAndMend(proof, checkout))
+    await recordOutcome(proof, commit, await checkAndMend(proof, checkout))
   } finally {
     await removeBaseCheckout(checkout, proof.deps)
   }
@@ -305,10 +305,7 @@ export function isProving(orderId: string): boolean {
   return inFlight.has(orderId)
 }
 
-/**
- * Prove the base branch builds and passes its checks. Never throws: a failure is
- * recorded. A call while the same order is being proven gets that proof back.
- */
+/** Never throws: a failure is recorded. A second call joins the running proof. */
 export function proveEnvironment(order: WorkOrder, deps: BaselineDeps): Promise<void> {
   const running = inFlight.get(order.id)
   if (running !== undefined) return running
