@@ -4,6 +4,20 @@ extensions/git-integration/src/components/pr-review/inline-comment.css
   s_e708cca5bdf352::t_a615b7a8a4a285 1-79
 extensions/git-integration/tests/unit/InlineCommentThread.spec.tsx
   s_e708cca5bdf352::t_b8e26ab259dbee 61-66,85,93,99
+extensions/git-integration/tests/unit/ChapterFileList.spec.tsx
+  s_e708cca5bdf352::t_52aa9dc4e899c2 6,8,96,104,106-107
+extensions/git-integration/src/components/pr-review/file-rows.tsx
+  s_e708cca5bdf352::t_52aa9dc4e899c2 2,5-6,8,56,58-68,70-71,76-111
+extensions/git-integration/tests/unit/FullFileList.spec.tsx
+  s_e708cca5bdf352::t_52aa9dc4e899c2 3,6,8,66,92,97,102-108,121,123,126-135,170,174-178,192,195,199-231,235,237-244,248-249,263
+extensions/git-integration/tests/unit/risk-score-fixtures.ts
+  s_e708cca5bdf352::t_52aa9dc4e899c2 1-21
+extensions/git-integration/src/components/pr-review/ChapterFileList.tsx
+  s_e708cca5bdf352::t_52aa9dc4e899c2 9,82,92,105,109-114,125,133,140
+extensions/git-integration/src/components/pr-review/FullFileList.tsx
+  s_e708cca5bdf352::t_52aa9dc4e899c2 1,7,25,42,45-48,53,56-57,59,68-73,90,96,101-102,122,126-127,130-131,144
+extensions/git-integration/src/components/pr-review/file-tree.css
+  s_e708cca5bdf352::t_52aa9dc4e899c2 1-166
 ---
 {
   "schema_version": "authorship/3.0.0",
