@@ -94,7 +94,7 @@ function registerEveryCoreHandler(): void {
   registerDialogHandlers(noWindow)
   registerDbIpcHandlers()
   registerEditorHandlers()
-  registerExtensionHandlers(partialFake<ExtensionHost>({}), vi.fn(), () => null)
+  registerExtensionHandlers(partialFake<ExtensionHost>({}), vi.fn())
   registerFsHandlers()
   registerGitHandlers()
   registerIntegrationsHandlers(noWindow)

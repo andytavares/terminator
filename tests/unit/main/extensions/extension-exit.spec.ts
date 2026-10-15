@@ -2,10 +2,9 @@ import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 import {
   routeExtensionExitRequest,
   type ExtensionExitDeps,
+  type ExtensionSurface,
 } from '../../../../src/main/extensions/extension-exit.js'
 import type { Extension } from '../../../../src/shared/types/index.js'
-
-const SENDER = { id: 'sender' } as never
 
 function makeExt(overrides: Partial<Extension> = {}): Extension {
   return {
@@ -21,12 +20,11 @@ function makeExt(overrides: Partial<Extension> = {}): Extension {
 
 let send: Mock<ExtensionExitDeps['send']>
 let focusMainRenderer: Mock<ExtensionExitDeps['focusMainRenderer']>
-let findViewByWebContents: Mock<ExtensionExitDeps['findViewByWebContents']>
 let listExtensions: Mock<ExtensionExitDeps['listExtensions']>
+let surface: ExtensionSurface
 
 function route(): boolean {
-  return routeExtensionExitRequest(SENDER, {
-    findViewByWebContents,
+  return routeExtensionExitRequest(surface, {
     listExtensions,
     focusMainRenderer,
     send,
@@ -37,8 +35,8 @@ function useExitDeps(): void {
   beforeEach(() => {
     send = vi.fn()
     focusMainRenderer = vi.fn()
-    findViewByWebContents = vi.fn(() => ({ extensionId: 'com.test.ext', viewParam: 'main' }))
     listExtensions = vi.fn(() => [makeExt()])
+    surface = { extensionId: 'com.test.ext', viewParam: 'main' }
   })
 }
 
@@ -63,7 +61,7 @@ describe('routeExtensionExitRequest — sidebar views', () => {
   useExitDeps()
 
   it('names the sidebar panel when the request came from a sidebar view', () => {
-    findViewByWebContents.mockReturnValue({ extensionId: 'com.test.ext', viewParam: 'sidebar' })
+    surface = { extensionId: 'com.test.ext', viewParam: 'sidebar' }
     listExtensions.mockReturnValue([
       makeExt({ contributes: { sidebarPanel: { label: 'Git', view: 'sidebar' } } }),
     ])
@@ -77,7 +75,7 @@ describe('routeExtensionExitRequest — sidebar views', () => {
   })
 
   it('treats the default sidebar view name as a sidebar surface', () => {
-    findViewByWebContents.mockReturnValue({ extensionId: 'com.test.ext', viewParam: 'sidebar' })
+    surface = { extensionId: 'com.test.ext', viewParam: 'sidebar' }
     listExtensions.mockReturnValue([makeExt({ contributes: { sidebarPanel: { label: 'Git' } } })])
 
     route()
@@ -89,11 +87,11 @@ describe('routeExtensionExitRequest — sidebar views', () => {
   })
 })
 
-describe('routeExtensionExitRequest — full-screen views and unknown senders', () => {
+describe('routeExtensionExitRequest — full-screen views', () => {
   useExitDeps()
 
   it('does not treat a full-screen view of a panel-owning extension as a sidebar exit', () => {
-    findViewByWebContents.mockReturnValue({ extensionId: 'com.test.ext', viewParam: 'main' })
+    surface = { extensionId: 'com.test.ext', viewParam: 'main' }
     listExtensions.mockReturnValue([
       makeExt({
         contributes: {
@@ -112,16 +110,8 @@ describe('routeExtensionExitRequest — full-screen views and unknown senders', 
   })
 })
 
-describe('routeExtensionExitRequest — unknown senders and removed extensions', () => {
+describe('routeExtensionExitRequest — removed extensions', () => {
   useExitDeps()
-
-  it('ignores a request from webContents that is not an extension view', () => {
-    findViewByWebContents.mockReturnValue(null)
-
-    expect(route()).toBe(false)
-    expect(send).not.toHaveBeenCalled()
-    expect(focusMainRenderer).not.toHaveBeenCalled()
-  })
 
   it('still exits when the extension is no longer installed', () => {
     listExtensions.mockReturnValue([])

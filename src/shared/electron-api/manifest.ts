@@ -38,6 +38,8 @@ import type {
   WorktreeInfo,
 } from '../types/index'
 import type { ChangeStats } from '../schemas/git.schema'
+import type { FramePortRequest } from '../frame-wire'
+import { OPEN_FRAME_PORT_CHANNEL } from '../frame-wire'
 import type {
   ConnectInputSchema,
   DisconnectInputSchema,
@@ -710,45 +712,19 @@ export const ELECTRON_API_MANIFEST = [
   }),
   // Remote stub: WebContentsView positioning is an Electron-only concept.
   method({
-    path: 'extension.updatePanelBounds',
-    kind: 'invoke',
-    channel: 'extension:update-panel-bounds',
-    signature:
-      signature<
-        (payload: {
-          extensionId: string
-          viewParam: string
-          bounds: { x: number; y: number; width: number; height: number }
-          visible: boolean
-          repoRoot?: string | null
-        }) => Promise<void>
-      >(),
-    remote: 'stub',
-  }),
-  method({
-    path: 'extension.setBottomInset',
-    kind: 'send',
-    channel: 'extension:set-bottom-inset',
-    signature: signature<(inset: number) => void>(),
-    toPayload: (inset) => ({ inset }),
-    remote: 'omit',
-  }),
-  method({
-    path: 'extension.setLeftInset',
-    kind: 'send',
-    channel: 'extension:set-left-inset',
-    signature: signature<(inset: number) => void>(),
-    toPayload: (inset) => ({ inset }),
-    remote: 'omit',
-  }),
-  method({
-    // An extension view is its own document and never sees the renderer's
-    // `data-theme`, so the renderer has to tell it.
+    // The theme of the main window, told to every extension frame (they never see its `data-theme`).
     path: 'extension.setTheme',
     kind: 'send',
     channel: 'extension:set-theme',
     signature: signature<(theme: 'dark' | 'light') => void>(),
     toPayload: (theme) => ({ theme }),
+    remote: 'omit',
+  }),
+  method({
+    path: 'extension.openFramePort',
+    kind: 'send',
+    channel: OPEN_FRAME_PORT_CHANNEL,
+    signature: signature<(request: FramePortRequest) => void>(),
     remote: 'omit',
   }),
 
@@ -921,7 +897,6 @@ export const ELECTRON_API_MANIFEST = [
     remote: 'omit',
     extensionView: 'shared',
   }),
-  extensionIdEvent('extensionEvents.onExtensionPanelLoaded', 'extension:panel-loaded'),
   extensionIdEvent('extensionEvents.onExtensionRendererReload', 'extension:renderer-reload'),
   // Emitted when the double-Escape exit gesture fires inside an extension
   // WebContentsView. Native only: remote extension panels are iframes in the

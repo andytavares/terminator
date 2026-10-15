@@ -3,10 +3,13 @@ import type { Extension } from '../../shared/types/index.js'
 /** Fallback used by the renderer loader when a sidebarPanel omits `view`. */
 const DEFAULT_SIDEBAR_VIEW = 'sidebar'
 
+/** The surface an exit request came from. */
+export interface ExtensionSurface {
+  extensionId: string
+  viewParam: string
+}
+
 export interface ExtensionExitDeps {
-  findViewByWebContents(
-    webContents: Electron.WebContents
-  ): { extensionId: string; viewParam: string } | null
   listExtensions(): Extension[]
   focusMainRenderer(): void
   send(channel: 'extension:exit-to-terminal', payload: ExtensionExitPayload): void
@@ -24,25 +27,21 @@ interface ExtensionExitPayload {
 
 /**
  * Attributes an exit request to the extension surface that sent it and asks the
- * main renderer to dismiss it. Returns false when the sender is not a known
- * extension view, in which case nothing happens — an exit request can only come
- * from the core-owned webview preload, but the sender is still untrusted input.
+ * main renderer to dismiss it.
  */
 export function routeExtensionExitRequest(
-  sender: Electron.WebContents,
+  surface: ExtensionSurface,
   deps: ExtensionExitDeps
 ): boolean {
-  const view = deps.findViewByWebContents(sender)
-  if (!view) return false
-
-  const ext = deps.listExtensions().find((e) => e.id === view.extensionId)
+  const ext = deps.listExtensions().find((e) => e.id === surface.extensionId)
   const sidebarPanel = ext?.contributes?.sidebarPanel
-  const isSidebar = !!sidebarPanel && (sidebarPanel.view ?? DEFAULT_SIDEBAR_VIEW) === view.viewParam
+  const isSidebar =
+    !!sidebarPanel && (sidebarPanel.view ?? DEFAULT_SIDEBAR_VIEW) === surface.viewParam
 
   deps.focusMainRenderer()
   deps.send('extension:exit-to-terminal', {
-    extensionId: view.extensionId,
-    sidebarPanelId: isSidebar ? view.extensionId : null,
+    extensionId: surface.extensionId,
+    sidebarPanelId: isSidebar ? surface.extensionId : null,
   })
   return true
 }

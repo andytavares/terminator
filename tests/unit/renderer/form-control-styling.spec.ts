@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { EXTENSION_BASE_CSS } from '../../../src/main/extensions/extension-view-host'
+import { EXTENSION_BASE_CSS } from '../../../packages/extension-ui/src/extension-base-css'
 
 // Every checkbox AND radio in the app must be the themed control, not the OS
 // widget. `accent-color` alone is not enough — it tints the fill and leaves a

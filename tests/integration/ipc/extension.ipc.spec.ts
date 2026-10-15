@@ -39,7 +39,6 @@ vi.mock('electron-store', async () =>
 import { globalRegistry } from '../../../src/main/extensions/api'
 import { registerExtensionHandlers } from '../../../src/main/ipc/extension.ipc'
 import type { ExtensionHost } from '../../../src/main/extensions/extension-host'
-import type { ExtensionViewHost } from '../../../src/main/extensions/extension-view-host'
 import { partialFake } from '../../support/fakes'
 
 const mockExtensionHost = {
@@ -63,7 +62,7 @@ function useExtensionHandlers(): void {
   beforeEach(() => {
     vi.clearAllMocks()
     ;(globalRegistry.settingsSections as Map<string, unknown>).clear()
-    registerExtensionHandlers(extensionHost, vi.fn(), () => null)
+    registerExtensionHandlers(extensionHost, vi.fn())
   })
 }
 
@@ -159,7 +158,7 @@ describe('extension IPC handlers — extension:reload broadcasts', () => {
   it('calls broadcast with extension:renderer-reload on successful reload', async () => {
     const broadcast = vi.fn()
     vi.clearAllMocks()
-    registerExtensionHandlers(extensionHost, broadcast, () => null)
+    registerExtensionHandlers(extensionHost, broadcast)
     const ext = { id: 'com.test', status: 'enabled' }
     mockExtensionHost.reloadExtension.mockResolvedValue({ extension: ext })
     const handler = captureHandle('extension:reload')
@@ -170,86 +169,11 @@ describe('extension IPC handlers — extension:reload broadcasts', () => {
   it('does not call broadcast when reload fails', async () => {
     const broadcast = vi.fn()
     vi.clearAllMocks()
-    registerExtensionHandlers(extensionHost, broadcast, () => null)
+    registerExtensionHandlers(extensionHost, broadcast)
     mockExtensionHost.reloadExtension.mockResolvedValue({ error: 'NOT_FOUND' })
     const handler = captureHandle('extension:reload')
     await handler({}, { id: 'missing' })
     expect(broadcast).not.toHaveBeenCalled()
-  })
-})
-
-describe('extension IPC handlers — extension:update-panel-bounds', () => {
-  useExtensionHandlers()
-
-  it("places the extension's view where the renderer's placeholder is", async () => {
-    const updatePanelBounds = vi.fn().mockResolvedValue(undefined)
-    vi.clearAllMocks()
-    registerExtensionHandlers(extensionHost, vi.fn(), () =>
-      partialFake<ExtensionViewHost>({ updatePanelBounds })
-    )
-    const ext = { id: 'com.test', name: 'Test' }
-    mockExtensionHost.listAll.mockReturnValue([ext])
-    const bounds = { x: 10, y: 20, width: 300, height: 400 }
-    await captureHandle('extension:update-panel-bounds')(
-      {},
-      { extensionId: 'com.test', viewParam: 'main', bounds, visible: true, repoRoot: '/repo' }
-    )
-    const [findExtension, placement] = updatePanelBounds.mock.calls[0]
-    expect(placement).toEqual({
-      extensionId: 'com.test',
-      viewParam: 'main',
-      bounds,
-      visible: true,
-      repoRoot: '/repo',
-    })
-    expect(findExtension()).toBe(ext)
-  })
-})
-
-describe('extension IPC handlers — extension:update-panel-bounds before activation', () => {
-  useExtensionHandlers()
-
-  it("does not create the extension's view until that extension has been activated", async () => {
-    const updatePanelBounds = vi.fn().mockResolvedValue(undefined)
-    vi.clearAllMocks()
-    let finishActivation = () => {}
-    mockExtensionHost.whenActivated.mockReturnValueOnce(
-      new Promise<void>((resolve) => (finishActivation = resolve))
-    )
-    registerExtensionHandlers(extensionHost, vi.fn(), () =>
-      partialFake<ExtensionViewHost>({ updatePanelBounds })
-    )
-    const bounds = { x: 0, y: 0, width: 1, height: 1 }
-    const pending = captureHandle('extension:update-panel-bounds')(
-      {},
-      { extensionId: 'com.slow', viewParam: 'main', bounds, visible: true }
-    )
-
-    await Promise.resolve()
-    expect(mockExtensionHost.whenActivated).toHaveBeenCalledWith('com.slow')
-    expect(updatePanelBounds).not.toHaveBeenCalled()
-
-    finishActivation()
-    await pending
-    expect(updatePanelBounds).toHaveBeenCalledTimes(1)
-  })
-})
-
-describe('extension IPC handlers — extension:update-panel-bounds without a view host', () => {
-  useExtensionHandlers()
-
-  it('does nothing before the view host exists', async () => {
-    const handler = captureHandle('extension:update-panel-bounds')
-    const result = await handler(
-      {},
-      {
-        extensionId: 'com.test',
-        viewParam: 'main',
-        bounds: { x: 0, y: 0, width: 1, height: 1 },
-        visible: false,
-      }
-    )
-    expect(result).toBeUndefined()
   })
 })
 

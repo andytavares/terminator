@@ -1,11 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { EventEmitter } from 'node:events'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
-import type { WebContents } from 'electron'
 import { makeTempDir } from '../../support/temp-dir'
 import { nextLoopTurn, openWatches } from '../../support/watches'
-import { partialFake } from '../../support/fakes'
+import { fakeWebContentsView } from '../../support/fake-web-contents'
 
 type Handler = (event: unknown, payload?: unknown) => unknown
 const handlers = vi.hoisted(() => new Map<string, Handler>())
@@ -24,26 +22,8 @@ interface ChangeEvent {
   filename: string | null
 }
 
-/** A view as the handlers know one: what it was sent, and the ways it can go away. */
 function fakeView() {
-  const received: ChangeEvent[] = []
-  let destroyed = false
-  const events = new EventEmitter()
-  type Listener = (...args: never[]) => void
-  const calling = (listener: Listener) => (details: unknown) => listener(details as never)
-  const sender: WebContents = partialFake<WebContents>({
-    send: (_channel: string, event: ChangeEvent) => void received.push(event),
-    isDestroyed: () => destroyed,
-    once: (name: string, listener: Listener) => (events.once(name, calling(listener)), sender),
-    on: (name: string, listener: Listener) => (events.on(name, calling(listener)), sender),
-  })
-  const destroy = () => {
-    destroyed = true
-    events.emit('destroyed')
-  }
-  const navigate = (navigation: { isMainFrame: boolean; isSameDocument: boolean }) =>
-    events.emit('did-start-navigation', navigation)
-  return { sender, received, destroy, navigate }
+  return fakeWebContentsView<ChangeEvent>()
 }
 
 type View = ReturnType<typeof fakeView>

@@ -1,7 +1,7 @@
 import './claim-profile.js'
 import { onChannel } from './ipc/channel-registrar.js'
 import { registerAppInfoHandlers, registerDialogHandlers } from './ipc/app.ipc.js'
-import { app, BrowserWindow, dialog, Menu, shell, net, session, protocol } from 'electron'
+import { app, BrowserWindow, dialog, Menu, shell, session, protocol } from 'electron'
 import { join } from 'path'
 import {
   registerWorkspaceHandlers,
@@ -41,8 +41,10 @@ import {
   onExtensionSettingsChanged,
 } from './storage/extension-settings-store.js'
 import { onWorkspacesChanged } from './storage/workspace-store.js'
-import { ExtensionViewHost } from './extensions/extension-view-host.js'
-import { routeExtensionExitRequest } from './extensions/extension-exit.js'
+import { createExtProtocolHandler } from './extensions/ext-protocol.js'
+import { EXTENSION_BASE_CSS } from '@terminator/extension-ui/extension-base-css'
+import { FrameBridge, registerFramePortChannel } from './extensions/frame-bridge.js'
+import { routeExtensionExitRequest, type ExtensionSurface } from './extensions/extension-exit.js'
 import { logger } from './logger.js'
 import { sendToWindow } from './safe-send.js'
 import { buildWindowMenu } from './window-menu.js'
@@ -66,7 +68,12 @@ import {
 // Set by before-quit so the macOS close handler lets the window go.
 let isQuitting = false
 let mainWindow: BrowserWindow | null = null
-let viewHost: ExtensionViewHost | null = null
+const frameBridge = new FrameBridge({
+  invokeRegistry: ipcInvokeRegistry,
+  sendRegistry: ipcSendRegistry,
+  onExitRequest: (surface) => exitExtensionSurface(surface),
+  onQuickActionsOpen: () => mainWindow?.webContents.send('quick-actions:open'),
+})
 const ptyManager = new PtyManager()
 // Reads core state the way an extension's API does, for the extension host's snapshot.
 const coreView = createExtensionAPI('terminator.extension-host')
@@ -86,19 +93,6 @@ const extensionHostProcess: ExtensionHostProcess = new ExtensionHostProcess({
 })
 const extensionHost: ExtensionHost = new ExtensionHost(extensionHostProcess)
 
-/** Returning from another app lands the caret where the user left it. Electron restores focus to
- * the window's own webContents at most, so the focused surface is recorded on blur (by 'focus'
- * Electron has overwritten it) and focused again on focus. */
-function restoreFocusOnReturn(win: BrowserWindow): void {
-  win.webContents.on('focus', () => viewHost?.noteFocused(null))
-  win.on('blur', () => viewHost?.captureFocusTarget())
-  win.on('focus', () => {
-    // Deferred a tick so Electron's own RestoreFocus runs first and does not
-    // immediately undo the restore.
-    setImmediate(() => viewHost?.restoreFocus())
-  })
-}
-
 function loadRenderer(win: BrowserWindow): void {
   if (process.env.NODE_ENV === 'development' || process.env['ELECTRON_RENDERER_URL']) {
     win.loadURL(process.env['ELECTRON_RENDERER_URL'] || 'http://localhost:5173')
@@ -107,7 +101,7 @@ function loadRenderer(win: BrowserWindow): void {
   }
 }
 
-/** Forwards every main→renderer push to browser bridge clients and extension views. */
+/** Forwards every main→renderer push to browser bridge clients and extension frames. */
 function relayPushes(win: BrowserWindow): void {
   const _origSend = win.webContents.send.bind(win.webContents)
   win.webContents.send = (channel: string, ...args: unknown[]) => {
@@ -115,10 +109,10 @@ function relayPushes(win: BrowserWindow): void {
     // A file watch reports to the one view that asked for it (ADR 109), this window included.
     if (channel === 'fs:changed') return
     bridgeEventBus.emit(channel, ...args)
-    // Relay to extension WebContentsViews so extension renderers receive push events
+    // Relay to extension frames so extension renderers receive push events
     // (terminal: is high-frequency; workspace:changed is relayed separately below)
     if (!channel.startsWith('terminal:') && channel !== 'workspace:changed') {
-      viewHost?.broadcastToAll(channel, args[0] as unknown)
+      frameBridge.broadcast(channel, args[0] as unknown)
     }
   }
 }
@@ -173,8 +167,6 @@ function createWindow(): void {
     },
   })
   mainWindow = win
-  viewHost = new ExtensionViewHost(win, join(__dirname, '../preload/webview.js'))
-  restoreFocusOnReturn(win)
   loadRenderer(win)
   relayPushes(win)
   openLinksInBrowser(win)
@@ -219,7 +211,7 @@ function buildViewSubmenu(): Electron.MenuItemConstructorOptions[] {
     {
       label: 'Open Extension DevTools',
       accelerator: 'CmdOrCtrl+Shift+I',
-      click: () => viewHost?.openDevToolsForAll(),
+      click: () => mainWindow?.webContents.openDevTools({ mode: 'detach' }),
     },
   ]
 }
@@ -315,69 +307,40 @@ protocol.registerSchemesAsPrivileged([
   },
 ])
 
-/** Serves extension renderer files via ext://<id>/<relPath>. Only files within the extension's
- * registered directory are accessible. */
-async function serveExtensionFile(request: Request): Promise<Response> {
-  const url = new URL(request.url)
-  const extensionId = url.hostname
-  const relPath = url.pathname.slice(1)
-  const dir = extensionHost.getExtensionDirectory(extensionId)
-  if (!dir || !relPath) return new Response('Not found', { status: 404 })
-  const fullPath = join(dir, relPath).replace(/\\/g, '/')
-  if (!fullPath.startsWith(dir.replace(/\\/g, '/'))) {
-    return new Response('Forbidden', { status: 403 })
-  }
-  let res: Response
-  try {
-    res = await net.fetch(`file://${fullPath}`)
-  } catch {
-    return new Response(`Not found: ${relPath}`, { status: 404 })
-  }
-  if (!res.ok) return new Response(`Not found: ${relPath}`, { status: res.status })
-  const headers: Record<string, string> = { 'Cache-Control': 'no-store', Pragma: 'no-cache' }
-  res.headers.forEach((value, key) => {
-    headers[key] = value
-  })
-  return new Response(res.body, { status: res.status, headers })
-}
-
-/** Extension WebContentsViews use the 'ext-views' in-memory partition to avoid service-worker
- * storage conflicts with the main window session. Both sessions need the handler registered. */
+/** The `ext://` handler: extension files, and the frame shim at ext://core/. Only the default
+ * session serves it, because extension frames now live in the main window's session. */
 function registerExtProtocol(): void {
-  session.defaultSession.protocol.handle('ext', serveExtensionFile)
-  session.fromPartition('ext-views').protocol.handle('ext', serveExtensionFile)
+  session.defaultSession.protocol.handle(
+    'ext',
+    createExtProtocolHandler({
+      extensionDirectory: (id) => extensionHost.getExtensionDirectory(id),
+      coreDirectory: join(__dirname, '../renderer-remote'),
+      baseCss: EXTENSION_BASE_CSS,
+    })
+  )
 }
 
-/** What the extension views send main: insets, the theme, a request to exit, the active workspace. */
+/** Where the double-Escape gesture in a frame leaves to: main attributes it to a surface and
+ * relays the exit to the main window. */
+function exitExtensionSurface(surface: ExtensionSurface): void {
+  if (!mainWindow || mainWindow.isDestroyed()) return
+  routeExtensionExitRequest(surface, {
+    listExtensions: () => extensionHost.listAll(),
+    focusMainRenderer: () => mainWindow!.webContents.focus(),
+    send: (channel, payload) => mainWindow!.webContents.send(channel, payload),
+  })
+}
+
+/** What the main window sends about extension frames: the theme and the active workspace. */
 function registerExtensionViewChannels(): void {
-  onChannel('extension:set-bottom-inset', (_event, { inset }: { inset: number }) => {
-    viewHost?.setBottomInset(inset)
-  })
-  onChannel('extension:set-left-inset', (_event, { inset }: { inset: number }) => {
-    viewHost?.setLeftInset(inset)
-  })
   onChannel('extension:set-theme', (_event, { theme }: { theme: 'dark' | 'light' }) => {
-    viewHost?.setTheme(theme)
-  })
-  // Sent by the double-Escape gesture in the extension webview preload. The
-  // extension view is its own webContents, so the host renderer never sees the
-  // keystroke — main attributes it to a surface and relays the exit.
-  onChannel('extension:request-exit', (event) => {
-    if (!viewHost || !mainWindow || mainWindow.isDestroyed()) return
-    routeExtensionExitRequest(event.sender, {
-      findViewByWebContents: (wc) => viewHost!.findViewByWebContents(wc),
-      listExtensions: () => extensionHost.listAll(),
-      focusMainRenderer: () => {
-        viewHost!.noteFocused(null)
-        mainWindow!.webContents.focus()
-      },
-      send: (channel, payload) => mainWindow!.webContents.send(channel, payload),
-    })
+    frameBridge.setTheme(theme)
   })
   onChannel('workspace:active-changed', (_event, data: ActiveWorkspaceContext) => {
     setActiveWorkspaceContext(data)
-    viewHost?.broadcastToAll('workspace:changed', data)
+    frameBridge.broadcast('workspace:changed', data)
   })
+  registerFramePortChannel(frameBridge, (id) => extensionHost.whenActivated(id))
 }
 
 /** Workspaces, terminals, settings, extensions, git, integrations and session records. */
@@ -389,11 +352,7 @@ function registerSessionHandlers(): OutputRelay {
   )
   registerTerminalHandlers(ptyManager, () => mainWindow, terminalRelay)
   registerSettingsHandlers()
-  registerExtensionHandlers(
-    extensionHost,
-    (channel, data) => viewHost?.broadcastToAll(channel, data),
-    () => viewHost
-  )
+  registerExtensionHandlers(extensionHost, (channel, data) => frameBridge.broadcast(channel, data))
   registerExtensionViewChannels()
   registerGitHandlers()
   registerIntegrationsHandlers(() => mainWindow)
@@ -452,16 +411,16 @@ function broadcastToWindows(channel: string, data: unknown): void {
   for (const win of BrowserWindow.getAllWindows()) {
     sendToWindow(win, channel, data)
   }
-  // The main window's send is patched above to relay to extension WebContentsViews for every
+  // The main window's send is patched above to relay to extension frames for every
   // channel except the two it filters out — only relay explicitly when that patch did not already
-  // do it, or the views would receive the same push twice.
+  // do it, or the frames would receive the same push twice.
   const relayedByMainWindow =
     !!mainWindow &&
     !mainWindow.isDestroyed() &&
     !mainWindow.webContents.isDestroyed() &&
     !channel.startsWith('terminal:') &&
     channel !== 'workspace:changed'
-  if (!relayedByMainWindow) viewHost?.broadcastToAll(channel, data)
+  if (!relayedByMainWindow) frameBridge.broadcast(channel, data)
 }
 
 function extensionDeps(terminalRelay: OutputRelay, userData: string): ExtensionAPIDeps {
@@ -471,7 +430,8 @@ function extensionDeps(terminalRelay: OutputRelay, userData: string): ExtensionA
     db: getAppDb(),
     paths: { app: app.getAppPath(), userData },
     broadcastToWindows,
-    focusExtensionView: (extId, viewParam) => viewHost?.focusView(extId, viewParam),
+    focusExtensionView: (extensionId, viewParam) =>
+      mainWindow?.webContents.send('extension:focus-view', { extensionId, viewParam }),
     bridge: {
       invokeRegistry: ipcInvokeRegistry,
       sendRegistry: ipcSendRegistry,

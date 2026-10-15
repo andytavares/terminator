@@ -157,7 +157,6 @@ export interface ElectronAPI {
     onTogglePanel(handler: (panelId: string) => void): () => void
     onMenuOpenSettings(handler: () => void): () => void
     notifyPanelState(panelId: string, open: boolean): void
-    onExtensionPanelLoaded(handler: (id: string) => void): () => void
     onExtensionRendererReload(handler: (id: string) => void): () => void
   }
   app: {

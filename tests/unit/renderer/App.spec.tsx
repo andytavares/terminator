@@ -261,7 +261,6 @@ function extensionParts(events: MainEvents, sent: MainSent) {
     },
     extensionBridge: { on: events.bridge.on, invoke: async () => ({}) },
     extension: {
-      setBottomInset: () => {},
       getCommands: sent.getCommands,
       onCommandsChanged: events.commandsChanged.addListener,
       list: async () => ({ extensions: [] }),

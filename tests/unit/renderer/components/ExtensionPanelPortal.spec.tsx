@@ -1,76 +1,48 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, act } from '@testing-library/react'
+import { render, act, fireEvent } from '@testing-library/react'
 
-const mockUpdatePanelBounds = vi.fn()
-const mockOnExtensionPanelLoaded = vi.fn()
-
-type ResizeObserverCallback = (entries: ResizeObserverEntry[]) => void
-let capturedResizeCallback: ResizeObserverCallback | null = null
-const mockObserve = vi.fn()
-const mockDisconnect = vi.fn()
-
-vi.stubGlobal(
-  'ResizeObserver',
-  class {
-    constructor(cb: ResizeObserverCallback) {
-      capturedResizeCallback = cb
-    }
-    observe = mockObserve
-    disconnect = mockDisconnect
-  }
-)
-
+import { FRAME_PORT_MESSAGE } from '../../../../src/shared/frame-wire'
 import { ExtensionPanelPortal } from '../../../../src/renderer/components/ExtensionPanelPortal.js'
 import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
 import { useShownExtensionViews } from '../../../../src/renderer/stores/shown-extension-views.store'
-import { useModalStore } from '../../../../src/renderer/stores/modal.store'
 
+const mockOpenFramePort = vi.fn()
+const mockUpdatePanelBounds = vi.fn()
 const mockExitExtensionToTerminal = vi.fn()
 
 vi.mock('../../../../src/renderer/lib/focus-terminal', () => ({
   focusActiveTerminal: vi.fn(),
 }))
 
-let panelLoadedHandler: ((id: string) => void) | null = null
-
 const originalElectronAPI = window.electronAPI
 
-beforeEach(() => {
-  vi.clearAllMocks()
-  capturedResizeCallback = null
-  panelLoadedHandler = null
-  mockOnExtensionPanelLoaded.mockImplementation((handler: (id: string) => void) => {
-    panelLoadedHandler = handler
-    return () => {
-      panelLoadedHandler = null
-    }
-  })
-  // Mock getBoundingClientRect to return a controlled rect
-  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
-    left: 10,
-    top: 20,
-    width: 400,
-    height: 300,
-    right: 410,
-    bottom: 320,
-    x: 10,
-    y: 20,
-    toJSON: () => ({}),
-  } as DOMRect)
+function stubDesktopApi(): void {
   Object.defineProperty(window, 'electronAPI', {
     value: {
-      extension: { updatePanelBounds: mockUpdatePanelBounds },
-      extensionEvents: { onExtensionPanelLoaded: mockOnExtensionPanelLoaded },
+      extension: {
+        openFramePort: mockOpenFramePort,
+        updatePanelBounds: mockUpdatePanelBounds,
+      },
     },
     configurable: true,
     writable: true,
   })
+}
+
+function stubRemoteApi(): void {
+  Object.defineProperty(window, 'electronAPI', {
+    value: { extension: { updatePanelBounds: mockUpdatePanelBounds } },
+    configurable: true,
+    writable: true,
+  })
+}
+
+beforeEach(() => {
+  vi.clearAllMocks()
 })
 
 afterEach(() => {
-  capturedResizeCallback = null
-  vi.restoreAllMocks()
   Object.defineProperty(window, 'electronAPI', {
     value: originalElectronAPI,
     configurable: true,
@@ -78,165 +50,173 @@ afterEach(() => {
   })
 })
 
-describe('ExtensionPanelPortal', () => {
-  it('fires updatePanelBounds using element rect dimensions when ResizeObserver fires', () => {
-    render(<ExtensionPanelPortal extensionId="com.test.ext" viewParam="main" isActive={true} />)
-    act(() => {
-      capturedResizeCallback?.([])
-    })
-    // width = rect.width = 400, height = rect.height = 300
-    expect(mockUpdatePanelBounds).toHaveBeenCalledWith({
-      extensionId: 'com.test.ext',
-      viewParam: 'main',
-      bounds: { x: 10, y: 20, width: 400, height: 300 },
-      visible: true,
-      repoRoot: null,
-    })
-  })
+function firstIframe(container: HTMLElement): HTMLIFrameElement {
+  return container.querySelector('iframe') as HTMLIFrameElement
+}
 
-  it('sends visible: false when isActive is false', () => {
-    render(<ExtensionPanelPortal extensionId="com.test.ext" viewParam="main" isActive={false} />)
-    act(() => {
-      capturedResizeCallback?.([])
-    })
-    expect(mockUpdatePanelBounds).toHaveBeenCalledWith(expect.objectContaining({ visible: false }))
-  })
-
-  it('shows a loading spinner initially', () => {
-    const { container } = render(
-      <ExtensionPanelPortal extensionId="com.test.ext" viewParam="main" isActive={true} />
-    )
-    expect(container.querySelector('[data-testid="extension-loading"]')).toBeTruthy()
-  })
-})
-
-describe('ExtensionPanelPortal — shows no spinner when the host cannot report that the panel loaded', () => {
-  it('shows no spinner when the host cannot report that the panel loaded', () => {
-    Object.defineProperty(window, 'electronAPI', {
-      value: { extension: { updatePanelBounds: mockUpdatePanelBounds }, extensionEvents: {} },
-      configurable: true,
-      writable: true,
-    })
-    const { container } = render(
-      <ExtensionPanelPortal extensionId="com.test.ext" viewParam="main" isActive={true} />
-    )
-    expect(container.querySelector('[data-testid="extension-loading"]')).toBeNull()
-  })
-
-  it('dismisses the spinner when onExtensionPanelLoaded fires with matching id', () => {
-    const { container } = render(
-      <ExtensionPanelPortal extensionId="com.test.ext" viewParam="main" isActive={true} />
-    )
-    act(() => {
-      panelLoadedHandler?.('com.test.ext')
-    })
-    expect(container.querySelector('[data-testid="extension-loading"]')).toBeNull()
-  })
-})
-
-describe('ExtensionPanelPortal — does not dismiss spinner when onExtensionPanelLoaded fires with a different id', () => {
-  it('does not dismiss spinner when onExtensionPanelLoaded fires with a different id', () => {
-    const { container } = render(
-      <ExtensionPanelPortal extensionId="com.test.ext" viewParam="main" isActive={true} />
-    )
-    act(() => {
-      panelLoadedHandler?.('com.other.ext')
-    })
-    expect(container.querySelector('[data-testid="extension-loading"]')).toBeTruthy()
-  })
-
-  it('disconnects ResizeObserver on unmount', () => {
-    const { unmount } = render(
-      <ExtensionPanelPortal extensionId="com.test.ext" viewParam="main" isActive={true} />
-    )
-    unmount()
-    expect(mockDisconnect).toHaveBeenCalled()
-  })
-
-  it('sends visible: false on unmount to release pointer event capture', () => {
-    const { unmount } = render(
-      <ExtensionPanelPortal extensionId="com.test.ext" viewParam="main" isActive={true} />
-    )
-    mockUpdatePanelBounds.mockClear()
-    unmount()
-    expect(mockUpdatePanelBounds).toHaveBeenCalledWith(
-      expect.objectContaining({ visible: false, extensionId: 'com.test.ext', viewParam: 'main' })
-    )
-  })
-})
-
-/** The hooks every "ExtensionPanelPortal — remote/browser mode (onExtensionPanelLoaded absent)" describe registers. */
-function setUpExtensionPanelPortalRemoteBrowserMode(): void {
-  beforeEach(() => {
-    Object.defineProperty(window, 'electronAPI', {
-      value: {
-        extension: { updatePanelBounds: () => {} },
-        extensionEvents: {}, // onExtensionPanelLoaded missing → remote mode
-      },
-      configurable: true,
-      writable: true,
-    })
+function loadFrame(container: HTMLElement): void {
+  act(() => {
+    fireEvent.load(firstIframe(container))
   })
 }
 
-describe('ExtensionPanelPortal — remote/browser mode (onExtensionPanelLoaded absent)', () => {
-  setUpExtensionPanelPortalRemoteBrowserMode()
+function framePortMessage(frameToken: string, source: MessageEventSource | null = window): void {
+  act(() => {
+    const event = new MessageEvent('message', {
+      data: { type: FRAME_PORT_MESSAGE, frameToken },
+      ports: [{} as MessagePort],
+    })
+    Object.defineProperty(event, 'source', { value: source })
+    window.dispatchEvent(event)
+  })
+}
 
-  it('renders an iframe instead of a WebContentsView portal', () => {
-    const { container } = render(
-      <ExtensionPanelPortal extensionId="com.test.ext" viewParam="main" isActive={true} />
+// createElement rather than JSX: lizard (the clean-gate's parser) misreads JSX with an
+// expression attr here and merges every following describe into this function.
+function renderPortal(extraProps: Record<string, unknown> = {}): ReturnType<typeof render> {
+  return render(
+    React.createElement(ExtensionPanelPortal, {
+      extensionId: 'com.test.ext',
+      viewParam: 'main',
+      isActive: true,
+      ...extraProps,
+    })
+  )
+}
+
+function panelWrapper(container: HTMLElement): HTMLElement {
+  return container.querySelector('[data-extension-panel]') as HTMLElement
+}
+
+describe('ExtensionPanelPortal — desktop src and spinner', () => {
+  beforeEach(stubDesktopApi)
+
+  it('renders an iframe with the ext:// src including view and repoRoot', () => {
+    const { container } = renderPortal({
+      repoRoot: '/home/user/repo',
+      rendererUrl: 'ext://com.test.ext/renderer/index.html',
+    })
+    expect(firstIframe(container).src).toBe(
+      'ext://com.test.ext/renderer/index.html?view=main&repoRoot=%2Fhome%2Fuser%2Frepo'
     )
-    const iframe = container.querySelector('iframe')
-    expect(iframe).toBeTruthy()
+  })
+
+  it('falls back to ext://<id>/index.html when no rendererUrl is given', () => {
+    const { container } = renderPortal({ viewParam: 'sidebar' })
+    expect(firstIframe(container).src).toBe('ext://com.test.ext/index.html?view=sidebar')
+  })
+
+  it('shows a spinner until the frame loads', () => {
+    const { container } = renderPortal()
+    expect(container.querySelector('[data-testid="extension-loading"]')).toBeTruthy()
+    loadFrame(container)
     expect(container.querySelector('[data-testid="extension-loading"]')).toBeNull()
-  })
-
-  it('iframe src points to /ext/<extensionId>/ with viewParam', () => {
-    const { container } = render(
-      <ExtensionPanelPortal extensionId="com.test.ext" viewParam="pr-review" isActive={true} />
-    )
-    const iframe = container.querySelector('iframe') as HTMLIFrameElement
-    expect(iframe.src).toContain('/ext/com.test.ext/')
-    expect(iframe.src).toContain('viewParam=pr-review')
-  })
-
-  it('marks the extension shown while its frame is active, as the frame draws its own toasts', () => {
-    const { unmount } = render(
-      <ExtensionPanelPortal extensionId="com.test.ext" viewParam="main" isActive={true} />
-    )
-    expect([...useShownExtensionViews.getState().shown.values()]).toEqual(['com.test.ext'])
-    unmount()
-    expect([...useShownExtensionViews.getState().shown.values()]).toEqual([])
   })
 })
 
-describe('ExtensionPanelPortal — remote/browser mode (onExtensionPanelLoaded absent) — iframe includes repoRoot in query params when provided', () => {
-  setUpExtensionPanelPortalRemoteBrowserMode()
+describe('ExtensionPanelPortal — desktop visibility and bounds', () => {
+  beforeEach(stubDesktopApi)
 
-  it('iframe includes repoRoot in query params when provided', () => {
+  it('hides the panel with display:none when inactive but keeps the frame mounted', () => {
+    const { container } = renderPortal({ isActive: false })
+    expect(panelWrapper(container).style.display).toBe('none')
+    expect(firstIframe(container)).toBeTruthy()
+  })
+
+  it('never calls updatePanelBounds', () => {
+    const { container, unmount } = renderPortal()
+    loadFrame(container)
+    unmount()
+    expect(mockUpdatePanelBounds).not.toHaveBeenCalled()
+  })
+})
+
+/** Renders a loaded desktop frame with its contentWindow's postMessage spied on. */
+const renderLoadedDesktopFrame = (): { postMessage: ReturnType<typeof vi.fn> } => {
+  const { container } = renderPortal()
+  loadFrame(container)
+  const postMessage = vi.fn()
+  Object.defineProperty(firstIframe(container), 'contentWindow', {
+    value: { postMessage },
+    configurable: true,
+  })
+  return { postMessage }
+}
+
+const lastOpenFrameRequest = (): { extensionId: string; viewParam: string; frameToken: string } =>
+  mockOpenFramePort.mock.calls[0][0]
+
+describe('ExtensionPanelPortal — desktop port request', () => {
+  beforeEach(stubDesktopApi)
+
+  it('asks main for a port with a fresh token on load', () => {
+    const { container } = renderPortal()
+    loadFrame(container)
+    expect(mockOpenFramePort).toHaveBeenCalledTimes(1)
+    const request = lastOpenFrameRequest()
+    expect(request.extensionId).toBe('com.test.ext')
+    expect(request.viewParam).toBe('main')
+    expect(request.frameToken).toMatch(/^[0-9a-f-]{36}$/)
+  })
+
+  it('uses a fresh token when the frame reloads', () => {
+    const { container } = renderPortal()
+    loadFrame(container)
+    loadFrame(container)
+    const [first, second] = mockOpenFramePort.mock.calls.map(([r]) => r.frameToken)
+    expect(first).not.toBe(second)
+  })
+})
+
+describe('ExtensionPanelPortal — desktop port forwarding', () => {
+  beforeEach(stubDesktopApi)
+
+  it('forwards a matching port message into the frame at the extension origin', () => {
+    const { postMessage } = renderLoadedDesktopFrame()
+    framePortMessage(lastOpenFrameRequest().frameToken)
+    expect(postMessage).toHaveBeenCalledWith({ type: FRAME_PORT_MESSAGE }, 'ext://com.test.ext', [
+      expect.anything(),
+    ])
+  })
+
+  it('ignores a message with a stale token or from another source', () => {
+    const { postMessage } = renderLoadedDesktopFrame()
+    framePortMessage('stale-token')
+    framePortMessage(lastOpenFrameRequest().frameToken, null)
+    expect(postMessage).not.toHaveBeenCalled()
+  })
+})
+
+describe('ExtensionPanelPortal — remote/browser (openFramePort absent)', () => {
+  beforeEach(stubRemoteApi)
+
+  it('renders an iframe pointing at /ext/<id>/ with viewParam and repoRoot', () => {
     const { container } = render(
       <ExtensionPanelPortal
         extensionId="com.test.ext"
-        viewParam="main"
+        viewParam="pr-review"
         isActive={true}
         repoRoot="/home/user/repo"
       />
     )
-    const iframe = container.querySelector('iframe') as HTMLIFrameElement
+    const iframe = firstIframe(container)
+    expect(iframe.src).toContain('/ext/com.test.ext/')
+    expect(iframe.src).toContain('viewParam=pr-review')
     expect(iframe.src).toContain('repoRoot=%2Fhome%2Fuser%2Frepo')
   })
 
-  it('wrapper div is hidden when isActive is false', () => {
+  it('does not ask main for a port', () => {
+    render(<ExtensionPanelPortal extensionId="com.test.ext" viewParam="main" isActive={true} />)
+    expect(mockOpenFramePort).not.toHaveBeenCalled()
+  })
+
+  it('hides the wrapper when inactive but keeps the frame mounted', () => {
     const { container } = render(
       <ExtensionPanelPortal extensionId="com.test.ext" viewParam="main" isActive={false} />
     )
     const wrapper = container.querySelector('[data-extension-panel]') as HTMLElement
     expect(wrapper.style.display).toBe('none')
-  })
-
-  it('does not call updatePanelBounds (no WebContentsView to position)', () => {
-    render(<ExtensionPanelPortal extensionId="com.test.ext" viewParam="main" isActive={true} />)
-    expect(mockUpdatePanelBounds).not.toHaveBeenCalled()
+    expect(firstIframe(container)).toBeTruthy()
   })
 })
 
@@ -248,41 +228,45 @@ function pressEscapeInIframe(iframe: HTMLIFrameElement, times: number): void {
   })
 }
 
-/** The hooks every "ExtensionPanelPortal — remote/browser mode (onExtensionPanelLoaded absent) — double-Escape exit" describe registers. */
-function setUpExtensionPanelPortalRemoteBrowserMode_(): void {
-  setUpExtensionPanelPortalRemoteBrowserMode()
-
-  beforeEach(() => {
-    mockExitExtensionToTerminal.mockReset().mockReturnValue(true)
-    useExtensionRegistry.setState({
-      sidebarPanels: new Map(),
-      exitExtensionToTerminal: mockExitExtensionToTerminal,
-    })
+/** The beforeEach every double-Escape describe registers. */
+function stubRemoteEscape(): void {
+  stubRemoteApi()
+  mockExitExtensionToTerminal.mockReturnValue(true)
+  useExtensionRegistry.setState({
+    sidebarPanels: new Map(),
+    exitExtensionToTerminal: mockExitExtensionToTerminal,
   })
 }
 
-describe('ExtensionPanelPortal — remote/browser mode (onExtensionPanelLoaded absent) — double-Escape exit', () => {
-  setUpExtensionPanelPortalRemoteBrowserMode_()
+describe('ExtensionPanelPortal — remote/browser — double-Escape exit', () => {
+  beforeEach(stubRemoteEscape)
 
-  it('ignores a single Escape', () => {
+  it('ignores a single Escape and exits on the second', () => {
     const { container } = render(
       <ExtensionPanelPortal extensionId="com.test.ext" viewParam="main" isActive={true} />
     )
-    pressEscapeInIframe(container.querySelector('iframe') as HTMLIFrameElement, 1)
+    pressEscapeInIframe(firstIframe(container), 1)
     expect(mockExitExtensionToTerminal).not.toHaveBeenCalled()
+    pressEscapeInIframe(firstIframe(container), 1)
+    expect(mockExitExtensionToTerminal).toHaveBeenCalledWith(undefined)
   })
 
-  it('exits the full-screen surface on a second Escape', () => {
-    const { container } = render(
+  it('stops listening after unmount', () => {
+    const { container, unmount } = render(
       <ExtensionPanelPortal extensionId="com.test.ext" viewParam="main" isActive={true} />
     )
-    pressEscapeInIframe(container.querySelector('iframe') as HTMLIFrameElement, 2)
-    expect(mockExitExtensionToTerminal).toHaveBeenCalledWith(undefined)
+    const win = firstIframe(container).contentWindow
+    unmount()
+    act(() => {
+      win?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+      win?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    })
+    expect(mockExitExtensionToTerminal).not.toHaveBeenCalled()
   })
 })
 
-describe('ExtensionPanelPortal — remote/browser mode (onExtensionPanelLoaded absent) — double-Escape exit — closes the panel when the iframe is the extension’s sidebar surface', () => {
-  setUpExtensionPanelPortalRemoteBrowserMode_()
+describe('ExtensionPanelPortal — remote/browser — double-Escape in the sidebar surface', () => {
+  beforeEach(stubRemoteEscape)
 
   it('closes the panel when the iframe is the extension’s sidebar surface', () => {
     useExtensionRegistry.setState({
@@ -296,33 +280,16 @@ describe('ExtensionPanelPortal — remote/browser mode (onExtensionPanelLoaded a
     const { container } = render(
       <ExtensionPanelPortal extensionId="com.test.ext" viewParam="sidebar" isActive={true} />
     )
-    pressEscapeInIframe(container.querySelector('iframe') as HTMLIFrameElement, 2)
+    pressEscapeInIframe(firstIframe(container), 2)
     expect(mockExitExtensionToTerminal).toHaveBeenCalledWith('com.test.ext')
   })
 })
 
-describe('ExtensionPanelPortal — remote/browser mode (onExtensionPanelLoaded absent) — double-Escape exit — stops listening after unmount', () => {
-  setUpExtensionPanelPortalRemoteBrowserMode_()
-
-  it('stops listening after unmount', () => {
-    const { container, unmount } = render(
-      <ExtensionPanelPortal extensionId="com.test.ext" viewParam="main" isActive={true} />
-    )
-    const iframe = container.querySelector('iframe') as HTMLIFrameElement
-    const win = iframe.contentWindow
-    unmount()
-    act(() => {
-      win?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
-      win?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
-    })
-    expect(mockExitExtensionToTerminal).not.toHaveBeenCalled()
-  })
-})
-
-describe('ExtensionPanelPortal — tells the core which extension covers the toast region', () => {
+describe('ExtensionPanelPortal — shown views', () => {
   const shownIds = () => [...useShownExtensionViews.getState().shown.values()]
 
-  it('marks the extension shown while its panel is active, and not after', () => {
+  it('marks the extension shown while active, and not after', () => {
+    stubDesktopApi()
     const { rerender, unmount } = render(
       <ExtensionPanelPortal extensionId="com.test.ext" viewParam="main" isActive={true} />
     )
@@ -334,11 +301,13 @@ describe('ExtensionPanelPortal — tells the core which extension covers the toa
     expect(shownIds()).toEqual([])
   })
 
-  it('does not mark it while a modal hides the view', () => {
-    act(() => useModalStore.getState().push())
-    render(<ExtensionPanelPortal extensionId="com.test.ext" viewParam="main" isActive={true} />)
-    expect(shownIds()).toEqual([])
-    act(() => useModalStore.getState().pop())
+  it('marks remote frames shown too', () => {
+    stubRemoteApi()
+    const { unmount } = render(
+      <ExtensionPanelPortal extensionId="com.test.ext" viewParam="main" isActive={true} />
+    )
     expect(shownIds()).toEqual(['com.test.ext'])
+    unmount()
+    expect(shownIds()).toEqual([])
   })
 })

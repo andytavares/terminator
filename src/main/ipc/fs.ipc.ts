@@ -1,14 +1,18 @@
-import type { WebContents } from 'electron'
 import { z } from 'zod'
 import fs from 'node:fs/promises'
 import { defineChannel } from '@terminator/extension-sdk'
-import { registerInvokeTable, noPayload, defineViewChannel } from './invoke-table.js'
+import {
+  registerInvokeTable,
+  noPayload,
+  defineViewChannel,
+  type ViewCaller,
+} from './invoke-table.js'
 import { fsWatcherService, type FsChangeBatch, type FsChangeListener } from '../fs/fs-watcher.js'
 
-// A view's file watches (ADR 109). The view that asks is the one that is told, and it is named
-// by `event.sender` (https://www.electronjs.org/docs/latest/api/structures/ipc-main-invoke-event).
+// A view's file watches (ADR 109). The view that asks is the one that is told, named by its
+// ViewCaller: a desktop view's WebContents, or an extension frame's port.
 
-const listeners = new WeakMap<WebContents, FsChangeListener>()
+const listeners = new WeakMap<ViewCaller, FsChangeListener>()
 
 /** The event a view receives: the one file a burst changed, or null when it changed several. */
 function changeEventOf(batch: FsChangeBatch) {
@@ -16,19 +20,13 @@ function changeEventOf(batch: FsChangeBatch) {
   return { projectRoot: batch.projectRoot, eventType: batch.eventType, filename }
 }
 
-/** The listener every watch of `view` reports to. Made once: it also ends the view's watches
- * when the view is destroyed, or leaves the page that asked for them (a reload). */
-function listenerOf(view: WebContents): FsChangeListener {
+/** The listener every watch of `view` reports to. Made once; the view's watches end with it. */
+function listenerOf(view: ViewCaller): FsChangeListener {
   const existing = listeners.get(view)
   if (existing) return existing
-  const listener: FsChangeListener = (batch) => {
-    if (!view.isDestroyed()) view.send('fs:changed', changeEventOf(batch))
-  }
+  const listener: FsChangeListener = (batch) => view.send('fs:changed', changeEventOf(batch))
   listeners.set(view, listener)
-  view.once('destroyed', () => fsWatcherService.unwatch(listener))
-  view.on('did-start-navigation', (navigation) => {
-    if (navigation.isMainFrame && !navigation.isSameDocument) fsWatcherService.unwatch(listener)
-  })
+  view.onGone(() => fsWatcherService.unwatch(listener))
   return listener
 }
 
