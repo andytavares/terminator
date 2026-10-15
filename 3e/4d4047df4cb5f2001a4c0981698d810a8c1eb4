@@ -1,0 +1,24 @@
+extensions/git-integration/tests/unit/overview-signals.spec.ts
+  s_e708cca5bdf352::t_64c4a968afd7a0 1-155,158-177,179,181-197,201-230,232,234-242,244,246-264,269-280,284-289,291,293-298,305-311,313,315-336
+  s_e708cca5bdf352::t_956177dfbf8c2b 198-200,243,245,281-283,312,314
+  s_e708cca5bdf352::t_829fa3eeed3dbf 178,180,231,233,290,292
+  s_e708cca5bdf352::t_53eb2f9f10b8ff 156-157,265-268,299-304
+extensions/git-integration/src/components/pr-review/overview-signals.ts
+  s_e708cca5bdf352::t_98588284aff994 1-189
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "3e4d4047df4cb5f2001a4c0981698d810a8c1eb4",
+  "prompts": {},
+  "sessions": {
+    "s_e708cca5bdf352": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5d7c9815-e79e-402d-b85d-cf8028e700ad",
+        "model": "unknown"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
