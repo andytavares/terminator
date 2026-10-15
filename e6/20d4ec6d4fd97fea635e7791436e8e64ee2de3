@@ -1,0 +1,25 @@
+docs/user-guide/USER-GUIDE.md
+  s_402975842e5b4f::t_c3d43033888177 969-976
+  s_402975842e5b4f::t_5e64219b81c0db 707
+  s_402975842e5b4f::t_90bf6334ad8716 751,753-765
+docs/adr/111-the-base-branch-is-proven-while-the-order-is-shaped.md
+  s_402975842e5b4f::t_d7c6a1d0c7e49b 1-57
+CHANGELOG.md
+  s_402975842e5b4f::t_3b385f146a5b6d 11
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e620d4ec6d4fd97fea635e7791436e8e64ee2de3",
+  "prompts": {},
+  "sessions": {
+    "s_402975842e5b4f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5884d9c4-7cce-4149-80c4-5ca403338036",
+        "model": "unknown"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
