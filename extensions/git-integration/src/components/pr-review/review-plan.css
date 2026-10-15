@@ -1,0 +1,138 @@
+.review-plan__heading {
+  display: flex;
+  align-items: baseline;
+  gap: var(--tm-space-3);
+  margin-bottom: var(--tm-space-2);
+}
+.review-plan__heading h3 {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.review-plan__heading span {
+  font-size: 12px;
+  color: var(--tm-text-muted);
+}
+.review-plan__rows {
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-md);
+  overflow: hidden;
+}
+.review-plan__row {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) 88px 64px 120px 56px;
+  align-items: center;
+  gap: var(--tm-space-3);
+  width: 100%;
+  height: 40px;
+  padding: 0 14px;
+  border: 0;
+  border-top: 1px solid var(--tm-border);
+  background: transparent;
+  color: var(--tm-text-primary);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.review-plan__row:first-child {
+  border-top: 0;
+}
+.review-plan__row:hover,
+.review-plan__row:focus-visible {
+  background: var(--tm-overlay-subtle);
+}
+.review-plan__number {
+  font-family: var(--tm-font-mono);
+  font-size: 11.5px;
+  color: var(--tm-text-muted);
+}
+.review-plan__name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.review-plan__name small {
+  margin-left: var(--tm-space-2);
+  font-size: 12px;
+  color: var(--tm-text-muted);
+}
+.review-plan__risk {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.review-plan__risk::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.review-plan__risk--high {
+  color: var(--tm-danger);
+}
+.review-plan__risk--medium {
+  color: var(--tm-warning);
+}
+.review-plan__risk--low {
+  color: var(--tm-text-muted);
+  font-weight: 400;
+}
+.review-plan__files,
+.review-plan__minutes {
+  font-size: 12px;
+  color: var(--tm-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.review-plan__minutes {
+  text-align: right;
+}
+.review-plan__bar {
+  display: flex;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--tm-overlay);
+  overflow: hidden;
+}
+.review-plan__bar b {
+  display: block;
+  height: 100%;
+}
+.review-plan__bar-added {
+  background: color-mix(in srgb, var(--tm-success) 70%, transparent);
+}
+.review-plan__bar-removed {
+  background: color-mix(in srgb, var(--tm-danger) 70%, transparent);
+}
+.review-plan__start {
+  display: none;
+  align-items: center;
+  gap: var(--tm-space-1);
+  font-size: 12px;
+  color: var(--tm-accent-text);
+}
+.review-plan__start svg {
+  width: 12px;
+  height: 12px;
+}
+.review-plan__row:hover .review-plan__bar,
+.review-plan__row:focus-visible .review-plan__bar {
+  display: none;
+}
+.review-plan__row:hover .review-plan__start,
+.review-plan__row:focus-visible .review-plan__start {
+  display: inline-flex;
+}
+
+@container pr-overview (max-width: 640px) {
+  .review-plan__row {
+    grid-template-columns: 28px minmax(0, 1fr) 88px 56px;
+  }
+  .review-plan__files,
+  .review-plan__change {
+    display: none;
+  }
+}
