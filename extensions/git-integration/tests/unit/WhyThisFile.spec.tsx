@@ -129,3 +129,11 @@ describe('WhyThisFile — thresholds are floors', () => {
     expect(screen.getByText('under 20')).toBeTruthy()
   })
 })
+
+describe('WhyThisFile — a factor under its floor does not claim it', () => {
+  it('titles low churn as how often it changes, not "Changes often"', () => {
+    renderFile(riskyScore({ level: 'low' }, { churn90d: 2 }))
+    expect(screen.getByText('How often it changes')).toBeTruthy()
+    expect(screen.queryByText('Changes often')).toBeNull()
+  })
+})

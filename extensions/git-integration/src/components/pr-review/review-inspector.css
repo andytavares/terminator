@@ -59,7 +59,8 @@
   border-left: 1px solid var(--tm-border-strong);
   /* No shadow token exists. */
   box-shadow: -12px 0 32px rgba(0, 0, 0, 0.35);
-  z-index: var(--tm-layer-panel);
+  /* The file header also takes the overlay layer; the drawer comes later in the DOM, so it wins. */
+  z-index: var(--tm-layer-overlay);
 }
 
 /* ─── Why this file ──────────────────────────────────────────────────────── */
