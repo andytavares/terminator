@@ -38,7 +38,7 @@ const STATE_ICON: Record<StatusCheck['state'], LucideIcon> = {
 
 type CheckState = StatusCheck['state']
 
-interface CheckCounts {
+export interface CheckCounts {
   total: number
   fail: number
   pending: number
@@ -46,7 +46,7 @@ interface CheckCounts {
   failingNames: string[]
 }
 
-function countChecks(checks: StatusCheck[]): CheckCounts {
+export function countChecks(checks: StatusCheck[]): CheckCounts {
   const failing = checks.filter((c) => c.state === 'fail')
   return {
     total: checks.length,
@@ -57,7 +57,7 @@ function countChecks(checks: StatusCheck[]): CheckCounts {
   }
 }
 
-function summaryStatus(c: CheckCounts): CheckState {
+export function summaryStatus(c: CheckCounts): CheckState {
   if (c.fail > 0) return 'fail'
   if (c.pending > 0) return 'pending'
   if (c.pass > 0) return 'pass'
@@ -73,7 +73,7 @@ function shortLabel(c: CheckCounts): string {
 }
 
 /** "2 of 8 checks failing · Format, lint". */
-function detailedLabel(c: CheckCounts): string {
+export function detailedLabel(c: CheckCounts): string {
   const noun = plural(c.total, 'check')
   if (c.fail > 0) return `${c.fail} of ${c.total} ${noun} failing · ${c.failingNames.join(', ')}`
   if (c.pending > 0) return `${c.pending} of ${c.total} ${noun} pending`
