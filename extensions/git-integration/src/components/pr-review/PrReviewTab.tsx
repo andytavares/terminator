@@ -364,7 +364,10 @@ function OverviewScreen({ t, h, repoRoot, pr }: OpenPrProps) {
       repoRoot={repoRoot}
       pr={pr}
       sessionStatus={view.activeQueuePr?.sessionStatus ?? 'not-started'}
-      onStartReview={() => view.setShowOverview(false)}
+      onStartReview={(chapterId) => {
+        if (chapterId) t.store.setCurrentChapter(chapterId)
+        view.setShowOverview(false)
+      }}
       onClose={h.handleClosePr}
       onRefresh={h.handleRefreshPr}
       onPopOut={popOutHandler(t, h)}

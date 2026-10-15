@@ -167,18 +167,6 @@ function renderPanel(overrides: Partial<PrReviewDetail> = {}, props = {}) {
   )
 }
 
-/** The "At a glance" aside, where status, people and linked issues sit. */
-function atAGlance(): HTMLElement {
-  return screen.getByRole('complementary', { name: 'At a glance' })
-}
-
-/** Renders the panel and opens one of its tabs. */
-function renderOnTab(tab: RegExp, overrides: Partial<PrReviewDetail> = {}) {
-  const view = renderPanel(overrides)
-  fireEvent.click(screen.getByRole('tab', { name: tab }))
-  return view
-}
-
 const bobsComment = {
   id: 1,
   author: 'bob',
@@ -188,411 +176,222 @@ const bobsComment = {
   updatedAt: new Date().toISOString(),
 }
 
-describe('PrOverviewPanel — the At a glance aside', () => {
-  it('labels a row for each fact about the pull request', () => {
+/** The buttons in the header, where Mark as ready and Start review first sit. */
+function headerActions(): HTMLElement {
+  return screen.getByRole('group', { name: 'Pull request actions' })
+}
+
+function readiness(): HTMLElement {
+  return screen.getByRole('group', { name: 'Readiness' })
+}
+
+function openDiscussion() {
+  fireEvent.click(screen.getByRole('tab', { name: /Discussion/ }))
+}
+
+const approval = (author: string) => ({
+  author,
+  authorAvatarUrl: '',
+  submittedAt: new Date().toISOString(),
+})
+
+describe('PrOverviewPanel — the header', () => {
+  it('shows the title and number in the page heading', () => {
     renderPanel()
-    const aside = within(atAGlance())
-    for (const label of ['Checks', 'Reviewers', 'Author', 'Branch', 'Opened', 'Merge state']) {
-      expect(aside.getByText(label)).toBeTruthy()
-    }
-    expect(aside.getByText('alice')).toBeTruthy()
-    expect(aside.getByText('feature/x → main')).toBeTruthy()
-    expect(aside.queryByText('Linked issues')).toBeNull()
+    const heading = screen.getByRole('heading', { level: 1 })
+    expect(heading.textContent).toContain('Add feature X')
+    expect(heading.textContent).toContain('#42')
+    expect(heading.textContent).not.toContain('Draft')
   })
 
-  it('lists linked issues only when the pull request has some', () => {
-    renderPanel({ issueRefs: [{ ref: '#7', type: 'github', title: 'Crash on save' }] })
-    const aside = within(atAGlance())
-    expect(aside.getByText('Linked issues')).toBeTruthy()
-    expect(aside.getByText('#7')).toBeTruthy()
-    expect(aside.getByText('Crash on save')).toBeTruthy()
+  it('marks a draft in the heading', () => {
+    renderPanel({ isDraft: true })
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toContain('Draft')
   })
 
-  it('says so when there are no checks and no reviewers', () => {
-    renderPanel({ statusChecks: [] })
-    const aside = within(atAGlance())
-    expect(aside.getByText('No checks')).toBeTruthy()
-    expect(aside.getByText('None requested')).toBeTruthy()
-    expect(aside.getByText('No conflicts')).toBeTruthy()
+  it('puts author, branches, size and time on the meta line', () => {
+    renderPanel()
+    const meta = within(screen.getByRole('group', { name: 'Pull request summary' }))
+    expect(meta.getByText('alice')).toBeTruthy()
+    expect(meta.getByText('feature/x')).toBeTruthy()
+    expect(meta.getByText('main')).toBeTruthy()
+    expect(meta.getByText('3 files')).toBeTruthy()
+    expect(meta.getByText('+85')).toBeTruthy()
+    expect(meta.getByText('−32')).toBeTruthy()
+    expect(meta.getByText('about 15 min')).toBeTruthy()
+    expect(meta.getByText('2 days ago').getAttribute('datetime')).toBe(basePr.openedAt)
   })
 })
 
-describe('PrOverviewPanel — the tabs beside it', () => {
-  it('offers Description, Discussion with its count, and Insights, Description first', () => {
-    renderPanel()
-    const tabs = screen.getAllByRole('tab', { name: /^(Description|Discussion · 0|Insights)$/ })
-    expect(tabs.map((t) => t.textContent)).toEqual(['Description', 'Discussion · 0', 'Insights'])
-    expect(tabs[0].getAttribute('aria-selected')).toBe('true')
-  })
-
-  it("keeps only the selected tab's panel in the document", () => {
-    renderPanel()
-    expect(screen.getAllByRole('tabpanel')).toHaveLength(1)
-    expect(screen.getByText('This PR adds feature X.')).toBeTruthy()
-    expect(screen.queryByText('What to look at')).toBeNull()
-    fireEvent.click(screen.getByRole('tab', { name: 'Insights' }))
-    expect(screen.getAllByRole('tabpanel')).toHaveLength(1)
-    expect(screen.getByText('What to look at')).toBeTruthy()
-    expect(screen.queryByText('This PR adds feature X.')).toBeNull()
-  })
-
-  it('offers Summarize on the description and keeps the summary across tab switches', async () => {
-    renderPanel()
-    fireEvent.click(screen.getByRole('button', { name: 'Summarize' }))
-    expect(await screen.findByText('A summary.')).toBeTruthy()
-    fireEvent.click(screen.getByRole('tab', { name: 'Insights' }))
-    expect(screen.queryByText('A summary.')).toBeNull()
-    fireEvent.click(screen.getByRole('tab', { name: 'Description' }))
-    expect(screen.getByText('A summary.')).toBeTruthy()
-  })
-})
-
-describe('PrOverviewPanel', () => {
-  it('renders PR title and number', () => {
-    const onStartReview = vi.fn()
+describe('PrOverviewPanel — the header actions', () => {
+  it('closes from the Close button', () => {
     const onClose = vi.fn()
-    render(
-      <PrOverviewPanel
-        repoRoot="/repo"
-        pr={basePr}
-        sessionStatus="not-started"
-        onStartReview={onStartReview}
-        onClose={onClose}
-      />
-    )
-    expect(screen.getByText('Add feature X')).toBeTruthy()
-    expect(screen.getByText('#42')).toBeTruthy()
-  })
-})
-
-describe('PrOverviewPanel — renders author and branch info', () => {
-  it('renders author and branch info', () => {
-    render(
-      <PrOverviewPanel
-        repoRoot="/repo"
-        pr={basePr}
-        sessionStatus="not-started"
-        onStartReview={vi.fn()}
-        onClose={vi.fn()}
-      />
-    )
-    expect(screen.getByText('alice')).toBeTruthy()
-    expect(screen.getByText('feature/x → main')).toBeTruthy()
-  })
-
-  it('summarises passing checks and keeps the list collapsed', () => {
-    renderPanel()
-    expect(within(atAGlance()).getByText('1 check passing')).toBeTruthy()
-    expect(screen.queryByRole('list')).toBeNull()
-  })
-})
-
-describe('PrOverviewPanel — names the failing checks in the summary and expands the full list on click', () => {
-  it('names the failing checks in the summary and expands the full list on click', () => {
-    renderPanel({
-      statusChecks: [
-        { name: 'Format', state: 'fail' },
-        { name: 'codecov/patch', state: 'fail' },
-        { name: 'build', state: 'pass' },
-        { name: 'lint', state: 'pass' },
-      ],
-    })
-    const summary = within(atAGlance()).getByRole('button', {
-      name: /2 of 4 checks failing · Format, codecov\/patch/,
-    })
-    expect(screen.queryByRole('list')).toBeNull()
-    fireEvent.click(summary)
-    expect(screen.getByRole('list')).toBeTruthy()
-    expect(screen.getByText('build')).toBeTruthy()
-  })
-})
-
-describe('PrOverviewPanel — says how many checks are pending', () => {
-  it('says how many checks are pending', () => {
-    renderPanel({
-      statusChecks: [
-        { name: 'a', state: 'pending' },
-        { name: 'b', state: 'pass' },
-      ],
-    })
-    expect(within(atAGlance()).getByText('1 of 2 checks pending')).toBeTruthy()
-  })
-
-  it('shows Start Review for not-started PRs', () => {
-    render(
-      <PrOverviewPanel
-        repoRoot="/repo"
-        pr={basePr}
-        sessionStatus="not-started"
-        onStartReview={vi.fn()}
-        onClose={vi.fn()}
-      />
-    )
-    expect(screen.getByText('Start Review')).toBeTruthy()
-  })
-})
-
-describe('PrOverviewPanel — shows Resume Review for paused PRs', () => {
-  it('shows Resume Review for paused PRs', () => {
-    render(
-      <PrOverviewPanel
-        repoRoot="/repo"
-        pr={basePr}
-        sessionStatus="paused"
-        onStartReview={vi.fn()}
-        onClose={vi.fn()}
-      />
-    )
-    expect(screen.getByText('Resume Review · 0 of 3 viewed')).toBeTruthy()
-  })
-
-  it('shows Continue Review for in-progress PRs', () => {
-    render(
-      <PrOverviewPanel
-        repoRoot="/repo"
-        pr={basePr}
-        sessionStatus="in-progress"
-        onStartReview={vi.fn()}
-        onClose={vi.fn()}
-      />
-    )
-    expect(screen.getByText('Continue Review · 0 of 3 viewed')).toBeTruthy()
-  })
-})
-
-describe('PrOverviewPanel — calls onStartReview when start button is clicked', () => {
-  it('calls onStartReview when start button is clicked', () => {
-    const onStartReview = vi.fn()
-    render(
-      <PrOverviewPanel
-        repoRoot="/repo"
-        pr={basePr}
-        sessionStatus="not-started"
-        onStartReview={onStartReview}
-        onClose={vi.fn()}
-      />
-    )
-    fireEvent.click(screen.getByText('Start Review'))
-    expect(onStartReview).toHaveBeenCalledOnce()
-  })
-})
-
-describe('PrOverviewPanel — calls onClose when × is clicked', () => {
-  it('calls onClose when × is clicked', () => {
-    const onClose = vi.fn()
-    render(
-      <PrOverviewPanel
-        repoRoot="/repo"
-        pr={basePr}
-        sessionStatus="not-started"
-        onStartReview={vi.fn()}
-        onClose={onClose}
-      />
-    )
-    fireEvent.click(screen.getByLabelText('Close'))
+    renderPanel({}, { onClose })
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
     expect(onClose).toHaveBeenCalledOnce()
   })
-})
 
-describe('PrOverviewPanel — renders PR description via RichContent', () => {
-  it('renders PR description via RichContent', () => {
-    render(
-      <PrOverviewPanel
-        repoRoot="/repo"
-        pr={basePr}
-        sessionStatus="not-started"
-        onStartReview={vi.fn()}
-        onClose={vi.fn()}
-      />
-    )
-    expect(screen.getByTestId('rich-content')).toBeTruthy()
-    expect(screen.getByText('This PR adds feature X.')).toBeTruthy()
+  it('offers pop out only when the caller can', () => {
+    renderPanel()
+    expect(screen.queryByRole('button', { name: 'Open in focused window' })).toBeNull()
   })
 
-  it('shows no-description message when body is empty', () => {
-    render(
-      <PrOverviewPanel
-        repoRoot="/repo"
-        pr={{ ...basePr, body: '' }}
-        sessionStatus="not-started"
-        onStartReview={vi.fn()}
-        onClose={vi.fn()}
-      />
-    )
-    expect(screen.getByText('No description provided.')).toBeTruthy()
+  it('pops out when asked to', () => {
+    const onPopOut = vi.fn()
+    renderPanel({}, { onPopOut })
+    fireEvent.click(screen.getByRole('button', { name: 'Open in focused window' }))
+    expect(onPopOut).toHaveBeenCalledOnce()
+  })
+
+  it('offers Mark as ready only on a draft', () => {
+    renderPanel()
+    expect(within(headerActions()).queryByRole('button', { name: 'Mark as ready' })).toBeNull()
+  })
+
+  it('marks a draft ready', async () => {
+    const { githubAPI } = await import('../../src/api/github')
+    renderPanel({ isDraft: true })
+    fireEvent.click(within(headerActions()).getByRole('button', { name: 'Mark as ready' }))
+    await waitFor(() => expect(githubAPI.prMarkReady).toHaveBeenCalledWith('/repo', 42))
   })
 })
 
-describe('PrOverviewPanel — folds hotspot files into the risk row, leaving out low risk files', () => {
-  it('folds hotspot files into the risk row, leaving out low risk files', () => {
-    renderOnTab(/Insights/)
-    const risk = screen.getByText('Risk').closest('.ib-score') as HTMLElement
-    expect(screen.getByTitle('src/high.ts')).toBeTruthy()
-    expect(screen.getByTitle('src/medium.ts')).toBeTruthy()
-    expect(risk.textContent).toContain('Hotspots')
-    expect(screen.queryByTitle('src/low.ts')).toBeNull()
-    expect(screen.queryByText(/Hotspots — focus here first/)).toBeNull()
-  })
-
-  it('puts risk, time and size on one header line', () => {
-    renderOnTab(/Insights/)
-    expect(screen.getByText('What to look at')).toBeTruthy()
-    expect(screen.getByText('High risk')).toBeTruthy()
-    expect(screen.getByText(/about 15 min · 3 files, \+85 −32/)).toBeTruthy()
+describe('PrOverviewPanel — the start button label', () => {
+  it.each([
+    ['not-started', 'Start Review'],
+    ['paused', 'Resume Review · 0 of 3 viewed'],
+    ['in-progress', 'Continue Review · 0 of 3 viewed'],
+  ])('labels the button for a %s review', (sessionStatus, label) => {
+    renderPanel({}, { sessionStatus })
+    expect(within(headerActions()).getByRole('button', { name: label })).toBeTruthy()
   })
 })
 
-describe('PrOverviewPanel — has no metric tiles and no high/med/low chips', () => {
-  it('has no metric tiles and no high/med/low chips', () => {
-    renderOnTab(/Insights/)
-    for (const label of ['Additions', 'Deletions', 'Est. time', 'Files', 'CI']) {
-      expect(screen.queryByText(label)).toBeNull()
-    }
-    expect(screen.queryByText(/\d+ high$/)).toBeNull()
-    expect(screen.queryByText(/\d+ med$/)).toBeNull()
-    expect(screen.queryByText(/\d+ low$/)).toBeNull()
-    expect(screen.queryByText('Passing')).toBeNull()
-    expect(document.querySelector('.pr-overview-metric')).toBeNull()
-  })
-})
-
-describe('PrOverviewPanel — shows analysis provenance as a tooltip, not as text', () => {
-  it('shows analysis provenance as a tooltip, not as text', () => {
-    renderOnTab(/Insights/, {
-      insights: {
-        complexity: { branchDelta: 3, functions: [], source: 'tree-sitter · hunk base vs head' },
-        coverage: {
-          changedFunctions: 0,
-          testedFunctions: 0,
-          untestedFunctions: [],
-          patchPercent: null,
-          source: 'CI check codecov/patch',
-          changedSourceFiles: 0,
-          changedSourceFilesWithTests: 0,
-        },
-        health: { flags: [], source: 'tree-sitter · detectDryViolations' },
-        understandability: {
-          level: 'easy',
-          linesToRead: 10,
-          newExports: 0,
-          longestChain: 1,
-          crossChapterRefs: 0,
-          source: 'reading-order graph',
-        },
-      },
-    })
-    expect(screen.queryByText('tree-sitter · hunk base vs head')).toBeNull()
-    expect(screen.getByTitle('tree-sitter · hunk base vs head')).toBeTruthy()
-  })
-})
-
-describe('PrOverviewPanel — puts viewed progress on the footer button for a review under way', () => {
-  it('puts viewed progress on the footer button for a review under way', () => {
+describe('PrOverviewPanel — starting the review', () => {
+  it('counts the files already viewed', () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
       viewedFiles: new Set(['src/high.ts']),
       issueComments: [],
     })
     renderPanel({}, { sessionStatus: 'in-progress' })
-    expect(screen.getByRole('button', { name: 'Continue Review · 1 of 3 viewed' })).toBeTruthy()
-    expect(screen.queryByText('1/3 reviewed')).toBeNull()
+    expect(screen.getAllByRole('button', { name: 'Continue Review · 1 of 3 viewed' })).toHaveLength(
+      2
+    )
   })
 
-  it('shows no progress on the footer button before a review starts', () => {
+  it('starts at the first chapter when no chapter is chosen', () => {
+    const onStartReview = vi.fn()
+    renderPanel({}, { onStartReview })
+    fireEvent.click(within(headerActions()).getByRole('button', { name: 'Start Review' }))
+    expect(onStartReview).toHaveBeenCalledWith()
+  })
+
+  it('starts at the chapter whose plan row is clicked', () => {
+    const onStartReview = vi.fn()
+    renderPanel({}, { onStartReview })
+    fireEvent.click(screen.getByRole('button', { name: 'Start review at Core' }))
+    expect(onStartReview).toHaveBeenCalledWith('ch1')
+  })
+})
+
+describe('PrOverviewPanel — the tabs', () => {
+  it('offers Overview and Discussion with its count, and no Insights', () => {
     renderPanel()
-    expect(screen.getByRole('button', { name: 'Start Review' })).toBeTruthy()
+    const tabs = screen.getAllByRole('tab')
+    expect(tabs.map((tab) => tab.textContent)).toEqual(['Overview', 'Discussion · 0'])
+    expect(tabs[0].getAttribute('aria-selected')).toBe('true')
+    expect(screen.queryByRole('tab', { name: 'Insights' })).toBeNull()
+  })
+
+  it('shows the properties rail beside the overview', () => {
+    renderPanel()
+    expect(screen.getByRole('complementary', { name: 'Pull request details' })).toBeTruthy()
+  })
+
+  it('keeps only the selected tab in the document', () => {
+    renderPanel()
+    expect(screen.getAllByRole('tabpanel')).toHaveLength(1)
+    openDiscussion()
+    expect(screen.queryByText('This PR adds feature X.')).toBeNull()
   })
 })
 
-describe('PrOverviewPanel — says how long ago the pull request was opened', () => {
-  it('says how long ago the pull request was opened', () => {
-    render(
-      <PrOverviewPanel
-        repoRoot="/repo"
-        pr={basePr}
-        sessionStatus="not-started"
-        onStartReview={vi.fn()}
-        onClose={vi.fn()}
-      />
-    )
-    expect(screen.getByText('2 days ago').getAttribute('datetime')).toBe(basePr.openedAt)
+describe('PrOverviewPanel — the readiness strip', () => {
+  it('is present under the header', () => {
+    renderPanel()
+    expect(within(readiness()).getByText('Checks')).toBeTruthy()
+    expect(within(readiness()).getByText('Merge')).toBeTruthy()
+  })
+
+  it('names approvers and who the review is still waiting on', () => {
+    renderPanel({ approvals: [approval('bob'), approval('carol')], requestedReviewers: ['dave'] })
+    expect(within(readiness()).getByText(/Approved by bob, carol/)).toBeTruthy()
+  })
+
+  it.each([
+    ['a requested reviewer', { requestedReviewers: ['alice', 'bob'] }],
+    ['an assignee', { assigneeLogins: ['alice'] }],
+  ])('flags that your review is requested when you are %s', (_who, overrides) => {
+    vi.mocked(usePrReviewStore).mockReturnValue({
+      viewedFiles: new Set(),
+      issueComments: [],
+      currentUserLogin: 'alice',
+    })
+    renderPanel(overrides)
+    expect(within(readiness()).getByText('Your review requested')).toBeTruthy()
+  })
+
+  it('does not flag a review nobody asked you for', () => {
+    renderPanel({ requestedReviewers: ['bob'] })
+    expect(screen.queryByText('Your review requested')).toBeNull()
   })
 })
 
-describe('PrOverviewPanel — renders optional pop out button when onPopOut is provided', () => {
-  it('renders optional pop out button when onPopOut is provided', () => {
-    const onPopOut = vi.fn()
-    render(
-      <PrOverviewPanel
-        repoRoot="/repo"
-        pr={basePr}
-        sessionStatus="not-started"
-        onStartReview={vi.fn()}
-        onClose={vi.fn()}
-        onPopOut={onPopOut}
-      />
-    )
-    const btn = screen.getByTitle('Open in focused window')
-    expect(btn).toBeTruthy()
-    fireEvent.click(btn)
-    expect(onPopOut).toHaveBeenCalledOnce()
+describe('PrOverviewPanel — the description', () => {
+  it('reads the description under its own heading', () => {
+    renderPanel()
+    expect(screen.getByRole('heading', { name: 'Description' })).toBeTruthy()
+    expect(screen.getByText('alice wrote')).toBeTruthy()
+    expect(screen.getByTestId('rich-content').textContent).toBe('This PR adds feature X.')
+  })
+
+  it('says so when there is no description', () => {
+    renderPanel({ body: '' })
+    expect(screen.getByText('No description provided.')).toBeTruthy()
+  })
+
+  it('shows the whole description until a summary exists', () => {
+    renderPanel()
+    expect(screen.queryByRole('button', { name: 'Show full description' })).toBeNull()
   })
 })
 
-describe('PrOverviewPanel — shows approvals bar when PR has approvals', () => {
-  it('shows approvals bar when PR has approvals', () => {
-    render(
-      <PrOverviewPanel
-        repoRoot="/repo"
-        pr={{
-          ...basePr,
-          approvals: [
-            { author: 'bob', authorAvatarUrl: '', submittedAt: new Date().toISOString() },
-            { author: 'carol', authorAvatarUrl: '', submittedAt: new Date().toISOString() },
-          ],
-        }}
-        sessionStatus="not-started"
-        onStartReview={vi.fn()}
-        onClose={vi.fn()}
-      />
-    )
-    expect(within(atAGlance()).getByText('Approved by bob, carol')).toBeTruthy()
+describe('PrOverviewPanel — clamping the description', () => {
+  it('clamps the description once a summary is shown, and unclamps on request', async () => {
+    renderPanel()
+    fireEvent.click(screen.getByRole('button', { name: 'Summarize' }))
+    await screen.findByText('A summary.')
+    fireEvent.click(screen.getByRole('button', { name: 'Show full description' }))
+    expect(screen.getByRole('button', { name: 'Show less' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Show full description' })).toBeNull()
+  })
+
+  it('keeps the summary across a tab switch', async () => {
+    renderPanel()
+    fireEvent.click(screen.getByRole('button', { name: 'Summarize' }))
+    await screen.findByText('A summary.')
+    openDiscussion()
+    expect(screen.queryByText('A summary.')).toBeNull()
+    fireEvent.click(screen.getByRole('tab', { name: 'Overview' }))
+    expect(screen.getByText('A summary.')).toBeTruthy()
   })
 })
 
-describe('PrOverviewPanel — does not show approvals bar when PR has no approvals', () => {
-  it('does not show approvals bar when PR has no approvals', () => {
-    render(
-      <PrOverviewPanel
-        repoRoot="/repo"
-        pr={basePr}
-        sessionStatus="not-started"
-        onStartReview={vi.fn()}
-        onClose={vi.fn()}
-      />
-    )
-    expect(within(atAGlance()).queryByText(/Approved by/)).toBeNull()
-  })
-
-  it('does not render pop out button when onPopOut is absent', () => {
-    render(
-      <PrOverviewPanel
-        repoRoot="/repo"
-        pr={basePr}
-        sessionStatus="not-started"
-        onStartReview={vi.fn()}
-        onClose={vi.fn()}
-      />
-    )
-    expect(screen.queryByTitle('Open in focused window')).toBeNull()
-  })
-})
-
-describe('PrOverviewPanel — keeps the discussion behind its tab', () => {
+describe('PrOverviewPanel — the discussion composer', () => {
   it('shows no composer until the Discussion tab is selected', () => {
     renderPanel()
     expect(screen.queryByPlaceholderText('Leave a comment…')).toBeNull()
-    expect(screen.queryByText('Write')).toBeNull()
-    fireEvent.click(screen.getByRole('tab', { name: /Discussion · 0/ }))
+    openDiscussion()
     expect(screen.getByPlaceholderText('Leave a comment…')).toBeTruthy()
   })
 
@@ -603,31 +402,48 @@ describe('PrOverviewPanel — keeps the discussion behind its tab', () => {
       currentUserLogin: null,
     })
     renderPanel()
-    expect(screen.queryByText('Looks off')).toBeNull()
-    fireEvent.click(screen.getByRole('tab', { name: /Discussion · 1/ }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Discussion · 1' }))
     expect(screen.getByText('Looks off')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Reply' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Summarize' })).toBeTruthy()
   })
 
   it('offers no Summarize on a discussion with no comments', () => {
-    renderOnTab(/Discussion · 0/)
+    renderPanel()
+    openDiscussion()
     expect(screen.queryByRole('button', { name: 'Summarize' })).toBeNull()
   })
 })
 
-describe('PrOverviewPanel — renders write/preview tabs in the discussion composer once its tab is selected', () => {
-  it('renders write/preview tabs in the discussion composer once its tab is selected', () => {
+describe('PrOverviewPanel — replying and posting', () => {
+  it('quotes a comment into the composer on Reply', () => {
+    vi.mocked(usePrReviewStore).mockReturnValue({
+      viewedFiles: new Set(),
+      issueComments: [bobsComment],
+      currentUserLogin: null,
+    })
     renderPanel()
-    fireEvent.click(screen.getByRole('tab', { name: /Discussion/ }))
-    expect(screen.getByText('Write')).toBeTruthy()
-    expect(screen.getByText('Preview')).toBeTruthy()
-    expect(screen.getByPlaceholderText('Leave a comment…')).toBeTruthy()
+    fireEvent.click(screen.getByRole('tab', { name: 'Discussion · 1' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Reply' }))
+    expect((screen.getByPlaceholderText('Leave a comment…') as HTMLTextAreaElement).value).toBe(
+      '> Looks off\n\n'
+    )
+  })
+})
+
+describe('PrOverviewPanel — writing a comment', () => {
+  it('shows Write and Preview, and an empty preview', () => {
+    renderPanel()
+    openDiscussion()
+    fireEvent.click(screen.getByText('Preview'))
+    expect(screen.getByText('Nothing to preview.')).toBeTruthy()
+    expect(screen.queryByPlaceholderText('Leave a comment…')).toBeNull()
   })
 
-  it('posts a comment from the discussion composer', async () => {
+  it('posts a comment from the composer', async () => {
     const { githubAPI } = await import('../../src/api/github')
     renderPanel()
-    fireEvent.click(screen.getByRole('tab', { name: /Discussion/ }))
+    openDiscussion()
     fireEvent.change(screen.getByPlaceholderText('Leave a comment…'), {
       target: { value: 'Ship it' },
     })
@@ -642,300 +458,51 @@ describe('PrOverviewPanel — renders write/preview tabs in the discussion compo
   })
 })
 
-describe('PrOverviewPanel — shows preview pane when Preview tab is clicked', () => {
-  it('shows preview pane when Preview tab is clicked', () => {
-    renderPanel()
-    fireEvent.click(screen.getByRole('tab', { name: /Discussion/ }))
-    fireEvent.click(screen.getByText('Preview'))
-    expect(screen.getByText('Nothing to preview.')).toBeTruthy()
-    expect(screen.queryByPlaceholderText('Leave a comment…')).toBeNull()
+describe('PrOverviewPanel — a branch that is behind', () => {
+  const behind = { mergeStateStatus: 'behind' as const }
+
+  it('says so and offers the update', () => {
+    renderPanel(behind)
+    expect(within(readiness()).getByText('Behind main')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Update from main' })).toBeTruthy()
   })
 
-  it('marks a draft ready from the footer', async () => {
-    const { githubAPI } = await import('../../src/api/github')
-    renderPanel({ isDraft: true })
-    fireEvent.click(screen.getByText('Mark as Ready'))
-    await waitFor(() => expect(githubAPI.prMarkReady).toHaveBeenCalledWith('/repo', 42))
-  })
-})
-
-describe('PrOverviewPanel — shows behind badge when mergeStateStatus is behind', () => {
-  it('shows "behind" badge when mergeStateStatus is behind', () => {
-    render(
-      <PrOverviewPanel
-        repoRoot="/repo"
-        pr={{ ...basePr, mergeStateStatus: 'behind' }}
-        sessionStatus="not-started"
-        onStartReview={vi.fn()}
-        onClose={vi.fn()}
-      />
-    )
-    expect(screen.getByText(/Behind main/)).toBeTruthy()
-  })
-
-  it('shows "conflicts" badge when mergeStateStatus is dirty', () => {
-    render(
-      <PrOverviewPanel
-        repoRoot="/repo"
-        pr={{ ...basePr, mergeStateStatus: 'dirty' }}
-        sessionStatus="not-started"
-        onStartReview={vi.fn()}
-        onClose={vi.fn()}
-      />
-    )
-    expect(screen.getByText(/Conflicts/)).toBeTruthy()
-  })
-})
-
-describe('PrOverviewPanel — shows resolve conflicts button when mergeStateStatus is dirty', () => {
-  it('shows resolve conflicts button when mergeStateStatus is dirty', () => {
-    render(
-      <PrOverviewPanel
-        repoRoot="/repo"
-        pr={{ ...basePr, mergeStateStatus: 'dirty' }}
-        sessionStatus="not-started"
-        onStartReview={vi.fn()}
-        onClose={vi.fn()}
-      />
-    )
-    expect(screen.getByText(/Resolve conflicts/i)).toBeTruthy()
-  })
-
-  it('does not show resolve conflicts button when mergeStateStatus is clean', () => {
-    render(
-      <PrOverviewPanel
-        repoRoot="/repo"
-        pr={{ ...basePr, mergeStateStatus: 'clean' }}
-        sessionStatus="not-started"
-        onStartReview={vi.fn()}
-        onClose={vi.fn()}
-      />
-    )
-    expect(screen.queryByText(/Resolve conflicts/i)).toBeNull()
-  })
-})
-
-describe('PrOverviewPanel — resolve conflicts button prepares worktree then calls onStartMergeFlow', () => {
-  it('resolve conflicts button prepares worktree then calls onStartMergeFlow', async () => {
-    const onStartMergeFlow = vi.fn()
-    render(
-      <PrOverviewPanel
-        repoRoot="/repo"
-        pr={{ ...basePr, mergeStateStatus: 'dirty' }}
-        sessionStatus="not-started"
-        onStartReview={vi.fn()}
-        onClose={vi.fn()}
-        onStartMergeFlow={onStartMergeFlow}
-      />
-    )
-    fireEvent.click(screen.getByText(/Resolve conflicts/i))
-    await waitFor(() => {
-      expect(mockPreparePrWorktree).toHaveBeenCalledWith({
-        repoRoot: '/repo',
-        worktreePath: '/tmp/worktree/branch',
-        headRefName: basePr.headRefName,
-        baseRefName: basePr.baseRefName,
-      })
-      expect(onStartMergeFlow).toHaveBeenCalledWith('/tmp/worktree/branch')
-    })
-  })
-})
-
-describe('PrOverviewPanel — does not show merge state badge when mergeStateStatus is clean', () => {
-  it('does not show merge state badge when mergeStateStatus is clean', () => {
-    render(
-      <PrOverviewPanel
-        repoRoot="/repo"
-        pr={{ ...basePr, mergeStateStatus: 'clean' }}
-        sessionStatus="not-started"
-        onStartReview={vi.fn()}
-        onClose={vi.fn()}
-      />
-    )
-    expect(screen.queryByText(/Behind/)).toBeNull()
-    expect(screen.queryByText(/Conflicts/)).toBeNull()
-  })
-
-  it('shows update branch button when mergeStateStatus is behind', () => {
-    render(
-      <PrOverviewPanel
-        repoRoot="/repo"
-        pr={{ ...basePr, mergeStateStatus: 'behind' }}
-        sessionStatus="not-started"
-        onStartReview={vi.fn()}
-        onClose={vi.fn()}
-      />
-    )
-    expect(screen.getByText(/Update from main/)).toBeTruthy()
-  })
-})
-
-describe('PrOverviewPanel — does not show update branch button when mergeStateStatus is clean', () => {
-  it('does not show update branch button when mergeStateStatus is clean', () => {
-    render(
-      <PrOverviewPanel
-        repoRoot="/repo"
-        pr={{ ...basePr, mergeStateStatus: 'clean' }}
-        sessionStatus="not-started"
-        onStartReview={vi.fn()}
-        onClose={vi.fn()}
-      />
-    )
-    expect(screen.queryByText(/Update from/)).toBeNull()
-  })
-})
-
-describe('PrOverviewPanel — calls prUpdateBranch and onRefresh when update branch button clicked', () => {
-  it('calls prUpdateBranch and onRefresh when update branch button clicked', async () => {
+  it('updates the branch, then refreshes the pull request', async () => {
     const { githubAPI } = await import('../../src/api/github')
     const onRefresh = vi.fn().mockResolvedValue(undefined)
-    render(
-      <PrOverviewPanel
-        repoRoot="/repo"
-        pr={{ ...basePr, mergeStateStatus: 'behind' }}
-        sessionStatus="not-started"
-        onStartReview={vi.fn()}
-        onClose={vi.fn()}
-        onRefresh={onRefresh}
-      />
-    )
-    fireEvent.click(screen.getByText(/Update from main/))
+    renderPanel(behind, { onRefresh })
+    fireEvent.click(screen.getByRole('button', { name: 'Update from main' }))
     await waitFor(() => {
       expect(githubAPI.prUpdateBranch).toHaveBeenCalledWith('/repo', 42)
       expect(onRefresh).toHaveBeenCalled()
     })
   })
-})
 
-describe('PrOverviewPanel — shows error message when prUpdateBranch returns error', () => {
-  it('shows error message when prUpdateBranch returns error', async () => {
+  it('shows the error when GitHub refuses the update', async () => {
     const { githubAPI } = await import('../../src/api/github')
     vi.mocked(githubAPI.prUpdateBranch).mockResolvedValueOnce({ error: 'update failed' })
-    render(
-      <PrOverviewPanel
-        repoRoot="/repo"
-        pr={{ ...basePr, mergeStateStatus: 'behind' }}
-        sessionStatus="not-started"
-        onStartReview={vi.fn()}
-        onClose={vi.fn()}
-      />
-    )
-    fireEvent.click(screen.getByText(/Update from main/))
-    await waitFor(() => {
-      expect(screen.getByText('update failed')).toBeTruthy()
+    renderPanel(behind)
+    fireEvent.click(screen.getByRole('button', { name: 'Update from main' }))
+    expect(await screen.findByText('update failed')).toBeTruthy()
+  })
+})
+
+describe('PrOverviewPanel — a branch with conflicts', () => {
+  it('offers no branch action on a clean branch', () => {
+    renderPanel()
+    expect(screen.queryByRole('button', { name: /Update from|Resolve conflicts/ })).toBeNull()
+  })
+
+  it('prepares a worktree, then opens the merge flow on it', async () => {
+    const onStartMergeFlow = vi.fn()
+    renderPanel({ mergeStateStatus: 'dirty' }, { onStartMergeFlow })
+    fireEvent.click(screen.getByRole('button', { name: 'Resolve conflicts' }))
+    await waitFor(() => expect(onStartMergeFlow).toHaveBeenCalledWith('/tmp/worktree/branch'))
+    expect(mockPreparePrWorktree).toHaveBeenCalledWith({
+      repoRoot: '/repo',
+      worktreePath: '/tmp/worktree/branch',
+      headRefName: basePr.headRefName,
+      baseRefName: basePr.baseRefName,
     })
-  })
-})
-
-describe('PrOverviewPanel — shows requested reviewers as pending when no approvals', () => {
-  it('shows requested reviewers as pending when no approvals', () => {
-    render(
-      <PrOverviewPanel
-        repoRoot="/repo"
-        pr={{ ...basePr, requestedReviewers: ['dave', 'eve'] }}
-        sessionStatus="not-started"
-        onStartReview={vi.fn()}
-        onClose={vi.fn()}
-      />
-    )
-    expect(within(atAGlance()).getByText('Review requested from dave, eve')).toBeTruthy()
-  })
-})
-
-describe('PrOverviewPanel — shows Awaiting label for pending reviewers when approvals already exist', () => {
-  it('shows "Awaiting" label for pending reviewers when approvals already exist', () => {
-    render(
-      <PrOverviewPanel
-        repoRoot="/repo"
-        pr={{
-          ...basePr,
-          approvals: [
-            { author: 'bob', authorAvatarUrl: '', submittedAt: new Date().toISOString() },
-          ],
-          requestedReviewers: ['dave'],
-        }}
-        sessionStatus="not-started"
-        onStartReview={vi.fn()}
-        onClose={vi.fn()}
-      />
-    )
-    expect(within(atAGlance()).getByText('Approved by bob')).toBeTruthy()
-    expect(within(atAGlance()).getByText('Awaiting dave')).toBeTruthy()
-  })
-})
-
-describe('PrOverviewPanel — does not show reviewer bar when no approvals and no requested reviewers', () => {
-  it('does not show reviewer bar when no approvals and no requested reviewers', () => {
-    render(
-      <PrOverviewPanel
-        repoRoot="/repo"
-        pr={basePr}
-        sessionStatus="not-started"
-        onStartReview={vi.fn()}
-        onClose={vi.fn()}
-      />
-    )
-    expect(within(atAGlance()).queryByText(/Approved by/)).toBeNull()
-    expect(within(atAGlance()).queryByText(/Review requested from/)).toBeNull()
-  })
-})
-
-describe('PrOverviewPanel — shows Your review requested badge when current user is a requested reviewer', () => {
-  it('shows "Your review requested" badge when current user is a requested reviewer', () => {
-    vi.mocked(usePrReviewStore).mockReturnValue({
-      viewedFiles: new Set(),
-      issueComments: [],
-      currentUserLogin: 'alice',
-    })
-    render(
-      <PrOverviewPanel
-        repoRoot="/repo"
-        pr={{ ...basePr, requestedReviewers: ['alice', 'bob'] }}
-        sessionStatus="not-started"
-        onStartReview={vi.fn()}
-        onClose={vi.fn()}
-      />
-    )
-    expect(within(atAGlance()).getByText('Your review requested')).toBeTruthy()
-  })
-})
-
-describe('PrOverviewPanel — shows Your review requested badge when current user is an assignee', () => {
-  it('shows "Your review requested" badge when current user is an assignee', () => {
-    vi.mocked(usePrReviewStore).mockReturnValue({
-      viewedFiles: new Set(),
-      issueComments: [],
-      currentUserLogin: 'alice',
-    })
-    render(
-      <PrOverviewPanel
-        repoRoot="/repo"
-        pr={{ ...basePr, assigneeLogins: ['alice'] }}
-        sessionStatus="not-started"
-        onStartReview={vi.fn()}
-        onClose={vi.fn()}
-      />
-    )
-    expect(within(atAGlance()).getByText('Your review requested')).toBeTruthy()
-  })
-})
-
-describe('PrOverviewPanel — does not show Your review requested badge when current user is not a reviewer or assignee', () => {
-  it('does not show "Your review requested" badge when current user is not a reviewer or assignee', () => {
-    vi.mocked(usePrReviewStore).mockReturnValue({
-      viewedFiles: new Set(),
-      issueComments: [],
-      currentUserLogin: 'alice',
-    })
-    render(
-      <PrOverviewPanel
-        repoRoot="/repo"
-        pr={{ ...basePr, requestedReviewers: ['bob'] }}
-        sessionStatus="not-started"
-        onStartReview={vi.fn()}
-        onClose={vi.fn()}
-      />
-    )
-    expect(within(atAGlance()).queryByText('Your review requested')).toBeNull()
   })
 })

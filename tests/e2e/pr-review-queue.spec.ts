@@ -74,7 +74,7 @@ const queueRow = (view: Page, title: string) => view.locator('.rd-row').filter({
 async function openPrOverview(title: string): Promise<Page> {
   const view = await openCodeReviews(handle, 'Review Queue')
   await queueRow(view, title).click()
-  await expect(view.locator('.pr-review-topbar-title')).toContainText(title)
+  await expect(view.getByRole('heading', { level: 1 })).toContainText(title)
   return view
 }
 
@@ -104,8 +104,8 @@ test('a comment in the discussion is posted to the pull request', async () => {
 
 test('a draft is marked ready, and a branch behind main is brought up to date', async () => {
   const view = await openCodeReviews(handle, 'Review Queue')
-  await view.getByRole('button', { name: 'Mark as Ready' }).click()
-  await expect(view.locator('.pr-draft-badge')).toBeHidden()
+  await view.getByRole('button', { name: 'Mark as ready' }).click()
+  await expect(view.getByRole('heading', { level: 1 })).not.toContainText('Draft')
   expect(stub.pullRequest(1).isDraft).toBe(false)
 
   await view.getByRole('button', { name: 'Update from main' }).click()
@@ -147,7 +147,7 @@ test('a conflicted pull request is merged in a worktree and pushed', async () =>
   await view.getByRole('button', { name: /^Confirm/ }).click()
   await view.getByRole('button', { name: 'Commit merge' }).click()
 
-  await expect(view.locator('.pr-review-topbar-title')).toContainText('Rework greeting', {
+  await expect(view.getByRole('heading', { level: 1 })).toContainText('Rework greeting', {
     timeout: 15000,
   })
   await expect.poll(() => git(bare, 'log', '-1', '--format=%s', 'feat/greeting')).toMatch(/^Merge/)
