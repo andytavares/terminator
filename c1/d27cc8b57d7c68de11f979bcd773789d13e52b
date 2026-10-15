@@ -1,0 +1,21 @@
+CHANGELOG.md
+  s_837ce62a35c763::t_b18b890abb9ec5 60
+docs/adr/111-pr-summaries-run-the-review-agents-claude.md
+  s_837ce62a35c763::t_c3a842c27185ae 27
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c1d27cc8b57d7c68de11f979bcd773789d13e52b",
+  "prompts": {},
+  "sessions": {
+    "s_837ce62a35c763": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "45533135-b709-406c-9718-b6ef771239e3",
+        "model": "claude-haiku-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
