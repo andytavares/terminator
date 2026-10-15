@@ -105,6 +105,22 @@
   color: var(--tm-text-secondary);
 }
 
+.fh-why-file {
+  margin-left: auto;
+  padding: 1px var(--tm-space-2);
+  border: 0;
+  border-radius: var(--tm-radius-sm);
+  background: transparent;
+  color: var(--tm-text-muted);
+  font: 12px/1.4 var(--tm-font-ui);
+  cursor: pointer;
+}
+
+.fh-why-file:hover {
+  background: var(--tm-overlay-subtle);
+  color: var(--tm-text-primary);
+}
+
 .fh-why-label {
   color: var(--tm-text-primary);
   font-weight: 500;

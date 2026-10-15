@@ -8,7 +8,7 @@ export interface Span {
 const MAX_LINE_LENGTH = 1000
 const MAX_TOKEN_PRODUCT = 250_000
 const MIN_SHARED_FRACTION = 0.4
-const TOKEN_PATTERN = /[A-Za-z0-9_]+|\s+|[^A-Za-z0-9_\s]/g
+const TOKEN_PATTERN = /[A-Za-z0-9_]+|\s+|[^A-Za-z0-9_\s]/gu
 
 /** Identifier/number runs, whitespace runs and single punctuation characters; they join back to the input. */
 export function tokenize(text: string): string[] {
@@ -97,7 +97,7 @@ export function pairReplacedLines(lines: DiffLine[]): Map<number, number> {
   return pairs
 }
 
-const HTML_UNIT = /<[^>]*>|&#?\w+;|[^<&]|&/g
+const HTML_UNIT = /<[^>]*>|&#?\w+;|[^<&]|&/gu
 
 /** Wraps the changed characters of highlighted HTML in `<span class>`; a mark never spans a tag. */
 export function markChangedWords(html: string, spans: Span[], className: string): string {
@@ -110,9 +110,14 @@ export function markChangedWords(html: string, spans: Span[], className: string)
     const wantMark = !isTag && changedAt[position] === true
     marked += markBoundary(marking, wantMark, className) + unit
     marking = wantMark
-    if (!isTag) position++
+    if (!isTag) position += textWidth(unit)
   }
   return marking ? `${marked}</span>` : marked
+}
+
+/** UTF-16 units a unit stands for in the span text: an entity is one character, an astral character two. */
+function textWidth(unit: string): number {
+  return unit.startsWith('&') && unit.length > 1 ? 1 : unit.length
 }
 
 /** The tag that opens or closes a mark when marking changes between two units, else nothing. */

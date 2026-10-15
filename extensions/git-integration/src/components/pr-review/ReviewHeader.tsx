@@ -5,6 +5,7 @@ import { StatusChecksBar } from './StatusChecksBar'
 import type { StatusCheck } from '../../schemas/pr-review.schema'
 import { plural } from '@terminator/extension-sdk'
 import './review-header.css'
+import './review-layout.css'
 
 /** One chapter's slice of the progress bar. */
 export interface ChapterProgress {
@@ -122,9 +123,20 @@ function filledPercent(chapter: ChapterProgress): number {
 }
 
 /** One segment per chapter, as wide as the chapter has files. */
-function ChapterSegments(props: { chapters: ChapterProgress[]; label: string }) {
+function ChapterSegments(props: {
+  chapters: ChapterProgress[]
+  viewedCount: number
+  totalFiles: number
+}) {
   return (
-    <div role="img" aria-label={props.label} className="rh-segments">
+    <div
+      role="progressbar"
+      aria-label="Files viewed"
+      aria-valuemin={0}
+      aria-valuemax={props.totalFiles}
+      aria-valuenow={props.viewedCount}
+      className="rh-segments"
+    >
       {props.chapters.map((chapter) => (
         <i
           key={chapter.id}
@@ -151,7 +163,8 @@ function ReviewProgress(props: ReviewHeaderProps) {
     <div className="rh-progress">
       <ChapterSegments
         chapters={props.chapters}
-        label={`${viewedCount} of ${totalFiles} files viewed`}
+        viewedCount={viewedCount}
+        totalFiles={totalFiles}
       />
       <span className="rh-progress-text">
         {progressText(viewedCount, totalFiles, props.minutesLeft)}
@@ -164,6 +177,8 @@ interface MenuItemProps {
   label: string
   hint?: React.ReactNode
   disabled?: boolean
+  /** Set on a toggle: the item is then a checkbox menu item. */
+  checked?: boolean
   onSelect: () => void
 }
 
@@ -171,7 +186,8 @@ function HeaderMenuItem(props: MenuItemProps & { close: () => void }) {
   return (
     <button
       type="button"
-      role="menuitem"
+      role={props.checked === undefined ? 'menuitem' : 'menuitemcheckbox'}
+      aria-checked={props.checked}
       className="rh-menu-item"
       disabled={props.disabled}
       onClick={() => {
@@ -188,7 +204,12 @@ function HeaderMenuItem(props: MenuItemProps & { close: () => void }) {
 /** The "more" menu's items, in order; an item whose handler is absent is left out. */
 function menuItems(props: ReviewHeaderProps): MenuItemProps[] {
   const items: (MenuItemProps | false)[] = [
-    { label: 'Focus mode', hint: props.focusMode && 'On', onSelect: props.onToggleFocusMode },
+    {
+      label: 'Focus mode',
+      hint: props.focusMode && 'On',
+      checked: props.focusMode,
+      onSelect: props.onToggleFocusMode,
+    },
     !!props.onShowOverview && { label: 'Overview', hint: 'i', onSelect: props.onShowOverview },
     { label: 'Hide file list', hint: 't', onSelect: props.onToggleFileList },
     { label: 'Pause review', onSelect: props.onPause },
@@ -251,7 +272,7 @@ function SubmitButton(props: { draftCount: number; onSubmit: () => void }) {
       {props.draftCount > 0 && (
         <span className="rh-count">
           {props.draftCount}
-          <span className="rh-hidden"> {plural(props.draftCount, 'pending comment')}</span>
+          <span className="pr-visually-hidden"> {plural(props.draftCount, 'pending comment')}</span>
         </span>
       )}
     </Button>

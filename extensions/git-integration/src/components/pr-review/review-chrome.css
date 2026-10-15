@@ -79,23 +79,6 @@
   font: 13px/1.45 var(--tm-font-ui);
 }
 
-.rc-keys-bar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 9px 14px;
-  background: var(--tm-bg-surface);
-  border-bottom: 1px solid var(--tm-border);
-}
-
-.rc-keys-bar .rc-t {
-  font-weight: 600;
-}
-
-.rc-keys-bar .rc-sp {
-  flex: 1;
-}
-
 .rc-keys {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

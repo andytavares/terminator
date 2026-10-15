@@ -103,3 +103,20 @@ describe('markChangedWords', () => {
     )
   })
 })
+
+describe('astral characters', () => {
+  const loneSurrogate = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/
+
+  it('never splits a surrogate pair into two spans', () => {
+    const { old, new: next } = wordSpans('ready 😀 now', 'ready 😃 now')
+    for (const span of [...old, ...next]) expect(span.text).not.toMatch(loneSurrogate)
+    expect(next.find((span) => span.changed)?.text).toBe('😃')
+  })
+
+  it('marks the emoji whole in highlighted HTML', () => {
+    const { new: next } = wordSpans('ready 😀 now', 'ready 😃 now')
+    const marked = markChangedWords('ready 😃 now', next, 'w')
+    expect(marked).toBe('ready <span class="w">😃</span> now')
+    expect(marked).not.toMatch(loneSurrogate)
+  })
+})

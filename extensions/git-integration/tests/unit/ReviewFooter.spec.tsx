@@ -41,28 +41,28 @@ describe('ReviewFooter — previous file', () => {
 describe('ReviewFooter — forward action', () => {
   it('names the next file and marks the open one viewed', async () => {
     const handlers = renderFooter()
-    await userEvent.click(screen.getByRole('button', { name: 'Viewed, next: api.py' }))
+    await userEvent.click(screen.getByRole('button', { name: /^Viewed, next: api.py/ }))
     expect(handlers.onMarkViewed).toHaveBeenCalledTimes(1)
   })
 
   it('says "next chapter" on the last file of a chapter', async () => {
     const handlers = renderFooter({ isLastFile: true, nextFileName: 'models.py' })
-    await userEvent.click(screen.getByRole('button', { name: 'Viewed, next chapter' }))
+    await userEvent.click(screen.getByRole('button', { name: /^Viewed, next chapter/ }))
     expect(handlers.onFinishChapter).toHaveBeenCalledTimes(1)
   })
 
   it('says "submit review" on the last file overall and finishes, which opens the submit panel', async () => {
     const handlers = renderFooter({ isLastFile: true, isLastChapter: true, nextFileName: null })
-    await userEvent.click(screen.getByRole('button', { name: 'Viewed, submit review' }))
+    await userEvent.click(screen.getByRole('button', { name: /^Viewed, submit review/ }))
     expect(handlers.onFinishChapter).toHaveBeenCalledTimes(1)
   })
 })
 
 describe('ReviewFooter — one primary action', () => {
   it.each([
-    [false, false, 'Viewed, next: api.py'],
-    [true, false, 'Viewed, next chapter'],
-    [true, true, 'Viewed, submit review'],
+    [false, false, /^Viewed, next: api.py/],
+    [true, false, /^Viewed, next chapter/],
+    [true, true, /^Viewed, submit review/],
   ])(
     'renders exactly one primary button (last file %s, last chapter %s)',
     (isLastFile, isLastChapter, name) => {
@@ -72,6 +72,20 @@ describe('ReviewFooter — one primary action', () => {
       expect(screen.getByRole('button', { name })).toBe(primary[0])
     }
   )
+})
+
+describe('ReviewFooter — narrow width', () => {
+  it('keeps the short label readable to assistive technology, since the long one is display:none there', () => {
+    renderFooter()
+    const short = document.querySelector('.rf-short')
+    expect(short?.hasAttribute('aria-hidden')).toBe(false)
+    expect(screen.getByRole('button', { name: /Next/ })).toBeTruthy()
+  })
+
+  it('reads "Viewed, next file" without an empty name when the open file is outside the sequence', () => {
+    renderFooter({ nextFileName: null })
+    expect(screen.getByRole('button', { name: /^Viewed, next file/ })).toBeTruthy()
+  })
 })
 
 describe('ReviewFooter — hints', () => {

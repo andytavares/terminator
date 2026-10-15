@@ -274,7 +274,7 @@ describe('PrReviewView — shows risk panel when ShowRisk is clicked', () => {
     render(
       <PrReviewView repoRoot="/repo" pr={mockPr} onClose={mockClose} onRefresh={mockRefresh} />
     )
-    fireEvent.click(screen.getByRole('button', { name: 'Viewed, submit review' }))
+    fireEvent.click(screen.getByRole('button', { name: /^Viewed, submit review/ }))
     expect(screen.getByTestId('submit-panel')).toBeTruthy()
   })
 })
@@ -292,7 +292,7 @@ describe('PrReviewView — advances to next chapter (not submit) when FinishChap
         onRefresh={mockRefresh}
       />
     )
-    fireEvent.click(screen.getByRole('button', { name: 'Viewed, next chapter' }))
+    fireEvent.click(screen.getByRole('button', { name: /^Viewed, next chapter/ }))
     expect(mockSetCurrentChapter).toHaveBeenCalledWith('ch-2')
     expect(screen.queryByTestId('submit-panel')).toBeNull()
   })
@@ -313,7 +313,7 @@ describe('PrReviewView — finishing a chapter marks its unviewed files in one b
         onRefresh={mockRefresh}
       />
     )
-    fireEvent.click(screen.getByRole('button', { name: 'Viewed, submit review' }))
+    fireEvent.click(screen.getByRole('button', { name: /^Viewed, submit review/ }))
     expect(mockMarkFilesViewed).toHaveBeenCalledTimes(1)
     expect(mockMarkFilesViewed).toHaveBeenCalledWith(
       { repoRoot: '/repo', prNumber: 1, headSHA: 'abc' },
@@ -477,7 +477,7 @@ describe('PrReviewView (continued) — large-PR warning — toggles focus mode o
     )
     expect(screen.queryByRole('button', { name: 'Focus mode', pressed: true })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'More review actions' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: /^Focus mode/ }))
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /^Focus mode/ }))
     const pill = screen.getByRole('button', { name: 'Focus mode', pressed: true })
     fireEvent.click(pill)
     expect(screen.queryByRole('button', { name: 'Focus mode', pressed: true })).toBeNull()
@@ -498,9 +498,11 @@ describe('PrReviewView (continued) — large-PR warning — drops all-low-risk c
       { currentFilePath: 'src/high.ts', currentChapterId: 'ch-high' }
     )
     fireEvent.click(screen.getByRole('button', { name: 'More review actions' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: /^Focus mode/ }))
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /^Focus mode/ }))
     // Progress total should reflect only the high-risk chapter (1 file), not both (2 files)
-    expect(screen.getByRole('img', { name: '0 of 1 files viewed' })).toBeTruthy()
+    expect(
+      screen.getByRole('progressbar', { name: 'Files viewed' }).getAttribute('aria-valuemax')
+    ).toBe('1')
     unmount()
   })
 })
@@ -527,7 +529,7 @@ describe('PrReviewView (continued) — large-PR warning — progress bar does no
       />
     )
     // Only the one displayed file counts, however many viewed paths the store holds.
-    const segments = screen.getByRole('img', { name: '1 of 1 files viewed' })
+    const segments = screen.getByRole('progressbar', { name: 'Files viewed' })
     expect(segments.querySelector('i')?.style.getPropertyValue('--filled')).toBe('100%')
   })
 })

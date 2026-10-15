@@ -1,5 +1,6 @@
 import { classifyTier } from '../github/pr-review-service'
-import { analyseLines, symbolFromHunkHeader } from './symbols'
+import { analyseLines } from './symbols'
+import { symbolFromHunkHeader } from './hunk-header'
 import type { ReadingStep, SymbolUse } from '../schemas/pr-review.schema'
 import type { FileDiff } from '../schemas/git.schema'
 import type { ParsedPrFile } from './parsed-file'

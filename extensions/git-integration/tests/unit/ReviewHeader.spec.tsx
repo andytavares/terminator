@@ -154,14 +154,17 @@ describe('ReviewHeader (continued)', () => {
   describe('progress', () => {
     it('draws one segment per chapter, named by the viewed total', () => {
       render(<ReviewHeader {...baseProps({ viewedCount: 3, totalFiles: 12 })} />)
-      const segments = screen.getByRole('img', { name: '3 of 12 files viewed' })
+      const segments = screen.getByRole('progressbar', { name: 'Files viewed' })
       expect(segments.querySelectorAll('i')).toHaveLength(2)
+      expect(segments.getAttribute('aria-valuemin')).toBe('0')
+      expect(segments.getAttribute('aria-valuemax')).toBe('12')
+      expect(segments.getAttribute('aria-valuenow')).toBe('3')
     })
 
     it('sizes each segment by its file count and fills the viewed share', () => {
       render(<ReviewHeader {...baseProps()} />)
       const [first, second] = screen
-        .getByRole('img', { name: '2 of 10 files viewed' })
+        .getByRole('progressbar', { name: 'Files viewed' })
         .querySelectorAll('i')
       expect(first.style.flexGrow).toBe('6')
       expect(first.style.getPropertyValue('--filled')).toBe('33.33333333333333%')
@@ -220,7 +223,7 @@ describe('ReviewHeader (continued) — More menu', () => {
     render(<ReviewHeader {...baseProps({ onToggleFocusMode })} />)
     openMenu()
     expect(screen.getByRole('menu')).toBeTruthy()
-    fireEvent.click(screen.getByRole('menuitem', { name: /focus mode/i }))
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /focus mode/i }))
     expect(onToggleFocusMode).toHaveBeenCalledTimes(1)
     expect(screen.queryByRole('menu')).toBeNull()
   })
@@ -228,7 +231,8 @@ describe('ReviewHeader (continued) — More menu', () => {
   it('shows "On" next to Focus mode item when focusMode is true', () => {
     render(<ReviewHeader {...baseProps({ focusMode: true })} />)
     openMenu()
-    expect(screen.getByRole('menuitem', { name: /focus mode.*on/i })).toBeTruthy()
+    const item = screen.getByRole('menuitemcheckbox', { name: /focus mode.*on/i })
+    expect(item.getAttribute('aria-checked')).toBe('true')
   })
 })
 

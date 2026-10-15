@@ -239,6 +239,20 @@ describe('FullFileList — comments and folder', () => {
     expect(within(screen.getByTitle('src/bar.ts')).queryByText('3')).toBeNull()
   })
 
+  it.each([
+    [3, 'comments'],
+    [1, 'comment'],
+  ])('names %s as "%s" for assistive technology', (count, word) => {
+    vi.mocked(usePrReviewStore).mockReturnValue({
+      viewedFiles: new Set<string>(),
+      fileOrderOverrides: {},
+      threads: { 'src/foo.ts': Array.from({ length: count }, () => ({})) },
+    })
+    render(<FullFileList {...defaultProps} />)
+    const row = screen.getByTitle('src/foo.ts')
+    expect(within(row).getByText(word).className).toBe('pr-visually-hidden')
+  })
+
   it('shows the folder muted after the file name', () => {
     render(<FullFileList {...defaultProps} />)
     expect(within(screen.getByTitle('src/foo.ts')).getByText('src/')).toBeTruthy()

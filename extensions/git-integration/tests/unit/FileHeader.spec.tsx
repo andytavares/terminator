@@ -68,6 +68,23 @@ describe('FileHeader', () => {
   })
 })
 
+describe('FileHeader — Why this file', () => {
+  it.each(['low', 'medium'] as const)(
+    'opens the explanation from the second line for %s risk',
+    (level) => {
+      const onShowRisk = vi.fn()
+      renderFileHeader(changedFileAt(level, null), { onShowRisk })
+      screen.getByRole('button', { name: 'Why this file' }).click()
+      expect(onShowRisk).toHaveBeenCalledTimes(1)
+    }
+  )
+
+  it('leaves the High risk chip as the only way in for high risk', () => {
+    renderFileHeader(changedFileAt('high', null))
+    expect(screen.queryByRole('button', { name: 'Why this file' })).toBeNull()
+  })
+})
+
 describe('FileHeader second row', () => {
   it('says why the file is here', () => {
     renderFileHeader(changedFileAt('low', null))
