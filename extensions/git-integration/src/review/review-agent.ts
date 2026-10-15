@@ -661,8 +661,8 @@ const SUMMARY_SUBJECT: Record<SummaryKind, string> = {
   discussion: 'discussion (each comment starts with its author in bold)',
 }
 
-/** @internal */
-export function buildSummaryPrompt(input: Pick<RunSummaryInput, 'prNumber' | 'kind' | 'text'>) {
+/** The ask, the read-only rule, and the PR's own text marked as content to summarize. */
+function buildSummaryPrompt(input: Pick<RunSummaryInput, 'prNumber' | 'kind' | 'text'>) {
   return [
     `Summarize the ${SUMMARY_SUBJECT[input.kind]} of pull request #${input.prNumber} for a ` +
       'reviewer, in a few short Markdown sentences or bullets.',
