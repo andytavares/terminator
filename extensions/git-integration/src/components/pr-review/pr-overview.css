@@ -213,7 +213,15 @@
   background: var(--tm-overlay-soft);
 }
 
+.pr-overview-reading {
+  min-width: 0;
+  max-width: 100%;
+}
+
 .pr-overview-reading .tmui-markdown table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
   border-collapse: collapse;
   font-size: 12.5px;
 }
