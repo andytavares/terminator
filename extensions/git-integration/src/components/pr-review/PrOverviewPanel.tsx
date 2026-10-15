@@ -38,12 +38,12 @@ interface Props {
 type SessionStatus = Props['sessionStatus']
 
 const START_LABEL: Record<SessionStatus, string> = {
-  'not-started': 'Start Review',
-  'in-progress': 'Continue Review',
-  paused: 'Resume Review',
+  'not-started': 'Start review',
+  'in-progress': 'Continue review',
+  paused: 'Resume review',
 }
 
-/** "Start Review", or "Resume Review · 3 of 9 viewed" for a review already under way. */
+/** "Start review", or "Resume review · 3 of 9 viewed" for a review already under way. */
 function startLabel(status: SessionStatus, viewedCount: number, totalFiles: number): string {
   const base = START_LABEL[status]
   if (status === 'not-started' || totalFiles === 0) return base

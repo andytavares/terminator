@@ -2,7 +2,7 @@
 
 .rs-strip {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.3fr);
   border-top: 1px solid var(--tm-border);
   border-bottom: 1px solid var(--tm-border);
 }
@@ -60,6 +60,8 @@
 
 .rs-end {
   margin-left: auto;
+  flex-shrink: 0;
+  white-space: nowrap;
   display: flex;
   align-items: center;
   gap: var(--tm-space-1);

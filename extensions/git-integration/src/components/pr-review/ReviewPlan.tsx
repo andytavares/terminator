@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useId } from 'react'
 import { ArrowRight } from 'lucide-react'
 import { plural } from '@terminator/extension-sdk'
 import type { Chapter } from '../../schemas/pr-review.schema'
@@ -36,25 +36,40 @@ function ChangeBar({ chapter, largest }: { chapter: Chapter; largest: number }) 
   )
 }
 
-function PlanRow({ chapter, number, largest, onStartAt }: RowProps) {
+/** Risk and file count: the two facts between a chapter's name and its size. */
+function ChapterFacts({ chapter }: { chapter: Chapter }) {
   const risk = chapterRiskLevel(chapter)
   const fileCount = chapter.files.length
+  return (
+    <>
+      <span className={`review-plan__risk review-plan__risk--${risk}`}>{RISK_LABEL[risk]}</span>
+      <span className="review-plan__files">
+        {fileCount} {plural(fileCount, 'file')}
+      </span>
+    </>
+  )
+}
+
+function PlanRow({ chapter, number, largest, onStartAt }: RowProps) {
+  // Named by a hidden label, not aria-label: the icon-tooltip installer shows any aria-label
+  // that the visible text lacks, which put a tooltip under every row.
+  const labelId = useId()
   return (
     <button
       type="button"
       className="review-plan__row"
-      aria-label={`Start review at ${chapter.name}`}
+      aria-labelledby={labelId}
       onClick={() => onStartAt(chapter.id)}
     >
+      <span id={labelId} className="review-plan__hidden">
+        Start review at {chapter.name}
+      </span>
       <span className="review-plan__number">{number}</span>
       <span className="review-plan__name">
         {chapter.name}
         <small>{fileNamesOf(chapter)}</small>
       </span>
-      <span className={`review-plan__risk review-plan__risk--${risk}`}>{RISK_LABEL[risk]}</span>
-      <span className="review-plan__files">
-        {fileCount} {plural(fileCount, 'file')}
-      </span>
+      <ChapterFacts chapter={chapter} />
       <span className="review-plan__change">
         <ChangeBar chapter={chapter} largest={largest} />
         <span className="review-plan__start">

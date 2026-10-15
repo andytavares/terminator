@@ -258,9 +258,9 @@ describe('PrOverviewPanel — the header actions', () => {
 
 describe('PrOverviewPanel — the start button label', () => {
   it.each([
-    ['not-started', 'Start Review'],
-    ['paused', 'Resume Review · 0 of 3 viewed'],
-    ['in-progress', 'Continue Review · 0 of 3 viewed'],
+    ['not-started', 'Start review'],
+    ['paused', 'Resume review · 0 of 3 viewed'],
+    ['in-progress', 'Continue review · 0 of 3 viewed'],
   ])('labels the button for a %s review', (sessionStatus, label) => {
     renderPanel({}, { sessionStatus })
     expect(within(headerActions()).getByRole('button', { name: label })).toBeTruthy()
@@ -274,7 +274,7 @@ describe('PrOverviewPanel — starting the review', () => {
       issueComments: [],
     })
     renderPanel({}, { sessionStatus: 'in-progress' })
-    expect(screen.getAllByRole('button', { name: 'Continue Review · 1 of 3 viewed' })).toHaveLength(
+    expect(screen.getAllByRole('button', { name: 'Continue review · 1 of 3 viewed' })).toHaveLength(
       2
     )
   })
@@ -282,7 +282,7 @@ describe('PrOverviewPanel — starting the review', () => {
   it('starts at the first chapter when no chapter is chosen', () => {
     const onStartReview = vi.fn()
     renderPanel({}, { onStartReview })
-    fireEvent.click(within(headerActions()).getByRole('button', { name: 'Start Review' }))
+    fireEvent.click(within(headerActions()).getByRole('button', { name: 'Start review' }))
     expect(onStartReview).toHaveBeenCalledWith()
   })
 
