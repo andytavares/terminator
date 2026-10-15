@@ -12,10 +12,12 @@ import {
   lastIntake,
   loopFacts,
   agreedFacts,
+  environmentWaivedAt,
   turnEndedAt as turnEndedAtOf,
 } from '../forge/intake-outcome.js'
 import type { IntakeOutcome } from '../forge/intake-outcome.js'
-import type { LoopFacts, AgreedFacts } from '../forge/readiness.js'
+import type { LoopFacts, AgreedFacts, EnvironmentFacts } from '../forge/readiness.js'
+import { readBaseline } from '../line/baseline.js'
 import { readCiState } from '../line/ci-state.js'
 import { readPulls } from '../line/integrate.js'
 import { pullNumber } from '../line/pull-number.js'
@@ -127,6 +129,7 @@ const CompilePayload = z.object({
 
 const RecipePayload = z.object({ id: z.string(), recipe: z.string().nullable() })
 const HoldPayload = z.object({ id: z.string(), held: z.boolean() })
+const EnvironmentPayload = z.object({ id: z.string(), move: z.enum(['check', 'waive']) })
 
 const WriteBackPayload = z.object({
   id: z.string(),
@@ -221,6 +224,8 @@ export interface ForgeDeps {
    * follow-up, hand off) is the loop's own business, in `src/index.ts`.
    */
   readonly onReleased: (order: WorkOrder) => void
+  /** Prove the base branch builds and passes its checks. Never throws. */
+  readonly proveEnvironment?: (order: WorkOrder) => Promise<void>
 }
 
 export interface ForgeChannels {
@@ -244,6 +249,8 @@ export interface ForgeChannels {
   recipe(payload: z.infer<typeof RecipePayload>): Promise<unknown>
   /** Hold the loop for the operator, or release it. */
   hold(payload: z.infer<typeof HoldPayload>): Promise<unknown>
+  /** Check the base branch again, or hand off without it. */
+  environment(payload: z.infer<typeof EnvironmentPayload>): Promise<unknown>
 }
 
 /** The order plus its checks — what every Forge channel hands back. */
@@ -254,26 +261,31 @@ function view(order: WorkOrder, changed: string[] = []) {
 /**
  * The backend facts the redesigned Forge reads, from one read of the ledger.
  *
- * Every response that used to carry `intake` alone now carries these four
+ * Every response that used to carry `intake` alone now carries these five
  * together — one function so no call site can add a fifth response that
  * forgets one of them, the way `intake` alone was added in three places and
  * a fourth was missed.
  */
 async function readFacts(
-  store: OrderStore,
+  deps: Pick<ForgeDeps, 'store' | 'dataRoot'>,
   orderId: string
 ): Promise<{
   intake: IntakeOutcome
   loop: LoopFacts
   agreed: AgreedFacts | null
   turnEndedAt: string | null
+  environment: EnvironmentFacts
 }> {
-  const entries = await store.entries(orderId)
+  const entries = await deps.store.entries(orderId)
   return {
     intake: lastIntake(entries),
     loop: loopFacts(entries),
     agreed: agreedFacts(entries),
     turnEndedAt: turnEndedAtOf(entries),
+    environment: {
+      baseline: await readBaseline(deps.dataRoot(), orderId),
+      waivedAt: environmentWaivedAt(entries),
+    },
   }
 }
 
@@ -311,6 +323,7 @@ export function createForgeChannels(deps: ForgeDeps): ForgeChannels {
     cancel: (payload) => cancel(deps, payload),
     recipe: (payload) => recipe(deps, payload),
     hold: (payload) => hold(deps, payload),
+    environment: (payload) => environment(deps, payload),
   }
 }
 
@@ -356,6 +369,8 @@ async function create(deps: ForgeDeps, payload: CreateInput): Promise<unknown> {
     reason: `seeded from ${attacked.source.kind}`,
     evidence: [],
   })
+  // Minutes of work on the base branch, which the operator reads when it lands.
+  void deps.proveEnvironment?.(attacked)
 
   return { ...view(attacked), unavailableChecks: seeded.unavailableChecks }
 }
@@ -518,7 +533,7 @@ async function runArchitectTurn(
     return {
       ...view(order),
       error: started.reason,
-      ...(await readFacts(deps.store, order.id)),
+      ...(await readFacts(deps, order.id)),
     }
   }
 
@@ -528,7 +543,7 @@ async function runArchitectTurn(
   return {
     ...view(order),
     converging: started.sessionId,
-    ...(await readFacts(deps.store, order.id)),
+    ...(await readFacts(deps, order.id)),
   }
 }
 
@@ -639,7 +654,7 @@ async function compile(deps: ForgeDeps, payload: z.infer<typeof CompilePayload>)
   const result = compileOrder(order)
   // How the last intake turn ended, on the read the Forge polls: a refusal is only in
   // the ledger, and without this "working" and "finished, nothing accepted" look alike.
-  const facts = await readFacts(deps.store, id)
+  const facts = await readFacts(deps, id)
   if (!commit || !result.ok) return { compile: result, order, ...facts }
 
   const agreed = agreeOrder(order, deps.now())
@@ -659,7 +674,7 @@ async function compile(deps: ForgeDeps, payload: z.infer<typeof CompilePayload>)
     order: agreed.order,
     // Recomputed rather than reused: the ledger line just written is the
     // agreement this response is about, and the read above predates it.
-    ...(await readFacts(deps.store, id)),
+    ...(await readFacts(deps, id)),
     capability,
     advisory,
   }
@@ -960,6 +975,31 @@ async function hold(deps: ForgeDeps, payload: z.infer<typeof HoldPayload>): Prom
   return view(order)
 }
 
+const WAIVED_REASON =
+  'Handed off without a proven base branch; checks that fail there will read "failing on base".'
+
+// Check the base branch again, or hand off without it. A check runs on after the answer;
+// the Forge reads its result when baseline.json announces.
+async function environment(
+  deps: ForgeDeps,
+  payload: z.infer<typeof EnvironmentPayload>
+): Promise<unknown> {
+  const order = await deps.store.load(payload.id)
+  if (order === null) return { error: `No order ${payload.id}.` }
+
+  if (payload.move === 'check') {
+    void deps.proveEnvironment?.(order)
+  } else {
+    await recordOperator(deps, order.id, {
+      action: 'environment.waived',
+      subject: order.id,
+      reason: WAIVED_REASON,
+    })
+  }
+
+  return { ...view(order), ...(await readFacts(deps, order.id)) }
+}
+
 /** The Forge's channels, each with the schema its payload is parsed with (ADR 096). */
 export function forgeChannelSpecs(forge: ForgeChannels): ChannelSpec[] {
   return [
@@ -975,5 +1015,6 @@ export function forgeChannelSpecs(forge: ForgeChannels): ChannelSpec[] {
     foundryChannel('foundry:order.cancel', CancelPayload, forge.cancel),
     foundryChannel('foundry:order.recipe', RecipePayload, forge.recipe),
     foundryChannel('foundry:order.hold', HoldPayload, forge.hold),
+    foundryChannel('foundry:forge.environment', EnvironmentPayload, forge.environment),
   ]
 }

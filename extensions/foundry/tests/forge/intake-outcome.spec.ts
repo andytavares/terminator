@@ -4,6 +4,7 @@ import {
   intakeRefusal,
   loopFacts,
   agreedFacts,
+  environmentWaivedAt,
   turnEndedAt,
   reviewedCurrentPlan,
   anotherPassWanted,
@@ -519,5 +520,17 @@ describe('a skipped red team', () => {
     const skipped = entry({ action: 'review.skipped', reason: 'small' })
     expect(reviewedCurrentPlan([skipped])).toBe(true)
     expect(reviewedCurrentPlan([skipped, entry({ action: 'order.redrafted' })])).toBe(false)
+  })
+})
+
+describe('environmentWaivedAt', () => {
+  it('is null until the operator hands off without the base branch proven', () => {
+    expect(environmentWaivedAt([entry({ action: 'environment.failing' })])).toBeNull()
+  })
+
+  it('is the time of the last waiver', () => {
+    const waived = (at: string) => entry({ action: 'environment.waived', actor: 'operator', at })
+    const entries = [waived('2026-09-09T19:31:00Z'), waived('2026-09-09T19:35:00Z')]
+    expect(environmentWaivedAt(entries)).toBe('2026-09-09T19:35:00Z')
   })
 })

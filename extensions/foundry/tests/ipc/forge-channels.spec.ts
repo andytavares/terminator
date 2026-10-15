@@ -7,6 +7,8 @@ import { dispatchChannel } from '@terminator/extension-sdk'
 import { createForgeChannels, forgeChannelSpecs } from '../../src/ipc/forge-channels.js'
 import type { ForgeDeps } from '../../src/ipc/forge-channels.js'
 import { quietForgeSeams } from './forge-deps.js'
+import { writeBaseline } from '../../src/line/baseline.js'
+import { provenBaseline } from '../helpers/environment.js'
 import { createOrderStore } from '../../src/order/store.js'
 import { raiseGate } from '../../src/gates/rules.js'
 import { writeCiState } from '../../src/line/ci-state.js'
@@ -1950,6 +1952,88 @@ describe('foundry:order.hold', () => {
     expect(r.error).toBe('No order WO-nope.')
   })
 })
+
+describe('the base branch check', () => {
+  describe('starting and reading', startingAndReadingTests)
+  describe('readingTests', readingTests)
+  describe('the moves', theMovesTests)
+  describe('theMoveErrorsTests', theMoveErrorsTests)
+})
+
+function startingAndReadingTests() {
+  it('starts when an order is created, without the channel waiting for it', async () => {
+    let finish: () => void = () => undefined
+    const proveEnvironment = vi.fn(() => new Promise<void>((resolve) => (finish = resolve)))
+    const c = createForgeChannels(forgeDeps({ proveEnvironment }))
+    const made = (await c.create({
+      source: { kind: 'typed', text: 'x' },
+      repoPaths: [repo],
+    })) as OrderView
+    expect(proveEnvironment).toHaveBeenCalledTimes(1)
+    expect(proveEnvironment).toHaveBeenCalledWith(expect.objectContaining({ id: made.order.id }))
+    finish()
+  })
+
+  it('is read with the other facts: the baseline and when the operator waived it', async () => {
+    const seed = await drafted()
+    await writeBaseline(root, seed.order.id, provenBaseline())
+    const c = channels()
+    await c.environment({ id: seed.order.id, move: 'waive' })
+    const r = (await c.compile(compiling(seed.order.id, false))) as {
+      environment: { baseline: { state: string } | null; waivedAt: string | null }
+    }
+    expect(r.environment.baseline?.state).toBe('proven')
+    expect(r.environment.waivedAt).toBe(NOW)
+  })
+}
+
+function readingTests() {
+  it('has no baseline until one is written', async () => {
+    const seed = await drafted()
+    const r = (await channels().compile(compiling(seed.order.id, false))) as {
+      environment: unknown
+    }
+    expect(r.environment).toEqual({ baseline: null, waivedAt: null })
+  })
+}
+
+function theMovesTests() {
+  it('checks again on "check", and answers the view straight away', async () => {
+    const seed = await drafted()
+    const proveEnvironment = vi.fn(async () => undefined)
+    const c = createForgeChannels(forgeDeps({ proveEnvironment }))
+    const r = (await c.environment({ id: seed.order.id, move: 'check' })) as OrderView
+    expect(proveEnvironment).toHaveBeenCalledWith(expect.objectContaining({ id: seed.order.id }))
+    expect(r.order.id).toBe(seed.order.id)
+  })
+
+  it('records "environment.waived" on "waive", and checks nothing', async () => {
+    const seed = await drafted()
+    const proveEnvironment = vi.fn(async () => undefined)
+    const c = createForgeChannels(forgeDeps({ proveEnvironment }))
+    await c.environment({ id: seed.order.id, move: 'waive' })
+    const last = (await store.entries(seed.order.id)).at(-1)
+    expect(last).toMatchObject({
+      actor: 'operator',
+      action: 'environment.waived',
+      subject: seed.order.id,
+    })
+    expect(proveEnvironment).not.toHaveBeenCalled()
+  })
+}
+
+function theMoveErrorsTests() {
+  it('refuses a move other than check or waive, and errors on an unknown order', async () => {
+    const seed = await drafted()
+    expect(
+      await sendThroughSchema('foundry:forge.environment', { id: seed.order.id, move: 'skip' })
+    ).toEqual({ error: 'Malformed request.' })
+    const r = (await channels().environment({ id: 'WO-nope', move: 'check' })) as {
+      error?: string
+    }
+    expect(r.error).toBe('No order WO-nope.')
+  })
+}
 
 // An order made by mistake used to stay on the list for good. Discarding marks
 // it rather than deleting it, and refuses one whose agents are still working.

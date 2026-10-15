@@ -195,6 +195,7 @@ export function intakeRefusal(entries: readonly LedgerEntry[]): string | null {
 const REVIEW_HELD = 'review.held'
 const REVIEW_RELEASED = 'review.released'
 const ORDER_AGREED = 'order.agreed'
+const ENVIRONMENT_WAIVED = 'environment.waived'
 
 /** What the ledger has said about the review loop so far, read in order. */
 interface LoopTally {
@@ -276,6 +277,14 @@ export function agreedFacts(entries: readonly LedgerEntry[]): AgreedFacts | null
     if (entry.action === ORDER_AGREED) {
       return { at: entry.at, by: entry.actor === 'rule:forge' ? 'automatic' : 'you' }
     }
+  }
+  return null
+}
+
+/** When the operator last chose to hand off without a proven base branch. */
+export function environmentWaivedAt(entries: readonly LedgerEntry[]): string | null {
+  for (let i = entries.length - 1; i >= 0; i -= 1) {
+    if (entries[i].action === ENVIRONMENT_WAIVED) return entries[i].at
   }
   return null
 }

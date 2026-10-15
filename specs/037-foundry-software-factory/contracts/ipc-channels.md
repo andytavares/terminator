@@ -90,6 +90,27 @@ turn, or hand-off.
 
 ---
 
+## `foundry:forge.environment`
+
+Check the base branch again, or hand off without it proven.
+
+**Payload**:
+
+```typescript
+{
+  id: string
+  move: 'check' | 'waive'
+}
+```
+
+**Reply**: the order view with the backend facts (including `environment`), or `{ error }`.
+
+**Ledger**: `waive` writes `environment.waived`, actor `operator`, subject the
+order id. `check` starts the base branch check without waiting for it; it
+writes `baseline.json` and the `environment.*` lines itself.
+
+---
+
 ## `foundry:issues.mine`
 
 Your tickets, so one can be picked rather than remembered. `order.create` has

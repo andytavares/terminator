@@ -38,6 +38,7 @@ import {
   LOCAL_REASONS,
   type LoopFacts,
   type AgreedFacts,
+  type EnvironmentFacts,
   type Row,
   type StepView,
   type FindingView,
@@ -52,7 +53,7 @@ import { invoke } from '@terminator/extension-sdk/renderer'
 //
 // One box, one derivation. `readiness()` (ADR 074) is the one answer every
 // piece of this screen reads: who holds the order, the status strip, the
-// step rail, the six hand-off rows, the red-team findings by who acts on
+// step rail, the seven hand-off rows, the red-team findings by who acts on
 // them, and why every control that can be unavailable is unavailable. This
 // component draws what it returns and decides nothing about state itself.
 
@@ -67,6 +68,7 @@ interface OrderView {
   loop?: LoopFacts
   agreed?: AgreedFacts | null
   turnEndedAt?: string | null
+  environment?: EnvironmentFacts
   advisory?: string | null
 }
 
@@ -366,6 +368,7 @@ function useForgeState(orderId: string, onStarted: ForgeProps['onStarted']) {
   const edits = useOrderEdits(orderId, shown)
   const talk = useConverge(orderId, shown)
   const moves = useOrderMoves(orderId, { shown, shapes })
+  const moveEnvironment = useEnvironmentMove(orderId, shown)
   const handOff = useHandOff({ orderId, onStarted, shown, shapes })
   useQueuedSettle(shown.view, choices, talk.applySettle)
   return {
@@ -381,6 +384,7 @@ function useForgeState(orderId: string, onStarted: ForgeProps['onStarted']) {
     ...edits,
     ...talk,
     ...moves,
+    moveEnvironment,
   }
 }
 
@@ -459,7 +463,7 @@ function useOrderView(orderId: string) {
   // settled order, so only a draft listens.
   const readThisOrder = useCallback(() => readCompiled(orderId), [orderId])
   usePushed(readThisOrder, showCompiled, {
-    kinds: view?.order.status === 'draft' ? ['order', 'ledger', 'live'] : [],
+    kinds: view?.order.status === 'draft' ? ['order', 'ledger', 'live', 'graph'] : [],
     orderId,
   })
   return { view, setView, ...busy, moved, setMoved, refresh }
@@ -593,6 +597,19 @@ async function startAgreedRun(
   return started.error ?? null
 }
 
+/** Checking the base branch again, or handing off without it. */
+function useEnvironmentMove(orderId: string, { setView }: Pick<Shown, 'setView'>) {
+  return useCallback(
+    async (move: 'check' | 'waive') => {
+      const next = (await invoke('foundry:forge.environment', { id: orderId, move })) as
+        | OrderView
+        | { error: string }
+      if ('order' in next) setView(next)
+    },
+    [orderId, setView]
+  )
+}
+
 /** Holding the order, and picking its shape. */
 function useOrderMoves(orderId: string, { shown, shapes }: Pick<HandOffDeps, 'shown' | 'shapes'>) {
   const { setBusy, refresh } = shown
@@ -690,6 +707,7 @@ function settledFacts(view: OrderView) {
     loop: view.loop ?? { rounds: [], heldAt: null, exhausted: false },
     agreed: view.agreed ?? null,
     turnEndedAt: view.turnEndedAt ?? null,
+    environment: view.environment,
   }
 }
 
@@ -1156,6 +1174,7 @@ function CheckRow({ forge, row }: ForgeProp & { readonly row: Row }) {
 function RowMoves({ forge, row }: ForgeProp & { readonly row: Row }) {
   if (row.state === 'passed') return null
   if (row.id === 'turn') return <TurnMoves forge={forge} row={row} />
+  if (row.id === 'environment') return <EnvironmentMoves forge={forge} row={row} />
   const remedies = CHECK_REMEDIES[row.id]
   if (row.state === 'in-progress') {
     const answering = remedies.some(
@@ -1172,6 +1191,22 @@ function RowMoves({ forge, row }: ForgeProp & { readonly row: Row }) {
       {remedies.map((remedy) => (
         <RemedyMove key={remedy.label} forge={forge} remedy={remedy} />
       ))}
+    </div>
+  )
+}
+
+// Not proven: check it again, or hand off without it. A check under way has no move.
+function EnvironmentMoves({ forge, row }: ForgeProp & { readonly row: Row }) {
+  return (
+    <div className="fdry-chk-moves">
+      {row.state === 'in-progress' ? null : (
+        <Button size="sm" onClick={() => void forge.moveEnvironment('check')}>
+          Check again
+        </Button>
+      )}
+      <Button size="sm" onClick={() => void forge.moveEnvironment('waive')}>
+        Hand off anyway
+      </Button>
     </div>
   )
 }
@@ -1883,7 +1918,7 @@ function AgreedRows({ forge }: ForgeProp) {
   return (
     <>
       <p className="fdry-step-intro">
-        All six rows passed at agreement. The order is now read-only. Changes go through the run.
+        All seven rows passed at agreement. The order is now read-only. Changes go through the run.
       </p>
       <div className="fdry-checks">
         <div className="fdry-chk">
@@ -1891,8 +1926,10 @@ function AgreedRows({ forge }: ForgeProp) {
             <Check aria-hidden="true" />
           </span>
           <div>
-            <b>Six of six rows passed</b>
-            <small>Questions, proof, coverage, risk, red team, nobody changing the plan.</small>
+            <b>Seven of seven rows passed</b>
+            <small>
+              Questions, proof, coverage, risk, red team, base branch, nobody changing the plan.
+            </small>
           </div>
           <span className="fdry-pill fdry-pill--pass">Agreed</span>
         </div>

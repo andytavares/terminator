@@ -7,6 +7,7 @@ import { draftOrder } from '../../src/order/draft.js'
 import { compileOrder } from '../../src/order/compile.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import { openForgeStep } from '../helpers/forge-steps.js'
+import { PROVEN_ENVIRONMENT } from '../helpers/environment.js'
 
 // The mapping panel (FR-060): which of the tracker's own states each moment
 // means. Presented rather than assumed, because "In Review" is a decision
@@ -350,6 +351,7 @@ function compiledFor(current: WorkOrder, over: StartReplies, payload: unknown) {
   return {
     order: shown,
     compile: compileOrder(shown),
+    environment: PROVEN_ENVIRONMENT,
     ...(over.intake === undefined ? {} : { intake: answerOrCall(over.intake) }),
     ...(commit ? { advisory: over.advisory ?? null } : {}),
   }

@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { PROVEN_ENVIRONMENT, baseStep, provenBaseline } from '../helpers/environment.js'
 import { builderUnit, testCriterion } from '../helpers/order-parts.js'
 import { REWRITING_UNREADABLE } from '../../src/forge/autonomy.js'
 import { readiness } from '../../src/forge/readiness.js'
@@ -107,6 +108,7 @@ function baseInput(
     intake: baseIntake(),
     loop: baseLoop(),
     agreed: null,
+    environment: PROVEN_ENVIRONMENT,
     turnEndedAt: null,
     shape: { name: 'Direct', yours: false },
     offers: { shape: true, tracker: true },
@@ -544,7 +546,7 @@ describe('readiness — rows', () => {
 })
 
 function allRowsPassTests() {
-  it('all six rows pass on the clean WO-0928-9c6-like fixture', () => {
+  it('all seven rows pass on the clean WO-0928-9c6-like fixture', () => {
     const result = readiness(baseInput())
     expect(result.rows.map((r) => r.id)).toEqual([
       'questions',
@@ -552,6 +554,7 @@ function allRowsPassTests() {
       'coverage',
       'risk',
       'redTeam',
+      'environment',
       'turn',
     ])
     expect(result.rows.map((r) => r.label)).toEqual([
@@ -560,17 +563,16 @@ function allRowsPassTests() {
       'Plan and criteria cover each other',
       'Risk graded against this plan',
       'No blocking red-team findings',
+      'The base branch builds and passes its checks',
       'Nobody is changing the plan',
     ])
     expect(result.rows.every((r) => r.state === 'passed')).toBe(true)
-
-    const [questions, verifiable, coverage, risk, redTeam, turn] = result.rows
+    const [questions, verifiable, coverage, risk, redTeam, , turn] = result.rows
     expect(questions.detail).toBe('None were asked.')
     expect(verifiable.detail).toBe(`Both criteria are proven by a named test in ${SPEC_PATH}.`)
     expect(coverage.detail).toBe('1 unit builds both criteria.')
     expect(risk.detail).toBe(`Low risk, graded over the 2 files the plan touches.`)
-    expect(redTeam.detail).toBe('No findings.')
-    expect(turn.detail).toBe('No turn has run yet.')
+    expect([redTeam.detail, turn.detail]).toEqual(['No findings.', 'No turn has run yet.'])
   })
 }
 
@@ -705,7 +707,7 @@ function turnRowPerActorTests() {
       baseInput({
         intake: runningTurn({ actor: 'red team', round: 2 }),
       })
-    ).rows[5]
+    ).rows[6]
     expect(redTeam.detail).toBe(
       'The red team is reviewing round 2. The checks above can change when it finishes.'
     )
@@ -714,7 +716,7 @@ function turnRowPerActorTests() {
       baseInput({
         intake: runningTurn({ trigger: 'you' }),
       })
-    ).rows[5]
+    ).rows[6]
     expect(architect.detail).toBe(
       'The architect is changing the plan. The checks above can change when it finishes.'
     )
@@ -723,7 +725,7 @@ function turnRowPerActorTests() {
       baseInput({
         intake: runningTurn({ asked: 'scout', actor: 'scout' }),
       })
-    ).rows[5]
+    ).rows[6]
     expect(scout.detail).toBe('The scout is reading the repository.')
   })
 }
@@ -731,15 +733,15 @@ function turnRowPerActorTests() {
 function turnRowRefusedAndPassedTests() {
   it('turn row: refused is failing', () => {
     const result = readiness(baseInput({ intake: { kind: 'refused', at: T1, reason: 'bad' } }))
-    expect(result.rows[5].state).toBe('failing')
-    expect(result.rows[5].detail).toBe(
+    expect(result.rows[6].state).toBe('failing')
+    expect(result.rows[6].detail).toBe(
       'The last turn ended in a refusal, so the plan is not the one the architect meant to write.'
     )
   })
 
   it('turn row: passed shows when the last turn ended', () => {
     const result = readiness(baseInput({ turnEndedAt: T1 }))
-    expect(result.rows[5].detail).toBe(`The last turn ended at ${T1}.`)
+    expect(result.rows[6].detail).toBe(`The last turn ended at ${T1}.`)
   })
 }
 
@@ -1154,3 +1156,177 @@ describe('readiness — finding text in plain words', () => {
     )
   })
 })
+
+// The base branch row: whether the branch the work starts from builds and passes,
+// and the one place hand-off waits for it.
+const environmentOf = (environment: ReadinessInput['environment'], over = {}) =>
+  readiness(baseInput({ environment, ...over }))
+const rowOf = (result: ReturnType<typeof readiness>) =>
+  result.rows.find((row) => row.id === 'environment')
+
+const testsFailOnBase = provenBaseline({
+  state: 'failing',
+  steps: [baseStep('Build'), baseStep('Tests', { result: 'fail', exitCode: 1 })],
+})
+
+describe('readiness — the base branch row', () => {
+  describe('before and during the check', beforeAndDuringTests)
+  describe('after the check', afterTheCheckTests)
+  describe('failing', failingTests)
+  describe('a bug fix', aBugFixTests)
+  describe('handing off anyway', handingOffAnywayTests)
+  describe('questionsStillShowTests', questionsStillShowTests)
+})
+
+function beforeAndDuringTests() {
+  it('is not checked yet when there is no baseline, and hand-off waits', () => {
+    const result = environmentOf({ baseline: null, waivedAt: null })
+    expect(rowOf(result)).toMatchObject({
+      state: 'needs-you',
+      detail: 'Not checked for this order yet.',
+    })
+    expect(result.canHandOff).toBe(false)
+    expect(result.locks.handOff).toBe(
+      'Not checked for this order yet. Check it again, or hand off anyway.'
+    )
+  })
+
+  it('says what is being checked while it runs, and hand-off waits', () => {
+    const result = environmentOf({
+      baseline: provenBaseline({ state: 'checking' }),
+      waivedAt: null,
+    })
+    expect(rowOf(result)).toMatchObject({
+      state: 'in-progress',
+      detail: 'Checking main: format, lint, tests and build, in their own terminal tabs.',
+    })
+    expect(result.canHandOff).toBe(false)
+    expect(result.locks.handOff).toBe(
+      'Hand-off opens when the base branch check finishes, or hand off anyway.'
+    )
+  })
+}
+
+function afterTheCheckTests() {
+  it('names the commit and the steps that passed, and opens hand-off', () => {
+    const result = environmentOf({ baseline: provenBaseline(), waivedAt: null })
+    expect(rowOf(result)).toMatchObject({
+      state: 'passed',
+      detail: 'main at b289028 passed format, lint, tests and build.',
+    })
+    expect(result.canHandOff).toBe(true)
+    expect(result.locks.handOff).toBeNull()
+  })
+
+  it('says so when a reinstall was needed, and names what was not measured', () => {
+    const baseline = provenBaseline({
+      mended: true,
+      steps: [baseStep('Lint'), baseStep('Build', { result: 'not_measured', exitCode: null })],
+    })
+    expect(rowOf(environmentOf({ baseline, waivedAt: null }))?.detail).toBe(
+      'main at b289028 passed lint after a reinstall. Not measured: Build.'
+    )
+  })
+}
+
+function failingTests() {
+  it('names each failed step with its exit code and command, and blocks hand-off', () => {
+    const baseline = provenBaseline({
+      state: 'failing',
+      steps: [
+        baseStep('Lint', { result: 'fail', exitCode: 2, command: 'npm run lint' }),
+        baseStep('Tests', { result: 'fail', exitCode: 1, command: 'npm test' }),
+      ],
+    })
+    const result = environmentOf({ baseline, waivedAt: null })
+    expect(rowOf(result)).toMatchObject({
+      state: 'failing',
+      detail:
+        'Lint failed on main with exit code 2: `npm run lint`. Tests failed on main with exit code 1: `npm test`.',
+    })
+    expect(result.canHandOff).toBe(false)
+    expect(result.locks.handOff).toContain('Check it again, or hand off anyway.')
+  })
+
+  it('says the branch could not be checked when no step failed', () => {
+    const baseline = provenBaseline({ state: 'failing', steps: [] })
+    expect(rowOf(environmentOf({ baseline, waivedAt: null }))).toMatchObject({
+      state: 'failing',
+      detail: 'main could not be checked.',
+    })
+  })
+}
+
+function aBugFixTests() {
+  it('starts from failing tests, so only they failing passes the row', () => {
+    const result = environmentOf(
+      { baseline: testsFailOnBase, waivedAt: null },
+      { shape: { name: 'bugfix', yours: false } }
+    )
+    expect(rowOf(result)).toMatchObject({
+      state: 'passed',
+      detail: 'Tests fail on main, which is where a bug fix starts. It builds.',
+    })
+    expect(result.canHandOff).toBe(true)
+  })
+
+  it('still fails when the build is broken as well', () => {
+    const baseline = provenBaseline({
+      state: 'failing',
+      steps: [...testsFailOnBase.steps, baseStep('Lint', { result: 'fail', exitCode: 1 })],
+    })
+    const result = environmentOf(
+      { baseline, waivedAt: null },
+      { shape: { name: 'bugfix', yours: false } }
+    )
+    expect(rowOf(result)?.state).toBe('failing')
+  })
+
+  it('is no exception for any other shape', () => {
+    expect(rowOf(environmentOf({ baseline: testsFailOnBase, waivedAt: null }))?.state).toBe(
+      'failing'
+    )
+  })
+}
+
+function handingOffAnywayTests() {
+  it('passes once the operator hands off anyway, and says when', () => {
+    const baseline = provenBaseline({
+      state: 'failing',
+      steps: [baseStep('Build', { result: 'fail' })],
+    })
+    const result = environmentOf({ baseline, waivedAt: T2 })
+    expect(rowOf(result)).toMatchObject({
+      state: 'passed',
+      detail: `You handed off without it at ${T2}. Checks that fail on main will read “failing on base”.`,
+    })
+    expect(result.canHandOff).toBe(true)
+  })
+
+  it('passes a waiver even when the base branch was never checked', () => {
+    const result = environmentOf({ baseline: null, waivedAt: T2 })
+    expect(rowOf(result)?.state).toBe('passed')
+    expect(result.canHandOff).toBe(true)
+  })
+}
+
+function questionsStillShowTests() {
+  it('does not hide an open question behind the base branch', () => {
+    const order = wo0928Order({
+      openQuestions: [
+        {
+          id: 'Q-1',
+          text: 'which?',
+          why: '',
+          options: ['a', 'b'],
+          recommended: 0,
+          answer: null,
+          rank: 1,
+          confidence: 0.5,
+        },
+      ],
+    })
+    const result = environmentOf({ baseline: null, waivedAt: null }, { order })
+    expect(result.locks.handOff).toContain('questions need your answer')
+  })
+}

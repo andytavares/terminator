@@ -6,6 +6,8 @@ import type { CheckId, CompileResult } from '../order/compile.js'
 import { refusedParts } from '../order/proposal.js'
 import { REWRITING_UNREADABLE } from './autonomy.js'
 import type { IntakeOutcome } from './intake-outcome.js'
+import type { Baseline } from '../line/baseline.js'
+import type { StepOutcome } from '../verify/ladder.js'
 import type { StepId } from './steps.js'
 
 // Who holds a draft order, what stops it being handed off, and what happens
@@ -41,12 +43,23 @@ export interface AgreedFacts {
   readonly by: 'you' | 'automatic'
 }
 
+/** Whether the base branch was proven, and whether the operator handed off without it. */
+export interface EnvironmentFacts {
+  readonly baseline: Baseline | null
+  /** When the operator chose to hand off anyway; null when they did not. */
+  readonly waivedAt: string | null
+}
+
+const NO_ENVIRONMENT: EnvironmentFacts = { baseline: null, waivedAt: null }
+
 export interface ReadinessInput {
   readonly order: WorkOrder
   readonly compile: CompileResult
   readonly intake: IntakeOutcome
   readonly loop: LoopFacts
   readonly agreed: AgreedFacts | null
+  /** The base branch check. Absent reads as never checked. */
+  readonly environment?: EnvironmentFacts
   /** When the last intake line was written, for "The last turn ended at …". */
   readonly turnEndedAt: string | null
   /** The shape hand-off will run, and whether it is the operator's pick. */
@@ -98,7 +111,7 @@ type RowState = 'passed' | 'in-progress' | 'needs-you' | 'failing'
 
 /** One row of "Ready to hand off?": the five checks and whether anyone is changing the plan. */
 export interface Row {
-  readonly id: CheckId | 'turn'
+  readonly id: CheckId | 'environment' | 'turn'
   readonly label: string
   readonly state: RowState
   readonly detail: string
@@ -168,12 +181,13 @@ export function capitalise(word: string): string {
   return word === '' ? word : word[0].toUpperCase() + word.slice(1)
 }
 
-const ROW_LABELS: Record<CheckId | 'turn', string> = {
+const ROW_LABELS: Record<CheckId | 'environment' | 'turn', string> = {
   questions: 'No open questions',
   verifiable: 'Every criterion can be proven',
   coverage: 'Plan and criteria cover each other',
   risk: 'Risk graded against this plan',
   redTeam: 'No blocking red-team findings',
+  environment: 'The base branch builds and passes its checks',
   turn: 'Nobody is changing the plan',
 }
 
@@ -628,6 +642,65 @@ function checkRow(id: CheckId, input: ReadinessInput): Row {
   return { id, label: ROW_LABELS[id], state: 'failing', detail: failure.detail }
 }
 
+function stepNames(steps: readonly StepOutcome[], result: StepOutcome['result']): string[] {
+  return steps.filter((step) => step.result === result).map((step) => step.name)
+}
+
+function provenDetail({ baseBranch, commit, steps, mended }: Baseline): string {
+  const passed = listInWords(stepNames(steps, 'pass').map((name) => name.toLowerCase()))
+  const unmeasured = stepNames(steps, 'not_measured')
+  const at = commit === null ? baseBranch : `${baseBranch} at ${commit.slice(0, 7)}`
+  const measured = `${at} passed ${passed}${mended ? ' after a reinstall' : ''}.`
+  return unmeasured.length === 0 ? measured : `${measured} Not measured: ${unmeasured.join(', ')}.`
+}
+
+function failedDetail({ baseBranch, steps }: Baseline): string {
+  const failed = steps.filter((step) => step.result === 'fail')
+  if (failed.length === 0) return `${baseBranch} could not be checked.`
+  return failed
+    .map(
+      (step) =>
+        `${step.name} failed on ${baseBranch} with exit code ${step.exitCode}: \`${step.command}\`.`
+    )
+    .join(' ')
+}
+
+/** A bug fix starts from a failing test; a base that builds and fails only its tests is its start. */
+function bugfixStartsHere(baseline: Baseline, shape: ReadinessInput['shape']): boolean {
+  const failed = baseline.steps.filter((step) => step.result === 'fail')
+  return shape.name === 'bugfix' && failed.length > 0 && failed.every((s) => s.name === 'Tests')
+}
+
+function environmentRow(input: ReadinessInput): Row {
+  const { baseline, waivedAt } = input.environment ?? NO_ENVIRONMENT
+  const label = ROW_LABELS.environment
+  if (waivedAt !== null) {
+    const branch = baseline?.baseBranch ?? 'the base branch'
+    const detail = `You handed off without it at ${input.clock(waivedAt)}. Checks that fail on ${branch} will read “failing on base”.`
+    return { id: 'environment', label, state: 'passed', detail }
+  }
+  if (baseline === null) {
+    return {
+      id: 'environment',
+      label,
+      state: 'needs-you',
+      detail: 'Not checked for this order yet.',
+    }
+  }
+  if (baseline.state === 'checking') {
+    const detail = `Checking ${baseline.baseBranch}: format, lint, tests and build, in their own terminal tabs.`
+    return { id: 'environment', label, state: 'in-progress', detail }
+  }
+  if (baseline.state === 'proven') {
+    return { id: 'environment', label, state: 'passed', detail: provenDetail(baseline) }
+  }
+  if (bugfixStartsHere(baseline, input.shape)) {
+    const detail = `Tests fail on ${baseline.baseBranch}, which is where a bug fix starts. It builds.`
+    return { id: 'environment', label, state: 'passed', detail }
+  }
+  return { id: 'environment', label, state: 'failing', detail: failedDetail(baseline) }
+}
+
 function turnRow(input: ReadinessInput): Row {
   const { intake, turnEndedAt, clock } = input
   const label = ROW_LABELS.turn
@@ -663,6 +736,7 @@ function buildRows(input: ReadinessInput): readonly Row[] {
     checkRow('coverage', input),
     checkRow('risk', input),
     checkRow('redTeam', input),
+    environmentRow(input),
     turnRow(input),
   ]
 }
@@ -1008,7 +1082,24 @@ const decisionsLock = ({
   return input.compile.failures.length > 0 ? input.compile.failures[0].detail : null
 }
 
-const LOCK_RULES: readonly LockRule[] = [handedOffLock, runningLock, refusedLock, heldLock]
+/** A draft whose plan is otherwise ready, held only by the base branch check. */
+const environmentLock: LockRule = ({ input }) => {
+  if (input.order.status !== 'draft' || !input.compile.ok) return undefined
+  const row = environmentRow(input)
+  if (row.state === 'passed') return undefined
+  if (row.state === 'in-progress') {
+    return 'Hand-off opens when the base branch check finishes, or hand off anyway.'
+  }
+  return `${row.detail} Check it again, or hand off anyway.`
+}
+
+const LOCK_RULES: readonly LockRule[] = [
+  handedOffLock,
+  runningLock,
+  refusedLock,
+  heldLock,
+  environmentLock,
+]
 
 function buildRedraftLock(input: ReadinessInput, handOffLockText: string | null): string | null {
   const { order, intake, clock } = input
@@ -1062,7 +1153,8 @@ export function readiness(input: ReadinessInput): Readiness {
     compile.ok &&
     intake.kind !== 'running' &&
     intake.kind !== 'refused' &&
-    loop.heldAt === null
+    loop.heldAt === null &&
+    environmentRow(input).state === 'passed'
 
   const rows = buildRows(input)
   const steps = buildSteps(input, canHandOff, holder)
