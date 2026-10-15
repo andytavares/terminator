@@ -83,11 +83,12 @@ vi.mock('../../src/components/pr-review/PrOverviewPanel', () => ({
     onStartReview,
     onClose,
   }: {
-    onStartReview: () => void
+    onStartReview: (chapterId?: string) => void
     onClose: () => void
   }) => (
     <div data-testid="pr-overview-panel">
-      <button onClick={onStartReview}>Start Review</button>
+      <button onClick={() => onStartReview()}>Start Review</button>
+      <button onClick={() => onStartReview('c2')}>Start at chapter 2</button>
       <button onClick={onClose}>Close Overview</button>
     </div>
   ),
@@ -100,6 +101,7 @@ const mockReset = vi.fn()
 const mockMarkPrInProgress = vi.fn()
 const mockDismissPr = vi.fn()
 const mockSetPaused = vi.fn()
+const mockSetCurrentChapter = vi.fn()
 
 const defaultStoreState = {
   activePr: null,
@@ -110,6 +112,7 @@ const defaultStoreState = {
   markPrInProgress: mockMarkPrInProgress,
   dismissPr: mockDismissPr,
   setPaused: mockSetPaused,
+  setCurrentChapter: mockSetCurrentChapter,
   nextPrCursor: null,
   viewedFiles: new Set<string>(),
   currentChapterId: null,
@@ -203,6 +206,31 @@ describe('PrReviewTab', () => {
     // Since activePr is pre-set here, showOverview stays false → PrReviewView shows
     render(<PrReviewTab repoRoot="/repo" />)
     // With activePr set and showOverview=false, PrReviewView should render
+    expect(screen.getByTestId('pr-review-view')).toBeTruthy()
+  })
+})
+
+describe('PrReviewTab — starting from the overview', () => {
+  function showOverviewOfOpenPr() {
+    vi.mocked(usePrReviewStore).mockReturnValue({
+      ...defaultStoreState,
+      activePr: partialFake<PrReviewDetail>({ number: 1, title: 'My PR' }),
+    })
+    render(<PrReviewTab repoRoot="/repo" />)
+    fireEvent.click(screen.getByText('Show Overview'))
+  }
+
+  it('opens the review at the chapter picked in the review plan', () => {
+    showOverviewOfOpenPr()
+    fireEvent.click(screen.getByText('Start at chapter 2'))
+    expect(mockSetCurrentChapter).toHaveBeenCalledWith('c2')
+    expect(screen.getByTestId('pr-review-view')).toBeTruthy()
+  })
+
+  it('keeps the saved chapter when the review starts from the header button', () => {
+    showOverviewOfOpenPr()
+    fireEvent.click(screen.getByText('Start Review'))
+    expect(mockSetCurrentChapter).not.toHaveBeenCalled()
     expect(screen.getByTestId('pr-review-view')).toBeTruthy()
   })
 })

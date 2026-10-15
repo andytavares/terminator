@@ -51,6 +51,19 @@ describe('PropertiesRail — Details', () => {
     expect(rail().getByText('Oct 7, 2026')).toBeTruthy()
     expect(rail().getByText('No linked issues')).toBeTruthy()
   })
+})
+
+describe('PropertiesRail — linked issues', () => {
+  it('opens a linked issue in the browser rather than inside the view', () => {
+    const url = 'https://linear.app/t/issue/TER-12'
+    const issueRefs: PrReviewDetail['issueRefs'] = [{ ref: 'TER-12', type: 'linear', url }]
+    render(<PropertiesRail pr={buildPr({ issueRefs })} />)
+    const link = rail().getByRole('link', { name: 'TER-12' })
+    const click = new MouseEvent('click', { bubbles: true, cancelable: true })
+    link.dispatchEvent(click)
+    expect(click.defaultPrevented).toBe(true)
+    expect(window.electronAPI.shell.openExternal).toHaveBeenCalledWith(url)
+  })
 
   it('renders a linked issue with its ref and title', () => {
     const issueRefs = [{ ref: 'TER-12', type: 'linear', title: 'Batch the ledger' }]
