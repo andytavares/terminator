@@ -1,0 +1,22 @@
+extensions/git-integration/tests/unit/word-diff.spec.ts
+  s_e708cca5bdf352::t_9ab8e21fc6dba4 1-5,7-78
+  s_e708cca5bdf352::t_5fe3a15feaa7d1 79-80
+extensions/git-integration/src/components/pr-review/diff-pane/word-diff.ts
+  s_e708cca5bdf352::t_d9ceea0b15a3a3 1-98
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "ebbc298d0001e1c3ba221e8507cbb60f1885e77f",
+  "prompts": {},
+  "sessions": {
+    "s_e708cca5bdf352": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5d7c9815-e79e-402d-b85d-cf8028e700ad",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
