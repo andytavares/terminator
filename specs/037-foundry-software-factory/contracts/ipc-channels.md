@@ -92,7 +92,7 @@ turn, or hand-off.
 
 ## `foundry:forge.environment`
 
-Check the base branch again, or hand off without it proven.
+Check the base branch again, or skip the check. Only a draft order can do either; any other answers `{ error: 'Only a draft order can check its base branch again.' }`.
 
 **Payload**:
 
@@ -236,7 +236,9 @@ Run the six checks and, when they all pass, move the order to `agreed`. Idempote
 
 **Payload**: `{ id: string; commit: boolean }`
 
-**Response**: `{ compile: CompileResult; order: WorkOrder; advisory?: string | null }`
+**Response**: `{ compile: CompileResult; order: WorkOrder; advisory?: string | null; refused?: string }`
+
+When `commit` is true and the base branch is not proven (and the check was not skipped), nothing is saved or recorded and `refused` says why, in the words of the Forge's base branch row. The automatic hand-off is refused the same way.
 
 When `commit` is true and `compile.ok` is false the order is unchanged and `failures` names the specific offending criterion or unit (FR-011).
 

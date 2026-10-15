@@ -282,9 +282,15 @@ export function agreedFacts(entries: readonly LedgerEntry[]): AgreedFacts | null
 }
 
 /** When the operator last chose to hand off without a proven base branch. */
-export function environmentWaivedAt(entries: readonly LedgerEntry[]): string | null {
+export function environmentWaivedAt(
+  entries: readonly LedgerEntry[],
+  checkStartedAt: string | null = null
+): string | null {
   for (let i = entries.length - 1; i >= 0; i -= 1) {
-    if (entries[i].action === ENVIRONMENT_WAIVED) return entries[i].at
+    if (entries[i].action !== ENVIRONMENT_WAIVED) continue
+    const staleSinceCheck =
+      checkStartedAt !== null && Date.parse(entries[i].at) < Date.parse(checkStartedAt)
+    return staleSinceCheck ? null : entries[i].at
   }
   return null
 }

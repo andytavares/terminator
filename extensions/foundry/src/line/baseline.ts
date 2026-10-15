@@ -15,6 +15,8 @@ import type { Toolchain } from '../verify/toolchain-probe.js'
 import { lastLines, safeFilename } from './execution-parts.js'
 import type { ShellExec } from './integrate.js'
 import { issueOf } from './order-project.js'
+import { failedStepSentence } from './baseline-steps.js'
+export { failedStepSentence, isTestStep } from './baseline-steps.js'
 import {
   ensureBaselineCheckout,
   removeBaseCheckout,
@@ -92,16 +94,6 @@ export function recordedOnBase(
   if (baseline === null || commit === null || baseline.commit !== commit) return null
   const passed = baseline.steps.find((step) => step.command === command && step.result === 'pass')
   return passed?.exitCode ?? null
-}
-
-/** The sentence for a step that failed on the base branch, shared with the Forge. */
-export function failedStepSentence(step: StepOutcome, baseBranch: string): string {
-  return `${step.name} failed on ${baseBranch} with exit code ${step.exitCode}: \`${step.command}\`.`
-}
-
-/** The test step is the one on rung L1; callers do not match on its label. */
-export function isTestStep(step: StepOutcome): boolean {
-  return step.rung === 'L1'
 }
 
 interface Proof {

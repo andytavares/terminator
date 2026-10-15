@@ -488,13 +488,15 @@ function releaseDepsFor(forge: Forge): ReleaseDeps {
 async function agreeShapedOrder(forge: Forge, o: WorkOrder): Promise<Step> {
   const r = (await forge.channels().forge.compile({ id: o.id, commit: true, automatic: true })) as {
     error?: string
+    refused?: string
     order?: WorkOrder
     compile?: { failures: { detail: string }[] }
   }
   if (r.order?.status === 'agreed') return { ok: true }
   return {
     ok: false,
-    reason: r.error ?? r.compile?.failures[0]?.detail ?? 'the order could not be agreed',
+    reason:
+      r.error ?? r.refused ?? r.compile?.failures[0]?.detail ?? 'the order could not be agreed',
   }
 }
 

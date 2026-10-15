@@ -70,6 +70,8 @@ interface OrderView {
   turnEndedAt?: string | null
   environment?: EnvironmentFacts
   advisory?: string | null
+  /** Why hand-off was turned down, when the base branch check held it. */
+  refused?: string
 }
 
 interface StatesView {
@@ -598,15 +600,19 @@ async function startAgreedRun(
 }
 
 /** Checking the base branch again, or handing off without it. */
-function useEnvironmentMove(orderId: string, { setView }: Pick<Shown, 'setView'>) {
+function useEnvironmentMove(
+  orderId: string,
+  { setView, setProblem }: Pick<Shown, 'setView' | 'setProblem'>
+) {
   return useCallback(
     async (move: 'check' | 'waive') => {
       const next = (await invoke('foundry:forge.environment', { id: orderId, move })) as
         | OrderView
         | { error: string }
-      if ('order' in next) setView(next)
+      if ('error' in next) setProblem(next.error)
+      else if ('order' in next) setView(next)
     },
-    [orderId, setView]
+    [orderId, setView, setProblem]
   )
 }
 
@@ -656,6 +662,10 @@ function useHandOff({ orderId, onStarted, shown, shapes }: HandOffDeps) {
           return
         }
         setView(next)
+        if (next.refused !== undefined) {
+          setProblem(next.refused)
+          return
+        }
         if (next.order.status !== 'agreed') return
         const trouble = await startAgreedRun(orderId, chosen)
         if (trouble !== null) {
@@ -1195,7 +1205,7 @@ function RowMoves({ forge, row }: ForgeProp & { readonly row: Row }) {
   )
 }
 
-// Not proven: check it again, or hand off without it. A check under way has no move.
+// Not proven: check it again, or skip this check. A check under way has no move.
 function EnvironmentMoves({ forge, row }: ForgeProp & { readonly row: Row }) {
   return (
     <div className="fdry-chk-moves">
@@ -1205,7 +1215,7 @@ function EnvironmentMoves({ forge, row }: ForgeProp & { readonly row: Row }) {
         </Button>
       )}
       <Button size="sm" onClick={() => void forge.moveEnvironment('waive')}>
-        Hand off anyway
+        Skip this check
       </Button>
     </div>
   )

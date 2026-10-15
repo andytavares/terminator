@@ -16,8 +16,10 @@ import {
   turnEndedAt as turnEndedAtOf,
 } from '../forge/intake-outcome.js'
 import type { IntakeOutcome } from '../forge/intake-outcome.js'
+import { environmentRefusal } from '../forge/readiness.js'
+import { proposeRecipe } from './run-channels.js'
 import type { LoopFacts, AgreedFacts, EnvironmentFacts } from '../forge/readiness.js'
-import { readBaseline } from '../line/baseline.js'
+import { isProving, readBaseline } from '../line/baseline.js'
 import { readCiState } from '../line/ci-state.js'
 import { readPulls } from '../line/integrate.js'
 import { pullNumber } from '../line/pull-number.js'
@@ -277,14 +279,16 @@ async function readFacts(
   environment: EnvironmentFacts
 }> {
   const entries = await deps.store.entries(orderId)
+  const baseline = await readBaseline(deps.dataRoot(), orderId)
   return {
     intake: lastIntake(entries),
     loop: loopFacts(entries),
     agreed: agreedFacts(entries),
     turnEndedAt: turnEndedAtOf(entries),
     environment: {
-      baseline: await readBaseline(deps.dataRoot(), orderId),
-      waivedAt: environmentWaivedAt(entries),
+      baseline,
+      waivedAt: environmentWaivedAt(entries, baseline?.startedAt ?? null),
+      proving: isProving(orderId),
     },
   }
 }
@@ -657,6 +661,10 @@ async function compile(deps: ForgeDeps, payload: z.infer<typeof CompilePayload>)
   const facts = await readFacts(deps, id)
   if (!commit || !result.ok) return { compile: result, order, ...facts }
 
+  // Hand-off waits for the base branch check here too, so no caller can go around the Forge's row.
+  const refused = environmentRefusal(facts.environment, order.recipe ?? proposeRecipe(order).name)
+  if (refused !== null) return { compile: result, order, ...facts, refused }
+
   const agreed = agreeOrder(order, deps.now())
   if (!agreed.ok) return { compile: agreed.result, order, ...facts }
 
@@ -986,6 +994,9 @@ async function environment(
 ): Promise<unknown> {
   const order = await deps.store.load(payload.id)
   if (order === null) return { error: `No order ${payload.id}.` }
+  if (order.status !== 'draft') {
+    return { error: 'Only a draft order can check its base branch again.' }
+  }
 
   if (payload.move === 'check') {
     void deps.proveEnvironment?.(order)

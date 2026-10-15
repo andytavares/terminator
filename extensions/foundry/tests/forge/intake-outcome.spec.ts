@@ -533,4 +533,15 @@ describe('environmentWaivedAt', () => {
     const entries = [waived('2026-09-09T19:31:00Z'), waived('2026-09-09T19:35:00Z')]
     expect(environmentWaivedAt(entries)).toBe('2026-09-09T19:35:00Z')
   })
+
+  it('ignores a waiver older than the check that started since', () => {
+    const waived = entry({
+      action: 'environment.waived',
+      actor: 'operator',
+      at: '2026-09-09T19:31:00Z',
+    })
+    expect(environmentWaivedAt([waived], '2026-09-09T19:40:00Z')).toBeNull()
+    expect(environmentWaivedAt([waived], '2026-09-09T19:31:00Z')).toBe('2026-09-09T19:31:00Z')
+    expect(environmentWaivedAt([waived], '2026-09-09T19:20:00Z')).toBe('2026-09-09T19:31:00Z')
+  })
 })

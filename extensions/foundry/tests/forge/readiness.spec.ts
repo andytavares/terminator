@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest'
 import { PROVEN_ENVIRONMENT, baseStep, provenBaseline } from '../helpers/environment.js'
 import { builderUnit, testCriterion } from '../helpers/order-parts.js'
 import { REWRITING_UNREADABLE } from '../../src/forge/autonomy.js'
-import { readiness } from '../../src/forge/readiness.js'
-import type { LoopFacts, ReadinessInput } from '../../src/forge/readiness.js'
+import { environmentPasses, readiness } from '../../src/forge/readiness.js'
+import type { EnvironmentFacts, LoopFacts, ReadinessInput } from '../../src/forge/readiness.js'
 import { draftOrder } from '../../src/order/draft.js'
 import { compileOrder } from '../../src/order/compile.js'
 import type { WorkOrder } from '../../src/order/schema.js'
@@ -1173,7 +1173,10 @@ describe('readiness — the base branch row', () => {
   describe('before and during the check', beforeAndDuringTests)
   describe('after the check', afterTheCheckTests)
   describe('failing', failingTests)
+  describe('failingEdgesTests', failingEdgesTests)
+  describe('a check that stopped', stoppedCheckTests)
   describe('a bug fix', aBugFixTests)
+  describe('aBugFixEdgesTests', aBugFixEdgesTests)
   describe('handing off anyway', handingOffAnywayTests)
   describe('questionsStillShowTests', questionsStillShowTests)
 })
@@ -1187,7 +1190,7 @@ function beforeAndDuringTests() {
     })
     expect(result.canHandOff).toBe(false)
     expect(result.locks.handOff).toBe(
-      'Not checked for this order yet. Check it again, or hand off anyway.'
+      'Not checked for this order yet. Check it again, or skip this check.'
     )
   })
 
@@ -1202,7 +1205,7 @@ function beforeAndDuringTests() {
     })
     expect(result.canHandOff).toBe(false)
     expect(result.locks.handOff).toBe(
-      'Hand-off opens when the base branch check finishes, or hand off anyway.'
+      'Hand-off opens when the base branch check finishes, or skip this check.'
     )
   })
 }
@@ -1245,15 +1248,55 @@ function failingTests() {
         'Lint failed on main with exit code 2: `npm run lint`. Tests failed on main with exit code 1: `npm test`.',
     })
     expect(result.canHandOff).toBe(false)
-    expect(result.locks.handOff).toContain('Check it again, or hand off anyway.')
+    expect(result.locks.handOff).toContain('Check it again, or skip this check.')
   })
 
   it('says the branch could not be checked when no step failed', () => {
     const baseline = provenBaseline({ state: 'failing', steps: [] })
     expect(rowOf(environmentOf({ baseline, waivedAt: null }))).toMatchObject({
       state: 'failing',
-      detail: 'main could not be checked.',
+      detail: 'Nothing could be measured on main.',
     })
+  })
+}
+
+function failingEdgesTests() {
+  it('says nothing could be measured when every step was not measured', () => {
+    const baseline = provenBaseline({
+      state: 'failing',
+      steps: [baseStep('Lint', { result: 'not_measured', exitCode: null })],
+    })
+    expect(rowOf(environmentOf({ baseline, waivedAt: null }))?.detail).toBe(
+      'Nothing could be measured on main.'
+    )
+  })
+
+  it('never reads "passed ." when a proven check has no passed step', () => {
+    const baseline = provenBaseline({ steps: [] })
+    const detail = rowOf(environmentOf({ baseline, waivedAt: null }))?.detail ?? ''
+    expect(detail).not.toMatch(/passed \./)
+    expect(detail).toBe('main at b289028 had nothing that could be measured.')
+  })
+}
+
+function stoppedCheckTests() {
+  it('reads a check left "checking" by a quit app as stopped, and offers it again', () => {
+    const baseline = provenBaseline({ state: 'checking' })
+    const result = environmentOf({ baseline, waivedAt: null, proving: false })
+    expect(rowOf(result)).toMatchObject({
+      state: 'failing',
+      detail: 'The check of main stopped before it finished.',
+    })
+    expect(result.locks.handOff).toBe(
+      'The check of main stopped before it finished. Check it again, or skip this check.'
+    )
+  })
+
+  it('keeps reading a check that is really running as in progress', () => {
+    const baseline = provenBaseline({ state: 'checking' })
+    expect(rowOf(environmentOf({ baseline, waivedAt: null, proving: true }))?.state).toBe(
+      'in-progress'
+    )
   })
 }
 
@@ -1268,6 +1311,35 @@ function aBugFixTests() {
       detail: 'Tests fail on main, which is where a bug fix starts. It builds.',
     })
     expect(result.canHandOff).toBe(true)
+  })
+
+  it('says nothing of a build that did not pass', () => {
+    const baseline = provenBaseline({
+      state: 'failing',
+      steps: [baseStep('Tests', { result: 'fail', exitCode: 1 })],
+    })
+    const result = environmentOf(
+      { baseline, waivedAt: null },
+      { shape: { name: 'bugfix', yours: false } }
+    )
+    expect(rowOf(result)).toMatchObject({
+      state: 'passed',
+      detail: 'Tests fail on main, which is where a bug fix starts.',
+    })
+  })
+}
+
+function aBugFixEdgesTests() {
+  it('finds the test step by its rung, not by its label', () => {
+    const baseline = provenBaseline({
+      state: 'failing',
+      steps: [baseStep('Unit', { rung: 'L1', result: 'fail', exitCode: 1 })],
+    })
+    const result = environmentOf(
+      { baseline, waivedAt: null },
+      { shape: { name: 'bugfix', yours: false } }
+    )
+    expect(rowOf(result)?.state).toBe('passed')
   })
 
   it('still fails when the build is broken as well', () => {
@@ -1330,3 +1402,50 @@ function questionsStillShowTests() {
     expect(result.locks.handOff).toContain('questions need your answer')
   })
 }
+
+const failing = provenBaseline({
+  state: 'failing',
+  steps: [baseStep('Lint', { result: 'fail', exitCode: 1 })],
+})
+
+const passesCases: [string, EnvironmentFacts, string | null, boolean][] = [
+  ['never checked', { baseline: null, waivedAt: null }, null, false],
+  ['checking', { baseline: provenBaseline({ state: 'checking' }), waivedAt: null }, null, false],
+  [
+    'a check that stopped',
+    { baseline: provenBaseline({ state: 'checking' }), waivedAt: null, proving: false },
+    null,
+    false,
+  ],
+  ['failing', { baseline: failing, waivedAt: null }, null, false],
+  ['proven', { baseline: provenBaseline(), waivedAt: null }, null, true],
+  ['failing but waived', { baseline: failing, waivedAt: T2 }, null, true],
+  ['never checked but waived', { baseline: null, waivedAt: T2 }, null, true],
+  [
+    'only tests failing on a bug fix',
+    { baseline: testsFailOnBase, waivedAt: null },
+    'bugfix',
+    true,
+  ],
+  [
+    'only tests failing on another shape',
+    { baseline: testsFailOnBase, waivedAt: null },
+    'feature',
+    false,
+  ],
+]
+
+const passesRows = passesCases.map(([name, environment, shapeName, expected]) => ({
+  name,
+  environment,
+  shapeName,
+  expected,
+}))
+
+describe('environmentPasses', () => {
+  it.each(passesRows)('$name', ({ environment, shapeName, expected }) => {
+    expect(environmentPasses(environment, shapeName)).toBe(expected)
+    const row = rowOf(environmentOf(environment, { shape: { name: shapeName, yours: false } }))
+    expect(row?.state === 'passed').toBe(expected)
+  })
+})

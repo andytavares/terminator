@@ -2,10 +2,17 @@ import type { Baseline } from '../../src/line/baseline.js'
 import type { EnvironmentFacts } from '../../src/forge/readiness.js'
 import type { StepOutcome } from '../../src/verify/ladder.js'
 
+const RUNG_OF: Record<string, StepOutcome['rung']> = {
+  Format: 'L0',
+  Lint: 'L0',
+  Tests: 'L1',
+  Build: 'L5',
+}
+
 /** A step that ran on the base branch, passing unless `over` says otherwise. */
 export function baseStep(name: string, over: Partial<StepOutcome> = {}): StepOutcome {
   return {
-    rung: 'L1',
+    rung: RUNG_OF[name] ?? 'L1',
     name,
     result: 'pass',
     reason: '',
