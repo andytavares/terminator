@@ -103,6 +103,8 @@ export interface Shipment {
    * known, which reads as the older "no findings" rather than as a skip.
    */
   readonly inspection?: { readonly ran: boolean; readonly reason: string }
+  /** Checks that already failed on the base branch before this change, by name. */
+  readonly failingOnBase?: readonly string[]
 }
 
 export interface LanePullRequest {
@@ -130,11 +132,7 @@ function acceptanceLines(order: WorkOrder, shipment: Shipment): string[] {
     return ['- No verdicts were recorded. The criteria were not judged.']
   }
   return order.acceptance.map((criterion) => {
-    const found = shipment.verdicts.filter((v) => v.criterionId === criterion.id)
-    const worst =
-      found.find((v) => v.result === 'fail') ??
-      found.find((v) => v.result === 'not_measured') ??
-      found[0]
+    const worst = worstVerdict(criterion.id, shipment.verdicts)
     const outcome =
       worst === undefined
         ? 'not measured: nothing ran'
@@ -206,20 +204,26 @@ export function shipModeFor(order: WorkOrder): ShipMode {
     : 'push_then_gate'
 }
 
+/** fail beats not measured beats the first; undefined when nothing was judged. */
+function worstVerdict(criterionId: string, verdicts: readonly Verdict[]): Verdict | undefined {
+  const found = verdicts.filter((v) => v.criterionId === criterionId)
+  return (
+    found.find((v) => v.result === 'fail') ??
+    found.find((v) => v.result === 'not_measured') ??
+    found[0]
+  )
+}
+
 function verdictLine(order: WorkOrder, criterionId: string, verdicts: readonly Verdict[]): string {
   const statement = order.acceptance.find((c) => c.id === criterionId)?.statement ?? ''
-  const found = verdicts.filter((v) => v.criterionId === criterionId)
+  const worst = worstVerdict(criterionId, verdicts)
 
   // No verdict is "not measured", never a pass. This is the same rule the
   // ladder enforces, said again at the surface a reviewer actually reads —
   // a criterion silently omitted from this table is how an unchecked change
   // gets approved.
-  if (found.length === 0) return `| ${criterionId} | ${statement} | not measured | nothing ran |`
+  if (worst === undefined) return `| ${criterionId} | ${statement} | not measured | nothing ran |`
 
-  const worst =
-    found.find((v) => v.result === 'fail') ??
-    found.find((v) => v.result === 'not_measured') ??
-    found[0]
   const result = worst.result === 'not_measured' ? 'not measured' : worst.result
   return `| ${criterionId} | ${statement} | ${result} | ${worst.reason} |`
 }
@@ -287,6 +291,7 @@ export function prBody(
   return [
     ...introLines(order),
     ...verdictTable(order, shipment),
+    ...leftForYouLines(order, shipment),
     ...verificationLines(shipment.ladder ?? null),
     ...rulesLines(shipment.rulesInForce ?? []),
     '',
@@ -328,6 +333,62 @@ function verdictTable(order: WorkOrder, shipment: Shipment): string[] {
     '| | Criterion | Result | Notes |',
     '| --- | --- | --- | --- |',
     ...(rows.length === 0 ? ['| — | _No criteria._ | not measured | |'] : rows),
+  ]
+}
+
+/** Every item that still needs a person, from what the order and shipment already hold. */
+function leftForYouLines(order: WorkOrder, shipment: Shipment): string[] {
+  const failing = order.acceptance.filter(
+    (criterion) => worstVerdict(criterion.id, shipment.verdicts)?.result !== 'pass'
+  )
+  const items = [
+    ...failing.map((criterion) => criterionItem(criterion, shipment.verdicts)),
+    ...unmeasuredStepItems(shipment.ladder ?? null),
+    ...failingOnBaseItems(order, shipment.failingOnBase ?? []),
+    ...pendingDecisionItems(order),
+  ]
+  const total = order.acceptance.length
+  const summary =
+    failing.length === 0 && items.length === 0
+      ? 'Nothing. Every criterion passed and nothing is pending.'
+      : `**${total - failing.length} of ${total}** criteria pass. ${failing.length} need you.`
+  return ['', "### What's left for you", '', summary, ...items]
+}
+
+function criterionItem(
+  criterion: WorkOrder['acceptance'][number],
+  verdicts: readonly Verdict[]
+): string {
+  const worst = worstVerdict(criterion.id, verdicts)
+  const head = `- **${criterion.id}** ${criterion.statement}:`
+  if (worst?.result === 'fail') return `${head} failed. ${worst.reason}`
+  return `${head} not measured. ${worst?.reason || 'nothing ran'}`
+}
+
+function unmeasuredStepItems(ladder: LadderOutcome | null): string[] {
+  return (ladder?.steps ?? [])
+    .filter((step) => step.result === 'not_measured')
+    .map((step) => `- **${step.name}**: not measured. ${step.reason}`)
+}
+
+function failingOnBaseItems(order: WorkOrder, names: readonly string[]): string[] {
+  const base = order.context.repos[0]?.baseBranch ?? 'the base branch'
+  return names.map(
+    (name) => `- **${name}**: fails on ${base} before this change. Not this pull request's to fix.`
+  )
+}
+
+function pendingDecisionItems(order: WorkOrder): string[] {
+  return [
+    ...order.redTeam
+      .filter((finding) => finding.status === 'accepted')
+      .map((f) => `- **${f.id}** accepted by you: ${f.text}. Reason: ${f.reason}`),
+    ...order.assumptions
+      .filter((assumption) => !assumption.struck)
+      .map((a) => `- **${a.id}** assumed: ${a.text}. Nobody struck it.`),
+    ...order.openQuestions
+      .filter((question) => question.answer === null)
+      .map((q) => `- **${q.id}** still open: ${q.text}`),
   ]
 }
 

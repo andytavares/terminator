@@ -5,6 +5,7 @@ import { RUNGS, rungLevelInWords } from '../verify/ladder.js'
 import { askOnce, createLiveGateStore } from '../gates/store.js'
 import type { GateStore } from '../gates/store.js'
 import { shipOrder } from './integrate.js'
+import { readBaseline } from './baseline.js'
 import { afterFinalCheck, ciRounds, settledOnce } from './ship-tail.js'
 import { createEarlyShip } from './early-ship.js'
 import { executePlan } from './executor.js'
@@ -54,6 +55,8 @@ interface RunTail {
   // sends work back only once the check has settled, so a builder never edits
   // the checkout the check is climbing over.
   readonly finalCheck: ReturnType<typeof settledOnce<boolean>>
+  // Checks the base branch already failed, so the draft can say they are not this change's.
+  readonly failingOnBase: readonly string[]
 }
 
 /** What a shipment is drawn from: the run's verdicts, its ladder, and whether inspection is owed. */
@@ -102,7 +105,14 @@ async function prepareRun(api: ExtensionAPI, run: OrderRun): Promise<RunTail> {
     graphRef: { current: graph },
     shippedOrderRef: { current: order },
     finalCheck: settledOnce<boolean>(),
+    failingOnBase: await failingOnBaseOf(root, order.id),
   }
+}
+
+async function failingOnBaseOf(root: string, orderId: string): Promise<string[]> {
+  const baseline = await readBaseline(root, orderId)
+  if (baseline?.state !== 'failing') return []
+  return baseline.steps.filter((step) => step.result === 'fail').map((step) => step.name)
 }
 
 function shipmentFor(tail: RunTail, found: Found): Shipment {
@@ -114,6 +124,7 @@ function shipmentFor(tail: RunTail, found: Found): Shipment {
       reason: `graded ${tail.shippedOrderRef.current.risk.grade} with no risk triggers`,
     },
     ladder: found.ladder,
+    failingOnBase: tail.failingOnBase,
     // Grouped by rung, so the record says what was in force where rather
     // than listing every rule as though they all applied at once.
     rulesInForce: RUNGS.flatMap((rung) =>

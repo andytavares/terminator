@@ -14,6 +14,9 @@ import { agentsAnswer, agreedLineOrder, checks, repositoryWithRemote } from '../
 import { createOrderStore } from '../../src/order/store.js'
 import { createGateStore } from '../../src/gates/store.js'
 import { checkoutPath } from '../../src/line/worktree.js'
+import { writeBaseline } from '../../src/line/baseline.js'
+import type { Baseline } from '../../src/line/baseline.js'
+import { orderDir } from '../../src/data-root.js'
 import { readGraph } from '../../src/state/live-index.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import { theRunner } from '../helpers/supervision-mocks.js'
@@ -88,6 +91,23 @@ beforeEach(async () => {
   agentsAnswer(theRunner, parent)
 })
 
+function failingBaseline(): Baseline {
+  const step = { rung: 'L0' as const, exitCode: 0, command: 'npm run lint', reason: '' }
+  return {
+    state: 'failing',
+    startedAt: '2026-09-06T10:00:00.000Z',
+    finishedAt: '2026-09-06T10:01:00.000Z',
+    baseBranch: 'main',
+    commit: null,
+    steps: [
+      { ...step, name: 'Lint', result: 'pass' },
+      { ...step, rung: 'L1', name: 'Tests', result: 'fail', exitCode: 1 },
+    ],
+    logs: {},
+    mended: false,
+  }
+}
+
 describe('an agreed order whose checks pass', () => {
   it('opens a draft, watches CI to green, asks whether it is ready, and is shipped', async () => {
     githubWithOneDraft(() => checks('pass'))
@@ -97,6 +117,21 @@ describe('an agreed order whose checks pass', () => {
       expect.arrayContaining(['run.complete', 'ship.draft_opened'])
     )
     expect(await gateIdFor('ready-for-review')).toBeTruthy()
+  })
+})
+
+describe('an order whose base branch was already failing', () => {
+  it('says in the draft body which checks failed on the base before the change', async () => {
+    githubWithOneDraft(() => checks('pass'))
+    await writeBaseline(dataDir, 'WO-1', failingBaseline())
+    await startOrderRun(agreedLineOrder(repo))
+    await untilShipped()
+    const body = fs.readFileSync(
+      path.join(orderDir(dataDir, 'WO-1'), 'pull-request-lane-1.md'),
+      'utf8'
+    )
+    expect(body).toContain('- **Tests**: fails on main before this change.')
+    expect(body).not.toContain('**Lint**: fails on')
   })
 })
 
