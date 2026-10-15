@@ -1,0 +1,50 @@
+extensions/git-integration/tests/unit/diff-lines.spec.ts
+  s_e708cca5bdf352::t_8c1a949d75536e 1-9
+extensions/git-integration/src/components/pr-review/diff-pane/rows.tsx
+  s_e708cca5bdf352::t_d99246bec3f505 17-19,67-68,70-71,93-100,112,121-125,127-130,132-134,152-156,268-270,294-302,305,309,311,316,375-387,392-394
+extensions/git-integration/src/components/pr-review/diff-pane/lines.ts
+  s_e708cca5bdf352::t_80a92dd645aa94 3,5,57,71-95
+extensions/git-integration/src/review/hunk-header.ts
+  s_e708cca5bdf352::t_45afb7b663a7fd 32
+  s_e708cca5bdf352::t_ed38e22cbeb92f 1-31,33-44
+extensions/git-integration/src/components/pr-review/diff-pane/diff-rows.css
+  s_e708cca5bdf352::t_738f072eecb625 1-176
+extensions/git-integration/tests/unit/ReviewDiffPane.spec.tsx
+  s_e708cca5bdf352::t_5ad6a27b075469 608-609,1048-1053,1072,1074,1083,1087
+  s_e708cca5bdf352::t_41d1844d2f1d30 320-323,876,1597,1614,1633,1647,1661-1715
+  s_e708cca5bdf352::t_1d6404d46ed50a 523,525,588-590,763,766
+  s_e708cca5bdf352::t_2368b8e945e6d8 312-313,316,632,640,663,691,710,724,778,836,1046,1132,1216
+extensions/git-integration/src/review/symbols.ts
+  s_e708cca5bdf352::t_ed38e22cbeb92f 386
+extensions/git-integration/src/components/pr-review/DiffLineRows.tsx
+  s_e708cca5bdf352::t_80a92dd645aa94 2,7-8,43-44,73,117-120,131-138,141,144,146,196-201
+extensions/git-integration/tests/unit/symbols.spec.ts
+  s_e708cca5bdf352::t_ed38e22cbeb92f 3
+extensions/git-integration/tests/unit/word-diff.spec.ts
+  s_e708cca5bdf352::t_29220e9d6d5bcb 6,95,102
+  s_e708cca5bdf352::t_8c1a949d75536e 81-94,96-101,103-104
+  s_e708cca5bdf352::t_71751bf04e7e0d 105
+extensions/git-integration/src/components/pr-review/diff-pane/word-diff.ts
+  s_e708cca5bdf352::t_80a92dd645aa94 99-110,112-115,122
+  s_e708cca5bdf352::t_3e84526f3dbf8b 111,116-121
+extensions/git-integration/tests/unit/hunk-header.spec.ts
+  s_e708cca5bdf352::t_ed38e22cbeb92f 1-31
+packages/extension-ui/src/tokens.css
+  s_e708cca5bdf352::t_899c65755029b7 47-48,124-125
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "494380666d781ed97bdd28926baef1b9599a6462",
+  "prompts": {},
+  "sessions": {
+    "s_e708cca5bdf352": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5d7c9815-e79e-402d-b85d-cf8028e700ad",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
