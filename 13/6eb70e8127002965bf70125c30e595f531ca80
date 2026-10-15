@@ -1,0 +1,28 @@
+extensions/git-integration/src/components/pr-review/review-plan.css
+  s_e708cca5bdf352::t_90de71d1bd745b 139-147
+extensions/git-integration/src/components/pr-review/PrOverviewPanel.tsx
+  s_e708cca5bdf352::t_90de71d1bd745b 41-43,46
+extensions/git-integration/src/components/pr-review/ReviewPlan.tsx
+  s_e708cca5bdf352::t_eef6d3861938cc 39-40,43-53,72
+  s_e708cca5bdf352::t_90de71d1bd745b 1,54-56,61,64-66
+extensions/git-integration/tests/unit/PrOverviewPanel.spec.tsx
+  s_e708cca5bdf352::t_90de71d1bd745b 261-263,277,285
+extensions/git-integration/src/components/pr-review/readiness-strip.css
+  s_e708cca5bdf352::t_90de71d1bd745b 5,63-64
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "136eb70e8127002965bf70125c30e595f531ca80",
+  "prompts": {},
+  "sessions": {
+    "s_e708cca5bdf352": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5d7c9815-e79e-402d-b85d-cf8028e700ad",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
