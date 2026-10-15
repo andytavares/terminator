@@ -1,0 +1,29 @@
+extensions/foundry/tests/line/integrate.spec.ts
+  s_402975842e5b4f::t_a0e82a82819f65 467,1738,1740,1763
+  s_402975842e5b4f::t_37c154140c56a4 2,466,1628-1695,1697-1703,1705-1723,1725-1737,1739,1741-1762
+  s_402975842e5b4f::t_65b5f52ce7f7eb 1696,1704,1724
+extensions/foundry/src/line/integrate.ts
+  s_402975842e5b4f::t_f7f6b523d09cb7 135
+  s_402975842e5b4f::t_983c7d36838e30 106-107,207-216,219,225,294,339-394
+extensions/foundry/tests/line/execute-run.spec.ts
+  s_402975842e5b4f::t_09ee4bda390030 17-19,94-110,123-134
+  s_402975842e5b4f::t_d0aca694e72bfa 135-137
+extensions/foundry/src/line/execute-run.ts
+  s_402975842e5b4f::t_c403e82679c977 8,58-59,108,112-117,127
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "8d3e711041c44d3684776c8f7a9fcc1aad96d5b2",
+  "prompts": {},
+  "sessions": {
+    "s_402975842e5b4f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5884d9c4-7cce-4149-80c4-5ca403338036",
+        "model": "unknown"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
