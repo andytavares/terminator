@@ -1,0 +1,23 @@
+extensions/git-integration/src/components/pr-review/review-inspector.css
+  s_e708cca5bdf352::t_57022c76bdedfb 62-63
+extensions/git-integration/src/components/pr-review/WhyThisFile.tsx
+  s_e708cca5bdf352::t_19279bbb359036 58,78
+extensions/git-integration/tests/unit/WhyThisFile.spec.tsx
+  s_e708cca5bdf352::t_30b4e0a011f178 132-139
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "61278c5c86ff1c7900d0533c33daca0ab69f901f",
+  "prompts": {},
+  "sessions": {
+    "s_e708cca5bdf352": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5d7c9815-e79e-402d-b85d-cf8028e700ad",
+        "model": "unknown"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
