@@ -6,6 +6,12 @@ import type {
   SignalDots,
 } from '../schemas/pr-review.schema'
 import type { RawFileMetrics } from '../api/github'
+import {
+  BLAST_HIGH_IMPORTERS,
+  BLAST_MEDIUM_IMPORTERS,
+  CHURN_HIGH_COMMITS,
+  CHURN_MEDIUM_COMMITS,
+} from './risk-thresholds'
 import { computeRiskScore, queueRiskLevel } from '../github/pr-review-service'
 
 type RiskLevel = RiskScore['level']
@@ -121,7 +127,7 @@ export function signalDots(measured: MeasuredFile[], pr: PrReviewDetail): Signal
     coverage: coverageDot(measured, pr),
     ci: CI_DOTS[pr.ciStatus] ?? 'unknown',
     lint: pr.lintStatus ?? 'unknown',
-    churn: thresholdDot(maxChurn, 20, 50),
-    blast: thresholdDot(maxBlast, 10, 20),
+    churn: thresholdDot(maxChurn, CHURN_MEDIUM_COMMITS, CHURN_HIGH_COMMITS),
+    blast: thresholdDot(maxBlast, BLAST_MEDIUM_IMPORTERS, BLAST_HIGH_IMPORTERS),
   }
 }
