@@ -2,29 +2,11 @@ import React from 'react'
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { ReviewInspector } from '../../src/components/pr-review/ReviewInspector'
-import type { RiskScore } from '../../src/schemas/pr-review.schema'
+import { makeRiskScore } from './risk-score-fixtures'
 
-vi.mock('../../src/components/pr-review/RiskBreakdownPanel', () => ({
-  RiskBreakdownPanel: () => <div data-testid="risk-panel" />,
+vi.mock('../../src/components/pr-review/WhyThisFile', () => ({
+  WhyThisFile: () => <div data-testid="why-panel" />,
 }))
-
-function makeRiskScore(): RiskScore {
-  return {
-    level: 'low',
-    composite: 30,
-    dominantDriver: '',
-    topImporters: [],
-    importerCount: 0,
-    metrics: {
-      changeSize: 10,
-      testFilePresent: true,
-      complexityDelta: 0,
-      churn90d: 2,
-      blastRadius: 1,
-      patchCoverage: 85,
-    },
-  }
-}
 
 const baseFile = {
   path: 'src/foo.ts',
@@ -46,7 +28,7 @@ describe('ReviewInspector', () => {
       />
     )
     expect(screen.getByRole('tab', { name: /Agent/ })).toBeTruthy()
-    expect(screen.queryByRole('tab', { name: /File/ })).toBeNull()
+    expect(screen.queryByRole('tab', { name: /Why this file/ })).toBeNull()
   })
 })
 
@@ -64,7 +46,7 @@ describe('ReviewInspector — shows only the File tab when agent is unavailable'
       />
     )
     expect(screen.queryByRole('tab', { name: /Agent/ })).toBeNull()
-    expect(screen.getByRole('tab', { name: /File/ })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: /Why this file/ })).toBeTruthy()
   })
 })
 
@@ -82,11 +64,11 @@ describe('ReviewInspector — marks the active tab aria-selected and renders its
       />
     )
     const agentTab = screen.getByRole('tab', { name: /Agent/ })
-    const fileTab = screen.getByRole('tab', { name: /File/ })
+    const fileTab = screen.getByRole('tab', { name: /Why this file/ })
     expect(agentTab.getAttribute('aria-selected')).toBe('true')
     expect(fileTab.getAttribute('aria-selected')).toBe('false')
     expect(screen.getByTestId('agent-body')).toBeTruthy()
-    expect(screen.queryByTestId('risk-panel')).toBeNull()
+    expect(screen.queryByTestId('why-panel')).toBeNull()
   })
 })
 
@@ -104,7 +86,7 @@ describe('ReviewInspector — calls onTabChange when a tab is clicked', () => {
         file={baseFile}
       />
     )
-    fireEvent.click(screen.getByRole('tab', { name: /File/ }))
+    fireEvent.click(screen.getByRole('tab', { name: /Why this file/ }))
     expect(onTabChange).toHaveBeenCalledWith('file')
   })
 })
@@ -175,8 +157,8 @@ describe('ReviewInspector — falls back to the available tab when the requested
         file={baseFile}
       />
     )
-    expect(screen.getByTestId('risk-panel')).toBeTruthy()
-    const fileTab = screen.getByRole('tab', { name: /File/ })
+    expect(screen.getByTestId('why-panel')).toBeTruthy()
+    const fileTab = screen.getByRole('tab', { name: /Why this file/ })
     expect(fileTab.getAttribute('aria-selected')).toBe('true')
   })
 })
@@ -200,8 +182,8 @@ describe('ReviewInspector — calls onClose when the close button is clicked', (
   })
 })
 
-describe('ReviewInspector — renders the File tab with the risk panel and the Health list rows', () => {
-  it('renders the File tab with the risk panel and the Health list rows', () => {
+describe('ReviewInspector — renders the Why this file tab with its panel', () => {
+  it('renders the Why this file tab with its panel', () => {
     render(
       <ReviewInspector
         tab="file"
@@ -210,11 +192,10 @@ describe('ReviewInspector — renders the File tab with the risk panel and the H
         agentAvailable
         agentFindingCount={0}
         agent={<div data-testid="agent-body" />}
-        file={{ ...baseFile, ciStatus: 'passing', lintStatus: 'pass' }}
+        file={baseFile}
       />
     )
-    expect(screen.getByTestId('risk-panel')).toBeTruthy()
-    expect(screen.getByText('Health')).toBeTruthy()
+    expect(screen.getByTestId('why-panel')).toBeTruthy()
     expect(screen.getByRole('tabpanel')).toBeTruthy()
   })
 })
@@ -252,7 +233,7 @@ describe('ReviewInspector — moves to the File tab with the arrow keys', () => 
     )
     fireEvent.keyDown(screen.getByRole('tab', { name: 'Agent' }), { key: 'ArrowRight' })
     expect(onTabChange).toHaveBeenCalledWith('file')
-    expect(document.activeElement).toBe(screen.getByRole('tab', { name: 'File' }))
+    expect(document.activeElement).toBe(screen.getByRole('tab', { name: 'Why this file' }))
   })
 })
 
@@ -272,5 +253,48 @@ describe('ReviewInspector — names the Agent tab with its finding count and tie
     const agentTab = screen.getByRole('tab', { name: 'Agent, 3' })
     expect(screen.getByRole('tabpanel').getAttribute('aria-labelledby')).toBe(agentTab.id)
     expect(agentTab.getAttribute('aria-controls')).toBe(screen.getByRole('tabpanel').id)
+  })
+})
+
+describe('ReviewInspector — names its two tabs Why this file and Agent', () => {
+  it('names its two tabs Why this file and Agent', () => {
+    render(
+      <ReviewInspector
+        tab="agent"
+        onTabChange={vi.fn()}
+        onClose={vi.fn()}
+        agentAvailable
+        agentFindingCount={0}
+        agent={<div />}
+        file={baseFile}
+      />
+    )
+    const names = screen.getAllByRole('tab').map((tab) => tab.textContent)
+    expect(names).toEqual(['Agent', 'Why this file'])
+  })
+})
+
+function DrawerHarness() {
+  const [open, setOpen] = React.useState(true)
+  if (!open) return null
+  return (
+    <ReviewInspector
+      tab="agent"
+      onTabChange={vi.fn()}
+      onClose={() => setOpen(false)}
+      agentAvailable
+      agentFindingCount={0}
+      agent={<div />}
+      file={baseFile}
+    />
+  )
+}
+
+describe('ReviewInspector — closes on Escape', () => {
+  it('leaves the DOM when Escape is pressed', () => {
+    render(<DrawerHarness />)
+    expect(screen.getByRole('tablist', { name: 'Inspector' })).toBeTruthy()
+    fireEvent.keyDown(document.body, { key: 'Escape' })
+    expect(screen.queryByRole('tablist', { name: 'Inspector' })).toBeNull()
   })
 })

@@ -43,3 +43,157 @@
 .ri-panel .ap-header {
   display: none;
 }
+
+/* ─── Drawer ─────────────────────────────────────────────────────────────── */
+
+.ri-drawer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 380px;
+  max-width: 90%;
+  display: flex;
+  flex-direction: column;
+  background: var(--tm-bg-elevated);
+  border-left: 1px solid var(--tm-border-strong);
+  /* No shadow token exists. */
+  box-shadow: -12px 0 32px rgba(0, 0, 0, 0.35);
+  z-index: var(--tm-layer-panel);
+}
+
+/* ─── Why this file ──────────────────────────────────────────────────────── */
+
+.ri-why {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tm-space-4);
+  padding: var(--tm-space-4);
+}
+
+.ri-lead {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--tm-space-2);
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.ri-chip {
+  padding: 2px var(--tm-space-2);
+  border-radius: var(--tm-radius-sm);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.ri-chip--high {
+  background: color-mix(in srgb, var(--tm-danger) 16%, transparent);
+  color: var(--tm-danger);
+}
+
+.ri-chip--medium {
+  background: color-mix(in srgb, var(--tm-warning) 16%, transparent);
+  color: var(--tm-warning);
+}
+
+.ri-chip--low {
+  background: var(--tm-overlay-soft);
+  color: var(--tm-text-secondary);
+}
+
+.ri-factors {
+  display: flex;
+  flex-direction: column;
+}
+
+.ri-factor {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+  padding: 10px 0;
+  border-top: 1px solid var(--tm-border);
+  font-size: 12.5px;
+}
+
+.ri-factor b {
+  display: block;
+  font-weight: 500;
+}
+
+.ri-factor small {
+  display: block;
+  margin-top: 1px;
+  font-size: 11.5px;
+  color: var(--tm-text-muted);
+}
+
+.ri-factor-icon {
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  color: var(--tm-text-muted);
+}
+
+.ri-factor--hi .ri-factor-icon {
+  color: var(--tm-danger);
+}
+
+.ri-factor--md .ri-factor-icon {
+  color: var(--tm-warning);
+}
+
+.ri-factor--ok .ri-factor-icon {
+  color: var(--tm-success);
+}
+
+.ri-factor-note {
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--tm-text-secondary);
+}
+
+.ri-importers-heading {
+  margin: var(--tm-space-2) 0 var(--tm-space-1);
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--tm-text-secondary);
+}
+
+.ri-importer-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tm-space-1);
+}
+
+.ri-importer {
+  padding: 1px var(--tm-space-2);
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-sm);
+  background: transparent;
+  font-family: var(--tm-font-mono);
+  font-size: 11px;
+  color: var(--tm-accent-text);
+  cursor: pointer;
+}
+
+.ri-importer:hover {
+  background: var(--tm-overlay-soft);
+  color: var(--tm-text-primary);
+}
+
+.ri-importer-more {
+  font-size: 11px;
+  color: var(--tm-text-muted);
+}
+
+.ri-foot-note {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--tm-text-muted);
+}
