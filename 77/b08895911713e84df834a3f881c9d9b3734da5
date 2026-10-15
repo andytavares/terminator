@@ -1,0 +1,19 @@
+extensions/git-integration/src/review/review-agent.ts
+  s_f9309412e89414::t_2cbea15303137d 664-665
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "77b08895911713e84df834a3f881c9d9b3734da5",
+  "prompts": {},
+  "sessions": {
+    "s_f9309412e89414": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ce51b59a-7553-4c40-93cb-3c33611e1390",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
