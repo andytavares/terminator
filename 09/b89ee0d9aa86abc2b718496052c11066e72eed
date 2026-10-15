@@ -1,0 +1,24 @@
+tests/e2e/foundry-harness.ts
+  s_e708cca5bdf352::t_7c375a703216db 279-281,284,288-291,294-295,297-299,302,304
+  s_e708cca5bdf352::t_a6b764e162b5e6 296
+tests/e2e/foundry-intake.spec.ts
+  s_e708cca5bdf352::t_7c375a703216db 8-9,152-153
+tests/e2e/foundry-forge.spec.ts
+  s_e708cca5bdf352::t_7c375a703216db 14,17,145-146
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "09b89ee0d9aa86abc2b718496052c11066e72eed",
+  "prompts": {},
+  "sessions": {
+    "s_e708cca5bdf352": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5d7c9815-e79e-402d-b85d-cf8028e700ad",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
