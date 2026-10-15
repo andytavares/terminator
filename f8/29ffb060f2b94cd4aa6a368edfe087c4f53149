@@ -1,0 +1,29 @@
+extensions/git-integration/tests/unit/risk-score.spec.ts
+  s_e708cca5bdf352::t_41dabe1d2600af 237-239,254,256-280,284-306
+  s_e708cca5bdf352::t_a0285e8fa55be9 281-283
+  s_e708cca5bdf352::t_bde1031ff71057 240-253,255
+extensions/git-integration/src/review/risk-thresholds.ts
+  s_e708cca5bdf352::t_41dabe1d2600af 1-7
+extensions/git-integration/src/github/pr-review-service.ts
+  s_e708cca5bdf352::t_cc7eeb1b0ce4bc 329,331
+  s_e708cca5bdf352::t_01a35abc35c073 265-287,290-291
+  s_e708cca5bdf352::t_41dabe1d2600af 13-21,56-57,205-219,224-229,232-237,246-248,252,255,288-289,292,302-303,311
+extensions/git-integration/src/review/pr-signals.ts
+  s_e708cca5bdf352::t_41dabe1d2600af 9-14,130-131
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f829ffb060f2b94cd4aa6a368edfe087c4f53149",
+  "prompts": {},
+  "sessions": {
+    "s_e708cca5bdf352": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5d7c9815-e79e-402d-b85d-cf8028e700ad",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
