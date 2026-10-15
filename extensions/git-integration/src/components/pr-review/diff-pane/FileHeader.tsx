@@ -77,6 +77,16 @@ function ViewedToggle(props: FileHeaderProps) {
   )
 }
 
+/** Medium and low files have no risk chip; this opens the same explanation. */
+function WhyThisFileButton(props: { file: PrChangedFile; onShowRisk: () => void }) {
+  if (props.file.riskScore.level === 'high') return null
+  return (
+    <button type="button" className="fh-why-file" onClick={props.onShowRisk}>
+      Why this file
+    </button>
+  )
+}
+
 function WhyHere(props: FileHeaderProps & { children: React.ReactNode }) {
   const churn = props.file.riskScore.metrics.churn90d
   return (
@@ -93,6 +103,7 @@ function WhyHere(props: FileHeaderProps & { children: React.ReactNode }) {
           </span>
         </>
       )}
+      <WhyThisFileButton file={props.file} onShowRisk={props.onShowRisk} />
     </div>
   )
 }

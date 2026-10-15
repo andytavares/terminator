@@ -19,7 +19,7 @@ const THRESHOLDS = {
   changeSize: { medium: CHANGE_MEDIUM_LINES, high: CHANGE_HIGH_LINES },
 }
 
-type Severity = 'hi' | 'md' | 'lo' | 'ok'
+type Severity = 'high' | 'medium' | 'low' | 'fine'
 type Band = { medium: number; high: number }
 type Metrics = RiskScore['metrics']
 
@@ -39,9 +39,9 @@ export interface WhyThisFileProps {
 }
 
 function severityOf(value: number, band: Band): Severity {
-  if (value >= band.high) return 'hi'
-  if (value >= band.medium) return 'md'
-  return 'lo'
+  if (value >= band.high) return 'high'
+  if (value >= band.medium) return 'medium'
+  return 'low'
 }
 
 function thresholdNote(value: number, band: Band): string {
@@ -55,7 +55,7 @@ function churnFactor(churn: number | null): Factor {
   return {
     key: 'churn',
     icon: Flame,
-    title: choose(severity === 'lo', 'How often it changes', 'Changes often'),
+    title: choose(severity === 'low', 'How often it changes', 'Changes often'),
     detail: choose(
       churn == null,
       'Not measured',
@@ -63,22 +63,22 @@ function churnFactor(churn: number | null): Factor {
     ),
     note: choose(churn == null, 'unknown', thresholdNote(known, band)),
     severity,
-    reason: choose(severity === 'lo', undefined, 'changes often'),
+    reason: choose(severity === 'low', undefined, 'changes often'),
   }
 }
 
-function usedByFactor(metrics: Metrics, importerCount: number): Factor {
+function usedByFactor(metrics: Metrics): Factor {
   const band = THRESHOLDS.blastRadius
-  const count = metrics.blastRadius ?? importerCount
+  const count = metrics.blastRadius ?? 0
   const severity = severityOf(count, band)
   return {
     key: 'used-by',
     icon: Share2,
     title: `Used by ${count} ${plural(count, 'file')}`,
-    detail: choose(severity === 'lo', 'Few files depend on it', 'Most affected if it breaks'),
+    detail: choose(severity === 'low', 'Few files depend on it', 'Most affected if it breaks'),
     note: thresholdNote(count, band),
     severity,
-    reason: choose(severity === 'lo', undefined, 'is used by much of the code'),
+    reason: choose(severity === 'low', undefined, 'is used by much of the code'),
   }
 }
 
@@ -97,34 +97,33 @@ function sizeFactor(changeSize: number | null): Factor {
     detail: 'Additions plus deletions',
     note: thresholdNote(lines, band),
     severity,
-    reason: choose(severity === 'lo', undefined, 'changes a lot of lines'),
+    reason: choose(severity === 'low', undefined, 'changes a lot of lines'),
   }
 }
 
 function testFactor(present: boolean | null): Factor {
   const base = { key: 'test', icon: FlaskConical, title: 'Has a test' }
-  if (present == null) return { ...base, detail: 'Not checked', note: 'unknown', severity: 'lo' }
+  if (present == null) return { ...base, detail: 'Not checked', note: 'unknown', severity: 'low' }
   if (present)
-    return { ...base, detail: 'A test file sits alongside it', note: 'yes', severity: 'ok' }
+    return { ...base, detail: 'A test file sits alongside it', note: 'yes', severity: 'fine' }
   return {
     ...base,
     detail: 'No test file alongside it',
     note: 'no',
-    severity: 'md',
-    reason: 'has no test',
+    severity: 'medium',
   }
 }
 
 function coverageSeverity(percent: number): Severity {
-  if (percent >= 80) return 'ok'
-  if (percent >= 50) return 'md'
-  return 'hi'
+  if (percent >= 80) return 'fine'
+  if (percent >= 50) return 'medium'
+  return 'high'
 }
 
 function coverageFactor(percent: number | null): Factor {
   const base = { key: 'coverage', icon: Percent, title: 'Patch coverage' }
   if (percent == null) {
-    return { ...base, detail: 'CI did not report it', note: 'unknown', severity: 'lo' }
+    return { ...base, detail: 'CI did not report it', note: 'unknown', severity: 'low' }
   }
   return {
     ...base,
@@ -135,10 +134,10 @@ function coverageFactor(percent: number | null): Factor {
 }
 
 function factorsOf(riskScore: RiskScore): Factor[] {
-  const { metrics, importerCount } = riskScore
+  const { metrics } = riskScore
   return [
     churnFactor(metrics.churn90d),
-    usedByFactor(metrics, importerCount),
+    usedByFactor(metrics),
     sizeFactor(metrics.changeSize),
     testFactor(metrics.testFilePresent),
     coverageFactor(metrics.patchCoverage),
@@ -151,9 +150,9 @@ const LEVEL_LABEL: Record<RiskScore['level'], string> = {
   low: 'Low risk',
 }
 
-const SEVERITY_RANK: Record<Severity, number> = { hi: 0, md: 1, lo: 2, ok: 3 }
+const SEVERITY_RANK: Record<Severity, number> = { high: 0, medium: 1, low: 2, fine: 3 }
 
-/** One sentence naming the one or two worst factors. */
+/** One sentence naming the one or two worst factors that set the level; a missing test is listed but never named. */
 function leadSentence(factors: Factor[]): string {
   const reasons = factors
     .filter((factor) => factor.reason != null)
@@ -174,6 +173,7 @@ function Importers({ riskScore, repoRoot }: { riskScore: RiskScore; repoRoot: st
       <div className="ri-importer-list">
         {topImporters.map((importer) => (
           <button
+            type="button"
             key={importer}
             className="risk-importer-btn ri-importer"
             onClick={() => window.electronAPI.shell.openPath(`${repoRoot}/${importer}`)}
@@ -192,7 +192,7 @@ function FactorRow({ factor, children }: { factor: Factor; children?: React.Reac
   const Icon = factor.icon
   return (
     <div className={`ri-factor ri-factor--${factor.severity}`}>
-      <Icon className="ri-factor-icon" />
+      <Icon className="ri-factor-icon" aria-hidden="true" />
       <div>
         <b>{factor.title}</b>
         <small>{factor.detail}</small>

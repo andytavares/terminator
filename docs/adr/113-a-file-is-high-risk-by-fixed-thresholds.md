@@ -22,4 +22,4 @@
 
 - A PR's labels mean the same thing in every PR, whatever the other files are.
 - The file header shows a risk chip only for high. Medium and low appear in **Why this file**, which lists each factor against its floor.
-- The signal dots still compare with `>` while the level compares with `>=`, so at exactly 20 commits the level reads medium but the dot stays a pass. Aligning them changes the queue's dots and is left for its own change.
+- The queue's churn and used-by signal dots use the same floors and the same `>=` as the level, so at exactly 20 commits both read medium.

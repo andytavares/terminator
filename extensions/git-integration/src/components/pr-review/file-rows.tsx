@@ -2,8 +2,10 @@ import React from 'react'
 import { Circle, CircleCheck, MessageSquare } from 'lucide-react'
 import type { Chapter, PrChangedFile } from '../../schemas/pr-review.schema'
 import type { PrReviewStore } from '../../stores/pr-review.store'
+import { plural } from '@terminator/extension-sdk'
 import { choose, splitPath } from '../text'
 import './file-tree.css'
+import './review-layout.css'
 
 /** Whether a file is viewed, changed since the last look, new, or nothing of those. */
 export type RowState = 'viewed' | 'changed' | 'new' | 'default'
@@ -103,6 +105,7 @@ export function FileRowContent(props: FileRowContentProps) {
           <span className="file-tree-comments">
             <MessageSquare aria-hidden="true" />
             {threadCount}
+            <span className="pr-visually-hidden"> {plural(threadCount, 'comment')}</span>
           </span>
         )}
         <span className="file-tree-add">+{file.additions}</span>

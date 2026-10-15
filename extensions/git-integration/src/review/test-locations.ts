@@ -1,4 +1,5 @@
-import { analyseSnippet, symbolFromHunkHeader } from './symbols.js'
+import { analyseSnippet } from './symbols.js'
+import { symbolFromHunkHeader } from './hunk-header'
 import type { PrHead } from '../schemas/pr-review.schema.js'
 
 type RunGit = (cwd: string, args: string[]) => Promise<string>

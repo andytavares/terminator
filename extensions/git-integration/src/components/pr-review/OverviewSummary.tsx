@@ -6,6 +6,7 @@ import { RichContent } from './RichContent'
 import { errorMessageOf } from '../text'
 import './brief-card.css'
 import type { IssueComment } from '../../schemas/pr-review.schema'
+import './review-layout.css'
 
 /** What a Summarize button summarizes: the PR's description, or its discussion. */
 export type SummarySubject =

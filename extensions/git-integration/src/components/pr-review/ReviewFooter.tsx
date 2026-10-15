@@ -2,6 +2,7 @@ import React from 'react'
 import { ChevronLeft } from 'lucide-react'
 import { Button } from '@terminator/extension-ui'
 import './review-footer.css'
+import './review-layout.css'
 
 export interface ReviewFooterProps {
   /** Base names of the neighbouring files in review order; null at either end. */
@@ -23,8 +24,10 @@ function PreviousButton(props: ReviewFooterProps) {
       disabled={props.previousFileName === null}
       onClick={props.onPrevFile}
     >
-      <span className="rf-hidden-label">Previous file: </span>
-      <span className="rf-name rf-collapsible">{props.previousFileName}</span>
+      <span className="pr-visually-hidden">Previous file: {props.previousFileName}</span>
+      <span className="rf-name rf-collapsible" aria-hidden="true">
+        {props.previousFileName}
+      </span>
     </Button>
   )
 }
@@ -33,6 +36,9 @@ function PreviousButton(props: ReviewFooterProps) {
 function ForwardButton(props: ReviewFooterProps) {
   const { isLastFile, isLastChapter, nextFileName } = props
   if (!isLastFile) {
+    if (nextFileName === null) {
+      return <ForwardLabel onClick={props.onMarkViewed}>Viewed, next file</ForwardLabel>
+    }
     return (
       <ForwardLabel onClick={props.onMarkViewed}>
         Viewed, next: <span className="rf-name">{nextFileName}</span>
@@ -47,9 +53,7 @@ function ForwardLabel(props: { onClick: () => void; children: React.ReactNode })
   return (
     <Button variant="primary" onClick={props.onClick}>
       <span className="rf-long">{props.children}</span>
-      <span className="rf-short" aria-hidden="true">
-        Next
-      </span>
+      <span className="rf-short">Next</span>
       <kbd className="tmui-kbd" aria-hidden="true">
         ↵
       </kbd>

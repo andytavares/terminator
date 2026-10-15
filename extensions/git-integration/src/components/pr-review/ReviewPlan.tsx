@@ -5,6 +5,7 @@ import type { Chapter } from '../../schemas/pr-review.schema'
 import { chapterRiskLevel } from '../../github/pr-review-service'
 import { choose, splitPath } from '../text'
 import './review-plan.css'
+import './review-layout.css'
 
 interface Props {
   chapters: Chapter[]

@@ -63,7 +63,7 @@ The remote browser chooses the checkout a channel runs git or gh in, so a payloa
 
 ### Rendering untrusted text
 
-PR descriptions, templates and comments are rendered only through `src/components/pr-review/RichContent.tsx`, which wraps the design system's `Markdown` (`packages/extension-ui`: react-markdown + rehype-sanitize, ADR 091). Never add a second markdown renderer: this view can run shell commands. The only `dangerouslySetInnerHTML` is RichContent's highlight.js output for fenced code.
+PR descriptions, templates and comments are rendered only through `src/components/pr-review/RichContent.tsx`, which wraps the design system's `Markdown` (`packages/extension-ui`: react-markdown + rehype-sanitize, ADR 091). Never add a second markdown renderer: this view can run shell commands. `dangerouslySetInnerHTML` is set in two places: RichContent's highlight.js output for fenced code, and the diff rows (`DiffLineRows.tsx`), whose input is hljs output or `escapeHtml` (`src/utils/syntax.ts`). `markChangedWords` only re-emits those units plus fixed-class spans; keep that invariant.
 
 ### Lint and typecheck
 

@@ -95,34 +95,6 @@
   cursor: pointer;
 }
 
-.pr-load-more-row {
-  padding: 12px 16px;
-  text-align: center;
-  flex-shrink: 0;
-  border-top: 1px solid var(--tm-border);
-}
-
-.pr-load-more-btn {
-  padding: 6px 18px;
-  background: none;
-  border: 1px solid var(--tm-border-strong);
-  border-radius: 6px;
-  color: var(--tm-text-muted);
-  font-size: 12px;
-  cursor: pointer;
-  transition:
-    border-color 0.15s,
-    color 0.15s;
-}
-.pr-load-more-btn:hover:not(:disabled) {
-  border-color: var(--tm-accent);
-  color: var(--tm-accent-text);
-}
-.pr-load-more-btn:disabled {
-  opacity: 0.65;
-  cursor: default;
-}
-
 /* Sections */
 
 .pr-queue-empty,
@@ -142,53 +114,6 @@
 .pr-sections {
   overflow-y: auto;
   flex: 1;
-}
-
-.pr-row-signals {
-  display: flex;
-  gap: 4px;
-  align-items: center;
-  flex-shrink: 0;
-}
-
-.pr-signal-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-.pr-signal-dot--pass {
-  background: var(--tm-success);
-}
-.pr-signal-dot--warn {
-  background: var(--tm-warning);
-}
-.pr-signal-dot--fail {
-  background: var(--tm-danger);
-}
-.pr-signal-dot--unknown {
-  background: var(--tm-overlay-strong);
-}
-
-.pr-risk-chip {
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  padding: 2px 5px;
-  border-radius: 3px;
-  flex-shrink: 0;
-}
-.pr-risk-chip--low {
-  background: color-mix(in srgb, var(--tm-success) 12%, transparent);
-  color: var(--tm-success);
-}
-.pr-risk-chip--medium {
-  background: color-mix(in srgb, var(--tm-warning) 12%, transparent);
-  color: var(--tm-warning);
-}
-.pr-risk-chip--high {
-  background: color-mix(in srgb, var(--tm-danger) 12%, transparent);
-  color: var(--tm-danger);
 }
 
 /* ─── Status checks bar ──────────────────────────────────────────────────── */
@@ -510,11 +435,6 @@
 .review-diff-table-wrap--split .diff-split-header {
   border-top: 1px solid var(--tm-border);
 }
-
-/* Split view layout */
-.diff-split-hunk {
-  border-bottom: 1px solid var(--tm-border);
-}
 .diff-split-tables {
   display: flex;
   width: 100%;
@@ -710,42 +630,19 @@
 .full-file-row:hover {
   background: var(--tm-overlay-subtle);
 }
-/* The status dot carries the state; the reading-order reason stays muted. */
-
-/* The selected row is a solid accent fill with white text (WCAG 1.4.11, 1.4.3). */
-
 /* Principle XII: the glyphs these carried were text and took a font size; an
    icon takes real dimensions. One block for every check-state and control icon
    converted in this pass. */
 .pr-checks-icon svg,
 .pr-checks-summary-icon svg,
-.pr-checks-link svg,
-.review-diff-viewed-badge svg,
-.chapter-nav__done svg,
-.chapter-file-list__done svg {
+.pr-checks-link svg {
   width: 12px;
   height: 12px;
   flex: 0 0 auto;
 }
 
-.pr-large-pr-banner__icon,
-.review-diff-hotspot svg {
+.pr-large-pr-banner__icon {
   width: 14px;
   height: 14px;
   flex: 0 0 auto;
-}
-
-.pr-review-view__refresh svg {
-  width: 13px;
-  height: 13px;
-  display: block;
-}
-
-.pr-visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
 }

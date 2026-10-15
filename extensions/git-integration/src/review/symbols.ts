@@ -382,5 +382,3 @@ function countBranchesInWholeTree(node: Node): number {
   visit(node)
   return count
 }
-
-export { symbolFromHunkHeader } from './hunk-header'

@@ -156,7 +156,11 @@
 }
 
 @container pr-review (max-width: 1100px) {
-  .file-tree-chapter-header,
+  /* The rail shows no chapter heading; display:none keeps focus off an invisible control. */
+  .file-tree-chapter-header {
+    display: none;
+  }
+
   .file-tree-name,
   .file-tree-end {
     position: absolute;

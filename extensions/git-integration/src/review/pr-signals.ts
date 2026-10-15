@@ -111,10 +111,10 @@ function coverageDot(measured: MeasuredFile[], pr: PrReviewDetail): SignalDots['
   return 'fail'
 }
 
-/** 'fail' above `failOver`, 'warn' above `warnOver`, else 'pass'. */
-function thresholdDot(value: number, warnOver: number, failOver: number): SignalDots['churn'] {
-  if (value > failOver) return 'fail'
-  if (value > warnOver) return 'warn'
+/** 'fail' at or over `failFloor`, 'warn' at or over `warnFloor`, else 'pass'; the file level's floors. */
+function thresholdDot(value: number, warnFloor: number, failFloor: number): SignalDots['churn'] {
+  if (value >= failFloor) return 'fail'
+  if (value >= warnFloor) return 'warn'
   return 'pass'
 }
 

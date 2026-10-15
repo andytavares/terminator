@@ -57,6 +57,25 @@ describe('WhyThisFile — the lead line', () => {
   })
 })
 
+describe('WhyThisFile — only level-setting factors are named', () => {
+  it('does not say a low-risk file is low risk because it has no test', () => {
+    renderFile(
+      riskyScore({ level: 'low' }, { churn90d: 2, changeSize: 10, testFilePresent: false })
+    )
+    expect(screen.getByText('Low risk')).toBeTruthy()
+    expect(screen.queryByText(/has no test/)).toBeNull()
+    expect(screen.getByText(/because no single factor stands out/)).toBeTruthy()
+    expect(screen.getByText('No test file alongside it')).toBeTruthy()
+  })
+})
+
+describe('WhyThisFile — used by agrees with the level', () => {
+  it('counts a file with no measured importers as used by none, as the level does', () => {
+    renderFile(riskyScore({ importerCount: 25, topImporters: [] }, { blastRadius: null }))
+    expect(screen.getByText('Used by 0 files')).toBeTruthy()
+  })
+})
+
 describe('WhyThisFile — the factor rows', () => {
   it('writes each measured value in words with the threshold it crossed', () => {
     renderFile()
@@ -99,6 +118,18 @@ describe('WhyThisFile — what it leaves out', () => {
 })
 
 describe('WhyThisFile — importers', () => {
+  it('draws importer buttons that submit nothing and icons hidden from assistive technology', () => {
+    renderFile()
+    expect(screen.getByRole('button', { name: 'store.ts' }).getAttribute('type')).toBe('button')
+    expect(document.querySelectorAll('.ri-factor-icon[aria-hidden="true"]')).toHaveLength(5)
+  })
+
+  it('classes each factor by its severity in words', () => {
+    renderFile(riskyScore({}, { churn90d: 60 }))
+    expect(document.querySelector('.ri-factor--high')).toBeTruthy()
+    expect(document.querySelector('.ri-factor--hi')).toBeNull()
+  })
+
   it('lists importers as buttons under an Importers heading', () => {
     renderFile()
     expect(screen.getByText('Importers (2)')).toBeTruthy()

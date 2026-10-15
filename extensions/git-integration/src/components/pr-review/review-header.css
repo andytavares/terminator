@@ -198,13 +198,3 @@
   border-radius: 999px;
   line-height: 17px;
 }
-
-/* Read by screen readers so the badge's number says what it counts. */
-.rh-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}

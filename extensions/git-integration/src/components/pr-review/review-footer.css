@@ -29,15 +29,7 @@
   vertical-align: bottom;
 }
 
-.rf-hidden-label {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-}
-
-/* Under 640px the primary shortens to "Next" and the previous file keeps only its arrow. */
+/* Under 640px the primary shortens to "Next" and the previous file keeps only its arrow (its name stays in `.pr-visually-hidden`). */
 @container (max-width: 640px) {
   .rf-long {
     display: none;
@@ -48,11 +40,7 @@
   }
 
   .rf-collapsible {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
+    display: none;
   }
 }
 
