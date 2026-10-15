@@ -1,0 +1,25 @@
+extensions/git-integration/src/components/pr-review/review-plan.css
+  s_e708cca5bdf352::t_719aba7765a3bd 1-138
+extensions/git-integration/src/components/pr-review/ReviewPlan.tsx
+  s_e708cca5bdf352::t_719aba7765a3bd 1-101
+extensions/git-integration/tests/unit/ReviewPlan.spec.tsx
+  s_e708cca5bdf352::t_e9cdec1c2300c5 26,31-37
+  s_e708cca5bdf352::t_5fe98ba74c8d3c 1-25,38-73
+  s_e708cca5bdf352::t_33224fa1f3230e 27-30
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "964b22064ad52e6dccfca87dd341a0cb63aa4883",
+  "prompts": {},
+  "sessions": {
+    "s_e708cca5bdf352": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5d7c9815-e79e-402d-b85d-cf8028e700ad",
+        "model": "unknown"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
