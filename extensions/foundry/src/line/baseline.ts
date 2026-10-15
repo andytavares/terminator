@@ -15,7 +15,11 @@ import type { Toolchain } from '../verify/toolchain-probe.js'
 import { lastLines, safeFilename } from './execution-parts.js'
 import type { ShellExec } from './integrate.js'
 import { issueOf } from './order-project.js'
-import { ensureBaseCheckout, removeBaseCheckout, unlinkBorrowedDependencies } from './worktree.js'
+import {
+  ensureBaselineCheckout,
+  removeBaseCheckout,
+  unlinkBorrowedDependencies,
+} from './worktree.js'
 import type { Checkout } from './worktree.js'
 
 // Whether the base branch builds and passes its mechanical checks, proven while
@@ -79,32 +83,39 @@ export async function writeBaseline(
   indexFor(root).announce({ kind: 'graph', orderId })
 }
 
-/** The exit code `command` recorded on this very commit, or null when it did not run there. */
+/** The exit code `command` recorded as a pass on this very commit, or null. A failure is run again. */
 export function recordedOnBase(
   baseline: Baseline | null,
   command: string,
   commit: string | null
 ): number | null {
   if (baseline === null || commit === null || baseline.commit !== commit) return null
-  const ran = baseline.steps.find(
-    (step) => step.command === command && (step.result === 'pass' || step.result === 'fail')
-  )
-  return ran?.exitCode ?? null
+  const passed = baseline.steps.find((step) => step.command === command && step.result === 'pass')
+  return passed?.exitCode ?? null
+}
+
+/** The sentence for a step that failed on the base branch, shared with the Forge. */
+export function failedStepSentence(step: StepOutcome, baseBranch: string): string {
+  return `${step.name} failed on ${baseBranch} with exit code ${step.exitCode}: \`${step.command}\`.`
+}
+
+/** The test step is the one on rung L1; callers do not match on its label. */
+export function isTestStep(step: StepOutcome): boolean {
+  return step.rung === 'L1'
 }
 
 interface Proof {
   readonly order: WorkOrder
   readonly deps: BaselineDeps
-  readonly repoPath: string
   readonly baseBranch: string
   readonly startedAt: string
 }
 
-async function readCommit(proof: Proof): Promise<string | null> {
+async function readCommit(proof: Proof, checkout: Checkout): Promise<string | null> {
   const { stdout, exitCode } = await proof.deps.exec({
     command: 'git',
-    args: ['rev-parse', proof.baseBranch],
-    cwd: proof.repoPath,
+    args: ['rev-parse', 'HEAD'],
+    cwd: checkout.path,
   })
   return exitCode === 0 ? stdout.trim() : null
 }
@@ -189,13 +200,14 @@ async function checkAndMend(proof: Proof, checkout: Checkout): Promise<Finding> 
   return { pass: await runSteps(proof, checkout, steps), mended: true }
 }
 
-function failureReason(proof: Proof, failed: StepOutcome[]): string {
-  return failed
-    .map(
-      (step) =>
-        `${step.name} failed on ${proof.baseBranch} with exit code ${step.exitCode}: \`${step.command}\`.`
-    )
-    .join(' ')
+function failureReason(proof: Proof, pass: Pass): string {
+  const failed = failedIn(pass)
+  if (failed.length > 0) return failed.map((s) => failedStepSentence(s, proof.baseBranch)).join(' ')
+  const why =
+    pass.steps.length === 0
+      ? 'this repository has no format, lint, test or build command'
+      : `${pass.steps.map((step) => step.name).join(', ')} did not run`
+  return `Nothing could be measured on ${proof.baseBranch}: ${why}.`
 }
 
 async function failureEvidence(pass: Pass): Promise<LedgerEntry['evidence']> {
@@ -240,9 +252,13 @@ function baselineOf(proof: Proof, rest: Partial<Baseline>): Baseline {
   }
 }
 
+// Nothing failed and something passed: a step that did not run is not a pass.
+function isProven(pass: Pass): boolean {
+  return failedIn(pass).length === 0 && pass.steps.some((step) => step.result === 'pass')
+}
+
 async function settle(proof: Proof, commit: string | null, found: Finding): Promise<void> {
-  const failed = failedIn(found.pass)
-  const state = failed.length === 0 ? 'proven' : 'failing'
+  const state = isProven(found.pass) ? 'proven' : 'failing'
   await writeBaseline(
     proof.deps.root,
     proof.order.id,
@@ -260,15 +276,15 @@ async function settle(proof: Proof, commit: string | null, found: Finding): Prom
     reason:
       state === 'proven'
         ? `${proof.baseBranch} builds and passes its checks.`
-        : failureReason(proof, failed),
+        : failureReason(proof, found.pass),
     evidence: await failureEvidence(found.pass),
   })
 }
 
 async function proveOnCheckout(proof: Proof, lane: number): Promise<void> {
-  const commit = await readCommit(proof)
-  const checkout = await ensureBaseCheckout(proof.order, lane, proof.deps)
+  const checkout = await ensureBaselineCheckout(proof.order, lane, proof.deps)
   try {
+    const commit = await readCommit(proof, checkout)
     await settle(proof, commit, await checkAndMend(proof, checkout))
   } finally {
     await removeBaseCheckout(checkout, proof.deps)
@@ -289,14 +305,31 @@ async function recordCouldNotCheck(proof: Proof, error: unknown): Promise<void> 
   })
 }
 
-/** Prove the base branch builds and passes its checks. Never throws: a failure is recorded. */
-export async function proveEnvironment(order: WorkOrder, deps: BaselineDeps): Promise<void> {
+const inFlight = new Map<string, Promise<void>>()
+
+/** Whether a proof for this order is running now. Reads memory only. */
+export function isProving(orderId: string): boolean {
+  return inFlight.has(orderId)
+}
+
+/**
+ * Prove the base branch builds and passes its checks. Never throws: a failure is
+ * recorded. A call while the same order is being proven gets that proof back.
+ */
+export function proveEnvironment(order: WorkOrder, deps: BaselineDeps): Promise<void> {
+  const running = inFlight.get(order.id)
+  if (running !== undefined) return running
+  const proof = prove(order, deps).finally(() => inFlight.delete(order.id))
+  inFlight.set(order.id, proof)
+  return proof
+}
+
+async function prove(order: WorkOrder, deps: BaselineDeps): Promise<void> {
   const repo = [...order.context.repos].sort((a, b) => a.lane - b.lane)[0]
   if (repo === undefined) return
   const proof: Proof = {
     order,
     deps,
-    repoPath: repo.path,
     baseBranch: repo.baseBranch,
     startedAt: deps.now(),
   }

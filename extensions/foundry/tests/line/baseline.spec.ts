@@ -4,12 +4,16 @@ import * as path from 'node:path'
 
 import {
   baselineSteps,
+  failedStepSentence,
+  isProving,
+  isTestStep,
   proveEnvironment,
   readBaseline,
   recordedOnBase,
   writeBaseline,
 } from '../../src/line/baseline.js'
 import type { Baseline, BaselineDeps } from '../../src/line/baseline.js'
+import { checkoutPath } from '../../src/line/worktree.js'
 import { runStepOnBaseCheckout } from '../../src/line/lane-commands.js'
 import type { RunContext } from '../../src/line/run-context.js'
 import { draftOrder } from '../../src/order/draft.js'
@@ -221,8 +225,13 @@ function recordedBaseline(over: Partial<Baseline> = {}): Baseline {
 }
 
 describe('recordedOnBase', () => {
-  it('answers with the recorded exit code for the same command on the same commit', () => {
-    expect(recordedOnBase(recordedBaseline(), 'npm test', 'abc')).toBe(1)
+  it('answers with the recorded exit code for a passing command on the same commit', () => {
+    const passed = { ...TESTS_FAILED, result: 'pass', exitCode: 0 } as const
+    expect(recordedOnBase(recordedBaseline({ steps: [passed] }), 'npm test', 'abc')).toBe(0)
+  })
+
+  it('answers nothing for a recorded failure, so it is run fresh', () => {
+    expect(recordedOnBase(recordedBaseline(), 'npm test', 'abc')).toBeNull()
   })
 
   it('answers nothing for another commit, another command or a step that did not run', () => {
@@ -243,9 +252,12 @@ const TESTS_STEP = {
   check: 'test',
 } as const
 
-async function contextWithBaselineAt(commit: string): Promise<RunContext> {
+async function contextWithBaselineAt(
+  commit: string,
+  steps: StepOutcome[] = [TESTS_FAILED, BUILD_NOT_RUN]
+): Promise<RunContext> {
   const root = path.join(parent, 'data')
-  await writeBaseline(root, 'WO-1', recordedBaseline({ commit }))
+  await writeBaseline(root, 'WO-1', recordedBaseline({ commit, steps }))
   return partialFake<RunContext>({
     api: partialFake<ExtensionAPI>({}),
     root,
@@ -267,14 +279,16 @@ describe('runStepOnBaseCheckout', () => {
     runtime.supervisedRunner = null
   })
 
-  it('returns the recorded code and writes why, without running the command', async () => {
+  it('returns the recorded pass and writes why, without running the command', async () => {
     const head = (await gitAt(repo, 'rev-parse', 'main')).stdout.trim()
     const logPath = path.join(parent, 'logs', 'tests.log')
-    const context = await contextWithBaselineAt(head)
-    expect(await runStepOnBaseCheckout(context, TESTS_STEP, logPath)).toBe(1)
+    const context = await contextWithBaselineAt(head, [
+      { ...TESTS_FAILED, result: 'pass', exitCode: 0 },
+    ])
+    expect(await runStepOnBaseCheckout(context, TESTS_STEP, logPath)).toBe(0)
     expect(runCommand).not.toHaveBeenCalled()
     expect(fs.readFileSync(logPath, 'utf8')).toContain(
-      `\`npm test\` already ran on main at ${head.slice(0, 7)} while the order was shaped (exit 1); not run again.`
+      `\`npm test\` already ran on main at ${head.slice(0, 7)} while the order was shaped (exit 0); not run again.`
     )
   })
 
@@ -283,5 +297,113 @@ describe('runStepOnBaseCheckout', () => {
     await runStepOnBaseCheckout(context, TESTS_STEP, path.join(parent, 'logs', 'tests.log'))
     expect(runCommand).toHaveBeenCalledOnce()
     await gitAt(repo, 'worktree', 'prune')
+  })
+})
+
+describe('runStepOnBaseCheckout with a recorded failure', () => {
+  const runCommand = vi.fn<BaselineDeps['runCommand']>()
+
+  beforeEach(() => {
+    runCommand.mockReset().mockResolvedValue(0)
+    runtime.supervisedRunner = partialFake<SupervisedRunner>({ runCommand })
+  })
+  afterEach(() => {
+    runtime.supervisedRunner = null
+  })
+
+  it('runs the command again when the recorded result was a failure', async () => {
+    const head = (await gitAt(repo, 'rev-parse', 'main')).stdout.trim()
+    const context = await contextWithBaselineAt(head)
+    await runStepOnBaseCheckout(context, TESTS_STEP, path.join(parent, 'logs', 'tests.log'))
+    expect(runCommand).toHaveBeenCalledOnce()
+    await gitAt(repo, 'worktree', 'prune')
+  })
+})
+
+describe('proveEnvironment while a proof is running', () => {
+  it('hands a second caller the same proof instead of starting another', async () => {
+    const h = harness()
+    const first = proveEnvironment(orderOn(repo), h.deps)
+    expect(isProving('WO-1')).toBe(true)
+    const second = proveEnvironment(orderOn(repo), h.deps)
+    expect(second).toBe(first)
+    await Promise.all([first, second])
+    expect(isProving('WO-1')).toBe(false)
+    for (const command of Object.values(commands)) {
+      expect(h.ran.filter((c) => c === command)).toHaveLength(1)
+    }
+    expect(h.ledger.filter((e) => e.action === 'environment.checking')).toHaveLength(1)
+  })
+})
+
+/** Records where each command ran, and which commit that checkout stood at. */
+function locationRecorder(places: { path: string; head: string }[]): BaselineDeps['runCommand'] {
+  return async ({ worktreePath }) => {
+    const head = (await gitAt(worktreePath, 'rev-parse', 'HEAD')).stdout.trim()
+    places.push({ path: worktreePath, head })
+    return 0
+  }
+}
+
+describe('proveEnvironment checkout', () => {
+  it('uses its own checkout, never the one the line shares', async () => {
+    const h = harness()
+    const places: { path: string; head: string }[] = []
+    await proveEnvironment(orderOn(repo), { ...h.deps, runCommand: locationRecorder(places) })
+    expect(places.length).toBeGreaterThan(0)
+    for (const place of places) expect(place.path.endsWith('@baseline')).toBe(true)
+  })
+
+  it('replaces a leftover checkout and records the commit it really checked', async () => {
+    const h = harness()
+    const order = orderOn(repo)
+    const stale = `${checkoutPath(h.deps.root, order, order.context.repos[0]?.name ?? '')}@baseline`
+    await gitAt(repo, 'worktree', 'add', '--detach', stale, 'main')
+    fs.writeFileSync(path.join(repo, 'next.txt'), 'next')
+    await gitAt(repo, 'add', '-A')
+    await gitAt(repo, 'commit', '-q', '-m', 'next')
+    const tip = (await gitAt(repo, 'rev-parse', 'main')).stdout.trim()
+    const places: { path: string; head: string }[] = []
+    await proveEnvironment(order, { ...h.deps, runCommand: locationRecorder(places) })
+    expect(places.every((place) => place.head === tip)).toBe(true)
+    expect((await readBaseline(h.deps.root, 'WO-1'))?.commit).toBe(tip)
+  })
+})
+
+describe('proveEnvironment when nothing could be measured', () => {
+  it('is failing, not proven, when every step did not run', async () => {
+    const h = harness({ exitFor: () => null })
+    const baseline = await baselineAfter(h)
+    expect(baseline.state).toBe('failing')
+    const last = h.ledger[h.ledger.length - 1]
+    expect(last?.action).toBe('environment.failing')
+    expect(last?.reason).toBe(
+      'Nothing could be measured on main: Format, Lint, Tests, Build did not run.'
+    )
+  })
+
+  it('is failing when the repository has no check command at all', async () => {
+    fs.writeFileSync(path.join(repo, 'package.json'), '{}')
+    await gitAt(repo, 'add', '-A')
+    await gitAt(repo, 'commit', '-q', '-m', 'no scripts')
+    const h = harness()
+    const baseline = await baselineAfter(h)
+    expect(baseline.state).toBe('failing')
+    expect(h.ledger[h.ledger.length - 1]?.reason).toBe(
+      'Nothing could be measured on main: this repository has no format, lint, test or build command.'
+    )
+  })
+})
+
+describe('failedStepSentence and isTestStep', () => {
+  it('names the step, branch, exit code and command', () => {
+    expect(failedStepSentence(TESTS_FAILED, 'main')).toBe(
+      'Tests failed on main with exit code 1: `npm test`.'
+    )
+  })
+
+  it('knows the test step by its rung, not its label', () => {
+    expect(isTestStep({ ...TESTS_FAILED, name: 'Unit' })).toBe(true)
+    expect(isTestStep({ ...BUILD_NOT_RUN, rung: 'L5' })).toBe(false)
   })
 })
