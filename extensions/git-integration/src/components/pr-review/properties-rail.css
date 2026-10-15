@@ -10,6 +10,8 @@
   padding: 24px 20px;
   border-left: 1px solid var(--tm-border);
   background: var(--tm-bg-surface);
+  min-width: 0;
+  overflow-x: hidden;
 }
 
 .pr-rail-heading {
