@@ -61,6 +61,8 @@ async function mergeBaseOf(ctx: GithubContext, file: PrFile): Promise<string> {
   const viewAtRef = () =>
     ctx.github.pullRequests.view(ctx.target(file.repoRoot), file.prNumber, ['baseRefName'])
   const baseRefName = file.baseRef ?? String((await viewAtRef()).baseRefName)
+  // A stacked PR's base is another PR's branch, which a plain checkout has no origin/ ref for.
+  await runGit(file.repoRoot, ['fetch', 'origin', baseRefName])
   const args = ['merge-base', `origin/${baseRefName}`, pullRef(file.prNumber)]
   const mergeBase = (await runGit(file.repoRoot, args)).trim()
   if (file.headSHA) ctx.prDiffBases.set(cacheKey, { headSHA: file.headSHA, mergeBase })

@@ -19,6 +19,10 @@ const pending: StatusCheck[] = [
   { name: 'lint', state: 'pass' },
 ]
 
+function noOwnedFilter() {
+  return { ownedCount: 0, ownedOnly: false, onToggleOwnedOnly: vi.fn() }
+}
+
 function baseProps(overrides: Partial<ReviewHeaderProps> = {}): ReviewHeaderProps {
   return {
     prNumber: 42,
@@ -39,6 +43,7 @@ function baseProps(overrides: Partial<ReviewHeaderProps> = {}): ReviewHeaderProp
     onDismissLargePr: vi.fn(),
     focusMode: false,
     onToggleFocusMode: vi.fn(),
+    ...noOwnedFilter(),
     onAskAgent: vi.fn(),
     onRefresh: vi.fn(),
     refreshing: false,
@@ -341,5 +346,32 @@ describe('ReviewHeader — submit and pause', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: 'Pause review' }))
     expect(onPause).toHaveBeenCalledTimes(1)
     expect(screen.queryByRole('menu')).toBeNull()
+  })
+})
+
+describe('ReviewHeader — only my files', () => {
+  it('counts the files the viewer owns and toggles the filter from the More menu', () => {
+    const onToggleOwnedOnly = vi.fn()
+    render(<ReviewHeader {...baseProps({ ownedCount: 3, onToggleOwnedOnly })} />)
+    openMenu()
+    const item = screen.getByRole('menuitemcheckbox', { name: /only my files.*3/i })
+    fireEvent.click(item)
+    expect(onToggleOwnedOnly).toHaveBeenCalledTimes(1)
+  })
+
+  it('is disabled when the viewer owns no changed file', () => {
+    render(<ReviewHeader {...baseProps({ ownedCount: 0 })} />)
+    openMenu()
+    const item = screen.getByRole('menuitemcheckbox', { name: /only my files/i })
+    expect(item.hasAttribute('disabled')).toBe(true)
+  })
+
+  it('shows a pressed pill while the filter is on, and turns it off on click', () => {
+    const onToggleOwnedOnly = vi.fn()
+    render(<ReviewHeader {...baseProps({ ownedCount: 3, ownedOnly: true, onToggleOwnedOnly })} />)
+    const pill = screen.getByRole('button', { name: /^my files$/i })
+    expect(pill.getAttribute('aria-pressed')).toBe('true')
+    fireEvent.click(pill)
+    expect(onToggleOwnedOnly).toHaveBeenCalledTimes(1)
   })
 })

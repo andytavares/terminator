@@ -30,6 +30,10 @@ export interface ReviewHeaderProps {
   onDismissLargePr: () => void
   focusMode: boolean
   onToggleFocusMode: () => void
+  /** Changed files the viewer owns; the filter has nothing to show when it is 0. */
+  ownedCount: number
+  ownedOnly: boolean
+  onToggleOwnedOnly: () => void
   onAskAgent: () => void
   onShowOverview?: () => void
   onPopOut?: () => void
@@ -210,6 +214,13 @@ function menuItems(props: ReviewHeaderProps): MenuItemProps[] {
       checked: props.focusMode,
       onSelect: props.onToggleFocusMode,
     },
+    {
+      label: 'Only my files',
+      hint: props.ownedCount > 0 ? props.ownedCount : 'none owned',
+      checked: props.ownedOnly,
+      disabled: props.ownedCount === 0,
+      onSelect: props.onToggleOwnedOnly,
+    },
     !!props.onShowOverview && { label: 'Overview', hint: 'i', onSelect: props.onShowOverview },
     { label: 'Hide file list', hint: 't', onSelect: props.onToggleFileList },
     { label: 'Pause review', onSelect: props.onPause },
@@ -245,22 +256,23 @@ function MoreMenu({ header }: { header: ReviewHeaderProps }) {
   )
 }
 
+/** A pill showing a filter that is on; clicking it turns the filter off. */
+function FilterPill({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button aria-pressed={true} type="button" className="rh-pill rh-pill--focus" onClick={onClick}>
+      {label}
+    </button>
+  )
+}
+
 function HeaderPills({ header }: { header: ReviewHeaderProps }) {
   const { checks, largePr, focusMode } = header
   return (
     <>
       {checks.length > 0 && <ChecksPill checks={checks} />}
       {largePr && <LargePrPill largePr={largePr} onDismiss={header.onDismissLargePr} />}
-      {focusMode && (
-        <button
-          aria-pressed={focusMode}
-          type="button"
-          className="rh-pill rh-pill--focus"
-          onClick={header.onToggleFocusMode}
-        >
-          Focus mode
-        </button>
-      )}
+      {focusMode && <FilterPill label="Focus mode" onClick={header.onToggleFocusMode} />}
+      {header.ownedOnly && <FilterPill label="My files" onClick={header.onToggleOwnedOnly} />}
     </>
   )
 }
@@ -293,15 +305,17 @@ export function ReviewHeader(props: ReviewHeaderProps): JSX.Element {
       <HeaderPills header={props} />
       <div className="rh-spacer" />
       <ReviewProgress {...props} />
-      <Button
-        aria-label="Ask agent about this PR"
-        variant="ghost"
-        icon={Sparkles}
-        onClick={props.onAskAgent}
-      >
-        Ask agent
-      </Button>
-      <SubmitButton draftCount={props.draftCount} onSubmit={props.onSubmit} />
+      <div className="rh-actions">
+        <Button
+          aria-label="Ask agent about this PR"
+          variant="ghost"
+          icon={Sparkles}
+          onClick={props.onAskAgent}
+        >
+          <span className="rh-ask-label">Ask agent</span>
+        </Button>
+        <SubmitButton draftCount={props.draftCount} onSubmit={props.onSubmit} />
+      </div>
       <MoreMenu header={props} />
       <IconButton icon={X} label="Close review" onClick={props.onClose} />
     </div>

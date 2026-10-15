@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import type { SessionSnapshot } from '../../../src/shared/types/index'
@@ -37,6 +37,12 @@ const SNAP: SessionSnapshot = {
 beforeEach(() => {
   userData = makeTempDir('session-record-store-')
   sessionContext.deleted.length = 0
+  // The fixtures' dates are fixed; the 30-day retention measures from the clock.
+  vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-09-20T00:00:00.000Z') })
+})
+
+afterEach(() => {
+  vi.useRealTimers()
 })
 
 describe('session-record-store — loading', () => {

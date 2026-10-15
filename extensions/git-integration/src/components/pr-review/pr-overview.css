@@ -138,7 +138,7 @@
 
 .pr-overview-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 300px;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 340px);
   min-height: 100%;
 }
 
@@ -152,10 +152,6 @@
   gap: 30px;
   min-width: 0;
   padding: 26px 40px 36px var(--tm-space-6);
-}
-
-.pr-overview-column > * {
-  max-width: 720px;
 }
 
 /* Description */
@@ -193,7 +189,6 @@
 
 .pr-overview-reading {
   position: relative;
-  max-width: 68ch;
   font-size: 13.5px;
   line-height: 1.65;
   color: var(--tm-text-primary);
@@ -218,7 +213,15 @@
   background: var(--tm-overlay-soft);
 }
 
+.pr-overview-reading {
+  min-width: 0;
+  max-width: 100%;
+}
+
 .pr-overview-reading .tmui-markdown table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
   border-collapse: collapse;
   font-size: 12.5px;
 }
@@ -257,10 +260,12 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-width: 0;
 }
 
 .pr-overview-issue-ref {
   display: flex;
+  min-width: 0;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
@@ -361,7 +366,6 @@
 }
 
 .pr-issue-comment-body {
-  max-width: 64ch;
   margin-top: 4px;
   font-size: 13.5px;
   line-height: 1.6;

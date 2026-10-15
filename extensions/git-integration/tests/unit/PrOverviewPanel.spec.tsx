@@ -111,6 +111,7 @@ const basePr: PrReviewDetail = {
   approvals: [],
   requestedReviewers: [],
   assigneeLogins: [],
+  ownedPaths: [],
   issueRefs: [],
   dryViolations: [],
   chapters: [

@@ -67,6 +67,8 @@ function scopesEqual(a: AgentScope, b: AgentScope): boolean {
 interface Props {
   repoRoot: string
   pr: PrReviewDetail
+  /** The file open in the diff, which the ask form can narrow a run to. */
+  currentFilePath: string | null
 }
 
 type Phase = 'ask' | 'running' | 'findings' | 'failed'
@@ -274,7 +276,37 @@ function postAsComment(store: PanelStore, finding: AgentFinding): void {
   })
 }
 
-function AskPhase(props: { scope: AgentScope; form: AskForm; onRun: () => void }) {
+const SCOPE_CHOICES = [
+  { value: 'file', label: 'This file' },
+  { value: 'pr', label: 'Whole PR' },
+] as const
+
+/** Switches a PR or file scope between the open file and the whole PR; a selection has no choice. */
+function ScopeChoice(props: { scope: AgentScope; currentFilePath: string | null; form: AskForm }) {
+  const { scope, currentFilePath, form } = props
+  const openAgentPanel = useReviewUiStore((s) => s.openAgentPanel)
+  if ((scope.kind !== 'pr' && scope.kind !== 'file') || !currentFilePath) return null
+  const selectScope = (kind: 'file' | 'pr') =>
+    openAgentPanel({ ...scope, kind, path: kind === 'file' ? currentFilePath : null }, form.request)
+  return (
+    <SegmentedControl
+      label="Scope"
+      size="sm"
+      options={[...SCOPE_CHOICES]}
+      value={scope.kind}
+      onChange={selectScope}
+    />
+  )
+}
+
+interface AskPhaseProps {
+  scope: AgentScope
+  currentFilePath: string | null
+  form: AskForm
+  onRun: () => void
+}
+
+function AskPhase(props: AskPhaseProps) {
   const { form } = props
   return (
     <div>
@@ -282,6 +314,7 @@ function AskPhase(props: { scope: AgentScope; form: AskForm; onRun: () => void }
       <p className="ap-note" style={{ margin: '6px 0' }}>
         Scope: {scopeDescription(props.scope)} · reads the PR head in a private worktree
       </p>
+      <ScopeChoice scope={props.scope} currentFilePath={props.currentFilePath} form={form} />
       <SegmentedControl
         label="Request"
         size="sm"
@@ -428,6 +461,7 @@ function FailedPhase({ run, onRetry }: { run: AgentRun; onRetry: () => void }) {
 interface PhaseViewProps {
   phase: Phase
   scope: AgentScope
+  currentFilePath: string | null
   form: AskForm
   ctx: FindingContext | null
   onRun: () => void
@@ -436,11 +470,20 @@ interface PhaseViewProps {
 function PhaseView(props: PhaseViewProps) {
   const { phase, scope, form, ctx } = props
   const label = scopeLabel(scope)
-  if (phase === 'ask') return <AskPhase scope={scope} form={form} onRun={props.onRun} />
+  if (phase === 'ask') return <AskPhase {...props} />
   if (!ctx) return null
   if (phase === 'running') return <RunningPhase run={ctx.run} label={label} />
   if (phase === 'findings') return <FindingsPhase ctx={ctx} label={label} />
   return <FailedPhase run={ctx.run} onRetry={() => form.setForceAsk(true)} />
+}
+
+function PanelHeader({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="ap-header">
+      <span className="ap-header-title">Agent</span>
+      <IconButton icon={X} size="sm" label="Close agent panel" onClick={onClose} />
+    </div>
+  )
 }
 
 export function AgentPanel(props: Props) {
@@ -454,18 +497,11 @@ export function AgentPanel(props: Props) {
   const ctx = choose(run, { props, store, form, run: run as AgentRun }, null)
   return (
     <aside className="ap-panel" aria-label="Agent panel">
-      <div className="ap-header">
-        <span className="ap-header-title">Agent</span>
-        <IconButton
-          icon={X}
-          size="sm"
-          label="Close agent panel"
-          onClick={() => store.openAgentPanel(null)}
-        />
-      </div>
+      <PanelHeader onClose={() => store.openAgentPanel(null)} />
       <PhaseView
         phase={phaseOf(form.forceAsk, run)}
         scope={scope}
+        currentFilePath={props.currentFilePath}
         form={form}
         ctx={ctx}
         onRun={() => void handleStart(form.request)}

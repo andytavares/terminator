@@ -41,6 +41,7 @@ export interface PrReviewStore {
   pausedAt: string | null
   /** Head SHA each viewed file was viewed at (S1). */
   viewedAt: Record<string, string>
+  viewedHunks: Record<string, string[]>
   /** Files you viewed that a later push changed. Not counted as viewed. */
   changedSince: Set<string>
   /** Files a push added since you last looked (S1 "new file"). */
@@ -82,6 +83,7 @@ export interface PrReviewStore {
   markFileViewed(head: PrHead, filePath: string): void
   markFilesViewed(head: PrHead, filePaths: string[]): void
   unmarkFileViewed(head: PrHead, filePath: string): void
+  toggleHunkViewed(head: PrHead, filePath: string, hunkHeader: string): void
   reorderFiles(head: PrHead, chapterId: string, orderedPaths: string[]): void
   setScrollPosition(pos: number | null): void
   setPaused(head: PrHead, isoTimestamp: string | null): void
@@ -147,6 +149,7 @@ type SessionFields = Pick<
   | 'currentChapterId'
   | 'currentFilePath'
   | 'viewedAt'
+  | 'viewedHunks'
   | 'notes'
   | 'drafts'
 >
@@ -169,6 +172,7 @@ function emptyReviewState() {
     scrollPosition: null,
     pausedAt: null,
     viewedAt: {},
+    viewedHunks: {},
     changedSince: new Set<string>(),
     newSinceLook: new Set<string>(),
     lastSeenHeadSHA: null,
@@ -196,6 +200,7 @@ async function persistSession(store: SessionFields, head: PrHead): Promise<void>
     pausedAt: store.pausedAt,
     lastAccessedAt: new Date().toISOString(),
     viewedAt: store.viewedAt,
+    viewedHunks: store.viewedHunks,
     notes: store.notes,
     drafts: store.drafts,
   }
@@ -257,7 +262,18 @@ function viewedRemoved(state: PrReviewStore, path: string, prNumber: number) {
   const viewedAt = { ...state.viewedAt }
   delete viewedAt[path]
   const prQueue = withViewedCount(state.prQueue, prNumber, { viewedFileCount: viewedFiles.size })
-  return { viewedFiles, changedSince, viewedAt, prQueue }
+  const { [path]: _forgotten, ...viewedHunks } = state.viewedHunks
+  return { viewedFiles, changedSince, viewedAt, viewedHunks, prQueue }
+}
+
+/** `hunkHeader` added to the file's viewed hunks, or removed when it is already there. */
+function hunkViewedToggled(state: PrReviewStore, path: string, hunkHeader: string) {
+  const current = state.viewedHunks[path] ?? []
+  const next = current.includes(hunkHeader)
+    ? current.filter((header) => header !== hunkHeader)
+    : [...current, hunkHeader]
+  const { [path]: _previous, ...others } = state.viewedHunks
+  return { viewedHunks: next.length > 0 ? { ...others, [path]: next } : others }
 }
 
 /** Viewed files a push touched move to `changedSince`; 'all' (a force-push) moves every one. */
@@ -347,6 +363,10 @@ function viewedActions(set: SetState, get: GetState) {
       persistSession(get(), head)
       syncViewed(viewedTarget(get(), head), filePath, false)
     },
+    toggleHunkViewed: (head: PrHead, filePath: string, hunkHeader: string) => {
+      set((state) => hunkViewedToggled(state, filePath, hunkHeader))
+      persistSession(get(), head)
+    },
     reconcileHead: (head: PrHead, changedPaths: string[] | 'all', addedPaths: string[] = []) => {
       set((state) => reconciled(state, changedPaths, addedPaths))
       persistSession(get(), head)
@@ -429,6 +449,7 @@ function prSessionActions(set: SetState, get: GetState) {
         scrollPosition: session.scrollPosition,
         pausedAt: session.pausedAt,
         viewedAt: session.viewedAt ?? {},
+        viewedHunks: session.viewedHunks ?? {},
         changedSince: new Set(),
         newSinceLook: new Set(),
         lastSeenHeadSHA: session.headSHA,

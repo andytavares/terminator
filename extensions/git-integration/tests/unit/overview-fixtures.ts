@@ -127,6 +127,7 @@ export const buildPr = (overrides: Partial<PrReviewDetail> = {}): PrReviewDetail
   readingOrder: [],
   movedBlocks: [],
   insights: baseInsights,
+  ownedPaths: [],
   ...overrides,
 })
 

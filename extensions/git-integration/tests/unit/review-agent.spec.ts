@@ -539,6 +539,27 @@ describe('runSummary — the claude it starts', () => {
   })
 })
 
+describe('runSummary — a description summary', () => {
+  it('asks for current state, what the change does, risks as bullets, and diagrams only if needed', async () => {
+    const { fake } = await startFakeSummary({
+      ...summaryInput,
+      kind: 'description',
+      text: 'Moves the queue to Redis.',
+    })
+    expect(fake.writtenStdin).toMatch(/Current state.*1-3 sentences/s)
+    expect(fake.writtenStdin).toMatch(/What the change does.*1-3 sentences/s)
+    expect(fake.writtenStdin).toMatch(/Risks.*bullet list/s)
+    expect(fake.writtenStdin).toMatch(/diagram.*only when/is)
+    expect(fake.writtenStdin).not.toMatch(/at most four bullet points/i)
+  })
+
+  it('leaves a discussion summary on the four-bullet format', async () => {
+    const { fake } = await startFakeSummary()
+    expect(fake.writtenStdin).toMatch(/at most four bullet points/i)
+    expect(fake.writtenStdin).not.toMatch(/Current state/)
+  })
+})
+
 describe('runSummary — what it answers', () => {
   it('answers the summary claude returned as structured_output', async () => {
     const { fake, done } = await startFakeSummary()

@@ -74,6 +74,8 @@ function freshHandlers(): Record<string, Handler> {
   const handlers: Record<string, Handler> = {}
   beforeEach(() => {
     vi.clearAllMocks()
+    // A gh call no test queued fails, as it does when gh cannot answer, instead of never replying.
+    mockExecFile.mockImplementation(stubFails(new Error('no reply queued')))
     Object.assign(handlers, captureHandlers())
   })
   return handlers
@@ -350,6 +352,50 @@ describe('github:pr-review-detail', () => {
   })
 })
 
+const OWNER_TEST_FILES = ['web/app.tsx', 'api/main.py'].map((filename) => ({
+  filename,
+  status: 'modified',
+  additions: 1,
+  deletions: 0,
+  patch: '@@ -1 +1,2 @@\n+x',
+}))
+
+/** Answers the owner lookups by what they ask for, after the PR's own calls have been queued. */
+function answerOwnerLookups(codeowners: string | null) {
+  mockExecFile.mockImplementation(
+    stubAnswering(({ args }) => {
+      if (args[1].includes('contents/.github/CODEOWNERS') && codeowners !== null) return codeowners
+      if (args[1] === 'user/teams') return 'klaviyo/frontend'
+      if (args[1] === 'user') return 'ana'
+      return new Error('404')
+    })
+  )
+}
+
+describe('github:pr-review-detail — the files the viewer owns', () => {
+  const handlers = freshHandlers()
+
+  async function ownedPathsOfPr(): Promise<string[]> {
+    const result = (await handlers['github:pr-review-detail']({
+      repoRoot: '/repo',
+      prNumber: 6,
+    })) as { pr: { ownedPaths: string[] } }
+    return result.pr.ownedPaths
+  }
+
+  it('lists the changed files that base-branch CODEOWNERS gives to the viewer or their team', async () => {
+    mockPrDetail(PR_META, OWNER_TEST_FILES)
+    answerOwnerLookups('* @klaviyo/backend\nweb/ @klaviyo/frontend')
+    expect(await ownedPathsOfPr()).toEqual(['web/app.tsx'])
+  })
+
+  it('lists none when the base branch has no CODEOWNERS', async () => {
+    mockPrDetail(PR_META, OWNER_TEST_FILES)
+    answerOwnerLookups(null)
+    expect(await ownedPathsOfPr()).toEqual([])
+  })
+})
+
 describe('github:pr-review-detail — returns a pr object on success with no status checks', () => {
   const handlers = freshHandlers()
 
@@ -416,8 +462,8 @@ describe('github:pr-review-detail — skips check-suites fallback when headSHA i
     })) as { pr: { statusChecks: unknown[] } }
 
     expect(result.pr.statusChecks).toEqual([])
-    // Only 5 execFile calls (repo view + pr view + files + reviews + requested_reviewers), check-suites skipped
-    expect(mockExecFile).toHaveBeenCalledTimes(5)
+    const asked = mockExecFile.mock.calls.map((call) => (call[1] as string[]).join(' '))
+    expect(asked.some((request) => request.includes('check-suites'))).toBe(false)
   })
 })
 
@@ -848,6 +894,7 @@ describe('github:pr-file-diff', () => {
   it('fetches PR ref with --force so stale local refs do not block the diff', async () => {
     mockGitSuccess('') // git fetch
     mockGitSuccess('{"baseRefName":"main"}') // gh pr view (also goes through execFile)
+    mockGitSuccess('') // git fetch of the base branch
     mockGitSuccess('abc123\n') // git merge-base
     mockGitSuccess('') // git diff
 
@@ -885,6 +932,7 @@ describe('github:pr-file-diff — parses a diff with binary file indicator', () 
   it('parses a diff with binary file indicator', async () => {
     mockGitSuccess('') // git fetch
     mockGitSuccess('{"baseRefName":"main"}') // gh pr view
+    mockGitSuccess('') // git fetch of the base branch
     mockGitSuccess('abc123\n') // git merge-base
     mockGitSuccess('Binary files a/image.png and b/image.png differ\n') // git diff
 
@@ -914,6 +962,7 @@ describe('github:pr-file-diff — parses a diff with actual hunks', () => {
 `
     mockGitSuccess('') // git fetch
     mockGitSuccess('{"baseRefName":"main"}') // gh pr view
+    mockGitSuccess('') // git fetch of the base branch
     mockGitSuccess('abc123\n') // git merge-base
     mockGitSuccess(diffContent) // git diff
 
@@ -2442,6 +2491,7 @@ describe('review revamp — edge branches', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockExecFile.mockReset()
+    mockExecFile.mockImplementation(stubFails(new Error('no reply queued')))
     handlers = captureHandlers()
   })
 
@@ -2977,6 +3027,17 @@ describe('github:pr-file-diff caching — fetches again when the head commit cha
     await handlers['github:pr-file-diff']({ ...payload, headSHA: 'h2' })
 
     expect(spawns.some((s) => s.args[0] === 'fetch')).toBe(true)
+  })
+
+  it('fetches the base branch before taking the merge base, so a stacked PR resolves', async () => {
+    const spawns = routeExec(gitRoute)
+
+    await handlers['github:pr-file-diff']({ ...payload, baseRef: 'develop', headSHA: 'h1' })
+
+    const order = spawns.map((s) => s.args.join(' '))
+    const baseFetch = order.findIndex((a) => a.startsWith('fetch') && a.includes('develop'))
+    expect(baseFetch).toBeGreaterThan(-1)
+    expect(baseFetch).toBeLessThan(order.findIndex((a) => a.startsWith('merge-base')))
   })
 
   it('does not ask gh for the base branch when the caller supplies it', async () => {
