@@ -31,12 +31,12 @@ frame-shim.js ── invoke / send / subscribe / request-exit / quick-actions-op
 
 ## Alternatives considered
 
-| Option                                           | Why not                                                                                                                                                                                                                                                                        |
-| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Keep views, hide them while a modal is open      | The screen behind the modal goes blank. That is the bug.                                                                                                                                                                                                                       |
-| Keep views, show a screenshot under the modal    | It imitates the page instead of showing it, and the content goes stale while the modal is open.                                                                                                                                                                                |
-| Keep views, draw modals in a topmost native view | It needs a second renderer, and 11 modals would have to move across a process boundary with their stores and callbacks. Popovers and toasts would still be covered.                                                                                                            |
-| Iframe with `nodeIntegrationInSubFrames`         | Experimental, and "all your preloads will load for every iframe" ([WebPreferences](https://www.electronjs.org/docs/latest/api/structures/web-preferences)), which hands the main preload's whole API to extension code.                                                         |
+| Option                                           | Why not                                                                                                                                                                                                                 |
+| ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Keep views, hide them while a modal is open      | The screen behind the modal goes blank. That is the bug.                                                                                                                                                                |
+| Keep views, show a screenshot under the modal    | It imitates the page instead of showing it, and the content goes stale while the modal is open.                                                                                                                         |
+| Keep views, draw modals in a topmost native view | It needs a second renderer, and 11 modals would have to move across a process boundary with their stores and callbacks. Popovers and toasts would still be covered.                                                     |
+| Iframe with `nodeIntegrationInSubFrames`         | Experimental, and "all your preloads will load for every iframe" ([WebPreferences](https://www.electronjs.org/docs/latest/api/structures/web-preferences)), which hands the main preload's whole API to extension code. |
 
 ## Consequences
 

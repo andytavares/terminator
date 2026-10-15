@@ -1,6 +1,6 @@
 # ADR-022: WebContentsView-Isolated Extension Renderer
 
-**Status**: Accepted  
+**Status**: Superseded by [ADR 114](114-extension-views-are-frames-in-the-window.md)  
 **Date**: 2026-06-24  
 **Deciders**: Andrew Tavares
 

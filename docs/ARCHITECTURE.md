@@ -37,17 +37,17 @@ Read it top to bottom the first time: the process model and the IPC contract are
 
 ## Process model
 
-Terminator is an Electron application with four kinds of process: the main process, the extension host, the main window's renderer, and one renderer per extension view ([ADR 094](adr/094-extensions-follow-the-vs-code-model.md)).
+Terminator is an Electron application with four kinds of process: the main process, the extension host, and the main window's renderer, which also holds one frame per extension view ([ADR 094](adr/094-extensions-follow-the-vs-code-model.md)).
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │ Main process (Node.js)                    src/main/index.ts  │
 │  PtyManager (node-pty) · OutputRelay · electron-store files  │
 │  app.sqlite connection · IPC handlers (invoke table)         │
-│  ExtensionHost (manifests, status) · ExtensionViewHost       │
+│  ExtensionHost (manifests, status) · FrameBridge             │
 └───────┬───────────────────────┬──────────────────────┬───────┘
-        │ MessagePort           │ contextBridge         │ WebContentsView
-        │ requests, events,     │ preload.ts            │ preload-webview.ts
+        │ MessagePort           │ contextBridge         │ MessagePort per frame
+        │ requests, events,     │ preload.ts            │ frame-shim.js
         │ callbacks by id       │ window.electronAPI    │ window.electronAPI
 ┌───────▼──────────────┐ ┌──────▼─────────────────┐ ┌───▼──────────────────────┐
 │ Extension host       │ │ Main window renderer   │ │ Extension views          │
@@ -62,7 +62,7 @@ Terminator is an Electron application with four kinds of process: the main proce
 - **Main process.** Owns the windows, every terminal process (`src/main/terminal/pty-manager.ts`), the core's settings files and the IPC handlers. `node-pty` is a native module and stays here ([ADR-001](adr/001-pty-in-main-process.md)).
 - **Extension host.** One Electron [`utilityProcess`](https://www.electronjs.org/docs/latest/api/utility-process) that runs every extension backend, so extension work never shares the event loop that relays terminal output. Its entry is `src/main/extensions/host/entry.ts`, built to `out/main/extension-host.js`. It is the only place a backend runs: main never `require()`s an extension's entry point. See [Extension system](#extension-system).
 - **Main window renderer.** The core UI, with `contextIsolation: true` and `nodeIntegration: false`. It reaches main only through `window.electronAPI`, which `src/main/preload.ts` exposes.
-- **Extension views.** Each extension surface is a `WebContentsView` composited over the area the main window reserves for it, loading the extension's own document. It reaches main through `src/main/preload-webview.ts`.
+- **Extension views.** Each extension surface is an `<iframe>` in the main window's own page, loading the extension's document from `ext://`. It reaches main over a `MessagePort` that `FrameBridge` (`src/main/extensions/frame-bridge.ts`) hands it ([ADR 114](adr/114-extension-views-are-frames-in-the-window.md)).
 
 ---
 
@@ -79,7 +79,7 @@ The window comes first; everything slow happens beside it. `app.whenReady()` in 
 
 `afterActivation` runs once every extension has activated. It is where the legacy PGlite import (`src/main/db/legacy-pglite-import.ts`) runs, because it copies into tables the extensions create in `activate`.
 
-An extension view is created by `extension:update-panel-bounds`, which first awaits `ExtensionHost.whenActivated(extensionId)`: the extension's own activation, and the import when one is pending. A view therefore never loads before the backend it talks to, and one slow extension delays only its own view.
+An extension frame is given its port by `extension:open-frame-port`, which first awaits `ExtensionHost.whenActivated(extensionId)`: the extension's own activation, and the import when one is pending. A frame therefore never talks to a backend that is not there yet, and one slow extension delays only its own frame.
 
 Because the PATH probe runs beside the window, a child process started from a core IPC handler in the first moments after launch can still see the app's own PATH on macOS. Extension code is not affected (it waits on `beforeActivation`).
 
@@ -102,214 +102,13 @@ All renderer-to-main communication goes through `window.electronAPI`. The surfac
 
 `src/shared/electron-api/api-type.ts` derives the renderer's `ElectronAPI` type from the manifest with mapped types, so a renderer call site type-checks against it. The manifest also derives the core's remote allowlist ([ADR-023](adr/023-channel-manifest-and-declared-remote-access.md)).
 
-Specs marked `extensionView` are what an extension view receives. `src/main/preload-webview.ts` is still written by hand, because two preload entries sharing the builder would make Rollup emit a chunk the sandboxed preload cannot load; `tests/unit/main/preload-webview.spec.ts` fails when it and the manifest disagree on a method, a channel or a payload. electron-vite's `build.preload.isolatedEntries` removes that shared chunk, but in 5.0.0 it crashes when stdout is not a terminal (CI pipes the build); 6.0.0-beta.8 guards it, so the webview preload moves onto `build-api.ts` when electron-vite 6.0.0 is released.
-
-### The main side: the invoke table and `ChannelSpec`
-
-Every invoke channel, core and extension, is a `ChannelSpec` (declared in `packages/extension-sdk/src/index.ts`): the channel name, a required zod `schema`, the `invalid` response for a payload the schema rejects, `run`, which receives the parsed payload, and an optional `onError` ([ADR-096](adr/096-every-ipc-channel-has-a-schema.md)). `dispatchChannel` is the one parse step both kinds share.
-
-- Core channels are registered by `registerInvokeTable` (`src/main/ipc/invoke-table.ts`), one table per `src/main/ipc/*.ipc.ts` file that has invoke channels (`log.ipc.ts` has only a send channel). A file with many channels keeps them in module-level `ChannelSpec[]` arrays grouped by topic, and its register function passes them to one table, as `git.ipc.ts` does with its repository, branch and worktree channels. That keeps each function within the size limits in [CONTRIBUTING.md](CONTRIBUTING.md#lint-and-format).
-- Extension channels are registered by `api.ipc.registerHandler(spec, { remoteAccessible? })` in `src/main/extensions/api.ts`. The spec's `schema` and `run` stay in the extension host, which validates the payload before `run`.
-
-Both call `handleChannel` (`src/main/ipc/channel-registrar.ts`); ESLint (`eslint.config.mjs`) forbids any other caller. Registration records the channel and its remote-access declaration in the bridge registry (`src/main/remote/ipc-registry.ts`); `ipcMain` is never patched. The remote bridge dispatches to the same registered handler, so a payload from a remote client is validated exactly as the renderer's is.
-
-Push events (main to renderer) go through `webContents.send`. Everything sent to the main window is also relayed to the extension views, except `terminal:*` and `workspace:changed`, which have their own paths (`src/main/index.ts`).
-
-### Core channel namespaces
-
-These are the channels the core registers or pushes (`src/shared/electron-api/manifest.ts`):
-
-| Namespace                                               | What it carries                                                                                                                      |
-| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `terminal:*`                                            | Create, attach, input, output, acknowledge, resize, close, process exit, list, cleanup                                               |
-| `workspace:*`                                           | Workspace create, list, update, delete, reorder; the active selection                                                                |
-| `project:*`                                             | Project create, list, rename, branch, delete, reorder                                                                                |
-| `settings:*`                                            | Global and per-workspace settings                                                                                                    |
-| `session-records:*`                                     | Session descriptions, links and agent conversations (see [Home and the Monitor wall](#home-and-the-monitor-wall))                    |
-| `integrations:*`                                        | Issue trackers: connection, issue list, search, get, comment, project links, agent context                                           |
-| `git:*`                                                 | Branches, worktrees, fetch and change statistics the core sidebar needs                                                              |
-| `shell:*`                                               | `shell:exec` (git and gh only; `cwd` confined to `workspaceRoot`, after `realpath`, when one is given), `open-path`, `open-external` |
-| `fs:*`                                                  | File watch start and stop for the view that asks, `fs:read-file`, `fs:changed` pushed to that view alone (desktop only)              |
-| `extension:*`                                           | Install, toggle, reload, list, settings, commands, view bounds, insets, theme, exit gesture                                          |
-| `notifications:*`                                       | Create, list, dismiss, trigger an action, push                                                                                       |
-| `metrics:*`                                             | System and per-process metrics                                                                                                       |
-| `menu:*`                                                | Native menu events pushed to the renderer                                                                                            |
-| `editor:*`                                              | Detect and open an external editor                                                                                                   |
-| `app:*`, `db:*`, `dialog:*`, `log:*`, `quick-actions:*` | App info, database health, folder picker, renderer log lines, opening Quick Actions                                                  |
-
-An extension's channels are its own and the core knows nothing of them: git-integration registers `git:status`, `github:*` and others, Foundry `foundry:*`, task-vault `task-vault:*`. Each extension's spec files and `src/ipc/` directory are their reference.
-
-### Types and schemas
-
-- `src/shared/types/index.ts`: TypeScript interfaces both processes use.
-- `src/shared/schemas/`: zod schemas for core payloads and stored shapes. A payload that fails its schema gets the `invalid` response declared in the channel's table row, usually an `{ error: 'VALIDATION_ERROR' }` envelope shaped like the channel's other responses.
-
----
-
-## Data and persistence
-
-```
-Workspace ──── (many) ──── Project
-                               │
-                               └── (many) ── TerminalSession [in memory only]
-
-GlobalSettings ──── (many) ──── WorkspaceSettings [per-workspace overrides]
-
-Extension ──── contributes to ──── extension settings (by key)
-```
-
-| Entity                            | Stored? | Where                                                                            |
-| --------------------------------- | ------- | -------------------------------------------------------------------------------- |
-| Workspace, Project                | Yes     | electron-store `workspaces.json` (`src/main/storage/workspace-store.ts`)         |
-| GlobalSettings, WorkspaceSettings | Yes     | electron-store `settings.json` (`src/main/storage/settings-store.ts`)            |
-| Extension settings                | Yes     | electron-store `extension-settings.json` (`storage/extension-settings-store.ts`) |
-| Extension registry                | Yes     | electron-store `extensions.json` (`src/main/extensions/extension-host.ts`)       |
-| Extension data                    | Yes     | `userData/app.sqlite`, each extension's own tables                               |
-| SessionRecord                     | Yes     | `session-records.json`; kept 30 days past close                                  |
-| AgentConversation                 | Yes     | On its `SessionRecord`; the transcript itself is the agent's                     |
-| Agent session reports             | Yes     | `userData/agent-sessions/<terminal id>.json`, one per terminal                   |
-| Tracker credentials               | Yes     | `integrations.json`, each value `safeStorage`-encrypted                          |
-| Tracker connection config         | Yes     | `integrations.json`, plaintext beside the credential                             |
-| TerminalSession metadata          | No      | Renderer memory (`session.store.ts`) and `PtyManager`                            |
-| xterm.js buffer                   | No      | The xterm.js `Terminal` instance                                                 |
-| PTY process                       | No      | An OS process, killed on tab close or app quit                                   |
-
-Terminal sessions do not survive an app restart. What the operator wrote about a session does: its description and its own work item link are a `SessionRecord`, kept until 30 days after the session closes (see [Home and the Monitor wall](#home-and-the-monitor-wall), ADR 054). So does the agent conversation that ran in it, which can be picked up again afterwards (see [Resuming an agent session](#resuming-an-agent-session), ADR 055).
-
-See [ADR-003](adr/003-electron-store-for-persistence.md) for the storage decision. The core stores are read through a per-key cache (see [Loops in the main process](#loops-in-the-main-process)).
-
-**Application database.** `userData/app.sqlite` is the one SQL database of the app, opened through Node's built-in `node:sqlite` (`DatabaseSync`, WAL journal, foreign keys on) in `src/main/db/index.ts`. The core owns no tables; each extension creates its own when it activates and reaches the database only through the injected `ExtensionDB` (`exec`, `query`, `get`, `run`, `transaction`). The extension host opens its own connection (WAL, `busy_timeout` 5 s), which every backend shares, so `transaction(fn)` runs `fn` in the extension's own process; main keeps one for the health check and the legacy import. On each connection statements and transactions run in call order; a statement issued while a transaction is open waits for it. `node:sqlite` is a release candidate (stability 1.2) in Node 24, the risk ADR 099 accepts. It replaced PGlite, which added about 250 MB to the main process and about 0.6 s to every start.
-
-**Import from PGlite.** Up to and including the release before this one, the database was `userData/app.pglite`. On the first start where `app.sqlite` does not exist and `app.pglite` does, `src/main/db/legacy-pglite-import.ts` opens the old database once (PGlite is imported dynamically, on this path only, so a normal start never loads it) and, after the extensions have run their schema setup in `activate`, copies every row of each table that exists in both databases, in one transaction with foreign keys deferred. `app.pglite` is left untouched as the backup. If the import fails, the error is logged (`Legacy PGlite import failed`), the transaction is rolled back and the app starts with an empty database instead of refusing to start; the backup stays, and deleting `app.sqlite` makes the next start import again. Only tables of extensions that were activated on that start are imported. The import, the `@electric-sql/pglite` dependency and the `asarUnpack` entries for `postgres.wasm` and `postgres.data` are removed one release later (ADR 099).
-
-**One process per profile.** `userData/app.sqlite` is opened by one process at a time. `src/main/claim-profile.ts`, the first import of `src/main/index.ts`, takes Electron's single-instance lock (a second launch exits and focuses the first window) and moves an unpackaged run to `<userData>-dev` unless `--user-data-dir` is given, so `npm run dev` never opens the installed app's database.
-
----
-
-## Terminal sessions
-
-```
-createSession() called
-      │
-      ▼
-terminal:create IPC ──► PtyManager.spawn()
-      │                      │
-      │                      ├─ spawns node-pty process
-      │                      │  (env carries TERMINATOR_SESSION_ID, which is how
-      │                      │   an agent's conversation is paired to this terminal)
-      │                      ├─ registers onData → OutputRelay (batched, flow-controlled) → 'terminal:output'
-      │                      └─ registers onExit → webContents.send('terminal:process-exit')
-      │                         (exit code, or null when a signal ended the process)
-      ▼
-TerminalInstance created (renderer)
-      │
-      ├─ new Terminal({ scrollback }) from @xterm/xterm 6 (theme carries the scrollbar colours)
-      ├─ subscribes to its session through the output router (one shared terminal:output listener)
-      └─ sends keystrokes via terminal:input IPC
-
-Tab switch (navigate away)
-      │
-      └─ TerminalInstance.detach() — removes from DOM, ResizeObserver disconnected
-         PTY keeps running in main process
-
-Tab switch (return)
-      │
-      └─ TerminalInstance.attach(containerEl) — re-opens into DOM
-         Buffer and scroll position intact (xterm.js instance was never destroyed)
-         [ADR-004]
-
-Tab close
-      │
-      ├─ terminal:close IPC ──► PtyManager.kill(sessionId), then markClosed(sessionId) on its record
-      ├─ session removed from Zustand store
-      └─ TerminalInstance.dispose() — xterm.js instance disposed, output unsubscribed
-```
-
-The desktop and the phone client share one terminal library, `@xterm/xterm` 6 with `@xterm/addon-fit`
-(ADR 097). xterm 6 draws its own scrollbar (`.xterm-scrollable-element`) and scrolls virtually, so the
-scrollbar colours are set in the xterm theme objects (`XTERM_THEMES` in `TerminalSession.tsx`:
-`scrollbarSliderBackground`, `scrollbarSliderHoverBackground`, `scrollbarSliderActiveBackground`), not in
-CSS. Its width is fixed (14px) and `FitAddon` reserves it, whatever the OS scrollbar setting. Code and
-tests that need the scroll position read the xterm buffer or the scrollbar slider, never the
-`.xterm-viewport` element's `scrollTop`.
-
-**Renderer choice.** A visible desktop terminal draws with `@xterm/addon-webgl`; the DOM renderer is the
-fallback. `TerminalInstance.mount()` loads the add-on, and `unmount()` or `mountPreview()` (an Overview
-tile) disposes it, so a hidden terminal or a thumbnail never holds a GPU context. Chromium keeps at most
-16 live WebGL contexts, so `WebglContextBudget` (`src/renderer/terminal/webgl-contexts.ts`) hands out 12
-and a terminal past that stays on the DOM renderer. A lost context (`onContextLoss`) or a machine without
-WebGL2 also falls back to the DOM renderer. The DOM renderer clips the last column's glyph on macOS (about
-2px), which WebGL does not do because it has no row boxes to clip. The phone client keeps the DOM renderer.
-The DOM renderer gives each row div `overflow: hidden` and a width of exactly cols × cellWidth but lays text
-out with the font's natural advance width, so the difference accumulates across the line (902px of content
-in a 900px row on macOS with xterm 6). A CSS rule that widens the rows cannot come back: xterm 6 draws its own
-fixed-width scrollbar beside the screen, which FitAddon reserves, so wider rows sit under it, and the terminal's
-geometry does not depend on the macOS overlay-scrollbar setting. `tests/e2e/terminal-right-edge.spec.ts`
-checks the live renderer: under WebGL the canvas ends at or before the scrollbar and the last column holds ink;
-under the DOM renderer a row's `scrollWidth` fits its `clientWidth`.
-Because WebGL leaves no terminal text in the DOM, the renderer sets `window.terminatorE2E.terminalRows()`
-(`src/renderer/terminal/terminal-rows.ts`), which reads every terminal's visible rows from its xterm buffer,
-one terminal after another, and `terminalRowsIn(element)`, which reads only the terminal drawn in that
-element; the end-to-end specs read terminals through them.
-
-**Links.** `src/renderer/terminal/terminal-links.ts` finds the URLs and paths on a row and declares them to
-xterm. `LinkPointer` (`src/renderer/terminal/link-pointer.ts`) underlines the link under the pointer while
-⌘ (Ctrl off macOS) is held and opens it on ⌘-click. It maps the pointer to a cell from the box of
-`.xterm-screen`, which both renderers size to exactly `cols × rows` cells inside the pane's padding
-(`WebglRenderer.ts` and `DomRenderer.ts` in xterm.js). It never measures `.xterm-rows`, which the WebGL
-renderer does not create.
-
-**Batching and flow control.** A PTY produces thousands of small chunks a second. `OutputRelay`
-(`src/main/terminal/output-relay.ts`) joins them in an `OutputBatcher` and sends one `terminal:output`
-message per 16 ms frame, or at once when the batch reaches 128 KiB. Order is kept, and pending output is
-flushed before `terminal:process-exit` is sent. Flow control follows the
-[xterm.js guide](https://xtermjs.org/docs/guides/flowcontrol/): the renderer passes
-`terminal.write(data, callback)` and the callback sends `terminal:acknowledge` with the number of characters
-written. `FlowControl` (`src/main/terminal/flow-control.ts`) counts the characters sent and not yet
-acknowledged, calls `PtyManager.pause()` (node-pty `pause()`) above 1 MiB and `resume()` below 256 KiB (characters), so a
-process that prints faster than xterm can parse blocks on its own output instead of filling the renderer's
-memory. Only output actually delivered to a window is counted, output for a session with no subscriber is
-acknowledged on arrival, and `terminal:attach` forgets what an earlier renderer owed, so a reload cannot
-leave a process paused. A browser client (remote) does not acknowledge: its output arrives by its own path. A terminal an extension
-opens (`api.pty.openTerminal`, `api.pty.runInTerminal`) uses the same relay, not a broadcast to every
-window and view.
-In the renderer the output router (`src/renderer/terminal/output-router.ts`) holds the one
-`terminal:output` listener and dispatches by session id.
-
-**Exit status.** node-pty reports a process ended by a signal as `exitCode` 0 with `signal` set
-(`WIFSIGNALED` in its [`src/unix/pty.cc`](https://github.com/microsoft/node-pty/blob/main/src/unix/pty.cc)).
-`PtyManager` passes `null` for such a process, never that 0, so a terminal closed or killed before its
-process finished does not read as a success. `api.pty.runInTerminal` runs a program as a tab's own
-process and resolves with `{ sessionId, exitCode }` when it ends; it subscribes to the exit in the tick
-it spawns, so a program that exits at once is not missed across the extension host's port.
-
----
-
-## Settings resolution
-
-Settings use a two-level hierarchy: global defaults + optional workspace overrides.
-
-```
-Resolved settings = GlobalSettings merged with WorkspaceSettings.overrides
-```
-
-The `resolveSettings(workspaceId?)` selector in `settings.store.ts` performs this merge. The result determines the `data-theme` attribute on `document.documentElement` (for CSS custom properties) and the `scrollback` value passed to new `Terminal` instances.
-
-Theme changes take effect immediately — no restart needed — because the CSS variable system responds to the attribute change.
-
-The shape is declared once, as zod schemas in `src/shared/schemas/settings.schema.ts`; `GlobalSettings`, `WorkspaceSettings` and the quick-action types are inferred from them. `settings-store.ts` merges a patch into what is stored and parses the result with the schema before saving, so a write that would break the shape stores nothing and `settings:update-global` / `settings:update-workspace` answer `{ error: 'VALIDATION_ERROR' }`.
-
----
-
-## Extension system
-
-The core and the extensions meet only through the Extension SDK, on VS Code's model ([ADR 094](adr/094-extensions-follow-the-vs-code-model.md), Constitution II). `packages/extension-sdk/types/api.d.ts` declares the API; `src/main/extensions/api.ts` implements it and the compiler checks the two agree. The core builds and runs with every extension directory deleted. How to write an extension is in [EXTENSION-DEVELOPMENT.md](EXTENSION-DEVELOPMENT.md); this section is how the core runs one.
+Specs marked `extensionView` are what an extension frame receives. `buildElectronApi` in `mode: 'frame'` builds them in the frame (`src/extension-frame/frame-shim.ts`) over the port; `src/shared/electron-api/__tests__/build-api.spec.ts` fails when the frame surface and the manifest disagree on a method.
 
 Three classes share the work in main:
 
 - `ExtensionHost` (`src/main/extensions/extension-host.ts`) reads and validates manifests, keeps each extension's status in `extensions.json`, and activates, reloads, toggles and unloads extensions.
 - `ExtensionHostProcess` (`src/main/extensions/host/host-process.ts`) starts the extension host `utilityProcess` and restarts it. `ExtensionHost` is constructed with it (`src/main/index.ts`) and has no other way to load a backend; its unit specs give it a test double of the same `BackendHost` interface.
-- `ExtensionViewHost` (`src/main/extensions/extension-view-host.ts`) creates, places and themes the extensions' `WebContentsView`s.
+- `FrameBridge` (`src/main/extensions/frame-bridge.ts`) gives each extension frame a `MessagePort`, answers its calls through the channel registries, and pushes it events and the theme.
 
 ### The process boundary
 
@@ -345,25 +144,22 @@ The renderer learns the enabled extensions from `extension:list` and turns each 
 ### Extension views
 
 ```
-Main window renderer                         Main process
-  ExtensionPanelPortal (placeholder)  ──►    ExtensionViewHost
-    reports its bounds over                    creates a WebContentsView in the
-    extension:update-panel-bounds              'ext-views' partition, positions it
-                                               over the placeholder, injects the
-                                               design system CSS, stamps data-theme
-                                                     │ loads
-                                                     ▼
-                                     ext://<extension id>/<manifest.renderer>?view=…&repoRoot=…
-                                       preload: out/preload/webview.js (preload-webview.ts)
-                                       window.electronAPI.extensionBridge.invoke / on
+Main window renderer                              Main process
+  ExtensionPanelPortal                              FrameBridge
+    <iframe src="ext://<id>/<renderer>?view=…">       one MessageChannelMain per frame
+    on load: extension.openFramePort ───────────►     (after whenActivated(id))
+    ◄── extension:frame-port [port1] (preload forwards it to the page)
+    postMessage(port1) ──► frame-shim.js              port2 stays here, tagged {id, view}
+                             window.electronAPI  ◄──► invoke / send / subscribe / events
 ```
 
-- The extension's bundle is never imported into the main renderer. A view is its own document with its own `webContents`, so it can crash without taking the core down ([ADR-022](adr/022-webview-isolated-extension-renderer.md)).
-- The `ext://` protocol handler in `src/main/index.ts` serves only files inside the extension's directory, with `Cache-Control: no-store`; it is registered on the default session and on `ext-views`.
+- The extension's bundle is never imported into the main renderer. A frame is a separate document on its own `ext://` origin ([ADR 114](adr/114-extension-views-are-frames-in-the-window.md)).
+- The `ext://` protocol handler (`src/main/extensions/ext-protocol.ts`) serves only files inside the extension's directory, with `Cache-Control: no-store`. For an extension's HTML it injects the frame shim (`ext://core/frame-shim.js`, built by `vite.config.remote.ts`) and the design system CSS.
 - The surface's `view` and the current `repoRoot` arrive as URL parameters; `workspace:changed` is sent on load and on every change.
-- Reloading an extension (`extension:reload`) pushes `extension:renderer-reload`, and the portal remounts the view; the app is not rebuilt.
-- A `WebContentsView` composites above the main window's DOM, so nothing the core draws can cover it. A centred core modal hides every view while it is open (`useModalEffect`, `src/renderer/stores/modal.store.ts`); a drawer moves views aside instead (`extension:set-left-inset`, `extension:set-bottom-inset`). An extension's own dialogs render inside its view ([ADR-038](adr/038-dialogs-render-in-the-extension-view.md)).
-- `⌘P` / `Ctrl+P` pressed inside a view opens the core's Quick Actions: `ExtensionViewHost` watches each view's `before-input-event` (`isQuickActionsOpenShortcut`), focuses the main window and sends `quick-actions:open`.
+- Reloading an extension (`extension:reload`) pushes `extension:renderer-reload`, and the portal remounts the frame, which asks for a new port.
+- A frame is page content, so a modal's backdrop dims it and a drawer or toast draws over it: nothing is hidden and no strip is reserved. An extension's own dialogs still render inside its frame ([ADR-038](adr/038-dialogs-render-in-the-extension-view.md)).
+- `⌘P` / `Ctrl+P` pressed inside a frame opens the core's Quick Actions: the shim recognises it (`isQuickActionsLeader`) and posts `quick-actions-open`, and main sends `quick-actions:open` to the main window.
+- Main names a caller by its port, not by a `WebContents`: the view-scoped channels (`defineViewChannel`, ADR 109) are given a `ViewCaller`.
 
 **Pop-out windows.** `api.window.openAuxiliary(view, params)` opens a `BrowserWindow` that loads the extension's own view document with `?view=<view>` and the params, with the main preload and the design system CSS injected. A method an extension view calls in a pop-out must therefore be `extensionView: 'shared'` in the manifest, not `'only'`: Notepad's note window calls `extension.onSettingsChanged`, and while it was `'only'` the call threw and the window stayed blank. One window is kept per `view`. Pop-outs are ordinary top-level windows: the Window menu (`src/main/window-menu.ts`) has the `window` role, so macOS lists every open window there, and each pop-out names itself through `document.title`.
 
@@ -409,15 +205,15 @@ Otherwise a command's `shortcut` is a display hint shown in the Quick Actions pa
 
 ### Escape-to-terminal exit
 
-Pressing `Esc` twice within 500 ms inside any extension surface returns the user to the terminal session they were last in. Because an extension view is its own `webContents`, the gesture is detected in two places and converges on one action:
+Pressing `Esc` twice within 500 ms inside any extension surface returns the user to the terminal session they were last in. Because an extension frame is its own document, the gesture is detected in two places and converges on one action:
 
 ```
-Extension WebContentsView            Host renderer chrome
-  preload-webview.ts keydown           useExtensionEscapeExit keydown
+Extension frame                      Host renderer chrome
+  frame-shim.js keydown                useExtensionEscapeExit keydown
     │ extension:request-exit                    │
     ▼                                           │
   routeExtensionExitRequest (main)              │
-    │  attributes sender → { extensionId, viewParam }
+    │  the port names { extensionId, viewParam }
     │  focuses main renderer                    │
     │ extension:exit-to-terminal                │
     ▼                                           ▼
@@ -444,8 +240,8 @@ The core and every extension are built from one design system, `packages/extensi
 **Tokens.** `packages/extension-ui/src/tokens.css` is the one definition of every token: colour, spacing, radius, fonts and the `--tm-layer-*` scale, under the `--tm-*` names, for both themes (a dark `:root` and a light `[data-theme='light']`). Tokens reach each document differently:
 
 - The core renderer imports the file in `src/renderer/index.tsx` and uses the `--tm-*` names directly. `src/renderer/styles.css` defines only the core's own values (layout measures, the agent-state scale).
-- An extension view is a separate document, so CSS has to be injected into it. `EXTENSION_BASE_CSS` (`src/extension-base-css.ts`: `tokens.css`, `extension-base.css` with the icon scale and element resets, and `controls.css` with the one field height, the themed checkboxes and radios, and `.tmui-inline-edit` for a name edited in place) is read at build time with Vite's `?raw` import, so nothing is looked up on disk at run time. `ExtensionViewHost` inserts it into every view on load, and `extensions/remote-control/src/server/remote-server.ts` serves the same constant to the remote client. The e2e specs that render extension stylesheets in plain Chromium rebuild it with `tests/e2e/extension-base-css.ts`, which reads the builder's own `?raw` imports, and `tests/unit/renderer/extension-base-css.spec.ts` checks the two are identical.
-- An extension document never sees the main renderer's `data-theme`, so `ExtensionViewHost.setTheme` stamps it on every open view and remembers it for views created later, driven by the renderer over `extension:set-theme`.
+- An extension view is a separate document, so CSS has to be injected into it. `EXTENSION_BASE_CSS` (`src/extension-base-css.ts`: `tokens.css`, `extension-base.css` with the icon scale and element resets, and `controls.css` with the one field height, the themed checkboxes and radios, and `.tmui-inline-edit` for a name edited in place) is read at build time with Vite's `?raw` import, so nothing is looked up on disk at run time. `ext-protocol.ts` injects it into every extension page, and `extensions/remote-control/src/server/remote-server.ts` serves the same constant to the remote client. The e2e specs that render extension stylesheets in plain Chromium rebuild it with `tests/e2e/extension-base-css.ts`, which reads the builder's own `?raw` imports, and `tests/unit/renderer/extension-base-css.spec.ts` checks the two are identical.
+- An extension document never sees the main renderer's `data-theme`, so `FrameBridge.setTheme` sends it to every open frame and to each new one, driven by the renderer over `extension:set-theme`, and the shim stamps it on the document.
 
 A `--tm-*` name referenced but not defined makes its declaration invalid, and the browser drops it.
 
@@ -462,7 +258,7 @@ A `--tm-*` name referenced but not defined makes its declaration invalid, and th
 
 A raw `z-index` number in an extension is a lint error.
 
-**Modal surfaces** are not on that scale. Each is a `ModalShell` (`src/ModalShell.tsx`, [ADR 110](adr/110-modal-surfaces-use-the-native-dialog-element.md)): a native `<dialog>` opened with `showModal()` while it is mounted, so the browser keeps focus inside, makes the page behind inert, paints the shell above every z-index and returns focus on close. Every modal is centred in its window on both axes; the shell states the placement `!important`, so no caller moves one, and `expectCentredInWindow` (`tests/e2e/modal-centre.ts`) measures it in each spec that opens a modal. `Dialog` is the shell with a title, body and actions. Settings and Quick Actions in the core, Notepad's search and quick create, and Task Vault's block, recurrence and query-confirmation dialogs are the shell with their own content. The shell dismisses on the dialog's `cancel` event (Escape, a phone's back gesture) and on a press on the backdrop. `ToastRegion` renders inside the shell opened last (`src/modal-stack.ts`), because everything outside an open modal dialog is inert. The top layer belongs to one document, so a core modal still hides the extension views (`useModalEffect`, `src/renderer/stores/modal.store.ts`), which are separate native views painted over the page.
+**Modal surfaces** are not on that scale. Each is a `ModalShell` (`src/ModalShell.tsx`, [ADR 110](adr/110-modal-surfaces-use-the-native-dialog-element.md)): a native `<dialog>` opened with `showModal()` while it is mounted, so the browser keeps focus inside, makes the page behind inert, paints the shell above every z-index and returns focus on close. Every modal is centred in its window on both axes; the shell states the placement `!important`, so no caller moves one, and `expectCentredInWindow` (`tests/e2e/modal-centre.ts`) measures it in each spec that opens a modal. `Dialog` is the shell with a title, body and actions. Settings and Quick Actions in the core, Notepad's search and quick create, and Task Vault's block, recurrence and query-confirmation dialogs are the shell with their own content. The shell dismisses on the dialog's `cancel` event (Escape, a phone's back gesture) and on a press on the backdrop. `ToastRegion` renders inside the shell opened last (`src/modal-stack.ts`), because everything outside an open modal dialog is inert. An extension frame is page content, so a core modal's backdrop dims it instead of hiding it.
 
 **Modal depth is per document.** `contextIsolation: true` gives an extension page and its preload different `window` objects, so `ModalShell` reports its depth across the bridge with `electronAPI.ui.setModalDepth`; that is how the double-Escape exit stands down while a dialog is open. Among surfaces that are not modal (`Popover`, `useDismissible`), Escape is answered by the one opened last (`isInnermost` in `useDismissible.ts`), which prevents the key's default so a shell around it stays open.
 
@@ -550,15 +346,7 @@ render the row as a link.
 
 A core-renderer notification may name a `sessionId`; `notifications:create` turns it into an `onClick` that shows the window and sends `terminal:navigate-to-session`. A native banner click runs `onClick` when there is one, else the first action — before, a notification with only `onClick` did nothing when its banner was clicked.
 
-**The notification drawer reserves a strip rather than hiding what is under
-it.** An extension's UI is a native `WebContentsView` painting above the
-renderer's DOM, so anything drawn over it is invisible; the general answer is
-`useModalEffect()`, which hides every extension view while a modal is open.
-That is right for a centred dialog and wrong for a drawer down one edge — it
-blanked the whole application to show a 340px panel. The drawer measures itself
-and calls `extension.setLeftInset()`, the left-edge counterpart of the log
-window's `setBottomInset()`: the view moves aside and narrows instead of
-disappearing.
+**The notification drawer draws over the extension frames.** A frame is page content, so the drawer and a modal's backdrop cover it like anything else; nothing is hidden and no strip is reserved ([ADR 114](adr/114-extension-views-are-frames-in-the-window.md)).
 
 ---
 
@@ -592,7 +380,7 @@ A manifest can declare `contributes.commands[]` (`{ id, label, description?, sho
 
 ### Reaching the panel from an extension's own view
 
-The leader is `CmdOrCtrl+P`: `⌘P` on macOS, `Ctrl+P` elsewhere, decided in one place, `isQuickActionsLeader` (`src/shared/quick-actions-leader.ts`). A focused terminal hands it on: xterm turns `Ctrl+P` into `^P` for the shell and stops the event, so `TerminalInstance`'s custom key handler returns `false` for the leader, and the keydown reaches the window listener in `useKeyboardShortcuts.ts`. An extension's UI is a separate `WebContentsView` with its own `webContents`; the host window's `⌘P` keydown listener never sees a keystroke that originated there. `extension-view-host.ts` attaches a `before-input-event` listener to every extension view (`isQuickActionsOpenShortcut`, unit-tested for both the mac and non-mac branches); on `⌘P`/`Ctrl+P` it calls `preventDefault()`, focuses the main window, and sends `quick-actions:open`, which `App.tsx` handles the same way as the in-window shortcut. The panel's own Escape closes only the panel — it claims Escape through the `useModalEffect` "modal depth" signal the double-Escape-exit detector already reads, so closing the panel is never counted as the first half of a double-Escape extension exit. The panel also moves DOM focus into itself on mount (a plain `tabIndex={-1}` container), because leaving focus on whatever was focused before `⌘P` — most often a terminal — meant xterm's own capture-phase Escape handler (attached directly to its textarea) could consume Escape and stop it from ever bubbling to the panel's own window-level listener.
+The leader is `CmdOrCtrl+P`: `⌘P` on macOS, `Ctrl+P` elsewhere, decided in one place, `isQuickActionsLeader` (`src/shared/quick-actions-leader.ts`). A focused terminal hands it on: xterm turns `Ctrl+P` into `^P` for the shell and stops the event, so `TerminalInstance`'s custom key handler returns `false` for the leader, and the keydown reaches the window listener in `useKeyboardShortcuts.ts`. An extension's UI is a frame with its own document; the host window's `⌘P` keydown listener never sees a keystroke that originated there. The frame shim (`src/extension-frame/frame-shim.ts`) listens for it (`isQuickActionsLeader`), calls `preventDefault()` and posts `quick-actions-open` over the port, and main sends `quick-actions:open`, which `App.tsx` handles the same way as the in-window shortcut. The panel's own Escape closes only the panel — it claims Escape through the `useModalEffect` "modal depth" signal the double-Escape-exit detector already reads, so closing the panel is never counted as the first half of a double-Escape extension exit. The panel also moves DOM focus into itself on mount (a plain `tabIndex={-1}` container), because leaving focus on whatever was focused before `⌘P` — most often a terminal — meant xterm's own capture-phase Escape handler (attached directly to its textarea) could consume Escape and stop it from ever bubbling to the panel's own window-level listener.
 
 ### Persistence
 
@@ -863,7 +651,7 @@ See [ADR-017](adr/017-embedded-http-remote-server.md) for the architectural deci
 
 The Git project tab (status, staging, commit, pull requests), the Code Reviews workspace tab and the Reviews global tab. It runs git and gh through `api.shell.exec` and `api.github`, and is the only git parser in the repository ([ADR 094](adr/094-extensions-follow-the-vs-code-model.md) ended ADR-025's two parsers).
 
-Its e2e specs run against real local repositories with a bare `origin` and a stub GitHub at the boundary the app has, the gh CLI: `tests/e2e/fixtures/bin/gh`, on the app's PATH beside the `claude` stub, forwards a call to `tests/e2e/github-stub.ts` when the app's `XDG_CONFIG_HOME` holds `gh/e2e-stub-url`, and otherwise runs the real gh: the next gh on PATH whose real path is not the stub's own, since PATH reaches the stub as `fixtures/zdotdir/../bin` too. gh itself cannot be pointed at a local server (`GH_HOST` means HTTPS to `<host>/api/v3`, and the core passes no `GH_HOST`). Each extension view is a WebContentsView, which Playwright lists among the app's windows, so `tests/e2e/git-harness.ts` drives it as a page.
+Its e2e specs run against real local repositories with a bare `origin` and a stub GitHub at the boundary the app has, the gh CLI: `tests/e2e/fixtures/bin/gh`, on the app's PATH beside the `claude` stub, forwards a call to `tests/e2e/github-stub.ts` when the app's `XDG_CONFIG_HOME` holds `gh/e2e-stub-url`, and otherwise runs the real gh: the next gh on PATH whose real path is not the stub's own, since PATH reaches the stub as `fixtures/zdotdir/../bin` too. gh itself cannot be pointed at a local server (`GH_HOST` means HTTPS to `<host>/api/v3`, and the core passes no `GH_HOST`). Each extension view is an iframe in the main window, which Playwright lists among the page's frames, so `tests/e2e/git-harness.ts` drives it through `ExtensionView`.
 
 #### The review window
 

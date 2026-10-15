@@ -1,6 +1,6 @@
 # Extension Development Guide
 
-An extension adds a feature to Terminator without touching the core. It has two halves: a **backend** that runs in the extension host process and talks to the core through the `ExtensionAPI` object, and an optional **view**, a web page the core shows in its own `WebContentsView`. The core and an extension meet only through the Extension SDK (Constitution II, [ADR 094](adr/094-extensions-follow-the-vs-code-model.md)).
+An extension adds a feature to Terminator without touching the core. It has two halves: a **backend** that runs in the extension host process and talks to the core through the `ExtensionAPI` object, and an optional **view**, a web page the core shows in an `<iframe>` in its own window. The core and an extension meet only through the Extension SDK (Constitution II, [ADR 094](adr/094-extensions-follow-the-vs-code-model.md)).
 
 The API is declared once, in `packages/extension-sdk/types/api.d.ts`. The core implements that declaration in `src/main/extensions/api.ts`, and the compiler checks the two agree. The SDK's current version is the `version` field of `packages/extension-sdk/package.json`; `packages/extension-sdk/CHANGELOG.md` lists what changed in each version and how to migrate.
 
@@ -223,13 +223,14 @@ The workspace package versions shown are the ones in `packages/*/package.json` t
 
 ## The view
 
-A view is an ordinary web page. `ExtensionViewHost` (`src/main/extensions/extension-view-host.ts`) loads it into a `WebContentsView` placed over the area the core reserves for the surface:
+A view is an ordinary web page. The core loads it into an `<iframe>` in the main window ([ADR 114](adr/114-extension-views-are-frames-in-the-window.md)), placed in the area the core reserves for the surface:
 
-- The URL is `ext://<extension id>/<manifest.renderer>?view=<view>&repoRoot=<path>`. The `ext://` protocol, registered in `src/main/index.ts`, serves only files inside the extension's directory, with `Cache-Control: no-store`.
-- The view runs with `contextIsolation: true` and `nodeIntegration: false`, in the `ext-views` session partition, with the core's webview preload (`src/main/preload-webview.ts`). That preload gives the page `window.electronAPI`, typed by `@terminator/extension-sdk/types/renderer`.
-- On every load the host injects the design system's stylesheet (tokens, icon scale, control resets) and stamps `data-theme` on `<html>`.
-- The view is created the first time its surface is shown, after the extension's backend has activated (`ExtensionHost.whenActivated`), so it never calls a channel that is not registered yet.
-- Reloading an extension from Settings → Extensions sends `extension:renderer-reload`, and the core remounts its views. The app does not need rebuilding.
+- The URL is `ext://<extension id>/<manifest.renderer>?view=<view>&repoRoot=<path>`. The `ext://` protocol (`src/main/extensions/ext-protocol.ts`) serves only files inside the extension's directory, with `Cache-Control: no-store`.
+- The core injects a small script into the page's `<head>` (`ext://core/frame-shim.js`) that gives it `window.electronAPI`, typed by `@terminator/extension-sdk/types/renderer`, over a `MessagePort` to the core. The script runs before your own module script.
+- The core injects the design system's stylesheet (tokens, icon scale, control resets) the same way, and stamps `data-theme` on `<html>`.
+- The frame is given its port only after the extension's backend has activated (`ExtensionHost.whenActivated`), so it never calls a channel that is not registered yet.
+- Reloading an extension from Settings → Extensions sends `extension:renderer-reload`, and the core remounts its frames. The app does not need rebuilding.
+- A frame is page content, so the core's modals, drawers and toasts draw over it. Do not rely on your view being the topmost thing on screen.
 
 ### Setting up a view
 
@@ -370,11 +371,11 @@ await window.electronAPI.fs.watchStop()
 ### Keys the core handles in your view
 
 - **`⌘P` / `Ctrl+P`** opens the core's Quick Actions panel even while focus is in your view: the host watches `before-input-event` on every view (`isQuickActionsOpenShortcut`).
-- **`Esc` twice within 500 ms** leaves your extension and returns the operator to their terminal ([ADR 026](adr/026-double-escape-extension-exit.md)). The listener in the webview preload is passive and bubble-phase, so your own single-`Esc` handlers run as normal. It stands down inside a text field and while a dialog is open; the design system's `ModalShell` (and so `Dialog`) reports open dialogs over `electronAPI.ui.setModalDepth`. Do not write a modal of your own: give `ModalShell` your content. Do not stop `Esc` propagation at the window level, or the gesture stops working in your view.
+- **`Esc` twice within 500 ms** leaves your extension and returns the operator to their terminal ([ADR 026](adr/026-double-escape-extension-exit.md)). The listener in the core's frame script is passive and bubble-phase, so your own single-`Esc` handlers run as normal. It stands down inside a text field and while a dialog is open; the design system's `ModalShell` (and so `Dialog`) reports open dialogs over `electronAPI.ui.setModalDepth`. Do not write a modal of your own: give `ModalShell` your content. Do not stop `Esc` propagation at the window level, or the gesture stops working in your view.
 
 ### Testing your view end to end
 
-A view is its own `WebContentsView` on an `ext://` origin, and Playwright attaches to it like any other page in the app's browser context. `tests/e2e/extension-page.ts` finds it, so a spec clicks, types and drags in your view with ordinary locators:
+A view is an iframe on an `ext://` origin inside the main window's page. `tests/e2e/extension-page.ts` finds it as an `ExtensionView`, so a spec clicks, types and drags in your view with ordinary locators:
 
 ```ts
 const vault = await openFromAppBand(
@@ -435,7 +436,7 @@ What the package handles that is easy to get wrong alone:
 
 - **A modal is the browser's own.** `ModalShell` is a native `<dialog>` opened with `showModal()` ([ADR 110](adr/110-modal-surfaces-use-the-native-dialog-element.md)): focus stays inside, the view behind is inert, it paints above every `z-index`, and Escape closes only the one opened last. The remote client runs your view in a phone's browser, where the back gesture dismisses it too.
 - **What you open from a modal must be inside it.** Everything outside an open modal dialog is inert. `Popover` and `ToastRegion` handle this; a surface you portal to `document.body` must portal to `trigger.closest('dialog') ?? document.body`.
-- **A dialog renders in your view, never in the core.** The core cannot draw over a `WebContentsView` ([ADR 038](adr/038-dialogs-render-in-the-extension-view.md)).
+- **A dialog renders in your view.** It is a modal over your own document, and the core's modals draw over your frame ([ADR 038](adr/038-dialogs-render-in-the-extension-view.md), [ADR 114](adr/114-extension-views-are-frames-in-the-window.md)).
 - **Stacking of everything else comes from a named scale** (`panel` 100, `overlay` 200, `modal` 300, `toast` 400). A raw `z-index` number in an extension is a lint error.
 
 ### Styling
