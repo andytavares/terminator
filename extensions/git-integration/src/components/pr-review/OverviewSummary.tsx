@@ -1,9 +1,10 @@
 import React, { useState } from 'react'
-import { Button } from '@terminator/extension-ui'
-import { Sparkles } from 'lucide-react'
+import { Button, RelativeTime } from '@terminator/extension-ui'
+import { Sparkles, TriangleAlert } from 'lucide-react'
 import { reviewAgentAPI } from '../../api/review-agent'
 import { RichContent } from './RichContent'
-import { choose, errorMessageOf } from '../text'
+import { errorMessageOf } from '../text'
+import './brief-card.css'
 import type { IssueComment } from '../../schemas/pr-review.schema'
 
 /** What a Summarize button summarizes: the PR's description, or its discussion. */
@@ -23,6 +24,7 @@ export function useSummary(repoRoot: string, prNumber: number) {
   const [busy, setBusy] = useState(false)
   const [summary, setSummary] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [finishedAt, setFinishedAt] = useState<string | null>(null)
   const requestSummary = async (subject: SummarySubject) => {
     setBusy(true)
     setError(null)
@@ -35,14 +37,17 @@ export function useSummary(repoRoot: string, prNumber: number) {
         text,
       })
       if ('error' in result) setError(result.error)
-      else setSummary(result.summary)
+      else {
+        setSummary(result.summary)
+        setFinishedAt(new Date().toISOString())
+      }
     } catch (e) {
       setError(errorMessageOf(e))
     } finally {
       setBusy(false)
     }
   }
-  return { busy, summary, error, requestSummary }
+  return { busy, summary, error, finishedAt, requestSummary }
 }
 
 export type Summary = ReturnType<typeof useSummary>
@@ -52,40 +57,92 @@ interface Props {
   summary: Summary
 }
 
-function SummaryError({ subject, summary }: Props) {
+/** Whether the Brief is showing a summary, so the description below it can be clamped. */
+export function summaryShown(summary: Summary): boolean {
+  return Boolean(summary.summary) && !summary.error
+}
+
+function BriefHeading({ meta, action }: { meta: React.ReactNode; action?: React.ReactNode }) {
   return (
-    <div className="pr-overview-summary-error" role="alert">
-      <span>Could not summarize: {summary.error}</span>
-      <Button size="sm" onClick={() => summary.requestSummary(subject)} disabled={summary.busy}>
-        Retry
+    <div className="brief-card__head">
+      <h5 className="brief-card__title">
+        <Sparkles className="brief-card__icon" aria-hidden="true" />
+        Brief
+      </h5>
+      <span className="brief-card__meta">{meta}</span>
+      {action}
+    </div>
+  )
+}
+
+function BriefIdle({ subject, summary }: Props) {
+  return (
+    <div className="brief-idle">
+      <Sparkles className="brief-card__icon" aria-hidden="true" />
+      <span className="brief-idle__text">Summarize the {subject.kind} with the review agent</span>
+      <Button size="sm" onClick={() => summary.requestSummary(subject)}>
+        Summarize
       </Button>
     </div>
   )
 }
 
-/** Summarize, and what the review agent's read-only claude said, above the text it summarized. */
-export function OverviewSummary({ subject, summary }: Props) {
-  if (!subjectText(subject).trim()) return null
-  const idleLabel = choose(summary.summary, 'Summarize again', 'Summarize')
+function BriefBusy({ subject }: { subject: SummarySubject }) {
   return (
-    <div className="pr-overview-summary">
-      {!summary.error && (
-        <Button
-          size="sm"
-          icon={Sparkles}
-          onClick={() => summary.requestSummary(subject)}
-          disabled={summary.busy}
-          className="pr-overview-summary-button"
-        >
-          {choose(summary.busy, 'Summarizing…', idleLabel)}
-        </Button>
-      )}
-      {summary.error && <SummaryError subject={subject} summary={summary} />}
-      {summary.summary && !summary.error && (
-        <div className="pr-overview-summary-text">
-          <RichContent>{summary.summary}</RichContent>
-        </div>
-      )}
+    <div className="brief-card" aria-busy="true">
+      <BriefHeading meta={`reading the ${subject.kind}…`} />
+      <div className="brief-skeleton">
+        <span className="brief-visually-hidden">Summarizing</span>
+        <i style={{ width: '92%' }} />
+        <i style={{ width: '78%' }} />
+        <i style={{ width: '86%' }} />
+      </div>
     </div>
   )
+}
+
+function BriefDone({ subject, summary }: Props) {
+  const regenerate = (
+    <Button variant="ghost" size="sm" onClick={() => summary.requestSummary(subject)}>
+      Regenerate
+    </Button>
+  )
+  const meta = (
+    <>
+      review agent · from the {subject.kind} ·{' '}
+      {summary.finishedAt && <RelativeTime value={summary.finishedAt} />}
+    </>
+  )
+  return (
+    <div className="brief-card">
+      <BriefHeading meta={meta} action={regenerate} />
+      <div className="brief-card__body">
+        <RichContent>{summary.summary ?? ''}</RichContent>
+      </div>
+    </div>
+  )
+}
+
+function BriefError({ subject, summary }: Props) {
+  const reason = (summary.error ?? '').replace(/\.$/, '')
+  return (
+    <div className="brief-error" role="alert">
+      <TriangleAlert className="brief-error__icon" aria-hidden="true" />
+      <div>
+        <p>The review agent could not summarize this: {reason}.</p>
+        <Button size="sm" onClick={() => summary.requestSummary(subject)}>
+          Try again
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+/** The Brief: the review agent's summary of the description or discussion, in the state it is in. */
+export function OverviewSummary({ subject, summary }: Props) {
+  if (!subjectText(subject).trim()) return null
+  if (summary.busy) return <BriefBusy subject={subject} />
+  if (summary.error) return <BriefError subject={subject} summary={summary} />
+  if (summary.summary) return <BriefDone subject={subject} summary={summary} />
+  return <BriefIdle subject={subject} summary={summary} />
 }
