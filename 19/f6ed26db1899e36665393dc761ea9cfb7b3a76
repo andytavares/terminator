@@ -5,16 +5,70 @@ extensions/git-integration/src/components/pr-review/diff-pane/FileHeader.tsx
   s_e708cca5bdf352::t_a0996804e5322c 134
   s_e708cca5bdf352::t_4532ca04eb138f 2-3,8,29-35,40-54,57-58,66,73-75,90-105,107-111,120-128,130
   s_e708cca5bdf352::t_36cbede67bdf62 131-133
+  s_e708cca5bdf352::t_6e4d5d9624ca61 80-89,106
 extensions/git-integration/tests/unit/FileHeader.spec.tsx
   s_e708cca5bdf352::t_8783894a53d686 91,93
   s_e708cca5bdf352::t_3e186a5147ae4b 90
   s_e708cca5bdf352::t_bde1031ff71057 4-7,92
   s_e708cca5bdf352::t_4532ca04eb138f 1-3,8-70,88-89,94-113
+  s_e708cca5bdf352::t_6e4d5d9624ca61 71-87
 extensions/git-integration/tests/unit/UsesPopover.spec.tsx
   s_e708cca5bdf352::t_bde1031ff71057 20-21,26-27,33-38,45-47,57-59
   s_e708cca5bdf352::t_6df96468610d64 62
 extensions/git-integration/src/components/pr-review/diff-pane/file-header.css
   s_e708cca5bdf352::t_226f8b4a84000c 1-107,124-131
+  s_e708cca5bdf352::t_6e4d5d9624ca61 108-123
+extensions/git-integration/src/review/test-locations.ts
+  s_e708cca5bdf352::t_6e4d5d9624ca61 1-2
+extensions/git-integration/tests/unit/ReviewFooter.spec.tsx
+  s_e708cca5bdf352::t_6e4d5d9624ca61 44,50,56,63-65,77-88
+extensions/git-integration/src/components/pr-review/ReviewPlan.tsx
+  s_e708cca5bdf352::t_bb2184c8d3b22f 8
+extensions/git-integration/src/components/pr-review/pr-review.css
+  s_e708cca5bdf352::t_0c662e4e990cee 638
+  s_e708cca5bdf352::t_6e4d5d9624ca61 644
+extensions/git-integration/src/components/pr-review/review-inspector.css
+  s_e708cca5bdf352::t_6e4d5d9624ca61 142,146,150
+extensions/git-integration/src/review/reading-order.ts
+  s_e708cca5bdf352::t_6e4d5d9624ca61 2-3
+extensions/git-integration/src/components/pr-review/review-layout.css
+  s_e708cca5bdf352::t_6e4d5d9624ca61 25-34
+extensions/git-integration/tests/unit/FullFileList.spec.tsx
+  s_e708cca5bdf352::t_6e4d5d9624ca61 242-255
+extensions/git-integration/src/components/pr-review/OverviewSummary.tsx
+  s_e708cca5bdf352::t_bb2184c8d3b22f 9
+extensions/git-integration/src/components/pr-review/review-footer.css
+  s_e708cca5bdf352::t_6e4d5d9624ca61 32,43
+extensions/git-integration/src/components/pr-review/ReviewFooter.tsx
+  s_e708cca5bdf352::t_6e4d5d9624ca61 5,27-30,39-41,56
+extensions/git-integration/src/components/pr-review/file-rows.tsx
+  s_e708cca5bdf352::t_6e4d5d9624ca61 5,8,108
+extensions/git-integration/src/components/pr-review/file-tree.css
+  s_e708cca5bdf352::t_6e4d5d9624ca61 159-163
+extensions/git-integration/tests/unit/ReviewHeader.spec.tsx
+  s_e708cca5bdf352::t_6e4d5d9624ca61 157,159-161,167,226,234-235
+extensions/git-integration/src/review/pr-signals.ts
+  s_e708cca5bdf352::t_6e4d5d9624ca61 114-117
+extensions/git-integration/src/components/pr-review/ReviewHeader.tsx
+  s_e708cca5bdf352::t_6e4d5d9624ca61 8,126-130,132-139,166-167,180-181,189-190,207-212,275
+docs/adr/113-a-file-is-high-risk-by-fixed-thresholds.md
+  s_e708cca5bdf352::t_6e4d5d9624ca61 25
+docs/user-guide/USER-GUIDE.md
+  s_e708cca5bdf352::t_6e4d5d9624ca61 565,568
+extensions/git-integration/src/components/pr-review/diff-pane/word-diff.ts
+  s_e708cca5bdf352::t_6e4d5d9624ca61 11,100,113,118-120
+extensions/git-integration/tests/unit/PrReviewView.spec.tsx
+  s_e708cca5bdf352::t_6e4d5d9624ca61 277,295,316,480,501,503-505,532
+extensions/git-integration/src/components/pr-review/WhyThisFile.tsx
+  s_e708cca5bdf352::t_6e4d5d9624ca61 22,42-44,58,66,70,72,78,81,100,106,108,113,118-120,126,137,140,153,155,176,195
+extensions/git-integration/CLAUDE.md
+  s_e708cca5bdf352::t_6e4d5d9624ca61 66
+extensions/git-integration/tests/unit/pr-signals.spec.ts
+  s_e708cca5bdf352::t_6e4d5d9624ca61 1-33
+extensions/git-integration/tests/unit/WhyThisFile.spec.tsx
+  s_e708cca5bdf352::t_6e4d5d9624ca61 60-78,121-132
+extensions/git-integration/tests/unit/word-diff.spec.ts
+  s_e708cca5bdf352::t_6e4d5d9624ca61 106-122
 ---
 {
   "schema_version": "authorship/3.0.0",
