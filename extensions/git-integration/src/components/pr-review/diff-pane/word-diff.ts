@@ -96,3 +96,27 @@ export function pairReplacedLines(lines: DiffLine[]): Map<number, number> {
   }
   return pairs
 }
+
+const HTML_UNIT = /<[^>]*>|&#?\w+;|[^<&]|&/g
+
+/** Wraps the changed characters of highlighted HTML in `<span class>`; a mark never spans a tag. */
+export function markChangedWords(html: string, spans: Span[], className: string): string {
+  const changedAt = spans.flatMap((span) => new Array<boolean>(span.text.length).fill(span.changed))
+  let position = 0
+  let marking = false
+  let marked = ''
+  for (const unit of html.match(HTML_UNIT) ?? []) {
+    const isTag = unit.startsWith('<')
+    const wantMark = !isTag && changedAt[position] === true
+    marked += markBoundary(marking, wantMark, className) + unit
+    marking = wantMark
+    if (!isTag) position++
+  }
+  return marking ? `${marked}</span>` : marked
+}
+
+/** The tag that opens or closes a mark when marking changes between two units, else nothing. */
+function markBoundary(marking: boolean, wantMark: boolean, className: string): string {
+  if (marking === wantMark) return ''
+  return wantMark ? `<span class="${className}">` : '</span>'
+}

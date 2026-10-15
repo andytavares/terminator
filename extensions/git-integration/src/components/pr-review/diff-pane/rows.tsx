@@ -14,7 +14,9 @@ import {
   OpenTests,
   SelectionExtras,
 } from './annotations'
-import { hunkCode, unifiedSide } from './lines'
+import { hunkCode, unifiedSide, wordSpansFor } from './lines'
+import { hunkContextText, symbolFromHunkHeader } from '../../../review/hunk-header'
+import './diff-rows.css'
 
 interface LineRef {
   ctx: PaneContext
@@ -62,9 +64,11 @@ type ItemRenderers = {
   [K in DiffItem['kind']]: (ctx: PaneContext, item: ItemOf<K>) => React.ReactNode
 }
 
-// A unified row's number cells carry 28px of padding and a 1px border; the insight gutter 8px of padding.
-const NUM_CELL_CHROME_PX = 29
+// A unified row's number cells carry 8px of right padding and 6px for the column edge; the insight gutter 8px of padding.
+const NUM_CELL_CHROME_PX = 6
 const GUTTER_CELL_PADDING_PX = 8
+const PREFIX_COLUMN_PX = 16
+const PIP_GUTTER_PX = 22
 
 function chipOn(props: LineRef) {
   const { ctx, lineNum, side } = props
@@ -86,6 +90,14 @@ function gutterFindingCount(props: LineRef): number {
   return ctx.lookups.findingsForLine(lineNum, side).length
 }
 
+/** The insight gutter's width: none when no row has a chip, unless hidden counts need a place. */
+function gutterWidthOf(ctx: PaneContext): number {
+  const { gutterWidth } = ctx.lookups
+  const showsPips = ctx.actions.commentVisibility === 'hidden' || !ctx.actions.agentNotesOn
+  if (gutterWidth === 0 && showsPips) return PIP_GUTTER_PX
+  return gutterWidth
+}
+
 /** What a memoised row shows for its line, as primitives so unchanged rows skip rendering. */
 function rowProps(at: LineRef, expanded: boolean) {
   const { ctx, lineNum, side } = at
@@ -97,7 +109,7 @@ function rowProps(at: LineRef, expanded: boolean) {
     chip: chipOn(at),
     hiddenThreadCount: hiddenThreadCount(at),
     findingCount: gutterFindingCount(at),
-    gutterWidth: ctx.lookups.gutterWidth,
+    gutterWidth: gutterWidthOf(ctx),
     onGutterMouseDown: ctx.drag.onGutterMouseDown,
     onRowMouseEnter: ctx.drag.onRowMouseEnter,
     onShowHiddenComments: ctx.actions.showHiddenComments,
@@ -106,13 +118,20 @@ function rowProps(at: LineRef, expanded: boolean) {
 
 function UnifiedRowsTable(props: { ctx: PaneContext; children: React.ReactNode }) {
   const { ctx, children } = props
-  const { numColWidth } = ctx.layout
+  const numberColumn = ctx.layout.numColWidth + NUM_CELL_CHROME_PX
+  const gutter = gutterWidthOf(ctx)
+  const gutterColumn = gutter === 0 ? 0 : gutter + GUTTER_CELL_PADDING_PX
+  // Comment cards start where the code does, which inline-comment.css reads.
+  const codeOffset = numberColumn * 2 + gutterColumn + PREFIX_COLUMN_PX
   return (
-    <table className="diff-table diff-table--review diff-table--row">
+    <table
+      className="diff-table diff-table--review diff-table--row"
+      style={{ '--diff-code-offset': `${codeOffset}px` } as React.CSSProperties}
+    >
       <colgroup>
-        <col style={{ width: numColWidth + NUM_CELL_CHROME_PX }} />
-        <col style={{ width: numColWidth + NUM_CELL_CHROME_PX }} />
-        <col style={{ width: ctx.lookups.gutterWidth + GUTTER_CELL_PADDING_PX }} />
+        <col style={{ width: numberColumn }} />
+        <col style={{ width: numberColumn }} />
+        <col style={{ width: gutterColumn }} />
         <col className="diff-col--prefix" />
         <col />
       </colgroup>
@@ -130,7 +149,11 @@ function UnifiedLine(props: UnifiedLineProps) {
   }
   return (
     <>
-      <UnifiedLineRow line={line} {...rowProps(at, expanded)} />
+      <UnifiedLineRow
+        line={line}
+        words={wordSpansFor(ctx.diff, line)}
+        {...rowProps(at, expanded)}
+      />
       <SelectionExtras ctx={ctx} lineNum={at.lineNum} side={at.side} />
       <LineAnnotations ctx={ctx} lineNum={at.lineNum} side={at.side} />
     </>
@@ -242,9 +265,9 @@ function ExpandButton(props: ExpandButtonProps) {
   )
 }
 
-function allLinesLabels(hidden: number | null): { label: string; text: string } {
-  if (hidden == null) return { label: 'Show all lines', text: 'All lines' }
-  return { label: `Show all ${hidden} lines`, text: `${hidden} lines` }
+function allLinesLabel(hidden: number | null): string {
+  if (hidden == null) return 'Show all lines'
+  return `Show all ${hidden} ${plural(hidden, 'line')}`
 }
 
 const STEP_BUTTONS = {
@@ -268,19 +291,29 @@ function StepButton(props: { ctx: PaneContext; gapKey: string; kind: 'above' | '
   )
 }
 
+function UnchangedCount({ hidden }: { hidden: number | null }) {
+  if (hidden == null) return null
+  return (
+    <span className="diff-gap-count">
+      {hidden} unchanged {plural(hidden, 'line')}
+    </span>
+  )
+}
+
 function ExpandButtons(props: { ctx: PaneContext; gapKey: string; hidden: number | null }) {
   const { ctx, gapKey } = props
-  const all = allLinesLabels(props.hidden)
+  const label = allLinesLabel(props.hidden)
   return (
     <>
       <StepButton ctx={ctx} gapKey={gapKey} kind="below" />
+      <UnchangedCount hidden={props.hidden} />
       <ExpandButton
-        label={all.label}
+        label={label}
         disabled={ctx.gaps.fileText.status === 'loading'}
         onClick={() => ctx.gaps.expandGap(gapKey, 'all')}
       >
         <UnfoldVertical aria-hidden="true" />
-        <span>{all.text}</span>
+        <span>{label}</span>
       </ExpandButton>
       <StepButton ctx={ctx} gapKey={gapKey} kind="above" />
     </>
@@ -339,11 +372,26 @@ function TestsButton(props: TestsButtonProps) {
   )
 }
 
+/** Where the hunk sits: "in <symbol>", else git's context text; the line ranges stay out of it. */
+function HunkContext({ header }: { header: string }) {
+  const symbol = symbolFromHunkHeader(header)
+  if (symbol) {
+    return (
+      <>
+        in <code>{symbol}</code>
+      </>
+    )
+  }
+  return hunkContextText(header)
+}
+
 function PaneHunkHeader(props: { ctx: PaneContext; hunk: DiffHunk; hunkIndex: number }) {
   const { ctx, hunk, hunkIndex } = props
   const bar = (
     <div className="rs-hunk-bar">
-      <span className="rs-hunk-bar__text">{hunk.header}</span>
+      <span className="rs-hunk-bar__text">
+        <HunkContext header={hunk.header} />
+      </span>
       <TestsButton
         ctx={ctx}
         anchor={`hunk-${hunkIndex}`}
