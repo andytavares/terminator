@@ -1,0 +1,26 @@
+docs/user-guide/USER-GUIDE.md
+  s_e708cca5bdf352::t_0dac948f529076 566,602-609
+docs/adr/112-the-pr-overview-shows-status-before-story.md
+  s_e708cca5bdf352::t_baf703510fb6c2 1-37
+README.md
+  s_e708cca5bdf352::t_0dac948f529076 22
+docs/research/pr-overview-redesign.html
+  s_e708cca5bdf352::t_b6404e8a4d5904 1-815,817,823-826,830-831,837-839,843-844,850-852,872
+  s_e708cca5bdf352::t_b881f8fc70c20d 816,818-822,827-829,832-836,840-842,845-849,853-871,873-2841
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "7d0f653fd09d39cead1ab72532eb72221858b951",
+  "prompts": {},
+  "sessions": {
+    "s_e708cca5bdf352": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5d7c9815-e79e-402d-b85d-cf8028e700ad",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
