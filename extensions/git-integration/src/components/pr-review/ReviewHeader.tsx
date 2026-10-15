@@ -250,7 +250,6 @@ function SubmitButton(props: { draftCount: number; onSubmit: () => void }) {
       Submit review
       {props.draftCount > 0 && (
         <span className="rh-count">
-          <span className="rh-hidden">, </span>
           {props.draftCount}
           <span className="rh-hidden"> {plural(props.draftCount, 'pending comment')}</span>
         </span>

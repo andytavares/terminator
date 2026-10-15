@@ -83,6 +83,7 @@ const SURFACES: Surface[] = [
   {
     name: 'pr-rail',
     selected: '.full-file-row--active',
+    indicator: 'border',
     ready: '.full-file-row--active',
   },
   {

@@ -263,3 +263,15 @@ describe('pr-review store — session v2 (continued) — viewed marks and risk s
     expect(chapters[1].files[0].riskScore.composite).toBe(80)
   })
 })
+
+describe('pr-review store — complexity keeps the threshold-based risk level', () => {
+  it('raises the composite but leaves a low file low', () => {
+    usePrReviewStore.getState().setActivePr(activePr())
+    const measured = { ...(riskScore(75) as object), metrics: { changeSize: 3 } } as never
+    usePrReviewStore.getState().updateFileRiskScores({ 'a.ts': measured })
+    usePrReviewStore.getState().patchFileComplexity('ch-1', 'a.ts', 15)
+    const scored = usePrReviewStore.getState().activePr!.chapters[0].files[0].riskScore
+    expect(scored.composite).toBeGreaterThan(75)
+    expect(scored.level).toBe('low')
+  })
+})

@@ -95,7 +95,7 @@ export function FileRowContent(props: FileRowContentProps) {
       <RowGlyph isViewed={props.isViewed} isHighRisk={isHighRisk} />
       <span className="file-tree-name">
         <b>{name}</b>
-        {dir && <small>{dir}</small>}
+        {dir && <small> {dir}</small>}
       </span>
       <span className="file-tree-end">
         <RowSinceLabel state={props.state} />

@@ -420,14 +420,13 @@ function PausedQueue(): JSX.Element {
 const surfaces: Record<string, () => JSX.Element> = {
   'review-footer': () => (
     <ReviewFooter
-      drafts={[]}
+      previousFileName="math.ts"
+      nextFileName={null}
       isLastFile
       isLastChapter
-      onPause={() => {}}
       onPrevFile={() => {}}
       onMarkViewed={() => {}}
       onFinishChapter={() => {}}
-      onOpenSubmit={() => {}}
       onOpenShortcuts={() => {}}
     />
   ),

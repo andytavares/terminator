@@ -1284,7 +1284,7 @@ describe('ReviewDiffPane expandable context', () => {
     const names = rows.map((r) =>
       Array.from(r.querySelectorAll('button')).map((b) => b.getAttribute('aria-label'))
     )
-    expect(names[0]).toEqual(['Show all 9 lines', 'Show 20 lines above'])
+    expect(names[0]).toEqual(['Show 9 unchanged lines'])
     expect(names[1]).toEqual(['Show 20 lines below', 'Show all 37 lines', 'Show 20 lines above'])
     expect(names[2]).toEqual(['Show 20 lines below', 'Show all lines'])
     expect(container.querySelectorAll('.diff-hunk-header').length).toBe(2)
@@ -1312,18 +1312,18 @@ describe('ReviewDiffPane expandable context — fetches once on the first click 
     expect(rows[0].classList.contains('diff-line--expanded')).toBe(true)
     expect(rows[0].textContent).toContain('line 13')
 
-    clickGap(container, 1, 'Show 20 lines below')
+    clickGap(container, 1, 'Show 17 unchanged lines')
     await waitFor(() => expect(expandedRows(container).length).toBe(37))
     expect(mockPrFileContent).toHaveBeenCalledTimes(1)
   })
 })
 
-describe('ReviewDiffPane expandable context — reveals lines just above the next hunk from the above button', () => {
+describe('ReviewDiffPane expandable context — a gap no bigger than one step opens in one click', () => {
   useFileContent()
 
-  it('reveals lines just above the next hunk from the above button', async () => {
+  it('reveals the whole 9-line gap above the first hunk', async () => {
     const { container } = await renderLoaded()
-    clickGap(container, 0, 'Show 20 lines above')
+    clickGap(container, 0, 'Show 9 unchanged lines')
     await waitFor(() => expect(expandedRows(container).length).toBe(9))
     const rows = Array.from(expandedRows(container))
     expect(rows[0].getAttribute('data-new-line')).toBe('1')
@@ -1354,7 +1354,7 @@ describe('ReviewDiffPane expandable context — Show all removes that expander a
       ],
     }
     const { container } = await renderLoaded(shifted)
-    clickGap(container, 1, 'Show all*')
+    clickGap(container, 1, 'Show 8 unchanged lines')
     await waitFor(() => expect(expandedRows(container).length).toBe(8))
     const rows = Array.from(expandedRows(container))
     expect(rows[0].getAttribute('data-new-line')).toBe('13')
@@ -1678,16 +1678,16 @@ describe('ReviewDiffPane — hunk rows read as prose', () => {
 })
 
 describe('ReviewDiffPane — gap of one line', () => {
-  it('says "1 unchanged line" and offers "Show all 1 line"', async () => {
+  it('offers one control, "Show 1 unchanged line"', async () => {
     const hunks = [10, 14].map((start) => ({
       ...hunkAt(start),
       header: `@@ -${start},3 +${start},3 @@`,
     }))
     const { container } = await renderLoaded({ path: 'src/foo.ts', isBinary: false, hunks })
     const between = container.querySelectorAll('.diff-gap-row')[1]
-    expect(between.textContent).toContain('1 unchanged line')
+    expect(between.textContent).toContain('Show 1 unchanged line')
     expect(between.textContent).not.toContain('1 unchanged lines')
-    expect(screen.getAllByRole('button', { name: 'Show all 1 line' }).length).toBe(1)
+    expect(between.querySelectorAll('button').length).toBe(1)
   })
 })
 

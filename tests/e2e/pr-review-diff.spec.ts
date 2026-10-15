@@ -151,16 +151,16 @@ test('a pending comment goes out with the review, and finishing marks the rest v
   await view.getByRole('button', { name: /^Comment/ }).click()
   await view.getByPlaceholder('Leave a comment…').fill('Name the operands minuend and subtrahend.')
   await view.getByRole('button', { name: 'Add to pending review' }).click()
-  await expect(view.getByRole('button', { name: '1 draft on 1 file' })).toBeVisible()
+  await expect(view.getByRole('button', { name: /^Submit review 1 pending comment/ })).toBeVisible()
 
   // On the last file, finishing marks every file still unviewed (src/math.ts) viewed.
   await fileInList(view, 'tests/math.spec.ts').click()
-  await view.getByRole('button', { name: 'Submit review…' }).click()
+  await view.getByRole('button', { name: /Viewed, submit review/ }).click()
   const dialog = view.getByRole('dialog', { name: 'Submit review' })
   await expectCentredInWindow(dialog, 'Git: Submit review')
   await dialog.getByLabel('Request changes').check()
   await dialog.getByPlaceholder('Leave a summary comment (optional)…').fill('One naming nit.')
-  await dialog.getByRole('button', { name: 'Submit review' }).click()
+  await dialog.getByRole('button', { name: 'Submit changes request' }).click()
   await expect(dialog).toContainText('Review submitted successfully.')
 
   const pr = stub.pullRequest(1)
@@ -177,7 +177,8 @@ test('a pending comment goes out with the review, and finishing marks the rest v
 
 test('after the author pushes again, the review says what changed since the last look', async () => {
   const view = await openCodeReviews(handle, 'Review Diff')
-  await view.getByRole('button', { name: 'Pause review' }).click()
+  await view.getByRole('button', { name: 'More review actions' }).click()
+  await view.getByRole('menuitem', { name: 'Pause review' }).click()
   await expect(view.locator('.rd-row').filter({ hasText: 'Add subtract' })).toBeVisible()
 
   git(repo, 'checkout', '--quiet', 'feat/subtract')

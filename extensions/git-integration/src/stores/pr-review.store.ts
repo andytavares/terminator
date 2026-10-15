@@ -286,13 +286,8 @@ function withFiles(
   return { ...activePr, chapters }
 }
 
-function riskLevelFor(composite: number): RiskScore['level'] {
-  if (composite >= 67) return 'high'
-  if (composite >= 34) return 'medium'
-  return 'low'
-}
-
-/** Adds the complexity weight (0.10 of the 80-point scale) to a scored file's composite. */
+/** Adds the complexity weight (0.10 of the 80-point scale) to a scored file's composite. The level
+ *  stays: it comes from fixed thresholds (risk-thresholds.ts), not from the composite. */
 function withComplexity(file: PrChangedFile, complexityDelta: number): PrChangedFile {
   const prevComposite = file.riskScore.composite ?? 0
   const compContrib = complexityDelta <= 0 ? 0 : Math.min(1, complexityDelta / 15) * 0.1 * 80
@@ -304,7 +299,6 @@ function withComplexity(file: PrChangedFile, complexityDelta: number): PrChanged
   const riskScore: RiskScore = {
     ...file.riskScore,
     composite: newComposite || null,
-    level: riskLevelFor(newComposite),
     metrics: { ...file.riskScore.metrics, complexityDelta },
   }
   return { ...file, riskScore }
