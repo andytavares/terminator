@@ -1,0 +1,21 @@
+extensions/git-integration/src/components/pr-review/diff-pane/word-diff.ts
+  s_e708cca5bdf352::t_18202cfb0ff133 13-14
+extensions/git-integration/tests/unit/overview-fixtures.ts
+  s_e708cca5bdf352::t_464ae963426418 82
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "4b8472f5bd91b80dfbff56345c463be2acacae27",
+  "prompts": {},
+  "sessions": {
+    "s_e708cca5bdf352": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5d7c9815-e79e-402d-b85d-cf8028e700ad",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
