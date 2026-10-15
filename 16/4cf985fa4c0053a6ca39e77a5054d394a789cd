@@ -1,0 +1,26 @@
+extensions/git-integration/tests/unit/ReadinessStrip.spec.tsx
+  s_e708cca5bdf352::t_5eb04cc29820b4 76,98,119-121,145
+  s_e708cca5bdf352::t_8e9015a563b2b1 1-75,77-97,99-118,122-144
+extensions/git-integration/src/components/pr-review/ReadinessStrip.tsx
+  s_e708cca5bdf352::t_8a5c84a2c0f747 1-166
+extensions/git-integration/src/components/pr-review/StatusChecksBar.tsx
+  s_e708cca5bdf352::t_177ec46b272b06 41,49,60,76
+extensions/git-integration/src/components/pr-review/readiness-strip.css
+  s_e708cca5bdf352::t_ae2501ae5a6572 1-143
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "164cf985fa4c0053a6ca39e77a5054d394a789cd",
+  "prompts": {},
+  "sessions": {
+    "s_e708cca5bdf352": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5d7c9815-e79e-402d-b85d-cf8028e700ad",
+        "model": "unknown"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
