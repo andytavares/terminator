@@ -309,17 +309,17 @@ function oneHunk(header: string, lines: DiffLineFixture[], path = 'src/foo.ts') 
 /** The one-line diff 'const x = 1' under @@ -1,1 +1,1 @@. */
 const oneLineDiff = () => oneHunk('@@ -1,1 +1,1 @@', [ctxLine(1, 'const x = 1')])
 
-/** Serves `diff` for the open file, renders the pane with `props`, and waits for `header`. */
-async function renderDiffPane(
-  diff: unknown,
-  header: string,
-  props: Partial<typeof defaultProps> = {}
-) {
+/** Serves `diff` for the open file, renders the pane with `props`, and waits for its first hunk. */
+async function renderDiffPane(diff: unknown, props: Partial<typeof defaultProps> = {}) {
   mockPrFileDiff.mockResolvedValue({ diff })
   const view = await renderPane(props)
-  await waitFor(() => expect(screen.getByText(header)).toBeTruthy())
+  await waitFor(() => expect(view.container.querySelector('.rs-hunk-anchor')).toBeTruthy())
   return view
 }
+
+/** Waits for the pane to mount its first hunk row. */
+const findFirstHunk = (container: HTMLElement) =>
+  waitFor(() => expect(container.querySelector('.rs-hunk-anchor')).toBeTruthy())
 
 /** Line 1 of src/foo.ts, right side, as the reviewer's selection. */
 function selectLineOne() {
@@ -520,9 +520,9 @@ describe('ReviewDiffPane', () => {
     expect(screen.queryByText('+5/−2')).toBeNull()
   })
 
-  it('shows low-risk label for low risk file', async () => {
+  it('shows no risk label for a low risk file', async () => {
     await renderPane()
-    expect(screen.getByText(/Low risk/)).toBeTruthy()
+    expect(screen.queryByText(/Low risk/)).toBeNull()
   })
 
   it('shows high-risk label for high risk file', async () => {
@@ -585,8 +585,9 @@ describe('ReviewDiffPane — marks the file viewed from the header checkbox with
 
   it('calls onShowRisk when the Why? button is clicked', async () => {
     const onShowRisk = vi.fn()
-    await renderPane({ onShowRisk })
-    fireEvent.click(screen.getByRole('button', { name: 'Low risk' }))
+    const highFile = { ...mockFile, riskScore: { ...mockFile.riskScore, level: 'high' as const } }
+    await renderPane({ onShowRisk, file: highFile })
+    fireEvent.click(screen.getByRole('button', { name: 'High risk' }))
     expect(onShowRisk).toHaveBeenCalled()
   })
 })
@@ -604,8 +605,8 @@ describe('ReviewDiffPane — renders diff hunks when diff is loaded', () => {
       ],
     }
     mockPrFileDiff.mockResolvedValue({ diff })
-    await renderPane()
-    await waitFor(() => expect(screen.getByText('@@ -1,3 +1,3 @@')).toBeTruthy())
+    const { container } = await renderPane()
+    await waitFor(() => expect(container.querySelector('.rs-hunk-anchor')).toBeTruthy())
   })
 
   it('does not repeat the change type in the file toolbar', async () => {
@@ -628,7 +629,7 @@ describe('ReviewDiffPane — switches to split view mode when Split button is cl
   it('switches to split view mode when Split button is clicked', async () => {
     const diff = oneHunk('@@ -1,3 +1,3 @@', [ctxLine(1, 'x'), addLine(2, 'y'), removeLine(2, 'z')])
     uiStoreMock.mockReturnValue({ ...baseReviewUiStoreState(), diffViewMode: 'split' })
-    const { container } = await renderDiffPane(diff, '@@ -1,3 +1,3 @@')
+    const { container } = await renderDiffPane(diff)
 
     await waitFor(() => expect(container.querySelector('.diff-table--split')).toBeTruthy())
   })
@@ -636,7 +637,7 @@ describe('ReviewDiffPane — switches to split view mode when Split button is cl
 
 describe('ReviewDiffPane — gutter drag no longer opens the composer, but calls setSelection', () => {
   it('gutter drag no longer opens the composer, but calls setSelection', async () => {
-    await renderDiffPane(oneLineDiff(), '@@ -1,1 +1,1 @@')
+    await renderDiffPane(oneLineDiff())
 
     const btn = screen.getAllByRole('button', { name: 'Add comment' })[0]
     fireEvent.mouseDown(btn)
@@ -659,7 +660,7 @@ describe('ReviewDiffPane — a gutter drag across rows keeps the multi-line sele
       '@@ -1,3 +1,3 @@',
       [1, 2, 3].map((n) => ctxLine(n))
     )
-    const { container } = await renderDiffPane(diff, '@@ -1,3 +1,3 @@')
+    const { container } = await renderDiffPane(diff)
 
     const rows = container.querySelectorAll<HTMLTableRowElement>('tr.diff-line')
     fireEvent.mouseDown(rows[0].querySelector('.diff-gutter-btn')!)
@@ -687,7 +688,7 @@ describe('ReviewDiffPane — a background click after the drag has settled still
       '@@ -1,2 +1,2 @@',
       [1, 2].map((n) => ctxLine(n))
     )
-    const { container } = await renderDiffPane(diff, '@@ -1,2 +1,2 @@')
+    const { container } = await renderDiffPane(diff)
 
     const rows = container.querySelectorAll<HTMLTableRowElement>('tr.diff-line')
     fireEvent.mouseDown(rows[0].querySelector('.diff-gutter-btn')!)
@@ -706,7 +707,7 @@ describe('ReviewDiffPane — a background click after the drag has settled still
 describe('ReviewDiffPane — shows the float bar under a selection, with Comment opening the composer', () => {
   it('shows the float bar under a selection, with Comment opening the composer', async () => {
     selectLineOne()
-    await renderDiffPane(oneLineDiff(), '@@ -1,1 +1,1 @@')
+    await renderDiffPane(oneLineDiff())
 
     expect(screen.queryByTestId('composer')).toBeNull()
     fireEvent.click(screen.getByText('Comment'))
@@ -720,7 +721,7 @@ describe('ReviewDiffPane — shows the float bar under a selection, with Comment
 describe('ReviewDiffPane — calls openAgentPanel with the lines scope when Ask agent is clicked', () => {
   it('calls openAgentPanel with the lines scope when Ask agent is clicked', async () => {
     selectLineOne()
-    await renderDiffPane(oneLineDiff(), '@@ -1,1 +1,1 @@')
+    await renderDiffPane(oneLineDiff())
 
     fireEvent.click(screen.getByText(/Ask agent/))
     expect(mockOpenAgentPanel).toHaveBeenCalledWith(
@@ -759,10 +760,10 @@ describe('ReviewDiffPane — fires keyboard navigation events for prev-file and 
     expect(onMarkViewed).toHaveBeenCalled()
   })
 
-  it('shows medium-risk label for medium risk file', async () => {
+  it('shows no risk label for a medium risk file', async () => {
     const medFile = { ...mockFile, riskScore: { ...mockFile.riskScore, level: 'medium' as const } }
     await renderPane({ file: medFile })
-    expect(screen.getByText(/Medium risk/)).toBeTruthy()
+    expect(screen.queryByText(/Medium risk/)).toBeNull()
   })
 })
 
@@ -774,7 +775,7 @@ describe('ReviewDiffPane — comment visibility (R2)', () => {
   async function renderThreads(threads: unknown[], visibility: string) {
     storeThreads(threads)
     uiStoreMock.mockReturnValue({ ...baseReviewUiStoreState(), commentVisibility: visibility })
-    await renderDiffPane(oneLineDiff(), '@@ -1,1 +1,1 @@')
+    await renderDiffPane(oneLineDiff())
   }
 
   it('Hidden removes thread rendering and shows a gutter pip with the count', async () => {
@@ -832,7 +833,7 @@ describe('ReviewDiffPane — agent notes (R5)', () => {
 
   it('shows an agent pip instead of the note when agent notes are off', async () => {
     await renderWithRun(false)
-    await waitFor(() => expect(screen.getByText('@@ fetchFileMetrics @@')).toBeTruthy())
+    await waitFor(() => expect(screen.getByText('x')).toBeTruthy())
     expect(screen.queryByText(/Agent note ·/)).toBeNull()
     expect(screen.getByText('1')).toBeTruthy()
   })
@@ -872,7 +873,7 @@ async function renderSplit(overrides: Partial<typeof defaultProps> = {}) {
     diffViewMode: 'split',
   })
   const view = await renderPane(overrides)
-  await waitFor(() => expect(screen.getByText('@@ -85,3 +88,3 @@')).toBeTruthy())
+  await waitFor(() => expect(view.container.querySelector('.rs-hunk-anchor')).toBeTruthy())
   await waitFor(() => expect(document.querySelector('.diff-table--split')).toBeTruthy())
   return view
 }
@@ -1042,11 +1043,14 @@ const keyTwoHunkDiff = {
 
 /** Renders the two-hunk diff and waits for its first hunk. */
 const renderTwoHunks = (props: Partial<typeof defaultProps> = {}) =>
-  renderDiffPane(keyTwoHunkDiff, '@@ -1,1 +1,1 @@', props)
+  renderDiffPane(keyTwoHunkDiff, props)
 
-/** The scroll position of the entry holding `header`. */
-const topOfHunk = (header: string) =>
-  Number(screen.getByText(header).closest<HTMLElement>('[data-index]')!.dataset.index) * ROW_PX
+/** The scroll position of the entry holding the hunk at `hunkIndex`. */
+const topOfHunk = (hunkIndex: number) =>
+  Number(
+    document.querySelectorAll('.rs-hunk-anchor')[hunkIndex].closest<HTMLElement>('[data-index]')!
+      .dataset.index
+  ) * ROW_PX
 
 /** The hunk at line 1, the scope the agent keys act on without a selection. */
 const firstHunkScope = {
@@ -1065,9 +1069,9 @@ describe('ReviewDiffPane — keyboard events (REVIEW_KEY_EVENTS)', () => {
     await renderTwoHunks()
     const scroller = document.querySelector<HTMLElement>('.review-diff-scroll')!
     window.dispatchEvent(new CustomEvent('review:next-hunk'))
-    expect(topOfHunk('@@ -10,1 +10,1 @@')).toBeGreaterThan(0)
+    expect(topOfHunk(1)).toBeGreaterThan(0)
     expect(scroller.scrollTo).toHaveBeenLastCalledWith(
-      expect.objectContaining({ top: topOfHunk('@@ -10,1 +10,1 @@') })
+      expect.objectContaining({ top: topOfHunk(1) })
     )
   })
 
@@ -1076,11 +1080,11 @@ describe('ReviewDiffPane — keyboard events (REVIEW_KEY_EVENTS)', () => {
     const scroller = document.querySelector<HTMLElement>('.review-diff-scroll')!
     window.dispatchEvent(new CustomEvent('review:next-hunk')) // move to hunk 1 first
     expect(scroller.scrollTo).toHaveBeenLastCalledWith(
-      expect.objectContaining({ top: topOfHunk('@@ -10,1 +10,1 @@') })
+      expect.objectContaining({ top: topOfHunk(1) })
     )
     window.dispatchEvent(new CustomEvent('review:prev-hunk'))
     expect(scroller.scrollTo).toHaveBeenLastCalledWith(
-      expect.objectContaining({ top: topOfHunk('@@ -1,1 +1,1 @@') })
+      expect.objectContaining({ top: topOfHunk(0) })
     )
   })
 })
@@ -1125,7 +1129,7 @@ describe('ReviewDiffPane — keyboard events (REVIEW_KEY_EVENTS) — leaving the
 
   it('nextHunk at the last hunk calls onNextFile', async () => {
     const onNextFile = vi.fn()
-    await renderDiffPane(oneHunk('@@ -1,1 +1,1 @@', [ctxLine(1, 'a')]), '@@ -1,1 +1,1 @@', {
+    await renderDiffPane(oneHunk('@@ -1,1 +1,1 @@', [ctxLine(1, 'a')]), {
       onNextFile,
     })
     window.dispatchEvent(new CustomEvent('review:next-hunk'))
@@ -1209,7 +1213,7 @@ describe('ReviewDiffPane — insight gutter chips (R4)', () => {
       { name: 'readBurnIn', line: 89, branchDelta: 3 },
     ]
     const insights = insightsFor(functions, ['readBurnIn'])
-    await renderDiffPane(splitDiff, '@@ -85,3 +88,3 @@', { pr: { ...mockPr, insights } })
+    await renderDiffPane(splitDiff, { pr: { ...mockPr, insights } })
     expect(screen.getByText('+6')).toBeTruthy()
     expect(screen.getByText('untested')).toBeTruthy()
     // The gutter column is sized to its widest chip ("untested"), so it never overlaps code.
@@ -1590,7 +1594,7 @@ describe('ReviewDiffPane — fetch and render cost — a drag over the diff re-r
   it('a drag over the diff re-renders only the rows whose selection changed', async () => {
     mockPrFileDiff.mockResolvedValue({ diff: longDiff(30) })
     const { container } = await renderPane()
-    await screen.findByText('@@ -1,30 +1,30 @@')
+    await findFirstHunk(container)
     const rows = container.querySelectorAll<HTMLTableRowElement>('tr.diff-line')
     fireEvent.mouseDown(rows[0].querySelector('.diff-gutter-btn')!)
     rowRenderSpy.mockClear()
@@ -1607,7 +1611,7 @@ describe('ReviewDiffPane — fetch and render cost — dragging the split divide
     uiStoreMock.mockReturnValue({ ...baseReviewUiStoreState(), diffViewMode: 'split' })
     mockPrFileDiff.mockResolvedValue({ diff: longDiff(30) })
     const { container } = await renderPane()
-    await screen.findByText('@@ -1,30 +1,30 @@')
+    await findFirstHunk(container)
     vi.spyOn(
       container.querySelector('.review-diff-scroll')!,
       'getBoundingClientRect'
@@ -1626,7 +1630,7 @@ describe('ReviewDiffPane — fetch and render cost — dragging the split divide
     layOut(800)
     mockPrFileDiff.mockResolvedValue({ diff: longDiff(2000) })
     const { container } = await renderPane()
-    await screen.findByText('@@ -1,2000 +1,2000 @@')
+    await findFirstHunk(container)
 
     const mounted = container.querySelectorAll('tr.diff-line').length
     expect(mounted).toBeGreaterThan(800 / ROW_PX - 1)
@@ -1640,7 +1644,7 @@ describe('ReviewDiffPane — fetch and render cost — mounts the rows it scroll
     layOut(800)
     mockPrFileDiff.mockResolvedValue({ diff: longDiff(2000) })
     const { container } = await renderPane()
-    await screen.findByText('@@ -1,2000 +1,2000 @@')
+    await findFirstHunk(container)
     const scroller = container.querySelector<HTMLElement>('.review-diff-scroll')!
 
     Object.defineProperty(scroller, 'scrollTop', { configurable: true, value: 1500 * ROW_PX })
@@ -1652,5 +1656,60 @@ describe('ReviewDiffPane — fetch and render cost — mounts the rows it scroll
       )
     await waitFor(() => expect(Math.min(...mountedLines())).toBeGreaterThan(1000))
     expect(mountedLines().length).toBeLessThan(MOUNTED_ROWS_CAP)
+  })
+})
+
+describe('ReviewDiffPane — hunk rows read as prose', () => {
+  it('names the enclosing symbol and hides the line ranges', async () => {
+    const diff = oneHunk('@@ -1,3 +1,3 @@ def add(a, b):', [ctxLine(1, 'return a + b')])
+    const { container } = await renderDiffPane(diff)
+    const row = container.querySelector('.diff-hunk-header')!
+    expect(row.textContent).toContain('in add')
+    expect(row.querySelector('code')?.textContent).toBe('add')
+    expect(container.textContent).not.toContain('@@')
+  })
+
+  it('shows the context text when it names no symbol', async () => {
+    const diff = oneHunk('@@ -1,3 +1,3 @@ (', [ctxLine(1, 'x')])
+    const { container } = await renderDiffPane(diff)
+    expect(container.querySelector('.diff-hunk-header')!.textContent).toContain('(')
+    expect(container.textContent).not.toContain('@@')
+  })
+})
+
+describe('ReviewDiffPane — gap of one line', () => {
+  it('says "1 unchanged line" and offers "Show all 1 line"', async () => {
+    const hunks = [10, 14].map((start) => ({
+      ...hunkAt(start),
+      header: `@@ -${start},3 +${start},3 @@`,
+    }))
+    const { container } = await renderLoaded({ path: 'src/foo.ts', isBinary: false, hunks })
+    const between = container.querySelectorAll('.diff-gap-row')[1]
+    expect(between.textContent).toContain('1 unchanged line')
+    expect(between.textContent).not.toContain('1 unchanged lines')
+    expect(screen.getAllByRole('button', { name: 'Show all 1 line' }).length).toBe(1)
+  })
+})
+
+describe('ReviewDiffPane — changed words in the unified view', () => {
+  const replaced = oneHunk('@@ -43,2 +43,3 @@', [
+    removeLine(43, '        self.button = Button(pin, bounce_time=0.05)'),
+    addLine(43, '        self.button = Button(pin, pull_up=True)'),
+    addLine(44, '        self.contact = settings.contact'),
+  ])
+
+  it('marks the changed words of a replaced pair and nothing else', async () => {
+    const { container } = await renderDiffPane(replaced)
+    const added = container.querySelectorAll('.diff-word--add')
+    const removed = container.querySelectorAll('.diff-word--remove')
+    expect(Array.from(added).map((n) => n.textContent)).toEqual(['pull_up', 'True'])
+    expect(Array.from(removed).map((n) => n.textContent)).toEqual(['bounce_time', '0.05'])
+  })
+
+  it('leaves an unpaired added line unmarked', async () => {
+    const { container } = await renderDiffPane(replaced)
+    const unpaired = container.querySelector('tr[data-new-line="44"]')!
+    expect(unpaired.querySelector('.diff-word--add')).toBeNull()
+    expect(unpaired.textContent).toContain('self.contact = settings.contact')
   })
 })

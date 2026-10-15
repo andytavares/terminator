@@ -3,6 +3,7 @@ import {
   tokenize,
   wordSpans,
   pairReplacedLines,
+  markChangedWords,
 } from '../../src/components/pr-review/diff-pane/word-diff'
 import type { DiffLine } from '../../src/schemas/git.schema'
 
@@ -75,5 +76,30 @@ describe('pairReplacedLines', () => {
 
   it('pairs nothing when a context line separates the runs', () => {
     expect(pairReplacedLines([line('remove'), line('context', ' '), line('add')]).size).toBe(0)
+  })
+})
+
+describe('markChangedWords', () => {
+  it('wraps changed text, keeping highlight tags and entities intact', () => {
+    const html = '<span class="hljs-keyword">if</span> a &amp;&amp; b'
+    const spans = [
+      { text: 'if a ', changed: false },
+      { text: '&&', changed: true },
+      { text: ' b', changed: false },
+    ]
+    expect(markChangedWords(html, spans, 'w')).toBe(
+      '<span class="hljs-keyword">if</span> a <span class="w">&amp;&amp;</span> b'
+    )
+  })
+
+  it('puts the mark inside a highlight tag that opens within the change', () => {
+    const html = 'x = <span class="hljs-string">"ab"</span>'
+    const spans = [
+      { text: 'x = ', changed: false },
+      { text: '"ab"', changed: true },
+    ]
+    expect(markChangedWords(html, spans, 'w')).toBe(
+      'x = <span class="hljs-string"><span class="w">"ab"</span></span>'
+    )
   })
 })

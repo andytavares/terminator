@@ -1,8 +1,11 @@
 import React, { memo } from 'react'
+import { Plus } from 'lucide-react'
 import type { DiffLine } from '../../schemas/git.schema'
 import { highlight, type detectLanguage } from '../FileDiffView'
 import { choose } from '../text'
 import { unifiedSide } from './diff-pane/lines'
+import { markChangedWords, type Span } from './diff-pane/word-diff'
+import './diff-pane/diff-rows.css'
 
 export type Side = 'LEFT' | 'RIGHT'
 type Language = ReturnType<typeof detectLanguage>
@@ -37,6 +40,8 @@ interface LineRowProps {
   chip: GutterChip | null
   hiddenThreadCount: number
   findingCount: number
+  /** Changed-word spans of a replaced line; the unified view marks them. */
+  words?: Span[]
   onGutterMouseDown: (e: React.MouseEvent, lineNum: number, side: Side) => void
   onRowMouseEnter: (lineNum: number, side: Side) => void
   onShowHiddenComments: () => void
@@ -65,7 +70,7 @@ function GutterButton({ lineNum, side, onGutterMouseDown }: GutterButtonProps) {
       aria-label="Add comment"
       onMouseDown={(e) => onGutterMouseDown(e, lineNum, side)}
     >
-      +
+      <Plus aria-hidden="true" />
     </button>
   )
 }
@@ -109,7 +114,10 @@ function RowPips({ row }: { row: PipProps }) {
 function ChipCell(props: { row: PipProps; chip: GutterChip | null; gutterWidth: number }) {
   const { chip, gutterWidth } = props
   return (
-    <td className="rs-gut" style={{ width: gutterWidth, minWidth: gutterWidth }}>
+    <td
+      className={choose(gutterWidth === 0, 'rs-gut rs-gut--none', 'rs-gut')}
+      style={{ width: gutterWidth, minWidth: gutterWidth }}
+    >
       {chip && <span className={`rs-gutter-chip rs-gutter-chip--${chip.kind}`}>{chip.label}</span>}
       <RowPips row={props.row} />
     </td>
@@ -120,14 +128,22 @@ interface CodeCellsProps {
   line: DiffLine
   language: Language
   prefix: string
+  words?: Span[]
 }
 
-function CodeCells({ line, language, prefix }: CodeCellsProps) {
+/** The line's highlighted HTML, with its changed words marked on top of the syntax colours. */
+function codeHtml({ line, language, words }: Omit<CodeCellsProps, 'prefix'>): string {
+  const html = cachedHighlight(line.content, language)
+  if (!words) return html
+  return markChangedWords(html, words, `diff-word--${line.type}`)
+}
+
+function CodeCells(props: CodeCellsProps) {
   return (
     <>
-      <td className="diff-line__prefix">{prefix}</td>
+      <td className="diff-line__prefix">{props.prefix}</td>
       <td className="diff-line__content">
-        <pre dangerouslySetInnerHTML={{ __html: cachedHighlight(line.content, language) }} />
+        <pre dangerouslySetInnerHTML={{ __html: codeHtml(props) }} />
       </td>
     </>
   )
@@ -177,7 +193,12 @@ export const UnifiedLineRow = memo(function UnifiedLineRow(
     >
       <UnifiedNumbers line={line} side={side} button={button} />
       <ChipCell row={props} chip={chip} gutterWidth={props.gutterWidth} />
-      <CodeCells line={line} language={props.language} prefix={PREFIX[line.type]} />
+      <CodeCells
+        line={line}
+        language={props.language}
+        prefix={PREFIX[line.type]}
+        words={props.words}
+      />
     </tr>
   )
 })

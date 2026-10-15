@@ -44,6 +44,8 @@
   --tm-agent-dim: rgba(179, 156, 245, 0.1);
   --tm-diff-added-bg: rgba(152, 195, 121, 0.12);
   --tm-diff-removed-bg: rgba(224, 108, 117, 0.12);
+  --tm-diff-added-word-bg: rgba(152, 195, 121, 0.24);
+  --tm-diff-removed-word-bg: rgba(224, 108, 117, 0.24);
   --tm-syntax-comment: #8585b8;
   --tm-syntax-keyword: #cf9ee8;
   --tm-syntax-string: #4ade80;
@@ -119,6 +121,8 @@
   --tm-agent-dim: rgba(107, 79, 191, 0.08);
   --tm-diff-added-bg: rgba(15, 92, 42, 0.1);
   --tm-diff-removed-bg: rgba(150, 45, 32, 0.1);
+  --tm-diff-added-word-bg: rgba(15, 92, 42, 0.2);
+  --tm-diff-removed-word-bg: rgba(150, 45, 32, 0.2);
   --tm-syntax-comment: #5c5c94;
   --tm-syntax-keyword: #8a3fa8;
   --tm-syntax-string: #0f5c2a;
