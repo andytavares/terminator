@@ -109,7 +109,8 @@ test("the overview's review plan opens a chapter at its first file", async () =>
 
 test("a file's risk names the files that import it", async () => {
   const view = await openCodeReviews(handle, 'Review Diff')
-  await view.getByRole('main').getByRole('button', { name: /risk$/ }).first().click()
+  await view.getByRole('button', { name: 'Ask agent about this PR' }).click()
+  await view.getByRole('tab', { name: 'Why this file' }).click()
   await expect(view.getByText('Importers (1)')).toBeVisible()
   await expect(view.locator('.risk-importer-btn')).toHaveAttribute('title', 'tests/math.spec.ts')
   await view.keyboard.press('Escape')
