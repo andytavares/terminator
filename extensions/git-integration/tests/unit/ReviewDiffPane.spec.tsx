@@ -124,6 +124,7 @@ function basePrReviewStoreState() {
     patchFileComplexity: mockPatchFileComplexity,
     changedSince: new Set<string>(),
     viewedAt: {},
+    viewedHunks: {},
     historyRewritten: false,
     notes: [],
     drafts: [],

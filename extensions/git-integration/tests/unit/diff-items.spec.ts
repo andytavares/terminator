@@ -23,6 +23,7 @@ function diffItemSource(
     gapViews: new Map(),
     hotspots: [],
     movedMark: () => null,
+    viewedHunks: new Set(),
     ...overrides,
   }
 }
@@ -112,5 +113,25 @@ describe('buildDiffItems() — moved blocks', () => {
     expect(visibleSplitKeys(hidingOnly('LEFT', 7))).toEqual(['0-header', '0-row-0'])
     expect(visibleSplitKeys(hidingOnly('RIGHT', 8))).toEqual(['0-header', '0-row-0'])
     expect(visibleSplitKeys(hidingOnly('LEFT', 5))).toEqual(['0-header', '0-row-1'])
+  })
+})
+
+describe('buildDiffItems() — viewed hunks', () => {
+  const hunks = [
+    hunkOf('@@ -1,2 +1,2 @@ in from', [contextLine(1), contextLine(2)]),
+    hunkOf('@@ -9,2 +9,2 @@ in RETRYABLE_CODES', [contextLine(9)]),
+  ]
+
+  it('keeps only the header of a viewed hunk and flags it viewed', () => {
+    const items = buildDiffItems(diffItemSource(hunks, { viewedHunks: new Set([hunks[0].header]) }))
+    expect(items.map((item) => item.key)).toEqual(['0-header', '1-header', '1-0'])
+    expect(items[0]).toMatchObject({ kind: 'hunk-header', viewed: true })
+    expect(items[1]).toMatchObject({ kind: 'hunk-header', viewed: false })
+  })
+
+  it('drops the complexity hotspot of a viewed hunk', () => {
+    const hotspots = [{ hunkIndex: 0, message: 'complex' }]
+    const viewedHunks = new Set([hunks[0].header])
+    expect(keysOf(diffItemSource(hunks, { hotspots, viewedHunks }))).not.toContain('0-hotspot')
   })
 })

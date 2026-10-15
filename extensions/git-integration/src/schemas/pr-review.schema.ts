@@ -372,6 +372,8 @@ export const ReviewSessionSchema = z.object({
   lastAccessedAt: z.string(),
   /** v2: head SHA each file was marked viewed at (S1). */
   viewedAt: z.record(z.string(), z.string()).default({}),
+  /** Hunk headers marked viewed, per file path; they collapse to their header. */
+  viewedHunks: z.record(z.string(), z.array(z.string())).default({}),
   /** v2: private notes (S2). A note containing "??" is a question. */
   notes: z.array(ReviewNoteSchema).default([]),
   /** v2: draft comments, sent together on submit (S5). */

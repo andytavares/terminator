@@ -29,6 +29,7 @@ function session(overrides: Partial<ReviewSession> = {}): ReviewSession {
     scrollPosition: null,
     pausedAt: null,
     lastAccessedAt: '2026-09-27T10:00:00.000Z',
+    viewedHunks: {},
     viewedAt: {
       'scripts/e2e-timings.ts': 'aaa111',
       'scripts/e2e-shard.ts': 'aaa111',
@@ -273,5 +274,30 @@ describe('pr-review store — complexity keeps the threshold-based risk level', 
     const scored = usePrReviewStore.getState().activePr!.chapters[0].files[0].riskScore
     expect(scored.composite).toBeGreaterThan(75)
     expect(scored.level).toBe('low')
+  })
+})
+
+describe('pr-review store — viewed hunks', () => {
+  const HUNK = '@@ -9,2 +9,2 @@ in RETRYABLE_CODES'
+
+  it('toggles a hunk viewed, persists it with the session, and toggles it back', () => {
+    const store = usePrReviewStore.getState()
+    store.initSession(session())
+    store.toggleHunkViewed(HEAD_A, 'src/faults.py', HUNK)
+    expect(usePrReviewStore.getState().viewedHunks['src/faults.py']).toEqual([HUNK])
+    expect(sessionSet).toHaveBeenLastCalledWith(
+      sessionKey(REPO, 211),
+      expect.objectContaining({ viewedHunks: { 'src/faults.py': [HUNK] } })
+    )
+    store.toggleHunkViewed(HEAD_A, 'src/faults.py', HUNK)
+    expect(usePrReviewStore.getState().viewedHunks['src/faults.py']).toBeUndefined()
+  })
+
+  it("forgets a file's viewed hunks when the file is unmarked viewed", () => {
+    const store = usePrReviewStore.getState()
+    store.initSession(session())
+    store.toggleHunkViewed(HEAD_A, 'playwright.config.ts', HUNK)
+    store.unmarkFileViewed(HEAD_A, 'playwright.config.ts')
+    expect(usePrReviewStore.getState().viewedHunks['playwright.config.ts']).toBeUndefined()
   })
 })

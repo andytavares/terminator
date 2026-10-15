@@ -49,6 +49,7 @@ interface ItemSource {
   hideFormattingHunks: boolean
   gapViews: Map<string, GapView>
   movedMark: (lineNum: number, side: Side) => MovedMark | null
+  viewedHunks: Set<string>
 }
 
 interface ComplexityTarget {
@@ -66,6 +67,8 @@ export function usePaneReviewStore() {
       patchFileComplexity: s.patchFileComplexity,
       changedSince: s.changedSince,
       viewedAt: s.viewedAt,
+      viewedHunks: s.viewedHunks,
+      toggleHunkViewed: s.toggleHunkViewed,
       historyRewritten: s.historyRewritten,
       notes: s.notes,
       drafts: s.drafts,
@@ -227,9 +230,14 @@ function visibleHunksOf(diff: FileDiff | null, hideFormatting: boolean) {
   return all.filter(({ hunk }) => classifyHunk(hunk) === 'semantic')
 }
 
+/** The headers of the file's hunks marked viewed, stable until they change. */
+export function useViewedHunks(headers: string[] | undefined): Set<string> {
+  return useMemo(() => new Set(headers), [headers])
+}
+
 /** The virtual list's entries for the diff as shown. */
 export function useDiffItems(source: ItemSource): DiffItem[] {
-  const { diff, mode, hideFormattingHunks, gapViews, movedMark } = source
+  const { diff, mode, hideFormattingHunks, gapViews, movedMark, viewedHunks } = source
   const hotspots = useMemo(() => (diff && detectComplexityHotspots(diff)) || [], [diff])
   const splitRows = useMemo(() => splitRowsOf(diff), [diff])
   const visibleHunks = useMemo(
@@ -238,9 +246,9 @@ export function useDiffItems(source: ItemSource): DiffItem[] {
   )
   return useMemo(() => {
     if (!diff) return []
-    const parts = { visibleHunks, splitRows, gapViews, hotspots, movedMark }
+    const parts = { visibleHunks, splitRows, gapViews, hotspots, movedMark, viewedHunks }
     return buildDiffItems({ mode, hunkCount: diff.hunks.length, ...parts })
-  }, [diff, mode, visibleHunks, splitRows, gapViews, hotspots, movedMark])
+  }, [diff, mode, visibleHunks, splitRows, gapViews, hotspots, movedMark, viewedHunks])
 }
 
 function splitRowsOf(diff: FileDiff | null) {

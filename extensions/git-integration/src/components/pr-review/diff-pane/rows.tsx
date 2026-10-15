@@ -403,13 +403,29 @@ function HunkContext({ header }: { header: string }) {
   return hunkContextText(header)
 }
 
-function PaneHunkHeader(props: { ctx: PaneContext; hunk: DiffHunk; hunkIndex: number }) {
-  const { ctx, hunk, hunkIndex } = props
-  const bar = (
+function HunkViewedToggle(props: { ctx: PaneContext; header: string; viewed: boolean }) {
+  const { ctx, header, viewed } = props
+  return (
+    <label className="rs-hunk-viewed">
+      <input
+        type="checkbox"
+        aria-label="Section viewed"
+        checked={viewed}
+        onChange={() => ctx.actions.toggleHunkViewed(ctx.head, ctx.file.path, header)}
+      />
+      Viewed
+    </label>
+  )
+}
+
+function HunkBar(props: { ctx: PaneContext; hunk: DiffHunk; hunkIndex: number; viewed: boolean }) {
+  const { ctx, hunk, hunkIndex, viewed } = props
+  return (
     <div className="rs-hunk-bar">
       <span className="rs-hunk-bar__text">
         <HunkContext header={hunk.header} />
       </span>
+      <HunkViewedToggle ctx={ctx} header={hunk.header} viewed={viewed} />
       <TestsButton
         ctx={ctx}
         anchor={`hunk-${hunkIndex}`}
@@ -418,6 +434,16 @@ function PaneHunkHeader(props: { ctx: PaneContext; hunk: DiffHunk; hunkIndex: nu
       />
     </div>
   )
+}
+
+function PaneHunkHeader(props: {
+  ctx: PaneContext
+  hunk: DiffHunk
+  hunkIndex: number
+  viewed: boolean
+}) {
+  const { ctx } = props
+  const bar = <HunkBar {...props} />
   if (ctx.mode !== 'unified') return <div className="diff-split-header rs-hunk-anchor">{bar}</div>
   return (
     <UnifiedRowsTable ctx={ctx}>
@@ -519,7 +545,7 @@ function Hotspot(props: { message: string }) {
 const ITEM_RENDERERS: ItemRenderers = {
   notice: (ctx, item) => <FormattingNotice ctx={ctx} hiddenCount={item.hiddenCount} />,
   'hunk-header': (ctx, item) => (
-    <PaneHunkHeader ctx={ctx} hunk={item.hunk} hunkIndex={item.hunkIndex} />
+    <PaneHunkHeader ctx={ctx} hunk={item.hunk} hunkIndex={item.hunkIndex} viewed={item.viewed} />
   ),
   line: (ctx, item) => <UnifiedItem ctx={ctx} line={item.line} moved={item.moved} />,
   'split-row': (ctx, item) => <SplitItem ctx={ctx} item={item} />,

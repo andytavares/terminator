@@ -25,7 +25,7 @@ export type DiffItem =
   | { kind: 'notice'; key: string; hiddenCount: number }
   | { kind: 'gap-line'; key: string; line: DiffLine }
   | { kind: 'gap-expander'; key: string; gapKey: string; hidden: number | null }
-  | { kind: 'hunk-header'; key: string; hunkIndex: number; hunk: DiffHunk }
+  | { kind: 'hunk-header'; key: string; hunkIndex: number; hunk: DiffHunk; viewed: boolean }
   | { kind: 'line'; key: string; line: DiffLine; moved: MovedMark | null }
   | {
       kind: 'split-row'
@@ -45,6 +45,8 @@ export interface DiffItemSource {
   gapViews: Map<string, GapView>
   hotspots: Array<{ hunkIndex: number; message: string }>
   movedMark: (lineNum: number, side: Side) => MovedMark | null
+  /** Headers of the hunks marked viewed; each shows as its header alone. */
+  viewedHunks: Set<string>
 }
 
 /** A line inside a collapsed moved block is hidden; the block's first line stays as its anchor. */
@@ -112,13 +114,16 @@ function splitItems(source: DiffItemSource, hunkIndex: number): DiffItem[] {
 }
 
 function hunkItems(source: DiffItemSource, hunk: DiffHunk, hunkIndex: number): DiffItem[] {
-  const hotspot = source.hotspots.find((h) => h.hunkIndex === hunkIndex)
+  const viewed = source.viewedHunks.has(hunk.header)
+  const hotspot = viewed ? undefined : source.hotspots.find((h) => h.hunkIndex === hunkIndex)
+  const rows =
+    source.mode === 'unified'
+      ? unifiedItems(source, hunk, hunkIndex)
+      : splitItems(source, hunkIndex)
   return [
     ...(hunkIndex === 0 ? gapItems(source, 'top') : []),
-    { kind: 'hunk-header', key: `${hunkIndex}-header`, hunkIndex, hunk },
-    ...(source.mode === 'unified'
-      ? unifiedItems(source, hunk, hunkIndex)
-      : splitItems(source, hunkIndex)),
+    { kind: 'hunk-header', key: `${hunkIndex}-header`, hunkIndex, hunk, viewed },
+    ...(viewed ? [] : rows),
     ...(hotspot
       ? [{ kind: 'hotspot' as const, key: `${hunkIndex}-hotspot`, message: hotspot.message }]
       : []),

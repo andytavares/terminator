@@ -25,6 +25,7 @@ import {
   usePaneReviewStore,
   usePaneUiStore,
   useTests,
+  useViewedHunks,
 } from './diff-pane/usePaneState'
 import { maxLineNumber, numColWidthFor } from './diff-pane/lines'
 import { renderDiffItem } from './diff-pane/rows'
@@ -150,12 +151,14 @@ function useDiffView(props: Props, store: ReviewStore, ui: UiStore) {
   }
   const gaps = useGaps({ target, diff, isBinary: file.isBinary, diffKey: request.diffKey })
   const moved = useMovedMarks(pr.movedBlocks, file.path)
+  const viewedHunks = useViewedHunks(store.viewedHunks[file.path])
   const items = useDiffItems({
     diff,
     mode: ui.diffViewMode,
     hideFormattingHunks: ui.hideFormattingHunks,
     gapViews: gaps.gapViews,
     movedMark: moved.movedMark,
+    viewedHunks,
   })
   return { request, loaded, gaps, moved, items }
 }
@@ -242,6 +245,7 @@ function paneActions(w: Wiring, extra: ActionExtras) {
     updateDraft: store.updateDraft,
     removeDraft: store.removeDraft,
     toggleMoved: w.view.moved.toggleMoved,
+    toggleHunkViewed: store.toggleHunkViewed,
   }
 }
 

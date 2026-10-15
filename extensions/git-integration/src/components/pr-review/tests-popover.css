@@ -106,6 +106,15 @@
   min-height: 22px;
 }
 
+.rs-hunk-viewed {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--tm-text-secondary);
+  cursor: pointer;
+}
+
 .rs-hunk-bar__text {
   flex: 1;
   min-width: 0;
