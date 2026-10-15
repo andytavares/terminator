@@ -6,6 +6,9 @@ import type { CheckId, CompileResult } from '../order/compile.js'
 import { refusedParts } from '../order/proposal.js'
 import { REWRITING_UNREADABLE } from './autonomy.js'
 import type { IntakeOutcome } from './intake-outcome.js'
+import { failedStepSentence, isTestStep } from '../line/baseline-steps.js'
+import type { Baseline } from '../line/baseline.js'
+import type { StepOutcome } from '../verify/ladder.js'
 import type { StepId } from './steps.js'
 
 // Who holds a draft order, what stops it being handed off, and what happens
@@ -41,12 +44,25 @@ export interface AgreedFacts {
   readonly by: 'you' | 'automatic'
 }
 
+/** Whether the base branch was proven, and whether the operator handed off without it. */
+export interface EnvironmentFacts {
+  readonly baseline: Baseline | null
+  /** When the operator chose to skip the check; null when they did not. */
+  readonly waivedAt: string | null
+  /** Whether a check is running in this process; absent reads as running. */
+  readonly proving?: boolean
+}
+
+const NO_ENVIRONMENT: EnvironmentFacts = { baseline: null, waivedAt: null }
+
 export interface ReadinessInput {
   readonly order: WorkOrder
   readonly compile: CompileResult
   readonly intake: IntakeOutcome
   readonly loop: LoopFacts
   readonly agreed: AgreedFacts | null
+  /** The base branch check. Absent reads as never checked. */
+  readonly environment?: EnvironmentFacts
   /** When the last intake line was written, for "The last turn ended at …". */
   readonly turnEndedAt: string | null
   /** The shape hand-off will run, and whether it is the operator's pick. */
@@ -98,7 +114,7 @@ type RowState = 'passed' | 'in-progress' | 'needs-you' | 'failing'
 
 /** One row of "Ready to hand off?": the five checks and whether anyone is changing the plan. */
 export interface Row {
-  readonly id: CheckId | 'turn'
+  readonly id: CheckId | 'environment' | 'turn'
   readonly label: string
   readonly state: RowState
   readonly detail: string
@@ -168,12 +184,13 @@ export function capitalise(word: string): string {
   return word === '' ? word : word[0].toUpperCase() + word.slice(1)
 }
 
-const ROW_LABELS: Record<CheckId | 'turn', string> = {
+const ROW_LABELS: Record<CheckId | 'environment' | 'turn', string> = {
   questions: 'No open questions',
   verifiable: 'Every criterion can be proven',
   coverage: 'Plan and criteria cover each other',
   risk: 'Risk graded against this plan',
   redTeam: 'No blocking red-team findings',
+  environment: 'The base branch builds and passes its checks',
   turn: 'Nobody is changing the plan',
 }
 
@@ -628,6 +645,98 @@ function checkRow(id: CheckId, input: ReadinessInput): Row {
   return { id, label: ROW_LABELS[id], state: 'failing', detail: failure.detail }
 }
 
+function stepNames(steps: readonly StepOutcome[], result: StepOutcome['result']): string[] {
+  return steps.filter((step) => step.result === result).map((step) => step.name)
+}
+
+function provenDetail({ baseBranch, commit, steps, mended }: Baseline): string {
+  const passed = listInWords(stepNames(steps, 'pass').map((name) => name.toLowerCase()))
+  const unmeasured = stepNames(steps, 'not_measured')
+  const at = commit === null ? baseBranch : `${baseBranch} at ${commit.slice(0, 7)}`
+  if (passed === '') return `${at} had nothing that could be measured.`
+  const measured = `${at} passed ${passed}${mended ? ' after a reinstall' : ''}.`
+  return unmeasured.length === 0 ? measured : `${measured} Not measured: ${unmeasured.join(', ')}.`
+}
+
+function failedDetail({ baseBranch, steps }: Baseline): string {
+  const failed = steps.filter((step) => step.result === 'fail')
+  if (failed.length === 0) return `Nothing could be measured on ${baseBranch}.`
+  return failed.map((step) => failedStepSentence(step, baseBranch)).join(' ')
+}
+
+/** A bug fix starts from a failing test; a base whose only failure is its tests is its start. */
+function bugfixStartsHere(baseline: Baseline, shapeName: string | null): boolean {
+  const failed = baseline.steps.filter((step) => step.result === 'fail')
+  return shapeName === 'bugfix' && failed.length > 0 && failed.every(isTestStep)
+}
+
+function bugfixDetail(baseline: Baseline): string {
+  const starts = `Tests fail on ${baseline.baseBranch}, which is where a bug fix starts.`
+  const built = baseline.steps.some((step) => step.rung === 'L5' && step.result === 'pass')
+  return built ? `${starts} It builds.` : starts
+}
+
+function waivedRow(environment: EnvironmentFacts, waivedAt: string, clock: Clock): Row {
+  const branch = environment.baseline?.baseBranch ?? 'the base branch'
+  const detail = `You handed off without it at ${clock(waivedAt)}. Checks that fail on ${branch} will read “failing on base”.`
+  return { id: 'environment', label: ROW_LABELS.environment, state: 'passed', detail }
+}
+
+function checkedRow(baseline: Baseline, proving: boolean, shapeName: string | null): Row {
+  const row = (state: Row['state'], detail: string): Row => ({
+    id: 'environment',
+    label: ROW_LABELS.environment,
+    state,
+    detail,
+  })
+  if (baseline.state === 'checking') {
+    if (!proving)
+      return row('failing', `The check of ${baseline.baseBranch} stopped before it finished.`)
+    const detail = `Checking ${baseline.baseBranch}: format, lint, tests and build, in their own terminal tabs.`
+    return row('in-progress', detail)
+  }
+  if (baseline.state === 'proven') return row('passed', provenDetail(baseline))
+  if (bugfixStartsHere(baseline, shapeName)) return row('passed', bugfixDetail(baseline))
+  return row('failing', failedDetail(baseline))
+}
+
+type Clock = (iso: string) => string
+
+function environmentRowOf(
+  environment: EnvironmentFacts,
+  shapeName: string | null,
+  clock: Clock
+): Row {
+  const { baseline, waivedAt, proving = true } = environment
+  if (waivedAt !== null) return waivedRow(environment, waivedAt, clock)
+  if (baseline === null) {
+    const detail = 'Not checked for this order yet.'
+    return { id: 'environment', label: ROW_LABELS.environment, state: 'needs-you', detail }
+  }
+  return checkedRow(baseline, proving, shapeName)
+}
+
+/** Whether the base branch check lets an order be handed off: the row is passed exactly then. @internal */
+export function environmentPasses(
+  environment: EnvironmentFacts,
+  shapeName: string | null
+): boolean {
+  return environmentRowOf(environment, shapeName, String).state === 'passed'
+}
+
+/** Why the check holds hand-off, or null when it does not. */
+export function environmentRefusal(
+  environment: EnvironmentFacts,
+  shapeName: string | null
+): string | null {
+  const row = environmentRowOf(environment, shapeName, String)
+  return row.state === 'passed' ? null : row.detail
+}
+
+function environmentRow(input: ReadinessInput): Row {
+  return environmentRowOf(input.environment ?? NO_ENVIRONMENT, input.shape.name, input.clock)
+}
+
 function turnRow(input: ReadinessInput): Row {
   const { intake, turnEndedAt, clock } = input
   const label = ROW_LABELS.turn
@@ -663,6 +772,7 @@ function buildRows(input: ReadinessInput): readonly Row[] {
     checkRow('coverage', input),
     checkRow('risk', input),
     checkRow('redTeam', input),
+    environmentRow(input),
     turnRow(input),
   ]
 }
@@ -1008,7 +1118,24 @@ const decisionsLock = ({
   return input.compile.failures.length > 0 ? input.compile.failures[0].detail : null
 }
 
-const LOCK_RULES: readonly LockRule[] = [handedOffLock, runningLock, refusedLock, heldLock]
+/** A draft whose plan is otherwise ready, held only by the base branch check. */
+const environmentLock: LockRule = ({ input }) => {
+  if (input.order.status !== 'draft' || !input.compile.ok) return undefined
+  const row = environmentRow(input)
+  if (row.state === 'passed') return undefined
+  if (row.state === 'in-progress') {
+    return 'Hand-off opens when the base branch check finishes, or skip this check.'
+  }
+  return `${row.detail} Check it again, or skip this check.`
+}
+
+const LOCK_RULES: readonly LockRule[] = [
+  handedOffLock,
+  runningLock,
+  refusedLock,
+  heldLock,
+  environmentLock,
+]
 
 function buildRedraftLock(input: ReadinessInput, handOffLockText: string | null): string | null {
   const { order, intake, clock } = input
@@ -1062,7 +1189,8 @@ export function readiness(input: ReadinessInput): Readiness {
     compile.ok &&
     intake.kind !== 'running' &&
     intake.kind !== 'refused' &&
-    loop.heldAt === null
+    loop.heldAt === null &&
+    environmentRow(input).state === 'passed'
 
   const rows = buildRows(input)
   const steps = buildSteps(input, canHandOff, holder)

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
-import { builderUnit, testCriterion } from '../helpers/order-parts.js'
+import { builderUnit, openQuestion, testCriterion } from '../helpers/order-parts.js'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import {
@@ -463,6 +463,8 @@ describe('the pull request body (FR-056)', () => {
   describe('summary and verdicts', summaryAndVerdictsTests)
   describe('inspection', integrateInspectionTests)
   describe('provenance', provenanceTests)
+  describe("what's left for you", leftForYouTests)
+  describe("what's left for you, edges", leftForYouEdgeTests)
 })
 
 function summaryAndVerdictsTests() {
@@ -1621,5 +1623,150 @@ function cancelledChecksTests() {
     expect(result.gate?.summary).toBe(
       'CI is still red on e2e, unit-tests for Refuse an expired refresh token'
     )
+  })
+}
+
+const SECOND_CRITERION = testCriterion('AC-2', { statement: 'A valid token is kept' })
+const THIRD_CRITERION = testCriterion('AC-3', { statement: 'The refusal is logged' })
+const FOURTH_CRITERION = testCriterion('AC-4', { statement: 'The refusal is documented' })
+
+const LEFT_HEADER = "### What's left for you"
+
+/** The "What's left for you" section alone, from its header to the next heading. */
+function leftForYou(body: string): string[] {
+  const lines = body.split('\n')
+  const start = lines.indexOf(LEFT_HEADER)
+  if (start === -1) return []
+  const rest = lines.slice(start + 2)
+  const next = rest.findIndex((line) => line.startsWith('### '))
+  const section = next === -1 ? rest : rest.slice(0, next)
+  while (section.at(-1) === '') section.pop()
+  return section
+}
+
+function ladderWith(steps: LadderOutcome['steps']): LadderOutcome {
+  return { steps, stoppedAt: null, unmeasured: [], ok: true }
+}
+
+function leftOrder(): WorkOrder {
+  return refreshTokenOrder({
+    acceptance: [REFUSED_CRITERION, SECOND_CRITERION, THIRD_CRITERION, FOURTH_CRITERION],
+    assumptions: [
+      { id: 'AS-1', text: 'Tokens live in Redis', struck: false, affects: [] },
+      { id: 'AS-2', text: 'Clocks agree', struck: true, affects: [] },
+    ],
+    openQuestions: [
+      openQuestion('Q-1', { text: 'Should refusal be silent?' }),
+      openQuestion('Q-2', { text: 'Settled already', answer: 'Yes' }),
+    ],
+    redTeam: [
+      redTeamFinding({ id: 'RT-1', status: 'accepted', text: 'No rate limit', reason: 'Later' }),
+      redTeamFinding({ id: 'RT-2', status: 'resolved', text: 'Typo', reason: '' }),
+      redTeamFinding({ id: 'RT-3', status: 'open', text: 'Still arguing', reason: '' }),
+    ],
+  })
+}
+
+function redTeamFinding(over: Partial<WorkOrder['redTeam'][number]>): WorkOrder['redTeam'][number] {
+  return {
+    id: 'RT-0',
+    severity: 'medium',
+    text: '',
+    status: 'open',
+    reason: '',
+    category: 'wrong-outcome',
+    round: 0,
+    ...over,
+  }
+}
+
+function leftShipment(): Parameters<typeof prBody>[1] {
+  return {
+    verdicts: [
+      verdict({ criterionId: 'AC-1', result: 'pass' }),
+      verdict({ criterionId: 'AC-2', result: 'fail', reason: 'kept token was refused' }),
+      verdict({ criterionId: 'AC-3', result: 'not_measured', reason: 'no log harness' }),
+    ],
+    findings: [],
+    ladder: ladderWith([
+      {
+        rung: 'L0',
+        name: 'Lint',
+        result: 'pass',
+        reason: '',
+        exitCode: 0,
+        command: 'npm run lint',
+      },
+      {
+        rung: 'L5',
+        name: 'Build',
+        result: 'not_measured',
+        reason: 'no build command',
+        exitCode: null,
+        command: null,
+      },
+    ]),
+    failingOnBase: ['Tests'],
+  }
+}
+
+function leftForYouTests() {
+  it('counts criteria by their worst verdict, and a criterion with no verdict as not passing', () => {
+    const section = leftForYou(prBody(leftOrder(), leftShipment()))
+    expect(section.slice(0, 2)).toEqual(['**1 of 4** criteria pass. 3 need you.', ''])
+  })
+
+  it('lists every item in order: criteria, unmeasured steps, base failures, accepted findings, assumptions, questions', () => {
+    const section = leftForYou(prBody(leftOrder(), leftShipment()))
+    expect(section.slice(2)).toEqual([
+      '- **AC-2** A valid token is kept: failed. kept token was refused',
+      '- **AC-3** The refusal is logged: not measured. no log harness',
+      '- **AC-4** The refusal is documented: not measured. nothing ran',
+      '- **Build**: not measured. no build command',
+      "- **Tests**: fails on main before this change. Not this pull request's to fix.",
+      '- **RT-1** accepted by you: No rate limit. Reason: Later',
+      '- **AS-1** assumed: Tokens live in Redis. Nobody struck it.',
+      '- **Q-1** still open: Should refusal be silent?',
+    ])
+  })
+
+  it('leaves out struck assumptions, answered questions, and findings that are not accepted', () => {
+    const text = leftForYou(prBody(leftOrder(), leftShipment())).join('\n')
+    expect(text).not.toContain('AS-2')
+    expect(text).not.toContain('Q-2')
+    expect(text).not.toContain('RT-2')
+    expect(text).not.toContain('RT-3')
+  })
+}
+
+function leftForYouEdgeTests() {
+  it('says what still needs you, not a count of zero, when criteria pass but items remain', () => {
+    const shipment = { ...leftShipment(), verdicts: [verdict()] }
+    const section = leftForYou(prBody(refreshTokenOrder(), shipment))
+    expect(section.slice(0, 2)).toEqual(['**1 of 1** criteria pass. These still need you:', ''])
+    expect(section.join('\n')).not.toContain('0 need you')
+  })
+
+  it('names the base branch of the first repository', () => {
+    const order = leftOrder()
+    const moved = {
+      ...order,
+      context: { ...order.context, repos: [{ ...APP_REPO, baseBranch: 'develop' }] },
+    }
+    expect(leftForYou(prBody(moved, leftShipment())).join('\n')).toContain(
+      'fails on develop before this change'
+    )
+  })
+
+  it('says nothing is left when every criterion passed and nothing is pending', () => {
+    const section = leftForYou(prBody(refreshTokenOrder(), { verdicts: [verdict()], findings: [] }))
+    expect(section).toEqual(['Nothing. Every criterion passed and nothing is pending.'])
+  })
+
+  it('sits after the verdicts and before the verification table', () => {
+    const body = prBody(leftOrder(), leftShipment())
+    const at = (heading: string): number => body.indexOf(heading)
+    expect(at('### Verdicts')).toBeLessThan(at(LEFT_HEADER))
+    expect(at(LEFT_HEADER)).toBeLessThan(at('### Verification'))
   })
 }

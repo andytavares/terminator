@@ -303,20 +303,40 @@ export async function ensureBaseCheckout(
   lane: number,
   deps: CheckoutDeps
 ): Promise<Checkout> {
+  return detachedBaseCheckout({ order, lane, suffix: '@base', fresh: false }, deps)
+}
+
+/** Never the line's `@base`, and always new: a crash's leftover stands at an older commit. */
+export async function ensureBaselineCheckout(
+  order: WorkOrder,
+  lane: number,
+  deps: CheckoutDeps
+): Promise<Checkout> {
+  return detachedBaseCheckout({ order, lane, suffix: '@baseline', fresh: true }, deps)
+}
+
+interface BaseCheckoutPlan {
+  readonly order: WorkOrder
+  readonly lane: number
+  readonly suffix: string
+  /** Remove any checkout already at the target first. */
+  readonly fresh: boolean
+}
+
+async function detachedBaseCheckout(
+  { order, lane, suffix, fresh }: BaseCheckoutPlan,
+  deps: CheckoutDeps
+): Promise<Checkout> {
   const repo = order.context.repos.find((r) => r.lane === lane)
   if (repo === undefined)
     throw new CheckoutFailedError(`lane ${lane}`, 'the order has no such lane')
 
-  const target = `${checkoutPath(deps.root, order, repo.name)}@base`
+  const target = `${checkoutPath(deps.root, order, repo.name)}${suffix}`
+  const leftover = { repo: repo.name, origin: repo.path, path: target, branch: repo.baseBranch }
+  if (fresh) await removeBaseCheckout({ ...leftover, created: false }, deps)
   const existing = await addWorktree(repo, { target, how: ['--detach'] }, deps)
 
-  const checkout = {
-    repo: repo.name,
-    origin: repo.path,
-    path: target,
-    branch: repo.baseBranch,
-    created: !existing,
-  }
+  const checkout = { ...leftover, created: !existing }
   await provisionDependencies(checkout, deps)
   return checkout
 }
