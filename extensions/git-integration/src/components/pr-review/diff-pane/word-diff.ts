@@ -10,7 +10,8 @@ const MAX_TOKEN_PRODUCT = 250_000
 const MIN_SHARED_FRACTION = 0.4
 const TOKEN_PATTERN = /[A-Za-z0-9_]+|\s+|[^A-Za-z0-9_\s]/gu
 
-/** Identifier/number runs, whitespace runs and single punctuation characters; they join back to the input. */
+/** Identifier/number runs, whitespace runs and single punctuation characters; they join back to the input.
+ * @internal */
 export function tokenize(text: string): string[] {
   return text.match(TOKEN_PATTERN) ?? []
 }

@@ -79,7 +79,7 @@ export const baseInsights: PrInsights = {
   },
 }
 
-export const prHeader = () => ({
+const prHeader = () => ({
   number: 211,
   title: 'Shard e2e specs by duration',
   body: '',
