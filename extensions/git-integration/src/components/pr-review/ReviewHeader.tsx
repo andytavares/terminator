@@ -305,15 +305,17 @@ export function ReviewHeader(props: ReviewHeaderProps): JSX.Element {
       <HeaderPills header={props} />
       <div className="rh-spacer" />
       <ReviewProgress {...props} />
-      <Button
-        aria-label="Ask agent about this PR"
-        variant="ghost"
-        icon={Sparkles}
-        onClick={props.onAskAgent}
-      >
-        Ask agent
-      </Button>
-      <SubmitButton draftCount={props.draftCount} onSubmit={props.onSubmit} />
+      <div className="rh-actions">
+        <Button
+          aria-label="Ask agent about this PR"
+          variant="ghost"
+          icon={Sparkles}
+          onClick={props.onAskAgent}
+        >
+          <span className="rh-ask-label">Ask agent</span>
+        </Button>
+        <SubmitButton draftCount={props.draftCount} onSubmit={props.onSubmit} />
+      </div>
       <MoreMenu header={props} />
       <IconButton icon={X} label="Close review" onClick={props.onClose} />
     </div>

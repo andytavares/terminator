@@ -14,6 +14,16 @@
   flex-shrink: 0;
   position: relative;
   z-index: calc(var(--tm-layer-overlay) + 10);
+  container: rh-bar / inline-size;
+}
+
+/* The buttons never wrap; the title and the progress give way first. */
+.rh-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .rh-num {
@@ -63,6 +73,7 @@
   color: var(--tm-text-muted);
   cursor: pointer;
   line-height: 16px;
+  white-space: nowrap;
 }
 
 .rh-pill:hover {
@@ -188,6 +199,29 @@
 .rh-menu-hint {
   font-size: 10px;
   color: var(--tm-text-muted);
+}
+
+@container rh-bar (max-width: 1200px) {
+  .rh-progress-text {
+    display: none;
+  }
+}
+
+@container rh-bar (max-width: 1000px) {
+  .rh-ask-label {
+    display: none;
+  }
+
+  .rh-segments {
+    width: 72px;
+  }
+}
+
+@container rh-bar (max-width: 760px) {
+  .rh-progress,
+  .rh-pill--focus {
+    display: none;
+  }
 }
 
 .rh-count {
