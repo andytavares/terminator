@@ -236,9 +236,27 @@
 }
 
 .pr-checks-chevron {
-  font-size: 8px;
+  width: 12px;
+  height: 12px;
   flex-shrink: 0;
   color: var(--tm-text-muted);
+  transition: transform 0.15s;
+}
+.pr-checks-chevron--open {
+  transform: rotate(180deg);
+}
+
+.pr-checks-group-heading {
+  margin: 0;
+  padding: 8px 12px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--tm-text-muted);
+}
+.pr-checks-item--fail {
+  background: color-mix(in srgb, var(--tm-danger) 6%, transparent);
 }
 
 .pr-checks-list {
@@ -295,6 +313,7 @@
 
 .pr-checks-link {
   flex-shrink: 0;
+  display: inline-flex;
   font-size: 10px;
   color: var(--tm-accent-text);
   text-decoration: none;
@@ -1882,6 +1901,7 @@
    converted in this pass. */
 .pr-checks-icon svg,
 .pr-checks-summary-icon svg,
+.pr-checks-link svg,
 .review-diff-viewed-badge svg,
 .pr-merge-state-badge svg,
 .chapter-nav__done svg,
