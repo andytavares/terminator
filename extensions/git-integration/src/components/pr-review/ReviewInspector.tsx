@@ -1,9 +1,15 @@
-import React from 'react'
+import React, { useRef } from 'react'
 import { X } from 'lucide-react'
-import { IconButton, Tab, TabList, TabPanel, TabsRoot } from '@terminator/extension-ui'
+import {
+  IconButton,
+  Tab,
+  TabList,
+  TabPanel,
+  TabsRoot,
+  useDismissible,
+} from '@terminator/extension-ui'
 import type { RiskScore } from '../../schemas/pr-review.schema'
-import { RiskBreakdownPanel } from './RiskBreakdownPanel'
-import { HealthChips } from './HealthChips'
+import { WhyThisFile } from './WhyThisFile'
 import './review-inspector.css'
 
 export type InspectorTab = 'agent' | 'file'
@@ -19,10 +25,6 @@ export interface ReviewInspectorProps {
     path: string
     riskScore: RiskScore
     repoRoot: string
-    ciStatus?: 'passing' | 'failing' | 'pending' | 'none'
-    lintStatus?: 'pass' | 'fail' | 'warn' | 'unknown'
-    coverageStatus?: 'pass' | 'fail' | 'warn' | 'unknown'
-    dryViolationCount?: number
   } | null
 }
 
@@ -51,7 +53,7 @@ function InspectorTabs({ inspector: props }: { inspector: ReviewInspectorProps }
             {count > 0 && <span className="ri-tab-badge">{count}</span>}
           </Tab>
         )}
-        {props.file != null && <Tab id="file">File</Tab>}
+        {props.file != null && <Tab id="file">Why this file</Tab>}
       </TabList>
       <IconButton icon={X} size="sm" label="Close inspector" onClick={props.onClose} />
     </div>
@@ -61,26 +63,23 @@ function InspectorTabs({ inspector: props }: { inspector: ReviewInspectorProps }
 function FilePanel({ file }: { file: InspectorFile }) {
   return (
     <TabPanel id="file" className="ri-panel">
-      <RiskBreakdownPanel
-        filePath={file.path}
-        riskScore={file.riskScore}
-        repoRoot={file.repoRoot}
-      />
-      <HealthChips
-        riskScore={file.riskScore}
-        ciStatus={file.ciStatus}
-        lintStatus={file.lintStatus}
-        coverageStatus={file.coverageStatus}
-        dryViolationCount={file.dryViolationCount}
-      />
+      <WhyThisFile file={file} />
     </TabPanel>
   )
 }
 
 export function ReviewInspector(props: ReviewInspectorProps) {
+  const rootRef = useRef<HTMLDivElement>(null)
+  // The drawer sits over the diff, so a click on the diff must not close it: Escape and the X do.
+  useDismissible({
+    ref: rootRef,
+    onDismiss: props.onClose,
+    manageFocus: false,
+    closeOnOutsideClick: false,
+  })
   return (
     <TabsRoot selectedId={resolveTab(props)} onSelect={props.onTabChange}>
-      <div className="ri-root">
+      <div className="ri-root" ref={rootRef}>
         <InspectorTabs inspector={props} />
         {props.agentAvailable && (
           <TabPanel id="agent" className="ri-panel">
