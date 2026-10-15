@@ -24,7 +24,7 @@ sequenceDiagram
   IPC-->>OS: { summary } | { error }
 ```
 
-- **Same runner, same tools.** `runSummary` (`src/review/review-agent.ts`) uses the step the review run uses to find `claude`, spawn it, time it out and cancel it. Its arguments are `-p --output-format json --json-schema` (requiring `summary`) and `--tools Read,Grep,Glob`. The model, effort and timeout come from the review agent settings. A timeout says the configured minutes.
+- **Same runner, same tools.** `runSummary` (`extensions/git-integration/src/review/review-agent.ts`) uses the step the review run uses to find `claude`, spawn it, time it out and cancel it. Its arguments are `-p --output-format json --json-schema` (requiring `summary`) and `--tools Read,Grep,Glob`. The model, effort and timeout come from the review agent settings. A timeout says the configured minutes.
 - **Not `api.shell.exec`, not an SDK.** `shell.exec` runs git and gh inside declared roots. It does not run `claude`, and it does not give the cancel-on-dispose that a model call needs. An Anthropic SDK dependency would bring in a second model path, with its own key handling and no read-only tool limit, for a feature the existing agent already covers (Principle IV).
 - **cwd is the extension's storage folder** (`api.paths.globalStorage`). `repoRoot` can be `gh:owner/name`, which has no folder, and a summary reads no checkout. So no PR worktree is made for it.
 - **Nothing is persisted.** The summary is held in the overview's component state, per tab, until the overview closes or the PR changes. No store, no cache, and no automatic run.
