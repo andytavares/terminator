@@ -1,7 +1,8 @@
 import React, { useState } from 'react'
-import { Button } from '@terminator/extension-ui'
+import { Button, RelativeTime } from '@terminator/extension-ui'
 import type { Thread } from '../../schemas/pr-review.schema'
 import { RichContent } from './RichContent'
+import './inline-comment.css'
 
 interface Props {
   thread: Thread
@@ -19,22 +20,22 @@ function threadClass(thread: Thread): string {
 function ThreadCommentItem({ comment, resolved }: { comment: ThreadComment; resolved: boolean }) {
   return (
     <div className={`inline-comment${comment.isReply ? ' inline-comment--reply' : ''}`}>
-      <div className="inline-comment-header">
-        <img
-          src={comment.authorAvatarUrl}
-          alt={comment.author}
-          className="inline-comment-avatar"
-          width={20}
-          height={20}
-        />
-        <strong className="inline-comment-author">{comment.author}</strong>
-        {resolved && <span className="inline-comment-resolved-label">Resolved</span>}
-        <time className="inline-comment-time" dateTime={comment.createdAt}>
-          {formatTime(comment.createdAt)}
-        </time>
-      </div>
-      <div className="inline-comment-body">
-        <RichContent>{comment.body}</RichContent>
+      <img
+        src={comment.authorAvatarUrl}
+        alt={comment.author}
+        className="inline-comment-avatar"
+        width={22}
+        height={22}
+      />
+      <div>
+        <div className="inline-comment-header">
+          <strong className="inline-comment-author">{comment.author}</strong>
+          {resolved && <span className="inline-comment-resolved-label">Resolved</span>}
+          <RelativeTime value={comment.createdAt} />
+        </div>
+        <div className="inline-comment-body">
+          <RichContent>{comment.body}</RichContent>
+        </div>
       </div>
     </div>
   )
@@ -56,18 +57,16 @@ export function InlineCommentThread({ thread, onReply }: Props) {
         </Button>
       )}
       {onReply && (
-        <Button variant="ghost" size="sm" onClick={() => onReply(thread.id)}>
-          Reply
-        </Button>
+        <div className="inline-comment-reply">
+          <button
+            type="button"
+            className="inline-comment-reply-field"
+            onClick={() => onReply(thread.id)}
+          >
+            Reply<span aria-hidden="true">…</span>
+          </button>
+        </div>
       )}
     </div>
   )
-}
-
-function formatTime(iso: string): string {
-  try {
-    return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-  } catch {
-    return iso
-  }
 }
