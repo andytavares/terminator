@@ -1,0 +1,19 @@
+extensions/git-integration/src/components/pr-review/pr-review.css
+  s_e708cca5bdf352::t_8d7fbded284119 350,475
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "9e72d5051dac5d4a742fa16f377c1f81a8b02810",
+  "prompts": {},
+  "sessions": {
+    "s_e708cca5bdf352": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5d7c9815-e79e-402d-b85d-cf8028e700ad",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
