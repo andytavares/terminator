@@ -1,0 +1,21 @@
+CHANGELOG.md
+  s_38e83f41dfbdce::t_d2ec9939dcb135 60
+docs/user-guide/USER-GUIDE.md
+  s_38e83f41dfbdce::t_1da317524150fa 566
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "5d75198e0be777f1fefb8e0258ed8b5a2139dae4",
+  "prompts": {},
+  "sessions": {
+    "s_38e83f41dfbdce": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b4247fd1-c5bf-43d2-8b78-e01fefbb8958",
+        "model": "claude-haiku-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
