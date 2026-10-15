@@ -163,7 +163,7 @@ test('an approval from the pop-out window reaches GitHub and closes the window',
   await view.getByRole('button', { name: 'Pop out' }).click()
   const popout = await gitView(handle, 'pr-review')
   await queueRow(popout, 'Add subtract').click()
-  await popout.getByRole('button', { name: /^(Start|Continue|Resume) Review/ }).click()
+  await popout.getByRole('button', { name: /^(Start|Continue|Resume) review/ }).click()
   await popout.getByRole('button', { name: 'Submit review…' }).click()
   const dialog = popout.getByRole('dialog', { name: 'Submit review' })
   await dialog.getByLabel('Approve').check()

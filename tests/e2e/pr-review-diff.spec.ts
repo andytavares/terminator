@@ -78,7 +78,7 @@ test.afterAll(async () => {
 async function startPrReview(): Promise<Page> {
   const view = await openCodeReviews(handle, 'Review Diff')
   await view.locator('.rd-row').filter({ hasText: 'Add subtract' }).click()
-  await view.getByRole('button', { name: /^(Start|Continue|Resume) Review/ }).click()
+  await view.getByRole('button', { name: /^(Start|Continue|Resume) review/ }).click()
   return view
 }
 

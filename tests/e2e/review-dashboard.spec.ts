@@ -76,7 +76,7 @@ test('Clone and review clones the repository and opens the pull request', async 
   await row.getByRole('button', { name: 'Clone and review' }).click()
 
   const review = await gitView(handle, 'pr-review')
-  await expect(review.locator('.pr-review-topbar-title')).toContainText('Add subtract', {
+  await expect(review.getByRole('heading', { level: 1 })).toContainText('Add subtract', {
     timeout: 20000,
   })
   const clone = join(cloneFolder, 'widgets')

@@ -289,7 +289,7 @@ describe('PrOverviewPanel — starting the review', () => {
   it('starts at the chapter whose plan row is clicked', () => {
     const onStartReview = vi.fn()
     renderPanel({}, { onStartReview })
-    fireEvent.click(screen.getByRole('button', { name: 'Start review at Core' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Start at Core' }))
     expect(onStartReview).toHaveBeenCalledWith('ch1')
   })
 })

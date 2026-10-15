@@ -40,7 +40,7 @@ const chapters: Chapter[] = [
 describe('ReviewPlan', () => {
   it('renders a row per chapter with name, minutes and the highest risk', () => {
     render(<ReviewPlan chapters={chapters} onStartAt={() => {}} />)
-    const row = screen.getByRole('button', { name: /Start review at Settings store and debounce/ })
+    const row = screen.getByRole('button', { name: /Start at Settings store and debounce/ })
     expect(row.textContent).toContain('12 min')
     expect(row.textContent).toContain('High risk')
     expect(row.textContent).toContain('store.ts')
@@ -48,7 +48,7 @@ describe('ReviewPlan', () => {
 
   it('shows the first three file names and the rest as a count', () => {
     render(<ReviewPlan chapters={chapters} onStartAt={() => {}} />)
-    const row = screen.getByRole('button', { name: /Start review at Panel layout/ })
+    const row = screen.getByRole('button', { name: /Start at Panel layout/ })
     expect(row.textContent).toContain('+2')
     expect(row.textContent).not.toContain('four.tsx')
     expect(row.textContent).toContain('5 files')
@@ -57,7 +57,7 @@ describe('ReviewPlan', () => {
   it('starts at the chapter whose row is clicked', () => {
     const started: string[] = []
     render(<ReviewPlan chapters={chapters} onStartAt={(id) => started.push(id)} />)
-    fireEvent.click(screen.getByRole('button', { name: /Start review at Panel layout/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Start at Panel layout/ }))
     expect(started).toEqual(['c2'])
   })
 

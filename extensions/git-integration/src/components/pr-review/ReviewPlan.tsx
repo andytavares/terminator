@@ -62,7 +62,7 @@ function PlanRow({ chapter, number, largest, onStartAt }: RowProps) {
       onClick={() => onStartAt(chapter.id)}
     >
       <span id={labelId} className="review-plan__hidden">
-        Start review at {chapter.name}
+        Start at {chapter.name}
       </span>
       <span className="review-plan__number">{number}</span>
       <span className="review-plan__name">

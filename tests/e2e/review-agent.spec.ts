@@ -77,7 +77,7 @@ async function askReviewAgent(): Promise<Page> {
   await expect(queueOrReview).toBeVisible({ timeout: 15000 })
   if (await view.locator('.rd-row').first().isVisible()) {
     await view.locator('.rd-row').filter({ hasText: 'Add subtract' }).click()
-    await view.getByRole('button', { name: /^(Start|Continue|Resume) Review/ }).click()
+    await view.getByRole('button', { name: /^(Start|Continue|Resume) review/ }).click()
   }
   await view.getByRole('button', { name: 'Ask agent about this PR' }).click()
   return view
