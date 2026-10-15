@@ -30,55 +30,6 @@
   color: var(--tm-text-muted);
 }
 
-/* ── S1: file-list state rows ─────────────────────────────────────────── */
-
-.rc-frow-state {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 14px;
-  height: 14px;
-}
-
-.rc-frow-state svg {
-  width: 12px;
-  height: 12px;
-}
-
-.rc-frow-sub {
-  font-size: 11px;
-  color: var(--tm-text-muted);
-}
-
-.rc-frow-sub--changed {
-  color: var(--tm-warning);
-}
-
-.rc-frow-sub--new {
-  color: var(--tm-accent-text);
-}
-
-.rc-frow-sub--viewed {
-  color: var(--tm-success);
-}
-
-.full-file-row-body {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.rc-frow-reason {
-  display: block;
-  line-height: 1.35;
-  font-size: 11px;
-  color: var(--tm-text-muted);
-}
-
-.rc-frow-reason--viewed {
-  color: var(--tm-success);
-}
-
 /* ── S2: resume card ───────────────────────────────────────────────────── */
 
 .rc-resume {
