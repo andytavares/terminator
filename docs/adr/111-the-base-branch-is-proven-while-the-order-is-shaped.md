@@ -24,22 +24,31 @@ The comparison is in the design document that led to this ADR.
 
 1. **A new order proves its base branch while it is shaped.** When the Forge
    creates an order, `proveEnvironment` (`extensions/foundry/src/line/baseline.ts`)
-   checks out the base branch and runs format, lint, tests and build, each in
+   checks out the base branch into its own fresh worktree (`<repo>@baseline`,
+   never the line's `@base`) and runs format, lint, tests and build, each in
    its own terminal tab, while the architect and red team work. Each step runs
    even when an earlier one fails, so the record says everything that is
-   wrong. A broken install is mended once, as in ADR 088.
+   wrong. A broken install is mended once, as in ADR 088. One proof runs per
+   order at a time; asking again while one runs joins it.
 2. **The result is a record, not a guess.** It is written to `baseline.json`
-   beside the order, with the base commit, and to the ledger as
+   beside the order, with the commit the checkout was at, and to the ledger as
    `environment.checking`, then `environment.proven` or `environment.failing`.
+   Proven needs at least one passing step: a base where nothing could be
+   measured is not proven (rule 2 of the extension: "not measured" is never a
+   pass). A check left running when the application quit reads as stopped, and
+   can be run again.
 3. **Hand-off waits for it, and names its moves.** The Hand off step gains a
    seventh row, "The base branch builds and passes its checks". While it is not
-   passing, the row offers **Check again** and **Hand off anyway**. Handing off
-   anyway records `environment.waived`. A bug fix whose only failure on base is
-   its tests passes the row, because a failing test is where a bug fix starts.
-4. **The final check does not run a command twice on the same base.** When the
-   final check climbs the base branch to ask whose failure it is (ADR 080), a
-   step the baseline already ran on the same base commit returns its recorded
-   exit code instead of running again.
+   passing, the row offers **Check again** and **Skip this check**. Skipping
+   records `environment.waived`; a later check that fails again needs a new
+   decision. A bug fix whose only failure on base is its tests passes the row,
+   because a failing test is where a bug fix starts. The backend refuses to
+   agree an order the row holds, so the automatic hand-off waits too.
+4. **The final check does not run a passing command twice on the same base.**
+   When the final check climbs the base branch to ask whose failure it is
+   (ADR 080), a step the baseline saw pass on the same base commit returns that
+   pass instead of running again. A recorded failure is always run again: a
+   failure on base excuses the change, so it has to be fresh.
 5. **The pull request says what is left.** The body gains "What's left for
    you": the criteria that did not pass, the checks not measured, the checks
    that fail on base, accepted red-team findings, assumptions nobody struck,

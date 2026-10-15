@@ -752,20 +752,21 @@ continue** picks up where it would have gone.
 no open questions, every criterion can be proven, plan and criteria cover each
 other, risk graded against _this_ plan, no blocking red-team findings, the base
 branch builds and passes its checks, and nobody is changing the plan. A passing
-row says why it passed.
+row says why it passed. A failing check
+also shows on the step that clears it, with what to do about it: either a
+button that takes you to the control that clears it, or one that redrafts with
+the instruction the architect needs.
 
 **The base branch** is checked as soon as the order is created. While the
 architect drafts, Foundry checks out the base branch and runs its format, lint,
 test and build commands, each in its own terminal tab. A broken install is
 reinstalled once. If a check fails there, the row says which one, with its exit
 code and command, and offers **Check again** (after you fix the branch or the
-setup) or **Hand off anyway**. Handing off anyway is recorded in the ledger,
+setup) or **Skip this check**. Skipping it is recorded in the ledger,
 and a check that fails on the base branch then reads **failing on base** in the
 pull request, not as this change's fault. A bug fix whose only failure there is
-its tests passes this row: a failing test is where a bug fix starts. A failing check
-also shows on the step that clears it, with what to do about it: either a
-button that takes you to the control that clears it, or one that redrafts with
-the instruction the architect needs.
+its tests passes this row: a failing test is where a bug fix starts. A
+base branch where nothing could be measured does not pass either.
 
 The one that catches people is **criteria falsifiable** on a change somebody
 can see: a plan that touches a `.tsx`, `.css` or `.html` file and has no
