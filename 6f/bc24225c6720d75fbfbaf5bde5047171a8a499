@@ -1,0 +1,29 @@
+extensions/git-integration/src/components/pr-review/OverviewSummary.tsx
+  s_e708cca5bdf352::t_956177dfbf8c2b 2-3,6-7,27,40-43,50,60-78,80-84,90,92-134,136,140-148
+extensions/git-integration/tests/unit/OverviewSummary.spec.tsx
+  s_e708cca5bdf352::t_af1698d5c28d57 11
+  s_e708cca5bdf352::t_47a2f411b0e2fd 81,83
+  s_e708cca5bdf352::t_5cd58f125ab3a7 6,8,53-60,66-68,77-79,95-105,114,136-139,155
+extensions/git-integration/src/review/review-agent.ts
+  s_e708cca5bdf352::t_af1698d5c28d57 668-669
+extensions/git-integration/src/components/pr-review/brief-card.css
+  s_e708cca5bdf352::t_956177dfbf8c2b 1-133
+extensions/git-integration/tests/unit/review-agent.spec.ts
+  s_e708cca5bdf352::t_af1698d5c28d57 533-539
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "6fbc24225c6720d75fbfbaf5bde5047171a8a499",
+  "prompts": {},
+  "sessions": {
+    "s_e708cca5bdf352": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5d7c9815-e79e-402d-b85d-cf8028e700ad",
+        "model": "unknown"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
