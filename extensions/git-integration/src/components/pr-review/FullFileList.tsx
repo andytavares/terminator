@@ -1,16 +1,12 @@
-import React, { useMemo, useState } from 'react'
-import { Check, ChevronDown, ChevronRight } from 'lucide-react'
+import React, { useState } from 'react'
 import { usePrReviewStore } from '../../stores/pr-review.store'
 import type { PrReviewDetail, Chapter, PrChangedFile } from '../../schemas/pr-review.schema'
-import { chapterRiskLevel } from '../../github/pr-review-service'
-import { choose } from '../text'
 import {
   classNames,
   currentAttr,
+  FileRowContent,
   orderedFiles,
   rowState,
-  RowStateLabel,
-  RowStateMark,
   type SinceSets,
 } from './file-rows'
 
@@ -23,120 +19,44 @@ interface Props {
   showChapterHeaders?: boolean
 }
 
-type ChapterStatus = 'not-started' | 'in-progress' | 'complete'
-
-interface ReadingReason {
-  reason: string
-  allUsesViewed: boolean
-}
-
-/** Each file's place in the reading order, and whether every definition it uses was viewed. */
-function readingReasons(
-  readingOrder: PrReviewDetail['readingOrder'],
-  viewedFiles: Set<string>
-): Map<string, ReadingReason> {
-  const map = new Map<string, ReadingReason>()
-  for (const step of readingOrder ?? []) {
-    const allUsesViewed = step.uses.every(
-      (u) => u.definedInPath == null || viewedFiles.has(u.definedInPath)
-    )
-    map.set(step.path, { reason: step.reason, allUsesViewed })
-  }
-  return map
-}
-
-function chapterStatus(ch: Chapter, viewedFiles: Set<string>): ChapterStatus {
-  const viewed = ch.files.filter((f) => viewedFiles.has(f.path)).length
-  if (viewed === 0) return 'not-started'
-  if (viewed === ch.files.length) return 'complete'
-  return 'in-progress'
-}
-
 /** What the list shares with every chapter and row. */
 interface ListContext {
   sets: SinceSets
-  reasons: Map<string, ReadingReason>
+  threadCounts: Record<string, number>
   currentFilePath: string | null
   onSelectFile: Props['onSelectFile']
-}
-
-function ChapterRisk({ chapter }: { chapter: Chapter }) {
-  // A chapter of only generated files and lock files (tier 3) is not scored.
-  if (!chapter.files.some((f) => f.tier !== 3)) {
-    return <span className="full-file-chapter-risk full-file-chapter-risk--none">auto</span>
-  }
-  const level = chapterRiskLevel(chapter)
-  return <span className={`full-file-chapter-risk full-file-chapter-risk--${level}`}>{level}</span>
 }
 
 interface ChapterHeaderProps {
   chapter: Chapter
   num: number
-  status: ChapterStatus
   isOpen: boolean
   progress: string
   onToggle: () => void
 }
 
 function ChapterHeader(props: ChapterHeaderProps) {
-  const { status } = props
   return (
     <button
       aria-expanded={props.isOpen}
-      className="full-file-chapter-header"
+      className="file-tree-chapter-header"
       onClick={props.onToggle}
     >
-      <span className={`full-file-chapter-status full-file-chapter-status--${status}`} />
-      <span className="full-file-chapter-num">Chapter {props.num}</span>
-      <span className="full-file-chapter-name">{props.chapter.name}</span>
-      <ChapterRisk chapter={props.chapter} />
-      <span className="full-file-chapter-progress">{props.progress}</span>
-      {status === 'complete' && <Check aria-hidden="true" className="full-file-chapter-done" />}
-      {props.isOpen && <ChevronDown aria-hidden="true" className="full-file-chapter-chevron" />}
-      {!props.isOpen && <ChevronRight aria-hidden="true" className="full-file-chapter-chevron" />}
+      <b>
+        {props.num} · {props.chapter.name}
+      </b>
+      <span>{props.progress}</span>
     </button>
   )
 }
 
-function rowRiskClass(file: PrChangedFile): string {
-  const level = choose(file.tier === 3, 'none', file.riskScore.level)
-  return `full-file-row-risk full-file-row-risk--${level}`
-}
-
-function RowReason({ info }: { info: ReadingReason | undefined }) {
-  if (!info) return null
-  const viewed = choose(info.allUsesViewed, ' rc-frow-reason--viewed', '')
-  return <span className={`rc-frow-reason${viewed}`}>{info.reason}</span>
-}
-
-function FullRowBody({ file, reason }: { file: PrChangedFile; reason: ReadingReason | undefined }) {
-  return (
-    <>
-      <span className={rowRiskClass(file)} />
-      <span className="full-file-row-body">
-        <span className="full-file-row-name">{file.path.split('/').pop()}</span>
-        <RowReason info={reason} />
-      </span>
-      <span className="full-file-row-changes">
-        <span className="full-file-row-add">+{file.additions}</span>
-        <span className="full-file-row-del">−{file.deletions}</span>
-      </span>
-    </>
-  )
-}
-
-function FullFileRow(props: {
-  file: PrChangedFile
-  num: number
-  chapterId: string
-  ctx: ListContext
-}) {
+function FullFileRow(props: { file: PrChangedFile; chapterId: string; ctx: ListContext }) {
   const { file, ctx } = props
   const isActive = file.path === ctx.currentFilePath
-  const state = rowState(file, ctx.sets)
-  const className = classNames('full-file-row', {
+  const isViewed = ctx.sets.viewedFiles.has(file.path)
+  const className = classNames('full-file-row file-tree-row', {
     'full-file-row--active': isActive,
-    'full-file-row--viewed': ctx.sets.viewedFiles.has(file.path),
+    'full-file-row--viewed': isViewed,
   })
   return (
     <button
@@ -145,9 +65,12 @@ function FullFileRow(props: {
       onClick={() => ctx.onSelectFile(file.path, props.chapterId)}
       title={file.path}
     >
-      <RowStateMark state={state} num={props.num} numClass="full-file-row-num" />
-      <FullRowBody file={file} reason={ctx.reasons.get(file.path)} />
-      <RowStateLabel state={state} />
+      <FileRowContent
+        file={file}
+        state={rowState(file, ctx.sets)}
+        isViewed={isViewed}
+        threadCount={ctx.threadCounts[file.path] ?? 0}
+      />
     </button>
   )
 }
@@ -162,23 +85,21 @@ interface ChapterSectionProps {
 
 function ChapterSection(props: ChapterSectionProps) {
   const { chapter, ctx, files, headers } = props
-  const status = chapterStatus(chapter, ctx.sets.viewedFiles)
   const viewedInChapter = files.filter((f) => ctx.sets.viewedFiles.has(f.path)).length
   return (
-    <div className={`full-file-chapter full-file-chapter--${status}`}>
+    <div className="file-tree-chapter">
       {headers.show && (
         <ChapterHeader
           chapter={chapter}
           num={props.num}
-          status={status}
           isOpen={headers.isOpen}
-          progress={`${viewedInChapter}/${files.length}`}
+          progress={`${viewedInChapter} of ${files.length}`}
           onToggle={headers.onToggle}
         />
       )}
       {(!headers.show || headers.isOpen) &&
-        files.map((file, fi) => (
-          <FullFileRow key={file.path} file={file} num={fi + 1} chapterId={chapter.id} ctx={ctx} />
+        files.map((file) => (
+          <FullFileRow key={file.path} file={file} chapterId={chapter.id} ctx={ctx} />
         ))}
     </div>
   )
@@ -195,21 +116,19 @@ function useCollapsed(pr: PrReviewDetail) {
 }
 
 function useListContext(props: Props) {
-  const { pr } = props
   const {
     viewedFiles,
     fileOrderOverrides,
+    threads = {},
     changedSince = new Set<string>(),
     newSinceLook = new Set<string>(),
   } = usePrReviewStore()
-  const reasons = useMemo(
-    () => readingReasons(pr.readingOrder, viewedFiles),
-    [pr.readingOrder, viewedFiles]
+  const threadCounts = Object.fromEntries(
+    Object.entries(threads).map(([path, list]) => [path, list.length])
   )
-  const sets = { viewedFiles, changedSince, newSinceLook }
   const ctx: ListContext = {
-    sets,
-    reasons,
+    sets: { viewedFiles, changedSince, newSinceLook },
+    threadCounts,
     currentFilePath: props.currentFilePath,
     onSelectFile: props.onSelectFile,
   }
@@ -222,7 +141,7 @@ export function FullFileList(props: Props) {
   const { ctx, fileOrderOverrides } = useListContext(props)
   const { collapsed, toggle } = useCollapsed(pr)
   return (
-    <div className="full-file-list">
+    <div className="full-file-list file-tree">
       {pr.chapters.map((chapter, ci) => (
         <ChapterSection
           key={chapter.id}

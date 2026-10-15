@@ -1,14 +1,11 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, within } from '@testing-library/react'
 import { FullFileList } from '../../src/components/pr-review/FullFileList'
 import { usePrReviewStore } from '../../src/stores/pr-review.store'
-import {
-  PrReviewDetailSchema,
-  type PrReviewDetail,
-  type RiskScore,
-} from '../../src/schemas/pr-review.schema'
+import { PrReviewDetailSchema, type PrReviewDetail } from '../../src/schemas/pr-review.schema'
 import { changedFile } from './support/pr-review-file'
+import { makeRiskScore } from './risk-score-fixtures'
 
 vi.mock('../../src/stores/pr-review.store', () => ({
   usePrReviewStore: vi.fn(),
@@ -17,24 +14,6 @@ vi.mock('../../src/stores/pr-review.store', () => ({
 vi.mock('../../src/github/pr-review-service', () => ({
   chapterRiskLevel: vi.fn().mockReturnValue('low'),
 }))
-
-function makeRiskScore(): RiskScore {
-  return {
-    level: 'low',
-    composite: 10,
-    dominantDriver: '',
-    topImporters: [],
-    importerCount: 0,
-    metrics: {
-      changeSize: 5,
-      testFilePresent: true,
-      complexityDelta: 0,
-      churn90d: 1,
-      blastRadius: 1,
-      patchCoverage: 90,
-    },
-  }
-}
 
 // Parsed as the review channel's answer is, so the schema's defaults are filled in.
 function makePr(chapters: PrReviewDetail['chapters']): PrReviewDetail {
@@ -84,7 +63,7 @@ const defaultProps = {
 describe('FullFileList', () => {
   it('renders chapter name', () => {
     render(<FullFileList {...defaultProps} />)
-    expect(screen.getByText('Core')).toBeTruthy()
+    expect(screen.getByText('1 · Core')).toBeTruthy()
   })
 
   it('renders file names', () => {
@@ -110,19 +89,23 @@ describe('FullFileList', () => {
 describe('FullFileList — toggles chapter collapsed state when header is clicked', () => {
   it('toggles chapter collapsed state when header is clicked', () => {
     render(<FullFileList {...defaultProps} />)
-    const chapterHeader = screen.getByRole('button', { name: /Chapter 1/ })
+    const chapterHeader = screen.getByRole('button', { name: /1 · Core/ })
     fireEvent.click(chapterHeader)
     expect(screen.queryByText('foo.ts')).toBeNull()
   })
 
-  it('marks viewed files with check indicator', () => {
+  it('marks a viewed file as viewed and an unviewed one as not viewed', () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
       viewedFiles: new Set(['src/foo.ts']),
       fileOrderOverrides: {},
     })
-    const { container } = render(<FullFileList {...defaultProps} />)
-    const viewedRow = container.querySelector('.full-file-row--viewed')
-    expect(viewedRow).toBeTruthy()
+    render(<FullFileList {...defaultProps} />)
+    expect(
+      within(screen.getByTitle('src/foo.ts')).getByRole('img', { name: 'Viewed' })
+    ).toBeTruthy()
+    expect(
+      within(screen.getByTitle('src/bar.ts')).getByRole('img', { name: 'Not viewed' })
+    ).toBeTruthy()
   })
 
   it('marks active file with active class', () => {
@@ -135,18 +118,21 @@ describe('FullFileList — toggles chapter collapsed state when header is clicke
 })
 
 describe('FullFileList — shows progress per chapter', () => {
-  it('shows progress per chapter', () => {
-    render(<FullFileList {...defaultProps} />)
-    expect(screen.getByText('0/2')).toBeTruthy()
-  })
-
-  it('shows done check when chapter is complete', () => {
+  it('shows viewed of total per chapter', () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
-      viewedFiles: new Set(['src/foo.ts', 'src/bar.ts']),
+      viewedFiles: new Set(['src/foo.ts']),
       fileOrderOverrides: {},
     })
-    const { container } = render(<FullFileList {...defaultProps} />)
-    expect(container.querySelector('.full-file-chapter-done')).toBeTruthy()
+    render(<FullFileList {...defaultProps} />)
+    expect(screen.getByText('1 of 2')).toBeTruthy()
+  })
+
+  it('numbers each chapter before its name', () => {
+    const second = { ...defaultProps.pr.chapters[0], id: 'ch-2', name: 'Tests' }
+    const pr = makePr([...defaultProps.pr.chapters, second])
+    render(<FullFileList {...defaultProps} pr={pr} />)
+    expect(screen.getByText('1 · Core')).toBeTruthy()
+    expect(screen.getByText('2 · Tests')).toBeTruthy()
   })
 
   it('respects fileOrderOverrides for chapter file order', () => {
@@ -181,12 +167,15 @@ describe('FullFileList — shows changed for a file the store lists as changed s
       viewedAt: { 'src/foo.ts': 'abc' },
     })
     render(<FullFileList {...defaultProps} />)
-    expect(screen.getByText('viewed')).toBeTruthy()
+    expect(screen.getByRole('img', { name: 'Viewed' })).toBeTruthy()
   })
 })
 
-describe('FullFileList — shows new file for a file a push added since your last look', () => {
-  it('shows "new file" for a file a push added since your last look', () => {
+describe.each([
+  ['a push added since your last look', new Set(['src/new.ts']), true],
+  ['a first review', new Set<string>(), false],
+])('FullFileList — added file on %s', (_name, newSinceLook, isLabelled) => {
+  it(`${isLabelled ? 'shows' : 'does not show'} "new file"`, () => {
     const pr = makePr([
       {
         id: 'ch-1',
@@ -200,37 +189,64 @@ describe('FullFileList — shows new file for a file a push added since your las
       viewedFiles: new Set<string>(),
       fileOrderOverrides: {},
       changedSince: new Set<string>(),
-      newSinceLook: new Set(['src/new.ts']),
+      newSinceLook,
     })
     render(<FullFileList {...defaultProps} pr={pr} />)
-    expect(screen.getByText('new file')).toBeTruthy()
+    expect(screen.queryByText('new file') !== null).toBe(isLabelled)
   })
 })
 
-describe('FullFileList — does not call an added file new on a first review', () => {
-  it('does not call an added file new on a first review', () => {
-    const pr = makePr([
-      {
-        id: 'ch-1',
-        name: 'Core',
-        estimatedMinutes: 10,
-        status: 'not-started',
-        files: [{ ...makeFile('src/new.ts'), changeType: 'added' }],
-      },
-    ])
+describe('FullFileList — row details', () => {
+  const highRiskFile = {
+    ...makeFile('src/risky.ts'),
+    riskScore: { ...makeRiskScore(), level: 'high' as const },
+  }
+  const riskyPr = makePr([
+    {
+      id: 'ch-1',
+      name: 'Core',
+      estimatedMinutes: 10,
+      status: 'not-started',
+      files: [highRiskFile],
+    },
+  ])
+
+  it('shows the risk state on an unviewed high-risk file', () => {
+    render(<FullFileList {...defaultProps} pr={riskyPr} />)
+    expect(screen.getByRole('img', { name: 'High risk, not viewed' })).toBeTruthy()
+  })
+
+  it('shows viewed, not risk, once a high-risk file is viewed', () => {
+    vi.mocked(usePrReviewStore).mockReturnValue({
+      viewedFiles: new Set(['src/risky.ts']),
+      fileOrderOverrides: {},
+    })
+    render(<FullFileList {...defaultProps} pr={riskyPr} />)
+    expect(screen.getByRole('img', { name: 'Viewed' })).toBeTruthy()
+    expect(screen.queryByRole('img', { name: /High risk/ })).toBeNull()
+  })
+})
+
+describe('FullFileList — comments and folder', () => {
+  it('shows the comment count of a file with threads', () => {
     vi.mocked(usePrReviewStore).mockReturnValue({
       viewedFiles: new Set<string>(),
       fileOrderOverrides: {},
-      changedSince: new Set<string>(),
-      newSinceLook: new Set<string>(),
+      threads: { 'src/foo.ts': [{}, {}, {}] },
     })
-    render(<FullFileList {...defaultProps} pr={pr} />)
-    expect(screen.queryByText('new file')).toBeNull()
+    render(<FullFileList {...defaultProps} />)
+    expect(within(screen.getByTitle('src/foo.ts')).getByText('3')).toBeTruthy()
+    expect(within(screen.getByTitle('src/bar.ts')).queryByText('3')).toBeNull()
+  })
+
+  it('shows the folder muted after the file name', () => {
+    render(<FullFileList {...defaultProps} />)
+    expect(within(screen.getByTitle('src/foo.ts')).getByText('src/')).toBeTruthy()
   })
 })
 
-describe('FullFileList — shows the reading-order reason under the file name', () => {
-  it('shows the reading-order reason under the file name', () => {
+describe('FullFileList — reading-order reason', () => {
+  it('does not render the reading-order reason on the row', () => {
     const pr = makePr([
       {
         id: 'ch-1',
@@ -243,13 +259,7 @@ describe('FullFileList — shows the reading-order reason under the file name', 
     pr.readingOrder = [
       { step: 1, path: 'src/foo.ts', symbol: null, reason: 'Defines RiskScore', uses: [] },
     ]
-    vi.mocked(usePrReviewStore).mockReturnValue({
-      viewedFiles: new Set<string>(),
-      fileOrderOverrides: {},
-      changedSince: new Set<string>(),
-      viewedAt: {},
-    })
     render(<FullFileList {...defaultProps} pr={pr} />)
-    expect(screen.getByText('Defines RiskScore')).toBeTruthy()
+    expect(screen.queryByText('Defines RiskScore')).toBeNull()
   })
 })
