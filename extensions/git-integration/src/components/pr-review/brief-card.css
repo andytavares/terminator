@@ -100,15 +100,6 @@
   background: color-mix(in srgb, var(--tm-agent) 16%, transparent);
 }
 
-.brief-visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
-
 .brief-error {
   display: flex;
   align-items: flex-start;

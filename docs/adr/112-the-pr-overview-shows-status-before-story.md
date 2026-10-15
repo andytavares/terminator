@@ -34,4 +34,6 @@ flowchart TD
 - No new data is fetched. Every value comes from `PrReviewDetail`.
 - The Reviews cell is read-only: there is no request-reviewers call. Check durations are not shown, because `StatusCheckSchema` has no times.
 - A running summary cannot be cancelled. No such channel exists (ADR 111).
+- The Reviews cell cannot show "changes requested". `PrReviewDetail` carries `approvals` and `requestedReviewers` but not the review decision, which only the queue item has. Showing it in red needs the decision fetched with the detail.
+- A second click on the Checks cell does not close its popover: the click outside closes it on mousedown, then the click reopens it. `ReviewHeader`'s popovers have the same problem. The fix belongs in `Popover` (`packages/extension-ui`), which should let a caller count the trigger as inside.
 - The design and its renderings are in `docs/research/pr-overview-redesign.html`.

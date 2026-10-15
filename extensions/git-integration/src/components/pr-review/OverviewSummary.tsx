@@ -65,10 +65,10 @@ export function summaryShown(summary: Summary): boolean {
 function BriefHeading({ meta, action }: { meta: React.ReactNode; action?: React.ReactNode }) {
   return (
     <div className="brief-card__head">
-      <h5 className="brief-card__title">
+      <h2 className="brief-card__title">
         <Sparkles className="brief-card__icon" aria-hidden="true" />
         Brief
-      </h5>
+      </h2>
       <span className="brief-card__meta">{meta}</span>
       {action}
     </div>
@@ -92,7 +92,7 @@ function BriefBusy({ subject }: { subject: SummarySubject }) {
     <div className="brief-card" aria-busy="true">
       <BriefHeading meta={`reading the ${subject.kind}…`} />
       <div className="brief-skeleton">
-        <span className="brief-visually-hidden">Summarizing</span>
+        <span className="pr-visually-hidden">Summarizing</span>
         <i style={{ width: '92%' }} />
         <i style={{ width: '78%' }} />
         <i style={{ width: '86%' }} />

@@ -3,33 +3,14 @@ import { describe, it, expect } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { ReadinessStrip } from '../../src/components/pr-review/ReadinessStrip'
 import type { PrReviewDetail } from '../../src/schemas/pr-review.schema'
+import { buildPr } from './overview-fixtures'
 
-const basePr: PrReviewDetail = {
+const basePr = buildPr({
   number: 42,
-  title: 'Add feature X',
-  body: '',
-  author: 'alice',
-  authorAvatarUrl: '',
-  openedAt: '2026-01-01T00:00:00Z',
-  headRefName: 'feature/x',
-  baseRefName: 'main',
-  headSHA: 'abc123',
-  isDraft: false,
-  mergeStateStatus: 'clean',
-  ciStatus: 'passing',
-  lintStatus: 'pass',
-  coverageStatus: 'pass',
   statusChecks: [{ name: 'CI', state: 'pass' }],
-  approvals: [],
-  requestedReviewers: [],
-  assigneeLogins: [],
-  issueRefs: [],
-  dryViolations: [],
   chapters: [],
-  readingOrder: [],
-  movedBlocks: [],
   insights: null,
-}
+})
 
 const idleBranch = {
   updating: false,
@@ -67,6 +48,13 @@ describe('ReadinessStrip checks', () => {
     renderStrip({ statusChecks: [] })
     expect(screen.getByText('No checks')).toBeTruthy()
     expect(screen.queryByRole('button', { name: /check/ })).toBeNull()
+  })
+
+  it('does not tone skipped-only checks as passing', () => {
+    renderStrip({ statusChecks: [{ name: 'deploy', state: 'skipped' }] })
+    const cell = screen.getByRole('button', { name: /^Checks/ }).closest('.rs-cell')
+    expect(cell?.className).toContain('rs-cell--quiet')
+    expect(cell?.className).not.toContain('rs-cell--ok')
   })
 
   it('reports pending checks', () => {

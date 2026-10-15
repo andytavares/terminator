@@ -374,13 +374,22 @@ function OverviewFooter(footer: HeaderProps) {
 
 function Reading({ pr, clamped }: { pr: PrReviewDetail; clamped: boolean }) {
   const [expanded, setExpanded] = useState(false)
+  const [overflows, setOverflows] = useState(false)
+  const readingRef = useRef<HTMLDivElement>(null)
   const clamp = clamped && !expanded
+  useEffect(() => {
+    const element = readingRef.current
+    if (clamp && element) setOverflows(element.scrollHeight > element.clientHeight)
+  }, [clamp, pr.body])
   return (
     <>
-      <div className={`pr-overview-reading${clamp ? ' pr-overview-reading--clamped' : ''}`}>
+      <div
+        ref={readingRef}
+        className={`pr-overview-reading${clamp ? ' pr-overview-reading--clamped' : ''}`}
+      >
         <RichContent>{pr.body}</RichContent>
       </div>
-      {clamped && (
+      {clamped && (expanded || overflows) && (
         <Button variant="ghost" size="sm" onClick={() => setExpanded(!expanded)}>
           {choose(expanded, 'Show less', 'Show full description')}
         </Button>
@@ -513,10 +522,6 @@ function useLoadOnOpen(load: (prNumber: number) => Promise<void>, prNumber: numb
   }, [load, prNumber])
 }
 
-function countFiles(pr: PrReviewDetail): number {
-  return pr.chapters.reduce((n, c) => n + c.files.length, 0)
-}
-
 function branchOf(actions: OverviewActions): ReadinessBranch {
   return {
     updating: actions.update.busy,
@@ -534,7 +539,7 @@ export function PrOverviewPanel(props: Props) {
   const actions = useOverviewActions(props, loadIssueComments)
   const { box, composerRef } = useIssueComment(props, loadIssueComments)
   useLoadOnOpen(loadIssueComments, pr.number)
-  const label = startLabel(props.sessionStatus, viewedFiles.size, countFiles(pr))
+  const label = startLabel(props.sessionStatus, viewedFiles.size, overviewTotals(pr).fileCount)
   return (
     <div className="pr-overview">
       <OverviewHeader props={props} actions={actions} label={label} />

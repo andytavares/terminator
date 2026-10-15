@@ -43,6 +43,17 @@ describe('overviewSignals risk', () => {
   })
 })
 
+describe('overviewSignals risk ignores generated files', () => {
+  it('reads Low when the only high file is tier 3, like the plan rows', () => {
+    const generated = {
+      ...makeFile('dist/out.js', { level: 'high', composite: 90, dominantDriver: 'Churn' }),
+      tier: 3 as const,
+    }
+    const pr = buildPr({ chapters: [{ ...shardingChapter(), files: [generated] }] })
+    expect(pickSignal(pr, 'risk')).toMatchObject({ value: 'Low' })
+  })
+})
+
 describe('overviewSignals risk edge cases', () => {
   it('shortens deep paths in the hotspot', () => {
     const deep = buildPr({

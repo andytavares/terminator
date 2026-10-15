@@ -13,7 +13,7 @@ interface Props {
 
 const SHOWN_FILE_NAMES = 3
 
-const RISK_LABEL = { high: 'High risk', medium: 'Medium', low: 'Low' } as const
+const RISK_LABEL = { high: 'High risk', medium: 'Medium risk', low: 'Low risk' } as const
 
 function totalLines(chapter: Chapter): number {
   return chapter.files.reduce((sum, f) => sum + f.additions + f.deletions, 0)
@@ -43,8 +43,31 @@ function ChapterFacts({ chapter }: { chapter: Chapter }) {
   return (
     <>
       <span className={`review-plan__risk review-plan__risk--${risk}`}>{RISK_LABEL[risk]}</span>
-      <span className="review-plan__files">
-        {fileCount} {plural(fileCount, 'file')}
+      <span className="review-plan__files">{filesText(fileCount)}</span>
+    </>
+  )
+}
+
+function filesText(fileCount: number): string {
+  return `${fileCount} ${plural(fileCount, 'file')}`
+}
+
+interface AccessibleTextProps {
+  chapter: Chapter
+  labelId: string
+  descriptionId: string
+}
+
+/** What a screen reader hears for a row: its name, then the facts the sighted columns show. */
+function RowAccessibleText({ chapter, labelId, descriptionId }: AccessibleTextProps) {
+  return (
+    <>
+      <span id={labelId} className="pr-visually-hidden">
+        Start here: {chapter.name}
+      </span>
+      <span id={descriptionId} className="pr-visually-hidden">
+        {RISK_LABEL[chapterRiskLevel(chapter)]}, {filesText(chapter.files.length)},{' '}
+        {chapter.estimatedMinutes} min
       </span>
     </>
   )
@@ -54,16 +77,16 @@ function PlanRow({ chapter, number, largest, onStartAt }: RowProps) {
   // Named by a hidden label, not aria-label: the icon-tooltip installer shows any aria-label
   // that the visible text lacks, which put a tooltip under every row.
   const labelId = useId()
+  const descriptionId = useId()
   return (
     <button
       type="button"
       className="review-plan__row"
       aria-labelledby={labelId}
+      aria-describedby={descriptionId}
       onClick={() => onStartAt(chapter.id)}
     >
-      <span id={labelId} className="review-plan__hidden">
-        Start at {chapter.name}
-      </span>
+      <RowAccessibleText chapter={chapter} labelId={labelId} descriptionId={descriptionId} />
       <span className="review-plan__number">{number}</span>
       <span className="review-plan__name">
         {chapter.name}
@@ -89,13 +112,14 @@ interface RowProps {
 }
 
 export function ReviewPlan({ chapters, onStartAt }: Props) {
+  const headingId = useId()
   if (chapters.length === 0) return null
   const largest = Math.max(1, ...chapters.map(totalLines))
   const minutes = chapters.reduce((sum, c) => sum + c.estimatedMinutes, 0)
   return (
-    <section className="review-plan" aria-labelledby="review-plan-heading">
+    <section className="review-plan" aria-labelledby={headingId}>
       <header className="review-plan__heading">
-        <h3 id="review-plan-heading">Review plan</h3>
+        <h2 id={headingId}>Review plan</h2>
         <span>
           {chapters.length} {plural(chapters.length, 'chapter')} · about {minutes} min
         </span>

@@ -1,6 +1,7 @@
 import React from 'react'
 import { Check, Dot, Plus } from 'lucide-react'
 import type { Chapter, PrChangedFile } from '../../schemas/pr-review.schema'
+import type { PrReviewStore } from '../../stores/pr-review.store'
 
 /** What a file row shows beside its name: viewed, changed since the last look, new, or nothing. */
 export type RowState = 'viewed' | 'changed' | 'new' | 'default'
@@ -28,6 +29,21 @@ export function orderedFiles(
   return overrideOrder
     .map((p) => chapter.files.find((f) => f.path === p))
     .filter((f): f is PrChangedFile => !!f)
+}
+
+/** Makes `chapterId` current and opens its first file, in the reviewer's order. */
+export function startAtChapter(
+  store: Pick<PrReviewStore, 'setCurrentChapter' | 'setCurrentFile' | 'fileOrderOverrides'>,
+  chapters: Chapter[],
+  chapterId: string
+): void {
+  store.setCurrentChapter(chapterId)
+  const chapter = chapters.find((c) => c.id === chapterId)
+  if (chapter) {
+    store.setCurrentFile(
+      orderedFiles(chapter, store.fileOrderOverrides[chapter.id])[0]?.path ?? null
+    )
+  }
 }
 
 /** The class names whose flag is set, after `base`. */

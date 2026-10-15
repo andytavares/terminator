@@ -887,11 +887,15 @@ export function parseReviewQueuePR(raw: unknown): ReviewQueuePR {
 
 // ─── Chapter risk ─────────────────────────────────────────────────────────────
 
-export function chapterRiskLevel(chapter: Chapter): 'low' | 'medium' | 'high' {
-  const scoreable = chapter.files.filter((f) => f.tier !== 3)
+export function filesRiskLevel(files: PrChangedFile[]): 'low' | 'medium' | 'high' {
+  const scoreable = files.filter((f) => f.tier !== 3)
   if (scoreable.some((f) => f.riskScore.level === 'high')) return 'high'
   if (scoreable.some((f) => f.riskScore.level === 'medium')) return 'medium'
   return 'low'
+}
+
+export function chapterRiskLevel(chapter: Chapter): 'low' | 'medium' | 'high' {
+  return filesRiskLevel(chapter.files)
 }
 
 // ─── Hunk classification (formatting vs semantic) ─────────────────────────────

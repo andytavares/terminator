@@ -8,6 +8,7 @@ import { ReviewQueue } from './ReviewQueue'
 import { PrReviewView } from './PrReviewView'
 import type { SinceInfo } from './PrReviewView'
 import { PrOverviewPanel } from './PrOverviewPanel'
+import { startAtChapter } from './file-rows'
 import { MergeFlowView } from '../merge-flow/MergeFlowView'
 import {
   useLoadPrQueue,
@@ -365,7 +366,7 @@ function OverviewScreen({ t, h, repoRoot, pr }: OpenPrProps) {
       pr={pr}
       sessionStatus={view.activeQueuePr?.sessionStatus ?? 'not-started'}
       onStartReview={(chapterId) => {
-        if (chapterId) t.store.setCurrentChapter(chapterId)
+        if (chapterId) startAtChapter(t.store, pr.chapters, chapterId)
         view.setShowOverview(false)
       }}
       onClose={h.handleClosePr}

@@ -36,7 +36,7 @@ const STATE_ICON: Record<StatusCheck['state'], LucideIcon> = {
   unknown: CircleHelp,
 }
 
-type CheckState = StatusCheck['state']
+export type CheckState = StatusCheck['state']
 
 export interface CheckCounts {
   total: number

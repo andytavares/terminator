@@ -289,7 +289,7 @@ describe('PrOverviewPanel — starting the review', () => {
   it('starts at the chapter whose plan row is clicked', () => {
     const onStartReview = vi.fn()
     renderPanel({}, { onStartReview })
-    fireEvent.click(screen.getByRole('button', { name: 'Start at Core' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Start here: Core' }))
     expect(onStartReview).toHaveBeenCalledWith('ch1')
   })
 })
@@ -366,16 +366,51 @@ describe('PrOverviewPanel — the description', () => {
   })
 })
 
+function stubDescriptionHeights(scrollHeight: number, clientHeight: number) {
+  const proto = HTMLElement.prototype
+  const original = {
+    scrollHeight: Object.getOwnPropertyDescriptor(proto, 'scrollHeight'),
+    clientHeight: Object.getOwnPropertyDescriptor(proto, 'clientHeight'),
+  }
+  Object.defineProperty(proto, 'scrollHeight', { configurable: true, value: scrollHeight })
+  Object.defineProperty(proto, 'clientHeight', { configurable: true, value: clientHeight })
+  return () => {
+    for (const key of ['scrollHeight', 'clientHeight'] as const) {
+      const descriptor = original[key]
+      if (descriptor) Object.defineProperty(proto, key, descriptor)
+      else delete (proto as unknown as Record<string, unknown>)[key]
+    }
+  }
+}
+
 describe('PrOverviewPanel — clamping the description', () => {
+  it('offers no expand button when the clamped description fits', async () => {
+    renderPanel()
+    fireEvent.click(screen.getByRole('button', { name: 'Summarize' }))
+    await screen.findByText('A summary.')
+    expect(screen.queryByRole('button', { name: 'Show full description' })).toBeNull()
+  })
+
   it('clamps the description once a summary is shown, and unclamps on request', async () => {
+    const restore = stubDescriptionHeights(900, 300)
+    try {
+      await clampThenExpand()
+    } finally {
+      restore()
+    }
+  })
+
+  async function clampThenExpand() {
     renderPanel()
     fireEvent.click(screen.getByRole('button', { name: 'Summarize' }))
     await screen.findByText('A summary.')
     fireEvent.click(screen.getByRole('button', { name: 'Show full description' }))
     expect(screen.getByRole('button', { name: 'Show less' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Show full description' })).toBeNull()
-  })
+  }
+})
 
+describe('PrOverviewPanel — the summary and tabs', () => {
   it('keeps the summary across a tab switch', async () => {
     renderPanel()
     fireEvent.click(screen.getByRole('button', { name: 'Summarize' }))

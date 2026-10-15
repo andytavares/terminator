@@ -22,7 +22,7 @@ import { QUEUE_RISK_HIGH_LINES } from '../../github/pr-review-service'
 import { useResizePanel } from '../../hooks/useResizePanel'
 import type { PrReviewDetail, PrChangedFile, Chapter } from '../../schemas/pr-review.schema'
 import type { AgentRun, AgentScope } from '../../schemas/review-agent.schema'
-import { orderedFiles as orderedFilesOf } from './file-rows'
+import { orderedFiles as orderedFilesOf, startAtChapter } from './file-rows'
 import { choose } from '../text'
 import './review-chrome.css'
 
@@ -303,13 +303,7 @@ function goToFile(r: ReviewState, target: FileEntry): void {
 }
 
 function selectChapterIn(r: ReviewState, id: string): void {
-  r.store.setCurrentChapter(id)
-  const chapter = r.displayPr.chapters.find((c) => c.id === id)
-  if (chapter) {
-    r.store.setCurrentFile(
-      orderedFilesOf(chapter, r.store.fileOrderOverrides[chapter.id])[0]?.path ?? null
-    )
-  }
+  startAtChapter(r.store, r.displayPr.chapters, id)
 }
 
 function stepChapter(r: ReviewState, delta: 1 | -1): void {

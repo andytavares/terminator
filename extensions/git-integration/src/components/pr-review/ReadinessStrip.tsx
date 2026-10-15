@@ -14,7 +14,13 @@ import {
 import { Button, Popover } from '@terminator/extension-ui'
 import type { PrReviewDetail } from '../../schemas/pr-review.schema'
 import { choose } from '../text'
-import { GroupedCheckList, countChecks, detailedLabel, summaryStatus } from './StatusChecksBar'
+import {
+  GroupedCheckList,
+  countChecks,
+  detailedLabel,
+  summaryStatus,
+  type CheckState,
+} from './StatusChecksBar'
 import './readiness-strip.css'
 
 export interface ReadinessBranch {
@@ -60,10 +66,12 @@ function Cell(props: CellProps) {
   )
 }
 
-const CHECK_TONE: Record<string, { tone: Tone; icon: LucideIcon }> = {
+const CHECK_TONE: Record<CheckState, { tone: Tone; icon: LucideIcon }> = {
   fail: { tone: 'bad', icon: CircleX },
   pending: { tone: 'wait', icon: CircleDashed },
   pass: { tone: 'ok', icon: CircleCheck },
+  skipped: { tone: 'quiet', icon: CircleDashed },
+  unknown: { tone: 'quiet', icon: CircleDashed },
 }
 
 function ChecksCell({ pr }: { pr: PrReviewDetail }) {
@@ -73,7 +81,7 @@ function ChecksCell({ pr }: { pr: PrReviewDetail }) {
     return <Cell tone="quiet" icon={CircleDashed} label="Checks" detail="No checks" />
   }
   const counts = countChecks(checks)
-  const { tone, icon } = CHECK_TONE[summaryStatus(counts)] ?? CHECK_TONE.pass
+  const { tone, icon } = CHECK_TONE[summaryStatus(counts)]
   const detail = detailedLabel(counts)
   return (
     <div className={`rs-cell rs-cell--${tone} rs-cell--anchor`}>

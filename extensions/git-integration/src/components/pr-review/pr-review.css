@@ -249,11 +249,9 @@
 .pr-checks-group-heading {
   margin: 0;
   padding: 8px 12px 4px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--tm-text-muted);
+  color: var(--tm-text-secondary);
 }
 .pr-checks-item--fail {
   background: color-mix(in srgb, var(--tm-danger) 6%, transparent);
@@ -1494,4 +1492,13 @@
   width: 13px;
   height: 13px;
   display: block;
+}
+
+.pr-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }

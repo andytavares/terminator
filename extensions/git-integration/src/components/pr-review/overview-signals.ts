@@ -1,6 +1,7 @@
 import type { PrChangedFile, PrReviewDetail } from '../../schemas/pr-review.schema'
 import { plural } from '@terminator/extension-sdk'
 import { choose } from '../text'
+import { filesRiskLevel } from '../../github/pr-review-service'
 
 type Insights = NonNullable<PrReviewDetail['insights']>
 type RiskLevel = 'high' | 'medium' | 'low'
@@ -57,12 +58,6 @@ function shortPath(path: string): string {
   return `…/${parts.slice(-2).join('/')}`
 }
 
-function highestFileRisk(files: PrChangedFile[]): RiskLevel {
-  if (files.some((file) => file.riskScore.level === 'high')) return 'high'
-  if (files.some((file) => file.riskScore.level === 'medium')) return 'medium'
-  return 'low'
-}
-
 function riskHotspots(measured: PrChangedFile[]): PrChangedFile[] {
   return [...measured]
     .filter((file) => file.riskScore.level !== 'low')
@@ -80,7 +75,7 @@ function riskSignal(files: PrChangedFile[]): Signal {
   if (measured.length === 0) {
     return { ...base, tone: 'neutral', value: 'Not measured', detail: null }
   }
-  const level = highestFileRisk(files)
+  const level = filesRiskLevel(files)
   const [top] = riskHotspots(measured)
   const detail = choose(
     top === undefined,

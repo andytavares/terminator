@@ -4,7 +4,7 @@ import { act, render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { PrReviewTab } from '../../src/components/pr-review/PrReviewTab'
 import { usePrReviewStore } from '../../src/stores/pr-review.store'
 import * as githubModule from '../../src/api/github'
-import type { PrReviewDetail } from '../../src/schemas/pr-review.schema'
+import type { Chapter, PrChangedFile, PrReviewDetail } from '../../src/schemas/pr-review.schema'
 import { partialFake } from '../../../../tests/support/fakes'
 
 vi.mock('../../src/stores/pr-review.store', async (importOriginal) => {
@@ -102,6 +102,7 @@ const mockMarkPrInProgress = vi.fn()
 const mockDismissPr = vi.fn()
 const mockSetPaused = vi.fn()
 const mockSetCurrentChapter = vi.fn()
+const mockSetCurrentFile = vi.fn()
 
 const defaultStoreState = {
   activePr: null,
@@ -113,6 +114,7 @@ const defaultStoreState = {
   dismissPr: mockDismissPr,
   setPaused: mockSetPaused,
   setCurrentChapter: mockSetCurrentChapter,
+  setCurrentFile: mockSetCurrentFile,
   nextPrCursor: null,
   viewedFiles: new Set<string>(),
   currentChapterId: null,
@@ -214,7 +216,13 @@ describe('PrReviewTab — starting from the overview', () => {
   function showOverviewOfOpenPr() {
     vi.mocked(usePrReviewStore).mockReturnValue({
       ...defaultStoreState,
-      activePr: partialFake<PrReviewDetail>({ number: 1, title: 'My PR' }),
+      activePr: partialFake<PrReviewDetail>({
+        number: 1,
+        title: 'My PR',
+        chapters: [
+          partialFake<Chapter>({ id: 'c2', files: [partialFake<PrChangedFile>({ path: 'b.ts' })] }),
+        ],
+      }),
     })
     render(<PrReviewTab repoRoot="/repo" />)
     fireEvent.click(screen.getByText('Show Overview'))
@@ -224,6 +232,7 @@ describe('PrReviewTab — starting from the overview', () => {
     showOverviewOfOpenPr()
     fireEvent.click(screen.getByText('Start at chapter 2'))
     expect(mockSetCurrentChapter).toHaveBeenCalledWith('c2')
+    expect(mockSetCurrentFile).toHaveBeenCalledWith('b.ts')
     expect(screen.getByTestId('pr-review-view')).toBeTruthy()
   })
 
@@ -231,6 +240,7 @@ describe('PrReviewTab — starting from the overview', () => {
     showOverviewOfOpenPr()
     fireEvent.click(screen.getByText('Start Review'))
     expect(mockSetCurrentChapter).not.toHaveBeenCalled()
+    expect(mockSetCurrentFile).not.toHaveBeenCalled()
     expect(screen.getByTestId('pr-review-view')).toBeTruthy()
   })
 })
