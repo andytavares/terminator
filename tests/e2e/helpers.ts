@@ -437,16 +437,16 @@ export async function closeSettingsPanel(page: Page): Promise<void> {
   await expect(page.locator('.settings-panel')).toBeHidden()
 }
 
-/** Runs `script` inside the first extension view whose URL contains `urlPart`:
- * a WebContentsView of its own, which the page cannot reach. */
+/** Runs `script` inside the first extension frame whose URL contains `urlPart`. */
 export function inExtensionView<T>(handle: AppHandle, urlPart: string, script: string): Promise<T> {
   return handle.app.evaluate(
     async ({ webContents }, { part, source }) => {
-      const view = webContents
-        .getAllWebContents()
-        .find((contents) => !contents.isDestroyed() && contents.getURL().includes(part))
-      if (!view) throw new Error(`no extension view loaded for ${part}`)
-      return view.executeJavaScript(source) as Promise<unknown>
+      const win = webContents.getAllWebContents().find((contents) => !contents.isDestroyed())
+      const frame = win?.mainFrame.frames.find(
+        (f) => f.url.startsWith('ext://') && f.url.includes(part)
+      )
+      if (!frame) throw new Error(`no extension frame loaded for ${part}`)
+      return frame.executeJavaScript(source) as Promise<unknown>
     },
     { part: urlPart, source: script }
   ) as Promise<T>

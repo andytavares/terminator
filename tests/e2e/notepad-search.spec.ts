@@ -1,9 +1,9 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect } from '@playwright/test'
 import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { AppHandle, launchApp, closeApp } from './helpers'
-import { answerNextOpenDialog, invokeChannel } from './extension-page'
+import { answerNextOpenDialog, invokeChannel, type ExtensionView } from './extension-page'
 import { noteRow, openNotepad, storedNotes } from './notepad-harness'
 import { expectCentredInWindow } from './modal-centre'
 
@@ -11,7 +11,7 @@ import { expectCentredInWindow } from './modal-centre'
 // list's search box and the ⌘⇧F overlay, with text in any script, and tags.
 
 let handle: AppHandle
-let notepad: Page
+let notepad: ExtensionView
 
 /** Markdown files as an export from another machine left them: front matter, then the body. */
 function exportedFolder(): string {

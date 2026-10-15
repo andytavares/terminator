@@ -1,10 +1,11 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect } from '@playwright/test'
 import { mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { closeApp, launchApp, type AppHandle } from './helpers'
 import { misalignedOn } from './control-alignment'
 import { git, openGitTab, openRepo, writeFile } from './git-harness'
+import type { ExtensionView } from './extension-page'
 
 /** The Conflict Solver on a real conflicted repository: each choice written to disk, undo,
  * Start over, and a merge commit that lands with a warning it could not be pushed. */
@@ -77,14 +78,14 @@ function watchReads(file: string): { stopWatching(): string[] } {
   return { stopWatching: () => (clearInterval(timer), torn) }
 }
 
-async function openSolver(): Promise<Page> {
+async function openSolver(): Promise<ExtensionView> {
   const view = await openGitTab(handle)
   await view.getByRole('button', { name: 'Resolve conflicts' }).click()
   await expect(view.getByText('Merge conflicts need resolving')).toBeVisible({ timeout: 15000 })
   return view
 }
 
-async function decideConflict(view: Page, choice: 'Keep mine' | 'Keep theirs'): Promise<void> {
+async function decideConflict(view: ExtensionView, choice: 'Keep mine' | 'Keep theirs'): Promise<void> {
   await view.getByRole('button', { name: new RegExp(`^${choice}`) }).click()
   await view.getByRole('button', { name: /^Confirm/ }).click()
 }
@@ -142,7 +143,7 @@ test('Start over restores every conflict marker once a file is fully decided', a
 })
 
 /** The solver is still open from the previous test; go back to its file list and into app.ts. */
-async function gitViewWithResolver(): Promise<Page> {
+async function gitViewWithResolver(): Promise<ExtensionView> {
   const view = await openGitTab(handle)
   await view.getByRole('button', { name: 'Back to file list' }).click()
   await view.getByTestId('conflict-file-row').filter({ hasText: 'app.ts' }).click()

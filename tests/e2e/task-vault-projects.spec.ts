@@ -1,6 +1,6 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect } from '@playwright/test'
 import { AppHandle, launchApp, closeApp } from './helpers'
-import { invokeChannel } from './extension-page'
+import { invokeChannel, type ExtensionView } from './extension-page'
 import { goToSection, openVault, pressRowAction, storedTask } from './task-vault-harness'
 
 // Projects, areas and the history of what was archived: creating, renaming,
@@ -21,7 +21,7 @@ interface StoredArea {
 }
 
 let handle: AppHandle
-let vault: Page
+let vault: ExtensionView
 
 test.beforeAll(async () => {
   handle = await launchApp()
@@ -169,7 +169,7 @@ test('an archived project is restored from History, archived again and deleted',
     .getByRole('button', { name: 'Archive project' })
     .click()
   await vault.locator('.projects-browser__filter-btn', { hasText: 'Archived' }).click()
-  vault.once('dialog', (dialog) => void dialog.accept())
+  handle.page.once('dialog', (dialog) => void dialog.accept())
   await projectCard('Launch the new website')
     .getByRole('button', { name: 'Delete project' })
     .click()
@@ -219,7 +219,7 @@ async function renameAndArchiveArea(): Promise<void> {
   expect((await areas()).map((area) => area.name)).toContain('Wellbeing')
   expect(await storedTask(vault, 'Walk every day')).toMatchObject({ area: 'Wellbeing' })
 
-  vault.once('dialog', (dialog) => void dialog.accept())
+  handle.page.once('dialog', (dialog) => void dialog.accept())
   await areaCard('Wellbeing').getByRole('button', { name: 'Archive area' }).click()
   await expect
     .poll(async () => (await areas()).find((a) => a.name === 'Wellbeing')?.status)
@@ -243,10 +243,10 @@ async function restoreArchivedArea(): Promise<void> {
 /** Archives Wellbeing again, and deletes it for good. */
 async function deleteArchivedArea(): Promise<void> {
   await goToSection(vault, 'Areas')
-  vault.once('dialog', (dialog) => void dialog.accept())
+  handle.page.once('dialog', (dialog) => void dialog.accept())
   await areaCard('Wellbeing').getByRole('button', { name: 'Archive area' }).click()
   await vault.locator('.projects-browser__filter-btn', { hasText: 'Archived' }).click()
-  vault.once('dialog', (dialog) => void dialog.accept())
+  handle.page.once('dialog', (dialog) => void dialog.accept())
   await areaCard('Wellbeing').getByRole('button', { name: 'Delete area permanently' }).click()
   await expect(areaCard('Wellbeing')).toHaveCount(0)
   expect((await areas()).map((area) => area.name)).not.toContain('Wellbeing')
@@ -284,7 +284,7 @@ test('History restores a finished task and deletes another for good', async () =
   await expect(archiveRow('Return the library books')).toHaveCount(0)
   expect(await storedTask(vault, 'Return the library books')).toMatchObject({ status: 'open' })
 
-  vault.once('dialog', (dialog) => void dialog.accept())
+  handle.page.once('dialog', (dialog) => void dialog.accept())
   await archiveRow('Fix the gate').getByRole('button', { name: 'Delete permanently' }).click()
   await expect(archiveRow('Fix the gate')).toHaveCount(0)
   expect(await storedTask(vault, 'Fix the gate')).toBeUndefined()

@@ -1,7 +1,8 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect } from '@playwright/test'
 import { rmSync } from 'node:fs'
 import { closeApp, launchApp, type AppHandle } from './helpers'
 import { misalignedOn } from './control-alignment'
+import type { ExtensionView } from './extension-page'
 import {
   git,
   makeRepoWithRemote,
@@ -75,14 +76,14 @@ test.afterAll(async () => {
   for (const dir of [repo, bare]) if (dir) rmSync(dir, { recursive: true, force: true })
 })
 
-async function startPrReview(): Promise<Page> {
+async function startPrReview(): Promise<ExtensionView> {
   const view = await openCodeReviews(handle, 'Review Diff')
   await view.locator('.rd-row').filter({ hasText: 'Add subtract' }).click()
   await view.getByRole('button', { name: /^(Start|Continue|Resume) review/ }).click()
   return view
 }
 
-function fileInList(view: Page, path: string) {
+function fileInList(view: ExtensionView, path: string) {
   return view.locator(`.full-file-row[title="${path}"]`)
 }
 

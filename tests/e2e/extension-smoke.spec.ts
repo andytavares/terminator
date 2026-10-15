@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { AppHandle, launchApp, closeApp, createWorkspace } from './helpers'
+import { findExtensionFrame } from './extension-page'
 
 /**
  * Open every extension surface, including the ones behind a disclosure, and
@@ -53,30 +54,21 @@ test.afterAll(async () => {
   await closeApp(handle)
 })
 
-function inView<T>(part: string, script: string): Promise<T> {
-  return handle.app.evaluate(
-    async ({ webContents }, { p, src }) => {
-      const v = webContents
-        .getAllWebContents()
-        .find((w) => !w.isDestroyed() && w.getURL().includes(p))
-      if (!v) throw new Error(`no view for ${p}`)
-      return v.executeJavaScript(src) as Promise<unknown>
-    },
-    { p: part, src: script }
-  ) as Promise<T>
+/** The surface's frame, once loaded; runs `script` in it. */
+async function inView<T>(part: string, script: string): Promise<T> {
+  const frame = await findExtensionFrame(handle, part)
+  return frame.evaluate(script) as Promise<T>
 }
 
-/** True once the extension surface's own WebContentsView has finished loading
- * and drawn its view, which may be a lazy chunk that renders after the load. */
+/** True once the extension surface's frame has finished loading and drawn its
+ * view, which may be a lazy chunk that renders after the load. */
 async function viewReady(part: string): Promise<boolean> {
-  const loaded = await handle.app.evaluate(
-    ({ webContents }, p) =>
-      webContents
-        .getAllWebContents()
-        .some((wc) => !wc.isDestroyed() && wc.getURL().includes(p) && !wc.isLoading()),
-    part
-  )
-  return loaded && (await inView<number>(part, 'document.body.innerText.length')) > 20
+  const frame = handle.page
+    .frames()
+    .find((f) => f.url().startsWith('ext://') && f.url().includes(part))
+  if (!frame) return false
+  const loaded = await frame.evaluate(() => document.readyState === 'complete').catch(() => false)
+  return loaded && (await frame.evaluate<number>('document.body.innerText.length')) > 20
 }
 
 /** Opens the surface's panel, and waits for its view to draw. */

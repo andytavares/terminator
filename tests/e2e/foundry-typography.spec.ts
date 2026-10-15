@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { launchApp, closeApp, createWorkspace, type AppHandle, e2eTempDir } from './helpers'
+import { inFoundry } from './foundry-harness'
 import { execFileSync } from 'node:child_process'
 
 // Nothing in an extension view should render at the browser's default size.
@@ -34,14 +35,14 @@ async function openFoundry(): Promise<void> {
       { timeout: 30_000 }
     )
     .toBe(true)
-  // The WebContentsView `inFoundry` reaches attaches a little after the
+  // The frame `inFoundryFrame` reaches attaches a little after the
   // channel answers — polled with its rejection caught, since `expect.poll`
   // does not retry a callback that throws, only one whose value mismatches.
   await expect
     .poll(
       async () => {
         try {
-          return await inFoundry<number>(`document.querySelectorAll('button').length`)
+          return await inFoundryFrame<number>(`document.querySelectorAll('button').length`)
         } catch {
           return 0
         }
@@ -66,14 +67,9 @@ test.afterAll(async () => {
   if (handle !== undefined) await closeApp(handle)
 })
 
-function inFoundry<T>(script: string): Promise<T> {
-  return handle.app.evaluate(async ({ webContents }, src) => {
-    const view = webContents
-      .getAllWebContents()
-      .find((wc) => !wc.isDestroyed() && wc.getURL().includes('foundry'))
-    if (!view) throw new Error('the Foundry view is not loaded')
-    return view.executeJavaScript(src) as Promise<unknown>
-  }, script) as Promise<T>
+/** Runs `script` in Foundry's frame. */
+function inFoundryFrame<T>(script: string): Promise<T> {
+  return inFoundry<T>(handle, script)
 }
 
 interface Oversized {
@@ -85,7 +81,7 @@ interface Oversized {
 
 /** Every element whose own text renders at the untouched browser default. */
 function oversized(): Promise<Oversized[]> {
-  return inFoundry<Oversized[]>(`(function () {
+  return inFoundryFrame<Oversized[]>(`(function () {
     var out = []
     var all = document.querySelectorAll('body *')
     for (var i = 0; i < all.length; i++) {
@@ -114,7 +110,7 @@ function oversized(): Promise<Oversized[]> {
 }
 
 function clickByName(name: string): Promise<boolean> {
-  return inFoundry<boolean>(`(function () {
+  return inFoundryFrame<boolean>(`(function () {
     var all = document.querySelectorAll('button')
     for (var i = 0; i < all.length; i++) {
       var label = (all[i].getAttribute('aria-label') || all[i].textContent || '').trim()
@@ -127,7 +123,7 @@ function clickByName(name: string): Promise<boolean> {
 
 /** Does the view need scrolling, and by how much. */
 function overflow(): Promise<{ scroll: number; view: number }> {
-  return inFoundry<{ scroll: number; view: number }>(
+  return inFoundryFrame<{ scroll: number; view: number }>(
     '({ scroll: document.documentElement.scrollHeight, view: window.innerHeight })'
   )
 }
@@ -137,13 +133,13 @@ test('an order fits the view it is shown in', async () => {
   // the bottom while the order beside them — text, which does not want 1300px
   // of line length — left the right-hand two thirds empty. Scrolling past dead
   // space, on a screen with room for all of it.
-  await inFoundry(`window.electronAPI.extensionBridge.invoke('foundry:order.create', {
+  await inFoundryFrame(`window.electronAPI.extensionBridge.invoke('foundry:order.create', {
     source: { kind: 'typed', text: 'Read the session TTL from the environment' },
     repoPaths: [${'' + JSON.stringify(repoPath) + ''}],
   })`)
   await expect.poll(() => clickByName('Forge')).toBe(true)
   await expect
-    .poll(() => inFoundry<number>(`document.querySelectorAll('.fdry-orders button').length`), {
+    .poll(() => inFoundryFrame<number>(`document.querySelectorAll('.fdry-orders button').length`), {
       timeout: 15_000,
     })
     .toBeGreaterThan(0)
@@ -163,7 +159,7 @@ test('no text on any Foundry surface renders at the browser default size', async
     // has nothing running to show), so what is waited for is the view
     // settling after the click — two animation frames — rather than that
     // surface's own tab actually becoming active.
-    await inFoundry<void>(
+    await inFoundryFrame<void>(
       `new Promise(function (resolve) {
         requestAnimationFrame(function () { requestAnimationFrame(resolve) })
       })`
@@ -181,9 +177,9 @@ test('controls that share a row in the Forge share one height', async () => {
   // 28px between two 34px buttons, found by looking at the screen.
   await expect.poll(() => clickByName('Forge')).toBe(true)
   await expect
-    .poll(() => inFoundry<number>(`document.querySelectorAll('.fdry-seed > *').length`))
+    .poll(() => inFoundryFrame<number>(`document.querySelectorAll('.fdry-seed > *').length`))
     .toBeGreaterThan(2)
-  const rows = await inFoundry<Record<string, number[]>>(`(function () {
+  const rows = await inFoundryFrame<Record<string, number[]>>(`(function () {
     var out = {}
     var rows = document.querySelectorAll('.fdry-seed, .fdry-input')
     for (var i = 0; i < rows.length; i++) {

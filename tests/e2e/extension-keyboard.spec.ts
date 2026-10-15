@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { AppHandle, launchApp, closeApp, createWorkspace } from './helpers'
+import { extensionFrame } from './extension-page'
 
 /**
  * SC-003: every scenario in this feature can be completed with a keyboard.
@@ -23,48 +24,32 @@ test.afterAll(async () => {
   await closeApp(handle)
 })
 
-function inView<T>(part: string, script: string): Promise<T> {
-  return handle.app.evaluate(
-    async ({ webContents }, { p, src }) => {
-      const v = webContents
-        .getAllWebContents()
-        .find((w) => !w.isDestroyed() && w.getURL().includes(p))
-      if (!v) throw new Error(`no view for ${p}`)
-      return v.executeJavaScript(src) as Promise<unknown>
-    },
-    { p: part, src: script }
-  ) as Promise<T>
+/** Run `script` inside the extension frame whose URL contains `part`. */
+async function inView<T>(part: string, script: string): Promise<T> {
+  const frame = extensionFrame(handle, part)
+  if (!frame) throw new Error(`no frame for ${part}`)
+  return frame.evaluate(script) as Promise<T>
 }
 
-/** True once the extension surface's own WebContentsView has finished loading. */
-function viewReady(part: string): Promise<boolean> {
-  return handle.app.evaluate(
-    ({ webContents }, p) =>
-      webContents
-        .getAllWebContents()
-        .some((wc) => !wc.isDestroyed() && wc.getURL().includes(p) && !wc.isLoading()),
-    part
-  )
+/** True once the extension surface's frame has finished loading. */
+async function viewReady(part: string): Promise<boolean> {
+  const frame = extensionFrame(handle, part)
+  if (!frame) return false
+  return frame.evaluate(() => document.readyState === 'complete').catch(() => false)
 }
 
-/** Send real key events into an extension's own webContents. */
-async function key(part: string, keyCode: string, modifiers: string[] = []): Promise<void> {
-  await handle.app.evaluate(
-    async ({ webContents }, { p, k, mods }) => {
-      const v = webContents
-        .getAllWebContents()
-        .find((w) => !w.isDestroyed() && w.getURL().includes(p))
-      if (!v) return
-      v.sendInputEvent({ type: 'keyDown', keyCode: k, modifiers: mods as never })
-      v.sendInputEvent({ type: 'char', keyCode: k, modifiers: mods as never })
-      v.sendInputEvent({ type: 'keyUp', keyCode: k, modifiers: mods as never })
-      // Let React commit the resulting state before the next call reads the DOM.
-      await v.executeJavaScript(
-        'new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))'
-      )
-    },
-    { p: part, k: keyCode, mods: modifiers }
-  )
+/** Sends a key into an extension's frame as a real key press. */
+async function key(part: string, keyCode: string): Promise<void> {
+  const frame = extensionFrame(handle, part)
+  if (!frame) return
+  // The frame's document must own focus for its listeners to see the key.
+  await frame.evaluate(() => (document.body as HTMLElement).focus())
+  await handle.page.keyboard.press(keyCode)
+  // Let React commit the resulting state before the next call reads the DOM.
+  // A key can legitimately exit the extension, detaching the frame mid-wait.
+  await frame
+    .evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))))
+    .catch(() => {})
 }
 
 /** The extension whose panel is up, or null. */

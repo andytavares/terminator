@@ -1,10 +1,11 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect } from '@playwright/test'
 import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { closeApp, launchApp, type AppHandle } from './helpers'
 import { misalignedOn } from './control-alignment'
 import { git, gitView, makeRepoWithRemote, pushBranchToOrigin } from './git-harness'
+import { popoutPage, type ExtensionView } from './extension-page'
 import { startGithubStub, type GithubStub } from './github-stub'
 
 /** The Reviews dashboard, against the stub GitHub: narrowing it to chosen
@@ -44,7 +45,7 @@ test.afterAll(async () => {
     if (dir) rmSync(dir, { recursive: true, force: true })
 })
 
-async function openDashboard(): Promise<Page> {
+async function openDashboard(): Promise<ExtensionView> {
   await handle.page.getByRole('button', { name: 'Reviews', exact: true }).click()
   return gitView(handle, 'reviews')
 }
@@ -75,7 +76,7 @@ test('Clone and review clones the repository and opens the pull request', async 
   const row = view.locator('.rd-row').filter({ hasText: 'Add subtract' })
   await row.getByRole('button', { name: 'Clone and review' }).click()
 
-  const review = await gitView(handle, 'pr-review')
+  const review = await popoutPage(handle, 'view=pr-review')
   await expect(review.getByRole('heading', { level: 1 })).toContainText('Add subtract', {
     timeout: 20000,
   })

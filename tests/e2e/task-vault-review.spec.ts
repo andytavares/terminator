@@ -1,16 +1,16 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect } from '@playwright/test'
 import { existsSync, mkdtempSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { AppHandle, launchApp, closeApp } from './helpers'
-import { answerNextSaveDialog, invokeChannel } from './extension-page'
+import { answerNextSaveDialog, invokeChannel, type ExtensionView } from './extension-page'
 import { goToSection, openVault, storedTask, localDate } from './task-vault-harness'
 
 // The six-step weekly review, walked end to end: every decision a step offers
 // is made once, then the review is read back from History and exported.
 
 let handle: AppHandle
-let vault: Page
+let vault: ExtensionView
 
 /** A row of the weekly review's current step. */
 const reviewItem = (text: string) => vault.locator('.wr-step__item', { hasText: text })

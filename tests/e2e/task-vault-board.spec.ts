@@ -1,6 +1,6 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect } from '@playwright/test'
 import { AppHandle, launchApp, closeApp } from './helpers'
-import { invokeChannel } from './extension-page'
+import { invokeChannel, type ExtensionView } from './extension-page'
 import { openVault, storedTask, localDate } from './task-vault-harness'
 import { expectCentredInWindow } from './modal-centre'
 
@@ -13,7 +13,7 @@ interface KanbanConfig {
 }
 
 let handle: AppHandle
-let vault: Page
+let vault: ExtensionView
 
 /** A day in this month's calendar grid other than today. */
 const OTHER_DAY =

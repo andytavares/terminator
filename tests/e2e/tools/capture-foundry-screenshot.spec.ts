@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { writeFileSync as write } from 'node:fs'
 import { launchApp, closeApp, createWorkspace, type AppHandle, e2eTempDir } from '../helpers'
 import { git } from '../foundry-harness'
+import { extensionPage, inExtensionView } from '../extension-page'
 
 // Retakes the user-guide screenshots of the Foundry surfaces.
 //
@@ -62,35 +63,18 @@ function seedAcceptedCheck(): void {
   )
 }
 
-/** Runs `script` in the Foundry view. */
+/** Runs `script` in the Foundry frame. */
 async function runInFoundry(script: string): Promise<void> {
-  await handle.app.evaluate(async ({ webContents }, source: string) => {
-    const view = webContents
-      .getAllWebContents()
-      .find((wc) => !wc.isDestroyed() && wc.getURL().includes('foundry'))
-    if (!view) throw new Error('the Foundry view is not loaded')
-    await view.executeJavaScript(source)
-  }, script)
+  await inExtensionView(handle, 'foundry', script)
 }
 
-/** The Foundry view as a PNG. The image comes back as base64 rather than being
- * written inside the main process: `evaluate` runs there, but only
- * serialisable values cross back. */
+/** The Foundry frame as a PNG. */
 async function captureWindow(): Promise<Buffer> {
-  const png = await handle.app.evaluate(async ({ webContents }) => {
-    const view = webContents
-      .getAllWebContents()
-      .find((wc) => !wc.isDestroyed() && wc.getURL().includes('foundry'))
-    if (!view) throw new Error('the Foundry view is not loaded')
-    const image = await view.capturePage()
-    return image.toPNG().toString('base64')
-  })
-  return Buffer.from(png, 'base64')
+  const view = await extensionPage(handle, 'foundry')
+  return view.screenshot()
 }
 
-/** Clicks land inside the extension's own WebContentsView, which Playwright's
- * `page` cannot see. Sent through the view's input queue instead, by the
- * accessible name the tab renders. */
+/** Clicks land inside the extension's frame by the accessible name the tab renders. */
 async function openSurface(label: string): Promise<void> {
   await runInFoundry(
     `Array.from(document.querySelectorAll('button')).find((b) => b.textContent?.trim() === ${JSON.stringify(

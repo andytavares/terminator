@@ -3,6 +3,7 @@ import { execSync } from 'node:child_process'
 import { rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { AppHandle, launchApp, closeApp, createWorkspace, e2eTempDir } from './helpers'
+import { gitIntegrationFrame } from './extension-page'
 
 /**
  * The whole-class checks `extension-smoke.spec.ts` runs, for the extension it
@@ -69,22 +70,11 @@ interface Report {
   sideScrollers: string[]
 }
 
-function inGit(viewParam: string, script: string): Promise<Report> {
-  return handle.app.evaluate(
-    async ({ webContents }, { param, src }) => {
-      const v = webContents
-        .getAllWebContents()
-        .find(
-          (w) =>
-            !w.isDestroyed() &&
-            w.getURL().includes('git-integration') &&
-            w.getURL().includes(`view=${param}`)
-        )
-      if (!v) throw new Error(`no git-integration view for view=${param}`)
-      return v.executeJavaScript(src) as Promise<unknown>
-    },
-    { param: viewParam, src: script }
-  ) as Promise<Report>
+/** Run `script` inside the git-integration frame showing `viewParam`. */
+async function inGit(viewParam: string, script: string): Promise<Report> {
+  const frame = gitIntegrationFrame(handle, viewParam)
+  if (!frame) throw new Error(`no git-integration frame for view=${viewParam}`)
+  return frame.evaluate(script) as Promise<Report>
 }
 
 test.beforeAll(async () => {
@@ -132,19 +122,11 @@ function assertClean(view: string, report: Report): void {
   ).toHaveLength(0)
 }
 
-/** Whether git-integration's project view has finished loading. */
-function projectViewLoaded(): Promise<boolean> {
-  return handle.app.evaluate(({ webContents }) =>
-    webContents
-      .getAllWebContents()
-      .some(
-        (wc) =>
-          !wc.isDestroyed() &&
-          wc.getURL().includes('git-integration') &&
-          wc.getURL().includes('view=project') &&
-          !wc.isLoading()
-      )
-  )
+/** Whether git-integration's project frame has finished loading. */
+async function projectViewLoaded(): Promise<boolean> {
+  const frame = gitIntegrationFrame(handle, 'project')
+  if (!frame) return false
+  return frame.evaluate(() => document.readyState === 'complete').catch(() => false)
 }
 
 test('the git project view renders, and everything on it is styled', async () => {

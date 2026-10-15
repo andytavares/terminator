@@ -2,7 +2,8 @@ import { expect } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
 import { mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { launchApp, closeApp, workspaceRow, e2eTempDir } from './helpers'
+import { launchApp, closeApp, workspaceRow, e2eTempDir, inExtensionView } from './helpers'
+import { extensionPage } from './extension-page'
 import type { AppHandle } from './helpers'
 
 // Shared helpers for every `tests/e2e/foundry-*.spec.ts` file. Each spec keeps
@@ -52,16 +53,9 @@ export function foundryChannel(
   )
 }
 
-/** Runs a script inside Foundry's own view, which the page cannot reach —
- *  it is an overlaid WebContentsView. */
+/** Runs a script inside Foundry's frame in the main window. */
 export function inFoundry<T>(handle: AppHandle, script: string): Promise<T> {
-  return handle.app.evaluate(async ({ webContents }, src) => {
-    const view = webContents
-      .getAllWebContents()
-      .find((wc) => !wc.isDestroyed() && wc.getURL().includes('foundry'))
-    if (!view) throw new Error('the Foundry view is not loaded')
-    return view.executeJavaScript(src) as Promise<unknown>
-  }, script) as Promise<T>
+  return inExtensionView<T>(handle, 'foundry', script)
 }
 
 /**
@@ -186,10 +180,9 @@ export async function openFoundry(handle: AppHandle): Promise<void> {
   }
   await expect(panel).toHaveCount(1, { timeout: 30_000 })
   // The channel answers through the main window's own bridge, which needs
-  // nothing from the extension's own WebContentsView — so it is checked
-  // first, exactly as every foundry spec's own `beforeAll` used to. Only once
-  // the extension has activated is the view itself (which `inFoundry` reaches
-  // via `getAllWebContents`) worth polling for.
+  // nothing from the extension's frame — so it is checked first, exactly as
+  // every foundry spec's own `beforeAll` used to. Only once the extension has
+  // activated is the frame `inFoundry` reaches worth polling for.
   await expect
     .poll(
       async () => (await foundryChannel(handle, 'foundry:order.list').catch(() => null)) !== null,
@@ -199,9 +192,9 @@ export async function openFoundry(handle: AppHandle): Promise<void> {
     )
     .toBe(true)
   // The channel answers as soon as the extension host has activated, but the
-  // WebContentsView `inFoundry` reaches is attached separately and a little
-  // later — polled with its rejection caught, since `expect.poll` does not
-  // retry a callback that throws, only one whose returned value mismatches.
+  // frame `inFoundry` reaches attaches a little later — polled with its
+  // rejection caught, since `expect.poll` does not retry a callback that
+  // throws, only one whose returned value mismatches.
   await expect
     .poll(
       async () => {
@@ -311,15 +304,8 @@ export function hasAgentLaunchScript(handle: AppHandle): boolean {
 export async function captureFoundry(handle: AppHandle, name: string): Promise<void> {
   const outDir = join(process.cwd(), 'test-results')
   mkdirSync(outDir, { recursive: true })
-  const pngBase64 = await handle.app.evaluate(async ({ webContents }) => {
-    const view = webContents
-      .getAllWebContents()
-      .find((wc) => !wc.isDestroyed() && wc.getURL().includes('foundry'))
-    if (!view) throw new Error('the Foundry view is not loaded')
-    const image = await view.capturePage()
-    return image.toPNG().toString('base64')
-  })
-  writeFileSync(join(outDir, name), Buffer.from(pngBase64, 'base64'))
+  const view = await extensionPage(handle, 'foundry')
+  writeFileSync(join(outDir, name), await view.screenshot())
 }
 
 /** Creates a typed order on `repo` and returns its id; `missing` is the failure's message. */

@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect } from '@playwright/test'
 import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -11,6 +11,7 @@ import {
 } from './helpers'
 import { makeRepoWithRemote, openCodeReviews, openRepo, pushBranchToOrigin } from './git-harness'
 import { startGithubStub, type GithubStub } from './github-stub'
+import type { ExtensionView } from './extension-page'
 
 /** The review agent: a run cancelled, continued in a terminal, and one whose finding stays
  * dismissed. The `claude` stub (fixtures/bin/claude) idles until E2E_CLAUDE_REVIEW_REPLY
@@ -71,7 +72,7 @@ test.afterAll(async () => {
   }
 })
 
-async function askReviewAgent(): Promise<Page> {
+async function askReviewAgent(): Promise<ExtensionView> {
   const view = await openCodeReviews(handle, 'Agent Review')
   const queueOrReview = view.locator('.rd-row, [aria-label="Close review"]').first()
   await expect(queueOrReview).toBeVisible({ timeout: 15000 })
@@ -83,7 +84,7 @@ async function askReviewAgent(): Promise<Page> {
   return view
 }
 
-const panel = (view: Page) => view.getByRole('complementary', { name: 'Agent panel' })
+const panel = (view: Pick<ExtensionView, 'getByRole'>) => view.getByRole('complementary', { name: 'Agent panel' })
 
 test('a running review can be continued in a terminal, then cancelled', async () => {
   const view = await askReviewAgent()

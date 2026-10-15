@@ -1,9 +1,9 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect } from '@playwright/test'
 import { mkdtempSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { AppHandle, launchApp, closeApp } from './helpers'
-import { invokeChannel } from './extension-page'
+import { invokeChannel, type ExtensionView } from './extension-page'
 import { allTasks, openVault, todayTasks } from './task-vault-harness'
 import { expectCentredInWindow } from './modal-centre'
 
@@ -11,7 +11,7 @@ import { expectCentredInWindow } from './modal-centre'
 // console, export to JSON, reset, re-initialise, and import of the export.
 
 let handle: AppHandle
-let vault: Page
+let vault: ExtensionView
 let exportFile: string
 
 test.beforeAll(async () => {
@@ -43,16 +43,14 @@ async function openVaultDataTools(tab: 'Export & import' | 'Database'): Promise<
   await expectCentredInWindow(dataTools(), `Task Vault: Data tools, ${tab}`)
 }
 
-/** Saves the vault view's next download to `filePath`, where the save dialog
- * Electron shows by default would have let the user put it. */
+/** Saves the vault's next download to `filePath`. The frame downloads through
+ * the main window's session, so the path is set on that session. */
 function saveNextDownload(filePath: string): Promise<void> {
   return handle.app.evaluate(
     ({ webContents }, target) =>
       new Promise<void>((resolve, reject) => {
-        const view = webContents
-          .getAllWebContents()
-          .find((contents) => contents.getURL().includes('terminator.task-vault'))
-        view?.session.once('will-download', (_event, item) => {
+        const win = webContents.getAllWebContents().find((contents) => !contents.isDestroyed())
+        win?.session.once('will-download', (_event, item) => {
           item.setSavePath(target)
           item.once('done', (_done, state) =>
             state === 'completed' ? resolve() : reject(new Error(state))

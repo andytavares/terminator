@@ -1,6 +1,6 @@
-import { expect, type Page } from '@playwright/test'
+import { expect } from '@playwright/test'
 import type { AppHandle } from './helpers'
-import { invokeChannel, openFromAppBand } from './extension-page'
+import { invokeChannel, openFromAppBand, type ExtensionView } from './extension-page'
 import { expectCentredInWindow } from './modal-centre'
 
 // Shared by the tests/e2e/notepad-*.spec.ts files: opening Notepad, creating
@@ -18,7 +18,7 @@ export interface StoredNote {
 const NOTEPAD_URL = 'terminator.notepad/dist/index.html?view=main'
 
 /** Opens Notepad from the app band and waits for it to render. */
-export async function openNotepad(handle: AppHandle): Promise<Page> {
+export async function openNotepad(handle: AppHandle): Promise<ExtensionView> {
   const notepad = await openFromAppBand(handle, 'Notes', NOTEPAD_URL)
   await expect(notepad.locator('.notepad-view')).toBeVisible({ timeout: 20_000 })
   return notepad
@@ -26,7 +26,7 @@ export async function openNotepad(handle: AppHandle): Promise<Page> {
 
 /** Creates a note, diagram or folder through the New dialog, as a user does. */
 export async function createItem(
-  notepad: Page,
+  notepad: ExtensionView,
   kind: 'Note' | 'Diagram' | 'Folder',
   title: string
 ): Promise<void> {
@@ -41,7 +41,7 @@ export async function createItem(
 }
 
 /** Every note Notepad holds, archived ones too. */
-export async function storedNotes(notepad: Page): Promise<StoredNote[]> {
+export async function storedNotes(notepad: ExtensionView): Promise<StoredNote[]> {
   const result = await invokeChannel<{ data: StoredNote[] }>(
     notepad,
     'terminator.notepad:notes.list',
@@ -51,7 +51,7 @@ export async function storedNotes(notepad: Page): Promise<StoredNote[]> {
 }
 
 /** The stored note with this title, body included. */
-export async function storedNote(notepad: Page, title: string): Promise<StoredNote | undefined> {
+export async function storedNote(notepad: ExtensionView, title: string): Promise<StoredNote | undefined> {
   const listed = (await storedNotes(notepad)).find((note) => note.title === title)
   if (!listed) return undefined
   const result = await invokeChannel<{ data: StoredNote }>(
@@ -63,7 +63,7 @@ export async function storedNote(notepad: Page, title: string): Promise<StoredNo
 }
 
 /** A row in the note list, by its exact title. */
-export function noteRow(notepad: Page, title: string) {
+export function noteRow(notepad: ExtensionView, title: string) {
   return notepad
     .locator('.notepad-note-row')
     .filter({ has: notepad.locator('.notepad-note-row__title').getByText(title, { exact: true }) })

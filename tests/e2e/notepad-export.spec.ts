@@ -1,9 +1,9 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect } from '@playwright/test'
 import { existsSync, mkdtempSync, readFileSync, readdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { AppHandle, launchApp, closeApp } from './helpers'
-import { answerNextOpenDialog, invokeChannel } from './extension-page'
+import { answerNextOpenDialog, invokeChannel, type ExtensionView } from './extension-page'
 import { noteRow, openNotepad } from './notepad-harness'
 import { expectCentredInWindow } from './modal-centre'
 
@@ -11,12 +11,12 @@ import { expectCentredInWindow } from './modal-centre'
 // comments in the format chosen, and diagrams as .excalidraw files.
 
 let handle: AppHandle
-let notepad: Page
+let notepad: ExtensionView
 
 const RECTANGLE = { id: 'r1', type: 'rectangle', x: 10, y: 20, width: 160, height: 100 }
 
 /** What the export finds: a commented note and a drawn diagram, made in the other specs' way. */
-async function seedNoteAndDiagram(notepad: Page): Promise<void> {
+async function seedNoteAndDiagram(notepad: ExtensionView): Promise<void> {
   const note = await invokeChannel<{ data: { id: string } }>(
     notepad,
     'terminator.notepad:notes.create',

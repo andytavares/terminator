@@ -1,6 +1,6 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect } from '@playwright/test'
 import { AppHandle, launchApp, closeApp, closeSettingsPanel } from './helpers'
-import { invokeChannel } from './extension-page'
+import { invokeChannel, type ExtensionView } from './extension-page'
 import { openExtensionSettings, settingRow } from './extension-settings-page'
 import { goToSection, openVault, localDate } from './task-vault-harness'
 
@@ -8,7 +8,7 @@ import { goToSection, openVault, localDate } from './task-vault-harness'
 // seen on Today: a task that has rolled over for longer is marked stale.
 
 let handle: AppHandle
-let vault: Page
+let vault: ExtensionView
 
 test.beforeAll(async () => {
   handle = await launchApp()

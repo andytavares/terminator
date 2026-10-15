@@ -1,6 +1,6 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect } from '@playwright/test'
 import { AppHandle, launchApp, closeApp } from './helpers'
-import { invokeChannel } from './extension-page'
+import { invokeChannel, type ExtensionView } from './extension-page'
 import {
   dailyLogTaskRow,
   openVault,
@@ -16,7 +16,7 @@ import { expectCentredInWindow } from './modal-centre'
 // back from what the vault stored.
 
 let handle: AppHandle
-let vault: Page
+let vault: ExtensionView
 
 test.beforeAll(async () => {
   handle = await launchApp()

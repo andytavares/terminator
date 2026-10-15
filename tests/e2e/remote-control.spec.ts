@@ -11,7 +11,7 @@ import {
   e2eTempDir,
   launchApp,
 } from './helpers'
-import { openFromAppBand } from './extension-page'
+import { openFromAppBand, type ExtensionView } from './extension-page'
 
 // Remote Control's channels, driven from its view, with each effect read where it lands: a
 // browser running the real remote renderer, the server, or the clipboard. The public address
@@ -40,7 +40,7 @@ const REMOTE_CONTROL_CHANNELS = [
 
 let handle: AppHandle
 /** The Remote Control view in the desktop app. */
-let view: Page
+let view: ExtensionView
 /** Chromium, where every phone in this spec runs the remote renderer. */
 let browser: Browser
 /** A phone watching the desktop app's terminal. */

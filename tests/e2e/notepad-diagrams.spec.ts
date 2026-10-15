@@ -1,6 +1,6 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect } from '@playwright/test'
 import { AppHandle, launchApp, closeApp } from './helpers'
-import { extensionPage, invokeChannel } from './extension-page'
+import { popoutPage, invokeChannel, type ExtensionView } from './extension-page'
 import { createItem, noteRow, openNotepad } from './notepad-harness'
 
 // Diagrams in Notepad: drawing on the Excalidraw canvas, renaming, pinning
@@ -21,7 +21,7 @@ interface DiagramComment {
 }
 
 let handle: AppHandle
-let notepad: Page
+let notepad: ExtensionView
 let diagramId: string
 
 test.beforeAll(async () => {
@@ -137,7 +137,7 @@ test('a comment thread on the canvas is deleted', async () => {
 
 test('double-clicking the diagram opens it in its own window', async () => {
   await noteRow(notepad, 'System architecture').dblclick()
-  const window = await extensionPage(handle, 'view=diagram')
+  const window = await popoutPage(handle, 'view=diagram')
   await expect(window.locator('.diagram-view__title-btn')).toContainText('System architecture', {
     timeout: 20_000,
   })
@@ -159,7 +159,7 @@ test('a diagram is archived, restored, archived again and deleted for good', asy
   expect((await storedDiagram()).archivedAt).toBeNull()
 
   await menu('Archive')
-  notepad.once('dialog', (dialog) => void dialog.accept())
+  handle.page.once('dialog', (dialog) => void dialog.accept())
   await menu('Delete')
   await expect(noteRow(notepad, 'System architecture')).toHaveCount(0)
   expect(await diagrams()).toEqual([])

@@ -18,6 +18,7 @@ import {
   workspaceRow,
 } from './helpers'
 import { git, makeFixtureRepo } from './foundry-harness'
+import { extensionFrame } from './extension-page'
 import { answerFolderPicker, recordShellOpens, shellOpens } from './main-stubs'
 
 // The core channels no other spec reaches. The parts of window.electronAPI only an
@@ -249,13 +250,11 @@ async function bellNotifiesAndReveals(handle: AppHandle): Promise<void> {
 
 async function quickActionsOpenInsideView(handle: AppHandle): Promise<void> {
   await openNotesView(handle)
-  await handle.app.evaluate(({ webContents }, part) => {
-    const view = webContents.getAllWebContents().find((w) => w.getURL().includes(part))!
-    const modifiers = [process.platform === 'darwin' ? 'meta' : 'control'] as never
-    view.focus()
-    view.sendInputEvent({ type: 'keyDown', keyCode: 'P', modifiers })
-    view.sendInputEvent({ type: 'keyUp', keyCode: 'P', modifiers })
-  }, NOTES)
+  const frame = extensionFrame(handle, NOTES)
+  if (!frame) throw new Error(`no frame for ${NOTES}`)
+  // The frame's document must own focus for its listeners to see the key.
+  await frame.evaluate(() => (document.body as HTMLElement).focus())
+  await handle.page.keyboard.press('ControlOrMeta+p')
   const panel = quickActionsPanel(handle.page)
   await expect(panel).toBeVisible()
   // Escape closes the panel from inside it; pressed before focus has moved

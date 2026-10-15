@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect } from '@playwright/test'
 import {
   AppHandle,
   addAndSelectProject,
@@ -7,7 +7,7 @@ import {
   launchApp,
   projectGroup,
 } from './helpers'
-import { invokeChannel } from './extension-page'
+import { invokeChannel, type ExtensionView } from './extension-page'
 import {
   dailyLogTaskRow,
   openVault,
@@ -21,12 +21,12 @@ import {
 // view calls, are driven the way a remote client calls them.
 
 let handle: AppHandle
-let vault: Page
+let vault: ExtensionView
 /** The session the task was linked to, as the vault stored it. */
 let alphaSessionId: string
 
 /** Picks the option naming the alpha branch in a terminal picker. */
-async function pickAlpha(select: ReturnType<Page['locator']>): Promise<void> {
+async function pickAlpha(select: ReturnType<ExtensionView['locator']>): Promise<void> {
   const label = (await select.locator('option', { hasText: 'alpha' }).textContent()) ?? ''
   await select.selectOption({ label })
 }

@@ -1,6 +1,6 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect } from '@playwright/test'
 import { AppHandle, launchApp, closeApp } from './helpers'
-import { invokeChannel } from './extension-page'
+import { invokeChannel, type ExtensionView } from './extension-page'
 import { createItem, noteRow, openNotepad, storedNote, storedNotes } from './notepad-harness'
 import { expectCentredInWindow } from './modal-centre'
 
@@ -9,7 +9,7 @@ import { expectCentredInWindow } from './modal-centre'
 // is read back from what Notepad stored.
 
 let handle: AppHandle
-let notepad: Page
+let notepad: ExtensionView
 
 test.beforeAll(async () => {
   handle = await launchApp()
@@ -118,7 +118,8 @@ test('a note is archived, restored, archived again and deleted for good', async 
     'aria-expanded',
     'true'
   )
-  notepad.once('dialog', (dialog) => void dialog.accept())
+  // The confirm dialog is the host page's, not the frame's, so it is answered there.
+  handle.page.once('dialog', (dialog) => void dialog.accept())
   await contextMenu('Old draft', 'Delete')
   await expect(noteRow(notepad, 'Old draft')).toHaveCount(0)
   expect(await storedNote(notepad, 'Old draft')).toBeUndefined()

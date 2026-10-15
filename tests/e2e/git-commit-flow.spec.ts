@@ -1,9 +1,10 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect } from '@playwright/test'
 import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { closeApp, launchApp, type AppHandle } from './helpers'
 import { misalignedOn } from './control-alignment'
+import type { ExtensionView } from './extension-page'
 import {
   git,
   gitView,
@@ -35,11 +36,11 @@ function installPreCommitHook(script: string): void {
   chmodSync(join(repo, '.git/hooks/pre-commit'), 0o755)
 }
 
-function fileRow(view: Page, path: string) {
+function fileRow(view: ExtensionView, path: string) {
   return view.locator('.staging-area__file-row').filter({ hasText: path })
 }
 
-function gitViewSection(view: Page, title: RegExp) {
+function gitViewSection(view: ExtensionView, title: RegExp) {
   return view.locator('.staging-area__section').filter({ hasText: title })
 }
 

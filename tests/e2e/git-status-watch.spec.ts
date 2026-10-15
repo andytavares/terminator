@@ -1,9 +1,10 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect } from '@playwright/test'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { closeApp, launchApp, type AppHandle } from './helpers'
 import { git, makeRepoWithRemote, openGitTab, openRepo, writeFile } from './git-harness'
+import type { ExtensionView } from './extension-page'
 
 /** The Git tab follows its repository through the file watch: nothing here is done in the app,
  * and the tab has no timer to notice it with. Each change is made again on every look, because
@@ -18,7 +19,7 @@ function linkedWorktreeOf(repo: string): string {
   return worktree
 }
 
-const stagedHeading = (view: Page) => view.getByText(/^Staged \(\d+\)/).first()
+const stagedHeading = (view: ExtensionView) => view.getByText(/^Staged \(\d+\)/).first()
 
 /** The app with one checkout open, filled in before the first test of its group runs. */
 class OpenCheckout {

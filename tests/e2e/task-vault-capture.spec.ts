@@ -1,6 +1,6 @@
-import { test, expect, type Locator, type Page } from '@playwright/test'
+import { test, expect, type Locator } from '@playwright/test'
 import { AppHandle, launchApp, closeApp } from './helpers'
-import { invokeChannel } from './extension-page'
+import { invokeChannel, type ExtensionView } from './extension-page'
 import { goToSection, openVault, storedTask, type StoredTask } from './task-vault-harness'
 import { canPressGlobalKeys, pressGlobalChord } from './x11-keys'
 import { expectCentredInWindow } from './modal-centre'
@@ -10,7 +10,7 @@ import { expectCentredInWindow } from './modal-centre'
 // and reads back what the vault stored.
 
 let handle: AppHandle
-let vault: Page
+let vault: ExtensionView
 
 test.beforeAll(async () => {
   handle = await launchApp()
@@ -70,7 +70,7 @@ test('moving an item to the backlog takes it out of the inbox', async () => {
 
 test('deleting an inbox item asks first, then removes it for good', async () => {
   await captureFromInbox('Junk mail')
-  vault.once('dialog', (dialog) => void dialog.accept())
+  handle.page.once('dialog', (dialog) => void dialog.accept())
   await inboxRow('Junk mail').getByRole('button', { name: 'Delete' }).click()
 
   await expect(inboxRow('Junk mail')).toHaveCount(0)

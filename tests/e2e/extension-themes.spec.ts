@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { AppHandle, launchApp, closeApp, createWorkspace } from './helpers'
+import { findExtensionFrame } from './extension-page'
 import { CONTRAST_PROBE, type Probe } from './contrast-probe'
 
 /**
@@ -31,29 +32,19 @@ test.afterAll(async () => {
   await closeApp(handle)
 })
 
-/** Run a script inside the first loaded extension view whose URL matches. */
-function inView<T>(urlPart: string, script: string): Promise<T> {
-  return handle.app.evaluate(
-    async ({ webContents }, { part, src }) => {
-      const view = webContents
-        .getAllWebContents()
-        .find((wc) => !wc.isDestroyed() && wc.getURL().includes(part))
-      if (!view) throw new Error(`no loaded view matching ${part}`)
-      return view.executeJavaScript(src) as Promise<unknown>
-    },
-    { part: urlPart, src: script }
-  ) as Promise<T>
+/** Run a script inside the first extension frame whose URL matches. */
+async function inView<T>(urlPart: string, script: string): Promise<T> {
+  const frame = await findExtensionFrame(handle, urlPart)
+  return frame.evaluate(script) as Promise<T>
 }
 
-/** True once the extension surface's own WebContentsView has finished loading. */
-function viewReady(urlPart: string): Promise<boolean> {
-  return handle.app.evaluate(
-    ({ webContents }, part) =>
-      webContents
-        .getAllWebContents()
-        .some((wc) => !wc.isDestroyed() && wc.getURL().includes(part) && !wc.isLoading()),
-    urlPart
-  )
+/** True once the extension surface's frame has finished loading. */
+async function viewReady(urlPart: string): Promise<boolean> {
+  const frame = handle.page
+    .frames()
+    .find((f) => f.url().startsWith('ext://') && f.url().includes(urlPart))
+  if (!frame) return false
+  return frame.evaluate(() => document.readyState === 'complete').catch(() => false)
 }
 
 async function setTheme(theme: 'dark' | 'light'): Promise<void> {
@@ -154,9 +145,8 @@ for (const { id, label, urlPart } of SURFACES) {
     test(`${label} text meets WCAG AA in the ${theme} theme`, async () => {
       await openExtension(id, urlPart)
       await setTheme(theme)
-      // Dark is the absence of the attribute (extension-view-host.ts
-      // `applyTheme` removes it rather than setting 'dark'), so light is the
-      // only value to match against directly.
+      // Dark is the absence of the attribute (the frame shim removes it rather
+      // than setting 'dark'), so light is the only value to match against.
       await expect
         .poll(
           () =>

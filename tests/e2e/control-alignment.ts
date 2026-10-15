@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test'
+import type { Frame, Page } from '@playwright/test'
 
 // Each function below runs in the page, so each uses only the DOM and the functions sent with it.
 
@@ -66,8 +66,11 @@ function misalignedControls(selector: string): Misalignment[] {
   )
 }
 
-/** The misaligned control pairs on `page` now, each labelled with `screen`. */
-export async function misalignedOn(page: Page, screen: string): Promise<string[]> {
+/** The misaligned control pairs on `page` (or an extension frame) now, labelled with `screen`. */
+export async function misalignedOn(
+  page: Pick<Page, 'evaluate'> | Pick<Frame, 'evaluate'>,
+  screen: string
+): Promise<string[]> {
   const helpers = [visibleOnScreen, boxed, described, besideEachOther, mismatch, misalignedControls]
   const script = `(() => { ${helpers.map(String).join('\n')}
     return misalignedControls(${JSON.stringify(CONTROLS)}) })()`

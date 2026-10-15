@@ -1,6 +1,7 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect } from '@playwright/test'
 import { AppHandle, launchApp, closeApp, closeSettingsPanel } from './helpers'
 import { openExtensionSettings, settingRow } from './extension-settings-page'
+import type { ExtensionView } from './extension-page'
 import { createItem, noteRow, openNotepad, storedNote } from './notepad-harness'
 
 // Notepad's editor settings, changed on its settings page and seen in the
@@ -8,7 +9,7 @@ import { createItem, noteRow, openNotepad, storedNote } from './notepad-harness'
 // is saved. The view reads them again whenever a setting changes.
 
 let handle: AppHandle
-let notepad: Page
+let notepad: ExtensionView
 
 test.describe.configure({ mode: 'serial' })
 

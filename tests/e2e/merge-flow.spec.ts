@@ -3,6 +3,7 @@ import { execSync } from 'node:child_process'
 import { rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { AppHandle, launchApp, closeApp, createWorkspace, e2eTempDir } from './helpers'
+import { gitIntegrationFrame } from './extension-page'
 import { CONTRAST_PROBE, type Probe } from './contrast-probe'
 
 /**
@@ -41,42 +42,20 @@ function makeConflictedRepo(): string {
   return dir
 }
 
-/** True once the git-integration view for `viewParam` has finished loading and
+/** True once the git-integration frame for `viewParam` has finished loading and
  * drawn its view, a lazy chunk that renders after the load. */
 async function gitViewReady(viewParam: string): Promise<boolean> {
-  const loaded = await handle.app.evaluate(
-    ({ webContents }, param) =>
-      webContents
-        .getAllWebContents()
-        .some(
-          (wc) =>
-            !wc.isDestroyed() &&
-            wc.getURL().includes('git-integration') &&
-            wc.getURL().includes(`view=${param}`) &&
-            !wc.isLoading()
-        ),
-    viewParam
-  )
-  return loaded && (await inGit<number>(viewParam, 'document.body.innerText.length')) > 0
+  const frame = gitIntegrationFrame(handle, viewParam)
+  if (!frame) return false
+  const loaded = await frame.evaluate(() => document.readyState === 'complete').catch(() => false)
+  return loaded && (await frame.evaluate<number>('document.body.innerText.length')) > 0
 }
 
-/** Run a script inside the git-integration view matching `viewParam`. */
-function inGit<T>(viewParam: string, script: string): Promise<T> {
-  return handle.app.evaluate(
-    async ({ webContents }, { param, src }) => {
-      const v = webContents
-        .getAllWebContents()
-        .find(
-          (w) =>
-            !w.isDestroyed() &&
-            w.getURL().includes('git-integration') &&
-            w.getURL().includes(`view=${param}`)
-        )
-      if (!v) throw new Error(`no git-integration view for view=${param}`)
-      return v.executeJavaScript(src) as Promise<unknown>
-    },
-    { param: viewParam, src: script }
-  ) as Promise<T>
+/** Run a script inside the git-integration frame showing `viewParam`. */
+async function inGit<T>(viewParam: string, script: string): Promise<T> {
+  const frame = gitIntegrationFrame(handle, viewParam)
+  if (!frame) throw new Error(`no git-integration frame for view=${viewParam}`)
+  return frame.evaluate(script) as Promise<T>
 }
 
 test.beforeAll(async () => {
@@ -191,9 +170,9 @@ for (const viewParam of ['project'] as const) {
       await openGitProjectTab()
       await setTheme(theme)
       // Mirrors extension-themes.spec.ts: dark is the absence of the
-      // attribute (extension-view-host.ts `applyTheme` removes it rather
-      // than setting 'dark'), and colours declared with a CSS `transition`
-      // can still be mid-interpolation right after the flip.
+      // attribute (the frame shim removes it rather than setting 'dark'), and
+      // colours declared with a CSS `transition` can still be
+      // mid-interpolation right after the flip.
       await expect
         .poll(
           () =>

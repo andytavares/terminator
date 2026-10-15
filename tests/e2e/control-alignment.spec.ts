@@ -11,7 +11,7 @@ import {
 } from './helpers'
 import { openVault, goToSection } from './task-vault-harness'
 import { openNotepad } from './notepad-harness'
-import { openFromAppBand } from './extension-page'
+import { openFromAppBand, type ExtensionView } from './extension-page'
 import { misalignedOn } from './control-alignment'
 
 // Controls side by side are one height and share a centre, on every screen a person reaches:
@@ -57,7 +57,7 @@ test('every Settings section lines up', async () => {
 })
 
 /** A project with a task, its card open, as the project card's add row is seen. */
-async function projectCardWithATask(vault: Page): Promise<string[]> {
+async function projectCardWithATask(vault: ExtensionView): Promise<string[]> {
   await goToSection(vault, 'Projects')
   await vault.getByRole('button', { name: '+ New project' }).click()
   const found = await misalignedOn(vault, 'Task Vault: new project form')
@@ -73,7 +73,7 @@ async function projectCardWithATask(vault: Page): Promise<string[]> {
 }
 
 /** Today with a task, its add row open, then the task in edit. */
-async function todayWithATask(vault: Page): Promise<string[]> {
+async function todayWithATask(vault: ExtensionView): Promise<string[]> {
   await goToSection(vault, 'Today')
   await vault.getByRole('button', { name: 'Add task', exact: true }).click()
   const input = vault.locator('.daily-log__add-row input')

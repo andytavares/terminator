@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test'
-import { AppHandle, launchApp, closeApp, createWorkspace } from './helpers'
+import { AppHandle, launchApp, closeApp, createWorkspace, inExtensionView } from './helpers'
+import { openFoundry as openFoundryPanel } from './foundry-harness'
 
 // The guards on the exit gesture (feature 036).
 //
@@ -9,8 +10,7 @@ import { AppHandle, launchApp, closeApp, createWorkspace } from './helpers'
 // the extension and discard the draft; there was no confirmation and no undo.
 //
 // These cannot be unit tests. The keystroke has to originate inside the
-// extension's own WebContentsView, which is a separate webContents the
-// Playwright page can neither see nor type into.
+// extension's frame, where the frame shim (ADR 114) applies the guards.
 
 let handle: AppHandle
 
@@ -28,11 +28,9 @@ const FOUNDRY_IDEA = 'input[aria-label="Describe what you want built or fixed"]'
 
 /**
  * Waits out real wall-clock time. The double-Escape gesture is timed against
- * `Date.now()`/`performance.now()` inside the extension's own
- * WebContentsView (`src/main/preload-webview.ts`), which Playwright cannot
- * attach a fake clock to, so proving presses fall inside or outside
- * `DOUBLE_ESCAPE_WINDOW_MS` genuinely requires that much time to elapse. Not
- * a settle-and-hope sleep: the duration is the feature's own timing contract.
+ * `Date.now()` inside the extension's frame, which Playwright cannot attach a
+ * fake clock to, so proving presses fall inside or outside
+ * `DOUBLE_ESCAPE_WINDOW_MS` genuinely requires that much time to elapse.
  */
 async function realDelay(ms: number): Promise<void> {
   const deadline = Date.now() + ms
@@ -41,73 +39,36 @@ async function realDelay(ms: number): Promise<void> {
   }
 }
 
-/** Run script inside the Foundry extension view and return its result. */
+/** Run script inside the Foundry extension frame and return its result. */
 function inFoundry<T>(script: string): Promise<T> {
-  return handle.app.evaluate(async ({ webContents }, src) => {
-    const view = webContents
-      .getAllWebContents()
-      .find((wc) => !wc.isDestroyed() && wc.getURL().includes('foundry'))
-    if (!view) throw new Error('the Foundry view is not loaded')
-    return view.executeJavaScript(src) as Promise<unknown>
-  }, script) as Promise<T>
+  return inExtensionView<T>(handle, 'foundry', script)
 }
 
-/** Sends Escape into Foundry's own view, bypassing the host page. */
+/** Sends Escape into Foundry's frame as real key presses. */
 async function pressEscape(times: number, gapMs = 100): Promise<void> {
-  await handle.app.evaluate(
-    async ({ webContents }, { count, gap }) => {
-      const view = webContents
-        .getAllWebContents()
-        .find((wc) => !wc.isDestroyed() && wc.getURL().includes('foundry'))
-      if (!view) throw new Error('the Foundry view is not loaded')
-      for (let i = 0; i < count; i++) {
-        view.sendInputEvent({ type: 'keyDown', keyCode: 'Escape' })
-        view.sendInputEvent({ type: 'keyUp', keyCode: 'Escape' })
-        if (i < count - 1) {
-          const deadline = Date.now() + gap
-          while (Date.now() < deadline) {
-            await new Promise((done) => setImmediate(done))
-          }
-        }
-      }
-    },
-    { count: times, gap: gapMs }
-  )
+  const frame = handle.page.frames().find((f) => f.url().includes('foundry'))
+  if (!frame) throw new Error('the Foundry frame is not loaded')
+  // The frame's document must own focus for the shim to see the key.
+  await frame.evaluate(() => (document.body as HTMLElement).focus())
+  for (let i = 0; i < times; i++) {
+    await handle.page.keyboard.press('Escape')
+    if (i < times - 1) await realDelay(gapMs)
+  }
 }
 
-/**
- * Is an extension surface still on screen?
- *
- * Deliberately NOT `getAllWebContents().some(...)`: exiting an extension calls
- * `setVisible(false)` on its WebContentsView, it does not destroy it, so the
- * webContents outlives the exit and that predicate reports true forever. Ask
- * the window what it is actually compositing instead.
- */
+/** Is an extension surface still on screen? The panel div outlives the exit
+ * (it stays mounted, hidden), so ask whether it is actually displayed. */
 function extensionShowing(): Promise<boolean> {
-  return handle.app.evaluate(({ BrowserWindow }) => {
-    const win = BrowserWindow.getAllWindows()[0]
-    const views = win.contentView.children
-    return views.some((v) => {
-      const b = v.getBounds()
-      return v.getVisible() && b.width > 100 && b.height > 100
-    })
+  return handle.page.evaluate(() => {
+    const panel = document.querySelector('[data-extension-panel]')
+    return !!panel && getComputedStyle(panel).display !== 'none'
   })
 }
 
-/**
- * Idempotent: the workspace tab button toggles, so clicking it when the view is
- * already up closes it. Each test asks for "Foundry is on screen", not "click
- * the Foundry button".
- */
-async function openFoundry(): Promise<void> {
+/** Foundry on screen, unless it already is (its band button toggles). */
+async function showFoundry(): Promise<void> {
   if (await extensionShowing()) return
-  const button = handle.page.locator('button[aria-label="Foundry"]')
-  await expect(button).toBeVisible({ timeout: 15000 })
-  await button.click()
-  await expect.poll(extensionShowing, { timeout: 20000 }).toBe(true)
-  await expect
-    .poll(() => inFoundry<boolean>('!!document.querySelector("button")'), { timeout: 10000 })
-    .toBe(true)
+  await openFoundryPanel(handle)
 }
 
 /** Move focus off any text field, so the text-field guard is not what is being tested. */
@@ -165,15 +126,14 @@ function ideaValue(): Promise<string> {
 
 /**
  * Report an open dialog the way @terminator/extension-ui does — across the
- * bridge. Setting a key on the page's own window would be invisible to the
- * preload, which runs in an isolated world.
+ * bridge.
  */
 function setModalDepth(depth: number): Promise<void> {
   return inFoundry(`(() => { window.electronAPI.ui.setModalDepth(${depth}); return true })()`)
 }
 
 test('Escape twice in a text field keeps the extension open and the draft intact', async () => {
-  await openFoundry()
+  await showFoundry()
   await openForge()
   expect(await focusIdeaAndType('my unsaved draft')).toBe('my unsaved draft')
 
@@ -187,7 +147,7 @@ test('Escape twice in a text field keeps the extension open and the draft intact
 })
 
 test('Escape twice while a dialog is open does not exit the extension', async () => {
-  await openFoundry()
+  await showFoundry()
   await blurEverything()
   await setModalDepth(1)
 
@@ -199,7 +159,7 @@ test('Escape twice while a dialog is open does not exit the extension', async ()
 })
 
 test('Escape twice with nested dialogs open does not exit the extension', async () => {
-  await openFoundry()
+  await showFoundry()
   await blurEverything()
   await setModalDepth(3)
 
@@ -211,7 +171,7 @@ test('Escape twice with nested dialogs open does not exit the extension', async 
 })
 
 test('the exit gesture still works once nothing has claimed the key', async () => {
-  await openFoundry()
+  await showFoundry()
   // Neither a text field nor a terminal, and nothing open — the one case where
   // the gesture is supposed to fire.
   await blurEverything()
@@ -227,7 +187,7 @@ test('the exit gesture still works once nothing has claimed the key', async () =
 })
 
 test('two Escapes further apart than the gesture window never pair', async () => {
-  await openFoundry()
+  await showFoundry()
   await blurEverything()
 
   await pressEscape(1)

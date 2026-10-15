@@ -17,14 +17,8 @@ import {
 } from './foundry-harness'
 
 // The Forge's List ⇄ Factory toggle, driven through the running application.
-//
-// The extension's UI is an overlaid WebContentsView — Playwright's `page`
-// cannot see it — so this reaches it the same way tests/e2e/foundry-*.spec.ts
-// does: `electronApp.evaluate` over `getAllWebContents`, and every control is
-// addressed by role and accessible name, never by CSS class.
-//
-// Each test below launches and closes its own app: neither depends on what
-// the other left running, so either passes run alone.
+// Controls are reached with `inFoundry` and addressed by role and accessible
+// name, never by CSS class. Each test launches and closes its own app.
 
 /** The Forge is in Factory view, and List is not pressed. */
 async function expectFactoryPressed(timeout: number): Promise<void> {

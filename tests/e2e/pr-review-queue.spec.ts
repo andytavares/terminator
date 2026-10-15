@@ -1,15 +1,15 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect } from '@playwright/test'
 import { rmSync } from 'node:fs'
 import { closeApp, launchApp, type AppHandle } from './helpers'
 import {
   git,
-  gitView,
   makeRepoWithRemote,
   openCodeReviews,
   openRepo,
   pushBranchToOrigin,
   writeFile,
 } from './git-harness'
+import { popoutPage, type ExtensionView } from './extension-page'
 import { startGithubStub, type GithubStub } from './github-stub'
 
 /** Code Reviews' queue and a pull request's overview against the stub GitHub, from search
@@ -69,9 +69,10 @@ test.afterAll(async () => {
   for (const dir of [repo, bare]) if (dir) rmSync(dir, { recursive: true, force: true })
 })
 
-const queueRow = (view: Page, title: string) => view.locator('.rd-row').filter({ hasText: title })
+const queueRow = (view: Pick<ExtensionView, 'locator'>, title: string) =>
+  view.locator('.rd-row').filter({ hasText: title })
 
-async function openPrOverview(title: string): Promise<Page> {
+async function openPrOverview(title: string): Promise<ExtensionView> {
   const view = await openCodeReviews(handle, 'Review Queue')
   await queueRow(view, title).click()
   await expect(view.getByRole('heading', { level: 1 })).toContainText(title)
@@ -161,7 +162,7 @@ test('an approval from the pop-out window reaches GitHub and closes the window',
   await view.getByRole('button', { name: 'Close' }).click()
   await expect(queueRow(view, 'Add subtract')).toBeVisible()
   await view.getByRole('button', { name: 'Pop out' }).click()
-  const popout = await gitView(handle, 'pr-review')
+  const popout = await popoutPage(handle, 'view=pr-review')
   await queueRow(popout, 'Add subtract').click()
   await popout.getByRole('button', { name: /^(Start|Continue|Resume) review/ }).click()
   await popout.getByRole('button', { name: /^Submit review/ }).click()

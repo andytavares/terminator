@@ -3,6 +3,8 @@ import { execFileSync } from 'node:child_process'
 import { mkdirSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { launchApp, closeApp, createWorkspace, type AppHandle, e2eTempDir } from './helpers'
+import { inFoundry as inFoundryFrame } from './foundry-harness'
+import { extensionPage } from './extension-page'
 
 // Opening the application on a run the last one left in flight.
 //
@@ -215,15 +217,9 @@ async function foundry(channel: string, payload: unknown = {}): Promise<unknown>
   )
 }
 
-/** Runs a script inside Foundry's own view, which the page cannot reach. */
+/** Runs a script inside Foundry's frame in the main window. */
 function inFoundry<T>(script: string): Promise<T> {
-  return handle.app.evaluate(async ({ webContents }, src) => {
-    const view = webContents
-      .getAllWebContents()
-      .find((wc) => !wc.isDestroyed() && wc.getURL().includes('foundry'))
-    if (!view) throw new Error('the Foundry view is not loaded')
-    return view.executeJavaScript(src) as Promise<unknown>
-  }, script) as Promise<T>
+  return inFoundryFrame<T>(handle, script)
 }
 
 function clickByName(name: string): Promise<boolean> {
@@ -402,18 +398,11 @@ test('the inbox renders the row with its move on it', async () => {
 
   // The picture, because a structural assertion passes while the band renders
   // in the wrong place, off-screen, or unreadable.
-  const shot = (await handle.app.evaluate(async ({ webContents }) => {
-    const view = webContents
-      .getAllWebContents()
-      .find((wc) => !wc.isDestroyed() && wc.getURL().includes('foundry'))
-    if (!view) throw new Error('the Foundry view is not loaded')
-    const image = await view.capturePage()
-    return image.toPNG().toString('base64')
-  })) as string
+  const view = await extensionPage(handle, 'foundry')
   mkdirSync(join(process.cwd(), 'test-results'), { recursive: true })
   writeFileSync(
     join(process.cwd(), 'test-results', 'foundry-interrupted-inbox.png'),
-    Buffer.from(shot, 'base64')
+    await view.screenshot()
   )
   expect(existsSync(join(process.cwd(), 'test-results', 'foundry-interrupted-inbox.png'))).toBe(
     true
@@ -462,15 +451,10 @@ const HAS_TRY_AGAIN = `(function () {
       return false
     })()`
 
-/** A PNG of the Foundry view as it is now, base64. */
+/** A PNG of the Foundry frame as it is now, base64. */
 async function foundryShot(): Promise<string> {
-  return (await handle.app.evaluate(async ({ webContents }) => {
-    const view = webContents
-      .getAllWebContents()
-      .find((wc) => !wc.isDestroyed() && wc.getURL().includes('foundry'))
-    if (!view) throw new Error('the Foundry view is not loaded')
-    return (await view.capturePage()).toPNG().toString('base64')
-  })) as string
+  const view = await extensionPage(handle, 'foundry')
+  return (await view.screenshot()).toString('base64')
 }
 
 test('the Floor carries the same move, above the graph', async () => {

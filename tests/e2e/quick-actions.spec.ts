@@ -10,6 +10,7 @@ import {
   addAndSelectProject,
   e2eTempDir,
 } from './helpers'
+import { extensionFrame } from './extension-page'
 import { expectCentredInWindow } from './modal-centre'
 
 /**
@@ -26,10 +27,6 @@ import { expectCentredInWindow } from './modal-centre'
  */
 
 const DIALOG_NAME = 'Quick actions'
-
-// The leader is CmdOrCtrl+P: ⌘ on macOS, Ctrl elsewhere. Page keys say so with
-// Playwright's ControlOrMeta; sendInputEvent into an extension view needs it spelled out.
-const LEADER_MODIFIER = process.platform === 'darwin' ? 'meta' : 'control'
 
 function dialog(page: Page) {
   return page.getByRole('dialog', { name: DIALOG_NAME })
@@ -53,38 +50,20 @@ async function waitForAnimationsToFinish(page: Page, selector: string): Promise<
   }, selector)
 }
 
-/** Run a script inside the first loaded webContents whose URL contains `part`. */
-function inView<T>(handle: AppHandle, part: string, script: string): Promise<T> {
-  return handle.app.evaluate(
-    async ({ webContents }, { p, src }) => {
-      const v = webContents
-        .getAllWebContents()
-        .find((w) => !w.isDestroyed() && w.getURL().includes(p))
-      if (!v) throw new Error(`no view for ${p}`)
-      return v.executeJavaScript(src) as Promise<unknown>
-    },
-    { p: part, src: script }
-  ) as Promise<T>
+/** Run a script inside the extension frame whose URL contains `part`. */
+async function inView<T>(handle: AppHandle, part: string, script: string): Promise<T> {
+  const frame = extensionFrame(handle, part)
+  if (!frame) throw new Error(`no frame for ${part}`)
+  return frame.evaluate(script) as Promise<T>
 }
 
-/** Send a keyDown/char/keyUp triple into an extension's own webContents. */
-async function keyInView(
-  handle: AppHandle,
-  part: string,
-  { keyCode, modifiers = [] }: { keyCode: string; modifiers?: string[] }
-): Promise<void> {
-  await handle.app.evaluate(
-    async ({ webContents }, { p, k, mods }) => {
-      const v = webContents
-        .getAllWebContents()
-        .find((w) => !w.isDestroyed() && w.getURL().includes(p))
-      if (!v) throw new Error(`no view for ${p}`)
-      v.sendInputEvent({ type: 'keyDown', keyCode: k, modifiers: mods as never })
-      if (k.length === 1) v.sendInputEvent({ type: 'char', keyCode: k, modifiers: mods as never })
-      v.sendInputEvent({ type: 'keyUp', keyCode: k, modifiers: mods as never })
-    },
-    { p: part, k: keyCode, mods: modifiers }
-  )
+/** Press a key inside an extension's frame, with the host page's modifier name. */
+async function keyInView(handle: AppHandle, part: string, keyCode: string): Promise<void> {
+  const frame = extensionFrame(handle, part)
+  if (!frame) throw new Error(`no frame for ${part}`)
+  // The frame's document must own focus for its listeners to see the key.
+  await frame.evaluate(() => (document.body as HTMLElement).focus())
+  await handle.page.keyboard.press(keyCode)
 }
 
 async function setTheme(page: Page, theme: 'dark' | 'light'): Promise<void> {
@@ -221,17 +200,16 @@ async function leaderInsideNotesOpensPanel(handle: AppHandle): Promise<void> {
   await expect(notesPanel).toHaveCount(1, { timeout: 10000 })
   await expect
     .poll(
-      () =>
-        handle.app.evaluate(({ webContents }) =>
-          webContents
-            .getAllWebContents()
-            .some((wc) => !wc.isDestroyed() && wc.getURL().includes('notepad') && !wc.isLoading())
-        ),
+      async () => {
+        const frame = extensionFrame(handle, 'notepad')
+        if (!frame) return false
+        return frame.evaluate(() => document.readyState === 'complete').catch(() => false)
+      },
       { timeout: 15000 }
     )
     .toBe(true)
 
-  await keyInView(handle, 'notepad', { keyCode: 'P', modifiers: [LEADER_MODIFIER] })
+  await keyInView(handle, 'notepad', 'ControlOrMeta+p')
   await expect(dialog(page)).toBeVisible({ timeout: 10000 })
   // Escape closes the panel from inside it; pressed before focus has moved
   // there from the extension's view, it closes nothing (as core-ipc found).

@@ -1,6 +1,6 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect } from '@playwright/test'
 import { AppHandle, launchApp, closeApp } from './helpers'
-import { invokeChannel } from './extension-page'
+import { invokeChannel, type ExtensionView } from './extension-page'
 import { createItem, noteRow, openNotepad, storedNote } from './notepad-harness'
 
 // Comments on a note: anchoring one to selected text, editing, replying,
@@ -17,7 +17,7 @@ interface StoredComment {
 }
 
 let handle: AppHandle
-let notepad: Page
+let notepad: ExtensionView
 let noteId: string
 
 const BODY = '# Review\nThe quick brown fox jumps over the lazy dog.'

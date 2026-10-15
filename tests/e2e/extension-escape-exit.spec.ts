@@ -1,10 +1,10 @@
 import { test, expect } from '@playwright/test'
 import { AppHandle, launchApp, closeApp } from './helpers'
+import { extensionFrame } from './extension-page'
 
-// Proves the double-Escape exit against the real app, including the part unit
-// tests cannot reach: the keystroke originates inside an extension's own
-// WebContentsView, which is a separate webContents the Playwright page cannot
-// see or type into.
+// Proves the double-Escape exit against the real app, with the keystroke
+// originating inside the extension's frame: the frame shim (ADR 114) detects
+// the gesture in the page and posts it over the port.
 
 let handle: AppHandle
 
@@ -24,27 +24,16 @@ async function activeGlobalTab(): Promise<string | null> {
   })
 }
 
-/** True once the extension's WebContentsView exists and has finished loading. */
-function extensionViewReady(): Promise<boolean> {
-  return handle.app.evaluate(({ webContents }) =>
-    webContents
-      .getAllWebContents()
-      .some((wc) => !wc.isDestroyed() && wc.getURL().startsWith('ext://') && !wc.isLoading())
-  )
-}
-
-/** Sends Escape into the extension's own WebContentsView, bypassing the host page. */
+/** Sends Escape into the extension's frame as real key presses. */
 async function pressEscapeInExtensionView(times: number): Promise<void> {
-  await handle.app.evaluate(async ({ webContents }, count) => {
-    const view = webContents
-      .getAllWebContents()
-      .find((wc) => !wc.isDestroyed() && wc.getURL().startsWith('ext://'))
-    if (!view) throw new Error('no extension WebContentsView is loaded')
-    for (let i = 0; i < count; i++) {
-      view.sendInputEvent({ type: 'keyDown', keyCode: 'Escape' })
-      view.sendInputEvent({ type: 'keyUp', keyCode: 'Escape' })
-    }
-  }, times)
+  const frame = extensionFrame(handle, 'dist/index.html')
+  if (!frame) throw new Error('no extension frame is loaded')
+  // The frame's document must own focus for the shim to see the key; focusing
+  // its body is what a click into the view does.
+  await frame.evaluate(() => (document.body as HTMLElement).focus())
+  for (let i = 0; i < times; i++) {
+    await handle.page.keyboard.press('Escape')
+  }
 }
 
 // Named explicitly: the first rail tabs are the core Home and Overview screens, which
@@ -53,11 +42,9 @@ const EXTENSION_TAB_TITLE = 'Notes'
 
 /**
  * Waits out real wall-clock time. The double-Escape gesture is timed against
- * `Date.now()` inside the extension's own WebContentsView
- * (`src/main/preload-webview.ts`), which Playwright cannot attach a fake
- * clock to, so proving a press falls outside `DOUBLE_ESCAPE_WINDOW_MS`
- * genuinely requires that much time to elapse. Not a settle-and-hope sleep:
- * the duration is the feature's own timing contract, not a guess.
+ * `Date.now()` inside the extension's frame, which Playwright cannot attach a
+ * fake clock to, so proving a press falls outside `DOUBLE_ESCAPE_WINDOW_MS`
+ * genuinely requires that much time to elapse.
  */
 async function realDelay(ms: number): Promise<void> {
   const deadline = Date.now() + ms
@@ -72,10 +59,18 @@ async function openExtensionGlobalTab(): Promise<void> {
   await expect(tab).toBeVisible({ timeout: 15000 })
   await tab.click()
   await expect(handle.page.locator('[data-extension-panel]')).toHaveCount(1, { timeout: 10000 })
-  // The host renderer only reports bounds; main creates and loads the view
-  // afterwards, so the placeholder existing does not mean it can take input yet.
+  // The host renderer draws the panel placeholder first; the frame attaches and
+  // loads afterwards, so the placeholder existing does not mean the frame can
+  // take input yet.
   await expect
-    .poll(extensionViewReady, { timeout: 20000, message: 'extension view never finished loading' })
+    .poll(
+      async () => {
+        const frame = extensionFrame(handle, 'dist/index.html')
+        if (!frame) return false
+        return frame.evaluate(() => document.readyState === 'complete').catch(() => false)
+      },
+      { timeout: 20000, message: 'extension frame never finished loading' }
+    )
     .toBe(true)
 }
 

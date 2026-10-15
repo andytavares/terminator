@@ -1,29 +1,31 @@
 import { test, expect } from '@playwright/test'
-import { AppHandle, launchApp, closeApp } from './helpers'
+import { AppHandle, launchApp, closeApp, inExtensionView } from './helpers'
+import { extensionFrame } from './extension-page'
 
 // The outline's parsing and nesting are unit-tested. What only the real app can
 // answer is whether the panel is wired to anything: it lives in the notepad's
-// own WebContentsView, which the Playwright page cannot see or type into, and
-// its click has to reach a CodeMirror view three components away.
+// own frame in the main window, and its click has to reach a CodeMirror view
+// three components away.
 
 let handle: AppHandle
 
-/** Creates the fixture note and reloads the view. Seeded through the
+/** Creates the fixture note and reloads the frame. Seeded through the
  * extension's own bridge: typing markdown through synthetic key events would
  * be exercising the input plumbing, not this. */
 async function seedOutlineNote(): Promise<void> {
-  await handle.app.evaluate(async ({ webContents }, body) => {
-    const view = webContents
-      .getAllWebContents()
-      .find((wc) => !wc.isDestroyed() && wc.getURL().startsWith('ext://'))
-    if (!view) throw new Error('no notepad view is loaded')
-    await view.executeJavaScript(
-      `window.electronAPI.extensionBridge.invoke('terminator.notepad:notes.create', ${JSON.stringify(
-        { title: 'Outline fixture', body }
-      )})`
-    )
-    view.reload()
-  }, BODY)
+  const frame = extensionFrame(handle, 'notepad')
+  if (!frame) throw new Error('no notepad frame is loaded')
+  await frame.evaluate(
+    (body) =>
+      window.electronAPI.extensionBridge.invoke('terminator.notepad:notes.create', {
+        title: 'Outline fixture',
+        body,
+      }),
+    BODY
+  )
+  await frame.evaluate(() => {
+    location.reload()
+  })
 }
 
 test.beforeAll(async () => {
@@ -34,34 +36,29 @@ test.afterAll(async () => {
   await closeApp(handle)
 })
 
-/** True once the notepad's WebContentsView exists and has finished loading. */
-function extensionViewReady(): Promise<boolean> {
-  return handle.app.evaluate(({ webContents }) =>
-    webContents
-      .getAllWebContents()
-      .some((wc) => !wc.isDestroyed() && wc.getURL().startsWith('ext://') && !wc.isLoading())
-  )
+/** True once the notepad's frame exists and has finished loading. */
+async function extensionViewReady(): Promise<boolean> {
+  const frame = extensionFrame(handle, 'notepad')
+  if (!frame) return false
+  return frame.evaluate(() => document.readyState === 'complete').catch(() => false)
 }
 
 /**
  * Runs a script inside a notepad view and returns its result. `where` picks the
- * surface: the docked panel, or the pop-out note window, which is a second
- * webContents on the same ext:// origin.
+ * surface: the docked panel (a frame in the main window), or the pop-out note
+ * window, which is a real BrowserWindow loading the same ext:// URL directly.
  */
 function inNotepad<T>(script: string, where: 'panel' | 'window' = 'panel'): Promise<T> {
-  return handle.app.evaluate(
-    async ({ webContents }, { src, target }) => {
-      const views = webContents
-        .getAllWebContents()
-        .filter((wc) => !wc.isDestroyed() && wc.getURL().startsWith('ext://'))
-      const view = views.find((wc) =>
-        target === 'window' ? wc.getURL().includes('view=note') : !wc.getURL().includes('view=note')
-      )
-      if (!view) throw new Error(`no notepad ${target} view is loaded`)
-      return view.executeJavaScript(src) as Promise<unknown>
-    },
-    { src: script, target: where }
-  ) as Promise<T>
+  if (where === 'panel') {
+    return inExtensionView<T>(handle, 'notepad/dist/index.html?view=main', script)
+  }
+  return handle.app.evaluate(async ({ webContents }, src) => {
+    const view = webContents
+      .getAllWebContents()
+      .find((wc) => !wc.isDestroyed() && wc.getURL().includes('view=note'))
+    if (!view) throw new Error('no notepad window view is loaded')
+    return view.executeJavaScript(src) as Promise<unknown>
+  }, script) as Promise<T>
 }
 
 // Long enough that the editor genuinely has to scroll — a note that fits on
