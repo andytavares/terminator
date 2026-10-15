@@ -55,7 +55,7 @@ function churnFactor(churn: number | null): Factor {
   return {
     key: 'churn',
     icon: Flame,
-    title: 'Changes often',
+    title: choose(severity === 'lo', 'How often it changes', 'Changes often'),
     detail: choose(
       churn == null,
       'Not measured',
@@ -75,7 +75,7 @@ function usedByFactor(metrics: Metrics, importerCount: number): Factor {
     key: 'used-by',
     icon: Share2,
     title: `Used by ${count} ${plural(count, 'file')}`,
-    detail: 'Most affected if it breaks',
+    detail: choose(severity === 'lo', 'Few files depend on it', 'Most affected if it breaks'),
     note: thresholdNote(count, band),
     severity,
     reason: choose(severity === 'lo', undefined, 'is used by much of the code'),
