@@ -47,6 +47,12 @@ function openCheckoutOnce(checkoutOf: (repo: string) => string): OpenCheckout {
 function aSavedFileAppears(open: OpenCheckout): void {
   test('a file saved outside the app appears in the list', async () => {
     const view = await openGitTab(open.handle)
+    // The first status is read once the watch has started: the clock below times a change, not
+    // the view starting up, which a cold CI runner can take two seconds over.
+    const opened = Date.now()
+    await expect(view.getByText(PREPARED[0], { exact: true }).first()).toBeAttached()
+    const shown = Date.now()
+    test.info().annotations.push({ type: 'first status', description: `${shown - opened}ms` })
     let saves = 0
     const saveAndCount = () => {
       writeFile(open.checkout, 'saved-outside.txt', `save ${++saves}\n`)
@@ -54,6 +60,7 @@ function aSavedFileAppears(open: OpenCheckout): void {
     }
     // Sooner than the three seconds the tab used to poll at.
     await expect.poll(saveAndCount, { timeout: 2500 }).toBeGreaterThan(0)
+    test.info().annotations.push({ type: 'change shown', description: `${Date.now() - shown}ms` })
   })
 }
 
