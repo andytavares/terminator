@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { Button, Popover } from '@terminator/extension-ui'
+import { plural } from '@terminator/extension-sdk'
 import './view-menu.css'
 
 /** @internal */
@@ -36,13 +37,18 @@ function UsesList(props: { uses: Use[]; onPeek: () => void }) {
   )
 }
 
+function labelsFor(uses: Use[]) {
+  const unread = uses.filter((u) => !u.read).length
+  const countText = `Uses ${uses.length} ${plural(uses.length, 'symbol')} from this PR`
+  return { countText, fullText: `${countText} · ${unread} not yet read`, unread }
+}
+
 /** File-header "Uses" button: the reading-order symbols this file depends on. */
 export function UsesPopover({ uses, compact, onPeekDefinition }: UsesPopoverProps) {
   const [open, setOpen] = useState(false)
   if (uses.length === 0) return null
-  const unread = uses.filter((u) => !u.read).length
-  const fullText = `Uses ${uses.length} · ${unread} unread`
-  const label = compact || unread === 0 ? `Uses ${uses.length}` : fullText
+  const { countText, fullText, unread } = labelsFor(uses)
+  const label = compact || unread === 0 ? countText : fullText
   const peek = () => {
     setOpen(false)
     onPeekDefinition()
