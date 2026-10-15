@@ -97,6 +97,16 @@ test('the diff shows the change, and the context below it on request', async () 
   await expect(view.getByRole('main')).toContainText('export const step20 = 20')
 })
 
+test("the overview's review plan opens a chapter at its first file", async () => {
+  const view = await openCodeReviews(handle, 'Review Diff')
+  await fileInList(view, 'tests/math.spec.ts').click()
+  await view.getByRole('main').focus()
+  await view.keyboard.press('i')
+  await view.getByRole('button', { name: 'Start here: Tests' }).click()
+  await expect(fileInList(view, 'src/math.ts')).toHaveAttribute('aria-current', 'true')
+  await expect(fileInList(view, 'tests/math.spec.ts')).not.toHaveAttribute('aria-current', 'true')
+})
+
 test("a file's risk names the files that import it", async () => {
   const view = await openCodeReviews(handle, 'Review Diff')
   await view.getByRole('main').getByRole('button', { name: /risk$/ }).first().click()
