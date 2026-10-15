@@ -10,6 +10,14 @@ extensions/git-integration/src/github/pr-review-service.ts
   s_e708cca5bdf352::t_41dabe1d2600af 13-21,56-57,205-219,224-229,232-237,246-248,252,255,288-289,292,302-303,311
 extensions/git-integration/src/review/pr-signals.ts
   s_e708cca5bdf352::t_41dabe1d2600af 9-14,130-131
+docs/adr/113-a-file-is-high-risk-by-fixed-thresholds.md
+  s_e708cca5bdf352::t_a75d595beb6587 1-25
+docs/user-guide/USER-GUIDE.md
+  s_e708cca5bdf352::t_a75d595beb6587 560-568
+docs/research/review-screen-redesign.html
+  s_e708cca5bdf352::t_a75d595beb6587 1-3056
+README.md
+  s_e708cca5bdf352::t_a75d595beb6587 22
 ---
 {
   "schema_version": "authorship/3.0.0",
