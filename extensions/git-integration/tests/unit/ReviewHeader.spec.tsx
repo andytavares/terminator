@@ -27,7 +27,14 @@ function baseProps(overrides: Partial<ReviewHeaderProps> = {}): ReviewHeaderProp
     checks: [],
     viewedCount: 2,
     totalFiles: 10,
-    estimatedMinutes: 6,
+    chapters: [
+      { id: 'c1', fileCount: 6, viewedCount: 2 },
+      { id: 'c2', fileCount: 4, viewedCount: 0 },
+    ],
+    minutesLeft: 6,
+    draftCount: 0,
+    onSubmit: vi.fn(),
+    onPause: vi.fn(),
     largePr: null,
     onDismissLargePr: vi.fn(),
     focusMode: false,
@@ -145,18 +152,36 @@ describe('ReviewHeader (continued)', () => {
 
 describe('ReviewHeader (continued)', () => {
   describe('progress', () => {
-    it('exposes aria progressbar values and visible text', () => {
-      render(
-        <ReviewHeader {...baseProps({ viewedCount: 3, totalFiles: 12, estimatedMinutes: 6 })} />
-      )
-      const meter = screen.getByRole('progressbar', { name: '3 of 12 files viewed' })
-      expect(meter.getAttribute('aria-valuenow')).toBe('3')
-      expect(meter.getAttribute('aria-valuemin')).toBe('0')
-      expect(meter.getAttribute('aria-valuemax')).toBe('12')
-      expect(screen.getByText('3/12 viewed · ~6m')).toBeTruthy()
+    it('draws one segment per chapter, named by the viewed total', () => {
+      render(<ReviewHeader {...baseProps({ viewedCount: 3, totalFiles: 12 })} />)
+      const segments = screen.getByRole('img', { name: '3 of 12 files viewed' })
+      expect(segments.querySelectorAll('i')).toHaveLength(2)
+    })
+
+    it('sizes each segment by its file count and fills the viewed share', () => {
+      render(<ReviewHeader {...baseProps()} />)
+      const [first, second] = screen
+        .getByRole('img', { name: '2 of 10 files viewed' })
+        .querySelectorAll('i')
+      expect(first.style.flexGrow).toBe('6')
+      expect(first.style.getPropertyValue('--filled')).toBe('33.33333333333333%')
+      expect(second.style.flexGrow).toBe('4')
+      expect(second.style.getPropertyValue('--filled')).toBe('0%')
+    })
+
+    it('says how many files are viewed and how long is left', () => {
+      render(<ReviewHeader {...baseProps({ viewedCount: 4, totalFiles: 23, minutesLeft: 26 })} />)
+      expect(screen.getByText('4 of 23 viewed · about 26 min left')).toBeTruthy()
+    })
+
+    it('leaves the time out when nothing is left to read', () => {
+      render(<ReviewHeader {...baseProps({ viewedCount: 10, totalFiles: 10, minutesLeft: 0 })} />)
+      expect(screen.getByText('10 of 10 viewed')).toBeTruthy()
     })
   })
+})
 
+describe('ReviewHeader — ask agent', () => {
   it('calls onAskAgent from the Ask agent button with the right accessible name', () => {
     const onAskAgent = vi.fn()
     render(<ReviewHeader {...baseProps({ onAskAgent })} />)
@@ -272,6 +297,45 @@ describe('ReviewHeader (continued) — More menu — calls onPopOut for Pop out 
     openMenu()
     fireEvent.click(screen.getByRole('menuitem', { name: /keyboard shortcuts/i }))
     expect(onOpenKeyboardHelp).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('menu')).toBeNull()
+  })
+})
+
+describe('ReviewHeader — back arrow', () => {
+  it('goes back to the overview from the back arrow', () => {
+    const onShowOverview = vi.fn()
+    render(<ReviewHeader {...baseProps({ onShowOverview })} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Back to overview' }))
+    expect(onShowOverview).toHaveBeenCalledTimes(1)
+  })
+
+  it('has no back arrow without an overview to go back to', () => {
+    render(<ReviewHeader {...baseProps({ onShowOverview: undefined })} />)
+    expect(screen.queryByRole('button', { name: 'Back to overview' })).toBeNull()
+  })
+})
+
+describe('ReviewHeader — submit and pause', () => {
+  it('shows the draft count on the Submit review button', () => {
+    const onSubmit = vi.fn()
+    render(<ReviewHeader {...baseProps({ draftCount: 2, onSubmit })} />)
+    const submit = screen.getByRole('button', { name: /^Submit review/ })
+    expect(submit.textContent).toContain('2')
+    fireEvent.click(submit)
+    expect(onSubmit).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows no count badge without drafts', () => {
+    render(<ReviewHeader {...baseProps({ draftCount: 0 })} />)
+    expect(screen.getByRole('button', { name: 'Submit review' }).textContent).toBe('Submit review')
+  })
+
+  it('keeps Pause review in the more menu', () => {
+    const onPause = vi.fn()
+    render(<ReviewHeader {...baseProps({ onPause })} />)
+    openMenu()
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Pause review' }))
+    expect(onPause).toHaveBeenCalledTimes(1)
     expect(screen.queryByRole('menu')).toBeNull()
   })
 })
