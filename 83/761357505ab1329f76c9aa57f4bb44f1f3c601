@@ -1,0 +1,19 @@
+tests/e2e/pr-review-diff.spec.ts
+  s_e708cca5bdf352::t_b264127d289059 102-103
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "83761357505ab1329f76c9aa57f4bb44f1f3c601",
+  "prompts": {},
+  "sessions": {
+    "s_e708cca5bdf352": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5d7c9815-e79e-402d-b85d-cf8028e700ad",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
