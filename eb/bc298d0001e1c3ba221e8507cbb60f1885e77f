@@ -3,6 +3,28 @@ extensions/git-integration/tests/unit/word-diff.spec.ts
   s_e708cca5bdf352::t_5fe3a15feaa7d1 79-80
 extensions/git-integration/src/components/pr-review/diff-pane/word-diff.ts
   s_e708cca5bdf352::t_d9ceea0b15a3a3 1-98
+extensions/git-integration/tests/unit/ReviewDiffPane.spec.tsx
+  s_e708cca5bdf352::t_360e1e424d31e1 1287,1315,1321,1324,1326,1357,1681,1688,1690
+extensions/git-integration/src/components/pr-review/file-tree.css
+  s_e708cca5bdf352::t_360e1e424d31e1 45-46,62-64
+extensions/git-integration/src/components/pr-review/file-rows.tsx
+  s_e708cca5bdf352::t_360e1e424d31e1 98
+tests/e2e/pr-review-diff.spec.ts
+  s_e708cca5bdf352::t_360e1e424d31e1 154,158,163,180-181
+extensions/git-integration/src/stores/pr-review.store.ts
+  s_e708cca5bdf352::t_360e1e424d31e1 289-290
+extensions/git-integration/src/components/pr-review/diff-pane/rows.tsx
+  s_e708cca5bdf352::t_360e1e424d31e1 303-317,321-323
+tests/e2e/pr-review-queue.spec.ts
+  s_e708cca5bdf352::t_360e1e424d31e1 167,170
+tests/e2e/git-integration-contrast.spec.ts
+  s_e708cca5bdf352::t_360e1e424d31e1 86
+tests/e2e/git-integration-contrast.entry.tsx
+  s_e708cca5bdf352::t_360e1e424d31e1 423-424
+extensions/git-integration/src/components/pr-review/review-layout.css
+  s_e708cca5bdf352::t_360e1e424d31e1 20-21
+extensions/git-integration/tests/unit/pr-review.store.spec.ts
+  s_e708cca5bdf352::t_360e1e424d31e1 266-277
 ---
 {
   "schema_version": "authorship/3.0.0",
