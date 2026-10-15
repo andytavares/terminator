@@ -276,23 +276,32 @@ export async function openListedOrder(handle: AppHandle, id: string): Promise<vo
  * "what is this agent running" is answered by reading that file, not by
  * scraping a screen an agent's own output may since have scrolled past.
  */
-export function launchScript(handle: AppHandle): string {
+/** The newest launch script that starts an agent. Order creation also launches the environment
+ *  baseline (build, test) through the same folder, so the newest script is not always the agent's. */
+export function agentLaunchScript(handle: AppHandle): string {
   // Foundry's own folder (ADR 103): <userData>/extensions/<id>/runtime.
   const dir = join(handle.userDataDir, 'extensions', 'terminator.foundry', 'runtime', 'launch')
-  const scripts = readdirSync(dir)
+  const agentScripts = readdirSync(dir)
     .filter((name) => name.endsWith('.sh'))
     .map((name) => join(dir, name))
     .sort((a, b) => statSync(a).mtimeMs - statSync(b).mtimeMs)
-  if (scripts.length === 0) throw new Error(`no launch script was written in ${dir}`)
-  return readFileSync(scripts[scripts.length - 1], 'utf8')
+    .map((path) => readFileSync(path, 'utf8'))
+    .filter(launchesAgent)
+  if (agentScripts.length === 0) throw new Error(`no agent launch script was written in ${dir}`)
+  return agentScripts[agentScripts.length - 1]
 }
 
-/** Whether a launch script has been written yet — the poll condition to wait
+/** True when the script's command line starts claude, not a baseline step such as `npm run test`. */
+function launchesAgent(script: string): boolean {
+  return /(^|[\s(;])claude\s/m.test(script)
+}
+
+/** Whether an agent launch script has been written yet — the poll condition to wait
  *  on instead of reading terminal scrollback, which a talkative agent scrolls
  *  out of view. */
-export function hasLaunchScript(handle: AppHandle): boolean {
+export function hasAgentLaunchScript(handle: AppHandle): boolean {
   try {
-    launchScript(handle)
+    agentLaunchScript(handle)
     return true
   } catch {
     return false

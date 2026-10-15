@@ -5,8 +5,8 @@ import { join } from 'node:path'
 import { launchApp, closeApp, createWorkspace, type AppHandle } from './helpers'
 import {
   foundryChannel,
-  hasLaunchScript,
-  launchScript,
+  hasAgentLaunchScript,
+  agentLaunchScript,
   makeFixtureRepo,
   openFoundry,
 } from './foundry-harness'
@@ -149,8 +149,8 @@ async function expectReadOnlyLaunch(): Promise<void> {
   // What the launch actually wrote, not the terminal's visible scrollback — a
   // talkative agent scrolls the typed line out of view, which is a fact about
   // the terminal, not about whether the launch happened.
-  await expect.poll(() => hasLaunchScript(handle), { timeout: 60_000 }).toBe(true)
-  const launched = launchScript(handle)
+  await expect.poll(() => hasAgentLaunchScript(handle), { timeout: 60_000 }).toBe(true)
+  const launched = agentLaunchScript(handle)
   expect(launched).toContain('claude --session-id')
   // Never the thing this replaced: an invisible agent approving its own calls.
   expect(launched).not.toContain('bypassPermissions')
