@@ -8,17 +8,7 @@ import {
   TabPanel,
   TabsRoot,
 } from '@terminator/extension-ui'
-import {
-  ArrowDown,
-  ArrowRight,
-  ChevronDown,
-  ChevronRight,
-  ExternalLink,
-  Eye,
-  RefreshCw,
-  TriangleAlert,
-  X,
-} from 'lucide-react'
+import { ArrowDown, ArrowRight, ExternalLink, Eye, RefreshCw, TriangleAlert, X } from 'lucide-react'
 import { usePrReviewStore } from '../../stores/pr-review.store'
 import { useLoadIssueComments } from '../../hooks/usePrReview'
 import { githubAPI } from '../../api/github'
@@ -26,6 +16,7 @@ import { mergeFlowAPI } from '../../api/merge-flow'
 import { StatusChecksBar } from './StatusChecksBar'
 import { RichContent } from './RichContent'
 import { InsightsPanel } from './InsightsPanel'
+import { OverviewSummary, useSummary, type Summary } from './OverviewSummary'
 import type { PrReviewDetail, IssueComment } from '../../schemas/pr-review.schema'
 import { choose } from '../text'
 
@@ -208,15 +199,6 @@ function focusAtEnd(box: HTMLTextAreaElement | null): void {
   box?.setSelectionRange(len, len)
 }
 
-function Chevron({ open }: { open: boolean }) {
-  return (
-    <span className="pr-overview-section-toggle">
-      {open && <ChevronDown aria-hidden="true" />}
-      {!open && <ChevronRight aria-hidden="true" />}
-    </span>
-  )
-}
-
 interface TopBarProps {
   props: Props
   refresh: BusyFlag
@@ -290,6 +272,19 @@ function Reviewers({ pr, youAreRequested }: { pr: PrReviewDetail; youAreRequeste
   )
 }
 
+/** Approvals, pending requests and your own request, or that nobody was asked. */
+function ReviewersRow({ pr, youAreRequested }: { pr: PrReviewDetail; youAreRequested: boolean }) {
+  const anyone =
+    (pr.approvals?.length ?? 0) > 0 || (pr.requestedReviewers?.length ?? 0) > 0 || youAreRequested
+  if (!anyone) return <span className="pr-glance-none">None requested</span>
+  return <Reviewers pr={pr} youAreRequested={youAreRequested} />
+}
+
+const SETTLED_MERGE_STATE: Record<'clean' | 'unknown', string> = {
+  clean: 'No conflicts',
+  unknown: 'Not reported',
+}
+
 function MergeStateBadge({ pr }: { pr: PrReviewDetail }) {
   if (pr.mergeStateStatus === 'behind') {
     return (
@@ -298,7 +293,9 @@ function MergeStateBadge({ pr }: { pr: PrReviewDetail }) {
       </span>
     )
   }
-  if (pr.mergeStateStatus !== 'dirty') return null
+  if (pr.mergeStateStatus !== 'dirty') {
+    return <span className="pr-glance-none">{SETTLED_MERGE_STATE[pr.mergeStateStatus]}</span>
+  }
   return (
     <span className="pr-merge-state-badge pr-merge-state-badge--dirty">
       <TriangleAlert aria-hidden="true" /> Conflicts
@@ -306,21 +303,46 @@ function MergeStateBadge({ pr }: { pr: PrReviewDetail }) {
   )
 }
 
-function StatusBlock({ pr, youAreRequested }: { pr: PrReviewDetail; youAreRequested: boolean }) {
-  const checks = pr.statusChecks ?? []
+function GlanceRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <section className="pr-overview-block pr-overview-status" aria-label="Status">
-      <StatusChecksBar detailed checks={checks} />
-      <div className="pr-overview-meta">
-        <Reviewers pr={pr} youAreRequested={youAreRequested} />
-        <span className="pr-overview-meta-author">{pr.author}</span>
-        <span className="pr-overview-meta-branch">
+    <div className="pr-glance-row">
+      <dt className="pr-glance-label">{label}</dt>
+      <dd className="pr-glance-value">{children}</dd>
+    </div>
+  )
+}
+
+function ChecksRow({ pr }: { pr: PrReviewDetail }) {
+  const checks = pr.statusChecks ?? []
+  if (checks.length === 0) return <span className="pr-glance-none">No checks</span>
+  return <StatusChecksBar detailed checks={checks} />
+}
+
+/** The facts a reviewer checks before reading: status, people, branch and linked issues. */
+function AtAGlance({ pr, youAreRequested }: { pr: PrReviewDetail; youAreRequested: boolean }) {
+  const issueRefs = pr.issueRefs ?? []
+  return (
+    <aside className="pr-glance" aria-label="At a glance">
+      <dl className="pr-glance-list">
+        <GlanceRow label="Checks">
+          <ChecksRow pr={pr} />
+        </GlanceRow>
+        <GlanceRow label="Reviewers">
+          <ReviewersRow pr={pr} youAreRequested={youAreRequested} />
+        </GlanceRow>
+        <GlanceRow label="Author">{pr.author}</GlanceRow>
+        <GlanceRow label="Branch">
           {pr.headRefName} → {pr.baseRefName}
-        </span>
-        <RelativeTime value={pr.openedAt} />
-        <MergeStateBadge pr={pr} />
-      </div>
-    </section>
+        </GlanceRow>
+        <GlanceRow label="Opened">
+          <RelativeTime value={pr.openedAt} />
+        </GlanceRow>
+        <GlanceRow label="Merge state">
+          <MergeStateBadge pr={pr} />
+        </GlanceRow>
+        {issueRefs.length > 0 && <LinkedIssuesRow issueRefs={issueRefs} />}
+      </dl>
+    </aside>
   )
 }
 
@@ -356,40 +378,27 @@ function IssueRefItem({ issueRef }: { issueRef: IssueRef }) {
   )
 }
 
-function IssueContext({ issueRefs }: { issueRefs: IssueRef[] }) {
-  const [expanded, setExpanded] = useState(true)
+function LinkedIssuesRow({ issueRefs }: { issueRefs: IssueRef[] }) {
   return (
-    <div className="pr-overview-block">
-      <h3
-        aria-expanded={expanded}
-        className="pr-overview-section-title pr-overview-section-title--collapsible"
-        onClick={() => setExpanded((v) => !v)}
-        role="button"
-      >
-        Context
-        <Chevron open={expanded} />
-      </h3>
-      {expanded && (
-        <ul className="pr-overview-issue-refs">
-          {issueRefs.map((ref, i) => (
-            <IssueRefItem key={i} issueRef={ref} />
-          ))}
-        </ul>
-      )}
-    </div>
+    <GlanceRow label="Linked issues">
+      <ul className="pr-overview-issue-refs">
+        {issueRefs.map((ref, i) => (
+          <IssueRefItem key={i} issueRef={ref} />
+        ))}
+      </ul>
+    </GlanceRow>
   )
 }
 
-function Description({ body }: { body: string | null | undefined }) {
-  if (!body)
-    return <div className="pr-overview-block pr-overview-no-desc">No description provided.</div>
+function DescriptionPanel({ pr, summary }: { pr: PrReviewDetail; summary: Summary }) {
+  if (!pr.body) return <p className="pr-overview-no-desc">No description provided.</p>
   return (
-    <div className="pr-overview-block">
-      <h3 className="pr-overview-section-title">Description</h3>
+    <>
+      <OverviewSummary subject={{ kind: 'description', body: pr.body }} summary={summary} />
       <div className="pr-overview-description">
-        <RichContent>{body}</RichContent>
+        <RichContent>{pr.body}</RichContent>
       </div>
-    </div>
+    </>
   )
 }
 
@@ -467,29 +476,22 @@ interface DiscussionProps {
   comments: IssueComment[]
   box: IssueCommentBox
   composerRef: ComposerRef
+  summary: Summary
 }
 
-function Discussion({ comments, box, composerRef }: DiscussionProps) {
-  const [open, setOpen] = useState(false)
+function DiscussionPanel({ comments, box, composerRef, summary }: DiscussionProps) {
   return (
-    <div className="pr-overview-block">
-      <button
-        aria-expanded={open}
-        className="pr-overview-section-title pr-overview-discussion-toggle"
-        onClick={() => setOpen((v) => !v)}
-      >
-        Discussion · {comments.length}
-        <Chevron open={open} />
-      </button>
-      {open && comments.length > 0 && (
+    <>
+      <OverviewSummary subject={{ kind: 'discussion', comments }} summary={summary} />
+      {comments.length > 0 && (
         <div className="pr-issue-comment-list">
           {comments.map((comment) => (
             <IssueCommentItem key={comment.id} comment={comment} onReply={box.handleReply} />
           ))}
         </div>
       )}
-      {open && <DiscussionComposer box={box} composerRef={composerRef} />}
-    </div>
+      <DiscussionComposer box={box} composerRef={composerRef} />
+    </>
   )
 }
 
@@ -544,23 +546,50 @@ function CtaBar(props: {
   )
 }
 
-function OverviewBody(props: {
+interface OverviewBodyProps {
+  repoRoot: string
   pr: PrReviewDetail
   comments: IssueComment[]
   box: IssueCommentBox
   composerRef: ComposerRef
   youAreRequested: boolean
-}) {
-  const { pr } = props
+}
+
+type OverviewTab = 'description' | 'discussion' | 'insights'
+
+/** Description, Discussion and Insights, one at a time. Each summary lives here, so it outlasts a
+ *  tab switch and goes with the overview. */
+function OverviewTabs(props: OverviewBodyProps) {
+  const [tab, setTab] = useState<OverviewTab>('description')
+  const descriptionSummary = useSummary(props.repoRoot, props.pr.number)
+  const discussionSummary = useSummary(props.repoRoot, props.pr.number)
   return (
-    <div className="pr-overview-body-scroll">
-      <StatusBlock pr={pr} youAreRequested={props.youAreRequested} />
-      <section className="pr-overview-block">
-        <InsightsPanel pr={pr} />
-      </section>
-      {pr.issueRefs && pr.issueRefs.length > 0 && <IssueContext issueRefs={pr.issueRefs} />}
-      <Description body={pr.body} />
-      <Discussion comments={props.comments} box={props.box} composerRef={props.composerRef} />
+    <div className="pr-overview-main">
+      <TabsRoot selectedId={tab} onSelect={setTab}>
+        <TabList label="Pull request sections" className="pr-overview-tabs">
+          <Tab id="description">Description</Tab>
+          <Tab id="discussion">Discussion · {props.comments.length}</Tab>
+          <Tab id="insights">Insights</Tab>
+        </TabList>
+        <TabPanel id="description" className="pr-overview-tab-panel">
+          <DescriptionPanel pr={props.pr} summary={descriptionSummary} />
+        </TabPanel>
+        <TabPanel id="discussion" className="pr-overview-tab-panel">
+          <DiscussionPanel {...props} summary={discussionSummary} />
+        </TabPanel>
+        <TabPanel id="insights" className="pr-overview-tab-panel">
+          <InsightsPanel pr={props.pr} />
+        </TabPanel>
+      </TabsRoot>
+    </div>
+  )
+}
+
+function OverviewBody(props: OverviewBodyProps) {
+  return (
+    <div className="pr-overview-body">
+      <AtAGlance pr={props.pr} youAreRequested={props.youAreRequested} />
+      <OverviewTabs key={props.pr.number} {...props} />
     </div>
   )
 }
@@ -579,6 +608,7 @@ export function PrOverviewPanel(props: Props) {
     <div className="pr-overview">
       <OverviewTopBar props={props} refresh={actions.refresh} onRefresh={actions.handleRefresh} />
       <OverviewBody
+        repoRoot={repoRoot}
         pr={pr}
         comments={issueComments}
         box={box}

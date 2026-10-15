@@ -599,6 +599,8 @@ Features:
 - Paginated queue of open and draft PRs, newest first, with **Sort** and search (see "The pull request queue").
 - In the queue, a PR's risk is classified by total lines changed (≥400 = high, ≥150 = medium); opening a PR refines its risk with per-file analysis (churn, blast radius, coverage, complexity).
 - PRs scored across six signals: tests, coverage, CI, lint, churn, and blast radius.
+- **PR overview:** opening a PR shows an **At a glance** column (checks, reviewers, author, branch, when it was opened, merge state, and linked issues when the PR body names any) beside three tabs: **Description**, **Discussion · N** (the comments and the comment box) and **Insights** (risk, hotspots and what to look at). The column stacks above the tabs when the pane is narrow.
+- **Summarize:** the Description and Discussion tabs offer **Summarize** when there is something to summarize. It asks the review agent's read-only `claude` (model, effort and timeout from the review agent settings) for a short summary shown above the text. If it fails, the reason is shown with **Retry**. The summary is not saved: closing or reloading the overview drops it.
 - Chapter-by-chapter review surface with syntax-highlighted diffs and inline comment threading.
 - One-click review submission (Approve / Request Changes / Comment) via `gh` CLI.
 - **AI-era enhancements:** universal language-agnostic chapter grouping, semantic-only diff filter (hides formatting/whitespace-only hunks), DRY violation detection, large-PR cognitive load warning (>400 LOC) with estimated review time.

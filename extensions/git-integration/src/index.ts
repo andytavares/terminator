@@ -213,6 +213,7 @@ function registerChannels(api: ExtensionAPI, roots: ChannelRoots): void {
     getSetting: (key) => api.settings.get(key),
     broadcast: (channel, data) => api.window.broadcast(channel, data),
     openTerminal: (input) => openReviewAgentTerminal(api, input),
+    storagePath: roots.storage,
   })
   disposables.push(reviewAgent)
 }

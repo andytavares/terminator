@@ -1,10 +1,16 @@
 import { z } from 'zod'
 import { namedStore } from '../storage-directory.js'
 import { randomUUID } from 'crypto'
-import { AgentScopeSchema, AGENT_REQUESTS, type AgentRun } from '../schemas/review-agent.schema.js'
+import {
+  AgentScopeSchema,
+  AGENT_REQUESTS,
+  SUMMARY_KINDS,
+  type AgentRun,
+  type SummaryResult,
+} from '../schemas/review-agent.schema.js'
 import type { PrHead } from '../schemas/pr-review.schema.js'
 import { ensureReviewWorktree } from '../review/worktree.js'
-import { runAgentReview } from '../review/review-agent.js'
+import { runAgentReview, runSummary } from '../review/review-agent.js'
 import {
   defineChannel,
   noPayload,
@@ -25,9 +31,13 @@ export interface ReviewAgentDeps {
   getSetting: <T>(key: string) => T | undefined
   broadcast: (channel: string, data: unknown) => void
   openTerminal: (input: OpenTerminalInput) => void
+  /** The extension's own globalStorage folder, where a summary's claude runs: `repoRoot` can be a
+   *  `gh:owner/name` with no folder, and a summary reads no checkout. */
+  storagePath: string
   /** Injectable for tests; defaults to the real worktree/agent implementations. */
   ensureWorktree?: typeof ensureReviewWorktree
   runReview?: typeof runAgentReview
+  runSummary?: typeof runSummary
 }
 
 /** The agent settings one run uses: model, optional effort, and how long it may take. */
@@ -42,9 +52,10 @@ interface AgentContext {
   deps: ReviewAgentDeps
   ensureWorktree: typeof ensureReviewWorktree
   runReview: typeof runAgentReview
+  runSummary: typeof runSummary
   /** repoRoot:::prNumber:::scopeJson -> the run currently going for that (pr, scope) */
   runningByScope: Map<string, AgentRun>
-  /** runId -> its cancel, for a run this process started */
+  /** runId -> its cancel, for a run or summary this process started */
   liveRuns: Map<string, () => void>
 }
 
@@ -77,6 +88,13 @@ const StartPayload = z.object({
   question: z.string().nullable().optional(),
   /** Overrides the `agentModel` setting for this one run. */
   model: z.enum(['opus', 'sonnet']).optional(),
+})
+
+const SummarizePayload = z.object({
+  repoRoot: RepoRoot,
+  prNumber: z.number(),
+  kind: z.enum(SUMMARY_KINDS),
+  text: z.string().trim().min(1),
 })
 
 const SETTING = 'terminator.git-integration.review'
@@ -223,6 +241,24 @@ async function openRunTerminal(ctx: AgentContext, runId: string) {
   return { ok: true }
 }
 
+/** Summarizes the text with the agent's settings; the summary is answered, never stored. */
+async function summarize(
+  ctx: AgentContext,
+  input: z.infer<typeof SummarizePayload>
+): Promise<SummaryResult> {
+  const { model, effort, timeoutMs } = runSettings(ctx.deps)
+  const { prNumber, kind, text } = input
+  const cwd = ctx.deps.storagePath
+  const { done, cancel } = ctx.runSummary({ prNumber, kind, text, cwd, model, effort, timeoutMs })
+  const id = randomUUID()
+  ctx.liveRuns.set(id, cancel)
+  try {
+    return await done
+  } finally {
+    ctx.liveRuns.delete(id)
+  }
+}
+
 function cancelRun(ctx: AgentContext, runId: string) {
   const cancel = ctx.liveRuns.get(runId)
   if (!cancel) return { ok: false }
@@ -251,6 +287,13 @@ function runChannels(ctx: AgentContext): ChannelSpec[] {
       run: ({ runId }) => openRunTerminal(ctx, runId),
       onError: errorEnvelope,
     }),
+    defineChannel({
+      channel: 'review-agent:summarize',
+      schema: SummarizePayload,
+      invalid: VALIDATION_ERROR,
+      run: (input) => summarize(ctx, input),
+      onError: errorEnvelope,
+    }),
   ]
 }
 
@@ -277,7 +320,7 @@ function storedRunChannels(deps: ReviewAgentDeps): ChannelSpec[] {
   ]
 }
 
-/** Disposing the result cancels every run still going: its `claude` is this process's child, and
+/** Disposing the result cancels every run and summary still going: its `claude` is this process's child, and
  *  a quitting extension host leaves its children running, so a run left alone outlives the app. */
 export function registerReviewAgentHandlers(
   register: RegisterFn,
@@ -287,6 +330,7 @@ export function registerReviewAgentHandlers(
     deps,
     ensureWorktree: deps.ensureWorktree ?? ensureReviewWorktree,
     runReview: deps.runReview ?? runAgentReview,
+    runSummary: deps.runSummary ?? runSummary,
     runningByScope: new Map(),
     liveRuns: new Map(),
   }

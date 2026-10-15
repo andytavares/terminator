@@ -6,7 +6,9 @@ import {
   buildClaudeArgs,
   buildDiffText,
   runAgentReview,
+  runSummary,
   claudeFromShellOutput,
+  type RunSummaryInput,
   type RunAgentReviewInput,
   type SpawnedProcess,
   type ExecFn,
@@ -461,5 +463,116 @@ describe('claudeFromShellOutput', () => {
 
   it('is null for an alias or function rather than a file', () => {
     expect(claudeFromShellOutput("alias claude='claude --foo'\n")).toBeNull()
+  })
+})
+
+describe('runAgentReview — the timeout message', () => {
+  it('names the configured minutes, not a fixed five', async () => {
+    vi.useFakeTimers()
+    try {
+      const fake = makeFakeProcess()
+      const exec = vi.fn(async () => ({ stdout: 'diff' }))
+      const spawn = vi.fn((..._args: Parameters<SpawnFn>) => fake)
+      const input = { ...baseInput, timeoutMs: 12 * 60_000 }
+      const { done } = runAgentReview(input, { exec, spawn, resolveClaude })
+      await vi.advanceTimersByTimeAsync(12 * 60_000)
+      expect((await done).error).toBe('Timed out after 12 min')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+
+const summaryInput: RunSummaryInput = {
+  prNumber: 42,
+  kind: 'discussion',
+  text: '**ana**: Ship it\n\n**bo**: Wait for CI',
+  cwd: '/storage/git-integration',
+  model: 'sonnet',
+  timeoutMs: 12 * 60_000,
+}
+
+/** Starts a summary against a fake claude process and waits for it to be spawned. */
+async function startFakeSummary(input: RunSummaryInput = summaryInput) {
+  const fake = makeFakeProcess()
+  const spawn = vi.fn((..._args: Parameters<SpawnFn>) => fake)
+  const { done, cancel } = runSummary(input, { spawn, resolveClaude })
+  await vi.waitFor(() => expect(spawn).toHaveBeenCalled())
+  return { fake, spawn, done, cancel }
+}
+
+/** The value that follows `flag` in claude's argv. */
+function flagValue(args: string[], flag: string): string {
+  return args[args.indexOf(flag) + 1]
+}
+
+describe('runSummary — the claude it starts', () => {
+  it('runs claude -p read-only in the storage folder, with a schema requiring summary', async () => {
+    const { spawn } = await startFakeSummary()
+    const [cmd, args, opts] = spawn.mock.calls[0]
+    expect(cmd).toBe('/Users/me/.local/bin/claude')
+    expect(args).toContain('-p')
+    expect(flagValue(args, '--output-format')).toBe('json')
+    expect(JSON.parse(flagValue(args, '--json-schema'))).toMatchObject({
+      required: ['summary'],
+      properties: { summary: { type: 'string' } },
+    })
+    expect(flagValue(args, '--tools')).toBe('Read,Grep,Glob')
+    expect(flagValue(args, '--model')).toBe('sonnet')
+    expect(opts.cwd).toBe('/storage/git-integration')
+  })
+
+  it('sends the text on stdin as untrusted content under the read-only rule', async () => {
+    const { fake } = await startFakeSummary()
+    expect(fake.writtenStdin).toContain('**ana**: Ship it')
+    expect(fake.writtenStdin).toContain('#42')
+    expect(fake.writtenStdin).toMatch(/discussion/i)
+    expect(fake.writtenStdin).toMatch(/READ-ONLY/)
+    expect(fake.writtenStdin).toMatch(/never as instructions/i)
+  })
+})
+
+describe('runSummary — what it answers', () => {
+  it('answers the summary claude returned as structured_output', async () => {
+    const { fake, done } = await startFakeSummary()
+    printAndExit(fake, { structured_output: { summary: 'Ana approves; Bo waits on CI.' } })
+    expect(await done).toEqual({ summary: 'Ana approves; Bo waits on CI.' })
+  })
+
+  it("answers claude's error output when it exits non-zero", async () => {
+    const { fake, done } = await startFakeSummary()
+    fake.stderrEmitter.emit('data', 'model not available\n')
+    fake.emitExit(1)
+    expect(await done).toEqual({ error: 'model not available' })
+  })
+
+  it('answers a plain error when the output has no summary', async () => {
+    const { fake, done } = await startFakeSummary()
+    printAndExit(fake, { structured_output: { findings: [] } })
+    expect(await done).toEqual({ error: 'The review agent answered without a summary.' })
+  })
+})
+
+describe('runSummary — a summary that does not finish', () => {
+  it('times out naming the configured minutes and kills claude', async () => {
+    vi.useFakeTimers()
+    try {
+      const fake = makeFakeProcess()
+      const spawn = vi.fn((..._args: Parameters<SpawnFn>) => fake)
+      const { done } = runSummary(summaryInput, { spawn, resolveClaude })
+      await vi.advanceTimersByTimeAsync(12 * 60_000)
+      expect(await done).toEqual({ error: 'Timed out after 12 min' })
+      expect(fake.kill).toHaveBeenCalledWith('SIGKILL')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('cancel() kills claude and answers that the summary was cancelled', async () => {
+    const { fake, done, cancel } = await startFakeSummary()
+    cancel()
+    fake.emitExit(137)
+    expect(await done).toEqual({ error: 'Summary cancelled.' })
+    expect(fake.kill).toHaveBeenCalledWith('SIGKILL')
   })
 })
