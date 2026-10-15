@@ -300,9 +300,27 @@ function UnchangedCount({ hidden }: { hidden: number | null }) {
   )
 }
 
+/** A gap no bigger than one step opens in one go: a step and an "all" control would do the same. */
+function ShowGapButton(props: { ctx: PaneContext; gapKey: string; hidden: number }) {
+  const label = `Show ${props.hidden} unchanged ${plural(props.hidden, 'line')}`
+  return (
+    <ExpandButton
+      label={label}
+      disabled={props.ctx.gaps.fileText.status === 'loading'}
+      onClick={() => props.ctx.gaps.expandGap(props.gapKey, 'all')}
+    >
+      <UnfoldVertical aria-hidden="true" />
+      <span>{label}</span>
+    </ExpandButton>
+  )
+}
+
 function ExpandButtons(props: { ctx: PaneContext; gapKey: string; hidden: number | null }) {
   const { ctx, gapKey } = props
   const label = allLinesLabel(props.hidden)
+  if (props.hidden != null && props.hidden <= EXPAND_STEP) {
+    return <ShowGapButton ctx={ctx} gapKey={gapKey} hidden={props.hidden} />
+  }
   return (
     <>
       <StepButton ctx={ctx} gapKey={gapKey} kind="below" />

@@ -17,7 +17,8 @@
     min-width: 44px;
   }
 
-  .pr-review-view .pr-resize-handle {
+  .pr-review-view .pr-resize-handle,
+  .pr-review-view .pr-review-panel--left .pr-review-panel-header {
     display: none;
   }
 }

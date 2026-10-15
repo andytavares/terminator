@@ -42,7 +42,8 @@
   height: 30px;
   padding: 0 12px 0 14px;
   background: none;
-  border: none;
+  border: 1px solid transparent;
+  border-radius: var(--tm-radius-sm);
   cursor: pointer;
   font-size: 12.5px;
   text-align: left;
@@ -58,7 +59,9 @@
 .full-file-row--active:hover,
 .chapter-file-row--active,
 .chapter-file-row--active:hover {
-  background: var(--tm-overlay-strong);
+  background: var(--tm-overlay);
+  /* The outline carries WCAG 1.4.11's 3:1 against the panel; a fill that strong would shout. */
+  border-color: var(--tm-accent-text);
   color: var(--tm-text-primary);
 }
 .full-file-row--active .file-tree-name b,
