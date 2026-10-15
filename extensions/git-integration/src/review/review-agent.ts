@@ -661,12 +661,28 @@ const SUMMARY_SUBJECT: Record<SummaryKind, string> = {
   discussion: 'discussion (each comment starts with its author in bold)',
 }
 
+const BULLET_SUMMARY_ASK =
+  'as Markdown: at most four bullet points, each under 25 words. Add a final ' +
+  'bullet starting "Not done:" only when the text says something was left undone.'
+
+const DESCRIPTION_SUMMARY_ASK =
+  'as Markdown with exactly these parts, in this order, each under its own bold label: ' +
+  '**Current state** (1-3 sentences on how things work before this change), ' +
+  '**What the change does** (1-3 sentences), ' +
+  '**Risks** (a bullet list, one risk per bullet; write "None found" if there are none). ' +
+  'Add a simple plain-text diagram in a fenced code block after the risks only when the ' +
+  'structure or flow is hard to follow in words; otherwise leave it out.'
+
+const SUMMARY_ASK: Record<SummaryKind, string> = {
+  description: DESCRIPTION_SUMMARY_ASK,
+  discussion: BULLET_SUMMARY_ASK,
+}
+
 /** The ask, the read-only rule, and the PR's own text marked as content to summarize. */
 function buildSummaryPrompt(input: Pick<RunSummaryInput, 'prNumber' | 'kind' | 'text'>) {
   return [
     `Summarize the ${SUMMARY_SUBJECT[input.kind]} of pull request #${input.prNumber} for a ` +
-      'reviewer as Markdown: at most four bullet points, each under 25 words. Add a final ' +
-      'bullet starting "Not done:" only when the text says something was left undone.',
+      `reviewer ${SUMMARY_ASK[input.kind]}`,
     '',
     READ_ONLY_RULE,
     UNTRUSTED_TEXT_RULE,
