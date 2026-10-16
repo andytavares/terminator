@@ -74,17 +74,9 @@ const CLAUDE_STUB_DIR = join(dirname(fileURLToPath(import.meta.url)), 'fixtures'
  */
 const CLAUDE_STUB_ZDOTDIR = join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'zdotdir')
 
-/** The app's PATH: `firstDirs`, then the `claude` stub, then the runner's own.
- * A spec that stands in for another program passes its folder as `env.PATH`
- * through this, so the `claude` stub stays ahead of any real one. */
-function e2ePath(...firstDirs: string[]): string {
-  return [...firstDirs, CLAUDE_STUB_DIR, process.env.PATH ?? ''].join(delimiter)
-}
-
-/** The env that puts stub folders first on the app's PATH. The app adopts the login shell's PATH
- * ahead of the one it was launched with, so the fixture's .zprofile re-adds them as E2E_PATH_FIRST. */
-export function stubsFirst(...dirs: string[]): Record<string, string> {
-  return { PATH: e2ePath(...dirs), E2E_PATH_FIRST: dirs.join(delimiter) }
+/** The app's PATH: the `claude` stub, then the runner's own. */
+function e2ePath(): string {
+  return [CLAUDE_STUB_DIR, process.env.PATH ?? ''].join(delimiter)
 }
 
 /** The environment every e2e-launched Electron process gets. */
