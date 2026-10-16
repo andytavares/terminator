@@ -69,32 +69,36 @@ test.afterAll(async () => {
   await closeApp(handle)
 })
 
-test('step 1 captures loose items into the inbox', async () => {
+/** Step 1 captures loose items into the inbox. */
+async function captureLooseItems(): Promise<void> {
   await vault.getByPlaceholder('Add to inbox…').fill('Pay the parking fine')
   await vault.getByPlaceholder('Add to inbox…').press('Enter')
   await expect(vault.locator('.wr-step__captured-item')).toHaveText(['Pay the parking fine'])
   await vault.getByRole('button', { name: 'Next: inbox' }).click()
-})
+}
 
-test('step 2 clarifies what was captured', async () => {
+/** Step 2 clarifies what was captured. */
+async function clarifyCaptured(): Promise<void> {
   await expect(vault.locator('.inbox-processor__text')).toHaveText('Pay the parking fine')
   await vault.getByRole('button', { name: 'Yes' }).click()
   await vault.getByRole('button', { name: 'Do now — Today' }).click()
   await expect(vault.getByText('Inbox cleared!')).toBeVisible()
   expect(await storedTask(vault, 'Pay the parking fine')).toMatchObject({ status: 'in-progress' })
   await vault.getByRole('button', { name: 'Next: projects' }).click()
-})
+}
 
-test('step 3 keeps a live project and shelves a stale one', async () => {
+/** Step 3 keeps a live project and shelves a stale one. */
+async function reviewProjects(): Promise<void> {
   await reviewItem('Kitchen Remodel').getByRole('button', { name: 'Keep' }).click()
   await reviewItem('Garden Shed').getByRole('button', { name: 'Someday' }).click()
   await expect(vault.getByText('All projects reviewed!')).toBeVisible()
   expect(await projectStatus('Kitchen Remodel')).toBe('active')
   expect(await projectStatus('Garden Shed')).toBe('someday')
   await vault.getByRole('button', { name: 'Next: stale' }).click()
-})
+}
 
-test('step 4 backlogs, deletes and keeps the tasks that went stale', async () => {
+/** Step 4 backlogs, deletes and keeps the tasks that went stale. */
+async function reviewStaleTasks(): Promise<void> {
   await reviewItem('Sort the receipts').getByRole('button', { name: 'Backlog' }).click()
   await reviewItem('Fix the bike').getByRole('button', { name: 'Delete' }).click()
   await reviewItem('Call the bank').getByRole('button', { name: 'Keep' }).click()
@@ -121,9 +125,10 @@ test('step 4 backlogs, deletes and keeps the tasks that went stale', async () =>
   )
   expect(today.tasks.find((task) => task.text === 'Call the bank')?.todaySince).toBe(localDate(0))
   await vault.getByRole('button', { name: 'Next: someday' }).click()
-})
+}
 
-test('step 5 picks up and archives backlog items and promotes a someday project', async () => {
+/** Step 5 picks up and archives backlog items and promotes a someday project. */
+async function reviewSomeday(): Promise<void> {
   await reviewItem('Read the backlog novel').getByRole('button', { name: 'Pick up today' }).click()
   await reviewItem('Retire the old laptop').getByRole('button', { name: 'Archive' }).click()
   await reviewItem('Learn Piano').getByRole('button', { name: 'Promote to active' }).click()
@@ -137,9 +142,10 @@ test('step 5 picks up and archives backlog items and promotes a someday project'
   expect(await storedTask(vault, 'Retire the old laptop')).toMatchObject({ status: 'cancelled' })
   expect(await projectStatus('Learn Piano')).toBe('active')
   await vault.getByRole('button', { name: 'Next: reflect' }).click()
-})
+}
 
-test('step 6 saves the reflection and History shows what the review did', async () => {
+/** Step 6 saves the reflection and History shows what the review did. */
+async function reflectAndReadHistory(): Promise<void> {
   await vault.getByLabel('What worked well?').fill('Mornings without meetings')
   await vault.getByLabel("What didn't work?").fill('Too many open loops')
   await vault.getByLabel('What will you try next week?').fill('A daily shutdown')
@@ -156,9 +162,10 @@ test('step 6 saves the reflection and History shows what the review did', async 
   await expect(detail).toContainText('Sort the receipts')
   await expect(detail).toContainText('Read the backlog novel')
   await expect(detail.locator('.wr-history__reflection')).toContainText('A daily shutdown')
-})
+}
 
-test('a past review exports to the markdown file chosen', async () => {
+/** A past review exports to the markdown file chosen. */
+async function exportReview(): Promise<void> {
   const file = join(mkdtempSync(join(tmpdir(), 'review-export-')), 'review.md')
   await answerNextSaveDialog(handle, file)
   await vault
@@ -173,4 +180,18 @@ test('a past review exports to the markdown file chosen', async () => {
     .poll(() => (existsSync(file) ? readFileSync(file, 'utf8') : ''), { timeout: 10_000 })
     .toContain('Mornings without meetings')
   expect(readFileSync(file, 'utf8')).toContain('Garden Shed')
+}
+
+const THE_WEEKLY_REVIEW: [string, () => Promise<void>][] = [
+  ['step 1 captures loose items into the inbox', captureLooseItems],
+  ['step 2 clarifies what was captured', clarifyCaptured],
+  ['step 3 keeps a live project and shelves a stale one', reviewProjects],
+  ['step 4 backlogs, deletes and keeps the tasks that went stale', reviewStaleTasks],
+  ['step 5 picks up and archives backlog items and promotes a someday project', reviewSomeday],
+  ['step 6 saves the reflection and History shows what the review did', reflectAndReadHistory],
+  ['a past review exports to the markdown file chosen', exportReview],
+]
+
+test('a week is reviewed step by step, then read back and exported', async () => {
+  for (const [title, step] of THE_WEEKLY_REVIEW) await test.step(title, step)
 })

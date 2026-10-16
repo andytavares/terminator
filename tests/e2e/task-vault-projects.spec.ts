@@ -5,7 +5,8 @@ import { goToSection, openVault, pressRowAction, storedTask } from './task-vault
 
 // Projects, areas and the history of what was archived: creating, renaming,
 // filing tasks under them, archiving, restoring and deleting, each through the
-// vault's own screens and read back from what it stored.
+// vault's own screens and read back from what it stored. The steps run in order
+// on one project, one area and the day they leave behind.
 
 interface StoredProject {
   name: string
@@ -68,7 +69,8 @@ function areaCard(name: string) {
     .filter({ has: vault.locator('.areas-view__card-name').getByText(name, { exact: true }) })
 }
 
-test('a project created with an outcome, a new area and a deadline is listed', async () => {
+/** A project created with an outcome, a new area and a deadline is listed. */
+async function createProject(): Promise<void> {
   await goToSection(vault, 'Projects')
   await vault.getByRole('button', { name: '+ New project' }).click()
   const form = vault.locator('.create-project-form')
@@ -86,9 +88,10 @@ test('a project created with an outcome, a new area and a deadline is listed', a
     area: 'Marketing',
   })
   expect((await areas()).map((area) => area.name)).toContain('Marketing')
-})
+}
 
-test("a project's tasks are added, edited, completed and reopened from its card", async () => {
+/** A project's tasks are added, edited, completed and reopened from its card. */
+async function workProjectTasks(): Promise<void> {
   const card = projectCard('Launch The Website')
   await card.getByRole('button', { name: 'Show tasks tagged @Launch The Website' }).click()
   const input = card.getByPlaceholder('Add task to @Launch The Website…')
@@ -116,9 +119,10 @@ test("a project's tasks are added, edited, completed and reopened from its card"
   await pressRowAction(card.getByTitle("Reopen on today's log"))
   await expect(card.locator('.projects-browser__done-tasks')).toHaveCount(0)
   expect(await storedTask(vault, 'Write the hero copy')).toMatchObject({ status: 'open' })
-})
+}
 
-test('a project is renamed, moved to another area and its deadline cleared', async () => {
+/** A project is renamed, moved to another area and its deadline cleared. */
+async function renameMoveAndDeadline(): Promise<void> {
   const card = projectCard('Launch The Website')
   await card.getByRole('button', { name: 'Rename project' }).click()
   // While renaming, the card shows an input in place of its name.
@@ -146,9 +150,10 @@ test('a project is renamed, moved to another area and its deadline cleared', asy
   await renamed.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(renamed.getByTitle('Edit deadline')).toBeVisible()
   expect((await storedProject('Launch the new website'))?.deadline).toMatch(/^\d{4}-\d{2}-\d{2}$/)
-})
+}
 
-test('an archived project is restored from History, archived again and deleted', async () => {
+/** An archived project is restored from History, archived again and deleted. */
+async function archiveRestoreDeleteProject(): Promise<void> {
   await projectCard('Launch the new website')
     .getByRole('button', { name: 'Archive project' })
     .click()
@@ -176,7 +181,7 @@ test('an archived project is restored from History, archived again and deleted',
   await expect(projectCard('Launch the new website')).toHaveCount(0)
   expect(await storedProject('Launch the new website')).toBeUndefined()
   expect(await storedTask(vault, 'Write the hero copy')).toBeUndefined()
-})
+}
 
 /** Creates the Health area and gives it a task. */
 async function createHealthAreaWithTask(): Promise<void> {
@@ -252,15 +257,17 @@ async function deleteArchivedArea(): Promise<void> {
   expect((await areas()).map((area) => area.name)).not.toContain('Wellbeing')
 }
 
-test('an area is created, given a task, renamed, archived, restored and deleted', async () => {
+/** An area is created, given a task, renamed, archived, restored and deleted. */
+async function areaLifecycle(): Promise<void> {
   await createHealthAreaWithTask()
   await editAndCompleteAreaTask()
   await renameAndArchiveArea()
   await restoreArchivedArea()
   await deleteArchivedArea()
-})
+}
 
-test('History restores a finished task and deletes another for good', async () => {
+/** History restores a finished task and deletes another for good. */
+async function historyRestoreAndDelete(): Promise<void> {
   // Deleting the project took its tasks with it, so the day starts empty.
   await goToSection(vault, 'Today')
   await vault.getByRole('button', { name: 'Add task', exact: true }).click()
@@ -288,4 +295,20 @@ test('History restores a finished task and deletes another for good', async () =
   await archiveRow('Fix the gate').getByRole('button', { name: 'Delete permanently' }).click()
   await expect(archiveRow('Fix the gate')).toHaveCount(0)
   expect(await storedTask(vault, 'Fix the gate')).toBeUndefined()
+}
+
+const PROJECT_AND_AREA_LIFECYCLE: [string, () => Promise<void>][] = [
+  ['a project created with an outcome, a new area and a deadline is listed', createProject],
+  ["a project's tasks are added, edited, completed and reopened from its card", workProjectTasks],
+  ['a project is renamed, moved to another area and its deadline cleared', renameMoveAndDeadline],
+  [
+    'an archived project is restored from History, archived again and deleted',
+    archiveRestoreDeleteProject,
+  ],
+  ['an area is created, given a task, renamed, archived, restored and deleted', areaLifecycle],
+  ['History restores a finished task and deletes another for good', historyRestoreAndDelete],
+]
+
+test('a project and an area are run from start to finish', async () => {
+  for (const [title, step] of PROJECT_AND_AREA_LIFECYCLE) await test.step(title, step)
 })
