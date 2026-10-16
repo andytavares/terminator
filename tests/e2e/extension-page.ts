@@ -6,7 +6,7 @@ import {
   type Mouse,
   type Page,
 } from '@playwright/test'
-import type { AppHandle } from './helpers'
+import { frameFocusEmulated, type AppHandle } from './helpers'
 
 // An extension's view is an iframe inside the main window's page (ADR 114), so
 // Playwright sees it as a Frame of `handle.page`, not a Page. A Frame has no
@@ -65,7 +65,9 @@ export async function findExtensionFrame(handle: AppHandle, urlPart: string): Pr
       message: `no ext:// frame for ${urlPart}`,
     })
     .toBe(true)
-  return extensionFrame(handle, urlPart) as Frame
+  const frame = extensionFrame(handle, urlPart) as Frame
+  await frameFocusEmulated(handle.page, frame)
+  return frame
 }
 
 /** The frame methods a view forwards to the frame found at each call, so a

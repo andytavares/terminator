@@ -1,15 +1,17 @@
-import { _electron as electron, ElectronApplication, Locator, Page, expect } from '@playwright/test'
+import {
+  _electron as electron,
+  ElectronApplication,
+  Frame,
+  Locator,
+  Page,
+  expect,
+} from '@playwright/test'
 import type { ChildProcess } from 'node:child_process'
 import { mkdtempSync } from 'node:fs'
 import { dirname, delimiter, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { saveIpcTrace, startIpcTrace } from './ipc-trace'
 import { appProcessTree, expectNoProcessesLeft, launchMarker } from './leftover-processes'
-import {
-  installSettingsDiagnostics,
-  markSettingsDiagnostics,
-  saveSettingsDiagnostics,
-} from './settings-diagnostics'
 
 // Shared e2e harness. Every spec launches the real Electron app in an isolated,
 // throwaway profile (via Chromium's --user-data-dir, which Electron honours for
@@ -209,12 +211,37 @@ async function keepWindowsClearOfTheCursor(app: ElectronApplication): Promise<vo
   })
 }
 
-/** A frame fires focus and blur only while the app is the active application, which a CI runner's
- * freshly launched app is not: a field filled there is never blurred, so its save never runs. */
-async function makeAppActive(electronApp: ElectronApplication): Promise<void> {
-  await electronApp.evaluate(({ app, BrowserWindow }) => {
-    app.focus({ steal: true })
-    for (const window of BrowserWindow.getAllWindows()) window.focus()
+/** Each extension frame's focus emulation, keyed by the frame, settled once it is on. */
+const frameFocusEmulation = new WeakMap<Frame, Promise<void>>()
+
+/** Makes `frame` behave as if its window had focus, as Playwright already does for the page.
+ * An extension frame runs in its own process, which Playwright leaves out: while the window is not
+ * the active application (a CI runner's usually is not) its fields are never focused or blurred,
+ * so a setting saved on blur is never saved and a key lands nowhere.
+ * https://chromedevtools.github.io/devtools-protocol/tot/Emulation/#method-setFocusEmulationEnabled */
+function emulateFrameFocus(page: Page, frame: Frame): Promise<void> {
+  const enabled = page
+    .context()
+    .newCDPSession(frame)
+    .then((session) => session.send('Emulation.setFocusEmulationEnabled', { enabled: true }))
+    .then(() => undefined)
+  frameFocusEmulation.set(frame, enabled)
+  return enabled
+}
+
+/** Resolves once `frame` has focus emulation, turning it on if no navigation has yet. */
+export function frameFocusEmulated(page: Page, frame: Frame): Promise<void> {
+  const pending = frameFocusEmulation.get(frame)
+  // A try made while the frame was still navigating can fail; the frame is settled by now.
+  return pending
+    ? pending.catch(() => emulateFrameFocus(page, frame))
+    : emulateFrameFocus(page, frame)
+}
+
+/** Every extension frame gets focus emulation as it loads, a reload included. */
+function emulateFocusInExtensionFrames(page: Page): void {
+  page.on('framenavigated', (frame) => {
+    if (frame.url().startsWith('ext://')) emulateFrameFocus(page, frame).catch(() => undefined)
   })
 }
 
@@ -230,8 +257,7 @@ export async function launchApp(
   try {
     const page = await firstReadyWindow(app, remaining)
     await keepWindowsClearOfTheCursor(app)
-    await makeAppActive(app)
-    await installSettingsDiagnostics(app, page)
+    emulateFocusInExtensionFrames(page)
     return { app, page, userDataDir, launchId: marker.launchId }
   } catch (error) {
     throw await launchFailure(app, output, error)
@@ -329,8 +355,6 @@ export async function closeApp(
 ): Promise<void> {
   if (!handle) return
   await saveIpcTrace(handle.app)
-  const window = handle.app.windows()[0]
-  if (window) await saveSettingsDiagnostics(window)
   const started = appProcessTree(handle.app.process().pid ?? -1)
   await stopApp(handle.app, GRACEFUL_CLOSE_MS)
   await expectNoProcessesLeft(handle.launchId, started)
@@ -445,13 +469,10 @@ export async function openSettingsSection(page: Page, section: string): Promise<
   if (!(await page.locator('.settings-panel').isVisible())) {
     // Focus may sit in an extension's frame, where the host page's shortcut is not heard.
     await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
-    await markSettingsDiagnostics(page, 'blurred, pressing the Settings shortcut')
     await page.keyboard.press('ControlOrMeta+,')
   }
   await expect(page.locator('.settings-panel')).toBeVisible()
-  await markSettingsDiagnostics(page, `clicking ${section}`)
   await page.locator('.settings-panel__nav-item', { hasText: section }).click()
-  await markSettingsDiagnostics(page, `clicked ${section}`)
 }
 
 /** Closes Settings with its close button. */
