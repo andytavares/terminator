@@ -11,6 +11,7 @@ import { mkdtempSync } from 'node:fs'
 import { dirname, delimiter, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { saveIpcTrace, startIpcTrace } from './ipc-trace'
+import { installSettingsDiagnostics, markSettingsDiagnostics } from './settings-diagnostics'
 import { appProcessTree, expectNoProcessesLeft, launchMarker } from './leftover-processes'
 
 // Shared e2e harness. Every spec launches the real Electron app in an isolated,
@@ -258,6 +259,7 @@ export async function launchApp(
     const page = await firstReadyWindow(app, remaining)
     await keepWindowsClearOfTheCursor(app)
     emulateFocusInExtensionFrames(page)
+    await installSettingsDiagnostics(app, page)
     return { app, page, userDataDir, launchId: marker.launchId }
   } catch (error) {
     throw await launchFailure(app, output, error)
@@ -469,10 +471,13 @@ export async function openSettingsSection(page: Page, section: string): Promise<
   if (!(await page.locator('.settings-panel').isVisible())) {
     // Focus may sit in an extension's frame, where the host page's shortcut is not heard.
     await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
+    await markSettingsDiagnostics(page, 'blurred, pressing the Settings shortcut')
     await page.keyboard.press('ControlOrMeta+,')
   }
   await expect(page.locator('.settings-panel')).toBeVisible()
+  await markSettingsDiagnostics(page, `clicking ${section}`)
   await page.locator('.settings-panel__nav-item', { hasText: section }).click()
+  await markSettingsDiagnostics(page, `clicked ${section}`)
 }
 
 /** Closes Settings with its close button. */

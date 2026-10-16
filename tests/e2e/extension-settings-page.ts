@@ -1,5 +1,6 @@
 import { expect, type Locator, type Page } from '@playwright/test'
 import { openSettingsSection } from './helpers'
+import { printSettingsDiagnostics } from './settings-diagnostics'
 
 // An extension's own page in Settings → Extensions, opened with its ⚙ button,
 // and one setting's row on it, found by the label the extension declared.
@@ -27,7 +28,14 @@ export async function openExtensionSettings(page: Page, name: string): Promise<L
   await openSettingsSection(page, 'Extensions')
   const entry = extensionEntry(page, name)
   if ((await entry.locator('.extension-settings-panel').count()) === 0) {
-    await entry.getByTitle('Configure').click()
+    // TEMPORARY (PR #269): fails inside the test's own timeout so the diagnostics can be read.
+    await entry
+      .getByTitle('Configure')
+      .click({ timeout: 10_000 })
+      .catch(async (error: Error) => {
+        await printSettingsDiagnostics(page)
+        throw error
+      })
   }
   await expect(entry.locator('.extension-settings-panel')).toBeVisible()
   return entry
