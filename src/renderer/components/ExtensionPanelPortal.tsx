@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useShownExtensionViews } from '../stores/shown-extension-views.store'
+import { useModalStore } from '../stores/modal.store'
 import { useExtensionRegistry } from '../extensions/registry'
 import { createDoubleEscapeDetector } from '../../shared/double-escape'
 import { FRAME_PORT_MESSAGE } from '../../shared/frame-wire'
@@ -190,6 +191,15 @@ function panelStyle(isActive: boolean): React.CSSProperties {
 
 const IFRAME_STYLE: React.CSSProperties = { flex: 1, border: 'none', width: '100%', minHeight: 0 }
 
+/** Under an open modal the frame stays painted beneath the backdrop but takes no input. The modal
+ * makes the page around it inert, yet the browser has routed a click on the modal into the
+ * out-of-process frame below it; inert and pointer-events on the iframe itself keep it out. */
+function frameInputProps(modalOpen: boolean): React.IframeHTMLAttributes<HTMLIFrameElement> {
+  if (!modalOpen) return { style: IFRAME_STYLE }
+  // React 18 has no `inert` prop; an empty string renders the boolean attribute.
+  return { style: { ...IFRAME_STYLE, pointerEvents: 'none' }, ...{ inert: '' } }
+}
+
 function LoadingOverlay(): JSX.Element {
   return (
     <div
@@ -212,6 +222,7 @@ function ExtensionFrame(props: Props): JSX.Element {
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const [loaded, setLoaded] = useState(false)
   const desktop = isDesktop()
+  const modalOpen = useModalStore((s) => s.depth > 0)
   useShownWhileVisible({ extensionId, viewParam }, isActive)
   useFramePort(props, iframeRef, () => setLoaded(true))
   useDoubleEscapeInFrame(iframeRef, { extensionId, viewParam }, !desktop)
@@ -225,7 +236,7 @@ function ExtensionFrame(props: Props): JSX.Element {
       <iframe
         ref={iframeRef}
         src={desktop ? desktopFrameSrc(props) : frameSrc(props)}
-        style={IFRAME_STYLE}
+        {...frameInputProps(modalOpen)}
         allow="clipboard-read; clipboard-write"
       />
       {!loaded && <LoadingOverlay />}

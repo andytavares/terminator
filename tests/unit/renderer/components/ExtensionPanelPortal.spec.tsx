@@ -6,6 +6,7 @@ import { FRAME_PORT_MESSAGE } from '../../../../src/shared/frame-wire'
 import { ExtensionPanelPortal } from '../../../../src/renderer/components/ExtensionPanelPortal.js'
 import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
 import { useShownExtensionViews } from '../../../../src/renderer/stores/shown-extension-views.store'
+import { useModalStore } from '../../../../src/renderer/stores/modal.store'
 
 const mockOpenFramePort = vi.fn()
 let reloadHandler: ((extensionId: string) => void) | null = null
@@ -137,6 +138,33 @@ describe('ExtensionPanelPortal — desktop visibility and bounds', () => {
     loadFrame(container)
     unmount()
     expect(mockUpdatePanelBounds).not.toHaveBeenCalled()
+  })
+})
+
+describe('ExtensionPanelPortal — under a host modal', () => {
+  beforeEach(stubDesktopApi)
+  afterEach(() => useModalStore.setState({ depth: 0 }))
+
+  it('takes no clicks or focus while a modal is open, and stays visible under it', () => {
+    const { container } = renderPortal()
+    act(() => useModalStore.getState().push())
+    const iframe = firstIframe(container)
+    expect(iframe.hasAttribute('inert')).toBe(true)
+    expect(iframe.style.pointerEvents).toBe('none')
+    expect(panelWrapper(container).style.display).toBe('flex')
+  })
+
+  it('takes clicks and focus again once the last modal closes', () => {
+    const { container } = renderPortal()
+    act(() => {
+      useModalStore.getState().push()
+      useModalStore.getState().push()
+    })
+    act(() => useModalStore.getState().pop())
+    expect(firstIframe(container).hasAttribute('inert')).toBe(true)
+    act(() => useModalStore.getState().pop())
+    expect(firstIframe(container).hasAttribute('inert')).toBe(false)
+    expect(firstIframe(container).style.pointerEvents).toBe('')
   })
 })
 
