@@ -14,6 +14,7 @@ import {
 } from './helpers'
 import { git, makeFixtureRepo } from './foundry-harness'
 import { gitView } from './git-harness'
+import { startGithubStub, type GithubStub } from './github-stub'
 
 // The bundled extensions' commands no other spec runs, run from Quick
 // Actions like any operator would, each asserted by what it brings up.
@@ -21,6 +22,8 @@ import { gitView } from './git-harness'
 let handle: AppHandle
 let repo: string
 let remote: string
+/** Answers the app's gh calls, so no spec step waits on the real GitHub. */
+let stub: GithubStub
 
 const gitTab = () => handle.page.locator('.tab-bar--primary .tab-bar__tab', { hasText: 'Git' })
 const activeElementIn = (part: string) =>
@@ -36,7 +39,8 @@ test.beforeAll(async () => {
   repo = makeFixtureRepo('terminator-e2e-commands-')
   git(repo, 'remote', 'add', 'origin', remote)
   git(repo, 'push', '-u', 'origin', 'main')
-  handle = await launchApp()
+  stub = await startGithubStub({ bareRepo: remote })
+  handle = await launchApp(undefined, stub.env)
   await createWorkspace(handle.page, 'Cmds', repo)
   await projectGroup(handle.page, 'main').click()
   await expect(handle.page.getByRole('textbox', { name: 'Terminal input' }).first()).toBeVisible({
@@ -44,7 +48,10 @@ test.beforeAll(async () => {
   })
 })
 
-test.afterAll(async () => closeApp(handle))
+test.afterAll(async () => {
+  await closeApp(handle)
+  await stub?.shutDown()
+})
 
 test('Git → Commit… opens the Git tab with the cursor in the commit message', async () => {
   await runQuickActionFromPanel(handle.page, 'Commit…')
@@ -56,7 +63,7 @@ test('Git → Create PR… opens the pull request dialog', async () => {
   // A fresh app, so the Git view does not exist yet here either.
   const { userDataDir } = handle
   await closeApp(handle)
-  handle = await launchApp(userDataDir)
+  handle = await launchApp(userDataDir, stub.env)
   await projectGroup(handle.page, 'main').click()
   await runQuickActionFromPanel(handle.page, 'Create PR…')
   await expect(gitTab()).toHaveClass(/tab-bar__tab--active/)
