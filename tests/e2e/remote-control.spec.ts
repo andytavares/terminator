@@ -12,9 +12,10 @@ import {
   launchApp,
 } from './helpers'
 import { openFromAppBand, type ExtensionView } from './extension-page'
+import { expectCentredInWindow } from './modal-centre'
 
 // Remote Control's channels, driven from its view, with each effect read where it lands: a
-// browser running the real remote renderer, the server, or the clipboard. The public address
+// browser running the real remote renderer (phone and desktop layouts), the server, or the clipboard. The public address
 // comes from a stand-in ngrok (fixtures/ngrok-bin/ngrok) that accepts only this spec's token.
 
 const NGROK_STUB_DIR = join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'ngrok-bin')
@@ -45,6 +46,8 @@ let view: ExtensionView
 let browser: Browser
 /** A phone watching the desktop app's terminal. */
 let phone: Page
+/** A desktop browser running the remote renderer at /app/. */
+let desk: Page
 /** Where the stand-in ngrok writes its agent API's address once it listens. */
 let ngrokApiFile: string
 
@@ -175,13 +178,25 @@ function invokeEach(page: Page, channels: string[]): Promise<string[]> {
   )
 }
 
-async function remoteRendererCannotDriveRemoteControl(): Promise<void> {
-  const desk = await browser.newPage({ baseURL: BASE_URL, viewport: { width: 1600, height: 900 } })
+/** /app/ in a browser signed in with the password: the session cookie gets the bridge ticket
+ * (no password in the page or a header), and the bridge serves workspace:list, so the
+ * workspace made in the desktop app is drawn. */
+async function browserRendererShowsTheDesktopWorkspace(): Promise<void> {
+  desk = await browser.newPage({ baseURL: BASE_URL, viewport: { width: 1600, height: 900 } })
   await desk.goto('/')
   await desk.getByPlaceholder('Password').fill(PASSWORD)
   await desk.getByRole('button', { name: 'Connect' }).click()
   await desk.waitForURL(/\/app\//)
+  expect((await desk.request.post('/api/app-ticket')).status()).toBe(201)
   await expect(desk.locator('.repo-header__name', { hasText: 'Remote-WS' })).toBeVisible()
+  await desk.click('.sidebar-header__add')
+  const dialog = desk.getByRole('dialog', { name: 'Create Workspace' })
+  await expectCentredInWindow(dialog, 'Remote client: Create Workspace')
+  await dialog.getByRole('button', { name: 'Cancel' }).click()
+  await expect(dialog).toHaveCount(0)
+}
+
+async function remoteRendererCannotDriveRemoteControl(): Promise<void> {
   expect(await invokeEach(desk, REMOTE_CONTROL_CHANNELS)).toEqual(
     REMOTE_CONTROL_CHANNELS.map(() => 'channel not remote-accessible')
   )
@@ -190,26 +205,38 @@ async function remoteRendererCannotDriveRemoteControl(): Promise<void> {
   await desk.close()
 }
 
-test.describe.serial('Remote Control, driven from its view', () => {
-  test(
+/** A flow's steps in order, each titled for the behaviour it checks. */
+type Steps = Array<[title: string, body: () => Promise<void>]>
+
+const REMOTE_STEPS: Steps = [
+  [
     'the account token saved in Settings is what opens the public address',
-    tokenOpensThePublicAddress
-  )
-  test(
+    tokenOpensThePublicAddress,
+  ],
+  [
     'Reconnect brings a dropped public address back and keeps the phone connected',
-    reconnectKeepsThePhone
-  )
-  test(
+    reconnectKeepsThePhone,
+  ],
+  [
     'a viewer over the limit saved in Settings is turned away, and told so',
-    viewerLimitTurnsTheNextAway
-  )
-  test('Disconnect ends that phone’s connection, and it says so', disconnectEndsThatPhone)
-  test(
+    viewerLimitTurnsTheNextAway,
+  ],
+  ['Disconnect ends that phone’s connection, and it says so', disconnectEndsThatPhone],
+  [
     'Copy Caddyfile names the address the remote renderer is served from',
-    caddyfileProxiesTheRemoteRenderer
-  )
-  test(
+    caddyfileProxiesTheRemoteRenderer,
+  ],
+  [
+    "the browser remote renderer shows the desktop's workspace through its bridge, and centres its dialogs",
+    browserRendererShowsTheDesktopWorkspace,
+  ],
+  [
     'the remote renderer can drive none of these channels itself',
-    remoteRendererCannotDriveRemoteControl
-  )
+    remoteRendererCannotDriveRemoteControl,
+  ],
+]
+
+test('Remote Control is turned on from its view and used from a phone and a browser', async () => {
+  test.setTimeout(180_000)
+  for (const [title, body] of REMOTE_STEPS) await test.step(title, body)
 })
