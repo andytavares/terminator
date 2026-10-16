@@ -47,6 +47,18 @@ async function viewReady(urlPart: string): Promise<boolean> {
   return frame.evaluate(() => document.readyState === 'complete').catch(() => false)
 }
 
+/** Waits for the view to take `theme`: the frame shim hears it as a message after the app's own
+ * switch. Dark is the absence of the attribute (the shim removes it rather than setting 'dark'),
+ * so light is the only value to match against. */
+async function expectViewTheme(urlPart: string, label: string, theme: 'dark' | 'light') {
+  await expect
+    .poll(
+      () => inView<string | null>(urlPart, "document.documentElement.getAttribute('data-theme')"),
+      { timeout: 5000, message: `${label} view never adopted the ${theme} theme` }
+    )
+    .toBe(theme === 'light' ? 'light' : null)
+}
+
 async function setTheme(theme: 'dark' | 'light'): Promise<void> {
   // Driven through the same API the settings panel uses, as a script string —
   // `window.electronAPI` is injected by the preload and has no type here.
@@ -119,22 +131,14 @@ test('an extension view follows the app into the light theme', async () => {
   await openExtension('terminator.foundry', 'foundry')
 
   await setTheme('light')
-  const light = await inView<string | null>(
-    'foundry',
-    "document.documentElement.getAttribute('data-theme')"
-  )
-  expect(light).toBe('light')
+  await expectViewTheme('foundry', 'Foundry', 'light')
 
   // The attribute is only useful if it actually repaints. Dark's base is
   // #0c0c0f and light's is #f0f0f5, so the body's own ground has to change.
   const lightBg = await inView<string>('foundry', 'getComputedStyle(document.body).backgroundColor')
 
   await setTheme('dark')
-  const dark = await inView<string | null>(
-    'foundry',
-    "document.documentElement.getAttribute('data-theme')"
-  )
-  expect(dark).not.toBe('light')
+  await expectViewTheme('foundry', 'Foundry', 'dark')
   const darkBg = await inView<string>('foundry', 'getComputedStyle(document.body).backgroundColor')
 
   expect(lightBg).not.toBe(darkBg)
@@ -145,18 +149,7 @@ for (const { id, label, urlPart } of SURFACES) {
     test(`${label} text meets WCAG AA in the ${theme} theme`, async () => {
       await openExtension(id, urlPart)
       await setTheme(theme)
-      // Dark is the absence of the attribute (the frame shim removes it rather
-      // than setting 'dark'), so light is the only value to match against.
-      await expect
-        .poll(
-          () =>
-            inView<string | null>(urlPart, "document.documentElement.getAttribute('data-theme')"),
-          {
-            timeout: 5000,
-            message: `${label} view never adopted the ${theme} theme`,
-          }
-        )
-        .toBe(theme === 'light' ? 'light' : null)
+      await expectViewTheme(urlPart, label, theme)
       // The attribute flip is synchronous, but many colours are declared with
       // a CSS `transition` (e.g. `.vault-sidebar__item { transition: color
       // 0.1s }` in task-vault.css), so the computed colour right after the
