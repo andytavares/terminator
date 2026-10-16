@@ -1,0 +1,8 @@
+{
+  // The view, as the browser loads it: index.html's module and everything it
+  // imports. It also runs in the phone's browser through Remote Control, where
+  // iPhone Safari has no Temporal, so this check has no Temporal types and a
+  // use of it in any file the view reaches is an error (ADR 108).
+  "extends": "../../tsconfig.extension.json",
+  "include": ["src/renderer/main.tsx"]
+}
