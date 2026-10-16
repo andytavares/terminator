@@ -1,0 +1,19 @@
+extensions/foundry/tests/channel-schemas.spec.ts
+  s_1770e4e124cf1a::t_97ebfb4548c436 126-143,145-156
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e2acdf410fe67ee2b1d27d4122dac9c3a69469dc",
+  "prompts": {},
+  "sessions": {
+    "s_1770e4e124cf1a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8bf63343-f3d0-4338-98ee-2e52bd4d7695",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
