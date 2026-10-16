@@ -49,6 +49,7 @@ function taskVaultVaultCaptureIPCStoringTests() {
 function taskVaultVaultCaptureIPCTagsTests() {
   describe('creates the project', taskVaultVaultCaptureIPCTagsCreatesTheProjectTests)
   describe('reuses an existing', taskVaultVaultCaptureIPCTagsReusesAnExistingTests)
+  describe('found by vault:query', taskVaultVaultCaptureIPCTagsFoundByQueryTests)
 }
 
 function taskVaultVaultCaptureIPCTagsCreatesTheProjectTests() {
@@ -82,6 +83,29 @@ function taskVaultVaultCaptureIPCTagsReusesAnExistingTests() {
 
     expect(await db.query('SELECT id FROM projects')).toHaveLength(1)
     expect(await db.query('SELECT id FROM tasks WHERE project_id IS NOT NULL')).toHaveLength(2)
+  })
+}
+
+function taskVaultVaultCaptureIPCTagsFoundByQueryTests() {
+  it('files captured tasks where vault:query finds them by each tag in display form', async () => {
+    for (const text of [
+      'Buy paint +errands #home due:2031-01-10',
+      'Call the council +phone #home due:2031-03-01',
+      'Email the editor +computer',
+    ]) {
+      await captureVia({ text })
+    }
+    const textsFound = async (filter: Record<string, unknown>) =>
+      (
+        (await harness.invoke('task-vault:vault:query', filter)) as { tasks: { text: string }[] }
+      ).tasks.map((task) => task.text)
+
+    expect(await textsFound({ context: 'Errands' })).toEqual(['Buy paint'])
+    expect(await textsFound({ area: 'Home' })).toEqual(['Buy paint', 'Call the council'])
+    expect(await textsFound({ area: 'Home', dueBefore: '2031-02-01' })).toEqual(['Buy paint'])
+    expect(await textsFound({ status: ['open'], context: 'Computer' })).toEqual([
+      'Email the editor',
+    ])
   })
 }
 
