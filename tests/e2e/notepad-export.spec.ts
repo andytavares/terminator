@@ -112,6 +112,19 @@ test('export saves each diagram as an .excalidraw file Excalidraw can open', asy
   })
 })
 
+/** TEMPORARY (PR #269): on CI the Escape has missed Settings; says where focus was if it does. */
+async function expectSettingsClosed(): Promise<void> {
+  const focused = () =>
+    `${document.activeElement?.tagName}.${(document.activeElement as HTMLElement | null)?.className}`
+  await expect(handle.page.locator('.settings-panel'))
+    .toBeHidden()
+    .catch(async (error: Error) => {
+      const host = await handle.page.evaluate(focused)
+      console.log(`host focus: ${host}; frame focus: ${await notepad.evaluate(focused)}`)
+      throw error
+    })
+}
+
 test('the dialog starts on the folder and comment format chosen in Settings', async () => {
   const folder = mkdtempSync(join(tmpdir(), 'notepad-configured-'))
   const { page } = handle
@@ -131,6 +144,7 @@ test('the dialog starts on the folder and comment format chosen in Settings', as
   await exportRow('Export folder').getByRole('button', { name: 'Choose…' }).click()
   await expect(exportRow('Export folder')).toContainText(folder)
   await page.keyboard.press('Escape')
+  await expectSettingsClosed()
 
   await notepad.bringToFront()
   await notepad.getByRole('button', { name: 'Export', exact: true }).first().click()
