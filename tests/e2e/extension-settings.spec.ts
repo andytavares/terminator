@@ -176,7 +176,6 @@ test.afterAll(async () => closeApp(handle))
 
 /** Writes every setting of one extension from its settings page, and checks main stored each. */
 async function writesEverySetting(extension: string): Promise<void> {
-  test.setTimeout(120_000)
   const schema = schemas.find((s) => s.label === extension)!
   const panel = await openPage(handle.page, schema)
   const folder = mkdtempSync(join(tmpdir(), 'terminator-e2e-setting-folder-'))
@@ -200,7 +199,6 @@ async function writesEverySetting(extension: string): Promise<void> {
 }
 
 async function valuesSurviveRestart(): Promise<void> {
-  test.setTimeout(180_000)
   const { userDataDir } = handle
   await closeApp(handle)
   handle = await launchApp(userDataDir)
@@ -223,13 +221,23 @@ const EXTENSIONS_WITH_SETTINGS = [
   'Task Vault',
 ]
 
-test.describe.serial('every extension setting', () => {
-  for (const extension of EXTENSIONS_WITH_SETTINGS) {
-    test(`${extension}: every setting is written from its settings page`, () =>
-      writesEverySetting(extension))
-  }
+/** A flow's steps in order, each titled for the behaviour it checks. */
+type Steps = Array<[title: string, body: () => Promise<void>]>
 
-  test('every value survives a restart, in main and on each settings page', valuesSurviveRestart)
+const WRITE_STEPS: Steps = [
+  ...EXTENSIONS_WITH_SETTINGS.map((extension): Steps[number] => [
+    `${extension}: every setting is written from its settings page`,
+    () => writesEverySetting(extension),
+  ]),
+  ['every value survives a restart, in main and on each settings page', valuesSurviveRestart],
+]
+
+// The second flow reads what the first wrote, so the two run in order on one profile.
+test.describe.configure({ mode: 'serial' })
+
+test('every extension setting is written from its page and survives a restart', async () => {
+  test.setTimeout(600_000)
+  for (const [title, body] of WRITE_STEPS) await test.step(title, body)
 })
 
 async function gitIntegrationOffRegistersNoCommands(): Promise<void> {
@@ -308,29 +316,27 @@ async function remoteControlViewerLimitMatchesPage(): Promise<void> {
     .toContain('13')
 }
 
-test.describe.serial('what the settings change', () => {
-  test(
+const EFFECT_STEPS: Steps = [
+  [
     'Git Integration switched off keeps its settings page, and registers no commands',
-    gitIntegrationOffRegistersNoCommands
-  )
-
-  test(
+    gitIntegrationOffRegistersNoCommands,
+  ],
+  [
     "Foundry's budgets, critical paths and write-backs are what a new order starts with",
-    foundryOrderStartsWithSettings
-  )
-
-  test(
+    foundryOrderStartsWithSettings,
+  ],
+  [
     "Notepad's default tags are on a new note before anything is typed",
-    notepadNoteStartsWithDefaultTags
-  )
-
-  test(
+    notepadNoteStartsWithDefaultTags,
+  ],
+  [
     'a notification switched off goes nowhere, and switched on reaches the centre',
-    notificationSwitchRoutesIt
-  )
+    notificationSwitchRoutesIt,
+  ],
+  ["Remote Control's viewer limit is the one its page shows", remoteControlViewerLimitMatchesPage],
+]
 
-  test(
-    "Remote Control's viewer limit is the one its page shows",
-    remoteControlViewerLimitMatchesPage
-  )
+test('what the settings change shows where a person looks for it', async () => {
+  test.setTimeout(120_000)
+  for (const [title, body] of EFFECT_STEPS) await test.step(title, body)
 })
