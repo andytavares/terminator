@@ -1,0 +1,23 @@
+.github/workflows/ci.yml
+  s_1770e4e124cf1a::t_7f5a32905af2f8 409-410,453,456,471
+scripts/e2e-select.mjs
+  s_1770e4e124cf1a::t_af458c891e1a3f 15-17,32,37,41,49,53
+tests/unit/scripts/e2e-select.spec.ts
+  s_1770e4e124cf1a::t_64ea6abdb11f66 37-39,41,46,83-84,87,97,100,132,136
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "0badcdcac0ddaf70888b42f69ad5c2b35f7e7313",
+  "prompts": {},
+  "sessions": {
+    "s_1770e4e124cf1a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8bf63343-f3d0-4338-98ee-2e52bd4d7695",
+        "model": "unknown"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
