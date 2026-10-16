@@ -86,8 +86,14 @@ async function viewRunsCommandById(): Promise<void> {
   const { page } = handle
   await expect(page.locator('[data-extension-panel="e2e.probe"]')).toHaveCount(1)
   await expect
-    .poll(() => inExtensionView<string>(handle, 'e2e.probe', 'document.title').catch(() => ''))
-    .toBe('E2E Probe')
+    .poll(() =>
+      inExtensionView<boolean>(
+        handle,
+        'e2e.probe',
+        `typeof window.electronAPI?.extension?.runCommand === 'function'`
+      ).catch(() => false)
+    )
+    .toBe(true)
   // The view's frame exists only while its tab is on screen, so the command
   // runs from there and the leaving click comes after the call resolves.
   const ran = await inExtensionView<{ ok: boolean }>(
