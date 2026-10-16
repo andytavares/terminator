@@ -1,0 +1,25 @@
+tests/e2e/fixtures/zdotdir/.zprofile
+  s_1770e4e124cf1a::t_bcc41b2fd74cf5 4-6
+tests/e2e/fixtures/zdotdir/.zshrc
+  s_1770e4e124cf1a::t_d4e5be75f13a81 6
+tests/e2e/helpers.ts
+  s_1770e4e124cf1a::t_fce282af0154be 77-79
+tests/e2e/remote-control.spec.ts
+  s_1770e4e124cf1a::t_283ff6beea089e 2,7-9,14,39,81,88,91,173-174,183-184,186
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "51aca224084b83ae0df53d786676f7333bc3ab11",
+  "prompts": {},
+  "sessions": {
+    "s_1770e4e124cf1a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8bf63343-f3d0-4338-98ee-2e52bd4d7695",
+        "model": "unknown"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
