@@ -2,6 +2,7 @@
 // All calls go through extensionBridge.invoke which routes via registered IPC handlers.
 
 import type { IssueComment } from '../schemas/pr-review.schema'
+import type { ContributionsReply } from '../schemas/contributions.schema'
 import { invoke } from '@terminator/extension-sdk/renderer'
 import type { BridgeResult } from './bridge'
 
@@ -160,4 +161,8 @@ export const githubAPI = {
     bridge().invoke('github:accessible-repos', refresh === undefined ? {} : { refresh }),
 
   setReviewRepos: (repos: string[]) => bridge().invoke('github:review-repos-set', { repos }),
+
+  /** The Home Contributions section's year calendar and period sums (ADR 108, plain dates). */
+  contributionsCalendar: (args: { from: string; to: string; repo?: string; refresh?: boolean }) =>
+    invoke<BridgeResult<ContributionsReply>>('github:contributions', args),
 }

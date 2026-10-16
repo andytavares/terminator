@@ -100,6 +100,7 @@ A page shows only the view its `?view=` names, so an `App.tsx` that routes betwe
 | `workspaceTab` | `label`, `icon?`, `view?`                                        | A tab scoped to the active workspace                                                             | `workspace`    |
 | `projectTab`   | `label`, `view?`                                                 | A tab scoped to the selected project                                                             | `project`      |
 | `sidebarPanel` | `label`, `icon?`, `defaultOpen?`, `view?`                        | A panel beside the terminal                                                                      | `sidebar`      |
+| `homeSection`  | `label`, `view?`                                                 | A section at the top of Home, as tall as its content, that scrolls away with the sessions        | `home`         |
 | `windowViews`  | `[{ id, view }]`                                                 | Views `api.window.openAuxiliary(id)` opens in their own window                                   | —              |
 | `commands`     | `[{ id, label, description?, shortcut?, mnemonic?, requires? }]` | Reserves the command's row in the Quick Actions panel (see [`api.commands`](#apicommands))       | —              |
 | `quickActions` | `{ group: { mnemonic?, label } }`                                | Your group's letter and label in the Quick Actions panel                                         | —              |

@@ -8,8 +8,9 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "noEmit": true,
-    // The specs run on Node 24 (.nvmrc), not in the bundle's ES2022 target.
-    "lib": ["ES2024", "DOM", "DOM.Iterable"],
+    // The specs run on Node 24 (.nvmrc), not in the bundle's ES2022 target, with
+    // Temporal behind the flag vitest.config.ts passes (ADR 108).
+    "lib": ["ES2024", "ESNext.Temporal", "DOM", "DOM.Iterable"],
     // A spec that activates the extension imports `src/index.ts` by name, not
     // the esbuild bundle beside it, which vi.mock cannot reach into.
     "allowImportingTsExtensions": true,

@@ -9,6 +9,7 @@ const GROUPS: Record<string, string[]> = {
   Accent: ['accent', 'accent-hover', 'accent-dim', 'accent-glow', 'on-accent'],
   Meaning: ['danger', 'success', 'warning', 'agent'],
   Lines: ['border', 'border-strong', 'overlay-subtle', 'overlay-soft', 'overlay', 'overlay-strong'],
+  Heatmap: ['heat-0', 'heat-1', 'heat-2', 'heat-3', 'heat-4'],
 }
 
 function Swatch({ name }: { name: string }): JSX.Element {
@@ -53,10 +54,19 @@ type Story = StoryObj<typeof meta>
 const tokenValue = (name: string): string =>
   getComputedStyle(document.documentElement).getPropertyValue(name).trim()
 
+/** Every heatmap level is a colour, no two adjacent levels alike. */
+const expectDistinctHeatLevels = async (): Promise<void> => {
+  const values = [0, 1, 2, 3, 4].map((level) => tokenValue(`--tm-heat-${level}`))
+  for (const value of values) await expect(value).not.toBe('')
+  for (let i = 1; i < values.length; i++) await expect(values[i]).not.toBe(values[i - 1])
+}
+
 export const Dark: Story = {
   play: async () => {
     await expect(document.documentElement.hasAttribute('data-theme')).toBe(false)
     await expect(tokenValue('--tm-bg-base')).toBe('#0c0c0f')
+    await expect(tokenValue('--tm-heat-4')).toBe('#4ade80')
+    await expectDistinctHeatLevels()
   },
 }
 
@@ -64,5 +74,7 @@ export const Light: Story = inLight({
   play: async () => {
     await expect(document.documentElement.getAttribute('data-theme')).toBe('light')
     await expect(tokenValue('--tm-bg-base')).toBe('#f0f0f5')
+    await expect(tokenValue('--tm-heat-4')).toBe('#166534')
+    await expectDistinctHeatLevels()
   },
 } satisfies Story)

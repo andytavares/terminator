@@ -115,8 +115,16 @@ describe('initExtensions — manifest-driven (contributes) registration — regi
 describe('initExtensions — manifest-driven (contributes) registration — does not call any registry method when extension has no contributes', () => {
   it('does not call any registry method when extension has no contributes', async () => {
     await callInit([{ id: 'com.test.ext' }])
-    const { globalTabs, workspaceTabs, projectTabs, sidebarPanels, windowViews } = registryState()
-    for (const surfaces of [globalTabs, workspaceTabs, projectTabs, sidebarPanels, windowViews]) {
+    const { globalTabs, workspaceTabs, projectTabs, sidebarPanels, windowViews, homeSections } =
+      registryState()
+    for (const surfaces of [
+      globalTabs,
+      workspaceTabs,
+      projectTabs,
+      sidebarPanels,
+      windowViews,
+      homeSections,
+    ]) {
       expect(surfaces.size).toBe(0)
     }
   })
@@ -161,6 +169,18 @@ describe('registerWebviewExtension — default view params', () => {
     expect(portalOf(panel.component, { repoRoot: null, onClose: () => {} })).toBe(
       'com.test.ext:sidebar'
     )
+  })
+})
+
+describe('registerWebviewExtension — home section', () => {
+  const registerContributions = (contributes: Extension['contributes']) =>
+    registerWebviewExtension(makeExt({ contributes }), registryState())
+
+  it('hosts the "home" view in a home section that names none', () => {
+    registerContributions({ homeSection: { label: 'Pull requests' } })
+    const section = registryState().homeSections.get('com.test.ext')!
+    expect(section).toMatchObject({ label: 'Pull requests', view: 'home' })
+    expect(portalOf(section.component, {})).toBe('com.test.ext:home')
   })
 })
 

@@ -324,6 +324,56 @@ describe('ExtensionPanelPortal — remote/browser — double-Escape in the sideb
   })
 })
 
+/** Dispatches a frame-height message, as the shim of a fit=content frame posts it. */
+function heightMessage(
+  container: HTMLElement,
+  height: number,
+  source: MessageEventSource | null = firstIframe(container).contentWindow
+): void {
+  act(() => {
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        data: { type: 'terminator:frame-height', height },
+        source,
+      })
+    )
+  })
+}
+
+describe('ExtensionPanelPortal — fitContent', () => {
+  beforeEach(stubDesktopApi)
+
+  it('adds fit=content to the src and starts with no flex and zero height', () => {
+    const { container } = renderPortal({ fitContent: true })
+    expect(firstIframe(container).src).toContain('fit=content')
+    const wrapper = panelWrapper(container)
+    expect(wrapper.style.flex).toBe('')
+    expect(wrapper.style.height).toBe('0px')
+    expect(wrapper.style.minHeight).toBe('')
+  })
+
+  it('sets the wrapper height from a height message of its own frame', () => {
+    const { container } = renderPortal({ fitContent: true })
+    heightMessage(container, 240)
+    expect(panelWrapper(container).style.height).toBe('240px')
+  })
+
+  it('ignores a height message from another source', () => {
+    const { container } = renderPortal({ fitContent: true })
+    heightMessage(container, 240, null)
+    heightMessage(container, 240, window)
+    expect(panelWrapper(container).style.height).toBe('0px')
+  })
+
+  it('keeps the flex layout and ignores height messages without fitContent', () => {
+    const { container } = renderPortal()
+    expect(firstIframe(container).src).not.toContain('fit=content')
+    heightMessage(container, 240)
+    expect(panelWrapper(container).style.flex).toBe('1 1 0%')
+    expect(panelWrapper(container).style.height).toBe('')
+  })
+})
+
 describe('ExtensionPanelPortal — shown views', () => {
   const shownIds = () => [...useShownExtensionViews.getState().shown.values()]
 

@@ -1,0 +1,258 @@
+/* ─── Home Contributions section ──────────────────────────────────────────
+   An auto-height frame at the top of Home: the page sizes to its content
+   (no 100% heights, no inner scroll), so the frame shim can report it.
+   Every class is prefixed ct- to sit beside rd- and the other views. */
+
+.ct-section {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 16px;
+  background: transparent;
+  color: var(--tm-text-primary);
+  font: 13px/1.45 var(--tm-font-ui);
+}
+
+.ct-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ct-bar .ct-title {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.ct-sp {
+  flex: 1;
+}
+
+/* A picker's own wrapper, so the popover anchors to the button's corner. */
+.ct-picker {
+  position: relative;
+}
+
+.ct-picker .tmui-popover {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  min-width: 220px;
+}
+
+.ct-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: var(--tm-radius-xs);
+  background: transparent;
+  color: var(--tm-text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ct-option:hover {
+  background: var(--tm-bg-card-hover);
+}
+
+.ct-option[aria-checked='true'] {
+  color: var(--tm-accent-text);
+}
+
+.ct-custom {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding-top: 4px;
+  border-top: 1px solid var(--tm-border);
+}
+
+.ct-custom input[type='date'] {
+  color-scheme: inherit;
+}
+
+.ct-custom-error {
+  width: 100%;
+  font-size: 11.5px;
+  color: var(--tm-danger);
+}
+
+/* The four period stats, and the four highlights: a dl per stat. */
+.ct-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+@media (max-width: 560px) {
+  .ct-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.ct-stat {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  margin: 0;
+}
+
+.ct-stat dt {
+  font-size: 12px;
+  color: var(--tm-text-muted);
+}
+
+.ct-stat dd {
+  margin: 0;
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+}
+
+.ct-stat .ct-delta {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 12px;
+  color: var(--tm-text-muted);
+}
+
+.ct-stat .ct-delta svg {
+  width: 12px;
+  height: 12px;
+}
+
+.ct-delta--up {
+  color: var(--tm-success) !important;
+}
+
+.ct-delta--down {
+  color: var(--tm-danger) !important;
+}
+
+.ct-stat .ct-sub {
+  font-size: 12px;
+  color: var(--tm-text-muted);
+}
+
+/* A reload keeps the last numbers on screen, dimmed, so nothing jumps. */
+.ct-loading .ct-stats,
+.ct-loading .ct-heatmap {
+  opacity: 0.55;
+}
+
+.ct-map-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ct-map-head h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.ct-legend {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11.5px;
+  color: var(--tm-text-muted);
+}
+
+.ct-legend i {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+/* The heatmap scrolls sideways inside its own box when the frame is narrow. */
+.ct-heatmap {
+  overflow-x: auto;
+}
+
+.ct-grid {
+  display: flex;
+  gap: 2px;
+  width: max-content;
+}
+
+.ct-weekdays {
+  display: grid;
+  grid-template-rows: repeat(7, 10px);
+  gap: 2px;
+  margin-top: 16px;
+  margin-right: 4px;
+  font-size: 9px;
+  line-height: 10px;
+  color: var(--tm-text-muted);
+}
+
+/* A label shows on the Mon/Wed/Fri rows only; the others keep the row's height. */
+.ct-weekdays span {
+  visibility: hidden;
+}
+
+.ct-weekdays span:nth-child(1),
+.ct-weekdays span:nth-child(3),
+.ct-weekdays span:nth-child(5) {
+  visibility: visible;
+}
+
+.ct-year {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ct-months {
+  position: relative;
+  height: 14px;
+  margin-bottom: 2px;
+  font-size: 10px;
+  color: var(--tm-text-muted);
+}
+
+.ct-months span {
+  position: absolute;
+  white-space: nowrap;
+}
+
+.ct-week {
+  display: grid;
+  grid-template-rows: repeat(7, 10px);
+  gap: 2px;
+}
+
+.ct-day {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+.ct-note {
+  font-size: 11.5px;
+  color: var(--tm-text-muted);
+}
+
+.ct-error {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 12px 0;
+  color: var(--tm-danger);
+}

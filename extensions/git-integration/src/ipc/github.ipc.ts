@@ -8,6 +8,7 @@ import { prFileChannels } from './github/pr-files.js'
 import { prCommentChannels } from './github/pr-comments.js'
 import { reviewSessionChannels } from './github/sessions.js'
 import { dashboardChannels } from './github/dashboard.js'
+import { contributionsChannels } from './github/contributions.js'
 import { viewedChannels } from './github/viewed.js'
 
 export type { GithubHandlerOptions } from './github/context.js'
@@ -29,6 +30,7 @@ export function registerGithubHandlers(
     ...prCommentChannels(ctx),
     ...reviewSessionChannels(ctx),
     ...dashboardChannels(ctx),
+    ...contributionsChannels(ctx),
     ...viewedChannels(ctx),
   ]
   for (const spec of channels) register(spec)

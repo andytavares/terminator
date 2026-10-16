@@ -12,6 +12,8 @@ interface Props {
   repoRoot?: string | null
   /** ext:// URL of the extension's renderer entry point; the desktop frame's src. */
   rendererUrl?: string
+  /** Sizes the frame to the height its page reports instead of filling its flex slot. */
+  fitContent?: boolean
 }
 
 type Surface = Pick<Props, 'extensionId' | 'viewParam'>
@@ -54,18 +56,20 @@ function listenInFrame(iframe: HTMLIFrameElement, listener: (e: KeyboardEvent) =
 
 /** Where Remote Control serves the extension's view to a browser. */
 function frameSrc(props: Props): string {
-  const { extensionId, viewParam, repoRoot } = props
+  const { extensionId, viewParam, repoRoot, fitContent } = props
   const params = new URLSearchParams({ viewParam })
   if (repoRoot) params.set('repoRoot', repoRoot)
+  if (fitContent) params.set('fit', 'content')
   return `/ext/${extensionId}/?${params.toString()}`
 }
 
 /** Desktop src: the extension's own ext:// URL, shaped as ExtensionViewHost.buildUrl shapes it. */
 function desktopFrameSrc(props: Props): string {
-  const { extensionId, viewParam, repoRoot, rendererUrl } = props
+  const { extensionId, viewParam, repoRoot, rendererUrl, fitContent } = props
   const url = new URL(rendererUrl ?? `ext://${extensionId}/index.html`)
   if (viewParam) url.searchParams.set('view', viewParam)
   if (repoRoot) url.searchParams.set('repoRoot', repoRoot)
+  if (fitContent) url.searchParams.set('fit', 'content')
   return url.toString()
 }
 
@@ -177,6 +181,29 @@ function useFramePort(
   })
 }
 
+/** The window message the frame shim posts with its content height (the fit=content mode). */
+const FRAME_HEIGHT_MESSAGE = 'terminator:frame-height'
+
+/** Tracks the height a fit=content frame reports; only its own frame's messages count. */
+function useReportedHeight(
+  iframeRef: React.RefObject<HTMLIFrameElement>,
+  enabled: boolean
+): number | null {
+  const [height, setHeight] = useState<number | null>(null)
+  useEffect(() => {
+    if (!enabled) return
+    const onMessage = (event: MessageEvent): void => {
+      if (event.source !== iframeRef.current?.contentWindow) return
+      const data = event.data as { type?: string; height?: unknown } | null
+      if (data?.type !== FRAME_HEIGHT_MESSAGE || typeof data.height !== 'number') return
+      setHeight(Math.max(0, data.height))
+    }
+    window.addEventListener('message', onMessage)
+    return () => window.removeEventListener('message', onMessage)
+  }, [iframeRef, enabled])
+  return enabled ? height : null
+}
+
 function panelStyle(isActive: boolean): React.CSSProperties {
   return {
     flex: 1,
@@ -189,6 +216,16 @@ function panelStyle(isActive: boolean): React.CSSProperties {
 }
 
 const IFRAME_STYLE: React.CSSProperties = { flex: 1, border: 'none', width: '100%', minHeight: 0 }
+
+/** fit=content: the wrapper is as tall as the frame's last reported content height. */
+function fitContentStyle(isActive: boolean, height: number | null): React.CSSProperties {
+  return {
+    height: height ?? 0,
+    display: isActive ? 'flex' : 'none',
+    flexDirection: 'column',
+    position: 'relative',
+  }
+}
 
 function LoadingOverlay(): JSX.Element {
   return (
@@ -208,9 +245,10 @@ function LoadingOverlay(): JSX.Element {
 }
 
 function ExtensionFrame(props: Props): JSX.Element {
-  const { extensionId, viewParam, isActive } = props
+  const { extensionId, viewParam, isActive, fitContent } = props
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const [loaded, setLoaded] = useState(false)
+  const reportedHeight = useReportedHeight(iframeRef, Boolean(fitContent))
   const desktop = isDesktop()
   useShownWhileVisible({ extensionId, viewParam }, isActive)
   useFramePort(props, iframeRef, () => setLoaded(true))
@@ -220,7 +258,7 @@ function ExtensionFrame(props: Props): JSX.Element {
     <div
       data-extension-panel={extensionId}
       data-view-param={viewParam}
-      style={panelStyle(isActive)}
+      style={fitContent ? fitContentStyle(isActive, reportedHeight) : panelStyle(isActive)}
     >
       <iframe
         ref={iframeRef}

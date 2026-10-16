@@ -234,3 +234,85 @@ describe('frame-shim app shortcuts', () => {
     expect(port.posted).not.toContainEqual({ type: 'settings-open' })
   })
 })
+
+/** Records what a fit=content shim observes and posts to its parent window. */
+function createFitContentSpies() {
+  const spies: {
+    resizeCallback: (() => void) | null
+    observed: Element[]
+    parentPosts: { message: unknown; origin: string }[]
+  } = { resizeCallback: null, observed: [], parentPosts: [] }
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      constructor(callback: () => void) {
+        spies.resizeCallback = callback
+      }
+      observe(element: Element): void {
+        spies.observed.push(element)
+      }
+      disconnect(): void {}
+    }
+  )
+  vi.spyOn(window.parent, 'postMessage').mockImplementation((message, origin) => {
+    spies.parentPosts.push({ message, origin: String(origin) })
+  })
+  return spies
+}
+
+/** Loads the shim as if the frame's page were at `url`, embedded by the page at `referrer`. */
+async function loadShimAt(url: string, referrer = 'http://localhost:5173/home'): Promise<void> {
+  const realLocation = window.location
+  Object.defineProperty(window, 'location', {
+    value: { ...realLocation, search: new URL(url).search },
+    configurable: true,
+  })
+  Object.defineProperty(document, 'referrer', {
+    value: referrer,
+    configurable: true,
+  })
+  await loadShimInFrame()
+}
+
+describe('frame-shim fit=content height reporting', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  it('observes the document and posts each height to the parent origin with fit=content', async () => {
+    const spies = createFitContentSpies()
+    await loadShimAt('ext://com.test.ext/index.html?view=home&fit=content')
+    expect(spies.observed).toContain(document.documentElement)
+    spies.resizeCallback?.()
+    expect(spies.parentPosts).toEqual([
+      {
+        message: { type: 'terminator:frame-height', height: expect.any(Number) },
+        origin: 'http://localhost:5173',
+      },
+    ])
+  })
+
+  it('posts nothing without fit=content', async () => {
+    const spies = createFitContentSpies()
+    await loadShimAt('ext://com.test.ext/index.html?view=home')
+    expect(spies.observed).toEqual([])
+    expect(spies.parentPosts).toEqual([])
+  })
+})
+
+describe('frame-shim fit=content without a referrer', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  it('still posts when the embedding page has no referrer, as a packaged app loaded from file://', async () => {
+    const spies = createFitContentSpies()
+    await loadShimAt('ext://com.test.ext/index.html?view=home&fit=content', '')
+    spies.resizeCallback?.()
+    expect(spies.parentPosts).toEqual([
+      { message: { type: 'terminator:frame-height', height: expect.any(Number) }, origin: '*' },
+    ])
+  })
+})

@@ -374,7 +374,7 @@ async function coreScreensLineUp(): Promise<void> {
   await projectGroup(page, TERMINAL_BRANCH).click()
   await expect(page.getByRole('textbox', { name: 'Terminal input' }).first()).toBeVisible()
   const found = await misalignedOn(page, 'terminal')
-  await page.getByRole('button', { name: 'Home' }).click()
+  await page.getByRole('button', { name: 'Home', exact: true }).click()
   found.push(...(await misalignedOn(page, 'Home ledger')))
   await page.getByRole('radio', { name: 'Logbook' }).click()
   found.push(...(await misalignedOn(page, 'Home logbook')))
