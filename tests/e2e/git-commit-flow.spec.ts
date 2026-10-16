@@ -261,8 +261,10 @@ async function runGitQuickAction(mnemonic: string): Promise<void> {
 async function commitQuickActionShowsTheMessageBox(): Promise<void> {
   await projectTab(handle.page, 'Terminal').click()
   await runGitQuickAction('c')
-  const view = await openGitTab(handle)
-  await expect(view.getByPlaceholder('Commit message…')).toBeVisible()
+  // Not openGitTab: its click on the tab would take the cursor out of the box.
+  await expect(projectTab(handle.page, 'Git')).toHaveClass(/tab-bar__tab--active/)
+  const view = await gitView(handle, 'project')
+  await expect(view.getByPlaceholder('Commit message…')).toBeFocused()
 }
 
 async function createPrQuickActionOpensTheDialog(): Promise<void> {
@@ -328,7 +330,7 @@ const CHANGE_TO_PULL_REQUEST: Steps = [
     openPrShowsTheExistingPullRequest,
   ],
   [
-    'the Commit… Quick Action brings the Git tab forward with the message box',
+    'the Commit… Quick Action brings the Git tab forward with the cursor in the message box',
     commitQuickActionShowsTheMessageBox,
   ],
   ['the Create PR… Quick Action opens the pull request dialog', createPrQuickActionOpensTheDialog],
