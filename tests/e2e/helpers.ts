@@ -204,6 +204,15 @@ async function keepWindowsClearOfTheCursor(app: ElectronApplication): Promise<vo
   })
 }
 
+/** A frame fires focus and blur only while the app is the active application, which a CI runner's
+ * freshly launched app is not: a field filled there is never blurred, so its save never runs. */
+async function makeAppActive(electronApp: ElectronApplication): Promise<void> {
+  await electronApp.evaluate(({ app, BrowserWindow }) => {
+    app.focus({ steal: true })
+    for (const window of BrowserWindow.getAllWindows()) window.focus()
+  })
+}
+
 export async function launchApp(
   userDataDir: string = e2eProfileDir(),
   env: Record<string, string> = {}
@@ -216,6 +225,7 @@ export async function launchApp(
   try {
     const page = await firstReadyWindow(app, remaining)
     await keepWindowsClearOfTheCursor(app)
+    await makeAppActive(app)
     return { app, page, userDataDir, launchId: marker.launchId }
   } catch (error) {
     throw await launchFailure(app, output, error)
