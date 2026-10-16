@@ -22,3 +22,4 @@ That height follows a new mode of the frame shim. `ExtensionPanelPortal` takes `
 - The section never pushes Home's own states off the screen: it scrolls with them.
 - A frame that posts no height (an old build of the shim, a page that errors) renders zero pixels tall — invisible rather than a wrong-sized hole.
 - `terminator:frame-height` is a second window-message type between host and frame, beside `terminator:frame-port`; both authenticate by source, not origin string.
+- Home exists only in the desktop app, so a section's channels are local-only: `github:contributions` is deliberately not in `REMOTE_READ_CHANNELS` (`extensions/git-integration/src/remote-access.ts`).

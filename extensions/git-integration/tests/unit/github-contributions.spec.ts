@@ -226,14 +226,41 @@ describe('github:contributions — splits a search past 1000 results and de-dupl
     mockContributions({
       'is:merged': searchReply([]),
       'reviewed-by:': searchReply([]),
-      'created:2025-10-13..2026-04-15': searchReply([prs[0]], 600),
-      'created:2026-04-16..2026-10-16': searchReply(prs, 700),
+      'created:2025-10-12..2026-04-14': searchReply([prs[0]], 600),
+      'created:2026-04-15..2026-10-16': searchReply(prs, 700),
       'author:alice created:': searchReply([], 1500), // over the cap: the two halves above run
     })
     const result = await invoke(handlers)
     // PR 2 appears in both halves; it must count once.
     expect(result.repos).toEqual(['acme/widgets'])
     expect(result.calendar.total).toBe(2)
+  })
+})
+
+describe('github:contributions — starts each search a day early for GitHub, which reads dates in UTC', () => {
+  it('searches from the day before the calendar starts, so a late-evening local PR is found', async () => {
+    const handlers = captureHandlers()
+    // 02:55 UTC on 13 Oct is 22:55 on 12 Oct in New York: GitHub files it under the 13th.
+    mockSearches([openedNode(1, '2025-10-13T02:55:00Z')], [], [])
+    await invoke(handlers, { ...PAYLOAD })
+    const searches = mockExecFile.mock.calls
+      .map((call) => fieldsOf(call[1] as string[]).search)
+      .filter(Boolean)
+    expect(searches).toHaveLength(3)
+    expect(searches.every((search) => search.includes('2025-10-12..2026-10-16'))).toBe(true)
+  })
+})
+
+describe('github:contributions — stops splitting a one-day search that is still over the cap', () => {
+  it('answers the nodes it has instead of searching the same day again', async () => {
+    const handlers = captureHandlers()
+    mockContributions({
+      'is:merged': searchReply([]),
+      'reviewed-by:': searchReply([]),
+      'author:alice created:2026-10-16..2026-10-16': searchReply([], 1500),
+    })
+    const payload = { from: '2026-10-16', to: '2026-10-16' }
+    await expect(invoke(handlers, payload)).resolves.toBeDefined()
   })
 })
 

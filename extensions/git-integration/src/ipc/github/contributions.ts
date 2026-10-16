@@ -122,29 +122,35 @@ async function searchWindow(ctx: GithubContext, search: ContributionSearch): Pro
 }
 
 /** One node as its contributions: merged counts at mergedAt; each submitted review once. */
-function contributionsOf(
-  kind: Contribution['kind'],
-  since: string,
-  node: SearchNode
-): Contribution[] {
+function contributionsOf(kind: Contribution['kind'], node: SearchNode): Contribution[] {
   const repo = node.repository
   if (kind === 'opened') return node.createdAt ? [{ kind, at: node.createdAt, repo }] : []
   if (kind === 'merged') return node.mergedAt ? [{ kind, at: node.mergedAt, repo }] : []
   return (node.reviews ?? [])
-    .filter((submittedAt) => submittedAt !== null && submittedAt >= since)
+    .filter((submittedAt) => submittedAt !== null)
     .map((submittedAt) => ({ kind, at: submittedAt!, repo }))
 }
 
+/** What one fetch found, and when. */
+interface Fetched {
+  contributions: Contribution[]
+  fetchedAt: string
+}
+
 /** The viewer's contributions of every kind since `since`, all three searches concurrent. */
-async function fetchContributions(ctx: GithubContext, since: string): Promise<Contribution[]> {
+async function fetchContributions(ctx: GithubContext, since: string): Promise<Fetched> {
   const login = await ctx.viewer(ctx.noCheckoutCwd)
-  const window = { from: since, to: localClock().today }
+  // GitHub reads a date in UTC, so a local evening falls on the next day there: start a day
+  // early and let the calendar place each instant on its local day.
+  const from = Temporal.PlainDate.from(since).subtract({ days: 1 }).toString()
+  const window = { from, to: localClock().today }
   const kinds: Contribution['kind'][] = ['opened', 'merged', 'reviewed']
   const searches = kinds.map((kind) => ({ kind, login, window, depth: 0 }))
   const found = await Promise.all(searches.map((search) => searchWindow(ctx, search)))
-  return searches.flatMap((search, i) =>
-    found[i].flatMap((node) => contributionsOf(search.kind, since, node))
+  const contributions = searches.flatMap((search, i) =>
+    found[i].flatMap((node) => contributionsOf(search.kind, node))
   )
+  return { contributions, fetchedAt: new Date().toISOString() }
 }
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/
@@ -157,11 +163,8 @@ const payloadSchema = z.object({
 type Payload = z.infer<typeof payloadSchema>
 
 /** The channel's answer: the calendar and the two periods from the (cached) contributions. */
-function answer(
-  contributions: Contribution[],
-  payload: Payload,
-  clock: { today: string; timeZone: string }
-) {
+function answer(fetched: Fetched, payload: Payload, clock: { today: string; timeZone: string }) {
+  const { contributions, fetchedAt } = fetched
   const range = { from: payload.from, to: payload.to }
   const inRepo = payload.repo ? contributions.filter((c) => c.repo === payload.repo) : contributions
   return {
@@ -169,14 +172,14 @@ function answer(
     period: countBetween(inRepo, range, clock.timeZone),
     previous: countBetween(inRepo, previousRange(range), clock.timeZone),
     repos: [...new Set(contributions.map((c) => c.repo))].sort(),
-    fetchedAt: new Date().toISOString(),
+    fetchedAt,
   }
 }
 
 export function contributionsChannels(ctx: GithubContext): ChannelSpec[] {
   // The fetched list per `since`, kept until it fails, as ctx's other lookups are;
   // `refresh: true` asks GitHub again.
-  const fetches = new Map<string, Promise<Contribution[]>>()
+  const fetches = new Map<string, Promise<Fetched>>()
   const fetchOnce = (payload: Payload, since: string) => {
     if (payload.refresh) fetches.delete(since)
     let pending = fetches.get(since)

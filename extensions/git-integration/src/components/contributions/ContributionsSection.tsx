@@ -26,11 +26,8 @@ interface ContributionsState {
 const INITIAL: ContributionsState = { reply: null, loading: true, error: null }
 
 /** The error text the view shows for a failed or refused load. */
-function errorText(reply: unknown, thrown: unknown): string {
-  const error =
-    reply && typeof reply === 'object' && 'error' in reply
-      ? String(reply.error)
-      : errorMessageOf(thrown)
+function errorText(thrown: unknown): string {
+  const error = errorMessageOf(thrown)
   if (error === 'NOT_AUTHENTICATED') return NOT_AUTHENTICATED_HINT
   if (error === 'RATE_LIMITED') return RATE_LIMITED_HINT
   return error
@@ -75,7 +72,7 @@ function useContributions(): Contributions {
         if (request === requestRef.current) setState({ reply, loading: false, error: null })
       } catch (thrown) {
         if (request === requestRef.current) {
-          setState((was) => ({ ...was, loading: false, error: errorText(null, thrown) }))
+          setState((was) => ({ ...was, loading: false, error: errorText(thrown) }))
         }
       }
     },
