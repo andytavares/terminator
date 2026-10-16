@@ -3,21 +3,17 @@ import { execFileSync } from 'node:child_process'
 import { mkdirSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { launchApp, closeApp, createWorkspace, type AppHandle, e2eTempDir } from './helpers'
-import { inFoundry as inFoundryFrame } from './foundry-harness'
+import {
+  clickByName as clickInFoundry,
+  foundryChannel,
+  inFoundry as inFoundryFrame,
+  openFoundry as openFoundryPanel,
+} from './foundry-harness'
 import { extensionPage } from './extension-page'
 
-// Opening the application on a run the last one left in flight.
-//
-// This is the only level the claim can be made at. An agent's terminal is a
-// child of the application process, so "the agents are gone" is a fact about a
-// *fresh* process — and a spec that stubs the runner has, by construction,
-// nothing to be fresh about. So the records are written before the application
-// launches, exactly as a previous session would have left them, and what is
-// asserted is what the operator sees on opening it.
-//
-// A separate file from `foundry.spec.ts` on purpose: the extension looks at a
-// records location once, and that file's own tests read it long before this
-// could seed anything.
+// Opening the application on a run the last one left in flight. An agent's terminal is a
+// child of the application, so "the agents are gone" is a fact about a fresh process: the
+// records are written before the app launches, as a previous session would have left them.
 
 let handle: AppHandle
 let repo: string
@@ -210,11 +206,8 @@ function graphOnDisk(): { nodes: { id: string; state: string; attempts: number }
   ) as { nodes: { id: string; state: string; attempts: number }[] }
 }
 
-async function foundry(channel: string, payload: unknown = {}): Promise<unknown> {
-  return handle.page.evaluate(
-    ([ch, body]) => window.electronAPI.extensionBridge.invoke(ch as string, body),
-    [channel, payload] as [string, unknown]
-  )
+function foundry(channel: string, payload: unknown = {}): Promise<unknown> {
+  return foundryChannel(handle, channel, payload)
 }
 
 /** Runs a script inside Foundry's frame in the main window. */
@@ -223,15 +216,7 @@ function inFoundry<T>(script: string): Promise<T> {
 }
 
 function clickByName(name: string): Promise<boolean> {
-  return inFoundry<boolean>(`(function () {
-    var all = document.querySelectorAll('button')
-    var want = ${JSON.stringify(name)}
-    for (var i = 0; i < all.length; i++) {
-      var label = (all[i].getAttribute('aria-label') || all[i].textContent || '').trim()
-      if (label === want || label.indexOf(want + ', ') === 0) { all[i].click(); return true }
-    }
-    return false
-  })()`)
+  return clickInFoundry(handle, 'button', name)
 }
 
 /**
@@ -245,38 +230,8 @@ function bodyText(): Promise<string> {
   return inFoundry<string>('document.body.textContent')
 }
 
-async function openFoundry(): Promise<void> {
-  const panel = handle.page.locator('[data-extension-panel="terminator.foundry"]')
-  if ((await panel.count()) === 0) {
-    const button = handle.page.locator('button[aria-label="Foundry"]')
-    await expect(button).toBeVisible({ timeout: 30_000 })
-    await button.click()
-  }
-  await expect(panel).toHaveCount(1, { timeout: 30_000 })
-  // The channel answers through the main window's own bridge, which needs
-  // nothing from the extension's own WebContentsView, so it is checked
-  // first; only once the extension has activated is the view itself worth
-  // polling for.
-  await expect
-    .poll(async () => (await foundry('foundry:order.list').catch(() => null)) !== null, {
-      timeout: 30_000,
-    })
-    .toBe(true)
-  // The WebContentsView `inFoundry` reaches attaches a little after the
-  // channel answers — polled with its rejection caught, since `expect.poll`
-  // does not retry a callback that throws, only one whose value mismatches.
-  await expect
-    .poll(
-      async () => {
-        try {
-          return await inFoundry<number>(`document.querySelectorAll('button').length`)
-        } catch {
-          return 0
-        }
-      },
-      { timeout: 30_000 }
-    )
-    .toBeGreaterThan(0)
+function openFoundry(): Promise<void> {
+  return openFoundryPanel(handle)
 }
 
 /** The fixture repository's one commit: a README and a package whose test passes. */
@@ -327,11 +282,6 @@ test.beforeAll(async () => {
   handle = await launchApp()
   await createWorkspace(handle.page, 'Foundry', repo)
   await openFoundry()
-  await expect
-    .poll(async () => (await foundry('foundry:order.list').catch(() => null)) !== null, {
-      timeout: 30_000,
-    })
-    .toBe(true)
 })
 
 test.afterAll(async () => {
@@ -339,7 +289,7 @@ test.afterAll(async () => {
   rmSync(repo, { recursive: true, force: true, maxRetries: 5 })
 })
 
-test('the run is noticed on opening, without anybody going to look', async () => {
+async function noticedOnOpening(): Promise<void> {
   // Through the channel the chrome polls every four seconds from the moment
   // the application opens, which is the whole claim: this is found in one poll
   // rather than by coming back hours later and noticing nothing had moved.
@@ -366,23 +316,22 @@ test('the run is noticed on opening, without anybody going to look', async () =>
   expect(listed.gates.map((g) => g.rule)).toEqual(['run.interrupted'])
   expect(listed.gates[0].why).toContain('builder · U-1 refresh the token on a 401')
   expect(listed.gates[0].options.map((o) => o.id)).toEqual(['resume', 'stop', 'hold'])
-})
+}
 
-test('the Floor says nothing is running it, rather than drawing a working run', async () => {
+async function floorSaysNothingRunsIt(): Promise<void> {
   const view = (await foundry('foundry:run.observe', { id: ORDER_ID })) as { orphaned: string[] }
   expect(view.orphaned).toEqual(['build:U-1'])
-})
+}
 
-test('it refuses to send you to a terminal that no longer exists', async () => {
+async function refusesADeadTerminal(): Promise<void> {
   const r = (await foundry('foundry:session.attach', {
     orderId: ORDER_ID,
     nodeId: 'build:U-1',
   })) as { error?: string }
   expect(r.error).toMatch(/no live agent/)
-})
+}
 
-test('the inbox renders the row with its move on it', async () => {
-  test.setTimeout(90_000)
+async function inboxRendersTheMove(): Promise<void> {
   await openFoundry()
   // Polled rather than read once: the inbox refetches on a timer, and the gate
   // is raised by the same poll the chrome makes.
@@ -407,7 +356,7 @@ test('the inbox renders the row with its move on it', async () => {
   expect(existsSync(join(process.cwd(), 'test-results', 'foundry-interrupted-inbox.png'))).toBe(
     true
   )
-})
+}
 
 /** Waits for the order's row in the Forge list, then opens it. */
 async function openOrderRowInView(id: string, missing: string): Promise<void> {
@@ -457,8 +406,7 @@ async function foundryShot(): Promise<string> {
   return (await view.screenshot()).toString('base64')
 }
 
-test('the Floor carries the same move, above the graph', async () => {
-  test.setTimeout(90_000)
+async function floorCarriesTheMove(): Promise<void> {
   await openFoundry()
 
   // The Forge tab, then the running order — which opens on the Floor.
@@ -467,12 +415,8 @@ test('the Floor carries the same move, above the graph', async () => {
 
   await expect.poll(() => bodyText(), { timeout: 15_000 }).toContain('Halted — your move')
   const text = await bodyText()
-  // `Halted — your move`, not `Nothing is running this`. An orphan always
-  // raises `run.interrupted` (adopt.ts), and ADR-045 puts an unanswered gate
-  // ahead of everything else in the standing — "every other condition below is
-  // a symptom of it". The adrift headline is what this order says *after* the
-  // gate is held, which is a different screen. This assertion predates that
-  // ordering.
+  // `Halted — your move`, not `Nothing is running this`: an orphan always raises
+  // `run.interrupted` (adopt.ts), and ADR-045 puts an unanswered gate first.
   expect(text, `the Floor rendered:\n${text}`).toContain('Halted — your move')
   // A gate is one line until it is opened; its reason is behind the chevron.
   expect(await inFoundry<boolean>(SHOW_THE_REASON), 'no collapsed gate to open').toBe(true)
@@ -486,22 +430,15 @@ test('the Floor carries the same move, above the graph', async () => {
     join(process.cwd(), 'test-results', 'foundry-interrupted-floor.png'),
     Buffer.from(await foundryShot(), 'base64')
   )
-})
+}
 
-test('a run that finished every step and still failed to ship says so, with a move', async () => {
-  test.setTimeout(90_000)
+async function unshippedRunSaysSo(): Promise<void> {
   await openFoundry()
 
-  // Get to the Forge regardless of what an earlier test left on screen — this
-  // test seeds and reads its own order, so it passes the same way whether the
-  // suite runs it or it runs alone.
+  // The interrupted order is still open from the step before: "All orders" is
+  // the way back to the list, and the list refetches on its own 4s timer.
   expect(await clickByName('Forge')).toBe(true)
-  // An order may already be open (from an earlier test, or the click above
-  // landing on a still-open one) — "All orders" is the way back to the list
-  // either way, and a no-op if the list is already showing.
   await clickByName('All orders')
-  // The list refetches on its own 4s timer, and the previous test left the
-  // view mid-navigation — a fixed pause here was a flake waiting to happen.
   await openOrderRowInView(UNSHIPPED_ID, 'no row for the unshipped order')
 
   await expect.poll(() => bodyText(), { timeout: 15_000 }).toContain('Finished, but not shipped')
@@ -513,9 +450,9 @@ test('a run that finished every step and still failed to ship says so, with a mo
   // The standing text also shows in the order's list row, so it can be on
   // screen before the Floor renders its move: wait for the button itself.
   await expect.poll(() => inFoundry<boolean>(HAS_TRY_AGAIN), { timeout: 15_000 }).toBe(true)
-})
+}
 
-test('answering it puts the abandoned step back in the queue', async () => {
+async function answeringRequeuesTheStep(): Promise<void> {
   expect(graphOnDisk().nodes[0].state).toBe('running')
 
   const decided = (await foundry('foundry:inbox.decide', {
@@ -532,9 +469,9 @@ test('answering it puts the abandoned step back in the queue', async () => {
     .poll(() => graphOnDisk().nodes[0].attempts, { timeout: 20_000 })
     .toBeLessThanOrEqual(1)
   expect(['waiting', 'running']).toContain(graphOnDisk().nodes[0].state)
-})
+}
 
-test('stopping a run stops it, which nothing used to do', async () => {
+async function stoppingStopsTheRun(): Promise<void> {
   const stopped = (await foundry('foundry:run.stop', { id: ORDER_ID })) as { ok?: boolean }
   expect(stopped.ok).toBe(true)
 
@@ -553,4 +490,23 @@ test('stopping a run stops it, which nothing used to do', async () => {
   const ledger = readFileSync(join(dataRoot(), 'orders', ORDER_ID, 'ledger.jsonl'), 'utf8')
   expect(ledger).toContain('run.interrupted')
   expect(ledger).toContain('run.stopped')
+}
+
+test('a run that died with the app is noticed on opening, shown with its move, resumed and stopped', async () => {
+  test.setTimeout(180_000)
+  const step = test.step
+  await step('the run is noticed on opening, without anybody going to look', noticedOnOpening)
+  await step(
+    'the Floor says nothing is running it, rather than drawing a working run',
+    floorSaysNothingRunsIt
+  )
+  await step('it refuses to send you to a terminal that no longer exists', refusesADeadTerminal)
+  await step('the inbox renders the row with its move on it', inboxRendersTheMove)
+  await step('the Floor carries the same move, above the graph', floorCarriesTheMove)
+  await step(
+    'a run that finished every step and still failed to ship says so, with a move',
+    unshippedRunSaysSo
+  )
+  await step('answering it puts the abandoned step back in the queue', answeringRequeuesTheStep)
+  await step('stopping a run stops it, which nothing used to do', stoppingStopsTheRun)
 })
