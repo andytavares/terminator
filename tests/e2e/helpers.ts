@@ -14,6 +14,7 @@ import { saveIpcTrace, startIpcTrace } from './ipc-trace'
 import {
   installSettingsDiagnostics,
   markSettingsDiagnostics,
+  saveHitTestTrace,
   saveSettingsDiagnostics,
 } from './settings-diagnostics'
 import { appProcessTree, expectNoProcessesLeft, launchMarker } from './leftover-processes'
@@ -363,6 +364,7 @@ export async function closeApp(
   await saveIpcTrace(handle.app)
   const window = handle.app.windows()[0]
   if (window) await saveSettingsDiagnostics(window)
+  await saveHitTestTrace(handle.app).catch(() => undefined)
   const started = appProcessTree(handle.app.process().pid ?? -1)
   await stopApp(handle.app, GRACEFUL_CLOSE_MS)
   await expectNoProcessesLeft(handle.launchId, started)

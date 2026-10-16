@@ -1,5 +1,5 @@
 import { test, type ElectronApplication, type Frame, type Page } from '@playwright/test'
-import { appendFileSync, mkdirSync } from 'node:fs'
+import { appendFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { basename, join } from 'node:path'
 
 // TEMPORARY (PR #269): records where focus and keys go in the host page and in each extension
@@ -37,6 +37,16 @@ const probe = (where: string) => `(() => {
     document.addEventListener(type, (e) => note(type + ' on ' + describe(e.target)), true)
 })()`
 
+// Which renderer each mouse event reached, when hit-test data was submitted and aggregated, and the
+// test's own marks (performance.mark) to line them up with the log.
+const TRACE_CATEGORIES = ['disabled-by-default-viz.hit_testing_flow', 'input', 'blink.user_timing']
+const TRACE_EVENTS = new Set([
+  'Event.Pipeline',
+  'RenderWidgetHostImpl::ForwardMouseEvent',
+  'WebFrameWidgetImpl::HandleInputEvent',
+  'process_name',
+])
+
 /** Main's side writes into the page's log, so one dump holds both. */
 export async function installSettingsDiagnostics(
   app: ElectronApplication,
@@ -47,6 +57,11 @@ export async function installSettingsDiagnostics(
     if (frame.url().startsWith('ext://')) installInFrame(frame).catch(() => undefined)
   })
   await installInMain(app)
+  await app.evaluate(
+    ({ contentTracing }, categories) =>
+      contentTracing.startRecording({ included_categories: categories }),
+    TRACE_CATEGORIES
+  )
 }
 
 /** Main's sends and window events, written into the page's log. */
@@ -87,7 +102,7 @@ export async function markSettingsDiagnostics(page: Page, line: string): Promise
     (text) =>
       (window as unknown as { settingsDiag?: string[] }).settingsDiag?.push(
         `${Date.now()} test: ${text}`
-      ),
+      ) && performance.mark(`test: ${text}`),
     line
   )
 }
@@ -122,4 +137,38 @@ export async function saveSettingsDiagnostics(page: Page): Promise<void> {
   const directory = join('test-results', 'settings-diagnostics')
   mkdirSync(directory, { recursive: true })
   appendFileSync(join(directory, `${basename(test.info().file)}.log`), `${lines.join('\n')}\n---\n`)
+}
+
+interface TraceEvent {
+  name?: string
+  cat?: string
+}
+
+/** Which process is the host page and which is each extension frame, by OS pid. */
+function rendererPids(app: ElectronApplication): Promise<Record<string, number>> {
+  return app.evaluate(({ BrowserWindow }) => {
+    const contents = BrowserWindow.getAllWindows()[0]?.webContents
+    if (!contents) return {}
+    const pids: Record<string, number> = { host: contents.getOSProcessId() }
+    for (const frame of contents.mainFrame.framesInSubtree) {
+      if (frame.url.startsWith('ext://')) pids[frame.url] = frame.osProcessId
+    }
+    return pids
+  })
+}
+
+/** Stops the launch's trace and keeps the routing events beside the log. */
+export async function saveHitTestTrace(app: ElectronApplication): Promise<void> {
+  const directory = join(process.cwd(), 'test-results', 'settings-diagnostics')
+  mkdirSync(directory, { recursive: true })
+  const raw = join(directory, `raw-${Date.now()}.json`)
+  const pids = await rendererPids(app).catch(() => ({}))
+  await app.evaluate(({ contentTracing }, path) => contentTracing.stopRecording(path), raw)
+  const parsed = JSON.parse(readFileSync(raw, 'utf8')) as { traceEvents?: TraceEvent[] }
+  rmSync(raw, { force: true })
+  const kept = (parsed.traceEvents ?? []).filter(
+    (event) => TRACE_EVENTS.has(event.name ?? '') || event.cat === 'blink.user_timing'
+  )
+  const file = join(directory, `${basename(test.info().file)}.${Date.now()}.trace.json`)
+  writeFileSync(file, JSON.stringify({ pids, traceEvents: kept }))
 }
