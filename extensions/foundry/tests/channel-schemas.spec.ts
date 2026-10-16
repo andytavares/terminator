@@ -124,3 +124,35 @@ describe('every Foundry channel', () => {
     expect(foreign).toEqual([])
   })
 })
+
+describe('every Foundry channel the source declares', () => {
+  // A channel declared in the source and missing from the registry is dead wiring: the surface
+  // calling it fails at the moment the operator presses the button.
+  it('is in the registry for every channel the source declares', () => {
+    const missing = declaredChannels().filter((name) => !registeredChannels().includes(name))
+    expect(declaredChannels().length).toBeGreaterThan(30)
+    expect(missing, `declared but never registered: ${missing.join(', ')}`).toEqual([])
+  })
+
+  // An empty payload is what a surface sends when it has nothing to say. A channel that needs
+  // arguments answers its invalid response; none of them may reject the invoke.
+  it('answers an empty payload rather than rejecting', async () => {
+    const rejected: string[] = []
+    for (const spec of specs) {
+      await dispatchChannel(spec, {}).catch(() => rejected.push(spec.channel))
+    }
+    expect(rejected, `rejected an empty payload: ${rejected.join(', ')}`).toEqual([])
+  })
+})
+
+/** Every `foundry:` channel name the IPC sources declare, read from the text. */
+function declaredChannels(): string[] {
+  const src = path.join(here, '..', 'src')
+  const files = [
+    path.join(src, 'index.ts'),
+    ...fs.readdirSync(path.join(src, 'ipc')).map((file) => path.join(src, 'ipc', file)),
+  ]
+  const source = files.map((file) => fs.readFileSync(file, 'utf8')).join('\n')
+  const declared = /(?:(?:foundry|session)Channel\(\s*|channel: )'(foundry:[^']+)'/g
+  return [...new Set([...source.matchAll(declared)].map((match) => match[1]))]
+}
