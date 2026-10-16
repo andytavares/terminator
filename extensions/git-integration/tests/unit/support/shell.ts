@@ -44,13 +44,18 @@ export interface StubCall {
   command: string
   args: string[]
   cwd?: string
+  maxBuffer?: number
 }
 
 /** An execFile stub that answers each call with what `answer` returns: stdout text, or an Error to fail. */
 export function stubAnswering(answer: (call: StubCall) => string | StubError): ExecFileStub {
   return (...callArgs) => {
-    const [command, args, opts] = callArgs as [string, string[], { cwd?: string } | undefined]
-    const out = answer({ command, args, cwd: opts?.cwd })
+    const [command, args, opts] = callArgs as [
+      string,
+      string[],
+      { cwd?: string; maxBuffer?: number } | undefined,
+    ]
+    const out = answer({ command, args, cwd: opts?.cwd, maxBuffer: opts?.maxBuffer })
     const cb = callArgs.at(-1) as ExecFileCallback
     if (out instanceof Error) return cb(out)
     return cb(null, { stdout: out, stderr: '' })

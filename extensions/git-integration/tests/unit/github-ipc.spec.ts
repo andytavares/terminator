@@ -363,8 +363,14 @@ const OWNER_TEST_FILES = ['web/app.tsx', 'api/main.py'].map((filename) => ({
 /** Answers the owner lookups by what they ask for, after the PR's own calls have been queued. */
 function answerOwnerLookups(codeowners: string | null) {
   mockExecFile.mockImplementation(
-    stubAnswering(({ args }) => {
-      if (args[1].includes('contents/.github/CODEOWNERS') && codeowners !== null) return codeowners
+    stubAnswering(({ args, maxBuffer }) => {
+      if (args[1].includes('contents/.github/CODEOWNERS') && codeowners !== null) {
+        // gh turns -f into a POST unless told otherwise, and GitHub has no such route.
+        if (args.includes('-f') && !args.includes('GET')) return new Error('404')
+        // A real monorepo's CODEOWNERS is over the 1 MiB default output cap.
+        if ((maxBuffer ?? 1024 * 1024) < 16 * 1024 * 1024) return new Error('maxBuffer exceeded')
+        return codeowners
+      }
       if (args[1] === 'user/teams') return 'klaviyo/frontend'
       if (args[1] === 'user') return 'ana'
       return new Error('404')

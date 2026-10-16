@@ -4,6 +4,9 @@ import type { GithubContext } from './context.js'
 /** Where GitHub looks for CODEOWNERS, in the order it looks. */
 const CODEOWNERS_LOCATIONS = ['.github/CODEOWNERS', 'CODEOWNERS', 'docs/CODEOWNERS']
 
+/** A monorepo's CODEOWNERS runs past 1 MiB, the shell's default output cap. */
+const CODEOWNERS_MAX_BUFFER = 16 * 1024 * 1024
+
 interface OwnerLookup {
   repoRoot: string
   repoPath: string
@@ -16,7 +19,10 @@ async function codeownersOf(ctx: GithubContext, at: OwnerLookup): Promise<string
     try {
       return await ctx.api(at.repoRoot, {
         path: `${at.repoPath}/contents/${location}`,
+        // gh sends a POST once it has fields, unless told to GET.
+        method: 'GET',
         fields: { ref: at.baseRefName },
+        maxBuffer: CODEOWNERS_MAX_BUFFER,
         accept: 'application/vnd.github.raw+json',
       })
     } catch {
