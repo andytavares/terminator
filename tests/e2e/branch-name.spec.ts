@@ -1,5 +1,4 @@
 import { test, expect } from '@playwright/test'
-import { execFileSync } from 'node:child_process'
 import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
@@ -13,6 +12,7 @@ import {
   openSettingsSection,
   closeSettingsPanel,
 } from './helpers'
+import { git } from './foundry-harness'
 
 /**
  * A repository's branches, managed from the sidebar against real git: the card is named by the
@@ -24,10 +24,6 @@ let repo: string
 let remote: string
 const WS = 'Repo One'
 const EXCLUDED = ['gh-readonly-queue/main/pr-248-3f1a2b9c', 'trunk-merge/pr-9']
-
-function git(cwd: string, ...args: string[]): string {
-  return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: 'pipe' }).trim()
-}
 
 /** A repo pushed to a bare remote, with branches to exclude and a staged change to count. */
 function makeRepository(): void {
