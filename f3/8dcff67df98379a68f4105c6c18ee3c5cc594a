@@ -1,0 +1,29 @@
+tests/e2e/extension.spec.ts
+  s_1770e4e124cf1a::t_46cbf85cdb3ad8 2,15
+tests/e2e/git-sidebar.spec.ts
+  s_1770e4e124cf1a::t_f78be3bc7d179e 5-12,73
+tests/e2e/helpers.ts
+  s_1770e4e124cf1a::t_c81d8a8416d479 477-484,492
+tests/e2e/notepad-export.spec.ts
+  s_1770e4e124cf1a::t_89dc3310aa42e3 5,132
+tests/e2e/notepad-search.spec.ts
+  s_1770e4e124cf1a::t_5df1884cb2eb15 5,122
+tests/e2e/task-vault-data.spec.ts
+  s_1770e4e124cf1a::t_34415381f68135 5,115
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f38dcff67df98379a68f4105c6c18ee3c5cc594a",
+  "prompts": {},
+  "sessions": {
+    "s_1770e4e124cf1a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8bf63343-f3d0-4338-98ee-2e52bd4d7695",
+        "model": "unknown"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
