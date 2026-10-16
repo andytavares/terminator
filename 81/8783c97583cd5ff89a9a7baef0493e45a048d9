@@ -1,0 +1,19 @@
+tests/e2e/git-commit-flow.spec.ts
+  s_1770e4e124cf1a::t_b4fbe292864eeb 264-267,333
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "818783c97583cd5ff89a9a7baef0493e45a048d9",
+  "prompts": {},
+  "sessions": {
+    "s_1770e4e124cf1a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8bf63343-f3d0-4338-98ee-2e52bd4d7695",
+        "model": "unknown"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
