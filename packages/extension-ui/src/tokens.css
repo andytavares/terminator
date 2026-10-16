@@ -46,6 +46,12 @@
   --tm-diff-removed-bg: rgba(224, 108, 117, 0.12);
   --tm-diff-added-word-bg: rgba(152, 195, 121, 0.24);
   --tm-diff-removed-word-bg: rgba(224, 108, 117, 0.24);
+  /* The contribution heatmap's levels: 0 is a day with nothing, 4 is the busiest. */
+  --tm-heat-0: #26262e;
+  --tm-heat-1: #14532d;
+  --tm-heat-2: #16a34a;
+  --tm-heat-3: #22c55e;
+  --tm-heat-4: #4ade80;
   --tm-syntax-comment: #8585b8;
   --tm-syntax-keyword: #cf9ee8;
   --tm-syntax-string: #4ade80;
@@ -123,6 +129,12 @@
   --tm-diff-removed-bg: rgba(150, 45, 32, 0.1);
   --tm-diff-added-word-bg: rgba(15, 92, 42, 0.2);
   --tm-diff-removed-word-bg: rgba(150, 45, 32, 0.2);
+  /* The contribution heatmap's levels: 0 is a day with nothing, 4 is the busiest. */
+  --tm-heat-0: #dedee8;
+  --tm-heat-1: #bbf7d0;
+  --tm-heat-2: #4ade80;
+  --tm-heat-3: #16a34a;
+  --tm-heat-4: #166534;
   --tm-syntax-comment: #5c5c94;
   --tm-syntax-keyword: #8a3fa8;
   --tm-syntax-string: #0f5c2a;
