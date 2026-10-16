@@ -22,13 +22,9 @@ import {
   createTypedOrder,
 } from './foundry-harness'
 
-// The Forge: opening an order, running it, and the controls that manage its
-// budgets.
-//
-// Split out of what used to be `foundry.spec.ts` (see
-// docs/research/e2e-deterministic-selective.md) — this file's own app and
-// fixture repo, and every test seeds its own order and navigates to it
-// itself, rather than relying on what an earlier test left on screen.
+// The Forge as one journey: an order opens as a frame, its budgets are set on the Plan
+// step, records written by hand are read after a restart, the gate that stopped a run
+// raises its budget, and an agreed order runs as a supervised agent in its own worktree.
 
 let handle: AppHandle
 let repo: string
@@ -164,19 +160,18 @@ async function expectSupervisedLaunch(): Promise<void> {
   expect(launched.length).toBeGreaterThan(1024)
 }
 
-test('a run cuts a worktree and launches a supervised agent in a visible terminal', async () => {
-  test.setTimeout(180_000)
+const AGREED_ORDER = 'WO-E2E-1'
 
-  // A complete order, written where the extension keeps its records. The Forge
-  // is what fills one in normally and has its own cover; what is under test
-  // here is everything after it.
-  const id = 'WO-E2E-1'
-  const dir = join(repo, '.foundry', 'orders', id)
+/** A complete order, written where the extension keeps its records. The Forge is what fills
+ *  one in normally and has its own cover; what is under test is everything after it. */
+function writeAgreedOrder(): void {
+  const dir = join(repo, '.foundry', 'orders', AGREED_ORDER)
   mkdirSync(dir, { recursive: true })
-  writeFileSync(join(dir, 'order.json'), JSON.stringify(agreedForgeOrder(id)))
+  writeFileSync(join(dir, 'order.json'), JSON.stringify(agreedForgeOrder(AGREED_ORDER)))
+}
 
-  handle = await restartFoundry(handle, 'Foundry Forge')
-  await startForgeRun(id)
+async function runLaunchesSupervisedAgent(): Promise<void> {
+  await startForgeRun(AGREED_ORDER)
 
   // The worktree became a project in the sidebar, named for the branch the
   // run cut — which is what makes it findable at all.
@@ -195,8 +190,8 @@ test('a run cuts a worktree and launches a supervised agent in a visible termina
   // The worktree is a real checkout of the fixture repository, cut under the
   // data root rather than inside the repository being worked on.
   const worktrees = execFileSync('git', ['worktree', 'list'], { cwd: repo }).toString()
-  expect(worktrees).toContain(join('.foundry', 'orders', id, 'worktrees', 'fixture'))
-})
+  expect(worktrees).toContain(join('.foundry', 'orders', AGREED_ORDER, 'worktrees', 'fixture'))
+}
 
 /** Run in Foundry's view: where the controls that end an order are, and whether they are on screen. */
 const END_CONTROLS = `(function () {
@@ -275,29 +270,19 @@ async function withWindowSize(
   }
 }
 
-test('an open order is a frame, and the controls that end it never scroll away', async () => {
+async function openOrderIsAFrame(): Promise<void> {
   // Asserted as behaviour, not as a stylesheet: the controls are on screen before and after
-  // everything that can scroll has scrolled to its end. The fault it guards against is in
-  // docs/research/forge-shaping-redesign.md, "Layout".
-  // The run test above left a worktree project open, so Foundry's frame is not
-  // in the window until its panel is opened again.
-  await openFoundry(handle)
+  // everything that can scroll has scrolled to its end (docs/research/forge-shaping-redesign.md).
   const id = await createTypedOrder(handle, {
     repo,
     text: 'the frame keeps its controls at the foot',
     missing: 'no order was created to open',
   })
-
-  // A window small enough that the rail cannot fit in it, which is the whole
-  // point — and the size the report came from. Restored afterwards, because
-  // every test in this file shares one application.
+  // A window small enough that the rail cannot fit in it, the size the report came from.
   await withWindowSize([1305, 800], async () => {
     await openOrderRow(id)
-    // Nothing scrolled yet: the operator has just opened the order.
     await expectEndControlsOnScreen(15_000, 'is off screen before anything is scrolled')
-    // And after every scroller on the surface has been driven to its end —
-    // the rail, the document, the frame. This is the half that used to fail:
-    // the controls were the last thing in the page's own scroll.
+    // The half that used to fail: the controls were the last thing in the page's own scroll.
     await inFoundry(handle, SCROLL_EVERYTHING)
     await expectEndControlsOnScreen(10_000, 'scrolled off the screen')
     await expectStepWithinFrame()
@@ -305,7 +290,7 @@ test('an open order is a frame, and the controls that end it never scroll away',
       await misalignedOn(await extensionPage(handle, 'terminator.foundry'), 'Forge order')
     ).toEqual([])
   })
-})
+}
 
 async function budgetsOf(id: string): Promise<Record<string, number | null>> {
   const view = (await foundryChannel(handle, 'foundry:order.compile', { id })) as {
@@ -352,26 +337,13 @@ const RENDERED_MARKDOWN = `(function () {
     }
   })()`
 
-// The operator could not see or change an order's budgets, and "Raise the
-// budget" resumed the run against the budget it had just gone past. Both are
-// read back from the order the running application saved, not from the call.
-test('what the architect writes is shown as markdown in the Forge', async () => {
-  const id = await createTypedOrder(handle, {
-    repo,
-    text: 'markdown in the forge',
-    missing: 'no order was created to open',
-  })
-  writeMarkdownQuestion(id)
-  handle = await restartFoundry(handle, 'Foundry Forge')
-
+async function markdownIsRendered(id: string): Promise<void> {
   await openOrderRow(id)
-
   await expect
     .poll(() => inFoundry<Record<string, boolean>>(handle, RENDERED_MARKDOWN), { timeout: 15_000 })
     .toEqual({ bold: true, code: true, list: true, option: true, noAsterisks: true })
-
   await captureFoundry(handle, 'forge-markdown.png')
-})
+}
 
 /** Run in Foundry's view: clicks the Plan step, and says whether there was one. */
 const CLICK_PLAN_STEP = `(function () {
@@ -480,20 +452,60 @@ async function raiseAtGate(id: string, summary: string): Promise<void> {
   expect(decided[0].decision?.option).toBe('raise')
 }
 
-test('an order’s budgets are set on the Plan step, and raised at the gate that stopped it', async () => {
+async function budgetsSetOnPlan(): Promise<string> {
   const id = await createTypedOrder(handle, {
     repo,
     text: 'budgets are the operator’s to set',
     missing: 'no order was created',
   })
-
   await openOrderRow(id)
   await openPlanStep()
   await setBudgets(id)
+  return id
+}
 
-  const gate = agentsBudgetGate(id)
-  writeFileSync(join(repo, '.foundry', 'orders', id, 'gates.json'), JSON.stringify([gate]))
+/** Writes what an architect and the Line would have left on disk, and restarts: Foundry
+ *  reads its records once, as an operator who edited them would find. */
+async function writeRecordsAndRestart(
+  budgeted: string
+): Promise<{ markdown: string; gate: string }> {
+  const markdown = await createTypedOrder(handle, {
+    repo,
+    text: 'markdown in the forge',
+    missing: 'no order was created to open',
+  })
+  writeMarkdownQuestion(markdown)
+  const gate = agentsBudgetGate(budgeted)
+  writeFileSync(join(repo, '.foundry', 'orders', budgeted, 'gates.json'), JSON.stringify([gate]))
+  writeAgreedOrder()
   handle = await restartFoundry(handle, 'Foundry Forge')
+  return { markdown, gate: gate.summary }
+}
+
+async function budgetRaisedAtGate(id: string, summary: string): Promise<void> {
   await openOrderRow(id)
-  await raiseAtGate(id, gate.summary)
+  await raiseAtGate(id, summary)
+}
+
+test('an open order is a frame whose budgets are set on Plan and raised at the gate, and an agreed order runs as a supervised agent', async () => {
+  test.setTimeout(240_000)
+  const step = test.step
+  await step(
+    'an open order is a frame, and the controls that end it never scroll away',
+    openOrderIsAFrame
+  )
+  const budgeted = await step('an order’s budgets are set on the Plan step', budgetsSetOnPlan)
+  const written = await step('records written by hand are read after a restart', () =>
+    writeRecordsAndRestart(budgeted)
+  )
+  await step('what the architect writes is shown as markdown in the Forge', () =>
+    markdownIsRendered(written.markdown)
+  )
+  await step('an order’s budgets are raised at the gate that stopped it', () =>
+    budgetRaisedAtGate(budgeted, written.gate)
+  )
+  await step(
+    'a run cuts a worktree and launches a supervised agent in a visible terminal',
+    runLaunchesSupervisedAgent
+  )
 })
