@@ -153,7 +153,7 @@ test("a reply to a reviewer's thread is posted to GitHub and shown under it", as
 test('marking a file viewed marks it on GitHub', async () => {
   const view = await backInPrReview()
   await fileInList(view, 'tests/math.spec.ts').click()
-  await view.getByRole('checkbox', { name: 'Viewed' }).check()
+  await view.getByRole('checkbox', { name: 'Viewed', exact: true }).check()
   await expect.poll(() => stub.pullRequest(1).viewedPaths).toEqual(['tests/math.spec.ts'])
 })
 
