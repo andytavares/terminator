@@ -1,4 +1,4 @@
-import type { AppHandle } from './helpers'
+import type { ElectronApplication, Page } from '@playwright/test'
 
 // TEMPORARY (PR #269): records what opens, closes and re-sections Settings and where focus goes,
 // to find why Settings ends up on Appearance after the Extensions click on CI. Remove with the fix.
@@ -30,31 +30,46 @@ const PAGE_PROBE = `(() => {
     document.addEventListener(type, (e) => note(type + ' on ' + describe(e.target)), true)
 })()`
 
-export async function installSettingsDiagnostics(handle: AppHandle): Promise<void> {
-  await handle.app.evaluate(({ BrowserWindow }) => {
+/** Main's side writes into the page's log, so one dump holds both. */
+export async function installSettingsDiagnostics(
+  app: ElectronApplication,
+  page: Page
+): Promise<void> {
+  await page.addScriptTag({ content: PAGE_PROBE })
+  await app.evaluate(({ BrowserWindow }) => {
     const win = BrowserWindow.getAllWindows()[0]
-    const g = globalThis as unknown as { settingsDiag?: string[] }
-    if (!win || g.settingsDiag) return
-    const log: string[] = (g.settingsDiag = [])
+    if (!win) return
+    const note = (line: string) =>
+      void win.webContents
+        .executeJavaScript(
+          `window.settingsDiag?.push(${JSON.stringify(`${Date.now()} main: ${line}`)})`
+        )
+        .catch(() => undefined)
     const send = win.webContents.send.bind(win.webContents)
     win.webContents.send = (channel: string, ...args: unknown[]) => {
       if (channel.startsWith('menu:') || channel === 'extension:focus-view') {
-        log.push(`${Date.now()} main→renderer ${channel} ${JSON.stringify(args[0] ?? '')}`)
+        note(`${channel} ${JSON.stringify(args[0] ?? '')}`)
       }
       return send(channel, ...args)
     }
-    win.on('focus', () => log.push(`${Date.now()} window focus`))
-    win.on('blur', () => log.push(`${Date.now()} window blur`))
+    win.on('focus', () => note('window focus'))
+    win.on('blur', () => note('window blur'))
   })
-  await handle.page.addScriptTag({ content: PAGE_PROBE })
 }
 
-export async function settingsDiagnostics(handle: AppHandle): Promise<string> {
-  const page = await handle.page.evaluate(
-    () => (window as unknown as { settingsDiag?: string[] }).settingsDiag ?? []
+export async function markSettingsDiagnostics(page: Page, line: string): Promise<void> {
+  await page.evaluate(
+    (text) =>
+      (window as unknown as { settingsDiag?: string[] }).settingsDiag?.push(
+        `${Date.now()} test: ${text}`
+      ),
+    line
   )
-  const main = await handle.app.evaluate(
-    () => (globalThis as unknown as { settingsDiag?: string[] }).settingsDiag ?? []
-  )
-  return [...page, ...main].sort().join('\n')
+}
+
+export async function printSettingsDiagnostics(page: Page): Promise<void> {
+  const log = await page
+    .evaluate(() => (window as unknown as { settingsDiag?: string[] }).settingsDiag ?? [])
+    .catch((error: Error) => [`unreadable: ${error.message}`])
+  console.log(`settings diagnostics:\n${log.join('\n')}`)
 }
