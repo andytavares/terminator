@@ -1,0 +1,19 @@
+tests/e2e/notepad-export.spec.ts
+  s_1770e4e124cf1a::t_3dcb7422f83c9c 115-127,147
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "7203453c8e25219ccbb2982f7e916e00ceb6117d",
+  "prompts": {},
+  "sessions": {
+    "s_1770e4e124cf1a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8bf63343-f3d0-4338-98ee-2e52bd4d7695",
+        "model": "unknown"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
