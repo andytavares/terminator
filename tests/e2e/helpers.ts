@@ -5,7 +5,11 @@ import { dirname, delimiter, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { saveIpcTrace, startIpcTrace } from './ipc-trace'
 import { appProcessTree, expectNoProcessesLeft, launchMarker } from './leftover-processes'
-import { installSettingsDiagnostics, markSettingsDiagnostics } from './settings-diagnostics'
+import {
+  installSettingsDiagnostics,
+  markSettingsDiagnostics,
+  saveSettingsDiagnostics,
+} from './settings-diagnostics'
 
 // Shared e2e harness. Every spec launches the real Electron app in an isolated,
 // throwaway profile (via Chromium's --user-data-dir, which Electron honours for
@@ -325,6 +329,8 @@ export async function closeApp(
 ): Promise<void> {
   if (!handle) return
   await saveIpcTrace(handle.app)
+  const window = handle.app.windows()[0]
+  if (window) await saveSettingsDiagnostics(window)
   const started = appProcessTree(handle.app.process().pid ?? -1)
   await stopApp(handle.app, GRACEFUL_CLOSE_MS)
   await expectNoProcessesLeft(handle.launchId, started)

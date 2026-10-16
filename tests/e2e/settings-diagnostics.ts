@@ -1,4 +1,6 @@
-import type { ElectronApplication, Page } from '@playwright/test'
+import { test, type ElectronApplication, type Page } from '@playwright/test'
+import { appendFileSync, mkdirSync } from 'node:fs'
+import { basename, join } from 'node:path'
 
 // TEMPORARY (PR #269): records what opens, closes and re-sections Settings and where focus goes,
 // to find why Settings ends up on Appearance after the Extensions click on CI. Remove with the fix.
@@ -72,4 +74,24 @@ export async function printSettingsDiagnostics(page: Page): Promise<void> {
     .evaluate(() => (window as unknown as { settingsDiag?: string[] }).settingsDiag ?? [])
     .catch((error: Error) => [`unreadable: ${error.message}`])
   console.log(`settings diagnostics:\n${log.join('\n')}`)
+}
+
+const READ_DEADLINE_MS = 2_000
+
+/** Writes the launch's log beside the failed tests, which CI uploads as test-results-N. */
+export async function saveSettingsDiagnostics(page: Page): Promise<void> {
+  const read = page
+    .evaluate(() => (window as unknown as { settingsDiag?: string[] }).settingsDiag ?? [])
+    .catch((error: Error) => [`unreadable: ${error.message}`])
+  const lines = await Promise.race([
+    read,
+    // A deadline, not a sleep: the race ends as soon as the log is read.
+    new Promise<string[]>((resolve) =>
+      // eslint-disable-next-line no-restricted-syntax
+      setTimeout(() => resolve(['read timed out']), READ_DEADLINE_MS)
+    ),
+  ])
+  const directory = join('test-results', 'settings-diagnostics')
+  mkdirSync(directory, { recursive: true })
+  appendFileSync(join(directory, `${basename(test.info().file)}.log`), `${lines.join('\n')}\n---\n`)
 }
