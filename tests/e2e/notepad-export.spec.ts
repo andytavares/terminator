@@ -116,6 +116,8 @@ test('the dialog starts on the folder and comment format chosen in Settings', as
   const folder = mkdtempSync(join(tmpdir(), 'notepad-configured-'))
   const { page } = handle
   await page.bringToFront()
+  // Focus may sit in the notepad's frame, where the host page's shortcut is not heard.
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
   await page.keyboard.press('ControlOrMeta+,')
   await page.locator('.settings-panel__nav-item').filter({ hasText: 'Extensions' }).click()
   const notepadSettings = page.locator('.extension-item-wrapper').filter({

@@ -102,9 +102,9 @@ test('a running review can be continued in a terminal, then cancelled', async ()
     .poll(async () => (await readTerminalRowsIn(screen)).join('\n'), { timeout: 15000 })
     .toContain('claude-stub --resume')
 
-  await openCodeReviews(handle, 'Agent Review')
-  await panel(view).getByRole('button', { name: 'Cancel' }).click()
-  await expect(panel(view)).not.toContainText('Reviewing')
+  const reopened = await openCodeReviews(handle, 'Agent Review')
+  await panel(reopened).getByRole('button', { name: 'Cancel' }).click()
+  await expect(panel(reopened)).not.toContainText('Reviewing')
 })
 
 test('a finished review lists its finding, and a dismissed finding stays dismissed', async () => {

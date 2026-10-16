@@ -279,6 +279,9 @@ test('an open order is a frame, and the controls that end it never scroll away',
   // Asserted as behaviour, not as a stylesheet: the controls are on screen before and after
   // everything that can scroll has scrolled to its end. The fault it guards against is in
   // docs/research/forge-shaping-redesign.md, "Layout".
+  // The run test above left a worktree project open, so Foundry's frame is not
+  // in the window until its panel is opened again.
+  await openFoundry(handle)
   const id = await createTypedOrder(handle, {
     repo,
     text: 'the frame keeps its controls at the foot',

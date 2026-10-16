@@ -326,19 +326,24 @@ async function viewReadFileReadsOrReportsMissing(handle: AppHandle, folder: stri
 
 async function viewListsAndClosesSessions(handle: AppHandle): Promise<void> {
   const { page } = handle
+  // Selecting the project first: a sidebar click closes an open extension panel
+  // and unloads its frame, so the view's calls all run after it.
+  await projectGroup(page, 'notebook').click()
+  const open = await page.locator('.tab-bar__tab--session').count()
+  // An earlier Escape may have closed the Notes panel, which unloads its frame.
+  await openNotesView(handle)
   const listed = await fromView<Array<{ tabTitle: string }>>(handle, 'api.terminal.listSessions()')
   expect(listed.map((s) => s.tabTitle)).toEqual(
     expect.arrayContaining(['Terminal 1', 'Terminal 2'])
   )
-  await projectGroup(page, 'notebook').click()
-  const open = await page.locator('.tab-bar__tab--session').count()
   const closed = await fromView<{ terminatedCount: number }>(handle, 'api.terminal.closeAll()')
   expect(closed.terminatedCount).toBe(listed.length)
   expect(await fromView(handle, 'api.terminal.listSessions()')).toEqual([])
   // Every tab that was open says its terminal ended.
-  const ended = page.locator('.tab-bar__tab--session', { hasText: '[exited]' })
+  const ended = page.locator('.tab-bar__tab--session', {
+    has: page.locator('.tab-bar__state[aria-label="Exited"]'),
+  })
   await expect(ended).toHaveCount(open)
-  await expect(ended.locator('.tab-bar__state[aria-label="Exited"]')).toHaveCount(open)
 }
 
 test.describe.serial('cards, terminals and notifications in a plain folder', () => {

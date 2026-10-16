@@ -425,6 +425,8 @@ export async function runQuickActionFromPanel(page: Page, label: string): Promis
 /** Opens Settings with ⌘, (Ctrl+, off macOS) on the named section. */
 export async function openSettingsSection(page: Page, section: string): Promise<void> {
   if (!(await page.locator('.settings-panel').isVisible())) {
+    // Focus may sit in an extension's frame, where the host page's shortcut is not heard.
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
     await page.keyboard.press('ControlOrMeta+,')
   }
   await expect(page.locator('.settings-panel')).toBeVisible()

@@ -70,12 +70,20 @@ export async function gitView(handle: AppHandle, view: string): Promise<Extensio
   return extensionPage(handle, `terminator.git-integration/dist/index.html?view=${view}`)
 }
 
-/** Opens the repository's Code Reviews tab from its sidebar header and returns its view. */
+/** Opens the repository's Code Reviews tab from its sidebar header and returns its view.
+ * A click on the header re-opens the tab when the click before left it open and did not
+ * touch the tabs: the sidebar then reads it as chrome and dismisses the surfaces. */
 export async function openCodeReviews(handle: AppHandle, workspace: string): Promise<ExtensionView> {
   const header = workspaceRow(handle.page, workspace)
   await header.hover()
   await header.getByRole('button', { name: 'Code Reviews' }).click()
-  return gitView(handle, 'code-reviews')
+  const view = await extensionPage(handle, `terminator.git-integration/dist/index.html?view=code-reviews`)
+    .catch(async () => {
+      await header.hover()
+      await header.getByRole('button', { name: 'Code Reviews' }).click()
+      return extensionPage(handle, `terminator.git-integration/dist/index.html?view=code-reviews`)
+    })
+  return view
 }
 
 /** Clicks the project's Git tab and returns its view. */
