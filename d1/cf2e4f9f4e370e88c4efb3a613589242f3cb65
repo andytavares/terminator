@@ -1,0 +1,24 @@
+tests/e2e/settings-diagnostics.ts
+  s_1770e4e124cf1a::t_2e7439bb540823 1,33-39,41-47,51,55-56,60-66,68
+  s_1770e4e124cf1a::t_8d15d5d58173c7 69-74
+tests/e2e/extension-settings-page.ts
+  s_1770e4e124cf1a::t_26495de77a0132 3,31-38
+tests/e2e/helpers.ts
+  s_1770e4e124cf1a::t_807379ca874e7f 8,230,442,446,448
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d1cf2e4f9f4e370e88c4efb3a613589242f3cb65",
+  "prompts": {},
+  "sessions": {
+    "s_1770e4e124cf1a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8bf63343-f3d0-4338-98ee-2e52bd4d7695",
+        "model": "unknown"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
