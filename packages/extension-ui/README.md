@@ -39,7 +39,7 @@ should define a colour.
 | `Markdown`                                       | react-markdown with GFM and sanitised raw HTML (ADR 091); `inline`, `fetchesNothing`                                                             |
 | `RelativeTime`, `formatRelativeTime`             | "5 minutes ago" through `Intl.RelativeTimeFormat`                                                                                                |
 
-**Sizes** — every control of a size is one height: `--tm-control-height` (28px) for fields, selects, `Button` and `IconButton`; `--tm-control-height-sm` (22px) for their `sm`. A control beside another uses the same size. `tests/e2e/control-alignment.spec.ts` fails on any two side-by-side controls that differ in height or centre.
+**Sizes** — every control of a size is one height: `--tm-control-height` (28px) for fields, selects, `Button` and `IconButton`; `--tm-control-height-sm` (22px) for their `sm`. A control beside another uses the same size. `tests/e2e/extension-smoke.spec.ts` fails on any two side-by-side controls that differ in height or centre.
 
 **Fields** — no component: every `input`, `textarea` and `select` is the themed field from `controls.css` at one element's weight, so any class refines it. A field inside a box that draws the edge sets `border: none; padding: 0; outline: none` and the box takes `:focus-within`.
 

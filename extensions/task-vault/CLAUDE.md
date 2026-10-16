@@ -47,4 +47,4 @@ The backend (what `src/index.ts` imports and the view does not) computes dates w
 
 ## End-to-end tests
 
-`tests/e2e/task-vault-*.spec.ts` drive every channel this extension registers in the real app, through its own view (`tests/e2e/task-vault-harness.ts`). A new channel gets a step there that does what a user does and reads back what was stored; a channel no view calls is driven as a remote client calls it (`task-vault-remote-api.spec.ts`).
+`tests/e2e/task-vault-*.spec.ts` drive every channel this extension registers in the real app, through its own view (`tests/e2e/task-vault-harness.ts`). A new channel gets a step there that does what a user does and reads back what was stored; a channel no view calls is covered by the extension's IPC tests (`extensions/task-vault/tests/ipc/`).

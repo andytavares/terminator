@@ -263,7 +263,7 @@ A raw `z-index` number in an extension is a lint error.
 
 **Modal depth is per document.** `contextIsolation: true` gives an extension page and its preload different `window` objects, so `ModalShell` reports its depth across the bridge with `electronAPI.ui.setModalDepth`; that is how the double-Escape exit stands down while a dialog is open. Among surfaces that are not modal (`Popover`, `useDismissible`), Escape is answered by the one opened last (`isInnermost` in `useDismissible.ts`), which prevents the key's default so a shell around it stays open.
 
-**Contrast** is verified by rendering, not by reading the stylesheet: `tests/e2e/extension-themes.spec.ts` walks every visible text node in each extension view, in both themes, resolves the real composited backdrop through the translucent layers above it, and asserts WCAG AA. `color-mix` and layered alpha only resolve in a browser.
+**Contrast** is verified by rendering, not by reading the stylesheet: `tests/e2e/extension-smoke.spec.ts` walks every visible text node in each extension view, in both themes, resolves the real composited backdrop through the translucent layers above it, and asserts WCAG AA. `color-mix` and layered alpha only resolve in a browser.
 
 The written rules for extension UI are [EXTENSION-STYLE.md](EXTENSION-STYLE.md); its vocabulary rules are ESLint selectors with a fixture spec.
 

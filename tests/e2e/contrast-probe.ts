@@ -1,9 +1,9 @@
 /**
  * Measuring what a reader actually sees, in a rendered document.
  *
- * Shared by `extension-themes.spec.ts` and `merge-flow.spec.ts`: the first
- * covers the four extensions reachable from a global tab, the second the one
- * that needs a repository mid-merge before its surfaces exist at all.
+ * Shared by `extension-smoke.spec.ts` and `merge-flow.spec.ts`: the first
+ * covers the extensions reachable from a global tab, the second the one that
+ * needs a repository mid-merge before its surfaces exist at all.
  *
  * This has to run in a browser. Half the colours in these stylesheets are
  * `rgba()` over an inherited surface or a `color-mix()`, and the value a reader
