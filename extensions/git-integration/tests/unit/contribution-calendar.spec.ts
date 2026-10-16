@@ -4,9 +4,10 @@ import {
   calendarStart,
   countBetween,
   previousRange,
-  type CalendarDay,
   type Contribution,
 } from '../../src/review/contribution-calendar'
+
+type CalendarDay = ReturnType<typeof buildContributionCalendar>['weeks'][number][number]
 
 const ZONE = 'America/New_York'
 // A Friday, so a streak into this week can run over a weekend.

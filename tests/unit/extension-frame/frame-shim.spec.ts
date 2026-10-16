@@ -260,15 +260,15 @@ function createFitContentSpies() {
   return spies
 }
 
-/** Loads the shim as if the frame's page were at `url`, embedded from localhost:5173. */
-async function loadShimAt(url: string): Promise<void> {
+/** Loads the shim as if the frame's page were at `url`, embedded by the page at `referrer`. */
+async function loadShimAt(url: string, referrer = 'http://localhost:5173/home'): Promise<void> {
   const realLocation = window.location
   Object.defineProperty(window, 'location', {
     value: { ...realLocation, search: new URL(url).search },
     configurable: true,
   })
   Object.defineProperty(document, 'referrer', {
-    value: 'http://localhost:5173/home',
+    value: referrer,
     configurable: true,
   })
   await loadShimInFrame()
@@ -298,5 +298,21 @@ describe('frame-shim fit=content height reporting', () => {
     await loadShimAt('ext://com.test.ext/index.html?view=home')
     expect(spies.observed).toEqual([])
     expect(spies.parentPosts).toEqual([])
+  })
+})
+
+describe('frame-shim fit=content without a referrer', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  it('still posts when the embedding page has no referrer, as a packaged app loaded from file://', async () => {
+    const spies = createFitContentSpies()
+    await loadShimAt('ext://com.test.ext/index.html?view=home&fit=content', '')
+    spies.resizeCallback?.()
+    expect(spies.parentPosts).toEqual([
+      { message: { type: 'terminator:frame-height', height: expect.any(Number) }, origin: '*' },
+    ])
   })
 })

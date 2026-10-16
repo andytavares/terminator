@@ -113,7 +113,7 @@ function dayTitle(day: ContributionsDay): string {
 }
 
 /** The month a week starts in, above the first column of each run of that month. */
-export function monthLabels(weeks: ContributionsDay[][]): { label: string; column: number }[] {
+function monthLabels(weeks: ContributionsDay[][]): { label: string; column: number }[] {
   const labels: { label: string; column: number }[] = []
   weeks.forEach((week, column) => {
     const first = week[0]

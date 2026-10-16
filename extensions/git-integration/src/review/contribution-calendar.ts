@@ -1,7 +1,7 @@
 // The contribution calendar's sums (ADR 108). Backend only: the view has no Temporal.
 
 /** What one contribution to a pull request is. */
-export type ContributionKind = 'opened' | 'merged' | 'reviewed'
+type ContributionKind = 'opened' | 'merged' | 'reviewed'
 
 /** One contribution: its kind, the ISO instant it happened at, and the `owner/name` it was on. */
 export interface Contribution {
@@ -19,7 +19,7 @@ export interface ContributionCounts {
 }
 
 /** One day of the calendar. `level` is 0 for an empty day, else 1..4 by quartile. */
-export interface CalendarDay extends ContributionCounts {
+interface CalendarDay extends ContributionCounts {
   date: string
   level: 0 | 1 | 2 | 3 | 4
   future: boolean

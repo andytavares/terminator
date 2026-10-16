@@ -221,15 +221,20 @@ function createFrameKeydown(post: (message: FrameRequest) => void) {
 }
 
 // fit=content (ExtensionPanelPortal's fitContent prop) asks the frame to size its host wrapper:
-// the shim posts each content height to the embedding window. The frame is cross-origin, so the
-// host's origin comes from the referrer (the embedding document), never '*'.
+// the shim posts each content height to the embedding window. A packaged app's page is file://,
+// which has no referrer and no origin to name, so '*' is the only target there; the portal
+// accepts the message by its source window, so the target only keeps the number from other pages.
+function parentOrigin(): string {
+  return document.referrer ? new URL(document.referrer).origin : '*'
+}
+
 function reportContentHeight(): void {
   if (new URLSearchParams(window.location.search).get('fit') !== 'content') return
-  const parentOrigin = new URL(document.referrer).origin
+  const targetOrigin = parentOrigin()
   const observer = new ResizeObserver(() => {
     window.parent.postMessage(
       { type: 'terminator:frame-height', height: document.documentElement.scrollHeight },
-      parentOrigin
+      targetOrigin
     )
   })
   observer.observe(document.documentElement)

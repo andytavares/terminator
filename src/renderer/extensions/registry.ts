@@ -37,7 +37,7 @@ interface SidebarPanelRegistration {
   view?: string
 }
 
-export interface HomeSectionRegistration {
+interface HomeSectionRegistration {
   id: string
   label: string
   component: ComponentType<{ repoRoot?: string | null }>
