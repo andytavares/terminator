@@ -32,7 +32,6 @@ vi.mock('electron', async () => {
 import {
   FrameBridge,
   registerFramePortChannel,
-  type FrameBridgeDeps,
 } from '../../../../src/main/extensions/frame-bridge.js'
 import { nodePortAsFramePort } from '../../../support/frame-port.js'
 
@@ -318,10 +317,10 @@ function openPortRequest(payload: unknown) {
   return { sender, settled: Promise.resolve(settled) }
 }
 
-describe('registerFramePortChannel — valid requests', () => {
+describe('registerFramePortChannel — a validated request', () => {
   beforeEach(() => channelListeners.clear())
 
-  it('hands a validated request a port and replies with its frameToken', async () => {
+  it('is handed a port and replied to with its frameToken', async () => {
     const bridge = makeBridge(makeCallbacks())
     const open = vi.spyOn(bridge, 'open')
     registerFramePortChannel(bridge, () => Promise.resolve())
@@ -335,18 +334,17 @@ describe('registerFramePortChannel — valid requests', () => {
       [expect.anything()]
     )
   })
+})
+
+describe('registerFramePortChannel — waiting for the backend', () => {
+  beforeEach(() => channelListeners.clear())
 
   it("gives the frame its port only after the extension's backend has activated", async () => {
-    const bridge = makeBridge(makeCallbacks())
     let activate = () => {}
-    const activated = new Promise<void>((resolve) => (activate = resolve))
-    const whenActivated = vi.fn(() => activated)
-    registerFramePortChannel(bridge, whenActivated)
-    const { sender, settled } = openPortRequest({
-      extensionId: 'ext.slow',
-      viewParam: 'main',
-      frameToken: 'tok-2',
-    })
+    const whenActivated = vi.fn(() => new Promise<void>((resolve) => (activate = resolve)))
+    registerFramePortChannel(makeBridge(makeCallbacks()), whenActivated)
+    const request = { extensionId: 'ext.slow', viewParam: 'main', frameToken: 'tok-2' }
+    const { sender, settled } = openPortRequest(request)
     await Promise.resolve()
     expect(whenActivated).toHaveBeenCalledWith('ext.slow')
     expect(sender.postMessage).not.toHaveBeenCalled()

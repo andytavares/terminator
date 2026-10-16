@@ -1,9 +1,9 @@
-import type { BrowserWindow, WebContentsView } from 'electron'
+import type { BrowserWindow } from 'electron'
 
 // Sending to a receiver that is already gone.
 //
 // A PTY outlives the window that opened it. Output arriving after the window
-// or the extension view has closed reaches a destroyed `webContents`, and
+// has closed reaches a destroyed `webContents`, and
 // every property access on a destroyed Electron object throws
 // `TypeError: Object has been destroyed` — from inside a node-pty data event,
 // where nothing catches it, so it takes the main process down.
@@ -22,9 +22,4 @@ export function sendToWindow(
   if (!win || win.isDestroyed()) return
   if (win.webContents.isDestroyed()) return
   win.webContents.send(channel, data)
-}
-
-export function sendToView(view: WebContentsView, channel: string, data: unknown): void {
-  if (view.webContents.isDestroyed()) return
-  view.webContents.send(channel, data)
 }

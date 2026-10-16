@@ -37,7 +37,6 @@ function makeExtensionHost(overrides: Partial<ExtensionHost> = {}): ExtensionHos
 }
 
 let broadcast: Mock<(channel: string, data: unknown) => void>
-const noViewHost = () => null
 
 beforeEach(() => {
   vi.clearAllMocks()
