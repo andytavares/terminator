@@ -37,7 +37,7 @@ async function render(body: string) {
   return { page, context }
 }
 
-test('the review header menu is drawn above the file toolbar', async () => {
+async function theReviewHeaderMenuIsAboveTheFileToolbar(): Promise<void> {
   const { page, context } = await render(`
     <div class="pr-review-view" style="height:500px;display:flex;flex-direction:column">
       <div class="rh-row">
@@ -61,7 +61,7 @@ test('the review header menu is drawn above the file toolbar', async () => {
   } finally {
     await context.close()
   }
-})
+}
 
 /** Run in the page: scrolls the picker, then, for each row checkbox under the
  * owner heading, whether the heading is what a click there would hit. */
@@ -87,7 +87,7 @@ function probeUnderHeading(): { n: number; probes: boolean[]; box: number } {
   return { n: under.length, probes, box: box.width }
 }
 
-test('the sticky owner heading in the repository picker stays above scrolled rows', async () => {
+async function theStickyOwnerHeadingStaysAboveScrolledRows(): Promise<void> {
   const rows = Array.from(
     { length: 30 },
     (_, i) => `<label class="rp-row"><input type="checkbox" /><span>acme/repo-${i}</span></label>`
@@ -104,9 +104,9 @@ test('the sticky owner heading in the repository picker stays above scrolled row
   } finally {
     await context.close()
   }
-})
+}
 
-test('a text field and a select beside it are the same height', async () => {
+async function aTextFieldAndASelectAreTheSameHeight(): Promise<void> {
   const { page, context } = await render(`
     <div class="pr-search-row">
       <input class="pr-search-input" type="search" placeholder="Search open PRs">
@@ -121,7 +121,7 @@ test('a text field and a select beside it are the same height', async () => {
   } finally {
     await context.close()
   }
-})
+}
 
 /** A unified review table as the diff pane renders it: a hunk header, then a line. */
 function unifiedReviewTables(): string {
@@ -140,7 +140,7 @@ function unifiedReviewTables(): string {
   </div>`
 }
 
-test('a unified review diff spans the pane, hunk header and code alike', async () => {
+async function aUnifiedReviewDiffSpansThePane(): Promise<void> {
   const { page, context } = await render(unifiedReviewTables())
   try {
     const widths = await page.evaluate(() => ({
@@ -153,9 +153,9 @@ test('a unified review diff spans the pane, hunk header and code alike', async (
   } finally {
     await context.close()
   }
-})
+}
 
-test('a Git tab diff row lays out as a table row', async () => {
+async function aGitTabDiffRowIsATableRow(): Promise<void> {
   const { page, context } = await render(`<div class="file-diff-view" style="width:800px">
     <table class="diff-table"><tbody>
       <tr><td colspan="4" class="diff-hunk-header">@@ -1,2 +1,2 @@</td></tr>
@@ -172,9 +172,9 @@ test('a Git tab diff row lays out as a table row', async () => {
   } finally {
     await context.close()
   }
-})
+}
 
-test('a review row with two actions keeps them clear of the size column', async () => {
+async function aReviewRowKeepsItsActionsClearOfTheSizeColumn(): Promise<void> {
   const { page, context } = await render(`<div class="rd-rows" style="width:1100px">
     <div class="rd-row rd-row--clickable">
       <span class="rd-ti"><span class="rd-t1"><span class="rd-no">#11</span>
@@ -201,4 +201,31 @@ test('a review row with two actions keeps them clear of the size column', async 
   } finally {
     await context.close()
   }
+}
+
+/** The flow's steps in order, each titled with the behaviour it checks. */
+const STEPS: Array<[title: string, run: () => Promise<void>]> = [
+  [
+    'the review header menu is drawn above the file toolbar',
+    theReviewHeaderMenuIsAboveTheFileToolbar,
+  ],
+  [
+    'the sticky owner heading in the repository picker stays above scrolled rows',
+    theStickyOwnerHeadingStaysAboveScrolledRows,
+  ],
+  ['a text field and a select beside it are the same height', aTextFieldAndASelectAreTheSameHeight],
+  [
+    'a unified review diff spans the pane, hunk header and code alike',
+    aUnifiedReviewDiffSpansThePane,
+  ],
+  ['a Git tab diff row lays out as a table row', aGitTabDiffRowIsATableRow],
+  [
+    'a review row with two actions keeps them clear of the size column',
+    aReviewRowKeepsItsActionsClearOfTheSizeColumn,
+  ],
+]
+
+test('the review surfaces stack and size their parts so each can be seen and clicked', async () => {
+  test.setTimeout(60_000)
+  for (const [title, run] of STEPS) await test.step(title, run)
 })

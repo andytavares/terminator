@@ -1,16 +1,17 @@
-import { test, expect, type Locator, type Page } from '@playwright/test'
+import { test, expect, type Locator, type TestStepInfo } from '@playwright/test'
 import { AppHandle, launchApp, closeApp } from './helpers'
-import { invokeChannel } from './extension-page'
+import { invokeChannel, type ExtensionView } from './extension-page'
 import { goToSection, openVault, storedTask, type StoredTask } from './task-vault-harness'
 import { canPressGlobalKeys, pressGlobalChord } from './x11-keys'
 import { expectCentredInWindow } from './modal-centre'
 
 // Capturing into the Task Vault inbox and clarifying what was captured, the
-// GTD loop the inbox exists for. Each test drives the view the way a user does
-// and reads back what the vault stored.
+// GTD loop the inbox exists for. Each step drives the view the way a user does
+// and reads back what the vault stored; the steps run in order and build on
+// each other's inbox.
 
 let handle: AppHandle
-let vault: Page
+let vault: ExtensionView
 
 test.beforeAll(async () => {
   handle = await launchApp()
@@ -37,16 +38,18 @@ function inboxRow(text: string) {
   return vault.locator('.inbox-item').filter({ hasText: text })
 }
 
-test('an item captured in the inbox is listed, counted and stored', async () => {
+/** An item captured in the inbox is listed, counted and stored. */
+async function captureIntoInbox(): Promise<void> {
   await goToSection(vault, 'Inbox')
   await captureFromInbox('Call the plumber')
 
   await expect(vault.locator('.inbox-view__count')).toHaveText('1 item')
   await expect(vault.locator('.vault-sidebar__badge')).toHaveText('1')
   expect(await inboxTexts()).toEqual(['Call the plumber'])
-})
+}
 
-test('editing an inbox item rewrites its text and parses its tags', async () => {
+/** Editing an inbox item rewrites its text and parses its tags. */
+async function editInboxItem(): Promise<void> {
   await inboxRow('Call the plumber').locator('.inbox-item__text').dblclick()
   const editor = vault.locator('.inbox-item__edit input')
   await editor.fill('Call the plumber about the leak due:2031-05-04')
@@ -54,9 +57,10 @@ test('editing an inbox item rewrites its text and parses its tags', async () => 
 
   await expect(inboxRow('Call the plumber about the leak')).toContainText('due:2031-05-04')
   expect(await inboxTexts()).toEqual(['Call the plumber about the leak'])
-})
+}
 
-test('moving an item to the backlog takes it out of the inbox', async () => {
+/** Moving an item to the backlog takes it out of the inbox. */
+async function moveToBacklog(): Promise<void> {
   await captureFromInbox('Learn the cello')
   await inboxRow('Learn the cello').getByRole('button', { name: 'Move to backlog' }).click()
 
@@ -66,16 +70,17 @@ test('moving an item to the backlog takes it out of the inbox', async () => {
     'task-vault:vault:list-someday'
   )
   expect(backlog.tasks.map((task) => task.text)).toContain('Learn the cello')
-})
+}
 
-test('deleting an inbox item asks first, then removes it for good', async () => {
+/** Deleting an inbox item asks first, then removes it for good. */
+async function deleteAfterConfirm(): Promise<void> {
   await captureFromInbox('Junk mail')
-  vault.once('dialog', (dialog) => void dialog.accept())
+  handle.page.once('dialog', (dialog) => void dialog.accept())
   await inboxRow('Junk mail').getByRole('button', { name: 'Delete' }).click()
 
   await expect(inboxRow('Junk mail')).toHaveCount(0)
   expect(await storedTask(vault, 'Junk mail')).toBeUndefined()
-})
+}
 
 /** Answers the clarify questions for each of the five inbox items, in the order they come. */
 async function clarifyEachItem(processor: Locator): Promise<void> {
@@ -105,7 +110,8 @@ async function clarifyEachItem(processor: Locator): Promise<void> {
   await processor.getByText('Create project "Finances"').click()
 }
 
-test('clarifying the inbox trashes, incubates, does now and files each item', async () => {
+/** Clarifying the inbox trashes, incubates, does now and files each item. */
+async function clarifyInbox(): Promise<void> {
   for (const text of ['Old flyer', 'Write a novel', 'Reply to Sam', 'Draft the budget']) {
     await captureFromInbox(text)
   }
@@ -128,10 +134,14 @@ test('clarifying the inbox trashes, incubates, does now and files each item', as
     'task-vault:vault:list-someday'
   )
   expect(backlog.tasks.map((task) => task.text)).toContain('Write a novel')
-})
+}
 
-test('Capture to inbox from Quick Actions saves what was typed', async () => {
+/** Capture to inbox from Quick Actions saves what was typed. */
+async function captureFromQuickActions(): Promise<void> {
   await handle.page.bringToFront()
+  // The clarify run ends with focus inside the vault's frame, which the
+  // host's ⌘P listener cannot hear; blur it so the panel opens.
+  await handle.page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
   await handle.page.keyboard.press('ControlOrMeta+p')
   await handle.page.keyboard.press('v')
   await handle.page.keyboard.press('c')
@@ -145,10 +155,11 @@ test('Capture to inbox from Quick Actions saves what was typed', async () => {
   await expect(dialog).toHaveCount(0)
   expect(await inboxTexts()).toEqual(['Buy stamps'])
   await expect(vault.locator('.vault-sidebar__badge')).toHaveText('1')
-})
+}
 
-test('the global capture shortcut opens the capture overlay from any window', async () => {
-  test.skip(
+/** The global capture shortcut opens the capture overlay from any window. */
+async function captureByGlobalShortcut(step: TestStepInfo): Promise<void> {
+  step.skip(
     !canPressGlobalKeys,
     'pressing a system-wide chord needs an X server; macOS needs Accessibility consent for the runner'
   )
@@ -163,4 +174,22 @@ test('the global capture shortcut opens the capture overlay from any window', as
 
   await expect(dialog).toHaveCount(0)
   expect(await inboxTexts()).toContain('Renew the passport')
+}
+
+const THE_INBOX_LOOP: [string, (step: TestStepInfo) => Promise<void>][] = [
+  ['an item captured in the inbox is listed, counted and stored', captureIntoInbox],
+  ['editing an inbox item rewrites its text and parses its tags', editInboxItem],
+  ['moving an item to the backlog takes it out of the inbox', moveToBacklog],
+  ['deleting an inbox item asks first, then removes it for good', deleteAfterConfirm],
+  ['clarifying the inbox trashes, incubates, does now and files each item', clarifyInbox],
+  ['Capture to inbox from Quick Actions saves what was typed', captureFromQuickActions],
+  [
+    'the global capture shortcut opens the capture overlay from any window',
+    captureByGlobalShortcut,
+  ],
+]
+
+// CI's X11 job runs this file by name for the global shortcut step (.github/workflows/ci.yml).
+test('the inbox is captured into, clarified and captured into again', async () => {
+  for (const [title, step] of THE_INBOX_LOOP) await test.step(title, step)
 })

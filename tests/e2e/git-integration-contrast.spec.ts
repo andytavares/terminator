@@ -180,25 +180,32 @@ async function expectSelectedRowContrast(
   )
 }
 
-for (const theme of ['dark', 'light'] as const) {
-  for (const surface of SURFACES) {
-    test(`${surface.name} meets WCAG 2.1 AA contrast in the ${theme} theme`, async () => {
-      const context = await browser.newContext({ viewport: { width: 1200, height: 700 } })
-      const page = await context.newPage()
-      try {
-        await renderSurface(page, surface, theme)
-        await page.screenshot({ path: join(SHOTS, `${surface.name}-${theme}.png`) })
+/** Renders `surface` in `theme`, keeps a screenshot of it, and checks its contrast. */
+async function meetsContrast(surface: Surface, theme: 'dark' | 'light'): Promise<void> {
+  const context = await browser.newContext({ viewport: { width: 1200, height: 700 } })
+  const page = await context.newPage()
+  try {
+    await renderSurface(page, surface, theme)
+    await page.screenshot({ path: join(SHOTS, `${surface.name}-${theme}.png`) })
 
-        const axe = await new AxeBuilder({ page }).withRules(['color-contrast']).analyze()
-        const failures = axe.violations.flatMap((v) =>
-          v.nodes.map((n) => `${n.target.join(' ')} :: ${n.any[0]?.message ?? v.help}`)
-        )
-        expect(failures, 'axe color-contrast violations').toEqual([])
+    const axe = await new AxeBuilder({ page }).withRules(['color-contrast']).analyze()
+    const failures = axe.violations.flatMap((v) =>
+      v.nodes.map((n) => `${n.target.join(' ')} :: ${n.any[0]?.message ?? v.help}`)
+    )
+    expect(failures, 'axe color-contrast violations').toEqual([])
 
-        if (surface.selected) await expectSelectedRowContrast(page, surface.selected, surface)
-      } finally {
-        await context.close()
-      }
-    })
+    if (surface.selected) await expectSelectedRowContrast(page, surface.selected, surface)
+  } finally {
+    await context.close()
   }
 }
+
+test('every review surface meets WCAG 2.1 AA contrast in both themes', async () => {
+  test.setTimeout(120_000)
+  for (const theme of ['dark', 'light'] as const) {
+    for (const surface of SURFACES) {
+      await test.step(`${surface.name} meets WCAG 2.1 AA contrast in the ${theme} theme`, () =>
+        meetsContrast(surface, theme))
+    }
+  }
+})

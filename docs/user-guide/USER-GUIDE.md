@@ -508,7 +508,7 @@ It takes two presses because extensions use a single `Esc` for their own dismiss
 
 ## 14. Extensions Overview
 
-Extensions install from any directory on disk via a `manifest.json`. They contribute UI without modifying core code: sidebar items, sidebar panels, global tabs, workspace-scoped tabs, top-bar menu items, native View menu items, context menu entries, and terminal event hooks. Extension UIs run in isolated `WebContentsView` contexts — no app rebuild required after updates.
+Extensions install from any directory on disk via a `manifest.json`. They contribute UI without modifying core code: sidebar items, sidebar panels, global tabs, workspace-scoped tabs, top-bar menu items, native View menu items, context menu entries, and terminal event hooks. Extension UIs run in their own frames inside the app window — no app rebuild required after updates.
 
 Terminator ships five built-in extensions:
 

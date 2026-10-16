@@ -1,12 +1,10 @@
 import { test, expect, type ElectronApplication } from '@playwright/test'
-import { mkdtempSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
 import {
   AppHandle,
   addAndSelectProject,
   closeApp,
   createWorkspace,
+  e2eTempDir,
   launchApp,
   projectGroup,
   runQuickActionFromPanel,
@@ -50,38 +48,38 @@ let handle: AppHandle
 test.beforeAll(async () => {
   handle = await launchApp()
   await recordShellOpens(handle.app)
-  await createWorkspace(handle.page, 'Menus', mkdtempSync(join(tmpdir(), 'terminator-e2e-menu-')))
+  await createWorkspace(handle.page, 'Menus', e2eTempDir('terminator-e2e-menu-'))
   await addAndSelectProject(handle.page, 'Menus', 'menu-branch')
 })
 
 test.afterAll(async () => closeApp(handle))
 
-test('View → Toggle Sidebar hides the sidebar, and shows it again', async () => {
+async function toggleSidebarHidesAndShows(): Promise<void> {
   const { app, page } = handle
   await clickMenuItem(app, ['View', 'Toggle Sidebar'])
   await expect(page.locator('.unified-sidebar')).toHaveClass(/unified-sidebar--hidden/)
   await clickMenuItem(app, ['View', 'Toggle Sidebar'])
   await expect(page.locator('.unified-sidebar')).not.toHaveClass(/unified-sidebar--hidden/)
-})
+}
 
-test('View → Open Settings opens Settings', async () => {
+async function openSettingsOpensSettings(): Promise<void> {
   const { app, page } = handle
   await clickMenuItem(app, ['View', 'Open Settings'])
   await expect(page.getByRole('dialog', { name: 'Settings' })).toBeVisible()
   await page.locator('.settings-panel__close').click()
   await expect(page.getByRole('dialog', { name: 'Settings' })).toBeHidden()
-})
+}
 
-test('Window → Home opens Home', async () => {
+async function homeOpensHome(): Promise<void> {
   const { app, page } = handle
   await projectGroup(page, 'menu-branch').click()
   const home = page.getByRole('heading', { name: 'Home', exact: true })
   await expect(home).toBeHidden()
   await clickMenuItem(app, ['Window', 'Home'])
   await expect(home).toBeVisible()
-})
+}
 
-test('Window → Close Tab closes the active terminal tab', async () => {
+async function closeTabClosesActiveTab(): Promise<void> {
   const { app, page } = handle
   await projectGroup(page, 'menu-branch').click()
   await runQuickActionFromPanel(page, 'New tab')
@@ -89,9 +87,9 @@ test('Window → Close Tab closes the active terminal tab', async () => {
   await expect(tabs).toHaveCount(2)
   await clickMenuItem(app, ['Window', 'Close Tab'])
   await expect(tabs).toHaveCount(1)
-})
+}
 
-test('Help → About shows the versions and that the database is healthy', async () => {
+async function aboutShowsHealthyDatabase(): Promise<void> {
   const { app, page } = handle
   await clickMenuItem(app, ['Help', 'About'])
   const about = page.getByRole('dialog', { name: 'About' })
@@ -101,9 +99,9 @@ test('Help → About shows the versions and that the database is healthy', async
   await expect(dbRow.locator('dd')).toHaveText('OK')
   await about.locator('.tmui-button--primary', { hasText: 'Close' }).click()
   await expect(about).toBeHidden()
-})
+}
 
-test("View → Toggle Vault Calendar opens Task Vault's sidebar panel and ticks the item", async () => {
+async function vaultCalendarTogglesItsPanel(): Promise<void> {
   const { app, page } = handle
   await projectGroup(page, 'menu-branch').click()
   const panel = page.locator('[data-extension-panel="terminator.task-vault"]')
@@ -114,10 +112,33 @@ test("View → Toggle Vault Calendar opens Task Vault's sidebar panel and ticks 
   await clickMenuItem(app, ['View', 'Toggle Vault Calendar'])
   await expect(panel).toHaveCount(0)
   await expect.poll(() => menuItemChecked(app, ['View', 'Toggle Vault Calendar'])).toBe(false)
-})
+}
 
-test('Help → View on GitHub hands the repository URL to the browser', async () => {
+async function viewOnGitHubOpensRepository(): Promise<void> {
   const { app } = handle
   await clickMenuItem(app, ['Help', 'View on GitHub'])
   await expect.poll(() => shellOpens(app)).toContain('https://github.com/anthropics/terminator')
+}
+
+test('the app menu drives the sidebar, Settings, Home, tabs, About, an extension and the browser', async () => {
+  test.setTimeout(90_000)
+  await test.step(
+    'View → Toggle Sidebar hides the sidebar, and shows it again',
+    toggleSidebarHidesAndShows
+  )
+  await test.step('View → Open Settings opens Settings', openSettingsOpensSettings)
+  await test.step('Window → Home opens Home', homeOpensHome)
+  await test.step('Window → Close Tab closes the active terminal tab', closeTabClosesActiveTab)
+  await test.step(
+    'Help → About shows the versions and that the database is healthy',
+    aboutShowsHealthyDatabase
+  )
+  await test.step(
+    "View → Toggle Vault Calendar opens Task Vault's sidebar panel and ticks the item",
+    vaultCalendarTogglesItsPanel
+  )
+  await test.step(
+    'Help → View on GitHub hands the repository URL to the browser',
+    viewOnGitHubOpensRepository
+  )
 })

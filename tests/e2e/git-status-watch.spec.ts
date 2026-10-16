@@ -1,9 +1,10 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect } from '@playwright/test'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { closeApp, launchApp, type AppHandle } from './helpers'
+import { closeApp, launchApp, projectGroup, type AppHandle } from './helpers'
 import { git, makeRepoWithRemote, openGitTab, openRepo, writeFile } from './git-harness'
+import type { ExtensionView } from './extension-page'
 
 /** The Git tab follows its repository through the file watch: nothing here is done in the app,
  * and the tab has no timer to notice it with. Each change is made again on every look, because
@@ -12,93 +13,107 @@ import { git, makeRepoWithRemote, openGitTab, openRepo, writeFile } from './git-
 /** Untracked before the app starts, so staging one later changes only git's own files. */
 const PREPARED = Array.from({ length: 30 }, (_unused, index) => `prepared-${index}.txt`)
 
-function linkedWorktreeOf(repo: string): string {
+let handle: AppHandle
+const directories: string[] = []
+
+/** A checkout the app opens, and the branch its sidebar row is found by. */
+interface Checkout {
+  path: string
+  branch: string
+}
+
+function ownCheckout(): Checkout {
+  const { repo, bare } = makeRepoWithRemote('terminator-e2e-watch')
+  directories.push(repo, bare)
+  git(repo, 'branch', '-m', 'watched')
+  return { path: repo, branch: 'watched' }
+}
+
+/** A linked worktree, whose index lives in the main checkout's .git, outside it. */
+function linkedWorktree(): Checkout {
+  const { repo, bare } = makeRepoWithRemote('terminator-e2e-watch-main')
   const worktree = join(mkdtempSync(join(tmpdir(), 'terminator-e2e-linked-')), 'linked')
+  directories.push(repo, bare, worktree)
   git(repo, 'worktree', 'add', '--quiet', '-b', 'linked', worktree)
-  return worktree
+  return { path: worktree, branch: 'linked' }
 }
 
-const stagedHeading = (view: Page) => view.getByText(/^Staged \(\d+\)/).first()
+let own: Checkout
+let linked: Checkout
 
-/** The app with one checkout open, filled in before the first test of its group runs. */
-class OpenCheckout {
-  handle!: AppHandle
-  checkout = ''
+test.beforeAll(async () => {
+  own = ownCheckout()
+  linked = linkedWorktree()
+  for (const file of PREPARED) {
+    writeFile(own.path, file, 'prepared\n')
+    writeFile(linked.path, file, 'prepared\n')
+  }
+  handle = await launchApp()
+  await openRepo(handle, 'Watched', own.path)
+  await openRepo(handle, 'Linked', linked.path)
+})
+
+test.afterAll(async () => {
+  await closeApp(handle)
+  for (const directory of directories) rmSync(directory, { recursive: true, force: true })
+})
+
+const stagedHeading = (view: ExtensionView) => view.getByText(/^Staged \(\d+\)/).first()
+
+async function gitTabOf(checkout: Checkout): Promise<ExtensionView> {
+  await projectGroup(handle.page, checkout.branch).click()
+  const view = await openGitTab(handle)
+  // The first status is read once the watch has started: the clocks below time a change, not
+  // the view starting up, which a cold CI runner can take two seconds over.
+  await expect(view.getByText(PREPARED[0], { exact: true }).first()).toBeAttached()
+  return view
 }
 
-function openCheckoutOnce(checkoutOf: (repo: string) => string): OpenCheckout {
-  const open = new OpenCheckout()
-  let directories: string[] = []
-  test.beforeAll(async () => {
-    const { repo, bare } = makeRepoWithRemote('terminator-e2e-watch')
-    open.checkout = checkoutOf(repo)
-    directories = [repo, bare, open.checkout]
-    for (const file of PREPARED) writeFile(open.checkout, file, 'prepared\n')
-    open.handle = await launchApp()
-    await openRepo(open.handle, 'Watched', open.checkout)
-  })
-  test.afterAll(async () => {
-    await closeApp(open.handle)
-    for (const directory of directories) rmSync(directory, { recursive: true, force: true })
-  })
-  return open
+async function aSavedFileAppears(checkout: Checkout): Promise<void> {
+  const view = await gitTabOf(checkout)
+  const shown = Date.now()
+  let saves = 0
+  const saveAndCount = () => {
+    writeFile(checkout.path, 'saved-outside.txt', `save ${++saves}\n`)
+    return view.getByText('saved-outside.txt').count()
+  }
+  // Sooner than the three seconds the tab used to poll at.
+  await expect.poll(saveAndCount, { timeout: 2500 }).toBeGreaterThan(0)
+  test.info().annotations.push({ type: 'change shown', description: `${Date.now() - shown}ms` })
 }
 
-function aSavedFileAppears(open: OpenCheckout): void {
-  test('a file saved outside the app appears in the list', async () => {
-    const view = await openGitTab(open.handle)
-    // The first status is read once the watch has started: the clock below times a change, not
-    // the view starting up, which a cold CI runner can take two seconds over.
-    const opened = Date.now()
-    await expect(view.getByText(PREPARED[0], { exact: true }).first()).toBeAttached()
-    const shown = Date.now()
-    test.info().annotations.push({ type: 'first status', description: `${shown - opened}ms` })
-    let saves = 0
-    const saveAndCount = () => {
-      writeFile(open.checkout, 'saved-outside.txt', `save ${++saves}\n`)
-      return view.getByText('saved-outside.txt').count()
-    }
-    // Sooner than the three seconds the tab used to poll at.
-    await expect.poll(saveAndCount, { timeout: 2500 }).toBeGreaterThan(0)
-    test.info().annotations.push({ type: 'change shown', description: `${Date.now() - shown}ms` })
-  })
+async function gitAddMovesAFileToStaged(checkout: Checkout): Promise<void> {
+  const view = await gitTabOf(checkout)
+  await expect(stagedHeading(view)).toHaveText(/^Staged \(0\)/)
+  let next = 0
+  const stageAnotherAndRead = () => {
+    git(checkout.path, 'add', PREPARED[next++])
+    return stagedHeading(view).textContent()
+  }
+  await expect.poll(stageAnotherAndRead).toMatch(/^Staged \([1-9]/)
 }
 
-function gitAddMovesAFileToStaged(open: OpenCheckout): void {
-  test('git add in a terminal moves a file to Staged', async () => {
-    const view = await openGitTab(open.handle)
-    await expect(stagedHeading(view)).toHaveText(/^Staged \(0\)/)
-    let next = 0
-    const stageAnotherAndRead = () => {
-      git(open.checkout, 'add', PREPARED[next++])
-      return stagedHeading(view).textContent()
-    }
-    await expect.poll(stageAnotherAndRead).toMatch(/^Staged \([1-9]/)
-  })
+async function gitCommitEmptiesStaged(checkout: Checkout): Promise<void> {
+  const view = await gitTabOf(checkout)
+  const commitAndRead = () => {
+    git(checkout.path, 'commit', '--quiet', '--allow-empty', '-m', 'committed outside')
+    return stagedHeading(view).textContent()
+  }
+  await expect.poll(commitAndRead).toMatch(/^Staged \(0\)/)
 }
 
-function gitCommitEmptiesStaged(open: OpenCheckout): void {
-  test('git commit in a terminal empties Staged', async () => {
-    const view = await openGitTab(open.handle)
-    const commitAndRead = () => {
-      git(open.checkout, 'commit', '--quiet', '--allow-empty', '-m', 'committed outside')
-      return stagedHeading(view).textContent()
-    }
-    await expect.poll(commitAndRead).toMatch(/^Staged \(0\)/)
-  })
-}
-
-const CHECKOUTS: Array<[string, (repo: string) => string]> = [
-  ['a repository’s own checkout', (repo) => repo],
-  ['a linked worktree, whose index is outside it', linkedWorktreeOf],
-]
-
-for (const [title, checkoutOf] of CHECKOUTS) {
-  test.describe(`the Git tab on ${title}`, () => {
-    test.describe.configure({ mode: 'serial' })
-    const open = openCheckoutOnce(checkoutOf)
-    aSavedFileAppears(open)
-    gitAddMovesAFileToStaged(open)
-    gitCommitEmptiesStaged(open)
-  })
-}
+test('the Git tab follows a file saved, staged and committed outside the app', async () => {
+  test.setTimeout(60_000)
+  const checkouts: Array<[Checkout, string]> = [
+    [own, 'a repository’s own checkout'],
+    [linked, 'a linked worktree, whose index is outside it'],
+  ]
+  for (const [checkout, where] of checkouts) {
+    await test.step(`a file saved outside the app appears in the list, on ${where}`, () =>
+      aSavedFileAppears(checkout))
+    await test.step(`git add in a terminal moves a file to Staged, on ${where}`, () =>
+      gitAddMovesAFileToStaged(checkout))
+    await test.step(`git commit in a terminal empties Staged, on ${where}`, () =>
+      gitCommitEmptiesStaged(checkout))
+  }
+})

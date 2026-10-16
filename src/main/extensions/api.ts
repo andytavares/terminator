@@ -41,7 +41,7 @@ interface BridgeDeps {
 
 import { handleChannel, removeChannel } from '../ipc/channel-registrar.js'
 import { BrowserWindow, dialog, globalShortcut as electronGlobalShortcut } from 'electron'
-import { EXTENSION_BASE_CSS } from './extension-view-host.js'
+import { EXTENSION_BASE_CSS } from '@terminator/extension-ui/extension-base-css'
 import { sendToWindow } from '../safe-send.js'
 import { join } from 'path'
 

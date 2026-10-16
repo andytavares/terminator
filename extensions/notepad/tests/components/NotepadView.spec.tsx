@@ -242,6 +242,15 @@ describe('NotepadView toolbar view modes', () => {
 })
 
 describe('NotepadView toolbar panel buttons', () => {
+  it('the rail holds the outline above the comments', async () => {
+    await openNote()
+    const rail = document.querySelector('.notepad-view__rail')!
+    expect([...rail.children].map((panel) => panel.className)).toEqual([
+      'notepad-outline',
+      'notepad-view__comments',
+    ])
+  })
+
   it('outline and comments are pressed toggles that hide and show their panels', async () => {
     await openNote()
     const outline = screen.getByRole('button', { name: 'Outline' })

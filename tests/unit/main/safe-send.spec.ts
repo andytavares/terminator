@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
-import type { BrowserWindow, WebContents, WebContentsView } from 'electron'
-import { sendToWindow, sendToView } from '../../../src/main/safe-send.js'
+import type { BrowserWindow, WebContents } from 'electron'
+import { sendToWindow } from '../../../src/main/safe-send.js'
 import { partialFake } from '../../support/fakes'
 
 // A supervised run's PTY kept emitting after its window closed. The broadcast
@@ -55,27 +55,5 @@ describe('sending to a window', () => {
   it('is a no-op with no window at all', () => {
     expect(() => sendToWindow(null, 'terminal:output', {})).not.toThrow()
     expect(() => sendToWindow(undefined, 'terminal:output', {})).not.toThrow()
-  })
-})
-
-describe('sending to an extension view', () => {
-  function makeView(destroyed: boolean): { view: WebContentsView; send: ReturnType<typeof vi.fn> } {
-    const send = vi.fn()
-    const view = partialFake<WebContentsView>({
-      webContents: partialFake<WebContents>({ send, isDestroyed: () => destroyed }),
-    })
-    return { view, send }
-  }
-
-  it('sends while the view is alive', () => {
-    const { view, send } = makeView(false)
-    sendToView(view, 'speckit:changed', { n: 1 })
-    expect(send).toHaveBeenCalledWith('speckit:changed', { n: 1 })
-  })
-
-  it('drops the send to a closed view', () => {
-    const { view, send } = makeView(true)
-    expect(() => sendToView(view, 'speckit:changed', {})).not.toThrow()
-    expect(send).not.toHaveBeenCalled()
   })
 })

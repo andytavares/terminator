@@ -1,4 +1,11 @@
-import { _electron as electron, ElectronApplication, Locator, Page, expect } from '@playwright/test'
+import {
+  _electron as electron,
+  ElectronApplication,
+  Frame,
+  Locator,
+  Page,
+  expect,
+} from '@playwright/test'
 import type { ChildProcess } from 'node:child_process'
 import { mkdtempSync } from 'node:fs'
 import { dirname, delimiter, join } from 'node:path'
@@ -67,17 +74,9 @@ const CLAUDE_STUB_DIR = join(dirname(fileURLToPath(import.meta.url)), 'fixtures'
  */
 const CLAUDE_STUB_ZDOTDIR = join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'zdotdir')
 
-/** The app's PATH: `firstDirs`, then the `claude` stub, then the runner's own.
- * A spec that stands in for another program passes its folder as `env.PATH`
- * through this, so the `claude` stub stays ahead of any real one. */
-function e2ePath(...firstDirs: string[]): string {
-  return [...firstDirs, CLAUDE_STUB_DIR, process.env.PATH ?? ''].join(delimiter)
-}
-
-/** The env that puts stub folders first on the app's PATH. The app adopts the login shell's PATH
- * ahead of the one it was launched with, so the fixture's .zprofile re-adds them as E2E_PATH_FIRST. */
-export function stubsFirst(...dirs: string[]): Record<string, string> {
-  return { PATH: e2ePath(...dirs), E2E_PATH_FIRST: dirs.join(delimiter) }
+/** The app's PATH: the `claude` stub, then the runner's own. */
+function e2ePath(): string {
+  return [CLAUDE_STUB_DIR, process.env.PATH ?? ''].join(delimiter)
 }
 
 /** The environment every e2e-launched Electron process gets. */
@@ -204,6 +203,40 @@ async function keepWindowsClearOfTheCursor(app: ElectronApplication): Promise<vo
   })
 }
 
+/** Each extension frame's focus emulation, keyed by the frame, settled once it is on. */
+const frameFocusEmulation = new WeakMap<Frame, Promise<void>>()
+
+/** Makes `frame` behave as if its window had focus, as Playwright already does for the page.
+ * An extension frame runs in its own process, which Playwright leaves out: while the window is not
+ * the active application (a CI runner's usually is not) its fields are never focused or blurred,
+ * so a setting saved on blur is never saved and a key lands nowhere.
+ * https://chromedevtools.github.io/devtools-protocol/tot/Emulation/#method-setFocusEmulationEnabled */
+function emulateFrameFocus(page: Page, frame: Frame): Promise<void> {
+  const enabled = page
+    .context()
+    .newCDPSession(frame)
+    .then((session) => session.send('Emulation.setFocusEmulationEnabled', { enabled: true }))
+    .then(() => undefined)
+  frameFocusEmulation.set(frame, enabled)
+  return enabled
+}
+
+/** Resolves once `frame` has focus emulation, turning it on if no navigation has yet. */
+export function frameFocusEmulated(page: Page, frame: Frame): Promise<void> {
+  const pending = frameFocusEmulation.get(frame)
+  // A try made while the frame was still navigating can fail; the frame is settled by now.
+  return pending
+    ? pending.catch(() => emulateFrameFocus(page, frame))
+    : emulateFrameFocus(page, frame)
+}
+
+/** Every extension frame gets focus emulation as it loads, a reload included. */
+function emulateFocusInExtensionFrames(page: Page): void {
+  page.on('framenavigated', (frame) => {
+    if (frame.url().startsWith('ext://')) emulateFrameFocus(page, frame).catch(() => undefined)
+  })
+}
+
 export async function launchApp(
   userDataDir: string = e2eProfileDir(),
   env: Record<string, string> = {}
@@ -216,6 +249,7 @@ export async function launchApp(
   try {
     const page = await firstReadyWindow(app, remaining)
     await keepWindowsClearOfTheCursor(app)
+    emulateFocusInExtensionFrames(page)
     return { app, page, userDataDir, launchId: marker.launchId }
   } catch (error) {
     throw await launchFailure(app, output, error)
@@ -422,12 +456,21 @@ export async function runQuickActionFromPanel(page: Page, label: string): Promis
   await expect(panel).toBeHidden({ timeout: 15000 })
 }
 
+/** Resolves once the window has drawn what the page shows. The browser routes a click by the
+ * last frame it drew, so a click on a dialog that is in the DOM but not yet on screen goes to
+ * whatever was drawn there before, such as an extension frame. A screenshot makes the browser
+ * draw (and update its hit-testing) before it returns. */
+async function untilDrawn(page: Page): Promise<void> {
+  await page.screenshot({ clip: { x: 0, y: 0, width: 1, height: 1 } })
+}
+
 /** Opens Settings with ⌘, (Ctrl+, off macOS) on the named section. */
 export async function openSettingsSection(page: Page, section: string): Promise<void> {
   if (!(await page.locator('.settings-panel').isVisible())) {
     await page.keyboard.press('ControlOrMeta+,')
   }
   await expect(page.locator('.settings-panel')).toBeVisible()
+  await untilDrawn(page)
   await page.locator('.settings-panel__nav-item', { hasText: section }).click()
 }
 
@@ -437,16 +480,16 @@ export async function closeSettingsPanel(page: Page): Promise<void> {
   await expect(page.locator('.settings-panel')).toBeHidden()
 }
 
-/** Runs `script` inside the first extension view whose URL contains `urlPart`:
- * a WebContentsView of its own, which the page cannot reach. */
+/** Runs `script` inside the first extension frame whose URL contains `urlPart`. */
 export function inExtensionView<T>(handle: AppHandle, urlPart: string, script: string): Promise<T> {
   return handle.app.evaluate(
     async ({ webContents }, { part, source }) => {
-      const view = webContents
-        .getAllWebContents()
-        .find((contents) => !contents.isDestroyed() && contents.getURL().includes(part))
-      if (!view) throw new Error(`no extension view loaded for ${part}`)
-      return view.executeJavaScript(source) as Promise<unknown>
+      const win = webContents.getAllWebContents().find((contents) => !contents.isDestroyed())
+      const frame = win?.mainFrame.frames.find(
+        (f) => f.url.startsWith('ext://') && f.url.includes(part)
+      )
+      if (!frame) throw new Error(`no extension frame loaded for ${part}`)
+      return frame.executeJavaScript(source) as Promise<unknown>
     },
     { part: urlPart, source: script }
   ) as Promise<T>

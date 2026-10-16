@@ -1,17 +1,18 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect } from '@playwright/test'
 import { mkdtempSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { AppHandle, launchApp, closeApp } from './helpers'
-import { invokeChannel } from './extension-page'
+import { AppHandle, launchApp, closeApp, openSettingsSection } from './helpers'
+import { invokeChannel, type ExtensionView } from './extension-page'
 import { allTasks, openVault, todayTasks } from './task-vault-harness'
 import { expectCentredInWindow } from './modal-centre'
 
 // Task Vault's data tools and its database actions in Settings: the SQL
 // console, export to JSON, reset, re-initialise, and import of the export.
+// The steps run in order: the import restores the file the export wrote.
 
 let handle: AppHandle
-let vault: Page
+let vault: ExtensionView
 let exportFile: string
 
 test.beforeAll(async () => {
@@ -43,16 +44,14 @@ async function openVaultDataTools(tab: 'Export & import' | 'Database'): Promise<
   await expectCentredInWindow(dataTools(), `Task Vault: Data tools, ${tab}`)
 }
 
-/** Saves the vault view's next download to `filePath`, where the save dialog
- * Electron shows by default would have let the user put it. */
+/** Saves the vault's next download to `filePath`. The frame downloads through
+ * the main window's session, so the path is set on that session. */
 function saveNextDownload(filePath: string): Promise<void> {
   return handle.app.evaluate(
     ({ webContents }, target) =>
       new Promise<void>((resolve, reject) => {
-        const view = webContents
-          .getAllWebContents()
-          .find((contents) => contents.getURL().includes('terminator.task-vault'))
-        view?.session.once('will-download', (_event, item) => {
+        const win = webContents.getAllWebContents().find((contents) => !contents.isDestroyed())
+        win?.session.once('will-download', (_event, item) => {
           item.setSavePath(target)
           item.once('done', (_done, state) =>
             state === 'completed' ? resolve() : reject(new Error(state))
@@ -68,34 +67,38 @@ async function runSql(sql: string): Promise<void> {
   await dataTools().getByRole('button', { name: 'Run', exact: true }).click()
 }
 
-test('the Database tab counts each table and answers a query', async () => {
+/** The Database tab counts each table and answers a query. */
+async function countAndQuery(): Promise<void> {
   await openVaultDataTools('Database')
   const tasksChip = dataTools().locator('.db-admin__stat-chip', { hasText: /^tasks/ })
   await expect(tasksChip.locator('.db-admin__stat-count')).toHaveText('2')
 
   await runSql("SELECT text FROM tasks WHERE text LIKE 'Water%'")
   await expect(dataTools().locator('.db-admin__table')).toContainText('Water the plants')
-})
+}
 
-test('a write in the SQL console shows on the log at once', async () => {
+/** A write in the SQL console shows on the log at once. */
+async function sqlWriteShowsOnLog(): Promise<void> {
   await runSql("UPDATE tasks SET text = 'Water the ferns' WHERE text = 'Water the plants'")
   await expect(dataTools().locator('.db-admin__results')).toContainText('1 row affected')
   expect((await todayTasks(vault)).map((task) => task.text)).toContain('Water the ferns')
 
   await dataTools().press('Escape')
   await expect(vault.getByText('Water the ferns', { exact: true })).toBeVisible()
-})
+}
 
-test('the SQL console refuses to change the schema', async () => {
+/** The SQL console refuses to change the schema. */
+async function refuseSchemaChange(): Promise<void> {
   await openVaultDataTools('Database')
   await runSql('DROP TABLE tasks')
   await expect(dataTools().locator('.db-admin__error')).toHaveText(
     'DDL statements (DROP, CREATE, ALTER) are not permitted'
   )
   expect(await allTasks(vault)).toHaveLength(2)
-})
+}
 
-test('Export JSON downloads every task, project and area', async () => {
+/** Export JSON downloads every task, project and area. */
+async function exportJson(): Promise<void> {
   await openVaultDataTools('Export & import')
   exportFile = join(mkdtempSync(join(tmpdir(), 'vault-export-')), 'vault.json')
   const saved = saveNextDownload(exportFile)
@@ -109,13 +112,12 @@ test('Export JSON downloads every task, project and area', async () => {
     'Water the ferns',
   ])
   await dataTools().press('Escape')
-})
+}
 
 async function taskVaultSettingsAction(label: string): Promise<void> {
   const { page } = handle
   await page.bringToFront()
-  await page.keyboard.press('ControlOrMeta+,')
-  await page.locator('.settings-panel__nav-item').filter({ hasText: 'Extensions' }).click()
+  await openSettingsSection(page, 'Extensions')
   const row = page.locator('.extension-item-wrapper').filter({
     has: page.locator('.extension-item__name', { hasText: 'Task Vault' }),
   })
@@ -125,13 +127,15 @@ async function taskVaultSettingsAction(label: string): Promise<void> {
   await row.getByRole('button', { name: label, exact: true }).click()
 }
 
-test('Reset in Settings deletes every task, after asking', async () => {
+/** Reset in Settings deletes every task, after asking. */
+async function resetInSettings(): Promise<void> {
   handle.page.once('dialog', (dialog) => void dialog.accept())
   await taskVaultSettingsAction('Reset (delete all data)')
   await expect.poll(() => allTasks(vault)).toEqual([])
-})
+}
 
-test('Re-initialize in Settings reapplies the schema and reports success', async () => {
+/** Re-initialize in Settings reapplies the schema and reports success. */
+async function reinitialiseInSettings(): Promise<void> {
   await taskVaultSettingsAction('Re-initialize')
   await expect
     .poll(async () =>
@@ -146,9 +150,10 @@ test('Re-initialize in Settings reapplies the schema and reports success', async
   })
   expect(taskId).toBeTruthy()
   await handle.page.keyboard.press('Escape')
-})
+}
 
-test('Import JSON brings back what was exported', async () => {
+/** Import JSON brings back what was exported. */
+async function importJson(): Promise<void> {
   await vault.bringToFront()
   await openVaultDataTools('Export & import')
   await dataTools().locator('input[type="file"]').setInputFiles(exportFile)
@@ -159,4 +164,18 @@ test('Import JSON brings back what was exported', async () => {
     'Back up the laptop',
     'Water the ferns',
   ])
+}
+
+const INSPECT_EXPORT_RESTORE: [string, () => Promise<void>][] = [
+  ['the Database tab counts each table and answers a query', countAndQuery],
+  ['a write in the SQL console shows on the log at once', sqlWriteShowsOnLog],
+  ['the SQL console refuses to change the schema', refuseSchemaChange],
+  ['Export JSON downloads every task, project and area', exportJson],
+  ['Reset in Settings deletes every task, after asking', resetInSettings],
+  ['Re-initialize in Settings reapplies the schema and reports success', reinitialiseInSettings],
+  ['Import JSON brings back what was exported', importJson],
+]
+
+test("the vault's data is inspected, exported, wiped and restored from the export", async () => {
+  for (const [title, step] of INSPECT_EXPORT_RESTORE) await test.step(title, step)
 })

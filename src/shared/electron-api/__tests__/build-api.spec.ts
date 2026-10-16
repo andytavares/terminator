@@ -132,25 +132,11 @@ const WIRE_CASES = [
     payload: { path: '/repo' },
   },
   {
-    path: 'extension.setBottomInset',
-    args: [280],
-    kind: 'send',
-    channel: 'extension:set-bottom-inset',
-    payload: { inset: 280 },
-  },
-  {
     path: 'workspace.setActive',
     args: [{ workspaceId: 'w1', projectId: 'p1', repoRoot: '/repo' }],
     kind: 'send',
     channel: 'workspace:active-changed',
     payload: { workspaceId: 'w1', projectId: 'p1', repoRoot: '/repo' },
-  },
-  {
-    path: 'extension.setLeftInset',
-    args: [44],
-    kind: 'send',
-    channel: 'extension:set-left-inset',
-    payload: { inset: 44 },
   },
   {
     path: 'extensionEvents.notifyPanelState',
@@ -190,12 +176,6 @@ const HANDLER_CASES = [
     channel: 'workspace:project-removed',
     pushed: [{ id: 'p1' }],
     expected: ['p1'],
-  },
-  {
-    path: 'extensionEvents.onExtensionPanelLoaded',
-    channel: 'extension:panel-loaded',
-    pushed: [{ id: 'ext.a', viewParam: 'main' }],
-    expected: ['ext.a'],
   },
   {
     path: 'extensionEvents.onExtensionRendererReload',
@@ -241,7 +221,6 @@ describe('buildElectronApi — native mode surface', () => {
     expect(typeof api.workspace.getActive).toBe('function')
     expect(typeof api.db.health).toBe('function')
     expect(typeof api.getFilePath).toBe('function')
-    expect(typeof api.extension.setBottomInset).toBe('function')
     expect(typeof api.extension.setTheme).toBe('function')
   })
 
@@ -296,7 +275,6 @@ describe('buildElectronApi — remote mode', () => {
     expect(api.workspace.getActive).toBeUndefined()
     expect(api.db).toBeUndefined()
     expect(api.getFilePath).toBeUndefined()
-    expect(api.extension.setBottomInset).toBeUndefined()
     expect(api.project.onAdded).toBeUndefined()
   })
 })
@@ -305,12 +283,6 @@ describe('buildElectronApi — remote mode transport', () => {
   it('replaces stub methods with the supplied local implementation', async () => {
     const { t, api } = remoteBridge()
     await expect(api.dialog.openDirectory()).resolves.toEqual({ cancelled: true })
-    api.extension.updatePanelBounds({
-      extensionId: 'notepad',
-      viewParam: 'main',
-      bounds: { x: 0, y: 0, width: 100, height: 100 },
-      visible: true,
-    })
     expect(t.invoke).not.toHaveBeenCalled()
   })
 
@@ -367,5 +339,120 @@ describe('buildElectronApi — the manifest is the whole surface', () => {
       expect(methodAt(api, 'terminal.listSessions')).toBeUndefined()
       expect(api.ui).toBeUndefined()
     }
+  })
+})
+
+const FRAME_LOCALS = {
+  'ui.setModalDepth': () => {},
+  'extensionBridge.invoke': vi.fn(),
+  'extensionBridge.on': vi.fn(),
+}
+
+/** Every path an extension frame's electronAPI exposes, spelled out so a change to it is a decision. */
+const FRAME_API_PATHS = [
+  'app.getInfo',
+  'db.health',
+  'dialog.openDirectory',
+  'extension.executeCommand',
+  'extension.getCommands',
+  'extension.getSettingsSchemas',
+  'extension.getSettingsValues',
+  'extension.hasCommand',
+  'extension.install',
+  'extension.list',
+  'extension.onSettingsChanged',
+  'extension.reload',
+  'extension.runCommand',
+  'extension.toggle',
+  'extension.uninstall',
+  'extension.updateSetting',
+  'extensionBridge.invoke',
+  'extensionBridge.on',
+  'extensionEvents.notifyPanelState',
+  'extensionEvents.onExtensionRendererReload',
+  'extensionEvents.onMenuOpenSettings',
+  'extensionEvents.onTogglePanel',
+  'fs.onChanged',
+  'fs.readFile',
+  'fs.watchStart',
+  'fs.watchStop',
+  'git.checkout',
+  'git.createBranch',
+  'git.createWorktree',
+  'git.currentBranch',
+  'git.isRepo',
+  'git.listBranches',
+  'git.listWorktrees',
+  'git.removeWorktree',
+  'git.suggestWorktreePath',
+  'logger.write',
+  'metrics.getPids',
+  'metrics.getProcesses',
+  'metrics.getSystem',
+  'notifications.create',
+  'notifications.dismiss',
+  'notifications.list',
+  'notifications.onPush',
+  'notifications.triggerAction',
+  'project.create',
+  'project.delete',
+  'project.list',
+  'project.rename',
+  'project.reorder',
+  'project.updateBranch',
+  'settings.getGlobal',
+  'settings.getWorkspace',
+  'settings.updateGlobal',
+  'settings.updateWorkspace',
+  'shell.exec',
+  'shell.openExternal',
+  'shell.openPath',
+  'terminal.cleanupOrphans',
+  'terminal.close',
+  'terminal.closeAll',
+  'terminal.create',
+  'terminal.input',
+  'terminal.listSessions',
+  'terminal.onProcessExit',
+  'terminal.resize',
+  'ui.setModalDepth',
+  'workspace.create',
+  'workspace.delete',
+  'workspace.getActive',
+  'workspace.list',
+  'workspace.reorder',
+  'workspace.update',
+]
+
+function frameBridge() {
+  const t = makeTransport()
+  return { t, api: buildElectronApi(t, { mode: 'frame', locals: FRAME_LOCALS }) as ElectronAPI }
+}
+
+describe('buildElectronApi — frame mode', () => {
+  it('exposes exactly the declared frame paths, and no others', () => {
+    const { api } = frameBridge()
+    expect(collectMethodPaths(api).sort()).toEqual([...FRAME_API_PATHS].sort())
+  })
+
+  it('routes a shared method through the transport', async () => {
+    const { t, api } = frameBridge()
+    await api.terminal.close('sess-1')
+    expect(t.invoke).toHaveBeenCalledWith('terminal:close', { sessionId: 'sess-1' })
+  })
+
+  it('throws at build time when a local implementation is missing', () => {
+    const t = makeTransport()
+    expect(() => buildElectronApi(t, { mode: 'frame', locals: {} })).toThrow(
+      /missing local implementation/
+    )
+  })
+
+  it('keeps app-renderer-only methods out of the frame', () => {
+    const { api } = frameBridge()
+    expect(api.getFilePath).toBeUndefined()
+    expect(api.editor).toBeUndefined()
+    expect(methodAt(api, 'terminal.onOutput')).toBeUndefined()
+    expect(methodAt(api, 'extension.setTheme')).toBeUndefined()
   })
 })

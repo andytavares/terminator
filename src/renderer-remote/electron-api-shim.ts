@@ -173,8 +173,6 @@ forgetLegacyToken()
         'fs.watchStart': () => Promise.resolve({ error: 'WATCH_UNAVAILABLE' }),
         'fs.watchStop': () => Promise.resolve({ ok: true }),
         'fs.onChanged': () => () => {},
-        // No-op in remote mode: WebContentsView positioning is an Electron-only concept.
-        'extension.updatePanelBounds': () => {},
         // Dynamic passthrough for extension-owned channels.
         'extensionBridge.invoke': (channel: string, payload?: unknown) => invoke(channel, payload),
         'extensionBridge.on': (channel: string, handler: (data: unknown) => void) =>

@@ -37,7 +37,6 @@ function makeExtensionHost(overrides: Partial<ExtensionHost> = {}): ExtensionHos
 }
 
 let broadcast: Mock<(channel: string, data: unknown) => void>
-const noViewHost = () => null
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -48,7 +47,7 @@ beforeEach(() => {
 
 describe('extension:execute-command', () => {
   it('forwards the key and ctx to executeExtensionCommand', async () => {
-    registerExtensionHandlers(makeExtensionHost(), broadcast, noViewHost)
+    registerExtensionHandlers(makeExtensionHost(), broadcast)
     const listener = onHandlers.get('extension:execute-command')!
     const ctx = { projectId: 'p1', sessionId: null, repoRoot: '/repo' }
 
@@ -61,7 +60,7 @@ describe('extension:execute-command', () => {
 describe('extension:run-command', () => {
   it('runs the command with args and a null ctx, returning its result', async () => {
     mockExecuteExtensionCommand.mockResolvedValue({ ok: false, reason: 'not-registered' })
-    registerExtensionHandlers(makeExtensionHost(), broadcast, noViewHost)
+    registerExtensionHandlers(makeExtensionHost(), broadcast)
     const handler = handleHandlers.get('extension:run-command')!
 
     const result = await handler({}, { key: 'ext.command.open', args: { n: 1 } })

@@ -34,21 +34,16 @@ function realSpecs() {
 }
 
 const specs = [
-  'foundry.spec.ts',
-  'foundry-factory-view.spec.ts',
-  'git-sidebar.spec.ts',
-  'git-integration-smoke.spec.ts',
+  'foundry-intake.spec.ts',
+  'foundry-floor.spec.ts',
+  'git-commit-flow.spec.ts',
   'merge-flow.spec.ts',
-  'notepad-outline.spec.ts',
-  'dismiss-surface-on-click.spec.ts',
-  'extension-escape-exit.spec.ts',
+  'notepad-notes.spec.ts',
   'quick-actions.spec.ts',
-  'remote-app.spec.ts',
   'remote-control.spec.ts',
   'extension-smoke.spec.ts',
-  'extension-keyboard.spec.ts',
-  'extension-themes.spec.ts',
   'extension-escape.spec.ts',
+  'extension-settings.spec.ts',
   'terminal.spec.ts',
   'workspace.spec.ts',
   'session-home.spec.ts',
@@ -85,12 +80,11 @@ describe('select() — a foundry-only diff', () => {
     expect(result.mode).toBe('some')
     expect(result.specs).toEqual(
       [
-        'foundry.spec.ts',
-        'foundry-factory-view.spec.ts',
+        'foundry-intake.spec.ts',
+        'foundry-floor.spec.ts',
         'extension-smoke.spec.ts',
-        'extension-keyboard.spec.ts',
-        'extension-themes.spec.ts',
         'extension-escape.spec.ts',
+        'extension-settings.spec.ts',
         'terminal.spec.ts',
         'workspace.spec.ts',
       ].sort()
@@ -100,12 +94,10 @@ describe('select() — a foundry-only diff', () => {
 
 describe('select() — a remote-control diff', () => {
   it.each(['extensions/remote-control/src/index.ts', 'src/renderer-remote/MobileApp.tsx'])(
-    'selects both remote specs for %s',
+    'selects the remote spec for %s',
     (changed) => {
       const result = select({ changed: [changed], specs, isMainPush: false })
-      expect(result.specs).toEqual(
-        expect.arrayContaining(['remote-app.spec.ts', 'remote-control.spec.ts'])
-      )
+      expect(result.specs).toContain('remote-control.spec.ts')
     }
   )
 })
@@ -137,14 +129,11 @@ describe('select() — mixed diffs', () => {
     expect(result.mode).toBe('some')
     expect(result.specs).toEqual(
       [
-        'notepad-outline.spec.ts',
-        'dismiss-surface-on-click.spec.ts',
-        'extension-escape-exit.spec.ts',
+        'notepad-notes.spec.ts',
         'quick-actions.spec.ts',
         'extension-smoke.spec.ts',
-        'extension-keyboard.spec.ts',
-        'extension-themes.spec.ts',
         'extension-escape.spec.ts',
+        'extension-settings.spec.ts',
         'terminal.spec.ts',
         'workspace.spec.ts',
       ].sort()

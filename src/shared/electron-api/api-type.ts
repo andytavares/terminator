@@ -34,3 +34,13 @@ type BridgeOf<Spec extends { path: string }> = {
 
 /** window.electronAPI in the app renderer, native and remote. */
 export type ElectronAPI = BridgeOf<OnAppRenderer<ManifestSpec>>
+
+type OnExtensionFrame<Spec> = Spec extends unknown
+  ? ExtensionViewBehavior extends ExtensionViewOf<Spec>
+    ? never
+    : Spec
+  : never
+
+/** window.electronAPI inside an extension frame (src/extension-frame/frame-shim.ts):
+ * the specs marked extensionView, 'shared' and 'only' alike. */
+export type FrameElectronAPI = BridgeOf<OnExtensionFrame<ManifestSpec>>

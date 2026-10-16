@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { useModalStore } from '../stores/modal.store'
 import { useShownExtensionViews } from '../stores/shown-extension-views.store'
 import { useExtensionRegistry } from '../extensions/registry'
 import { createDoubleEscapeDetector } from '../../shared/double-escape'
+import { FRAME_PORT_MESSAGE } from '../../shared/frame-wire'
 import { focusActiveTerminal } from '../lib/focus-terminal'
 
 interface Props {
@@ -10,13 +10,15 @@ interface Props {
   viewParam: string
   isActive: boolean
   repoRoot?: string | null
+  /** ext:// URL of the extension's renderer entry point; the desktop frame's src. */
+  rendererUrl?: string
 }
 
 type Surface = Pick<Props, 'extensionId' | 'viewParam'>
 
-// True only in the real Electron renderer — the remote shim does not expose this.
-function isElectronLocal(): boolean {
-  return typeof window.electronAPI?.extensionEvents?.onExtensionPanelLoaded === 'function'
+// True only in the real Electron renderer — the remote shim omits openFramePort.
+function isDesktop(): boolean {
+  return typeof window.electronAPI?.extension?.openFramePort === 'function'
 }
 
 /** A second Escape leaves the surface for the terminal: a sidebar panel closes, a tab clears. */
@@ -51,10 +53,20 @@ function listenInFrame(iframe: HTMLIFrameElement, listener: (e: KeyboardEvent) =
 }
 
 /** Where Remote Control serves the extension's view to a browser. */
-function frameSrc({ extensionId, viewParam, repoRoot }: Props): string {
+function frameSrc(props: Props): string {
+  const { extensionId, viewParam, repoRoot } = props
   const params = new URLSearchParams({ viewParam })
   if (repoRoot) params.set('repoRoot', repoRoot)
   return `/ext/${extensionId}/?${params.toString()}`
+}
+
+/** Desktop src: the extension's own ext:// URL, shaped as ExtensionViewHost.buildUrl shapes it. */
+function desktopFrameSrc(props: Props): string {
+  const { extensionId, viewParam, repoRoot, rendererUrl } = props
+  const url = new URL(rendererUrl ?? `ext://${extensionId}/index.html`)
+  if (viewParam) url.searchParams.set('view', viewParam)
+  if (repoRoot) url.searchParams.set('repoRoot', repoRoot)
+  return url.toString()
 }
 
 /** Marks the extension's view on screen while it is, so the core leaves its toasts to it. */
@@ -68,143 +80,159 @@ function useShownWhileVisible({ extensionId, viewParam }: Surface, visible: bool
   }, [extensionId, viewParam, visible])
 }
 
-/** Native panels get the double-Escape exit from the webview preload; browser
- * clients have no preload, so the host page listens on the same-origin frame. */
+/** Browser clients have no preload, so the host page listens on the same-origin frame. */
 function useDoubleEscapeInFrame(
   iframeRef: React.RefObject<HTMLIFrameElement>,
-  { extensionId, viewParam }: Surface
+  { extensionId, viewParam }: Surface,
+  enabled: boolean
 ): void {
   useEffect(() => {
+    if (!enabled) return
     const iframe = iframeRef.current
     if (!iframe) return
     return listenInFrame(iframe, doubleEscapeListener({ extensionId, viewParam }))
-  }, [iframeRef, extensionId, viewParam])
+  }, [iframeRef, extensionId, viewParam, enabled])
 }
 
-function RemoteIframe(props: Props): JSX.Element {
-  const { extensionId, viewParam, isActive } = props
-  const iframeRef = useRef<HTMLIFrameElement>(null)
-  useShownWhileVisible({ extensionId, viewParam }, isActive)
-  useDoubleEscapeInFrame(iframeRef, { extensionId, viewParam })
-  const display = isActive ? 'flex' : 'none'
+/** Forwards main's port reply to the frame whose current token it carries. */
+function useFramePortForward(
+  iframeRef: React.RefObject<HTMLIFrameElement>,
+  extensionId: Props['extensionId'],
+  tokenRef: React.MutableRefObject<string | null>
+): void {
+  useEffect(() => {
+    const onMessage = (event: MessageEvent): void => {
+      if (event.source !== window || event.data?.type !== FRAME_PORT_MESSAGE) return
+      if (event.data.frameToken !== tokenRef.current) return
+      iframeRef.current?.contentWindow?.postMessage(
+        { type: FRAME_PORT_MESSAGE },
+        `ext://${extensionId}`,
+        [event.ports[0]]
+      )
+    }
+    window.addEventListener('message', onMessage)
+    return () => window.removeEventListener('message', onMessage)
+  }, [iframeRef, extensionId, tokenRef])
+}
+
+interface FrameHandshake extends Surface {
+  iframeRef: React.RefObject<HTMLIFrameElement>
+  tokenRef: React.MutableRefObject<string | null>
+  onFirstLoad: () => void
+}
+
+/** Asks main for the frame's port on every load; a stale token from an earlier load is ignored. */
+function useFrameHandshake(handshake: FrameHandshake): void {
+  const { iframeRef, tokenRef, onFirstLoad, extensionId, viewParam } = handshake
+  const onLoadRef = useRef(onFirstLoad)
+  useEffect(() => {
+    onLoadRef.current = onFirstLoad
+  }, [onFirstLoad])
+  useEffect(() => {
+    const iframe = iframeRef.current
+    if (!iframe) return
+    const onLoad = (): void => {
+      onLoadRef.current()
+      const frameToken = crypto.randomUUID()
+      tokenRef.current = frameToken
+      window.electronAPI.extension.openFramePort({ extensionId, viewParam, frameToken })
+    }
+    iframe.addEventListener('load', onLoad)
+    return () => iframe.removeEventListener('load', onLoad)
+  }, [iframeRef, tokenRef, extensionId, viewParam])
+}
+
+/** A reloaded extension's backend is new, so the frame's port to the old one is dead: the frame
+ * reloads, and its next load asks main for a port to the new backend. */
+function useReloadOnExtensionReload(
+  iframeRef: React.RefObject<HTMLIFrameElement>,
+  extensionId: Props['extensionId'],
+  enabled: boolean
+): void {
+  useEffect(() => {
+    if (!enabled) return
+    return window.electronAPI.extensionEvents.onExtensionRendererReload((reloaded) => {
+      const iframe = iframeRef.current
+      // The frame is cross-origin, so its own `location` is out of reach; setting `src` again reloads it.
+      if (reloaded === extensionId && iframe) iframe.setAttribute('src', iframe.src)
+    })
+  }, [iframeRef, extensionId, enabled])
+}
+
+/** Wires the desktop port handshake: asks main on each frame load, forwards the reply. */
+function useFramePort(
+  props: Props,
+  iframeRef: React.RefObject<HTMLIFrameElement>,
+  onFirstLoad: () => void
+): void {
+  const tokenRef = useRef<string | null>(null)
+  useFramePortForward(iframeRef, props.extensionId, tokenRef)
+  useReloadOnExtensionReload(iframeRef, props.extensionId, isDesktop())
+  useFrameHandshake({
+    iframeRef,
+    tokenRef,
+    extensionId: props.extensionId,
+    viewParam: props.viewParam,
+    onFirstLoad,
+  })
+}
+
+function panelStyle(isActive: boolean): React.CSSProperties {
+  return {
+    flex: 1,
+    minHeight: 0,
+    minWidth: 0,
+    display: isActive ? 'flex' : 'none',
+    flexDirection: 'column',
+    position: 'relative',
+  }
+}
+
+const IFRAME_STYLE: React.CSSProperties = { flex: 1, border: 'none', width: '100%', minHeight: 0 }
+
+function LoadingOverlay(): JSX.Element {
   return (
     <div
-      data-extension-panel={extensionId}
-      data-view-param={viewParam}
-      style={{ flex: 1, minHeight: 0, minWidth: 0, display, flexDirection: 'column' }}
+      data-testid="extension-loading"
+      style={{
+        position: 'absolute',
+        inset: 0,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
     >
-      <iframe
-        ref={iframeRef}
-        src={frameSrc(props)}
-        style={{ flex: 1, border: 'none', width: '100%', minHeight: 0 }}
-        allow="clipboard-read; clipboard-write"
-      />
+      <div className="activity-spinner" />
     </div>
   )
 }
 
-interface PanelPlacement extends Surface {
-  visible: boolean
-  repoRoot: string | null
-}
-
-function sendPanelBounds(el: HTMLElement, placement: PanelPlacement): void {
-  const rect = el.getBoundingClientRect()
-  window.electronAPI?.extension?.updatePanelBounds?.({
-    ...placement,
-    bounds: {
-      x: Math.round(rect.left),
-      y: Math.round(rect.top),
-      width: Math.round(rect.width),
-      height: Math.round(rect.height),
-    },
-  })
-}
-
-/** Keeps the extension's WebContentsView over the container: its bounds follow every resize, and
- * it hides while a modal is open or the panel is not active. */
-function usePanelBounds(
-  containerRef: React.RefObject<HTMLDivElement>,
-  { extensionId, viewParam, isActive, repoRoot = null }: Props
-): void {
-  const modalOpen = useModalStore((s) => s.depth > 0)
-  useShownWhileVisible({ extensionId, viewParam }, isActive && !modalOpen)
-  useEffect(() => {
-    const el = containerRef.current
-    if (!el) return
-    const visible = isActive && !modalOpen
-    const sendBounds = () => sendPanelBounds(el, { extensionId, viewParam, visible, repoRoot })
-    const observer = new ResizeObserver(sendBounds)
-    observer.observe(el)
-    sendBounds()
-    window.addEventListener('resize', sendBounds)
-    const timer = setTimeout(sendBounds, 250)
-
-    return () => {
-      observer.disconnect()
-      window.removeEventListener('resize', sendBounds)
-      clearTimeout(timer)
-      window.electronAPI?.extension?.updatePanelBounds?.({
-        extensionId,
-        viewParam,
-        bounds: { x: 0, y: 0, width: 0, height: 0 },
-        visible: false,
-        repoRoot: null,
-      })
-    }
-  }, [containerRef, extensionId, viewParam, isActive, repoRoot, modalOpen])
-}
-
-/** Whether the spinner shows: until main says the panel loaded, on a host that says so at all. */
-function usePanelLoading(extensionId: string): boolean {
-  const [loading, setLoading] = useState(true)
-  const reportsLoaded =
-    typeof window.electronAPI?.extensionEvents?.onExtensionPanelLoaded === 'function'
-
-  useEffect(() => {
-    if (!reportsLoaded) return
-    const unsubscribe = window.electronAPI.extensionEvents.onExtensionPanelLoaded((id: string) => {
-      if (id === extensionId) setLoading(false)
-    })
-    return unsubscribe
-  }, [extensionId, reportsLoaded])
-  return loading && reportsLoaded
-}
-
-function LocalWebContentsPortal(props: Props): JSX.Element {
-  const { extensionId, viewParam } = props
-  const containerRef = useRef<HTMLDivElement>(null)
-  usePanelBounds(containerRef, props)
-  const loading = usePanelLoading(extensionId)
+function ExtensionFrame(props: Props): JSX.Element {
+  const { extensionId, viewParam, isActive } = props
+  const iframeRef = useRef<HTMLIFrameElement>(null)
+  const [loaded, setLoaded] = useState(false)
+  const desktop = isDesktop()
+  useShownWhileVisible({ extensionId, viewParam }, isActive)
+  useFramePort(props, iframeRef, () => setLoaded(true))
+  useDoubleEscapeInFrame(iframeRef, { extensionId, viewParam }, !desktop)
 
   return (
     <div
-      ref={containerRef}
       data-extension-panel={extensionId}
       data-view-param={viewParam}
-      style={{ flex: 1, minHeight: 0, minWidth: 0, position: 'relative' }}
+      style={panelStyle(isActive)}
     >
-      {loading && (
-        <div
-          data-testid="extension-loading"
-          style={{
-            position: 'absolute',
-            inset: 0,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <div className="activity-spinner" />
-        </div>
-      )}
+      <iframe
+        ref={iframeRef}
+        src={desktop ? desktopFrameSrc(props) : frameSrc(props)}
+        style={IFRAME_STYLE}
+        allow="clipboard-read; clipboard-write"
+      />
+      {!loaded && <LoadingOverlay />}
     </div>
   )
 }
 
 export function ExtensionPanelPortal(props: Props): JSX.Element {
-  if (isElectronLocal()) {
-    return <LocalWebContentsPortal {...props} />
-  }
-  return <RemoteIframe {...props} />
+  return <ExtensionFrame {...props} />
 }

@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
-import { rmSync, writeFileSync } from 'node:fs'
+import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   AppHandle,
@@ -8,80 +8,53 @@ import {
   createWorkspace,
   addAndSelectProject,
   e2eTempDir,
+  projectGroup,
 } from './helpers'
+import { openOverview, runInVisibleTerminal } from './session-views'
 
 // The Overview tab as a Monitor wall, against the running app: a tile shows its
 // terminal's output as it arrives, and the wall's arrangement survives a restart.
 // Addressed by role and name (contracts/ui-surfaces.md).
 
-// Every test launches its own app on its own profile and folder, so the
-// shards can split this file by test instead of carrying all of it.
-test.describe.configure({ mode: 'parallel' })
-
-let handle: AppHandle | undefined
-let folder: string
-
-test.beforeEach(() => {
-  folder = e2eTempDir('wall-')
-})
-
-test.afterEach(async () => {
-  await closeApp(handle)
-  handle = undefined
-  rmSync(folder, { recursive: true, force: true })
-})
-
-async function openWall(page: Page): Promise<void> {
-  const entry = page.getByRole('button', { name: 'Overview' })
-  if ((await entry.getAttribute('aria-current')) !== 'page') await entry.click()
-  await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible()
+function largeTiles(page: Page) {
+  return page.getByRole('radiogroup', { name: 'Tile size' }).getByRole('radio', { name: 'Large' })
 }
 
-test('the wall says when no terminal is open', async () => {
-  handle = await launchApp()
-  await openWall(handle.page)
-  await expect(handle.page.getByText('No terminals are open')).toBeVisible()
-})
+function pinSwitch(page: Page) {
+  return page.getByRole('switch', { name: 'Pin sessions that need you' })
+}
 
-test("a tile shows its terminal's output as it arrives", async () => {
-  handle = await launchApp()
-  const { page } = handle
-  await createWorkspace(page, 'Wall', folder)
-  await addAndSelectProject(page, 'Wall', 'live')
-  await page.locator('.terminal-pane').click()
-  await page.keyboard.type('for i in $(seq 1 80); do echo tick-$i; sleep 0.1; done')
-  await page.keyboard.press('Enter')
+async function emptyWall(page: Page): Promise<void> {
+  await openOverview(page)
+  await expect(page.getByText('No terminals are open')).toBeVisible()
+}
 
-  await openWall(page)
-  const tile = page.getByRole('article', { name: /Wall \/ live/ })
-  await expect(tile).toBeVisible()
-  const preview = tile.locator('.live-preview')
-  await expect(preview).toContainText('tick-', { timeout: 10000 })
-  const first = await preview.innerText()
-  await expect.poll(async () => preview.innerText(), { timeout: 10000 }).not.toBe(first)
+async function overviewIconNamedOnFocus(page: Page): Promise<void> {
+  // Focus, not hover: other apps launched at once move the real pointer.
+  await page.getByRole('button', { name: 'Overview' }).focus()
+  await expect(page.locator('.tmui-tooltip')).toHaveText('Overview')
+  await expect(page.locator('.tmui-tooltip')).toBeVisible()
+}
 
-  await page.screenshot({ path: 'test-results/054/monitor-wall.png' })
-})
+/** Large before any tile exists, so the tile is placed once, at the size it keeps. */
+async function arrangeWall(page: Page): Promise<void> {
+  await largeTiles(page).click()
+  await expect(largeTiles(page)).toHaveAttribute('aria-checked', 'true')
+  await pinSwitch(page).click()
+  await expect(pinSwitch(page)).toHaveAttribute('aria-checked', 'false')
+}
 
-/** Run in the page: whether the row reading `text` is drawn inside the tile's preview box. */
+/** Run in the page: whether the row reading `text` is drawn inside its tile's preview box. */
 function rowInsidePreview(text: string): boolean {
-  const preview = document.querySelector('.live-preview')!.getBoundingClientRect()
   const row = [...document.querySelectorAll('.live-preview .xterm-rows > div')].find((r) =>
     r.textContent?.includes(text)
   )
+  const preview = row?.closest('.live-preview')?.getBoundingClientRect()
   const drawn = row?.getBoundingClientRect()
-  return !!drawn && drawn.top >= preview.top && drawn.bottom <= preview.bottom
+  return !!drawn && !!preview && drawn.top >= preview.top && drawn.bottom <= preview.bottom
 }
 
-test('a tile shows the line a fullscreen program is writing, not the empty middle', async () => {
-  handle = await launchApp()
-  const { page } = handle
-  // Large before the tile exists, so the tile is placed once, at the size it keeps.
-  await openWall(page)
-  await page
-    .getByRole('radiogroup', { name: 'Tile size' })
-    .getByRole('radio', { name: 'Large' })
-    .click()
+async function fullscreenProgramLineShows(page: Page, folder: string): Promise<void> {
   await createWorkspace(page, 'Wall', folder)
   await addAndSelectProject(page, 'Wall', 'live')
   // Like Claude Code: the alternate screen, a header at the top, the input near the bottom.
@@ -90,41 +63,58 @@ test('a tile shows the line a fullscreen program is writing, not the empty middl
     draw,
     "printf '\\033[?1049h\\033[H HEADER-TOP'; printf '\\033[%d;1H > INPUT-LINE' $(($(tput lines)-3)); sleep 60\n"
   )
-  await page.locator('.terminal-pane').click()
-  await page.keyboard.type(`sh ${draw}`)
-  await page.keyboard.press('Enter')
-
-  await openWall(page)
-  const tile = page.getByRole('article', { name: /Wall \/ live/ })
+  await runInVisibleTerminal(page, `sh ${draw}`)
+  await openOverview(page)
+  const tile = page.getByRole('article', { name: 'Wall / live, Terminal 1' })
   await expect(tile.locator('.live-preview')).toContainText('INPUT-LINE', { timeout: 10000 })
   await expect.poll(() => page.evaluate(rowInsidePreview, 'INPUT-LINE')).toBe(true)
-})
+}
 
-test("the wall's size and pinning survive a restart", async () => {
-  handle = await launchApp()
-  const profile = handle.userDataDir
-  await openWall(handle.page)
-  await handle.page
-    .getByRole('radiogroup', { name: 'Tile size' })
-    .getByRole('radio', { name: 'Large' })
-    .click()
-  await handle.page.getByRole('switch', { name: 'Pin sessions that need you' }).click()
+async function liveOutputArrives(page: Page): Promise<void> {
+  // A sidebar click leaves the wall for the branch's terminals.
+  await projectGroup(page, 'live').click()
+  await page.getByTitle('New tab (⌘T)').click()
+  await expect(page.locator('.tab-bar__tab--session')).toHaveCount(2)
+  await runInVisibleTerminal(page, 'for i in $(seq 1 80); do echo tick-$i; sleep 0.1; done')
+  await openOverview(page)
+  const preview = page
+    .getByRole('article', { name: 'Wall / live, Terminal 2' })
+    .locator('.live-preview')
+  await expect(preview).toContainText('tick-', { timeout: 10000 })
+  const first = await preview.innerText()
+  await expect.poll(() => preview.innerText(), { timeout: 10000 }).not.toBe(first)
+  await page.screenshot({ path: 'test-results/054/monitor-wall.png' })
+}
 
-  await closeApp(handle)
-  handle = await launchApp(profile)
-  await openWall(handle.page)
-  await expect(
-    handle.page.getByRole('radiogroup', { name: 'Tile size' }).getByRole('radio', { name: 'Large' })
-  ).toHaveAttribute('aria-checked', 'true')
-  await expect(
-    handle.page.getByRole('switch', { name: 'Pin sessions that need you' })
-  ).toHaveAttribute('aria-checked', 'false')
-})
+async function arrangementRemembered(page: Page): Promise<void> {
+  await openOverview(page)
+  await expect(largeTiles(page)).toHaveAttribute('aria-checked', 'true')
+  await expect(pinSwitch(page)).toHaveAttribute('aria-checked', 'false')
+}
 
-test("keyboard focus on the rail's Overview icon names it", async () => {
-  handle = await launchApp()
-  // Focus, not hover: the sibling apps this file launches at once move the real pointer.
-  await handle.page.getByRole('button', { name: 'Overview' }).focus()
-  await expect(handle.page.locator('.tmui-tooltip')).toHaveText('Overview')
-  await expect(handle.page.locator('.tmui-tooltip')).toBeVisible()
+async function watchTheWall(page: Page, folder: string): Promise<void> {
+  await test.step("keyboard focus on the rail's Overview icon names it", () =>
+    overviewIconNamedOnFocus(page))
+  await test.step('the wall says when no terminal is open', () => emptyWall(page))
+  await test.step('the wall is set to large tiles, without pinning', () => arrangeWall(page))
+  await test.step('a tile shows the line a fullscreen program is writing, not the empty middle', () =>
+    fullscreenProgramLineShows(page, folder))
+  await test.step("a tile shows its terminal's output as it arrives", () => liveOutputArrives(page))
+}
+
+test('the Overview wall watches every terminal, and keeps its arrangement across a restart', async () => {
+  test.setTimeout(90_000)
+  let handle: AppHandle | undefined = await launchApp()
+  try {
+    const profile = handle.userDataDir
+    await watchTheWall(handle.page, e2eTempDir('wall-'))
+    await closeApp(handle)
+    handle = undefined
+    handle = await launchApp(profile)
+    const { page } = handle
+    await test.step("the wall's size and pinning survive a restart", () =>
+      arrangementRemembered(page))
+  } finally {
+    await closeApp(handle)
+  }
 })

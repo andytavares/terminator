@@ -98,11 +98,7 @@ function useShellWindows() {
   const [sidebarVisible, setSidebarVisible] = useState(true)
   const [linkSessionId, setLinkSessionId] = useState<string | null>(null)
   const [logOpen, setLogOpen] = useState(false)
-  // The log window takes the bottom of the screen, so extension views move up.
-  const showLog = useCallback((open: boolean) => {
-    setLogOpen(open)
-    window.electronAPI.extension.setBottomInset(open ? 280 : 0)
-  }, [])
+  const showLog = useCallback((open: boolean) => setLogOpen(open), [])
   return {
     settingsOpen,
     aboutOpen,

@@ -6,7 +6,6 @@ import type { Notification } from '../../../../src/renderer/stores/notification.
 
 const mockTriggerAction = vi.fn().mockResolvedValue({ ok: true })
 const mockDismiss = vi.fn().mockResolvedValue({ ok: true })
-const mockSetLeftInset = vi.fn()
 
 // In jsdom, globalThis === window, so setting globalThis.electronAPI sets window.electronAPI
 installElectronApi({
@@ -14,7 +13,6 @@ installElectronApi({
     dismiss: mockDismiss,
     triggerAction: mockTriggerAction,
   },
-  extension: { setLeftInset: mockSetLeftInset },
 })
 
 import { NotificationPanel } from '../../../../src/renderer/components/NotificationPanel'
@@ -222,38 +220,6 @@ describe('NotificationPanel — clicking a notification without onClick does not
     render(<NotificationPanel />)
     const time = screen.getByText('2 minutes ago')
     expect(time.getAttribute('datetime')).toBe(new Date(timestamp).toISOString())
-  })
-})
-
-describe('opening the drawer without blanking what is behind it', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-    mockTriggerAction.mockResolvedValue({ ok: true })
-    resetStore()
-  })
-  afterEach(cleanup)
-
-  it('reserves the strip it occupies instead of hiding the extension views', () => {
-    // It used to push onto the modal store, which hides every extension
-    // WebContentsView while a modal is open. That is right for a centred
-    // dialog and wrong for a drawer down one edge: the whole application went
-    // black to show a 340px panel.
-    // jsdom lays nothing out; the drawer's right edge is what a browser would measure.
-    const measure = vi
-      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
-      .mockReturnValue(new DOMRect(0, 0, 339.5, 800))
-    useNotificationStore.setState({ notifications: [], panelOpen: true, unreadCount: 0 })
-    render(<NotificationPanel />)
-    measure.mockRestore()
-    expect(mockSetLeftInset).toHaveBeenLastCalledWith(340)
-  })
-
-  it('gives the strip back when it closes', () => {
-    useNotificationStore.setState({ notifications: [], panelOpen: true, unreadCount: 0 })
-    const { unmount } = render(<NotificationPanel />)
-    mockSetLeftInset.mockClear()
-    unmount()
-    expect(mockSetLeftInset).toHaveBeenLastCalledWith(0)
   })
 })
 

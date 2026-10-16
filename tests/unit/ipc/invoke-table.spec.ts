@@ -8,7 +8,13 @@ vi.mock('electron', () => ({
 }))
 
 import { defineChannel } from '@terminator/extension-sdk'
-import { registerInvokeTable, noPayload } from '../../../src/main/ipc/invoke-table.js'
+import {
+  registerInvokeTable,
+  noPayload,
+  defineViewChannel,
+  type ViewCaller,
+} from '../../../src/main/ipc/invoke-table.js'
+import { fakeWebContentsView } from '../../support/fake-web-contents.js'
 
 function capturedHandler(channel: string) {
   return mockHandle.mock.calls.find(([ch]) => ch === channel)![1] as (
@@ -133,5 +139,89 @@ describe('noPayload', () => {
   it('accepts what the desktop renderer sends (nothing) and what the bridge sends ({})', () => {
     expect(noPayload.safeParse(undefined).success).toBe(true)
     expect(noPayload.safeParse({}).success).toBe(true)
+  })
+})
+
+function viewChannel(run: (args: Record<string, never>, caller: ViewCaller) => unknown) {
+  return defineViewChannel({
+    channel: 'v:channel',
+    schema: z.object({}),
+    invalid: null,
+    run,
+  })
+}
+
+async function callerFromEvent(extra: Record<string, unknown> = {}) {
+  let seen: ViewCaller | undefined
+  registerInvokeTable([
+    viewChannel(((_args: never, caller: ViewCaller) => (seen = caller)) as never),
+  ])
+  const view = fakeWebContentsView()
+  await capturedHandler('v:channel')({ sender: view.sender, ...extra }, {})
+  return { seen: seen!, view }
+}
+
+describe('defineViewChannel — deriving the ViewCaller', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('passes run a ViewCaller derived from event.sender', async () => {
+    const { seen } = await callerFromEvent()
+    expect(seen).toBeDefined()
+  })
+
+  it('ViewCaller.send forwards to sender.send', async () => {
+    const { seen, view } = await callerFromEvent()
+    seen.send('fs:changed', { filename: 'a.ts' })
+    expect(view.received).toEqual([{ filename: 'a.ts' }])
+  })
+
+  it('the same WebContents gets the same ViewCaller', async () => {
+    const callers: ViewCaller[] = []
+    registerInvokeTable([
+      viewChannel(((_args: never, caller: ViewCaller) => void callers.push(caller)) as never),
+    ])
+    const view = fakeWebContentsView()
+    await capturedHandler('v:channel')({ sender: view.sender }, {})
+    await capturedHandler('v:channel')({ sender: view.sender }, {})
+    expect(callers[0]).toBe(callers[1])
+  })
+
+  it('a frame on the event is used as the ViewCaller instead of sender', async () => {
+    const frame: ViewCaller = { send: vi.fn(), onGone: vi.fn() }
+    const { seen } = await callerFromEvent({ frame })
+    expect(seen).toBe(frame)
+  })
+})
+
+describe('defineViewChannel — onGone', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('onGone fires when the WebContents is destroyed', async () => {
+    const { seen, view } = await callerFromEvent()
+    const gone = vi.fn()
+    seen.onGone(gone)
+    view.destroy()
+    expect(gone).toHaveBeenCalled()
+  })
+
+  it('onGone fires on a main-frame cross-document navigation', async () => {
+    const { seen, view } = await callerFromEvent()
+    const gone = vi.fn()
+    seen.onGone(gone)
+    view.navigate({ isMainFrame: true, isSameDocument: false })
+    expect(gone).toHaveBeenCalled()
+  })
+
+  it('onGone does not fire on same-document or subframe navigation', async () => {
+    const { seen, view } = await callerFromEvent()
+    const gone = vi.fn()
+    seen.onGone(gone)
+    view.navigate({ isMainFrame: true, isSameDocument: true })
+    view.navigate({ isMainFrame: false, isSameDocument: false })
+    expect(gone).not.toHaveBeenCalled()
   })
 })

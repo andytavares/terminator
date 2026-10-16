@@ -3,7 +3,6 @@ import { onChannel } from './channel-registrar.js'
 import { defineChannel, type ChannelSpec } from '@terminator/extension-sdk'
 import { registerInvokeTable, noPayload } from './invoke-table.js'
 import type { ExtensionHost } from '../extensions/extension-host.js'
-import type { ExtensionViewHost } from '../extensions/extension-view-host.js'
 import {
   listExtensionSettingsSections,
   listExtensionCommands,
@@ -24,14 +23,6 @@ const CommandContextSchema = z.object({
   sessionId: z.string().nullable(),
   repoRoot: z.string().nullable(),
 })
-const PanelBoundsSchema = z.object({
-  extensionId: z.string().min(1),
-  viewParam: z.string(),
-  bounds: z.object({ x: z.number(), y: z.number(), width: z.number(), height: z.number() }),
-  visible: z.boolean(),
-  repoRoot: z.string().nullable().optional(),
-})
-
 /** The extension that registered `key` as `workspaceScoped`, if one did. */
 function workspaceScopedOwner(key: string): string | undefined {
   return listExtensionSettingsSections().find(
@@ -167,29 +158,9 @@ function reloadChannel(
   })
 }
 
-function panelBoundsChannel(
-  extensionHost: ExtensionHost,
-  getViewHost: () => ExtensionViewHost | null
-): ChannelSpec {
-  return defineChannel({
-    channel: 'extension:update-panel-bounds',
-    schema: PanelBoundsSchema,
-    invalid,
-    run: async (placement) => {
-      // A view talks to its extension's backend as soon as it loads.
-      await extensionHost.whenActivated(placement.extensionId)
-      await getViewHost()?.updatePanelBounds(
-        () => extensionHost.listAll().find((e) => e.id === placement.extensionId),
-        placement
-      )
-    },
-  })
-}
-
 export function registerExtensionHandlers(
   extensionHost: ExtensionHost,
-  broadcast: (channel: string, data: unknown) => void,
-  getViewHost: () => ExtensionViewHost | null
+  broadcast: (channel: string, data: unknown) => void
 ): void {
   registerInvokeTable([
     ...catalogueChannels(extensionHost),
@@ -197,7 +168,6 @@ export function registerExtensionHandlers(
     reloadChannel(extensionHost, broadcast),
     ...settingsChannels,
     ...commandChannels,
-    panelBoundsChannel(extensionHost, getViewHost),
   ])
 
   onChannel(

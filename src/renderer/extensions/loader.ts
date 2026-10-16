@@ -10,15 +10,16 @@ import { makeRendererLogger } from '../logger'
 const log = makeRendererLogger('quick-actions')
 
 function makePortalComponent(
-  extensionId: string,
+  ext: Extension,
   viewParam: string
 ): ComponentType<{ repoRoot?: string | null }> {
   return function ExtensionPortalComponent({ repoRoot }: { repoRoot?: string | null } = {}) {
     return React.createElement(ExtensionPanelPortal, {
-      extensionId,
+      extensionId: ext.id,
       viewParam,
       isActive: true,
       repoRoot,
+      rendererUrl: ext.rendererUrl,
     })
   }
 }
@@ -35,7 +36,7 @@ function registerFullTabs(ext: Extension, contributes: Contributes, registry: Re
       id: ext.id,
       label: globalTab.label,
       icon: globalTab.icon ? iconFromName(globalTab.icon) : undefined,
-      component: makePortalComponent(ext.id, viewParam) as ComponentType<Record<string, never>>,
+      component: makePortalComponent(ext, viewParam) as ComponentType<Record<string, never>>,
       sortOrder: 1,
       view: viewParam,
     })
@@ -46,7 +47,7 @@ function registerFullTabs(ext: Extension, contributes: Contributes, registry: Re
       id: ext.id,
       label: workspaceTab.label,
       icon: workspaceTab.icon ? iconFromName(workspaceTab.icon) : undefined,
-      component: makePortalComponent(ext.id, viewParam),
+      component: makePortalComponent(ext, viewParam),
       view: viewParam,
     })
   }
@@ -64,7 +65,7 @@ function registerContributedProjectTab(
   registry.registerProjectTab({
     id: ext.id,
     label: projectTab.label,
-    component: makePortalComponent(ext.id, viewParam) as ComponentType<{
+    component: makePortalComponent(ext, viewParam) as ComponentType<{
       repoRoot: string | null
     }>,
     view: viewParam,
@@ -85,7 +86,7 @@ function registerContributedSidebarPanel(
     label: sidebarPanel.label,
     defaultOpen: sidebarPanel.defaultOpen,
     view: viewParam,
-    component: makePortalComponent(ext.id, viewParam) as ComponentType<{
+    component: makePortalComponent(ext, viewParam) as ComponentType<{
       repoRoot: string | null
       onClose: () => void
     }>,
@@ -101,7 +102,7 @@ function registerWindowsAndShortcuts(
   for (const { id: viewId, view } of contributes.windowViews ?? []) {
     registry.registerWindowView(
       viewId,
-      makePortalComponent(ext.id, view) as ComponentType<{ repoRoot: string | null }>
+      makePortalComponent(ext, view) as ComponentType<{ repoRoot: string | null }>
     )
   }
   if (!contributes.sidebarPanel) return

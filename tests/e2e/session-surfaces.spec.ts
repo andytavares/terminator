@@ -1,5 +1,4 @@
 import { test, expect, type Page } from '@playwright/test'
-import { rmSync } from 'node:fs'
 import {
   AppHandle,
   launchApp,
@@ -8,42 +7,16 @@ import {
   addAndSelectProject,
   e2eTempDir,
 } from './helpers'
+import {
+  expectTerminalFocused,
+  openHome,
+  openOverview,
+  runInVisibleTerminal,
+} from './session-views'
 
-// A regression suite for feature 058: output arriving in a background terminal
-// must never reorder Home or the wall, and every way of opening a session must
-// focus its terminal. Addressed by role and name (contracts/ui-surfaces.md)
-// wherever a role exists; a few rows have no clean accessible name (nested
-// interactive children) and are addressed the way helpers.ts already does,
-// by CSS class plus visible text.
-
-// Every test launches its own app on its own profile and folder, so the
-// shards can split this file by test instead of carrying all of it.
-test.describe.configure({ mode: 'parallel' })
-
-let handle: AppHandle | undefined
-let folder: string
-
-test.beforeEach(() => {
-  folder = e2eTempDir('surfaces-')
-})
-
-test.afterEach(async () => {
-  await closeApp(handle)
-  handle = undefined
-  rmSync(folder, { recursive: true, force: true })
-})
-
-async function openHome(page: Page): Promise<void> {
-  const entry = page.getByRole('button', { name: /^Home/ })
-  if ((await entry.getAttribute('aria-current')) !== 'page') await entry.click()
-  await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible()
-}
-
-async function openOverview(page: Page): Promise<void> {
-  const entry = page.getByRole('button', { name: /^Overview/ })
-  if ((await entry.getAttribute('aria-current')) !== 'page') await entry.click()
-  await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible()
-}
+// Feature 058: background output never reorders Home or the wall, and opening a session focuses
+// its terminal. Rows with nested interactive children have no clean accessible name, so they
+// are addressed as helpers.ts does, by CSS class plus visible text.
 
 /** Starts a second and third terminal on the branch already showing. */
 async function addTwoMoreTabs(page: Page): Promise<void> {
@@ -57,9 +30,7 @@ async function addTwoMoreTabs(page: Page): Promise<void> {
 /** Runs a command in the terminal whose tab is at `index`, without waiting for it to finish. */
 async function runInTab(page: Page, index: number, command: string): Promise<void> {
   await page.locator('.tab-bar__tab--session').nth(index).click()
-  await page.locator('.terminal-pane').click()
-  await page.keyboard.type(command)
-  await page.keyboard.press('Enter')
+  await runInVisibleTerminal(page, command)
 }
 
 /** Samples `read` every 250ms, `times` times, and returns the distinct results seen. */
@@ -80,15 +51,11 @@ function sidebarTerminalRow(page: Page, title: string) {
     .filter({ has: page.locator('.terminal-row__name', { hasText: title }) })
 }
 
-async function expectTerminalFocused(page: Page): Promise<void> {
-  await expect
-    .poll(() =>
-      page.evaluate(() => {
-        const el = document.activeElement as HTMLElement | null
-        return el?.tagName === 'TEXTAREA' && el.getAttribute('aria-label') === 'Terminal input'
-      })
-    )
-    .toBe(true)
+/** Shows the branch's terminals in the sidebar, unless they already are. */
+async function showSidebarTerminals(page: Page): Promise<void> {
+  const show = page.locator('.branch-row__disclosure[aria-label^="Show terminals in"]')
+  if ((await show.count()) > 0) await show.click()
+  await expect(page.locator('.terminal-row').first()).toBeVisible()
 }
 
 /** The Ledger's rows, top to bottom. */
@@ -107,84 +74,15 @@ function wallOrder(page: Page): Promise<string> {
   )
 }
 
-test('output never reorders sessions, on Home or the wall', async () => {
-  test.setTimeout(120_000)
-  handle = await launchApp()
-  const { page } = handle
-  await createWorkspace(page, 'Order', folder)
-  await addAndSelectProject(page, 'Order', 'loud')
-  await addTwoMoreTabs(page)
-
+async function outputNeverReorders(page: Page): Promise<void> {
   // Two of the three terminals never stop producing output.
   await runInTab(page, 0, 'while true; do echo tick; sleep 0.4; done')
   await runInTab(page, 1, 'while true; do echo tick; sleep 0.4; done')
-
   await openHome(page)
-  const homeOrders = await sampleDistinct(() => ledgerOrder(page), 40)
-  expect(homeOrders.size).toBe(1)
-
+  expect((await sampleDistinct(() => ledgerOrder(page), 40)).size).toBe(1)
   await openOverview(page)
-  const wallOrders = await sampleDistinct(() => wallOrder(page), 40)
-  expect(wallOrders.size).toBe(1)
-})
-
-/** 1. Enter on a Ledger row. 2. The "Open <name>" button on a wall tile. */
-async function openFromHomeAndWall(page: Page): Promise<void> {
-  await openHome(page)
-  const row = page.getByRole('row', { name: 'Terminal 1' })
-  await row.locator('.ledger__name').click()
-  await page.keyboard.press('Enter')
-  await expectTerminalFocused(page)
-  await expect(page.getByRole('heading', { name: 'Home' })).toBeHidden()
-
-  await openOverview(page)
-  await page
-    .getByRole('article', { name: /Terminal 2/ })
-    .getByRole('button', { name: 'Open Terminal 2' })
-    .click()
-  await expectTerminalFocused(page)
+  expect((await sampleDistinct(() => wallOrder(page), 40)).size).toBe(1)
 }
-
-/** 3. A sidebar terminal row, for a different session. 4. The sidebar row of
- * the already-active session, clicked again. 5. A session tab in the tab bar. */
-async function openFromSidebarAndTabs(page: Page): Promise<void> {
-  await page.locator('.branch-row__disclosure[aria-label^="Show terminals in"]').click()
-  await sidebarTerminalRow(page, 'Terminal 3').click()
-  await expectTerminalFocused(page)
-
-  await sidebarTerminalRow(page, 'Terminal 3').click()
-  await expectTerminalFocused(page)
-
-  await page.locator('.tab-bar__tab--session').nth(0).click()
-  await expectTerminalFocused(page)
-}
-
-/** 6. Quick Actions, opened over Home. */
-async function openFromQuickActions(page: Page): Promise<void> {
-  await openHome(page)
-  await page.keyboard.press('Meta+p')
-  await page.keyboard.press('/')
-  const search = page.getByRole('combobox', { name: 'Search quick actions' })
-  await expect(search).toBeVisible()
-  await search.fill('Terminal 2')
-  await page.keyboard.press('Enter')
-  await expectTerminalFocused(page)
-  await expect(page.getByRole('heading', { name: 'Home' })).toBeHidden()
-}
-
-test('opening a session always focuses its terminal', async () => {
-  test.setTimeout(60_000)
-  handle = await launchApp()
-  const { page } = handle
-  await createWorkspace(page, 'Focus', folder)
-  await addAndSelectProject(page, 'Focus', 'branch')
-  await addTwoMoreTabs(page)
-  // Default titles, in creation order: Terminal 1, Terminal 2, Terminal 3.
-
-  await openFromHomeAndWall(page)
-  await openFromSidebarAndTabs(page)
-  await openFromQuickActions(page)
-})
 
 /** Run in the page: links Terminal 1's record to ENG-123 through the preload API. */
 async function linkTerminalOneToEng123(): Promise<void> {
@@ -210,17 +108,9 @@ async function linkTerminalOneToEng123(): Promise<void> {
   if ('error' in result) throw new Error(result.message)
 }
 
-test('a session link made from Home shows on the sidebar terminal row and the session tab', async () => {
-  handle = await launchApp()
-  const { page } = handle
-  await createWorkspace(page, 'Linked', folder)
-  await addAndSelectProject(page, 'Linked', 'ticket')
-  // 'Terminal 1' is the branch's only session.
-
-  // Give the session a real record (a description write), so the main
-  // process has assigned it a snapshot we can read back the exact fields of —
-  // no tracker is connected in e2e, so the link itself is set through the
-  // preload API directly, as src/renderer/stores/session-records.store.ts does.
+/** Gives Terminal 1 a real record (a description write) and links it. No tracker is connected in
+ * e2e, so the link is set through the preload API, as src/renderer/stores/session-records.store.ts does. */
+async function linkFromHome(page: Page): Promise<void> {
   await openHome(page)
   const box = page
     .getByRole('row', { name: 'Terminal 1' })
@@ -228,23 +118,93 @@ test('a session link made from Home shows on the sidebar terminal row and the se
   await box.fill('Wiring up the link')
   await box.press('Enter')
   await expect(page.getByText('Wiring up the link')).toBeVisible()
-
   await page.evaluate(linkTerminalOneToEng123)
+}
 
+async function linkShowsOnSidebarAndTab(page: Page): Promise<void> {
+  await linkFromHome(page)
   // Branches start collapsed, so the branch row itself must carry the key.
   await expect(page.getByRole('button', { name: /^ticket/ }).getByText('ENG-123')).toBeVisible()
-
-  await page.locator('.branch-row__disclosure[aria-label^="Show terminals in"]').click()
+  await showSidebarTerminals(page)
   const row = sidebarTerminalRow(page, 'Terminal 1')
   await expect(row.getByText('ENG-123')).toBeVisible()
-
   // Leave Home to see the tab bar's own copy of the key.
   await row.click()
   await expect(page.getByRole('heading', { name: 'Home' })).toBeHidden()
   await expect(page.locator('.tab-bar__tab--session').getByText('ENG-123')).toBeVisible()
-
   await row.click({ button: 'right' })
   await page.locator('.ctx-menu').getByRole('button', { name: 'Remove session link' }).click()
   await expect(row.getByText('ENG-123')).toHaveCount(0)
   await expect(page.locator('.tab-bar__tab--session').getByText('ENG-123')).toHaveCount(0)
+}
+
+/** 1. Enter on a Ledger row. 2. The "Open <name>" button on a wall tile. */
+async function openFromHomeAndWall(page: Page): Promise<void> {
+  await openHome(page)
+  await page.getByRole('row', { name: 'Terminal 1' }).locator('.ledger__name').click()
+  await page.keyboard.press('Enter')
+  await expectTerminalFocused(page)
+  await expect(page.getByRole('heading', { name: 'Home' })).toBeHidden()
+  await openOverview(page)
+  await page
+    .getByRole('article', { name: /Terminal 2/ })
+    .getByRole('button', { name: 'Open Terminal 2' })
+    .click()
+  await expectTerminalFocused(page)
+}
+
+/** 3. A sidebar terminal row, for a different session. 4. The sidebar row of
+ * the already-active session, clicked again. 5. A session tab in the tab bar. */
+async function openFromSidebarAndTabs(page: Page): Promise<void> {
+  await showSidebarTerminals(page)
+  await sidebarTerminalRow(page, 'Terminal 3').click()
+  await expectTerminalFocused(page)
+  await sidebarTerminalRow(page, 'Terminal 3').click()
+  await expectTerminalFocused(page)
+  await page.locator('.tab-bar__tab--session').nth(0).click()
+  await expectTerminalFocused(page)
+}
+
+/** 6. Quick Actions, opened over Home. */
+async function openFromQuickActions(page: Page): Promise<void> {
+  await openHome(page)
+  await page.keyboard.press('Meta+p')
+  await page.keyboard.press('/')
+  const search = page.getByRole('combobox', { name: 'Search quick actions' })
+  await expect(search).toBeVisible()
+  await search.fill('Terminal 2')
+  await page.keyboard.press('Enter')
+  await expectTerminalFocused(page)
+  await expect(page.getByRole('heading', { name: 'Home' })).toBeHidden()
+}
+
+async function openingFocusesTheTerminal(page: Page): Promise<void> {
+  await openFromHomeAndWall(page)
+  await openFromSidebarAndTabs(page)
+  await openFromQuickActions(page)
+}
+
+test.describe('session surfaces', () => {
+  let handle: AppHandle
+
+  test.beforeAll(async () => {
+    handle = await launchApp()
+  })
+
+  test.afterAll(() => closeApp(handle))
+
+  test('three sessions are watched, linked and opened from every surface that names them', async () => {
+    test.setTimeout(120_000)
+    const { page } = handle
+    await createWorkspace(page, 'Surfaces', e2eTempDir('surfaces-'))
+    await addAndSelectProject(page, 'Surfaces', 'ticket')
+    // Default titles, in creation order: Terminal 1, Terminal 2, Terminal 3.
+    await addTwoMoreTabs(page)
+    await test.step('output never reorders sessions, on Home or the wall', () =>
+      outputNeverReorders(page))
+    await test.step('a session link made from Home shows on the sidebar terminal row and the session tab', () =>
+      linkShowsOnSidebarAndTab(page))
+    await test.step('opening a session always focuses its terminal', () =>
+      openingFocusesTheTerminal(page))
+  })
 })

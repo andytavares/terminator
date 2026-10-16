@@ -841,6 +841,36 @@ describe('UnifiedSidebar — two menus replace four bands of chrome (US5) — di
   })
 })
 
+describe('UnifiedSidebar — what the branch-first sidebar draws', () => {
+  it('names a repo folder under home from ~ on the name tooltip', async () => {
+    Object.defineProperty(window, 'electronAPI', {
+      configurable: true,
+      value: {
+        project: projectApi,
+        app: { getInfo: vi.fn().mockResolvedValue({ homeDir: '/Users/me' }) },
+        editor: { detect: vi.fn().mockResolvedValue({ editor: null }), open: vi.fn() },
+      },
+    })
+    setWorkspaces([{ ...ws1, folderPath: '/Users/me/repos/backend' }, ws2])
+    const { container } = renderSidebar()
+    const name = container.querySelector('.repo-header__name')!
+    await waitFor(() => expect(name.getAttribute('title')).toBe('~/repos/backend'))
+  })
+
+  it('draws none of the surfaces it retired', () => {
+    const { container } = renderSidebar()
+    for (const retired of [
+      '.extension-footer',
+      '.scratch-section',
+      '.sidebar-header__tabs',
+      '.ws-row',
+      '.unified-sidebar__bulk-bar',
+    ]) {
+      expect(container.querySelector(retired), retired).toBeNull()
+    }
+  })
+})
+
 describe('UnifiedSidebar — agent state is derived, not read from a field nobody writes', () => {
   it('treats a session with an unread bell as awaiting input', () => {
     setSessions(new Map([['s6', sidebarSession('s6', 'p1', { tabTitle: 'claude', bellCount: 2 })]]))

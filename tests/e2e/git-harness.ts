@@ -2,11 +2,12 @@ import { expect, type Page } from '@playwright/test'
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
+import { extensionPage, type ExtensionView } from './extension-page'
 import { git } from './foundry-harness'
 import { createWorkspace, workspaceRow, type AppHandle } from './helpers'
 
 // Git Integration specs' setup: a repository whose remote is a local bare one (which the stub
-// GitHub serves pull requests from), and each view, its own WebContentsView, as a Playwright page.
+// GitHub serves pull requests from), and each view, a frame in the main window, as a view to drive.
 
 export { git }
 
@@ -64,34 +65,40 @@ export function projectTab(page: Page, label: string) {
   return page.locator('.tab-bar--primary .tab-bar__tab').filter({ hasText: label }).first()
 }
 
-/** The Git Integration view showing `view`, once loaded, as a page to drive. */
-export async function gitView(handle: AppHandle, view: string): Promise<Page> {
-  const findGitView = () =>
-    handle.app
-      .windows()
-      .find(
-        (page) =>
-          page.url().startsWith('ext://terminator.git-integration/') &&
-          new URL(page.url()).searchParams.get('view') === view
-      )
-  await expect
-    .poll(() => Boolean(findGitView()), { message: `no ${view} view`, timeout: 20000 })
-    .toBe(true)
-  const page = findGitView() as Page
-  await page.waitForLoadState('domcontentloaded')
-  return page
+/** The Git Integration frame showing `view`, once loaded, as a view to drive. */
+export async function gitView(handle: AppHandle, view: string): Promise<ExtensionView> {
+  return extensionPage(handle, `terminator.git-integration/dist/index.html?view=${view}`)
 }
 
-/** Opens the repository's Code Reviews tab from its sidebar header and returns its view. */
-export async function openCodeReviews(handle: AppHandle, workspace: string): Promise<Page> {
+/** Opens the repository's Code Reviews tab from its sidebar header and returns its view.
+ * A click on the header re-opens the tab when the click before left it open and did not
+ * touch the tabs: the sidebar then reads it as chrome and dismisses the surfaces. */
+export async function openCodeReviews(
+  handle: AppHandle,
+  workspace: string
+): Promise<ExtensionView> {
   const header = workspaceRow(handle.page, workspace)
+  const codeReviews = header.getByRole('button', { name: 'Code Reviews' })
+  const panel = handle.page.locator('[data-extension-panel="terminator.git-integration"]')
   await header.hover()
-  await header.getByRole('button', { name: 'Code Reviews' }).click()
-  return gitView(handle, 'code-reviews')
+  await codeReviews.click()
+  // A click when the tab is already open and nothing else was touched reads as chrome and
+  // closes it; clicking again re-opens it, so a closed panel is no reason to wait out a frame.
+  if ((await panel.count()) === 0) {
+    await header.hover()
+    await codeReviews.click()
+  }
+  const view = await gitView(handle, 'code-reviews')
+  // The queue or an open pull request: the tab reloads fresh on a re-open, so a
+  // PR the test before left open shows again only from its queue row.
+  await expect(view.locator('.rd-row, [aria-label="Close review"]').first()).toBeVisible({
+    timeout: 30000,
+  })
+  return view
 }
 
 /** Clicks the project's Git tab and returns its view. */
-export async function openGitTab(handle: AppHandle): Promise<Page> {
+export async function openGitTab(handle: AppHandle): Promise<ExtensionView> {
   await projectTab(handle.page, 'Git').click()
   return gitView(handle, 'project')
 }

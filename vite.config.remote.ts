@@ -13,10 +13,15 @@ export default defineConfig({
         index: resolve(__dirname, 'src/renderer-remote/index.html'),
         mobile: resolve(__dirname, 'src/renderer-remote/mobile.html'),
         shim: resolve(__dirname, 'src/renderer-remote/electron-api-shim.ts'),
+        frameShim: resolve(__dirname, 'src/extension-frame/frame-shim.ts'),
       },
       output: {
         entryFileNames: (chunk) =>
-          chunk.name === 'shim' ? 'remote-shim.js' : 'assets/[name]-[hash].js',
+          chunk.name === 'shim'
+            ? 'remote-shim.js'
+            : chunk.name === 'frameShim'
+              ? 'frame-shim.js'
+              : 'assets/[name]-[hash].js',
       },
     },
   },

@@ -54,6 +54,30 @@ describe('QuickCreateOverlay', () => {
   })
 })
 
+describe('QuickCreateOverlay focus', () => {
+  afterEach(() => vi.useRealTimers())
+
+  it('puts focus in the title as it opens', () => {
+    useNotesStore.setState({ showQuickCreate: true })
+    render(<QuickCreateOverlay />)
+    expect(document.activeElement).toBe(screen.getByPlaceholderText('Title'))
+  })
+
+  // A late focus() would take the keyboard back from whatever the user went to since,
+  // such as the app's Quick actions opened over the overlay.
+  it('never takes focus back after something else has it', () => {
+    vi.useFakeTimers()
+    useNotesStore.setState({ showQuickCreate: true })
+    render(<QuickCreateOverlay />)
+    const elsewhere = document.createElement('button')
+    document.body.appendChild(elsewhere)
+    elsewhere.focus()
+    vi.advanceTimersByTime(1000)
+    expect(document.activeElement).toBe(elsewhere)
+    elsewhere.remove()
+  })
+})
+
 describe('QuickCreateOverlay kind', () => {
   it('offers what to create as one choice, Note first', () => {
     useNotesStore.setState({ showQuickCreate: true })

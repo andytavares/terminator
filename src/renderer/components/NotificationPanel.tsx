@@ -1,5 +1,5 @@
 import { useShallow } from 'zustand/react/shallow'
-import React, { useEffect, useRef } from 'react'
+import React from 'react'
 import { Bell, Info, CheckCircle, AlertTriangle, XCircle } from 'lucide-react'
 import { RelativeTime } from '@terminator/extension-ui'
 import { useCloseOnEscape } from '../hooks/useCloseOnEscape'
@@ -137,25 +137,6 @@ function NotificationActions({
   )
 }
 
-/** Reserves the drawer's strip, as an extension's WebContentsView paints over the DOM; hiding
- * every view (`useModalEffect`) blanked the app to show a 340px drawer. Measured from the
- * rendered element, so the reservation cannot drift from the CSS. */
-function useLeftInset(panelRef: React.RefObject<HTMLDivElement>): void {
-  useEffect(() => {
-    const setInset = (px: number): void => window.electronAPI?.extension?.setLeftInset?.(px)
-    const reserve = (): void => {
-      const rect = panelRef.current?.getBoundingClientRect()
-      if (rect !== undefined) setInset(Math.ceil(rect.right))
-    }
-    reserve()
-    window.addEventListener('resize', reserve)
-    return () => {
-      window.removeEventListener('resize', reserve)
-      setInset(0)
-    }
-  }, [panelRef])
-}
-
 function NotificationPanelInner(): JSX.Element {
   const { closePanel, notifications, markAllRead, clearAll } = useNotificationStore(
     useShallow((s) => ({
@@ -165,14 +146,12 @@ function NotificationPanelInner(): JSX.Element {
       clearAll: s.clearAll,
     }))
   )
-  const panelRef = useRef<HTMLDivElement>(null)
-  useLeftInset(panelRef)
   useCloseOnEscape(closePanel)
 
   return (
     <>
       <div className="notif-backdrop" onClick={closePanel} />
-      <div className="notif-panel" ref={panelRef} role="region" aria-label="Notifications">
+      <div className="notif-panel" role="region" aria-label="Notifications">
         <div className="notif-panel__header">
           <span className="notif-panel__title">Notifications</span>
           {notifications.length > 0 && (

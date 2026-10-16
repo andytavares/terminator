@@ -1,6 +1,6 @@
 import { resolve } from 'node:path'
 import { describe, it, expect } from 'vitest'
-import { EXTENSION_BASE_CSS } from '../../../src/main/extensions/extension-view-host'
+import { EXTENSION_BASE_CSS } from '../../../packages/extension-ui/src/extension-base-css'
 import { LAYERS, LAYER_NAMES } from '../../../packages/extension-ui/src/layers'
 import { extensionBaseCss } from '../../e2e/extension-base-css'
 

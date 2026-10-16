@@ -13,7 +13,7 @@ export interface ApiTransport {
 }
 
 export interface BuildApiOptions {
-  mode: 'native' | 'remote'
+  mode: 'native' | 'remote' | 'frame'
   /**
    * Implementations keyed by spec path for kind 'local' specs, and — in remote
    * mode — for specs with remote: 'stub'. Missing entries throw at build time
@@ -22,8 +22,10 @@ export interface BuildApiOptions {
   locals?: Record<string, (...args: never[]) => unknown>
 }
 
-// Specs for extension views only belong to src/main/preload-webview.ts.
+// 'native' and 'remote' serve the app renderer; 'frame' serves an extension in
+// an iframe: the specs marked `extensionView`.
 function belongsToSurface(spec: ChannelSpec, mode: BuildApiOptions['mode']): boolean {
+  if (mode === 'frame') return spec.extensionView === 'shared' || spec.extensionView === 'only'
   if (spec.extensionView === 'only') return false
   return mode === 'native' || (spec.remote ?? 'same') !== 'omit'
 }

@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect } from '@playwright/test'
 import {
   AppHandle,
   addAndSelectProject,
@@ -7,7 +7,7 @@ import {
   launchApp,
   projectGroup,
 } from './helpers'
-import { invokeChannel } from './extension-page'
+import { invokeChannel, type ExtensionView } from './extension-page'
 import {
   dailyLogTaskRow,
   openVault,
@@ -17,16 +17,15 @@ import {
 } from './task-vault-harness'
 
 // Linking tasks and projects to terminal sessions, and jumping from a task to
-// the terminal it is linked to. The remote API's two link channels, which no
-// view calls, are driven the way a remote client calls them.
+// the terminal it is linked to. The steps run in order on one task and one
+// project. The remote API's link channels are covered by
+// extensions/task-vault/tests/ipc/links.ipc.spec.ts.
 
 let handle: AppHandle
-let vault: Page
-/** The session the task was linked to, as the vault stored it. */
-let alphaSessionId: string
+let vault: ExtensionView
 
 /** Picks the option naming the alpha branch in a terminal picker. */
-async function pickAlpha(select: ReturnType<Page['locator']>): Promise<void> {
+async function pickAlpha(select: ReturnType<ExtensionView['locator']>): Promise<void> {
   const label = (await select.locator('option', { hasText: 'alpha' }).textContent()) ?? ''
   await select.selectOption({ label })
 }
@@ -48,7 +47,8 @@ test.afterAll(async () => {
   await closeApp(handle)
 })
 
-test('a task is linked to the terminal picked for it', async () => {
+/** A task is linked to the terminal picked for it. */
+async function linkTaskToTerminal(): Promise<void> {
   await pressRowAction(
     dailyLogTaskRow(vault, 'Deploy the fix').getByRole('button', {
       name: 'Link to terminal session',
@@ -66,10 +66,10 @@ test('a task is linked to the terminal picked for it', async () => {
     terminatorLinks: string[]
   }
   expect(stored.terminatorLinks).toHaveLength(1)
-  alphaSessionId = stored.terminatorLinks[0]
-})
+}
 
-test('jumping from the task brings its terminal forward', async () => {
+/** Jumping from the task brings its terminal forward. */
+async function jumpToTerminal(): Promise<void> {
   await expect(projectGroup(handle.page, 'beta')).toHaveClass(/branch-row--selected/)
   await pressRowAction(
     dailyLogTaskRow(vault, 'Deploy the fix').getByRole('button', {
@@ -78,9 +78,13 @@ test('jumping from the task brings its terminal forward', async () => {
   )
 
   await expect(projectGroup(handle.page, 'alpha')).toHaveClass(/branch-row--selected/)
-})
+}
 
-test('a project is linked to a terminal from its card', async () => {
+/** A project is linked to a terminal from its card. */
+async function linkProjectToTerminal(): Promise<void> {
+  // The jump test left the terminal on screen; the vault's frame unmounted
+  // with its global tab, so this is a new frame at the same URL.
+  vault = await openVault(handle)
   await vault
     .locator('.vault-sidebar')
     .getByRole('button', { name: 'Projects', exact: true })
@@ -90,35 +94,14 @@ test('a project is linked to a terminal from its card', async () => {
   await pickAlpha(card.locator('.projects-browser__link-picker select'))
 
   await expect(card.getByTitle('Linked')).toBeVisible()
-})
+}
 
-test('the remote API lists what a terminal is linked to, and unlinks a task', async () => {
-  const linked = await invokeChannel<{ tasks: { text: string }[]; projects: { name: string }[] }>(
-    vault,
-    'task-vault:links:get-for-terminator-target',
-    { targetId: alphaSessionId }
-  )
-  expect(linked.tasks.map((task) => task.text)).toEqual(['Deploy the fix'])
-  expect(linked.projects.map((project) => project.name)).toEqual(['Release'])
+const LINK_AND_JUMP: [string, () => Promise<void>][] = [
+  ['a task is linked to the terminal picked for it', linkTaskToTerminal],
+  ['jumping from the task brings its terminal forward', jumpToTerminal],
+  ['a project is linked to a terminal from its card', linkProjectToTerminal],
+]
 
-  const task = (await storedTask(vault, 'Deploy the fix')) as StoredTask
-  await invokeChannel(vault, 'task-vault:links:remove', {
-    taskId: task.id,
-    targetId: alphaSessionId,
-  })
-  await invokeChannel(vault, 'task-vault:links:remove', {
-    projectFilePath: 'Release',
-    targetId: alphaSessionId,
-  })
-
-  const after = await invokeChannel<{ tasks: unknown[]; projects: unknown[] }>(
-    vault,
-    'task-vault:links:get-for-terminator-target',
-    { targetId: alphaSessionId }
-  )
-  expect(after).toEqual({ tasks: [], projects: [] })
-  await vault.locator('.vault-sidebar').getByRole('button', { name: 'Today', exact: true }).click()
-  const row = dailyLogTaskRow(vault, 'Deploy the fix')
-  await row.hover()
-  await expect(row.getByRole('button', { name: 'Link to terminal session' })).toBeVisible()
+test('a task and a project are linked to a terminal, and the task jumps to it', async () => {
+  for (const [title, step] of LINK_AND_JUMP) await test.step(title, step)
 })

@@ -131,7 +131,7 @@
 
 .qa-row {
   display: grid;
-  grid-template-columns: 24px 1fr auto;
+  grid-template-columns: 40px 1fr auto;
   align-items: center;
   gap: 10px;
   padding: 6px 8px;
@@ -269,6 +269,8 @@
   height: 22px;
   display: grid;
   place-items: center;
+  justify-self: start;
+  white-space: nowrap;
   border-radius: 5px;
   background: var(--tm-bg-card, rgba(255, 255, 255, 0.04));
   border: 1px solid var(--tm-border-strong, rgba(255, 255, 255, 0.1));

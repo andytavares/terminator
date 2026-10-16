@@ -1,6 +1,6 @@
-import { expect, type Locator, type Page } from '@playwright/test'
+import { expect, type Locator } from '@playwright/test'
 import type { AppHandle } from './helpers'
-import { invokeChannel, openFromAppBand } from './extension-page'
+import { invokeChannel, openFromAppBand, type ExtensionView } from './extension-page'
 
 // Shared by the tests/e2e/task-vault-*.spec.ts files: opening the vault, moving
 // between its sections, and reading back what an action stored.
@@ -30,36 +30,39 @@ export function localDate(offsetDays = 0): string {
 }
 
 /** Opens Task Vault from the app band and waits for its navigation. */
-export async function openVault(handle: AppHandle): Promise<Page> {
+export async function openVault(handle: AppHandle): Promise<ExtensionView> {
   const vault = await openFromAppBand(handle, 'Task Vault', VAULT_URL)
   await expect(vault.locator('.vault-sidebar')).toBeVisible({ timeout: 20_000 })
   return vault
 }
 
 /** Clicks a section in the vault's own sidebar: Today, Inbox, Projects, Areas, History or Weekly review. */
-export async function goToSection(vault: Page, section: string): Promise<void> {
+export async function goToSection(vault: ExtensionView, section: string): Promise<void> {
   await vault.locator('.vault-sidebar').getByRole('button', { name: section, exact: true }).click()
 }
 
 /** Every task the vault holds, whatever its status. */
-export async function allTasks(vault: Page): Promise<StoredTask[]> {
+export async function allTasks(vault: ExtensionView): Promise<StoredTask[]> {
   const result = await invokeChannel<{ tasks: StoredTask[] }>(vault, 'task-vault:vault:query', {})
   return result.tasks
 }
 
 /** The stored task with exactly this text, if there is one. */
-export async function storedTask(vault: Page, text: string): Promise<StoredTask | undefined> {
+export async function storedTask(
+  vault: ExtensionView,
+  text: string
+): Promise<StoredTask | undefined> {
   return (await allTasks(vault)).find((task) => task.text === text)
 }
 
 /** Today's open log, as the vault stores it. */
-export async function todayTasks(vault: Page): Promise<StoredTask[]> {
+export async function todayTasks(vault: ExtensionView): Promise<StoredTask[]> {
   const result = await invokeChannel<{ tasks: StoredTask[] }>(vault, 'task-vault:vault:get-today')
   return result.tasks
 }
 
 /** A task row of the open daily log, found by its exact text. */
-export function dailyLogTaskRow(vault: Page, text: string) {
+export function dailyLogTaskRow(vault: ExtensionView, text: string) {
   return vault.locator('.daily-log__task').filter({ has: vault.getByText(text, { exact: true }) })
 }
 

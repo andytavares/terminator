@@ -92,3 +92,22 @@ describe('editor:open', () => {
     })
   })
 })
+
+// The renderer sends a folder and nothing else: main decides what to launch, from a fixed list.
+describe('editor:open — what it refuses', () => {
+  it('refuses an empty folder without launching anything', async () => {
+    expect(await handlerFor('editor:open')({}, { folderPath: '' })).toEqual({
+      error: 'VALIDATION_ERROR',
+    })
+    expect(openInEditor).not.toHaveBeenCalled()
+  })
+
+  it('takes a folder, never a command', async () => {
+    expect(await handlerFor('editor:open')({}, { command: 'rm -rf ~' })).toEqual({
+      error: 'VALIDATION_ERROR',
+    })
+    await handlerFor('editor:open')({}, { folderPath: '/repos/app', command: 'rm -rf ~' })
+    expect(openInEditor).toHaveBeenCalledWith('/repos/app', undefined)
+    expect(openInEditor).toHaveBeenCalledTimes(1)
+  })
+})

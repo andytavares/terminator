@@ -75,7 +75,6 @@ function stubElectronApi(): void {
     terminal: { onProcessExit: () => () => {}, input: () => {} },
     notifications: { list: async () => [], onPush: () => () => {} },
     extensionBridge: { on: () => () => {} },
-    extension: { setBottomInset: () => {} },
     quickActions: { onOpen: () => () => {} },
   })
 }

@@ -1,29 +1,17 @@
 import { test, expect, type Browser, type Page } from '@playwright/test'
-import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
-import {
-  AppHandle,
-  addAndSelectProject,
-  closeApp,
-  createWorkspace,
-  stubsFirst,
-  e2eTempDir,
-  launchApp,
-} from './helpers'
-import { openFromAppBand } from './extension-page'
+import { AppHandle, addAndSelectProject, closeApp, createWorkspace, launchApp } from './helpers'
+import { openFromAppBand, type ExtensionView } from './extension-page'
+import { expectCentredInWindow } from './modal-centre'
 
 // Remote Control's channels, driven from its view, with each effect read where it lands: a
-// browser running the real remote renderer, the server, or the clipboard. The public address
-// comes from a stand-in ngrok (fixtures/ngrok-bin/ngrok) that accepts only this spec's token.
+// browser running the real remote renderer (phone and desktop layouts), the server, or the
+// clipboard. The ngrok tunnel is not driven here: ngrok-manager.spec.ts and
+// extension-index.spec.ts check the token reaches ngrok and the address comes back.
 
-const NGROK_STUB_DIR = join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'ngrok-bin')
-const NGROK_TOKEN = 'e2e-ngrok-token'
-const PUBLIC_URL = 'https://e2e-stub.ngrok-free.app'
 const PORT = 17683
 const PASSWORD = 'e2e-remote-control'
 const BASE_URL = `http://127.0.0.1:${PORT}`
-const PUBLIC_HEADING = 'On — reachable from any browser'
+const LOCAL_HEADING = 'On — reachable on this network'
 
 /** Every channel Remote Control registers (extensions/remote-control/src/index.ts). */
 const REMOTE_CONTROL_CHANNELS = [
@@ -40,20 +28,15 @@ const REMOTE_CONTROL_CHANNELS = [
 
 let handle: AppHandle
 /** The Remote Control view in the desktop app. */
-let view: Page
+let view: ExtensionView
 /** Chromium, where every phone in this spec runs the remote renderer. */
 let browser: Browser
 /** A phone watching the desktop app's terminal. */
 let phone: Page
-/** Where the stand-in ngrok writes its agent API's address once it listens. */
-let ngrokApiFile: string
-
+/** A desktop browser running the remote renderer at /app/. */
+let desk: Page
 test.beforeAll(async ({ playwright }) => {
-  ngrokApiFile = join(e2eTempDir('ngrok-'), 'api')
-  handle = await launchApp(undefined, {
-    ...stubsFirst(NGROK_STUB_DIR),
-    E2E_NGROK_API_FILE: ngrokApiFile,
-  })
+  handle = await launchApp()
   await createWorkspace(handle.page, 'Remote-WS', handle.userDataDir)
   await addAndSelectProject(handle.page, 'Remote-WS', 'phone-branch')
   view = await openFromAppBand(handle, 'Remote Control', 'remote-control')
@@ -95,28 +78,18 @@ function heading(name: string) {
   return view.getByRole('heading', { name, exact: true })
 }
 
-async function tokenOpensThePublicAddress(): Promise<void> {
+async function turnedOnWithAPassword(): Promise<void> {
   await openRemoteSettings()
-  await saveRemoteField('Account token', NGROK_TOKEN)
   await view.getByPlaceholder('New password').fill(PASSWORD)
   await view.getByRole('button', { name: 'Set password' }).click()
   await expect(view.getByText('A password is set.')).toBeVisible()
   await saveRemoteField('Port', String(PORT))
   await view.getByRole('button', { name: 'Turn on' }).click()
-  // The stand-in opens a tunnel only when ngrok is started with the saved token.
-  await expect(heading(PUBLIC_HEADING)).toBeVisible({ timeout: 20_000 })
-  await expect(view.locator('.rc-address__url')).toHaveText(PUBLIC_URL)
+  await expect(heading(LOCAL_HEADING)).toBeVisible()
 }
 
-async function reconnectKeepsThePhone(): Promise<void> {
+async function phoneSignsInAndWatches(): Promise<void> {
   phone = await openPhone()
-  await expect(view.locator('.rc-device')).toHaveCount(1)
-  await fetch(`${readFileSync(ngrokApiFile, 'utf8')}/e2e/crash`)
-  await expect(heading('The public address stopped working.')).toBeVisible()
-  await view.getByRole('button', { name: 'Reconnect' }).click()
-  await expect(heading(PUBLIC_HEADING)).toBeVisible({ timeout: 20_000 })
-  await expect(view.locator('.rc-address__url')).toHaveText(PUBLIC_URL)
-  // Only the tunnel restarted: the phone on this network never lost its terminal.
   await expect(view.locator('.rc-device')).toHaveCount(1)
   await expect(phone.getByRole('alert')).toHaveCount(0)
 }
@@ -175,41 +148,62 @@ function invokeEach(page: Page, channels: string[]): Promise<string[]> {
   )
 }
 
-async function remoteRendererCannotDriveRemoteControl(): Promise<void> {
-  const desk = await browser.newPage({ baseURL: BASE_URL, viewport: { width: 1600, height: 900 } })
+/** /app/ in a browser signed in with the password: the session cookie gets the bridge ticket
+ * (no password in the page or a header), and the bridge serves workspace:list, so the
+ * workspace made in the desktop app is drawn. */
+async function browserRendererShowsTheDesktopWorkspace(): Promise<void> {
+  desk = await browser.newPage({ baseURL: BASE_URL, viewport: { width: 1600, height: 900 } })
   await desk.goto('/')
   await desk.getByPlaceholder('Password').fill(PASSWORD)
   await desk.getByRole('button', { name: 'Connect' }).click()
   await desk.waitForURL(/\/app\//)
+  expect((await desk.request.post('/api/app-ticket')).status()).toBe(201)
   await expect(desk.locator('.repo-header__name', { hasText: 'Remote-WS' })).toBeVisible()
+  await desk.click('.sidebar-header__add')
+  const dialog = desk.getByRole('dialog', { name: 'Create Workspace' })
+  await expectCentredInWindow(dialog, 'Remote client: Create Workspace')
+  await dialog.getByRole('button', { name: 'Cancel' }).click()
+  await expect(dialog).toHaveCount(0)
+}
+
+async function remoteRendererCannotDriveRemoteControl(): Promise<void> {
   expect(await invokeEach(desk, REMOTE_CONTROL_CHANNELS)).toEqual(
     REMOTE_CONTROL_CHANNELS.map(() => 'channel not remote-accessible')
   )
-  // Nothing it asked for happened: the server is still on, with its address.
-  await expect(heading(PUBLIC_HEADING)).toBeVisible()
+  // Nothing it asked for happened: the server is still on.
+  await expect(heading(LOCAL_HEADING)).toBeVisible()
   await desk.close()
 }
 
-test.describe.serial('Remote Control, driven from its view', () => {
-  test(
-    'the account token saved in Settings is what opens the public address',
-    tokenOpensThePublicAddress
-  )
-  test(
-    'Reconnect brings a dropped public address back and keeps the phone connected',
-    reconnectKeepsThePhone
-  )
-  test(
+/** A flow's steps in order, each titled for the behaviour it checks. */
+type Steps = Array<[title: string, body: () => Promise<void>]>
+
+const REMOTE_STEPS: Steps = [
+  [
+    'Remote Control is turned on with a password, on the port saved in Settings',
+    turnedOnWithAPassword,
+  ],
+  ['a phone signs in with the password and watches the terminal', phoneSignsInAndWatches],
+  [
     'a viewer over the limit saved in Settings is turned away, and told so',
-    viewerLimitTurnsTheNextAway
-  )
-  test('Disconnect ends that phone’s connection, and it says so', disconnectEndsThatPhone)
-  test(
+    viewerLimitTurnsTheNextAway,
+  ],
+  ['Disconnect ends that phone’s connection, and it says so', disconnectEndsThatPhone],
+  [
     'Copy Caddyfile names the address the remote renderer is served from',
-    caddyfileProxiesTheRemoteRenderer
-  )
-  test(
+    caddyfileProxiesTheRemoteRenderer,
+  ],
+  [
+    "the browser remote renderer shows the desktop's workspace through its bridge, and centres its dialogs",
+    browserRendererShowsTheDesktopWorkspace,
+  ],
+  [
     'the remote renderer can drive none of these channels itself',
-    remoteRendererCannotDriveRemoteControl
-  )
+    remoteRendererCannotDriveRemoteControl,
+  ],
+]
+
+test('Remote Control is turned on from its view and used from a phone and a browser', async () => {
+  test.setTimeout(180_000)
+  for (const [title, body] of REMOTE_STEPS) await test.step(title, body)
 })

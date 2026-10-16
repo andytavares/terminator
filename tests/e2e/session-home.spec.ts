@@ -1,5 +1,4 @@
 import { test, expect, type Page } from '@playwright/test'
-import { rmSync } from 'node:fs'
 import {
   AppHandle,
   launchApp,
@@ -9,180 +8,63 @@ import {
   selectProject,
   e2eTempDir,
 } from './helpers'
+import { openHome } from './session-views'
 import { expectCentredInWindow } from './modal-centre'
 
 // Home against the running app: it is the launch view, it lists every terminal
-// where it lives, and what the operator writes about a session is still there
-// after a restart. Addressed by role and name (contracts/ui-surfaces.md).
+// where it lives, it ends and clears away sessions, and what the operator
+// writes about a session is still there after a restart. Addressed by role and
+// name (contracts/ui-surfaces.md).
 
-// Every test launches its own app on its own profile and folder, so the
-// shards can split this file by test instead of carrying all of it.
+// Each flow launches its own app on its own profile and folder.
 test.describe.configure({ mode: 'parallel' })
 
-let handle: AppHandle | undefined
-let folder: string
+const BRANCH_GROUP = 'Repo One / feature-a'
+const KEPT = 'Checking the ghostty keybinds'
+const REMOVED = 'chasing the flaky test'
 
-test.beforeEach(() => {
-  folder = e2eTempDir('home-')
-})
-
-test.afterEach(async () => {
-  await closeApp(handle)
-  handle = undefined
-  rmSync(folder, { recursive: true, force: true })
-})
-
-async function openHome(page: Page): Promise<void> {
-  const entry = page.getByRole('button', { name: /^Home/ })
-  if ((await entry.getAttribute('aria-current')) !== 'page') await entry.click()
-  await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible()
+function homeRegion(page: Page) {
+  return page.getByRole('region', { name: 'Home' })
 }
 
-test('the app opens on Home', async () => {
-  handle = await launchApp()
-  await expect(handle.page.getByRole('heading', { name: 'Home' })).toBeVisible()
-  await expect(handle.page.getByText('No terminals are open')).toBeVisible()
-})
+async function opensOnHomeWithNothingOpen(page: Page): Promise<void> {
+  await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible()
+  await expect(page.getByText('No terminals are open')).toBeVisible()
+}
 
-test('Home lists each terminal under its workspace and branch, asking what it is for', async () => {
-  handle = await launchApp()
-  const { page } = handle
+async function branchWithATerminal(page: Page, folder: string): Promise<void> {
   await createWorkspace(page, 'Repo One', folder)
   await addAndSelectProject(page, 'Repo One', 'feature-a')
   await openHome(page)
+}
 
-  const group = page.getByRole('rowgroup', { name: 'Repo One / feature-a' })
-  await expect(group).toBeVisible()
-  const rows = group.getByRole('row')
+async function listsTerminalUnderItsBranch(page: Page, folder: string): Promise<void> {
+  await branchWithATerminal(page, folder)
+  const rows = page.getByRole('rowgroup', { name: BRANCH_GROUP }).getByRole('row')
   await expect(rows).toHaveCount(1)
   await expect(
     rows.first().getByRole('textbox', { name: 'What is this session doing?' })
   ).toBeVisible()
-})
+}
 
-test('a description survives a restart, and a closed session is found by it', async () => {
-  handle = await launchApp()
-  const profile = handle.userDataDir
-  const { page } = handle
-  await createWorkspace(page, 'Repo One', folder)
-  await addAndSelectProject(page, 'Repo One', 'feature-a')
-  await openHome(page)
-
-  const box = page
-    .getByRole('rowgroup', { name: 'Repo One / feature-a' })
-    .getByRole('textbox', { name: 'What is this session doing?' })
-  await box.fill('Checking the ghostty keybinds')
+/** Describes the only open session in the Ledger, which an open session can close but not remove. */
+async function openSessionCanCloseButNotRemove(page: Page): Promise<void> {
+  const box = page.getByRole('textbox', { name: 'What is this session doing?' }).first()
+  await box.fill(REMOVED)
   await box.press('Enter')
-  await expect(page.getByText('Checking the ghostty keybinds')).toBeVisible()
+  await expect(page.getByRole('button', { name: /^Close / })).toBeVisible()
+  await expect(page.getByRole('button', { name: /^Remove / })).toHaveCount(0)
+}
 
-  await closeApp(handle)
-  handle = await launchApp(profile)
-  const restarted = handle.page
-  await expect(restarted.getByRole('heading', { name: 'Home' })).toBeVisible()
-
-  const closed = restarted.getByRole('rowgroup', { name: 'Closed' })
-  await expect(closed.getByText('Checking the ghostty keybinds')).toBeVisible()
-
-  await restarted.getByRole('searchbox', { name: 'Filter sessions' }).fill('ghostty')
-  await expect(closed.getByRole('row')).toHaveCount(1)
-  await expect(restarted.getByRole('rowgroup')).toHaveCount(1)
-  await restarted.getByRole('searchbox', { name: 'Filter sessions' }).fill('nothing like this')
-  await expect(restarted.getByText('No sessions match')).toBeVisible()
-})
-
-test('the Logbook is remembered, and describing a session there names it in the list', async () => {
-  handle = await launchApp()
-  const profile = handle.userDataDir
-  const { page } = handle
-  await createWorkspace(page, 'Repo One', folder)
-  await addAndSelectProject(page, 'Repo One', 'feature-a')
-  await openHome(page)
-  await page
-    .getByRole('radiogroup', { name: 'Layout' })
-    .getByRole('radio', { name: 'Logbook' })
-    .click()
-
-  const list = page.getByRole('listbox', { name: 'Sessions' })
-  await list.getByRole('option', { name: /Add a description/ }).click()
-  const box = page.getByRole('textbox', { name: 'What is this session doing?' })
-  await expect(box).toBeFocused()
-  await box.fill('Trying the Logbook')
-  await page.getByRole('button', { name: 'Save description' }).click()
-  await expect(list.getByRole('option', { name: /Trying the Logbook/ })).toBeVisible()
-
-  await closeApp(handle)
-  handle = await launchApp(profile)
-  await expect(
-    handle.page.getByRole('radiogroup', { name: 'Layout' }).getByRole('radio', { name: 'Logbook' })
-  ).toHaveAttribute('aria-checked', 'true')
-})
-
-test('linking a session says where to connect a tracker when none is', async () => {
-  handle = await launchApp()
-  const { page } = handle
-  await createWorkspace(page, 'Repo One', folder)
-  await addAndSelectProject(page, 'Repo One', 'feature-a')
-  await openHome(page)
-
-  await page
-    .getByRole('rowgroup', { name: 'Repo One / feature-a' })
-    .getByRole('button', { name: 'Link a work item' })
-    .click()
-  const dialog = page.getByRole('dialog', { name: 'Link a work item' })
-  await expectCentredInWindow(dialog, 'Link a work item')
-  await expect(dialog.getByRole('alert')).toHaveText(
-    'No issue tracker is connected. Connect Linear or Jira in Settings → Integrations.'
-  )
-  await dialog.getByRole('button', { name: 'Cancel' }).click()
-  await expect(dialog).toBeHidden()
-})
-
-test('the link dialog closes on Escape and on a click outside it', async () => {
-  handle = await launchApp()
-  const { page } = handle
-  await createWorkspace(page, 'Repo One', folder)
-  await addAndSelectProject(page, 'Repo One', 'feature-a')
-  await openHome(page)
-
-  const link = page
-    .getByRole('rowgroup', { name: 'Repo One / feature-a' })
-    .getByRole('button', { name: 'Link a work item' })
-  const dialog = page.getByRole('dialog', { name: 'Link a work item' })
-
-  await link.click()
-  await expect(dialog).toBeVisible()
-  await page.keyboard.press('Escape')
-  await expect(dialog).toBeHidden()
-
-  await link.click()
-  await expect(dialog).toBeVisible()
-  await page.mouse.click(40, 700)
-  await expect(dialog).toBeHidden()
-})
-
-test("the Ledger's columns and grouping survive a restart", async () => {
-  handle = await launchApp()
-  const profile = handle.userDataDir
-  const { page } = handle
-  await createWorkspace(page, 'Repo One', folder)
-  await addAndSelectProject(page, 'Repo One', 'feature-a')
-  await openHome(page)
-
-  await page.getByRole('region', { name: 'Home' }).getByRole('button', { name: 'Display' }).click()
-  await page.getByRole('menuitemcheckbox', { name: 'Latest output' }).click()
-  await page.getByRole('menuitemradio', { name: 'Branch', exact: true }).click()
-  await expect(page.getByRole('rowgroup', { name: 'feature-a' })).toBeVisible()
-
-  await closeApp(handle)
-  handle = await launchApp(profile)
-  const restarted = handle.page
-  // Terminals do not survive a restart, so give the Ledger a row to arrange.
-  await selectProject(restarted, 'Repo One', 'feature-a')
-  await openHome(restarted)
-  await expect(restarted.getByRole('columnheader', { name: 'Session' })).toBeVisible()
-  await expect(restarted.getByRole('columnheader', { name: 'Latest output' })).toHaveCount(0)
-  await expect(restarted.getByRole('rowgroup', { name: 'feature-a' })).toBeVisible()
-})
+async function endedFromHomeThenRemoved(page: Page): Promise<void> {
+  await page.getByRole('button', { name: /^Close / }).click()
+  // The session is history now, description and all. (The tab bar belongs to
+  // the terminal view, which Home covers, so Closed is what proves it ended.)
+  const closed = page.getByRole('rowgroup', { name: 'Closed' })
+  await expect(closed.getByText(REMOVED)).toBeVisible()
+  await page.getByRole('button', { name: /^Remove / }).click()
+  await expect(closed).toHaveCount(0)
+}
 
 async function assertMenuOnScreen(page: Page, name: string): Promise<void> {
   const menu = page.getByRole('menu', { name })
@@ -203,76 +85,9 @@ async function assertMenuOnScreen(page: Page, name: string): Promise<void> {
   }
 }
 
-test('every Home menu opens inside the window, wherever its button sits', async () => {
-  handle = await launchApp()
-  const { page } = handle
-  await createWorkspace(page, 'Repo One', folder)
-  await addAndSelectProject(page, 'Repo One', 'feature-a')
-  await openHome(page)
-
-  const home = page.getByRole('region', { name: 'Home' })
-  await home.getByRole('button', { name: 'Display' }).click()
-  await assertMenuOnScreen(page, 'Display options')
-  await page.keyboard.press('Escape')
-  await page.mouse.click(600, 600)
-
-  await home.getByRole('button', { name: 'New terminal' }).click()
-  await assertMenuOnScreen(page, 'Start a terminal')
-})
-
-test('the empty state opens its menu inside the window too', async () => {
-  handle = await launchApp()
-  const { page } = handle
-  await createWorkspace(page, 'Repo One', folder)
-  await addAndSelectProject(page, 'Repo One', 'feature-a')
-  // Close the only terminal, so Home shows its empty state.
-  await page.locator('.tab-bar__close').first().click()
-  await openHome(page)
-  await expect(page.getByText('No terminals are open')).toBeVisible()
-
-  await page
-    .getByRole('region', { name: 'Home' })
-    .getByRole('button', { name: 'New terminal' })
-    .last()
-    .click()
-  await assertMenuOnScreen(page, 'Start a terminal')
-})
-
-test('a terminal can be started from Home, on a branch or as a scratch', async () => {
-  handle = await launchApp()
-  const { page } = handle
-  await createWorkspace(page, 'Repo One', folder)
-  await addAndSelectProject(page, 'Repo One', 'feature-a')
-  await openHome(page)
-  await expect(
-    page.getByRole('rowgroup', { name: 'Repo One / feature-a' }).getByRole('row')
-  ).toHaveCount(1)
-
-  const home = page.getByRole('region', { name: 'Home' })
-  await home.getByRole('button', { name: 'New terminal' }).click()
-  await page.getByRole('menuitem', { name: 'New terminal in Repo One / feature-a' }).click()
-  // Starting a terminal shows it, so Home gives way to the terminal.
-  await expect(page.locator('.tab-bar__tab--session')).toHaveCount(2)
-
-  await openHome(page)
-  await expect(
-    page.getByRole('rowgroup', { name: 'Repo One / feature-a' }).getByRole('row')
-  ).toHaveCount(2)
-
-  await home.getByRole('button', { name: 'New terminal' }).click()
-  await page.getByRole('menuitem', { name: 'New scratch terminal' }).click()
-  await expect(page.locator('.tab-bar__tab--session')).toHaveCount(1)
-  await openHome(page)
-  await expect(page.getByRole('rowgroup', { name: 'No branch' }).getByRole('row')).toHaveCount(1)
-})
-
-/** Height, text size and corner radius of a control, as rendered. */
-async function shapeOf(
-  scope: ReturnType<Page['getByRole']>,
-  name: string | RegExp,
-  nth = 0
-): Promise<Record<string, string>> {
-  return scope
+/** Height, text size and corner radius of a Home control, as rendered. */
+async function shapeOf(page: Page, name: string | RegExp, nth = 0) {
+  return homeRegion(page)
     .getByRole('button', { name })
     .nth(nth)
     .evaluate((el) => {
@@ -285,50 +100,228 @@ async function shapeOf(
     })
 }
 
-test('Home draws its controls as one set, in the bar and in the empty state', async () => {
-  handle = await launchApp()
-  const { page } = handle
-  await createWorkspace(page, 'Repo One', folder)
-  await addAndSelectProject(page, 'Repo One', 'feature-a')
-  await openHome(page)
-
-  const home = page.getByRole('region', { name: 'Home' })
-  const needsYou = await shapeOf(home, /Needs you/)
-  expect(await shapeOf(home, /^New terminal$/)).toEqual(needsYou)
-  expect(await shapeOf(home, /^Display$/)).toEqual(needsYou)
-
-  // Close the only terminal, so the empty state's two buttons sit side by side.
-  await page.getByRole('button', { name: /^Home/ }).click()
-  await page.locator('.tab-bar__close').first().click()
-  await openHome(page)
+/** With nothing open, the empty state's own New terminal sits beside Go to terminals. */
+async function emptyStateMenuAndControls(page: Page): Promise<void> {
   await expect(page.getByText('No terminals are open')).toBeVisible()
-  expect(await shapeOf(home, /^New terminal$/, 1)).toEqual(await shapeOf(home, /^Go to terminals$/))
+  expect(await shapeOf(page, /^New terminal$/, 1)).toEqual(await shapeOf(page, /^Go to terminals$/))
+  await homeRegion(page).getByRole('button', { name: 'New terminal' }).last().click()
+  await assertMenuOnScreen(page, 'Start a terminal')
+}
+
+async function startFromEmptyStateOnBranch(page: Page): Promise<void> {
+  await page.getByRole('menuitem', { name: `New terminal in ${BRANCH_GROUP}` }).click()
+  // Starting a terminal shows it, so Home gives way to the terminal.
+  await expect(page.getByRole('heading', { name: 'Home' })).toBeHidden()
+  await openHome(page)
+  await expect(page.getByRole('rowgroup', { name: BRANCH_GROUP }).getByRole('row')).toHaveCount(1)
+}
+
+/** Latest output off, grouped by branch alone. */
+async function arrangeLedger(page: Page): Promise<void> {
+  await homeRegion(page).getByRole('button', { name: 'Display' }).click()
+  await page.getByRole('menuitemcheckbox', { name: 'Latest output' }).click()
+  await page.getByRole('menuitemradio', { name: 'Branch', exact: true }).click()
+  await expect(page.getByRole('rowgroup', { name: 'feature-a' })).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('menu', { name: 'Display options' })).toBeHidden()
+}
+
+function layoutRadio(page: Page, name: 'Ledger' | 'Logbook') {
+  return page.getByRole('radiogroup', { name: 'Layout' }).getByRole('radio', { name })
+}
+
+async function describeInLogbook(page: Page): Promise<void> {
+  await layoutRadio(page, 'Logbook').click()
+  const list = page.getByRole('listbox', { name: 'Sessions' })
+  await list.getByRole('option', { name: /Add a description/ }).click()
+  const box = page.getByRole('textbox', { name: 'What is this session doing?' })
+  await expect(box).toBeFocused()
+  await box.fill(KEPT)
+  await page.getByRole('button', { name: 'Save description' }).click()
+  await expect(list.getByRole('option', { name: new RegExp(KEPT) })).toBeVisible()
+}
+
+/** The first run: a session ended and removed, another described, Home arranged. */
+async function aDayOnHome(page: Page, folder: string): Promise<void> {
+  await test.step('the app opens on Home', () => opensOnHomeWithNothingOpen(page))
+  await test.step('Home lists each terminal under its workspace and branch, asking what it is for', () =>
+    listsTerminalUnderItsBranch(page, folder))
+  await test.step('an open session offers no way to remove it from the list', () =>
+    openSessionCanCloseButNotRemove(page))
+  await test.step('a session is ended from Home, then removed from the list', () =>
+    endedFromHomeThenRemoved(page))
+  await test.step('the empty state draws its controls as one set and opens its menu inside the window', () =>
+    emptyStateMenuAndControls(page))
+  await test.step('a terminal is started from Home on a branch', () =>
+    startFromEmptyStateOnBranch(page))
+  await test.step("the Ledger's columns and grouping are changed", () => arrangeLedger(page))
+  await test.step('describing a session in the Logbook names it in the list', () =>
+    describeInLogbook(page))
+}
+
+async function logbookRemembered(page: Page): Promise<void> {
+  await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible()
+  await expect(layoutRadio(page, 'Logbook')).toHaveAttribute('aria-checked', 'true')
+  await layoutRadio(page, 'Ledger').click()
+}
+
+async function closedSessionFoundByDescription(page: Page): Promise<void> {
+  const closed = page.getByRole('rowgroup', { name: 'Closed' })
+  await expect(closed.getByText(KEPT)).toBeVisible()
+  await expect(page.getByText(REMOVED)).toHaveCount(0)
+  const filter = page.getByRole('searchbox', { name: 'Filter sessions' })
+  await filter.fill('ghostty')
+  await expect(closed.getByRole('row')).toHaveCount(1)
+  await expect(page.getByRole('rowgroup')).toHaveCount(1)
+  await filter.fill('nothing like this')
+  await expect(page.getByText('No sessions match')).toBeVisible()
+  await filter.fill('')
+}
+
+async function ledgerArrangementRemembered(page: Page): Promise<void> {
+  // Terminals do not survive a restart, so give the Ledger a row to arrange.
+  await selectProject(page, 'Repo One', 'feature-a')
+  await openHome(page)
+  await expect(page.getByRole('columnheader', { name: 'Session' })).toBeVisible()
+  await expect(page.getByRole('columnheader', { name: 'Latest output' })).toHaveCount(0)
+  await expect(page.getByRole('rowgroup', { name: 'feature-a' })).toBeVisible()
+}
+
+async function afterRestart(page: Page): Promise<void> {
+  await test.step('the Logbook is remembered across a restart', () => logbookRemembered(page))
+  await test.step('a description survives a restart, a closed session is found by it, and a removed one stays gone', () =>
+    closedSessionFoundByDescription(page))
+  await test.step("the Ledger's columns and grouping survive a restart", () =>
+    ledgerArrangementRemembered(page))
+}
+
+test("a day's sessions are kept on Home, and what was written about them survives a restart", async () => {
+  test.setTimeout(90_000)
+  const folder = e2eTempDir('home-')
+  let handle: AppHandle | undefined = await launchApp()
+  try {
+    const profile = handle.userDataDir
+    await aDayOnHome(handle.page, folder)
+    await closeApp(handle)
+    handle = undefined
+    handle = await launchApp(profile)
+    await afterRestart(handle.page)
+  } finally {
+    await closeApp(handle)
+  }
 })
 
-test('the Ledger fits its surface at every width, with every column on', async () => {
-  handle = await launchApp()
-  const { page } = handle
-  await createWorkspace(page, 'Repo One', folder)
-  await addAndSelectProject(page, 'Repo One', 'feature-a')
-  await openHome(page)
+// ---------------------------------------------------------------------------
+// Home's controls: starting terminals, the link dialog, the menus and the Ledger's fit.
+// ---------------------------------------------------------------------------
 
+function linkButton(page: Page) {
+  return page
+    .getByRole('rowgroup', { name: BRANCH_GROUP })
+    .getByRole('button', { name: 'Link a work item' })
+}
+
+async function linkDialogNamesWhereToConnect(page: Page): Promise<void> {
+  const dialog = page.getByRole('dialog', { name: 'Link a work item' })
+  await linkButton(page).click()
+  await expectCentredInWindow(dialog, 'Link a work item')
+  await expect(dialog.getByRole('alert')).toHaveText(
+    'No issue tracker is connected. Connect Linear or Jira in Settings → Integrations.'
+  )
+  await dialog.getByRole('button', { name: 'Cancel' }).click()
+  await expect(dialog).toBeHidden()
+}
+
+async function linkDialogClosesOnEscapeAndOutside(page: Page): Promise<void> {
+  const dialog = page.getByRole('dialog', { name: 'Link a work item' })
+  await linkButton(page).click()
+  await expect(dialog).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(dialog).toBeHidden()
+  await linkButton(page).click()
+  await expect(dialog).toBeVisible()
+  await page.mouse.click(40, 700)
+  await expect(dialog).toBeHidden()
+}
+
+async function everyMenuInsideTheWindow(page: Page): Promise<void> {
+  await homeRegion(page).getByRole('button', { name: 'Display' }).click()
+  await assertMenuOnScreen(page, 'Display options')
+  await page.keyboard.press('Escape')
+  await page.mouse.click(600, 600)
+  await homeRegion(page).getByRole('button', { name: 'New terminal' }).click()
+  await assertMenuOnScreen(page, 'Start a terminal')
+  await page.mouse.click(600, 600)
+  await expect(page.getByRole('menu', { name: 'Start a terminal' })).toBeHidden()
+}
+
+async function barControlsAreOneSet(page: Page): Promise<void> {
+  const needsYou = await shapeOf(page, /Needs you/)
+  expect(await shapeOf(page, /^New terminal$/)).toEqual(needsYou)
+  expect(await shapeOf(page, /^Display$/)).toEqual(needsYou)
+}
+
+async function startOnBranchThenScratch(page: Page): Promise<void> {
+  const sessionTabs = page.locator('.tab-bar__tab--session')
+  await homeRegion(page).getByRole('button', { name: 'New terminal' }).click()
+  await page.getByRole('menuitem', { name: `New terminal in ${BRANCH_GROUP}` }).click()
+  // Starting a terminal shows it, so Home gives way to the terminal.
+  await expect(sessionTabs).toHaveCount(2)
+  await openHome(page)
+  await expect(page.getByRole('rowgroup', { name: BRANCH_GROUP }).getByRole('row')).toHaveCount(2)
+  await homeRegion(page).getByRole('button', { name: 'New terminal' }).click()
+  await page.getByRole('menuitem', { name: 'New scratch terminal' }).click()
+  await expect(sessionTabs).toHaveCount(1)
+  await openHome(page)
+  await expect(page.getByRole('rowgroup', { name: 'No branch' }).getByRole('row')).toHaveCount(1)
+}
+
+/** Run in the page: sideways overflow, and the age column's gutter, for the first Ledger row. */
+function ledgerFit(): { overflow: number; ageGap: number } {
+  const home = document.querySelector('.home')!.getBoundingClientRect()
+  const grid = document.querySelector('.ledger') as HTMLElement
+  const age = document.querySelector('.ledger__row .ledger__age')!.getBoundingClientRect()
+  return {
+    overflow: grid.scrollWidth - grid.clientWidth,
+    ageGap: Math.round(home.right - age.right),
+  }
+}
+
+async function ledgerFitsEveryWidth(page: Page): Promise<void> {
   // Tags is the one column off by default; with it on the row is at its widest.
-  await page.getByRole('region', { name: 'Home' }).getByRole('button', { name: 'Display' }).click()
+  await homeRegion(page).getByRole('button', { name: 'Display' }).click()
   await page.getByRole('menuitemcheckbox', { name: 'Tags' }).click()
   await page.mouse.click(500, 700)
-
   for (const width of [1440, 1100, 900, 780]) {
     await page.setViewportSize({ width, height: 800 })
-    const measured = await page.evaluate(() => {
-      const home = document.querySelector('.home')!.getBoundingClientRect()
-      const grid = document.querySelector('.ledger') as HTMLElement
-      const age = document.querySelector('.ledger__row .ledger__age')!.getBoundingClientRect()
-      return {
-        overflow: grid.scrollWidth - grid.clientWidth,
-        ageGap: Math.round(home.right - age.right),
-      }
-    })
+    const measured = await page.evaluate(ledgerFit)
     expect(measured.overflow, `no sideways scroll at ${width}px`).toBeLessThanOrEqual(0)
     expect(measured.ageGap, `gutter at ${width}px`).toBeGreaterThanOrEqual(12)
   }
+}
+
+test.describe('Home controls', () => {
+  let handle: AppHandle
+
+  test.beforeAll(async () => {
+    handle = await launchApp()
+  })
+
+  test.afterAll(() => closeApp(handle))
+
+  test('Home starts terminals, and its dialogs, menus and Ledger stay inside the window', async () => {
+    const { page } = handle
+    await branchWithATerminal(page, e2eTempDir('home-controls-'))
+    await test.step('linking a session says where to connect a tracker when none is', () =>
+      linkDialogNamesWhereToConnect(page))
+    await test.step('the link dialog closes on Escape and on a click outside it', () =>
+      linkDialogClosesOnEscapeAndOutside(page))
+    await test.step('every Home menu opens inside the window, wherever its button sits', () =>
+      everyMenuInsideTheWindow(page))
+    await test.step('Home draws its bar controls as one set', () => barControlsAreOneSet(page))
+    await test.step('a terminal can be started from Home, on a branch or as a scratch', () =>
+      startOnBranchThenScratch(page))
+    await test.step('the Ledger fits its surface at every width, with every column on', () =>
+      ledgerFitsEveryWidth(page))
+  })
 })

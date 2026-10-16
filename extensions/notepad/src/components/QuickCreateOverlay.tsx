@@ -21,8 +21,6 @@ function toFilenameSlug(title: string): string {
 
 type CreateKind = 'note' | 'diagram' | 'folder'
 
-type TitleRef = React.RefObject<HTMLInputElement>
-
 interface TagChipBarProps {
   tags: string[]
   tagInput: string
@@ -42,10 +40,6 @@ interface DraftProps {
 
 interface SaveProps extends DraftProps {
   onSave: () => Promise<void>
-}
-
-interface TitleInputProps extends SaveProps {
-  titleRef: TitleRef
 }
 
 function TagChipBar(props: TagChipBarProps): React.JSX.Element {
@@ -189,12 +183,11 @@ function defaultTagsOf(values: Record<string, unknown>): string[] {
     .filter(Boolean)
 }
 
-/** Focuses the title on open, and starts with the configured default tags. */
-function useOpenDefaults(open: boolean, draft: QuickCreateDraft, titleRef: TitleRef) {
+/** Starts with the configured default tags. */
+function useOpenDefaults(open: boolean, draft: QuickCreateDraft) {
   const { setTags } = draft
   useEffect(() => {
     if (!open) return
-    const t = setTimeout(() => titleRef.current?.focus(), 50)
     window.electronAPI.extension
       .getSettingsValues()
       .then((result) => {
@@ -204,7 +197,6 @@ function useOpenDefaults(open: boolean, draft: QuickCreateDraft, titleRef: Title
       .catch(() => {
         /* ignore */
       })
-    return () => clearTimeout(t)
   }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
 }
 
@@ -224,8 +216,7 @@ export function QuickCreateOverlay(): React.JSX.Element | null {
   const showQuickCreate = useNotesStore((s) => s.showQuickCreate)
   const draft = useQuickCreateDraft()
   const handleSave = saveHandler(draft)
-  const titleRef = useRef<HTMLInputElement>(null)
-  useOpenDefaults(showQuickCreate, draft, titleRef)
+  useOpenDefaults(showQuickCreate, draft)
 
   if (!showQuickCreate) return null
   return (
@@ -236,7 +227,7 @@ export function QuickCreateOverlay(): React.JSX.Element | null {
     >
       <QuickCreateHeader draft={draft} />
       <div className="notepad-quick-create__divider" />
-      <TitleInput titleRef={titleRef} draft={draft} onSave={handleSave} />
+      <TitleInput draft={draft} onSave={handleSave} />
       <div className="notepad-quick-create__divider" />
       {draft.type === 'note' && (
         <div className="notepad-quick-create__body">
@@ -267,10 +258,12 @@ function QuickCreateHeader({ draft }: DraftProps): React.JSX.Element {
   )
 }
 
-function TitleInput({ titleRef, draft, onSave }: TitleInputProps): React.JSX.Element {
+/** Focused as the dialog opens (ModalShell's autoFocus), never later: a late focus() would take
+ * the keyboard back from whatever had it since, such as Quick actions opened over this. */
+function TitleInput({ draft, onSave }: SaveProps): React.JSX.Element {
   return (
     <input
-      ref={titleRef}
+      autoFocus
       className="notepad-quick-create__title-input"
       placeholder="Title"
       value={draft.title}

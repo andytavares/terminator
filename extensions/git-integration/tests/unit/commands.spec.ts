@@ -21,6 +21,8 @@ function buildMockApi() {
   const registrations: { command: CommandContribution; handler: Handler; disposed: boolean }[] = []
   const showToast = vi.fn()
   const showSelf = vi.fn()
+  const raise = vi.fn()
+  const focusSelf = vi.fn()
   const broadcast = vi.fn()
 
   const api = {
@@ -32,11 +34,11 @@ function buildMockApi() {
       }),
       setEnabled: vi.fn(),
     },
-    window: { showSelf, broadcast },
+    window: { showSelf, broadcast, raise, focusSelf },
     notifications: { showToast },
   }
 
-  return { api, registrations, showToast, showSelf, broadcast }
+  return { api, registrations, showToast, showSelf, broadcast, raise, focusSelf }
 }
 
 function ctx(repoRoot: string | null): CommandContext {
@@ -178,6 +180,17 @@ describe('registerQuickActionCommands (continued)', () => {
 
       expect(showSelf).toHaveBeenCalledWith('project')
       expect(broadcast).toHaveBeenCalledWith('git:focus-commit-message', { repoRoot: '/repo' })
+    })
+
+    it('raises the window and puts the keyboard in its own view, as Task Vault does', () => {
+      const { api, registrations, raise, focusSelf } = buildMockApi()
+      registerQuickActionCommands(api as never)
+
+      const commit = registrations.find((r) => r.command.id === 'commit')!
+      commit.handler(ctx('/repo'))
+
+      expect(raise).toHaveBeenCalledTimes(1)
+      expect(focusSelf).toHaveBeenCalledWith('project')
     })
 
     it('does nothing when ctx.repoRoot is null', () => {
