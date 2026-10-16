@@ -1,0 +1,22 @@
+tests/e2e/settings-diagnostics.ts
+  s_1770e4e124cf1a::t_c847cc9182ef02 6-49
+  s_1770e4e124cf1a::t_32d09e9a6d0915 1-5,50-60
+tests/e2e/git-settings.spec.ts
+  s_1770e4e124cf1a::t_705078dc20fdf8 6,23-29
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "5a4cf39fcef02dee9d39aaf1e45685289be0dffc",
+  "prompts": {},
+  "sessions": {
+    "s_1770e4e124cf1a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8bf63343-f3d0-4338-98ee-2e52bd4d7695",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
