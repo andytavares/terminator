@@ -11,7 +11,8 @@ const log = makeRendererLogger('quick-actions')
 
 function makePortalComponent(
   ext: Extension,
-  viewParam: string
+  viewParam: string,
+  fitContent = false
 ): ComponentType<{ repoRoot?: string | null }> {
   return function ExtensionPortalComponent({ repoRoot }: { repoRoot?: string | null } = {}) {
     return React.createElement(ExtensionPanelPortal, {
@@ -20,6 +21,7 @@ function makePortalComponent(
       isActive: true,
       repoRoot,
       rendererUrl: ext.rendererUrl,
+      fitContent,
     })
   }
 }
@@ -93,6 +95,23 @@ function registerContributedSidebarPanel(
   })
 }
 
+/** The home section, which sits at the top of Home and sizes to its content. */
+function registerContributedHomeSection(
+  ext: Extension,
+  contributes: Contributes,
+  registry: Registry
+): void {
+  const { homeSection } = contributes
+  if (!homeSection) return
+  const viewParam = homeSection.view ?? 'home'
+  registry.registerHomeSection({
+    id: ext.id,
+    label: homeSection.label,
+    component: makePortalComponent(ext, viewParam, true),
+    view: viewParam,
+  })
+}
+
 /** Window views, and the shortcuts that toggle the extension's sidebar panel. */
 function registerWindowsAndShortcuts(
   ext: Extension,
@@ -122,6 +141,7 @@ export function registerWebviewExtension(ext: Extension, registry: Registry): vo
   registerFullTabs(ext, ext.contributes, registry)
   registerContributedProjectTab(ext, ext.contributes, registry)
   registerContributedSidebarPanel(ext, ext.contributes, registry)
+  registerContributedHomeSection(ext, ext.contributes, registry)
   registerWindowsAndShortcuts(ext, ext.contributes, registry)
 }
 

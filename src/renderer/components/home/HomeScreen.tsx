@@ -53,6 +53,7 @@ export function HomeScreen({ onOpenQuickActions }: HomeScreenProps = {}): JSX.El
     <section className="home" aria-label="Home">
       <HomeBar {...{ openCount, prefs, update, filters, onOpenQuickActions }} />
       <div className="home__body">
+        <ContributedHomeSections />
         {openCount === 0 && <NothingOpen />}
         {facts.length > 0 && filters.matches === 0 ? (
           <NoMatches onClear={filters.clear} />
@@ -68,6 +69,21 @@ export function HomeScreen({ onOpenQuickActions }: HomeScreenProps = {}): JSX.El
       </div>
       {linking !== null && <SessionLinkDialog facts={linking} onClose={() => setLinking(null)} />}
     </section>
+  )
+}
+
+/** Each extension's homeSection, in registration order, above the sessions. */
+function ContributedHomeSections(): JSX.Element | null {
+  const homeSections = useExtensionRegistry((s) => s.homeSections)
+  if (homeSections.size === 0) return null
+  return (
+    <>
+      {[...homeSections.values()].map((section) => (
+        <section key={section.id} aria-label={section.label} className="home__section">
+          <section.component />
+        </section>
+      ))}
+    </>
   )
 }
 

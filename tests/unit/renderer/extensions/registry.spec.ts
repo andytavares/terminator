@@ -178,6 +178,36 @@ describe('useExtensionRegistry — registerWindowView', () => {
   })
 })
 
+describe('useExtensionRegistry — registerHomeSection', () => {
+  setUpUseExtensionRegistry()
+
+  it('adds the section to homeSections', () => {
+    const section = {
+      id: 'com.test.ext',
+      label: 'Pull requests',
+      view: 'home',
+      component: NullComponent,
+    }
+    useExtensionRegistry.getState().registerHomeSection(section)
+    expect(useExtensionRegistry.getState().homeSections.get('com.test.ext')).toMatchObject({
+      label: 'Pull requests',
+      view: 'home',
+    })
+  })
+
+  it('returns a dispose function that removes the section', () => {
+    const section = {
+      id: 'com.test.ext',
+      label: 'Pull requests',
+      view: 'home',
+      component: NullComponent,
+    }
+    const dispose = useExtensionRegistry.getState().registerHomeSection(section)
+    dispose()
+    expect(useExtensionRegistry.getState().homeSections.has('com.test.ext')).toBe(false)
+  })
+})
+
 describe('useExtensionRegistry — registerGlobalTab', () => {
   setUpUseExtensionRegistry()
 

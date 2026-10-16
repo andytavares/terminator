@@ -37,6 +37,14 @@ interface SidebarPanelRegistration {
   view?: string
 }
 
+export interface HomeSectionRegistration {
+  id: string
+  label: string
+  component: ComponentType<{ repoRoot?: string | null }>
+  /** Resolved manifest `view` param, used to tell this surface from the extension's others. */
+  view?: string
+}
+
 export interface ProjectTabRegistration {
   id: string
   label: string
@@ -65,6 +73,7 @@ interface CommandRegistration {
 interface ExtensionRegistry {
   sidebarPanels: Map<string, SidebarPanelRegistration>
   projectTabs: Map<string, ProjectTabRegistration>
+  homeSections: Map<string, HomeSectionRegistration>
   globalTabs: Map<string, GlobalTabRegistration>
   workspaceTabs: Map<string, WorkspaceTabRegistration>
   windowViews: Map<string, ComponentType<{ repoRoot: string | null }>>
@@ -82,6 +91,7 @@ interface ExtensionRegistry {
 
   registerSidebarPanel(panel: SidebarPanelRegistration): () => void
   registerProjectTab(tab: ProjectTabRegistration): () => void
+  registerHomeSection(section: HomeSectionRegistration): () => void
   registerGlobalTab(tab: GlobalTabRegistration): () => void
   registerWorkspaceTab(tab: WorkspaceTabRegistration): () => void
   registerWindowView(id: string, component: ComponentType<{ repoRoot: string | null }>): void
@@ -127,6 +137,12 @@ function toggledIn(ids: Set<string>, id: string): Set<string> {
   if (next.has(id)) next.delete(id)
   else next.add(id)
   return next
+}
+
+/** A home section sits on Home itself; nothing tracks it as active, so removing it is enough. */
+function registerHomeSection(set: SetRegistry, section: HomeSectionRegistration): () => void {
+  set((s) => ({ homeSections: withEntry(s.homeSections, section.id, section) }))
+  return () => set((s) => ({ homeSections: withoutEntry(s.homeSections, section.id) }))
 }
 
 function registerSidebarPanel(set: SetRegistry, panel: SidebarPanelRegistration): () => void {
@@ -180,6 +196,7 @@ function contributionSlice(
   set: SetRegistry
 ): Slice<
   | 'registerSidebarPanel'
+  | 'registerHomeSection'
   | 'registerWindowView'
   | 'registerKeyboardShortcut'
   | 'registerOverlay'
@@ -187,6 +204,7 @@ function contributionSlice(
 > {
   return {
     registerSidebarPanel: (panel) => registerSidebarPanel(set, panel),
+    registerHomeSection: (section) => registerHomeSection(set, section),
     registerWindowView: (id, component) =>
       set((s) => ({ windowViews: withEntry(s.windowViews, id, component) })),
     registerKeyboardShortcut(shortcut) {
@@ -311,6 +329,7 @@ function pendingNavigationSlice(
 export const useExtensionRegistry = create<ExtensionRegistry>((set, get) => ({
   sidebarPanels: new Map(),
   projectTabs: new Map(),
+  homeSections: new Map(),
   globalTabs: new Map(),
   workspaceTabs: new Map(),
   windowViews: new Map(),

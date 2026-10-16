@@ -154,6 +154,7 @@ function createFrameShim(): FrameShim {
   const link = createFrameLink()
   const keydown = createFrameKeydown(link.post)
   installFrameApi(link, keydown.noteModalDepth)
+  reportContentHeight()
   return {
     receiveWindowMessage(event: MessageEvent): void {
       if (event.source !== window.parent) return
@@ -217,6 +218,21 @@ function createFrameKeydown(post: (message: FrameRequest) => void) {
       if (escapeDetector.register(performance.now())) post({ type: 'request-exit' })
     },
   }
+}
+
+// fit=content (ExtensionPanelPortal's fitContent prop) asks the frame to size its host wrapper:
+// the shim posts each content height to the embedding window. The frame is cross-origin, so the
+// host's origin comes from the referrer (the embedding document), never '*'.
+function reportContentHeight(): void {
+  if (new URLSearchParams(window.location.search).get('fit') !== 'content') return
+  const parentOrigin = new URL(document.referrer).origin
+  const observer = new ResizeObserver(() => {
+    window.parent.postMessage(
+      { type: 'terminator:frame-height', height: document.documentElement.scrollHeight },
+      parentOrigin
+    )
+  })
+  observer.observe(document.documentElement)
 }
 
 function keyPressOf(event: KeyboardEvent) {

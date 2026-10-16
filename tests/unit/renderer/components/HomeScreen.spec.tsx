@@ -29,6 +29,29 @@ vi.mock('../../../../src/renderer/terminal/navigate-to-session', () => ({
   revealSession: navigate,
 }))
 
+interface FakePortalProps {
+  extensionId: string
+  viewParam?: string
+  fitContent?: boolean
+}
+
+/** Stands in for the real frame portal, which mounts an extension iframe. */
+function FakeExtensionPortal(props: FakePortalProps): JSX.Element {
+  return (
+    <div
+      data-testid={`portal-${props.extensionId}`}
+      data-view-param={props.viewParam}
+      data-fit-content={String(Boolean(props.fitContent))}
+    />
+  )
+}
+
+function fakePortalModule(): { ExtensionPanelPortal: typeof FakeExtensionPortal } {
+  return { ExtensionPanelPortal: FakeExtensionPortal }
+}
+
+vi.mock('../../../../src/renderer/components/ExtensionPanelPortal', fakePortalModule)
+
 vi.mock('../../../../src/renderer/components/session/SessionLinkDialog', () => ({
   SessionLinkDialog: ({ facts, onClose }: { facts: { name: string }; onClose: () => void }) => (
     <div role="dialog" aria-label={`Link ${facts.name}`}>
@@ -40,6 +63,7 @@ vi.mock('../../../../src/renderer/components/session/SessionLinkDialog', () => (
 }))
 
 import { HomeScreen } from '../../../../src/renderer/components/home/HomeScreen'
+import { ExtensionPanelPortal } from '../../../../src/renderer/components/ExtensionPanelPortal'
 import { useSessionRecordsStore } from '../../../../src/renderer/stores/session-records.store'
 import { useIntegrationsStore } from '../../../../src/renderer/stores/integrations.store'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
@@ -167,6 +191,53 @@ describe('HomeScreen — says when nothing matches and clears the filter on requ
     render(<HomeScreen />)
     fireEvent.click(screen.getAllByRole('button', { name: /^Close / })[0])
     expect(closeSession).toHaveBeenCalled()
+  })
+})
+
+/** A registered home section whose component is the (mocked) portal for `id`. */
+function registerSection(id: string, label: string): void {
+  const SectionPortal = (): JSX.Element =>
+    React.createElement(ExtensionPanelPortal, {
+      extensionId: id,
+      viewParam: 'home',
+      isActive: true,
+      fitContent: true,
+    })
+  useExtensionRegistry.getState().registerHomeSection({
+    id,
+    label,
+    view: 'home',
+    component: SectionPortal,
+  })
+}
+
+describe('HomeScreen — contributed home sections', () => {
+  it('renders one labelled section per registration, above the sessions list', () => {
+    registerSection('com.test.one', 'Pull requests')
+    registerSection('com.test.two', 'Deployments')
+    const { container } = render(<HomeScreen />)
+    const body = container.querySelector('.home__body') as HTMLElement
+    expect(within(body).getByRole('region', { name: 'Pull requests' })).toBeTruthy()
+    expect(within(body).getByRole('region', { name: 'Deployments' })).toBeTruthy()
+    expect(screen.getByTestId('portal-com.test.one').dataset.fitContent).toBe('true')
+    const grid = screen.getByRole('grid', { name: 'Sessions' })
+    expect(
+      screen.getByRole('region', { name: 'Pull requests' }).compareDocumentPosition(grid) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy()
+  })
+
+  it('renders no section when nothing is registered', () => {
+    const { container } = render(<HomeScreen />)
+    expect(container.querySelector('[data-fit-content]')).toBeNull()
+  })
+
+  it('keeps the empty state below the sections', () => {
+    state.facts = []
+    registerSection('com.test.one', 'Pull requests')
+    render(<HomeScreen />)
+    expect(screen.getByRole('region', { name: 'Pull requests' })).toBeTruthy()
+    expect(screen.getByText('No terminals are open')).toBeTruthy()
   })
 })
 
