@@ -1,0 +1,27 @@
+docs/ARCHITECTURE.md
+  s_1770e4e124cf1a::t_90d1f9f9116995 266
+extensions/task-vault/CLAUDE.md
+  s_1770e4e124cf1a::t_8ce036f4062845 50
+packages/extension-ui/README.md
+  s_1770e4e124cf1a::t_9c591e56448b73 42
+tests/e2e/contrast-probe.ts
+  s_1770e4e124cf1a::t_e0488df61a1225 4-6
+tests/e2e/global-setup.ts
+  s_1770e4e124cf1a::t_bc4e55c5d621a5 6-8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "fc23525a1ac0e0cf11dc651d4966212545361d93",
+  "prompts": {},
+  "sessions": {
+    "s_1770e4e124cf1a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8bf63343-f3d0-4338-98ee-2e52bd4d7695",
+        "model": "unknown"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
