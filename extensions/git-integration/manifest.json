@@ -21,10 +21,22 @@
       "icon": "git-pull-request",
       "view": "reviews"
     },
-    "windowViews": [{ "id": "pr-review", "view": "pr-review" }],
+    "windowViews": [
+      {
+        "id": "pr-review",
+        "view": "pr-review"
+      }
+    ],
     "quickActions": {
-      "group": { "mnemonic": "g", "label": "Git" }
+      "group": {
+        "mnemonic": "g",
+        "label": "Git"
+      }
     },
-    "shellRoots": ["terminator.git-integration.review.cloneFolder"]
+    "shellRoots": ["terminator.git-integration.review.cloneFolder"],
+    "homeSection": {
+      "label": "Contributions",
+      "view": "home"
+    }
   }
 }

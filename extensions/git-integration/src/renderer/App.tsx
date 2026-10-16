@@ -12,6 +12,11 @@ const PrReviewTab = lazy(() =>
 const ReviewDashboard = lazy(() =>
   import('../components/pr-review/ReviewDashboard').then((m) => ({ default: m.ReviewDashboard }))
 )
+const ContributionsSection = lazy(() =>
+  import('../components/contributions/ContributionsSection').then((m) => ({
+    default: m.ContributionsSection,
+  }))
+)
 
 function getSearchParam(key: string): string | null {
   return new URLSearchParams(window.location.search).get(key)
@@ -39,6 +44,9 @@ function ViewForPage(): JSX.Element {
 
   if (view === 'reviews') {
     return <ReviewDashboard />
+  }
+  if (view === 'home') {
+    return <ContributionsSection />
   }
   if (view === 'code-reviews' || view === 'pr-review') {
     return <PrReviewTab repoRoot={repoRoot} />
