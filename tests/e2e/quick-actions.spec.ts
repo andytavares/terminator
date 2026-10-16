@@ -143,18 +143,26 @@ async function slashSearchFindsPush(handle: AppHandle): Promise<void> {
   await expect(dialog(page)).toBeHidden()
 }
 
+/** Opens the panel, runs the row `rowKey` of the group `groupKey` (listed as `groupLabel`), and waits
+ * for the panel to close. The mnemonic listener is rebound on every mode change (QuickActions.tsx),
+ * so the row's key goes only once the group's listbox has rendered. Generous on closing: the first
+ * time an extension's view is created it can cold-load, and closing goes through the same
+ * main-process path. */
+async function runGroupRow(
+  page: Page,
+  group: { key: string; label: string },
+  rowKey: string
+): Promise<void> {
+  await openPanel(page)
+  await page.keyboard.press(group.key)
+  await expect(page.getByRole('listbox', { name: group.label })).toBeVisible()
+  await page.keyboard.press(rowKey)
+  await expect(dialog(page)).toBeHidden({ timeout: 15000 })
+}
+
 // AC6 (part): Notepad's manifest command.
 async function leaderNNOpensNotepadQuickCreate(handle: AppHandle): Promise<void> {
-  const { page } = handle
-  await openPanel(page)
-  await page.keyboard.press('n')
-  // The mnemonic listener is rebound on every mode change (QuickActions.tsx), so a key sent
-  // before the group's listbox renders reaches the stale closure and does nothing.
-  await expect(page.getByRole('listbox', { name: 'Notes' })).toBeVisible()
-  await page.keyboard.press('n')
-  // Generous: the first time an extension's view is created it can cold-load,
-  // and closing the panel goes through the same main-process path.
-  await expect(dialog(page)).toBeHidden({ timeout: 15000 })
+  await runGroupRow(handle.page, { key: 'n', label: 'Notes' }, 'n')
   await expect
     .poll(
       async () =>
@@ -170,16 +178,7 @@ async function leaderNNOpensNotepadQuickCreate(handle: AppHandle): Promise<void>
 
 // AC6 (part): Task Vault's manifest command.
 async function leaderVCOpensTaskVaultCapture(handle: AppHandle): Promise<void> {
-  const { page } = handle
-  await openPanel(page)
-  await page.keyboard.press('v')
-  // See the Notepad test above: the row's mnemonic goes only once the group's listbox has
-  // rendered, or 'c' is seen by the stale "top mode" keydown closure and does nothing.
-  await expect(page.getByRole('listbox', { name: 'Task Vault' })).toBeVisible()
-  await page.keyboard.press('c')
-  // Generous: the first time an extension's view is created it can cold-load,
-  // and closing the panel goes through the same main-process path.
-  await expect(dialog(page)).toBeHidden({ timeout: 15000 })
+  await runGroupRow(handle.page, { key: 'v', label: 'Task Vault' }, 'c')
   await expect
     .poll(
       async () => inView<string>(handle, 'task-vault', `document.body.innerText`).catch(() => ''),
