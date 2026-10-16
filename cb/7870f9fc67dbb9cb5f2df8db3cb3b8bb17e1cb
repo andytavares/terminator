@@ -1,0 +1,24 @@
+tests/e2e/session-surfaces.spec.ts
+  s_1770e4e124cf1a::t_bccb894234a918 11-13
+  s_1770e4e124cf1a::t_55083d2971f96d 19,54,77,82,84,111-113,122,124-125,128,139-202,204
+  s_1770e4e124cf1a::t_a341f753fb2317 10,14-15,17-18,33,55-58,203,205-209
+tests/e2e/monitor-wall.spec.ts
+  s_1770e4e124cf1a::t_fd6b27aa861054 2,11,13,19-20,23-25,27-30,32-37,39-45,47,52,54,57,66-68,71-87,89-93,95-103,105-118
+  s_1770e4e124cf1a::t_cff29294522eb3 119
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "cb7870f9fc67dbb9cb5f2df8db3cb3b8bb17e1cb",
+  "prompts": {},
+  "sessions": {
+    "s_1770e4e124cf1a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8bf63343-f3d0-4338-98ee-2e52bd4d7695",
+        "model": "unknown"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
