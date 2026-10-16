@@ -1,0 +1,35 @@
+docs/ARCHITECTURE.md
+  s_1770e4e124cf1a::t_51432e31766aa4 162
+docs/adr/114-extension-views-are-frames-in-the-window.md
+  s_1770e4e124cf1a::t_d31104b325b722 22,28
+src/extension-frame/frame-shim.ts
+  s_1770e4e124cf1a::t_c2ca1d0433f50e 188-189,206-211
+src/main/extensions/frame-bridge.ts
+  s_1770e4e124cf1a::t_df791d08b87420 34,125
+src/main/index.ts
+  s_1770e4e124cf1a::t_c7845a3119a7f9 76
+src/shared/frame-wire.ts
+  s_1770e4e124cf1a::t_8ad8b4e471253f 12
+tests/e2e/helpers.ts
+  s_1770e4e124cf1a::t_f19a58990b4dca 478
+tests/unit/extension-frame/frame-shim.spec.ts
+  s_1770e4e124cf1a::t_6e1ad367f1c42b 209-216,218,221,224-235
+tests/unit/main/extensions/frame-bridge.spec.ts
+  s_1770e4e124cf1a::t_d03fac7d86083c 93,103,293-300
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "6efa711e176f77b76386d416e474461cd8a374bd",
+  "prompts": {},
+  "sessions": {
+    "s_1770e4e124cf1a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8bf63343-f3d0-4338-98ee-2e52bd4d7695",
+        "model": "unknown"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
