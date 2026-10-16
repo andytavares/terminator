@@ -1,0 +1,20 @@
+tests/e2e/issue-trackers.spec.ts
+  s_1770e4e124cf1a::t_e4db56897732a9 5-12,15,20-21,28,126-128,138-140,142-145,151,155,157,159-161,170-173,175,178,192-198,200,206-207,209,216,218-264,270-272,278-318
+  s_1770e4e124cf1a::t_fe9a5cb5b493d0 319-325
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "60ab498b277abc55740980962d4e6fafb61768e5",
+  "prompts": {},
+  "sessions": {
+    "s_1770e4e124cf1a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8bf63343-f3d0-4338-98ee-2e52bd4d7695",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
