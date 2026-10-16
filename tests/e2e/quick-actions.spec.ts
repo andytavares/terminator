@@ -150,6 +150,7 @@ async function leaderNNOpensNotepadQuickCreate(handle: AppHandle): Promise<void>
   await page.keyboard.press('n')
   // The mnemonic listener is rebound on every mode change (QuickActions.tsx), so a key sent
   // before the group's listbox renders reaches the stale closure and does nothing.
+  await expect(page.getByRole('listbox', { name: 'Notes' })).toBeVisible()
   await page.keyboard.press('n')
   // Generous: the first time an extension's view is created it can cold-load,
   // and closing the panel goes through the same main-process path.
@@ -172,9 +173,9 @@ async function leaderVCOpensTaskVaultCapture(handle: AppHandle): Promise<void> {
   const { page } = handle
   await openPanel(page)
   await page.keyboard.press('v')
-  // See the Notepad test above: wait for the group's listbox to render
-  // before sending the row's mnemonic, or 'c' can be seen by the stale
-  // "top mode" keydown closure and do nothing.
+  // See the Notepad test above: the row's mnemonic goes only once the group's listbox has
+  // rendered, or 'c' is seen by the stale "top mode" keydown closure and does nothing.
+  await expect(page.getByRole('listbox', { name: 'Task Vault' })).toBeVisible()
   await page.keyboard.press('c')
   // Generous: the first time an extension's view is created it can cold-load,
   // and closing the panel goes through the same main-process path.
