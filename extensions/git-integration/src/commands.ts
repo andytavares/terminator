@@ -25,6 +25,8 @@ let pendingTimer: ReturnType<typeof setTimeout> | null = null
  *  as Notepad and Foundry do for the same race. */
 function requestOfView(api: ExtensionAPI, request: ViewRequest): void {
   api.window.showSelf('project')
+  api.window.raise()
+  api.window.focusSelf('project')
   api.window.broadcast(VIEW_REQUEST_CHANNEL[request.kind], { repoRoot: request.repoRoot })
   pendingRequest = request
   if (pendingTimer !== null) clearTimeout(pendingTimer)
