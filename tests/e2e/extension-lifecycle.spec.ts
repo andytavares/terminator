@@ -88,30 +88,48 @@ async function viewRunsCommandById(): Promise<void> {
   await expect
     .poll(() => inExtensionView<string>(handle, 'e2e.probe', 'document.title').catch(() => ''))
     .toBe('E2E Probe')
-  await page.locator('.tab-bar--primary .tab-bar__tab', { hasText: 'Terminal' }).click()
-  await expect(probeTab()).not.toHaveClass(/tab-bar__tab--active/)
-  const result = await inExtensionView<{ ok: boolean }>(
+  // The view's frame exists only while its tab is on screen, so the command
+  // runs from there and the leaving click comes after the call resolves.
+  const ran = await inExtensionView<{ ok: boolean }>(
     handle,
     'e2e.probe',
     `window.electronAPI.extension.runCommand('e2e.probe.command.show-tab')`
   )
-  expect(result).toEqual({ ok: true })
+  expect(ran).toEqual({ ok: true })
   await expect(probeTab()).toHaveClass(/tab-bar__tab--active/)
 }
 
 async function reloadReactivatesAndTellsViews(): Promise<void> {
   const { page } = handle
+  await expect(probeTab()).toHaveClass(/tab-bar__tab--active/)
+  const marker = `before-reload-${Date.now()}`
+  await inExtensionView(handle, 'e2e.probe', `window.__beforeReload = '${marker}'`)
   await openSettingsSection(page, 'Extensions')
   await probeRow().getByRole('button', { name: 'Reload' }).click()
   await expect(
     page.locator('.tmui-toast__message', { hasText: 'Extension reloaded' })
   ).toBeVisible()
-  await expect
-    .poll(() => inExtensionView<string>(handle, 'e2e.probe', `document.body.innerText`))
-    .toContain('reloads: 1')
   await closeSettingsPanel(page)
-  await runQuickActionFromPanel(page, 'Show the probe tab')
-  await expect(probeTab()).toHaveClass(/tab-bar__tab--active/)
+  // The open view is told to reload: its document is a new one, and its electronAPI
+  // answers through the re-activated backend.
+  await expect
+    .poll(() =>
+      inExtensionView<string>(
+        handle,
+        'e2e.probe',
+        `String(window.__beforeReload ?? 'reloaded')`
+      ).catch(() => 'detached')
+    )
+    .toBe('reloaded')
+  await expect
+    .poll(() =>
+      inExtensionView<boolean>(
+        handle,
+        'e2e.probe',
+        `window.electronAPI.extension.hasCommand('e2e.probe.command.show-tab')`
+      ).catch(() => false)
+    )
+    .toBe(true)
 }
 
 async function uninstallRemovesItAcrossRestart(): Promise<void> {

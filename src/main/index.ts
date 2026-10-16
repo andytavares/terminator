@@ -352,7 +352,9 @@ function registerSessionHandlers(): OutputRelay {
   )
   registerTerminalHandlers(ptyManager, () => mainWindow, terminalRelay)
   registerSettingsHandlers()
-  registerExtensionHandlers(extensionHost, (channel, data) => frameBridge.broadcast(channel, data))
+  registerExtensionHandlers(extensionHost, (channel, data) =>
+    mainWindow?.webContents.send(channel, data)
+  )
   registerExtensionViewChannels()
   registerGitHandlers()
   registerIntegrationsHandlers(() => mainWindow)

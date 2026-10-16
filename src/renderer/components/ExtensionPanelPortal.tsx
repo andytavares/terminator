@@ -142,6 +142,23 @@ function useFrameHandshake(handshake: FrameHandshake): void {
   }, [iframeRef, tokenRef, extensionId, viewParam])
 }
 
+/** A reloaded extension's backend is new, so the frame's port to the old one is dead: the frame
+ * reloads, and its next load asks main for a port to the new backend. */
+function useReloadOnExtensionReload(
+  iframeRef: React.RefObject<HTMLIFrameElement>,
+  extensionId: Props['extensionId'],
+  enabled: boolean
+): void {
+  useEffect(() => {
+    if (!enabled) return
+    return window.electronAPI.extensionEvents.onExtensionRendererReload((reloaded) => {
+      const iframe = iframeRef.current
+      // The frame is cross-origin, so its own `location` is out of reach; setting `src` again reloads it.
+      if (reloaded === extensionId && iframe) iframe.setAttribute('src', iframe.src)
+    })
+  }, [iframeRef, extensionId, enabled])
+}
+
 /** Wires the desktop port handshake: asks main on each frame load, forwards the reply. */
 function useFramePort(
   props: Props,
@@ -150,6 +167,7 @@ function useFramePort(
 ): void {
   const tokenRef = useRef<string | null>(null)
   useFramePortForward(iframeRef, props.extensionId, tokenRef)
+  useReloadOnExtensionReload(iframeRef, props.extensionId, isDesktop())
   useFrameHandshake({
     iframeRef,
     tokenRef,

@@ -8,6 +8,7 @@ import { useExtensionRegistry } from '../../../../src/renderer/extensions/regist
 import { useShownExtensionViews } from '../../../../src/renderer/stores/shown-extension-views.store'
 
 const mockOpenFramePort = vi.fn()
+let reloadHandler: ((extensionId: string) => void) | null = null
 const mockUpdatePanelBounds = vi.fn()
 const mockExitExtensionToTerminal = vi.fn()
 
@@ -23,6 +24,14 @@ function stubDesktopApi(): void {
       extension: {
         openFramePort: mockOpenFramePort,
         updatePanelBounds: mockUpdatePanelBounds,
+      },
+      extensionEvents: {
+        onExtensionRendererReload: (handler: (extensionId: string) => void) => {
+          reloadHandler = handler
+          return () => {
+            reloadHandler = null
+          }
+        },
       },
     },
     configurable: true,
@@ -184,6 +193,36 @@ describe('ExtensionPanelPortal — desktop port forwarding', () => {
     framePortMessage('stale-token')
     framePortMessage(lastOpenFrameRequest().frameToken, null)
     expect(postMessage).not.toHaveBeenCalled()
+  })
+})
+
+describe('ExtensionPanelPortal — an extension reload', () => {
+  beforeEach(stubDesktopApi)
+
+  function loadedFrame(extensionId = 'com.test.ext') {
+    const { container } = renderPortal({ extensionId })
+    loadFrame(container)
+    const iframe = firstIframe(container)
+    const assigned = vi.spyOn(iframe, 'setAttribute')
+    return assigned
+  }
+
+  it('reloads the frame of the extension that reloaded, so it gets a port to its new backend', () => {
+    const assigned = loadedFrame()
+    act(() => reloadHandler?.('com.test.ext'))
+    expect(assigned).toHaveBeenCalledWith('src', 'ext://com.test.ext/index.html?view=main')
+  })
+
+  it("leaves another extension's frame alone", () => {
+    const assigned = loadedFrame()
+    act(() => reloadHandler?.('com.other.ext'))
+    expect(assigned).not.toHaveBeenCalled()
+  })
+
+  it('stops listening when the frame unmounts', () => {
+    const { unmount } = renderPortal()
+    unmount()
+    expect(reloadHandler).toBeNull()
   })
 })
 
