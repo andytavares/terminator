@@ -9,7 +9,12 @@ import { basename, join } from 'node:path'
 const probe = (where: string) => `(() => {
   if (window.settingsDiag) return
   const log = (window.settingsDiag = [])
-  const note = (line) => log.push(Date.now() + ' ${where}: ' + line + ' [hasFocus=' + document.hasFocus() + ']')
+  let lastFrame = performance.now()
+  const tick = () => { lastFrame = performance.now(); requestAnimationFrame(tick) }
+  requestAnimationFrame(tick)
+  const note = (line) => log.push(Date.now() + ' ${where}: ' + line + ' [hasFocus=' + document.hasFocus() +
+    ' vis=' + document.visibilityState + ' sinceFrame=' + Math.round(performance.now() - lastFrame) + 'ms]')
+  document.addEventListener('visibilitychange', () => note('visibilitychange'))
   const describe = (el) =>
     el && el.tagName ? el.tagName + (el.className ? '.' + String(el.className).split(' ')[0] : '') : String(el)
   const isSettings = (node) => node instanceof Element && node.matches('.settings-panel')
@@ -41,6 +46,11 @@ export async function installSettingsDiagnostics(
   page.on('framenavigated', (frame) => {
     if (frame.url().startsWith('ext://')) installInFrame(frame).catch(() => undefined)
   })
+  await installInMain(app)
+}
+
+/** Main's sends and window events, written into the page's log. */
+async function installInMain(app: ElectronApplication): Promise<void> {
   await app.evaluate(({ BrowserWindow }) => {
     const win = BrowserWindow.getAllWindows()[0]
     if (!win) return
@@ -57,8 +67,12 @@ export async function installSettingsDiagnostics(
       }
       return send(channel, ...args)
     }
-    win.on('focus', () => note('window focus'))
-    win.on('blur', () => note('window blur'))
+    for (const event of ['focus', 'blur', 'show', 'hide', 'minimize', 'restore'] as const) {
+      win.on(event as 'focus', () =>
+        note(`window ${event} (visible=${win.isVisible()} minimized=${win.isMinimized()})`)
+      )
+    }
+    note(`window at install (visible=${win.isVisible()} focused=${win.isFocused()})`)
   })
 }
 
