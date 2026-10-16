@@ -206,17 +206,31 @@ describe('frame-shim keyboard gestures', () => {
     pressFrameKey('Escape')
     expect(port.posted).not.toContainEqual({ type: 'request-exit' })
   })
+})
 
+/** Presses `key` on the frame's page and returns the event, to read whether it was swallowed. */
+function pressShortcut(key: string, init: KeyboardEventInit = {}): KeyboardEvent {
+  const event = new KeyboardEvent('keydown', { key, cancelable: true, bubbles: true, ...init })
+  document.body.dispatchEvent(event)
+  return event
+}
+
+describe('frame-shim app shortcuts', () => {
   it('posts quick-actions-open on Cmd+P and swallows the key', async () => {
     const { port } = await connectedFrame()
-    const event = new KeyboardEvent('keydown', {
-      key: 'p',
-      metaKey: true,
-      cancelable: true,
-      bubbles: true,
-    })
-    document.body.dispatchEvent(event)
-    expect(event.defaultPrevented).toBe(true)
+    expect(pressShortcut('p', { metaKey: true }).defaultPrevented).toBe(true)
     expect(port.posted).toContainEqual({ type: 'quick-actions-open' })
+  })
+
+  it('posts settings-open on Cmd+, and swallows the key', async () => {
+    const { port } = await connectedFrame()
+    expect(pressShortcut(',', { metaKey: true }).defaultPrevented).toBe(true)
+    expect(port.posted).toContainEqual({ type: 'settings-open' })
+  })
+
+  it('leaves a comma typed without the modifier to the frame', async () => {
+    const { port } = await connectedFrame()
+    expect(pressShortcut(',').defaultPrevented).toBe(false)
+    expect(port.posted).not.toContainEqual({ type: 'settings-open' })
   })
 })

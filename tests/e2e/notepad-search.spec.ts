@@ -119,8 +119,6 @@ test('the remote API lists, renames and deletes tags', async () => {
 test('Re-initialise database in Settings keeps the notes', async () => {
   const { page } = handle
   await page.bringToFront()
-  // Focus may sit in the notepad's frame, where the host page's shortcut is not heard.
-  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
   await page.keyboard.press('ControlOrMeta+,')
   await page.locator('.settings-panel__nav-item').filter({ hasText: 'Extensions' }).click()
   const row = page.locator('.extension-item-wrapper').filter({

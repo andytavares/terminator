@@ -9,6 +9,7 @@ export type FrameRequest =
   | { type: 'subscribe'; channel: string }
   | { type: 'request-exit' }
   | { type: 'quick-actions-open' }
+  | { type: 'settings-open' }
 
 /** What main sends a frame. */
 export type FrameReply =

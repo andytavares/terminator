@@ -90,6 +90,7 @@ function makeCallbacks() {
     sendRegistry: new Map<string, IpcSendHandler>(),
     onExitRequest: vi.fn(),
     onQuickActionsOpen: vi.fn(),
+    onSettingsOpen: vi.fn(),
   }
 }
 
@@ -99,6 +100,7 @@ function makeBridge(callbacks: ReturnType<typeof makeCallbacks>): FrameBridge {
     sendRegistry: callbacks.sendRegistry,
     onExitRequest: callbacks.onExitRequest,
     onQuickActionsOpen: callbacks.onQuickActionsOpen,
+    onSettingsOpen: callbacks.onSettingsOpen,
   })
 }
 
@@ -287,6 +289,14 @@ describe('FrameBridge — exit and quick actions', () => {
     frame.post({ type: 'quick-actions-open' })
     await portTurn()
     expect(rig.spies().onQuickActionsOpen).toHaveBeenCalled()
+  })
+
+  it('settings-open calls onSettingsOpen, not onQuickActionsOpen', async () => {
+    const frame = rig.open('ext.a', 'main')
+    frame.post({ type: 'settings-open' })
+    await portTurn()
+    expect(rig.spies().onSettingsOpen).toHaveBeenCalled()
+    expect(rig.spies().onQuickActionsOpen).not.toHaveBeenCalled()
   })
 })
 

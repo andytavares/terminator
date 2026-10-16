@@ -73,6 +73,7 @@ const frameBridge = new FrameBridge({
   sendRegistry: ipcSendRegistry,
   onExitRequest: (surface) => exitExtensionSurface(surface),
   onQuickActionsOpen: () => mainWindow?.webContents.send('quick-actions:open'),
+  onSettingsOpen: () => mainWindow?.webContents.send('menu:open-settings'),
 })
 const ptyManager = new PtyManager()
 // Reads core state the way an extension's API does, for the extension host's snapshot.

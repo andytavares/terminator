@@ -31,6 +31,7 @@ export interface FrameBridgeDeps {
   sendRegistry: Map<string, IpcSendHandler>
   onExitRequest(surface: ExtensionSurface): void
   onQuickActionsOpen(): void
+  onSettingsOpen(): void
 }
 
 interface Frame {
@@ -121,6 +122,7 @@ export class FrameBridge {
     if (message.type === 'send') return this.dispatchSend(frame, message)
     if (message.type === 'subscribe') return void frame.subscriptions.add(message.channel)
     if (message.type === 'request-exit') return this.deps.onExitRequest(frame.surface)
+    if (message.type === 'settings-open') return this.deps.onSettingsOpen()
     this.deps.onQuickActionsOpen()
   }
 

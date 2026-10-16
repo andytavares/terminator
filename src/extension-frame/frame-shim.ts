@@ -185,8 +185,8 @@ function installFrameApi(link: FrameLink, noteModalDepth: (depth: number) => voi
   Object.assign(window, { electronAPI: api as unknown as FrameElectronAPI })
 }
 
-// Escape twice exits the extension; ⌘P/Ctrl+P opens quick actions. In a frame
-// both are keydowns on this document, which main cannot see.
+// Escape twice exits the extension; ⌘P/Ctrl+P opens quick actions and ⌘,/Ctrl+, opens
+// Settings. In a frame all are keydowns on this document, which main cannot see.
 function createFrameKeydown(post: (message: FrameRequest) => void) {
   const escapeDetector = createDoubleEscapeDetector()
   const mac = navigator.platform.startsWith('Mac')
@@ -201,6 +201,12 @@ function createFrameKeydown(post: (message: FrameRequest) => void) {
       if (isQuickActionsLeader(keyPressOf(event), mac)) {
         event.preventDefault()
         post({ type: 'quick-actions-open' })
+        return
+      }
+      // The app's own ⌘, (useKeyboardShortcuts), which the host page cannot hear from here.
+      if ((event.metaKey || event.ctrlKey) && event.key === ',') {
+        event.preventDefault()
+        post({ type: 'settings-open' })
         return
       }
       if (event.key !== 'Escape') return
