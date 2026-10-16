@@ -1,0 +1,19 @@
+tests/e2e/settings-diagnostics.ts
+  s_1770e4e124cf1a::t_e1a2c89488c9ce 12-17,49-53,70-75
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "89203caf533f722a8dccdf96bcfb30a7be15cea4",
+  "prompts": {},
+  "sessions": {
+    "s_1770e4e124cf1a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8bf63343-f3d0-4338-98ee-2e52bd4d7695",
+        "model": "unknown"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
