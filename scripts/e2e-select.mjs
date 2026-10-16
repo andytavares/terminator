@@ -115,6 +115,7 @@ export const CORE_SPECS = [
   'core-ipc.spec.ts',
   'core-quick-actions.spec.ts',
   'design-system-fields.spec.ts',
+  'extension-frame-layering.spec.ts',
   'extension-lifecycle.spec.ts',
   'extension.spec.ts',
   'integrations.spec.ts',

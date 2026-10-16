@@ -23,8 +23,7 @@ export interface BuildApiOptions {
 }
 
 // 'native' and 'remote' serve the app renderer; 'frame' serves an extension in
-// an iframe, exactly the surface src/main/preload-webview.ts hand-writes for
-// the native WebContentsViews it replaces.
+// an iframe: the specs marked `extensionView`.
 function belongsToSurface(spec: ChannelSpec, mode: BuildApiOptions['mode']): boolean {
   if (mode === 'frame') return spec.extensionView === 'shared' || spec.extensionView === 'only'
   if (spec.extensionView === 'only') return false

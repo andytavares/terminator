@@ -134,7 +134,19 @@ function surfaceHandlers(
       const surface = findSurface(surfaces, extensionId, view)
       if (surface) showSurface(surface)
     },
+    'extension:focus-view': (data) => {
+      const { extensionId, viewParam } = data as { extensionId: string; viewParam: string }
+      focusExtensionFrame(extensionId, viewParam)
+    },
   }
+}
+
+/** Gives the keyboard to an extension's frame, as `api.window.focusSelf` asks. */
+function focusExtensionFrame(extensionId: string, viewParam: string): void {
+  const panel = document.querySelector(
+    `[data-extension-panel="${extensionId}"][data-view-param="${viewParam}"]`
+  )
+  panel?.querySelector('iframe')?.focus()
 }
 
 /** Terminals an extension opens, closes or brings into view. */

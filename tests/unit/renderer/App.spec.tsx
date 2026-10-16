@@ -1797,3 +1797,42 @@ describe('App — terminals that fail to start', () => {
     )
   })
 })
+
+function mountExtensionFrame(extensionId: string, viewParam: string): HTMLIFrameElement {
+  const panel = document.createElement('div')
+  panel.setAttribute('data-extension-panel', extensionId)
+  panel.setAttribute('data-view-param', viewParam)
+  const frame = document.createElement('iframe')
+  panel.appendChild(frame)
+  document.body.appendChild(panel)
+  vi.spyOn(frame, 'focus')
+  return frame
+}
+
+describe('App — extension:focus-view', () => {
+  it('focuses the frame of the extension view that asked for focus', () => {
+    const wanted = mountExtensionFrame('terminator.foundry', 'main')
+    const other = mountExtensionFrame('terminator.notepad', 'main')
+    render(<App />)
+    act(() =>
+      main.events.bridge.emit('extension:focus-view', {
+        extensionId: 'terminator.foundry',
+        viewParam: 'main',
+      })
+    )
+    expect(wanted.focus).toHaveBeenCalledTimes(1)
+    expect(other.focus).not.toHaveBeenCalled()
+  })
+
+  it('does nothing when that view has no frame on screen', () => {
+    const other = mountExtensionFrame('terminator.notepad', 'main')
+    render(<App />)
+    act(() =>
+      main.events.bridge.emit('extension:focus-view', {
+        extensionId: 'terminator.foundry',
+        viewParam: 'main',
+      })
+    )
+    expect(other.focus).not.toHaveBeenCalled()
+  })
+})

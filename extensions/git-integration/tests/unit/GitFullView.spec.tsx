@@ -27,11 +27,14 @@ vi.mock('../../src/components/PrDialog', () => ({
   PrDialog: ({
     onClose,
     onCreated,
+    existingPr,
   }: {
     onClose: () => void
     onCreated: (pr: { number: number; url: string; title: string; state: string }) => void
+    existingPr?: { number: number } | null
   }) => (
     <div data-testid="pr-dialog">
+      {existingPr && <span>existing PR #{existingPr.number}</span>}
       <button onClick={onClose}>ClosePrDialog</button>
       <button
         onClick={() =>
@@ -414,6 +417,16 @@ describe('GitFullView — ignores git:focus-commit-message for a different repo'
     await waitFor(() => expect(screen.getByTestId('pr-dialog')).toBeTruthy())
   })
 
+  it('shows the pull request the branch already has when git:open-pr-dialog opens it', async () => {
+    mockGitPrStatus.mockResolvedValue({
+      pr: { number: 7, url: 'http://example.com/pull/7', title: 'Existing', state: 'open' },
+    })
+    await renderView('/repo')
+    channelHandlers.get('git:open-pr-dialog')?.({ repoRoot: '/repo' })
+    await waitFor(() => expect(screen.getByText('existing PR #7')).toBeTruthy())
+    expect(mockGitPrStatus).toHaveBeenCalledWith({ repoRoot: '/repo' })
+  })
+
   it('ignores git:open-pr-dialog for a different repo', async () => {
     await renderView('/repo')
     channelHandlers.get('git:open-pr-dialog')?.({ repoRoot: '/other-repo' })
@@ -421,17 +434,17 @@ describe('GitFullView — ignores git:focus-commit-message for a different repo'
   })
 })
 
-describe('GitFullView — a Commit… or Create PR… run before the view existed', () => {
-  /** Answers git:ui.consume-pending-request with `request`, the rest as beforeEach does. */
-  function leavePendingRequest(request: { kind: string; repoRoot: string } | null) {
-    const answer = mockInvoke.getMockImplementation()!
-    mockInvoke.mockImplementation((channel: string, payload: unknown) =>
-      channel === 'git:ui.consume-pending-request'
-        ? Promise.resolve({ request })
-        : answer(channel, payload)
-    )
-  }
+/** Answers git:ui.consume-pending-request with `request`, the rest as beforeEach does. */
+function leavePendingRequest(request: { kind: string; repoRoot: string } | null) {
+  const answer = mockInvoke.getMockImplementation()!
+  mockInvoke.mockImplementation((channel: string, payload: unknown) =>
+    channel === 'git:ui.consume-pending-request'
+      ? Promise.resolve({ request })
+      : answer(channel, payload)
+  )
+}
 
+describe('GitFullView — a Commit… or Create PR… run before the view existed', () => {
   it('focuses the commit message box for a pending Commit… on this repo', async () => {
     leavePendingRequest({ kind: 'commit', repoRoot: '/repo' })
     await renderView('/repo')
@@ -443,6 +456,17 @@ describe('GitFullView — a Commit… or Create PR… run before the view existe
     leavePendingRequest({ kind: 'pull-request', repoRoot: '/repo' })
     await renderView('/repo')
     await waitFor(() => expect(screen.getByTestId('pr-dialog')).toBeTruthy())
+  })
+})
+
+describe('GitFullView — a pending Create PR… and the pull request a branch has', () => {
+  it('shows the pull request the branch already has for a pending Create PR…', async () => {
+    mockGitPrStatus.mockResolvedValue({
+      pr: { number: 9, url: 'http://example.com/pull/9', title: 'Existing', state: 'open' },
+    })
+    leavePendingRequest({ kind: 'pull-request', repoRoot: '/repo' })
+    await renderView('/repo')
+    await waitFor(() => expect(screen.getByText('existing PR #9')).toBeTruthy())
   })
 
   it("leaves another repository's pending request alone", async () => {

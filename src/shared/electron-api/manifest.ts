@@ -2,7 +2,7 @@
 //
 // Every adapter is built from this manifest:
 //   - src/main/preload.ts        (app renderer, native: ipcRenderer over Electron IPC)
-//   - src/main/preload-webview.ts  (extension views: the specs marked `extensionView`)
+//   - src/extension-frame/frame-shim.ts  (extension frames: the specs marked `extensionView`)
 //   - src/renderer-remote/electron-api-shim.ts  (remote: WebSocket bridge)
 //
 // and so are the renderer's `window.electronAPI` type (./api-type.ts, from each

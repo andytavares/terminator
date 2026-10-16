@@ -7,9 +7,7 @@ import { FRAME_PORT_CHANNEL, FRAME_PORT_MESSAGE } from '../shared/frame-wire.js'
 // implementations that must run in the preload context.
 //
 // Bundling note: the shared manifest/builder are inlined into this entry by the
-// preload build. Do NOT import them from preload-webview.ts as well — two preload
-// entries sharing a module would make Rollup emit a shared chunk, which Electron's
-// sandboxed require cannot resolve.
+// preload build, so the preload stays one file Electron's sandboxed require can load.
 
 // A frame's port reaches the isolated world; the page's own postMessage forwards
 // it to the main world, which hands it to the iframe (Electron message-ports guide).

@@ -185,9 +185,8 @@ function installFrameApi(link: FrameLink, noteModalDepth: (depth: number) => voi
   Object.assign(window, { electronAPI: api as unknown as FrameElectronAPI })
 }
 
-// Escape twice exits the extension; ⌘P/Ctrl+P opens quick actions. Both used
-// to live in preload-webview.ts (Escape) and the host's before-input-event
-// (quick actions); in a frame they are keydowns on this document.
+// Escape twice exits the extension; ⌘P/Ctrl+P opens quick actions. In a frame
+// both are keydowns on this document, which main cannot see.
 function createFrameKeydown(post: (message: FrameRequest) => void) {
   const escapeDetector = createDoubleEscapeDetector()
   const mac = navigator.platform.startsWith('Mac')

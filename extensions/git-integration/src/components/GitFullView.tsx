@@ -301,19 +301,18 @@ function prOf(answer: PrStatusAnswer): PullRequest | null {
 function usePrDialog(repoRoot: string | null) {
   const [showPrDialog, setShowPrDialog] = useState(false)
   const [existingPr, setExistingPr] = useState<PullRequest | null>(null)
-  useBridgeTrigger('git:open-pr-dialog', repoRoot, () => setShowPrDialog(true))
   const handleOpenPr = useCallback(async () => {
     if (!repoRoot) return
     const prResult = (await gitAPI.prStatus(repoRoot)) as PrStatusAnswer
     setExistingPr(prOf(prResult))
     setShowPrDialog(true)
   }, [repoRoot])
+  useBridgeTrigger('git:open-pr-dialog', repoRoot, handleOpenPr)
   const handlePrCreated = useCallback((pr: PullRequest) => {
     setShowPrDialog(false)
     window.dispatchEvent(new CustomEvent('git:pr-created', { detail: { pr } }))
   }, [])
-  const openPrDialog = useCallback(() => setShowPrDialog(true), [])
-  return { showPrDialog, setShowPrDialog, existingPr, handleOpenPr, handlePrCreated, openPrDialog }
+  return { showPrDialog, setShowPrDialog, existingPr, handleOpenPr, handlePrCreated }
 }
 
 type PrDialogState = ReturnType<typeof usePrDialog>
@@ -522,7 +521,7 @@ function useGitFullView(repoRoot: string | null) {
   const flow = useCommitFlow(repoRoot, status?.files.some((f) => f.staged) ?? false)
   const pr = usePrDialog(repoRoot)
   const commitMessageRef = useRef<HTMLTextAreaElement>(null)
-  usePendingViewRequest(repoRoot, { commitMessageRef, openPrDialog: pr.openPrDialog })
+  usePendingViewRequest(repoRoot, { commitMessageRef, openPrDialog: pr.handleOpenPr })
   return {
     ...{ resize, disabled, view, setView, selectedDiff, handleFileSelect },
     ...{ flow, pr, commitMessageRef },

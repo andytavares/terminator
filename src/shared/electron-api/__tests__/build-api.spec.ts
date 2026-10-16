@@ -178,12 +178,6 @@ const HANDLER_CASES = [
     expected: ['p1'],
   },
   {
-    path: 'extensionEvents.onExtensionPanelLoaded',
-    channel: 'extension:panel-loaded',
-    pushed: [{ id: 'ext.a', viewParam: 'main' }],
-    expected: ['ext.a'],
-  },
-  {
     path: 'extensionEvents.onExtensionRendererReload',
     channel: 'extension:renderer-reload',
     pushed: [{ id: 'ext.a' }],
@@ -354,8 +348,8 @@ const FRAME_LOCALS = {
   'extensionBridge.on': vi.fn(),
 }
 
-/** Every path src/main/preload-webview.ts exposes by hand — the frame surface. */
-const PRELOAD_WEBVIEW_PATHS = [
+/** Every path an extension frame's electronAPI exposes, spelled out so a change to it is a decision. */
+const FRAME_API_PATHS = [
   'app.getInfo',
   'db.health',
   'dialog.openDirectory',
@@ -375,7 +369,6 @@ const PRELOAD_WEBVIEW_PATHS = [
   'extensionBridge.invoke',
   'extensionBridge.on',
   'extensionEvents.notifyPanelState',
-  'extensionEvents.onExtensionPanelLoaded',
   'extensionEvents.onExtensionRendererReload',
   'extensionEvents.onMenuOpenSettings',
   'extensionEvents.onTogglePanel',
@@ -437,9 +430,9 @@ function frameBridge() {
 }
 
 describe('buildElectronApi — frame mode', () => {
-  it('exposes exactly the paths preload-webview.ts exposes, and no others', () => {
+  it('exposes exactly the declared frame paths, and no others', () => {
     const { api } = frameBridge()
-    expect(collectMethodPaths(api).sort()).toEqual([...PRELOAD_WEBVIEW_PATHS].sort())
+    expect(collectMethodPaths(api).sort()).toEqual([...FRAME_API_PATHS].sort())
   })
 
   it('routes a shared method through the transport', async () => {
