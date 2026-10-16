@@ -84,7 +84,8 @@ async function askReviewAgent(): Promise<ExtensionView> {
   return view
 }
 
-const panel = (view: Pick<ExtensionView, 'getByRole'>) => view.getByRole('complementary', { name: 'Agent panel' })
+const panel = (view: Pick<ExtensionView, 'getByRole'>) =>
+  view.getByRole('complementary', { name: 'Agent panel' })
 
 test('a running review can be continued in a terminal, then cancelled', async () => {
   const view = await askReviewAgent()
@@ -102,9 +103,10 @@ test('a running review can be continued in a terminal, then cancelled', async ()
     .poll(async () => (await readTerminalRowsIn(screen)).join('\n'), { timeout: 15000 })
     .toContain('claude-stub --resume')
 
-  const reopened = await openCodeReviews(handle, 'Agent Review')
-  await panel(reopened).getByRole('button', { name: 'Cancel' }).click()
-  await expect(panel(reopened)).not.toContainText('Reviewing')
+  const back = await askReviewAgent()
+  await expect(panel(back)).toContainText('Reviewing', { timeout: 15000 })
+  await panel(back).getByRole('button', { name: 'Cancel' }).click()
+  await expect(panel(back)).not.toContainText('Reviewing')
 })
 
 test('a finished review lists its finding, and a dismissed finding stays dismissed', async () => {

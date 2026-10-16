@@ -339,11 +339,12 @@ async function viewListsAndClosesSessions(handle: AppHandle): Promise<void> {
   const closed = await fromView<{ terminatedCount: number }>(handle, 'api.terminal.closeAll()')
   expect(closed.terminatedCount).toBe(listed.length)
   expect(await fromView(handle, 'api.terminal.listSessions()')).toEqual([])
-  // Every tab that was open says its terminal ended.
-  const ended = page.locator('.tab-bar__tab--session', {
-    has: page.locator('.tab-bar__state[aria-label="Exited"]'),
-  })
+  // The Notes global tab replaced the terminal area, unmounting its tab bar;
+  // back on the project, every tab that was open says its terminal ended.
+  await projectGroup(page, 'notebook').click()
+  const ended = page.locator('.tab-bar__tab--session', { hasText: '[exited]' })
   await expect(ended).toHaveCount(open)
+  await expect(ended.locator('.tab-bar__state[aria-label="Exited"]')).toHaveCount(open)
 }
 
 test.describe.serial('cards, terminals and notifications in a plain folder', () => {

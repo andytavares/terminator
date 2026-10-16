@@ -51,7 +51,10 @@ export async function storedNotes(notepad: ExtensionView): Promise<StoredNote[]>
 }
 
 /** The stored note with this title, body included. */
-export async function storedNote(notepad: ExtensionView, title: string): Promise<StoredNote | undefined> {
+export async function storedNote(
+  notepad: ExtensionView,
+  title: string
+): Promise<StoredNote | undefined> {
   const listed = (await storedNotes(notepad)).find((note) => note.title === title)
   if (!listed) return undefined
   const result = await invokeChannel<{ data: StoredNote }>(

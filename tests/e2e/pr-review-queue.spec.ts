@@ -104,7 +104,7 @@ test('a comment in the discussion is posted to the pull request', async () => {
 })
 
 test('a draft is marked ready, and a branch behind main is brought up to date', async () => {
-  const view = await openCodeReviews(handle, 'Review Queue')
+  const view = await openPrOverview('Add subtract')
   await view.getByRole('button', { name: 'Mark as ready' }).click()
   await expect(view.getByRole('heading', { level: 1 })).not.toContainText('Draft')
   expect(stub.pullRequest(1).isDraft).toBe(false)
@@ -115,7 +115,7 @@ test('a draft is marked ready, and a branch behind main is brought up to date', 
 })
 
 test('an opened review stays in progress until it is dismissed', async () => {
-  const view = await openCodeReviews(handle, 'Review Queue')
+  const view = await openPrOverview('Add subtract')
   await view.getByRole('button', { name: 'Close' }).click()
   await expect(queueRow(view, 'Add subtract')).toContainText('0 of 1 viewed')
   await queueRow(view, 'Add subtract').hover()
@@ -158,7 +158,7 @@ test('a conflicted pull request is merged in a worktree and pushed', async () =>
 })
 
 test('an approval from the pop-out window reaches GitHub and closes the window', async () => {
-  const view = await openCodeReviews(handle, 'Review Queue')
+  const view = await openPrOverview('Add subtract')
   await view.getByRole('button', { name: 'Close' }).click()
   await expect(queueRow(view, 'Add subtract')).toBeVisible()
   await view.getByRole('button', { name: 'Pop out' }).click()

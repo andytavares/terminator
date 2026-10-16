@@ -83,6 +83,18 @@ async function startPrReview(): Promise<ExtensionView> {
   return view
 }
 
+/** The PR the test before left open: the tab reloads fresh on a re-open, so the
+ * review screen comes back through its queue row, or from its overview when the
+ * queue remembers it in progress. */
+async function backInPrReview(): Promise<ExtensionView> {
+  const view = await openCodeReviews(handle, 'Review Diff')
+  if (await view.locator('.rd-row').first().isVisible()) {
+    await view.locator('.rd-row').filter({ hasText: 'Add subtract' }).click()
+  }
+  await view.getByRole('button', { name: /^(Start|Continue|Resume) review/ }).click()
+  return view
+}
+
 function fileInList(view: ExtensionView, path: string) {
   return view.locator(`.full-file-row[title="${path}"]`)
 }
@@ -99,7 +111,7 @@ test('the diff shows the change, and the context below it on request', async () 
 })
 
 test("the overview's review plan opens a chapter at its first file", async () => {
-  const view = await openCodeReviews(handle, 'Review Diff')
+  const view = await backInPrReview()
   await fileInList(view, 'tests/math.spec.ts').click()
   await view.getByRole('main').focus()
   await view.keyboard.press('i')
@@ -109,7 +121,7 @@ test("the overview's review plan opens a chapter at its first file", async () =>
 })
 
 test("a file's risk names the files that import it", async () => {
-  const view = await openCodeReviews(handle, 'Review Diff')
+  const view = await backInPrReview()
   await view.getByRole('button', { name: 'Ask agent about this PR' }).click()
   await view.getByRole('tab', { name: 'Why this file' }).click()
   await expect(view.getByText('Importers (1)')).toBeVisible()
@@ -118,7 +130,7 @@ test("a file's risk names the files that import it", async () => {
 })
 
 test("a block's tests are found in the pull request", async () => {
-  const view = await openCodeReviews(handle, 'Review Diff')
+  const view = await backInPrReview()
   await view.getByRole('button', { name: 'Jump to the tests for this block' }).first().click()
   const popover = view.getByRole('group', { name: 'Tests for this block' })
   await expect(popover.locator('.tp-where').first()).toHaveText(/^tests\/math\.spec\.ts:\d+$/)
@@ -127,7 +139,7 @@ test("a block's tests are found in the pull request", async () => {
 })
 
 test("a reply to a reviewer's thread is posted to GitHub and shown under it", async () => {
-  const view = await openCodeReviews(handle, 'Review Diff')
+  const view = await backInPrReview()
   const thread = view.locator('.inline-comment-thread').filter({ hasText: 'guard against NaN' })
   await thread.getByRole('button', { name: 'Reply' }).click()
   await view.getByPlaceholder('Leave a comment…').fill('Callers validate first.')
@@ -139,14 +151,14 @@ test("a reply to a reviewer's thread is posted to GitHub and shown under it", as
 })
 
 test('marking a file viewed marks it on GitHub', async () => {
-  const view = await openCodeReviews(handle, 'Review Diff')
+  const view = await backInPrReview()
   await fileInList(view, 'tests/math.spec.ts').click()
   await view.getByRole('checkbox', { name: 'Viewed' }).check()
   await expect.poll(() => stub.pullRequest(1).viewedPaths).toEqual(['tests/math.spec.ts'])
 })
 
 test('a pending comment goes out with the review, and finishing marks the rest viewed', async () => {
-  const view = await openCodeReviews(handle, 'Review Diff')
+  const view = await backInPrReview()
   await fileInList(view, 'src/math.ts').click()
   const lineFive = view.getByRole('row', { name: /^5 Add comment/ })
   await lineFive.getByRole('button', { name: 'Add comment' }).click()
@@ -178,7 +190,11 @@ test('a pending comment goes out with the review, and finishing marks the rest v
 })
 
 test('after the author pushes again, the review says what changed since the last look', async () => {
-  const view = await openCodeReviews(handle, 'Review Diff')
+  // A pause, a push and a re-open, each through the sidebar: past the 30s default on a
+  // serial run that has already spent its first seconds on the app and the queue.
+  test.setTimeout(60000)
+  // Submitted before: the row reopens the PR at its overview, which offers Continue.
+  const view = await backInPrReview()
   await view.getByRole('button', { name: 'More review actions' }).click()
   await view.getByRole('menuitem', { name: 'Pause review' }).click()
   await expect(view.locator('.rd-row').filter({ hasText: 'Add subtract' })).toBeVisible()

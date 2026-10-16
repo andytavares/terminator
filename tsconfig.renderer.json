@@ -20,5 +20,10 @@
       "@shared/*": ["./src/shared/*"]
     }
   },
-  "include": ["src/renderer/**/*", "src/shared/**/*", "src/extension-frame/**/*", "src/main/preload.ts"]
+  "include": [
+    "src/renderer/**/*",
+    "src/shared/**/*",
+    "src/extension-frame/**/*",
+    "src/main/preload.ts"
+  ]
 }

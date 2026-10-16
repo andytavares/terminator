@@ -48,7 +48,10 @@ export async function allTasks(vault: ExtensionView): Promise<StoredTask[]> {
 }
 
 /** The stored task with exactly this text, if there is one. */
-export async function storedTask(vault: ExtensionView, text: string): Promise<StoredTask | undefined> {
+export async function storedTask(
+  vault: ExtensionView,
+  text: string
+): Promise<StoredTask | undefined> {
   return (await allTasks(vault)).find((task) => task.text === text)
 }
 

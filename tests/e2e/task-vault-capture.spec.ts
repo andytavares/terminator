@@ -132,6 +132,9 @@ test('clarifying the inbox trashes, incubates, does now and files each item', as
 
 test('Capture to inbox from Quick Actions saves what was typed', async () => {
   await handle.page.bringToFront()
+  // The clarify run ends with focus inside the vault's frame, which the
+  // host's ⌘P listener cannot hear; blur it so the panel opens.
+  await handle.page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
   await handle.page.keyboard.press('ControlOrMeta+p')
   await handle.page.keyboard.press('v')
   await handle.page.keyboard.press('c')

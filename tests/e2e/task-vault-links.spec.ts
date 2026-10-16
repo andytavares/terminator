@@ -81,6 +81,9 @@ test('jumping from the task brings its terminal forward', async () => {
 })
 
 test('a project is linked to a terminal from its card', async () => {
+  // The jump test left the terminal on screen; the vault's frame unmounted
+  // with its global tab, so this is a new frame at the same URL.
+  vault = await openVault(handle)
   await vault
     .locator('.vault-sidebar')
     .getByRole('button', { name: 'Projects', exact: true })

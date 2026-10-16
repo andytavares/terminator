@@ -73,16 +73,27 @@ export async function gitView(handle: AppHandle, view: string): Promise<Extensio
 /** Opens the repository's Code Reviews tab from its sidebar header and returns its view.
  * A click on the header re-opens the tab when the click before left it open and did not
  * touch the tabs: the sidebar then reads it as chrome and dismisses the surfaces. */
-export async function openCodeReviews(handle: AppHandle, workspace: string): Promise<ExtensionView> {
+export async function openCodeReviews(
+  handle: AppHandle,
+  workspace: string
+): Promise<ExtensionView> {
   const header = workspaceRow(handle.page, workspace)
+  const codeReviews = header.getByRole('button', { name: 'Code Reviews' })
+  const panel = handle.page.locator('[data-extension-panel="terminator.git-integration"]')
   await header.hover()
-  await header.getByRole('button', { name: 'Code Reviews' }).click()
-  const view = await extensionPage(handle, `terminator.git-integration/dist/index.html?view=code-reviews`)
-    .catch(async () => {
-      await header.hover()
-      await header.getByRole('button', { name: 'Code Reviews' }).click()
-      return extensionPage(handle, `terminator.git-integration/dist/index.html?view=code-reviews`)
-    })
+  await codeReviews.click()
+  // A click when the tab is already open and nothing else was touched reads as chrome and
+  // closes it; clicking again re-opens it, so a closed panel is no reason to wait out a frame.
+  if ((await panel.count()) === 0) {
+    await header.hover()
+    await codeReviews.click()
+  }
+  const view = await gitView(handle, 'code-reviews')
+  // The queue or an open pull request: the tab reloads fresh on a re-open, so a
+  // PR the test before left open shows again only from its queue row.
+  await expect(view.locator('.rd-row, [aria-label="Close review"]').first()).toBeVisible({
+    timeout: 30000,
+  })
   return view
 }
 

@@ -1,4 +1,11 @@
-import { expect, type Frame, type Keyboard, type Locator, type Mouse, type Page } from '@playwright/test'
+import {
+  expect,
+  type Frame,
+  type Keyboard,
+  type Locator,
+  type Mouse,
+  type Page,
+} from '@playwright/test'
 import type { AppHandle } from './helpers'
 
 // An extension's view is an iframe inside the main window's page (ADR 114), so
@@ -45,9 +52,8 @@ export function gitIntegrationFrame(handle: AppHandle, viewParam: string): Frame
   return (
     handle.page
       .frames()
-      .find(
-        (f) => f.url().includes('git-integration') && f.url().includes(`view=${viewParam}`)
-      ) ?? null
+      .find((f) => f.url().includes('git-integration') && f.url().includes(`view=${viewParam}`)) ??
+    null
   )
 }
 
@@ -62,42 +68,53 @@ export async function findExtensionFrame(handle: AppHandle, urlPart: string): Pr
   return extensionFrame(handle, urlPart) as Frame
 }
 
-function extensionView(handle: AppHandle, frame: Frame): ExtensionView {
+/** The frame methods a view forwards to the frame found at each call, so a
+ * re-opened view (a new frame at the same URL) answers instead of the first. */
+const FORWARDED = [
+  'locator',
+  'getByRole',
+  'getByText',
+  'getByPlaceholder',
+  'getByLabel',
+  'getByTestId',
+  'getByTitle',
+  'evaluate',
+  'waitForFunction',
+  'waitForSelector',
+  'frameLocator',
+] as const
+
+function extensionView(handle: AppHandle, urlPart: string, frame: Frame): ExtensionView {
   const { page } = handle
   // The iframe element carrying this frame (ExtensionPanelPortal puts
   // `data-extension-panel` on the wrapping div, not on the iframe itself).
   const iframe = () => page.locator(`[data-extension-panel] iframe[src^="ext://"]`).first()
+  // The frame at a call, not the one found first: a spec can dismiss the view
+  // and re-open it, and the re-open is a new frame at the same URL.
+  const frameNow = (): Frame => extensionFrame(handle, urlPart) ?? frame
+  const callOnFrame = <K extends keyof Frame>(method: K): Frame[K] =>
+    ((...args: unknown[]) =>
+      (frameNow()[method] as (...a: unknown[]) => unknown)(...args)) as Frame[K]
+  const forwarded = Object.fromEntries(FORWARDED.map((method) => [method, callOnFrame(method)]))
   return {
-    locator: frame.locator.bind(frame),
-    getByRole: frame.getByRole.bind(frame),
-    getByText: frame.getByText.bind(frame),
-    getByPlaceholder: frame.getByPlaceholder.bind(frame),
-    getByLabel: frame.getByLabel.bind(frame),
-    getByTestId: frame.getByTestId.bind(frame),
-    getByTitle: frame.getByTitle.bind(frame),
-    evaluate: frame.evaluate.bind(frame),
-    waitForFunction: frame.waitForFunction.bind(frame),
-    waitForSelector: frame.waitForSelector.bind(frame),
-    frameLocator: frame.frameLocator.bind(frame),
-    url: () => frame.url(),
+    ...forwarded,
+    url: () => frameNow().url(),
     keyboard: page.keyboard,
     mouse: page.mouse,
     screenshot: (options) => iframe().screenshot(options),
     reload: async (): Promise<void> => {
-      await frame.evaluate(() => {
-        location.reload()
-      })
-      await frame.waitForLoadState('domcontentloaded')
+      await frameNow().evaluate(() => location.reload())
+      await frameNow().waitForLoadState('domcontentloaded')
     },
     bringToFront: () => Promise.resolve(),
-  }
+  } as ExtensionView
 }
 
 /** The loaded extension view whose URL contains `urlPart`, once it exists. */
 export async function extensionPage(handle: AppHandle, urlPart: string): Promise<ExtensionView> {
   const frame = await findExtensionFrame(handle, urlPart)
   await frame.waitForLoadState('domcontentloaded')
-  return extensionView(handle, frame)
+  return extensionView(handle, urlPart, frame)
 }
 
 /** Opens an extension from the app band and returns its view. */

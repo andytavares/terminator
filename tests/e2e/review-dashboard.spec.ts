@@ -45,9 +45,15 @@ test.afterAll(async () => {
     if (dir) rmSync(dir, { recursive: true, force: true })
 })
 
+/** The Reviews dashboard tab. A click on the band re-opens the tab when the click before
+ * left it open and did not touch the tabs: the band reads it as chrome and toggles it off. */
 async function openDashboard(): Promise<ExtensionView> {
-  await handle.page.getByRole('button', { name: 'Reviews', exact: true }).click()
-  return gitView(handle, 'reviews')
+  const open = handle.page.getByRole('button', { name: 'Reviews', exact: true })
+  await open.click()
+  return gitView(handle, 'reviews').catch(async () => {
+    await open.click()
+    return gitView(handle, 'reviews')
+  })
 }
 
 test('choosing repositories narrows what the dashboard asks GitHub for', async () => {

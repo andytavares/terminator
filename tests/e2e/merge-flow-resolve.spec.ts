@@ -85,7 +85,10 @@ async function openSolver(): Promise<ExtensionView> {
   return view
 }
 
-async function decideConflict(view: ExtensionView, choice: 'Keep mine' | 'Keep theirs'): Promise<void> {
+async function decideConflict(
+  view: ExtensionView,
+  choice: 'Keep mine' | 'Keep theirs'
+): Promise<void> {
   await view.getByRole('button', { name: new RegExp(`^${choice}`) }).click()
   await view.getByRole('button', { name: /^Confirm/ }).click()
 }
