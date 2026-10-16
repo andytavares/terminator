@@ -526,7 +526,11 @@ function compareRefs(context: StubContext, match: RegExpMatchArray) {
 /** `contents/<path>?ref=` with the raw media type: the file itself. */
 function fileContent(context: StubContext, request: ApiRequest, match: RegExpMatchArray) {
   const path = decodeURIComponent(match[1])
-  return bareGit(context, 'show', `${request.query.get('ref') ?? 'HEAD'}:${path}`)
+  try {
+    return bareGit(context, 'show', `${request.query.get('ref') ?? 'HEAD'}:${path}`)
+  } catch {
+    throw new GhFailure(404, 'Not Found')
+  }
 }
 
 // ─── GraphQL ─────────────────────────────────────────────────────────────────
