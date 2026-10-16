@@ -1,0 +1,21 @@
+extensions/notepad/src/components/QuickCreateOverlay.tsx
+  s_1770e4e124cf1a::t_1887dea3b0e4b6 186-187,219,230,261-263,266
+extensions/notepad/tests/components/QuickCreateOverlay.spec.tsx
+  s_1770e4e124cf1a::t_30791eb424100c 57-80
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "fe42e1eeec18abc2ae8c3afd30f0795b7692d3b6",
+  "prompts": {},
+  "sessions": {
+    "s_1770e4e124cf1a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8bf63343-f3d0-4338-98ee-2e52bd4d7695",
+        "model": "unknown"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
