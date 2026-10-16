@@ -1,0 +1,23 @@
+tests/e2e/session-home.spec.ts
+  s_1770e4e124cf1a::t_b097f7ef700e85 254
+  s_1770e4e124cf1a::t_8d2b68160ead2b 15-17,19,22-24,26-28,30,32,35,39,41-43,48,50-53,55-57,59-67,69-86,88-101,103-114,116-117,119-134,139,141-142,144-160,162-183,185-196,198-220,222-224,226,233,235,237,241,247-248,252,255-256,258-262,264-267,269,271-272,274,279-288,290,292,297,301-322
+  s_1770e4e124cf1a::t_719fd5ac9d6c9c 11,323-326
+tests/e2e/session-views.ts
+  s_1770e4e124cf1a::t_0d7557ff223daf 1-32
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "878e31956a4ea683a4d2211d6e5f15eeaa904e0f",
+  "prompts": {},
+  "sessions": {
+    "s_1770e4e124cf1a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8bf63343-f3d0-4338-98ee-2e52bd4d7695",
+        "model": "unknown"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}

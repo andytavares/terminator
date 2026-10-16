@@ -1,0 +1,20 @@
+tests/e2e/resume-session.spec.ts
+  s_1770e4e124cf1a::t_22c4c75bbfe4f0 20,22-28,34,40-41,49,57,65-72,74,80-81,83,85-86,88-89,92-97,100-102,104-105,107-108,110,112-128,130-132,134-135,137-138,142,146,148-157,162-163,166-168,170-173,175-187,193-195,203,205,207-210,212-217,219,221-223,226-247,252
+  s_1770e4e124cf1a::t_931b60208fe1af 3,13,248-251
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "ad4dcad582eac2dc350bf17142ebfa3232df02d9",
+  "prompts": {},
+  "sessions": {
+    "s_1770e4e124cf1a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8bf63343-f3d0-4338-98ee-2e52bd4d7695",
+        "model": "unknown"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
