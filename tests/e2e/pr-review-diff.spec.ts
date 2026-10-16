@@ -37,8 +37,6 @@ const MATH_SPEC =
   "test('add', () => expect(add(1, 2)).toBe(3))\n" +
   "test('subtract', () => expect(subtract(3, 2)).toBe(1))\n"
 
-test.describe.configure({ mode: 'serial' })
-
 test.beforeAll(async () => {
   ;({ repo, bare } = makeRepoWithRemote('terminator-e2e-review'))
   writeFile(repo, 'src/math.ts', [...MATH_HEAD.slice(0, 4), ...MATH_TAIL, ''].join('\n'))
@@ -99,7 +97,7 @@ function fileInList(view: ExtensionView, path: string) {
   return view.locator(`.full-file-row[title="${path}"]`)
 }
 
-test('the diff shows the change, and the context below it on request', async () => {
+async function theDiffShowsTheChangeAndContext(): Promise<void> {
   const view = await startPrReview()
   await fileInList(view, 'src/math.ts').click()
   await expect(view.getByRole('main')).toContainText('return a - b')
@@ -108,9 +106,9 @@ test('the diff shows the change, and the context below it on request', async () 
 
   await view.getByRole('button', { name: 'Show 20 lines below' }).click()
   await expect(view.getByRole('main')).toContainText('export const step20 = 20')
-})
+}
 
-test("the overview's review plan opens a chapter at its first file", async () => {
+async function theReviewPlanOpensAChapter(): Promise<void> {
   const view = await backInPrReview()
   await fileInList(view, 'tests/math.spec.ts').click()
   await view.getByRole('main').focus()
@@ -118,27 +116,27 @@ test("the overview's review plan opens a chapter at its first file", async () =>
   await view.getByRole('button', { name: 'Start here: Tests' }).click()
   await expect(fileInList(view, 'src/math.ts')).toHaveAttribute('aria-current', 'true')
   await expect(fileInList(view, 'tests/math.spec.ts')).not.toHaveAttribute('aria-current', 'true')
-})
+}
 
-test("a file's risk names the files that import it", async () => {
+async function aFilesRiskNamesItsImporters(): Promise<void> {
   const view = await backInPrReview()
   await view.getByRole('button', { name: 'Ask agent about this PR' }).click()
   await view.getByRole('tab', { name: 'Why this file' }).click()
   await expect(view.getByText('Importers (1)')).toBeVisible()
   await expect(view.locator('.risk-importer-btn')).toHaveAttribute('title', 'tests/math.spec.ts')
   await view.keyboard.press('Escape')
-})
+}
 
-test("a block's tests are found in the pull request", async () => {
+async function aBlocksTestsAreFound(): Promise<void> {
   const view = await backInPrReview()
   await view.getByRole('button', { name: 'Jump to the tests for this block' }).first().click()
   const popover = view.getByRole('group', { name: 'Tests for this block' })
   await expect(popover.locator('.tp-where').first()).toHaveText(/^tests\/math\.spec\.ts:\d+$/)
   await expect(popover).toContainText('Open in review')
   await view.keyboard.press('Escape')
-})
+}
 
-test("a reply to a reviewer's thread is posted to GitHub and shown under it", async () => {
+async function aReplyIsPostedUnderTheThread(): Promise<void> {
   const view = await backInPrReview()
   const thread = view.locator('.inline-comment-thread').filter({ hasText: 'guard against NaN' })
   await thread.getByRole('button', { name: 'Reply' }).click()
@@ -148,16 +146,16 @@ test("a reply to a reviewer's thread is posted to GitHub and shown under it", as
   await expect(thread).toContainText('Callers validate first.')
   const reply = stub.pullRequest(1).reviewComments.find((c) => c.in_reply_to_id === 501)
   expect(reply?.body).toBe('Callers validate first.')
-})
+}
 
-test('marking a file viewed marks it on GitHub', async () => {
+async function markingAFileViewedMarksItOnGitHub(): Promise<void> {
   const view = await backInPrReview()
   await fileInList(view, 'tests/math.spec.ts').click()
   await view.getByRole('checkbox', { name: 'Viewed', exact: true }).check()
   await expect.poll(() => stub.pullRequest(1).viewedPaths).toEqual(['tests/math.spec.ts'])
-})
+}
 
-test('a pending comment goes out with the review, and finishing marks the rest viewed', async () => {
+async function aPendingCommentGoesOutWithTheReview(): Promise<void> {
   const view = await backInPrReview()
   await fileInList(view, 'src/math.ts').click()
   const lineFive = view.getByRole('row', { name: /^5 Add comment/ })
@@ -187,12 +185,9 @@ test('a pending comment goes out with the review, and finishing marks the rest v
   })
   expect([...pr.viewedPaths].sort()).toEqual(['src/math.ts', 'tests/math.spec.ts'])
   await dialog.getByRole('button', { name: 'Close', exact: true }).last().click()
-})
+}
 
-test('after the author pushes again, the review says what changed since the last look', async () => {
-  // A pause, a push and a re-open, each through the sidebar: past the 30s default on a
-  // serial run that has already spent its first seconds on the app and the queue.
-  test.setTimeout(60000)
+async function aReReviewSaysWhatChangedSinceTheLastLook(): Promise<void> {
   // Submitted before: the row reopens the PR at its overview, which offers Continue.
   const view = await backInPrReview()
   await view.getByRole('button', { name: 'More review actions' }).click()
@@ -211,4 +206,33 @@ test('after the author pushes again, the review says what changed since the last
 
   await startPrReview()
   await expect(view.getByText('1 commit since you last looked')).toBeVisible()
+}
+
+/** The flow's steps in order, each titled with the behaviour it checks. */
+const STEPS: Array<[title: string, run: () => Promise<void>]> = [
+  [
+    'the diff shows the change, and the context below it on request',
+    theDiffShowsTheChangeAndContext,
+  ],
+  ["the overview's review plan opens a chapter at its first file", theReviewPlanOpensAChapter],
+  ["a file's risk names the files that import it", aFilesRiskNamesItsImporters],
+  ["a block's tests are found in the pull request", aBlocksTestsAreFound],
+  [
+    "a reply to a reviewer's thread is posted to GitHub and shown under it",
+    aReplyIsPostedUnderTheThread,
+  ],
+  ['marking a file viewed marks it on GitHub', markingAFileViewedMarksItOnGitHub],
+  [
+    'a pending comment goes out with the review, and finishing marks the rest viewed',
+    aPendingCommentGoesOutWithTheReview,
+  ],
+  [
+    'after the author pushes again, the review says what changed since the last look',
+    aReReviewSaysWhatChangedSinceTheLastLook,
+  ],
+]
+
+test("a pull request's diff is read in context, commented on, submitted and re-reviewed after a push", async () => {
+  test.setTimeout(150_000)
+  for (const [title, run] of STEPS) await test.step(title, run)
 })

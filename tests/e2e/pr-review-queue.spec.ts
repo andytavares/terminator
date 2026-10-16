@@ -20,8 +20,6 @@ let stub: GithubStub
 let repo: string
 let bare: string
 
-test.describe.configure({ mode: 'serial' })
-
 /** Three pull requests: a draft behind main with a comment, one in conflict, and one clean. */
 function openQueuePullRequests(stub: GithubStub): void {
   const subtract = stub.openPullRequest({
@@ -79,7 +77,7 @@ async function openPrOverview(title: string): Promise<ExtensionView> {
   return view
 }
 
-test('the queue lists the open pull requests, and search narrows it', async () => {
+async function theQueueListsAndSearchNarrows(): Promise<void> {
   const view = await openCodeReviews(handle, 'Review Queue')
   await expect(view.locator('.rd-row')).toHaveCount(3)
   await view.getByRole('searchbox', { name: 'Search pull requests' }).fill('greeting')
@@ -87,9 +85,9 @@ test('the queue lists the open pull requests, and search narrows it', async () =
   await expect(queueRow(view, 'Rework greeting')).toBeVisible()
   await view.getByRole('searchbox', { name: 'Search pull requests' }).fill('')
   await expect(view.locator('.rd-row')).toHaveCount(3)
-})
+}
 
-test('a comment in the discussion is posted to the pull request', async () => {
+async function aDiscussionCommentIsPosted(): Promise<void> {
   const view = await openPrOverview('Add subtract')
   await view.getByRole('tab', { name: /^Discussion · 1/ }).click()
   await expect(view.locator('.pr-issue-comment-list')).toContainText('once CI is green')
@@ -101,9 +99,9 @@ test('a comment in the discussion is posted to the pull request', async () => {
     'Ready for a look once CI is green.',
     'Looking now.',
   ])
-})
+}
 
-test('a draft is marked ready, and a branch behind main is brought up to date', async () => {
+async function aDraftIsMarkedReadyAndUpdated(): Promise<void> {
   const view = await openPrOverview('Add subtract')
   await view.getByRole('button', { name: 'Mark as ready' }).click()
   await expect(view.getByRole('heading', { level: 1 })).not.toContainText('Draft')
@@ -112,9 +110,9 @@ test('a draft is marked ready, and a branch behind main is brought up to date', 
   await view.getByRole('button', { name: 'Update from main' }).click()
   await expect(view.getByText('Behind main')).toBeHidden()
   expect(stub.pullRequest(1).branchUpdates).toBe(1)
-})
+}
 
-test('an opened review stays in progress until it is dismissed', async () => {
+async function anOpenedReviewStaysInProgressUntilDismissed(): Promise<void> {
   const view = await openPrOverview('Add subtract')
   await view.getByRole('button', { name: 'Close' }).click()
   await expect(queueRow(view, 'Add subtract')).toContainText('0 of 1 viewed')
@@ -126,9 +124,9 @@ test('an opened review stays in progress until it is dismissed', async () => {
   await view.getByRole('button', { name: 'Refresh pull requests' }).click()
   await expect(queueRow(view, 'Add subtract')).toContainText('Review')
   await expect(queueRow(view, 'Add subtract')).not.toContainText('viewed')
-})
+}
 
-test('a review whose pull request was merged elsewhere leaves the queue', async () => {
+async function aReviewMergedElsewhereLeavesTheQueue(): Promise<void> {
   const view = await openPrOverview('Tidy docs')
   await view.getByRole('button', { name: 'Close' }).click()
   await expect(queueRow(view, 'Tidy docs')).toContainText('0 of 1 viewed')
@@ -137,9 +135,9 @@ test('a review whose pull request was merged elsewhere leaves the queue', async 
   await view.getByRole('button', { name: 'Refresh pull requests' }).click()
   await expect(view.locator('.rd-row')).toHaveCount(2)
   await expect(queueRow(view, 'Tidy docs')).toHaveCount(0)
-})
+}
 
-test('a conflicted pull request is merged in a worktree and pushed', async () => {
+async function aConflictedPullRequestIsMergedInAWorktree(): Promise<void> {
   const view = await openPrOverview('Rework greeting')
   await view.getByRole('button', { name: 'Resolve conflicts' }).click()
   await expect(view.getByText('Merge conflicts need resolving')).toBeVisible({ timeout: 15000 })
@@ -155,9 +153,9 @@ test('a conflicted pull request is merged in a worktree and pushed', async () =>
   const head = git(bare, 'rev-parse', 'feat/greeting')
   expect(git(bare, 'rev-list', '--parents', '-n', '1', head).split(' ')).toHaveLength(3)
   expect(git(bare, 'show', `${head}:README.md`)).toBe('# widgets, renamed on main')
-})
+}
 
-test('an approval from the pop-out window reaches GitHub and closes the window', async () => {
+async function anApprovalFromThePopOutReachesGitHub(): Promise<void> {
   const view = await openPrOverview('Add subtract')
   await view.getByRole('button', { name: 'Close' }).click()
   await expect(queueRow(view, 'Add subtract')).toBeVisible()
@@ -173,4 +171,35 @@ test('an approval from the pop-out window reaches GitHub and closes the window',
   await popout.waitForEvent('close')
   expect(stub.pullRequest(1).reviews.at(-1)?.state).toBe('APPROVED')
   await expect(queueRow(view, 'Add subtract')).toContainText('1 approved')
+}
+
+/** The flow's steps in order, each titled with the behaviour it checks. */
+const STEPS: Array<[title: string, run: () => Promise<void>]> = [
+  ['the queue lists the open pull requests, and search narrows it', theQueueListsAndSearchNarrows],
+  ['a comment in the discussion is posted to the pull request', aDiscussionCommentIsPosted],
+  [
+    'a draft is marked ready, and a branch behind main is brought up to date',
+    aDraftIsMarkedReadyAndUpdated,
+  ],
+  [
+    'an opened review stays in progress until it is dismissed',
+    anOpenedReviewStaysInProgressUntilDismissed,
+  ],
+  [
+    'a review whose pull request was merged elsewhere leaves the queue',
+    aReviewMergedElsewhereLeavesTheQueue,
+  ],
+  [
+    'a conflicted pull request is merged in a worktree and pushed',
+    aConflictedPullRequestIsMergedInAWorktree,
+  ],
+  [
+    'an approval from the pop-out window reaches GitHub and closes the window',
+    anApprovalFromThePopOutReachesGitHub,
+  ],
+]
+
+test('a pull request is found in the queue, discussed, brought up to date, merged and approved', async () => {
+  test.setTimeout(120_000)
+  for (const [title, run] of STEPS) await test.step(title, run)
 })
