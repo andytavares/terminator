@@ -178,14 +178,26 @@ test('the Commit… Quick Action brings the Git tab forward with the message box
   await projectTab(handle.page, 'Terminal').click()
   await runGitQuickAction('c')
   const view = await openGitTab(handle)
-  // `toBeFocused` also needs the window to be the active application, which a runner does not
-  // promise. What a user relies on is that typing lands in the box: it is the frame's active
-  // element, and the frame is the page's.
-  await expect
-    .poll(() => view.evaluate(() => document.activeElement?.getAttribute('placeholder')))
-    .toBe('Commit message…')
-  await expect(handle.page.locator('iframe[src^="ext://terminator.git-integration"]')).toBeFocused()
+  const box = view.getByPlaceholder('Commit message…')
+  try {
+    await expect(box).toBeFocused()
+  } catch (failure) {
+    throw new Error(`${(failure as Error).message}\n${await focusDiagnosis(view)}`, {
+      cause: failure,
+    })
+  }
 })
+
+/** Where the frame's focus is, read when the spec checks, so a failure says why. */
+async function focusDiagnosis(view: ExtensionView): Promise<string> {
+  const state = await view.evaluate(() => ({
+    active: document.activeElement?.tagName,
+    placeholder: document.activeElement?.getAttribute('placeholder'),
+    hasFocus: document.hasFocus(),
+    ready: document.readyState,
+  }))
+  return `frame focus: ${JSON.stringify(state)}`
+}
 
 test('the Create PR… Quick Action opens the pull request dialog', async () => {
   await runGitQuickAction('r')
