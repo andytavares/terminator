@@ -474,6 +474,14 @@ export async function runQuickActionFromPanel(page: Page, label: string): Promis
   await expect(panel).toBeHidden({ timeout: 15000 })
 }
 
+/** Resolves once the window has drawn what the page shows. The browser routes a click by the
+ * last frame it drew, so a click on a dialog that is in the DOM but not yet on screen goes to
+ * whatever was drawn there before, such as an extension frame. A screenshot makes the browser
+ * draw (and update its hit-testing) before it returns. */
+export async function untilDrawn(page: Page): Promise<void> {
+  await page.screenshot({ clip: { x: 0, y: 0, width: 1, height: 1 } })
+}
+
 /** Opens Settings with ⌘, (Ctrl+, off macOS) on the named section. */
 export async function openSettingsSection(page: Page, section: string): Promise<void> {
   if (!(await page.locator('.settings-panel').isVisible())) {
@@ -481,6 +489,7 @@ export async function openSettingsSection(page: Page, section: string): Promise<
     await page.keyboard.press('ControlOrMeta+,')
   }
   await expect(page.locator('.settings-panel')).toBeVisible()
+  await untilDrawn(page)
   await markSettingsDiagnostics(page, `clicking ${section}`)
   await page.locator('.settings-panel__nav-item', { hasText: section }).click()
   await markSettingsDiagnostics(page, `clicked ${section}`)

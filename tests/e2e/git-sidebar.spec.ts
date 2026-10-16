@@ -2,7 +2,14 @@ import { test, expect } from '@playwright/test'
 import { execSync } from 'node:child_process'
 import { rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { AppHandle, launchApp, closeApp, createWorkspace, e2eTempDir } from './helpers'
+import {
+  AppHandle,
+  launchApp,
+  closeApp,
+  createWorkspace,
+  e2eTempDir,
+  openSettingsSection,
+} from './helpers'
 
 // Exercises the git-integration extension against a REAL temporary repo:
 // the Git project tab and the extension's settings section. PR-creation flows are intentionally not covered — they
@@ -63,9 +70,7 @@ test('the Git project tab renders the full git view', async () => {
 
 test('the Git Integration settings section appears in the settings panel', async () => {
   const { page } = handle
-  await page.keyboard.press('Meta+,')
-  await page.waitForSelector('.settings-panel')
-  await page.locator('.settings-panel__nav-item').filter({ hasText: 'Extensions' }).click()
+  await openSettingsSection(page, 'Extensions')
   await expect(page.locator('.settings-panel__content')).toContainText('Git Integration')
   await page.keyboard.press('Escape')
 })

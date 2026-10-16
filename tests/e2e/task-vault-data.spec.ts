@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test'
 import { mkdtempSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { AppHandle, launchApp, closeApp } from './helpers'
+import { AppHandle, launchApp, closeApp, openSettingsSection } from './helpers'
 import { invokeChannel, type ExtensionView } from './extension-page'
 import { allTasks, openVault, todayTasks } from './task-vault-harness'
 import { expectCentredInWindow } from './modal-centre'
@@ -112,8 +112,7 @@ test('Export JSON downloads every task, project and area', async () => {
 async function taskVaultSettingsAction(label: string): Promise<void> {
   const { page } = handle
   await page.bringToFront()
-  await page.keyboard.press('ControlOrMeta+,')
-  await page.locator('.settings-panel__nav-item').filter({ hasText: 'Extensions' }).click()
+  await openSettingsSection(page, 'Extensions')
   const row = page.locator('.extension-item-wrapper').filter({
     has: page.locator('.extension-item__name', { hasText: 'Task Vault' }),
   })

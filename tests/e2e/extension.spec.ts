@@ -1,5 +1,5 @@
 import { test, expect, Page } from '@playwright/test'
-import { AppHandle, launchApp, closeApp } from './helpers'
+import { AppHandle, launchApp, closeApp, openSettingsSection } from './helpers'
 
 let handle: AppHandle
 
@@ -12,10 +12,7 @@ test.afterAll(async () => {
 })
 
 async function openExtensionsSettings(pg: Page): Promise<void> {
-  // ⌘ on macOS, Ctrl elsewhere: https://playwright.dev/docs/api/class-keyboard#keyboard-press
-  await pg.keyboard.press('ControlOrMeta+,')
-  await pg.waitForSelector('.settings-panel', { timeout: 5000 })
-  await pg.locator('.settings-panel__nav-item').filter({ hasText: 'Extensions' }).click()
+  await openSettingsSection(pg, 'Extensions')
 }
 
 async function closeSettings(pg: Page): Promise<void> {

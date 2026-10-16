@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test'
 import { existsSync, mkdtempSync, readFileSync, readdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { AppHandle, launchApp, closeApp } from './helpers'
+import { AppHandle, launchApp, closeApp, openSettingsSection } from './helpers'
 import { answerNextOpenDialog, invokeChannel, type ExtensionView } from './extension-page'
 import { noteRow, openNotepad } from './notepad-harness'
 import { expectCentredInWindow } from './modal-centre'
@@ -129,8 +129,7 @@ test('the dialog starts on the folder and comment format chosen in Settings', as
   const folder = mkdtempSync(join(tmpdir(), 'notepad-configured-'))
   const { page } = handle
   await page.bringToFront()
-  await page.keyboard.press('ControlOrMeta+,')
-  await page.locator('.settings-panel__nav-item').filter({ hasText: 'Extensions' }).click()
+  await openSettingsSection(page, 'Extensions')
   const notepadSettings = page.locator('.extension-item-wrapper').filter({
     has: page.locator('.extension-item__name', { hasText: 'Notepad' }),
   })
