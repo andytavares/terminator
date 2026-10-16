@@ -3,6 +3,7 @@ import { rmSync } from 'node:fs'
 import { closeApp, closeSettingsPanel, launchApp, type AppHandle } from './helpers'
 import { git, makeRepoWithRemote, openGitTab, openRepo, writeFile } from './git-harness'
 import { openExtensionSettings, settingRow } from './extension-settings-page'
+import { installSettingsDiagnostics, settingsDiagnostics } from './settings-diagnostics'
 
 /** Git Integration's settings, seen in the Git tab: the file list stops at its limit and says
  * so, and sign-off adds a Signed-off-by trailer
@@ -19,6 +20,13 @@ test.beforeAll(async () => {
   for (let i = 0; i < 12; i++) writeFile(repo, `note-${String(i).padStart(2, '0')}.md`, `${i}\n`)
   handle = await launchApp()
   await openRepo(handle, 'Git Settings', repo)
+  await installSettingsDiagnostics(handle)
+})
+
+test.afterEach(async () => {
+  if (test.info().status !== test.info().expectedStatus) {
+    console.log(`settings diagnostics:\n${await settingsDiagnostics(handle)}`)
+  }
 })
 
 test.afterAll(async () => {
