@@ -11,12 +11,6 @@ import { mkdtempSync } from 'node:fs'
 import { dirname, delimiter, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { saveIpcTrace, startIpcTrace } from './ipc-trace'
-import {
-  installSettingsDiagnostics,
-  markSettingsDiagnostics,
-  saveHitTestTrace,
-  saveSettingsDiagnostics,
-} from './settings-diagnostics'
 import { appProcessTree, expectNoProcessesLeft, launchMarker } from './leftover-processes'
 
 // Shared e2e harness. Every spec launches the real Electron app in an isolated,
@@ -264,7 +258,6 @@ export async function launchApp(
     const page = await firstReadyWindow(app, remaining)
     await keepWindowsClearOfTheCursor(app)
     emulateFocusInExtensionFrames(page)
-    await installSettingsDiagnostics(app, page)
     return { app, page, userDataDir, launchId: marker.launchId }
   } catch (error) {
     throw await launchFailure(app, output, error)
@@ -362,9 +355,6 @@ export async function closeApp(
 ): Promise<void> {
   if (!handle) return
   await saveIpcTrace(handle.app)
-  const window = handle.app.windows()[0]
-  if (window) await saveSettingsDiagnostics(window)
-  await saveHitTestTrace(handle.app).catch(() => undefined)
   const started = appProcessTree(handle.app.process().pid ?? -1)
   await stopApp(handle.app, GRACEFUL_CLOSE_MS)
   await expectNoProcessesLeft(handle.launchId, started)
@@ -485,14 +475,11 @@ async function untilDrawn(page: Page): Promise<void> {
 /** Opens Settings with ⌘, (Ctrl+, off macOS) on the named section. */
 export async function openSettingsSection(page: Page, section: string): Promise<void> {
   if (!(await page.locator('.settings-panel').isVisible())) {
-    await markSettingsDiagnostics(page, 'pressing the Settings shortcut')
     await page.keyboard.press('ControlOrMeta+,')
   }
   await expect(page.locator('.settings-panel')).toBeVisible()
   await untilDrawn(page)
-  await markSettingsDiagnostics(page, `clicking ${section}`)
   await page.locator('.settings-panel__nav-item', { hasText: section }).click()
-  await markSettingsDiagnostics(page, `clicked ${section}`)
 }
 
 /** Closes Settings with its close button. */
