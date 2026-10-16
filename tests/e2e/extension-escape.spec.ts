@@ -1,16 +1,11 @@
 import { test, expect } from '@playwright/test'
-import { AppHandle, launchApp, closeApp, createWorkspace, inExtensionView } from './helpers'
-import { openFoundry as openFoundryPanel } from './foundry-harness'
+import { AppHandle, launchApp, closeApp, createWorkspace } from './helpers'
+import { extensionFrame } from './extension-page'
+import { expectCentredInWindow } from './modal-centre'
 
-// The guards on the exit gesture (feature 036).
-//
-// `extension-escape-exit.spec.ts` covers the gesture itself. This covers when it
-// must stand down — the rule the host window applied and the extension view did
-// not. Typing into an extension field and pressing Escape twice used to close
-// the extension and discard the draft; there was no confirmation and no undo.
-//
-// These cannot be unit tests. The keystroke has to originate inside the
-// extension's frame, where the frame shim (ADR 114) applies the guards.
+// Leaving an extension with the keyboard (feature 036, ADR 114). The keystroke has to start
+// inside the extension's frame, where the frame shim applies the double-Escape gesture and its
+// guards, so none of this can be a unit test.
 
 let handle: AppHandle
 
@@ -24,13 +19,25 @@ test.afterAll(async () => {
   await closeApp(handle)
 })
 
-const FOUNDRY_IDEA = 'input[aria-label="Describe what you want built or fixed"]'
+interface Surface {
+  id: string
+  label: string
+  part: string
+}
+
+const NOTES: Surface = { id: 'terminator.notepad', label: 'Notes', part: 'notepad' }
+const FOUNDRY: Surface = { id: 'terminator.foundry', label: 'Foundry', part: 'foundry' }
+const TASK_VAULT: Surface = { id: 'terminator.task-vault', label: 'Task Vault', part: 'task-vault' }
+const REMOTE_CONTROL: Surface = {
+  id: 'terminator.remote-control',
+  label: 'Remote Control',
+  part: 'remote-control',
+}
 
 /**
- * Waits out real wall-clock time. The double-Escape gesture is timed against
- * `Date.now()` inside the extension's frame, which Playwright cannot attach a
- * fake clock to, so proving presses fall inside or outside
- * `DOUBLE_ESCAPE_WINDOW_MS` genuinely requires that much time to elapse.
+ * Waits out real wall-clock time. The double-Escape gesture is timed against `Date.now()`
+ * inside the extension's frame, which Playwright cannot attach a fake clock to, so proving
+ * presses fall outside `DOUBLE_ESCAPE_WINDOW_MS` genuinely requires that much time to elapse.
  */
 async function realDelay(ms: number): Promise<void> {
   const deadline = Date.now() + ms
@@ -39,161 +46,351 @@ async function realDelay(ms: number): Promise<void> {
   }
 }
 
-/** Run script inside the Foundry extension frame and return its result. */
-function inFoundry<T>(script: string): Promise<T> {
-  return inExtensionView<T>(handle, 'foundry', script)
+/** Run `script` inside the extension frame whose URL contains `part`. */
+async function inView<T>(part: string, script: string): Promise<T> {
+  const frame = extensionFrame(handle, part)
+  if (!frame) throw new Error(`no frame for ${part}`)
+  return frame.evaluate(script) as Promise<T>
 }
 
-/** Sends Escape into Foundry's frame as real key presses. */
-async function pressEscape(times: number, gapMs = 100): Promise<void> {
-  const frame = handle.page.frames().find((f) => f.url().includes('foundry'))
-  if (!frame) throw new Error('the Foundry frame is not loaded')
-  // The frame's document must own focus for the shim to see the key.
+/** True once the extension surface's frame has finished loading. */
+async function viewReady(part: string): Promise<boolean> {
+  const frame = extensionFrame(handle, part)
+  if (!frame) return false
+  return frame.evaluate(() => document.readyState === 'complete').catch(() => false)
+}
+
+/** Sends a key into an extension's frame as a real key press. */
+async function key(part: string, keyCode: string): Promise<void> {
+  const frame = extensionFrame(handle, part)
+  if (!frame) return
+  // The frame's document must own focus for its listeners to see the key.
   await frame.evaluate(() => (document.body as HTMLElement).focus())
-  for (let i = 0; i < times; i++) {
-    await handle.page.keyboard.press('Escape')
-    if (i < times - 1) await realDelay(gapMs)
-  }
+  await handle.page.keyboard.press(keyCode)
+  // Let React commit the resulting state before the next call reads the DOM.
+  // A key can legitimately exit the extension, detaching the frame mid-wait.
+  await frame
+    .evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))))
+    .catch(() => {})
 }
 
-/** Is an extension surface still on screen? The panel div outlives the exit
- * (it stays mounted, hidden), so ask whether it is actually displayed. */
-function extensionShowing(): Promise<boolean> {
+/** Two Escapes inside the gesture window. */
+async function pressEscapeTwice(part: string): Promise<void> {
+  await key(part, 'Escape')
+  await key(part, 'Escape')
+}
+
+/** The extension whose panel is on screen, or null. The panel div outlives the exit (it stays
+ * mounted, hidden), so this asks which one is actually displayed. */
+function activeExtensionPanel(): Promise<string | null> {
   return handle.page.evaluate(() => {
-    const panel = document.querySelector('[data-extension-panel]')
-    return !!panel && getComputedStyle(panel).display !== 'none'
+    const shown = [...document.querySelectorAll('[data-extension-panel]')].find(
+      (panel) => getComputedStyle(panel).display !== 'none'
+    )
+    return shown?.getAttribute('data-extension-panel') ?? null
   })
 }
 
-/** Foundry on screen, unless it already is (its band button toggles). */
-async function showFoundry(): Promise<void> {
-  if (await extensionShowing()) return
-  await openFoundryPanel(handle)
-}
-
-/** Move focus off any text field, so the text-field guard is not what is being tested. */
-function blurEverything(): Promise<void> {
-  return inFoundry(`(() => {
-    const el = document.activeElement
-    if (el && typeof el.blur === 'function') el.blur()
-    return true
-  })()`)
-}
-
-/**
- * Put the Forge on screen.
- *
- * The inbox is home, and the text field this spec needs is on the Forge — so
- * "open Foundry" is not enough to reach a text field any more.
- */
-async function openForge(): Promise<void> {
+/** Brings an extension's panel up and waits for its view to load. Idempotent: the band button
+ * toggles, so clicking it when the panel is already up would put the extension away. */
+async function showPanel({ id, label, part }: Surface): Promise<void> {
+  if ((await activeExtensionPanel()) !== id) {
+    await handle.page.locator(`button[aria-label="${label}"]`).click()
+  }
+  await expect.poll(activeExtensionPanel, { timeout: 20000 }).toBe(id)
   await expect
-    .poll(() =>
-      inFoundry<boolean>(`(function () {
-    var all = document.querySelectorAll('button')
-    for (var i = 0; i < all.length; i++) {
-      if ((all[i].textContent || '').trim() === 'Forge') { all[i].click(); return true }
-    }
-    return false
-  })()`)
-    )
+    .poll(() => viewReady(part), { timeout: 20000, message: `${label} view never loaded` })
+    .toBe(true)
+}
+
+/** Neither a text field nor a dialog holds the key, so only the gesture itself is tested. */
+async function nothingClaimsTheKey(part: string): Promise<void> {
+  await inView(
+    part,
+    `(() => {
+      const el = document.activeElement
+      if (el && typeof el.blur === 'function') el.blur()
+      window.electronAPI.ui.setModalDepth(0)
+      return true
+    })()`
+  )
+}
+
+async function stillShowing(surface: Surface, why: string): Promise<void> {
+  expect(await activeExtensionPanel(), why).toBe(surface.id)
+}
+
+async function exitsToTheTerminal(surface: Surface, why: string): Promise<void> {
+  await expect.poll(activeExtensionPanel, { timeout: 6000, message: why }).not.toBe(surface.id)
+}
+
+// ── Leaving with two Escapes ─────────────────────────────────────────────────
+
+async function singleAndSlowEscapesStay(): Promise<void> {
+  await showPanel(NOTES)
+  await nothingClaimsTheKey(NOTES.part)
+  await key(NOTES.part, 'Escape')
+  await realDelay(900)
+  await stillShowing(NOTES, 'a single Escape closed the extension')
+  await key(NOTES.part, 'Escape')
+  await realDelay(600)
+  await stillShowing(NOTES, 'two Escapes further apart than the gesture window paired')
+}
+
+async function doubleEscapeReturnsToTerminal(): Promise<void> {
+  await showPanel(NOTES)
+  await pressEscapeTwice(NOTES.part)
+  await exitsToTheTerminal(NOTES, 'the extension panel should be gone')
+}
+
+/** Reports an open dialog the way @terminator/extension-ui does — across the bridge. */
+function setModalDepth(part: string, depth: number): Promise<void> {
+  return inView(part, `(() => { window.electronAPI.ui.setModalDepth(${depth}); return true })()`)
+}
+
+async function openDialogsHoldTheKey(): Promise<void> {
+  await showPanel(FOUNDRY)
+  for (const depth of [1, 3]) {
+    await nothingClaimsTheKey(FOUNDRY.part)
+    await setModalDepth(FOUNDRY.part, depth)
+    await pressEscapeTwice(FOUNDRY.part)
+    await realDelay(50)
+    await stillShowing(FOUNDRY, `two Escapes with ${depth} dialog(s) open exited the extension`)
+  }
+  await setModalDepth(FOUNDRY.part, 0)
+}
+
+async function gestureWorksOnceNothingClaimsTheKey(): Promise<void> {
+  await showPanel(FOUNDRY)
+  await nothingClaimsTheKey(FOUNDRY.part)
+  await pressEscapeTwice(FOUNDRY.part)
+  await exitsToTheTerminal(FOUNDRY, 'the extension should have exited')
+}
+
+// ── A draft in a text field keeps the extension open ─────────────────────────
+
+/** Each extension opens on an empty state, so the field to type into is brought up first —
+ * which is also the path a person takes. Foundry's is on the Forge, and Foundry goes last: its
+ * dialog steps follow once the Forge has settled, as a fresh view re-reports its depth. */
+/** `inline`: the field is on the screen itself, not in a dialog Escape rightly closes, so the
+ * draft must still be in it afterwards. */
+interface DraftSurface extends Surface {
+  open: string
+  inline?: boolean
+}
+
+const DRAFT_SURFACES: DraftSurface[] = [
+  { ...NOTES, open: 'new note' },
+  { ...TASK_VAULT, open: 'add task' },
+  { ...FOUNDRY, open: 'forge', inline: true },
+]
+
+const FIELD = `document.querySelector('input:not([type=hidden]),textarea')`
+
+/** Presses the control named `open`, and waits for a text field to show. */
+async function bringUpTextField({ label, part, open }: DraftSurface): Promise<void> {
+  // Polled: the view reports loaded before React has drawn the button.
+  const pressOpen = `(() => {
+    const b = [...document.querySelectorAll('button')].find((x) =>
+      (x.textContent || '').toLowerCase().includes(${JSON.stringify(open)}))
+    if (b) b.click()
+    return !!b
+  })()`
+  await expect
+    .poll(() => inView<boolean>(part, pressOpen), { message: `${label} never offered "${open}"` })
     .toBe(true)
   await expect
-    .poll(() => inFoundry<boolean>(`!!document.querySelector(${JSON.stringify(FOUNDRY_IDEA)})`), {
+    .poll(() => inView<boolean>(part, `!!${FIELD}`), {
       timeout: 10000,
+      message: `${label} never showed a text field after opening "${open}"`,
     })
     .toBe(true)
 }
 
-async function focusIdeaAndType(value: string): Promise<string> {
-  return inFoundry<string>(`(() => {
-    const el = document.querySelector(${JSON.stringify(FOUNDRY_IDEA)})
-    if (!el) return 'no input'
-    el.focus()
-    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set
-    setter.call(el, ${JSON.stringify(value)})
-    el.dispatchEvent(new Event('input', { bubbles: true }))
-    return document.activeElement === el ? el.value : 'not focused'
-  })()`)
+/** Run in a view: types an unsaved draft into its first text field, and says whether it has focus. */
+const TYPE_DRAFT = `(() => {
+  const el = ${FIELD}
+  if (!el) return false
+  el.focus()
+  const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement : HTMLInputElement
+  Object.getOwnPropertyDescriptor(proto.prototype, 'value').set.call(el, 'UNSAVED DRAFT')
+  el.dispatchEvent(new Event('input', { bubbles: true }))
+  return document.activeElement === el
+})()`
+
+async function draftKeepsItOpen(surface: DraftSurface): Promise<void> {
+  const { label, part } = surface
+  await showPanel(surface)
+  await bringUpTextField(surface)
+  expect(await inView<boolean>(part, TYPE_DRAFT), `${label} offered no field to type in`).toBe(true)
+  await key(part, 'Escape')
+  await key(part, 'Escape')
+  await stillShowing(surface, `${label} was closed by Escape while a draft was unsaved`)
+  if (!surface.inline) return
+  expect(await inView<string>(part, `${FIELD}?.value ?? '<gone>'`)).toBe('UNSAVED DRAFT')
 }
 
-function ideaValue(): Promise<string> {
-  return inFoundry<string>(`(() => {
-    const el = document.querySelector(${JSON.stringify(FOUNDRY_IDEA)})
-    return el ? el.value : '<gone>'
-  })()`)
+/** Remote Control's screen has no text field and no dialog: nothing to protect, so the gesture
+ * must still fire. A guard that only ever suppresses is a broken feature. */
+async function remoteControlLeavesOnTwoEscapes(): Promise<void> {
+  await showPanel(REMOTE_CONTROL)
+  const state = await inView<{ fields: number; surfaces: number }>(
+    REMOTE_CONTROL.part,
+    `(() => ({
+      fields: document.querySelectorAll('input:not([type=hidden]),textarea').length,
+      surfaces: document.querySelectorAll('[data-tmui-surface],[data-tmui-panel]').length,
+    }))()`
+  )
+  expect(state, 'this only means anything with no field and no surface open').toEqual({
+    fields: 0,
+    surfaces: 0,
+  })
+  await pressEscapeTwice(REMOTE_CONTROL.part)
+  await exitsToTheTerminal(REMOTE_CONTROL, 'with nothing at risk the exit gesture must fire')
 }
 
-/**
- * Report an open dialog the way @terminator/extension-ui does — across the
- * bridge.
- */
-function setModalDepth(depth: number): Promise<void> {
-  return inFoundry(`(() => { window.electronAPI.ui.setModalDepth(${depth}); return true })()`)
-}
+/** A flow's steps in order, each titled for the behaviour it checks. */
+type Steps = Array<[title: string, body: () => Promise<void>]>
 
-test('Escape twice in a text field keeps the extension open and the draft intact', async () => {
-  await showFoundry()
-  await openForge()
-  expect(await focusIdeaAndType('my unsaved draft')).toBe('my unsaved draft')
+const LEAVING_STEPS: Steps = [
+  [
+    'a single Escape, or two further apart than the gesture window, leave Notes open',
+    singleAndSlowEscapesStay,
+  ],
+  ['two quick Escapes inside Notes return to the terminal', doubleEscapeReturnsToTerminal],
+  ...DRAFT_SURFACES.map((surface): Steps[number] => [
+    `${surface.label}: two Escapes with a draft in a text field keep it open${surface.inline ? ', the draft intact' : ''}`,
+    () => draftKeepsItOpen(surface),
+  ]),
+  [
+    'two Escapes while a dialog, or nested dialogs, are open do not exit Foundry',
+    openDialogsHoldTheKey,
+  ],
+  [
+    'the exit gesture still works once nothing has claimed the key',
+    gestureWorksOnceNothingClaimsTheKey,
+  ],
+  [
+    'Remote Control: two Escapes still leave, because nothing is at risk',
+    remoteControlLeavesOnTwoEscapes,
+  ],
+]
 
-  await pressEscape(2)
-  await realDelay(50)
-
-  // The defect: before the guard, both of these failed — the extension closed
-  // and the text went with it.
-  expect(await extensionShowing()).toBe(true)
-  expect(await ideaValue()).toBe('my unsaved draft')
+test('an extension is left with two quick Escapes, and only when nothing is at risk', async () => {
+  test.setTimeout(180_000)
+  for (const [title, body] of LEAVING_STEPS) await test.step(title, body)
 })
 
-test('Escape twice while a dialog is open does not exit the extension', async () => {
-  await showFoundry()
-  await blurEverything()
-  await setModalDepth(1)
+// ── Working an extension from the keyboard ───────────────────────────────────
 
-  await pressEscape(2)
-  await realDelay(50)
+/** Run in a view: whether focus is inside its open dialog. */
+const FOCUS_IN_SURFACE = `(() => {
+  const s = document.querySelector('dialog[open]')
+  return !!s && s.contains(document.activeElement)
+})()`
 
-  expect(await extensionShowing()).toBe(true)
-  await setModalDepth(0)
-})
-
-test('Escape twice with nested dialogs open does not exit the extension', async () => {
-  await showFoundry()
-  await blurEverything()
-  await setModalDepth(3)
-
-  await pressEscape(2)
-  await realDelay(50)
-
-  expect(await extensionShowing()).toBe(true)
-  await setModalDepth(0)
-})
-
-test('the exit gesture still works once nothing has claimed the key', async () => {
-  await showFoundry()
-  // Neither a text field nor a terminal, and nothing open — the one case where
-  // the gesture is supposed to fire.
-  await blurEverything()
-  await setModalDepth(0)
-
-  await pressEscape(2)
-
-  // The preserved behaviour: a deliberate double press with nothing claiming
-  // the key still returns the user to their terminal.
+/** Opens Notes' composer, then uses no mouse on it. */
+async function openNotesComposer(): Promise<void> {
+  await showPanel(NOTES)
   await expect
-    .poll(extensionShowing, { timeout: 6000, message: 'the extension should have exited' })
-    .toBe(false)
-})
+    .poll(() =>
+      inView<boolean>(
+        NOTES.part,
+        `(() => {
+          const b = [...document.querySelectorAll('button')].find((x) => /new note/i.test(x.textContent || ''))
+          if (b) b.click()
+          return !!b
+        })()`
+      )
+    )
+    .toBe(true)
+  await expect
+    .poll(() => inView<boolean>(NOTES.part, `!!document.querySelector('dialog[open]')`), {
+      timeout: 10000,
+      message: 'the composer never opened',
+    })
+    .toBe(true)
+}
 
-test('two Escapes further apart than the gesture window never pair', async () => {
-  await showFoundry()
-  await blurEverything()
+async function dialogTrapsFocusAndClosesOnEscape(): Promise<void> {
+  await openNotesComposer()
+  expect(await inView<boolean>(NOTES.part, FOCUS_IN_SURFACE), 'focus moves into the dialog').toBe(
+    true
+  )
+  for (let i = 0; i < 8; i++) await key(NOTES.part, 'Tab')
+  expect(await inView<boolean>(NOTES.part, FOCUS_IN_SURFACE), 'Tab never leaves the dialog').toBe(
+    true
+  )
+  await key(NOTES.part, 'Escape')
+  expect(await inView<boolean>(NOTES.part, `!document.querySelector('dialog[open]')`)).toBe(true)
+  await stillShowing(NOTES, 'closing a dialog must not close the extension')
+}
 
-  await pressEscape(1)
-  await realDelay(900)
-  await pressEscape(1)
-  await realDelay(600)
+/** Run in a view: the focusable controls, of the first 40, that show no focus ring. */
+const CONTROLS_WITHOUT_RING = `(() => {
+  const bad = []
+  const controls = [...document.querySelectorAll('button, a[href], input, select, textarea, [tabindex]:not([tabindex="-1"])')]
+  for (const el of controls.slice(0, 40)) {
+    const r = el.getBoundingClientRect()
+    if (r.width < 1 || r.height < 1) continue
+    el.focus()
+    if (document.activeElement !== el) continue
+    const cs = getComputedStyle(el)
+    const ring = (cs.outlineStyle !== 'none' && parseFloat(cs.outlineWidth) > 0) || cs.boxShadow !== 'none'
+    if (!ring) bad.push((el.className || el.tagName).toString().split(' ')[0])
+  }
+  return bad
+})()`
 
-  expect(await extensionShowing()).toBe(true)
+async function everyControlShowsAFocusRing(): Promise<void> {
+  await showPanel(NOTES)
+  const missing = await inView<string[]>(NOTES.part, CONTROLS_WITHOUT_RING)
+  expect(missing, `controls with no visible focus indicator: ${missing.join(', ')}`).toHaveLength(0)
+}
+
+/** The frame's box, which a modal drawn over it must leave alone. */
+function taskVaultFrameBox() {
+  return handle.page.locator(`[data-extension-panel="${TASK_VAULT.id}"] iframe`).boundingBox()
+}
+
+/** ADR 114: the view is a frame in the window, so a modal draws over it instead of hiding it. */
+async function quickActionsDrawsOverTheFrame(): Promise<void> {
+  const { page } = handle
+  await showPanel(TASK_VAULT)
+  const frameBox = await taskVaultFrameBox()
+  expect(frameBox, 'the Task Vault iframe has no box').not.toBeNull()
+  await page.keyboard.press('ControlOrMeta+p')
+  const dialog = page.getByRole('dialog', { name: 'Quick actions' })
+  await expect(dialog).toBeVisible({ timeout: 10000 })
+  await expectCentredInWindow(dialog, 'Quick actions over Task Vault')
+  expect(await taskVaultFrameBox(), 'the frame was resized or hidden for the modal').toEqual(
+    frameBox
+  )
+  const hit = await page.evaluate(() => {
+    const el = document.querySelector('dialog[open]')
+    const r = el?.getBoundingClientRect()
+    const atCentre = r && document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)
+    return !!atCentre && el!.contains(atCentre)
+  })
+  expect(hit, 'something else paints over Quick Actions').toBe(true)
+  await page.keyboard.press('Escape')
+  await expect(dialog).toBeHidden()
+  await expect(page.locator(`[data-extension-panel="${TASK_VAULT.id}"] iframe`)).toBeVisible()
+}
+
+const KEYBOARD_STEPS: Steps = [
+  [
+    'a dialog puts focus inside itself, keeps Tab there, and closes on Escape',
+    dialogTrapsFocusAndClosesOnEscape,
+  ],
+  ['every focusable control in an extension view shows a focus ring', everyControlShowsAFocusRing],
+  [
+    'Quick Actions draws over the extension frame, centred, and the frame stays up',
+    quickActionsDrawsOverTheFrame,
+  ],
+]
+
+test('an extension is worked from the keyboard, with Quick Actions drawn over it', async () => {
+  test.setTimeout(120_000)
+  for (const [title, body] of KEYBOARD_STEPS) await test.step(title, body)
 })
