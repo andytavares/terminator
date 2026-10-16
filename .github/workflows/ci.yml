@@ -406,6 +406,8 @@ jobs:
     if: needs.e2e-select.outputs.mode != 'none'
     runs-on: macos-14
     strategy:
+      # Every shard runs to the end, so one run reports every failing spec rather than the first.
+      fail-fast: false
       matrix:
         shard: [1, 2, 3, 4, 5]
 
@@ -448,10 +450,10 @@ jobs:
           if [ "$MODE" = all ]; then SPECS=""; fi
           ARGS=$(node scripts/e2e-shard.mjs ${{ matrix.shard }} 5 $SPECS)
           if [ -z "$ARGS" ]; then echo "Nothing selected for this shard."; exit 0; fi
-          # remote-app.spec.ts and remote-control.spec.ts drive the browser remote renderer in Chromium, and
+          # remote-control.spec.ts drives the browser remote renderer in Chromium, and
           # git-integration-contrast.spec.ts and git-integration-stacking.spec.ts
           # render the extension views in it, and design-system-fields.spec.ts renders the shared field styles.
-          case "$ARGS" in *remote-app.spec.ts* | *remote-control.spec.ts* | *git-integration-contrast.spec.ts* | *git-integration-stacking.spec.ts* | *design-system-fields.spec.ts*) npx playwright install chromium ;; esac
+          case "$ARGS" in *remote-control.spec.ts* | *git-integration-contrast.spec.ts* | *git-integration-stacking.spec.ts* | *design-system-fields.spec.ts*) npx playwright install chromium ;; esac
           npx playwright test $ARGS --reporter=blob,dot
         timeout-minutes: 10
 
@@ -466,7 +468,7 @@ jobs:
         run: |
           ARGS=$(node scripts/e2e-shard.mjs ${{ matrix.shard }} 5 ${{ needs.e2e-select.outputs.changed }})
           if [ -z "$ARGS" ]; then echo "Nothing changed on this shard."; exit 0; fi
-          case "$ARGS" in *remote-app.spec.ts* | *remote-control.spec.ts* | *git-integration-contrast.spec.ts* | *git-integration-stacking.spec.ts* | *design-system-fields.spec.ts*) npx playwright install chromium ;; esac
+          case "$ARGS" in *remote-control.spec.ts* | *git-integration-contrast.spec.ts* | *git-integration-stacking.spec.ts* | *design-system-fields.spec.ts*) npx playwright install chromium ;; esac
           npx playwright test $ARGS --repeat-each=2 --reporter=dot
         timeout-minutes: 10
 
