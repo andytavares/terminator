@@ -1,0 +1,60 @@
+tests/unit/ipc/home-feed.ipc.spec.ts
+  s_3ced19ecaa16dd::t_2b3ba19cddf6c7 1-61,63-72
+  s_3ced19ecaa16dd::t_fec558fa19a0b4 62
+src/renderer/stores/home-feed.store.ts
+  s_3ced19ecaa16dd::t_35e4c8dc471316 1-39
+src/main/ipc/home-feed.ipc.ts
+  s_3ced19ecaa16dd::t_35e4c8dc471316 1-7,12-17,19-23,25-39
+  s_3ced19ecaa16dd::t_ad5c29ede311f2 8-11,18,24
+src/main/extensions/host/host-api.ts
+  s_3ced19ecaa16dd::t_ad5c29ede311f2 275,291-293
+  s_3ced19ecaa16dd::t_9095d399bd121a 294
+tests/unit/home/home-feed.fixtures.ts
+  s_3ced19ecaa16dd::t_838cf97a3d514f 1-6,8-43,46-48
+  s_3ced19ecaa16dd::t_2b3ba19cddf6c7 7,44-45,49-51
+src/main/home/home-feed.ts
+  s_3ced19ecaa16dd::t_35e4c8dc471316 1-76
+tests/unit/renderer/stores/home-feed.store.spec.ts
+  s_3ced19ecaa16dd::t_2b3ba19cddf6c7 1-60,64-72
+  s_3ced19ecaa16dd::t_d4305994cdf0cd 61-63
+tests/unit/home/home-feed.spec.ts
+  s_3ced19ecaa16dd::t_6ec36487c22f78 14,69-71
+  s_3ced19ecaa16dd::t_2b3ba19cddf6c7 1-13,15-68,72-94
+tests/unit/schemas/home-feed.schema.spec.ts
+  s_3ced19ecaa16dd::t_2b3ba19cddf6c7 1-29,31-39
+  s_3ced19ecaa16dd::t_e6d57656e46830 30
+src/shared/schemas/home-feed.schema.ts
+  s_3ced19ecaa16dd::t_35e4c8dc471316 1-94
+src/shared/electron-api/manifest.ts
+  s_3ced19ecaa16dd::t_0a32fcbb0407d2 61,1159-1188
+  s_3ced19ecaa16dd::t_626ac550a44a81 62-64,1123-1158
+  s_3ced19ecaa16dd::t_51e5822e2572c5 1189
+src/main/extensions/api.ts
+  s_3ced19ecaa16dd::t_0a32fcbb0407d2 680-692,970
+  s_3ced19ecaa16dd::t_518d9546ed9742 74
+packages/extension-sdk/types/api.d.ts
+  s_3ced19ecaa16dd::t_d4305994cdf0cd 324-326
+  s_3ced19ecaa16dd::t_b9a1a96a6add2f 297-323,327-360,482-483
+src/main/index.ts
+  s_3ced19ecaa16dd::t_0a32fcbb0407d2 25,364
+src/main/extensions/host/api-server.ts
+  s_3ced19ecaa16dd::t_ad5c29ede311f2 42-43
+docs/adr/117-extensions-send-home-data-core-draws-it.md
+  s_3ced19ecaa16dd::t_d60d69c58fbdcd 1-26
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "3d911be3985c62c61cb5dc0f3c3d193937e557a3",
+  "prompts": {},
+  "sessions": {
+    "s_3ced19ecaa16dd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "958bebf4-85fd-422a-9a09-b64994561aeb",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
