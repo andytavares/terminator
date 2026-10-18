@@ -274,11 +274,16 @@ async function loadShimAt(url: string, referrer = 'http://localhost:5173/home'):
   await loadShimInFrame()
 }
 
+/** Undoes what a fit=content shim set on the shared document, and the spies. */
+function resetFitContent(): void {
+  document.documentElement.removeAttribute('style')
+  document.body.removeAttribute('style')
+  vi.unstubAllGlobals()
+  vi.restoreAllMocks()
+}
+
 describe('frame-shim fit=content height reporting', () => {
-  afterEach(() => {
-    vi.unstubAllGlobals()
-    vi.restoreAllMocks()
-  })
+  afterEach(resetFitContent)
 
   it('observes the document and posts each height to the parent origin with fit=content', async () => {
     const spies = createFitContentSpies()
@@ -292,12 +297,38 @@ describe('frame-shim fit=content height reporting', () => {
       },
     ])
   })
+})
+
+describe('frame-shim fit=content sizes the page to its content', () => {
+  afterEach(resetFitContent)
+
+  it('lets the page grow with its content, since the frame starts 0px tall', async () => {
+    createFitContentSpies()
+    await loadShimAt('ext://com.test.ext/index.html?view=home&fit=content')
+    expect(document.documentElement.style.height).toBe('auto')
+    expect(document.body.style.height).toBe('auto')
+  })
+
+  it('reports the page shrinking, which the frame-sized scrollHeight never would', async () => {
+    const spies = createFitContentSpies()
+    await loadShimAt('ext://com.test.ext/index.html?view=home&fit=content')
+    vi.spyOn(document.documentElement, 'scrollHeight', 'get').mockReturnValue(391)
+    vi.spyOn(document.documentElement, 'getBoundingClientRect').mockReturnValue(
+      new DOMRect(0, 0, 800, 0)
+    )
+    spies.resizeCallback?.()
+    expect(spies.parentPosts.at(-1)?.message).toEqual({
+      type: 'terminator:frame-height',
+      height: 0,
+    })
+  })
 
   it('posts nothing without fit=content', async () => {
     const spies = createFitContentSpies()
     await loadShimAt('ext://com.test.ext/index.html?view=home')
     expect(spies.observed).toEqual([])
     expect(spies.parentPosts).toEqual([])
+    expect(document.documentElement.style.height).toBe('')
   })
 })
 
