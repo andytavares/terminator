@@ -1,0 +1,21 @@
+extensions/git-integration/src/components/contributions/Heatmap.tsx
+  s_6282b73fce0370::t_5df462293ba703 74,79
+extensions/git-integration/src/components/contributions/contributions.css
+  s_6282b73fce0370::t_5df462293ba703 182-186,188-192,198,202-205,208-211,214,250-251,255-256
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "5edabd5b24d1727a44be89c82c9b0ec738f0c354",
+  "prompts": {},
+  "sessions": {
+    "s_6282b73fce0370": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8fd4c19d-08a1-4eea-adbf-e1701c0949fd",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
