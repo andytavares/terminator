@@ -1,0 +1,28 @@
+tests/unit/extension-frame/frame-shim.spec.ts
+  s_3e90f40ad8d120::t_0456756df44213 300-302
+  s_3e90f40ad8d120::t_7c879a6adb463b 277-284,286,303
+  s_3e90f40ad8d120::t_8954201868fec1 305-311,331
+  s_3e90f40ad8d120::t_d9966e45755861 312-324
+  s_3e90f40ad8d120::t_f5858ed63e1e31 304
+src/extension-frame/frame-shim.ts
+  s_3e90f40ad8d120::t_d62665dba6b675 241
+  s_3e90f40ad8d120::t_d9966e45755861 233-236,239-240
+docs/adr/116-extensions-can-add-a-home-section.md
+  s_3e90f40ad8d120::t_d62665dba6b675 17
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "086c18629e74b37a4369629b049535d9c1163997",
+  "prompts": {},
+  "sessions": {
+    "s_3e90f40ad8d120": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a1a101da-b3f6-46eb-8c01-f7b6e20a703e",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
