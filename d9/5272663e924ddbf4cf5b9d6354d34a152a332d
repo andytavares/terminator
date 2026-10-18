@@ -1,0 +1,30 @@
+docs/EXTENSION-DEVELOPMENT.md
+  s_52dbe36f8c6b4c::t_a20454f478ef5a 61
+tests/unit/extensions/extension-host.spec.ts
+  s_52dbe36f8c6b4c::t_de2fdea70ce1b5 248-256
+  s_52dbe36f8c6b4c::t_1955eb4f37dcfd 247
+  s_52dbe36f8c6b4c::t_7f21d396ea3bee 257-259
+tests/unit/extensions/extension-host-start.spec.ts
+  s_52dbe36f8c6b4c::t_5e334748adc921 201-203,205-227
+  s_52dbe36f8c6b4c::t_1996ca749e0818 186-199,204
+  s_52dbe36f8c6b4c::t_1955eb4f37dcfd 200
+  s_52dbe36f8c6b4c::t_bee9344747ea00 228-229
+src/main/extensions/extension-host.ts
+  s_52dbe36f8c6b4c::t_40377fc76f51b5 2,43-47,53,81-89,325,380
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d95272663e924ddbf4cf5b9d6354d34a152a332d",
+  "prompts": {},
+  "sessions": {
+    "s_52dbe36f8c6b4c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c5af82f5-cd71-4a5c-8dee-3bd55d500b03",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
