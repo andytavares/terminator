@@ -1,0 +1,19 @@
+src/renderer/components/fit-content-height.ts
+  s_cdb54a81c638e2::t_95c58ceda86dcd 6
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "289dc195a2309c73889f42531eee9d4c74d022e9",
+  "prompts": {},
+  "sessions": {
+    "s_cdb54a81c638e2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "902a848e-c082-49ba-a9e3-14c98cfa3f0c",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
