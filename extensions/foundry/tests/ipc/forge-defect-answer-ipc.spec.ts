@@ -261,6 +261,21 @@ describe('after the architect amends an answered defect', () => {
   describe('the order before', theOrderBeforeTests)
 })
 
+/** Waits for the run's last write: the timeline frame where every agent has its session. A run
+ * still writing as the file ends recreates the folder cleanup removed, and CI fails the leak. */
+async function untilRunSettles(): Promise<void> {
+  const timeline = path.join(dataDir, 'orders', 'WO-1', 'run-timeline.jsonl')
+  await vi.waitFor(
+    () => {
+      const last = fs.readFileSync(timeline, 'utf8').trim().split('\n').at(-1) ?? ''
+      for (const session of ['builder-session', 'verifier-session', 'scribe-session']) {
+        expect(last).toContain(`"sessionId":"${session}"`)
+      }
+    },
+    { timeout: 5000 }
+  )
+}
+
 function agreeingAgainTests() {
   it('agrees the released order again and starts its run', async () => {
     await seed(true)
@@ -276,6 +291,7 @@ function agreeingAgainTests() {
     expect(lines.filter((l) => l.action === 'order.agreed').at(-1)?.actor).toBe('rule:forge')
     expect(lines.some((l) => l.action === 'converge.started')).toBe(true)
     expect((await createOrderStore(dataDir).load('WO-1'))?.status).toBe('running')
+    await untilRunSettles()
   })
 }
 
@@ -323,7 +339,7 @@ function theOrderBeforeTests() {
           timeout: 2000,
         }
       )
-      await new Promise((resolve) => setTimeout(resolve, 200))
+      await untilRunSettles()
     } finally {
       slow.restore()
     }

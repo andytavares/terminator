@@ -1,5 +1,5 @@
 import { spawn, execSync, type ChildProcess } from 'child_process'
-import { writeFileSync } from 'fs'
+import { rmSync, writeFileSync } from 'fs'
 import { createServer } from 'net'
 import { networkInterfaces, tmpdir } from 'os'
 import { join } from 'path'
@@ -61,9 +61,18 @@ function userConfigPath(): string | null {
  * ngrok the person runs may hold. Later files win when ngrok merges them, so theirs comes first.
  */
 function agentConfigArgs(apiPort: number): string[] {
-  const own = join(tmpdir(), `terminator-ngrok-${process.pid}.yml`)
+  const own = ownConfigPath()
   writeFileSync(own, `version: "3"\nagent:\n  web_addr: 127.0.0.1:${apiPort}\n`)
   return ['--config', [userConfigPath(), own].filter(Boolean).join(',')]
+}
+
+function ownConfigPath(): string {
+  return join(tmpdir(), `terminator-ngrok-${process.pid}.yml`)
+}
+
+/** Once ngrok is gone its file is not needed, and each launch of the app would leave one more. */
+function removeOwnConfig(): void {
+  rmSync(ownConfigPath(), { force: true })
 }
 
 export class NgrokManager {
@@ -101,6 +110,7 @@ export class NgrokManager {
 
     this.process.on('exit', (code) => {
       this.process = null
+      removeOwnConfig()
       if (code !== 0 && this.onCrashCallback) {
         this.onCrashCallback()
       }
@@ -119,6 +129,7 @@ export class NgrokManager {
       this.process.kill('SIGTERM')
       this.process = null
     }
+    removeOwnConfig()
   }
 
   private async pollForUrl(port: number, apiPort: number): Promise<string> {

@@ -65,6 +65,7 @@ afterEach(() => {
 
 describe('the run timeline', () => {
   describe('frames', timelineStoreFramesTests)
+  describe('write order', writeOrderTests)
   describe('tool calls', toolCallsTests)
   describe('reading', timelineStoreReadingTests)
 })
@@ -105,6 +106,27 @@ function timelineStoreFramesTests() {
     await recordGraph(dir, graph({ a: 'running' }), 1000)
     await (await afterRestart()).recordGraph(dir, graph({ a: 'running' }), 2000)
     expect((await readTimeline(dir)).frames).toHaveLength(1)
+  })
+}
+
+function writeOrderTests() {
+  it('writes frames in the order the graph was written, however long each write takes', async () => {
+    const mkdir = fs.promises.mkdir
+    let calls = 0
+    vi.spyOn(fs.promises, 'mkdir').mockImplementation((async (
+      ...args: Parameters<typeof mkdir>
+    ) => {
+      if (++calls === 1) await new Promise((resolve) => setTimeout(resolve, 50))
+      return mkdir(...args)
+    }) as typeof mkdir)
+    const first = recordGraph(dir, graph({ a: 'running' }), 1000)
+    const second = recordGraph(dir, graph({ a: 'passed' }), 1000)
+    await Promise.all([first, second])
+    vi.restoreAllMocks()
+    expect((await readTimeline(dir)).frames.map((f) => f.nodes[0].state)).toEqual([
+      'running',
+      'passed',
+    ])
   })
 }
 

@@ -448,11 +448,14 @@ export async function runQuickActionFromPanel(page: Page, label: string): Promis
   await expect(panel.locator(':focus')).toHaveCount(1, { timeout: 10000 })
   await page.keyboard.press('/')
   await page.keyboard.type(label)
-  await panel
+  const row = panel
     .locator('.qa-row')
     .filter({ has: page.locator('.qa-row__label', { hasText: exactly(label) }) })
     .first()
-    .click()
+  // The filtered row is new, and the panel may sit over an extension frame.
+  await expect(row).toBeVisible()
+  await untilDrawn(page)
+  await row.click()
   await expect(panel).toBeHidden({ timeout: 15000 })
 }
 
