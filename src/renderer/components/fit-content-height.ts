@@ -3,7 +3,7 @@ import React, { createContext, useContext, useEffect, useLayoutEffect, useState 
 // A fit=content page first reports its empty layout, before the extension draws, so a section
 // above other content would jump: the frame starts at the height it settled on last time.
 
-/** How long a frame's page may stay empty before its height is taken as final. */
+/** @internal How long a frame's page may stay empty before its height is taken as final. */
 export const FRAME_SETTLE_LIMIT_MS = 1000
 
 /** The window message the frame shim posts with its content height. */
