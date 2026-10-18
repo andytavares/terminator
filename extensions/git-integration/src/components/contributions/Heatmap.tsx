@@ -71,12 +71,12 @@ function WeekdayColumn(): JSX.Element {
   )
 }
 
-/** One month name above the first column that starts in it; 12px is a cell plus its gap. */
+/** One month name above the first column that starts in it, one week's pitch per column. */
 function MonthRow({ weeks }: { weeks: ContributionsDay[][] }): JSX.Element {
   return (
     <div className="ct-months" aria-hidden="true">
       {monthLabels(weeks).map((month) => (
-        <span key={month.column} style={{ left: month.column * 12 }}>
+        <span key={month.column} style={{ left: `calc(${month.column} * var(--ct-pitch))` }}>
           {month.label}
         </span>
       ))}
