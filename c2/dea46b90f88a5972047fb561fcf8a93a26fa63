@@ -1,0 +1,23 @@
+extensions/remote-control/tests/unit/lazy-server.spec.ts
+  s_cdb54a81c638e2::t_3c84591a85bd33 17-25
+extensions/remote-control/tests/unit/ngrok-manager.spec.ts
+  s_cdb54a81c638e2::t_3c84591a85bd33 8,23,307-316,373-382
+extensions/remote-control/src/server/ngrok-manager.ts
+  s_cdb54a81c638e2::t_02a45fb6ede273 2,64,69-77,113,132
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c2dea46b90f88a5972047fb561fcf8a93a26fa63",
+  "prompts": {},
+  "sessions": {
+    "s_cdb54a81c638e2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "902a848e-c082-49ba-a9e3-14c98cfa3f0c",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
