@@ -134,6 +134,20 @@ async function memoryOf(dir: string): Promise<Recorded> {
   return memory
 }
 
+// Each timeline's writes, one after another in the order they were asked for: the executor writes
+// a run's graph from several lanes at once, and a frame landing late put an old state last.
+const writing = new Map<string, Promise<void>>()
+
+function inTurn(dir: string, write: () => Promise<void>): Promise<void> {
+  const done = (writing.get(dir) ?? Promise.resolve()).then(write)
+  const settled = done.catch(() => undefined)
+  writing.set(dir, settled)
+  void settled.then(() => {
+    if (writing.get(dir) === settled) writing.delete(dir)
+  })
+  return done
+}
+
 async function append(dir: string, lines: readonly unknown[]): Promise<void> {
   if (lines.length === 0) return
   await fs.promises.mkdir(dir, { recursive: true })
@@ -148,11 +162,13 @@ export async function recordGraph(dir: string, graph: RunGraph, at: number): Pro
     attempts: n.attempts,
     sessionId: n.sessionId,
   }))
-  const memory = await memoryOf(dir)
-  const key = frameKey(nodes)
-  if (memory.lastFrame === key) return
-  memory.lastFrame = key
-  await append(dir, [{ kind: 'graph', at, nodes }])
+  return inTurn(dir, async () => {
+    const memory = await memoryOf(dir)
+    const key = frameKey(nodes)
+    if (memory.lastFrame === key) return
+    memory.lastFrame = key
+    await append(dir, [{ kind: 'graph', at, nodes }])
+  })
 }
 
 /**
@@ -162,13 +178,15 @@ export async function recordGraph(dir: string, graph: RunGraph, at: number): Pro
  */
 export async function recordCi(dir: string, ci: CiState | null, at: number): Promise<void> {
   if (ci === null) return
-  const memory = await memoryOf(dir)
-  const key = ciKey(ci)
-  if (memory.lastCi === key) return
-  memory.lastCi = key
-  await append(dir, [
-    { kind: 'ci', at, round: ci.round, max: ci.max, status: ci.status, pulls: ci.pulls },
-  ])
+  return inTurn(dir, async () => {
+    const memory = await memoryOf(dir)
+    const key = ciKey(ci)
+    if (memory.lastCi === key) return
+    memory.lastCi = key
+    await append(dir, [
+      { kind: 'ci', at, round: ci.round, max: ci.max, status: ci.status, pulls: ci.pulls },
+    ])
+  })
 }
 
 /** Record the tool calls in `activity` this timeline does not already hold. */
@@ -177,13 +195,15 @@ export async function recordTools(
   sessionId: string,
   activity: readonly ToolActivity[]
 ): Promise<void> {
-  const memory = await memoryOf(dir)
-  const fresh = activity.filter((a) => !memory.tools.has(toolKey(sessionId, a)))
-  for (const a of fresh) memory.tools.add(toolKey(sessionId, a))
-  await append(
-    dir,
-    fresh.map((a) => ({ kind: 'tool', at: a.at, sessionId, activity: a }))
-  )
+  return inTurn(dir, async () => {
+    const memory = await memoryOf(dir)
+    const fresh = activity.filter((a) => !memory.tools.has(toolKey(sessionId, a)))
+    for (const a of fresh) memory.tools.add(toolKey(sessionId, a))
+    await append(
+      dir,
+      fresh.map((a) => ({ kind: 'tool', at: a.at, sessionId, activity: a }))
+    )
+  })
 }
 
 /** The whole recording, in time order. */
