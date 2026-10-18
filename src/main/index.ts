@@ -22,6 +22,7 @@ import { installCaptureScript, installUserHook } from './agents/agent-session-ho
 import { startAgentSessionWatcher } from './agents/agent-session-watcher.js'
 import { makeSnapshotFor } from './sessions/session-snapshot.js'
 import { registerSessionRecordsHandlers } from './ipc/session-records.ipc.js'
+import { registerHomeFeedHandlers } from './ipc/home-feed.ipc.js'
 import { ensureHookScript } from './integrations/context-sync.js'
 import { registerShellHandlers } from './ipc/shell.ipc.js'
 import { startAdoptingLoginShellPath } from './shell/login-shell-path.js'
@@ -360,6 +361,7 @@ function registerSessionHandlers(): OutputRelay {
   registerGitHandlers()
   registerIntegrationsHandlers(() => mainWindow)
   registerSessionRecordsHandlers(() => mainWindow)
+  registerHomeFeedHandlers(() => mainWindow)
   return terminalRelay
 }
 

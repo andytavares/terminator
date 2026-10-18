@@ -294,6 +294,70 @@ export interface SaveDialogOptions {
   filters?: Array<{ name: string; extensions: string[] }>
 }
 
+export interface HomeApi {
+  /** Replace everything this extension shows on Home. */
+  publish(feed: HomeFeed): void
+  /** Called when the user presses one of this extension's item actions. */
+  onAction(handler: (itemId: string, actionId: string) => Promise<void>): Disposable
+}
+
+export interface HomeFeed {
+  asks: HomeAsk[]
+  facets: ThreadFacet[]
+  measures: HomeMeasure[]
+  focus?: HomeFocusCandidate[]
+}
+
+export interface HomeAsk {
+  id: string
+  kind: 'answer' | 'fix' | 'review' | 'decide' | 'finished' | 'task'
+  title: string
+  detail: string
+  facts: string[]
+  workKey: WorkKey | null
+  /** ISO time. */
+  since: string
+  actions: { id: string; label: string; primary?: boolean }[]
+  open: { command: string; args?: unknown }
+}
+
+export type WorkKey =
+  | { tracker: 'linear' | 'jira'; key: string }
+  | { repoRoot: string; branch: string }
+
+export interface ThreadFacet {
+  workKey: WorkKey
+  kind: 'pull-request' | 'order' | 'task'
+  stage: 'shaping' | 'building' | 'in-review' | 'merging' | 'shipped'
+  whoseMove: 'you' | 'agents' | 'others'
+  title?: string
+  line: string
+  tone: 'neutral' | 'good' | 'bad' | 'waiting'
+  url?: string
+  closedAt: string | null
+  checks?: { name: string; state: 'passed' | 'failed' | 'running'; detail?: string }[]
+  updatedAt: string
+}
+
+export interface HomeMeasure {
+  id: string
+  question: string
+  value: number
+  unit: 'count' | 'minutes' | 'days' | 'percent'
+  window: 'week' | '30d' | 'quarter' | 'year'
+  series: number[]
+  previous?: number
+  detail?: string
+}
+
+export interface HomeFocusCandidate {
+  id: string
+  title: string
+  detail?: string
+  workKey: WorkKey | null
+  done: boolean
+}
+
 export interface ExtensionAPI {
   /** The extension's database. Throws until the app database is initialised. The extension host
    * holds its own connection, so `transaction(fn)` runs `fn` in the extension's own process. */
@@ -415,6 +479,8 @@ export interface ExtensionAPI {
       onClick?: () => void
     }): Disposable
   }
+  /** Publish what Home should show; core draws it (ADR 117). */
+  home: HomeApi
   nativeMenu: {
     addViewMenuItem(item: NativeMenuItemContribution): Disposable
   }

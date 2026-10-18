@@ -58,6 +58,10 @@ import type {
   SetLinkInputSchema,
   TransferInputSchema,
 } from '../schemas/session-records.schema'
+import type { HomeFeedActionInputSchema, MergedHomeFeed } from '../schemas/home-feed.schema'
+import type { AgentAsk } from '../agent-sessions/ask'
+import type { AttentionMeasures } from '../home/attention-measures'
+import type { MeasuresInputSchema, RecordStateInputSchema } from '../schemas/attention.schema'
 
 type RemoteBehavior = 'same' | 'omit' | 'stub'
 
@@ -1114,6 +1118,73 @@ export const ELECTRON_API_MANIFEST = [
           handler: (payload: { sessionId: string; record: SessionRecordListing | null }) => void
         ) => Unsubscribe
       >(),
+  }),
+
+  // ── agent asks (a Claude Code Notification hook says the agent is waiting on you) ──
+  method({
+    path: 'agentAsk.list',
+    kind: 'invoke',
+    channel: 'agent-ask:list',
+    signature: signature<() => Promise<{ data: Array<{ sessionId: string; ask: AgentAsk }> }>>(),
+  }),
+  method({
+    path: 'agentAsk.onChanged',
+    kind: 'event',
+    channel: 'agent-ask:changed',
+    signature:
+      signature<
+        (handler: (payload: { sessionId: string; ask: AgentAsk | null }) => void) => Unsubscribe
+      >(),
+  }),
+
+  // ── attention log (when sessions worked and when they waited on you) ──────
+  method({
+    path: 'attention.record',
+    kind: 'invoke',
+    channel: 'attention:record',
+    signature:
+      signature<
+        (
+          input: z.input<typeof RecordStateInputSchema>
+        ) => Promise<{ data: true } | { error: string; message: string }>
+      >(),
+  }),
+  method({
+    path: 'attention.measures',
+    kind: 'invoke',
+    channel: 'attention:measures',
+    signature:
+      signature<
+        (input: z.input<typeof MeasuresInputSchema>) => Promise<{ data: AttentionMeasures }>
+      >(),
+  }),
+
+  // ── home feed (what extensions publish for Home to draw; core only) ───────
+  method({
+    path: 'homeFeed.get',
+    kind: 'invoke',
+    channel: 'home:feed-get',
+    signature: signature<() => Promise<{ data: MergedHomeFeed }>>(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'homeFeed.action',
+    kind: 'invoke',
+    channel: 'home:feed-action',
+    signature:
+      signature<
+        (
+          input: z.input<typeof HomeFeedActionInputSchema>
+        ) => Promise<{ data: true } | { error: string; message: string }>
+      >(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'homeFeed.onChanged',
+    kind: 'event',
+    channel: 'home:feed-changed',
+    signature: signature<(handler: (feed: MergedHomeFeed) => void) => Unsubscribe>(),
+    remote: 'omit',
   }),
 
   // ── integrations (issue trackers) ─────────────────────────────────────────

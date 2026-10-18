@@ -71,6 +71,7 @@ import { defaultShellFor } from '../terminal/default-shell.js'
 import { basename } from 'path'
 import { randomUUID } from 'crypto'
 import { makeLogger } from '../logger.js'
+import { clearFeed, publishFeed, setActionHandler } from '../home/home-feed.js'
 
 const apiLog = makeLogger('extension-api')
 import {
@@ -676,6 +677,19 @@ function notificationsApi({ extensionId, disposable }: ApiContext): ExtensionAPI
   }
 }
 
+function homeApi({ extensionId, disposable }: ApiContext): ExtensionAPI['home'] {
+  // Unloading the extension takes its items off Home.
+  disposable(() => clearFeed(extensionId))
+  return {
+    publish(feed): void {
+      publishFeed(extensionId, feed)
+    },
+    onAction(handler): Disposable {
+      return disposable(setActionHandler(extensionId, handler))
+    },
+  }
+}
+
 function nativeMenuApi({ extensionId, disposable }: ApiContext): ExtensionAPI['nativeMenu'] {
   return {
     addViewMenuItem(item: NativeMenuItemContribution): Disposable {
@@ -953,6 +967,7 @@ export function createExtensionAPI(
     github: createGithubApi(context.execInScope),
     issues: { ...issueReadApi(), ...issueWorkflowApi(), ...issueCreateApi() },
     notifications: notificationsApi(context),
+    home: homeApi(context),
     nativeMenu: nativeMenuApi(context),
     commands: commandsApi(context),
     ipc: { ...ipcRegistrationApi(context), ...ipcBridgeApi(context) },
