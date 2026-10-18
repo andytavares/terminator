@@ -23,8 +23,9 @@
 
 /* Every modal sits in the middle of the window, on both axes (ADR 110). These are
    the browser's own values for a modal dialog, made unmovable: no caller's class,
-   offset or transform, animated or not, takes a modal off centre. */
-.tmui-modal {
+   offset or transform, animated or not, takes a modal off centre. The drawer is the one
+   exception: it docks to the right edge (desk.css). */
+.tmui-modal:not(.tmui-drawer) {
   position: fixed !important;
   inset: 0 !important;
   margin: auto !important;
