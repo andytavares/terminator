@@ -1,6 +1,5 @@
-import { createRequire } from 'node:module'
 import { join } from 'path'
-import { readdirSync, existsSync } from 'fs'
+import { readdirSync, existsSync, readFileSync } from 'fs'
 import { app } from 'electron'
 import { CachedStore } from '../storage/cached-store.js'
 import type { z } from 'zod'
@@ -10,9 +9,6 @@ import type { Disposable, ExtensionAPI } from '@terminator/extension-sdk'
 import { createExtensionAPI, getApiDisposables, type ExtensionAPIDeps } from './api.js'
 import { makeLogger } from '../logger.js'
 import type { BackendRecord } from './host/host-runtime.js'
-
-// Manifests are read with require(); main is an ES module.
-const loadCommonJs = createRequire(import.meta.url)
 
 const hostLogger = makeLogger('extension-host')
 
@@ -44,12 +40,17 @@ type RegisterResult =
 
 type ParsedManifest = z.infer<typeof ExtensionManifestSchema>
 
+/** Read from disk every time: require() would cache it, and a pulled manifest would never show. */
+function readManifestJson(directoryPath: string): Record<string, unknown> {
+  return JSON.parse(readFileSync(join(directoryPath, 'manifest.json'), 'utf8'))
+}
+
 function readManifest(
   directoryPath: string
 ): { data: ParsedManifest } | { error: 'INVALID_MANIFEST'; message: string } {
   let manifest: Record<string, unknown>
   try {
-    manifest = loadCommonJs(join(directoryPath, 'manifest.json'))
+    manifest = readManifestJson(directoryPath)
   } catch {
     hostLogger.warn(`INVALID_MANIFEST: cannot read manifest.json at ${directoryPath}`)
     return { error: 'INVALID_MANIFEST', message: 'Cannot read manifest.json' }
@@ -75,6 +76,15 @@ function toRecord(manifest: ParsedManifest, directoryPath: string): ExtensionRec
     rendererUrl: renderer ? `ext://${id}/${renderer}` : undefined,
     contributes,
   }
+}
+
+/** The stored record with what its manifest declares now. A bundled extension stays registered
+ * across updates, so the record can predate a field; an unreadable manifest keeps the record. */
+function withCurrentManifest(record: ExtensionRecord): ExtensionRecord {
+  const manifest = readManifest(record.directoryPath)
+  if ('error' in manifest) return record
+  const { status, installedAt, errorMessage } = record
+  return { ...toRecord(manifest.data, record.directoryPath), status, installedAt, errorMessage }
 }
 
 /** Read from the manifest, not the stored record: a bundled extension stays registered across
@@ -312,6 +322,7 @@ export class ExtensionHost {
    * promise, then activates them all at once after `beforeActivation`. One extension failing
    * never stops another: `activate` reports failure as a value. Views wait on `whenActivated`. */
   async startAll(options: StartOptions): Promise<void> {
+    store.set('extensions', store.get('extensions').map(withCurrentManifest))
     const registered = [
       ...store
         .get('extensions')
@@ -366,7 +377,7 @@ export class ExtensionHost {
 
   private isStored(directoryPath: string): boolean {
     try {
-      const { id } = loadCommonJs(join(directoryPath, 'manifest.json')) as { id?: string }
+      const { id } = readManifestJson(directoryPath) as { id?: string }
       return store.get('extensions').some((e) => e.id === id)
     } catch {
       return false // registerDirectory() reports the unreadable manifest

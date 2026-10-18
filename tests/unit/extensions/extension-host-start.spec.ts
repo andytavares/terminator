@@ -183,6 +183,50 @@ describe('ExtensionHost.start — listing and stored extensions', () => {
   })
 })
 
+const homeSection = { label: 'Contributions', view: 'home' }
+
+/** The manifest after a pull: a new version that adds a renderer and a home section. */
+const pulledManifest = {
+  id: 'com.stored',
+  name: 'Stored',
+  version: '2.0.0',
+  description: 'Updated',
+  main: 'main.js',
+  renderer: 'dist/index.html',
+  minAppVersion: '0.0.1',
+  contributes: { homeSection },
+}
+
+describe('ExtensionHost.start — stored records follow their manifest', () => {
+  it('lists a stored extension with what its manifest declares now, not when it was stored', async () => {
+    const directory = join(writeBundle({ 'com.stored': [] }), 'com.stored')
+    storeData.extensions = [storedExtensionRecord(bundle, 'com.stored', 'enabled')]
+    writeFileSync(join(directory, 'manifest.json'), JSON.stringify(pulledManifest))
+    const { host } = await newExtensionHost()
+
+    await host.startAll({ bundledDirectory: bundle, beforeActivation: ready })
+
+    expect(host.listAll()[0]).toMatchObject({
+      version: '2.0.0',
+      rendererUrl: 'ext://com.stored/dist/index.html',
+      contributes: { homeSection },
+    })
+    expect(host.getExtensionContributes('com.stored')).toMatchObject({ homeSection })
+  })
+
+  it('keeps a stored extension whose manifest no longer parses as it was stored', async () => {
+    const directory = join(writeBundle({ 'com.stored': [] }), 'com.stored')
+    const stored = storedExtensionRecord(bundle, 'com.stored', 'enabled')
+    storeData.extensions = [stored]
+    writeFileSync(join(directory, 'manifest.json'), '{ not json')
+    const { host } = await newExtensionHost()
+
+    await host.startAll({ bundledDirectory: bundle, beforeActivation: ready })
+
+    expect(host.listAll()[0]).toMatchObject({ id: 'com.stored', version: stored.version })
+  })
+})
+
 describe('ExtensionHost.start — disabled extensions and whenActivated', () => {
   it('does not activate an extension stored as disabled', async () => {
     writeBundle({ 'com.off': [] })
