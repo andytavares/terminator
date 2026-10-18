@@ -1,0 +1,34 @@
+extensions/git-integration/src/index.ts
+  s_3e90f40ad8d120::t_0b98ef23cc7dbf 115-117,120-121
+  s_3e90f40ad8d120::t_31f09d50a9351b 118-119
+extensions/git-integration/tests/unit/ContributionsOnHome.spec.tsx
+  s_3e90f40ad8d120::t_e4551b34799439 48,50
+  s_3e90f40ad8d120::t_ad084a5c25fe67 1-29,33-37,39-47,49,51-53,55-57,59-61,63-71
+  s_3e90f40ad8d120::t_1a335c60b8f169 30-32,38,54,58,62
+extensions/git-integration/README.md
+  s_3e90f40ad8d120::t_31f09d50a9351b 38,47
+  s_3e90f40ad8d120::t_ca708d9a552e42 48
+extensions/git-integration/src/renderer/App.tsx
+  s_3e90f40ad8d120::t_0b98ef23cc7dbf 15-17,49
+extensions/git-integration/src/components/contributions/ContributionsOnHome.tsx
+  s_3e90f40ad8d120::t_d744708a774c31 14
+  s_3e90f40ad8d120::t_0b98ef23cc7dbf 1-13,15-19
+tests/e2e/home-contributions-setting.spec.ts
+  s_3e90f40ad8d120::t_c5d6dec58dc6bb 1-40
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "86d9154bbce3d703fbdb02ecd3712203fe749705",
+  "prompts": {},
+  "sessions": {
+    "s_3e90f40ad8d120": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a1a101da-b3f6-46eb-8c01-f7b6e20a703e",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
