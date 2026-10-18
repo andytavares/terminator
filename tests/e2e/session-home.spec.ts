@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect, type Locator, type Page } from '@playwright/test'
 import {
   AppHandle,
   launchApp,
@@ -7,6 +7,7 @@ import {
   addAndSelectProject,
   selectProject,
   e2eTempDir,
+  untilDrawn,
 } from './helpers'
 import { openHome } from './session-views'
 import { expectCentredInWindow } from './modal-centre'
@@ -30,6 +31,14 @@ function homeRegion(page: Page) {
 async function opensOnHomeWithNothingOpen(page: Page): Promise<void> {
   await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible()
   await expect(page.getByText('No terminals are open')).toBeVisible()
+}
+
+/** Clicks a control in a dialog or menu that has just opened over the Contributions frame: the
+ * browser routes the click by the last frame it drew, which may still show the frame there. */
+async function clickOnceDrawn(control: Locator): Promise<void> {
+  await expect(control).toBeVisible()
+  await untilDrawn(control.page())
+  await control.click()
 }
 
 async function branchWithATerminal(page: Page, folder: string): Promise<void> {
@@ -109,7 +118,7 @@ async function emptyStateMenuAndControls(page: Page): Promise<void> {
 }
 
 async function startFromEmptyStateOnBranch(page: Page): Promise<void> {
-  await page.getByRole('menuitem', { name: `New terminal in ${BRANCH_GROUP}` }).click()
+  await clickOnceDrawn(page.getByRole('menuitem', { name: `New terminal in ${BRANCH_GROUP}` }))
   // Starting a terminal shows it, so Home gives way to the terminal.
   await expect(page.getByRole('heading', { name: 'Home' })).toBeHidden()
   await openHome(page)
@@ -228,7 +237,7 @@ async function linkDialogNamesWhereToConnect(page: Page): Promise<void> {
   await expect(dialog.getByRole('alert')).toHaveText(
     'No issue tracker is connected. Connect Linear or Jira in Settings → Integrations.'
   )
-  await dialog.getByRole('button', { name: 'Cancel' }).click()
+  await clickOnceDrawn(dialog.getByRole('button', { name: 'Cancel' }))
   await expect(dialog).toBeHidden()
 }
 
@@ -264,13 +273,13 @@ async function barControlsAreOneSet(page: Page): Promise<void> {
 async function startOnBranchThenScratch(page: Page): Promise<void> {
   const sessionTabs = page.locator('.tab-bar__tab--session')
   await homeRegion(page).getByRole('button', { name: 'New terminal' }).click()
-  await page.getByRole('menuitem', { name: `New terminal in ${BRANCH_GROUP}` }).click()
+  await clickOnceDrawn(page.getByRole('menuitem', { name: `New terminal in ${BRANCH_GROUP}` }))
   // Starting a terminal shows it, so Home gives way to the terminal.
   await expect(sessionTabs).toHaveCount(2)
   await openHome(page)
   await expect(page.getByRole('rowgroup', { name: BRANCH_GROUP }).getByRole('row')).toHaveCount(2)
   await homeRegion(page).getByRole('button', { name: 'New terminal' }).click()
-  await page.getByRole('menuitem', { name: 'New scratch terminal' }).click()
+  await clickOnceDrawn(page.getByRole('menuitem', { name: 'New scratch terminal' }))
   await expect(sessionTabs).toHaveCount(1)
   await openHome(page)
   await expect(page.getByRole('rowgroup', { name: 'No branch' }).getByRole('row')).toHaveCount(1)
@@ -290,7 +299,7 @@ function ledgerFit(): { overflow: number; ageGap: number } {
 async function ledgerFitsEveryWidth(page: Page): Promise<void> {
   // Tags is the one column off by default; with it on the row is at its widest.
   await homeRegion(page).getByRole('button', { name: 'Display' }).click()
-  await page.getByRole('menuitemcheckbox', { name: 'Tags' }).click()
+  await clickOnceDrawn(page.getByRole('menuitemcheckbox', { name: 'Tags' }))
   await page.mouse.click(500, 700)
   for (const width of [1440, 1100, 900, 780]) {
     await page.setViewportSize({ width, height: 800 })
