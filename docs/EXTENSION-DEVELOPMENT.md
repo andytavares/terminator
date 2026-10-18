@@ -58,7 +58,7 @@ task-vault/
 
 ## The manifest
 
-`manifest.json` is validated by `ExtensionManifestSchema` (`src/shared/schemas/extension.schema.ts`) when the extension is registered.
+`manifest.json` is validated by `ExtensionManifestSchema` (`src/shared/schemas/extension.schema.ts`) when the extension is registered. The host reads it from disk again at every start, so a manifest change (a new `contributes` entry after a pull) shows after a restart; a manifest that no longer parses leaves the stored registration as it was.
 
 ```json
 {

@@ -230,12 +230,15 @@ function parentOrigin(): string {
 
 function reportContentHeight(): void {
   if (new URLSearchParams(window.location.search).get('fit') !== 'content') return
+  // The base CSS makes html and body 100% of the frame, which starts 0px tall: the page would
+  // never be taller than the frame, so no height would ever change and none would be reported.
+  document.documentElement.style.height = 'auto'
+  document.body.style.height = 'auto'
   const targetOrigin = parentOrigin()
   const observer = new ResizeObserver(() => {
-    window.parent.postMessage(
-      { type: 'terminator:frame-height', height: document.documentElement.scrollHeight },
-      targetOrigin
-    )
+    // The element's own height: scrollHeight never reports less than the frame, so it never shrinks.
+    const height = Math.ceil(document.documentElement.getBoundingClientRect().height)
+    window.parent.postMessage({ type: 'terminator:frame-height', height }, targetOrigin)
   })
   observer.observe(document.documentElement)
 }

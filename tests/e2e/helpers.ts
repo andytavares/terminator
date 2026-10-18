@@ -460,7 +460,7 @@ export async function runQuickActionFromPanel(page: Page, label: string): Promis
  * last frame it drew, so a click on a dialog that is in the DOM but not yet on screen goes to
  * whatever was drawn there before, such as an extension frame. A screenshot makes the browser
  * draw (and update its hit-testing) before it returns. */
-async function untilDrawn(page: Page): Promise<void> {
+export async function untilDrawn(page: Page): Promise<void> {
   await page.screenshot({ clip: { x: 0, y: 0, width: 1, height: 1 } })
 }
 

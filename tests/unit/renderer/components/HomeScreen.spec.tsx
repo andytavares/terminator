@@ -35,8 +35,13 @@ interface FakePortalProps {
   fitContent?: boolean
 }
 
+/** Each fake portal's way to say its height is ready, as the real frame does. */
+const readyNotices = vi.hoisted(() => new Map<string, () => void>())
+
 /** Stands in for the real frame portal, which mounts an extension iframe. */
 function FakeExtensionPortal(props: FakePortalProps): JSX.Element {
+  const notifyReady = React.useContext(FrameHeightReadyContext)
+  readyNotices.set(props.extensionId, () => notifyReady(props.extensionId))
   return (
     <div
       data-testid={`portal-${props.extensionId}`}
@@ -64,6 +69,7 @@ vi.mock('../../../../src/renderer/components/session/SessionLinkDialog', () => (
 
 import { HomeScreen } from '../../../../src/renderer/components/home/HomeScreen'
 import { ExtensionPanelPortal } from '../../../../src/renderer/components/ExtensionPanelPortal'
+import { FrameHeightReadyContext } from '../../../../src/renderer/components/fit-content-height'
 import { useSessionRecordsStore } from '../../../../src/renderer/stores/session-records.store'
 import { useIntegrationsStore } from '../../../../src/renderer/stores/integrations.store'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
@@ -238,6 +244,29 @@ describe('HomeScreen — contributed home sections', () => {
     render(<HomeScreen />)
     expect(screen.getByRole('region', { name: 'Pull requests' })).toBeTruthy()
     expect(screen.getByText('No terminals are open')).toBeTruthy()
+  })
+})
+
+function sayReady(extensionId: string): void {
+  act(() => readyNotices.get(extensionId)?.())
+}
+
+describe('HomeScreen — holds its body until each section has a height', () => {
+  it('holds the body while a section has no height to show', () => {
+    registerSection('com.test.one', 'Pull requests')
+    registerSection('com.test.two', 'Deployments')
+    const { container } = render(<HomeScreen />)
+    const body = container.querySelector('.home__body') as HTMLElement
+    expect(body.dataset.holding).toBe('true')
+    sayReady('com.test.one')
+    expect(body.dataset.holding).toBe('true')
+    sayReady('com.test.two')
+    expect(body.dataset.holding).toBeUndefined()
+  })
+
+  it('does not hold the body with no sections', () => {
+    const { container } = render(<HomeScreen />)
+    expect((container.querySelector('.home__body') as HTMLElement).dataset.holding).toBeUndefined()
   })
 })
 

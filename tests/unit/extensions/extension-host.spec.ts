@@ -244,6 +244,19 @@ describe('ExtensionHost lifecycle — reload', () => {
   })
 })
 
+describe('ExtensionHost lifecycle — reinstall', () => {
+  it('a reinstall reads the manifest as it is on disk now, not as first read', async () => {
+    const { host } = await newExtensionHost()
+    await host.load(writeManifestOnly('com.pulled'))
+    await host.uninstallExtension('com.pulled')
+    const homeSection = { label: 'Contributions', view: 'home' }
+
+    await host.load(writeManifestOnly('com.pulled', { contributes: { homeSection } }))
+
+    expect(host.getExtensionContributes('com.pulled')).toMatchObject({ homeSection })
+  })
+})
+
 describe('ExtensionHost lifecycle — toggle', () => {
   it('toggle off deactivates the backend; toggle on activates it again', async () => {
     const { host, backendHost } = await newExtensionHost()

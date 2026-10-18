@@ -12,9 +12,9 @@ const PrReviewTab = lazy(() =>
 const ReviewDashboard = lazy(() =>
   import('../components/pr-review/ReviewDashboard').then((m) => ({ default: m.ReviewDashboard }))
 )
-const ContributionsSection = lazy(() =>
-  import('../components/contributions/ContributionsSection').then((m) => ({
-    default: m.ContributionsSection,
+const ContributionsOnHome = lazy(() =>
+  import('../components/contributions/ContributionsOnHome').then((m) => ({
+    default: m.ContributionsOnHome,
   }))
 )
 
@@ -46,7 +46,7 @@ function ViewForPage(): JSX.Element {
     return <ReviewDashboard />
   }
   if (view === 'home') {
-    return <ContributionsSection />
+    return <ContributionsOnHome />
   }
   if (view === 'code-reviews' || view === 'pr-review') {
     return <PrReviewTab repoRoot={repoRoot} />

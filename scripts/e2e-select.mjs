@@ -38,6 +38,7 @@ export const IMPACT_MAP = [
       'git-integration-contrast.spec.ts',
       'git-integration-stacking.spec.ts',
       'git-status-watch.spec.ts',
+      'home-contributions-setting.spec.ts',
       'merge-flow.spec.ts',
       'pr-review-*.spec.ts',
       'review-*.spec.ts',

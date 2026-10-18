@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useCallback, useMemo, useState } from 'react'
 import { Command, Search } from 'lucide-react'
 import { LedgerView } from './LedgerView'
 import { LogbookView } from './LogbookView'
@@ -8,6 +8,7 @@ import { StateChip } from '../session/StateChip'
 import { useIssueTitles, useSessionFacts } from '../session/useSessionFacts'
 import { useSessionRecordsStore } from '../../stores/session-records.store'
 import { useExtensionRegistry } from '../../extensions/registry'
+import { FrameHeightReadyContext } from '../fit-content-height'
 import { startScratchSession, startSessionInBranch } from '../../terminal/start-session'
 import { SESSION_ACTIONS } from '../session/session-actions'
 import { answersFor } from '../session/answers'
@@ -52,8 +53,7 @@ export function HomeScreen({ onOpenQuickActions }: HomeScreenProps = {}): JSX.El
   return (
     <section className="home" aria-label="Home">
       <HomeBar {...{ openCount, prefs, update, filters, onOpenQuickActions }} />
-      <div className="home__body">
-        <ContributedHomeSections />
+      <HomeBody>
         {openCount === 0 && <NothingOpen />}
         {facts.length > 0 && filters.matches === 0 ? (
           <NoMatches onClear={filters.clear} />
@@ -66,15 +66,34 @@ export function HomeScreen({ onOpenQuickActions }: HomeScreenProps = {}): JSX.El
             />
           )
         )}
-      </div>
+      </HomeBody>
       {linking !== null && <SessionLinkDialog facts={linking} onClose={() => setLinking(null)} />}
     </section>
   )
 }
 
-/** Each extension's homeSection, in registration order, above the sessions. */
-function ContributedHomeSections(): JSX.Element | null {
+/** Held hidden until every section has a height, so the sessions under them never jump. */
+function HomeBody({ children }: { children: React.ReactNode }): JSX.Element {
   const homeSections = useExtensionRegistry((s) => s.homeSections)
+  const [readyIds, setReadyIds] = useState<ReadonlySet<string>>(() => new Set())
+  const markReady = useCallback((extensionId: string) => {
+    setReadyIds((ids) => (ids.has(extensionId) ? ids : new Set(ids).add(extensionId)))
+  }, [])
+  const holding = [...homeSections.keys()].some((id) => !readyIds.has(id))
+  return (
+    <div className="home__body" data-holding={holding || undefined}>
+      <FrameHeightReadyContext.Provider value={markReady}>
+        <ContributedHomeSections homeSections={homeSections} />
+      </FrameHeightReadyContext.Provider>
+      {children}
+    </div>
+  )
+}
+
+type HomeSections = ReturnType<typeof useExtensionRegistry.getState>['homeSections']
+
+/** Each extension's homeSection, in registration order, above the sessions. */
+function ContributedHomeSections({ homeSections }: { homeSections: HomeSections }) {
   if (homeSections.size === 0) return null
   return (
     <>

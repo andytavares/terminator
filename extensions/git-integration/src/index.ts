@@ -112,6 +112,13 @@ const SETTINGS: Record<string, SettingDefinition> = {
     min: MAX_DISPLAYED_FILES.min,
     max: MAX_DISPLAYED_FILES.max,
   },
+  'terminator.git-integration.home.showContributions': {
+    type: 'boolean',
+    label: 'Show contributions on Home',
+    description:
+      'The Contributions section (heatmap, streaks and period stats) at the top of Home.',
+    default: true,
+  },
   'terminator.git-integration.review.agentModel': {
     type: 'enum',
     label: 'Review agent model',

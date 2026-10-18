@@ -4,6 +4,10 @@ import { render, act, fireEvent } from '@testing-library/react'
 
 import { FRAME_PORT_MESSAGE } from '../../../../src/shared/frame-wire'
 import { ExtensionPanelPortal } from '../../../../src/renderer/components/ExtensionPanelPortal.js'
+import {
+  FRAME_SETTLE_LIMIT_MS,
+  FrameHeightReadyContext,
+} from '../../../../src/renderer/components/fit-content-height'
 import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
 import { useShownExtensionViews } from '../../../../src/renderer/stores/shown-extension-views.store'
 
@@ -340,8 +344,14 @@ function heightMessage(
   })
 }
 
+/** Desktop API, and no height remembered from an earlier test. */
+function freshDesktopFrame(): void {
+  stubDesktopApi()
+  localStorage.clear()
+}
+
 describe('ExtensionPanelPortal — fitContent', () => {
-  beforeEach(stubDesktopApi)
+  beforeEach(freshDesktopFrame)
 
   it('adds fit=content to the src and starts with no flex and zero height', () => {
     const { container } = renderPortal({ fitContent: true })
@@ -371,6 +381,113 @@ describe('ExtensionPanelPortal — fitContent', () => {
     heightMessage(container, 240)
     expect(panelWrapper(container).style.flex).toBe('1 1 0%')
     expect(panelWrapper(container).style.height).toBe('')
+  })
+})
+
+const REMEMBERED_KEY = 'terminator.frame-height.com.test.ext.main'
+
+describe('ExtensionPanelPortal — fitContent remembers its height', () => {
+  beforeEach(freshDesktopFrame)
+  afterEach(() => vi.useRealTimers())
+
+  it('starts at the height it settled on last time', () => {
+    localStorage.setItem(REMEMBERED_KEY, '425')
+    const { container } = renderPortal({ fitContent: true })
+    expect(panelWrapper(container).style.height).toBe('425px')
+  })
+
+  it('keeps that height through the empty layout a page reports before its content', () => {
+    localStorage.setItem(REMEMBERED_KEY, '425')
+    const { container } = renderPortal({ fitContent: true })
+    heightMessage(container, 0)
+    expect(panelWrapper(container).style.height).toBe('425px')
+    heightMessage(container, 300)
+    expect(panelWrapper(container).style.height).toBe('300px')
+    heightMessage(container, 0)
+    expect(panelWrapper(container).style.height).toBe('0px')
+  })
+})
+
+describe('ExtensionPanelPortal — fitContent settles on its page', () => {
+  beforeEach(freshDesktopFrame)
+  afterEach(() => vi.useRealTimers())
+
+  it('takes a 0px page as final once the settle limit passes', () => {
+    vi.useFakeTimers()
+    localStorage.setItem(REMEMBERED_KEY, '425')
+    const { container } = renderPortal({ fitContent: true })
+    heightMessage(container, 0)
+    act(() => {
+      vi.advanceTimersByTime(FRAME_SETTLE_LIMIT_MS - 1)
+    })
+    expect(panelWrapper(container).style.height).toBe('425px')
+    act(() => {
+      vi.advanceTimersByTime(1)
+    })
+    expect(panelWrapper(container).style.height).toBe('0px')
+  })
+
+  it('starts the next frame at the height this one settled on', () => {
+    const first = renderPortal({ fitContent: true })
+    heightMessage(first.container, 240)
+    first.unmount()
+    const { container } = renderPortal({ fitContent: true })
+    expect(panelWrapper(container).style.height).toBe('240px')
+  })
+
+  it('remembers nothing without fitContent', () => {
+    const { container } = renderPortal()
+    heightMessage(container, 240)
+    expect(localStorage.getItem(REMEMBERED_KEY)).toBeNull()
+  })
+})
+
+/** Renders a fit=content frame under a provider that records which extensions became ready. */
+function renderReporting(ready: string[]): ReturnType<typeof render> {
+  return render(
+    React.createElement(
+      FrameHeightReadyContext.Provider,
+      { value: (extensionId: string) => ready.push(extensionId) },
+      React.createElement(ExtensionPanelPortal, {
+        extensionId: 'com.test.ext',
+        viewParam: 'main',
+        isActive: true,
+        fitContent: true,
+      })
+    )
+  )
+}
+
+describe('ExtensionPanelPortal — fitContent says when its height is ready', () => {
+  beforeEach(freshDesktopFrame)
+  afterEach(() => vi.useRealTimers())
+
+  it('is ready at once with a remembered height', () => {
+    localStorage.setItem(REMEMBERED_KEY, '0')
+    const ready: string[] = []
+    renderReporting(ready)
+    expect(ready).toEqual(['com.test.ext'])
+  })
+
+  it('without one, is ready at its first page with content, not its empty layout', () => {
+    const ready: string[] = []
+    const { container } = renderReporting(ready)
+    heightMessage(container, 0)
+    expect(ready).toEqual([])
+    heightMessage(container, 425)
+    expect(ready).toEqual(['com.test.ext'])
+  })
+
+  it('without one, is ready when the settle limit passes on an empty page', () => {
+    vi.useFakeTimers()
+    const ready: string[] = []
+    const { container } = renderReporting(ready)
+    heightMessage(container, 0)
+    act(() => {
+      vi.advanceTimersByTime(FRAME_SETTLE_LIMIT_MS)
+    })
+    expect(ready).toEqual(['com.test.ext'])
+    expect(panelWrapper(container).style.height).toBe('0px')
   })
 })
 
