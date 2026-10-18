@@ -4,6 +4,7 @@ import { useExtensionRegistry } from '../extensions/registry'
 import { createDoubleEscapeDetector } from '../../shared/double-escape'
 import { FRAME_PORT_MESSAGE } from '../../shared/frame-wire'
 import { focusActiveTerminal } from '../lib/focus-terminal'
+import { useFitContentHeight } from './fit-content-height'
 
 interface Props {
   extensionId: string
@@ -181,29 +182,6 @@ function useFramePort(
   })
 }
 
-/** The window message the frame shim posts with its content height (the fit=content mode). */
-const FRAME_HEIGHT_MESSAGE = 'terminator:frame-height'
-
-/** Tracks the height a fit=content frame reports; only its own frame's messages count. */
-function useReportedHeight(
-  iframeRef: React.RefObject<HTMLIFrameElement>,
-  enabled: boolean
-): number | null {
-  const [height, setHeight] = useState<number | null>(null)
-  useEffect(() => {
-    if (!enabled) return
-    const onMessage = (event: MessageEvent): void => {
-      if (event.source !== iframeRef.current?.contentWindow) return
-      const data = event.data as { type?: string; height?: unknown } | null
-      if (data?.type !== FRAME_HEIGHT_MESSAGE || typeof data.height !== 'number') return
-      setHeight(Math.max(0, data.height))
-    }
-    window.addEventListener('message', onMessage)
-    return () => window.removeEventListener('message', onMessage)
-  }, [iframeRef, enabled])
-  return enabled ? height : null
-}
-
 function panelStyle(isActive: boolean): React.CSSProperties {
   return {
     flex: 1,
@@ -248,7 +226,7 @@ function ExtensionFrame(props: Props): JSX.Element {
   const { extensionId, viewParam, isActive, fitContent } = props
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const [loaded, setLoaded] = useState(false)
-  const reportedHeight = useReportedHeight(iframeRef, Boolean(fitContent))
+  const reportedHeight = useFitContentHeight(iframeRef, props, Boolean(fitContent))
   const desktop = isDesktop()
   useShownWhileVisible({ extensionId, viewParam }, isActive)
   useFramePort(props, iframeRef, () => setLoaded(true))

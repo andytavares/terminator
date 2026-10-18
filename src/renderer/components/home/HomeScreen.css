@@ -107,6 +107,12 @@
   overflow: auto;
 }
 
+/* What sits under the sections is unseen and unclickable while one still finds its height. The
+   sections stay visible: Chromium stops rendering a hidden frame, so it would never report one. */
+.home__body[data-holding] > :not(.home__section) {
+  visibility: hidden;
+}
+
 .home__empty-actions {
   display: flex;
   align-items: center;
