@@ -1,0 +1,28 @@
+extensions/foundry/tests/ipc/forge-defect-answer-ipc.spec.ts
+  s_cdb54a81c638e2::t_8f4a7fd320258b 264-265
+  s_cdb54a81c638e2::t_f9d5374b8845d2 266-274,277-278,342
+  s_cdb54a81c638e2::t_496d19301a508c 275-276,294
+extensions/foundry/src/factory/timeline-store.ts
+  s_cdb54a81c638e2::t_54eb2a9b47d112 137-150,165-171,181-189,198-206
+extensions/foundry/tests/factory/timeline-store.spec.ts
+  s_cdb54a81c638e2::t_3b2da74e0f9b05 68,112
+  s_cdb54a81c638e2::t_5839cdaa52b5fe 113-115,119-129
+  s_cdb54a81c638e2::t_54eb2a9b47d112 116-118
+  s_cdb54a81c638e2::t_a4f3785d57feb4 130-132
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "40f495fa5dd8fb66c54e3d5d4a1201520687fc04",
+  "prompts": {},
+  "sessions": {
+    "s_cdb54a81c638e2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "902a848e-c082-49ba-a9e3-14c98cfa3f0c",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
