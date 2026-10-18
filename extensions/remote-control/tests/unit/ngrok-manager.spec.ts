@@ -5,6 +5,7 @@ const mockExecSync = vi.fn()
 const mockFetch = vi.fn()
 const mockNetworkInterfaces = vi.fn()
 const mockWriteFileSync = vi.fn()
+const mockRmSync = vi.fn()
 /** The port the OS hands out for the agent API. */
 const AGENT_API_PORT = 51234
 const USER_CONFIG = '/Users/me/Library/Application Support/ngrok/ngrok.yml'
@@ -19,7 +20,7 @@ vi.mock('os', () => ({
   tmpdir: () => '/tmp',
 }))
 
-vi.mock('fs', () => ({ writeFileSync: mockWriteFileSync }))
+vi.mock('fs', () => ({ writeFileSync: mockWriteFileSync, rmSync: mockRmSync }))
 
 vi.mock('net', () => ({
   createServer: () => {
@@ -303,6 +304,16 @@ function ngrokStopTests() {
     manager.stop()
     expect(mockProcess.kill).toHaveBeenCalledWith('SIGTERM')
   })
+
+  it('removes the config file it wrote for its agent', async () => {
+    mockTunnelUrl('https://xyz.ngrok.io')
+    await startManagerTunnel()
+    mockRmSync.mockClear()
+    manager.stop()
+    expect(mockRmSync).toHaveBeenCalledWith(mockWriteFileSync.mock.calls.at(-1)![0], {
+      force: true,
+    })
+  })
 }
 
 function ngrokCrashTests() {
@@ -358,6 +369,16 @@ function ngrokCrashSelfExitTests() {
     // stop() should be a no-op now — process reference was cleared by the exit handler
     manager.stop()
     expect(mockProcess.kill).not.toHaveBeenCalled()
+  })
+
+  it('removes the config file it wrote when ngrok exits on its own', async () => {
+    mockTunnelUrl('https://ref.ngrok.io')
+    await startManagerTunnel()
+    mockRmSync.mockClear()
+    processExitHandler()?.(1, null)
+    expect(mockRmSync).toHaveBeenCalledWith(mockWriteFileSync.mock.calls.at(-1)![0], {
+      force: true,
+    })
   })
 }
 

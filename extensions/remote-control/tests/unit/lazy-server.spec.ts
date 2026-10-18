@@ -14,6 +14,15 @@ vi.mock('../../src/server/remote-server', () => {
   return { createRemoteServer }
 })
 
+// Turning Remote Control on starts the public tunnel when ngrok is installed: a real ngrok on the
+// machine running the spec, and a config file left in its temporary directory.
+vi.mock('../../src/server/ngrok-manager', () => ({
+  NgrokManager: class {
+    static isInstalled = () => false
+  },
+  generateCaddyfile: () => '',
+}))
+
 const settings = new Map<string, unknown>()
 const specs: ChannelSpec[] = []
 
