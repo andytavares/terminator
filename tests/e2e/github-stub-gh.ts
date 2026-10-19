@@ -221,6 +221,7 @@ function pullRequestJson(context: StubContext, pr: StubPullRequest): Record<stri
     url: `https://github.com/${context.owner}/${context.name}/pull/${pr.number}`,
     author: { login: pr.author, avatarUrl: '' },
     createdAt: pr.createdAt,
+    updatedAt: pr.createdAt,
     headRefName: pr.headRefName,
     baseRefName: pr.baseRefName,
     headRefOid: headSha(context, pr),

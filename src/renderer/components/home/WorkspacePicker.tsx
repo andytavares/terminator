@@ -17,7 +17,7 @@ export interface WorkspacePickerProps {
 }
 
 /** Why the suggested workspace was suggested, in the person's words; nothing once they picked one. */
-export function suggestionNote({
+function suggestionNote({
   reason,
   ticketKey,
 }: Pick<WorkspacePickerProps, 'reason' | 'ticketKey'>): string | null {
