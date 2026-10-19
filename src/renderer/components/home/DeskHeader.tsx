@@ -4,6 +4,7 @@ import { Button, Kbd, SegmentedControl } from '@terminator/extension-ui'
 import { DeskSearch } from './DeskSearch'
 import { useStartWorkStore } from './start-work'
 import { useHomeView, type HomeViewName } from './home-view'
+import { InsightsBar } from './Insights'
 
 const VIEWS = [
   { value: 'desk', label: 'Desk' },
@@ -20,7 +21,22 @@ function deskDate(now: number): string {
 
 const openStartWork = (): void => useStartWorkStore.getState().openLauncher()
 
-/** Home's title and date, the Desk | Insights switch, search and Start work. */
+/** Search and Start work on the Desk; the time window and repo filter on Insights. */
+const DeskHeaderTools = forwardRef<HTMLInputElement, { view: HomeViewName }>(
+  function DeskHeaderTools({ view }, searchRef) {
+    if (view === 'insights') return <InsightsBar />
+    return (
+      <>
+        <DeskSearch ref={searchRef} />
+        <Button variant="primary" icon={Plus} className="hd__start" onClick={openStartWork}>
+          Start work <Kbd>⌘N</Kbd>
+        </Button>
+      </>
+    )
+  }
+)
+
+/** Home's title and date, the Desk | Insights switch, and the view's own tools. */
 export const DeskHeader = forwardRef<HTMLInputElement, { now: number }>(function DeskHeader(
   { now },
   searchRef
@@ -39,10 +55,7 @@ export const DeskHeader = forwardRef<HTMLInputElement, { now: number }>(function
         size="sm"
       />
       <span className="hd__spacer" />
-      <DeskSearch ref={searchRef} />
-      <Button variant="primary" icon={Plus} className="hd__start" onClick={openStartWork}>
-        Start work <Kbd>⌘N</Kbd>
-      </Button>
+      <DeskHeaderTools view={view} ref={searchRef} />
     </header>
   )
 })

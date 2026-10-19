@@ -1,7 +1,8 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
-import { Insights } from '../../../../src/renderer/components/home/Insights'
+import { Insights, InsightsBar } from '../../../../src/renderer/components/home/Insights'
+import { useInsightsWindow } from '../../../../src/renderer/components/home/insights-window'
 import { useHomeFeedStore } from '../../../../src/renderer/stores/home-feed.store'
 import { useSessionRecordsStore } from '../../../../src/renderer/stores/session-records.store'
 import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
@@ -31,7 +32,8 @@ const before: AttentionMeasures = {
   ...attention,
   waitsOnYou: { ...attention.waitsOnYou, medianMinutes: 4 },
 }
-const merged: HomeMeasure = {
+const merged: Sourced<HomeMeasure> = {
+  source: 'git-integration',
   id: 'merged',
   question: 'How much shipped?',
   value: 28,
@@ -40,7 +42,8 @@ const merged: HomeMeasure = {
   series: [1, 2, 3, 2, 3, 4, 2, 1, 2, 3, 1, 3, 7],
   previous: 20,
 }
-const firstPass: HomeMeasure = {
+const firstPass: Sourced<HomeMeasure> = {
+  source: 'foundry',
   id: 'foundry-first-pass',
   question: 'Orders that shipped first time',
   value: 71,
@@ -61,11 +64,12 @@ const measuresCall = vi.fn()
 const usageCall = vi.fn()
 const intervalsCall = vi.fn()
 
-function seedFeed(measures: HomeMeasure[]): void {
+function seedFeed(measures: Sourced<HomeMeasure>[]): void {
   useHomeFeedStore.setState({ asks: [], facets: [], focus: [], measures })
 }
 
 beforeEach(() => {
+  useInsightsWindow.setState({ chosen: 'week' })
   vi.clearAllMocks()
   measuresCall.mockImplementation(() => Promise.resolve({ data: attention }))
   measuresCall.mockImplementationOnce(() => Promise.resolve({ data: attention }))
@@ -174,11 +178,15 @@ describe('Insights: nothing made up', () => {
 })
 
 describe('Insights: nothing made up, measures', () => {
-  it('shows no shipped number when nobody published the measure, and hides the Foundry card', () => {
+  it('shows no shipped number when nobody published the measure, nor a first-pass figure', () => {
     seedFeed([])
     render(<Insights />)
     expect(within(card('How much shipped?')).getByText('Not measured for this range')).toBeTruthy()
-    expect(screen.queryByText('How often does it pass first time?', { exact: false })).toBeNull()
+    expect(
+      within(card('How often does it pass first time?')).getByText(
+        'No Foundry order has shipped yet'
+      )
+    ).toBeTruthy()
   })
 
   it('shows the Foundry card as not measured for a range its measure does not cover', () => {
@@ -201,9 +209,19 @@ describe('Insights: nothing made up, measures', () => {
   })
 })
 
+/** Insights as Home draws it: the window control sits in Home's header. */
+function WithHeaderBar(): JSX.Element {
+  return (
+    <>
+      <InsightsBar />
+      <Insights />
+    </>
+  )
+}
+
 describe('Insights: the window', () => {
   it('asks for a week first, and for 30 days, and the 30 before, after switching', async () => {
-    render(<Insights />)
+    render(<WithHeaderBar />)
     await waitFor(() => expect(measuresCall).toHaveBeenCalledTimes(2))
     const week = measuresCall.mock.calls[0][0].window
     expect(week.to - week.from).toBe(7 * DAY)
@@ -217,7 +235,7 @@ describe('Insights: the window', () => {
   })
 
   it('shows the Foundry measure once the window it covers is chosen', async () => {
-    render(<Insights />)
+    render(<WithHeaderBar />)
     fireEvent.click(screen.getByRole('radio', { name: '30 days' }))
     expect(within(card('How often does it pass first time?')).getByText('71')).toBeTruthy()
   })

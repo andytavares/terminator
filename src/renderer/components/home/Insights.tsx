@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useMemo } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { Button, SegmentedControl } from '@terminator/extension-ui'
 import { useHomeFeedStore } from '../../stores/home-feed.store'
@@ -16,14 +16,13 @@ import { FirstPassCard, ShippedCard, StartToMergeCard, WaitCard } from './Insigh
 import { AgentTimeCard, LookingBackCard, ShipSections } from './InsightsLower'
 import { TimeBreakdownCard } from './TimeBreakdownCard'
 import { useInsightsData, type InsightsData } from './useInsightsData'
+import { useInsightsWindow } from './insights-window'
 import './Insights.css'
 
-interface WindowProps {
-  chosen: InsightsWindow
-  onChange: (chosen: InsightsWindow) => void
-}
-
-function InsightsBar({ chosen, onChange }: WindowProps): JSX.Element {
+/** The time window and the repo filter; Home's header shows them in place of search and Start work. */
+export function InsightsBar(): JSX.Element {
+  const chosen = useInsightsWindow((s) => s.chosen)
+  const onChange = useInsightsWindow((s) => s.choose)
   return (
     <div className="ins__bar">
       <SegmentedControl
@@ -108,12 +107,11 @@ function LookingBackRow({ data, feed }: Pick<RowProps, 'data' | 'feed'>): JSX.El
 
 /** The second view of Home: each card is titled by the question it answers. */
 export function Insights(): JSX.Element {
-  const [chosen, setChosen] = useState<InsightsWindow>('week')
+  const chosen = useInsightsWindow((s) => s.chosen)
   const data = useInsightsData(chosen)
   const feed = useFeedForInsights()
   return (
     <section className="ins" aria-label="Insights">
-      <InsightsBar chosen={chosen} onChange={setChosen} />
       <QuestionsRow {...{ chosen, data, feed }} />
       <TimeRow {...{ chosen, data, feed }} />
       <LookingBackRow data={data} feed={feed} />

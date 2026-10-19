@@ -139,12 +139,11 @@ export function WaitCard({ attention, before }: WaitCardProps): JSX.Element {
 export function FirstPassCard({ measures, chosen }: ShippedCardProps): JSX.Element | null {
   const question = 'How often does it pass first time?'
   const qualifier = '· Foundry orders'
-  if (!measures.some((m) => m.id === 'foundry-first-pass')) return null
-  const reading = measureReading(measures, 'foundry-first-pass', chosen)
+  const published = measures.some((m) => m.id === 'foundry-first-pass')
+  const reading = published ? measureReading(measures, 'foundry-first-pass', chosen) : null
   if (reading === null) {
-    return (
-      <EmptyCard question={question} qualifier={qualifier} reason="Not measured for this range" />
-    )
+    const reason = published ? 'Not measured for this range' : 'No Foundry order has shipped yet'
+    return <EmptyCard question={question} qualifier={qualifier} reason={reason} />
   }
   return (
     <MetricCard

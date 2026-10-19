@@ -17,13 +17,13 @@ export const REVEAL_SESSION_COMMAND = 'core:reveal-session'
 
 const SEPARATOR = ' · '
 
-/** What the ask is about: the ticket and its title, else the branch. */
+/** The repo, then the ticket and its title, else the branch. The repo is the workspace (ADR 032). */
 function whereOf(facts: SessionFacts, titles: IssueTitles): string {
   const ref = facts.workItem?.ref
   const work = ref
     ? [ref.key, titles.get(`${ref.tracker}:${ref.key}`)].filter(Boolean).join(' ')
     : facts.branch
-  return [facts.projectName, work].filter(Boolean).join(SEPARATOR)
+  return [facts.workspaceName, work].filter(Boolean).join(SEPARATOR)
 }
 
 function itemId(kind: HomeAsk['kind'], facts: SessionFacts): string {

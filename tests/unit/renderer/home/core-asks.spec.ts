@@ -25,6 +25,8 @@ describe('coreAsksFrom: awaiting input', () => {
       [
         fact({
           sessionId: 's9',
+          workspaceName: 'terminator',
+          projectName: 'main',
           state: 'awaiting-input',
           lastActivityAt: 1000,
           choicePrompt: numberedPrompt,
