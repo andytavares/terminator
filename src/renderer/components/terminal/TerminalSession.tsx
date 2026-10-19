@@ -224,6 +224,7 @@ export class TerminalInstance {
       this.opened = true
     }
     this.enableWebgl()
+    if (!this.webglAddon) this.measureGlyphsWhereVisible()
     this.fitAddon.fit()
     this.terminal.focus()
     // Detaching/reattaching the element on tab switch (ADR-004) resets the
@@ -275,6 +276,7 @@ export class TerminalInstance {
     this.disableWebgl()
     this.styleAsPreview()
     container.appendChild(this.element)
+    this.measureGlyphsWhereVisible()
     place()
     // The cursor moves as output arrives, and a tile or row changes size; the window follows both.
     const following = this.terminal.onRender(place)
@@ -302,6 +304,13 @@ export class TerminalInstance {
       containerH: container.offsetHeight || 150,
     })
     this.element.style.transform = `translateY(${translateY}px) scale(${scale})`
+  }
+
+  // xterm measures glyphs on an option change only; a renderer built while detached measured 0.
+  private measureGlyphsWhereVisible(): void {
+    const { letterSpacing } = this.terminal.options
+    this.terminal.options.letterSpacing = (letterSpacing ?? 0) + 1
+    this.terminal.options.letterSpacing = letterSpacing
   }
 
   private styleAsPreview(): void {
