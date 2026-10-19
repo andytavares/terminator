@@ -1,0 +1,29 @@
+extensions/foundry/tests/home/feed.spec.ts
+  s_3ced19ecaa16dd::t_57015e8237f616 93-99
+extensions/task-vault/src/home/feed.ts
+  s_3ced19ecaa16dd::t_d5079479b24451 33,51
+packages/extension-sdk/types/api.d.ts
+  s_3ced19ecaa16dd::t_d5079479b24451 316-317
+src/shared/schemas/home-feed.schema.ts
+  s_3ced19ecaa16dd::t_d5079479b24451 17-18
+extensions/task-vault/tests/home/feed.spec.ts
+  s_3ced19ecaa16dd::t_57015e8237f616 40
+extensions/foundry/src/home/feed.ts
+  s_3ced19ecaa16dd::t_d5079479b24451 73,105-110
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "3b603f3c10e6cb4db0b5a3b4be83742c4fed2ba3",
+  "prompts": {},
+  "sessions": {
+    "s_3ced19ecaa16dd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "958bebf4-85fd-422a-9a09-b64994561aeb",
+        "model": "unknown"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
