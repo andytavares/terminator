@@ -2,6 +2,7 @@ import React, { useMemo } from 'react'
 import { useHomeFeedStore } from '../../stores/home-feed.store'
 import { useNow } from '../session/useNow'
 import { useDismissalsStore } from '../../home/dismissals'
+import { isHidden } from '../../home/desk-order'
 import {
   oldestReview,
   startToMerge,
@@ -71,7 +72,7 @@ function TimeRow(props: RowProps): JSX.Element {
 function LookingBackRow({ data, feed }: Pick<RowProps, 'data' | 'feed'>): JSX.Element {
   const now = useNow()
   const entries = useDismissalsStore((state) => state.entries)
-  const open = feed.asks.filter((ask) => !entries[ask.id])
+  const open = feed.asks.filter((ask) => !isHidden(ask, entries, now))
   const oldest = oldestReview(open)
   return (
     <div className="ins__row ins__row--two">

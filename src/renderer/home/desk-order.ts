@@ -24,7 +24,8 @@ export function askSignature(ask: Pick<HomeAsk, 'detail' | 'facts'>): string {
   return [ask.detail, ...ask.facts].join('\n')
 }
 
-function isHidden(ask: HomeAsk, dismissals: Dismissals, now: number): boolean {
+/** Whether the operator marked the ask done, or snoozed it and it has not woken. */
+export function isHidden(ask: HomeAsk, dismissals: Dismissals, now: number): boolean {
   const entry = dismissals[ask.id]
   if (!entry) return false
   if (entry.kind === 'done') return true
