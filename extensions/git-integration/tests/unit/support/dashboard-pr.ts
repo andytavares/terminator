@@ -12,6 +12,7 @@ export function dashboardPrFixture(overrides: Partial<DashboardPR> = {}): Dashbo
     url: 'https://github.com/acme/widgets/pull/275',
     author: 'andrew',
     isDraft: false,
+    reviewedByMe: false,
     createdAt: '2026-10-15T09:00:00Z',
     additions: 120,
     deletions: 30,

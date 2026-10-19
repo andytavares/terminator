@@ -244,6 +244,27 @@ describe('parseDashboard — computes commitsSinceMyReview by counting commits a
   })
 })
 
+describe('parseDashboard — reviewedByMe from my latest reviews', () => {
+  it('flags a pull request whose latestReviews include the viewer', () => {
+    const node = prNode({
+      latestReviews: {
+        nodes: [
+          { author: { login: 'alice' }, submittedAt: '2026-01-02T00:00:00Z', commit: { oid: 'a' } },
+        ],
+      },
+    })
+    const raw = { data: { requested: { nodes: [node] } } }
+    const [pr] = parseDashboard(raw, { login: 'alice', localRoots: new Map() })
+    expect(pr.reviewedByMe).toBe(true)
+  })
+
+  it('does not flag a pull request the viewer never reviewed', () => {
+    const raw = { data: { requested: { nodes: [prNode()] } } }
+    const [pr] = parseDashboard(raw, { login: 'alice', localRoots: new Map() })
+    expect(pr.reviewedByMe).toBe(false)
+  })
+})
+
 describe('parseDashboard — drops re-review rows with no commits since my review', () => {
   it('drops re-review rows with no commits since my review', () => {
     const node = prNode({

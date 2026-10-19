@@ -299,6 +299,8 @@ export const DashboardPRSchema = z.object({
   unresolvedThreads: z.number(),
   /** Re-review only: commits after your latest review. */
   commitsSinceMyReview: z.number(),
+  /** Whether the viewer has reviewed this pull request before. */
+  reviewedByMe: z.boolean().default(false),
   reviewerCount: z.number(),
   sessionStatus: z.enum(['not-started', 'in-progress', 'paused']).default('not-started'),
   viewedFileCount: z.number().default(0),
