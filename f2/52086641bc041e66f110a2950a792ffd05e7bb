@@ -1,0 +1,126 @@
+src/renderer/components/home/Insights.tsx
+  s_3ced19ecaa16dd::t_19218a1e25c93a 16,19-40,46-86,89-103,108,111-114
+  s_3ced19ecaa16dd::t_1656fc1b4e58fa 41-45,87-88
+  s_3ced19ecaa16dd::t_e5c9bdabe34c10 1-15,17-18,104-107,109-110,115-117
+src/renderer/components/home/InsightsCards.tsx
+  s_3ced19ecaa16dd::t_1656fc1b4e58fa 47-53,71-73,93-94,99-103,113-119,145-147
+  s_3ced19ecaa16dd::t_e83b04b345a101 1-46,54-70,74-92,95-98,104-112,120-144,148-158
+src/renderer/components/home/useInsightsData.ts
+  s_3ced19ecaa16dd::t_a21f79751ac04e 1-53
+tests/unit/renderer/components/extension-surfaces.spec.tsx
+  s_3ced19ecaa16dd::t_b9f84cf27b6ad4 238,246
+extensions/git-integration/manifest.json
+  s_3ced19ecaa16dd::t_b9f84cf27b6ad4 37
+docs/adr/116-extensions-can-add-a-home-section.md
+  s_3ced19ecaa16dd::t_6265c357f843d6 3
+tests/e2e/home-contributions-setting.spec.ts
+  s_3ced19ecaa16dd::t_460b5f423f6f59 5,23
+  s_3ced19ecaa16dd::t_c67f9a5507a8c0 6,29,31
+docs/EXTENSION-DEVELOPMENT.md
+  s_3ced19ecaa16dd::t_644379a9c9b815 97-107
+tests/unit/renderer/extensions/registry.spec.ts
+  s_3ced19ecaa16dd::t_b9f84cf27b6ad4 181,184,191-192,205,207
+tests/unit/renderer/components/Insights.spec.tsx
+  s_3ced19ecaa16dd::t_9abb874d528e7f 1-9,11-24,29-94,98-122,129,131,133-141,145-152,156-193,216,223-226,228-240
+  s_3ced19ecaa16dd::t_8213dd4328879e 25-28,123-128,142-144,153-155
+  s_3ced19ecaa16dd::t_ca948922da8910 10,194-215,217-222,227
+  s_3ced19ecaa16dd::t_cb6fee1612a3ae 95-97,130,132
+src/renderer/home/insights.ts
+  s_3ced19ecaa16dd::t_1656fc1b4e58fa 173,177
+  s_3ced19ecaa16dd::t_edf2373c8d8823 1-172,178-188
+  s_3ced19ecaa16dd::t_a46f04202c47ca 174-176
+tests/unit/renderer/home/insights.spec.ts
+  s_3ced19ecaa16dd::t_0dcbcb98023e6c 55
+  s_3ced19ecaa16dd::t_d7eee1cd356890 1-54,56-93,106-107,109-126,128,130-131,135-140,144-189
+  s_3ced19ecaa16dd::t_012bdd7696f289 94-105,108,127,129
+  s_3ced19ecaa16dd::t_a46f04202c47ca 132-134,141-143
+tests/unit/renderer/extensions/loader.spec.ts
+  s_3ced19ecaa16dd::t_460b5f423f6f59 180
+  s_3ced19ecaa16dd::t_b9f84cf27b6ad4 119,127,176,181-182
+  s_3ced19ecaa16dd::t_c3971ac242e795 4,188-201
+src/renderer/extensions/registry.ts
+  s_3ced19ecaa16dd::t_d0bf513213276e 143-146
+  s_3ced19ecaa16dd::t_546b7bb9ed076f 142
+  s_3ced19ecaa16dd::t_b9f84cf27b6ad4 40,76,94,147-148,202,210,335
+src/renderer/components/home/PlanTheDay.tsx
+  s_3ced19ecaa16dd::t_2e530259561839 1-55,58-67,69-218
+  s_3ced19ecaa16dd::t_aa9e5e64c3153e 56-57,68
+tests/unit/renderer/home/plan-the-day.spec.ts
+  s_3ced19ecaa16dd::t_ecaba8ccac42e9 75
+  s_3ced19ecaa16dd::t_a46f04202c47ca 1-74,76-101
+tests/unit/extensions/extension-host.spec.ts
+  s_3ced19ecaa16dd::t_b9f84cf27b6ad4 252,254,256
+src/renderer/home/plan-the-day.ts
+  s_3ced19ecaa16dd::t_7c0ef0a16894b5 28-31
+  s_3ced19ecaa16dd::t_ecaba8ccac42e9 69,71
+  s_3ced19ecaa16dd::t_2e530259561839 76
+  s_3ced19ecaa16dd::t_fd714d513f2c58 1-27,32-68,70,72-75,77-96
+extensions/git-integration/tests/unit/home-feed.spec.ts
+  s_3ced19ecaa16dd::t_57015e8237f616 29-34,272
+  s_3ced19ecaa16dd::t_9f03d44b7e7da2 264-266,268-271
+  s_3ced19ecaa16dd::t_d17ad2b369fdb4 267
+  s_3ced19ecaa16dd::t_a2d646eb6b8260 273
+extensions/git-integration/src/components/contributions/ContributionsOnHome.tsx
+  s_3ced19ecaa16dd::t_460b5f423f6f59 6
+src/renderer/extensions/loader.ts
+  s_3ced19ecaa16dd::t_b9f84cf27b6ad4 99,104-107,109,144
+  s_3ced19ecaa16dd::t_546b7bb9ed076f 98
+src/shared/types/index.ts
+  s_3ced19ecaa16dd::t_b9f84cf27b6ad4 132
+src/renderer/components/home/Insights.css
+  s_3ced19ecaa16dd::t_1656fc1b4e58fa 1-110
+packages/extension-sdk/README.md
+  s_3ced19ecaa16dd::t_b9f84cf27b6ad4 94
+tests/unit/shared/schemas/extension.schema.spec.ts
+  s_3ced19ecaa16dd::t_b9f84cf27b6ad4 77-78,80,84,89
+extensions/git-integration/tests/unit/ContributionsOnHome.spec.tsx
+  s_3ced19ecaa16dd::t_460b5f423f6f59 41
+extensions/git-integration/CLAUDE.md
+  s_3ced19ecaa16dd::t_85575bf7c332a3 56
+src/shared/schemas/extension.schema.ts
+  s_3ced19ecaa16dd::t_b9f84cf27b6ad4 25,50,61
+src/renderer/home/focus-store.ts
+  s_3ced19ecaa16dd::t_7c0ef0a16894b5 11-12,22-23,32-36,48-52,69
+tests/unit/renderer/components/PlanTheDay.spec.tsx
+  s_3ced19ecaa16dd::t_cbb6eceec714b7 100-109,120
+  s_3ced19ecaa16dd::t_cb6fee1612a3ae 75-77,129,131,172,174
+  s_3ced19ecaa16dd::t_8213dd4328879e 1-74,78-99,110-119,121-128,130,132-171,173,175-208
+src/renderer/components/home/InsightsLower.tsx
+  s_3ced19ecaa16dd::t_aa9e5e64c3153e 77,80-103,110-111,151-152,174-199,203-204,206,209,217-218
+  s_3ced19ecaa16dd::t_1656fc1b4e58fa 8-14,105-109,123-128,172-173,200,211-215
+  s_3ced19ecaa16dd::t_e5c9bdabe34c10 1-7,15-76,78-79,104,112-122,129-150,153-171,201-202,205,207-208,210,216,219-221
+tests/unit/extensions/extension-host-start.spec.ts
+  s_3ced19ecaa16dd::t_b9f84cf27b6ad4 186,197,212,214
+  s_3ced19ecaa16dd::t_546b7bb9ed076f 188
+extensions/git-integration/src/index.ts
+  s_3ced19ecaa16dd::t_460b5f423f6f59 118,120
+extensions/git-integration/README.md
+  s_3ced19ecaa16dd::t_460b5f423f6f59 47
+  s_3ced19ecaa16dd::t_644379a9c9b815 38
+src/renderer/components/home/PlanTheDay.css
+  s_3ced19ecaa16dd::t_2e530259561839 1-146
+extensions/git-integration/src/home/feed.ts
+  s_3ced19ecaa16dd::t_086fd76af72d4b 12,176-185
+  s_3ced19ecaa16dd::t_d5079479b24451 24-30,37,73,189,200-206
+  s_3ced19ecaa16dd::t_98294b88b8436f 207
+docs/user-guide/USER-GUIDE.md
+  s_3ced19ecaa16dd::t_2c5dcfb8beb46f 413-436
+extensions/git-integration/tests/unit/home-publisher.spec.ts
+  s_3ced19ecaa16dd::t_0f31e67dde3e61 77
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f252086641bc041e66f110a2950a792ffd05e7bb",
+  "prompts": {},
+  "sessions": {
+    "s_3ced19ecaa16dd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "958bebf4-85fd-422a-9a09-b64994561aeb",
+        "model": "unknown"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
