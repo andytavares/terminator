@@ -1,0 +1,47 @@
+docs/ARCHITECTURE.md
+  s_3ced19ecaa16dd::t_74294f39dbe531 501-502
+docs/adr/117-extensions-send-home-data-core-draws-it.md
+  s_3ced19ecaa16dd::t_5dc93776f2f75b 26
+extensions/git-integration/src/home/actions.ts
+  s_3ced19ecaa16dd::t_b1c699397d0df4 2,66
+src/main/agents/agent-ask-hook.ts
+  s_3ced19ecaa16dd::t_428704d8147038 76-78
+src/main/agents/transcript-usage.ts
+  s_3ced19ecaa16dd::t_e3ddb7cd4ecd37 144,162-175
+src/main/extensions/api.ts
+  s_3ced19ecaa16dd::t_00fca85dc2742c 681-686,689,692
+src/main/home/attention-log.ts
+  s_3ced19ecaa16dd::t_570fe1283ee28e 24-27,46-51,74,79-84,100
+src/main/terminal/output-relay.ts
+  s_3ced19ecaa16dd::t_4eeebfa0f80ab2 1,33
+src/shared/schemas/agent-usage.schema.ts
+  s_3ced19ecaa16dd::t_87522905fba1b4 15-25
+tests/unit/agents/agent-ask-hook.spec.ts
+  s_3ced19ecaa16dd::t_a0bee74a31cd1b 2,119-150
+tests/unit/agents/transcript-usage.spec.ts
+  s_3ced19ecaa16dd::t_463472ad901ad2 24,86-95
+tests/unit/extensions/api-home.spec.ts
+  s_3ced19ecaa16dd::t_a01ce346924772 1-53
+tests/unit/home/attention-log.spec.ts
+  s_3ced19ecaa16dd::t_64faf2361e634a 113-153
+tests/unit/ipc/thread-summary.ipc.spec.ts
+  s_3ced19ecaa16dd::t_3c6b84c850d581 59-65
+tests/unit/terminal/output-relay.spec.ts
+  s_3ced19ecaa16dd::t_bf814c8b5ea132 2,7-8,43-47
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "146ea2cf25f771ab2b07c3914cdaac00313e5fbf",
+  "prompts": {},
+  "sessions": {
+    "s_3ced19ecaa16dd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "958bebf4-85fd-422a-9a09-b64994561aeb",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
