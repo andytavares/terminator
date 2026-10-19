@@ -391,7 +391,22 @@ export async function createWorkspace(page: Page, name: string, folderPath: stri
   await page.click('.tmui-dialog__actions .tmui-button--primary')
   await expect(workspaceRow(page, name)).toBeVisible()
   const branch = checkedOutBranchOf(folderPath)
-  if (branch !== null) await expect(projectGroup(page, branch)).toBeVisible()
+  if (branch !== null) await expectCheckoutCard(page, folderPath, branch)
+}
+
+/** The checkout's branch card, or a failure that says what the app answered about the folder: the
+ * app makes the card only when git:is-repo says the folder is one, and it answers false for any
+ * git failure, so a missing card is otherwise a bare timeout. */
+async function expectCheckoutCard(page: Page, folderPath: string, branch: string): Promise<void> {
+  try {
+    await expect(projectGroup(page, branch)).toBeVisible()
+  } catch (error) {
+    const answer = await page.evaluate((path) => window.electronAPI.git.isRepo(path), folderPath)
+    throw new Error(
+      `${folderPath} is a git checkout on ${branch}, but no "${branch}" card appeared; the app now answers git:is-repo with ${JSON.stringify(answer)}`,
+      { cause: error }
+    )
+  }
 }
 
 /** The branch a folder has checked out, or null when it is not a git checkout. */
