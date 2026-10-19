@@ -44,6 +44,29 @@ describe('coreAsksFrom: awaiting input', () => {
   })
 })
 
+describe('coreAsksFrom: where the work is', () => {
+  const where = (patch: Parameters<typeof fact>[0]) => coreAsksFrom([fact(patch)], titles)[0]
+
+  it('names the tab when the workspace has no ticket and no branch', () => {
+    const ask = where({ state: 'awaiting-input', branch: null, name: 'terminal 3' })
+    expect(ask.where).toBe('Personal · terminal 3')
+  })
+
+  it('names its work even for a scratch terminal with nothing to show', () => {
+    const ask = where({
+      state: 'idle',
+      agent,
+      lastActivityAt: 500,
+      workspaceName: null,
+      branch: null,
+      name: 'terminal 3',
+      latestLine: 'Done',
+    })
+    expect(ask.where).toBe('Scratch terminal · tab “terminal 3”')
+    expect(ask.detail).toBe('Last output: Done')
+  })
+})
+
 describe('coreAsksFrom: awaiting input without a prompt', () => {
   it('uses the free-text ask message, then the latest line, when there is no prompt', () => {
     const base = { state: 'awaiting-input' as const, latestLine: 'last line' }
@@ -75,7 +98,10 @@ describe('coreAsksFrom: finished while away', () => {
     expect(ask.actions.map((a) => a.id)).toEqual(['review-changes'])
   })
 
-  it('falls back to the branch when there is no description', () => {
+  it('falls back to the last output, then the branch, when there is no description', () => {
+    expect(
+      coreAsksFrom([fact({ ...finished, latestLine: 'All tests pass' })], titles)[0].detail
+    ).toBe('Last output: All tests pass')
     expect(coreAsksFrom([fact(finished)], titles)[0].detail).toBe('tav-31')
   })
 

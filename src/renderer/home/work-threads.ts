@@ -211,6 +211,7 @@ function titleOf(draft: Draft, issue: IssueSummary | undefined): string {
     facets.find((f) => f.title)?.title,
     firstLine(sessions.find((s) => s.description)?.description),
     sessions.find((s) => s.branch)?.branch,
+    sessions.find((s) => s.name)?.name,
     sessions[0]?.projectName,
   ]
   return candidates.find((c) => c) ?? draft.key

@@ -19,10 +19,11 @@ const SEPARATOR = ' · '
 
 /** The repo, then the ticket and its title, else the branch. The repo is the workspace (ADR 032). */
 function whereOf(facts: SessionFacts, titles: IssueTitles): string {
+  if (!facts.workspaceName) return `Scratch terminal · tab “${facts.name}”`
   const ref = facts.workItem?.ref
   const work = ref
     ? [ref.key, titles.get(`${ref.tracker}:${ref.key}`)].filter(Boolean).join(' ')
-    : facts.branch
+    : (facts.branch ?? facts.name)
   return [facts.workspaceName, work].filter(Boolean).join(SEPARATOR)
 }
 
@@ -66,9 +67,13 @@ function finishedAsk(facts: SessionFacts, titles: IssueTitles): DeskAsk {
     id: itemId('finished', facts),
     kind: 'finished',
     title: 'Agent finished',
-    detail: facts.description ?? facts.branch ?? '',
+    detail: facts.description ?? lastOutputOf(facts) ?? facts.branch ?? '',
     actions: [{ id: 'review-changes', label: 'Review changes', primary: true }],
   }
+}
+
+function lastOutputOf(facts: SessionFacts): string | null {
+  return facts.latestLine !== '' ? `Last output: ${facts.latestLine}` : null
 }
 
 function finishedWhileAway(facts: SessionFacts): boolean {
