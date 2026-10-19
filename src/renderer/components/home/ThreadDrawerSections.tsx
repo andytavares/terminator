@@ -44,7 +44,7 @@ export function TerminalSection({ thread }: { thread: WorkThread }): JSX.Element
         className="desk-dr__terminal"
         role="button"
         tabIndex={0}
-        aria-label="Open terminal"
+        aria-label={`Open ${terminalName(lead)} terminal full size`}
         onClick={open}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {

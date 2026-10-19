@@ -54,8 +54,7 @@ function openDrawerFor(facts: SessionFacts[], threadKey: string): void {
   useDeskSelection.getState().openThread(threadKey)
 }
 
-const terminalBox = () =>
-  screen.getAllByRole('button', { name: 'Open terminal' }).find((el) => el.tagName === 'DIV')!
+const terminalBox = () => screen.getByRole('button', { name: /terminal full size$/ })
 
 const OPEN_SESSION = {
   sessionId: 's9',
