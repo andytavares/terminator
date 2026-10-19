@@ -90,6 +90,13 @@ describe('asks', () => {
     })
   })
 
+  it("says where the ask comes from: the repo and the order's title", () => {
+    const row = orderRow({ standing: standingWith({ kind: 'failed', turn: 'you' }) })
+    const [ask] = feedOf([row]).asks
+    const repo = row.order.context.repos[0].path.split('/').at(-1)
+    expect(ask.where).toBe(`${repo} · order "${row.order.title}"`)
+  })
+
   it('raises nothing for an order whose turn is Foundry', () => {
     expect(feedOf([orderRow()]).asks).toEqual([])
   })

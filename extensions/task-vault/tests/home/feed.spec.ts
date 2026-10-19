@@ -37,6 +37,7 @@ describe('Home asks for due tasks', () => {
         kind: 'task',
         title: 'Task due',
         detail: 'Send invoice',
+        where: 'Task Vault · Acme',
         facts: ['Acme'],
         workKey: null,
         actions: [

@@ -313,6 +313,8 @@ export interface HomeAsk {
   kind: 'answer' | 'fix' | 'review' | 'decide' | 'finished' | 'task'
   title: string
   detail: string
+  /** Where it comes from, e.g. "terminator · TAV-20 · pull request #275". */
+  where?: string
   facts: string[]
   workKey: WorkKey | null
   /** ISO time. */

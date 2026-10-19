@@ -14,6 +14,8 @@ export const HomeAskSchema = z.object({
   kind: z.enum(['answer', 'fix', 'review', 'decide', 'finished', 'task']),
   title: z.string(),
   detail: z.string(),
+  /** Where it comes from, e.g. "terminator · TAV-20 · pull request #275". */
+  where: z.string().optional(),
   facts: z.array(z.string()),
   workKey: WorkKeySchema.nullable(),
   since: z.string(),

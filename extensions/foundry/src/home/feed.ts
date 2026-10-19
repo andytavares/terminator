@@ -70,6 +70,7 @@ function askOf({ order, standing, gate, since }: OrderRow): HomeAsk {
     kind,
     title,
     detail: standing.headline,
+    where: orderWhere(order),
     facts: askFactsOf(order, standing),
     workKey: foundryWorkKeyOf(order),
     since,
@@ -101,6 +102,12 @@ function askFactsOf(order: WorkOrder, standing: Standing): string[] {
 }
 
 /** A ticket order is keyed by its ticket; any other by where its branch lives. */
+/** "Workout Timer · order "Interval presets"": the repo folder's name and the order's title. */
+function orderWhere(order: WorkOrder): string {
+  const repo = order.context.repos[0]?.path.split('/').at(-1)
+  return [repo, `order "${order.title}"`].filter(Boolean).join(' · ')
+}
+
 function foundryWorkKeyOf(order: WorkOrder): WorkKey | null {
   const { tracker, key } = order.source
   if (tracker !== null && key !== null) return { tracker, key }
