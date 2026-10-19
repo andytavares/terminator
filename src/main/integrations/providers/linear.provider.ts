@@ -10,14 +10,15 @@ import type {
   TrackerErrorKind,
 } from '../../../shared/types/index.js'
 import { TrackerError, toErrorMessage } from '../tracker-error.js'
-import type {
-  NewIssueInput,
-  StoredCredential,
-  TrackerProvider,
-  TrackerTeam,
-  TrackerStateOption,
-  TransitionIntent,
-  VerifiedAccount,
+import {
+  MAX_MINE_ISSUES,
+  type NewIssueInput,
+  type StoredCredential,
+  type TrackerProvider,
+  type TrackerTeam,
+  type TrackerStateOption,
+  type TransitionIntent,
+  type VerifiedAccount,
 } from './provider.js'
 
 // Linear, through the official SDK.
@@ -30,10 +31,15 @@ import type {
 /** Comments beyond this are read in Linear; the drawer and the agent context both bound. */
 const MAX_COMMENTS = 5
 
-/** Filter to exclude completed and canceled issues from listMine results. */
+/** Excludes the `completed` and `canceled` state types from listMine: finished work is not "mine
+ * to do". Every other type is open and stays, including `triage` and `backlog`. Search does not
+ * use this, so closed issues are still found by name. */
 const OPEN_STATES_FILTER: LinearDocument.IssueFilter = {
   state: { type: { nin: ['completed', 'canceled'] } },
 }
+
+/** Linear's connection page size ceiling is 250; 100 keeps each request light. */
+const MAX_PAGE_SIZE = 100
 
 /** The part of the SDK client the provider calls; specs pass a fake of it. */
 type LinearLike = Pick<
@@ -286,28 +292,56 @@ function verify(client: LinearLike): Promise<VerifiedAccount> {
   })
 }
 
-/** The issues assigned to the configured email, or to the key's own viewer when there is none. */
-async function assignedIssues(client: LinearLike, email: string | null, limit: number) {
+interface PageArgs {
+  first: number
+  after?: string
+}
+
+interface RawConnection {
+  nodes?: RawIssue[]
+  pageInfo?: { hasNextPage?: boolean; endCursor?: string | null }
+}
+
+/** One page of the issues assigned to the configured email, or to the key's own viewer when
+ * there is none. */
+async function assignedPage(client: LinearLike, email: string | null, page: PageArgs) {
   if (email === null) {
     // No email configured: the key's own viewer is the answer, and it is one
     // fewer round trip than looking the user up first.
     const viewer = await client.viewer
-    return viewer.assignedIssues?.({ filter: OPEN_STATES_FILTER, first: limit }) ?? { nodes: [] }
+    return viewer.assignedIssues?.({ filter: OPEN_STATES_FILTER, ...page }) ?? { nodes: [] }
   }
   return client.issues({
     filter: { ...OPEN_STATES_FILTER, assignee: { email: { eq: email } } },
-    first: limit,
     orderBy: PaginationOrderBy.UpdatedAt,
+    ...page,
   })
+}
+
+/** Follows the connection's cursor until it ends or `limit` (never past the cap) is reached. */
+async function allAssigned(client: LinearLike, email: string | null, limit: number) {
+  const wanted = Math.min(limit, MAX_MINE_ISSUES)
+  const nodes: RawIssue[] = []
+  let after: string | undefined
+  while (nodes.length < wanted) {
+    const first = Math.min(wanted - nodes.length, MAX_PAGE_SIZE)
+    const connection = (await assignedPage(
+      client,
+      email,
+      after === undefined ? { first } : { first, after }
+    )) as RawConnection | null
+    nodes.push(...(connection?.nodes ?? []))
+    const { hasNextPage, endCursor } = connection?.pageInfo ?? {}
+    if (!hasNextPage || !endCursor) break
+    after = endCursor
+  }
+  return nodes.slice(0, wanted)
 }
 
 function listMine(client: LinearLike, mine: MineSelector, limit: number): Promise<IssueSummary[]> {
   return run(async () => {
     const email = mine.kind === 'assignee' ? mine.email : null
-    const connection = (await assignedIssues(client, email, limit)) as {
-      nodes?: RawIssue[]
-    } | null
-    return Promise.all((connection?.nodes ?? []).map(toSummary))
+    return Promise.all((await allAssigned(client, email, limit)).map(toSummary))
   })
 }
 

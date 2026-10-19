@@ -54,6 +54,10 @@ export interface VerifiedAccount extends TrackerAccount {
  * 7. **Absent means null.** A field the tracker does not have is null or
  *    empty, never synthesised.
  */
+/** The most issues "mine" ever returns: every open one in practice, bounded so a runaway list
+ * cannot page forever. */
+export const MAX_MINE_ISSUES = 250
+
 export interface TrackerProvider {
   readonly id: TrackerId
 

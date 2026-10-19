@@ -209,6 +209,20 @@ describe('issue-service — listMine when trackers are missing', () => {
   })
 })
 
+describe('issue-service — listMine limit', () => {
+  it('asks for every open issue (the 250 cap) when no limit is passed', async () => {
+    const { service, linear } = build()
+    await service.listMine({ tracker: 'linear' })
+    expect(linear.listMine).toHaveBeenCalledWith(expect.anything(), expect.anything(), 250)
+  })
+
+  it('passes a caller limit through', async () => {
+    const { service, linear } = build()
+    await service.listMine({ tracker: 'linear', limit: 10 })
+    expect(linear.listMine).toHaveBeenCalledWith(expect.anything(), expect.anything(), 10)
+  })
+})
+
 describe('issue-service — search', () => {
   it('resolves an exact key directly and sorts it first', async () => {
     const linear = fakeProvider('linear', {
