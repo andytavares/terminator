@@ -1,0 +1,112 @@
+extensions/git-integration/tests/unit/home-work-key.spec.ts
+  s_3ced19ecaa16dd::t_ff632f81bf8a1a 1-2,5-23,29-30,33-35,38-40,43-45,61-62
+  s_3ced19ecaa16dd::t_e0605f9f2f83df 3,24-28,32,37,42,47-60
+  s_3ced19ecaa16dd::t_5bee84aa324c95 4,31,36,41,46
+extensions/git-integration/src/home/actions.ts
+  s_3ced19ecaa16dd::t_2b4334768cd5d7 51-58,64,83
+  s_3ced19ecaa16dd::t_76a39d982cf860 74-77
+  s_3ced19ecaa16dd::t_e299a6c42e8f3e 1-25,27-30,41,43-50,59-63,65-73,78-82,84-86,88-100
+  s_3ced19ecaa16dd::t_81317a9301a21e 31-40,42
+  s_3ced19ecaa16dd::t_a8230241bec165 26,87
+extensions/git-integration/src/index.ts
+  s_3ced19ecaa16dd::t_caa5d7331092da 18,191,205,207-209
+extensions/git-integration/tests/unit/support/activate.ts
+  s_3ced19ecaa16dd::t_82e03bb06c368b 93
+extensions/git-integration/src/github/dashboard-search.ts
+  s_3ced19ecaa16dd::t_891c92d98d450d 221
+  s_3ced19ecaa16dd::t_8500b677328d56 3-10,39-47,93,128-131,205-211,213,235
+  s_3ced19ecaa16dd::t_2724fb389655e5 212,214
+extensions/git-integration/src/home/work-key.ts
+  s_3ced19ecaa16dd::t_891c92d98d450d 2-5,9-12,22-24,28-30
+  s_3ced19ecaa16dd::t_275ed81abefc03 1,6-8,13-21,25-27
+extensions/git-integration/tests/unit/home-actions.spec.ts
+  s_3ced19ecaa16dd::t_e299a6c42e8f3e 1,53,186,189
+  s_3ced19ecaa16dd::t_82e03bb06c368b 34,58,94,149-150
+  s_3ced19ecaa16dd::t_27c5e9a17a7acf 68-80
+  s_3ced19ecaa16dd::t_1a595115b18835 44,54-57,59-64,84-88,93,103,166,168
+  s_3ced19ecaa16dd::t_dc381215e0d1a8 2-33,35-43,46-52,89-92,95-102,104-107,109-120,122-147,151-160,162-165,167,169,171-184,187-188,190-194,196-200
+  s_3ced19ecaa16dd::t_e7bd698352ccc7 45,65-67,81-83,108,121,148,161,170,185,195
+extensions/git-integration/src/ipc/github.ipc.ts
+  s_3ced19ecaa16dd::t_caa5d7331092da 10,22,37
+extensions/git-integration/src/home/publisher.ts
+  s_3ced19ecaa16dd::t_76a39d982cf860 64
+  s_3ced19ecaa16dd::t_8500b677328d56 28-36,65
+  s_3ced19ecaa16dd::t_d471ec4bd9552c 43-45
+  s_3ced19ecaa16dd::t_27c5e9a17a7acf 5
+  s_3ced19ecaa16dd::t_a4f241ca105ea8 49-50,54-57
+  s_3ced19ecaa16dd::t_dd5d7f2cec7844 1-4,7-16,37-40,46-48,51-52,58-60,62-63,66-67
+  s_3ced19ecaa16dd::t_81317a9301a21e 6,17-27,41-42,53,61
+extensions/git-integration/tests/unit/github-contributions.spec.ts
+  s_3ced19ecaa16dd::t_28d9305a6d003d 21,35,41-42,324-341
+  s_3ced19ecaa16dd::t_d0048ef1cd1e26 342
+extensions/git-integration/tests/unit/home-publisher.spec.ts
+  s_3ced19ecaa16dd::t_dd5d7f2cec7844 1-5,7-30,32-41,43-47,49-72,75-83,85-96,98-103
+  s_3ced19ecaa16dd::t_8500b677328d56 6
+  s_3ced19ecaa16dd::t_130d8fa117d88d 42
+  s_3ced19ecaa16dd::t_a723cf1f44e7f6 31,48,73-74,84,97
+extensions/git-integration/src/ipc/github/contributions.ts
+  s_3ced19ecaa16dd::t_caa5d7331092da 196-199
+extensions/git-integration/src/ipc/github/dashboard.ts
+  s_3ced19ecaa16dd::t_caa5d7331092da 182,201,210
+  s_3ced19ecaa16dd::t_a4f241ca105ea8 209
+extensions/git-integration/tests/unit/remote-access.spec.ts
+  s_3ced19ecaa16dd::t_5a478b2aeb0c34 170
+  s_3ced19ecaa16dd::t_b9e7880b2949d6 171-172
+extensions/git-integration/tests/unit/dashboard-search.spec.ts
+  s_3ced19ecaa16dd::t_8500b677328d56 397,400,426-430,444
+  s_3ced19ecaa16dd::t_ab556adafe93bd 379-396,398-399,401-425,431-443
+extensions/git-integration/tests/unit/github-ipc.spec.ts
+  s_3ced19ecaa16dd::t_28d9305a6d003d 3397-3417
+extensions/git-integration/CLAUDE.md
+  s_3ced19ecaa16dd::t_1d5f58ce37e7a8 54-57
+extensions/git-integration/tests/unit/home-feed.spec.ts
+  s_3ced19ecaa16dd::t_e2c58dcb11e571 164-173,176-177,179-184,186-212,214-216
+  s_3ced19ecaa16dd::t_ba1cfde5d0b477 80,136,140,142,225-236,238
+  s_3ced19ecaa16dd::t_76a39d982cf860 3-6
+  s_3ced19ecaa16dd::t_ff632f81bf8a1a 1,9,13-14,17-34,39-48,53-71,76-79,83,139,141,143,145-159,161-163,217-224,237,239-253,256-262,264,268-275
+  s_3ced19ecaa16dd::t_e0605f9f2f83df 7,10-12,16,35-38,49-52,72-75,160,267
+  s_3ced19ecaa16dd::t_b81b25a86bed55 254-255
+  s_3ced19ecaa16dd::t_e777137d5bcbc5 84-135,137
+  s_3ced19ecaa16dd::t_27c5e9a17a7acf 2,174,178,185,263,265
+  s_3ced19ecaa16dd::t_1c8c9332fe0265 8,15,81-82,138,144,175,213,266
+extensions/git-integration/tests/unit/dashboard-checks.spec.ts
+  s_3ced19ecaa16dd::t_d471ec4bd9552c 38-40
+  s_3ced19ecaa16dd::t_2d08841ac88e63 1-3,11-21,27-37,41-47,51-96
+  s_3ced19ecaa16dd::t_8500b677328d56 48-50
+  s_3ced19ecaa16dd::t_27c5e9a17a7acf 4-10,22-26
+extensions/git-integration/src/home/feed.ts
+  s_3ced19ecaa16dd::t_27c5e9a17a7acf 191-192
+  s_3ced19ecaa16dd::t_275ed81abefc03 4-5,23,35-36,42-58,63-66,76,78-80,106,109-120,123-129,139-140,146-153,186,194-195
+  s_3ced19ecaa16dd::t_b81b25a86bed55 2-3,6-22,24-34,37-41,59-62,67-75,77,81-85,92-93,96,98,121-122,130-138,141-145,154-185,187-190,193,196-198
+  s_3ced19ecaa16dd::t_76a39d982cf860 1
+  s_3ced19ecaa16dd::t_2b4334768cd5d7 94-95,97,99-105,107-108
+  s_3ced19ecaa16dd::t_ba1cfde5d0b477 86-91
+extensions/git-integration/src/github/dashboard-checks.ts
+  s_3ced19ecaa16dd::t_8500b677328d56 11
+  s_3ced19ecaa16dd::t_2d08841ac88e63 1-10,12-63
+extensions/git-integration/tests/unit/support/dashboard-pr.ts
+  s_3ced19ecaa16dd::t_ff632f81bf8a1a 1-30
+extensions/git-integration/src/ipc/github/context.ts
+  s_3ced19ecaa16dd::t_a4f241ca105ea8 25
+  s_3ced19ecaa16dd::t_caa5d7331092da 11-12
+  s_3ced19ecaa16dd::t_dd5d7f2cec7844 24,26
+extensions/git-integration/src/schemas/pr-review.schema.ts
+  s_3ced19ecaa16dd::t_891c92d98d450d 279-280
+  s_3ced19ecaa16dd::t_2d08841ac88e63 264-273,281-284
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "8b7d1f97b6ed68ee1baabf0558bbe65c5403fd3d",
+  "prompts": {},
+  "sessions": {
+    "s_3ced19ecaa16dd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "958bebf4-85fd-422a-9a09-b64994561aeb",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
