@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { ToastTone } from './Toast'
+import type { ToastItem, ToastTone } from './Toast'
 
 export interface QueuedToast {
   id: string
@@ -7,6 +7,7 @@ export interface QueuedToast {
   message: string
   duration: number
   onClick?: () => void
+  action?: ToastItem['action']
 }
 
 export interface ToastQueue {
@@ -16,6 +17,7 @@ export interface ToastQueue {
     message: string
     duration?: number
     onClick?: () => void
+    action?: ToastItem['action']
   }) => void
   removeToast: (id: string) => void
 }
@@ -26,9 +28,9 @@ export function createToastStore() {
   return create<ToastQueue>((set) => ({
     toasts: [],
 
-    addToast: ({ type, message, duration = type === 'error' ? 6000 : 3500, onClick }) => {
+    addToast: ({ type, message, duration = type === 'error' ? 6000 : 3500, onClick, action }) => {
       const id = crypto.randomUUID()
-      set((s) => ({ toasts: [...s.toasts, { id, type, message, duration, onClick }] }))
+      set((s) => ({ toasts: [...s.toasts, { id, type, message, duration, onClick, action }] }))
       setTimeout(() => {
         set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) }))
       }, duration)

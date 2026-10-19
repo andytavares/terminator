@@ -11,6 +11,8 @@ import { singleQuoted } from '../../terminal/typed-input'
 import { MAX_TYPED_LINE_BYTES } from '../../quick-actions/custom-actions'
 import { openSnapshot } from '../../sidebar/session-facts'
 import { createFromDraft } from '../sidebar/create-project'
+import { useDismissedThreads } from './dismissed-threads'
+import { workKeyId } from '../../home/work-threads'
 import type { IssueSummary, Workspace } from '../../../shared/types/index'
 
 // What the Start work launcher decides and does, apart from how it is drawn.
@@ -215,6 +217,7 @@ async function startExtensionOption(option: StartWorkOptionRegistration, request
   if (command === undefined) return `${option.label} is not turned on, so it cannot take this.`
   const context = { projectId: null, sessionId: null, repoRoot: request.workspace.folderPath }
   window.electronAPI.extension.executeCommand(command.key, context, optionArgs(request))
+  restoreStarted(request)
   return null
 }
 
@@ -232,6 +235,17 @@ async function linkTicket(sessionId: string, issue: IssueSummary): Promise<void>
   await useSessionRecordsStore.getState().setLink(openSnapshot(session, project, workspace), ref)
 }
 
+/** Starting work on purpose undoes an earlier dismissal of it. Prompts have no thread to restore. */
+function restoreStarted(request: WorkRequest): void {
+  const { folderPath } = request.workspace
+  if (request.kind === 'prompt') return
+  const key =
+    request.kind === 'ticket'
+      ? workKeyId({ tracker: request.issue.tracker, key: request.issue.key })
+      : workKeyId({ repoRoot: folderPath, branch: request.branch })
+  useDismissedThreads.getState().restore(key)
+}
+
 /** Does the work. Null when it started; otherwise what to tell the person, in plain words. */
 export async function startWork(request: WorkRequest): Promise<Outcome> {
   const option = useExtensionRegistry.getState().startWorkOptions.get(request.runAs)
@@ -243,5 +257,6 @@ export async function startWork(request: WorkRequest): Promise<Outcome> {
   const sessionId = await startSessionInBranch(projectId, command)
   if (sessionId === null) return 'The terminal could not be opened.'
   if (request.kind === 'ticket') await linkTicket(sessionId, request.issue)
+  restoreStarted(request)
   return null
 }

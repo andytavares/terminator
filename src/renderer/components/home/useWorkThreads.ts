@@ -77,14 +77,14 @@ function parkedByHand(threads: WorkThread[], keys: readonly string[]): WorkThrea
   return threads.map((t) => (keys.includes(t.key) ? { ...t, parked: true } : t))
 }
 
-/** The threads worth showing: parked ones marked so, dismissed ones left out until they stir. */
+/** The threads worth showing: parked ones marked so, dismissed ones left out. */
 function shownThreads(
   input: WorkThreadInput,
   parkedKeys: readonly string[],
   dismissed: Record<string, number>
 ): WorkThread[] {
   return parkedByHand(buildWorkThreads(input), parkedKeys).filter(
-    (t) => !isDismissed(dismissed, t.key, t.lastActivity)
+    (t) => !isDismissed(dismissed, t.key)
   )
 }
 

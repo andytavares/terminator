@@ -9,6 +9,7 @@ import { leadSessionOf } from './thread-actions'
 import { SESSION_ACTIONS } from '../session/session-actions'
 import { SessionLinkDialog } from '../session/SessionLinkDialog'
 import { ConfirmDialog } from '../ConfirmDialog'
+import { useToastStore } from '../../stores/toast.store'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import type { WorkThread } from '../../home/work-threads'
 
@@ -57,6 +58,18 @@ function sessionItems(thread: WorkThread, run: Run, actions: ItemActions): Conte
   return items
 }
 
+/** Hides the row for good and offers Undo in a toast. */
+function dismissWithUndo(thread: WorkThread): void {
+  const { dismiss, restore } = useDismissedThreads.getState()
+  dismiss(thread.key, Date.now())
+  useToastStore.getState().addToast({
+    type: 'info',
+    message: `Dismissed "${thread.title}"`,
+    duration: 6000,
+    action: { label: 'Undo', onSelect: () => restore(thread.key) },
+  })
+}
+
 /** Park or Unpark, and Dismiss: what every row offers. */
 function rowItems(thread: WorkThread, run: Run): ContextMenuItem[] {
   return [
@@ -67,7 +80,7 @@ function rowItems(thread: WorkThread, run: Run): ContextMenuItem[] {
     },
     {
       label: 'Dismiss',
-      onSelect: run(() => useDismissedThreads.getState().dismiss(thread.key, thread.lastActivity)),
+      onSelect: run(() => dismissWithUndo(thread)),
     },
   ]
 }

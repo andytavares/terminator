@@ -43,6 +43,18 @@ describe('ToastContainer', () => {
   })
 })
 
+describe('ToastContainer — action', () => {
+  it('draws the toast action and runs it when clicked', () => {
+    const onSelect = vi.fn()
+    withToasts([
+      { id: '7', type: 'info', message: 'Dismissed', action: { label: 'Undo', onSelect } },
+    ])
+    render(<ToastContainer />)
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
+    expect(onSelect).toHaveBeenCalledTimes(1)
+  })
+})
+
 describe('ToastContainer — leaves expiry to the store', () => {
   // The store already expires a toast; a second timer in the region would
   // remove it early and twice.

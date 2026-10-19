@@ -6,6 +6,7 @@ import { useIntegrationsStore } from '../../../../src/renderer/stores/integratio
 import { useSessionRecordsStore } from '../../../../src/renderer/stores/session-records.store'
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
+import { useDismissedThreads } from '../../../../src/renderer/components/home/dismissed-threads'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { installElectronApi } from '../../../support/electron-api'
 import type { ElectronAPI } from '../../../../src/shared/electron-api/api-type'
@@ -265,6 +266,35 @@ describe('StartWork — Enter on a ticket', () => {
       tracker: 'linear',
       key: 'TAV-33',
     })
+  })
+})
+
+describe('StartWork — starting dismissed work', () => {
+  it('brings a dismissed ticket back to In flight once it has started', async () => {
+    useDismissedThreads.setState({ dismissed: { 'linear:TAV-33': 1, 'linear:TAV-99': 1 } })
+    const onClose = await open()
+    fireEvent.keyDown(searchBox(), { key: 'Enter' })
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+    expect(Object.keys(useDismissedThreads.getState().dismissed)).toEqual(['linear:TAV-99'])
+  })
+
+  it('brings a dismissed branch back once a session started on it', async () => {
+    useDismissedThreads.setState({ dismissed: { '/repo#main': 1 } })
+    const onClose = await open()
+    goToTab('Branch')
+    await screen.findByRole('option', { name: /main/ })
+    fireEvent.keyDown(searchBox(), { key: 'Enter' })
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+    expect(useDismissedThreads.getState().dismissed).toEqual({})
+  })
+
+  it('leaves a dismissed ticket dismissed when starting it failed', async () => {
+    useDismissedThreads.setState({ dismissed: { 'linear:TAV-33': 1 } })
+    launched.createFromDraft.mockResolvedValue({ field: 'form', message: 'Worktree error: nope' })
+    await open()
+    fireEvent.keyDown(searchBox(), { key: 'Enter' })
+    await waitFor(() => expect(launched.createFromDraft).toHaveBeenCalled())
+    expect(Object.keys(useDismissedThreads.getState().dismissed)).toEqual(['linear:TAV-33'])
   })
 })
 
