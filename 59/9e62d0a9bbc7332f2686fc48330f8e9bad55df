@@ -1,0 +1,116 @@
+src/main/index.ts
+  s_3ced19ecaa16dd::t_05e9654612e212 396,401-406,412-415
+  s_3ced19ecaa16dd::t_bc75643a927787 417-419
+  s_3ced19ecaa16dd::t_17d459c9d2239a 25-29,369-370,416,420-421
+src/main/agents/agent-ask-hook.ts
+  s_3ced19ecaa16dd::t_3dd9398d9eec86 1-86
+tests/unit/renderer/sidebar/session-facts.spec.ts
+  s_3ced19ecaa16dd::t_bc75643a927787 296-308
+  s_3ced19ecaa16dd::t_3e4910ef5592b3 293-295,309,311
+src/renderer/sidebar/agent-state.ts
+  s_3ced19ecaa16dd::t_a3f9f8eb2e4a5c 13-15,17-19,27
+src/shared/agent-sessions/ask.ts
+  s_3ced19ecaa16dd::t_074cc8671e0692 1-50
+src/main/home/attention-log.ts
+  s_3ced19ecaa16dd::t_68fe0472aaf061 1-4,6-78,80-105
+  s_3ced19ecaa16dd::t_a93ff96cc8eeeb 79
+  s_3ced19ecaa16dd::t_bc75643a927787 5
+tests/unit/agents/agent-ask-hook.spec.ts
+  s_3ced19ecaa16dd::t_bc75643a927787 34-37
+  s_3ced19ecaa16dd::t_dc711b7b1b3cfc 1-33,38-118
+src/renderer/sidebar/session-facts.ts
+  s_3ced19ecaa16dd::t_8fdd2086ad47b1 87
+  s_3ced19ecaa16dd::t_a3f9f8eb2e4a5c 44-45,113,169
+src/main/agents/agent-session-watcher.ts
+  s_3ced19ecaa16dd::t_a6b85ecc790d17 75
+tests/unit/integrations/claude-settings-put-hook.spec.ts
+  s_3ced19ecaa16dd::t_e299a6c42e8f3e 10,61-63,70
+  s_3ced19ecaa16dd::t_93f96111f69692 12,41-43,45,55
+  s_3ced19ecaa16dd::t_bf65d709de7804 18,33
+  s_3ced19ecaa16dd::t_bc75643a927787 40,44
+  s_3ced19ecaa16dd::t_3dd9398d9eec86 13-17,19-32,49-53,67
+  s_3ced19ecaa16dd::t_e2d77f40c3a9a3 1-9,11,34-39,46-48,54,56-60,64-66,68-69
+src/main/ipc/terminal.ipc.ts
+  s_3ced19ecaa16dd::t_dc134d9e1a7010 17,203
+tests/unit/home/attention-log.spec.ts
+  s_3ced19ecaa16dd::t_9fa9de4b017ff4 81,88-89,95
+  s_3ced19ecaa16dd::t_745700ac0a67b9 103-105
+  s_3ced19ecaa16dd::t_93f96111f69692 82,96
+  s_3ced19ecaa16dd::t_e299a6c42e8f3e 50,52,77,79
+  s_3ced19ecaa16dd::t_bc75643a927787 1-49,51,53-76,78,80,83-87,90-94,97-102,106-112
+src/main/agents/ask-watcher.ts
+  s_3ced19ecaa16dd::t_4fc95730bb441c 5,8-9,44,73,77,84-88,90,92-94,96
+  s_3ced19ecaa16dd::t_2fa0ab5f3d53a6 1-4,6-7,10-35,45-72,74-76,78-81,89,91,95,97
+  s_3ced19ecaa16dd::t_dc134d9e1a7010 36-43
+  s_3ced19ecaa16dd::t_bc75643a927787 82-83
+src/renderer/stores/session.store.ts
+  s_3ced19ecaa16dd::t_e5bed21b4c859d 207-208,583-584
+  s_3ced19ecaa16dd::t_93f96111f69692 580-582,661
+  s_3ced19ecaa16dd::t_a3f9f8eb2e4a5c 4
+  s_3ced19ecaa16dd::t_80fa0c454cd168 585-587
+src/main/ipc/agent-ask.ipc.ts
+  s_3ced19ecaa16dd::t_fb0fdead465f8a 2,13
+  s_3ced19ecaa16dd::t_bc75643a927787 20-22
+  s_3ced19ecaa16dd::t_3315fcaa9c726a 1,3-12,14-19,23
+src/main/ipc/attention.ipc.ts
+  s_3ced19ecaa16dd::t_a93ff96cc8eeeb 1-34
+src/shared/types/index.ts
+  s_3ced19ecaa16dd::t_626ac550a44a81 2,102-103
+tests/unit/renderer/shell/agent-attention.spec.ts
+  s_3ced19ecaa16dd::t_9fa9de4b017ff4 3,67
+  s_3ced19ecaa16dd::t_93f96111f69692 6,19-20,30,40,50-52,60,62
+  s_3ced19ecaa16dd::t_44a37aeab56967 1-2,4-5,7-18,21-29,31-39,41-49,53-59,61,63-66,68-73
+tests/unit/shared/home/attention-measures.spec.ts
+  s_3ced19ecaa16dd::t_93f96111f69692 23-24,36-38,44,49,64,70-71,81-83,91-92,101-104,106,113-116,150,155-158
+  s_3ced19ecaa16dd::t_9fa9de4b017ff4 152
+  s_3ced19ecaa16dd::t_fd49d4103cf579 125-127,139-143
+  s_3ced19ecaa16dd::t_bf65d709de7804 63
+  s_3ced19ecaa16dd::t_bc75643a927787 1-22,25-35,39-43,45-48,50-62,65-69,72-80,84-90,93-100,105,107-112,117-124,128-138,144-149,151,153-154,159-164
+tests/unit/shared/agent-sessions/ask.spec.ts
+  s_3ced19ecaa16dd::t_074cc8671e0692 1-28,33-55
+  s_3ced19ecaa16dd::t_bc75643a927787 29-32
+tests/unit/renderer/sidebar/fixtures/facts.ts
+  s_3ced19ecaa16dd::t_f7c0737379d35a 26
+src/renderer/shell/bootstrap.ts
+  s_3ced19ecaa16dd::t_f7c0737379d35a 11,23
+  s_3ced19ecaa16dd::t_2d4155e17d1706 24
+src/shared/home/attention-measures.ts
+  s_3ced19ecaa16dd::t_c1611a5f1ab9a3 77,90,96,110,121,221
+  s_3ced19ecaa16dd::t_0ef70f37b7f9b8 169-171
+  s_3ced19ecaa16dd::t_3dd9398d9eec86 152-167,173-175
+  s_3ced19ecaa16dd::t_fb0fdead465f8a 1-76,78-89,91-95,97-109,111-120,122-151,168,172,176-220,222-231
+src/renderer/shell/agent-attention.ts
+  s_3ced19ecaa16dd::t_c1611a5f1ab9a3 26,55-56,61,69,74,91-92
+  s_3ced19ecaa16dd::t_0ef70f37b7f9b8 27
+  s_3ced19ecaa16dd::t_f7c0737379d35a 1-25,28-47,64,80-81,85,93-94,96-113
+  s_3ced19ecaa16dd::t_3dd9398d9eec86 48-54,57-60,62-63,65-68,70-73,75-79,82-84,86-90,95
+src/shared/schemas/attention.schema.ts
+  s_3ced19ecaa16dd::t_a93ff96cc8eeeb 1-14
+src/main/integrations/claude-settings.ts
+  s_3ced19ecaa16dd::t_265f56890cdd06 45-47,49,54-55,57,62-64
+  s_3ced19ecaa16dd::t_3dd9398d9eec86 50,56,58-59,65
+  s_3ced19ecaa16dd::t_a6b85ecc790d17 66
+tests/unit/agents/ask-watcher.spec.ts
+  s_3ced19ecaa16dd::t_bc75643a927787 44-53
+  s_3ced19ecaa16dd::t_7db4c22c8768b3 1-43,54-95
+src/main/agents/agent-session-hook.ts
+  s_3ced19ecaa16dd::t_2fa0ab5f3d53a6 122
+src/shared/electron-api/manifest.ts
+  s_3ced19ecaa16dd::t_fd7c3a33003e19 1129,1139,1153,1163
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "599e62d0a9bbc7332f2686fc48330f8e9bad55df",
+  "prompts": {},
+  "sessions": {
+    "s_3ced19ecaa16dd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "958bebf4-85fd-422a-9a09-b64994561aeb",
+        "model": "unknown"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
