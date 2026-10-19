@@ -8,6 +8,8 @@ const KEPT_DAYS = 7
 interface Persisted {
   days: Record<string, FocusItem[]>
   lastLeftHomeAt: number | null
+  /** The local day whose Plan today band was started or skipped. */
+  planDismissedOn: string | null
 }
 
 interface FocusState extends Persisted {
@@ -17,6 +19,8 @@ interface FocusState extends Persisted {
   toggleDone: (id: string) => void
   /** Remembers when the operator last looked at Home, for "Since you left". */
   markLeftHome: (now: number) => void
+  /** Hides the Plan today band for the rest of the local day of `now`. */
+  dismissPlan: (now: number) => void
 }
 
 function newestDays(days: Persisted['days']): Persisted['days'] {
@@ -25,7 +29,11 @@ function newestDays(days: Persisted['days']): Persisted['days'] {
 }
 
 function persist(state: Persisted): Persisted {
-  writeStoredJson(FOCUS_KEY, { days: state.days, lastLeftHomeAt: state.lastLeftHomeAt })
+  writeStoredJson(FOCUS_KEY, {
+    days: state.days,
+    lastLeftHomeAt: state.lastLeftHomeAt,
+    planDismissedOn: state.planDismissedOn,
+  })
   return state
 }
 
@@ -37,7 +45,11 @@ function updateToday(state: Persisted, change: (items: FocusItem[]) => FocusItem
 }
 
 export const useFocusStore = create<FocusState>((set) => ({
-  ...readStoredJson<Persisted>(FOCUS_KEY, { days: {}, lastLeftHomeAt: null }),
+  ...readStoredJson<Persisted>(FOCUS_KEY, {
+    days: {},
+    lastLeftHomeAt: null,
+    planDismissedOn: null,
+  }),
   pickFocus: (item) =>
     set((s) =>
       updateToday(s, (items) =>
@@ -54,4 +66,5 @@ export const useFocusStore = create<FocusState>((set) => ({
       )
     ),
   markLeftHome: (now) => set((s) => persist({ ...s, lastLeftHomeAt: now })),
+  dismissPlan: (now) => set((s) => persist({ ...s, planDismissedOn: localDateKey(now) })),
 }))

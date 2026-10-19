@@ -74,7 +74,7 @@ describe('contributions fetch', () => {
     publisher.hooks.onDashboard({ prs: [dashboardPrFixture({ ciStatus: 'failing' })], failed: [] })
     publisher.hooks.onContributions(buildContributionCalendar([], '2026-10-18', 'UTC'))
     expect(published.at(-1)?.asks).toHaveLength(1)
-    expect(published.at(-1)?.measures.map((m) => m.id)).toEqual(['merged'])
+    expect(published.at(-1)?.measures.map((m) => m.id)).toEqual(['merged', 'contributions-days'])
   })
 })
 

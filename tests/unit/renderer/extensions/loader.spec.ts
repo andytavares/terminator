@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { readFileSync } from 'node:fs'
 import { render, screen } from '@testing-library/react'
 import type { Extension } from '../../../../src/shared/types/index.js'
 import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
@@ -115,7 +116,7 @@ describe('initExtensions — manifest-driven (contributes) registration — regi
 describe('initExtensions — manifest-driven (contributes) registration — does not call any registry method when extension has no contributes', () => {
   it('does not call any registry method when extension has no contributes', async () => {
     await callInit([{ id: 'com.test.ext' }])
-    const { globalTabs, workspaceTabs, projectTabs, sidebarPanels, windowViews, homeSections } =
+    const { globalTabs, workspaceTabs, projectTabs, sidebarPanels, windowViews, insightsSections } =
       registryState()
     for (const surfaces of [
       globalTabs,
@@ -123,7 +124,7 @@ describe('initExtensions — manifest-driven (contributes) registration — does
       projectTabs,
       sidebarPanels,
       windowViews,
-      homeSections,
+      insightsSections,
     ]) {
       expect(surfaces.size).toBe(0)
     }
@@ -172,15 +173,29 @@ describe('registerWebviewExtension — default view params', () => {
   })
 })
 
-describe('registerWebviewExtension — home section', () => {
+describe('registerWebviewExtension — Insights section', () => {
   const registerContributions = (contributes: Extension['contributes']) =>
     registerWebviewExtension(makeExt({ contributes }), registryState())
 
-  it('hosts the "home" view in a home section that names none', () => {
-    registerContributions({ homeSection: { label: 'Pull requests' } })
-    const section = registryState().homeSections.get('com.test.ext')!
+  it('hosts the "home" view in an Insights section that names none', () => {
+    registerContributions({ insightsSection: { label: 'Pull requests' } })
+    const section = registryState().insightsSections.get('com.test.ext')!
     expect(section).toMatchObject({ label: 'Pull requests', view: 'home' })
     expect(portalOf(section.component, {})).toBe('com.test.ext:home')
+  })
+})
+
+describe('registerWebviewExtension — the Git integration manifest', () => {
+  it('registers its Contributions section on Insights, and no longer declares a home section', () => {
+    const manifest = JSON.parse(
+      readFileSync('extensions/git-integration/manifest.json', 'utf8')
+    ) as { contributes: Extension['contributes'] & { homeSection?: unknown } }
+    registerWebviewExtension(makeExt({ contributes: manifest.contributes }), registryState())
+    expect(registryState().insightsSections.get('com.test.ext')).toMatchObject({
+      label: 'Contributions',
+      view: 'home',
+    })
+    expect(manifest.contributes.homeSection).toBeUndefined()
   })
 })
 

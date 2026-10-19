@@ -9,6 +9,7 @@ import type { DashboardCheck } from '../schemas/pr-review.schema.js'
 
 const REVIEW_PULL_REQUEST = 'terminator.git-integration.command.review-pull-request'
 const WEEKS_IN_QUARTER = 13
+const RAIL_DAYS = 36
 
 /** Stable id of a pull request across refreshes; actions look the pull request up by it. */
 export function pullRequestId(pr: Pick<DashboardPR, 'repo' | 'number'>): string {
@@ -20,12 +21,20 @@ export function reviewTarget(pr: DashboardPR): { repoRoot: string; number: numbe
   return { repoRoot: pr.localRepoRoot ?? `gh:${pr.repo}`, number: pr.number }
 }
 
+/** "Fluent · TAV-20 · pull request #41": the repo's name, its ticket when it has one, the number. */
+function pullRequestWhere(pr: DashboardPR, tickets: TicketIndex): string {
+  const key = workKeyOf(pr, tickets)
+  const ticket = key !== null && 'key' in key ? [key.key] : []
+  return [pr.repo.split('/').at(-1) ?? pr.repo, ...ticket, `pull request #${pr.number}`].join(' · ')
+}
+
 function reviewRequestAsk(pr: DashboardPR, tickets: TicketIndex): HomeAsk {
   return {
     id: `review:${pullRequestId(pr)}`,
     kind: 'review',
     title: pr.section === 're-review' ? 'Re-review requested' : 'Review requested',
     detail: pr.title,
+    where: pullRequestWhere(pr, tickets),
     facts: [
       `${pr.fileCount} files`,
       `+${pr.additions} −${pr.deletions}`,
@@ -61,6 +70,7 @@ function fixAsk(pr: DashboardPR, tickets: TicketIndex): HomeAsk {
     kind: 'fix',
     title: 'Check failed',
     detail: failureDetail(pr, failed),
+    where: pullRequestWhere(pr, tickets),
     facts: failed.map((check) => check.name),
     workKey: workKeyOf(pr, tickets),
     since: failedSince(pr, failed),
@@ -163,10 +173,20 @@ function mergedPerWeek(calendar: ContributionCalendar, weeks: number, skip: numb
 
 const sum = (counts: number[]) => counts.reduce((total, count) => total + count, 0)
 
-/** "How much shipped?", from the calendar the Home contributions section already fetched. */
+/** Contribution levels 0-4 of the last `RAIL_DAYS` days up to today, oldest first. */
+function recentLevels(calendar: ContributionCalendar): number[] {
+  return calendar.weeks
+    .flat()
+    .filter((day) => !day.future)
+    .slice(-RAIL_DAYS)
+    .map((day) => day.level)
+}
+
+/** "How much shipped?" and the recent days' levels, from the calendar Insights already fetched. */
 export function buildMeasures(calendar: ContributionCalendar | null): HomeMeasure[] {
   if (!calendar) return []
   const series = mergedPerWeek(calendar, WEEKS_IN_QUARTER, 0)
+  const levels = recentLevels(calendar)
   return [
     {
       id: 'merged',
@@ -176,6 +196,14 @@ export function buildMeasures(calendar: ContributionCalendar | null): HomeMeasur
       window: 'quarter',
       series,
       previous: sum(mergedPerWeek(calendar, WEEKS_IN_QUARTER, WEEKS_IN_QUARTER)),
+    },
+    {
+      id: 'contributions-days',
+      question: 'When do I ship?',
+      value: levels.filter((level) => level > 0).length,
+      unit: 'count',
+      window: 'quarter',
+      series: levels,
     },
   ]
 }

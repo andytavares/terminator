@@ -115,9 +115,9 @@ const SETTINGS: Record<string, SettingDefinition> = {
   },
   'terminator.git-integration.home.showContributions': {
     type: 'boolean',
-    label: 'Show contributions on Home',
+    label: 'Show contributions on Insights',
     description:
-      'The Contributions section (heatmap, streaks and period stats) at the top of Home.',
+      'The Contributions section (heatmap, streaks and period stats) on the Insights view of Home.',
     default: true,
   },
   'terminator.git-integration.review.agentModel': {

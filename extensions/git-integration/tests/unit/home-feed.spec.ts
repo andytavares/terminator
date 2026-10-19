@@ -26,6 +26,12 @@ describe('buildAsks: review', () => {
     expect(ask.open.command).toBe('terminator.git-integration.command.review-pull-request')
   })
 
+  it('says where the request comes from: the repo, its ticket and the number', () => {
+    const pr = dashboardPrFixture({ section: 'requested', number: 41, headRefName: 'tav-20-cache' })
+    const [ask] = buildAsks([pr], new Map([['TAV-20', 'linear']]) as TicketIndex)
+    expect(ask.where).toBe('widgets · TAV-20 · pull request #41')
+  })
+
   it('titles a re-review differently', () => {
     const [ask] = buildAsks([dashboardPrFixture({ section: 're-review' })], NO_ISSUES)
     expect(ask.title).toBe('Re-review requested')
@@ -253,6 +259,16 @@ describe('buildMeasures', () => {
     const [merged] = buildMeasures(calendar)
     expect(merged.value).toBe(7)
     expect(merged.previous).toBe(5)
+  })
+
+  it('publishes the last 36 days of contribution levels, oldest first, for the Today rail', () => {
+    const days = buildMeasures(calendar).find((m) => m.id === 'contributions-days')
+    expect(days?.series).toHaveLength(36)
+    // 2026-10-18 is the last day; 10-16 had a merge, 10-17 and 10-18 none.
+    expect(days?.series.at(-3)).toBeGreaterThan(0)
+    expect(days?.series.at(-2)).toBe(0)
+    expect(days?.series.at(-1)).toBe(0)
+    expect(days?.series.every((level) => level >= 0 && level <= 4)).toBe(true)
   })
 
   it('publishes no measure before contributions have been fetched', () => {

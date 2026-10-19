@@ -129,7 +129,7 @@ interface ExtensionContributes {
   workspaceTab?: ExtensionSurfaceContribution
   projectTab?: ExtensionSurfaceContribution
   sidebarPanel?: ExtensionSurfaceContribution
-  homeSection?: ExtensionSurfaceContribution
+  insightsSection?: ExtensionSurfaceContribution
   windowViews?: Array<{ id: string; view: string }>
   commands?: Array<{
     id: string

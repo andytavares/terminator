@@ -235,7 +235,7 @@ describe('the extension API surface is unchanged', () => {
       workspaceTab: { label: 'w' },
       projectTab: { label: 'p' },
       sidebarPanel: { label: 's' },
-      homeSection: { label: 'h' },
+      insightsSection: { label: 'h' },
       windowViews: [{ id: 'v', view: 'v' }],
       commands: [{ id: 'c', label: 'C' }],
       sidebarButton: { label: 'not a contribution type' },
@@ -243,7 +243,7 @@ describe('the extension API surface is unchanged', () => {
     expect(Object.keys(parsed).sort()).toEqual([
       'commands',
       'globalTab',
-      'homeSection',
+      'insightsSection',
       'projectTab',
       'quickActions',
       'shellRoots',

@@ -1,0 +1,146 @@
+/* Plan today, drawn as in the approved Home design (.plan, .plan-h, .plan-b, .plan-c, .pl, .slot,
+   .load). It sits above the Your move band and never covers it. */
+.plan {
+  margin: 14px 18px 0;
+  border: 1px solid var(--tm-border-strong);
+  border-radius: 12px;
+  background: var(--tm-bg-surface);
+}
+
+.plan__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--tm-border);
+}
+
+.plan__head h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.plan__head p {
+  margin: 0;
+  color: var(--tm-text-secondary);
+  font-size: 12px;
+}
+
+.plan__sun {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  color: var(--tm-warning);
+}
+
+.plan__actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.plan__body {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.1fr;
+}
+
+.plan__column {
+  padding: 12px 16px 16px;
+  border-right: 1px solid var(--tm-border);
+}
+
+.plan__column:last-child {
+  border-right: 0;
+}
+
+.plan__title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 8px;
+  color: var(--tm-text-secondary);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.plan__title svg {
+  width: 12px;
+  height: 12px;
+}
+
+.plan__none {
+  margin: 0;
+  color: var(--tm-text-faint);
+  font-size: 12px;
+}
+
+.plan__row {
+  display: grid;
+  grid-template-columns: 16px 1fr auto;
+  align-items: start;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--tm-border);
+  font-size: 12px;
+}
+
+.plan__row:last-child {
+  border-bottom: 0;
+}
+
+.plan__row > .tmui-status-dot {
+  margin-top: 5px;
+}
+
+.plan__row small {
+  display: block;
+  color: var(--tm-text-faint);
+  font-size: 11px;
+}
+
+.plan__slot {
+  display: grid;
+  grid-template-columns: 20px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 7px;
+  padding: 8px 10px;
+  border: 1px dashed var(--tm-border-strong);
+  border-radius: 8px;
+  color: var(--tm-text-faint);
+  font-size: 12px;
+}
+
+.plan__slot[data-filled] {
+  border-style: solid;
+  border-color: var(--tm-accent);
+  background: var(--tm-accent-dim);
+  color: var(--tm-text-primary);
+}
+
+.plan__slot-number {
+  color: var(--tm-text-secondary);
+  font-family: var(--tm-font-mono);
+  font-size: 11px;
+}
+
+.plan__load {
+  margin-top: 10px;
+  color: var(--tm-text-secondary);
+  font-size: 11px;
+}
+
+.plan__load-track {
+  height: 6px;
+  margin-top: 5px;
+  border-radius: 3px;
+  background: var(--tm-bg-card);
+  overflow: hidden;
+}
+
+.plan__load-track i {
+  display: block;
+  height: 100%;
+  background: var(--tm-accent-text);
+}

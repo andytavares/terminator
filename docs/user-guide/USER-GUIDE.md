@@ -410,6 +410,30 @@ Home has two layouts. Switch between them with **Ledger** and **Logbook** at the
 
 ![Home, Logbook layout](screenshots/11b-home-logbook.png)
 
+### Insights
+
+**Insights** is the second view of Home, for looking back. Each card is titled by the question it answers, and none compares you with anyone else. **This week**, **30 days**, **Quarter** and **Year** at the top choose the range every card covers.
+
+- **How much shipped?** Merged pull requests, against the range before. It comes from Git integration.
+- **How long from start to merge?** The median days from a ticket's first session to its merge, and the middle half. It needs at least three merged tickets in the range; until then the card says **Not enough merged work yet** rather than guess.
+- **How long do agents wait on me?** The median time an agent sat waiting for your answer, how many asks that was, and how many waited over 30 minutes.
+- **How often does it pass first time?** The share of Foundry orders whose checks passed on the first try. It is hidden when Foundry publishes nothing.
+- **How am I spending agent time?** Agent hours, how many agents ran at once, the share that finished without asking you, and Foundry orders shipped. Below them, **Tokens** and **Estimated cost** come from the agents' own conversation files. The cost is an estimate from public prices, and says **partial** when a model had no price.
+- **When do I ship?** A view an extension adds to Insights; Git integration's contribution heatmap lives here. **Show contributions on Insights** in Git Integration's settings switches it off.
+- **Looking back** gathers the weekly review (when Task Vault offers it), the longest wait on you, and the oldest review you owe.
+
+A card with no number to show says why instead of showing a made-up one. Terminator keeps 90 days of how agents waited, so **Year** shows at most that much of it.
+
+### Plan today
+
+On the first view of Home each day, **Plan today** appears above the Desk. It starts with a line such as "Yesterday you finished 2 of 3 focus items. Overnight, 2 agents finished and 1 review came in." and has three columns:
+
+- **Carried over** lists focus items you picked yesterday and did not finish, and your open Task Vault tasks for today.
+- **Since you left** lists what happened after you last had Home open: agents that finished, review requests, pull requests approved or merged, and failing checks.
+- **Today's focus** has three slots. **Add** on any item puts it in the next free slot, and **×** takes it out. When the slots are full, **Add** is off.
+
+Under the slots, **Estimated review time for your queue** adds up the "about N min" of the reviews you owe, so you see the load before you take more on. **Start the day** (`Cmd+Enter`) or **Skip today** hides the band until tomorrow.
+
 ### Saying what a session is for
 
 A session with no ticket shows **What is this session doing?**. Type an answer and press `Enter` — on Home, on its Overview tile, or from its tab (right-click → **Add description…**, or `Cmd+I`). The description is saved at once and survives a restart. When the session ends, it moves to **Closed** and stays findable by the filter for 30 days.

@@ -37,7 +37,7 @@ interface SidebarPanelRegistration {
   view?: string
 }
 
-interface HomeSectionRegistration {
+interface InsightsSectionRegistration {
   id: string
   label: string
   component: ComponentType<{ repoRoot?: string | null }>
@@ -73,7 +73,7 @@ interface CommandRegistration {
 interface ExtensionRegistry {
   sidebarPanels: Map<string, SidebarPanelRegistration>
   projectTabs: Map<string, ProjectTabRegistration>
-  homeSections: Map<string, HomeSectionRegistration>
+  insightsSections: Map<string, InsightsSectionRegistration>
   globalTabs: Map<string, GlobalTabRegistration>
   workspaceTabs: Map<string, WorkspaceTabRegistration>
   windowViews: Map<string, ComponentType<{ repoRoot: string | null }>>
@@ -91,7 +91,7 @@ interface ExtensionRegistry {
 
   registerSidebarPanel(panel: SidebarPanelRegistration): () => void
   registerProjectTab(tab: ProjectTabRegistration): () => void
-  registerHomeSection(section: HomeSectionRegistration): () => void
+  registerInsightsSection(section: InsightsSectionRegistration): () => void
   registerGlobalTab(tab: GlobalTabRegistration): () => void
   registerWorkspaceTab(tab: WorkspaceTabRegistration): () => void
   registerWindowView(id: string, component: ComponentType<{ repoRoot: string | null }>): void
@@ -139,10 +139,13 @@ function toggledIn(ids: Set<string>, id: string): Set<string> {
   return next
 }
 
-/** A home section sits on Home itself; nothing tracks it as active, so removing it is enough. */
-function registerHomeSection(set: SetRegistry, section: HomeSectionRegistration): () => void {
-  set((s) => ({ homeSections: withEntry(s.homeSections, section.id, section) }))
-  return () => set((s) => ({ homeSections: withoutEntry(s.homeSections, section.id) }))
+/** An Insights section sits on the Insights view; nothing tracks it as active, so removing it is enough. */
+function registerInsightsSection(
+  set: SetRegistry,
+  section: InsightsSectionRegistration
+): () => void {
+  set((s) => ({ insightsSections: withEntry(s.insightsSections, section.id, section) }))
+  return () => set((s) => ({ insightsSections: withoutEntry(s.insightsSections, section.id) }))
 }
 
 function registerSidebarPanel(set: SetRegistry, panel: SidebarPanelRegistration): () => void {
@@ -196,7 +199,7 @@ function contributionSlice(
   set: SetRegistry
 ): Slice<
   | 'registerSidebarPanel'
-  | 'registerHomeSection'
+  | 'registerInsightsSection'
   | 'registerWindowView'
   | 'registerKeyboardShortcut'
   | 'registerOverlay'
@@ -204,7 +207,7 @@ function contributionSlice(
 > {
   return {
     registerSidebarPanel: (panel) => registerSidebarPanel(set, panel),
-    registerHomeSection: (section) => registerHomeSection(set, section),
+    registerInsightsSection: (section) => registerInsightsSection(set, section),
     registerWindowView: (id, component) =>
       set((s) => ({ windowViews: withEntry(s.windowViews, id, component) })),
     registerKeyboardShortcut(shortcut) {
@@ -329,7 +332,7 @@ function pendingNavigationSlice(
 export const useExtensionRegistry = create<ExtensionRegistry>((set, get) => ({
   sidebarPanels: new Map(),
   projectTabs: new Map(),
-  homeSections: new Map(),
+  insightsSections: new Map(),
   globalTabs: new Map(),
   workspaceTabs: new Map(),
   windowViews: new Map(),

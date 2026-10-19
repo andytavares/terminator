@@ -38,7 +38,7 @@ describe('ContributionsOnHome', () => {
     expect(await sectionShown()).toBeTruthy()
   })
 
-  it('shows nothing when "Show contributions on Home" is off', async () => {
+  it('shows nothing when "Show contributions on Insights" is off', async () => {
     getSettingsValues.mockResolvedValue({ values: { [SHOW_KEY]: false } })
     const { container } = render(<ContributionsOnHome />)
     await waitFor(() => expect(getSettingsValues).toHaveBeenCalled())

@@ -91,7 +91,7 @@ my-extension/
 ```
 
 The `contributes` keys are `globalTab`, `workspaceTab`, `projectTab`, `sidebarPanel`,
-`homeSection`, `windowViews`, `commands`, `quickActions` and `shellRoots`; the guide's
+`insightsSection`, `windowViews`, `commands`, `quickActions` and `shellRoots`; the guide's
 [`contributes`](../../docs/EXTENSION-DEVELOPMENT.md#contributes) table gives each one's fields.
 
 The backend, `src/index.ts`. Every channel is a `ChannelSpec` whose payload is parsed with its

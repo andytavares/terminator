@@ -94,17 +94,17 @@ Each surface shows the extension's view, with its `view` string passed as `?view
 
 A page shows only the view its `?view=` names, so an `App.tsx` that routes between heavy views can load each with [`React.lazy`](https://react.dev/reference/react/lazy) behind a `Suspense` boundary. Vite then builds each as its own chunk ([dynamic import](https://vite.dev/guide/features#dynamic-import)), and a page loads only the view it shows. git-integration's `src/renderer/App.tsx` does this.
 
-| Key            | Fields                                                           | Where it appears                                                                                 | Default `view` |
-| -------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | -------------- |
-| `globalTab`    | `label`, `icon?`, `view?`                                        | An icon in the sidebar's app band; the view fills the main area                                  | `main`         |
-| `workspaceTab` | `label`, `icon?`, `view?`                                        | A tab scoped to the active workspace                                                             | `workspace`    |
-| `projectTab`   | `label`, `view?`                                                 | A tab scoped to the selected project                                                             | `project`      |
-| `sidebarPanel` | `label`, `icon?`, `defaultOpen?`, `view?`                        | A panel beside the terminal                                                                      | `sidebar`      |
-| `homeSection`  | `label`, `view?`                                                 | A section at the top of Home, as tall as its content, that scrolls away with the sessions        | `home`         |
-| `windowViews`  | `[{ id, view }]`                                                 | Views `api.window.openAuxiliary(id)` opens in their own window                                   | —              |
-| `commands`     | `[{ id, label, description?, shortcut?, mnemonic?, requires? }]` | Reserves the command's row in the Quick Actions panel (see [`api.commands`](#apicommands))       | —              |
-| `quickActions` | `{ group: { mnemonic?, label } }`                                | Your group's letter and label in the Quick Actions panel                                         | —              |
-| `shellRoots`   | `[settingKey]`                                                   | Nowhere: directories `api.shell.exec` and `api.github` may run in (see [`api.shell`](#apishell)) | —              |
+| Key               | Fields                                                           | Where it appears                                                                                 | Default `view` |
+| ----------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | -------------- |
+| `globalTab`       | `label`, `icon?`, `view?`                                        | An icon in the sidebar's app band; the view fills the main area                                  | `main`         |
+| `workspaceTab`    | `label`, `icon?`, `view?`                                        | A tab scoped to the active workspace                                                             | `workspace`    |
+| `projectTab`      | `label`, `view?`                                                 | A tab scoped to the selected project                                                             | `project`      |
+| `sidebarPanel`    | `label`, `icon?`, `defaultOpen?`, `view?`                        | A panel beside the terminal                                                                      | `sidebar`      |
+| `insightsSection` | `label`, `view?`                                                 | A section on the Insights view of Home, as tall as its content                                   | `home`         |
+| `windowViews`     | `[{ id, view }]`                                                 | Views `api.window.openAuxiliary(id)` opens in their own window                                   | —              |
+| `commands`        | `[{ id, label, description?, shortcut?, mnemonic?, requires? }]` | Reserves the command's row in the Quick Actions panel (see [`api.commands`](#apicommands))       | —              |
+| `quickActions`    | `{ group: { mnemonic?, label } }`                                | Your group's letter and label in the Quick Actions panel                                         | —              |
+| `shellRoots`      | `[settingKey]`                                                   | Nowhere: directories `api.shell.exec` and `api.github` may run in (see [`api.shell`](#apishell)) | —              |
 
 `icon` takes one of the names `iconFromName` knows (`src/renderer/extensions/icon-from-name.ts`), such as `puzzle`, `wrench`, `terminal`, `git-branch`, `database`, `list` or `calendar`.
 

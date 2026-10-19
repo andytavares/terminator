@@ -22,7 +22,7 @@ export const ExtensionContributesSchema = z
     workspaceTab: SurfaceContributionSchema.optional(),
     projectTab: SurfaceContributionSchema.optional(),
     sidebarPanel: SurfaceContributionSchema.optional(),
-    homeSection: SurfaceContributionSchema.optional(),
+    insightsSection: SurfaceContributionSchema.optional(),
     windowViews: z.array(z.object({ id: z.string().min(1), view: z.string().min(1) })).optional(),
     commands: z
       .array(
@@ -47,7 +47,7 @@ export const ExtensionContributesSchema = z
       workspaceTab,
       projectTab,
       sidebarPanel,
-      homeSection,
+      insightsSection,
       windowViews,
       commands,
       quickActions,
@@ -58,7 +58,7 @@ export const ExtensionContributesSchema = z
       workspaceTab,
       projectTab,
       sidebarPanel,
-      homeSection,
+      insightsSection,
       windowViews,
       commands,
       quickActions,
