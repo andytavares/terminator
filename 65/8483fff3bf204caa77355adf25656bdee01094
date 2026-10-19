@@ -1,0 +1,19 @@
+extensions/git-integration/tests/unit/home-publisher.spec.ts
+  s_3ced19ecaa16dd::t_9e588369a64c0f 1,73,78-81
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "658483fff3bf204caa77355adf25656bdee01094",
+  "prompts": {},
+  "sessions": {
+    "s_3ced19ecaa16dd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "958bebf4-85fd-422a-9a09-b64994561aeb",
+        "model": "unknown"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
