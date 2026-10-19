@@ -1,0 +1,21 @@
+tests/unit/ipc/attention.ipc.spec.ts
+  s_3ced19ecaa16dd::t_2fe488f116bed7 11,14,45-99
+tests/unit/ipc/agent-ask.ipc.spec.ts
+  s_3ced19ecaa16dd::t_2fe488f116bed7 1-33
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f0f9c1831b035df2a403f9c8032fd6caa20b0dcc",
+  "prompts": {},
+  "sessions": {
+    "s_3ced19ecaa16dd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "958bebf4-85fd-422a-9a09-b64994561aeb",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
