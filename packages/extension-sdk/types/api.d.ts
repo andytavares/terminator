@@ -319,6 +319,8 @@ export interface HomeAsk {
   workKey: WorkKey | null
   /** ISO time. */
   since: string
+  /** An action with the id `SEND_TO_AGENT_ACTION` (exported from the SDK) also appears as Send
+   * to agent on the failing checks of the work this ask is about. */
   actions: { id: string; label: string; primary?: boolean }[]
   open: { command: string; args?: unknown }
 }
@@ -347,6 +349,8 @@ export interface ThreadFacet {
 }
 
 export interface HomeMeasure {
+  /** Home places a measure by id: use a value of `HOME_MEASURES` (exported from the SDK) to be
+   * drawn on the Week and Insights cards. Its `question` and `detail` are shown as written. */
   id: string
   question: string
   value: number

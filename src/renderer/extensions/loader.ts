@@ -112,6 +112,23 @@ function registerContributedInsightsSection(
   })
 }
 
+/** The ways to run work that the extension adds to the Start work launcher. */
+function registerContributedStartWorkOptions(
+  ext: Extension,
+  contributes: Contributes,
+  registry: Registry
+): void {
+  for (const { id, label, description, command } of contributes.startWorkOptions ?? []) {
+    registry.registerStartWorkOption({
+      key: `${ext.id}:${id}`,
+      extensionId: ext.id,
+      label,
+      description,
+      command,
+    })
+  }
+}
+
 /** Window views, and the shortcuts that toggle the extension's sidebar panel. */
 function registerWindowsAndShortcuts(
   ext: Extension,
@@ -142,6 +159,7 @@ export function registerWebviewExtension(ext: Extension, registry: Registry): vo
   registerContributedProjectTab(ext, ext.contributes, registry)
   registerContributedSidebarPanel(ext, ext.contributes, registry)
   registerContributedInsightsSection(ext, ext.contributes, registry)
+  registerContributedStartWorkOptions(ext, ext.contributes, registry)
   registerWindowsAndShortcuts(ext, ext.contributes, registry)
 }
 

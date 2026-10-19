@@ -24,7 +24,7 @@ const NOW = Date.parse('2026-10-18T12:00:00.000Z')
 const DAY = 86_400_000
 
 const merged: HomeMeasure = {
-  id: 'merged',
+  id: 'shipped',
   question: 'How much shipped?',
   value: 28,
   unit: 'count',
@@ -49,20 +49,23 @@ describe('windowRange and rangeBefore', () => {
 
 describe('measureReading', () => {
   it('reads a measure as published when its window is the chosen one', () => {
-    expect(measureReading([merged], 'merged', 'quarter')).toMatchObject({ value: 28, previous: 20 })
+    expect(measureReading([merged], 'shipped', 'quarter')).toMatchObject({
+      value: 28,
+      previous: 20,
+    })
   })
 
   it('cuts a quarter of weekly points down to the last week and the one before', () => {
-    expect(measureReading([merged], 'merged', 'week')).toMatchObject({ value: 4, previous: 3 })
+    expect(measureReading([merged], 'shipped', 'week')).toMatchObject({ value: 4, previous: 3 })
   })
 
   it('cuts 30 days from the last four weeks against the four before', () => {
-    expect(measureReading([merged], 'merged', '30d')).toMatchObject({ value: 11, previous: 9 })
+    expect(measureReading([merged], 'shipped', '30d')).toMatchObject({ value: 11, previous: 9 })
   })
 
   it('has no reading for a window it cannot be cut to, or a measure nobody published', () => {
-    expect(measureReading([merged], 'merged', 'year')).toBeNull()
-    expect(measureReading([merged], 'foundry-shipped', 'week')).toBeNull()
+    expect(measureReading([merged], 'shipped', 'year')).toBeNull()
+    expect(measureReading([merged], 'orders-shipped', 'week')).toBeNull()
   })
 
   it('does not stretch a percent measure to another window', () => {

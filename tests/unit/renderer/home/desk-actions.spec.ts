@@ -68,11 +68,18 @@ describe('untilLabel', () => {
 })
 
 describe('replyToSession', () => {
-  it('types the text and presses Enter in that session', () => {
+  it('pastes the text and presses Enter in that session', () => {
     const input = vi.fn()
     installElectronApi({ terminal: { input } })
     replyToSession('s1', 'use staging')
-    expect(input).toHaveBeenCalledWith('s1', 'use staging\r')
+    expect(input).toHaveBeenCalledWith('s1', '\x1b[200~use staging\x1b[201~\r')
+  })
+
+  it('keeps a reply that starts with a digit from picking that menu option', () => {
+    const input = vi.fn()
+    installElectronApi({ terminal: { input } })
+    replyToSession('s1', '2 would be safer')
+    expect(input).toHaveBeenCalledWith('s1', '\x1b[200~2 would be safer\x1b[201~\r')
   })
 })
 
@@ -88,7 +95,7 @@ describe('runAskAction', () => {
   })
 
   it("hands an extension's ask back to the extension that published it", async () => {
-    const runAction = vi.fn().mockResolvedValue(true)
+    const runAction = vi.fn().mockResolvedValue({ ok: true })
     useHomeFeedStore.setState({ runAction })
     await runAskAction(
       ask({ source: 'git-integration', id: 'fix:1', sessionId: undefined }),
@@ -96,6 +103,23 @@ describe('runAskAction', () => {
     )
     expect(runAction).toHaveBeenCalledWith('git-integration', 'fix:1', 'send-to-agent')
     expect(answer).not.toHaveBeenCalled()
+  })
+})
+
+describe('runAskAction: an extension that could not run the action', () => {
+  it("tells the operator in the extension's own words", async () => {
+    const runAction = vi
+      .fn()
+      .mockResolvedValue({ ok: false, message: 'No agent terminal is open.' })
+    useHomeFeedStore.setState({ runAction })
+    useToastStore.setState({ toasts: [] })
+    await runAskAction(ask({ source: 'git-integration', id: 'fix:1', sessionId: undefined }), 'x')
+    expect(useToastStore.getState().toasts).toEqual([
+      expect.objectContaining({
+        type: 'error',
+        message: 'That did not work. No agent terminal is open.',
+      }),
+    ])
   })
 })
 

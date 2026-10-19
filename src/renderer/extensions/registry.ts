@@ -45,6 +45,17 @@ interface InsightsSectionRegistration {
   view?: string
 }
 
+/** A way to run work the Start work launcher lists, as an extension's manifest declared it. */
+export interface StartWorkOptionRegistration {
+  /** `<extension id>:<option id>`, unique across extensions. */
+  key: string
+  extensionId: string
+  label: string
+  description: string
+  /** The extension command that takes the work. */
+  command: string
+}
+
 export interface ProjectTabRegistration {
   id: string
   label: string
@@ -74,6 +85,7 @@ interface ExtensionRegistry {
   sidebarPanels: Map<string, SidebarPanelRegistration>
   projectTabs: Map<string, ProjectTabRegistration>
   insightsSections: Map<string, InsightsSectionRegistration>
+  startWorkOptions: Map<string, StartWorkOptionRegistration>
   globalTabs: Map<string, GlobalTabRegistration>
   workspaceTabs: Map<string, WorkspaceTabRegistration>
   windowViews: Map<string, ComponentType<{ repoRoot: string | null }>>
@@ -92,6 +104,7 @@ interface ExtensionRegistry {
   registerSidebarPanel(panel: SidebarPanelRegistration): () => void
   registerProjectTab(tab: ProjectTabRegistration): () => void
   registerInsightsSection(section: InsightsSectionRegistration): () => void
+  registerStartWorkOption(option: StartWorkOptionRegistration): () => void
   registerGlobalTab(tab: GlobalTabRegistration): () => void
   registerWorkspaceTab(tab: WorkspaceTabRegistration): () => void
   registerWindowView(id: string, component: ComponentType<{ repoRoot: string | null }>): void
@@ -146,6 +159,19 @@ function registerInsightsSection(
 ): () => void {
   set((s) => ({ insightsSections: withEntry(s.insightsSections, section.id, section) }))
   return () => set((s) => ({ insightsSections: withoutEntry(s.insightsSections, section.id) }))
+}
+
+function registerStartWorkOption(
+  set: SetRegistry,
+  option: StartWorkOptionRegistration
+): () => void {
+  set((s) => ({ startWorkOptions: withEntry(s.startWorkOptions, option.key, option) }))
+  return () => set((s) => ({ startWorkOptions: withoutEntry(s.startWorkOptions, option.key) }))
+}
+
+/** The ways to run work that extensions add to Home's Start work launcher. */
+function startWorkSlice(set: SetRegistry): Slice<'registerStartWorkOption'> {
+  return { registerStartWorkOption: (option) => registerStartWorkOption(set, option) }
 }
 
 function registerSidebarPanel(set: SetRegistry, panel: SidebarPanelRegistration): () => void {
@@ -333,6 +359,7 @@ export const useExtensionRegistry = create<ExtensionRegistry>((set, get) => ({
   sidebarPanels: new Map(),
   projectTabs: new Map(),
   insightsSections: new Map(),
+  startWorkOptions: new Map(),
   globalTabs: new Map(),
   workspaceTabs: new Map(),
   windowViews: new Map(),
@@ -347,6 +374,7 @@ export const useExtensionRegistry = create<ExtensionRegistry>((set, get) => ({
   quickActionGroups: [],
   ...tabSlice(set),
   ...contributionSlice(set),
+  ...startWorkSlice(set),
   ...updateSlice(set),
   ...navigationSlice(set, get),
   ...pendingNavigationSlice(set),

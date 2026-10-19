@@ -2,7 +2,7 @@ import React from 'react'
 import { CircleCheck } from 'lucide-react'
 import { Button, Kbd } from '@terminator/extension-ui'
 import { useStartWorkStore } from './start-work'
-import type { DeskState } from './useDeskAsks'
+import type { DeskState } from './useDeskModel'
 import './YourMove.css'
 
 /** What replaces the band when nothing waits on the operator. */

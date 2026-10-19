@@ -1,6 +1,9 @@
+import { SEND_TO_AGENT_ACTION } from '@terminator/extension-sdk'
 import { useHomeFeedStore } from '../../stores/home-feed.store'
 import { startSessionInBranch } from '../../terminal/start-session'
-import { agentCommand } from './start-work'
+import { agentCommand, PROMPT_TOO_LONG } from './start-work'
+import { runFeedAction } from './desk-actions'
+import { useToastStore } from '../../stores/toast.store'
 import { workKeyId, type WorkThread } from '../../home/work-threads'
 import type { SessionFacts } from '../../sidebar/session-facts'
 
@@ -20,21 +23,23 @@ export async function startAgentOnBranch(thread: WorkThread): Promise<void> {
   const projectId = leadSessionOf(thread)?.projectId
   if (!projectId) return
   const prompt = thread.ticketKey ? `Work on ${thread.ticketKey}: ${thread.title}` : null
-  await startSessionInBranch(projectId, agentCommand(prompt) ?? undefined)
+  const command = agentCommand(prompt)
+  if (command === null) {
+    useToastStore.getState().addToast({ type: 'error', message: PROMPT_TOO_LONG })
+    return
+  }
+  await startSessionInBranch(projectId, command)
 }
-
-const SEND_TO_AGENT = 'send-to-agent'
 
 /** Runs the extension's own "send to agent" for this thread, when one published it; null when none did. */
 export function useSendToAgent(thread: WorkThread): (() => Promise<boolean>) | null {
   const asks = useHomeFeedStore((s) => s.asks)
-  const runAction = useHomeFeedStore((s) => s.runAction)
   const ids = [thread.key, ...thread.facets.map((f) => workKeyId(f.workKey))]
   const ask = asks.find(
     (a) =>
       a.workKey !== null &&
       ids.includes(workKeyId(a.workKey)) &&
-      a.actions.some((action) => action.id === SEND_TO_AGENT)
+      a.actions.some((action) => action.id === SEND_TO_AGENT_ACTION)
   )
-  return ask ? () => runAction(ask.source, ask.id, SEND_TO_AGENT) : null
+  return ask ? () => runFeedAction(ask.source, ask.id, SEND_TO_AGENT_ACTION) : null
 }

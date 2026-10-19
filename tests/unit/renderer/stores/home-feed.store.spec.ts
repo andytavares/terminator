@@ -53,20 +53,23 @@ describe('useHomeFeedStore pushes and actions', () => {
     })
     useHomeFeedStore.getState().subscribe()
     push(merged())
-    expect(useHomeFeedStore.getState().measures[0].id).toBe('merged')
+    expect(useHomeFeedStore.getState().measures[0].id).toBe('shipped')
   })
 
-  it('sends an action to main with its source and reports whether it ran', async () => {
+  it('sends an action to main with its source and reports whether it ran, and why not', async () => {
     homeFeed.action.mockResolvedValue({ data: true })
-    expect(await useHomeFeedStore.getState().runAction('git-integration', 'ask-1', 'approve')).toBe(
-      true
-    )
+    expect(
+      await useHomeFeedStore.getState().runAction('git-integration', 'ask-1', 'approve')
+    ).toEqual({ ok: true })
     expect(homeFeed.action).toHaveBeenCalledWith({
       source: 'git-integration',
       itemId: 'ask-1',
       actionId: 'approve',
     })
     homeFeed.action.mockResolvedValue({ error: 'failed', message: 'no handler' })
-    expect(await useHomeFeedStore.getState().runAction('x', 'i', 'a')).toBe(false)
+    expect(await useHomeFeedStore.getState().runAction('x', 'i', 'a')).toEqual({
+      ok: false,
+      message: 'no handler',
+    })
   })
 })

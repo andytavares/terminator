@@ -34,7 +34,7 @@ const before: AttentionMeasures = {
 }
 const merged: Sourced<HomeMeasure> = {
   source: 'git-integration',
-  id: 'merged',
+  id: 'shipped',
   question: 'How much shipped?',
   value: 28,
   unit: 'count',
@@ -44,8 +44,9 @@ const merged: Sourced<HomeMeasure> = {
 }
 const firstPass: Sourced<HomeMeasure> = {
   source: 'foundry',
-  id: 'foundry-first-pass',
-  question: 'Orders that shipped first time',
+  id: 'first-pass',
+  question: 'How often do Foundry orders pass first time?',
+  detail: 'of Foundry orders passed their checks on the first try',
   value: 71,
   unit: 'percent',
   window: '30d',
@@ -183,17 +184,14 @@ describe('Insights: nothing made up, measures', () => {
     render(<Insights />)
     expect(within(card('How much shipped?')).getByText('Not measured for this range')).toBeTruthy()
     expect(
-      within(card('How often does it pass first time?')).getByText(
-        'No Foundry order has shipped yet'
-      )
+      within(card('How often does it pass first time?')).getByText('Nothing measures this yet')
     ).toBeTruthy()
+    expect(document.body.textContent).not.toMatch(/Foundry/)
   })
 
   it('shows the Foundry card as not measured for a range its measure does not cover', () => {
     render(<Insights />)
-    expect(
-      within(card('How often does it pass first time?')).getByText('Not measured for this range')
-    ).toBeTruthy()
+    expect(within(card(firstPass.question)).getByText('Not measured for this range')).toBeTruthy()
   })
 
   it('shows empty cards when attention cannot be read', async () => {
@@ -237,7 +235,7 @@ describe('Insights: the window', () => {
   it('shows the Foundry measure once the window it covers is chosen', async () => {
     render(<WithHeaderBar />)
     fireEvent.click(screen.getByRole('radio', { name: '30 days' }))
-    expect(within(card('How often does it pass first time?')).getByText('71')).toBeTruthy()
+    expect(within(card(firstPass.question)).getByText('71')).toBeTruthy()
   })
 })
 

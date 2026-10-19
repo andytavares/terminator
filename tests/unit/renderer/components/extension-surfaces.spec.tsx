@@ -248,6 +248,7 @@ describe('the extension API surface is unchanged', () => {
       'quickActions',
       'shellRoots',
       'sidebarPanel',
+      'startWorkOptions',
       'windowViews',
       'workspaceTab',
     ])

@@ -43,11 +43,29 @@ function snoozedSummary(hidden: readonly DeskAsk[], entries: Dismissals): DeskSt
   return { count: untils.length, until: untils.length > 0 ? Math.min(...untils) : null }
 }
 
-/** What waits on the operator (core's asks and every extension's), who is working, and the counts. */
-export function useDeskAsks(): DeskState {
+/** How many asks wait on the operator, without building the work threads the Desk draws. */
+export function useDeskAskCount(): number {
   const now = useNow()
+  const coreAsks = useCoreAsks()
+  const feedAsks = useHomeFeedStore((s) => s.asks)
+  const entries = useDismissalsStore((s) => s.entries)
+  return useMemo(
+    () => orderAsks([...coreAsks, ...feedAsks], entries, now).length,
+    [coreAsks, feedAsks, entries, now]
+  )
+}
+
+function useCoreAsks(): DeskAsk[] {
   const facts = useSessionFacts()
   const titles = useIssueTitles()
+  return useMemo(() => coreAsksFrom(facts, titles), [facts, titles])
+}
+
+/** What waits on the operator (core's asks and every extension's), who is working, and the counts. */
+export function useDeskModel(): DeskState {
+  const now = useNow()
+  const facts = useSessionFacts()
+  const coreAsks = useCoreAsks()
   const feedAsks = useHomeFeedStore((s) => s.asks)
   const entries = useDismissalsStore((s) => s.entries)
   const changeStats = useChangeStatsStore((s) => s.entries)
@@ -55,7 +73,7 @@ export function useDeskAsks(): DeskState {
 
   return useMemo(() => {
     const all: DeskAsk[] = [
-      ...coreAsksFrom(facts, titles).map((ask) => withFinishedFacts(ask, facts, changeStats)),
+      ...coreAsks.map((ask) => withFinishedFacts(ask, facts, changeStats)),
       ...feedAsks,
     ]
     const asks = orderAsks(all, entries, now)
@@ -69,5 +87,5 @@ export function useDeskAsks(): DeskState {
       doneToday: useDismissalsStore.getState().doneToday(now),
       now,
     }
-  }, [facts, titles, feedAsks, entries, changeStats, threads, allThreads, now])
+  }, [facts, coreAsks, feedAsks, entries, changeStats, threads, allThreads, now])
 }

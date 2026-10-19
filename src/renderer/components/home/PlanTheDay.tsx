@@ -5,6 +5,7 @@ import { useHomeFeedStore } from '../../stores/home-feed.store'
 import { useFocusStore } from '../../home/focus-store'
 import {
   FOCUS_LIMIT,
+  carriedOver,
   focusDone as isFocusDone,
   localDateKey,
   type FocusItem,
@@ -20,16 +21,11 @@ import {
   type PlanRow,
 } from '../../home/plan-the-day'
 import { useNow } from '../session/useNow'
-import { useDeskAsks } from './useDeskAsks'
+import { useDeskModel } from './useDeskModel'
 import { useWorkThreads } from './useWorkThreads'
 import './PlanTheDay.css'
 
 type Pick = Omit<FocusItem, 'doneByHand'>
-
-/** Remembers when Home was last looked at, once it goes away, for "Since you left". */
-export function useMarkLeftHome(): void {
-  useEffect(() => () => useFocusStore.getState().markLeftHome(Date.now()), [])
-}
 
 /** The first view of each local day, until Start the day or Skip today is pressed. */
 export function PlanTheDay(): JSX.Element | null {
@@ -47,7 +43,7 @@ interface Plan {
 }
 
 function usePlan(now: number): Plan {
-  const { asks } = useDeskAsks()
+  const { asks } = useDeskModel()
   const { allThreads } = useWorkThreads()
   const facets = useHomeFeedStore((s) => s.facets)
   const candidates = useHomeFeedStore((s) => s.focus)
@@ -57,7 +53,7 @@ function usePlan(now: number): Plan {
     const yesterday = days[yesterdayKey(now)] ?? []
     const events = sinceYouLeft(asks, facets, lastLeftHomeAt)
     const finished = yesterday.filter((item) => isFocusDone(item, allThreads, candidates))
-    const left = yesterday.filter((item) => !finished.includes(item))
+    const left = carriedOver(yesterday).filter((item) => !finished.includes(item))
     return {
       sentence: planSentence({ focusTotal: yesterday.length, focusDone: finished.length, events }),
       carried: carriedOverRows(left, candidates, today),

@@ -64,9 +64,9 @@ describe('useWorkThreads', () => {
   it('keeps the parked set across a reload', () => {
     act(() => useParkedThreads.getState().park('a'))
     act(() => useParkedThreads.getState().park('a'))
-    expect(JSON.parse(localStorage.getItem('terminator.home.parked-threads') as string)).toEqual([
-      'a',
-    ])
+    expect(JSON.parse(localStorage.getItem('terminator.home.parked-threads') as string)).toEqual({
+      a: expect.any(Number),
+    })
     act(() => useParkedThreads.getState().unpark('a'))
     expect(useParkedThreads.getState().keys).toEqual([])
   })

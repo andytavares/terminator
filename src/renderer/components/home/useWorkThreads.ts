@@ -90,7 +90,7 @@ export function useWorkThreads(): WorkThreads {
   )
   const changeStats = useChangeStats(projectIds)
 
-  return useMemo(() => {
+  const result = useMemo(() => {
     const input: WorkThreadInput = { facts, facets, issues, changeStats, repoRoots, now }
     const threads = parkedByHand(buildWorkThreads(input), parkedKeys)
     return {
@@ -99,4 +99,9 @@ export function useWorkThreads(): WorkThreads {
       allThreads: parkedByHand(allWorkThreads(input), parkedKeys),
     }
   }, [facts, facets, issues, changeStats, repoRoots, now, parkedKeys])
+  useEffect(() => {
+    const live = new Set(result.allThreads.map((t) => t.key))
+    useParkedThreads.getState().forgetGone(live, Date.now())
+  }, [result.allThreads])
+  return result
 }

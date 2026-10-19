@@ -253,7 +253,7 @@ describe('buildMeasures', () => {
   it('publishes how much shipped as merged counts per week, oldest first', () => {
     const [merged] = buildMeasures(calendar)
     expect(merged).toMatchObject({
-      id: 'merged',
+      id: 'shipped',
       question: 'How much shipped?',
       unit: 'count',
       window: 'quarter',

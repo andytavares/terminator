@@ -32,7 +32,7 @@ const facet: ThreadFacet = {
 }
 
 const measure: HomeMeasure = {
-  id: 'merged',
+  id: 'shipped',
   question: 'How many pull requests merged?',
   value: 4,
   unit: 'count',

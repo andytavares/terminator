@@ -5,6 +5,7 @@ import { StartWork } from '../../../../src/renderer/components/home/StartWork'
 import { useIntegrationsStore } from '../../../../src/renderer/stores/integrations.store'
 import { useSessionRecordsStore } from '../../../../src/renderer/stores/session-records.store'
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
+import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { installElectronApi } from '../../../support/electron-api'
 import type { ElectronAPI } from '../../../../src/shared/electron-api/api-type'
@@ -124,6 +125,7 @@ function seedStartWorkStores(): void {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  useExtensionRegistry.setState({ startWorkOptions: new Map() })
   git.isRepo.mockResolvedValue({ isRepo: true, root: '/repo' })
   git.listBranches.mockResolvedValue({
     branches: [{ name: 'main', isCurrent: true, isRemote: false }],
@@ -131,7 +133,11 @@ beforeEach(() => {
   git.listWorktrees.mockResolvedValue({ worktrees: [] })
   installElectronApi({
     git,
-    extension: { executeCommand, getCommands: vi.fn(async () => ({ commands: [] })) },
+    extension: {
+      executeCommand,
+      getCommands: vi.fn(async () => ({ commands: [] })),
+      list: vi.fn(async () => ({ extensions: [] })),
+    },
   })
   launched.inBranch.mockResolvedValue('s-new')
   launched.createFromDraft.mockResolvedValue('p-new')
@@ -193,11 +199,31 @@ describe('StartWork — opening and closing', () => {
 describe('StartWork — run it as', () => {
   const checked = () => screen.getByRole('radio', { checked: true }).getAttribute('aria-label')
 
-  it('starts on Claude agent and Tab cycles through the three', async () => {
+  it('offers only Claude agent and Terminal only when no extension adds an option', async () => {
     await open()
-    expect(checked()).toBe('Claude agent')
+    expect(screen.getAllByRole('radio').map((r) => r.getAttribute('aria-label'))).toEqual([
+      'Claude agent',
+      'Terminal only',
+    ])
+    expect(document.body.textContent).not.toMatch(/Foundry/)
     fireEvent.keyDown(searchBox(), { key: 'Tab' })
-    expect(checked()).toBe('Terminal only')
+    fireEvent.keyDown(searchBox(), { key: 'Tab' })
+    expect(checked()).toBe('Claude agent')
+  })
+})
+
+describe('StartWork — run it as, with an extension option', () => {
+  const checked = () => screen.getByRole('radio', { checked: true }).getAttribute('aria-label')
+
+  it('lists what an extension declared after the two built-in ones, and Tab reaches it', async () => {
+    registerFoundryOption()
+    await open()
+    expect(screen.getAllByRole('radio').map((r) => r.getAttribute('aria-label'))).toEqual([
+      'Claude agent',
+      'Terminal only',
+      'Foundry order',
+    ])
+    fireEvent.keyDown(searchBox(), { key: 'Tab' })
     fireEvent.keyDown(searchBox(), { key: 'Tab' })
     expect(checked()).toBe('Foundry order')
     fireEvent.keyDown(searchBox(), { key: 'Tab' })
@@ -274,8 +300,19 @@ describe('StartWork — Enter on a ticket, run another way', () => {
   })
 })
 
-describe('StartWork — Foundry order', () => {
-  it('runs the command Foundry registered for a new order', async () => {
+function registerFoundryOption(): void {
+  useExtensionRegistry.getState().registerStartWorkOption({
+    key: 'x:new-order',
+    extensionId: 'x',
+    label: 'Foundry order',
+    description: "Shaped, planned and built by Foundry's line.",
+    command: 'new-order',
+  })
+}
+
+describe('StartWork — an extension option', () => {
+  it('runs the command the extension declared for it', async () => {
+    registerFoundryOption()
     useExtensionCommandsRegistered()
     const onClose = await open()
     fireEvent.keyDown(searchBox(), { key: 'Tab' })
@@ -296,6 +333,21 @@ describe('StartWork — Foundry order', () => {
   })
 })
 
+describe('StartWork — an extension option whose command is not running', () => {
+  it('says so in plain words and starts nothing', async () => {
+    registerFoundryOption()
+    const onClose = await open()
+    fireEvent.keyDown(searchBox(), { key: 'Tab' })
+    fireEvent.keyDown(searchBox(), { key: 'Tab' })
+    fireEvent.keyDown(searchBox(), { key: 'Enter' })
+    expect((await screen.findByRole('alert')).textContent).toBe(
+      'Foundry order is not turned on, so it cannot take this.'
+    )
+    expect(onClose).not.toHaveBeenCalled()
+    expect(executeCommand).not.toHaveBeenCalled()
+  })
+})
+
 function useExtensionCommandsRegistered(): void {
   installElectronApi({
     git,
@@ -308,7 +360,6 @@ function useExtensionCommandsRegistered(): void {
             extensionId: 'x',
             id: 'new-order',
             label: 'New work order…',
-            category: 'Foundry',
           },
         ],
       })),

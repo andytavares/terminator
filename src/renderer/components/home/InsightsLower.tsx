@@ -1,4 +1,5 @@
 import React from 'react'
+import { HOME_MEASURES } from '@terminator/extension-sdk'
 import { Clock, GitPullRequest, ListTodo } from 'lucide-react'
 import { Button, MetricCard } from '@terminator/extension-ui'
 import type { AgentUsage } from '../../../shared/agents/agent-usage'
@@ -44,12 +45,14 @@ interface AgentTimeProps {
   chosen: InsightsWindow
 }
 
-function FoundryShipped({ measures, chosen }: Pick<AgentTimeProps, 'measures' | 'chosen'>) {
-  const shipped = measureReading(measures, 'foundry-shipped', chosen)
-  const firstPass = measureReading(measures, 'foundry-first-pass', chosen)
-  if (shipped === null) return null
-  const detail = firstPass === null ? 'orders' : `first-pass ${firstPass.value}%`
-  return <Kpi label="Foundry orders shipped" value={String(shipped.value)} detail={detail} />
+/** The orders an extension shipped, worded by the measure it published; nothing when none did. */
+function OrdersShipped({ measures, chosen }: Pick<AgentTimeProps, 'measures' | 'chosen'>) {
+  const published = measures.find((m) => m.id === HOME_MEASURES.ordersShipped)
+  const shipped = measureReading(measures, HOME_MEASURES.ordersShipped, chosen)
+  const firstPass = measureReading(measures, HOME_MEASURES.firstPass, chosen)
+  if (published === undefined || shipped === null) return null
+  const detail = firstPass === null ? published.detail : `first-pass ${firstPass.value}%`
+  return <Kpi label={published.question} value={String(shipped.value)} detail={detail ?? ''} />
 }
 
 function UsageLine({ usage }: { usage: AgentUsage | null }): JSX.Element {
@@ -85,7 +88,7 @@ function AgentKpis(props: AgentTimeProps): JSX.Element {
         value={dash(attention?.finishedWithoutHelpRatio, ratio)}
         detail="no ask before done"
       />
-      <FoundryShipped measures={props.measures} chosen={props.chosen} />
+      <OrdersShipped measures={props.measures} chosen={props.chosen} />
     </div>
   )
 }

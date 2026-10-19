@@ -1,7 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, within } from '@testing-library/react'
-import { PlanTheDay, useMarkLeftHome } from '../../../../src/renderer/components/home/PlanTheDay'
+import { PlanTheDay } from '../../../../src/renderer/components/home/PlanTheDay'
 import { useFocusStore } from '../../../../src/renderer/home/focus-store'
 import { useHomeFeedStore } from '../../../../src/renderer/stores/home-feed.store'
 import { localDateKey } from '../../../../src/renderer/home/focus'
@@ -9,8 +9,8 @@ import { yesterdayKey } from '../../../../src/renderer/home/plan-the-day'
 import type { DeskAsk } from '../../../../src/renderer/home/core-asks'
 
 const desk = vi.hoisted(() => ({ asks: [] as unknown[] }))
-vi.mock('../../../../src/renderer/components/home/useDeskAsks', () => ({
-  useDeskAsks: () => ({ asks: desk.asks }),
+vi.mock('../../../../src/renderer/components/home/useDeskModel', () => ({
+  useDeskModel: () => ({ asks: desk.asks }),
 }))
 vi.mock('../../../../src/renderer/components/home/useWorkThreads', () => ({
   useWorkThreads: () => ({ allThreads: [] }),
@@ -191,18 +191,5 @@ describe('PlanTheDay: the slot limit', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Remove One' }))
     expect(useFocusStore.getState().days[today]).toEqual([])
     expect(screen.getByRole('button', { name: "Add One to today's focus" })).toBeTruthy()
-  })
-})
-
-describe('useMarkLeftHome', () => {
-  it('records when Home went away', () => {
-    function Probe(): null {
-      useMarkLeftHome()
-      return null
-    }
-    const { unmount } = render(<Probe />)
-    expect(useFocusStore.getState().lastLeftHomeAt).toBe(LEFT)
-    unmount()
-    expect(useFocusStore.getState().lastLeftHomeAt).toBe(NOW)
   })
 })

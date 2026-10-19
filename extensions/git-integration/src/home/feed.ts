@@ -1,3 +1,4 @@
+import { HOME_MEASURES, SEND_TO_AGENT_ACTION } from '@terminator/extension-sdk'
 import type { HomeAsk, HomeFeed, HomeMeasure, ThreadFacet } from '@terminator/extension-sdk'
 import type { DashboardPR } from '../schemas/pr-review.schema.js'
 import type { MergedPullRequest } from '../github/merged-search.js'
@@ -76,7 +77,7 @@ function fixAsk(pr: DashboardPR, tickets: TicketIndex): HomeAsk {
     workKey: workKeyOf(pr, tickets),
     since: failedSince(pr, failed),
     actions: [
-      { id: 'send-to-agent', label: 'Send to agent', primary: true },
+      { id: SEND_TO_AGENT_ACTION, label: 'Send to agent', primary: true },
       { id: 'open-log', label: 'Open log' },
     ],
     open: { command: REVIEW_PULL_REQUEST, args: reviewTarget(pr) },
@@ -222,7 +223,7 @@ export function buildMeasures(calendar: ContributionCalendar | null): HomeMeasur
   const levels = recentLevels(calendar)
   return [
     {
-      id: 'merged',
+      id: HOME_MEASURES.shipped,
       question: 'How much shipped?',
       value: sum(series),
       unit: 'count',
@@ -231,7 +232,7 @@ export function buildMeasures(calendar: ContributionCalendar | null): HomeMeasur
       previous: sum(mergedPerWeek(calendar, WEEKS_IN_QUARTER, WEEKS_IN_QUARTER)),
     },
     {
-      id: 'contributions-days',
+      id: HOME_MEASURES.contributionsDays,
       question: 'When do I ship?',
       value: levels.filter((level) => level > 0).length,
       unit: 'count',

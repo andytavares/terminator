@@ -1,4 +1,4 @@
-import { plural } from '@terminator/extension-sdk'
+import { HOME_MEASURES, plural } from '@terminator/extension-sdk'
 import type { ExtensionAPI } from '@terminator/extension-sdk'
 
 import { surfacedQuestions } from '../forge/interview.js'
@@ -171,8 +171,9 @@ function toneOf(standing: Standing): ThreadFacet['tone'] {
 function measuresOf(metrics: FactoryMetrics): HomeMeasure[] {
   const measures: HomeMeasure[] = [
     {
-      id: 'foundry-shipped',
+      id: HOME_MEASURES.ordersShipped,
       question: 'Foundry orders shipped',
+      detail: 'orders',
       value: metrics.shipped,
       unit: 'count',
       window: '30d',
@@ -181,8 +182,9 @@ function measuresOf(metrics: FactoryMetrics): HomeMeasure[] {
   ]
   if (metrics.firstPassYield !== null) {
     measures.push({
-      id: 'foundry-first-pass',
-      question: 'Orders that shipped first time',
+      id: HOME_MEASURES.firstPass,
+      question: 'How often do Foundry orders pass first time?',
+      detail: 'of Foundry orders passed their checks on the first try',
       value: Math.round(metrics.firstPassYield * 100),
       unit: 'percent',
       window: '30d',

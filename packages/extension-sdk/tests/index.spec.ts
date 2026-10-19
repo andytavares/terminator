@@ -3,7 +3,9 @@ import { z } from 'zod'
 import {
   createIpcRegistrar,
   dispatchChannel,
+  HOME_MEASURES,
   plural,
+  SEND_TO_AGENT_ACTION,
   validationError,
   type ChannelSpec,
   type ExtensionAPI,
@@ -109,5 +111,17 @@ describe('createIpcRegistrar when a channel throws, and on cleanup', () => {
     cleanup()
 
     expect(registered.map((r) => r.dispose.mock.calls.length)).toEqual([1, 1])
+  })
+})
+
+describe('the Home contract', () => {
+  it('gives every measure Home reads a distinct id, none named for an extension', () => {
+    const ids = Object.values(HOME_MEASURES)
+    expect(new Set(ids).size).toBe(ids.length)
+    expect(ids.join(' ')).not.toMatch(/foundry|git|github/i)
+  })
+
+  it('names the ask action that hands a problem to an agent', () => {
+    expect(SEND_TO_AGENT_ACTION).toBe('send-to-agent')
   })
 })

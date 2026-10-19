@@ -1,9 +1,28 @@
 import { create } from 'zustand'
+import { z } from 'zod'
+import { WorkKeySchema } from '../../shared/schemas/home-feed.schema'
 import { readStoredJson, writeStoredJson } from './local-storage'
 import { FOCUS_LIMIT, localDateKey, type FocusItem } from './focus'
 
 export const FOCUS_KEY = 'terminator.home.focus'
 const KEPT_DAYS = 7
+
+const PersistedSchema = z.object({
+  days: z.record(
+    z.string(),
+    z.array(
+      z.object({
+        id: z.string(),
+        title: z.string(),
+        detail: z.string().optional(),
+        workKey: WorkKeySchema.optional(),
+        doneByHand: z.boolean(),
+      })
+    )
+  ),
+  lastLeftHomeAt: z.number().nullable().default(null),
+  planDismissedOn: z.string().nullable().default(null),
+})
 
 interface Persisted {
   days: Record<string, FocusItem[]>
@@ -45,11 +64,11 @@ function updateToday(state: Persisted, change: (items: FocusItem[]) => FocusItem
 }
 
 export const useFocusStore = create<FocusState>((set) => ({
-  ...readStoredJson<Persisted>(FOCUS_KEY, {
-    days: {},
-    lastLeftHomeAt: null,
-    planDismissedOn: null,
-  }),
+  ...readStoredJson<Persisted>(
+    FOCUS_KEY,
+    { days: {}, lastLeftHomeAt: null, planDismissedOn: null },
+    PersistedSchema
+  ),
   pickFocus: (item) =>
     set((s) =>
       updateToday(s, (items) =>

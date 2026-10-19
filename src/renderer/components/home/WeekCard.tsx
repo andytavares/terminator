@@ -1,4 +1,5 @@
 import React from 'react'
+import { HOME_MEASURES } from '@terminator/extension-sdk'
 import { ArrowUpRight } from 'lucide-react'
 import { useHomeFeedStore } from '../../stores/home-feed.store'
 import { useHomeView } from './home-view'
@@ -84,8 +85,8 @@ function HeatStrip({ days }: { days: readonly number[] }): JSX.Element {
 
 /** Only the tiles whose numbers exist: a measure nobody published leaves no tile. */
 function weekKpis(measures: readonly HomeMeasure[], week: WeekMeasures | null): KpiProps[] {
-  const merged = measures.find((m) => m.id === 'merged')
-  const wait = measures.find((m) => m.id === 'review-wait')
+  const merged = measures.find((m) => m.id === HOME_MEASURES.shipped)
+  const wait = measures.find((m) => m.id === HOME_MEASURES.reviewWait)
   return [
     ...(merged ? [mergedKpi(merged)] : []),
     ...(wait ? [waitKpi(wait)] : []),
@@ -98,7 +99,7 @@ export function WeekCard(): JSX.Element {
   const measures = useHomeFeedStore((s) => s.measures)
   const show = useHomeView((s) => s.show)
   const week = useWeekMeasures()
-  const heat = measures.find((m) => m.id === 'contributions-days')
+  const heat = measures.find((m) => m.id === HOME_MEASURES.contributionsDays)
   const kpis = weekKpis(measures, week)
   return (
     <div className="desk-card">

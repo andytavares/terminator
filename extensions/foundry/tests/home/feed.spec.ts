@@ -238,12 +238,12 @@ describe('measures', () => {
   it('reports orders shipped and the first-pass share in the 30 day window', () => {
     const { measures } = feedOf([], { ...NO_METRICS, shipped: 2, firstPassYield: 0.5 })
     expect(measures).toMatchObject([
-      { id: 'foundry-shipped', value: 2, unit: 'count', window: '30d' },
-      { id: 'foundry-first-pass', value: 50, unit: 'percent', window: '30d' },
+      { id: 'orders-shipped', value: 2, unit: 'count', window: '30d' },
+      { id: 'first-pass', value: 50, unit: 'percent', window: '30d' },
     ])
   })
 
   it('leaves the first-pass share out when nothing has shipped', () => {
-    expect(feedOf([]).measures.map((m) => m.id)).toEqual(['foundry-shipped'])
+    expect(feedOf([]).measures.map((m) => m.id)).toEqual(['orders-shipped'])
   })
 })

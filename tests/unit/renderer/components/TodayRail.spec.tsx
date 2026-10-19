@@ -139,12 +139,13 @@ describe('This week — what is shown', () => {
     expect(screen.getByText('across 14 sessions')).toBeTruthy()
     expect(screen.getByText('21')).toBeTruthy()
     expect(screen.getByText('6 min')).toBeTruthy()
+    expect(document.body.textContent).not.toMatch(/Foundry/)
   })
 
   it('draws the published numbers with their change from last week', async () => {
     useHomeFeedStore.setState({
       measures: [
-        homeMeasure('merged', { value: 9, previous: 7 }),
+        homeMeasure('shipped', { value: 9, previous: 7 }),
         homeMeasure('review-wait', { value: 190, unit: 'minutes' }),
         homeMeasure('contributions-days', { series: [0, 1, 2, 3, 4, 9, -2] }),
       ],

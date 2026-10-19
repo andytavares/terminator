@@ -1,3 +1,4 @@
+import { pastedLine } from '../../terminal/typed-input'
 import { answerChoice } from '../../terminal/session-controller'
 import { revealSession } from '../../terminal/navigate-to-session'
 import { useHomeFeedStore } from '../../stores/home-feed.store'
@@ -39,9 +40,24 @@ export function untilLabel(until: number): string {
   return time.toLocaleTimeString('en-US', options)
 }
 
-/** Types `text` into the session and presses Enter. */
+/** Pastes `text` into the session and presses Enter; a reply that starts "2" is not menu choice 2. */
 export function replyToSession(sessionId: string, text: string): void {
-  window.electronAPI.terminal.input(sessionId, `${text}\r`)
+  window.electronAPI.terminal.input(sessionId, pastedLine(text))
+}
+
+/** Runs an extension's action; on failure says why in a toast and resolves false. */
+export async function runFeedAction(
+  source: string,
+  itemId: string,
+  actionId: string
+): Promise<boolean> {
+  const result = await useHomeFeedStore.getState().runAction(source, itemId, actionId)
+  if (!result.ok) {
+    useToastStore
+      .getState()
+      .addToast({ type: 'error', message: `That did not work. ${result.message}` })
+  }
+  return result.ok
 }
 
 /** The last lines of the session's screen, as text; empty when its terminal is not open. */
@@ -56,7 +72,7 @@ export function terminalExcerpt(sessionId: string | undefined): string[] {
 /** Runs one of the ask's actions: core answers or opens its own session, an extension runs the rest. */
 export async function runAskAction(ask: DeskAsk, actionId: string): Promise<void> {
   if (ask.source !== 'core') {
-    await useHomeFeedStore.getState().runAction(ask.source, ask.id, actionId)
+    await runFeedAction(ask.source, ask.id, actionId)
     return
   }
   const choice = CHOICE_ACTION.exec(actionId)

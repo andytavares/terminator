@@ -6,7 +6,7 @@ import { useFocusStore } from '../../home/focus-store'
 import { focusDone, localDateKey } from '../../home/focus'
 import type { DeskCounts } from '../../home/desk-summary'
 import { useDeskFilter, type DeskCount } from './desk-filter'
-import type { DeskState } from './useDeskAsks'
+import type { DeskState } from './useDeskModel'
 
 export interface SummaryLineProps {
   desk: Pick<DeskState, 'counts' | 'allThreads' | 'now'>

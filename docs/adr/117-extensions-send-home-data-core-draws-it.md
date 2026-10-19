@@ -24,3 +24,4 @@ Extensions publish typed data and core renders it. `api.home.publish(feed)` repl
 - Extensions lose control of Home's look; they choose only the data and its action labels.
 - An action reaches only the extension that published the item; an extension with no handler registered answers an error to the click.
 - ADR 116 home sections became Insights sections: `contributes.homeSection` is now `contributes.insightsSection`, drawn on Home's Insights view.
+- Core gives some ids a meaning, so they are part of the SDK contract rather than an extension's private names: the measure ids in `HOME_MEASURES` and the ask action `SEND_TO_AGENT_ACTION` (`packages/extension-sdk/src/home-contract.ts`), and the manifest contribution `contributes.startWorkOptions`, through which an extension adds a "Run it as" choice to Start work. Core never names an extension's own ids.

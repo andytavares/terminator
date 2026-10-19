@@ -69,13 +69,13 @@ function repoKey(repoRoot: string, branch: string): string {
   return workKeyId({ repoRoot, branch })
 }
 
-/** Which ticket each repo branch belongs to, as the sessions on it say; project links win. */
 /** A closed session has no live project, so its record's snapshot says where it ran. */
 function projectIdOf(f: SessionFacts): string | null {
   if (!f.isClosed) return f.projectId
   return f.snapshot.projectId || null
 }
 
+/** Which ticket each repo branch belongs to, as the sessions on it say; project links win. */
 function branchTickets(input: WorkThreadInput): Map<string, string> {
   const byBranch = new Map<string, string>()
   const ranked = [...input.facts].sort(

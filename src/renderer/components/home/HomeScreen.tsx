@@ -9,9 +9,10 @@ import { InFlight } from './InFlight'
 import { TodayRail } from './TodayRail'
 import { Insights } from './Insights'
 import { useHomeView } from './home-view'
-import { useDeskAsks, type DeskState } from './useDeskAsks'
+import { useDeskModel, type DeskState } from './useDeskModel'
 import { useDeskController, type DeskController } from './use-desk-controller'
 import { useDeskKeys } from './use-desk-keys'
+import { useMarkLeftHome } from './use-mark-left-home'
 import { useOpenRequestedResume } from './desk-selection'
 import './HomeScreen.css'
 
@@ -26,13 +27,14 @@ export interface HomeScreenProps {
  * Single-letter keys act while focus is inside this section and never in a field or a terminal.
  */
 export function HomeScreen(_props: HomeScreenProps = {}): JSX.Element {
-  const desk = useShownAsks(useDeskAsks())
+  const desk = useShownAsks(useDeskModel())
   const view = useHomeView((s) => s.view)
   const rootRef = useRef<HTMLElement>(null)
   const searchRef = useRef<HTMLInputElement>(null)
   const controller = useDeskController(desk)
   const onKeyDown = useRootKeys(controller, searchRef)
   useOpenRequestedResume()
+  useMarkLeftHome()
 
   useEffect(() => rootRef.current?.focus({ preventScroll: true }), [])
 

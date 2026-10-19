@@ -1,10 +1,14 @@
+import { useMemo } from 'react'
 import { create } from 'zustand'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import { useSessionStore } from '../../stores/session.store'
 import { useIntegrationsStore } from '../../stores/integrations.store'
 import { useSessionRecordsStore } from '../../stores/session-records.store'
+import { useExtensionRegistry, type StartWorkOptionRegistration } from '../../extensions/registry'
 import { useExtensionCommandsStore } from '../../stores/extension-commands.store'
 import { startSessionInBranch } from '../../terminal/start-session'
+import { singleQuoted } from '../../terminal/typed-input'
+import { MAX_TYPED_LINE_BYTES } from '../../quick-actions/custom-actions'
 import { openSnapshot } from '../../sidebar/session-facts'
 import { createFromDraft } from '../sidebar/create-project'
 import type { IssueSummary, Workspace } from '../../../shared/types/index'
@@ -25,26 +29,44 @@ export const useStartWorkStore = create<{
   closeLauncher: () => set({ open: false, prefill: '' }),
 }))
 
-export type RunAs = 'agent' | 'terminal' | 'foundry'
+/** 'agent', 'terminal', or the key of an extension's start-work option. */
+export type RunAs = string
 
-export const RUN_AS_OPTIONS: Array<{ value: RunAs; label: string; hint: string }> = [
+export interface RunAsOption {
+  value: RunAs
+  label: string
+  hint: string
+}
+
+const BUILT_IN_RUN_AS: RunAsOption[] = [
   {
     value: 'agent',
     label: 'Claude agent',
     hint: 'Ticket injected as context. You answer its questions on the Desk.',
   },
   { value: 'terminal', label: 'Terminal only', hint: 'A shell in the new worktree.' },
-  {
-    value: 'foundry',
-    label: 'Foundry order',
-    hint: "Shaped, planned and built by Foundry's line.",
-  },
 ]
 
+/** Claude agent and Terminal only, then every option an extension declared. */
+export function useRunAsOptions(): RunAsOption[] {
+  const registered = useExtensionRegistry((s) => s.startWorkOptions)
+  return useMemo(
+    () => [
+      ...BUILT_IN_RUN_AS,
+      ...[...registered.values()].map((o) => ({
+        value: o.key,
+        label: o.label,
+        hint: o.description,
+      })),
+    ],
+    [registered]
+  )
+}
+
 /** The option Tab moves to; Shift+Tab goes back. */
-export function cycleRunAs(current: RunAs, step: 1 | -1): RunAs {
-  const index = RUN_AS_OPTIONS.findIndex((o) => o.value === current)
-  return RUN_AS_OPTIONS[(index + step + RUN_AS_OPTIONS.length) % RUN_AS_OPTIONS.length].value
+export function cycleRunAs(options: readonly RunAsOption[], current: RunAs, step: 1 | -1): RunAs {
+  const index = options.findIndex((o) => o.value === current)
+  return options[(index + step + options.length) % options.length].value
 }
 
 // Linear's state types, in the order a person works them. Priority is not used.
@@ -95,15 +117,13 @@ export const branchOf = (issue: IssueSummary): string => issue.branchName ?? iss
 
 export const worktreeFolder = (branch: string): string => `.worktrees/${branch}`
 
-/** A line typed into a terminal is cut at 1024 bytes (PTY MAX_CANON); stay well inside it. */
-const MAX_COMMAND_BYTES = 900
+export const PROMPT_TOO_LONG = 'That prompt is too long to start an agent with. Shorten it.'
 
 /** `claude '<prompt>'`, or plain `claude` for none; null when the line would be too long to type. */
 export function agentCommand(prompt: string | null): string | null {
   if (prompt === null) return 'claude'
-  const quoted = `'${prompt.replace(/\s+/g, ' ').trim().replace(/'/g, `'\\''`)}'`
-  const command = `claude ${quoted}`
-  return new TextEncoder().encode(command).length > MAX_COMMAND_BYTES ? null : command
+  const command = `claude ${singleQuoted(prompt.replace(/\s+/g, ' ').trim())}`
+  return new TextEncoder().encode(command).length > MAX_TYPED_LINE_BYTES ? null : command
 }
 
 export const ticketPrompt = (issue: IssueSummary): string =>
@@ -117,7 +137,7 @@ export type WorkRequest = { workspace: Workspace; runAs: RunAs } & (
 
 type Outcome = string | null
 
-const projectsOf = (workspaceId: string) =>
+const branchCardsOf = (workspaceId: string) =>
   useWorkspaceStore.getState().projectsByWorkspaceId.get(workspaceId) ?? []
 
 /** Why a worktree was refused, in words that need no git knowledge. */
@@ -128,7 +148,7 @@ function refusalMessage(workspace: Workspace, branch: string, message: string): 
 
 /** The card for `branch` in this repo, creating its worktree first when it has none. */
 async function projectForBranch(workspace: Workspace, branch: string): Promise<string | Error> {
-  const existing = projectsOf(workspace.id).find((p) => p.gitBranch === branch)
+  const existing = branchCardsOf(workspace.id).find((p) => p.gitBranch === branch)
   if (existing !== undefined) return existing.id
   const repo = await window.electronAPI.git.isRepo(workspace.folderPath)
   if (!repo.isRepo || !repo.root) return new Error(`${workspace.name} is not a git repo.`)
@@ -153,7 +173,7 @@ async function projectForBranch(workspace: Workspace, branch: string): Promise<s
 
 /** The repo's own checkout: the first card that is not a worktree. */
 function mainProjectId(workspace: Workspace): string | Error {
-  const projects = projectsOf(workspace.id)
+  const projects = branchCardsOf(workspace.id)
   const main = projects.find((p) => !p.isWorktree) ?? projects[0]
   return main?.id ?? new Error(`Add a branch to ${workspace.name} first, then start it there.`)
 }
@@ -174,25 +194,26 @@ function promptOf(request: WorkRequest): string | null {
 function commandFor(request: WorkRequest): string | undefined | Error {
   if (request.runAs !== 'agent') return undefined
   const command = agentCommand(promptOf(request))
-  return command ?? new Error('That prompt is too long to start an agent with. Shorten it.')
+  return command ?? new Error(PROMPT_TOO_LONG)
 }
 
-/** What Foundry's new-order command is given when a ticket was chosen. */
-function foundryArgs(request: WorkRequest): object | undefined {
+/** What an extension's start-work command is given when a ticket was chosen. */
+function optionArgs(request: WorkRequest): object | undefined {
   if (request.kind !== 'ticket') return undefined
   const { tracker, key, title } = request.issue
   return { tracker, key, title, repoRoot: request.workspace.folderPath }
 }
 
-/** Foundry's own command for a new order, given the chosen ticket when there is one. */
-async function startFoundryOrder(request: WorkRequest): Promise<Outcome> {
+/** The extension's own command for this option, given the chosen ticket when there is one. */
+async function startExtensionOption(option: StartWorkOptionRegistration, request: WorkRequest) {
   await useExtensionCommandsStore.getState().refresh()
   const { registered } = useExtensionCommandsStore.getState()
-  const command = registered.find((c) => c.category === 'Foundry' && c.id === 'new-order')
-  if (command === undefined) return 'Foundry is not turned on, so it cannot take an order.'
-  const repoRoot = request.workspace.folderPath
-  const context = { projectId: null, sessionId: null, repoRoot }
-  window.electronAPI.extension.executeCommand(command.key, context, foundryArgs(request))
+  const command = registered.find(
+    (c) => c.extensionId === option.extensionId && c.id === option.command
+  )
+  if (command === undefined) return `${option.label} is not turned on, so it cannot take this.`
+  const context = { projectId: null, sessionId: null, repoRoot: request.workspace.folderPath }
+  window.electronAPI.extension.executeCommand(command.key, context, optionArgs(request))
   return null
 }
 
@@ -212,7 +233,8 @@ async function linkTicket(sessionId: string, issue: IssueSummary): Promise<void>
 
 /** Does the work. Null when it started; otherwise what to tell the person, in plain words. */
 export async function startWork(request: WorkRequest): Promise<Outcome> {
-  if (request.runAs === 'foundry') return startFoundryOrder(request)
+  const option = useExtensionRegistry.getState().startWorkOptions.get(request.runAs)
+  if (option !== undefined) return startExtensionOption(option, request)
   const command = commandFor(request)
   if (command instanceof Error) return command.message
   const projectId = await projectFor(request)

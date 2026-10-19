@@ -4,10 +4,10 @@ import { Button, Chip, Kbd, ModalShell } from '@terminator/extension-ui'
 import { startScratchSession } from '../../terminal/start-session'
 import { useWorkspaceStore } from '../../stores/workspace.store'
 import {
-  RUN_AS_OPTIONS,
   branchOf,
   cycleRunAs,
   startWork,
+  useRunAsOptions,
   useStartWorkStore,
   worktreeFolder,
   type RunAs,
@@ -73,7 +73,8 @@ function useLauncher(onClose: () => void) {
   const fields = useLauncherFields()
   const data = useLauncherData(fields)
   const { tab, query, runAs, picking, error } = fields
-  const view = { tab, query, runAs, picking, error, ...data }
+  const runAsOptions = useRunAsOptions()
+  const view = { tab, query, runAs, picking, error, runAsOptions, ...data }
   const actions = launcherActions({ fields, view, onClose })
   return { view, actions, selectedIndex: data.index }
 }
@@ -169,7 +170,7 @@ function handleKey(e: React.KeyboardEvent, { view, actions, selectedIndex }: Lau
   const moves: Record<string, () => void> = {
     ArrowDown: () => actions.select(Math.min(selectedIndex + 1, view.rows.length - 1)),
     ArrowUp: () => actions.select(Math.max(selectedIndex - 1, 0)),
-    Tab: () => actions.setRunAs(cycleRunAs(view.runAs, e.shiftKey ? -1 : 1)),
+    Tab: () => actions.setRunAs(cycleRunAs(view.runAsOptions, view.runAs, e.shiftKey ? -1 : 1)),
     Enter: () => void actions.start(),
   }
   const isRepoKey = e.key.toLowerCase() === 'r' && (e.metaKey || e.ctrlKey)
@@ -339,7 +340,7 @@ function RunAsPanel({ view, actions }: Launcher): JSX.Element {
     <div className="start-work__side">
       <div className="start-work__label">Run it as</div>
       <div role="radiogroup" aria-label="Run it as" className="start-work__options">
-        {RUN_AS_OPTIONS.map((option) => (
+        {view.runAsOptions.map((option) => (
           <div
             key={option.value}
             role="radio"

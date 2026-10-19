@@ -5,6 +5,7 @@ export type * from '../types/api'
 export type * from '../types/issues'
 export type * from '../types/extensions'
 export type * from '../types/github'
+export { HOME_MEASURES, SEND_TO_AGENT_ACTION } from './home-contract'
 
 /** One invoke channel: its payload schema, the response to a payload the schema rejects, and how
  * to answer a valid one. The core registers its own channels in this shape, and so does

@@ -5,6 +5,7 @@ import { useSettingsStore } from '../stores/settings.store'
 import { useSessionStore } from '../stores/session.store'
 import { useSessionRecordsStore } from '../stores/session-records.store'
 import { useExtensionCommandsStore } from '../stores/extension-commands.store'
+import { useHomeFeedStore } from '../stores/home-feed.store'
 import { useMetricsStore } from '../stores/metrics.store'
 import { useActiveScope } from '../quick-actions/use-active-scope'
 import { useBranchSync } from '../hooks/useBranchSync'
@@ -12,6 +13,14 @@ import { useAgentAttention } from './agent-attention'
 
 // What the window loads when it opens, and what it keeps in step with the
 // stores for as long as it is open.
+
+/** What extensions publish for Home, read now and kept current for the badge and the Desk. */
+function useHomeFeed(): void {
+  useEffect(() => {
+    void useHomeFeedStore.getState().load()
+    return useHomeFeedStore.getState().subscribe()
+  }, [])
+}
 
 /** Workspaces, settings, session records and extension commands, read from main. */
 export function useInitialLoad(): void {
@@ -27,6 +36,8 @@ export function useInitialLoad(): void {
     void records.load()
     return records.subscribe()
   }, [])
+
+  useHomeFeed()
 
   // Read before the first ⌘P, so the keys typed straight after it find them,
   // and again whenever a backend registers or drops a command.

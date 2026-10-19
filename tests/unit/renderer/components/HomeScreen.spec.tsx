@@ -126,6 +126,7 @@ describe('HomeScreen — the Quiet desk', () => {
     expect(screen.queryByRole('region', { name: 'Your move' })).toBeNull()
     expect(screen.getByText('Nothing needs you.')).toBeTruthy()
     expect(screen.getByText(/Done today: 0/)).toBeTruthy()
+    expect(document.body.textContent).not.toMatch(/Foundry/)
   })
 
   it('shows the lower area and the header controls', () => {
@@ -224,7 +225,7 @@ describe('HomeScreen — answering in place', () => {
     const reply = screen.getByRole('textbox', { name: 'Reply in your own words' })
     fireEvent.change(reply, { target: { value: 'use staging' } })
     fireEvent.keyDown(reply, { key: 'Enter' })
-    expect(input).toHaveBeenCalledWith('a', 'use staging\r')
+    expect(input).toHaveBeenCalledWith('a', '\x1b[200~use staging\x1b[201~\r')
   })
 
   it('answers with a number key and closes with Escape', () => {
@@ -451,5 +452,29 @@ describe('HomeScreen — search results, continued', () => {
     fireEvent.keyDown(screen.getByRole('searchbox', { name: 'Search work' }), { key: 'Enter' })
     expect(useStartWorkStore.getState().open).toBe(true)
     expect(useStartWorkStore.getState().prefill).toBe('zzz nothing')
+  })
+})
+
+describe('HomeScreen — Since you left', () => {
+  it('lists what finished while Home was closed in Plan the day', async () => {
+    const { PlanTheDay: RealPlanTheDay } = await vi.importActual<
+      typeof import('../../../../src/renderer/components/home/PlanTheDay')
+    >('../../../../src/renderer/components/home/PlanTheDay')
+    useFocusStore.setState({ days: {}, lastLeftHomeAt: null, planDismissedOn: null })
+    render(<HomeScreen />).unmount()
+    const leftAt = useFocusStore.getState().lastLeftHomeAt as number
+    expect(leftAt).toBeGreaterThan(0)
+    const finished = homeFeedAsk({
+      id: 'done',
+      kind: 'finished',
+      title: 'Agent finished',
+      detail: 'Cache work is ready for review',
+      since: new Date(leftAt + 1000).toISOString(),
+      actions: [],
+    })
+    useHomeFeedStore.setState({ asks: [finished] })
+    render(<RealPlanTheDay />)
+    const column = screen.getByText('SINCE YOU LEFT').parentElement as HTMLElement
+    expect(within(column).getByText('Cache work is ready for review')).toBeTruthy()
   })
 })

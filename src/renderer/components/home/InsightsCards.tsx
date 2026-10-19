@@ -1,4 +1,5 @@
 import React from 'react'
+import { HOME_MEASURES } from '@terminator/extension-sdk'
 import { MetricCard, Sparkline } from '@terminator/extension-ui'
 import type { SparklineTone } from '@terminator/extension-ui'
 import type { HomeMeasure } from '../../../shared/schemas/home-feed.schema'
@@ -42,7 +43,7 @@ interface ShippedCardProps {
 
 export function ShippedCard({ measures, chosen }: ShippedCardProps): JSX.Element {
   const question = 'How much shipped?'
-  const reading = measureReading(measures, 'merged', chosen)
+  const reading = measureReading(measures, HOME_MEASURES.shipped, chosen)
   if (reading === null) {
     return (
       <EmptyCard
@@ -136,22 +137,31 @@ export function WaitCard({ attention, before }: WaitCardProps): JSX.Element {
   )
 }
 
+/** The first-pass rate an extension published; no card when none did. */
 export function FirstPassCard({ measures, chosen }: ShippedCardProps): JSX.Element | null {
-  const question = 'How often does it pass first time?'
-  const qualifier = '· Foundry orders'
-  const published = measures.some((m) => m.id === 'foundry-first-pass')
-  const reading = published ? measureReading(measures, 'foundry-first-pass', chosen) : null
+  const measure = measures.find((m) => m.id === HOME_MEASURES.firstPass)
+  if (measure === undefined) {
+    const reason = 'Nothing measures this yet'
+    return <EmptyCard question="How often does it pass first time?" qualifier="" reason={reason} />
+  }
+  const qualifier = `· ${windowQualifier(chosen)}`
+  const reading = measureReading(measures, HOME_MEASURES.firstPass, chosen)
   if (reading === null) {
-    const reason = published ? 'Not measured for this range' : 'No Foundry order has shipped yet'
-    return <EmptyCard question={question} qualifier={qualifier} reason={reason} />
+    return (
+      <EmptyCard
+        question={measure.question}
+        qualifier={qualifier}
+        reason="Not measured for this range"
+      />
+    )
   }
   return (
     <MetricCard
-      question={question}
+      question={measure.question}
       qualifier={qualifier}
       value={reading.value}
       unit="%"
-      sub="of Foundry orders passed their checks on the first try"
+      sub={measure.detail}
     />
   )
 }

@@ -140,6 +140,8 @@ interface ExtensionContributes {
     requires?: 'repo' | 'session'
   }>
   quickActions?: { group?: { mnemonic?: string; label: string } }
+  /** Ways to run work from the Start work launcher; `command` is one of the extension's command ids. */
+  startWorkOptions?: Array<{ id: string; label: string; description: string; command: string }>
   /** Keys of the extension's own folder settings whose directories its git and gh may run in. */
   shellRoots?: string[]
 }
