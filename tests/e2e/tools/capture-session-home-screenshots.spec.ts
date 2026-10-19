@@ -1,147 +1,112 @@
 import { test, expect, type Page } from '@playwright/test'
-import { mkdirSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { execFileSync } from 'node:child_process'
+import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   launchApp,
   closeApp,
   createWorkspace,
-  addAndSelectProject,
-  type AppHandle,
   e2eTempDir,
+  projectGroup,
+  runQuickActionFromPanel,
+  workspaceRow,
 } from '../helpers'
+import type { AppHandle } from '../helpers'
+import { openHome, runInVisibleTerminal } from '../session-views'
 
-// Retakes the user-guide screenshots of Home and the Overview wall, with a
-// session in each of the four states, and records what Tab reaches on Home.
-// Writes into docs/, so it is run deliberately:
+// Retakes the user-guide screenshots of the Desk and Insights, with terminals on two branches
+// and one agent asking a numbered question. Writes into docs/, so it is run deliberately:
 //
+//   npm run build
 //   E2E_TOOLS=1 npx playwright test tests/e2e/tools/capture-session-home-screenshots.spec.ts
 
 let handle: AppHandle | undefined
 const DOCS = 'docs/user-guide/screenshots'
-const REVIEW = join(tmpdir(), 'terminator-054-screens')
 
 test.afterAll(async () => closeApp(handle))
 
-async function run(page: Page, command: string): Promise<void> {
-  await page.locator('.terminal-pane').click()
-  await page.keyboard.type(command)
-  await page.keyboard.press('Enter')
+// ❯ as its UTF-8 bytes in octal: typed as itself it reaches a shell with no UTF-8 locale
+// (as on CI) as unknown characters, and nothing reads the prompt as a question.
+const QUESTION =
+  "clear; printf ' Do you want to create BoardScreen.tsx?\\n \\342\\235\\257 1. Yes\\n   2. Yes, and allow edits this session\\n   3. No\\n'"
+const BUSY = 'while true; do echo "$(date +%T) 14 passed, 2 failed"; sleep 0.4; done'
+
+/** Task Vault offers its weekly review on one weekday; move it off today so the band holds only the question. */
+function profileWithoutWeeklyReview(): string {
+  const profile = e2eTempDir('profile-')
+  const otherDay = String((new Date().getDay() + 3) % 7)
+  const values = { 'terminator.task-vault.weeklyReviewDay': otherDay }
+  writeFileSync(join(profile, 'extension-settings.json'), JSON.stringify({ values }))
+  return profile
 }
 
-async function tab(page: Page, name: string): Promise<void> {
-  const entry = page.getByRole('button', { name: new RegExp(`^${name}`) })
-  if ((await entry.getAttribute('aria-current')) !== 'page') await entry.click()
-}
-
-async function describe(page: Page, group: string, text: string): Promise<void> {
-  const box = page
-    .getByRole('rowgroup', { name: group })
-    .getByRole('textbox', { name: 'What is this session doing?' })
-  await box.fill(text)
-  await box.press('Enter')
-}
-
-/** Four sessions, one in each state: waiting on a prompt, busy, idle and ended. */
-async function startFourSessions(page: Page): Promise<void> {
-  await addAndSelectProject(page, 'terminator', 'session-home')
-  await run(
-    page,
-    // ❯ as its UTF-8 bytes in octal: typed as itself it reaches a shell with no UTF-8 locale
-    // (as on CI) as three unknown characters, and nothing reads the prompt as waiting on you.
-    "clear; printf ' Do you want to create BoardScreen.tsx?\\n \\342\\235\\257 1. Yes\\n   2. Yes, and allow edits this session\\n   3. No\\n'"
-  )
-
-  await addAndSelectProject(page, 'terminator', 'rate-limits')
-  await run(page, 'while true; do echo "$(date +%T) 14 passed, 2 failed"; sleep 0.4; done')
-
-  await addAndSelectProject(page, 'terminator', 'dotfiles')
-  await run(page, 'echo moving kitty keybinds to ghostty')
-
-  await addAndSelectProject(page, 'terminator', 'bundle-check')
-  await run(page, 'exit')
-}
-
-/** Describes two of them on Home, and waits for the prompt to be read as needing you. */
-async function describeAndSettle(page: Page): Promise<void> {
-  await tab(page, 'Home')
-  await describe(
-    page,
-    'terminator / dotfiles',
-    'Moving kitty config to Ghostty, keybinds half done'
-  )
-  // The session waiting on its prompt is lifted out of its branch into the
-  // Needs you group, which Home's default sort draws first.
-  await describe(page, 'Needs you', 'Session home view, build pass')
-  // State settles a moment after output stops; wait for the prompt to be read.
-  await expect(
-    page.getByRole('region', { name: 'Home' }).getByRole('button', { name: /Needs you/ })
-  ).toContainText('1', { timeout: 15_000 })
-  await page.waitForTimeout(2000)
-}
-
-/** What Tab reaches from the filter onwards, twelve presses. */
-async function tabOrder(page: Page): Promise<string[]> {
-  await page
-    .getByRole('region', { name: 'Home' })
-    .getByRole('searchbox', { name: 'Filter sessions' })
-    .focus()
-  const reached: string[] = []
-  for (let i = 0; i < 12; i++) {
-    await page.keyboard.press('Tab')
-    reached.push(
-      await page.evaluate(() => {
-        const el = document.activeElement as HTMLElement | null
-        if (!el) return 'none'
-        const outline = getComputedStyle(el).outlineStyle
-        return `${el.getAttribute('role') ?? el.tagName.toLowerCase()}: ${el.getAttribute('aria-label') ?? el.textContent?.trim().slice(0, 30)} [outline ${outline}]`
-      })
-    )
-  }
-  return reached
-}
-
-/** The Logbook and the Overview wall, for the guide. */
-async function captureLogbookAndWall(page: Page): Promise<void> {
-  await page.getByRole('radio', { name: 'Logbook' }).click()
-  await page.getByRole('option', { name: /Moving kitty config/ }).click()
-  await page.waitForTimeout(800)
-  await page.screenshot({ path: join(DOCS, '11b-home-logbook.png') })
-
-  await tab(page, 'Overview')
-  await page.waitForTimeout(1500)
-  await page.screenshot({ path: join(DOCS, '12-overview-screen.png') })
-}
-
-/** The wall, the Logbook and the Ledger in the light theme, for review only. */
-async function captureLightTheme(page: Page): Promise<void> {
-  await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'light'))
-  await page.waitForTimeout(500)
-  await page.screenshot({ path: join(REVIEW, 'wall-light.png') })
-  await tab(page, 'Home')
-  await page.waitForTimeout(500)
-  await page.screenshot({ path: join(REVIEW, 'logbook-light.png') })
-  await page.getByRole('radio', { name: 'Ledger' }).click()
-  await page.waitForTimeout(500)
-  await page.screenshot({ path: join(REVIEW, 'ledger-light.png') })
-}
-
-test('capture Home and the Overview wall', async () => {
-  test.setTimeout(180_000)
-  mkdirSync(REVIEW, { recursive: true })
+/** A repository with one commit, so each branch the app makes reports its own name. */
+function gitFolder(): string {
   const folder = e2eTempDir('home-shots-')
-  handle = await launchApp()
+  const git = (...args: string[]) => execFileSync('git', args, { cwd: folder, stdio: 'ignore' })
+  git('init', '-q')
+  git(
+    '-c',
+    'user.name=Demo',
+    '-c',
+    'user.email=demo@example.com',
+    'commit',
+    '-q',
+    '--allow-empty',
+    '-m',
+    'Start'
+  )
+  return folder
+}
+
+/** A second branch of the repository, in a worktree of its own, selected. */
+async function addWorktreeBranch(page: Page, name: string): Promise<void> {
+  await workspaceRow(page, 'terminator').hover()
+  await workspaceRow(page, 'terminator')
+    .locator('.repo-header__action[aria-label="New branch in terminator"]')
+    .click()
+  await page.getByPlaceholder('feature/my-feature').fill(name)
+  await page.click('.tmui-dialog__actions .tmui-button--primary')
+  await projectGroup(page, name).click()
+  await page.getByRole('textbox', { name: 'Terminal input' }).first().waitFor({ timeout: 15_000 })
+}
+
+/** Two branches: main has an agent asking and a test run going; the other has a short job. */
+async function startWork(page: Page): Promise<void> {
+  await projectGroup(page, 'main').click()
+  await runInVisibleTerminal(page, QUESTION)
+  await page.getByRole('button', { name: 'New terminal' }).click()
+  await runInVisibleTerminal(page, BUSY)
+  await addWorktreeBranch(page, 'rate-limits')
+  await runInVisibleTerminal(page, 'echo moving kitty keybinds to ghostty')
+}
+
+async function settleOnDesk(page: Page): Promise<void> {
+  await openHome(page)
+  await page.getByRole('button', { name: 'Skip today' }).click()
+  await expect(page.getByRole('region', { name: 'Your move' })).toContainText(
+    'Do you want to create BoardScreen.tsx?',
+    { timeout: 20_000 }
+  )
+  await expect(
+    page.getByRole('region', { name: 'In flight' }).locator('[data-thread-key]')
+  ).toHaveCount(2)
+}
+
+test('capture the Desk and Insights', async () => {
+  test.setTimeout(180_000)
+  handle = await launchApp(profileWithoutWeeklyReview(), {}, { hideSidebarOnHome: true })
   const { page } = handle
   await page.setViewportSize({ width: 1440, height: 900 })
-  await createWorkspace(page, 'terminator', folder)
-  await startFourSessions(page)
-  await describeAndSettle(page)
+  await runQuickActionFromPanel(page, 'Toggle sidebar')
+  await createWorkspace(page, 'terminator', gitFolder())
+  await startWork(page)
+  await settleOnDesk(page)
+  await page.getByRole('status').getByRole('button', { name: 'Dismiss' }).click()
+  await expect(page.getByRole('status')).toHaveCount(0)
+  await page.screenshot({ path: join(DOCS, '11a-home-desk.png') })
 
-  await page.getByRole('rowgroup', { name: 'Needs you' }).getByRole('row').first().click()
-  await page.waitForTimeout(800)
-  await page.screenshot({ path: join(DOCS, '11a-home-ledger.png') })
-
-  writeFileSync(join(REVIEW, 'home-tab-order.json'), JSON.stringify(await tabOrder(page), null, 2))
-  await captureLogbookAndWall(page)
-  await captureLightTheme(page)
+  await page.getByRole('radio', { name: 'Insights' }).click()
+  await expect(page.getByText('How long do agents wait on me?')).toBeVisible()
+  await page.screenshot({ path: join(DOCS, '11b-home-insights.png') })
 })

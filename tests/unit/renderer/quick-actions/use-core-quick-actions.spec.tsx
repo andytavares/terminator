@@ -7,6 +7,8 @@ import {
 import { useSessionStore } from '../../../../src/renderer/stores/session.store'
 import { useWorkspaceStore } from '../../../../src/renderer/stores/workspace.store'
 import { useIntegrationsStore } from '../../../../src/renderer/stores/integrations.store'
+import { useDeskSelection } from '../../../../src/renderer/components/home/desk-selection'
+import { useSessionRecordsStore } from '../../../../src/renderer/stores/session-records.store'
 import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
 import type { QuickActionTarget } from '../../../../src/renderer/quick-actions/use-active-scope'
 import type { TerminalSession } from '../../../../src/shared/types/index'
@@ -154,6 +156,31 @@ describe('useCoreQuickActions — the global tabs', () => {
     expect(useExtensionRegistry.getState().activeGlobalTabId).toBe('core.home')
     useExtensionRegistry.getState().setActiveGlobalTab(null)
     runCoreAction('core.open-home')
+    expect(useExtensionRegistry.getState().activeGlobalTabId).toBe('core.home')
+  })
+})
+
+describe('useCoreQuickActions — resume', () => {
+  const record = (patch: Record<string, unknown>) =>
+    [
+      's9',
+      { sessionId: 's9', closedAt: '2026-10-18T10:00:00.000Z', resumable: true, ...patch },
+    ] as const
+
+  beforeEach(() => {
+    useDeskSelection.setState({ resumeRequested: false })
+  })
+
+  it('asks Home to open the latest conversation when one can be resumed', () => {
+    useSessionRecordsStore.setState({ records: new Map([record({})]) as never })
+    runCoreAction('core.resume')
+    expect(useDeskSelection.getState().resumeRequested).toBe(true)
+  })
+
+  it('only shows Home when nothing can be resumed', () => {
+    useSessionRecordsStore.setState({ records: new Map([record({ resumable: false })]) as never })
+    runCoreAction('core.resume')
+    expect(useDeskSelection.getState().resumeRequested).toBe(false)
     expect(useExtensionRegistry.getState().activeGlobalTabId).toBe('core.home')
   })
 })

@@ -2,6 +2,7 @@ import type { ThreadFacet, WorkKey } from '../../shared/schemas/home-feed.schema
 import type { ChangeStats } from '../../shared/schemas/git.schema'
 import type { IssueSummary } from '../../shared/types/index'
 import type { SessionFacts } from '../sidebar/session-facts'
+import { planResume } from '../sidebar/resume'
 
 type Stage = ThreadFacet['stage']
 type WhoseMove = ThreadFacet['whoseMove']
@@ -23,6 +24,8 @@ export interface WorkThread {
   prChip: { text: string; tone: Tone } | null
   changes: ChangeStats | null
   lastActivity: number
+  /** When the work began (epoch ms); it orders a list, because output never moves it. */
+  startedAt: number
   parked: boolean
   /** Every facet is closed and no session is open: the work is over. */
   closed: boolean
@@ -67,13 +70,20 @@ function repoKey(repoRoot: string, branch: string): string {
 }
 
 /** Which ticket each repo branch belongs to, as the sessions on it say; project links win. */
+/** A closed session has no live project, so its record's snapshot says where it ran. */
+function projectIdOf(f: SessionFacts): string | null {
+  if (!f.isClosed) return f.projectId
+  return f.snapshot.projectId || null
+}
+
 function branchTickets(input: WorkThreadInput): Map<string, string> {
   const byBranch = new Map<string, string>()
   const ranked = [...input.facts].sort(
     (a, b) => Number(a.workItem?.source === 'project') - Number(b.workItem?.source === 'project')
   )
   for (const f of ranked) {
-    const root = f.projectId ? input.repoRoots.get(f.projectId) : undefined
+    const projectId = projectIdOf(f)
+    const root = projectId ? input.repoRoots.get(projectId) : undefined
     if (f.workItem && root && f.branch) {
       byBranch.set(repoKey(root, f.branch), workKeyId(f.workItem.ref))
     }
@@ -82,7 +92,8 @@ function branchTickets(input: WorkThreadInput): Map<string, string> {
 }
 
 function keyOfSession(f: SessionFacts, input: WorkThreadInput, tickets: Map<string, string>) {
-  const root = f.projectId ? input.repoRoots.get(f.projectId) : undefined
+  const projectId = projectIdOf(f)
+  const root = projectId ? input.repoRoots.get(projectId) : undefined
   if (f.workItem) return workKeyId(f.workItem.ref)
   if (root && f.branch) return tickets.get(repoKey(root, f.branch)) ?? repoKey(root, f.branch)
   return `session:${f.sessionId}`
@@ -100,7 +111,8 @@ function draftFor(drafts: Map<string, Draft>, key: string): Draft {
 }
 
 function repoRootOf(f: SessionFacts, input: WorkThreadInput): string | null {
-  return f.projectId ? (input.repoRoots.get(f.projectId) ?? null) : null
+  const projectId = projectIdOf(f)
+  return projectId ? (input.repoRoots.get(projectId) ?? null) : null
 }
 
 function attachSessionToDraft(draft: Draft, f: SessionFacts, repoRoot: string | null) {
@@ -113,10 +125,22 @@ function attachFacetToDraft(draft: Draft, facet: ThreadFacet) {
   if ('repoRoot' in facet.workKey) draft.repoRoot ??= facet.workKey.repoRoot
 }
 
+/**
+ * Open sessions first, then the ended ones a thread can still resume.
+ * A closed scratch terminal belongs to no work, so it is left out.
+ */
+function sessionsToShow(facts: readonly SessionFacts[]): SessionFacts[] {
+  const belongsToWork = (f: SessionFacts) => f.workItem !== null || projectIdOf(f) !== null
+  return [
+    ...facts.filter((f) => !f.isClosed),
+    ...facts.filter((f) => f.isClosed && belongsToWork(f)),
+  ]
+}
+
 function collectDrafts(input: WorkThreadInput): Draft[] {
   const tickets = branchTickets(input)
   const drafts = new Map<string, Draft>()
-  for (const f of input.facts.filter((s) => !s.isClosed)) {
+  for (const f of sessionsToShow(input.facts)) {
     attachSessionToDraft(draftFor(drafts, keyOfSession(f, input, tickets)), f, repoRootOf(f, input))
   }
   for (const facet of input.facets)
@@ -200,14 +224,22 @@ function lastActivityOf(draft: Draft): number {
   )
 }
 
+function startedAtOf(draft: Draft): number {
+  const times = [
+    ...draft.sessions.map((s) => Date.parse(s.startedAt)),
+    ...draft.facets.map((f) => Date.parse(f.openedAt ?? f.updatedAt)),
+  ]
+  return Math.min(...times)
+}
+
 function isParked(draft: Draft, lastActivity: number, now: number): boolean {
-  const scratch = draft.facets.length === 0 && draft.sessions.every((s) => s.projectId === null)
+  const scratch = draft.facets.length === 0 && draft.sessions.every((s) => projectIdOf(s) === null)
   return scratch || now - lastActivity > PARKED_AFTER_MS
 }
 
 function isClosedDraft(draft: Draft): boolean {
   return (
-    draft.sessions.length === 0 &&
+    draft.sessions.every((s) => s.isClosed) &&
     draft.facets.length > 0 &&
     draft.facets.every((f) => f.closedAt !== null)
   )
@@ -244,6 +276,7 @@ function statusOf(draft: Draft, now: number) {
     agentsLabel: agentsLabelOf(draft.sessions),
     prChip: pr ? { text: pr.line, tone: pr.tone } : null,
     lastActivity,
+    startedAt: startedAtOf(draft),
     parked: isParked(draft, lastActivity, now),
     closed: isClosedDraft(draft),
   }
@@ -268,6 +301,16 @@ export function allWorkThreads(input: WorkThreadInput): WorkThread[] {
   return collectDrafts(input).map((draft) => toThread(draft, input))
 }
 
+/** The thread holding the conversation that ended most recently and can still be resumed. */
+export function latestResumableThread(threads: readonly WorkThread[]): WorkThread | undefined {
+  const endedAt = (thread: WorkThread) =>
+    Math.max(
+      0,
+      ...thread.sessions.filter((s) => planResume(s) !== null).map((s) => s.lastActivityAt)
+    )
+  return threads.filter((thread) => endedAt(thread) > 0).sort((a, b) => endedAt(b) - endedAt(a))[0]
+}
+
 /** The threads worth showing: work with an open session or a facet still open. */
 export function buildWorkThreads(input: WorkThreadInput): WorkThread[] {
   return allWorkThreads(input).filter((t) => !t.closed)
@@ -284,9 +327,12 @@ function threadGroupOf(thread: WorkThread): ThreadGroup['id'] {
   return thread.whoseMove === 'others' ? 'others' : 'agents'
 }
 
-function yourMoveFirst(a: WorkThread, b: WorkThread): number {
+/** Your move first, then newest work first; a row never moves because its terminal printed. */
+export function yourMoveFirst(a: WorkThread, b: WorkThread): number {
   return (
-    Number(b.whoseMove === 'you') - Number(a.whoseMove === 'you') || b.lastActivity - a.lastActivity
+    Number(b.whoseMove === 'you') - Number(a.whoseMove === 'you') ||
+    b.startedAt - a.startedAt ||
+    a.key.localeCompare(b.key)
   )
 }
 

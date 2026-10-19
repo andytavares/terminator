@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect, type Locator, type Page } from '@playwright/test'
 import { mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import {
@@ -9,14 +9,16 @@ import {
   addAndSelectProject,
   selectProject,
   e2eTempDir,
+  runQuickActionFromPanel,
 } from './helpers'
-import { expectTerminalFocused, openOverview } from './session-views'
+import { expectTerminalFocused, openHome, openOverview } from './session-views'
 
 // Resume against the running app. A conversation is reported exactly as the
 // capture hook reports one — a file in the profile's agent-sessions directory —
 // so the whole path from report to control is exercised without running an
 // agent. Pressing Resume against a real agent is tests/e2e/live/resume-live.spec.ts.
-// Resume is on the Overview wall's tiles; the Desk lists no ended session.
+// Resume is on the Overview wall's tiles and in the Desk's work-thread drawer, which lists the
+// ended sessions of the work it opens.
 
 /** The two terminals on the branch: the first's transcript is there, the second's never was. */
 interface Conversations {
@@ -204,8 +206,47 @@ async function firstRun(handle: AppHandle, run: Conversations): Promise<void> {
     resumeFromKeyboard(page, run))
 }
 
+/** The drawer of the thread holding the last conversation, opened the way an operator finds it. */
+async function openResumeDrawer(page: Page): Promise<Locator> {
+  await openHome(page)
+  await runQuickActionFromPanel(page, 'Resume a conversation…')
+  const drawer = page.getByRole('dialog')
+  await expect(drawer).toBeVisible()
+  return drawer
+}
+
+/** A restart starts no agent on its own, and the last run's conversations are still on offer. */
+async function offeredAfterRestart(page: Page): Promise<void> {
+  await expect(page.locator('.tab-bar__tab--session')).toHaveCount(0)
+  const drawer = await openResumeDrawer(page)
+  const rows = drawer.locator('.desk-lr')
+  await expect(
+    rows.filter({ hasText: 'resume test' }).getByRole('button', { name: 'Resume' })
+  ).toBeVisible()
+  // The conversation whose transcript is gone is listed as work too, with nothing to resume.
+  await page.keyboard.press('Escape')
+  await expect(drawer).toBeHidden()
+  await expect(
+    page.getByRole('region', { name: 'In flight' }).getByRole('button', { name: 'the other one' })
+  ).toBeVisible()
+  await openResumeDrawer(page)
+  await expect(drawer.getByRole('button', { name: 'Resume' })).toHaveCount(1)
+}
+
+/** Resumes from the keyboard, with a focus ring to show where it is: the one control that brings
+ * work back must not need a mouse. */
+async function resumedFromTheDrawer(page: Page): Promise<void> {
+  const resume = page.getByRole('dialog').getByRole('button', { name: 'Resume' })
+  await resume.focus()
+  expect(
+    await resume.evaluate((el) => getComputedStyle(el, ':focus-visible').outlineWidth)
+  ).not.toBe('0px')
+  await page.keyboard.press('Enter')
+  await expect(page.locator('.tab-bar__tab--session[title="resume test"]')).toBeVisible()
+}
+
 test('a conversation is resumed, and only when it can be', async () => {
-  test.setTimeout(120_000)
+  test.setTimeout(180_000)
   const folder = e2eTempDir('resume-')
   const run: Conversations = {
     folder,
@@ -214,9 +255,20 @@ test('a conversation is resumed, and only when it can be', async () => {
     second: '',
   }
   writeFileSync(run.transcript, '{}\n')
-  const handle = await launchApp()
+  let handle: AppHandle | undefined = await launchApp()
   try {
+    const profile = handle.userDataDir
     await firstRun(handle, run)
+    // The transcript is back, so the conversation can be offered after the restart.
+    writeFileSync(run.transcript, '{}\n')
+    await closeApp(handle)
+    handle = undefined
+    handle = await launchApp(profile)
+    const { page } = handle
+    await test.step('a conversation from the last run is offered on the Desk, and nothing restarted itself', () =>
+      offeredAfterRestart(page))
+    await test.step('it is resumed from the keyboard on its branch', () =>
+      resumedFromTheDrawer(page))
   } finally {
     await closeApp(handle)
   }

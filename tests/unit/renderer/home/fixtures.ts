@@ -1,8 +1,9 @@
-import type { ThreadFacet } from '../../../../src/shared/schemas/home-feed.schema'
+import type { Sourced, ThreadFacet } from '../../../../src/shared/schemas/home-feed.schema'
 
 /** A pull-request facet with every field present, for specs to vary one at a time. */
-export function facet(patch: Partial<ThreadFacet> = {}): ThreadFacet {
+export function facet(patch: Partial<ThreadFacet> = {}): Sourced<ThreadFacet> {
   return {
+    source: 'git-integration',
     workKey: { repoRoot: '/repos/terminator', branch: 'tav-31' },
     kind: 'pull-request',
     stage: 'in-review',

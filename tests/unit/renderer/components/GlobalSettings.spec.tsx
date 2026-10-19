@@ -26,7 +26,7 @@ const globalSettings: GlobalSettingsValue = {
     scrollbackLimit: 5000,
     defaultShell: '/bin/zsh',
   },
-  ui: { hasSeenWelcome: false, editor: '', showMetricsBar: false },
+  ui: { hasSeenWelcome: false, editor: '', showMetricsBar: false, hideSidebarOnHome: true },
   sidebar: { staleAfterMs: 7_200_000 },
 }
 

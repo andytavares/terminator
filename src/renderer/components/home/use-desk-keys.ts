@@ -43,12 +43,19 @@ function isTyping(target: EventTarget): boolean {
   )
 }
 
+/** Enter on a button or link presses it; the Desk must not also take it as "open the row". */
+function pressesControl(event: React.KeyboardEvent): boolean {
+  const { target } = event
+  return event.key === 'Enter' && target instanceof Element && target.closest('button, a') !== null
+}
+
 /** The keydown handler for Home's root: reads the key, then hands the command on. */
 export function useDeskKeys(onCommand: (command: DeskKeyCommand) => void) {
   const afterG = useRef(false)
   return useCallback(
     (event: React.KeyboardEvent) => {
       if (isTyping(event.target) && event.key !== 'Escape') return
+      if (pressesControl(event)) return
       const command = deskKeyCommand(event, afterG.current)
       afterG.current = command?.kind === 'go-to'
       if (command === null) return

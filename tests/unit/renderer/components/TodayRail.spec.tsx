@@ -77,8 +77,15 @@ describe("Today's focus — Task Vault", () => {
   it("lists Task Vault's items for today under the picked focus, ticked by their own state", () => {
     useHomeFeedStore.setState({
       focus: [
-        { id: 'tv1', title: 'Write the report', workKey: null, done: true, detail: 'due today' },
-        { id: 'tv2', title: 'Call the bank', workKey: null, done: false },
+        {
+          source: 'task-vault',
+          id: 'tv1',
+          title: 'Write the report',
+          workKey: null,
+          done: true,
+          detail: 'due today',
+        },
+        { source: 'task-vault', id: 'tv2', title: 'Call the bank', workKey: null, done: false },
       ],
     })
     render(<TodayRail />)
@@ -95,7 +102,9 @@ describe("Today's focus — Task Vault", () => {
 describe("Today's focus — choosing", () => {
   it('picks from threads and Task Vault candidates, up to three', () => {
     useHomeFeedStore.setState({
-      focus: [{ id: 'tv1', title: 'Write the report', workKey: null, done: false }],
+      focus: [
+        { source: 'task-vault', id: 'tv1', title: 'Write the report', workKey: null, done: false },
+      ],
     })
     render(<TodayRail />)
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }))

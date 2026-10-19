@@ -9,6 +9,7 @@ import { usageLabel, useSessionUsage } from './useSessionUsage'
 import { pullRequestOf } from './thread-format'
 import { useSendToAgent } from './thread-actions'
 import { buildTimeline, timelineTime } from './thread-timeline'
+import { planResume } from '../../sidebar/resume'
 import type { SessionFacts } from '../../sidebar/session-facts'
 import type { WorkThread } from '../../home/work-threads'
 
@@ -67,7 +68,7 @@ function sessionDetails(s: SessionFacts, props: SectionProps, usage: string | un
   const changes = props.thread.changes
   return [
     s.agent ? 'Claude' : (s.shell?.split('/').pop() ?? 'terminal'),
-    ageLabel(s.startedAt, props.now),
+    s.isClosed ? 'ended' : ageLabel(s.startedAt, props.now),
     lead && changes && (changes.added || changes.removed)
       ? `+${changes.added} −${changes.removed}`
       : '',
@@ -78,7 +79,7 @@ function sessionDetails(s: SessionFacts, props: SectionProps, usage: string | un
 function SessionRow(props: SectionProps & { session: SessionFacts; usage?: string }): JSX.Element {
   const { session: s } = props
   const what = s.latestLine || s.description?.split('\n')[0] || s.name
-  const canResume = s.resumable && s.state === 'idle'
+  const canResume = planResume(s) !== null
   return (
     <div className="desk-lr">
       <StatusDot tone={sessionDotTone(s)} pulse={s.state === 'working'} />
@@ -91,14 +92,16 @@ function SessionRow(props: SectionProps & { session: SessionFacts; usage?: strin
             Resume
           </Button>
         )}
-        <Button
-          size="sm"
-          variant="ghost"
-          aria-label={`Open ${what}`}
-          onClick={() => SESSION_ACTIONS.onOpen(s.sessionId)}
-        >
-          Open
-        </Button>
+        {!s.isClosed && (
+          <Button
+            size="sm"
+            variant="ghost"
+            aria-label={`Open ${what}`}
+            onClick={() => SESSION_ACTIONS.onOpen(s.sessionId)}
+          >
+            Open
+          </Button>
+        )}
       </span>
     </div>
   )

@@ -40,7 +40,7 @@ function WorkCell({ thread }: { thread: WorkThread }): JSX.Element {
 }
 
 function AgentsCell({ thread }: { thread: WorkThread }): JSX.Element {
-  const live = thread.sessions.filter((s) => s.state !== 'idle')
+  const live = thread.sessions.filter((s) => s.state === 'working' || s.state === 'awaiting-input')
   return (
     <div className="desk-tr__agents">
       {live.map((s) => (

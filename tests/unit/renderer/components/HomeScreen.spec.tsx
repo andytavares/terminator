@@ -1,5 +1,5 @@
 import React from 'react'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 import { render, screen, fireEvent, within } from '@testing-library/react'
 import { fact } from '../sidebar/fixtures/facts'
 import { isoMinutesBefore } from '../home/desk-world'
@@ -38,6 +38,7 @@ vi.mock('../../../../src/renderer/components/home/PlanTheDay', () => ({
 }))
 vi.mock('../../../../src/renderer/components/home/Insights', () => ({
   Insights: () => <div>Insights view</div>,
+  InsightsBar: () => <div>Insights window</div>,
 }))
 
 import { HomeScreen } from '../../../../src/renderer/components/home/HomeScreen'
@@ -88,7 +89,7 @@ const asking = (): SessionFacts =>
     } as SessionFacts['choicePrompt'],
   })
 
-let input: ReturnType<typeof vi.fn>
+let input: Mock<(sessionId: string, data: string) => void>
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -352,6 +353,8 @@ describe('HomeScreen — Desk and Insights', () => {
     render(<HomeScreen />)
     fireEvent.click(screen.getByRole('radio', { name: 'Insights' }))
     expect(screen.getByText('Insights view')).toBeTruthy()
+    expect(screen.getByText('Insights window')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /Start work/ })).toBeNull()
     expect(screen.queryByRole('region', { name: 'Your move' })).toBeNull()
     fireEvent.keyDown(home(), { key: 'g' })
     fireEvent.keyDown(home(), { key: 'd' })

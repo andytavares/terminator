@@ -8,8 +8,9 @@ import {
   selectProject,
   e2eTempDir,
   untilDrawn,
+  readTerminalRows,
 } from './helpers'
-import { openHome } from './session-views'
+import { openHome, runInVisibleTerminal } from './session-views'
 import { expectCentredInWindow } from './modal-centre'
 
 // Home against the running app: it is the launch view, a terminal is listed under In flight by
@@ -107,6 +108,26 @@ async function groupMenuOpensInsideTheWindow(page: Page): Promise<void> {
   await expect(inFlight(page).getByRole('button', { name: 'Group: repo' })).toBeVisible()
 }
 
+/** The names of In flight's rows, top to bottom. */
+function inFlightOrder(page: Page): Promise<(string | null)[]> {
+  return inFlight(page)
+    .locator('[data-thread-key]')
+    .evaluateAll((rows) => rows.map((row) => row.getAttribute('aria-label')))
+}
+
+/** Feature 058: a terminal printing never moves a row. The older branch prints; were rows sorted
+ * by activity it would climb above the newer one. */
+async function outputLeavesInFlightOrder(page: Page): Promise<void> {
+  await addAndSelectProject(page, 'Repo One', 'feature-b')
+  await selectProject(page, 'Repo One', BRANCH)
+  await runInVisibleTerminal(page, 'echo printed-$((20 + 22))')
+  await expect
+    .poll(async () => (await readTerminalRows(page)).some((row) => row.includes('printed-42')))
+    .toBe(true)
+  await openHome(page)
+  await expect.poll(() => inFlightOrder(page)).toEqual(['feature-b', DESCRIPTION])
+}
+
 test('a session is kept on Home under the work it serves, and what is written about it names that work', async () => {
   test.setTimeout(90_000)
   const { page } = handle
@@ -120,4 +141,6 @@ test('a session is kept on Home under the work it serves, and what is written ab
   await test.step('the link dialog closes on Escape', () => linkDialogClosesOnEscape(page))
   await test.step("Home's group menu opens inside the window", () =>
     groupMenuOpensInsideTheWindow(page))
+  await test.step('output in a session leaves In flight in the order it had', () =>
+    outputLeavesInFlightOrder(page))
 })

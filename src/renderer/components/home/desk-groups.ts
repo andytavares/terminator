@@ -1,4 +1,4 @@
-import { groupThreads, type WorkThread } from '../../home/work-threads'
+import { groupThreads, yourMoveFirst, type WorkThread } from '../../home/work-threads'
 
 export type DeskGroupBy = 'move' | 'repo'
 
@@ -46,7 +46,7 @@ function byRepo(threads: readonly WorkThread[]): DeskGroup[] {
       label: repo,
       tone: 'muted' as const,
       collapsible: false,
-      threads: inRepo.sort((a, b) => b.lastActivity - a.lastActivity),
+      threads: inRepo.sort(yourMoveFirst),
     }))
 }
 

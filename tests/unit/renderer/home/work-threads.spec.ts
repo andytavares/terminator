@@ -3,12 +3,14 @@ import {
   allWorkThreads,
   buildWorkThreads,
   groupThreads,
+  latestResumableThread,
   type WorkThreadInput,
 } from '../../../../src/renderer/home/work-threads'
 import { fact } from '../sidebar/fixtures/facts'
 import { facet } from './fixtures'
 import { ticket } from './desk-world'
 import type { IssueSummary } from '../../../../src/shared/types/index'
+import type { SessionFacts } from '../../../../src/renderer/sidebar/session-facts'
 
 const NOW = Date.parse('2026-10-18T12:00:00.000Z')
 const hoursBeforeNow = (hours: number) => NOW - hours * 3_600_000
@@ -99,8 +101,55 @@ describe('joining: facets without a session', () => {
     expect(buildWorkThreads(input({ facts: [working()], facets: [merged] }))).toHaveLength(1)
   })
 
-  it('ignores closed session records', () => {
-    expect(buildWorkThreads(input({ facts: [working({ isClosed: true })] }))).toEqual([])
+  it('ignores a closed scratch terminal, which belongs to no work', () => {
+    const scratch = fact({
+      isClosed: true,
+      projectId: null,
+      snapshot: { ...fact().snapshot, projectId: '' },
+    })
+    expect(buildWorkThreads(input({ facts: [scratch] }))).toEqual([])
+  })
+})
+
+/** A session that has ended: its record keeps the project only in the snapshot. */
+const ended = (patch: Partial<SessionFacts> = {}) =>
+  fact({
+    isClosed: true,
+    state: 'exited',
+    projectId: null,
+    resumable: true,
+    branch: 'tav-31',
+    lastActivityAt: hoursBeforeNow(1),
+    ...patch,
+  })
+
+describe('joining: sessions that have ended', () => {
+  it('lists a resumable closed session with the open ones on its branch', () => {
+    const [thread] = buildWorkThreads(
+      input({ facts: [ended({ sessionId: 'old' }), working({ sessionId: 'live' })] })
+    )
+    expect(thread.sessions.map((s) => s.sessionId)).toEqual(['live', 'old'])
+    expect(thread.branch).toBe('tav-31')
+  })
+
+  it('keeps a thread whose only sessions have ended, in In flight until 48 hours pass', () => {
+    const [recent] = buildWorkThreads(input({ facts: [ended()] }))
+    expect(recent).toMatchObject({ whoseMove: 'others', parked: false, closed: false })
+    const [stale] = buildWorkThreads(
+      input({ facts: [ended({ lastActivityAt: hoursBeforeNow(49) })] })
+    )
+    expect(stale.parked).toBe(true)
+  })
+
+  it('drops the thread once its pull request has merged', () => {
+    const merged = facet({ stage: 'shipped', closedAt: '2026-10-18T10:00:00.000Z' })
+    expect(buildWorkThreads(input({ facts: [ended()], facets: [merged] }))).toEqual([])
+    expect(buildWorkThreads(input({ facts: [ended()], facets: [facet()] }))).toHaveLength(1)
+  })
+
+  it('keeps an ended session that is not resumable, within its retention', () => {
+    const [thread] = buildWorkThreads(input({ facts: [ended({ resumable: false })] }))
+    expect(thread.sessions).toHaveLength(1)
   })
 })
 
@@ -200,6 +249,37 @@ describe('thread fields: title, parking and changes', () => {
   })
 })
 
+describe('latestResumableThread', () => {
+  const agent = {
+    provider: 'claude' as const,
+    sessionId: 'conv-1',
+    cwd: '/repos/terminator',
+    transcriptPath: '/repos/terminator/conv-1.jsonl',
+    capturedAt: '2026-10-18T09:00:00.000Z',
+  }
+  const resumable = (patch: Partial<SessionFacts>) => ended({ agent, ...patch })
+
+  it('picks the thread whose conversation ended most recently', () => {
+    const threads = buildWorkThreads(
+      input({
+        facts: [
+          resumable({ sessionId: 'a', branch: 'a', lastActivityAt: hoursBeforeNow(5) }),
+          resumable({ sessionId: 'b', branch: 'b', lastActivityAt: hoursBeforeNow(2) }),
+          working({ sessionId: 'c', branch: 'c' }),
+        ],
+      })
+    )
+    expect(latestResumableThread(threads)?.branch).toBe('b')
+  })
+
+  it('finds nothing when no ended conversation can be resumed', () => {
+    const threads = buildWorkThreads(
+      input({ facts: [resumable({ resumable: false }), working({ branch: 'c' })] })
+    )
+    expect(latestResumableThread(threads)).toBeUndefined()
+  })
+})
+
 describe('groupThreads', () => {
   it('groups, puts your move first in Agents working, and omits empty groups', () => {
     const threads = buildWorkThreads(
@@ -228,5 +308,30 @@ describe('groupThreads', () => {
       'agents',
       'others',
     ])
+  })
+})
+
+describe('groupThreads: order', () => {
+  it('orders a group by when the work began, so output never moves a row', () => {
+    const facts = (activity: { a: number; b: number }) => [
+      working({
+        sessionId: 'a',
+        branch: 'a',
+        startedAt: '2026-10-18T08:00:00.000Z',
+        lastActivityAt: hoursBeforeNow(activity.a),
+      }),
+      working({
+        sessionId: 'b',
+        branch: 'b',
+        startedAt: '2026-10-18T09:00:00.000Z',
+        lastActivityAt: hoursBeforeNow(activity.b),
+      }),
+    ]
+    const order = (activity: { a: number; b: number }) =>
+      groupThreads(buildWorkThreads(input({ facts: facts(activity) })))[0].threads.map(
+        (t) => t.branch
+      )
+    expect(order({ a: 5, b: 1 })).toEqual(['b', 'a'])
+    expect(order({ a: 1, b: 5 })).toEqual(['b', 'a'])
   })
 })

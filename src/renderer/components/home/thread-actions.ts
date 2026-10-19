@@ -4,9 +4,11 @@ import { agentCommand } from './start-work'
 import { workKeyId, type WorkThread } from '../../home/work-threads'
 import type { SessionFacts } from '../../sidebar/session-facts'
 
-/** The session to open first: the one that most recently did something. */
+/** The open session to show first: the one that most recently did something. */
 export function leadSessionOf(thread: WorkThread): SessionFacts | undefined {
-  return [...thread.sessions].sort((a, b) => b.lastActivityAt - a.lastActivityAt)[0]
+  return thread.sessions
+    .filter((s) => !s.isClosed)
+    .sort((a, b) => b.lastActivityAt - a.lastActivityAt)[0]
 }
 
 export function openLinkExternally(url: string): void {

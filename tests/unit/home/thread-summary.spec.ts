@@ -23,7 +23,7 @@ const THREAD: ThreadSummaryInput = {
 
 function setup(stdout = 'It is waiting on review.') {
   let clock = 1_000_000
-  const run = vi.fn(async () => ({
+  const run = vi.fn(async (_input: object, _env: NodeJS.ProcessEnv) => ({
     exitCode: 0,
     stdout,
     stderr: '',
@@ -108,14 +108,14 @@ it.each([
   [{ exitCode: 0, stdout: '  ' }, 'Could not write a summary: Claude Code stopped with an error'],
 ])('says in plain words when it fails (%o), and retries next time', async (failure, message) => {
   const { run, summarize } = setup()
-  run.mockResolvedValueOnce({
+  const completed = {
     exitCode: 0,
     stdout: '',
     stderr: '',
     timedOut: false,
     exceededMaxBuffer: false,
-    ...failure,
-  })
+  }
+  run.mockResolvedValueOnce({ ...completed, ...failure })
   expect(await summarize(THREAD)).toEqual({ error: message })
   expect('text' in (await summarize(THREAD))).toBe(true)
   expect(run).toHaveBeenCalledTimes(2)

@@ -153,6 +153,7 @@ describe('what the drawer hands the model and the focus editor', () => {
       ticketKey: 'TAV-20',
       sessions: [
         {
+          sessionId: 'building',
           state: 'working',
           lastAssistantTexts: ['Writing ReviewHeader tests'],
           firstUserPrompt: 'Keep the existing risk chip.',

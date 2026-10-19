@@ -397,6 +397,8 @@ only thing it can write is a comment, and only in two places:
 
 Terminator opens on **Home**, which is the **Desk**: what waits on you, what is in flight, and what you meant to do today, on one screen. The header holds the **Desk | Insights** switch, **Search** (`Cmd+K`) and **Start work** (`Cmd+N`). Under it a summary line counts what needs you, how many agents are working, what waits on others and how many checks fail; press a count to narrow the Desk to it, and press it again to clear.
 
+![The Desk: an agent's question in Your move, two branches under In flight](screenshots/11a-home-desk.png)
+
 While Home shows, the branch tree is hidden, so Home has the whole window. `Cmd+B` shows it for as long as you stay on Home. To keep the tree beside Home, turn off **Hide the branch tree on Home** in **Settings → Interface**.
 
 #### Your move
@@ -463,6 +465,8 @@ The single-letter keys act only while focus is inside Home, and never while a te
 
 ### Insights
 
+![Insights, a card for each question](screenshots/11b-home-insights.png)
+
 **Insights** is the second view of Home, for looking back. Each card is titled by the question it answers, and none compares you with anyone else. **This week**, **30 days**, **Quarter** and **Year** at the top choose the range every card covers.
 
 - **How much shipped?** Merged pull requests, against the range before. It comes from Git integration.
@@ -515,7 +519,7 @@ Tile size (**S**, **M**, **L**), **Pin sessions that need you** and **Then by** 
 
 When a Claude Code session ends — you typed `/exit`, the terminal closed, or you quit Terminator — the conversation itself is still on disk. A **Resume** button appears on that session wherever it is shown: its work thread's drawer on Home, and its Overview tile. Press it and Terminator opens a terminal on the same branch, in the same folder, running `claude --resume` for that conversation. The new terminal takes over the old one's description and ticket link, and the exited tab closes, so there is one terminal per conversation.
 
-After a restart, conversations from the last run wait with their Resume button. Nothing is resumed for you: a restart never starts agents on its own, so you choose which threads to pick up.
+After a restart, conversations from the last run wait with their Resume button. Nothing is resumed for you: a restart never starts agents on its own, so you choose which threads to pick up. A thread whose sessions have all ended stays under In flight (under Parked after two days) until its pull request merges or closes, or its records are dropped after 30 days. **Resume a conversation…** in Quick actions (`Cmd+P`) opens the drawer of the thread holding the most recent one.
 
 Resume appears only where it can work:
 
