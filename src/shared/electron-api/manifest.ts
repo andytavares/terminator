@@ -62,7 +62,7 @@ import type {
 } from '../schemas/session-records.schema'
 import type { HomeFeedActionInputSchema, MergedHomeFeed } from '../schemas/home-feed.schema'
 import type { AgentAsk } from '../agent-sessions/ask'
-import type { AttentionMeasures } from '../home/attention-measures'
+import type { AttentionInterval, AttentionMeasures } from '../home/attention-measures'
 import type { MeasuresInputSchema, RecordStateInputSchema } from '../schemas/attention.schema'
 
 type RemoteBehavior = 'same' | 'omit' | 'stub'
@@ -1187,6 +1187,16 @@ export const ELECTRON_API_MANIFEST = [
     signature:
       signature<
         (input: z.input<typeof MeasuresInputSchema>) => Promise<{ data: AttentionMeasures }>
+      >(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'attention.intervals',
+    kind: 'invoke',
+    channel: 'attention:intervals',
+    signature:
+      signature<
+        (input: z.input<typeof MeasuresInputSchema>) => Promise<{ data: AttentionInterval[] }>
       >(),
     remote: 'omit',
   }),

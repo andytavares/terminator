@@ -10,6 +10,7 @@ import { exceededMaxBuffer } from '../../shell/run-git.js'
 import { RepoRoot, parseRemoteRepo } from '../repo-root.js'
 import type { DashboardPR } from '../../schemas/pr-review.schema.js'
 import type { ContributionCalendar } from '../../review/contribution-calendar.js'
+import type { MergedPullRequest } from '../../github/merged-search.js'
 
 /** What the host offers the GitHub channels beyond gh itself; each part is optional. */
 export interface GithubHandlerOptions {
@@ -23,6 +24,7 @@ export interface GithubHandlerOptions {
   isBranchExcluded?: BranchExclusionQuery
   /** Home publishes from each dashboard search and each all-repositories contributions fetch. */
   onDashboard?: (result: { prs: DashboardPR[]; failed: unknown[] }) => void
+  onMerged?: (merged: MergedPullRequest[]) => void
   onContributions?: (calendar: ContributionCalendar) => void
 }
 

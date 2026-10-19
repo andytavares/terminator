@@ -80,6 +80,14 @@ function clipToWindow(interval: AttentionInterval, window: TimeWindow): Span | n
   return Number.isNaN(start) || Number.isNaN(end) || end <= start ? null : { start, end }
 }
 
+/** The intervals that overlap the window, whole (not clipped). */
+export function intervalsIn(
+  intervals: readonly AttentionInterval[],
+  window: TimeWindow
+): AttentionInterval[] {
+  return intervals.filter((interval) => clipToWindow(interval, window) !== null)
+}
+
 function spansIn(
   intervals: readonly AttentionInterval[],
   state: AttentionState,

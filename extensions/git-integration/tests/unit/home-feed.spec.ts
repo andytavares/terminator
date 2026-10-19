@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { buildAsks, buildFacets, buildMeasures, buildGitHomeFeed } from '../../src/home/feed'
+import {
+  buildAsks,
+  buildFacets,
+  buildMergedFacets,
+  buildMeasures,
+  buildGitHomeFeed,
+} from '../../src/home/feed'
 import {
   buildContributionCalendar,
   type Contribution,
@@ -26,12 +32,6 @@ describe('buildAsks: review', () => {
     expect(ask.open.command).toBe('terminator.git-integration.command.review-pull-request')
   })
 
-  it('says where the request comes from: the repo, its ticket and the number', () => {
-    const pr = dashboardPrFixture({ section: 'requested', number: 41, headRefName: 'tav-20-cache' })
-    const [ask] = buildAsks([pr], new Map([['TAV-20', 'linear']]) as TicketIndex)
-    expect(ask.where).toBe('widgets · TAV-20 · pull request #41')
-  })
-
   it('titles a re-review differently', () => {
     const [ask] = buildAsks([dashboardPrFixture({ section: 're-review' })], NO_ISSUES)
     expect(ask.title).toBe('Re-review requested')
@@ -47,6 +47,14 @@ describe('buildAsks: review', () => {
 
   it.each(['team', 'involved'] as const)('asks nothing for the %s section', (section) => {
     expect(buildAsks([dashboardPrFixture({ section })], NO_ISSUES)).toEqual([])
+  })
+})
+
+describe('buildAsks: where', () => {
+  it('says where the request comes from: the repo, its ticket and the number', () => {
+    const pr = dashboardPrFixture({ section: 'requested', number: 41, headRefName: 'tav-20-cache' })
+    const [ask] = buildAsks([pr], new Map([['TAV-20', 'linear']]) as TicketIndex)
+    expect(ask.where).toBe('widgets · TAV-20 · pull request #41')
   })
 })
 
@@ -282,10 +290,48 @@ describe('buildGitHomeFeed', () => {
       prs: [dashboardPrFixture({ ciStatus: 'failing' })],
       tickets: NO_ISSUES,
       calendar: null,
+      merged: [],
       updatedAt: '2026-10-18T10:00:00Z',
     })
     expect(feed.asks.map((a) => a.kind)).toEqual(['fix'])
     expect(feed.facets).toHaveLength(1)
     expect(feed.measures).toEqual([])
+  })
+})
+
+const merged = {
+  repo: 'acme/widgets',
+  number: 41,
+  title: 'TAV-20 Add login redirect',
+  url: 'https://github.com/acme/widgets/pull/41',
+  headRefName: 'tav-20-login',
+  localRepoRoot: '/work/widgets',
+  openedAt: '2026-10-10T09:00:00Z',
+  readyAt: '2026-10-12T10:00:00Z',
+  firstReviewAt: null,
+  mergedAt: '2026-10-14T15:00:00Z',
+  checksMinutes: 7,
+}
+
+describe('buildMergedFacets', () => {
+  it('publishes a shipped, closed facet that carries the timeline', () => {
+    const tickets = new Map([['TAV-20', 'linear' as const]])
+    const [facet] = buildMergedFacets([merged], tickets, '2026-10-18T12:00:00Z')
+    expect(facet).toMatchObject({
+      workKey: { tracker: 'linear', key: 'TAV-20' },
+      kind: 'pull-request',
+      stage: 'shipped',
+      tone: 'good',
+      closedAt: merged.mergedAt,
+      openedAt: merged.openedAt,
+      readyAt: merged.readyAt,
+      firstReviewAt: null,
+      checksMinutes: 7,
+    })
+  })
+
+  it('falls back to the checkout and branch without a matching issue', () => {
+    const [facet] = buildMergedFacets([merged], new Map(), '2026-10-18T12:00:00Z')
+    expect(facet.workKey).toEqual({ repoRoot: '/work/widgets', branch: 'tav-20-login' })
   })
 })

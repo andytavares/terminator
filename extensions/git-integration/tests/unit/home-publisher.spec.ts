@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import type { ExtensionAPI, HomeFeed } from '@terminator/extension-sdk'
 import { partialFake } from '../../../../tests/support/fakes'
-import { createHomePublisher, HOME_REFRESH_MS } from '../../src/home/publisher'
+import { createHomePublisher, HOME_REFRESH_MS, MERGED_REFRESH_MS } from '../../src/home/publisher'
 import { buildContributionCalendar } from '../../src/review/contribution-calendar'
 import { dashboardPrFixture } from './support/dashboard-pr'
 
@@ -99,5 +99,45 @@ describe('background refresh', () => {
     await vi.advanceTimersByTimeAsync(0)
     expect(api.log.warn).toHaveBeenCalledWith(expect.stringContaining('HTTP 502'))
     refreshing.dispose()
+  })
+})
+
+const merged = {
+  repo: 'acme/widgets',
+  number: 41,
+  title: 'Add login redirect',
+  url: 'https://github.com/acme/widgets/pull/41',
+  headRefName: 'feat/login',
+  localRepoRoot: '/work/widgets',
+  openedAt: '2026-10-10T09:00:00Z',
+  readyAt: '2026-10-10T09:00:00Z',
+  firstReviewAt: null,
+  mergedAt: '2026-10-14T15:00:00Z',
+  checksMinutes: null,
+}
+
+describe('merged pull requests', () => {
+  it('publishes them as shipped facets beside the open ones', () => {
+    const { published, publisher } = setupPublisher()
+    publisher.hooks.onMerged([merged])
+    expect(published.at(-1)?.facets.map((f) => [f.stage, f.closedAt])).toEqual([
+      ['shipped', merged.mergedAt],
+    ])
+  })
+})
+
+describe('merged search schedule', () => {
+  it('searches at once and then every 15 minutes, not with the 2-minute dashboard refresh', async () => {
+    vi.useFakeTimers()
+    const { publisher } = setupPublisher()
+    const search = vi.fn(async () => {})
+    const searching = publisher.refreshMergedEvery(search)
+    await vi.advanceTimersByTimeAsync(MERGED_REFRESH_MS - 1)
+    expect(search).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(search).toHaveBeenCalledTimes(2)
+    searching.dispose()
+    await vi.advanceTimersByTimeAsync(MERGED_REFRESH_MS)
+    expect(search).toHaveBeenCalledTimes(2)
   })
 })

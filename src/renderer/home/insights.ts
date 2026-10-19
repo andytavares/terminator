@@ -1,7 +1,5 @@
 import type { HomeAsk, HomeMeasure, ThreadFacet } from '../../shared/schemas/home-feed.schema'
-import type { TimeWindow } from '../../shared/home/attention-measures'
-import type { WorkItemRef } from '../../shared/types/index'
-import { workKeyId } from './work-threads'
+import type { AttentionInterval, TimeWindow } from '../../shared/home/attention-measures'
 
 // What the Insights view says, as functions of the data it is given. Medians and the middle half,
 // never averages: one stuck ticket would otherwise swamp a week.
@@ -114,40 +112,118 @@ export function quantile(sorted: readonly number[], at: number): number {
   return sorted[below] + (sorted[above] - sorted[below]) * (position - below)
 }
 
-export interface SessionStart {
-  link: WorkItemRef | null
-  startedAt: string
-}
-
-/** The earliest start of any session linked to each ticket. */
-function ticketStarts(records: readonly SessionStart[]): Map<string, number> {
-  const starts = new Map<string, number>()
-  for (const record of records) {
-    const at = Date.parse(record.startedAt)
-    if (record.link === null || Number.isNaN(at)) continue
-    const id = workKeyId(record.link)
-    starts.set(id, Math.min(at, starts.get(id) ?? at))
-  }
-  return starts
-}
-
-/** Days from a ticket's first session to the merge of its pull request, for ticket merges in
- * `range`. Null when too few tickets merged to say a median and a middle half. */
-export function startToMerge(
-  records: readonly SessionStart[],
-  facets: readonly ThreadFacet[],
+/** What the ticket views read: the pull requests that closed, and the attention log's intervals. */
+export interface TicketTimeInput {
+  facets: readonly ThreadFacet[]
+  intervals: readonly AttentionInterval[]
   range: TimeWindow
-): DurationSpread | null {
-  const starts = ticketStarts(records)
-  const days = facets.flatMap((facet) => {
-    const closed = facet.closedAt === null ? NaN : Date.parse(facet.closedAt)
-    const start = 'tracker' in facet.workKey ? starts.get(workKeyId(facet.workKey)) : undefined
-    const merged = facet.kind === 'pull-request' && facet.tone === 'good'
-    const inRange = closed >= range.from && closed < range.to
-    return merged && inRange && start !== undefined && closed > start
-      ? [(closed - start) / DAY_MS]
-      : []
-  })
+}
+
+interface TicketMerge {
+  key: string
+  title: string
+  facet: ThreadFacet
+  start: number
+  closed: number
+}
+
+const sameKey = (a: string, b: string): boolean => a.toUpperCase() === b.toUpperCase()
+
+const keyIntervalsOf = (intervals: readonly AttentionInterval[], key: string) =>
+  intervals.filter((i) => i.workKey !== null && sameKey(i.workKey, key))
+
+/** The first moment of work on the ticket: its first attention interval, or its pull request's opening. */
+function startOf(facet: ThreadFacet, keyIntervals: readonly AttentionInterval[]): number {
+  const moments = [...keyIntervals.map((i) => i.start), facet.openedAt ?? '']
+    .map((at) => Date.parse(at))
+    .filter((at) => !Number.isNaN(at))
+  return moments.length === 0 ? NaN : Math.min(...moments)
+}
+
+function ticketMergeOf(facet: ThreadFacet, input: TicketTimeInput): TicketMerge[] {
+  const closed = facet.closedAt === null ? NaN : Date.parse(facet.closedAt)
+  const merged = facet.kind === 'pull-request' && facet.tone === 'good'
+  if (!merged || !('tracker' in facet.workKey)) return []
+  if (!(closed >= input.range.from && closed < input.range.to)) return []
+  const { key } = facet.workKey
+  const start = startOf(facet, keyIntervalsOf(input.intervals, key))
+  return closed > start ? [{ key, title: facet.title ?? key, facet, start, closed }] : []
+}
+
+/** The tickets whose pull request merged in the range, each from its start to its merge. */
+function ticketMerges(input: TicketTimeInput): TicketMerge[] {
+  return input.facets.flatMap((facet) => ticketMergeOf(facet, input))
+}
+
+export type TimeSegment = 'agent' | 'you' | 'review' | 'checks'
+
+const SEGMENT_ORDER: readonly TimeSegment[] = ['agent', 'you', 'review', 'checks']
+const MINUTE_MS = 60_000
+
+export interface TicketTime {
+  key: string
+  title: string
+  totalDays: number
+  /** Minutes per segment; a segment that could not be measured for the ticket is absent. */
+  minutes: Partial<Record<TimeSegment, number>>
+}
+
+export interface TimeBreakdown {
+  tickets: TicketTime[]
+  /** The segments measured for at least one ticket, in legend order. */
+  measured: TimeSegment[]
+}
+
+/** Minutes the intervals in `state` lasted between the ticket's start and merge. */
+function minutesIn(merge: TicketMerge, intervals: readonly AttentionInterval[], state: string) {
+  return intervals
+    .filter((i) => i.state === state)
+    .reduce((total, i) => {
+      const start = Math.max(Date.parse(i.start), merge.start)
+      const end = Math.min(i.end === null ? merge.closed : Date.parse(i.end), merge.closed)
+      return end > start ? total + (end - start) / MINUTE_MS : total
+    }, 0)
+}
+
+/** Waiting for review: from ready until the first review by someone else, else until the merge. */
+function reviewMinutes(merge: TicketMerge): number | undefined {
+  const ready = Date.parse(merge.facet.readyAt ?? '')
+  if (Number.isNaN(ready)) return undefined
+  const reviewed = Date.parse(merge.facet.firstReviewAt ?? '')
+  const until = Number.isNaN(reviewed) ? merge.closed : reviewed
+  return Math.max(0, (until - ready) / MINUTE_MS)
+}
+
+function segmentsOf(merge: TicketMerge, keyIntervals: readonly AttentionInterval[]) {
+  const logged = keyIntervals.length > 0
+  const checks = merge.facet.checksMinutes
+  const parts: Array<[TimeSegment, number | undefined]> = [
+    ['agent', logged ? minutesIn(merge, keyIntervals, 'working') : undefined],
+    ['you', logged ? minutesIn(merge, keyIntervals, 'awaiting-input') : undefined],
+    ['review', reviewMinutes(merge)],
+    ['checks', checks ?? undefined],
+  ]
+  return Object.fromEntries(parts.filter(([, minutes]) => minutes !== undefined))
+}
+
+/** Where each ticket's time went, for the tickets merged in the range, latest merge first. */
+export function timeBreakdown(input: TicketTimeInput): TimeBreakdown {
+  const tickets = ticketMerges(input)
+    .sort((a, b) => b.closed - a.closed)
+    .map((merge) => ({
+      key: merge.key,
+      title: merge.title,
+      totalDays: (merge.closed - merge.start) / DAY_MS,
+      minutes: segmentsOf(merge, keyIntervalsOf(input.intervals, merge.key)),
+    }))
+  const measured = SEGMENT_ORDER.filter((id) => tickets.some((t) => t.minutes[id] !== undefined))
+  return { tickets, measured }
+}
+
+/** Days from a ticket's start to the merge of its pull request, for ticket merges in the range.
+ * Null when too few tickets merged to say a median and a middle half. */
+export function startToMerge(input: TicketTimeInput): DurationSpread | null {
+  const days = ticketMerges(input).map((merge) => (merge.closed - merge.start) / DAY_MS)
   if (days.length < MIN_TICKETS) return null
   const sorted = [...days].sort((a, b) => a - b)
   return {

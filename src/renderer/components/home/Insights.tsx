@@ -2,17 +2,19 @@ import React, { useMemo, useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { Button, SegmentedControl } from '@terminator/extension-ui'
 import { useHomeFeedStore } from '../../stores/home-feed.store'
-import { useSessionRecordsStore } from '../../stores/session-records.store'
 import { useNow } from '../session/useNow'
 import {
   INSIGHTS_WINDOWS,
   oldestReview,
   startToMerge,
+  timeBreakdown,
   windowRange,
+  type TicketTimeInput,
   type InsightsWindow,
 } from '../../home/insights'
 import { FirstPassCard, ShippedCard, StartToMergeCard, WaitCard } from './InsightsCards'
-import { AgentTimeCard, LookingBackCard, ShipSections, TimeBreakdownCard } from './InsightsLower'
+import { AgentTimeCard, LookingBackCard, ShipSections } from './InsightsLower'
+import { TimeBreakdownCard } from './TimeBreakdownCard'
 import { useInsightsData, type InsightsData } from './useInsightsData'
 import './Insights.css'
 
@@ -53,19 +55,20 @@ interface RowProps {
   feed: Feed
 }
 
-/** Ticket start to merge, from the sessions' records and the pull requests that closed. */
-function useStartToMerge({ chosen, feed }: Pick<RowProps, 'chosen' | 'feed'>) {
-  const records = useSessionRecordsStore((s) => s.records)
+/** The pull requests that closed and the log's intervals, over the chosen window, for the ticket cards. */
+function useTicketTimeInput({ chosen, data, feed }: RowProps): TicketTimeInput {
   const now = useNow()
+  const { facets } = feed
+  const { intervals } = data
   return useMemo(
-    () => startToMerge([...records.values()], feed.facets, windowRange(chosen, now)),
-    [records, feed.facets, chosen, now]
+    () => ({ facets, intervals, range: windowRange(chosen, now) }),
+    [facets, intervals, chosen, now]
   )
 }
 
 function QuestionsRow(props: RowProps): JSX.Element {
   const { chosen, data, feed } = props
-  const spread = useStartToMerge(props)
+  const spread = startToMerge(useTicketTimeInput(props))
   return (
     <div className="ins__row ins__row--four">
       <ShippedCard measures={feed.measures} chosen={chosen} />
@@ -76,11 +79,13 @@ function QuestionsRow(props: RowProps): JSX.Element {
   )
 }
 
-function TimeRow({ chosen, data, feed }: RowProps): JSX.Element {
+function TimeRow(props: RowProps): JSX.Element {
+  const { chosen, data, feed } = props
   const { attention, usage } = data
+  const breakdown = timeBreakdown(useTicketTimeInput(props))
   return (
     <div className="ins__row ins__row--two">
-      <TimeBreakdownCard chosen={chosen} />
+      <TimeBreakdownCard chosen={chosen} breakdown={breakdown} />
       <AgentTimeCard {...{ attention, usage, chosen }} measures={feed.measures} />
     </div>
   )

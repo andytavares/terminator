@@ -7,7 +7,12 @@ import { useSessionRecordsStore } from '../../../../src/renderer/stores/session-
 import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
 import { installElectronApi } from '../../../support/electron-api'
 import type { AttentionMeasures } from '../../../../src/shared/home/attention-measures'
-import type { HomeAsk, HomeMeasure, Sourced } from '../../../../src/shared/schemas/home-feed.schema'
+import type {
+  HomeAsk,
+  HomeMeasure,
+  Sourced,
+  ThreadFacet,
+} from '../../../../src/shared/schemas/home-feed.schema'
 
 const DAY = 86_400_000
 const attention: AttentionMeasures = {
@@ -54,6 +59,7 @@ const usage = {
 
 const measuresCall = vi.fn()
 const usageCall = vi.fn()
+const intervalsCall = vi.fn()
 
 function seedFeed(measures: HomeMeasure[]): void {
   useHomeFeedStore.setState({ asks: [], facets: [], focus: [], measures })
@@ -65,7 +71,11 @@ beforeEach(() => {
   measuresCall.mockImplementationOnce(() => Promise.resolve({ data: attention }))
   measuresCall.mockImplementationOnce(() => Promise.resolve({ data: before }))
   usageCall.mockResolvedValue({ data: usage })
-  installElectronApi({ attention: { measures: measuresCall }, agentUsage: { get: usageCall } })
+  intervalsCall.mockResolvedValue({ data: [] })
+  installElectronApi({
+    attention: { measures: measuresCall, intervals: intervalsCall },
+    agentUsage: { get: usageCall },
+  })
   useSessionRecordsStore.setState({ records: new Map() })
   useExtensionRegistry.setState({ insightsSections: new Map() })
   seedFeed([merged, firstPass])
@@ -114,6 +124,40 @@ describe('Insights: agent time', () => {
     })
     render(<Insights />)
     expect(await screen.findByText(/estimate, partial/)).toBeTruthy()
+  })
+})
+
+const mergedFacet = (key: string): Sourced<ThreadFacet> => ({
+  source: 'git-integration',
+  workKey: { tracker: 'linear', key },
+  kind: 'pull-request',
+  stage: 'shipped',
+  whoseMove: 'others',
+  line: '#41 merged',
+  tone: 'good',
+  closedAt: new Date(Date.now() - DAY).toISOString(),
+  openedAt: new Date(Date.now() - 4 * DAY).toISOString(),
+  readyAt: new Date(Date.now() - 3 * DAY).toISOString(),
+  firstReviewAt: new Date(Date.now() - 2 * DAY).toISOString(),
+  checksMinutes: 12,
+  updatedAt: new Date().toISOString(),
+})
+
+describe('Insights: where the time went', () => {
+  it('draws a bar per merged ticket and a legend of the measured segments only', async () => {
+    const facets = ['TAV-1', 'TAV-2', 'TAV-3'].map(mergedFacet)
+    useHomeFeedStore.setState({ asks: [], facets, focus: [], measures: [merged] })
+    render(<Insights />)
+    const time = card('Where did the time go?')
+    expect(await within(time).findAllByRole('img')).toHaveLength(3)
+    expect(within(time).getByRole('img', { name: /TAV-1: 1 d Waiting for review/ })).toBeTruthy()
+    const legend = within(time).getByRole('list', { name: 'Legend' })
+    expect(
+      within(legend)
+        .getAllByRole('listitem')
+        .map((li) => li.textContent)
+    ).toEqual(['Waiting for review', 'Checks running'])
+    expect(within(card('How long from start to merge?')).getByText('3')).toBeTruthy()
   })
 })
 
@@ -193,7 +237,7 @@ describe('Insights: sections from extensions', () => {
   })
 })
 
-const feedAsk = (patch: Partial<Sourced<HomeAsk>>): Sourced<HomeAsk> => ({
+const insightsFeedAsk = (patch: Partial<Sourced<HomeAsk>>): Sourced<HomeAsk> => ({
   id: 'x',
   source: 'git',
   kind: 'review',
@@ -206,7 +250,7 @@ const feedAsk = (patch: Partial<Sourced<HomeAsk>>): Sourced<HomeAsk> => ({
   open: { command: 'x' },
   ...patch,
 })
-const weeklyReview = feedAsk({
+const weeklyReview = insightsFeedAsk({
   id: 'weekly-review',
   source: 'vault',
   kind: 'task',
@@ -214,7 +258,7 @@ const weeklyReview = feedAsk({
   detail: 'Look back',
   actions: [{ id: 'start-review', label: 'Start', primary: true }],
 })
-const oldestReviewAsk = feedAsk({
+const oldestReviewAsk = insightsFeedAsk({
   id: 'review:acme#41',
   title: 'Review requested',
   detail: 'Fluent #41',

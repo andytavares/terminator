@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { HomeFeedSchema } from '../../../src/shared/schemas/home-feed.schema'
+import { HomeFeedSchema, ThreadFacetSchema } from '../../../src/shared/schemas/home-feed.schema'
 import { fullFeed } from '../home/home-feed.fixtures'
 
 describe('HomeFeedSchema', () => {
@@ -35,5 +35,28 @@ describe('HomeFeedSchema', () => {
   it('rejects a feed missing its asks', () => {
     const { asks: _asks, ...feed } = fullFeed()
     expect(HomeFeedSchema.safeParse(feed).success).toBe(false)
+  })
+})
+
+describe('ThreadFacetSchema: a merged pull request', () => {
+  const [open] = fullFeed().facets
+
+  it('accepts the optional timeline fields, with no review and unknown checks as null', () => {
+    const merged = {
+      ...open,
+      openedAt: '2026-10-10T09:00:00Z',
+      readyAt: '2026-10-12T10:00:00Z',
+      firstReviewAt: null,
+      checksMinutes: null,
+    }
+    expect(ThreadFacetSchema.parse(merged)).toMatchObject({
+      firstReviewAt: null,
+      checksMinutes: null,
+    })
+  })
+
+  it('still accepts a facet without them, and rejects a non-numeric checks time', () => {
+    expect(ThreadFacetSchema.safeParse(open).success).toBe(true)
+    expect(ThreadFacetSchema.safeParse({ ...open, checksMinutes: 'long' }).success).toBe(false)
   })
 })

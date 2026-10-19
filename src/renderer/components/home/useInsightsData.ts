@@ -1,5 +1,9 @@
 import { useEffect, useState } from 'react'
-import type { AttentionMeasures } from '../../../shared/home/attention-measures'
+import {
+  ATTENTION_RETENTION_MS,
+  type AttentionInterval,
+  type AttentionMeasures,
+} from '../../../shared/home/attention-measures'
 import type { AgentUsage } from '../../../shared/agents/agent-usage'
 import { rangeBefore, windowRange, type InsightsWindow } from '../../home/insights'
 
@@ -8,9 +12,11 @@ export interface InsightsData {
   /** The same measures over the range just before, for "up from 4". */
   attentionBefore: AttentionMeasures | null
   usage: AgentUsage | null
+  /** The log's intervals back to the retention limit: a ticket merged this week began earlier. */
+  intervals: AttentionInterval[]
 }
 
-const NOTHING: InsightsData = { attention: null, attentionBefore: null, usage: null }
+const NOTHING: InsightsData = { attention: null, attentionBefore: null, usage: null, intervals: [] }
 
 type Range = { from: number; to: number }
 
@@ -21,6 +27,15 @@ function readAttention(range: Range): Promise<AttentionMeasures | null> {
     .measures({ window: range })
     .then((result) => result.data)
     .catch(() => null)
+}
+
+function readIntervals(range: Range): Promise<AttentionInterval[]> {
+  const api = window.electronAPI?.attention
+  if (!api?.intervals) return Promise.resolve([])
+  return api
+    .intervals({ window: { from: range.from - ATTENTION_RETENTION_MS, to: range.to } })
+    .then((result) => result.data)
+    .catch(() => [])
 }
 
 function readUsage(range: Range): Promise<AgentUsage | null> {
@@ -42,8 +57,9 @@ export function useInsightsData(chosen: InsightsWindow): InsightsData {
       readAttention(range),
       readAttention(rangeBefore(range)),
       readUsage(range),
-    ]).then(([attention, attentionBefore, usage]) => {
-      if (current) setData({ attention, attentionBefore, usage })
+      readIntervals(range),
+    ]).then(([attention, attentionBefore, usage, intervals]) => {
+      if (current) setData({ attention, attentionBefore, usage, intervals })
     })
     return () => {
       current = false

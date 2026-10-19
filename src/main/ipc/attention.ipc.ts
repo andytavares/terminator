@@ -1,7 +1,7 @@
 import { defineChannel, type ChannelSpec, validationError } from '@terminator/extension-sdk'
 import { registerInvokeTable } from './invoke-table.js'
 import { listIntervals, recordState } from '../home/attention-log.js'
-import { attentionMeasures } from '../../shared/home/attention-measures.js'
+import { attentionMeasures, intervalsIn } from '../../shared/home/attention-measures.js'
 import {
   MeasuresInputSchema,
   RecordStateInputSchema,
@@ -26,6 +26,12 @@ const attentionChannels: ChannelSpec[] = [
     schema: MeasuresInputSchema,
     invalid: validationError,
     run: ({ window }) => ({ data: attentionMeasures(listIntervals(), window, Date.now()) }),
+  }),
+  defineChannel({
+    channel: 'attention:intervals',
+    schema: MeasuresInputSchema,
+    invalid: validationError,
+    run: ({ window }) => ({ data: intervalsIn(listIntervals(), window) }),
   }),
 ]
 

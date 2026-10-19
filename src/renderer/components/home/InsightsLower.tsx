@@ -13,20 +13,10 @@ import {
   type InsightsWindow,
 } from '../../home/insights'
 import { openAsk, runAskAction } from './desk-actions'
-import { EmptyCard, windowQualifier } from './InsightsCards'
+import { windowQualifier } from './InsightsCards'
 
 // The lower half of Insights: where the time went, how agent time was spent, when the work
 // shipped (an extension's own view), and the things worth looking back at.
-
-export function TimeBreakdownCard({ chosen }: { chosen: InsightsWindow }): JSX.Element {
-  return (
-    <EmptyCard
-      question="Where did the time go?"
-      qualifier={`· tickets merged ${windowQualifier(chosen)}, start to merge`}
-      reason="Not enough merged work yet"
-    />
-  )
-}
 
 interface KpiProps {
   label: string

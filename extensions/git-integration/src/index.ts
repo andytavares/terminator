@@ -204,9 +204,13 @@ function registerGithub(api: ExtensionAPI, registerFn: RegisterFn, roots: Channe
     isBranchExcluded: (branch, repoPath) => api.settings.isBranchExcluded(branch, repoPath),
     ...home.hooks,
   }
-  const { refreshDashboard } = registerGithubHandlers(registerFn, access, options)
+  const { refreshDashboard, refreshMerged } = registerGithubHandlers(registerFn, access, options)
   // Home's asks must not wait for the Reviews view to open; one search set per dashboard interval.
-  disposables.push(home.actions, home.refreshEvery(refreshDashboard))
+  disposables.push(
+    home.actions,
+    home.refreshEvery(refreshDashboard),
+    home.refreshMergedEvery(refreshMerged)
+  )
 }
 
 /** Every channel this extension answers, each with its remote-access rule. */

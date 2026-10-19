@@ -44,6 +44,11 @@ export const ThreadFacetSchema = z.object({
       })
     )
     .optional(),
+  /** What a merged pull request's timeline measured (ISO times; minutes for checks). */
+  openedAt: z.string().optional(),
+  readyAt: z.string().optional(),
+  firstReviewAt: z.string().nullable().optional(),
+  checksMinutes: z.number().nullable().optional(),
   updatedAt: z.string(),
 })
 

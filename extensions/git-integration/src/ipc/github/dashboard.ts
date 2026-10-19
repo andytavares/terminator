@@ -11,6 +11,7 @@ import {
   parseDashboard,
   resolveBranchExclusions,
 } from '../../github/dashboard-search.js'
+import { mergedQuery, parseMerged } from '../../github/merged-search.js'
 import { runGit } from '../../shell/run-git.js'
 import { VALIDATION_ERROR } from '../register.js'
 import { catchError, type AccessibleRepo, type GithubContext } from './context.js'
@@ -208,6 +209,19 @@ export async function runDashboardSearch(ctx: GithubContext) {
   }
   ctx.options.onDashboard?.(answer)
   return answer
+}
+
+/** Searches my pull requests merged lately and hands them to Home; apart from the dashboard search. */
+export async function runMergedSearch(ctx: GithubContext) {
+  const query = mergedQuery(Date.now())
+  const raw = await ctx.api(ctx.noCheckoutCwd, {
+    path: 'graphql',
+    fields: { query },
+    timeoutMs: 60_000,
+  })
+  const merged = parseMerged(JSON.parse(raw), await localRootsByRepo(ctx.options.listProjectRoots))
+  ctx.options.onMerged?.(merged)
+  return merged
 }
 
 export function dashboardChannels(ctx: GithubContext): ChannelSpec[] {

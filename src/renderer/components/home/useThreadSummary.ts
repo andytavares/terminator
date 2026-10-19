@@ -15,6 +15,7 @@ export function summaryInputOf(thread: WorkThread): ThreadSummaryInput {
     title: thread.title,
     ...(thread.ticketKey ? { ticketKey: thread.ticketKey } : {}),
     sessions: thread.sessions.map((s) => ({
+      sessionId: s.sessionId,
       state: s.state,
       lastAssistantTexts: s.latestLine ? [s.latestLine] : [],
       firstUserPrompt: s.description,

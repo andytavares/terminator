@@ -14,6 +14,8 @@ export const ThreadSummaryInputSchema = z.object({
   ticketKey: z.string().max(100).optional(),
   sessions: z.array(
     z.object({
+      /** Lets main read the session's transcript for what the renderer cannot. */
+      sessionId: z.string().max(200).optional(),
       state: z.string().max(100),
       lastAssistantTexts: z.array(PlainText).max(5),
       firstUserPrompt: PlainText.nullable(),

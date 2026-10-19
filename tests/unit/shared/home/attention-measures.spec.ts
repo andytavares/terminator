@@ -3,6 +3,7 @@ import {
   agentHours,
   attentionMeasures,
   finishedWithoutHelpRatio,
+  intervalsIn,
   longestWait,
   pruneIntervals,
   runningAtOnceMedian,
@@ -160,5 +161,15 @@ describe('pruneIntervals', () => {
       NOW
     )
     expect(kept.map((i) => i.sessionId)).toEqual(['recent', 'open'])
+  })
+})
+
+describe('intervalsIn', () => {
+  it('keeps the whole intervals that overlap the window and drops the rest', () => {
+    const before = attentionInterval('a', 'working', [at(6), at(7), 'idle'])
+    const across = attentionInterval('b', 'working', [at(8), at(10), 'idle'])
+    const open = attentionInterval('c', 'awaiting-input', [at(17), null, null])
+    const window = { from: new Date(2026, 9, 18, 9).getTime(), to: NOW }
+    expect(intervalsIn([before, across, open], window)).toEqual([across, open])
   })
 })

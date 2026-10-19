@@ -1,5 +1,6 @@
 import type { HomeAsk, HomeFeed, HomeMeasure, ThreadFacet } from '@terminator/extension-sdk'
 import type { DashboardPR } from '../schemas/pr-review.schema.js'
+import type { MergedPullRequest } from '../github/merged-search.js'
 import type { ContributionCalendar } from '../review/contribution-calendar.js'
 import { workKeyOf, type TicketIndex } from './work-key.js'
 import type { DashboardCheck } from '../schemas/pr-review.schema.js'
@@ -163,6 +164,38 @@ export function buildFacets(
     .flatMap((pr) => facetOf(pr, { tickets, updatedAt }))
 }
 
+function mergedFacetOf(pr: MergedPullRequest, { tickets, updatedAt }: FacetSource): ThreadFacet[] {
+  const workKey = workKeyOf(pr, tickets)
+  if (!workKey) return []
+  return [
+    {
+      workKey,
+      kind: 'pull-request',
+      stage: 'shipped',
+      whoseMove: 'others',
+      tone: 'good',
+      line: `#${pr.number} merged`,
+      title: pr.title,
+      url: pr.url,
+      closedAt: pr.mergedAt,
+      openedAt: pr.openedAt,
+      readyAt: pr.readyAt,
+      firstReviewAt: pr.firstReviewAt,
+      checksMinutes: pr.checksMinutes,
+      updatedAt,
+    },
+  ]
+}
+
+/** One closed facet per merged pull request of mine that can be joined to its work. */
+export function buildMergedFacets(
+  merged: MergedPullRequest[],
+  tickets: TicketIndex,
+  updatedAt: string
+): ThreadFacet[] {
+  return merged.flatMap((pr) => mergedFacetOf(pr, { tickets, updatedAt }))
+}
+
 /** Merged pull requests per week, oldest first, over the last `weeks` weeks ending `skip` weeks ago. */
 function mergedPerWeek(calendar: ContributionCalendar, weeks: number, skip: number): number[] {
   const end = calendar.weeks.length - skip
@@ -213,14 +246,18 @@ export interface FeedInputs {
   prs: DashboardPR[]
   tickets: TicketIndex
   calendar: ContributionCalendar | null
+  merged: MergedPullRequest[]
   updatedAt: string
 }
 
 export function buildGitHomeFeed(inputs: FeedInputs): HomeFeed {
-  const { prs, tickets, calendar, updatedAt } = inputs
+  const { prs, tickets, calendar, merged, updatedAt } = inputs
   return {
     asks: buildAsks(prs, tickets),
-    facets: buildFacets(prs, tickets, updatedAt),
+    facets: [
+      ...buildFacets(prs, tickets, updatedAt),
+      ...buildMergedFacets(merged, tickets, updatedAt),
+    ],
     measures: buildMeasures(calendar),
   }
 }

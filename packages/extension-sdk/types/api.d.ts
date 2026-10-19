@@ -338,6 +338,11 @@ export interface ThreadFacet {
   url?: string
   closedAt: string | null
   checks?: { name: string; state: 'passed' | 'failed' | 'running'; detail?: string }[]
+  /** What a merged pull request's timeline measured (ISO times; minutes for checks). */
+  openedAt?: string
+  readyAt?: string
+  firstReviewAt?: string | null
+  checksMinutes?: number | null
   updatedAt: string
 }
 

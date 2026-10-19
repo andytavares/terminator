@@ -9,10 +9,15 @@ import {
   quantile,
   rangeBefore,
   startToMerge,
+  timeBreakdown,
   windowRange,
-  type SessionStart,
 } from '../../../../src/renderer/home/insights'
-import type { HomeAsk, HomeMeasure } from '../../../../src/shared/schemas/home-feed.schema'
+import type { AttentionState } from '../../../../src/shared/home/attention-measures'
+import type {
+  HomeAsk,
+  HomeMeasure,
+  ThreadFacet,
+} from '../../../../src/shared/schemas/home-feed.schema'
 import { facet } from './fixtures'
 
 const NOW = Date.parse('2026-10-18T12:00:00.000Z')
@@ -93,26 +98,34 @@ describe('quantile', () => {
 
 const range = { from: NOW - 7 * DAY, to: NOW }
 const link = (key: string) => ({ tracker: 'linear' as const, key })
-const startedDaysAgo = (key: string, days: number): SessionStart => ({
-  link: link(key),
-  startedAt: new Date(NOW - days * DAY).toISOString(),
-})
-const mergedTicket = (key: string, daysAgo: number) =>
+const isoDaysAgo = (days: number): string => new Date(NOW - days * DAY).toISOString()
+const mergedTicket = (key: string, daysAgo: number, overrides: Partial<ThreadFacet> = {}) =>
   facet({
     workKey: link(key),
     tone: 'good',
     stage: 'shipped',
-    closedAt: new Date(NOW - daysAgo * DAY).toISOString(),
+    closedAt: isoDaysAgo(daysAgo),
+    ...overrides,
   })
+const loggedInterval = (key: string, state: AttentionState, span: [number, number]) => ({
+  sessionId: `${key}-${state}-${span[0]}`,
+  projectId: null,
+  branch: null,
+  workKey: key,
+  state,
+  start: isoDaysAgo(span[0]),
+  end: isoDaysAgo(span[1]),
+  next: null,
+})
 
 describe('startToMerge', () => {
-  it('takes the median and the middle half from first session to merge, per ticket', () => {
-    const records = [
-      startedDaysAgo('TAV-1', 6),
-      startedDaysAgo('TAV-1', 9),
-      startedDaysAgo('TAV-2', 5),
-      startedDaysAgo('TAV-3', 4),
-      startedDaysAgo('TAV-4', 3),
+  it('takes the median and the middle half from first work to merge, per ticket', () => {
+    const intervals = [
+      loggedInterval('TAV-1', 'working', [6, 5.5]),
+      loggedInterval('TAV-1', 'working', [9, 8]),
+      loggedInterval('TAV-2', 'working', [5, 4]),
+      loggedInterval('TAV-3', 'working', [4, 3]),
+      loggedInterval('TAV-4', 'working', [3, 2]),
     ]
     const facets = [
       mergedTicket('TAV-1', 5),
@@ -120,27 +133,82 @@ describe('startToMerge', () => {
       mergedTicket('TAV-3', 1),
       mergedTicket('TAV-4', 1),
     ]
-    const spread = startToMerge(records, facets, range)
-    // TAV-1 counts from its earliest session: 9 - 5 = 4 days; the others 2, 3, 2.
+    const spread = startToMerge({ facets, intervals, range })
+    // TAV-1 counts from its earliest interval: 9 - 5 = 4 days; the others 2, 3, 2.
     expect(spread).toEqual({ medianDays: 2.5, lowDays: 2, highDays: 3.25, count: 4 })
+  })
+
+  it('starts at the pull request opening when that is earlier than any session', () => {
+    const facets = ['TAV-1', 'TAV-2', 'TAV-3'].map((key) =>
+      mergedTicket(key, 1, { openedAt: isoDaysAgo(5) })
+    )
+    expect(startToMerge({ facets, intervals: [], range })).toMatchObject({ medianDays: 4 })
   })
 })
 
 describe('startToMerge: too little to say', () => {
+  const openedAt = isoDaysAgo(6)
+
   it('has nothing to say below three tickets, or for merges outside the range', () => {
-    const records = [startedDaysAgo('TAV-1', 6), startedDaysAgo('TAV-2', 6)]
-    expect(
-      startToMerge(records, [mergedTicket('TAV-1', 2), mergedTicket('TAV-2', 2)], range)
-    ).toBeNull()
-    const old = [mergedTicket('TAV-1', 20), mergedTicket('TAV-2', 20), mergedTicket('TAV-3', 20)]
-    expect(startToMerge(records, old, range)).toBeNull()
+    const two = [mergedTicket('TAV-1', 2, { openedAt }), mergedTicket('TAV-2', 2, { openedAt })]
+    expect(startToMerge({ facets: two, intervals: [], range })).toBeNull()
+    const old = ['TAV-1', 'TAV-2', 'TAV-3'].map((key) => mergedTicket(key, 20, { openedAt }))
+    expect(startToMerge({ facets: old, intervals: [], range })).toBeNull()
   })
 
-  it('skips a pull request closed without merging and one with no recorded session', () => {
-    const open = facet({ workKey: link('TAV-1'), closedAt: new Date(NOW - DAY).toISOString() })
-    expect(
-      startToMerge([startedDaysAgo('TAV-1', 6)], [open, mergedTicket('TAV-9', 1)], range)
-    ).toBeNull()
+  it('skips a pull request closed without merging and one with no known start', () => {
+    const unmerged = mergedTicket('TAV-1', 1, { tone: 'neutral', openedAt })
+    const facets = [unmerged, mergedTicket('TAV-9', 1)]
+    expect(startToMerge({ facets, intervals: [], range })).toBeNull()
+  })
+})
+
+const full = mergedTicket('TAV-1', 1, {
+  openedAt: isoDaysAgo(4),
+  readyAt: isoDaysAgo(3),
+  firstReviewAt: isoDaysAgo(2),
+  checksMinutes: 12,
+})
+const fullIntervals = [
+  loggedInterval('TAV-1', 'working', [4, 3.5]),
+  loggedInterval('TAV-1', 'awaiting-input', [3.5, 3.25]),
+  loggedInterval('TAV-1', 'working', [3.25, 3]),
+]
+
+describe('timeBreakdown', () => {
+  it('splits a ticket into agent, you, review and checks, from its start to its merge', () => {
+    const { tickets, measured } = timeBreakdown({ facets: [full], intervals: fullIntervals, range })
+    expect(measured).toEqual(['agent', 'you', 'review', 'checks'])
+    expect(tickets).toEqual([
+      {
+        key: 'TAV-1',
+        title: 'TAV-1',
+        totalDays: 3,
+        minutes: { agent: 12 * 60 + 6 * 60, you: 6 * 60, review: 24 * 60, checks: 12 },
+      },
+    ])
+  })
+
+  it('waits on review until the merge when nobody reviewed', () => {
+    const unreviewed = { ...full, firstReviewAt: null }
+    const { tickets } = timeBreakdown({ facets: [unreviewed], intervals: fullIntervals, range })
+    expect(tickets[0].minutes.review).toBe(2 * 24 * 60)
+  })
+})
+
+describe('timeBreakdown: what cannot be measured', () => {
+  it('without intervals shows only the review and checks segments', () => {
+    const { tickets, measured } = timeBreakdown({ facets: [full], intervals: [], range })
+    expect(measured).toEqual(['review', 'checks'])
+    expect(tickets[0].minutes).toEqual({ review: 24 * 60, checks: 12 })
+  })
+
+  it('leaves out a ticket merged outside the range, and the segments nothing measured', () => {
+    const old = mergedTicket('TAV-2', 20, { openedAt: isoDaysAgo(25), readyAt: isoDaysAgo(24) })
+    const bare = mergedTicket('TAV-3', 1, { openedAt: isoDaysAgo(2) })
+    const result = timeBreakdown({ facets: [old, bare], intervals: [], range })
+    expect(result.tickets.map((t) => t.key)).toEqual(['TAV-3'])
+    expect(result.measured).toEqual([])
   })
 })
 
