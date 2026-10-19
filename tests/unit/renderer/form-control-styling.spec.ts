@@ -269,7 +269,7 @@ describe('no form control may drift back to a native or half-styled widget — d
     //
     // Classes named "checkbox" that are not inputs at all — icon buttons that
     // merely look like one — are exempt, listed so each is a conscious call.
-    const notAnInput = ['.daily-log__task-checkbox']
+    const notAnInput = ['.daily-log__task-checkbox', '.start-work__radio']
     const bad: string[] = []
     for (const file of cssFiles) {
       for (const [selector, body] of rules(readFileSync(file, 'utf8'))) {

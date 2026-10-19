@@ -1,3 +1,5 @@
+import { fact } from './sidebar/fixtures/facts'
+import type { SessionFacts } from '../../../src/renderer/sidebar/session-facts'
 import React, { type ComponentProps } from 'react'
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
@@ -44,11 +46,12 @@ vi.mock('electron-store', async () =>
 // The children are stand-ins: what is under test is the shell that wires them.
 vi.mock('../../../src/renderer/extensions/loader', () => ({}))
 const facts = vi.hoisted(() => ({
-  sessionFacts: [] as Array<{ sessionId: string; workItem: null }>,
+  sessionFacts: [] as Array<Pick<SessionFacts, 'sessionId' | 'workItem'> & Partial<SessionFacts>>,
 }))
 vi.mock('../../../src/renderer/components/session/useSessionFacts', () => ({
   useSessionFacts: () => facts.sessionFacts,
   useIssue: () => null,
+  useIssueTitles: () => new Map(),
 }))
 vi.mock('../../../src/renderer/components/session/SessionLinkDialog', () => ({
   SessionLinkDialog: ({
@@ -949,18 +952,14 @@ describe('App — Home', () => {
 
 describe('App — Home — badges Home with the number of sessions waiting on the operator', () => {
   it('badges Home with the number of sessions waiting on the operator', () => {
-    // State is derived, never read from the store: a bell or a visible choice
-    // makes a session wait on the operator; a closed one never does.
-    const session = (id: string, patch: Partial<TerminalSession>) =>
-      terminalSessionOf({ id, projectId: 'p', ...patch })
-    setupApp({
-      sessions: [
-        session('a', { bellCount: 1 }),
-        session('b', { choicePrompt: { question: 'Proceed?', options: [] } }),
-        session('c', { busy: true }),
-        session('d', { bellCount: 2, status: 'closed' }),
-      ],
-    })
+    // The badge counts every ask on the Desk: here two sessions wait, one works, one is closed.
+    setupApp({})
+    facts.sessionFacts = [
+      fact({ sessionId: 'a', state: 'awaiting-input', latestLine: 'Ring?' }),
+      fact({ sessionId: 'b', state: 'awaiting-input', latestLine: 'Proceed?' }),
+      fact({ sessionId: 'c', state: 'working' }),
+      fact({ sessionId: 'd', state: 'exited', isClosed: true }),
+    ]
     render(<App />)
     expect(registry().globalTabs.get('core.home')).toMatchObject({
       badge: 2,

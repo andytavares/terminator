@@ -167,8 +167,8 @@ describe("a remote-accessible channel's repoRoot — outside the workspace", () 
       error: 'VALIDATION_ERROR',
     })
     expect(exec).not.toHaveBeenCalled()
-    // Activation starts Home's own dashboard refresh, which asks gh who the viewer is.
-    const calls = githubApi.mock.calls as unknown as Array<[unknown, { path: string }]>
-    expect(calls.filter(([, request]) => request.path !== 'user')).toEqual([])
+    // Activation starts Home's own refreshes; they run in the extension's storage, never `outside`.
+    const calls = githubApi.mock.calls as unknown as Array<[{ cwd?: string }, unknown]>
+    expect(calls.filter(([target]) => target.cwd?.startsWith(outside))).toEqual([])
   })
 })
