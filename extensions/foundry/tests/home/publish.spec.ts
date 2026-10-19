@@ -1,3 +1,4 @@
+import { HOME_MEASURES } from '@terminator/extension-sdk'
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest'
 
 import { makeTempDir } from '../../../../tests/support/temp-dir'
@@ -71,7 +72,7 @@ describe('publishing to Home when a record changes', () => {
     const feed = lastFeed()
     expect(feed.asks).toMatchObject([{ id: `gate:${gateId}`, title: 'Foundry needs a decision' }])
     expect(feed.facets).toMatchObject([{ stage: 'building', whoseMove: 'you' }])
-    expect(feed.measures.map((m) => m.id)).toContain('foundry-shipped')
+    expect(feed.measures.map((m) => m.id)).toContain(HOME_MEASURES.ordersShipped)
   })
 
   it('publishes once for a burst of changes', async () => {

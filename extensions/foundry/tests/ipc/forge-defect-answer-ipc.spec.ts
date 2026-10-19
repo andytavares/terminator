@@ -20,6 +20,7 @@ import { builderUnit, testCriterion } from '../helpers/order-parts.js'
 import { writeBaseline } from '../../src/line/baseline.js'
 import { provenBaseline } from '../helpers/environment.js'
 import { createOrderStore } from '../../src/order/store.js'
+import { gateStoreAt, orderStoreAt } from '../../src/state/live-index.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import type { Gate } from '../../src/gates/rules.js'
@@ -43,8 +44,9 @@ function order(over: Partial<WorkOrder> = {}): WorkOrder {
   return { ...base, status: 'draft', recipe: 'direct', ...over }
 }
 
-function saveGate(gate: Gate): void {
-  fs.writeFileSync(path.join(dataDir, 'orders', 'WO-1', 'gates.json'), JSON.stringify([gate]))
+/** Through the index, which the Home publisher may already have read for this location. */
+function saveGate(gate: Gate): Promise<void> {
+  return gateStoreAt(dataDir).save(gate)
 }
 
 function forgeDefectGate(): Gate {
@@ -182,7 +184,7 @@ function architectAmends(): void {
 }
 async function seed(released: boolean): Promise<void> {
   dataDir = makeTempDir('fdry-amended-')
-  const store = createOrderStore(dataDir)
+  const store = orderStoreAt(dataDir)
   await store.save(cleanOrder())
   if (released) {
     await writeBaseline(dataDir, 'WO-1', provenBaseline())
@@ -196,16 +198,16 @@ async function seed(released: boolean): Promise<void> {
       evidence: [],
     })
   }
-  saveGate(forgeDefectGate())
+  await saveGate(forgeDefectGate())
   architectAmends()
 }
 
 function startingTheArchitectTests() {
   it('starts the architect on every open blocking finding, rather than resuming, when the order is not running', async () => {
     dataDir = makeTempDir('fdry-forge-defect-')
-    const store = createOrderStore(dataDir)
+    const store = orderStoreAt(dataDir)
     await store.save(order({ redTeam: [regression('RT-2', 'drops canceled tickets')] }))
-    saveGate(forgeDefectGate())
+    await saveGate(forgeDefectGate())
 
     const r = (await host.call('foundry:inbox.decide', {
       gateId: 'WO-1-forge-defect',
@@ -223,12 +225,12 @@ function startingTheArchitectTests() {
 function resumeFailuresTests() {
   it('records a resume failure as gate.action_failed, rather than a silent no-op', async () => {
     dataDir = makeTempDir('fdry-forge-defect-resume-')
-    const store = createOrderStore(dataDir)
+    const store = orderStoreAt(dataDir)
     // No red-team findings: `fixMessage` is null, and the gate's own rule name
     // is what the architect turn (or, on a rule this test does not special-
     // case, the resume failure) has to name instead.
     await store.save(order({ status: 'draft' }))
-    saveGate({
+    await saveGate({
       ...forgeDefectGate(),
       id: 'WO-1-unit-boundary',
       rule: 'unit.boundary',

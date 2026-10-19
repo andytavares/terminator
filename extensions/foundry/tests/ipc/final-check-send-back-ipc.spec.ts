@@ -16,7 +16,7 @@ import { fakeHost, type FoundryHost } from '../helpers/foundry-host.js'
 import { activateFoundry } from '../helpers/foundry-activation.js'
 import { builderUnit } from '../helpers/order-parts.js'
 import { agentNode } from '../helpers/run-nodes.js'
-import { createOrderStore } from '../../src/order/store.js'
+import { orderStoreAt } from '../../src/state/live-index.js'
 import { draftOrder } from '../../src/order/draft.js'
 import { raiseGate } from '../../src/gates/rules.js'
 import type { Gate } from '../../src/gates/rules.js'
@@ -75,7 +75,7 @@ async function seedFailedFinalCheck(gates: readonly Gate[]): Promise<void> {
     repoPaths: ['/repos/a'],
     now: AT,
   })
-  await createOrderStore(dataDir).save({
+  await orderStoreAt(dataDir).save({
     ...base,
     status: 'running',
     recipe: 'direct',

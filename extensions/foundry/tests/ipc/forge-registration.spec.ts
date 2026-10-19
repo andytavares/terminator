@@ -11,6 +11,7 @@ import { fakeHost, seededRepository, temporaryDirectory } from '../helpers/found
 import { activateFoundry, deactivate } from '../helpers/foundry-activation.js'
 import type { FoundryHost } from '../helpers/foundry-host.js'
 import { createOrderStore } from '../../src/order/store.js'
+import { orderStoreAt } from '../../src/state/live-index.js'
 import { draftOrder } from '../../src/order/draft.js'
 import { orderDir } from '../../src/data-root.js'
 import { priorArtInRecords } from '../../src/ipc/forge-registration.js'
@@ -131,7 +132,7 @@ function readingTheIssueTests() {
 
 function capabilitiesAndUnknownTrackersTests() {
   it('says up front when its tracker cannot move the issue, and records it', async () => {
-    await createOrderStore(dataDir).save(
+    await orderStoreAt(dataDir).save(
       draftOrder({
         id: 'WO-1',
         title: 'Make text red',
@@ -217,7 +218,7 @@ function forgeRegistrationDeletingTests() {
       repoPaths: [repo],
       now: '2026-10-12T10:00:00.000Z',
     })
-    await createOrderStore(dataDir).save(order)
+    await orderStoreAt(dataDir).save(order)
     theRunner.start.mockImplementation((async (input: {
       phase: string
       onRegistered: (run: { sessionId: string; transcriptFrom: number }) => void

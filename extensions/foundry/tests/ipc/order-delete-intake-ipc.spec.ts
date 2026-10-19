@@ -15,7 +15,7 @@ import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest'
 import { makeTempDir } from '../../../../tests/support/temp-dir'
 import { fakeHost, type FoundryHost } from '../helpers/foundry-host.js'
 import { activateFoundry } from '../helpers/foundry-activation.js'
-import { createOrderStore } from '../../src/order/store.js'
+import { orderStoreAt } from '../../src/state/live-index.js'
 import { draftOrder } from '../../src/order/draft.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import { theRunner } from '../helpers/supervision-mocks.js'
@@ -62,7 +62,7 @@ beforeEach(() => {
 describe('deleting an order while its scout is still reading', () => {
   it('starts nothing more for it once the scout ends, and leaves nothing on disk', async () => {
     dataDir = makeTempDir('fdry-delete-intake-')
-    await createOrderStore(dataDir).save(order())
+    await orderStoreAt(dataDir).save(order())
 
     // The architect starts at seed, beside the scout rather than after it.
     await host.call('foundry:order.converge', { id: 'WO-1' })

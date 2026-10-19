@@ -38,28 +38,65 @@ export function startFoundryHomePublisher(
   context: ActivationContext,
   deps: HomePublisherDeps
 ): HomePublisher {
-  const { api } = context
+  disposables.push(context.api.home.onAction(homeActionHandlerOf(context.api, deps)))
+  return singleFlightPublisher(context, deps.standingSources)
+}
+
+interface Flight {
+  reading: boolean
+  changedWhileReading: boolean
+  disposed: boolean
+  /** The root of the latest change: a read of an older one could index a location early. */
+  root: string
+}
+
+// One read at a time: a change during a read earns one more read after it, so the
+// feed published last is always the newest, and nothing is published once disposed.
+function singleFlightPublisher(
+  { api, dataRoot }: ActivationContext,
+  sources: LiveStandingSources
+): HomePublisher {
   let timer: ReturnType<typeof setTimeout> | null = null
-  const publishFoundryFeedNow = async (root: string): Promise<void> => {
-    timer = null
-    try {
-      api.home.publish(await readFeed(root, deps.standingSources))
-    } catch (error) {
-      api.log.error('Home could not be told what Foundry is doing', error)
-    }
+  const flight: Flight = {
+    reading: false,
+    changedWhileReading: false,
+    disposed: false,
+    root: dataRoot(),
   }
-  disposables.push(api.home.onAction(homeActionHandlerOf(api, deps)))
   return {
     scheduleFoundryPublish() {
-      // The root is read now, not when the timer fires: by then the records location
-      // may have moved on, and a read of a root nothing changed in would index it early.
-      const root = context.dataRoot()
-      timer ??= setTimeout(() => void publishFoundryFeedNow(root), DEBOUNCE_MS)
+      flight.root = dataRoot()
+      if (flight.reading) flight.changedWhileReading = true
+      else
+        timer ??= setTimeout(() => {
+          timer = null
+          void publishUntilCaughtUp(api, sources, flight)
+        }, DEBOUNCE_MS)
     },
     dispose() {
+      flight.disposed = true
       if (timer !== null) clearTimeout(timer)
       timer = null
     },
+  }
+}
+
+async function publishUntilCaughtUp(
+  api: ExtensionAPI,
+  sources: LiveStandingSources,
+  flight: Flight
+): Promise<void> {
+  flight.reading = true
+  try {
+    do {
+      flight.changedWhileReading = false
+      const feed = await readFeed(flight.root, sources)
+      if (!flight.disposed) api.home.publish(feed)
+    } while (flight.changedWhileReading && !flight.disposed)
+  } catch (error) {
+    api.log.error('Home could not be told what Foundry is doing', error)
+  } finally {
+    flight.reading = false
   }
 }
 
