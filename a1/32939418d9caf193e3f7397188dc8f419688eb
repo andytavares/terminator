@@ -1,0 +1,31 @@
+.husky/pre-push
+  s_d918463020569b::t_1ae3633e4fdb19 1
+scripts/ci-e2e-local.mjs
+  s_d918463020569b::t_1ae3633e4fdb19 3
+scripts/ci-local.mjs
+  s_d918463020569b::t_1ae3633e4fdb19 44,53
+  s_d918463020569b::t_827bdf0db15a6d 1-43,45-52,54-58
+docs/CONTRIBUTING.md
+  s_d918463020569b::t_724832af35da37 60-68
+tests/unit/scripts/ci-local.spec.ts
+  s_d918463020569b::t_222cbe9932894d 1-30,37-44
+  s_d918463020569b::t_4fb7b0e017d110 31-36
+package.json
+  s_d918463020569b::t_1ae3633e4fdb19 29-30
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a132939418d9caf193e3f7397188dc8f419688eb",
+  "prompts": {},
+  "sessions": {
+    "s_d918463020569b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d87208e1-2bcc-4a55-9ad3-bf8512e6e948",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
