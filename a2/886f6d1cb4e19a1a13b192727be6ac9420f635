@@ -1,0 +1,35 @@
+tests/unit/renderer/components/Insights.spec.tsx
+  s_3ced19ecaa16dd::t_e7d226e56516ee 45-46,67
+  s_3ced19ecaa16dd::t_27dcfedddc8c6c 35-36
+  s_3ced19ecaa16dd::t_f08f9dc5d214b0 4-5,72,181,185,189,238
+  s_3ced19ecaa16dd::t_c5a5da95ae1a7d 186-188,212-221,224
+tests/unit/renderer/home/core-asks.spec.ts
+  s_3ced19ecaa16dd::t_018d99c036f211 28-29
+src/renderer/components/home/insights-window.ts
+  s_3ced19ecaa16dd::t_018d99c036f211 1-13
+src/renderer/components/home/InsightsCards.tsx
+  s_3ced19ecaa16dd::t_018d99c036f211 142-143,145-146
+src/renderer/components/home/DeskHeader.tsx
+  s_3ced19ecaa16dd::t_b78d8d80a6be60 24-39,58
+  s_3ced19ecaa16dd::t_018d99c036f211 7
+src/renderer/home/core-asks.ts
+  s_3ced19ecaa16dd::t_018d99c036f211 20,26
+src/renderer/components/home/Insights.tsx
+  s_3ced19ecaa16dd::t_018d99c036f211 1,19,22-25,110
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a2886f6d1cb4e19a1a13b192727be6ac9420f635",
+  "prompts": {},
+  "sessions": {
+    "s_3ced19ecaa16dd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "958bebf4-85fd-422a-9a09-b64994561aeb",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
