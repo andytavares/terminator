@@ -1,0 +1,223 @@
+src/renderer/components/home/useSessionUsage.ts
+  s_3ced19ecaa16dd::t_0f77cfaf5f4210 1-34
+src/renderer/components/home/useThreadSummary.ts
+  s_3ced19ecaa16dd::t_0f77cfaf5f4210 1-35,41-50,53,59-60,62,66-67,71-73,75,80
+  s_3ced19ecaa16dd::t_fe3ce7bd04e212 51-52,58,61,63-65,68-70,74,76-79
+  s_3ced19ecaa16dd::t_1c1b4cf235cbe0 36-40
+  s_3ced19ecaa16dd::t_128c0f10466d99 54-57
+src/renderer/components/home/useWorkThreads.ts
+  s_3ced19ecaa16dd::t_554592883c81ed 1-102
+src/renderer/components/home/TodayRail.tsx
+  s_3ced19ecaa16dd::t_d6cb943b948d74 2,12,96,98
+  s_3ced19ecaa16dd::t_73b0193cd52adf 1,3-11,13-95,97,99-121
+src/renderer/components/home/HomeScreen.tsx
+  s_3ced19ecaa16dd::t_1f073141cc1a81 40,94-98,103-106
+  s_3ced19ecaa16dd::t_cb6556742c01e2 18,27
+  s_3ced19ecaa16dd::t_5493690cc2f847 2,5-14,23,25,29-33,35,38-39,45,50-58,64,66,69-70,73-74,76,78-85,108
+  s_3ced19ecaa16dd::t_44339287804a8d 1,3-4,28,62,65,71-72,77,90-93,99,107
+  s_3ced19ecaa16dd::t_37000a1d287ae2 46-49
+  s_3ced19ecaa16dd::t_77760885d8efcc 41
+src/renderer/components/AppShellParts.tsx
+  s_3ced19ecaa16dd::t_7e9d4ef6413310 1,3,9,14,16-21
+src/renderer/components/home/InFlight.css
+  s_3ced19ecaa16dd::t_4fe0161bff417e 1-156
+src/renderer/components/home/SummaryLine.tsx
+  s_3ced19ecaa16dd::t_bece88412e3804 8,16,26,56-58,67
+  s_3ced19ecaa16dd::t_5ccaa2e1427046 1-2,4-7,9-15,17-25,27-55,59-66,68-87,93-105
+  s_3ced19ecaa16dd::t_071b1247b8b091 3
+  s_3ced19ecaa16dd::t_37000a1d287ae2 88-92
+src/renderer/components/home/DeskSearch.css
+  s_3ced19ecaa16dd::t_44339287804a8d 1-36
+src/renderer/components/home/parked-threads.ts
+  s_3ced19ecaa16dd::t_13245b7141f905 13,22
+  s_3ced19ecaa16dd::t_229e372fd27bbc 1-12,14-19,23
+  s_3ced19ecaa16dd::t_c719b8bca4ac1e 20-21
+src/renderer/components/home/HomeScreen.css
+  s_3ced19ecaa16dd::t_5493690cc2f847 1,3-11,14-17,20-23,25-27,29-34,36,38-39,41-42,44-50,53-55,57-58,60-63,65-68,70-75,77,79-80,82-83,86-92,94-103,105-107,109-112,114-115,117-118,120
+src/renderer/components/home/AnswerInPlace.tsx
+  s_3ced19ecaa16dd::t_37c31a65c0bb85 25,27,29-61
+  s_3ced19ecaa16dd::t_13245b7141f905 26
+  s_3ced19ecaa16dd::t_491f830a28e22e 1-24,28,62-84
+src/renderer/components/home/desk-filter.ts
+  s_3ced19ecaa16dd::t_bece88412e3804 1-33
+src/renderer/components/home/YourMove.css
+  s_3ced19ecaa16dd::t_5493690cc2f847 1-223
+src/renderer/components/home/YourMove.tsx
+  s_3ced19ecaa16dd::t_37c31a65c0bb85 118,145-163
+  s_3ced19ecaa16dd::t_37000a1d287ae2 68-69
+  s_3ced19ecaa16dd::t_491f830a28e22e 1-67,70-117,120-123,136-137,143,164-168,170-190
+  s_3ced19ecaa16dd::t_13245b7141f905 119,169
+  s_3ced19ecaa16dd::t_6df0a6759331d9 124-135,138-142,144
+src/renderer/components/home/DeskSearch.tsx
+  s_3ced19ecaa16dd::t_bece88412e3804 1-10,12-36,40,46-65,67-71,73-91
+  s_3ced19ecaa16dd::t_44339287804a8d 11
+  s_3ced19ecaa16dd::t_13245b7141f905 38,66,72
+  s_3ced19ecaa16dd::t_42d4d0a10d08d5 37,39,41-45
+src/renderer/components/home/QuietDesk.tsx
+  s_3ced19ecaa16dd::t_5ccaa2e1427046 2,23
+  s_3ced19ecaa16dd::t_491f830a28e22e 1,3-8,14-22,24-28
+  s_3ced19ecaa16dd::t_37000a1d287ae2 9-13
+src/renderer/components/home/DeskHeader.tsx
+  s_3ced19ecaa16dd::t_37000a1d287ae2 17
+  s_3ced19ecaa16dd::t_13245b7141f905 16,18
+  s_3ced19ecaa16dd::t_bece88412e3804 2,4,42
+  s_3ced19ecaa16dd::t_5ccaa2e1427046 1,3,5-15,19-20,23-33,41,44-48
+  s_3ced19ecaa16dd::t_37c31a65c0bb85 22,34-40
+  s_3ced19ecaa16dd::t_cba46b4abb63a9 21,43
+src/renderer/components/home/desk-actions.ts
+  s_3ced19ecaa16dd::t_44339287804a8d 5,51-53,78-84
+  s_3ced19ecaa16dd::t_f92aea004d7ab0 1-4,6-50,54-77,85-87
+tests/unit/renderer/components/HomeScreen.spec.tsx
+  s_3ced19ecaa16dd::t_d31b7d6d6c7971 173
+  s_3ced19ecaa16dd::t_1f073141cc1a81 10-14,25-26,49,98-99,254,378,388,394-396,399-400,402,404,408-410,419-421,423-432,434,436-437,439,441-442,445,447-450
+  s_3ced19ecaa16dd::t_3277ca38e8d515 5,58-69,72-75,120,164,168-169,183,194-195,200,207,212,256-258,272-273,275,277,281,284,296,329-330,341,345,351,359,366,397-398,403
+  s_3ced19ecaa16dd::t_06b91059011d1e 380-387,389-390,393,411-418,438
+  s_3ced19ecaa16dd::t_128c0f10466d99 23,51-53,97,112,240-241,244-247,250-253,259,302-317,319-322,327-328,332
+  s_3ced19ecaa16dd::t_aa9e5e64c3153e 326
+  s_3ced19ecaa16dd::t_37000a1d287ae2 50,111,137,139-142,165-166,193,196,206,208
+  s_3ced19ecaa16dd::t_a4ab27d338bb53 151
+  s_3ced19ecaa16dd::t_29fb3ff347addf 3,6,8,15-16,22,28-31,33-40,43-48,54-55,57,77-89,91,96,100-110,113-115,119,122-123,125-127,130,132-134,146-150,153-160,163,167,174-175,177-178,181-182,185-186,190-192,199,201-202,205,210-211,213,217-226,229-230,232-236,263-265,274,276,280,283,287,289-290,294-295,298-301,335,337,340,343-344,349-350,353-358,363-365,367-376
+  s_3ced19ecaa16dd::t_c719b8bca4ac1e 152,266-269
+  s_3ced19ecaa16dd::t_0cb63990288e95 198
+tests/unit/renderer/components/DeskModel.spec.tsx
+  s_3ced19ecaa16dd::t_3277ca38e8d515 44,51,111,114,129,151,172
+  s_3ced19ecaa16dd::t_303ed74f1082e9 31-35
+  s_3ced19ecaa16dd::t_128c0f10466d99 164,166
+  s_3ced19ecaa16dd::t_c719b8bca4ac1e 168-171
+  s_3ced19ecaa16dd::t_1c1b4cf235cbe0 1-30,36-43,45-50,52-110,112-113,115-128,130-150,152-163,165,167,173-197
+src/renderer/components/home/InFlightRow.tsx
+  s_3ced19ecaa16dd::t_4fe0161bff417e 1-99
+src/renderer/components/home/useDeskAsks.ts
+  s_3ced19ecaa16dd::t_1f9aab5aa4786e 5,12,31
+  s_3ced19ecaa16dd::t_5ccaa2e1427046 19-20,54,72
+  s_3ced19ecaa16dd::t_16f77e8628001c 1-4,7-10,13-18,21-30,32-34,36-50,52,55-57,59-65,67-71,73
+  s_3ced19ecaa16dd::t_fb85390cc8d269 6,11,35,51,53,58
+  s_3ced19ecaa16dd::t_8fa5e592c17688 66
+src/renderer/components/home/desk-groups.ts
+  s_3ced19ecaa16dd::t_4fe0161bff417e 12-13,22,31
+  s_3ced19ecaa16dd::t_071b1247b8b091 72-79
+  s_3ced19ecaa16dd::t_229e372fd27bbc 1-11,14-21,23-30,32-63,70,80,86,93
+  s_3ced19ecaa16dd::t_6599e8569f32f6 64-69,71,81-85,87-92
+src/renderer/components/home/thread-actions.ts
+  s_3ced19ecaa16dd::t_e5d6b22f69375a 1-11,13-38
+  s_3ced19ecaa16dd::t_2f3220b68def59 12
+src/renderer/components/home/desk-selection.ts
+  s_3ced19ecaa16dd::t_303ed74f1082e9 3-4,41,44-47
+  s_3ced19ecaa16dd::t_554592883c81ed 1-2,5-40,42-43,48
+tests/unit/renderer/components/InFlight.spec.tsx
+  s_3ced19ecaa16dd::t_800415e0b7061f 1-8,10-26,32-35,54-56,59,65,67-74,76-86,88-91,93-95,97-99,101,103-124,128-130,136,138-151,153-159,161,163-182,184,186-189,191-202,204,206-218,220-221,223-234,236,267-268
+  s_3ced19ecaa16dd::t_128c0f10466d99 36-51,57-58,60-64,66,100,102,131-132,134-135,137,160,162,183,185,203,205
+  s_3ced19ecaa16dd::t_3277ca38e8d515 75,87,92,96,133,152,235
+  s_3ced19ecaa16dd::t_f7ba85ef670c28 9,190
+  s_3ced19ecaa16dd::t_c719b8bca4ac1e 125-127
+  s_3ced19ecaa16dd::t_1c1b4cf235cbe0 219,222
+  s_3ced19ecaa16dd::t_303ed74f1082e9 27-31,52-53,238-266
+  s_3ced19ecaa16dd::t_e4863781c438dc 237
+src/renderer/components/home/ThreadDrawer.css
+  s_3ced19ecaa16dd::t_e5d6b22f69375a 1-131
+src/renderer/components/home/use-desk-keys.ts
+  s_3ced19ecaa16dd::t_f92aea004d7ab0 1-2,4-11,13-27,29-39,44-60
+  s_3ced19ecaa16dd::t_fb85390cc8d269 3,12,28
+  s_3ced19ecaa16dd::t_37000a1d287ae2 40-43
+src/renderer/components/home/InFlight.tsx
+  s_3ced19ecaa16dd::t_fe3ce7bd04e212 85-98
+  s_3ced19ecaa16dd::t_303ed74f1082e9 108
+  s_3ced19ecaa16dd::t_4fe0161bff417e 1-9,12-84,99-103,106-107,109-115,117-125
+  s_3ced19ecaa16dd::t_d34278dc1db104 10-11,104-105,116
+tests/unit/renderer/hooks/useKeyboardShortcuts.spec.tsx
+  s_3ced19ecaa16dd::t_1f073141cc1a81 526-532
+  s_3ced19ecaa16dd::t_328821c4df2c7e 524-525,533-534
+tests/unit/renderer/components/TodayRail.spec.tsx
+  s_3ced19ecaa16dd::t_3277ca38e8d515 28
+  s_3ced19ecaa16dd::t_0c7fd9d3d6e97f 35,138-140
+  s_3ced19ecaa16dd::t_a5f389c61e9ec5 1-27,29-34,36-69,73,75,77-84,91-92,94,96-122,124-137,141-149,151,153-164
+  s_3ced19ecaa16dd::t_128c0f10466d99 74,76,123,150,152
+  s_3ced19ecaa16dd::t_f7ba85ef670c28 93,95
+  s_3ced19ecaa16dd::t_1c1b4cf235cbe0 70-72,85-90
+src/renderer/components/home/home-view.ts
+  s_3ced19ecaa16dd::t_229e372fd27bbc 1-8
+tests/unit/renderer/home/use-desk-keys.spec.ts
+  s_3ced19ecaa16dd::t_754bd6cea72102 1-42
+src/renderer/components/home/ThreadDrawerSections.tsx
+  s_3ced19ecaa16dd::t_1c1b4cf235cbe0 71-73
+  s_3ced19ecaa16dd::t_071b1247b8b091 57-59,61-63
+  s_3ced19ecaa16dd::t_e5d6b22f69375a 1-56,60,64-70,74-83,85-181
+  s_3ced19ecaa16dd::t_da2f8a016f47ca 84
+src/renderer/components/home/ThreadDrawer.tsx
+  s_3ced19ecaa16dd::t_d6cb943b948d74 1,100-103,110-112,120
+  s_3ced19ecaa16dd::t_fe3ce7bd04e212 24,27-29,31-34,36-44,47-55,68-69
+  s_3ced19ecaa16dd::t_e5d6b22f69375a 2-10,12-23,25-26,45-46,56-67,70-73,75-99,113-119,121-123,125-136
+  s_3ced19ecaa16dd::t_8e96c13d9b3d18 104-109
+  s_3ced19ecaa16dd::t_13245b7141f905 11,30,35,74,124
+src/renderer/hooks/useKeyboardShortcuts.ts
+  s_3ced19ecaa16dd::t_1f073141cc1a81 137-140
+  s_3ced19ecaa16dd::t_c9385a6be32346 133-134,136
+tests/unit/renderer/home/work-threads.spec.ts
+  s_3ced19ecaa16dd::t_3277ca38e8d515 10
+src/renderer/components/home/TodayRail.css
+  s_3ced19ecaa16dd::t_73b0193cd52adf 1-121
+src/renderer/components/home/useWeekMeasures.ts
+  s_3ced19ecaa16dd::t_aa0c040f110caf 1-51
+src/renderer/components/home/SnoozeMenu.tsx
+  s_3ced19ecaa16dd::t_491f830a28e22e 1-31
+src/renderer/components/home/thread-timeline.ts
+  s_3ced19ecaa16dd::t_0f77cfaf5f4210 1-33,38-71
+  s_3ced19ecaa16dd::t_1c1b4cf235cbe0 34-37
+src/renderer/components/home/use-desk-controller.ts
+  s_3ced19ecaa16dd::t_13245b7141f905 25,30,53,61,171-172,178,185,190
+  s_3ced19ecaa16dd::t_71f2d6db9a27d6 2-24,26-29,32-33,40-46,49-51,74-79,85-86,90-92,104,106-108,113-114,117-148,151-168,173-177,179,182-184,186-189,193
+  s_3ced19ecaa16dd::t_37c31a65c0bb85 47-48,52,54-60,62-73,87-89
+  s_3ced19ecaa16dd::t_6df0a6759331d9 93-103
+  s_3ced19ecaa16dd::t_37000a1d287ae2 1,34-39,80-84,149-150,169-170
+  s_3ced19ecaa16dd::t_47f5790c023f0d 31,105,109-112,115-116,180-181,191-192
+src/renderer/components/home/WeekCard.tsx
+  s_3ced19ecaa16dd::t_fe3ce7bd04e212 85-95,101-102
+  s_3ced19ecaa16dd::t_1c1b4cf235cbe0 35-38,58,76-79
+  s_3ced19ecaa16dd::t_071b1247b8b091 15-16,111
+  s_3ced19ecaa16dd::t_aa0c040f110caf 1-14,17-34,39-57,59-75,80-84,96-100,103-110,112-122
+tests/unit/renderer/home/desk-order.spec.ts
+  s_3ced19ecaa16dd::t_3277ca38e8d515 30,111
+  s_3ced19ecaa16dd::t_a4ab27d338bb53 2
+src/renderer/components/home/StartWork.tsx
+  s_3ced19ecaa16dd::t_c9385a6be32346 44,46
+src/renderer/components/home/start-work.ts
+  s_3ced19ecaa16dd::t_c9385a6be32346 17-19,23-25
+tests/unit/renderer/home/desk-world.ts
+  s_3ced19ecaa16dd::t_3277ca38e8d515 35-40
+  s_3ced19ecaa16dd::t_f7ba85ef670c28 134-135,137-147
+  s_3ced19ecaa16dd::t_800415e0b7061f 1-5,7-34,41-69,72-133
+  s_3ced19ecaa16dd::t_e511011454c24e 70-71
+  s_3ced19ecaa16dd::t_15b6a9d789389f 6,136
+tests/unit/renderer/home/desk-actions.spec.ts
+  s_3ced19ecaa16dd::t_fb48565d4226e9 1
+  s_3ced19ecaa16dd::t_1f073141cc1a81 12,20-21,125-129,131-136,138-144,146-159
+  s_3ced19ecaa16dd::t_754bd6cea72102 2-11,13-19,22-50,55-92,97-114,116-119,121-124,160-162
+  s_3ced19ecaa16dd::t_a46f04202c47ca 51-54,93-96
+  s_3ced19ecaa16dd::t_c719b8bca4ac1e 115,120,130,137,145
+src/renderer/components/home/thread-format.ts
+  s_3ced19ecaa16dd::t_67db69732f02ef 19,25
+  s_3ced19ecaa16dd::t_7584ba714f6d34 20-24
+  s_3ced19ecaa16dd::t_229e372fd27bbc 1,3-18,26-56
+  s_3ced19ecaa16dd::t_071b1247b8b091 2
+src/renderer/components/home/focus-options.ts
+  s_3ced19ecaa16dd::t_73b0193cd52adf 1-33
+src/renderer/components/home/desk-search.ts
+  s_3ced19ecaa16dd::t_1f073141cc1a81 48-50
+  s_3ced19ecaa16dd::t_bece88412e3804 1-47,51-52
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "34dfbd288ac25af55632c6323371b9c39a0868f9",
+  "prompts": {},
+  "sessions": {
+    "s_3ced19ecaa16dd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "958bebf4-85fd-422a-9a09-b64994561aeb",
+        "model": "unknown"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
