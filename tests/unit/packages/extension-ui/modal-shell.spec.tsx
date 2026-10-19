@@ -176,3 +176,16 @@ describe('ModalShell — modal depth', () => {
     expect(getModalDepth(window)).toBe(0)
   })
 })
+
+describe('ModalShell — placement', () => {
+  it('sits in the middle unless asked to sit at the top', () => {
+    const { dialog } = renderShell()
+    expect(dialog.classList.contains('tmui-modal--top')).toBe(false)
+  })
+
+  it('takes the top modifier for a launcher and keeps the caller’s class', () => {
+    const { dialog } = renderShell({ placement: 'top', className: 'start-work-shell' })
+    expect(dialog.classList.contains('tmui-modal--top')).toBe(true)
+    expect(dialog.classList.contains('start-work-shell')).toBe(true)
+  })
+})

@@ -7,7 +7,7 @@
  * that what reaches `api.commands.register` carries the group's category and
  * mnemonic rule, and that the static command actually brings Foundry forward.
  */
-import { freshFoundryStorage } from '../helpers/foundry-host.js'
+import { freshFoundryStorage, idleHome } from '../helpers/foundry-host.js'
 
 const GLOBAL_STORAGE = freshFoundryStorage()
 
@@ -87,6 +87,7 @@ function paletteApi(): ExtensionAPI {
       showSelf: vi.fn(),
     }),
     commands: registeringCommands(),
+    home: idleHome(),
     notifications: partialFake<ExtensionAPI['notifications']>({
       showToast: vi.fn(),
       createNotification: vi.fn(disposableStub),

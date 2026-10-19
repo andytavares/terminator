@@ -1,0 +1,232 @@
+/* The Home "Desk" building blocks: key cap, status dot, chip, stage bar, sparkline, metric card,
+ * drawer and checkbox. Sizes follow the approved Home design; every colour is a --tm-* token. */
+
+.tmui-kbd {
+  display: inline-block;
+  padding: 0 4px;
+  border: 1px solid var(--tm-border-strong);
+  border-radius: var(--tm-radius-xs);
+  background: var(--tm-bg-elevated);
+  color: var(--tm-text-secondary);
+  font-family: var(--tm-font-mono);
+  font-size: 10.5px;
+  line-height: 16px;
+}
+
+.tmui-status-dot {
+  display: inline-block;
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.tmui-status-dot--waiting {
+  background: var(--tm-warning);
+}
+.tmui-status-dot--working {
+  background: var(--tm-accent-text);
+}
+.tmui-status-dot--good {
+  background: var(--tm-success);
+}
+.tmui-status-dot--bad {
+  background: var(--tm-danger);
+}
+.tmui-status-dot--muted {
+  background: var(--tm-idle);
+}
+/* A static ring, not an animation: nothing here moves, so reduced motion needs no override. */
+.tmui-status-dot--pulse {
+  box-shadow: 0 0 0 3px var(--tm-accent-dim);
+}
+
+.tmui-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 10px;
+  background: var(--tm-bg-card);
+  color: var(--tm-text-secondary);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.tmui-chip svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+.tmui-chip--good {
+  color: var(--tm-success);
+}
+.tmui-chip--bad {
+  background: var(--tm-danger-dim);
+  color: var(--tm-danger);
+}
+.tmui-chip--waiting {
+  background: var(--tm-warning-dim);
+  color: var(--tm-warning);
+}
+
+.tmui-stage-bar {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tmui-stage-bar__segment {
+  min-width: 0;
+}
+.tmui-stage-bar__segment i {
+  display: block;
+  background: var(--tm-track);
+}
+.tmui-stage-bar__segment[data-state='done'] i {
+  background: var(--tm-track-done);
+}
+.tmui-stage-bar__segment[data-state='current'] i {
+  background: var(--tm-accent-text);
+}
+.tmui-stage-bar--your-move .tmui-stage-bar__segment[data-state='current'] i {
+  background: var(--tm-warning);
+}
+.tmui-stage-bar__name {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.tmui-stage-bar--compact {
+  display: flex;
+  gap: 3px;
+  align-items: center;
+}
+.tmui-stage-bar--compact .tmui-stage-bar__segment {
+  flex: 1;
+}
+.tmui-stage-bar--compact .tmui-stage-bar__segment i {
+  height: 5px;
+  border-radius: 3px;
+}
+.tmui-stage-caption {
+  margin-top: 4px;
+  color: var(--tm-text-secondary);
+  font-size: 11px;
+}
+
+.tmui-stage-bar--large {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+}
+.tmui-stage-bar--large .tmui-stage-bar__segment {
+  color: var(--tm-text-faint);
+  font-size: 11px;
+}
+.tmui-stage-bar--large .tmui-stage-bar__segment i {
+  height: 4px;
+  margin-bottom: 5px;
+  border-radius: 2px;
+}
+.tmui-stage-bar--large .tmui-stage-bar__segment[data-state='done'] {
+  color: var(--tm-text-secondary);
+}
+.tmui-stage-bar--large .tmui-stage-bar__segment[data-state='current'] {
+  color: var(--tm-text-primary);
+  font-weight: 600;
+}
+.tmui-stage-bar--large .tmui-stage-bar__name {
+  position: static;
+  width: auto;
+  height: auto;
+  clip-path: none;
+}
+
+.tmui-sparkline {
+  display: block;
+  width: 100%;
+}
+
+.tmui-metric-card {
+  padding: 13px 14px;
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius-md);
+  background: var(--tm-bg-surface);
+}
+.tmui-metric-card__question {
+  color: var(--tm-text-secondary);
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.tmui-metric-card__qualifier {
+  color: var(--tm-text-faint);
+  font-weight: 500;
+  text-transform: none;
+}
+.tmui-metric-card__value {
+  margin-top: 4px;
+  font-size: 25px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.tmui-metric-card__unit {
+  color: var(--tm-text-secondary);
+  font-size: 13px;
+  font-weight: 400;
+}
+.tmui-metric-card__sub {
+  margin-top: 2px;
+  color: var(--tm-text-faint);
+  font-size: 11px;
+}
+.tmui-metric-card__chart {
+  margin-top: 8px;
+}
+
+/* Docked to the right edge: the one modal that is not centred (see `.tmui-modal` in
+   extension-ui.css). The backdrop is the modal's own scrim. */
+.tmui-drawer {
+  position: fixed;
+  inset: 0 0 0 auto;
+  width: 600px;
+  max-width: 100%;
+  height: 100%;
+  max-height: 100%;
+  margin: 0;
+  border-left: 1px solid var(--tm-border-strong);
+  background: var(--tm-bg-surface);
+  box-shadow: -20px 0 40px var(--tm-scrim);
+  overflow: hidden;
+}
+.tmui-drawer__panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  outline: none;
+}
+
+.tmui-checkbox {
+  display: grid;
+  place-items: center;
+  flex: none;
+  box-sizing: border-box;
+  width: 14px;
+  height: 14px;
+  margin: 1px 0 0;
+  padding: 0;
+  border: 1.5px solid var(--tm-text-faint);
+  border-radius: var(--tm-radius-xs);
+  background: transparent;
+  color: var(--tm-on-success);
+}
+.tmui-checkbox[aria-checked='true'] {
+  border-color: var(--tm-success);
+  background: var(--tm-success);
+}
+button.tmui-checkbox {
+  cursor: pointer;
+}

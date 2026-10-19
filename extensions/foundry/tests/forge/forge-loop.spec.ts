@@ -9,6 +9,7 @@ import * as path from 'node:path'
 import { activateFoundry, deactivate } from '../helpers/foundry-activation.js'
 import type { FoundryHost } from '../helpers/foundry-host.js'
 import { createOrderStore } from '../../src/order/store.js'
+import { orderStoreAt } from '../../src/state/live-index.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import {
   fakeHost,
@@ -173,7 +174,7 @@ describe('a plan still failing its checks', () => {
 describe('an order the operator holds', () => {
   it('keeps the redraft but starts nothing, and picks the loop up when released', async () => {
     writes = { architect: () => ({ note: 'tightened' }), 'red-team': () => ({ redTeam: [] }) }
-    await createOrderStore(dataDir).save(readyDraft(repo))
+    await orderStoreAt(dataDir).save(readyDraft(repo))
     await host.call('foundry:order.hold', { id: 'WO-1', held: true })
     await convergeFromTheArchitect(readyDraft(repo))
     await untilLedgerHas(dataDir, 'order.redrafted')
@@ -208,7 +209,7 @@ describe('an architect turn that cannot start', () => {
   it('says why when the repository cannot be checked out', async () => {
     const draft = readyDraft(repo)
     const gone = { ...draft.context.repos[0], path: path.join(dataDir, 'gone') }
-    await createOrderStore(dataDir).save({ ...draft, context: { ...draft.context, repos: [gone] } })
+    await orderStoreAt(dataDir).save({ ...draft, context: { ...draft.context, repos: [gone] } })
     const started = (await host.call('foundry:order.converge', { id: 'WO-1', message: 'go' })) as {
       error?: string
     }
@@ -219,7 +220,7 @@ describe('an architect turn that cannot start', () => {
 
   it('says why when the terminal could not be opened', async () => {
     theRunner.start.mockRejectedValue(new Error('no terminal could be opened'))
-    await createOrderStore(dataDir).save(readyDraft(repo))
+    await orderStoreAt(dataDir).save(readyDraft(repo))
     const started = (await host.call('foundry:order.converge', { id: 'WO-1', message: 'go' })) as {
       error?: string
     }
@@ -261,7 +262,7 @@ function askingArchitect(answered: (resolve: (requestId: string) => void) => voi
 describe('a turn that has started', () => {
   it("tells the surfaces about a turn's conversation once, though its start is reported twice", async () => {
     theRunner.start.mockImplementation(askingArchitect(() => undefined) as never)
-    await createOrderStore(dataDir).save(readyDraft(repo))
+    await orderStoreAt(dataDir).save(readyDraft(repo))
     host.broadcast.mockClear()
     await host.call('foundry:order.converge', { id: 'WO-1', message: 'go' })
     await vi.waitFor(async () =>
@@ -284,7 +285,7 @@ describe('a question the architect asks', () => {
         answer = resolve
       }) as never
     )
-    await createOrderStore(dataDir).save(readyDraft(repo))
+    await orderStoreAt(dataDir).save(readyDraft(repo))
     await host.call('foundry:order.converge', { id: 'WO-1', message: 'go' })
 
     const listed = (await host.call('foundry:permissions-list')) as {

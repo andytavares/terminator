@@ -1,0 +1,223 @@
+/* The Your move band, answering in place, and the Quiet desk (approved Home design). */
+
+.move {
+  margin: 14px 18px 0;
+  border: 1px solid color-mix(in srgb, var(--tm-warning) 28%, transparent);
+  background: linear-gradient(var(--tm-warning-dim), var(--tm-warning-dim)), var(--tm-bg-surface);
+  border-radius: 10px;
+}
+.move__header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--tm-border);
+}
+.move__header-icon {
+  width: 14px;
+  height: 14px;
+  color: var(--tm-warning);
+}
+.move__title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--tm-warning);
+}
+.move__hint {
+  margin-left: auto;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  color: var(--tm-text-faint);
+  font-size: 11.5px;
+}
+.move__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.move__item {
+  position: relative;
+  border-bottom: 1px solid var(--tm-border);
+}
+.move__item:last-child {
+  border-bottom: 0;
+}
+.move__more {
+  display: flex;
+  gap: 14px;
+  padding: 7px 14px;
+  border-top: 1px solid var(--tm-border);
+  color: var(--tm-text-secondary);
+  font-size: 11.5px;
+}
+
+.mi {
+  display: grid;
+  grid-template-columns: 22px 230px 1fr auto 58px;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+.mi[data-expanded] {
+  grid-template-columns: 22px 230px 1fr 58px;
+}
+.mi[aria-current] {
+  background: var(--tm-overlay-subtle);
+  box-shadow: inset 2px 0 0 var(--tm-warning);
+}
+.mi__icon {
+  display: grid;
+  place-items: center;
+  color: var(--tm-warning);
+}
+.mi__icon svg {
+  width: 14px;
+  height: 14px;
+}
+.mi__icon--fix {
+  color: var(--tm-danger);
+}
+.mi__icon--review,
+.mi__icon--task {
+  color: var(--tm-accent-text);
+}
+.mi__icon--decide {
+  color: var(--tm-agent);
+}
+.mi__icon--finished {
+  color: var(--tm-success);
+}
+.mi__where {
+  min-width: 0;
+}
+.mi__where b,
+.mi__where small {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mi__where b {
+  font-weight: 600;
+}
+.mi__where small {
+  color: var(--tm-text-faint);
+  font-size: 11.5px;
+}
+.mi__what {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mi__what em {
+  font-style: normal;
+  color: var(--tm-text-secondary);
+}
+.mi__actions {
+  display: flex;
+  gap: 6px;
+}
+.mi__actions .tmui-button .tmui-kbd {
+  margin-right: 6px;
+}
+.mi__age {
+  color: var(--tm-text-secondary);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-size: 11.5px;
+}
+.mi__age[data-hot] {
+  color: var(--tm-warning);
+}
+
+.answer {
+  display: grid;
+  grid-template-columns: 1fr 330px;
+  gap: 16px;
+  padding: 4px 14px 14px 48px;
+}
+.answer__term {
+  margin: 0;
+  padding: 9px 11px;
+  border: 1px solid var(--tm-border);
+  border-radius: 7px;
+  background: var(--tm-bg-base);
+  color: var(--tm-text-primary);
+  font-family: var(--tm-font-mono);
+  font-size: 11.5px;
+  line-height: 1.55;
+  white-space: pre;
+  overflow: hidden;
+}
+.answer__side {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+.answer__side .tmui-button {
+  justify-content: flex-start;
+}
+.answer__side .tmui-button .tmui-kbd {
+  margin-right: 6px;
+}
+.answer__label {
+  color: var(--tm-text-secondary);
+  font-size: 11.5px;
+}
+.answer__more {
+  display: flex;
+  gap: 6px;
+}
+
+.snooze-menu {
+  position: absolute;
+  right: 14px;
+  top: 100%;
+  z-index: var(--tm-layer-overlay);
+  display: grid;
+  min-width: 160px;
+  padding: 4px;
+  border: 1px solid var(--tm-border-strong);
+  border-radius: 8px;
+  background: var(--tm-bg-elevated);
+}
+.snooze-menu__item {
+  padding: 5px 10px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--tm-text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.snooze-menu__item:hover {
+  background: var(--tm-overlay-soft);
+}
+
+.quiet {
+  margin: 14px 18px 0;
+  border: 1px dashed var(--tm-border-strong);
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  color: var(--tm-text-secondary);
+}
+.quiet b {
+  color: var(--tm-text-primary);
+  font-weight: 600;
+}
+.quiet__icon {
+  width: 16px;
+  height: 16px;
+  color: var(--tm-success);
+}
+.quiet .tmui-button {
+  margin-left: auto;
+}

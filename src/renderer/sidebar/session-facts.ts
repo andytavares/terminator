@@ -41,6 +41,8 @@ export interface SessionFacts {
   closedAt: string | null
   latestLine: string
   choicePrompt: ChoicePrompt | null
+  /** What the agent said it is waiting on, from its Notification hook. */
+  askMessage: string | null
   /** The agent conversation that ran in this session, when one was reported. */
   agent: AgentConversation | null
   /** Whether that conversation can be brought back on this machine right now. */
@@ -82,7 +84,7 @@ function recordFacts(record: SessionRecordListing | undefined) {
 }
 
 /** Where the session runs, as its record keeps it. */
-function openSnapshot(
+export function openSnapshot(
   session: TerminalSession,
   project: Project | undefined,
   workspace: Workspace | undefined
@@ -108,6 +110,7 @@ function liveFacts(session: TerminalSession) {
     lastAttendedAt: session.lastAttendedAt ?? null,
     latestLine: session.latestLine ?? '',
     choicePrompt: session.choicePrompt ?? null,
+    askMessage: session.agentAsk?.message ?? null,
   }
 }
 
@@ -163,6 +166,7 @@ const CLOSED = {
   lastAttendedAt: null,
   latestLine: '',
   choicePrompt: null,
+  askMessage: null,
 } as const
 
 function closedFacts(record: SessionRecordListing & { closedAt: string }): SessionFacts {

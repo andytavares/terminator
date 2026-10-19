@@ -193,7 +193,10 @@ export function contributionsChannels(ctx: GithubContext): ChannelSpec[] {
   const run = async (payload: Payload) => {
     const clock = localClock()
     const since = [calendarStart(clock.today), previousRange(payload).from].sort()[0]
-    return answer(await fetchOnce(payload, since), payload, clock)
+    const result = answer(await fetchOnce(payload, since), payload, clock)
+    // A repository-filtered calendar is not the user's whole output.
+    if (!payload.repo) ctx.options.onContributions?.(result.calendar)
+    return result
   }
   return [
     defineChannel({

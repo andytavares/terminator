@@ -11,6 +11,7 @@ import {
   parseDashboard,
   resolveBranchExclusions,
 } from '../../github/dashboard-search.js'
+import { mergedQuery, parseMerged } from '../../github/merged-search.js'
 import { runGit } from '../../shell/run-git.js'
 import { VALIDATION_ERROR } from '../register.js'
 import { catchError, type AccessibleRepo, type GithubContext } from './context.js'
@@ -179,7 +180,7 @@ function withSessionProgress(prs: DashboardPR[], stored: Record<string, unknown>
   })
 }
 
-async function runDashboardSearch(ctx: GithubContext) {
+export async function runDashboardSearch(ctx: GithubContext) {
   const login = await ctx.viewer(ctx.noCheckoutCwd)
   const repos = ctx.options.getReviewRepos?.() ?? []
   const requests = buildSectionQueries(login, repos)
@@ -198,7 +199,7 @@ async function runDashboardSearch(ctx: GithubContext) {
   const capped = [...results.matched]
     .filter(([, { issueCount, returned }]) => issueCount > returned)
     .map(([section]) => section)
-  return {
+  const answer = {
     prs: withSessionProgress(prs, await storedSessions()),
     capped,
     login,
@@ -206,6 +207,21 @@ async function runDashboardSearch(ctx: GithubContext) {
     failed: [...results.failed].map(([section, error]) => ({ section, error })),
     scopedTo: repos.length,
   }
+  ctx.options.onDashboard?.(answer)
+  return answer
+}
+
+/** Searches my pull requests merged lately and hands them to Home; apart from the dashboard search. */
+export async function runMergedSearch(ctx: GithubContext) {
+  const query = mergedQuery(Date.now())
+  const raw = await ctx.api(ctx.noCheckoutCwd, {
+    path: 'graphql',
+    fields: { query },
+    timeoutMs: 60_000,
+  })
+  const merged = parseMerged(JSON.parse(raw), await localRootsByRepo(ctx.options.listProjectRoots))
+  ctx.options.onMerged?.(merged)
+  return merged
 }
 
 export function dashboardChannels(ctx: GithubContext): ChannelSpec[] {

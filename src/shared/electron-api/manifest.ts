@@ -52,12 +52,18 @@ import type {
   SetMineInputSchema,
   StatusInputSchema,
 } from '../schemas/integrations.schema'
+import type { AgentUsageInputSchema, ThreadSummaryInputSchema } from '../schemas/agent-usage.schema'
+import type { AgentUsage } from '../agents/agent-usage'
 import type {
   ForgetInputSchema,
   SetDescriptionInputSchema,
   SetLinkInputSchema,
   TransferInputSchema,
 } from '../schemas/session-records.schema'
+import type { HomeFeedActionInputSchema, MergedHomeFeed } from '../schemas/home-feed.schema'
+import type { AgentAsk } from '../agent-sessions/ask'
+import type { AttentionInterval, AttentionMeasures } from '../home/attention-measures'
+import type { MeasuresInputSchema, RecordStateInputSchema } from '../schemas/attention.schema'
 
 type RemoteBehavior = 'same' | 'omit' | 'stub'
 
@@ -684,8 +690,8 @@ export const ELECTRON_API_MANIFEST = [
     path: 'extension.executeCommand',
     kind: 'send',
     channel: 'extension:execute-command',
-    signature: signature<(key: string, ctx: CommandContext) => void>(),
-    toPayload: (key, ctx) => ({ key, ctx }),
+    signature: signature<(key: string, ctx: CommandContext, args?: unknown) => void>(),
+    toPayload: (key, ctx, args) => ({ key, ctx, args }),
     extensionView: 'shared',
   }),
   // Run another extension's command by full id, e.g.
@@ -1114,6 +1120,113 @@ export const ELECTRON_API_MANIFEST = [
           handler: (payload: { sessionId: string; record: SessionRecordListing | null }) => void
         ) => Unsubscribe
       >(),
+  }),
+
+  // ── agent usage and work-thread summaries (core only) ─────────────────────
+  method({
+    path: 'agentUsage.get',
+    kind: 'invoke',
+    channel: 'agents:usage',
+    signature:
+      signature<
+        (
+          input: z.input<typeof AgentUsageInputSchema>
+        ) => Promise<{ data: AgentUsage } | { error: string; message: string }>
+      >(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'homeThreadSummary.get',
+    kind: 'invoke',
+    channel: 'home:thread-summary',
+    signature:
+      signature<
+        (
+          input: z.input<typeof ThreadSummaryInputSchema>
+        ) => Promise<{ text: string; generatedAt: string } | { error: string }>
+      >(),
+    remote: 'omit',
+  }),
+
+  // ── agent asks (a Claude Code Notification hook says the agent is waiting on you) ──
+  method({
+    path: 'agentAsk.list',
+    kind: 'invoke',
+    channel: 'agent-ask:list',
+    signature: signature<() => Promise<{ data: Array<{ sessionId: string; ask: AgentAsk }> }>>(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'agentAsk.onChanged',
+    kind: 'event',
+    channel: 'agent-ask:changed',
+    signature:
+      signature<
+        (handler: (payload: { sessionId: string; ask: AgentAsk | null }) => void) => Unsubscribe
+      >(),
+    remote: 'omit',
+  }),
+
+  // ── attention log (when sessions worked and when they waited on you) ──────
+  method({
+    path: 'attention.record',
+    kind: 'invoke',
+    channel: 'attention:record',
+    signature:
+      signature<
+        (
+          input: z.input<typeof RecordStateInputSchema>
+        ) => Promise<{ data: true } | { error: string; message: string }>
+      >(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'attention.measures',
+    kind: 'invoke',
+    channel: 'attention:measures',
+    signature:
+      signature<
+        (input: z.input<typeof MeasuresInputSchema>) => Promise<{ data: AttentionMeasures }>
+      >(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'attention.intervals',
+    kind: 'invoke',
+    channel: 'attention:intervals',
+    signature:
+      signature<
+        (input: z.input<typeof MeasuresInputSchema>) => Promise<{ data: AttentionInterval[] }>
+      >(),
+    remote: 'omit',
+  }),
+
+  // ── home feed (what extensions publish for Home to draw; core only) ───────
+  method({
+    path: 'homeFeed.get',
+    kind: 'invoke',
+    channel: 'home:feed-get',
+    signature: signature<() => Promise<{ data: MergedHomeFeed }>>(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'homeFeed.action',
+    kind: 'invoke',
+    channel: 'home:feed-action',
+    signature:
+      signature<
+        (
+          input: z.input<typeof HomeFeedActionInputSchema>
+        ) => Promise<{ data: true } | { error: string; message: string }>
+      >(),
+    remote: 'omit',
+  }),
+  method({
+    path: 'homeFeed.onChanged',
+    kind: 'event',
+    channel: 'home:feed-changed',
+    signature: signature<(handler: (feed: MergedHomeFeed) => void) => Unsubscribe>(),
+    remote: 'omit',
   }),
 
   // ── integrations (issue trackers) ─────────────────────────────────────────

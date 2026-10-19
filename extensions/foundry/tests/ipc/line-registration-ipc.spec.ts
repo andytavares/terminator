@@ -12,6 +12,7 @@ import { activateFoundry, deactivate } from '../helpers/foundry-activation.js'
 import type { FoundryHost } from '../helpers/foundry-host.js'
 import { agentNode } from '../helpers/run-nodes.js'
 import { createOrderStore } from '../../src/order/store.js'
+import { orderStoreAt } from '../../src/state/live-index.js'
 import { draftOrder } from '../../src/order/draft.js'
 import { strandedAgents } from '../../src/runtime/runtime-state.js'
 import type { WorkOrder } from '../../src/order/schema.js'
@@ -49,7 +50,7 @@ afterEach(() => {
 })
 
 async function saveTypedOrder(over: Partial<WorkOrder>): Promise<void> {
-  await createOrderStore(dataDir).save({
+  await orderStoreAt(dataDir).save({
     ...draftOrder({
       id: 'WO-1',
       title: 'Make the thing work',

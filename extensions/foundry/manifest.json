@@ -15,6 +15,14 @@
     "quickActions": {
       "group": { "mnemonic": "f", "label": "Foundry" }
     },
+    "startWorkOptions": [
+      {
+        "id": "new-order",
+        "label": "Foundry order",
+        "description": "Shaped, planned and built by Foundry's line.",
+        "command": "new-order"
+      }
+    ],
     "shellRoots": ["terminator.foundry.dataDir"]
   }
 }

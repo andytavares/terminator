@@ -48,7 +48,10 @@ interface TwinIds {
 }
 type TaskId = { taskId: string }
 
-async function completeTask({ db }: IpcContext, args: z.infer<typeof CompleteTaskRequestSchema>) {
+export async function completeTask(
+  { db }: IpcContext,
+  args: z.infer<typeof CompleteTaskRequestSchema>
+) {
   const { taskId } = args
   const now = nowIso()
   const todayStr = today()

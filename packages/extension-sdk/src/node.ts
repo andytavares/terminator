@@ -54,3 +54,13 @@ function movePath(legacy: string, target: string): UserDataMoveOutcome {
 export function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`
 }
+
+/** A parent Claude session's variables make a child `claude` join its bridge and hang. */
+export function envWithoutParentClaude(env: NodeJS.ProcessEnv): Record<string, string> {
+  const kept: Record<string, string> = {}
+  for (const [name, value] of Object.entries(env)) {
+    if (value === undefined || name === 'CLAUDECODE' || name.startsWith('CLAUDE_CODE_')) continue
+    kept[name] = value
+  }
+  return kept
+}

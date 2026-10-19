@@ -26,7 +26,7 @@ const DEFAULT_SETTINGS: GlobalSettings = {
     promptForName: false,
   },
   git: { worktreeBaseDir: '', branchExcludePatterns: [] },
-  ui: { hasSeenWelcome: false, editor: '' },
+  ui: { hasSeenWelcome: false, editor: '', hideSidebarOnHome: true },
   sidebar: { staleAfterMs: 2 * 60 * 60 * 1000 },
   notifications: { defaultTargets: ['system', 'center', 'toast'], overrides: {} },
   quickActions: { pins: [], usage: [], directUse: [], custom: [] },
@@ -276,6 +276,19 @@ describe('useSettingsStore — updateShowMetricsBar', () => {
     expect(mockElectronAPI.settings.updateGlobal).toHaveBeenCalledWith({
       ui: { showMetricsBar: false },
     })
+  })
+})
+
+describe('useSettingsStore — updateHideSidebarOnHome', () => {
+  it('writes ui.hideSidebarOnHome and keeps the saved settings', async () => {
+    const updated = { ...DEFAULT_SETTINGS, ui: { hasSeenWelcome: false, hideSidebarOnHome: false } }
+    mockElectronAPI.settings.updateGlobal.mockResolvedValue({ settings: updated })
+
+    await useSettingsStore.getState().updateHideSidebarOnHome(false)
+    expect(mockElectronAPI.settings.updateGlobal).toHaveBeenCalledWith({
+      ui: { hideSidebarOnHome: false },
+    })
+    expect(useSettingsStore.getState().globalSettings?.ui?.hideSidebarOnHome).toBe(false)
   })
 })
 

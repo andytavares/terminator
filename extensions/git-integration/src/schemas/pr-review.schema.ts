@@ -261,11 +261,27 @@ export const ReviewQueuePRSchema = z.object({
 
 const DashboardSectionSchema = z.enum(['re-review', 'requested', 'team', 'mine', 'involved'])
 
+/** One check on a pull request's latest commit. */
+const DashboardCheckSchema = z.object({
+  name: z.string(),
+  state: z.enum(['passed', 'failed', 'running']),
+  detailsUrl: z.string().optional(),
+  completedAt: z.string().optional(),
+})
+
+export type DashboardCheck = z.infer<typeof DashboardCheckSchema>
+
 export const DashboardPRSchema = z.object({
   /** owner/name */
   repo: z.string(),
   /** Local checkout whose origin is this repo, when there is one. */
   localRepoRoot: z.string().nullable(),
+  /** The source branch, for Home to join this pull request to the rest of its work. */
+  headRefName: z.string().optional(),
+  /** Mine only: the latest commit's checks. */
+  checks: z.array(DashboardCheckSchema).optional(),
+  /** Requested and re-review only: when the review was requested. */
+  reviewRequestedAt: z.string().optional(),
   section: DashboardSectionSchema,
   number: z.number(),
   title: z.string(),

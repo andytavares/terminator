@@ -3,7 +3,7 @@
 import * as path from 'node:path'
 import { builderUnit, testCriterion } from './order-parts.js'
 import type { FoundryHost } from './foundry-host.js'
-import { createOrderStore } from '../../src/order/store.js'
+import { orderStoreAt } from '../../src/state/live-index.js'
 import { draftOrder } from '../../src/order/draft.js'
 import { orderDir } from '../../src/data-root.js'
 import { rungOutputPath } from '../../src/line/rung-output.js'
@@ -50,7 +50,7 @@ export function readyDraft(repo: string, over: Partial<WorkOrder> = {}): WorkOrd
 
 /** Saves `order` and asks the Forge to converge it; what the channel answered. */
 export async function convergeOrder(host: FoundryHost, dataDir: string, order: WorkOrder) {
-  await createOrderStore(dataDir).save(order)
+  await orderStoreAt(dataDir).save(order)
   const answer = await host.call('foundry:order.converge', {
     id: 'WO-1',
     message: 'tighten the plan',

@@ -9,6 +9,7 @@ import * as path from 'node:path'
 import { fakeHost, seededRepository, temporaryDirectory } from '../helpers/foundry-host.js'
 import type { FoundryHost } from '../helpers/foundry-host.js'
 import { createOrderStore } from '../../src/order/store.js'
+import { orderStoreAt } from '../../src/state/live-index.js'
 
 import { readyDraft } from '../helpers/forge-turns.js'
 vi.mock('../../src/runtime/control-server.js', () => ({
@@ -62,7 +63,7 @@ function sayingSoTests() {
 
 function supervisionUnavailableRefusalsTests() {
   it('refuses an architect turn and says why', async () => {
-    await createOrderStore(dataDir).save(readyDraft(repo))
+    await orderStoreAt(dataDir).save(readyDraft(repo))
     const started = (await host.call('foundry:order.converge', { id: 'WO-1', message: 'go' })) as {
       error?: string
     }
@@ -70,7 +71,7 @@ function supervisionUnavailableRefusalsTests() {
   })
 
   it('records the red team as refused when a released order would be reviewed', async () => {
-    await createOrderStore(dataDir).save(readyDraft(repo))
+    await orderStoreAt(dataDir).save(readyDraft(repo))
     await host.call('foundry:order.hold', { id: 'WO-1', held: true })
     await host.call('foundry:order.hold', { id: 'WO-1', held: false })
     await vi.waitFor(async () => {

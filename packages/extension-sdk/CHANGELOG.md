@@ -14,6 +14,9 @@ under Added is optional, so an extension that did neither runs unchanged.
   `handleRemote` for ones the remote client may call, and `cleanup`. Notepad and Task Vault each
   kept a copy. `invalid` defaults to the new `validationError(error)`, the answer
   `{ error: 'VALIDATION_ERROR', message }` the core's channels give.
+- `HOME_MEASURES` and `SEND_TO_AGENT_ACTION`: the measure ids and the ask action id Home reads by
+  name when an extension publishes with `api.home`, and `contributes.startWorkOptions` for a way
+  to run work in Start work. Home names no extension; it reads these.
 - `plural(count, word, many?)`, which git-integration and Foundry each kept a copy of.
 - `@terminator/extension-sdk/renderer`: `openInBrowser(url)`, a view's way to open an address in
   the person's browser. Task Vault and Foundry each kept a copy.

@@ -7,7 +7,7 @@
  * cover that — but that the channel a surface calls reaches it. Every bug this
  * branch shipped was in exactly that gap.
  */
-import { freshFoundryStorage } from '../helpers/foundry-host.js'
+import { freshFoundryStorage, idleHome } from '../helpers/foundry-host.js'
 
 // A real userData, created before any spec mocks `node:fs`: the supervision
 // runtime writes its feed, mutes and per-session settings in Foundry's own
@@ -99,6 +99,7 @@ function actionsApi(handlers: Handlers, commands: Map<string, () => void>): Exte
       showSelf: vi.fn(),
     }),
     commands: keptCommands(commands),
+    home: idleHome(),
     shell: partialFake<ExtensionAPI['shell']>({ exec }),
     notifications: partialFake<ExtensionAPI['notifications']>({ showToast, createNotification }),
     log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },

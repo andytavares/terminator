@@ -163,8 +163,28 @@ function InterfaceFields({ settings }: { settings: Settings }): JSX.Element {
           Displays a system metrics bar at the bottom of every screen.
         </span>
       </div>
+      <HideSidebarOnHomeField hide={settings.ui?.hideSidebarOnHome ?? true} />
       <StaleAfterField staleAfterMs={settings.sidebar.staleAfterMs} />
     </>
+  )
+}
+
+const HIDE_SIDEBAR_LABEL = 'Hide the branch tree on Home'
+
+function HideSidebarOnHomeField({ hide }: { hide: boolean }): JSX.Element {
+  const updateHideSidebarOnHome = useSettingsStore((s) => s.updateHideSidebarOnHome)
+  return (
+    <div className="settings-section__field">
+      <label className="settings-section__label settings-section__label--inline">
+        <input
+          type="checkbox"
+          checked={hide}
+          onChange={(e) => void updateHideSidebarOnHome(e.target.checked)}
+        />
+        {HIDE_SIDEBAR_LABEL}
+      </label>
+      <span className="settings-section__hint">Press ⌘B to show it</span>
+    </div>
   )
 }
 

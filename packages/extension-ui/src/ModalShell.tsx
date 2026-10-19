@@ -11,6 +11,9 @@ export interface ModalShellProps {
   children: React.ReactNode
   /** The caller's own look and placement; the shell itself draws only the backdrop. */
   className?: string
+  /** Where the surface sits: the middle of the window (the default), or horizontally centred
+   * near the top, as a launcher does. */
+  placement?: 'center' | 'top'
   /** When false, Escape and a press outside do not dismiss: for unsaved work, which must offer
    * its own way out. */
   dismissible?: boolean
@@ -22,7 +25,10 @@ export interface ModalShellProps {
  * long as it is mounted (ADR 110). Focus opens on the first control inside, or on the field
  * that asks for it with `autoFocus`, and returns to whatever had it. */
 export function ModalShell(props: ModalShellProps): JSX.Element {
-  const { className, dismissible = true } = props
+  const { dismissible = true, placement = 'center' } = props
+  const className = [props.className, placement === 'top' && 'tmui-modal--top']
+    .filter(Boolean)
+    .join(' ')
   return (
     <dialog
       data-tmui-panel=""

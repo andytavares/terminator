@@ -39,9 +39,10 @@ export function queueEntriesOf(root: () => string): () => Promise<QueueEntry[]> 
   return () => computeQueueEntries(root(), orderStoreAt(root()))
 }
 
-/** Replace the index with one that tells every window what changed. */
-export function connectIndexes(api: ExtensionAPI): void {
+/** Replace the index with one that tells every window, and `onChange`, what changed. */
+export function connectIndexes(api: ExtensionAPI, onChange: () => void = () => {}): void {
   indexes = createFoundryIndexes(diskSourceFor, (change) => {
+    onChange()
     try {
       api.window.broadcast('foundry:changed', change)
     } catch (error) {

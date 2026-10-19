@@ -5,6 +5,7 @@ import {
   closeApp,
   createWorkspace,
   addAndSelectProject,
+  selectProject,
   e2eTempDir,
 } from './helpers'
 import {
@@ -14,8 +15,8 @@ import {
   runInVisibleTerminal,
 } from './session-views'
 
-// Feature 058: background output never reorders Home or the wall, and opening a session focuses
-// its terminal. Rows with nested interactive children have no clean accessible name, so they
+// Feature 058: background output never reorders the wall, and opening a session focuses its
+// terminal from every surface that names it. Session tabs and sidebar rows carry no role, so they
 // are addressed as helpers.ts does, by CSS class plus visible text.
 
 /** Starts a second and third terminal on the branch already showing. */
@@ -45,6 +46,8 @@ async function sampleDistinct(read: () => Promise<string>, times: number): Promi
   return seen
 }
 
+const inFlight = (page: Page) => page.getByRole('region', { name: 'In flight' })
+
 function sidebarTerminalRow(page: Page, title: string) {
   return page
     .locator('.terminal-row')
@@ -58,15 +61,6 @@ async function showSidebarTerminals(page: Page): Promise<void> {
   await expect(page.locator('.terminal-row').first()).toBeVisible()
 }
 
-/** The Ledger's rows, top to bottom. */
-function ledgerOrder(page: Page): Promise<string> {
-  return page.evaluate(() =>
-    [...document.querySelectorAll('[role="row"][aria-label]')]
-      .map((el) => el.getAttribute('aria-label'))
-      .join('|')
-  )
-}
-
 /** The wall's tiles, by the order each is drawn in. */
 function wallOrder(page: Page): Promise<string> {
   return page.evaluate(() =>
@@ -78,8 +72,6 @@ async function outputNeverReorders(page: Page): Promise<void> {
   // Two of the three terminals never stop producing output.
   await runInTab(page, 0, 'while true; do echo tick; sleep 0.4; done')
   await runInTab(page, 1, 'while true; do echo tick; sleep 0.4; done')
-  await openHome(page)
-  expect((await sampleDistinct(() => ledgerOrder(page), 40)).size).toBe(1)
   await openOverview(page)
   expect((await sampleDistinct(() => wallOrder(page), 40)).size).toBe(1)
 }
@@ -108,17 +100,19 @@ async function linkTerminalOneToEng123(): Promise<void> {
   if ('error' in result) throw new Error(result.message)
 }
 
-/** Gives Terminal 1 a real record (a description write) and links it. No tracker is connected in
- * e2e, so the link is set through the preload API, as src/renderer/stores/session-records.store.ts does. */
+/** Gives Terminal 1 a real record (a description written from its tab) and links it. No tracker is
+ * connected in e2e, so the link is set through the preload API, as src/renderer/stores/session-records.store.ts does. */
 async function linkFromHome(page: Page): Promise<void> {
-  await openHome(page)
-  const box = page
-    .getByRole('row', { name: 'Terminal 1' })
-    .getByRole('textbox', { name: 'What is this session doing?' })
+  await selectProject(page, 'Surfaces', 'ticket')
+  await page.locator('.tab-bar__tab--session').nth(0).click({ button: 'right' })
+  await page.locator('.ctx-menu').getByRole('button', { name: 'Add description…' }).click()
+  const box = page.getByRole('textbox', { name: 'What is this session doing?' })
   await box.fill('Wiring up the link')
   await box.press('Enter')
-  await expect(page.getByText('Wiring up the link')).toBeVisible()
   await page.evaluate(linkTerminalOneToEng123)
+  await openHome(page)
+  await expect(inFlight(page).getByRole('button', { name: /Wiring up the link/ })).toBeVisible()
+  await expect(inFlight(page).getByText('ENG-123')).toBeVisible()
 }
 
 async function linkShowsOnSidebarAndTab(page: Page): Promise<void> {
@@ -138,11 +132,16 @@ async function linkShowsOnSidebarAndTab(page: Page): Promise<void> {
   await expect(page.locator('.tab-bar__tab--session').getByText('ENG-123')).toHaveCount(0)
 }
 
-/** 1. Enter on a Ledger row. 2. The "Open <name>" button on a wall tile. */
+/** 1. Enter on a work row, then the drawer's Open terminal. 2. The "Open <name>" button on a wall tile. */
 async function openFromHomeAndWall(page: Page): Promise<void> {
   await openHome(page)
-  await page.getByRole('row', { name: 'Terminal 1' }).locator('.ledger__name').click()
+  const row = inFlight(page).getByRole('button', { name: /Wiring up the link/ })
+  await row.focus()
   await page.keyboard.press('Enter')
+  await page
+    .getByRole('dialog', { name: /Wiring up the link/ })
+    .getByRole('button', { name: 'Open terminal' })
+    .click()
   await expectTerminalFocused(page)
   await expect(page.getByRole('heading', { name: 'Home' })).toBeHidden()
   await openOverview(page)
@@ -200,9 +199,8 @@ test.describe('session surfaces', () => {
     await addAndSelectProject(page, 'Surfaces', 'ticket')
     // Default titles, in creation order: Terminal 1, Terminal 2, Terminal 3.
     await addTwoMoreTabs(page)
-    await test.step('output never reorders sessions, on Home or the wall', () =>
-      outputNeverReorders(page))
-    await test.step('a session link made from Home shows on the sidebar terminal row and the session tab', () =>
+    await test.step('output never reorders the wall', () => outputNeverReorders(page))
+    await test.step('a session described and linked shows on Home, and shows on the sidebar terminal row and the session tab', () =>
       linkShowsOnSidebarAndTab(page))
     await test.step('opening a session always focuses its terminal', () =>
       openingFocusesTheTerminal(page))

@@ -49,6 +49,7 @@ export interface CoreActionDeps {
   onCopyIssueKey(): void
   onOpenIssue(): void
   onHome(): void
+  onStartWork(): void
   onOverview(): void
   onToggleSidebar(): void
   onOpenSettings(): void
@@ -256,6 +257,14 @@ const WORKSPACE_ACTIONS: CoreActionSpec[] = [
 ]
 
 const TOP_ACTIONS: CoreActionSpec[] = [
+  {
+    id: 'core.start-work',
+    label: 'Start work',
+    group: 'top',
+    mnemonic: 'n',
+    shortcut: '⌘N',
+    run: (d) => d.onStartWork(),
+  },
   {
     id: 'core.open-home',
     label: 'Home',

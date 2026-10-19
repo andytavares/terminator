@@ -178,18 +178,18 @@ describe('useExtensionRegistry — registerWindowView', () => {
   })
 })
 
-describe('useExtensionRegistry — registerHomeSection', () => {
+describe('useExtensionRegistry — registerInsightsSection', () => {
   setUpUseExtensionRegistry()
 
-  it('adds the section to homeSections', () => {
+  it('adds the section to insightsSections', () => {
     const section = {
       id: 'com.test.ext',
       label: 'Pull requests',
       view: 'home',
       component: NullComponent,
     }
-    useExtensionRegistry.getState().registerHomeSection(section)
-    expect(useExtensionRegistry.getState().homeSections.get('com.test.ext')).toMatchObject({
+    useExtensionRegistry.getState().registerInsightsSection(section)
+    expect(useExtensionRegistry.getState().insightsSections.get('com.test.ext')).toMatchObject({
       label: 'Pull requests',
       view: 'home',
     })
@@ -202,9 +202,9 @@ describe('useExtensionRegistry — registerHomeSection', () => {
       view: 'home',
       component: NullComponent,
     }
-    const dispose = useExtensionRegistry.getState().registerHomeSection(section)
+    const dispose = useExtensionRegistry.getState().registerInsightsSection(section)
     dispose()
-    expect(useExtensionRegistry.getState().homeSections.has('com.test.ext')).toBe(false)
+    expect(useExtensionRegistry.getState().insightsSections.has('com.test.ext')).toBe(false)
   })
 })
 

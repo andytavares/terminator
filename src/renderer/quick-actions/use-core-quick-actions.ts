@@ -10,6 +10,9 @@ import { useSessionFacts, useIssue } from '../components/session/useSessionFacts
 import { revealSession } from '../terminal/navigate-to-session'
 import { qualifiedBranchLabel } from '../sidebar/branch-display'
 import { agentStateOf } from '../sidebar/agent-state'
+import { useStartWorkStore } from '../components/home/start-work'
+import { useDeskSelection } from '../components/home/desk-selection'
+import { useSessionRecordsStore } from '../stores/session-records.store'
 import { buildCoreActions, type CoreSessionSummary } from './core-actions'
 import type { QuickActionTarget } from './use-active-scope'
 import type { CoreActionDeps } from './core-actions'
@@ -160,6 +163,15 @@ function nextWaiting(c: CoreContext): void {
 
 const showHome = (): void => useExtensionRegistry.getState().setActiveGlobalTab('core.home')
 
+/** Home, with the drawer of the latest resumable conversation open when there is one. */
+function showResumable(): void {
+  showHome()
+  const records = [...useSessionRecordsStore.getState().records.values()]
+  if (records.some((r) => r.closedAt !== undefined && r.resumable)) {
+    useDeskSelection.getState().requestResume()
+  }
+}
+
 function sessionHandlers(
   c: CoreContext
 ): Handlers<'onCycleRecentSession' | 'onSelectSession' | 'onNextWaiting' | 'onResume' | 'onHome'> {
@@ -167,7 +179,7 @@ function sessionHandlers(
     onCycleRecentSession: (delta) => cycleRecent(c, delta),
     onSelectSession: (session) => revealSession(session.id),
     onNextWaiting: () => nextWaiting(c),
-    onResume: showHome,
+    onResume: showResumable,
     onHome: showHome,
   }
 }
@@ -224,6 +236,7 @@ function coreActionDeps(c: CoreContext, paletteSessions: CoreSessionSummary[]): 
     ...workspaceHandlers(c),
     ...issueHandlers(c),
     ...shellHandlers(c.shell),
+    onStartWork: () => useStartWorkStore.getState().openLauncher(),
   }
 }
 

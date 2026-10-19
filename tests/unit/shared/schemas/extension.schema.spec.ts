@@ -74,19 +74,19 @@ describe('ExtensionContributesSchema — command mnemonics and requires', () => 
   })
 })
 
-describe('ExtensionContributesSchema — home section', () => {
-  it('keeps a homeSection through the transform', () => {
+describe('ExtensionContributesSchema — Insights section', () => {
+  it('keeps a insightsSection through the transform', () => {
     const result = ExtensionContributesSchema.safeParse({
-      homeSection: { label: 'Pull requests', view: 'prs' },
+      insightsSection: { label: 'Pull requests', view: 'prs' },
     })
     expect(result.success).toBe(true)
     if (result.success) {
-      expect(result.data.homeSection).toEqual({ label: 'Pull requests', view: 'prs' })
+      expect(result.data.insightsSection).toEqual({ label: 'Pull requests', view: 'prs' })
     }
   })
 
   it('requires the label', () => {
-    const result = ExtensionContributesSchema.safeParse({ homeSection: { view: 'prs' } })
+    const result = ExtensionContributesSchema.safeParse({ insightsSection: { view: 'prs' } })
     expect(result.success).toBe(false)
   })
 })

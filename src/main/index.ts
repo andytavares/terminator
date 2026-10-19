@@ -22,6 +22,14 @@ import { installCaptureScript, installUserHook } from './agents/agent-session-ho
 import { startAgentSessionWatcher } from './agents/agent-session-watcher.js'
 import { makeSnapshotFor } from './sessions/session-snapshot.js'
 import { registerSessionRecordsHandlers } from './ipc/session-records.ipc.js'
+import { registerAgentAskHandlers } from './ipc/agent-ask.ipc.js'
+import { registerAttentionHandlers } from './ipc/attention.ipc.js'
+import { loadAttentionLog } from './home/attention-log.js'
+import { startAskWatcher } from './agents/ask-watcher.js'
+import { installAskHooks, installAskScript } from './agents/agent-ask-hook.js'
+import { registerAgentUsageHandlers } from './ipc/agent-usage.ipc.js'
+import { registerThreadSummaryHandler } from './ipc/thread-summary.ipc.js'
+import { registerHomeFeedHandlers } from './ipc/home-feed.ipc.js'
 import { ensureHookScript } from './integrations/context-sync.js'
 import { registerShellHandlers } from './ipc/shell.ipc.js'
 import { startAdoptingLoginShellPath } from './shell/login-shell-path.js'
@@ -360,6 +368,11 @@ function registerSessionHandlers(): OutputRelay {
   registerGitHandlers()
   registerIntegrationsHandlers(() => mainWindow)
   registerSessionRecordsHandlers(() => mainWindow)
+  registerAgentAskHandlers(() => mainWindow)
+  registerAttentionHandlers()
+  registerAgentUsageHandlers()
+  registerThreadSummaryHandler()
+  registerHomeFeedHandlers(() => mainWindow)
   return terminalRelay
 }
 
@@ -384,14 +397,30 @@ function startIntegrationsAndRecords(): void {
     )
   // Lets an agent — including one the operator starts by hand — report the
   // conversation it is having, so the session can be resumed later (ADR 055).
-  void installCaptureScript(join(app.getPath('userData'), 'integrations'))
+  const sessionHookInstalled = installCaptureScript(join(app.getPath('userData'), 'integrations'))
     .then((scriptPath) => installUserHook({ execPath: process.execPath, scriptPath }))
     .catch((error) =>
       logger.error('could not install the agent session hook', { error: String(error) })
     )
+  // The Notification and Stop hooks tell core an agent is waiting on an answer (ask-watcher).
+  // Installed after the session hook finishes: both edit the one settings file.
+  startAskWatcherAndHooks(sessionHookInstalled)
+  void loadAttentionLog().catch((error) =>
+    logger.error('could not read the attention log', { error: String(error) })
+  )
   // Written at startup rather than shipped beside the bundle: a loose script
   // survives development and vanishes from the packaged app (ADR-026).
   void ensureHookScript()
+}
+
+function startAskWatcherAndHooks(after: Promise<void>): void {
+  startAskWatcher()
+  void after
+    .then(() => installAskScript(join(app.getPath('userData'), 'integrations')))
+    .then((scriptPath) => installAskHooks({ execPath: process.execPath, scriptPath }))
+    .catch((error) =>
+      logger.error('could not install the agent ask hook', { error: String(error) })
+    )
 }
 
 /** Shell, editor, files, logging, notifications, metrics, the database, dialogs and the app. */

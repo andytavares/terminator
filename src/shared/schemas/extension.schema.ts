@@ -10,6 +10,14 @@ const SurfaceContributionSchema = z.object({
   defaultOpen: z.boolean().optional(),
 })
 
+const StartWorkOptionSchema = z.object({
+  id: z.string().min(1),
+  label: z.string().min(1).max(50),
+  description: z.string().min(1),
+  /** The id of one of the extension's own commands, run with the chosen ticket when there is one. */
+  command: z.string().min(1),
+})
+
 const QuickActionsGroupSchema = z.object({
   mnemonic: z.string().length(1).optional(),
   label: z.string().min(1),
@@ -22,7 +30,7 @@ export const ExtensionContributesSchema = z
     workspaceTab: SurfaceContributionSchema.optional(),
     projectTab: SurfaceContributionSchema.optional(),
     sidebarPanel: SurfaceContributionSchema.optional(),
-    homeSection: SurfaceContributionSchema.optional(),
+    insightsSection: SurfaceContributionSchema.optional(),
     windowViews: z.array(z.object({ id: z.string().min(1), view: z.string().min(1) })).optional(),
     commands: z
       .array(
@@ -37,6 +45,8 @@ export const ExtensionContributesSchema = z
       )
       .optional(),
     quickActions: z.object({ group: QuickActionsGroupSchema.optional() }).optional(),
+    /** Ways to run work from Home's Start work launcher, listed after Claude agent and Terminal only. */
+    startWorkOptions: z.array(StartWorkOptionSchema).optional(),
     /** The extension's own folder settings whose directories its git and gh may run in (ADR 102). */
     shellRoots: z.array(z.string().min(1)).optional(),
   })
@@ -47,10 +57,11 @@ export const ExtensionContributesSchema = z
       workspaceTab,
       projectTab,
       sidebarPanel,
-      homeSection,
+      insightsSection,
       windowViews,
       commands,
       quickActions,
+      startWorkOptions,
       shellRoots,
     } = data
     return {
@@ -58,10 +69,11 @@ export const ExtensionContributesSchema = z
       workspaceTab,
       projectTab,
       sidebarPanel,
-      homeSection,
+      insightsSection,
       windowViews,
       commands,
       quickActions,
+      startWorkOptions,
       shellRoots,
     }
   })

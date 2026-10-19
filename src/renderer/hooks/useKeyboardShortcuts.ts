@@ -4,6 +4,7 @@ import { useSessionStore } from '../stores/session.store'
 import { useTerminalSession } from './useTerminalSession'
 import { useSettingsStore } from '../stores/settings.store'
 import { useExtensionRegistry, matchesAccelerator } from '../extensions/registry'
+import { useStartWorkStore } from '../components/home/start-work'
 import {
   cycleMostRecentlyAttended,
   jumpToNextAwaitingInput,
@@ -92,6 +93,12 @@ const APP_KEYS: CoreKey[] = [
     actionId: 'core.toggle-overview',
     run: (c) => c.options.onToggleOverview?.(),
   },
+  // Cmd+N: the Start work launcher. The menu has no New Window item, so the key reaches the page.
+  {
+    test: (e, at) => at.isMeta && !e.shiftKey && e.key === 'n',
+    actionId: 'core.start-work',
+    run: () => useStartWorkStore.getState().openLauncher(),
+  },
   {
     test: (e, at) => at.isMeta && e.shiftKey && e.key === 't',
     actionId: 'core.new-scratch',
@@ -123,9 +130,14 @@ const WORKSPACE_KEYS: CoreKey[] = [
 ]
 
 const TERMINAL_KEYS: CoreKey[] = [
-  // Cmd+K: clear terminal screen (skip if typing — Cmd+K kills to line start in text fields)
+  // Cmd+K: clear terminal screen (skip if typing — Cmd+K kills to line start in text fields).
+  // On Home it is the search field's key.
   {
-    test: (e, at) => at.isMeta && e.key === 'k' && !at.inTextField,
+    test: (e, at) =>
+      at.isMeta &&
+      e.key === 'k' &&
+      !at.inTextField &&
+      useExtensionRegistry.getState().activeGlobalTabId !== 'core.home',
     actionId: 'core.clear',
     run: (c) => clearTerminal(effectiveProjectOf(c), useSessionStore.getState()),
   },

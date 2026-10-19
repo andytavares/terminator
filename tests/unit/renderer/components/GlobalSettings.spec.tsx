@@ -26,11 +26,12 @@ const globalSettings: GlobalSettingsValue = {
     scrollbackLimit: 5000,
     defaultShell: '/bin/zsh',
   },
-  ui: { hasSeenWelcome: false, editor: '', showMetricsBar: false },
+  ui: { hasSeenWelcome: false, editor: '', showMetricsBar: false, hideSidebarOnHome: true },
   sidebar: { staleAfterMs: 7_200_000 },
 }
 
 const mockUpdateQuickActions = vi.fn()
+const mockUpdateHideSidebarOnHome = vi.fn()
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -41,6 +42,7 @@ beforeEach(() => {
     updateScrollbackLimit: mockUpdateScrollback,
     updateWorktreeBaseDir: mockUpdateWorktreeBaseDir,
     updateShowMetricsBar: mockUpdateShowMetrics,
+    updateHideSidebarOnHome: mockUpdateHideSidebarOnHome,
     updateBranchExcludePatterns: mockUpdateBranchExclude,
     updatePromptForName: mockUpdatePromptForName,
     updateNotificationDefaultTargets: mockUpdateNotificationDefaultTargets,
@@ -270,5 +272,16 @@ describe('GlobalSettings — values left unset', () => {
     fireEvent.change(shellInput, { target: { value: '   ' } })
     fireEvent.blur(shellInput)
     expect(mockUpdateGlobal).not.toHaveBeenCalled()
+  })
+})
+
+describe('GlobalSettings — hide the branch tree on home', () => {
+  it('is checked by default and writes the unchecked value when toggled', () => {
+    render(<GlobalSettings />)
+    const checkbox = screen.getByRole('checkbox', { name: /hide the branch tree on home/i })
+    expect((checkbox as HTMLInputElement).checked).toBe(true)
+    expect(screen.getByText('Press ⌘B to show it')).toBeTruthy()
+    fireEvent.click(checkbox)
+    expect(mockUpdateHideSidebarOnHome).toHaveBeenCalledWith(false)
   })
 })

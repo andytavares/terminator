@@ -33,6 +33,22 @@ export type {
 export { SegmentedControl } from './SegmentedControl'
 export type { SegmentedControlProps, SegmentedOption } from './SegmentedControl'
 
+export { Kbd } from './Kbd'
+export { StatusDot } from './StatusDot'
+export type { StatusDotProps, StatusTone } from './StatusDot'
+export { Chip } from './Chip'
+export type { ChipProps, ChipTone } from './Chip'
+export { StageBar, WORK_STAGES } from './StageBar'
+export type { StageBarProps, WorkStage } from './StageBar'
+export { Sparkline } from './Sparkline'
+export type { SparklineProps, SparklineTone } from './Sparkline'
+export { MetricCard } from './MetricCard'
+export type { MetricCardProps } from './MetricCard'
+export { Drawer } from './Drawer'
+export type { DrawerProps } from './Drawer'
+export { Checkbox } from './Checkbox'
+export type { CheckboxProps } from './Checkbox'
+
 export { ListInput, listItems } from './ListInput'
 export type { ListInputProps } from './ListInput'
 

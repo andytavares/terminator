@@ -35,6 +35,7 @@ import {
   useSelectionEffects,
 } from './shell/bootstrap'
 import { MainArea } from './shell/MainArea'
+import { useSidebarVisibility } from './shell/useSidebarVisibility'
 import { ShellOverlays } from './shell/ShellOverlays'
 
 export function App(): JSX.Element {
@@ -95,7 +96,7 @@ function useMetricsBar(): boolean {
 function useShellWindows() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [aboutOpen, setAboutOpen] = useState(false)
-  const [sidebarVisible, setSidebarVisible] = useState(true)
+  const { sidebarVisible, toggleSidebar } = useSidebarVisibility()
   const [linkSessionId, setLinkSessionId] = useState<string | null>(null)
   const [logOpen, setLogOpen] = useState(false)
   const showLog = useCallback((open: boolean) => setLogOpen(open), [])
@@ -110,7 +111,7 @@ function useShellWindows() {
     closeSettings: useCallback(() => setSettingsOpen(false), []),
     openAbout: useCallback(() => setAboutOpen(true), []),
     closeAbout: useCallback(() => setAboutOpen(false), []),
-    toggleSidebar: useCallback(() => setSidebarVisible((v) => !v), []),
+    toggleSidebar,
     toggleLog: useCallback(() => showLog(!logOpen), [logOpen, showLog]),
     closeLog: useCallback(() => showLog(false), [showLog]),
     closeLink: useCallback(() => setLinkSessionId(null), []),

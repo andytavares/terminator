@@ -118,7 +118,7 @@ describe('GlobalSettingsSchema — shell, ui and extensions', () => {
     const result = GlobalSettingsSchema.safeParse(withoutUi)
     expect(result.success).toBe(true)
     if (result.success) {
-      expect(result.data.ui).toEqual({ hasSeenWelcome: false, editor: '' })
+      expect(result.data.ui).toEqual({ hasSeenWelcome: false, editor: '', hideSidebarOnHome: true })
     }
   })
 })

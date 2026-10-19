@@ -53,7 +53,19 @@ describe('extension:execute-command', () => {
 
     listener({}, { key: 'ext.command.push', ctx })
 
-    expect(mockExecuteExtensionCommand).toHaveBeenCalledWith('ext.command.push', ctx)
+    expect(mockExecuteExtensionCommand).toHaveBeenCalledWith('ext.command.push', ctx, undefined)
+  })
+
+  it('forwards the args when the caller gave some', async () => {
+    registerExtensionHandlers(makeExtensionHost(), broadcast)
+    const listener = onHandlers.get('extension:execute-command')!
+    const ctx = { projectId: null, sessionId: null, repoRoot: '/repo' }
+
+    listener({}, { key: 'ext.command.new-order', ctx, args: { key: 'TAV-33' } })
+
+    expect(mockExecuteExtensionCommand).toHaveBeenCalledWith('ext.command.new-order', ctx, {
+      key: 'TAV-33',
+    })
   })
 })
 

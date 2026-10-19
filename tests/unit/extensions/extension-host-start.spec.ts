@@ -183,9 +183,9 @@ describe('ExtensionHost.start — listing and stored extensions', () => {
   })
 })
 
-const homeSection = { label: 'Contributions', view: 'home' }
+const insightsSection = { label: 'Contributions', view: 'home' }
 
-/** The manifest after a pull: a new version that adds a renderer and a home section. */
+/** The manifest after a pull: a new version that adds a renderer and an Insights section. */
 const pulledManifest = {
   id: 'com.stored',
   name: 'Stored',
@@ -194,7 +194,7 @@ const pulledManifest = {
   main: 'main.js',
   renderer: 'dist/index.html',
   minAppVersion: '0.0.1',
-  contributes: { homeSection },
+  contributes: { insightsSection },
 }
 
 describe('ExtensionHost.start — stored records follow their manifest', () => {
@@ -209,9 +209,9 @@ describe('ExtensionHost.start — stored records follow their manifest', () => {
     expect(host.listAll()[0]).toMatchObject({
       version: '2.0.0',
       rendererUrl: 'ext://com.stored/dist/index.html',
-      contributes: { homeSection },
+      contributes: { insightsSection },
     })
-    expect(host.getExtensionContributes('com.stored')).toMatchObject({ homeSection })
+    expect(host.getExtensionContributes('com.stored')).toMatchObject({ insightsSection })
   })
 
   it('keeps a stored extension whose manifest no longer parses as it was stored', async () => {

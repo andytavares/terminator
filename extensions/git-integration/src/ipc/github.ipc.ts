@@ -7,7 +7,7 @@ import { prActionChannels } from './github/pr-actions.js'
 import { prFileChannels } from './github/pr-files.js'
 import { prCommentChannels } from './github/pr-comments.js'
 import { reviewSessionChannels } from './github/sessions.js'
-import { dashboardChannels } from './github/dashboard.js'
+import { dashboardChannels, runDashboardSearch, runMergedSearch } from './github/dashboard.js'
 import { contributionsChannels } from './github/contributions.js'
 import { viewedChannels } from './github/viewed.js'
 
@@ -19,7 +19,7 @@ export function registerGithubHandlers(
   registerRaw: RegisterFn,
   access: GithubAccess,
   options: GithubHandlerOptions = {}
-): void {
+): { refreshDashboard: () => Promise<unknown>; refreshMerged: () => Promise<unknown> } {
   const register = withTiming(registerRaw)
   const ctx = githubContext(access, options)
   const channels = [
@@ -34,4 +34,8 @@ export function registerGithubHandlers(
     ...viewedChannels(ctx),
   ]
   for (const spec of channels) register(spec)
+  return {
+    refreshDashboard: () => runDashboardSearch(ctx),
+    refreshMerged: () => runMergedSearch(ctx),
+  }
 }

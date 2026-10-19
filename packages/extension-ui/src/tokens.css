@@ -22,6 +22,8 @@
   --tm-text-primary: #e2e2ee;
   --tm-text-secondary: #9090c4;
   --tm-text-muted: #8585b8;
+  /* Quieter than muted: a caption under a value, a step not yet reached. */
+  --tm-text-faint: #6f6fa0;
   --tm-border: rgba(255, 255, 255, 0.06);
   --tm-border-strong: rgba(255, 255, 255, 0.12);
   --tm-accent: #5c6bc0;
@@ -39,6 +41,12 @@
   --tm-danger: #e46a6a;
   --tm-success: #4ade80;
   --tm-warning: #facc15;
+  --tm-warning-dim: rgba(250, 204, 21, 0.09);
+  --tm-danger-dim: rgba(228, 106, 106, 0.1);
+  /* Progress tracks: the unfilled bar, the part already done, and a dot for something idle. */
+  --tm-track: #2a2a36;
+  --tm-track-done: #3f4a8a;
+  --tm-idle: #4a4a60;
   /* Work an agent produced for the reader alone: private notes, findings. */
   --tm-agent: #b39cf5;
   --tm-agent-dim: rgba(179, 156, 245, 0.1);
@@ -112,6 +120,7 @@
   --tm-text-primary: #1a1a2e;
   --tm-text-secondary: #555580;
   --tm-text-muted: #5c5c94;
+  --tm-text-faint: #6a6a9a;
   --tm-border: rgba(0, 0, 0, 0.08);
   --tm-border-strong: rgba(0, 0, 0, 0.15);
   --tm-accent: #4a57a8;
@@ -123,6 +132,11 @@
   --tm-danger: #962d20;
   --tm-success: #0f5c2a;
   --tm-warning: #9c5400;
+  --tm-warning-dim: rgba(156, 84, 0, 0.1);
+  --tm-danger-dim: rgba(150, 45, 32, 0.1);
+  --tm-track: #dcdce8;
+  --tm-track-done: #9aa4d8;
+  --tm-idle: #a4a4bc;
   --tm-agent: #6b4fbf;
   --tm-agent-dim: rgba(107, 79, 191, 0.08);
   --tm-diff-added-bg: rgba(15, 92, 42, 0.1);

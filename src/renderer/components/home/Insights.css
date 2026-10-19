@@ -1,0 +1,173 @@
+/* Insights, drawn as in the approved Home design (.ins, .mcard, .kpi, .lr). MetricCard and
+   Sparkline bring their own styles from @terminator/extension-ui. */
+.ins {
+  display: grid;
+  gap: 16px;
+  padding: 16px 18px 20px;
+}
+
+.ins__bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.ins__row {
+  display: grid;
+  gap: 14px;
+}
+
+.ins__row--four {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.ins__row--two {
+  grid-template-columns: 1.35fr 1fr;
+}
+
+.ins__row--two > :only-child {
+  grid-column: 1 / -1;
+}
+
+.ins__up {
+  color: var(--tm-success);
+}
+
+.ins__down {
+  color: var(--tm-warning);
+}
+
+.ins__kpis {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 14px;
+  margin-top: 2px;
+}
+
+.ins__kpi small {
+  display: block;
+  color: var(--tm-text-secondary);
+  font-size: 11px;
+}
+
+.ins__kpi b {
+  display: block;
+  margin-top: 1px;
+  font-size: 19px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.ins__kpi i {
+  color: var(--tm-text-faint);
+  font-size: 10.5px;
+  font-style: normal;
+}
+
+.ins__note {
+  margin-top: 12px;
+  color: var(--tm-text-faint);
+  font-size: 11px;
+}
+
+.ins__note b {
+  color: var(--tm-text-secondary);
+  font-weight: 500;
+}
+
+.ins__lr {
+  display: grid;
+  grid-template-columns: 16px 1fr auto;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--tm-border);
+  font-size: 12px;
+}
+
+.ins__lr:last-child {
+  border-bottom: 0;
+}
+
+.ins__lr > svg {
+  width: 16px;
+  height: 16px;
+  color: var(--tm-text-faint);
+}
+
+.ins__lr:first-child > svg {
+  color: var(--tm-accent-text);
+}
+
+.ins__lr small {
+  color: var(--tm-text-faint);
+  font-size: inherit;
+}
+
+.ins__section {
+  min-width: 0;
+}
+
+.ins__tl {
+  display: grid;
+  grid-template-columns: 64px 1fr 64px;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+  font-size: 12px;
+}
+
+.ins__tl-key {
+  color: var(--tm-text-secondary);
+}
+
+.ins__tl-total {
+  color: var(--tm-text-faint);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.ins__bar-track {
+  display: flex;
+  height: 10px;
+  gap: 1px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: var(--tm-border);
+}
+
+.ins__seg--agent {
+  background: var(--tm-accent);
+}
+
+.ins__seg--you {
+  background: var(--tm-warning);
+}
+
+.ins__seg--review {
+  background: var(--tm-text-faint);
+}
+
+.ins__seg--checks {
+  background: var(--tm-success);
+}
+
+.ins__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--tm-text-muted);
+  font-size: 11.5px;
+}
+
+.ins__swatch {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 5px;
+  border-radius: 2px;
+}

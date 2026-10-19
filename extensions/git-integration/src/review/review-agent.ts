@@ -13,6 +13,7 @@ import {
   type AgentScope,
 } from '../schemas/review-agent.schema.js'
 import { runGit } from '../shell/run-git.js'
+import { envWithoutParentClaude } from '@terminator/extension-sdk/node'
 
 const DIFF_CAP_BYTES = 200 * 1024
 const DEFAULT_TIMEOUT_MS = 5 * 60_000
@@ -473,17 +474,6 @@ function doneRun(run: RunContext, output: AgentOutput): AgentRun {
   }
 }
 
-/** Scrubs a parent Claude session's env vars so the child doesn't join its bridge and hang. */
-function scrubbedEnv(): Record<string, string> {
-  const env: Record<string, string> = {}
-  for (const [k, v] of Object.entries(process.env)) {
-    if (v === undefined) continue
-    if (k === 'CLAUDECODE' || k.startsWith('CLAUDE_CODE_')) continue
-    env[k] = v
-  }
-  return env
-}
-
 function parseStructuredOutput(stdout: string): unknown {
   const parsed = JSON.parse(stdout) as { structured_output?: unknown; result?: unknown }
   if (parsed.structured_output !== undefined) return parsed.structured_output
@@ -569,7 +559,10 @@ async function launchClaude(
   const claudePath = await (deps.resolveClaude ?? (() => defaultResolveClaude(control)))()
   if (control.cancelled) return { kind: 'cancelled' }
   const spawn = deps.spawn ?? defaultSpawn
-  return spawnClaude({ ...call, spawn, claudePath, env: scrubbedEnv() }, control)
+  return spawnClaude(
+    { ...call, spawn, claudePath, env: envWithoutParentClaude(process.env) },
+    control
+  )
 }
 
 /** Stops a run wherever it is: finding claude, or running it. */

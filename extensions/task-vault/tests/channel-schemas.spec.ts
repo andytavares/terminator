@@ -42,6 +42,7 @@ async function activateCapturingChannels(): Promise<ChannelSpec[]> {
       register: async () => disposable,
     }),
     commands: partialFake<ExtensionAPI['commands']>({ register: () => disposable }),
+    home: { publish: () => {}, onAction: () => disposable },
   })
   await activate(api)
   return specs

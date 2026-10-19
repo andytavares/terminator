@@ -13,6 +13,8 @@ import { createDeciding, createStandingSources } from './ipc/standing.js'
 import { createForgeLoop } from './forge/forge-loop.js'
 import { registerForgeChannels } from './ipc/forge-registration.js'
 import { registerLineChannels } from './ipc/line-registration.js'
+import { startFoundryHomePublisher } from './home/publish.js'
+import type { HomePublisher } from './home/publish.js'
 import { registerInboxChannels } from './ipc/inbox-registration.js'
 import { registerRecordChannels } from './ipc/record-registration.js'
 import { registerSupervisionChannels } from './ipc/supervision-registration.js'
@@ -34,7 +36,9 @@ import { registerSettings } from './state/settings-schema.js'
 export function activate(api: ExtensionAPI): void {
   // Before anything opens the records or the runtime state.
   moveFromSharedUserData(api)
-  connectIndexes(api)
+  // Home is told after every change; the publisher exists once the inbox it decides through does.
+  let home: HomePublisher | null = null
+  connectIndexes(api, () => home?.scheduleFoundryPublish())
   // Activation cannot be async — the host calls it synchronously — so the
   // runtime comes up in the background.
   void startSupervisionRuntime(api)
@@ -54,17 +58,25 @@ export function activate(api: ExtensionAPI): void {
   const loop = createForgeLoop(context, { deciding, channels: () => ({ forge, runs }) })
   const forge = registerForgeChannels(context, { standingSources, loop })
   const runs = registerLineChannels(context, standingSources)
-  registerInboxChannels(context, { standingSources, runs, loop })
+  const inbox = registerInboxChannels(context, { standingSources, runs, loop })
+  home = startFoundryHomePublisher(context, { standingSources, decide: inbox.decide })
+  homePublisher = home
+  home.scheduleFoundryPublish()
   registerRecordChannels(context, signalStore)
   registerSupervisionChannels(api)
   registerModelChannels(api)
 
   registerSettings(api)
   registerViewChannels(api)
-  registerCommands(api)
+  registerCommands(api, forge)
 }
 
+// The publisher of the active session, so deactivation can stop its pending publish.
+let homePublisher: HomePublisher | null = null
+
 export function deactivate(): void {
+  homePublisher?.dispose()
+  homePublisher = null
   disposables.forEach((d) => d.dispose())
   disposables.length = 0
   // Or a reactivated extension never looks again at what the last session left

@@ -14,6 +14,7 @@ import type { PtyManager } from '../terminal/pty-manager.js'
 import type { BrowserWindow } from 'electron'
 import { defaultShellFor } from '../terminal/default-shell.js'
 import { markClosed } from '../sessions/session-record-store.js'
+import { clearAskOnInput } from '../agents/ask-watcher.js'
 
 const CreateTerminalSchema = z.object({
   projectId: z.string().uuid(),
@@ -199,6 +200,7 @@ function registerStreamHandlers({ ptyManager, relay }: TerminalContext): void {
     const parsed = TerminalInputSchema.safeParse(payload)
     if (parsed.success) {
       ptyManager.write(parsed.data.sessionId, parsed.data.data)
+      clearAskOnInput(parsed.data.sessionId, parsed.data.data)
     }
   })
 

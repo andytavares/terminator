@@ -8,11 +8,12 @@ import type {
 } from '../../shared/types/index.js'
 import type { ExtensionAPI } from '@terminator/extension-sdk'
 import { TrackerError, toErrorKind, toErrorMessage } from './tracker-error.js'
-import type {
-  StoredCredential,
-  TrackerProvider,
-  TrackerStateOption,
-  TrackerTeam,
+import {
+  MAX_MINE_ISSUES,
+  type StoredCredential,
+  type TrackerProvider,
+  type TrackerStateOption,
+  type TrackerTeam,
 } from './providers/provider.js'
 
 // The one place that decides how fresh is fresh enough, how many requests one
@@ -208,7 +209,7 @@ function searchMethods(context: ServiceContext): Pick<IssueService, 'listMine' |
   const { deps } = context
   return {
     async listMine(opts = {}): Promise<IssueListResult> {
-      const limit = opts.limit ?? DEFAULT_LIMIT
+      const limit = opts.limit ?? MAX_MINE_ISSUES
       return gather(context, trackersFor(opts), async (tracker, cred) =>
         deps.providers[tracker].listMine(cred, await deps.getMine(tracker), limit)
       )

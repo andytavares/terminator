@@ -135,6 +135,19 @@ function isShaping(order: FactoryOrderRow): boolean {
   )
 }
 
+// Home's "Open" on an order: show the Forge with that order open in the list.
+function useOpenOrderRequests(open: (orderId: string) => void): void {
+  const latest = useRef(open)
+  useEffect(() => {
+    latest.current = open
+  })
+  useEffect(() => {
+    return window.electronAPI.extensionBridge.on('foundry:ui.open-order', (data: unknown) =>
+      latest.current((data as { orderId: string }).orderId)
+    )
+  }, [])
+}
+
 // The "New work order…" quick action, whether or not this view was open: a request
 // now, or one that fired before the view existed, picked up on first mount.
 function useNewOrderRequests(open: () => void): void {
@@ -224,6 +237,10 @@ function useChrome(): Chrome {
   useNewOrderRequests(() => {
     surfaces.show('forge')
     setFocusIdeaSignal((n) => n + 1)
+  })
+  useOpenOrderRequests((orderId) => {
+    surfaces.show('forge')
+    forge.openInList(orderId)
   })
   useWorkspaceSwitch((next) => {
     setRepoRoot(next)

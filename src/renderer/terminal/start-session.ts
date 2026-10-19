@@ -17,12 +17,15 @@ import { SCRATCH_PROJECT_ID } from '../../shared/types/index'
  *
  * The working directory is the branch's own checkout when it has one — a
  * worktree — and otherwise the repo's folder, the same rule the rest of the app
- * resolves a terminal's cwd by.
+ * resolves a terminal's cwd by. Returns the new session's id, or null when none opened.
  */
-export async function startSessionInBranch(projectId: string): Promise<void> {
+export async function startSessionInBranch(
+  projectId: string,
+  initialCommand?: string
+): Promise<string | null> {
   const { workspaces, projectsByWorkspaceId } = useWorkspaceStore.getState()
   const project = [...projectsByWorkspaceId.values()].flat().find((p) => p.id === projectId)
-  if (project === undefined) return
+  if (project === undefined) return null
   const workspace = workspaces.find((w) => w.id === project.workspaceId)
   const { scrollbackLimit } = useSettingsStore
     .getState()
@@ -35,10 +38,13 @@ export async function startSessionInBranch(projectId: string): Promise<void> {
       title: '',
       cwd,
       scrollbackLimit,
+      ...(initialCommand === undefined ? {} : { initialCommand }),
     })
     revealSession(sessionId)
+    return sessionId
   } catch {
     // The controller has already said why; Home stays where it is.
+    return null
   }
 }
 

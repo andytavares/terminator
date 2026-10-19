@@ -90,6 +90,7 @@ function capturingApi(
     paths: { app: '/app', globalStorage: places.globalStorage },
     log: { debug: () => {}, info: () => {}, warn: spies.warn, error: () => {} },
     commands: { register: () => disposable },
+    home: { publish: vi.fn(), onAction: vi.fn(() => disposable) },
     window: partialFake<ExtensionAPI['window']>({ broadcast: () => {}, openAuxiliary: () => {} }),
     nativeMenu: partialFake<ExtensionAPI['nativeMenu']>({ addViewMenuItem: () => disposable }),
     notifications: partialFake<ExtensionAPI['notifications']>({

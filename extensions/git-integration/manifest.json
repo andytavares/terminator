@@ -34,7 +34,7 @@
       }
     },
     "shellRoots": ["terminator.git-integration.review.cloneFolder"],
-    "homeSection": {
+    "insightsSection": {
       "label": "Contributions",
       "view": "home"
     }

@@ -19,7 +19,7 @@ import { activateFoundry, deactivate } from '../helpers/foundry-activation.js'
 import type { FoundryHost } from '../helpers/foundry-host.js'
 import { writeBaseline } from '../../src/line/baseline.js'
 import { provenBaseline } from '../helpers/environment.js'
-import { createOrderStore } from '../../src/order/store.js'
+import { orderStoreAt } from '../../src/state/live-index.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import {
   convergeOrder,
@@ -161,7 +161,7 @@ describe('a plan still failing its checks when the operator lets go', () => {
     // Saved before anything reads it: the records are read once, then pushed to.
     const gap = readyDraft(repo)
     const units = gap.plan.units.map((unit) => ({ ...unit, satisfies: [] }))
-    await createOrderStore(dataDir).save({ ...gap, plan: { ...gap.plan, units } })
+    await orderStoreAt(dataDir).save({ ...gap, plan: { ...gap.plan, units } })
     await setOrderHeld(true)
     await host.call('foundry:order.converge', { id: 'WO-1', message: 'tighten the plan' })
     await untilLedgerHas(dataDir, 'order.redrafted')
@@ -188,7 +188,7 @@ describe('a plan still failing its checks when the operator lets go', () => {
 
 describe('letting go of an order with nothing to pick up', () => {
   it('starts nothing for an order that is no longer a draft', async () => {
-    await createOrderStore(dataDir).save({ ...readyDraft(repo), status: 'agreed' })
+    await orderStoreAt(dataDir).save({ ...readyDraft(repo), status: 'agreed' })
     await setOrderHeld(true)
     await setOrderHeld(false)
     await new Promise((resolve) => setTimeout(resolve, 100))
@@ -211,7 +211,7 @@ describe('letting go of an order with nothing to pick up', () => {
 
 /** An order the operator handed off and answered a gate on before it came back to the Forge. */
 async function releasedBefore(): Promise<void> {
-  const store = createOrderStore(dataDir)
+  const store = orderStoreAt(dataDir)
   await store.save(readyDraft(repo))
   await writeBaseline(dataDir, 'WO-1', provenBaseline())
   for (const action of ['order.agreed', 'run.started', 'gate.decided']) {

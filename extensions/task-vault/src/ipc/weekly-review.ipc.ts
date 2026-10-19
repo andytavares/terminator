@@ -4,6 +4,7 @@ import { z } from 'zod'
 import type { ExtensionAPI, ExtensionDB } from '@terminator/extension-sdk'
 import { noPayload } from '@terminator/extension-sdk'
 import { localRoute, registerRoutes, route, type IpcContext } from './register'
+import { indexUpdated } from './vault-shared'
 import {
   completeReview,
   formatReviewMarkdown,
@@ -45,8 +46,10 @@ const idSchema = z.object({ reviewId: z.string().min(1) })
 
 const listSchema = z.object({ limit: z.number().int().positive().max(500).optional() }).default({})
 
-function startWeeklyReview({ db }: IpcContext) {
-  return startOrResumeReview(db)
+async function startWeeklyReview({ db }: IpcContext) {
+  const started = await startOrResumeReview(db)
+  indexUpdated()
+  return started
 }
 
 async function logWeeklyReviewAction({ db }: IpcContext, args: z.infer<typeof logSchema>) {
@@ -55,6 +58,7 @@ async function logWeeklyReviewAction({ db }: IpcContext, args: z.infer<typeof lo
 
 async function completeWeeklyReview({ db }: IpcContext, args: z.infer<typeof completeSchema>) {
   await completeReview(db, args)
+  indexUpdated()
   return { ok: true }
 }
 

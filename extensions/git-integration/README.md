@@ -35,7 +35,7 @@ Configure under **Settings → Git Integration**. `activate` (`src/index.ts`) re
 | `terminator.git-integration.git.githubToken`                      | string  | `''`      | global    | Token passed to gh as `GH_TOKEN`; stored as a secret           |
 | `terminator.git-integration.git.commit.signOff`                   | boolean | `false`   | workspace | Commit with `--signoff` (a `Signed-off-by` trailer)            |
 | `terminator.git-integration.git.maxDisplayedFiles`                | number  | `500`     | global    | Changed files the Git tab lists at most (10–5000)              |
-| `terminator.git-integration.home.showContributions`               | boolean | `true`    | global    | Show the Contributions section at the top of Home              |
+| `terminator.git-integration.home.showContributions`               | boolean | `true`    | global    | Show the Contributions section on the Insights view of Home    |
 | `terminator.git-integration.review.agentModel`                    | enum    | `sonnet`  | global    | Review agent model: `opus` or `sonnet`                         |
 | `terminator.git-integration.review.agentEffort`                   | enum    | `default` | global    | Review agent effort: `default`, `low`, `medium`, `high`        |
 | `terminator.git-integration.review.cloneFolder`                   | folder  | `''`      | global    | Where "Clone and review" clones; empty keeps reviews diff-only |
@@ -44,7 +44,7 @@ Configure under **Settings → Git Integration**. `activate` (`src/index.ts`) re
 
 `git:commit` and `git:status` read the two Git settings on every call (`src/git-settings.ts`), so a change applies to the next commit and the next status refresh. With more changed files than **Max displayed changed files**, the Git tab lists that many and says so.
 
-**Show contributions on Home** is read by the Home view when it opens and again whenever a setting changes (`src/components/contributions/ContributionsOnHome.tsx`), so switching it off removes the section at once and switching it on brings it back, with no reload.
+**Show contributions on Insights** is read by the Insights view of Home when it opens and again whenever a setting changes (`src/components/contributions/ContributionsOnHome.tsx`), so switching it off removes the section at once and switching it on brings it back, with no reload.
 
 A **workspace** setting can also be set per workspace in Workspace Settings ("Use global default" hands it back), and is read for the repository a call is about (`api.settings.get(key, { repoPath })`). Sign-off is read for the repository being committed in. **Enable Git Integration** is read for the repository a channel names (`repoRoot`, or `git:status`'s `path`): where it is off, the channel answers `{ error: 'GIT_DISABLED' }` and runs nothing (`src/ipc/workspace-switch.ts`), and the Git tab says "Git Integration is off for this workspace." A channel that names no repository follows the global value. The extension activates when the setting is on globally or in any workspace; off everywhere, it registers only its settings page, and switching it back on takes a reload.
 

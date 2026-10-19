@@ -1,7 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest'
+import { clearAsk } from '../../../src/main/agents/ask-watcher'
 import { OutputRelay, type RendererSend } from '../../../src/main/terminal/output-relay'
 import { OUTPUT_FLUSH_INTERVAL_MS } from '../../../src/main/terminal/output-batcher'
 import { HIGH_WATERMARK_CHARS, LOW_WATERMARK_CHARS } from '../../../src/main/terminal/flow-control'
+
+vi.mock('../../../src/main/agents/ask-watcher', () => ({ clearAsk: vi.fn() }))
 
 function relayPtyManager() {
   const dataListeners: Array<(data: string) => void> = []
@@ -36,6 +39,11 @@ function useRelay(): void {
 
 describe('OutputRelay', () => {
   useRelay()
+
+  it('withdraws the exited session’s pending ask', () => {
+    ptyManager.pushExit(0)
+    expect(clearAsk).toHaveBeenCalledWith('s1')
+  })
 
   it('sends the chunks of one frame as one message', () => {
     ptyManager.pushData('a')

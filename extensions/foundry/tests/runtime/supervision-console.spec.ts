@@ -8,7 +8,7 @@ import * as path from 'node:path'
 
 import { fakeHost, temporaryDirectory, type FoundryHost } from '../helpers/foundry-host.js'
 import { activateFoundry, deactivate } from '../helpers/foundry-activation.js'
-import { createOrderStore } from '../../src/order/store.js'
+import { orderStoreAt } from '../../src/state/live-index.js'
 import { draftOrder } from '../../src/order/draft.js'
 import { orderDir } from '../../src/data-root.js'
 import { theRunner } from '../helpers/supervision-mocks.js'
@@ -39,7 +39,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   dataDir = temporaryDirectory('fdry-console')
-  await createOrderStore(dataDir).save(
+  await orderStoreAt(dataDir).save(
     draftOrder({
       id: 'WO-1',
       title: 'Make it red',

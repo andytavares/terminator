@@ -1,6 +1,6 @@
 # ADR 116: Extensions can add a home section
 
-**Status**: Accepted
+**Status**: Accepted. Superseded in part by [ADR 117](117-extensions-send-home-data-core-draws-it.md): sections now render on Home's Insights view, under `contributes.insightsSection`.
 
 **Date**: 2026-10-16
 

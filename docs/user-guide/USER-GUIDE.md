@@ -229,13 +229,13 @@ Open Settings with **`Cmd+,`** or via **View → Open Settings**.
 
 ### Global settings
 
-| Section            | Options                                                   |
-| ------------------ | --------------------------------------------------------- |
-| **Interface**      | Theme (dark/light), show CPU/Memory/Network bar           |
-| **Terminal**       | Default shell, scrollback limit                           |
-| **Integrations**   | Connect Linear and Jira — see below                       |
-| **Extensions**     | Enable/disable individual extensions                      |
-| **Remote Control** | Enable local server, port, ngrok tunnel, session password |
+| Section            | Options                                                                       |
+| ------------------ | ----------------------------------------------------------------------------- |
+| **Interface**      | Theme (dark/light), show CPU/Memory/Network bar, hide the branch tree on Home |
+| **Terminal**       | Default shell, scrollback limit                                               |
+| **Integrations**   | Connect Linear and Jira — see below                                           |
+| **Extensions**     | Enable/disable individual extensions                                          |
+| **Remote Control** | Enable local server, port, ngrok tunnel, session password                     |
 
 ### Integrations — connecting an issue tracker
 
@@ -393,36 +393,111 @@ only thing it can write is a comment, and only in two places:
 
 ## 11. Home and the Overview Wall
 
-### Home
+### Home, the Desk
 
-![Home, Ledger layout](screenshots/11a-home-ledger.png)
+Terminator opens on **Home**, which is the **Desk**: what waits on you, what is in flight, and what you meant to do today, on one screen. The header holds the **Desk | Insights** switch, **Search** (`Cmd+K`) and **Start work** (`Cmd+N`). Under it a summary line counts what needs you, how many agents are working, what waits on others and how many checks fail; press a count to narrow the Desk to it, and press it again to clear.
 
-Terminator opens on **Home**. It answers one question for every terminal you have open: which session, in which repo and branch, is working on what, and what state is it in. The Home icon at the top of the sidebar counts the sessions waiting on you.
+![The Desk: an agent's question in Your move, two branches under In flight](screenshots/11a-home-desk.png)
 
-Home has two layouts. Switch between them with **Ledger** and **Logbook** at the top; Terminator remembers which you chose.
+While Home shows, the branch tree is hidden, so Home has the whole window. `Cmd+B` shows it for as long as you stay on Home. To keep the tree beside Home, turn off **Hide the branch tree on Home** in **Settings → Interface**.
 
-- **Ledger** — one row per session, grouped by repo and branch. Sessions waiting on you are lifted into a **Needs you** band at the top, tinted amber. Each state is a labelled chip — amber when a session needs you, green while it works, grey when idle or exited — and a session keeps its place while it prints; it moves only when it starts needing you, exits, or is new, and new ones join at the end. Each row shows the session's state, name, branch, its ticket or your description, its latest line of output and how long since it was active. Click a row to open a live preview with **Open terminal**; press `Enter` to go straight to the terminal. **Display** chooses the grouping, the sort, which columns show, whether the selected row previews, and whether exited sessions are hidden — all remembered.
-- **Logbook** — sessions listed under **Needs you**, **Running**, **Exited** and **Closed**, each headlined by its ticket's title, or your description, or **Add a description**. Select one to see where it lives, edit what it is for (**Save description**, or `Cmd+Enter`), link a ticket, and watch a large live preview. Tickets worth linking are suggested: your branch's own ticket, then open tickets assigned to you.
+#### Your move
 
-**New terminal** starts work without leaving Home: pick any branch in any repo, or a scratch terminal that belongs to none. Terminator opens the terminal it started, so you land in it.
+The full-width **Your move** band lists everything waiting on you, from Terminator and from extensions, oldest and hottest first:
 
-**Filter sessions** matches a session's name, repo, branch, ticket key or title, and description. **Needs you** narrows either layout to sessions waiting on you. Neither filter is remembered, so Home never opens narrowed.
+- an agent asking a question, and an agent that finished while you were away;
+- a failing check on your pull request, a review you owe, a Foundry decision;
+- a task that is due, and the weekly review when Task Vault offers it.
 
-![Home, Logbook layout](screenshots/11b-home-logbook.png)
+Each row says where it comes from, what it asks and how long it has waited, and puts its main action on the row. The **Home** icon counts the asks and reads out as "Home, 3 need you". With nothing waiting the band becomes one quiet line, "Nothing needs you.", with how many agents are working and how many things you finished today.
+
+**E** marks an ask done and **H** snoozes it until an hour from now, this afternoon or tomorrow; a snoozed ask wakes early if the work moves. A line under the band counts what is snoozed and what you finished today.
+
+#### Answering in place
+
+Open an ask (click it, or press `Enter`) and it expands in the band. You see the agent's last screen as text, its numbered answers as buttons and a field to **Reply in your own words**. Press **1**–**9** to pick that answer, **R** to reply, **T** to open the terminal and `Esc` to close. A numbered answer is typed into the terminal as if you had typed the number, after Terminator reads the screen again and checks the question is still the same; nothing is sent if you answered it in the terminal first.
+
+Questions from Claude Code arrive through its `Notification` and `Stop` hooks. On start Terminator adds those two entries, beside the `SessionStart` entry, to your own `~/.claude/settings.json`; each runs a small script that records which terminal is asking and writes nothing else. To remove them, delete the entries under `hooks.Notification` and `hooks.Stop` whose command mentions `agent-ask-hook.cjs` after quitting Terminator. A terminal that is not Claude Code still asks by ringing the bell or leaving a numbered choice on screen.
+
+#### In flight
+
+**In flight** lists the work behind your terminals, Foundry orders and pull requests, one row per piece of work: a ticket with its sessions and pull request, a branch, or an order. A row shows the work, its stage (Shaping, Building, In review, Merging, Shipped) with a caption, its agents, its pull request and when it last moved. Rows are grouped by whose move it is — **Agents working**, **Waiting on others** — or by repo; **Group** at the right changes it. Scratch terminals and work untouched for two days sit under a collapsed **Parked** group.
+
+Press a row, or `Enter` on it, to open its **drawer**. The drawer holds a short written summary of what is happening and what blocks it (Terminator asks Claude Code, with no tools, to read the agents' latest messages and the pull request), the agents and terminals on it with how long they have run and their tokens, the pull request and its checks with **Send to agent** on a failing one, and a timeline. Its buttons are **Open terminal**, **New agent on this branch**, the pull request and ticket links, and **Park**. `Esc` closes the drawer.
+
+#### Today
+
+The **Today** rail holds **Today's focus** — up to three items you chose with **Add** — and **This week** with how long agents waited on you and the agent hours, against last week. **Open Insights** switches to the second view. On the first view of Home each day, **Plan today** (see below) sits above the Desk.
+
+#### Search
+
+`Cmd+K` puts the cursor in **Search work**. It filters both Your move and In flight by what a row says: the ticket key and title, the repo, the branch, the description and the question.
+
+#### Start work
+
+**Start work** (`Cmd+N`, the header button, or Quick Actions) opens a launcher with four tabs:
+
+- **My tickets** lists your open Linear tickets by state; type to search.
+- **Prompt** starts from a sentence describing the task.
+- **Branch** starts on an existing branch.
+- **Scratch terminal** opens a terminal that belongs to no branch.
+
+Choose how to run it — as a **Claude agent**, **Terminal only**, or a **Foundry** order — with `Tab`, and the repo with `Cmd+R`. `Enter` starts it, and Terminator opens what it started so you land in it.
+
+#### Keyboard
+
+| Key          | Does                                                 | Where                   |
+| ------------ | ---------------------------------------------------- | ----------------------- |
+| `J` / `K`    | Next and previous item                               | Your move, In flight    |
+| `Enter`      | Expand an ask, or open the thread drawer             | Both                    |
+| `1`–`9`      | Pick that numbered answer                            | An expanded ask         |
+| `R`          | Reply in your own words                              | An expanded ask         |
+| `E`          | Done: remove it from the band                        | Your move               |
+| `H`          | Snooze: 1 hour, this afternoon, tomorrow             | Your move               |
+| `T`          | Open the terminal                                    | Any item with a session |
+| `G` then `I` | Switch to Insights; `G` then `D` returns to the Desk | Home                    |
+| `Cmd+K`      | Search                                               | Home                    |
+| `Cmd+N`      | Start work                                           | Everywhere              |
+| `Cmd+P`      | Quick actions                                        | Everywhere              |
+| `Cmd+B`      | Show or hide the branch tree                         | Home                    |
+
+The single-letter keys act only while focus is inside Home, and never while a terminal or a text field has it, so typing a reply never moves the selection.
+
+### Insights
+
+![Insights, a card for each question](screenshots/11b-home-insights.png)
+
+**Insights** is the second view of Home, for looking back. Each card is titled by the question it answers, and none compares you with anyone else. **This week**, **30 days**, **Quarter** and **Year** at the top choose the range every card covers.
+
+- **How much shipped?** Merged pull requests, against the range before. It comes from Git integration.
+- **How long from start to merge?** The median days from a ticket's first session to its merge, and the middle half. It needs at least three merged tickets in the range; until then the card says **Not enough merged work yet** rather than guess.
+- **How long do agents wait on me?** The median time an agent sat waiting for your answer, how many asks that was, and how many waited over 30 minutes.
+- **How often does it pass first time?** The share of Foundry orders whose checks passed on the first try. It is hidden when Foundry publishes nothing.
+- **How am I spending agent time?** Agent hours, how many agents ran at once, the share that finished without asking you, and Foundry orders shipped. Below them, **Tokens** and **Estimated cost** come from the agents' own conversation files. The cost is an estimate from public prices, and says **partial** when a model had no price.
+- **When do I ship?** A view an extension adds to Insights; Git integration's contribution heatmap lives here. **Show contributions on Insights** in Git Integration's settings switches it off.
+- **Looking back** gathers the weekly review (when Task Vault offers it), the longest wait on you, and the oldest review you owe.
+
+A card with no number to show says why instead of showing a made-up one. Terminator keeps 90 days of how agents waited, so **Year** shows at most that much of it.
+
+### Plan today
+
+On the first view of Home each day, **Plan today** appears above the Desk. It starts with a line such as "Yesterday you finished 2 of 3 focus items. Overnight, 2 agents finished and 1 review came in." and has three columns:
+
+- **Carried over** lists focus items you picked yesterday and did not finish, and your open Task Vault tasks for today.
+- **Since you left** lists what happened after you last had Home open: agents that finished, review requests, pull requests approved or merged, and failing checks.
+- **Today's focus** has three slots. **Add** on any item puts it in the next free slot, and **×** takes it out. When the slots are full, **Add** is off.
+
+Under the slots, **Estimated review time for your queue** adds up the "about N min" of the reviews you owe, so you see the load before you take more on. **Start the day** (`Cmd+Enter`) or **Skip today** hides the band until tomorrow.
 
 ### Saying what a session is for
 
-A session with no ticket shows **What is this session doing?**. Type an answer and press `Enter` — on Home, on its Overview tile, or from its tab (right-click → **Add description…**, or `Cmd+I`). The description is saved at once and survives a restart. When the session ends, it moves to **Closed** and stays findable by the filter for 30 days.
+A session with no ticket can say what it is for. Right-click its tab and choose **Add description…** (or press `Cmd+I`), type an answer and press `Enter`; on Overview the tile asks **What is this session doing?** in place. The description is saved at once and survives a restart. On the Desk it names the work: the row and its drawer show your words when no ticket does. A described or linked session is kept for 30 days after it ends.
 
-### Ending a session, and clearing it away
-
-Every row on Home, every entry in the Logbook and every tile on Overview carries a **×**. On a running session it ends the terminal, exactly as closing its tab would; the session then moves to **Closed** with its description and ticket intact. On a session already under **Closed** the same **×** reads **Remove from the list** and deletes what is left of it — description, link and captured conversation — so you can clear history without waiting out the 30 days. Neither asks for confirmation.
-
-**New terminal** on Home and on Overview starts one on any branch, or a scratch terminal, without going to the sidebar.
+**New terminal** on Overview, and **Start work** on the Desk, start one on any branch, or a scratch terminal, without going to the sidebar. A session you close ends the terminal exactly as closing its tab would.
 
 ### Linking a session to a ticket
 
-A session shows its branch's linked ticket by default. **Link** on any row, tile or the Logbook pins a different Linear or Jira ticket to that one session, which matters when two terminals on one branch serve different tickets. **Remove session link** hands the session back to its branch's ticket; the branch's own link is never changed from here. With no tracker connected, the dialog tells you to connect one in **Settings → Integrations**. The ticket an agent is briefed with at start-up still comes from the branch (see [What your agent sessions are told](#what-your-agent-sessions-are-told)).
+A session shows its branch's linked ticket by default. Right-click a session's tab or its tile and choose **Link issue…** to pin a different Linear or Jira ticket to that one session, which matters when two terminals on one branch serve different tickets. **Remove session link** hands the session back to its branch's ticket; the branch's own link is never changed from here. With no tracker connected, the dialog tells you to connect one in **Settings → Integrations**. The ticket an agent is briefed with at start-up still comes from the branch (see [What your agent sessions are told](#what-your-agent-sessions-are-told)).
 
 ### The Overview wall
 
@@ -430,11 +505,11 @@ A session shows its branch's linked ticket by default. **Link** on any row, tile
 
 **Overview** (`Cmd+Shift+E`) shows every open terminal as a live tile, named by repo, branch and session, with its ticket or description underneath. Sessions waiting on you are pinned double-width in a **Needs you** band at the top, with an amber border; everything else follows, ordered by state unless **Then by** says otherwise. **Recently opened** orders by when you last opened each one. Output never moves a tile.
 
-Opening a session from anywhere — a Ledger row, a tile, the sidebar, a tab, Quick Actions, or a notification — takes you to its terminal with the cursor in it, ready to type.
+Opening a session from anywhere — a work thread's drawer, a tile, the sidebar, a tab, Quick Actions, or a notification — takes you to its terminal with the cursor in it, ready to type.
 
 A ticket linked to one terminal shows as its key on that terminal's sidebar row, on its branch's row while the branch is collapsed (with **+N** when its terminals carry more than one), and on its tab. Right-click either to link, change or remove it; **Quick actions → Link issue** links the focused terminal, and **Link issue to branch** links the branch. An agent started in that terminal is given the terminal's own ticket as context, over the branch's.
 
-When an agent is waiting on a numbered choice — a Claude Code permission prompt, for example — its options appear as buttons on the tile and in the Ledger's preview. Pressing one answers it as if you had typed the number. Terminator reads the screen again first, and sends nothing if the question has changed or been answered in the terminal.
+When an agent is waiting on a numbered choice — a Claude Code permission prompt, for example — its options appear as buttons on the tile and in the Desk's Your move band. Pressing one answers it as if you had typed the number. Terminator reads the screen again first, and sends nothing if the question has changed or been answered in the terminal.
 
 Tile size (**S**, **M**, **L**), **Pin sessions that need you** and **Then by** are remembered. Previews fill the tile's width and follow the cursor, so the newest line is the one you see; on a very wide terminal, Large tiles are the readable size.
 
@@ -442,9 +517,9 @@ Tile size (**S**, **M**, **L**), **Pin sessions that need you** and **Then by** 
 
 ### Picking a Claude Code conversation back up
 
-When a Claude Code session ends — you typed `/exit`, the terminal closed, or you quit Terminator — the conversation itself is still on disk. A **Resume** button appears on that session wherever it is shown: its Ledger row, its Logbook entry, and its Overview tile. Press it and Terminator opens a terminal on the same branch, in the same folder, running `claude --resume` for that conversation. The new terminal takes over the old one's description and ticket link, and the exited tab closes, so there is one terminal per conversation.
+When a Claude Code session ends — you typed `/exit`, the terminal closed, or you quit Terminator — the conversation itself is still on disk. A **Resume** button appears on that session wherever it is shown: its work thread's drawer on Home, and its Overview tile. Press it and Terminator opens a terminal on the same branch, in the same folder, running `claude --resume` for that conversation. The new terminal takes over the old one's description and ticket link, and the exited tab closes, so there is one terminal per conversation.
 
-After a restart, conversations from the last run sit under **Closed** on Home with their Resume button. Nothing is resumed for you: a restart never starts agents on its own, so you choose which threads to pick up.
+After a restart, conversations from the last run wait with their Resume button. Nothing is resumed for you: a restart never starts agents on its own, so you choose which threads to pick up. A thread whose sessions have all ended stays under In flight (under Parked after two days) until its pull request merges or closes, or its records are dropped after 30 days. **Resume a conversation…** in Quick actions (`Cmd+P`) opens the drawer of the thread holding the most recent one.
 
 Resume appears only where it can work:
 
@@ -494,6 +569,8 @@ Click the **bell icon** in the sidebar header to open the notification center pa
 | Settings                             | `Cmd+,`                  |
 | Toggle Overview screen               | `Cmd+Shift+E`            |
 | Open Home                            | `Cmd+~`                  |
+| Start work (on Home)                 | `Cmd+N`                  |
+| Search Home                          | `Cmd+K` (on Home)        |
 | Send newline (always)                | `Cmd+Enter`              |
 | Send newline (bracketed paste mode)  | `Shift+Enter`            |
 | Leave an extension, back to terminal | `Esc` `Esc`              |

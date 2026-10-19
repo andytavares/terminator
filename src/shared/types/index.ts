@@ -1,4 +1,5 @@
 export type { NotificationTarget } from '../notifications/resolve-targets'
+import type { AgentAsk } from '../agent-sessions/ask'
 import type { NotificationTarget, NotificationType } from '../notifications/resolve-targets'
 
 export interface NotificationAction {
@@ -98,6 +99,8 @@ export interface TerminalSession {
   latestLine?: string
   /** A numbered-choice prompt read off the visible screen at the last busy → idle (renderer-side view state). */
   choicePrompt?: ChoicePrompt
+  /** What the agent said it is waiting on, from its Notification hook (renderer-side view state). */
+  agentAsk?: AgentAsk
 }
 
 /** One option in a numbered-choice prompt, numbered as on screen. */
@@ -126,7 +129,7 @@ interface ExtensionContributes {
   workspaceTab?: ExtensionSurfaceContribution
   projectTab?: ExtensionSurfaceContribution
   sidebarPanel?: ExtensionSurfaceContribution
-  homeSection?: ExtensionSurfaceContribution
+  insightsSection?: ExtensionSurfaceContribution
   windowViews?: Array<{ id: string; view: string }>
   commands?: Array<{
     id: string
@@ -137,6 +140,8 @@ interface ExtensionContributes {
     requires?: 'repo' | 'session'
   }>
   quickActions?: { group?: { mnemonic?: string; label: string } }
+  /** Ways to run work from the Start work launcher; `command` is one of the extension's command ids. */
+  startWorkOptions?: Array<{ id: string; label: string; description: string; command: string }>
   /** Keys of the extension's own folder settings whose directories its git and gh may run in. */
   shellRoots?: string[]
 }

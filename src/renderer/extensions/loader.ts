@@ -95,21 +95,38 @@ function registerContributedSidebarPanel(
   })
 }
 
-/** The home section, which sits at the top of Home and sizes to its content. */
-function registerContributedHomeSection(
+/** The Insights section, drawn on the Insights view of Home and sized to its content. */
+function registerContributedInsightsSection(
   ext: Extension,
   contributes: Contributes,
   registry: Registry
 ): void {
-  const { homeSection } = contributes
-  if (!homeSection) return
-  const viewParam = homeSection.view ?? 'home'
-  registry.registerHomeSection({
+  const { insightsSection } = contributes
+  if (!insightsSection) return
+  const viewParam = insightsSection.view ?? 'home'
+  registry.registerInsightsSection({
     id: ext.id,
-    label: homeSection.label,
+    label: insightsSection.label,
     component: makePortalComponent(ext, viewParam, true),
     view: viewParam,
   })
+}
+
+/** The ways to run work that the extension adds to the Start work launcher. */
+function registerContributedStartWorkOptions(
+  ext: Extension,
+  contributes: Contributes,
+  registry: Registry
+): void {
+  for (const { id, label, description, command } of contributes.startWorkOptions ?? []) {
+    registry.registerStartWorkOption({
+      key: `${ext.id}:${id}`,
+      extensionId: ext.id,
+      label,
+      description,
+      command,
+    })
+  }
 }
 
 /** Window views, and the shortcuts that toggle the extension's sidebar panel. */
@@ -141,7 +158,8 @@ export function registerWebviewExtension(ext: Extension, registry: Registry): vo
   registerFullTabs(ext, ext.contributes, registry)
   registerContributedProjectTab(ext, ext.contributes, registry)
   registerContributedSidebarPanel(ext, ext.contributes, registry)
-  registerContributedHomeSection(ext, ext.contributes, registry)
+  registerContributedInsightsSection(ext, ext.contributes, registry)
+  registerContributedStartWorkOptions(ext, ext.contributes, registry)
   registerWindowsAndShortcuts(ext, ext.contributes, registry)
 }
 

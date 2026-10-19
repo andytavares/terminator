@@ -521,3 +521,14 @@ describe('session navigation shortcuts (FR-032) — leaves the new bindings alon
     field.remove()
   })
 })
+
+describe('useKeyboardShortcuts — Cmd+K on Home', () => {
+  it('leaves Cmd+K to the search field while Home is the active tab', () => {
+    setup({ activeProjectId: 'proj-1' })
+    withTabs('proj-1', ['session-1'], 'session-1')
+    useExtensionRegistry.setState({ activeGlobalTabId: 'core.home' })
+    renderHook(() => useKeyboardShortcuts())
+    pressKey('k', { metaKey: true })
+    expect(input).not.toHaveBeenCalled()
+  })
+})

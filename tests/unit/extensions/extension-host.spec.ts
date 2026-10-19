@@ -249,11 +249,11 @@ describe('ExtensionHost lifecycle — reinstall', () => {
     const { host } = await newExtensionHost()
     await host.load(writeManifestOnly('com.pulled'))
     await host.uninstallExtension('com.pulled')
-    const homeSection = { label: 'Contributions', view: 'home' }
+    const insightsSection = { label: 'Contributions', view: 'home' }
 
-    await host.load(writeManifestOnly('com.pulled', { contributes: { homeSection } }))
+    await host.load(writeManifestOnly('com.pulled', { contributes: { insightsSection } }))
 
-    expect(host.getExtensionContributes('com.pulled')).toMatchObject({ homeSection })
+    expect(host.getExtensionContributes('com.pulled')).toMatchObject({ insightsSection })
   })
 })
 

@@ -1,5 +1,6 @@
 import type { AgentState, CustomAction } from '../../shared/types'
 import { expandVariables, type VarName } from './variables'
+import { pastedLine } from '../terminal/typed-input'
 
 export interface CustomRunEnv {
   focused: { sessionId: string; isAgent: boolean; agentState: AgentState } | null
@@ -12,7 +13,6 @@ export type CustomRunPlan =
   | { ok: true; kind: 'input'; sessionId: string; data: string }
   | { ok: true; kind: 'new-tab'; projectId: string; data: string }
 
-/** @internal */
 export const MAX_TYPED_LINE_BYTES = 1024
 
 function planPrompt(a: CustomAction, env: CustomRunEnv, text: string): CustomRunPlan {
@@ -26,7 +26,7 @@ function planPrompt(a: CustomAction, env: CustomRunEnv, text: string): CustomRun
     ok: true,
     kind: 'input',
     sessionId: env.focused.sessionId,
-    data: `\x1b[200~${text}\x1b[201~\r`,
+    data: pastedLine(text),
   }
 }
 

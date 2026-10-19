@@ -72,7 +72,7 @@ const PROBE_TRIES = 40
 /** Writes the probe file until the watch reports it, which is the only proof the watch is armed:
  * macOS arms `fs.watch` a moment after it returns and has no event for it
  * (https://nodejs.org/api/fs.html#caveats). Returns how to stop trying. */
-function probeUntilArmed(directory: string, isArmed: () => boolean): () => void {
+export function probeUntilArmed(directory: string, isArmed: () => boolean): () => void {
   const probe = path.join(directory, ARMED_PROBE)
   let timer: NodeJS.Timeout | undefined
   const tryOnce = (triesLeft: number): void => {

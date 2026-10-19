@@ -21,7 +21,7 @@ import { writeBaseline } from '../../src/line/baseline.js'
 import type { Baseline } from '../../src/line/baseline.js'
 import { orderDir } from '../../src/data-root.js'
 import { partialFake } from '../../../../tests/support/fakes'
-import { readGraph } from '../../src/state/live-index.js'
+import { orderStoreAt, readGraph } from '../../src/state/live-index.js'
 import type { WorkOrder } from '../../src/order/schema.js'
 import { theRunner } from '../helpers/supervision-mocks.js'
 import { ledgerActions } from '../helpers/order-ledger.js'
@@ -64,7 +64,7 @@ function githubWithOneDraft(checksFor: () => string): void {
 }
 
 async function startOrderRun(saved: WorkOrder, recipe = 'direct'): Promise<void> {
-  await createOrderStore(dataDir).save(saved)
+  await orderStoreAt(dataDir).save(saved)
   expect(await host.call('foundry:run.start', { id: saved.id, recipe })).toMatchObject({
     started: true,
   })

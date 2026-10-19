@@ -294,6 +294,81 @@ export interface SaveDialogOptions {
   filters?: Array<{ name: string; extensions: string[] }>
 }
 
+export interface HomeApi {
+  /** Replace everything this extension shows on Home. */
+  publish(feed: HomeFeed): void
+  /** Called when the user presses one of this extension's item actions. */
+  onAction(handler: (itemId: string, actionId: string) => Promise<void>): Disposable
+}
+
+export interface HomeFeed {
+  asks: HomeAsk[]
+  facets: ThreadFacet[]
+  measures: HomeMeasure[]
+  focus?: HomeFocusCandidate[]
+}
+
+export interface HomeAsk {
+  id: string
+  kind: 'answer' | 'fix' | 'review' | 'decide' | 'finished' | 'task'
+  title: string
+  detail: string
+  /** Where it comes from, e.g. "terminator · TAV-20 · pull request #275". */
+  where?: string
+  facts: string[]
+  workKey: WorkKey | null
+  /** ISO time. */
+  since: string
+  /** An action with the id `SEND_TO_AGENT_ACTION` (exported from the SDK) also appears as Send
+   * to agent on the failing checks of the work this ask is about. */
+  actions: { id: string; label: string; primary?: boolean }[]
+  open: { command: string; args?: unknown }
+}
+
+export type WorkKey =
+  | { tracker: 'linear' | 'jira'; key: string }
+  | { repoRoot: string; branch: string }
+
+export interface ThreadFacet {
+  workKey: WorkKey
+  kind: 'pull-request' | 'order' | 'task'
+  stage: 'shaping' | 'building' | 'in-review' | 'merging' | 'shipped'
+  whoseMove: 'you' | 'agents' | 'others'
+  title?: string
+  line: string
+  tone: 'neutral' | 'good' | 'bad' | 'waiting'
+  url?: string
+  closedAt: string | null
+  checks?: { name: string; state: 'passed' | 'failed' | 'running'; detail?: string }[]
+  /** What a merged pull request's timeline measured (ISO times; minutes for checks). */
+  openedAt?: string
+  readyAt?: string
+  firstReviewAt?: string | null
+  checksMinutes?: number | null
+  updatedAt: string
+}
+
+export interface HomeMeasure {
+  /** Home places a measure by id: use a value of `HOME_MEASURES` (exported from the SDK) to be
+   * drawn on the Week and Insights cards. Its `question` and `detail` are shown as written. */
+  id: string
+  question: string
+  value: number
+  unit: 'count' | 'minutes' | 'days' | 'percent'
+  window: 'week' | '30d' | 'quarter' | 'year'
+  series: number[]
+  previous?: number
+  detail?: string
+}
+
+export interface HomeFocusCandidate {
+  id: string
+  title: string
+  detail?: string
+  workKey: WorkKey | null
+  done: boolean
+}
+
 export interface ExtensionAPI {
   /** The extension's database. Throws until the app database is initialised. The extension host
    * holds its own connection, so `transaction(fn)` runs `fn` in the extension's own process. */
@@ -415,6 +490,8 @@ export interface ExtensionAPI {
       onClick?: () => void
     }): Disposable
   }
+  /** Publish what Home should show; core draws it (ADR 117). */
+  home: HomeApi
   nativeMenu: {
     addViewMenuItem(item: NativeMenuItemContribution): Disposable
   }
