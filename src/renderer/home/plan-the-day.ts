@@ -1,3 +1,4 @@
+import { plural } from '@terminator/extension-sdk'
 import type { HomeAsk, HomeFocusCandidate } from '../../shared/schemas/home-feed.schema'
 import { localDateKey, type FocusItem } from './focus'
 import type { SinceEvent } from './since-you-left'
@@ -10,9 +11,6 @@ export function yesterdayKey(now: number): string {
   day.setDate(day.getDate() - 1)
   return localDateKey(day.getTime())
 }
-
-const plural = (count: number, one: string, many: string): string =>
-  `${count} ${count === 1 ? one : many}`
 
 export interface PlanFacts {
   /** Yesterday's focus items, and how many of them got done. */
@@ -28,11 +26,11 @@ export function planSentence({ focusTotal, focusDone, events }: PlanFacts): stri
   const yesterday =
     focusTotal === 0
       ? ''
-      : `Yesterday you finished ${focusDone} of ${plural(focusTotal, 'focus item', 'focus items')}. `
+      : `Yesterday you finished ${focusDone} of ${focusTotal} ${plural(focusTotal, 'focus item')}. `
   const overnight =
     agents + reviews === 0
       ? 'Nothing new came in overnight.'
-      : `Overnight, ${plural(agents, 'agent', 'agents')} finished and ${plural(reviews, 'review', 'reviews')} came in.`
+      : `Overnight, ${agents} ${plural(agents, 'agent')} finished and ${reviews} ${plural(reviews, 'review')} came in.`
   return yesterday + overnight
 }
 

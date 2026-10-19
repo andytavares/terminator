@@ -72,6 +72,9 @@ const HOME = join(__dirname, '../../../../src/renderer/home')
 const STATEFUL = new Set(['dismissals.ts', 'focus-store.ts', 'local-storage.ts'])
 const homeModules = readdirSync(HOME).filter((f) => f.endsWith('.ts') && !STATEFUL.has(f))
 
+// The SDK's helpers are pure functions shared with the extensions (plural, validationError).
+const PURE_PACKAGES = new Set(['@terminator/extension-sdk'])
+
 describe('the Desk pure layer imports nothing but types, siblings and the sidebar layer', () => {
   it('has modules to check', () => {
     expect(homeModules.length).toBeGreaterThan(0)
@@ -82,7 +85,9 @@ describe('the Desk pure layer imports nothing but types, siblings and the sideba
     for (const [, clause, specifier] of imports) {
       if (/^\s*type\b/.test(clause)) continue
       expect(
-        specifier.startsWith('./') || specifier.startsWith('../sidebar/'),
+        specifier.startsWith('./') ||
+          specifier.startsWith('../sidebar/') ||
+          PURE_PACKAGES.has(specifier),
         `${file} value-imports '${specifier}'`
       ).toBe(true)
     }
