@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import * as path from 'node:path'
 import * as fs from 'node:fs'
+import { execFileSync } from 'node:child_process'
 import {
   ensureCheckout,
   ensureCheckouts,
@@ -119,6 +120,8 @@ describe('preparing a checkout', () => {
   describe('failures', worktreeFailuresTests)
   describe('concurrent callers', concurrentCallersTests)
   describe('retrying', worktreeRetryingTests)
+  describe('real git', realGitTests)
+  describe('real git, other starts', realGitResetTests)
 })
 
 function twoLanes(): WorkOrder {
@@ -170,13 +173,15 @@ function worktreeAddingTests() {
 
 function worktreeReusingTests() {
   it('reuses the worktree git already has, rather than adding a second', async () => {
-    const target = path.join(ROOT, 'orders', 'WO-1', 'worktrees', 'app')
+    const root = tmpDir('foundry-reuse-')
+    const target = path.join(root, 'orders', 'WO-1', 'worktrees', 'app')
+    fs.mkdirSync(target, { recursive: true })
     const exec = vi.fn(async (options: { args: string[] }) =>
       options.args[1] === 'list'
         ? { exitCode: 0, stdout: `worktree ${target}\nHEAD abc\n`, stderr: '', timedOut: false }
         : { exitCode: 0, stdout: '', stderr: '', timedOut: false }
     )
-    const d = deps({ exec: exec as never })
+    const d = deps({ exec: exec as never, root })
     const checkout = await ensureCheckout(order(), 1, d)
 
     expect(checkout.created).toBe(false)
@@ -187,6 +192,122 @@ function worktreeReusingTests() {
     const d = deps()
     await ensureCheckout(order(), 1, d)
     expect(calls(d.exec)[0].args).toEqual(['worktree', 'list', '--porcelain'])
+  })
+}
+
+const gitExec: CheckoutDeps['exec'] = async ({ args, cwd }) => {
+  try {
+    const stdout = execFileSync('git', args, { cwd, encoding: 'utf8', stdio: 'pipe' })
+    return { exitCode: 0, stdout, stderr: '', timedOut: false }
+  } catch (error) {
+    const failure = error as { status?: number; stdout?: string; stderr?: string }
+    return {
+      exitCode: failure.status ?? 1,
+      stdout: failure.stdout ?? '',
+      stderr: failure.stderr ?? '',
+      timedOut: false,
+    }
+  }
+}
+
+function git(cwd: string, ...args: string[]): string {
+  return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: 'pipe' }).trim()
+}
+
+/** A real repository on `main` with one commit, and an order whose lane 1 is cut from it. */
+function realRepo(): { deps: CheckoutDeps; repoPath: string; target: string; order: WorkOrder } {
+  const repoPath = tmpDir('foundry-real-repo-')
+  git(repoPath, 'init', '-q', '-b', 'main')
+  commitOn(repoPath, 'base')
+  const seeded = order()
+  const real: WorkOrder = {
+    ...seeded,
+    context: {
+      ...seeded.context,
+      repos: [{ name: 'app', path: repoPath, lane: 1, baseBranch: 'main', headBranch: '' }],
+    },
+  }
+  const root = tmpDir('foundry-real-root-')
+  return {
+    deps: { exec: gitExec, root },
+    repoPath,
+    target: checkoutPath(root, real, 'app'),
+    order: real,
+  }
+}
+
+function commitOn(cwd: string, message: string): string {
+  git(
+    cwd,
+    '-c',
+    'user.name=t',
+    '-c',
+    'user.email=t@t',
+    'commit',
+    '-q',
+    '--allow-empty',
+    '-m',
+    message
+  )
+  return git(cwd, 'rev-parse', 'HEAD')
+}
+
+function realGitTests() {
+  it('creates the checkout when only its @baseline sibling is registered', async () => {
+    const { deps: real, repoPath, target, order: o } = realRepo()
+    fs.mkdirSync(path.dirname(target), { recursive: true })
+    git(repoPath, 'worktree', 'add', '--detach', `${target}@baseline`, 'main')
+
+    const checkout = await ensureCheckout(o, 1, real)
+
+    expect(checkout.created).toBe(true)
+    expect(fs.statSync(target).isDirectory()).toBe(true)
+  })
+
+  it('recreates a deleted checkout and keeps the commits on its branch', async () => {
+    const { deps: real, target, order: o } = realRepo()
+    const first = await ensureCheckout(o, 1, real)
+    const extra = commitOn(target, 'work in progress')
+    fs.rmSync(target, { recursive: true, force: true })
+
+    const again = await ensureCheckout(o, 1, real)
+
+    expect(again.created).toBe(true)
+    expect(fs.statSync(target).isDirectory()).toBe(true)
+    expect(git(target, 'rev-parse', 'HEAD')).toBe(extra)
+    expect(git(target, 'rev-parse', `refs/heads/${first.branch}`)).toBe(extra)
+  })
+}
+
+function realGitResetTests() {
+  it('reports a checkout that is still there as not created', async () => {
+    const { deps: real, order: o } = realRepo()
+    await ensureCheckout(o, 1, real)
+    expect((await ensureCheckout(o, 1, real)).created).toBe(false)
+  })
+
+  it('resets a leftover branch onto the base when the order never registered a checkout', async () => {
+    const { deps: real, repoPath, target, order: o } = realRepo()
+    const base = git(repoPath, 'rev-parse', 'main')
+    git(repoPath, 'checkout', '-q', '-b', branchFor(o, 1))
+    commitOn(repoPath, 'leftover')
+    git(repoPath, 'checkout', '-q', 'main')
+
+    const checkout = await ensureCheckout(o, 1, real)
+
+    expect(checkout.created).toBe(true)
+    expect(git(target, 'rev-parse', 'HEAD')).toBe(base)
+  })
+
+  it('recreates a deleted base checkout detached', async () => {
+    const { deps: real, order: o } = realRepo()
+    const first = await ensureBaseCheckout(o, 1, real)
+    fs.rmSync(first.path, { recursive: true, force: true })
+
+    const again = await ensureBaseCheckout(o, 1, real)
+
+    expect(again.created).toBe(true)
+    expect(fs.statSync(again.path).isDirectory()).toBe(true)
   })
 }
 
@@ -580,13 +701,16 @@ function addingAndReusingTests() {
   })
 
   it('reuses the one git already has', async () => {
+    const root = tmpDir('foundry-reuse-base-')
+    const existing = `${checkoutPath(root, order(), 'app')}@base`
+    fs.mkdirSync(existing, { recursive: true })
     const exec = vi.fn(async (options: { args: string[] }) => ({
       exitCode: 0,
-      stdout: options.args[1] === 'list' ? `worktree ${baseTarget}\nHEAD abc\n` : '',
+      stdout: options.args[1] === 'list' ? `worktree ${existing}\nHEAD abc\n` : '',
       stderr: '',
       timedOut: false,
     }))
-    const checkout = await ensureBaseCheckout(order(), 1, deps({ exec: exec as never }))
+    const checkout = await ensureBaseCheckout(order(), 1, deps({ exec: exec as never, root }))
 
     expect(checkout.created).toBe(false)
     expect(calls(exec).some((c) => c.args[1] === 'add')).toBe(false)
