@@ -58,6 +58,19 @@ describe('Toast — offers somewhere to go as a named button', () => {
     expect(onSelect).toHaveBeenCalledOnce()
   })
 
+  it('closes once its action has run, as an Undo has nothing left to offer', () => {
+    const onDismiss = vi.fn()
+    render(
+      <Toast
+        message="Dismissed"
+        action={{ label: 'Undo', onSelect: vi.fn() }}
+        onDismiss={onDismiss}
+      />
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
+    expect(onDismiss).toHaveBeenCalledOnce()
+  })
+
   it('has no action button when there is nowhere to go', () => {
     render(<Toast message="Saved" onDismiss={vi.fn()} />)
     expect(screen.getAllByRole('button')).toHaveLength(1) // dismiss only
