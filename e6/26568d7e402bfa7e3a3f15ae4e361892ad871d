@@ -1,0 +1,28 @@
+tests/unit/renderer/App.spec.tsx
+  s_3ced19ecaa16dd::t_1a106f185c9801 49
+  s_3ced19ecaa16dd::t_99b0ce5a1de9ef 54
+  s_3ced19ecaa16dd::t_7044aceaca494b 1-2,955-962
+tests/unit/renderer/form-control-styling.spec.ts
+  s_3ced19ecaa16dd::t_99b0ce5a1de9ef 272
+scripts/e2e-select.mjs
+  s_3ced19ecaa16dd::t_99b0ce5a1de9ef 103
+  s_3ced19ecaa16dd::t_c80d119ae6551d 106
+extensions/git-integration/tests/unit/remote-access.spec.ts
+  s_3ced19ecaa16dd::t_08bae0332ad89e 170-172
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e626568d7e402bfa7e3a3f15ae4e361892ad871d",
+  "prompts": {},
+  "sessions": {
+    "s_3ced19ecaa16dd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "958bebf4-85fd-422a-9a09-b64994561aeb",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
