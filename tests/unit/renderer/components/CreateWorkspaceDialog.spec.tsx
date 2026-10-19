@@ -26,6 +26,9 @@ const mockCreateProject = vi.fn<ElectronAPI['project']['create']>(async (payload
   project: projectFixture({ id: 'proj-new', ...CreateProjectInputSchema.parse(payload) }),
 }))
 const mockOpenDirectory = vi.fn<ElectronAPI['dialog']['openDirectory']>()
+const mockDeleteWorkspace = vi.fn<ElectronAPI['workspace']['delete']>(async () => ({
+  success: true,
+}))
 
 const storedWorkspaceNames = (): string[] =>
   useWorkspaceStore.getState().workspaces.map((w) => w.name)
@@ -35,7 +38,7 @@ function withApi(
 ): void {
   installElectronApi({
     dialog: { openDirectory: mockOpenDirectory },
-    workspace: { create: mockCreateWorkspace },
+    workspace: { create: mockCreateWorkspace, delete: mockDeleteWorkspace },
     project: { create: mockCreateProject },
     git: repo,
   })
@@ -228,23 +231,54 @@ describe('CreateWorkspaceDialog — auto-creates a branch project when the chose
   })
 })
 
-describe('CreateWorkspaceDialog — a repo whose root or branch is unknown', () => {
-  it('uses the folder as the root and names the branch main', async () => {
+function submitRepoWorkspace(onClose: () => void, folder = '/picked'): void {
+  render(<CreateWorkspaceDialog onClose={onClose} />)
+  fireEvent.change(screen.getByPlaceholderText('My Workspace'), { target: { value: 'Repo WS' } })
+  fireEvent.change(screen.getByPlaceholderText('/path/to/folder'), { target: { value: folder } })
+  fireEvent.click(screen.getByText('Create'))
+}
+
+describe('CreateWorkspaceDialog — git could not say whether the folder is a repository', () => {
+  it('keeps the dialog open and says so, rather than leaving a workspace with no branches', async () => {
+    nextWorkspaceId = REPO_WORKSPACE
+    withApi({ isRepo: async () => ({ error: 'git rev-parse timed out' }) })
+    const onClose = vi.fn()
+    submitRepoWorkspace(onClose)
+    await screen.findByText(/could not read the git repository/i)
+    expect(onClose).not.toHaveBeenCalled()
+    expect(mockCreateProject).not.toHaveBeenCalled()
+    expect(mockDeleteWorkspace).toHaveBeenCalledWith(REPO_WORKSPACE)
+  })
+})
+
+describe('CreateWorkspaceDialog — git could not say which branch is checked out', () => {
+  it('does not name the card main; it keeps the dialog open and says so', async () => {
     nextWorkspaceId = REPO_WORKSPACE
     withApi({
-      isRepo: async () => ({ isRepo: true }),
-      currentBranch: async () => ({ error: 'NOT_A_REPO', message: 'detached' }),
+      isRepo: async () => ({ isRepo: true, root: '/picked' }),
+      currentBranch: async () => ({ error: 'git branch timed out' }),
     })
     const onClose = vi.fn()
-    render(<CreateWorkspaceDialog onClose={onClose} />)
-    fireEvent.change(screen.getByPlaceholderText('My Workspace'), { target: { value: 'Repo WS' } })
-    fireEvent.change(screen.getByPlaceholderText('/path/to/folder'), {
-      target: { value: '/picked' },
+    submitRepoWorkspace(onClose)
+    await screen.findByText(/could not read the git repository/i)
+    expect(onClose).not.toHaveBeenCalled()
+    expect(mockCreateProject).not.toHaveBeenCalled()
+    expect(mockDeleteWorkspace).toHaveBeenCalledWith(REPO_WORKSPACE)
+  })
+})
+
+describe('CreateWorkspaceDialog — the branch project could not be created', () => {
+  it('says so instead of closing on a workspace with no branches', async () => {
+    nextWorkspaceId = REPO_WORKSPACE
+    withApi({
+      isRepo: async () => ({ isRepo: true, root: '/picked' }),
+      currentBranch: async () => ({ branch: 'develop' }),
     })
-    fireEvent.click(screen.getByText('Create'))
-    await vi.waitFor(() => expect(onClose).toHaveBeenCalled())
-    expect(useWorkspaceStore.getState().projectsByWorkspaceId.get(REPO_WORKSPACE)).toEqual([
-      expect.objectContaining({ name: 'main', gitBranch: 'main', worktreePath: '/picked' }),
-    ])
+    mockCreateProject.mockResolvedValueOnce({ error: 'DUPLICATE_NAME' })
+    const onClose = vi.fn()
+    submitRepoWorkspace(onClose)
+    await screen.findByText(/could not add the branch/i)
+    expect(onClose).not.toHaveBeenCalled()
+    expect(mockDeleteWorkspace).toHaveBeenCalledWith(REPO_WORKSPACE)
   })
 })
