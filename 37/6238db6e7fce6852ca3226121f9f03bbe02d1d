@@ -1,0 +1,21 @@
+docs/adr/118-dismissed-means-gone.md
+  s_d918463020569b::t_724249ad0aca8d 1-23
+docs/user-guide/USER-GUIDE.md
+  s_d918463020569b::t_96562ef9676bd9 426-427,447
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "376238db6e7fce6852ca3226121f9f03bbe02d1d",
+  "prompts": {},
+  "sessions": {
+    "s_d918463020569b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d87208e1-2bcc-4a55-9ad3-bf8512e6e948",
+        "model": "unknown"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
