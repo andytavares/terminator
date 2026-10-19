@@ -98,10 +98,18 @@ export function groupTickets(issues: IssueSummary[], query: string): TicketGroup
 
 const teamOf = (key: string): string => key.split('-')[0]
 
-/** The repo whose branch last linked a ticket of this ticket's team, else the one in use. */
-export function defaultWorkspaceId(issue: IssueSummary | null): string | null {
+export type SuggestionReason = 'linked-ticket' | 'active' | 'first'
+
+/** The repo whose branch last linked a ticket of this ticket's team, else the one in use, else the first. */
+export function defaultWorkspaceId(issue: IssueSummary | null): {
+  id: string | null
+  reason: SuggestionReason
+} {
   const { workspaces, projectsByWorkspaceId, activeWorkspaceId } = useWorkspaceStore.getState()
-  const fallback = activeWorkspaceId ?? workspaces[0]?.id ?? null
+  const fallback =
+    activeWorkspaceId === null
+      ? { id: workspaces[0]?.id ?? null, reason: 'first' as const }
+      : { id: activeWorkspaceId, reason: 'active' as const }
   if (issue === null) return fallback
   const { links } = useIntegrationsStore.getState()
   const linked = [...projectsByWorkspaceId.values()]
@@ -111,7 +119,8 @@ export function defaultWorkspaceId(issue: IssueSummary | null): string | null {
       return link != null && teamOf(link.key) === teamOf(issue.key)
     })
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-  return linked[0]?.workspaceId ?? fallback
+  const linkedId = linked[0]?.workspaceId
+  return linkedId === undefined ? fallback : { id: linkedId, reason: 'linked-ticket' }
 }
 
 /** The branch a ticket is worked on: Linear's own suggestion, else its key. */

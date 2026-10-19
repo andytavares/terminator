@@ -2,7 +2,12 @@ import { useEffect, useMemo, useState } from 'react'
 import { defaultBranchFirst, freeBranches } from '../sidebar/create-project'
 import { useIntegrationsStore } from '../../stores/integrations.store'
 import { useWorkspaceStore } from '../../stores/workspace.store'
-import { groupTickets, defaultWorkspaceId, type TicketGroup } from './start-work'
+import {
+  groupTickets,
+  defaultWorkspaceId,
+  type SuggestionReason,
+  type TicketGroup,
+} from './start-work'
 import type { IssueSummary, Workspace } from '../../../shared/types/index'
 
 // What the Start work launcher shows: the lists on its left and the facts on its right.
@@ -108,13 +113,20 @@ function branchChoices(git: RepoGit, text: string): LauncherRow[] {
   ]
 }
 
+export type ChosenRepo = {
+  workspace: Workspace | null
+  reason: 'picked' | SuggestionReason
+}
+
 /** The repo the work goes to: the person's pick, else the best guess for the selected ticket. */
 export function useChosenRepo(
   selected: LauncherRow | undefined,
   pickedId: string | null
-): Workspace | null {
+): ChosenRepo {
   const workspaces = useWorkspaceStore((s) => s.workspaces)
   const issue = selected?.kind === 'ticket' ? selected.issue : null
-  const id = pickedId ?? defaultWorkspaceId(issue)
-  return workspaces.find((w) => w.id === id) ?? null
+  const suggestion = defaultWorkspaceId(issue)
+  const id = pickedId ?? suggestion.id
+  const reason = pickedId === null ? suggestion.reason : 'picked'
+  return { workspace: workspaces.find((w) => w.id === id) ?? null, reason }
 }
