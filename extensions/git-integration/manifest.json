@@ -12,7 +12,7 @@
       "view": "project"
     },
     "workspaceTab": {
-      "label": "Code Reviews",
+      "label": "Git",
       "icon": "git-pull-request",
       "view": "code-reviews"
     },

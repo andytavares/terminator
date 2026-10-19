@@ -119,13 +119,16 @@ export async function extensionPage(handle: AppHandle, urlPart: string): Promise
   return extensionView(handle, urlPart, frame)
 }
 
-/** Opens an extension from the app band and returns its view. */
+/** Opens an extension from the app band and returns its view. The entry toggles its surface, so
+ * it is pressed only when the surface is not already showing: a click on the open one closes it. */
 export async function openFromAppBand(
   handle: AppHandle,
   bandLabel: string,
   urlPart: string
 ): Promise<ExtensionView> {
-  await handle.page.locator(`.app-band__entry[aria-label="${bandLabel}"]`).click()
+  const entry = handle.page.locator(`.app-band__entry[aria-label="${bandLabel}"]`)
+  if ((await entry.getAttribute('aria-current')) !== 'page') await entry.click()
+  await expect(entry).toHaveAttribute('aria-current', 'page')
   return extensionPage(handle, urlPart)
 }
 

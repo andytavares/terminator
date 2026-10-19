@@ -4,15 +4,24 @@ import { storedFocusOf, storedParkedOf } from '../../../../src/renderer/home/sto
 const item = { id: 'f1', title: 'Get TAV-14 approved', doneByHand: false }
 
 describe('storedFocusOf', () => {
-  it('reads a stored focus and fills missing times with null', () => {
+  it('reads a stored focus and fills missing fields with their empty values', () => {
     expect(storedFocusOf({ days: { '2026-10-18': [item] } })).toEqual({
       days: { '2026-10-18': [item] },
-      lastLeftHomeAt: null,
       planDismissedOn: null,
+      planCollapsed: false,
     })
   })
 
-  it('keeps a ticket or a branch work key and the stored times', () => {
+  it('reads an older stored value without planCollapsed as not collapsed', () => {
+    const stored = { days: {}, planDismissedOn: '2026-10-17' }
+    expect(storedFocusOf(stored)).toEqual({
+      days: {},
+      planDismissedOn: '2026-10-17',
+      planCollapsed: false,
+    })
+  })
+
+  it('keeps a ticket or a branch work key and the stored fields', () => {
     const keyed = [
       { ...item, workKey: { tracker: 'linear', key: 'TAV-14' } },
       {
@@ -22,7 +31,7 @@ describe('storedFocusOf', () => {
         detail: 'pull request #271',
       },
     ]
-    const stored = { days: { d: keyed }, lastLeftHomeAt: 5, planDismissedOn: 'd' }
+    const stored = { days: { d: keyed }, planDismissedOn: 'd', planCollapsed: true }
     expect(storedFocusOf(stored)).toEqual(stored)
   })
 })
@@ -34,7 +43,7 @@ describe('storedFocusOf: what it refuses', () => {
     ['days that are not lists', { days: { d: 'x' } }],
     ['an item without a title', { days: { d: [{ id: 'f1', doneByHand: false }] } }],
     ['a work key of neither kind', { days: { d: [{ ...item, workKey: { key: 'TAV-1' } }] } }],
-    ['a time that is not a number', { days: {}, lastLeftHomeAt: 'yesterday' }],
+    ['a collapsed flag that is not a boolean', { days: {}, planCollapsed: 'yes' }],
   ])('refuses %s', (_name, value) => {
     expect(storedFocusOf(value)).toBeNull()
   })

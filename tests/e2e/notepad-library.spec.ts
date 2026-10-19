@@ -111,10 +111,12 @@ async function diagramOpensOnCanvas(): Promise<void> {
 
 async function rectangleIsSaved(): Promise<void> {
   const box = (await canvas().boundingBox())!
+  // Focus the canvas where the toolbar is not: its top bar overlays the corner, so a click at the
+  // corner waits for an icon to stop intercepting it, and which icon is under it depends on scroll.
   await canvas()
     .locator('canvas')
     .last()
-    .click({ position: { x: 20, y: 20 } })
+    .click({ position: { x: box.width / 2, y: Math.min(box.height - 20, 400) } })
   await notepad.keyboard.press('r')
   await notepad.mouse.move(box.x + box.width / 2 - 80, box.y + box.height / 2 - 50)
   await notepad.mouse.down()

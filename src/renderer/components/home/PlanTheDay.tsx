@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo } from 'react'
-import { Check, Clock, Moon, Sun } from 'lucide-react'
-import { Button, Checkbox, Kbd, StatusDot } from '@terminator/extension-ui'
+import { Check, ChevronDown, ChevronRight, Clock, Sun } from 'lucide-react'
+import { Button, Checkbox, Kbd } from '@terminator/extension-ui'
 import { useHomeFeedStore } from '../../stores/home-feed.store'
 import { useFocusStore } from '../../home/focus-store'
 import {
@@ -10,11 +10,9 @@ import {
   localDateKey,
   type FocusItem,
 } from '../../home/focus'
-import { sinceYouLeft, type SinceEvent } from '../../home/since-you-left'
 import {
   carriedOverRows,
   estimatedReviewMinutes,
-  eventTone,
   planSentence,
   reviewLoadShare,
   yesterdayKey,
@@ -23,6 +21,7 @@ import {
 import { useNow } from '../session/useNow'
 import { useDeskModel } from './useDeskModel'
 import { useWorkThreads } from './useWorkThreads'
+import { TicketsColumn } from './TicketsColumn'
 import './PlanTheDay.css'
 
 type Pick = Omit<FocusItem, 'doneByHand'>
@@ -37,7 +36,6 @@ export function PlanTheDay(): JSX.Element | null {
 interface Plan {
   sentence: string
   carried: PlanRow[]
-  events: SinceEvent[]
   today: FocusItem[]
   reviewMinutes: number
 }
@@ -45,23 +43,27 @@ interface Plan {
 function usePlan(now: number): Plan {
   const { asks } = useDeskModel()
   const { allThreads } = useWorkThreads()
-  const facets = useHomeFeedStore((s) => s.facets)
   const candidates = useHomeFeedStore((s) => s.focus)
-  const { days, lastLeftHomeAt } = useFocusStore()
+  const days = useFocusStore((s) => s.days)
   return useMemo(() => {
     const today = days[localDateKey(now)] ?? []
     const yesterday = days[yesterdayKey(now)] ?? []
-    const events = sinceYouLeft(asks, facets, lastLeftHomeAt)
     const finished = yesterday.filter((item) => isFocusDone(item, allThreads, candidates))
     const left = carriedOver(yesterday).filter((item) => !finished.includes(item))
     return {
-      sentence: planSentence({ focusTotal: yesterday.length, focusDone: finished.length, events }),
+      sentence: planSentence({
+        focusTotal: yesterday.length,
+        focusDone: finished.length,
+        waiting: {
+          agents: asks.filter((a) => a.kind === 'finished').length,
+          reviews: asks.filter((a) => a.kind === 'review').length,
+        },
+      }),
       carried: carriedOverRows(left, candidates, today),
-      events,
       today,
       reviewMinutes: estimatedReviewMinutes(asks),
     }
-  }, [asks, facets, candidates, lastLeftHomeAt, days, now, allThreads])
+  }, [asks, candidates, days, now, allThreads])
 }
 
 function useStartTheDayShortcut(start: () => void): void {
@@ -74,33 +76,76 @@ function useStartTheDayShortcut(start: () => void): void {
   }, [start])
 }
 
+function PlanActions({
+  collapsed,
+  onClose,
+}: {
+  collapsed: boolean
+  onClose: () => void
+}): JSX.Element {
+  const togglePlanCollapsed = useFocusStore((s) => s.togglePlanCollapsed)
+  return (
+    <span className="plan__actions">
+      <Button
+        variant="ghost"
+        icon={collapsed ? ChevronRight : ChevronDown}
+        aria-expanded={!collapsed}
+        aria-controls="plan-body"
+        onClick={togglePlanCollapsed}
+      >
+        {collapsed ? 'Expand' : 'Collapse'}
+      </Button>
+      <Button variant="ghost" onClick={onClose}>
+        Skip today
+      </Button>
+      <Button variant="primary" onClick={onClose}>
+        Start the day <Kbd>⌘↵</Kbd>
+      </Button>
+    </span>
+  )
+}
+
+function PlanHead({
+  sentence,
+  picked,
+  onClose,
+}: {
+  sentence: string
+  picked: number
+  onClose: () => void
+}): JSX.Element {
+  const collapsed = useFocusStore((s) => s.planCollapsed)
+  return (
+    <div className="plan__head">
+      <Sun aria-hidden="true" className="plan__sun" />
+      <div>
+        <h2>Plan today</h2>
+        <p>
+          {sentence}
+          {collapsed && picked > 0 ? ` · ${picked} of ${FOCUS_LIMIT} focus picked` : ''}
+        </p>
+      </div>
+      <PlanActions collapsed={collapsed} onClose={onClose} />
+    </div>
+  )
+}
+
 function PlanBand({ now }: { now: number }): JSX.Element {
   const plan = usePlan(now)
   const dismissPlan = useFocusStore((s) => s.dismissPlan)
+  const collapsed = useFocusStore((s) => s.planCollapsed)
   const close = (): void => dismissPlan(Date.now())
   useStartTheDayShortcut(close)
   return (
     <section className="plan" aria-label="Plan today">
-      <div className="plan__head">
-        <Sun aria-hidden="true" className="plan__sun" />
-        <div>
-          <h2>Plan today</h2>
-          <p>{plan.sentence}</p>
+      <PlanHead sentence={plan.sentence} picked={plan.today.length} onClose={close} />
+      {!collapsed && (
+        <div className="plan__body" id="plan-body">
+          <CarriedOverColumn rows={plan.carried} full={plan.today.length >= FOCUS_LIMIT} />
+          <TicketsColumn />
+          <FocusColumn today={plan.today} reviewMinutes={plan.reviewMinutes} />
         </div>
-        <span className="plan__actions">
-          <Button variant="ghost" onClick={close}>
-            Skip today
-          </Button>
-          <Button variant="primary" onClick={close}>
-            Start the day <Kbd>⌘↵</Kbd>
-          </Button>
-        </span>
-      </div>
-      <div className="plan__body">
-        <CarriedOverColumn rows={plan.carried} full={plan.today.length >= FOCUS_LIMIT} />
-        <SinceYouLeftColumn events={plan.events} today={plan.today} />
-        <FocusColumn today={plan.today} reviewMinutes={plan.reviewMinutes} />
-      </div>
+      )}
     </section>
   )
 }
@@ -149,26 +194,6 @@ function CarriedOverColumn({ rows, full }: { rows: PlanRow[]; full: boolean }): 
           <AddButton item={row.item} disabled={full} />
         </div>
       ))}
-    </div>
-  )
-}
-
-function SinceYouLeftColumn(props: { events: SinceEvent[]; today: FocusItem[] }): JSX.Element {
-  const full = props.today.length >= FOCUS_LIMIT
-  return (
-    <div className="plan__column">
-      <ColumnTitle icon={<Moon aria-hidden="true" />}>SINCE YOU LEFT</ColumnTitle>
-      {props.events.length === 0 && <p className="plan__none">Nothing since you left.</p>}
-      {props.events.map((event) => {
-        const picked = props.today.some((item) => item.id === event.id)
-        return (
-          <div className="plan__row" key={event.id}>
-            <StatusDot tone={eventTone(event.kind)} />
-            <span>{event.text}</span>
-            <AddButton item={{ id: event.id, title: event.text }} disabled={full || picked} />
-          </div>
-        )
-      })}
     </div>
   )
 }

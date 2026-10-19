@@ -187,9 +187,53 @@ describe('project:delete — failing worktree removal', () => {
       worktreePath: '/repos/alpha-feature',
     })
 
-    expect(await invoke('project:delete', { id: project.id })).toEqual({ success: true })
+    expect(await invoke('project:delete', { id: project.id })).toEqual({
+      success: true,
+      worktreeKept: { path: '/repos/alpha-feature', reason: 'worktree is dirty' },
+    })
 
     expect(await projectNames(workspace.id)).toEqual([])
+  })
+})
+
+async function workspaceWithWorktree(name: string): Promise<Workspace> {
+  const workspace = await invokeCreateWorkspace(name)
+  await invokeCreateProject(workspace.id, 'feature', {
+    isWorktree: true,
+    worktreePath: `/repos/${name}-feature`,
+  })
+  return workspace
+}
+
+describe('workspace:delete — worktrees on disk', () => {
+  it("removes each worktree project's worktree and skips the non-worktree project", async () => {
+    const workspace = await workspaceWithWorktree('alpha')
+    await invokeCreateProject(workspace.id, 'feature-2', {
+      isWorktree: true,
+      worktreePath: '/repos/alpha-feature-2',
+    })
+    await invokeCreateProject(workspace.id, 'app')
+    sent.length = 0
+
+    expect(await invoke('workspace:delete', { id: workspace.id })).toEqual({ success: true })
+
+    expect(git.removeWorktree).toHaveBeenCalledTimes(2)
+    expect(git.removeWorktree).toHaveBeenCalledWith('/repos/alpha', '/repos/alpha-feature')
+    expect(git.removeWorktree).toHaveBeenCalledWith('/repos/alpha', '/repos/alpha-feature-2')
+    expect(sent.filter((s) => s.channel === 'workspace:project-removed')).toHaveLength(3)
+    expect(await listedWorkspaceNames()).toEqual([])
+  })
+
+  it('reports worktrees git could not remove and still deletes the workspace', async () => {
+    git.removeWorktree.mockRejectedValue(new Error('worktree is dirty'))
+    const workspace = await workspaceWithWorktree('alpha')
+
+    expect(await invoke('workspace:delete', { id: workspace.id })).toEqual({
+      success: true,
+      worktreesKept: [{ path: '/repos/alpha-feature', reason: 'worktree is dirty' }],
+    })
+
+    expect(await listedWorkspaceNames()).toEqual([])
   })
 })
 

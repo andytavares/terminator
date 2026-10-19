@@ -66,13 +66,22 @@ function misalignedControls(selector: string): Misalignment[] {
   )
 }
 
-/** The misaligned control pairs on `page` (or an extension frame) now, labelled with `screen`. */
+/** Resolves once the page has drawn the frame its last change asked for. */
+function afterDrawnFrame(): Promise<void> {
+  return new Promise((resolve) =>
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+  )
+}
+
+/** The misaligned control pairs on `page` (or an extension frame), read after a drawn frame so a
+ * layout still being applied is not measured, labelled with `screen`. */
 export async function misalignedOn(
   page: Pick<Page, 'evaluate'> | Pick<Frame, 'evaluate'>,
   screen: string
 ): Promise<string[]> {
   const helpers = [visibleOnScreen, boxed, described, besideEachOther, mismatch, misalignedControls]
-  const script = `(() => { ${helpers.map(String).join('\n')}
+  const script = `(async () => { ${[afterDrawnFrame, ...helpers].map(String).join('\n')}
+    await afterDrawnFrame()
     return misalignedControls(${JSON.stringify(CONTROLS)}) })()`
   const found = (await page.evaluate(script)) as Misalignment[]
   return found.map(

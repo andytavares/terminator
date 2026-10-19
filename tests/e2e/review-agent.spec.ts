@@ -104,6 +104,8 @@ async function choosingRepositoriesNarrowsTheQuery(): Promise<void> {
   const misaligned = await misalignedOn(view, 'Reviews')
   await view.getByRole('button', { name: 'All repositories, choose repositories' }).click()
   const picker = view.getByRole('dialog', { name: 'Repositories for Reviews' })
+  // The check reads the page once; before the picker is drawn it would inspect nothing and pass.
+  await expect(picker.getByRole('searchbox', { name: 'Search repositories' })).toBeVisible()
   misaligned.push(...(await misalignedOn(view, 'Reviews: repository picker')))
   expect(misaligned).toEqual([])
   await picker.getByRole('checkbox', { name: 'acme/widgets' }).check()

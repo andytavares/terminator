@@ -76,7 +76,7 @@ const workspaceChannels: ChannelSpec[] = [
     channel: 'workspace:delete',
     schema: IdSchema,
     invalid: failed,
-    run: ({ id }) => deleteWorkspace(id),
+    run: ({ id }) => removeWorkspaceAndItsLinks(id),
   }),
   defineChannel({
     channel: 'workspace:reorder',
@@ -137,22 +137,50 @@ export function registerWorkspaceHandlers(): void {
   registerInvokeTable([...workspaceChannels, ...projectChannels])
 }
 
-async function removeProjectAndItsLinks(id: string): Promise<{ success: boolean }> {
-  const project = getProjectById(id)
-  if (project?.isWorktree && project.worktreePath) {
-    const workspace = listWorkspaces().find((w) => w.id === project.workspaceId)
-    if (workspace) {
-      try {
-        await removeWorktree(workspace.folderPath, project.worktreePath)
-      } catch {
-        // proceed with deletion even if worktree removal fails
-      }
-    }
+/** A worktree folder git refused to remove; the record is still gone. */
+interface WorktreeKept {
+  path: string
+  reason: string
+}
+
+async function removeWorkspaceAndItsLinks(
+  id: string
+): Promise<{ success: boolean; worktreesKept?: WorktreeKept[] }> {
+  const kept: WorktreeKept[] = []
+  for (const project of listProjects(id)) {
+    const result = await removeProjectAndItsLinks(project.id)
+    if (result.worktreeKept) kept.push(result.worktreeKept)
   }
-  const result = deleteProject(id)
+  deleteWorkspace(id)
+  return kept.length > 0 ? { success: true, worktreesKept: kept } : { success: true }
+}
+
+async function removeProjectAndItsLinks(
+  id: string
+): Promise<{ success: boolean; worktreeKept?: WorktreeKept }> {
+  const worktreeKept = await removeWorktreeOnDisk(id)
+  deleteProject(id)
   emitProjectDelete(id)
   BrowserWindow.getAllWindows().forEach((win) => {
     win.webContents.send('workspace:project-removed', { id })
   })
-  return result
+  return worktreeKept ? { success: true, worktreeKept } : { success: true }
+}
+
+/** Removes the project's worktree from its workspace's repository; answers why it could not. */
+async function removeWorktreeOnDisk(projectId: string): Promise<WorktreeKept | undefined> {
+  const project = getProjectById(projectId)
+  if (!project?.isWorktree || !project.worktreePath) return undefined
+  const workspace = listWorkspaces().find((w) => w.id === project.workspaceId)
+  if (!workspace) return undefined
+  try {
+    await removeWorktree(workspace.folderPath, project.worktreePath)
+    return undefined
+  } catch (error) {
+    // proceed with deletion even if worktree removal fails
+    return {
+      path: project.worktreePath,
+      reason: error instanceof Error ? error.message : String(error),
+    }
+  }
 }

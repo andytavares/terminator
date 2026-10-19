@@ -5,6 +5,8 @@ import { Insights } from '../../../../src/renderer/components/home/Insights'
 import { InsightsBar } from '../../../../src/renderer/components/home/InsightsBar'
 import { useInsightsWindow } from '../../../../src/renderer/components/home/insights-window'
 import { useHomeFeedStore } from '../../../../src/renderer/stores/home-feed.store'
+import { useDismissalsStore } from '../../../../src/renderer/home/dismissals'
+import { askSignature } from '../../../../src/renderer/home/desk-order'
 import { useSessionRecordsStore } from '../../../../src/renderer/stores/session-records.store'
 import { useExtensionRegistry } from '../../../../src/renderer/extensions/registry'
 import { installElectronApi } from '../../../support/electron-api'
@@ -72,6 +74,7 @@ function seedFeed(measures: Sourced<HomeMeasure>[]): void {
 
 beforeEach(() => {
   useInsightsWindow.setState({ chosen: 'week' })
+  useDismissalsStore.setState({ entries: {} })
   vi.clearAllMocks()
   measuresCall.mockImplementation(() => Promise.resolve({ data: attention }))
   measuresCall.mockImplementationOnce(() => Promise.resolve({ data: attention }))
@@ -280,6 +283,45 @@ const oldestReviewAsk = insightsFeedAsk({
   title: 'Review requested',
   detail: 'Fluent #41',
   since: new Date(Date.now() - 3 * 3_600_000).toISOString(),
+})
+
+describe('Insights: dismissing a looking-back row', () => {
+  it('dismisses the oldest review so a dead request leaves the card and stays gone', () => {
+    useHomeFeedStore.setState({ asks: [oldestReviewAsk] })
+    render(<Insights />)
+    const back = card('Looking back')
+    fireEvent.click(within(back).getByRole('button', { name: 'Dismiss Fluent #41' }))
+    expect(within(back).queryByText(/Fluent #41/)).toBeNull()
+    expect(useDismissalsStore.getState().entries['review:acme#41']?.kind).toBe('done')
+  })
+
+  it('does not offer a review the operator already dismissed', () => {
+    useHomeFeedStore.setState({ asks: [oldestReviewAsk] })
+    useDismissalsStore.setState({ entries: { 'review:acme#41': { kind: 'done', at: Date.now() } } })
+    render(<Insights />)
+    expect(within(card('Looking back')).queryByText(/Fluent #41/)).toBeNull()
+  })
+})
+
+describe('Insights: a snoozed row in looking back', () => {
+  it('hides a row while it is snoozed and shows it again once the snooze has run out', () => {
+    const snooze = (until: number) => ({
+      'review:acme#41': {
+        kind: 'snoozed' as const,
+        at: 0,
+        until,
+        signature: askSignature(oldestReviewAsk),
+      },
+    })
+    useHomeFeedStore.setState({ asks: [oldestReviewAsk] })
+    useDismissalsStore.setState({ entries: snooze(Date.now() + 3_600_000) })
+    const { unmount } = render(<Insights />)
+    expect(within(card('Looking back')).queryByText(/Fluent #41/)).toBeNull()
+    unmount()
+    useDismissalsStore.setState({ entries: snooze(Date.now() - 1000) })
+    render(<Insights />)
+    expect(within(card('Looking back')).getByText(/Fluent #41/)).toBeTruthy()
+  })
 })
 
 describe('Insights: looking back', () => {

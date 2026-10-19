@@ -2,13 +2,11 @@ import { describe, it, expect } from 'vitest'
 import {
   carriedOverRows,
   estimatedReviewMinutes,
-  eventTone,
   planSentence,
   reviewLoadShare,
   yesterdayKey,
 } from '../../../../src/renderer/home/plan-the-day'
 import type { FocusItem } from '../../../../src/renderer/home/focus'
-import type { SinceEvent } from '../../../../src/renderer/home/since-you-left'
 import type { HomeAsk } from '../../../../src/shared/schemas/home-feed.schema'
 
 const focus = (id: string, patch: Partial<FocusItem> = {}): FocusItem => ({
@@ -17,7 +15,6 @@ const focus = (id: string, patch: Partial<FocusItem> = {}): FocusItem => ({
   doneByHand: false,
   ...patch,
 })
-const event = (kind: SinceEvent['kind']): SinceEvent => ({ id: kind, kind, text: kind, at: 1 })
 const review = (facts: string[]): HomeAsk => ({
   id: facts.join(),
   kind: 'review',
@@ -38,19 +35,18 @@ describe('yesterdayKey', () => {
 })
 
 describe('planSentence', () => {
-  it('counts yesterday focus and what came in overnight', () => {
-    const events = [event('agent-finished'), event('agent-finished'), event('review-requested')]
-    expect(planSentence({ focusTotal: 3, focusDone: 2, events })).toBe(
-      'Yesterday you finished 2 of 3 focus items. Overnight, 2 agents finished and 1 review came in.'
+  it('counts yesterday focus and what waits on the operator', () => {
+    expect(planSentence({ focusTotal: 3, focusDone: 2, waiting: { agents: 2, reviews: 1 } })).toBe(
+      'Yesterday you finished 2 of 3 focus items. Waiting on you: 2 agents finished and 1 review.'
     )
   })
 
-  it('leaves out yesterday when nothing was picked, and says when nothing came in', () => {
-    expect(planSentence({ focusTotal: 0, focusDone: 0, events: [] })).toBe(
-      'Nothing new came in overnight.'
+  it('leaves out yesterday when nothing was picked, and says when nothing waits', () => {
+    expect(planSentence({ focusTotal: 0, focusDone: 0, waiting: { agents: 0, reviews: 0 } })).toBe(
+      'Nothing is waiting on you.'
     )
-    expect(planSentence({ focusTotal: 1, focusDone: 1, events: [] })).toBe(
-      'Yesterday you finished 1 of 1 focus item. Nothing new came in overnight.'
+    expect(planSentence({ focusTotal: 1, focusDone: 1, waiting: { agents: 0, reviews: 0 } })).toBe(
+      'Yesterday you finished 1 of 1 focus item. Nothing is waiting on you.'
     )
   })
 })
@@ -87,13 +83,7 @@ describe('carriedOverRows', () => {
   })
 })
 
-describe('eventTone and reviewLoadShare', () => {
-  it('tones failures bad, requests as working, the rest good', () => {
-    expect(eventTone('checks-failed')).toBe('bad')
-    expect(eventTone('review-requested')).toBe('working')
-    expect(eventTone('agent-finished')).toBe('good')
-  })
-
+describe('reviewLoadShare', () => {
   it('fills the bar at an hour of reviews, never past it', () => {
     expect(reviewLoadShare(30)).toBe(50)
     expect(reviewLoadShare(240)).toBe(100)

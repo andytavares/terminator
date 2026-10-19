@@ -99,6 +99,7 @@
 
 .tmui-dialog__description {
   margin: 0;
+  white-space: pre-line;
   color: var(--tm-text-secondary);
   font-size: 13px;
   line-height: 1.5;
@@ -413,6 +414,7 @@
 
 .tmui-toast__message {
   flex: 1 1 auto;
+  white-space: pre-line;
 }
 
 @media (prefers-reduced-motion: reduce) {

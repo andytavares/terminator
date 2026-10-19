@@ -212,6 +212,7 @@ function titleOf(draft: Draft, issue: IssueSummary | undefined): string {
     firstLine(sessions.find((s) => s.description)?.description),
     sessions.find((s) => s.branch)?.branch,
     sessions[0]?.projectName,
+    sessions.find((s) => s.name)?.name,
   ]
   return candidates.find((c) => c) ?? draft.key
 }

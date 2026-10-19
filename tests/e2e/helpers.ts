@@ -6,7 +6,7 @@ import {
   Page,
   expect,
 } from '@playwright/test'
-import type { ChildProcess } from 'node:child_process'
+import { spawnSync, type ChildProcess } from 'node:child_process'
 import { existsSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { dirname, delimiter, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -379,7 +379,9 @@ export async function closeApp(
 /**
  * Create a workspace via the sidebar dialog. `folderPath` is required by the
  * schema; pass a non-git directory (e.g. the test's userDataDir) to avoid the
- * auto-create-branch-project path.
+ * auto-create-branch-project path. A git checkout gets its first branch card after the app has
+ * asked git about it, which is after the workspace's header shows, so this returns once the card
+ * is there too: a caller that acts on `main` straight away is not racing those git calls.
  */
 export async function createWorkspace(page: Page, name: string, folderPath: string): Promise<void> {
   await page.click('.sidebar-header__add')
@@ -388,6 +390,33 @@ export async function createWorkspace(page: Page, name: string, folderPath: stri
   await page.getByPlaceholder('/path/to/folder').fill(folderPath)
   await page.click('.tmui-dialog__actions .tmui-button--primary')
   await expect(workspaceRow(page, name)).toBeVisible()
+  const branch = checkedOutBranchOf(folderPath)
+  if (branch !== null) await expectCheckoutCard(page, folderPath, branch)
+}
+
+/** The checkout's branch card, or a failure that says what the app answered about the folder: the
+ * app makes the card only when git:is-repo says the folder is one, and it answers false for any
+ * git failure, so a missing card is otherwise a bare timeout. */
+async function expectCheckoutCard(page: Page, folderPath: string, branch: string): Promise<void> {
+  try {
+    await expect(projectGroup(page, branch)).toBeVisible()
+  } catch (error) {
+    const answer = await page.evaluate((path) => window.electronAPI.git.isRepo(path), folderPath)
+    throw new Error(
+      `${folderPath} is a git checkout on ${branch}, but no "${branch}" card appeared; the app now answers git:is-repo with ${JSON.stringify(answer)}`,
+      { cause: error }
+    )
+  }
+}
+
+/** The branch a folder has checked out, or null when it is not a git checkout. */
+function checkedOutBranchOf(folderPath: string): string | null {
+  if (!existsSync(join(folderPath, '.git'))) return null
+  const result = spawnSync('git', ['-C', folderPath, 'rev-parse', '--abbrev-ref', 'HEAD'], {
+    encoding: 'utf8',
+  })
+  const branch = result.stdout.trim()
+  return result.status === 0 && branch !== '' && branch !== 'HEAD' ? branch : null
 }
 
 /**

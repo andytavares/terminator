@@ -78,7 +78,7 @@ export async function openCodeReviews(
   workspace: string
 ): Promise<ExtensionView> {
   const header = workspaceRow(handle.page, workspace)
-  const codeReviews = header.getByRole('button', { name: 'Code Reviews' })
+  const codeReviews = header.getByRole('button', { name: 'Git' })
   const panel = handle.page.locator('[data-extension-panel="terminator.git-integration"]')
   await header.hover()
   await codeReviews.click()

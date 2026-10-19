@@ -1,7 +1,6 @@
 import { plural } from '@terminator/extension-sdk/plain'
 import type { HomeAsk, HomeFocusCandidate } from '../../shared/schemas/home-feed.schema'
 import { localDateKey, type FocusItem } from './focus'
-import type { SinceEvent } from './since-you-left'
 
 // What the morning band says, as functions of the data it is given.
 
@@ -16,22 +15,22 @@ export interface PlanFacts {
   /** Yesterday's focus items, and how many of them got done. */
   focusTotal: number
   focusDone: number
-  events: readonly SinceEvent[]
+  /** The agents finished and the reviews waiting on the operator right now. */
+  waiting: { agents: number; reviews: number }
 }
 
-/** "Yesterday you finished 2 of 3 focus items. Overnight, 2 agents finished and 1 review came in." */
-export function planSentence({ focusTotal, focusDone, events }: PlanFacts): string {
-  const agents = events.filter((e) => e.kind === 'agent-finished').length
-  const reviews = events.filter((e) => e.kind === 'review-requested').length
+/** "Yesterday you finished 2 of 3 focus items. Waiting on you: 2 agents finished and 1 review." */
+export function planSentence({ focusTotal, focusDone, waiting }: PlanFacts): string {
+  const { agents, reviews } = waiting
   const yesterday =
     focusTotal === 0
       ? ''
       : `Yesterday you finished ${focusDone} of ${focusTotal} ${plural(focusTotal, 'focus item')}. `
-  const overnight =
+  const waitingText =
     agents + reviews === 0
-      ? 'Nothing new came in overnight.'
-      : `Overnight, ${agents} ${plural(agents, 'agent')} finished and ${reviews} ${plural(reviews, 'review')} came in.`
-  return yesterday + overnight
+      ? 'Nothing is waiting on you.'
+      : `Waiting on you: ${agents} ${plural(agents, 'agent')} finished and ${reviews} ${plural(reviews, 'review')}.`
+  return yesterday + waitingText
 }
 
 const REVIEW_MINUTES = /about (\d+) min/
@@ -74,18 +73,6 @@ export function carriedOverRows(
   const rows = [...left.map(leftOverRow), ...candidates.filter((c) => !c.done).map(dueRow)]
   return rows.filter((row) => !seen.has(row.id) && seen.add(row.id))
 }
-
-export type EventTone = 'good' | 'bad' | 'working'
-
-const EVENT_TONE: Record<SinceEvent['kind'], EventTone> = {
-  'agent-finished': 'good',
-  'pull-request-approved': 'good',
-  'pull-request-merged': 'good',
-  'review-requested': 'working',
-  'checks-failed': 'bad',
-}
-
-export const eventTone = (kind: SinceEvent['kind']): EventTone => EVENT_TONE[kind]
 
 /** The bar under the estimate: an hour of review fills it. */
 const FULL_BAR_MINUTES = 60

@@ -9,6 +9,9 @@ const GitFullView = lazy(() =>
 const PrReviewTab = lazy(() =>
   import('../components/pr-review/PrReviewTab').then((m) => ({ default: m.PrReviewTab }))
 )
+const WorkspaceGitView = lazy(() =>
+  import('../components/worktrees/WorkspaceGitView').then((m) => ({ default: m.WorkspaceGitView }))
+)
 const ReviewDashboard = lazy(() =>
   import('../components/pr-review/ReviewDashboard').then((m) => ({ default: m.ReviewDashboard }))
 )
@@ -48,7 +51,10 @@ function ViewForPage(): JSX.Element {
   if (view === 'home') {
     return <ContributionsOnHome />
   }
-  if (view === 'code-reviews' || view === 'pr-review') {
+  if (view === 'code-reviews') {
+    return <WorkspaceGitView repoRoot={repoRoot} />
+  }
+  if (view === 'pr-review') {
     return <PrReviewTab repoRoot={repoRoot} />
   }
   return <GitFullView repoRoot={repoRoot} />

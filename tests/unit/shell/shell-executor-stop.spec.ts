@@ -25,9 +25,19 @@ afterEach(() => {
   process.env.PATH = originalPath
 })
 
+/** How long the stand-in gh may take to start its sleep: it writes its pid in 10-15 ms, 342 ms at
+ * worst in 40 starts on a loaded machine. The command's own timeout starts when it is spawned, so
+ * it must outlast this: otherwise a slow start is killed before it writes the pid. */
+const STAND_IN_STARTS_WITHIN_MS = 4000
+
+/** The command's timeout, the wait for its child to start, and time to stop what it started. */
+const TIMEOUT_TEST_LIMIT_MS = STAND_IN_STARTS_WITHIN_MS + 1000 + 5000
+
 async function grandchildPid(): Promise<number> {
   await expect
-    .poll(() => existsSync(pidFile) && readFileSync(pidFile, 'utf8').trim() !== '')
+    .poll(() => existsSync(pidFile) && readFileSync(pidFile, 'utf8').trim() !== '', {
+      timeout: STAND_IN_STARTS_WITHIN_MS,
+    })
     .toBe(true)
   return Number(readFileSync(pidFile, 'utf8'))
 }
@@ -51,11 +61,20 @@ describe('stopRunningCommands', () => {
 })
 
 describe('execShell timeout', () => {
-  it('ends what the command started, not only the command', async () => {
-    const run = execShell({ command: 'gh', args: [], cwd: scratch, timeoutMs: 1000 })
-    const grandchild = await grandchildPid()
+  it(
+    'ends what the command started, not only the command',
+    async () => {
+      const run = execShell({
+        command: 'gh',
+        args: [],
+        cwd: scratch,
+        timeoutMs: STAND_IN_STARTS_WITHIN_MS + 1000,
+      })
+      const grandchild = await grandchildPid()
 
-    expect(await run).toMatchObject({ timedOut: true, exitCode: 124 })
-    await expect.poll(() => isProcessAlive(grandchild)).toBe(false)
-  })
+      expect(await run).toMatchObject({ timedOut: true, exitCode: 124 })
+      await expect.poll(() => isProcessAlive(grandchild)).toBe(false)
+    },
+    TIMEOUT_TEST_LIMIT_MS
+  )
 })

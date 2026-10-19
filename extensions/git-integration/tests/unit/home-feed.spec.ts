@@ -32,11 +32,6 @@ describe('buildAsks: review', () => {
     expect(ask.open.command).toBe('terminator.git-integration.command.review-pull-request')
   })
 
-  it('titles a re-review differently', () => {
-    const [ask] = buildAsks([dashboardPrFixture({ section: 're-review' })], NO_ISSUES)
-    expect(ask.title).toBe('Re-review requested')
-  })
-
   it('names the repository when there is no local checkout', () => {
     const [ask] = buildAsks(
       [dashboardPrFixture({ section: 'requested', localRepoRoot: null })],
@@ -47,6 +42,18 @@ describe('buildAsks: review', () => {
 
   it.each(['team', 'involved'] as const)('asks nothing for the %s section', (section) => {
     expect(buildAsks([dashboardPrFixture({ section })], NO_ISSUES)).toEqual([])
+  })
+})
+
+describe('buildAsks: review — only direct requests, titled by whether I reviewed before', () => {
+  it('asks nothing for a re-review row: only direct review requests are asks', () => {
+    expect(buildAsks([dashboardPrFixture({ section: 're-review' })], NO_ISSUES)).toEqual([])
+  })
+
+  it('titles a request on a pull request I reviewed before as a re-review', () => {
+    const pr = dashboardPrFixture({ section: 'requested', reviewedByMe: true })
+    const [ask] = buildAsks([pr], NO_ISSUES)
+    expect(ask.title).toBe('Re-review requested')
   })
 })
 
@@ -316,7 +323,8 @@ const merged = {
 describe('buildMergedFacets', () => {
   it('publishes a shipped, closed facet that carries the timeline', () => {
     const tickets = new Map([['TAV-20', 'linear' as const]])
-    const [facet] = buildMergedFacets([merged], tickets, '2026-10-18T12:00:00Z')
+    const [facet] = buildMergedFacets([merged], tickets)
+    expect(facet.updatedAt).toBe(merged.mergedAt)
     expect(facet).toMatchObject({
       workKey: { tracker: 'linear', key: 'TAV-20' },
       kind: 'pull-request',
@@ -331,7 +339,7 @@ describe('buildMergedFacets', () => {
   })
 
   it('falls back to the checkout and branch without a matching issue', () => {
-    const [facet] = buildMergedFacets([merged], new Map(), '2026-10-18T12:00:00Z')
+    const [facet] = buildMergedFacets([merged], new Map())
     expect(facet.workKey).toEqual({ repoRoot: '/work/widgets', branch: 'tav-20-login' })
   })
 })

@@ -13,6 +13,7 @@ import {
   AgentsSection,
   PullRequestSection,
   SummarySection,
+  TerminalSection,
   TimelineSection,
 } from './ThreadDrawerSections'
 import type { WorkThread } from '../../home/work-threads'
@@ -126,6 +127,7 @@ export function ThreadDrawer(): JSX.Element | null {
         <StageBar stage={thread.stage} yourMove={thread.whoseMove === 'you'} size="large" />
       </div>
       <div className="desk-dr-b">
+        <TerminalSection thread={thread} />
         <SummarySection thread={thread} />
         <AgentsSection thread={thread} now={now} />
         <PullRequestSection thread={thread} />

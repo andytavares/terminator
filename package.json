@@ -26,6 +26,7 @@
     "test:perf": "vitest run --config vitest.perf.config.ts",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "ci:local": "node scripts/ci-e2e-local.mjs",
     "test:coverage": "vitest run --coverage --reporter=verbose --reporter=junit \"--outputFile.junit=test-report.junit.xml\"",
     "lint": "eslint .",
     "lint:deps": "syncpack lint",

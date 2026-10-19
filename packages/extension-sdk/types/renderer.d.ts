@@ -40,7 +40,11 @@ export interface ElectronAPI {
     list(): Promise<{ workspaces: Array<{ id: string; name: string; folderPath: string }> }>
     create(payload: unknown): Promise<{ workspace: unknown } | { error: string }>
     update(payload: unknown): Promise<{ workspace: unknown } | { error: string }>
-    delete(id: string): Promise<{ success: boolean }>
+    delete(id: string): Promise<{
+      success: boolean
+      /** Worktree folders git refused to remove; the workspace's records are gone either way. */
+      worktreesKept?: Array<{ path: string; reason: string }>
+    }>
     reorder(ids: string[]): Promise<{ success: boolean }>
     /** What the operator has focused in the main window. */
     getActive(): Promise<{
@@ -52,7 +56,11 @@ export interface ElectronAPI {
   project: {
     list(workspaceId: string): Promise<{ projects: Array<{ id: string; name: string }> }>
     create(payload: unknown): Promise<{ project: unknown } | { error: string }>
-    delete(id: string): Promise<{ success: boolean }>
+    delete(id: string): Promise<{
+      success: boolean
+      /** The worktree folder git refused to remove; the project's record is gone either way. */
+      worktreeKept?: { path: string; reason: string }
+    }>
     updateBranch(id: string, gitBranch: string): Promise<{ project: unknown } | { error: string }>
     rename(id: string, name: string): Promise<{ project: unknown } | { error: string }>
     reorder(workspaceId: string, ids: string[]): Promise<{ success: boolean }>

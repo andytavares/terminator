@@ -34,7 +34,7 @@ function reviewRequestAsk(pr: DashboardPR, tickets: TicketIndex): HomeAsk {
   return {
     id: `review:${pullRequestId(pr)}`,
     kind: 'review',
-    title: pr.section === 're-review' ? 'Re-review requested' : 'Review requested',
+    title: pr.reviewedByMe ? 'Re-review requested' : 'Review requested',
     detail: pr.title,
     where: pullRequestWhere(pr, tickets),
     facts: [
@@ -88,8 +88,7 @@ function fixAsk(pr: DashboardPR, tickets: TicketIndex): HomeAsk {
  * @internal */
 export function buildAsks(prs: DashboardPR[], tickets: TicketIndex): HomeAsk[] {
   return prs.flatMap((pr) => {
-    if (pr.section === 'requested' || pr.section === 're-review')
-      return [reviewRequestAsk(pr, tickets)]
+    if (pr.section === 'requested') return [reviewRequestAsk(pr, tickets)]
     if (pr.section === 'mine' && pr.ciStatus === 'failing') return [fixAsk(pr, tickets)]
     return []
   })
@@ -167,7 +166,7 @@ export function buildFacets(
     .flatMap((pr) => facetOf(pr, { tickets, updatedAt }))
 }
 
-function mergedFacetOf(pr: MergedPullRequest, { tickets, updatedAt }: FacetSource): ThreadFacet[] {
+function mergedFacetOf(pr: MergedPullRequest, tickets: TicketIndex): ThreadFacet[] {
   const workKey = workKeyOf(pr, tickets)
   if (!workKey) return []
   return [
@@ -185,19 +184,18 @@ function mergedFacetOf(pr: MergedPullRequest, { tickets, updatedAt }: FacetSourc
       readyAt: pr.readyAt,
       firstReviewAt: pr.firstReviewAt,
       checksMinutes: pr.checksMinutes,
-      updatedAt,
+      updatedAt: pr.mergedAt,
     },
   ]
 }
 
-/** One closed facet per merged pull request of mine that can be joined to its work.
- * @internal */
+/** One closed facet per merged pull request of mine that can be joined to its work,
+ *  dated by the merge. @internal */
 export function buildMergedFacets(
   merged: MergedPullRequest[],
-  tickets: TicketIndex,
-  updatedAt: string
+  tickets: TicketIndex
 ): ThreadFacet[] {
-  return merged.flatMap((pr) => mergedFacetOf(pr, { tickets, updatedAt }))
+  return merged.flatMap((pr) => mergedFacetOf(pr, tickets))
 }
 
 /** Merged pull requests per week, oldest first, over the last `weeks` weeks ending `skip` weeks ago. */
@@ -259,10 +257,7 @@ export function buildGitHomeFeed(inputs: FeedInputs): HomeFeed {
   const { prs, tickets, calendar, merged, updatedAt } = inputs
   return {
     asks: buildAsks(prs, tickets),
-    facets: [
-      ...buildFacets(prs, tickets, updatedAt),
-      ...buildMergedFacets(merged, tickets, updatedAt),
-    ],
+    facets: [...buildFacets(prs, tickets, updatedAt), ...buildMergedFacets(merged, tickets)],
     measures: buildMeasures(calendar),
   }
 }

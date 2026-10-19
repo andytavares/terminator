@@ -10,6 +10,7 @@ function makePr(overrides: Partial<DashboardPR> = {}): DashboardPR {
     repo: 'andytavares/terminator',
     localRepoRoot: '/repo/terminator',
     section: 'requested',
+    reviewedByMe: false,
     number: 1,
     title: 'Sample PR',
     url: 'https://github.com/andytavares/terminator/pull/1',

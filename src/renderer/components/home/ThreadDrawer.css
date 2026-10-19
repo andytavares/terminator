@@ -70,6 +70,31 @@
   color: var(--tm-text-muted);
 }
 
+.desk-dr__terminal {
+  position: relative;
+  height: 150px;
+  overflow: hidden;
+  border: 1px solid var(--tm-border);
+  border-radius: 6px;
+  background: var(--tm-bg-base);
+  cursor: pointer;
+}
+.desk-dr__live {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--tm-text-secondary);
+}
+.desk-dr-hint {
+  margin: 6px 0 0;
+  font-size: 11px;
+  color: var(--tm-text-muted);
+}
+
 .desk-lr {
   display: grid;
   grid-template-columns: 16px 1fr auto;

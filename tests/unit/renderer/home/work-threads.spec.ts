@@ -249,6 +249,20 @@ describe('thread fields: title, parking and changes', () => {
   })
 })
 
+describe('thread fields: scratch title', () => {
+  it('titles a scratch session by its tab name, never by its session key', () => {
+    const scratch = fact({
+      projectId: null,
+      projectName: null,
+      branch: null,
+      name: 'terminal 3',
+      lastActivityAt: hoursBeforeNow(1),
+    })
+    const [thread] = buildWorkThreads(input({ facts: [scratch] }))
+    expect(thread.title).toBe('terminal 3')
+  })
+})
+
 describe('latestResumableThread', () => {
   const agent = {
     provider: 'claude' as const,

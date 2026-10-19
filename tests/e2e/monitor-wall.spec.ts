@@ -30,7 +30,10 @@ async function emptyWall(page: Page): Promise<void> {
 }
 
 async function overviewIconNamedOnFocus(page: Page): Promise<void> {
-  // Focus, not hover: other apps launched at once move the real pointer.
+  // Focus, not hover: other apps launched at once move the real pointer. A pointer press anywhere
+  // before the focus makes it a click's focus, which names nothing; a key press is what a keyboard
+  // user did last, so the test says so rather than relying on nothing having been clicked.
+  await page.keyboard.press('Shift')
   await page.getByRole('button', { name: 'Overview' }).focus()
   await expect(page.locator('.tmui-tooltip')).toHaveText('Overview')
   await expect(page.locator('.tmui-tooltip')).toBeVisible()

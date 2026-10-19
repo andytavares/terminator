@@ -2,12 +2,13 @@ import React, { useState } from 'react'
 import { CircleCheck, CircleX, Clock } from 'lucide-react'
 import { Button, StatusDot, type StatusTone } from '@terminator/extension-ui'
 import { SESSION_ACTIONS } from '../session/session-actions'
+import { LivePreview } from '../session/LivePreview'
 import { useDismissalsStore } from '../../home/dismissals'
 import { ageLabel } from '../../home/desk-order'
 import { useThreadSummary } from './useThreadSummary'
 import { usageLabel, useSessionUsage } from './useSessionUsage'
 import { pullRequestOf } from './thread-format'
-import { useSendToAgent } from './thread-actions'
+import { leadSessionOf, useSendToAgent } from './thread-actions'
 import { buildTimeline, timelineTime } from './thread-timeline'
 import { planResume } from '../../sidebar/resume'
 import type { SessionFacts } from '../../sidebar/session-facts'
@@ -24,6 +25,41 @@ function Section({ title, children }: { title: string; children: React.ReactNode
       <h6>{title}</h6>
       {children}
     </section>
+  )
+}
+
+function terminalName(lead: SessionFacts): string {
+  if (lead.agent) return lead.agent.provider
+  return lead.shell?.split('/').pop() ?? 'terminal'
+}
+
+/** The lead session's live terminal, opened full size on click. Only for a thread with an open session. */
+export function TerminalSection({ thread }: { thread: WorkThread }): JSX.Element | null {
+  const lead = leadSessionOf(thread)
+  if (!lead) return null
+  const open = (): void => SESSION_ACTIONS.onOpen(lead.sessionId)
+  return (
+    <Section title={`LIVE TERMINAL · ${terminalName(lead)}`}>
+      <div
+        className="desk-dr__terminal"
+        role="button"
+        tabIndex={0}
+        aria-label={`Open ${terminalName(lead)} terminal full size`}
+        onClick={open}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            open()
+          }
+        }}
+      >
+        <LivePreview sessionId={lead.sessionId} className="desk-dr__terminal-view" />
+        <span className="desk-dr__live">
+          <StatusDot tone="good" /> live
+        </span>
+      </div>
+      <p className="desk-dr-hint">Click the terminal to open it full size.</p>
+    </Section>
   )
 }
 

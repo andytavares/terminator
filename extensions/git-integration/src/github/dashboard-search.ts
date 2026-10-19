@@ -198,6 +198,7 @@ function reviewProgressOf(node: RawPrNode, login: string) {
     reviewDecision: mapReviewDecision(node.reviewDecision),
     unresolvedThreads: node.reviewThreads.nodes.filter((t) => !t.isResolved).length,
     commitsSinceMyReview: computeCommitsSinceMyReview(node, login),
+    reviewedByMe: node.latestReviews.nodes.some((r) => r.author?.login === login),
     reviewerCount: reviewerCountOf(node),
   }
 }

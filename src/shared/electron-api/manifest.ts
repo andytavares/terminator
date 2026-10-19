@@ -324,7 +324,12 @@ export const ELECTRON_API_MANIFEST = [
     path: 'workspace.delete',
     kind: 'invoke',
     channel: 'workspace:delete',
-    signature: signature<(id: string) => Promise<{ success: boolean }>>(),
+    signature: signature<
+      (id: string) => Promise<{
+        success: boolean
+        worktreesKept?: Array<{ path: string; reason: string }>
+      }>
+    >(),
     toPayload: (id) => ({ id }),
     extensionView: 'shared',
   }),
@@ -386,7 +391,12 @@ export const ELECTRON_API_MANIFEST = [
     path: 'project.delete',
     kind: 'invoke',
     channel: 'project:delete',
-    signature: signature<(id: string) => Promise<{ success: boolean }>>(),
+    signature:
+      signature<
+        (
+          id: string
+        ) => Promise<{ success: boolean; worktreeKept?: { path: string; reason: string } }>
+      >(),
     toPayload: (id) => ({ id }),
     extensionView: 'shared',
   }),
