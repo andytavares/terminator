@@ -132,12 +132,7 @@ function groupedChecks(checks: DashboardCheck[]): ThreadFacet['checks'] {
   ]
 }
 
-interface FacetSource {
-  tickets: TicketIndex
-  updatedAt: string
-}
-
-function facetOf(pr: DashboardPR, { tickets, updatedAt }: FacetSource): ThreadFacet[] {
+function facetOf(pr: DashboardPR, tickets: TicketIndex): ThreadFacet[] {
   const workKey = workKeyOf(pr, tickets)
   if (!workKey) return []
   return [
@@ -147,7 +142,7 @@ function facetOf(pr: DashboardPR, { tickets, updatedAt }: FacetSource): ThreadFa
       title: pr.title,
       url: pr.url,
       closedAt: null,
-      updatedAt,
+      updatedAt: pr.updatedAt,
       ...(pr.checks ? { checks: groupedChecks(pr.checks) } : {}),
       ...pullRequestStateOf(pr),
     },
@@ -156,14 +151,8 @@ function facetOf(pr: DashboardPR, { tickets, updatedAt }: FacetSource): ThreadFa
 
 /** One facet per open pull request of mine that can be joined to its work.
  * @internal */
-export function buildFacets(
-  prs: DashboardPR[],
-  tickets: TicketIndex,
-  updatedAt: string
-): ThreadFacet[] {
-  return prs
-    .filter((pr) => pr.section === 'mine')
-    .flatMap((pr) => facetOf(pr, { tickets, updatedAt }))
+export function buildFacets(prs: DashboardPR[], tickets: TicketIndex): ThreadFacet[] {
+  return prs.filter((pr) => pr.section === 'mine').flatMap((pr) => facetOf(pr, tickets))
 }
 
 function mergedFacetOf(pr: MergedPullRequest, tickets: TicketIndex): ThreadFacet[] {
@@ -250,14 +239,13 @@ export interface FeedInputs {
   tickets: TicketIndex
   calendar: ContributionCalendar | null
   merged: MergedPullRequest[]
-  updatedAt: string
 }
 
 export function buildGitHomeFeed(inputs: FeedInputs): HomeFeed {
-  const { prs, tickets, calendar, merged, updatedAt } = inputs
+  const { prs, tickets, calendar, merged } = inputs
   return {
     asks: buildAsks(prs, tickets),
-    facets: [...buildFacets(prs, tickets, updatedAt), ...buildMergedFacets(merged, tickets)],
+    facets: [...buildFacets(prs, tickets), ...buildMergedFacets(merged, tickets)],
     measures: buildMeasures(calendar),
   }
 }

@@ -53,6 +53,7 @@ const prFields = (section: DashboardSection) => `fragment prFields on PullReques
     deletions
     changedFiles
     createdAt
+    updatedAt
     repository { nameWithOwner }
     headRefName
     author { login }
@@ -107,6 +108,7 @@ interface RawPrNode {
   deletions: number
   changedFiles: number
   createdAt: string
+  updatedAt: string
   repository: { nameWithOwner: string }
   headRefName?: string
   author: { login: string } | null
@@ -227,6 +229,7 @@ function mapNode(node: RawPrNode, section: DashboardSection, viewer: DashboardVi
     author: node.author?.login ?? '',
     isDraft: node.isDraft,
     createdAt: node.createdAt,
+    updatedAt: node.updatedAt,
     additions,
     deletions,
     fileCount: node.changedFiles,

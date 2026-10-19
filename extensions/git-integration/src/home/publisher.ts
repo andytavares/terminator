@@ -63,14 +63,13 @@ function refreshersOf(api: ExtensionAPI) {
 
 /** What has been read so far, and the way to publish it. */
 function latestFeedOf(api: ExtensionAPI) {
-  const latest: Omit<FeedInputs, 'updatedAt'> = {
+  const latest: FeedInputs = {
     prs: [],
     tickets: new Map(),
     calendar: null,
     merged: [],
   }
-  const publishGitHomeFeed = () =>
-    api.home.publish(buildGitHomeFeed({ ...latest, updatedAt: new Date().toISOString() }))
+  const publishGitHomeFeed = () => api.home.publish(buildGitHomeFeed(latest))
   return { latest, publishGitHomeFeed }
 }
 

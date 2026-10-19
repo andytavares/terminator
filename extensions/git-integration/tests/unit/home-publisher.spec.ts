@@ -55,6 +55,19 @@ describe('dashboard refresh', () => {
   })
 })
 
+describe('dashboard refresh: facet times', () => {
+  it('publishes identical facets when the same dashboard is read again later', () => {
+    vi.useFakeTimers()
+    const { published, publisher } = setupPublisher()
+    const result = { prs: [dashboardPrFixture({ ciStatus: 'failing' })], failed: [] }
+    publisher.hooks.onDashboard(result)
+    vi.setSystemTime(Date.now() + HOME_REFRESH_MS)
+    publisher.hooks.onDashboard(result)
+    expect(published[1].facets).toEqual(published[0].facets)
+    expect(published[0].facets[0].updatedAt).toBe('2026-10-16T09:00:00Z')
+  })
+})
+
 describe('dashboard refresh: tickets', () => {
   it('republishes with the work keys of the issues once they arrive', async () => {
     const { published, publisher } = setupPublisher([issue('TAV-20')])

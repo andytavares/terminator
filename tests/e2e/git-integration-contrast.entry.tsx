@@ -193,6 +193,7 @@ function dashboardPr(
     author: 'octocat',
     isDraft: false,
     createdAt: ago(number % 5),
+    updatedAt: ago(number % 5),
     additions: 120 + number,
     deletions: 40,
     fileCount: 9,

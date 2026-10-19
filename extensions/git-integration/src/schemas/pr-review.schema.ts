@@ -289,6 +289,7 @@ export const DashboardPRSchema = z.object({
   author: z.string(),
   isDraft: z.boolean(),
   createdAt: z.string(),
+  updatedAt: z.string(),
   additions: z.number(),
   deletions: z.number(),
   fileCount: z.number(),

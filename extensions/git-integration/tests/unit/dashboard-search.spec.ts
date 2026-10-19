@@ -29,6 +29,7 @@ function prNode(overrides: Record<string, unknown> = {}) {
     deletions: 5,
     changedFiles: 2,
     createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-02T00:00:00Z',
     repository: { nameWithOwner: 'acme/widgets' },
     headRefName: 'fix/bug',
     author: { login: 'alice' },
@@ -132,6 +133,7 @@ describe('parseDashboard', () => {
     expect(pr.ciStatus).toBe('passing')
     expect(pr.reviewDecision).toBe('review-required')
     expect(pr.unresolvedThreads).toBe(1)
+    expect(pr.updatedAt).toBe('2026-01-02T00:00:00Z')
     expect(pr.localRepoRoot).toBeNull()
   })
 })
