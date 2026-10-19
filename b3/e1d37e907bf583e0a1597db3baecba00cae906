@@ -1,0 +1,21 @@
+tests/unit/renderer/sidebar/purity.spec.ts
+  s_3ced19ecaa16dd::t_a3ea15a0601585 75-77,88-90
+src/renderer/home/plan-the-day.ts
+  s_3ced19ecaa16dd::t_7cc259b074e578 1,29,33
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b3e1d37e907bf583e0a1597db3baecba00cae906",
+  "prompts": {},
+  "sessions": {
+    "s_3ced19ecaa16dd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "958bebf4-85fd-422a-9a09-b64994561aeb",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
