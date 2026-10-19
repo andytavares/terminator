@@ -10,14 +10,13 @@ import {
   selectProject,
   e2eTempDir,
 } from './helpers'
-import { expectTerminalFocused, openHome } from './session-views'
+import { expectTerminalFocused, openOverview } from './session-views'
 
 // Resume against the running app. A conversation is reported exactly as the
 // capture hook reports one — a file in the profile's agent-sessions directory —
 // so the whole path from report to control is exercised without running an
 // agent. Pressing Resume against a real agent is tests/e2e/live/resume-live.spec.ts.
-
-const BRANCH_GROUP = 'Repo One / feature-a'
+// Resume is on the Overview wall's tiles; the Desk lists no ended session.
 
 /** The two terminals on the branch: the first's transcript is there, the second's never was. */
 interface Conversations {
@@ -27,10 +26,9 @@ interface Conversations {
   second: string
 }
 
-/** Back to the terminal, which Home covers while it is showing. */
+/** Back to the terminal, which Home and the wall cover while one of them is showing. */
 async function goToTerminal(page: Page): Promise<void> {
-  const entry = page.getByRole('button', { name: /^Home/ })
-  if ((await entry.getAttribute('aria-current')) === 'page') await entry.click()
+  await selectProject(page, 'Repo One', 'feature-a')
   await expect(page.locator('.terminal-pane').filter({ visible: true }).first()).toBeVisible()
 }
 
@@ -62,7 +60,7 @@ function reportConversation(
   renameSync(`${target}.tmp`, target)
 }
 
-/** The ids of the records Home has written, oldest first. */
+/** The ids of the session records written so far, oldest first. */
 function recordIds(page: Page): Promise<string[]> {
   return page.evaluate(async () => {
     const { data } = await window.electronAPI.sessionRecords.list()
@@ -71,19 +69,18 @@ function recordIds(page: Page): Promise<string[]> {
 }
 
 /**
- * Describes the last session on the branch and returns the id of the terminal it is.
+ * Describes the session in the tab at `index` and returns the id of the terminal it is.
  *
  * Learned the way anything else would: describe the session, then read the
  * record that description created. The capture hook learns it from the
  * environment instead, which no browser context can see.
  */
-async function describeAndLearnId(page: Page, description: string): Promise<string> {
+async function describeAndLearnId(page: Page, tab: { index: number; text: string }) {
   const before = await recordIds(page)
-  const box = page
-    .getByRole('rowgroup', { name: BRANCH_GROUP })
-    .getByRole('textbox', { name: 'What is this session doing?' })
-    .last()
-  await box.fill(description)
+  await page.locator('.tab-bar__tab--session').nth(tab.index).click({ button: 'right' })
+  await page.locator('.ctx-menu').getByRole('button', { name: 'Add description…' }).click()
+  const box = page.getByRole('textbox', { name: 'What is this session doing?' })
+  await box.fill(tab.text)
   await box.press('Enter')
   await expect.poll(async () => (await recordIds(page)).length).toBe(before.length + 1)
   return (await recordIds(page)).find((id) => !before.includes(id))!
@@ -106,7 +103,6 @@ async function openSecondTerminal(page: Page): Promise<void> {
   await goToTerminal(page)
   await page.getByRole('button', { name: 'New terminal' }).click()
   await expect(page.locator('.tab-bar__tab--session')).toHaveCount(2)
-  await openHome(page)
 }
 
 /** Two terminals on the one branch, each reporting its own conversation. The report names the
@@ -116,13 +112,14 @@ async function twoConversationsPairWithTheirSessions(
   run: Conversations
 ): Promise<void> {
   const { page, userDataDir } = handle
-  run.first = await describeAndLearnId(page, 'resume test')
+  await goToTerminal(page)
+  run.first = await describeAndLearnId(page, { index: 0, text: 'resume test' })
   reportConversation(userDataDir, run.first, {
     conversationId: 'conv-first',
     transcriptPath: run.transcript,
   })
   await openSecondTerminal(page)
-  run.second = await describeAndLearnId(page, 'the other one')
+  run.second = await describeAndLearnId(page, { index: 1, text: 'the other one' })
   reportConversation(userDataDir, run.second, {
     conversationId: 'conv-second',
     transcriptPath: join(run.folder, 'missing.jsonl'),
@@ -142,7 +139,7 @@ async function exitTerminal(page: Page, index: number): Promise<void> {
   await expectTerminalFocused(page)
   await page.keyboard.type('exit')
   await page.keyboard.press('Enter')
-  await openHome(page)
+  await openOverview(page)
 }
 
 async function goneTranscriptSaysSo(page: Page): Promise<void> {
@@ -157,25 +154,44 @@ async function stoppedSessionOffersResume(page: Page): Promise<void> {
 }
 
 // Whether a transcript is there is only true as of the moment it was read, and
-// the agent owns that file: it can go while Home is on screen. Coming back to
-// Home has to ask again, or the operator is offered a button that cannot work.
+// the agent owns that file: it can go while the wall is on screen. Coming back to
+// the wall has to ask again, or the operator is offered a button that cannot work.
 async function goneWhileRunningStopsBeingOffered(page: Page, run: Conversations): Promise<void> {
   rmSync(run.transcript)
   await goToTerminal(page)
-  await openHome(page)
+  await openOverview(page)
   await expect(page.getByText('Conversation no longer available')).toHaveCount(2)
   await expect(resumeButtons(page)).toHaveCount(0)
+}
+
+/** Resumes the stopped conversation from the keyboard, with a focus ring to show
+ * where it is: this is the one control that brings work back, and it must not
+ * need a mouse. */
+async function resumeFromKeyboard(page: Page, run: Conversations): Promise<void> {
+  writeFileSync(run.transcript, '{}\n')
+  await goToTerminal(page)
+  await openOverview(page)
+  const resume = resumeButtons(page)
+  await expect(resume).toHaveCount(1, { timeout: 15_000 })
+  await resume.focus()
+  expect(
+    await resume.evaluate((el) => getComputedStyle(el, ':focus-visible').outlineWidth)
+  ).not.toBe('0px')
+  await page.keyboard.press('Enter')
+  // The terminal that took the conversation over carries its description.
+  await expect(page.locator('.tab-bar__tab--session[title="resume test"]')).toBeVisible()
 }
 
 async function firstRun(handle: AppHandle, run: Conversations): Promise<void> {
   const { page } = handle
   await createWorkspace(page, 'Repo One', run.folder)
   await addAndSelectProject(page, 'Repo One', 'feature-a')
-  await openHome(page)
+  await openOverview(page)
   await test.step('before anything is reported there is nothing to resume', () =>
     expect(resumeButtons(page)).toHaveCount(0))
   await test.step('two conversations on one branch each come back to their own session', () =>
     twoConversationsPairWithTheirSessions(handle, run))
+  await openOverview(page)
   await test.step('a running session offers nothing to resume', () =>
     expect(resumeButtons(page)).toHaveCount(0))
   await test.step('a conversation whose transcript has gone says so instead', () =>
@@ -184,43 +200,8 @@ async function firstRun(handle: AppHandle, run: Conversations): Promise<void> {
     stoppedSessionOffersResume(page))
   await test.step('a conversation that goes while the app is running stops being offered', () =>
     goneWhileRunningStopsBeingOffered(page, run))
-}
-
-/** Resumes the closed conversation from the keyboard, with a focus ring to show
- * where it is: this is the one control that brings work back, and it must not
- * need a mouse. */
-async function resumeFromKeyboard(page: Page): Promise<void> {
-  const resume = page.getByRole('rowgroup', { name: 'Closed' }).getByRole('button', {
-    name: /^Resume/,
-  })
-  await resume.focus()
-  expect(
-    await resume.evaluate((el) => getComputedStyle(el, ':focus-visible').outlineWidth)
-  ).not.toBe('0px')
-  await page.keyboard.press('Enter')
-}
-
-async function offeredUnderClosedAfterRestart(page: Page): Promise<void> {
-  await openHome(page)
-  const closed = page.getByRole('rowgroup', { name: 'Closed' })
-  // SC-007: a restart starts no agents on its own.
-  await expect(closed).toBeVisible()
-  await expect(page.locator('.tab-bar__tab--session')).toHaveCount(0)
-  await expect(closed.getByRole('button', { name: /^Resume/ })).toBeVisible()
-}
-
-/** Resuming takes it out of the history: a live session again, not one beside a ghost of itself. */
-async function resumedOnItsBranch(page: Page): Promise<void> {
-  // The branch it belonged to is still the one it would come back in.
-  await selectProject(page, 'Repo One', 'feature-a')
-  await openHome(page)
-  await resumeFromKeyboard(page)
-  // The terminal that took the conversation over carries its description.
-  await expect(page.locator('.tab-bar__tab--session[title="resume test"]')).toBeVisible()
-  await openHome(page)
-  const closed = page.getByRole('rowgroup', { name: 'Closed' })
-  await expect(closed.getByText('the other one')).toBeVisible()
-  await expect(closed.getByText('resume test')).toHaveCount(0)
+  await test.step('a conversation that is back is resumed from the keyboard on its branch', () =>
+    resumeFromKeyboard(page, run))
 }
 
 test('a conversation is resumed, and only when it can be', async () => {
@@ -233,20 +214,9 @@ test('a conversation is resumed, and only when it can be', async () => {
     second: '',
   }
   writeFileSync(run.transcript, '{}\n')
-  let handle: AppHandle | undefined = await launchApp()
+  const handle = await launchApp()
   try {
-    const profile = handle.userDataDir
     await firstRun(handle, run)
-    // The transcript is back, so the conversation can be offered after the restart.
-    writeFileSync(run.transcript, '{}\n')
-    await closeApp(handle)
-    handle = undefined
-    handle = await launchApp(profile)
-    const { page } = handle
-    await test.step('a conversation from the last run is offered under Closed, and nothing restarted itself', () =>
-      offeredUnderClosedAfterRestart(page))
-    await test.step('resuming it from the keyboard brings it back on its branch', () =>
-      resumedOnItsBranch(page))
   } finally {
     await closeApp(handle)
   }

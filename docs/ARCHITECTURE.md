@@ -445,21 +445,21 @@ change counts and selection.
 
 `src/renderer/sidebar/` holds the pure core. **These modules import nothing but types** — no React, no store, no `Date.now()`; `now` is always a parameter. `tests/unit/renderer/sidebar/purity.spec.ts` guards the directory rather than any one module, so a file added here inherits the rule.
 
-| Module                                                     | Role                                                                                     |
-| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `branch-rows.ts`                                           | `buildBranchRows` — the sidebar's list: repos, and the branches under them               |
-| `branch-state.ts`                                          | `aggregateBranchState`, `countInState` — a branch's one state, folded from its terminals |
-| `session-facts.ts`, `work-item.ts`                         | `buildSessionFacts` — what Home and the wall say about every session; `resolveWorkItem`  |
-| `ledger-rows.ts`, `logbook-groups.ts`, `session-filter.ts` | Home's two layouts: grouping, ordering, suggestions, and the text filter                 |
-| `wall-order.ts`                                            | `placeWall` — each wall tile's band, CSS `order` and span, emitted in session id order   |
-| `choice-prompt.ts`, `screen.ts`                            | `parseChoicePrompt`, `samePrompt`, `latestLineOf` — read off a settled terminal screen   |
-| `home-prefs.ts`, `wall-prefs.ts`                           | Home and wall arrangement, persisted (the named `localStorage` side effect)              |
-| `manual-order.ts`                                          | `mergeReorder` — folds a drag over the visible rows back into the stored list            |
-| `view-model.ts`                                            | `STATUS_ORDER`, `isStale`, and the view/filter/sort types                                |
-| `views.ts`                                                 | built-in views as data, and their persistence                                            |
-| `session-status.ts`                                        | state → glyph/label, total over `AgentState`                                             |
-| `branch-display.ts`                                        | `branchLabel`, `abbreviatePath`, `qualifiedBranchLabel`                                  |
-| `collapse-state.ts`, `relative-time.ts`, `agent-state.ts`  | unchanged                                                                                |
+| Module                                                    | Role                                                                                     |
+| --------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `branch-rows.ts`                                          | `buildBranchRows` — the sidebar's list: repos, and the branches under them               |
+| `branch-state.ts`                                         | `aggregateBranchState`, `countInState` — a branch's one state, folded from its terminals |
+| `session-facts.ts`, `work-item.ts`                        | `buildSessionFacts` — what Home and the wall say about every session; `resolveWorkItem`  |
+| `session-filter.ts`                                       | The text match on a session, and issue titles for the Desk's asks                        |
+| `wall-order.ts`                                           | `placeWall` — each wall tile's band, CSS `order` and span, emitted in session id order   |
+| `choice-prompt.ts`, `screen.ts`                           | `parseChoicePrompt`, `samePrompt`, `latestLineOf` — read off a settled terminal screen   |
+| `wall-prefs.ts`                                           | The wall's arrangement, persisted (the named `localStorage` side effect)                 |
+| `manual-order.ts`                                         | `mergeReorder` — folds a drag over the visible rows back into the stored list            |
+| `view-model.ts`                                           | `STATUS_ORDER`, `isStale`, and the view/filter/sort types                                |
+| `views.ts`                                                | built-in views as data, and their persistence                                            |
+| `session-status.ts`                                       | state → glyph/label, total over `AgentState`                                             |
+| `branch-display.ts`                                       | `branchLabel`, `abbreviatePath`, `qualifiedBranchLabel`                                  |
+| `collapse-state.ts`, `relative-time.ts`, `agent-state.ts` | unchanged                                                                                |
 
 `buildBranchRows` is the seam the whole list rests on. The rule that matters: **every branch is a row whether or not a terminal is open on it, unconditionally**. Filters lift one level — a branch matches when any of its terminals matches — with `hideStale` the deliberate exception, since it is about abandoned work and has nothing to say about a branch nobody has started.
 
@@ -484,14 +484,41 @@ Clicking a branch resolves to exactly one terminal: one that is waiting on you, 
 Two core global tabs draw every session from one view model. `useSessionFacts` builds `SessionFacts` from the session, workspace, session-records and integrations stores through `buildSessionFacts`, which is pure.
 
 - **Ending and starting** are on the surfaces themselves: `CloseSessionButton` ends a live session through `closeSessionFromFacts` (leave the split, then close, as Cmd+W does) and removes a closed one through `session-records:forget`; `NewSessionMenu` starts one on Home and on the wall. Both live in `components/session/`, since Home and Overview share them.
-- **Home** (`core.home`, `components/home/`) is the launch view: `useCoreTabs` (`src/renderer/shell/core-tabs.tsx`) registers it and activates it on mount, and `HomeBadge` (`components/AppShellParts.tsx`) keeps its app-band badge at the count of sessions waiting on you. `HomeScreen` switches between `LedgerView` (rows from `buildLedger`, arranged by `LedgerDisplayMenu`) and `LogbookView` (a list from `buildLogbook` and one session's detail). The layout and the Ledger's arrangement persist; the text and Needs you filters do not.
+- **Home** is the Desk; it has its own section below.
 - **The Monitor wall** (`core.overview`, `OverviewScreen`) draws a `WallTile` per open session. **Every tile and both band headings are direct children of one grid**, and `placeWall` emits placements in session id order with position carried by CSS `order` and `grid-column: span`. That is load-bearing: `LivePreview` calls `mountPreview`, which moves the session's single xterm element into the tile, and a re-parented or reordered tile would tear the live terminal out. ADR 036's invariant, kept by ADR 054.
 - **Live previews** fill their box's width and follow the cursor (`terminal/preview-window.ts`), re-placed on every xterm render.
 - **Descriptions and session links** live in `src/main/sessions/session-record-store.ts`, beside `issue-link-store` and in its shape: in memory, mirrored to `userData/session-records.json` with a tmp-then-rename write, exposed as `session-records:*` on `window.electronAPI.sessionRecords`. A record exists only while a session has a description or its own link. `terminal:close` closes it, a startup sweep closes anything the last run left open (a quit closes no terminals one by one), and `pruneRecords` drops records 30 days after close. A session's work item is its own link, else its branch's. The branch link, and the agent context injected from it, are untouched. `forget` deletes a **closed** record outright, which is how the operator clears one from Home before retention does; it refuses an open one, whose record is what Home draws the session from.
-- **Order follows standing, not output** (ADR 058). `wall-order`, `ledger-rows` and `logbook-groups` rank by `standingRank` — needs you, running (working and idle together), exited — then start time; the "recent" option sorts by `lastAttendedAt`. Nothing orders by `lastActivityAt`, which restamps once a second for every printing session. The Ledger lifts needs-you sessions into a first `needs-you` group.
+- **Order follows standing, not output** (ADR 058). `wall-order` ranks by `standingRank` — needs you, running (working and idle together), exited — then start time; the "recent" option sorts by `lastAttendedAt`. Nothing on the wall orders by `lastActivityAt`, which restamps once a second for every printing session. The Desk orders its work threads by whose move it is, then by `lastActivity` (see below).
 - **State colour lives on fills and edges.** `StateChip` (`components/session/`) draws a label on `--state-*-fill` with a `--state-*` edge — amber needs you, green working, neutral otherwise — and its glyph keeps `currentColor` and opacity. `compact` drops the label for the sidebar gutter.
 - **Work items read one way.** `SessionFacts.workItem` (own link, else branch link) feeds Home, the wall, the sidebar terminal row (`BranchTerminal.workItem`) and the tab bar, and a collapsed branch row shows its terminals' own keys after its own (`sessionIssueKeys`: one element, the rest counted as `+N`); every terminal-level Link/Change/Remove opens `SessionLinkDialog`. A session link also writes `userData/integrations/session-context/<sessionId>.json` (`integrations/session-context.ts`), which the user-level SessionStart hook prints for the terminal named by `TERMINATOR_SESSION_ID`; the project hook stays silent for that session.
 - **Answering in place.** `session-controller` reads a terminal's visible rows once per busy → idle transition, stores `latestLine` and `parseChoicePrompt`'s result as view state, and clears the prompt on the next output. `answerChoice` re-reads the screen and types the option's digit only when `samePrompt` still holds. A bare digit answers a Claude Code select prompt, verified live on 2.1.273 (`tests/e2e/live/choice-prompt.spec.ts`).
+
+### The Desk
+
+`core.home` (`components/home/HomeScreen.tsx`) is the launch view: `useCoreTabs` (`src/renderer/shell/core-tabs.tsx`) registers it and activates it on mount, and `HomeBadge` (`components/AppShellParts.tsx`) writes its app-band badge, named "N need you", from the count of asks. `HomeScreen` is a header (Desk | Insights, search, Start work), then either `Insights` or the Desk body: `SummaryLine`, `PlanTheDay` (first view of a local day), the `YourMove` band (or `QuietDesk` when empty), and `InFlight` beside `TodayRail`. A press on a count in the summary line narrows the body to that count.
+
+- **The home feed contract** (ADR 117). An extension calls `api.home.publish(feed)` with `asks`, `facets`, `measures` and `focus`; `src/shared/schemas/home-feed.schema.ts` validates it at the boundary, `src/main/home/home-feed.ts` keeps one feed per extension id and pushes the merged feed (each item tagged with its `source`) over `home:feed-changed`, and `useHomeFeedStore` holds it in the renderer. `home:feed-action` carries a press on an ask's action back to the extension that published it. These channels are core-only and `remote: 'omit'`. Core never names an extension's channel; Git Integration, Foundry and Task Vault are three publishers of the same shape.
+- **Core asks.** `useDeskAsks` joins the feed with asks core raises from `SessionFacts` (`home/core-asks.ts`): a session in `awaiting-input` becomes an `answer` ask carrying its numbered `choices`, and an agent that went idle while unattended becomes a `finished` ask. `home/desk-order.ts` puts them in one order and applies `home/dismissals.ts` (done and snooze, which wakes early on new activity).
+- **Agent questions come from Claude Code's hooks.** Beside its `SessionStart` entry, core adds `Notification` and `Stop` entries to `~/.claude/settings.json` (`agents/agent-ask-hook.ts`, matched by script name like the capture hook). The script writes `userData/agent-sessions/asks/<terminal>.json`; `agents/ask-watcher.ts` claims each file by rename, keeps the ask per terminal and announces it over `agent-ask:*`; `shell/agent-attention.ts` mirrors it onto the session (`agentAsk`), and `BellAndBusySource` reads an ask as `awaiting-input` before the bell or a choice prompt on screen. An agent that is not Claude Code still raises asks through the bell and `parseChoicePrompt`.
+- **Answering in place** is `AnswerInPlace` (`components/home/AnswerInPlace.tsx`): the terminal's last screen as text, the choices, a reply field and Open terminal. Pressing `1`–`9` calls `answerChoice`, which re-reads the screen and sends the digit only while `samePrompt` still holds; a reply goes through `terminal.input` with a carriage return. Single-letter keys (`use-desk-keys.ts`) act only while focus is inside Home and never in a field or an `.xterm`.
+- **Attention log.** `shell/agent-attention.ts` reports each settled state change of any session (after `SETTLE_MS`) to `attention:record`; `src/main/home/attention-log.ts` keeps the working and awaiting-input intervals, mirrored atomically to `userData/attention-log.json`, closes what the last run left open at the saved time, and prunes to 90 days (`ATTENTION_RETENTION_MS`). `attention:measures` and `attention:intervals` answer Home's "waited on you" line and the Insights cards from it.
+- **Work threads.** `home/work-threads.ts` is pure: it joins session facts, extension `facets` and tickets on one string key per piece of work (the ticket, else `repoRoot#branch`, else the session), and derives the stage, whose move it is, the now line and the pull request chip. `useWorkThreads` supplies the inputs; `InFlight` groups them by whose move it is (or by repo), and Scratch terminals and work untouched for two days sit under a collapsed Parked group. `ThreadDrawer` is the shared `Drawer` (a modal shell, so Escape and focus return are the shell's).
+- **Transcripts.** `agents/transcript-usage.ts` reads a Claude Code transcript once per `message.id` for tokens by model, and `shared/agents/model-prices.ts` turns them into an estimated cost; `agents:usage` serves the drawer's per-session figures and Insights' tokens and cost. `home:thread-summary` (`home/thread-summary.ts`) runs Claude Code headless with no tools over the agents' latest messages and the pull request to write the drawer's summary, with a two-minute cooldown.
+- **Insights** (`components/home/Insights*.tsx`, `home/insights.ts`) is the second `useHomeView` view. Each card is titled by the question it answers and states why when it has no honest number. An extension adds a section with `contributes.insightsSection` (the old `homeSection`, ADR 116), drawn as a frame.
+- **The branch tree on Home.** `useSidebarVisibility` hides the sidebar while `core.home` is active and `ui.hideSidebarOnHome` is on (the default); `toggleSidebar` (⌘B) then reveals it for that visit only.
+- **Start work** (`StartWork.tsx`, `start-work.ts`) is a modal opened by ⌘N, Quick Actions or the header button: tickets from `integrations`, a prompt, a branch or a scratch terminal, run as a Claude agent, a terminal or a Foundry order.
+
+#### Persistence boundaries
+
+| Where                                           | What                                                                                            |
+| ----------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `userData/attention-log.json`                   | Agent working and waiting intervals, 90 days, written atomically by the main process            |
+| `localStorage` `terminator.home.dismissals`     | Asks marked done or snoozed, dropped after 7 days; renderer only                                |
+| `localStorage` `terminator.home.focus`          | Today's focus items by local day (7 days kept), when Home was last left, and the Plan dismissal |
+| `localStorage` `terminator.home.parked-threads` | Work keys the operator parked by hand                                                           |
+| `userData/session-records.json`                 | Descriptions and session links (see below)                                                      |
+
+Every `localStorage` read goes through `home/local-storage.ts`, which falls back to a default on absent, blocked or corrupt storage.
 
 ### Revealing a session
 
@@ -516,7 +543,7 @@ Every mix spells its fallback as `var(--ws-color, transparent)`: an unresolved c
 
 ### Collapse persistence
 
-`collapse-state.ts` plus `localStorage` key `terminator.sidebar.collapsed`, keyed by grouping. Home's arrangement is `terminator.home.prefs` and the wall's is `terminator.wall.prefs`; both degrade field by field to defaults on corrupt storage. Filters are never persisted.
+`collapse-state.ts` plus `localStorage` key `terminator.sidebar.collapsed`, keyed by grouping. The wall's arrangement is `terminator.wall.prefs`; it degrades field by field to defaults on corrupt storage. Filters are never persisted. The Desk's own keys are under [Persistence boundaries](#persistence-boundaries).
 
 ### Resize
 

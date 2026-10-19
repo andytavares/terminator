@@ -7,7 +7,7 @@ import {
   expect,
 } from '@playwright/test'
 import type { ChildProcess } from 'node:child_process'
-import { mkdtempSync } from 'node:fs'
+import { existsSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { dirname, delimiter, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { saveIpcTrace, startIpcTrace } from './ipc-trace'
@@ -237,10 +237,26 @@ function emulateFocusInExtensionFrames(page: Page): void {
   })
 }
 
+/** Home hides the branch tree by default (`ui.hideSidebarOnHome`); a spec that clicks the
+ * sidebar from Home would find nothing there. A new profile is seeded with the tree shown,
+ * unless the spec is about the default and asks for it. */
+export interface LaunchOptions {
+  hideSidebarOnHome?: boolean
+}
+
+/** electron-store's file for the settings store (`name: 'settings'`); `global` is merged over the defaults. */
+function seedSidebarShownOnHome(userDataDir: string): void {
+  const file = join(userDataDir, 'settings.json')
+  if (existsSync(file)) return
+  writeFileSync(file, JSON.stringify({ global: { ui: { hideSidebarOnHome: false } } }))
+}
+
 export async function launchApp(
   userDataDir: string = e2eProfileDir(),
-  env: Record<string, string> = {}
+  env: Record<string, string> = {},
+  options: LaunchOptions = {}
 ): Promise<AppHandle> {
+  if (options.hideSidebarOnHome !== true) seedSidebarShownOnHome(userDataDir)
   const deadline = Date.now() + LAUNCH_DEADLINE_MS
   const marker = launchMarker()
   const remaining = () => Math.max(1, deadline - Date.now())
