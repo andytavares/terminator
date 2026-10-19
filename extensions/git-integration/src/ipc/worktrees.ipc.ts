@@ -18,7 +18,6 @@ const RemoveLocalPayload = z.object({
       z.object({
         branch: z.string().min(1).nullable(),
         worktreePath: z.string().min(1).nullable(),
-        forceWorktree: z.boolean(),
         forceBranch: z.boolean(),
       })
     )
@@ -51,16 +50,19 @@ function inventoryShell(workspace: Workspace): InventoryShell {
   }
 }
 
-function removeShell(workspace: Workspace): RemoveShell {
+function removeShell({ workspace, pty }: Pick<ExtensionAPI, 'workspace' | 'pty'>): RemoveShell {
   return {
     exec: (cwd, args) => runGit(cwd, args),
     listProjects: async () => listAllProjects(workspace)(),
+    listSessions: async () =>
+      (await pty.listSessions()).map((s) => ({ cwd: s.cwd, projectId: s.projectId })),
     deleteProject: (id) => workspace.deleteProject(id),
   }
 }
 
 /** git:local-inventory and git:remove-local, the Worktrees tab's two channels. */
-function worktreesChannels(workspace: Workspace): ChannelSpec[] {
+function worktreesChannels(api: Pick<ExtensionAPI, 'workspace' | 'pty'>): ChannelSpec[] {
+  const { workspace } = api
   return [
     defineChannel({
       channel: 'git:local-inventory',
@@ -75,12 +77,15 @@ function worktreesChannels(workspace: Workspace): ChannelSpec[] {
       channel: 'git:remove-local',
       schema: RemoveLocalPayload,
       invalid: VALIDATION_ERROR,
-      run: ({ repoRoot, items }) => removeLocalItems(repoRoot, removeShell(workspace), items),
+      run: ({ repoRoot, items }) => removeLocalItems(repoRoot, removeShell(api), items),
       onError: errorEnvelope,
     }),
   ]
 }
 
-export function registerWorktreesHandlers(register: RegisterFn, workspace: Workspace): void {
-  for (const spec of worktreesChannels(workspace)) register(spec)
+export function registerWorktreesHandlers(
+  register: RegisterFn,
+  api: Pick<ExtensionAPI, 'workspace' | 'pty'>
+): void {
+  for (const spec of worktreesChannels(api)) register(spec)
 }

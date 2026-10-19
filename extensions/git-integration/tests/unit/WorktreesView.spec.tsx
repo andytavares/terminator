@@ -230,12 +230,32 @@ describe('WorktreesView — confirming a removal', () => {
           {
             branch: 'feature-merged',
             worktreePath: null,
-            forceWorktree: false,
             forceBranch: false,
           },
         ],
       })
     )
+  })
+})
+
+describe('WorktreesView — confirming twice', () => {
+  it('disables the confirm button while the removal is running', async () => {
+    stubRemoval({ ok: true })
+    mockInvoke.mockImplementation((channel: string) =>
+      channel === 'git:remove-local'
+        ? new Promise(() => {})
+        : Promise.resolve({ rows: [MAIN, MERGED] })
+    )
+    await renderWorktrees()
+    fireEvent.click(screen.getByRole('button', { name: 'Select stale' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Remove selected · 1' }))
+    const confirm = within(await screen.findByRole('dialog')).getByRole('button', {
+      name: 'Remove 1',
+    })
+    fireEvent.click(confirm)
+    await waitFor(() => expect((confirm as HTMLButtonElement).disabled).toBe(true))
+    fireEvent.click(confirm)
+    expect(mockInvoke.mock.calls.filter(([c]) => c === 'git:remove-local')).toHaveLength(1)
   })
 })
 

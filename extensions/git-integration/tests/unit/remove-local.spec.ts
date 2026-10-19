@@ -10,6 +10,7 @@ interface FakeShellOptions {
   mainWorktree?: string
   currentBranch?: string
   projects?: Array<{ id: string; name: string; worktreePath?: string }>
+  sessions?: Array<{ cwd: string; projectId?: string }>
   failOn?: (args: string[]) => string | null
 }
 
@@ -28,6 +29,7 @@ function recordingShell(options: FakeShellOptions) {
       return ''
     },
     listProjects: async () => options.projects ?? [],
+    listSessions: async () => options.sessions ?? [],
     deleteProject: (id) => deleted.push(id),
   }
   return { shell, calls, deleted }
@@ -39,8 +41,8 @@ describe('removeLocalItems — refusals', () => {
   it('refuses the main worktree and the current branch', async () => {
     const { shell, calls } = recordingShell({ currentBranch: 'main' })
     const { results } = await removeLocalItems('/repo', shell, [
-      { branch: null, worktreePath: '/repo', forceWorktree: false, forceBranch: false },
-      { branch: 'main', worktreePath: null, forceWorktree: false, forceBranch: false },
+      { branch: null, worktreePath: '/repo', forceBranch: false },
+      { branch: 'main', worktreePath: null, forceBranch: false },
     ])
     expect(results).toEqual([
       { branch: null, worktreePath: '/repo', ok: false, reason: 'main worktree' },
@@ -53,7 +55,6 @@ describe('removeLocalItems — refusals', () => {
 const removalItem = (branch: string | null, worktreePath: string | null, forceBranch = false) => ({
   branch,
   worktreePath,
-  forceWorktree: false,
   forceBranch,
 })
 
@@ -81,15 +82,7 @@ describe('removeLocalItems — removal', () => {
   })
 })
 
-describe('removeLocalItems — flags and failures', () => {
-  it('passes --force only when the item asks for it', async () => {
-    const { shell, calls } = recordingShell({})
-    await removeLocalItems('/repo', shell, [
-      { ...removalItem(null, '/repo/.worktrees/dirty'), forceWorktree: true },
-    ])
-    expect(gitArgs(calls)).toContain('worktree remove --force /repo/.worktrees/dirty')
-  })
-
+describe('removeLocalItems — failures', () => {
   it('reports a failed item with git’s message and keeps going', async () => {
     const { shell, calls } = recordingShell({
       failOn: (args) => (args[1] === 'remove' ? 'fatal: is dirty' : null),
@@ -120,5 +113,48 @@ describe('removeLocalItems — the project of a removed worktree', () => {
     })
     await removeLocalItems('/repo', shell, [removalItem(null, '/repo/.worktrees/fix')])
     expect(deleted).toEqual([])
+  })
+})
+
+describe('removeLocalItems — a worktree with an open session', () => {
+  const OPEN = '/repo/.worktrees/open'
+
+  it('refuses a worktree a terminal runs in, whatever the caller asked for', async () => {
+    const { shell, calls } = recordingShell({ sessions: [{ cwd: `${OPEN}/src` }] })
+    const { results } = await removeLocalItems('/repo', shell, [removalItem('open', OPEN, true)])
+    expect(results).toEqual([
+      { branch: 'open', worktreePath: OPEN, ok: false, reason: 'open session' },
+    ])
+    expect(gitArgs(calls).some((args) => args.startsWith('worktree remove'))).toBe(false)
+    expect(gitArgs(calls).some((args) => args.startsWith('branch -'))).toBe(false)
+  })
+
+  it('refuses a worktree whose project card has a terminal, even one that runs elsewhere', async () => {
+    const { shell } = recordingShell({
+      projects: [{ id: 'p9', name: 'Open', worktreePath: OPEN }],
+      sessions: [{ cwd: '/somewhere/else', projectId: 'p9' }],
+    })
+    const { results } = await removeLocalItems('/repo', shell, [removalItem('open', OPEN)])
+    expect(results[0]).toMatchObject({ ok: false, reason: 'open session' })
+  })
+
+  it('does not treat a sibling folder with the same prefix as the same worktree', async () => {
+    const { shell } = recordingShell({ sessions: [{ cwd: `${OPEN}-other` }] })
+    const { results } = await removeLocalItems('/repo', shell, [removalItem(null, OPEN)])
+    expect(results[0]).toMatchObject({ ok: true })
+  })
+})
+
+describe('removeLocalItems — the branch fails after the worktree went', () => {
+  it('reports the failure but still removes the project card of the deleted folder', async () => {
+    const { shell, deleted } = recordingShell({
+      projects: FIX_PROJECT,
+      failOn: (args) => (args[0] === 'branch' ? 'error: not fully merged' : null),
+    })
+    const { results } = await removeLocalItems('/repo', shell, [
+      removalItem('fix', '/repo/.worktrees/fix'),
+    ])
+    expect(results[0]).toMatchObject({ ok: false, reason: 'error: not fully merged' })
+    expect(deleted).toEqual(['p1'])
   })
 })

@@ -223,7 +223,7 @@ function registerChannels(api: ExtensionAPI, roots: ChannelRoots): void {
     disposables.push(api.ipc.registerHandler(gated, remoteAccessFor(spec.channel)))
   }
   registerGitExtensionHandlers(registerFn, gitSettings(api))
-  registerWorktreesHandlers(registerFn, api.workspace)
+  registerWorktreesHandlers(registerFn, api)
   registerFn(pendingRequestChannel())
   registerGithub(api, registerFn, roots)
   // Read-only review agent: headless `claude -p` in a detached PR-head worktree.

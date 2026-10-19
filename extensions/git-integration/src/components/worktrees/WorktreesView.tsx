@@ -167,7 +167,6 @@ function toRemoveItem(row: ViewRow): RemoveItem {
   return {
     branch: row.branch,
     worktreePath: row.worktreePath,
-    forceWorktree: false,
     forceBranch: !row.merged,
   }
 }
@@ -226,7 +225,9 @@ function failuresByRow(results: RemoveResult[]): Map<string, string> {
 }
 
 function RemoveDialog(props: RemoveDialogProps): JSX.Element {
+  const [removing, setRemoving] = useState(false)
   const confirm = async (): Promise<void> => {
+    setRemoving(true)
     const answer = await gitAPI.removeLocal(props.repoRoot, props.rows.map(toRemoveItem))
     props.onDone(answer.results ?? [])
   }
@@ -236,7 +237,12 @@ function RemoveDialog(props: RemoveDialogProps): JSX.Element {
       onDismiss={props.onCancel}
       actions={[
         { label: 'Cancel', onSelect: props.onCancel },
-        { label: `Remove ${props.rows.length}`, tone: 'danger', onSelect: confirm },
+        {
+          label: `Remove ${props.rows.length}`,
+          tone: 'danger',
+          onSelect: confirm,
+          disabled: removing,
+        },
       ]}
     >
       <p>This deletes the folders and local branches. Remote branches stay.</p>
