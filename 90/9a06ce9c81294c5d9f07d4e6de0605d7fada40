@@ -1,0 +1,73 @@
+src/renderer/terminal/start-session.ts
+  s_3ced19ecaa16dd::t_8fdd2086ad47b1 20,22-25,28,41,44,47
+packages/extension-ui/src/extension-ui.css
+  s_3ced19ecaa16dd::t_a4910adaaa600b 28,36-40
+  s_3ced19ecaa16dd::t_1649c0068c9894 41-44
+src/renderer/quick-actions/core-actions.ts
+  s_3ced19ecaa16dd::t_b473d58f192afd 52,260-267
+src/renderer/components/home/start-work-model.ts
+  s_3ced19ecaa16dd::t_dc66c5e0185628 33,40
+  s_3ced19ecaa16dd::t_c7b0da78c24d97 1-32,34-39,41-71,79-81,84-87,91-92,94-97,100,107-119
+  s_3ced19ecaa16dd::t_9ae8c24fe275ef 72-78,82-83,88-90,93,98-99,101-106
+src/renderer/hooks/useKeyboardShortcuts.ts
+  s_3ced19ecaa16dd::t_b473d58f192afd 7,96-100
+  s_3ced19ecaa16dd::t_ce39fd271a0332 101
+tests/unit/renderer/quick-actions/core-actions.spec.ts
+  s_3ced19ecaa16dd::t_b473d58f192afd 46,226
+src/renderer/shell/ShellOverlays.tsx
+  s_3ced19ecaa16dd::t_b473d58f192afd 9,61
+tests/unit/packages/extension-ui/modal-shell.spec.tsx
+  s_3ced19ecaa16dd::t_a4910adaaa600b 179-191
+tests/support/quick-actions.ts
+  s_3ced19ecaa16dd::t_b473d58f192afd 49-52
+  s_3ced19ecaa16dd::t_a6e9c24af858df 48
+tests/unit/main/ipc/extension.ipc.spec.ts
+  s_3ced19ecaa16dd::t_97e998d714b216 56-68
+src/main/ipc/extension.ipc.ts
+  s_3ced19ecaa16dd::t_a4910adaaa600b 175-176
+src/renderer/components/home/StartWork.tsx
+  s_3ced19ecaa16dd::t_a4910adaaa600b 153
+  s_3ced19ecaa16dd::t_dc66c5e0185628 17,42-43,51-61,63-64,66-111,118,123,128-131,200,261-262,265,369-370
+  s_3ced19ecaa16dd::t_3a6020f8c91163 26,263-264,268-269,274-290
+  s_3ced19ecaa16dd::t_07b0629e7dec4c 1-16,18-24,27-41,44-50,62,65,112-117,119-122,124-127,132-152,154-199,201-243,245-246,248-249,258-260,266-267,291-368,371-434
+  s_3ced19ecaa16dd::t_bebd03ed7cafd4 25,247,250-253,256-257,270-273
+  s_3ced19ecaa16dd::t_fccb147679ebfb 244,254-255
+tests/unit/renderer/components/StartWork.spec.tsx
+  s_3ced19ecaa16dd::t_a4910adaaa600b 285-294
+  s_3ced19ecaa16dd::t_cfa384fc5f85ba 358-361
+  s_3ced19ecaa16dd::t_4fc95730bb441c 51-57,73-77,79-83,85-89,106,138
+  s_3ced19ecaa16dd::t_183e2a0a3094ec 366
+  s_3ced19ecaa16dd::t_17fe6c0530d348 1-50,59-71,96-105,107-137,139-146,148-177,179,181-242,244,246-284,295-339,341,343-357,362-365,367-371
+  s_3ced19ecaa16dd::t_bebd03ed7cafd4 147,178,180,243,245,340,342
+  s_3ced19ecaa16dd::t_74ab5d069ba486 58,72,78,84,90-95
+src/renderer/quick-actions/use-core-quick-actions.ts
+  s_3ced19ecaa16dd::t_b473d58f192afd 13,228
+packages/extension-ui/src/ModalShell.tsx
+  s_3ced19ecaa16dd::t_a4910adaaa600b 14-16,28-31
+src/shared/electron-api/manifest.ts
+  s_3ced19ecaa16dd::t_a4910adaaa600b 693-694
+src/renderer/components/home/start-work.ts
+  s_3ced19ecaa16dd::t_b17563b78c72ce 1-3,5-14,24-118,125-147,149-154,156-172,175-176,186-189,193-199,201,208-211,213-221
+  s_3ced19ecaa16dd::t_cfa384fc5f85ba 4,15-23,119-124,148,155,173-174,200,202-207
+  s_3ced19ecaa16dd::t_a4910adaaa600b 177-185,190-192,212
+src/renderer/components/home/StartWork.css
+  s_3ced19ecaa16dd::t_a37cea864a2eb3 1-235
+tests/unit/renderer/quick-actions/shortcut-conflict-guard.spec.tsx
+  s_3ced19ecaa16dd::t_40707612c0a722 69
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "909a06ce9c81294c5d9f07d4e6de0605d7fada40",
+  "prompts": {},
+  "sessions": {
+    "s_3ced19ecaa16dd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "958bebf4-85fd-422a-9a09-b64994561aeb",
+        "model": "unknown"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
