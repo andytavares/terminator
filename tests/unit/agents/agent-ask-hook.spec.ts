@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { makeTempDir } from '../../support/temp-dir'
@@ -114,5 +114,37 @@ describe('installing the ask hooks', () => {
     expect(hooks.Stop).toHaveLength(2)
     expect(JSON.stringify(hooks.Stop)).toContain('mine.sh')
     expect(hooks.Notification[0].hooks[0].command).toContain('agent-ask-hook.cjs')
+  })
+})
+
+describe('the installed hook command, run through a shell', () => {
+  // A stand-in for Electron that records it was started.
+  async function installedCommand(): Promise<{ command: string; started: string }> {
+    const started = path.join(userData, 'electron-started')
+    const stub = path.join(userData, 'stub-electron.sh')
+    fs.writeFileSync(stub, `#!/bin/sh\ntouch ${started}\n`, { mode: 0o755 })
+    const mod = await load()
+    const scriptPath = await mod.installAskScript(userData)
+    await mod.installAskHooks({ execPath: stub, scriptPath })
+    const settings = path.join(home, '.claude', 'settings.json')
+    const hooks = JSON.parse(fs.readFileSync(settings, 'utf8')).hooks
+    return { command: hooks.Stop[0].hooks[0].command, started }
+  }
+
+  const shell = (command: string, env: Record<string, string>) =>
+    spawnSync('/bin/sh', ['-c', command], { env: { PATH: process.env.PATH ?? '', ...env } })
+
+  it('starts nothing outside Terminator, and still exits 0', async () => {
+    const { command, started } = await installedCommand()
+    const result = shell(command, {})
+    expect(result.status).toBe(0)
+    expect(fs.existsSync(started)).toBe(false)
+  })
+
+  it('starts the script inside a Terminator terminal', async () => {
+    const { command, started } = await installedCommand()
+    const result = shell(command, { TERMINATOR_SESSION_ID: 's1' })
+    expect(result.status).toBe(0)
+    expect(fs.existsSync(started)).toBe(true)
   })
 })

@@ -110,3 +110,44 @@ describe('the attention log — unreadable file', () => {
     expect(log.listIntervals()).toEqual([])
   })
 })
+
+describe('the attention log — a record while the file is being read', () => {
+  const storedWorking = {
+    sessionId: 'old',
+    projectId: null,
+    branch: null,
+    workKey: null,
+    state: 'working',
+    start: new Date(Date.now() - 3_600_000).toISOString(),
+    end: new Date(Date.now() - 1_800_000).toISOString(),
+    next: 'idle',
+  }
+
+  it('keeps the record and the stored history, on disk too', async () => {
+    fs.writeFileSync(
+      file(),
+      JSON.stringify({ savedAt: new Date().toISOString(), intervals: [storedWorking] })
+    )
+    const log = await load()
+    const loading = log.loadAttentionLog()
+    const recording = log.recordState(report('working', new Date().toISOString(), 'fresh'))
+    await Promise.all([loading, recording])
+    expect(log.listIntervals().map((i) => i.sessionId)).toEqual(['old', 'fresh'])
+    const saved = JSON.parse(fs.readFileSync(file(), 'utf8'))
+    expect(saved.intervals.map((i: { sessionId: string }) => i.sessionId)).toEqual(['old', 'fresh'])
+  })
+})
+
+describe('the attention log — quick successive writes', () => {
+  it('ends with the latest state on disk', async () => {
+    const log = await load()
+    const at = (minute: number) => `2026-10-18T09:0${minute}:00.000Z`
+    await Promise.all([
+      log.recordState(report('working', at(0))),
+      log.recordState(report('awaiting-input', at(1))),
+      log.recordState(report('idle', at(2))),
+    ])
+    const saved = JSON.parse(fs.readFileSync(file(), 'utf8'))
+    expect(saved.intervals.map((i: { next: string }) => i.next)).toEqual(['awaiting-input', 'idle'])
+  })
+})

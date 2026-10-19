@@ -1,3 +1,4 @@
+import { clearAsk } from '../agents/ask-watcher.js'
 import type { PtyManager } from './pty-manager.js'
 import { OutputBatcher } from './output-batcher.js'
 import { FlowControl } from './flow-control.js'
@@ -29,6 +30,7 @@ export class OutputRelay {
     this.ptyManager.onExit(sessionId, (exitCode) => {
       batcher.flush()
       this.flows.delete(sessionId)
+      clearAsk(sessionId)
       this.send('terminal:process-exit', { sessionId, exitCode })
     })
   }

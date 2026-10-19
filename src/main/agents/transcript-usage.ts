@@ -141,8 +141,7 @@ function snapshot(state: ParseState): TranscriptUsage {
   return { ...result, byModel: structuredClone(result.byModel) }
 }
 
-/** Token usage by model plus the opening prompt and latest assistant words of a transcript. */
-export async function readTranscriptUsage(file: string): Promise<TranscriptUsage> {
+async function readFromCache(file: string): Promise<TranscriptUsage> {
   const { mtimeMs, size } = await fs.promises.stat(file)
   const cached = cache.get(file)
   if (cached && cached.mtimeMs === mtimeMs && cached.size === size) return cached.result
@@ -159,4 +158,18 @@ export async function readTranscriptUsage(file: string): Promise<TranscriptUsage
   const result = snapshot(state)
   cache.set(file, { mtimeMs, size, offset, state, result })
   return result
+}
+
+/** The last read queued for each file: a read starts only once the one before it has stored its state. */
+const queued = new Map<string, Promise<unknown>>()
+
+/** Token usage by model plus the opening prompt and latest assistant words of a transcript. */
+export function readTranscriptUsage(file: string): Promise<TranscriptUsage> {
+  const read = (queued.get(file) ?? Promise.resolve()).then(() => readFromCache(file))
+  const settled = read.catch(() => undefined)
+  queued.set(file, settled)
+  void settled.then(() => {
+    if (queued.get(file) === settled) queued.delete(file)
+  })
+  return read
 }

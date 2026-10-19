@@ -21,6 +21,10 @@ export interface StateReport {
 }
 
 let intervals: AttentionInterval[] = []
+/** Records wait on this, so none lands before the stored history is in and none is lost to the read. */
+let loading: Promise<void> = Promise.resolve()
+/** Writes run one at a time; each writes the state as it is when its turn comes. */
+let writing: Promise<unknown> = Promise.resolve()
 
 function attentionLogPath(): string {
   return path.join(app.getPath('userData'), FILE_NAME)
@@ -39,7 +43,12 @@ function isInterval(value: unknown): value is AttentionInterval {
 }
 
 /** Read what was stored, closing what the last run left open. Safe to call again. */
-export async function loadAttentionLog(): Promise<void> {
+export function loadAttentionLog(): Promise<void> {
+  loading = readStoredIntervals()
+  return loading
+}
+
+async function readStoredIntervals(): Promise<void> {
   intervals = []
   try {
     const parsed = JSON.parse(await fs.readFile(attentionLogPath(), 'utf8')) as {
@@ -62,9 +71,15 @@ function closeAtShutdown(interval: AttentionInterval, savedAt: string | null): A
   return { ...interval, end: savedAt ?? interval.start, next: 'exited' }
 }
 
-async function persist(): Promise<void> {
+async function writeCurrent(): Promise<void> {
   intervals = pruneIntervals(intervals, Date.now())
   await writeJsonAtomic(attentionLogPath(), { savedAt: new Date().toISOString(), intervals })
+}
+
+function persist(): Promise<void> {
+  const written = writing.then(writeCurrent)
+  writing = written.catch(() => undefined)
+  return written
 }
 
 function openIntervalOf(sessionId: string): AttentionInterval | undefined {
@@ -82,6 +97,7 @@ function closeOpen(report: StateReport): void {
 /** Folds one transition in: the previous interval ends, and working or waiting begins a new one.
  * Repeating the state the session is already in changes nothing. */
 export async function recordState(report: StateReport): Promise<void> {
+  await loading
   const open = openIntervalOf(report.sessionId)
   if (open?.state === report.state) return
   closeOpen(report)

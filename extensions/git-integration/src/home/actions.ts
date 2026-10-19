@@ -1,4 +1,5 @@
 import type { ExtensionAPI } from '@terminator/extension-sdk'
+import { shellQuote } from '@terminator/extension-sdk/node'
 import type { DashboardPR } from '../schemas/pr-review.schema.js'
 import { canonical } from '../ipc/repo-root.js'
 import { openPrReviewWindow } from '../review-command.js'
@@ -20,8 +21,6 @@ export function worktreeOfBranch(porcelain: string, branch: string): string | un
     .find((entry) => entry.split('\n').includes(`branch refs/heads/${branch}`))
   return block?.split('\n')[0].replace(/^worktree /, '')
 }
-
-const singleQuoted = (text: string) => `'${text.replaceAll("'", `'\\''`)}'`
 
 function openReviewWindowFor(api: ExtensionAPI, pr: DashboardPR): void {
   const { repoRoot, number } = reviewTarget(pr)
@@ -64,7 +63,7 @@ async function startAgentIn(api: ExtensionAPI, { folder, tabTitle, message }: Ag
     tabTitle,
     type: 'agent',
   })
-  if (sessionId) api.pty.write(sessionId, `claude ${singleQuoted(message)}\r`)
+  if (sessionId) api.pty.write(sessionId, `claude ${shellQuote(message)}\r`)
 }
 
 async function sendToAgent({ api }: ActionDeps, pr: DashboardPR): Promise<void> {

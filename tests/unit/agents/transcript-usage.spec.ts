@@ -21,7 +21,7 @@ function copyFixture(): string {
   return target
 }
 
-function assistantLine(id: string, text: string, output: number): string {
+function assistantLine(id: string | undefined, text: string, output: number): string {
   return (
     JSON.stringify({
       type: 'assistant',
@@ -81,6 +81,16 @@ it('reads only the appended tail when the file grew, without double counting', a
   expect(after.byModel['claude-sonnet-5'].output).toBe(40)
   expect(after.byModel['claude-haiku-5-5']).toEqual(before.byModel['claude-haiku-5-5'])
   expect(after.lastAssistantTexts.at(-1)).toBe('More work.')
+})
+
+it('gives overlapping reads of a grown file the totals of one read', async () => {
+  const file = copyFixture()
+  await readTranscriptUsage(file)
+  fs.appendFileSync(file, assistantLine(undefined, 'No id on this one.', 40))
+  const [first, second] = await Promise.all([readTranscriptUsage(file), readTranscriptUsage(file)])
+  expect(first.byModel['claude-sonnet-5'].output).toBe(40)
+  expect(second.byModel['claude-sonnet-5'].output).toBe(40)
+  expect(second.lastAssistantTexts.filter((t) => t === 'No id on this one.')).toHaveLength(1)
 })
 
 it('does not read an unchanged file again', async () => {

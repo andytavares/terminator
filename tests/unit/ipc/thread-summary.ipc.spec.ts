@@ -56,6 +56,13 @@ describe('thread summary input', () => {
     })
     expect(parsed.sessions[0].sessionId).toBe('s1')
   })
+
+  it('refuses more than twenty sessions', () => {
+    const session = { state: 'idle', lastAssistantTexts: [], firstUserPrompt: null }
+    const sessionsOf = (count: number) => ({ title: 't', sessions: Array(count).fill(session) })
+    expect(ThreadSummaryInputSchema.safeParse(sessionsOf(20)).success).toBe(true)
+    expect(ThreadSummaryInputSchema.safeParse(sessionsOf(21)).success).toBe(false)
+  })
 })
 
 describe('home:thread-summary', () => {

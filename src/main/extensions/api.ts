@@ -678,13 +678,18 @@ function notificationsApi({ extensionId, disposable }: ApiContext): ExtensionAPI
 }
 
 function homeApi({ extensionId, disposable }: ApiContext): ExtensionAPI['home'] {
-  // Unloading the extension takes its items off Home.
-  disposable(() => clearFeed(extensionId))
+  let unloaded = false
+  // Unloading the extension takes its items off Home and ignores what it sends after.
+  disposable(() => {
+    unloaded = true
+    clearFeed(extensionId)
+  })
   return {
     publish(feed): void {
-      publishFeed(extensionId, feed)
+      if (!unloaded) publishFeed(extensionId, feed)
     },
     onAction(handler): Disposable {
+      if (unloaded) return { dispose() {} }
       return disposable(setActionHandler(extensionId, handler))
     },
   }

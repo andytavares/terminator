@@ -73,8 +73,9 @@ function askCommand(options: CaptureHookOptions): string {
     shellQuote(options.scriptPath),
     shellQuote(reportDirectory()),
   ].join(' ')
-  // Guarded by the script's existence: this entry outlives any install of the application.
-  return `test -f ${shellQuote(options.scriptPath)} && ${run} || true`
+  // Claude settings are global: skip outside a Terminator terminal, and when the script is gone
+  // (this entry outlives any install of the application). Always exits 0.
+  return `[ -n "$TERMINATOR_SESSION_ID" ] && test -f ${shellQuote(options.scriptPath)} && ${run} || true`
 }
 
 /** Registers the Notification and Stop entries in the operator's Claude settings, ours alone. */

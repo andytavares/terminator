@@ -23,4 +23,4 @@ Extensions publish typed data and core renders it. `api.home.publish(feed)` repl
 - Home can rank and count across extensions, because the data is in one place.
 - Extensions lose control of Home's look; they choose only the data and its action labels.
 - An action reaches only the extension that published the item; an extension with no handler registered answers an error to the click.
-- ADR 116 home sections move to an Insights section later in this branch; until then both mechanisms coexist.
+- ADR 116 home sections became Insights sections: `contributes.homeSection` is now `contributes.insightsSection`, drawn on Home's Insights view.

@@ -12,15 +12,17 @@ const PlainText = z.string().max(2000)
 export const ThreadSummaryInputSchema = z.object({
   title: PlainText,
   ticketKey: z.string().max(100).optional(),
-  sessions: z.array(
-    z.object({
-      /** Lets main read the session's transcript for what the renderer cannot. */
-      sessionId: z.string().max(200).optional(),
-      state: z.string().max(100),
-      lastAssistantTexts: z.array(PlainText).max(5),
-      firstUserPrompt: PlainText.nullable(),
-    })
-  ),
+  sessions: z
+    .array(
+      z.object({
+        /** Lets main read the session's transcript for what the renderer cannot. */
+        sessionId: z.string().max(200).optional(),
+        state: z.string().max(100),
+        lastAssistantTexts: z.array(PlainText).max(5),
+        firstUserPrompt: PlainText.nullable(),
+      })
+    )
+    .max(20),
   pullRequest: z
     .object({ number: z.number().int(), isDraft: z.boolean(), checksLine: PlainText })
     .optional(),
