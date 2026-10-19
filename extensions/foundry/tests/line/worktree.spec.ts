@@ -3,6 +3,7 @@ import * as path from 'node:path'
 import * as fs from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import {
+  reattachCheckout,
   ensureCheckout,
   ensureCheckouts,
   ensureBaseCheckout,
@@ -122,6 +123,8 @@ describe('preparing a checkout', () => {
   describe('retrying', worktreeRetryingTests)
   describe('real git', realGitTests)
   describe('real git, other starts', realGitResetTests)
+  describe('real git, two orders in one repository', realGitTwoOrdersTests)
+  describe('real git, re-attaching only', realGitReattachTests)
 })
 
 function twoLanes(): WorkOrder {
@@ -276,6 +279,50 @@ function realGitTests() {
     expect(fs.statSync(target).isDirectory()).toBe(true)
     expect(git(target, 'rev-parse', 'HEAD')).toBe(extra)
     expect(git(target, 'rev-parse', `refs/heads/${first.branch}`)).toBe(extra)
+  })
+}
+
+/** A second order on the same repository as `first`, on a branch of its own. */
+function secondOrder(first: WorkOrder): WorkOrder {
+  return { ...first, id: 'WO-0002-abc', source: { ...first.source, branch: 'lane-two' } }
+}
+
+/** Checks out `o`'s lane 1, commits on it, deletes its folder; the commit it made. */
+async function workThenDelete(o: WorkOrder, real: CheckoutDeps): Promise<string> {
+  const checkout = await ensureCheckout(o, 1, real)
+  const extra = commitOn(checkout.path, `work on ${o.id}`)
+  fs.rmSync(checkout.path, { recursive: true, force: true })
+  return extra
+}
+
+function realGitTwoOrdersTests() {
+  it('recreating one deleted lane leaves the other order its commits', async () => {
+    const { deps: real, order: first } = realRepo()
+    const second = secondOrder(first)
+    await workThenDelete(first, real)
+    const secondWork = await workThenDelete(second, real)
+
+    await ensureCheckout(first, 1, real)
+    const again = await ensureCheckout(second, 1, real)
+
+    expect(git(again.path, 'rev-parse', 'HEAD')).toBe(secondWork)
+  })
+}
+
+function realGitReattachTests() {
+  it('re-attaches a branch git no longer lists a worktree for, commits kept', async () => {
+    const { deps: real, repoPath, order: o } = realRepo()
+    const extra = await workThenDelete(o, real)
+    git(repoPath, 'worktree', 'prune')
+
+    const checkout = await reattachCheckout(o, 1, real)
+
+    expect(git(checkout.path, 'rev-parse', 'HEAD')).toBe(extra)
+  })
+
+  it('refuses rather than cut a new branch when the lane branch is gone', async () => {
+    const { deps: real, order: o } = realRepo()
+    await expect(reattachCheckout(o, 1, real)).rejects.toThrow(/no longer exists/)
   })
 }
 

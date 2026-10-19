@@ -3,7 +3,7 @@ import type { ExtensionAPI } from '@terminator/extension-sdk'
 import { createLiveGateStore } from '../gates/store.js'
 import { raiseGate } from '../gates/rules.js'
 import { readPulls } from './integrate.js'
-import { branchFor, ensureCheckout } from './worktree.js'
+import { branchFor, reattachCheckout } from './worktree.js'
 import { readRefineryState, writeRefineryState } from './refinery-state.js'
 import { refineryTick } from './refinery-tick.js'
 import type { RefineryTickDeps } from './refinery-tick.js'
@@ -140,7 +140,7 @@ async function lanesOf(
   const deps = { exec: shellExecOf(api), root }
   return Promise.all(
     order.context.repos.map(async (repo) => ({
-      cwd: (await ensureCheckout(order, repo.lane, deps)).path,
+      cwd: (await reattachCheckout(order, repo.lane, deps)).path,
       branch: branchFor(order, repo.lane),
       base: repo.baseBranch,
     }))
