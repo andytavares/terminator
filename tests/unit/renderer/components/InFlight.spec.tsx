@@ -474,6 +474,17 @@ describe('the row menu — Remove worktree', () => {
   })
 })
 
+describe('the row menu — Remove worktree with open terminals', () => {
+  it('says the removal also closes the terminals open in the worktree', async () => {
+    useWorkspaceStore.setState({ deleteProject: vi.fn() })
+    render(<InFlight />)
+    rightClickRow('PR overview shows status before story')
+    fireEvent.click(openMenuItem('Remove worktree…'))
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText(/This also closes \d+ open terminals?\./)).toBeTruthy()
+  })
+})
+
 describe('the row grid', () => {
   it('starts every cell on the row’s first line', () => {
     const css = readFileSync(

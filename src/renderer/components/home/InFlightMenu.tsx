@@ -110,6 +110,15 @@ interface MenuDialogsProps {
 }
 
 /** The link dialog and the worktree-removal confirmation, each open on its own state. */
+/** What removing the worktree does; says so when terminals are still open in it. */
+function removalDescription(thread: WorkThread): string {
+  const open = thread.sessions.filter((s) => !s.isClosed).length
+  const base = 'Deletes the folder from disk and the branch card. The branch stays in git.'
+  return open === 0
+    ? base
+    : `${base}\nThis also closes ${open} open ${open === 1 ? 'terminal' : 'terminals'}.`
+}
+
 function MenuDialogs({
   thread,
   linking,
@@ -123,7 +132,7 @@ function MenuDialogs({
     return (
       <ConfirmDialog
         title={`Remove worktree for "${thread.title}"?`}
-        description="Deletes the folder from disk and the branch card. The branch stays in git."
+        description={removalDescription(thread)}
         confirmLabel="Remove"
         danger
         onConfirm={() => void useWorkspaceStore.getState().deleteProject(lead.projectId ?? '')}
