@@ -1,0 +1,50 @@
+extensions/foundry/src/home/publish.ts
+  s_3ced19ecaa16dd::t_23874bb6e0a077 41-58,70,101
+  s_3ced19ecaa16dd::t_713295c74d82ae 60-64,68-69,71-74,77,84-100,102
+extensions/foundry/tests/home/publish-single-flight.spec.ts
+  s_3ced19ecaa16dd::t_23874bb6e0a077 1-9,11-62,64-79
+  s_3ced19ecaa16dd::t_db5a0beb5e6623 10
+  s_3ced19ecaa16dd::t_2c44550b73c070 63
+extensions/foundry/tests/ipc/forge-defect-answer-ipc.spec.ts
+  s_3ced19ecaa16dd::t_23874bb6e0a077 23,47-49,187,201,208,210,228,233
+extensions/foundry/tests/forge/forge-loop-release.spec.ts
+  s_3ced19ecaa16dd::t_23874bb6e0a077 22,164,191,214
+extensions/foundry/tests/helpers/forge-turns.ts
+  s_3ced19ecaa16dd::t_23874bb6e0a077 6,53
+extensions/foundry/tests/forge/forge-loop.spec.ts
+  s_3ced19ecaa16dd::t_64f438fff29653 12,177,212,223,265,288
+extensions/foundry/tests/home/publish.spec.ts
+  s_3ced19ecaa16dd::t_b0d966b4f10a63 1,75
+extensions/foundry/tests/ipc/final-check-send-back-ipc.spec.ts
+  s_3ced19ecaa16dd::t_7c92d88abf9396 19,78
+extensions/foundry/tests/ipc/forge-registration.spec.ts
+  s_3ced19ecaa16dd::t_956082a79359db 14,135,221
+extensions/foundry/tests/ipc/line-registration-ipc.spec.ts
+  s_3ced19ecaa16dd::t_2f218fe766af10 15,53
+extensions/foundry/tests/ipc/order-delete-intake-ipc.spec.ts
+  s_3ced19ecaa16dd::t_d3f9f164d59bc1 18,65
+extensions/foundry/tests/line/execute-run.spec.ts
+  s_3ced19ecaa16dd::t_1cec4c6312be01 24,67
+extensions/foundry/tests/line/run-tail-ends.spec.ts
+  s_3ced19ecaa16dd::t_c68920d3fddec4 16,71,129
+extensions/foundry/tests/runtime/supervision-console.spec.ts
+  s_3ced19ecaa16dd::t_153e4a18971682 11,42
+extensions/foundry/tests/runtime/supervision-unavailable.spec.ts
+  s_3ced19ecaa16dd::t_12c09416fcece7 12,66,74
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "480e7ff5528d36057f8bed736c76e5968d1bb92c",
+  "prompts": {},
+  "sessions": {
+    "s_3ced19ecaa16dd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "958bebf4-85fd-422a-9a09-b64994561aeb",
+        "model": "unknown"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
