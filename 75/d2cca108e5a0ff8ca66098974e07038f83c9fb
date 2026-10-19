@@ -1,0 +1,88 @@
+tests/unit/renderer/components/DeskModel.spec.tsx
+  s_3ced19ecaa16dd::t_52be7c6c033283 156
+src/renderer/components/home/thread-actions.ts
+  s_3ced19ecaa16dd::t_93b931bd0ffe05 7
+  s_3ced19ecaa16dd::t_b55d1148e6bdf9 9-11
+docs/user-guide/USER-GUIDE.md
+  s_3ced19ecaa16dd::t_98cea2386446a8 400-401,468
+  s_3ced19ecaa16dd::t_c93b01cd413854 522
+  s_3ced19ecaa16dd::t_c2e8a916d78e57 469
+tests/e2e/resume-session.spec.ts
+  s_3ced19ecaa16dd::t_233108e13808d7 226-232
+  s_3ced19ecaa16dd::t_def074064bbb86 1,12,14,20-21,209-221,233-247,249,258,260,262-271
+  s_3ced19ecaa16dd::t_1790292f038ff8 222-225
+tests/unit/renderer/components/HomeScreen.spec.tsx
+  s_3ced19ecaa16dd::t_b78d8d80a6be60 41,356-357
+  s_3ced19ecaa16dd::t_ae5a2976e5f5be 2
+  s_3ced19ecaa16dd::t_c7c46434e3b346 92
+src/renderer/components/home/ThreadDrawerSections.tsx
+  s_3ced19ecaa16dd::t_93b931bd0ffe05 12,71,82,95-104
+src/renderer/components/home/desk-groups.ts
+  s_3ced19ecaa16dd::t_ca913cce71763c 1,49
+src/renderer/components/home/use-desk-keys.ts
+  s_3ced19ecaa16dd::t_21915f8f9cf19f 46-51,58
+tests/e2e/tools/capture-session-home-screenshots.spec.ts
+  s_3ced19ecaa16dd::t_e9767442c9ab4c 10,12,62-71,74,76,80,103
+  s_3ced19ecaa16dd::t_22e7483567fded 3,34-40,86,98
+  s_3ced19ecaa16dd::t_46bb0748a21846 14-15,17-18,20,28-33,75,77-79,81,84-85,87-89,92-93,96,104,107-111
+  s_3ced19ecaa16dd::t_94db0659980833 105-106
+  s_3ced19ecaa16dd::t_cbb87f170d64e0 2,43-59,102
+  s_3ced19ecaa16dd::t_8790a50d7dcb6c 11,101
+src/renderer/components/home/HomeScreen.tsx
+  s_3ced19ecaa16dd::t_93b931bd0ffe05 15,35
+src/renderer/quick-actions/use-core-quick-actions.ts
+  s_3ced19ecaa16dd::t_93b931bd0ffe05 14-15,166-174,182
+src/renderer/components/home/desk-selection.ts
+  s_3ced19ecaa16dd::t_93b931bd0ffe05 2,4,14-15,21,30,35,56-66
+  s_3ced19ecaa16dd::t_68dbbbdbfc9e5f 67
+tests/unit/renderer/components/use-desk-keys.spec.tsx
+  s_3ced19ecaa16dd::t_21915f8f9cf19f 1-30
+src/renderer/home/work-threads.ts
+  s_3ced19ecaa16dd::t_ec40ea5b4d3ba1 75-76
+  s_3ced19ecaa16dd::t_93b931bd0ffe05 5,304-306
+  s_3ced19ecaa16dd::t_ca913cce71763c 27-28,73-74,77-78,85-86,95-96,114-115,128-139,143,227-234,236,242,279,312,330-331,333-335
+  s_3ced19ecaa16dd::t_b55d1148e6bdf9 307-311
+  s_3ced19ecaa16dd::t_2ad896c95b5852 313
+tests/unit/renderer/home/work-threads.spec.ts
+  s_3ced19ecaa16dd::t_a53a4fd6a53a25 13,104-137,141-152,281,313,315-335,337
+  s_3ced19ecaa16dd::t_27dcfedddc8c6c 253-259
+  s_3ced19ecaa16dd::t_9e60967e217838 314
+  s_3ced19ecaa16dd::t_ca913cce71763c 138-140
+  s_3ced19ecaa16dd::t_b55d1148e6bdf9 6,252,260-280,336
+  s_3ced19ecaa16dd::t_e95ce3e7c7c8a9 282
+tests/unit/renderer/components/GlobalSettings.spec.tsx
+  s_3ced19ecaa16dd::t_27dcfedddc8c6c 29
+tests/unit/renderer/components/TodayRail.spec.tsx
+  s_3ced19ecaa16dd::t_27dcfedddc8c6c 80-88,105-107
+tests/unit/renderer/quick-actions/use-core-quick-actions.spec.tsx
+  s_3ced19ecaa16dd::t_b55d1148e6bdf9 10-11,163-183,185
+  s_3ced19ecaa16dd::t_f31a6304c159c7 184,186-187
+tests/unit/renderer/home/fixtures.ts
+  s_3ced19ecaa16dd::t_27dcfedddc8c6c 1,4,6
+tests/unit/home/thread-summary.spec.ts
+  s_3ced19ecaa16dd::t_27dcfedddc8c6c 26,118
+  s_3ced19ecaa16dd::t_ae5a2976e5f5be 111,117
+extensions/foundry/tests/home/feed.spec.ts
+  s_3ced19ecaa16dd::t_0d6e7794923bf4 109-114
+  s_3ced19ecaa16dd::t_6edddc283755ab 115-117
+tests/e2e/session-home.spec.ts
+  s_3ced19ecaa16dd::t_74752c357e1288 11,13,111-130,144-145
+src/renderer/components/home/InFlightRow.tsx
+  s_3ced19ecaa16dd::t_93b931bd0ffe05 43
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "75d2cca108e5a0ff8ca66098974e07038f83c9fb",
+  "prompts": {},
+  "sessions": {
+    "s_3ced19ecaa16dd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "958bebf4-85fd-422a-9a09-b64994561aeb",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Andrew <andrew.tavaes87@gmail.com>"
+    }
+  }
+}
