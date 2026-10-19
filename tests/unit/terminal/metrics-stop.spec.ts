@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { chmodSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { chmodSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { queryProcessMetrics } from '../../../src/main/ipc/metrics.ipc'
 import { stopRunningCommands } from '../../../src/main/shell/command-runner'
 import { makeTempDir } from '../../support/temp-dir'
-import { isProcessAlive } from '../../support/processes'
+import { expectProcessGone, recordedPid } from '../../support/processes'
 
 // The metrics view samples its terminals with `ps` every two seconds, so one
 // can be running as the app quits; it ends with the app, with anything it
@@ -28,12 +28,11 @@ afterEach(() => {
 describe('queryProcessMetrics while the app quits', () => {
   it('has its ps stopped with whatever it started', async () => {
     const sampling = queryProcessMetrics([process.pid])
-    await expect.poll(() => existsSync(pidFile) && readFileSync(pidFile, 'utf8') !== '').toBe(true)
-    const grandchild = Number(readFileSync(pidFile, 'utf8'))
+    const grandchild = await recordedPid(pidFile)
 
     stopRunningCommands()
 
     expect(await sampling).toEqual([])
-    await expect.poll(() => isProcessAlive(grandchild)).toBe(false)
+    await expectProcessGone(grandchild)
   })
 })
